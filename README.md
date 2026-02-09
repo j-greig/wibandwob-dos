@@ -17,6 +17,11 @@ This is not software. This is a [symbient](https://wibandwob.com/2025/05/21/symb
 
 ![WibWob-DOS — multiple ASCII art windows, primers, animations and generative patterns running concurrently](screenshots/wibwobdos-UI-collage.png)
 
+<table><tr>
+<td><img src="screenshots/wibwobdos-UI-bg-color-changer.png" alt="Background colour themes"></td>
+<td><img src="screenshots/wibwobdos-UI-grimoire-monsters.jpg" alt="Monster grimoire gallery"></td>
+</tr></table>
+
 ---
 
 ## Source Code
