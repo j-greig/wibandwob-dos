@@ -1,0 +1,8 @@
+*.mp4
+*.mov
+*.avi
+.DS_Store
+Thumbs.db
+._*
+*.swp
+*~
