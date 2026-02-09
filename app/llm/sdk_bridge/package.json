@@ -1,0 +1,28 @@
+{
+  "name": "claude-sdk-bridge",
+  "version": "1.0.0",
+  "description": "Claude Code SDK bridge for C++ TUI applications",
+  "main": "claude_sdk_bridge.js",
+  "scripts": {
+    "start": "node claude_sdk_bridge.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.1.56",
+    "axios": "^1.6.0",
+    "dotenv": "^17.2.3",
+    "zod": "^3.24.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "claude",
+    "ai",
+    "tui",
+    "streaming",
+    "anthropic"
+  ],
+  "author": "WibWob TUI Team",
+  "license": "MIT"
+}

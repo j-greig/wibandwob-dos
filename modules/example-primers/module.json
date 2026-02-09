@@ -1,0 +1,9 @@
+{
+  "name": "example-primers",
+  "version": "1.0.0",
+  "description": "Demo ASCII art primers showing the primer format",
+  "type": "content",
+  "provides": {
+    "primers": "primers/*.txt"
+  }
+}

@@ -24,12 +24,6 @@ This is not software. This is a [symbient](https://wibandwob.com/2025/05/21/symb
 
 ---
 
-## Source Code
-
-The full source code lives in the Turbo Vision fork: **[j-greig/tvision](https://github.com/j-greig/tvision)** — specifically the `app/` directory and `tools/api_server/`.
-
----
-
 ## What Makes This Different
 
 Traditional AI tools operate *under* humans. WibWob-DOS gives the AI the same controls:
@@ -59,8 +53,8 @@ Verse Field (flow/swirl/weave) · Mycelium Field · Monster Portal · Monster Ve
 ### Unlimited Concurrent Windows
 Test patterns · gradients (horizontal, vertical, radial, diagonal) · text editors · text viewers · animation players · primer art · wallpapers. All resizable, movable, stackable.
 
-### 139 ASCII Art Primers
-Pre-composed ASCII art templates: monsters, isometric scenes, caves, consciousness fragments, Wib&Wob portraits. Batch-spawn with precise positioning via API.
+### ASCII Art Primers
+Pre-composed ASCII art templates loaded via the module system. Batch-spawn with precise positioning via API.
 
 ### REST API + MCP (20+ Endpoints)
 Full programmatic control: window CRUD, text injection, figlet rendering, batch layouts, primer spawning, pattern modes, screenshots, workspace persistence. Real-time WebSocket events. All endpoints auto-exposed as MCP tools.
@@ -76,11 +70,11 @@ File · Edit · View · Window · Tools · Help. Generative art launchers, layou
 ## Quick Start
 
 ```bash
-# Clone the source repo
-git clone https://github.com/j-greig/tvision.git
-cd tvision
+# Clone with submodules (Turbo Vision library)
+git clone --recursive https://github.com/j-greig/wibandwob-dos.git
+cd wibandwob-dos
 
-# Build from project root (not app/)
+# Build
 cmake . -B ./build -DCMAKE_BUILD_TYPE=Release
 cmake --build ./build
 
@@ -95,13 +89,11 @@ cmake --build ./build
 
 ```bash
 # Terminal 1: Start API server
-cd tools/api_server && python3 -m venv venv && source venv/bin/activate
-pip install -r requirements.txt
-cd ../.. && python -m tools.api_server.main --port=8089
+./start_api_server.sh
 
 # Terminal 2: Run WibWob-DOS
 ./build/app/test_pattern
-# Then: Tools → Wib&Wob Chat (F12)
+# Then: Tools > Wib&Wob Chat (F12)
 ```
 
 ### Programmatic Control
@@ -114,10 +106,38 @@ curl -X POST "http://127.0.0.1:8089/windows" \
 
 # Get desktop state
 curl "http://127.0.0.1:8089/state"
+```
 
-# Batch spawn ASCII art
-curl -X POST "http://127.0.0.1:8089/primers/batch" \
-  -d '{"primers": [{"primer_path": "primers/monster-angel-of-death.txt", "x": 5, "y": 2}]}'
+---
+
+## Modules
+
+WibWob-DOS uses a module system for content packs, prompts, and extensions.
+
+```
+modules/                  # Public modules (shipped with repo)
+  example-primers/        # Demo ASCII art primers
+modules-private/          # Private modules (gitignored)
+  wibwob-primers/         # Your primer collection
+  wibwob-prompts/         # Your personality prompts
+```
+
+- **Public modules** in `modules/` are tracked in git and ship with the repo
+- **Private modules** in `modules-private/` are gitignored — your primers, prompts, and art packs stay private
+- The app scans both directories at startup
+
+Each module has a `module.json` manifest. See [modules/README.md](modules/README.md) for the full spec.
+
+### Adding Primers
+
+Drop `.txt` files into a module's `primers/` directory:
+
+```
+modules-private/my-art/
+├── module.json
+└── primers/
+    ├── cool-monster.txt
+    └── landscape.txt
 ```
 
 ---
@@ -125,9 +145,9 @@ curl -X POST "http://127.0.0.1:8089/primers/batch" \
 ## Architecture
 
 ```
-Human ──→ Keyboard/Mouse ──→ ┌─────────────────────┐
+Human ──> Keyboard/Mouse ──> ┌─────────────────────┐
                               │   WibWob-DOS (C++)   │
-AI Agent ──→ MCP / REST ──→  │   Turbo Vision TUI   │
+AI Agent ──> MCP / REST ──>  │   Turbo Vision TUI   │
                               └──────────┬──────────┘
                                          │
                               Unix Socket IPC
@@ -140,7 +160,21 @@ AI Agent ──→ MCP / REST ──→  │   Turbo Vision TUI   │
 
 **Core stack**: C++14 / Turbo Vision / ncurses · Python / FastAPI / MCP · Claude Code SDK · Node.js bridge
 
-**MCP tools exposed**: `tui_create_window` · `tui_move_window` · `tui_close_window` · `tui_get_state` · `tui_send_text` · `tui_send_figlet` · `tui_cascade_windows` · `tui_tile_windows` + all REST endpoints
+### Repository Structure
+
+```
+wibandwob-dos/
+├── app/                    # C++ application source
+│   ├── llm/                # LLM provider integration
+│   └── paint/              # Paint sub-app
+├── vendor/
+│   └── tvision/            # Turbo Vision library (git submodule)
+├── tools/
+│   └── api_server/         # FastAPI + MCP server
+├── modules/                # Public modules
+│   └── example-primers/    # Demo primer pack
+└── modules-private/        # Private modules (gitignored)
+```
 
 ---
 
@@ -167,16 +201,6 @@ Read more: [Symbients, Not Software](https://wibandwob.com/2025/05/21/symbients-
 | Windows | Win32 Console API | Supported |
 
 Requires: C++14, CMake 3.5+, ncursesw. Full 24-bit RGB colour, Unicode throughout.
-
----
-
-## Documentation
-
-Full technical reference, API docs, and build details are in the source repo:
-
-- [CLAUDE.md](https://github.com/j-greig/tvision/blob/develop/CLAUDE.md) — Technical reference, API docs, build details
-- [tools/api_server/](https://github.com/j-greig/tvision/tree/develop/tools/api_server) — REST API server setup and endpoints
-- [app/wibandwob.prompt.md](https://github.com/j-greig/tvision/blob/develop/app/wibandwob.prompt.md) — Wib & Wob personality system
 
 ---
 

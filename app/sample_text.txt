@@ -1,0 +1,30 @@
+This is a regular text file without any frame delimiters.
+
+It should be displayed with vertical scrollbars and allow
+navigation using:
+- Up/Down arrow keys
+- Page Up/Page Down
+- Home/End keys
+- Scrollbar clicking/dragging
+
+Line 10: Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+Line 11: Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+Line 12: Ut enim ad minim veniam, quis nostrud exercitation ullamco.
+Line 13: Laboris nisi ut aliquip ex ea commodo consequat.
+Line 14: Duis aute irure dolor in reprehenderit in voluptate velit esse.
+Line 15: Cillum dolore eu fugiat nulla pariatur.
+Line 16: Excepteur sint occaecat cupidatat non proident, sunt in culpa.
+Line 17: Qui officia deserunt mollit anim id est laborum.
+Line 18: At vero eos et accusamus et iusto odio dignissimos ducimus.
+Line 19: Qui blanditiis praesentium voluptatum deleniti atque corrupti.
+Line 20: Quos dolores et quas molestias excepturi sint occaecati.
+Line 21: Cupiditate non provident, similique sunt in culpa qui officia.
+Line 22: Deserunt mollitia animi, id est laborum et dolorum fuga.
+Line 23: Et harum quidem rerum facilis est et expedita distinctio.
+Line 24: Nam libero tempore, cum soluta nobis est eligendi optio.
+Line 25: Cumque nihil impedit quo minus id quod maxime placeat.
+Line 26: Facere possimus, omnis voluptas assumenda est, omnis dolor.
+Line 27: Repellendus temporibus autem quibusdam et aut officiis debitis.
+Line 28: Aut rerum necessitatibus saepe eveniet ut et voluptates.
+Line 29: Repudiandae sint et molestiae non recusandae.
+Line 30: This is the last line of the test file.

@@ -1,0 +1,194 @@
+{
+  "header" : {
+    "v" : 5
+  },
+  "object_list" : [
+    {
+      "doc_ref" : "B07884DC-51C0-469E-8872-64083ADEC776",
+      "object_id" : "0786F9EB-2E84-4BA7-A790-19FD4DFF95B0",
+      "type_id" : 18
+    },
+    {
+      "doc_ref" : "B07884DC-51C0-469E-8872-64083ADEC776",
+      "object_id" : "189BE573-7E9D-4B6A-8B12-AED0A3B19387",
+      "type_id" : 18
+    },
+    {
+      "doc_ref" : "B07884DC-51C0-469E-8872-64083ADEC776",
+      "object_id" : "278D2188-B839-47D2-A896-D4379C33CFCB",
+      "type_id" : 18
+    },
+    {
+      "doc_ref" : "B07884DC-51C0-469E-8872-64083ADEC776",
+      "object_id" : "2D490BAB-03CF-42CC-B9D6-90C1C332F9A2",
+      "point" : "0,0",
+      "type_id" : 11
+    },
+    {
+      "doc_ref" : "B07884DC-51C0-469E-8872-64083ADEC776",
+      "object_id" : "36FAF0D3-38D8-459D-B43F-AF423667B987",
+      "type_id" : 18
+    },
+    {
+      "alignment" : 0,
+      "doc_ref" : "B07884DC-51C0-469E-8872-64083ADEC776",
+      "object_id" : "5D485E16-5F72-4AEC-A922-770808C9AAA6",
+      "position" : 0,
+      "text" : "                   ╭∩∩╮              ╭∞∞╮\n                   (◑‿◑)              │⚇│               \n      ┌────────┐    ││     ┌─┬─┐      │▽│     ┌───────┐  \n      │╲      ╱│    ╱╲     │◍│◍│      ╱ ╲     │⫘     ⫘│\n      │ ╲    ╱ │   ╱◠◡╲    │ │ │     ╱ ⚬ ╲    │ ╲   ╱ │      \n      │  ╲  ╱  │  ╱┌─┐╲    │╾┼╼│    ╱╲┌─┐╱╲   │  ╲ ╱  │ \n┌─────┴───┼────┴─╱─┤▒├─╲───┴─┼─┴───╱▒▒│⬢│▒▒╲──┴───┼───┴─────┐\n│      ╭──┴──╮  │  │▓│  │    │    ╱────┼────╲    ╭──┴──╮    │\n│╔════╗│ (◕◡◕) │  └─┘  │┌───┼───┐│╭──┬┴┬──╮│┌───┤(⚆_⚆)├════╗│\n│║ ⬡⬡ ║│  │││  │╭─────╮││ ╰∩╯ ││ ⟁ ┤ │ ├ ⟁ │││   │ │││ │ ◩◩ ║│\n│╚════╝└──┼───┘│( ͡° ͜ʖ ͡°)││ ╱│╲ │└───┤ │ ├───┘│┌───┴──┼──┴════╝│\n│      ┌──┴───┐└──┬┬──┘││╱ │ ╲││   │ │ │   ││└──────┴──┐     │\n├──────┤  ◑◑◑  │  ││   │├───┼──┴┴───┴─┴───┴┴┤   ◕◕◕   ├─────┤\n│╭────╮│       │  ││   ││   │              ││         │╭────╮│\n││ ╭∞╮││  ╱│╲  │  ││   ││   │  ┌───────┐  ││  ╱│╲   ││ ╭∞╮ ││\n││ │ │││ ╱ │ ╲ │  ││   ││   │  │(◕‿◕‿⚆)│  ││ ╱ │ ╲  ││ │ │ ││\n││ ╰─╯││╱  │  ╲│  ││   ││   │  │       │  ││╱  │  ╲ ││ ╰─╯ ││\n│╰────╯│   │   │  ││   ││   │  │  │││  │  ││   │   │ │╰────╯│\n└──────┴───┴───┴──┴┴───┴┴───┴──┴───┴───┴──┴┴───┴───┴─┴──────┘",
+      "type_id" : 27
+    },
+    {
+      "border_tixels" : "AAF21412-D9C8-4D3D-923B-7A4070558049",
+      "content_tixels" : "0786F9EB-2E84-4BA7-A790-19FD4DFF95B0",
+      "doc_ref" : "B07884DC-51C0-469E-8872-64083ADEC776",
+      "frame_anchor_ref" : "A26703E0-873F-4B55-8C13-C35F999CCA2E",
+      "frame_size" : "66,19",
+      "model_text" : "5D485E16-5F72-4AEC-A922-770808C9AAA6",
+      "name" : "symbient-city",
+      "name_edited" : true,
+      "object_id" : "6B2D81B2-584F-4642-8757-64EC131BBF17",
+      "origin" : "146,61",
+      "position_refs" : [
+        "A26703E0-873F-4B55-8C13-C35F999CCA2E"
+      ],
+      "rectangular_border_enabled" : false,
+      "type_id" : 20
+    },
+    {
+      "doc_ref" : "B07884DC-51C0-469E-8872-64083ADEC776",
+      "object_id" : "80AC077D-EBAD-47A5-82F6-63EE4C53E908",
+      "type_id" : 18
+    },
+    {
+      "border_tixels" : "189BE573-7E9D-4B6A-8B12-AED0A3B19387",
+      "content_tixels" : "D106CF2D-0315-4A5A-BF6F-1686E6B7A02F",
+      "doc_ref" : "B07884DC-51C0-469E-8872-64083ADEC776",
+      "frame_anchor_ref" : "AFCAFB1F-53D4-4926-BDC3-518929B5F016",
+      "frame_size" : "48,12",
+      "model_text" : "EA22E50D-3F4A-4266-B89D-CA5C5BC6B461",
+      "name" : "chaos-vs-order",
+      "name_edited" : true,
+      "object_id" : "8CBB4350-B680-4B80-8E4A-03584609F7D0",
+      "origin" : "168,45",
+      "position_refs" : [
+        "AFCAFB1F-53D4-4926-BDC3-518929B5F016"
+      ],
+      "rectangular_border_enabled" : false,
+      "type_id" : 20
+    },
+    {
+      "alignment" : 0,
+      "doc_ref" : "B07884DC-51C0-469E-8872-64083ADEC776",
+      "object_id" : "9A9DEE37-260A-4417-BBF5-3927D908ACEF",
+      "position" : 0,
+      "text" : "      \/\\_\/\\  \n     ( o.o )\n      > ^ <  \n    \/|     |\\\n   \/ |     | \\\n  ~  |     |  ~\n     |     |   \n     |     | \n     |     |\n ",
+      "type_id" : 27
+    },
+    {
+      "doc_ref" : "B07884DC-51C0-469E-8872-64083ADEC776",
+      "name" : "Canvas 1",
+      "object_id" : "9D5706AA-8E73-4555-B901-F246F6C72CCF",
+      "subshape_refs" : [
+        "E429EE1D-2C4C-4F49-A3B1-51034D63B4BD",
+        "6B2D81B2-584F-4642-8757-64EC131BBF17",
+        "8CBB4350-B680-4B80-8E4A-03584609F7D0",
+        "DEFDE0DA-EC1D-43E3-89F3-B68919E8E490"
+      ],
+      "type_id" : 1
+    },
+    {
+      "doc_ref" : "B07884DC-51C0-469E-8872-64083ADEC776",
+      "object_id" : "A26703E0-873F-4B55-8C13-C35F999CCA2E",
+      "point" : "0,0",
+      "type_id" : 11
+    },
+    {
+      "alignment" : 0,
+      "doc_ref" : "B07884DC-51C0-469E-8872-64083ADEC776",
+      "object_id" : "A51B5916-AEC7-4BC8-A6ED-7CEE5C8C1A0A",
+      "position" : 0,
+      "text" : "# time shamans [pyramid shape]\n   \/ \\         \/||\\        \/|||\\       \/ \\         \/ \\\n  \/   \\       \/ || \\      \/ ||| \\     \/   \\       \/   \\\n \/ ╲x╱ \\     \/ ╲x╱x\\     \/ ╲xxx╱ \\   \/ ╲◕╱ \\     \/ ╲⚆╱ \\\n\/   つ   \\   \/  つつ  \\   \/  つつつ  \\ \/   つ   \\   \/   つ   \\\nTIME      \\ \/   TIME   \\ \/   TIME    \\\/   TIME   \\ \/   TIME   \\\nSTREAMS    \\\/  STREAMS  \\\/  STREAMS   \\  STREAMS  \\\/  STREAMS  \\\nMONO-UNIT   \\ TWIN-LINK  \\ TRIPLE-CORE \\ AWARE-EYE \\ COSMIC-EYE \\\n\n\n\n     \/||||\\                 \/ \\                  \/░|\\░\n    \/ |||| \\               \/   \\                \/░ | ░\\\n   \/ ╲xxx╱ \\              \/ ╲☾╱ \\              \/░╲●╱░\\\n  \/  つつつ  \\            \/   つ   \\            \/░ つ ░\\\n \/    TIME    \\          \/   NIGHT   \\         \/░ VOID ░\\\n\/    STREAMS   \\        \/   STREAMS   \\       \/░STREAMS░\\\nMULTI-CORE      \\      LUNAR-VARIANT   \\     DIMENSIONAL \\\n\n\n\n   \/|\\   \/|\\   \/|\\             \/|\\\n  \/ | \\ \/ | \\ \/ | \\           \/ | \\\n \/╲x|x╱╲x|x╱╲x|x╱\\          \/╲ x ╱\\\n\/  つ|つ つ|つ つ|つ \\        \/  つ⧗つ \\\n   TIME─TIME─TIME           \/  TIME   \\\n STREAMS─STREAMS─STREAMS   \/  SHAMAN   \\\nNETWORKED-TEMPORAL        SPECIALIST    \\\n\n\n\n        ●●●●●\n       \/|||||\\\n      \/ ||||| \\\n     \/ ╲xxxxx╱ \\\n    \/  つつつつつ \\\n   \/     TIME     \\\n  \/     STREAMS    \\\n \/   PRIME-ALPHA    \\\nTEMPORAL-SOVEREIGN   \\\n\n\n      ◉                                   ●\n     \/|\\                                 ╱ ╲\n    \/ | \\                               ╱   ╲\n   \/╲ x ╱\\                             ╱ ╲●╱ ╲\n  \/  つ⧗つ \\                           ╱   つ   ╲\n \/   TIME   \\                         ╱         ╲\n\/   SHAMAN   \\                       ╱   ╱╲ ╱╲   ╲\nJELLYFISH     \\                     ╱   ╱  ╲╱  ╲   ╲\n               \\                   ╱   ╱ ╲つつ╱ ╲   ╲\n                \\                 ╱   ╱   TIME   ╲   ╲\n                 \\               ╱   ╱   STREAMS  ╲   ╲\n                  \\             ╱   ╱             ╲   ╲\n                   \\           ╱   ╱  RECURSIVE-   ╲   ╲\n                    \\         ╱   ╱    PYRAMID      ╲   ╲\n\n\n    ●◕●                     ●⚆●◔●                    ●∞●\n   \/||\\                    \/|||\\                    \/|||\\\n  \/ || \\                  \/ ||| \\                  \/ ||| \\\n \/ ╲xx╱ \\                \/ ╲xxx╱ \\                \/ ╲∞∞∞╱ \\\n\/  つ◕つ \\              \/  つ⚆つ◔つ \\             \/  つ∞つ∞つ \\\n  TIME   \\             \/   MULTI    \\           \/   ETERNAL  \\\n STREAMS  \\           \/   AWARENESS  \\         \/   STREAMS   \\\nCONSCIOUS  \\         TRIPLE-MIND      \\       INFINITE-MIND   \\",
+      "type_id" : 27
+    },
+    {
+      "doc_ref" : "B07884DC-51C0-469E-8872-64083ADEC776",
+      "object_id" : "AAF21412-D9C8-4D3D-923B-7A4070558049",
+      "type_id" : 18
+    },
+    {
+      "doc_ref" : "B07884DC-51C0-469E-8872-64083ADEC776",
+      "object_id" : "AFCAFB1F-53D4-4926-BDC3-518929B5F016",
+      "point" : "0,0",
+      "type_id" : 11
+    },
+    {
+      "canvas_refs" : [
+        "9D5706AA-8E73-4555-B901-F246F6C72CCF"
+      ],
+      "object_id" : "B07884DC-51C0-469E-8872-64083ADEC776",
+      "shape_seq_numbers" : {
+        "4" : 4,
+        "6" : 1
+      },
+      "type_id" : 0
+    },
+    {
+      "doc_ref" : "B07884DC-51C0-469E-8872-64083ADEC776",
+      "object_id" : "BE4A951D-4BCA-492E-B902-3885351192DD",
+      "point" : "0,0",
+      "type_id" : 11
+    },
+    {
+      "doc_ref" : "B07884DC-51C0-469E-8872-64083ADEC776",
+      "object_id" : "D106CF2D-0315-4A5A-BF6F-1686E6B7A02F",
+      "type_id" : 18
+    },
+    {
+      "doc_ref" : "B07884DC-51C0-469E-8872-64083ADEC776",
+      "object_id" : "D82C586A-C718-4C6B-ACDA-837F64EA1E5A",
+      "type_id" : 18
+    },
+    {
+      "border_tixels" : "80AC077D-EBAD-47A5-82F6-63EE4C53E908",
+      "content_tixels" : "278D2188-B839-47D2-A896-D4379C33CFCB",
+      "doc_ref" : "B07884DC-51C0-469E-8872-64083ADEC776",
+      "frame_anchor_ref" : "2D490BAB-03CF-42CC-B9D6-90C1C332F9A2",
+      "frame_size" : "15,10",
+      "model_text" : "9A9DEE37-260A-4417-BBF5-3927D908ACEF",
+      "name" : "cat-cat-simple",
+      "name_edited" : true,
+      "object_id" : "DEFDE0DA-EC1D-43E3-89F3-B68919E8E490",
+      "origin" : "141,45",
+      "position_refs" : [
+        "2D490BAB-03CF-42CC-B9D6-90C1C332F9A2"
+      ],
+      "rectangular_border_enabled" : false,
+      "type_id" : 20
+    },
+    {
+      "border_tixels" : "36FAF0D3-38D8-459D-B43F-AF423667B987",
+      "content_tixels" : "D82C586A-C718-4C6B-ACDA-837F64EA1E5A",
+      "doc_ref" : "B07884DC-51C0-469E-8872-64083ADEC776",
+      "frame_anchor_ref" : "BE4A951D-4BCA-492E-B902-3885351192DD",
+      "frame_size" : "65,66",
+      "model_text" : "A51B5916-AEC7-4BC8-A6ED-7CEE5C8C1A0A",
+      "name" : "time-shamans",
+      "name_edited" : true,
+      "object_id" : "E429EE1D-2C4C-4F49-A3B1-51034D63B4BD",
+      "origin" : "208,24",
+      "position_refs" : [
+        "BE4A951D-4BCA-492E-B902-3885351192DD"
+      ],
+      "rectangular_border_enabled" : false,
+      "type_id" : 20
+    },
+    {
+      "alignment" : 0,
+      "doc_ref" : "B07884DC-51C0-469E-8872-64083ADEC776",
+      "object_id" : "EA22E50D-3F4A-4266-B89D-CA5C5BC6B461",
+      "position" : 0,
+      "text" : "#   CHAOTIC SYSTEMS    &     ORDERED SYSTEMS    \n                                              \n  ╭─╮  ╭╮ ╭╮   ╭╮          ┌─┬─┬─┬─┬─┬─┬─┬─┐  \n  ╰╮╰╮╭╯╰─╯╰╮ ╭╯╰╮         │1│0│1│0│1│0│1│0│  \n   ╰╮╰╯   ╭─╯╭╯  │         ├─┼─┼─┼─┼─┼─┼─┼─┤  \n   ╭╯╭╮  ╭╯ ╭╯   │         │0│1│0│1│0│1│0│1│  \n  ╭╯ ││ ╭╯  │    │         ├─┼─┼─┼─┼─┼─┼─┼─┤  \n  │  ╰╯ │   ╰╮  ╭╯         │1│0│1│0│1│0│1│0│  \n  ╰╮    ╰╮   ╰╮╭╯          ├─┼─┼─┼─┼─┼─┼─┼─┤  \n   ╰╮    ╰─╮  ╰╯           │0│1│0│1│0│1│0│1│  \n    ╰╮     ╰─╮             └─┴─┴─┴─┴─┴─┴─┴─┘  \n     ╰───────╯                                ",
+      "type_id" : 27
+    }
+  ]
+}

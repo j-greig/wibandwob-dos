@@ -1,0 +1,16 @@
+
+    _   _      _ _        __        __         _     _ _
+   | | | | ___| | | ___   \ \      / /__  _ __| | __| | |
+   | |_| |/ _ \ | |/ _ \   \ \ /\ / / _ \| '__| |/ _` | |
+   |  _  |  __/ | | (_) |   \ V  V / (_) | |  | | (_| |_|
+   |_| |_|\___|_|_|\___/     \_/\_/ \___/|_|  |_|\__,_(_)
+
+              Welcome to WibWob-DOS
+
+    This is an example primer file. Primers are
+    pre-composed ASCII art or text that can be
+    loaded as windows in the TUI.
+
+    つ◕‿◕‿⚆༽つ  Wib says hello
+    つ⚆‿◕‿◕༽つ  Wob says hello
+

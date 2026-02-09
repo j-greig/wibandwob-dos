@@ -1,8 +1,39 @@
-*.mp4
-*.mov
-*.avi
+# Private modules (primers, prompts, art packs)
+modules-private/
+
+# Build
+build/
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+
+# Secrets / local config
+.mcp.json
+*.env
+
+# OS
 .DS_Store
 Thumbs.db
 ._*
+
+# Media
+*.mp4
+*.mov
+*.avi
+
+# Editor temp
 *.swp
 *~
+
+# Node
+node_modules/
+
+# Logs
+app/logs/
