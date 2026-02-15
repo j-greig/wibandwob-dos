@@ -1,0 +1,49 @@
+name: Story
+description: One vertical slice, usually one pull request.
+title: "S: "
+labels:
+  - story
+body:
+  - type: input
+    id: parent_feature
+    attributes:
+      label: Parent Feature
+      description: Link to feature issue.
+      placeholder: "#124"
+    validations:
+      required: true
+  - type: input
+    id: pull_request_scope
+    attributes:
+      label: Pull Request Scope
+      description: Short summary of this slice.
+      placeholder: Registry skeleton plus one capability-driven API path
+    validations:
+      required: true
+  - type: textarea
+    id: tasks
+    attributes:
+      label: Tasks
+      description: Implementation checklist for this story.
+      placeholder: |
+        - [ ] ...
+        - [ ] ...
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance Criteria
+      description: Include test command/procedure for each criterion.
+      placeholder: |
+        AC-1: ...
+        Test: ...
+    validations:
+      required: true
+  - type: textarea
+    id: rollback
+    attributes:
+      label: Rollback Plan
+      description: Exact rollback action if this slice regresses.
+    validations:
+      required: true

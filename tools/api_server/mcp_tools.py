@@ -8,6 +8,7 @@ tool interfaces.
 from typing import Optional, Dict, Any, List
 from .controller import Controller
 from .models import WindowType, Rect
+from .browser import BrowserSession, fetch_and_convert
 
 
 # Note: Controller instance will be passed from main.py
@@ -40,6 +41,68 @@ def serialize_window(window) -> Dict[str, Any]:
         "focused": window.focused,
         "props": dict(window.props)
     }
+
+_browser_session: Optional[BrowserSession] = None
+
+def get_browser_session() -> BrowserSession:
+    """Get or create the browser session singleton."""
+    global _browser_session
+    if _browser_session is None:
+        _browser_session = BrowserSession()
+    return _browser_session
+
+
+def register_browser_tools(mcp):
+    """Register browser control tools with the MCP server."""
+
+    @mcp.tool("browser_fetch")
+    async def browser_fetch(url: str) -> Dict[str, Any]:
+        """Fetch a URL and return readable content as markdown.
+
+        Fetches the web page, extracts the main article content using
+        readability, converts to markdown, and returns a RenderBundle
+        with title, markdown text, and extracted links.
+
+        Args:
+            url: The URL to fetch and convert to readable markdown.
+
+        Returns:
+            RenderBundle dict with url, title, markdown, links, meta.
+        """
+        session = get_browser_session()
+        try:
+            bundle = fetch_and_convert(url)
+            session.navigate(bundle)
+            return {"success": True, **bundle}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    @mcp.tool("browser_back")
+    async def browser_back() -> Dict[str, Any]:
+        """Navigate back in browser session history.
+
+        Returns:
+            Previous page's RenderBundle, or error if no history.
+        """
+        session = get_browser_session()
+        bundle = session.back()
+        if bundle is None:
+            return {"success": False, "error": "no previous page in history"}
+        return {"success": True, **bundle}
+
+    @mcp.tool("browser_forward")
+    async def browser_forward() -> Dict[str, Any]:
+        """Navigate forward in browser session history.
+
+        Returns:
+            Next page's RenderBundle, or error if at end of history.
+        """
+        session = get_browser_session()
+        bundle = session.forward()
+        if bundle is None:
+            return {"success": False, "error": "no next page in history"}
+        return {"success": True, **bundle}
+
 
 def register_tui_tools(mcp):
     """Register all TUI control tools with the MCP server"""

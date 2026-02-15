@@ -265,3 +265,31 @@ class PrimersListResponse(BaseModel):
     primers: List[PrimerInfo]
     count: int
 
+
+# ----- Browser Models -----
+
+class BrowserFetchRequest(BaseModel):
+    url: str
+
+
+class BrowserLink(BaseModel):
+    id: int
+    text: str
+    url: str
+
+
+class BrowserMeta(BaseModel):
+    fetched_at: str
+    cache: str
+    source_bytes: int
+
+
+class RenderBundle(BaseModel):
+    url: str
+    title: str
+    markdown: str
+    tui_text: str
+    links: List[BrowserLink]
+    assets: List[Any] = Field(default_factory=list)
+    meta: BrowserMeta
+

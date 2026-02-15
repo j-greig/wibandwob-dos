@@ -1,0 +1,49 @@
+name: Feature
+description: Capability under an epic.
+title: "F: "
+labels:
+  - feature
+body:
+  - type: input
+    id: parent_epic
+    attributes:
+      label: Parent Epic
+      description: Link to epic issue.
+      placeholder: "#123"
+    validations:
+      required: true
+  - type: input
+    id: capability
+    attributes:
+      label: Capability
+      description: Name of this feature capability.
+      placeholder: Capability-driven API exposure
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: In-scope and out-of-scope.
+    validations:
+      required: true
+  - type: textarea
+    id: stories
+    attributes:
+      label: Planned Stories
+      description: Story issues expected under this feature.
+      placeholder: |
+        - [ ] S: ...
+        - [ ] S: ...
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance Criteria
+      description: Observable, binary, scoped.
+      placeholder: |
+        AC-1: ...
+        Test: ...
+    validations:
+      required: true
