@@ -470,7 +470,6 @@ class Controller:
         mode: str = "new",
         record_history: bool = True,
     ) -> Dict[str, Any]:
-        bundle = fetch_render_bundle(url)
         if mode == "same" and window_id:
             win = self._require(window_id)
             if win.type != WindowType.browser:
@@ -478,10 +477,21 @@ class Controller:
         else:
             win = await self.create_window(
                 WindowType.browser,
-                bundle.get("title", "Browser"),
+                "Browser",
                 Rect(2, 1, 100, 30),
                 {},
             )
+        image_mode = str(win.props.get("image_mode", "none"))
+        render_mode = str(win.props.get("render_mode", "plain"))
+        bundle = fetch_render_bundle(url, width=win.rect.w, image_mode=image_mode)
+        win.title = str(bundle.get("title", "Browser"))
+        tui_text = render_markdown(
+            str(bundle.get("markdown", "")),
+            headings=render_mode,
+            images=image_mode,
+            width=win.rect.w,
+            assets=list(bundle.get("assets", [])),
+        )
 
         history = list(win.props.get("history", []))
         if record_history:
@@ -495,10 +505,11 @@ class Controller:
                 "history": history,
                 "history_index": history_index,
                 "markdown": bundle.get("markdown", ""),
-                "tui_text": bundle.get("tui_text", ""),
+                "tui_text": tui_text,
                 "links": bundle.get("links", []),
-                "render_mode": win.props.get("render_mode", "plain"),
-                "image_mode": win.props.get("image_mode", "none"),
+                "assets": bundle.get("assets", []),
+                "render_mode": render_mode,
+                "image_mode": image_mode,
             }
         )
         await self._events.emit("browser.opened", {"window_id": win.id, "url": url})
@@ -544,10 +555,22 @@ class Controller:
             win.props["render_mode"] = headings
         if images:
             win.props["image_mode"] = images
+        current_url = str(win.props.get("url", ""))
+        if current_url:
+            bundle = fetch_render_bundle(
+                current_url,
+                width=win.rect.w,
+                image_mode=str(win.props.get("image_mode", "none")),
+            )
+            win.props["markdown"] = bundle.get("markdown", "")
+            win.props["links"] = bundle.get("links", [])
+            win.props["assets"] = bundle.get("assets", [])
         win.props["tui_text"] = render_markdown(
             str(win.props.get("markdown", "")),
-            headings=win.props.get("render_mode", "plain"),
-            images=win.props.get("image_mode", "none"),
+            headings=str(win.props.get("render_mode", "plain")),
+            images=str(win.props.get("image_mode", "none")),
+            width=win.rect.w,
+            assets=list(win.props.get("assets", [])),
         )
         return {"ok": True, "window_id": window_id, "render_mode": win.props.get("render_mode"), "image_mode": win.props.get("image_mode")}
 
@@ -558,7 +581,7 @@ class Controller:
         return {"ok": True, "bundle": bundle}
 
     async def browser_render(self, markdown: str, headings: str = "plain", images: str = "none", width: int = 80) -> Dict[str, Any]:
-        return {"ok": True, "tui_text": render_markdown(markdown, headings=headings, images=images, width=width)}
+        return {"ok": True, "tui_text": render_markdown(markdown, headings=headings, images=images, width=width, assets=[])}
 
     async def browser_get_content(self, window_id: str, fmt: str = "text") -> Dict[str, Any]:
         win = self._require(window_id)
@@ -594,20 +617,36 @@ class Controller:
         out_path.parent.mkdir(parents=True, exist_ok=True)
         markdown = str(win.props.get("markdown", ""))
         if include_images:
-            markdown += "\n\n<!-- images included -->\n"
+            assets = list(win.props.get("assets", []))
+            blocks = []
+            for asset in assets:
+                src = str(asset.get("source_url", ""))
+                alt = str(asset.get("alt", ""))
+                status = str(asset.get("status", "skipped"))
+                blocks.append(f"- [{status}] {alt or src}")
+                if asset.get("ansi_block"):
+                    blocks.append("\n```ansi")
+                    blocks.append(str(asset.get("ansi_block")))
+                    blocks.append("```")
+            markdown += "\n\n## Images\n" + "\n".join(blocks) + "\n"
         out_path.write_text(markdown, encoding="utf-8")
         return {"ok": True, "path": str(out_path)}
 
     async def browser_toggle_gallery(self, window_id: str) -> Dict[str, Any]:
         win = self._require(window_id)
+        win.props["image_mode"] = "gallery"
         gallery_id = win.props.get("gallery_window_id")
         if gallery_id:
             return {"ok": True, "gallery_window_id": gallery_id, "reused": True}
+        assets = list(win.props.get("assets", []))
+        gallery_text = "\n".join(
+            [f"[{a.get('status', 'skipped')}] {a.get('alt') or a.get('source_url')}" for a in assets]
+        )
         gallery = await self.create_window(
             WindowType.text_view,
             f"Gallery: {win.title}",
             Rect(30, 3, 118, 30),
-            {"source_window_id": window_id},
+            {"source_window_id": window_id, "content": gallery_text},
         )
         win.props["gallery_window_id"] = gallery.id
         return {"ok": True, "gallery_window_id": gallery.id, "reused": False}

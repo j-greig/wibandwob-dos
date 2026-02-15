@@ -3,18 +3,48 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import shutil
+import subprocess
+import tempfile
+import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
+from urllib.parse import urljoin
 
 try:
     import requests
 except Exception:  # pragma: no cover
     requests = None
 
+try:
+    from PIL import Image
+except Exception:  # pragma: no cover
+    Image = None
+
+
+MAX_IMAGE_SOURCE_BYTES = 5 * 1024 * 1024
+MAX_IMAGE_DIMENSION = 4096
+MAX_RENDER_WIDTH_CELLS = 120
+PER_IMAGE_RENDER_TIMEOUT_MS = 1500
+TOTAL_IMAGE_RENDER_BUDGET_MS = 4000
+KEY_INLINE_MAX_IMAGES = 5
+
 
 def _cache_key(url: str, reader: str, width: int, image_mode: str) -> str:
     raw = f"{url}|{reader}|{width}|{image_mode}".encode("utf-8")
+    return hashlib.sha256(raw).hexdigest()
+
+
+def _image_cache_key(
+    source_hash: str,
+    mode: str,
+    width_cells: int,
+    backend: str,
+    dither: str = "none",
+    color_mode: str = "full",
+) -> str:
+    raw = f"{source_hash}|{mode}|{width_cells}|{backend}|{dither}|{color_mode}".encode("utf-8")
     return hashlib.sha256(raw).hexdigest()
 
 
@@ -27,16 +57,22 @@ def _extract_title(html: str, url: str) -> str:
 
 def _extract_links(html: str, base_url: str) -> List[Dict[str, Any]]:
     links = []
-    for idx, m in enumerate(re.finditer(r'<a[^>]*href=["\']([^"\']+)["\'][^>]*>(.*?)</a>', html, flags=re.IGNORECASE | re.DOTALL), 1):
+    for idx, m in enumerate(
+        re.finditer(
+            r'<a[^>]*href=["\']([^"\']+)["\'][^>]*>(.*?)</a>',
+            html,
+            flags=re.IGNORECASE | re.DOTALL,
+        ),
+        1,
+    ):
         href = m.group(1).strip()
         text = re.sub(r"<[^>]+>", "", m.group(2))
         text = re.sub(r"\s+", " ", text).strip() or href
-        links.append({"id": idx, "text": text, "url": href, "base_url": base_url})
+        links.append({"id": idx, "text": text, "url": urljoin(base_url, href)})
     return links
 
 
 def _html_to_markdown(html: str) -> str:
-    # Minimal markdown conversion for S04-S05 MVP.
     text = re.sub(r"(?is)<(script|style).*?>.*?</\1>", "", html)
     text = re.sub(r"(?i)<h1[^>]*>(.*?)</h1>", r"# \1\n", text)
     text = re.sub(r"(?i)<h2[^>]*>(.*?)</h2>", r"## \1\n", text)
@@ -47,13 +83,230 @@ def _html_to_markdown(html: str) -> str:
     return text.strip()
 
 
-def render_markdown(markdown: str, headings: str = "plain", images: str = "none", width: int = 80) -> str:
+def _extract_image_assets(html: str, base_url: str) -> List[Dict[str, Any]]:
+    assets: List[Dict[str, Any]] = []
+    for idx, m in enumerate(re.finditer(r"<img\b([^>]*)>", html, flags=re.IGNORECASE | re.DOTALL), start=1):
+        attrs = m.group(1)
+        src_match = re.search(r'src=["\']([^"\']+)["\']', attrs, flags=re.IGNORECASE)
+        if not src_match:
+            continue
+        src = src_match.group(1).strip()
+        if not src:
+            continue
+        alt_match = re.search(r'alt=["\']([^"\']*)["\']', attrs, flags=re.IGNORECASE)
+        alt = alt_match.group(1).strip() if alt_match else ""
+        source_url = urljoin(base_url, src)
+        assets.append(
+            {
+                "id": f"img{idx}",
+                "source_url": source_url,
+                "alt": alt,
+                "anchor_index": idx,
+                "status": "skipped",
+                "render_meta": {"backend": "chafa", "width_cells": 0, "height_cells": 0, "duration_ms": 0, "cache_hit": False},
+            }
+        )
+    return assets
+
+
+def _clamp_width(width: int) -> int:
+    return max(20, min(int(width), MAX_RENDER_WIDTH_CELLS))
+
+
+def _select_assets(assets: List[Dict[str, Any]], mode: str) -> List[int]:
+    if mode == "none":
+        return []
+    if mode == "all-inline":
+        return list(range(len(assets)))
+    if mode in ("key-inline", "gallery"):
+        # Hero + first few meaningful images (currently first N in document order).
+        return list(range(min(KEY_INLINE_MAX_IMAGES, len(assets))))
+    return []
+
+
+def _probe_dimensions(image_bytes: bytes) -> Optional[Dict[str, int]]:
+    if Image is None:
+        return None
+    try:
+        with tempfile.NamedTemporaryFile(delete=True) as tmp:
+            tmp.write(image_bytes)
+            tmp.flush()
+            with Image.open(tmp.name) as img:
+                return {"w": int(img.width), "h": int(img.height)}
+    except Exception:
+        return None
+
+
+def _run_chafa(image_bytes: bytes, width_cells: int, timeout_ms: int) -> Dict[str, Any]:
+    if shutil.which("chafa") is None:
+        return {"ok": False, "error": "chafa_not_found"}
+    with tempfile.NamedTemporaryFile(delete=True, suffix=".img") as tmp:
+        tmp.write(image_bytes)
+        tmp.flush()
+        cmd = ["chafa", "--size", f"{width_cells}x0", "--format", "symbols", "--animate", "off", tmp.name]
+        try:
+            started = time.perf_counter()
+            proc = subprocess.run(cmd, capture_output=True, text=True, check=False, timeout=max(0.1, timeout_ms / 1000.0))
+            elapsed_ms = int((time.perf_counter() - started) * 1000)
+            if proc.returncode != 0:
+                return {"ok": False, "error": (proc.stderr.strip() or "chafa_error"), "duration_ms": elapsed_ms}
+            return {"ok": True, "ansi_block": proc.stdout.rstrip("\n"), "duration_ms": elapsed_ms}
+        except subprocess.TimeoutExpired:
+            return {"ok": False, "error": "timeout", "duration_ms": timeout_ms}
+
+
+def _cache_paths(image_cache_root: Path, key: str) -> Path:
+    image_cache_root.mkdir(parents=True, exist_ok=True)
+    return image_cache_root / f"{key}.json"
+
+
+def _fetch_image_bytes(source_url: str) -> Dict[str, Any]:
+    if requests is None:
+        return {"ok": False, "error": "requests_unavailable"}
+    try:
+        resp = requests.get(source_url, timeout=15)
+        resp.raise_for_status()
+        content = resp.content
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
+
+    if len(content) > MAX_IMAGE_SOURCE_BYTES:
+        return {"ok": False, "error": "source_too_large", "source_bytes": len(content)}
+    return {"ok": True, "content": content, "source_bytes": len(content)}
+
+
+def _render_asset(
+    asset: Dict[str, Any],
+    mode: str,
+    width_cells: int,
+    image_cache_root: Path,
+    budget_state: Dict[str, int],
+) -> Dict[str, Any]:
+    src = str(asset.get("source_url", ""))
+    src_hash = hashlib.sha256(src.encode("utf-8")).hexdigest()
+    cache_key = _image_cache_key(src_hash, mode, width_cells, "chafa")
+    cache_path = _cache_paths(image_cache_root, cache_key)
+
+    if cache_path.exists():
+        cached = json.loads(cache_path.read_text(encoding="utf-8"))
+        out = dict(asset)
+        out["status"] = "ready"
+        out["ansi_block"] = cached.get("ansi_block", "")
+        meta = dict(cached.get("render_meta", {}))
+        meta["cache_hit"] = True
+        out["render_meta"] = meta
+        return out
+
+    if budget_state["remaining_ms"] <= 0:
+        out = dict(asset)
+        out["status"] = "deferred"
+        out["render_meta"] = {"backend": "chafa", "width_cells": width_cells, "height_cells": 0, "duration_ms": 0, "cache_hit": False}
+        return out
+
+    fetched = _fetch_image_bytes(src)
+    if not fetched.get("ok"):
+        out = dict(asset)
+        out["status"] = "failed"
+        out["render_meta"] = {"backend": "chafa", "width_cells": width_cells, "height_cells": 0, "duration_ms": 0, "cache_hit": False}
+        return out
+
+    image_bytes = fetched["content"]
+    dims = _probe_dimensions(image_bytes)
+    if dims and (dims["w"] > MAX_IMAGE_DIMENSION or dims["h"] > MAX_IMAGE_DIMENSION):
+        out = dict(asset)
+        out["status"] = "failed"
+        out["render_meta"] = {"backend": "chafa", "width_cells": width_cells, "height_cells": 0, "duration_ms": 0, "cache_hit": False}
+        return out
+
+    timeout_ms = min(PER_IMAGE_RENDER_TIMEOUT_MS, budget_state["remaining_ms"])
+    rendered = _run_chafa(image_bytes, width_cells=width_cells, timeout_ms=timeout_ms)
+    duration_ms = int(rendered.get("duration_ms", 0))
+    budget_state["remaining_ms"] = max(0, budget_state["remaining_ms"] - duration_ms)
+
+    out = dict(asset)
+    if not rendered.get("ok"):
+        out["status"] = "failed" if rendered.get("error") != "timeout" else "deferred"
+        out["render_meta"] = {"backend": "chafa", "width_cells": width_cells, "height_cells": 0, "duration_ms": duration_ms, "cache_hit": False}
+        return out
+
+    ansi_block = rendered.get("ansi_block", "")
+    out["status"] = "ready"
+    out["ansi_block"] = ansi_block
+    out["render_meta"] = {
+        "backend": "chafa",
+        "width_cells": width_cells,
+        "height_cells": max(1, len(ansi_block.splitlines())) if ansi_block else 0,
+        "duration_ms": duration_ms,
+        "cache_hit": False,
+    }
+    cache_path.write_text(json.dumps({"ansi_block": ansi_block, "render_meta": out["render_meta"]}, sort_keys=True), encoding="utf-8")
+    return out
+
+
+def render_markdown(
+    markdown: str,
+    headings: str = "plain",
+    images: str = "none",
+    width: int = 80,
+    assets: Optional[List[Dict[str, Any]]] = None,
+) -> str:
     rendered = markdown
     if headings != "plain":
         rendered = rendered.replace("# ", "[H1] ").replace("## ", "[H2] ").replace("### ", "[H3] ")
+
     if images != "none":
         rendered += f"\n\n[images mode={images}]"
+
+    if assets:
+        rendered += "\n\n"
+        if images == "gallery":
+            rendered += f"[gallery assets={len(assets)}]\n"
+        for asset in assets:
+            alt = str(asset.get("alt") or asset.get("source_url", ""))
+            status = str(asset.get("status", "skipped"))
+            if status == "ready" and asset.get("ansi_block"):
+                rendered += f"\n[image:{alt}]\n{asset['ansi_block']}\n"
+            else:
+                rendered += f"\n[image:{alt}] ({status})\n"
+
     return rendered[: max(2000, width * 40)]
+
+
+def _render_assets_for_mode(
+    html: str,
+    base_url: str,
+    image_mode: str,
+    width: int,
+    image_cache_root: Path,
+) -> List[Dict[str, Any]]:
+    assets = _extract_image_assets(html, base_url)
+    if not assets:
+        return []
+
+    selected = set(_select_assets(assets, image_mode))
+    width_cells = _clamp_width(width)
+    budget_state = {"remaining_ms": TOTAL_IMAGE_RENDER_BUDGET_MS}
+    rendered_assets: List[Dict[str, Any]] = []
+
+    for idx, asset in enumerate(assets):
+        if image_mode == "none":
+            out = dict(asset)
+            out["status"] = "skipped"
+            rendered_assets.append(out)
+            continue
+        if idx not in selected:
+            out = dict(asset)
+            out["status"] = "skipped"
+            rendered_assets.append(out)
+            continue
+        if image_mode == "gallery":
+            out = dict(asset)
+            out["status"] = "deferred"
+            rendered_assets.append(out)
+            continue
+        rendered_assets.append(_render_asset(asset, image_mode, width_cells, image_cache_root, budget_state))
+
+    return rendered_assets
 
 
 def fetch_render_bundle(
@@ -68,6 +321,7 @@ def fetch_render_bundle(
     key = _cache_key(url, reader, width, image_mode)
     entry_dir = cache_dir / key
     bundle_path = entry_dir / "bundle.json"
+    image_cache_root = cache_dir / "images"
 
     if bundle_path.exists():
         bundle = json.loads(bundle_path.read_text(encoding="utf-8"))
@@ -84,19 +338,21 @@ def fetch_render_bundle(
     title = _extract_title(html, url)
     links = _extract_links(html, url)
     markdown = _html_to_markdown(html)
-    tui_text = render_markdown(markdown, headings="plain", images=image_mode, width=width)
+    assets = _render_assets_for_mode(html, base_url=url, image_mode=image_mode, width=width, image_cache_root=image_cache_root)
+    tui_text = render_markdown(markdown, headings="plain", images=image_mode, width=width, assets=assets)
     bundle = {
         "url": url,
         "title": title,
         "markdown": markdown,
         "tui_text": tui_text,
         "links": links,
-        "assets": [],
+        "assets": assets,
         "meta": {
             "fetched_at": datetime.now(timezone.utc).isoformat(),
             "cache": "miss",
             "source_bytes": len(html.encode("utf-8")),
             "cache_key": key,
+            "image_mode": image_mode,
         },
     }
 
