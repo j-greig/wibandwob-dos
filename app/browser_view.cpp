@@ -20,6 +20,7 @@
 #define Uses_TStaticText
 #define Uses_TProgram
 #define Uses_TDeskTop
+#define Uses_TText
 #include <tvision/tv.h>
 
 #include <cstdio>
@@ -205,7 +206,7 @@ void TBrowserContentView::draw() {
             for (const auto &seg : line.segs) {
                 if (x >= size.x) break;
                 buf.moveStr((ushort) x, TStringView(seg.text.data(), seg.text.size()), seg.attr);
-                x += (int) seg.text.size();
+                x += (int) TText::width(TStringView(seg.text.data(), seg.text.size()));
             }
         }
 

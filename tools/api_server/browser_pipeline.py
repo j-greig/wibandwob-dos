@@ -29,6 +29,8 @@ MAX_IMAGE_DIMENSION = 4096
 MAX_RENDER_WIDTH_CELLS = 120
 PER_IMAGE_RENDER_TIMEOUT_MS = 3000
 TOTAL_IMAGE_RENDER_BUDGET_MS = 10000
+MAX_TUI_TEXT_CHARS = 250000
+PIPELINE_CACHE_VERSION = "v2"
 KEY_INLINE_MAX_IMAGES = 5
 
 
@@ -63,7 +65,7 @@ def _needs_image_refresh(bundle: Dict[str, Any], image_mode: str) -> bool:
 
 
 def _cache_key(url: str, reader: str, width: int, image_mode: str) -> str:
-    raw = f"{url}|{reader}|{width}|{image_mode}".encode("utf-8")
+    raw = f"{PIPELINE_CACHE_VERSION}|{url}|{reader}|{width}|{image_mode}".encode("utf-8")
     return hashlib.sha256(raw).hexdigest()
 
 
@@ -336,7 +338,7 @@ def render_markdown(
                 else:
                     rendered += f"\n[image:{alt}] ({status})\n"
 
-    return rendered[: max(2000, width * 40)]
+    return rendered[:MAX_TUI_TEXT_CHARS]
 
 
 def _render_assets_for_mode(

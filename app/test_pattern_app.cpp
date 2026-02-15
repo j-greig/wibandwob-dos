@@ -1591,72 +1591,54 @@ void TTestPatternApp::setPatternMode(bool continuous)
 
 void TTestPatternApp::takeScreenshot()
 {
-    // Create screenshots directory if it doesn't exist
+    // Create screenshots directory if it doesn't exist.
     mkdir("screenshots", 0755);
-    
-    // Generate timestamp for filename
+
+    // Generate timestamp for filenames.
     time_t rawtime;
     struct tm* timeinfo;
     char timestamp[80];
     time(&rawtime);
     timeinfo = localtime(&rawtime);
     strftime(timestamp, sizeof(timestamp), "%Y%m%d_%H%M%S", timeinfo);
-    
-    std::string outPath = std::string("screenshots/tui_") + timestamp + ".png";
 
-    // Prefer the actual frontmost window ID (works for whichever terminal is active).
-    std::string frontWindowId;
+    // 1) Authoritative in-process capture from Turbo Vision screen buffer.
+    std::string base = std::string("screenshots/tui_") + timestamp;
+    std::string txtPath = base + ".txt";
+    std::string ansiPath = base + ".ans";
+    auto frame = getFrameCapture().captureScreen();
+
+    CaptureOptions txtOpts;
+    txtOpts.format = CaptureFormat::PlainText;
+    txtOpts.addTimestamp = true;
+    txtOpts.includeMetadata = true;
+    bool txtOk = getFrameCapture().saveFrame(frame, txtPath, txtOpts);
+
+    CaptureOptions ansiOpts;
+    ansiOpts.format = CaptureFormat::AnsiEscapes;
+    ansiOpts.addTimestamp = true;
+    ansiOpts.includeMetadata = true;
+    bool ansiOk = getFrameCapture().saveFrame(frame, ansiPath, ansiOpts);
+
+    // 2) Optional OS screenshot for pixel PNG (best-effort only).
+    std::string pngPath = base + ".png";
+    int pngResult = -1;
     {
-        const char* detectCmd =
-            "osascript -e 'tell application \"System Events\" to tell (first process whose frontmost is true) to get id of front window' 2>/dev/null";
-        FILE* pipe = popen(detectCmd, "r");
-        if (pipe) {
-            char idBuf[128] = {0};
-            if (fgets(idBuf, sizeof(idBuf), pipe)) {
-                frontWindowId = idBuf;
-                while (!frontWindowId.empty() &&
-                       (frontWindowId.back() == '\n' || frontWindowId.back() == '\r' || frontWindowId.back() == ' ' || frontWindowId.back() == '\t')) {
-                    frontWindowId.pop_back();
-                }
-            }
-            pclose(pipe);
-        }
+        std::stringstream cmd;
+        cmd << "screencapture -x " << pngPath << " 2>/dev/null";
+        pngResult = system(cmd.str().c_str());
     }
 
-    int result = -1;
-    if (!frontWindowId.empty()) {
-        std::stringstream cmd;
-        cmd << "screencapture -x -l" << frontWindowId << " " << outPath << " 2>/dev/null";
-        result = system(cmd.str().c_str());
-    }
-
-    // Fallback to previous terminal-specific behavior if front-window capture fails.
-    if (result != 0) {
-        std::stringstream cmd;
-        const char* termProgram = getenv("TERM_PROGRAM");
-        std::string appName = "Terminal";
-        if (termProgram) {
-            std::string term(termProgram);
-            if (term == "iTerm.app")
-                appName = "iTerm2";
-            else if (term == "Apple_Terminal")
-                appName = "Terminal";
-        }
-        cmd << "screencapture -x -l$(osascript -e 'tell app \"" 
-            << appName 
-            << "\" to id of window 1' 2>/dev/null) "
-            << outPath << " 2>/dev/null";
-        result = system(cmd.str().c_str());
-    }
-    
-    // Show result message
-    if (result == 0) {
+    if (txtOk || ansiOk || pngResult == 0) {
         std::stringstream msg;
-        msg << "Screenshot saved to " << outPath;
+        msg << "Saved capture:";
+        if (txtOk) msg << " " << txtPath;
+        if (ansiOk) msg << " " << ansiPath;
+        if (pngResult == 0) msg << " " << pngPath;
+        if (pngResult != 0) msg << "\n(PNG export unavailable; text/ANSI capture still saved)";
         messageBox(msg.str().c_str(), mfInformation | mfOKButton);
     } else {
-        messageBox("Screenshot failed. Try manual capture with Cmd+Shift+4", 
-                   mfError | mfOKButton);
+        messageBox("Capture failed (screen buffer and PNG paths both failed).", mfError | mfOKButton);
     }
 }
 
