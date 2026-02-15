@@ -38,3 +38,13 @@ node_modules/
 
 # Logs
 app/logs/
+logs/*
+!logs/agent-mailbox/
+!logs/agent-mailbox/**
+
+# Runtime cache
+cache/
+
+# Local workspace snapshots/artifacts
+workspaces/*
+!workspaces/.gitkeep
