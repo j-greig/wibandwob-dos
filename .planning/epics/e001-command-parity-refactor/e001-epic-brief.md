@@ -29,7 +29,7 @@ Naming:
 
 ## Features
 
-- [~] **F1: Command Registry** — define commands once in C++, derive capabilities, remove duplicates
+- [x] **F1: Command Registry** — define commands once in C++, derive capabilities, remove duplicates
   - Brief: `.planning/epics/e001-command-parity-refactor/f01-command-registry/f01-feature-brief.md`
 - [ ] **F2: Parity Enforcement** — automated drift checks for menu, IPC/API, MCP surfaces
 - [ ] **F3: State/Event Authority** — `exec_command` dispatch, typed events, snapshot sanity
@@ -46,6 +46,8 @@ Naming:
   - Brief: `.planning/epics/e001-command-parity-refactor/f01-command-registry/s04-full-mcp-command-parity/s04-story-brief.md`
 - [x] **S5 (PR-2+):** Native ctest coverage for command registry
   - Brief: `.planning/epics/e001-command-parity-refactor/f01-command-registry/s05-command-registry-ctest/s05-story-brief.md`
+- [x] **S6 (PR-2+):** F01 closeout quality gates
+  - Brief: `.planning/epics/e001-command-parity-refactor/f01-command-registry/s06-f01-closeout/s06-story-brief.md`
 
 ## Acceptance Criteria (PR-1)
 
