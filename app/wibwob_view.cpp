@@ -704,6 +704,7 @@ void TWibWobWindow::processUserInput(const std::string& input) {
         }
         logMessage("Stream", "[chunk] type=" + chunkType +
                   " content_len=" + std::to_string(chunk.content.length()) +
+                  (chunk.content.empty() ? "" : " content=" + chunk.content) +
                   (chunk.error_message.empty() ? "" : " err=" + chunk.error_message));
 
         if (chunk.type == StreamChunk::CONTENT_DELTA) {

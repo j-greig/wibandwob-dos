@@ -1,4 +1,5 @@
 #include "api_ipc.h"
+#include "command_registry.h"
 
 #ifndef _WIN32
 #include <sys/socket.h>
@@ -12,6 +13,7 @@
 #include <sstream>
 #include <map>
 #include <vector>
+#include <fstream>
 
 // Base64 decoding function
 static const std::string base64_chars =
@@ -76,7 +78,8 @@ extern void api_tile(TTestPatternApp& app);
 extern void api_close_all(TTestPatternApp& app);
 extern void api_set_pattern_mode(TTestPatternApp& app, const std::string& mode);
 extern void api_save_workspace(TTestPatternApp& app);
-extern void api_open_workspace_path(TTestPatternApp& app, const std::string& path);
+extern bool api_save_workspace_path(TTestPatternApp& app, const std::string& path);
+extern bool api_open_workspace_path(TTestPatternApp& app, const std::string& path);
 extern void api_screenshot(TTestPatternApp& app);
 extern std::string api_get_state(TTestPatternApp& app);
 extern std::string api_move_window(TTestPatternApp& app, const std::string& id, int x, int y);
@@ -167,7 +170,16 @@ void ApiIpcServer::poll() {
     }
 
     std::string resp = "ok\n";
-    if (cmd == "create_window") {
+    if (cmd == "get_capabilities") {
+        resp = get_command_capabilities_json() + "\n";
+    } else if (cmd == "exec_command") {
+        auto it = kv.find("name");
+        if (it == kv.end() || it->second.empty()) {
+            resp = "err missing name\n";
+        } else {
+            resp = exec_registry_command(*app_, it->second, kv) + "\n";
+        }
+    } else if (cmd == "create_window") {
         std::string type = kv["type"]; // test_pattern|gradient|frame_player|text_view
         
         // Extract optional positioning parameters
@@ -217,8 +229,14 @@ void ApiIpcServer::poll() {
         api_save_workspace(*app_);
     } else if (cmd == "open_workspace") {
         auto it = kv.find("path");
-        if (it != kv.end()) api_open_workspace_path(*app_, it->second);
-        else resp = "err missing path\n";
+        if (it == kv.end() || it->second.empty()) {
+            resp = "err missing path\n";
+        } else {
+            bool ok = api_open_workspace_path(*app_, it->second);
+            fprintf(stderr, "[ipc] open_workspace path=%s ok=%s\n", it->second.c_str(), ok ? "true" : "false");
+            if (!ok)
+                resp = "err open workspace failed\n";
+        }
     } else if (cmd == "screenshot") {
         api_screenshot(*app_);
     } else if (cmd == "get_state") {
@@ -306,6 +324,64 @@ void ApiIpcServer::poll() {
         }
     } else if (cmd == "get_canvas_size") {
         resp = api_get_canvas_size(*app_) + "\n";
+    } else if (cmd == "export_state") {
+        std::string path = "workspace_state.json";
+        auto it = kv.find("path");
+        if (it != kv.end() && !it->second.empty())
+            path = it->second;
+        bool ok = api_save_workspace_path(*app_, path);
+        fprintf(stderr, "[ipc] export_state path=%s ok=%s\n", path.c_str(), ok ? "true" : "false");
+        resp = ok ? "ok\n" : "err export failed\n";
+    } else if (cmd == "import_state") {
+        auto it = kv.find("path");
+        if (it == kv.end() || it->second.empty()) {
+            resp = "err missing path\n";
+        } else {
+            std::ifstream in(it->second.c_str());
+            if (!in.is_open()) {
+                resp = "err cannot open import path\n";
+            } else {
+                std::stringstream buffer;
+                buffer << in.rdbuf();
+                std::string content = buffer.str();
+                // Minimal validity gate for S01: ensure expected snapshot keys are present.
+                if (content.find("\"version\"") == std::string::npos ||
+                    content.find("\"windows\"") == std::string::npos) {
+                    fprintf(stderr, "[ipc] import_state path=%s invalid_snapshot\n", it->second.c_str());
+                    resp = "err invalid snapshot\n";
+                } else {
+                    // Try direct apply first (legacy workspace shape with "bounds").
+                    if (api_open_workspace_path(*app_, it->second)) {
+                        fprintf(stderr, "[ipc] import_state path=%s applied=direct\n", it->second.c_str());
+                        resp = "ok\n";
+                    } else {
+                        // Compatibility fallback: convert state snapshot shape ("rect") into workspace shape ("bounds").
+                        std::string normalized = content;
+                        if (normalized.find("\"rect\"") != std::string::npos &&
+                            normalized.find("\"bounds\"") == std::string::npos) {
+                            size_t pos = 0;
+                            while ((pos = normalized.find("\"rect\"", pos)) != std::string::npos) {
+                                normalized.replace(pos, 6, "\"bounds\"");
+                                pos += 8;
+                            }
+                        }
+
+                        std::string tmp_path = it->second + ".wwd-import-tmp.json";
+                        std::ofstream out(tmp_path.c_str(), std::ios::out | std::ios::trunc);
+                        if (!out.is_open()) {
+                            resp = "err cannot write import temp\n";
+                        } else {
+                            out << normalized;
+                            out.close();
+                            bool ok = api_open_workspace_path(*app_, tmp_path);
+                            ::unlink(tmp_path.c_str());
+                            fprintf(stderr, "[ipc] import_state path=%s applied=compat ok=%s\n", it->second.c_str(), ok ? "true" : "false");
+                            resp = ok ? "ok\n" : "err import apply failed\n";
+                        }
+                    }
+                }
+            }
+        }
     } else {
         resp = "err unknown cmd\n";
     }

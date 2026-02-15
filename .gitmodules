@@ -1,3 +1,9 @@
 [submodule "vendor/tvision"]
 	path = vendor/tvision
 	url = https://github.com/j-greig/tvision.git
+[submodule "/Users/james/Repos/wibandwob-dos/vendor/tvision"]
+	path = /Users/james/Repos/wibandwob-dos/vendor/tvision
+	url = https://github.com/magiblot/tvision
+[submodule "vendor/claude-system"]
+	path = vendor/claude-system
+	url = https://github.com/juanandresgs/claude-system
