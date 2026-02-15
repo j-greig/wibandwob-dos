@@ -34,6 +34,8 @@ Naming:
   - Brief: `.planning/epics/e002-browser-and-state-export/f03-rich-rendering/f03-feature-brief.md`
 - [x] **F4: AI Browser Tools** — MCP tools for browser control, page summarisation, clip-to-memory
   - Brief: `.planning/epics/e002-browser-and-state-export/f04-ai-browser-tools/f04-feature-brief.md`
+- [~] **F5: Browser Image Rendering to ANSI** — image modes and ANSI/quarter-pixel-compatible rendering path
+  - Brief: `.planning/epics/e002-browser-and-state-export/f05-browser-image-ansi/f05-feature-brief.md`
 
 ## Story Backlog
 
@@ -64,6 +66,12 @@ Stories are numbered globally within this epic (s01-s99).
 - [x] **S11:** MCP tools: `browser.open`, `browser.back`, `browser.forward`, `browser.refresh`, `browser.find`
 - [x] **S12:** MCP tools: `browser.set_mode`, `browser.fetch`, `browser.render`
 - [x] **S13:** AI actions: summarise page to new window, extract links, clip page to markdown file
+
+### F5: Browser Image Rendering to ANSI
+
+- [x] **S15:** ANSI image rendering specification (modes, backend contract, limits, test plan)
+- [ ] **S16:** Backend adapter + cache implementation for ANSI image blocks
+- [ ] **S17:** Browser/TUI/API/MCP integration for image modes and gallery behavior
 
 ## Milestone Plan
 
@@ -258,7 +266,7 @@ This epic builds on E001 command registry infrastructure:
 
 ## Status
 
-Status: `done`
+Status: `in-progress`
 GitHub issue: #16
 PR: #23, #28, #30
 
