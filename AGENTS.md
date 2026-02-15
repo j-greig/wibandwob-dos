@@ -14,6 +14,11 @@ Treat the rules below as a required prompt-shim and manual gate before finishing
 3. Keep PR scope to one logical slice.
 4. Update planning briefs the same day issue state changes.
 5. Preserve AC -> Test traceability in story files.
+6. Sync GitHub issue lifecycle continuously, not just at closeout:
+   - Set issue to `in-progress` when implementation starts.
+   - Comment with commit SHAs and test evidence as slices land.
+   - Update planning `PR:` field when PR is opened.
+   - Close story/feature/epic issues immediately after their acceptance checks pass and planning status is `done`.
 
 ## Naming Rules (mirror `name-lint.sh`)
 
@@ -66,6 +71,7 @@ Before ending a coding pass:
 2. Verify every acceptance criterion has at least one runnable test.
 3. Verify no untested AC remains for completed/in-progress work.
 4. Verify commit messages (if committing) follow `type(scope): ...`.
+5. Verify issue lifecycle is synced (`state`, progress comment, PR link, close conditions).
 
 ## Codex Execution Defaults for This Repo
 
