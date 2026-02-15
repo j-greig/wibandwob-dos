@@ -16,7 +16,7 @@ Fix regression where `import_state`/`open_workspace` returns success but does no
 - [x] Ensure restore path supports current snapshot/workspace payload shape used by save/export
 - [x] Return explicit error when restore cannot be applied
 - [x] Add contract test proving `open_workspace` failure is no longer silent
-- [ ] Run manual smoke save -> close -> open -> verify restored windows
+- [x] Run manual smoke save -> close -> open -> verify restored windows
 
 ## Acceptance Criteria
 
@@ -24,8 +24,8 @@ Fix regression where `import_state`/`open_workspace` returns success but does no
   - Test: `ctest --test-dir build -R command_registry --output-on-failure`
 - [x] **AC-2:** Invalid/unrestorable payload returns error, not false `ok`
   - Test: `uv run --with pytest --with jsonschema --with fastapi pytest tests/contract/test_workspace_open_applies_state.py -q`
-- [ ] **AC-3:** Save/open round-trip restores window count and key types for supported classes
-  - Test: manual smoke via API (`save_workspace` -> `close_all_windows` -> `open_workspace` -> `GET /state`)
+- [x] **AC-3:** Save/open round-trip restores window count and key types for supported classes
+  - Test: `python3 tools/api_server/live_api_parity_suite.py --base-url http://127.0.0.1:8089`
 
 ## Rollback
 
@@ -33,6 +33,6 @@ Fix regression where `import_state`/`open_workspace` returns success but does no
 
 ## Status
 
-Status: `in-progress`
+Status: `done`
 GitHub issue: #29
 PR: #23

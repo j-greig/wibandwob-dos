@@ -78,6 +78,6 @@ Establish a stable, versioned snapshot format for engine state. Enable workspace
 
 ## Status
 
-Status: `in-progress`
+Status: `done`
 GitHub issue: #15
-PR: —
+PR: #23

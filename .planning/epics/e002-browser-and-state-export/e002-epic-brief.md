@@ -260,7 +260,7 @@ This epic builds on E001 command registry infrastructure:
 
 Status: `in-progress`
 GitHub issue: #16
-PR: —
+PR: #23
 
 ## Symbient Tag
 
