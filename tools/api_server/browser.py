@@ -8,6 +8,7 @@ Tracks session history for back/forward navigation.
 from __future__ import annotations
 
 import re
+import warnings
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from urllib.parse import urljoin
@@ -22,8 +23,18 @@ def fetch_and_convert(url: str) -> Dict[str, Any]:
 
     Pipeline: requests.get → readability extract → markdownify → bundle.
     """
-    resp = requests.get(url, timeout=15, headers={"User-Agent": "WibWob-DOS/0.1"})
-    resp.raise_for_status()
+    headers = {"User-Agent": "WibWob-DOS/0.1"}
+    try:
+        resp = requests.get(url, timeout=15, headers=headers)
+        resp.raise_for_status()
+    except requests.exceptions.SSLError:
+        # Some local Python environments have incomplete CA trust chains.
+        # Retry once without certificate verification so browser navigation
+        # remains usable from the TUI.
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            resp = requests.get(url, timeout=15, headers=headers, verify=False)
+            resp.raise_for_status()
     source_bytes = len(resp.content)
 
     doc = Document(resp.text)

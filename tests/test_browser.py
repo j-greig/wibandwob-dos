@@ -9,6 +9,7 @@ import json
 from unittest.mock import MagicMock, patch
 
 import pytest
+import requests
 
 from tools.api_server.browser import BrowserSession, fetch_and_convert, _extract_links
 
@@ -141,6 +142,18 @@ class TestFetchPipeline:
         mock_get.return_value = _mock_response(SAMPLE_HTML)
         bundle = fetch_and_convert("https://example.com")
         assert bundle["tui_text"] == bundle["markdown"]
+
+    @patch("tools.api_server.browser.requests.get")
+    def test_ssl_error_retries_without_verify(self, mock_get):
+        ssl_err = requests.exceptions.SSLError("cert verify failed")
+        ok_resp = _mock_response(SAMPLE_HTML)
+        mock_get.side_effect = [ssl_err, ok_resp]
+
+        bundle = fetch_and_convert("https://example.com")
+        assert bundle["url"] == "https://example.com"
+        assert mock_get.call_count == 2
+        _, second_kwargs = mock_get.call_args_list[1]
+        assert second_kwargs.get("verify") is False
 
 
 # --- AC-3: Links extracted with id, text, url ---
