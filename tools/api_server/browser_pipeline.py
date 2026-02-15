@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import html as html_lib
 import json
 import re
 import shutil
@@ -23,6 +24,16 @@ try:
 except Exception:  # pragma: no cover
     Image = None
 
+try:
+    from readability import Document
+except Exception:  # pragma: no cover
+    Document = None
+
+try:
+    import trafilatura
+except Exception:  # pragma: no cover
+    trafilatura = None
+
 
 MAX_IMAGE_SOURCE_BYTES = 10 * 1024 * 1024
 MAX_IMAGE_DIMENSION = 4096
@@ -30,7 +41,7 @@ MAX_RENDER_WIDTH_CELLS = 120
 PER_IMAGE_RENDER_TIMEOUT_MS = 3000
 TOTAL_IMAGE_RENDER_BUDGET_MS = 10000
 MAX_TUI_TEXT_CHARS = 250000
-PIPELINE_CACHE_VERSION = "v3"
+PIPELINE_CACHE_VERSION = "v5"
 IMAGE_WIDTH_RATIO = 0.5
 MAX_IMAGE_HEIGHT_CELLS = 34
 KEY_INLINE_MAX_IMAGES = 5
@@ -86,7 +97,7 @@ def _image_cache_key(
 def _extract_title(html: str, url: str) -> str:
     m = re.search(r"<title>(.*?)</title>", html, flags=re.IGNORECASE | re.DOTALL)
     if m:
-        return re.sub(r"\s+", " ", m.group(1)).strip()
+        return html_lib.unescape(re.sub(r"\s+", " ", m.group(1)).strip())
     return url
 
 
@@ -102,6 +113,7 @@ def _extract_links(html: str, base_url: str) -> List[Dict[str, Any]]:
     ):
         href = m.group(1).strip()
         text = re.sub(r"<[^>]+>", "", m.group(2))
+        text = html_lib.unescape(text)
         text = re.sub(r"\s+", " ", text).strip() or href
         links.append({"id": idx, "text": text, "url": urljoin(base_url, href)})
     return links
@@ -114,8 +126,91 @@ def _html_to_markdown(html: str) -> str:
     text = re.sub(r"(?i)<h3[^>]*>(.*?)</h3>", r"### \1\n", text)
     text = re.sub(r"(?i)<p[^>]*>(.*?)</p>", r"\1\n\n", text)
     text = re.sub(r"<[^>]+>", "", text)
+    text = html_lib.unescape(text)
     text = re.sub(r"\n{3,}", "\n\n", text)
     return text.strip()
+
+
+def _decode_html_response(resp: Any) -> str:
+    content = bytes(resp.content or b"")
+    if not content:
+        return ""
+    enc = str(getattr(resp, "encoding", "") or "").strip().lower()
+
+    # Many sites send UTF-8 bytes with an ISO-8859-1 fallback header.
+    if enc in ("iso-8859-1", "latin-1", "latin1", "cp1252", "windows-1252"):
+        try:
+            return content.decode("utf-8")
+        except Exception:
+            pass
+    if enc:
+        try:
+            return content.decode(enc)
+        except Exception:
+            pass
+    try:
+        return content.decode("utf-8")
+    except Exception:
+        return str(getattr(resp, "text", ""))
+
+
+def _extract_markdown_for_reader(html: str, reader: str) -> str:
+    reader_name = (reader or "readability").strip().lower()
+
+    if reader_name == "trafilatura" and trafilatura is not None:
+        try:
+            attempts = [
+                {
+                    "output_format": "markdown",
+                    "include_links": True,
+                    "include_images": False,
+                    "include_tables": False,
+                    "favor_precision": True,
+                },
+                {
+                    "output_format": "markdown",
+                    "include_links": True,
+                    "include_images": False,
+                    "include_tables": False,
+                    "favor_recall": True,
+                },
+                {
+                    "output_format": "txt",
+                    "include_links": False,
+                    "include_images": False,
+                    "include_tables": False,
+                    "favor_recall": True,
+                },
+            ]
+            for idx, kwargs in enumerate(attempts, start=1):
+                out = trafilatura.extract(html, **kwargs)
+                if out and out.strip():
+                    _debug_log(
+                        "reader.extract",
+                        {
+                            "reader": "trafilatura",
+                            "ok": True,
+                            "attempt": idx,
+                            "output_format": kwargs["output_format"],
+                            "chars": len(out),
+                        },
+                    )
+                    return out.strip()
+            _debug_log("reader.extract", {"reader": "trafilatura", "ok": False, "reason": "empty_output"})
+        except Exception as exc:
+            _debug_log("reader.extract", {"reader": "trafilatura", "ok": False, "error": str(exc)})
+
+    if reader_name in ("readability", "trafilatura") and Document is not None:
+        try:
+            article_html = Document(html).summary()
+            if article_html and article_html.strip():
+                _debug_log("reader.extract", {"reader": "readability", "ok": True})
+                return _html_to_markdown(article_html)
+        except Exception as exc:
+            _debug_log("reader.extract", {"reader": "readability", "ok": False, "error": str(exc)})
+
+    _debug_log("reader.extract", {"reader": "raw", "ok": True})
+    return _html_to_markdown(html)
 
 
 def _extract_image_assets(html: str, base_url: str) -> List[Dict[str, Any]]:
@@ -457,7 +552,7 @@ def fetch_render_bundle(
                 direct_image_mode = True
                 html = ""
             else:
-                html = resp.text
+                html = _decode_html_response(resp)
         except requests.exceptions.SSLError:
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
@@ -471,7 +566,7 @@ def fetch_render_bundle(
                     direct_image_mode = True
                     html = ""
                 else:
-                    html = resp.text
+                    html = _decode_html_response(resp)
 
     if direct_image_mode:
         title = url
@@ -493,7 +588,7 @@ def fetch_render_bundle(
     else:
         title = _extract_title(html, url)
         links = _extract_links(html, url)
-        markdown = _html_to_markdown(html)
+        markdown = _extract_markdown_for_reader(html, reader=reader)
         assets = _render_assets_for_mode(html, base_url=url, image_mode=image_mode, width=width, image_cache_root=image_cache_root)
     tui_text = render_markdown(markdown, headings="plain", images=image_mode, width=width, assets=assets)
     bundle = {

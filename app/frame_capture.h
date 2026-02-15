@@ -126,7 +126,7 @@ private:
     
     // Utility methods
     std::string getCurrentTimestamp();
-    char screenCellToChar(const TScreenCell& cell);
+    std::string screenCellToText(const TScreenCell& cell);
     bool isVisibleCharacter(char c);
     
     // ANSI escape codes
