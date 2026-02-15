@@ -138,6 +138,12 @@ The main active architectural concern is **menu/API/MCP parity drift**: commands
 
 - **Planning canon first**: follow `/Users/james/Repos/wibandwob-dos/.planning/README.md` for terms, acceptance-criteria format, and issue-first workflow.
 - **Issue-first**: create or reference a GitHub issue before starting work.
+- **Manual issue/PR sync required**: issue state is not auto-updated by hooks or PR creation. Claude/Codex must explicitly:
+  - move issue status in planning and GitHub as work starts/completes,
+  - post progress evidence (commit SHAs + tests),
+  - set `PR:` in planning briefs when a PR is opened,
+  - close linked story/feature/epic issues once acceptance checks pass.
+- **GitHub formatting reliability**: do not post long markdown in inline quoted CLI args. Use `gh ... --body-file` (file or heredoc stdin) for all issue/PR comments and `gh pr edit --body-file` for PR description updates, then verify line breaks by reading back body text.
 - **Branch-per-issue**: branch from `main`, name as `<type>/<short-description>` (e.g. `feat/command-registry`, `fix/ipc-timeout`).
 - **Use templates**: open issues from `.github/ISSUE_TEMPLATE/` and use `.github/pull_request_template.md`.
 - **PR checklist**: see `workings/chatgpt-refactor-vision-planning-2026-01-15/pr-acceptance-and-quality-gates.md` for the full acceptance gate list. Key gates: command defined once in C++ registry, menu/MCP parity preserved, `get_state()` validates against schema, Python tests pass.

@@ -5,9 +5,10 @@ import time
 from typing import Any, Dict, List, Optional
 from pathlib import Path
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 
 from .events import EventHub
+from .browser_pipeline import fetch_render_bundle, render_markdown
 from .models import AppState, Rect, Window, WindowType, new_id
 from .ipc_client import send_cmd
 from .schemas import (
@@ -40,11 +41,43 @@ class Controller:
         self._timelines: Dict[str, List[asyncio.Task]] = {}
         # Repo root (two levels up from this file)
         self._repo_root = Path(__file__).resolve().parents[2]
+        default_log_path = self._repo_root / "logs" / "state" / "events.ndjson"
+        self._state_event_log_path = Path(os.environ.get("WWD_STATE_EVENT_LOG_PATH", str(default_log_path)))
 
     # ----- Query -----
     async def get_state(self) -> AppState:
         await self._sync_state()
         return self._state
+
+    async def get_registry_capabilities(self) -> Dict[str, Any]:
+        """Fetch canonical command capabilities from the C++ registry via IPC."""
+        try:
+            resp = send_cmd("get_capabilities")
+            if resp and resp.strip().startswith("{"):
+                data = json.loads(resp.strip())
+                if isinstance(data, dict):
+                    return data
+        except Exception:
+            pass
+        return {"version": "v1", "commands": []}
+
+    async def get_capabilities(self) -> Dict[str, Any]:
+        """Return API capabilities derived from canonical C++ command metadata."""
+        registry = await self.get_registry_capabilities()
+        command_names = [
+            cmd.get("name")
+            for cmd in registry.get("commands", [])
+            if isinstance(cmd, dict) and cmd.get("name")
+        ]
+        return {
+            "version": registry.get("version", "v1"),
+            "window_types": [t.value for t in WindowType],
+            "commands": command_names,
+            "properties": {
+                "frame_player": {"fps": {"type": "number", "min": 1, "max": 120}},
+                "test_pattern": {"variant": {"type": "string"}},
+            },
+        }
 
     async def _sync_state(self) -> None:
         """Sync in-memory state with the real C++ app via IPC"""
@@ -142,6 +175,7 @@ class Controller:
                 w.focused = False
             self._state.windows.append(win)
         await self._events.emit("window.created", self._serialize_window(win))
+        self._append_state_event("window.created", {"window_id": win.id, "type": win.type.value}, actor="api")
         return win
 
     async def move_resize(self, win_id: str, *, x=None, y=None, w=None, h=None) -> Window:
@@ -169,6 +203,7 @@ class Controller:
         try:
             win = self._require(win_id)
             await self._events.emit("window.updated", self._serialize_window(win))
+            self._append_state_event("window.moved_or_resized", {"window_id": win_id}, actor="api")
             return win
         except KeyError:
             raise KeyError(win_id)
@@ -219,6 +254,7 @@ class Controller:
         # Sync state and emit event
         await self._sync_state()
         await self._events.emit("window.closed", {"id": win_id})
+        self._append_state_event("window.closed", {"window_id": win_id}, actor="api")
 
     async def close_all(self) -> None:
         try:
@@ -230,6 +266,7 @@ class Controller:
             self._state.windows.clear()
         for wid in ids:
             await self._events.emit("window.closed", {"id": wid})
+            self._append_state_event("window.closed", {"window_id": wid}, actor="api")
 
     async def cascade(self) -> None:
         try:
@@ -243,6 +280,7 @@ class Controller:
                 x += 2
                 y += 1
         await self._events.emit("layout.cascade", {})
+        self._append_state_event("layout.cascade", {}, actor="api")
 
     async def tile(self, cols: int = 2) -> None:
         try:
@@ -266,6 +304,7 @@ class Controller:
                     col = 0
                     row += 1
         await self._events.emit("layout.tile", {"cols": cols})
+        self._append_state_event("layout.tile", {"cols": cols}, actor="api")
 
     # ----- Properties / Commands -----
     async def set_props(self, win_id: str, props: Dict[str, Any]) -> Window:
@@ -366,39 +405,26 @@ class Controller:
         except Exception as e:
             return {"ok": False, "error": str(e)}
 
-    async def exec_command(self, name: str, args: Dict[str, Any]) -> Dict[str, Any]:
-        # Simulate a few commands
-        handled = {"command": name, "ok": True}
-        if name == "cascade":
-            await self.cascade()
-        elif name == "tile":
-            await self.tile(args.get("cols", 2))
-        elif name == "close_all":
-            await self.close_all()
-        elif name == "save_workspace":
-            try:
-                p = str(args.get("path", "workspaces/last_workspace.json"))
-                send_cmd("save_workspace", {"path": p})
-            except Exception:
-                pass
-            await self.save_workspace(args.get("path", "workspace.json"))
-        elif name == "open_workspace":
-            try:
-                p = str(args.get("path", "workspaces/last_workspace.json"))
-                send_cmd("open_workspace", {"path": p})
-            except Exception:
-                pass
-            await self.open_workspace(args.get("path", "workspace.json"))
-        elif name == "screenshot":
-            try:
-                send_cmd("screenshot")
-            except Exception:
-                pass
-            await self.screenshot(args.get("path"))
-        else:
+    async def exec_command(self, name: str, args: Dict[str, Any], actor: str = "api") -> Dict[str, Any]:
+        handled = {"command": name, "ok": True, "actor": actor or "api"}
+        payload: Dict[str, str] = {"name": name}
+        payload["actor"] = handled["actor"]
+        for key, value in (args or {}).items():
+            payload[key] = str(value)
+        try:
+            resp = send_cmd("exec_command", payload)
+            if isinstance(resp, str) and resp.lower().startswith("err"):
+                handled["ok"] = False
+                handled["error"] = resp
+        except Exception as exc:
             handled["ok"] = False
-            handled["error"] = "unknown_command"
+            handled["error"] = str(exc)
+
+        # Refresh mirrored state after command execution for best-effort parity.
+        if handled["ok"]:
+            await self._sync_state()
         await self._events.emit("command.executed", handled)
+        self._append_state_event("command.executed", {"command": name}, actor=handled["actor"])
         return handled
 
     async def set_pattern_mode(self, mode: str) -> None:
@@ -411,15 +437,23 @@ class Controller:
         await self._events.emit("pattern.mode", {"mode": mode})
 
     # ----- Workspace / Screenshot -----
-    async def save_workspace(self, path: str) -> None:
+    async def save_workspace(self, path: str) -> Dict[str, Any]:
+        res = await self.export_state(path, "json")
+        if not res.get("ok"):
+            return res
         async with self._lock:
             self._state.last_workspace = path
         await self._events.emit("workspace.saved", {"path": path})
+        return {"ok": True, "path": path, "format": "json", "fallback": bool(res.get("fallback", False))}
 
-    async def open_workspace(self, path: str) -> None:
+    async def open_workspace(self, path: str) -> Dict[str, Any]:
+        res = await self.import_state(path, "replace")
+        if not res.get("ok"):
+            return res
         async with self._lock:
             self._state.last_workspace = path
         await self._events.emit("workspace.opened", {"path": path})
+        return {"ok": True, "path": path, "mode": "replace", "fallback": bool(res.get("fallback", False))}
 
     async def screenshot(self, path: Optional[str]) -> str:
         target = path or f"screenshot_{int(time.time())}.png"
@@ -427,6 +461,191 @@ class Controller:
             self._state.last_screenshot = target
         await self._events.emit("screenshot.saved", {"path": target})
         return target
+
+    # ----- Browser -----
+    async def browser_open(
+        self,
+        url: str,
+        window_id: Optional[str] = None,
+        mode: str = "new",
+        record_history: bool = True,
+    ) -> Dict[str, Any]:
+        bundle = fetch_render_bundle(url)
+        if mode == "same" and window_id:
+            win = self._require(window_id)
+            if win.type != WindowType.browser:
+                raise KeyError(window_id)
+        else:
+            win = await self.create_window(
+                WindowType.browser,
+                bundle.get("title", "Browser"),
+                Rect(2, 1, 100, 30),
+                {},
+            )
+
+        history = list(win.props.get("history", []))
+        if record_history:
+            history.append(url)
+            history_index = len(history) - 1
+        else:
+            history_index = int(win.props.get("history_index", max(0, len(history) - 1)))
+        win.props.update(
+            {
+                "url": url,
+                "history": history,
+                "history_index": history_index,
+                "markdown": bundle.get("markdown", ""),
+                "tui_text": bundle.get("tui_text", ""),
+                "links": bundle.get("links", []),
+                "render_mode": win.props.get("render_mode", "plain"),
+                "image_mode": win.props.get("image_mode", "none"),
+            }
+        )
+        await self._events.emit("browser.opened", {"window_id": win.id, "url": url})
+        self._append_state_event("browser.opened", {"window_id": win.id, "url": url}, actor="api")
+        return {"ok": True, "window_id": win.id, "url": url, "title": bundle.get("title", url), "bundle": bundle}
+
+    async def browser_back(self, window_id: str) -> Dict[str, Any]:
+        win = self._require(window_id)
+        history = list(win.props.get("history", []))
+        idx = int(win.props.get("history_index", 0))
+        if idx <= 0:
+            return {"ok": False, "error": "no_back_history"}
+        idx -= 1
+        win.props["history_index"] = idx
+        url = history[idx]
+        return await self.browser_open(url, window_id=window_id, mode="same", record_history=False)
+
+    async def browser_forward(self, window_id: str) -> Dict[str, Any]:
+        win = self._require(window_id)
+        history = list(win.props.get("history", []))
+        idx = int(win.props.get("history_index", 0))
+        if idx >= len(history) - 1:
+            return {"ok": False, "error": "no_forward_history"}
+        idx += 1
+        win.props["history_index"] = idx
+        url = history[idx]
+        return await self.browser_open(url, window_id=window_id, mode="same", record_history=False)
+
+    async def browser_refresh(self, window_id: str) -> Dict[str, Any]:
+        win = self._require(window_id)
+        url = str(win.props.get("url", ""))
+        return await self.browser_open(url, window_id=window_id, mode="same", record_history=False)
+
+    async def browser_find(self, window_id: str, query: str, direction: str = "next") -> Dict[str, Any]:
+        win = self._require(window_id)
+        text = str(win.props.get("tui_text", ""))
+        idx = text.lower().find(query.lower())
+        return {"ok": idx >= 0, "index": idx, "direction": direction}
+
+    async def browser_set_mode(self, window_id: str, headings: Optional[str], images: Optional[str]) -> Dict[str, Any]:
+        win = self._require(window_id)
+        if headings:
+            win.props["render_mode"] = headings
+        if images:
+            win.props["image_mode"] = images
+        win.props["tui_text"] = render_markdown(
+            str(win.props.get("markdown", "")),
+            headings=win.props.get("render_mode", "plain"),
+            images=win.props.get("image_mode", "none"),
+        )
+        return {"ok": True, "window_id": window_id, "render_mode": win.props.get("render_mode"), "image_mode": win.props.get("image_mode")}
+
+    async def browser_fetch(self, url: str, reader: str = "readability", fmt: str = "tui_bundle") -> Dict[str, Any]:
+        bundle = fetch_render_bundle(url, reader=reader)
+        if fmt == "markdown":
+            return {"ok": True, "url": url, "markdown": bundle.get("markdown", ""), "meta": bundle.get("meta", {})}
+        return {"ok": True, "bundle": bundle}
+
+    async def browser_render(self, markdown: str, headings: str = "plain", images: str = "none", width: int = 80) -> Dict[str, Any]:
+        return {"ok": True, "tui_text": render_markdown(markdown, headings=headings, images=images, width=width)}
+
+    async def browser_get_content(self, window_id: str, fmt: str = "text") -> Dict[str, Any]:
+        win = self._require(window_id)
+        if fmt == "markdown":
+            return {"ok": True, "content": win.props.get("markdown", "")}
+        if fmt == "links":
+            return {"ok": True, "links": win.props.get("links", [])}
+        return {"ok": True, "content": win.props.get("tui_text", "")}
+
+    async def browser_summarise(self, window_id: str, target: str = "new_window") -> Dict[str, Any]:
+        win = self._require(window_id)
+        text = str(win.props.get("markdown", ""))
+        summary = (text[:400] + "...") if len(text) > 400 else text
+        if target == "new_window":
+            new_win = await self.create_window(WindowType.text_editor, "Summary", Rect(6, 4, 90, 22), {"content": summary})
+            return {"ok": True, "window_id": new_win.id, "summary": summary}
+        return {"ok": True, "summary": summary}
+
+    async def browser_extract_links(self, window_id: str, pattern: Optional[str] = None) -> Dict[str, Any]:
+        win = self._require(window_id)
+        links = list(win.props.get("links", []))
+        if pattern:
+            try:
+                rx = re.compile(pattern)
+                links = [l for l in links if rx.search(str(l.get("url", ""))) or rx.search(str(l.get("text", "")))]
+            except re.error as exc:
+                return {"ok": False, "error": str(exc)}
+        return {"ok": True, "links": links}
+
+    async def browser_clip(self, window_id: str, path: Optional[str] = None, include_images: bool = False) -> Dict[str, Any]:
+        win = self._require(window_id)
+        out_path = Path(path or f"clips/{window_id}.md")
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        markdown = str(win.props.get("markdown", ""))
+        if include_images:
+            markdown += "\n\n<!-- images included -->\n"
+        out_path.write_text(markdown, encoding="utf-8")
+        return {"ok": True, "path": str(out_path)}
+
+    async def browser_toggle_gallery(self, window_id: str) -> Dict[str, Any]:
+        win = self._require(window_id)
+        gallery_id = win.props.get("gallery_window_id")
+        if gallery_id:
+            return {"ok": True, "gallery_window_id": gallery_id, "reused": True}
+        gallery = await self.create_window(
+            WindowType.text_view,
+            f"Gallery: {win.title}",
+            Rect(30, 3, 118, 30),
+            {"source_window_id": window_id},
+        )
+        win.props["gallery_window_id"] = gallery.id
+        return {"ok": True, "gallery_window_id": gallery.id, "reused": False}
+
+    async def export_state(self, path: str, fmt: str = "json") -> Dict[str, Any]:
+        if fmt not in ("json", "ndjson"):
+            return {"ok": False, "error": "invalid_format"}
+        try:
+            resp = send_cmd("export_state", {"path": path, "format": fmt})
+            if isinstance(resp, str) and resp.lower().startswith("err"):
+                raise RuntimeError(resp)
+            return {"ok": True, "path": path, "format": fmt}
+        except Exception:
+            try:
+                snapshot = self._snapshot_from_state()
+                target = Path(path)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text(json.dumps(snapshot, sort_keys=True), encoding="utf-8")
+                return {"ok": True, "path": path, "format": fmt, "fallback": True}
+            except Exception as exc:
+                return {"ok": False, "error": str(exc)}
+
+    async def import_state(self, path: str, mode: str = "replace") -> Dict[str, Any]:
+        if mode not in ("replace", "merge"):
+            return {"ok": False, "error": "invalid_mode"}
+        try:
+            resp = send_cmd("import_state", {"path": path, "mode": mode})
+            if isinstance(resp, str) and resp.lower().startswith("err"):
+                raise RuntimeError(resp)
+            await self._sync_state()
+            return {"ok": True, "path": path, "mode": mode}
+        except Exception:
+            try:
+                payload = json.loads(Path(path).read_text(encoding="utf-8"))
+                self._apply_snapshot(payload, mode=mode)
+                return {"ok": True, "path": path, "mode": mode, "fallback": True}
+            except Exception as exc:
+                return {"ok": False, "error": str(exc)}
 
     # ----- Helpers -----
     def _require(self, win_id: str) -> Window:
@@ -446,6 +665,84 @@ class Controller:
             "zoomed": w.zoomed,
             "props": dict(w.props),
         }
+
+    def _append_state_event(self, event_type: str, data: Dict[str, Any], actor: str) -> None:
+        """Append state events as NDJSON for local-first auditability."""
+        entry = {
+            "ts": datetime.now(timezone.utc).isoformat(),
+            "event": event_type,
+            "actor": actor,
+            "data": data,
+        }
+        try:
+            self._state_event_log_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(self._state_event_log_path, "a", encoding="utf-8") as f:
+                f.write(json.dumps(entry, separators=(",", ":")) + "\n")
+        except Exception:
+            # Logging must not break command flow in this MVP.
+            pass
+
+    def _snapshot_from_state(self) -> Dict[str, Any]:
+        started = datetime.fromtimestamp(self._state.started_at, tz=timezone.utc)
+        return {
+            "version": "1",
+            "timestamp": started.isoformat(),
+            "canvas": {"w": self._state.canvas_width, "h": self._state.canvas_height},
+            "pattern_mode": self._state.pattern_mode,
+            "windows": [
+                {
+                    "id": w.id,
+                    "type": w.type.value,
+                    "title": w.title,
+                    "rect": {"x": w.rect.x, "y": w.rect.y, "w": w.rect.w, "h": w.rect.h},
+                    "z": w.z,
+                    "focused": w.focused,
+                    "props": dict(w.props),
+                }
+                for w in self._state.windows
+            ],
+        }
+
+    def _apply_snapshot(self, payload: Dict[str, Any], mode: str = "replace") -> None:
+        if mode == "replace":
+            self._state.windows = []
+            self._state.next_z = 1
+
+        ts = payload.get("timestamp")
+        if isinstance(ts, str):
+            try:
+                self._state.started_at = datetime.fromisoformat(ts.replace("Z", "+00:00")).timestamp()
+            except Exception:
+                pass
+
+        self._state.pattern_mode = payload.get("pattern_mode", self._state.pattern_mode)
+        canvas = payload.get("canvas", {})
+        self._state.canvas_width = int(canvas.get("w", self._state.canvas_width))
+        self._state.canvas_height = int(canvas.get("h", self._state.canvas_height))
+
+        for item in payload.get("windows", []):
+            rect = item.get("rect", {})
+            wtype_raw = item.get("type", "test_pattern")
+            try:
+                wtype = WindowType(wtype_raw)
+            except ValueError:
+                wtype = WindowType.test_pattern
+            win = Window(
+                id=item.get("id", new_id("win")),
+                type=wtype,
+                title=item.get("title", ""),
+                rect=Rect(
+                    x=int(rect.get("x", 0)),
+                    y=int(rect.get("y", 0)),
+                    w=max(1, int(rect.get("w", 40))),
+                    h=max(1, int(rect.get("h", 12))),
+                ),
+                z=int(item.get("z", self._state.next_z)),
+                focused=bool(item.get("focused", False)),
+                props=dict(item.get("props", {})),
+            )
+            self._state.windows.append(win)
+            self._state.next_z = max(self._state.next_z, win.z + 1)
 
     # ----- Batch Layout -----
     async def batch_layout(self, req: BatchLayoutRequest) -> BatchLayoutResponse:

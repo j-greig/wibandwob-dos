@@ -5,8 +5,10 @@ like Claude Code to programmatically control TUI applications via standardized
 tool interfaces.
 """
 
-from typing import Optional, Dict, Any, List
+import json
+from typing import Optional, Dict, Any, List, Callable, Awaitable
 from .controller import Controller
+from .ipc_client import send_cmd
 from .models import WindowType, Rect
 from .browser import BrowserSession, fetch_and_convert
 
@@ -41,6 +43,161 @@ def serialize_window(window) -> Dict[str, Any]:
         "focused": window.focused,
         "props": dict(window.props)
     }
+
+
+CommandToolHandler = Callable[..., Awaitable[Dict[str, Any]]]
+
+
+def _exec_result_error(result: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "success": False,
+        "error": result.get("error", "command_failed"),
+    }
+
+
+def _make_simple_command_handler(command_name: str, success_message: str) -> CommandToolHandler:
+    async def _handler() -> Dict[str, Any]:
+        controller = get_controller()
+        result = await controller.exec_command(command_name, {}, actor="mcp")
+        if not result.get("ok"):
+            return _exec_result_error(result)
+        return {
+            "success": True,
+            "message": success_message,
+        }
+    return _handler
+
+
+def _make_tile_handler() -> CommandToolHandler:
+    async def _handler(columns: Optional[int] = 2) -> Dict[str, Any]:
+        controller = get_controller()
+        result = await controller.exec_command("tile", {"cols": columns or 2}, actor="mcp")
+        if not result.get("ok"):
+            return _exec_result_error(result)
+        return {
+            "success": True,
+            "message": f"Windows tiled in {columns} columns",
+        }
+    return _handler
+
+
+def _make_pattern_mode_handler() -> CommandToolHandler:
+    async def _handler(mode: str) -> Dict[str, Any]:
+        if mode not in ["continuous", "tiled"]:
+            return {
+                "success": False,
+                "error": f"Invalid mode: {mode}",
+                "valid_modes": ["continuous", "tiled"],
+            }
+        controller = get_controller()
+        result = await controller.exec_command("pattern_mode", {"mode": mode}, actor="mcp")
+        if not result.get("ok"):
+            return _exec_result_error(result)
+        return {
+            "success": True,
+            "message": f"Pattern mode set to {mode}",
+        }
+    return _handler
+
+
+def _make_screenshot_handler() -> CommandToolHandler:
+    async def _handler(path: Optional[str] = None) -> Dict[str, Any]:
+        args: Dict[str, Any] = {}
+        if path:
+            args["path"] = path
+        controller = get_controller()
+        result = await controller.exec_command("screenshot", args, actor="mcp")
+        if not result.get("ok"):
+            return _exec_result_error(result)
+        return {
+            "success": True,
+            "screenshot_path": path or "default",
+        }
+    return _handler
+
+
+def _make_save_workspace_handler() -> CommandToolHandler:
+    async def _handler(path: str = "workspace.json") -> Dict[str, Any]:
+        controller = get_controller()
+        result = await controller.exec_command("save_workspace", {"path": path}, actor="mcp")
+        if not result.get("ok"):
+            return _exec_result_error(result)
+        return {
+            "success": True,
+            "path": path,
+        }
+    return _handler
+
+
+def _make_open_workspace_handler() -> CommandToolHandler:
+    async def _handler(path: str) -> Dict[str, Any]:
+        controller = get_controller()
+        result = await controller.exec_command("open_workspace", {"path": path}, actor="mcp")
+        if not result.get("ok"):
+            return _exec_result_error(result)
+        return {
+            "success": True,
+            "path": path,
+        }
+    return _handler
+
+
+def _command_tool_builders() -> Dict[str, Dict[str, Any]]:
+    return {
+        "cascade": {
+            "tool_name": "tui_cascade_windows",
+            "handler": _make_simple_command_handler("cascade", "Windows arranged in cascade layout"),
+        },
+        "tile": {
+            "tool_name": "tui_tile_windows",
+            "handler": _make_tile_handler(),
+        },
+        "close_all": {
+            "tool_name": "tui_close_all_windows",
+            "handler": _make_simple_command_handler("close_all", "All windows closed"),
+        },
+        "pattern_mode": {
+            "tool_name": "tui_set_pattern_mode",
+            "handler": _make_pattern_mode_handler(),
+        },
+        "screenshot": {
+            "tool_name": "tui_screenshot",
+            "handler": _make_screenshot_handler(),
+        },
+        "save_workspace": {
+            "tool_name": "tui_save_workspace",
+            "handler": _make_save_workspace_handler(),
+        },
+        "open_workspace": {
+            "tool_name": "tui_open_workspace",
+            "handler": _make_open_workspace_handler(),
+        },
+    }
+
+
+def _registry_command_names() -> List[str]:
+    try:
+        response = send_cmd("get_capabilities")
+        payload = json.loads(response)
+        names = [
+            cmd.get("name")
+            for cmd in payload.get("commands", [])
+            if isinstance(cmd, dict) and cmd.get("name")
+        ]
+        if names:
+            return names
+    except Exception:
+        pass
+    return list(_command_tool_builders().keys())
+
+
+def command_tool_names_for_registration() -> List[str]:
+    builders = _command_tool_builders()
+    names: List[str] = []
+    for command_name in _registry_command_names():
+        if command_name in builders:
+            names.append(builders[command_name]["tool_name"])
+    return names
 
 _browser_session: Optional[BrowserSession] = None
 
@@ -272,126 +429,13 @@ def register_tui_tools(mcp):
                 "error": str(e)
             }
     
-    @mcp.tool("tui_cascade_windows")
-    async def cascade_tui_windows() -> Dict[str, Any]:
-        """Arrange all windows in cascade layout
-        
-        Returns:
-            Dictionary containing success status
-        """
-        controller = get_controller()
-        
-        try:
-            await controller.cascade()
-            return {
-                "success": True,
-                "message": "Windows arranged in cascade layout"
-            }
-        except Exception as e:
-            return {
-                "success": False,
-                "error": str(e)
-            }
-    
-    @mcp.tool("tui_tile_windows")
-    async def tile_tui_windows(columns: Optional[int] = 2) -> Dict[str, Any]:
-        """Arrange all windows in tiled layout
-        
-        Args:
-            columns: Number of columns for tiling (default: 2)
-            
-        Returns:
-            Dictionary containing success status
-        """
-        controller = get_controller()
-        
-        try:
-            await controller.tile(columns)
-            return {
-                "success": True,
-                "message": f"Windows tiled in {columns} columns"
-            }
-        except Exception as e:
-            return {
-                "success": False,
-                "error": str(e)
-            }
-    
-    @mcp.tool("tui_close_all_windows")
-    async def close_all_tui_windows() -> Dict[str, Any]:
-        """Close all TUI windows
-        
-        Returns:
-            Dictionary containing success status
-        """
-        controller = get_controller()
-        
-        try:
-            await controller.close_all()
-            return {
-                "success": True,
-                "message": "All windows closed"
-            }
-        except Exception as e:
-            return {
-                "success": False,
-                "error": str(e)
-            }
-    
-    @mcp.tool("tui_set_pattern_mode")
-    async def set_tui_pattern_mode(mode: str) -> Dict[str, Any]:
-        """Set the test pattern display mode
-        
-        Args:
-            mode: Pattern mode ('continuous' or 'tiled')
-            
-        Returns:
-            Dictionary containing success status
-        """
-        controller = get_controller()
-        
-        if mode not in ['continuous', 'tiled']:
-            return {
-                "success": False,
-                "error": f"Invalid mode: {mode}",
-                "valid_modes": ["continuous", "tiled"]
-            }
-        
-        try:
-            await controller.set_pattern_mode(mode)
-            return {
-                "success": True,
-                "message": f"Pattern mode set to {mode}"
-            }
-        except Exception as e:
-            return {
-                "success": False,
-                "error": str(e)
-            }
-    
-    @mcp.tool("tui_screenshot")
-    async def take_tui_screenshot(path: Optional[str] = None) -> Dict[str, Any]:
-        """Take a screenshot of the TUI application
-        
-        Args:
-            path: Optional screenshot file path
-            
-        Returns:
-            Dictionary containing success status and screenshot path
-        """
-        controller = get_controller()
-        
-        try:
-            screenshot_path = await controller.screenshot(path)
-            return {
-                "success": True,
-                "screenshot_path": screenshot_path
-            }
-        except Exception as e:
-            return {
-                "success": False,
-                "error": str(e)
-            }
+    # Register command-style MCP tools from canonical registry capability names.
+    command_builders = _command_tool_builders()
+    for command_name in _registry_command_names():
+        tool_spec = command_builders.get(command_name)
+        if not tool_spec:
+            continue
+        mcp.tool(tool_spec["tool_name"])(tool_spec["handler"])
     
     @mcp.tool("tui_batch_layout")
     async def batch_layout_windows(request: Dict[str, Any]) -> Dict[str, Any]:
@@ -592,3 +636,68 @@ def register_tui_tools(mcp):
                 "success": False,
                 "error": str(e)
             }
+
+    @mcp.tool("browser.open")
+    async def browser_open_tool(url: str, window_id: Optional[str] = None, mode: str = "new") -> Dict[str, Any]:
+        controller = get_controller()
+        return await controller.browser_open(url, window_id, mode)
+
+    @mcp.tool("browser.back")
+    async def browser_back_tool(window_id: str) -> Dict[str, Any]:
+        controller = get_controller()
+        return await controller.browser_back(window_id)
+
+    @mcp.tool("browser.forward")
+    async def browser_forward_tool(window_id: str) -> Dict[str, Any]:
+        controller = get_controller()
+        return await controller.browser_forward(window_id)
+
+    @mcp.tool("browser.refresh")
+    async def browser_refresh_tool(window_id: str) -> Dict[str, Any]:
+        controller = get_controller()
+        return await controller.browser_refresh(window_id)
+
+    @mcp.tool("browser.find")
+    async def browser_find_tool(window_id: str, query: str, direction: str = "next") -> Dict[str, Any]:
+        controller = get_controller()
+        return await controller.browser_find(window_id, query, direction)
+
+    @mcp.tool("browser.set_mode")
+    async def browser_set_mode_tool(window_id: str, headings: Optional[str] = None, images: Optional[str] = None) -> Dict[str, Any]:
+        controller = get_controller()
+        return await controller.browser_set_mode(window_id, headings, images)
+
+    @mcp.tool("browser.fetch")
+    async def browser_fetch_tool(url: str, reader: str = "readability", format: str = "tui_bundle") -> Dict[str, Any]:
+        controller = get_controller()
+        return await controller.browser_fetch(url, reader, format)
+
+    @mcp.tool("browser.render")
+    async def browser_render_tool(markdown: str, headings: str = "plain", images: str = "none", width: int = 80) -> Dict[str, Any]:
+        controller = get_controller()
+        return await controller.browser_render(markdown, headings, images, width)
+
+    @mcp.tool("browser.get_content")
+    async def browser_get_content_tool(window_id: str, format: str = "text") -> Dict[str, Any]:
+        controller = get_controller()
+        return await controller.browser_get_content(window_id, format)
+
+    @mcp.tool("browser.summarise")
+    async def browser_summarise_tool(window_id: str, target: str = "new_window") -> Dict[str, Any]:
+        controller = get_controller()
+        return await controller.browser_summarise(window_id, target)
+
+    @mcp.tool("browser.extract_links")
+    async def browser_extract_links_tool(window_id: str, filter: Optional[str] = None) -> Dict[str, Any]:
+        controller = get_controller()
+        return await controller.browser_extract_links(window_id, pattern=filter)
+
+    @mcp.tool("browser.clip")
+    async def browser_clip_tool(window_id: str, path: Optional[str] = None, include_images: bool = False) -> Dict[str, Any]:
+        controller = get_controller()
+        return await controller.browser_clip(window_id, path=path, include_images=include_images)
+
+    @mcp.tool("browser.gallery")
+    async def browser_gallery_tool(window_id: str) -> Dict[str, Any]:
+        controller = get_controller()
+        return await controller.browser_toggle_gallery(window_id)

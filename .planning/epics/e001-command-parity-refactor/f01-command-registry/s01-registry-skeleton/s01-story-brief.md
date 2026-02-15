@@ -12,23 +12,23 @@ Deliver the first vertical slice proving parity direction: add a command/capabil
 
 ## Tasks
 
-- [ ] Add C++ registry skeleton and integration point for existing command handling
-- [ ] Expose capability data through one non-breaking IPC/API path
-- [ ] Migrate one hardcoded API/MCP command list path to capability-driven flow
-- [ ] Add one parity test (menu/capability consistency for migrated path)
-- [ ] Add one schema validation test
-- [ ] Add one snapshot/event sanity test
-- [ ] Update architecture/migration docs for source-of-truth direction
+- [x] Add C++ registry skeleton and integration point for existing command handling
+- [x] Expose capability data through one non-breaking IPC/API path
+- [x] Migrate one hardcoded API/MCP command list path to capability-driven flow
+- [x] Add one parity test (menu/capability consistency for migrated path)
+- [x] Add one schema validation test
+- [x] Add one snapshot/event sanity test
+- [x] Update architecture/migration docs for source-of-truth direction
 
 ## Acceptance Criteria
 
-- [ ] **AC-1:** Migrated path uses canonical registry/capability source
+- [x] **AC-1:** Migrated path uses canonical registry/capability source
   - Test: `uv run python tools/api_server/test_registry_dispatch.py`
-- [ ] **AC-2:** Capability payload validates against schema
+- [x] **AC-2:** Capability payload validates against schema
   - Test: `uv run pytest tests/contract/test_capabilities_schema.py::test_registry_capabilities_payload_validates`
-- [ ] **AC-3:** Parity check passes for migrated command set
+- [x] **AC-3:** Parity check passes for migrated command set
   - Test: `uv run pytest tests/contract/test_parity_drift.py::test_menu_vs_capabilities_parity`
-- [ ] **AC-4:** Snapshot/event sanity is preserved for migrated path
+- [x] **AC-4:** Snapshot/event sanity is preserved for migrated path
   - Test: `uv run pytest tests/contract/test_snapshot_event_sanity.py::test_snapshot_round_trip_and_event_emission`
 
 ## Rollback
@@ -38,6 +38,6 @@ Deliver the first vertical slice proving parity direction: add a command/capabil
 
 ## Status
 
-Status: `not-started`
-GitHub issue: (not yet created)
+Status: `done`
+GitHub issue: #2
 PR: —

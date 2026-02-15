@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.10)
 project(wibwob-dos CXX)
+enable_testing()
 
 # Build Turbo Vision library from submodule
 # Disable examples — we only need the library

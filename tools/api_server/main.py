@@ -25,6 +25,14 @@ from .schemas import (
     BatchLayoutResponse,
     BatchPrimersRequest,
     BatchPrimersResponse,
+    BrowserClipReq,
+    BrowserFetchReq,
+    BrowserFindReq,
+    BrowserGetContentReq,
+    BrowserOpenReq,
+    BrowserRenderReq,
+    BrowserSetModeReq,
+    BrowserWindowReq,
     BrowserFetchRequest,
     CanvasInfo,
     Capabilities,
@@ -39,6 +47,8 @@ from .schemas import (
     SendTextReq,
     SendFigletReq,
     SendMultiFigletReq,
+    StateExportReq,
+    StateImportReq,
     WindowCreate,
     WindowMoveResize,
     WindowPropsUpdate,
@@ -95,21 +105,12 @@ def make_app() -> FastAPI:
 
     @app.get("/capabilities", response_model=Capabilities)
     async def capabilities() -> Capabilities:
+        caps = await ctl.get_capabilities()
         return Capabilities(
-            version="v1",
-            window_types=[t.value for t in WindowType],
-            commands=[
-                "cascade",
-                "tile",
-                "close_all",
-                "save_workspace",
-                "open_workspace",
-                "screenshot",
-            ],
-            properties={
-                "frame_player": {"fps": {"type": "number", "min": 1, "max": 120}},
-                "test_pattern": {"variant": {"type": "string"}},
-            },
+            version=str(caps.get("version", "v1")),
+            window_types=list(caps.get("window_types", [t.value for t in WindowType])),
+            commands=list(caps.get("commands", [])),
+            properties=dict(caps.get("properties", {})),
         )
 
     @app.get("/state", response_model=AppStateModel)
@@ -284,7 +285,7 @@ def make_app() -> FastAPI:
 
     @app.post("/menu/command")
     async def menu_command(payload: MenuCommand) -> Dict[str, Any]:
-        res = await ctl.exec_command(payload.command, payload.args)
+        res = await ctl.exec_command(payload.command, payload.args, actor=payload.actor or "api")
         if not res.get("ok"):
             raise HTTPException(status_code=400, detail=res.get("error", "command_failed"))
         return res
@@ -296,13 +297,125 @@ def make_app() -> FastAPI:
 
     @app.post("/workspace/save")
     async def workspace_save(payload: WorkspaceSave) -> Dict[str, Any]:
-        await ctl.save_workspace(payload.path)
-        return {"ok": True, "path": payload.path}
+        res = await ctl.save_workspace(payload.path)
+        if not res.get("ok"):
+            raise HTTPException(status_code=400, detail=res.get("error", "workspace_save_failed"))
+        return res
 
     @app.post("/workspace/open")
     async def workspace_open(payload: WorkspaceOpen) -> Dict[str, Any]:
-        await ctl.open_workspace(payload.path)
-        return {"ok": True, "path": payload.path}
+        res = await ctl.open_workspace(payload.path)
+        if not res.get("ok"):
+            raise HTTPException(status_code=400, detail=res.get("error", "workspace_open_failed"))
+        return res
+
+    @app.post("/state/export")
+    async def state_export(payload: StateExportReq) -> Dict[str, Any]:
+        res = await ctl.export_state(payload.path, payload.format)
+        if not res.get("ok"):
+            raise HTTPException(status_code=400, detail=res.get("error", "export_failed"))
+        return res
+
+    @app.post("/state/import")
+    async def state_import(payload: StateImportReq) -> Dict[str, Any]:
+        res = await ctl.import_state(payload.path, payload.mode)
+        if not res.get("ok"):
+            raise HTTPException(status_code=400, detail=res.get("error", "import_failed"))
+        return res
+
+    @app.post("/browser/open")
+    async def browser_open(payload: BrowserOpenReq) -> Dict[str, Any]:
+        res = await ctl.browser_open(payload.url, payload.window_id, payload.mode)
+        if not res.get("ok"):
+            raise HTTPException(status_code=400, detail=res.get("error", "browser_open_failed"))
+        return res
+
+    @app.post("/browser/{window_id}/back")
+    async def browser_back(window_id: str) -> Dict[str, Any]:
+        res = await ctl.browser_back(window_id)
+        if not res.get("ok"):
+            raise HTTPException(status_code=400, detail=res.get("error", "browser_back_failed"))
+        return res
+
+    @app.post("/browser/{window_id}/forward")
+    async def browser_forward(window_id: str) -> Dict[str, Any]:
+        res = await ctl.browser_forward(window_id)
+        if not res.get("ok"):
+            raise HTTPException(status_code=400, detail=res.get("error", "browser_forward_failed"))
+        return res
+
+    @app.post("/browser/{window_id}/refresh")
+    async def browser_refresh(window_id: str) -> Dict[str, Any]:
+        res = await ctl.browser_refresh(window_id)
+        if not res.get("ok"):
+            raise HTTPException(status_code=400, detail=res.get("error", "browser_refresh_failed"))
+        return res
+
+    @app.post("/browser/{window_id}/find")
+    async def browser_find(window_id: str, payload: BrowserFindReq) -> Dict[str, Any]:
+        res = await ctl.browser_find(window_id, payload.query, payload.direction)
+        if not res.get("ok"):
+            raise HTTPException(status_code=400, detail=res.get("error", "browser_find_failed"))
+        return res
+
+    @app.post("/browser/{window_id}/set_mode")
+    async def browser_set_mode(window_id: str, payload: BrowserSetModeReq) -> Dict[str, Any]:
+        res = await ctl.browser_set_mode(window_id, payload.headings, payload.images)
+        if not res.get("ok"):
+            raise HTTPException(status_code=400, detail=res.get("error", "browser_set_mode_failed"))
+        return res
+
+    @app.post("/browser/fetch_ext")
+    async def browser_fetch_ext(payload: BrowserFetchReq) -> Dict[str, Any]:
+        res = await ctl.browser_fetch(payload.url, payload.reader, payload.format)
+        if not res.get("ok"):
+            raise HTTPException(status_code=400, detail=res.get("error", "browser_fetch_failed"))
+        return res
+
+    @app.post("/browser/render")
+    async def browser_render(payload: BrowserRenderReq) -> Dict[str, Any]:
+        res = await ctl.browser_render(payload.markdown, payload.headings or "plain", payload.images or "none", payload.width or 80)
+        if not res.get("ok"):
+            raise HTTPException(status_code=400, detail=res.get("error", "browser_render_failed"))
+        return res
+
+    @app.post("/browser/get_content")
+    async def browser_get_content(payload: BrowserGetContentReq) -> Dict[str, Any]:
+        res = await ctl.browser_get_content(payload.window_id, payload.format)
+        if not res.get("ok"):
+            raise HTTPException(status_code=400, detail=res.get("error", "browser_get_content_failed"))
+        return res
+
+    @app.post("/browser/{window_id}/summarise")
+    async def browser_summarise(window_id: str) -> Dict[str, Any]:
+        res = await ctl.browser_summarise(window_id, target="new_window")
+        if not res.get("ok"):
+            raise HTTPException(status_code=400, detail=res.get("error", "browser_summarise_failed"))
+        return res
+
+    @app.post("/browser/{window_id}/extract_links")
+    async def browser_extract_links(window_id: str, payload: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        pattern = (payload or {}).get("filter")
+        res = await ctl.browser_extract_links(window_id, pattern=pattern)
+        if not res.get("ok"):
+            raise HTTPException(status_code=400, detail=res.get("error", "browser_extract_links_failed"))
+        return res
+
+    @app.post("/browser/{window_id}/clip")
+    async def browser_clip(window_id: str, payload: Optional[BrowserClipReq] = None) -> Dict[str, Any]:
+        p = payload.path if payload else None
+        include_images = payload.include_images if payload else False
+        res = await ctl.browser_clip(window_id, path=p, include_images=include_images)
+        if not res.get("ok"):
+            raise HTTPException(status_code=400, detail=res.get("error", "browser_clip_failed"))
+        return res
+
+    @app.post("/browser/{window_id}/gallery")
+    async def browser_gallery(window_id: str) -> Dict[str, Any]:
+        res = await ctl.browser_toggle_gallery(window_id)
+        if not res.get("ok"):
+            raise HTTPException(status_code=400, detail=res.get("error", "browser_gallery_failed"))
+        return res
 
     @app.post("/screenshot")
     async def screenshot(payload: Optional[ScreenshotReq] = None) -> Dict[str, Any]:

@@ -13,6 +13,7 @@ class WindowType(str, enum.Enum):
     frame_player = "frame_player"
     text_view = "text_view"
     text_editor = "text_editor"
+    browser = "browser"
     wallpaper = "wallpaper"
     browser = "browser"
 
@@ -51,4 +52,3 @@ class AppState:
 
 def new_id(prefix: str) -> str:
     return f"{prefix}_{uuid.uuid4().hex[:8]}"
-
