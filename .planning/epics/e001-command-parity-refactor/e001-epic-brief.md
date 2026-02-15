@@ -44,6 +44,8 @@ Naming:
   - Brief: `.planning/epics/e001-command-parity-refactor/f01-command-registry/s03-mcp-capability-registration/s03-story-brief.md`
 - [x] **S4 (PR-2+):** Full MCP parity for migrated registry commands
   - Brief: `.planning/epics/e001-command-parity-refactor/f01-command-registry/s04-full-mcp-command-parity/s04-story-brief.md`
+- [x] **S5 (PR-2+):** Native ctest coverage for command registry
+  - Brief: `.planning/epics/e001-command-parity-refactor/f01-command-registry/s05-command-registry-ctest/s05-story-brief.md`
 
 ## Acceptance Criteria (PR-1)
 

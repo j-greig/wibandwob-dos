@@ -15,6 +15,7 @@ Define commands once in C++ and derive capabilities from that source to remove d
 - [x] `.planning/epics/e001-command-parity-refactor/f01-command-registry/s02-parity-expansion/s02-story-brief.md` — expand MCP parity coverage + drift enforcement
 - [x] `.planning/epics/e001-command-parity-refactor/f01-command-registry/s03-mcp-capability-registration/s03-story-brief.md` — capability-driven MCP command tool registration
 - [x] `.planning/epics/e001-command-parity-refactor/f01-command-registry/s04-full-mcp-command-parity/s04-story-brief.md` — full MCP parity for migrated registry commands
+- [x] `.planning/epics/e001-command-parity-refactor/f01-command-registry/s05-command-registry-ctest/s05-story-brief.md` — native ctest coverage for command registry
 
 ## Acceptance Criteria
 

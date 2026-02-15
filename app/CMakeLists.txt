@@ -95,3 +95,11 @@ add_executable(ascii_dump
     tvision_ascii_view_poc.cpp
 )
 target_include_directories(ascii_dump PRIVATE ${CMAKE_CURRENT_LIST_DIR})
+
+# command_registry_test (native ctest coverage for registry capability payload)
+add_executable(command_registry_test
+    command_registry_test.cpp
+    command_registry.cpp
+)
+
+add_test(NAME command_registry COMMAND command_registry_test)
