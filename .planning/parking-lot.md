@@ -8,11 +8,11 @@ GitHub issue: —
 PR: —
 
 ## Active Items
-- [~] `task` #36 — always-on Codex<>Claude mailbox daemon with unread notifications
-  - Scope: local NDJSON mailbox + daemon + hook adapters
-  - Promotion trigger: if this splits into multiple long-lived capability tracks, promote to a dedicated epic
+- —
 
 ## Completed Items
+- [x] `task` #36 — always-on Codex<>Claude mailbox daemon with unread notifications
+- [x] `task` #38 — promoted to dedicated planning track `e003-dark-pastel-theme`
 - [x] `task` #35 — browser copy API route
 - [x] `task` #33 — screenshot reliability
 
