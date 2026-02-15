@@ -88,6 +88,8 @@ extern std::string api_focus_window(TTestPatternApp& app, const std::string& id)
 extern std::string api_close_window(TTestPatternApp& app, const std::string& id);
 extern std::string api_get_canvas_size(TTestPatternApp& app);
 extern void api_spawn_text_editor(TTestPatternApp& app, const TRect* bounds);
+extern void api_spawn_browser(TTestPatternApp& app, const TRect* bounds);
+extern std::string api_browser_fetch(TTestPatternApp& app, const std::string& url);
 extern std::string api_send_text(TTestPatternApp& app, const std::string& id, 
                                  const std::string& content, const std::string& mode, 
                                  const std::string& position);
@@ -213,6 +215,8 @@ void ApiIpcServer::poll() {
             else resp = "err missing path\n";
         } else if (type == "text_editor") {
             api_spawn_text_editor(*app_, bounds);
+        } else if (type == "browser") {
+            api_spawn_browser(*app_, bounds);
         } else {
             resp = "err unknown type\n";
         }
@@ -381,6 +385,13 @@ void ApiIpcServer::poll() {
                     }
                 }
             }
+        }
+    } else if (cmd == "browser_fetch") {
+        auto url_it = kv.find("url");
+        if (url_it != kv.end()) {
+            resp = api_browser_fetch(*app_, url_it->second) + "\n";
+        } else {
+            resp = "err missing url\n";
         }
     } else {
         resp = "err unknown cmd\n";

@@ -21,6 +21,7 @@ class WindowCreate(BaseModel):
         "text_editor",
         "browser",
         "wallpaper",
+        "browser",
     ]
     title: Optional[str] = None
     rect: Optional[RectModel] = None

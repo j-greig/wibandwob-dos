@@ -26,6 +26,9 @@ def fetch_and_convert(url: str) -> Dict[str, Any]:
     resp.raise_for_status()
     source_bytes = len(resp.content)
 
+    # Force UTF-8 decoding — requests sometimes guesses Latin-1 for
+    # responses without an explicit charset, causing double-encoding.
+    resp.encoding = resp.apparent_encoding or "utf-8"
     doc = Document(resp.text)
     title = doc.title()
     article_html = doc.summary()
