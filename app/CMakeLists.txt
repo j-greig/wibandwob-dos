@@ -12,6 +12,7 @@ set(TV_COMMON_SOURCES
     frame_capture.cpp
     api_ipc.cpp
     command_registry.cpp
+    theme_manager.cpp
     wibwob_view.cpp
     wibwob_engine.cpp
     llm/base/llm_config.cpp

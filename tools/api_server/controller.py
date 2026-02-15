@@ -88,6 +88,10 @@ class Controller:
                 state_data = json.loads(resp.strip())
                 
                 async with self._lock:
+                    # Update theme state from C++
+                    self._state.theme_mode = state_data.get("theme_mode", "light")
+                    self._state.theme_variant = state_data.get("theme_variant", "monochrome")
+
                     # Update windows list with real IDs from C++
                     new_windows = []
                     for win_data in state_data.get("windows", []):
@@ -97,7 +101,7 @@ class Controller:
                             title=win_data["title"],
                             rect=Rect(
                                 x=win_data["x"],
-                                y=win_data["y"], 
+                                y=win_data["y"],
                                 w=win_data["width"],
                                 h=win_data["height"]
                             ),
@@ -106,7 +110,7 @@ class Controller:
                             props={}
                         )
                         new_windows.append(win)
-                    
+
                     self._state.windows = new_windows
                     
             # Get canvas size separately
@@ -435,6 +439,18 @@ class Controller:
         async with self._lock:
             self._state.pattern_mode = mode
         await self._events.emit("pattern.mode", {"mode": mode})
+
+    async def set_theme_mode(self, mode: str) -> Dict[str, Any]:
+        """Set theme mode (light or dark) via command registry"""
+        return await self.exec_command("set_theme_mode", {"mode": mode})
+
+    async def set_theme_variant(self, variant: str) -> Dict[str, Any]:
+        """Set theme variant (monochrome or dark_pastel) via command registry"""
+        return await self.exec_command("set_theme_variant", {"variant": variant})
+
+    async def reset_theme(self) -> Dict[str, Any]:
+        """Reset theme to defaults (monochrome + light) via command registry"""
+        return await self.exec_command("reset_theme", {})
 
     # ----- Workspace / Screenshot -----
     async def save_workspace(self, path: str) -> Dict[str, Any]:
