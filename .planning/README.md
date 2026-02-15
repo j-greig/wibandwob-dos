@@ -133,6 +133,7 @@ Link checkboxes to their GitHub issue when one exists:
 | Spike | GitHub issue state | `spkNN-*.md` findings section |
 | Task | GitHub issue checklist | Story brief task list |
 
+<<<<<<< HEAD
 ### Parking Lot Container (Canon)
 
 Use `.planning/parking-lot.md` as the global container for cross-cutting `task`/`spike` follow-ons that are not yet promoted to a dedicated epic/feature track.
@@ -141,6 +142,14 @@ Rules:
 1. Every parking-lot item must link a GitHub issue.
 2. Use only `task` (implementation) or `spike` (investigation) type labels in the register.
 3. If an item grows beyond one small PR or needs its own story chain, promote it into a proper epic/feature/story path under `.planning/epics/`.
+
+### Off-Cuff / Side Work Rule
+
+When work appears mid-stream and is not required to close the current story/feature:
+
+1. Create a GitHub `task` issue (implementation) or `spike` issue (investigation).
+2. Track it either in `.planning/parking-lot.md` or under a `Non-epic follow-ons` note in the parent brief.
+3. Do not mark parent ACs done based on follow-on progress.
 
 ## Git Conventions
 
