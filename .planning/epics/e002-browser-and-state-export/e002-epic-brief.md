@@ -44,6 +44,7 @@ Stories are numbered globally within this epic (s01-s99).
 - [x] **S01:** Versioned snapshot schema + `export_state`/`import_state` IPC commands
 - [x] **S02:** `save_workspace`/`open_workspace` REST endpoints + file persistence
 - [x] **S03:** Event-triggered snapshot logging (window create/close/move/resize, command exec, timer)
+- [ ] **S14:** Fix `import_state` no-op so `open_workspace` applies state to running app
 
 ### F2: Browser Core
 
@@ -257,7 +258,7 @@ This epic builds on E001 command registry infrastructure:
 
 ## Status
 
-Status: `done`
+Status: `in-progress`
 GitHub issue: #16
 PR: —
 
