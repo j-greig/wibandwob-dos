@@ -40,5 +40,12 @@ Blocking items:
 - S17 AC-2 (gallery anchor-sync/focus assertions) still open.
 
 Non-gating follow-ons tracked as canon `task` issues:
-- #35 (browser copy API route)
-- #33 (screenshot reliability)
+- [x] #35 (browser copy API route) — done/closed
+- [x] #33 (screenshot reliability) — done/closed
+
+Closeout snapshot (2026-02-15):
+- Completed this pass:
+  - screenshot path stabilized to canonical in-process capture artifacts (`.txt`, `.ans`)
+  - browser copy API and screenshot reliability follow-ons closed (#35, #33)
+- Remaining to close F5:
+  - S17 AC-2 gallery anchor-sync/focus behavior requires explicit deterministic assertion before issue #31 can close

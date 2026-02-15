@@ -274,8 +274,16 @@ Open blockers:
 - F5/S17 gallery anchor-sync/focus behavior not yet fully asserted (AC-2)
 
 Non-epic follow-ons (canon: `task` for implementation, `spike` for investigation):
-- Task: #35 — browser copy API route (`POST /browser/{window_id}/copy`)
-- Task: #33 — screenshot reliability fix for active Turbo Vision frame capture
+- [x] Task: #35 — browser copy API route (`POST /browser/{window_id}/copy`) (done/closed)
+- [x] Task: #33 — screenshot reliability fix for active Turbo Vision frame capture (done/closed)
+
+Closeout snapshot (2026-02-15):
+- Completed this pass:
+  - non-epic follow-ons #35 and #33 closed with test evidence and issue comments
+  - screenshot capture path aligned to deterministic `.txt`/`.ans` output for API consumers
+- Remaining to close epic #16:
+  - close F5/#31 by completing S17 AC-2 gallery anchor-sync/focus assertions
+  - then flip epic Definition of Done items and AC checklist to all green
 
 ## Symbient Tag
 

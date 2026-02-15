@@ -83,6 +83,16 @@ Before ending a coding pass:
 4. Verify commit messages (if committing) follow `type(scope): ...`.
 5. Verify issue lifecycle is synced (`state`, progress comment, PR link, close conditions).
 
+## Closeout Pass (Canon)
+
+When asked to "tidy", "polish", or "close out" an epic/feature, treat it as a canon `closeout pass` task:
+
+1. Reconcile GitHub issue state vs `.planning` mirrors (GitHub is source of truth).
+2. Ensure all newly completed follow-ons are marked done/closed in epic/feature briefs.
+3. Record unresolved blockers explicitly in the epic/feature/story status blocks.
+4. Add or refresh evidence links (test commands, logs, issue comments).
+5. Keep closeout commits scoped to reconciliation/docs/small guardrail fixes only.
+
 ## Codex Execution Defaults for This Repo
 
 1. Prefer smallest vertical slice proving direction.

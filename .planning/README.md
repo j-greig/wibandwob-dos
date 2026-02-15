@@ -24,6 +24,7 @@ This directory is the authoritative reference for how work is planned, named, sc
 | **Story** | A vertical slice with user-visible or interface-visible value, normally one PR target. |
 | **Task** | A concrete implementation step inside a story. |
 | **Spike** | Timeboxed investigation to reduce uncertainty before implementation. |
+| **Closeout pass** | Final reconciliation task: sync issue state, planning mirrors, tests/evidence links, and unresolved blockers before handoff/merge. |
 
 ## Naming Conventions
 

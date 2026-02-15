@@ -566,7 +566,7 @@ private:
     void cascade();
     void tile();
     void closeAll();
-    void takeScreenshot();
+    void takeScreenshot(bool showDialog = true);
     void setPatternMode(bool continuous);
     void saveWorkspace();
     bool saveWorkspacePath(const std::string& path);
@@ -1589,7 +1589,7 @@ void TTestPatternApp::setPatternMode(bool continuous)
 }
 
 
-void TTestPatternApp::takeScreenshot()
+void TTestPatternApp::takeScreenshot(bool showDialog)
 {
     // Create screenshots directory if it doesn't exist.
     mkdir("screenshots", 0755);
@@ -1620,25 +1620,16 @@ void TTestPatternApp::takeScreenshot()
     ansiOpts.includeMetadata = true;
     bool ansiOk = getFrameCapture().saveFrame(frame, ansiPath, ansiOpts);
 
-    // 2) Optional OS screenshot for pixel PNG (best-effort only).
-    std::string pngPath = base + ".png";
-    int pngResult = -1;
-    {
-        std::stringstream cmd;
-        cmd << "screencapture -x " << pngPath << " 2>/dev/null";
-        pngResult = system(cmd.str().c_str());
-    }
-
-    if (txtOk || ansiOk || pngResult == 0) {
-        std::stringstream msg;
-        msg << "Saved capture:";
-        if (txtOk) msg << " " << txtPath;
-        if (ansiOk) msg << " " << ansiPath;
-        if (pngResult == 0) msg << " " << pngPath;
-        if (pngResult != 0) msg << "\n(PNG export unavailable; text/ANSI capture still saved)";
-        messageBox(msg.str().c_str(), mfInformation | mfOKButton);
-    } else {
-        messageBox("Capture failed (screen buffer and PNG paths both failed).", mfError | mfOKButton);
+    if (showDialog) {
+        if (txtOk || ansiOk) {
+            std::stringstream msg;
+            msg << "Saved capture:";
+            if (txtOk) msg << " " << txtPath;
+            if (ansiOk) msg << " " << ansiPath;
+            messageBox(msg.str().c_str(), mfInformation | mfOKButton);
+        } else {
+            messageBox("Capture failed (screen buffer paths failed).", mfError | mfOKButton);
+        }
     }
 }
 
@@ -2012,7 +2003,7 @@ bool api_open_workspace_path(TTestPatternApp& app, const std::string& path) {
     return app.openWorkspacePath(path);
 }
 
-void api_screenshot(TTestPatternApp& app) { app.takeScreenshot(); }
+void api_screenshot(TTestPatternApp& app) { app.takeScreenshot(false); }
 
 std::string api_get_state(TTestPatternApp& app) {
     // Rebuild window registry to sync with current desktop state

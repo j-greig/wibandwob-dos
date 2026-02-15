@@ -35,7 +35,7 @@ Traditional AI tools operate *under* humans. WibWob-DOS gives the AI the same co
 | Create generative art | Menu commands | API calls with parameters |
 | Write text to editors | Type directly | `send_text` / `send_figlet` |
 | Save/load workspaces | File menu | API endpoints |
-| Capture screenshots | Ctrl+P | `POST /screenshot` |
+| Capture screenshots | Ctrl+P | `POST /screenshot` (`.txt`/`.ans` canonical output) |
 | Navigate & control | Full keyboard/mouse | Full API + WebSocket events |
 
 The AI agent inside the chat window can spawn new windows, fill them with ASCII art, rearrange the desktop, trigger generative art — all while conversing.
@@ -60,7 +60,7 @@ Test patterns · gradients (horizontal, vertical, radial, diagonal) · text edit
 Pre-composed ASCII art templates loaded via the module system. Batch-spawn with precise positioning via API.
 
 ### REST API + MCP
-Full programmatic control: window CRUD, browser open/fetch/render/actions, text injection, figlet rendering, batch layouts, primer spawning, pattern modes, screenshots, workspace persistence. Real-time WebSocket events. API capabilities are auto-exposed as MCP tools.
+Full programmatic control: window CRUD, browser open/fetch/render/actions, text injection, figlet rendering, batch layouts, primer spawning, pattern modes, screenshots (`.txt`/`.ans` canonical output), workspace persistence. Real-time WebSocket events. API capabilities are auto-exposed as MCP tools.
 
 ### Glitch Effects Engine
 Character scatter · colour bleed · radial distortion · diagonal scatter · dimension corruption · buffer desync. Configurable intensity, capturable to text.
