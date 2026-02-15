@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wibwob.local/contracts/state/v1/snapshot.schema.json",
+  "title": "WibWob State Snapshot v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "timestamp", "canvas", "pattern_mode", "windows"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "const": "1"
+    },
+    "timestamp": {
+      "type": "string",
+      "minLength": 1
+    },
+    "canvas": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["w", "h"],
+      "properties": {
+        "w": {"type": "integer", "minimum": 1},
+        "h": {"type": "integer", "minimum": 1}
+      }
+    },
+    "pattern_mode": {
+      "type": "string",
+      "enum": ["continuous", "tiled"]
+    },
+    "windows": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "type", "title", "rect", "z", "focused", "props"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "type": {"type": "string", "minLength": 1},
+          "title": {"type": "string"},
+          "rect": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["x", "y", "w", "h"],
+            "properties": {
+              "x": {"type": "integer"},
+              "y": {"type": "integer"},
+              "w": {"type": "integer", "minimum": 1},
+              "h": {"type": "integer", "minimum": 1}
+            }
+          },
+          "z": {"type": "integer"},
+          "focused": {"type": "boolean"},
+          "props": {"type": "object"}
+        }
+      }
+    }
+  }
+}

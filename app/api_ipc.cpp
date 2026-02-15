@@ -13,6 +13,7 @@
 #include <sstream>
 #include <map>
 #include <vector>
+#include <fstream>
 
 // Base64 decoding function
 static const std::string base64_chars =
@@ -316,6 +317,42 @@ void ApiIpcServer::poll() {
         }
     } else if (cmd == "get_canvas_size") {
         resp = api_get_canvas_size(*app_) + "\n";
+    } else if (cmd == "export_state") {
+        std::string path = "workspace_state.json";
+        auto it = kv.find("path");
+        if (it != kv.end() && !it->second.empty())
+            path = it->second;
+
+        std::ofstream out(path.c_str(), std::ios::out | std::ios::trunc);
+        if (!out.is_open()) {
+            resp = "err cannot open export path\n";
+        } else {
+            out << api_get_state(*app_);
+            out.close();
+            resp = "ok\n";
+        }
+    } else if (cmd == "import_state") {
+        auto it = kv.find("path");
+        if (it == kv.end() || it->second.empty()) {
+            resp = "err missing path\n";
+        } else {
+            std::ifstream in(it->second.c_str());
+            if (!in.is_open()) {
+                resp = "err cannot open import path\n";
+            } else {
+                std::stringstream buffer;
+                buffer << in.rdbuf();
+                std::string content = buffer.str();
+                // Minimal validity gate for S01: ensure expected snapshot keys are present.
+                if (content.find("\"version\"") == std::string::npos ||
+                    content.find("\"windows\"") == std::string::npos) {
+                    resp = "err invalid snapshot\n";
+                } else {
+                    // S01 scope: command path + schema contract. Full state replay in later story.
+                    resp = "ok\n";
+                }
+            }
+        }
     } else {
         resp = "err unknown cmd\n";
     }

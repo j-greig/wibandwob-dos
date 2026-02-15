@@ -37,6 +37,8 @@ from .schemas import (
     SendTextReq,
     SendFigletReq,
     SendMultiFigletReq,
+    StateExportReq,
+    StateImportReq,
     WindowCreate,
     WindowMoveResize,
     WindowPropsUpdate,
@@ -291,6 +293,20 @@ def make_app() -> FastAPI:
     async def workspace_open(payload: WorkspaceOpen) -> Dict[str, Any]:
         await ctl.open_workspace(payload.path)
         return {"ok": True, "path": payload.path}
+
+    @app.post("/state/export")
+    async def state_export(payload: StateExportReq) -> Dict[str, Any]:
+        res = await ctl.export_state(payload.path, payload.format)
+        if not res.get("ok"):
+            raise HTTPException(status_code=400, detail=res.get("error", "export_failed"))
+        return res
+
+    @app.post("/state/import")
+    async def state_import(payload: StateImportReq) -> Dict[str, Any]:
+        res = await ctl.import_state(payload.path, payload.mode)
+        if not res.get("ok"):
+            raise HTTPException(status_code=400, detail=res.get("error", "import_failed"))
+        return res
 
     @app.post("/screenshot")
     async def screenshot(payload: Optional[ScreenshotReq] = None) -> Dict[str, Any]:

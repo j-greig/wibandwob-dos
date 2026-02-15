@@ -83,6 +83,16 @@ class WorkspaceOpen(BaseModel):
     path: str
 
 
+class StateExportReq(BaseModel):
+    path: str
+    format: Literal["json", "ndjson"] = "json"
+
+
+class StateImportReq(BaseModel):
+    path: str
+    mode: Literal["replace", "merge"] = "replace"
+
+
 class ScreenshotReq(BaseModel):
     path: Optional[str] = None
 

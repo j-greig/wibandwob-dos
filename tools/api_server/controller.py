@@ -444,6 +444,29 @@ class Controller:
         await self._events.emit("screenshot.saved", {"path": target})
         return target
 
+    async def export_state(self, path: str, fmt: str = "json") -> Dict[str, Any]:
+        if fmt not in ("json", "ndjson"):
+            return {"ok": False, "error": "invalid_format"}
+        try:
+            resp = send_cmd("export_state", {"path": path, "format": fmt})
+            if isinstance(resp, str) and resp.lower().startswith("err"):
+                return {"ok": False, "error": resp}
+            return {"ok": True, "path": path, "format": fmt}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)}
+
+    async def import_state(self, path: str, mode: str = "replace") -> Dict[str, Any]:
+        if mode not in ("replace", "merge"):
+            return {"ok": False, "error": "invalid_mode"}
+        try:
+            resp = send_cmd("import_state", {"path": path, "mode": mode})
+            if isinstance(resp, str) and resp.lower().startswith("err"):
+                return {"ok": False, "error": resp}
+            await self._sync_state()
+            return {"ok": True, "path": path, "mode": mode}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)}
+
     # ----- Helpers -----
     def _require(self, win_id: str) -> Window:
         for w in self._state.windows:
