@@ -180,6 +180,25 @@ curl -X POST localhost:8089/primers/batch -H 'Content-Type: application/json' \
 # Returns list of created windows with their final dimensions
 ```
 
+### Browser/State Dump Helper
+Capture a browser fetch bundle and app state to timestamped files for agent consumption:
+```bash
+# Basic: key-inline + all-inline bundles, plus /state
+tools/api_server/dump_browser_bundle.sh https://symbient.life
+
+# Include direct edge markdown probe (Accept: text/markdown)
+tools/api_server/dump_browser_bundle.sh \
+  https://blog.cloudflare.com/markdown-for-agents/ \
+  --probe-markdown-edge
+```
+
+Outputs are written to `logs/browser/dumps/<timestamp>/` and include:
+- raw API responses
+- normalized bundle JSON (`.bundle // .`)
+- extracted `tui_text` and markdown text files
+- compact asset summaries
+- optional state snapshot and edge markdown probe headers/body
+
 ## Batch Layout (LLM-Optimized)
 
 The batch layout endpoint enables AI agents to create complex window arrangements in a single call, following MCP "second wave" principles:
