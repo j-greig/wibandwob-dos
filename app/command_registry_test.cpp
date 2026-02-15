@@ -9,7 +9,7 @@ void api_cascade(TTestPatternApp&) {}
 void api_tile(TTestPatternApp&) {}
 void api_close_all(TTestPatternApp&) {}
 void api_save_workspace(TTestPatternApp&) {}
-void api_open_workspace_path(TTestPatternApp&, const std::string&) {}
+bool api_open_workspace_path(TTestPatternApp&, const std::string&) { return true; }
 void api_screenshot(TTestPatternApp&) {}
 void api_set_pattern_mode(TTestPatternApp&, const std::string&) {}
 

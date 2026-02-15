@@ -8,7 +8,7 @@ extern void api_cascade(TTestPatternApp& app);
 extern void api_tile(TTestPatternApp& app);
 extern void api_close_all(TTestPatternApp& app);
 extern void api_save_workspace(TTestPatternApp& app);
-extern void api_open_workspace_path(TTestPatternApp& app, const std::string& path);
+extern bool api_open_workspace_path(TTestPatternApp& app, const std::string& path);
 extern void api_screenshot(TTestPatternApp& app);
 extern void api_set_pattern_mode(TTestPatternApp& app, const std::string& mode);
 
@@ -83,8 +83,7 @@ std::string exec_registry_command(
         auto it = kv.find("path");
         if (it == kv.end() || it->second.empty())
             return "err missing path";
-        api_open_workspace_path(app, it->second);
-        return "ok";
+        return api_open_workspace_path(app, it->second) ? "ok" : "err open workspace failed";
     }
     if (name == "screenshot") {
         api_screenshot(app);

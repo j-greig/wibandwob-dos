@@ -294,13 +294,17 @@ def make_app() -> FastAPI:
 
     @app.post("/workspace/save")
     async def workspace_save(payload: WorkspaceSave) -> Dict[str, Any]:
-        await ctl.save_workspace(payload.path)
-        return {"ok": True, "path": payload.path}
+        res = await ctl.save_workspace(payload.path)
+        if not res.get("ok"):
+            raise HTTPException(status_code=400, detail=res.get("error", "workspace_save_failed"))
+        return res
 
     @app.post("/workspace/open")
     async def workspace_open(payload: WorkspaceOpen) -> Dict[str, Any]:
-        await ctl.open_workspace(payload.path)
-        return {"ok": True, "path": payload.path}
+        res = await ctl.open_workspace(payload.path)
+        if not res.get("ok"):
+            raise HTTPException(status_code=400, detail=res.get("error", "workspace_open_failed"))
+        return res
 
     @app.post("/state/export")
     async def state_export(payload: StateExportReq) -> Dict[str, Any]:

@@ -646,7 +646,7 @@ private:
     friend void api_close_all(TTestPatternApp&);
     friend void api_set_pattern_mode(TTestPatternApp&, const std::string&);
     friend void api_save_workspace(TTestPatternApp&);
-    friend void api_open_workspace_path(TTestPatternApp&, const std::string&);
+    friend bool api_open_workspace_path(TTestPatternApp&, const std::string&);
     friend void api_screenshot(TTestPatternApp&);
     friend std::string api_get_state(TTestPatternApp&);
     friend std::string api_move_window(TTestPatternApp&, const std::string&, int, int);
@@ -1967,8 +1967,8 @@ void api_set_pattern_mode(TTestPatternApp& app, const std::string& mode) {
 
 void api_save_workspace(TTestPatternApp& app) { app.saveWorkspace(); }
 
-void api_open_workspace_path(TTestPatternApp& app, const std::string& path) {
-    app.openWorkspacePath(path);
+bool api_open_workspace_path(TTestPatternApp& app, const std::string& path) {
+    return app.openWorkspacePath(path);
 }
 
 void api_screenshot(TTestPatternApp& app) { app.takeScreenshot(); }

@@ -437,17 +437,23 @@ class Controller:
         await self._events.emit("pattern.mode", {"mode": mode})
 
     # ----- Workspace / Screenshot -----
-    async def save_workspace(self, path: str) -> None:
-        await self.export_state(path, "json")
+    async def save_workspace(self, path: str) -> Dict[str, Any]:
+        res = await self.export_state(path, "json")
+        if not res.get("ok"):
+            return res
         async with self._lock:
             self._state.last_workspace = path
         await self._events.emit("workspace.saved", {"path": path})
+        return {"ok": True, "path": path, "format": "json", "fallback": bool(res.get("fallback", False))}
 
-    async def open_workspace(self, path: str) -> None:
-        await self.import_state(path, "replace")
+    async def open_workspace(self, path: str) -> Dict[str, Any]:
+        res = await self.import_state(path, "replace")
+        if not res.get("ok"):
+            return res
         async with self._lock:
             self._state.last_workspace = path
         await self._events.emit("workspace.opened", {"path": path})
+        return {"ok": True, "path": path, "mode": "replace", "fallback": bool(res.get("fallback", False))}
 
     async def screenshot(self, path: Optional[str]) -> str:
         target = path or f"screenshot_{int(time.time())}.png"

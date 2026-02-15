@@ -78,7 +78,7 @@ extern void api_tile(TTestPatternApp& app);
 extern void api_close_all(TTestPatternApp& app);
 extern void api_set_pattern_mode(TTestPatternApp& app, const std::string& mode);
 extern void api_save_workspace(TTestPatternApp& app);
-extern void api_open_workspace_path(TTestPatternApp& app, const std::string& path);
+extern bool api_open_workspace_path(TTestPatternApp& app, const std::string& path);
 extern void api_screenshot(TTestPatternApp& app);
 extern std::string api_get_state(TTestPatternApp& app);
 extern std::string api_move_window(TTestPatternApp& app, const std::string& id, int x, int y);
@@ -228,8 +228,11 @@ void ApiIpcServer::poll() {
         api_save_workspace(*app_);
     } else if (cmd == "open_workspace") {
         auto it = kv.find("path");
-        if (it != kv.end()) api_open_workspace_path(*app_, it->second);
-        else resp = "err missing path\n";
+        if (it == kv.end() || it->second.empty()) {
+            resp = "err missing path\n";
+        } else if (!api_open_workspace_path(*app_, it->second)) {
+            resp = "err open workspace failed\n";
+        }
     } else if (cmd == "screenshot") {
         api_screenshot(*app_);
     } else if (cmd == "get_state") {
@@ -348,8 +351,33 @@ void ApiIpcServer::poll() {
                     content.find("\"windows\"") == std::string::npos) {
                     resp = "err invalid snapshot\n";
                 } else {
-                    // S01 scope: command path + schema contract. Full state replay in later story.
-                    resp = "ok\n";
+                    // Try direct apply first (legacy workspace shape with "bounds").
+                    if (api_open_workspace_path(*app_, it->second)) {
+                        resp = "ok\n";
+                    } else {
+                        // Compatibility fallback: convert state snapshot shape ("rect") into workspace shape ("bounds").
+                        std::string normalized = content;
+                        if (normalized.find("\"rect\"") != std::string::npos &&
+                            normalized.find("\"bounds\"") == std::string::npos) {
+                            size_t pos = 0;
+                            while ((pos = normalized.find("\"rect\"", pos)) != std::string::npos) {
+                                normalized.replace(pos, 6, "\"bounds\"");
+                                pos += 8;
+                            }
+                        }
+
+                        std::string tmp_path = it->second + ".wwd-import-tmp.json";
+                        std::ofstream out(tmp_path.c_str(), std::ios::out | std::ios::trunc);
+                        if (!out.is_open()) {
+                            resp = "err cannot write import temp\n";
+                        } else {
+                            out << normalized;
+                            out.close();
+                            bool ok = api_open_workspace_path(*app_, tmp_path);
+                            ::unlink(tmp_path.c_str());
+                            resp = ok ? "ok\n" : "err import apply failed\n";
+                        }
+                    }
                 }
             }
         }
