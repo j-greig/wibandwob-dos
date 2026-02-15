@@ -31,7 +31,8 @@ Naming:
 
 - [x] **F1: Command Registry** — define commands once in C++, derive capabilities, remove duplicates
   - Brief: `.planning/epics/e001-command-parity-refactor/f01-command-registry/f01-feature-brief.md`
-- [ ] **F2: Parity Enforcement** — automated drift checks for menu, IPC/API, MCP surfaces
+- [x] **F2: Parity Enforcement** — automated drift checks for menu, IPC/API, MCP surfaces
+  - Brief: `.planning/epics/e001-command-parity-refactor/f02-parity-enforcement/f02-feature-brief.md`
 - [ ] **F3: State/Event Authority** — `exec_command` dispatch, typed events, snapshot sanity
 - [ ] **F4: Instance Boundaries** — isolation for state, vault, events; local-first this pass
 
@@ -48,6 +49,8 @@ Naming:
   - Brief: `.planning/epics/e001-command-parity-refactor/f01-command-registry/s05-command-registry-ctest/s05-story-brief.md`
 - [x] **S6 (PR-2+):** F01 closeout quality gates
   - Brief: `.planning/epics/e001-command-parity-refactor/f01-command-registry/s06-f01-closeout/s06-story-brief.md`
+- [x] **S7 (PR-2+):** Parity matrix test for menu/registry/MCP
+  - Brief: `.planning/epics/e001-command-parity-refactor/f02-parity-enforcement/s07-parity-matrix-test/s07-story-brief.md`
 
 ## Acceptance Criteria (PR-1)
 
