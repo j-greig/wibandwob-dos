@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import os
 import platform
+import re
 import subprocess
 from pathlib import Path
+
+SAFE_ID_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 
 
 def terminal_bell() -> None:
@@ -27,6 +30,8 @@ def macos_notification(title: str, message: str) -> bool:
 
 
 def touch_sentinel(root: str | Path, agent: str) -> Path:
+    if not SAFE_ID_RE.match(agent):
+        raise ValueError("agent must match ^[A-Za-z0-9._-]+$")
     p = Path(root) / "index" / f".new-mail-{agent}"
     p.parent.mkdir(parents=True, exist_ok=True)
     with p.open("a", encoding="utf-8"):

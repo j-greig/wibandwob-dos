@@ -5,6 +5,8 @@ import sys
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[3]
 MAILBOX_DIR = ROOT / "tools" / "agent_mailbox"
 if str(MAILBOX_DIR) not in sys.path:
@@ -68,3 +70,40 @@ def test_blob_roundtrip(tmp_path: Path) -> None:
     blob_path = store.write_blob(source)
     out = store.read_blob(blob_path)
     assert out == source
+
+
+def test_read_blob_rejects_paths_outside_blob_root(tmp_path: Path) -> None:
+    store = MailboxStore(tmp_path)
+    outside = tmp_path / "outside.txt"
+    outside.write_text("nope", encoding="utf-8")
+
+    with pytest.raises(ValueError):
+        store.read_blob(str(outside))
+
+
+def test_iter_records_skips_malformed_lines(tmp_path: Path) -> None:
+    store = MailboxStore(tmp_path)
+    store.send(
+        from_agent="codex",
+        to_agent="claude",
+        subject="good-1",
+        body_text="ok",
+        body_path=None,
+        thread_id="general",
+    )
+    thread_file = next((tmp_path / "threads").glob("general-*.ndjson"))
+    with thread_file.open("a", encoding="utf-8") as f:
+        f.write("{bad-json\n")
+    store.send(
+        from_agent="codex",
+        to_agent="claude",
+        subject="good-2",
+        body_text="ok",
+        body_path=None,
+        thread_id="general",
+    )
+
+    unread = store.inbox(agent="claude", unread_only=True, thread_id="general")
+    subjects = [m.subject for m in unread]
+    assert "good-1" in subjects
+    assert "good-2" in subjects
