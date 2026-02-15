@@ -10,6 +10,8 @@ COMMAND_TOOL_MAPPING = {
     "close_all": "tui_close_all_windows",
     "pattern_mode": "tui_set_pattern_mode",
     "screenshot": "tui_screenshot",
+    "save_workspace": "tui_save_workspace",
+    "open_workspace": "tui_open_workspace",
 }
 
 

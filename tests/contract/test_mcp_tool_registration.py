@@ -30,6 +30,7 @@ def test_registers_command_tools_from_registry_capabilities(monkeypatch) -> None
         "commands": [
             {"name": "cascade", "description": "d", "requires_path": False},
             {"name": "pattern_mode", "description": "d", "requires_path": False},
+            {"name": "open_workspace", "description": "d", "requires_path": True},
         ],
     }
     monkeypatch.setattr(mcp_tools, "send_cmd", lambda cmd, kv=None: json.dumps(payload))
@@ -39,6 +40,7 @@ def test_registers_command_tools_from_registry_capabilities(monkeypatch) -> None
 
     assert "tui_cascade_windows" in mcp.names
     assert "tui_set_pattern_mode" in mcp.names
+    assert "tui_open_workspace" in mcp.names
     assert "tui_tile_windows" not in mcp.names
 
 
@@ -56,5 +58,7 @@ def test_fallback_registration_when_registry_unavailable(monkeypatch) -> None:
         "tui_close_all_windows",
         "tui_set_pattern_mode",
         "tui_screenshot",
+        "tui_save_workspace",
+        "tui_open_workspace",
     ]:
         assert tool_name in mcp.names

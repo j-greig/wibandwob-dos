@@ -115,6 +115,32 @@ def _make_screenshot_handler() -> CommandToolHandler:
     return _handler
 
 
+def _make_save_workspace_handler() -> CommandToolHandler:
+    async def _handler(path: str = "workspace.json") -> Dict[str, Any]:
+        controller = get_controller()
+        result = await controller.exec_command("save_workspace", {"path": path})
+        if not result.get("ok"):
+            return _exec_result_error(result)
+        return {
+            "success": True,
+            "path": path,
+        }
+    return _handler
+
+
+def _make_open_workspace_handler() -> CommandToolHandler:
+    async def _handler(path: str) -> Dict[str, Any]:
+        controller = get_controller()
+        result = await controller.exec_command("open_workspace", {"path": path})
+        if not result.get("ok"):
+            return _exec_result_error(result)
+        return {
+            "success": True,
+            "path": path,
+        }
+    return _handler
+
+
 def _command_tool_builders() -> Dict[str, Dict[str, Any]]:
     return {
         "cascade": {
@@ -136,6 +162,14 @@ def _command_tool_builders() -> Dict[str, Dict[str, Any]]:
         "screenshot": {
             "tool_name": "tui_screenshot",
             "handler": _make_screenshot_handler(),
+        },
+        "save_workspace": {
+            "tool_name": "tui_save_workspace",
+            "handler": _make_save_workspace_handler(),
+        },
+        "open_workspace": {
+            "tool_name": "tui_open_workspace",
+            "handler": _make_open_workspace_handler(),
         },
     }
 
