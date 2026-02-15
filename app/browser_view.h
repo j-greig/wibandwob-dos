@@ -56,6 +56,7 @@ public:
     void scrollLineDown();
     void scrollPageUp();
     void scrollPageDown();
+    std::string getPlainText() const;
 
 private:
 

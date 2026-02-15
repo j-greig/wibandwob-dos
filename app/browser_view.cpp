@@ -18,6 +18,7 @@
 #define Uses_TButton
 #define Uses_TLabel
 #define Uses_TStaticText
+#define Uses_THardwareInfo
 #define Uses_TProgram
 #define Uses_TDeskTop
 #define Uses_TText
@@ -271,6 +272,16 @@ void TBrowserContentView::scrollPageDown() {
     scrollTo(delta.x, newY);
 }
 
+std::string TBrowserContentView::getPlainText() const {
+    std::string out;
+    for (size_t i = 0; i < sourceLines.size(); ++i) {
+        out += sourceLines[i];
+        if (i + 1 < sourceLines.size())
+            out.push_back('\n');
+    }
+    return out;
+}
+
 void TBrowserContentView::rebuildWrappedLines() {
     styledLines.clear();
     for (const auto& line : sourceLines) {
@@ -455,6 +466,14 @@ void TBrowserWindow::handleEvent(TEvent& event) {
         }
         drawView();
     }
+
+    if (event.what == evCommand && event.message.command == cmCopy) {
+        std::string text = contentView ? contentView->getPlainText() : std::string();
+        if (!text.empty()) {
+            THardwareInfo::setClipboardText(TStringView(text.data(), text.size()));
+        }
+        clearEvent(event);
+    }
 }
 
 void TBrowserWindow::draw() {
@@ -606,7 +625,7 @@ void TBrowserWindow::startFetch(const std::string& url) {
     std::string cmd = "curl -s -X POST http://127.0.0.1:8089/browser/fetch_ext "
                       "-H 'Content-Type: application/json' "
                       "-d '{\"url\":\"" + escapedUrl + "\","
-                      "\"reader\":\"readability\","
+                      "\"reader\":\"trafilatura\","
                       "\"format\":\"tui_bundle\","
                       "\"images\":\"" + imageMode + "\","
                       "\"width\":" + std::to_string(targetWidth) + "}' 2>/dev/null";
