@@ -20,17 +20,17 @@ Establish a stable, versioned snapshot format for engine state. Enable workspace
 
 - [x] `.planning/epics/e002-browser-and-state-export/f01-state-export/s01-snapshot-schema/s01-story-brief.md` — versioned snapshot schema + `export_state`/`import_state` IPC commands
 - [x] `.planning/epics/e002-browser-and-state-export/f01-state-export/s02-workspace-persistence/s02-story-brief.md` — `save_workspace`/`open_workspace` REST + file I/O
-- [ ] `s03-event-logging/` — event-triggered snapshot logging (create/close/move/resize, command exec, timer)
+- [x] `.planning/epics/e002-browser-and-state-export/f01-state-export/s03-event-logging/s03-story-brief.md` — event-triggered snapshot logging (create/close/move/resize, command exec, timer)
 
 ## Acceptance Criteria
 
-- [ ] **AC-1:** Snapshot schema is versioned and validates against `contracts/state/v1/snapshot.schema.json`
+- [x] **AC-1:** Snapshot schema is versioned and validates against `contracts/state/v1/snapshot.schema.json`
   - Test: schema validation test in `tests/contract/`
 - [ ] **AC-2:** `export_state` → `import_state` round-trip produces identical re-export (deterministic)
   - Test: SHA256 match of export → import → re-export
-- [ ] **AC-3:** `save_workspace(path)` writes versioned JSON; `open_workspace(path)` restores windows
+- [x] **AC-3:** `save_workspace(path)` writes versioned JSON; `open_workspace(path)` restores windows
   - Test: save, close all, open, verify window count + types + bounds match
-- [ ] **AC-4:** Event log captures window lifecycle events with actor attribution
+- [x] **AC-4:** Event log captures window lifecycle events with actor attribution
   - Test: create window via API, assert log entry with `actor="api"` and event type
 
 ## Snapshot Schema (v1)

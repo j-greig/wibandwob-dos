@@ -5,7 +5,7 @@ import time
 from typing import Any, Dict, List, Optional
 from pathlib import Path
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 
 from .events import EventHub
 from .models import AppState, Rect, Window, WindowType, new_id
@@ -40,6 +40,8 @@ class Controller:
         self._timelines: Dict[str, List[asyncio.Task]] = {}
         # Repo root (two levels up from this file)
         self._repo_root = Path(__file__).resolve().parents[2]
+        default_log_path = self._repo_root / "logs" / "state" / "events.ndjson"
+        self._state_event_log_path = Path(os.environ.get("WWD_STATE_EVENT_LOG_PATH", str(default_log_path)))
 
     # ----- Query -----
     async def get_state(self) -> AppState:
@@ -172,6 +174,7 @@ class Controller:
                 w.focused = False
             self._state.windows.append(win)
         await self._events.emit("window.created", self._serialize_window(win))
+        self._append_state_event("window.created", {"window_id": win.id, "type": win.type.value}, actor="api")
         return win
 
     async def move_resize(self, win_id: str, *, x=None, y=None, w=None, h=None) -> Window:
@@ -199,6 +202,7 @@ class Controller:
         try:
             win = self._require(win_id)
             await self._events.emit("window.updated", self._serialize_window(win))
+            self._append_state_event("window.moved_or_resized", {"window_id": win_id}, actor="api")
             return win
         except KeyError:
             raise KeyError(win_id)
@@ -249,6 +253,7 @@ class Controller:
         # Sync state and emit event
         await self._sync_state()
         await self._events.emit("window.closed", {"id": win_id})
+        self._append_state_event("window.closed", {"window_id": win_id}, actor="api")
 
     async def close_all(self) -> None:
         try:
@@ -260,6 +265,7 @@ class Controller:
             self._state.windows.clear()
         for wid in ids:
             await self._events.emit("window.closed", {"id": wid})
+            self._append_state_event("window.closed", {"window_id": wid}, actor="api")
 
     async def cascade(self) -> None:
         try:
@@ -273,6 +279,7 @@ class Controller:
                 x += 2
                 y += 1
         await self._events.emit("layout.cascade", {})
+        self._append_state_event("layout.cascade", {}, actor="api")
 
     async def tile(self, cols: int = 2) -> None:
         try:
@@ -296,6 +303,7 @@ class Controller:
                     col = 0
                     row += 1
         await self._events.emit("layout.tile", {"cols": cols})
+        self._append_state_event("layout.tile", {"cols": cols}, actor="api")
 
     # ----- Properties / Commands -----
     async def set_props(self, win_id: str, props: Dict[str, Any]) -> Window:
@@ -415,6 +423,7 @@ class Controller:
         if handled["ok"]:
             await self._sync_state()
         await self._events.emit("command.executed", handled)
+        self._append_state_event("command.executed", {"command": name}, actor=handled["actor"])
         return handled
 
     async def set_pattern_mode(self, mode: str) -> None:
@@ -487,6 +496,22 @@ class Controller:
             "zoomed": w.zoomed,
             "props": dict(w.props),
         }
+
+    def _append_state_event(self, event_type: str, data: Dict[str, Any], actor: str) -> None:
+        """Append state events as NDJSON for local-first auditability."""
+        entry = {
+            "ts": datetime.now(timezone.utc).isoformat(),
+            "event": event_type,
+            "actor": actor,
+            "data": data,
+        }
+        try:
+            self._state_event_log_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(self._state_event_log_path, "a", encoding="utf-8") as f:
+                f.write(json.dumps(entry, separators=(",", ":")) + "\n")
+        except Exception:
+            # Logging must not break command flow in this MVP.
+            pass
 
     # ----- Batch Layout -----
     async def batch_layout(self, req: BatchLayoutRequest) -> BatchLayoutResponse:
