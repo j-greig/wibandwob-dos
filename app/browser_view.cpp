@@ -594,7 +594,40 @@ void TBrowserWindow::navigateForward() {
     drawView();
 }
 
+// Encode a Unicode codepoint as UTF-8 bytes
+static void appendUtf8(std::string& out, uint32_t cp) {
+    if (cp < 0x80) {
+        out.push_back(static_cast<char>(cp));
+    } else if (cp < 0x800) {
+        out.push_back(static_cast<char>(0xC0 | (cp >> 6)));
+        out.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+    } else if (cp < 0x10000) {
+        out.push_back(static_cast<char>(0xE0 | (cp >> 12)));
+        out.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
+        out.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+    } else if (cp < 0x110000) {
+        out.push_back(static_cast<char>(0xF0 | (cp >> 18)));
+        out.push_back(static_cast<char>(0x80 | ((cp >> 12) & 0x3F)));
+        out.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
+        out.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+    }
+}
+
+// Parse a 4-digit hex value from a string at position pos
+static uint16_t parseHex4(const std::string& s, size_t pos) {
+    uint16_t val = 0;
+    for (int j = 0; j < 4 && pos + j < s.size(); ++j) {
+        char h = s[pos + j];
+        val <<= 4;
+        if (h >= '0' && h <= '9') val |= (h - '0');
+        else if (h >= 'a' && h <= 'f') val |= (h - 'a' + 10);
+        else if (h >= 'A' && h <= 'F') val |= (h - 'A' + 10);
+    }
+    return val;
+}
+
 // Reuse the extractJsonStringField pattern from claude_code_sdk_provider.cpp
+// Extended with \uXXXX Unicode escape handling for proper UTF-8 output
 std::string TBrowserWindow::extractJsonStringField(const std::string& json, const std::string& key) {
     const std::string pattern = "\"" + key + "\":\"";
     size_t pos = json.find(pattern);
@@ -609,9 +642,32 @@ std::string TBrowserWindow::extractJsonStringField(const std::string& json, cons
             switch (c) {
                 case '\\': out.push_back('\\'); break;
                 case '"':  out.push_back('"'); break;
+                case '/':  out.push_back('/'); break;
                 case 'n':  out.push_back('\n'); break;
                 case 'r':  out.push_back('\r'); break;
                 case 't':  out.push_back('\t'); break;
+                case 'u': {
+                    // \uXXXX Unicode escape
+                    if (i + 4 < json.size()) {
+                        uint16_t hi = parseHex4(json, i + 1);
+                        i += 4;
+                        // Check for surrogate pair: \uD800-\uDBFF followed by \uDC00-\uDFFF
+                        if (hi >= 0xD800 && hi <= 0xDBFF && i + 2 < json.size()
+                            && json[i + 1] == '\\' && json[i + 2] == 'u' && i + 6 < json.size()) {
+                            uint16_t lo = parseHex4(json, i + 3);
+                            if (lo >= 0xDC00 && lo <= 0xDFFF) {
+                                uint32_t cp = 0x10000 + ((uint32_t)(hi - 0xD800) << 10) + (lo - 0xDC00);
+                                appendUtf8(out, cp);
+                                i += 6;  // Skip \uXXXX of low surrogate
+                            } else {
+                                appendUtf8(out, hi);
+                            }
+                        } else {
+                            appendUtf8(out, hi);
+                        }
+                    }
+                    break;
+                }
                 default:   out.push_back(c); break;
             }
             escape = false;
