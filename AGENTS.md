@@ -6,6 +6,7 @@ This file aligns Codex execution style with the repo canon in `.planning/README.
 
 Codex does not natively execute Claude Code hook scripts.  
 Treat the rules below as a required prompt-shim and manual gate before finishing work.
+Mirror high-value hook behavior explicitly, including `.claude/hooks/gh-format-lint.sh` for GitHub markdown posting safety.
 
 ## Canon Workflow Rules
 
