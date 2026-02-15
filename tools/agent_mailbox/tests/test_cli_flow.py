@@ -48,3 +48,25 @@ def test_cli_send_inbox_ack(tmp_path: Path) -> None:
     inbox_after = _run("inbox", "--root", root, "--agent", "claude", "--json")
     arr_after = json.loads(inbox_after.stdout)
     assert arr_after == []
+
+
+def test_cli_inbox_strips_control_sequences_in_text_mode(tmp_path: Path) -> None:
+    root = str(tmp_path)
+    raw_subject = "hello\x1b[31m-red"
+    _run(
+        "send",
+        "--root",
+        root,
+        "--from",
+        "codex",
+        "--to",
+        "claude",
+        "--subject",
+        raw_subject,
+        "--body-text",
+        "ping",
+    )
+
+    inbox = _run("inbox", "--root", root, "--agent", "claude")
+    assert "\x1b" not in inbox.stdout
+    assert "hello[31m-red" in inbox.stdout

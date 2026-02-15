@@ -21,6 +21,10 @@ def _add_common_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--root", default=str(_default_root()), help="Mailbox root path")
 
 
+def _sanitize_display(text: str) -> str:
+    return "".join(ch for ch in text if ch == "\t" or ch == "\n" or ord(ch) >= 0x20)
+
+
 def _cmd_send(args: argparse.Namespace) -> int:
     store = MailboxStore(args.root)
     body_text = args.body_text
@@ -49,7 +53,12 @@ def _cmd_inbox(args: argparse.Namespace) -> int:
         return 0
 
     for m in messages:
-        print(f"{m.id}\t{m.ts.isoformat()}\t{m.from_agent}\t{m.subject}")
+        print(
+            f"{_sanitize_display(m.id)}\t"
+            f"{m.ts.isoformat()}\t"
+            f"{_sanitize_display(m.from_agent)}\t"
+            f"{_sanitize_display(m.subject)}"
+        )
     return 0
 
 
@@ -73,7 +82,12 @@ def _cmd_follow(args: argparse.Namespace) -> int:
                 if args.json:
                     print(m.model_dump_json(by_alias=True, exclude_none=True))
                 else:
-                    print(f"{m.id}\t{m.ts.isoformat()}\t{m.from_agent}\t{m.subject}")
+                    print(
+                        f"{_sanitize_display(m.id)}\t"
+                        f"{m.ts.isoformat()}\t"
+                        f"{_sanitize_display(m.from_agent)}\t"
+                        f"{_sanitize_display(m.subject)}"
+                    )
             time.sleep(args.interval)
     except KeyboardInterrupt:
         return 0

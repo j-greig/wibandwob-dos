@@ -76,7 +76,15 @@ class MailboxStore:
         return str(p)
 
     def read_blob(self, path: str | Path) -> bytes:
-        return Path(path).read_bytes()
+        requested = Path(path)
+        candidate = requested if requested.is_absolute() else (self.blobs_dir / requested)
+        resolved = candidate.resolve()
+        root_resolved = self.blobs_dir.resolve()
+        if root_resolved not in resolved.parents and resolved != root_resolved:
+            raise ValueError("blob path must stay within mailbox blobs directory")
+        if not resolved.exists():
+            raise FileNotFoundError(str(resolved))
+        return resolved.read_bytes()
 
     def list_agents(self, thread_id: str | None = None) -> set[str]:
         agents: set[str] = set()
@@ -105,25 +113,28 @@ class MailboxStore:
 
     def _safe_append_line(self, target: Path, payload: bytes) -> None:
         target.parent.mkdir(parents=True, exist_ok=True)
-
-        with tempfile.NamedTemporaryFile(prefix=".tmp-", dir=str(target.parent), delete=False) as tmp:
-            tmp.write(payload)
-            tmp.flush()
-            os.fsync(tmp.fileno())
-            tmp_name = tmp.name
-
         fd = os.open(str(target), os.O_APPEND | os.O_CREAT | os.O_WRONLY, 0o644)
         try:
             fcntl.flock(fd, fcntl.LOCK_EX)
-            os.write(fd, payload)
+            offset = 0
+            while offset < len(payload):
+                written = os.write(fd, payload[offset:])
+                if written <= 0:
+                    raise OSError("short write while appending mailbox record")
+                offset += written
             os.fsync(fd)
         finally:
-            fcntl.flock(fd, fcntl.LOCK_UN)
-            os.close(fd)
             try:
-                os.unlink(tmp_name)
-            except FileNotFoundError:
-                pass
+                fcntl.flock(fd, fcntl.LOCK_UN)
+            finally:
+                os.close(fd)
+
+        # fsync directory metadata after append to tighten durability guarantees.
+        dir_fd = os.open(str(target.parent), os.O_RDONLY)
+        try:
+            os.fsync(dir_fd)
+        finally:
+            os.close(dir_fd)
 
     def _thread_files(self, thread_id: str | None = None) -> list[Path]:
         files = sorted(self.threads_dir.glob("*.ndjson"))
@@ -136,7 +147,11 @@ class MailboxStore:
             for line in path.read_text(encoding="utf-8").splitlines():
                 if not line.strip():
                     continue
-                yield parse_record(json.loads(line))
+                try:
+                    yield parse_record(json.loads(line))
+                except (json.JSONDecodeError, ValueError):
+                    # Keep mailbox readable even if one line is corrupted.
+                    continue
 
     def _acked_message_ids(self, agent: str, thread_id: str | None = None) -> set[str]:
         acked: set[str] = set()
@@ -154,4 +169,17 @@ class MailboxStore:
             "count": len(unread),
         }
         out = self.index_dir / f"unread-{agent}.json"
-        out.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", dir=str(self.index_dir), prefix=f"{out.name}.", delete=False
+        ) as tmp:
+            tmp.write(json.dumps(payload, indent=2))
+            tmp.flush()
+            os.fsync(tmp.fileno())
+            tmp_name = tmp.name
+
+        os.replace(tmp_name, out)
+        dir_fd = os.open(str(self.index_dir), os.O_RDONLY)
+        try:
+            os.fsync(dir_fd)
+        finally:
+            os.close(dir_fd)

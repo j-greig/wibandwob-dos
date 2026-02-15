@@ -12,6 +12,7 @@ if str(MAILBOX_DIR) not in sys.path:
     sys.path.insert(0, str(MAILBOX_DIR))
 
 from store import MailboxStore
+import agent_mailboxd
 
 
 def test_daemon_touches_sentinel_within_sla(tmp_path: Path) -> None:
@@ -62,3 +63,23 @@ def test_daemon_touches_sentinel_within_sla(tmp_path: Path) -> None:
     finally:
         daemon.terminate()
         daemon.wait(timeout=2)
+
+
+def test_notify_agents_for_deltas_targets_only_increased_unread(tmp_path: Path, monkeypatch) -> None:
+    store = MailboxStore(tmp_path / "mailbox")
+    touched: list[str] = []
+
+    def _fake_touch(root: str | Path, agent: str) -> Path:
+        touched.append(agent)
+        return Path(root) / "index" / f".new-mail-{agent}"
+
+    monkeypatch.setattr(agent_mailboxd, "touch_sentinel", _fake_touch)
+    monkeypatch.setattr(agent_mailboxd, "terminal_bell", lambda: None)
+    monkeypatch.setattr(agent_mailboxd, "macos_notification", lambda title, message: True)
+
+    before = {"claude": 1, "codex": 2}
+    after = {"claude": 2, "codex": 2, "reviewer": 1}
+    agent_mailboxd._notify_agents_for_deltas(
+        store, before=before, after=after, title="Agent Mailbox", body="New mailbox event"
+    )
+    assert touched == ["claude", "reviewer"]

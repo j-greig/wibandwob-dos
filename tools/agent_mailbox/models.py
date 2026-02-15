@@ -4,7 +4,10 @@ from datetime import datetime, timezone
 from typing import Any, Literal, Optional
 from uuid import uuid4
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+
+SAFE_ID_PATTERN = r"^[A-Za-z0-9._-]+$"
 
 
 class MessageEvent(BaseModel):
@@ -30,6 +33,15 @@ class MessageEvent(BaseModel):
             raise ValueError("either body_text or body_path is required")
         return self
 
+    @field_validator("from_agent", "to_agent", "thread_id")
+    @classmethod
+    def _validate_safe_ids(cls, v: str) -> str:
+        import re
+
+        if not re.match(SAFE_ID_PATTERN, v):
+            raise ValueError("must match ^[A-Za-z0-9._-]+$")
+        return v
+
 
 class AckEvent(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -42,6 +54,15 @@ class AckEvent(BaseModel):
     thread_id: str = Field(default="general", min_length=1)
     target_id: str = Field(min_length=1)
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("actor", "thread_id")
+    @classmethod
+    def _validate_safe_ids(cls, v: str) -> str:
+        import re
+
+        if not re.match(SAFE_ID_PATTERN, v):
+            raise ValueError("must match ^[A-Za-z0-9._-]+$")
+        return v
 
 
 Record = MessageEvent | AckEvent
