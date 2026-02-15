@@ -27,11 +27,22 @@ def _sanitize_display(text: str) -> str:
 
 def _cmd_send(args: argparse.Namespace) -> int:
     store = MailboxStore(args.root)
+    msg = _send_message_from_args(store, args)
+    print(msg.model_dump_json(by_alias=True, exclude_none=True))
+    return 0
+
+
+def _resolve_body(args: argparse.Namespace) -> tuple[str | None, str | None]:
     body_text = args.body_text
     body_path = args.body_path
     if body_path and not body_text:
         body_path = str(Path(body_path).resolve())
-    msg = store.send(
+    return body_text, body_path
+
+
+def _send_message_from_args(store: MailboxStore, args: argparse.Namespace):
+    body_text, body_path = _resolve_body(args)
+    return store.send(
         from_agent=args.from_agent,
         to_agent=args.to_agent,
         subject=args.subject,
@@ -41,7 +52,23 @@ def _cmd_send(args: argparse.Namespace) -> int:
         priority=args.priority,
         ref=args.ref,
     )
-    print(msg.model_dump_json(by_alias=True, exclude_none=True))
+
+
+def _cmd_reply(args: argparse.Namespace) -> int:
+    store = MailboxStore(args.root)
+    msg = _send_message_from_args(store, args)
+    ack = None
+    if args.ack_id:
+        ack = store.ack(
+            agent=args.from_agent,
+            target_id=args.ack_id,
+            thread_id=(args.ack_thread or args.thread),
+        )
+    payload = {
+        "message": msg.model_dump(by_alias=True, exclude_none=True, mode="json"),
+        "ack": ack.model_dump(exclude_none=True, mode="json") if ack else None,
+    }
+    print(json.dumps(payload, indent=2))
     return 0
 
 
@@ -97,18 +124,28 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Local agent mailbox CLI")
     sub = parser.add_subparsers(dest="cmd", required=True)
 
+    def _add_send_like_args(p: argparse.ArgumentParser) -> None:
+        p.add_argument("--from", dest="from_agent", required=True)
+        p.add_argument("--to", dest="to_agent", required=True)
+        p.add_argument("--subject", default="")
+        p.add_argument("--thread", default="general")
+        p.add_argument("--priority", choices=["low", "medium", "high"], default="medium")
+        p.add_argument("--ref")
+        body_group = p.add_mutually_exclusive_group(required=True)
+        body_group.add_argument("--body-text")
+        body_group.add_argument("--body-path")
+
     send = sub.add_parser("send", help="Send a mailbox message")
     _add_common_args(send)
-    send.add_argument("--from", dest="from_agent", required=True)
-    send.add_argument("--to", dest="to_agent", required=True)
-    send.add_argument("--subject", default="")
-    send.add_argument("--thread", default="general")
-    send.add_argument("--priority", choices=["low", "medium", "high"], default="medium")
-    send.add_argument("--ref")
-    body_group = send.add_mutually_exclusive_group(required=True)
-    body_group.add_argument("--body-text")
-    body_group.add_argument("--body-path")
+    _add_send_like_args(send)
     send.set_defaults(func=_cmd_send)
+
+    reply = sub.add_parser("reply", help="Send reply and optionally ack original")
+    _add_common_args(reply)
+    _add_send_like_args(reply)
+    reply.add_argument("--ack-id", help="Message id to acknowledge after sending reply")
+    reply.add_argument("--ack-thread", help="Ack thread override (defaults to --thread)")
+    reply.set_defaults(func=_cmd_reply)
 
     inbox = sub.add_parser("inbox", help="List inbox messages")
     _add_common_args(inbox)
