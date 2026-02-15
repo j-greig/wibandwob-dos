@@ -2,3 +2,6 @@ fastapi>=0.111
 uvicorn[standard]>=0.30
 pydantic>=2.6
 fastapi-mcp>=0.1.0
+readability-lxml>=0.8
+markdownify>=0.14
+requests>=2.31

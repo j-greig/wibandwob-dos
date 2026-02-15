@@ -33,6 +33,7 @@ from .schemas import (
     BrowserRenderReq,
     BrowserSetModeReq,
     BrowserWindowReq,
+    BrowserFetchRequest,
     CanvasInfo,
     Capabilities,
     MenuCommand,
@@ -41,6 +42,7 @@ from .schemas import (
     PatternMode,
     PrimerInfo,
     PrimersListResponse,
+    RenderBundle,
     ScreenshotReq,
     SendTextReq,
     SendFigletReq,
@@ -55,6 +57,7 @@ from .schemas import (
     WorkspaceSave,
     RectModel,
 )
+from .browser import BrowserSession, fetch_and_convert
 from pydantic import BaseModel
 
 
@@ -362,8 +365,8 @@ def make_app() -> FastAPI:
             raise HTTPException(status_code=400, detail=res.get("error", "browser_set_mode_failed"))
         return res
 
-    @app.post("/browser/fetch")
-    async def browser_fetch(payload: BrowserFetchReq) -> Dict[str, Any]:
+    @app.post("/browser/fetch_ext")
+    async def browser_fetch_ext(payload: BrowserFetchReq) -> Dict[str, Any]:
         res = await ctl.browser_fetch(payload.url, payload.reader, payload.format)
         if not res.get("ok"):
             raise HTTPException(status_code=400, detail=res.get("error", "browser_fetch_failed"))
@@ -545,6 +548,38 @@ def make_app() -> FastAPI:
     async def monodraw_parse(payload: MonodrawParseRequest) -> Dict[str, Any]:
         """Parse Monodraw file without creating windows (preview mode)."""
         return await ctl.parse_monodraw_file(payload.file_path)
+
+    # ----- Browser -----
+
+    browser_session = BrowserSession()
+
+    @app.post("/browser/fetch", response_model=RenderBundle)
+    async def browser_fetch(payload: BrowserFetchRequest) -> RenderBundle:
+        """Fetch a URL, extract readable content, return RenderBundle."""
+        try:
+            bundle = await asyncio.get_event_loop().run_in_executor(
+                None, fetch_and_convert, payload.url
+            )
+        except Exception as e:
+            raise HTTPException(status_code=502, detail=str(e))
+        browser_session.navigate(bundle)
+        return RenderBundle(**bundle)
+
+    @app.post("/browser/back", response_model=RenderBundle)
+    async def browser_back() -> RenderBundle:
+        """Navigate back in browser session history."""
+        bundle = browser_session.back()
+        if bundle is None:
+            raise HTTPException(status_code=404, detail="no previous page in history")
+        return RenderBundle(**bundle)
+
+    @app.post("/browser/forward", response_model=RenderBundle)
+    async def browser_forward() -> RenderBundle:
+        """Navigate forward in browser session history."""
+        bundle = browser_session.forward()
+        if bundle is None:
+            raise HTTPException(status_code=404, detail="no next page in history")
+        return RenderBundle(**bundle)
 
     @app.websocket("/ws")
     async def ws(websocket: WebSocket) -> None:
