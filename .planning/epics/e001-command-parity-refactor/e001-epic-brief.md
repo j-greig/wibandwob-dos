@@ -35,7 +35,8 @@ Naming:
   - Brief: `.planning/epics/e001-command-parity-refactor/f02-parity-enforcement/f02-feature-brief.md`
 - [x] **F3: State/Event Authority** — `exec_command` dispatch, typed events, snapshot sanity
   - Brief: `.planning/epics/e001-command-parity-refactor/f03-state-event-authority/f03-feature-brief.md`
-- [ ] **F4: Instance Boundaries** — isolation for state, vault, events; local-first this pass
+- [x] **F4: Instance Boundaries** — isolation for state, vault, events; local-first this pass
+  - Brief: `.planning/epics/e001-command-parity-refactor/f04-instance-boundaries/f04-feature-brief.md`
 
 ## Story Backlog
 
@@ -54,6 +55,8 @@ Naming:
   - Brief: `.planning/epics/e001-command-parity-refactor/f02-parity-enforcement/s07-parity-matrix-test/s07-story-brief.md`
 - [x] **S8 (PR-2+):** Actor attribution on canonical command execution
   - Brief: `.planning/epics/e001-command-parity-refactor/f03-state-event-authority/s08-actor-attribution/s08-story-brief.md`
+- [x] **S9 (PR-2+):** Local instance isolation contract test
+  - Brief: `.planning/epics/e001-command-parity-refactor/f04-instance-boundaries/s09-instance-isolation-test/s09-story-brief.md`
 
 ## Acceptance Criteria (PR-1)
 
