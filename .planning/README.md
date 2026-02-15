@@ -133,6 +133,15 @@ Link checkboxes to their GitHub issue when one exists:
 | Spike | GitHub issue state | `spkNN-*.md` findings section |
 | Task | GitHub issue checklist | Story brief task list |
 
+### Parking Lot Container (Canon)
+
+Use `.planning/parking-lot.md` as the global container for cross-cutting `task`/`spike` follow-ons that are not yet promoted to a dedicated epic/feature track.
+
+Rules:
+1. Every parking-lot item must link a GitHub issue.
+2. Use only `task` (implementation) or `spike` (investigation) type labels in the register.
+3. If an item grows beyond one small PR or needs its own story chain, promote it into a proper epic/feature/story path under `.planning/epics/`.
+
 ## Git Conventions
 
 1. **Issue-first.** Every non-trivial change starts as a GitHub issue. Reference the issue number in commits and PR body.
