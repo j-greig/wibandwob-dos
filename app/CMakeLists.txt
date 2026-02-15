@@ -43,6 +43,7 @@ add_executable(test_pattern
     generative_monster_cam_view.cpp
     # DISABLED: generative_ascii_cam_view.cpp
     text_editor_view.cpp
+    browser_view.cpp
     transparent_text_view.cpp
     ansi_view.cpp
     wibwob_scroll_test.cpp

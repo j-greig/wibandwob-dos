@@ -73,6 +73,8 @@
 #include "notitle_frame.h"
 // Transparent background text view
 #include "transparent_text_view.h"
+// TUI Browser window
+#include "browser_view.h"
 // Factory for ASCII grid demo window (implemented in ascii_grid_view.cpp).
 class TWindow; TWindow* createAsciiGridDemoWindow(const TRect &bounds);
 // #include "mech_window.h" // deferred feature; header not present yet
@@ -184,6 +186,7 @@ const ushort cmWibWobTestA = 148;  // Scrollbar test: standardScrollBar fix
 const ushort cmWibWobTestB = 149;  // Scrollbar test: TScroller refactor
 const ushort cmWibWobTestC = 160;  // Scrollbar test: Split view architecture
 const ushort cmRepaint = 161;      // Force repaint
+const ushort cmBrowser = 170;      // Browser window
 
 // Help menu commands
 const ushort cmAbout = 129;
@@ -547,6 +550,8 @@ private:
     void newGradientWindow(TGradientWindow::GradientType type, const TRect& bounds);
     // void newMechWindow();
     void newDonutWindow();
+    void newBrowserWindow();
+    void newBrowserWindow(const TRect& bounds);
     void newWibWobWindow();
     void newWibWobTestWindowA();
     void newWibWobTestWindowB();
@@ -655,6 +660,8 @@ private:
     friend std::string api_close_window(TTestPatternApp&, const std::string&);
     friend std::string api_get_canvas_size(TTestPatternApp&);
     friend void api_spawn_text_editor(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_browser(TTestPatternApp&, const TRect* bounds);
+    friend std::string api_browser_fetch(TTestPatternApp&, const std::string& url);
     friend std::string api_send_text(TTestPatternApp&, const std::string&, const std::string&, 
                                      const std::string&, const std::string&);
     friend std::string api_send_figlet(TTestPatternApp&, const std::string&, const std::string&, 
@@ -784,6 +791,10 @@ void TTestPatternApp::handleEvent(TEvent& event)
                 clearEvent(event);
                 break;
             }
+            case cmBrowser:
+                newBrowserWindow();
+                clearEvent(event);
+                break;
             case cmAsciiGridDemo: {
                 TRect r = deskTop->getExtent();
                 r.grow(-10, -5);
@@ -1171,6 +1182,22 @@ void TTestPatternApp::newTestWindow(const TRect& bounds)
     
     // Create and insert window with provided bounds
     TTestPatternWindow* window = new TTestPatternWindow(bounds, title.str().c_str());
+    deskTop->insert(window);
+    registerWindow(window);
+}
+
+void TTestPatternApp::newBrowserWindow()
+{
+    TRect r = deskTop->getExtent();
+    r.grow(-3, -2);
+    TWindow* window = createBrowserWindow(r);
+    deskTop->insert(window);
+    registerWindow(window);
+}
+
+void TTestPatternApp::newBrowserWindow(const TRect& bounds)
+{
+    TWindow* window = createBrowserWindow(bounds);
     deskTop->insert(window);
     registerWindow(window);
 }
@@ -1687,6 +1714,7 @@ TMenuBar* TTestPatternApp::initMenuBar(TRect r)
             *new TMenuItem("~F~ull Screen", cmFullScreen, kbF11) +
         *new TSubMenu("~W~indow", kbAltW) +
             *new TMenuItem("~E~dit Text Editor", cmTextEditor, kbNoKey) +
+            *new TMenuItem("~B~rowser", cmBrowser, kbCtrlB) +
             newLine() +
             *new TMenuItem("~O~pen Text File (Transparent BG)...", cmOpenTransparentText, kbNoKey) +
             newLine() +
@@ -2654,6 +2682,37 @@ std::string api_send_figlet(TTestPatternApp& app, const std::string& id, const s
             return "ok";
         }
     }
-    
+
     return "err no text editor available";
+}
+
+void api_spawn_browser(TTestPatternApp& app, const TRect* bounds) {
+    if (bounds) {
+        app.newBrowserWindow(*bounds);
+    } else {
+        app.newBrowserWindow();
+    }
+}
+
+std::string api_browser_fetch(TTestPatternApp& app, const std::string& url) {
+    // Find the most recently inserted browser window and trigger a fetch
+    TView* start = app.deskTop->first();
+    TBrowserWindow* browserWin = nullptr;
+    if (start) {
+        TView* v = start;
+        do {
+            TBrowserWindow* candidate = dynamic_cast<TBrowserWindow*>(v);
+            if (candidate) {
+                browserWin = candidate;
+            }
+            v = v->next;
+        } while (v != start);
+    }
+
+    if (!browserWin) {
+        return "err no browser window";
+    }
+
+    browserWin->fetchUrl(url);
+    return "ok";
 }
