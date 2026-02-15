@@ -19,7 +19,7 @@ Establish a stable, versioned snapshot format for engine state. Enable workspace
 ## Stories
 
 - [x] `.planning/epics/e002-browser-and-state-export/f01-state-export/s01-snapshot-schema/s01-story-brief.md` — versioned snapshot schema + `export_state`/`import_state` IPC commands
-- [ ] `s02-workspace-persistence/` — `save_workspace`/`open_workspace` REST + file I/O
+- [x] `.planning/epics/e002-browser-and-state-export/f01-state-export/s02-workspace-persistence/s02-story-brief.md` — `save_workspace`/`open_workspace` REST + file I/O
 - [ ] `s03-event-logging/` — event-triggered snapshot logging (create/close/move/resize, command exec, timer)
 
 ## Acceptance Criteria

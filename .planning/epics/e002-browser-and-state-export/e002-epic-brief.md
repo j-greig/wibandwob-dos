@@ -42,7 +42,7 @@ Stories are numbered globally within this epic (s01-s99).
 ### F1: State Export
 
 - [x] **S01:** Versioned snapshot schema + `export_state`/`import_state` IPC commands
-- [ ] **S02:** `save_workspace`/`open_workspace` REST endpoints + file persistence
+- [x] **S02:** `save_workspace`/`open_workspace` REST endpoints + file persistence
 - [ ] **S03:** Event-triggered snapshot logging (window create/close/move/resize, command exec, timer)
 
 ### F2: Browser Core

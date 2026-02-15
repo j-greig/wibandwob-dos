@@ -428,11 +428,13 @@ class Controller:
 
     # ----- Workspace / Screenshot -----
     async def save_workspace(self, path: str) -> None:
+        await self.export_state(path, "json")
         async with self._lock:
             self._state.last_workspace = path
         await self._events.emit("workspace.saved", {"path": path})
 
     async def open_workspace(self, path: str) -> None:
+        await self.import_state(path, "replace")
         async with self._lock:
             self._state.last_workspace = path
         await self._events.emit("workspace.opened", {"path": path})
