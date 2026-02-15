@@ -9,6 +9,10 @@ from pathlib import Path
 SAFE_ID_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 
 
+def _escape_osascript_string(value: str) -> str:
+    return value.replace("\\", "\\\\").replace('"', '\\"')
+
+
 def terminal_bell() -> None:
     # Terminal bell is intentionally minimal and portable.
     print("\a", end="", flush=True)
@@ -17,10 +21,12 @@ def terminal_bell() -> None:
 def macos_notification(title: str, message: str) -> bool:
     if platform.system() != "Darwin":
         return False
+    safe_title = _escape_osascript_string(title)
+    safe_message = _escape_osascript_string(message)
     cmd = [
         "osascript",
         "-e",
-        f'display notification "{message}" with title "{title}"',
+        f'display notification "{safe_message}" with title "{safe_title}"',
     ]
     try:
         subprocess.run(cmd, check=False, capture_output=True, text=True)
