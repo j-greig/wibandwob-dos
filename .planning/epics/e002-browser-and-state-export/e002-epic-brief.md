@@ -256,19 +256,23 @@ This epic builds on E001 command registry infrastructure:
 - [x] `browser.open(url)` renders readable web content in a TUI window
 - [x] Figlet headings render at 3 size tiers with toggle
 - [x] ANSI images render via chafa with 4 modes and lazy loading
-- [x] Gallery window syncs with main browser scroll position
+- [~] Gallery window syncs with main browser scroll position
 - [x] Link navigation works via both cursor selection and numbered refs
 - [x] Back/forward history, caching, find-in-page all functional
 - [x] AI can operate browser via MCP tools with full parity
 - [x] AI can summarise pages, extract links, clip to markdown files
 - [x] `get_state()` includes browser window props for rebootable sessions
-- [x] All ACs have tests
+- [ ] All ACs have tests
 
 ## Status
 
 Status: `in-progress`
 GitHub issue: #16
 PR: #23, #28, #30
+
+Open blockers:
+- F5/S16 contract suite currently failing on branch (`tests/contract/test_browser_image_backend.py`)
+- F5/S17 gallery anchor-sync/focus behavior not yet fully asserted (AC-2)
 
 ## Symbient Tag
 

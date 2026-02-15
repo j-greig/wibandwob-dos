@@ -18,8 +18,8 @@ Add deterministic image rendering for browser pages in terminal output, with qua
 ## Stories
 
 - [x] `.planning/epics/e002-browser-and-state-export/f05-browser-image-ansi/s15-ansi-image-spec/s15-story-brief.md` — define quarter-pixel image rendering spec, contracts, limits, and implementation tests (#32)
-- [ ] `.planning/epics/e002-browser-and-state-export/f05-browser-image-ansi/s16-backend-adapter-cache/s16-story-brief.md` — implement backend adapter and cache pipeline for ANSI image blocks (#31)
-- [ ] `.planning/epics/e002-browser-and-state-export/f05-browser-image-ansi/s17-integration-modes-gallery/s17-story-brief.md` — implement browser image mode integration and gallery behavior in TUI/API/MCP (#31)
+- [~] `.planning/epics/e002-browser-and-state-export/f05-browser-image-ansi/s16-backend-adapter-cache/s16-story-brief.md` — implement backend adapter and cache pipeline for ANSI image blocks (#31)
+- [~] `.planning/epics/e002-browser-and-state-export/f05-browser-image-ansi/s17-integration-modes-gallery/s17-story-brief.md` — implement browser image mode integration and gallery behavior in TUI/API/MCP (#31)
 
 ## Acceptance Criteria
 
@@ -35,3 +35,7 @@ Add deterministic image rendering for browser pages in terminal output, with qua
 Status: `in-progress`
 GitHub issue: #31
 PR: —
+
+Blocking items:
+- S16 contract suite (`tests/contract/test_browser_image_backend.py`) currently failing on branch after edge-markdown pipeline changes.
+- S17 AC-2 (gallery anchor-sync/focus assertions) still open.
