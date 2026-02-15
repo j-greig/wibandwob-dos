@@ -47,6 +47,9 @@ The AI agent inside the chat window can spawn new windows, fill them with ASCII 
 ### Dual-Persona AI Chat
 Embedded Wib&Wob chat powered by Claude Code SDK with MCP tool access. The agent sees the desktop state, spawns windows, populates them with art and text, and persists memory across sessions via [symbient-brain](https://brain.zilla.workers.dev/symbient/wibwob).
 
+### Text-Native Web Browser
+Open web pages directly in Turbo Vision with readable markdown rendering, link navigation/history, figlet heading modes, ANSI image modes (`none`, `key-inline`, `all-inline`, `gallery`), and companion gallery sync. Browser control is available to both human and AI via menu commands, REST API, and MCP tools.
+
 ### 8+ Generative Art Engines
 Verse Field (flow/swirl/weave) · Mycelium Field · Monster Portal · Monster Verse · Torus Field · Cube Spinner · Orbit Field · Monster Cam · Game of Life
 
@@ -56,8 +59,8 @@ Test patterns · gradients (horizontal, vertical, radial, diagonal) · text edit
 ### ASCII Art Primers
 Pre-composed ASCII art templates loaded via the module system. Batch-spawn with precise positioning via API.
 
-### REST API + MCP (20+ Endpoints)
-Full programmatic control: window CRUD, text injection, figlet rendering, batch layouts, primer spawning, pattern modes, screenshots, workspace persistence. Real-time WebSocket events. All endpoints auto-exposed as MCP tools.
+### REST API + MCP
+Full programmatic control: window CRUD, browser open/fetch/render/actions, text injection, figlet rendering, batch layouts, primer spawning, pattern modes, screenshots, workspace persistence. Real-time WebSocket events. API capabilities are auto-exposed as MCP tools.
 
 ### Glitch Effects Engine
 Character scatter · colour bleed · radial distortion · diagonal scatter · dimension corruption · buffer desync. Configurable intensity, capturable to text.
