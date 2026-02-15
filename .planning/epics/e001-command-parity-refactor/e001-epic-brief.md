@@ -60,24 +60,24 @@ Naming:
 
 ## Acceptance Criteria (PR-1)
 
-- [ ] **AC-1:** Registry exposes capabilities JSON for registered commands
+- [x] **AC-1:** Registry exposes capabilities JSON for registered commands
   - Test: `uv run pytest tests/contract/test_capabilities_schema.py::test_registry_capabilities_payload_validates`
-- [ ] **AC-2:** At least one API/MCP path dispatches via canonical command source
+- [x] **AC-2:** At least one API/MCP path dispatches via canonical command source
   - Test: `uv run python tools/api_server/test_registry_dispatch.py`
-- [ ] **AC-3:** Everyday command parity does not regress
+- [x] **AC-3:** Everyday command parity does not regress
   - Test: `uv run pytest tests/contract/test_parity_drift.py::test_menu_vs_capabilities_parity`
-- [ ] **AC-4:** Snapshot/event sanity is preserved
+- [x] **AC-4:** Snapshot/event sanity is preserved
   - Test: `uv run pytest tests/contract/test_snapshot_event_sanity.py::test_snapshot_round_trip_and_event_emission`
 
 ## Required Artifacts
 
-- [ ] `docs/architecture/parity-drift-audit.md`
-- [ ] `docs/architecture/refactor-brief-vnext.md`
-- [ ] `docs/migration/vnext-migration-plan.md`
-- [ ] `docs/architecture/phase-zero-canon-alignment.md`
-- [ ] `docs/manifestos/symbient-os-manifesto-template.md`
-- [ ] Versioned schemas under `contracts/`
-- [ ] Tests covering parity + contracts + snapshot/event sanity
+- [x] `docs/architecture/parity-drift-audit.md`
+- [x] `docs/architecture/refactor-brief-vnext.md`
+- [x] `docs/migration/vnext-migration-plan.md`
+- [x] `docs/architecture/phase-zero-canon-alignment.md`
+- [x] `docs/manifestos/symbient-os-manifesto-template.md`
+- [x] Versioned schemas under `contracts/`
+- [x] Tests covering parity + contracts + snapshot/event sanity
 
 ## Phase Sequencing
 
@@ -89,16 +89,16 @@ Naming:
 
 ## Definition of Done (Epic)
 
-- [ ] Canonical command source exists and is used by at least one end-to-end path
-- [ ] Capability export is schema-validated
-- [ ] Parity drift tests exist and are enforced in CI
-- [ ] Snapshot/event sanity tests exist
-- [ ] PRs follow issue-first, branch-per-issue, rollback-noted workflow
+- [x] Canonical command source exists and is used by at least one end-to-end path
+- [x] Capability export is schema-validated
+- [x] Parity drift tests exist and are enforced in CI
+- [x] Snapshot/event sanity tests exist
+- [x] PRs follow issue-first, branch-per-issue, rollback-noted workflow
 
 ## Status
 
-Status: `in-progress`
+Status: `done`
 GitHub issue: #1
 PR: —
 
-Next action: execute S01 PR-1 vertical slice and publish test evidence
+Next action: track follow-on epic for browser/export evolution separately
