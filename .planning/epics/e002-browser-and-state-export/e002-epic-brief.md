@@ -28,11 +28,11 @@ Naming:
 
 - [x] **F1: State Export & Workspace Management** — stable snapshot format, save/load, event logging, replay
   - Brief: `.planning/epics/e002-browser-and-state-export/f01-state-export/f01-feature-brief.md`
-- [ ] **F2: Browser Core** — fetch HTML, extract readable content, convert to markdown, render in TUI, navigate links
+- [x] **F2: Browser Core** — fetch HTML, extract readable content, convert to markdown, render in TUI, navigate links
   - Brief: `.planning/epics/e002-browser-and-state-export/f02-browser-core/f02-feature-brief.md`
-- [ ] **F3: Rich Rendering** — figlet heading pipeline (3 tiers), ANSI image blocks via chafa, lazy rendering
+- [x] **F3: Rich Rendering** — figlet heading pipeline (3 tiers), ANSI image blocks via chafa, lazy rendering
   - Brief: `.planning/epics/e002-browser-and-state-export/f03-rich-rendering/f03-feature-brief.md`
-- [ ] **F4: AI Browser Tools** — MCP tools for browser control, page summarisation, clip-to-memory
+- [x] **F4: AI Browser Tools** — MCP tools for browser control, page summarisation, clip-to-memory
   - Brief: `.planning/epics/e002-browser-and-state-export/f04-ai-browser-tools/f04-feature-brief.md`
 
 ## Story Backlog
@@ -47,22 +47,22 @@ Stories are numbered globally within this epic (s01-s99).
 
 ### F2: Browser Core
 
-- [ ] **S04:** BrowserWindow skeleton in C++ (URL bar, status, scrollable content pane, keybindings)
-- [ ] **S05:** Python sidecar fetch pipeline (readability-lxml + markdownify → RenderBundle JSON)
-- [ ] **S06:** Link navigation (cursor selection + numbered refs), back/forward history, go-to-URL
-- [ ] **S07:** Caching layer (URL + options keyed, raw HTML + markdown + render bundle stored)
+- [x] **S04:** BrowserWindow skeleton in C++ (URL bar, status, scrollable content pane, keybindings)
+- [x] **S05:** Python sidecar fetch pipeline (readability-lxml + markdownify → RenderBundle JSON)
+- [x] **S06:** Link navigation (cursor selection + numbered refs), back/forward history, go-to-URL
+- [x] **S07:** Caching layer (URL + options keyed, raw HTML + markdown + render bundle stored)
 
 ### F3: Rich Rendering
 
-- [ ] **S08:** Figlet heading renderer (H1=`big`, H2=`standard`, H3-5=`small`) with toggle modes
-- [ ] **S09:** ANSI image renderer via chafa with 4 image modes (none/key-inline/all-inline/gallery)
-- [ ] **S10:** Gallery window (companion view, scroll sync with main browser, image focus)
+- [x] **S08:** Figlet heading renderer (H1=`big`, H2=`standard`, H3-5=`small`) with toggle modes
+- [x] **S09:** ANSI image renderer via chafa with 4 image modes (none/key-inline/all-inline/gallery)
+- [x] **S10:** Gallery window (companion view, scroll sync with main browser, image focus)
 
 ### F4: AI Browser Tools
 
-- [ ] **S11:** MCP tools: `browser.open`, `browser.back`, `browser.forward`, `browser.refresh`, `browser.find`
-- [ ] **S12:** MCP tools: `browser.set_mode`, `browser.fetch`, `browser.render`
-- [ ] **S13:** AI actions: summarise page to new window, extract links, clip page to markdown file
+- [x] **S11:** MCP tools: `browser.open`, `browser.back`, `browser.forward`, `browser.refresh`, `browser.find`
+- [x] **S12:** MCP tools: `browser.set_mode`, `browser.fetch`, `browser.render`
+- [x] **S13:** AI actions: summarise page to new window, extract links, clip page to markdown file
 
 ## Milestone Plan
 
@@ -242,22 +242,22 @@ This epic builds on E001 command registry infrastructure:
 
 ## Definition of Done (Epic)
 
-- [ ] State snapshots are versioned, deterministic, and round-trip tested
-- [ ] Workspace save/load persists and restores complete UI state including browser sessions
-- [ ] `browser.open(url)` renders readable web content in a TUI window
-- [ ] Figlet headings render at 3 size tiers with toggle
-- [ ] ANSI images render via chafa with 4 modes and lazy loading
-- [ ] Gallery window syncs with main browser scroll position
-- [ ] Link navigation works via both cursor selection and numbered refs
-- [ ] Back/forward history, caching, find-in-page all functional
-- [ ] AI can operate browser via MCP tools with full parity
-- [ ] AI can summarise pages, extract links, clip to markdown files
-- [ ] `get_state()` includes browser window props for rebootable sessions
-- [ ] All ACs have tests
+- [x] State snapshots are versioned, deterministic, and round-trip tested
+- [x] Workspace save/load persists and restores complete UI state including browser sessions
+- [x] `browser.open(url)` renders readable web content in a TUI window
+- [x] Figlet headings render at 3 size tiers with toggle
+- [x] ANSI images render via chafa with 4 modes and lazy loading
+- [x] Gallery window syncs with main browser scroll position
+- [x] Link navigation works via both cursor selection and numbered refs
+- [x] Back/forward history, caching, find-in-page all functional
+- [x] AI can operate browser via MCP tools with full parity
+- [x] AI can summarise pages, extract links, clip to markdown files
+- [x] `get_state()` includes browser window props for rebootable sessions
+- [x] All ACs have tests
 
 ## Status
 
-Status: `in-progress`
+Status: `done`
 GitHub issue: #16
 PR: —
 

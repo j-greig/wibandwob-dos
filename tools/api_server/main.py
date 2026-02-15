@@ -25,6 +25,14 @@ from .schemas import (
     BatchLayoutResponse,
     BatchPrimersRequest,
     BatchPrimersResponse,
+    BrowserClipReq,
+    BrowserFetchReq,
+    BrowserFindReq,
+    BrowserGetContentReq,
+    BrowserOpenReq,
+    BrowserRenderReq,
+    BrowserSetModeReq,
+    BrowserWindowReq,
     CanvasInfo,
     Capabilities,
     MenuCommand,
@@ -306,6 +314,100 @@ def make_app() -> FastAPI:
         res = await ctl.import_state(payload.path, payload.mode)
         if not res.get("ok"):
             raise HTTPException(status_code=400, detail=res.get("error", "import_failed"))
+        return res
+
+    @app.post("/browser/open")
+    async def browser_open(payload: BrowserOpenReq) -> Dict[str, Any]:
+        res = await ctl.browser_open(payload.url, payload.window_id, payload.mode)
+        if not res.get("ok"):
+            raise HTTPException(status_code=400, detail=res.get("error", "browser_open_failed"))
+        return res
+
+    @app.post("/browser/{window_id}/back")
+    async def browser_back(window_id: str) -> Dict[str, Any]:
+        res = await ctl.browser_back(window_id)
+        if not res.get("ok"):
+            raise HTTPException(status_code=400, detail=res.get("error", "browser_back_failed"))
+        return res
+
+    @app.post("/browser/{window_id}/forward")
+    async def browser_forward(window_id: str) -> Dict[str, Any]:
+        res = await ctl.browser_forward(window_id)
+        if not res.get("ok"):
+            raise HTTPException(status_code=400, detail=res.get("error", "browser_forward_failed"))
+        return res
+
+    @app.post("/browser/{window_id}/refresh")
+    async def browser_refresh(window_id: str) -> Dict[str, Any]:
+        res = await ctl.browser_refresh(window_id)
+        if not res.get("ok"):
+            raise HTTPException(status_code=400, detail=res.get("error", "browser_refresh_failed"))
+        return res
+
+    @app.post("/browser/{window_id}/find")
+    async def browser_find(window_id: str, payload: BrowserFindReq) -> Dict[str, Any]:
+        res = await ctl.browser_find(window_id, payload.query, payload.direction)
+        if not res.get("ok"):
+            raise HTTPException(status_code=400, detail=res.get("error", "browser_find_failed"))
+        return res
+
+    @app.post("/browser/{window_id}/set_mode")
+    async def browser_set_mode(window_id: str, payload: BrowserSetModeReq) -> Dict[str, Any]:
+        res = await ctl.browser_set_mode(window_id, payload.headings, payload.images)
+        if not res.get("ok"):
+            raise HTTPException(status_code=400, detail=res.get("error", "browser_set_mode_failed"))
+        return res
+
+    @app.post("/browser/fetch")
+    async def browser_fetch(payload: BrowserFetchReq) -> Dict[str, Any]:
+        res = await ctl.browser_fetch(payload.url, payload.reader, payload.format)
+        if not res.get("ok"):
+            raise HTTPException(status_code=400, detail=res.get("error", "browser_fetch_failed"))
+        return res
+
+    @app.post("/browser/render")
+    async def browser_render(payload: BrowserRenderReq) -> Dict[str, Any]:
+        res = await ctl.browser_render(payload.markdown, payload.headings or "plain", payload.images or "none", payload.width or 80)
+        if not res.get("ok"):
+            raise HTTPException(status_code=400, detail=res.get("error", "browser_render_failed"))
+        return res
+
+    @app.post("/browser/get_content")
+    async def browser_get_content(payload: BrowserGetContentReq) -> Dict[str, Any]:
+        res = await ctl.browser_get_content(payload.window_id, payload.format)
+        if not res.get("ok"):
+            raise HTTPException(status_code=400, detail=res.get("error", "browser_get_content_failed"))
+        return res
+
+    @app.post("/browser/{window_id}/summarise")
+    async def browser_summarise(window_id: str) -> Dict[str, Any]:
+        res = await ctl.browser_summarise(window_id, target="new_window")
+        if not res.get("ok"):
+            raise HTTPException(status_code=400, detail=res.get("error", "browser_summarise_failed"))
+        return res
+
+    @app.post("/browser/{window_id}/extract_links")
+    async def browser_extract_links(window_id: str, payload: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        pattern = (payload or {}).get("filter")
+        res = await ctl.browser_extract_links(window_id, pattern=pattern)
+        if not res.get("ok"):
+            raise HTTPException(status_code=400, detail=res.get("error", "browser_extract_links_failed"))
+        return res
+
+    @app.post("/browser/{window_id}/clip")
+    async def browser_clip(window_id: str, payload: Optional[BrowserClipReq] = None) -> Dict[str, Any]:
+        p = payload.path if payload else None
+        include_images = payload.include_images if payload else False
+        res = await ctl.browser_clip(window_id, path=p, include_images=include_images)
+        if not res.get("ok"):
+            raise HTTPException(status_code=400, detail=res.get("error", "browser_clip_failed"))
+        return res
+
+    @app.post("/browser/{window_id}/gallery")
+    async def browser_gallery(window_id: str) -> Dict[str, Any]:
+        res = await ctl.browser_toggle_gallery(window_id)
+        if not res.get("ok"):
+            raise HTTPException(status_code=400, detail=res.get("error", "browser_gallery_failed"))
         return res
 
     @app.post("/screenshot")

@@ -573,3 +573,68 @@ def register_tui_tools(mcp):
                 "success": False,
                 "error": str(e)
             }
+
+    @mcp.tool("browser.open")
+    async def browser_open_tool(url: str, window_id: Optional[str] = None, mode: str = "new") -> Dict[str, Any]:
+        controller = get_controller()
+        return await controller.browser_open(url, window_id, mode)
+
+    @mcp.tool("browser.back")
+    async def browser_back_tool(window_id: str) -> Dict[str, Any]:
+        controller = get_controller()
+        return await controller.browser_back(window_id)
+
+    @mcp.tool("browser.forward")
+    async def browser_forward_tool(window_id: str) -> Dict[str, Any]:
+        controller = get_controller()
+        return await controller.browser_forward(window_id)
+
+    @mcp.tool("browser.refresh")
+    async def browser_refresh_tool(window_id: str) -> Dict[str, Any]:
+        controller = get_controller()
+        return await controller.browser_refresh(window_id)
+
+    @mcp.tool("browser.find")
+    async def browser_find_tool(window_id: str, query: str, direction: str = "next") -> Dict[str, Any]:
+        controller = get_controller()
+        return await controller.browser_find(window_id, query, direction)
+
+    @mcp.tool("browser.set_mode")
+    async def browser_set_mode_tool(window_id: str, headings: Optional[str] = None, images: Optional[str] = None) -> Dict[str, Any]:
+        controller = get_controller()
+        return await controller.browser_set_mode(window_id, headings, images)
+
+    @mcp.tool("browser.fetch")
+    async def browser_fetch_tool(url: str, reader: str = "readability", format: str = "tui_bundle") -> Dict[str, Any]:
+        controller = get_controller()
+        return await controller.browser_fetch(url, reader, format)
+
+    @mcp.tool("browser.render")
+    async def browser_render_tool(markdown: str, headings: str = "plain", images: str = "none", width: int = 80) -> Dict[str, Any]:
+        controller = get_controller()
+        return await controller.browser_render(markdown, headings, images, width)
+
+    @mcp.tool("browser.get_content")
+    async def browser_get_content_tool(window_id: str, format: str = "text") -> Dict[str, Any]:
+        controller = get_controller()
+        return await controller.browser_get_content(window_id, format)
+
+    @mcp.tool("browser.summarise")
+    async def browser_summarise_tool(window_id: str, target: str = "new_window") -> Dict[str, Any]:
+        controller = get_controller()
+        return await controller.browser_summarise(window_id, target)
+
+    @mcp.tool("browser.extract_links")
+    async def browser_extract_links_tool(window_id: str, filter: Optional[str] = None) -> Dict[str, Any]:
+        controller = get_controller()
+        return await controller.browser_extract_links(window_id, pattern=filter)
+
+    @mcp.tool("browser.clip")
+    async def browser_clip_tool(window_id: str, path: Optional[str] = None, include_images: bool = False) -> Dict[str, Any]:
+        controller = get_controller()
+        return await controller.browser_clip(window_id, path=path, include_images=include_images)
+
+    @mcp.tool("browser.gallery")
+    async def browser_gallery_tool(window_id: str) -> Dict[str, Any]:
+        controller = get_controller()
+        return await controller.browser_toggle_gallery(window_id)

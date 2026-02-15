@@ -8,6 +8,7 @@ import re
 from datetime import datetime, timezone
 
 from .events import EventHub
+from .browser_pipeline import fetch_render_bundle, render_markdown
 from .models import AppState, Rect, Window, WindowType, new_id
 from .ipc_client import send_cmd
 from .schemas import (
@@ -454,6 +455,156 @@ class Controller:
             self._state.last_screenshot = target
         await self._events.emit("screenshot.saved", {"path": target})
         return target
+
+    # ----- Browser -----
+    async def browser_open(
+        self,
+        url: str,
+        window_id: Optional[str] = None,
+        mode: str = "new",
+        record_history: bool = True,
+    ) -> Dict[str, Any]:
+        bundle = fetch_render_bundle(url)
+        if mode == "same" and window_id:
+            win = self._require(window_id)
+            if win.type != WindowType.browser:
+                raise KeyError(window_id)
+        else:
+            win = await self.create_window(
+                WindowType.browser,
+                bundle.get("title", "Browser"),
+                Rect(2, 1, 100, 30),
+                {},
+            )
+
+        history = list(win.props.get("history", []))
+        if record_history:
+            history.append(url)
+            history_index = len(history) - 1
+        else:
+            history_index = int(win.props.get("history_index", max(0, len(history) - 1)))
+        win.props.update(
+            {
+                "url": url,
+                "history": history,
+                "history_index": history_index,
+                "markdown": bundle.get("markdown", ""),
+                "tui_text": bundle.get("tui_text", ""),
+                "links": bundle.get("links", []),
+                "render_mode": win.props.get("render_mode", "plain"),
+                "image_mode": win.props.get("image_mode", "none"),
+            }
+        )
+        await self._events.emit("browser.opened", {"window_id": win.id, "url": url})
+        self._append_state_event("browser.opened", {"window_id": win.id, "url": url}, actor="api")
+        return {"ok": True, "window_id": win.id, "url": url, "title": bundle.get("title", url), "bundle": bundle}
+
+    async def browser_back(self, window_id: str) -> Dict[str, Any]:
+        win = self._require(window_id)
+        history = list(win.props.get("history", []))
+        idx = int(win.props.get("history_index", 0))
+        if idx <= 0:
+            return {"ok": False, "error": "no_back_history"}
+        idx -= 1
+        win.props["history_index"] = idx
+        url = history[idx]
+        return await self.browser_open(url, window_id=window_id, mode="same", record_history=False)
+
+    async def browser_forward(self, window_id: str) -> Dict[str, Any]:
+        win = self._require(window_id)
+        history = list(win.props.get("history", []))
+        idx = int(win.props.get("history_index", 0))
+        if idx >= len(history) - 1:
+            return {"ok": False, "error": "no_forward_history"}
+        idx += 1
+        win.props["history_index"] = idx
+        url = history[idx]
+        return await self.browser_open(url, window_id=window_id, mode="same", record_history=False)
+
+    async def browser_refresh(self, window_id: str) -> Dict[str, Any]:
+        win = self._require(window_id)
+        url = str(win.props.get("url", ""))
+        return await self.browser_open(url, window_id=window_id, mode="same", record_history=False)
+
+    async def browser_find(self, window_id: str, query: str, direction: str = "next") -> Dict[str, Any]:
+        win = self._require(window_id)
+        text = str(win.props.get("tui_text", ""))
+        idx = text.lower().find(query.lower())
+        return {"ok": idx >= 0, "index": idx, "direction": direction}
+
+    async def browser_set_mode(self, window_id: str, headings: Optional[str], images: Optional[str]) -> Dict[str, Any]:
+        win = self._require(window_id)
+        if headings:
+            win.props["render_mode"] = headings
+        if images:
+            win.props["image_mode"] = images
+        win.props["tui_text"] = render_markdown(
+            str(win.props.get("markdown", "")),
+            headings=win.props.get("render_mode", "plain"),
+            images=win.props.get("image_mode", "none"),
+        )
+        return {"ok": True, "window_id": window_id, "render_mode": win.props.get("render_mode"), "image_mode": win.props.get("image_mode")}
+
+    async def browser_fetch(self, url: str, reader: str = "readability", fmt: str = "tui_bundle") -> Dict[str, Any]:
+        bundle = fetch_render_bundle(url, reader=reader)
+        if fmt == "markdown":
+            return {"ok": True, "url": url, "markdown": bundle.get("markdown", ""), "meta": bundle.get("meta", {})}
+        return {"ok": True, "bundle": bundle}
+
+    async def browser_render(self, markdown: str, headings: str = "plain", images: str = "none", width: int = 80) -> Dict[str, Any]:
+        return {"ok": True, "tui_text": render_markdown(markdown, headings=headings, images=images, width=width)}
+
+    async def browser_get_content(self, window_id: str, fmt: str = "text") -> Dict[str, Any]:
+        win = self._require(window_id)
+        if fmt == "markdown":
+            return {"ok": True, "content": win.props.get("markdown", "")}
+        if fmt == "links":
+            return {"ok": True, "links": win.props.get("links", [])}
+        return {"ok": True, "content": win.props.get("tui_text", "")}
+
+    async def browser_summarise(self, window_id: str, target: str = "new_window") -> Dict[str, Any]:
+        win = self._require(window_id)
+        text = str(win.props.get("markdown", ""))
+        summary = (text[:400] + "...") if len(text) > 400 else text
+        if target == "new_window":
+            new_win = await self.create_window(WindowType.text_editor, "Summary", Rect(6, 4, 90, 22), {"content": summary})
+            return {"ok": True, "window_id": new_win.id, "summary": summary}
+        return {"ok": True, "summary": summary}
+
+    async def browser_extract_links(self, window_id: str, pattern: Optional[str] = None) -> Dict[str, Any]:
+        win = self._require(window_id)
+        links = list(win.props.get("links", []))
+        if pattern:
+            try:
+                rx = re.compile(pattern)
+                links = [l for l in links if rx.search(str(l.get("url", ""))) or rx.search(str(l.get("text", "")))]
+            except re.error as exc:
+                return {"ok": False, "error": str(exc)}
+        return {"ok": True, "links": links}
+
+    async def browser_clip(self, window_id: str, path: Optional[str] = None, include_images: bool = False) -> Dict[str, Any]:
+        win = self._require(window_id)
+        out_path = Path(path or f"clips/{window_id}.md")
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        markdown = str(win.props.get("markdown", ""))
+        if include_images:
+            markdown += "\n\n<!-- images included -->\n"
+        out_path.write_text(markdown, encoding="utf-8")
+        return {"ok": True, "path": str(out_path)}
+
+    async def browser_toggle_gallery(self, window_id: str) -> Dict[str, Any]:
+        win = self._require(window_id)
+        gallery_id = win.props.get("gallery_window_id")
+        if gallery_id:
+            return {"ok": True, "gallery_window_id": gallery_id, "reused": True}
+        gallery = await self.create_window(
+            WindowType.text_view,
+            f"Gallery: {win.title}",
+            Rect(30, 3, 118, 30),
+            {"source_window_id": window_id},
+        )
+        win.props["gallery_window_id"] = gallery.id
+        return {"ok": True, "gallery_window_id": gallery.id, "reused": False}
 
     async def export_state(self, path: str, fmt: str = "json") -> Dict[str, Any]:
         if fmt not in ("json", "ndjson"):

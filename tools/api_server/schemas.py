@@ -19,6 +19,7 @@ class WindowCreate(BaseModel):
         "frame_player",
         "text_view",
         "text_editor",
+        "browser",
         "wallpaper",
     ]
     title: Optional[str] = None
@@ -153,6 +154,52 @@ class AppStateModel(BaseModel):
     last_workspace: Optional[str] = None
     last_screenshot: Optional[str] = None
     uptime_sec: float
+
+
+class BrowserOpenReq(BaseModel):
+    url: str
+    window_id: Optional[str] = None
+    mode: Literal["same", "new"] = "new"
+
+
+class BrowserWindowReq(BaseModel):
+    window_id: str
+
+
+class BrowserFindReq(BaseModel):
+    window_id: str
+    query: str
+    direction: Literal["next", "prev"] = "next"
+
+
+class BrowserSetModeReq(BaseModel):
+    window_id: str
+    headings: Optional[str] = None
+    images: Optional[str] = None
+
+
+class BrowserFetchReq(BaseModel):
+    url: str
+    reader: Literal["readability", "raw"] = "readability"
+    format: Literal["markdown", "tui_bundle"] = "tui_bundle"
+
+
+class BrowserRenderReq(BaseModel):
+    markdown: str
+    headings: Optional[str] = "plain"
+    images: Optional[str] = "none"
+    width: Optional[int] = 80
+
+
+class BrowserGetContentReq(BaseModel):
+    window_id: str
+    format: Literal["text", "markdown", "links"] = "text"
+
+
+class BrowserClipReq(BaseModel):
+    window_id: str
+    path: Optional[str] = None
+    include_images: bool = False
 
 
 # ----- Batch Layout Models -----
