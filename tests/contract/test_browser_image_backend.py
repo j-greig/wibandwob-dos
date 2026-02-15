@@ -13,24 +13,28 @@ import tools.api_server.browser_pipeline as pipeline
 
 
 class _Resp:
-    def __init__(self, *, text: str = "", content: bytes = b"") -> None:
+    def __init__(self, *, text: str = "", content: bytes = b"", headers: dict | None = None) -> None:
         self.text = text
         self.content = content
+        self.headers = headers or {}
 
     def raise_for_status(self) -> None:
         return None
 
 
-def _mock_get(url: str, timeout: int = 30):  # pylint: disable=unused-argument
+def _mock_get(url: str, timeout: int = 30, headers: dict | None = None, verify: bool = True):  # pylint: disable=unused-argument
     if url.startswith("https://img.example.com/"):
-        return _Resp(content=b"fake-image-bytes")
+        return _Resp(content=b"fake-image-bytes", headers={"content-type": "image/png"})
+    html = (
+        "<html><title>T</title><h1>H</h1>"
+        "<img src='https://img.example.com/a.png' alt='a'/>"
+        "<img src='https://img.example.com/b.png' alt='b'/>"
+        "</html>"
+    )
     return _Resp(
-        text=(
-            "<html><title>T</title><h1>H</h1>"
-            "<img src='https://img.example.com/a.png' alt='a'/>"
-            "<img src='https://img.example.com/b.png' alt='b'/>"
-            "</html>"
-        )
+        text=html,
+        content=html.encode("utf-8"),
+        headers={"content-type": "text/html; charset=utf-8"},
     )
 
 
