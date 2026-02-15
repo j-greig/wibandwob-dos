@@ -53,6 +53,14 @@ class PatternMode(BaseModel):
     mode: Literal["continuous", "tiled"]
 
 
+class ThemeMode(BaseModel):
+    mode: Literal["light", "dark"]
+
+
+class ThemeVariant(BaseModel):
+    variant: Literal["monochrome", "dark_pastel"]
+
+
 class MonodrawLoadRequest(BaseModel):
     file_path: str
     scale: float = 1.0
@@ -150,6 +158,8 @@ class CanvasInfo(BaseModel):
 
 class AppStateModel(BaseModel):
     pattern_mode: str
+    theme_mode: str
+    theme_variant: str
     windows: List[WindowState]
     canvas: CanvasInfo
     last_workspace: Optional[str] = None

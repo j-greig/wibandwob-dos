@@ -11,6 +11,9 @@ extern void api_save_workspace(TTestPatternApp& app);
 extern bool api_open_workspace_path(TTestPatternApp& app, const std::string& path);
 extern void api_screenshot(TTestPatternApp& app);
 extern void api_set_pattern_mode(TTestPatternApp& app, const std::string& mode);
+extern std::string api_set_theme_mode(TTestPatternApp& app, const std::string& mode);
+extern std::string api_set_theme_variant(TTestPatternApp& app, const std::string& variant);
+extern std::string api_reset_theme(TTestPatternApp& app);
 
 const std::vector<CommandCapability>& get_command_capabilities() {
     static const std::vector<CommandCapability> capabilities = {
@@ -21,6 +24,9 @@ const std::vector<CommandCapability>& get_command_capabilities() {
         {"open_workspace", "Open workspace from a path", true},
         {"screenshot", "Capture screen to a text snapshot", false},
         {"pattern_mode", "Set pattern mode: continuous or tiled", false},
+        {"set_theme_mode", "Set theme mode: light or dark", true},
+        {"set_theme_variant", "Set theme variant: monochrome or dark_pastel", true},
+        {"reset_theme", "Reset theme to default (monochrome + light)", false},
     };
     return capabilities;
 }
@@ -94,6 +100,21 @@ std::string exec_registry_command(
         std::string mode = (it == kv.end() || it->second.empty()) ? "continuous" : it->second;
         api_set_pattern_mode(app, mode);
         return "ok";
+    }
+    if (name == "set_theme_mode") {
+        auto it = kv.find("mode");
+        if (it == kv.end() || it->second.empty())
+            return "err missing mode";
+        return api_set_theme_mode(app, it->second);
+    }
+    if (name == "set_theme_variant") {
+        auto it = kv.find("variant");
+        if (it == kv.end() || it->second.empty())
+            return "err missing variant";
+        return api_set_theme_variant(app, it->second);
+    }
+    if (name == "reset_theme") {
+        return api_reset_theme(app);
     }
     return "err unknown command";
 }
