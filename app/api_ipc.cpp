@@ -1,4 +1,5 @@
 #include "api_ipc.h"
+#include "command_registry.h"
 
 #ifndef _WIN32
 #include <sys/socket.h>
@@ -167,7 +168,16 @@ void ApiIpcServer::poll() {
     }
 
     std::string resp = "ok\n";
-    if (cmd == "create_window") {
+    if (cmd == "get_capabilities") {
+        resp = get_command_capabilities_json() + "\n";
+    } else if (cmd == "exec_command") {
+        auto it = kv.find("name");
+        if (it == kv.end() || it->second.empty()) {
+            resp = "err missing name\n";
+        } else {
+            resp = exec_registry_command(*app_, it->second, kv) + "\n";
+        }
+    } else if (cmd == "create_window") {
         std::string type = kv["type"]; // test_pattern|gradient|frame_player|text_view
         
         // Extract optional positioning parameters

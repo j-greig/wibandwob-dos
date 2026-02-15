@@ -11,6 +11,7 @@ set(TV_COMMON_SOURCES
     glitch_engine.cpp
     frame_capture.cpp
     api_ipc.cpp
+    command_registry.cpp
     wibwob_view.cpp
     wibwob_engine.cpp
     llm/base/llm_config.cpp

@@ -92,21 +92,12 @@ def make_app() -> FastAPI:
 
     @app.get("/capabilities", response_model=Capabilities)
     async def capabilities() -> Capabilities:
+        caps = await ctl.get_capabilities()
         return Capabilities(
-            version="v1",
-            window_types=[t.value for t in WindowType],
-            commands=[
-                "cascade",
-                "tile",
-                "close_all",
-                "save_workspace",
-                "open_workspace",
-                "screenshot",
-            ],
-            properties={
-                "frame_player": {"fps": {"type": "number", "min": 1, "max": 120}},
-                "test_pattern": {"variant": {"type": "string"}},
-            },
+            version=str(caps.get("version", "v1")),
+            window_types=list(caps.get("window_types", [t.value for t in WindowType])),
+            commands=list(caps.get("commands", [])),
+            properties=dict(caps.get("properties", {})),
         )
 
     @app.get("/state", response_model=AppStateModel)

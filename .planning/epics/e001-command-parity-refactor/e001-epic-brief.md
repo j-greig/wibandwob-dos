@@ -29,7 +29,7 @@ Naming:
 
 ## Features
 
-- [ ] **F1: Command Registry** — define commands once in C++, derive capabilities, remove duplicates
+- [~] **F1: Command Registry** — define commands once in C++, derive capabilities, remove duplicates
   - Brief: `.planning/epics/e001-command-parity-refactor/f01-command-registry/f01-feature-brief.md`
 - [ ] **F2: Parity Enforcement** — automated drift checks for menu, IPC/API, MCP surfaces
 - [ ] **F3: State/Event Authority** — `exec_command` dispatch, typed events, snapshot sanity
@@ -37,7 +37,7 @@ Naming:
 
 ## Story Backlog
 
-- [ ] **S1 (PR-1):** Registry skeleton + first capability-driven path
+- [~] **S1 (PR-1):** Registry skeleton + first capability-driven path
   - Brief: `.planning/epics/e001-command-parity-refactor/f01-command-registry/s01-registry-skeleton/s01-story-brief.md`
 - [ ] **S2 (PR-2+):** Expand parity coverage + enforce drift tests
 
@@ -80,8 +80,8 @@ Naming:
 
 ## Status
 
-Status: `not-started`
-GitHub issue: (not yet created)
+Status: `in-progress`
+GitHub issue: #1
 PR: —
 
-Next action: open epic issue + create feature/story issues for S1 execution
+Next action: execute S01 PR-1 vertical slice and publish test evidence

@@ -11,7 +11,7 @@ Define commands once in C++ and derive capabilities from that source to remove d
 
 ## Stories
 
-- [ ] `.planning/epics/e001-command-parity-refactor/f01-command-registry/s01-registry-skeleton/s01-story-brief.md` — registry skeleton + first capability-driven path
+- [~] `.planning/epics/e001-command-parity-refactor/f01-command-registry/s01-registry-skeleton/s01-story-brief.md` — registry skeleton + first capability-driven path
 
 ## Acceptance Criteria
 
@@ -24,8 +24,8 @@ Define commands once in C++ and derive capabilities from that source to remove d
 
 ## Status
 
-Status: `not-started`
-GitHub issue: (not yet created)
+Status: `in-progress`
+GitHub issue: #3
 PR: —
 
 ## Notes

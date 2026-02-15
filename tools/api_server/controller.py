@@ -46,6 +46,36 @@ class Controller:
         await self._sync_state()
         return self._state
 
+    async def get_registry_capabilities(self) -> Dict[str, Any]:
+        """Fetch canonical command capabilities from the C++ registry via IPC."""
+        try:
+            resp = send_cmd("get_capabilities")
+            if resp and resp.strip().startswith("{"):
+                data = json.loads(resp.strip())
+                if isinstance(data, dict):
+                    return data
+        except Exception:
+            pass
+        return {"version": "v1", "commands": []}
+
+    async def get_capabilities(self) -> Dict[str, Any]:
+        """Return API capabilities derived from canonical C++ command metadata."""
+        registry = await self.get_registry_capabilities()
+        command_names = [
+            cmd.get("name")
+            for cmd in registry.get("commands", [])
+            if isinstance(cmd, dict) and cmd.get("name")
+        ]
+        return {
+            "version": registry.get("version", "v1"),
+            "window_types": [t.value for t in WindowType],
+            "commands": command_names,
+            "properties": {
+                "frame_player": {"fps": {"type": "number", "min": 1, "max": 120}},
+                "test_pattern": {"variant": {"type": "string"}},
+            },
+        }
+
     async def _sync_state(self) -> None:
         """Sync in-memory state with the real C++ app via IPC"""
         try:
@@ -367,37 +397,22 @@ class Controller:
             return {"ok": False, "error": str(e)}
 
     async def exec_command(self, name: str, args: Dict[str, Any]) -> Dict[str, Any]:
-        # Simulate a few commands
         handled = {"command": name, "ok": True}
-        if name == "cascade":
-            await self.cascade()
-        elif name == "tile":
-            await self.tile(args.get("cols", 2))
-        elif name == "close_all":
-            await self.close_all()
-        elif name == "save_workspace":
-            try:
-                p = str(args.get("path", "workspaces/last_workspace.json"))
-                send_cmd("save_workspace", {"path": p})
-            except Exception:
-                pass
-            await self.save_workspace(args.get("path", "workspace.json"))
-        elif name == "open_workspace":
-            try:
-                p = str(args.get("path", "workspaces/last_workspace.json"))
-                send_cmd("open_workspace", {"path": p})
-            except Exception:
-                pass
-            await self.open_workspace(args.get("path", "workspace.json"))
-        elif name == "screenshot":
-            try:
-                send_cmd("screenshot")
-            except Exception:
-                pass
-            await self.screenshot(args.get("path"))
-        else:
+        payload: Dict[str, str] = {"name": name}
+        for key, value in (args or {}).items():
+            payload[key] = str(value)
+        try:
+            resp = send_cmd("exec_command", payload)
+            if isinstance(resp, str) and resp.lower().startswith("err"):
+                handled["ok"] = False
+                handled["error"] = resp
+        except Exception as exc:
             handled["ok"] = False
-            handled["error"] = "unknown_command"
+            handled["error"] = str(exc)
+
+        # Refresh mirrored state after command execution for best-effort parity.
+        if handled["ok"]:
+            await self._sync_state()
         await self._events.emit("command.executed", handled)
         return handled
 
