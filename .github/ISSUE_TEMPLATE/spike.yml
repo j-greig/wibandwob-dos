@@ -1,0 +1,48 @@
+name: Spike
+description: Timeboxed investigation to reduce uncertainty.
+title: "SP: "
+labels:
+  - spike
+body:
+  - type: input
+    id: parent
+    attributes:
+      label: Parent Epic or Feature
+      description: Link to related issue.
+      placeholder: "#123"
+    validations:
+      required: true
+  - type: input
+    id: question
+    attributes:
+      label: Research Question
+      description: Exact uncertainty to resolve.
+      placeholder: How should capability schemas be versioned to avoid drift?
+    validations:
+      required: true
+  - type: input
+    id: timebox
+    attributes:
+      label: Timebox
+      description: Strict max effort.
+      placeholder: 1 day
+    validations:
+      required: true
+  - type: textarea
+    id: deliverables
+    attributes:
+      label: Required Deliverables
+      description: Findings doc paths and decisions expected.
+      placeholder: |
+        - docs/research/...
+        - recommendation with rationale
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: Done Definition
+      description: How this spike closes.
+      placeholder: Findings documented; decision recorded; follow-up implementation issue created.
+    validations:
+      required: true

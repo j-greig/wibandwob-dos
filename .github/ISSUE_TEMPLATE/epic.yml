@@ -1,0 +1,59 @@
+name: Epic
+description: Multi-pull-request architectural outcome.
+title: "E: "
+labels:
+  - epic
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this for large outcomes spanning multiple pull requests.
+  - type: input
+    id: outcome
+    attributes:
+      label: Outcome
+      description: One-sentence target outcome.
+      placeholder: Establish canonical command registry parity across menu, API, and tools.
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Statement
+      description: What is broken or risky today?
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: In-scope and out-of-scope items.
+      placeholder: |
+        In: command registry, capability export, parity tests
+        Out: web viewer implementation, hosted runtime
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance Criteria
+      description: Use AC format from .planning/README.md.
+      placeholder: |
+        AC-1: ...
+        Test: ...
+    validations:
+      required: true
+  - type: textarea
+    id: test_plan
+    attributes:
+      label: Test Plan
+      description: Commands/tests proving completion.
+    validations:
+      required: true
+  - type: textarea
+    id: rollback
+    attributes:
+      label: Rollback Plan
+      description: What to revert and impact if rollback needed.
+    validations:
+      required: true

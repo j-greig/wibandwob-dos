@@ -1,108 +1,125 @@
-# WibWob-DOS Refactor Prompt (2026-02-15)
+# WibWob-DOS Refactor Prompt (2026-02-15, refined)
 
 ```text
-You are operating inside the wibwob-dos repository with full filesystem access and the ability to run commands, edit files, and perform web/doc research.
+You are operating inside the wibandwob-dos repository with filesystem and command access.
 
-Objective:
-Deliver an incremental refactor plan and implementation slices that make WibWob-DOS a reference implementation of an agent-native Turbo Vision OS, while preserving Turbo Vision architectural DNA and preventing drift between UI and AI control surfaces.
+Mission:
+Deliver a real, incremental refactor that makes WibWob-DOS a contract-driven, agent-native Turbo Vision OS while preserving Turbo Vision architectural DNA and eliminating drift between UI, IPC/API, and MCP/tool surfaces.
 
-This is architecture + implementation work, not brainstorming only.
+This is implementation work, not brainstorming.
 
-Core outcomes required:
-1) Single source of truth for commands/capabilities in C++.
-2) Parity between menu actions, IPC commands, REST endpoints, and MCP tools.
-3) Authoritative engine state with append-only events and deterministic snapshots.
-4) Instance isolation model that supports local-first now and hosted/multi-tenant later.
-5) PR-sized, reviewable changes with tests and docs.
+Hard constraints:
+1) Do not assume idealized repo layout. Start from actual files in this checkout.
+2) Preserve behavior for existing users unless a change is explicitly flagged as breaking.
+3) No broad rewrite. Prefer smallest vertical slice with strong evidence.
+4) Do not add retrieval-pipeline features in this pass.
+
+Mandatory onboarding reads before proposing code changes:
+- workings/chatgpt-refactor-vision-planning-2026-01-15/overview.md
+- workings/chatgpt-refactor-vision-planning-2026-01-15/thread-memory-refresh.md
+- workings/chatgpt-refactor-vision-planning-2026-01-15/spec-state-log-vault-browser.md
+- workings/chatgpt-refactor-vision-planning-2026-01-15/pr-acceptance-and-quality-gates.md
+- workings/chatgpt-refactor-vision-planning-2026-01-15/prompts/execution-prompts.md
+- workings/chatgpt-refactor-vision-planning-2026-01-15/local-first-research-phase-a.md
+- workings/chatgpt-refactor-vision-planning-2026-01-15/local-first-research-phases-b-f.md
 
 Preserve Turbo Vision invariants:
-- TObject hierarchy
-- TView/TGroup ownership and lifecycle
-- TApplication event loop discipline (GetEvent -> HandleEvent -> Idle)
+- TObject hierarchy and ownership lifecycle
+- TView/TGroup event routing discipline
+- TApplication loop model (GetEvent -> HandleEvent -> Idle)
 - Command/message architecture (cmXxx semantics)
-- Streaming/object persistence principles
+- Streamability/persistence as an architectural principle
 
-Distinguish historical constraints from principles:
-- Historical constraints (DOS memory model, no threads) may be modernized.
-- Architectural principles (message dispatch discipline, hierarchy, streamability, command routing) must be preserved.
+Distinguish principles from historical constraints:
+- Historical DOS constraints may be modernized.
+- Architectural principles must be preserved.
 
-Non-negotiable design requirements:
-- All state mutation goes through one engine command dispatch path.
-- UI actions must call the same command path as API/MCP.
-- API/MCP tool surfaces must derive from capabilities, not duplicate hand-maintained command lists.
-- Contracts must be versioned and schema-validated.
-- Event stream and snapshots must reflect engine truth.
+Non-negotiable architecture outcomes:
+1) Single source of truth for commands/capabilities in C++.
+2) Parity between menu actions, IPC/API commands, and MCP/tool exposure.
+3) Authoritative engine state with append-only, actor-attributed events.
+4) Deterministic snapshot export/import sanity.
+5) Instance isolation model (local-first now, hosted-ready later).
+6) Versioned schemas/contracts and validation tests.
 
-Scope guardrails:
-- Use local-first memory substrate principles.
-- Do not implement retrieval pipeline features in this refactor pass.
-- Focus on contracts, parity, state/event architecture, and contributor-safe workflow.
-
-GitHub workflow rules (required):
-- Plan work as GitHub issues by default.
-- Implement in small PR-sized milestones, one milestone per branch/PR.
-- Treat repository as multi-contributor: explicit assumptions, acceptance criteria, and rollback notes per PR.
-- Do not batch unrelated architectural changes in one PR.
+Repo-reality hints (verify, do not blindly trust):
+- UI/menu command definitions are concentrated in app/test_pattern_app.cpp.
+- API/MCP surfaces are under tools/api_server/ (main.py, controller.py, mcp_tools.py).
+- Existing capabilities endpoint exists but may not be canonical yet.
 
 Required process:
-PHASE 1 — Audit current repo
-- Map menu commands vs IPC vs API/MCP capability drift.
-- Identify duplicated command definitions and state authority conflicts.
-- Produce a drift report with exact file references.
 
-PHASE 2 — Architecture proposal
-- Define command registry + capability export model.
-- Define contracts layout/versioning strategy.
-- Define event model + snapshot model.
-- Define instance model + isolation boundaries.
-- Define migration strategy (no rewrite).
+PHASE 0 — Grounding and invariants digest
+- Confirm onboarding docs were read.
+- Produce a short invariants digest tied to this repo (not generic).
 
-PHASE 3 — Incremental implementation plan
-- Split into PR-1 / PR-2 / PR-3 ... with explicit scope boundaries.
-- Each PR includes: code changes, tests, docs, risks, rollback.
+PHASE 1 — Drift and authority audit
+- Map command definitions and execution paths across:
+  - Turbo Vision menu/command handlers
+  - IPC bridge
+  - FastAPI endpoints
+  - MCP tool exposure
+- Identify duplicated command declarations and any state-authority split.
+- Produce file-precise drift report with line references.
 
-PHASE 4 — Execute only PR-1
-- Implement first minimal slice that proves parity direction.
-- Stop after PR-1 deliverables and report results.
+PHASE 2 — vNext architecture (incremental, no rewrite)
+- Define command registry + capability export contract.
+- Define event and snapshot contracts (append-only events, deterministic snapshots).
+- Define instance/vault boundaries for local-first durability.
+- Define migration path from current shape to target shape.
+- Call out assumptions and unknowns explicitly.
 
-PR-1 target (minimum viable refactor slice):
-- Add command/capability registry skeleton in C++.
-- Expose capabilities through IPC/API in a non-breaking way.
-- Replace at least one hardcoded API command list path with capability-driven path.
-- Add one parity test and one schema validation test.
-- Update docs for new source-of-truth path.
+PHASE 3 — PR-sized rollout plan
+- Break work into PR-1 / PR-2 / PR-3 with explicit boundaries.
+- For each PR include:
+  - scope and non-goals
+  - touched files/components
+  - tests and acceptance criteria
+  - rollback strategy
+  - risk notes
 
-Required deliverables in-repo:
-- docs/architecture/refactor-brief-vnext.md
+PHASE 4 — Execute PR-1 only
+- Implement the smallest vertical slice that proves parity direction.
+- Stop after PR-1 and report outcomes.
+
+PR-1 minimum target:
+- Introduce a C++ command/capability registry skeleton (or equivalent canonical table) integrated with existing command handling.
+- Drive at least one API/MCP path from that canonical source instead of duplicated hardcoded command lists.
+- Add at least:
+  - one parity test (menu/command/API consistency)
+  - one schema validation test
+  - one snapshot/event sanity test (can be minimal)
+- Update docs for source-of-truth and migration intent.
+
+Required deliverables in-repo (create if missing):
 - docs/architecture/parity-drift-audit.md
+- docs/architecture/refactor-brief-vnext.md
 - docs/migration/vnext-migration-plan.md
-- docs/architecture/phase-zero-canon-alignment.md
-- docs/manifestos/symbient-os-manifesto-template.md
-- versioned contract schema files under contracts/
-- tests for parity + contracts + snapshot/event sanity
+- versioned schemas under contracts/ (or a clearly justified equivalent path)
+- tests covering parity + contract validation + snapshot/event sanity
 
-Quality gates (must satisfy; treat as blocking):
-Use and satisfy checklist in:
-- workings/chatgpt-refactor-vision-planning-2026-01-15/pr-acceptance-and-quality-gates.md
+Quality gates (blocking):
+- Satisfy checklist in:
+  - workings/chatgpt-refactor-vision-planning-2026-01-15/pr-acceptance-and-quality-gates.md
+- At minimum prove:
+  - schema validation passes
+  - capabilities -> execution sanity is intact
+  - everyday command parity is not regressed
+  - snapshot round-trip sanity
+  - impacted local runtime smoke checks
 
-At minimum include:
-- contract/schema validation
-- capabilities -> toolgen -> exec sanity
-- menu parity check for everyday commands
-- snapshot round-trip sanity
-- container/local smoke checks for impacted surfaces
+Output format:
+1) Findings and risks
+2) Proposed architecture
+3) PR breakdown
+4) PR-1 implementation with exact changed files
+5) Test evidence (commands run + key output)
+6) Remaining work for PR-2
 
-Output format expectations:
-- Start with findings and risks.
-- Then proposed architecture.
-- Then PR breakdown.
-- Then execute PR-1 and show concrete changed files + test evidence.
-- End with what remains for PR-2.
-
-Style constraints:
+Style rules:
 - Be concrete, file-specific, and test-oriented.
-- Prefer minimal viable refactor over broad rewrites.
-- Keep decisions explicit and reversible.
+- Keep decisions explicit, reversible, and contributor-friendly.
+- If blocked, stop and report blockers with smallest viable next move.
 
-Begin now with PHASE 1 audit.
+Begin with PHASE 0.
 ```

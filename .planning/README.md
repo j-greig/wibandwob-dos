@@ -19,6 +19,11 @@ This directory is the authoritative reference for how work is planned, named, sc
 | **Adapter** | IPC, REST, MCP, CLI — anything that translates between the engine command surface and an external caller. |
 | **Sidecar** | An optional external process (browser renderer, image converter) that talks to the engine via adapters. |
 | **Primer** | Content module (art, prompts, themes) loaded from `modules/` or `modules-private/`. |
+| **Epic** | A multi-PR program of work that delivers a major architectural outcome. |
+| **Feature** | A coherent capability inside an epic; typically delivered across 1-3 stories. |
+| **Story** | A vertical slice with user-visible or interface-visible value, normally one PR target. |
+| **Task** | A concrete implementation step inside a story. |
+| **Spike** | Timeboxed investigation to reduce uncertainty before implementation. |
 
 ## Naming Conventions
 
@@ -68,6 +73,66 @@ Multi-line body is encouraged for non-trivial commits. Explain *why*, not *what*
 - ADRs: `adr-NNNN-<kebab-title>.md` (e.g., `adr-0001-contracts.md`)
 - Test files: `test_<thing>.py` or `test_<thing>.cpp`
 
+### Planning Files
+
+Files under `.planning/epics/` follow prefix conventions enforced by hooks:
+
+| Level | Prefix | Dir example | File example |
+|-------|--------|-------------|--------------|
+| Epic | `eNNN-` | `e001-command-parity-refactor/` | `e001-epic-brief.md` |
+| Feature | `fNN-` | `f01-command-registry/` | `f01-feature-brief.md` |
+| Story | `sNN-` | `s01-registry-skeleton/` | `s01-story-brief.md` |
+| Spike | `spkNN-` | `spk01-command-mapping/` | `spk01-findings.md` |
+
+Story numbers should be globally unique within an epic (s01-s99), not per-feature. (Convention — hooks enforce prefix matching, not cross-file uniqueness.)
+Spikes can be flat files or directories depending on artifact count.
+
+## Progress Tracking
+
+### Authority Rule
+
+**GitHub issues are the source of truth for completion state.** Markdown checkboxes are mirrors — update them the same day as the issue state changes. If GitHub and markdown disagree, GitHub wins.
+
+### Status Header
+
+Every epic brief, feature brief, story brief, and spike file must have a status block at the top of its Status section:
+
+```
+Status: not-started | in-progress | blocked | done | dropped
+GitHub issue: #NNN
+PR: #NNN (when created)
+```
+
+### Checkbox Format
+
+Use these and only these checkbox states:
+
+| Marker | Meaning |
+|--------|---------|
+| `[ ]` | Not started |
+| `[~]` | In progress |
+| `[x]` | Done |
+| `[-]` | Dropped / not applicable |
+
+Link checkboxes to their GitHub issue when one exists:
+
+```
+- [x] Registry skeleton class (#12)
+- [~] Capability export endpoint (#13)
+- [ ] Parity drift test (#14)
+- [-] Web viewer support (out of scope this pass)
+```
+
+### Where Progress Lives
+
+| Item | Completion truth | Markdown mirror |
+|------|-----------------|-----------------|
+| Epic | GitHub milestone | `e001-epic-brief.md` feature checklist |
+| Feature | GitHub issue state | `fNN-feature-brief.md` story checklist |
+| Story | GitHub issue state | `sNN-story-brief.md` task/AC checklist |
+| Spike | GitHub issue state | `spkNN-*.md` findings section |
+| Task | GitHub issue checklist | Story brief task list |
+
 ## Git Conventions
 
 1. **Issue-first.** Every non-trivial change starts as a GitHub issue. Reference the issue number in commits and PR body.
@@ -76,6 +141,61 @@ Multi-line body is encouraged for non-trivial commits. Explain *why*, not *what*
 4. **No batching unrelated changes.** If a PR touches command registry *and* paint palette colors, split it.
 5. **PR-sized milestones.** Each PR is small enough to review in one sitting. If you can't describe the change in two sentences, split it.
 6. **Rollback notes.** Every PR body includes a "Rollback" section: what to revert and what breaks.
+
+## Work Item Model (Epic -> Feature -> Story -> Task)
+
+This repo plans work using GitHub issues and PRs by default.
+
+### Hierarchy
+
+1. **Epic**
+   - Scope: large architectural outcome across multiple PRs.
+   - Output: architecture change and durable docs/contracts/tests.
+2. **Feature**
+   - Scope: a coherent capability under one epic.
+   - Output: one or more stories.
+3. **Story**
+   - Scope: smallest vertical slice we merge confidently.
+   - Output: usually one PR with tests and docs updates.
+4. **Task**
+   - Scope: implementation checklist item inside a story.
+   - Output: code/doc/test step.
+5. **Spike**
+   - Scope: uncertainty reduction only.
+   - Output: findings and decision; no unbounded buildout.
+
+### GitHub Mapping
+
+| Item | GitHub representation | Naming guidance |
+|------|------------------------|-----------------|
+| Epic | Issue + milestone + `epic` label | `E: <outcome>` |
+| Feature | Issue linked to epic + `feature` label | `F: <capability>` |
+| Story | Issue linked to feature + `story` label | `S: <vertical-slice>` |
+| Task | Issue checklist item or child issue + `task` label | concise action |
+| Spike | Separate issue + `spike` label + explicit timebox | `SP: <question>` |
+
+Default GitHub templates:
+- `.github/ISSUE_TEMPLATE/epic.yml`
+- `.github/ISSUE_TEMPLATE/feature.yml`
+- `.github/ISSUE_TEMPLATE/story.yml`
+- `.github/ISSUE_TEMPLATE/spike.yml`
+- `.github/pull_request_template.md`
+
+### Issue Requirements
+
+Every non-trivial issue should include:
+- Problem statement
+- Scope (in/out)
+- Acceptance criteria (AC format below)
+- Test plan
+- Rollback note
+- Links to parent epic/feature
+
+### Story Sizing Rule
+
+- Prefer stories that land in one review session and one PR.
+- If a story cannot be summarized in two sentences, split it.
+- If a PR touches unrelated domains, split it.
 
 ## Goals (This Refactor Pass)
 
@@ -87,6 +207,17 @@ Multi-line body is encouraged for non-trivial commits. Explain *why*, not *what*
 6. **Instance isolation.** Instance A's state, vault, and events are invisible to Instance B. Tested.
 7. **Contract-driven interfaces.** Versioned JSON schemas under `contracts/`. Breaking changes require version bump. Schema validation in CI.
 8. **PR-safe contributor workflow.** Any agent or human can pick up an issue, implement on a branch, and pass quality gates without tribal knowledge.
+
+## Active Refactor Track (Current)
+
+Canonical prompt for current track:
+- `workings/chatgpt-refactor-vision-planning-2026-01-15/prompts/refactor-prompt-2026-02-15.md`
+
+Default sequencing for implementation:
+1. Epic: command/capability parity refactor
+2. Feature: registry source-of-truth + capability export
+3. Story PR-1: registry skeleton + first capability-driven path + parity/schema tests
+4. Story PR-2+: expand parity coverage and enforce drift tests
 
 ## Non-Goals (Explicitly Out of Scope)
 

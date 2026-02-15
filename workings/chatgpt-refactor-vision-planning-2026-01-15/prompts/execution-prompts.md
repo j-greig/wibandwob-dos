@@ -1,7 +1,7 @@
 # Execution Prompt Pack (Operational)
 
 ## 1) Formalize `wibwob-oslog@1` contracts
-```bash
+```text
 You are operating inside the WibWob-DOS repository.
 
 Your task is to design and implement a canonical schema specification for:
