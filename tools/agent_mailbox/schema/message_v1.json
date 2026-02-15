@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wibandwob.local/contracts/agent-mailbox/message-v1.json",
+  "title": "Agent Mailbox Event v1",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": [
+        "event",
+        "version",
+        "id",
+        "ts",
+        "from",
+        "to",
+        "thread_id"
+      ],
+      "properties": {
+        "event": { "const": "message" },
+        "version": { "const": "v1" },
+        "id": { "type": "string", "minLength": 1 },
+        "ts": { "type": "string", "format": "date-time" },
+        "from": { "type": "string", "minLength": 1 },
+        "to": { "type": "string", "minLength": 1 },
+        "thread_id": { "type": "string", "minLength": 1 },
+        "subject": { "type": "string" },
+        "body_text": { "type": "string" },
+        "body_path": { "type": "string" },
+        "priority": {
+          "type": "string",
+          "enum": ["low", "medium", "high"]
+        },
+        "ref": { "type": "string" },
+        "metadata": { "type": "object" }
+      },
+      "additionalProperties": false,
+      "anyOf": [
+        { "required": ["body_text"] },
+        { "required": ["body_path"] }
+      ]
+    },
+    {
+      "type": "object",
+      "required": [
+        "event",
+        "version",
+        "id",
+        "ts",
+        "actor",
+        "thread_id",
+        "target_id"
+      ],
+      "properties": {
+        "event": { "const": "ack" },
+        "version": { "const": "v1" },
+        "id": { "type": "string", "minLength": 1 },
+        "ts": { "type": "string", "format": "date-time" },
+        "actor": { "type": "string", "minLength": 1 },
+        "thread_id": { "type": "string", "minLength": 1 },
+        "target_id": { "type": "string", "minLength": 1 },
+        "metadata": { "type": "object" }
+      },
+      "additionalProperties": false
+    }
+  ]
+}
