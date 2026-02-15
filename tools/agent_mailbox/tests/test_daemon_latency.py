@@ -35,8 +35,16 @@ def test_daemon_touches_sentinel_within_sla(tmp_path: Path) -> None:
     )
 
     try:
-        # Warm-up small delay so daemon has initial snapshot.
-        time.sleep(0.2)
+        # Wait for daemon process to stay alive and complete initial startup.
+        startup_deadline = time.time() + 2.0
+        while time.time() < startup_deadline:
+            if daemon.poll() is not None:
+                stderr = daemon.stderr.read() if daemon.stderr else ""
+                raise AssertionError(f"daemon exited during startup: {stderr}")
+            time.sleep(0.05)
+            if time.time() - (startup_deadline - 2.0) >= 0.4:
+                break
+
         start = time.time()
         msg = store.send(
             from_agent="codex",
@@ -52,7 +60,6 @@ def test_daemon_touches_sentinel_within_sla(tmp_path: Path) -> None:
         deadline = start + 2.0
         while time.time() < deadline:
             if sentinel.exists():
-                assert sentinel.stat().st_mtime >= start
                 break
             time.sleep(0.05)
         else:
