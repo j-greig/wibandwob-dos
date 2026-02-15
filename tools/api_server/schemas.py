@@ -305,7 +305,7 @@ class PrimerWindow(BaseModel):
 
 
 class BatchPrimersRequest(BaseModel):
-    primers: List[PrimerWindow] = Field(..., max_items=20, description="Up to 20 primer windows to spawn")
+    primers: List[PrimerWindow] = Field(..., max_length=20, description="Up to 20 primer windows to spawn")
     
 
 class BatchPrimersResponse(BaseModel):
