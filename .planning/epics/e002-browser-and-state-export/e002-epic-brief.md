@@ -26,15 +26,15 @@ Naming:
 
 ## Features
 
-- [x] **F1: State Export & Workspace Management** — stable snapshot format, save/load, event logging, replay
+- [x] **F1: State Export & Workspace Management** — stable snapshot format, save/load, event logging, replay (#15)
   - Brief: `.planning/epics/e002-browser-and-state-export/f01-state-export/f01-feature-brief.md`
-- [x] **F2: Browser Core** — fetch HTML, extract readable content, convert to markdown, render in TUI, navigate links
+- [x] **F2: Browser Core** — fetch HTML, extract readable content, convert to markdown, render in TUI, navigate links (#22)
   - Brief: `.planning/epics/e002-browser-and-state-export/f02-browser-core/f02-feature-brief.md`
-- [x] **F3: Rich Rendering** — figlet heading pipeline (3 tiers), ANSI image blocks via chafa, lazy rendering
+- [x] **F3: Rich Rendering** — figlet heading pipeline (3 tiers), ANSI image blocks via chafa, lazy rendering (#21)
   - Brief: `.planning/epics/e002-browser-and-state-export/f03-rich-rendering/f03-feature-brief.md`
-- [x] **F4: AI Browser Tools** — MCP tools for browser control, page summarisation, clip-to-memory
+- [x] **F4: AI Browser Tools** — MCP tools for browser control, page summarisation, clip-to-memory (#20)
   - Brief: `.planning/epics/e002-browser-and-state-export/f04-ai-browser-tools/f04-feature-brief.md`
-- [~] **F5: Browser Image Rendering to ANSI** — image modes and ANSI/quarter-pixel-compatible rendering path
+- [~] **F5: Browser Image Rendering to ANSI** — image modes and ANSI/quarter-pixel-compatible rendering path (#31)
   - Brief: `.planning/epics/e002-browser-and-state-export/f05-browser-image-ansi/f05-feature-brief.md`
 
 ## Story Backlog
@@ -43,10 +43,10 @@ Stories are numbered globally within this epic (s01-s99).
 
 ### F1: State Export
 
-- [x] **S01:** Versioned snapshot schema + `export_state`/`import_state` IPC commands
-- [x] **S02:** `save_workspace`/`open_workspace` REST endpoints + file persistence
-- [x] **S03:** Event-triggered snapshot logging (window create/close/move/resize, command exec, timer)
-- [ ] **S14:** Fix `import_state` no-op so `open_workspace` applies state to running app
+- [x] **S01:** Versioned snapshot schema + `export_state`/`import_state` IPC commands (#17)
+- [x] **S02:** `save_workspace`/`open_workspace` REST endpoints + file persistence (#18)
+- [x] **S03:** Event-triggered snapshot logging (window create/close/move/resize, command exec, timer) (#19)
+- [x] **S14:** Fix `import_state` no-op so `open_workspace` applies state to running app (#29)
 
 ### F2: Browser Core
 
@@ -69,7 +69,7 @@ Stories are numbered globally within this epic (s01-s99).
 
 ### F5: Browser Image Rendering to ANSI
 
-- [x] **S15:** ANSI image rendering specification (modes, backend contract, limits, test plan)
+- [x] **S15:** ANSI image rendering specification (modes, backend contract, limits, test plan) (#32)
 - [ ] **S16:** Backend adapter + cache implementation for ANSI image blocks
 - [ ] **S17:** Browser/TUI/API/MCP integration for image modes and gallery behavior
 

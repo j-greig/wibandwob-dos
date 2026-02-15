@@ -18,10 +18,10 @@ Establish a stable, versioned snapshot format for engine state. Enable workspace
 
 ## Stories
 
-- [x] `.planning/epics/e002-browser-and-state-export/f01-state-export/s01-snapshot-schema/s01-story-brief.md` — versioned snapshot schema + `export_state`/`import_state` IPC commands
-- [x] `.planning/epics/e002-browser-and-state-export/f01-state-export/s02-workspace-persistence/s02-story-brief.md` — `save_workspace`/`open_workspace` REST + file I/O
-- [x] `.planning/epics/e002-browser-and-state-export/f01-state-export/s03-event-logging/s03-story-brief.md` — event-triggered snapshot logging (create/close/move/resize, command exec, timer)
-- [ ] `.planning/epics/e002-browser-and-state-export/f01-state-export/s04-import-state-applies/s04-story-brief.md` — fix `import_state` no-op so `open_workspace` actually restores engine state
+- [x] `.planning/epics/e002-browser-and-state-export/f01-state-export/s01-snapshot-schema/s01-story-brief.md` — versioned snapshot schema + `export_state`/`import_state` IPC commands (#17)
+- [x] `.planning/epics/e002-browser-and-state-export/f01-state-export/s02-workspace-persistence/s02-story-brief.md` — `save_workspace`/`open_workspace` REST + file I/O (#18)
+- [x] `.planning/epics/e002-browser-and-state-export/f01-state-export/s03-event-logging/s03-story-brief.md` — event-triggered snapshot logging (create/close/move/resize, command exec, timer) (#19)
+- [x] `.planning/epics/e002-browser-and-state-export/f01-state-export/s14-import-state-applies/s14-story-brief.md` — fix `import_state` no-op so `open_workspace` actually restores engine state (#29)
 
 ## Acceptance Criteria
 
@@ -33,7 +33,7 @@ Establish a stable, versioned snapshot format for engine state. Enable workspace
   - Test: save, close all, open, verify window count + types + bounds match
 - [x] **AC-4:** Event log captures window lifecycle events with actor attribution
   - Test: create window via API, assert log entry with `actor="api"` and event type
-- [ ] **AC-5:** `open_workspace(path)` applies imported state to running app (no false positive `ok`)
+- [x] **AC-5:** `open_workspace(path)` applies imported state to running app (no false positive `ok`)
   - Test: `uv run --with pytest --with jsonschema --with fastapi pytest tests/contract/test_workspace_open_applies_state.py -q`
 
 ## Snapshot Schema (v1)

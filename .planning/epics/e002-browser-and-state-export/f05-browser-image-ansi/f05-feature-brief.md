@@ -17,9 +17,9 @@ Add deterministic image rendering for browser pages in terminal output, with qua
 
 ## Stories
 
-- [x] `.planning/epics/e002-browser-and-state-export/f05-browser-image-ansi/s15-ansi-image-spec/s15-story-brief.md` — define quarter-pixel image rendering spec, contracts, limits, and implementation tests
-- [ ] `S16` (to be created): implement backend adapter and cache pipeline for ANSI image blocks
-- [ ] `S17` (to be created): implement browser image mode integration and gallery behavior in TUI/API/MCP
+- [x] `.planning/epics/e002-browser-and-state-export/f05-browser-image-ansi/s15-ansi-image-spec/s15-story-brief.md` — define quarter-pixel image rendering spec, contracts, limits, and implementation tests (#32)
+- [ ] `.planning/epics/e002-browser-and-state-export/f05-browser-image-ansi/s16-backend-adapter-cache/s16-story-brief.md` — implement backend adapter and cache pipeline for ANSI image blocks (#31)
+- [ ] `.planning/epics/e002-browser-and-state-export/f05-browser-image-ansi/s17-integration-modes-gallery/s17-story-brief.md` — implement browser image mode integration and gallery behavior in TUI/API/MCP (#31)
 
 ## Acceptance Criteria
 
@@ -28,7 +28,7 @@ Add deterministic image rendering for browser pages in terminal output, with qua
 - [x] **AC-2:** Quarter-pixel backend strategy and safety limits are specified (dimensions, byte caps, timeouts)
   - Test: review `s15-story-brief.md` “Backend and Limits” section and verify concrete numeric limits and fallback behavior are present
 - [x] **AC-3:** Follow-up implementation stories are defined with AC/Test traceability
-  - Test: feature story list includes S16/S17 placeholders and each future story requirement references concrete test procedures in S15
+  - Test: feature story list links concrete S16/S17 story briefs and each story references concrete test procedures from S15
 
 ## Status
 
