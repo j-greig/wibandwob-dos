@@ -26,6 +26,7 @@
 #include <cstring>
 #include <sstream>
 #include <algorithm>
+#include <array>
 #include <fcntl.h>
 #include <unistd.h>
 
@@ -40,20 +41,172 @@ TBrowserContentView::TBrowserContentView(const TRect& bounds, TScrollBar* hScrol
     options |= ofSelectable;
 }
 
+namespace {
+
+struct AnsiRgbState {
+    TColorRGB fg {255, 255, 255};
+    TColorRGB bg {0, 0, 0};
+    bool bold {false};
+};
+
+static const std::array<TColorRGB, 16> kAnsi16 = {
+    TColorRGB(0x00,0x00,0x00), TColorRGB(0x80,0x00,0x00), TColorRGB(0x00,0x80,0x00), TColorRGB(0x80,0x80,0x00),
+    TColorRGB(0x00,0x00,0x80), TColorRGB(0x80,0x00,0x80), TColorRGB(0x00,0x80,0x80), TColorRGB(0xC0,0xC0,0xC0),
+    TColorRGB(0x80,0x80,0x80), TColorRGB(0xFF,0x00,0x00), TColorRGB(0x00,0xFF,0x00), TColorRGB(0xFF,0xFF,0x00),
+    TColorRGB(0x00,0x00,0xFF), TColorRGB(0xFF,0x00,0xFF), TColorRGB(0x00,0xFF,0xFF), TColorRGB(0xFF,0xFF,0xFF)
+};
+
+static TColorRGB xtermToRgb(int idx) {
+    if (idx < 0) idx = 0;
+    if (idx > 255) idx = 255;
+    if (idx < 16) return kAnsi16[(size_t) idx];
+    if (idx >= 232) {
+        int v = 8 + (idx - 232) * 10;
+        if (v < 0) v = 0;
+        if (v > 255) v = 255;
+        return TColorRGB((uint8_t) v, (uint8_t) v, (uint8_t) v);
+    }
+    int n = idx - 16;
+    int r = n / 36;
+    int g = (n / 6) % 6;
+    int b = n % 6;
+    auto level = [] (int c) -> uint8_t {
+        return c == 0 ? 0 : (uint8_t) (55 + c * 40);
+    };
+    return TColorRGB(level(r), level(g), level(b));
+}
+
+static void appendStyled(
+    TBrowserContentView::StyledLine &line,
+    std::string &buf,
+    const AnsiRgbState &state
+) {
+    if (buf.empty()) return;
+    TColorRGB fg = state.fg;
+    if (state.bold) {
+        fg = TColorRGB(
+            (uint8_t) std::min(255, (int) fg.r + 32),
+            (uint8_t) std::min(255, (int) fg.g + 32),
+            (uint8_t) std::min(255, (int) fg.b + 32)
+        );
+    }
+    TColorAttr attr(fg, state.bg);
+    if (!line.segs.empty() && line.segs.back().attr == attr) {
+        line.segs.back().text += buf;
+    } else {
+        line.segs.push_back({buf, attr});
+    }
+    line.length += (int) buf.size();
+    buf.clear();
+}
+
+static void applySgr(const std::vector<int> &params, AnsiRgbState &state) {
+    if (params.empty()) {
+        state = AnsiRgbState{};
+        return;
+    }
+    for (size_t i = 0; i < params.size(); ++i) {
+        int p = params[i];
+        if (p == 0) {
+            state = AnsiRgbState{};
+        } else if (p == 1) {
+            state.bold = true;
+        } else if (p == 22) {
+            state.bold = false;
+        } else if (p >= 30 && p <= 37) {
+            state.fg = kAnsi16[(size_t) (p - 30)];
+        } else if (p >= 90 && p <= 97) {
+            state.fg = kAnsi16[(size_t) (p - 90 + 8)];
+        } else if (p >= 40 && p <= 47) {
+            state.bg = kAnsi16[(size_t) (p - 40)];
+        } else if (p >= 100 && p <= 107) {
+            state.bg = kAnsi16[(size_t) (p - 100 + 8)];
+        } else if (p == 39) {
+            state.fg = TColorRGB(255, 255, 255);
+            state.bold = false;
+        } else if (p == 49) {
+            state.bg = TColorRGB(0, 0, 0);
+        } else if ((p == 38 || p == 48) && i + 1 < params.size()) {
+            bool isFg = (p == 38);
+            int mode = params[++i];
+            if (mode == 2 && i + 3 < params.size()) {
+                uint8_t r = (uint8_t) std::max(0, std::min(255, params[++i]));
+                uint8_t g = (uint8_t) std::max(0, std::min(255, params[++i]));
+                uint8_t b = (uint8_t) std::max(0, std::min(255, params[++i]));
+                if (isFg) state.fg = TColorRGB(r, g, b);
+                else state.bg = TColorRGB(r, g, b);
+            } else if (mode == 5 && i + 1 < params.size()) {
+                int idx = params[++i];
+                TColorRGB rgb = xtermToRgb(idx);
+                if (isFg) state.fg = rgb;
+                else state.bg = rgb;
+            }
+        }
+    }
+}
+
+static TBrowserContentView::StyledLine parseAnsiLine(const std::string &text) {
+    TBrowserContentView::StyledLine line;
+    AnsiRgbState state;
+    std::string buf;
+    size_t i = 0;
+    while (i < text.size()) {
+        unsigned char c = (unsigned char) text[i++];
+        if (c == 0x1B && i < text.size() && text[i] == '[') {
+            appendStyled(line, buf, state);
+            ++i; // Skip '['
+            std::vector<int> params;
+            std::string num;
+            char finalByte = '\0';
+            while (i < text.size()) {
+                char ch = text[i++];
+                if (ch >= '0' && ch <= '9') {
+                    num.push_back(ch);
+                } else if (ch == ';') {
+                    params.push_back(num.empty() ? 0 : std::atoi(num.c_str()));
+                    num.clear();
+                } else if (ch >= 0x40 && ch <= 0x7E) {
+                    if (!num.empty()) {
+                        params.push_back(std::atoi(num.c_str()));
+                        num.clear();
+                    }
+                    finalByte = ch;
+                    break;
+                }
+            }
+            if (finalByte == 'm') {
+                applySgr(params, state);
+            }
+            continue;
+        }
+        if (c != '\r')
+            buf.push_back((char) c);
+    }
+    appendStyled(line, buf, state);
+    return line;
+}
+
+} // namespace
+
 void TBrowserContentView::draw() {
     TDrawBuffer buf;
     TColorAttr normalColor = getColor(1);
 
-    int totalLines = static_cast<int>(wrappedLines.size());
+    int totalLines = static_cast<int>(styledLines.size());
 
     for (int y = 0; y < size.y; y++) {
         int lineIdx = delta.y + y;
+        int x = 0;
 
         buf.moveChar(0, ' ', normalColor, size.x);
 
         if (lineIdx >= 0 && lineIdx < totalLines) {
-            const auto& wl = wrappedLines[lineIdx];
-            buf.moveStr(0, wl.text.c_str(), normalColor);
+            const auto &line = styledLines[lineIdx];
+            for (const auto &seg : line.segs) {
+                if (x >= size.x) break;
+                buf.moveStr((ushort) x, TStringView(seg.text.data(), seg.text.size()), seg.attr);
+                x += (int) seg.text.size();
+            }
         }
 
         writeLine(0, y, size.x, 1, buf);
@@ -74,7 +227,7 @@ void TBrowserContentView::setContent(const std::vector<std::string>& newLines) {
 
 void TBrowserContentView::clear() {
     sourceLines.clear();
-    wrappedLines.clear();
+    styledLines.clear();
     scrollTo(0, 0);
     setLimit(size.x, 0);
     drawView();
@@ -107,17 +260,11 @@ void TBrowserContentView::scrollPageDown() {
 }
 
 void TBrowserContentView::rebuildWrappedLines() {
-    wrappedLines.clear();
-    int width = size.x > 0 ? size.x : 80;
-
+    styledLines.clear();
     for (const auto& line : sourceLines) {
-        auto wrapped = wrapText(line, width);
-        for (const auto& w : wrapped) {
-            wrappedLines.push_back({w});
-        }
+        styledLines.push_back(parseAnsiLine(line));
     }
-
-    setLimit(size.x, static_cast<int>(wrappedLines.size()));
+    setLimit(size.x, static_cast<int>(styledLines.size()));
     if (vScrollBar)
         vScrollBar->drawView();
 }

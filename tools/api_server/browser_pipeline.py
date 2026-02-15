@@ -24,11 +24,11 @@ except Exception:  # pragma: no cover
     Image = None
 
 
-MAX_IMAGE_SOURCE_BYTES = 5 * 1024 * 1024
+MAX_IMAGE_SOURCE_BYTES = 10 * 1024 * 1024
 MAX_IMAGE_DIMENSION = 4096
 MAX_RENDER_WIDTH_CELLS = 120
-PER_IMAGE_RENDER_TIMEOUT_MS = 1500
-TOTAL_IMAGE_RENDER_BUDGET_MS = 4000
+PER_IMAGE_RENDER_TIMEOUT_MS = 3000
+TOTAL_IMAGE_RENDER_BUDGET_MS = 10000
 KEY_INLINE_MAX_IMAGES = 5
 
 
@@ -378,6 +378,10 @@ def fetch_render_bundle(
     image_mode: str = "none",
     cache_root: str = "cache/browser",
 ) -> Dict[str, Any]:
+    _debug_log(
+        "bundle.fetch_start",
+        {"url": url, "reader": reader, "width": width, "image_mode": image_mode, "cache_root": cache_root},
+    )
     cache_dir = Path(cache_root)
     cache_dir.mkdir(parents=True, exist_ok=True)
     key = _cache_key(url, reader, width, image_mode)
@@ -389,6 +393,15 @@ def fetch_render_bundle(
         bundle = json.loads(bundle_path.read_text(encoding="utf-8"))
         if not _needs_image_refresh(bundle, image_mode=image_mode):
             bundle["meta"]["cache"] = "hit"
+            _debug_log(
+                "bundle.cache_hit",
+                {
+                    "url": url,
+                    "image_mode": image_mode,
+                    "cache_key": key,
+                    "assets": len(bundle.get("assets", [])),
+                },
+            )
             return bundle
         _debug_log(
             "bundle.cache_stale",
@@ -401,6 +414,7 @@ def fetch_render_bundle(
         )
 
     raw_html_path = entry_dir / "raw.html"
+    direct_image_mode = False
     if raw_html_path.exists():
         html = raw_html_path.read_text(encoding="utf-8")
     elif requests is None:
@@ -413,7 +427,12 @@ def fetch_render_bundle(
             except TypeError:
                 resp = requests.get(url, timeout=30)
             resp.raise_for_status()
-            html = resp.text
+            ctype = str(resp.headers.get("content-type", "")).lower()
+            if ctype.startswith("image/"):
+                direct_image_mode = True
+                html = ""
+            else:
+                html = resp.text
         except requests.exceptions.SSLError:
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
@@ -422,12 +441,35 @@ def fetch_render_bundle(
                 except TypeError:
                     resp = requests.get(url, timeout=30)
                 resp.raise_for_status()
-                html = resp.text
+                ctype = str(resp.headers.get("content-type", "")).lower()
+                if ctype.startswith("image/"):
+                    direct_image_mode = True
+                    html = ""
+                else:
+                    html = resp.text
 
-    title = _extract_title(html, url)
-    links = _extract_links(html, url)
-    markdown = _html_to_markdown(html)
-    assets = _render_assets_for_mode(html, base_url=url, image_mode=image_mode, width=width, image_cache_root=image_cache_root)
+    if direct_image_mode:
+        title = url
+        links = []
+        markdown = f"# Image\n\n{url}"
+        assets = [
+            {
+                "id": "img1",
+                "source_url": url,
+                "alt": "direct image",
+                "anchor_index": 1,
+                "status": "skipped",
+                "render_meta": {"backend": "chafa", "width_cells": 0, "height_cells": 0, "duration_ms": 0, "cache_hit": False},
+            }
+        ]
+        if image_mode != "none":
+            budget_state = {"remaining_ms": TOTAL_IMAGE_RENDER_BUDGET_MS}
+            assets = [_render_asset(assets[0], image_mode, _clamp_width(width), image_cache_root, budget_state)]
+    else:
+        title = _extract_title(html, url)
+        links = _extract_links(html, url)
+        markdown = _html_to_markdown(html)
+        assets = _render_assets_for_mode(html, base_url=url, image_mode=image_mode, width=width, image_cache_root=image_cache_root)
     tui_text = render_markdown(markdown, headings="plain", images=image_mode, width=width, assets=assets)
     bundle = {
         "url": url,
@@ -444,6 +486,25 @@ def fetch_render_bundle(
             "image_mode": image_mode,
         },
     }
+    ready = sum(1 for a in assets if a.get("status") == "ready")
+    failed = sum(1 for a in assets if a.get("status") == "failed")
+    deferred = sum(1 for a in assets if a.get("status") == "deferred")
+    skipped = sum(1 for a in assets if a.get("status") == "skipped")
+    _debug_log(
+        "bundle.fetch_done",
+        {
+            "url": url,
+            "image_mode": image_mode,
+            "cache": "miss",
+            "assets_total": len(assets),
+            "ready": ready,
+            "failed": failed,
+            "deferred": deferred,
+            "skipped": skipped,
+            "source_bytes": bundle["meta"].get("source_bytes", 0),
+            "cache_key": key,
+        },
+    )
 
     entry_dir.mkdir(parents=True, exist_ok=True)
     bundle_path.write_text(json.dumps(bundle, sort_keys=True), encoding="utf-8")

@@ -33,6 +33,16 @@ class TBrowserContentView : public TScroller {
 public:
     TBrowserContentView(const TRect& bounds, TScrollBar* hScroll, TScrollBar* vScroll);
 
+    struct StyledSegment {
+        std::string text;
+        TColorAttr attr;
+    };
+
+    struct StyledLine {
+        std::vector<StyledSegment> segs;
+        int length = 0;
+    };
+
     virtual void draw() override;
     virtual void changeBounds(const TRect& bounds) override;
 
@@ -48,12 +58,9 @@ public:
     void scrollPageDown();
 
 private:
-    struct WrappedLine {
-        std::string text;
-    };
 
     std::vector<std::string> sourceLines;
-    std::vector<WrappedLine> wrappedLines;
+    std::vector<StyledLine> styledLines;
 
     void rebuildWrappedLines();
     std::vector<std::string> wrapText(const std::string& text, int width) const;

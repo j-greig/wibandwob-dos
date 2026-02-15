@@ -1602,35 +1602,57 @@ void TTestPatternApp::takeScreenshot()
     timeinfo = localtime(&rawtime);
     strftime(timestamp, sizeof(timestamp), "%Y%m%d_%H%M%S", timeinfo);
     
-    // Build screenshot command for macOS
-    std::stringstream cmd;
-    
-    // Try to detect terminal application
-    const char* termProgram = getenv("TERM_PROGRAM");
-    std::string appName = "Terminal"; // default
-    
-    if (termProgram) {
-        std::string term(termProgram);
-        if (term == "iTerm.app") {
-            appName = "iTerm2";
-        } else if (term == "Apple_Terminal") {
-            appName = "Terminal";
+    std::string outPath = std::string("screenshots/tui_") + timestamp + ".png";
+
+    // Prefer the actual frontmost window ID (works for whichever terminal is active).
+    std::string frontWindowId;
+    {
+        const char* detectCmd =
+            "osascript -e 'tell application \"System Events\" to tell (first process whose frontmost is true) to get id of front window' 2>/dev/null";
+        FILE* pipe = popen(detectCmd, "r");
+        if (pipe) {
+            char idBuf[128] = {0};
+            if (fgets(idBuf, sizeof(idBuf), pipe)) {
+                frontWindowId = idBuf;
+                while (!frontWindowId.empty() &&
+                       (frontWindowId.back() == '\n' || frontWindowId.back() == '\r' || frontWindowId.back() == ' ' || frontWindowId.back() == '\t')) {
+                    frontWindowId.pop_back();
+                }
+            }
+            pclose(pipe);
         }
     }
-    
-    // Build the screenshot command
-    cmd << "screencapture -x -l$(osascript -e 'tell app \"" 
-        << appName 
-        << "\" to id of window 1' 2>/dev/null) "
-        << "screenshots/tui_" << timestamp << ".png 2>/dev/null";
-    
-    // Execute the screenshot command
-    int result = system(cmd.str().c_str());
+
+    int result = -1;
+    if (!frontWindowId.empty()) {
+        std::stringstream cmd;
+        cmd << "screencapture -x -l" << frontWindowId << " " << outPath << " 2>/dev/null";
+        result = system(cmd.str().c_str());
+    }
+
+    // Fallback to previous terminal-specific behavior if front-window capture fails.
+    if (result != 0) {
+        std::stringstream cmd;
+        const char* termProgram = getenv("TERM_PROGRAM");
+        std::string appName = "Terminal";
+        if (termProgram) {
+            std::string term(termProgram);
+            if (term == "iTerm.app")
+                appName = "iTerm2";
+            else if (term == "Apple_Terminal")
+                appName = "Terminal";
+        }
+        cmd << "screencapture -x -l$(osascript -e 'tell app \"" 
+            << appName 
+            << "\" to id of window 1' 2>/dev/null) "
+            << outPath << " 2>/dev/null";
+        result = system(cmd.str().c_str());
+    }
     
     // Show result message
     if (result == 0) {
         std::stringstream msg;
-        msg << "Screenshot saved to screenshots/tui_" << timestamp << ".png";
+        msg << "Screenshot saved to " << outPath;
         messageBox(msg.str().c_str(), mfInformation | mfOKButton);
     } else {
         messageBox("Screenshot failed. Try manual capture with Cmd+Shift+4", 
