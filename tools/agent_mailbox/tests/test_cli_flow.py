@@ -70,3 +70,67 @@ def test_cli_inbox_strips_control_sequences_in_text_mode(tmp_path: Path) -> None
     inbox = _run("inbox", "--root", root, "--agent", "claude")
     assert "\x1b" not in inbox.stdout
     assert "hello[31m-red" in inbox.stdout
+
+
+def test_cli_reply_send_and_ack_in_one_step(tmp_path: Path) -> None:
+    root = str(tmp_path)
+    inbound = _run(
+        "send",
+        "--root",
+        root,
+        "--from",
+        "claude",
+        "--to",
+        "codex",
+        "--subject",
+        "incoming",
+        "--body-text",
+        "ping",
+    )
+    inbound_msg = json.loads(inbound.stdout)
+
+    reply = _run(
+        "reply",
+        "--root",
+        root,
+        "--from",
+        "codex",
+        "--to",
+        "claude",
+        "--subject",
+        "re: incoming",
+        "--body-text",
+        "pong",
+        "--ack-id",
+        inbound_msg["id"],
+    )
+    payload = json.loads(reply.stdout)
+    assert payload["message"]["from"] == "codex"
+    assert payload["ack"]["target_id"] == inbound_msg["id"]
+
+    codex_unread = json.loads(_run("inbox", "--root", root, "--agent", "codex", "--json").stdout)
+    assert codex_unread == []
+
+    claude_unread = json.loads(_run("inbox", "--root", root, "--agent", "claude", "--json").stdout)
+    assert len(claude_unread) == 1
+    assert claude_unread[0]["subject"] == "re: incoming"
+
+
+def test_cli_reply_without_ack(tmp_path: Path) -> None:
+    root = str(tmp_path)
+    out = _run(
+        "reply",
+        "--root",
+        root,
+        "--from",
+        "codex",
+        "--to",
+        "claude",
+        "--subject",
+        "quick",
+        "--body-text",
+        "just reply",
+    )
+    payload = json.loads(out.stdout)
+    assert payload["message"]["subject"] == "quick"
+    assert payload["ack"] is None
