@@ -12,6 +12,7 @@ Define commands once in C++ and derive capabilities from that source to remove d
 ## Stories
 
 - [~] `.planning/epics/e001-command-parity-refactor/f01-command-registry/s01-registry-skeleton/s01-story-brief.md` — registry skeleton + first capability-driven path
+- [x] `.planning/epics/e001-command-parity-refactor/f01-command-registry/s02-parity-expansion/s02-story-brief.md` — expand MCP parity coverage + drift enforcement
 
 ## Acceptance Criteria
 

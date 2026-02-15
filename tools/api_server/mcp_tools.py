@@ -219,7 +219,12 @@ def register_tui_tools(mcp):
         controller = get_controller()
         
         try:
-            await controller.cascade()
+            result = await controller.exec_command("cascade", {})
+            if not result.get("ok"):
+                return {
+                    "success": False,
+                    "error": result.get("error", "command_failed"),
+                }
             return {
                 "success": True,
                 "message": "Windows arranged in cascade layout"
@@ -243,7 +248,12 @@ def register_tui_tools(mcp):
         controller = get_controller()
         
         try:
-            await controller.tile(columns)
+            result = await controller.exec_command("tile", {"cols": columns or 2})
+            if not result.get("ok"):
+                return {
+                    "success": False,
+                    "error": result.get("error", "command_failed"),
+                }
             return {
                 "success": True,
                 "message": f"Windows tiled in {columns} columns"
@@ -264,7 +274,12 @@ def register_tui_tools(mcp):
         controller = get_controller()
         
         try:
-            await controller.close_all()
+            result = await controller.exec_command("close_all", {})
+            if not result.get("ok"):
+                return {
+                    "success": False,
+                    "error": result.get("error", "command_failed"),
+                }
             return {
                 "success": True,
                 "message": "All windows closed"
@@ -295,7 +310,12 @@ def register_tui_tools(mcp):
             }
         
         try:
-            await controller.set_pattern_mode(mode)
+            result = await controller.exec_command("pattern_mode", {"mode": mode})
+            if not result.get("ok"):
+                return {
+                    "success": False,
+                    "error": result.get("error", "command_failed"),
+                }
             return {
                 "success": True,
                 "message": f"Pattern mode set to {mode}"
@@ -319,10 +339,18 @@ def register_tui_tools(mcp):
         controller = get_controller()
         
         try:
-            screenshot_path = await controller.screenshot(path)
+            args: Dict[str, Any] = {}
+            if path:
+                args["path"] = path
+            result = await controller.exec_command("screenshot", args)
+            if not result.get("ok"):
+                return {
+                    "success": False,
+                    "error": result.get("error", "command_failed"),
+                }
             return {
                 "success": True,
-                "screenshot_path": screenshot_path
+                "screenshot_path": path or "default"
             }
         except Exception as e:
             return {

@@ -37,9 +37,9 @@ Naming:
 
 ## Story Backlog
 
-- [~] **S1 (PR-1):** Registry skeleton + first capability-driven path
+- [x] **S1 (PR-1):** Registry skeleton + first capability-driven path
   - Brief: `.planning/epics/e001-command-parity-refactor/f01-command-registry/s01-registry-skeleton/s01-story-brief.md`
-- [ ] **S2 (PR-2+):** Expand parity coverage + enforce drift tests
+- [x] **S2 (PR-2+):** Expand parity coverage + enforce drift tests
 
 ## Acceptance Criteria (PR-1)
 
