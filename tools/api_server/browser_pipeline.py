@@ -30,7 +30,9 @@ MAX_RENDER_WIDTH_CELLS = 120
 PER_IMAGE_RENDER_TIMEOUT_MS = 3000
 TOTAL_IMAGE_RENDER_BUDGET_MS = 10000
 MAX_TUI_TEXT_CHARS = 250000
-PIPELINE_CACHE_VERSION = "v2"
+PIPELINE_CACHE_VERSION = "v3"
+IMAGE_WIDTH_RATIO = 0.5
+MAX_IMAGE_HEIGHT_CELLS = 34
 KEY_INLINE_MAX_IMAGES = 5
 
 
@@ -177,7 +179,7 @@ def _probe_dimensions(image_bytes: bytes) -> Optional[Dict[str, int]]:
 def _run_chafa(image_bytes: bytes, width_cells: int, timeout_ms: int) -> Dict[str, Any]:
     if shutil.which("chafa") is None:
         return {"ok": False, "error": "chafa_not_found"}
-    height_cells = max(1, min(80, width_cells // 2))
+    height_cells = max(1, min(MAX_IMAGE_HEIGHT_CELLS, width_cells // 2))
     with tempfile.NamedTemporaryFile(delete=True, suffix=".img") as tmp:
         tmp.write(image_bytes)
         tmp.flush()
@@ -280,8 +282,9 @@ def _render_asset(
         _debug_log("image.failed", {"source_url": src, "mode": mode, "reason": "dimensions_too_large", "dims": dims})
         return out
 
+    target_width = max(20, int(width_cells * IMAGE_WIDTH_RATIO))
     timeout_ms = min(PER_IMAGE_RENDER_TIMEOUT_MS, budget_state["remaining_ms"])
-    rendered = _run_chafa(image_bytes, width_cells=width_cells, timeout_ms=timeout_ms)
+    rendered = _run_chafa(image_bytes, width_cells=target_width, timeout_ms=timeout_ms)
     duration_ms = int(rendered.get("duration_ms", 0))
     budget_state["remaining_ms"] = max(0, budget_state["remaining_ms"] - duration_ms)
 
@@ -289,7 +292,7 @@ def _render_asset(
     if not rendered.get("ok"):
         out["status"] = "failed" if rendered.get("error") != "timeout" else "deferred"
         out["render_error"] = str(rendered.get("error", "render_failed"))
-        out["render_meta"] = {"backend": "chafa", "width_cells": width_cells, "height_cells": 0, "duration_ms": duration_ms, "cache_hit": False}
+        out["render_meta"] = {"backend": "chafa", "width_cells": target_width, "height_cells": 0, "duration_ms": duration_ms, "cache_hit": False}
         _debug_log("image.failed", {"source_url": src, "mode": mode, "reason": out["render_error"], "duration_ms": duration_ms})
         return out
 
@@ -298,7 +301,7 @@ def _render_asset(
     out["ansi_block"] = ansi_block
     out["render_meta"] = {
         "backend": "chafa",
-        "width_cells": width_cells,
+        "width_cells": target_width,
         "height_cells": max(1, len(ansi_block.splitlines())) if ansi_block else 0,
         "duration_ms": duration_ms,
         "cache_hit": False,
@@ -318,6 +321,7 @@ def render_markdown(
     rendered = markdown
     if headings != "plain":
         rendered = rendered.replace("# ", "[H1] ").replace("## ", "[H2] ").replace("### ", "[H3] ")
+    rendered = _normalize_markdown(rendered)
 
     if images != "none":
         rendered += f"\n\n[images mode={images}]"
@@ -339,6 +343,25 @@ def render_markdown(
                     rendered += f"\n[image:{alt}] ({status})\n"
 
     return rendered[:MAX_TUI_TEXT_CHARS]
+
+
+def _normalize_markdown(markdown: str) -> str:
+    # Keep simple-reader output compact and left-aligned.
+    lines = markdown.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    out: List[str] = []
+    blank = False
+    for raw in lines:
+        line = raw.strip()
+        if not line:
+            if not blank:
+                out.append("")
+            blank = True
+            continue
+        blank = False
+        out.append(line)
+    while out and not out[-1]:
+        out.pop()
+    return "\n".join(out)
 
 
 def _render_assets_for_mode(

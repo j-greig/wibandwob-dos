@@ -47,6 +47,8 @@ namespace {
 struct AnsiRgbState {
     TColorRGB fg {255, 255, 255};
     TColorRGB bg {0, 0, 0};
+    TColorRGB defaultFg {255, 255, 255};
+    TColorRGB defaultBg {0, 0, 0};
     bool bold {false};
 };
 
@@ -103,13 +105,17 @@ static void appendStyled(
 
 static void applySgr(const std::vector<int> &params, AnsiRgbState &state) {
     if (params.empty()) {
-        state = AnsiRgbState{};
+        state.fg = state.defaultFg;
+        state.bg = state.defaultBg;
+        state.bold = false;
         return;
     }
     for (size_t i = 0; i < params.size(); ++i) {
         int p = params[i];
         if (p == 0) {
-            state = AnsiRgbState{};
+            state.fg = state.defaultFg;
+            state.bg = state.defaultBg;
+            state.bold = false;
         } else if (p == 1) {
             state.bold = true;
         } else if (p == 22) {
@@ -123,10 +129,10 @@ static void applySgr(const std::vector<int> &params, AnsiRgbState &state) {
         } else if (p >= 100 && p <= 107) {
             state.bg = kAnsi16[(size_t) (p - 100 + 8)];
         } else if (p == 39) {
-            state.fg = TColorRGB(255, 255, 255);
+            state.fg = state.defaultFg;
             state.bold = false;
         } else if (p == 49) {
-            state.bg = TColorRGB(0, 0, 0);
+            state.bg = state.defaultBg;
         } else if ((p == 38 || p == 48) && i + 1 < params.size()) {
             bool isFg = (p == 38);
             int mode = params[++i];
@@ -146,9 +152,14 @@ static void applySgr(const std::vector<int> &params, AnsiRgbState &state) {
     }
 }
 
-static TBrowserContentView::StyledLine parseAnsiLine(const std::string &text) {
+static TBrowserContentView::StyledLine parseAnsiLine(const std::string &text, TColorAttr defaultAttr) {
     TBrowserContentView::StyledLine line;
     AnsiRgbState state;
+    uint8_t bios = (uint8_t) (unsigned char) defaultAttr;
+    state.defaultFg = kAnsi16[(size_t) (bios & 0x0F)];
+    state.defaultBg = kAnsi16[(size_t) ((bios >> 4) & 0x0F)];
+    state.fg = state.defaultFg;
+    state.bg = state.defaultBg;
     std::string buf;
     size_t i = 0;
     while (i < text.size()) {
@@ -263,7 +274,7 @@ void TBrowserContentView::scrollPageDown() {
 void TBrowserContentView::rebuildWrappedLines() {
     styledLines.clear();
     for (const auto& line : sourceLines) {
-        styledLines.push_back(parseAnsiLine(line));
+        styledLines.push_back(parseAnsiLine(line, getColor(1)));
     }
     setLimit(size.x, static_cast<int>(styledLines.size()));
     if (vScrollBar)
