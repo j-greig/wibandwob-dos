@@ -191,7 +191,7 @@ class BrowserSetModeReq(BaseModel):
 
 class BrowserFetchReq(BaseModel):
     url: str
-    reader: Literal["readability", "raw"] = "readability"
+    reader: Literal["readability", "trafilatura", "raw"] = "readability"
     format: Literal["markdown", "tui_bundle"] = "tui_bundle"
 
 

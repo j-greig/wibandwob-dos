@@ -168,15 +168,15 @@ std::string FrameCapture::exportAsPlainText(const CapturedFrame& frame, const Ca
     for (int y = 0; y < frame.height; y++) {
         for (int x = 0; x < frame.width; x++) {
             TScreenCell cell = frame.getCell(x, y);
-            char c = screenCellToChar(cell);
+            std::string s = screenCellToText(cell);
             
             if (options.addCorruptionMarkers && isCellCorrupted(cell, x, y)) {
                 oss << options.corruptionMarker;
-            } else if (c == ' ' && !options.preserveSpaces) {
+            } else if (s == " " && !options.preserveSpaces) {
                 // Skip trailing spaces unless preserving
                 continue;
             } else {
-                oss << c;
+                oss << s;
             }
         }
         oss << std::endl;
@@ -207,11 +207,11 @@ std::string FrameCapture::exportAsAnsi(const CapturedFrame& frame, const Capture
                 }
             }
             
-            char c = screenCellToChar(cell);
+            std::string s = screenCellToText(cell);
             if (options.addCorruptionMarkers && isCellCorrupted(cell, x, y)) {
                 oss << "\033[31m" << options.corruptionMarker << "\033[0m"; // Red corruption marker
             } else {
-                oss << c;
+                oss << s;
             }
             
             prevCell = cell;
@@ -253,10 +253,10 @@ std::string FrameCapture::exportAsHtml(const CapturedFrame& frame, const Capture
     for (int y = 0; y < frame.height; y++) {
         for (int x = 0; x < frame.width; x++) {
             TScreenCell cell = frame.getCell(x, y);
-            char c = screenCellToChar(cell);
+            std::string s = screenCellToText(cell);
             
             if (options.addCorruptionMarkers && isCellCorrupted(cell, x, y)) {
-                oss << "<span class=\"corruption\">" << escapeHtml(std::string(1, c)) << "</span>";
+                oss << "<span class=\"corruption\">" << escapeHtml(s) << "</span>";
             } else {
                 oss << cellToHtml(cell);
             }
@@ -286,9 +286,9 @@ std::string FrameCapture::exportAsJson(const CapturedFrame& frame, const Capture
         oss << "    [";
         for (int x = 0; x < frame.width; x++) {
             TScreenCell cell = frame.getCell(x, y);
-            char c = screenCellToChar(cell);
+            std::string s = screenCellToText(cell);
             
-            oss << "{\"char\":\"" << escapeHtml(std::string(1, c)) << "\"";
+            oss << "{\"char\":\"" << escapeHtml(s) << "\"";
             if (options.includeColors) {
                 // Add color information (simplified)
                 oss << ",\"color\":" << static_cast<int>(cell.attr);
@@ -428,8 +428,7 @@ std::string FrameCapture::cellToAnsi(const TScreenCell& cell, const TScreenCell*
 }
 
 std::string FrameCapture::cellToHtml(const TScreenCell& cell) {
-    char c = screenCellToChar(cell);
-    std::string result = escapeHtml(std::string(1, c));
+    std::string result = escapeHtml(screenCellToText(cell));
     
     // Add color styling based on cell attributes
     // Simplified implementation
@@ -455,11 +454,14 @@ std::string FrameCapture::escapeHtml(const std::string& text) {
 bool FrameCapture::isCellCorrupted(const TScreenCell& cell, int x, int y) {
     // Heuristics for detecting corruption
     // This is simplified - real implementation would have better detection
-    char c = screenCellToChar(cell);
-    
-    // Check for unusual characters or color combinations
-    if (c < 32 && c != ' ' && c != '\t' && c != '\n') return true;
-    if (c > 126) return true;
+    std::string s = screenCellToText(cell);
+    if (s.empty())
+        return false;
+    if (s == " ")
+        return false;
+    unsigned char c = (unsigned char) s[0];
+    if (c < 32 && c != ' ' && c != '\t' && c != '\n')
+        return true;
     
     return false;
 }
@@ -484,9 +486,17 @@ std::string FrameCapture::getCurrentTimestamp() {
     return oss.str();
 }
 
-char FrameCapture::screenCellToChar(const TScreenCell& cell) {
-    // Extract character from TScreenCell directly
-    return cell._ch[0];
+std::string FrameCapture::screenCellToText(const TScreenCell& cell) {
+    const TCellChar &ch = cell._ch;
+    if (ch.isWideCharTrail())
+        return " ";
+    TStringView tv = ch.getText();
+    if (tv.empty())
+        return " ";
+    std::string s(tv.data(), tv.size());
+    if (s.size() == 1 && s[0] == '\0')
+        return " ";
+    return s;
 }
 
 bool FrameCapture::isVisibleCharacter(char c) {
