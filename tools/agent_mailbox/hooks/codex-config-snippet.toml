@@ -1,0 +1,16 @@
+# Add to ~/.codex/config.toml
+# The notify command receives a JSON payload from Codex.
+# This adapter forwards that payload into the local mailbox.
+
+notify = [
+  "python3",
+  "/ABSOLUTE/PATH/TO/wibandwob-dos/tools/agent_mailbox/hooks/codex_notify_hook.py",
+  "--root",
+  "/ABSOLUTE/PATH/TO/wibandwob-dos/logs/agent-mailbox",
+  "--from-agent",
+  "codex",
+  "--to-agent",
+  "claude",
+  "--thread",
+  "notify"
+]
