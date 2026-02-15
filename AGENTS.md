@@ -63,6 +63,15 @@ Allowed types:
 Recommended scopes:
 - `engine`, `registry`, `ipc`, `api`, `mcp`, `ui`, `contracts`, `vault`, `events`, `paint`, `llm`, `build`, `planning`
 
+## GitHub Formatting Guardrails
+
+1. Never send long GitHub markdown inline in a quoted shell argument.
+2. For issue/PR comments, always use `gh ... --body-file` with a file or heredoc stdin.
+3. For PR body updates, always use `gh pr edit --body-file`.
+4. Use explicit markdown sections (`Summary`, `Evidence`, `Tests`, `Links`) for readability.
+5. Confirm rendered newlines by reading back body text (`gh pr view --json body` / `gh api ... --jq .body`).
+6. For commit messages with multiline bodies, use heredoc (`git commit -m \"subject\" -m \"$(cat <<'EOF' ... EOF)\"`) to preserve line breaks.
+
 ## Stop Checklist (mirror `stop-ac-check.sh`)
 
 Before ending a coding pass:
