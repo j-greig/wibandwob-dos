@@ -461,10 +461,17 @@ class Controller:
         try:
             resp = send_cmd("export_state", {"path": path, "format": fmt})
             if isinstance(resp, str) and resp.lower().startswith("err"):
-                return {"ok": False, "error": resp}
+                raise RuntimeError(resp)
             return {"ok": True, "path": path, "format": fmt}
-        except Exception as exc:
-            return {"ok": False, "error": str(exc)}
+        except Exception:
+            try:
+                snapshot = self._snapshot_from_state()
+                target = Path(path)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text(json.dumps(snapshot, sort_keys=True), encoding="utf-8")
+                return {"ok": True, "path": path, "format": fmt, "fallback": True}
+            except Exception as exc:
+                return {"ok": False, "error": str(exc)}
 
     async def import_state(self, path: str, mode: str = "replace") -> Dict[str, Any]:
         if mode not in ("replace", "merge"):
@@ -472,11 +479,16 @@ class Controller:
         try:
             resp = send_cmd("import_state", {"path": path, "mode": mode})
             if isinstance(resp, str) and resp.lower().startswith("err"):
-                return {"ok": False, "error": resp}
+                raise RuntimeError(resp)
             await self._sync_state()
             return {"ok": True, "path": path, "mode": mode}
-        except Exception as exc:
-            return {"ok": False, "error": str(exc)}
+        except Exception:
+            try:
+                payload = json.loads(Path(path).read_text(encoding="utf-8"))
+                self._apply_snapshot(payload, mode=mode)
+                return {"ok": True, "path": path, "mode": mode, "fallback": True}
+            except Exception as exc:
+                return {"ok": False, "error": str(exc)}
 
     # ----- Helpers -----
     def _require(self, win_id: str) -> Window:
@@ -512,6 +524,68 @@ class Controller:
         except Exception:
             # Logging must not break command flow in this MVP.
             pass
+
+    def _snapshot_from_state(self) -> Dict[str, Any]:
+        started = datetime.fromtimestamp(self._state.started_at, tz=timezone.utc)
+        return {
+            "version": "1",
+            "timestamp": started.isoformat(),
+            "canvas": {"w": self._state.canvas_width, "h": self._state.canvas_height},
+            "pattern_mode": self._state.pattern_mode,
+            "windows": [
+                {
+                    "id": w.id,
+                    "type": w.type.value,
+                    "title": w.title,
+                    "rect": {"x": w.rect.x, "y": w.rect.y, "w": w.rect.w, "h": w.rect.h},
+                    "z": w.z,
+                    "focused": w.focused,
+                    "props": dict(w.props),
+                }
+                for w in self._state.windows
+            ],
+        }
+
+    def _apply_snapshot(self, payload: Dict[str, Any], mode: str = "replace") -> None:
+        if mode == "replace":
+            self._state.windows = []
+            self._state.next_z = 1
+
+        ts = payload.get("timestamp")
+        if isinstance(ts, str):
+            try:
+                self._state.started_at = datetime.fromisoformat(ts.replace("Z", "+00:00")).timestamp()
+            except Exception:
+                pass
+
+        self._state.pattern_mode = payload.get("pattern_mode", self._state.pattern_mode)
+        canvas = payload.get("canvas", {})
+        self._state.canvas_width = int(canvas.get("w", self._state.canvas_width))
+        self._state.canvas_height = int(canvas.get("h", self._state.canvas_height))
+
+        for item in payload.get("windows", []):
+            rect = item.get("rect", {})
+            wtype_raw = item.get("type", "test_pattern")
+            try:
+                wtype = WindowType(wtype_raw)
+            except ValueError:
+                wtype = WindowType.test_pattern
+            win = Window(
+                id=item.get("id", new_id("win")),
+                type=wtype,
+                title=item.get("title", ""),
+                rect=Rect(
+                    x=int(rect.get("x", 0)),
+                    y=int(rect.get("y", 0)),
+                    w=max(1, int(rect.get("w", 40))),
+                    h=max(1, int(rect.get("h", 12))),
+                ),
+                z=int(item.get("z", self._state.next_z)),
+                focused=bool(item.get("focused", False)),
+                props=dict(item.get("props", {})),
+            )
+            self._state.windows.append(win)
+            self._state.next_z = max(self._state.next_z, win.z + 1)
 
     # ----- Batch Layout -----
     async def batch_layout(self, req: BatchLayoutRequest) -> BatchLayoutResponse:

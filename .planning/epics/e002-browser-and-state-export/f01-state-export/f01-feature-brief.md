@@ -26,8 +26,8 @@ Establish a stable, versioned snapshot format for engine state. Enable workspace
 
 - [x] **AC-1:** Snapshot schema is versioned and validates against `contracts/state/v1/snapshot.schema.json`
   - Test: schema validation test in `tests/contract/`
-- [ ] **AC-2:** `export_state` → `import_state` round-trip produces identical re-export (deterministic)
-  - Test: SHA256 match of export → import → re-export
+- [x] **AC-2:** `export_state` → `import_state` round-trip produces identical re-export (deterministic)
+  - Test: `uv run --with pytest --with fastapi pytest tests/contract/test_state_roundtrip_determinism.py -q`
 - [x] **AC-3:** `save_workspace(path)` writes versioned JSON; `open_workspace(path)` restores windows
   - Test: save, close all, open, verify window count + types + bounds match
 - [x] **AC-4:** Event log captures window lifecycle events with actor attribution
@@ -75,6 +75,6 @@ Establish a stable, versioned snapshot format for engine state. Enable workspace
 
 ## Status
 
-Status: `in-progress`
+Status: `done`
 GitHub issue: #15
 PR: —

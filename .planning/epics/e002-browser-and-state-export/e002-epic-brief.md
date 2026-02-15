@@ -26,7 +26,7 @@ Naming:
 
 ## Features
 
-- [~] **F1: State Export & Workspace Management** — stable snapshot format, save/load, event logging, replay
+- [x] **F1: State Export & Workspace Management** — stable snapshot format, save/load, event logging, replay
   - Brief: `.planning/epics/e002-browser-and-state-export/f01-state-export/f01-feature-brief.md`
 - [ ] **F2: Browser Core** — fetch HTML, extract readable content, convert to markdown, render in TUI, navigate links
   - Brief: `.planning/epics/e002-browser-and-state-export/f02-browser-core/f02-feature-brief.md`
