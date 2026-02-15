@@ -100,6 +100,19 @@ All views are TView subclasses — resizable, movable, stackable:
 - **Utility**: Text editor, ANSI viewer, ASCII image, grid, transparent text, token tracker
 - **Paint**: Full pixel-level drawing system (`app/paint/`)
 
+### Turbo Vision ANSI Rendering Rule
+
+When implementing image/terminal-rich rendering in Turbo Vision views:
+
+1. Do **not** write raw ANSI escape streams (`\x1b[...`) directly to `TDrawBuffer` text.
+2. Parse ANSI into a cell model first: `cell = glyph + fg + bg`.
+3. Render cells with Turbo Vision-native draw operations (attributes/colors per cell).
+4. Treat visible ESC/CSI sequences in UI as a correctness bug.
+
+Use this kickoff prompt for any ANSI/image rendering task:
+
+`Before coding, design the render path from first principles for Turbo Vision: source bytes -> ANSI stream -> parsed cell grid (glyph, fg, bg) -> native TV draw calls. Do not render raw ANSI text. Show parser/renderer boundaries, cache keys, failure modes, and a test that fails if ESC sequences appear in UI output.`
+
 ### Module System
 
 Content packs in `modules/` (public, shipped) and `modules-private/` (user content, gitignored). Each module has a `module.json` manifest. Types: content, prompt, view, tool. See `modules/README.md`.

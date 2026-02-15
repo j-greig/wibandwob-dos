@@ -89,3 +89,19 @@ Before ending a coding pass:
 2. Keep behavior compatible unless explicitly scoped as breaking.
 3. Add tests for parity/contracts/state sanity when refactoring command surfaces.
 4. Include rollback notes in issue/PR artifacts.
+
+## Turbo Vision ANSI Guardrail
+
+When rendering images or rich terminal output inside Turbo Vision:
+
+1. Never dump raw ANSI escape streams directly into `TDrawBuffer` text.
+2. Always parse ANSI (CSI/SGR) into a cell model first:
+   - cell = glyph + fg + bg
+3. Render the cell model using Turbo Vision-native drawing (`putChar`/`putAttribute`/`moveStr` with mapped attrs).
+4. Treat raw `\x1b[` sequences appearing in UI as a hard failure.
+
+### Prompt Template (use at task start)
+
+Use this exact prompt when starting ANSI/image rendering work:
+
+`Before coding, design the render path from first principles for Turbo Vision: source bytes -> ANSI stream -> parsed cell grid (glyph, fg, bg) -> native TV draw calls. Do not render raw ANSI text. Show the parser/renderer boundaries, cache keys, failure modes, and a test that fails if ESC sequences appear in UI output.`
