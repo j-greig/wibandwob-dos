@@ -1694,6 +1694,8 @@ TMenuBar* TTestPatternApp::initMenuBar(TRect r)
             newLine() +
             *new TMenuItem("E~x~it", cmQuit, cmQuit, hcNoContext, "Alt-X") +
         *new TSubMenu("~E~dit", kbAltE) +
+            *new TMenuItem("~C~opy Page", cmCopy, kbCtrlIns) +
+            newLine() +
             *new TMenuItem("Sc~r~eenshot", cmScreenshot, kbCtrlP) +
             newLine() +
             (TMenuItem&) (

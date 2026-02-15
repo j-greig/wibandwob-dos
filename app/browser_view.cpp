@@ -29,6 +29,7 @@
 #include <sstream>
 #include <algorithm>
 #include <array>
+#include <set>
 #include <fcntl.h>
 #include <unistd.h>
 
@@ -432,6 +433,10 @@ void TBrowserWindow::handleEvent(TEvent& event) {
                 if (contentView) contentView->scrollToTop();
                 clearEvent(event);
                 break;
+            case kbCtrlIns:
+                copyPageToClipboard();
+                clearEvent(event);
+                break;
             default:
                 // Check for character keys
                 char ch = event.keyDown.charScan.charCode;
@@ -461,6 +466,11 @@ void TBrowserWindow::handleEvent(TEvent& event) {
                         cycleImageMode();
                         clearEvent(event);
                         break;
+                    case 'y':
+                    case 'Y':
+                        copyPageToClipboard();
+                        clearEvent(event);
+                        break;
                 }
                 break;
         }
@@ -468,10 +478,7 @@ void TBrowserWindow::handleEvent(TEvent& event) {
     }
 
     if (event.what == evCommand && event.message.command == cmCopy) {
-        std::string text = contentView ? contentView->getPlainText() : std::string();
-        if (!text.empty()) {
-            THardwareInfo::setClipboardText(TStringView(text.data(), text.size()));
-        }
+        copyPageToClipboard();
         clearEvent(event);
     }
 }
@@ -550,9 +557,29 @@ void TBrowserWindow::drawKeyHints() {
     if (w <= 0 || y < 0) return;
 
     buf.moveChar(0, ' ', hintColor, w);
-    buf.moveStr(1, "g:Go  b:Back  f:Fwd  r:Refresh  i:Images  PgUp/PgDn:Scroll  Esc:Close", hintColor);
+    buf.moveStr(1, "g:Go  b:Back  f:Fwd  r:Refresh  i:Images  y:Copy  PgUp/PgDn:Scroll  Esc:Close", hintColor);
 
     writeLine(1, y, w, 1, buf);
+}
+
+void TBrowserWindow::copyPageToClipboard() {
+    std::string text = latestMarkdown.empty()
+        ? (contentView ? contentView->getPlainText() : std::string())
+        : latestMarkdown;
+
+    if (!latestImageUrls.empty()) {
+        if (!text.empty() && text.back() != '\n')
+            text.push_back('\n');
+        text += "\nImage URLs:\n";
+        for (const auto &u : latestImageUrls) {
+            text += u;
+            text.push_back('\n');
+        }
+    }
+
+    if (!text.empty()) {
+        THardwareInfo::setClipboardText(TStringView(text.data(), text.size()));
+    }
 }
 
 void TBrowserWindow::promptForUrl() {
@@ -688,10 +715,11 @@ void TBrowserWindow::finishFetch() {
     }
 
     // Parse JSON response — extract markdown and title
-    std::string markdown = extractJsonStringField(fetchBuffer, "tui_text");
-    if (markdown.empty()) {
-        markdown = extractJsonStringField(fetchBuffer, "markdown");
-    }
+    std::string tuiText = extractJsonStringField(fetchBuffer, "tui_text");
+    std::string markdownField = extractJsonStringField(fetchBuffer, "markdown");
+    std::string markdown = tuiText.empty() ? markdownField : tuiText;
+    latestMarkdown = markdownField.empty() ? markdown : markdownField;
+    refreshCopyPayload(fetchBuffer);
     pageTitle = extractJsonStringField(fetchBuffer, "title");
 
     if (markdown.empty() && pageTitle.empty()) {
@@ -900,6 +928,79 @@ std::string TBrowserWindow::extractJsonStringField(const std::string& json, cons
         out.push_back(c);
     }
     return out;
+}
+
+std::vector<std::string> TBrowserWindow::extractJsonStringValues(const std::string& json, const std::string& key) {
+    std::vector<std::string> out;
+    const std::string pattern = "\"" + key + "\":\"";
+    size_t pos = 0;
+    while (true) {
+        pos = json.find(pattern, pos);
+        if (pos == std::string::npos)
+            break;
+        pos += pattern.size();
+        std::string value;
+        bool escape = false;
+        size_t i = pos;
+        for (; i < json.size(); ++i) {
+            char c = json[i];
+            if (escape) {
+                switch (c) {
+                    case '\\': value.push_back('\\'); break;
+                    case '"':  value.push_back('"'); break;
+                    case '/':  value.push_back('/'); break;
+                    case 'n':  value.push_back('\n'); break;
+                    case 'r':  value.push_back('\r'); break;
+                    case 't':  value.push_back('\t'); break;
+                    case 'u': {
+                        if (i + 4 < json.size()) {
+                            uint16_t hi = parseHex4(json, i + 1);
+                            i += 4;
+                            if (hi >= 0xD800 && hi <= 0xDBFF && i + 2 < json.size()
+                                && json[i + 1] == '\\' && json[i + 2] == 'u' && i + 6 < json.size()) {
+                                uint16_t lo = parseHex4(json, i + 3);
+                                if (lo >= 0xDC00 && lo <= 0xDFFF) {
+                                    uint32_t cp = 0x10000 + ((uint32_t)(hi - 0xD800) << 10) + (lo - 0xDC00);
+                                    appendUtf8(value, cp);
+                                    i += 6;
+                                } else {
+                                    appendUtf8(value, hi);
+                                }
+                            } else {
+                                appendUtf8(value, hi);
+                            }
+                        }
+                        break;
+                    }
+                    default: value.push_back(c); break;
+                }
+                escape = false;
+                continue;
+            }
+            if (c == '\\') {
+                escape = true;
+                continue;
+            }
+            if (c == '"')
+                break;
+            value.push_back(c);
+        }
+        if (!value.empty())
+            out.push_back(value);
+        pos = i + 1;
+    }
+    return out;
+}
+
+void TBrowserWindow::refreshCopyPayload(const std::string& rawJson) {
+    latestImageUrls.clear();
+    std::set<std::string> seen;
+    for (const auto &url : extractJsonStringValues(rawJson, "source_url")) {
+        if (url.empty())
+            continue;
+        if (seen.insert(url).second)
+            latestImageUrls.push_back(url);
+    }
 }
 
 // Factory function
