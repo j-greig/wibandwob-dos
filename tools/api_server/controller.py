@@ -574,8 +574,15 @@ class Controller:
         )
         return {"ok": True, "window_id": window_id, "render_mode": win.props.get("render_mode"), "image_mode": win.props.get("image_mode")}
 
-    async def browser_fetch(self, url: str, reader: str = "readability", fmt: str = "tui_bundle") -> Dict[str, Any]:
-        bundle = fetch_render_bundle(url, reader=reader)
+    async def browser_fetch(
+        self,
+        url: str,
+        reader: str = "readability",
+        fmt: str = "tui_bundle",
+        images: str = "none",
+        width: int = 80,
+    ) -> Dict[str, Any]:
+        bundle = fetch_render_bundle(url, reader=reader, width=width, image_mode=images)
         if fmt == "markdown":
             return {"ok": True, "url": url, "markdown": bundle.get("markdown", ""), "meta": bundle.get("meta", {})}
         return {"ok": True, "bundle": bundle}

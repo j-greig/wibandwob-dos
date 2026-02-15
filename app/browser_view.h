@@ -81,6 +81,7 @@ public:
     // Accessors
     const std::string& getCurrentUrl() const { return currentUrl; }
     FetchState getState() const { return fetchState; }
+    const std::string& getImageMode() const { return imageMode; }
 
 private:
     static TFrame* initFrame(TRect r);
@@ -116,6 +117,7 @@ private:
 
     // URL input dialog
     void promptForUrl();
+    void cycleImageMode();
 
     // JSON parsing (reuses extractJsonStringField pattern)
     static std::string extractJsonStringField(const std::string& json, const std::string& key);
@@ -124,6 +126,9 @@ private:
     void drawUrlBar();
     void drawStatusBar();
     void drawKeyHints();
+
+    // Render mode state
+    std::string imageMode {"key-inline"};
 };
 
 // Factory function
