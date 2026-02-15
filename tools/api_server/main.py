@@ -26,6 +26,7 @@ from .schemas import (
     BatchPrimersRequest,
     BatchPrimersResponse,
     BrowserClipReq,
+    BrowserCopyReq,
     BrowserFetchReq,
     BrowserFindReq,
     BrowserGetContentReq,
@@ -416,6 +417,19 @@ def make_app() -> FastAPI:
             raise HTTPException(status_code=400, detail=res.get("error", "browser_clip_failed"))
         return res
 
+    @app.post("/browser/{window_id}/copy")
+    async def browser_copy(window_id: str, payload: Optional[BrowserCopyReq] = None) -> Dict[str, Any]:
+        p = payload or BrowserCopyReq()
+        res = await ctl.browser_copy(
+            window_id,
+            fmt=p.format,
+            include_image_urls=p.include_image_urls,
+            image_url_mode=p.image_url_mode,
+        )
+        if not res.get("ok"):
+            raise HTTPException(status_code=400, detail=res.get("error", "browser_copy_failed"))
+        return res
+
     @app.post("/browser/{window_id}/gallery")
     async def browser_gallery(window_id: str) -> Dict[str, Any]:
         res = await ctl.browser_toggle_gallery(window_id)
@@ -425,8 +439,10 @@ def make_app() -> FastAPI:
 
     @app.post("/screenshot")
     async def screenshot(payload: Optional[ScreenshotReq] = None) -> Dict[str, Any]:
-        target = await ctl.screenshot((payload or ScreenshotReq()).path)
-        return {"ok": True, "path": target}
+        res = await ctl.screenshot((payload or ScreenshotReq()).path)
+        if not res.get("ok"):
+            raise HTTPException(status_code=400, detail=res.get("error", "screenshot_failed"))
+        return res
 
     @app.post("/windows/batch_layout", response_model=BatchLayoutResponse)
     async def windows_batch_layout(payload: BatchLayoutRequest) -> BatchLayoutResponse:
