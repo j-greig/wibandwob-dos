@@ -5,7 +5,11 @@ import time
 from typing import Any, Dict, List, Optional
 from pathlib import Path
 import re
+import shutil
+import subprocess
+import sys
 from datetime import datetime, timezone
+from urllib.parse import urljoin
 
 from .events import EventHub
 from .browser_pipeline import fetch_render_bundle, render_markdown
@@ -23,6 +27,45 @@ from .monodraw_parser import MonodrawParser, MonodrawLayer, scale_coordinates
 import json
 import tempfile
 import os
+
+ANSI_CSI_RE = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
+
+
+def _strip_ansi(text: str) -> str:
+    return ANSI_CSI_RE.sub("", text or "")
+
+
+def _copy_text_to_system_clipboard(text: str) -> Dict[str, Any]:
+    content = str(text or "")
+    if not content:
+        return {"ok": False, "error": "empty_content"}
+
+    commands: List[List[str]] = []
+    if sys.platform == "darwin":
+        commands.append(["pbcopy"])
+    elif sys.platform.startswith("win"):
+        commands.append(["powershell", "-NoProfile", "-Command", "Set-Clipboard"])
+        commands.append(["clip"])
+    else:
+        if shutil.which("wl-copy"):
+            commands.append(["wl-copy"])
+        if shutil.which("xclip"):
+            commands.append(["xclip", "-selection", "clipboard"])
+        if shutil.which("xsel"):
+            commands.append(["xsel", "--clipboard", "--input"])
+
+    if not commands:
+        return {"ok": False, "error": "clipboard_unavailable"}
+
+    last_err = "clipboard_write_failed"
+    for cmd in commands:
+        try:
+            subprocess.run(cmd, input=content, text=True, check=True, capture_output=True)
+            return {"ok": True, "command": " ".join(cmd)}
+        except Exception as exc:  # pragma: no cover - platform dependent
+            last_err = str(exc)
+
+    return {"ok": False, "error": last_err}
 
 
 class Controller:
@@ -471,12 +514,91 @@ class Controller:
         await self._events.emit("workspace.opened", {"path": path})
         return {"ok": True, "path": path, "mode": "replace", "fallback": bool(res.get("fallback", False))}
 
-    async def screenshot(self, path: Optional[str]) -> str:
-        target = path or f"screenshot_{int(time.time())}.png"
+    async def screenshot(self, path: Optional[str]) -> Dict[str, Any]:
+        """Capture screenshot via canonical app command path and verify output exists."""
+        start_ts = time.time()
+        shots_dir = self._repo_root / "screenshots"
+        shots_dir.mkdir(parents=True, exist_ok=True)
+
+        try:
+            resp = send_cmd("screenshot")
+            if isinstance(resp, str) and resp.lower().startswith("err"):
+                return {"ok": False, "error": "screenshot_command_failed", "detail": resp}
+        except Exception as exc:
+            return {"ok": False, "error": "screenshot_ipc_failed", "detail": str(exc)}
+
+        # The app emits tui_<timestamp>.{txt,ans,png}; wait briefly for filesystem visibility.
+        generated: List[Path] = []
+        for _ in range(30):
+            candidates = sorted(
+                (
+                    p for p in shots_dir.glob("tui_*")
+                    if p.suffix in {".txt", ".ans", ".png"}
+                    and p.exists()
+                    and p.stat().st_mtime >= (start_ts - 0.2)
+                ),
+                key=lambda p: p.stat().st_mtime,
+                reverse=True,
+            )
+            if candidates:
+                generated = candidates
+                break
+            await asyncio.sleep(0.05)
+
+        if not generated:
+            return {"ok": False, "error": "screenshot_missing_output", "detail": "no_capture_files_found"}
+
+        def _select_source(ext: Optional[str]) -> Path:
+            if ext:
+                for p in generated:
+                    if p.suffix.lower() == ext.lower():
+                        return p
+            # Prefer authoritative in-process captures over best-effort PNG.
+            for preferred in (".txt", ".ans", ".png"):
+                for p in generated:
+                    if p.suffix == preferred:
+                        return p
+            return generated[0]
+
+        requested = (path or "").strip()
+        if requested:
+            target = Path(requested)
+            if not target.is_absolute():
+                target = self._repo_root / target
+            source = _select_source(target.suffix if target.suffix else None)
+            try:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(source, target)
+            except Exception as exc:
+                return {
+                    "ok": False,
+                    "error": "screenshot_copy_failed",
+                    "detail": str(exc),
+                    "source_path": str(source),
+                    "requested_path": str(target),
+                }
+            final_path = target
+        else:
+            source = _select_source(None)
+            final_path = source
+
+        if not final_path.exists():
+            return {"ok": False, "error": "screenshot_missing_output", "detail": str(final_path)}
+
+        size_bytes = int(final_path.stat().st_size)
+        result = {
+            "ok": True,
+            "path": str(final_path),
+            "backend": "ipc_screenshot",
+            "source_path": str(source),
+            "file_exists": True,
+            "bytes": size_bytes,
+        }
+
         async with self._lock:
-            self._state.last_screenshot = target
-        await self._events.emit("screenshot.saved", {"path": target})
-        return target
+            self._state.last_screenshot = str(final_path)
+        await self._events.emit("screenshot.saved", result)
+        return result
 
     # ----- Browser -----
     async def browser_open(
@@ -613,6 +735,63 @@ class Controller:
             markdown += "\n\n<!-- images included -->\n"
         out_path.write_text(markdown, encoding="utf-8")
         return {"ok": True, "path": str(out_path)}
+
+    async def browser_copy(
+        self,
+        window_id: str,
+        fmt: str = "plain",
+        include_image_urls: bool = False,
+        image_url_mode: str = "full",
+    ) -> Dict[str, Any]:
+        win = self._require(window_id)
+        if win.type != WindowType.browser:
+            return {"ok": False, "error": "not_browser_window"}
+
+        if fmt not in ("plain", "markdown", "tui"):
+            return {"ok": False, "error": "invalid_format"}
+        if image_url_mode != "full":
+            return {"ok": False, "error": "invalid_image_url_mode"}
+
+        markdown = str(win.props.get("markdown", "") or "")
+        tui_text = str(win.props.get("tui_text", "") or "")
+        if fmt == "markdown":
+            content = markdown
+        elif fmt == "tui":
+            content = tui_text
+        else:
+            content = _strip_ansi(tui_text)
+
+        if not content.strip():
+            return {"ok": False, "error": "no_browser_content"}
+
+        resolved_urls: List[str] = []
+        if include_image_urls:
+            base_url = str(win.props.get("url", "") or "")
+            seen = set()
+            for asset in list(win.props.get("assets", [])):
+                src = str(asset.get("source_url", "") or "").strip()
+                if not src:
+                    continue
+                full = urljoin(base_url, src) if image_url_mode == "full" and base_url else src
+                if full in seen:
+                    continue
+                seen.add(full)
+                resolved_urls.append(full)
+            if resolved_urls:
+                content = content.rstrip() + "\n\nImage URLs:\n" + "\n".join(f"- {u}" for u in resolved_urls) + "\n"
+
+        copied = _copy_text_to_system_clipboard(content)
+        if not copied.get("ok"):
+            return {"ok": False, "error": f"clipboard_write_failed: {copied.get('error', 'unknown')}"}
+
+        return {
+            "ok": True,
+            "window_id": window_id,
+            "chars": len(content),
+            "copied": True,
+            "format": fmt,
+            "included_image_urls": len(resolved_urls),
+        }
 
     async def browser_toggle_gallery(self, window_id: str) -> Dict[str, Any]:
         win = self._require(window_id)

@@ -73,7 +73,8 @@ Key Endpoints
 - Properties: `POST /props/{id}` — update window props: `{props:{...}}`
 - Menu commands: `POST /menu/command` — `{command, args?}` (supports `cascade`, `tile`, `close_all`, `save_workspace`, `open_workspace`, `screenshot`)
 - Workspace: `POST /workspace/save|open` — `{path}`
-- Screenshot: `POST /screenshot` — `{path?}` returns `{path}`
+- Browser copy: `POST /browser/{window_id}/copy` — `{format:"plain|markdown|tui", include_image_urls?, image_url_mode?}`
+- Screenshot: `POST /screenshot` — `{path?}` returns capture metadata (`path`, `backend`, `bytes`, `file_exists`) and fails if output file is missing
 - Pattern mode: `POST /pattern_mode` — `{mode:"continuous"|"tiled"}`
 - **Batch layout: `POST /windows/batch_layout`** — create/move/close multiple windows in one call with macro support
 - **Timeline operations: `GET /timeline/status?group_id=...`, `POST /timeline/cancel`** — for future scheduled operations 
@@ -110,6 +111,47 @@ Examples (curl)
   - `curl -X POST localhost:8089/props/<id> -H 'Content-Type: application/json' -d '{"props":{"fps":24}}'`
 - Execute a menu command (save workspace):
   - `curl -X POST localhost:8089/menu/command -H 'Content-Type: application/json' -d '{"command":"save_workspace","args":{"path":"workspace.json"}}'`
+
+### Browser Copy API
+Copy browser content to system clipboard without requiring TUI focus:
+
+```bash
+curl -X POST "http://127.0.0.1:8089/browser/<window_id>/copy" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "format": "markdown",
+    "include_image_urls": true,
+    "image_url_mode": "full"
+  }'
+```
+
+Response example:
+
+```json
+{
+  "ok": true,
+  "window_id": "win_abc123",
+  "chars": 1242,
+  "copied": true,
+  "format": "markdown",
+  "included_image_urls": 3
+}
+```
+
+Format semantics:
+- `plain`: TUI content with ANSI escape sequences stripped
+- `markdown`: browser markdown payload
+- `tui`: rendered TUI payload (may include ANSI)
+
+Image URL behavior:
+- `include_image_urls=true` appends an `Image URLs` section built from browser asset metadata.
+- `image_url_mode=full` outputs absolute URLs (resolved against current browser URL when needed).
+
+Error cases (HTTP 400):
+- Browser window not found / wrong window type
+- Empty browser content for requested format
+- Clipboard unavailable or write failure
+- Invalid `format` or `image_url_mode`
 
 ## Text Editor & Primer Files
 
