@@ -272,7 +272,7 @@ def make_app() -> FastAPI:
 
     @app.post("/menu/command")
     async def menu_command(payload: MenuCommand) -> Dict[str, Any]:
-        res = await ctl.exec_command(payload.command, payload.args)
+        res = await ctl.exec_command(payload.command, payload.args, actor=payload.actor or "api")
         if not res.get("ok"):
             raise HTTPException(status_code=400, detail=res.get("error", "command_failed"))
         return res

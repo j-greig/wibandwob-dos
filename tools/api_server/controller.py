@@ -396,9 +396,10 @@ class Controller:
         except Exception as e:
             return {"ok": False, "error": str(e)}
 
-    async def exec_command(self, name: str, args: Dict[str, Any]) -> Dict[str, Any]:
-        handled = {"command": name, "ok": True}
+    async def exec_command(self, name: str, args: Dict[str, Any], actor: str = "api") -> Dict[str, Any]:
+        handled = {"command": name, "ok": True, "actor": actor or "api"}
         payload: Dict[str, str] = {"name": name}
+        payload["actor"] = handled["actor"]
         for key, value in (args or {}).items():
             payload[key] = str(value)
         try:

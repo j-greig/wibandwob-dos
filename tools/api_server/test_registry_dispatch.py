@@ -51,8 +51,10 @@ async def _run() -> None:
         ctl = Controller(EventHub())
         result = await ctl.exec_command("cascade", {})
         assert result["ok"] is True, result
+        assert result["actor"] == "api", result
         assert sent[0][0] == "exec_command", sent
         assert sent[0][1].get("name") == "cascade", sent
+        assert sent[0][1].get("actor") == "api", sent
 
         caps = await ctl.get_capabilities()
         assert "cascade" in caps["commands"], caps

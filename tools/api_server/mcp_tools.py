@@ -57,7 +57,7 @@ def _exec_result_error(result: Dict[str, Any]) -> Dict[str, Any]:
 def _make_simple_command_handler(command_name: str, success_message: str) -> CommandToolHandler:
     async def _handler() -> Dict[str, Any]:
         controller = get_controller()
-        result = await controller.exec_command(command_name, {})
+        result = await controller.exec_command(command_name, {}, actor="mcp")
         if not result.get("ok"):
             return _exec_result_error(result)
         return {
@@ -70,7 +70,7 @@ def _make_simple_command_handler(command_name: str, success_message: str) -> Com
 def _make_tile_handler() -> CommandToolHandler:
     async def _handler(columns: Optional[int] = 2) -> Dict[str, Any]:
         controller = get_controller()
-        result = await controller.exec_command("tile", {"cols": columns or 2})
+        result = await controller.exec_command("tile", {"cols": columns or 2}, actor="mcp")
         if not result.get("ok"):
             return _exec_result_error(result)
         return {
@@ -89,7 +89,7 @@ def _make_pattern_mode_handler() -> CommandToolHandler:
                 "valid_modes": ["continuous", "tiled"],
             }
         controller = get_controller()
-        result = await controller.exec_command("pattern_mode", {"mode": mode})
+        result = await controller.exec_command("pattern_mode", {"mode": mode}, actor="mcp")
         if not result.get("ok"):
             return _exec_result_error(result)
         return {
@@ -105,7 +105,7 @@ def _make_screenshot_handler() -> CommandToolHandler:
         if path:
             args["path"] = path
         controller = get_controller()
-        result = await controller.exec_command("screenshot", args)
+        result = await controller.exec_command("screenshot", args, actor="mcp")
         if not result.get("ok"):
             return _exec_result_error(result)
         return {
@@ -118,7 +118,7 @@ def _make_screenshot_handler() -> CommandToolHandler:
 def _make_save_workspace_handler() -> CommandToolHandler:
     async def _handler(path: str = "workspace.json") -> Dict[str, Any]:
         controller = get_controller()
-        result = await controller.exec_command("save_workspace", {"path": path})
+        result = await controller.exec_command("save_workspace", {"path": path}, actor="mcp")
         if not result.get("ok"):
             return _exec_result_error(result)
         return {
@@ -131,7 +131,7 @@ def _make_save_workspace_handler() -> CommandToolHandler:
 def _make_open_workspace_handler() -> CommandToolHandler:
     async def _handler(path: str) -> Dict[str, Any]:
         controller = get_controller()
-        result = await controller.exec_command("open_workspace", {"path": path})
+        result = await controller.exec_command("open_workspace", {"path": path}, actor="mcp")
         if not result.get("ok"):
             return _exec_result_error(result)
         return {

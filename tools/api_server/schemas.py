@@ -44,6 +44,7 @@ class WindowPropsUpdate(BaseModel):
 class MenuCommand(BaseModel):
     command: str
     args: Dict[str, Any] = Field(default_factory=dict)
+    actor: Optional[str] = "api"
 
 
 class PatternMode(BaseModel):
@@ -264,4 +265,3 @@ class PrimerInfo(BaseModel):
 class PrimersListResponse(BaseModel):
     primers: List[PrimerInfo]
     count: int
-

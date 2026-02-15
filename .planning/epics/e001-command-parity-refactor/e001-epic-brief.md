@@ -33,7 +33,8 @@ Naming:
   - Brief: `.planning/epics/e001-command-parity-refactor/f01-command-registry/f01-feature-brief.md`
 - [x] **F2: Parity Enforcement** — automated drift checks for menu, IPC/API, MCP surfaces
   - Brief: `.planning/epics/e001-command-parity-refactor/f02-parity-enforcement/f02-feature-brief.md`
-- [ ] **F3: State/Event Authority** — `exec_command` dispatch, typed events, snapshot sanity
+- [x] **F3: State/Event Authority** — `exec_command` dispatch, typed events, snapshot sanity
+  - Brief: `.planning/epics/e001-command-parity-refactor/f03-state-event-authority/f03-feature-brief.md`
 - [ ] **F4: Instance Boundaries** — isolation for state, vault, events; local-first this pass
 
 ## Story Backlog
@@ -51,6 +52,8 @@ Naming:
   - Brief: `.planning/epics/e001-command-parity-refactor/f01-command-registry/s06-f01-closeout/s06-story-brief.md`
 - [x] **S7 (PR-2+):** Parity matrix test for menu/registry/MCP
   - Brief: `.planning/epics/e001-command-parity-refactor/f02-parity-enforcement/s07-parity-matrix-test/s07-story-brief.md`
+- [x] **S8 (PR-2+):** Actor attribution on canonical command execution
+  - Brief: `.planning/epics/e001-command-parity-refactor/f03-state-event-authority/s08-actor-attribution/s08-story-brief.md`
 
 ## Acceptance Criteria (PR-1)
 
