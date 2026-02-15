@@ -11,9 +11,9 @@ Render markdown headings as figlet ASCII art at 3 size tiers and convert web ima
 
 ## Stories
 
-- [x] `s08-figlet-headings/` — figlet heading renderer with 3-tier font mapping and toggle modes
-- [x] `s09-ansi-images/` — chafa image pipeline, 4 image modes, lazy rendering, ANSI cache
-- [x] `s10-gallery-window/` — companion gallery TView, scroll sync, image focus
+- [x] `.planning/epics/e002-browser-and-state-export/f03-rich-rendering/s08-figlet-headings/s08-story-brief.md` — figlet heading renderer with 3-tier font mapping and toggle modes (#21)
+- [x] `.planning/epics/e002-browser-and-state-export/f03-rich-rendering/s09-ansi-images/s09-story-brief.md` — chafa image pipeline, 4 image modes, lazy rendering, ANSI cache (#21)
+- [x] `.planning/epics/e002-browser-and-state-export/f03-rich-rendering/s10-gallery-window/s10-story-brief.md` — companion gallery TView, scroll sync, image focus (#21)
 
 ## Figlet Heading Design
 
