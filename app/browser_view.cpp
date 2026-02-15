@@ -200,6 +200,69 @@ static TBrowserContentView::StyledLine parseAnsiLine(const std::string &text, TC
     return line;
 }
 
+static std::string trimCopyText(std::string s) {
+    auto isSpace = [] (char c) -> bool {
+        return c == ' ' || c == '\t' || c == '\r' || c == '\n';
+    };
+    while (!s.empty() && isSpace(s.front()))
+        s.erase(s.begin());
+    while (!s.empty() && isSpace(s.back()))
+        s.pop_back();
+    return s;
+}
+
+// Convert markdown links like "[label](url)" (including multiline labels)
+// into a copy-friendly plain form:
+// label
+// url
+static std::string flattenMarkdownLinks(const std::string &in) {
+    std::string out;
+    out.reserve(in.size());
+    size_t i = 0;
+    while (i < in.size()) {
+        if (in[i] != '[') {
+            out.push_back(in[i++]);
+            continue;
+        }
+
+        size_t closeBracket = in.find(']', i + 1);
+        if (closeBracket == std::string::npos) {
+            out.push_back(in[i++]);
+            continue;
+        }
+
+        size_t urlOpen = closeBracket + 1;
+        while (urlOpen < in.size() &&
+               (in[urlOpen] == ' ' || in[urlOpen] == '\t' || in[urlOpen] == '\r' || in[urlOpen] == '\n')) {
+            ++urlOpen;
+        }
+        if (urlOpen >= in.size() || in[urlOpen] != '(') {
+            out.push_back(in[i++]);
+            continue;
+        }
+
+        size_t closeParen = in.find(')', urlOpen + 1);
+        if (closeParen == std::string::npos) {
+            out.push_back(in[i++]);
+            continue;
+        }
+
+        std::string label = trimCopyText(in.substr(i + 1, closeBracket - (i + 1)));
+        std::string url = trimCopyText(in.substr(urlOpen + 1, closeParen - (urlOpen + 1)));
+        if (!label.empty() && !url.empty()) {
+            out += label;
+            out.push_back('\n');
+            out += url;
+        } else if (!label.empty()) {
+            out += label;
+        } else if (!url.empty()) {
+            out += url;
+        }
+        i = closeParen + 1;
+    }
+    return out;
+}
+
 } // namespace
 
 void TBrowserContentView::draw() {
@@ -566,6 +629,7 @@ void TBrowserWindow::copyPageToClipboard() {
     std::string text = latestMarkdown.empty()
         ? (contentView ? contentView->getPlainText() : std::string())
         : latestMarkdown;
+    text = flattenMarkdownLinks(text);
 
     if (!latestImageUrls.empty()) {
         if (!text.empty() && text.back() != '\n')
