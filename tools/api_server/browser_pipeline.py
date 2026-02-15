@@ -41,7 +41,7 @@ MAX_RENDER_WIDTH_CELLS = 120
 PER_IMAGE_RENDER_TIMEOUT_MS = 3000
 TOTAL_IMAGE_RENDER_BUDGET_MS = 10000
 MAX_TUI_TEXT_CHARS = 250000
-PIPELINE_CACHE_VERSION = "v7"
+PIPELINE_CACHE_VERSION = "v8"
 IMAGE_WIDTH_RATIO = 0.5
 MAX_IMAGE_HEIGHT_CELLS = 34
 
@@ -183,6 +183,20 @@ def _looks_like_markdown(text: str) -> bool:
         or re.search(r"(?m)^\s*[-*+]\s+\S", text or "")
         or re.search(r"\[[^\]]+\]\([^)]+\)", text or "")
     )
+
+
+def _looks_binary_text(text: str) -> bool:
+    if not text:
+        return False
+    sample = text[:4000]
+    ctrl = 0
+    for ch in sample:
+        o = ord(ch)
+        if o in (9, 10, 13):
+            continue
+        if o < 32:
+            ctrl += 1
+    return (ctrl / max(1, len(sample))) > 0.01
 
 
 def _title_from_markdown(markdown: str, fallback: str) -> str:
@@ -592,6 +606,7 @@ def fetch_render_bundle(
         try:
             edge_headers = dict(headers)
             edge_headers["Accept"] = "text/markdown"
+            edge_headers["Accept-Encoding"] = "identity"
             edge_resp = _http_get(url, timeout=30, headers=edge_headers)
             edge_content_type = str(edge_resp.headers.get("content-type", "")).lower()
             edge_server = str(edge_resp.headers.get("server", "")).strip() or None
@@ -603,7 +618,7 @@ def fetch_render_bundle(
                 _debug_log("edge_markdown.probe", {"url": url, "ok": False, "reason": "direct_image"})
             else:
                 edge_text = _decode_html_response(edge_resp)
-                edge_ok = ("text/markdown" in edge_content_type) or _looks_like_markdown(edge_text)
+                edge_ok = (("text/markdown" in edge_content_type) or _looks_like_markdown(edge_text)) and not _looks_binary_text(edge_text)
                 _debug_log(
                     "edge_markdown.probe",
                     {
@@ -611,6 +626,7 @@ def fetch_render_bundle(
                         "ok": edge_ok,
                         "content_type": edge_content_type,
                         "tokens_header_present": bool(edge_markdown_tokens),
+                        "binary_like": _looks_binary_text(edge_text),
                     },
                 )
                 if edge_ok:
