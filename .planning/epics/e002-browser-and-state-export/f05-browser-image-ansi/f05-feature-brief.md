@@ -19,7 +19,7 @@ Add deterministic image rendering for browser pages in terminal output, with qua
 
 - [x] `.planning/epics/e002-browser-and-state-export/f05-browser-image-ansi/s15-ansi-image-spec/s15-story-brief.md` — define quarter-pixel image rendering spec, contracts, limits, and implementation tests (#32)
 - [x] `.planning/epics/e002-browser-and-state-export/f05-browser-image-ansi/s16-backend-adapter-cache/s16-story-brief.md` — implement backend adapter and cache pipeline for ANSI image blocks (#31)
-- [~] `.planning/epics/e002-browser-and-state-export/f05-browser-image-ansi/s17-integration-modes-gallery/s17-story-brief.md` — implement browser image mode integration and gallery behavior in TUI/API/MCP (#31)
+- [x] `.planning/epics/e002-browser-and-state-export/f05-browser-image-ansi/s17-integration-modes-gallery/s17-story-brief.md` — implement browser image mode integration and gallery behavior in TUI/API/MCP (#31)
 
 ## Acceptance Criteria
 
@@ -32,12 +32,9 @@ Add deterministic image rendering for browser pages in terminal output, with qua
 
 ## Status
 
-Status: `in-progress`
+Status: `done`
 GitHub issue: #31
 PR: —
-
-Blocking items:
-- S17 AC-2 (gallery anchor-sync/focus assertions) still open.
 
 Non-gating follow-ons tracked as canon `task` issues:
 - [x] #35 (browser copy API route) — done/closed
@@ -47,5 +44,4 @@ Closeout snapshot (2026-02-15):
 - Completed this pass:
   - screenshot path stabilized to canonical in-process capture artifacts (`.txt`, `.ans`)
   - browser copy API and screenshot reliability follow-ons closed (#35, #33)
-- Remaining to close F5:
-  - S17 AC-2 gallery anchor-sync/focus behavior requires explicit deterministic assertion before issue #31 can close
+  - S17 AC-2 gallery sync/focus assertions reconciled with passing gallery contract test

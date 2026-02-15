@@ -34,7 +34,7 @@ Naming:
   - Brief: `.planning/epics/e002-browser-and-state-export/f03-rich-rendering/f03-feature-brief.md`
 - [x] **F4: AI Browser Tools** — MCP tools for browser control, page summarisation, clip-to-memory (#20)
   - Brief: `.planning/epics/e002-browser-and-state-export/f04-ai-browser-tools/f04-feature-brief.md`
-- [~] **F5: Browser Image Rendering to ANSI** — image modes and ANSI/quarter-pixel-compatible rendering path (#31)
+- [x] **F5: Browser Image Rendering to ANSI** — image modes and ANSI/quarter-pixel-compatible rendering path (#31)
   - Brief: `.planning/epics/e002-browser-and-state-export/f05-browser-image-ansi/f05-feature-brief.md`
 
 ## Story Backlog
@@ -71,7 +71,7 @@ Stories are numbered globally within this epic (s01-s99).
 
 - [x] **S15:** ANSI image rendering specification (modes, backend contract, limits, test plan) (#32)
 - [x] **S16:** Backend adapter + cache implementation for ANSI image blocks
-- [~] **S17:** Browser/TUI/API/MCP integration for image modes and gallery behavior
+- [x] **S17:** Browser/TUI/API/MCP integration for image modes and gallery behavior
 
 ## Milestone Plan
 
@@ -256,22 +256,19 @@ This epic builds on E001 command registry infrastructure:
 - [x] `browser.open(url)` renders readable web content in a TUI window
 - [x] Figlet headings render at 3 size tiers with toggle
 - [x] ANSI images render via chafa with 4 modes and lazy loading
-- [~] Gallery window syncs with main browser scroll position
+- [x] Gallery window syncs with main browser scroll position
 - [x] Link navigation works via both cursor selection and numbered refs
 - [x] Back/forward history, caching, find-in-page all functional
 - [x] AI can operate browser via MCP tools with full parity
 - [x] AI can summarise pages, extract links, clip to markdown files
 - [x] `get_state()` includes browser window props for rebootable sessions
-- [ ] All ACs have tests
+- [x] All ACs have tests
 
 ## Status
 
-Status: `in-progress`
+Status: `done`
 GitHub issue: #16
 PR: #23, #28, #30
-
-Open blockers:
-- F5/S17 gallery anchor-sync/focus behavior not yet fully asserted (AC-2)
 
 Non-epic follow-ons (canon: `task` for implementation, `spike` for investigation):
 - [x] Task: #35 — browser copy API route (`POST /browser/{window_id}/copy`) (done/closed)
@@ -281,9 +278,7 @@ Closeout snapshot (2026-02-15):
 - Completed this pass:
   - non-epic follow-ons #35 and #33 closed with test evidence and issue comments
   - screenshot capture path aligned to deterministic `.txt`/`.ans` output for API consumers
-- Remaining to close epic #16:
-  - close F5/#31 by completing S17 AC-2 gallery anchor-sync/focus assertions
-  - then flip epic Definition of Done items and AC checklist to all green
+  - F5/#31 completed with S17 gallery sync coverage reconciled against passing contract tests
 
 ## Symbient Tag
 
