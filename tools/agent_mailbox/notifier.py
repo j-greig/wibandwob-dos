@@ -1,0 +1,34 @@
+from __future__ import annotations
+
+import os
+import platform
+import subprocess
+from pathlib import Path
+
+
+def terminal_bell() -> None:
+    # Terminal bell is intentionally minimal and portable.
+    print("\a", end="", flush=True)
+
+
+def macos_notification(title: str, message: str) -> bool:
+    if platform.system() != "Darwin":
+        return False
+    cmd = [
+        "osascript",
+        "-e",
+        f'display notification "{message}" with title "{title}"',
+    ]
+    try:
+        subprocess.run(cmd, check=False, capture_output=True, text=True)
+        return True
+    except Exception:
+        return False
+
+
+def touch_sentinel(root: str | Path, agent: str) -> Path:
+    p = Path(root) / "index" / f".new-mail-{agent}"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    with p.open("a", encoding="utf-8"):
+        os.utime(p, None)
+    return p

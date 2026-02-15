@@ -78,6 +78,21 @@ class MailboxStore:
     def read_blob(self, path: str | Path) -> bytes:
         return Path(path).read_bytes()
 
+    def list_agents(self, thread_id: str | None = None) -> set[str]:
+        agents: set[str] = set()
+        for record in self._iter_records(thread_id=thread_id):
+            if isinstance(record, MessageEvent):
+                agents.add(record.from_agent)
+                agents.add(record.to_agent)
+            elif isinstance(record, AckEvent):
+                agents.add(record.actor)
+        return agents
+
+    def refresh_unread_indices(self, agents: set[str] | None = None) -> None:
+        target_agents = agents or self.list_agents()
+        for agent in sorted(target_agents):
+            self._write_unread_index(agent)
+
     def _thread_path(self, thread_id: str, ts: datetime) -> Path:
         day = ts.astimezone(timezone.utc).strftime("%Y%m%d")
         return self.threads_dir / f"{thread_id}-{day}.ndjson"
