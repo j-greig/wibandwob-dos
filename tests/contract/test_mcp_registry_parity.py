@@ -15,8 +15,10 @@ COMMAND_TOOL_MAPPING = {
 
 def test_mcp_command_tools_use_canonical_dispatch() -> None:
     source = Path("tools/api_server/mcp_tools.py").read_text(encoding="utf-8")
+    assert "_registry_command_names()" in source
+    assert 'mcp.tool(tool_spec["tool_name"])(tool_spec["handler"])' in source
     for command in COMMAND_TOOL_MAPPING:
-        assert f'controller.exec_command("{command}"' in source
+        assert f'"{command}": {{' in source
 
 
 def test_registry_commands_have_matching_mcp_command_tools() -> None:
@@ -28,4 +30,4 @@ def test_registry_commands_have_matching_mcp_command_tools() -> None:
     )
     for command, tool_name in COMMAND_TOOL_MAPPING.items():
         assert command in registry_commands
-        assert f'@mcp.tool("{tool_name}")' in mcp_source
+        assert f'"tool_name": "{tool_name}"' in mcp_source

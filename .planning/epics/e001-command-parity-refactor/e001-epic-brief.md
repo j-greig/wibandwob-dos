@@ -40,6 +40,8 @@ Naming:
 - [x] **S1 (PR-1):** Registry skeleton + first capability-driven path
   - Brief: `.planning/epics/e001-command-parity-refactor/f01-command-registry/s01-registry-skeleton/s01-story-brief.md`
 - [x] **S2 (PR-2+):** Expand parity coverage + enforce drift tests
+- [x] **S3 (PR-2+):** Capability-driven MCP command tool registration
+  - Brief: `.planning/epics/e001-command-parity-refactor/f01-command-registry/s03-mcp-capability-registration/s03-story-brief.md`
 
 ## Acceptance Criteria (PR-1)
 
