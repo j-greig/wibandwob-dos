@@ -518,6 +518,7 @@ void TBrowserWindow::fetchUrl(const std::string& url) {
     fetchState = Fetching;
     pageTitle.clear();
     errorMessage.clear();
+    if (contentView) contentView->clear();
     startFetch(url);
     drawView();
 }
@@ -587,6 +588,7 @@ void TBrowserWindow::finishFetch() {
         if (status != 0 || fetchBuffer.empty()) {
             fetchState = Error;
             errorMessage = "Fetch failed (API server running?)";
+            if (contentView) contentView->clear();
             drawView();
             return;
         }
@@ -610,6 +612,7 @@ void TBrowserWindow::finishFetch() {
             fetchState = Error;
             errorMessage = "Empty response from API";
         }
+        if (contentView) contentView->clear();
         drawView();
         return;
     }
@@ -679,6 +682,7 @@ void TBrowserWindow::navigateBack() {
     fetchState = Fetching;
     pageTitle.clear();
     errorMessage.clear();
+    if (contentView) contentView->clear();
     startFetch(currentUrl);
     drawView();
 }
@@ -690,6 +694,7 @@ void TBrowserWindow::navigateForward() {
     fetchState = Fetching;
     pageTitle.clear();
     errorMessage.clear();
+    if (contentView) contentView->clear();
     startFetch(currentUrl);
     drawView();
 }
