@@ -564,6 +564,7 @@ private:
     void takeScreenshot();
     void setPatternMode(bool continuous);
     void saveWorkspace();
+    bool saveWorkspacePath(const std::string& path);
     TRect calculateWindowBounds(const std::string& filePath);
     std::string buildWorkspaceJson();
     static std::string jsonEscape(const std::string& s);
@@ -646,6 +647,7 @@ private:
     friend void api_close_all(TTestPatternApp&);
     friend void api_set_pattern_mode(TTestPatternApp&, const std::string&);
     friend void api_save_workspace(TTestPatternApp&);
+    friend bool api_save_workspace_path(TTestPatternApp&, const std::string&);
     friend bool api_open_workspace_path(TTestPatternApp&, const std::string&);
     friend void api_screenshot(TTestPatternApp&);
     friend std::string api_get_state(TTestPatternApp&);
@@ -1966,6 +1968,7 @@ void api_set_pattern_mode(TTestPatternApp& app, const std::string& mode) {
 }
 
 void api_save_workspace(TTestPatternApp& app) { app.saveWorkspace(); }
+bool api_save_workspace_path(TTestPatternApp& app, const std::string& path) { return app.saveWorkspacePath(path); }
 
 bool api_open_workspace_path(TTestPatternApp& app, const std::string& path) {
     return app.openWorkspacePath(path);
@@ -2360,7 +2363,9 @@ void TTestPatternApp::openWorkspace()
 
 bool TTestPatternApp::openWorkspacePath(const std::string& path)
 {
-    return loadWorkspaceFromFile(path);
+    bool ok = loadWorkspaceFromFile(path);
+    fprintf(stderr, "[workspace] open path=%s ok=%s\n", path.c_str(), ok ? "true" : "false");
+    return ok;
 }
 
 // Minimal JSON helpers
@@ -2523,6 +2528,28 @@ void TTestPatternApp::saveWorkspace()
     }
     std::string ok = std::string("Workspace saved to ") + path + "\nSnapshot: " + snapPath;
     messageBox(ok.c_str(), mfInformation | mfOKButton);
+}
+
+bool TTestPatternApp::saveWorkspacePath(const std::string& path)
+{
+    if (path.empty())
+        return false;
+
+    std::string json = buildWorkspaceJson();
+    std::string tmpPath = path + ".tmp";
+
+    std::ofstream out(tmpPath.c_str(), std::ios::out | std::ios::trunc);
+    if (!out)
+        return false;
+    out << json;
+    out.close();
+    if (!out.good())
+        return false;
+
+    std::remove(path.c_str()); // ignore errors
+    bool ok = (std::rename(tmpPath.c_str(), path.c_str()) == 0);
+    fprintf(stderr, "[workspace] save path=%s ok=%s\n", path.c_str(), ok ? "true" : "false");
+    return ok;
 }
 
 std::string api_get_canvas_size(TTestPatternApp& app) {

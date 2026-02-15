@@ -78,6 +78,7 @@ extern void api_tile(TTestPatternApp& app);
 extern void api_close_all(TTestPatternApp& app);
 extern void api_set_pattern_mode(TTestPatternApp& app, const std::string& mode);
 extern void api_save_workspace(TTestPatternApp& app);
+extern bool api_save_workspace_path(TTestPatternApp& app, const std::string& path);
 extern bool api_open_workspace_path(TTestPatternApp& app, const std::string& path);
 extern void api_screenshot(TTestPatternApp& app);
 extern std::string api_get_state(TTestPatternApp& app);
@@ -230,8 +231,11 @@ void ApiIpcServer::poll() {
         auto it = kv.find("path");
         if (it == kv.end() || it->second.empty()) {
             resp = "err missing path\n";
-        } else if (!api_open_workspace_path(*app_, it->second)) {
-            resp = "err open workspace failed\n";
+        } else {
+            bool ok = api_open_workspace_path(*app_, it->second);
+            fprintf(stderr, "[ipc] open_workspace path=%s ok=%s\n", it->second.c_str(), ok ? "true" : "false");
+            if (!ok)
+                resp = "err open workspace failed\n";
         }
     } else if (cmd == "screenshot") {
         api_screenshot(*app_);
@@ -325,15 +329,9 @@ void ApiIpcServer::poll() {
         auto it = kv.find("path");
         if (it != kv.end() && !it->second.empty())
             path = it->second;
-
-        std::ofstream out(path.c_str(), std::ios::out | std::ios::trunc);
-        if (!out.is_open()) {
-            resp = "err cannot open export path\n";
-        } else {
-            out << api_get_state(*app_);
-            out.close();
-            resp = "ok\n";
-        }
+        bool ok = api_save_workspace_path(*app_, path);
+        fprintf(stderr, "[ipc] export_state path=%s ok=%s\n", path.c_str(), ok ? "true" : "false");
+        resp = ok ? "ok\n" : "err export failed\n";
     } else if (cmd == "import_state") {
         auto it = kv.find("path");
         if (it == kv.end() || it->second.empty()) {
@@ -349,10 +347,12 @@ void ApiIpcServer::poll() {
                 // Minimal validity gate for S01: ensure expected snapshot keys are present.
                 if (content.find("\"version\"") == std::string::npos ||
                     content.find("\"windows\"") == std::string::npos) {
+                    fprintf(stderr, "[ipc] import_state path=%s invalid_snapshot\n", it->second.c_str());
                     resp = "err invalid snapshot\n";
                 } else {
                     // Try direct apply first (legacy workspace shape with "bounds").
                     if (api_open_workspace_path(*app_, it->second)) {
+                        fprintf(stderr, "[ipc] import_state path=%s applied=direct\n", it->second.c_str());
                         resp = "ok\n";
                     } else {
                         // Compatibility fallback: convert state snapshot shape ("rect") into workspace shape ("bounds").
@@ -375,6 +375,7 @@ void ApiIpcServer::poll() {
                             out.close();
                             bool ok = api_open_workspace_path(*app_, tmp_path);
                             ::unlink(tmp_path.c_str());
+                            fprintf(stderr, "[ipc] import_state path=%s applied=compat ok=%s\n", it->second.c_str(), ok ? "true" : "false");
                             resp = ok ? "ok\n" : "err import apply failed\n";
                         }
                     }
