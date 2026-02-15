@@ -133,6 +133,14 @@ Link checkboxes to their GitHub issue when one exists:
 | Spike | GitHub issue state | `spkNN-*.md` findings section |
 | Task | GitHub issue checklist | Story brief task list |
 
+### Off-Cuff / Side Work Rule
+
+When work appears mid-stream and is not required to close the current story/feature:
+
+1. Create a GitHub `task` issue (implementation) or `spike` issue (investigation).
+2. Add it to the parent epic/feature Status section under a `Non-epic follow-ons` note.
+3. Do not mark parent ACs done based on follow-on progress.
+
 ## Git Conventions
 
 1. **Issue-first.** Every non-trivial change starts as a GitHub issue. Reference the issue number in commits and PR body.

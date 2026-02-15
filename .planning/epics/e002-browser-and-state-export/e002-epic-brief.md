@@ -70,8 +70,8 @@ Stories are numbered globally within this epic (s01-s99).
 ### F5: Browser Image Rendering to ANSI
 
 - [x] **S15:** ANSI image rendering specification (modes, backend contract, limits, test plan) (#32)
-- [ ] **S16:** Backend adapter + cache implementation for ANSI image blocks
-- [ ] **S17:** Browser/TUI/API/MCP integration for image modes and gallery behavior
+- [x] **S16:** Backend adapter + cache implementation for ANSI image blocks
+- [~] **S17:** Browser/TUI/API/MCP integration for image modes and gallery behavior
 
 ## Milestone Plan
 
@@ -271,8 +271,11 @@ GitHub issue: #16
 PR: #23, #28, #30
 
 Open blockers:
-- F5/S16 contract suite currently failing on branch (`tests/contract/test_browser_image_backend.py`)
 - F5/S17 gallery anchor-sync/focus behavior not yet fully asserted (AC-2)
+
+Non-epic follow-ons (canon: `task` for implementation, `spike` for investigation):
+- Task: #35 — browser copy API route (`POST /browser/{window_id}/copy`)
+- Task: #33 — screenshot reliability fix for active Turbo Vision frame capture
 
 ## Symbient Tag
 
