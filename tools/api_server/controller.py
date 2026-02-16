@@ -705,6 +705,8 @@ class Controller:
             "timestamp": started.isoformat(),
             "canvas": {"w": self._state.canvas_width, "h": self._state.canvas_height},
             "pattern_mode": self._state.pattern_mode,
+            "theme_mode": self._state.theme_mode,
+            "theme_variant": self._state.theme_variant,
             "windows": [
                 {
                     "id": w.id,
@@ -732,6 +734,8 @@ class Controller:
                 pass
 
         self._state.pattern_mode = payload.get("pattern_mode", self._state.pattern_mode)
+        self._state.theme_mode = payload.get("theme_mode", self._state.theme_mode)
+        self._state.theme_variant = payload.get("theme_variant", self._state.theme_variant)
         canvas = payload.get("canvas", {})
         self._state.canvas_width = int(canvas.get("w", self._state.canvas_width))
         self._state.canvas_height = int(canvas.get("h", self._state.canvas_height))

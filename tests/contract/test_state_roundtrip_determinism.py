@@ -26,6 +26,8 @@ def test_export_import_roundtrip_is_deterministic(monkeypatch, tmp_path: Path) -
         await src.create_window(WindowType.test_pattern, "A", Rect(1, 1, 20, 8), {})
         await src.create_window(WindowType.text_editor, "B", Rect(5, 2, 30, 10), {})
         src._state.pattern_mode = "tiled"
+        src._state.theme_mode = "dark"
+        src._state.theme_variant = "dark_pastel"
 
         p1 = tmp_path / "snap1.json"
         p2 = tmp_path / "snap2.json"
@@ -42,3 +44,5 @@ def test_export_import_roundtrip_is_deterministic(monkeypatch, tmp_path: Path) -
 
     a, b = asyncio.run(_run())
     assert a == b
+    assert a["theme_mode"] == "dark"
+    assert a["theme_variant"] == "dark_pastel"
