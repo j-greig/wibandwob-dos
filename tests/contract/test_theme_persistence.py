@@ -13,7 +13,7 @@ def test_workspace_includes_theme_in_globals() -> None:
     source = Path("app/test_pattern_app.cpp").read_text(encoding="utf-8")
 
     # Verify theme fields are added to globals
-    assert '"globals"' in source
+    assert '\\"globals\\"' in source
     assert 'themeMode' in source
     assert 'themeVariant' in source
 

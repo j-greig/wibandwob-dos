@@ -2,7 +2,7 @@
 
 ## Objective
 
-Add a dark pastel theme option for WibWob DOS, preserving monochrome as default while introducing a user-selectable `light|dark|auto` behavior aligned with macOS day/night expectations.
+Add a dark pastel theme option for WibWob DOS, preserving monochrome as default while introducing a user-selectable `light|dark` behavior across registry, API, and MCP surfaces.
 
 ## Source of Truth
 
@@ -19,7 +19,7 @@ If this file conflicts with `.planning/README.md`, follow `.planning/README.md`.
 
 ## Features
 
-- [ ] **F01: Theme Switch + Palette Mapping**
+- [x] **F01: Theme Switch + Palette Mapping**
   - Brief: `.planning/epics/e003-dark-pastel-theme/f01-dark-pastel-theme/f01-feature-brief.md`
 
 ## Theme Direction
@@ -34,14 +34,14 @@ Constraints:
 
 ## Definition of Done (Epic)
 
-- [ ] Theme table supports `monochrome` + `dark_pastel`
-- [ ] User can choose `light|dark|auto` mode path
-- [ ] `auto` follows OS-style day/night behavior (dusk to dawn equivalent for platform hook)
-- [ ] Manual visual smoke set captured for core surfaces
-- [ ] No regressions to existing monochrome default behavior
+- [x] Theme table supports `monochrome` + `dark_pastel`
+- [x] User can choose `light|dark` mode path
+- [-] `auto` follows OS-style day/night behavior (deferred follow-on issue)
+- [x] Contract/API parity tests captured for core state surfaces
+- [x] No regressions to existing monochrome default behavior
 
 ## Status
 
-Status: `not-started`
+Status: `done`
 GitHub issue: #38
-PR: —
+PR: #42

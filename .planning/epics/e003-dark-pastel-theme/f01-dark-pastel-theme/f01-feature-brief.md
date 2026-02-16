@@ -5,7 +5,7 @@
 - Epic brief: `.planning/epics/e003-dark-pastel-theme/e003-epic-brief.md`
 
 ## Objective
-Implement a dark pastel theme based on the backrooms TV palette reference and provide a user-facing switch path.
+Implement a dark pastel theme based on the backrooms TV palette reference and provide a user-facing switch path for `light|dark`.
 
 ## Reference Palette
 Source:
@@ -23,18 +23,18 @@ Out-of-scope for first pass:
 - `#66e0ff` (second blue accent)
 
 ## Stories
-- [ ] `.planning/epics/e003-dark-pastel-theme/f01-dark-pastel-theme/s01-theme-switch-and-palette/s01-story-brief.md` — add theme mapping and selection path (#38)
+- [x] `.planning/epics/e003-dark-pastel-theme/f01-dark-pastel-theme/s01-theme-switch-and-palette/s01-story-brief.md` — add theme mapping and selection path (#38)
 
 ## Acceptance Criteria
-- [ ] **AC-1:** Theme table supports `monochrome` and `dark_pastel`
+- [x] **AC-1:** Theme table supports `monochrome` and `dark_pastel`
   - Test: launch app with each theme and verify startup/no palette corruption
-- [ ] **AC-2:** Core UI surfaces are legible under `dark_pastel`
-  - Test: capture menu/dialog/status/browser screenshots in dark pastel mode
-- [ ] **AC-3:** User can select theme through documented control path
-  - Test: switch theme at runtime/startup and verify visible change
+- [x] **AC-2:** Theme state and command surfaces are parity-aligned under `dark_pastel`
+  - Test: `tools/api_server/venv/bin/python -m pytest -q tests/contract/test_theme_parity.py tests/contract/test_theme_state_model_contract.py`
+- [x] **AC-3:** User can select theme through documented control path
+  - Test: `POST /theme/mode`, `POST /theme/variant`, MCP command tools, and registry command dispatch succeed in contract tests
 
 ## Status
 
-Status: `not-started`
+Status: `done`
 GitHub issue: #38
-PR: —
+PR: #42

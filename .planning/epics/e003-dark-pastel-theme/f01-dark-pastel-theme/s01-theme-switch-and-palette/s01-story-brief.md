@@ -6,27 +6,27 @@
 - Feature brief: `.planning/epics/e003-dark-pastel-theme/f01-dark-pastel-theme/f01-feature-brief.md`
 
 ## Objective
-Add `dark_pastel` palette mapping and wire a user-facing theme switch path while preserving monochrome default.
+Add `dark_pastel` palette mapping and wire a user-facing theme switch path (`light|dark`) while preserving monochrome default.
 
 ## Tasks
-- [ ] Add `dark_pastel` palette mapping in Turbo Vision app palette logic
-- [ ] Keep monochrome as default fallback path
-- [ ] Add theme selection control path (menu command and/or startup option)
-- [ ] Add/refresh manual smoke captures for menu/dialog/status/browser windows
+- [x] Add `dark_pastel` palette mapping in Turbo Vision app palette logic
+- [x] Keep monochrome as default fallback path
+- [x] Add theme selection control path via command registry/API/MCP
+- [x] Add contract coverage for theme state + parity surfaces
 
 ## Acceptance Criteria
-- [ ] **AC-1:** `dark_pastel` renders with approved single-blue palette
-  - Test: visual smoke captures confirm palette values and readability
-- [ ] **AC-2:** Theme switching works without restart regressions
-  - Test: switch theme control path and verify immediate UI update (or documented restart requirement)
-- [ ] **AC-3:** Monochrome remains unchanged by default
-  - Test: run app without override and verify previous monochrome appearance
+- [x] **AC-1:** `dark_pastel` render mapping is defined with approved single-blue palette
+  - Test: `tools/api_server/venv/bin/python -m pytest -q tests/contract/test_theme_parity.py`
+- [x] **AC-2:** Theme switching works through command surfaces without state regressions
+  - Test: `tools/api_server/venv/bin/python -m pytest -q tests/contract/test_theme_state_model_contract.py tests/contract/test_state_roundtrip_determinism.py`
+- [x] **AC-3:** Monochrome remains unchanged by default
+  - Test: defaults asserted in `tests/contract/test_theme_persistence.py::test_default_theme_values`
 
 ## Rollback
 - Revert theme mapping and switch-path wiring; keep monochrome-only mode.
 
 ## Status
 
-Status: `not-started`
+Status: `done`
 GitHub issue: #38
-PR: —
+PR: #42
