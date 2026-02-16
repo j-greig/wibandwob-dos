@@ -41,9 +41,11 @@ MAX_RENDER_WIDTH_CELLS = 120
 PER_IMAGE_RENDER_TIMEOUT_MS = 3000
 TOTAL_IMAGE_RENDER_BUDGET_MS = 10000
 MAX_TUI_TEXT_CHARS = 250000
-PIPELINE_CACHE_VERSION = "v8"
+PIPELINE_CACHE_VERSION = "v9"
 IMAGE_WIDTH_RATIO = 0.5
 MAX_IMAGE_HEIGHT_CELLS = 34
+KEY_INLINE_MAX_IMAGES = 4
+MAX_IMAGE_SECTION_CHARS = 90000
 
 
 def _debug_log(event: str, data: Dict[str, Any]) -> None:
@@ -306,8 +308,8 @@ def _select_assets(assets: List[Dict[str, Any]], mode: str) -> List[int]:
         # render all assets inline for visibility.
         return list(range(len(assets)))
     if mode == "key-inline":
-        # Current UX preference: render all discovered images inline.
-        return list(range(len(assets)))
+        # Hero + first few meaningful images.
+        return list(range(min(KEY_INLINE_MAX_IMAGES, len(assets))))
     return []
 
 
@@ -475,23 +477,37 @@ def render_markdown(
     if images != "none":
         suffix += f"\n\n[images mode={images}]"
 
+    image_section = ""
     if assets:
-        suffix += "\n\n"
+        image_section += "\n\n"
         if images == "gallery":
-            suffix += f"[gallery assets={len(assets)}]\n"
+            image_section += f"[gallery assets={len(assets)}]\n"
+        dropped = 0
+        used = 0
         for asset in assets:
             alt = str(asset.get("alt") or asset.get("source_url", ""))
             status = str(asset.get("status", "skipped"))
+            chunk = ""
             if status == "ready" and asset.get("ansi_block"):
-                suffix += f"\n[image:{alt}]\n{asset['ansi_block']}\n"
+                chunk = f"\n[image:{alt}]\n{asset['ansi_block']}\n"
             elif status in ("failed", "deferred"):
                 reason = str(asset.get("render_error", "")).strip()
                 if reason:
-                    suffix += f"\n[image:{alt}] ({status}: {reason})\n"
+                    chunk = f"\n[image:{alt}] ({status}: {reason})\n"
                 else:
-                    suffix += f"\n[image:{alt}] ({status})\n"
+                    chunk = f"\n[image:{alt}] ({status})\n"
             elif images == "gallery" and status == "skipped":
-                suffix += f"\n[image:{alt}] ({status})\n"
+                chunk = f"\n[image:{alt}] ({status})\n"
+            if not chunk:
+                continue
+            if used + len(chunk) > MAX_IMAGE_SECTION_CHARS:
+                dropped += 1
+                continue
+            image_section += chunk
+            used += len(chunk)
+        if dropped > 0:
+            image_section += f"\n[images truncated: {dropped} more]\n"
+    suffix += image_section
 
     available = MAX_TUI_TEXT_CHARS - len(suffix)
     if available <= 0:
