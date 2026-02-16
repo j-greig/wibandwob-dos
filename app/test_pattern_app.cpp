@@ -1592,7 +1592,8 @@ void TTestPatternApp::setPatternMode(bool continuous)
 void TTestPatternApp::takeScreenshot(bool showDialog)
 {
     // Create screenshots directory if it doesn't exist.
-    mkdir("screenshots", 0755);
+    mkdir("logs", 0755);
+    mkdir("logs/screenshots", 0755);
 
     // Generate timestamp for filenames.
     time_t rawtime;
@@ -1603,7 +1604,7 @@ void TTestPatternApp::takeScreenshot(bool showDialog)
     strftime(timestamp, sizeof(timestamp), "%Y%m%d_%H%M%S", timeinfo);
 
     // 1) Authoritative in-process capture from Turbo Vision screen buffer.
-    std::string base = std::string("screenshots/tui_") + timestamp;
+    std::string base = std::string("logs/screenshots/tui_") + timestamp;
     std::string txtPath = base + ".txt";
     std::string ansiPath = base + ".ans";
     auto frame = getFrameCapture().captureScreen();
