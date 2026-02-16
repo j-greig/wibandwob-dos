@@ -365,6 +365,11 @@ void TBrowserWindow::handleEvent(TEvent& event) {
                         }
                         clearEvent(event);
                         break;
+                    case 'i':
+                    case 'I':
+                        cycleImageMode();
+                        clearEvent(event);
+                        break;
                     case 'y':
                     case 'Y':
                         copyPageToClipboard();
@@ -392,7 +397,7 @@ void TBrowserWindow::draw() {
 void TBrowserWindow::drawUrlBar() {
     TDrawBuffer buf;
     TColorAttr urlColor = getColor(1);
-    TColorAttr labelColor = getColor(2);
+    TColorAttr labelColor = getColor(1);
 
     int w = size.x - 2;  // Interior width (minus frame)
     if (w <= 0) return;
@@ -414,7 +419,7 @@ void TBrowserWindow::drawUrlBar() {
 
 void TBrowserWindow::drawStatusBar() {
     TDrawBuffer buf;
-    TColorAttr statusColor = getColor(2);
+    TColorAttr statusColor = getColor(1);
 
     int w = size.x - 2;
     int y = size.y - 3;  // Two rows from bottom (inside frame)
@@ -438,6 +443,7 @@ void TBrowserWindow::drawStatusBar() {
             break;
     }
 
+    status += "  [images:" + imageMode + "]";
     if (static_cast<int>(status.size()) > w - 1) {
         status = status.substr(0, w - 4) + "...";
     }
@@ -448,14 +454,14 @@ void TBrowserWindow::drawStatusBar() {
 
 void TBrowserWindow::drawKeyHints() {
     TDrawBuffer buf;
-    TColorAttr hintColor = getColor(2);
+    TColorAttr hintColor = getColor(1);
 
     int w = size.x - 2;
     int y = size.y - 2;  // Bottom row inside frame
     if (w <= 0 || y < 0) return;
 
     buf.moveChar(0, ' ', hintColor, w);
-    buf.moveStr(1, "g:Go  b:Back  f:Fwd  r:Refresh  y:Copy  PgUp/PgDn:Scroll  Esc:Close", hintColor);
+    buf.moveStr(1, "g:Go  b:Back  f:Fwd  r:Refresh  i:Images  y:Copy  PgUp/PgDn:Scroll  Esc:Close", hintColor);
 
     writeLine(1, y, w, 1, buf);
 }
@@ -544,9 +550,17 @@ void TBrowserWindow::startFetch(const std::string& url) {
         pos += 4;
     }
 
-    std::string cmd = "curl -s -X POST http://127.0.0.1:8089/browser/fetch "
+    int targetWidth = 80;
+    if (contentView && contentView->size.x > 0)
+        targetWidth = std::max(20, (int)contentView->size.x);
+
+    std::string cmd = "curl -s -X POST http://127.0.0.1:8089/browser/fetch_ext "
                       "-H 'Content-Type: application/json' "
-                      "-d '{\"url\":\"" + escapedUrl + "\"}' 2>/dev/null";
+                      "-d '{\"url\":\"" + escapedUrl + "\","
+                      "\"reader\":\"trafilatura\","
+                      "\"format\":\"tui_bundle\","
+                      "\"images\":\"" + imageMode + "\","
+                      "\"width\":" + std::to_string(targetWidth) + "}' 2>/dev/null";
 
     fetchPipe = popen(cmd.c_str(), "r");
     if (!fetchPipe) {
@@ -707,6 +721,26 @@ void TBrowserWindow::navigateForward() {
     errorMessage.clear();
     if (contentView) contentView->clear();
     startFetch(currentUrl);
+    drawView();
+}
+
+void TBrowserWindow::cycleImageMode() {
+    if (imageMode == "none")
+        imageMode = "key-inline";
+    else if (imageMode == "key-inline")
+        imageMode = "all-inline";
+    else if (imageMode == "all-inline")
+        imageMode = "gallery";
+    else
+        imageMode = "none";
+
+    if (!currentUrl.empty()) {
+        fetchState = Fetching;
+        pageTitle.clear();
+        errorMessage.clear();
+        if (contentView) contentView->clear();
+        startFetch(currentUrl);
+    }
     drawView();
 }
 

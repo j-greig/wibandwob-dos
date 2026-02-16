@@ -82,6 +82,7 @@ public:
     // Accessors
     const std::string& getCurrentUrl() const { return currentUrl; }
     FetchState getState() const { return fetchState; }
+    const std::string& getImageMode() const { return imageMode; }
 
 private:
     static TFrame* initFrame(TRect r);
@@ -117,6 +118,7 @@ private:
 
     // URL input dialog
     void promptForUrl();
+    void cycleImageMode();
 
     // JSON parsing (reuses extractJsonStringField pattern)
     static std::string extractJsonStringField(const std::string& json, const std::string& key);
@@ -129,7 +131,8 @@ private:
     void drawKeyHints();
     void copyPageToClipboard();
 
-    // Cached source markdown + extracted image source URLs for clipboard copy.
+    // Render mode + cached source markdown/image URLs for clipboard copy.
+    std::string imageMode {"key-inline"};
     std::string latestMarkdown;
     std::vector<std::string> latestImageUrls;
 };

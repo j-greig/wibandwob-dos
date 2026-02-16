@@ -213,6 +213,12 @@ class BrowserClipReq(BaseModel):
     include_images: bool = False
 
 
+class BrowserCopyReq(BaseModel):
+    format: Literal["plain", "markdown", "tui"] = "plain"
+    include_image_urls: bool = False
+    image_url_mode: Literal["full"] = "full"
+
+
 # ----- Batch Layout Models -----
 
 class ScheduleModel(BaseModel):
