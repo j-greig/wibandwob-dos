@@ -556,7 +556,7 @@ void TBrowserWindow::draw() {
 void TBrowserWindow::drawUrlBar() {
     TDrawBuffer buf;
     TColorAttr urlColor = getColor(1);
-    TColorAttr labelColor = getColor(2);
+    TColorAttr labelColor = getColor(1);
 
     int w = size.x - 2;  // Interior width (minus frame)
     if (w <= 0) return;
@@ -578,7 +578,7 @@ void TBrowserWindow::drawUrlBar() {
 
 void TBrowserWindow::drawStatusBar() {
     TDrawBuffer buf;
-    TColorAttr statusColor = getColor(2);
+    TColorAttr statusColor = getColor(1);
 
     int w = size.x - 2;
     int y = size.y - 3;  // Two rows from bottom (inside frame)
@@ -613,7 +613,7 @@ void TBrowserWindow::drawStatusBar() {
 
 void TBrowserWindow::drawKeyHints() {
     TDrawBuffer buf;
-    TColorAttr hintColor = getColor(2);
+    TColorAttr hintColor = getColor(1);
 
     int w = size.x - 2;
     int y = size.y - 2;  // Bottom row inside frame

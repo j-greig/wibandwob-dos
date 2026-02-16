@@ -469,30 +469,36 @@ def render_markdown(
     rendered = markdown
     if headings != "plain":
         rendered = rendered.replace("# ", "[H1] ").replace("## ", "[H2] ").replace("### ", "[H3] ")
-    rendered = _normalize_markdown(rendered)
+    body = _normalize_markdown(rendered)
 
+    suffix = ""
     if images != "none":
-        rendered += f"\n\n[images mode={images}]"
+        suffix += f"\n\n[images mode={images}]"
 
     if assets:
-        rendered += "\n\n"
+        suffix += "\n\n"
         if images == "gallery":
-            rendered += f"[gallery assets={len(assets)}]\n"
+            suffix += f"[gallery assets={len(assets)}]\n"
         for asset in assets:
             alt = str(asset.get("alt") or asset.get("source_url", ""))
             status = str(asset.get("status", "skipped"))
             if status == "ready" and asset.get("ansi_block"):
-                rendered += f"\n[image:{alt}]\n{asset['ansi_block']}\n"
+                suffix += f"\n[image:{alt}]\n{asset['ansi_block']}\n"
             elif status in ("failed", "deferred"):
                 reason = str(asset.get("render_error", "")).strip()
                 if reason:
-                    rendered += f"\n[image:{alt}] ({status}: {reason})\n"
+                    suffix += f"\n[image:{alt}] ({status}: {reason})\n"
                 else:
-                    rendered += f"\n[image:{alt}] ({status})\n"
+                    suffix += f"\n[image:{alt}] ({status})\n"
             elif images == "gallery" and status == "skipped":
-                rendered += f"\n[image:{alt}] ({status})\n"
+                suffix += f"\n[image:{alt}] ({status})\n"
 
-    return rendered[:MAX_TUI_TEXT_CHARS]
+    available = MAX_TUI_TEXT_CHARS - len(suffix)
+    if available <= 0:
+        return suffix[:MAX_TUI_TEXT_CHARS]
+    if len(body) > available:
+        body = body[:available]
+    return body + suffix
 
 
 def _normalize_markdown(markdown: str) -> str:
