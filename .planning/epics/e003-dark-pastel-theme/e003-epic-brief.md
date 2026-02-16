@@ -36,7 +36,7 @@ Constraints:
 
 - [x] Theme table supports `monochrome` + `dark_pastel`
 - [x] User can choose `light|dark` mode path
-- [-] `auto` follows OS-style day/night behavior (deferred follow-on issue)
+- [-] `auto` follows OS-style day/night behavior (deferred follow-on issue as per https://github.com/j-greig/wibandwob-dos/issues/43)
 - [x] Contract/API parity tests captured for core state surfaces
 - [x] No regressions to existing monochrome default behavior
 
