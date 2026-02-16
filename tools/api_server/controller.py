@@ -527,13 +527,13 @@ class Controller:
         except Exception as exc:
             return {"ok": False, "error": "screenshot_ipc_failed", "detail": str(exc)}
 
-        # The app emits tui_<timestamp>.{txt,ans,png}; wait briefly for filesystem visibility.
+        # The app emits tui_<timestamp>.{txt,ans}; wait briefly for filesystem visibility.
         generated: List[Path] = []
         for _ in range(30):
             candidates = sorted(
                 (
                     p for p in shots_dir.glob("tui_*")
-                    if p.suffix in {".txt", ".ans", ".png"}
+                    if p.suffix in {".txt", ".ans"}
                     and p.exists()
                     and p.stat().st_mtime >= (start_ts - 0.2)
                 ),
@@ -553,8 +553,7 @@ class Controller:
                 for p in generated:
                     if p.suffix.lower() == ext.lower():
                         return p
-            # Prefer authoritative in-process captures over best-effort PNG.
-            for preferred in (".txt", ".ans", ".png"):
+            for preferred in (".txt", ".ans"):
                 for p in generated:
                     if p.suffix == preferred:
                         return p
