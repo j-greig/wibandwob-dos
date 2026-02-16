@@ -1610,15 +1610,15 @@ void TTestPatternApp::takeScreenshot(bool showDialog)
     std::string txtPath = base + ".txt";
     std::string ansiPath = base + ".ans";
 
-    auto frame = getFrameCapture().captureFrame();
+    auto frame = getFrameCapture().captureScreen();
 
-    FrameCaptureOptions txtOpts;
-    txtOpts.mode = FrameCaptureMode::ScreenBuffer;
+    CaptureOptions txtOpts;
+    txtOpts.format = CaptureFormat::PlainText;
     txtOpts.includeMetadata = true;
     bool txtOk = getFrameCapture().saveFrame(frame, txtPath, txtOpts);
 
-    FrameCaptureOptions ansiOpts;
-    ansiOpts.mode = FrameCaptureMode::AnsiFull;
+    CaptureOptions ansiOpts;
+    ansiOpts.format = CaptureFormat::AnsiEscapes;
     ansiOpts.includeMetadata = true;
     bool ansiOk = getFrameCapture().saveFrame(frame, ansiPath, ansiOpts);
 

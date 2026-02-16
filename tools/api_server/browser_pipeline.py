@@ -134,7 +134,7 @@ def _html_to_markdown(html: str) -> str:
 def _decode_html_response(resp: Any) -> str:
     content = bytes(resp.content or b"")
     if not content:
-        return ""
+        return str(getattr(resp, "text", ""))
     enc = str(getattr(resp, "encoding", "") or "").strip().lower()
 
     # Many sites send UTF-8 bytes with an ISO-8859-1 fallback header.
@@ -152,6 +152,12 @@ def _decode_html_response(resp: Any) -> str:
         return content.decode("utf-8")
     except Exception:
         return str(getattr(resp, "text", ""))
+
+
+def _is_ssl_error(exc: Exception) -> bool:
+    req_exc = getattr(requests, "exceptions", None)
+    ssl_cls = getattr(req_exc, "SSLError", None) if req_exc is not None else None
+    return bool(ssl_cls and isinstance(exc, ssl_cls))
 
 
 def _extract_markdown_for_reader(html: str, reader: str) -> str:
@@ -514,13 +520,15 @@ def fetch_render_bundle(
             except TypeError:
                 resp = requests.get(url, timeout=30)
             resp.raise_for_status()
-            ctype = str(resp.headers.get("content-type", "")).lower()
+            ctype = str(getattr(resp, "headers", {}).get("content-type", "")).lower()
             if ctype.startswith("image/"):
                 direct_image_mode = True
                 html = ""
             else:
                 html = _decode_html_response(resp)
-        except requests.exceptions.SSLError:
+        except Exception as exc:
+            if not _is_ssl_error(exc):
+                raise
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
                 try:
@@ -528,7 +536,7 @@ def fetch_render_bundle(
                 except TypeError:
                     resp = requests.get(url, timeout=30)
                 resp.raise_for_status()
-                ctype = str(resp.headers.get("content-type", "")).lower()
+                ctype = str(getattr(resp, "headers", {}).get("content-type", "")).lower()
                 if ctype.startswith("image/"):
                     direct_image_mode = True
                     html = ""

@@ -20,6 +20,7 @@
 #define Uses_TStaticText
 #define Uses_TProgram
 #define Uses_TDeskTop
+#define Uses_THardwareInfo
 #include <tvision/tv.h>
 
 #include <cstdio>
@@ -142,6 +143,16 @@ void TBrowserContentView::clear() {
     scrollTo(0, 0);
     setLimit(size.x, 0);
     drawView();
+}
+
+std::string TBrowserContentView::getPlainText() const {
+    std::ostringstream out;
+    for (size_t i = 0; i < sourceLines.size(); ++i) {
+        out << sourceLines[i];
+        if (i + 1 < sourceLines.size())
+            out << '\n';
+    }
+    return out.str();
 }
 
 void TBrowserContentView::scrollToTop() {

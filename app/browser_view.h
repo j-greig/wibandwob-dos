@@ -39,6 +39,7 @@ public:
     // Content management
     void setContent(const std::vector<std::string>& newLines);
     void clear();
+    std::string getPlainText() const;
 
     // Scrolling
     void scrollToTop();
