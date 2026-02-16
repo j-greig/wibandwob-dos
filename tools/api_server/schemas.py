@@ -193,7 +193,7 @@ class BrowserFetchReq(BaseModel):
     url: str
     reader: Literal["readability", "trafilatura", "raw"] = "readability"
     format: Literal["markdown", "tui_bundle"] = "tui_bundle"
-    images: Optional[Literal["none", "key-inline", "all-inline", "gallery"]] = "none"
+    images: Optional[Literal["none", "key-inline", "all-inline", "gallery"]] = "all-inline"
     width: Optional[int] = 80
 
 

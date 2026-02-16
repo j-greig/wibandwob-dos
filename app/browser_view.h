@@ -139,7 +139,7 @@ private:
     void copyPageToClipboard();
 
     // Render mode state
-    std::string imageMode {"key-inline"};
+    std::string imageMode {"all-inline"};
     std::string latestMarkdown;
     std::vector<std::string> latestImageUrls;
 };
