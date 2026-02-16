@@ -2744,3 +2744,22 @@ std::string api_browser_fetch(TTestPatternApp& app, const std::string& url) {
     browserWin->fetchUrl(url);
     return "ok";
 }
+
+std::string api_set_theme_mode(TTestPatternApp& app, const std::string& mode) {
+    (void)app;
+    if (mode != "light" && mode != "dark")
+        return "err invalid theme mode";
+    return "ok";
+}
+
+std::string api_set_theme_variant(TTestPatternApp& app, const std::string& variant) {
+    (void)app;
+    if (variant != "monochrome" && variant != "dark_pastel")
+        return "err invalid theme variant";
+    return "ok";
+}
+
+std::string api_reset_theme(TTestPatternApp& app) {
+    (void)app;
+    return "ok";
+}
