@@ -119,11 +119,18 @@ private:
 
     // JSON parsing (reuses extractJsonStringField pattern)
     static std::string extractJsonStringField(const std::string& json, const std::string& key);
+    static std::vector<std::string> extractJsonStringValues(const std::string& json, const std::string& key);
+    void refreshCopyPayload(const std::string& rawJson);
 
     // Draw helpers
     void drawUrlBar();
     void drawStatusBar();
     void drawKeyHints();
+    void copyPageToClipboard();
+
+    // Cached source markdown + extracted image source URLs for clipboard copy.
+    std::string latestMarkdown;
+    std::vector<std::string> latestImageUrls;
 };
 
 // Factory function
