@@ -339,6 +339,8 @@ def register_tui_tools(mcp):
         return {
             "windows": [serialize_window(w) for w in state.windows],
             "pattern_mode": state.pattern_mode,
+            "theme_mode": state.theme_mode,
+            "theme_variant": state.theme_variant,
             "uptime_sec": state.uptime_sec,
             "last_workspace": state.last_workspace,
             "last_screenshot": state.last_screenshot
