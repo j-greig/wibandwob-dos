@@ -26,8 +26,72 @@
 #include <cstring>
 #include <sstream>
 #include <algorithm>
+#include <set>
 #include <fcntl.h>
 #include <unistd.h>
+
+static std::string trimCopyText(std::string s) {
+    auto isSpace = [] (char c) -> bool {
+        return c == ' ' || c == '\t' || c == '\r' || c == '\n';
+    };
+    while (!s.empty() && isSpace(s.front()))
+        s.erase(s.begin());
+    while (!s.empty() && isSpace(s.back()))
+        s.pop_back();
+    return s;
+}
+
+// Convert markdown links like "[label](url)" (including multiline labels)
+// into a copy-friendly plain form:
+// label
+// url
+static std::string flattenMarkdownLinks(const std::string &in) {
+    std::string out;
+    out.reserve(in.size());
+    size_t i = 0;
+    while (i < in.size()) {
+        if (in[i] != '[') {
+            out.push_back(in[i++]);
+            continue;
+        }
+
+        size_t closeBracket = in.find(']', i + 1);
+        if (closeBracket == std::string::npos) {
+            out.push_back(in[i++]);
+            continue;
+        }
+
+        size_t urlOpen = closeBracket + 1;
+        while (urlOpen < in.size() &&
+               (in[urlOpen] == ' ' || in[urlOpen] == '\t' || in[urlOpen] == '\r' || in[urlOpen] == '\n')) {
+            ++urlOpen;
+        }
+        if (urlOpen >= in.size() || in[urlOpen] != '(') {
+            out.push_back(in[i++]);
+            continue;
+        }
+
+        size_t closeParen = in.find(')', urlOpen + 1);
+        if (closeParen == std::string::npos) {
+            out.push_back(in[i++]);
+            continue;
+        }
+
+        std::string label = trimCopyText(in.substr(i + 1, closeBracket - (i + 1)));
+        std::string url = trimCopyText(in.substr(urlOpen + 1, closeParen - (urlOpen + 1)));
+        if (!label.empty() && !url.empty()) {
+            out += label;
+            out.push_back('\n');
+            out += url;
+        } else if (!label.empty()) {
+            out += label;
+        } else if (!url.empty()) {
+            out += url;
+        }
+        i = closeParen + 1;
+    }
+    return out;
+}
 
 /*---------------------------------------------------------*/
 /*  TBrowserContentView Implementation                     */
@@ -262,6 +326,10 @@ void TBrowserWindow::handleEvent(TEvent& event) {
                 if (contentView) contentView->scrollToTop();
                 clearEvent(event);
                 break;
+            case kbCtrlIns:
+                copyPageToClipboard();
+                clearEvent(event);
+                break;
             default:
                 // Check for character keys
                 char ch = event.keyDown.charScan.charCode;
@@ -286,10 +354,20 @@ void TBrowserWindow::handleEvent(TEvent& event) {
                         }
                         clearEvent(event);
                         break;
+                    case 'y':
+                    case 'Y':
+                        copyPageToClipboard();
+                        clearEvent(event);
+                        break;
                 }
                 break;
         }
         drawView();
+    }
+
+    if (event.what == evCommand && event.message.command == cmCopy) {
+        copyPageToClipboard();
+        clearEvent(event);
     }
 }
 
@@ -366,9 +444,30 @@ void TBrowserWindow::drawKeyHints() {
     if (w <= 0 || y < 0) return;
 
     buf.moveChar(0, ' ', hintColor, w);
-    buf.moveStr(1, "g:Go  b:Back  f:Fwd  r:Refresh  PgUp/PgDn:Scroll  Esc:Close", hintColor);
+    buf.moveStr(1, "g:Go  b:Back  f:Fwd  r:Refresh  y:Copy  PgUp/PgDn:Scroll  Esc:Close", hintColor);
 
     writeLine(1, y, w, 1, buf);
+}
+
+void TBrowserWindow::copyPageToClipboard() {
+    std::string text = latestMarkdown.empty()
+        ? (contentView ? contentView->getPlainText() : std::string())
+        : latestMarkdown;
+    text = flattenMarkdownLinks(text);
+
+    if (!latestImageUrls.empty()) {
+        if (!text.empty() && text.back() != '\n')
+            text.push_back('\n');
+        text += "\nImage URLs:\n";
+        for (const auto &u : latestImageUrls) {
+            text += u;
+            text.push_back('\n');
+        }
+    }
+
+    if (!text.empty()) {
+        THardwareInfo::setClipboardText(TStringView(text.data(), text.size()));
+    }
 }
 
 void TBrowserWindow::promptForUrl() {
@@ -494,10 +593,11 @@ void TBrowserWindow::finishFetch() {
     }
 
     // Parse JSON response — extract markdown and title
-    std::string markdown = extractJsonStringField(fetchBuffer, "tui_text");
-    if (markdown.empty()) {
-        markdown = extractJsonStringField(fetchBuffer, "markdown");
-    }
+    std::string tuiText = extractJsonStringField(fetchBuffer, "tui_text");
+    std::string markdownField = extractJsonStringField(fetchBuffer, "markdown");
+    std::string markdown = tuiText.empty() ? markdownField : tuiText;
+    latestMarkdown = markdownField.empty() ? markdown : markdownField;
+    refreshCopyPayload(fetchBuffer);
     pageTitle = extractJsonStringField(fetchBuffer, "title");
 
     if (markdown.empty() && pageTitle.empty()) {
@@ -683,6 +783,79 @@ std::string TBrowserWindow::extractJsonStringField(const std::string& json, cons
         out.push_back(c);
     }
     return out;
+}
+
+std::vector<std::string> TBrowserWindow::extractJsonStringValues(const std::string& json, const std::string& key) {
+    std::vector<std::string> out;
+    const std::string pattern = "\"" + key + "\":\"";
+    size_t pos = 0;
+    while (true) {
+        pos = json.find(pattern, pos);
+        if (pos == std::string::npos)
+            break;
+        pos += pattern.size();
+        std::string value;
+        bool escape = false;
+        size_t i = pos;
+        for (; i < json.size(); ++i) {
+            char c = json[i];
+            if (escape) {
+                switch (c) {
+                    case '\\': value.push_back('\\'); break;
+                    case '"':  value.push_back('"'); break;
+                    case '/':  value.push_back('/'); break;
+                    case 'n':  value.push_back('\n'); break;
+                    case 'r':  value.push_back('\r'); break;
+                    case 't':  value.push_back('\t'); break;
+                    case 'u': {
+                        if (i + 4 < json.size()) {
+                            uint16_t hi = parseHex4(json, i + 1);
+                            i += 4;
+                            if (hi >= 0xD800 && hi <= 0xDBFF && i + 2 < json.size()
+                                && json[i + 1] == '\\' && json[i + 2] == 'u' && i + 6 < json.size()) {
+                                uint16_t lo = parseHex4(json, i + 3);
+                                if (lo >= 0xDC00 && lo <= 0xDFFF) {
+                                    uint32_t cp = 0x10000 + ((uint32_t)(hi - 0xD800) << 10) + (lo - 0xDC00);
+                                    appendUtf8(value, cp);
+                                    i += 6;
+                                } else {
+                                    appendUtf8(value, hi);
+                                }
+                            } else {
+                                appendUtf8(value, hi);
+                            }
+                        }
+                        break;
+                    }
+                    default: value.push_back(c); break;
+                }
+                escape = false;
+                continue;
+            }
+            if (c == '\\') {
+                escape = true;
+                continue;
+            }
+            if (c == '"')
+                break;
+            value.push_back(c);
+        }
+        if (!value.empty())
+            out.push_back(value);
+        pos = i + 1;
+    }
+    return out;
+}
+
+void TBrowserWindow::refreshCopyPayload(const std::string& rawJson) {
+    latestImageUrls.clear();
+    std::set<std::string> seen;
+    for (const auto &url : extractJsonStringValues(rawJson, "source_url")) {
+        if (url.empty())
+            continue;
+        if (seen.insert(url).second)
+            latestImageUrls.push_back(url);
+    }
 }
 
 // Factory function
