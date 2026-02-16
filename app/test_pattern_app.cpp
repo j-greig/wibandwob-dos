@@ -1591,7 +1591,7 @@ void TTestPatternApp::setPatternMode(bool continuous)
 
 void TTestPatternApp::takeScreenshot(bool showDialog)
 {
-    // Create screenshots directory if it doesn't exist.
+    // Create logs/screenshots/ directory if it doesn't exist.
     mkdir("logs", 0755);
     mkdir("logs/screenshots", 0755);
 

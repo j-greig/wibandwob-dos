@@ -73,9 +73,9 @@ For any changed `*-brief.md` files (via `git diff --name-only`):
 curl -sf -X POST http://127.0.0.1:8089/screenshot
 ```
 Produces three files per capture:
-- `screenshots/tui_{timestamp}.png` — visual review
-- `screenshots/tui_{timestamp}.txt` — plain text
-- `screenshots/tui_{timestamp}.ans` — ANSI color
+- `logs/screenshots/tui_{timestamp}.png` — visual review
+- `logs/screenshots/tui_{timestamp}.txt` — plain text
+- `logs/screenshots/tui_{timestamp}.ans` — ANSI color
 
 Read `.txt` for quick verification. Show `.png` path for visual review.
 
@@ -101,7 +101,7 @@ PLANNING (strict only)
   briefs:    OK / [list issues]
 
 SCREENSHOT
-  latest:    screenshots/tui_YYYYMMDD_HHMMSS.png
+  latest:    logs/screenshots/tui_YYYYMMDD_HHMMSS.png
 ```
 
 Each failed stage includes:
@@ -113,6 +113,6 @@ Each failed stage includes:
 - Build: `./build`
 - Binary: `./build/app/test_pattern`
 - API: `./start_api_server.sh` (port 8089)
-- Screenshots: `./screenshots/`
+- Screenshots: `./logs/screenshots/`
 - Debug: `./build/app/test_pattern 2> /tmp/wibwob_debug.log`
 - Socket: `/tmp/test_pattern_app.sock`

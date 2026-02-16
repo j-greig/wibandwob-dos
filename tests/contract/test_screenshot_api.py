@@ -17,7 +17,7 @@ from fastapi.testclient import TestClient
 
 
 def _write_fake_capture(root: Path, suffix: str = ".txt") -> Path:
-    shots = root / "screenshots"
+    shots = root / "logs" / "screenshots"
     shots.mkdir(parents=True, exist_ok=True)
     ts = time.strftime("%Y%m%d_%H%M%S", time.localtime())
     p = shots / f"tui_{ts}{suffix}"

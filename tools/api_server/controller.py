@@ -517,7 +517,7 @@ class Controller:
     async def screenshot(self, path: Optional[str]) -> Dict[str, Any]:
         """Capture screenshot via canonical app command path and verify output exists."""
         start_ts = time.time()
-        shots_dir = self._repo_root / "screenshots"
+        shots_dir = self._repo_root / "logs" / "screenshots"
         shots_dir.mkdir(parents=True, exist_ok=True)
 
         try:
