@@ -14,6 +14,8 @@ def test_snapshot_schema_validates_example() -> None:
         "timestamp": "2026-02-15T04:12:00Z",
         "canvas": {"w": 120, "h": 36},
         "pattern_mode": "continuous",
+        "theme_mode": "light",
+        "theme_variant": "monochrome",
         "windows": [
             {
                 "id": "w1",

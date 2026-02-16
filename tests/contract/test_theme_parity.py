@@ -113,8 +113,8 @@ def test_theme_in_get_state() -> None:
     source = Path("app/test_pattern_app.cpp").read_text(encoding="utf-8")
 
     # Check JSON construction includes theme fields
-    assert '"theme_mode"' in source
-    assert '"theme_variant"' in source
+    assert '\\"theme_mode\\"' in source
+    assert '\\"theme_variant\\"' in source
 
 
 def test_theme_in_workspace_persistence() -> None:
