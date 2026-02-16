@@ -129,11 +129,18 @@ Content packs in `modules/` (public, shipped) and `modules-private/` (user conte
 
 ## Dependencies
 
+### Build
 - **Turbo Vision**: Git submodule at `vendor/tvision` (fork of magiblot/tvision, C++14 TUI framework)
 - **ncurses/ncursesw**: Terminal backend
 - **CMake 3.10+**: Build system
-- **Python 3.x + FastAPI stack**: API server (`tools/api_server/`)
+
+### Runtime
+- **Python 3.x + FastAPI stack**: API server (`tools/api_server/`), auto-creates venv via `start_api_server.sh`
 - **Node.js**: Claude SDK bridge (`app/llm/sdk_bridge/`)
+
+### System tools (macOS: `brew install`)
+- **chafa**: ANSI image rendering for browser view (`brew install chafa`) — required for `images:all-inline`/`key-inline`/`gallery` modes
+- **curl**: Used by TUI browser to call API server (pre-installed on macOS/Linux)
 
 ## Dual Claude Instance Architecture
 

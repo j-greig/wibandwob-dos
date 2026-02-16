@@ -205,6 +205,19 @@ Read more: [Symbients, Not Software](https://wibandwob.com/2025/05/21/symbients-
 
 Requires: C++14, CMake 3.5+, ncursesw. Full 24-bit RGB colour, Unicode throughout.
 
+### System Dependencies
+
+```bash
+# macOS
+brew install cmake chafa
+
+# Linux (Debian/Ubuntu)
+sudo apt install cmake libncursesw5-dev chafa
+```
+
+- **chafa** — converts images to ANSI art for the browser view's inline image modes
+- Python deps for the API server are auto-installed by `./start_api_server.sh`
+
 ---
 
 ## Credits
