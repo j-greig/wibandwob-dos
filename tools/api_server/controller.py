@@ -618,7 +618,7 @@ class Controller:
                 Rect(2, 1, 100, 30),
                 {},
             )
-        image_mode = str(win.props.get("image_mode", "none"))
+        image_mode = str(win.props.get("image_mode", "key-inline"))
         render_mode = str(win.props.get("render_mode", "plain"))
         bundle = fetch_render_bundle(url, width=win.rect.w, image_mode=image_mode)
         win.title = str(bundle.get("title", "Browser"))
