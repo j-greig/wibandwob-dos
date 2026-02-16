@@ -473,17 +473,24 @@ def render_markdown(
         rendered = rendered.replace("# ", "[H1] ").replace("## ", "[H2] ").replace("### ", "[H3] ")
     body = _normalize_markdown(rendered)
 
-    suffix = ""
-    if images != "none":
-        suffix += f"\n\n[images mode={images}]"
+    if images == "none":
+        return body[:MAX_TUI_TEXT_CHARS]
 
-    image_section = ""
+    # Keep body text visible in image modes; fill remaining budget with image blocks.
+    target_body = min(len(body), max(50000, int(MAX_TUI_TEXT_CHARS * 0.6)))
+    max_suffix_budget = max(0, MAX_TUI_TEXT_CHARS - target_body)
+
+    suffix = f"\n\n[images mode={images}]"
     if assets:
-        image_section += "\n\n"
+        suffix += "\n\n"
         if images == "gallery":
-            image_section += f"[gallery assets={len(assets)}]\n"
+            suffix += f"[gallery assets={len(assets)}]\n"
+
         dropped = 0
         used = 0
+        # Remaining budget for image chunks after suffix header.
+        image_budget = max(0, min(MAX_IMAGE_SECTION_CHARS, max_suffix_budget - len(suffix)))
+
         for asset in assets:
             alt = str(asset.get("alt") or asset.get("source_url", ""))
             status = str(asset.get("status", "skipped"))
@@ -500,20 +507,21 @@ def render_markdown(
                 chunk = f"\n[image:{alt}] ({status})\n"
             if not chunk:
                 continue
-            if used + len(chunk) > MAX_IMAGE_SECTION_CHARS:
+            if used + len(chunk) > image_budget:
                 dropped += 1
                 continue
-            image_section += chunk
+            suffix += chunk
             used += len(chunk)
         if dropped > 0:
-            image_section += f"\n[images truncated: {dropped} more]\n"
-    suffix += image_section
+            suffix += f"\n[images truncated: {dropped} more]\n"
 
-    available = MAX_TUI_TEXT_CHARS - len(suffix)
-    if available <= 0:
-        return suffix[:MAX_TUI_TEXT_CHARS]
-    if len(body) > available:
-        body = body[:available]
+    # Final safety: if suffix still too large, clamp it and preserve leading body.
+    if len(suffix) > max_suffix_budget:
+        suffix = suffix[:max_suffix_budget]
+
+    available_for_body = max(0, MAX_TUI_TEXT_CHARS - len(suffix))
+    if len(body) > available_for_body:
+        body = body[:available_for_body]
     return body + suffix
 
 
