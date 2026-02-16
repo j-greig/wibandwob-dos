@@ -20,6 +20,7 @@
 #define Uses_TStaticText
 #define Uses_TProgram
 #define Uses_TDeskTop
+#define Uses_THardwareInfo
 #include <tvision/tv.h>
 
 #include <cstdio>
@@ -142,6 +143,16 @@ void TBrowserContentView::clear() {
     scrollTo(0, 0);
     setLimit(size.x, 0);
     drawView();
+}
+
+std::string TBrowserContentView::getPlainText() const {
+    std::ostringstream out;
+    for (size_t i = 0; i < sourceLines.size(); ++i) {
+        out << sourceLines[i];
+        if (i + 1 < sourceLines.size())
+            out << '\n';
+    }
+    return out.str();
 }
 
 void TBrowserContentView::scrollToTop() {
@@ -518,6 +529,7 @@ void TBrowserWindow::fetchUrl(const std::string& url) {
     fetchState = Fetching;
     pageTitle.clear();
     errorMessage.clear();
+    if (contentView) contentView->clear();
     startFetch(url);
     drawView();
 }
@@ -587,6 +599,7 @@ void TBrowserWindow::finishFetch() {
         if (status != 0 || fetchBuffer.empty()) {
             fetchState = Error;
             errorMessage = "Fetch failed (API server running?)";
+            if (contentView) contentView->clear();
             drawView();
             return;
         }
@@ -610,6 +623,7 @@ void TBrowserWindow::finishFetch() {
             fetchState = Error;
             errorMessage = "Empty response from API";
         }
+        if (contentView) contentView->clear();
         drawView();
         return;
     }
@@ -679,6 +693,7 @@ void TBrowserWindow::navigateBack() {
     fetchState = Fetching;
     pageTitle.clear();
     errorMessage.clear();
+    if (contentView) contentView->clear();
     startFetch(currentUrl);
     drawView();
 }
@@ -690,6 +705,7 @@ void TBrowserWindow::navigateForward() {
     fetchState = Fetching;
     pageTitle.clear();
     errorMessage.clear();
+    if (contentView) contentView->clear();
     startFetch(currentUrl);
     drawView();
 }

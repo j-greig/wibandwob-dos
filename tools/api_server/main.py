@@ -600,9 +600,7 @@ def make_app() -> FastAPI:
     async def browser_fetch(payload: BrowserFetchRequest) -> RenderBundle:
         """Fetch a URL, extract readable content, return RenderBundle."""
         try:
-            bundle = await asyncio.get_event_loop().run_in_executor(
-                None, fetch_and_convert, payload.url
-            )
+            bundle = await asyncio.to_thread(fetch_and_convert, payload.url)
         except Exception as e:
             raise HTTPException(status_code=502, detail=str(e))
         browser_session.navigate(bundle)
