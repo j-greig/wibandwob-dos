@@ -82,6 +82,8 @@ def make_app() -> FastAPI:
         st = asyncio.get_event_loop().run_until_complete(ctl.get_state())
         return AppStateModel(
             pattern_mode=st.pattern_mode,
+            theme_mode=st.theme_mode,
+            theme_variant=st.theme_variant,
             windows=[
                 WindowState(
                     id=w.id,
@@ -120,6 +122,8 @@ def make_app() -> FastAPI:
         st = await ctl.get_state()
         return AppStateModel(
             pattern_mode=st.pattern_mode,
+            theme_mode=st.theme_mode,
+            theme_variant=st.theme_variant,
             windows=[
                 WindowState(
                     id=w.id,
