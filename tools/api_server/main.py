@@ -395,7 +395,13 @@ def make_app() -> FastAPI:
 
     @app.post("/browser/fetch_ext")
     async def browser_fetch_ext(payload: BrowserFetchReq) -> Dict[str, Any]:
-        res = await ctl.browser_fetch(payload.url, payload.reader, payload.format)
+        res = await ctl.browser_fetch(
+            payload.url,
+            payload.reader,
+            payload.format,
+            payload.images or "none",
+            payload.width or 80,
+        )
         if not res.get("ok"):
             raise HTTPException(status_code=400, detail=res.get("error", "browser_fetch_failed"))
         return res

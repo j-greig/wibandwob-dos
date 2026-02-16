@@ -83,9 +83,35 @@ Before ending a coding pass:
 4. Verify commit messages (if committing) follow `type(scope): ...`.
 5. Verify issue lifecycle is synced (`state`, progress comment, PR link, close conditions).
 
+## Closeout Pass (Canon)
+
+When asked to "tidy", "polish", or "close out" an epic/feature, treat it as a canon `closeout pass` task:
+
+1. Reconcile GitHub issue state vs `.planning` mirrors (GitHub is source of truth).
+2. Ensure all newly completed follow-ons are marked done/closed in epic/feature briefs.
+3. Record unresolved blockers explicitly in the epic/feature/story status blocks.
+4. Add or refresh evidence links (test commands, logs, issue comments).
+5. Keep closeout commits scoped to reconciliation/docs/small guardrail fixes only.
+
 ## Codex Execution Defaults for This Repo
 
 1. Prefer smallest vertical slice proving direction.
 2. Keep behavior compatible unless explicitly scoped as breaking.
 3. Add tests for parity/contracts/state sanity when refactoring command surfaces.
 4. Include rollback notes in issue/PR artifacts.
+
+## Turbo Vision ANSI Guardrail
+
+When rendering images or rich terminal output inside Turbo Vision:
+
+1. Never dump raw ANSI escape streams directly into `TDrawBuffer` text.
+2. Always parse ANSI (CSI/SGR) into a cell model first:
+   - cell = glyph + fg + bg
+3. Render the cell model using Turbo Vision-native drawing (`putChar`/`putAttribute`/`moveStr` with mapped attrs).
+4. Treat raw `\x1b[` sequences appearing in UI as a hard failure.
+
+### Prompt Template (use at task start)
+
+Use this exact prompt when starting ANSI/image rendering work:
+
+`Before coding, design the render path from first principles for Turbo Vision: source bytes -> ANSI stream -> parsed cell grid (glyph, fg, bg) -> native TV draw calls. Do not render raw ANSI text. Show the parser/renderer boundaries, cache keys, failure modes, and a test that fails if ESC sequences appear in UI output.`

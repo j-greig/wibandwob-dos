@@ -33,13 +33,22 @@ class TBrowserContentView : public TScroller {
 public:
     TBrowserContentView(const TRect& bounds, TScrollBar* hScroll, TScrollBar* vScroll);
 
+    struct StyledSegment {
+        std::string text;
+        TColorAttr attr;
+    };
+
+    struct StyledLine {
+        std::vector<StyledSegment> segs;
+        int length = 0;
+    };
+
     virtual void draw() override;
     virtual void changeBounds(const TRect& bounds) override;
 
     // Content management
     void setContent(const std::vector<std::string>& newLines);
     void clear();
-    std::string getPlainText() const;
 
     // Scrolling
     void scrollToTop();
@@ -47,14 +56,12 @@ public:
     void scrollLineDown();
     void scrollPageUp();
     void scrollPageDown();
+    std::string getPlainText() const;
 
 private:
-    struct WrappedLine {
-        std::string text;
-    };
 
     std::vector<std::string> sourceLines;
-    std::vector<WrappedLine> wrappedLines;
+    std::vector<StyledLine> styledLines;
 
     void rebuildWrappedLines();
     std::vector<std::string> wrapText(const std::string& text, int width) const;
@@ -131,7 +138,7 @@ private:
     void drawKeyHints();
     void copyPageToClipboard();
 
-    // Render mode + cached source markdown/image URLs for clipboard copy.
+    // Render mode state
     std::string imageMode {"key-inline"};
     std::string latestMarkdown;
     std::vector<std::string> latestImageUrls;

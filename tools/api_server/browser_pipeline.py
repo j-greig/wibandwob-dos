@@ -35,16 +35,15 @@ except Exception:  # pragma: no cover
     trafilatura = None
 
 
-MAX_IMAGE_SOURCE_BYTES = 5 * 1024 * 1024
+MAX_IMAGE_SOURCE_BYTES = 10 * 1024 * 1024
 MAX_IMAGE_DIMENSION = 4096
 MAX_RENDER_WIDTH_CELLS = 120
 PER_IMAGE_RENDER_TIMEOUT_MS = 3000
 TOTAL_IMAGE_RENDER_BUDGET_MS = 10000
 MAX_TUI_TEXT_CHARS = 250000
-PIPELINE_CACHE_VERSION = "v5"
+PIPELINE_CACHE_VERSION = "v8"
 IMAGE_WIDTH_RATIO = 0.5
 MAX_IMAGE_HEIGHT_CELLS = 34
-KEY_INLINE_MAX_IMAGES = 5
 
 
 def _debug_log(event: str, data: Dict[str, Any]) -> None:
@@ -78,7 +77,7 @@ def _needs_image_refresh(bundle: Dict[str, Any], image_mode: str) -> bool:
 
 
 def _cache_key(url: str, reader: str, width: int, image_mode: str) -> str:
-    raw = f"{url}|{reader}|{width}|{image_mode}".encode("utf-8")
+    raw = f"{PIPELINE_CACHE_VERSION}|{url}|{reader}|{width}|{image_mode}".encode("utf-8")
     return hashlib.sha256(raw).hexdigest()
 
 
@@ -134,7 +133,7 @@ def _html_to_markdown(html: str) -> str:
 def _decode_html_response(resp: Any) -> str:
     content = bytes(resp.content or b"")
     if not content:
-        return str(getattr(resp, "text", ""))
+        return ""
     enc = str(getattr(resp, "encoding", "") or "").strip().lower()
 
     # Many sites send UTF-8 bytes with an ISO-8859-1 fallback header.
@@ -154,10 +153,58 @@ def _decode_html_response(resp: Any) -> str:
         return str(getattr(resp, "text", ""))
 
 
-def _is_ssl_error(exc: Exception) -> bool:
-    req_exc = getattr(requests, "exceptions", None)
-    ssl_cls = getattr(req_exc, "SSLError", None) if req_exc is not None else None
-    return bool(ssl_cls and isinstance(exc, ssl_cls))
+def _http_get(url: str, timeout: int, headers: Dict[str, str]) -> Any:
+    if requests is None:
+        raise RuntimeError("requests_unavailable")
+    try:
+        try:
+            resp = requests.get(url, timeout=timeout, headers=headers)
+        except TypeError:
+            resp = requests.get(url, timeout=timeout)
+        resp.raise_for_status()
+        return resp
+    except requests.exceptions.SSLError:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            try:
+                resp = requests.get(url, timeout=timeout, headers=headers, verify=False)
+            except TypeError:
+                resp = requests.get(url, timeout=timeout)
+            resp.raise_for_status()
+            return resp
+
+
+def _looks_like_markdown(text: str) -> bool:
+    head = (text or "")[:2000].lower()
+    if "<html" in head or "<body" in head:
+        return False
+    return bool(
+        re.search(r"(?m)^\s{0,3}#{1,6}\s+\S", text or "")
+        or re.search(r"(?m)^\s*[-*+]\s+\S", text or "")
+        or re.search(r"\[[^\]]+\]\([^)]+\)", text or "")
+    )
+
+
+def _looks_binary_text(text: str) -> bool:
+    if not text:
+        return False
+    sample = text[:4000]
+    ctrl = 0
+    for ch in sample:
+        o = ord(ch)
+        if o in (9, 10, 13):
+            continue
+        if o < 32:
+            ctrl += 1
+    return (ctrl / max(1, len(sample))) > 0.01
+
+
+def _title_from_markdown(markdown: str, fallback: str) -> str:
+    for line in (markdown or "").splitlines():
+        s = line.strip()
+        if s.startswith("#"):
+            return s.lstrip("#").strip() or fallback
+    return fallback
 
 
 def _extract_markdown_for_reader(html: str, reader: str) -> str:
@@ -259,8 +306,8 @@ def _select_assets(assets: List[Dict[str, Any]], mode: str) -> List[int]:
         # render all assets inline for visibility.
         return list(range(len(assets)))
     if mode == "key-inline":
-        # Hero + first few meaningful images (currently first N in document order).
-        return list(range(min(KEY_INLINE_MAX_IMAGES, len(assets))))
+        # Current UX preference: render all discovered images inline.
+        return list(range(len(assets)))
     return []
 
 
@@ -280,7 +327,7 @@ def _probe_dimensions(image_bytes: bytes) -> Optional[Dict[str, int]]:
 def _run_chafa(image_bytes: bytes, width_cells: int, timeout_ms: int) -> Dict[str, Any]:
     if shutil.which("chafa") is None:
         return {"ok": False, "error": "chafa_not_found"}
-    height_cells = max(1, min(80, width_cells // 2))
+    height_cells = max(1, min(MAX_IMAGE_HEIGHT_CELLS, width_cells // 2))
     with tempfile.NamedTemporaryFile(delete=True, suffix=".img") as tmp:
         tmp.write(image_bytes)
         tmp.flush()
@@ -383,8 +430,9 @@ def _render_asset(
         _debug_log("image.failed", {"source_url": src, "mode": mode, "reason": "dimensions_too_large", "dims": dims})
         return out
 
+    target_width = max(20, int(width_cells * IMAGE_WIDTH_RATIO))
     timeout_ms = min(PER_IMAGE_RENDER_TIMEOUT_MS, budget_state["remaining_ms"])
-    rendered = _run_chafa(image_bytes, width_cells=width_cells, timeout_ms=timeout_ms)
+    rendered = _run_chafa(image_bytes, width_cells=target_width, timeout_ms=timeout_ms)
     duration_ms = int(rendered.get("duration_ms", 0))
     budget_state["remaining_ms"] = max(0, budget_state["remaining_ms"] - duration_ms)
 
@@ -392,7 +440,7 @@ def _render_asset(
     if not rendered.get("ok"):
         out["status"] = "failed" if rendered.get("error") != "timeout" else "deferred"
         out["render_error"] = str(rendered.get("error", "render_failed"))
-        out["render_meta"] = {"backend": "chafa", "width_cells": width_cells, "height_cells": 0, "duration_ms": duration_ms, "cache_hit": False}
+        out["render_meta"] = {"backend": "chafa", "width_cells": target_width, "height_cells": 0, "duration_ms": duration_ms, "cache_hit": False}
         _debug_log("image.failed", {"source_url": src, "mode": mode, "reason": out["render_error"], "duration_ms": duration_ms})
         return out
 
@@ -401,7 +449,7 @@ def _render_asset(
     out["ansi_block"] = ansi_block
     out["render_meta"] = {
         "backend": "chafa",
-        "width_cells": width_cells,
+        "width_cells": target_width,
         "height_cells": max(1, len(ansi_block.splitlines())) if ansi_block else 0,
         "duration_ms": duration_ms,
         "cache_hit": False,
@@ -421,6 +469,7 @@ def render_markdown(
     rendered = markdown
     if headings != "plain":
         rendered = rendered.replace("# ", "[H1] ").replace("## ", "[H2] ").replace("### ", "[H3] ")
+    rendered = _normalize_markdown(rendered)
 
     if images != "none":
         rendered += f"\n\n[images mode={images}]"
@@ -434,14 +483,35 @@ def render_markdown(
             status = str(asset.get("status", "skipped"))
             if status == "ready" and asset.get("ansi_block"):
                 rendered += f"\n[image:{alt}]\n{asset['ansi_block']}\n"
-            else:
+            elif status in ("failed", "deferred"):
                 reason = str(asset.get("render_error", "")).strip()
                 if reason:
                     rendered += f"\n[image:{alt}] ({status}: {reason})\n"
                 else:
                     rendered += f"\n[image:{alt}] ({status})\n"
+            elif images == "gallery" and status == "skipped":
+                rendered += f"\n[image:{alt}] ({status})\n"
 
-    return rendered[: max(2000, width * 40)]
+    return rendered[:MAX_TUI_TEXT_CHARS]
+
+
+def _normalize_markdown(markdown: str) -> str:
+    # Keep simple-reader output compact and left-aligned.
+    lines = markdown.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    out: List[str] = []
+    blank = False
+    for raw in lines:
+        line = raw.strip()
+        if not line:
+            if not blank:
+                out.append("")
+            blank = True
+            continue
+        blank = False
+        out.append(line)
+    while out and not out[-1]:
+        out.pop()
+    return "\n".join(out)
 
 
 def _render_assets_for_mode(
@@ -483,19 +553,35 @@ def fetch_render_bundle(
     image_mode: str = "none",
     cache_root: str = "cache/browser",
 ) -> Dict[str, Any]:
-    width = _clamp_width(width)
+    _debug_log(
+        "bundle.fetch_start",
+        {"url": url, "reader": reader, "width": width, "image_mode": image_mode, "cache_root": cache_root},
+    )
     cache_dir = Path(cache_root)
     cache_dir.mkdir(parents=True, exist_ok=True)
     key = _cache_key(url, reader, width, image_mode)
     entry_dir = cache_dir / key
     bundle_path = entry_dir / "bundle.json"
     image_cache_root = cache_dir / "images"
-    direct_image_mode = False
+    source_format = "html_reader"
+    edge_markdown_tokens: Optional[str] = None
+    edge_content_type: Optional[str] = None
+    edge_server: Optional[str] = None
+    source_bytes = 0
 
     if bundle_path.exists():
         bundle = json.loads(bundle_path.read_text(encoding="utf-8"))
         if not _needs_image_refresh(bundle, image_mode=image_mode):
             bundle["meta"]["cache"] = "hit"
+            _debug_log(
+                "bundle.cache_hit",
+                {
+                    "url": url,
+                    "image_mode": image_mode,
+                    "cache_key": key,
+                    "assets": len(bundle.get("assets", [])),
+                },
+            )
             return bundle
         _debug_log(
             "bundle.cache_stale",
@@ -508,6 +594,9 @@ def fetch_render_bundle(
         )
 
     raw_html_path = entry_dir / "raw.html"
+    direct_image_mode = False
+    markdown_from_edge = ""
+    html = ""
     if raw_html_path.exists():
         html = raw_html_path.read_text(encoding="utf-8")
     elif requests is None:
@@ -515,33 +604,48 @@ def fetch_render_bundle(
     else:
         headers = {"User-Agent": "WibWob-DOS/0.1"}
         try:
-            try:
-                resp = requests.get(url, timeout=30, headers=headers)
-            except TypeError:
-                resp = requests.get(url, timeout=30)
-            resp.raise_for_status()
-            ctype = str(getattr(resp, "headers", {}).get("content-type", "")).lower()
+            edge_headers = dict(headers)
+            edge_headers["Accept"] = "text/markdown"
+            edge_headers["Accept-Encoding"] = "identity"
+            edge_resp = _http_get(url, timeout=30, headers=edge_headers)
+            edge_content_type = str(edge_resp.headers.get("content-type", "")).lower()
+            edge_server = str(edge_resp.headers.get("server", "")).strip() or None
+            edge_markdown_tokens = str(edge_resp.headers.get("x-markdown-tokens", "")).strip() or None
+
+            if edge_content_type.startswith("image/"):
+                direct_image_mode = True
+                html = ""
+                _debug_log("edge_markdown.probe", {"url": url, "ok": False, "reason": "direct_image"})
+            else:
+                edge_text = _decode_html_response(edge_resp)
+                edge_ok = (("text/markdown" in edge_content_type) or _looks_like_markdown(edge_text)) and not _looks_binary_text(edge_text)
+                _debug_log(
+                    "edge_markdown.probe",
+                    {
+                        "url": url,
+                        "ok": edge_ok,
+                        "content_type": edge_content_type,
+                        "tokens_header_present": bool(edge_markdown_tokens),
+                        "binary_like": _looks_binary_text(edge_text),
+                    },
+                )
+                if edge_ok:
+                    markdown_from_edge = (edge_text or "").strip()
+                    source_format = "edge_markdown"
+                    source_bytes = len(markdown_from_edge.encode("utf-8"))
+                    _debug_log("edge_markdown.use", {"url": url, "tokens": edge_markdown_tokens})
+        except Exception as exc:
+            _debug_log("edge_markdown.probe", {"url": url, "ok": False, "error": str(exc)})
+
+        # We still need HTML when image rendering is enabled, or as fallback when edge markdown isn't available.
+        if not direct_image_mode and (image_mode != "none" or not markdown_from_edge):
+            resp = _http_get(url, timeout=30, headers=headers)
+            ctype = str(resp.headers.get("content-type", "")).lower()
             if ctype.startswith("image/"):
                 direct_image_mode = True
                 html = ""
             else:
                 html = _decode_html_response(resp)
-        except Exception as exc:
-            if not _is_ssl_error(exc):
-                raise
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                try:
-                    resp = requests.get(url, timeout=30, headers=headers, verify=False)
-                except TypeError:
-                    resp = requests.get(url, timeout=30)
-                resp.raise_for_status()
-                ctype = str(getattr(resp, "headers", {}).get("content-type", "")).lower()
-                if ctype.startswith("image/"):
-                    direct_image_mode = True
-                    html = ""
-                else:
-                    html = _decode_html_response(resp)
 
     if direct_image_mode:
         title = url
@@ -561,10 +665,17 @@ def fetch_render_bundle(
             budget_state = {"remaining_ms": TOTAL_IMAGE_RENDER_BUDGET_MS}
             assets = [_render_asset(assets[0], image_mode, _clamp_width(width), image_cache_root, budget_state)]
     else:
-        title = _extract_title(html, url)
-        links = _extract_links(html, url)
-        markdown = _extract_markdown_for_reader(html, reader=reader)
+        if markdown_from_edge:
+            markdown = markdown_from_edge
+            title = _extract_title(html, url) if html else _title_from_markdown(markdown, url)
+            links = _extract_links(html, url) if html else []
+        else:
+            title = _extract_title(html, url)
+            links = _extract_links(html, url)
+            markdown = _extract_markdown_for_reader(html, reader=reader)
         assets = _render_assets_for_mode(html, base_url=url, image_mode=image_mode, width=width, image_cache_root=image_cache_root)
+        if source_format != "edge_markdown":
+            source_bytes = len(html.encode("utf-8"))
     tui_text = render_markdown(markdown, headings="plain", images=image_mode, width=width, assets=assets)
     bundle = {
         "url": url,
@@ -576,11 +687,35 @@ def fetch_render_bundle(
         "meta": {
             "fetched_at": datetime.now(timezone.utc).isoformat(),
             "cache": "miss",
-            "source_bytes": len(html.encode("utf-8")),
+            "source_bytes": source_bytes,
             "cache_key": key,
             "image_mode": image_mode,
+            "source_format": source_format,
+            "edge_markdown_tokens": edge_markdown_tokens,
+            "edge_content_type": edge_content_type,
+            "edge_server": edge_server,
         },
     }
+    ready = sum(1 for a in assets if a.get("status") == "ready")
+    failed = sum(1 for a in assets if a.get("status") == "failed")
+    deferred = sum(1 for a in assets if a.get("status") == "deferred")
+    skipped = sum(1 for a in assets if a.get("status") == "skipped")
+    _debug_log(
+        "bundle.fetch_done",
+        {
+            "url": url,
+            "image_mode": image_mode,
+            "cache": "miss",
+            "assets_total": len(assets),
+            "ready": ready,
+            "failed": failed,
+            "deferred": deferred,
+            "skipped": skipped,
+            "source_bytes": bundle["meta"].get("source_bytes", 0),
+            "cache_key": key,
+            "source_format": source_format,
+        },
+    )
 
     entry_dir.mkdir(parents=True, exist_ok=True)
     bundle_path.write_text(json.dumps(bundle, sort_keys=True), encoding="utf-8")

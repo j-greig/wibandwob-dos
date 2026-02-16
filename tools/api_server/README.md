@@ -74,7 +74,7 @@ Key Endpoints
 - Menu commands: `POST /menu/command` — `{command, args?}` (supports `cascade`, `tile`, `close_all`, `save_workspace`, `open_workspace`, `screenshot`)
 - Workspace: `POST /workspace/save|open` — `{path}`
 - Browser copy: `POST /browser/{window_id}/copy` — `{format:"plain|markdown|tui", include_image_urls?, image_url_mode?}`
-- Screenshot: `POST /screenshot` — `{path?}` returns capture metadata (`path`, `backend`, `bytes`, `file_exists`) and fails if output file is missing
+- Screenshot: `POST /screenshot` — `{path?}` returns capture metadata (`path`, `backend`, `bytes`, `file_exists`) from canonical `.txt`/`.ans` capture and fails if output file is missing
 - Pattern mode: `POST /pattern_mode` — `{mode:"continuous"|"tiled"}`
 - **Batch layout: `POST /windows/batch_layout`** — create/move/close multiple windows in one call with macro support
 - **Timeline operations: `GET /timeline/status?group_id=...`, `POST /timeline/cancel`** — for future scheduled operations 
