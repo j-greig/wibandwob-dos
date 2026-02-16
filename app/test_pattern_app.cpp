@@ -638,7 +638,11 @@ private:
     
     // IPC server
     ApiIpcServer* ipcServer = nullptr;
-    
+
+    // Theme state
+    std::string themeMode = "light";         // "light" or "dark"
+    std::string themeVariant = "monochrome"; // "monochrome" or "dark_pastel"
+
     // Friend API helper functions implemented below to bridge IPC calls.
     friend void api_spawn_test(TTestPatternApp&);
     friend void api_spawn_gradient(TTestPatternApp&, const std::string&);
@@ -664,10 +668,13 @@ private:
     friend void api_spawn_text_editor(TTestPatternApp&, const TRect* bounds);
     friend void api_spawn_browser(TTestPatternApp&, const TRect* bounds);
     friend std::string api_browser_fetch(TTestPatternApp&, const std::string& url);
-    friend std::string api_send_text(TTestPatternApp&, const std::string&, const std::string&, 
+    friend std::string api_send_text(TTestPatternApp&, const std::string&, const std::string&,
                                      const std::string&, const std::string&);
-    friend std::string api_send_figlet(TTestPatternApp&, const std::string&, const std::string&, 
+    friend std::string api_send_figlet(TTestPatternApp&, const std::string&, const std::string&,
                                        const std::string&, int, const std::string&);
+    friend std::string api_set_theme_mode(TTestPatternApp&, const std::string&);
+    friend std::string api_set_theme_variant(TTestPatternApp&, const std::string&);
+    friend std::string api_reset_theme(TTestPatternApp&);
 };
 
 TTestPatternApp::TTestPatternApp() :
@@ -2008,10 +2015,12 @@ std::string api_get_state(TTestPatternApp& app) {
     // Rebuild window registry to sync with current desktop state
     app.winToId.clear();
     app.idToWin.clear();
-    
+
     std::stringstream json;
-    json << "{\"windows\":[";
-    
+    json << "{\"theme_mode\":\"" << app.themeMode << "\""
+         << ",\"theme_variant\":\"" << app.themeVariant << "\""
+         << ",\"windows\":[";
+
     bool first = true;
     TView *start = app.deskTop->first();
     if (start) {
@@ -2020,15 +2029,15 @@ std::string api_get_state(TTestPatternApp& app) {
             TWindow *w = dynamic_cast<TWindow*>(v);
             if (w) {
                 std::string id = app.registerWindow(w);
-                
+
                 if (!first) json << ",";
                 json << "{\"id\":\"" << id << "\""
                      << ",\"x\":" << w->origin.x
-                     << ",\"y\":" << w->origin.y  
+                     << ",\"y\":" << w->origin.y
                      << ",\"width\":" << w->size.x
                      << ",\"height\":" << w->size.y
                      << ",\"title\":\"";
-                
+
                 // Safely escape title
                 if (w->title) {
                     std::string title(w->title);
@@ -2044,7 +2053,7 @@ std::string api_get_state(TTestPatternApp& app) {
             v = v->next;
         } while (v != start);
     }
-    
+
     json << "]}";
     return json.str();
 }
@@ -2259,8 +2268,10 @@ bool TTestPatternApp::loadWorkspaceFromFile(const std::string& path)
         return false;
     }
 
-    // Extract globals.patternMode
+    // Extract globals.patternMode and theme settings
     bool continuous = USE_CONTINUOUS_PATTERN;
+    std::string loadedThemeMode = themeMode;
+    std::string loadedThemeVariant = themeVariant;
     size_t globalsPos = data.find("\"globals\"");
     if (globalsPos != std::string::npos) {
         size_t pos = data.find('{', globalsPos);
@@ -2268,6 +2279,12 @@ bool TTestPatternApp::loadWorkspaceFromFile(const std::string& path)
             std::string pm;
             if (parseKeyedString(data, pos+1, "patternMode", pm))
                 continuous = (pm == "continuous");
+            std::string tm;
+            if (parseKeyedString(data, pos+1, "themeMode", tm))
+                loadedThemeMode = tm;
+            std::string tv;
+            if (parseKeyedString(data, pos+1, "themeVariant", tv))
+                loadedThemeVariant = tv;
         }
     }
 
@@ -2304,6 +2321,8 @@ bool TTestPatternApp::loadWorkspaceFromFile(const std::string& path)
 
     // Apply globals
     USE_CONTINUOUS_PATTERN = continuous;
+    themeMode = loadedThemeMode;
+    themeVariant = loadedThemeVariant;
 
     // Restore windows
     std::vector<TWindow*> created;
@@ -2438,7 +2457,9 @@ std::string TTestPatternApp::buildWorkspaceJson()
     json += "  \"app\": \"test_pattern\",\n";
     json += std::string("  \"timestamp\": \"") + ts + "\",\n";
     json += "  \"screen\": { \"width\": " + std::to_string(sw) + ", \"height\": " + std::to_string(sh) + " },\n";
-    json += std::string("  \"globals\": { \"patternMode\": \"") + (USE_CONTINUOUS_PATTERN ? "continuous" : "tiled") + "\" },\n";
+    json += std::string("  \"globals\": { \"patternMode\": \"") + (USE_CONTINUOUS_PATTERN ? "continuous" : "tiled") + "\""
+         + ", \"themeMode\": \"" + themeMode + "\""
+         + ", \"themeVariant\": \"" + themeVariant + "\" },\n";
     json += "  \"windows\": [\n";
 
     // Collect windows in current z-order (child list is circular)
@@ -2741,5 +2762,30 @@ std::string api_browser_fetch(TTestPatternApp& app, const std::string& url) {
     }
 
     browserWin->fetchUrl(url);
+    return "ok";
+}
+
+std::string api_set_theme_mode(TTestPatternApp& app, const std::string& mode) {
+    if (mode != "light" && mode != "dark") {
+        return "err invalid mode";
+    }
+    app.themeMode = mode;
+    // TODO: Trigger UI redraw when theme rendering is implemented
+    return "ok";
+}
+
+std::string api_set_theme_variant(TTestPatternApp& app, const std::string& variant) {
+    if (variant != "monochrome" && variant != "dark_pastel") {
+        return "err invalid variant";
+    }
+    app.themeVariant = variant;
+    // TODO: Trigger UI redraw when theme rendering is implemented
+    return "ok";
+}
+
+std::string api_reset_theme(TTestPatternApp& app) {
+    app.themeMode = "light";
+    app.themeVariant = "monochrome";
+    // TODO: Trigger UI redraw when theme rendering is implemented
     return "ok";
 }

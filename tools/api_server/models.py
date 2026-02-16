@@ -40,6 +40,8 @@ class Window:
 @dataclass
 class AppState:
     pattern_mode: str = "continuous"  # or "tiled"
+    theme_mode: str = "light"  # or "dark"
+    theme_variant: str = "monochrome"  # or "dark_pastel"
     windows: List[Window] = field(default_factory=list)
     next_z: int = 1
     last_workspace: Optional[str] = None

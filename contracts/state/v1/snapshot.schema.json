@@ -4,7 +4,7 @@
   "title": "WibWob State Snapshot v1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["version", "timestamp", "canvas", "pattern_mode", "windows"],
+  "required": ["version", "timestamp", "canvas", "pattern_mode", "theme_mode", "theme_variant", "windows"],
   "properties": {
     "version": {
       "type": "string",
@@ -26,6 +26,14 @@
     "pattern_mode": {
       "type": "string",
       "enum": ["continuous", "tiled"]
+    },
+    "theme_mode": {
+      "type": "string",
+      "enum": ["light", "dark"]
+    },
+    "theme_variant": {
+      "type": "string",
+      "enum": ["monochrome", "dark_pastel"]
     },
     "windows": {
       "type": "array",

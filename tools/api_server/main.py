@@ -40,6 +40,8 @@ from .schemas import (
     MonodrawLoadRequest,
     MonodrawParseRequest,
     PatternMode,
+    ThemeMode,
+    ThemeVariant,
     PrimerInfo,
     PrimersListResponse,
     RenderBundle,
@@ -80,6 +82,8 @@ def make_app() -> FastAPI:
         st = asyncio.get_event_loop().run_until_complete(ctl.get_state())
         return AppStateModel(
             pattern_mode=st.pattern_mode,
+            theme_mode=st.theme_mode,
+            theme_variant=st.theme_variant,
             windows=[
                 WindowState(
                     id=w.id,
@@ -118,6 +122,8 @@ def make_app() -> FastAPI:
         st = await ctl.get_state()
         return AppStateModel(
             pattern_mode=st.pattern_mode,
+            theme_mode=st.theme_mode,
+            theme_variant=st.theme_variant,
             windows=[
                 WindowState(
                     id=w.id,
@@ -294,6 +300,27 @@ def make_app() -> FastAPI:
     async def pattern_mode(payload: PatternMode) -> Dict[str, Any]:
         await ctl.set_pattern_mode(payload.mode)
         return {"ok": True}
+
+    @app.post("/theme/mode")
+    async def theme_mode(payload: ThemeMode) -> Dict[str, Any]:
+        result = await ctl.set_theme_mode(payload.mode)
+        if not result.get("ok"):
+            raise HTTPException(status_code=400, detail=result.get("error", "set_theme_mode_failed"))
+        return result
+
+    @app.post("/theme/variant")
+    async def theme_variant(payload: ThemeVariant) -> Dict[str, Any]:
+        result = await ctl.set_theme_variant(payload.variant)
+        if not result.get("ok"):
+            raise HTTPException(status_code=400, detail=result.get("error", "set_theme_variant_failed"))
+        return result
+
+    @app.post("/theme/reset")
+    async def theme_reset() -> Dict[str, Any]:
+        result = await ctl.reset_theme()
+        if not result.get("ok"):
+            raise HTTPException(status_code=400, detail=result.get("error", "reset_theme_failed"))
+        return result
 
     @app.post("/workspace/save")
     async def workspace_save(payload: WorkspaceSave) -> Dict[str, Any]:

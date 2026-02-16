@@ -100,6 +100,57 @@ def _make_pattern_mode_handler() -> CommandToolHandler:
     return _handler
 
 
+def _make_theme_mode_handler() -> CommandToolHandler:
+    async def _handler(mode: str) -> Dict[str, Any]:
+        if mode not in ["light", "dark"]:
+            return {
+                "success": False,
+                "error": f"Invalid mode: {mode}",
+                "valid_modes": ["light", "dark"],
+            }
+        controller = get_controller()
+        result = await controller.exec_command("set_theme_mode", {"mode": mode}, actor="mcp")
+        if not result.get("ok"):
+            return _exec_result_error(result)
+        return {
+            "success": True,
+            "message": f"Theme mode set to {mode}",
+        }
+    return _handler
+
+
+def _make_theme_variant_handler() -> CommandToolHandler:
+    async def _handler(variant: str) -> Dict[str, Any]:
+        if variant not in ["monochrome", "dark_pastel"]:
+            return {
+                "success": False,
+                "error": f"Invalid variant: {variant}",
+                "valid_variants": ["monochrome", "dark_pastel"],
+            }
+        controller = get_controller()
+        result = await controller.exec_command("set_theme_variant", {"variant": variant}, actor="mcp")
+        if not result.get("ok"):
+            return _exec_result_error(result)
+        return {
+            "success": True,
+            "message": f"Theme variant set to {variant}",
+        }
+    return _handler
+
+
+def _make_reset_theme_handler() -> CommandToolHandler:
+    async def _handler() -> Dict[str, Any]:
+        controller = get_controller()
+        result = await controller.exec_command("reset_theme", {}, actor="mcp")
+        if not result.get("ok"):
+            return _exec_result_error(result)
+        return {
+            "success": True,
+            "message": "Theme reset to defaults (monochrome + light)",
+        }
+    return _handler
+
+
 def _make_screenshot_handler() -> CommandToolHandler:
     async def _handler(path: Optional[str] = None) -> Dict[str, Any]:
         args: Dict[str, Any] = {}
@@ -159,6 +210,18 @@ def _command_tool_builders() -> Dict[str, Dict[str, Any]]:
         "pattern_mode": {
             "tool_name": "tui_set_pattern_mode",
             "handler": _make_pattern_mode_handler(),
+        },
+        "set_theme_mode": {
+            "tool_name": "tui_set_theme_mode",
+            "handler": _make_theme_mode_handler(),
+        },
+        "set_theme_variant": {
+            "tool_name": "tui_set_theme_variant",
+            "handler": _make_theme_variant_handler(),
+        },
+        "reset_theme": {
+            "tool_name": "tui_reset_theme",
+            "handler": _make_reset_theme_handler(),
         },
         "screenshot": {
             "tool_name": "tui_screenshot",
@@ -276,6 +339,8 @@ def register_tui_tools(mcp):
         return {
             "windows": [serialize_window(w) for w in state.windows],
             "pattern_mode": state.pattern_mode,
+            "theme_mode": state.theme_mode,
+            "theme_variant": state.theme_variant,
             "uptime_sec": state.uptime_sec,
             "last_workspace": state.last_workspace,
             "last_screenshot": state.last_screenshot

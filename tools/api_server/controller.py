@@ -88,6 +88,10 @@ class Controller:
                 state_data = json.loads(resp.strip())
                 
                 async with self._lock:
+                    # Update theme state from C++
+                    self._state.theme_mode = state_data.get("theme_mode", "light")
+                    self._state.theme_variant = state_data.get("theme_variant", "monochrome")
+
                     # Update windows list with real IDs from C++
                     new_windows = []
                     for win_data in state_data.get("windows", []):
@@ -97,7 +101,7 @@ class Controller:
                             title=win_data["title"],
                             rect=Rect(
                                 x=win_data["x"],
-                                y=win_data["y"], 
+                                y=win_data["y"],
                                 w=win_data["width"],
                                 h=win_data["height"]
                             ),
@@ -106,7 +110,7 @@ class Controller:
                             props={}
                         )
                         new_windows.append(win)
-                    
+
                     self._state.windows = new_windows
                     
             # Get canvas size separately
@@ -436,6 +440,18 @@ class Controller:
             self._state.pattern_mode = mode
         await self._events.emit("pattern.mode", {"mode": mode})
 
+    async def set_theme_mode(self, mode: str) -> Dict[str, Any]:
+        """Set theme mode (light or dark) via command registry"""
+        return await self.exec_command("set_theme_mode", {"mode": mode})
+
+    async def set_theme_variant(self, variant: str) -> Dict[str, Any]:
+        """Set theme variant (monochrome or dark_pastel) via command registry"""
+        return await self.exec_command("set_theme_variant", {"variant": variant})
+
+    async def reset_theme(self) -> Dict[str, Any]:
+        """Reset theme to defaults (monochrome + light) via command registry"""
+        return await self.exec_command("reset_theme", {})
+
     # ----- Workspace / Screenshot -----
     async def save_workspace(self, path: str) -> Dict[str, Any]:
         res = await self.export_state(path, "json")
@@ -689,6 +705,8 @@ class Controller:
             "timestamp": started.isoformat(),
             "canvas": {"w": self._state.canvas_width, "h": self._state.canvas_height},
             "pattern_mode": self._state.pattern_mode,
+            "theme_mode": self._state.theme_mode,
+            "theme_variant": self._state.theme_variant,
             "windows": [
                 {
                     "id": w.id,
@@ -716,6 +734,8 @@ class Controller:
                 pass
 
         self._state.pattern_mode = payload.get("pattern_mode", self._state.pattern_mode)
+        self._state.theme_mode = payload.get("theme_mode", self._state.theme_mode)
+        self._state.theme_variant = payload.get("theme_variant", self._state.theme_variant)
         canvas = payload.get("canvas", {})
         self._state.canvas_width = int(canvas.get("w", self._state.canvas_width))
         self._state.canvas_height = int(canvas.get("h", self._state.canvas_height))
