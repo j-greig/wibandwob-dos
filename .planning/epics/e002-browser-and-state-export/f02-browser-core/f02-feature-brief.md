@@ -11,10 +11,10 @@ Build a text-native markdown browser window that fetches web pages, extracts rea
 
 ## Stories
 
-- [x] `s04-browser-window-skeleton/` — C++ BrowserWindow (URL bar, status, scrollable pane, keybindings)
-- [x] `s05-fetch-pipeline/` — Python sidecar fetch (readability-lxml + markdownify → RenderBundle JSON)
-- [x] `s06-link-navigation/` — cursor selection + numbered refs, back/forward, go-to-URL
-- [x] `s07-caching/` — URL+options-keyed cache (raw HTML, markdown, render bundle)
+- [x] `.planning/epics/e002-browser-and-state-export/f02-browser-core/s04-browser-window-skeleton/s04-story-brief.md` — C++ BrowserWindow (URL bar, status, scrollable pane, keybindings) (#22)
+- [x] `.planning/epics/e002-browser-and-state-export/f02-browser-core/s05-fetch-pipeline/s05-story-brief.md` — Python sidecar fetch (readability-lxml + markdownify → RenderBundle JSON) (#22)
+- [x] `.planning/epics/e002-browser-and-state-export/f02-browser-core/s06-link-navigation/s06-story-brief.md` — cursor selection + numbered refs, back/forward, go-to-URL (#22)
+- [x] `.planning/epics/e002-browser-and-state-export/f02-browser-core/s07-caching/s07-story-brief.md` — URL+options-keyed cache (raw HTML, markdown, render bundle) (#22)
 
 ## Acceptance Criteria
 

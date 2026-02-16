@@ -11,9 +11,9 @@ Expose the browser as a full MCP tool surface so the embedded AI (Wib&Wob chat) 
 
 ## Stories
 
-- [x] `s11-mcp-browser-core/` — MCP tools: open, back, forward, refresh, find
-- [x] `s12-mcp-browser-modes/` — MCP tools: set_mode, fetch, render
-- [x] `s13-ai-actions/` — summarise page to new window, extract links by type, clip to markdown file
+- [x] `.planning/epics/e002-browser-and-state-export/f04-ai-browser-tools/s11-mcp-browser-core/s11-story-brief.md` — MCP tools: open, back, forward, refresh, find (#20)
+- [x] `.planning/epics/e002-browser-and-state-export/f04-ai-browser-tools/s12-mcp-browser-modes/s12-story-brief.md` — MCP tools: set_mode, fetch, render (#20)
+- [x] `.planning/epics/e002-browser-and-state-export/f04-ai-browser-tools/s13-ai-actions/s13-story-brief.md` — summarise page to new window, extract links by type, clip to markdown file (#20)
 
 ## MCP Tools
 
