@@ -694,7 +694,19 @@ TTestPatternApp::TTestPatternApp() :
 {
     // Start IPC server for local API control (best-effort; ignore failures)
     ipcServer = new ApiIpcServer(this);
-    ipcServer->start("/tmp/test_pattern_app.sock");
+
+    // Derive socket path from WIBWOB_INSTANCE env var.
+    // Unset or empty: legacy path for backward compat.
+    std::string sockPath = "/tmp/test_pattern_app.sock";
+    const char* inst = std::getenv("WIBWOB_INSTANCE");
+    if (inst && inst[0] != '\0') {
+        sockPath = std::string("/tmp/wibwob_") + inst + ".sock";
+        fprintf(stderr, "[wibwob] instance=%s socket=%s\n", inst, sockPath.c_str());
+    } else {
+        fprintf(stderr, "[wibwob] instance=(none) socket=%s\n", sockPath.c_str());
+    }
+    ipcServer->start(sockPath);
+    fprintf(stderr, "[wibwob] IPC server started\n");
 
     // No wallpaper initialization.
 }

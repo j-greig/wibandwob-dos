@@ -202,3 +202,58 @@ The remaining blocker is **not browser-specific**:
 ---
 
 **Why this matters:** WibWob-DOS can live in a browser tab via PTY bridge, unlocking remote access and web-native embedding without rewriting the TUI. All gaps are pre-existing app features (paint, LLM key management) not browser-caused regressions.
+
+---
+
+## Multi-Instance IPC + tmux Dashboard
+
+**Added:** 2026-02-17 (continued spike session)
+**Plan:** `memories/2026/02/20260217-tmux-dashboard-plan.md`
+
+### Problem
+All socket paths hardcoded to `/tmp/test_pattern_app.sock`. Can only run one instance at a time. Browser deployment needs N instances behind tmux with a monitoring sidebar.
+
+### Solution: WIBWOB_INSTANCE env var
+
+`WIBWOB_INSTANCE=N` drives per-instance socket naming: `/tmp/wibwob_N.sock`.
+Unset = legacy path `/tmp/test_pattern_app.sock` for backward compat.
+
+### Files changed
+
+| File | Change |
+|------|--------|
+| `app/test_pattern_app.cpp` | Read `WIBWOB_INSTANCE`, derive socket path at startup |
+| `app/llm/tools/tui_tools.cpp` | Same env var derivation in `sendIpcCommand()`, + `strncpy` fix |
+| `tools/api_server/ipc_client.py` | `_resolve_sock_path()`: `TV_IPC_SOCK` > `WIBWOB_INSTANCE` > legacy |
+| `tools/api_server/test_ipc.py` | Env-aware `_sock_path()` helper |
+| `tools/api_server/test_move.py` | Same |
+| `tools/api_server/test_browser_ipc.py` | Same |
+| `tools/api_server/move_test_pattern.py` | Same |
+| `tools/monitor/instance_monitor.py` | **New** — discovers `/tmp/wibwob_*.sock` via glob, polls `get_state`, renders ANSI dashboard |
+| `tools/scripts/launch_tmux.sh` | **New** — spawns N tmux panes with `WIBWOB_INSTANCE=1..N` + monitor sidebar |
+
+### Verification
+```bash
+# Build
+cmake --build ./build
+
+# Legacy path (no env var) — backward compat
+./build/app/test_pattern &
+ls -l /tmp/test_pattern_app.sock
+kill %1
+
+# Instance path
+WIBWOB_INSTANCE=1 ./build/app/test_pattern &
+ls -l /tmp/wibwob_1.sock
+echo 'cmd:get_state' | nc -U /tmp/wibwob_1.sock
+kill %1
+
+# Monitor
+WIBWOB_INSTANCE=1 ./build/app/test_pattern &
+WIBWOB_INSTANCE=2 ./build/app/test_pattern &
+python3 tools/monitor/instance_monitor.py
+# Should show both as LIVE
+
+# Full tmux launch
+./tools/scripts/launch_tmux.sh 4
+```

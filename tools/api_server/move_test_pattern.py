@@ -1,10 +1,19 @@
 #!/usr/bin/env python3
+import os
 import socket
 import json
 
+
+def _sock_path():
+    inst = os.environ.get("WIBWOB_INSTANCE")
+    if inst:
+        return f"/tmp/wibwob_{inst}.sock"
+    return "/tmp/test_pattern_app.sock"
+
+
 def send_ipc_cmd(cmd_str):
     """Send command directly to IPC socket"""
-    sock_path = "/tmp/test_pattern_app.sock"
+    sock_path = _sock_path()
     s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     try:
         s.connect(sock_path)
