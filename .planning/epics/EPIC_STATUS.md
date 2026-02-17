@@ -9,6 +9,6 @@ e002-browser-and-state-export — done
 e003-dark-pastel-theme — done
 e004-browser-rendering-reliability — not-started
 e005-theme-runtime-wiring — not-started
-e006-scramble-tui-presence — not-started
+e006-scramble-tui-presence — in-progress
 e007-browser-hosted-deployment — not-started
 

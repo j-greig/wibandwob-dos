@@ -1,7 +1,7 @@
 ---
 id: E006
 title: Scramble TUI Presence
-status: not-started
+status: in-progress
 issue: 55
 pr: ~
 depends_on: []
