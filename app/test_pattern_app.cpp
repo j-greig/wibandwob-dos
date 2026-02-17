@@ -1284,26 +1284,55 @@ void TTestPatternApp::wireScrambleInput()
             scrambleWindow->getMessageView()->addMessage("you", input);
         }
 
-        // Slash commands: check registry first, then fall through to engine
-        // This makes /cascade, /screenshot, /scramble_pet etc actually execute.
+        // Slash commands: check registry first, then fall through to engine.
+        // /cascade, /screenshot, /scramble_pet → execute the registry command.
+        // /scramble_say hello cat → cmdName="scramble_say", args="hello cat"
         if (!input.empty() && input[0] == '/' && input.size() > 1) {
-            std::string cmdName = input.substr(1);
+            std::string rest = input.substr(1);
+            // Split on first space: "scramble_say hello" → name="scramble_say" args="hello"
+            std::string cmdName;
+            std::string cmdArgs;
+            size_t sp = rest.find(' ');
+            if (sp != std::string::npos) {
+                cmdName = rest.substr(0, sp);
+                cmdArgs = rest.substr(sp + 1);
+                // Strip leading spaces from args
+                while (!cmdArgs.empty() && cmdArgs.front() == ' ') cmdArgs.erase(cmdArgs.begin());
+            } else {
+                cmdName = rest;
+            }
             for (char& c : cmdName) if (c >= 'A' && c <= 'Z') c += 32;
             while (!cmdName.empty() && cmdName.back() == ' ') cmdName.pop_back();
 
             const auto& caps = get_command_capabilities();
             for (const auto& cap : caps) {
                 if (cmdName == cap.name) {
+                    // Pass args under all plausible param names — each command reads only one
                     std::map<std::string, std::string> kv;
-                    std::string result = exec_registry_command(*this, cmdName, kv);
-                    std::string ack = (result == "ok" || result.rfind("ok", 0) == 0)
-                        ? "done. /ᐠ- -ᐟ\\"
-                        : (result.size() > 20 ? result : "err: " + result + " (=^..^=)");
-                    if (scrambleWindow->getView()) {
-                        scrambleWindow->getView()->say(ack);
+                    if (!cmdArgs.empty()) {
+                        kv["text"] = cmdArgs;
+                        kv["path"] = cmdArgs;
+                        kv["mode"] = cmdArgs;
+                        kv["variant"] = cmdArgs;
                     }
-                    if (scrambleWindow->getMessageView()) {
-                        scrambleWindow->getMessageView()->addMessage("scramble", ack);
+                    std::string result = exec_registry_command(*this, cmdName, kv);
+                    // If command returned a response (e.g. scramble_say returns text), show it
+                    std::string ack;
+                    if (result == "ok") {
+                        ack = "done. /ᐠ- -ᐟ\\";
+                    } else if (result.rfind("err", 0) == 0) {
+                        ack = result + " (=^..^=)";
+                    } else {
+                        ack = result; // e.g. scramble_say returns the response text
+                    }
+                    // Only show ack in message view if scramble_say didn't already add it
+                    if (cmdName != "scramble_say" && cmdName != "scramble_pet") {
+                        if (scrambleWindow->getView()) {
+                            scrambleWindow->getView()->say(ack);
+                        }
+                        if (scrambleWindow->getMessageView()) {
+                            scrambleWindow->getMessageView()->addMessage("scramble", ack);
+                        }
                     }
                     return;
                 }
