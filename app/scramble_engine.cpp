@@ -37,11 +37,6 @@ bool ScrambleHaikuClient::configure()
 
 bool ScrambleHaikuClient::canCall() const
 {
-    // Re-read key so setting env after launch is picked up immediately.
-    const char* envKey = std::getenv("ANTHROPIC_API_KEY");
-    if (envKey && envKey[0] != '\0') {
-        const_cast<ScrambleHaikuClient*>(this)->apiKey = envKey;
-    }
     if (!isAvailable()) return false;
     time_t now = std::time(nullptr);
     return (now - lastCallTime) >= kRateLimitSeconds;
@@ -83,11 +78,6 @@ std::string ScrambleHaikuClient::jsonEscape(const std::string& s)
 
 std::string ScrambleHaikuClient::ask(const std::string& question) const
 {
-    // Re-read key from env on every call — supports setting key after app launch.
-    const char* envKey = std::getenv("ANTHROPIC_API_KEY");
-    if (envKey && envKey[0] != '\0') {
-        const_cast<ScrambleHaikuClient*>(this)->apiKey = envKey;
-    }
     if (!isAvailable()) return "";
 
     std::string sysPrompt = buildSystemPrompt();
