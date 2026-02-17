@@ -582,6 +582,16 @@ void TWibWobWindow::ensureEngineInitialized() {
 
         engine = new WibWobEngine();
 
+        // Inject runtime API key if set (e.g. from Tools > API Key dialog)
+        {
+            extern std::string getAppRuntimeApiKey();
+            std::string rtKey = getAppRuntimeApiKey();
+            if (!rtKey.empty()) {
+                engine->setApiKey(rtKey);
+                fprintf(stderr, "DEBUG: Injected runtime API key into chat engine\n");
+            }
+        }
+
         // Load system prompt from file - try module dirs first, then legacy paths
         std::vector<std::string> promptPaths = {
             "modules-private/wibwob-prompts/wibandwob.prompt.md",
@@ -687,6 +697,14 @@ void TWibWobWindow::processUserInput(const std::string& input) {
     inputView->setInputEnabled(false);
 
     // Log provider info
+    // If anthropic_api provider is active and has no key, prompt user
+    if (engine->getCurrentProvider() == "anthropic_api" && engine->needsApiKey()) {
+        messageView->addMessage("System",
+            "No API key set. Use Tools > API Key to enter your Anthropic key.");
+        inputView->setStatus("API key required - see Tools menu");
+        return;
+    }
+
     logMessage("System", "Using provider: " + engine->getCurrentProvider() + ", model: " + engine->getCurrentModel());
 
     auto start = std::chrono::steady_clock::now();

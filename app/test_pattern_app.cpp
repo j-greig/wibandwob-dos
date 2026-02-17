@@ -32,6 +32,8 @@
 #define Uses_cmCascade
 #define Uses_TFileDialog
 #define Uses_TBackground
+#define Uses_TInputLine
+#define Uses_TLabel
 #include <tvision/tv.h>
 
 #include "test_pattern.h"
@@ -187,6 +189,7 @@ const ushort cmWibWobTestB = 149;  // Scrollbar test: TScroller refactor
 const ushort cmWibWobTestC = 160;  // Scrollbar test: Split view architecture
 const ushort cmRepaint = 161;      // Force repaint
 const ushort cmBrowser = 170;      // Browser window
+const ushort cmApiKey = 171;       // API key entry dialog
 
 // Help menu commands
 const ushort cmAbout = 129;
@@ -568,6 +571,7 @@ private:
     void closeAll();
     void takeScreenshot(bool showDialog = true);
     void setPatternMode(bool continuous);
+    void showApiKeyDialog();
     void saveWorkspace();
     bool saveWorkspacePath(const std::string& path);
     TRect calculateWindowBounds(const std::string& filePath);
@@ -585,6 +589,10 @@ private:
     
     int windowNumber;
     static const int maxWindows = 99;
+
+    // Runtime API key (shared across all chat windows)
+    static std::string runtimeApiKey;
+    friend std::string getAppRuntimeApiKey();
 
     // Kaomoji mood helper
     void setKaomojiMood(TCustomMenuBar::KaomojiMood mood, int durationMs = 2000) {
@@ -669,6 +677,14 @@ private:
     friend std::string api_send_figlet(TTestPatternApp&, const std::string&, const std::string&, 
                                        const std::string&, int, const std::string&);
 };
+
+// Static member definition
+std::string TTestPatternApp::runtimeApiKey;
+
+// Accessor for runtime API key (used by wibwob_view.cpp)
+std::string getAppRuntimeApiKey() {
+    return TTestPatternApp::runtimeApiKey;
+}
 
 TTestPatternApp::TTestPatternApp() :
     TProgInit(&TTestPatternApp::initStatusLine,
@@ -1001,7 +1017,11 @@ void TTestPatternApp::handleEvent(TEvent& event)
                 messageBox("🚀 QUANTUM PRINTER ACTIVATED! 🚀\n\nPrinting reality at 42Hz...", mfInformation | mfOKButton);
                 clearEvent(event);
                 break;
-                
+            case cmApiKey:
+                showApiKeyDialog();
+                clearEvent(event);
+                break;
+
             // Help menu commands
             case cmAbout:
                 messageBox("WIBWOBWORLD Test Pattern Generator\n\nBuilt with Turbo Vision\nつ◕‿◕‿◕༽つ", mfInformation | mfOKButton);
@@ -1589,6 +1609,57 @@ void TTestPatternApp::setPatternMode(bool continuous)
 }
 
 
+void TTestPatternApp::showApiKeyDialog()
+{
+    // Build dialog
+    TRect dlgRect(0, 0, 56, 10);
+    dlgRect.move((TProgram::deskTop->size.x - 56) / 2,
+                 (TProgram::deskTop->size.y - 10) / 2);
+
+    TDialog* dlg = new TDialog(dlgRect, "API Key");
+
+    dlg->insert(new TLabel(TRect(3, 2, 53, 3), "Anthropic API key (sk-ant-...):", nullptr));
+
+    TRect inputRect(3, 3, 53, 4);
+    TInputLine* input = new TInputLine(inputRect, 256);
+    dlg->insert(input);
+
+    // Status line showing current key state
+    std::string status = runtimeApiKey.empty() ? "No key set" : "Key configured";
+    dlg->insert(new TStaticText(TRect(3, 5, 53, 6), status.c_str()));
+
+    TRect okRect(12, 7, 24, 9);
+    TRect cancelRect(30, 7, 42, 9);
+    dlg->insert(new TButton(okRect, "~O~K", cmOK, bfDefault));
+    dlg->insert(new TButton(cancelRect, "Cancel", cmCancel, bfNormal));
+
+    ushort result = TProgram::deskTop->execView(dlg);
+    if (result == cmOK) {
+        char keyBuf[256];
+        input->getData(keyBuf);
+        std::string key(keyBuf);
+        // Trim whitespace
+        while (!key.empty() && (key.back() == ' ' || key.back() == '\0'))
+            key.pop_back();
+        while (!key.empty() && key.front() == ' ')
+            key.erase(key.begin());
+
+        if (!key.empty()) {
+            runtimeApiKey = key;
+            if (key.substr(0, 6) == "sk-ant") {
+                messageBox("API key set. Chat will use Anthropic API.",
+                           mfInformation | mfOKButton);
+            } else {
+                messageBox("Key set, but doesn't look like an Anthropic key (expected sk-ant-...).",
+                           mfWarning | mfOKButton);
+            }
+        } else {
+            messageBox("No key entered.", mfWarning | mfOKButton);
+        }
+    }
+    TObject::destroy(dlg);
+}
+
 void TTestPatternApp::takeScreenshot(bool showDialog)
 {
     // Create logs/screenshots/ directory if it doesn't exist.
@@ -1759,6 +1830,8 @@ TMenuBar* TTestPatternApp::initMenuBar(TRect r)
             *new TMenuItem("Animation ~S~tudio", cmAnimationStudio, kbNoKey) +
             newLine() +
             *new TMenuItem("~Q~uantum Printer", cmQuantumPrinter, kbF11) +
+            newLine() +
+            *new TMenuItem("API ~K~ey...", cmApiKey, kbNoKey) +
         *new TSubMenu("~H~elp", kbAltH) +
             *new TMenuItem("~A~bout WIBWOBWORLD", cmAbout, kbNoKey)
     );

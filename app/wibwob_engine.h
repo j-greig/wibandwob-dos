@@ -54,6 +54,10 @@ public:
     std::string getLastError() const;
     std::string getSessionId() const;  // Get current session ID (empty if provider doesn't support it)
 
+    // Runtime API key management (for browser mode)
+    void setApiKey(const std::string& key);
+    bool needsApiKey() const;
+
     // Tool support
     void initializeBuiltinTools();
     void registerTool(const Tool& tool);
