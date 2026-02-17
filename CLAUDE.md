@@ -83,6 +83,14 @@ Human / AI Agent
 - **`app/api_ipc.h/cpp`** — Unix socket listener, JSON command/response protocol
 - **`tools/api_server/main.py`** — FastAPI REST + WebSocket + MCP server (port 8089)
 
+### Command Registry (`app/command_registry.h/cpp`)
+
+**One list, many callers.** All TUI commands are defined once in `get_command_capabilities()`. Menu items, IPC socket, REST API, MCP tools, and Scramble's slash commands all read from the same registry. To add a new command: add to the capabilities vector + dispatch in `exec_registry_command()` + stub in test files. Never wire a command in multiple places separately.
+
+### Scramble (`app/scramble_view.h/cpp`, `app/scramble_engine.h/cpp`)
+
+Symbient cat. Three window states: hidden / smol (28×14, cat + bubble) / tall (full height, message history + input). Slash commands typed in Scramble's input check the command registry first — `/cascade`, `/screenshot`, `/scramble_pet` etc all execute. Commands not in registry fall through to `ScrambleEngine` for `/help`, `/who`, `/cmds`, or Haiku chat. API key for Haiku set via Tools > API Key or `ANTHROPIC_API_KEY` env var.
+
 ### LLM Provider System (`app/llm/`)
 
 Abstract provider interface (`ILLMProvider`) with factory dispatch. Active provider configured in `app/llm/config/llm_config.json`. Available providers:
