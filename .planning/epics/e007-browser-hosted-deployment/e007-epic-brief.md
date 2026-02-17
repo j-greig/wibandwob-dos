@@ -109,13 +109,19 @@ Target: $5 Hetzner VPS (2GB ARM), 4 concurrent rooms max.
 
 ## Open Questions
 
-1. Room creation UX — CLI tool? Web UI? Config file? (recommend: YAML + CLI first)
-2. Rate limiting — how many LLM messages per Twitter user per session?
-3. LLM costs — host's API key per room? Visitor brings own?
-4. Room capacity — 1:1 or many:1? (shared terminal = shared cursor if multiple visitors)
-5. Layout restoration — sequence of IPC `create_window` commands from config?
-6. Chat persistence format and location?
-7. Multi-visitor interaction model?
+Full technical planning report (build order, schema, risk register, auth design): [#57 comment](https://github.com/j-greig/wibandwob-dos/issues/57#issuecomment-3916823285)
+
+Three decisions needed before implementation starts:
+
+1. **API key model** — host key per room (recommended: host pays, rate limit bounds cost, visitor UX is clean) vs visitor brings own key (kills the "walk through a door" metaphor)
+2. **Multi-visitor model** — ttyd default is shared cursor when two visitors hit same room URL. Feature (shared space) or bug? Recommend: ship as shared in V1, revisit in V2.
+3. **Room creation UX** — hand-authored YAML + TUI-saved workspace JSON (recommended for V1) vs CLI wizard (2+ days extra)
+
+Resolved in planning report:
+- Rate limiting: 20 LLM messages/visitor/hour tracked in orchestrator, inject message on exceed
+- Layout restoration: `WIBWOB_LAYOUT_PATH` env var → auto-restore on startup via existing `loadWorkspaceFromFile()`
+- Chat persistence: JSON per visitor in `{state_dir}/chat_{handle}.json`, append after each LLM response
+- Room capacity: 4 concurrent rooms max on €3.79/mo Hetzner CAX11 ARM (~50MB/instance)
 
 ## Known Risks
 
@@ -137,11 +143,13 @@ Target: $5 Hetzner VPS (2GB ARM), 4 concurrent rooms max.
 ## Status
 
 Status: `not-started`
-GitHub issue: (create when work begins)
+GitHub issue: [#57](https://github.com/j-greig/wibandwob-dos/issues/57)
 PR: —
 
 ## References
 
+- Epic issue: [#57 — E007: Browser-Hosted Deployment (Teleport Rooms)](https://github.com/j-greig/wibandwob-dos/issues/57)
+- Planning report: [#57 comment — full technical analysis](https://github.com/j-greig/wibandwob-dos/issues/57#issuecomment-3916823285)
 - Spike issue: [#54 — SP: xterm.js PTY rendering validation](https://github.com/j-greig/wibandwob-dos/issues/54)
 - Spike branch: `spike/xterm-pty-validation`
 - Feature concept: `memories/2026/02/20260217-teleport-rooms.md`
