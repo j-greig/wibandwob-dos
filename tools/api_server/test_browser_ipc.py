@@ -8,12 +8,20 @@ AC-3: browser_fetch url=<url> → response ok
 """
 
 import json
+import os
 import socket
 import sys
 import time
 
 
-SOCK_PATH = "/tmp/test_pattern_app.sock"
+def _sock_path():
+    inst = os.environ.get("WIBWOB_INSTANCE")
+    if inst:
+        return f"/tmp/wibwob_{inst}.sock"
+    return "/tmp/test_pattern_app.sock"
+
+
+SOCK_PATH = _sock_path()
 
 
 def send_ipc(cmd: str) -> str:

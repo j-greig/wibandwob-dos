@@ -11,6 +11,7 @@
 #include <sys/un.h>
 #include <unistd.h>
 #include <cstring>
+#include <cstdlib>
 
 class TUIToolExecutor : public IToolExecutor {
 public:
@@ -75,11 +76,18 @@ private:
     std::string sendIpcCommand(const std::string& command) {
         int sock = socket(AF_UNIX, SOCK_STREAM, 0);
         if (sock < 0) return "";
-        
+
+        // Derive socket path from same env var as main app
+        std::string sockPath = "/tmp/test_pattern_app.sock";
+        const char* inst = std::getenv("WIBWOB_INSTANCE");
+        if (inst && inst[0] != '\0') {
+            sockPath = std::string("/tmp/wibwob_") + inst + ".sock";
+        }
+
         struct sockaddr_un addr;
         memset(&addr, 0, sizeof(addr));
         addr.sun_family = AF_UNIX;
-        strcpy(addr.sun_path, "/tmp/test_pattern_app.sock");
+        strncpy(addr.sun_path, sockPath.c_str(), sizeof(addr.sun_path) - 1);
         
         if (connect(sock, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
             close(sock);

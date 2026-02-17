@@ -6,7 +6,21 @@ import base64
 from typing import Dict, Optional
 
 
-SOCK_PATH = os.environ.get("TV_IPC_SOCK", "/tmp/test_pattern_app.sock")
+def _resolve_sock_path() -> str:
+    """Resolve IPC socket path.
+
+    Priority: TV_IPC_SOCK (explicit) > WIBWOB_INSTANCE (derived) > legacy default.
+    """
+    explicit = os.environ.get("TV_IPC_SOCK")
+    if explicit:
+        return explicit
+    instance = os.environ.get("WIBWOB_INSTANCE")
+    if instance:
+        return f"/tmp/wibwob_{instance}.sock"
+    return "/tmp/test_pattern_app.sock"
+
+
+SOCK_PATH = _resolve_sock_path()
 
 
 def send_cmd(cmd: str, kv: Optional[Dict[str, str]] = None) -> str:

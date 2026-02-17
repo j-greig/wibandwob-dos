@@ -197,6 +197,42 @@ std::string WibWobEngine::getSessionId() const {
     return "";
 }
 
+void WibWobEngine::setApiKey(const std::string& key) {
+    if (!config) {
+        loadConfiguration();
+    }
+    // Create anthropic_api provider directly, bypassing the isAvailable() gate.
+    // Key must be set BEFORE availability check — initializeProvider() checks
+    // isAvailable() which requires apiKey to be non-empty.
+    auto provider = LLMProviderFactory::getInstance().createProvider("anthropic_api");
+    if (!provider) {
+        fprintf(stderr, "ERROR: Failed to create anthropic_api provider\n");
+        return;
+    }
+    // Configure endpoint/model from config (if loaded)
+    if (config) {
+        ProviderConfig pc = config->getProviderConfig("anthropic_api");
+        std::string configJson = generateProviderConfigJson(pc);
+        provider->configure(configJson);
+    }
+    // Inject key BEFORE availability check
+    provider->setApiKey(key);
+    if (provider->isAvailable()) {
+        currentProvider = std::move(provider);
+        fprintf(stderr, "DEBUG: anthropic_api provider active with runtime key (len=%zu)\n", key.size());
+    } else {
+        fprintf(stderr, "ERROR: anthropic_api provider still not available after key injection\n");
+    }
+}
+
+bool WibWobEngine::needsApiKey() const {
+    if (!currentProvider) {
+        const_cast<WibWobEngine*>(this)->loadConfiguration();
+    }
+    if (!currentProvider) return true;
+    return currentProvider->needsApiKey();
+}
+
 void WibWobEngine::loadConfiguration() {
     config = std::make_unique<LLMConfig>();
     

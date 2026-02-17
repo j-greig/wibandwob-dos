@@ -34,6 +34,10 @@ public:
     
     // Session management
     void resetSession() override;
+
+    // Runtime API key injection
+    void setApiKey(const std::string& key) override;
+    bool needsApiKey() const override { return apiKey.empty(); }
     
     // Tool support (disabled for now to avoid tool_use path on simple sync client)
     bool supportsTools() const override { return false; }

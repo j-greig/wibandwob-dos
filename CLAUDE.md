@@ -60,7 +60,7 @@ Human / AI Agent
               │  ├─ Chat interface (wibwob_view)  │
               │  └─ IPC socket listener           │
               └───────────┬──────────────────────┘
-                          │ Unix socket (/tmp/test_pattern_app.sock)
+                          │ Unix socket (/tmp/wibwob_N.sock or legacy /tmp/test_pattern_app.sock)
               ┌───────────▼──────────────────────┐
               │  FastAPI Server (Python)          │
               │  tools/api_server/main.py         │
@@ -126,6 +126,15 @@ Content packs in `modules/` (public, shipped) and `modules-private/` (user conte
 | `app/README-CLAUDE-CONFIG.md` | Dual Claude instance setup, MCP config |
 | `tools/api_server/requirements.txt` | Python deps (FastAPI, uvicorn, pydantic, fastapi-mcp) |
 | `.gitmodules` | tvision submodule at `vendor/tvision` |
+
+### Multi-Instance Environment Variables
+
+| Variable | Effect |
+|----------|--------|
+| `WIBWOB_INSTANCE` | Instance ID (e.g. `1`, `2`). Drives socket path `/tmp/wibwob_N.sock`. Unset = legacy `/tmp/test_pattern_app.sock` |
+| `TV_IPC_SOCK` | Explicit socket path override (Python only, takes priority over `WIBWOB_INSTANCE`) |
+
+Launch multiple instances: `./tools/scripts/launch_tmux.sh [N]` (tmux + monitor sidebar).
 
 ## Dependencies
 

@@ -10,7 +10,7 @@
       "sessionTimeout": 3600
     },
     "anthropic_api": {
-      "enabled": false,
+      "enabled": true,
       "model": "claude-sonnet-4-5",
       "endpoint": "https://api.anthropic.com/v1/messages",
       "apiKeyEnv": "ANTHROPIC_API_KEY",
