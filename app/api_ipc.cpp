@@ -95,6 +95,9 @@ extern std::string api_send_text(TTestPatternApp& app, const std::string& id,
                                  const std::string& position);
 extern std::string api_send_figlet(TTestPatternApp& app, const std::string& id, const std::string& text,
                                    const std::string& font, int width, const std::string& mode);
+extern std::string api_set_theme_mode(TTestPatternApp& app, const std::string& mode);
+extern std::string api_set_theme_variant(TTestPatternApp& app, const std::string& variant);
+extern std::string api_reset_theme(TTestPatternApp& app);
 
 ApiIpcServer::ApiIpcServer(TTestPatternApp* app) : app_(app) {}
 
@@ -393,6 +396,22 @@ void ApiIpcServer::poll() {
         } else {
             resp = "err missing url\n";
         }
+    } else if (cmd == "set_theme_mode") {
+        auto mode_it = kv.find("mode");
+        if (mode_it != kv.end() && !mode_it->second.empty()) {
+            resp = api_set_theme_mode(*app_, mode_it->second) + "\n";
+        } else {
+            resp = "err missing mode\n";
+        }
+    } else if (cmd == "set_theme_variant") {
+        auto variant_it = kv.find("variant");
+        if (variant_it != kv.end() && !variant_it->second.empty()) {
+            resp = api_set_theme_variant(*app_, variant_it->second) + "\n";
+        } else {
+            resp = "err missing variant\n";
+        }
+    } else if (cmd == "reset_theme") {
+        resp = api_reset_theme(*app_) + "\n";
     } else {
         resp = "err unknown cmd\n";
     }
