@@ -6,6 +6,8 @@
 
 extern void api_cascade(TTestPatternApp& app);
 extern void api_toggle_scramble(TTestPatternApp& app);
+extern void api_expand_scramble(TTestPatternApp& app);
+extern std::string api_scramble_say(TTestPatternApp& app, const std::string& text);
 extern void api_tile(TTestPatternApp& app);
 extern void api_close_all(TTestPatternApp& app);
 extern void api_save_workspace(TTestPatternApp& app);
@@ -29,6 +31,8 @@ const std::vector<CommandCapability>& get_command_capabilities() {
         {"set_theme_variant", "Set theme variant: monochrome or dark_pastel", true},
         {"reset_theme", "Reset theme to default (monochrome + light)", false},
         {"open_scramble", "Toggle Scramble cat overlay", false},
+        {"scramble_expand", "Toggle Scramble between smol and tall mode", false},
+        {"scramble_say", "Send a message to Scramble chat (requires text param)", true},
     };
     return capabilities;
 }
@@ -121,6 +125,16 @@ std::string exec_registry_command(
     if (name == "open_scramble") {
         api_toggle_scramble(app);
         return "ok";
+    }
+    if (name == "scramble_expand") {
+        api_expand_scramble(app);
+        return "ok";
+    }
+    if (name == "scramble_say") {
+        auto it = kv.find("text");
+        if (it == kv.end() || it->second.empty())
+            return "err missing text";
+        return api_scramble_say(app, it->second);
     }
     return "err unknown command";
 }

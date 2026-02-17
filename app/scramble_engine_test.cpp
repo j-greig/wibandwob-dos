@@ -22,6 +22,8 @@ std::string api_set_theme_mode(TTestPatternApp&, const std::string&) { return "o
 std::string api_set_theme_variant(TTestPatternApp&, const std::string&) { return "ok"; }
 std::string api_reset_theme(TTestPatternApp&) { return "ok"; }
 void api_toggle_scramble(TTestPatternApp&) {}
+void api_expand_scramble(TTestPatternApp&) {}
+std::string api_scramble_say(TTestPatternApp&, const std::string&) { return "ok"; }
 
 static int failures = 0;
 

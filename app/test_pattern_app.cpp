@@ -193,7 +193,9 @@ const ushort cmWibWobTestC = 160;  // Scrollbar test: Split view architecture
 const ushort cmRepaint = 161;      // Force repaint
 const ushort cmBrowser = 170;      // Browser window
 const ushort cmApiKey = 171;       // API key entry dialog
-const ushort cmScrambleCat = 180;  // Scramble cat toggle
+// cmScrambleToggle (180) defined in scramble_view.h
+const ushort cmScrambleCat = cmScrambleToggle;  // alias for menu/IPC
+const ushort cmScrambleExpand = 181;  // Scramble expand/shrink
 
 // Help menu commands
 const ushort cmAbout = 129;
@@ -597,7 +599,10 @@ private:
     // Scramble cat overlay
     TScrambleWindow* scrambleWindow;
     ScrambleEngine scrambleEngine;
+    ScrambleDisplayState scrambleState;
     void toggleScramble();
+    void toggleScrambleExpand();
+    void wireScrambleInput();
 
     // Runtime API key (shared across all chat windows)
     static std::string runtimeApiKey;
@@ -666,6 +671,8 @@ private:
     friend void api_open_animation_path(TTestPatternApp&, const std::string&, const TRect* bounds);
     friend void api_cascade(TTestPatternApp&);
     friend void api_toggle_scramble(TTestPatternApp&);
+    friend void api_expand_scramble(TTestPatternApp&);
+    friend std::string api_scramble_say(TTestPatternApp&, const std::string&);
     friend void api_tile(TTestPatternApp&);
     friend void api_close_all(TTestPatternApp&);
     friend void api_set_pattern_mode(TTestPatternApp&, const std::string&);
@@ -701,7 +708,8 @@ TTestPatternApp::TTestPatternApp() :
               &TTestPatternApp::initMenuBar,
               &TTestPatternApp::initDeskTop),
     windowNumber(0),
-    scrambleWindow(nullptr)
+    scrambleWindow(nullptr),
+    scrambleState(sdsHidden)
 {
     // Start IPC server for local API control (best-effort; ignore failures)
     ipcServer = new ApiIpcServer(this);
@@ -841,6 +849,10 @@ void TTestPatternApp::handleEvent(TEvent& event)
                 break;
             case cmScrambleCat:
                 toggleScramble();
+                clearEvent(event);
+                break;
+            case cmScrambleExpand:
+                toggleScrambleExpand();
                 clearEvent(event);
                 break;
             case cmAsciiGridDemo: {
@@ -1258,26 +1270,111 @@ void TTestPatternApp::newBrowserWindow(const TRect& bounds)
         browser->fetchUrl("https://symbient.life");
 }
 
+void TTestPatternApp::wireScrambleInput()
+{
+    if (!scrambleWindow || !scrambleWindow->getInputView()) return;
+
+    scrambleWindow->getInputView()->onSubmit = [this](const std::string& input) {
+        if (!scrambleWindow) return;
+
+        // Add user message to history
+        if (scrambleWindow->getMessageView()) {
+            scrambleWindow->getMessageView()->addMessage("you", input);
+        }
+
+        // Query engine
+        std::string response;
+        response = scrambleEngine.ask(input);
+        if (response.empty()) {
+            response = "... (=^..^=)";
+        }
+
+        // Show response in bubble and history
+        if (scrambleWindow->getView()) {
+            scrambleWindow->getView()->setPose(spCurious);
+            scrambleWindow->getView()->say(response);
+        }
+        if (scrambleWindow->getMessageView()) {
+            scrambleWindow->getMessageView()->addMessage("scramble", response);
+        }
+    };
+}
+
 void TTestPatternApp::toggleScramble()
 {
     if (scrambleWindow) {
         // Remove existing Scramble window
         destroy(scrambleWindow);
         scrambleWindow = nullptr;
+        scrambleState = sdsHidden;
     } else {
-        // Create at bottom-right corner of desktop
+        // Create at bottom-right corner of desktop in smol mode
         TRect desktop = deskTop->getExtent();
         int w = 28;
         int h = 14;
         TRect r(desktop.b.x - w - 1, desktop.b.y - h,
                 desktop.b.x - 1,     desktop.b.y);
-        scrambleWindow = static_cast<TScrambleWindow*>(createScrambleWindow(r));
+        scrambleWindow = static_cast<TScrambleWindow*>(createScrambleWindow(r, sdsSmol));
+        scrambleState = sdsSmol;
         // Wire engine into view
         if (scrambleWindow->getView()) {
             scrambleWindow->getView()->setEngine(&scrambleEngine);
         }
+        wireScrambleInput();
         deskTop->insert(scrambleWindow);
         // Put behind other windows (just in front of background)
+        if (deskTop->background) {
+            scrambleWindow->putInFrontOf((TView*)deskTop->background);
+        }
+    }
+}
+
+void TTestPatternApp::toggleScrambleExpand()
+{
+    if (!scrambleWindow) {
+        // Not visible — create in tall mode directly
+        TRect desktop = deskTop->getExtent();
+        int w = 30;
+        TRect r(desktop.b.x - w - 1, desktop.a.y,
+                desktop.b.x - 1,     desktop.b.y);
+        scrambleWindow = static_cast<TScrambleWindow*>(createScrambleWindow(r, sdsTall));
+        scrambleState = sdsTall;
+        if (scrambleWindow->getView()) {
+            scrambleWindow->getView()->setEngine(&scrambleEngine);
+        }
+        wireScrambleInput();
+        deskTop->insert(scrambleWindow);
+        scrambleWindow->focusInput();
+        // Welcome message in message history
+        if (scrambleWindow->getMessageView()) {
+            scrambleWindow->getMessageView()->addMessage("scramble", "mrrp! ask me anything (=^..^=)");
+        }
+    } else if (scrambleState == sdsSmol) {
+        // Expand: smol -> tall
+        TRect desktop = deskTop->getExtent();
+        int w = 30;
+        TRect r(desktop.b.x - w - 1, desktop.a.y,
+                desktop.b.x - 1,     desktop.b.y);
+        scrambleWindow->changeBounds(r);
+        scrambleWindow->setDisplayState(sdsTall);
+        scrambleState = sdsTall;
+        scrambleWindow->focusInput();
+        // Welcome message if history is empty
+        if (scrambleWindow->getMessageView() &&
+            scrambleWindow->getMessageView()->getMessages().empty()) {
+            scrambleWindow->getMessageView()->addMessage("scramble", "mrrp! ask me anything (=^..^=)");
+        }
+    } else if (scrambleState == sdsTall) {
+        // Shrink: tall -> smol
+        TRect desktop = deskTop->getExtent();
+        int w = 28;
+        int h = 14;
+        TRect r(desktop.b.x - w - 1, desktop.b.y - h,
+                desktop.b.x - 1,     desktop.b.y);
+        scrambleWindow->setDisplayState(sdsSmol);
+        scrambleWindow->changeBounds(r);
+        scrambleState = sdsSmol;
+        // Put behind other windows
         if (deskTop->background) {
             scrambleWindow->putInFrontOf((TView*)deskTop->background);
         }
@@ -1845,6 +1942,7 @@ TMenuBar* TTestPatternApp::initMenuBar(TRect r)
             *new TMenuItem("~F~ull Screen", cmFullScreen, kbF11) +
             newLine() +
             *new TMenuItem("Scra~m~ble Cat", cmScrambleCat, kbF8) +
+            *new TMenuItem("Scramble E~x~pand", cmScrambleExpand, kbShiftF8) +
         *new TSubMenu("~W~indow", kbAltW) +
             *new TMenuItem("~E~dit Text Editor", cmTextEditor, kbNoKey) +
             *new TMenuItem("~B~rowser", cmBrowser, kbCtrlB) +
@@ -2122,6 +2220,24 @@ void api_open_animation_path(TTestPatternApp& app, const std::string& path, cons
 
 void api_cascade(TTestPatternApp& app) { app.cascade(); }
 void api_toggle_scramble(TTestPatternApp& app) { app.toggleScramble(); }
+void api_expand_scramble(TTestPatternApp& app) { app.toggleScrambleExpand(); }
+
+std::string api_scramble_say(TTestPatternApp& app, const std::string& text) {
+    if (!app.scrambleWindow) return "err scramble not open";
+    // Simulate user sending a message — same as onSubmit
+    auto* msgView = app.scrambleWindow->getMessageView();
+    if (msgView) msgView->addMessage("you", text);
+
+    std::string response = app.scrambleEngine.ask(text);
+    if (response.empty()) response = "... (=^..^=)";
+
+    if (app.scrambleWindow->getView()) {
+        app.scrambleWindow->getView()->setPose(spCurious);
+        app.scrambleWindow->getView()->say(response);
+    }
+    if (msgView) msgView->addMessage("scramble", response);
+    return response;
+}
 void api_tile(TTestPatternApp& app) { app.tile(); }
 void api_close_all(TTestPatternApp& app) { app.closeAll(); }
 

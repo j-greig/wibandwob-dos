@@ -22,6 +22,10 @@
 
 #include <string>
 #include <vector>
+#include <functional>
+
+// Command constants for Scramble subsystem
+const ushort cmScrambleToggle = 180;   // Toggle scramble visibility
 
 // Forward declare — engine lives in scramble_engine.h (no tvision dependency)
 class ScrambleEngine;
@@ -35,6 +39,16 @@ enum ScramblePose {
     spSleeping = 1,
     spCurious  = 2,
     spCount    = 3
+};
+
+/*---------------------------------------------------------*/
+/* ScrambleDisplayState - window size states                */
+/*---------------------------------------------------------*/
+
+enum ScrambleDisplayState {
+    sdsHidden = 0,
+    sdsSmol   = 1,
+    sdsTall   = 2
 };
 
 /*---------------------------------------------------------*/
@@ -95,19 +109,96 @@ private:
 };
 
 /*---------------------------------------------------------*/
+/* TScrambleMessageView - minimal message history          */
+/*---------------------------------------------------------*/
+
+struct ScrambleMessage {
+    std::string sender;  // "you" or "scramble"
+    std::string text;
+};
+
+class TScrambleMessageView : public TView
+{
+public:
+    TScrambleMessageView(const TRect& bounds);
+
+    virtual void draw() override;
+
+    void addMessage(const std::string& sender, const std::string& text);
+    void clear();
+    const std::vector<ScrambleMessage>& getMessages() const { return messages; }
+
+private:
+    std::vector<ScrambleMessage> messages;
+
+    struct WrappedLine {
+        std::string text;
+        bool isSenderLine;
+    };
+    std::vector<WrappedLine> wrappedLines;
+
+    void rebuildWrappedLines();
+    std::vector<std::string> wrapText(const std::string& text, int width) const;
+};
+
+/*---------------------------------------------------------*/
+/* TScrambleInputView - minimal single-line input          */
+/*---------------------------------------------------------*/
+
+class TScrambleInputView : public TView
+{
+public:
+    TScrambleInputView(const TRect& bounds);
+    virtual ~TScrambleInputView();
+
+    virtual void draw() override;
+    virtual void handleEvent(TEvent& event) override;
+    virtual void setState(ushort aState, Boolean enable) override;
+
+    std::string getCurrentInput() const { return currentInput; }
+    void clearInput();
+
+    // Callback when user presses Enter
+    std::function<void(const std::string&)> onSubmit;
+
+private:
+    std::string currentInput;
+    int cursorPos;
+
+    // Cursor blink
+    bool cursorVisible;
+    void* cursorTimerId;
+    void startCursorBlink();
+    void stopCursorBlink();
+};
+
+/*---------------------------------------------------------*/
 /* TScrambleWindow - minimal-chrome wrapper                */
 /*---------------------------------------------------------*/
 
 class TScrambleWindow : public TWindow
 {
 public:
-    TScrambleWindow(const TRect& bounds);
+    TScrambleWindow(const TRect& bounds, ScrambleDisplayState initialState = sdsSmol);
 
     TScrambleView* getView() { return scrambleView; }
+    TScrambleMessageView* getMessageView() { return messageView; }
+    TScrambleInputView* getInputView() { return inputView; }
+    ScrambleDisplayState getDisplayState() const { return displayState; }
+
+    void setDisplayState(ScrambleDisplayState state);
+    void focusInput();
     virtual void changeBounds(const TRect& bounds) override;
+    virtual void handleEvent(TEvent& event) override;
+    virtual void setState(ushort aState, Boolean enable) override;
 
 private:
+    ScrambleDisplayState displayState;
     TScrambleView* scrambleView;
+    TScrambleMessageView* messageView;
+    TScrambleInputView* inputView;
+
+    void layoutChildren();
     static TFrame* initFrame(TRect r);
 };
 
@@ -115,6 +206,6 @@ private:
 /* Factory                                                 */
 /*---------------------------------------------------------*/
 
-TWindow* createScrambleWindow(const TRect& bounds);
+TWindow* createScrambleWindow(const TRect& bounds, ScrambleDisplayState state = sdsSmol);
 
 #endif // SCRAMBLE_VIEW_H

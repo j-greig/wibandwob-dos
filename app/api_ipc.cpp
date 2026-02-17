@@ -15,6 +15,31 @@
 #include <vector>
 #include <fstream>
 
+// Percent-decode IPC values (%20 -> space, %0A -> newline, etc.)
+static std::string percent_decode(const std::string& s) {
+    std::string out;
+    out.reserve(s.size());
+    for (size_t i = 0; i < s.size(); ++i) {
+        if (s[i] == '%' && i + 2 < s.size()) {
+            char hi = s[i+1], lo = s[i+2];
+            auto hexval = [](char c) -> int {
+                if (c >= '0' && c <= '9') return c - '0';
+                if (c >= 'a' && c <= 'f') return 10 + c - 'a';
+                if (c >= 'A' && c <= 'F') return 10 + c - 'A';
+                return -1;
+            };
+            int h = hexval(hi), l = hexval(lo);
+            if (h >= 0 && l >= 0) {
+                out += static_cast<char>((h << 4) | l);
+                i += 2;
+                continue;
+            }
+        }
+        out += s[i];
+    }
+    return out;
+}
+
 // Base64 decoding function
 static const std::string base64_chars =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -165,7 +190,7 @@ void ApiIpcServer::poll() {
             } else {
                 auto eq = tok.find('=');
                 if (eq != std::string::npos) {
-                    kv[tok.substr(0, eq)] = tok.substr(eq+1);
+                    kv[tok.substr(0, eq)] = percent_decode(tok.substr(eq+1));
                 }
             }
         }

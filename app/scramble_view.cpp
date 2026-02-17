@@ -2,6 +2,7 @@
 /*                                                         */
 /*   scramble_view.cpp - Scramble the Symbient Cat         */
 /*   ASCII cat presence with speech bubbles                */
+/*   + expand states: smol / tall with message history     */
 /*                                                         */
 /*---------------------------------------------------------*/
 
@@ -144,7 +145,7 @@ void TScrambleView::toggleVisible()
 }
 
 /*---------------------------------------------------------*/
-/* Word wrap                                               */
+/* Word wrap (shared helper)                               */
 /*---------------------------------------------------------*/
 
 std::vector<std::string> TScrambleView::wordWrap(const std::string& text, int width) const
@@ -338,30 +339,488 @@ void TScrambleView::handleEvent(TEvent& event)
     }
 }
 
-/*---------------------------------------------------------*/
-/* TScrambleWindow                                         */
-/*---------------------------------------------------------*/
+/*=========================================================*/
+/*  TScrambleMessageView - minimal message history         */
+/*=========================================================*/
 
-TScrambleWindow::TScrambleWindow(const TRect& bounds)
-    : TWindow(bounds, "", wnNoNumber),
-      TWindowInit(&TScrambleWindow::initFrame)
+static std::vector<std::string> simpleWordWrap(const std::string& text, int width)
 {
-    flags = 0;  // No close/zoom/resize frame buttons
-    options &= ~ofSelectable;  // Don't steal focus from other windows
+    std::vector<std::string> lines;
+    if (text.empty() || width <= 0) return lines;
 
+    std::string current;
+    std::string word;
+
+    for (size_t i = 0; i <= text.size(); ++i) {
+        char ch = (i < text.size()) ? text[i] : ' ';
+        if (ch == ' ' || ch == '\n' || i == text.size()) {
+            if (!word.empty()) {
+                if (current.empty()) {
+                    current = word;
+                } else if (static_cast<int>(current.size() + 1 + word.size()) <= width) {
+                    current += ' ';
+                    current += word;
+                } else {
+                    lines.push_back(current);
+                    current = word;
+                }
+                word.clear();
+            }
+            if (ch == '\n' && !current.empty()) {
+                lines.push_back(current);
+                current.clear();
+            }
+        } else {
+            word += ch;
+        }
+    }
+    if (!current.empty()) {
+        lines.push_back(current);
+    }
+    return lines;
+}
+
+TScrambleMessageView::TScrambleMessageView(const TRect& bounds)
+    : TView(bounds)
+{
+    growMode = gfGrowHiX | gfGrowHiY;
+    eventMask = 0; // passive — no events needed
+}
+
+void TScrambleMessageView::addMessage(const std::string& sender, const std::string& text)
+{
+    ScrambleMessage msg;
+    msg.sender = sender;
+    msg.text = text;
+    messages.push_back(msg);
+    rebuildWrappedLines();
+    drawView();
+}
+
+void TScrambleMessageView::clear()
+{
+    messages.clear();
+    wrappedLines.clear();
+    drawView();
+}
+
+void TScrambleMessageView::rebuildWrappedLines()
+{
+    wrappedLines.clear();
+    int textWidth = size.x - 2; // 1 char padding each side
+    if (textWidth < 4) textWidth = 4;
+
+    for (size_t i = 0; i < messages.size(); ++i) {
+        const auto& msg = messages[i];
+        // Sender line
+        WrappedLine senderLine;
+        senderLine.text = msg.sender + ":";
+        senderLine.isSenderLine = true;
+        wrappedLines.push_back(senderLine);
+
+        // Wrapped content lines
+        std::vector<std::string> lines = simpleWordWrap(msg.text, textWidth - 1);
+        for (size_t j = 0; j < lines.size(); ++j) {
+            WrappedLine wl;
+            wl.text = " " + lines[j];
+            wl.isSenderLine = false;
+            wrappedLines.push_back(wl);
+        }
+    }
+}
+
+void TScrambleMessageView::draw()
+{
+    TDrawBuffer b;
+
+    // Colours
+    TColorAttr bgAttr = TColorAttr(TColorRGB(160, 160, 170), TColorRGB(30, 30, 40));
+    TColorAttr senderAttr = TColorAttr(TColorRGB(200, 180, 120), TColorRGB(30, 30, 40));
+    TColorAttr textAttr = TColorAttr(TColorRGB(190, 190, 200), TColorRGB(30, 30, 40));
+
+    // Show last N lines that fit in the view
+    int totalLines = static_cast<int>(wrappedLines.size());
+    int startLine = totalLines - size.y;
+    if (startLine < 0) startLine = 0;
+
+    for (int row = 0; row < size.y; ++row) {
+        b.moveChar(0, ' ', bgAttr, size.x);
+
+        int lineIdx = startLine + row;
+        if (lineIdx < totalLines) {
+            const auto& wl = wrappedLines[lineIdx];
+            TColorAttr attr = wl.isSenderLine ? senderAttr : textAttr;
+            // Pad/truncate to fit
+            std::string display = " " + wl.text;
+            if (static_cast<int>(display.size()) > size.x)
+                display = display.substr(0, size.x);
+            b.moveStr(0, display.c_str(), attr);
+        }
+
+        writeLine(0, row, size.x, 1, b);
+    }
+}
+
+std::vector<std::string> TScrambleMessageView::wrapText(const std::string& text, int width) const
+{
+    return simpleWordWrap(text, width);
+}
+
+/*=========================================================*/
+/*  TScrambleInputView - minimal single-line input         */
+/*=========================================================*/
+
+TScrambleInputView::TScrambleInputView(const TRect& bounds)
+    : TView(bounds),
+      cursorPos(0),
+      cursorVisible(true),
+      cursorTimerId(0)
+{
+    growMode = gfGrowHiX | gfGrowLoY | gfGrowHiY;
+    eventMask |= evKeyDown | evBroadcast;
+    options |= ofSelectable | ofFirstClick;
+}
+
+TScrambleInputView::~TScrambleInputView()
+{
+    stopCursorBlink();
+}
+
+void TScrambleInputView::startCursorBlink()
+{
+    if (cursorTimerId == 0)
+        cursorTimerId = setTimer(500, 500); // 500ms blink
+}
+
+void TScrambleInputView::stopCursorBlink()
+{
+    if (cursorTimerId != 0) {
+        killTimer(cursorTimerId);
+        cursorTimerId = 0;
+    }
+}
+
+void TScrambleInputView::setState(ushort aState, Boolean enable)
+{
+    TView::setState(aState, enable);
+    if ((aState & sfFocused) != 0) {
+        if (enable) {
+            startCursorBlink();
+            cursorVisible = true;
+        } else {
+            stopCursorBlink();
+            cursorVisible = false;
+        }
+        drawView();
+    }
+}
+
+void TScrambleInputView::clearInput()
+{
+    currentInput.clear();
+    cursorPos = 0;
+    drawView();
+}
+
+void TScrambleInputView::draw()
+{
+    TDrawBuffer b;
+
+    // Colours
+    TColorAttr promptAttr = TColorAttr(TColorRGB(200, 180, 120), TColorRGB(25, 25, 35));
+    TColorAttr inputAttr = TColorAttr(TColorRGB(220, 220, 230), TColorRGB(25, 25, 35));
+    TColorAttr cursorAttr = TColorAttr(TColorRGB(25, 25, 35), TColorRGB(220, 220, 230));
+
+    // Separator line on row 0
+    TColorAttr sepAttr = TColorAttr(TColorRGB(80, 80, 100), TColorRGB(25, 25, 35));
+    b.moveChar(0, '\xC4', sepAttr, size.x);
+    writeLine(0, 0, size.x, 1, b);
+
+    // Input line on row 1
+    b.moveChar(0, ' ', inputAttr, size.x);
+    b.moveStr(0, "> ", promptAttr);
+
+    // Render input text
+    int maxTextWidth = size.x - 3; // "> " prefix + 1 for cursor
+    int displayStart = 0;
+    if (cursorPos > maxTextWidth)
+        displayStart = cursorPos - maxTextWidth;
+    std::string visible = currentInput.substr(displayStart,
+                                              maxTextWidth);
+    b.moveStr(2, visible.c_str(), inputAttr);
+
+    // Draw cursor
+    if (cursorVisible && (state & sfFocused)) {
+        int cursorX = 2 + (cursorPos - displayStart);
+        if (cursorX < size.x) {
+            char cursorChar = (cursorPos < static_cast<int>(currentInput.size()))
+                ? currentInput[cursorPos] : ' ';
+            char buf[2] = { cursorChar, 0 };
+            b.moveStr(cursorX, buf, cursorAttr);
+        }
+    }
+
+    writeLine(0, 1, size.x, 1, b);
+}
+
+void TScrambleInputView::handleEvent(TEvent& event)
+{
+    // Handle keyboard events directly — don't pass to TView first
+    // (avoids TV's focus-gating on keyboard dispatch)
+    if (event.what == evKeyDown) {
+        ushort keyCode = event.keyDown.keyCode;
+        char ch = event.keyDown.charScan.charCode;
+
+        if (keyCode == kbEnter) {
+            if (!currentInput.empty() && onSubmit) {
+                std::string input = currentInput;
+                clearInput();
+                onSubmit(input);
+            }
+            clearEvent(event);
+        } else if (keyCode == kbBack) {
+            if (cursorPos > 0) {
+                currentInput.erase(cursorPos - 1, 1);
+                cursorPos--;
+                drawView();
+            }
+            clearEvent(event);
+        } else if (keyCode == kbDel) {
+            if (cursorPos < static_cast<int>(currentInput.size())) {
+                currentInput.erase(cursorPos, 1);
+                drawView();
+            }
+            clearEvent(event);
+        } else if (keyCode == kbLeft) {
+            if (cursorPos > 0) {
+                cursorPos--;
+                drawView();
+            }
+            clearEvent(event);
+        } else if (keyCode == kbRight) {
+            if (cursorPos < static_cast<int>(currentInput.size())) {
+                cursorPos++;
+                drawView();
+            }
+            clearEvent(event);
+        } else if (keyCode == kbHome) {
+            cursorPos = 0;
+            drawView();
+            clearEvent(event);
+        } else if (keyCode == kbEnd) {
+            cursorPos = static_cast<int>(currentInput.size());
+            drawView();
+            clearEvent(event);
+        } else if (ch >= 32 && ch < 127) {
+            // Printable character
+            currentInput.insert(currentInput.begin() + cursorPos, ch);
+            cursorPos++;
+            drawView();
+            clearEvent(event);
+        }
+        return;
+    }
+
+    // Let base class handle non-keyboard events (broadcasts, etc.)
+    TView::handleEvent(event);
+
+    if (event.what == evBroadcast && event.message.command == cmTimerExpired) {
+        if (cursorTimerId != 0 && event.message.infoPtr == cursorTimerId) {
+            cursorVisible = !cursorVisible;
+            drawView();
+            clearEvent(event);
+        }
+    }
+}
+
+/*=========================================================*/
+/*  TScrambleWindow                                        */
+/*=========================================================*/
+
+// Heights for cat view region (cat art + bubble space)
+static const int kCatViewHeight = 12;
+// Height for input view (separator + input line)
+static const int kInputViewHeight = 2;
+
+TScrambleWindow::TScrambleWindow(const TRect& bounds, ScrambleDisplayState initialState)
+    : TWindow(bounds, "", wnNoNumber),
+      TWindowInit(&TScrambleWindow::initFrame),
+      displayState(initialState),
+      scrambleView(nullptr),
+      messageView(nullptr),
+      inputView(nullptr)
+{
+    // Smol: no chrome. Tall: close + move + title.
+    if (displayState == sdsSmol) {
+        flags = 0;
+        options &= ~ofSelectable;  // Don't steal focus from other windows
+    } else {
+        flags = wfClose | wfMove;
+        delete[] (char*)title;
+        title = newStr("Scramble");
+    }
+
+    // Create all subviews — visibility managed by layoutChildren
     TRect interior = getExtent();
     interior.grow(-1, -1);
 
+    // Cat view always exists
     scrambleView = new TScrambleView(interior);
     insert(scrambleView);
+
+    // Message view — created but hidden in smol
+    messageView = new TScrambleMessageView(interior);
+    insert(messageView);
+
+    // Input view — created but hidden in smol
+    TRect inputRect(interior.a.x, interior.b.y - kInputViewHeight,
+                    interior.b.x, interior.b.y);
+    inputView = new TScrambleInputView(inputRect);
+    insert(inputView);
+
+    layoutChildren();
+}
+
+void TScrambleWindow::setDisplayState(ScrambleDisplayState state)
+{
+    if (state == displayState) return;
+    displayState = state;
+
+    if (displayState == sdsSmol) {
+        flags = 0;
+        options &= ~ofSelectable;
+        delete[] (char*)title;
+        title = newStr("");
+    } else if (displayState == sdsTall) {
+        flags = wfClose | wfMove;
+        options |= ofSelectable;
+        delete[] (char*)title;
+        title = newStr("Scramble");
+    }
+
+    layoutChildren();
+}
+
+void TScrambleWindow::layoutChildren()
+{
+    TRect interior = getExtent();
+    interior.grow(-1, -1);
+    int h = interior.b.y - interior.a.y;
+
+    if (displayState == sdsSmol) {
+        // Smol: cat view fills everything, message + input hidden
+        if (messageView) messageView->hide();
+        if (inputView) inputView->hide();
+        if (scrambleView) {
+            scrambleView->changeBounds(interior);
+            scrambleView->show();
+        }
+    } else if (displayState == sdsTall) {
+        // Tall layout:
+        //   [message view]  top to (bottom - catViewHeight - inputHeight)
+        //   [input view]    2 rows above cat
+        //   [cat view]      bottom kCatViewHeight rows
+
+        if (h < kInputViewHeight + 4) {
+            // Too small for tall layout — hide message/input, show cat only
+            if (messageView) messageView->hide();
+            if (inputView) inputView->hide();
+            if (scrambleView) {
+                scrambleView->changeBounds(interior);
+                scrambleView->show();
+            }
+            drawView();
+            return;
+        }
+
+        int catH = std::min(kCatViewHeight, h);
+        int inputH = kInputViewHeight;
+        int msgH = h - catH - inputH;
+        if (msgH < 2) msgH = 2; // minimum message area
+
+        int msgTop = interior.a.y;
+        int msgBot = msgTop + msgH;
+        int inputTop = msgBot;
+        int inputBot = inputTop + inputH;
+        int catTop = inputBot;
+        int catBot = interior.b.y;
+
+        if (messageView) {
+            TRect msgRect(interior.a.x, msgTop, interior.b.x, msgBot);
+            messageView->changeBounds(msgRect);
+            messageView->show();
+        }
+        if (inputView) {
+            TRect inputRect(interior.a.x, inputTop, interior.b.x, inputBot);
+            inputView->changeBounds(inputRect);
+            inputView->show();
+        }
+        if (scrambleView) {
+            TRect catRect(interior.a.x, catTop, interior.b.x, catBot);
+            scrambleView->changeBounds(catRect);
+            scrambleView->show();
+        }
+    }
+
+    drawView();
+}
+
+void TScrambleWindow::focusInput()
+{
+    if (displayState == sdsTall && inputView) {
+        options |= ofSelectable;
+        // select() on TWindow only calls makeFirst() (Z-order) due to ofTopSelect,
+        // then resetCurrent() picks the FIRST visible+selectable view from the
+        // bottom of the Z-list — which may be a DIFFERENT window.
+        // Fix: directly set this window as desktop's current focused view.
+        if (owner) {
+            makeFirst();
+            TGroup* grp = static_cast<TGroup*>(owner);
+            grp->setCurrent(this, normalSelect);
+        }
+        // Then route focus to input view within this window
+        inputView->select();
+    }
+}
+
+void TScrambleWindow::handleEvent(TEvent& event)
+{
+    // Close button → toggle off via app command (prevents dangling pointer)
+    if (event.what == evCommand && event.message.command == cmClose) {
+        clearEvent(event);
+        TEvent toggle;
+        toggle.what = evCommand;
+        toggle.message.command = cmScrambleToggle;
+        toggle.message.infoPtr = nullptr;
+        putEvent(toggle);
+        return;
+    }
+
+    // In tall mode, forward keyboard to input view.
+    // inputView only consumes keys it knows (printable, backspace, arrows, enter).
+    // Unconsumed keys fall through to TWindow::handleEvent for normal dispatch.
+    if (displayState == sdsTall && inputView && (inputView->state & sfVisible)) {
+        if (event.what == evKeyDown) {
+            inputView->handleEvent(event);
+            if (event.what == evNothing) return;
+        }
+    }
+    TWindow::handleEvent(event);
+}
+
+void TScrambleWindow::setState(ushort aState, Boolean enable)
+{
+    TWindow::setState(aState, enable);
+    // When the window gets focused, route to the input view in tall mode
+    if ((aState & sfFocused) && enable && displayState == sdsTall && inputView) {
+        inputView->select();
+    }
 }
 
 void TScrambleWindow::changeBounds(const TRect& bounds)
 {
     TWindow::changeBounds(bounds);
-    if (scrambleView) {
-        scrambleView->drawView();
-    }
+    layoutChildren();
 }
 
 TFrame* TScrambleWindow::initFrame(TRect r)
@@ -373,7 +832,7 @@ TFrame* TScrambleWindow::initFrame(TRect r)
 /* Factory                                                 */
 /*---------------------------------------------------------*/
 
-TWindow* createScrambleWindow(const TRect& bounds)
+TWindow* createScrambleWindow(const TRect& bounds, ScrambleDisplayState state)
 {
-    return new TScrambleWindow(bounds);
+    return new TScrambleWindow(bounds, state);
 }
