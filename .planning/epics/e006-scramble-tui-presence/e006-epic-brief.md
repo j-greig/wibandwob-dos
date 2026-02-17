@@ -58,11 +58,11 @@ Possible placement:
 
 ## Features
 
-- [ ] **F01: Scramble View** — ASCII art cat TView subclass with speech bubble rendering, pose states, placement system
-- [ ] **F02: Knowledge Base** — Non-LLM content: parsed README, command help, system state observations. Scramble can answer "how do I..." from local docs without calling an LLM
-- [ ] **F03: Haiku Brain** — Lightweight LLM integration (Claude Haiku) for wit, personality, and questions the knowledge base can't answer. Low-cost, fast, character-accurate
-- [ ] **F04: Trigger System** — When Scramble speaks: direct address (user asks), idle observations (timer-based, rare), state reactions (window events, errors), and silence (most of the time)
-- [ ] **F05: Scramble IPC/API/MCP Surface** — Commands: `scramble.ask`, `scramble.poke`, `scramble.feed`, `scramble.mood`. Registered in command registry per E001 infrastructure
+- [x] **F01: Scramble View** — ASCII cat TView subclass, speech bubble, 3 poses, smol/tall/hidden window states. Ships in spk01 commit `6d428d9`.
+- [x] **F02: Chat Interface** — ~~keyword KB scrapped~~ → slash commands (`/help`, `/who`, `/cmds`) + direct Haiku for free text. Ships in commit `a326e9c`.
+- [x] **F03: Haiku Brain** — Haiku client, system prompt, voice filter (lowercase, kaomoji). Rate limit 3s. Ships in spk01.
+- [~] **F04: Trigger System** — Direct ask: done (input field). Idle observations: done (timer-based, 10-20s). Error/state reactions: not started.
+- [~] **F05: Scramble IPC/API/MCP Surface** — `scramble_toggle`, `scramble_expand`, `scramble_say` wired in command registry + IPC. `scramble.ask` / `scramble.poke` / `scramble.feed` / `scramble.mood`: not started.
 
 ## Component Architecture
 
@@ -217,15 +217,15 @@ Test: Toggle Scramble off, verify hidden. Toggle on, verify returns to previous 
 
 ## Definition of Done (Epic)
 
-- [ ] ASCII art Scramble renders in TUI with multiple poses
-- [ ] Speech bubble system displays text with proper word-wrap
-- [ ] Knowledge base answers common system questions without LLM
-- [ ] Haiku integration produces in-character responses
-- [ ] Trigger system fires idle observations without being annoying
-- [ ] `scramble.*` commands in registry with API/MCP parity
-- [ ] Scramble can be hidden/shown
-- [ ] No regressions to existing TUI functionality
-- [ ] Voice is accurate to Scramble canon (deadpan, terse, kaomoji)
+- [x] ASCII art Scramble renders in TUI with multiple poses
+- [x] Speech bubble system displays text with proper word-wrap
+- [x] Slash commands + Haiku answer questions in Scramble voice
+- [x] Haiku integration produces in-character responses
+- [x] Idle observations fire on timer without blocking UI
+- [~] `scramble.*` commands in registry with API/MCP parity (toggle/expand/say done; ask/poke/feed/mood pending)
+- [x] Scramble can be hidden/shown/expanded
+- [x] No regressions to existing TUI functionality
+- [x] Voice is accurate to Scramble canon (deadpan, terse, kaomoji)
 
 ## Rollback
 
@@ -233,9 +233,21 @@ Remove `ScrambleView` and `ScrambleEngine` files. Remove `scramble.*` from comma
 
 ## Status
 
-Status: not-started
+Status: in-progress
 GitHub issue: #55
 PR: —
+
+### Completed in spk01 (2026-02-17)
+- Smol/tall/hidden window states with layout engine
+- TScrambleMessageView (history), TScrambleInputView (chat), TScrambleView (cat art)
+- Slash command interface + Haiku LLM chat
+- Frame chrome (close button, title) in tall mode
+- TV focus bug fixed: `select()` on TWindow only changes Z-order; use `setCurrent()` directly
+
+### Remaining
+- F04 error/state reactions (when app errors, Scramble notices)
+- F05 full command surface (ask/poke/feed/mood)
+- MCP parity for scramble commands
 
 ## Symbient Tag
 

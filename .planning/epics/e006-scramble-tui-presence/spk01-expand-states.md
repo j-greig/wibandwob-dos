@@ -1,5 +1,9 @@
 # Spike: Scramble Window Expand States
 
+**Status: COMPLETE** — landed 2026-02-17 in commits `6d428d9` + `a326e9c`
+
+Key discoveries: TV `select()` on TWindow only changes Z-order (not focus) due to `ofTopSelect`. Fixed by calling `makeFirst()` + `owner->setCurrent()` directly. See `memories/2026/02/20260217-183200-headless-tui-testing.md` for full trace.
+
 > tl;dr — Scramble window gets 3 display states: hidden, smol (current 28x14), tall (full desktop height). Tall mode adds message history + input field so you can actually chat with the cat. Transition via keybind or command.
 
 ## The Problem
