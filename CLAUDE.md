@@ -60,7 +60,7 @@ Human / AI Agent
               │  ├─ Chat interface (wibwob_view)  │
               │  └─ IPC socket listener           │
               └───────────┬──────────────────────┘
-                          │ Unix socket (/tmp/test_pattern_app.sock)
+                          │ Unix socket (/tmp/wibwob_N.sock or legacy /tmp/test_pattern_app.sock)
               ┌───────────▼──────────────────────┐
               │  FastAPI Server (Python)          │
               │  tools/api_server/main.py         │
@@ -127,6 +127,15 @@ Content packs in `modules/` (public, shipped) and `modules-private/` (user conte
 | `tools/api_server/requirements.txt` | Python deps (FastAPI, uvicorn, pydantic, fastapi-mcp) |
 | `.gitmodules` | tvision submodule at `vendor/tvision` |
 
+### Multi-Instance Environment Variables
+
+| Variable | Effect |
+|----------|--------|
+| `WIBWOB_INSTANCE` | Instance ID (e.g. `1`, `2`). Drives socket path `/tmp/wibwob_N.sock`. Unset = legacy `/tmp/test_pattern_app.sock` |
+| `TV_IPC_SOCK` | Explicit socket path override (Python only, takes priority over `WIBWOB_INSTANCE`) |
+
+Launch multiple instances: `./tools/scripts/launch_tmux.sh [N]` (tmux + monitor sidebar).
+
 ## Dependencies
 
 ### Build
@@ -152,16 +161,17 @@ The API server on port 8089 bridges between the Python/MCP layer and the C++ app
 
 ## Current Known Gaps
 
-The main active architectural concern is **menu/API/MCP parity drift**: commands can be added to the C++ menu bar, the Python REST API, or the MCP tool surface independently, with no single registry enforcing consistency. The planned fix is a **unified command registry** in C++ where each command is defined once and menu items, IPC handlers, and MCP tools are auto-generated from it. See `workings/chatgpt-refactor-vision-planning-2026-01-15/` for the full refactor planning bundle (start with `overview.md` → `spec-state-log-vault-browser.md` → `pr-acceptance-and-quality-gates.md`).
+Menu/API/MCP parity drift was resolved by E001 (command registry). The unified `CommandRegistry` in C++ is now the single source for commands — menu items, IPC handlers, and MCP tools derive from it. Parity is enforced by automated drift tests. See `.planning/epics/e001-command-parity-refactor/` for the full epic record.
 
 ## Agent Workflow
 
-- **Planning canon first**: follow `/Users/james/Repos/wibandwob-dos/.planning/README.md` for terms, acceptance-criteria format, and issue-first workflow.
+- **Planning canon first**: follow `.planning/README.md` for terms, acceptance-criteria format, and issue-first workflow.
+- **Epic status**: `.planning/epics/EPIC_STATUS.md` is the quick-read register. Run `.claude/scripts/planning.sh status` for live table from frontmatter. Each epic brief has YAML frontmatter (`id`, `title`, `status`, `issue`, `pr`, `depends_on`). A PostToolUse hook auto-syncs EPIC_STATUS.md whenever a brief is edited.
 - **Issue-first**: create or reference a GitHub issue before starting work.
 - **Manual issue/PR sync required**: issue state is not auto-updated by hooks or PR creation. Claude/Codex must explicitly:
   - move issue status in planning and GitHub as work starts/completes,
+  - update frontmatter `status:` and `pr:` fields in epic briefs (hook syncs EPIC_STATUS.md automatically),
   - post progress evidence (commit SHAs + tests),
-  - set `PR:` in planning briefs when a PR is opened,
   - close linked story/feature/epic issues once acceptance checks pass.
 - **GitHub formatting reliability**: do not post long markdown in inline quoted CLI args. Use `gh ... --body-file` (file or heredoc stdin) for all issue/PR comments and `gh pr edit --body-file` for PR description updates, then verify line breaks by reading back body text.
 - **Branch-per-issue**: branch from `main`, name as `<type>/<short-description>` (e.g. `feat/command-registry`, `fix/ipc-timeout`).

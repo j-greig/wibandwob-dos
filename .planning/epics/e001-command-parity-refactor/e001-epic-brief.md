@@ -1,3 +1,12 @@
+---
+id: E001
+title: Command/Capability Parity Refactor
+status: done
+issue: 1
+pr: ~
+depends_on: []
+---
+
 # E001: Command/Capability Parity Refactor
 
 ## Objective

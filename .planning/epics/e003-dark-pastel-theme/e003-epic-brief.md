@@ -1,3 +1,12 @@
+---
+id: E003
+title: Dark Pastel Theme
+status: done
+issue: 38
+pr: 42
+depends_on: []
+---
+
 # E003: Dark Pastel Theme
 
 ## Objective

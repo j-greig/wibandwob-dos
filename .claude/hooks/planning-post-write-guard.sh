@@ -23,15 +23,36 @@ if [ ! -f "$FILE_PATH" ]; then
 fi
 CONTENT=$(cat "$FILE_PATH")
 
+# Check for status metadata — accept either YAML frontmatter or body-level fields.
+HAS_FRONTMATTER=false
+if echo "$CONTENT" | head -1 | grep -q '^---$'; then
+  HAS_FRONTMATTER=true
+fi
+
 MISSING=()
-if ! echo "$CONTENT" | grep -q '^Status:'; then
-  MISSING+=("Status:")
-fi
-if ! echo "$CONTENT" | grep -q '^GitHub issue:'; then
-  MISSING+=("GitHub issue:")
-fi
-if ! echo "$CONTENT" | grep -q '^PR:'; then
-  MISSING+=("PR:")
+if $HAS_FRONTMATTER; then
+  # Frontmatter mode: check for status/issue/pr in YAML block
+  FM=$(echo "$CONTENT" | awk '/^---$/{n++; next} n==1{print} n>=2{exit}')
+  if ! echo "$FM" | grep -q '^status:'; then
+    MISSING+=("frontmatter status:")
+  fi
+  if ! echo "$FM" | grep -q '^issue:'; then
+    MISSING+=("frontmatter issue:")
+  fi
+  if ! echo "$FM" | grep -q '^pr:'; then
+    MISSING+=("frontmatter pr:")
+  fi
+else
+  # Legacy body mode: check for Status:/GitHub issue:/PR: lines
+  if ! echo "$CONTENT" | grep -q '^Status:'; then
+    MISSING+=("Status:")
+  fi
+  if ! echo "$CONTENT" | grep -q '^GitHub issue:'; then
+    MISSING+=("GitHub issue:")
+  fi
+  if ! echo "$CONTENT" | grep -q '^PR:'; then
+    MISSING+=("PR:")
+  fi
 fi
 
 if [ ${#MISSING[@]} -gt 0 ]; then
@@ -93,22 +114,41 @@ JSON
   exit 0
 fi
 
-# Enforce non-placeholder issue only after work has started.
-STATUS_VALUE=$(printf "%s\n" "$CONTENT" | awk '
-  /^Status:/ {
-    sub(/^Status:[[:space:]]*/, "", $0)
-    gsub(/`/, "", $0)
-    gsub(/^[[:space:]]+|[[:space:]]+$/, "", $0)
-    print $0
-    exit
-  }
-')
+# Auto-sync EPIC_STATUS.md from frontmatter when any epic brief is written.
+PLANNING_SCRIPT="${CLAUDE_PROJECT_DIR:-.}/.claude/scripts/planning.sh"
+if [ -x "$PLANNING_SCRIPT" ]; then
+  "$PLANNING_SCRIPT" sync >/dev/null 2>&1 || true
+fi
 
-if [ "${STATUS_VALUE}" != "not-started" ] && echo "$CONTENT" | grep -qE '^GitHub issue:[[:space:]]*(\(not yet created\)|#NNN|—|N/A)$'; then
+# Enforce non-placeholder issue only after work has started.
+if $HAS_FRONTMATTER; then
+  STATUS_VALUE=$(echo "$FM" | awk '/^status:/{sub(/^status:[[:space:]]*/, ""); print; exit}')
+  ISSUE_PLACEHOLDER=false
+  ISSUE_VAL=$(echo "$FM" | awk '/^issue:/{sub(/^issue:[[:space:]]*/, ""); print; exit}')
+  if [ -z "$ISSUE_VAL" ] || [ "$ISSUE_VAL" = "~" ] || [ "$ISSUE_VAL" = "null" ]; then
+    ISSUE_PLACEHOLDER=true
+  fi
+else
+  STATUS_VALUE=$(printf "%s\n" "$CONTENT" | awk '
+    /^Status:/ {
+      sub(/^Status:[[:space:]]*/, "", $0)
+      gsub(/`/, "", $0)
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", $0)
+      print $0
+      exit
+    }
+  ')
+  ISSUE_PLACEHOLDER=false
+  if echo "$CONTENT" | grep -qE '^GitHub issue:[[:space:]]*(\(not yet created\)|#NNN|—|N/A)$'; then
+    ISSUE_PLACEHOLDER=true
+  fi
+fi
+
+if [ "${STATUS_VALUE}" != "not-started" ] && $ISSUE_PLACEHOLDER; then
   cat <<JSON
 {
   "decision": "block",
-  "reason": "Planning brief has non-not-started status but still uses placeholder GitHub issue metadata. Replace with a real issue number."
+  "reason": "Planning brief has non-not-started status but still uses placeholder issue metadata. Replace with a real issue number."
 }
 JSON
   exit 0

@@ -1,3 +1,12 @@
+---
+id: E002
+title: Markdown Browser + State Export
+status: done
+issue: 16
+pr: 23
+depends_on: [E001]
+---
+
 # E002: Markdown Browser + State Export
 
 ## Objective

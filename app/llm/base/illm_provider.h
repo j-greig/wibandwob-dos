@@ -91,6 +91,10 @@ public:
     virtual void resetSession() = 0;
     virtual std::string getSessionId() const { return ""; }  // Optional, returns empty if not applicable
 
+    // Runtime API key injection (for providers that support it)
+    virtual void setApiKey(const std::string& /*key*/) {}
+    virtual bool needsApiKey() const { return false; }
+
     // Tool support
     virtual bool supportsTools() const = 0;
     virtual void registerTool(const Tool& tool) = 0;

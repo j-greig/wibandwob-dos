@@ -108,16 +108,23 @@ bool AnthropicAPIProvider::configure(const std::string& config) {
     // Note: ApiConfig fallback removed - use environment variable only
 
     if (apiKey.empty()) {
-        fprintf(stderr, "ERROR: Anthropic API key not found. Expected env var %s\n", keyEnv.c_str());
+        fprintf(stderr, "INFO: Anthropic API key not in env (%s) — can be set at runtime via setApiKey()\n", keyEnv.c_str());
     } else {
         fprintf(stderr, "DEBUG: Anthropic API key loaded from %s (len=%zu)\n", keyEnv.c_str(), apiKey.size());
     }
 
-    return !apiKey.empty();
+    // Return true even without key — key can be injected at runtime via setApiKey()
+    return true;
 }
 
 void AnthropicAPIProvider::resetSession() {
     conversationHistory.clear();
+}
+
+void AnthropicAPIProvider::setApiKey(const std::string& key) {
+    apiKey = key;
+    std::string masked = key.size() > 16 ? key.substr(0, 16) + "****" : "****";
+    fprintf(stderr, "DEBUG: API key set at runtime (%s, len=%zu)\n", masked.c_str(), apiKey.size());
 }
 
 LLMResponse AnthropicAPIProvider::makeSimpleAPIRequest(const LLMRequest& request) {
@@ -145,13 +152,18 @@ LLMResponse AnthropicAPIProvider::makeSimpleAPIRequest(const LLMRequest& request
     // Build curl command
     std::string curlCmd = "curl -sS --max-time 30 ";
     curlCmd += "-H \"Content-Type: application/json\" ";
-    curlCmd += "-H \"x-api-key: " + apiKey + "\" ";
+    curlCmd += "-H \"x-api-key: " + apiKey + "\" ";  // Key passed to curl, not logged
     curlCmd += "-H \"anthropic-version: 2023-06-01\" ";
     curlCmd += "-X POST ";
     curlCmd += "\"" + endpoint + "\" ";
     curlCmd += "--data @" + tempFile;
 
-    fprintf(stderr, "DEBUG: Anthropic curl command: %s\n", curlCmd.c_str());
+    // Log curl command with masked API key
+    std::string maskedKey = apiKey.size() > 16
+        ? apiKey.substr(0, 16) + "****"
+        : "****";
+    fprintf(stderr, "DEBUG: Anthropic API call: POST %s (key: %s, payload: %s)\n",
+            endpoint.c_str(), maskedKey.c_str(), tempFile.c_str());
 
     // Execute curl and capture output
     FILE* pipe = popen(curlCmd.c_str(), "r");

@@ -111,6 +111,35 @@ curl -X POST "http://127.0.0.1:8089/windows" \
 curl "http://127.0.0.1:8089/state"
 ```
 
+### Multi-Instance (Power Users)
+
+Run multiple isolated WibWob-DOS instances side by side, each with its own IPC socket and desktop state.
+
+```bash
+# Instance 1
+WIBWOB_INSTANCE=1 ./build/app/test_pattern 2>/tmp/wibwob_1.log
+
+# Instance 2
+WIBWOB_INSTANCE=2 ./build/app/test_pattern 2>/tmp/wibwob_2.log
+
+# Monitor dashboard (discovers all running instances)
+python3 tools/monitor/instance_monitor.py
+
+# Or launch N instances in tmux with monitor sidebar
+./tools/scripts/launch_tmux.sh 4
+```
+
+### Browser Access
+
+Serve WibWob-DOS to a web browser via [ttyd](https://github.com/nicm/ttyd) PTY bridge — zero code changes, full TUI fidelity.
+
+```bash
+brew install ttyd  # macOS
+ttyd --port 7681 --writable -t fontSize=14 -t 'theme={"background":"#000000"}' \
+  bash -c 'cd /path/to/repo && TERM=xterm-256color WIBWOB_INSTANCE=1 exec ./build/app/test_pattern'
+# Open http://localhost:7681 in browser
+```
+
 ---
 
 ## Modules

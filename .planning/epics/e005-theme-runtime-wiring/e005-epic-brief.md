@@ -1,3 +1,12 @@
+---
+id: E005
+title: Theme Runtime Wiring
+status: not-started
+issue: 43
+pr: ~
+depends_on: [E003]
+---
+
 # E005: Theme Runtime Wiring
 
 > tl;dr — E003 shipped ThemeManager lookup table + API/IPC routing but C++ handlers are stubs (`(void)app; return "ok"`). Wire theme state into C++ app class, make set_theme_mode/variant store state + apply colours + repaint. `get_state` must reflect actual values. Optional: auto mode (dusk/dawn).
