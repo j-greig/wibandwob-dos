@@ -642,9 +642,9 @@ private:
     // IPC server
     ApiIpcServer* ipcServer = nullptr;
     
-    // Theme state
-    ThemeMode currentThemeMode = ThemeMode::Light;
-    ThemeVariant currentThemeVariant = ThemeVariant::Monochrome;
+    // Theme state (mutable to allow modification in const getPalette())
+    mutable ThemeMode currentThemeMode = ThemeMode::Light;
+    mutable ThemeVariant currentThemeVariant = ThemeVariant::Monochrome;
     
     // Friend API helper functions implemented below to bridge IPC calls.
     friend void api_spawn_test(TTestPatternApp&);
@@ -1683,18 +1683,17 @@ void TTestPatternApp::takeScreenshot(bool showDialog)
 TPalette& TTestPatternApp::getPalette() const
 {
     // Dynamic palette based on current theme state
-    // Since this is const, we use mutable static and cast to access theme state
-    TTestPatternApp* mutableThis = const_cast<TTestPatternApp*>(this);
+    // Theme state members are mutable, allowing safe access in const method
     
     // For dark_pastel variant, use a visually distinct palette
-    if (mutableThis->currentThemeVariant == ThemeVariant::DarkPastel) {
+    if (currentThemeVariant == ThemeVariant::DarkPastel) {
         static TPalette darkPastelPalette(cpDarkPastel, sizeof(cpDarkPastel)-1);
         return darkPastelPalette;
     }
     
     // Default monochrome palette
-    static TPalette monochronePalette(cpMonochrome, sizeof(cpMonochrome)-1);
-    return monochronePalette;
+    static TPalette monochromePalette(cpMonochrome, sizeof(cpMonochrome)-1);
+    return monochromePalette;
 }
 
 TMenuBar* TTestPatternApp::initMenuBar(TRect r)

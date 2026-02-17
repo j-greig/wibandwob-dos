@@ -51,8 +51,8 @@ def test_set_theme_mode():
     """AC-1: set_theme_mode stores mode and get_state reflects it"""
     print("\n=== Test: set_theme_mode ===")
     
-    # Set to dark
-    response = send_ipc_command("cmd:set_theme_mode mode=dark")
+    # Set to dark using command registry path
+    response = send_ipc_command("cmd:exec_command name=set_theme_mode mode=dark")
     print(f"set_theme_mode dark response: {response}")
     assert response == "ok", f"Expected 'ok', got '{response}'"
     
@@ -75,8 +75,8 @@ def test_set_theme_variant():
     """AC-2: set_theme_variant stores variant and get_state reflects it"""
     print("\n=== Test: set_theme_variant ===")
     
-    # Set to dark_pastel
-    response = send_ipc_command("cmd:set_theme_variant variant=dark_pastel")
+    # Set to dark_pastel using command registry path
+    response = send_ipc_command("cmd:exec_command name=set_theme_variant variant=dark_pastel")
     print(f"set_theme_variant dark_pastel response: {response}")
     assert response == "ok", f"Expected 'ok', got '{response}'"
     
@@ -99,13 +99,13 @@ def test_reset_theme():
     """AC-4: reset_theme restores monochrome/light defaults"""
     print("\n=== Test: reset_theme ===")
     
-    # First set to dark + dark_pastel
-    send_ipc_command("cmd:set_theme_mode mode=dark")
-    send_ipc_command("cmd:set_theme_variant variant=dark_pastel")
+    # First set to dark + dark_pastel using command registry path
+    send_ipc_command("cmd:exec_command name=set_theme_mode mode=dark")
+    send_ipc_command("cmd:exec_command name=set_theme_variant variant=dark_pastel")
     time.sleep(0.1)
     
-    # Reset
-    response = send_ipc_command("cmd:reset_theme")
+    # Reset using command registry path
+    response = send_ipc_command("cmd:exec_command name=reset_theme")
     print(f"reset_theme response: {response}")
     assert response == "ok", f"Expected 'ok', got '{response}'"
     
@@ -132,7 +132,7 @@ def test_invalid_mode():
     """Test that invalid mode values are rejected"""
     print("\n=== Test: invalid mode rejection ===")
     
-    response = send_ipc_command("cmd:set_theme_mode mode=invalid")
+    response = send_ipc_command("cmd:exec_command name=set_theme_mode mode=invalid")
     
     if response.startswith("err"):
         print(f"✓ Invalid mode rejected: {response}")
@@ -147,7 +147,7 @@ def test_invalid_variant():
     """Test that invalid variant values are rejected"""
     print("\n=== Test: invalid variant rejection ===")
     
-    response = send_ipc_command("cmd:set_theme_variant variant=invalid")
+    response = send_ipc_command("cmd:exec_command name=set_theme_variant variant=invalid")
     
     if response.startswith("err"):
         print(f"✓ Invalid variant rejected: {response}")
@@ -165,68 +165,71 @@ def test_snapshot_roundtrip():
     import os
     import tempfile
     
-    # Set theme to dark + dark_pastel
-    send_ipc_command("cmd:set_theme_mode mode=dark")
-    send_ipc_command("cmd:set_theme_variant variant=dark_pastel")
+    # Set theme to dark + dark_pastel using command registry path
+    send_ipc_command("cmd:exec_command name=set_theme_mode mode=dark")
+    send_ipc_command("cmd:exec_command name=set_theme_variant variant=dark_pastel")
     time.sleep(0.1)
     
-    # Export state
-    export_path = tempfile.mktemp(suffix=".json")
-    export_resp = send_ipc_command(f"cmd:export_state path={export_path}")
-    print(f"export_state response: {export_resp}")
+    # Export state - use secure temporary file
+    fd, export_path = tempfile.mkstemp(suffix=".json", prefix="wibwob_test_")
+    os.close(fd)  # Close fd, we'll use the path
     
-    if not export_resp.startswith("ok"):
-        print(f"FAIL: Export failed: {export_resp}")
-        return False
-    
-    if not os.path.exists(export_path):
-        print(f"FAIL: Export file not created: {export_path}")
-        return False
-    
-    # Read exported file to verify theme fields present
-    with open(export_path, 'r') as f:
-        exported_data = json.load(f)
-    
-    print(f"Exported theme_mode: {exported_data.get('theme_mode')}")
-    print(f"Exported theme_variant: {exported_data.get('theme_variant')}")
-    
-    if exported_data.get('theme_mode') != 'dark' or exported_data.get('theme_variant') != 'dark_pastel':
-        print(f"FAIL: Exported theme fields incorrect")
-        os.unlink(export_path)
-        return False
-    
-    # Reset theme to defaults
-    send_ipc_command("cmd:reset_theme")
-    time.sleep(0.1)
-    
-    # Verify reset
-    state = json.loads(send_ipc_command("cmd:get_state"))
-    if state.get('theme_mode') != 'light' or state.get('theme_variant') != 'monochrome':
-        print("FAIL: Theme not reset before import")
-        os.unlink(export_path)
-        return False
-    
-    # Import state
-    import_resp = send_ipc_command(f"cmd:import_state path={export_path}")
-    print(f"import_state response: {import_resp}")
-    time.sleep(0.1)
-    
-    # Verify theme restored
-    state = json.loads(send_ipc_command("cmd:get_state"))
-    
-    mode_ok = state.get('theme_mode') == 'dark'
-    variant_ok = state.get('theme_variant') == 'dark_pastel'
-    
-    os.unlink(export_path)
-    
-    if mode_ok and variant_ok:
-        print(f"✓ theme_mode restored to 'dark' after import")
-        print(f"✓ theme_variant restored to 'dark_pastel' after import")
-        print("PASS: snapshot round-trip preserves theme")
-        return True
-    else:
-        print(f"FAIL: Theme not restored: {state.get('theme_mode')}/{state.get('theme_variant')}")
-        return False
+    try:
+        export_resp = send_ipc_command(f"cmd:export_state path={export_path}")
+        print(f"export_state response: {export_resp}")
+        
+        if not export_resp.startswith("ok"):
+            print(f"FAIL: Export failed: {export_resp}")
+            return False
+        
+        if not os.path.exists(export_path):
+            print(f"FAIL: Export file not created: {export_path}")
+            return False
+        
+        # Read exported file to verify theme fields present
+        with open(export_path, 'r') as f:
+            exported_data = json.load(f)
+        
+        print(f"Exported theme_mode: {exported_data.get('theme_mode')}")
+        print(f"Exported theme_variant: {exported_data.get('theme_variant')}")
+        
+        if exported_data.get('theme_mode') != 'dark' or exported_data.get('theme_variant') != 'dark_pastel':
+            print(f"FAIL: Exported theme fields incorrect")
+            return False
+        
+        # Reset theme to defaults using command registry path
+        send_ipc_command("cmd:exec_command name=reset_theme")
+        time.sleep(0.1)
+        
+        # Verify reset
+        state = json.loads(send_ipc_command("cmd:get_state"))
+        if state.get('theme_mode') != 'light' or state.get('theme_variant') != 'monochrome':
+            print("FAIL: Theme not reset before import")
+            return False
+        
+        # Import state
+        import_resp = send_ipc_command(f"cmd:import_state path={export_path}")
+        print(f"import_state response: {import_resp}")
+        time.sleep(0.1)
+        
+        # Verify theme restored
+        state = json.loads(send_ipc_command("cmd:get_state"))
+        
+        mode_ok = state.get('theme_mode') == 'dark'
+        variant_ok = state.get('theme_variant') == 'dark_pastel'
+        
+        if mode_ok and variant_ok:
+            print(f"✓ theme_mode restored to 'dark' after import")
+            print(f"✓ theme_variant restored to 'dark_pastel' after import")
+            print("PASS: snapshot round-trip preserves theme")
+            return True
+        else:
+            print(f"FAIL: Theme not restored: {state.get('theme_mode')}/{state.get('theme_variant')}")
+            return False
+    finally:
+        # Ensure cleanup even if test fails
+        if os.path.exists(export_path):
+            os.unlink(export_path)
 
 
 def main():
