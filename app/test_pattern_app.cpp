@@ -98,6 +98,7 @@ class TWindow; TWindow* createAsciiGridDemoWindow(const TRect &bounds);
 #include <dirent.h>
 // Local API IPC bridge (Unix domain socket)
 #include "api_ipc.h"
+#include "command_registry.h"
 
 // Find first existing primer directory across module paths.
 // Checks modules-private/*/primers/ then modules/*/primers/ then legacy app/primers/.
@@ -673,6 +674,7 @@ private:
     friend void api_toggle_scramble(TTestPatternApp&);
     friend void api_expand_scramble(TTestPatternApp&);
     friend std::string api_scramble_say(TTestPatternApp&, const std::string&);
+    friend std::string api_scramble_pet(TTestPatternApp&);
     friend void api_tile(TTestPatternApp&);
     friend void api_close_all(TTestPatternApp&);
     friend void api_set_pattern_mode(TTestPatternApp&, const std::string&);
@@ -1282,9 +1284,35 @@ void TTestPatternApp::wireScrambleInput()
             scrambleWindow->getMessageView()->addMessage("you", input);
         }
 
-        // Query engine
-        std::string response;
-        response = scrambleEngine.ask(input);
+        // Slash commands: check registry first, then fall through to engine
+        // This makes /cascade, /screenshot, /scramble_pet etc actually execute.
+        if (!input.empty() && input[0] == '/' && input.size() > 1) {
+            std::string cmdName = input.substr(1);
+            for (char& c : cmdName) if (c >= 'A' && c <= 'Z') c += 32;
+            while (!cmdName.empty() && cmdName.back() == ' ') cmdName.pop_back();
+
+            const auto& caps = get_command_capabilities();
+            for (const auto& cap : caps) {
+                if (cmdName == cap.name) {
+                    std::map<std::string, std::string> kv;
+                    std::string result = exec_registry_command(*this, cmdName, kv);
+                    std::string ack = (result == "ok" || result.rfind("ok", 0) == 0)
+                        ? "done. /ᐠ- -ᐟ\\"
+                        : (result.size() > 20 ? result : "err: " + result + " (=^..^=)");
+                    if (scrambleWindow->getView()) {
+                        scrambleWindow->getView()->say(ack);
+                    }
+                    if (scrambleWindow->getMessageView()) {
+                        scrambleWindow->getMessageView()->addMessage("scramble", ack);
+                    }
+                    return;
+                }
+            }
+            // Not in registry — engine handles /help, /who, /cmds, unknown
+        }
+
+        // Query engine (free text + engine slash commands)
+        std::string response = scrambleEngine.ask(input);
         if (response.empty()) {
             response = "... (=^..^=)";
         }
@@ -2242,6 +2270,27 @@ std::string api_scramble_say(TTestPatternApp& app, const std::string& text) {
     if (msgView) msgView->addMessage("scramble", response);
     return response;
 }
+std::string api_scramble_pet(TTestPatternApp& app) {
+    if (!app.scrambleWindow) return "err scramble not open";
+
+    static const char* petReactions[] = {
+        "...fine. /ᐠ- -ᐟ\\",
+        "*allows it* (=^..^=)",
+        "adequate petting technique. /ᐠ｡ꞈ｡ᐟ\\",
+        "i did not ask for this. and yet. (=^..^=)",
+        "*purrs once. stops. stares* /ᐠ°ᆽ°ᐟ\\",
+    };
+    std::string response = petReactions[std::rand() % 5];
+
+    if (app.scrambleWindow->getView()) {
+        app.scrambleWindow->getView()->setPose(spDefault);
+        app.scrambleWindow->getView()->say(response);
+    }
+    auto* msgView = app.scrambleWindow->getMessageView();
+    if (msgView) msgView->addMessage("scramble", response);
+    return response;
+}
+
 void api_tile(TTestPatternApp& app) { app.tile(); }
 void api_close_all(TTestPatternApp& app) { app.closeAll(); }
 

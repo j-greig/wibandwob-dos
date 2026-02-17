@@ -24,6 +24,7 @@ std::string api_reset_theme(TTestPatternApp&) { return "ok"; }
 void api_toggle_scramble(TTestPatternApp&) {}
 void api_expand_scramble(TTestPatternApp&) {}
 std::string api_scramble_say(TTestPatternApp&, const std::string&) { return "ok"; }
+std::string api_scramble_pet(TTestPatternApp&) { return "ok"; }
 
 static int failures = 0;
 
@@ -75,6 +76,7 @@ int main() {
         check("/cmds returns non-empty", !r.empty());
         check("/cmds mentions cascade", contains(r, "cascade"));
         check("/cmds mentions open_scramble", contains(r, "open_scramble"));
+        check("/cmds mentions scramble_pet", contains(r, "scramble_pet"));
         check("/cmds has kaomoji", contains(r, "(=^..^=)") || contains(r, "ᐟ\\"));
     }
 

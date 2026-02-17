@@ -18,6 +18,7 @@ std::string api_reset_theme(TTestPatternApp&) { return "ok"; }
 void api_toggle_scramble(TTestPatternApp&) {}
 void api_expand_scramble(TTestPatternApp&) {}
 std::string api_scramble_say(TTestPatternApp&, const std::string&) { return "ok"; }
+std::string api_scramble_pet(TTestPatternApp&) { return "ok"; }
 
 int main() {
     const std::string payload = get_command_capabilities_json();
@@ -36,6 +37,7 @@ int main() {
         "\"name\":\"open_scramble\"",
         "\"name\":\"scramble_expand\"",
         "\"name\":\"scramble_say\"",
+        "\"name\":\"scramble_pet\"",
     };
 
     for (const char* token : required) {

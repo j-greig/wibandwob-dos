@@ -216,7 +216,7 @@ std::string ScrambleEngine::handleSlashCommand(const std::string& input) const
     if (cmd == "help" || cmd == "h" || cmd == "?") {
         return "/help  — this message\n"
                "/who   — who am i\n"
-               "/cmds  — list tui commands\n"
+               "/cmds  — list commands (type /name to run)\n"
                "anything else → haiku (if key set) (=^..^=)";
     }
     if (cmd == "who" || cmd == "whoami") {
