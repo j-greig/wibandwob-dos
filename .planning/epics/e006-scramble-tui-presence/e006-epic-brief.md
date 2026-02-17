@@ -243,6 +243,8 @@ PR: —
 - Slash command interface + Haiku LLM chat
 - Frame chrome (close button, title) in tall mode
 - TV focus bug fixed: `select()` on TWindow only changes Z-order; use `setCurrent()` directly
+- API key dialog (Tools menu) now wires to ScrambleEngine at runtime — Haiku chat live immediately on key entry
+- Replaced keyword KB with slash commands (`/help`, `/who`, `/cmds`) + direct Haiku for free text
 
 ### Remaining
 - F04 error/state reactions (when app errors, Scramble notices)
