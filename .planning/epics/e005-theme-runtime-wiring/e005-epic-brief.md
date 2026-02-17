@@ -100,6 +100,12 @@ The `TTestPatternApp::getPalette()` (line 541) is the master palette — modifyi
   - Store `ThemeMode`/`ThemeVariant` on app, make IPC handlers mutate them, emit in `get_state`
 - [ ] **F02: Surface colour application and repaint** (issue TBD)
   - Apply `ThemeManager::getColor()` to TUI surfaces, trigger repaint on change
+- [ ] **F03: Module-loadable colour palettes** (issue TBD, stretch)
+  - Load palette JSON files from `modules-private/*/palettes/` and `modules/*/palettes/`
+  - Each palette maps `ThemeRole` to hex colour, e.g. `{"name":"ocean_night","roles":{"background":"#0a0e14",...}}`
+  - Extend `module.json` manifest with `"palettes": "palettes/*.json"`
+  - `ThemeManager` discovers and registers palettes as new `ThemeVariant` values at startup
+  - Depends on F01+F02 being wired first
 
 ## Acceptance Criteria (Epic-level)
 
@@ -132,7 +138,8 @@ Test: mock time near dusk, set mode auto, assert resolved mode == dark.
 - [ ] Snapshot round-trip preserves theme state
 - [ ] No regressions to monochrome default (app starts as `light`/`monochrome`)
 - [ ] Python tests pass (`uv run tools/api_server/test_ipc.py`)
-- [-] Auto mode (stretch — promote to F03 if pursued)
+- [-] Auto mode (stretch — promote to F04 if pursued)
+- [-] Module-loadable palettes (stretch — F03, depends on F01+F02)
 
 ## Rollback
 
