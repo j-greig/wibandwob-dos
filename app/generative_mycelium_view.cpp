@@ -16,6 +16,7 @@
 #include <vector>
 #include <cmath>
 #include <algorithm>
+#include <cstring>
 
 namespace {
 struct RGB{ float r,g,b; };

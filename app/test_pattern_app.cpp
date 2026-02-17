@@ -84,6 +84,7 @@ class TWindow; TWindow* createAsciiGridDemoWindow(const TRect &bounds);
 #include <cstdlib>
 #include <ctime>
 #include <cmath>
+#include <iomanip>
 #include <sys/stat.h>
 #include <cstdio>
 #include <fstream>
@@ -93,6 +94,8 @@ class TWindow; TWindow* createAsciiGridDemoWindow(const TRect &bounds);
 #include <dirent.h>
 // Local API IPC bridge (Unix domain socket)
 #include "api_ipc.h"
+// Theme management
+#include "theme_manager.h"
 
 // Find first existing primer directory across module paths.
 // Checks modules-private/*/primers/ then modules/*/primers/ then legacy app/primers/.
@@ -639,6 +642,10 @@ private:
     // IPC server
     ApiIpcServer* ipcServer = nullptr;
     
+    // Theme state
+    ThemeMode currentThemeMode = ThemeMode::Light;
+    ThemeVariant currentThemeVariant = ThemeVariant::Monochrome;
+    
     // Friend API helper functions implemented below to bridge IPC calls.
     friend void api_spawn_test(TTestPatternApp&);
     friend void api_spawn_gradient(TTestPatternApp&, const std::string&);
@@ -668,6 +675,9 @@ private:
                                      const std::string&, const std::string&);
     friend std::string api_send_figlet(TTestPatternApp&, const std::string&, const std::string&, 
                                        const std::string&, int, const std::string&);
+    friend std::string api_set_theme_mode(TTestPatternApp&, const std::string&);
+    friend std::string api_set_theme_variant(TTestPatternApp&, const std::string&);
+    friend std::string api_reset_theme(TTestPatternApp&);
 };
 
 TTestPatternApp::TTestPatternApp() :
@@ -1659,7 +1669,17 @@ void TTestPatternApp::takeScreenshot(bool showDialog)
 
 TPalette& TTestPatternApp::getPalette() const
 {
+    // Create palette based on current theme state
+    // For dark_pastel variant, we use RGB colors which Turbo Vision will map to nearest available colors
+    // For monochrome, we use the standard palette
+    
+    // Note: Since this is const, we use a mutable static that we update
+    // This is a workaround for Turbo Vision's const getPalette interface
     static TPalette palette(cpMonochrome, sizeof(cpMonochrome)-1);
+    
+    // For now, return the monochrome palette
+    // Full theme application will be implemented in S02
+    // The theme state is stored and get_state returns it correctly
     return palette;
 }
 
@@ -2047,7 +2067,8 @@ std::string api_get_state(TTestPatternApp& app) {
         } while (v != start);
     }
     
-    json << "]}";
+    json << "],\"theme_mode\":\"" << ThemeManager::modeToString(app.currentThemeMode) << "\""
+         << ",\"theme_variant\":\"" << ThemeManager::variantToString(app.currentThemeVariant) << "\"}";
     return json.str();
 }
 
@@ -2747,20 +2768,44 @@ std::string api_browser_fetch(TTestPatternApp& app, const std::string& url) {
 }
 
 std::string api_set_theme_mode(TTestPatternApp& app, const std::string& mode) {
-    (void)app;
     if (mode != "light" && mode != "dark")
         return "err invalid theme mode";
+    
+    app.currentThemeMode = ThemeManager::parseModeString(mode);
+    
+    // Force repaint to apply new theme
+    if (app.deskTop) {
+        app.deskTop->setState(sfExposed, true);
+        app.deskTop->drawView();
+    }
+    
     return "ok";
 }
 
 std::string api_set_theme_variant(TTestPatternApp& app, const std::string& variant) {
-    (void)app;
     if (variant != "monochrome" && variant != "dark_pastel")
         return "err invalid theme variant";
+    
+    app.currentThemeVariant = ThemeManager::parseVariantString(variant);
+    
+    // Force repaint to apply new theme
+    if (app.deskTop) {
+        app.deskTop->setState(sfExposed, true);
+        app.deskTop->drawView();
+    }
+    
     return "ok";
 }
 
 std::string api_reset_theme(TTestPatternApp& app) {
-    (void)app;
+    app.currentThemeMode = ThemeMode::Light;
+    app.currentThemeVariant = ThemeVariant::Monochrome;
+    
+    // Force repaint to apply reset theme
+    if (app.deskTop) {
+        app.deskTop->setState(sfExposed, true);
+        app.deskTop->drawView();
+    }
+    
     return "ok";
 }
