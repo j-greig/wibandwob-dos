@@ -5,6 +5,7 @@
 #include <sstream>
 
 extern void api_cascade(TTestPatternApp& app);
+extern void api_toggle_scramble(TTestPatternApp& app);
 extern void api_tile(TTestPatternApp& app);
 extern void api_close_all(TTestPatternApp& app);
 extern void api_save_workspace(TTestPatternApp& app);
@@ -27,6 +28,7 @@ const std::vector<CommandCapability>& get_command_capabilities() {
         {"set_theme_mode", "Set theme mode: light or dark", true},
         {"set_theme_variant", "Set theme variant: monochrome or dark_pastel", true},
         {"reset_theme", "Reset theme to default (monochrome + light)", false},
+        {"open_scramble", "Toggle Scramble cat overlay", false},
     };
     return capabilities;
 }
@@ -115,6 +117,10 @@ std::string exec_registry_command(
     }
     if (name == "reset_theme") {
         return api_reset_theme(app);
+    }
+    if (name == "open_scramble") {
+        api_toggle_scramble(app);
+        return "ok";
     }
     return "err unknown command";
 }

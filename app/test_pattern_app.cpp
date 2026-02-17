@@ -75,6 +75,8 @@
 #include "transparent_text_view.h"
 // TUI Browser window
 #include "browser_view.h"
+// Scramble cat presence
+#include "scramble_view.h"
 // Factory for ASCII grid demo window (implemented in ascii_grid_view.cpp).
 class TWindow; TWindow* createAsciiGridDemoWindow(const TRect &bounds);
 // #include "mech_window.h" // deferred feature; header not present yet
@@ -187,6 +189,7 @@ const ushort cmWibWobTestB = 149;  // Scrollbar test: TScroller refactor
 const ushort cmWibWobTestC = 160;  // Scrollbar test: Split view architecture
 const ushort cmRepaint = 161;      // Force repaint
 const ushort cmBrowser = 170;      // Browser window
+const ushort cmScrambleCat = 180;  // Scramble cat toggle
 
 // Help menu commands
 const ushort cmAbout = 129;
@@ -586,6 +589,10 @@ private:
     int windowNumber;
     static const int maxWindows = 99;
 
+    // Scramble cat overlay
+    TScrambleWindow* scrambleWindow;
+    void toggleScramble();
+
     // Kaomoji mood helper
     void setKaomojiMood(TCustomMenuBar::KaomojiMood mood, int durationMs = 2000) {
         if (menuBar) {
@@ -648,6 +655,7 @@ private:
     friend void api_spawn_gradient(TTestPatternApp&, const std::string&, const TRect* bounds);
     friend void api_open_animation_path(TTestPatternApp&, const std::string&, const TRect* bounds);
     friend void api_cascade(TTestPatternApp&);
+    friend void api_toggle_scramble(TTestPatternApp&);
     friend void api_tile(TTestPatternApp&);
     friend void api_close_all(TTestPatternApp&);
     friend void api_set_pattern_mode(TTestPatternApp&, const std::string&);
@@ -674,7 +682,8 @@ TTestPatternApp::TTestPatternApp() :
     TProgInit(&TTestPatternApp::initStatusLine,
               &TTestPatternApp::initMenuBar,
               &TTestPatternApp::initDeskTop),
-    windowNumber(0)
+    windowNumber(0),
+    scrambleWindow(nullptr)
 {
     // Start IPC server for local API control (best-effort; ignore failures)
     ipcServer = new ApiIpcServer(this);
@@ -795,6 +804,10 @@ void TTestPatternApp::handleEvent(TEvent& event)
             }
             case cmBrowser:
                 newBrowserWindow();
+                clearEvent(event);
+                break;
+            case cmScrambleCat:
+                toggleScramble();
                 clearEvent(event);
                 break;
             case cmAsciiGridDemo: {
@@ -1206,6 +1219,28 @@ void TTestPatternApp::newBrowserWindow(const TRect& bounds)
     registerWindow(window);
     if (auto* browser = dynamic_cast<TBrowserWindow*>(window))
         browser->fetchUrl("https://symbient.life");
+}
+
+void TTestPatternApp::toggleScramble()
+{
+    if (scrambleWindow) {
+        // Remove existing Scramble window
+        destroy(scrambleWindow);
+        scrambleWindow = nullptr;
+    } else {
+        // Create at bottom-right corner of desktop
+        TRect desktop = deskTop->getExtent();
+        int w = 28;
+        int h = 14;
+        TRect r(desktop.b.x - w - 1, desktop.b.y - h,
+                desktop.b.x - 1,     desktop.b.y);
+        scrambleWindow = static_cast<TScrambleWindow*>(createScrambleWindow(r));
+        deskTop->insert(scrambleWindow);
+        // Put behind other windows (just in front of background)
+        if (deskTop->background) {
+            scrambleWindow->putInFrontOf((TView*)deskTop->background);
+        }
+    }
 }
 
 void TTestPatternApp::cascade()
@@ -1716,6 +1751,8 @@ TMenuBar* TTestPatternApp::initMenuBar(TRect r)
             *new TMenuItem("Zoom ~O~ut", cmZoomOut, kbNoKey) +
             *new TMenuItem("~A~ctual Size", cmActualSize, kbNoKey) +
             *new TMenuItem("~F~ull Screen", cmFullScreen, kbF11) +
+            newLine() +
+            *new TMenuItem("Scra~m~ble Cat", cmScrambleCat, kbF8) +
         *new TSubMenu("~W~indow", kbAltW) +
             *new TMenuItem("~E~dit Text Editor", cmTextEditor, kbNoKey) +
             *new TMenuItem("~B~rowser", cmBrowser, kbCtrlB) +
@@ -1774,6 +1811,7 @@ TStatusLine* TTestPatternApp::initStatusLine(TRect r)
         *new TStatusItem("~F5~ Repaint", kbF5, cmRepaint) +
             *new TStatusItem("~F6~ Next", kbF6, cmNext) +
             *new TStatusItem("~Alt-F3~ Close", kbAltF3, cmClose) +
+            *new TStatusItem("~F8~ Scramble", kbF8, cmScrambleCat) +
             *new TStatusItem("~F10~ Menu", kbF10, cmMenu) +
             *new TStatusItem("~F11~ Quantum Printer", kbF11, cmMenu)
     );
@@ -1989,6 +2027,7 @@ void api_open_animation_path(TTestPatternApp& app, const std::string& path, cons
 }
 
 void api_cascade(TTestPatternApp& app) { app.cascade(); }
+void api_toggle_scramble(TTestPatternApp& app) { app.toggleScramble(); }
 void api_tile(TTestPatternApp& app) { app.tile(); }
 void api_close_all(TTestPatternApp& app) { app.closeAll(); }
 

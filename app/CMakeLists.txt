@@ -49,6 +49,7 @@ add_executable(test_pattern
     transparent_text_view.cpp
     ansi_view.cpp
     wibwob_scroll_test.cpp
+    scramble_view.cpp
 )
 target_link_libraries(test_pattern PRIVATE tvision)
 

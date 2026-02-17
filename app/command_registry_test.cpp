@@ -15,6 +15,7 @@ void api_set_pattern_mode(TTestPatternApp&, const std::string&) {}
 std::string api_set_theme_mode(TTestPatternApp&, const std::string&) { return "ok"; }
 std::string api_set_theme_variant(TTestPatternApp&, const std::string&) { return "ok"; }
 std::string api_reset_theme(TTestPatternApp&) { return "ok"; }
+void api_toggle_scramble(TTestPatternApp&) {}
 
 int main() {
     const std::string payload = get_command_capabilities_json();
@@ -30,6 +31,7 @@ int main() {
         "\"name\":\"set_theme_mode\"",
         "\"name\":\"set_theme_variant\"",
         "\"name\":\"reset_theme\"",
+        "\"name\":\"open_scramble\"",
     };
 
     for (const char* token : required) {
