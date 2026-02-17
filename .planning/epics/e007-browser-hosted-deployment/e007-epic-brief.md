@@ -1,5 +1,5 @@
 ---
-id: E006
+id: E007
 title: Browser-Hosted Deployment (Teleport Rooms)
 status: not-started
 issue: 57
@@ -7,7 +7,7 @@ pr: ~
 depends_on: []
 ---
 
-# E006: Browser-Hosted Deployment (Teleport Rooms)
+# E007: Browser-Hosted Deployment (Teleport Rooms)
 
 tl;dr: Serve WibWob-DOS to remote users via browser. Zoom-link-style URLs to curated sessions — Twitter OAuth, custom system prompts, persistent rooms, $5 VPS.
 
