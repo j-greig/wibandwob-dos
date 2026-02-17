@@ -1,8 +1,7 @@
 /*---------------------------------------------------------*/
 /*                                                         */
-/*   scramble_engine.h - Scramble Knowledge Base + Brain   */
-/*   F02: keyword KB from local docs                       */
-/*   F03: Haiku LLM for open questions                     */
+/*   scramble_engine.h - Scramble Brain                    */
+/*   Slash commands + Haiku LLM chat                       */
 /*                                                         */
 /*---------------------------------------------------------*/
 
@@ -11,56 +10,8 @@
 
 #include <string>
 #include <vector>
-#include <map>
 #include <ctime>
 #include <cstdlib>
-
-/*---------------------------------------------------------*/
-/* ScrambleKnowledgeBase - keyword-to-response index       */
-/*---------------------------------------------------------*/
-
-struct KBEntry {
-    std::string category;
-    std::vector<std::string> keywords;
-    std::string response;  // pre-formatted in Scramble voice
-};
-
-class ScrambleKnowledgeBase {
-public:
-    ScrambleKnowledgeBase();
-
-    // Load docs from filesystem. Call once at startup.
-    // projectRoot is the repo root (where README.md lives).
-    void loadDocs(const std::string& projectRoot);
-
-    // Load command capabilities from the registry.
-    void loadCommands(const std::vector<std::string>& commandNames);
-
-    // Query: returns best-match response, or empty if no match.
-    std::string query(const std::string& input) const;
-
-    // Get a random idle observation (for unprompted speech).
-    std::string idleObservation() const;
-
-    // Check if KB has any entries loaded.
-    bool isLoaded() const { return !entries.empty(); }
-    int entryCount() const { return static_cast<int>(entries.size()); }
-
-private:
-    std::vector<KBEntry> entries;
-    std::vector<std::string> idlePool;  // pool of idle quips
-
-    void addEntry(const std::string& category,
-                  const std::vector<std::string>& keywords,
-                  const std::string& response);
-    void addIdleQuip(const std::string& quip);
-    void loadBuiltinEntries();
-
-    // Score a query against an entry's keywords. Higher = better match.
-    int scoreMatch(const std::string& input, const KBEntry& entry) const;
-    // Tokenise input into lowercase words.
-    std::vector<std::string> tokenise(const std::string& input) const;
-};
 
 /*---------------------------------------------------------*/
 /* ScrambleHaikuClient - curl-based Haiku LLM calls        */
@@ -92,7 +43,7 @@ private:
     std::string model;
     int maxTokens;
     mutable time_t lastCallTime;
-    static const int kRateLimitSeconds = 30;
+    static const int kRateLimitSeconds = 3;  // min gap between Haiku calls
 
     // Scramble system prompt (personality + context).
     std::string buildSystemPrompt() const;
@@ -102,36 +53,45 @@ private:
 };
 
 /*---------------------------------------------------------*/
-/* ScrambleEngine - orchestrator (KB + Haiku + voice)      */
+/* ScrambleEngine - slash commands + Haiku chat + voice    */
 /*---------------------------------------------------------*/
 
 class ScrambleEngine {
 public:
     ScrambleEngine();
 
-    // Initialise: load KB docs, configure Haiku client.
+    // Initialise: load command list, configure Haiku client.
     void init(const std::string& projectRoot);
 
-    // Ask Scramble a question. Tries KB first, falls through to Haiku.
-    // Returns response in Scramble voice, or empty if nothing to say.
-    std::string ask(const std::string& question);
+    // Process user input.
+    // - Starts with '/'  → slash command (instant, preset response)
+    // - Everything else  → Haiku API (or fallback if no key)
+    std::string ask(const std::string& input);
 
     // Get an idle observation (for unprompted speech).
     std::string idleObservation();
 
-    // Access sub-components (for testing).
-    const ScrambleKnowledgeBase& kb() const { return knowledgeBase; }
+    // Access Haiku client (for testing).
     const ScrambleHaikuClient& haiku() const { return haikuClient; }
 
-private:
-    ScrambleKnowledgeBase knowledgeBase;
-    ScrambleHaikuClient haikuClient;
+    // Check if Haiku is available.
+    bool hasLLM() const { return haikuClient.isAvailable(); }
 
-    // Apply Scramble voice filter to a response.
+private:
+    ScrambleHaikuClient haikuClient;
+    std::vector<std::string> idlePool;
+    std::string commandsList;   // populated from command registry for /commands
+
+    // Handle a slash command. Input must start with '/'.
+    std::string handleSlashCommand(const std::string& input) const;
+
+    // Apply Scramble voice filter: enforce lowercase, append kaomoji if missing.
     std::string voiceFilter(const std::string& text) const;
 
-    // Pick a random kaomoji signoff.
+    // Pick a random kaomoji.
     std::string randomKaomoji() const;
+
+    void loadIdleQuips();
 };
 
 #endif // SCRAMBLE_ENGINE_H

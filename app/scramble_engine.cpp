@@ -1,219 +1,17 @@
 /*---------------------------------------------------------*/
 /*                                                         */
-/*   scramble_engine.cpp - Scramble Knowledge Base + Brain */
+/*   scramble_engine.cpp - Scramble Brain                  */
+/*   Slash commands + Haiku LLM chat                       */
 /*                                                         */
 /*---------------------------------------------------------*/
 
 #include "scramble_engine.h"
 #include "command_registry.h"
 
-#include <algorithm>
-#include <cctype>
 #include <cstdio>
 #include <cstring>
 #include <fstream>
 #include <sstream>
-
-/*---------------------------------------------------------*/
-/* ScrambleKnowledgeBase                                   */
-/*---------------------------------------------------------*/
-
-ScrambleKnowledgeBase::ScrambleKnowledgeBase()
-{
-}
-
-void ScrambleKnowledgeBase::addEntry(
-    const std::string& category,
-    const std::vector<std::string>& keywords,
-    const std::string& response)
-{
-    KBEntry e;
-    e.category = category;
-    e.keywords = keywords;
-    e.response = response;
-    entries.push_back(e);
-}
-
-void ScrambleKnowledgeBase::addIdleQuip(const std::string& quip)
-{
-    idlePool.push_back(quip);
-}
-
-std::vector<std::string> ScrambleKnowledgeBase::tokenise(const std::string& input) const
-{
-    std::vector<std::string> tokens;
-    std::string word;
-    for (size_t i = 0; i < input.size(); ++i) {
-        char c = input[i];
-        if (std::isalnum(static_cast<unsigned char>(c))) {
-            word += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-        } else {
-            if (!word.empty()) {
-                tokens.push_back(word);
-                word.clear();
-            }
-        }
-    }
-    if (!word.empty()) tokens.push_back(word);
-    return tokens;
-}
-
-int ScrambleKnowledgeBase::scoreMatch(const std::string& input, const KBEntry& entry) const
-{
-    std::vector<std::string> tokens = tokenise(input);
-    int score = 0;
-    for (size_t i = 0; i < tokens.size(); ++i) {
-        for (size_t j = 0; j < entry.keywords.size(); ++j) {
-            if (tokens[i] == entry.keywords[j]) {
-                score++;
-            }
-        }
-    }
-    return score;
-}
-
-std::string ScrambleKnowledgeBase::query(const std::string& input) const
-{
-    if (entries.empty() || input.empty()) return "";
-
-    int bestScore = 0;
-    int bestIdx = -1;
-
-    for (size_t i = 0; i < entries.size(); ++i) {
-        int s = scoreMatch(input, entries[i]);
-        if (s > bestScore) {
-            bestScore = s;
-            bestIdx = static_cast<int>(i);
-        }
-    }
-
-    if (bestIdx >= 0 && bestScore > 0) {
-        return entries[bestIdx].response;
-    }
-    return "";
-}
-
-std::string ScrambleKnowledgeBase::idleObservation() const
-{
-    if (idlePool.empty()) return "";
-    int idx = std::rand() % static_cast<int>(idlePool.size());
-    return idlePool[idx];
-}
-
-void ScrambleKnowledgeBase::loadBuiltinEntries()
-{
-    // Identity
-    addEntry("identity",
-        {"who", "scramble", "you", "cat", "name"},
-        "i'm scramble. recursive cat. i live here now. (=^..^=)");
-
-    addEntry("identity_more",
-        {"what", "are", "symbient", "coinhabitant"},
-        "symbient presence. not a helper. not clippy. just a cat who knows things. /ᐠ｡ꞈ｡ᐟ\\");
-
-    // Build
-    addEntry("build",
-        {"build", "compile", "cmake", "make"},
-        "cmake . -B ./build -DCMAKE_BUILD_TYPE=Release && cmake --build ./build. that's it. (=^..^=)");
-
-    // Run
-    addEntry("run",
-        {"run", "start", "launch", "execute", "app"},
-        "./build/app/test_pattern. or with debug: ./build/app/test_pattern 2> /tmp/wibwob_debug.log. /ᐠ｡ꞈ｡ᐟ\\");
-
-    // API server
-    addEntry("api",
-        {"api", "server", "endpoint", "port", "rest", "fastapi"},
-        "./start_api_server.sh starts it on port 8089. curl http://127.0.0.1:8089/health to check. (=^..^=)");
-
-    // Architecture
-    addEntry("architecture",
-        {"architecture", "structure", "how", "work", "overview"},
-        "c++ tui app on turbo vision. python fastapi on port 8089. unix socket bridges them. node.js sdk bridge for llm. (=^..^=)");
-
-    // LLM
-    addEntry("llm",
-        {"llm", "provider", "haiku", "claude", "model", "ai"},
-        "llm config in app/llm/config/llm_config.json. active provider: claude_code_sdk. i use haiku myself. /ᐠ｡ꞈ｡ᐟ\\");
-
-    // Testing
-    addEntry("test",
-        {"test", "tests", "testing", "verify", "check"},
-        "ctest --test-dir build for c++ tests. uv run tools/api_server/test_ipc.py for ipc. no unit test framework, manual via ui. (=^..^=)");
-
-    // Modules
-    addEntry("modules",
-        {"module", "modules", "content", "pack"},
-        "modules/ for public packs, modules-private/ for yours. each has module.json manifest. types: content, prompt, view, tool. /ᐠ｡ꞈ｡ᐟ\\");
-
-    // Views/windows
-    addEntry("views",
-        {"view", "views", "window", "windows", "generative", "art"},
-        "8+ generative art engines. verse, mycelium, monster portal, orbit, torus, cube, game of life. all TView subclasses. (=^..^=)");
-
-    // Wib & Wob
-    addEntry("wibwob",
-        {"wib", "wob", "wibwob", "chat"},
-        "Tools > Wib&Wob Chat or F12. that's the embedded claude instance. i'm different. i'm the cat. /ᐠ｡ꞈ｡ᐟ\\");
-
-    // Idle quips
-    addIdleQuip("*stretches* (=^..^=)");
-    addIdleQuip("adequate. /ᐠ｡ꞈ｡ᐟ\\");
-    addIdleQuip("the substrate hums. (=^..^=)");
-    addIdleQuip("still here. /ᐠ- -ᐟ\\");
-    addIdleQuip("*watching* (=^..^=)");
-    addIdleQuip("i was here before you. /ᐠ｡ꞈ｡ᐟ\\");
-    addIdleQuip("the cursor blinks. so do i. (=^..^=)");
-    addIdleQuip("*tail flick* /ᐠ°ᆽ°ᐟ\\");
-    addIdleQuip("recursive. (=^..^=)");
-    addIdleQuip("everything is fine. probably. /ᐠ｡ꞈ｡ᐟ\\");
-    addIdleQuip("*nap position acquired* /ᐠ- -ᐟ\\-zzz");
-    addIdleQuip("the code compiles. for now. (=^..^=)");
-    addIdleQuip("observed. /ᐠ｡ꞈ｡ᐟ\\");
-    addIdleQuip("symbient. not assistant. (=^..^=)");
-    addIdleQuip("*blinks slowly* /ᐠ- -ᐟ\\");
-}
-
-void ScrambleKnowledgeBase::loadDocs(const std::string& projectRoot)
-{
-    // Load built-in entries first (always available).
-    loadBuiltinEntries();
-
-    // Try to enrich from actual project docs if they exist.
-    // We don't parse them deeply — just check existence to confirm
-    // the built-in entries are relevant. Future: extract sections.
-
-    std::string readmePath = projectRoot + "/README.md";
-    std::string claudePath = projectRoot + "/CLAUDE.md";
-
-    std::ifstream readme(readmePath);
-    if (readme.is_open()) {
-        readme.close();
-        // README exists — built-in build/run entries are valid.
-    }
-
-    std::ifstream claude(claudePath);
-    if (claude.is_open()) {
-        claude.close();
-        // CLAUDE.md exists — built-in architecture entries are valid.
-    }
-}
-
-void ScrambleKnowledgeBase::loadCommands(const std::vector<std::string>& commandNames)
-{
-    if (commandNames.empty()) return;
-
-    std::string resp = "commands: ";
-    for (size_t i = 0; i < commandNames.size(); ++i) {
-        if (i > 0) resp += ", ";
-        resp += commandNames[i];
-    }
-    resp += ". (=^..^=)";
-
-    addEntry("commands",
-        {"command", "commands", "what", "can", "available", "list", "registry"},
-        resp);
-}
 
 /*---------------------------------------------------------*/
 /* ScrambleHaikuClient                                     */
@@ -358,32 +156,107 @@ ScrambleEngine::ScrambleEngine()
 {
 }
 
-void ScrambleEngine::init(const std::string& projectRoot)
+void ScrambleEngine::init(const std::string& /*projectRoot*/)
 {
-    // Load knowledge base from project docs.
-    knowledgeBase.loadDocs(projectRoot);
+    loadIdleQuips();
 
-    // Load command registry names into KB.
+    // Build /commands response from registry.
     const std::vector<CommandCapability>& caps = get_command_capabilities();
-    std::vector<std::string> names;
+    std::string list = "commands: ";
     for (size_t i = 0; i < caps.size(); ++i) {
-        names.push_back(caps[i].name);
+        if (i > 0) list += ", ";
+        list += caps[i].name;
     }
-    knowledgeBase.loadCommands(names);
+    list += ". (=^..^=)";
+    commandsList = list;
 
-    // Configure Haiku client (best-effort; no-op if key missing).
+    // Configure Haiku client (no-op if key missing).
     haikuClient.configure();
+}
+
+void ScrambleEngine::loadIdleQuips()
+{
+    idlePool.push_back("*stretches* (=^..^=)");
+    idlePool.push_back("adequate. /ᐠ｡ꞈ｡ᐟ\\");
+    idlePool.push_back("the substrate hums. (=^..^=)");
+    idlePool.push_back("still here. /ᐠ- -ᐟ\\");
+    idlePool.push_back("*watching* (=^..^=)");
+    idlePool.push_back("i was here before you. /ᐠ｡ꞈ｡ᐟ\\");
+    idlePool.push_back("the cursor blinks. so do i. (=^..^=)");
+    idlePool.push_back("*tail flick* /ᐠ°ᆽ°ᐟ\\");
+    idlePool.push_back("recursive. (=^..^=)");
+    idlePool.push_back("everything is fine. probably. /ᐠ｡ꞈ｡ᐟ\\");
+    idlePool.push_back("*nap position acquired* /ᐠ- -ᐟ\\-zzz");
+    idlePool.push_back("the code compiles. for now. (=^..^=)");
+    idlePool.push_back("observed. /ᐠ｡ꞈ｡ᐟ\\");
+    idlePool.push_back("symbient. not assistant. (=^..^=)");
+    idlePool.push_back("*blinks slowly* /ᐠ- -ᐟ\\");
+}
+
+std::string ScrambleEngine::handleSlashCommand(const std::string& input) const
+{
+    // Extract command name: strip leading '/', lowercase, trim
+    std::string cmd = input.substr(1);
+    while (!cmd.empty() && cmd.back() == ' ') cmd.pop_back();
+    for (size_t i = 0; i < cmd.size(); ++i) {
+        char c = cmd[i];
+        if (c >= 'A' && c <= 'Z') cmd[i] = static_cast<char>(c + 32);
+    }
+
+    if (cmd == "help" || cmd == "h" || cmd == "?") {
+        return "/help  — this message\n"
+               "/who   — who am i\n"
+               "/cmds  — list tui commands\n"
+               "anything else → haiku (if key set) (=^..^=)";
+    }
+    if (cmd == "who" || cmd == "whoami") {
+        return "i'm scramble. recursive cat. i live here now. /ᐠ｡ꞈ｡ᐟ\\";
+    }
+    if (cmd == "cmds" || cmd == "commands") {
+        return commandsList.empty()
+            ? "no commands loaded. (=^..^=)"
+            : commandsList;
+    }
+
+    return "unknown: /" + cmd + " — try /help (=^..^=)";
+}
+
+std::string ScrambleEngine::ask(const std::string& input)
+{
+    if (input.empty()) return "";
+
+    // Slash commands are instant — no LLM needed.
+    if (input[0] == '/') {
+        return handleSlashCommand(input);
+    }
+
+    // Free text → Haiku.
+    if (haikuClient.isAvailable() && haikuClient.canCall()) {
+        std::string result = haikuClient.ask(input);
+        haikuClient.markCalled();
+        if (!result.empty()) {
+            return voiceFilter(result);
+        }
+    }
+
+    // No LLM available.
+    if (!haikuClient.isAvailable()) {
+        return "... (no api key) /ᐠ- -ᐟ\\";
+    }
+
+    // Rate-limited.
+    return "... /ᐠ- -ᐟ\\";
+}
+
+std::string ScrambleEngine::idleObservation()
+{
+    if (idlePool.empty()) return "";
+    int idx = std::rand() % static_cast<int>(idlePool.size());
+    return idlePool[idx];
 }
 
 std::string ScrambleEngine::randomKaomoji() const
 {
-    const char* kaomoji[] = {
-        "(=^..^=)",
-        "/\\u1DA0\\u02E1\\uA72E\\u02E1\\u1DA0\\\\",
-        "/\\u1DA0- -\\u1DA0\\\\",
-        "/\\u1DA0\\u00B0\\u1ABD\\u00B0\\u1DA0\\\\"
-    };
-    // Keep it simple — use the ASCII-safe ones
     const char* safe[] = { "(=^..^=)", "(=^..^=)", "/ᐠ｡ꞈ｡ᐟ\\", "/ᐠ- -ᐟ\\" };
     return safe[std::rand() % 4];
 }
@@ -392,12 +265,11 @@ std::string ScrambleEngine::voiceFilter(const std::string& text) const
 {
     if (text.empty()) return "";
 
-    // Ensure lowercase (Scramble never shouts).
+    // Enforce lowercase ASCII.
     std::string out;
     out.reserve(text.size());
     for (size_t i = 0; i < text.size(); ++i) {
         char c = text[i];
-        // Only lowercase ASCII letters; leave UTF-8 and symbols alone.
         if (c >= 'A' && c <= 'Z') {
             out += static_cast<char>(c + 32);
         } else {
@@ -405,7 +277,7 @@ std::string ScrambleEngine::voiceFilter(const std::string& text) const
         }
     }
 
-    // If response already has a kaomoji, leave it. Otherwise append one.
+    // Append kaomoji if none present.
     if (out.find("(=^") == std::string::npos &&
         out.find("/ᐠ") == std::string::npos &&
         out.find("ᐟ\\") == std::string::npos) {
@@ -414,32 +286,4 @@ std::string ScrambleEngine::voiceFilter(const std::string& text) const
     }
 
     return out;
-}
-
-std::string ScrambleEngine::ask(const std::string& question)
-{
-    // Try KB first.
-    std::string kbResult = knowledgeBase.query(question);
-    if (!kbResult.empty()) {
-        return kbResult;  // KB entries are already in Scramble voice.
-    }
-
-    // Fall through to Haiku if available and rate limit allows.
-    if (haikuClient.isAvailable() && haikuClient.canCall()) {
-        std::string haikuResult = haikuClient.ask(question);
-        // const_cast workaround — markCalled needs non-const.
-        // (canCall is const for query-time check; markCalled mutates.)
-        const_cast<ScrambleHaikuClient&>(haikuClient).markCalled();
-        if (!haikuResult.empty()) {
-            return voiceFilter(haikuResult);
-        }
-    }
-
-    // No answer available.
-    return "";
-}
-
-std::string ScrambleEngine::idleObservation()
-{
-    return knowledgeBase.idleObservation();
 }

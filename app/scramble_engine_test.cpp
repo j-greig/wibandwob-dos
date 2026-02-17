@@ -1,5 +1,5 @@
 /*---------------------------------------------------------*/
-/*   scramble_engine_test.cpp - ctest for KB + engine      */
+/*   scramble_engine_test.cpp - ctest for engine           */
 /*---------------------------------------------------------*/
 
 #include "scramble_engine.h"
@@ -41,159 +41,120 @@ static bool contains(const std::string& haystack, const std::string& needle) {
 }
 
 int main() {
-    std::srand(42); // Deterministic for testing
+    std::srand(42);
 
     std::cout << "=== ScrambleEngine Tests ===\n\n";
 
-    // --- KB standalone tests ---
-    std::cout << "[KB: builtin entries]\n";
+    // --- Slash command tests ---
+    std::cout << "[Slash: /help]\n";
     {
-        ScrambleKnowledgeBase kb;
-        kb.loadDocs("."); // Load from project root (current dir)
-
-        check("KB has entries after loadDocs", kb.isLoaded());
-        check("KB has >5 entries", kb.entryCount() > 5);
+        ScrambleEngine engine;
+        engine.init(".");
+        std::string r = engine.ask("/help");
+        check("/help returns non-empty", !r.empty());
+        check("/help mentions /who", contains(r, "/who"));
+        check("/help mentions /cmds", contains(r, "/cmds"));
+        check("/help has kaomoji", contains(r, "(=^..^=)") || contains(r, "ᐟ\\"));
     }
 
-    std::cout << "\n[KB: identity query]\n";
+    std::cout << "\n[Slash: /who]\n";
     {
-        ScrambleKnowledgeBase kb;
-        kb.loadDocs(".");
-        std::string r = kb.query("who are you");
-        check("identity query returns non-empty", !r.empty());
-        check("identity mentions scramble", contains(r, "scramble"));
-        check("identity has kaomoji", contains(r, "(=^..^=)") || contains(r, "ᐟ\\"));
+        ScrambleEngine engine;
+        engine.init(".");
+        std::string r = engine.ask("/who");
+        check("/who returns non-empty", !r.empty());
+        check("/who mentions scramble", contains(r, "scramble"));
+        check("/who has kaomoji", contains(r, "(=^..^=)") || contains(r, "ᐟ\\"));
     }
 
-    std::cout << "\n[KB: build query]\n";
+    std::cout << "\n[Slash: /cmds]\n";
     {
-        ScrambleKnowledgeBase kb;
-        kb.loadDocs(".");
-        std::string r = kb.query("how do i build this");
-        check("build query returns non-empty", !r.empty());
-        check("build mentions cmake", contains(r, "cmake"));
+        ScrambleEngine engine;
+        engine.init(".");
+        std::string r = engine.ask("/cmds");
+        check("/cmds returns non-empty", !r.empty());
+        check("/cmds mentions cascade", contains(r, "cascade"));
+        check("/cmds mentions open_scramble", contains(r, "open_scramble"));
+        check("/cmds has kaomoji", contains(r, "(=^..^=)") || contains(r, "ᐟ\\"));
     }
 
-    std::cout << "\n[KB: run query]\n";
+    std::cout << "\n[Slash: unknown command]\n";
     {
-        ScrambleKnowledgeBase kb;
-        kb.loadDocs(".");
-        std::string r = kb.query("how do i run the app");
-        check("run query returns non-empty", !r.empty());
-        check("run mentions test_pattern", contains(r, "test_pattern"));
+        ScrambleEngine engine;
+        engine.init(".");
+        std::string r = engine.ask("/nope");
+        check("unknown slash returns non-empty", !r.empty());
+        check("unknown slash mentions /help", contains(r, "/help"));
     }
 
-    std::cout << "\n[KB: api query]\n";
+    std::cout << "\n[Slash: aliases]\n";
     {
-        ScrambleKnowledgeBase kb;
-        kb.loadDocs(".");
-        std::string r = kb.query("where is the api server");
-        check("api query returns non-empty", !r.empty());
-        check("api mentions 8089", contains(r, "8089"));
+        ScrambleEngine engine;
+        engine.init(".");
+        std::string help1 = engine.ask("/help");
+        std::string help2 = engine.ask("/h");
+        std::string help3 = engine.ask("/?");
+        check("/h same as /help", help1 == help2);
+        check("/? same as /help", help1 == help3);
+
+        std::string cmds1 = engine.ask("/cmds");
+        std::string cmds2 = engine.ask("/commands");
+        check("/commands same as /cmds", cmds1 == cmds2);
     }
 
-    std::cout << "\n[KB: commands query]\n";
+    // --- Free text without Haiku key ---
+    std::cout << "\n[LLM: no key fallback]\n";
     {
-        ScrambleKnowledgeBase kb;
-        kb.loadDocs(".");
-        // Load real command registry
-        const std::vector<CommandCapability>& caps = get_command_capabilities();
-        std::vector<std::string> names;
-        for (size_t i = 0; i < caps.size(); ++i) {
-            names.push_back(caps[i].name);
+        ScrambleEngine engine;
+        engine.init(".");
+        // No API key set in test environment
+        if (!engine.hasLLM()) {
+            std::string r = engine.ask("hello cat");
+            check("no-key returns non-empty fallback", !r.empty());
+            check("no-key fallback has kaomoji", contains(r, "(=^..^=)") || contains(r, "ᐟ\\"));
+        } else {
+            check("haiku available (skip no-key test)", true);
         }
-        kb.loadCommands(names);
-
-        std::string r = kb.query("what commands are available");
-        check("commands query returns non-empty", !r.empty());
-        check("commands mentions cascade", contains(r, "cascade"));
-        check("commands mentions open_scramble", contains(r, "open_scramble"));
     }
 
-    std::cout << "\n[KB: garbage query]\n";
-    {
-        ScrambleKnowledgeBase kb;
-        kb.loadDocs(".");
-        std::string r = kb.query("xyzzy plugh");
-        check("garbage query returns empty", r.empty());
-    }
-
-    std::cout << "\n[KB: idle observations]\n";
-    {
-        ScrambleKnowledgeBase kb;
-        kb.loadDocs(".");
-        std::string r = kb.idleObservation();
-        check("idle observation returns non-empty", !r.empty());
-        // Check it's in Scramble voice (has kaomoji)
-        check("idle has kaomoji or emote", contains(r, "(=^") || contains(r, "ᐟ\\") || contains(r, "*"));
-    }
-
-    // --- Haiku client tests (no live API) ---
-    std::cout << "\n[Haiku: config without key]\n";
+    // --- Haiku client unit tests ---
+    std::cout << "\n[Haiku: unavailable without key]\n";
     {
         ScrambleHaikuClient client;
-        // Don't configure — test unavailable state
-        check("haiku unavailable without key", !client.isAvailable());
-        check("haiku canCall false without key", !client.canCall());
-        std::string r = client.ask("test");
-        check("haiku returns empty without key", r.empty());
+        check("unavailable without configure()", !client.isAvailable());
+        check("canCall false without key", !client.canCall());
+        check("ask returns empty without key", client.ask("test").empty());
     }
 
     std::cout << "\n[Haiku: rate limiter]\n";
     {
         ScrambleHaikuClient client;
-        // Can't fully test rate limiter without key, but test markCalled
         client.markCalled();
-        // canCall should be false right after marking (no key anyway)
         check("canCall false after markCalled (no key)", !client.canCall());
     }
 
-    // --- Engine integration tests ---
-    std::cout << "\n[Engine: init and KB query]\n";
+    // --- Idle observations ---
+    std::cout << "\n[Engine: idle observations]\n";
     {
         ScrambleEngine engine;
         engine.init(".");
-
-        std::string r = engine.ask("how do i build");
-        check("engine.ask build returns non-empty", !r.empty());
-        check("engine.ask build mentions cmake", contains(r, "cmake"));
-    }
-
-    std::cout << "\n[Engine: idle observation]\n";
-    {
-        ScrambleEngine engine;
-        engine.init(".");
-
         std::string r = engine.idleObservation();
-        check("engine idle returns non-empty", !r.empty());
+        check("idle returns non-empty", !r.empty());
+        check("idle has kaomoji or emote", contains(r, "(=^") || contains(r, "ᐟ\\") || contains(r, "*"));
     }
 
-    std::cout << "\n[Engine: unknown question falls through]\n";
-    {
-        ScrambleEngine engine;
-        engine.init(".");
-        // With no API key, unknown questions should return empty
-        std::string r = engine.ask("what is the meaning of life the universe and everything");
-        // KB won't match this well, and Haiku isn't available
-        // Result depends on whether any keyword matches; this is intentionally vague
-        // The point is it doesn't crash
-        check("engine handles unknown question without crash", true);
-    }
-
-    // --- Voice filter test ---
+    // --- Voice filter (applied to Haiku output) ---
     std::cout << "\n[Engine: voice filter]\n";
     {
         ScrambleEngine engine;
         engine.init(".");
-        // Test via ask — KB entries are pre-filtered
-        std::string r = engine.ask("who are you");
-        check("voice is lowercase", r == r); // KB entries are already lowercase
-        // Check no uppercase in response
+        // Slash commands are pre-filtered; test idle (which is pre-lowercase already)
+        std::string r = engine.ask("/who");
         bool hasUpper = false;
-        for (size_t i = 0; i < r.size(); ++i) {
+        for (size_t i = 0; i < r.size() && r[i] >= 0; ++i) {
             if (r[i] >= 'A' && r[i] <= 'Z') hasUpper = true;
         }
-        check("response has no uppercase ASCII", !hasUpper);
+        check("/who response has no uppercase ASCII", !hasUpper);
     }
 
     std::cout << "\n=== Results: " << (failures == 0 ? "ALL PASSED" : "FAILURES") << " ===\n";
