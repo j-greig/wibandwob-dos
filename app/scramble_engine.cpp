@@ -30,9 +30,19 @@ bool ScrambleHaikuClient::configure()
     const char* key = std::getenv("ANTHROPIC_API_KEY");
     if (key && key[0] != '\0') {
         apiKey = key;
+        fprintf(stderr, "[scramble] api key loaded from env ANTHROPIC_API_KEY (len=%zu)\n",
+                apiKey.size());
         return true;
     }
+    fprintf(stderr, "[scramble] ANTHROPIC_API_KEY not set — haiku unavailable\n");
     return false;
+}
+
+void ScrambleHaikuClient::setApiKey(const std::string& key)
+{
+    apiKey = key;
+    fprintf(stderr, "[scramble] api key set at runtime (len=%zu, prefix=%.8s...)\n",
+            key.size(), key.size() >= 8 ? key.c_str() : "short");
 }
 
 bool ScrambleHaikuClient::canCall() const
@@ -227,16 +237,25 @@ std::string ScrambleEngine::ask(const std::string& input)
 
     // Slash commands are instant — no LLM needed.
     if (input[0] == '/') {
+        fprintf(stderr, "[scramble] slash command: %s\n", input.c_str());
         return handleSlashCommand(input);
     }
 
+    fprintf(stderr, "[scramble] ask: haiku_available=%d can_call=%d input=%.40s\n",
+            haikuClient.isAvailable() ? 1 : 0,
+            haikuClient.canCall() ? 1 : 0,
+            input.c_str());
+
     // Free text → Haiku.
     if (haikuClient.isAvailable() && haikuClient.canCall()) {
+        fprintf(stderr, "[scramble] calling haiku...\n");
         std::string result = haikuClient.ask(input);
         haikuClient.markCalled();
+        fprintf(stderr, "[scramble] haiku response len=%zu\n", result.size());
         if (!result.empty()) {
             return voiceFilter(result);
         }
+        fprintf(stderr, "[scramble] haiku returned empty\n");
     }
 
     // No LLM available.

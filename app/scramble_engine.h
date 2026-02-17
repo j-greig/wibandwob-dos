@@ -24,6 +24,9 @@ public:
     // Configure from environment. Returns true if API key found.
     bool configure();
 
+    // Set key directly at runtime (e.g. from Tools > API Key dialog).
+    void setApiKey(const std::string& key);
+
     // Send a question to Haiku. Returns response text, or empty on failure.
     // Blocks until curl completes (typically 1-3 seconds).
     std::string ask(const std::string& question) const;
@@ -76,6 +79,9 @@ public:
 
     // Check if Haiku is available.
     bool hasLLM() const { return haikuClient.isAvailable(); }
+
+    // Set API key at runtime (called when user sets key via Tools menu).
+    void setApiKey(const std::string& key) { haikuClient.setApiKey(key); }
 
 private:
     ScrambleHaikuClient haikuClient;

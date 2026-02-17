@@ -1799,6 +1799,10 @@ void TTestPatternApp::showApiKeyDialog()
 
         if (!key.empty()) {
             runtimeApiKey = key;
+            // Also wire to Scramble engine so it can use Haiku immediately.
+            scrambleEngine.setApiKey(key);
+            fprintf(stderr, "[app] api key set via dialog (len=%zu) — wired to runtimeApiKey + scrambleEngine\n",
+                    key.size());
             if (key.substr(0, 6) == "sk-ant") {
                 messageBox("API key set. Chat will use Anthropic API.",
                            mfInformation | mfOKButton);
