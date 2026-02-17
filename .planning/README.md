@@ -95,13 +95,32 @@ Spikes can be flat files or directories depending on artifact count.
 
 ### Status Header
 
-Every epic brief, feature brief, story brief, and spike file must have a status block at the top of its Status section:
+Every epic brief, feature brief, story brief, and spike file must have status metadata.
+
+**Epic briefs** use YAML frontmatter (preferred — enables `.claude/scripts/planning.sh` and auto-sync to `EPIC_STATUS.md`):
+
+```yaml
+---
+id: E005
+title: Theme Runtime Wiring
+status: not-started
+issue: 43
+pr: ~
+depends_on: [E003]
+---
+```
+
+Valid `status` values: `not-started`, `in-progress`, `blocked`, `done`, `dropped`.
+
+**Feature/story/spike briefs** use a body-level status block in the `## Status` section:
 
 ```
 Status: not-started | in-progress | blocked | done | dropped
 GitHub issue: #NNN
 PR: #NNN (when created)
 ```
+
+Both formats are accepted by the `planning-post-write-guard` hook.
 
 ### Checkbox Format
 

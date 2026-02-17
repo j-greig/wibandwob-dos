@@ -1,3 +1,12 @@
+---
+id: E004
+title: Browser Rendering Reliability
+status: not-started
+issue: 49
+pr: ~
+depends_on: [E002]
+---
+
 # E004: Browser Rendering Reliability and Quality Loop
 
 ## Objective
