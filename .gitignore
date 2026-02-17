@@ -48,3 +48,6 @@ cache/
 # Local workspace snapshots/artifacts
 workspaces/*
 !workspaces/.gitkeep
+
+# CoPilot
+_codeql_build_dir/
