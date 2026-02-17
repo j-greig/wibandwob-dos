@@ -170,6 +170,7 @@ Menu/API/MCP parity drift was resolved by E001 (command registry). The unified `
 - **PR body must use the template**: always populate the PR body from `.github/pull_request_template.md`. Tick all Acceptance Criteria checkboxes before declaring the PR ready. Verify by reading back the PR body with `gh pr view`.
 - **PR checklist**: see `workings/chatgpt-refactor-vision-planning-2026-01-15/pr-acceptance-and-quality-gates.md` for the full acceptance gate list. Key gates: command defined once in C++ registry, menu/MCP parity preserved, `get_state()` validates against schema, Python tests pass.
 - **No force-push to main**.
+- **No emoji in commit messages** — not in title, not in description. Plain text only.
 
 ## Scope Guardrails
 

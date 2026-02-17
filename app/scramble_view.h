@@ -23,6 +23,9 @@
 #include <string>
 #include <vector>
 
+// Forward declare — engine lives in scramble_engine.h (no tvision dependency)
+class ScrambleEngine;
+
 /*---------------------------------------------------------*/
 /* ScramblePose - cat pose states                          */
 /*---------------------------------------------------------*/
@@ -52,9 +55,11 @@ public:
     void say(const std::string& text);
     void setPose(ScramblePose pose);
     void toggleVisible();
+    void setEngine(ScrambleEngine* engine) { scrambleEngine = engine; }
     ScramblePose getPose() const { return currentPose; }
 
 private:
+    ScrambleEngine* scrambleEngine;
     // Cat state
     ScramblePose currentPose;
 

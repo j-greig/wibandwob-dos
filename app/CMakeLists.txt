@@ -50,6 +50,7 @@ add_executable(test_pattern
     ansi_view.cpp
     wibwob_scroll_test.cpp
     scramble_view.cpp
+    scramble_engine.cpp
 )
 target_link_libraries(test_pattern PRIVATE tvision)
 
@@ -106,3 +107,12 @@ add_executable(command_registry_test
 )
 
 add_test(NAME command_registry COMMAND command_registry_test)
+
+# scramble_engine_test (KB queries, rate limiter, engine integration)
+add_executable(scramble_engine_test
+    scramble_engine_test.cpp
+    scramble_engine.cpp
+    command_registry.cpp
+)
+
+add_test(NAME scramble_engine COMMAND scramble_engine_test)

@@ -77,6 +77,7 @@
 #include "browser_view.h"
 // Scramble cat presence
 #include "scramble_view.h"
+#include "scramble_engine.h"
 // Factory for ASCII grid demo window (implemented in ascii_grid_view.cpp).
 class TWindow; TWindow* createAsciiGridDemoWindow(const TRect &bounds);
 // #include "mech_window.h" // deferred feature; header not present yet
@@ -591,6 +592,7 @@ private:
 
     // Scramble cat overlay
     TScrambleWindow* scrambleWindow;
+    ScrambleEngine scrambleEngine;
     void toggleScramble();
 
     // Kaomoji mood helper
@@ -688,6 +690,9 @@ TTestPatternApp::TTestPatternApp() :
     // Start IPC server for local API control (best-effort; ignore failures)
     ipcServer = new ApiIpcServer(this);
     ipcServer->start("/tmp/test_pattern_app.sock");
+
+    // Init Scramble engine (KB + Haiku client).
+    scrambleEngine.init(".");
 
     // No wallpaper initialization.
 }
@@ -1235,6 +1240,10 @@ void TTestPatternApp::toggleScramble()
         TRect r(desktop.b.x - w - 1, desktop.b.y - h,
                 desktop.b.x - 1,     desktop.b.y);
         scrambleWindow = static_cast<TScrambleWindow*>(createScrambleWindow(r));
+        // Wire engine into view
+        if (scrambleWindow->getView()) {
+            scrambleWindow->getView()->setEngine(&scrambleEngine);
+        }
         deskTop->insert(scrambleWindow);
         // Put behind other windows (just in front of background)
         if (deskTop->background) {

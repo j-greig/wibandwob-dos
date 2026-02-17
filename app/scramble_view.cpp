@@ -6,6 +6,7 @@
 /*---------------------------------------------------------*/
 
 #include "scramble_view.h"
+#include "scramble_engine.h"
 #include <algorithm>
 #include <cstdlib>
 #include <ctime>
@@ -62,6 +63,7 @@ const std::vector<std::string>& TScrambleView::getCatArt(ScramblePose pose)
 
 TScrambleView::TScrambleView(const TRect& bounds)
     : TView(bounds),
+      scrambleEngine(nullptr),
       currentPose(spDefault),
       bubbleVisible(false),
       bubbleFadeTicks(0),
@@ -316,11 +318,19 @@ void TScrambleView::handleEvent(TEvent& event)
                 setPose(next);
                 resetIdleTimer();
 
-                switch (next) {
-                    case spSleeping: say("*yawn* zzZ"); break;
-                    case spCurious:  say("hm? (o.O)"); break;
-                    default:         say("mrrp!"); break;
+                // Get observation from engine if available, else fallback
+                std::string obs;
+                if (scrambleEngine) {
+                    obs = scrambleEngine->idleObservation();
                 }
+                if (obs.empty()) {
+                    switch (next) {
+                        case spSleeping: obs = "*yawn* zzZ"; break;
+                        case spCurious:  obs = "hm? (o.O)"; break;
+                        default:         obs = "mrrp!"; break;
+                    }
+                }
+                say(obs);
             }
 
             clearEvent(event);
