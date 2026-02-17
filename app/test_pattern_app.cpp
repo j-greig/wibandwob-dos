@@ -1667,20 +1667,34 @@ void TTestPatternApp::takeScreenshot(bool showDialog)
     "\x0F\x0F\x0F\x70\x0F\x07\x70\x70\x70\x07\x70\x0F\x07\x07\x78\x00" \
     "\x07\x0F\x07\x70\x70\x07\x0F\x70"
 
+// Dark pastel palette variant (distinct for visual verification)
+// Uses brighter colors to demonstrate theme switching
+#define cpDarkPastel \
+    "\x1F\x1F\x1E\x17\x1F\x1F\x1F\x17\x1E\x17\x17\x17\x1F\x17\x1E" \
+    "\x1F\x1E\x1F\x17\x17\x1F\x17\x1E\x1F\x3F\x3F\x1F\x17\x1F\x17\x1E" \
+    "\x1F\x3F\x3F\x1F\x17\x1F\x1F\x3F\x3F\x17\x1F\x1E\x1F\x1E\x1F\x17" \
+    "\x1E\x1E\x1E\x1F\x1E\x17\x1F\x1F\x1F\x17\x1F\x1E\x17\x17\x1B\x10" \
+    "\x1F\x5F\x1E\x1F\x17\x1F\x1F\x1E\x1E\x17\x5F\x3F\x18\x3F\x5F\x1F" \
+    "\x3F\x3F\x3F\x1E\x1F\x1F\x17\x1F\x1F\x1F\x17\x3F\x1F\x17\x18\x10" \
+    "\x1F\x3F\x3F\x1F\x17\x1F\x1F\x3F\x3F\x17\x1E\x1E\x1B\x1E\x1B\x17" \
+    "\x1E\x1E\x1E\x1F\x1E\x17\x1F\x1F\x1F\x17\x1F\x1E\x17\x17\x1B\x10" \
+    "\x17\x1E\x17\x1F\x1F\x17\x1E\x1F"
+
 TPalette& TTestPatternApp::getPalette() const
 {
-    // Create palette based on current theme state
-    // For dark_pastel variant, we use RGB colors which Turbo Vision will map to nearest available colors
-    // For monochrome, we use the standard palette
+    // Dynamic palette based on current theme state
+    // Since this is const, we use mutable static and cast to access theme state
+    TTestPatternApp* mutableThis = const_cast<TTestPatternApp*>(this);
     
-    // Note: Since this is const, we use a mutable static that we update
-    // This is a workaround for Turbo Vision's const getPalette interface
-    static TPalette palette(cpMonochrome, sizeof(cpMonochrome)-1);
+    // For dark_pastel variant, use a visually distinct palette
+    if (mutableThis->currentThemeVariant == ThemeVariant::DarkPastel) {
+        static TPalette darkPastelPalette(cpDarkPastel, sizeof(cpDarkPastel)-1);
+        return darkPastelPalette;
+    }
     
-    // For now, return the monochrome palette
-    // Full theme application will be implemented in S02
-    // The theme state is stored and get_state returns it correctly
-    return palette;
+    // Default monochrome palette
+    static TPalette monochronePalette(cpMonochrome, sizeof(cpMonochrome)-1);
+    return monochronePalette;
 }
 
 TMenuBar* TTestPatternApp::initMenuBar(TRect r)
