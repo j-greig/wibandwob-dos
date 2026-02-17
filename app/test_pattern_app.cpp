@@ -2307,6 +2307,15 @@ bool TTestPatternApp::loadWorkspaceFromFile(const std::string& path)
                 continuous = (pm == "continuous");
         }
     }
+    
+    // Extract theme_mode and theme_variant
+    std::string themeModeStr, themeVariantStr;
+    if (parseKeyedString(data, 0, "theme_mode", themeModeStr)) {
+        currentThemeMode = ThemeManager::parseModeString(themeModeStr);
+    }
+    if (parseKeyedString(data, 0, "theme_variant", themeVariantStr)) {
+        currentThemeVariant = ThemeManager::parseVariantString(themeVariantStr);
+    }
 
     // Locate windows array and extract each object substring
     size_t winKey = data.find("\"windows\"");
@@ -2476,6 +2485,8 @@ std::string TTestPatternApp::buildWorkspaceJson()
     json += std::string("  \"timestamp\": \"") + ts + "\",\n";
     json += "  \"screen\": { \"width\": " + std::to_string(sw) + ", \"height\": " + std::to_string(sh) + " },\n";
     json += std::string("  \"globals\": { \"patternMode\": \"") + (USE_CONTINUOUS_PATTERN ? "continuous" : "tiled") + "\" },\n";
+    json += std::string("  \"theme_mode\": \"") + ThemeManager::modeToString(currentThemeMode) + "\",\n";
+    json += std::string("  \"theme_variant\": \"") + ThemeManager::variantToString(currentThemeVariant) + "\",\n";
     json += "  \"windows\": [\n";
 
     // Collect windows in current z-order (child list is circular)
