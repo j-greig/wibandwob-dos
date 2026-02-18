@@ -146,9 +146,17 @@ def apply_delta(
 # ── Apply remote delta to local WibWob via IPC ───────────────────────────────
 
 def _rect(win: dict) -> dict:
-    """Extract rect/bounds from a window dict, normalising key names."""
-    rect = win.get("rect") or win.get("bounds") or {}
-    return rect if isinstance(rect, dict) else {}
+    """Extract rect/bounds from a window dict, normalising key names.
+
+    Handles both sub-dict form ({rect: {x,y,w,h}}) and flat form ({x,y,w,h}).
+    """
+    rect = win.get("rect") or win.get("bounds")
+    if isinstance(rect, dict):
+        return rect
+    # Fall back to top-level x/y/w/h keys (IPC / delta flat format)
+    if any(k in win for k in ("x", "y", "w", "h", "width", "height")):
+        return win
+    return {}
 
 
 def apply_delta_to_ipc(sock_path: str, delta: dict[str, Any]) -> list[str]:

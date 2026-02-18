@@ -202,3 +202,20 @@ class TestApplyDeltaToIpc:
             applied = apply_delta_to_ipc("/tmp/fake.sock", {})
         assert calls == []
         assert applied == []
+
+    def test_add_uses_toplevel_coords_flat_format(self):
+        """apply_delta_to_ipc reads x/y/w/h from top level (flat IPC delta format).
+
+        PartyKit deltas carry x/y/w/h at the top level of each window entry,
+        not nested under a 'rect' sub-dict. _rect() must fall back to the win
+        dict itself so windows are created at the correct position, not 0,0.
+        """
+        calls, fake = self._capture()
+        with patch("state_diff.ipc_command", side_effect=fake):
+            apply_delta_to_ipc("/tmp/fake.sock", {
+                "add": [{"id": "w1", "type": "test_pattern", "x": 5, "y": 3, "w": 40, "h": 20}]
+            })
+        create = [p for c, p in calls if c == "create_window"]
+        assert len(create) == 1
+        assert create[0]["x"] == 5
+        assert create[0]["y"] == 3

@@ -249,3 +249,45 @@ class TestBridgeReconnect:
 
         asyncio.run(run_test())
         assert len(connect_calls) >= 2, "Expected at least one reconnect attempt"
+
+
+# ── Sync loop prevention ──────────────────────────────────────────────────────
+
+class TestReceiveLoopNoEcho:
+    def test_receive_delta_adopts_local_state_as_baseline(self):
+        """After applying a remote state_delta, last_windows must reflect the
+        actual local IPC state, NOT the remote window IDs.
+
+        Root cause of the infinite-window bug: the C++ app assigns its own IDs
+        (e.g. 'w2') when create_window is called, but the remote delta carried
+        'w1'. If we store 'w1' in last_windows, the next poll sees 'w2' in the
+        local state, computes a diff, and re-broadcasts — infinite loop.
+
+        Fix: after apply_delta_to_ipc, read the real local state via ipc_get_state
+        and use that as the new baseline.
+        """
+        bridge = PartyKitBridge("2", "http://localhost:1999", "test-room")
+        bridge.last_windows = {}
+
+        remote_delta = {
+            "add": [{"id": "w1", "type": "test_pattern", "x": 5, "y": 5, "w": 40, "h": 20}]
+        }
+        # C++ assigns its own ID "w2" (not "w1") when create_window is called
+        local_state_after = {
+            "windows": [{"id": "w2", "type": "test_pattern", "x": 5, "y": 5, "w": 40, "h": 20}]
+        }
+
+        async def run():
+            raw_msg = json.dumps({"type": "state_delta", "delta": remote_delta})
+
+            async def async_messages():
+                yield raw_msg
+
+            with patch("partykit_bridge.apply_delta_to_ipc"), \
+                 patch("partykit_bridge.ipc_get_state", return_value=local_state_after):
+                await bridge.receive_loop(async_messages())
+
+        asyncio.run(run())
+
+        assert "w2" in bridge.last_windows, "Must track local ID w2, not remote w1"
+        assert "w1" not in bridge.last_windows, "Remote ID w1 must not persist in baseline"

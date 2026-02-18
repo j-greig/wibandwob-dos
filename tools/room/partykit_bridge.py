@@ -134,23 +134,21 @@ class PartyKitBridge:
                     if delta:
                         self.log(f"applying state_sync delta")
                         apply_delta_to_ipc(self.sock_path, delta)
-                        self.last_windows = new_windows
+                        # Re-read actual local state as baseline — C++ assigns its
+                        # own window IDs, so we must not track remote IDs or the
+                        # poll loop will see a mismatch and re-broadcast forever.
+                        actual = ipc_get_state(self.sock_path)
+                        self.last_windows = windows_from_state(actual) if actual else new_windows
 
             elif mtype == "state_delta":
                 delta = msg.get("delta", {})
                 if delta:
                     self.log(f"applying remote state_delta")
                     apply_delta_to_ipc(self.sock_path, delta)
-                    new_windows = dict(self.last_windows)
-                    for win in delta.get("add", []):
-                        if isinstance(win, dict) and "id" in win:
-                            new_windows[win["id"]] = win
-                    for wid in delta.get("remove", []):
-                        new_windows.pop(wid, None)
-                    for win in delta.get("update", []):
-                        if isinstance(win, dict) and win.get("id") in new_windows:
-                            new_windows[win["id"]].update(win)
-                    self.last_windows = new_windows
+                    # Same baseline fix: read actual local state, not remote IDs.
+                    actual = ipc_get_state(self.sock_path)
+                    if actual:
+                        self.last_windows = windows_from_state(actual)
 
             elif mtype == "chat_msg":
                 sender = msg.get("sender", "remote")
