@@ -123,6 +123,19 @@ extern std::string api_close_window(TTestPatternApp& app, const std::string& id)
 extern std::string api_get_canvas_size(TTestPatternApp& app);
 extern void api_spawn_text_editor(TTestPatternApp& app, const TRect* bounds);
 extern void api_spawn_browser(TTestPatternApp& app, const TRect* bounds);
+extern void api_spawn_verse(TTestPatternApp& app, const TRect* bounds);
+extern void api_spawn_mycelium(TTestPatternApp& app, const TRect* bounds);
+extern void api_spawn_orbit(TTestPatternApp& app, const TRect* bounds);
+extern void api_spawn_torus(TTestPatternApp& app, const TRect* bounds);
+extern void api_spawn_cube(TTestPatternApp& app, const TRect* bounds);
+extern void api_spawn_life(TTestPatternApp& app, const TRect* bounds);
+extern void api_spawn_blocks(TTestPatternApp& app, const TRect* bounds);
+extern void api_spawn_score(TTestPatternApp& app, const TRect* bounds);
+extern void api_spawn_ascii(TTestPatternApp& app, const TRect* bounds);
+extern void api_spawn_animated_gradient(TTestPatternApp& app, const TRect* bounds);
+extern void api_spawn_monster_cam(TTestPatternApp& app, const TRect* bounds);
+extern void api_spawn_monster_verse(TTestPatternApp& app, const TRect* bounds);
+extern void api_spawn_monster_portal(TTestPatternApp& app, const TRect* bounds);
 extern std::string api_browser_fetch(TTestPatternApp& app, const std::string& url);
 extern std::string api_send_text(TTestPatternApp& app, const std::string& id, 
                                  const std::string& content, const std::string& mode, 
@@ -407,6 +420,34 @@ void ApiIpcServer::poll() {
             api_spawn_text_editor(*app_, bounds);
         } else if (type == "browser") {
             api_spawn_browser(*app_, bounds);
+        } else if (type == "verse") {
+            api_spawn_verse(*app_, bounds);
+        } else if (type == "mycelium") {
+            api_spawn_mycelium(*app_, bounds);
+        } else if (type == "orbit") {
+            api_spawn_orbit(*app_, bounds);
+        } else if (type == "torus") {
+            api_spawn_torus(*app_, bounds);
+        } else if (type == "cube") {
+            api_spawn_cube(*app_, bounds);
+        } else if (type == "life") {
+            api_spawn_life(*app_, bounds);
+        } else if (type == "blocks") {
+            api_spawn_blocks(*app_, bounds);
+        } else if (type == "score") {
+            api_spawn_score(*app_, bounds);
+        } else if (type == "ascii") {
+            api_spawn_ascii(*app_, bounds);
+        } else if (type == "animated_gradient") {
+            api_spawn_animated_gradient(*app_, bounds);
+        } else if (type == "monster_cam") {
+            api_spawn_monster_cam(*app_, bounds);
+        } else if (type == "monster_verse") {
+            api_spawn_monster_verse(*app_, bounds);
+        } else if (type == "monster_portal") {
+            api_spawn_monster_portal(*app_, bounds);
+        } else if (type == "wibwob" || type == "scramble") {
+            resp = "err unsupported type\n";
         } else {
             resp = "err unknown type\n";
         }

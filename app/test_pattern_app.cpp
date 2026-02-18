@@ -63,6 +63,8 @@
 #include "generative_monster_verse_view.h"
 // Generative art: Monster Cam (Emoji)
 #include "generative_monster_cam_view.h"
+#include "game_of_life_view.h"
+#include "animated_ascii_view.h"
 // Generative art: ASCII Cam
 // DISABLED: #include "generative_ascii_cam_view.h"
 // API-controllable text editor
@@ -698,6 +700,19 @@ private:
     friend std::string api_get_canvas_size(TTestPatternApp&);
     friend void api_spawn_text_editor(TTestPatternApp&, const TRect* bounds);
     friend void api_spawn_browser(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_verse(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_mycelium(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_orbit(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_torus(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_cube(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_life(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_blocks(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_score(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_ascii(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_animated_gradient(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_monster_cam(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_monster_verse(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_monster_portal(TTestPatternApp&, const TRect* bounds);
     friend std::string api_browser_fetch(TTestPatternApp&, const std::string& url);
     friend std::string api_send_text(TTestPatternApp&, const std::string&, const std::string&, 
                                      const std::string&, const std::string&);
@@ -2373,12 +2388,44 @@ void api_screenshot(TTestPatternApp& app) { app.takeScreenshot(false); }
 
 static const char* windowTypeName(TWindow* w) {
     if (!w) return "test_pattern";
+
+    // Directly-typed windows whose classes are visible in this TU.
     if (dynamic_cast<TTestPatternWindow*>(w))    return "test_pattern";
     if (dynamic_cast<TGradientWindow*>(w))        return "gradient";
     if (dynamic_cast<TBrowserWindow*>(w))         return "browser";
     if (dynamic_cast<TTextEditorWindow*>(w))      return "text_editor";
     if (dynamic_cast<TTransparentTextWindow*>(w)) return "text_view";
     if (dynamic_cast<TFrameAnimationWindow*>(w))  return "frame_player";
+    if (dynamic_cast<TWibWobWindow*>(w))          return "wibwob";
+    if (dynamic_cast<TScrambleWindow*>(w))        return "scramble";
+
+    // Generative/animated window wrapper classes are local to their .cpp files
+    // and cannot be dynamic_cast from here. Identify them by their hosted
+    // child view type instead.
+#define HAS_CHILD_VIEW(ViewType) \
+    ([&]() -> bool { \
+        TView *_s = w->first(); \
+        if (!_s) return false; \
+        TView *_v = _s; \
+        do { if (dynamic_cast<ViewType*>(_v)) return true; _v = _v->next; } while (_v != _s); \
+        return false; \
+    }())
+
+    if (HAS_CHILD_VIEW(TGenerativeVerseView))         return "verse";
+    if (HAS_CHILD_VIEW(TGenerativeMyceliumView))      return "mycelium";
+    if (HAS_CHILD_VIEW(TGenerativeOrbitView))         return "orbit";
+    if (HAS_CHILD_VIEW(TGenerativeTorusView))         return "torus";
+    if (HAS_CHILD_VIEW(TGenerativeCubeView))          return "cube";
+    if (HAS_CHILD_VIEW(TGameOfLifeView))              return "life";
+    if (HAS_CHILD_VIEW(TAnimatedBlocksView))          return "blocks";
+    if (HAS_CHILD_VIEW(TAnimatedScoreView))           return "score";
+    if (HAS_CHILD_VIEW(TAnimatedAsciiView))           return "ascii";
+    if (HAS_CHILD_VIEW(TAnimatedHGradientView))       return "animated_gradient";
+    if (HAS_CHILD_VIEW(TGenerativeMonsterCamView))    return "monster_cam";
+    if (HAS_CHILD_VIEW(TGenerativeMonsterVerseView))  return "monster_verse";
+    if (HAS_CHILD_VIEW(TGenerativeMonsterPortalView)) return "monster_portal";
+
+#undef HAS_CHILD_VIEW
     return "test_pattern";
 }
 
@@ -3125,6 +3172,109 @@ void api_spawn_browser(TTestPatternApp& app, const TRect* bounds) {
     } else {
         app.newBrowserWindow();
     }
+}
+
+// Generative / animated art windows — spawnable via IPC create_window type=X
+static TRect api_centered_bounds(TTestPatternApp& app, int width, int height) {
+    TRect d = app.deskTop->getExtent();
+    int dw = d.b.x - d.a.x;
+    int dh = d.b.y - d.a.y;
+    width  = std::max(10, std::min(width,  dw));
+    height = std::max(6,  std::min(height, dh));
+    int left = d.a.x + (dw - width)  / 2;
+    int top  = d.a.y + (dh - height) / 2;
+    return TRect(left, top, left + width, top + height);
+}
+
+void api_spawn_verse(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 96, 30);
+    TWindow* w = createGenerativeVerseWindow(r);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
+}
+
+void api_spawn_mycelium(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 96, 30);
+    TWindow* w = createGenerativeMyceliumWindow(r);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
+}
+
+void api_spawn_orbit(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 96, 30);
+    TWindow* w = createGenerativeOrbitWindow(r);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
+}
+
+void api_spawn_torus(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 90, 28);
+    TWindow* w = createGenerativeTorusWindow(r);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
+}
+
+void api_spawn_cube(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 90, 28);
+    TWindow* w = createGenerativeCubeWindow(r);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
+}
+
+void api_spawn_life(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 90, 28);
+    TWindow* w = createGameOfLifeWindow(r);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
+}
+
+void api_spawn_blocks(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 84, 24);
+    TWindow* w = createAnimatedBlocksWindow(r);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
+}
+
+void api_spawn_score(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 108, 34);
+    TWindow* w = createAnimatedScoreWindow(r);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
+}
+
+void api_spawn_ascii(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 96, 30);
+    TWindow* w = createAnimatedAsciiWindow(r);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
+}
+
+void api_spawn_animated_gradient(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 84, 24);
+    TWindow* w = createAnimatedGradientWindow(r);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
+}
+
+void api_spawn_monster_cam(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 96, 30);
+    TWindow* w = createGenerativeMonsterCamWindow(r);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
+}
+
+void api_spawn_monster_verse(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 96, 30);
+    TWindow* w = createGenerativeMonsterVerseWindow(r);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
+}
+
+void api_spawn_monster_portal(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 96, 30);
+    TWindow* w = createGenerativeMonsterPortalWindow(r);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
 }
 
 std::string api_browser_fetch(TTestPatternApp& app, const std::string& url) {

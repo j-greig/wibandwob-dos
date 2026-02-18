@@ -35,6 +35,8 @@ add_executable(test_pattern
     animated_blocks_view.cpp
     animated_gradient_view.cpp
     animated_score_view.cpp
+    animated_ascii_view.cpp
+    game_of_life_view.cpp
     generative_verse_view.cpp
     generative_orbit_view.cpp
     generative_mycelium_view.cpp
