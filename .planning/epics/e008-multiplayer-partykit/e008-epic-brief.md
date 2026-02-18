@@ -95,12 +95,12 @@ State flow:
 
 ## MVP Features
 
-- [ ] **F01: PartyKit Server** — room Durable Object, state store, delta broadcast, presence → `f01-partykit-server/`
-- [ ] **F02: C++ WebSocket Client** — connect to PartyKit, push state deltas, receive + apply remote deltas → `f02-cpp-websocket/`
-- [ ] **F03: State Diffing** — detect local mutations, compute minimal delta JSON, apply remote deltas to local state → `f03-state-diff/`
-- [ ] **F04: Chat Relay** — Scramble messages broadcast via PartyKit, remote messages appear in local Scramble → `f04-chat-relay/`
-- [ ] **F05: Cursor Overlay** — inject PartyKit JS client into ttyd page, render ghost cursor for remote user → `f05-cursor-overlay/`
-- [ ] **F06: Room Config Extension** — `multiplayer: true` flag in room YAML, orchestrator spawns PartyKit-connected instances → `f06-room-config-mp/`
+- [x] **F01: PartyKit Server** — room Durable Object, state store, delta broadcast, presence → `f01-partykit-server/`
+- [x] **F02: WebSocket Bridge** — Python sidecar polls IPC, pushes state deltas, receives + applies remote deltas → `f02-cpp-websocket/`
+- [x] **F03: State Diffing** — detect local mutations, compute minimal delta JSON, apply remote deltas to local state → `f03-state-diff/`
+- [x] **F04: Chat Relay** — Scramble messages broadcast via PartyKit, remote messages appear in local Scramble → `f04-chat-relay/`
+- [ ] **F05: Cursor Overlay** (stretch) — inject PartyKit JS client into ttyd page, render ghost cursor for remote user → `f05-cursor-overlay/`
+- [x] **F06: Room Config Extension** — `multiplayer: true` flag in room YAML, orchestrator spawns PartyKit-connected instances → `f06-room-config-mp/`
 
 ## Feature Detail
 
@@ -193,12 +193,16 @@ Orchestrator passes `WIBWOB_PARTYKIT_URL` env var when spawning. Existing single
 
 ## Definition of Done (MVP)
 
-- [ ] Two browser users connect to same room, each gets own WibWob-DOS instance
-- [ ] Window open/close/move in one instance appears in the other within 500ms
-- [ ] Chat messages sent in one Scramble appear in the other
-- [ ] Presence indicator shows who's connected
-- [ ] Single-player rooms (E007) still work unchanged
-- [ ] At least cursor presence (not necessarily pixel overlay) visible to both users
+_Items below are live integration checks verified by manual testing. Code-complete items are noted. Pending items require two running instances against the deployed PartyKit server._
+
+| Check | Code status | Live test |
+|-------|-------------|-----------|
+| Two browser users connect to same room | Code-complete (F01+F02+F06) | Pending |
+| Window open/close/move syncs within 500ms | Code-complete (F02+F03) | Pending |
+| Chat messages sync between instances | Code-complete (F04) | Pending |
+| Presence indicator shows who's connected | Code-complete (F01 server) | Pending |
+| Single-player rooms (E007) still work | Verified — 138/138 tests pass | Pass |
+| Cursor presence visible to both users | Stretch (F05 not started) | Pending |
 
 Stretch (park if blocked):
 - Ghost cursor overlay on terminal canvas
