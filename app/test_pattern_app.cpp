@@ -726,8 +726,11 @@ TTestPatternApp::TTestPatternApp() :
     } else {
         fprintf(stderr, "[wibwob] instance=(none) socket=%s\n", sockPath.c_str());
     }
-    ipcServer->start(sockPath);
-    fprintf(stderr, "[wibwob] IPC server started\n");
+    if (!ipcServer->start(sockPath)) {
+        fprintf(stderr, "[wibwob] ERROR: IPC server failed to start on %s\n", sockPath.c_str());
+    } else {
+        fprintf(stderr, "[wibwob] IPC server started on %s\n", sockPath.c_str());
+    }
 
     // Init Scramble engine (KB + Haiku client).
     scrambleEngine.init(".");

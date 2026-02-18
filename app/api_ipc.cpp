@@ -3,6 +3,7 @@
 
 #ifndef _WIN32
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/un.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -125,13 +126,43 @@ ApiIpcServer::ApiIpcServer(TTestPatternApp* app) : app_(app) {}
 
 ApiIpcServer::~ApiIpcServer() { stop(); }
 
+// Probe a Unix socket to check if a listener is active.
+// Returns true if a process is listening (connection succeeds).
+static bool probe_socket_live(const std::string& path) {
+    int fd = ::socket(AF_UNIX, SOCK_STREAM, 0);
+    if (fd < 0) return false;
+
+    struct sockaddr_un addr;
+    std::memset(&addr, 0, sizeof(addr));
+    addr.sun_family = AF_UNIX;
+    std::snprintf(addr.sun_path, sizeof(addr.sun_path), "%s", path.c_str());
+
+    bool live = (::connect(fd, (struct sockaddr*)&addr, sizeof(addr)) == 0);
+    ::close(fd);
+    return live;
+}
+
 bool ApiIpcServer::start(const std::string& path) {
 #ifdef _WIN32
     (void)path; return false;
 #else
     sock_path_ = path;
-    // Clean up any stale socket.
-    ::unlink(sock_path_.c_str());
+
+    // Check for existing socket file before touching it.
+    struct stat st;
+    if (::stat(sock_path_.c_str(), &st) == 0) {
+        if (probe_socket_live(sock_path_)) {
+            // Another instance is listening on this socket — do not steal it.
+            fprintf(stderr, "[ipc] ERROR: socket %s is already in use by another instance. "
+                    "Set WIBWOB_INSTANCE to a unique value or stop the other instance.\n",
+                    sock_path_.c_str());
+            return false;
+        }
+        // Stale socket (no listener) — safe to clean up.
+        fprintf(stderr, "[ipc] Cleaning up stale socket: %s\n", sock_path_.c_str());
+        ::unlink(sock_path_.c_str());
+    }
+
     fd_listen_ = ::socket(AF_UNIX, SOCK_STREAM, 0);
     if (fd_listen_ < 0)
         return false;
