@@ -22,6 +22,9 @@ IPC_TIMEOUT = 2.0
 # Shared HMAC secret — read once from env at import time.
 _AUTH_SECRET: str = os.environ.get("WIBWOB_AUTH_SECRET", "")
 
+# Window types that are singleton internal UI — never sync across instances.
+_INTERNAL_TYPES: frozenset[str] = frozenset({"wibwob", "scramble"})
+
 
 # ── IPC helpers ───────────────────────────────────────────────────────────────
 
@@ -160,13 +163,16 @@ def windows_from_state(state: dict) -> dict[str, dict]:
             if isinstance(win, dict):
                 norm = _normalise_win(win)
                 norm.setdefault("id", wid)
-                windows[wid] = norm
+                if norm.get("type") not in _INTERNAL_TYPES:
+                    windows[wid] = norm
         return windows
     windows = {}
     for win in raw:
         if not isinstance(win, dict):
             continue
         norm = _normalise_win(win)
+        if norm.get("type") in _INTERNAL_TYPES:
+            continue
         wid = norm.get("id") or norm.get("title", "")
         if wid:
             windows[wid] = norm

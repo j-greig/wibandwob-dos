@@ -58,6 +58,28 @@ class TestWindowsFromState:
         assert "h" in result["w1"]
         assert result["w1"]["w"] == 40
         assert result["w1"]["h"] == 20
+
+    def test_excludes_internal_types_list(self):
+        """wibwob and scramble windows are internal singletons — never sync."""
+        state = {"windows": [
+            win("w1"),
+            {"id": "w2", "type": "wibwob", "x": 0, "y": 0, "w": 80, "h": 24},
+            {"id": "w3", "type": "scramble", "x": 0, "y": 0, "w": 28, "h": 14},
+        ]}
+        result = windows_from_state(state)
+        assert "w1" in result
+        assert "w2" not in result
+        assert "w3" not in result
+
+    def test_excludes_internal_types_dict(self):
+        """Internal type exclusion applies to PartyKit dict shape too."""
+        state = {"windows": {
+            "w1": win("w1"),
+            "w2": {"id": "w2", "type": "wibwob", "x": 0, "y": 0, "w": 80, "h": 24},
+        }}
+        result = windows_from_state(state)
+        assert "w1" in result
+        assert "w2" not in result
         assert "width" not in result["w1"]
         assert "height" not in result["w1"]
 
