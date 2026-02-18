@@ -63,20 +63,49 @@ def ipc_command(sock_path: str, cmd: str, params: dict[str, Any]) -> bool:
 
 # ── State extraction ──────────────────────────────────────────────────────────
 
+def _normalise_win(win: dict) -> dict:
+    """Normalise width/height → w/h so compute_delta comparisons are stable.
+
+    api_get_state emits w/h (after the fix), but PartyKit canonical state or
+    older snapshots may still carry width/height.  Always canonicalise to w/h.
+    """
+    out = dict(win)
+    if "w" not in out and "width" in out:
+        out["w"] = out.pop("width")
+    elif "width" in out:
+        out.pop("width")
+    if "h" not in out and "height" in out:
+        out["h"] = out.pop("height")
+    elif "height" in out:
+        out.pop("height")
+    return out
+
+
 def windows_from_state(state: dict) -> dict[str, dict]:
     """
     Extract a window_id → window_dict mapping from an IPC get_state response.
 
-    Handles both list-of-windows (IPC shape) and dict-of-windows (PartyKit canonical shape).
+    Handles both list-of-windows (IPC shape) and dict-of-windows (PartyKit
+    canonical shape). Normalises width/height → w/h so compute_delta works
+    correctly when comparing local state against remotely-received deltas.
     """
     raw = state.get("windows", [])
     if isinstance(raw, dict):
-        return dict(raw)
+        windows: dict[str, dict] = {}
+        for wid, win in raw.items():
+            if isinstance(win, dict):
+                norm = _normalise_win(win)
+                norm.setdefault("id", wid)
+                windows[wid] = norm
+        return windows
     windows = {}
     for win in raw:
-        wid = win.get("id") or win.get("title", "")
+        if not isinstance(win, dict):
+            continue
+        norm = _normalise_win(win)
+        wid = norm.get("id") or norm.get("title", "")
         if wid:
-            windows[wid] = win
+            windows[wid] = norm
     return windows
 
 

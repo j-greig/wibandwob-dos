@@ -2371,14 +2371,25 @@ bool api_open_workspace_path(TTestPatternApp& app, const std::string& path) {
 
 void api_screenshot(TTestPatternApp& app) { app.takeScreenshot(false); }
 
+static const char* windowTypeName(TWindow* w) {
+    if (!w) return "test_pattern";
+    if (dynamic_cast<TTestPatternWindow*>(w))    return "test_pattern";
+    if (dynamic_cast<TGradientWindow*>(w))        return "gradient";
+    if (dynamic_cast<TBrowserWindow*>(w))         return "browser";
+    if (dynamic_cast<TTextEditorWindow*>(w))      return "text_editor";
+    if (dynamic_cast<TTransparentTextWindow*>(w)) return "text_view";
+    if (dynamic_cast<TFrameAnimationWindow*>(w))  return "frame_player";
+    return "test_pattern";
+}
+
 std::string api_get_state(TTestPatternApp& app) {
     // Rebuild window registry to sync with current desktop state
     app.winToId.clear();
     app.idToWin.clear();
-    
+
     std::stringstream json;
     json << "{\"windows\":[";
-    
+
     bool first = true;
     TView *start = app.deskTop->first();
     if (start) {
@@ -2387,15 +2398,16 @@ std::string api_get_state(TTestPatternApp& app) {
             TWindow *w = dynamic_cast<TWindow*>(v);
             if (w) {
                 std::string id = app.registerWindow(w);
-                
+
                 if (!first) json << ",";
                 json << "{\"id\":\"" << id << "\""
+                     << ",\"type\":\"" << windowTypeName(w) << "\""
                      << ",\"x\":" << w->origin.x
-                     << ",\"y\":" << w->origin.y  
-                     << ",\"width\":" << w->size.x
-                     << ",\"height\":" << w->size.y
+                     << ",\"y\":" << w->origin.y
+                     << ",\"w\":" << w->size.x
+                     << ",\"h\":" << w->size.y
                      << ",\"title\":\"";
-                
+
                 // Safely escape title
                 if (w->title) {
                     std::string title(w->title);
