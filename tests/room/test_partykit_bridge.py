@@ -188,3 +188,64 @@ class TestOrchestratorSpawnsBridge:
         cmds_flat = [" ".join(c) for c in popen_calls]
         assert not any("partykit_bridge" in c for c in cmds_flat), \
             "Bridge must NOT be spawned for single-player rooms"
+
+
+# ── AC-1: bridge push_delta sends state_delta to WebSocket ────────────────────
+
+class TestBridgePushDelta:
+    def test_push_delta_sends_state_delta_message(self):
+        """Bridge sends {type: state_delta, delta: ...} to WS when state changes."""
+        bridge = PartyKitBridge("1", "http://localhost:1999", "test-room")
+        bridge._ws = AsyncMock()
+        bridge._ws.send = AsyncMock()
+
+        delta = {"add": [{"id": "w1", "type": "test_pattern", "x": 0, "y": 0}]}
+        asyncio.run(bridge.push_delta(delta))
+
+        bridge._ws.send.assert_called_once()
+        sent = json.loads(bridge._ws.send.call_args[0][0])
+        assert sent["type"] == "state_delta"
+        assert sent["delta"] == delta
+
+    def test_push_delta_noop_when_ws_none(self):
+        bridge = PartyKitBridge("1", "http://localhost:1999", "test-room")
+        bridge._ws = None
+        asyncio.run(bridge.push_delta({"add": []}))
+        # No exception raised
+
+
+# ── AC-4: bridge reconnects on disconnect ────────────────────────────────────
+
+class TestBridgeReconnect:
+    def test_reconnect_delay_under_5s(self):
+        """RECONNECT_DELAY constant must be <= 5s as specified by AC-4."""
+        import partykit_bridge
+        assert partykit_bridge.RECONNECT_DELAY <= 5
+
+    def test_run_loop_retries_after_exception(self):
+        """run() catches WS connection errors and retries (does not propagate)."""
+        bridge = PartyKitBridge("1", "http://localhost:1999", "test-room")
+        connect_calls = []
+
+        async def fake_connect(url):
+            connect_calls.append(url)
+            if len(connect_calls) == 1:
+                raise OSError("connection refused")
+            # On second call, raise CancelledError to exit the loop
+            raise asyncio.CancelledError
+
+        async def run_test():
+            try:
+                import websockets.asyncio.client as ws_client
+            except ImportError:
+                pytest.skip("websockets not installed")
+
+            with patch.object(ws_client, "connect", side_effect=fake_connect), \
+                 patch("asyncio.sleep", new_callable=AsyncMock):
+                try:
+                    await bridge.run()
+                except asyncio.CancelledError:
+                    pass
+
+        asyncio.run(run_test())
+        assert len(connect_calls) >= 2, "Expected at least one reconnect attempt"

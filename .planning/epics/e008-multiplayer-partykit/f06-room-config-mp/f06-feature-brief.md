@@ -16,7 +16,7 @@ Extend room YAML frontmatter with optional multiplayer fields. Orchestrator dete
 multiplayer: true
 partykit_room: scramble-demo   # Durable Object key on PartyKit
 max_players: 2
-partykit_server: https://wibwob.username.partykit.dev
+partykit_server: https://wibwob-rooms.j-greig.partykit.dev
 ```
 
 ## Scope
@@ -33,20 +33,20 @@ partykit_server: https://wibwob.username.partykit.dev
 
 ## Stories
 
-- [ ] `s01-config-fields` — add multiplayer fields to parser/validator
-- [ ] `s02-orchestrator-env` — pass partykit env vars when multiplayer:true
+- [x] `s01-config-fields` — add multiplayer fields to parser/validator
+- [x] `s02-orchestrator-env` — pass partykit env vars when multiplayer:true
 
 ## Acceptance Criteria
 
-- [ ] **AC-1:** room_config.py parses multiplayer fields when present; single-player configs unchanged
-  - Test: parse multiplayer-example.md, assert multiplayer=True, partykit_room, partykit_server extracted
-- [ ] **AC-2:** Orchestrator sets WIBWOB_PARTYKIT_URL and WIBWOB_PARTYKIT_ROOM in spawned process env when multiplayer:true
-  - Test: mock spawn, assert env vars present for multiplayer room, absent for single-player
-- [ ] **AC-3:** Validation rejects multiplayer:true without partykit_room or partykit_server
-  - Test: config with multiplayer:true but no partykit_room → validation error
+- [x] **AC-1:** room_config.py parses multiplayer fields when present; single-player configs unchanged
+  - Test: `TestMultiplayerFieldsParsed::test_multiplayer_fields_in_room_config` and `test_single_player_config_unaffected`
+- [x] **AC-2:** Orchestrator sets WIBWOB_PARTYKIT_URL and WIBWOB_PARTYKIT_ROOM in spawned process env when multiplayer:true
+  - Test: `TestOrchestratorMultiplayerEnv::test_partykit_env_vars_set_for_multiplayer`
+- [x] **AC-3:** Validation rejects multiplayer:true without partykit_room or partykit_server
+  - Test: `TestMultiplayerValidation::test_multiplayer_without_partykit_room_rejected` and `test_multiplayer_without_partykit_server_rejected`
 
 ## Status
 
-Status: not-started
+Status: done
 GitHub issue: #65
 PR: —

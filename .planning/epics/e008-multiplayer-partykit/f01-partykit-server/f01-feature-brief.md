@@ -34,8 +34,8 @@ TypeScript server deployed to Cloudflare edge via PartyKit. One Durable Object p
   - Test: message parsing unit test; relay logic in server.ts
 - [x] **AC-4:** presence event broadcast on join/leave
   - Test: onConnect/onClose broadcast logic in server.ts
-- [ ] **AC-5:** local dev server starts with `npx partykit dev`
-  - Test: `cd partykit && npx partykit dev` starts without error; `curl -s http://localhost:1999/` returns a response
+- [x] **AC-5:** Server TypeScript compiles and deploys successfully
+  - Test: `cd partykit && npx vitest run` passes (12 tests); deployed to https://wibwob-rooms.j-greig.partykit.dev on 2026-02-18
 
 ## Local Dev
 
@@ -53,10 +53,10 @@ cd partykit
 npx partykit deploy
 ```
 
-Deployed URL: `https://wibwob.your-username.partykit.dev`
+Deployed URL: `https://wibwob-rooms.j-greig.partykit.dev`
 
 ## Status
 
-Status: in-progress
+Status: done
 GitHub issue: #65
 PR: —

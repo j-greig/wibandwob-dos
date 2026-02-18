@@ -8,7 +8,7 @@ api_key_source: env
 max_visitors: 2
 multiplayer: true
 partykit_room: wibwob-shared
-partykit_server: https://wibwob.your-username.partykit.dev
+partykit_server: https://wibwob-rooms.j-greig.partykit.dev
 max_players: 2
 ---
 
