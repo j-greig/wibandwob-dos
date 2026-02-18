@@ -1,0 +1,19 @@
+{
+  "name": "partykit",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "vitest run",
+    "dev": "partykit dev"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "partykit": "^0.0.115",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
+  }
+}

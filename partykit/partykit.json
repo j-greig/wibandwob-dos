@@ -1,0 +1,4 @@
+{
+  "name": "wibwob-rooms",
+  "main": "src/server.ts"
+}
