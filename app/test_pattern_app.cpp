@@ -658,28 +658,45 @@ private:
     }
     
     TWindow* findWindowById(const std::string& id) {
-        auto it = idToWin.find(id);
-        if (it != idToWin.end()) return it->second;
-        // Fallback: scan desktop for windows that haven't been registered yet.
+        // Scan desktop to discover unregistered windows and purge stale entries.
+        // Must scan first so stale pointers are removed before we return one.
         // IMPORTANT: do NOT clear existing maps — that would reassign IDs for
         // already-known windows and cause multiplayer desync.
+        std::vector<TWindow*> activeWins;
         TView *start = deskTop->first();
         if (start) {
             TView *v = start;
             do {
                 TWindow *w = dynamic_cast<TWindow*>(v);
-                if (w && winToId.find(w) == winToId.end()) {
-                    // Unregistered window — give it a stable ID without firing an event.
-                    char buf[32];
-                    std::snprintf(buf, sizeof(buf), "w%d", apiIdCounter++);
-                    std::string new_id(buf);
-                    winToId[w] = new_id;
-                    idToWin[new_id] = w;
+                if (w) {
+                    activeWins.push_back(w);
+                    if (winToId.find(w) == winToId.end()) {
+                        // Unregistered window — give it a stable ID without firing an event.
+                        char buf[32];
+                        std::snprintf(buf, sizeof(buf), "w%d", apiIdCounter++);
+                        std::string new_id(buf);
+                        winToId[w] = new_id;
+                        idToWin[new_id] = w;
+                    }
                 }
                 v = v->next;
             } while (v != start);
         }
-        it = idToWin.find(id);
+        // Purge stale entries (windows closed since last scan).
+        {
+            auto it = winToId.begin();
+            while (it != winToId.end()) {
+                bool alive = false;
+                for (auto* aw : activeWins) { if (aw == it->first) { alive = true; break; } }
+                if (!alive) {
+                    idToWin.erase(it->second);
+                    it = winToId.erase(it);
+                } else {
+                    ++it;
+                }
+            }
+        }
+        auto it = idToWin.find(id);
         if (it != idToWin.end()) return it->second;
         return nullptr;
     }

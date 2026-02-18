@@ -361,6 +361,26 @@ class TestEncodeParam:
     def test_number_converts_to_string(self):
         assert _encode_param(42) == "42"
 
+    def test_ipc_command_accepts_ok_response(self):
+        """ipc_command returns True for legacy 'ok...' responses."""
+        with patch("state_diff.ipc_send", return_value="ok"):
+            assert ipc_command("/tmp/fake.sock", "move_window", {"id": "w1", "x": 5, "y": 5})
+
+    def test_ipc_command_accepts_success_json_response(self):
+        """ipc_command returns True for {'success':true} JSON (used by move/resize/close handlers)."""
+        with patch("state_diff.ipc_send", return_value='{"success":true}'):
+            assert ipc_command("/tmp/fake.sock", "move_window", {"id": "w1", "x": 5, "y": 5})
+
+    def test_ipc_command_rejects_error_json(self):
+        """ipc_command returns False for error responses."""
+        with patch("state_diff.ipc_send", return_value='{"error":"Window not found"}'):
+            assert not ipc_command("/tmp/fake.sock", "move_window", {"id": "w99", "x": 0, "y": 0})
+
+    def test_ipc_command_rejects_none(self):
+        """ipc_command returns False when ipc_send returns None (timeout/disconnect)."""
+        with patch("state_diff.ipc_send", return_value=None):
+            assert not ipc_command("/tmp/fake.sock", "move_window", {"id": "w1", "x": 5, "y": 5})
+
     def test_ipc_command_encodes_all_values(self):
         """ipc_command must percent-encode values so spaces don't break IPC tokenisation.
 

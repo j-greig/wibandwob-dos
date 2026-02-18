@@ -119,7 +119,10 @@ def ipc_command(sock_path: str, cmd: str, params: dict[str, Any]) -> bool:
     for k, v in params.items():
         parts.append(f"{k}={_encode_param(v)}")
     resp = ipc_send(sock_path, " ".join(parts))
-    return resp is not None and resp.startswith("ok")
+    if resp is None:
+        return False
+    # C++ handlers return either "ok..." (legacy) or {"success":true} JSON.
+    return resp.startswith("ok") or '"success":true' in resp
 
 
 # ── State extraction ──────────────────────────────────────────────────────────
