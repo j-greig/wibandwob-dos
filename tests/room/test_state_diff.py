@@ -285,6 +285,35 @@ class TestApplyDeltaToIpc:
         assert "w" not in resize[0]
         assert "h" not in resize[0]
 
+    def test_size_only_update_no_spurious_move(self):
+        """Size-only update delta must NOT send move_window x=0 y=0.
+
+        Root cause: .get('x', 0) default would force a spurious move-to-origin
+        for deltas that only carry w/h changes.
+        """
+        calls, fake = self._capture()
+        with patch("state_diff.ipc_command", side_effect=fake):
+            apply_delta_to_ipc("/tmp/fake.sock", {
+                "update": [{"id": "w1", "w": 80, "h": 40}]
+            })
+        move_calls = [p for c, p in calls if c == "move_window"]
+        assert len(move_calls) == 0, "No move_window for size-only delta"
+        resize_calls = [p for c, p in calls if c == "resize_window"]
+        assert len(resize_calls) == 1
+
+    def test_position_only_update_no_spurious_resize(self):
+        """Position-only update delta must NOT send resize_window."""
+        calls, fake = self._capture()
+        with patch("state_diff.ipc_command", side_effect=fake):
+            apply_delta_to_ipc("/tmp/fake.sock", {
+                "update": [{"id": "w1", "x": 5, "y": 3}]
+            })
+        resize_calls = [p for c, p in calls if c == "resize_window"]
+        assert len(resize_calls) == 0, "No resize_window for position-only delta"
+        move_calls = [p for c, p in calls if c == "move_window"]
+        assert len(move_calls) == 1
+        assert move_calls[0]["x"] == 5
+
     def test_add_file_backed_window_forwards_path(self):
         """create_window for text_view/frame_player must include the path param.
 

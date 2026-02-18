@@ -158,12 +158,13 @@ class PartyKitBridge:
 
     async def event_subscribe_loop(self) -> None:
         """Open a persistent IPC connection and react to push events immediately."""
+        import contextlib
         while True:
+            writer = None
             try:
                 reader, writer = await asyncio.open_unix_connection(self.sock_path)
                 if not await _async_auth_handshake(reader, writer):
                     self.log("IPC event subscription: auth failed")
-                    writer.close()
                     await asyncio.sleep(EVENT_RETRY_DELAY)
                     continue
                 writer.write(b"cmd:subscribe_events\n")
@@ -187,9 +188,13 @@ class PartyKitBridge:
                         event_name = event.get("event", "")
                         if event_name in ("state_changed", "window_closed"):
                             await self._sync_state_now(f"event:{event_name}")
-                writer.close()
             except (OSError, ConnectionRefusedError, EOFError) as e:
                 self.log(f"event subscribe dropped ({e}), retrying in {EVENT_RETRY_DELAY}s")
+            finally:
+                if writer is not None:
+                    writer.close()
+                    with contextlib.suppress(Exception):
+                        await writer.wait_closed()
             await asyncio.sleep(EVENT_RETRY_DELAY)
 
     async def poll_loop(self) -> None:

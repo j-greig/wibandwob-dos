@@ -283,18 +283,21 @@ def apply_delta_to_ipc(sock_path: str, delta: dict[str, Any]) -> list[str]:
             continue
         rect = _rect(win)
         if rect:
-            # Always sync position
-            ok = ipc_command(sock_path, "move_window", {
-                "id": wid,
-                "x": rect.get("x", 0),
-                "y": rect.get("y", 0),
-            })
-            tag = f"move_window id={wid} x={rect.get('x')} y={rect.get('y')}"
-            applied.append(tag if ok else f"FAIL {tag}")
-            # Also sync dimensions when they changed
-            w = rect.get("w") or rect.get("width")
-            h = rect.get("h") or rect.get("height")
-            if w and h:
+            # Only move if both coordinates are explicitly present in the delta.
+            # Defaulting to 0 when keys are absent would send spurious move_window
+            # x=0 y=0 for size-only updates.
+            if "x" in rect and "y" in rect:
+                ok = ipc_command(sock_path, "move_window", {
+                    "id": wid,
+                    "x": rect["x"],
+                    "y": rect["y"],
+                })
+                tag = f"move_window id={wid} x={rect['x']} y={rect['y']}"
+                applied.append(tag if ok else f"FAIL {tag}")
+            # Only resize if both dimensions are explicitly present.
+            w = rect["w"] if "w" in rect else rect.get("width")
+            h = rect["h"] if "h" in rect else rect.get("height")
+            if w is not None and h is not None:
                 # C++ IPC handler reads "width"/"height" (not "w"/"h")
                 ok = ipc_command(sock_path, "resize_window", {
                     "id": wid, "width": w, "height": h,
