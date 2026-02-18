@@ -1,7 +1,7 @@
 ---
 id: E007
 title: Browser-Hosted Deployment (Teleport Rooms)
-status: not-started
+status: done
 issue: 57
 pr: ~
 depends_on: []
