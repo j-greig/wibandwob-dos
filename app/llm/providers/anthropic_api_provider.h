@@ -10,6 +10,7 @@
 #include "../base/illm_provider.h"
 #include <string>
 #include <memory>
+#include <chrono>
 
 class AnthropicAPIProvider : public ILLMProvider {
 public:
@@ -61,6 +62,14 @@ private:
     
     // Simple synchronous execution
     
+    // Async execution state (non-blocking for Turbo Vision main loop)
+    FILE* activePipe = nullptr;
+    std::string outputBuffer;
+    ResponseCallback pendingCallback;
+    LLMRequest pendingRequest;
+    std::string activeTempFile;
+    std::chrono::high_resolution_clock::time_point requestStart;
+
     // API communication
     LLMResponse makeSimpleAPIRequest(const LLMRequest& request);
     std::string buildSimpleRequestJson(const LLMRequest& request) const;
