@@ -556,6 +556,10 @@ void ApiIpcServer::poll() {
         // Keep this fd open — the client will receive pushed events.
         // Set non-blocking so publish_event doesn't stall the event loop.
         ::fcntl(fd, F_SETFL, ::fcntl(fd, F_GETFL, 0) | O_NONBLOCK);
+#ifdef SO_NOSIGPIPE
+        int one = 1;
+        ::setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &one, sizeof(one));
+#endif
         // Send initial ack so the client knows subscription is active.
         const char* ack = "{\"type\":\"subscribed\"}\n";
         ::write(fd, ack, std::strlen(ack));
@@ -576,10 +580,38 @@ void ApiIpcServer::publish_event(const char* event_type, const std::string& payl
                     + ",\"event\":\"" + std::string(event_type) + "\""
                     + ",\"payload\":" + payload_json
                     + "}\n";
+    const char* data = msg.c_str();
+    const ssize_t total = static_cast<ssize_t>(msg.size());
     for (auto it = event_subscribers_.begin(); it != event_subscribers_.end(); ) {
-        ssize_t n = ::write(*it, msg.c_str(), msg.size());
-        if (n < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
-            ::close(*it);
+        int fd = *it;
+        // Use MSG_NOSIGNAL on Linux to avoid SIGPIPE killing the process when
+        // a subscriber disconnects. On macOS set SO_NOSIGPIPE on the fd instead.
+#ifdef SO_NOSIGPIPE
+        int one = 1;
+        ::setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &one, sizeof(one));
+#endif
+        ssize_t written = 0;
+        bool drop = false;
+        while (written < total) {
+#ifdef MSG_NOSIGNAL
+            ssize_t n = ::send(fd, data + written, static_cast<size_t>(total - written), MSG_NOSIGNAL);
+#else
+            ssize_t n = ::write(fd, data + written, static_cast<size_t>(total - written));
+#endif
+            if (n > 0) {
+                written += n;
+            } else if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+                // Non-blocking buffer full — drop this subscriber to avoid stalling.
+                drop = true;
+                break;
+            } else {
+                // Error or EOF — subscriber gone.
+                drop = true;
+                break;
+            }
+        }
+        if (drop) {
+            ::close(fd);
             it = event_subscribers_.erase(it);
         } else {
             ++it;

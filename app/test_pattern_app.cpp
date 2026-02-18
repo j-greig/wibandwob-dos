@@ -653,17 +653,21 @@ private:
     TWindow* findWindowById(const std::string& id) {
         auto it = idToWin.find(id);
         if (it != idToWin.end()) return it->second;
-        // Fallback: scan desktop to refresh mapping if needed
-        // Rebuild maps for current windows
-        winToId.clear();
-        idToWin.clear();
+        // Fallback: scan desktop for windows that haven't been registered yet.
+        // IMPORTANT: do NOT clear existing maps — that would reassign IDs for
+        // already-known windows and cause multiplayer desync.
         TView *start = deskTop->first();
         if (start) {
             TView *v = start;
             do {
                 TWindow *w = dynamic_cast<TWindow*>(v);
-                if (w) {
-                    registerWindow(w);
+                if (w && winToId.find(w) == winToId.end()) {
+                    // Unregistered window — give it a stable ID without firing an event.
+                    char buf[32];
+                    std::snprintf(buf, sizeof(buf), "w%d", apiIdCounter++);
+                    std::string new_id(buf);
+                    winToId[w] = new_id;
+                    idToWin[new_id] = w;
                 }
                 v = v->next;
             } while (v != start);

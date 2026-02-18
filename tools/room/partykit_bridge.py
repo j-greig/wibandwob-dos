@@ -70,6 +70,10 @@ class PartyKitBridge:
         self.last_windows: dict[str, dict] = {}
         self.last_chat_seq: int = 0
         self._ws = None
+        # Protects last_windows from concurrent coroutine updates.
+        # asyncio is single-threaded but awaits between diff and baseline write
+        # can allow another coroutine to interleave and overwrite with stale state.
+        self._state_lock: asyncio.Lock | None = None  # created in run() after loop starts
 
     def log(self, msg: str) -> None:
         ts = time.strftime("%H:%M:%S")
@@ -99,17 +103,22 @@ class PartyKitBridge:
     async def _sync_state_now(self, trigger: str = "poll") -> dict | None:
         """Fetch local IPC state, diff against baseline, push delta if changed.
 
+        Holds _state_lock around the diff+push+baseline update to prevent
+        concurrent coroutines from overwriting last_windows with stale state.
         Returns the raw state dict (for callers that also need it), or None on error.
         """
         state = ipc_get_state(self.sock_path)
         if not state:
             return None
-        new_windows = windows_from_state(state)
-        delta = compute_delta(self.last_windows, new_windows)
-        if delta:
-            self.log(f"[{trigger}] state change, pushing delta")
-            await self.push_delta(delta)
-            self.last_windows = new_windows
+        if self._state_lock is None:
+            return state
+        async with self._state_lock:
+            new_windows = windows_from_state(state)
+            delta = compute_delta(self.last_windows, new_windows)
+            if delta:
+                self.log(f"[{trigger}] state change, pushing delta")
+                await self.push_delta(delta)
+                self.last_windows = new_windows
         return state
 
     async def event_subscribe_loop(self) -> None:
@@ -171,28 +180,30 @@ class PartyKitBridge:
             if mtype == "state_sync":
                 canonical = msg.get("state", {})
                 windows = canonical.get("windows", {})
-                if windows:
-                    new_windows = dict(windows)
-                    delta = compute_delta(self.last_windows, new_windows)
-                    if delta:
-                        self.log(f"applying state_sync delta")
-                        apply_delta_to_ipc(self.sock_path, delta)
-                        # Re-read actual local state as baseline — C++ assigns its
-                        # own window IDs, so we must not track remote IDs or the
-                        # poll loop will see a mismatch and re-broadcast forever.
-                        actual = ipc_get_state(self.sock_path)
-                        self.last_windows = windows_from_state(actual) if actual else new_windows
+                if windows and self._state_lock:
+                    async with self._state_lock:
+                        new_windows = dict(windows)
+                        delta = compute_delta(self.last_windows, new_windows)
+                        if delta:
+                            self.log(f"applying state_sync delta")
+                            apply_delta_to_ipc(self.sock_path, delta)
+                            # Re-read actual local state as baseline — C++ assigns its
+                            # own window IDs, so we must not track remote IDs or the
+                            # poll loop will see a mismatch and re-broadcast forever.
+                            actual = ipc_get_state(self.sock_path)
+                            self.last_windows = windows_from_state(actual) if actual else new_windows
 
             elif mtype == "state_delta":
                 delta = msg.get("delta", {})
-                if delta:
+                if delta and self._state_lock:
                     applied = apply_delta_to_ipc(self.sock_path, delta)
                     for cmd in applied:
                         self.log(f"  {'✓' if not cmd.startswith('FAIL') else '✗'} {cmd}")
                     # Re-read actual local state as baseline to prevent re-broadcast loop.
-                    actual = ipc_get_state(self.sock_path)
-                    if actual:
-                        self.last_windows = windows_from_state(actual)
+                    async with self._state_lock:
+                        actual = ipc_get_state(self.sock_path)
+                        if actual:
+                            self.last_windows = windows_from_state(actual)
 
             elif mtype == "chat_msg":
                 sender = msg.get("sender", "remote")
@@ -209,6 +220,7 @@ class PartyKitBridge:
         except ImportError:
             print("ERROR: websockets not installed. Run: uv run tools/room/partykit_bridge.py", file=sys.stderr)
             return
+        self._state_lock = asyncio.Lock()
         self.log(f"connecting to {self.ws_url}")
         while True:
             try:

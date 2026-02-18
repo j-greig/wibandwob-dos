@@ -9,23 +9,75 @@ Used by partykit_bridge.py and any future sync transport.
 """
 
 import hashlib
+import hmac as _hmac
 import json
 import socket
 import os
 from typing import Any
+from urllib.parse import quote as _urlencode
 
 
 IPC_TIMEOUT = 2.0
 
+# Shared HMAC secret — read once from env at import time.
+_AUTH_SECRET: str = os.environ.get("WIBWOB_AUTH_SECRET", "")
+
 
 # ── IPC helpers ───────────────────────────────────────────────────────────────
 
+def _ipc_auth_handshake(s: socket.socket) -> bool:
+    """Complete HMAC challenge-response if WIBWOB_AUTH_SECRET is set.
+
+    Protocol (server-initiated):
+      1. Server sends: {"type":"challenge","nonce":"<hex>"}\\n
+      2. Client sends: {"type":"auth","hmac":"<hmac>"}\\n
+      3. Server sends: {"type":"auth_ok"}\\n  (or closes on failure)
+
+    Returns True on success or when auth is not required.
+    """
+    if not _AUTH_SECRET:
+        return True
+    try:
+        # Read challenge
+        raw = b""
+        while not raw.endswith(b"\n"):
+            chunk = s.recv(512)
+            if not chunk:
+                return False
+            raw += chunk
+        msg = json.loads(raw.strip())
+        if msg.get("type") != "challenge":
+            return False
+        nonce = msg["nonce"]
+        # Compute HMAC-SHA256(secret, nonce), hex-encoded
+        mac = _hmac.new(_AUTH_SECRET.encode(), nonce.encode(), "sha256").hexdigest()
+        auth_resp = json.dumps({"type": "auth", "hmac": mac}) + "\n"
+        s.sendall(auth_resp.encode())
+        # Read auth_ok
+        raw = b""
+        while not raw.endswith(b"\n"):
+            chunk = s.recv(512)
+            if not chunk:
+                return False
+            raw += chunk
+        ack = json.loads(raw.strip())
+        return ack.get("type") == "auth_ok"
+    except (OSError, json.JSONDecodeError, KeyError):
+        return False
+
+
 def ipc_send(sock_path: str, command: str, timeout: float = IPC_TIMEOUT) -> str | None:
-    """Send a command line to WibWob IPC, return response or None on error."""
+    """Send a command line to WibWob IPC, return response or None on error.
+
+    Handles HMAC auth handshake when WIBWOB_AUTH_SECRET is set.
+    """
     try:
         s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         s.settimeout(timeout)
         s.connect(sock_path)
+        if not _ipc_auth_handshake(s):
+            s.close()
+            return None
         s.sendall((command + "\n").encode())
         chunks = []
         while True:
@@ -52,11 +104,20 @@ def ipc_get_state(sock_path: str) -> dict | None:
         return None
 
 
+def _encode_param(v: Any) -> str:
+    """Encode a single IPC key=value param value.
+
+    The IPC server tokenises on spaces (app/api_ipc.cpp), so any value
+    containing spaces must be percent-encoded to avoid truncation.
+    """
+    return _urlencode(str(v), safe="")
+
+
 def ipc_command(sock_path: str, cmd: str, params: dict[str, Any]) -> bool:
     """Send a key=value command to WibWob IPC. Returns True on ok."""
     parts = [f"cmd:{cmd}"]
     for k, v in params.items():
-        parts.append(f"{k}={v}")
+        parts.append(f"{k}={_encode_param(v)}")
     resp = ipc_send(sock_path, " ".join(parts))
     return resp is not None and resp.startswith("ok")
 
@@ -216,8 +277,11 @@ def apply_delta_to_ipc(sock_path: str, delta: dict[str, Any]) -> list[str]:
 
     for win in delta.get("update", []):
         wid = win.get("id", "")
+        if not wid:
+            continue
         rect = _rect(win)
-        if rect and wid:
+        if rect:
+            # Always sync position
             ok = ipc_command(sock_path, "move_window", {
                 "id": wid,
                 "x": rect.get("x", 0),
@@ -225,5 +289,14 @@ def apply_delta_to_ipc(sock_path: str, delta: dict[str, Any]) -> list[str]:
             })
             tag = f"move_window id={wid} x={rect.get('x')} y={rect.get('y')}"
             applied.append(tag if ok else f"FAIL {tag}")
+            # Also sync dimensions when they changed
+            w = rect.get("w") or rect.get("width")
+            h = rect.get("h") or rect.get("height")
+            if w and h:
+                ok = ipc_command(sock_path, "resize_window", {
+                    "id": wid, "w": w, "h": h,
+                })
+                tag = f"resize_window id={wid} w={w} h={h}"
+                applied.append(tag if ok else f"FAIL {tag}")
 
     return applied
