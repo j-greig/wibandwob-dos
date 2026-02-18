@@ -1,8 +1,11 @@
 """Tests for F03: State diffing module (E008)."""
 
+import json
+import socket
 import sys
+import threading
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 import pytest
 
@@ -13,6 +16,8 @@ from state_diff import (
     compute_delta,
     apply_delta,
     apply_delta_to_ipc,
+    _encode_param,
+    ipc_command,
 )
 
 
@@ -259,3 +264,150 @@ class TestApplyDeltaToIpc:
         assert len(create) == 1
         assert create[0]["x"] == 5
         assert create[0]["y"] == 3
+
+    def test_update_resize_uses_width_height(self):
+        """resize_window IPC command must use 'width'/'height', not 'w'/'h'.
+
+        C++ api_ipc.cpp reads kv["width"] and kv["height"] for resize_window.
+        Sending 'w'/'h' causes the resize to silently fail (key not found → 0).
+        """
+        calls, fake = self._capture()
+        with patch("state_diff.ipc_command", side_effect=fake):
+            apply_delta_to_ipc("/tmp/fake.sock", {
+                "update": [{"id": "w1", "x": 0, "y": 0, "w": 80, "h": 40}]
+            })
+        resize = [p for c, p in calls if c == "resize_window"]
+        assert len(resize) == 1
+        assert "width" in resize[0], "resize_window must send 'width', not 'w'"
+        assert "height" in resize[0], "resize_window must send 'height', not 'h'"
+        assert resize[0]["width"] == 80
+        assert resize[0]["height"] == 40
+        assert "w" not in resize[0]
+        assert "h" not in resize[0]
+
+
+# ── _encode_param (percent-encoding) ──────────────────────────────────────────
+
+class TestEncodeParam:
+    def test_plain_value_unchanged(self):
+        assert _encode_param("hello") == "hello"
+
+    def test_spaces_encoded(self):
+        encoded = _encode_param("hello world")
+        assert " " not in encoded
+        assert "hello" in encoded
+
+    def test_slash_encoded(self):
+        encoded = _encode_param("/tmp/my path/file.txt")
+        assert " " not in encoded
+
+    def test_number_converts_to_string(self):
+        assert _encode_param(42) == "42"
+
+    def test_ipc_command_encodes_all_values(self):
+        """ipc_command must percent-encode values so spaces don't break IPC tokenisation.
+
+        The IPC server tokenises on spaces; a path like '/tmp/my dir/x' would be
+        truncated after 'dir/' if not encoded. All param values must be encoded.
+        """
+        captured = []
+        def fake_send(sock_path, command, timeout=2.0):
+            captured.append(command)
+            return "ok"
+        with patch("state_diff.ipc_send", side_effect=fake_send):
+            ipc_command("/tmp/fake.sock", "open_text", {"path": "/tmp/my folder/notes.txt"})
+        assert captured, "ipc_send should have been called"
+        cmd = captured[0]
+        # The space in the path must be percent-encoded in the IPC command string
+        assert " " not in cmd.split("path=", 1)[-1], \
+            f"Space leaked into IPC param: {cmd!r}"
+
+
+# ── _ipc_auth_handshake ────────────────────────────────────────────────────────
+
+class TestIpcAuthHandshake:
+    """Tests for the HMAC challenge-response auth handshake in ipc_send."""
+
+    def test_handshake_skipped_when_no_secret(self):
+        """With no AUTH_SECRET set, ipc_send should connect and send command directly."""
+        import state_diff as sd
+        original_secret = sd._AUTH_SECRET
+        try:
+            sd._AUTH_SECRET = ""
+            mock_sock = MagicMock()
+            mock_sock.recv.return_value = b"ok\n"
+            with patch("socket.socket") as MockSocket:
+                MockSocket.return_value.__enter__ = MagicMock(return_value=mock_sock)
+                MockSocket.return_value = mock_sock
+                # _ipc_auth_handshake returns True immediately when no secret
+                from state_diff import _ipc_auth_handshake
+                result = _ipc_auth_handshake(mock_sock)
+                assert result is True
+                mock_sock.recv.assert_not_called()
+        finally:
+            sd._AUTH_SECRET = original_secret
+
+    def _make_auth_server(self, secret: str) -> tuple:
+        """Create a real Unix socket pair that performs the HMAC handshake server-side."""
+        import hmac, hashlib, tempfile, os
+        sock_path = tempfile.mktemp(suffix=".sock")
+        server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        server.bind(sock_path)
+        server.listen(1)
+
+        nonce = "deadbeef0123456789abcdef"
+
+        def server_thread():
+            conn, _ = server.accept()
+            conn.sendall((json.dumps({"type": "challenge", "nonce": nonce}) + "\n").encode())
+            data = conn.recv(512).decode().strip()
+            msg = json.loads(data)
+            mac = hmac.new(secret.encode(), nonce.encode(), "sha256").hexdigest()
+            if msg.get("type") == "auth" and msg.get("hmac") == mac:
+                conn.sendall(b'{"type":"auth_ok"}\n')
+            else:
+                conn.sendall(b'{"type":"auth_fail"}\n')
+            conn.close()
+            server.close()
+            os.unlink(sock_path)
+
+        t = threading.Thread(target=server_thread, daemon=True)
+        t.start()
+        return sock_path, t
+
+    def test_handshake_succeeds_with_correct_secret(self):
+        import state_diff as sd
+        secret = "test-secret-xyz"
+        original = sd._AUTH_SECRET
+        try:
+            sd._AUTH_SECRET = secret
+            sock_path, t = self._make_auth_server(secret)
+            client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            client.settimeout(3.0)
+            client.connect(sock_path)
+            from state_diff import _ipc_auth_handshake
+            result = _ipc_auth_handshake(client)
+            client.close()
+            t.join(timeout=2)
+            assert result is True
+        finally:
+            sd._AUTH_SECRET = original
+
+    def test_handshake_fails_with_wrong_secret(self):
+        import state_diff as sd
+        correct_secret = "correct-secret"
+        wrong_secret = "wrong-secret"
+        original = sd._AUTH_SECRET
+        try:
+            sd._AUTH_SECRET = wrong_secret
+            sock_path, t = self._make_auth_server(correct_secret)
+            client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            client.settimeout(3.0)
+            client.connect(sock_path)
+            from state_diff import _ipc_auth_handshake
+            result = _ipc_auth_handshake(client)
+            client.close()
+            t.join(timeout=2)
+            assert result is False
+        finally:
+            sd._AUTH_SECRET = original

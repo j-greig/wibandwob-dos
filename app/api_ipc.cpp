@@ -186,16 +186,23 @@ bool ApiIpcServer::authenticate_connection(int fd) {
     std::string challenge = "{\"type\":\"challenge\",\"nonce\":\"" + nonce + "\"}\n";
     if (::write(fd, challenge.c_str(), challenge.size()) < 0) return false;
 
-    // Read auth response
+    // Read auth response — loop until we have a full newline-terminated frame.
     char buf[512];
-    ssize_t n = ::read(fd, buf, sizeof(buf) - 1);
-    if (n <= 0) {
-        fprintf(stderr, "[ipc] Auth read returned %zd (errno=%d)\n", n, errno);
-        return false;
+    std::string response;
+    while (response.find('\n') == std::string::npos) {
+        ssize_t n = ::read(fd, buf, sizeof(buf) - 1);
+        if (n <= 0) {
+            fprintf(stderr, "[ipc] Auth read returned %zd (errno=%d)\n", n, errno);
+            return false;
+        }
+        buf[n] = '\0';
+        response += buf;
+        if (response.size() > 4096) {
+            fprintf(stderr, "[ipc] Auth response too large\n");
+            return false;
+        }
     }
-    buf[n] = '\0';
-    std::string response(buf);
-    fprintf(stderr, "[ipc] Auth response (%zd bytes): %s\n", n, response.c_str());
+    fprintf(stderr, "[ipc] Auth response (%zu bytes): %s\n", response.size(), response.c_str());
 
     // Parse HMAC from response — handle both "hmac":"..." and "hmac": "..."
     size_t hmac_pos = response.find("\"hmac\":");
@@ -600,6 +607,9 @@ void ApiIpcServer::publish_event(const char* event_type, const std::string& payl
 #endif
             if (n > 0) {
                 written += n;
+            } else if (n < 0 && errno == EINTR) {
+                // Interrupted by signal — retry immediately.
+                continue;
             } else if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
                 // Non-blocking buffer full — drop this subscriber to avoid stalling.
                 drop = true;

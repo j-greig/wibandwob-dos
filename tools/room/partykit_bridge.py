@@ -34,9 +34,44 @@ from state_diff import (
     apply_delta_to_ipc,
     ipc_get_state,
     ipc_command,
+    _AUTH_SECRET,
 )
 
 # websockets imported lazily in run() so pure functions remain importable in tests.
+
+import hashlib
+import hmac as _hmac_mod
+
+
+async def _async_auth_handshake(reader: asyncio.StreamReader,
+                                 writer: asyncio.StreamWriter) -> bool:
+    """Async HMAC challenge-response for asyncio StreamReader/StreamWriter.
+
+    Mirrors _ipc_auth_handshake in state_diff.py but uses asyncio I/O so it
+    works in the event_subscribe_loop (which holds asyncio streams, not a
+    blocking socket).  Returns True on success or when auth is not required.
+    """
+    if not _AUTH_SECRET:
+        return True
+    try:
+        raw = await asyncio.wait_for(reader.readline(), timeout=3.0)
+        if not raw:
+            return False
+        msg = json.loads(raw.strip())
+        if msg.get("type") != "challenge":
+            return False
+        nonce = msg["nonce"]
+        mac = _hmac_mod.new(_AUTH_SECRET.encode(), nonce.encode(), "sha256").hexdigest()
+        writer.write((json.dumps({"type": "auth", "hmac": mac}) + "\n").encode())
+        await writer.drain()
+        ack_raw = await asyncio.wait_for(reader.readline(), timeout=3.0)
+        if not ack_raw:
+            return False
+        ack = json.loads(ack_raw.strip())
+        return ack.get("type") == "auth_ok"
+    except (OSError, asyncio.TimeoutError, json.JSONDecodeError, KeyError):
+        return False
+
 
 POLL_INTERVAL = 5.0        # slow heartbeat; real-time sync driven by IPC events
 RECONNECT_DELAY = 3        # seconds before WS reconnect attempt
@@ -126,6 +161,11 @@ class PartyKitBridge:
         while True:
             try:
                 reader, writer = await asyncio.open_unix_connection(self.sock_path)
+                if not await _async_auth_handshake(reader, writer):
+                    self.log("IPC event subscription: auth failed")
+                    writer.close()
+                    await asyncio.sleep(EVENT_RETRY_DELAY)
+                    continue
                 writer.write(b"cmd:subscribe_events\n")
                 await writer.drain()
                 self.log("IPC event subscription active")
@@ -196,11 +236,13 @@ class PartyKitBridge:
             elif mtype == "state_delta":
                 delta = msg.get("delta", {})
                 if delta and self._state_lock:
-                    applied = apply_delta_to_ipc(self.sock_path, delta)
-                    for cmd in applied:
-                        self.log(f"  {'✓' if not cmd.startswith('FAIL') else '✗'} {cmd}")
-                    # Re-read actual local state as baseline to prevent re-broadcast loop.
+                    # Hold the lock across the full apply+baseline refresh so that
+                    # concurrent poll/event loops cannot push stale outbound diffs.
                     async with self._state_lock:
+                        applied = apply_delta_to_ipc(self.sock_path, delta)
+                        for cmd in applied:
+                            self.log(f"  {'✓' if not cmd.startswith('FAIL') else '✗'} {cmd}")
+                        # Re-read actual local state as baseline to prevent re-broadcast loop.
                         actual = ipc_get_state(self.sock_path)
                         if actual:
                             self.last_windows = windows_from_state(actual)
@@ -212,7 +254,9 @@ class PartyKitBridge:
                 # Only apply messages from other instances (skip our own echo)
                 if text and origin_instance != self.instance_id:
                     self.log(f"chat from {sender}: {text[:60]}")
-                    ipc_command(self.sock_path, "chat_receive", {"sender": sender, "text": text})
+                    # chat_receive is in the command registry, not a direct IPC branch.
+                    ipc_command(self.sock_path, "exec_command",
+                                {"name": "chat_receive", "sender": sender, "text": text})
 
     async def run(self) -> None:
         try:

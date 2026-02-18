@@ -293,10 +293,11 @@ def apply_delta_to_ipc(sock_path: str, delta: dict[str, Any]) -> list[str]:
             w = rect.get("w") or rect.get("width")
             h = rect.get("h") or rect.get("height")
             if w and h:
+                # C++ IPC handler reads "width"/"height" (not "w"/"h")
                 ok = ipc_command(sock_path, "resize_window", {
-                    "id": wid, "w": w, "h": h,
+                    "id": wid, "width": w, "height": h,
                 })
-                tag = f"resize_window id={wid} w={w} h={h}"
+                tag = f"resize_window id={wid} width={w} height={h}"
                 applied.append(tag if ok else f"FAIL {tag}")
 
     return applied
