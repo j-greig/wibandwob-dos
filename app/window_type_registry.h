@@ -8,14 +8,17 @@
 #include <map>
 
 class TTestPatternApp;
+class TWindow;
 
 // Spawn callback: return nullptr on success, a static error string on failure.
 using WinSpawnFn = const char* (*)(TTestPatternApp&,
                                    const std::map<std::string, std::string>&);
+using WinMatchFn = bool (*)(TWindow*);
 
 struct WindowTypeSpec {
     const char* type;    // canonical slug, e.g. "verse", "gradient"
     WinSpawnFn  spawn;   // nullptr = recognised but not creatable via IPC
+    WinMatchFn  matches; // identifies whether a TWindow instance is this type
 };
 
 // Finds the spec for the given type slug (exact match). Returns nullptr if not found.

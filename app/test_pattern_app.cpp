@@ -102,6 +102,7 @@ class TWindow; TWindow* createAsciiGridDemoWindow(const TRect &bounds);
 // Local API IPC bridge (Unix domain socket)
 #include "api_ipc.h"
 #include "command_registry.h"
+#include "window_type_registry.h"
 
 // Find first existing primer directory across module paths.
 // Checks modules-private/*/primers/ then modules/*/primers/ then legacy app/primers/.
@@ -2394,46 +2395,12 @@ bool api_open_workspace_path(TTestPatternApp& app, const std::string& path) {
 void api_screenshot(TTestPatternApp& app) { app.takeScreenshot(false); }
 
 static const char* windowTypeName(TWindow* w) {
-    if (!w) return "test_pattern";
-
-    // Directly-typed windows whose classes are visible in this TU.
-    if (dynamic_cast<TTestPatternWindow*>(w))    return "test_pattern";
-    if (dynamic_cast<TGradientWindow*>(w))        return "gradient";
-    if (dynamic_cast<TBrowserWindow*>(w))         return "browser";
-    if (dynamic_cast<TTextEditorWindow*>(w))      return "text_editor";
-    if (dynamic_cast<TTransparentTextWindow*>(w)) return "text_view";
-    if (dynamic_cast<TFrameAnimationWindow*>(w))  return "frame_player";
-    if (dynamic_cast<TWibWobWindow*>(w))          return "wibwob";
-    if (dynamic_cast<TScrambleWindow*>(w))        return "scramble";
-
-    // Generative/animated window wrapper classes are local to their .cpp files
-    // and cannot be dynamic_cast from here. Identify them by their hosted
-    // child view type instead.
-#define HAS_CHILD_VIEW(ViewType) \
-    ([&]() -> bool { \
-        TView *_s = w->first(); \
-        if (!_s) return false; \
-        TView *_v = _s; \
-        do { if (dynamic_cast<ViewType*>(_v)) return true; _v = _v->next; } while (_v != _s); \
-        return false; \
-    }())
-
-    if (HAS_CHILD_VIEW(TGenerativeVerseView))         return "verse";
-    if (HAS_CHILD_VIEW(TGenerativeMyceliumView))      return "mycelium";
-    if (HAS_CHILD_VIEW(TGenerativeOrbitView))         return "orbit";
-    if (HAS_CHILD_VIEW(TGenerativeTorusView))         return "torus";
-    if (HAS_CHILD_VIEW(TGenerativeCubeView))          return "cube";
-    if (HAS_CHILD_VIEW(TGameOfLifeView))              return "life";
-    if (HAS_CHILD_VIEW(TAnimatedBlocksView))          return "blocks";
-    if (HAS_CHILD_VIEW(TAnimatedScoreView))           return "score";
-    if (HAS_CHILD_VIEW(TAnimatedAsciiView))           return "ascii";
-    if (HAS_CHILD_VIEW(TAnimatedHGradientView))       return "animated_gradient";
-    if (HAS_CHILD_VIEW(TGenerativeMonsterCamView))    return "monster_cam";
-    if (HAS_CHILD_VIEW(TGenerativeMonsterVerseView))  return "monster_verse";
-    if (HAS_CHILD_VIEW(TGenerativeMonsterPortalView)) return "monster_portal";
-
-#undef HAS_CHILD_VIEW
-    return "test_pattern";
+    const auto& specs = all_window_type_specs();
+    for (const auto& spec : specs) {
+        if (spec.matches && spec.matches(w)) return spec.type;
+    }
+    // Fallback to first registry entry (canonical default type slug).
+    return specs.empty() ? "test_pattern" : specs.front().type;
 }
 
 std::string api_get_state(TTestPatternApp& app) {
