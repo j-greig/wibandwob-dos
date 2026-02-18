@@ -732,10 +732,17 @@ TTestPatternApp::TTestPatternApp() :
         fprintf(stderr, "[wibwob] IPC server started on %s\n", sockPath.c_str());
     }
 
+    // Auto-restore layout from env var (room deployment).
+    const char* layoutPath = std::getenv("WIBWOB_LAYOUT_PATH");
+    if (layoutPath && layoutPath[0] != '\0') {
+        fprintf(stderr, "[wibwob] Restoring layout from WIBWOB_LAYOUT_PATH=%s\n", layoutPath);
+        if (!loadWorkspaceFromFile(layoutPath)) {
+            fprintf(stderr, "[wibwob] WARNING: Failed to restore layout from %s\n", layoutPath);
+        }
+    }
+
     // Init Scramble engine (KB + Haiku client).
     scrambleEngine.init(".");
-
-    // No wallpaper initialization.
 }
 
 void TTestPatternApp::handleEvent(TEvent& event)
