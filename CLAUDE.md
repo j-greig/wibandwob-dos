@@ -42,6 +42,12 @@ curl http://127.0.0.1:8089/state
 
 No C++ unit test framework is configured. C++ testing is manual via UI interaction or API calls.
 
+Primary automated regression coverage for multiplayer/IPC lives in `tests/room/` (Python, 160 tests). Run for all boundary/contract changes:
+
+```bash
+uv run --with pytest pytest tests/room/ -q
+```
+
 ## Architecture
 
 ```
