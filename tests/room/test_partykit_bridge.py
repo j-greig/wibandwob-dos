@@ -111,21 +111,21 @@ class TestComputeDelta:
 class TestApplyDeltaToIpc:
     def test_add_calls_create_window(self):
         calls = []
-        with patch("partykit_bridge.apply_ipc_command", side_effect=lambda p, c, params: calls.append((c, params)) or True):
+        with patch("state_diff.ipc_command", side_effect=lambda p, c, params: calls.append((c, params)) or True):
             delta = {"add": [{"id": "w1", "type": "gradient", "rect": {"x": 5, "y": 2, "w": 40, "h": 20}}]}
             apply_delta_to_ipc("/tmp/fake.sock", delta)
         assert any(c == "create_window" for c, _ in calls)
 
     def test_remove_calls_close_window(self):
         calls = []
-        with patch("partykit_bridge.apply_ipc_command", side_effect=lambda p, c, params: calls.append((c, params)) or True):
+        with patch("state_diff.ipc_command", side_effect=lambda p, c, params: calls.append((c, params)) or True):
             apply_delta_to_ipc("/tmp/fake.sock", {"remove": ["w1", "w2"]})
         close_calls = [p for c, p in calls if c == "close_window"]
         assert len(close_calls) == 2
 
     def test_update_calls_move_window(self):
         calls = []
-        with patch("partykit_bridge.apply_ipc_command", side_effect=lambda p, c, params: calls.append((c, params)) or True):
+        with patch("state_diff.ipc_command", side_effect=lambda p, c, params: calls.append((c, params)) or True):
             delta = {"update": [{"id": "w1", "rect": {"x": 10, "y": 5}}]}
             apply_delta_to_ipc("/tmp/fake.sock", delta)
         move_calls = [p for c, p in calls if c == "move_window"]
