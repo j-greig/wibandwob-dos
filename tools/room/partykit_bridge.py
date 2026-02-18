@@ -67,6 +67,7 @@ class PartyKitBridge:
         self.ws_url = build_ws_url(partykit_url, room)
         self.instance_id = instance_id
         self.last_windows: dict[str, dict] = {}
+        self.last_chat_seq: int = 0
         self._ws = None
 
     def log(self, msg: str) -> None:
@@ -83,6 +84,17 @@ class PartyKitBridge:
             self.log(f"send error: {e}")
             self._ws = None
 
+    async def push_chat(self, sender: str, text: str) -> None:
+        if self._ws is None:
+            return
+        msg = json.dumps({"type": "chat_msg", "sender": sender, "text": text,
+                          "instance": self.instance_id})
+        try:
+            await self._ws.send(msg)
+        except Exception as e:
+            self.log(f"send error (chat): {e}")
+            self._ws = None
+
     async def poll_loop(self) -> None:
         while True:
             state = ipc_get_state(self.sock_path)
@@ -93,6 +105,16 @@ class PartyKitBridge:
                     self.log(f"state change detected, pushing delta")
                     await self.push_delta(delta)
                     self.last_windows = new_windows
+                # Forward new local chat messages to PartyKit
+                for entry in state.get("chat_log", []):
+                    seq = entry.get("seq", 0)
+                    if seq > self.last_chat_seq:
+                        sender = entry.get("sender", "you")
+                        text = entry.get("text", "")
+                        if text:
+                            self.log(f"forwarding chat seq={seq}: {text[:40]}")
+                            await self.push_chat(sender, text)
+                        self.last_chat_seq = seq
             await asyncio.sleep(POLL_INTERVAL)
 
     async def receive_loop(self, ws) -> None:
@@ -131,7 +153,13 @@ class PartyKitBridge:
                     self.last_windows = new_windows
 
             elif mtype == "chat_msg":
-                self.log(f"chat from {msg.get('sender', '?')}: {msg.get('text', '')[:60]}")
+                sender = msg.get("sender", "remote")
+                text = msg.get("text", "")
+                origin_instance = msg.get("instance", "")
+                # Only apply messages from other instances (skip our own echo)
+                if text and origin_instance != self.instance_id:
+                    self.log(f"chat from {sender}: {text[:60]}")
+                    ipc_command(self.sock_path, "chat_receive", {"sender": sender, "text": text})
 
     async def run(self) -> None:
         try:

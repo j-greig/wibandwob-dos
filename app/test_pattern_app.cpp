@@ -95,6 +95,7 @@ class TWindow; TWindow* createAsciiGridDemoWindow(const TRect &bounds);
 #include <vector>
 #include <cstring>
 #include <map>
+#include <deque>
 #include <dirent.h>
 // Local API IPC bridge (Unix domain socket)
 #include "api_ipc.h"
@@ -619,6 +620,12 @@ private:
         }
     }
 
+    // Chat log for multiplayer relay (outgoing messages from local Scramble)
+    struct ChatEntry { int seq; std::string sender; std::string text; };
+    std::deque<ChatEntry> chatLog_;
+    int chatSeq_ = 0;
+    static constexpr int kChatLogMax = 50;
+
     // API/IPC registry for per-window control
     int apiIdCounter = 1;
     std::map<TWindow*, std::string> winToId;
@@ -675,6 +682,7 @@ private:
     friend void api_expand_scramble(TTestPatternApp&);
     friend std::string api_scramble_say(TTestPatternApp&, const std::string&);
     friend std::string api_scramble_pet(TTestPatternApp&);
+    friend std::string api_chat_receive(TTestPatternApp&, const std::string&, const std::string&);
     friend void api_tile(TTestPatternApp&);
     friend void api_close_all(TTestPatternApp&);
     friend void api_set_pattern_mode(TTestPatternApp&, const std::string&);
@@ -1292,6 +1300,13 @@ void TTestPatternApp::wireScrambleInput()
         // Add user message to history
         if (scrambleWindow->getMessageView()) {
             scrambleWindow->getMessageView()->addMessage("you", input);
+        }
+
+        // Log non-slash messages for multiplayer chat relay
+        if (input.empty() || input[0] != '/') {
+            chatLog_.push_back({++chatSeq_, "you", input});
+            if ((int)chatLog_.size() > kChatLogMax)
+                chatLog_.pop_front();
         }
 
         // Slash commands: check registry first, then fall through to engine.
@@ -2330,6 +2345,15 @@ std::string api_scramble_pet(TTestPatternApp& app) {
     return response;
 }
 
+std::string api_chat_receive(TTestPatternApp& app, const std::string& sender, const std::string& text) {
+    // Display a remote chat message in Scramble without AI processing.
+    if (!app.scrambleWindow) return "err scramble not open";
+    auto* msgView = app.scrambleWindow->getMessageView();
+    if (!msgView) return "err no message view";
+    msgView->addMessage(sender, text);
+    return "ok";
+}
+
 void api_tile(TTestPatternApp& app) { app.tile(); }
 void api_close_all(TTestPatternApp& app) { app.closeAll(); }
 
@@ -2388,6 +2412,18 @@ std::string api_get_state(TTestPatternApp& app) {
         } while (v != start);
     }
     
+    json << "]";
+
+    // Append chat_log for multiplayer relay bridge
+    json << ",\"chat_log\":[";
+    bool firstChat = true;
+    for (const auto& entry : app.chatLog_) {
+        if (!firstChat) json << ",";
+        json << "{\"seq\":" << entry.seq
+             << ",\"sender\":\"" << TTestPatternApp::jsonEscape(entry.sender) << "\""
+             << ",\"text\":\"" << TTestPatternApp::jsonEscape(entry.text) << "\"}";
+        firstChat = false;
+    }
     json << "]}";
     return json.str();
 }
