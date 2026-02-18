@@ -42,6 +42,28 @@ class TestWindowsFromState:
         result = windows_from_state(state)
         assert list(result.keys()) == ["w1"]
 
+    def test_normalises_width_height_to_w_h(self):
+        """api_get_state emits w/h; older snapshots may have width/height.
+        windows_from_state must canonicalise so compute_delta sees stable keys
+        and does not produce spurious update deltas every poll cycle."""
+        state = {"windows": [{"id": "w1", "type": "gradient",
+                               "x": 5, "y": 3, "width": 40, "height": 20}]}
+        result = windows_from_state(state)
+        assert "w" in result["w1"]
+        assert "h" in result["w1"]
+        assert result["w1"]["w"] == 40
+        assert result["w1"]["h"] == 20
+        assert "width" not in result["w1"]
+        assert "height" not in result["w1"]
+
+    def test_normalise_does_not_duplicate_w_h(self):
+        """If w/h already present, width/height are dropped without overwriting."""
+        state = {"windows": [{"id": "w1", "w": 40, "h": 20,
+                               "width": 99, "height": 99}]}
+        result = windows_from_state(state)
+        assert result["w1"]["w"] == 40
+        assert result["w1"]["h"] == 20
+
 
 # ── state_hash ────────────────────────────────────────────────────────────────
 
