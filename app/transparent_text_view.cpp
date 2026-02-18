@@ -240,6 +240,10 @@ void TTransparentTextWindow::changeBounds(const TRect& bounds)
     redraw();
 }
 
+const std::string& TTransparentTextWindow::getFilePath() const {
+    return textView->getFileName();
+}
+
 TFrame* TTransparentTextWindow::initFrame(TRect r)
 {
     return new TFrame(r);

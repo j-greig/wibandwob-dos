@@ -285,6 +285,34 @@ class TestApplyDeltaToIpc:
         assert "w" not in resize[0]
         assert "h" not in resize[0]
 
+    def test_add_file_backed_window_forwards_path(self):
+        """create_window for text_view/frame_player must include the path param.
+
+        Without path, the C++ IPC handler returns 'err missing path' and the
+        window is not created on the remote instance.
+        """
+        calls, fake = self._capture()
+        with patch("state_diff.ipc_command", side_effect=fake):
+            apply_delta_to_ipc("/tmp/fake.sock", {
+                "add": [{"id": "w1", "type": "text_view", "x": 0, "y": 0,
+                          "w": 80, "h": 24, "path": "/home/user/notes.txt"}]
+            })
+        create = [p for c, p in calls if c == "create_window"]
+        assert len(create) == 1
+        assert create[0]["path"] == "/home/user/notes.txt"
+
+    def test_add_no_path_key_when_missing(self):
+        """create_window for non-file-backed windows must NOT send path param."""
+        calls, fake = self._capture()
+        with patch("state_diff.ipc_command", side_effect=fake):
+            apply_delta_to_ipc("/tmp/fake.sock", {
+                "add": [{"id": "w1", "type": "test_pattern", "x": 0, "y": 0,
+                          "w": 40, "h": 20}]
+            })
+        create = [p for c, p in calls if c == "create_window"]
+        assert len(create) == 1
+        assert "path" not in create[0]
+
 
 # ── _encode_param (percent-encoding) ──────────────────────────────────────────
 

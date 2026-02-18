@@ -495,7 +495,8 @@ class TFrameAnimationWindow : public TWindow
 public:
     TFrameAnimationWindow(const TRect& bounds, const char* aTitle, const std::string& filePath) :
         TWindow(bounds, aTitle, wnNoNumber),
-        TWindowInit(&TFrameAnimationWindow::initFrame)
+        TWindowInit(&TFrameAnimationWindow::initFrame),
+        filePath_(filePath)
     {
         options |= ofTileable;  // Enable cascade/tile functionality
         
@@ -539,6 +540,11 @@ public:
     {
         return new TNoTitleFrame(r);
     }
+
+    const std::string& getFilePath() const { return filePath_; }
+
+private:
+    std::string filePath_;
 };
 
 /*---------------------------------------------------------*/
@@ -2483,7 +2489,16 @@ std::string api_get_state(TTestPatternApp& app) {
                 else json << c;
             }
         }
-        json << "\"}";
+        json << "\"";
+        // Emit path for file-backed window types (needed for remote create_window)
+        if (auto* ttw = dynamic_cast<TTransparentTextWindow*>(w)) {
+            const std::string& p = ttw->getFilePath();
+            if (!p.empty()) json << ",\"path\":\"" << TTestPatternApp::jsonEscape(p) << "\"";
+        } else if (auto* faw = dynamic_cast<TFrameAnimationWindow*>(w)) {
+            const std::string& p = faw->getFilePath();
+            if (!p.empty()) json << ",\"path\":\"" << TTestPatternApp::jsonEscape(p) << "\"";
+        }
+        json << "}";
         first = false;
     }
 

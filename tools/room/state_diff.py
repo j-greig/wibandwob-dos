@@ -264,9 +264,11 @@ def apply_delta_to_ipc(sock_path: str, delta: dict[str, Any]) -> list[str]:
         y = rect.get("y", 0)
         w = rect.get("w") or rect.get("width", 40)
         h = rect.get("h") or rect.get("height", 20)
-        ok = ipc_command(sock_path, "create_window", {
-            "type": win_type, "x": x, "y": y, "w": w, "h": h,
-        })
+        params: dict = {"type": win_type, "x": x, "y": y, "w": w, "h": h}
+        path = win.get("path", "")
+        if path:
+            params["path"] = path
+        ok = ipc_command(sock_path, "create_window", params)
         tag = f"create_window id={win.get('id')} type={win_type}"
         applied.append(tag if ok else f"FAIL {tag}")
 
