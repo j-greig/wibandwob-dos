@@ -2383,47 +2383,62 @@ static const char* windowTypeName(TWindow* w) {
 }
 
 std::string api_get_state(TTestPatternApp& app) {
-    // Rebuild window registry to sync with current desktop state
-    app.winToId.clear();
-    app.idToWin.clear();
-
-    std::stringstream json;
-    json << "{\"windows\":[";
-
-    bool first = true;
+    // Collect currently visible windows in desktop Z-order.
+    // Do NOT clear winToId/idToWin here — that would reassign new IDs on
+    // every call, causing compute_delta to see "new" windows every poll.
+    std::vector<TWindow*> activeWins;
     TView *start = app.deskTop->first();
     if (start) {
         TView *v = start;
         do {
             TWindow *w = dynamic_cast<TWindow*>(v);
-            if (w) {
-                std::string id = app.registerWindow(w);
-
-                if (!first) json << ",";
-                json << "{\"id\":\"" << id << "\""
-                     << ",\"type\":\"" << windowTypeName(w) << "\""
-                     << ",\"x\":" << w->origin.x
-                     << ",\"y\":" << w->origin.y
-                     << ",\"w\":" << w->size.x
-                     << ",\"h\":" << w->size.y
-                     << ",\"title\":\"";
-
-                // Safely escape title
-                if (w->title) {
-                    std::string title(w->title);
-                    for (char c : title) {
-                        if (c == '"') json << "\\\"";
-                        else if (c == '\\') json << "\\\\";
-                        else json << c;
-                    }
-                }
-                json << "\"}";
-                first = false;
-            }
+            if (w) activeWins.push_back(w);
             v = v->next;
         } while (v != start);
     }
-    
+
+    // Purge registry entries for windows that have been closed (stale pointers).
+    // Only purge; never clear — existing live windows keep their stable IDs.
+    {
+        auto it = app.winToId.begin();
+        while (it != app.winToId.end()) {
+            bool alive = false;
+            for (auto* aw : activeWins) { if (aw == it->first) { alive = true; break; } }
+            if (!alive) {
+                app.idToWin.erase(it->second);
+                it = app.winToId.erase(it);
+            } else {
+                ++it;
+            }
+        }
+    }
+
+    std::stringstream json;
+    json << "{\"windows\":[";
+
+    bool first = true;
+    for (TWindow* w : activeWins) {
+        std::string id = app.registerWindow(w);
+        if (!first) json << ",";
+        json << "{\"id\":\"" << id << "\""
+             << ",\"type\":\"" << windowTypeName(w) << "\""
+             << ",\"x\":" << w->origin.x
+             << ",\"y\":" << w->origin.y
+             << ",\"w\":" << w->size.x
+             << ",\"h\":" << w->size.y
+             << ",\"title\":\"";
+        if (w->title) {
+            std::string title(w->title);
+            for (char c : title) {
+                if (c == '"') json << "\\\"";
+                else if (c == '\\') json << "\\\\";
+                else json << c;
+            }
+        }
+        json << "\"}";
+        first = false;
+    }
+
     json << "]";
 
     // Append chat_log for multiplayer relay bridge

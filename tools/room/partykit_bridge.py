@@ -143,9 +143,10 @@ class PartyKitBridge:
             elif mtype == "state_delta":
                 delta = msg.get("delta", {})
                 if delta:
-                    self.log(f"applying remote state_delta")
-                    apply_delta_to_ipc(self.sock_path, delta)
-                    # Same baseline fix: read actual local state, not remote IDs.
+                    applied = apply_delta_to_ipc(self.sock_path, delta)
+                    for cmd in applied:
+                        self.log(f"  {'✓' if not cmd.startswith('FAIL') else '✗'} {cmd}")
+                    # Re-read actual local state as baseline to prevent re-broadcast loop.
                     actual = ipc_get_state(self.sock_path)
                     if actual:
                         self.last_windows = windows_from_state(actual)

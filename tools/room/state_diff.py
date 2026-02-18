@@ -206,13 +206,13 @@ def apply_delta_to_ipc(sock_path: str, delta: dict[str, Any]) -> list[str]:
         ok = ipc_command(sock_path, "create_window", {
             "type": win_type, "x": x, "y": y, "w": w, "h": h,
         })
-        if ok:
-            applied.append(f"create_window id={win.get('id')} type={win_type}")
+        tag = f"create_window id={win.get('id')} type={win_type}"
+        applied.append(tag if ok else f"FAIL {tag}")
 
     for wid in delta.get("remove", []):
         ok = ipc_command(sock_path, "close_window", {"id": wid})
-        if ok:
-            applied.append(f"close_window id={wid}")
+        tag = f"close_window id={wid}"
+        applied.append(tag if ok else f"FAIL {tag}")
 
     for win in delta.get("update", []):
         wid = win.get("id", "")
@@ -223,7 +223,7 @@ def apply_delta_to_ipc(sock_path: str, delta: dict[str, Any]) -> list[str]:
                 "x": rect.get("x", 0),
                 "y": rect.get("y", 0),
             })
-            if ok:
-                applied.append(f"move_window id={wid} x={rect.get('x')} y={rect.get('y')}")
+            tag = f"move_window id={wid} x={rect.get('x')} y={rect.get('y')}"
+            applied.append(tag if ok else f"FAIL {tag}")
 
     return applied
