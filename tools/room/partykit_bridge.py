@@ -104,6 +104,8 @@ class PartyKitBridge:
         self.instance_id = instance_id
         self.last_windows: dict[str, dict] = {}
         self.last_chat_seq: int = 0
+        self.id_map: dict[str, str] = {}  # remote window id -> local IPC id
+        self.consecutive_failures: int = 0
         self._ws = None
         # Protects last_windows from concurrent coroutine updates.
         # asyncio is single-threaded but awaits between diff and baseline write
@@ -142,7 +144,7 @@ class PartyKitBridge:
         concurrent coroutines from overwriting last_windows with stale state.
         Returns the raw state dict (for callers that also need it), or None on error.
         """
-        state = ipc_get_state(self.sock_path)
+        state = await asyncio.to_thread(ipc_get_state, self.sock_path)
         if not state:
             return None
         if self._state_lock is None:
@@ -231,11 +233,18 @@ class PartyKitBridge:
                         delta = compute_delta(self.last_windows, new_windows)
                         if delta:
                             self.log(f"applying state_sync delta")
-                            apply_delta_to_ipc(self.sock_path, delta)
+                            applied = await asyncio.to_thread(
+                                apply_delta_to_ipc, self.sock_path, delta, id_map=self.id_map
+                            )
+                            had_fail = any(c.startswith("FAIL") for c in applied)
+                            self.consecutive_failures = (self.consecutive_failures + 1) if had_fail else 0
+                            if self.consecutive_failures >= 3:
+                                await self._request_state_sync(ws, reason="apply_failures")
+                                self.consecutive_failures = 0
                             # Re-read actual local state as baseline — C++ assigns its
                             # own window IDs, so we must not track remote IDs or the
                             # poll loop will see a mismatch and re-broadcast forever.
-                            actual = ipc_get_state(self.sock_path)
+                            actual = await asyncio.to_thread(ipc_get_state, self.sock_path)
                             self.last_windows = windows_from_state(actual) if actual else new_windows
 
             elif mtype == "state_delta":
@@ -244,11 +253,18 @@ class PartyKitBridge:
                     # Hold the lock across the full apply+baseline refresh so that
                     # concurrent poll/event loops cannot push stale outbound diffs.
                     async with self._state_lock:
-                        applied = apply_delta_to_ipc(self.sock_path, delta)
+                        applied = await asyncio.to_thread(
+                            apply_delta_to_ipc, self.sock_path, delta, id_map=self.id_map
+                        )
                         for cmd in applied:
                             self.log(f"  {'✓' if not cmd.startswith('FAIL') else '✗'} {cmd}")
+                        had_fail = any(c.startswith("FAIL") for c in applied)
+                        self.consecutive_failures = (self.consecutive_failures + 1) if had_fail else 0
+                        if self.consecutive_failures >= 3:
+                            await self._request_state_sync(ws, reason="apply_failures")
+                            self.consecutive_failures = 0
                         # Re-read actual local state as baseline to prevent re-broadcast loop.
-                        actual = ipc_get_state(self.sock_path)
+                        actual = await asyncio.to_thread(ipc_get_state, self.sock_path)
                         if actual:
                             self.last_windows = windows_from_state(actual)
 
@@ -260,8 +276,25 @@ class PartyKitBridge:
                 if text and origin_instance != self.instance_id:
                     self.log(f"chat from {sender}: {text[:60]}")
                     # chat_receive is in the command registry, not a direct IPC branch.
-                    ipc_command(self.sock_path, "exec_command",
-                                {"name": "chat_receive", "sender": sender, "text": text})
+                    await asyncio.to_thread(
+                        ipc_command,
+                        self.sock_path,
+                        "exec_command",
+                        {"name": "chat_receive", "sender": sender, "text": text},
+                    )
+
+    async def _request_state_sync(self, ws, reason: str) -> None:
+        if ws is None:
+            return
+        try:
+            await ws.send(json.dumps({
+                "type": "state_request",
+                "reason": reason,
+                "instance": self.instance_id,
+            }))
+            self.log(f"requested state_sync (reason={reason})")
+        except Exception as e:
+            self.log(f"state_request send error: {e}")
 
     async def run(self) -> None:
         try:

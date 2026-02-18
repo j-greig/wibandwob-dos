@@ -50,6 +50,7 @@ interface CanonicalState {
 
 type IncomingMessage =
   | { type: "state_delta"; room_id?: string; delta: StateDelta }
+  | { type: "state_request"; room_id?: string; reason?: string; instance?: string }
   | { type: "chat_msg"; sender: string; text: string; ts?: number }
   | { type: "cursor_pos"; sender: string; x: number; y: number }
   | { type: "ping" };
@@ -156,6 +157,18 @@ export default class WibWobRoom implements Party.Server {
             from: sender.id,
           }),
           [sender.id]
+        );
+        break;
+      }
+
+      case "state_request": {
+        await this.ensureState();
+        sender.send(
+          JSON.stringify({
+            type: "state_sync",
+            state: this.state,
+            room: this.room.id,
+          })
         );
         break;
       }

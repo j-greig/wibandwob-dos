@@ -639,16 +639,21 @@ private:
     int apiIdCounter = 1;
     std::map<TWindow*, std::string> winToId;
     std::map<std::string, TWindow*> idToWin;
+    std::string lastRegisteredWindowId_;
     
     std::string registerWindow(TWindow* w, bool emit_event = true) {
         if (!w) return std::string();
         auto it = winToId.find(w);
-        if (it != winToId.end()) return it->second;
+        if (it != winToId.end()) {
+            lastRegisteredWindowId_ = it->second;
+            return it->second;
+        }
         char buf[32];
         std::snprintf(buf, sizeof(buf), "w%d", apiIdCounter++);
         std::string id(buf);
         winToId[w] = id;
         idToWin[id] = w;
+        lastRegisteredWindowId_ = id;
         // Notify event subscribers that state has changed.
         if (emit_event && ipcServer) {
             std::string payload = std::string("{\"id\":\"") + id + "\"}";
@@ -733,6 +738,7 @@ private:
     friend std::string api_get_canvas_size(TTestPatternApp&);
     friend void api_spawn_text_editor(TTestPatternApp&, const TRect* bounds);
     friend void api_spawn_browser(TTestPatternApp&, const TRect* bounds);
+    friend std::string api_take_last_registered_window_id(TTestPatternApp&);
     friend void api_spawn_verse(TTestPatternApp&, const TRect* bounds);
     friend void api_spawn_mycelium(TTestPatternApp&, const TRect* bounds);
     friend void api_spawn_orbit(TTestPatternApp&, const TRect* bounds);
@@ -2410,6 +2416,12 @@ bool api_open_workspace_path(TTestPatternApp& app, const std::string& path) {
 }
 
 void api_screenshot(TTestPatternApp& app) { app.takeScreenshot(false); }
+
+std::string api_take_last_registered_window_id(TTestPatternApp& app) {
+    std::string out = app.lastRegisteredWindowId_;
+    app.lastRegisteredWindowId_.clear();
+    return out;
+}
 
 static const char* windowTypeName(TWindow* w) {
     const auto& specs = all_window_type_specs();

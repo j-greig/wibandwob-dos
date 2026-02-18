@@ -118,14 +118,19 @@ def _encode_param(v: Any) -> str:
 
 def ipc_command(sock_path: str, cmd: str, params: dict[str, Any]) -> bool:
     """Send a key=value command to WibWob IPC. Returns True on ok."""
+    resp = ipc_command_raw(sock_path, cmd, params)
+    if resp is None:
+        return False
+    # C++ handlers return either "ok..." (legacy) or {"success":true,...} JSON.
+    return resp.startswith("ok") or '"success":true' in resp
+
+
+def ipc_command_raw(sock_path: str, cmd: str, params: dict[str, Any]) -> str | None:
+    """Send a key=value command to WibWob IPC. Returns raw response or None."""
     parts = [f"cmd:{cmd}"]
     for k, v in params.items():
         parts.append(f"{k}={_encode_param(v)}")
-    resp = ipc_send(sock_path, " ".join(parts))
-    if resp is None:
-        return False
-    # C++ handlers return either "ok..." (legacy) or {"success":true} JSON.
-    return resp.startswith("ok") or '"success":true' in resp
+    return ipc_send(sock_path, " ".join(parts))
 
 
 # ── State extraction ──────────────────────────────────────────────────────────
@@ -258,13 +263,22 @@ def _rect(win: dict) -> dict:
     return {}
 
 
-def apply_delta_to_ipc(sock_path: str, delta: dict[str, Any]) -> list[str]:
+def apply_delta_to_ipc(
+    sock_path: str,
+    delta: dict[str, Any],
+    id_map: dict[str, str] | None = None,
+) -> list[str]:
     """
     Apply a remote state_delta to a local WibWob instance via IPC.
 
     Returns list of applied command strings for logging/testing.
     """
     applied = []
+
+    def _map_id(remote_id: str) -> str:
+        if not remote_id:
+            return remote_id
+        return id_map.get(remote_id, remote_id) if id_map is not None else remote_id
 
     for win in delta.get("add", []):
         win_type = win.get("type", "test_pattern")
@@ -277,17 +291,38 @@ def apply_delta_to_ipc(sock_path: str, delta: dict[str, Any]) -> list[str]:
         path = win.get("path", "")
         if path:
             params["path"] = path
-        ok = ipc_command(sock_path, "create_window", params)
-        tag = f"create_window id={win.get('id')} type={win_type}"
+        remote_id = str(win.get("id", ""))
+        resp = ipc_command_raw(sock_path, "create_window", params)
+        ok = bool(resp) and (resp.startswith("ok") or '"success":true' in resp)
+        local_id = ""
+        if ok and resp and id_map is not None and remote_id:
+            try:
+                payload = json.loads(resp)
+                if payload.get("success") is True and isinstance(payload.get("id"), str):
+                    local_id = payload["id"]
+            except json.JSONDecodeError:
+                pass
+            if local_id:
+                id_map[remote_id] = local_id
+        tag = f"create_window id={remote_id} type={win_type}"
+        if local_id and local_id != remote_id:
+            tag += f" local_id={local_id}"
         applied.append(tag if ok else f"FAIL {tag}")
 
     for wid in delta.get("remove", []):
-        ok = ipc_command(sock_path, "close_window", {"id": wid})
-        tag = f"close_window id={wid}"
+        remote_id = str(wid)
+        local_id = _map_id(remote_id)
+        ok = ipc_command(sock_path, "close_window", {"id": local_id})
+        tag = f"close_window id={remote_id}"
+        if local_id != remote_id:
+            tag += f" local_id={local_id}"
         applied.append(tag if ok else f"FAIL {tag}")
+        if id_map is not None:
+            id_map.pop(remote_id, None)
 
     for win in delta.get("update", []):
-        wid = win.get("id", "")
+        remote_id = str(win.get("id", ""))
+        wid = _map_id(remote_id)
         if not wid:
             continue
         rect = _rect(win)
@@ -301,7 +336,9 @@ def apply_delta_to_ipc(sock_path: str, delta: dict[str, Any]) -> list[str]:
                     "x": rect["x"],
                     "y": rect["y"],
                 })
-                tag = f"move_window id={wid} x={rect['x']} y={rect['y']}"
+                tag = f"move_window id={remote_id} x={rect['x']} y={rect['y']}"
+                if wid != remote_id:
+                    tag += f" local_id={wid}"
                 applied.append(tag if ok else f"FAIL {tag}")
             # Only resize if both dimensions are explicitly present.
             w = rect["w"] if "w" in rect else rect.get("width")
@@ -311,7 +348,9 @@ def apply_delta_to_ipc(sock_path: str, delta: dict[str, Any]) -> list[str]:
                 ok = ipc_command(sock_path, "resize_window", {
                     "id": wid, "width": w, "height": h,
                 })
-                tag = f"resize_window id={wid} width={w} height={h}"
+                tag = f"resize_window id={remote_id} width={w} height={h}"
+                if wid != remote_id:
+                    tag += f" local_id={wid}"
                 applied.append(tag if ok else f"FAIL {tag}")
 
     return applied

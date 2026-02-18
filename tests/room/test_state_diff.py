@@ -208,26 +208,35 @@ class TestApplyDeltaToIpc:
         def fake_cmd(sock_path, cmd, params):
             calls.append((cmd, params))
             return True
-        return calls, fake_cmd
+        def fake_raw(sock_path, cmd, params):
+            calls.append((cmd, params))
+            # create_window now returns JSON with a local id
+            if cmd == "create_window":
+                return "{\"success\":true,\"id\":\"w_local\"}"
+            return "{\"success\":true}"
+        return calls, fake_cmd, fake_raw
 
     def test_add_creates_window(self):
-        calls, fake = self._capture()
-        with patch("state_diff.ipc_command", side_effect=fake):
+        calls, fake_cmd, fake_raw = self._capture()
+        with patch("state_diff.ipc_command", side_effect=fake_cmd), \
+             patch("state_diff.ipc_command_raw", side_effect=fake_raw):
             apply_delta_to_ipc("/tmp/fake.sock", {
                 "add": [win("w1", rect={"x": 5, "y": 2, "w": 40, "h": 20})]
             })
         assert any(c == "create_window" for c, _ in calls)
 
     def test_remove_closes_window(self):
-        calls, fake = self._capture()
-        with patch("state_diff.ipc_command", side_effect=fake):
+        calls, fake_cmd, fake_raw = self._capture()
+        with patch("state_diff.ipc_command", side_effect=fake_cmd), \
+             patch("state_diff.ipc_command_raw", side_effect=fake_raw):
             apply_delta_to_ipc("/tmp/fake.sock", {"remove": ["w1", "w2"]})
         close = [p for c, p in calls if c == "close_window"]
         assert len(close) == 2
 
     def test_update_moves_window(self):
-        calls, fake = self._capture()
-        with patch("state_diff.ipc_command", side_effect=fake):
+        calls, fake_cmd, fake_raw = self._capture()
+        with patch("state_diff.ipc_command", side_effect=fake_cmd), \
+             patch("state_diff.ipc_command_raw", side_effect=fake_raw):
             apply_delta_to_ipc("/tmp/fake.sock", {
                 "update": [{"id": "w1", "rect": {"x": 10, "y": 5}}]
             })
@@ -236,7 +245,8 @@ class TestApplyDeltaToIpc:
         assert move[0]["x"] == 10
 
     def test_returns_applied_commands(self):
-        with patch("state_diff.ipc_command", return_value=True):
+        with patch("state_diff.ipc_command", return_value=True), \
+             patch("state_diff.ipc_command_raw", return_value='{"success":true,"id":"w_local"}'):
             applied = apply_delta_to_ipc("/tmp/fake.sock", {
                 "add": [win("w1")],
                 "remove": ["w2"],
@@ -252,7 +262,8 @@ class TestApplyDeltaToIpc:
         apply_delta_to_ipc must still record the attempt with a FAIL prefix
         rather than silently dropping it. This makes ID-mismatch bugs visible.
         """
-        with patch("state_diff.ipc_command", return_value=False):
+        with patch("state_diff.ipc_command", return_value=False), \
+             patch("state_diff.ipc_command_raw", return_value='{"error":"nope"}'):
             applied = apply_delta_to_ipc("/tmp/fake.sock", {
                 "add": [win("w1")],
                 "remove": ["w99"],
@@ -264,8 +275,9 @@ class TestApplyDeltaToIpc:
         assert any("close_window" in a for a in applied)
 
     def test_empty_delta_no_calls(self):
-        calls, fake = self._capture()
-        with patch("state_diff.ipc_command", side_effect=fake):
+        calls, fake_cmd, fake_raw = self._capture()
+        with patch("state_diff.ipc_command", side_effect=fake_cmd), \
+             patch("state_diff.ipc_command_raw", side_effect=fake_raw):
             applied = apply_delta_to_ipc("/tmp/fake.sock", {})
         assert calls == []
         assert applied == []
@@ -277,8 +289,9 @@ class TestApplyDeltaToIpc:
         not nested under a 'rect' sub-dict. _rect() must fall back to the win
         dict itself so windows are created at the correct position, not 0,0.
         """
-        calls, fake = self._capture()
-        with patch("state_diff.ipc_command", side_effect=fake):
+        calls, fake_cmd, fake_raw = self._capture()
+        with patch("state_diff.ipc_command", side_effect=fake_cmd), \
+             patch("state_diff.ipc_command_raw", side_effect=fake_raw):
             apply_delta_to_ipc("/tmp/fake.sock", {
                 "add": [{"id": "w1", "type": "test_pattern", "x": 5, "y": 3, "w": 40, "h": 20}]
             })
@@ -293,8 +306,9 @@ class TestApplyDeltaToIpc:
         C++ api_ipc.cpp reads kv["width"] and kv["height"] for resize_window.
         Sending 'w'/'h' causes the resize to silently fail (key not found → 0).
         """
-        calls, fake = self._capture()
-        with patch("state_diff.ipc_command", side_effect=fake):
+        calls, fake_cmd, fake_raw = self._capture()
+        with patch("state_diff.ipc_command", side_effect=fake_cmd), \
+             patch("state_diff.ipc_command_raw", side_effect=fake_raw):
             apply_delta_to_ipc("/tmp/fake.sock", {
                 "update": [{"id": "w1", "x": 0, "y": 0, "w": 80, "h": 40}]
             })
@@ -313,8 +327,9 @@ class TestApplyDeltaToIpc:
         Root cause: .get('x', 0) default would force a spurious move-to-origin
         for deltas that only carry w/h changes.
         """
-        calls, fake = self._capture()
-        with patch("state_diff.ipc_command", side_effect=fake):
+        calls, fake_cmd, fake_raw = self._capture()
+        with patch("state_diff.ipc_command", side_effect=fake_cmd), \
+             patch("state_diff.ipc_command_raw", side_effect=fake_raw):
             apply_delta_to_ipc("/tmp/fake.sock", {
                 "update": [{"id": "w1", "w": 80, "h": 40}]
             })
@@ -325,8 +340,9 @@ class TestApplyDeltaToIpc:
 
     def test_position_only_update_no_spurious_resize(self):
         """Position-only update delta must NOT send resize_window."""
-        calls, fake = self._capture()
-        with patch("state_diff.ipc_command", side_effect=fake):
+        calls, fake_cmd, fake_raw = self._capture()
+        with patch("state_diff.ipc_command", side_effect=fake_cmd), \
+             patch("state_diff.ipc_command_raw", side_effect=fake_raw):
             apply_delta_to_ipc("/tmp/fake.sock", {
                 "update": [{"id": "w1", "x": 5, "y": 3}]
             })
@@ -342,8 +358,9 @@ class TestApplyDeltaToIpc:
         Without path, the C++ IPC handler returns 'err missing path' and the
         window is not created on the remote instance.
         """
-        calls, fake = self._capture()
-        with patch("state_diff.ipc_command", side_effect=fake):
+        calls, fake_cmd, fake_raw = self._capture()
+        with patch("state_diff.ipc_command", side_effect=fake_cmd), \
+             patch("state_diff.ipc_command_raw", side_effect=fake_raw):
             apply_delta_to_ipc("/tmp/fake.sock", {
                 "add": [{"id": "w1", "type": "text_view", "x": 0, "y": 0,
                           "w": 80, "h": 24, "path": "/home/user/notes.txt"}]
@@ -354,8 +371,9 @@ class TestApplyDeltaToIpc:
 
     def test_add_no_path_key_when_missing(self):
         """create_window for non-file-backed windows must NOT send path param."""
-        calls, fake = self._capture()
-        with patch("state_diff.ipc_command", side_effect=fake):
+        calls, fake_cmd, fake_raw = self._capture()
+        with patch("state_diff.ipc_command", side_effect=fake_cmd), \
+             patch("state_diff.ipc_command_raw", side_effect=fake_raw):
             apply_delta_to_ipc("/tmp/fake.sock", {
                 "add": [{"id": "w1", "type": "test_pattern", "x": 0, "y": 0,
                           "w": 40, "h": 20}]
@@ -363,6 +381,41 @@ class TestApplyDeltaToIpc:
         create = [p for c, p in calls if c == "create_window"]
         assert len(create) == 1
         assert "path" not in create[0]
+
+    def test_add_updates_id_map_from_create_window_response(self):
+        calls, fake_cmd, fake_raw = self._capture()
+        id_map = {}
+        with patch("state_diff.ipc_command", side_effect=fake_cmd), \
+             patch("state_diff.ipc_command_raw",
+                   side_effect=lambda p, c, params: calls.append((c, params)) or '{"success":true,"id":"w_local"}'):
+            apply_delta_to_ipc("/tmp/fake.sock", {
+                "add": [{"id": "w_remote", "type": "test_pattern", "x": 0, "y": 0, "w": 40, "h": 20}]
+            }, id_map=id_map)
+        assert id_map.get("w_remote") == "w_local"
+        assert any(c == "create_window" for c, _ in calls)
+
+    def test_update_translates_remote_id_via_id_map(self):
+        calls, fake_cmd, fake_raw = self._capture()
+        id_map = {"w_remote": "w_local"}
+        with patch("state_diff.ipc_command", side_effect=fake_cmd), \
+             patch("state_diff.ipc_command_raw", side_effect=fake_raw):
+            apply_delta_to_ipc("/tmp/fake.sock", {
+                "update": [{"id": "w_remote", "rect": {"x": 10, "y": 5}}]
+            }, id_map=id_map)
+        move = [p for c, p in calls if c == "move_window"]
+        assert len(move) == 1
+        assert move[0]["id"] == "w_local"
+
+    def test_remove_translates_remote_id_via_id_map(self):
+        calls, fake_cmd, fake_raw = self._capture()
+        id_map = {"w_remote": "w_local"}
+        with patch("state_diff.ipc_command", side_effect=fake_cmd), \
+             patch("state_diff.ipc_command_raw", side_effect=fake_raw):
+            apply_delta_to_ipc("/tmp/fake.sock", {"remove": ["w_remote"]}, id_map=id_map)
+        close = [p for c, p in calls if c == "close_window"]
+        assert len(close) == 1
+        assert close[0]["id"] == "w_local"
+        assert "w_remote" not in id_map
 
 
 # ── _encode_param (percent-encoding) ──────────────────────────────────────────

@@ -96,6 +96,33 @@ static std::string base64_decode(const std::string& encoded_string) {
     return ret;
 }
 
+#ifndef _WIN32
+static bool safe_write(int fd, const void* buf, size_t len) {
+    const char* p = static_cast<const char*>(buf);
+#ifdef SO_NOSIGPIPE
+    int one = 1;
+    ::setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &one, sizeof(one));
+#endif
+    size_t written = 0;
+    while (written < len) {
+#ifdef MSG_NOSIGNAL
+        ssize_t n = ::send(fd, p + written, len - written, MSG_NOSIGNAL);
+#else
+        ssize_t n = ::send(fd, p + written, len - written, 0);
+#endif
+        if (n > 0) {
+            written += static_cast<size_t>(n);
+            continue;
+        }
+        if (n < 0 && errno == EINTR) {
+            continue;
+        }
+        return false;
+    }
+    return true;
+}
+#endif
+
 // Include TRect definition
 #define Uses_TRect
 #include <tvision/tv.h>
@@ -110,6 +137,7 @@ extern void api_save_workspace(TTestPatternApp& app);
 extern bool api_save_workspace_path(TTestPatternApp& app, const std::string& path);
 extern bool api_open_workspace_path(TTestPatternApp& app, const std::string& path);
 extern void api_screenshot(TTestPatternApp& app);
+extern std::string api_take_last_registered_window_id(TTestPatternApp& app);
 extern std::string api_get_state(TTestPatternApp& app);
 extern std::string api_move_window(TTestPatternApp& app, const std::string& id, int x, int y);
 extern std::string api_resize_window(TTestPatternApp& app, const std::string& id, int width, int height);
@@ -184,7 +212,7 @@ bool ApiIpcServer::authenticate_connection(int fd) {
     // Send challenge: {"type":"challenge","nonce":"<hex>"}\n
     std::string nonce = generate_nonce();
     std::string challenge = "{\"type\":\"challenge\",\"nonce\":\"" + nonce + "\"}\n";
-    if (::write(fd, challenge.c_str(), challenge.size()) < 0) return false;
+    if (!safe_write(fd, challenge.c_str(), challenge.size())) return false;
 
     // Read auth response — loop until we have a full newline-terminated frame.
     char buf[512];
@@ -241,7 +269,7 @@ bool ApiIpcServer::authenticate_connection(int fd) {
 
     // Send auth_ok so client knows to proceed with commands.
     std::string ok_msg = "{\"type\":\"auth_ok\"}\n";
-    ::write(fd, ok_msg.c_str(), ok_msg.size());
+    (void)safe_write(fd, ok_msg.c_str(), ok_msg.size());
 
     fprintf(stderr, "[ipc] Auth OK for connection\n");
     return true;
@@ -325,7 +353,7 @@ void ApiIpcServer::poll() {
     if (auth_required()) {
         if (!authenticate_connection(fd)) {
             std::string err = "{\"error\":\"auth_failed\"}\n";
-            ::write(fd, err.c_str(), err.size());
+            (void)safe_write(fd, err.c_str(), err.size());
             ::close(fd);
             return;
         }
@@ -379,8 +407,20 @@ void ApiIpcServer::poll() {
         } else if (!spec->spawn) {
             resp = "err unsupported type\n";
         } else {
+            // Clear any previous create-window ID capture so we can reliably
+            // return the ID for this specific spawn.
+            (void)api_take_last_registered_window_id(*app_);
             const char* err = spec->spawn(*app_, kv);
-            if (err) resp = std::string(err) + "\n";
+            if (err) {
+                resp = std::string(err) + "\n";
+            } else {
+                std::string id = api_take_last_registered_window_id(*app_);
+                if (id.empty()) {
+                    resp = "{\"success\":true}\n";
+                } else {
+                    resp = std::string("{\"success\":true,\"id\":\"") + id + "\"}\n";
+                }
+            }
         }
     } else if (cmd == "cascade") {
         api_cascade(*app_);
@@ -561,20 +601,23 @@ void ApiIpcServer::poll() {
 
     if (cmd == "subscribe_events") {
         // Keep this fd open — the client will receive pushed events.
-        // Set non-blocking so publish_event doesn't stall the event loop.
-        ::fcntl(fd, F_SETFL, ::fcntl(fd, F_GETFL, 0) | O_NONBLOCK);
 #ifdef SO_NOSIGPIPE
         int one = 1;
         ::setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &one, sizeof(one));
 #endif
         // Send initial ack so the client knows subscription is active.
         const char* ack = "{\"type\":\"subscribed\"}\n";
-        ::write(fd, ack, std::strlen(ack));
+        if (!safe_write(fd, ack, std::strlen(ack))) {
+            ::close(fd);
+            return;
+        }
+        // Set non-blocking so publish_event doesn't stall the event loop.
+        ::fcntl(fd, F_SETFL, ::fcntl(fd, F_GETFL, 0) | O_NONBLOCK);
         event_subscribers_.push_back(fd);
         return; // do NOT write resp or close fd
     }
 
-    ::write(fd, resp.c_str(), resp.size());
+    (void)safe_write(fd, resp.c_str(), resp.size());
     ::close(fd);
 #endif
 }
