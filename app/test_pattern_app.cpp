@@ -642,6 +642,11 @@ private:
         std::string id(buf);
         winToId[w] = id;
         idToWin[id] = w;
+        // Notify event subscribers that state has changed.
+        if (ipcServer) {
+            std::string payload = std::string("{\"id\":\"") + id + "\"}";
+            ipcServer->publish_event("state_changed", payload);
+        }
         return id;
     }
     
@@ -2505,23 +2510,31 @@ std::string api_get_state(TTestPatternApp& app) {
 std::string api_move_window(TTestPatternApp& app, const std::string& id, int x, int y) {
     TWindow* w = app.findWindowById(id);
     if (!w) return "{\"error\":\"Window not found\"}";
-    
+
     TRect newBounds = w->getBounds();
     newBounds.move(x - newBounds.a.x, y - newBounds.a.y);
     w->locate(newBounds);
-    
+
+    if (app.ipcServer) {
+        std::string payload = std::string("{\"id\":\"") + id + "\"}";
+        app.ipcServer->publish_event("state_changed", payload);
+    }
     return "{\"success\":true}";
 }
 
 std::string api_resize_window(TTestPatternApp& app, const std::string& id, int width, int height) {
     TWindow* w = app.findWindowById(id);
     if (!w) return "{\"error\":\"Window not found\"}";
-    
+
     TRect newBounds = w->getBounds();
     newBounds.b.x = newBounds.a.x + width;
     newBounds.b.y = newBounds.a.y + height;
     w->locate(newBounds);
-    
+
+    if (app.ipcServer) {
+        std::string payload = std::string("{\"id\":\"") + id + "\"}";
+        app.ipcServer->publish_event("state_changed", payload);
+    }
     return "{\"success\":true}";
 }
 
@@ -2536,11 +2549,17 @@ std::string api_focus_window(TTestPatternApp& app, const std::string& id) {
 std::string api_close_window(TTestPatternApp& app, const std::string& id) {
     TWindow* w = app.findWindowById(id);
     if (!w) return "{\"error\":\"Window not found\"}";
-    
+
     // Remove from registry
     app.winToId.erase(w);
     app.idToWin.erase(id);
-    
+
+    // Notify subscribers before closing
+    if (app.ipcServer) {
+        std::string payload = std::string("{\"id\":\"") + id + "\"}";
+        app.ipcServer->publish_event("window_closed", payload);
+    }
+
     // Close the window
     w->close();
     return "{\"success\":true}";

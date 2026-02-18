@@ -628,13 +628,48 @@ void ApiIpcServer::poll() {
         resp = "err unknown cmd\n";
     }
 
+    if (cmd == "subscribe_events") {
+        // Keep this fd open — the client will receive pushed events.
+        // Set non-blocking so publish_event doesn't stall the event loop.
+        ::fcntl(fd, F_SETFL, ::fcntl(fd, F_GETFL, 0) | O_NONBLOCK);
+        // Send initial ack so the client knows subscription is active.
+        const char* ack = "{\"type\":\"subscribed\"}\n";
+        ::write(fd, ack, std::strlen(ack));
+        event_subscribers_.push_back(fd);
+        return; // do NOT write resp or close fd
+    }
+
     ::write(fd, resp.c_str(), resp.size());
     ::close(fd);
 #endif
 }
 
+void ApiIpcServer::publish_event(const char* event_type, const std::string& payload_json) {
+#ifndef _WIN32
+    if (event_subscribers_.empty()) return;
+    std::string msg = std::string("{\"type\":\"event\",\"seq\":")
+                    + std::to_string(next_event_seq_++)
+                    + ",\"event\":\"" + std::string(event_type) + "\""
+                    + ",\"payload\":" + payload_json
+                    + "}\n";
+    for (auto it = event_subscribers_.begin(); it != event_subscribers_.end(); ) {
+        ssize_t n = ::write(*it, msg.c_str(), msg.size());
+        if (n < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
+            ::close(*it);
+            it = event_subscribers_.erase(it);
+        } else {
+            ++it;
+        }
+    }
+#endif
+}
+
 void ApiIpcServer::stop() {
 #ifndef _WIN32
+    // Close all event subscriber fds.
+    for (int sub_fd : event_subscribers_) ::close(sub_fd);
+    event_subscribers_.clear();
+
     if (fd_listen_ >= 0) {
         ::close(fd_listen_);
         fd_listen_ = -1;

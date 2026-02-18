@@ -38,9 +38,10 @@ from state_diff import (
 
 # websockets imported lazily in run() so pure functions remain importable in tests.
 
-POLL_INTERVAL = 0.5        # seconds between IPC state polls
+POLL_INTERVAL = 5.0        # slow heartbeat; real-time sync driven by IPC events
 RECONNECT_DELAY = 3        # seconds before WS reconnect attempt
 IPC_TIMEOUT = 2.0          # seconds for IPC socket calls
+EVENT_RETRY_DELAY = 1.0    # seconds before re-subscribing to IPC events after drop
 
 
 def ipc_sock_path(instance_id: str) -> str:
@@ -95,16 +96,55 @@ class PartyKitBridge:
             self.log(f"send error (chat): {e}")
             self._ws = None
 
-    async def poll_loop(self) -> None:
+    async def _sync_state_now(self, trigger: str = "poll") -> None:
+        """Fetch local IPC state, diff against baseline, push delta if changed."""
+        state = ipc_get_state(self.sock_path)
+        if not state:
+            return
+        new_windows = windows_from_state(state)
+        delta = compute_delta(self.last_windows, new_windows)
+        if delta:
+            self.log(f"[{trigger}] state change, pushing delta")
+            await self.push_delta(delta)
+            self.last_windows = new_windows
+
+    async def event_subscribe_loop(self) -> None:
+        """Open a persistent IPC connection and react to push events immediately."""
         while True:
+            try:
+                reader, writer = await asyncio.open_unix_connection(self.sock_path)
+                writer.write(b"cmd:subscribe_events\n")
+                await writer.drain()
+                self.log("IPC event subscription active")
+                while True:
+                    line = await reader.readline()
+                    if not line:
+                        break  # server closed connection
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        event = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    # Acknowledgement from server — ignore
+                    if event.get("type") == "subscribed":
+                        continue
+                    if event.get("type") == "event":
+                        event_name = event.get("event", "")
+                        if event_name in ("state_changed", "window_closed"):
+                            await self._sync_state_now(f"event:{event_name}")
+                writer.close()
+            except (OSError, ConnectionRefusedError, EOFError) as e:
+                self.log(f"event subscribe dropped ({e}), retrying in {EVENT_RETRY_DELAY}s")
+            await asyncio.sleep(EVENT_RETRY_DELAY)
+
+    async def poll_loop(self) -> None:
+        """Slow heartbeat poll — catches anything missed by event subscription."""
+        while True:
+            await self._sync_state_now("heartbeat")
             state = ipc_get_state(self.sock_path)
             if state:
-                new_windows = windows_from_state(state)
-                delta = compute_delta(self.last_windows, new_windows)
-                if delta:
-                    self.log(f"state change detected, pushing delta")
-                    await self.push_delta(delta)
-                    self.last_windows = new_windows
                 # Forward new local chat messages to PartyKit
                 for entry in state.get("chat_log", []):
                     seq = entry.get("seq", 0)
@@ -175,6 +215,7 @@ class PartyKitBridge:
                     await asyncio.gather(
                         self.poll_loop(),
                         self.receive_loop(ws),
+                        self.event_subscribe_loop(),
                     )
             except Exception as e:
                 self._ws = None
