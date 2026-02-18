@@ -1,5 +1,6 @@
 #include "api_ipc.h"
 #include "command_registry.h"
+#include "window_type_registry.h"
 
 #ifndef _WIN32
 #include <sys/socket.h>
@@ -100,13 +101,7 @@ static std::string base64_decode(const std::string& encoded_string) {
 #include <tvision/tv.h>
 
 // Forward declarations of helper methods implemented in test_pattern_app.cpp.
-extern void api_spawn_test(TTestPatternApp& app);
-extern void api_spawn_gradient(TTestPatternApp& app, const std::string& kind);
-extern void api_open_animation_path(TTestPatternApp& app, const std::string& path);
-extern void api_open_text_view_path(TTestPatternApp& app, const std::string& path, const TRect* bounds);
-extern void api_spawn_test(TTestPatternApp& app, const TRect* bounds);
-extern void api_spawn_gradient(TTestPatternApp& app, const std::string& kind, const TRect* bounds);
-extern void api_open_animation_path(TTestPatternApp& app, const std::string& path, const TRect* bounds);
+// Note: window spawn functions are now in window_type_registry.cpp — not listed here.
 extern void api_cascade(TTestPatternApp& app);
 extern void api_tile(TTestPatternApp& app);
 extern void api_close_all(TTestPatternApp& app);
@@ -121,21 +116,6 @@ extern std::string api_resize_window(TTestPatternApp& app, const std::string& id
 extern std::string api_focus_window(TTestPatternApp& app, const std::string& id);
 extern std::string api_close_window(TTestPatternApp& app, const std::string& id);
 extern std::string api_get_canvas_size(TTestPatternApp& app);
-extern void api_spawn_text_editor(TTestPatternApp& app, const TRect* bounds);
-extern void api_spawn_browser(TTestPatternApp& app, const TRect* bounds);
-extern void api_spawn_verse(TTestPatternApp& app, const TRect* bounds);
-extern void api_spawn_mycelium(TTestPatternApp& app, const TRect* bounds);
-extern void api_spawn_orbit(TTestPatternApp& app, const TRect* bounds);
-extern void api_spawn_torus(TTestPatternApp& app, const TRect* bounds);
-extern void api_spawn_cube(TTestPatternApp& app, const TRect* bounds);
-extern void api_spawn_life(TTestPatternApp& app, const TRect* bounds);
-extern void api_spawn_blocks(TTestPatternApp& app, const TRect* bounds);
-extern void api_spawn_score(TTestPatternApp& app, const TRect* bounds);
-extern void api_spawn_ascii(TTestPatternApp& app, const TRect* bounds);
-extern void api_spawn_animated_gradient(TTestPatternApp& app, const TRect* bounds);
-extern void api_spawn_monster_cam(TTestPatternApp& app, const TRect* bounds);
-extern void api_spawn_monster_verse(TTestPatternApp& app, const TRect* bounds);
-extern void api_spawn_monster_portal(TTestPatternApp& app, const TRect* bounds);
 extern std::string api_browser_fetch(TTestPatternApp& app, const std::string& url);
 extern std::string api_send_text(TTestPatternApp& app, const std::string& id, 
                                  const std::string& content, const std::string& mode, 
@@ -385,71 +365,15 @@ void ApiIpcServer::poll() {
             resp = exec_registry_command(*app_, it->second, kv) + "\n";
         }
     } else if (cmd == "create_window") {
-        std::string type = kv["type"]; // test_pattern|gradient|frame_player|text_view
-        
-        // Extract optional positioning parameters
-        TRect* bounds = nullptr;
-        TRect rectBounds;
-        auto x_it = kv.find("x");
-        auto y_it = kv.find("y"); 
-        auto w_it = kv.find("w");
-        auto h_it = kv.find("h");
-        if (x_it != kv.end() && y_it != kv.end() && w_it != kv.end() && h_it != kv.end()) {
-            int x = std::atoi(x_it->second.c_str());
-            int y = std::atoi(y_it->second.c_str());
-            int w = std::atoi(w_it->second.c_str());
-            int h = std::atoi(h_it->second.c_str());
-            rectBounds = TRect(x, y, x + w, y + h);
-            bounds = &rectBounds;
-        }
-        
-        if (type == "test_pattern") {
-            api_spawn_test(*app_, bounds);
-        } else if (type == "gradient") {
-            std::string kind = kv.count("gradient") ? kv["gradient"] : std::string("horizontal");
-            api_spawn_gradient(*app_, kind, bounds);
-        } else if (type == "frame_player") {
-            auto it = kv.find("path");
-            if (it != kv.end()) api_open_animation_path(*app_, it->second, bounds);
-            else resp = "err missing path\n";
-        } else if (type == "text_view") {
-            auto it = kv.find("path");
-            if (it != kv.end()) api_open_text_view_path(*app_, it->second, bounds);
-            else resp = "err missing path\n";
-        } else if (type == "text_editor") {
-            api_spawn_text_editor(*app_, bounds);
-        } else if (type == "browser") {
-            api_spawn_browser(*app_, bounds);
-        } else if (type == "verse") {
-            api_spawn_verse(*app_, bounds);
-        } else if (type == "mycelium") {
-            api_spawn_mycelium(*app_, bounds);
-        } else if (type == "orbit") {
-            api_spawn_orbit(*app_, bounds);
-        } else if (type == "torus") {
-            api_spawn_torus(*app_, bounds);
-        } else if (type == "cube") {
-            api_spawn_cube(*app_, bounds);
-        } else if (type == "life") {
-            api_spawn_life(*app_, bounds);
-        } else if (type == "blocks") {
-            api_spawn_blocks(*app_, bounds);
-        } else if (type == "score") {
-            api_spawn_score(*app_, bounds);
-        } else if (type == "ascii") {
-            api_spawn_ascii(*app_, bounds);
-        } else if (type == "animated_gradient") {
-            api_spawn_animated_gradient(*app_, bounds);
-        } else if (type == "monster_cam") {
-            api_spawn_monster_cam(*app_, bounds);
-        } else if (type == "monster_verse") {
-            api_spawn_monster_verse(*app_, bounds);
-        } else if (type == "monster_portal") {
-            api_spawn_monster_portal(*app_, bounds);
-        } else if (type == "wibwob" || type == "scramble") {
+        const std::string& type = kv["type"];
+        const WindowTypeSpec* spec = find_window_type_by_name(type);
+        if (!spec) {
+            resp = "err unknown type\n";
+        } else if (!spec->spawn) {
             resp = "err unsupported type\n";
         } else {
-            resp = "err unknown type\n";
+            const char* err = spec->spawn(*app_, kv);
+            if (err) resp = std::string(err) + "\n";
         }
     } else if (cmd == "cascade") {
         api_cascade(*app_);
