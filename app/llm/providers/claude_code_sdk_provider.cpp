@@ -8,6 +8,7 @@
 #include "claude_code_sdk_provider.h"
 #include "claude_code_provider.h" // Fallback
 #include "../base/llm_provider_factory.h"
+#include "../base/path_search.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -218,10 +219,10 @@ bool ClaudeCodeSDKProvider::isAvailable() const {
         return false;
     }
     
-    // Check if bridge script exists
-    bool scriptExists = access(nodeScriptPath.c_str(), R_OK) == 0;
-    if (!scriptExists) {
-        fprintf(stderr, "DEBUG: Bridge script not found at: %s\n", nodeScriptPath.c_str());
+    // Check if bridge script exists (search upward so this works from repo root or build/app).
+    const std::string resolvedScriptPath = ww_find_first_existing_upwards({nodeScriptPath}, 6);
+    if (resolvedScriptPath.empty()) {
+        fprintf(stderr, "DEBUG: Bridge script not found (searched upwards). Configured path: %s\n", nodeScriptPath.c_str());
         return false;
     }
     
@@ -604,8 +605,14 @@ bool ClaudeCodeSDKProvider::configure(const std::string& config) {
     // maxTurns (quoted or numeric)
     maxTurns = parseIntField("maxTurns", maxTurns);
 
-    // nodeScriptPath
+    // nodeScriptPath (resolve relative path by searching upward from CWD).
     nodeScriptPath = parseStringField("nodeScriptPath", nodeScriptPath);
+    {
+        const std::string resolved = ww_find_first_existing_upwards({nodeScriptPath}, 6);
+        if (!resolved.empty()) {
+            nodeScriptPath = resolved;
+        }
+    }
 
     // sessionTimeout (quoted or numeric)
     sessionTimeout = parseIntField("sessionTimeout", sessionTimeout);

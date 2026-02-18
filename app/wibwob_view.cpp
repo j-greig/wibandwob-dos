@@ -9,6 +9,7 @@
 #include "wibwob_engine.h"
 #include "llm/providers/claude_code_sdk_provider.h"  // For SDK streaming
 #include "llm/providers/claude_code_provider.h"      // For CLI streaming
+#include "llm/base/path_search.h"
 
 #define Uses_TKeys
 #define Uses_TDrawBuffer
@@ -501,6 +502,7 @@ TWibWobWindow::TWibWobWindow(const TRect& bounds, const std::string& title)
 {
     options |= ofTileable;
     growMode = gfGrowHiX | gfGrowHiY;
+    eventMask |= evKeyDown | evBroadcast;
 
     TRect client = getExtent();
     client.grow(-1, -1);
@@ -547,6 +549,10 @@ TWibWobWindow::TWibWobWindow(const TRect& bounds, const std::string& title)
 }
 
 TWibWobWindow::~TWibWobWindow() {
+    if (pollTimerId) {
+        killTimer(pollTimerId);
+        pollTimerId = nullptr;
+    }
     delete engine;
 }
 
@@ -567,7 +573,7 @@ void TWibWobWindow::handleEvent(TEvent& event) {
 
     // Poll engine on timer broadcasts
     if (event.what == evBroadcast && event.message.command == cmTimerExpired) {
-        if (engineInitialized && engine) {
+        if (event.message.infoPtr == pollTimerId && engineInitialized && engine) {
             engine->poll();
         }
     }
@@ -582,6 +588,11 @@ void TWibWobWindow::ensureEngineInitialized() {
 
         engine = new WibWobEngine();
 
+        // Ensure we poll providers frequently (some providers rely on poll() to read subprocess output).
+        if (!pollTimerId) {
+            pollTimerId = setTimer(50, 50);
+        }
+
         // Inject runtime API key if set (e.g. from Tools > API Key dialog)
         {
             extern std::string getAppRuntimeApiKey();
@@ -592,26 +603,24 @@ void TWibWobWindow::ensureEngineInitialized() {
             }
         }
 
-        // Load system prompt from file - try module dirs first, then legacy paths
-        std::vector<std::string> promptPaths = {
+        // Load system prompt from file.
+        // Important: app is commonly launched from either repo root OR build/app; search upward.
+        const std::vector<std::string> promptCandidates = {
             "modules-private/wibwob-prompts/wibandwob.prompt.md",
             "modules/wibwob-prompts/wibandwob.prompt.md",
             "wibandwob.prompt.md",
             "app/wibandwob.prompt.md",
-            "../app/wibandwob.prompt.md",
+            "test-tui/wibandwob.prompt.md",
+            "app/test-tui/wibandwob.prompt.md",
         };
 
+        const std::string loadedPath = ww_find_first_existing_upwards(promptCandidates, 6);
         std::ifstream promptFile;
-        std::string loadedPath;
-        for (const auto& path : promptPaths) {
-            promptFile.open(path);
-            if (promptFile.is_open()) {
-                loadedPath = path;
-                break;
-            }
+        if (!loadedPath.empty()) {
+            promptFile.open(loadedPath);
         }
 
-        if (promptFile.is_open()) {
+        if (promptFile.is_open() && !loadedPath.empty()) {
             std::string customPrompt((std::istreambuf_iterator<char>(promptFile)),
                                    std::istreambuf_iterator<char>());
             promptFile.close();
@@ -773,7 +782,7 @@ void TWibWobWindow::processUserInput(const std::string& input) {
             if (!sdkProvider) {  // Only start message if SDK didn't already
                 messageView->startStreamingMessage("Wib&Wob");
             }
-            streamingStarted = cliProvider->sendStreamingQuery(input, streamCallback);
+            streamingStarted = cliProvider->sendStreamingQuery(input, streamCallback, engine->getSystemPrompt());
             logMessage("Stream", "[streaming] CLI sendStreamingQuery: " + std::string(streamingStarted ? "started" : "failed"));
         }
     }

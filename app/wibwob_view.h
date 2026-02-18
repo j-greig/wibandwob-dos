@@ -161,6 +161,7 @@ private:
     // Engine
     WibWobEngine* engine = nullptr;
     bool engineInitialized = false;
+    void* pollTimerId = nullptr;
 
     // Logging
     std::string sessionId;
