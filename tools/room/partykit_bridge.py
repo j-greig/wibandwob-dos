@@ -96,17 +96,21 @@ class PartyKitBridge:
             self.log(f"send error (chat): {e}")
             self._ws = None
 
-    async def _sync_state_now(self, trigger: str = "poll") -> None:
-        """Fetch local IPC state, diff against baseline, push delta if changed."""
+    async def _sync_state_now(self, trigger: str = "poll") -> dict | None:
+        """Fetch local IPC state, diff against baseline, push delta if changed.
+
+        Returns the raw state dict (for callers that also need it), or None on error.
+        """
         state = ipc_get_state(self.sock_path)
         if not state:
-            return
+            return None
         new_windows = windows_from_state(state)
         delta = compute_delta(self.last_windows, new_windows)
         if delta:
             self.log(f"[{trigger}] state change, pushing delta")
             await self.push_delta(delta)
             self.last_windows = new_windows
+        return state
 
     async def event_subscribe_loop(self) -> None:
         """Open a persistent IPC connection and react to push events immediately."""
@@ -142,8 +146,7 @@ class PartyKitBridge:
     async def poll_loop(self) -> None:
         """Slow heartbeat poll — catches anything missed by event subscription."""
         while True:
-            await self._sync_state_now("heartbeat")
-            state = ipc_get_state(self.sock_path)
+            state = await self._sync_state_now("heartbeat")
             if state:
                 # Forward new local chat messages to PartyKit
                 for entry in state.get("chat_log", []):
