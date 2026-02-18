@@ -2295,29 +2295,21 @@ void api_spawn_gradient(TTestPatternApp& app, const std::string& kind, const TRe
 }
 
 void api_open_text_view_path(TTestPatternApp& app, const std::string& path, const TRect* bounds) {
-    if (bounds) {
-        int width = bounds->b.x - bounds->a.x;
-        int height = bounds->b.y - bounds->a.y;
-        
-        if (width > 0 && height > 0) {
-            // Use provided bounds if width/height are positive
-            app.openAnimationFilePath(path, *bounds);
-        } else {
-            // Auto-size based on content, but use provided position
-            TRect autoBounds = app.calculateWindowBounds(path);
-            // Keep the original position, but use auto-calculated size
-            TRect finalBounds(
-                bounds->a.x, 
-                bounds->a.y, 
-                bounds->a.x + (autoBounds.b.x - autoBounds.a.x), 
-                bounds->a.y + (autoBounds.b.y - autoBounds.a.y)
-            );
-            app.openAnimationFilePath(path, finalBounds);
-        }
+    if (path.empty()) return;
+    app.windowNumber++;
+    size_t lastSlash = path.find_last_of("/\\");
+    std::string baseName = (lastSlash != std::string::npos) ? path.substr(lastSlash + 1) : path;
+    std::string title = baseName + " (Transparent)";
+    TRect r;
+    if (bounds && (bounds->b.x - bounds->a.x) > 0 && (bounds->b.y - bounds->a.y) > 0) {
+        r = *bounds;
     } else {
-        // No bounds provided - full auto-sizing (cascade position + content size)
-        app.openAnimationFilePath(path);
+        int offset = (app.windowNumber - 1) % 10;
+        r = TRect(2 + offset * 2, 1 + offset, 82 + offset * 2, 25 + offset);
     }
+    TTransparentTextWindow* window = new TTransparentTextWindow(r, title, path);
+    app.deskTop->insert(window);
+    app.registerWindow(window);
 }
 
 void api_open_animation_path(TTestPatternApp& app, const std::string& path, const TRect* bounds) {
