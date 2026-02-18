@@ -139,8 +139,8 @@ class TestIncomingChatRelay:
 
         mock_ipc.assert_called_once_with(
             bridge.sock_path,
-            "chat_receive",
-            {"sender": "james", "text": "check out this window"},
+            "exec_command",
+            {"name": "chat_receive", "sender": "james", "text": "check out this window"},
         )
 
     def test_own_echo_ignored(self):
@@ -184,5 +184,6 @@ class TestIncomingChatRelay:
 
         mock_ipc.assert_called_once()
         _, cmd, params = mock_ipc.call_args[0]
-        assert cmd == "chat_receive"
+        assert cmd == "exec_command"
+        assert params["name"] == "chat_receive"
         assert params["text"] == "hi there"

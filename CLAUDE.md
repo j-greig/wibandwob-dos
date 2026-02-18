@@ -189,6 +189,25 @@ Menu/API/MCP parity drift was resolved by E001 (command registry). The unified `
 - **No force-push to main**.
 - **No emoji in commit messages** — not in title, not in description. Plain text only.
 
+### Codex review loop (hardening tasks)
+
+When implementing a multi-round hardening task (bug fixing, IPC robustness, etc.):
+
+1. **After committing a batch of fixes**, immediately launch Codex round-N review in background:
+   ```bash
+   codex exec -C /Users/james/Repos/wibandwob-dos "<detailed prompt>" \
+     2>&1 | tee /Users/james/Repos/wibandwob-dos/codex-review-roundN-$(date +%Y%m%d-%H%M%S).log &
+   ```
+
+2. **Context limit protocol** — when context remaining drops below ~13%:
+   a. Launch Codex round-N with a detailed prompt referencing the last 2 log files and listing exact findings to look for
+   b. Run `/compact` to preserve session state to `logs/memory/compact-<date>.md`
+   c. The next session reads the Codex log and continues the loop
+
+3. **Per-round cycle**: read log → write `CODEX-ANALYSIS-ROUNDn-REVIEW.md` → implement findings → add/run tests → commit → launch next round
+
+4. **Stop when**: Codex reports no new Critical/High findings. Document "confirmed safe" list in final review.
+
 ## Scope Guardrails
 
 - The memory/state substrate is **local-first only** — no retrieval pipelines, no RAG, no cloud sync.

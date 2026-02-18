@@ -278,6 +278,8 @@ class TestReceiveLoopNoEcho:
         }
 
         async def run():
+            # _state_lock is normally created in run() — initialise it here for the test.
+            bridge._state_lock = asyncio.Lock()
             raw_msg = json.dumps({"type": "state_delta", "delta": remote_delta})
 
             async def async_messages():
