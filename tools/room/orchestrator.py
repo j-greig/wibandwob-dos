@@ -36,6 +36,7 @@ class RoomProcess:
 
     config: RoomConfig
     ttyd_proc: Optional[subprocess.Popen] = None
+    bridge_procs: list[subprocess.Popen] = field(default_factory=list)
     auth_secret: str = ""
     start_time: float = 0.0
     restart_count: int = 0
@@ -113,8 +114,8 @@ class Orchestrator:
         proc = subprocess.Popen(
             ttyd_cmd,
             env=env,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
         )
 
         room = RoomProcess(
@@ -132,15 +133,31 @@ class Orchestrator:
                 "uv", "run",
                 str(self.project_root / "tools" / "room" / "partykit_bridge.py"),
             ]
-            subprocess.Popen(
+            bridge_stdout = open(bridge_log, "a")
+            bridge_proc = subprocess.Popen(
                 bridge_cmd,
                 env=env,
-                stdout=open(bridge_log, "a"),
+                stdout=bridge_stdout,
                 stderr=subprocess.STDOUT,
             )
+            bridge_stdout.close()
+            room.bridge_procs.append(bridge_proc)
             print(f"[orch] Spawned PartyKit bridge for {config.room_id} -> {config.partykit_server}/party/{config.partykit_room}")
 
         return room
+
+    @staticmethod
+    def _terminate_process(proc: Optional[subprocess.Popen], name: str):
+        """Terminate a subprocess, escalating to kill after timeout."""
+        if proc is None or proc.poll() is not None:
+            return
+        try:
+            proc.terminate()
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            print(f"[orch] {name} did not exit after SIGTERM, sending SIGKILL")
+            proc.kill()
+            proc.wait(timeout=5)
 
     def probe_socket(self, sock_path: str) -> bool:
         """Check if a WibWob IPC socket is responding."""
@@ -180,13 +197,9 @@ class Orchestrator:
         room = self.rooms[room_id]
         print(f"[orch] Restarting {room_id} (restart #{room.restart_count + 1})")
 
-        # Kill existing process if still running
-        if room.ttyd_proc and room.ttyd_proc.poll() is None:
-            room.ttyd_proc.terminate()
-            try:
-                room.ttyd_proc.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                room.ttyd_proc.kill()
+        for bridge_proc in room.bridge_procs:
+            self._terminate_process(bridge_proc, f"{room_id} bridge")
+        self._terminate_process(room.ttyd_proc, f"{room_id} ttyd")
 
         # Respawn
         new_room = self.spawn_room(room.config)
@@ -198,13 +211,10 @@ class Orchestrator:
         if room_id not in self.rooms:
             return
         room = self.rooms[room_id]
-        if room.ttyd_proc and room.ttyd_proc.poll() is None:
-            print(f"[orch] Stopping {room_id}")
-            room.ttyd_proc.terminate()
-            try:
-                room.ttyd_proc.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                room.ttyd_proc.kill()
+        print(f"[orch] Stopping {room_id}")
+        for bridge_proc in room.bridge_procs:
+            self._terminate_process(bridge_proc, f"{room_id} bridge")
+        self._terminate_process(room.ttyd_proc, f"{room_id} ttyd")
         del self.rooms[room_id]
 
     def stop_all(self):
