@@ -179,6 +179,15 @@ std::string ApiIpcServer::compute_hmac(const std::string& nonce) {
 bool ApiIpcServer::authenticate_connection(int fd) {
     if (!auth_required()) return true;
 
+    // Ensure the accepted fd is blocking for the auth handshake.
+    int flags = ::fcntl(fd, F_GETFL, 0);
+    if (flags & O_NONBLOCK)
+        ::fcntl(fd, F_SETFL, flags & ~O_NONBLOCK);
+
+    // Set a short read timeout — failed probes must not freeze the TUI event loop.
+    struct timeval tv = {1, 0}; // 1 second
+    ::setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+
     // Send challenge: {"type":"challenge","nonce":"<hex>"}\n
     std::string nonce = generate_nonce();
     std::string challenge = "{\"type\":\"challenge\",\"nonce\":\"" + nonce + "\"}\n";
@@ -187,17 +196,23 @@ bool ApiIpcServer::authenticate_connection(int fd) {
     // Read auth response
     char buf[512];
     ssize_t n = ::read(fd, buf, sizeof(buf) - 1);
-    if (n <= 0) return false;
+    if (n <= 0) {
+        fprintf(stderr, "[ipc] Auth read returned %zd (errno=%d)\n", n, errno);
+        return false;
+    }
     buf[n] = '\0';
     std::string response(buf);
+    fprintf(stderr, "[ipc] Auth response (%zd bytes): %s\n", n, response.c_str());
 
-    // Parse HMAC from response: {"type":"auth","hmac":"<hex>"}
-    size_t hmac_pos = response.find("\"hmac\":\"");
+    // Parse HMAC from response — handle both "hmac":"..." and "hmac": "..."
+    size_t hmac_pos = response.find("\"hmac\":");
     if (hmac_pos == std::string::npos) {
         fprintf(stderr, "[ipc] Auth failed: no hmac field in response\n");
         return false;
     }
-    hmac_pos += 8; // skip past "hmac":"
+    hmac_pos = response.find('"', hmac_pos + 7); // find opening quote of HMAC value
+    if (hmac_pos == std::string::npos) return false;
+    hmac_pos += 1; // skip opening quote
     size_t hmac_end = response.find('"', hmac_pos);
     if (hmac_end == std::string::npos) return false;
     std::string client_hmac = response.substr(hmac_pos, hmac_end - hmac_pos);
