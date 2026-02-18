@@ -42,5 +42,5 @@ From spike debug notes (`.planning/spikes/spk-xterm-pty-validation/multi-instanc
 ## Status
 
 Status: done
-GitHub issue: —
+GitHub issue: #57
 PR: —

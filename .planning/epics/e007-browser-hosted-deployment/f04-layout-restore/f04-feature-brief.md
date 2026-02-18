@@ -38,5 +38,5 @@ WibWob-DOS reads a layout file on startup and restores a curated window arrangem
 ## Status
 
 Status: done
-GitHub issue: —
+GitHub issue: #57
 PR: —

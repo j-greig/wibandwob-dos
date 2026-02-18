@@ -53,11 +53,11 @@ Single-use nonces prevent replay. Session key rotation per connection.
   - Test: capture nonce+HMAC from first connection, replay on second, get rejected
 - [x] **AC-4:** No auth required when WIBWOB_AUTH_SECRET is unset (backward compat)
   - Test: existing IPC tests pass without env var set
-- [x] **AC-5:** Session key derived after auth and used for connection lifetime
-  - Test: Python test verifies session key derivation matches expected HMAC output
+- [-] **AC-5:** Session key derived after auth and used for connection lifetime (deferred — MVP uses single HMAC verify per connection)
+  - Test: N/A — dropped from MVP scope, session key rotation is a future enhancement
 
 ## Status
 
 Status: done
-GitHub issue: —
+GitHub issue: #57
 PR: —

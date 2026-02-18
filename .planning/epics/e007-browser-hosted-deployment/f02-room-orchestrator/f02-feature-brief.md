@@ -43,5 +43,5 @@ CLI daemon that reads room configs (markdown + YAML frontmatter), spawns ttyd+Wi
 ## Status
 
 Status: done
-GitHub issue: —
+GitHub issue: #57
 PR: —

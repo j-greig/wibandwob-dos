@@ -82,5 +82,5 @@ Host arranges windows before saving the layout.
 ## Status
 
 Status: done
-GitHub issue: —
+GitHub issue: #57
 PR: —
