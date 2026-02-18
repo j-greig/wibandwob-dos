@@ -250,6 +250,53 @@ class TestBridgeReconnect:
         asyncio.run(run_test())
         assert len(connect_calls) >= 2, "Expected at least one reconnect attempt"
 
+    def test_clean_disconnect_triggers_reconnect(self):
+        """run() must reconnect when receive_loop exits cleanly (no exception).
+
+        Root cause of deadlock: asyncio.gather() waits for ALL tasks. If
+        receive_loop ends normally, poll_loop and event_subscribe_loop keep
+        running forever — reconnect never triggers.
+
+        Fix: asyncio.wait(FIRST_COMPLETED) + cancel pending tasks + raise
+        ConnectionError so the outer except clause handles the reconnect.
+        """
+        bridge = PartyKitBridge("1", "http://localhost:1999", "test-room")
+        connect_calls = []
+
+        class FakeWs:
+            async def __aenter__(self):
+                return self
+            async def __aexit__(self, *_):
+                pass
+            send = AsyncMock()
+            async def __aiter__(self):
+                return self
+            async def __anext__(self):
+                raise StopAsyncIteration  # receive_loop exits cleanly
+
+        async def fake_connect(url):
+            connect_calls.append(url)
+            if len(connect_calls) == 1:
+                return FakeWs()
+            raise asyncio.CancelledError
+
+        async def run_test():
+            try:
+                import websockets.asyncio.client as ws_client
+            except ImportError:
+                pytest.skip("websockets not installed")
+
+            with patch.object(ws_client, "connect", side_effect=fake_connect), \
+                 patch("asyncio.sleep", new_callable=AsyncMock), \
+                 patch("partykit_bridge.ipc_get_state", return_value=None):
+                try:
+                    await bridge.run()
+                except (asyncio.CancelledError, Exception):
+                    pass
+
+        asyncio.run(run_test())
+        assert len(connect_calls) >= 2, "Clean disconnect must trigger reconnect"
+
 
 # ── Sync loop prevention ──────────────────────────────────────────────────────
 

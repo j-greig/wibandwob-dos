@@ -271,11 +271,23 @@ class PartyKitBridge:
                 async with ws_client.connect(self.ws_url) as ws:
                     self._ws = ws
                     self.log("connected")
-                    await asyncio.gather(
-                        self.poll_loop(),
-                        self.receive_loop(ws),
-                        self.event_subscribe_loop(),
+                    poll_task = asyncio.ensure_future(self.poll_loop())
+                    recv_task = asyncio.ensure_future(self.receive_loop(ws))
+                    evt_task  = asyncio.ensure_future(self.event_subscribe_loop())
+                    done, pending = await asyncio.wait(
+                        {poll_task, recv_task, evt_task},
+                        return_when=asyncio.FIRST_COMPLETED,
                     )
+                    for t in pending:
+                        t.cancel()
+                    await asyncio.gather(*pending, return_exceptions=True)
+                    # Surface the first exception; clean disconnect also reconnects.
+                    for t in done:
+                        if t.exception():
+                            raise t.exception()  # type: ignore[misc]
+                    raise ConnectionError("ws receive_loop ended cleanly")
+            except asyncio.CancelledError:
+                raise
             except Exception as e:
                 self._ws = None
                 self.log(f"disconnected ({e}), reconnecting in {RECONNECT_DELAY}s")

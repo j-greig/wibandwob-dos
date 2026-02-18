@@ -65,14 +65,14 @@ static const char* spawn_gradient(TTestPatternApp& app,
 static const char* spawn_frame_player(TTestPatternApp& app,
                                        const std::map<std::string, std::string>& kv) {
     auto it = kv.find("path");
-    if (it == kv.end()) return "err missing path";
+    if (it == kv.end() || it->second.empty()) return "err missing path";
     TRect r; api_open_animation_path(app, it->second, opt_bounds(kv, r)); return nullptr;
 }
 
 static const char* spawn_text_view(TTestPatternApp& app,
                                     const std::map<std::string, std::string>& kv) {
     auto it = kv.find("path");
-    if (it == kv.end()) return "err missing path";
+    if (it == kv.end() || it->second.empty()) return "err missing path";
     TRect r; api_open_text_view_path(app, it->second, opt_bounds(kv, r)); return nullptr;
 }
 
