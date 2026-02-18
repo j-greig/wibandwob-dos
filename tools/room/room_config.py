@@ -22,6 +22,11 @@ FIELD_TYPES = {
     "api_key_source": str,
     "max_visitors": int,
     "preload_files": list,
+    # Multiplayer fields (E008)
+    "multiplayer": bool,
+    "partykit_room": str,
+    "partykit_server": str,
+    "max_players": int,
 }
 VALID_API_KEY_SOURCES = {"env", "host_config", "visitor_dialog"}
 
@@ -42,6 +47,11 @@ class RoomConfig:
     welcome_message: str = ""
     raw_markdown: str = ""
     source_path: Optional[Path] = None
+    # Multiplayer fields (E008) — absent/False = single-player
+    multiplayer: bool = False
+    partykit_room: str = ""
+    partykit_server: str = ""
+    max_players: int = 2
 
 
 def parse_frontmatter(text: str) -> tuple[dict, str]:
@@ -100,6 +110,16 @@ def validate_frontmatter(fm: dict, source_path: Optional[Path] = None) -> list[s
             if not (base / f).exists():
                 errors.append(f"Preload file not found: {f}")
 
+    # Multiplayer validation: if multiplayer:true, require partykit_room + partykit_server
+    if fm.get("multiplayer") is True:
+        if not fm.get("partykit_room"):
+            errors.append("multiplayer:true requires 'partykit_room' field")
+        if not fm.get("partykit_server"):
+            errors.append("multiplayer:true requires 'partykit_server' field")
+        if "max_players" in fm and isinstance(fm["max_players"], int):
+            if fm["max_players"] < 2:
+                errors.append(f"max_players must be >= 2 for multiplayer rooms, got {fm['max_players']}")
+
     return errors
 
 
@@ -125,4 +145,8 @@ def parse_room_config(path: Path, check_files: bool = True) -> RoomConfig:
         welcome_message=extract_section(body, "Welcome Message"),
         raw_markdown=body,
         source_path=path,
+        multiplayer=bool(fm.get("multiplayer", False)),
+        partykit_room=fm.get("partykit_room", ""),
+        partykit_server=fm.get("partykit_server", ""),
+        max_players=fm.get("max_players", 2),
     )

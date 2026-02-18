@@ -88,6 +88,11 @@ class Orchestrator:
             layout_abs = str(self.project_root / config.layout_path)
             env["WIBWOB_LAYOUT_PATH"] = layout_abs
 
+        # Multiplayer: pass PartyKit connection details when multiplayer:true
+        if config.multiplayer and config.partykit_server and config.partykit_room:
+            env["WIBWOB_PARTYKIT_URL"] = config.partykit_server
+            env["WIBWOB_PARTYKIT_ROOM"] = config.partykit_room
+
         # Build ttyd command
         app_path = str(self.project_root / "build" / "app" / "test_pattern")
         log_path = f"/tmp/wibwob_{config.instance_id}.log"

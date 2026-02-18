@@ -1,8 +1,8 @@
 ---
 id: E008
 title: Multiplayer Teleport Rooms (PartyKit)
-status: not-started
-issue: ~
+status: in-progress
+issue: 65
 pr: ~
 depends_on: [E007]
 ---
