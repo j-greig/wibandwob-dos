@@ -640,7 +640,7 @@ private:
     std::map<TWindow*, std::string> winToId;
     std::map<std::string, TWindow*> idToWin;
     
-    std::string registerWindow(TWindow* w) {
+    std::string registerWindow(TWindow* w, bool emit_event = true) {
         if (!w) return std::string();
         auto it = winToId.find(w);
         if (it != winToId.end()) return it->second;
@@ -650,7 +650,7 @@ private:
         winToId[w] = id;
         idToWin[id] = w;
         // Notify event subscribers that state has changed.
-        if (ipcServer) {
+        if (emit_event && ipcServer) {
             std::string payload = std::string("{\"id\":\"") + id + "\"}";
             ipcServer->publish_event("state_changed", payload);
         }
@@ -2439,7 +2439,7 @@ std::string api_get_state(TTestPatternApp& app) {
 
     bool first = true;
     for (TWindow* w : activeWins) {
-        std::string id = app.registerWindow(w);
+        std::string id = app.registerWindow(w, false);
         if (!first) json << ",";
         json << "{\"id\":\"" << id << "\""
              << ",\"type\":\"" << windowTypeName(w) << "\""
