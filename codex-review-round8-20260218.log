@@ -1,0 +1,737 @@
+OpenAI Codex v0.101.0 (research preview)
+--------
+workdir: /Users/james/Repos/wibandwob-dos
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: medium
+reasoning summaries: auto
+session id: 019c727b-dcf8-7a91-b39b-2deb8bec8d1e
+--------
+user
+Read CODEX-ANALYSIS-ROUND7-REVIEW.md for context. This is the final verification pass — all major bugs from rounds 3-7 have been fixed. Do a comprehensive final sweep looking for any last remaining issues.
+
+Focus on:
+
+1. tools/room/state_diff.py apply_delta_to_ipc — the new key-presence checks:
+   - For the 'add' block: we create with x/y/w/h from rect with defaults. Are these defaults safe? Can we add a window at x=0 y=0 with w=40 h=20 if coords are missing?
+   - For the 'update' block: new explicit key checks. Any edge case with nested rect dicts (rect.get('rect') sub-object vs flat) that might cause 'x' to be missing when it shouldn't be?
+
+2. tools/room/partykit_bridge.py run() reconnect flow:
+   - The 'finally' block's writer cleanup: is it referenced before assignment if open_connection fails?
+   - Re-read the FIRST_COMPLETED logic — is the 'raise t.exception()' correct Python? t.exception() raises if the task was cancelled. Should be: 'exc = t.exception(); if exc: raise exc'.
+
+3. tools/room/partykit_bridge.py receive_loop:
+   - The async for loop — when ws closes cleanly, does async for raise StopAsyncIteration or just exit? Does the function return normally or raise?
+   - After receive_loop returns, run() raises ConnectionError. Good. But: does this leave last_windows in an inconsistent state? Should we reset last_windows on reconnect?
+
+4. app/api_ipc.cpp — the IPC command parsing:
+   - The percent-decoding: ipc_command() percent-encodes values. Does the C++ parser percent-decode them? If not, a path with spaces stored as %20 would be passed to fopen as '%20' literally.
+   - Check lines around parseIpcLine or wherever key=value pairs are parsed.
+
+5. The _normalise_win function in state_diff.py:
+   - It normalises width→w and height→h. But what about 'title'? If the local state has a title and a remote delta doesn't, compute_delta will see a diff on every poll (title present in baseline but not in delta). Is title being stripped before comparison?
+
+6. Overall flow check: windows in state have 'title'. Remote deltas also carry 'title'. When we do receive_loop → apply_delta_to_ipc → ipc_get_state → last_windows, the local state will have title. The original remote delta also has title. So they should match. But: does create_window send title to C++? And does C++ store it as the window's title? Or does C++ generate its own title?
+
+Report findings ranked by severity. Focus only on new issues not already in previous rounds.
+mcp startup: no servers
+2026-02-18T20:40:46.180099Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c67d3-e7fb-7423-879a-a3c6997f29d4
+2026-02-18T20:40:46.211375Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c6171-ccc2-7702-9b67-9c22338e3137
+2026-02-18T20:40:46.237653Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c6248-4000-77b0-815a-4015ebbba891
+
+thinking
+**Starting code review process**
+codex
+I’m going to load `CODEX-ANALYSIS-ROUND7-REVIEW.md` and then inspect the exact code paths you listed to do a final, issue-focused sweep. I’ll report only new findings, ranked by severity, with file/line references.
+
+thinking
+**Planning parallel file reads**
+exec
+/bin/zsh -lc "sed -n '1,260p' CODEX-ANALYSIS-ROUND7-REVIEW.md" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc 'rg --files' in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+# Codex Round-7 Review: Verification Pass
+
+**Raw log**: `codex-review-round7-20260218.log`
+**Token cost**: ~74,000
+**Model**: gpt-5.3-codex
+
+## Context
+
+Verification pass after round-6 fixes (reconnect deadlock, empty path guard).
+
+## Findings
+
+| # | Severity | Finding |
+|---|----------|---------|
+| 1 | High | `apply_delta_to_ipc` sends spurious `move_window x=0 y=0` on size-only update deltas |
+| 2 | Medium | `event_subscribe_loop` writer not closed/awaited on task cancellation — FD leak under reconnect churn |
+| 3 | Medium | EINTR retry in `publish_event` is unbounded — theoretical; non-blocking sockets make this academic |
+| 4 | Low | Nondeterministic which exception raised when multiple tasks fail simultaneously in `run()` |
+
+## Confirmed Correct
+ succeeded in 51ms:
+CODEX-ANALYSIS-ROUND7-REVIEW.md
+codex-multiplayer-bugs-20260218-191257.log
+codex-review-round5-20260218-202312.log
+codex-review-round6-20260218.log
+AGENTS.md
+codex-review-round4-20260218-201757.log
+CLAUDE.md
+rooms/multiplayer-example.md
+rooms/example.md
+codex-review-round3-20260218-201023.log
+CODEX-ANALYSIS-ROUND6-REVIEW.md
+modules/README.md
+modules/example-primers/module.json
+tests/test_browser.py
+tests/test_browser_window.py
+tests/__init__.py
+modules/example-primers/primers/box-pattern.txt
+modules/example-primers/primers/wibwob-faces.txt
+modules/example-primers/primers/animated-spinner.txt
+modules/example-primers/primers/simple-landscape.txt
+codex
+I’ve loaded the round-7 context; next I’m inspecting `state_diff.py`, `partykit_bridge.py`, and `app/api_ipc.cpp` directly to validate each specific edge case you listed.
+exec
+/bin/zsh -lc "sed -n '1,320p' tools/room/state_diff.py" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,380p' tools/room/partykit_bridge.py" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,340p' app/api_ipc.cpp" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+"""
+State diffing utilities for WibWob-DOS multiplayer sync (E008 F03).
+
+Extracts window state from IPC get_state responses, computes minimal
+add/remove/update deltas, and applies remote deltas to a local instance
+via IPC commands.
+
+Used by partykit_bridge.py and any future sync transport.
+"""
+
+import hashlib
+import hmac as _hmac
+import json
+import socket
+import os
+from typing import Any
+from urllib.parse import quote as _urlencode
+
+
+IPC_TIMEOUT = 2.0
+ succeeded in 53ms:
+#!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.11"
+# dependencies = ["websockets>=12"]
+# ///
+"""
+PartyKit bridge for WibWob-DOS multiplayer rooms (E008 F02).
+
+Runs as a sidecar alongside a WibWob instance. Polls local IPC state,
+diffs it, and pushes state_delta messages to PartyKit. Also receives
+remote deltas from PartyKit and applies them to the local instance via IPC.
+
+Usage (spawned by orchestrator):
+    uv run tools/room/partykit_bridge.py
+
+Environment:
+    WIBWOB_INSTANCE      — instance ID (e.g. "1"), drives /tmp/wibwob_1.sock
+    WIBWOB_PARTYKIT_URL  — PartyKit server URL (e.g. https://wibwob.user.partykit.dev)
+    WIBWOB_PARTYKIT_ROOM — PartyKit room/Durable Object key (e.g. "wibwob-shared")
+    WIBWOB_AUTH_SECRET   — shared HMAC secret for IPC auth (optional)
+ succeeded in 51ms:
+#include "api_ipc.h"
+#include "command_registry.h"
+#include "window_type_registry.h"
+
+#ifndef _WIN32
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/un.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <errno.h>
+#endif
+
+#ifdef __APPLE__
+#include <CommonCrypto/CommonHMAC.h>
+#else
+#include <openssl/hmac.h>
+#endif
+
+#include <cstring>
+
+thinking
+**Continuing API parse review**
+exec
+/bin/zsh -lc "sed -n '340,760p' app/api_ipc.cpp" in /Users/james/Repos/wibandwob-dos succeeded in 53ms:
+    }
+    buf[n] = 0;
+    std::string line(buf);
+    // Simple trim
+    while (!line.empty() && (line.back()=='\n' || line.back()=='\r' || line.back()==' ')) line.pop_back();
+
+    // Parse: "cmd:<name> k=v k=v"
+    std::string cmd;
+    std::map<std::string,std::string> kv;
+    {
+        std::istringstream iss(line);
+        std::string tok;
+        while (iss >> tok) {
+            if (tok.rfind("cmd:", 0) == 0) {
+                cmd = tok.substr(4);
+            } else {
+                auto eq = tok.find('=');
+                if (eq != std::string::npos) {
+                    kv[tok.substr(0, eq)] = percent_decode(tok.substr(eq+1));
+                }
+
+thinking
+**Assessing window creation handling**
+codex
+I’ve confirmed the parser now does percent-decoding. Next I’m tracing `create_window`/state serialization paths to verify whether `title` is preserved end-to-end or regenerated, and whether that can still cause drift.
+exec
+/bin/zsh -lc "sed -n '1,360p' app/test_pattern_app.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,320p' app/window_type_registry.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "rg -n \"title|create_window|spawn\\(|api_get_state|windows\" app/window_type_registry.cpp app/test_pattern_app.cpp app/api_ipc.cpp app/window_type_registry.h app/*.cpp app/*.h | sed -n '1,260p'" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+// Window type registry — single source of truth for all spawnable window types.
+// Keeps api_ipc.cpp free of per-type knowledge: adding a new type only requires
+// a new entry in the k_specs table below.
+
+#include "window_type_registry.h"
+
+// tvision for TRect
+#define Uses_TRect
+#include <tvision/tv.h>
+
+#include <cstdlib>  // atoi
+#include <cstring>  // strcmp
+
+// ── Extern declarations for spawn helpers in test_pattern_app.cpp ─────────────
+
+class TTestPatternApp; // forward decl (full type used only by called functions)
+
+extern void api_spawn_test(TTestPatternApp&, const TRect*);
+extern void api_spawn_gradient(TTestPatternApp&, const std::string&, const TRect*);
+extern void api_open_animation_path(TTestPatternApp&, const std::string&, const TRect*);
+ succeeded in 51ms:
+/*---------------------------------------------------------*/
+/*                                                         */
+/*   test_pattern_app.cpp - Test Pattern Window Spawner   */
+/*   Unlimited resizable windows with test patterns       */
+/*                                                         */
+/*---------------------------------------------------------*/
+
+#define Uses_TKeys
+#define Uses_TApplication
+#define Uses_TEvent
+#define Uses_TRect
+#define Uses_TDialog
+#define Uses_TStaticText
+#define Uses_TButton
+#define Uses_TMenuBar
+#define Uses_TSubMenu
+#define Uses_TMenuItem
+#define Uses_TMenu
+#define Uses_TStatusLine
+#define Uses_TStatusItem
+ succeeded in 53ms:
+app/api_ipc.cpp:113:extern std::string api_get_state(TTestPatternApp& app);
+app/api_ipc.cpp:374:    } else if (cmd == "create_window") {
+app/api_ipc.cpp:382:            const char* err = spec->spawn(*app_, kv);
+app/api_ipc.cpp:409:        resp = api_get_state(*app_) + "\n";
+app/api_ipc.cpp:515:                    content.find("\"windows\"") == std::string::npos) {
+app/ansi_view.cpp:8:/*     samples (rainbow_title, boxes, pixel art).          */
+app/ansi_view.cpp:208:TAnsiMiniWindow::TAnsiMiniWindow(const TRect &bounds, const char *title, const std::string &path)
+app/ansi_view.cpp:209:    : TWindow(bounds, title, wnNoNumber), TWindowInit(&TAnsiMiniWindow::initFrame)
+app/test_pattern_app.cpp:4:/*   Unlimited resizable windows with test patterns       */
+app/test_pattern_app.cpp:76:// Custom frame for windows without titles
+app/test_pattern_app.cpp:77:#include "notitle_frame.h"
+app/test_pattern_app.cpp:617:    // Runtime API key (shared across all chat windows)
+app/test_pattern_app.cpp:662:        // Fallback: scan desktop for windows that haven't been registered yet.
+app/test_pattern_app.cpp:664:        // already-known windows and cause multiplayer desync.
+app/test_pattern_app.cpp:710:    friend std::string api_get_state(TTestPatternApp&);
+app/test_pattern_app.cpp:1271:    // Create window title
+app/test_pattern_app.cpp:1273:    std::stringstream title;
+app/test_pattern_app.cpp:1274:    title << "Test Pattern " << windowNumber;
+app/test_pattern_app.cpp:1286:    TTestPatternWindow* window = new TTestPatternWindow(bounds, title.str().c_str());
+app/test_pattern_app.cpp:1292:    // Create window title
+
+thinking
+**Inspecting API spawn functions**
+exec
+/bin/zsh -lc "sed -n '2360,2535p' app/test_pattern_app.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '3180,3345p' app/test_pattern_app.cpp" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+        editorWindow = dynamic_cast<TTextEditorWindow*>(newWindow);
+    }
+    
+    // If we have a text editor, send the figlet text
+    if (editorWindow) {
+        // Focus the window
+        editorWindow->select();
+        
+        // Send the figlet text
+        TTextEditorView* editorView = editorWindow->getEditorView();
+        if (editorView) {
+            editorView->sendFigletText(text, font, width, mode);
+            return "ok";
+        }
+    }
+
+    return "err no text editor available";
+}
+
+void api_spawn_browser(TTestPatternApp& app, const TRect* bounds) {
+ succeeded in 52ms:
+
+    if (app.scrambleWindow->getView()) {
+        app.scrambleWindow->getView()->setPose(spDefault);
+        app.scrambleWindow->getView()->say(response);
+    }
+    auto* msgView = app.scrambleWindow->getMessageView();
+    if (msgView) msgView->addMessage("scramble", response);
+    return response;
+}
+
+std::string api_chat_receive(TTestPatternApp& app, const std::string& sender, const std::string& text) {
+    // Display a remote chat message in Scramble without AI processing.
+    if (!app.scrambleWindow) return "err scramble not open";
+    auto* msgView = app.scrambleWindow->getMessageView();
+    if (!msgView) return "err no message view";
+    msgView->addMessage(sender, text);
+    return "ok";
+}
+
+void api_tile(TTestPatternApp& app) { app.tile(); }
+exec
+/bin/zsh -lc "rg -n \"void api_spawn_|api_open_animation_path|api_open_text_view_path|create.*title|TWindow\\(|new .*Window\\(\" app/test_pattern_app.cpp | sed -n '1,260p'" in /Users/james/Repos/wibandwob-dos succeeded in 53ms:
+415:        TWindow(bounds, "", wnNoNumber),
+452:        TWindow(bounds, "", wnNoNumber),
+497:        TWindow(bounds, aTitle, wnNoNumber),
+690:    friend void api_spawn_test(TTestPatternApp&);
+691:    friend void api_spawn_gradient(TTestPatternApp&, const std::string&);
+692:    friend void api_open_animation_path(TTestPatternApp&, const std::string&);
+693:    friend void api_open_text_view_path(TTestPatternApp&, const std::string&, const TRect* bounds);
+694:    friend void api_spawn_test(TTestPatternApp&, const TRect* bounds);
+695:    friend void api_spawn_gradient(TTestPatternApp&, const std::string&, const TRect* bounds);
+696:    friend void api_open_animation_path(TTestPatternApp&, const std::string&, const TRect* bounds);
+716:    friend void api_spawn_text_editor(TTestPatternApp&, const TRect* bounds);
+717:    friend void api_spawn_browser(TTestPatternApp&, const TRect* bounds);
+718:    friend void api_spawn_verse(TTestPatternApp&, const TRect* bounds);
+719:    friend void api_spawn_mycelium(TTestPatternApp&, const TRect* bounds);
+720:    friend void api_spawn_orbit(TTestPatternApp&, const TRect* bounds);
+721:    friend void api_spawn_torus(TTestPatternApp&, const TRect* bounds);
+722:    friend void api_spawn_cube(TTestPatternApp&, const TRect* bounds);
+723:    friend void api_spawn_life(TTestPatternApp&, const TRect* bounds);
+724:    friend void api_spawn_blocks(TTestPatternApp&, const TRect* bounds);
+725:    friend void api_spawn_score(TTestPatternApp&, const TRect* bounds);
+
+thinking
+**Inspecting spawn functions for path handling**
+exec
+/bin/zsh -lc "sed -n '2248,2348p' app/test_pattern_app.cpp" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+    // DISABLED: Update animated kaomoji in menu bar (causing crashes + freezes)
+    // if (menuBar) {
+    //     auto* customMenuBar = dynamic_cast<TCustomMenuBar*>(menuBar);
+    //     if (customMenuBar) {
+    //         customMenuBar->update();
+    //     }
+    // }
+
+    // Idle: no default content window or wallpaper.
+}
+
+int main()
+{
+    TTestPatternApp app;
+    app.run();
+    return 0;
+}
+
+// ---- IPC API helper functions (friend) ----
+// Backward compatibility overloads
+
+thinking
+**Checking state drift and normalization**
+codex
+I’m now checking test coverage and edge conditions in `tests/room/test_state_diff.py` and bridge tests to see whether any untested regressions remain around nested `rect` handling, cancellation behavior, and title drift.
+exec
+/bin/zsh -lc "sed -n '1,360p' tests/room/test_partykit_bridge.py" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,320p' tests/room/test_state_diff.py" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "rg -n \"apply_delta_to_ipc|_rect|width|height|title|receive_loop|FIRST_COMPLETED|exception\\(\" tests/room -g'*.py' | sed -n '1,260p'" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+"""Tests for F02: PartyKit bridge — state diffing, delta application, WS URL building (E008)."""
+
+import asyncio
+import json
+import sys
+from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "tools" / "room"))
+from partykit_bridge import (
+    build_ws_url,
+    compute_delta,
+    windows_from_state,
+    apply_delta_to_ipc,
+    PartyKitBridge,
+)
+
+# ── URL building ──────────────────────────────────────────────────────────────
+ succeeded in 51ms:
+"""Tests for F03: State diffing module (E008)."""
+
+import json
+import socket
+import sys
+import threading
+from pathlib import Path
+from unittest.mock import patch, MagicMock
+
+import pytest
+
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "tools" / "room"))
+from state_diff import (
+    windows_from_state,
+    state_hash,
+    compute_delta,
+    apply_delta,
+    apply_delta_to_ipc,
+    _encode_param,
+    ipc_command,
+ succeeded in 52ms:
+tests/room/test_layout_restore.py:20:    "screen": {"width": 120, "height": 30},
+tests/room/test_layout_restore.py:26:            "title": "Pattern Window",
+tests/room/test_layout_restore.py:145:            {"id": "w1", "type": "test_pattern", "title": "P1",
+tests/room/test_layout_restore.py:147:            {"id": "w2", "type": "gradient", "title": "G1",
+tests/room/test_chat_relay.py:29:    """Simulate receiving one WebSocket message through receive_loop."""
+tests/room/test_chat_relay.py:32:    await bridge.receive_loop(fake_ws_iter())
+tests/room/test_chat_relay.py:125:# ── receive_loop: apply incoming chat_msg via IPC ─────────────────────────────
+tests/room/test_state_diff.py:18:    apply_delta_to_ipc,
+tests/room/test_state_diff.py:50:    def test_normalises_width_height_to_w_h(self):
+tests/room/test_state_diff.py:51:        """api_get_state emits w/h; older snapshots may have width/height.
+tests/room/test_state_diff.py:55:                               "x": 5, "y": 3, "width": 40, "height": 20}]}
+tests/room/test_state_diff.py:61:        assert "width" not in result["w1"]
+tests/room/test_state_diff.py:62:        assert "height" not in result["w1"]
+tests/room/test_state_diff.py:65:        """If w/h already present, width/height are dropped without overwriting."""
+tests/room/test_state_diff.py:67:                               "width": 99, "height": 99}]}
+tests/room/test_state_diff.py:181:# ── apply_delta_to_ipc ────────────────────────────────────────────────────────
+tests/room/test_state_diff.py:194:            apply_delta_to_ipc("/tmp/fake.sock", {
+tests/room/test_state_diff.py:202:            apply_delta_to_ipc("/tmp/fake.sock", {"remove": ["w1", "w2"]})
+tests/room/test_state_diff.py:209:            apply_delta_to_ipc("/tmp/fake.sock", {
+tests/room/test_state_diff.py:218:            applied = apply_delta_to_ipc("/tmp/fake.sock", {
+
+thinking
+**Extending test inspection for coverage**
+exec
+/bin/zsh -lc "sed -n '320,520p' tests/room/test_state_diff.py" in /Users/james/Repos/wibandwob-dos succeeded in 53ms:
+        Without path, the C++ IPC handler returns 'err missing path' and the
+        window is not created on the remote instance.
+        """
+        calls, fake = self._capture()
+        with patch("state_diff.ipc_command", side_effect=fake):
+            apply_delta_to_ipc("/tmp/fake.sock", {
+                "add": [{"id": "w1", "type": "text_view", "x": 0, "y": 0,
+                          "w": 80, "h": 24, "path": "/home/user/notes.txt"}]
+            })
+        create = [p for c, p in calls if c == "create_window"]
+        assert len(create) == 1
+        assert create[0]["path"] == "/home/user/notes.txt"
+
+    def test_add_no_path_key_when_missing(self):
+        """create_window for non-file-backed windows must NOT send path param."""
+        calls, fake = self._capture()
+        with patch("state_diff.ipc_command", side_effect=fake):
+            apply_delta_to_ipc("/tmp/fake.sock", {
+                "add": [{"id": "w1", "type": "test_pattern", "x": 0, "y": 0,
+                          "w": 40, "h": 20}]
+
+thinking
+**Analyzing task cancellation, state resync, and nested rect handling**
+exec
+/bin/zsh -lc "sed -n '1,320p' partykit/src/server.ts" in /Users/james/Repos/wibandwob-dos succeeded in 53ms:
+/**
+ * WibWob Rooms — PartyKit Server (E008 F01)
+ *
+ * One Durable Object instance per room (keyed by room_id).
+ * Coordinates multiplayer state for WibWob-DOS instances.
+ *
+ * Message protocol (JSON over WebSocket):
+ *
+ *   state_delta  { type, room_id, delta: { add?, remove?, update? } }
+ *     Sent by a C++ instance when its window layout mutates.
+ *     Server merges into canonical state, broadcasts to all others.
+ *
+ *   state_sync   { type, state }
+ *     Server → new joiner: full canonical state on connect.
+ *
+ *   chat_msg     { type, sender, text, ts }
+ *     Scramble chat message. Broadcast to all except sender.
+ *
+ *   cursor_pos   { type, sender, x, y }
+ *     Terminal cursor position (row/col). Broadcast to all except sender.
+
+thinking
+**Assessing fallback defaults safety**
+codex
+I’ve confirmed `create_window` does not pass `title`; I’m now checking ID allocation (`registerWindow`) to determine whether title mismatches can realistically cause persistent diff churn in this final pass.
+exec
+/bin/zsh -lc "rg -n \"registerWindow\\(|winToId|idToWin|nextWindowId|w\\\"\" app/test_pattern_app.cpp | sed -n '1,220p'" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+639:    std::map<TWindow*, std::string> winToId;
+640:    std::map<std::string, TWindow*> idToWin;
+642:    std::string registerWindow(TWindow* w) {
+644:        auto it = winToId.find(w);
+645:        if (it != winToId.end()) return it->second;
+649:        winToId[w] = id;
+650:        idToWin[id] = w;
+660:        auto it = idToWin.find(id);
+661:        if (it != idToWin.end()) return it->second;
+670:                if (w && winToId.find(w) == winToId.end()) {
+675:                    winToId[w] = new_id;
+676:                    idToWin[new_id] = w;
+681:        it = idToWin.find(id);
+682:        if (it != idToWin.end()) return it->second;
+1245:                        registerWindow(w);
+1300:    registerWindow(window);
+1309:    registerWindow(window);
+1318:    registerWindow(window);
+1562:    registerWindow(window);
+1590:    registerWindow(window);
+exec
+/bin/zsh -lc "sed -n '620,690p' app/test_pattern_app.cpp" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+
+    // Kaomoji mood helper
+    void setKaomojiMood(TCustomMenuBar::KaomojiMood mood, int durationMs = 2000) {
+        if (menuBar) {
+            auto* customMenuBar = dynamic_cast<TCustomMenuBar*>(menuBar);
+            if (customMenuBar) {
+                customMenuBar->setMood(mood, durationMs);
+            }
+        }
+    }
+
+    // Chat log for multiplayer relay (outgoing messages from local Scramble)
+    struct ChatEntry { int seq; std::string sender; std::string text; };
+    std::deque<ChatEntry> chatLog_;
+    int chatSeq_ = 0;
+    static constexpr int kChatLogMax = 50;
+
+    // API/IPC registry for per-window control
+    int apiIdCounter = 1;
+    std::map<TWindow*, std::string> winToId;
+
+thinking
+**Reviewing known issue references**
+exec
+/bin/zsh -lc "nl -ba tools/room/partykit_bridge.py | sed -n '150,310p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba tools/room/state_diff.py | sed -n '210,320p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba app/api_ipc.cpp | sed -n '20,90p;340,470p'" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+   150	        async with self._state_lock:
+   151	            new_windows = windows_from_state(state)
+   152	            delta = compute_delta(self.last_windows, new_windows)
+   153	            if delta:
+   154	                self.log(f"[{trigger}] state change, pushing delta")
+   155	                await self.push_delta(delta)
+   156	                self.last_windows = new_windows
+   157	        return state
+   158	
+   159	    async def event_subscribe_loop(self) -> None:
+   160	        """Open a persistent IPC connection and react to push events immediately."""
+   161	        import contextlib
+   162	        while True:
+   163	            writer = None
+   164	            try:
+   165	                reader, writer = await asyncio.open_unix_connection(self.sock_path)
+   166	                if not await _async_auth_handshake(reader, writer):
+   167	                    self.log("IPC event subscription: auth failed")
+   168	                    await asyncio.sleep(EVENT_RETRY_DELAY)
+   169	                    continue
+ succeeded in 52ms:
+   210	    if update:
+   211	        delta["update"] = update
+   212	    return delta
+   213	
+   214	
+   215	def apply_delta(
+   216	    current: dict[str, dict],
+   217	    delta: dict[str, Any],
+   218	) -> dict[str, dict]:
+   219	    """
+   220	    Apply a state delta to a window map and return the new map.
+   221	    Does not mutate the input.
+   222	    """
+   223	    result = dict(current)
+   224	    for win in delta.get("add", []):
+   225	        result[win["id"]] = win
+   226	    for wid in delta.get("remove", []):
+   227	        result.pop(wid, None)
+   228	    for win in delta.get("update", []):
+   229	        if win["id"] in result:
+ succeeded in 51ms:
+    20	#include <cstring>
+    21	#include <cstdlib>
+    22	#include <sstream>
+    23	#include <map>
+    24	#include <vector>
+    25	#include <fstream>
+    26	#include <random>
+    27	
+    28	// Percent-decode IPC values (%20 -> space, %0A -> newline, etc.)
+    29	static std::string percent_decode(const std::string& s) {
+    30	    std::string out;
+    31	    out.reserve(s.size());
+    32	    for (size_t i = 0; i < s.size(); ++i) {
+    33	        if (s[i] == '%' && i + 2 < s.size()) {
+    34	            char hi = s[i+1], lo = s[i+2];
+    35	            auto hexval = [](char c) -> int {
+    36	                if (c >= '0' && c <= '9') return c - '0';
+    37	                if (c >= 'a' && c <= 'f') return 10 + c - 'a';
+    38	                if (c >= 'A' && c <= 'F') return 10 + c - 'A';
+    39	                return -1;
+
+thinking
+**Planning window title normalization**
+exec
+/bin/zsh -lc "nl -ba tools/room/state_diff.py | sed -n '110,180p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba app/test_pattern_app.cpp | sed -n '2435,2515p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba app/window_type_registry.cpp | sed -n '34,96p'" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+   110	    The IPC server tokenises on spaces (app/api_ipc.cpp), so any value
+   111	    containing spaces must be percent-encoded to avoid truncation.
+   112	    """
+   113	    return _urlencode(str(v), safe="")
+   114	
+   115	
+   116	def ipc_command(sock_path: str, cmd: str, params: dict[str, Any]) -> bool:
+   117	    """Send a key=value command to WibWob IPC. Returns True on ok."""
+   118	    parts = [f"cmd:{cmd}"]
+   119	    for k, v in params.items():
+   120	        parts.append(f"{k}={_encode_param(v)}")
+   121	    resp = ipc_send(sock_path, " ".join(parts))
+   122	    return resp is not None and resp.startswith("ok")
+   123	
+   124	
+   125	# ── State extraction ──────────────────────────────────────────────────────────
+   126	
+   127	def _normalise_win(win: dict) -> dict:
+   128	    """Normalise width/height → w/h so compute_delta comparisons are stable.
+   129	
+ succeeded in 51ms:
+  2435	#undef HAS_CHILD_VIEW
+  2436	    return "test_pattern";
+  2437	}
+  2438	
+  2439	std::string api_get_state(TTestPatternApp& app) {
+  2440	    // Collect currently visible windows in desktop Z-order.
+  2441	    // Do NOT clear winToId/idToWin here — that would reassign new IDs on
+  2442	    // every call, causing compute_delta to see "new" windows every poll.
+  2443	    std::vector<TWindow*> activeWins;
+  2444	    TView *start = app.deskTop->first();
+  2445	    if (start) {
+  2446	        TView *v = start;
+  2447	        do {
+  2448	            TWindow *w = dynamic_cast<TWindow*>(v);
+  2449	            if (w) activeWins.push_back(w);
+  2450	            v = v->next;
+  2451	        } while (v != start);
+  2452	    }
+  2453	
+  2454	    // Purge registry entries for windows that have been closed (stale pointers).
+ succeeded in 52ms:
+    34	extern void api_spawn_monster_cam(TTestPatternApp&, const TRect*);
+    35	extern void api_spawn_monster_verse(TTestPatternApp&, const TRect*);
+    36	extern void api_spawn_monster_portal(TTestPatternApp&, const TRect*);
+    37	
+    38	// ── Bounds helper ─────────────────────────────────────────────────────────────
+    39	
+    40	static const TRect* opt_bounds(const std::map<std::string, std::string>& kv, TRect& buf) {
+    41	    auto xi = kv.find("x"), yi = kv.find("y");
+    42	    auto wi = kv.find("w"), hi = kv.find("h");
+    43	    if (xi == kv.end() || yi == kv.end() || wi == kv.end() || hi == kv.end())
+    44	        return nullptr;
+    45	    int x = std::atoi(xi->second.c_str()), y = std::atoi(yi->second.c_str());
+    46	    int w = std::atoi(wi->second.c_str()), h = std::atoi(hi->second.c_str());
+    47	    buf = TRect(x, y, x + w, y + h);
+    48	    return &buf;
+    49	}
+    50	
+    51	// ── Spawn wrappers ────────────────────────────────────────────────────────────
+    52	
+    53	static const char* spawn_test(TTestPatternApp& app,
+
+thinking
+**Confirming safer pattern applied**
+exec
+/bin/zsh -lc "sed -n '282,298p' tools/room/partykit_bridge.py" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+                    done, pending = await asyncio.wait(
+                        {poll_task, recv_task, evt_task},
+                        return_when=asyncio.FIRST_COMPLETED,
+                    )
+                    for t in pending:
+                        t.cancel()
+                    await asyncio.gather(*pending, return_exceptions=True)
+                    # Surface the first exception; clean disconnect also reconnects.
+                    for t in done:
+                        if not t.cancelled():
+                            exc = t.exception()
+                            if exc is not None:
+                                raise exc
+                    raise ConnectionError("ws receive_loop ended cleanly")
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:
+
+thinking
+**Identifying low-severity nested structure issues**
+codex
+I’ve finished source inspection and I’m running the focused room tests (`state_diff` and `partykit_bridge`) to validate that these paths behave as expected in practice before I finalize findings.
+exec
+/bin/zsh -lc 'pytest -q tests/room/test_state_diff.py tests/room/test_partykit_bridge.py' in /Users/james/Repos/wibandwob-dos exited 127 in 53ms:
+zsh:1: command not found: pytest
+
+thinking
+**Assessing pytest availability**
+exec
+/bin/zsh -lc 'uv run pytest -q tests/room/test_state_diff.py tests/room/test_partykit_bridge.py' in /Users/james/Repos/wibandwob-dos exited 2 in 317ms:
+error: Failed to spawn: `pytest`
+  Caused by: No such file or directory (os error 2)
+
+thinking
+**Summarizing low-severity issues**
+codex
+1. **Low**: `apply_delta_to_ipc` only unwraps one rect layer; double-nested rect payloads silently drop move/resize.
+- In `tools/room/state_diff.py:243`, `_rect()` returns `win["rect"]` if it is a dict, but does not recurse.
+- If a client sends `{"rect":{"rect":{"x":...,"y":...}}}`, then update checks at `tools/room/state_diff.py:289`/`tools/room/state_diff.py:298` won’t find `x/y/w/h`, so no move/resize is applied.
+- This is not produced by current PartyKit canonical flow (`x/y/w/h` flat), so impact is low and mostly robustness/interoperability.
+
+**Everything else you asked about checks out**
+
+- `add` defaults are currently safe as fallback: missing coords produce `x=0 y=0 w=40 h=20` (`tools/room/state_diff.py:263`-`tools/room/state_diff.py:267`).
+- `event_subscribe_loop` writer cleanup is safe: `writer = None` before `try`, guarded in `finally` (`tools/room/partykit_bridge.py:163`, `tools/room/partykit_bridge.py:194`).
+- `FIRST_COMPLETED` handling is already the safe pattern (`not t.cancelled(); exc = t.exception(); if exc: raise exc`) (`tools/room/partykit_bridge.py:290`-`tools/room/partykit_bridge.py:294`).
+- `receive_loop` clean websocket close exits `async for` normally; `run()` then forces reconnect via `ConnectionError` (`tools/room/partykit_bridge.py:217`, `tools/room/partykit_bridge.py:295`).
+- Keeping `last_windows` across reconnect is reasonable and avoids unnecessary full rebroadcast; baseline is refreshed after inbound apply (`tools/room/partykit_bridge.py:238`-`tools/room/partykit_bridge.py:253`).
+- IPC parser does percent-decode key/value tokens (`app/api_ipc.cpp:29`, `app/api_ipc.cpp:358`), so `%20` paths are decoded before command handlers.
+- `_normalise_win` does not strip `title` (`tools/room/state_diff.py:133`-`tools/room/state_diff.py:142`), and local state includes `title` (`app/test_pattern_app.cpp:2483`), so no inherent per-poll title churn in the normal bridge path.
+- `create_window` does **not** pass title (only type/x/y/w/h/path); spawned windows use app-generated titles (`tools/room/state_diff.py:267`, `app/window_type_registry.cpp:40`, `app/window_type_registry.cpp:53`). That’s a parity limitation, but not a new loop/regression by itself.
+
+Couldn’t run the Python tests in this environment because `pytest` is not installed (`pytest`/`uv run pytest` both unavailable).
+tokens used
+73,827
+1. **Low**: `apply_delta_to_ipc` only unwraps one rect layer; double-nested rect payloads silently drop move/resize.
+- In `tools/room/state_diff.py:243`, `_rect()` returns `win["rect"]` if it is a dict, but does not recurse.
+- If a client sends `{"rect":{"rect":{"x":...,"y":...}}}`, then update checks at `tools/room/state_diff.py:289`/`tools/room/state_diff.py:298` won’t find `x/y/w/h`, so no move/resize is applied.
+- This is not produced by current PartyKit canonical flow (`x/y/w/h` flat), so impact is low and mostly robustness/interoperability.
+
+**Everything else you asked about checks out**
+
+- `add` defaults are currently safe as fallback: missing coords produce `x=0 y=0 w=40 h=20` (`tools/room/state_diff.py:263`-`tools/room/state_diff.py:267`).
+- `event_subscribe_loop` writer cleanup is safe: `writer = None` before `try`, guarded in `finally` (`tools/room/partykit_bridge.py:163`, `tools/room/partykit_bridge.py:194`).
+- `FIRST_COMPLETED` handling is already the safe pattern (`not t.cancelled(); exc = t.exception(); if exc: raise exc`) (`tools/room/partykit_bridge.py:290`-`tools/room/partykit_bridge.py:294`).
+- `receive_loop` clean websocket close exits `async for` normally; `run()` then forces reconnect via `ConnectionError` (`tools/room/partykit_bridge.py:217`, `tools/room/partykit_bridge.py:295`).
+- Keeping `last_windows` across reconnect is reasonable and avoids unnecessary full rebroadcast; baseline is refreshed after inbound apply (`tools/room/partykit_bridge.py:238`-`tools/room/partykit_bridge.py:253`).
+- IPC parser does percent-decode key/value tokens (`app/api_ipc.cpp:29`, `app/api_ipc.cpp:358`), so `%20` paths are decoded before command handlers.
+- `_normalise_win` does not strip `title` (`tools/room/state_diff.py:133`-`tools/room/state_diff.py:142`), and local state includes `title` (`app/test_pattern_app.cpp:2483`), so no inherent per-poll title churn in the normal bridge path.
+- `create_window` does **not** pass title (only type/x/y/w/h/path); spawned windows use app-generated titles (`tools/room/state_diff.py:267`, `app/window_type_registry.cpp:40`, `app/window_type_registry.cpp:53`). That’s a parity limitation, but not a new loop/regression by itself.
+
+Couldn’t run the Python tests in this environment because `pytest` is not installed (`pytest`/`uv run pytest` both unavailable).
