@@ -10,11 +10,19 @@
 #include <errno.h>
 #endif
 
+#ifdef __APPLE__
+#include <CommonCrypto/CommonHMAC.h>
+#else
+#include <openssl/hmac.h>
+#endif
+
 #include <cstring>
+#include <cstdlib>
 #include <sstream>
 #include <map>
 #include <vector>
 #include <fstream>
+#include <random>
 
 // Percent-decode IPC values (%20 -> space, %0A -> newline, etc.)
 static std::string percent_decode(const std::string& s) {
@@ -122,7 +130,107 @@ extern std::string api_send_text(TTestPatternApp& app, const std::string& id,
 extern std::string api_send_figlet(TTestPatternApp& app, const std::string& id, const std::string& text,
                                    const std::string& font, int width, const std::string& mode);
 
-ApiIpcServer::ApiIpcServer(TTestPatternApp* app) : app_(app) {}
+// Convert bytes to hex string.
+static std::string bytes_to_hex(const unsigned char* data, size_t len) {
+    static const char hex[] = "0123456789abcdef";
+    std::string out;
+    out.reserve(len * 2);
+    for (size_t i = 0; i < len; ++i) {
+        out += hex[(data[i] >> 4) & 0xf];
+        out += hex[data[i] & 0xf];
+    }
+    return out;
+}
+
+ApiIpcServer::ApiIpcServer(TTestPatternApp* app) : app_(app) {
+    // Read auth secret from environment.
+    const char* secret = std::getenv("WIBWOB_AUTH_SECRET");
+    if (secret && secret[0] != '\0') {
+        auth_secret_ = secret;
+        fprintf(stderr, "[ipc] Auth enabled (secret length=%zu)\n", auth_secret_.size());
+    }
+}
+
+std::string ApiIpcServer::generate_nonce() {
+    std::random_device rd;
+    unsigned char bytes[16];
+    for (int i = 0; i < 16; ++i)
+        bytes[i] = static_cast<unsigned char>(rd());
+    return bytes_to_hex(bytes, 16);
+}
+
+std::string ApiIpcServer::compute_hmac(const std::string& nonce) {
+    unsigned char result[32]; // SHA-256 = 32 bytes
+#ifdef __APPLE__
+    CCHmac(kCCHmacAlgSHA256,
+           auth_secret_.data(), auth_secret_.size(),
+           nonce.data(), nonce.size(),
+           result);
+#else
+    unsigned int len = 32;
+    HMAC(EVP_sha256(),
+         auth_secret_.data(), auth_secret_.size(),
+         reinterpret_cast<const unsigned char*>(nonce.data()), nonce.size(),
+         result, &len);
+#endif
+    return bytes_to_hex(result, 32);
+}
+
+bool ApiIpcServer::authenticate_connection(int fd) {
+    if (!auth_required()) return true;
+
+    // Send challenge: {"type":"challenge","nonce":"<hex>"}\n
+    std::string nonce = generate_nonce();
+    std::string challenge = "{\"type\":\"challenge\",\"nonce\":\"" + nonce + "\"}\n";
+    if (::write(fd, challenge.c_str(), challenge.size()) < 0) return false;
+
+    // Read auth response
+    char buf[512];
+    ssize_t n = ::read(fd, buf, sizeof(buf) - 1);
+    if (n <= 0) return false;
+    buf[n] = '\0';
+    std::string response(buf);
+
+    // Parse HMAC from response: {"type":"auth","hmac":"<hex>"}
+    size_t hmac_pos = response.find("\"hmac\":\"");
+    if (hmac_pos == std::string::npos) {
+        fprintf(stderr, "[ipc] Auth failed: no hmac field in response\n");
+        return false;
+    }
+    hmac_pos += 8; // skip past "hmac":"
+    size_t hmac_end = response.find('"', hmac_pos);
+    if (hmac_end == std::string::npos) return false;
+    std::string client_hmac = response.substr(hmac_pos, hmac_end - hmac_pos);
+
+    // Check nonce replay
+    if (used_nonces_.count(nonce)) {
+        fprintf(stderr, "[ipc] Auth failed: nonce replay detected\n");
+        return false;
+    }
+
+    // Verify HMAC
+    std::string expected = compute_hmac(nonce);
+    if (client_hmac != expected) {
+        fprintf(stderr, "[ipc] Auth failed: HMAC mismatch\n");
+        return false;
+    }
+
+    // Mark nonce as used
+    used_nonces_.insert(nonce);
+    // Prune old nonces (keep last 1000)
+    if (used_nonces_.size() > 1000) {
+        auto it = used_nonces_.begin();
+        std::advance(it, used_nonces_.size() - 1000);
+        used_nonces_.erase(used_nonces_.begin(), it);
+    }
+
+    // Send auth_ok so client knows to proceed with commands.
+    std::string ok_msg = "{\"type\":\"auth_ok\"}\n";
+    ::write(fd, ok_msg.c_str(), ok_msg.size());
+
+    fprintf(stderr, "[ipc] Auth OK for connection\n");
+    return true;
+}
 
 ApiIpcServer::~ApiIpcServer() { stop(); }
 
@@ -197,6 +305,17 @@ void ApiIpcServer::poll() {
     if (fd < 0) {
         return; // EAGAIN expected in non-blocking mode
     }
+
+    // Authenticate if secret is set.
+    if (auth_required()) {
+        if (!authenticate_connection(fd)) {
+            std::string err = "{\"error\":\"auth_failed\"}\n";
+            ::write(fd, err.c_str(), err.size());
+            ::close(fd);
+            return;
+        }
+    }
+
     // Read a single line command.
     char buf[2048];
     ssize_t n = ::read(fd, buf, sizeof(buf)-1);
