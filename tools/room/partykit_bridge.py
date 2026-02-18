@@ -288,8 +288,10 @@ class PartyKitBridge:
                     await asyncio.gather(*pending, return_exceptions=True)
                     # Surface the first exception; clean disconnect also reconnects.
                     for t in done:
-                        if t.exception():
-                            raise t.exception()  # type: ignore[misc]
+                        if not t.cancelled():
+                            exc = t.exception()
+                            if exc is not None:
+                                raise exc
                     raise ConnectionError("ws receive_loop ended cleanly")
             except asyncio.CancelledError:
                 raise
