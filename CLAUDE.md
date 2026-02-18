@@ -199,14 +199,22 @@ When implementing a multi-round hardening task (bug fixing, IPC robustness, etc.
      2>&1 | tee /Users/james/Repos/wibandwob-dos/codex-review-roundN-$(date +%Y%m%d-%H%M%S).log &
    ```
 
-2. **Context limit protocol** — when context remaining drops below ~13%:
-   a. Launch Codex round-N with a detailed prompt referencing the last 2 log files and listing exact findings to look for
+2. **Always include a devnote preamble** in every Codex prompt that lists the last 5-10 CODEX-ANALYSIS-ROUNDn-REVIEW.md files. Codex has no persistent memory across calls, so it must be told what happened in previous rounds. Example:
+   ```
+   Read CODEX-ANALYSIS-ROUND7-REVIEW.md, CODEX-ANALYSIS-ROUND6-REVIEW.md,
+   CODEX-ANALYSIS-ROUND5-REVIEW.md to understand all previous findings and
+   fixes. Then do a fresh verification pass...
+   ```
+   The analysis markdowns are compact (~30-50 lines) and give Codex the full context it needs without requiring it to re-read raw logs.
+
+3. **Context limit protocol** — when context remaining drops below ~13%:
+   a. Launch Codex round-N with a detailed prompt referencing the last 2 log files AND recent CODEX-ANALYSIS markdowns for context
    b. Run `/compact` to preserve session state to `logs/memory/compact-<date>.md`
    c. The next session reads the Codex log and continues the loop
 
-3. **Per-round cycle**: read log → write `CODEX-ANALYSIS-ROUNDn-REVIEW.md` → implement findings → add/run tests → commit → launch next round
+4. **Per-round cycle**: read log → write `CODEX-ANALYSIS-ROUNDn-REVIEW.md` → implement findings → add/run tests → commit → launch next round
 
-4. **Stop when**: Codex reports no new Critical/High findings. Document "confirmed safe" list in final review.
+5. **Stop when**: Codex reports no new Critical/High findings. Document "confirmed safe" list in final review.
 
 ## Scope Guardrails
 
