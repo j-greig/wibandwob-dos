@@ -1,0 +1,513 @@
+OpenAI Codex v0.101.0 (research preview)
+--------
+workdir: /Users/james/Repos/wibandwob-dos
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: medium
+reasoning summaries: auto
+session id: 019c722b-85a4-75c0-9d8c-c03bcb8767f6
+--------
+user
+Two bugs in WibWob-DOS multiplayer bridge need fixing. Please read the relevant files and propose exact code changes.
+
+## Bug 1: api_get_state missing type field (C++)
+
+Read app/test_pattern_app.cpp around line 2374 (api_get_state function) and app/api_ipc.cpp around line 374 (create_window dispatch). The JSON output of api_get_state includes id, x, y, width, height, title but NOT type. The bridge needs the type field to call create_window type=... on the remote instance.
+
+create_window accepts: test_pattern, gradient, frame_player, text_view, text_editor, browser.
+Window classes: TTestPatternWindow, TGradientWindow, TFrameAnimationWindow (in test_pattern_app.cpp ~406-491), TBrowserWindow (browser_view.h), TTextEditorWindow (text_editor_view.h).
+
+Propose: add a static helper windowTypeName(TWindow*) before api_get_state using dynamic_cast for the 6 types (fallback test_pattern). Add type to the JSON output. Show complete replacement code.
+
+## Bug 2: width/height vs w/h key mismatch (Python)
+
+Read tools/room/state_diff.py. api_get_state emits width/height keys. create_window IPC reads w/h. compute_delta uses raw dict equality so {w:40} vs {width:40} looks like a change and causes spurious update deltas every 0.5s.
+
+Fix: normalise width->w and height->h in windows_from_state() so all internal state uses w/h. Show the complete replacement for windows_from_state.
+mcp startup: no servers
+2026-02-18T19:13:00.880817Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c5b37-7a44-7f52-ba1f-d6dfbdd333aa
+2026-02-18T19:13:00.904127Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c67d3-e7fb-7423-879a-a3c6997f29d4
+2026-02-18T19:13:00.928820Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c5d93-e778-7442-af45-a2ae579f5248
+2026-02-18T19:13:00.965020Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c6076-87c9-7e81-9675-bb3b5afd1157
+2026-02-18T19:13:00.993094Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c6171-ccc2-7702-9b67-9c22338e3137
+2026-02-18T19:13:01.018679Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c6248-4000-77b0-815a-4015ebbba891
+
+thinking
+**Planning code snippet extraction**
+codex
+I’ll inspect the referenced C++ and Python files first to confirm current implementations, then I’ll provide exact drop-in replacements for `api_get_state` support (`windowTypeName` + `type` field) and `windows_from_state()`.
+exec
+/bin/zsh -lc "sed -n '2320,2455p' app/test_pattern_app.cpp && sed -n '330,450p' app/api_ipc.cpp && sed -n '1,220p' tools/room/state_diff.py" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+    if (app.scrambleWindow->getView()) {
+        app.scrambleWindow->getView()->setPose(spCurious);
+        app.scrambleWindow->getView()->say(response);
+    }
+    if (msgView) msgView->addMessage("scramble", response);
+    return response;
+}
+std::string api_scramble_pet(TTestPatternApp& app) {
+    if (!app.scrambleWindow) return "err scramble not open";
+
+    static const char* petReactions[] = {
+        "...fine. /ᐠ- -ᐟ\\",
+        "*allows it* (=^..^=)",
+        "adequate petting technique. /ᐠ｡ꞈ｡ᐟ\\",
+        "i did not ask for this. and yet. (=^..^=)",
+        "*purrs once. stops. stares* /ᐠ°ᆽ°ᐟ\\",
+    };
+    std::string response = petReactions[std::rand() % 5];
+
+    if (app.scrambleWindow->getView()) {
+exec
+/bin/zsh -lc 'rg -n "api_get_state|create_window|class TFrameAnimationWindow|TTestPatternWindow|TGradientWindow|TBrowserWindow|TTextEditorWindow" app/test_pattern_app.cpp app/api_ipc.cpp app/browser_view.h app/text_editor_view.h tools/room/state_diff.py' in /Users/james/Repos/wibandwob-dos succeeded in 122ms:
+tools/room/state_diff.py:177:        ok = ipc_command(sock_path, "create_window", {
+tools/room/state_diff.py:181:            applied.append(f"create_window id={win.get('id')} type={win_type}")
+app/api_ipc.cpp:118:extern std::string api_get_state(TTestPatternApp& app);
+app/api_ipc.cpp:374:    } else if (cmd == "create_window") {
+app/api_ipc.cpp:437:        resp = api_get_state(*app_) + "\n";
+app/text_editor_view.h:83:class TTextEditorWindow : public TWindow {
+app/text_editor_view.h:85:    explicit TTextEditorWindow(const TRect &r);
+app/browser_view.h:71:/*  TBrowserWindow - Composes URL bar, content, status     */
+app/browser_view.h:74:class TBrowserWindow : public TWindow {
+app/browser_view.h:76:    TBrowserWindow(const TRect& bounds);
+app/browser_view.h:77:    virtual ~TBrowserWindow();
+app/test_pattern_app.cpp:219:class TTestPatternWindow;
+app/test_pattern_app.cpp:220:class TGradientWindow;
+app/test_pattern_app.cpp:221:class TFrameAnimationWindow;
+app/test_pattern_app.cpp:404:/* TTestPatternWindow - Window containing test pattern    */
+app/test_pattern_app.cpp:406:class TTestPatternWindow : public TWindow
+app/test_pattern_app.cpp:412:    TTestPatternWindow(const TRect& bounds, const char* aTitle) :
+app/test_pattern_app.cpp:414:        TWindowInit(&TTestPatternWindow::initFrame)
+app/test_pattern_app.cpp:437:/* TGradientWindow - Window containing gradient           */
+app/test_pattern_app.cpp:439:class TGradientWindow : public TWindow
+
+thinking
+**Investigating dynamic_cast usage**
+codex
+I confirmed the current behavior and now I’m checking the exact text-view window class name so the `windowTypeName` helper maps all six `create_window` types correctly.
+exec
+/bin/zsh -lc 'rg -n "api_open_text_view_path|class .*Text.*View|class .*Viewer|new .*text.*view|text_view" app/test_pattern_app.cpp app/*.h' in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+app/test_pattern_app.cpp:77:#include "transparent_text_view.h"
+app/test_pattern_app.cpp:676:    friend void api_open_text_view_path(TTestPatternApp&, const std::string&, const TRect* bounds);
+app/test_pattern_app.cpp:2273:void api_open_text_view_path(TTestPatternApp& app, const std::string& path, const TRect* bounds) {
+app/frame_file_player_view.h:94:class TTextFileView : public TGroup
+app/transparent_text_view.h:3:/*   transparent_text_view.h - Text View with             */
+app/transparent_text_view.h:31:class TTransparentTextView : public TView
+app/text_editor_view.h:27:class TTextEditorView : public TView {
+
+thinking
+**Inspecting view path and window class**
+exec
+/bin/zsh -lc "sed -n '2235,2315p' app/test_pattern_app.cpp && sed -n '1,140p' app/frame_file_player_view.h" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+
+// ---- IPC API helper functions (friend) ----
+// Backward compatibility overloads
+void api_spawn_test(TTestPatternApp& app) { app.newTestWindow(); }
+void api_spawn_gradient(TTestPatternApp& app, const std::string& kind) {
+    if (kind == "horizontal") app.newGradientWindow(TGradientWindow::gtHorizontal);
+    else if (kind == "vertical") app.newGradientWindow(TGradientWindow::gtVertical);
+    else if (kind == "radial") app.newGradientWindow(TGradientWindow::gtRadial);
+    else if (kind == "diagonal") app.newGradientWindow(TGradientWindow::gtDiagonal);
+    else app.newGradientWindow(TGradientWindow::gtHorizontal);
+}
+void api_open_animation_path(TTestPatternApp& app, const std::string& path) {
+    app.openAnimationFilePath(path);
+}
+
+// New overloads with bounds support
+void api_spawn_test(TTestPatternApp& app, const TRect* bounds) { 
+    if (bounds) {
+        app.newTestWindow(*bounds);
+    } else {
+
+thinking
+**Inspecting window class assignment**
+exec
+/bin/zsh -lc "sed -n '2660,2765p' app/test_pattern_app.cpp && sed -n '1,120p' app/test_pattern_app.cpp" in /Users/james/Repos/wibandwob-dos succeeded in 53ms:
+    if (arrPos == std::string::npos) return false;
+    std::vector<std::string> objects;
+    size_t p = arrPos+1; bool inStr=false; int depth=0;
+    while (p < data.size()) {
+        char c = data[p];
+        if (c == '"') { inStr = !inStr; ++p; continue; }
+        if (!inStr) {
+            if (c == '{') {
+                int d=1; size_t q=p+1;
+                while (q<data.size() && d) {
+                    if (data[q] == '"') { ++q; while (q<data.size() && data[q] != '"') { if (data[q]=='\\') ++q; ++q; } ++q; continue; }
+                    if (data[q] == '{') d++; else if (data[q] == '}') d--; ++q;
+                }
+                objects.emplace_back(data.substr(p, q-p));
+                p = q; continue;
+            }
+            if (c == ']') break;
+        }
+        ++p;
+    }
+
+thinking
+**Inspecting view class for frames**
+exec
+/bin/zsh -lc "sed -n '470,620p' app/test_pattern_app.cpp" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+                gradientView = new TRadialGradientView(interior);
+                break;
+            case gtDiagonal:
+                gradientView = new TDiagonalGradientView(interior);
+                break;
+        }
+        
+        if (gradientView)
+            insert(gradientView);
+    }
+
+    static TFrame* initFrame(TRect r)
+    {
+        return new TNoTitleFrame(r);
+    }
+};
+
+/*---------------------------------------------------------*/
+/* TFrameAnimationWindow - Window containing animation    */
+/*---------------------------------------------------------*/
+
+thinking
+**Assessing window class detection**
+codex
+I found `TFrameAnimationWindow` is used for both animation and plain text files, so I’m validating whether there’s a distinct text-view window class; if not, I’ll include a safe runtime check to distinguish `frame_player` vs `text_view`.
+exec
+/bin/zsh -lc "sed -n '1,220p' app/transparent_text_view.h && rg -n \"class .*Window|new .*Window|text_view\" app/transparent_text_view.h app/test_pattern_app.cpp" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+/*---------------------------------------------------------*/
+/*                                                         */
+/*   transparent_text_view.h - Text View with             */
+/*   Transparent/Custom Background Support                */
+/*                                                         */
+/*---------------------------------------------------------*/
+
+#ifndef TRANSPARENT_TEXT_VIEW_H
+#define TRANSPARENT_TEXT_VIEW_H
+
+#define Uses_TBackground
+#define Uses_TRect
+#define Uses_TView
+#define Uses_TDrawBuffer
+#define Uses_TEvent
+#define Uses_TWindow
+#define Uses_TFrame
+#define Uses_TKeys
+#define Uses_TProgram
+#define Uses_TDeskTop
+
+thinking
+**Designing window type detection and normalization**
+codex
+Replace these blocks exactly.
+
+### 1) C++: add `windowTypeName` + include `type` in `api_get_state`
+File: `app/test_pattern_app.cpp` (replace current `api_get_state` block; add helper immediately before it)
+
+```cpp
+static const char* windowTypeName(TWindow* w) {
+    if (!w) return "test_pattern";
+
+    if (dynamic_cast<TTestPatternWindow*>(w)) return "test_pattern";
+    if (dynamic_cast<TGradientWindow*>(w)) return "gradient";
+    if (dynamic_cast<TBrowserWindow*>(w)) return "browser";
+    if (dynamic_cast<TTextEditorWindow*>(w)) return "text_editor";
+    if (dynamic_cast<TTransparentTextWindow*>(w)) return "text_view";
+
+    if (auto* frameWin = dynamic_cast<TFrameAnimationWindow*>(w)) {
+        struct FrameKindProbe {
+            bool hasFramePlayer = false;
+            bool hasTextViewer = false;
+        } probe;
+
+        frameWin->forEach([](TView* view, void* ctx) {
+            auto* p = static_cast<FrameKindProbe*>(ctx);
+            if (dynamic_cast<FrameFilePlayerView*>(view)) p->hasFramePlayer = true;
+            if (dynamic_cast<TTextFileView*>(view)) p->hasTextViewer = true;
+        }, &probe);
+
+        if (probe.hasFramePlayer) return "frame_player";
+        if (probe.hasTextViewer) return "text_view";
+        return "frame_player";
+    }
+
+    return "test_pattern";
+}
+
+std::string api_get_state(TTestPatternApp& app) {
+    // Rebuild window registry to sync with current desktop state
+    app.winToId.clear();
+    app.idToWin.clear();
+
+    std::stringstream json;
+    json << "{\"windows\":[";
+
+    bool first = true;
+    TView *start = app.deskTop->first();
+    if (start) {
+        TView *v = start;
+        do {
+            TWindow *w = dynamic_cast<TWindow*>(v);
+            if (w) {
+                std::string id = app.registerWindow(w);
+
+                if (!first) json << ",";
+                json << "{\"id\":\"" << id << "\""
+                     << ",\"type\":\"" << windowTypeName(w) << "\""
+                     << ",\"x\":" << w->origin.x
+                     << ",\"y\":" << w->origin.y
+                     << ",\"width\":" << w->size.x
+                     << ",\"height\":" << w->size.y
+                     << ",\"title\":\"";
+
+                // Safely escape title
+                if (w->title) {
+                    std::string title(w->title);
+                    for (char c : title) {
+                        if (c == '"') json << "\\\"";
+                        else if (c == '\\') json << "\\\\";
+                        else json << c;
+                    }
+                }
+                json << "\"}";
+                first = false;
+            }
+            v = v->next;
+        } while (v != start);
+    }
+
+    json << "]";
+
+    // Append chat_log for multiplayer relay bridge
+    json << ",\"chat_log\":[";
+    bool firstChat = true;
+    for (const auto& entry : app.chatLog_) {
+        if (!firstChat) json << ",";
+        json << "{\"seq\":" << entry.seq
+             << ",\"sender\":\"" << TTestPatternApp::jsonEscape(entry.sender) << "\""
+             << ",\"text\":\"" << TTestPatternApp::jsonEscape(entry.text) << "\"}";
+        firstChat = false;
+    }
+    json << "]}";
+    return json.str();
+}
+```
+
+### 2) Python: normalize `width/height` to `w/h`
+File: `tools/room/state_diff.py` (replace `windows_from_state` completely)
+
+```python
+def windows_from_state(state: dict) -> dict[str, dict]:
+    """
+    Extract a window_id → window_dict mapping from an IPC get_state response.
+
+    Handles both list-of-windows (IPC shape) and dict-of-windows (PartyKit canonical shape).
+    Normalises width/height -> w/h so internal state comparisons are stable.
+    """
+    def _normalise_win(win: dict) -> dict:
+        out = dict(win)
+
+        # Flat keys
+        if "w" not in out and "width" in out:
+            out["w"] = out["width"]
+        if "h" not in out and "height" in out:
+            out["h"] = out["height"]
+        out.pop("width", None)
+        out.pop("height", None)
+
+        # Nested rect/bounds keys
+        for key in ("rect", "bounds"):
+            if isinstance(out.get(key), dict):
+                r = dict(out[key])
+                if "w" not in r and "width" in r:
+                    r["w"] = r["width"]
+                if "h" not in r and "height" in r:
+                    r["h"] = r["height"]
+                r.pop("width", None)
+                r.pop("height", None)
+                out[key] = r
+
+        return out
+
+    raw = state.get("windows", [])
+
+    if isinstance(raw, dict):
+        windows: dict[str, dict] = {}
+        for wid, win in raw.items():
+            if not isinstance(win, dict):
+                continue
+            norm = _normalise_win(win)
+            norm.setdefault("id", wid)
+            windows[wid] = norm
+        return windows
+
+    windows: dict[str, dict] = {}
+    for win in raw:
+        if not isinstance(win, dict):
+            continue
+        norm = _normalise_win(win)
+        wid = norm.get("id") or norm.get("title", "")
+        if wid:
+            windows[wid] = norm
+    return windows
+```
+
+
+tokens used
+30,727
+Replace these blocks exactly.
+
+### 1) C++: add `windowTypeName` + include `type` in `api_get_state`
+File: `app/test_pattern_app.cpp` (replace current `api_get_state` block; add helper immediately before it)
+
+```cpp
+static const char* windowTypeName(TWindow* w) {
+    if (!w) return "test_pattern";
+
+    if (dynamic_cast<TTestPatternWindow*>(w)) return "test_pattern";
+    if (dynamic_cast<TGradientWindow*>(w)) return "gradient";
+    if (dynamic_cast<TBrowserWindow*>(w)) return "browser";
+    if (dynamic_cast<TTextEditorWindow*>(w)) return "text_editor";
+    if (dynamic_cast<TTransparentTextWindow*>(w)) return "text_view";
+
+    if (auto* frameWin = dynamic_cast<TFrameAnimationWindow*>(w)) {
+        struct FrameKindProbe {
+            bool hasFramePlayer = false;
+            bool hasTextViewer = false;
+        } probe;
+
+        frameWin->forEach([](TView* view, void* ctx) {
+            auto* p = static_cast<FrameKindProbe*>(ctx);
+            if (dynamic_cast<FrameFilePlayerView*>(view)) p->hasFramePlayer = true;
+            if (dynamic_cast<TTextFileView*>(view)) p->hasTextViewer = true;
+        }, &probe);
+
+        if (probe.hasFramePlayer) return "frame_player";
+        if (probe.hasTextViewer) return "text_view";
+        return "frame_player";
+    }
+
+    return "test_pattern";
+}
+
+std::string api_get_state(TTestPatternApp& app) {
+    // Rebuild window registry to sync with current desktop state
+    app.winToId.clear();
+    app.idToWin.clear();
+
+    std::stringstream json;
+    json << "{\"windows\":[";
+
+    bool first = true;
+    TView *start = app.deskTop->first();
+    if (start) {
+        TView *v = start;
+        do {
+            TWindow *w = dynamic_cast<TWindow*>(v);
+            if (w) {
+                std::string id = app.registerWindow(w);
+
+                if (!first) json << ",";
+                json << "{\"id\":\"" << id << "\""
+                     << ",\"type\":\"" << windowTypeName(w) << "\""
+                     << ",\"x\":" << w->origin.x
+                     << ",\"y\":" << w->origin.y
+                     << ",\"width\":" << w->size.x
+                     << ",\"height\":" << w->size.y
+                     << ",\"title\":\"";
+
+                // Safely escape title
+                if (w->title) {
+                    std::string title(w->title);
+                    for (char c : title) {
+                        if (c == '"') json << "\\\"";
+                        else if (c == '\\') json << "\\\\";
+                        else json << c;
+                    }
+                }
+                json << "\"}";
+                first = false;
+            }
+            v = v->next;
+        } while (v != start);
+    }
+
+    json << "]";
+
+    // Append chat_log for multiplayer relay bridge
+    json << ",\"chat_log\":[";
+    bool firstChat = true;
+    for (const auto& entry : app.chatLog_) {
+        if (!firstChat) json << ",";
+        json << "{\"seq\":" << entry.seq
+             << ",\"sender\":\"" << TTestPatternApp::jsonEscape(entry.sender) << "\""
+             << ",\"text\":\"" << TTestPatternApp::jsonEscape(entry.text) << "\"}";
+        firstChat = false;
+    }
+    json << "]}";
+    return json.str();
+}
+```
+
+### 2) Python: normalize `width/height` to `w/h`
+File: `tools/room/state_diff.py` (replace `windows_from_state` completely)
+
+```python
+def windows_from_state(state: dict) -> dict[str, dict]:
+    """
+    Extract a window_id → window_dict mapping from an IPC get_state response.
+
+    Handles both list-of-windows (IPC shape) and dict-of-windows (PartyKit canonical shape).
+    Normalises width/height -> w/h so internal state comparisons are stable.
+    """
+    def _normalise_win(win: dict) -> dict:
+        out = dict(win)
+
+        # Flat keys
+        if "w" not in out and "width" in out:
+            out["w"] = out["width"]
+        if "h" not in out and "height" in out:
+            out["h"] = out["height"]
+        out.pop("width", None)
+        out.pop("height", None)
+
+        # Nested rect/bounds keys
+        for key in ("rect", "bounds"):
+            if isinstance(out.get(key), dict):
+                r = dict(out[key])
+                if "w" not in r and "width" in r:
+                    r["w"] = r["width"]
+                if "h" not in r and "height" in r:
+                    r["h"] = r["height"]
+                r.pop("width", None)
+                r.pop("height", None)
+                out[key] = r
+
+        return out
+
+    raw = state.get("windows", [])
+
+    if isinstance(raw, dict):
+        windows: dict[str, dict] = {}
+        for wid, win in raw.items():
+            if not isinstance(win, dict):
+                continue
+            norm = _normalise_win(win)
+            norm.setdefault("id", wid)
+            windows[wid] = norm
+        return windows
+
+    windows: dict[str, dict] = {}
+    for win in raw:
+        if not isinstance(win, dict):
+            continue
+        norm = _normalise_win(win)
+        wid = norm.get("id") or norm.get("title", "")
+        if wid:
+            windows[wid] = norm
+    return windows
+```
+
