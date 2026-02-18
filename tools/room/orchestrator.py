@@ -124,6 +124,22 @@ class Orchestrator:
             start_time=time.time(),
         )
         self.rooms[config.room_id] = room
+
+        # Spawn PartyKit bridge sidecar for multiplayer rooms
+        if config.multiplayer and config.partykit_server and config.partykit_room:
+            bridge_log = f"/tmp/wibwob_{config.instance_id}_bridge.log"
+            bridge_cmd = [
+                "uv", "run",
+                str(self.project_root / "tools" / "room" / "partykit_bridge.py"),
+            ]
+            subprocess.Popen(
+                bridge_cmd,
+                env=env,
+                stdout=open(bridge_log, "a"),
+                stderr=subprocess.STDOUT,
+            )
+            print(f"[orch] Spawned PartyKit bridge for {config.room_id} -> {config.partykit_server}/party/{config.partykit_room}")
+
         return room
 
     def probe_socket(self, sock_path: str) -> bool:
