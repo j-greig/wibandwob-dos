@@ -218,6 +218,24 @@ class TestApplyDeltaToIpc:
         assert any("create_window" in a for a in applied)
         assert any("close_window" in a for a in applied)
 
+    def test_failed_commands_logged_with_fail_prefix(self):
+        """IPC failures are logged as 'FAIL <cmd>' so the bridge can surface them.
+
+        When ipc_command returns False (e.g. close_window on unknown ID),
+        apply_delta_to_ipc must still record the attempt with a FAIL prefix
+        rather than silently dropping it. This makes ID-mismatch bugs visible.
+        """
+        with patch("state_diff.ipc_command", return_value=False):
+            applied = apply_delta_to_ipc("/tmp/fake.sock", {
+                "add": [win("w1")],
+                "remove": ["w99"],
+                "update": [{"id": "w99", "x": 5, "y": 5}],
+            })
+        assert all(a.startswith("FAIL ") for a in applied), \
+            f"All commands should fail: {applied}"
+        assert any("create_window" in a for a in applied)
+        assert any("close_window" in a for a in applied)
+
     def test_empty_delta_no_calls(self):
         calls, fake = self._capture()
         with patch("state_diff.ipc_command", side_effect=fake):
