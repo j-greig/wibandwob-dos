@@ -23,20 +23,20 @@ WibWob-DOS reads a layout file on startup and restores a curated window arrangem
 
 ## Stories
 
-- [ ] `s07-env-layout-restore` — read WIBWOB_LAYOUT_PATH at startup, restore layout
-- [ ] `s08-workspace-roundtrip` — verify save then restore produces same window arrangement
+- [x] `s07-env-layout-restore` — read WIBWOB_LAYOUT_PATH at startup, restore layout
+- [x] `s08-workspace-roundtrip` — verify save then restore produces same window arrangement
 
 ## Acceptance Criteria
 
-- [ ] **AC-1:** Setting WIBWOB_LAYOUT_PATH to a valid workspace JSON restores that layout on startup
+- [x] **AC-1:** Setting WIBWOB_LAYOUT_PATH to a valid workspace JSON restores that layout on startup
   - Test: save a layout, set env var, restart, verify windows match
-- [ ] **AC-2:** Missing or invalid layout path logs warning and starts with default desktop
+- [x] **AC-2:** Missing or invalid layout path logs warning and starts with default desktop
   - Test: set env var to nonexistent path, app starts normally with warning in stderr
-- [ ] **AC-3:** Workspace save/restore round-trips — save, restore, save again produces identical JSON
+- [x] **AC-3:** Workspace save/restore round-trips — save, restore, save again produces identical JSON
   - Test: diff the two saved files
 
 ## Status
 
-Status: not-started
+Status: done
 GitHub issue: —
 PR: —
