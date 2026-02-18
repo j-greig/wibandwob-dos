@@ -91,7 +91,7 @@ Spikes can be flat files or directories depending on artifact count.
 
 ### Authority Rule
 
-**GitHub issues are the source of truth for completion state.** Markdown checkboxes are mirrors — update them the same day as the issue state changes. If GitHub and markdown disagree, GitHub wins.
+**`.planning/` docs are the source of truth for work state.** Feature briefs, story briefs, and their checkboxes are where design, scope, ACs, and progress live. GitHub issues exist at the epic level for board-level visibility and PR linkage (`closes #N`). Do not duplicate feature/story/task tracking as separate GitHub issues — the briefs already carry more context than issue bodies ever will.
 
 ### Status Header
 
@@ -133,47 +133,46 @@ Use these and only these checkbox states:
 | `[x]` | Done |
 | `[-]` | Dropped / not applicable |
 
-Link checkboxes to their GitHub issue when one exists:
+Link checkboxes to their GitHub issue when one exists at the epic level:
 
 ```
-- [x] Registry skeleton class (#12)
-- [~] Capability export endpoint (#13)
-- [ ] Parity drift test (#14)
+- [x] Registry skeleton class
+- [~] Capability export endpoint
+- [ ] Parity drift test
 - [-] Web viewer support (out of scope this pass)
 ```
 
 ### Where Progress Lives
 
-| Item | Completion truth | Markdown mirror |
-|------|-----------------|-----------------|
-| Epic | GitHub milestone | `e001-epic-brief.md` feature checklist |
-| Feature | GitHub issue state | `fNN-feature-brief.md` story checklist |
-| Story | GitHub issue state | `sNN-story-brief.md` task/AC checklist |
-| Spike | GitHub issue state | `spkNN-*.md` findings section |
-| Task | GitHub issue checklist | Story brief task list |
+| Item | Truth lives in | GitHub |
+|------|---------------|--------|
+| Epic | `eNNN-epic-brief.md` frontmatter + feature checklist | One issue per epic (board view + PR linkage) |
+| Feature | `fNN-feature-brief.md` story checklist + ACs | No separate issue — brief is sufficient |
+| Story | `sNN-story-brief.md` task/AC checklist | No separate issue — brief is sufficient |
+| Spike | `spkNN-*.md` findings section | Issue if cross-cutting, otherwise brief only |
+| Task | Story brief task list | No issue — checkbox in brief |
 
-<<<<<<< HEAD
-### Parking Lot Container (Canon)
+### Parking Lot
 
-Use `.planning/parking-lot.md` as the global container for cross-cutting `task`/`spike` follow-ons that are not yet promoted to a dedicated epic/feature track.
+Each epic can have an `eNNN-parking-lot.md` for deferred items. Use `.planning/parking-lot.md` for cross-cutting follow-ons not tied to a specific epic.
 
 Rules:
-1. Every parking-lot item must link a GitHub issue.
-2. Use only `task` (implementation) or `spike` (investigation) type labels in the register.
-3. If an item grows beyond one small PR or needs its own story chain, promote it into a proper epic/feature/story path under `.planning/epics/`.
+1. Parking lot items do not need GitHub issues unless promoted to a feature/story.
+2. Use `task` (implementation) or `spike` (investigation) labels in the register.
+3. If an item grows beyond one small PR, promote it into a proper feature/story path.
 
 ### Off-Cuff / Side Work Rule
 
 When work appears mid-stream and is not required to close the current story/feature:
 
-1. Create a GitHub `task` issue (implementation) or `spike` issue (investigation).
-2. Track it either in `.planning/parking-lot.md` or under a `Non-epic follow-ons` note in the parent brief.
-3. Do not mark parent ACs done based on follow-on progress.
+1. Add it to the relevant epic's parking lot or `.planning/parking-lot.md`.
+2. Do not mark parent ACs done based on follow-on progress.
+3. Promote to a feature/story if it needs its own branch.
 
 ## Git Conventions
 
-1. **Issue-first.** Every non-trivial change starts as a GitHub issue. Reference the issue number in commits and PR body.
-2. **Branch-per-issue.** One branch per issue. One logical change per PR.
+1. **Epic issue only.** Each epic gets one GitHub issue for board visibility and PR linkage. Features/stories/tasks live in `.planning/` briefs, not as separate issues.
+2. **Branch-per-epic or per-feature.** One branch per logical unit of work. One logical change per PR.
 3. **No force-push to `main`.** Ever.
 4. **No batching unrelated changes.** If a PR touches command registry *and* paint palette colors, split it.
 5. **PR-sized milestones.** Each PR is small enough to review in one sitting. If you can't describe the change in two sentences, split it.
@@ -181,52 +180,49 @@ When work appears mid-stream and is not required to close the current story/feat
 
 ## Work Item Model (Epic -> Feature -> Story -> Task)
 
-This repo plans work using GitHub issues and PRs by default.
+This repo plans work in `.planning/` docs, with GitHub issues at the epic level only.
 
 ### Hierarchy
 
 1. **Epic**
    - Scope: large architectural outcome across multiple PRs.
-   - Output: architecture change and durable docs/contracts/tests.
+   - Tracked: `.planning/epics/eNNN-*/eNNN-epic-brief.md` + one GitHub issue.
 2. **Feature**
    - Scope: a coherent capability under one epic.
-   - Output: one or more stories.
+   - Tracked: `fNN-feature-brief.md` in the epic directory. No GitHub issue.
 3. **Story**
    - Scope: smallest vertical slice we merge confidently.
-   - Output: usually one PR with tests and docs updates.
+   - Tracked: `sNN-story-brief.md` in the feature directory. No GitHub issue.
 4. **Task**
    - Scope: implementation checklist item inside a story.
-   - Output: code/doc/test step.
+   - Tracked: checkbox in the story brief.
 5. **Spike**
    - Scope: uncertainty reduction only.
-   - Output: findings and decision; no unbounded buildout.
+   - Tracked: `spkNN-*.md`. GitHub issue only if cross-cutting.
 
 ### GitHub Mapping
 
-| Item | GitHub representation | Naming guidance |
-|------|------------------------|-----------------|
-| Epic | Issue + milestone + `epic` label | `E: <outcome>` |
-| Feature | Issue linked to epic + `feature` label | `F: <capability>` |
-| Story | Issue linked to feature + `story` label | `S: <vertical-slice>` |
-| Task | Issue checklist item or child issue + `task` label | concise action |
-| Spike | Separate issue + `spike` label + explicit timebox | `SP: <question>` |
+| Item | GitHub representation | `.planning/` representation |
+|------|----------------------|----------------------------|
+| Epic | Issue + `epic` label | `eNNN-epic-brief.md` (frontmatter + feature checklist) |
+| Feature | — | `fNN-feature-brief.md` (stories + ACs) |
+| Story | — | `sNN-story-brief.md` (tasks + ACs) |
+| Task | — | Checkbox in story brief |
+| Spike | Issue if cross-cutting | `spkNN-*.md` |
 
 Default GitHub templates:
 - `.github/ISSUE_TEMPLATE/epic.yml`
-- `.github/ISSUE_TEMPLATE/feature.yml`
-- `.github/ISSUE_TEMPLATE/story.yml`
 - `.github/ISSUE_TEMPLATE/spike.yml`
 - `.github/pull_request_template.md`
 
-### Issue Requirements
+### Epic Issue Requirements
 
-Every non-trivial issue should include:
-- Problem statement
-- Scope (in/out)
-- Acceptance criteria (AC format below)
-- Test plan
-- Rollback note
-- Links to parent epic/feature
+Every epic issue should include:
+- One-line objective
+- Link to epic brief in `.planning/`
+- Feature checklist (mirrors brief)
+
+Detailed scope, ACs, test plans, and rollback notes live in the feature/story briefs, not in the issue body.
 
 ### Story Sizing Rule
 

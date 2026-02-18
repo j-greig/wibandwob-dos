@@ -9,7 +9,7 @@ depends_on: []
 
 # E007: Browser-Hosted Deployment (Teleport Rooms)
 
-tl;dr: Serve WibWob-DOS to remote users via browser. Zoom-link-style URLs to curated sessions — Twitter OAuth, custom system prompts, persistent rooms, $5 VPS.
+tl;dr: Serve WibWob-DOS to remote users via browser. YAML room configs, ttyd orchestrator, HMAC agent auth, layout restore, IPC safety fix. MVP: a URL serves a curated WibWob room.
 
 ## Objective
 
@@ -72,7 +72,7 @@ python3 tools/monitor/instance_monitor.py
 [Visitor browser] → [wibwob.symbient.life/room/abc123]
        │
        ▼
-[nginx] → Twitter OAuth flow → session cookie
+[nginx] → (auth parked for MVP)
        │
        ▼
 [ttyd instance] → [WibWob-DOS + WIBWOB_INSTANCE=N]
@@ -93,19 +93,20 @@ Target: $5 Hetzner VPS (2GB ARM), 4 concurrent rooms max.
 |----------|--------|-----------|
 | PTY bridge | ttyd | Zero-config, battle-tested, proven in spike |
 | Visitor surface | Curated layout | Host arranges windows + chat. Visitor interacts but can't rearrange. |
-| Auth | Twitter OAuth | Identity for personalisation + rate limiting |
+| Auth | HMAC challenge-response | Shared secret at spawn, ephemeral session keys, ~75 LOC. Twitter OAuth parked. |
 | Preload | System prompt + files | Custom prompt shapes LLM. Markdown/primers as context windows. |
 | Persistence | Persistent room | Session survives disconnect. Visitor returns and picks up. |
 | LLM provider | `anthropic_api` (curl) | No Node.js dependency. API key dialog exists. |
 
-## Candidate Features
+## MVP Features
 
-- **F1: Room Config** — YAML/JSON room definition (layout, prompt, file paths, auth settings)
-- **F2: Room Orchestrator** — CLI/daemon that spawns ttyd+WibWob per room, manages lifecycle
-- **F3: Auth Layer** — nginx + Twitter OAuth proxy, session tokens, rate limiting
-- **F4: Layout Restore** — replay window layout from room config via IPC commands
-- **F5: State Persistence** — serialise/restore chat history + desktop state across disconnects
-- **F6: IPC Safety** — fix socket unlink race (probe before unlink), check `start()` return value
+- [~] **F01: Room Config** — YAML schema, validation, example config → `f01-room-config/`
+- [ ] **F02: Room Orchestrator** — spawn ttyd+WibWob per room, health check, restart → `f02-room-orchestrator/`
+- [ ] **F03: Agent Auth** — HMAC challenge-response over IPC sockets → `f03-agent-auth/`
+- [ ] **F04: Layout Restore** — WIBWOB_LAYOUT_PATH env var, auto-restore on startup → `f04-layout-restore/`
+- [ ] **F05: IPC Safety** — probe-before-unlink, bind failure propagation → `f05-ipc-safety/`
+
+Parked items (Twitter OAuth, state persistence, rate limiting, etc): `e007-parking-lot.md`
 
 ## Open Questions
 
@@ -130,15 +131,20 @@ Resolved in planning report:
 - **LLM cost** — unbounded without rate limiting per visitor.
 - **Right-edge clipping** — xterm.js reports wide terminal, TUI draws to that width. Fix: cap cols or use fit-addon.
 
-## Definition of Done
+## Definition of Done (MVP)
 
-- [ ] Room config format defined and documented
-- [ ] At least 1 room serveable to a browser visitor with auth
+- [ ] Room config YAML schema defined, validated, documented
+- [ ] Orchestrator spawns ttyd+WibWob from config, restarts on failure
+- [ ] Agent auth via HMAC challenge-response on IPC sockets
 - [ ] Layout restores from config on room join
-- [ ] Chat persists across visitor disconnect/reconnect
-- [ ] Deployed and reachable on Hetzner VPS
-- [ ] IPC unlink race fixed
-- [ ] Rate limiting on LLM calls per visitor
+- [ ] IPC unlink race fixed — no silent socket theft
+- [ ] At least 1 room serveable to a browser visitor via URL
+
+Deferred from MVP (see parking lot):
+- ~~Chat persists across disconnect~~ (parked)
+- ~~Deployed on Hetzner VPS~~ (parked — local serving first)
+- ~~Rate limiting on LLM calls~~ (parked — needs visitor identity)
+- ~~Twitter OAuth~~ (parked)
 
 ## Status
 
