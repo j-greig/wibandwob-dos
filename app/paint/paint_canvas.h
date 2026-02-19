@@ -52,6 +52,7 @@ public:
 
     virtual void draw() override;
     virtual void handleEvent(TEvent &ev) override;
+    virtual void changeBounds(const TRect &bounds) override;
     virtual void sizeLimits(TPoint &min, TPoint &max) override;
     virtual void setState(ushort aState, Boolean enable) override;
 

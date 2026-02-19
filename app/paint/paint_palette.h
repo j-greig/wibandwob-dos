@@ -28,7 +28,7 @@ public:
     virtual void handleEvent(TEvent &ev) override;
     virtual void sizeLimits(TPoint &min, TPoint &max) override {
         TView::sizeLimits(min, max);
-        min.x = 18; min.y = 8;
+        min.x = 18; min.y = 16;
     }
 
     void setCanvas(TPaintCanvasView *c) { canvas = c; }

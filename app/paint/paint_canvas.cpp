@@ -301,6 +301,29 @@ void TPaintCanvasView::handleEvent(TEvent &ev)
     }
 }
 
+void TPaintCanvasView::changeBounds(const TRect &bounds)
+{
+    TView::changeBounds(bounds);
+    int newCols = size.x;
+    int newRows = size.y;
+    if (newCols == cols && newRows == rows) return;
+
+    std::vector<PaintCell> newBuf(newCols * newRows);
+    for (auto &c : newBuf) {
+        c.uOn = false; c.lOn = false; c.uFg = fg; c.lFg = fg;
+        c.qMask = 0; c.qFg = fg; c.textChar = 0; c.textFg = 7; c.textBg = 0;
+    }
+    int copyW = std::min(cols, newCols);
+    int copyH = std::min(rows, newRows);
+    for (int y = 0; y < copyH; ++y)
+        for (int x = 0; x < copyW; ++x)
+            newBuf[y * newCols + x] = buffer[y * cols + x];
+
+    buffer = std::move(newBuf);
+    cols = newCols;
+    rows = newRows;
+}
+
 void TPaintCanvasView::sizeLimits(TPoint &min, TPoint &max)
 {
     TView::sizeLimits(min, max);
