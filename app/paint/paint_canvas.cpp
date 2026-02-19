@@ -232,7 +232,7 @@ void TPaintCanvasView::handleEvent(TEvent &ev)
             case kbUp:    moveCursor( 0,-1, shift); clearEvent(ev); break;
             case kbDown:  moveCursor( 0, 1, shift); clearEvent(ev); break;
             default:
-                if (pixelMode == PixelMode::Text && ctx && ctx->tool == PaintContext::Text) {
+                if (ctx && ctx->tool == PaintContext::Text) {
                     char ch = ev.keyDown.charScan.charCode;
                     if (ch == '\b' || ev.keyDown.keyCode == kbBack) {
                         // Backspace: move left, erase

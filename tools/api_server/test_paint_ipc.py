@@ -166,6 +166,13 @@ def test_text_tool_focus():
     # Tool panel must bail on keyboard when Text tool is active
     assert "ctx->tool == PaintContext::Text" in tools_src and "return" in tools_src, \
         "tool panel does not yield keyboard when Text tool active"
+
+    # Keyboard handler must NOT gate text input on pixelMode == PixelMode::Text
+    # (pixelMode is never set to Text, so that double-gate would silently block all typing)
+    handle_start = canvas_src.find("TPaintCanvasView::handleEvent")
+    handle_body = canvas_src[handle_start:]
+    assert "pixelMode == PixelMode::Text && ctx && ctx->tool == PaintContext::Text" not in handle_body, \
+        "keyboard handler still has redundant pixelMode gate that blocks text input"
     print("PASS AC-10: text tool focus implemented")
 
 
