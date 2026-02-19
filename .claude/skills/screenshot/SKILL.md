@@ -43,10 +43,6 @@ Flags compose: `/screenshot --log --diff --window Paint` works.
 
 If the API server isn't running, the script runs `start_api_server.sh` and waits up to 10s. If the TUI app isn't running, capture will fail with a clear error.
 
-## Known quirk
-
-`POST /screenshot` returns `screenshot_missing_output` even when files are written (timing bug in controller.py polling loop). The skill bypasses this by reading the .txt file directly from disk.
-
 ## Output format
 
 ````
