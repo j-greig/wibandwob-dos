@@ -54,6 +54,10 @@ void TPaintCanvasView::put(int x, int y, bool on)
             else    { c.qMask &= ~bit; }
             break;
         }
+        case PixelMode::Text:
+            // In text mode, put() operates as full-block toggle
+            c.uOn = on; c.lOn = on; c.uFg = fg; c.lFg = fg;
+            break;
     }
 }
 
@@ -195,6 +199,12 @@ void TPaintCanvasView::toggleDraw()
         case PixelMode::Quarter: {
             uint8_t bit = (ySub ? 0x4 : 0x1) << xSub;
             if (c.qMask & bit) c.qMask &= ~bit; else { c.qMask |= bit; c.qFg = fg; }
+            break;
+        }
+        case PixelMode::Text: {
+            // Toggle text char on/off
+            if (c.textChar != 0) { c.textChar = 0; }
+            else { c.textChar = '#'; c.textFg = fg; c.textBg = bg; }
             break;
         }
     }

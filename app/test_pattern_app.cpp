@@ -707,6 +707,7 @@ private:
     friend void api_spawn_monster_verse(TTestPatternApp&, const TRect* bounds);
     friend void api_spawn_monster_portal(TTestPatternApp&, const TRect* bounds);
     friend void api_spawn_paint(TTestPatternApp&, const TRect* bounds);
+    friend TPaintCanvasView* api_find_paint_canvas(TTestPatternApp&, const std::string&);
     friend std::string api_browser_fetch(TTestPatternApp&, const std::string& url);
     friend std::string api_send_text(TTestPatternApp&, const std::string&, const std::string&, 
                                      const std::string&, const std::string&);
@@ -3139,4 +3140,12 @@ void api_spawn_paint(TTestPatternApp& app, const TRect* bounds) {
     TWindow* pw = createPaintWindow(r);
     app.deskTop->insert(pw);
     app.registerWindow(pw);
+}
+
+TPaintCanvasView* api_find_paint_canvas(TTestPatternApp& app, const std::string& id) {
+    TWindow* w = app.findWindowById(id);
+    if (!w) return nullptr;
+    auto *pw = dynamic_cast<TPaintWindow*>(w);
+    if (!pw) return nullptr;
+    return pw->getCanvas();
 }

@@ -88,7 +88,10 @@ static std::string base64_decode(const std::string& encoded_string) {
 
 // Include TRect definition
 #define Uses_TRect
+#define Uses_TWindow
 #include <tvision/tv.h>
+
+#include "paint/paint_window.h"
 
 // Forward declarations of helper methods implemented in test_pattern_app.cpp.
 extern void api_spawn_test(TTestPatternApp& app);
@@ -114,6 +117,8 @@ extern std::string api_close_window(TTestPatternApp& app, const std::string& id)
 extern std::string api_get_canvas_size(TTestPatternApp& app);
 extern void api_spawn_text_editor(TTestPatternApp& app, const TRect* bounds);
 extern void api_spawn_browser(TTestPatternApp& app, const TRect* bounds);
+extern void api_spawn_paint(TTestPatternApp& app, const TRect* bounds);
+extern TPaintCanvasView* api_find_paint_canvas(TTestPatternApp& app, const std::string& id);
 extern std::string api_browser_fetch(TTestPatternApp& app, const std::string& url);
 extern std::string api_send_text(TTestPatternApp& app, const std::string& id, 
                                  const std::string& content, const std::string& mode, 
@@ -242,6 +247,8 @@ void ApiIpcServer::poll() {
             api_spawn_text_editor(*app_, bounds);
         } else if (type == "browser") {
             api_spawn_browser(*app_, bounds);
+        } else if (type == "paint") {
+            api_spawn_paint(*app_, bounds);
         } else {
             resp = "err unknown type\n";
         }
@@ -417,6 +424,122 @@ void ApiIpcServer::poll() {
             resp = api_browser_fetch(*app_, url_it->second) + "\n";
         } else {
             resp = "err missing url\n";
+        }
+    } else if (cmd == "paint_cell") {
+        auto id_it = kv.find("id");
+        auto x_it = kv.find("x");
+        auto y_it = kv.find("y");
+        if (id_it == kv.end() || x_it == kv.end() || y_it == kv.end()) {
+            resp = "err missing id/x/y\n";
+        } else {
+            auto *canvas = api_find_paint_canvas(*app_, id_it->second);
+            if (!canvas) { resp = "err paint window not found\n"; }
+            else {
+                int x = std::atoi(x_it->second.c_str());
+                int y = std::atoi(y_it->second.c_str());
+                auto fg_it = kv.find("fg");
+                auto bg_it = kv.find("bg");
+                uint8_t fg = fg_it != kv.end() ? std::atoi(fg_it->second.c_str()) : 15;
+                uint8_t bg = bg_it != kv.end() ? std::atoi(bg_it->second.c_str()) : 0;
+                canvas->putCell(x, y, fg, bg);
+                resp = "ok\n";
+            }
+        }
+    } else if (cmd == "paint_text") {
+        auto id_it = kv.find("id");
+        auto x_it = kv.find("x");
+        auto y_it = kv.find("y");
+        auto text_it = kv.find("text");
+        if (id_it == kv.end() || x_it == kv.end() || y_it == kv.end() || text_it == kv.end()) {
+            resp = "err missing id/x/y/text\n";
+        } else {
+            auto *canvas = api_find_paint_canvas(*app_, id_it->second);
+            if (!canvas) { resp = "err paint window not found\n"; }
+            else {
+                int x = std::atoi(x_it->second.c_str());
+                int y = std::atoi(y_it->second.c_str());
+                auto fg_it = kv.find("fg");
+                auto bg_it = kv.find("bg");
+                uint8_t fg = fg_it != kv.end() ? std::atoi(fg_it->second.c_str()) : 15;
+                uint8_t bg = bg_it != kv.end() ? std::atoi(bg_it->second.c_str()) : 0;
+                canvas->putText(x, y, text_it->second, fg, bg);
+                resp = "ok\n";
+            }
+        }
+    } else if (cmd == "paint_line") {
+        auto id_it = kv.find("id");
+        auto x0_it = kv.find("x0"); auto y0_it = kv.find("y0");
+        auto x1_it = kv.find("x1"); auto y1_it = kv.find("y1");
+        if (id_it == kv.end() || x0_it == kv.end() || y0_it == kv.end() ||
+            x1_it == kv.end() || y1_it == kv.end()) {
+            resp = "err missing id/x0/y0/x1/y1\n";
+        } else {
+            auto *canvas = api_find_paint_canvas(*app_, id_it->second);
+            if (!canvas) { resp = "err paint window not found\n"; }
+            else {
+                int x0 = std::atoi(x0_it->second.c_str());
+                int y0 = std::atoi(y0_it->second.c_str());
+                int x1 = std::atoi(x1_it->second.c_str());
+                int y1 = std::atoi(y1_it->second.c_str());
+                auto erase_it = kv.find("erase");
+                bool erase = (erase_it != kv.end() && erase_it->second == "1");
+                canvas->putLine(x0, y0, x1, y1, erase);
+                resp = "ok\n";
+            }
+        }
+    } else if (cmd == "paint_rect") {
+        auto id_it = kv.find("id");
+        auto x0_it = kv.find("x0"); auto y0_it = kv.find("y0");
+        auto x1_it = kv.find("x1"); auto y1_it = kv.find("y1");
+        if (id_it == kv.end() || x0_it == kv.end() || y0_it == kv.end() ||
+            x1_it == kv.end() || y1_it == kv.end()) {
+            resp = "err missing id/x0/y0/x1/y1\n";
+        } else {
+            auto *canvas = api_find_paint_canvas(*app_, id_it->second);
+            if (!canvas) { resp = "err paint window not found\n"; }
+            else {
+                int x0 = std::atoi(x0_it->second.c_str());
+                int y0 = std::atoi(y0_it->second.c_str());
+                int x1 = std::atoi(x1_it->second.c_str());
+                int y1 = std::atoi(y1_it->second.c_str());
+                auto erase_it = kv.find("erase");
+                bool erase = (erase_it != kv.end() && erase_it->second == "1");
+                canvas->putRect(x0, y0, x1, y1, erase);
+                resp = "ok\n";
+            }
+        }
+    } else if (cmd == "paint_export") {
+        auto id_it = kv.find("id");
+        if (id_it == kv.end()) {
+            resp = "err missing id\n";
+        } else {
+            auto *canvas = api_find_paint_canvas(*app_, id_it->second);
+            if (!canvas) { resp = "err paint window not found\n"; }
+            else {
+                std::string text = canvas->exportText();
+                auto path_it = kv.find("path");
+                if (path_it != kv.end() && !path_it->second.empty()) {
+                    // Write to file
+                    std::ofstream out(path_it->second.c_str());
+                    if (out.is_open()) {
+                        out << text;
+                        out.close();
+                        resp = "ok\n";
+                    } else {
+                        resp = "err cannot write file\n";
+                    }
+                } else {
+                    // Return inline as JSON
+                    std::string escaped;
+                    for (char ch : text) {
+                        if (ch == '\\') escaped += "\\\\";
+                        else if (ch == '"') escaped += "\\\"";
+                        else if (ch == '\n') escaped += "\\n";
+                        else escaped += ch;
+                    }
+                    resp = "{\"text\":\"" + escaped + "\"}\n";
+                }
+            }
         }
     } else {
         resp = "err unknown cmd\n";
