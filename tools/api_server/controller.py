@@ -82,8 +82,15 @@ class Controller:
         # Batch layout support
         self._requests: Dict[str, BatchLayoutResponse] = {}
         self._timelines: Dict[str, List[asyncio.Task]] = {}
-        # Repo root (two levels up from this file)
-        self._repo_root = Path(__file__).resolve().parents[2]
+        # Repo root: prefer env var, fall back to two levels up from this file.
+        # IMPORTANT: start_api_server.sh sets WIBWOB_REPO_ROOT to avoid cross-checkout
+        # mismatch (e.g. API server in wibandwob-dos-xterm, TUI in wibandwob-dos).
+        env_root = os.environ.get("WIBWOB_REPO_ROOT")
+        if env_root:
+            self._repo_root = Path(env_root).resolve()
+        else:
+            self._repo_root = Path(__file__).resolve().parents[2]
+        print(f"[controller] repo_root={self._repo_root}")
         default_log_path = self._repo_root / "logs" / "state" / "events.ndjson"
         self._state_event_log_path = Path(os.environ.get("WWD_STATE_EVENT_LOG_PATH", str(default_log_path)))
 

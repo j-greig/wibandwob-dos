@@ -39,16 +39,13 @@ uv run tools/api_server/test_move.py   # Test rapid window movement
 curl http://127.0.0.1:8089/health
 curl http://127.0.0.1:8089/state
 
-# TUI screenshot capture (requires running TUI + API server)
-curl -s -X POST http://127.0.0.1:8089/screenshot   # triggers C++ frame capture via IPC
-ls -t logs/screenshots/tui_*.txt | head -1           # latest plain-text capture
-cat "$(ls -t logs/screenshots/tui_*.txt | head -1)"  # read it — full screen buffer as text
-
-# Structural state (JSON: windows, positions, sizes)
-curl -s http://127.0.0.1:8089/state | python3 -m json.tool
+# TUI screenshot — use /screenshot skill for full pipeline
+# Quick manual: trigger capture, read latest text dump
+curl -s -X POST http://127.0.0.1:8089/screenshot
+cat "$(ls -t logs/screenshots/tui_*.txt | head -1)"
 ```
 
-**Agent visual inspection**: to "see" the TUI, trigger a screenshot then read the `.txt` file. It contains every cell of the Turbo Vision screen buffer as plain text (187x63 at full-screen). The `.ans` variant has ANSI colour codes. `GET /state` returns a JSON structural view (window list, rects, canvas size) without visual rendering.
+**Agent visual inspection**: use `/screenshot` skill (`.claude/skills/screenshot/`) which handles capture, state JSON, diff, window crop, and auto-recovery. See SKILL.md there for all modes.
 
 No C++ unit test framework is configured. C++ testing is manual via UI interaction or API calls.
 
@@ -157,6 +154,7 @@ Content packs in `modules/` (public, shipped) and `modules-private/` (user conte
 |----------|--------|
 | `WIBWOB_INSTANCE` | Instance ID (e.g. `1`, `2`). Drives socket path `/tmp/wibwob_N.sock`. Unset = legacy `/tmp/test_pattern_app.sock` |
 | `TV_IPC_SOCK` | Explicit socket path override (Python only, takes priority over `WIBWOB_INSTANCE`) |
+| `WIBWOB_REPO_ROOT` | Repo root for API server (set automatically by `start_api_server.sh`). Prevents cross-checkout path mismatch when API server and TUI run from different repo copies |
 
 Launch multiple instances: `./tools/scripts/launch_tmux.sh [N]` (tmux + monitor sidebar).
 
