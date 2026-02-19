@@ -1,7 +1,7 @@
 ---
 id: E010
 title: Paint Canvas Integration
-status: in-progress
+status: done
 issue: 66
 pr: ~
 depends_on: [E001]
@@ -13,7 +13,7 @@ depends_on: [E001]
 
 ## Status
 
-Status: in-progress
+Status: done
 GitHub issue: #66
 PR: ~
 
