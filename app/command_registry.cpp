@@ -9,6 +9,7 @@ extern void api_toggle_scramble(TTestPatternApp& app);
 extern void api_expand_scramble(TTestPatternApp& app);
 extern std::string api_scramble_say(TTestPatternApp& app, const std::string& text);
 extern std::string api_scramble_pet(TTestPatternApp& app);
+extern std::string api_chat_receive(TTestPatternApp& app, const std::string& sender, const std::string& text);
 extern void api_tile(TTestPatternApp& app);
 extern void api_close_all(TTestPatternApp& app);
 extern void api_save_workspace(TTestPatternApp& app);
@@ -38,6 +39,7 @@ const std::vector<CommandCapability>& get_command_capabilities() {
         {"scramble_say", "Send a message to Scramble chat (requires text param)", true},
         {"scramble_pet", "Pet the cat. She allows it.", false},
         {"new_paint_canvas", "Open a new paint canvas window", false},
+        {"chat_receive", "Display a remote chat message in Scramble (sender + text params)", true},
     };
     return capabilities;
 }
@@ -147,6 +149,14 @@ std::string exec_registry_command(
     if (name == "new_paint_canvas") {
         api_spawn_paint(app, nullptr);
         return "ok";
+    }
+    if (name == "chat_receive") {
+        auto itSender = kv.find("sender");
+        auto itText = kv.find("text");
+        if (itText == kv.end() || itText->second.empty())
+            return "err missing text";
+        std::string sender = (itSender != kv.end()) ? itSender->second : "remote";
+        return api_chat_receive(app, sender, itText->second);
     }
     return "err unknown command";
 }

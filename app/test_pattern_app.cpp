@@ -63,6 +63,8 @@
 #include "generative_monster_verse_view.h"
 // Generative art: Monster Cam (Emoji)
 #include "generative_monster_cam_view.h"
+#include "game_of_life_view.h"
+#include "animated_ascii_view.h"
 // Generative art: ASCII Cam
 // DISABLED: #include "generative_ascii_cam_view.h"
 // API-controllable text editor
@@ -97,10 +99,12 @@ class TWindow; TWindow* createAsciiGridDemoWindow(const TRect &bounds);
 #include <vector>
 #include <cstring>
 #include <map>
+#include <deque>
 #include <dirent.h>
 // Local API IPC bridge (Unix domain socket)
 #include "api_ipc.h"
 #include "command_registry.h"
+#include "window_type_registry.h"
 
 // Find first existing primer directory across module paths.
 // Checks modules-private/*/primers/ then modules/*/primers/ then legacy app/primers/.
@@ -202,8 +206,9 @@ const ushort cmScrambleExpand = 181;  // Scramble expand/shrink
 
 // Help menu commands
 const ushort cmAbout = 129;
-const ushort cmKeyboardShortcuts = 130;
-const ushort cmDebugInfo = 131;
+const ushort cmKeyboardShortcuts = 210;
+const ushort cmDebugInfo = 211;
+const ushort cmApiKeyHelp = 212;
 
 // Glitch menu commands
 const ushort cmToggleGlitchMode = 140;
@@ -494,7 +499,8 @@ class TFrameAnimationWindow : public TWindow
 public:
     TFrameAnimationWindow(const TRect& bounds, const char* aTitle, const std::string& filePath) :
         TWindow(bounds, aTitle, wnNoNumber),
-        TWindowInit(&TFrameAnimationWindow::initFrame)
+        TWindowInit(&TFrameAnimationWindow::initFrame),
+        filePath_(filePath)
     {
         options |= ofTileable;  // Enable cascade/tile functionality
         
@@ -538,6 +544,11 @@ public:
     {
         return new TNoTitleFrame(r);
     }
+
+    const std::string& getFilePath() const { return filePath_; }
+
+private:
+    std::string filePath_;
 };
 
 /*---------------------------------------------------------*/
@@ -621,42 +632,79 @@ private:
         }
     }
 
+    // Chat log for multiplayer relay (outgoing messages from local Scramble)
+    struct ChatEntry { int seq; std::string sender; std::string text; };
+    std::deque<ChatEntry> chatLog_;
+    int chatSeq_ = 0;
+    static constexpr int kChatLogMax = 50;
+
     // API/IPC registry for per-window control
     int apiIdCounter = 1;
     std::map<TWindow*, std::string> winToId;
     std::map<std::string, TWindow*> idToWin;
+    std::string lastRegisteredWindowId_;
     
-    std::string registerWindow(TWindow* w) {
+    std::string registerWindow(TWindow* w, bool emit_event = true) {
         if (!w) return std::string();
         auto it = winToId.find(w);
-        if (it != winToId.end()) return it->second;
+        if (it != winToId.end()) {
+            lastRegisteredWindowId_ = it->second;
+            return it->second;
+        }
         char buf[32];
         std::snprintf(buf, sizeof(buf), "w%d", apiIdCounter++);
         std::string id(buf);
         winToId[w] = id;
         idToWin[id] = w;
+        lastRegisteredWindowId_ = id;
+        // Notify event subscribers that state has changed.
+        if (emit_event && ipcServer) {
+            std::string payload = std::string("{\"id\":\"") + id + "\"}";
+            ipcServer->publish_event("state_changed", payload);
+        }
         return id;
     }
     
     TWindow* findWindowById(const std::string& id) {
-        auto it = idToWin.find(id);
-        if (it != idToWin.end()) return it->second;
-        // Fallback: scan desktop to refresh mapping if needed
-        // Rebuild maps for current windows
-        winToId.clear();
-        idToWin.clear();
+        // Scan desktop to discover unregistered windows and purge stale entries.
+        // Must scan first so stale pointers are removed before we return one.
+        // IMPORTANT: do NOT clear existing maps — that would reassign IDs for
+        // already-known windows and cause multiplayer desync.
+        std::vector<TWindow*> activeWins;
         TView *start = deskTop->first();
         if (start) {
             TView *v = start;
             do {
                 TWindow *w = dynamic_cast<TWindow*>(v);
                 if (w) {
-                    registerWindow(w);
+                    activeWins.push_back(w);
+                    if (winToId.find(w) == winToId.end()) {
+                        // Unregistered window — give it a stable ID without firing an event.
+                        char buf[32];
+                        std::snprintf(buf, sizeof(buf), "w%d", apiIdCounter++);
+                        std::string new_id(buf);
+                        winToId[w] = new_id;
+                        idToWin[new_id] = w;
+                    }
                 }
                 v = v->next;
             } while (v != start);
         }
-        it = idToWin.find(id);
+        // Purge stale entries (windows closed since last scan).
+        {
+            auto it = winToId.begin();
+            while (it != winToId.end()) {
+                bool alive = false;
+                for (auto* aw : activeWins) { if (aw == it->first) { alive = true; break; } }
+                if (!alive) {
+                    idToWin.erase(it->second);
+                    it = winToId.erase(it);
+                } else {
+                    ++it;
+                }
+            }
+        }
+        auto it = idToWin.find(id);
         if (it != idToWin.end()) return it->second;
         return nullptr;
     }
@@ -677,6 +725,7 @@ private:
     friend void api_expand_scramble(TTestPatternApp&);
     friend std::string api_scramble_say(TTestPatternApp&, const std::string&);
     friend std::string api_scramble_pet(TTestPatternApp&);
+    friend std::string api_chat_receive(TTestPatternApp&, const std::string&, const std::string&);
     friend void api_tile(TTestPatternApp&);
     friend void api_close_all(TTestPatternApp&);
     friend void api_set_pattern_mode(TTestPatternApp&, const std::string&);
@@ -744,13 +793,23 @@ TTestPatternApp::TTestPatternApp() :
     } else {
         fprintf(stderr, "[wibwob] instance=(none) socket=%s\n", sockPath.c_str());
     }
-    ipcServer->start(sockPath);
-    fprintf(stderr, "[wibwob] IPC server started\n");
+    if (!ipcServer->start(sockPath)) {
+        fprintf(stderr, "[wibwob] ERROR: IPC server failed to start on %s\n", sockPath.c_str());
+    } else {
+        fprintf(stderr, "[wibwob] IPC server started on %s\n", sockPath.c_str());
+    }
+
+    // Auto-restore layout from env var (room deployment).
+    const char* layoutPath = std::getenv("WIBWOB_LAYOUT_PATH");
+    if (layoutPath && layoutPath[0] != '\0') {
+        fprintf(stderr, "[wibwob] Restoring layout from WIBWOB_LAYOUT_PATH=%s\n", layoutPath);
+        if (!loadWorkspaceFromFile(layoutPath)) {
+            fprintf(stderr, "[wibwob] WARNING: Failed to restore layout from %s\n", layoutPath);
+        }
+    }
 
     // Init Scramble engine (KB + Haiku client).
     scrambleEngine.init(".");
-
-    // No wallpaper initialization.
 }
 
 void TTestPatternApp::handleEvent(TEvent& event)
@@ -839,27 +898,13 @@ void TTestPatternApp::handleEvent(TEvent& event)
                 
             // Edit menu commands
                 
-            // View menu commands  
-            case cmZoomIn:
-                messageBox("Zoom In coming soon!", mfInformation | mfOKButton);
-                clearEvent(event);
-                break;
-            case cmZoomOut:
-                messageBox("Zoom Out coming soon!", mfInformation | mfOKButton);
-                clearEvent(event);
-                break;
-            case cmActualSize:
-                messageBox("Actual Size coming soon!", mfInformation | mfOKButton);
-                clearEvent(event);
-                break;
-            case cmFullScreen:
-                messageBox("Full Screen mode coming soon!", mfInformation | mfOKButton);
-                clearEvent(event);
-                break;
+            // REMOVED E009: cmZoomIn/Out/ActualSize/FullScreen (placeholders, no menu items)
             case cmTextEditor: {
                 TRect r = deskTop->getExtent();
                 r.grow(-5, -3); // Leave some margin
-                deskTop->insert(createTextEditorWindow(r));
+                auto *w = createTextEditorWindow(r);
+                deskTop->insert(w);
+                registerWindow(w);
                 clearEvent(event);
                 break;
             }
@@ -998,83 +1043,21 @@ void TTestPatternApp::handleEvent(TEvent& event)
                 clearEvent(event);
                 break;
             }
-            case cmWindowBgColor: {
-                // Find the focused window and check if it supports background color
-                TView *focused = deskTop ? deskTop->current : nullptr;
-                if (!focused) {
-                    messageBox("No window is currently focused.", mfInformation | mfOKButton);
-                    break;
-                }
-                
-                // Check if it's a text view or frame player view
-                auto *textView = dynamic_cast<TTextFileView*>(focused);
-                auto *frameView = dynamic_cast<FrameFilePlayerView*>(focused);
-                
-                if (!textView && !frameView) {
-                    // Try looking inside the window if it's a TWindow
-                    if (auto *window = dynamic_cast<TWindow*>(focused)) {
-                        auto findTarget = [](TView *p, void *out) -> Boolean {
-                            if (!p) return False;
-                            TView **pp = (TView**)out;
-                            if (*pp) return False;
-                            if (dynamic_cast<TTextFileView*>(p) || dynamic_cast<FrameFilePlayerView*>(p)) {
-                                *pp = p; return True;
-                            }
-                            return False;
-                        };
-                        TView *target = nullptr;
-                        window->firstThat(findTarget, &target);
-                        textView = dynamic_cast<TTextFileView*>(target);
-                        frameView = dynamic_cast<FrameFilePlayerView*>(target);
-                    }
-                }
-                
-                if (textView) {
-                    textView->openBackgroundDialog();
-                } else if (frameView) {
-                    frameView->openBackgroundDialog();
-                } else {
-                    messageBox("The focused window doesn't support background color customization.", mfInformation | mfOKButton);
-                }
-                clearEvent(event);
-                break;
-            }
+            // REMOVED E009: cmWindowBgColor (Background Color retired, no menu item)
                 
             // Tools menu commands
             case cmWibWobChat:
                 newWibWobWindow();
                 clearEvent(event);
                 break;
-            case cmWibWobTestA:
-                newWibWobTestWindowA();
-                clearEvent(event);
-                break;
-            case cmWibWobTestB:
-                newWibWobTestWindowB();
-                clearEvent(event);
-                break;
-            case cmWibWobTestC:
-                newWibWobTestWindowC();
-                clearEvent(event);
-                break;
+            // REMOVED E009: cmWibWobTestA/B/C (dev-only, no menu items)
             case cmRepaint:
                 if (deskTop) {
                     deskTop->drawView();
                 }
                 clearEvent(event);
                 break;
-            case cmAnsiEditor:
-                messageBox("ANSI Editor coming soon!", mfInformation | mfOKButton);
-                clearEvent(event);
-                break;
-            case cmPaintTools:
-                messageBox("Paint Tools coming soon!", mfInformation | mfOKButton);
-                clearEvent(event);
-                break;
-            case cmAnimationStudio:
-                messageBox("Animation Studio coming soon!", mfInformation | mfOKButton);
-                clearEvent(event);
-                break;
+            // REMOVED E009: cmAnsiEditor, cmPaintTools, cmAnimationStudio (placeholders, no menu items)
             case cmQuantumPrinter:
                 messageBox("🚀 QUANTUM PRINTER ACTIVATED! 🚀\n\nPrinting reality at 42Hz...", mfInformation | mfOKButton);
                 clearEvent(event);
@@ -1089,114 +1072,51 @@ void TTestPatternApp::handleEvent(TEvent& event)
                 messageBox("WIBWOBWORLD Test Pattern Generator\n\nBuilt with Turbo Vision\nつ◕‿◕‿◕༽つ", mfInformation | mfOKButton);
                 clearEvent(event);
                 break;
+            case cmKeyboardShortcuts:
+                messageBox(
+                    "Keyboard Shortcuts\n\n"
+                    "Ctrl+N   New Test Pattern\n"
+                    "Ctrl+D   New Animation\n"
+                    "Ctrl+O   Open Text/Animation\n"
+                    "Ctrl+B   Browser\n"
+                    "Ctrl+S   Save Workspace\n"
+                    "Ctrl+P   Screenshot\n"
+                    "Ctrl+Ins Copy Page\n"
+                    "F5       Repaint\n"
+                    "F6       Next Window\n"
+                    "Shift+F6 Previous Window\n"
+                    "F8       Scramble Cat\n"
+                    "Shift+F8 Scramble Expand\n"
+                    "F12      Wib&Wob Chat\n"
+                    "Alt+F3   Close Window\n"
+                    "Alt+X    Exit",
+                    mfInformation | mfOKButton);
+                clearEvent(event);
+                break;
+            case cmApiKeyHelp:
+                messageBox(
+                    "API Key (ANTHROPIC_API_KEY)\n\n"
+                    "Powers two features:\n"
+                    "  Scramble Cat - Claude Haiku brain\n"
+                    "  Wib&Wob Chat - if anthropic_api\n"
+                    "    provider is active in config\n\n"
+                    "Set via:\n"
+                    "  1. ANTHROPIC_API_KEY env var\n"
+                    "     (in ~/.zshrc or .env file)\n"
+                    "  2. Tools > API Key dialog\n"
+                    "     (in-memory only, lost on exit)\n\n"
+                    "Dialog overrides env var at runtime.\n"
+                    "Neither is saved to app config.\n\n"
+                    "Provider: app/llm/config/llm_config.json",
+                    mfInformation | mfOKButton);
+                clearEvent(event);
+                break;
+
+            // REMOVED E009: entire Glitch Effects submenu handlers
+            // (cmToggleGlitchMode, cmGlitchScatter, cmGlitchColorBleed,
+            //  cmGlitchRadialDistort, cmGlitchDiagonalScatter,
+            //  cmCaptureGlitchedFrame, cmResetGlitchParams, cmGlitchSettings)
                 
-            // Glitch menu commands
-            case cmToggleGlitchMode: {
-                bool currentMode = getGlitchEngine().isGlitchModeEnabled();
-                getGlitchEngine().enableGlitchMode(!currentMode);
-                std::string msg = !currentMode ? 
-                    "Glitch mode ENABLED! Visual corruption effects are now active." :
-                    "Glitch mode disabled. Normal rendering restored.";
-                messageBox(msg.c_str(), mfInformation | mfOKButton);
-                // Update menu checkmark (would need menu refresh)
-                clearEvent(event);
-                break;
-            }
-            case cmGlitchScatter: {
-                if (!getGlitchEngine().isGlitchModeEnabled()) {
-                    messageBox("Enable Glitch Mode first to use scatter effects.", mfWarning | mfOKButton);
-                } else {
-                    GlitchParams params = getGlitchEngine().getGlitchParams();
-                    params.scatterIntensity = 0.8f;
-                    params.scatterRadius = 8;
-                    getGlitchEngine().setGlitchParams(params);
-                    messageBox("Scatter pattern applied! Characters will scatter during resize.", mfInformation | mfOKButton);
-                }
-                clearEvent(event);
-                break;
-            }
-            case cmGlitchColorBleed: {
-                if (!getGlitchEngine().isGlitchModeEnabled()) {
-                    messageBox("Enable Glitch Mode first to use color bleeding.", mfWarning | mfOKButton);
-                } else {
-                    GlitchParams params = getGlitchEngine().getGlitchParams();
-                    params.colorBleedChance = 0.6f;
-                    params.colorBleedDistance = 5;
-                    getGlitchEngine().setGlitchParams(params);
-                    messageBox("Color bleed applied! Colors will bleed across character positions.", mfInformation | mfOKButton);
-                }
-                clearEvent(event);
-                break;
-            }
-            case cmGlitchRadialDistort: {
-                if (!getGlitchEngine().isGlitchModeEnabled()) {
-                    messageBox("Enable Glitch Mode first to use radial distortion.", mfWarning | mfOKButton);
-                } else {
-                    // Apply radial distortion to current active window
-                    if (TView* activeView = deskTop->current) {
-                        TRect bounds = activeView->getBounds();
-                        int centerX = bounds.a.x + (bounds.b.x - bounds.a.x) / 2;
-                        int centerY = bounds.a.y + (bounds.b.y - bounds.a.y) / 2;
-                        // Note: This would need integration with drawing system
-                        messageBox("Radial distortion applied from window center!", mfInformation | mfOKButton);
-                    } else {
-                        messageBox("No active window for radial distortion.", mfWarning | mfOKButton);
-                    }
-                }
-                clearEvent(event);
-                break;
-            }
-            case cmGlitchDiagonalScatter: {
-                if (!getGlitchEngine().isGlitchModeEnabled()) {
-                    messageBox("Enable Glitch Mode first to use diagonal scatter.", mfWarning | mfOKButton);
-                } else {
-                    GlitchParams params = getGlitchEngine().getGlitchParams();
-                    params.scatterIntensity = 0.5f;
-                    params.enableCoordinateOffset = true;
-                    params.dimensionCorruption = 0.3f;
-                    getGlitchEngine().setGlitchParams(params);
-                    messageBox("Diagonal scatter applied! Creates diagonal streaking effects.", mfInformation | mfOKButton);
-                }
-                clearEvent(event);
-                break;
-            }
-            case cmCaptureGlitchedFrame: {
-                TView* activeView = deskTop->current;
-                std::string captured = captureGlitchedFrame(activeView);
-                
-                // Save to file with timestamp
-                auto now = std::chrono::system_clock::now();
-                auto time_t = std::chrono::system_clock::to_time_t(now);
-                std::ostringstream filename;
-                filename << "glitched_frame_" << std::put_time(std::localtime(&time_t), "%Y%m%d_%H%M%S") << ".txt";
-                
-                if (getFrameCapture().saveFrame(getFrameCapture().captureScreen(), filename.str(), 
-                                               CaptureOptions{CaptureFormat::AnsiEscapes, true, false, true, true, true})) {
-                    messageBox(("Frame captured to: " + filename.str()).c_str(), mfInformation | mfOKButton);
-                } else {
-                    messageBox("Failed to capture frame.", mfError | mfOKButton);
-                }
-                clearEvent(event);
-                break;
-            }
-            case cmResetGlitchParams: {
-                getGlitchEngine().resetCorruption();
-                GlitchParams defaultParams;
-                getGlitchEngine().setGlitchParams(defaultParams);
-                messageBox("Glitch parameters reset to defaults.", mfInformation | mfOKButton);
-                clearEvent(event);
-                break;
-            }
-            case cmGlitchSettings:
-                messageBox("Glitch Settings dialog coming soon!\n\nUse menu items to adjust parameters for now.", mfInformation | mfOKButton);
-                clearEvent(event);
-                break;
-                
-            // Future File commands
-            case cmOpenAnsiArt:
-                messageBox("ANSI Art file opening coming soon!", mfInformation | mfOKButton);
-                clearEvent(event);
-                break;
             case cmNewPaintCanvas: {
                 TRect d = deskTop->getExtent();
                 int w = std::min(82, d.b.x - d.a.x);
@@ -1309,6 +1229,13 @@ void TTestPatternApp::wireScrambleInput()
         // Add user message to history
         if (scrambleWindow->getMessageView()) {
             scrambleWindow->getMessageView()->addMessage("you", input);
+        }
+
+        // Log non-slash messages for multiplayer chat relay
+        if (input.empty() || input[0] != '/') {
+            chatLog_.push_back({++chatSeq_, "you", input});
+            if ((int)chatLog_.size() > kChatLogMax)
+                chatLog_.pop_front();
         }
 
         // Slash commands: check registry first, then fall through to engine.
@@ -1849,24 +1776,30 @@ void TTestPatternApp::setPatternMode(bool continuous)
 void TTestPatternApp::showApiKeyDialog()
 {
     // Build dialog
-    TRect dlgRect(0, 0, 56, 10);
+    TRect dlgRect(0, 0, 56, 14);
     dlgRect.move((TProgram::deskTop->size.x - 56) / 2,
-                 (TProgram::deskTop->size.y - 10) / 2);
+                 (TProgram::deskTop->size.y - 14) / 2);
 
     TDialog* dlg = new TDialog(dlgRect, "API Key");
 
-    dlg->insert(new TLabel(TRect(3, 2, 53, 3), "Anthropic API key (sk-ant-...):", nullptr));
+    dlg->insert(new TStaticText(TRect(3, 2, 53, 3),
+        "Used by Scramble (Haiku) and Wib&Wob Chat."));
+    dlg->insert(new TLabel(TRect(3, 4, 53, 5), "Anthropic API key (sk-ant-...):", nullptr));
 
-    TRect inputRect(3, 3, 53, 4);
+    TRect inputRect(3, 5, 53, 6);
     TInputLine* input = new TInputLine(inputRect, 256);
     dlg->insert(input);
 
     // Status line showing current key state
-    std::string status = runtimeApiKey.empty() ? "No key set" : "Key configured";
-    dlg->insert(new TStaticText(TRect(3, 5, 53, 6), status.c_str()));
+    std::string status = runtimeApiKey.empty()
+        ? "No key set (or use ANTHROPIC_API_KEY env var)"
+        : "Key configured (runtime override active)";
+    dlg->insert(new TStaticText(TRect(3, 7, 53, 8), status.c_str()));
+    dlg->insert(new TStaticText(TRect(3, 8, 53, 9),
+        "See Help > API Key Help for details."));
 
-    TRect okRect(12, 7, 24, 9);
-    TRect cancelRect(30, 7, 42, 9);
+    TRect okRect(12, 10, 24, 12);
+    TRect cancelRect(30, 10, 42, 12);
     dlg->insert(new TButton(okRect, "~O~K", cmOK, bfDefault));
     dlg->insert(new TButton(cancelRect, "Cancel", cmCancel, bfNormal));
 
@@ -1986,12 +1919,12 @@ TMenuBar* TTestPatternApp::initMenuBar(TRect r)
             *new TMenuItem("New ~V~-Gradient", cmNewGradientV, kbNoKey) +
             *new TMenuItem("New ~R~adial Gradient", cmNewGradientR, kbNoKey) +
             *new TMenuItem("New ~D~iagonal Gradient", cmNewGradientD, kbNoKey) +
-            *new TMenuItem("New ~M~echs Grid", cmNewMechs, kbCtrlM) +
+            // REMOVED E009: New Mechs Grid (dead end, handler commented out)
             *new TMenuItem("New ~A~nimation", cmNewDonut, kbCtrlD) +
             newLine() +
             *new TMenuItem("~O~pen Text/Animation...", cmOpenAnimation, kbCtrlO) +
             *new TMenuItem("Open I~m~age...", cmOpenImageFile, kbNoKey) +
-            *new TMenuItem("Open Monodra~w~...", cmOpenMonodraw, kbNoKey) +
+            *new TMenuItem("Open Mo~n~odraw...", cmOpenMonodraw, kbNoKey) +
             newLine() +
             *new TMenuItem("~S~ave Workspace", cmSaveWorkspace, kbCtrlS) +
             *new TMenuItem("Open ~W~orkspace...", cmOpenWorkspace, kbNoKey) +
@@ -2010,76 +1943,53 @@ TMenuBar* TTestPatternApp::initMenuBar(TRect r)
                                   cmPatternTiled, kbNoKey)
             ) +
         *new TSubMenu("~V~iew", kbAltV) +
-            *new TMenuItem("~A~SCII Grid Demo", cmAsciiGridDemo, kbNoKey) +
+            *new TMenuItem("ASCII ~G~rid Demo", cmAsciiGridDemo, kbNoKey) +
             *new TMenuItem("~A~nimated Blocks", cmAnimatedBlocks, kbNoKey) +
-            *new TMenuItem("Animated ~G~radient", cmAnimatedGradient, kbNoKey) +
+            *new TMenuItem("Animated Gradie~n~t", cmAnimatedGradient, kbNoKey) +
             *new TMenuItem("Animated S~c~ore", cmAnimatedScore, kbNoKey) +
             *new TMenuItem("Score ~B~G Color...", cmScoreBgColor, kbNoKey) +
             *new TMenuItem("~V~erse Field (Generative)", cmVerseField, kbNoKey) +
             *new TMenuItem("~O~rbit Field (Generative)", cmOrbitField, kbNoKey) +
-            *new TMenuItem("~M~ycelium Field (Generative)", cmMyceliumField, kbNoKey) +
+            *new TMenuItem("M~y~celium Field (Generative)", cmMyceliumField, kbNoKey) +
             *new TMenuItem("~T~orus Field (Generative)", cmTorusField, kbNoKey) +
-            *new TMenuItem("~C~ube Spinner (Generative)", cmCubeField, kbNoKey) +
-            *new TMenuItem("~M~onster Portal (Generative)", cmMonsterPortal, kbNoKey) +
-            *new TMenuItem("Monster ~V~erse (Generative)", cmMonsterVerse, kbNoKey) +
-            *new TMenuItem("Monster ~C~am (Emoji)", cmMonsterCam, kbNoKey) +
-            // DISABLED: *new TMenuItem("ASCII ~C~am", cmASCIICam, kbNoKey) +
-            *new TMenuItem("Zoom ~I~n", cmZoomIn, kbNoKey) +
-            *new TMenuItem("Zoom ~O~ut", cmZoomOut, kbNoKey) +
-            *new TMenuItem("~A~ctual Size", cmActualSize, kbNoKey) +
-            *new TMenuItem("~F~ull Screen", cmFullScreen, kbF11) +
+            *new TMenuItem("C~u~be Spinner (Generative)", cmCubeField, kbNoKey) +
+            *new TMenuItem("Monster ~P~ortal (Generative)", cmMonsterPortal, kbNoKey) +
+            *new TMenuItem("Monster Ve~r~se (Generative)", cmMonsterVerse, kbNoKey) +
+            *new TMenuItem("Monster Cam (Emo~j~i)", cmMonsterCam, kbNoKey) +
+            // REMOVED E009: ASCII Cam (disabled), Zoom In/Out/Actual Size/Full Screen (placeholders)
             newLine() +
-            *new TMenuItem("Paint ~C~anvas", cmNewPaintCanvas, kbNoKey) +
+            *new TMenuItem("Pa~i~nt Canvas", cmNewPaintCanvas, kbNoKey) +
             newLine() +
             *new TMenuItem("Scra~m~ble Cat", cmScrambleCat, kbF8) +
             *new TMenuItem("Scramble E~x~pand", cmScrambleExpand, kbShiftF8) +
         *new TSubMenu("~W~indow", kbAltW) +
-            *new TMenuItem("~E~dit Text Editor", cmTextEditor, kbNoKey) +
+            *new TMenuItem("~T~ext Editor", cmTextEditor, kbNoKey) +
             *new TMenuItem("~B~rowser", cmBrowser, kbCtrlB) +
-            newLine() +
-            *new TMenuItem("~O~pen Text File (Transparent BG)...", cmOpenTransparentText, kbNoKey) +
+            *new TMenuItem("~O~pen Text File (Transparent)...", cmOpenTransparentText, kbNoKey) +
             newLine() +
             *new TMenuItem("~C~ascade", cmCascade, kbNoKey) +
-            *new TMenuItem("~T~ile", cmTile, kbNoKey) +
-            *new TMenuItem("Send to ~B~ack", cmSendToBack, kbNoKey) +
+            *new TMenuItem("Ti~l~e", cmTile, kbNoKey) +
+            *new TMenuItem("Send to Bac~k~", cmSendToBack, kbNoKey) +
             newLine() +
             *new TMenuItem("~N~ext", cmNext, kbF6) +
             *new TMenuItem("~P~revious", cmPrev, kbShiftF6) +
             newLine() +
-            *new TMenuItem("Close", cmClose, kbAltF3) +
-            *new TMenuItem("C~l~ose All", cmCloseAll, kbNoKey) +
-            newLine() +
-            *new TMenuItem("Background ~C~olor...", cmWindowBgColor, kbNoKey) +
+            *new TMenuItem("Clos~e~", cmClose, kbAltF3) +
+            *new TMenuItem("Close ~A~ll", cmCloseAll, kbNoKey) +
+            // REMOVED E009: Background Color... (retired for now)
         *new TSubMenu("~T~ools", kbAltT) +
             *new TMenuItem("~W~ib&Wob Chat", cmWibWobChat, kbF12) +
-            *new TMenuItem("  Test A (stdScrollBar)", cmWibWobTestA, kbNoKey) +
-            *new TMenuItem("  Test B (TScroller)", cmWibWobTestB, kbNoKey) +
-            *new TMenuItem("  Test C (Split Arch)", cmWibWobTestC, kbNoKey) +
-            newLine() +
-            (TMenuItem&) (
-                *new TSubMenu("~G~litch Effects", kbNoKey) +
-                    *new TMenuItem(getGlitchEngine().isGlitchModeEnabled() ? "\x04 ~E~nable Glitch Mode" : "  ~E~nable Glitch Mode", 
-                                  cmToggleGlitchMode, kbCtrlG) +
-                    newLine() +
-                    *new TMenuItem("~S~catter Pattern", cmGlitchScatter, kbNoKey) +
-                    *new TMenuItem("~C~olor Bleed", cmGlitchColorBleed, kbNoKey) +
-                    *new TMenuItem("~R~adial Distort", cmGlitchRadialDistort, kbNoKey) +
-                    *new TMenuItem("~D~iagonal Scatter", cmGlitchDiagonalScatter, kbNoKey) +
-                    newLine() +
-                    *new TMenuItem("Ca~p~ture Frame", cmCaptureGlitchedFrame, kbF9) +
-                    *new TMenuItem("R~e~set Parameters", cmResetGlitchParams, kbNoKey) +
-                    *new TMenuItem("Glitch Se~t~tings...", cmGlitchSettings, kbNoKey)
-            ) +
-            newLine() +
-            *new TMenuItem("~A~NSI Editor", cmAnsiEditor, kbNoKey) +
-            *new TMenuItem("~P~aint Tools", cmPaintTools, kbNoKey) +
-            *new TMenuItem("Animation ~S~tudio", cmAnimationStudio, kbNoKey) +
+            // REMOVED E009: Test A/B/C (dev-only, type fallback to test_pattern)
+            // REMOVED E009: Glitch Effects submenu (entire submenu disabled)
+            // REMOVED E009: ANSI Editor, Animation Studio (placeholders)
             newLine() +
             *new TMenuItem("~Q~uantum Printer", cmQuantumPrinter, kbF11) +
             newLine() +
             *new TMenuItem("API ~K~ey...", cmApiKey, kbNoKey) +
         *new TSubMenu("~H~elp", kbAltH) +
-            *new TMenuItem("~A~bout WIBWOBWORLD", cmAbout, kbNoKey)
+            *new TMenuItem("~A~bout WIBWOBWORLD", cmAbout, kbNoKey) +
+            *new TMenuItem("~K~eyboard Shortcuts", cmKeyboardShortcuts, kbNoKey) +
+            *new TMenuItem("A~P~I Key Help", cmApiKeyHelp, kbNoKey)
     );
 }
 
@@ -2275,29 +2185,21 @@ void api_spawn_gradient(TTestPatternApp& app, const std::string& kind, const TRe
 }
 
 void api_open_text_view_path(TTestPatternApp& app, const std::string& path, const TRect* bounds) {
-    if (bounds) {
-        int width = bounds->b.x - bounds->a.x;
-        int height = bounds->b.y - bounds->a.y;
-        
-        if (width > 0 && height > 0) {
-            // Use provided bounds if width/height are positive
-            app.openAnimationFilePath(path, *bounds);
-        } else {
-            // Auto-size based on content, but use provided position
-            TRect autoBounds = app.calculateWindowBounds(path);
-            // Keep the original position, but use auto-calculated size
-            TRect finalBounds(
-                bounds->a.x, 
-                bounds->a.y, 
-                bounds->a.x + (autoBounds.b.x - autoBounds.a.x), 
-                bounds->a.y + (autoBounds.b.y - autoBounds.a.y)
-            );
-            app.openAnimationFilePath(path, finalBounds);
-        }
+    if (path.empty()) return;
+    app.windowNumber++;
+    size_t lastSlash = path.find_last_of("/\\");
+    std::string baseName = (lastSlash != std::string::npos) ? path.substr(lastSlash + 1) : path;
+    std::string title = baseName + " (Transparent)";
+    TRect r;
+    if (bounds && (bounds->b.x - bounds->a.x) > 0 && (bounds->b.y - bounds->a.y) > 0) {
+        r = *bounds;
     } else {
-        // No bounds provided - full auto-sizing (cascade position + content size)
-        app.openAnimationFilePath(path);
+        int offset = (app.windowNumber - 1) % 10;
+        r = TRect(2 + offset * 2, 1 + offset, 82 + offset * 2, 25 + offset);
     }
+    TTransparentTextWindow* window = new TTransparentTextWindow(r, title, path);
+    app.deskTop->insert(window);
+    app.registerWindow(window);
 }
 
 void api_open_animation_path(TTestPatternApp& app, const std::string& path, const TRect* bounds) {
@@ -2349,6 +2251,15 @@ std::string api_scramble_pet(TTestPatternApp& app) {
     return response;
 }
 
+std::string api_chat_receive(TTestPatternApp& app, const std::string& sender, const std::string& text) {
+    // Display a remote chat message in Scramble without AI processing.
+    if (!app.scrambleWindow) return "err scramble not open";
+    auto* msgView = app.scrambleWindow->getMessageView();
+    if (!msgView) return "err no message view";
+    msgView->addMessage(sender, text);
+    return "ok";
+}
+
 void api_tile(TTestPatternApp& app) { app.tile(); }
 void api_close_all(TTestPatternApp& app) { app.closeAll(); }
 
@@ -2366,47 +2277,99 @@ bool api_open_workspace_path(TTestPatternApp& app, const std::string& path) {
 
 void api_screenshot(TTestPatternApp& app) { app.takeScreenshot(false); }
 
+std::string api_take_last_registered_window_id(TTestPatternApp& app) {
+    std::string out = app.lastRegisteredWindowId_;
+    app.lastRegisteredWindowId_.clear();
+    return out;
+}
+
+static const char* windowTypeName(TWindow* w) {
+    const auto& specs = all_window_type_specs();
+    for (const auto& spec : specs) {
+        if (spec.matches && spec.matches(w)) return spec.type;
+    }
+    // Fallback to first registry entry (canonical default type slug).
+    return specs.empty() ? "test_pattern" : specs.front().type;
+}
+
 std::string api_get_state(TTestPatternApp& app) {
-    // Rebuild window registry to sync with current desktop state
-    app.winToId.clear();
-    app.idToWin.clear();
-    
-    std::stringstream json;
-    json << "{\"windows\":[";
-    
-    bool first = true;
+    // Collect currently visible windows in desktop Z-order.
+    // Do NOT clear winToId/idToWin here — that would reassign new IDs on
+    // every call, causing compute_delta to see "new" windows every poll.
+    std::vector<TWindow*> activeWins;
     TView *start = app.deskTop->first();
     if (start) {
         TView *v = start;
         do {
             TWindow *w = dynamic_cast<TWindow*>(v);
-            if (w) {
-                std::string id = app.registerWindow(w);
-                
-                if (!first) json << ",";
-                json << "{\"id\":\"" << id << "\""
-                     << ",\"x\":" << w->origin.x
-                     << ",\"y\":" << w->origin.y  
-                     << ",\"width\":" << w->size.x
-                     << ",\"height\":" << w->size.y
-                     << ",\"title\":\"";
-                
-                // Safely escape title
-                if (w->title) {
-                    std::string title(w->title);
-                    for (char c : title) {
-                        if (c == '"') json << "\\\"";
-                        else if (c == '\\') json << "\\\\";
-                        else json << c;
-                    }
-                }
-                json << "\"}";
-                first = false;
-            }
+            if (w) activeWins.push_back(w);
             v = v->next;
         } while (v != start);
     }
-    
+
+    // Purge registry entries for windows that have been closed (stale pointers).
+    // Only purge; never clear — existing live windows keep their stable IDs.
+    {
+        auto it = app.winToId.begin();
+        while (it != app.winToId.end()) {
+            bool alive = false;
+            for (auto* aw : activeWins) { if (aw == it->first) { alive = true; break; } }
+            if (!alive) {
+                app.idToWin.erase(it->second);
+                it = app.winToId.erase(it);
+            } else {
+                ++it;
+            }
+        }
+    }
+
+    std::stringstream json;
+    json << "{\"windows\":[";
+
+    bool first = true;
+    for (TWindow* w : activeWins) {
+        std::string id = app.registerWindow(w, false);
+        if (!first) json << ",";
+        json << "{\"id\":\"" << id << "\""
+             << ",\"type\":\"" << windowTypeName(w) << "\""
+             << ",\"x\":" << w->origin.x
+             << ",\"y\":" << w->origin.y
+             << ",\"w\":" << w->size.x
+             << ",\"h\":" << w->size.y
+             << ",\"title\":\"";
+        if (w->title) {
+            std::string title(w->title);
+            for (char c : title) {
+                if (c == '"') json << "\\\"";
+                else if (c == '\\') json << "\\\\";
+                else json << c;
+            }
+        }
+        json << "\"";
+        // Emit path for file-backed window types (needed for remote create_window)
+        if (auto* ttw = dynamic_cast<TTransparentTextWindow*>(w)) {
+            const std::string& p = ttw->getFilePath();
+            if (!p.empty()) json << ",\"path\":\"" << TTestPatternApp::jsonEscape(p) << "\"";
+        } else if (auto* faw = dynamic_cast<TFrameAnimationWindow*>(w)) {
+            const std::string& p = faw->getFilePath();
+            if (!p.empty()) json << ",\"path\":\"" << TTestPatternApp::jsonEscape(p) << "\"";
+        }
+        json << "}";
+        first = false;
+    }
+
+    json << "]";
+
+    // Append chat_log for multiplayer relay bridge
+    json << ",\"chat_log\":[";
+    bool firstChat = true;
+    for (const auto& entry : app.chatLog_) {
+        if (!firstChat) json << ",";
+        json << "{\"seq\":" << entry.seq
+             << ",\"sender\":\"" << TTestPatternApp::jsonEscape(entry.sender) << "\""
+             << ",\"text\":\"" << TTestPatternApp::jsonEscape(entry.text) << "\"}";
+        firstChat = false;
+    }
     json << "]}";
     return json.str();
 }
@@ -2414,23 +2377,31 @@ std::string api_get_state(TTestPatternApp& app) {
 std::string api_move_window(TTestPatternApp& app, const std::string& id, int x, int y) {
     TWindow* w = app.findWindowById(id);
     if (!w) return "{\"error\":\"Window not found\"}";
-    
+
     TRect newBounds = w->getBounds();
     newBounds.move(x - newBounds.a.x, y - newBounds.a.y);
     w->locate(newBounds);
-    
+
+    if (app.ipcServer) {
+        std::string payload = std::string("{\"id\":\"") + id + "\"}";
+        app.ipcServer->publish_event("state_changed", payload);
+    }
     return "{\"success\":true}";
 }
 
 std::string api_resize_window(TTestPatternApp& app, const std::string& id, int width, int height) {
     TWindow* w = app.findWindowById(id);
     if (!w) return "{\"error\":\"Window not found\"}";
-    
+
     TRect newBounds = w->getBounds();
     newBounds.b.x = newBounds.a.x + width;
     newBounds.b.y = newBounds.a.y + height;
     w->locate(newBounds);
-    
+
+    if (app.ipcServer) {
+        std::string payload = std::string("{\"id\":\"") + id + "\"}";
+        app.ipcServer->publish_event("state_changed", payload);
+    }
     return "{\"success\":true}";
 }
 
@@ -2445,11 +2416,17 @@ std::string api_focus_window(TTestPatternApp& app, const std::string& id) {
 std::string api_close_window(TTestPatternApp& app, const std::string& id) {
     TWindow* w = app.findWindowById(id);
     if (!w) return "{\"error\":\"Window not found\"}";
-    
+
     // Remove from registry
     app.winToId.erase(w);
     app.idToWin.erase(id);
-    
+
+    // Notify subscribers before closing
+    if (app.ipcServer) {
+        std::string payload = std::string("{\"id\":\"") + id + "\"}";
+        app.ipcServer->publish_event("window_closed", payload);
+    }
+
     // Close the window
     w->close();
     return "{\"success\":true}";
@@ -3081,6 +3058,109 @@ void api_spawn_browser(TTestPatternApp& app, const TRect* bounds) {
     } else {
         app.newBrowserWindow();
     }
+}
+
+// Generative / animated art windows — spawnable via IPC create_window type=X
+static TRect api_centered_bounds(TTestPatternApp& app, int width, int height) {
+    TRect d = app.deskTop->getExtent();
+    int dw = d.b.x - d.a.x;
+    int dh = d.b.y - d.a.y;
+    width  = std::max(10, std::min(width,  dw));
+    height = std::max(6,  std::min(height, dh));
+    int left = d.a.x + (dw - width)  / 2;
+    int top  = d.a.y + (dh - height) / 2;
+    return TRect(left, top, left + width, top + height);
+}
+
+void api_spawn_verse(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 96, 30);
+    TWindow* w = createGenerativeVerseWindow(r);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
+}
+
+void api_spawn_mycelium(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 96, 30);
+    TWindow* w = createGenerativeMyceliumWindow(r);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
+}
+
+void api_spawn_orbit(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 96, 30);
+    TWindow* w = createGenerativeOrbitWindow(r);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
+}
+
+void api_spawn_torus(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 90, 28);
+    TWindow* w = createGenerativeTorusWindow(r);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
+}
+
+void api_spawn_cube(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 90, 28);
+    TWindow* w = createGenerativeCubeWindow(r);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
+}
+
+void api_spawn_life(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 90, 28);
+    TWindow* w = createGameOfLifeWindow(r);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
+}
+
+void api_spawn_blocks(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 84, 24);
+    TWindow* w = createAnimatedBlocksWindow(r);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
+}
+
+void api_spawn_score(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 108, 34);
+    TWindow* w = createAnimatedScoreWindow(r);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
+}
+
+void api_spawn_ascii(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 96, 30);
+    TWindow* w = createAnimatedAsciiWindow(r);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
+}
+
+void api_spawn_animated_gradient(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 84, 24);
+    TWindow* w = createAnimatedGradientWindow(r);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
+}
+
+void api_spawn_monster_cam(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 96, 30);
+    TWindow* w = createGenerativeMonsterCamWindow(r);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
+}
+
+void api_spawn_monster_verse(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 96, 30);
+    TWindow* w = createGenerativeMonsterVerseWindow(r);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
+}
+
+void api_spawn_monster_portal(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 96, 30);
+    TWindow* w = createGenerativeMonsterPortalWindow(r);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
 }
 
 std::string api_browser_fetch(TTestPatternApp& app, const std::string& url) {

@@ -40,24 +40,24 @@ Single-use nonces prevent replay. Session key rotation per connection.
 
 ## Stories
 
-- [ ] `s05-ipc-challenge-response` — add challenge-response handshake to IPC socket accept loop
-- [ ] `s06-auth-bypass-local` — skip auth when no secret set (dev mode backward compat)
+- [x] `s05-ipc-challenge-response` — add challenge-response handshake to IPC socket accept loop
+- [x] `s06-auth-bypass-local` — skip auth when no secret set (dev mode backward compat)
 
 ## Acceptance Criteria
 
-- [ ] **AC-1:** IPC socket rejects commands from unauthenticated connections when secret is set
+- [x] **AC-1:** IPC socket rejects commands from unauthenticated connections when secret is set
   - Test: connect to socket without auth, send command, get rejected
-- [ ] **AC-2:** Authenticated connection succeeds with correct HMAC response
+- [x] **AC-2:** Authenticated connection succeeds with correct HMAC response
   - Test: Python test client completes handshake, sends command, gets response
-- [ ] **AC-3:** Replayed nonce is rejected (single-use enforcement)
+- [x] **AC-3:** Replayed nonce is rejected (single-use enforcement)
   - Test: capture nonce+HMAC from first connection, replay on second, get rejected
-- [ ] **AC-4:** No auth required when WIBWOB_AUTH_SECRET is unset (backward compat)
+- [x] **AC-4:** No auth required when WIBWOB_AUTH_SECRET is unset (backward compat)
   - Test: existing IPC tests pass without env var set
-- [ ] **AC-5:** Session key derived after auth and used for connection lifetime
-  - Test: Python test verifies session key derivation matches expected HMAC output
+- [-] **AC-5:** Session key derived after auth and used for connection lifetime (deferred — MVP uses single HMAC verify per connection)
+  - Test: N/A — dropped from MVP scope, session key rotation is a future enhancement
 
 ## Status
 
-Status: not-started
-GitHub issue: —
+Status: done
+GitHub issue: #57
 PR: —

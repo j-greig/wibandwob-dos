@@ -1,0 +1,9 @@
+**Fixes**
+- Remote→local window ID mapping: `create_window` now returns `{"success":true,"id":"wN"}` (`app/api_ipc.cpp:402` via `app/test_pattern_app.cpp:2420`), `apply_delta_to_ipc(..., id_map=...)` captures/uses it (`tools/room/state_diff.py:266`), and the bridge passes the shared map (`tools/room/partykit_bridge.py:107`).
+- SIGPIPE-safe IPC responses: added `safe_write()` and replaced the crashing `::write()` call sites (`app/api_ipc.cpp:100`).
+- Async bridge no longer blocks the event loop on IPC: wrapped `ipc_get_state`, `apply_delta_to_ipc`, `ipc_command` with `await asyncio.to_thread(...)` (`tools/room/partykit_bridge.py:147`).
+- FAIL escalation: after 3 consecutive `FAIL` results, bridge sends `{"type":"state_request"}` to trigger a resync (`tools/room/partykit_bridge.py:240`), and PartyKit server responds with `state_sync` (`partykit/src/server.ts:164`).
+
+**Tests**
+- `uv run pytest tests/room/ -q` failed here (`pytest` not found), so I ran `uv run --with pytest pytest tests/room/ -q`:
+  - `165 passed, 2 skipped in 4.44s`

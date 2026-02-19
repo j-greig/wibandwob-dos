@@ -21,6 +21,7 @@ std::string api_scramble_say(TTestPatternApp&, const std::string&) { return "ok"
 std::string api_scramble_pet(TTestPatternApp&) { return "ok"; }
 class TRect;
 void api_spawn_paint(TTestPatternApp&, const TRect*) {}
+std::string api_chat_receive(TTestPatternApp&, const std::string&, const std::string&) { return "ok"; }
 
 int main() {
     const std::string payload = get_command_capabilities_json();
@@ -41,6 +42,7 @@ int main() {
         "\"name\":\"scramble_say\"",
         "\"name\":\"scramble_pet\"",
         "\"name\":\"new_paint_canvas\"",
+        "\"name\":\"chat_receive\"",
     };
 
     for (const char* token : required) {

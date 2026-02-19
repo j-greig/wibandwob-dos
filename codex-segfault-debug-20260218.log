@@ -1,0 +1,498 @@
+OpenAI Codex v0.101.0 (research preview)
+--------
+workdir: /Users/james/Repos/wibandwob-dos
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: medium
+reasoning summaries: auto
+session id: 019c72a6-6ad2-7d10-b5b6-3a6acde00f23
+--------
+user
+Investigate a segmentation fault and IPC FAIL issues in the WibWob-DOS multiplayer bridge.
+
+## What happened (live test, 2026-02-18)
+
+Two TUI instances running (WIBWOB_INSTANCE=1 and 2). Two bridge sidecars connecting both to PartyKit room 'wibwob-dev-1'.
+
+OBSERVED:
+- Windows from instance 1 (w2, w3) moved in sync on instance 2 — THIS WORKED
+- Bridge 1 got: FAIL move_window w2, FAIL resize_window w2, FAIL move_window w3, FAIL resize_window w3
+- Bridge 2 got: FAIL move_window w3, FAIL resize_window w3 (then state_changed events)
+- Bridge 2 then: ✓ create_window id=w4 type=gradient (this WORKED on instance 2)
+- Bridge 2 then: ✗ FAIL close_window id=w4
+- Then: instance 2 TUI crashed with segmentation fault
+- Then: bridge 2 gets [Errno 61] Connection refused on event subscribe (socket gone)
+
+## Two bugs to investigate
+
+### Bug A: Segfault on create_window + close_window sequence
+
+The crash happened after create_window(gradient) succeeded and close_window failed. Read these files carefully:
+
+1. app/api_ipc.cpp — find the create_window and close_window IPC handlers. Look at:
+   - How create_window calls into the app (especially TTestPatternApp::spawnWindow or equivalent)
+   - How close_window calls TView::close() or similar
+   - Whether there's any raw pointer danger when a remotely-created window is closed
+
+2. app/test_pattern_app.cpp — find:
+   - The create_window dispatch path in exec_command or api_ipc handler
+   - registerWindow() — does it store the window safely?
+   - How close_window/destroy_window removes a window — is TDeskTop::remove() called safely?
+   - Any place where a TWindow* is stored and later dereferenced without checking validity
+
+3. app/window_type_registry.cpp — look at spawn functions for 'gradient' type. Does the spawned window get properly initialized before being inserted into the desktop?
+
+The crash sequence suggests: create_window succeeds (window added), close_window fails (maybe the ID lookup fails so it returns error but doesn't crash), then something else accesses the dangling/invalid window and segfaults. OR: close_window partially destroys the window, leaving a dangling pointer that gets accessed during the next event loop tick.
+
+Propose the most likely root cause and an exact fix.
+
+### Bug B: FAIL move_window / resize_window for existing windows
+
+Instance 1 has windows w2, w3. Instance 2 also has windows (from state_sync on connect). But move_window(w2) FAILS on instance 1's bridge — meaning instance 1 is receiving move commands for w2 from the remote (instance 2's state), but instance 1's OWN w2 is different from instance 2's w2.
+
+Read tools/room/state_diff.py carefully:
+- apply_delta_to_ipc — what window ID does it use for move_window?
+- The delta from instance 2 contains instance 2's local window IDs. When instance 1 receives that delta and calls move_window(id=w2), it's using instance 2's ID on instance 1's IPC socket. If both instances assigned the same IDs this works; if they diverge it doesn't.
+
+Read tools/room/partykit_bridge.py:
+- receive_loop — what does it do with incoming deltas? Does it apply them directly?
+- Is there any ID remapping between sender and receiver?
+
+Read app/api_ipc.cpp or app/test_pattern_app.cpp:
+- How are window IDs assigned? Is it a counter ('w1', 'w2', 'w3') or something stable?
+- Is 'w2' on instance 1 guaranteed to be the same window as 'w2' on instance 2?
+
+Propose: if IDs are ephemeral counters, what's the minimal fix to make deltas use stable IDs or include a remap step?
+
+Please read the actual source files before answering. Provide exact file paths and line numbers for your findings.
+mcp startup: no servers
+2026-02-18T21:27:14.947204Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c67d3-e7fb-7423-879a-a3c6997f29d4
+2026-02-18T21:27:14.976185Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c6171-ccc2-7702-9b67-9c22338e3137
+2026-02-18T21:27:15.002223Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c6248-4000-77b0-815a-4015ebbba891
+
+thinking
+**Starting code inspection and diagnostics**
+codex
+I’ll inspect the exact IPC, app window lifecycle, and bridge/delta code paths you listed, then map the crash and FAIL behavior to concrete lines and propose a minimal, exact fix for both bugs. I’m starting by locating and reading those files in parallel.
+exec
+/bin/zsh -lc "rg --files app tools/room | rg '(api_ipc.cpp|test_pattern_app.cpp|window_type_registry.cpp|state_diff.py|partykit_bridge.py)"'$'"'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc 'git status --short' in /Users/james/Repos/wibandwob-dos succeeded in 50ms:
+tools/room/partykit_bridge.py
+tools/room/state_diff.py
+app/api_ipc.cpp
+app/window_type_registry.cpp
+app/test_pattern_app.cpp
+ succeeded in 52ms:
+?? codex-segfault-debug-20260218.log
+
+thinking
+**Planning efficient large file reads**
+codex
+I found all target files; there’s only one untracked log file in the tree, so I’ll leave it untouched. Next I’m reading the relevant handlers and call paths with line numbers to pin down the failure mode precisely.
+exec
+/bin/zsh -lc "nl -ba app/api_ipc.cpp | sed -n '1,260p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba app/window_type_registry.cpp | sed -n '1,260p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba app/test_pattern_app.cpp | sed -n '1,320p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba tools/room/state_diff.py | sed -n '1,320p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba tools/room/partykit_bridge.py | sed -n '1,360p'" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+     1	#include "api_ipc.h"
+     2	#include "command_registry.h"
+     3	#include "window_type_registry.h"
+     4	
+     5	#ifndef _WIN32
+     6	#include <sys/socket.h>
+     7	#include <sys/stat.h>
+     8	#include <sys/un.h>
+     9	#include <fcntl.h>
+    10	#include <unistd.h>
+    11	#include <errno.h>
+    12	#endif
+    13	
+    14	#ifdef __APPLE__
+    15	#include <CommonCrypto/CommonHMAC.h>
+    16	#else
+    17	#include <openssl/hmac.h>
+    18	#endif
+    19	
+    20	#include <cstring>
+ succeeded in 51ms:
+     1	/*---------------------------------------------------------*/
+     2	/*                                                         */
+     3	/*   test_pattern_app.cpp - Test Pattern Window Spawner   */
+     4	/*   Unlimited resizable windows with test patterns       */
+     5	/*                                                         */
+     6	/*---------------------------------------------------------*/
+     7	
+     8	#define Uses_TKeys
+     9	#define Uses_TApplication
+    10	#define Uses_TEvent
+    11	#define Uses_TRect
+    12	#define Uses_TDialog
+    13	#define Uses_TStaticText
+    14	#define Uses_TButton
+    15	#define Uses_TMenuBar
+    16	#define Uses_TSubMenu
+    17	#define Uses_TMenuItem
+    18	#define Uses_TMenu
+    19	#define Uses_TStatusLine
+    20	#define Uses_TStatusItem
+ succeeded in 51ms:
+     1	// Window type registry — single source of truth for all spawnable window types.
+     2	// Keeps api_ipc.cpp free of per-type knowledge: adding a new type only requires
+     3	// a new entry in the k_specs table below.
+     4	
+     5	#include "window_type_registry.h"
+     6	#include "gradient.h"
+     7	#include "frame_file_player_view.h"
+     8	#include "transparent_text_view.h"
+     9	#include "text_editor_view.h"
+    10	#include "browser_view.h"
+    11	#include "generative_verse_view.h"
+    12	#include "generative_mycelium_view.h"
+    13	#include "generative_orbit_view.h"
+    14	#include "generative_torus_view.h"
+    15	#include "generative_cube_view.h"
+    16	#include "game_of_life_view.h"
+    17	#include "animated_blocks_view.h"
+    18	#include "animated_score_view.h"
+    19	#include "animated_ascii_view.h"
+    20	#include "animated_gradient_view.h"
+ succeeded in 51ms:
+     1	"""
+     2	State diffing utilities for WibWob-DOS multiplayer sync (E008 F03).
+     3	
+     4	Extracts window state from IPC get_state responses, computes minimal
+     5	add/remove/update deltas, and applies remote deltas to a local instance
+     6	via IPC commands.
+     7	
+     8	Used by partykit_bridge.py and any future sync transport.
+     9	"""
+    10	
+    11	import hashlib
+    12	import hmac as _hmac
+    13	import json
+    14	import socket
+    15	import os
+    16	from typing import Any
+    17	from urllib.parse import quote as _urlencode
+    18	
+    19	
+    20	IPC_TIMEOUT = 2.0
+ succeeded in 50ms:
+     1	#!/usr/bin/env python3
+     2	# /// script
+     3	# requires-python = ">=3.11"
+     4	# dependencies = ["websockets>=12"]
+     5	# ///
+     6	"""
+     7	PartyKit bridge for WibWob-DOS multiplayer rooms (E008 F02).
+     8	
+     9	Runs as a sidecar alongside a WibWob instance. Polls local IPC state,
+    10	diffs it, and pushes state_delta messages to PartyKit. Also receives
+    11	remote deltas from PartyKit and applies them to the local instance via IPC.
+    12	
+    13	Usage (spawned by orchestrator):
+    14	    uv run tools/room/partykit_bridge.py
+    15	
+    16	Environment:
+    17	    WIBWOB_INSTANCE      — instance ID (e.g. "1"), drives /tmp/wibwob_1.sock
+    18	    WIBWOB_PARTYKIT_URL  — PartyKit server URL (e.g. https://wibwob.user.partykit.dev)
+    19	    WIBWOB_PARTYKIT_ROOM — PartyKit room/Durable Object key (e.g. "wibwob-shared")
+    20	    WIBWOB_AUTH_SECRET   — shared HMAC secret for IPC auth (optional)
+
+thinking
+**Expanding function coverage in api_ipc and test_pattern**
+exec
+/bin/zsh -lc "nl -ba app/api_ipc.cpp | sed -n '260,760p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba app/test_pattern_app.cpp | sed -n '320,980p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba app/test_pattern_app.cpp | sed -n '980,1700p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc 'rg -n "create_window|close_window|move_window|resize_window|spawnWindow|registerWindow|destroy_window|windowById|windowId|nextWindowId|exec_command|subscribe_events" app/api_ipc.cpp app/test_pattern_app.cpp app/test_pattern_app.h app/window_type_registry.cpp' in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+   260	    addr.sun_family = AF_UNIX;
+   261	    std::snprintf(addr.sun_path, sizeof(addr.sun_path), "%s", path.c_str());
+   262	
+   263	    bool live = (::connect(fd, (struct sockaddr*)&addr, sizeof(addr)) == 0);
+   264	    ::close(fd);
+   265	    return live;
+   266	}
+   267	
+   268	bool ApiIpcServer::start(const std::string& path) {
+   269	#ifdef _WIN32
+   270	    (void)path; return false;
+   271	#else
+   272	    sock_path_ = path;
+   273	
+   274	    // Check for existing socket file before touching it.
+   275	    struct stat st;
+   276	    if (::stat(sock_path_.c_str(), &st) == 0) {
+   277	        if (probe_socket_live(sock_path_)) {
+   278	            // Another instance is listening on this socket — do not steal it.
+   279	            fprintf(stderr, "[ipc] ERROR: socket %s is already in use by another instance. "
+ exited 2 in 51ms:
+rg: app/test_pattern_app.h: No such file or directory (os error 2)
+app/api_ipc.cpp:114:extern std::string api_move_window(TTestPatternApp& app, const std::string& id, int x, int y);
+app/api_ipc.cpp:115:extern std::string api_resize_window(TTestPatternApp& app, const std::string& id, int width, int height);
+app/api_ipc.cpp:117:extern std::string api_close_window(TTestPatternApp& app, const std::string& id);
+app/api_ipc.cpp:367:    } else if (cmd == "exec_command") {
+app/api_ipc.cpp:374:    } else if (cmd == "create_window") {
+app/api_ipc.cpp:410:    } else if (cmd == "move_window") {
+app/api_ipc.cpp:417:            resp = api_move_window(*app_, id->second, x, y) + "\n";
+app/api_ipc.cpp:421:    } else if (cmd == "resize_window") {
+app/api_ipc.cpp:428:            resp = api_resize_window(*app_, id->second, width, height) + "\n";
+app/api_ipc.cpp:439:    } else if (cmd == "close_window") {
+app/api_ipc.cpp:442:            resp = api_close_window(*app_, id->second) + "\n";
+app/api_ipc.cpp:562:    if (cmd == "subscribe_events") {
+app/test_pattern_app.cpp:643:    std::string registerWindow(TWindow* w, bool emit_event = true) {
+app/test_pattern_app.cpp:712:    friend std::string api_move_window(TTestPatternApp&, const std::string&, int, int);
+app/test_pattern_app.cpp:713:    friend std::string api_resize_window(TTestPatternApp&, const std::string&, int, int);
+app/test_pattern_app.cpp:715:    friend std::string api_close_window(TTestPatternApp&, const std::string&);
+app/test_pattern_app.cpp:1246:                        registerWindow(w);
+app/test_pattern_app.cpp:1301:    registerWindow(window);
+app/test_pattern_app.cpp:1310:    registerWindow(window);
+ succeeded in 51ms:
+   320	
+   321	    void scheduleNextBlink() {
+   322	        // Random blink interval: 3-6 seconds
+   323	        int interval = 3000 + (rand() % 3000);
+   324	        nextBlinkTime = std::chrono::steady_clock::now() + std::chrono::milliseconds(interval);
+   325	    }
+   326	
+   327	    const char* getKaomojiForState() {
+   328	        // Blink overrides mood
+   329	        if (isBlinking) return "つ-‿-‿-༽つ";
+   330	
+   331	        switch(currentMood) {
+   332	            case EXCITED:    return "つ◉‿◉‿◉༽つ";
+   333	            case THINKING:   return "つ●‿●‿●༽つ";
+   334	            case SLEEPY:     return "つ◡‿◡‿◡༽つ";
+   335	            case CURIOUS:    return "つ○‿○‿○༽つ";
+   336	            case MEMORY:     return "つ■‿■‿■༽つ";
+   337	            case GEOMETRIC:  return "つ□‿□‿□༽つ";
+   338	            case SURPRISED:  return "つ◎‿◎‿◎༽つ";
+   339	            case NEUTRAL:
+ succeeded in 52ms:
+   980	                TRect r = deskTop->getExtent();
+   981	                r.grow(-2, -1);
+   982	                deskTop->insert(createGenerativeMonsterVerseWindow(r));
+   983	                clearEvent(event);
+   984	                break;
+   985	            }
+   986	            case cmMonsterCam: {
+   987	                TRect r = deskTop->getExtent();
+   988	                r.grow(-2, -1);
+   989	                deskTop->insert(createGenerativeMonsterCamWindow(r));
+   990	                clearEvent(event);
+   991	                break;
+   992	            }
+   993	            // DISABLED: ASCII Cam (file not in repo)
+   994	            // case cmASCIICam: {
+   995	            //     TRect r = deskTop->getExtent();
+   996	            //     r.grow(-2, -1);
+   997	            //     deskTop->insert(createGenerativeASCIICamWindow(r));
+   998	            //     clearEvent(event);
+   999	            //     break;
+
+thinking
+**Planning API state handling**
+codex
+I’ve identified the key registry and IPC dispatch code; now I’m drilling into `api_get_state`, `api_close_window`, and lifecycle cleanup paths to confirm whether stale pointers can survive a close and later crash in event/poll code.
+exec
+/bin/zsh -lc "nl -ba app/test_pattern_app.cpp | sed -n '2605,3360p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba app/test_pattern_app.cpp | sed -n '2240,2605p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "rg -n \"winToId|idToWin|registerWindow\\(|findWindowById\\(|close\\(|destroy\\(|window_closed|state_changed|get_state|api_close_window|api_move_window|api_resize_window|api_focus_window\" app/test_pattern_app.cpp" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+640:    std::map<TWindow*, std::string> winToId;
+641:    std::map<std::string, TWindow*> idToWin;
+643:    std::string registerWindow(TWindow* w, bool emit_event = true) {
+645:        auto it = winToId.find(w);
+646:        if (it != winToId.end()) return it->second;
+650:        winToId[w] = id;
+651:        idToWin[id] = w;
+655:            ipcServer->publish_event("state_changed", payload);
+660:    TWindow* findWindowById(const std::string& id) {
+661:        auto it = idToWin.find(id);
+662:        if (it != idToWin.end()) return it->second;
+671:                if (w && winToId.find(w) == winToId.end()) {
+676:                    winToId[w] = new_id;
+677:                    idToWin[new_id] = w;
+682:        it = idToWin.find(id);
+683:        if (it != idToWin.end()) return it->second;
+711:    friend std::string api_get_state(TTestPatternApp&);
+712:    friend std::string api_move_window(TTestPatternApp&, const std::string&, int, int);
+713:    friend std::string api_resize_window(TTestPatternApp&, const std::string&, int, int);
+714:    friend std::string api_focus_window(TTestPatternApp&, const std::string&);
+ succeeded in 52ms:
+  2240	    return TRect(x, y, x + windowWidth, y + windowHeight);
+  2241	}
+  2242	
+  2243	void TTestPatternApp::idle()
+  2244	{
+  2245	    TApplication::idle();
+  2246	    // Poll IPC server for incoming API commands
+  2247	    if (ipcServer) ipcServer->poll();
+  2248	
+  2249	    // DISABLED: Update animated kaomoji in menu bar (causing crashes + freezes)
+  2250	    // if (menuBar) {
+  2251	    //     auto* customMenuBar = dynamic_cast<TCustomMenuBar*>(menuBar);
+  2252	    //     if (customMenuBar) {
+  2253	    //         customMenuBar->update();
+  2254	    //     }
+  2255	    // }
+  2256	
+  2257	    // Idle: no default content window or wallpaper.
+  2258	}
+  2259	
+ succeeded in 52ms:
+  2605	{
+  2606	    size_t pos = objStart;
+  2607	    while (pos < s.size()) {
+  2608	        skipWs(s, pos);
+  2609	        if (s[pos] == '}' || s[pos] == ']') return false;
+  2610	        std::string k; size_t kpos = pos;
+  2611	        if (!parseString(s, kpos, k)) { ++pos; continue; }
+  2612	        pos = kpos; skipWs(s, pos);
+  2613	        if (!consume(s, pos, ':')) continue;
+  2614	        if (k == key) {
+  2615	            return parseString(s, pos, out);
+  2616	        }
+  2617	        // Skip value
+  2618	        skipWs(s, pos);
+  2619	        if (pos>=s.size()) break;
+  2620	        if (s[pos] == '"') { std::string tmp; parseString(s, pos, tmp); }
+  2621	        else if ((s[pos] >= '0' && s[pos] <= '9') || s[pos]=='-' || s[pos]=='+') { int dummy; parseNumber(s, pos, dummy); }
+  2622	        else if (s[pos] == 't' || s[pos] == 'f') { bool db; parseBool(s, pos, db); }
+  2623	        else if (s[pos] == '{') { int depth=1; ++pos; while (pos<s.size()&&depth){ if(s[pos]=='"'){ ++pos; while(pos<s.size()&&s[pos]!='"'){ if(s[pos]=='\\') ++pos; ++pos;} ++pos; continue;} if(s[pos]=='{')depth++; else if(s[pos]=='}')depth--; ++pos; } }
+  2624	        else if (s[pos] == '[') { int depth=1; ++pos; while (pos<s.size()&&depth){ if(s[pos]=='"'){ ++pos; while(pos<s.size()&&s[pos]!='"'){ if(s[pos]=='\\') ++pos; ++pos;} ++pos; continue;} if(s[pos]=='[')depth++; else if(s[pos]==']')depth--; ++pos; } }
+
+thinking
+**Identifying stale pointer and ID mismatch causes**
+codex
+I found a concrete unsafe-pointer path in `findWindowById`/`api_close_window`; I’ll quickly check the captured crash log to validate whether the process died during a close operation before replying on IPC.
+exec
+/bin/zsh -lc "nl -ba codex-segfault-debug-20260218.log | sed -n '1,260p'" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+     1	OpenAI Codex v0.101.0 (research preview)
+     2	--------
+     3	workdir: /Users/james/Repos/wibandwob-dos
+     4	model: gpt-5.3-codex
+     5	provider: openai
+     6	approval: never
+     7	sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+     8	reasoning effort: medium
+     9	reasoning summaries: auto
+    10	session id: 019c72a6-6ad2-7d10-b5b6-3a6acde00f23
+    11	--------
+    12	user
+    13	Investigate a segmentation fault and IPC FAIL issues in the WibWob-DOS multiplayer bridge.
+    14	
+    15	## What happened (live test, 2026-02-18)
+    16	
+    17	Two TUI instances running (WIBWOB_INSTANCE=1 and 2). Two bridge sidecars connecting both to PartyKit room 'wibwob-dev-1'.
+    18	
+    19	OBSERVED:
+    20	- Windows from instance 1 (w2, w3) moved in sync on instance 2 — THIS WORKED
+
+thinking
+**Analyzing stale pointer and ID mapping bugs**
+codex
+**Findings**
+
+**Bug A (segfault after `create_window` / `close_window`)**
+Most likely root cause is a stale raw pointer in the window ID registry.
+
+- `TTestPatternApp` stores raw `TWindow*` in `idToWin`/`winToId` (`app/test_pattern_app.cpp:640`, `app/test_pattern_app.cpp:641`).
+- `findWindowById` returns `idToWin[id]` immediately with no liveness check (`app/test_pattern_app.cpp:660`-`app/test_pattern_app.cpp:663`).
+- Stale entries are only purged during `api_get_state` (`app/test_pattern_app.cpp:2421`-`app/test_pattern_app.cpp:2434`), not before every command.
+- `api_close_window` dereferences the pointer and calls `w->close()` (`app/test_pattern_app.cpp:2527`-`app/test_pattern_app.cpp:2543`).
+
+Inference: if an ID points to a window already destroyed (or wrong window after ID drift), `api_close_window` can call through a dangling pointer and crash the TUI, which matches “close FAIL then socket refused”.
+
+`create_window` path itself looks structurally fine for `gradient`:
+- IPC dispatch: `app/api_ipc.cpp:374`-`app/api_ipc.cpp:383`
+- Gradient spawn wrapper: `app/window_type_registry.cpp:78`-`app/window_type_registry.cpp:83`
+- Actual construction+insert+register: `app/test_pattern_app.cpp:1589`-`app/test_pattern_app.cpp:1591`
+
+**Exact fix for Bug A**
+1. Add a shared “purge stale registry entries” helper (same logic as `api_get_state` purge at `app/test_pattern_app.cpp:2421`-`app/test_pattern_app.cpp:2434`).
+2. Call it at start of `findWindowById` and before dereferencing in `api_close_window`/`api_move_window`/`api_resize_window`/`api_focus_window`.
+3. In `findWindowById`, if mapped pointer is not present on desktop, erase mapping and return not found.
+4. Optional hardening: in `api_close_window`, verify window is still in desktop list before `w->close()`.
+
+---
+
+**Bug B (`FAIL move_window` / `resize_window`)**
+
+Two separate problems exist:
+
+1. **False FAIL logging due response format mismatch**
+- Bridge IPC helper only treats responses starting with `"ok"` as success (`tools/room/state_diff.py:122`).
+- But C++ handlers return JSON like `{"success":true}` for move/resize/close (`app/test_pattern_app.cpp:2488`-`app/test_pattern_app.cpp:2517`, `app/test_pattern_app.cpp:2527`-`app/test_pattern_app.cpp:2543`).
+- So commands can succeed but still log `FAIL` (exactly what you observed with windows visibly moving).
+
+2. **Real ID mismatch across instances**
+- IDs are local counters (`w1`, `w2`, …) from `registerWindow` (`app/test_pattern_app.cpp:648`).
+- Incoming deltas apply remote IDs directly for move/resize/close (`tools/room/state_diff.py:275`-`tools/room/state_diff.py:306`).
+- `receive_loop` applies deltas directly; no ID remap layer (`tools/room/partykit_bridge.py:241`-`tools/room/partykit_bridge.py:253`).
+- `create_window` IPC path does not establish shared cross-instance ID identity (`app/api_ipc.cpp:374`-`app/api_ipc.cpp:383`).
+
+**Minimal fix for Bug B**
+1. Fix success detection in `ipc_command` (`tools/room/state_diff.py:116`-`tools/room/state_diff.py:123`):
+- accept `"ok..."` OR parse JSON and treat `{"success":true}` as success.
+2. Add ID remap in bridge apply path:
+- maintain `remote_id -> local_id`.
+- on `add`, capture local state before/after create to discover newly created local ID, store mapping.
+- on `update`/`remove`, translate via remap before sending IPC.
+- keep this in `PartyKitBridge` while applying deltas (`tools/room/partykit_bridge.py:241`-`tools/room/partykit_bridge.py:253`).
+
+If you want, I can implement both fixes directly (pointer hardening in C++ + response/remap fixes in Python).
+tokens used
+75,076
+**Findings**
+
+**Bug A (segfault after `create_window` / `close_window`)**
+Most likely root cause is a stale raw pointer in the window ID registry.
+
+- `TTestPatternApp` stores raw `TWindow*` in `idToWin`/`winToId` (`app/test_pattern_app.cpp:640`, `app/test_pattern_app.cpp:641`).
+- `findWindowById` returns `idToWin[id]` immediately with no liveness check (`app/test_pattern_app.cpp:660`-`app/test_pattern_app.cpp:663`).
+- Stale entries are only purged during `api_get_state` (`app/test_pattern_app.cpp:2421`-`app/test_pattern_app.cpp:2434`), not before every command.
+- `api_close_window` dereferences the pointer and calls `w->close()` (`app/test_pattern_app.cpp:2527`-`app/test_pattern_app.cpp:2543`).
+
+Inference: if an ID points to a window already destroyed (or wrong window after ID drift), `api_close_window` can call through a dangling pointer and crash the TUI, which matches “close FAIL then socket refused”.
+
+`create_window` path itself looks structurally fine for `gradient`:
+- IPC dispatch: `app/api_ipc.cpp:374`-`app/api_ipc.cpp:383`
+- Gradient spawn wrapper: `app/window_type_registry.cpp:78`-`app/window_type_registry.cpp:83`
+- Actual construction+insert+register: `app/test_pattern_app.cpp:1589`-`app/test_pattern_app.cpp:1591`
+
+**Exact fix for Bug A**
+1. Add a shared “purge stale registry entries” helper (same logic as `api_get_state` purge at `app/test_pattern_app.cpp:2421`-`app/test_pattern_app.cpp:2434`).
+2. Call it at start of `findWindowById` and before dereferencing in `api_close_window`/`api_move_window`/`api_resize_window`/`api_focus_window`.
+3. In `findWindowById`, if mapped pointer is not present on desktop, erase mapping and return not found.
+4. Optional hardening: in `api_close_window`, verify window is still in desktop list before `w->close()`.
+
+---
+
+**Bug B (`FAIL move_window` / `resize_window`)**
+
+Two separate problems exist:
+
+1. **False FAIL logging due response format mismatch**
+- Bridge IPC helper only treats responses starting with `"ok"` as success (`tools/room/state_diff.py:122`).
+- But C++ handlers return JSON like `{"success":true}` for move/resize/close (`app/test_pattern_app.cpp:2488`-`app/test_pattern_app.cpp:2517`, `app/test_pattern_app.cpp:2527`-`app/test_pattern_app.cpp:2543`).
+- So commands can succeed but still log `FAIL` (exactly what you observed with windows visibly moving).
+
+2. **Real ID mismatch across instances**
+- IDs are local counters (`w1`, `w2`, …) from `registerWindow` (`app/test_pattern_app.cpp:648`).
+- Incoming deltas apply remote IDs directly for move/resize/close (`tools/room/state_diff.py:275`-`tools/room/state_diff.py:306`).
+- `receive_loop` applies deltas directly; no ID remap layer (`tools/room/partykit_bridge.py:241`-`tools/room/partykit_bridge.py:253`).
+- `create_window` IPC path does not establish shared cross-instance ID identity (`app/api_ipc.cpp:374`-`app/api_ipc.cpp:383`).
+
+**Minimal fix for Bug B**
+1. Fix success detection in `ipc_command` (`tools/room/state_diff.py:116`-`tools/room/state_diff.py:123`):
+- accept `"ok..."` OR parse JSON and treat `{"success":true}` as success.
+2. Add ID remap in bridge apply path:
+- maintain `remote_id -> local_id`.
+- on `add`, capture local state before/after create to discover newly created local ID, store mapping.
+- on `update`/`remove`, translate via remap before sending IPC.
+- keep this in `PartyKitBridge` while applying deltas (`tools/room/partykit_bridge.py:241`-`tools/room/partykit_bridge.py:253`).
+
+If you want, I can implement both fixes directly (pointer hardening in C++ + response/remap fixes in Python).

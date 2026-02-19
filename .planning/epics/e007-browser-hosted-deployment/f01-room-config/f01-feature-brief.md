@@ -66,21 +66,21 @@ Host arranges windows before saving the layout.
 
 ## Stories
 
-- [ ] `s01-room-schema` — define room config format, parser, validation, example config
+- [x] `s01-room-schema` — define room config format, parser, validation, example config
 
 ## Acceptance Criteria
 
-- [ ] **AC-1:** Room config parser extracts frontmatter settings and named markdown sections
+- [x] **AC-1:** Room config parser extracts frontmatter settings and named markdown sections
   - Test: parse example config, assert room_id, system_prompt, welcome_message all extracted
-- [ ] **AC-2:** Example room config exists at `rooms/example.md` and validates
+- [x] **AC-2:** Example room config exists at `rooms/example.md` and validates
   - Test: `uv run python tools/room/validate_config.py rooms/example.md`
-- [ ] **AC-3:** Invalid configs rejected with clear error messages (missing required fields, bad types, missing referenced files)
+- [x] **AC-3:** Invalid configs rejected with clear error messages (missing required fields, bad types, missing referenced files)
   - Test: validation script rejects config missing room_id, rejects non-integer ttyd_port
-- [ ] **AC-4:** System prompt extracted from `## System Prompt` section as plain text
+- [x] **AC-4:** System prompt extracted from `## System Prompt` section as plain text
   - Test: parse example config, assert system_prompt matches expected multiline string
 
 ## Status
 
-Status: not-started
-GitHub issue: —
+Status: done
+GitHub issue: #57
 PR: —

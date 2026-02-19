@@ -43,6 +43,8 @@ public:
     TColorRGB getBackgroundColor() const { return bgColor; }
     bool hasCustomBackground() const { return useCustomBg; }
 
+    const std::string& getFileName() const { return fileName; }
+
 private:
     std::vector<std::string> lines;
     std::string fileName;
@@ -67,6 +69,7 @@ public:
                           const std::string& filePath);
 
     TTransparentTextView* getTextView() { return textView; }
+    const std::string& getFilePath() const;
 
     // Override changeBounds for proper redraw
     virtual void changeBounds(const TRect& bounds) override;

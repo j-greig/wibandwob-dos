@@ -25,6 +25,9 @@ void api_toggle_scramble(TTestPatternApp&) {}
 void api_expand_scramble(TTestPatternApp&) {}
 std::string api_scramble_say(TTestPatternApp&, const std::string&) { return "ok"; }
 std::string api_scramble_pet(TTestPatternApp&) { return "ok"; }
+class TRect;
+void api_spawn_paint(TTestPatternApp&, const TRect*) {}
+std::string api_chat_receive(TTestPatternApp&, const std::string&, const std::string&) { return "ok"; }
 
 static int failures = 0;
 

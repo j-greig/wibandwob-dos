@@ -1,6 +1,6 @@
 ---
 name: codex-review
-description: Run OpenAI Codex CLI as a headless code reviewer with durable file output. Use when you need a second-opinion review from Codex, want to run codex exec non-interactively for code analysis, or need sandboxed GPT-powered review with saved artifacts. Works inside Claude Code sessions (no nesting conflict). Triggers on "codex review", "run codex on", "get a second opinion from codex", "codex check".
+description: Run OpenAI Codex CLI as a headless code reviewer with durable file output. Use when you need a second-opinion review from Codex, want to run codex exec non-interactively for code analysis, or need sandboxed GPT-powered review with saved artifacts. Works inside Claude Code sessions. Triggers on "codex review", "run codex on", "get a second opinion from codex", "codex check".
 todo:
   - "Fix example paths in docs — should use full .claude/skills/codex-review/ prefix"
   - "Output location should respect --workdir when set, not just caller pwd"

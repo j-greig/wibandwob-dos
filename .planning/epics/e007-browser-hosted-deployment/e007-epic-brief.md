@@ -1,7 +1,7 @@
 ---
 id: E007
 title: Browser-Hosted Deployment (Teleport Rooms)
-status: not-started
+status: done
 issue: 57
 pr: ~
 depends_on: []
@@ -100,11 +100,11 @@ Target: $5 Hetzner VPS (2GB ARM), 4 concurrent rooms max.
 
 ## MVP Features
 
-- [~] **F01: Room Config** — YAML schema, validation, example config → `f01-room-config/`
-- [ ] **F02: Room Orchestrator** — spawn ttyd+WibWob per room, health check, restart → `f02-room-orchestrator/`
-- [ ] **F03: Agent Auth** — HMAC challenge-response over IPC sockets → `f03-agent-auth/`
-- [ ] **F04: Layout Restore** — WIBWOB_LAYOUT_PATH env var, auto-restore on startup → `f04-layout-restore/`
-- [ ] **F05: IPC Safety** — probe-before-unlink, bind failure propagation → `f05-ipc-safety/`
+- [x] **F01: Room Config** — markdown + YAML frontmatter parser, validation, example → `f01-room-config/`
+- [x] **F02: Room Orchestrator** — spawn ttyd+WibWob per room, health check, restart → `f02-room-orchestrator/`
+- [x] **F03: Agent Auth** — HMAC challenge-response over IPC sockets → `f03-agent-auth/`
+- [x] **F04: Layout Restore** — WIBWOB_LAYOUT_PATH env var, auto-restore on startup → `f04-layout-restore/`
+- [x] **F05: IPC Safety** — probe-before-unlink, bind failure propagation → `f05-ipc-safety/`
 
 Parked items (Twitter OAuth, state persistence, rate limiting, etc): `e007-parking-lot.md`
 
@@ -133,12 +133,12 @@ Resolved in planning report:
 
 ## Definition of Done (MVP)
 
-- [ ] Room config YAML schema defined, validated, documented
-- [ ] Orchestrator spawns ttyd+WibWob from config, restarts on failure
-- [ ] Agent auth via HMAC challenge-response on IPC sockets
-- [ ] Layout restores from config on room join
-- [ ] IPC unlink race fixed — no silent socket theft
-- [ ] At least 1 room serveable to a browser visitor via URL
+- [x] Room config format defined, validated, documented (markdown + YAML frontmatter)
+- [x] Orchestrator spawns ttyd+WibWob from config, restarts on failure
+- [x] Agent auth via HMAC challenge-response on IPC sockets
+- [x] Layout restores from config on room join
+- [x] IPC unlink race fixed — no silent socket theft
+- [~] At least 1 room serveable to a browser visitor via URL (local serving works, VPS deployment parked)
 
 Deferred from MVP (see parking lot):
 - ~~Chat persists across disconnect~~ (parked)

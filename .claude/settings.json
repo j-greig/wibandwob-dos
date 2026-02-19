@@ -49,6 +49,15 @@
             "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/planning-context.sh"
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "input=$(cat); remaining=$(echo \"$input\" | jq -r '.context_window.remaining_percentage // 100' | cut -d. -f1); if [ \"$remaining\" -le 20 ] 2>/dev/null; then printf 'CONTEXT WINDOW: %s%% remaining. Consider /compact soon.' \"$remaining\"; fi",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "SessionStart": [

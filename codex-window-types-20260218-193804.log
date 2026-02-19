@@ -1,0 +1,1680 @@
+OpenAI Codex v0.101.0 (research preview)
+--------
+workdir: /Users/james/Repos/wibandwob-dos
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: medium
+reasoning summaries: auto
+session id: 019c7242-7b39-78b2-9715-9f21fcf2349d
+--------
+user
+
+Read these files in full before proposing anything:
+- app/test_pattern_app.cpp (focus: windowTypeName at line 2374, all new*Window methods, friend declarations at 673-700, handleEvent dispatch around 763-1050, api_spawn_* functions at 2238-3128)
+- app/api_ipc.cpp (focus: create_window block at line 374-412, all extern declarations at 103-130)
+- app/generative_verse_view.cpp (class definition, constructor signature)
+- app/generative_mycelium_view.cpp (class definition, constructor signature)
+- app/generative_orbit_view.cpp
+- app/generative_torus_view.cpp
+- app/generative_cube_view.cpp
+- app/game_of_life_view.cpp
+- app/animated_gradient_view.cpp
+- app/animated_blocks_view.cpp
+- app/animated_ascii_view.cpp
+- app/animated_score_view.cpp
+- app/generative_monster_cam_view.cpp
+- app/generative_monster_verse_view.cpp
+- app/generative_monster_portal_view.cpp
+
+CONTEXT:
+WibWob-DOS is a C++14 TUI multiplayer app. Two instances sync state via a Python bridge (partykit_bridge.py). The bridge calls IPC 'create_window type=X x=N y=N w=N h=N' to recreate windows in instance 2. The C++ api_get_state() emits a type string per window using windowTypeName(). Currently only 6 types are handled; all generative art windows fall back to 'test_pattern', causing wrong window types to be recreated on the remote instance.
+
+GOAL:
+Extend the C++ code so ALL window types are correctly identified and creatable via IPC. Show EXACT code changes (not pseudocode) for:
+
+1. **windowTypeName() in test_pattern_app.cpp (line 2374)**:
+   Add dynamic_cast checks for every TWindow subclass found in the generative/animated view files. The type string should be a stable short slug (e.g. 'verse', 'mycelium', 'orbit', 'torus', 'cube', 'life', 'blocks', 'score', 'ascii', 'animated_gradient', 'monster_cam', 'monster_verse', 'monster_portal', 'wibwob', 'scramble'). Show the complete replacement for the entire windowTypeName function.
+
+2. **api_spawn_* free functions in test_pattern_app.cpp**:
+   For each new generative type, add a free function like 'void api_spawn_verse(TTestPatternApp& app, const TRect* bounds)' that calls the appropriate new*Window method. Show where in the file to add them (after api_spawn_browser at line ~3128). Show the friend declarations needed at the TTestPatternApp class definition (~line 673).
+
+3. **create_window dispatch in api_ipc.cpp (line 374)**:
+   Add else-if branches for each new type string that call the new api_spawn_* functions. Show the extern declarations needed at the top of api_ipc.cpp and the complete updated else-if chain.
+
+IMPORTANT CONSTRAINTS:
+- C++14 only (no C++17 features)
+- The new*Window() methods are private; we need friend free functions (same pattern as api_spawn_test, api_spawn_gradient)
+- Some windows may require constructor params (path for frame_player/text_view, gradient type for TGradientWindow). For those that need a path, make the IPC command require 'path=...' param. For those with no required params, spawn with default TRect centered on desktop.
+- TScrambleWindow and TWibWobWindow are UI-singleton-ish — should NOT be created via IPC (skip them, or return 'err unsupported' for those types)
+- TAsciiImageWindow requires a path — add 'ascii_image' type that requires path= param
+- Focus on the generative art types that users will actually open: verse, mycelium, orbit, torus, cube, life, blocks, score, animated_gradient, monster_cam, monster_verse, monster_portal
+
+For each window class you read, note: (a) the actual C++ class name, (b) the constructor signature, (c) whether it takes mandatory external params (like a path string), and (d) any new*Window method that creates it.
+
+Show all code as complete replacement blocks (not diffs), so I can paste them directly.
+
+mcp startup: no servers
+2026-02-18T19:38:05.549910Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c67d3-e7fb-7423-879a-a3c6997f29d4
+2026-02-18T19:38:05.575743Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c6171-ccc2-7702-9b67-9c22338e3137
+2026-02-18T19:38:05.601004Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c6248-4000-77b0-815a-4015ebbba891
+
+thinking
+**Planning full file inspections**
+codex
+I’m going to read each file you listed end-to-end first, then I’ll map exact class names/constructors to `windowTypeName`, `api_spawn_*`, and `api_ipc.cpp` dispatch so the replacement blocks are paste-ready. I’ll start by loading the target files and extracting the relevant methods and declarations.
+exec
+/bin/zsh -lc 'wc -l app/test_pattern_app.cpp app/api_ipc.cpp app/generative_verse_view.cpp app/generative_mycelium_view.cpp app/generative_orbit_view.cpp app/generative_torus_view.cpp app/generative_cube_view.cpp app/game_of_life_view.cpp app/animated_gradient_view.cpp app/animated_blocks_view.cpp app/animated_ascii_view.cpp app/animated_score_view.cpp app/generative_monster_cam_view.cpp app/generative_monster_verse_view.cpp app/generative_monster_portal_view.cpp' in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc 'rg -n "class |constructor|new[A-Za-z]+Window|windowTypeName|api_spawn_|friend void api_spawn_|create_window|extern void api_spawn_" app/test_pattern_app.cpp app/api_ipc.cpp app/generative_verse_view.cpp app/generative_mycelium_view.cpp app/generative_orbit_view.cpp app/generative_torus_view.cpp app/generative_cube_view.cpp app/game_of_life_view.cpp app/animated_gradient_view.cpp app/animated_blocks_view.cpp app/animated_ascii_view.cpp app/animated_score_view.cpp app/generative_monster_cam_view.cpp app/generative_monster_verse_view.cpp app/generative_monster_portal_view.cpp' in /Users/james/Repos/wibandwob-dos succeeded in 50ms:
+    3170 app/test_pattern_app.cpp
+     605 app/api_ipc.cpp
+     216 app/generative_verse_view.cpp
+     115 app/generative_mycelium_view.cpp
+     137 app/generative_orbit_view.cpp
+     164 app/generative_torus_view.cpp
+     132 app/generative_cube_view.cpp
+     320 app/game_of_life_view.cpp
+     173 app/animated_gradient_view.cpp
+     162 app/animated_blocks_view.cpp
+     323 app/animated_ascii_view.cpp
+     540 app/animated_score_view.cpp
+     326 app/generative_monster_cam_view.cpp
+     262 app/generative_monster_verse_view.cpp
+     258 app/generative_monster_portal_view.cpp
+    6903 total
+ succeeded in 51ms:
+app/generative_torus_view.cpp:149:class TGenerativeTorusWindow : public TWindow{
+app/test_pattern_app.cpp:84:class TWindow; TWindow* createAsciiGridDemoWindow(const TRect &bounds);
+app/test_pattern_app.cpp:218:class TTestPatternView;
+app/test_pattern_app.cpp:219:class TTestPatternWindow;
+app/test_pattern_app.cpp:220:class TGradientWindow;
+app/test_pattern_app.cpp:221:class TFrameAnimationWindow;
+app/test_pattern_app.cpp:222:class TTestPatternApp;
+app/test_pattern_app.cpp:223:class TCustomMenuBar;
+app/test_pattern_app.cpp:224:class TCustomStatusLine;
+app/test_pattern_app.cpp:229:class TCustomMenuBar : public TMenuBar
+app/test_pattern_app.cpp:345:class TCustomStatusLine : public TStatusLine
+app/test_pattern_app.cpp:372:class TTestPatternView : public TView
+app/test_pattern_app.cpp:406:class TTestPatternWindow : public TWindow
+app/test_pattern_app.cpp:439:class TGradientWindow : public TWindow
+app/test_pattern_app.cpp:491:class TFrameAnimationWindow : public TWindow
+app/test_pattern_app.cpp:543:/* TTestPatternApp - Main application class               */
+app/test_pattern_app.cpp:545:class TTestPatternApp : public TApplication
+app/test_pattern_app.cpp:558:    void newTestWindow();
+app/test_pattern_app.cpp:559:    void newTestWindow(const TRect& bounds);
+app/test_pattern_app.cpp:560:    void newGradientWindow(TGradientWindow::GradientType type);
+
+thinking
+**Planning chunked full-file reads**
+codex
+I’ve indexed the symbols and line locations. Next I’m reading the files in full in chunks so we can extract exact constructor signatures and existing spawn/create patterns without missing anything.
+exec
+/bin/zsh -lc "sed -n '1,260p' app/generative_mycelium_view.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,260p' app/generative_verse_view.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,260p' app/generative_orbit_view.cpp" in /Users/james/Repos/wibandwob-dos succeeded in 50ms:
+/*---------------------------------------------------------*/
+/*                                                         */
+/*   generative_mycelium_view.cpp - Mycelium Field (Gen)  */
+/*                                                         */
+/*   Curl-noise flow field with branching ASCII motifs.   */
+/*                                                         */
+/*---------------------------------------------------------*/
+
+#include "generative_mycelium_view.h"
+#include "notitle_frame.h"
+
+#define Uses_TWindow
+#define Uses_TFrame
+#include <tvision/tv.h>
+
+#include <vector>
+#include <cmath>
+#include <algorithm>
+
+namespace {
+ succeeded in 51ms:
+/*---------------------------------------------------------*/
+/*                                                         */
+/*   generative_verse_view.cpp - Verse Field (Generative) */
+/*                                                         */
+/*   Full-window evolving generative field using layered   */
+/*   trigonometric fields and gradient palettes.          */
+/*                                                         */
+/*---------------------------------------------------------*/
+
+#include "generative_verse_view.h"
+#include "notitle_frame.h"
+
+#define Uses_TWindow
+#define Uses_TFrame
+#include <tvision/tv.h>
+
+#include <vector>
+#include <string>
+#include <cmath>
+#include <algorithm>
+ succeeded in 51ms:
+/*---------------------------------------------------------*/
+/*                                                         */
+/*   generative_orbit_view.cpp - Orbit Field (Generative) */
+/*                                                         */
+/*   Radial interference patterns from rotating sources.  */
+/*   Full-window evolving colour bands and ripples.       */
+/*                                                         */
+/*---------------------------------------------------------*/
+
+#include "generative_orbit_view.h"
+#include "notitle_frame.h"
+
+#define Uses_TWindow
+#define Uses_TFrame
+#include <tvision/tv.h>
+
+#include <vector>
+#include <cmath>
+#include <algorithm>
+
+codex
+I’ve finished the first three generative files and confirmed each concrete `TWindow` wrapper class and factory function names. I’ll continue through torus/cube/life and all animated + monster files next, then map these against existing `new*Window` methods in `test_pattern_app.cpp`.
+exec
+/bin/zsh -lc "sed -n '1,360p' app/game_of_life_view.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,260p' app/generative_torus_view.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,260p' app/generative_cube_view.cpp" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+/*---------------------------------------------------------*/
+/*                                                         */
+/*   game_of_life_view.cpp - Conway's Game of Life View   */
+/*                                                         */
+/*---------------------------------------------------------*/
+
+#include "game_of_life_view.h"
+
+#define Uses_TWindow
+#define Uses_TEvent
+#include <tvision/tv.h>
+#include <random>
+
+TGameOfLifeView::TGameOfLifeView(const TRect &bounds, unsigned periodMs)
+    : TView(bounds), periodMs(periodMs ? periodMs : 400)
+{
+    // Anchor to top-left and grow to the right and bottom like other views.
+    growMode = gfGrowHiX | gfGrowHiY;
+    // Receive timer expirations and mouse events
+    eventMask |= evBroadcast | evMouseDown;
+ succeeded in 51ms:
+/*---------------------------------------------------------*/
+/*                                                         */
+/*   generative_torus_view.cpp - Torus Field (Generative) */
+/*                                                         */
+/*   Animated ASCII donut with z-buffer shading and       */
+/*   palette colouring. Inspired by a1k0n donut math.     */
+/*                                                         */
+/*---------------------------------------------------------*/
+
+#include "generative_torus_view.h"
+#include "notitle_frame.h"
+
+#define Uses_TWindow
+#define Uses_TFrame
+#include <tvision/tv.h>
+
+#include <vector>
+#include <cmath>
+#include <algorithm>
+
+ succeeded in 52ms:
+/*---------------------------------------------------------*/
+/*                                                         */
+/*   generative_cube_view.cpp - Cube Spinner (Generative) */
+/*                                                         */
+/*   Wireframe rotating cube in perspective.              */
+/*                                                         */
+/*---------------------------------------------------------*/
+
+#include "generative_cube_view.h"
+#include "notitle_frame.h"
+
+#define Uses_TWindow
+#define Uses_TFrame
+#include <tvision/tv.h>
+
+#include <vector>
+#include <cmath>
+#include <algorithm>
+
+namespace {
+
+thinking
+**Identifying missing assets**
+codex
+I’ve confirmed torus/cube/life wrappers and factory names. I’m now reading the remaining animated and monster view files fully to capture their exact class names and constructor requirements, including any path-dependent windows.
+exec
+/bin/zsh -lc "sed -n '1,260p' app/animated_gradient_view.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,260p' app/animated_blocks_view.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,380p' app/animated_ascii_view.cpp" in /Users/james/Repos/wibandwob-dos succeeded in 50ms:
+/*---------------------------------------------------------*/
+/*                                                         */
+/*   animated_blocks_view.cpp - Zigzag Block Animation    */
+/*                                                         */
+/*---------------------------------------------------------*/
+
+#include "animated_blocks_view.h"
+
+#define Uses_TWindow
+#define Uses_TEvent
+#include <tvision/tv.h>
+
+namespace {
+// 16 classic ANSI-ish foreground colors on black background.
+static const TColorAttr kAnsi16[16] = {
+    TColorAttr(TColorRGB(0x00,0x00,0x00), TColorRGB(0x00,0x00,0x00)), // Black
+    TColorAttr(TColorRGB(0x00,0x00,0x80), TColorRGB(0x00,0x00,0x00)), // Blue
+    TColorAttr(TColorRGB(0x00,0x80,0x00), TColorRGB(0x00,0x00,0x00)), // Green
+    TColorAttr(TColorRGB(0x00,0x80,0x80), TColorRGB(0x00,0x00,0x00)), // Cyan
+    TColorAttr(TColorRGB(0x80,0x00,0x00), TColorRGB(0x00,0x00,0x00)), // Red
+ succeeded in 52ms:
+/*---------------------------------------------------------*/
+/*                                                         */
+/*   animated_gradient_view.cpp - Animated Gradient View  */
+/*                                                         */
+/*---------------------------------------------------------*/
+
+#include "animated_gradient_view.h"
+
+#define Uses_TWindow
+#define Uses_TEvent
+#include <tvision/tv.h>
+
+TAnimatedHGradientView::TAnimatedHGradientView(
+    const TRect &bounds, 
+    unsigned periodMs,
+    TColorRGB startColor,
+    TColorRGB endColor
+) : TView(bounds), 
+    periodMs(periodMs), 
+    startColor(startColor), 
+ succeeded in 51ms:
+/*---------------------------------------------------------*/
+/*                                                         */
+/*   animated_ascii_view.cpp - Multi-Layer ASCII Animation*/
+/*                                                         */
+/*---------------------------------------------------------*/
+
+#include "animated_ascii_view.h"
+
+#define Uses_TWindow
+#define Uses_TEvent
+#include <tvision/tv.h>
+#include <cmath>
+
+// Static ASCII art data - the original text split into lines
+const std::vector<std::string> TAnimatedAsciiView::asciiArtLines = {
+    "              ▝▝▗▗▝▝▗▗                   ≋≋≋≋≋            ",
+    "                                                      ░░░░░░░         ",
+    "    ▓▓▓▓▓                        ▒▒▒▒▒▒▒▒                            ",
+    "              つ◑‿◐༽つ                        ⊖        ⊖       ",
+    "                         ∿                                  ∿∿∿",
+codex
+I’ve verified animated gradient/blocks/ascii are parameterless factories (no required external path). I’ll now read `animated_score_view.cpp`, all monster files, and then `test_pattern_app.cpp`/`api_ipc.cpp` in full chunks to produce exact replacement blocks and friend/extern wiring.
+exec
+/bin/zsh -lc "sed -n '1,620p' app/animated_score_view.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,320p' app/generative_monster_verse_view.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,380p' app/generative_monster_cam_view.cpp" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+/*---------------------------------------------------------*/
+/*                                                         */
+/*   animated_score_view.cpp - Animated ASCII “Score”     */
+/*                                                         */
+/*   Turns a static multi-line ASCII/Unicode score into    */
+/*   a gentle animation using:                             */
+/*     - phase-based oscillation (≈/∿ wave shift)          */
+/*     - breathing loops (exhale/inhale/hold intensity)    */
+/*     - drift/scroll of token ribbons                     */
+/*     - cyclic face glyph morphing                        */
+/*                                                         */
+/*   This is intentionally simple and deterministic,       */
+/*   avoiding per-glyph slicing; we compose whole lines     */
+/*   with padding/spacing and let Turbo Vision handle      */
+/*   width truncation.                                     */
+/*                                                         */
+/*---------------------------------------------------------*/
+
+#include "animated_score_view.h"
+
+ succeeded in 51ms:
+/*---------------------------------------------------------*/
+/*                                                         */
+/*   generative_monster_verse_view.cpp - Monster Verse    */
+/*                                                         */
+/*   Smooth Verse fields (flow/swirl/weave + fbm) mapped  */
+/*   to whitespace/punct/geom + portal emoji, with sparse */
+/*   crown+eyes and diagonal limb hints.                   */
+/*                                                         */
+/*---------------------------------------------------------*/
+
+#include "generative_monster_verse_view.h"
+#include "notitle_frame.h"
+
+#define Uses_TWindow
+#define Uses_TFrame
+#include <tvision/tv.h>
+
+#include <vector>
+#include <string>
+#include <cmath>
+ succeeded in 51ms:
+/*---------------------------------------------------------*/
+/*                                                         */
+/*   generative_monster_cam_view.cpp - Monster Cam (Emoji)*/
+/*                                                         */
+/*   Reads webcam frames from /tmp/face_monster_cam.sock   */
+/*   (Python/OpenCV worker) and renders a minimal 3-line   */
+/*   face sprite on an empty background.                   */
+/*                                                         */
+/*   Controls:                                             */
+/*     Space: pause/resume                                  */
+/*     +/-   : adjust frame cadence                         */
+/*     j/J   : emoji bias up/down                           */
+/*     w/W   : whitespace bias up/down                      */
+/*     x     : toggle emoji flood                           */
+/*     f     : toggle face overlay                          */
+/*     r     : reset buffers                                */
+/*                                                         */
+/*---------------------------------------------------------*/
+
+#include "generative_monster_cam_view.h"
+codex
+I have score and two monster files parsed. I’ll finish with `generative_monster_portal_view.cpp`, then read `test_pattern_app.cpp` and `api_ipc.cpp` in full chunks to build exact full-function replacements and dispatch chains.
+exec
+/bin/zsh -lc "sed -n '701,1400p' app/test_pattern_app.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,340p' app/generative_monster_portal_view.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,700p' app/test_pattern_app.cpp" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+    friend std::string api_browser_fetch(TTestPatternApp&, const std::string& url);
+    friend std::string api_send_text(TTestPatternApp&, const std::string&, const std::string&, 
+                                     const std::string&, const std::string&);
+    friend std::string api_send_figlet(TTestPatternApp&, const std::string&, const std::string&, 
+                                       const std::string&, int, const std::string&);
+};
+
+// Static member definition
+std::string TTestPatternApp::runtimeApiKey;
+
+// Accessor for runtime API key (used by wibwob_view.cpp)
+std::string getAppRuntimeApiKey() {
+    return TTestPatternApp::runtimeApiKey;
+}
+
+TTestPatternApp::TTestPatternApp() :
+    TProgInit(&TTestPatternApp::initStatusLine,
+              &TTestPatternApp::initMenuBar,
+              &TTestPatternApp::initDeskTop),
+    windowNumber(0),
+ succeeded in 51ms:
+/*---------------------------------------------------------*/
+/*                                                         */
+/*   generative_monster_portal_view.cpp - Monster Portal  */
+/*                                                         */
+/*   Tiles emoji from the 'monster-death-flyer-portal'    */
+/*   primer on a black background. Brick offset per row.   */
+/*   Pattern decomposes over time (glitch drift + swaps).  */
+/*                                                         */
+/*   Controls:                                             */
+/*     Space: pause/resume                                 */
+/*     g/G  : increase/decrease glitch speed               */
+/*     r    : reset glitch                                 */
+/*                                                         */
+/*---------------------------------------------------------*/
+
+#include "generative_monster_portal_view.h"
+#include "notitle_frame.h"
+
+#define Uses_TWindow
+#define Uses_TFrame
+ succeeded in 51ms:
+/*---------------------------------------------------------*/
+/*                                                         */
+/*   test_pattern_app.cpp - Test Pattern Window Spawner   */
+/*   Unlimited resizable windows with test patterns       */
+/*                                                         */
+/*---------------------------------------------------------*/
+
+#define Uses_TKeys
+#define Uses_TApplication
+#define Uses_TEvent
+#define Uses_TRect
+#define Uses_TDialog
+#define Uses_TStaticText
+#define Uses_TButton
+#define Uses_TMenuBar
+#define Uses_TSubMenu
+#define Uses_TMenuItem
+#define Uses_TMenu
+#define Uses_TStatusLine
+#define Uses_TStatusItem
+
+thinking
+**Planning test implementation**
+exec
+/bin/zsh -lc "sed -n '2101,3170p' app/test_pattern_app.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1401,2100p' app/test_pattern_app.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,260p' app/api_ipc.cpp" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+#include "api_ipc.h"
+#include "command_registry.h"
+
+#ifndef _WIN32
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/un.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <errno.h>
+#endif
+
+#ifdef __APPLE__
+#include <CommonCrypto/CommonHMAC.h>
+#else
+#include <openssl/hmac.h>
+#endif
+
+#include <cstring>
+#include <cstdlib>
+ succeeded in 53ms:
+        // Wire engine into view
+        if (scrambleWindow->getView()) {
+            scrambleWindow->getView()->setEngine(&scrambleEngine);
+        }
+        wireScrambleInput();
+        deskTop->insert(scrambleWindow);
+        // Put behind other windows (just in front of background)
+        if (deskTop->background) {
+            scrambleWindow->putInFrontOf((TView*)deskTop->background);
+        }
+    }
+}
+
+void TTestPatternApp::toggleScrambleExpand()
+{
+    if (!scrambleWindow) {
+        // Not visible — create in tall mode directly
+        TRect desktop = deskTop->getExtent();
+        int w = 30;
+        TRect r(desktop.b.x - w - 1, desktop.a.y,
+ succeeded in 53ms:
+Total output lines: 1070
+
+    r.b.y--;
+    // Create desktop with standard constructor (plain background)
+    TDeskTop* desktop = new TDeskTop(r);
+    return desktop;
+}
+
+
+void TTestPatternApp::run()
+{
+    // Call parent run to initialize everything first
+    TApplication::run();
+}
+
+TRect TTestPatternApp::calculateWindowBounds(const std::string& filePath)
+{
+    // If the file contains animation frame delimiters, size to the
+    // largest frame (width/height). Otherwise, size to full text
+    // dimensions (longest line, total lines).
+
+thinking
+**Completing API IPC data retrieval**
+exec
+/bin/zsh -lc "sed -n '261,605p' app/api_ipc.cpp" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+    std::snprintf(addr.sun_path, sizeof(addr.sun_path), "%s", path.c_str());
+
+    bool live = (::connect(fd, (struct sockaddr*)&addr, sizeof(addr)) == 0);
+    ::close(fd);
+    return live;
+}
+
+bool ApiIpcServer::start(const std::string& path) {
+#ifdef _WIN32
+    (void)path; return false;
+#else
+    sock_path_ = path;
+
+    // Check for existing socket file before touching it.
+    struct stat st;
+    if (::stat(sock_path_.c_str(), &st) == 0) {
+        if (probe_socket_live(sock_path_)) {
+            // Another instance is listening on this socket — do not steal it.
+            fprintf(stderr, "[ipc] ERROR: socket %s is already in use by another instance. "
+                    "Set WIBWOB_INSTANCE to a unique value or stop the other instance.\n",
+
+thinking
+**Ensuring complete file read around truncation**
+codex
+I hit output truncation in one large `test_pattern_app.cpp` chunk, so I’m pulling the missing mid-section in smaller slices to guarantee full coverage before I draft the final replacement blocks.
+exec
+/bin/zsh -lc "sed -n '2460,2760p' app/test_pattern_app.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '2761,3170p' app/test_pattern_app.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "rg -n \"parseBounds\\(|windowTypeName\\(|api_spawn_browser\\(|api_spawn_text_editor\\(|api_spawn_test\\(|api_spawn_gradient\\(|friend void api_spawn_\" app/test_pattern_app.cpp app/api_ipc.cpp" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+    if (!w) return "{\"error\":\"Window not found\"}";
+    
+    TRect newBounds = w->getBounds();
+    newBounds.move(x - newBounds.a.x, y - newBounds.a.y);
+    w->locate(newBounds);
+    
+    return "{\"success\":true}";
+}
+
+std::string api_resize_window(TTestPatternApp& app, const std::string& id, int width, int height) {
+    TWindow* w = app.findWindowById(id);
+    if (!w) return "{\"error\":\"Window not found\"}";
+    
+    TRect newBounds = w->getBounds();
+    newBounds.b.x = newBounds.a.x + width;
+    newBounds.b.y = newBounds.a.y + height;
+    w->locate(newBounds);
+    
+    return "{\"success\":true}";
+}
+ succeeded in 51ms:
+    if (focusedIdx >= 0 && focusedIdx < (int)created.size()) created[focusedIdx]->select();
+
+    return true;
+}
+
+void TTestPatternApp::openWorkspace()
+{
+    // Open a dialog rooted at workspaces/ listing JSON files
+    char fileName[260];
+    std::strncpy(fileName, "workspaces/*.json", sizeof(fileName));
+    fileName[sizeof(fileName)-1] = '\0';
+    TFileDialog *dlg = new TFileDialog("workspaces/*.json", "Open Workspace", "~N~ame", fdOpenButton, 101);
+    ushort res = deskTop->execView(dlg);
+    std::string path;
+    if (res != cmCancel) {
+        dlg->getData(fileName);
+        path = fileName;
+        // Normalize: if only a filename, prepend workspaces/
+        if (!path.empty() && path.find('/') == std::string::npos)
+            path = std::string("workspaces/") + path;
+ succeeded in 52ms:
+app/api_ipc.cpp:103:extern void api_spawn_test(TTestPatternApp& app);
+app/api_ipc.cpp:104:extern void api_spawn_gradient(TTestPatternApp& app, const std::string& kind);
+app/api_ipc.cpp:107:extern void api_spawn_test(TTestPatternApp& app, const TRect* bounds);
+app/api_ipc.cpp:108:extern void api_spawn_gradient(TTestPatternApp& app, const std::string& kind, const TRect* bounds);
+app/api_ipc.cpp:124:extern void api_spawn_text_editor(TTestPatternApp& app, const TRect* bounds);
+app/api_ipc.cpp:125:extern void api_spawn_browser(TTestPatternApp& app, const TRect* bounds);
+app/api_ipc.cpp:394:            api_spawn_test(*app_, bounds);
+app/api_ipc.cpp:397:            api_spawn_gradient(*app_, kind, bounds);
+app/api_ipc.cpp:407:            api_spawn_text_editor(*app_, bounds);
+app/api_ipc.cpp:409:            api_spawn_browser(*app_, bounds);
+app/test_pattern_app.cpp:596:    static bool parseBounds(const std::string &s, size_t objStart, int &x,int &y,int &w,int &h);
+app/test_pattern_app.cpp:673:    friend void api_spawn_test(TTestPatternApp&);
+app/test_pattern_app.cpp:674:    friend void api_spawn_gradient(TTestPatternApp&, const std::string&);
+app/test_pattern_app.cpp:677:    friend void api_spawn_test(TTestPatternApp&, const TRect* bounds);
+app/test_pattern_app.cpp:678:    friend void api_spawn_gradient(TTestPatternApp&, const std::string&, const TRect* bounds);
+app/test_pattern_app.cpp:699:    friend void api_spawn_text_editor(TTestPatternApp&, const TRect* bounds);
+app/test_pattern_app.cpp:700:    friend void api_spawn_browser(TTestPatternApp&, const TRect* bounds);
+app/test_pattern_app.cpp:2238:void api_spawn_test(TTestPatternApp& app) { app.newTestWindow(); }
+app/test_pattern_app.cpp:2239:void api_spawn_gradient(TTestPatternApp& app, const std::string& kind) {
+app/test_pattern_app.cpp:2251:void api_spawn_test(TTestPatternApp& app, const TRect* bounds) { 
+
+thinking
+**Inspecting existing window creation methods**
+exec
+/bin/zsh -lc "rg -n \"void TTestPatternApp::new.*Window|new[A-Za-z]+Window\\(\" app/test_pattern_app.cpp" in /Users/james/Repos/wibandwob-dos succeeded in 53ms:
+558:    void newTestWindow();
+559:    void newTestWindow(const TRect& bounds);
+560:    void newGradientWindow(TGradientWindow::GradientType type);
+561:    void newGradientWindow(TGradientWindow::GradientType type, const TRect& bounds);
+562:    // void newMechWindow();
+563:    void newDonutWindow();
+564:    void newBrowserWindow();
+565:    void newBrowserWindow(const TRect& bounds);
+566:    void newWibWobWindow();
+765:                newTestWindow();
+769:                newGradientWindow(TGradientWindow::gtHorizontal);
+773:                newGradientWindow(TGradientWindow::gtVertical);
+777:                newGradientWindow(TGradientWindow::gtRadial);
+781:                newGradientWindow(TGradientWindow::gtDiagonal);
+785:            //     newMechWindow();
+789:                newDonutWindow();
+867:                newBrowserWindow();
+1045:                newWibWobWindow();
+1239:void TTestPatternApp::newTestWindow()
+1260:void TTestPatternApp::newTestWindow(const TRect& bounds)
+
+thinking
+**Planning friend functions and new window methods**
+exec
+/bin/zsh -lc "sed -n '1,220p' app/animated_blocks_view.h" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,220p' app/generative_verse_view.h" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,220p' app/animated_gradient_view.h" in /Users/james/Repos/wibandwob-dos succeeded in 50ms:
+/*---------------------------------------------------------*/
+/*                                                         */
+/*   animated_gradient_view.h - Animated Gradient View    */
+/*                                                         */
+/*---------------------------------------------------------*/
+
+#ifndef ANIMATED_GRADIENT_VIEW_H
+#define ANIMATED_GRADIENT_VIEW_H
+
+#define Uses_TView
+#define Uses_TDrawBuffer
+#define Uses_TRect
+#include <tvision/tv.h>
+#include <vector>
+
+// Animated horizontal gradient view that shifts colors over time.
+// Colors flow horizontally (left to right) with configurable speed.
+class TAnimatedHGradientView : public TView {
+public:
+    explicit TAnimatedHGradientView(
+ succeeded in 52ms:
+/*---------------------------------------------------------*/
+/*                                                         */
+/*   animated_blocks_view.h - Zigzag Block Animation View  */
+/*                                                         */
+/*---------------------------------------------------------*/
+
+#ifndef ANIMATED_BLOCKS_VIEW_H
+#define ANIMATED_BLOCKS_VIEW_H
+
+#define Uses_TView
+#define Uses_TDrawBuffer
+#define Uses_TRect
+#include <tvision/tv.h>
+#include <vector>
+
+// Simple animated view that renders colored block characters. On each
+// timer tick, rows shift one cell horizontally; even rows move right,
+// odd rows move left. Colors repeat across columns.
+class TAnimatedBlocksView : public TView {
+public:
+ succeeded in 52ms:
+/*---------------------------------------------------------*/
+/*                                                         */
+/*   generative_verse_view.h - Verse Field (Generative)   */
+/*                                                         */
+/*   Full-window evolving generative field with layered    */
+/*   waves, flow, and palettes. Inspired by Verse-like     */
+/*   minimal, living abstractions.                         */
+/*                                                         */
+/*---------------------------------------------------------*/
+
+#ifndef GENERATIVE_VERSE_VIEW_H
+#define GENERATIVE_VERSE_VIEW_H
+
+#define Uses_TView
+#define Uses_TRect
+#define Uses_TDrawBuffer
+#define Uses_TEvent
+#define Uses_TColorAttr
+#include <tvision/tv.h>
+
+
+thinking
+**Assessing dynamic_cast limitations for window types**
+codex
+I found a key constraint: most generative/animated `TWindow` wrapper classes are anonymous/local to their `.cpp` files, so `test_pattern_app.cpp` can’t `dynamic_cast` to those window types directly. I’m now verifying the exported view/factory symbols in headers so the replacement uses robust child-view detection and compiles.
+exec
+/bin/zsh -lc "sed -n '1,220p' app/generative_cube_view.h" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,220p' app/generative_mycelium_view.h" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,220p' app/generative_torus_view.h" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,220p' app/generative_orbit_view.h" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+/*---------------------------------------------------------*/
+/*                                                         */
+/*   generative_cube_view.h - Cube Spinner (Generative)   */
+/*                                                         */
+/*   Wireframe rotating cube with perspective projection, */
+/*   per-edge colouring by depth.                         */
+/*                                                         */
+/*---------------------------------------------------------*/
+
+#ifndef GENERATIVE_CUBE_VIEW_H
+#define GENERATIVE_CUBE_VIEW_H
+
+#define Uses_TView
+#define Uses_TRect
+#define Uses_TDrawBuffer
+#define Uses_TEvent
+#define Uses_TColorAttr
+#include <tvision/tv.h>
+
+class TGenerativeCubeView : public TView {
+ succeeded in 52ms:
+/*---------------------------------------------------------*/
+/*                                                         */
+/*   generative_mycelium_view.h - Mycelium Field (Gen)    */
+/*                                                         */
+/*   Curl-noise flow with branching motifs; living weave. */
+/*                                                         */
+/*---------------------------------------------------------*/
+
+#ifndef GENERATIVE_MYCELIUM_VIEW_H
+#define GENERATIVE_MYCELIUM_VIEW_H
+
+#define Uses_TView
+#define Uses_TRect
+#define Uses_TDrawBuffer
+#define Uses_TEvent
+#define Uses_TColorAttr
+#include <tvision/tv.h>
+
+class TGenerativeMyceliumView : public TView {
+public:
+ succeeded in 51ms:
+/*---------------------------------------------------------*/
+/*                                                         */
+/*   generative_orbit_view.h - Orbit Field (Generative)   */
+/*                                                         */
+/*   Radial interference from rotating attractors;        */
+/*   evolving colour bands and ripples.                   */
+/*                                                         */
+/*---------------------------------------------------------*/
+
+#ifndef GENERATIVE_ORBIT_VIEW_H
+#define GENERATIVE_ORBIT_VIEW_H
+
+#define Uses_TView
+#define Uses_TRect
+#define Uses_TDrawBuffer
+#define Uses_TEvent
+#define Uses_TColorAttr
+#include <tvision/tv.h>
+
+class TGenerativeOrbitView : public TView {
+ succeeded in 52ms:
+/*---------------------------------------------------------*/
+/*                                                         */
+/*   generative_torus_view.h - Torus Field (Generative)   */
+/*                                                         */
+/*   Classic ASCII donut rendered with z-buffer shading,  */
+/*   animated rotation and palette colouring.             */
+/*                                                         */
+/*---------------------------------------------------------*/
+
+#ifndef GENERATIVE_TORUS_VIEW_H
+#define GENERATIVE_TORUS_VIEW_H
+
+#define Uses_TView
+#define Uses_TRect
+#define Uses_TDrawBuffer
+#define Uses_TEvent
+#define Uses_TColorAttr
+#include <tvision/tv.h>
+
+class TGenerativeTorusView : public TView {
+
+thinking
+**Listing needed headers**
+exec
+/bin/zsh -lc "sed -n '1,260p' app/game_of_life_view.h" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,260p' app/animated_score_view.h" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,260p' app/animated_ascii_view.h" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,260p' app/generative_monster_cam_view.h" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+/*---------------------------------------------------------*/
+/*                                                         */
+/*   game_of_life_view.h - Conway's Game of Life View     */
+/*                                                         */
+/*---------------------------------------------------------*/
+
+#ifndef GAME_OF_LIFE_VIEW_H
+#define GAME_OF_LIFE_VIEW_H
+
+#define Uses_TView
+#define Uses_TDrawBuffer
+#define Uses_TRect
+#include <tvision/tv.h>
+#include <vector>
+#include <unordered_set>
+#include <unordered_map>
+
+// Coordinate struct for sparse grid representation
+struct CellCoord {
+    int x, y;
+ succeeded in 51ms:
+/*---------------------------------------------------------*/
+/*                                                         */
+/*   animated_score_view.h - Animated ASCII “Score” View  */
+/*                                                         */
+/*   A timer-driven view that renders a multi-line         */
+/*   Unicode ASCII score with subtle, musical-like         */
+/*   animation: phase shifts, breathing, drift, and        */
+/*   cyclic glyph changes.                                 */
+/*                                                         */
+/*   Implementation borrows patterns from                   */
+/*   animated_blocks_view and animated_gradient_view:      */
+/*   - UI-thread timer via setTimer/killTimer              */
+/*   - cmTimerExpired broadcast handling                   */
+/*   - draw() composes each frame based on phase           */
+/*                                                         */
+/*---------------------------------------------------------*/
+
+#ifndef ANIMATED_SCORE_VIEW_H
+#define ANIMATED_SCORE_VIEW_H
+
+ succeeded in 52ms:
+/*---------------------------------------------------------*/
+/*                                                         */
+/*   animated_ascii_view.h - Multi-Layer ASCII Animation  */
+/*                                                         */
+/*---------------------------------------------------------*/
+
+#ifndef ANIMATED_ASCII_VIEW_H
+#define ANIMATED_ASCII_VIEW_H
+
+#define Uses_TView
+#define Uses_TDrawBuffer
+#define Uses_TRect
+#include <tvision/tv.h>
+#include <vector>
+#include <string>
+#include <unordered_map>
+
+// Multi-layer animated ASCII art view where different character types
+// move with different patterns (waves flow, faces bob, circles drift, etc.)
+class TAnimatedAsciiView : public TView {
+ succeeded in 51ms:
+/*---------------------------------------------------------*/
+/*                                                         */
+/*   generative_monster_cam_view.h - Monster Cam (Emoji)  */
+/*                                                         */
+/*   Webcam-driven Verse-like emoji renderer with          */
+/*   width-aware emitter and graceful fallback.           */
+/*                                                         */
+/*---------------------------------------------------------*/
+
+#ifndef GENERATIVE_MONSTER_CAM_VIEW_H
+#define GENERATIVE_MONSTER_CAM_VIEW_H
+
+#define Uses_TView
+#define Uses_TRect
+#define Uses_TDrawBuffer
+#define Uses_TEvent
+#define Uses_TColorAttr
+#include <tvision/tv.h>
+
+#include <vector>
+
+thinking
+**Inspecting headers for window types**
+exec
+/bin/zsh -lc "sed -n '1,240p' app/generative_monster_verse_view.h" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,240p' app/generative_monster_portal_view.h" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,240p' app/ascii_image_view.h" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+/*---------------------------------------------------------*/
+/*                                                         */
+/*   generative_monster_verse_view.h - Monster Verse      */
+/*                                                         */
+/*   Verse-style smooth flow/swirl/weave fields with      */
+/*   emoji-monster glyph mapping + sparse portal motifs.  */
+/*                                                         */
+/*---------------------------------------------------------*/
+
+#ifndef GENERATIVE_MONSTER_VERSE_VIEW_H
+#define GENERATIVE_MONSTER_VERSE_VIEW_H
+
+#define Uses_TView
+#define Uses_TRect
+#define Uses_TDrawBuffer
+#define Uses_TEvent
+#define Uses_TColorAttr
+#include <tvision/tv.h>
+
+class TGenerativeMonsterVerseView : public TView {
+ succeeded in 51ms:
+/*---------------------------------------------------------*/
+/*                                                         */
+/*   generative_monster_portal_view.h - Monster Portal    */
+/*                                                         */
+/*   Tiled emoji portal pattern (from primer) on black     */
+/*   background. Alternate rows offset 50% (brick).        */
+/*   Over time the tile degrades (glitches) and drifts.    */
+/*                                                         */
+/*---------------------------------------------------------*/
+
+#ifndef GENERATIVE_MONSTER_PORTAL_VIEW_H
+#define GENERATIVE_MONSTER_PORTAL_VIEW_H
+
+#define Uses_TView
+#define Uses_TRect
+#define Uses_TDrawBuffer
+#define Uses_TEvent
+#define Uses_TColorAttr
+#include <tvision/tv.h>
+
+exec
+/bin/zsh -lc "sed -n '1,260p' app/scramble_view.h" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,260p' app/wibwob_view.h" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+// ASCII Image View (Turbo Vision) — Menu-integrated viewer
+#pragma once
+
+// Forward declarations to avoid forcing tv.h into headers
+class TWindow;
+struct TRect;
+#include <string>
+
+// Creates a tileable window that hosts an ASCII image view rendering the given file.
+// Supported formats: PNG/JPEG (via stb_image). Returns nullptr on failure.
+TWindow* createAsciiImageWindowFromFile(const TRect &bounds, const std::string &path);
+ succeeded in 50ms:
+/*---------------------------------------------------------*/
+/*                                                         */
+/*   wibwob_view.h - Wib&Wob AI Chat Interface            */
+/*   Split Architecture: MessageView + InputView           */
+/*                                                         */
+/*---------------------------------------------------------*/
+
+#ifndef WIBWOB_VIEW_H
+#define WIBWOB_VIEW_H
+
+#define Uses_TView
+#define Uses_TRect
+#define Uses_TEvent
+#define Uses_TKeys
+#define Uses_TDrawBuffer
+#define Uses_TWindow
+#define Uses_TFrame
+#define Uses_TScrollBar
+#define Uses_TScroller
+#define Uses_TGroup
+ succeeded in 52ms:
+/*---------------------------------------------------------*/
+/*                                                         */
+/*   scramble_view.h - Scramble the Symbient Cat           */
+/*   ASCII cat presence with speech bubbles                */
+/*                                                         */
+/*---------------------------------------------------------*/
+
+#ifndef SCRAMBLE_VIEW_H
+#define SCRAMBLE_VIEW_H
+
+#define Uses_TRect
+#define Uses_TView
+#define Uses_TDrawBuffer
+#define Uses_TEvent
+#define Uses_TWindow
+#define Uses_TFrame
+#define Uses_TKeys
+#define Uses_TProgram
+#define Uses_TDeskTop
+#define Uses_TBackground
+
+thinking
+**Planning window type identification**
+exec
+/bin/zsh -lc 'rg -n "class T.*Ascii.*(View|Window)|createAsciiImageWindowFromFile|TAsciiImage" app/ascii_image_view.cpp' in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+75:class TAsciiImageView : public TView{
+77:    TAsciiImageView(const Image &img,const RenderParams &params):TView(TRect(1,1,1,1)),original(img),rp(params){ growMode=gfGrowHiX|gfGrowHiY; options|=ofSelectable; }
+89:class TAsciiImageWindow : public TWindow{
+91:    explicit TAsciiImageWindow(const TRect &bounds):TWindow(bounds,"ASCII Image", wnNoNumber), TWindowInit(&TAsciiImageWindow::initFrame){ options|=ofTileable; }
+92:    void setView(TAsciiImageView* v){ view=v; insert(v); }
+94:private: TAsciiImageView *view{}; };
+96:TWindow* createAsciiImageWindowFromFile(const TRect &bounds, const std::string &path){
+100:        auto *w=new TAsciiImageWindow(bounds);
+103:        auto *v=new TAsciiImageView(img,rp);
+
+thinking
+**Designing spawn API and window type dispatch**
+codex
+`app/test_pattern_app.cpp` and `app/api_ipc.cpp` currently can’t `dynamic_cast` to most generative/animated *window wrapper* classes (they’re local classes inside each `.cpp`). The robust way is to detect those windows by their child `TView` type.
+
+### 0) Required include additions in `app/test_pattern_app.cpp`
+```cpp
+#include "game_of_life_view.h"
+#include "animated_ascii_view.h"
+```
+
+### 1) Complete replacement: `windowTypeName()` in `app/test_pattern_app.cpp`
+```cpp
+static const char* windowTypeName(TWindow* w) {
+    if (!w) return "test_pattern";
+
+    // Directly-typed windows visible in this TU.
+    if (dynamic_cast<TTestPatternWindow*>(w))    return "test_pattern";
+    if (dynamic_cast<TGradientWindow*>(w))        return "gradient";
+    if (dynamic_cast<TBrowserWindow*>(w))         return "browser";
+    if (dynamic_cast<TTextEditorWindow*>(w))      return "text_editor";
+    if (dynamic_cast<TTransparentTextWindow*>(w)) return "text_view";
+    if (dynamic_cast<TFrameAnimationWindow*>(w))  return "frame_player";
+    if (dynamic_cast<TWibWobWindow*>(w))          return "wibwob";
+    if (dynamic_cast<TScrambleWindow*>(w))        return "scramble";
+
+    // Most generative/animated wrappers are local classes in their own .cpp files,
+    // so identify by hosted child view type.
+#define HAS_CHILD_VIEW(ViewType)                                                      \
+    ([&]() -> bool {                                                                  \
+        TView *start = w->first();                                                    \
+        if (!start) return false;                                                     \
+        TView *v = start;                                                             \
+        do {                                                                          \
+            if (dynamic_cast<ViewType*>(v)) return true;                              \
+            v = v->next;                                                              \
+        } while (v != start);                                                         \
+        return false;                                                                 \
+    }())
+
+    if (HAS_CHILD_VIEW(TGenerativeVerseView))         return "verse";
+    if (HAS_CHILD_VIEW(TGenerativeMyceliumView))      return "mycelium";
+    if (HAS_CHILD_VIEW(TGenerativeOrbitView))         return "orbit";
+    if (HAS_CHILD_VIEW(TGenerativeTorusView))         return "torus";
+    if (HAS_CHILD_VIEW(TGenerativeCubeView))          return "cube";
+    if (HAS_CHILD_VIEW(TGameOfLifeView))              return "life";
+    if (HAS_CHILD_VIEW(TAnimatedBlocksView))          return "blocks";
+    if (HAS_CHILD_VIEW(TAnimatedScoreView))           return "score";
+    if (HAS_CHILD_VIEW(TAnimatedAsciiView))           return "ascii";
+    if (HAS_CHILD_VIEW(TAnimatedHGradientView))       return "animated_gradient";
+    if (HAS_CHILD_VIEW(TGenerativeMonsterCamView))    return "monster_cam";
+    if (HAS_CHILD_VIEW(TGenerativeMonsterVerseView))  return "monster_verse";
+    if (HAS_CHILD_VIEW(TGenerativeMonsterPortalView)) return "monster_portal";
+
+#undef HAS_CHILD_VIEW
+    return "test_pattern";
+}
+```
+
+### 2) Friend declarations + new `api_spawn_*` free functions in `app/test_pattern_app.cpp`
+
+Replace the friend block tail in `TTestPatternApp` with this (keep existing friends, add these lines):
+```cpp
+    friend void api_spawn_text_editor(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_browser(TTestPatternApp&, const TRect* bounds);
+
+    friend void api_spawn_verse(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_mycelium(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_orbit(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_torus(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_cube(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_life(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_blocks(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_score(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_ascii(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_animated_gradient(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_monster_cam(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_monster_verse(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_monster_portal(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_ascii_image(TTestPatternApp&, const std::string& path, const TRect* bounds);
+
+    friend std::string api_browser_fetch(TTestPatternApp&, const std::string& url);
+```
+
+Add this block **immediately after** `api_spawn_browser(...)`:
+```cpp
+static TRect api_centered_bounds(TTestPatternApp& app, int width, int height) {
+    TRect d = app.deskTop->getExtent();
+    int dw = d.b.x - d.a.x;
+    int dh = d.b.y - d.a.y;
+
+    width = std::max(10, std::min(width, dw));
+    height = std::max(6, std::min(height, dh));
+
+    int left = d.a.x + (dw - width) / 2;
+    int top  = d.a.y + (dh - height) / 2;
+    return TRect(left, top, left + width, top + height);
+}
+
+void api_spawn_verse(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 96, 30);
+    TWindow* w = createGenerativeVerseWindow(r);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
+}
+
+void api_spawn_mycelium(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 96, 30);
+    TWindow* w = createGenerativeMyceliumWindow(r);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
+}
+
+void api_spawn_orbit(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 96, 30);
+    TWindow* w = createGenerativeOrbitWindow(r);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
+}
+
+void api_spawn_torus(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 90, 28);
+    TWindow* w = createGenerativeTorusWindow(r);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
+}
+
+void api_spawn_cube(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 90, 28);
+    TWindow* w = createGenerativeCubeWindow(r);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
+}
+
+void api_spawn_life(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 90, 28);
+    TWindow* w = createGameOfLifeWindow(r);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
+}
+
+void api_spawn_blocks(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 84, 24);
+    TWindow* w = createAnimatedBlocksWindow(r);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
+}
+
+void api_spawn_score(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 108, 34);
+    TWindow* w = createAnimatedScoreWindow(r);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
+}
+
+void api_spawn_ascii(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 96, 30);
+    TWindow* w = createAnimatedAsciiWindow(r);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
+}
+
+void api_spawn_animated_gradient(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 84, 24);
+    TWindow* w = createAnimatedGradientWindow(r);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
+}
+
+void api_spawn_monster_cam(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 96, 30);
+    TWindow* w = createGenerativeMonsterCamWindow(r);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
+}
+
+void api_spawn_monster_verse(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 96, 30);
+    TWindow* w = createGenerativeMonsterVerseWindow(r);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
+}
+
+void api_spawn_monster_portal(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 96, 30);
+    TWindow* w = createGenerativeMonsterPortalWindow(r);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
+}
+
+void api_spawn_ascii_image(TTestPatternApp& app, const std::string& path, const TRect* bounds) {
+    if (path.empty()) return;
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 96, 30);
+    TWindow* w = createAsciiImageWindowFromFile(r, path);
+    if (w) {
+        app.deskTop->insert(w);
+        app.registerWindow(w);
+    }
+}
+```
+
+### 3) `app/api_ipc.cpp` externs + complete `create_window` chain
+
+Replace extern declarations block (around lines 103-130) with:
+```cpp
+extern void api_spawn_test(TTestPatternApp& app);
+extern void api_spawn_gradient(TTestPatternApp& app, const std::string& kind);
+extern void api_open_animation_path(TTestPatternApp& app, const std::string& path);
+extern void api_open_text_view_path(TTestPatternApp& app, const std::string& path, const TRect* bounds);
+extern void api_spawn_test(TTestPatternApp& app, const TRect* bounds);
+extern void api_spawn_gradient(TTestPatternApp& app, const std::string& kind, const TRect* bounds);
+extern void api_open_animation_path(TTestPatternApp& app, const std::string& path, const TRect* bounds);
+extern void api_cascade(TTestPatternApp& app);
+extern void api_tile(TTestPatternApp& app);
+extern void api_close_all(TTestPatternApp& app);
+extern void api_set_pattern_mode(TTestPatternApp& app, const std::string& mode);
+extern void api_save_workspace(TTestPatternApp& app);
+extern bool api_save_workspace_path(TTestPatternApp& app, const std::string& path);
+extern bool api_open_workspace_path(TTestPatternApp& app, const std::string& path);
+extern void api_screenshot(TTestPatternApp& app);
+extern std::string api_get_state(TTestPatternApp& app);
+extern std::string api_move_window(TTestPatternApp& app, const std::string& id, int x, int y);
+extern std::string api_resize_window(TTestPatternApp& app, const std::string& id, int width, int height);
+extern std::string api_focus_window(TTestPatternApp& app, const std::string& id);
+extern std::string api_close_window(TTestPatternApp& app, const std::string& id);
+extern std::string api_get_canvas_size(TTestPatternApp& app);
+extern void api_spawn_text_editor(TTestPatternApp& app, const TRect* bounds);
+extern void api_spawn_browser(TTestPatternApp& app, const TRect* bounds);
+extern void api_spawn_verse(TTestPatternApp& app, const TRect* bounds);
+extern void api_spawn_mycelium(TTestPatternApp& app, const TRect* bounds);
+extern void api_spawn_orbit(TTestPatternApp& app, const TRect* bounds);
+extern void api_spawn_torus(TTestPatternApp& app, const TRect* bounds);
+extern void api_spawn_cube(TTestPatternApp& app, const TRect* bounds);
+extern void api_spawn_life(TTestPatternApp& app, const TRect* bounds);
+extern void api_spawn_blocks(TTestPatternApp& app, const TRect* bounds);
+extern void api_spawn_score(TTestPatternApp& app, const TRect* bounds);
+extern void api_spawn_ascii(TTestPatternApp& app, const TRect* bounds);
+extern void api_spawn_animated_gradient(TTestPatternApp& app, const TRect* bounds);
+extern void api_spawn_monster_cam(TTestPatternApp& app, const TRect* bounds);
+extern void api_spawn_monster_verse(TTestPatternApp& app, const TRect* bounds);
+extern void api_spawn_monster_portal(TTestPatternApp& app, const TRect* bounds);
+extern void api_spawn_ascii_image(TTestPatternApp& app, const std::string& path, const TRect* bounds);
+extern std::string api_browser_fetch(TTestPatternApp& app, const std::string& url);
+extern std::string api_send_text(TTestPatternApp& app, const std::string& id, 
+                                 const std::string& content, const std::string& mode, 
+                                 const std::string& position);
+extern std::string api_send_figlet(TTestPatternApp& app, const std::string& id, const std::string& text,
+                                   const std::string& font, int width, const std::string& mode);
+```
+
+Replace the full `create_window` branch with:
+```cpp
+    } else if (cmd == "create_window") {
+        std::string type = kv["type"];
+
+        TRect* bounds = nullptr;
+        TRect rectBounds;
+        auto x_it = kv.find("x");
+        auto y_it = kv.find("y");
+        auto w_it = kv.find("w");
+        auto h_it = kv.find("h");
+        if (x_it != kv.end() && y_it != kv.end() && w_it != kv.end() && h_it != kv.end()) {
+            int x = std::atoi(x_it->second.c_str());
+            int y = std::atoi(y_it->second.c_str());
+            int w = std::atoi(w_it->second.c_str());
+            int h = std::atoi(h_it->second.c_str());
+            rectBounds = TRect(x, y, x + w, y + h);
+            bounds = &rectBounds;
+        }
+
+        if (type == "test_pattern") {
+            api_spawn_test(*app_, bounds);
+        } else if (type == "gradient") {
+            std::string kind = kv.count("gradient") ? kv["gradient"] : std::string("horizontal");
+            api_spawn_gradient(*app_, kind, bounds);
+        } else if (type == "frame_player") {
+            auto it = kv.find("path");
+            if (it != kv.end() && !it->second.empty()) api_open_animation_path(*app_, it->second, bounds);
+            else resp = "err missing path\n";
+        } else if (type == "text_view") {
+            auto it = kv.find("path");
+            if (it != kv.end() && !it->second.empty()) api_open_text_view_path(*app_, it->second, bounds);
+            else resp = "err missing path\n";
+        } else if (type == "text_editor") {
+            api_spawn_text_editor(*app_, bounds);
+        } else if (type == "browser") {
+            api_spawn_browser(*app_, bounds);
+
+        } else if (type == "verse") {
+            api_spawn_verse(*app_, bounds);
+        } else if (type == "mycelium") {
+            api_spawn_mycelium(*app_, bounds);
+        } else if (type == "orbit") {
+            api_spawn_orbit(*app_, bounds);
+        } else if (type == "torus") {
+            api_spawn_torus(*app_, bounds);
+        } else if (type == "cube") {
+            api_spawn_cube(*app_, bounds);
+        } else if (type == "life") {
+            api_spawn_life(*app_, bounds);
+        } else if (type == "blocks") {
+            api_spawn_blocks(*app_, bounds);
+        } else if (type == "score") {
+            api_spawn_score(*app_, bounds);
+        } else if (type == "ascii") {
+            api_spawn_ascii(*app_, bounds);
+        } else if (type == "animated_gradient") {
+            api_spawn_animated_gradient(*app_, bounds);
+        } else if (type == "monster_cam") {
+            api_spawn_monster_cam(*app_, bounds);
+        } else if (type == "monster_verse") {
+            api_spawn_monster_verse(*app_, bounds);
+        } else if (type == "monster_portal") {
+            api_spawn_monster_portal(*app_, bounds);
+        } else if (type == "ascii_image") {
+            auto it = kv.find("path");
+            if (it != kv.end() && !it->second.empty()) api_spawn_ascii_image(*app_, it->second, bounds);
+            else resp = "err missing path\n";
+        } else if (type == "wibwob" || type == "scramble") {
+            resp = "err unsupported type\n";
+        } else {
+            resp = "err unknown type\n";
+        }
+```
+
+---
+
+Class/ctor/params notes you asked for (from those files):
+- `TGenerativeVerseWindow(const TRect&)`, `TGenerativeMyceliumWindow(const TRect&)`, `TGenerativeOrbitWindow(const TRect&)`, `TGenerativeTorusWindow(const TRect&)`, `TGenerativeCubeWindow(const TRect&)`: no mandatory external params.
+- `TGameOfLifeWindow(const TRect&)`: no mandatory external params.
+- `TAnimatedGradientWindow(const TRect&)`, `TAnimatedBlocksWindow(const TRect&)`, `TAnimatedAsciiWindow(const TRect&)`, `TAnimatedScoreWindow(const TRect&)`: no mandatory external params.
+- `TGenerativeMonsterCamWindow(const TRect&)`, `TGenerativeMonsterVerseWindow(const TRect&)`, `TGenerativeMonsterPortalWindow(const TRect&)`: no mandatory external params.
+- `TAsciiImageWindow(const TRect&)` is created via `createAsciiImageWindowFromFile(bounds, path)`: **requires `path`**.
+
+tokens used
+118,670
+`app/test_pattern_app.cpp` and `app/api_ipc.cpp` currently can’t `dynamic_cast` to most generative/animated *window wrapper* classes (they’re local classes inside each `.cpp`). The robust way is to detect those windows by their child `TView` type.
+
+### 0) Required include additions in `app/test_pattern_app.cpp`
+```cpp
+#include "game_of_life_view.h"
+#include "animated_ascii_view.h"
+```
+
+### 1) Complete replacement: `windowTypeName()` in `app/test_pattern_app.cpp`
+```cpp
+static const char* windowTypeName(TWindow* w) {
+    if (!w) return "test_pattern";
+
+    // Directly-typed windows visible in this TU.
+    if (dynamic_cast<TTestPatternWindow*>(w))    return "test_pattern";
+    if (dynamic_cast<TGradientWindow*>(w))        return "gradient";
+    if (dynamic_cast<TBrowserWindow*>(w))         return "browser";
+    if (dynamic_cast<TTextEditorWindow*>(w))      return "text_editor";
+    if (dynamic_cast<TTransparentTextWindow*>(w)) return "text_view";
+    if (dynamic_cast<TFrameAnimationWindow*>(w))  return "frame_player";
+    if (dynamic_cast<TWibWobWindow*>(w))          return "wibwob";
+    if (dynamic_cast<TScrambleWindow*>(w))        return "scramble";
+
+    // Most generative/animated wrappers are local classes in their own .cpp files,
+    // so identify by hosted child view type.
+#define HAS_CHILD_VIEW(ViewType)                                                      \
+    ([&]() -> bool {                                                                  \
+        TView *start = w->first();                                                    \
+        if (!start) return false;                                                     \
+        TView *v = start;                                                             \
+        do {                                                                          \
+            if (dynamic_cast<ViewType*>(v)) return true;                              \
+            v = v->next;                                                              \
+        } while (v != start);                                                         \
+        return false;                                                                 \
+    }())
+
+    if (HAS_CHILD_VIEW(TGenerativeVerseView))         return "verse";
+    if (HAS_CHILD_VIEW(TGenerativeMyceliumView))      return "mycelium";
+    if (HAS_CHILD_VIEW(TGenerativeOrbitView))         return "orbit";
+    if (HAS_CHILD_VIEW(TGenerativeTorusView))         return "torus";
+    if (HAS_CHILD_VIEW(TGenerativeCubeView))          return "cube";
+    if (HAS_CHILD_VIEW(TGameOfLifeView))              return "life";
+    if (HAS_CHILD_VIEW(TAnimatedBlocksView))          return "blocks";
+    if (HAS_CHILD_VIEW(TAnimatedScoreView))           return "score";
+    if (HAS_CHILD_VIEW(TAnimatedAsciiView))           return "ascii";
+    if (HAS_CHILD_VIEW(TAnimatedHGradientView))       return "animated_gradient";
+    if (HAS_CHILD_VIEW(TGenerativeMonsterCamView))    return "monster_cam";
+    if (HAS_CHILD_VIEW(TGenerativeMonsterVerseView))  return "monster_verse";
+    if (HAS_CHILD_VIEW(TGenerativeMonsterPortalView)) return "monster_portal";
+
+#undef HAS_CHILD_VIEW
+    return "test_pattern";
+}
+```
+
+### 2) Friend declarations + new `api_spawn_*` free functions in `app/test_pattern_app.cpp`
+
+Replace the friend block tail in `TTestPatternApp` with this (keep existing friends, add these lines):
+```cpp
+    friend void api_spawn_text_editor(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_browser(TTestPatternApp&, const TRect* bounds);
+
+    friend void api_spawn_verse(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_mycelium(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_orbit(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_torus(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_cube(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_life(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_blocks(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_score(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_ascii(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_animated_gradient(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_monster_cam(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_monster_verse(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_monster_portal(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_ascii_image(TTestPatternApp&, const std::string& path, const TRect* bounds);
+
+    friend std::string api_browser_fetch(TTestPatternApp&, const std::string& url);
+```
+
+Add this block **immediately after** `api_spawn_browser(...)`:
+```cpp
+static TRect api_centered_bounds(TTestPatternApp& app, int width, int height) {
+    TRect d = app.deskTop->getExtent();
+    int dw = d.b.x - d.a.x;
+    int dh = d.b.y - d.a.y;
+
+    width = std::max(10, std::min(width, dw));
+    height = std::max(6, std::min(height, dh));
+
+    int left = d.a.x + (dw - width) / 2;
+    int top  = d.a.y + (dh - height) / 2;
+    return TRect(left, top, left + width, top + height);
+}
+
+void api_spawn_verse(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 96, 30);
+    TWindow* w = createGenerativeVerseWindow(r);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
+}
+
+void api_spawn_mycelium(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 96, 30);
+    TWindow* w = createGenerativeMyceliumWindow(r);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
+}
+
+void api_spawn_orbit(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 96, 30);
+    TWindow* w = createGenerativeOrbitWindow(r);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
+}
+
+void api_spawn_torus(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 90, 28);
+    TWindow* w = createGenerativeTorusWindow(r);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
+}
+
+void api_spawn_cube(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 90, 28);
+    TWindow* w = createGenerativeCubeWindow(r);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
+}
+
+void api_spawn_life(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 90, 28);
+    TWindow* w = createGameOfLifeWindow(r);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
+}
+
+void api_spawn_blocks(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 84, 24);
+    TWindow* w = createAnimatedBlocksWindow(r);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
+}
+
+void api_spawn_score(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 108, 34);
+    TWindow* w = createAnimatedScoreWindow(r);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
+}
+
+void api_spawn_ascii(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 96, 30);
+    TWindow* w = createAnimatedAsciiWindow(r);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
+}
+
+void api_spawn_animated_gradient(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 84, 24);
+    TWindow* w = createAnimatedGradientWindow(r);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
+}
+
+void api_spawn_monster_cam(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 96, 30);
+    TWindow* w = createGenerativeMonsterCamWindow(r);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
+}
+
+void api_spawn_monster_verse(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 96, 30);
+    TWindow* w = createGenerativeMonsterVerseWindow(r);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
+}
+
+void api_spawn_monster_portal(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 96, 30);
+    TWindow* w = createGenerativeMonsterPortalWindow(r);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
+}
+
+void api_spawn_ascii_image(TTestPatternApp& app, const std::string& path, const TRect* bounds) {
+    if (path.empty()) return;
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 96, 30);
+    TWindow* w = createAsciiImageWindowFromFile(r, path);
+    if (w) {
+        app.deskTop->insert(w);
+        app.registerWindow(w);
+    }
+}
+```
+
+### 3) `app/api_ipc.cpp` externs + complete `create_window` chain
+
+Replace extern declarations block (around lines 103-130) with:
+```cpp
+extern void api_spawn_test(TTestPatternApp& app);
+extern void api_spawn_gradient(TTestPatternApp& app, const std::string& kind);
+extern void api_open_animation_path(TTestPatternApp& app, const std::string& path);
+extern void api_open_text_view_path(TTestPatternApp& app, const std::string& path, const TRect* bounds);
+extern void api_spawn_test(TTestPatternApp& app, const TRect* bounds);
+extern void api_spawn_gradient(TTestPatternApp& app, const std::string& kind, const TRect* bounds);
+extern void api_open_animation_path(TTestPatternApp& app, const std::string& path, const TRect* bounds);
+extern void api_cascade(TTestPatternApp& app);
+extern void api_tile(TTestPatternApp& app);
+extern void api_close_all(TTestPatternApp& app);
+extern void api_set_pattern_mode(TTestPatternApp& app, const std::string& mode);
+extern void api_save_workspace(TTestPatternApp& app);
+extern bool api_save_workspace_path(TTestPatternApp& app, const std::string& path);
+extern bool api_open_workspace_path(TTestPatternApp& app, const std::string& path);
+extern void api_screenshot(TTestPatternApp& app);
+extern std::string api_get_state(TTestPatternApp& app);
+extern std::string api_move_window(TTestPatternApp& app, const std::string& id, int x, int y);
+extern std::string api_resize_window(TTestPatternApp& app, const std::string& id, int width, int height);
+extern std::string api_focus_window(TTestPatternApp& app, const std::string& id);
+extern std::string api_close_window(TTestPatternApp& app, const std::string& id);
+extern std::string api_get_canvas_size(TTestPatternApp& app);
+extern void api_spawn_text_editor(TTestPatternApp& app, const TRect* bounds);
+extern void api_spawn_browser(TTestPatternApp& app, const TRect* bounds);
+extern void api_spawn_verse(TTestPatternApp& app, const TRect* bounds);
+extern void api_spawn_mycelium(TTestPatternApp& app, const TRect* bounds);
+extern void api_spawn_orbit(TTestPatternApp& app, const TRect* bounds);
+extern void api_spawn_torus(TTestPatternApp& app, const TRect* bounds);
+extern void api_spawn_cube(TTestPatternApp& app, const TRect* bounds);
+extern void api_spawn_life(TTestPatternApp& app, const TRect* bounds);
+extern void api_spawn_blocks(TTestPatternApp& app, const TRect* bounds);
+extern void api_spawn_score(TTestPatternApp& app, const TRect* bounds);
+extern void api_spawn_ascii(TTestPatternApp& app, const TRect* bounds);
+extern void api_spawn_animated_gradient(TTestPatternApp& app, const TRect* bounds);
+extern void api_spawn_monster_cam(TTestPatternApp& app, const TRect* bounds);
+extern void api_spawn_monster_verse(TTestPatternApp& app, const TRect* bounds);
+extern void api_spawn_monster_portal(TTestPatternApp& app, const TRect* bounds);
+extern void api_spawn_ascii_image(TTestPatternApp& app, const std::string& path, const TRect* bounds);
+extern std::string api_browser_fetch(TTestPatternApp& app, const std::string& url);
+extern std::string api_send_text(TTestPatternApp& app, const std::string& id, 
+                                 const std::string& content, const std::string& mode, 
+                                 const std::string& position);
+extern std::string api_send_figlet(TTestPatternApp& app, const std::string& id, const std::string& text,
+                                   const std::string& font, int width, const std::string& mode);
+```
+
+Replace the full `create_window` branch with:
+```cpp
+    } else if (cmd == "create_window") {
+        std::string type = kv["type"];
+
+        TRect* bounds = nullptr;
+        TRect rectBounds;
+        auto x_it = kv.find("x");
+        auto y_it = kv.find("y");
+        auto w_it = kv.find("w");
+        auto h_it = kv.find("h");
+        if (x_it != kv.end() && y_it != kv.end() && w_it != kv.end() && h_it != kv.end()) {
+            int x = std::atoi(x_it->second.c_str());
+            int y = std::atoi(y_it->second.c_str());
+            int w = std::atoi(w_it->second.c_str());
+            int h = std::atoi(h_it->second.c_str());
+            rectBounds = TRect(x, y, x + w, y + h);
+            bounds = &rectBounds;
+        }
+
+        if (type == "test_pattern") {
+            api_spawn_test(*app_, bounds);
+        } else if (type == "gradient") {
+            std::string kind = kv.count("gradient") ? kv["gradient"] : std::string("horizontal");
+            api_spawn_gradient(*app_, kind, bounds);
+        } else if (type == "frame_player") {
+            auto it = kv.find("path");
+            if (it != kv.end() && !it->second.empty()) api_open_animation_path(*app_, it->second, bounds);
+            else resp = "err missing path\n";
+        } else if (type == "text_view") {
+            auto it = kv.find("path");
+            if (it != kv.end() && !it->second.empty()) api_open_text_view_path(*app_, it->second, bounds);
+            else resp = "err missing path\n";
+        } else if (type == "text_editor") {
+            api_spawn_text_editor(*app_, bounds);
+        } else if (type == "browser") {
+            api_spawn_browser(*app_, bounds);
+
+        } else if (type == "verse") {
+            api_spawn_verse(*app_, bounds);
+        } else if (type == "mycelium") {
+            api_spawn_mycelium(*app_, bounds);
+        } else if (type == "orbit") {
+            api_spawn_orbit(*app_, bounds);
+        } else if (type == "torus") {
+            api_spawn_torus(*app_, bounds);
+        } else if (type == "cube") {
+            api_spawn_cube(*app_, bounds);
+        } else if (type == "life") {
+            api_spawn_life(*app_, bounds);
+        } else if (type == "blocks") {
+            api_spawn_blocks(*app_, bounds);
+        } else if (type == "score") {
+            api_spawn_score(*app_, bounds);
+        } else if (type == "ascii") {
+            api_spawn_ascii(*app_, bounds);
+        } else if (type == "animated_gradient") {
+            api_spawn_animated_gradient(*app_, bounds);
+        } else if (type == "monster_cam") {
+            api_spawn_monster_cam(*app_, bounds);
+        } else if (type == "monster_verse") {
+            api_spawn_monster_verse(*app_, bounds);
+        } else if (type == "monster_portal") {
+            api_spawn_monster_portal(*app_, bounds);
+        } else if (type == "ascii_image") {
+            auto it = kv.find("path");
+            if (it != kv.end() && !it->second.empty()) api_spawn_ascii_image(*app_, it->second, bounds);
+            else resp = "err missing path\n";
+        } else if (type == "wibwob" || type == "scramble") {
+            resp = "err unsupported type\n";
+        } else {
+            resp = "err unknown type\n";
+        }
+```
+
+---
+
+Class/ctor/params notes you asked for (from those files):
+- `TGenerativeVerseWindow(const TRect&)`, `TGenerativeMyceliumWindow(const TRect&)`, `TGenerativeOrbitWindow(const TRect&)`, `TGenerativeTorusWindow(const TRect&)`, `TGenerativeCubeWindow(const TRect&)`: no mandatory external params.
+- `TGameOfLifeWindow(const TRect&)`: no mandatory external params.
+- `TAnimatedGradientWindow(const TRect&)`, `TAnimatedBlocksWindow(const TRect&)`, `TAnimatedAsciiWindow(const TRect&)`, `TAnimatedScoreWindow(const TRect&)`: no mandatory external params.
+- `TGenerativeMonsterCamWindow(const TRect&)`, `TGenerativeMonsterVerseWindow(const TRect&)`, `TGenerativeMonsterPortalWindow(const TRect&)`: no mandatory external params.
+- `TAsciiImageWindow(const TRect&)` is created via `createAsciiImageWindowFromFile(bounds, path)`: **requires `path`**.

@@ -27,20 +27,20 @@ From spike debug notes (`.planning/spikes/spk-xterm-pty-validation/multi-instanc
 
 ## Stories
 
-- [ ] `s09-probe-before-unlink` — connect-probe socket before unlink, abort if live
-- [ ] `s10-bind-failure-propagation` — check start() return, log and exit on bind failure
+- [x] `s09-probe-before-unlink` — connect-probe socket before unlink, abort if live
+- [x] `s10-bind-failure-propagation` — check start() return, log and exit on bind failure
 
 ## Acceptance Criteria
 
-- [ ] **AC-1:** Starting instance B on same socket as running instance A fails with clear error
+- [x] **AC-1:** Starting instance B on same socket as running instance A fails with clear error
   - Test: start two instances with same WIBWOB_INSTANCE, second exits with error message
-- [ ] **AC-2:** Stale socket (no listener) is cleaned up and new instance binds successfully
+- [x] **AC-2:** Stale socket (no listener) is cleaned up and new instance binds successfully
   - Test: create orphan socket file, start instance, it cleans up and binds
-- [ ] **AC-3:** start() return value checked — bind failure does not silently continue
+- [x] **AC-3:** start() return value checked — bind failure does not silently continue
   - Test: inspect stderr output on deliberate bind failure
 
 ## Status
 
-Status: not-started
-GitHub issue: —
+Status: done
+GitHub issue: #57
 PR: —

@@ -42,7 +42,8 @@ public:
     void clearTools() override;
 
     // Streaming support (uses --output-format stream-json)
-    bool sendStreamingQuery(const std::string& query, StreamingCallback streamCallback);
+    bool sendStreamingQuery(const std::string& query, StreamingCallback streamCallback,
+                            const std::string& systemPrompt);
     bool isStreamingActive() const { return streamingActive; }
 
 private:

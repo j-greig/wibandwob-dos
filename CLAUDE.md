@@ -42,6 +42,12 @@ curl http://127.0.0.1:8089/state
 
 No C++ unit test framework is configured. C++ testing is manual via UI interaction or API calls.
 
+Primary automated regression coverage for multiplayer/IPC lives in `tests/room/` (Python, 160 tests). Run for all boundary/contract changes:
+
+```bash
+uv run --with pytest pytest tests/room/ -q
+```
+
 ## Architecture
 
 ```
@@ -188,6 +194,33 @@ Menu/API/MCP parity drift was resolved by E001 (command registry). The unified `
 - **PR checklist**: see `workings/chatgpt-refactor-vision-planning-2026-01-15/pr-acceptance-and-quality-gates.md` for the full acceptance gate list. Key gates: command defined once in C++ registry, menu/MCP parity preserved, `get_state()` validates against schema, Python tests pass.
 - **No force-push to main**.
 - **No emoji in commit messages** — not in title, not in description. Plain text only.
+
+### Codex review loop (hardening tasks)
+
+When implementing a multi-round hardening task (bug fixing, IPC robustness, etc.):
+
+1. **After committing a batch of fixes**, immediately launch Codex round-N review in background:
+   ```bash
+   codex exec -C /Users/james/Repos/wibandwob-dos "<detailed prompt>" \
+     2>&1 | tee /Users/james/Repos/wibandwob-dos/codex-review-roundN-$(date +%Y%m%d-%H%M%S).log &
+   ```
+
+2. **Always include a devnote preamble** in every Codex prompt that lists the last 5-10 CODEX-ANALYSIS-ROUNDn-REVIEW.md files. Codex has no persistent memory across calls, so it must be told what happened in previous rounds. Example:
+   ```
+   Read CODEX-ANALYSIS-ROUND7-REVIEW.md, CODEX-ANALYSIS-ROUND6-REVIEW.md,
+   CODEX-ANALYSIS-ROUND5-REVIEW.md to understand all previous findings and
+   fixes. Then do a fresh verification pass...
+   ```
+   The analysis markdowns are compact (~30-50 lines) and give Codex the full context it needs without requiring it to re-read raw logs.
+
+3. **Context limit protocol** — when context remaining drops below ~13%:
+   a. Launch Codex round-N with a detailed prompt referencing the last 2 log files AND recent CODEX-ANALYSIS markdowns for context
+   b. Run `/compact` to preserve session state to `logs/memory/compact-<date>.md`
+   c. The next session reads the Codex log and continues the loop
+
+4. **Per-round cycle**: read log → write `CODEX-ANALYSIS-ROUNDn-REVIEW.md` → implement findings → add/run tests → commit → launch next round
+
+5. **Stop when**: Codex reports no new Critical/High findings. Document "confirmed safe" list in final review.
 
 ## Scope Guardrails
 

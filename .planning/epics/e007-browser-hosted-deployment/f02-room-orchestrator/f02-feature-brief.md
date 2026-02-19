@@ -25,23 +25,23 @@ CLI daemon that reads room configs (markdown + YAML frontmatter), spawns ttyd+Wi
 
 ## Stories
 
-- [ ] `s02-spawn-loop` — orchestrator reads config, spawns ttyd+wibwob, tracks PIDs
-- [ ] `s03-health-monitor` — periodic health check via socket probe, restart on failure
-- [ ] `s04-secret-generation` — generate per-room shared secret, pass via WIBWOB_AUTH_SECRET env var
+- [x] `s02-spawn-loop` — orchestrator reads config, spawns ttyd+wibwob, tracks PIDs
+- [x] `s03-health-monitor` — periodic health check via socket probe, restart on failure
+- [x] `s04-secret-generation` — generate per-room shared secret, pass via WIBWOB_AUTH_SECRET env var
 
 ## Acceptance Criteria
 
-- [ ] **AC-1:** Orchestrator spawns a ttyd+WibWob pair from a room config YAML
+- [x] **AC-1:** Orchestrator spawns a ttyd+WibWob pair from a room config YAML
   - Test: spawn with example config, curl ttyd port returns 200
-- [ ] **AC-2:** Orchestrator tracks child PIDs and logs per-room output
+- [x] **AC-2:** Orchestrator tracks child PIDs and logs per-room output
   - Test: kill a child process, orchestrator logs the exit and PID
-- [ ] **AC-3:** Health check detects dead socket and restarts the room
+- [x] **AC-3:** Health check detects dead socket and restarts the room
   - Test: kill WibWob process, orchestrator restarts within 10s
-- [ ] **AC-4:** Shared secret generated and passed to WibWob instance at spawn
+- [x] **AC-4:** Shared secret generated and passed to WibWob instance at spawn
   - Test: spawned process has WIBWOB_AUTH_SECRET env var set, value is 32+ hex chars
 
 ## Status
 
-Status: not-started
-GitHub issue: —
+Status: done
+GitHub issue: #57
 PR: —

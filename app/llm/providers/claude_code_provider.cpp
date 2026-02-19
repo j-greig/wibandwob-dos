@@ -6,6 +6,7 @@
 
 #include "claude_code_provider.h"
 #include "../base/llm_provider_factory.h"
+#include "../base/path_search.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -300,11 +301,18 @@ std::string ClaudeCodeProvider::buildClaudeCommand(const LLMRequest& request) co
         fprintf(stderr, "DEBUG: Starting new session (no session ID)\n");
     }
 
-    // System prompt: prefer file over inline
-    FILE* promptCheck = fopen("wibandwob.prompt.md", "r");
-    if (promptCheck) {
-        fclose(promptCheck);
-        cmd << " --system-prompt-file wibandwob.prompt.md";
+    // System prompt: prefer a file if we can find one (works from repo root or build/app).
+    const std::string promptFilePath = ww_find_first_existing_upwards({
+        "wibandwob.prompt.md",
+        "app/wibandwob.prompt.md",
+        "modules-private/wibwob-prompts/wibandwob.prompt.md",
+        "modules/wibwob-prompts/wibandwob.prompt.md",
+        "test-tui/wibandwob.prompt.md",
+        "app/test-tui/wibandwob.prompt.md",
+    }, 6);
+
+    if (!promptFilePath.empty()) {
+        cmd << " --system-prompt-file " << promptFilePath;
     } else if (!request.system_prompt.empty()) {
         // Fallback to inline system prompt
         cmd << " --append-system-prompt \"";
@@ -509,7 +517,8 @@ void ClaudeCodeProvider::clearTools() {
 // Streaming Support (using --output-format stream-json)
 // ============================================================================
 
-bool ClaudeCodeProvider::sendStreamingQuery(const std::string& query, StreamingCallback streamCallback) {
+bool ClaudeCodeProvider::sendStreamingQuery(const std::string& query, StreamingCallback streamCallback,
+                                            const std::string& systemPrompt) {
     if (busy || query.empty()) {
         return false;
     }
@@ -539,11 +548,27 @@ bool ClaudeCodeProvider::sendStreamingQuery(const std::string& query, StreamingC
         fprintf(stderr, "DEBUG: [streaming] Using session: %s\n", currentSessionId.c_str());
     }
 
-    // System prompt file
-    FILE* promptCheck = fopen("app/wibandwob.prompt.md", "r");
-    if (promptCheck) {
-        fclose(promptCheck);
-        cmd << " --system-prompt-file app/wibandwob.prompt.md";
+    // System prompt: prefer a file if we can find one (works from repo root or build/app).
+    const std::string promptFilePath = ww_find_first_existing_upwards({
+        "wibandwob.prompt.md",
+        "app/wibandwob.prompt.md",
+        "modules-private/wibwob-prompts/wibandwob.prompt.md",
+        "modules/wibwob-prompts/wibandwob.prompt.md",
+        "test-tui/wibandwob.prompt.md",
+        "app/test-tui/wibandwob.prompt.md",
+    }, 6);
+
+    if (!promptFilePath.empty()) {
+        cmd << " --system-prompt-file " << promptFilePath;
+    } else if (!systemPrompt.empty()) {
+        cmd << " --append-system-prompt \"";
+        for (char c : systemPrompt) {
+            if (c == '"' || c == '\\' || c == '$' || c == '`') {
+                cmd << '\\';
+            }
+            cmd << c;
+        }
+        cmd << "\"";
     }
 
     // Escape the query
