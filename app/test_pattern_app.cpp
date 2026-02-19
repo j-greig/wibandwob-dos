@@ -204,8 +204,9 @@ const ushort cmScrambleExpand = 181;  // Scramble expand/shrink
 
 // Help menu commands
 const ushort cmAbout = 129;
-const ushort cmKeyboardShortcuts = 130;
-const ushort cmDebugInfo = 131;
+const ushort cmKeyboardShortcuts = 210;
+const ushort cmDebugInfo = 211;
+const ushort cmApiKeyHelp = 212;
 
 // Glitch menu commands
 const ushort cmToggleGlitchMode = 140;
@@ -893,27 +894,13 @@ void TTestPatternApp::handleEvent(TEvent& event)
                 
             // Edit menu commands
                 
-            // View menu commands  
-            case cmZoomIn:
-                messageBox("Zoom In coming soon!", mfInformation | mfOKButton);
-                clearEvent(event);
-                break;
-            case cmZoomOut:
-                messageBox("Zoom Out coming soon!", mfInformation | mfOKButton);
-                clearEvent(event);
-                break;
-            case cmActualSize:
-                messageBox("Actual Size coming soon!", mfInformation | mfOKButton);
-                clearEvent(event);
-                break;
-            case cmFullScreen:
-                messageBox("Full Screen mode coming soon!", mfInformation | mfOKButton);
-                clearEvent(event);
-                break;
+            // REMOVED E009: cmZoomIn/Out/ActualSize/FullScreen (placeholders, no menu items)
             case cmTextEditor: {
                 TRect r = deskTop->getExtent();
                 r.grow(-5, -3); // Leave some margin
-                deskTop->insert(createTextEditorWindow(r));
+                auto *w = createTextEditorWindow(r);
+                deskTop->insert(w);
+                registerWindow(w);
                 clearEvent(event);
                 break;
             }
@@ -1052,83 +1039,21 @@ void TTestPatternApp::handleEvent(TEvent& event)
                 clearEvent(event);
                 break;
             }
-            case cmWindowBgColor: {
-                // Find the focused window and check if it supports background color
-                TView *focused = deskTop ? deskTop->current : nullptr;
-                if (!focused) {
-                    messageBox("No window is currently focused.", mfInformation | mfOKButton);
-                    break;
-                }
-                
-                // Check if it's a text view or frame player view
-                auto *textView = dynamic_cast<TTextFileView*>(focused);
-                auto *frameView = dynamic_cast<FrameFilePlayerView*>(focused);
-                
-                if (!textView && !frameView) {
-                    // Try looking inside the window if it's a TWindow
-                    if (auto *window = dynamic_cast<TWindow*>(focused)) {
-                        auto findTarget = [](TView *p, void *out) -> Boolean {
-                            if (!p) return False;
-                            TView **pp = (TView**)out;
-                            if (*pp) return False;
-                            if (dynamic_cast<TTextFileView*>(p) || dynamic_cast<FrameFilePlayerView*>(p)) {
-                                *pp = p; return True;
-                            }
-                            return False;
-                        };
-                        TView *target = nullptr;
-                        window->firstThat(findTarget, &target);
-                        textView = dynamic_cast<TTextFileView*>(target);
-                        frameView = dynamic_cast<FrameFilePlayerView*>(target);
-                    }
-                }
-                
-                if (textView) {
-                    textView->openBackgroundDialog();
-                } else if (frameView) {
-                    frameView->openBackgroundDialog();
-                } else {
-                    messageBox("The focused window doesn't support background color customization.", mfInformation | mfOKButton);
-                }
-                clearEvent(event);
-                break;
-            }
+            // REMOVED E009: cmWindowBgColor (Background Color retired, no menu item)
                 
             // Tools menu commands
             case cmWibWobChat:
                 newWibWobWindow();
                 clearEvent(event);
                 break;
-            case cmWibWobTestA:
-                newWibWobTestWindowA();
-                clearEvent(event);
-                break;
-            case cmWibWobTestB:
-                newWibWobTestWindowB();
-                clearEvent(event);
-                break;
-            case cmWibWobTestC:
-                newWibWobTestWindowC();
-                clearEvent(event);
-                break;
+            // REMOVED E009: cmWibWobTestA/B/C (dev-only, no menu items)
             case cmRepaint:
                 if (deskTop) {
                     deskTop->drawView();
                 }
                 clearEvent(event);
                 break;
-            case cmAnsiEditor:
-                messageBox("ANSI Editor coming soon!", mfInformation | mfOKButton);
-                clearEvent(event);
-                break;
-            case cmPaintTools:
-                messageBox("Paint Tools coming soon!", mfInformation | mfOKButton);
-                clearEvent(event);
-                break;
-            case cmAnimationStudio:
-                messageBox("Animation Studio coming soon!", mfInformation | mfOKButton);
-                clearEvent(event);
-                break;
+            // REMOVED E009: cmAnsiEditor, cmPaintTools, cmAnimationStudio (placeholders, no menu items)
             case cmQuantumPrinter:
                 messageBox("🚀 QUANTUM PRINTER ACTIVATED! 🚀\n\nPrinting reality at 42Hz...", mfInformation | mfOKButton);
                 clearEvent(event);
@@ -1143,118 +1068,52 @@ void TTestPatternApp::handleEvent(TEvent& event)
                 messageBox("WIBWOBWORLD Test Pattern Generator\n\nBuilt with Turbo Vision\nつ◕‿◕‿◕༽つ", mfInformation | mfOKButton);
                 clearEvent(event);
                 break;
+            case cmKeyboardShortcuts:
+                messageBox(
+                    "Keyboard Shortcuts\n\n"
+                    "Ctrl+N   New Test Pattern\n"
+                    "Ctrl+D   New Animation\n"
+                    "Ctrl+O   Open Text/Animation\n"
+                    "Ctrl+B   Browser\n"
+                    "Ctrl+S   Save Workspace\n"
+                    "Ctrl+P   Screenshot\n"
+                    "Ctrl+Ins Copy Page\n"
+                    "F5       Repaint\n"
+                    "F6       Next Window\n"
+                    "Shift+F6 Previous Window\n"
+                    "F8       Scramble Cat\n"
+                    "Shift+F8 Scramble Expand\n"
+                    "F12      Wib&Wob Chat\n"
+                    "Alt+F3   Close Window\n"
+                    "Alt+X    Exit",
+                    mfInformation | mfOKButton);
+                clearEvent(event);
+                break;
+            case cmApiKeyHelp:
+                messageBox(
+                    "API Key (ANTHROPIC_API_KEY)\n\n"
+                    "Powers two features:\n"
+                    "  Scramble Cat - Claude Haiku brain\n"
+                    "  Wib&Wob Chat - if anthropic_api\n"
+                    "    provider is active in config\n\n"
+                    "Set via:\n"
+                    "  1. ANTHROPIC_API_KEY env var\n"
+                    "     (in ~/.zshrc or .env file)\n"
+                    "  2. Tools > API Key dialog\n"
+                    "     (in-memory only, lost on exit)\n\n"
+                    "Dialog overrides env var at runtime.\n"
+                    "Neither is saved to app config.\n\n"
+                    "Provider: app/llm/config/llm_config.json",
+                    mfInformation | mfOKButton);
+                clearEvent(event);
+                break;
+
+            // REMOVED E009: entire Glitch Effects submenu handlers
+            // (cmToggleGlitchMode, cmGlitchScatter, cmGlitchColorBleed,
+            //  cmGlitchRadialDistort, cmGlitchDiagonalScatter,
+            //  cmCaptureGlitchedFrame, cmResetGlitchParams, cmGlitchSettings)
                 
-            // Glitch menu commands
-            case cmToggleGlitchMode: {
-                bool currentMode = getGlitchEngine().isGlitchModeEnabled();
-                getGlitchEngine().enableGlitchMode(!currentMode);
-                std::string msg = !currentMode ? 
-                    "Glitch mode ENABLED! Visual corruption effects are now active." :
-                    "Glitch mode disabled. Normal rendering restored.";
-                messageBox(msg.c_str(), mfInformation | mfOKButton);
-                // Update menu checkmark (would need menu refresh)
-                clearEvent(event);
-                break;
-            }
-            case cmGlitchScatter: {
-                if (!getGlitchEngine().isGlitchModeEnabled()) {
-                    messageBox("Enable Glitch Mode first to use scatter effects.", mfWarning | mfOKButton);
-                } else {
-                    GlitchParams params = getGlitchEngine().getGlitchParams();
-                    params.scatterIntensity = 0.8f;
-                    params.scatterRadius = 8;
-                    getGlitchEngine().setGlitchParams(params);
-                    messageBox("Scatter pattern applied! Characters will scatter during resize.", mfInformation | mfOKButton);
-                }
-                clearEvent(event);
-                break;
-            }
-            case cmGlitchColorBleed: {
-                if (!getGlitchEngine().isGlitchModeEnabled()) {
-                    messageBox("Enable Glitch Mode first to use color bleeding.", mfWarning | mfOKButton);
-                } else {
-                    GlitchParams params = getGlitchEngine().getGlitchParams();
-                    params.colorBleedChance = 0.6f;
-                    params.colorBleedDistance = 5;
-                    getGlitchEngine().setGlitchParams(params);
-                    messageBox("Color bleed applied! Colors will bleed across character positions.", mfInformation | mfOKButton);
-                }
-                clearEvent(event);
-                break;
-            }
-            case cmGlitchRadialDistort: {
-                if (!getGlitchEngine().isGlitchModeEnabled()) {
-                    messageBox("Enable Glitch Mode first to use radial distortion.", mfWarning | mfOKButton);
-                } else {
-                    // Apply radial distortion to current active window
-                    if (TView* activeView = deskTop->current) {
-                        TRect bounds = activeView->getBounds();
-                        int centerX = bounds.a.x + (bounds.b.x - bounds.a.x) / 2;
-                        int centerY = bounds.a.y + (bounds.b.y - bounds.a.y) / 2;
-                        // Note: This would need integration with drawing system
-                        messageBox("Radial distortion applied from window center!", mfInformation | mfOKButton);
-                    } else {
-                        messageBox("No active window for radial distortion.", mfWarning | mfOKButton);
-                    }
-                }
-                clearEvent(event);
-                break;
-            }
-            case cmGlitchDiagonalScatter: {
-                if (!getGlitchEngine().isGlitchModeEnabled()) {
-                    messageBox("Enable Glitch Mode first to use diagonal scatter.", mfWarning | mfOKButton);
-                } else {
-                    GlitchParams params = getGlitchEngine().getGlitchParams();
-                    params.scatterIntensity = 0.5f;
-                    params.enableCoordinateOffset = true;
-                    params.dimensionCorruption = 0.3f;
-                    getGlitchEngine().setGlitchParams(params);
-                    messageBox("Diagonal scatter applied! Creates diagonal streaking effects.", mfInformation | mfOKButton);
-                }
-                clearEvent(event);
-                break;
-            }
-            case cmCaptureGlitchedFrame: {
-                TView* activeView = deskTop->current;
-                std::string captured = captureGlitchedFrame(activeView);
-                
-                // Save to file with timestamp
-                auto now = std::chrono::system_clock::now();
-                auto time_t = std::chrono::system_clock::to_time_t(now);
-                std::ostringstream filename;
-                filename << "glitched_frame_" << std::put_time(std::localtime(&time_t), "%Y%m%d_%H%M%S") << ".txt";
-                
-                if (getFrameCapture().saveFrame(getFrameCapture().captureScreen(), filename.str(), 
-                                               CaptureOptions{CaptureFormat::AnsiEscapes, true, false, true, true, true})) {
-                    messageBox(("Frame captured to: " + filename.str()).c_str(), mfInformation | mfOKButton);
-                } else {
-                    messageBox("Failed to capture frame.", mfError | mfOKButton);
-                }
-                clearEvent(event);
-                break;
-            }
-            case cmResetGlitchParams: {
-                getGlitchEngine().resetCorruption();
-                GlitchParams defaultParams;
-                getGlitchEngine().setGlitchParams(defaultParams);
-                messageBox("Glitch parameters reset to defaults.", mfInformation | mfOKButton);
-                clearEvent(event);
-                break;
-            }
-            case cmGlitchSettings:
-                messageBox("Glitch Settings dialog coming soon!\n\nUse menu items to adjust parameters for now.", mfInformation | mfOKButton);
-                clearEvent(event);
-                break;
-                
-            // Future File commands
-            case cmOpenAnsiArt:
-                messageBox("ANSI Art file opening coming soon!", mfInformation | mfOKButton);
-                clearEvent(event);
-                break;
-            case cmNewPaintCanvas:
-                messageBox("Paint Canvas creation coming soon!", mfInformation | mfOKButton);
-                clearEvent(event);
-                break;
+            // REMOVED E009: cmOpenAnsiArt, cmNewPaintCanvas (orphan handlers, no menu items)
             case cmOpenImageFile: {
                 char fileName[MAXPATH];
                 strcpy(fileName, "*.{png,jpg,jpeg}");
@@ -1901,24 +1760,30 @@ void TTestPatternApp::setPatternMode(bool continuous)
 void TTestPatternApp::showApiKeyDialog()
 {
     // Build dialog
-    TRect dlgRect(0, 0, 56, 10);
+    TRect dlgRect(0, 0, 56, 14);
     dlgRect.move((TProgram::deskTop->size.x - 56) / 2,
-                 (TProgram::deskTop->size.y - 10) / 2);
+                 (TProgram::deskTop->size.y - 14) / 2);
 
     TDialog* dlg = new TDialog(dlgRect, "API Key");
 
-    dlg->insert(new TLabel(TRect(3, 2, 53, 3), "Anthropic API key (sk-ant-...):", nullptr));
+    dlg->insert(new TStaticText(TRect(3, 2, 53, 3),
+        "Used by Scramble (Haiku) and Wib&Wob Chat."));
+    dlg->insert(new TLabel(TRect(3, 4, 53, 5), "Anthropic API key (sk-ant-...):", nullptr));
 
-    TRect inputRect(3, 3, 53, 4);
+    TRect inputRect(3, 5, 53, 6);
     TInputLine* input = new TInputLine(inputRect, 256);
     dlg->insert(input);
 
     // Status line showing current key state
-    std::string status = runtimeApiKey.empty() ? "No key set" : "Key configured";
-    dlg->insert(new TStaticText(TRect(3, 5, 53, 6), status.c_str()));
+    std::string status = runtimeApiKey.empty()
+        ? "No key set (or use ANTHROPIC_API_KEY env var)"
+        : "Key configured (runtime override active)";
+    dlg->insert(new TStaticText(TRect(3, 7, 53, 8), status.c_str()));
+    dlg->insert(new TStaticText(TRect(3, 8, 53, 9),
+        "See Help > API Key Help for details."));
 
-    TRect okRect(12, 7, 24, 9);
-    TRect cancelRect(30, 7, 42, 9);
+    TRect okRect(12, 10, 24, 12);
+    TRect cancelRect(30, 10, 42, 12);
     dlg->insert(new TButton(okRect, "~O~K", cmOK, bfDefault));
     dlg->insert(new TButton(cancelRect, "Cancel", cmCancel, bfNormal));
 
@@ -2038,12 +1903,12 @@ TMenuBar* TTestPatternApp::initMenuBar(TRect r)
             *new TMenuItem("New ~V~-Gradient", cmNewGradientV, kbNoKey) +
             *new TMenuItem("New ~R~adial Gradient", cmNewGradientR, kbNoKey) +
             *new TMenuItem("New ~D~iagonal Gradient", cmNewGradientD, kbNoKey) +
-            *new TMenuItem("New ~M~echs Grid", cmNewMechs, kbCtrlM) +
+            // REMOVED E009: New Mechs Grid (dead end, handler commented out)
             *new TMenuItem("New ~A~nimation", cmNewDonut, kbCtrlD) +
             newLine() +
             *new TMenuItem("~O~pen Text/Animation...", cmOpenAnimation, kbCtrlO) +
             *new TMenuItem("Open I~m~age...", cmOpenImageFile, kbNoKey) +
-            *new TMenuItem("Open Monodra~w~...", cmOpenMonodraw, kbNoKey) +
+            *new TMenuItem("Open Mo~n~odraw...", cmOpenMonodraw, kbNoKey) +
             newLine() +
             *new TMenuItem("~S~ave Workspace", cmSaveWorkspace, kbCtrlS) +
             *new TMenuItem("Open ~W~orkspace...", cmOpenWorkspace, kbNoKey) +
@@ -2062,74 +1927,51 @@ TMenuBar* TTestPatternApp::initMenuBar(TRect r)
                                   cmPatternTiled, kbNoKey)
             ) +
         *new TSubMenu("~V~iew", kbAltV) +
-            *new TMenuItem("~A~SCII Grid Demo", cmAsciiGridDemo, kbNoKey) +
+            *new TMenuItem("ASCII ~G~rid Demo", cmAsciiGridDemo, kbNoKey) +
             *new TMenuItem("~A~nimated Blocks", cmAnimatedBlocks, kbNoKey) +
-            *new TMenuItem("Animated ~G~radient", cmAnimatedGradient, kbNoKey) +
+            *new TMenuItem("Animated Gradie~n~t", cmAnimatedGradient, kbNoKey) +
             *new TMenuItem("Animated S~c~ore", cmAnimatedScore, kbNoKey) +
             *new TMenuItem("Score ~B~G Color...", cmScoreBgColor, kbNoKey) +
             *new TMenuItem("~V~erse Field (Generative)", cmVerseField, kbNoKey) +
             *new TMenuItem("~O~rbit Field (Generative)", cmOrbitField, kbNoKey) +
-            *new TMenuItem("~M~ycelium Field (Generative)", cmMyceliumField, kbNoKey) +
+            *new TMenuItem("M~y~celium Field (Generative)", cmMyceliumField, kbNoKey) +
             *new TMenuItem("~T~orus Field (Generative)", cmTorusField, kbNoKey) +
-            *new TMenuItem("~C~ube Spinner (Generative)", cmCubeField, kbNoKey) +
-            *new TMenuItem("~M~onster Portal (Generative)", cmMonsterPortal, kbNoKey) +
-            *new TMenuItem("Monster ~V~erse (Generative)", cmMonsterVerse, kbNoKey) +
-            *new TMenuItem("Monster ~C~am (Emoji)", cmMonsterCam, kbNoKey) +
-            // DISABLED: *new TMenuItem("ASCII ~C~am", cmASCIICam, kbNoKey) +
-            *new TMenuItem("Zoom ~I~n", cmZoomIn, kbNoKey) +
-            *new TMenuItem("Zoom ~O~ut", cmZoomOut, kbNoKey) +
-            *new TMenuItem("~A~ctual Size", cmActualSize, kbNoKey) +
-            *new TMenuItem("~F~ull Screen", cmFullScreen, kbF11) +
+            *new TMenuItem("C~u~be Spinner (Generative)", cmCubeField, kbNoKey) +
+            *new TMenuItem("Monster ~P~ortal (Generative)", cmMonsterPortal, kbNoKey) +
+            *new TMenuItem("Monster Ve~r~se (Generative)", cmMonsterVerse, kbNoKey) +
+            *new TMenuItem("Monster Cam (Emo~j~i)", cmMonsterCam, kbNoKey) +
+            // REMOVED E009: ASCII Cam (disabled), Zoom In/Out/Actual Size/Full Screen (placeholders)
             newLine() +
             *new TMenuItem("Scra~m~ble Cat", cmScrambleCat, kbF8) +
             *new TMenuItem("Scramble E~x~pand", cmScrambleExpand, kbShiftF8) +
         *new TSubMenu("~W~indow", kbAltW) +
-            *new TMenuItem("~E~dit Text Editor", cmTextEditor, kbNoKey) +
+            *new TMenuItem("~T~ext Editor", cmTextEditor, kbNoKey) +
             *new TMenuItem("~B~rowser", cmBrowser, kbCtrlB) +
-            newLine() +
-            *new TMenuItem("~O~pen Text File (Transparent BG)...", cmOpenTransparentText, kbNoKey) +
+            *new TMenuItem("~O~pen Text File (Transparent)...", cmOpenTransparentText, kbNoKey) +
             newLine() +
             *new TMenuItem("~C~ascade", cmCascade, kbNoKey) +
-            *new TMenuItem("~T~ile", cmTile, kbNoKey) +
-            *new TMenuItem("Send to ~B~ack", cmSendToBack, kbNoKey) +
+            *new TMenuItem("Ti~l~e", cmTile, kbNoKey) +
+            *new TMenuItem("Send to Bac~k~", cmSendToBack, kbNoKey) +
             newLine() +
             *new TMenuItem("~N~ext", cmNext, kbF6) +
             *new TMenuItem("~P~revious", cmPrev, kbShiftF6) +
             newLine() +
-            *new TMenuItem("Close", cmClose, kbAltF3) +
-            *new TMenuItem("C~l~ose All", cmCloseAll, kbNoKey) +
-            newLine() +
-            *new TMenuItem("Background ~C~olor...", cmWindowBgColor, kbNoKey) +
+            *new TMenuItem("Clos~e~", cmClose, kbAltF3) +
+            *new TMenuItem("Close ~A~ll", cmCloseAll, kbNoKey) +
+            // REMOVED E009: Background Color... (retired for now)
         *new TSubMenu("~T~ools", kbAltT) +
             *new TMenuItem("~W~ib&Wob Chat", cmWibWobChat, kbF12) +
-            *new TMenuItem("  Test A (stdScrollBar)", cmWibWobTestA, kbNoKey) +
-            *new TMenuItem("  Test B (TScroller)", cmWibWobTestB, kbNoKey) +
-            *new TMenuItem("  Test C (Split Arch)", cmWibWobTestC, kbNoKey) +
-            newLine() +
-            (TMenuItem&) (
-                *new TSubMenu("~G~litch Effects", kbNoKey) +
-                    *new TMenuItem(getGlitchEngine().isGlitchModeEnabled() ? "\x04 ~E~nable Glitch Mode" : "  ~E~nable Glitch Mode", 
-                                  cmToggleGlitchMode, kbCtrlG) +
-                    newLine() +
-                    *new TMenuItem("~S~catter Pattern", cmGlitchScatter, kbNoKey) +
-                    *new TMenuItem("~C~olor Bleed", cmGlitchColorBleed, kbNoKey) +
-                    *new TMenuItem("~R~adial Distort", cmGlitchRadialDistort, kbNoKey) +
-                    *new TMenuItem("~D~iagonal Scatter", cmGlitchDiagonalScatter, kbNoKey) +
-                    newLine() +
-                    *new TMenuItem("Ca~p~ture Frame", cmCaptureGlitchedFrame, kbF9) +
-                    *new TMenuItem("R~e~set Parameters", cmResetGlitchParams, kbNoKey) +
-                    *new TMenuItem("Glitch Se~t~tings...", cmGlitchSettings, kbNoKey)
-            ) +
-            newLine() +
-            *new TMenuItem("~A~NSI Editor", cmAnsiEditor, kbNoKey) +
-            *new TMenuItem("~P~aint Tools", cmPaintTools, kbNoKey) +
-            *new TMenuItem("Animation ~S~tudio", cmAnimationStudio, kbNoKey) +
+            // REMOVED E009: Test A/B/C (dev-only, type fallback to test_pattern)
+            // REMOVED E009: Glitch Effects submenu (entire submenu disabled)
+            // REMOVED E009: ANSI Editor, Animation Studio (placeholders)
             newLine() +
             *new TMenuItem("~Q~uantum Printer", cmQuantumPrinter, kbF11) +
             newLine() +
             *new TMenuItem("API ~K~ey...", cmApiKey, kbNoKey) +
         *new TSubMenu("~H~elp", kbAltH) +
-            *new TMenuItem("~A~bout WIBWOBWORLD", cmAbout, kbNoKey)
+            *new TMenuItem("~A~bout WIBWOBWORLD", cmAbout, kbNoKey) +
+            *new TMenuItem("~K~eyboard Shortcuts", cmKeyboardShortcuts, kbNoKey) +
+            *new TMenuItem("A~P~I Key Help", cmApiKeyHelp, kbNoKey)
     );
 }
 

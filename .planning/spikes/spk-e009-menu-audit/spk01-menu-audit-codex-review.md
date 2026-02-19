@@ -1,6 +1,6 @@
 # SPK01 — Menu System Codex Review + Spike Plan
 
-Status: not-started
+Status: in-progress
 
 ## Purpose
 
@@ -95,13 +95,157 @@ Notes:
   - Edit is otherwise clean — no dead ends
 ```
 
+### View menu
+
+```
+BEFORE (current)                          AFTER (E009 target)
+─────────────────────────────────────     ─────────────────────────────────────
+┌─ View ─────────────────────────────┐   ┌─ View ─────────────────────────────┐
+│ ASCII Grid Demo [! type=fallback]  │   │ Generative ►                       │
+│ Animated Blocks                    │   │   ├ Verse Field                    │
+│ Animated Gradient                  │   │   ├ Orbit Field                    │
+│ Animated Score                     │   │   ├ Mycelium Field                 │
+│ Score BG Color...                  │   │   ├ Torus Field                    │
+│ Verse Field (Generative)           │   │   ├ Cube Spinner                   │
+│ Orbit Field (Generative)           │   │   ├ Monster Portal                 │
+│ Mycelium Field (Generative)        │   │   ├ Monster Verse                  │
+│ Torus Field (Generative)           │   │   └ Monster Cam                    │
+│ Cube Spinner (Generative)          │   │ ────────────────────────────────── │
+│ Monster Portal (Generative)        │   │ Animated ►                         │
+│ Monster Verse (Generative)         │   │   ├ Blocks                         │
+│ Monster Cam (Emoji)                │   │   ├ Gradient                       │
+│ ────────────────────────────────── │   │   └ Score                          │
+│ Zoom In       [x placeholder]      │   │ ASCII Grid Demo           [+reg]  │
+│ Zoom Out      [x placeholder]      │   │ ────────────────────────────────── │
+│ Actual Size   [x placeholder]      │   │ Score BG Color...                  │
+│ Full Screen   [x placeholder]  F11 │   │ ────────────────────────────────── │
+│ ────────────────────────────────── │   │ Scramble Cat                  F8   │
+│ Scramble Cat                  F8   │   │ Scramble Expand          Shift+F8  │
+│ Scramble Expand          Shift+F8  │   └─────────────────────────────────────┘
+└─────────────────────────────────────┘
+
+Notes:
+  - Zoom/FullScreen placeholders removed (no handler, no spec, F11 key wasted)
+  - 8 generative views collapsed into submenu (declutters main menu by 7 rows)
+  - 3 animated views collapsed into submenu
+  - ASCII Grid Demo gets a registry spec [+reg] so it stops falling back to test_pattern
+  - "(Generative)" / "(Emoji)" suffixes dropped — submenu heading makes them obvious
+  - Score BG Color stays (operates on existing Score window, not a spawn)
+```
+
+### Window menu
+
+```
+BEFORE (current)                          AFTER (E009 target)
+─────────────────────────────────────     ─────────────────────────────────────
+┌─ Window ───────────────────────────┐   ┌─ Window ───────────────────────────┐
+│ Edit Text Editor                   │   │ Text Editor                        │
+│ Browser                   Ctrl+B   │   │ Browser                   Ctrl+B   │
+│ ────────────────────────────────── │   │ Open Text (Transparent)...         │
+│ Open Text (Transparent BG)...      │   │ ────────────────────────────────── │
+│ ────────────────────────────────── │   │ Cascade                            │
+│ Cascade                            │   │ Tile                               │
+│ Tile                               │   │ Send to Back                       │
+│ Send to Back                       │   │ ────────────────────────────────── │
+│ ────────────────────────────────── │   │ Next                          F6   │
+│ Next                          F6   │   │ Previous                 Shift+F6  │
+│ Previous                 Shift+F6  │   │ ────────────────────────────────── │
+│ ────────────────────────────────── │   │ Close                     Alt+F3   │
+│ Close                     Alt+F3   │   │ Close All                          │
+│ Close All                          │   │ ────────────────────────────────── │
+│ ────────────────────────────────── │   │ Background Color...                │
+│ Background Color...                │   └─────────────────────────────────────┘
+└─────────────────────────────────────┘
+
+Notes:
+  - "Edit Text Editor" renamed to just "Text Editor" (less confusing in Window menu)
+  - Text Editor handler must call registerWindow() [bug #2]
+  - Otherwise clean — no dead ends, no type bugs
+  - "BG" expanded to full word for clarity
+```
+
+### Tools menu
+
+```
+BEFORE (current)                          AFTER (E009 target)
+─────────────────────────────────────     ─────────────────────────────────────
+┌─ Tools ────────────────────────────┐   ┌─ Tools ────────────────────────────┐
+│ Wib&Wob Chat              F12      │   │ Wib&Wob Chat              F12      │
+│ Test A (stdScrollBar)              │   │ ────────────────────────────────── │
+│ Test B (TScroller)                 │   │ Glitch Effects ►                   │
+│ Test C (Split Arch)                │   │   ├ Enable Glitch Mode    Ctrl+G   │
+│ ────────────────────────────────── │   │   ├ ──────────────────────────── │
+│ Glitch Effects ►                   │   │   ├ Scatter Pattern               │
+│   ├ Enable Glitch Mode    Ctrl+G   │   │   ├ Color Bleed                   │
+│   ├ ──────────────────────────── │   │   ├ Radial Distort                │
+│   ├ Scatter Pattern                │   │   ├ Diagonal Scatter              │
+│   ├ Color Bleed                    │   │   ├ ──────────────────────────── │
+│   ├ Radial Distort                 │   │   ├ Capture Frame            F9   │
+│   ├ Diagonal Scatter               │   │   └ Reset Parameters             │
+│   ├ ──────────────────────────── │   │ ────────────────────────────────── │
+│   ├ Capture Frame            F9    │   │ Quantum Printer          [easter] │
+│   ├ Reset Parameters               │   │ ────────────────────────────────── │
+│   └ Glitch Settings [x placeholder]│   │ API Key...                         │
+│ ────────────────────────────────── │   └─────────────────────────────────────┘
+│ ANSI Editor     [x placeholder]    │
+│ Paint Tools     [x placeholder]    │
+│ Animation Studio [x placeholder]   │
+│ ────────────────────────────────── │
+│ Quantum Printer          [easter]  │
+│ ────────────────────────────────── │
+│ API Key...                         │
+└─────────────────────────────────────┘
+
+Notes:
+  - Test A/B/C removed (dev-only, type=fallback to test_pattern, never ship)
+  - ANSI Editor / Paint Tools / Animation Studio removed (placeholder msg boxes)
+  - Glitch Settings removed (placeholder msg box inside submenu)
+  - Quantum Printer stays (easter egg, harmless, fun)
+  - Cmd ID collisions fixed elsewhere: cmTextEditor=130/cmKeyboardShortcuts=130,
+    cmWibWobChat=131/cmDebugInfo=131 [bug #1]
+  - WibWobChat type already marked internal/non-syncable — no type fix needed
+```
+
+### Help menu
+
+```
+BEFORE (current)                          AFTER (E009 target)
+─────────────────────────────────────     ─────────────────────────────────────
+┌─ Help ─────────────────────────────┐   ┌─ Help ─────────────────────────────┐
+│ About WIBWOBWORLD                  │   │ About WIBWOBWORLD                  │
+│                                    │   │ Keyboard Shortcuts...     [+new]   │
+└─────────────────────────────────────┘   └─────────────────────────────────────┘
+
+Notes:
+  - Clean. About dialog is fine.
+  - cmKeyboardShortcuts (130) exists but has no menu item — add here after ID fix
+```
+
+---
+
+## Full bug inventory (cross-referenced from wireframes)
+
+All 7 bugs from handover, plus issues surfaced during wireframe audit:
+
+| # | Bug | Severity | Menu(s) | Fix |
+|---|-----|----------|---------|-----|
+| 1 | Cmd ID collisions: cmTextEditor=cmKeyboardShortcuts=130, cmWibWobChat=cmDebugInfo=131 | HIGH | Window, Tools | Reassign to 200+ range |
+| 2 | text_editor skips registerWindow() | HIGH | Window | Add registerWindow(w) call |
+| 3 | Add syncable flag to WindowTypeSpec | MEDIUM | (infra) | bool syncable in spec, replace _INTERNAL_TYPES |
+| 4 | Fallback masks unknown types as test_pattern | MEDIUM | File, View, Tools | Return "unknown" not "test_pattern" |
+| 5 | Dead-end / placeholder menu items | LOW | File, View, Tools | Remove: Mechs, Zoom×4, ANSI/Paint/AnimStudio, GlitchSettings |
+| 6 | Gradient subtype not in sync delta | LOW | File | Add gradient_kind to get_state props |
+| 7 | No registry-menu linkage check | LOW | (infra) | Runtime assert in dev builds |
+| 8 | Test A/B/C fall through to test_pattern | LOW | Tools | Remove menu items (dev-only) |
+| 9 | ASCII Grid Demo falls through to test_pattern | LOW | View | Add registry spec or remove |
+| 10 | Open Image falls through to test_pattern | MEDIUM | File | Add ascii_image registry spec |
+| 11 | API Key dialog leaks into get_state as test_pattern | LOW | Tools | Dialog should be excluded from window iteration |
+
 ### Concept validation
 
 This ASCII wireframe approach works well for:
 - Spotting dead ends visually (the `[x]` rows stand out)
 - Communicating "before → after" without writing prose
 - Annotating type bugs inline (`[! type=fallback]`, `[+reg]`)
-- Could extend to View/Window/Tools in a full E009 spike doc
 
-Suggested: generate full 5-menu wireframe as part of the Codex spike output,
-to give the implementer a visual target rather than just a bug list.
+Full 5-menu + Help wireframe now complete — implementer has a visual target for every menu.
