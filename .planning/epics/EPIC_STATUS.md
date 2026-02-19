@@ -12,6 +12,6 @@ e005-theme-runtime-wiring — not-started
 e006-scramble-tui-presence — in-progress
 e007-browser-hosted-deployment — done
 e008-multiplayer-partykit — in-progress
-e009-menu-system-redesign — not-started
+e009-menu-system-redesign — in-progress
 e010-paint-canvas-integration — done
 
