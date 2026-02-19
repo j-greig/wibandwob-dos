@@ -20,6 +20,7 @@
 #define Uses_TGroup
 #include <tvision/tv.h>
 
+#include <atomic>
 #include <string>
 #include <vector>
 #include <functional>
@@ -162,6 +163,9 @@ private:
     WibWobEngine* engine = nullptr;
     bool engineInitialized = false;
     void* pollTimerId = nullptr;
+    // Set to false at the start of destruction before deleting engine.
+    // Stream callbacks check this before touching any child views.
+    std::atomic<bool> windowAlive_{true};
 
     // Logging
     std::string sessionId;

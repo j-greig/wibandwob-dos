@@ -549,6 +549,9 @@ TWibWobWindow::TWibWobWindow(const TRect& bounds, const std::string& title)
 }
 
 TWibWobWindow::~TWibWobWindow() {
+    // Mark dead FIRST so any in-flight stream callback bails out immediately
+    // rather than touching child views that may be mid-teardown.
+    windowAlive_.store(false);
     if (pollTimerId) {
         killTimer(pollTimerId);
         pollTimerId = nullptr;
@@ -720,6 +723,11 @@ void TWibWobWindow::processUserInput(const std::string& input) {
 
     // Streaming callback - shared between SDK and CLI providers
     auto streamCallback = [this, start](const StreamChunk& chunk) {
+        // Guard: if the window is being destroyed, bail immediately.
+        // The streaming thread may still be running when ~TWibWobWindow fires;
+        // touching child views after they are deleted causes use-after-free crashes.
+        if (!windowAlive_.load()) return;
+
         // Log all chunks for debugging
         std::string chunkType;
         switch (chunk.type) {
