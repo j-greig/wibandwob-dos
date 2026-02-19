@@ -26,8 +26,6 @@ TPaintWindow::TPaintWindow(const TRect &bounds)
 
     TRect toolsRect(client.a.x, client.a.y,
                      std::min(client.a.x + toolsW, client.b.x), client.b.y - 1);
-    auto *toolPanel = new TPaintToolPanel(toolsRect, &ctx);
-    insert(toolPanel);
 
     TRect palRect(std::max(client.b.x - palW, toolsRect.b.x), client.a.y,
                    client.b.x, client.b.y - 1);
@@ -39,10 +37,14 @@ TPaintWindow::TPaintWindow(const TRect &bounds)
     canvas = new TPaintCanvasView(canvasRect, cw, ch, &ctx);
     insert(canvas);
 
+    // Tool panel gets canvas ptr so it can trigger status refresh on tool change
+    insert(new TPaintToolPanel(toolsRect, &ctx, canvas));
+
     insert(new TPaintPaletteView(palRect, canvas));
 
     auto *status = new TPaintStatusView(
         TRect(client.a.x, client.b.y - 1, client.b.x, client.b.y), canvas);
+    canvas->setStatusView(status);
     insert(status);
 
     canvas->select();

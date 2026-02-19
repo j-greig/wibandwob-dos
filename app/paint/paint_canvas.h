@@ -72,6 +72,8 @@ public:
     int getXSub() const { return xSub; }
     PaintContext* getContext() const { return ctx; }
     void setTool(PaintContext::Tool t) { if (ctx) ctx->tool = t; }
+    void setStatusView(TView *v) { statusView = v; }
+    void refreshStatus() { if (statusView) statusView->drawView(); }
 
     // Public API for IPC control
     void putCell(int x, int y, uint8_t fgColor, uint8_t bgColor);
@@ -92,6 +94,7 @@ private:
     PixelMode pixelMode = PixelMode::Full;
     uint8_t fg = 15; // white ink
     uint8_t bg = 0;  // black background (empty)
+    TView *statusView = nullptr;
 
     void put(int x, int y, bool on);
     PaintCell &cell(int x, int y);

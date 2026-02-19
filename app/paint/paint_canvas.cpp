@@ -11,8 +11,8 @@ TPaintCanvasView::TPaintCanvasView(const TRect &bounds, int cols, int rows, Pain
     : TView(bounds), cols(cols), rows(rows), ctx(ctx), buffer(cols * rows)
 {
     options |= ofFramed | ofSelectable;
-    growMode = gfGrowAll;
-    eventMask |= evKeyboard | evMouseDown | evMouseAuto | evMouseMove;
+    growMode = gfGrowHiX | gfGrowHiY;
+    eventMask |= evKeyboard | evMouseDown | evMouseUp | evMouseAuto | evMouseMove;
     clear();
 }
 
@@ -122,7 +122,7 @@ void TPaintCanvasView::draw()
     for (int y = 0; y < H; ++y) {
         int by = y;
         if (by >= rows) {
-            b.moveChar(0, ' ', TColorAttr{0x07}, W);
+            b.moveChar(0, ' ', TColorAttr{(uint8_t)((bg << 4) | 0x07)}, W);
             writeLine(0, y, W, 1, b);
             continue;
         }
@@ -130,7 +130,7 @@ void TPaintCanvasView::draw()
         while (filled < W) {
             int x = filled;
             if (x >= cols) {
-                b.moveChar(filled, ' ', TColorAttr{0x07}, W - filled);
+                b.moveChar(filled, ' ', TColorAttr{(uint8_t)((bg << 4) | 0x07)}, W - filled);
                 break;
             }
             const auto &c = cell(x, by);
@@ -163,6 +163,7 @@ void TPaintCanvasView::draw()
         }
         writeLine(0, y, W, 1, b);
     }
+    if (statusView) statusView->drawView();
 }
 
 void TPaintCanvasView::moveCursor(int dx, int dy, bool drawWhileMoving)

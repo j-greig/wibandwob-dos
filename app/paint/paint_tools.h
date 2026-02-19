@@ -17,8 +17,10 @@
 
 class TPaintToolPanel : public TView {
 public:
-    TPaintToolPanel(const TRect &r, PaintContext *ctx) : TView(r), ctx(ctx) {
+    TPaintToolPanel(const TRect &r, PaintContext *ctx, TPaintCanvasView *cv = nullptr)
+        : TView(r), ctx(ctx), canvas(cv) {
         options |= ofFramed | ofPreProcess | ofSelectable;
+        growMode = gfGrowHiY;
         eventMask |= evMouseDown | evMouseMove | evKeyboard;
     }
 
@@ -44,6 +46,11 @@ public:
         b.moveChar(0, ' ', cFrame, size.x);
         b.moveStr(1, "[Tab] Y-sub, [,] X-sub", cFrame);
         writeLine(0, 6, size.x, 1, b);
+        // Clear remaining rows
+        for (int y = 7; y < size.y; ++y) {
+            b.moveChar(0, ' ', cFrame, size.x);
+            writeLine(0, y, size.x, 1, b);
+        }
     }
 
     virtual void handleEvent(TEvent &ev) override {
@@ -61,6 +68,7 @@ public:
                     case 4: ctx->tool = PaintContext::Text; break;
                 }
                 drawView();
+                if (canvas) canvas->refreshStatus();
             }
             clearEvent(ev);
         } else if (ev.what == evKeyDown) {
@@ -72,6 +80,7 @@ public:
             else if (ch=='t' || ch=='T') ctx->tool = PaintContext::Text;
             else return;
             drawView();
+            if (canvas) canvas->refreshStatus();
             clearEvent(ev);
         }
     }
@@ -83,6 +92,7 @@ public:
 
 private:
     PaintContext *ctx;
+    TPaintCanvasView *canvas;
 };
 
 #endif

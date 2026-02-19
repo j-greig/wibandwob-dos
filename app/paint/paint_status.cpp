@@ -10,7 +10,7 @@
 void TPaintStatusView::draw()
 {
     TDrawBuffer b;
-    TColorAttr a{0x07}; // light gray on black default
+    TColorAttr a{0x70};
     b.moveChar(0, ' ', a, size.x);
     if (canvas) {
         char buf[128];

@@ -15,16 +15,6 @@ TColorAttr TPaintPaletteView::swatchAttr(uint8_t idx) const
     return TColorAttr{attr};
 }
 
-void TPaintPaletteView::drawSwatch(TDrawBuffer &b, int x, int y, uint8_t idx)
-{
-    // Two rows tall, fill with spaces in background color
-    TColorAttr a = swatchAttr(idx);
-    b.moveChar(x, ' ', a, cellW);
-    writeLine(0, y, size.x, 1, b);
-    b.moveChar(x, ' ', a, cellW);
-    writeLine(0, y+1, size.x, 1, b);
-}
-
 void TPaintPaletteView::draw()
 {
     TDrawBuffer b;
@@ -34,25 +24,39 @@ void TPaintPaletteView::draw()
     b.moveStr(1, "Palette", frame);
     writeLine(0, 0, size.x, 1, b);
 
+    // Blank line 1
+    b.moveChar(0, ' ', frame, size.x);
+    writeLine(0, 1, size.x, 1, b);
+
     // Grid origin
     int ox = 1;
     int oy = 2;
-    // Draw grid lines row by row
+    // Draw grid: build full row buffer, write once per screen row
     for (int r = 0; r < rows; ++r) {
-        for (int c = 0; c < cols; ++c) {
-            uint8_t idx = r*cols + c;
-            // Prepare line buffer
+        // Each swatch is cellH rows tall
+        for (int subRow = 0; subRow < cellH; ++subRow) {
             b.moveChar(0, ' ', frame, size.x);
-            drawSwatch(b, ox + c*cellW, oy + r*cellH, idx);
+            for (int c = 0; c < cols; ++c) {
+                uint8_t idx = r * cols + c;
+                TColorAttr a = swatchAttr(idx);
+                b.moveChar(ox + c * cellW, ' ', a, cellW);
+            }
+            writeLine(0, oy + r * cellH + subRow, size.x, 1, b);
         }
     }
 
-    // Show indices below if space allows
-    int infoY = oy + rows*cellH + 1;
+    // Show hint below grid if space allows
+    int infoY = oy + rows * cellH + 1;
     if (infoY < size.y) {
         b.moveChar(0, ' ', frame, size.x);
         b.moveStr(1, "Left:FG Right:BG", frame);
         writeLine(0, infoY, size.x, 1, b);
+    }
+
+    // Clear remaining rows
+    for (int y = infoY + 1; y < size.y; ++y) {
+        b.moveChar(0, ' ', frame, size.x);
+        writeLine(0, y, size.x, 1, b);
     }
 }
 
@@ -87,4 +91,3 @@ void TPaintPaletteView::handleEvent(TEvent &ev)
         clearEvent(ev);
     }
 }
-
