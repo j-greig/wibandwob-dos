@@ -36,11 +36,10 @@ case "$BASENAME" in
 esac
 
 # Spike file location enforcement
-# spkNN-*.md files must live inside .planning/epics/<epic>/ or .planning/spikes/<name>/
-# (Cross-epic standalone spikes belong in .planning/spikes/spk-<name>/ directories.)
+# All spk*.md files must live under .planning/spikes/<spike-name>/ — nowhere else.
 if echo "$BASENAME" | grep -qE '^spk[0-9]'; then
-  if ! echo "$FILE_PATH" | grep -qE '\.planning/(epics|spikes)/'; then
-    echo "Spike file '$BASENAME' must live under .planning/epics/<epic>/ or .planning/spikes/<spike-name>/ — not in '$FILE_PATH'" >&2
+  if ! echo "$FILE_PATH" | grep -qE '\.planning/spikes/'; then
+    echo "Spike file '$BASENAME' must live under .planning/spikes/<spike-name>/ — not in '$FILE_PATH'" >&2
     exit 2
   fi
 fi
@@ -56,17 +55,17 @@ if echo "$FILE_PATH" | grep -q '\.planning/epics/'; then
     PARENT_DIR=$(basename "$(dirname "$FILE_PATH")")
 
     if echo "$PARENT_DIR" | grep -qE '^e[0-9]+-'; then
-      # Inside epic dir — file should start with eNNN- or spkNN-
+      # Inside epic dir — file should start with eNNN-
       EPIC_PREFIX=$(echo "$PARENT_DIR" | grep -oE '^e[0-9]+')
-      if ! echo "$NAME_NO_EXT" | grep -qE "^(${EPIC_PREFIX}-|spk[0-9]+-)"; then
-        echo "Epic file '$BASENAME' should start with '${EPIC_PREFIX}-' or 'spkNN-' (e.g. ${EPIC_PREFIX}-epic-brief.md, spk01-feasibility.md)" >&2
+      if ! echo "$NAME_NO_EXT" | grep -qE "^${EPIC_PREFIX}-"; then
+        echo "Epic file '$BASENAME' should start with '${EPIC_PREFIX}-' (e.g. ${EPIC_PREFIX}-epic-brief.md). Spikes belong in .planning/spikes/" >&2
         exit 2
       fi
     elif echo "$PARENT_DIR" | grep -qE '^f[0-9]+-'; then
-      # Inside feature dir — file should start with fNN- or spkNN-
+      # Inside feature dir — file should start with fNN-
       FEAT_PREFIX=$(echo "$PARENT_DIR" | grep -oE '^f[0-9]+')
-      if ! echo "$NAME_NO_EXT" | grep -qE "^(${FEAT_PREFIX}-|spk[0-9]+-)"; then
-        echo "Feature file '$BASENAME' should start with '${FEAT_PREFIX}-' or 'spkNN-' (e.g. ${FEAT_PREFIX}-feature-brief.md, spk01-feasibility.md)" >&2
+      if ! echo "$NAME_NO_EXT" | grep -qE "^${FEAT_PREFIX}-"; then
+        echo "Feature file '$BASENAME' should start with '${FEAT_PREFIX}-' (e.g. ${FEAT_PREFIX}-feature-brief.md). Spikes belong in .planning/spikes/" >&2
         exit 2
       fi
     elif echo "$PARENT_DIR" | grep -qE '^s[0-9]+-'; then
