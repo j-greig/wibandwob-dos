@@ -80,6 +80,8 @@
 // Scramble cat presence
 #include "scramble_view.h"
 #include "scramble_engine.h"
+// Paint canvas window
+#include "paint/paint_window.h"
 // Factory for ASCII grid demo window (implemented in ascii_grid_view.cpp).
 class TWindow; TWindow* createAsciiGridDemoWindow(const TRect &bounds);
 // #include "mech_window.h" // deferred feature; header not present yet
@@ -690,6 +692,21 @@ private:
     friend std::string api_get_canvas_size(TTestPatternApp&);
     friend void api_spawn_text_editor(TTestPatternApp&, const TRect* bounds);
     friend void api_spawn_browser(TTestPatternApp&, const TRect* bounds);
+    friend std::string api_take_last_registered_window_id(TTestPatternApp&);
+    friend void api_spawn_verse(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_mycelium(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_orbit(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_torus(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_cube(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_life(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_blocks(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_score(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_ascii(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_animated_gradient(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_monster_cam(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_monster_verse(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_monster_portal(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_paint(TTestPatternApp&, const TRect* bounds);
     friend std::string api_browser_fetch(TTestPatternApp&, const std::string& url);
     friend std::string api_send_text(TTestPatternApp&, const std::string&, const std::string&, 
                                      const std::string&, const std::string&);
@@ -1179,10 +1196,19 @@ void TTestPatternApp::handleEvent(TEvent& event)
                 messageBox("ANSI Art file opening coming soon!", mfInformation | mfOKButton);
                 clearEvent(event);
                 break;
-            case cmNewPaintCanvas:
-                messageBox("Paint Canvas creation coming soon!", mfInformation | mfOKButton);
+            case cmNewPaintCanvas: {
+                TRect d = deskTop->getExtent();
+                int w = std::min(82, d.b.x - d.a.x);
+                int h = std::min(26, d.b.y - d.a.y);
+                int left = d.a.x + (d.b.x - d.a.x - w) / 2;
+                int top  = d.a.y + (d.b.y - d.a.y - h) / 2;
+                TRect r(left, top, left + w, top + h);
+                TWindow* pw = createPaintWindow(r);
+                deskTop->insert(pw);
+                registerWindow(pw);
                 clearEvent(event);
                 break;
+            }
             case cmOpenImageFile: {
                 char fileName[MAXPATH];
                 strcpy(fileName, "*.{png,jpg,jpeg}");
@@ -2001,6 +2027,8 @@ TMenuBar* TTestPatternApp::initMenuBar(TRect r)
             *new TMenuItem("Zoom ~O~ut", cmZoomOut, kbNoKey) +
             *new TMenuItem("~A~ctual Size", cmActualSize, kbNoKey) +
             *new TMenuItem("~F~ull Screen", cmFullScreen, kbF11) +
+            newLine() +
+            *new TMenuItem("Paint ~C~anvas", cmNewPaintCanvas, kbNoKey) +
             newLine() +
             *new TMenuItem("Scra~m~ble Cat", cmScrambleCat, kbF8) +
             *new TMenuItem("Scramble E~x~pand", cmScrambleExpand, kbShiftF8) +
@@ -3094,4 +3122,21 @@ std::string api_set_theme_variant(TTestPatternApp& app, const std::string& varia
 std::string api_reset_theme(TTestPatternApp& app) {
     (void)app;
     return "ok";
+}
+
+void api_spawn_paint(TTestPatternApp& app, const TRect* bounds) {
+    TRect r;
+    if (bounds) {
+        r = *bounds;
+    } else {
+        TRect d = TProgram::deskTop->getExtent();
+        int w = std::min(82, d.b.x - d.a.x);
+        int h = std::min(26, d.b.y - d.a.y);
+        int left = d.a.x + (d.b.x - d.a.x - w) / 2;
+        int top  = d.a.y + (d.b.y - d.a.y - h) / 2;
+        r = TRect(left, top, left + w, top + h);
+    }
+    TWindow* pw = createPaintWindow(r);
+    app.deskTop->insert(pw);
+    app.registerWindow(pw);
 }

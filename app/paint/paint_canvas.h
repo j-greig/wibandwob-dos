@@ -24,13 +24,14 @@
 #define Uses_TKeys
 #include <tvision/tv.h>
 
+#include <string>
 #include <vector>
 
 struct PaintContext {
-    enum Tool { Pencil, Eraser, Line, Rect } tool = Pencil;
+    enum Tool { Pencil, Eraser, Line, Rect, Text } tool = Pencil;
 };
 
-enum class PixelMode { Full, HalfY, HalfX, Quarter };
+enum class PixelMode { Full, HalfY, HalfX, Quarter, Text };
 
 struct PaintCell {
     // HalfY data (supports two-color mix via FG/BG trick)
@@ -39,6 +40,10 @@ struct PaintCell {
     // Quarter/HalfX data (single ink color for all subpixels)
     uint8_t qMask;  // bit 0=TL, 1=TR, 2=BL, 3=BR
     uint8_t qFg;    // ink color when drawing quarter/halfx
+    // Text mode data
+    char textChar;     // 0 = empty/transparent
+    uint8_t textFg;    // text foreground color
+    uint8_t textBg;    // text background color
 };
 
 class TPaintCanvasView : public TView {
@@ -67,6 +72,15 @@ public:
     int getXSub() const { return xSub; }
     PaintContext* getContext() const { return ctx; }
     void setTool(PaintContext::Tool t) { if (ctx) ctx->tool = t; }
+
+    // Public API for IPC control
+    void putCell(int x, int y, uint8_t fgColor, uint8_t bgColor);
+    void putText(int x, int y, const std::string& text, uint8_t fgColor, uint8_t bgColor);
+    void putLine(int x0, int y0, int x1, int y1, bool erase = false);
+    void putRect(int x0, int y0, int x1, int y1, bool erase = false);
+    std::string exportText() const;
+    int getCols() const { return cols; }
+    int getRows() const { return rows; }
 
 private:
     int cols, rows;

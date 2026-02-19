@@ -51,7 +51,13 @@ add_executable(test_pattern
     wibwob_scroll_test.cpp
     scramble_view.cpp
     scramble_engine.cpp
+    paint/paint_canvas.cpp
+    paint/paint_palette.cpp
+    paint/paint_status.cpp
+    paint/paint_tools.cpp
+    paint/paint_window.cpp
 )
+target_include_directories(test_pattern PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(test_pattern PRIVATE tvision)
 
 # simple_tui (minimal reference app)
@@ -83,7 +89,9 @@ add_executable(paint_tui
     paint/paint_palette.cpp
     paint/paint_status.cpp
     paint/paint_tools.cpp
+    paint/paint_window.cpp
 )
+target_include_directories(paint_tui PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(paint_tui PRIVATE tvision)
 
 # tv_ascii_view (POC: Turbo Vision image→ASCII viewer)
