@@ -23,7 +23,8 @@ PR: ~
 - [x] F02: IPC paint commands (paint_cell, paint_text, paint_line, paint_rect, paint_export)
 - [x] F03: Layout correctness — tools | canvas | palette | status bar with correct growMode
 - [x] F04: Status bar live updates (tool, cursor position, FG/BG)
-- [ ] F05: Canvas buffer resizes with view (currently fixed at construction)
+- [x] F05: Canvas buffer resizes with view (changeBounds override)
+- [x] F06: Palette FG/BG color chip (Photoshop-style overlapping squares)
 
 ## Acceptance Criteria
 
@@ -42,8 +43,13 @@ Test: `tools/api_server/test_paint_ipc.py::test_no_debug_colours`
 AC-5: Build compiles clean with no errors.
 Test: `cmake --build ./build` exits 0 (verified manually — no C++ unit framework configured).
 
+AC-6: `TPaintCanvasView::changeBounds` is implemented — canvas buffer resizes with view bounds.
+Test: `tools/api_server/test_paint_ipc.py::test_canvas_resize_implemented`
+
+AC-7: Palette draw() renders FG/BG chip section before the swatch grid.
+Test: `tools/api_server/test_paint_ipc.py::test_palette_chip_implemented`
+
 ## Notes
 
-- C++ unit test framework not configured; IPC integration tests serve as acceptance tests.
-- Canvas buffer fixed-size (F05) is a known gap — deferred.
+- C++ unit test framework not configured; IPC integration tests and grep-based code-presence tests serve as acceptance tests.
 - Resize spike: `.planning/spikes/spk-tvision-responsive-layout.md`

@@ -9,6 +9,8 @@ AC-1: new_paint_canvas opens a paint window and returns ok
 AC-2: paint_cell + paint_export returns a non-empty text grid
 AC-3: paint_line and paint_rect return ok
 AC-4: No debug colour literals in paint source files
+AC-6: changeBounds is implemented in paint_canvas.cpp
+AC-7: Palette FG/BG chip code is present in paint_palette.cpp
 """
 
 import os
@@ -106,9 +108,29 @@ def test_no_debug_colours():
     print("PASS AC-4: no debug colours")
 
 
+def test_canvas_resize_implemented():
+    """AC-6: changeBounds override exists in paint_canvas.cpp."""
+    repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    src = open(os.path.join(repo_root, "app/paint/paint_canvas.cpp")).read()
+    assert "changeBounds" in src, "changeBounds not found in paint_canvas.cpp"
+    assert "TPaintCanvasView::changeBounds" in src, "changeBounds not implemented"
+    print("PASS AC-6: changeBounds implemented")
+
+
+def test_palette_chip_implemented():
+    """AC-7: FG/BG chip draw code present in paint_palette.cpp."""
+    repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    src = open(os.path.join(repo_root, "app/paint/paint_palette.cpp")).read()
+    assert "aFg" in src and "aBg" in src, "FG/BG chip attrs not found"
+    assert "FG/BG color chip" in src, "FG/BG chip comment not found"
+    print("PASS AC-7: palette FG/BG chip implemented")
+
+
 if __name__ == "__main__":
-    # AC-4 runs without the app
+    # AC-4, AC-6, AC-7 run without the app
     test_no_debug_colours()
+    test_canvas_resize_implemented()
+    test_palette_chip_implemented()
 
     # AC-1..3 require running app
     try:
