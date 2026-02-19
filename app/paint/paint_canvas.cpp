@@ -265,6 +265,7 @@ void TPaintCanvasView::handleEvent(TEvent &ev)
         }
     }
     else if (ev.what == evMouseDown) {
+        select(); // Grab keyboard focus so text tool input goes here, not the tool panel.
         TPoint m = makeLocal(ev.mouse.where);
         bool shift = (ev.mouse.eventFlags & (kbShift)) != 0;
         curX = std::max(0, std::min(cols - 1, m.x));

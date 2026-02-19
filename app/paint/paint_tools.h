@@ -68,10 +68,14 @@ public:
                     case 4: ctx->tool = PaintContext::Text; break;
                 }
                 drawView();
-                if (canvas) canvas->refreshStatus();
+                if (canvas) { canvas->refreshStatus(); canvas->select(); }
             }
             clearEvent(ev);
         } else if (ev.what == evKeyDown) {
+            // When Text tool is active, don't intercept printable keys — let them
+            // pass through to the canvas for text entry. Only switch tools via
+            // keyboard when a non-Text tool is active.
+            if (ctx->tool == PaintContext::Text) return;
             int ch = ev.keyDown.charScan.charCode;
             if (ch=='p' || ch=='P') ctx->tool = PaintContext::Pencil;
             else if (ch=='e' || ch=='E') ctx->tool = PaintContext::Eraser;
