@@ -147,13 +147,49 @@ def test_mouse_move_handled():
     print("PASS AC-9: evMouseMove handled in handleEvent")
 
 
+def test_text_tool_focus():
+    """AC-10: Canvas calls select() on mouseDown; tool panel skips keyboard when Text tool active."""
+    repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    canvas_src = open(os.path.join(repo_root, "app/paint/paint_canvas.cpp")).read()
+    tools_src = open(os.path.join(repo_root, "app/paint/paint_tools.h")).read()
+
+    # Canvas must call select() in the evMouseDown handler (not just eventMask line).
+    # Find the handleEvent body and look for select() near the evMouseDown branch.
+    handle_start = canvas_src.find("TPaintCanvasView::handleEvent")
+    assert handle_start != -1, "handleEvent not found"
+    handle_body = canvas_src[handle_start:]
+    mouse_down_pos = handle_body.find("evMouseDown")
+    assert mouse_down_pos != -1, "evMouseDown not in handleEvent body"
+    nearby = handle_body[mouse_down_pos:mouse_down_pos + 300]
+    assert "select()" in nearby, "canvas does not call select() on evMouseDown"
+
+    # Tool panel must bail on keyboard when Text tool is active
+    assert "ctx->tool == PaintContext::Text" in tools_src and "return" in tools_src, \
+        "tool panel does not yield keyboard when Text tool active"
+    print("PASS AC-10: text tool focus implemented")
+
+
+def test_chat_window_uaf_guard():
+    """AC-11: Chat window has windowAlive_ guard to prevent use-after-free on close."""
+    repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    header = open(os.path.join(repo_root, "app/wibwob_view.h")).read()
+    view = open(os.path.join(repo_root, "app/wibwob_view.cpp")).read()
+
+    assert "windowAlive_" in header, "windowAlive_ not declared in wibwob_view.h"
+    assert "windowAlive_.store(false)" in view, "windowAlive_ not cleared in destructor"
+    assert "windowAlive_.load()" in view, "windowAlive_ not checked in stream callback"
+    print("PASS AC-11: chat window use-after-free guard present")
+
+
 if __name__ == "__main__":
-    # AC-4, AC-6, AC-7, AC-8, AC-9 run without the app
+    # Static tests (no app required)
     test_no_debug_colours()
     test_canvas_resize_implemented()
     test_palette_chip_implemented()
     test_paint_rest_endpoints_exist()
     test_mouse_move_handled()
+    test_text_tool_focus()
+    test_chat_window_uaf_guard()
 
     # AC-1..3 require running app
     try:

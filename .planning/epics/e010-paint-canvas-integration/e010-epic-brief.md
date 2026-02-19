@@ -55,6 +55,12 @@ Test: `tools/api_server/test_paint_ipc.py::test_paint_rest_endpoints`
 AC-9: Pencil tool draws continuously on mouse drag (evMouseMove handled when left button held).
 Test: `tools/api_server/test_paint_ipc.py::test_canvas_resize_implemented` (code-presence check in paint_canvas.cpp for evMouseMove branch)
 
+AC-10: Text tool — canvas claims keyboard focus on click; tool panel yields all keys when Text tool active.
+Test: `tools/api_server/test_paint_ipc.py::test_text_tool_focus`
+
+AC-11: Chat window stream callback guards against use-after-free on window close (windowAlive_ flag).
+Test: `tools/api_server/test_paint_ipc.py::test_chat_window_uaf_guard`
+
 ## Notes
 
 - C++ unit test framework not configured; IPC integration tests and grep-based code-presence tests serve as acceptance tests.
