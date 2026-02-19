@@ -1,8 +1,8 @@
 ---
 id: E009
 title: Menu System Redesign
-status: not-started
-issue: —
+status: in-progress
+issue: 67
 pr: —
 depends_on: [E001, E008]
 ---
@@ -29,11 +29,11 @@ From the Codex menu audit (2026-02-18):
 
 ## Goals
 
-- [ ] Fix command ID collisions (immediate, low-risk)
+- [x] Fix command ID collisions (immediate, low-risk) — done in `1cadee6`
+- [x] Remove or stub dead-end menu items — done in `1cadee6`
+- [x] Add `registerWindow()` to `text_editor` and any other missing spawn sites — done in `1cadee6`
 - [ ] Add `syncable`, `singleton`, `side_effects` flags to `WindowTypeSpec`
 - [ ] Ensure every menu-spawned window has a unique, matchable registry entry
-- [ ] Remove or stub dead-end menu items
-- [ ] Add `registerWindow()` to `text_editor` and any other missing spawn sites
 - [ ] Add compile-time or runtime assertion: every `cmXxx` window command maps to a registered type
 - [ ] Bridge reads `syncable` flag instead of hardcoding `_INTERNAL_TYPES`
 
@@ -45,12 +45,13 @@ From the Codex menu audit (2026-02-18):
 
 ## Acceptance Criteria
 
-- [ ] No command ID collisions in `cmXxx` constants
+- [x] No command ID collisions in `cmXxx` constants
+- [x] Dead-end menu items removed or clearly marked as coming-soon stubs
+- [x] New tests for menu cleanup (6 static-analysis tests)
 - [ ] All window-spawning menu items have a registry spec with a unique matcher
-- [ ] `create_window type=text_editor` returns `{"success":true,"id":"wN"}` 
+- [ ] `create_window type=text_editor` returns `{"success":true,"id":"wN"}`
 - [ ] Bridge `_INTERNAL_TYPES` replaced by reading `syncable=false` from registry
-- [ ] Dead-end menu items removed or clearly marked as coming-soon stubs
-- [ ] All existing tests pass; new tests for registry completeness
+- [ ] Compile-time or runtime assertion: every `cmXxx` window command maps to a registered type
 
 ## References
 
