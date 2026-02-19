@@ -18,6 +18,7 @@ class TPaintStatusView : public TView {
 public:
     TPaintStatusView(const TRect &r, TPaintCanvasView *canvas) : TView(r), canvas(canvas) {
         options |= ofPreProcess;
+        growMode = gfGrowHiX | gfGrowLoY | gfGrowHiY;
     }
     virtual void draw() override;
     void setCanvas(TPaintCanvasView *c) { canvas = c; }

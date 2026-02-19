@@ -82,10 +82,15 @@ Files under `.planning/epics/` follow prefix conventions enforced by hooks:
 | Epic | `eNNN-` | `e001-command-parity-refactor/` | `e001-epic-brief.md` |
 | Feature | `fNN-` | `f01-command-registry/` | `f01-feature-brief.md` |
 | Story | `sNN-` | `s01-registry-skeleton/` | `s01-story-brief.md` |
-| Spike | `spkNN-` | `spk01-command-mapping/` | `spk01-findings.md` |
-
 Story numbers should be globally unique within an epic (s01-s99), not per-feature. (Convention — hooks enforce prefix matching, not cross-file uniqueness.)
-Spikes can be flat files or directories depending on artifact count.
+
+**All spikes** live under `.planning/spikes/` — never inside epic or feature dirs:
+
+| Level | Dir pattern | File convention |
+|-------|-------------|-----------------|
+| Spike | `.planning/spikes/spk-<kebab-name>/` | `spk01-findings.md`, `dev-log.md`, etc. |
+
+The hook enforces: any file named `spk[0-9]*.md` must live under `.planning/spikes/` — rejected everywhere else.
 
 ## Progress Tracking
 

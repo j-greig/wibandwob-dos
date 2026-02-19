@@ -5,19 +5,20 @@
 /*---------------------------------------------------------*/
 
 #include "paint_canvas.h"
+#include <sstream>
 
 TPaintCanvasView::TPaintCanvasView(const TRect &bounds, int cols, int rows, PaintContext *ctx)
     : TView(bounds), cols(cols), rows(rows), ctx(ctx), buffer(cols * rows)
 {
     options |= ofFramed | ofSelectable;
-    growMode = gfGrowAll;
-    eventMask |= evKeyboard | evMouseDown | evMouseAuto | evMouseMove;
+    growMode = gfGrowHiX | gfGrowHiY;
+    eventMask |= evKeyboard | evMouseDown | evMouseUp | evMouseAuto | evMouseMove;
     clear();
 }
 
 void TPaintCanvasView::clear()
 {
-    for (auto &c : buffer) { c.uOn = false; c.lOn = false; c.uFg = fg; c.lFg = fg; c.qMask = 0; c.qFg = fg; }
+    for (auto &c : buffer) { c.uOn = false; c.lOn = false; c.uFg = fg; c.lFg = fg; c.qMask = 0; c.qFg = fg; c.textChar = 0; c.textFg = 7; c.textBg = 0; }
     drawView();
 }
 
@@ -53,6 +54,10 @@ void TPaintCanvasView::put(int x, int y, bool on)
             else    { c.qMask &= ~bit; }
             break;
         }
+        case PixelMode::Text:
+            // In text mode, put() operates as full-block toggle
+            c.uOn = on; c.lOn = on; c.uFg = fg; c.lFg = fg;
+            break;
     }
 }
 
@@ -117,7 +122,7 @@ void TPaintCanvasView::draw()
     for (int y = 0; y < H; ++y) {
         int by = y;
         if (by >= rows) {
-            b.moveChar(0, ' ', TColorAttr{0x07}, W);
+            b.moveChar(0, ' ', TColorAttr{(uint8_t)((bg << 4) | 0x07)}, W);
             writeLine(0, y, W, 1, b);
             continue;
         }
@@ -125,12 +130,21 @@ void TPaintCanvasView::draw()
         while (filled < W) {
             int x = filled;
             if (x >= cols) {
-                b.moveChar(filled, ' ', TColorAttr{0x07}, W - filled);
+                b.moveChar(filled, ' ', TColorAttr{(uint8_t)((bg << 4) | 0x07)}, W - filled);
                 break;
             }
             const auto &c = cell(x, by);
             const char* glyph; uint8_t fgc, bgc;
-            if (pixelMode == PixelMode::Quarter) {
+            if (pixelMode == PixelMode::Text || c.textChar != 0) {
+                // Text mode: render character if present, else space
+                static char txtBuf[2];
+                if (c.textChar != 0) {
+                    txtBuf[0] = c.textChar; txtBuf[1] = '\0';
+                    glyph = txtBuf; fgc = c.textFg; bgc = c.textBg;
+                } else {
+                    glyph = " "; fgc = 7; bgc = bg;
+                }
+            } else if (pixelMode == PixelMode::Quarter) {
                 glyph = mapQuarterGlyph(c.qMask);
                 fgc = c.qFg; bgc = bg;
             } else if (pixelMode == PixelMode::HalfX) {
@@ -149,6 +163,7 @@ void TPaintCanvasView::draw()
         }
         writeLine(0, y, W, 1, b);
     }
+    if (statusView) statusView->drawView();
 }
 
 void TPaintCanvasView::moveCursor(int dx, int dy, bool drawWhileMoving)
@@ -187,6 +202,12 @@ void TPaintCanvasView::toggleDraw()
             if (c.qMask & bit) c.qMask &= ~bit; else { c.qMask |= bit; c.qFg = fg; }
             break;
         }
+        case PixelMode::Text: {
+            // Toggle text char on/off
+            if (c.textChar != 0) { c.textChar = 0; }
+            else { c.textChar = '#'; c.textFg = fg; c.textBg = bg; }
+            break;
+        }
     }
     drawView();
 }
@@ -211,13 +232,40 @@ void TPaintCanvasView::handleEvent(TEvent &ev)
             case kbUp:    moveCursor( 0,-1, shift); clearEvent(ev); break;
             case kbDown:  moveCursor( 0, 1, shift); clearEvent(ev); break;
             default:
-                if (ev.keyDown.charScan.charCode == ' ') { toggleDraw(); clearEvent(ev); }
-                else if (ev.keyDown.keyCode == kbTab) { toggleSubpixelY(); clearEvent(ev); }
-                else if (ev.keyDown.charScan.charCode == ',') { toggleSubpixelX(); clearEvent(ev); }
+                if (ctx && ctx->tool == PaintContext::Text) {
+                    char ch = ev.keyDown.charScan.charCode;
+                    if (ch == '\b' || ev.keyDown.keyCode == kbBack) {
+                        // Backspace: move left, erase
+                        if (curX > 0) curX--;
+                        auto &c = cell(curX, curY);
+                        c.textChar = 0; c.textFg = 7; c.textBg = 0;
+                        drawView(); clearEvent(ev);
+                    } else if (ch == '\r' || ch == '\n') {
+                        // Enter: move to start of next line
+                        curX = 0;
+                        if (curY < rows - 1) curY++;
+                        drawView(); clearEvent(ev);
+                    } else if (ch >= 32 && ch < 127) {
+                        // Printable ASCII: place char at cursor, advance right
+                        auto &c = cell(curX, curY);
+                        c.textChar = ch; c.textFg = fg; c.textBg = bg;
+                        if (curX < cols - 1) curX++;
+                        drawView(); clearEvent(ev);
+                    } else {
+                        if (ev.keyDown.charScan.charCode == ' ') { toggleDraw(); clearEvent(ev); }
+                        else if (ev.keyDown.keyCode == kbTab) { toggleSubpixelY(); clearEvent(ev); }
+                        else if (ev.keyDown.charScan.charCode == ',') { toggleSubpixelX(); clearEvent(ev); }
+                    }
+                } else {
+                    if (ev.keyDown.charScan.charCode == ' ') { toggleDraw(); clearEvent(ev); }
+                    else if (ev.keyDown.keyCode == kbTab) { toggleSubpixelY(); clearEvent(ev); }
+                    else if (ev.keyDown.charScan.charCode == ',') { toggleSubpixelX(); clearEvent(ev); }
+                }
                 break;
         }
     }
     else if (ev.what == evMouseDown) {
+        select(); // Grab keyboard focus so text tool input goes here, not the tool panel.
         TPoint m = makeLocal(ev.mouse.where);
         bool shift = (ev.mouse.eventFlags & (kbShift)) != 0;
         curX = std::max(0, std::min(cols - 1, m.x));
@@ -252,6 +300,58 @@ void TPaintCanvasView::handleEvent(TEvent &ev)
         }
         clearEvent(ev);
     }
+    else if (ev.what == evMouseMove) {
+        TPoint m = makeLocal(ev.mouse.where);
+        bool shift = (ev.mouse.eventFlags & (kbShift)) != 0;
+        curX = std::max(0, std::min(cols - 1, m.x));
+        curY = std::max(0, std::min(rows - 1, m.y));
+
+        if (!ctx) {
+            if (shift || (ev.mouse.buttons & mbLeftButton))
+                put(curX, curY, true);
+            else if (ev.mouse.buttons & mbRightButton)
+                put(curX, curY, false);
+        } else {
+            auto tool = ctx->tool;
+            if (tool == PaintContext::Pencil || tool == PaintContext::Eraser) {
+                bool on = (tool == PaintContext::Pencil);
+                if (ev.mouse.buttons & mbRightButton) on = false;
+                if (shift || (ev.mouse.buttons & (mbLeftButton | mbRightButton)))
+                    put(curX, curY, on);
+            } else if ((tool == PaintContext::Line || tool == PaintContext::Rect) &&
+                       dragging && (ev.mouse.buttons & mbLeftButton)) {
+                // Track drag endpoint for live preview.
+                curX = std::max(0, std::min(cols - 1, m.x));
+                curY = std::max(0, std::min(rows - 1, m.y));
+            }
+        }
+
+        drawView();
+        clearEvent(ev);
+    }
+}
+
+void TPaintCanvasView::changeBounds(const TRect &bounds)
+{
+    TView::changeBounds(bounds);
+    int newCols = size.x;
+    int newRows = size.y;
+    if (newCols == cols && newRows == rows) return;
+
+    std::vector<PaintCell> newBuf(newCols * newRows);
+    for (auto &c : newBuf) {
+        c.uOn = false; c.lOn = false; c.uFg = fg; c.lFg = fg;
+        c.qMask = 0; c.qFg = fg; c.textChar = 0; c.textFg = 7; c.textBg = 0;
+    }
+    int copyW = std::min(cols, newCols);
+    int copyH = std::min(rows, newRows);
+    for (int y = 0; y < copyH; ++y)
+        for (int x = 0; x < copyW; ++x)
+            newBuf[y * newCols + x] = buffer[y * cols + x];
+
+    buffer = std::move(newBuf);
+    cols = newCols;
+    rows = newRows;
 }
 
 void TPaintCanvasView::sizeLimits(TPoint &min, TPoint &max)
@@ -287,4 +387,70 @@ void TPaintCanvasView::commitRect(int x0, int y0, int x1, int y1, bool on)
     if (y0 > y1) std::swap(y0, y1);
     for (int x = x0; x <= x1; ++x) { put(x, y0, on); put(x, y1, on); }
     for (int y = y0; y <= y1; ++y) { put(x0, y, on); put(x1, y, on); }
+}
+
+// ---- Public API for IPC control ----
+
+void TPaintCanvasView::putCell(int x, int y, uint8_t fgColor, uint8_t bgColor)
+{
+    if (x < 0 || x >= cols || y < 0 || y >= rows) return;
+    auto &c = buffer[y * cols + x];
+    c.uOn = true; c.lOn = true;
+    c.uFg = fgColor; c.lFg = fgColor;
+    c.qMask = 0x0F; c.qFg = fgColor;
+    c.textChar = 0;
+    drawView();
+}
+
+void TPaintCanvasView::putText(int x, int y, const std::string& text, uint8_t fgColor, uint8_t bgColor)
+{
+    for (size_t i = 0; i < text.size(); ++i) {
+        int px = x + static_cast<int>(i);
+        if (px < 0 || px >= cols || y < 0 || y >= rows) continue;
+        auto &c = buffer[y * cols + px];
+        c.textChar = text[i];
+        c.textFg = fgColor;
+        c.textBg = bgColor;
+        // Clear pixel data so text renders cleanly
+        c.uOn = false; c.lOn = false;
+        c.qMask = 0;
+    }
+    drawView();
+}
+
+void TPaintCanvasView::putLine(int x0, int y0, int x1, int y1, bool erase)
+{
+    commitLine(x0, y0, x1, y1, !erase);
+    drawView();
+}
+
+void TPaintCanvasView::putRect(int x0, int y0, int x1, int y1, bool erase)
+{
+    commitRect(x0, y0, x1, y1, !erase);
+    drawView();
+}
+
+std::string TPaintCanvasView::exportText() const
+{
+    std::ostringstream os;
+    for (int y = 0; y < rows; ++y) {
+        for (int x = 0; x < cols; ++x) {
+            const auto &c = buffer[y * cols + x];
+            if (c.textChar != 0) {
+                os << c.textChar;
+            } else if (c.uOn && c.lOn) {
+                os << '#';
+            } else if (c.uOn) {
+                os << '^';
+            } else if (c.lOn) {
+                os << 'v';
+            } else if (c.qMask != 0) {
+                os << '.';
+            } else {
+                os << ' ';
+            }
+        }
+        os << '\n';
+    }
+    return os.str();
 }

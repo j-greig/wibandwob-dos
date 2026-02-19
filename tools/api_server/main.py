@@ -40,6 +40,10 @@ from .schemas import (
     MenuCommand,
     MonodrawLoadRequest,
     MonodrawParseRequest,
+    PaintCellRequest,
+    PaintClearRequest,
+    PaintLineRequest,
+    PaintRectRequest,
     PatternMode,
     ThemeMode,
     ThemeVariant,
@@ -350,6 +354,41 @@ def make_app() -> FastAPI:
         if not res.get("ok"):
             raise HTTPException(status_code=400, detail=res.get("error", "import_failed"))
         return res
+
+    @app.post("/paint/cell")
+    async def paint_cell(payload: PaintCellRequest) -> Dict[str, Any]:
+        resp = await ctl.paint_cell(payload.win_id, payload.x, payload.y, payload.fg, payload.bg)
+        if isinstance(resp, str) and resp.lower().startswith("err"):
+            raise HTTPException(status_code=422, detail=resp)
+        return {"ok": True}
+
+    @app.post("/paint/line")
+    async def paint_line(payload: PaintLineRequest) -> Dict[str, Any]:
+        resp = await ctl.paint_line(payload.win_id, payload.x0, payload.y0, payload.x1, payload.y1, payload.fg, payload.bg)
+        if isinstance(resp, str) and resp.lower().startswith("err"):
+            raise HTTPException(status_code=422, detail=resp)
+        return {"ok": True}
+
+    @app.post("/paint/rect")
+    async def paint_rect(payload: PaintRectRequest) -> Dict[str, Any]:
+        resp = await ctl.paint_rect(payload.win_id, payload.x0, payload.y0, payload.x1, payload.y1, payload.fg, payload.bg, payload.fill)
+        if isinstance(resp, str) and resp.lower().startswith("err"):
+            raise HTTPException(status_code=422, detail=resp)
+        return {"ok": True}
+
+    @app.post("/paint/clear")
+    async def paint_clear(payload: PaintClearRequest) -> Dict[str, Any]:
+        resp = await ctl.paint_clear(payload.win_id)
+        if isinstance(resp, str) and resp.lower().startswith("err"):
+            raise HTTPException(status_code=422, detail=resp)
+        return {"ok": True}
+
+    @app.get("/paint/export/{win_id}")
+    async def paint_export(win_id: str) -> Dict[str, Any]:
+        resp = await ctl.paint_export(win_id)
+        if isinstance(resp, str) and resp.lower().startswith("err"):
+            raise HTTPException(status_code=422, detail=resp)
+        return dict(resp)
 
     @app.post("/browser/open")
     async def browser_open(payload: BrowserOpenReq) -> Dict[str, Any]:

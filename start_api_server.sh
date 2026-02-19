@@ -27,4 +27,4 @@ echo "✅ Dependencies ready"
 # Run the server
 echo "🔌 Server starting (Ctrl+C to stop)"
 echo ""
-./tools/api_server/venv/bin/python -m tools.api_server.main --port=8089
+WIBWOB_REPO_ROOT="$SCRIPT_DIR" ./tools/api_server/venv/bin/python -m tools.api_server.main --port=8089

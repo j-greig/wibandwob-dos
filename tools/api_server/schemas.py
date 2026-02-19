@@ -107,6 +107,39 @@ class ScreenshotReq(BaseModel):
     path: Optional[str] = None
 
 
+class PaintCellRequest(BaseModel):
+    win_id: str
+    x: int
+    y: int
+    fg: int = 15
+    bg: int = 0
+
+
+class PaintLineRequest(BaseModel):
+    win_id: str
+    x0: int
+    y0: int
+    x1: int
+    y1: int
+    fg: int = 15
+    bg: int = 0
+
+
+class PaintRectRequest(BaseModel):
+    win_id: str
+    x0: int
+    y0: int
+    x1: int
+    y1: int
+    fg: int = 15
+    bg: int = 0
+    fill: bool = False
+
+
+class PaintClearRequest(BaseModel):
+    win_id: str
+
+
 class SendTextReq(BaseModel):
     content: str
     mode: Literal["append", "replace", "insert"] = "append"

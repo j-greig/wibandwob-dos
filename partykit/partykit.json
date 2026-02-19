@@ -1,0 +1,5 @@
+{
+  "name": "wibwob-rooms",
+  "main": "src/server.ts",
+  "compatibilityDate": "2026-02-18"
+}

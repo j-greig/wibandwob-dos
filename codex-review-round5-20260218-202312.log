@@ -1,0 +1,911 @@
+OpenAI Codex v0.101.0 (research preview)
+--------
+workdir: /Users/james/Repos/wibandwob-dos
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: medium
+reasoning summaries: auto
+session id: 019c726b-c9ec-7e42-b211-6b13be0a620a
+--------
+user
+Round-5 final verification of WibWob-DOS IPC hardening. We have now applied 4 rounds of fixes. This should be close to done.
+
+## What was fixed since round-4
+- text_view spawn: api_open_text_view_path now creates TTransparentTextWindow directly (was wrongly calling openAnimationFilePath which created a frame player)
+- test_chat_relay.py: updated assertions for exec_command routing
+- test_partykit_bridge.py: added _state_lock init in receive_delta test
+
+## Files to review
+- app/test_pattern_app.cpp: api_open_text_view_path (around line 2297), windowTypeName (line 2398), api_get_state (line 2441)
+- app/api_ipc.cpp: authenticate_connection (line 172), publish_event (line 575), subscribe_events handler (line 555)
+- tools/room/partykit_bridge.py: _async_auth_handshake, event_subscribe_loop, receive_loop state_delta block
+- tools/room/state_diff.py: apply_delta_to_ipc resize_window params, _normalise_win
+- tests/room/ (skim for coverage gaps)
+
+## Questions
+1. Is api_open_text_view_path correct now? Verify the window actually loads text correctly.
+2. Is there any missing type in windowTypeName() — specifically TAsciiImageWindow?
+3. Is the asyncio.Lock guard in receive_loop (state_delta branch) now correct?
+4. Are there any remaining protocol-level issues between Python and C++ IPC?
+5. Is there anything missing from api_get_state JSON output that the bridge needs?
+6. Final verdict: is the system ready for production use, or are there remaining blockers?
+
+Give severity-ranked findings. Be concise. Stop when nothing Critical or High remains.
+mcp startup: no servers
+2026-02-18T20:23:12.723961Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c67d3-e7fb-7423-879a-a3c6997f29d4
+2026-02-18T20:23:12.741462Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c6171-ccc2-7702-9b67-9c22338e3137
+2026-02-18T20:23:12.758661Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c6248-4000-77b0-815a-4015ebbba891
+
+thinking
+**Starting code review preparation**
+codex
+Reviewing the listed files now with a code-review focus on protocol correctness and production blockers. I’ll verify each of your six questions against the actual implementations and tests, then report only severity-ranked findings.
+exec
+/bin/zsh -lc "sed -n '2260,2485p' app/test_pattern_app.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '130,230p' app/api_ipc.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,260p' tools/room/partykit_bridge.py" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '520,640p' app/api_ipc.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '260,520p' tools/room/partykit_bridge.py" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,260p' tools/room/state_diff.py" in /Users/james/Repos/wibandwob-dos succeeded in 50ms:
+// ---- IPC API helper functions (friend) ----
+// Backward compatibility overloads
+void api_spawn_test(TTestPatternApp& app) { app.newTestWindow(); }
+void api_spawn_gradient(TTestPatternApp& app, const std::string& kind) {
+    if (kind == "horizontal") app.newGradientWindow(TGradientWindow::gtHorizontal);
+    else if (kind == "vertical") app.newGradientWindow(TGradientWindow::gtVertical);
+    else if (kind == "radial") app.newGradientWindow(TGradientWindow::gtRadial);
+    else if (kind == "diagonal") app.newGradientWindow(TGradientWindow::gtDiagonal);
+    else app.newGradientWindow(TGradientWindow::gtHorizontal);
+}
+void api_open_animation_path(TTestPatternApp& app, const std::string& path) {
+    app.openAnimationFilePath(path);
+}
+
+// New overloads with bounds support
+void api_spawn_test(TTestPatternApp& app, const TRect* bounds) { 
+    if (bounds) {
+        app.newTestWindow(*bounds);
+    } else {
+        app.newTestWindow();
+ succeeded in 52ms:
+    out.reserve(len * 2);
+    for (size_t i = 0; i < len; ++i) {
+        out += hex[(data[i] >> 4) & 0xf];
+        out += hex[data[i] & 0xf];
+    }
+    return out;
+}
+
+ApiIpcServer::ApiIpcServer(TTestPatternApp* app) : app_(app) {
+    // Read auth secret from environment.
+    const char* secret = std::getenv("WIBWOB_AUTH_SECRET");
+    if (secret && secret[0] != '\0') {
+        auth_secret_ = secret;
+        fprintf(stderr, "[ipc] Auth enabled (secret length=%zu)\n", auth_secret_.size());
+    }
+}
+
+std::string ApiIpcServer::generate_nonce() {
+    std::random_device rd;
+    unsigned char bytes[16];
+ succeeded in 51ms:
+#!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.11"
+# dependencies = ["websockets>=12"]
+# ///
+"""
+PartyKit bridge for WibWob-DOS multiplayer rooms (E008 F02).
+
+Runs as a sidecar alongside a WibWob instance. Polls local IPC state,
+diffs it, and pushes state_delta messages to PartyKit. Also receives
+remote deltas from PartyKit and applies them to the local instance via IPC.
+
+Usage (spawned by orchestrator):
+    uv run tools/room/partykit_bridge.py
+
+Environment:
+    WIBWOB_INSTANCE      — instance ID (e.g. "1"), drives /tmp/wibwob_1.sock
+    WIBWOB_PARTYKIT_URL  — PartyKit server URL (e.g. https://wibwob.user.partykit.dev)
+    WIBWOB_PARTYKIT_ROOM — PartyKit room/Durable Object key (e.g. "wibwob-shared")
+    WIBWOB_AUTH_SECRET   — shared HMAC secret for IPC auth (optional)
+exec
+/bin/zsh -lc 'ls -la tests/room && rg -n "exec_command|subscribe|state_delta|auth|window|api_get_state|resize_window|ascii|text_view|partykit|lock" tests/room' in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc 'rg -n "api_open_text_view_path|windowTypeName|api_get_state|authenticate_connection|publish_event|subscribe_events|_async_auth_handshake|event_subscribe_loop|receive_loop|state_delta|apply_delta_to_ipc|_normalise_win|TAsciiImageWindow" app tools tests/room app/test_pattern_app.cpp app/api_ipc.cpp tools/room/partykit_bridge.py tools/room/state_diff.py' in /Users/james/Repos/wibandwob-dos succeeded in 50ms:
+                    if (api_open_workspace_path(*app_, it->second)) {
+                        fprintf(stderr, "[ipc] import_state path=%s applied=direct\n", it->second.c_str());
+                        resp = "ok\n";
+                    } else {
+                        // Compatibility fallback: convert state snapshot shape ("rect") into workspace shape ("bounds").
+                        std::string normalized = content;
+                        if (normalized.find("\"rect\"") != std::string::npos &&
+                            normalized.find("\"bounds\"") == std::string::npos) {
+                            size_t pos = 0;
+                            while ((pos = normalized.find("\"rect\"", pos)) != std::string::npos) {
+                                normalized.replace(pos, 6, "\"bounds\"");
+                                pos += 8;
+                            }
+                        }
+
+                        std::string tmp_path = it->second + ".wwd-import-tmp.json";
+                        std::ofstream out(tmp_path.c_str(), std::ios::out | std::ios::trunc);
+                        if (!out.is_open()) {
+                            resp = "err cannot write import temp\n";
+                        } else {
+ succeeded in 51ms:
+
+    async def run(self) -> None:
+        try:
+            import websockets.asyncio.client as ws_client
+        except ImportError:
+            print("ERROR: websockets not installed. Run: uv run tools/room/partykit_bridge.py", file=sys.stderr)
+            return
+        self._state_lock = asyncio.Lock()
+        self.log(f"connecting to {self.ws_url}")
+        while True:
+            try:
+                async with ws_client.connect(self.ws_url) as ws:
+                    self._ws = ws
+                    self.log("connected")
+                    await asyncio.gather(
+                        self.poll_loop(),
+                        self.receive_loop(ws),
+                        self.event_subscribe_loop(),
+                    )
+            except Exception as e:
+ succeeded in 52ms:
+"""
+State diffing utilities for WibWob-DOS multiplayer sync (E008 F03).
+
+Extracts window state from IPC get_state responses, computes minimal
+add/remove/update deltas, and applies remote deltas to a local instance
+via IPC commands.
+
+Used by partykit_bridge.py and any future sync transport.
+"""
+
+import hashlib
+import hmac as _hmac
+import json
+import socket
+import os
+from typing import Any
+from urllib.parse import quote as _urlencode
+
+
+IPC_TIMEOUT = 2.0
+ succeeded in 51ms:
+total 200
+drwxr-xr-x@ 13 james  staff    416 Feb 18 20:21 .
+drwxr-xr-x@  8 james  staff    256 Feb 18 17:53 ..
+drwxr-xr-x@ 12 james  staff    384 Feb 18 20:21 __pycache__
+-rw-r--r--@  1 james  staff   8495 Feb 18 17:53 test_agent_auth.py
+-rw-r--r--@  1 james  staff   6827 Feb 18 20:20 test_chat_relay.py
+-rw-r--r--@  1 james  staff   6669 Feb 18 17:53 test_integration.py
+-rw-r--r--@  1 james  staff   4734 Feb 18 17:53 test_ipc_safety.py
+-rw-r--r--@  1 james  staff   6320 Feb 18 17:53 test_layout_restore.py
+-rw-r--r--@  1 james  staff   7768 Feb 18 17:53 test_orchestrator.py
+-rw-r--r--@  1 james  staff  11812 Feb 18 20:21 test_partykit_bridge.py
+-rw-r--r--@  1 james  staff   6297 Feb 18 17:53 test_room_config.py
+-rw-r--r--@  1 james  staff   7223 Feb 18 18:11 test_room_config_mp.py
+-rw-r--r--@  1 james  staff  16542 Feb 18 20:17 test_state_diff.py
+tests/room/test_room_config_mp.py:25:    "partykit_room": "wibwob-shared",
+tests/room/test_room_config_mp.py:26:    "partykit_server": "https://wibwob.test.partykit.dev",
+tests/room/test_room_config_mp.py:52:            "partykit_room: wibwob-shared\n"
+tests/room/test_room_config_mp.py:53:            "partykit_server: https://wibwob.test.partykit.dev\n"
+tests/room/test_room_config_mp.py:61:        assert cfg.partykit_room == "wibwob-shared"
+tests/room/test_room_config_mp.py:62:        assert cfg.partykit_server == "https://wibwob.test.partykit.dev"
+ succeeded in 51ms:
+tools/room/state_diff.py:127:def _normalise_win(win: dict) -> dict:
+tools/room/state_diff.py:130:    api_get_state emits w/h (after the fix), but PartyKit canonical state or
+tools/room/state_diff.py:158:                norm = _normalise_win(win)
+tools/room/state_diff.py:166:        norm = _normalise_win(win)
+tools/room/state_diff.py:252:def apply_delta_to_ipc(sock_path: str, delta: dict[str, Any]) -> list[str]:
+tools/room/state_diff.py:254:    Apply a remote state_delta to a local WibWob instance via IPC.
+tools/room/partykit_bridge.py:10:diffs it, and pushes state_delta messages to PartyKit. Also receives
+tools/room/partykit_bridge.py:34:    apply_delta_to_ipc,
+tools/room/partykit_bridge.py:46:async def _async_auth_handshake(reader: asyncio.StreamReader,
+tools/room/partykit_bridge.py:51:    works in the event_subscribe_loop (which holds asyncio streams, not a
+tools/room/partykit_bridge.py:120:        msg = json.dumps({"type": "state_delta", "delta": delta})
+tools/room/partykit_bridge.py:159:    async def event_subscribe_loop(self) -> None:
+tools/room/partykit_bridge.py:164:                if not await _async_auth_handshake(reader, writer):
+tools/room/partykit_bridge.py:169:                writer.write(b"cmd:subscribe_events\n")
+tools/room/partykit_bridge.py:212:    async def receive_loop(self, ws) -> None:
+tools/room/partykit_bridge.py:229:                            apply_delta_to_ipc(self.sock_path, delta)
+tools/room/partykit_bridge.py:236:            elif mtype == "state_delta":
+tools/room/partykit_bridge.py:242:                        applied = apply_delta_to_ipc(self.sock_path, delta)
+tools/room/partykit_bridge.py:276:                        self.receive_loop(ws),
+tools/room/partykit_bridge.py:277:                        self.event_subscribe_loop(),
+
+thinking
+**Planning deeper protocol inspection**
+codex
+I’ve pulled the target sections and test inventory. Next I’m checking the exact protocol edges (auth handshake framing, event subscribe framing, delta apply commands, and `api_get_state` fields) for any remaining high-severity mismatches.
+exec
+/bin/zsh -lc "sed -n '420,610p' app/api_ipc.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '240,390p' tools/room/state_diff.py" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '230,420p' app/api_ipc.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,240p' tests/room/test_chat_relay.py" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,240p' tests/room/test_partykit_bridge.py" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '2485,2585p' app/test_pattern_app.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '240,360p' tests/room/test_partykit_bridge.py" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,340p' tests/room/test_state_diff.py" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+
+    Handles both sub-dict form ({rect: {x,y,w,h}}) and flat form ({x,y,w,h}).
+    """
+    rect = win.get("rect") or win.get("bounds")
+    if isinstance(rect, dict):
+        return rect
+    # Fall back to top-level x/y/w/h keys (IPC / delta flat format)
+    if any(k in win for k in ("x", "y", "w", "h", "width", "height")):
+        return win
+    return {}
+
+
+def apply_delta_to_ipc(sock_path: str, delta: dict[str, Any]) -> list[str]:
+    """
+    Apply a remote state_delta to a local WibWob instance via IPC.
+
+    Returns list of applied command strings for logging/testing.
+    """
+    applied = []
+
+ succeeded in 52ms:
+        }
+    } else if (cmd == "resize_window") {
+        auto id = kv.find("id");
+        auto w_it = kv.find("width");
+        auto h_it = kv.find("height");
+        if (id != kv.end() && w_it != kv.end() && h_it != kv.end()) {
+            int width = std::atoi(w_it->second.c_str());
+            int height = std::atoi(h_it->second.c_str());
+            resp = api_resize_window(*app_, id->second, width, height) + "\n";
+        } else {
+            resp = "err missing id/width/height\n";
+        }
+    } else if (cmd == "focus_window") {
+        auto id = kv.find("id");
+        if (id != kv.end()) {
+            resp = api_focus_window(*app_, id->second) + "\n";
+        } else {
+            resp = "err missing id\n";
+        }
+    } else if (cmd == "close_window") {
+ succeeded in 52ms:
+        return false;
+    }
+
+    // Mark nonce as used
+    used_nonces_.insert(nonce);
+    // Prune old nonces (keep last 1000)
+    if (used_nonces_.size() > 1000) {
+        auto it = used_nonces_.begin();
+        std::advance(it, used_nonces_.size() - 1000);
+        used_nonces_.erase(used_nonces_.begin(), it);
+    }
+
+    // Send auth_ok so client knows to proceed with commands.
+    std::string ok_msg = "{\"type\":\"auth_ok\"}\n";
+    ::write(fd, ok_msg.c_str(), ok_msg.size());
+
+    fprintf(stderr, "[ipc] Auth OK for connection\n");
+    return true;
+}
+
+ succeeded in 51ms:
+            except ImportError:
+                pytest.skip("websockets not installed")
+
+            with patch.object(ws_client, "connect", side_effect=fake_connect), \
+                 patch("asyncio.sleep", new_callable=AsyncMock):
+                try:
+                    await bridge.run()
+                except asyncio.CancelledError:
+                    pass
+
+        asyncio.run(run_test())
+        assert len(connect_calls) >= 2, "Expected at least one reconnect attempt"
+
+
+# ── Sync loop prevention ──────────────────────────────────────────────────────
+
+class TestReceiveLoopNoEcho:
+    def test_receive_delta_adopts_local_state_as_baseline(self):
+        """After applying a remote state_delta, last_windows must reflect the
+        actual local IPC state, NOT the remote window IDs.
+ succeeded in 52ms:
+        }
+        json << "\"}";
+        first = false;
+    }
+
+    json << "]";
+
+    // Append chat_log for multiplayer relay bridge
+    json << ",\"chat_log\":[";
+    bool firstChat = true;
+    for (const auto& entry : app.chatLog_) {
+        if (!firstChat) json << ",";
+        json << "{\"seq\":" << entry.seq
+             << ",\"sender\":\"" << TTestPatternApp::jsonEscape(entry.sender) << "\""
+             << ",\"text\":\"" << TTestPatternApp::jsonEscape(entry.text) << "\"}";
+        firstChat = false;
+    }
+    json << "]}";
+    return json.str();
+}
+ succeeded in 52ms:
+"""Tests for F04: Chat relay — bridge forwards local chat to PartyKit, applies remote chat via IPC."""
+
+import asyncio
+import json
+import sys
+from pathlib import Path
+from unittest.mock import AsyncMock, patch
+
+import pytest
+
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "tools" / "room"))
+from partykit_bridge import PartyKitBridge
+
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+def make_bridge() -> PartyKitBridge:
+    b = PartyKitBridge("1", "http://localhost:1999", "test-room")
+    b._ws = AsyncMock()
+    b._ws.send = AsyncMock()
+ succeeded in 52ms:
+"""Tests for F02: PartyKit bridge — state diffing, delta application, WS URL building (E008)."""
+
+import asyncio
+import json
+import sys
+from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "tools" / "room"))
+from partykit_bridge import (
+    build_ws_url,
+    compute_delta,
+    windows_from_state,
+    apply_delta_to_ipc,
+    PartyKitBridge,
+)
+
+# ── URL building ──────────────────────────────────────────────────────────────
+ succeeded in 52ms:
+"""Tests for F03: State diffing module (E008)."""
+
+import json
+import socket
+import sys
+import threading
+from pathlib import Path
+from unittest.mock import patch, MagicMock
+
+import pytest
+
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "tools" / "room"))
+from state_diff import (
+    windows_from_state,
+    state_hash,
+    compute_delta,
+    apply_delta,
+    apply_delta_to_ipc,
+    _encode_param,
+    ipc_command,
+
+thinking
+**Inspecting child view type detection**
+codex
+I’m now checking window-type detection against the ASCII image implementation and then validating whether tests actually cover the new `text_view` spawn path end-to-end.
+exec
+/bin/zsh -lc "sed -n '1,220p' app/ascii_image_view.cpp" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+#include "ascii_image_view.h"
+
+#define Uses_TRect
+#define Uses_TWindow
+#define Uses_TView
+#define Uses_TDrawBuffer
+#define Uses_TEvent
+#define Uses_MsgBox
+#include <tvision/tv.h>
+
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <cstdint>
+#include <stdexcept>
+#include <string>
+#include <vector>
+
+// stb_image loader
+#define STB_IMAGE_IMPLEMENTATION
+exec
+/bin/zsh -lc 'rg -n "subscribe_events|publish_event|auth_ok|challenge|state_changed|window_closed|chat_log|get_state" tests/room app | head -n 240' in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc 'rg -n "open_text_view|text_view|TTransparentTextWindow|frame_player|windowTypeName|ascii_image|TAsciiImageWindow|open_animation" tests app | head -n 200' in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+tests/room/test_state_diff.py:51:        """api_get_state emits w/h; older snapshots may have width/height.
+tests/room/test_state_diff.py:329:    """Tests for the HMAC challenge-response auth handshake in ipc_send."""
+tests/room/test_state_diff.py:362:            conn.sendall((json.dumps({"type": "challenge", "nonce": nonce}) + "\n").encode())
+tests/room/test_state_diff.py:367:                conn.sendall(b'{"type":"auth_ok"}\n')
+tests/room/test_partykit_bridge.py:266:        Fix: after apply_delta_to_ipc, read the real local state via ipc_get_state
+tests/room/test_partykit_bridge.py:289:                 patch("partykit_bridge.ipc_get_state", return_value=local_state_after):
+tests/room/test_agent_auth.py:1:"""Tests for agent auth (HMAC challenge-response) protocol.
+tests/room/test_agent_auth.py:69:            # Send challenge
+tests/room/test_agent_auth.py:71:            challenge = json.dumps({"type": "challenge", "nonce": nonce}) + "\n"
+tests/room/test_agent_auth.py:72:            conn.sendall(challenge.encode())
+tests/room/test_agent_auth.py:97:            # Send auth_ok so client knows to send command
+tests/room/test_agent_auth.py:98:            conn.sendall(b'{"type":"auth_ok"}\n')
+tests/room/test_agent_auth.py:114:        # Read challenge
+tests/room/test_agent_auth.py:116:        challenge = json.loads(data)
+tests/room/test_agent_auth.py:117:        nonce = challenge["nonce"]
+tests/room/test_agent_auth.py:124:        # Wait for auth_ok before sending command
+tests/room/test_agent_auth.py:127:        if ack_msg.get("type") != "auth_ok":
+tests/room/test_agent_auth.py:174:            assert cmd == "cmd:get_state"
+tests/room/test_agent_auth.py:180:            resp = auth_client_connect(sock_path, secret, "cmd:get_state")
+tests/room/test_agent_auth.py:202:            # Read challenge
+ succeeded in 50ms:
+app/window_type_registry.cpp:20:extern void api_open_animation_path(TTestPatternApp&, const std::string&, const TRect*);
+app/window_type_registry.cpp:21:extern void api_open_text_view_path(TTestPatternApp&, const std::string&, const TRect*);
+app/window_type_registry.cpp:65:static const char* spawn_frame_player(TTestPatternApp& app,
+app/window_type_registry.cpp:69:    TRect r; api_open_animation_path(app, it->second, opt_bounds(kv, r)); return nullptr;
+app/window_type_registry.cpp:72:static const char* spawn_text_view(TTestPatternApp& app,
+app/window_type_registry.cpp:76:    TRect r; api_open_text_view_path(app, it->second, opt_bounds(kv, r)); return nullptr;
+app/window_type_registry.cpp:160:    { "frame_player",      spawn_frame_player     },
+app/window_type_registry.cpp:161:    { "text_view",         spawn_text_view        },
+app/test_pattern_app.cpp:44:#include "ascii_image_view.h"
+app/test_pattern_app.cpp:79:#include "transparent_text_view.h"
+app/test_pattern_app.cpp:686:    friend void api_open_animation_path(TTestPatternApp&, const std::string&);
+app/test_pattern_app.cpp:687:    friend void api_open_text_view_path(TTestPatternApp&, const std::string&, const TRect* bounds);
+app/test_pattern_app.cpp:690:    friend void api_open_animation_path(TTestPatternApp&, const std::string&, const TRect* bounds);
+app/test_pattern_app.cpp:1830:        TTransparentTextWindow* window = new TTransparentTextWindow(bounds, title.str(), filePath);
+app/test_pattern_app.cpp:2270:void api_open_animation_path(TTestPatternApp& app, const std::string& path) {
+app/test_pattern_app.cpp:2297:void api_open_text_view_path(TTestPatternApp& app, const std::string& path, const TRect* bounds) {
+app/test_pattern_app.cpp:2310:    TTransparentTextWindow* window = new TTransparentTextWindow(r, title, path);
+app/test_pattern_app.cpp:2315:void api_open_animation_path(TTestPatternApp& app, const std::string& path, const TRect* bounds) {
+app/test_pattern_app.cpp:2390:static const char* windowTypeName(TWindow* w) {
+app/test_pattern_app.cpp:2398:    if (dynamic_cast<TTransparentTextWindow*>(w)) return "text_view";
+
+thinking
+**Verifying file loading in view constructor**
+codex
+I found no direct integration test for `api_open_text_view_path`, so I’m validating that path manually through `TTransparentTextWindow` construction and file-load behavior in `transparent_text_view.cpp`.
+exec
+/bin/zsh -lc "sed -n '1,320p' app/transparent_text_view.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,220p' app/transparent_text_view.h" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc 'rg -n "loadFromFile|TTransparentTextWindow|TransparentTextView|filePath|open.*text" app/transparent_text_view.cpp app/test_pattern_app.cpp app/window_type_registry.cpp tests | head -n 200' in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+/*---------------------------------------------------------*/
+/*                                                         */
+/*   transparent_text_view.cpp - Text View with           */
+/*   Transparent/Custom Background Support                */
+/*                                                         */
+/*---------------------------------------------------------*/
+
+#include "transparent_text_view.h"
+#include <algorithm>
+
+/*---------------------------------------------------------*/
+/* TTransparentTextView Implementation                    */
+/*---------------------------------------------------------*/
+
+TTransparentTextView::TTransparentTextView(const TRect& bounds,
+                                         const std::string& filePath)
+    : TView(bounds),
+      fileName(filePath),
+      bgColor(0, 0, 0),           // Default black background
+      fgColor(220, 220, 220),     // Default light grey foreground
+ succeeded in 51ms:
+/*---------------------------------------------------------*/
+/*                                                         */
+/*   transparent_text_view.h - Text View with             */
+/*   Transparent/Custom Background Support                */
+/*                                                         */
+/*---------------------------------------------------------*/
+
+#ifndef TRANSPARENT_TEXT_VIEW_H
+#define TRANSPARENT_TEXT_VIEW_H
+
+#define Uses_TBackground
+#define Uses_TRect
+#define Uses_TView
+#define Uses_TDrawBuffer
+#define Uses_TEvent
+#define Uses_TWindow
+#define Uses_TFrame
+#define Uses_TKeys
+#define Uses_TProgram
+#define Uses_TDeskTop
+ succeeded in 51ms:
+app/window_type_registry.cpp:21:extern void api_open_text_view_path(TTestPatternApp&, const std::string&, const TRect*);
+app/window_type_registry.cpp:76:    TRect r; api_open_text_view_path(app, it->second, opt_bounds(kv, r)); return nullptr;
+app/transparent_text_view.cpp:12:/* TTransparentTextView Implementation                    */
+app/transparent_text_view.cpp:15:TTransparentTextView::TTransparentTextView(const TRect& bounds,
+app/transparent_text_view.cpp:16:                                         const std::string& filePath)
+app/transparent_text_view.cpp:18:      fileName(filePath),
+app/transparent_text_view.cpp:28:    loadFile(filePath);
+app/transparent_text_view.cpp:31:void TTransparentTextView::loadFile(const std::string& path)
+app/transparent_text_view.cpp:54:size_t TTransparentTextView::utf8Length(const std::string& str) const
+app/transparent_text_view.cpp:75:void TTransparentTextView::draw()
+app/transparent_text_view.cpp:149:void TTransparentTextView::handleEvent(TEvent& event)
+app/transparent_text_view.cpp:197:void TTransparentTextView::setBackgroundColor(TColorRGB color)
+app/transparent_text_view.cpp:204:void TTransparentTextView::setBackgroundToDefault()
+app/transparent_text_view.cpp:211:/* TTransparentTextWindow Implementation                  */
+app/transparent_text_view.cpp:214:TTransparentTextWindow::TTransparentTextWindow(const TRect& bounds,
+app/transparent_text_view.cpp:216:                                             const std::string& filePath)
+app/transparent_text_view.cpp:218:      TWindowInit(&TTransparentTextWindow::initFrame)
+app/transparent_text_view.cpp:227:    textView = new TTransparentTextView(interior, filePath);
+app/transparent_text_view.cpp:231:void TTransparentTextWindow::changeBounds(const TRect& bounds)
+app/transparent_text_view.cpp:243:TFrame* TTransparentTextWindow::initFrame(TRect r)
+
+thinking
+**Assessing nonce pruning and window sync risks**
+codex
+I found a likely classification gap around ASCII image windows; I’m confirming whether that type is exposed through the IPC registry, because if it is, `api_get_state` mislabeling would still break multiplayer parity.
+exec
+/bin/zsh -lc "sed -n '1,260p' app/window_type_registry.cpp" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+// Window type registry — single source of truth for all spawnable window types.
+// Keeps api_ipc.cpp free of per-type knowledge: adding a new type only requires
+// a new entry in the k_specs table below.
+
+#include "window_type_registry.h"
+
+// tvision for TRect
+#define Uses_TRect
+#include <tvision/tv.h>
+
+#include <cstdlib>  // atoi
+#include <cstring>  // strcmp
+
+// ── Extern declarations for spawn helpers in test_pattern_app.cpp ─────────────
+
+class TTestPatternApp; // forward decl (full type used only by called functions)
+
+extern void api_spawn_test(TTestPatternApp&, const TRect*);
+extern void api_spawn_gradient(TTestPatternApp&, const std::string&, const TRect*);
+extern void api_open_animation_path(TTestPatternApp&, const std::string&, const TRect*);
+
+thinking
+**Searching for ASCII spawn implementation**
+exec
+/bin/zsh -lc 'rg -n "api_spawn_ascii|createAsciiImageWindowFromFile|ascii" app/test_pattern_app.cpp app/ascii_image_view.h app/ascii_image_view.cpp | head -n 120' in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+app/ascii_image_view.h:11:TWindow* createAsciiImageWindowFromFile(const TRect &bounds, const std::string &path);
+app/ascii_image_view.cpp:1:#include "ascii_image_view.h"
+app/ascii_image_view.cpp:96:TWindow* createAsciiImageWindowFromFile(const TRect &bounds, const std::string &path){
+app/test_pattern_app.cpp:44:#include "ascii_image_view.h"
+app/test_pattern_app.cpp:67:#include "animated_ascii_view.h"
+app/test_pattern_app.cpp:69:// DISABLED: #include "generative_ascii_cam_view.h"
+app/test_pattern_app.cpp:85:// Factory for ASCII grid demo window (implemented in ascii_grid_view.cpp).
+app/test_pattern_app.cpp:720:    friend void api_spawn_ascii(TTestPatternApp&, const TRect* bounds);
+app/test_pattern_app.cpp:1237:                    if (TWindow *w = createAsciiImageWindowFromFile(bounds, fileName)) {
+app/test_pattern_app.cpp:2423:    if (HAS_CHILD_VIEW(TAnimatedAsciiView))           return "ascii";
+app/test_pattern_app.cpp:3260:void api_spawn_ascii(TTestPatternApp& app, const TRect* bounds) {
+exec
+/bin/zsh -lc "sed -n '1200,1275p' app/test_pattern_app.cpp && sed -n '3230,3295p' app/test_pattern_app.cpp" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+                } else {
+                    messageBox("Failed to capture frame.", mfError | mfOKButton);
+                }
+                clearEvent(event);
+                break;
+            }
+            case cmResetGlitchParams: {
+                getGlitchEngine().resetCorruption();
+                GlitchParams defaultParams;
+                getGlitchEngine().setGlitchParams(defaultParams);
+                messageBox("Glitch parameters reset to defaults.", mfInformation | mfOKButton);
+                clearEvent(event);
+                break;
+            }
+            case cmGlitchSettings:
+                messageBox("Glitch Settings dialog coming soon!\n\nUse menu items to adjust parameters for now.", mfInformation | mfOKButton);
+                clearEvent(event);
+                break;
+                
+            // Future File commands
+
+thinking
+**Identifying missing window data causing sync failures**
+codex
+I identified one protocol mismatch that can still break multiplayer for file-backed windows; I’m running the room test suite now to confirm there aren’t additional High regressions hiding behind the recent fixes.
+exec
+/bin/zsh -lc 'pytest -q tests/room/test_partykit_bridge.py tests/room/test_chat_relay.py tests/room/test_state_diff.py' in /Users/james/Repos/wibandwob-dos exited 127 in 52ms:
+zsh:1: command not found: pytest
+
+thinking
+**Running tests with uv**
+codex
+`pytest` isn’t installed globally in this shell, so I’m retrying via `uv run` to still get executable test evidence without changing the environment.
+exec
+/bin/zsh -lc 'uv run pytest -q tests/room/test_partykit_bridge.py tests/room/test_chat_relay.py tests/room/test_state_diff.py' in /Users/james/Repos/wibandwob-dos exited 2 in 51ms:
+error: Failed to spawn: `pytest`
+  Caused by: No such file or directory (os error 2)
+
+thinking
+**Analyzing protocol and event loop risks**
+exec
+/bin/zsh -lc "nl -ba app/test_pattern_app.cpp | sed -n '2290,2465p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba app/test_pattern_app.cpp | sed -n '2465,2515p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba tools/room/partykit_bridge.py | sed -n '208,270p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba tools/room/state_diff.py | sed -n '248,335p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba app/transparent_text_view.cpp | sed -n '12,70p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba app/window_type_registry.cpp | sed -n '60,190p'" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+  2290	    if (bounds) {
+  2291	        app.newGradientWindow(type, *bounds);
+  2292	    } else {
+  2293	        app.newGradientWindow(type);
+  2294	    }
+  2295	}
+  2296	
+  2297	void api_open_text_view_path(TTestPatternApp& app, const std::string& path, const TRect* bounds) {
+  2298	    if (path.empty()) return;
+  2299	    app.windowNumber++;
+  2300	    size_t lastSlash = path.find_last_of("/\\");
+  2301	    std::string baseName = (lastSlash != std::string::npos) ? path.substr(lastSlash + 1) : path;
+  2302	    std::string title = baseName + " (Transparent)";
+  2303	    TRect r;
+  2304	    if (bounds && (bounds->b.x - bounds->a.x) > 0 && (bounds->b.y - bounds->a.y) > 0) {
+  2305	        r = *bounds;
+  2306	    } else {
+  2307	        int offset = (app.windowNumber - 1) % 10;
+  2308	        r = TRect(2 + offset * 2, 1 + offset, 82 + offset * 2, 25 + offset);
+  2309	    }
+ succeeded in 51ms:
+  2465	    json << "{\"windows\":[";
+  2466	
+  2467	    bool first = true;
+  2468	    for (TWindow* w : activeWins) {
+  2469	        std::string id = app.registerWindow(w);
+  2470	        if (!first) json << ",";
+  2471	        json << "{\"id\":\"" << id << "\""
+  2472	             << ",\"type\":\"" << windowTypeName(w) << "\""
+  2473	             << ",\"x\":" << w->origin.x
+  2474	             << ",\"y\":" << w->origin.y
+  2475	             << ",\"w\":" << w->size.x
+  2476	             << ",\"h\":" << w->size.y
+  2477	             << ",\"title\":\"";
+  2478	        if (w->title) {
+  2479	            std::string title(w->title);
+  2480	            for (char c : title) {
+  2481	                if (c == '"') json << "\\\"";
+  2482	                else if (c == '\\') json << "\\\\";
+  2483	                else json << c;
+  2484	            }
+ succeeded in 51ms:
+   208	                            await self.push_chat(sender, text)
+   209	                        self.last_chat_seq = seq
+   210	            await asyncio.sleep(POLL_INTERVAL)
+   211	
+   212	    async def receive_loop(self, ws) -> None:
+   213	        async for raw in ws:
+   214	            try:
+   215	                msg = json.loads(raw)
+   216	            except json.JSONDecodeError:
+   217	                continue
+   218	
+   219	            mtype = msg.get("type")
+   220	            if mtype == "state_sync":
+   221	                canonical = msg.get("state", {})
+   222	                windows = canonical.get("windows", {})
+   223	                if windows and self._state_lock:
+   224	                    async with self._state_lock:
+   225	                        new_windows = dict(windows)
+   226	                        delta = compute_delta(self.last_windows, new_windows)
+   227	                        if delta:
+ succeeded in 51ms:
+   248	        return win
+   249	    return {}
+   250	
+   251	
+   252	def apply_delta_to_ipc(sock_path: str, delta: dict[str, Any]) -> list[str]:
+   253	    """
+   254	    Apply a remote state_delta to a local WibWob instance via IPC.
+   255	
+   256	    Returns list of applied command strings for logging/testing.
+   257	    """
+   258	    applied = []
+   259	
+   260	    for win in delta.get("add", []):
+   261	        win_type = win.get("type", "test_pattern")
+   262	        rect = _rect(win)
+   263	        x = rect.get("x", 0)
+   264	        y = rect.get("y", 0)
+   265	        w = rect.get("w") or rect.get("width", 40)
+   266	        h = rect.get("h") or rect.get("height", 20)
+   267	        ok = ipc_command(sock_path, "create_window", {
+ succeeded in 51ms:
+    12	/* TTransparentTextView Implementation                    */
+    13	/*---------------------------------------------------------*/
+    14	
+    15	TTransparentTextView::TTransparentTextView(const TRect& bounds,
+    16	                                         const std::string& filePath)
+    17	    : TView(bounds),
+    18	      fileName(filePath),
+    19	      bgColor(0, 0, 0),           // Default black background
+    20	      fgColor(220, 220, 220),     // Default light grey foreground
+    21	      useCustomBg(false),         // Start with terminal default
+    22	      scrollY(0),
+    23	      scrollX(0)
+    24	{
+    25	    growMode = gfGrowHiX | gfGrowHiY;
+    26	    options |= ofSelectable;
+    27	
+    28	    loadFile(filePath);
+    29	}
+    30	
+    31	void TTransparentTextView::loadFile(const std::string& path)
+ succeeded in 51ms:
+    60	    auto it = kv.find("gradient");
+    61	    std::string kind = (it != kv.end()) ? it->second : "horizontal";
+    62	    TRect r; api_spawn_gradient(app, kind, opt_bounds(kv, r)); return nullptr;
+    63	}
+    64	
+    65	static const char* spawn_frame_player(TTestPatternApp& app,
+    66	                                       const std::map<std::string, std::string>& kv) {
+    67	    auto it = kv.find("path");
+    68	    if (it == kv.end()) return "err missing path";
+    69	    TRect r; api_open_animation_path(app, it->second, opt_bounds(kv, r)); return nullptr;
+    70	}
+    71	
+    72	static const char* spawn_text_view(TTestPatternApp& app,
+    73	                                    const std::map<std::string, std::string>& kv) {
+    74	    auto it = kv.find("path");
+    75	    if (it == kv.end()) return "err missing path";
+    76	    TRect r; api_open_text_view_path(app, it->second, opt_bounds(kv, r)); return nullptr;
+    77	}
+    78	
+    79	static const char* spawn_text_editor(TTestPatternApp& app,
+
+thinking
+**Planning API IPC referencing**
+codex
+I have enough to answer all six questions. I’m grabbing exact line references for the IPC auth/event paths so the final findings are actionable and severity-ranked.
+exec
+/bin/zsh -lc "nl -ba app/api_ipc.cpp | sed -n '548,625p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba tools/room/partykit_bridge.py | sed -n '40,190p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba app/api_ipc.cpp | sed -n '160,235p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba tests/room/test_state_diff.py | sed -n '252,290p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba tests/room/test_partykit_bridge.py | sed -n '248,320p'" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+   548	                }
+   549	            }
+   550	        }
+   551	    } else if (cmd == "browser_fetch") {
+   552	        auto url_it = kv.find("url");
+   553	        if (url_it != kv.end()) {
+   554	            resp = api_browser_fetch(*app_, url_it->second) + "\n";
+   555	        } else {
+   556	            resp = "err missing url\n";
+   557	        }
+   558	    } else {
+   559	        resp = "err unknown cmd\n";
+   560	    }
+   561	
+   562	    if (cmd == "subscribe_events") {
+   563	        // Keep this fd open — the client will receive pushed events.
+   564	        // Set non-blocking so publish_event doesn't stall the event loop.
+   565	        ::fcntl(fd, F_SETFL, ::fcntl(fd, F_GETFL, 0) | O_NONBLOCK);
+   566	#ifdef SO_NOSIGPIPE
+   567	        int one = 1;
+ succeeded in 51ms:
+    40	# websockets imported lazily in run() so pure functions remain importable in tests.
+    41	
+    42	import hashlib
+    43	import hmac as _hmac_mod
+    44	
+    45	
+    46	async def _async_auth_handshake(reader: asyncio.StreamReader,
+    47	                                 writer: asyncio.StreamWriter) -> bool:
+    48	    """Async HMAC challenge-response for asyncio StreamReader/StreamWriter.
+    49	
+    50	    Mirrors _ipc_auth_handshake in state_diff.py but uses asyncio I/O so it
+    51	    works in the event_subscribe_loop (which holds asyncio streams, not a
+    52	    blocking socket).  Returns True on success or when auth is not required.
+    53	    """
+    54	    if not _AUTH_SECRET:
+    55	        return True
+    56	    try:
+    57	        raw = await asyncio.wait_for(reader.readline(), timeout=3.0)
+    58	        if not raw:
+    59	            return False
+ succeeded in 51ms:
+   160	           nonce.data(), nonce.size(),
+   161	           result);
+   162	#else
+   163	    unsigned int len = 32;
+   164	    HMAC(EVP_sha256(),
+   165	         auth_secret_.data(), auth_secret_.size(),
+   166	         reinterpret_cast<const unsigned char*>(nonce.data()), nonce.size(),
+   167	         result, &len);
+   168	#endif
+   169	    return bytes_to_hex(result, 32);
+   170	}
+   171	
+   172	bool ApiIpcServer::authenticate_connection(int fd) {
+   173	    if (!auth_required()) return true;
+   174	
+   175	    // Ensure the accepted fd is blocking for the auth handshake.
+   176	    int flags = ::fcntl(fd, F_GETFL, 0);
+   177	    if (flags & O_NONBLOCK)
+   178	        ::fcntl(fd, F_SETFL, flags & ~O_NONBLOCK);
+   179	
+ succeeded in 51ms:
+   252	        """apply_delta_to_ipc reads x/y/w/h from top level (flat IPC delta format).
+   253	
+   254	        PartyKit deltas carry x/y/w/h at the top level of each window entry,
+   255	        not nested under a 'rect' sub-dict. _rect() must fall back to the win
+   256	        dict itself so windows are created at the correct position, not 0,0.
+   257	        """
+   258	        calls, fake = self._capture()
+   259	        with patch("state_diff.ipc_command", side_effect=fake):
+   260	            apply_delta_to_ipc("/tmp/fake.sock", {
+   261	                "add": [{"id": "w1", "type": "test_pattern", "x": 5, "y": 3, "w": 40, "h": 20}]
+   262	            })
+   263	        create = [p for c, p in calls if c == "create_window"]
+   264	        assert len(create) == 1
+   265	        assert create[0]["x"] == 5
+   266	        assert create[0]["y"] == 3
+   267	
+   268	    def test_update_resize_uses_width_height(self):
+   269	        """resize_window IPC command must use 'width'/'height', not 'w'/'h'.
+   270	
+   271	        C++ api_ipc.cpp reads kv["width"] and kv["height"] for resize_window.
+ succeeded in 52ms:
+   248	                    pass
+   249	
+   250	        asyncio.run(run_test())
+   251	        assert len(connect_calls) >= 2, "Expected at least one reconnect attempt"
+   252	
+   253	
+   254	# ── Sync loop prevention ──────────────────────────────────────────────────────
+   255	
+   256	class TestReceiveLoopNoEcho:
+   257	    def test_receive_delta_adopts_local_state_as_baseline(self):
+   258	        """After applying a remote state_delta, last_windows must reflect the
+   259	        actual local IPC state, NOT the remote window IDs.
+   260	
+   261	        Root cause of the infinite-window bug: the C++ app assigns its own IDs
+   262	        (e.g. 'w2') when create_window is called, but the remote delta carried
+   263	        'w1'. If we store 'w1' in last_windows, the next poll sees 'w2' in the
+   264	        local state, computes a diff, and re-broadcasts — infinite loop.
+   265	
+   266	        Fix: after apply_delta_to_ipc, read the real local state via ipc_get_state
+   267	        and use that as the new baseline.
+
+thinking
+**Prioritizing high-severity findings**
+codex
+**Findings (Critical/High only)**  
+1. **High**: File-backed window replication is still broken at protocol level.  
+`api_get_state` emits only `id/type/x/y/w/h/title` (`app/test_pattern_app.cpp:2471`), but creating `text_view` and `frame_player` requires `path` (`app/window_type_registry.cpp:65`, `app/window_type_registry.cpp:72`).  
+`apply_delta_to_ipc` sends only type/geometry on add (`tools/room/state_diff.py:260`), so remote `create_window type=text_view|frame_player` will fail with `err missing path`.  
+This is a production blocker for multiplayer parity when those window types are present.
+
+**Answers**  
+1. `api_open_text_view_path` is now correct for local behavior: it creates `TTransparentTextWindow` directly (`app/test_pattern_app.cpp:2297`) and that loads file contents via `loadFile` (`app/transparent_text_view.cpp:28`, `app/transparent_text_view.cpp:31`).  
+2. `windowTypeName()` does not recognize `TAsciiImageWindow` (yes, missing). It currently maps animated ASCII (`TAnimatedAsciiView`) only (`app/test_pattern_app.cpp:2423`).  
+3. The `asyncio.Lock` guard in `receive_loop` is correct now for `state_delta` (`tools/room/partykit_bridge.py:236`, `tools/room/partykit_bridge.py:241`).  
+4. Remaining protocol issue: the missing file-path metadata for file-backed windows (above) is the major one.  
+5. Yes, `api_get_state` is missing data the bridge needs for faithful replay of file-backed windows (at least `path`, potentially subtype metadata for other parameterized windows).  
+6. **Final verdict**: not production-ready yet due to the High blocker above.
+
+Could not run Python tests in this shell because `pytest` is unavailable (`pytest` not installed and `uv run pytest` also failed).
+tokens used
+119,128
+**Findings (Critical/High only)**  
+1. **High**: File-backed window replication is still broken at protocol level.  
+`api_get_state` emits only `id/type/x/y/w/h/title` (`app/test_pattern_app.cpp:2471`), but creating `text_view` and `frame_player` requires `path` (`app/window_type_registry.cpp:65`, `app/window_type_registry.cpp:72`).  
+`apply_delta_to_ipc` sends only type/geometry on add (`tools/room/state_diff.py:260`), so remote `create_window type=text_view|frame_player` will fail with `err missing path`.  
+This is a production blocker for multiplayer parity when those window types are present.
+
+**Answers**  
+1. `api_open_text_view_path` is now correct for local behavior: it creates `TTransparentTextWindow` directly (`app/test_pattern_app.cpp:2297`) and that loads file contents via `loadFile` (`app/transparent_text_view.cpp:28`, `app/transparent_text_view.cpp:31`).  
+2. `windowTypeName()` does not recognize `TAsciiImageWindow` (yes, missing). It currently maps animated ASCII (`TAnimatedAsciiView`) only (`app/test_pattern_app.cpp:2423`).  
+3. The `asyncio.Lock` guard in `receive_loop` is correct now for `state_delta` (`tools/room/partykit_bridge.py:236`, `tools/room/partykit_bridge.py:241`).  
+4. Remaining protocol issue: the missing file-path metadata for file-backed windows (above) is the major one.  
+5. Yes, `api_get_state` is missing data the bridge needs for faithful replay of file-backed windows (at least `path`, potentially subtype metadata for other parameterized windows).  
+6. **Final verdict**: not production-ready yet due to the High blocker above.
+
+Could not run Python tests in this shell because `pytest` is unavailable (`pytest` not installed and `uv run pytest` also failed).

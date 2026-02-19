@@ -82,8 +82,15 @@ class Controller:
         # Batch layout support
         self._requests: Dict[str, BatchLayoutResponse] = {}
         self._timelines: Dict[str, List[asyncio.Task]] = {}
-        # Repo root (two levels up from this file)
-        self._repo_root = Path(__file__).resolve().parents[2]
+        # Repo root: prefer env var, fall back to two levels up from this file.
+        # IMPORTANT: start_api_server.sh sets WIBWOB_REPO_ROOT to avoid cross-checkout
+        # mismatch (e.g. API server in wibandwob-dos-xterm, TUI in wibandwob-dos).
+        env_root = os.environ.get("WIBWOB_REPO_ROOT")
+        if env_root:
+            self._repo_root = Path(env_root).resolve()
+        else:
+            self._repo_root = Path(__file__).resolve().parents[2]
+        print(f"[controller] repo_root={self._repo_root}")
         default_log_path = self._repo_root / "logs" / "state" / "events.ndjson"
         self._state_event_log_path = Path(os.environ.get("WWD_STATE_EVENT_LOG_PATH", str(default_log_path)))
 
@@ -360,6 +367,28 @@ class Controller:
             win.props.update(props)
         await self._events.emit("window.updated", self._serialize_window(win))
         return win
+
+    # ----- Paint IPC -----
+    async def paint_cell(self, win_id: str, x: int, y: int, fg: int = 15, bg: int = 0) -> str:
+        return send_cmd("paint_cell", {"id": win_id, "x": str(x), "y": str(y), "fg": str(fg), "bg": str(bg)})
+
+    async def paint_line(self, win_id: str, x0: int, y0: int, x1: int, y1: int, fg: int = 15, bg: int = 0) -> str:
+        return send_cmd("paint_line", {"id": win_id, "x0": str(x0), "y0": str(y0), "x1": str(x1), "y1": str(y1)})
+
+    async def paint_rect(self, win_id: str, x0: int, y0: int, x1: int, y1: int, fg: int = 15, bg: int = 0, fill: bool = False) -> str:
+        return send_cmd("paint_rect", {"id": win_id, "x0": str(x0), "y0": str(y0), "x1": str(x1), "y1": str(y1)})
+
+    async def paint_clear(self, win_id: str) -> str:
+        return send_cmd("paint_clear", {"id": win_id})
+
+    async def paint_export(self, win_id: str) -> Any:
+        resp = send_cmd("paint_export", {"id": win_id})
+        if isinstance(resp, str) and resp.lower().startswith("err"):
+            return resp
+        try:
+            return json.loads(resp)
+        except Exception:
+            return {"text": resp}
 
     async def send_text(self, win_id: str, content: str, mode: str = "append", position: str = "end") -> Dict[str, Any]:
         """Send text to a text editor window"""

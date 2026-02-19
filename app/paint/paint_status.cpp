@@ -10,7 +10,7 @@
 void TPaintStatusView::draw()
 {
     TDrawBuffer b;
-    TColorAttr a{0x07}; // light gray on black default
+    TColorAttr a{0x70};
     b.moveChar(0, ' ', a, size.x);
     if (canvas) {
         char buf[128];
@@ -24,6 +24,7 @@ void TPaintStatusView::draw()
                 snprintf(m, sizeof(m), "Q:%d%d", canvas->getXSub(), canvas->getYSub());
                 mode = m; break;
             }
+            case PixelMode::Text:   mode = "TXT"; break;
         }
         int x = canvas->getX();
         int y = canvas->getY();
@@ -36,6 +37,7 @@ void TPaintStatusView::draw()
                 case PaintContext::Eraser: tool = "E"; break;
                 case PaintContext::Line:   tool = "L"; break;
                 case PaintContext::Rect:   tool = "R"; break;
+                case PaintContext::Text:   tool = "T"; break;
             }
         }
         snprintf(buf, sizeof(buf), "x:%d y:%d mode:%s tool:%s FG:%d BG:%d", x, y, mode, tool, fg, bg);

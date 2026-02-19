@@ -14,6 +14,8 @@
 #include <chrono>
 #include <fstream>
 #include <algorithm>
+#include <fcntl.h>
+#include <unistd.h>
 
 // Register this provider with the factory
 REGISTER_LLM_PROVIDER("anthropic_api", AnthropicAPIProvider);
@@ -36,16 +38,93 @@ bool AnthropicAPIProvider::sendQuery(const LLMRequest& request, ResponseCallback
     
     clearError();
     busy = true;
-    
-    // Use simple synchronous call
-    LLMResponse response = makeSimpleAPIRequest(request);
-    
-    busy = false;
-    
-    if (callback) {
-        callback(response);
+
+    if (!isAvailable()) {
+        busy = false;
+        LLMResponse response;
+        response.provider_name = getProviderName();
+        response.model_used = model;
+        response.is_error = true;
+        response.error_message = "API key not configured";
+        if (callback) callback(response);
+        return false;
     }
-    
+
+    // Build JSON request payload.
+    const std::string jsonRequest = buildSimpleRequestJson(request);
+
+    // Create a unique temp file for payload (avoid collisions across concurrent runs).
+    char tmpTemplate[] = "/tmp/anthropic_simple_XXXXXX";
+    int tmpFd = mkstemp(tmpTemplate);
+    if (tmpFd == -1) {
+        busy = false;
+        LLMResponse response;
+        response.provider_name = getProviderName();
+        response.model_used = model;
+        response.is_error = true;
+        response.error_message = "Failed to create temp file for payload";
+        setError(response.error_message);
+        if (callback) callback(response);
+        return false;
+    }
+
+    activeTempFile = tmpTemplate;
+    ssize_t written = write(tmpFd, jsonRequest.data(), jsonRequest.size());
+    close(tmpFd);
+    if (written < 0 || static_cast<size_t>(written) != jsonRequest.size()) {
+        unlink(activeTempFile.c_str());
+        activeTempFile.clear();
+        busy = false;
+        LLMResponse response;
+        response.provider_name = getProviderName();
+        response.model_used = model;
+        response.is_error = true;
+        response.error_message = "Failed to write payload to temp file";
+        setError(response.error_message);
+        if (callback) callback(response);
+        return false;
+    }
+
+    // Build curl command.
+    std::string curlCmd = "curl -sS --max-time 30 ";
+    curlCmd += "-H \"Content-Type: application/json\" ";
+    curlCmd += "-H \"x-api-key: " + apiKey + "\" ";
+    curlCmd += "-H \"anthropic-version: 2023-06-01\" ";
+    curlCmd += "-X POST ";
+    curlCmd += "\"" + endpoint + "\" ";
+    curlCmd += "--data @" + activeTempFile;
+
+    // Log without leaking the API key.
+    const std::string maskedKey = apiKey.size() > 16 ? apiKey.substr(0, 16) + "****" : "****";
+    fprintf(stderr, "DEBUG: Anthropic API call (async): POST %s (key: %s, payload: %s)\n",
+            endpoint.c_str(), maskedKey.c_str(), activeTempFile.c_str());
+
+    // Start async execution (non-blocking read in poll()).
+    activePipe = popen(curlCmd.c_str(), "r");
+    if (!activePipe) {
+        unlink(activeTempFile.c_str());
+        activeTempFile.clear();
+        busy = false;
+        LLMResponse response;
+        response.provider_name = getProviderName();
+        response.model_used = model;
+        response.is_error = true;
+        response.error_message = "Failed to execute curl";
+        setError(response.error_message);
+        if (callback) callback(response);
+        return false;
+    }
+
+    // Set non-blocking mode on pipe.
+    int fd = fileno(activePipe);
+    int flags = fcntl(fd, F_GETFL, 0);
+    fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+
+    pendingCallback = callback;
+    pendingRequest = request;
+    outputBuffer.clear();
+    requestStart = std::chrono::high_resolution_clock::now();
+
     return true;
 }
 
@@ -58,11 +137,102 @@ bool AnthropicAPIProvider::isBusy() const {
 }
 
 void AnthropicAPIProvider::cancel() {
+    if (!busy) return;
+
     busy = false;
+
+    if (activePipe) {
+        pclose(activePipe);
+        activePipe = nullptr;
+    }
+
+    if (!activeTempFile.empty()) {
+        unlink(activeTempFile.c_str());
+        activeTempFile.clear();
+    }
+
+    outputBuffer.clear();
+
+    if (pendingCallback) {
+        LLMResponse response;
+        response.provider_name = getProviderName();
+        response.model_used = model;
+        response.is_error = true;
+        response.error_message = "Request cancelled by user";
+        pendingCallback(response);
+        pendingCallback = nullptr;
+    }
 }
 
 void AnthropicAPIProvider::poll() {
-    // Simple synchronous - no polling needed
+    if (!busy || !activePipe) {
+        return;
+    }
+
+    // Read available output (non-blocking).
+    char buffer[4096];
+    clearerr(activePipe);
+    size_t bytesRead = fread(buffer, 1, sizeof(buffer) - 1, activePipe);
+    if (bytesRead > 0) {
+        buffer[bytesRead] = '\0';
+        outputBuffer += buffer;
+    }
+
+    // Check for completion.
+    if (feof(activePipe)) {
+        int exitCode = pclose(activePipe);
+        activePipe = nullptr;
+        busy = false;
+
+        auto endTime = std::chrono::high_resolution_clock::now();
+        const int durationMs = (int)std::chrono::duration_cast<std::chrono::milliseconds>(
+            endTime - requestStart).count();
+
+        LLMResponse response;
+        response.provider_name = getProviderName();
+        response.model_used = model;
+        response.duration_ms = durationMs;
+
+        if (exitCode != 0 || outputBuffer.empty()) {
+            response.is_error = true;
+            response.error_message = "Curl failed or empty response. Exit code: " + std::to_string(exitCode);
+            response.session_id = "CURL_ERROR: " + outputBuffer;
+            setError(response.error_message);
+        } else {
+            response = parseSimpleResponse(outputBuffer);
+            response.provider_name = getProviderName();
+            response.model_used = model;
+            response.duration_ms = durationMs;
+
+            // Add tool count debug info (parity with previous synchronous path).
+            std::vector<Tool> allTools = registeredTools;
+            allTools.insert(allTools.end(), pendingRequest.tools.begin(), pendingRequest.tools.end());
+            response.session_id += " TOOLS_SENT: " + std::to_string(allTools.size());
+
+            // Add to conversation history if successful.
+            if (!response.is_error) {
+                if (!pendingRequest.message.empty()) {
+                    conversationHistory.push_back(std::make_pair("user", pendingRequest.message));
+                }
+                if (!response.result.empty()) {
+                    conversationHistory.push_back(std::make_pair("assistant", response.result));
+                }
+            }
+        }
+
+        if (!activeTempFile.empty()) {
+            unlink(activeTempFile.c_str());
+            activeTempFile.clear();
+        }
+
+        outputBuffer.clear();
+        pendingRequest = LLMRequest{};
+
+        if (pendingCallback) {
+            pendingCallback(response);
+            pendingCallback = nullptr;
+        }
+    }
 }
 
 std::vector<std::string> AnthropicAPIProvider::getSupportedModels() const {

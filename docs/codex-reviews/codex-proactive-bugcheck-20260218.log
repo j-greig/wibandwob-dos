@@ -1,0 +1,909 @@
+OpenAI Codex v0.101.0 (research preview)
+--------
+workdir: /Users/james/Repos/wibandwob-dos
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: medium
+reasoning summaries: auto
+session id: 019c72b1-cd05-72b3-8f6e-b2136b51d87a
+--------
+user
+You are doing a proactive bug hunt on WibWob-DOS to find segfault-class and crash-class bugs BEFORE they are hit in live testing.
+
+## DEVNOTE (read these first for full context)
+- docs/CODEX-RETRO-20260218.md — master retro guide, Part B has recurring bug patterns
+- CODEX-ANALYSIS-ROUND8-REVIEW.md
+- CODEX-ANALYSIS-ROUND7-REVIEW.md
+- CODEX-ANALYSIS-ROUND6-REVIEW.md
+- CODEX-ANALYSIS-ROUND5-REVIEW.md
+- CODEX-ANALYSIS-ROUND4-REVIEW.md
+- CODEX-ANALYSIS-ROUND3-REVIEW.md
+- CODEX-ANALYSIS-ROUND2-REVIEW.md
+- CODEX-ARCH-REVIEW-20260218.md
+
+## Context
+A live multiplayer test on 2026-02-18 revealed two bugs that were fixed:
+1. findWindowById returned stale TWindow* pointers (registry only purged in api_get_state, not before command dispatch) -> segfault when close/move called on freed window
+2. ipc_command checked resp.startswith('ok') but handlers return {'success':true} JSON -> every successful command logged as FAIL
+
+These have been fixed. Now find ALL REMAINING bugs of the same class.
+
+## Required file reads (read ALL of these in full)
+- app/test_pattern_app.cpp (focus: idToWin/winToId usage outside findWindowById, any TWindow* deref without liveness check, registerWindow calls, event pub paths)
+- app/api_ipc.cpp (focus: all command handlers, publish_event, subscriber fd management, SIGPIPE protection, partial write handling)
+- tools/room/partykit_bridge.py (focus: all async paths, blocking calls inside coroutines, task lifecycle, cancellation, writer cleanup)
+- tools/room/state_diff.py (focus: apply_delta_to_ipc failure handling, ID mismatch between instances, encoding correctness)
+- tools/room/orchestrator.py (focus: bridge Popen lifecycle, ttyd pipe draining)
+
+## Scope — find bugs in these specific categories:
+
+### Category 1: Stale pointer / use-after-free (C++)
+- Are there other sites in test_pattern_app.cpp where a TWindow* from idToWin/winToId is used WITHOUT going through findWindowById (which now does liveness check)?
+- Any place that stores a TWindow* and later dereferences it outside the IPC dispatch path?
+- Any Turbo Vision callback that could be invoked after window destruction?
+
+### Category 2: SIGPIPE / fd safety in publish_event (api_ipc.cpp)
+- Was SIGPIPE protection for ::write to dead subscriber fds fully implemented? Show the exact current code.
+- Are partial writes handled (EAGAIN, short write retry)?
+- Any other fd leak or double-close risk?
+
+### Category 3: Blocking IPC in async Python (partykit_bridge.py)
+- Show every location where ipc_get_state or ipc_send is called from inside an async def.
+- Are any of these inside await chains that could deadlock the event loop if IPC times out?
+- Is asyncio.to_thread() used anywhere, or are all IPC calls blocking?
+
+### Category 4: apply_delta_to_ipc failure escalation (state_diff.py)
+- When ipc_command returns False (failure), what happens? Does the bridge resync? Alert? Continue silently?
+- Could repeated silent failures cause permanent state divergence between instances?
+
+### Category 5: Window ID drift between instances (state_diff.py, partykit_bridge.py)
+- When instance 2 receives an 'add' delta from instance 1, it calls create_window. What local ID does the new window get?
+- When instance 2 then receives an 'update' delta for that window (using instance 1's ID), does it find the window?
+- Is there any remote_id -> local_id mapping? If not, how does this work at all, and when does it break?
+
+## Output format (mandatory)
+1. Severity table: Critical/High/Medium/Low.
+2. For each finding:
+   - file:line
+   - failure mode (what crashes/breaks and when)
+   - root cause
+   - exact fix (code snippet or description)
+   - test proposal
+3. 'Confirmed safe' section — what you checked and found OK.
+4. 'Not verified' section — anything blocked by environment.
+mcp startup: no servers
+2026-02-18T21:39:41.034092Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c67d3-e7fb-7423-879a-a3c6997f29d4
+2026-02-18T21:39:41.079844Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c6171-ccc2-7702-9b67-9c22338e3137
+2026-02-18T21:39:41.117228Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c6248-4000-77b0-815a-4015ebbba891
+
+thinking
+**Planning proactive code review**
+codex
+I’m running a focused crash-class audit on the exact files you listed, starting with the retro/review docs to align with known failure patterns, then I’ll inspect each target source file with line-level evidence and map findings to your five categories.
+exec
+/bin/zsh -lc 'ls -1' in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc 'wc -l docs/CODEX-RETRO-20260218.md CODEX-ANALYSIS-ROUND8-REVIEW.md CODEX-ANALYSIS-ROUND7-REVIEW.md CODEX-ANALYSIS-ROUND6-REVIEW.md CODEX-ANALYSIS-ROUND5-REVIEW.md CODEX-ANALYSIS-ROUND4-REVIEW.md CODEX-ANALYSIS-ROUND3-REVIEW.md CODEX-ANALYSIS-ROUND2-REVIEW.md CODEX-ARCH-REVIEW-20260218.md app/test_pattern_app.cpp app/api_ipc.cpp tools/room/partykit_bridge.py tools/room/state_diff.py tools/room/orchestrator.py' in /Users/james/Repos/wibandwob-dos succeeded in 53ms:
+AGENTS.md
+CLAUDE.md
+CMakeLists.txt
+CODEX-ANALYSIS-ARCHITECTURE-REVIEW.md
+CODEX-ANALYSIS-ROUND2-REVIEW.md
+CODEX-ANALYSIS-ROUND3-REVIEW.md
+CODEX-ANALYSIS-ROUND4-REVIEW.md
+CODEX-ANALYSIS-ROUND5-REVIEW.md
+CODEX-ANALYSIS-ROUND6-REVIEW.md
+CODEX-ANALYSIS-ROUND7-REVIEW.md
+CODEX-ANALYSIS-ROUND8-REVIEW.md
+CODEX-ARCH-REVIEW-20260218.md
+README.md
+app
+build
+cache
+codex-arch-fixes-20260218.log
+codex-arch-fixes-verification-20260218.log
+codex-arch-review-20260218.log
+codex-architecture-review-20260218-194638.log
+ succeeded in 52ms:
+     245 docs/CODEX-RETRO-20260218.md
+      64 CODEX-ANALYSIS-ROUND8-REVIEW.md
+      60 CODEX-ANALYSIS-ROUND7-REVIEW.md
+      69 CODEX-ANALYSIS-ROUND6-REVIEW.md
+      47 CODEX-ANALYSIS-ROUND5-REVIEW.md
+      54 CODEX-ANALYSIS-ROUND4-REVIEW.md
+      96 CODEX-ANALYSIS-ROUND3-REVIEW.md
+      54 CODEX-ANALYSIS-ROUND2-REVIEW.md
+      58 CODEX-ARCH-REVIEW-20260218.md
+    3334 app/test_pattern_app.cpp
+     647 app/api_ipc.cpp
+     330 tools/room/partykit_bridge.py
+     311 tools/room/state_diff.py
+     383 tools/room/orchestrator.py
+    5752 total
+
+thinking
+**Planning full file reads**
+codex
+I’ve confirmed the target file sizes; next I’m reading the retro and round-review docs fully to anchor this pass against prior bug patterns before extracting new crash vectors from code.
+exec
+/bin/zsh -lc 'cat docs/CODEX-RETRO-20260218.md' in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc 'cat CODEX-ANALYSIS-ROUND7-REVIEW.md' in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc 'cat CODEX-ANALYSIS-ROUND8-REVIEW.md' in /Users/james/Repos/wibandwob-dos succeeded in 55ms:
+# WibWob-DOS: Codex Retro & Agent Guide
+
+## TL;DR (max 200 words)
+WibWob-DOS is a C++14 Turbo Vision symbient OS with Python as integration/control plane, where C++ is authoritative runtime state and multiplayer (E008) mirrors semantic window state (`add/remove/update`) across instances. The E008 hardening campaign (Rounds 2-8) fixed real failure modes: missing auth handshake, SIGPIPE/partial-write event push failures, async race conditions, reconnect deadlocks, delta-apply bugs, and file-backed window parity gaps. The three most important Codex prompting rules here are: always include prior round summaries (Codex has no memory), require file:line + root-cause + fix + test outputs, and scope reviews to contract/parity/async risks rather than style. The three most important architectural truths are: (1) C++ owns truth and Python must mirror it, never invent it; (2) unified registries are mandatory to prevent parity drift (commands already unified, window types were hardened toward same model); (3) blocking work in async paths and write-side side effects during read flows create systemic instability. If you remember only one thing: this codebase fails at boundaries (IPC, async/task lifecycle, registry parity), so every change should be treated as a contract change and tested at that boundary.
+
+## Part A: How to Prompt Codex Better on This Codebase
+
+### A1: What worked well in the review prompts
+The strongest prompt pattern was iterative verification against prior fixes, not greenfield critique.
+
+Effective patterns that repeatedly produced actionable findings:
+- Devnote continuity across rounds: `"Always include a devnote preamble... lists the last 5-10 CODEX-ANALYSIS..."` (`CLAUDE.md:202`).
+- Tight verification scope per round, e.g. Round 5 explicitly constrained review to `api_get_state`, `windowTypeName`, delta apply, and chat relay (`CODEX-ANALYSIS-ROUND5-REVIEW.md:8`).
+- Findings formatted by severity table + concrete fix sections (`CODEX-ANALYSIS-ROUND3-REVIEW.md:12`, `CODEX-ANALYSIS-ROUND3-REVIEW.md:23`).
+- Root cause -> fix -> test sequencing (best in R5/R6/R7), e.g. reconnect deadlock diagnosis with `asyncio.gather()` and a specific `FIRST_COMPLETED` remediation plus test (`CODEX-ANALYSIS-ROUND6-REVIEW.md:39`, `CODEX-ANALYSIS-ROUND6-REVIEW.md:44`, `CODEX-ANALYSIS-ROUND6-REVIEW.md:49`).
+- Explicit protocol-level checks (auth framing, width/height key names, percent encoding) caught high-impact boundary bugs (`CODEX-ANALYSIS-ROUND3-REVIEW.md:16`, `CODEX-ANALYSIS-ROUND3-REVIEW.md:17`, `CODEX-ANALYSIS-ROUND3-REVIEW.md:43`).
+
+### A2: What was missing or weak in review prompts
+Recurring prompt weaknesses:
+- Insufficient environment constraints: Round 4 stalled on missing `pytest` in sandbox (`CODEX-ANALYSIS-ROUND4-REVIEW.md:4`, `CODEX-ANALYSIS-ROUND4-REVIEW.md:9`). Prompts should require “if tests cannot run, do static verification and list exactly what could not be executed.”
+ succeeded in 52ms:
+# Codex Round-8 Review: Final Verification Pass
+
+**Raw log**: `codex-review-round8-20260218.log`
+**Token cost**: ~74,000
+**Model**: gpt-5.3-codex
+
+## Context
+
+Final comprehensive sweep after rounds 3-7 fixes. Asked Codex to focus on
+remaining subtle issues: partial update logic, t.exception() safety, writer
+cleanup, percent-decoding, title churn, reconnect state.
+
+## Findings
+
+| # | Severity | Finding |
+|---|----------|---------|
+| 1 | Low | `_rect()` doesn't recurse through double-nested rect dicts — not produced by current PartyKit flow |
+
+## All Clean (explicit verification)
+
+ succeeded in 55ms:
+# Codex Round-7 Review: Verification Pass
+
+**Raw log**: `codex-review-round7-20260218.log`
+**Token cost**: ~74,000
+**Model**: gpt-5.3-codex
+
+## Context
+
+Verification pass after round-6 fixes (reconnect deadlock, empty path guard).
+
+## Findings
+
+| # | Severity | Finding |
+|---|----------|---------|
+| 1 | High | `apply_delta_to_ipc` sends spurious `move_window x=0 y=0` on size-only update deltas |
+| 2 | Medium | `event_subscribe_loop` writer not closed/awaited on task cancellation — FD leak under reconnect churn |
+| 3 | Medium | EINTR retry in `publish_event` is unbounded — theoretical; non-blocking sockets make this academic |
+| 4 | Low | Nondeterministic which exception raised when multiple tasks fail simultaneously in `run()` |
+
+## Confirmed Correct
+exec
+/bin/zsh -lc 'cat CODEX-ANALYSIS-ROUND6-REVIEW.md' in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc 'cat CODEX-ANALYSIS-ROUND4-REVIEW.md' in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc 'cat CODEX-ANALYSIS-ROUND5-REVIEW.md' in /Users/james/Repos/wibandwob-dos succeeded in 50ms:
+# Codex Round-6 Review: Verification Pass
+
+**Raw log**: `codex-review-round6-20260218.log`
+**Token cost**: ~116,000
+**Model**: gpt-5.3-codex
+
+## Context
+
+Verification pass after round-5 fixes (path emission for file-backed windows).
+
+## Findings
+
+| # | Severity | Finding |
+|---|----------|---------|
+| 1 | High | `asyncio.gather()` in `run()` deadlocks reconnect when `receive_loop` exits cleanly |
+| 2 | Medium | `TAsciiImageWindow` not detected — falls back to "test_pattern" (acceptable: TU-local) |
+| 3 | Medium | Test coverage gaps for async auth in event path, _state_lock edge cases |
+| 4 | Low | `spawn_frame_player`/`spawn_text_view` accept empty path string |
+
+## Confirmed Correct (all previously fixed items)
+ succeeded in 51ms:
+# Codex Round-4 Review: Verification Pass
+
+**Raw log**: `codex-review-round4-20260218-201757.log`
+**Token cost**: ~25,000 (Codex hit pytest-not-found before full findings output)
+**Model**: gpt-5.3-codex
+
+## Context
+
+Verification-only pass after round-3 fixes. Codex could not run tests (pytest not in shell PATH
+in its sandbox). It validated code structure and found:
+
+## Findings
+
+| # | Severity | Finding |
+|---|----------|---------|
+| 1 | Medium | Tests for `chat_receive` → `exec_command` routing were stale (asserted old `"chat_receive"` cmd) |
+| 2 | Medium | `test_receive_delta_adopts_local_state_as_baseline` skipped the apply block because `_state_lock` was None (only set in `run()`) |
+| 3 | Info | `windowTypeName()` is fully comprehensive — all 15 generative types covered |
+| 4 | Info | `WindowTypeRegistry` k_specs table is correct and complete |
+| 5 | Info | All round-3 fixes verified as correctly implemented in code structure |
+ succeeded in 50ms:
+# Codex Round-5 Review: Verification Pass
+
+**Raw log**: `codex-review-round5-20260218-202312.log`
+**Model**: gpt-5.3-codex
+
+## Context
+
+Verification pass after round-4 fixes (stale test assertions + lock init). Focused on:
+- api_get_state completeness
+- windowTypeName coverage
+- apply_delta_to_ipc correctness
+- chat relay routing
+
+## Findings
+
+| # | Severity | Finding |
+|---|----------|---------|
+| 1 | High | `api_get_state` missing `path` for file-backed windows — remote `create_window type=text_view path=...` fails with "err missing path" |
+| 2 | Info | `windowTypeName()` fully comprehensive — all 15 types covered |
+| 3 | Info | `WindowTypeRegistry` k_specs table correct and complete |
+codex
+I’ve ingested the retro plus rounds 4-8; now I’m reading rounds 2-3 and the architecture review, then I’ll switch to full source inspection with line-level crash-path tracing.
+exec
+/bin/zsh -lc 'cat CODEX-ANALYSIS-ROUND2-REVIEW.md' in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc 'cat CODEX-ARCH-REVIEW-20260218.md' in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc 'cat CODEX-ANALYSIS-ROUND3-REVIEW.md' in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+# Codex Architecture Review — 2026-02-18
+
+**Raw log**: `codex-arch-review-20260218.log`
+**Token cost**: ~93,000
+**Model**: gpt-5.3-codex
+
+## Scope
+
+Top-level architecture, DRY, C++14/Turbo Vision practices, Python best practices, naming, documentation.
+
+## Findings
+
+| # | Severity | Area | Finding |
+|---|----------|------|---------|
+| 1 | High | Orchestrator | `ttyd` stdout/stderr piped but never drained → pipe buffer deadlock risk; bridge Popen handles not tracked/stopped |
+| 2 | High | C++ IPC | Dual dispatch: `exec_command` (registry) AND giant if/else in `api_ipc.cpp:365` — parity drift risk |
+| 3 | High | C++ | Window type identity split: `windowTypeName()` and `window_type_registry.cpp` are independent — silent desync risk |
+| 4 | Medium | C++ | `registerWindow()` publishes `state_changed` → `api_get_state` (a read) can emit write-side effects |
+| 5 | Medium | C++ | `ipcServer` raw `new`, no `TTestPatternApp` destructor → depends on process teardown not RAII |
+| 6 | Medium | Python | Blocking `ipc_get_state`/`apply_delta_to_ipc` called inside async coroutines → stalls event loop on timeout |
+ succeeded in 52ms:
+# Codex Round-2 Review: IPC Architecture Hardening
+
+**Raw log**: `codex-review-round2-20260218-200353.log`
+**Token cost**: ~63,700
+**Model**: gpt-5.3-codex
+
+## Context
+
+Review of P0 (WindowTypeRegistry) and P1 (Event push) implementations, looking for remaining
+robustness issues.
+
+## Findings (Prioritised)
+
+| # | Severity | Finding |
+|---|----------|---------|
+| 1 | Critical | Auth mismatch — orchestrator sets `WIBWOB_AUTH_SECRET`, bridge has no HMAC handshake |
+| 2 | Critical | SIGPIPE crash risk — `::write` to dead subscriber fd can kill TUI process |
+| 3 | High | Partial writes in `publish_event` — short writes truncate JSON, EAGAIN not handled |
+| 4 | High | ID stability — `findWindowById` (line 658) clears maps, reassigns IDs, causes desync |
+| 5 | High | Delta apply misses resize — only `move_window` sent, never `resize_window` for w/h changes |
+ succeeded in 51ms:
+# Codex Round-3 Review: IPC Hardening Verification
+
+**Raw log**: `codex-review-round3-20260218-201023.log`
+**Token cost**: ~40,087
+**Model**: gpt-5.3-codex
+
+## Context
+
+Verification review of all round-2 fixes (SIGPIPE, partial writes, HMAC auth, asyncio.Lock,
+ID stability, resize_window, percent-encoding, WindowTypeRegistry). Looking for remaining issues.
+
+## Findings (Prioritised)
+
+| # | Severity | Finding |
+|---|----------|---------|
+| 1 | Critical | `event_subscribe_loop` sends `subscribe_events` before auth handshake — subscription silently fails when `WIBWOB_AUTH_SECRET` is set |
+| 2 | High | `resize_window` IPC sends `w`/`h` but server expects `width`/`height` — remote resize deltas fail |
+| 3 | High | `state_delta` apply in `receive_loop` runs outside `_state_lock` — race with poll/event loops |
+| 4 | Medium | `chat_receive` sent as `cmd:chat_receive` but IPC parser has no such branch — must use `cmd:exec_command name=chat_receive` |
+| 5 | Medium | `publish_event` drops subscriber on `EINTR` — should retry write |
+
+thinking
+**Planning chunked file reads**
+codex
+I’m moving to full source reads now. I’ll go file-by-file with line numbers so each finding can reference exact crash points and not just pattern matches.
+exec
+/bin/zsh -lc 'nl -ba app/api_ipc.cpp' in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+     1	#include "api_ipc.h"
+     2	#include "command_registry.h"
+     3	#include "window_type_registry.h"
+     4	
+     5	#ifndef _WIN32
+     6	#include <sys/socket.h>
+     7	#include <sys/stat.h>
+     8	#include <sys/un.h>
+     9	#include <fcntl.h>
+    10	#include <unistd.h>
+    11	#include <errno.h>
+    12	#endif
+    13	
+    14	#ifdef __APPLE__
+    15	#include <CommonCrypto/CommonHMAC.h>
+    16	#else
+    17	#include <openssl/hmac.h>
+    18	#endif
+    19	
+    20	#include <cstring>
+
+thinking
+**Planning chunked file reading**
+codex
+I’ve fully read `app/api_ipc.cpp`; next I’m reading `app/test_pattern_app.cpp` in numbered chunks because it’s large, then I’ll trace every raw `idToWin/winToId` use and pointer dereference path.
+exec
+/bin/zsh -lc "nl -ba app/test_pattern_app.cpp | sed -n '1,260p'" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+     1	/*---------------------------------------------------------*/
+     2	/*                                                         */
+     3	/*   test_pattern_app.cpp - Test Pattern Window Spawner   */
+     4	/*   Unlimited resizable windows with test patterns       */
+     5	/*                                                         */
+     6	/*---------------------------------------------------------*/
+     7	
+     8	#define Uses_TKeys
+     9	#define Uses_TApplication
+    10	#define Uses_TEvent
+    11	#define Uses_TRect
+    12	#define Uses_TDialog
+    13	#define Uses_TStaticText
+    14	#define Uses_TButton
+    15	#define Uses_TMenuBar
+    16	#define Uses_TSubMenu
+    17	#define Uses_TMenuItem
+    18	#define Uses_TMenu
+    19	#define Uses_TStatusLine
+    20	#define Uses_TStatusItem
+
+thinking
+**Planning chunk segmentation**
+exec
+/bin/zsh -lc "nl -ba app/test_pattern_app.cpp | sed -n '261,520p'" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+   261	                return TColorAttr(trueBlack, trueWhite);
+   262	            default:
+   263	                return TMenuBar::mapColor(index);
+   264	        }
+   265	    }
+   266	
+   267	    virtual void draw() override
+   268	    {
+   269	        TMenuBar::draw();
+   270	
+   271	        // Update blink state
+   272	        auto now = std::chrono::steady_clock::now();
+   273	        if (now >= nextBlinkTime && currentMood == NEUTRAL) {
+   274	            isBlinking = true;
+   275	            blinkStartTime = now;
+   276	        }
+   277	
+   278	        // End blink after 150ms
+   279	        if (isBlinking && std::chrono::duration_cast<std::chrono::milliseconds>(now - blinkStartTime).count() > 150) {
+   280	            isBlinking = false;
+exec
+/bin/zsh -lc "nl -ba app/test_pattern_app.cpp | sed -n '521,780p'" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+   521	    virtual void changeBounds(const TRect& bounds) override
+   522	    {
+   523	        TWindow::changeBounds(bounds);
+   524	        
+   525	        // Force complete redraw after window is resized/moved (e.g., by tile operations)
+   526	        setState(sfExposed, True);
+   527	        
+   528	        // Ensure child views are properly notified of resize for text content redraw
+   529	        forEach([](TView* view, void*) {
+   530	            if (auto* textView = dynamic_cast<TTextFileView*>(view)) {
+   531	                // Force text view to redraw its content
+   532	                textView->drawView();
+   533	            }
+   534	        }, nullptr);
+   535	        
+   536	        redraw();
+   537	    }
+   538	    
+   539	    // Custom frame initializer
+   540	    static TFrame *initFrame(TRect r)
+exec
+/bin/zsh -lc "nl -ba app/test_pattern_app.cpp | sed -n '781,1040p'" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+   781	        fprintf(stderr, "[wibwob] instance=%s socket=%s\n", inst, sockPath.c_str());
+   782	    } else {
+   783	        fprintf(stderr, "[wibwob] instance=(none) socket=%s\n", sockPath.c_str());
+   784	    }
+   785	    if (!ipcServer->start(sockPath)) {
+   786	        fprintf(stderr, "[wibwob] ERROR: IPC server failed to start on %s\n", sockPath.c_str());
+   787	    } else {
+   788	        fprintf(stderr, "[wibwob] IPC server started on %s\n", sockPath.c_str());
+   789	    }
+   790	
+   791	    // Auto-restore layout from env var (room deployment).
+   792	    const char* layoutPath = std::getenv("WIBWOB_LAYOUT_PATH");
+   793	    if (layoutPath && layoutPath[0] != '\0') {
+   794	        fprintf(stderr, "[wibwob] Restoring layout from WIBWOB_LAYOUT_PATH=%s\n", layoutPath);
+   795	        if (!loadWorkspaceFromFile(layoutPath)) {
+   796	            fprintf(stderr, "[wibwob] WARNING: Failed to restore layout from %s\n", layoutPath);
+   797	        }
+   798	    }
+   799	
+   800	    // Init Scramble engine (KB + Haiku client).
+exec
+/bin/zsh -lc "nl -ba app/test_pattern_app.cpp | sed -n '1041,1300p'" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+  1041	                if (score) {
+  1042	                    score->openBackgroundPaletteDialog();
+  1043	                } else {
+  1044	                    messageBox("No Animated Score view is active.", mfInformation | mfOKButton);
+  1045	                }
+  1046	                clearEvent(event);
+  1047	                break;
+  1048	            }
+  1049	            case cmWindowBgColor: {
+  1050	                // Find the focused window and check if it supports background color
+  1051	                TView *focused = deskTop ? deskTop->current : nullptr;
+  1052	                if (!focused) {
+  1053	                    messageBox("No window is currently focused.", mfInformation | mfOKButton);
+  1054	                    break;
+  1055	                }
+  1056	                
+  1057	                // Check if it's a text view or frame player view
+  1058	                auto *textView = dynamic_cast<TTextFileView*>(focused);
+  1059	                auto *frameView = dynamic_cast<FrameFilePlayerView*>(focused);
+  1060	                
+exec
+/bin/zsh -lc "nl -ba app/test_pattern_app.cpp | sed -n '1301,1560p'" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+  1301	    );
+  1302	    
+  1303	    // Create and insert window
+  1304	    TTestPatternWindow* window = new TTestPatternWindow(bounds, title.str().c_str());
+  1305	    deskTop->insert(window);
+  1306	}
+  1307	
+  1308	void TTestPatternApp::newTestWindow(const TRect& bounds)
+  1309	{
+  1310	    // Create window title
+  1311	    windowNumber++;
+  1312	    std::stringstream title;
+  1313	    title << "Test Pattern " << windowNumber;
+  1314	    
+  1315	    // Create and insert window with provided bounds
+  1316	    TTestPatternWindow* window = new TTestPatternWindow(bounds, title.str().c_str());
+  1317	    deskTop->insert(window);
+  1318	    registerWindow(window);
+  1319	}
+  1320	
+codex
+I’m halfway through `test_pattern_app.cpp`; I’ve already located raw pointer map hotspots around `registerWindow`, `findWindowById`, and close paths, and I’m now finishing the lower half to verify callback and lifecycle edges.
+exec
+/bin/zsh -lc "nl -ba app/test_pattern_app.cpp | sed -n '1561,1820p'" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+  1561	            title << "Radial Gradient " << windowNumber;
+  1562	            break;
+  1563	        case TGradientWindow::gtDiagonal:
+  1564	            title << "Diagonal Gradient " << windowNumber;
+  1565	            break;
+  1566	    }
+  1567	    
+  1568	    // Calculate window position (cascade effect)
+  1569	    int offset = (windowNumber - 1) % 10;
+  1570	    TRect bounds(
+  1571	        2 + offset * 2,           // left
+  1572	        1 + offset,               // top
+  1573	        50 + offset * 2,          // right
+  1574	        15 + offset               // bottom
+  1575	    );
+  1576	    
+  1577	    // Create and insert window
+  1578	    TGradientWindow* window = new TGradientWindow(bounds, title.str().c_str(), type);
+  1579	    deskTop->insert(window);
+  1580	    registerWindow(window);
+exec
+/bin/zsh -lc "nl -ba app/test_pattern_app.cpp | sed -n '1821,2080p'" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+  1821	    deskTop->insert(window);
+  1822	    registerWindow(window);
+  1823	}
+  1824	
+  1825	void TTestPatternApp::openTransparentTextFile()
+  1826	{
+  1827	    char fileName[MAXPATH];
+  1828	    std::string primerGlob = findPrimerDir() + "/*.txt";
+  1829	    strcpy(fileName, primerGlob.c_str());
+  1830	
+  1831	    TFileDialog* dialog = new TFileDialog(primerGlob.c_str(), "Open Text File (Transparent BG)", "~N~ame", fdOpenButton, 100);
+  1832	    if (executeDialog(dialog, fileName) != cmCancel)
+  1833	    {
+  1834	        windowNumber++;
+  1835	
+  1836	        // Extract filename without path for title
+  1837	        std::string filePath(fileName);
+  1838	        size_t lastSlash = filePath.find_last_of("/\\");
+  1839	        std::string baseName = (lastSlash != std::string::npos) ? filePath.substr(lastSlash + 1) : filePath;
+  1840	
+exec
+/bin/zsh -lc "nl -ba app/test_pattern_app.cpp | sed -n '2081,2340p'" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+  2081	            *new TMenuItem("~E~dit Text Editor", cmTextEditor, kbNoKey) +
+  2082	            *new TMenuItem("~B~rowser", cmBrowser, kbCtrlB) +
+  2083	            newLine() +
+  2084	            *new TMenuItem("~O~pen Text File (Transparent BG)...", cmOpenTransparentText, kbNoKey) +
+  2085	            newLine() +
+  2086	            *new TMenuItem("~C~ascade", cmCascade, kbNoKey) +
+  2087	            *new TMenuItem("~T~ile", cmTile, kbNoKey) +
+  2088	            *new TMenuItem("Send to ~B~ack", cmSendToBack, kbNoKey) +
+  2089	            newLine() +
+  2090	            *new TMenuItem("~N~ext", cmNext, kbF6) +
+  2091	            *new TMenuItem("~P~revious", cmPrev, kbShiftF6) +
+  2092	            newLine() +
+  2093	            *new TMenuItem("Close", cmClose, kbAltF3) +
+  2094	            *new TMenuItem("C~l~ose All", cmCloseAll, kbNoKey) +
+  2095	            newLine() +
+  2096	            *new TMenuItem("Background ~C~olor...", cmWindowBgColor, kbNoKey) +
+  2097	        *new TSubMenu("~T~ools", kbAltT) +
+  2098	            *new TMenuItem("~W~ib&Wob Chat", cmWibWobChat, kbF12) +
+  2099	            *new TMenuItem("  Test A (stdScrollBar)", cmWibWobTestA, kbNoKey) +
+  2100	            *new TMenuItem("  Test B (TScroller)", cmWibWobTestB, kbNoKey) +
+exec
+/bin/zsh -lc "nl -ba app/test_pattern_app.cpp | sed -n '2341,2600p'" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+  2341	        app.openAnimationFilePath(path, *bounds);
+  2342	    } else {
+  2343	        app.openAnimationFilePath(path);
+  2344	    }
+  2345	}
+  2346	
+  2347	void api_cascade(TTestPatternApp& app) { app.cascade(); }
+  2348	void api_toggle_scramble(TTestPatternApp& app) { app.toggleScramble(); }
+  2349	void api_expand_scramble(TTestPatternApp& app) { app.toggleScrambleExpand(); }
+  2350	
+  2351	std::string api_scramble_say(TTestPatternApp& app, const std::string& text) {
+  2352	    if (!app.scrambleWindow) return "err scramble not open";
+  2353	    // Simulate user sending a message — same as onSubmit
+  2354	    auto* msgView = app.scrambleWindow->getMessageView();
+  2355	    if (msgView) msgView->addMessage("you", text);
+  2356	
+  2357	    std::string response = app.scrambleEngine.ask(text);
+  2358	    if (response.empty()) response = "... (=^..^=)";
+  2359	
+  2360	    if (app.scrambleWindow->getView()) {
+exec
+/bin/zsh -lc "nl -ba app/test_pattern_app.cpp | sed -n '2601,2860p'" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+  2601	bool TTestPatternApp::parseNumber(const std::string &s, size_t &pos, int &out)
+  2602	{
+  2603	    skipWs(s, pos);
+  2604	    bool neg = false;
+  2605	    if (pos < s.size() && (s[pos] == '-' || s[pos] == '+')) { neg = (s[pos] == '-'); ++pos; }
+  2606	    long val = 0; bool any=false;
+  2607	    while (pos < s.size() && s[pos] >= '0' && s[pos] <= '9') { any=true; val = val*10 + (s[pos]-'0'); ++pos; }
+  2608	    if (!any) return false;
+  2609	    out = neg ? -int(val) : int(val);
+  2610	    return true;
+  2611	}
+  2612	
+  2613	bool TTestPatternApp::parseBool(const std::string &s, size_t &pos, bool &out)
+  2614	{
+  2615	    skipWs(s, pos);
+  2616	    if (s.compare(pos, 4, "true") == 0) { out = true; pos += 4; return true; }
+  2617	    if (s.compare(pos, 5, "false") == 0) { out = false; pos += 5; return true; }
+  2618	    return false;
+  2619	}
+  2620	
+exec
+/bin/zsh -lc "nl -ba app/test_pattern_app.cpp | sed -n '2861,3120p'" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+  2861	    bool ok = loadWorkspaceFromFile(path);
+  2862	    fprintf(stderr, "[workspace] open path=%s ok=%s\n", path.c_str(), ok ? "true" : "false");
+  2863	    return ok;
+  2864	}
+  2865	
+  2866	// Minimal JSON helpers
+  2867	std::string TTestPatternApp::jsonEscape(const std::string& s)
+  2868	{
+  2869	    std::string out;
+  2870	    out.reserve(s.size() + 8);
+  2871	    for (unsigned char c : s) {
+  2872	        switch (c) {
+  2873	            case '"': out += "\\\""; break;
+  2874	            case '\\': out += "\\\\"; break;
+  2875	            case '\n': out += "\\n"; break;
+  2876	            case '\r': out += "\\r"; break;
+  2877	            case '\t': out += "\\t"; break;
+  2878	            default:
+  2879	                if (c < 0x20) {
+  2880	                    char buf[7];
+exec
+/bin/zsh -lc "nl -ba app/test_pattern_app.cpp | sed -n '3121,3334p'" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+  3121	        fprintf(stderr, "[api_send_text] Window focused\n");
+  3122	
+  3123	        // Send the text
+  3124	        fprintf(stderr, "[api_send_text] Getting editor view...\n");
+  3125	        TTextEditorView* editorView = editorWindow->getEditorView();
+  3126	        fprintf(stderr, "[api_send_text] Editor view: %p\n", (void*)editorView);
+  3127	
+  3128	        if (editorView) {
+  3129	            fprintf(stderr, "[api_send_text] Calling sendText with %zu chars...\n", content.size());
+  3130	            editorView->sendText(content, mode, position);
+  3131	            fprintf(stderr, "[api_send_text] sendText completed\n");
+  3132	            return "ok";
+  3133	        }
+  3134	    }
+  3135	
+  3136	    fprintf(stderr, "[api_send_text] FAILED: no text editor available\n");
+  3137	    return "err no text editor available";
+  3138	}
+  3139	
+  3140	std::string api_send_figlet(TTestPatternApp& app, const std::string& id, const std::string& text, 
+
+thinking
+**Planning parallel file reads**
+codex
+I’ve now fully read `test_pattern_app.cpp`; next I’m auditing the three Python room files and then cross-linking these with IPC semantics for failure escalation and ID drift behavior.
+exec
+/bin/zsh -lc 'nl -ba tools/room/state_diff.py' in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc 'nl -ba tools/room/partykit_bridge.py' in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc 'nl -ba tools/room/orchestrator.py' in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+     1	"""
+     2	State diffing utilities for WibWob-DOS multiplayer sync (E008 F03).
+     3	
+     4	Extracts window state from IPC get_state responses, computes minimal
+     5	add/remove/update deltas, and applies remote deltas to a local instance
+     6	via IPC commands.
+     7	
+     8	Used by partykit_bridge.py and any future sync transport.
+     9	"""
+    10	
+    11	import hashlib
+    12	import hmac as _hmac
+    13	import json
+    14	import socket
+    15	import os
+    16	from typing import Any
+    17	from urllib.parse import quote as _urlencode
+    18	
+    19	
+    20	IPC_TIMEOUT = 2.0
+ succeeded in 51ms:
+     1	#!/usr/bin/env python3
+     2	# /// script
+     3	# requires-python = ">=3.11"
+     4	# dependencies = ["websockets>=12"]
+     5	# ///
+     6	"""
+     7	PartyKit bridge for WibWob-DOS multiplayer rooms (E008 F02).
+     8	
+     9	Runs as a sidecar alongside a WibWob instance. Polls local IPC state,
+    10	diffs it, and pushes state_delta messages to PartyKit. Also receives
+    11	remote deltas from PartyKit and applies them to the local instance via IPC.
+    12	
+    13	Usage (spawned by orchestrator):
+    14	    uv run tools/room/partykit_bridge.py
+    15	
+    16	Environment:
+    17	    WIBWOB_INSTANCE      — instance ID (e.g. "1"), drives /tmp/wibwob_1.sock
+    18	    WIBWOB_PARTYKIT_URL  — PartyKit server URL (e.g. https://wibwob.user.partykit.dev)
+    19	    WIBWOB_PARTYKIT_ROOM — PartyKit room/Durable Object key (e.g. "wibwob-shared")
+    20	    WIBWOB_AUTH_SECRET   — shared HMAC secret for IPC auth (optional)
+ succeeded in 51ms:
+     1	#!/usr/bin/env python3
+     2	"""Room orchestrator for WibWob-DOS teleport rooms.
+     3	
+     4	Reads room configs (markdown + YAML frontmatter), spawns ttyd+WibWob
+     5	instance pairs, manages lifecycle (health check, restart on failure),
+     6	generates shared secrets for agent auth.
+     7	
+     8	Usage:
+     9	    ./tools/room/orchestrator.py start rooms/*.md
+    10	    ./tools/room/orchestrator.py stop
+    11	    ./tools/room/orchestrator.py status
+    12	"""
+    13	
+    14	import argparse
+    15	import json
+    16	import os
+    17	import secrets
+    18	import signal
+    19	import socket
+    20	import subprocess
+
+thinking
+**Planning cross-file pattern search**
+codex
+I’ve finished full reads of all required files. I’m now doing targeted pattern sweeps (`idToWin/winToId`, blocking IPC calls, fd lifecycle) to turn this into concrete crash-class findings with exact line references and fixes.
+exec
+/bin/zsh -lc 'rg -n "subscribe_events|publish_event|event_subscribers_|SO_NOSIGPIPE|MSG_NOSIGNAL|EAGAIN|EWOULDBLOCK|EINTR" app/api_ipc.cpp' in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "rg -n \"idToWin|winToId|findWindowById|registerWindow|onSubmit|close\\(|destroy\\(|ipc_get_state\\(|ipc_send\\(|ipc_command\\(|apply_delta_to_ipc\\(|open_unix_connection|Popen\\(|stdout=|stderr=|send\\(|write\\(\" app/test_pattern_app.cpp app/api_ipc.cpp tools/room/partykit_bridge.py tools/room/state_diff.py tools/room/orchestrator.py" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+321:        return; // EAGAIN expected in non-blocking mode
+562:    if (cmd == "subscribe_events") {
+564:        // Set non-blocking so publish_event doesn't stall the event loop.
+566:#ifdef SO_NOSIGPIPE
+568:        ::setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &one, sizeof(one));
+573:        event_subscribers_.push_back(fd);
+582:void ApiIpcServer::publish_event(const char* event_type, const std::string& payload_json) {
+584:    if (event_subscribers_.empty()) return;
+592:    for (auto it = event_subscribers_.begin(); it != event_subscribers_.end(); ) {
+594:        // Use MSG_NOSIGNAL on Linux to avoid SIGPIPE killing the process when
+595:        // a subscriber disconnects. On macOS set SO_NOSIGPIPE on the fd instead.
+596:#ifdef SO_NOSIGPIPE
+598:        ::setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &one, sizeof(one));
+603:#ifdef MSG_NOSIGNAL
+604:            ssize_t n = ::send(fd, data + written, static_cast<size_t>(total - written), MSG_NOSIGNAL);
+610:            } else if (n < 0 && errno == EINTR) {
+613:            } else if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+625:            it = event_subscribers_.erase(it);
+636:    for (int sub_fd : event_subscribers_) ::close(sub_fd);
+637:    event_subscribers_.clear();
+ succeeded in 51ms:
+tools/room/orchestrator.py:114:        proc = subprocess.Popen(
+tools/room/orchestrator.py:117:            stdout=subprocess.DEVNULL,
+tools/room/orchestrator.py:118:            stderr=subprocess.DEVNULL,
+tools/room/orchestrator.py:137:            bridge_proc = subprocess.Popen(
+tools/room/orchestrator.py:140:                stdout=bridge_stdout,
+tools/room/orchestrator.py:141:                stderr=subprocess.STDOUT,
+tools/room/orchestrator.py:143:            bridge_stdout.close()
+tools/room/orchestrator.py:170:            s.close()
+tools/room/state_diff.py:69:def ipc_send(sock_path: str, command: str, timeout: float = IPC_TIMEOUT) -> str | None:
+tools/room/state_diff.py:79:            s.close()
+tools/room/state_diff.py:90:        s.close()
+tools/room/state_diff.py:96:def ipc_get_state(sock_path: str) -> dict | None:
+tools/room/state_diff.py:98:    raw = ipc_send(sock_path, "cmd:get_state")
+tools/room/state_diff.py:116:def ipc_command(sock_path: str, cmd: str, params: dict[str, Any]) -> bool:
+tools/room/state_diff.py:121:    resp = ipc_send(sock_path, " ".join(parts))
+tools/room/state_diff.py:255:def apply_delta_to_ipc(sock_path: str, delta: dict[str, Any]) -> list[str]:
+tools/room/state_diff.py:274:        ok = ipc_command(sock_path, "create_window", params)
+tools/room/state_diff.py:279:        ok = ipc_command(sock_path, "close_window", {"id": wid})
+tools/room/state_diff.py:293:                ok = ipc_command(sock_path, "move_window", {
+tools/room/state_diff.py:305:                ok = ipc_command(sock_path, "resize_window", {
+
+thinking
+**Checking event subscriber container**
+exec
+/bin/zsh -lc 'nl -ba app/api_ipc.h' in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+     1	// Unix domain socket IPC server with optional HMAC challenge-response auth.
+     2	// Protocol: cmd:<name> [key=value ...]\n
+     3	// Auth: when WIBWOB_AUTH_SECRET is set, new connections must complete a
+     4	//       challenge-response handshake before commands are accepted.
+     5	#pragma once
+     6	
+     7	#include <string>
+     8	#include <set>
+     9	#include <vector>
+    10	#include <cstdint>
+    11	
+    12	class TTestPatternApp;
+    13	
+    14	class ApiIpcServer {
+    15	public:
+    16	    explicit ApiIpcServer(TTestPatternApp* app);
+    17	    ~ApiIpcServer();
+    18	
+    19	    // Start listening on a Unix socket path. Returns false on failure.
+    20	    bool start(const std::string& path = "/tmp/test_pattern_app.sock");
+
+
+thinking
+**Identifying multiple critical IPC and state sync bugs**
+thinking
+**Planning detailed bug validation and report structure**
+codex
+| Severity | Count |
+|---|---:|
+| Critical | 1 |
+| High | 3 |
+| Medium | 0 |
+| Low | 0 |
+
+1. **Critical: Cross-instance window ID drift breaks update/remove and can cause churn/divergence**
+- `tools/room/state_diff.py:263`, `tools/room/state_diff.py:275`, `tools/room/state_diff.py:279`, `tools/room/state_diff.py:293`, `tools/room/state_diff.py:305`, `tools/room/partykit_bridge.py:236`
+- Failure mode: instance B receives `add` for remote `id=w1`, calls `create_window` without preserving/mapping that ID; local C++ assigns a different ID. Later `update/remove` for `w1` fail (`FAIL move_window/resize_window/close_window`), state diverges or churns on repeated sync.
+- Root cause: no `remote_id -> local_id` mapping exists; delta apply uses remote IDs directly for non-add ops.
+- Exact fix: keep a per-bridge ID map and rewrite incoming deltas before IPC commands.
+```python
+# on add success: capture local ID via state refresh + matching heuristic, then:
+remote_to_local[remote_id] = local_id
+
+# before remove/update:
+wid = remote_to_local.get(remote_id, remote_id)
+```
+- Test proposal: two-bridge integration test where A adds window, then A moves/closes it; assert B applies move/close successfully and no `FAIL ... id=` logs.
+
+2. **High: SIGPIPE crash risk still exists outside `publish_event`**
+- `app/api_ipc.cpp:187`, `app/api_ipc.cpp:244`, `app/api_ipc.cpp:328`, `app/api_ipc.cpp:572`, `app/api_ipc.cpp:577`
+- Failure mode: peer disconnects before server `::write(...)`; process can receive SIGPIPE and terminate.
+- Root cause: hardening was added in `publish_event`, but regular command/auth/ack writes still use raw `::write`.
+- Exact fix: use a shared safe-write helper (`send(..., MSG_NOSIGNAL)` on Linux / `SO_NOSIGPIPE` + retry loop on macOS) for all socket writes.
+- Test proposal: socket client connects then closes before response; assert server stays alive and next IPC command still works.
+
+3. **High: Blocking IPC calls inside async coroutines stall the event loop**
+- `tools/room/partykit_bridge.py:145`, `tools/room/partykit_bridge.py:234`, `tools/room/partykit_bridge.py:238`, `tools/room/partykit_bridge.py:247`, `tools/room/partykit_bridge.py:251`, `tools/room/partykit_bridge.py:263` (all call sync IPC from `state_diff.py`)
+- Failure mode: event loop blocks up to timeout per call; delayed WS reads/pings/reconnect, burst stalls under IPC slowness.
+- Root cause: `ipc_get_state/ipc_command/apply_delta_to_ipc` are synchronous socket calls used directly in `async def`.
+- Exact fix: wrap IPC calls with `await asyncio.to_thread(...)` (or convert IPC layer to async).
+- Test proposal: inject slow IPC (sleep > timeout) and assert WS receive loop and reconnect timing still progress.
+
+4. **High: Delta-apply failures are not escalated/resynced**
+- `tools/room/partykit_bridge.py:247`, `tools/room/partykit_bridge.py:249`, `tools/room/partykit_bridge.py:251`, `tools/room/state_diff.py:276`, `tools/room/state_diff.py:281`, `tools/room/state_diff.py:299`, `tools/room/state_diff.py:309`
+- Failure mode: failed commands are only logged; bridge continues, allowing long-lived divergence.
+- Root cause: no explicit failure policy (no nack/retry/full-resync trigger/backoff/alert path).
+- Exact fix: if any `applied` entry starts with `FAIL`, trigger explicit recovery (`request state_sync` or force full local `get_state` push with reconciliation marker) and surface hard error telemetry.
+- Test proposal: force IPC command failure (bad id), assert bridge emits recovery action and convergence occurs within N cycles.
+
+**Exact current `publish_event` safety code (confirmed):**
+`app/api_ipc.cpp:603` onward uses `send(..., MSG_NOSIGNAL)` (or `SO_NOSIGPIPE` path), retries `EINTR`, handles short writes via loop, and drops `EAGAIN/EWOULDBLOCK` subscribers safely.
+
+**Confirmed safe**
+- `app/test_pattern_app.cpp`: no direct dereference of `idToWin`/`winToId` outside `findWindowById`; command handlers use `findWindowById` before deref (`app/test_pattern_app.cpp:2506`, `app/test_pattern_app.cpp:2521`, `app/test_pattern_app.cpp:2537`, `app/test_pattern_app.cpp:2545`).
+- `app/api_ipc.cpp`: `publish_event` handles partial writes and iterator-safe erase (`app/api_ipc.cpp:592-629`).
+- `tools/room/orchestrator.py`: ttyd pipes are drained safely via `DEVNULL`, and bridge subprocesses are tracked/terminated (`tools/room/orchestrator.py:114-119`, `tools/room/orchestrator.py:137-145`, `tools/room/orchestrator.py:200-217`).
+
+**Not verified**
+- I did not run live multi-instance WS/IPC fault-injection in this pass, so findings are from full static audit plus code-path reasoning only.
+tokens used
+132,288
+| Severity | Count |
+|---|---:|
+| Critical | 1 |
+| High | 3 |
+| Medium | 0 |
+| Low | 0 |
+
+1. **Critical: Cross-instance window ID drift breaks update/remove and can cause churn/divergence**
+- `tools/room/state_diff.py:263`, `tools/room/state_diff.py:275`, `tools/room/state_diff.py:279`, `tools/room/state_diff.py:293`, `tools/room/state_diff.py:305`, `tools/room/partykit_bridge.py:236`
+- Failure mode: instance B receives `add` for remote `id=w1`, calls `create_window` without preserving/mapping that ID; local C++ assigns a different ID. Later `update/remove` for `w1` fail (`FAIL move_window/resize_window/close_window`), state diverges or churns on repeated sync.
+- Root cause: no `remote_id -> local_id` mapping exists; delta apply uses remote IDs directly for non-add ops.
+- Exact fix: keep a per-bridge ID map and rewrite incoming deltas before IPC commands.
+```python
+# on add success: capture local ID via state refresh + matching heuristic, then:
+remote_to_local[remote_id] = local_id
+
+# before remove/update:
+wid = remote_to_local.get(remote_id, remote_id)
+```
+- Test proposal: two-bridge integration test where A adds window, then A moves/closes it; assert B applies move/close successfully and no `FAIL ... id=` logs.
+
+2. **High: SIGPIPE crash risk still exists outside `publish_event`**
+- `app/api_ipc.cpp:187`, `app/api_ipc.cpp:244`, `app/api_ipc.cpp:328`, `app/api_ipc.cpp:572`, `app/api_ipc.cpp:577`
+- Failure mode: peer disconnects before server `::write(...)`; process can receive SIGPIPE and terminate.
+- Root cause: hardening was added in `publish_event`, but regular command/auth/ack writes still use raw `::write`.
+- Exact fix: use a shared safe-write helper (`send(..., MSG_NOSIGNAL)` on Linux / `SO_NOSIGPIPE` + retry loop on macOS) for all socket writes.
+- Test proposal: socket client connects then closes before response; assert server stays alive and next IPC command still works.
+
+3. **High: Blocking IPC calls inside async coroutines stall the event loop**
+- `tools/room/partykit_bridge.py:145`, `tools/room/partykit_bridge.py:234`, `tools/room/partykit_bridge.py:238`, `tools/room/partykit_bridge.py:247`, `tools/room/partykit_bridge.py:251`, `tools/room/partykit_bridge.py:263` (all call sync IPC from `state_diff.py`)
+- Failure mode: event loop blocks up to timeout per call; delayed WS reads/pings/reconnect, burst stalls under IPC slowness.
+- Root cause: `ipc_get_state/ipc_command/apply_delta_to_ipc` are synchronous socket calls used directly in `async def`.
+- Exact fix: wrap IPC calls with `await asyncio.to_thread(...)` (or convert IPC layer to async).
+- Test proposal: inject slow IPC (sleep > timeout) and assert WS receive loop and reconnect timing still progress.
+
+4. **High: Delta-apply failures are not escalated/resynced**
+- `tools/room/partykit_bridge.py:247`, `tools/room/partykit_bridge.py:249`, `tools/room/partykit_bridge.py:251`, `tools/room/state_diff.py:276`, `tools/room/state_diff.py:281`, `tools/room/state_diff.py:299`, `tools/room/state_diff.py:309`
+- Failure mode: failed commands are only logged; bridge continues, allowing long-lived divergence.
+- Root cause: no explicit failure policy (no nack/retry/full-resync trigger/backoff/alert path).
+- Exact fix: if any `applied` entry starts with `FAIL`, trigger explicit recovery (`request state_sync` or force full local `get_state` push with reconciliation marker) and surface hard error telemetry.
+- Test proposal: force IPC command failure (bad id), assert bridge emits recovery action and convergence occurs within N cycles.
+
+**Exact current `publish_event` safety code (confirmed):**
+`app/api_ipc.cpp:603` onward uses `send(..., MSG_NOSIGNAL)` (or `SO_NOSIGPIPE` path), retries `EINTR`, handles short writes via loop, and drops `EAGAIN/EWOULDBLOCK` subscribers safely.
+
+**Confirmed safe**
+- `app/test_pattern_app.cpp`: no direct dereference of `idToWin`/`winToId` outside `findWindowById`; command handlers use `findWindowById` before deref (`app/test_pattern_app.cpp:2506`, `app/test_pattern_app.cpp:2521`, `app/test_pattern_app.cpp:2537`, `app/test_pattern_app.cpp:2545`).
+- `app/api_ipc.cpp`: `publish_event` handles partial writes and iterator-safe erase (`app/api_ipc.cpp:592-629`).
+- `tools/room/orchestrator.py`: ttyd pipes are drained safely via `DEVNULL`, and bridge subprocesses are tracked/terminated (`tools/room/orchestrator.py:114-119`, `tools/room/orchestrator.py:137-145`, `tools/room/orchestrator.py:200-217`).
+
+**Not verified**
+- I did not run live multi-instance WS/IPC fault-injection in this pass, so findings are from full static audit plus code-path reasoning only.

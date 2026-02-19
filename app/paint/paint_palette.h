@@ -20,6 +20,7 @@ public:
     TPaintPaletteView(const TRect &r, TPaintCanvasView *canvas)
         : TView(r), canvas(canvas) {
         options |= ofFramed | ofPreProcess | ofSelectable;
+        growMode = gfGrowLoX | gfGrowHiX | gfGrowHiY;
         eventMask |= evMouseDown | evKeyboard;
     }
 
@@ -27,7 +28,7 @@ public:
     virtual void handleEvent(TEvent &ev) override;
     virtual void sizeLimits(TPoint &min, TPoint &max) override {
         TView::sizeLimits(min, max);
-        min.x = 18; min.y = 8;
+        min.x = 18; min.y = 16;
     }
 
     void setCanvas(TPaintCanvasView *c) { canvas = c; }
@@ -41,7 +42,6 @@ private:
     static constexpr int cellH = 2; // rows per swatch
 
     TColorAttr swatchAttr(uint8_t idx) const;
-    void drawSwatch(TDrawBuffer &b, int x, int y, uint8_t idx);
     bool hitTest(TPoint p, uint8_t &idx) const;
 };
 

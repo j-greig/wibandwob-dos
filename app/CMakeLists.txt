@@ -12,6 +12,7 @@ set(TV_COMMON_SOURCES
     frame_capture.cpp
     api_ipc.cpp
     command_registry.cpp
+    window_type_registry.cpp
     theme_manager.cpp
     wibwob_view.cpp
     wibwob_engine.cpp
@@ -35,6 +36,8 @@ add_executable(test_pattern
     animated_blocks_view.cpp
     animated_gradient_view.cpp
     animated_score_view.cpp
+    animated_ascii_view.cpp
+    game_of_life_view.cpp
     generative_verse_view.cpp
     generative_orbit_view.cpp
     generative_mycelium_view.cpp
@@ -51,7 +54,13 @@ add_executable(test_pattern
     wibwob_scroll_test.cpp
     scramble_view.cpp
     scramble_engine.cpp
+    paint/paint_canvas.cpp
+    paint/paint_palette.cpp
+    paint/paint_status.cpp
+    paint/paint_tools.cpp
+    paint/paint_window.cpp
 )
+target_include_directories(test_pattern PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(test_pattern PRIVATE tvision)
 
 # simple_tui (minimal reference app)
@@ -83,7 +92,9 @@ add_executable(paint_tui
     paint/paint_palette.cpp
     paint/paint_status.cpp
     paint/paint_tools.cpp
+    paint/paint_window.cpp
 )
+target_include_directories(paint_tui PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(paint_tui PRIVATE tvision)
 
 # tv_ascii_view (POC: Turbo Vision image→ASCII viewer)

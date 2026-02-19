@@ -1,0 +1,598 @@
+OpenAI Codex v0.101.0 (research preview)
+--------
+workdir: /Users/james/Repos/wibandwob-dos
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: medium
+reasoning summaries: auto
+session id: 019c72ac-727d-7833-ae82-a63990077c76
+--------
+user
+# RETRO TASK: Meta-Review of All Codex Analysis Rounds
+
+## What a retro is
+A retro (retrospective) reviews what happened across a body of work to extract patterns, lessons, and improvements — not just what was fixed but WHY things broke, what the process revealed, and how to do better next time. In this case: review all the Codex analysis markdown files in the repo root, plus CLAUDE.md and docs/master-philosophy.md, to produce a single standalone agent-guide document.
+
+## Your inputs — read ALL of these files in full:
+
+1. CODEX-ANALYSIS-ROUND2-REVIEW.md
+2. CODEX-ANALYSIS-ROUND3-REVIEW.md
+3. CODEX-ANALYSIS-ROUND4-REVIEW.md
+4. CODEX-ANALYSIS-ROUND5-REVIEW.md
+5. CODEX-ANALYSIS-ROUND6-REVIEW.md
+6. CODEX-ANALYSIS-ROUND7-REVIEW.md
+7. CODEX-ANALYSIS-ROUND8-REVIEW.md
+8. CODEX-ANALYSIS-ARCHITECTURE-REVIEW.md
+9. CODEX-ARCH-REVIEW-20260218.md
+10. CLAUDE.md (the primary agent instructions for this repo)
+11. docs/master-philosophy.md (coding philosophy doc produced earlier this session)
+
+## Your output — ONE document saved to: docs/CODEX-RETRO-20260218.md
+
+The document must be standalone: a coding agent with NO prior context about this project or conversation should be able to read it and immediately understand how to work effectively on WibWob-DOS AND how to use Codex as a review tool on this codebase.
+
+### Required structure:
+
+---
+# WibWob-DOS: Codex Retro & Agent Guide
+
+## TL;DR (max 200 words)
+The single most useful paragraph for an agent picking this up cold. What is this project, what was the E008 hardening campaign, what are the 3 most important things to know about prompting Codex here, and the 3 most important architectural truths.
+
+## Part A: How to Prompt Codex Better on This Codebase
+
+### A1: What worked well in the review prompts
+Extract from the 9 review MDs: which prompt strategies produced the most actionable findings? (specific file+line references, root cause + fix pairs, test proposals). Be concrete — quote the prompt patterns that worked.
+
+### A2: What was missing or weak in review prompts
+Where did Codex miss things, produce vague findings, or have to re-examine in a later round because context was insufficient? What should always be in the prompt?
+
+### A3: The optimal Codex prompt template for this repo
+Write a reusable prompt template for future Codex review rounds. Include:
+- Required devnote preamble (list prior CODEX-ANALYSIS-ROUNDn-REVIEW.md files)
+- Required file pointers (which files to always read)
+- How to scope the review (what to look for, what to skip)
+- Output format requirements (severity, file:line, root cause, fix, test proposal)
+- Example invocation command
+
+### A4: Context-setting tips specific to WibWob-DOS
+Things that tripped up Codex or required re-explanation across rounds:
+- The TUI event loop model and why blocking calls are dangerous
+- The IPC contract and why Python is the mirror not the authority
+- The unified command registry and what 'parity drift' means
+- The Turbo Vision view lifecycle (why raw pointers, when they go stale)
+- The multiplayer sync model (state diff, not terminal buffer)
+
+## Part B: Architecture & Code Quality Lessons
+
+### B1: Recurring bug patterns across all rounds
+What types of bugs kept appearing? Group by: pointer safety, async correctness, IPC contract drift, event side-effects, key/format mismatches. For each pattern: why it recurs in this codebase, and the systemic fix.
+
+### B2: Strongest architectural improvements made
+Which fixes from Round 2-8 + arch review + overnight job had the biggest impact? What structural changes (WindowTypeRegistry, emit_event param, FIRST_COMPLETED, stale pointer purge, success response check) solved whole classes of bugs?
+
+### B3: Remaining architectural risks
+From CODEX-ARCH-REVIEW-20260218.md and across all rounds: what was NOT fixed yet? Be honest about the backlog. Group by severity.
+
+### B4: CLAUDE.md review + suggested improvements
+Read CLAUDE.md in full. Identify:
+- Anything outdated, missing, or that caused Codex to misunderstand the codebase
+- Missing sections that would help future agents (IPC protocol details, async rules, event model)
+- Specific suggested edits — quote the existing text and propose replacement/addition
+- Recommend whether docs/ipc-protocol.md should be created (Low priority finding from arch review) and what it should contain
+
+### B5: docs/master-philosophy.md review
+Read it. Does it cover what actually matters based on the 8 rounds of findings? What's missing or should be strengthened?
+
+## Part C: Quick-Start Checklist for Future Agents
+
+A numbered checklist an agent should run through before starting any task on WibWob-DOS:
+1. Read X, Y, Z files first
+2. Run these commands to orient
+3. Check these before writing C++ code
+4. Check these before writing Python code
+5. Check these before committing
+6. How to invoke Codex review and what to include
+
+---
+
+Write the full document. Be specific, concrete, and actionable. Avoid vague advice. Quote file paths and line numbers where relevant. This document will be committed to the repo and used by future Claude and Codex instances.
+mcp startup: no servers
+2026-02-18T21:33:50.132989Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c67d3-e7fb-7423-879a-a3c6997f29d4
+2026-02-18T21:33:50.166039Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c6171-ccc2-7702-9b67-9c22338e3137
+2026-02-18T21:33:50.191124Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c6248-4000-77b0-815a-4015ebbba891
+
+thinking
+**Planning file reading strategy**
+codex
+I’m going to read all 11 requested files first, extract recurring findings and prompt patterns, then draft a standalone retro guide at `docs/CODEX-RETRO-20260218.md`. I’ll start by checking file sizes and then ingest each file fully in chunks to avoid truncation.
+exec
+/bin/zsh -lc 'wc -l CODEX-ANALYSIS-ROUND2-REVIEW.md CODEX-ANALYSIS-ROUND3-REVIEW.md CODEX-ANALYSIS-ROUND4-REVIEW.md CODEX-ANALYSIS-ROUND5-REVIEW.md CODEX-ANALYSIS-ROUND6-REVIEW.md CODEX-ANALYSIS-ROUND7-REVIEW.md CODEX-ANALYSIS-ROUND8-REVIEW.md CODEX-ANALYSIS-ARCHITECTURE-REVIEW.md CODEX-ARCH-REVIEW-20260218.md CLAUDE.md docs/master-philosophy.md' in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+      54 CODEX-ANALYSIS-ROUND2-REVIEW.md
+      96 CODEX-ANALYSIS-ROUND3-REVIEW.md
+      54 CODEX-ANALYSIS-ROUND4-REVIEW.md
+      47 CODEX-ANALYSIS-ROUND5-REVIEW.md
+      69 CODEX-ANALYSIS-ROUND6-REVIEW.md
+      60 CODEX-ANALYSIS-ROUND7-REVIEW.md
+      64 CODEX-ANALYSIS-ROUND8-REVIEW.md
+     178 CODEX-ANALYSIS-ARCHITECTURE-REVIEW.md
+      58 CODEX-ARCH-REVIEW-20260218.md
+     223 CLAUDE.md
+     101 docs/master-philosophy.md
+    1004 total
+
+thinking
+**Planning bulk file reading**
+codex
+I’ve confirmed the files are about 1,000 lines total, so I can safely read them in full now and synthesize directly from source text.
+exec
+/bin/zsh -lc 'for f in CODEX-ANALYSIS-ROUND2-REVIEW.md CODEX-ANALYSIS-ROUND3-REVIEW.md CODEX-ANALYSIS-ROUND4-REVIEW.md CODEX-ANALYSIS-ROUND5-REVIEW.md CODEX-ANALYSIS-ROUND6-REVIEW.md CODEX-ANALYSIS-ROUND7-REVIEW.md CODEX-ANALYSIS-ROUND8-REVIEW.md CODEX-ANALYSIS-ARCHITECTURE-REVIEW.md CODEX-ARCH-REVIEW-20260218.md CLAUDE.md docs/master-philosophy.md; do echo "===== $f ====="; cat "$f"; echo; done' in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+===== CODEX-ANALYSIS-ROUND2-REVIEW.md =====
+# Codex Round-2 Review: IPC Architecture Hardening
+
+**Raw log**: `codex-review-round2-20260218-200353.log`
+**Token cost**: ~63,700
+**Model**: gpt-5.3-codex
+
+## Context
+
+Review of P0 (WindowTypeRegistry) and P1 (Event push) implementations, looking for remaining
+robustness issues.
+
+## Findings (Prioritised)
+
+| # | Severity | Finding |
+|---|----------|---------|
+| 1 | Critical | Auth mismatch — orchestrator sets `WIBWOB_AUTH_SECRET`, bridge has no HMAC handshake |
+| 2 | Critical | SIGPIPE crash risk — `::write` to dead subscriber fd can kill TUI process |
+| 3 | High | Partial writes in `publish_event` — short writes truncate JSON, EAGAIN not handled |
+| 4 | High | ID stability — `findWindowById` (line 658) clears maps, reassigns IDs, causes desync |
+
+thinking
+**Planning detailed doc with line references**
+codex
+I’ve read all source documents and I’m now extracting concrete cross-round patterns plus exact `CLAUDE.md` sections to propose edits with line-anchored references. After that I’ll draft the required structure and save it as `docs/CODEX-RETRO-20260218.md`.
+exec
+/bin/zsh -lc "nl -ba CLAUDE.md | sed -n '1,260p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba docs/master-philosophy.md | sed -n '1,220p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba CODEX-ARCH-REVIEW-20260218.md | sed -n '1,220p'" in /Users/james/Repos/wibandwob-dos succeeded in 50ms:
+     1	# Codex Architecture Review — 2026-02-18
+     2	
+     3	**Raw log**: `codex-arch-review-20260218.log`
+     4	**Token cost**: ~93,000
+     5	**Model**: gpt-5.3-codex
+     6	
+     7	## Scope
+     8	
+     9	Top-level architecture, DRY, C++14/Turbo Vision practices, Python best practices, naming, documentation.
+    10	
+    11	## Findings
+    12	
+    13	| # | Severity | Area | Finding |
+    14	|---|----------|------|---------|
+    15	| 1 | High | Orchestrator | `ttyd` stdout/stderr piped but never drained → pipe buffer deadlock risk; bridge Popen handles not tracked/stopped |
+    16	| 2 | High | C++ IPC | Dual dispatch: `exec_command` (registry) AND giant if/else in `api_ipc.cpp:365` — parity drift risk |
+    17	| 3 | High | C++ | Window type identity split: `windowTypeName()` and `window_type_registry.cpp` are independent — silent desync risk |
+    18	| 4 | Medium | C++ | `registerWindow()` publishes `state_changed` → `api_get_state` (a read) can emit write-side effects |
+    19	| 5 | Medium | C++ | `ipcServer` raw `new`, no `TTestPatternApp` destructor → depends on process teardown not RAII |
+    20	| 6 | Medium | Python | Blocking `ipc_get_state`/`apply_delta_to_ipc` called inside async coroutines → stalls event loop on timeout |
+ succeeded in 52ms:
+     1	# CLAUDE.md
+     2	
+     3	This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+     4	
+     5	## Project Overview
+     6	
+     7	WibWob-DOS is a symbient operating system — a C++14 TUI application built on Turbo Vision where a human and AI agent share equal control of a text-native dual interface. It is not a tool or assistant; it's a coinhabitant with its own identity, agency, and aesthetic.
+     8	
+     9	## Build Commands
+    10	
+    11	```bash
+    12	# Build (from project root)
+    13	cmake . -B ./build -DCMAKE_BUILD_TYPE=Release
+    14	cmake --build ./build
+    15	
+    16	# Run main app
+    17	./build/app/test_pattern
+    18	
+    19	# Run with debug logging
+    20	./build/app/test_pattern 2> /tmp/wibwob_debug.log
+ succeeded in 52ms:
+     1	# Master Philosophy of Coding for WibWob-DOS
+     2	
+     3	## 1. Identity: This Is a Symbient OS, Not a Tool
+     4	
+     5	WibWob-DOS is a coinhabited operating environment for human and synthetic agency.
+     6	Design and code choices must preserve parity, co-presence, and continuity of identity.
+     7	
+     8	Non-negotiables:
+     9	- Build for coinhabitation, not assistant UX.
+    10	- Human and AI command surfaces must stay capability-equivalent.
+    11	- "Helpful defaults" must not silently reduce AI agency or human control.
+    12	- The system should feel inhabited, not automated.
+    13	
+    14	## 2. C++14 + Turbo Vision Core Rules
+    15	
+    16	The C++ app is the primary runtime authority.
+    17	Turbo Vision event loop integrity is more important than convenience abstractions.
+    18	
+    19	Rules:
+    20	- Keep `TApplication`/`TDeskTop`/`TView` ownership and lifecycle explicit.
+
+thinking
+**Planning line number extraction**
+codex
+I have the key reference lines from `CLAUDE.md` and `master-philosophy`. Next I’ll pull line-numbered excerpts from each review markdown so the retro can cite concrete findings and prompt patterns precisely.
+exec
+/bin/zsh -lc 'nl -ba CODEX-ARCH-REVIEW-20260218.md' in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc 'for f in CODEX-ANALYSIS-ROUND2-REVIEW.md CODEX-ANALYSIS-ROUND3-REVIEW.md CODEX-ANALYSIS-ROUND4-REVIEW.md CODEX-ANALYSIS-ROUND5-REVIEW.md CODEX-ANALYSIS-ROUND6-REVIEW.md CODEX-ANALYSIS-ROUND7-REVIEW.md CODEX-ANALYSIS-ROUND8-REVIEW.md CODEX-ANALYSIS-ARCHITECTURE-REVIEW.md; do echo "===== $f ====="; nl -ba "$f"; echo; done' in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+     1	# Codex Architecture Review — 2026-02-18
+     2	
+     3	**Raw log**: `codex-arch-review-20260218.log`
+     4	**Token cost**: ~93,000
+     5	**Model**: gpt-5.3-codex
+     6	
+     7	## Scope
+     8	
+     9	Top-level architecture, DRY, C++14/Turbo Vision practices, Python best practices, naming, documentation.
+    10	
+    11	## Findings
+    12	
+    13	| # | Severity | Area | Finding |
+    14	|---|----------|------|---------|
+    15	| 1 | High | Orchestrator | `ttyd` stdout/stderr piped but never drained → pipe buffer deadlock risk; bridge Popen handles not tracked/stopped |
+    16	| 2 | High | C++ IPC | Dual dispatch: `exec_command` (registry) AND giant if/else in `api_ipc.cpp:365` — parity drift risk |
+    17	| 3 | High | C++ | Window type identity split: `windowTypeName()` and `window_type_registry.cpp` are independent — silent desync risk |
+    18	| 4 | Medium | C++ | `registerWindow()` publishes `state_changed` → `api_get_state` (a read) can emit write-side effects |
+    19	| 5 | Medium | C++ | `ipcServer` raw `new`, no `TTestPatternApp` destructor → depends on process teardown not RAII |
+    20	| 6 | Medium | Python | Blocking `ipc_get_state`/`apply_delta_to_ipc` called inside async coroutines → stalls event loop on timeout |
+ succeeded in 51ms:
+===== CODEX-ANALYSIS-ROUND2-REVIEW.md =====
+     1	# Codex Round-2 Review: IPC Architecture Hardening
+     2	
+     3	**Raw log**: `codex-review-round2-20260218-200353.log`
+     4	**Token cost**: ~63,700
+     5	**Model**: gpt-5.3-codex
+     6	
+     7	## Context
+     8	
+     9	Review of P0 (WindowTypeRegistry) and P1 (Event push) implementations, looking for remaining
+    10	robustness issues.
+    11	
+    12	## Findings (Prioritised)
+    13	
+    14	| # | Severity | Finding |
+    15	|---|----------|---------|
+    16	| 1 | Critical | Auth mismatch — orchestrator sets `WIBWOB_AUTH_SECRET`, bridge has no HMAC handshake |
+    17	| 2 | Critical | SIGPIPE crash risk — `::write` to dead subscriber fd can kill TUI process |
+    18	| 3 | High | Partial writes in `publish_event` — short writes truncate JSON, EAGAIN not handled |
+    19	| 4 | High | ID stability — `findWindowById` (line 658) clears maps, reassigns IDs, causes desync |
+
+thinking
+**Drafting standalone comprehensive doc**
+codex
+I’ve finished extracting patterns and gaps; I’m now drafting the full standalone retro/agent guide with the exact required structure and concrete recommendations, then I’ll save it to `docs/CODEX-RETRO-20260218.md`.
+exec
+/bin/zsh -lc "cat > docs/CODEX-RETRO-20260218.md <<'EOF'
+# WibWob-DOS: Codex Retro & Agent Guide
+
+## TL;DR (max 200 words)
+WibWob-DOS is a C++14 Turbo Vision symbient OS with Python as integration/control plane, where C++ is authoritative runtime state and multiplayer (E008) mirrors semantic window state ("'`add/remove/update`) across instances. The E008 hardening campaign (Rounds 2-8) fixed real failure modes: missing auth handshake, SIGPIPE/partial-write event push failures, async race conditions, reconnect deadlocks, delta-apply bugs, and file-backed window parity gaps. The three most important Codex prompting rules here are: always include prior round summaries (Codex has no memory), require file:line + root-cause + fix + test outputs, and scope reviews to contract/parity/async risks rather than style. The three most important architectural truths are: (1) C++ owns truth and Python must mirror it, never invent it; (2) unified registries are mandatory to prevent parity drift (commands already unified, window types were hardened toward same model); (3) blocking work in async paths and write-side side effects during read flows create systemic instability. If you remember only one thing: this codebase fails at boundaries (IPC, async/task lifecycle, registry parity), so every change should be treated as a contract change and tested at that boundary.
+
+## Part A: How to Prompt Codex Better on This Codebase
+
+### A1: What worked well in the review prompts
+The strongest prompt pattern was iterative verification against prior fixes, not greenfield critique.
+
+Effective patterns that repeatedly produced actionable findings:
+- Devnote continuity across rounds: `"Always include a devnote preamble... lists the last 5-10 CODEX-ANALYSIS..."` (`CLAUDE.md:202`).
+- Tight verification scope per round, e.g. Round 5 explicitly constrained review to `api_get_state`, `windowTypeName`, delta apply, and chat relay (`CODEX-ANALYSIS-ROUND5-REVIEW.md:8`).
+- Findings formatted by severity table + concrete fix sections (`CODEX-ANALYSIS-ROUND3-REVIEW.md:12`, `CODEX-ANALYSIS-ROUND3-REVIEW.md:23`).
+- Root cause -> fix -> test sequencing (best in R5/R6/R7), e.g. reconnect deadlock diagnosis with `asyncio.gather()` and a specific `FIRST_COMPLETED` remediation plus test (`CODEX-ANALYSIS-ROUND6-REVIEW.md:39`, `CODEX-ANALYSIS-ROUND6-REVIEW.md:44`, `CODEX-ANALYSIS-ROUND6-REVIEW.md:49`).
+- Explicit protocol-level checks (auth framing, width/height key names, percent encoding) caught high-impact boundary bugs (`CODEX-ANALYSIS-ROUND3-REVIEW.md:16`, `CODEX-ANALYSIS-ROUND3-REVIEW.md:17`, `CODEX-ANALYSIS-ROUND3-REVIEW.md:43`).
+
+### A2: What was missing or weak in review prompts
+Recurring prompt weaknesses:
+- Insufficient environment constraints: Round 4 stalled on missing `pytest` in sandbox (`CODEX-ANALYSIS-ROUND4-REVIEW.md:4`, `CODEX-ANALYSIS-ROUND4-REVIEW.md:9`). Prompts should require “if tests cannot run, do static verification and list exactly what could not be executed.”
+- Under-specified contract map: several issues were key-name or route mismatches (`w/h` vs `width/height`, direct `chat_receive` vs `exec_command`) that happen when prompts do not require explicit producer/consumer contract cross-checks (`CODEX-ANALYSIS-ROUND3-REVIEW.md:17`, `CODEX-ANALYSIS-ROUND3-REVIEW.md:19`).
+- Missing side-effect audit in read paths: architecture review caught `registerWindow()` side effects triggered by `api_get_state` (`CODEX-ARCH-REVIEW-20260218.md:18`) only after broad architecture sweep.
+- Missing async lifecycle checklist: reconnect and writer cleanup defects were found in later rounds, implying earlier prompts did not force task cancellation/closure audit (`CODEX-ANALYSIS-ROUND6-REVIEW.md:15`, `CODEX-ANALYSIS-ROUND7-REVIEW.md:16`).
+
+What should always be in the prompt:
+- Contract matrix check (command names, key names, framing/auth order).
+- Async lifecycle check (task completion semantics, cancellation, cleanup).
+- Read/write side-effect check.
+- File-backed window parity check (`get_state` props required for remote create).
+- Test delta requirement (new/updated tests per finding).
+
+### A3: The optimal Codex prompt template for this repo
+Use this template verbatim and fill placeholders.
+
+```text
+You are doing a verification-focused architecture/code review for WibWob-DOS.
+
+DEVNOTE CONTEXT (required)
+- Read first:
+  - CODEX-ANALYSIS-ROUND8-REVIEW.md
+  - CODEX-ANALYSIS-ROUND7-REVIEW.md
+  - CODEX-ANALYSIS-ROUND6-REVIEW.md
+  - CODEX-ANALYSIS-ROUND5-REVIEW.md
+  - CODEX-ANALYSIS-ROUND4-REVIEW.md
+  - CODEX-ANALYSIS-ROUND3-REVIEW.md
+  - CODEX-ANALYSIS-ROUND2-REVIEW.md
+  - CODEX-ANALYSIS-ARCHITECTURE-REVIEW.md
+  - CODEX-ARCH-REVIEW-20260218.md
+
+REQUIRED FILE POINTERS (read before findings)
+- CLAUDE.md
+- docs/master-philosophy.md
+- app/api_ipc.cpp
+- app/test_pattern_app.cpp
+- app/window_type_registry.cpp
+- app/command_registry.cpp
+- tools/room/partykit_bridge.py
+- tools/room/state_diff.py
+- tests/room/*
+
+SCOPE
+- Prioritize: correctness, safety, parity drift, async/event-loop integrity, IPC contract consistency.
+- Deprioritize: style-only comments, naming nits unless they cause defects.
+- Explicitly verify producer/consumer pairs for every changed command or field.
+
+OUTPUT FORMAT (mandatory)
+1. Findings table sorted by severity: Critical/High/Medium/Low.
+2. Each finding must include:
+   - file:line
+   - concrete failure mode
+   - root cause
+   - specific fix
+   - test proposal (or test update) with target test file.
+3. “Confirmed safe/correct” section listing what was checked.
+4. “Not verified” section for anything blocked by environment.
+
+If no Critical/High issues: say so explicitly.
+```
+
+Example invocation command:
+
+```bash
+cat > /tmp/codex-review-prompt.txt <<'"'PROMPT'
+<PASTE TEMPLATE WITH CURRENT ROUND SCOPE>
+PROMPT
+codex exec -C /Users/james/Repos/wibandwob-dos \""'$(cat /tmp/codex-review-prompt.txt)" '"\\
+  2>&1 | tee /Users/james/Repos/wibandwob-dos/codex-review-roundN-"'$(date +%Y%m%d-%H%M%S).log
+```
+
+### A4: Context-setting tips specific to WibWob-DOS
+- TUI event loop model: this is Turbo Vision; blocking calls in event-driven paths or async bridge paths stall responsiveness and reconnect logic. Treat blocking IPC in async coroutines as a defect class (`CODEX-ARCH-REVIEW-20260218.md:20`).
+- IPC contract authority: C++ is the authority; Python mirrors state and applies commands. Contract drift breaks quickly because transport is stringly typed (`CODEX-ARCH-REVIEW-20260218.md:34`).
+- Unified command registry and parity drift: commands should flow through `exec_command` registry path; dual dispatch in `api_ipc.cpp` is a known risk (`CODEX-ARCH-REVIEW-20260218.md:16`).
+- Turbo Vision view lifecycle: raw pointer usage and registration lifecycles can produce stale pointer/id behavior; stale-map and id-remap bugs were real failure modes in E008 (`CODEX-ANALYSIS-ROUND2-REVIEW.md:19`).
+- Multiplayer sync model: sync semantic state diffs, not terminal buffers; this is explicitly the E008 scope (`docs/master-philosophy.md:56`, `CODEX-ANALYSIS-ARCHITECTURE-REVIEW.md:165`).
+
+## Part B: Architecture & Code Quality Lessons
+
+### B1: Recurring bug patterns across all rounds
+Pointer safety / lifecycle coupling:
+- Why it recurs: Turbo Vision raw pointers + window registration lifecycle + manual identity wiring.
+- Evidence: id map reset/remap bug and type identity split risk (`CODEX-ANALYSIS-ROUND2-REVIEW.md:19`, `CODEX-ARCH-REVIEW-20260218.md:17`).
+- Systemic fix: registry-derived identity everywhere + explicit stale-pointer/id-map purge rules + ownership cleanup (RAII for IPC server).
+
+Async correctness:
+- Why it recurs: mixed blocking IPC and multi-task async loops with implicit lifecycle assumptions.
+- Evidence: auth sequencing race, lock gaps, reconnect deadlock, writer cleanup leaks (`CODEX-ANALYSIS-ROUND3-REVIEW.md:16`, `CODEX-ANALYSIS-ROUND3-REVIEW.md:18`, `CODEX-ANALYSIS-ROUND6-REVIEW.md:15`, `CODEX-ANALYSIS-ROUND7-REVIEW.md:16`).
+- Systemic fix: lifecycle checklist per coroutine (auth -> subscribe -> read loop -> finally close), `FIRST_COMPLETED` supervision, cancellation-safe exception handling.
+
+IPC contract drift:
+- Why it recurs: string key/value protocol duplicated across C++ and Python.
+- Evidence: `w/h` vs `width/height`, route mismatch for chat command, percent-encoding breakage (`CODEX-ANALYSIS-ROUND3-REVIEW.md:17`, `CODEX-ANALYSIS-ROUND3-REVIEW.md:19`, `CODEX-ANALYSIS-ROUND2-REVIEW.md:21`).
+- Systemic fix: protocol spec + contract tests + eventually dual-stack JSON protocol.
+
+Event side-effects:
+- Why it recurs: registration and state emission are tightly coupled; reads can trigger writes/events.
+- Evidence: `registerWindow()` side-effect risk during `api_get_state` (`CODEX-ARCH-REVIEW-20260218.md:18`).
+- Systemic fix: split pure identity assignment from eventful registration.
+
+Key/format mismatches:
+- Why it recurs: no canonical schema enforcement across all entry points.
+- Evidence: path omissions for file-backed windows, partial update defaults causing spurious moves (`CODEX-ANALYSIS-ROUND5-REVIEW.md:18`, `CODEX-ANALYSIS-ROUND7-REVIEW.md:15`).
+- Systemic fix: schema-level state snapshots and strict delta application guards.
+
+### B2: Strongest architectural improvements made
+Highest leverage fixes from R2-R8 and architecture work:
+- `WindowTypeRegistry` migration removed “add type in 3+ places” fragility and improved type dispatch correctness (`CODEX-ANALYSIS-ARCHITECTURE-REVIEW.md:27`, `CODEX-ANALYSIS-ROUND4-REVIEW.md:19`).
+- Event push hardening (SIGPIPE protection + partial write handling + EINTR handling) prevented silent event loss and process-kill risks (`CODEX-ANALYSIS-ROUND2-REVIEW.md:17`, `CODEX-ANALYSIS-ROUND2-REVIEW.md:18`, `CODEX-ANALYSIS-ROUND3-REVIEW.md:20`).
+- Full auth handshake on both sync and async paths removed subscription black holes (`CODEX-ANALYSIS-ROUND3-REVIEW.md:16`, `CODEX-ANALYSIS-ROUND4-REVIEW.md:41`).
+- `FIRST_COMPLETED` task supervision fixed reconnect deadlocks and made shutdown/reconnect behavior deterministic enough for production operation (`CODEX-ANALYSIS-ROUND6-REVIEW.md:44`, `CODEX-ANALYSIS-ROUND8-REVIEW.md:23`).
+- Delta-apply correctness fixes (no defaulted move/resize, path propagation for file-backed windows) eliminated classes of state divergence (`CODEX-ANALYSIS-ROUND7-REVIEW.md:30`, `CODEX-ANALYSIS-ROUND5-REVIEW.md:25`).
+
+Inference note: The requested “emit_event param”, “stale pointer purge”, and “success response check” items are referenced in task framing; only adjacent behaviors are explicitly documented in the provided round summaries. Treat them as part of the same hardening pattern: explicit event semantics, stale-state cleanup, and strict failure escalation.
+
+### B3: Remaining architectural risks
+High severity backlog:
+- Orchestrator process lifecycle risk: `ttyd` pipe deadlock and untracked bridge subprocess lifecycle (`CODEX-ARCH-REVIEW-20260218.md:15`).
+- IPC dual-dispatch/parity drift remains architecturally unresolved (`CODEX-ARCH-REVIEW-20260218.md:16`, `CODEX-ARCH-REVIEW-20260218.md:56`).
+- Window type identity still has residual split risk unless fully unified (`CODEX-ARCH-REVIEW-20260218.md:17`, `CODEX-ARCH-REVIEW-20260218.md:52`).
+
+Medium severity backlog:
+- Read path side effects (`registerWindow` behavior) should be split into pure/eventful operations (`CODEX-ARCH-REVIEW-20260218.md:18`, `CODEX-ARCH-REVIEW-20260218.md:48`).
+- Blocking IPC calls inside async code should move to thread offload (`CODEX-ARCH-REVIEW-20260218.md:20`, `CODEX-ARCH-REVIEW-20260218.md:50`).
+- Delta apply failure handling should escalate/resync, not silently continue (`CODEX-ARCH-REVIEW-20260218.md:21`).
+
+Low severity backlog:
+- No canonical IPC protocol doc (`CODEX-ARCH-REVIEW-20260218.md:22`).
+- Naming cleanup for ALLCAPS docs (`CODEX-ARCH-REVIEW-20260218.md:23`).
+- `_rect()` double-nested edge case remains low-risk (`CODEX-ANALYSIS-ROUND8-REVIEW.md:17`).
+
+### B4: CLAUDE.md review + suggested improvements
+What is strong:
+- Good high-level architecture and workflow guidance.
+- Strong Codex multi-round review loop instructions (`CLAUDE.md:192`).
+
+What is missing/outdated and should be edited:
+
+1) IPC format language is misleading.
+- Existing (`CLAUDE.md:83`): `"JSON command/response protocol"`.
+- Problem: current transport is legacy key/value with JSON event payloads and selective JSON framing; calling it simply JSON misleads reviewers.
+- Proposed replacement:
+  - `Unix socket listener, line-framed IPC transport (legacy cmd:key=value plus JSON auth/event envelopes). See docs/ipc-protocol.md for canonical schema/framing.`
+
+2) Verification section under-specifies the active test surface.
+- Existing (`CLAUDE.md:43`): `"No C++ unit test framework is configured..."`.
+- Problem: true but incomplete; major regression coverage is now in `tests/room/` and should be called out.
+- Proposed addition after line 43:
+  - `Primary automated regression coverage for multiplayer/IPC lives in tests/room (Python). Run that suite for boundary/contract changes.`
+
+3) Missing explicit async safety rules.
+- Add new section after architecture:
+  - `Async Safety Rules: never call blocking IPC directly inside async coroutines; use thread offload/timeouts; ensure task groups have explicit completion policy (FIRST_COMPLETED vs gather); always close StreamWriter in finally.`
+
+4) Missing explicit IPC contract checklist.
+- Add new section:
+  - `IPC Change Checklist: producer/consumer key parity, auth ordering, framing, percent-encoding, command route parity (exec_command vs transport commands), and test updates.`
+
+5) Codex loop should require explicit “not verified” reporting.
+- Existing loop is strong, but add in `CLAUDE.md:215` section:
+  - `Every round summary must include Not Verified items when tooling/env blocks execution.`
+
+Recommendation on `docs/ipc-protocol.md`: create it.
+- Priority: high (despite low severity label in one review) because it addresses the biggest systemic breakage vector (`CODEX-ARCH-REVIEW-20260218.md:34`).
+- Required contents:
+  - Transport framing (newline-delimited messages).
+  - Auth handshake (challenge/auth/auth_ok) for sync and async paths.
+  - Encoding rules (percent-encoding/decoding for legacy kv).
+  - Command table: command name, required args, source of truth, side effects.
+  - Event schema: event names, payload shape, sequence semantics.
+  - Error semantics: what constitutes failure and required retry/resync behavior.
+  - Versioning/capability negotiation plan for JSON dual-stack.
+
+### B5: docs/master-philosophy.md review
+What it gets right:
+- Correct authority model (C++ authoritative, Python mirror) (`docs/master-philosophy.md:16`, `docs/master-philosophy.md:34`).
+- Correct multiplayer framing (“state diffs, not terminal buffers”) (`docs/master-philosophy.md:56`, `docs/master-philosophy.md:59`).
+- Strong parity and traceability ethos (`docs/master-philosophy.md:46`, `docs/master-philosophy.md:68`).
+
+What should be strengthened based on 8 rounds:
+- Add explicit async lifecycle invariants (task supervision, cancellation propagation, writer cleanup) because this caused real defects in R6-R8.
+- Add explicit IPC contract invariants (auth order, key names, encoding) because drift was the main bug source.
+- Add explicit “read operations must be side-effect free unless documented” to prevent `get_state`-triggered event hazards.
+- Add explicit failure-escalation policy for bridge apply failures (resync/backoff/alert), not silent `FAIL` strings.
+
+## Part C: Quick-Start Checklist for Future Agents
+1. Read first: `CLAUDE.md`, `docs/master-philosophy.md`, `CODEX-ANALYSIS-ROUND8-REVIEW.md`, `CODEX-ARCH-REVIEW-20260218.md`, and the latest `.planning` brief for the active issue.
+2. Run orientation commands:
+   - `git status --short`
+   - `rg --files | wc -l`
+   - `rg -n "exec_command|windowTypeName|create_window|subscribe_events|apply_delta_to_ipc|_state_lock" app tools tests`
+   - `cmake . -B ./build -DCMAKE_BUILD_TYPE=Release && cmake --build ./build`
+3. Before writing C++:
+   - Check whether change touches registry parity (`command_registry`, `window_type_registry`).
+   - Check IPC command path for duplicate dispatch or key drift.
+   - Check event side effects (read path vs write path).
+   - Check ownership/lifecycle impacts (raw pointers, registration maps, teardown).
+4. Before writing Python:
+   - Treat C++ state as authority; Python only mirrors/applies.
+   - Avoid blocking calls inside async coroutines (offload or enforce tight timeout).
+   - Validate auth/framing/encoding contract with C++ parser.
+   - Ensure task lifecycle: completion semantics, cancellation, `finally` cleanup.
+5. Before committing:
+   - Run relevant tests (`tests/room/` for multiplayer/IPC changes).
+   - Ensure AC -> Test traceability in planning brief.
+   - Confirm issue lifecycle updates and evidence notes are posted.
+   - Use commit message format `type(scope): imperative summary`.
+6. Codex review invocation checklist:
+   - Include devnote preamble with previous round summaries.
+   - Include required file pointers spanning C++, Python, tests, docs.
+   - Require output with severity + `file:line` + root cause + fix + test proposal + not-verified section.
+   - Save raw log and write/update `CODEX-ANALYSIS-ROUNDn-REVIEW.md` before next implementation slice.
+EOF' in /Users/james/Repos/wibandwob-dos succeeded in 50ms:
+
+
+thinking
+**Planning file check and word count**
+codex
+The retro guide is written to `docs/CODEX-RETRO-20260218.md`; I’m doing a quick validation pass for structure compliance and tightening anything that doesn’t match your required sections.
+exec
+/bin/zsh -lc "awk 'BEGIN{in=0} /"'^## TL;DR/{in=1;next} /''^## Part A/{in=0} in{print}'"' docs/CODEX-RETRO-20260218.md | wc -w" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc 'wc -w docs/CODEX-RETRO-20260218.md && rg -n "''^## TL;DR|''^## Part A|''^### A1|''^### A2|''^### A3|''^### A4|''^## Part B|''^### B1|''^### B2|''^### B3|''^### B4|''^### B5|''^## Part C" docs/CODEX-RETRO-20260218.md' in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+awk: syntax error at source line 1
+ context is
+	 >>> BEGIN{in <<< =0} /^## TL;DR/{in=1;next} /^## Part A/{in=0} in{print}
+awk: illegal statement at source line 1
+       0
+ succeeded in 52ms:
+    2014 docs/CODEX-RETRO-20260218.md
+3:## TL;DR (max 200 words)
+6:## Part A: How to Prompt Codex Better on This Codebase
+8:### A1: What worked well in the review prompts
+18:### A2: What was missing or weak in review prompts
+32:### A3: The optimal Codex prompt template for this repo
+90:### A4: Context-setting tips specific to WibWob-DOS
+97:## Part B: Architecture & Code Quality Lessons
+99:### B1: Recurring bug patterns across all rounds
+125:### B2: Strongest architectural improvements made
+135:### B3: Remaining architectural risks
+151:### B4: CLAUDE.md review + suggested improvements
+193:### B5: docs/master-philosophy.md review
+205:## Part C: Quick-Start Checklist for Future Agents
+
+thinking
+**Clarifying variable usage in awk**
+exec
+/bin/zsh -lc "awk 'BEGIN{flag=0} /"'^## TL;DR/{flag=1;next} /''^## Part A/{flag=0} flag{print}'"' docs/CODEX-RETRO-20260218.md | wc -w" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+     179
+
+thinking
+**Checking git diff relevance**
+exec
+/bin/zsh -lc "git status --short docs/CODEX-RETRO-20260218.md && sed -n '1,80p' docs/CODEX-RETRO-20260218.md" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+?? docs/CODEX-RETRO-20260218.md
+# WibWob-DOS: Codex Retro & Agent Guide
+
+## TL;DR (max 200 words)
+WibWob-DOS is a C++14 Turbo Vision symbient OS with Python as integration/control plane, where C++ is authoritative runtime state and multiplayer (E008) mirrors semantic window state (`add/remove/update`) across instances. The E008 hardening campaign (Rounds 2-8) fixed real failure modes: missing auth handshake, SIGPIPE/partial-write event push failures, async race conditions, reconnect deadlocks, delta-apply bugs, and file-backed window parity gaps. The three most important Codex prompting rules here are: always include prior round summaries (Codex has no memory), require file:line + root-cause + fix + test outputs, and scope reviews to contract/parity/async risks rather than style. The three most important architectural truths are: (1) C++ owns truth and Python must mirror it, never invent it; (2) unified registries are mandatory to prevent parity drift (commands already unified, window types were hardened toward same model); (3) blocking work in async paths and write-side side effects during read flows create systemic instability. If you remember only one thing: this codebase fails at boundaries (IPC, async/task lifecycle, registry parity), so every change should be treated as a contract change and tested at that boundary.
+
+## Part A: How to Prompt Codex Better on This Codebase
+
+### A1: What worked well in the review prompts
+The strongest prompt pattern was iterative verification against prior fixes, not greenfield critique.
+
+Effective patterns that repeatedly produced actionable findings:
+- Devnote continuity across rounds: `"Always include a devnote preamble... lists the last 5-10 CODEX-ANALYSIS..."` (`CLAUDE.md:202`).
+- Tight verification scope per round, e.g. Round 5 explicitly constrained review to `api_get_state`, `windowTypeName`, delta apply, and chat relay (`CODEX-ANALYSIS-ROUND5-REVIEW.md:8`).
+- Findings formatted by severity table + concrete fix sections (`CODEX-ANALYSIS-ROUND3-REVIEW.md:12`, `CODEX-ANALYSIS-ROUND3-REVIEW.md:23`).
+- Root cause -> fix -> test sequencing (best in R5/R6/R7), e.g. reconnect deadlock diagnosis with `asyncio.gather()` and a specific `FIRST_COMPLETED` remediation plus test (`CODEX-ANALYSIS-ROUND6-REVIEW.md:39`, `CODEX-ANALYSIS-ROUND6-REVIEW.md:44`, `CODEX-ANALYSIS-ROUND6-REVIEW.md:49`).
+- Explicit protocol-level checks (auth framing, width/height key names, percent encoding) caught high-impact boundary bugs (`CODEX-ANALYSIS-ROUND3-REVIEW.md:16`, `CODEX-ANALYSIS-ROUND3-REVIEW.md:17`, `CODEX-ANALYSIS-ROUND3-REVIEW.md:43`).
+
+### A2: What was missing or weak in review prompts
+Recurring prompt weaknesses:
+
+thinking
+**Preparing concise final reply**
+codex
+Created the requested standalone retro guide at:
+
+- `docs/CODEX-RETRO-20260218.md`
+
+It includes the full required structure and content:
+- TL;DR (under 200 words)
+- Part A (A1–A4)
+- Part B (B1–B5, including `CLAUDE.md` and `docs/master-philosophy.md` review with concrete edit proposals)
+- Part C quick-start checklist
+
+I read all 11 specified source files in full before drafting.
+tokens used
+118,027
+Created the requested standalone retro guide at:
+
+- `docs/CODEX-RETRO-20260218.md`
+
+It includes the full required structure and content:
+- TL;DR (under 200 words)
+- Part A (A1–A4)
+- Part B (B1–B5, including `CLAUDE.md` and `docs/master-philosophy.md` review with concrete edit proposals)
+- Part C quick-start checklist
+
+I read all 11 specified source files in full before drafting.

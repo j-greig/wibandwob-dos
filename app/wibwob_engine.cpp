@@ -6,6 +6,7 @@
 
 #include "wibwob_engine.h"
 #include "llm/base/llm_provider_factory.h"
+#include "llm/base/path_search.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -236,18 +237,16 @@ bool WibWobEngine::needsApiKey() const {
 void WibWobEngine::loadConfiguration() {
     config = std::make_unique<LLMConfig>();
     
-    // Config file path - assumes running from repo root (./build/app/test_pattern)
-    const std::vector<std::string> cfgPaths = {
-        "app/llm/config/llm_config.json"
+    // Config file path - app is commonly launched from either repo root OR build/app.
+    const std::vector<std::string> cfgCandidates = {
+        "app/llm/config/llm_config.json",
+        "llm/config/llm_config.json"
     };
     bool loadResult = false;
     std::string usedPath;
-    for (const auto& path : cfgPaths) {
-        if (config->loadFromFile(path)) {
-            loadResult = true;
-            usedPath = path;
-            break;
-        }
+    usedPath = ww_find_first_existing_upwards(cfgCandidates, 6);
+    if (!usedPath.empty()) {
+        loadResult = config->loadFromFile(usedPath);
     }
 
     fprintf(stderr, "DEBUG: Config file load result: %s%s\n",

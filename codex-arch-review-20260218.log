@@ -1,0 +1,1025 @@
+OpenAI Codex v0.101.0 (research preview)
+--------
+workdir: /Users/james/Repos/wibandwob-dos
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: medium
+reasoning summaries: auto
+session id: 019c7281-f6f9-7600-ae6f-704dddc75dce
+--------
+user
+Read CLAUDE.md for project overview and architecture. Read app/test_pattern_app.cpp (first 200 lines), app/api_ipc.cpp (first 100 lines), app/command_registry.h, app/window_type_registry.h, tools/room/state_diff.py, tools/room/partykit_bridge.py, tools/room/orchestrator.py to understand the system.
+
+Do a top-level architecture and code quality review focused on:
+
+1. **Documentation completeness**: Are the key architectural seams well-documented (IPC protocol, command registry, window type system, multiplayer bridge)? Any major gaps where a new developer would be lost?
+
+2. **DRY violations**: Any obvious duplication — repeated IPC command parsing patterns, copy-pasted JSON building, duplicated window creation logic, etc?
+
+3. **C++14 / Turbo Vision best practices**:
+   - Are TView subclasses following TV conventions (growMode, options flags, draw/handleEvent/changeBounds)?
+   - Is virtual destructor coverage correct?
+   - Any RAII concerns (raw resource ownership, missing cleanup)?
+   - Are window registration and lifecycle (registerWindow, winToId/idToWin maps) safe?
+
+4. **Python best practices** (tools/room/):
+   - Are type hints complete on public APIs?
+   - Is error handling consistent (IPC failures propagated or silently swallowed)?
+   - Any async correctness issues beyond what Codex rounds 3-8 already found?
+
+5. **Naming and structure**:
+   - Is the file naming convention consistent (snake_case .cpp/.h/.py, kebab-case .md)?
+   - Any files that are clearly misnamed or in the wrong place?
+   - Is the module boundary between app/ and tools/room/ clean?
+
+6. **Biggest architectural risk**: What is the single most fragile or under-documented part of the overall system that could bite a future developer?
+
+Keep findings practical. Propose concrete improvements (doc comments, extractions, renames) only where the benefit is clear. No refactor-for-refactor's-sake suggestions.
+mcp startup: no servers
+2026-02-18T20:47:26.067281Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c67d3-e7fb-7423-879a-a3c6997f29d4
+2026-02-18T20:47:26.092027Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c6171-ccc2-7702-9b67-9c22338e3137
+2026-02-18T20:47:26.125043Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c6248-4000-77b0-815a-4015ebbba891
+
+thinking
+**Preparing file inspection plan**
+codex
+I’ll review the requested files first, then give a focused architecture/code-quality assessment with concrete, high-value fixes only. I’m starting by pulling the exact sections you listed so findings are grounded in code references.
+exec
+/bin/zsh -lc "sed -n '1,220p' app/test_pattern_app.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,220p' CLAUDE.md" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,260p' app/command_registry.h" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,140p' app/api_ipc.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,260p' tools/room/partykit_bridge.py" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,260p' tools/room/state_diff.py" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,260p' app/window_type_registry.h" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,320p' tools/room/orchestrator.py" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project Overview
+
+WibWob-DOS is a symbient operating system — a C++14 TUI application built on Turbo Vision where a human and AI agent share equal control of a text-native dual interface. It is not a tool or assistant; it's a coinhabitant with its own identity, agency, and aesthetic.
+
+## Build Commands
+
+```bash
+# Build (from project root)
+cmake . -B ./build -DCMAKE_BUILD_TYPE=Release
+cmake --build ./build
+
+# Run main app
+./build/app/test_pattern
+
+# Run with debug logging
+./build/app/test_pattern 2> /tmp/wibwob_debug.log
+ succeeded in 55ms:
+/*---------------------------------------------------------*/
+/*                                                         */
+/*   test_pattern_app.cpp - Test Pattern Window Spawner   */
+/*   Unlimited resizable windows with test patterns       */
+/*                                                         */
+/*---------------------------------------------------------*/
+
+#define Uses_TKeys
+#define Uses_TApplication
+#define Uses_TEvent
+#define Uses_TRect
+#define Uses_TDialog
+#define Uses_TStaticText
+#define Uses_TButton
+#define Uses_TMenuBar
+#define Uses_TSubMenu
+#define Uses_TMenuItem
+#define Uses_TMenu
+#define Uses_TStatusLine
+#define Uses_TStatusItem
+ succeeded in 51ms:
+#include "api_ipc.h"
+#include "command_registry.h"
+#include "window_type_registry.h"
+
+#ifndef _WIN32
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/un.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <errno.h>
+#endif
+
+#ifdef __APPLE__
+#include <CommonCrypto/CommonHMAC.h>
+#else
+#include <openssl/hmac.h>
+#endif
+
+#include <cstring>
+ succeeded in 52ms:
+#pragma once
+
+#include <map>
+#include <string>
+#include <vector>
+
+class TTestPatternApp;
+
+struct CommandCapability {
+    const char* name;
+    const char* description;
+    bool requires_path;
+};
+
+const std::vector<CommandCapability>& get_command_capabilities();
+std::string get_command_capabilities_json();
+std::string exec_registry_command(
+    TTestPatternApp& app,
+    const std::string& name,
+    const std::map<std::string, std::string>& kv);
+ succeeded in 51ms:
+// Data-driven registry mapping window type slugs to spawn callbacks.
+// Eliminates the if-else dispatch chain and extern declarations in api_ipc.cpp.
+// To add a new window type: add ONE entry in window_type_registry.cpp.
+#pragma once
+
+#include <string>
+#include <vector>
+#include <map>
+
+class TTestPatternApp;
+
+// Spawn callback: return nullptr on success, a static error string on failure.
+using WinSpawnFn = const char* (*)(TTestPatternApp&,
+                                   const std::map<std::string, std::string>&);
+
+struct WindowTypeSpec {
+    const char* type;    // canonical slug, e.g. "verse", "gradient"
+    WinSpawnFn  spawn;   // nullptr = recognised but not creatable via IPC
+};
+
+ succeeded in 51ms:
+#!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.11"
+# dependencies = ["websockets>=12"]
+# ///
+"""
+PartyKit bridge for WibWob-DOS multiplayer rooms (E008 F02).
+
+Runs as a sidecar alongside a WibWob instance. Polls local IPC state,
+diffs it, and pushes state_delta messages to PartyKit. Also receives
+remote deltas from PartyKit and applies them to the local instance via IPC.
+
+Usage (spawned by orchestrator):
+    uv run tools/room/partykit_bridge.py
+
+Environment:
+    WIBWOB_INSTANCE      — instance ID (e.g. "1"), drives /tmp/wibwob_1.sock
+    WIBWOB_PARTYKIT_URL  — PartyKit server URL (e.g. https://wibwob.user.partykit.dev)
+    WIBWOB_PARTYKIT_ROOM — PartyKit room/Durable Object key (e.g. "wibwob-shared")
+    WIBWOB_AUTH_SECRET   — shared HMAC secret for IPC auth (optional)
+ succeeded in 51ms:
+"""
+State diffing utilities for WibWob-DOS multiplayer sync (E008 F03).
+
+Extracts window state from IPC get_state responses, computes minimal
+add/remove/update deltas, and applies remote deltas to a local instance
+via IPC commands.
+
+Used by partykit_bridge.py and any future sync transport.
+"""
+
+import hashlib
+import hmac as _hmac
+import json
+import socket
+import os
+from typing import Any
+from urllib.parse import quote as _urlencode
+
+
+IPC_TIMEOUT = 2.0
+ succeeded in 52ms:
+#!/usr/bin/env python3
+"""Room orchestrator for WibWob-DOS teleport rooms.
+
+Reads room configs (markdown + YAML frontmatter), spawns ttyd+WibWob
+instance pairs, manages lifecycle (health check, restart on failure),
+generates shared secrets for agent auth.
+
+Usage:
+    ./tools/room/orchestrator.py start rooms/*.md
+    ./tools/room/orchestrator.py stop
+    ./tools/room/orchestrator.py status
+"""
+
+import argparse
+import json
+import os
+import secrets
+import signal
+import socket
+import subprocess
+
+thinking
+**Planning deeper code inspection**
+codex
+I’ve loaded the requested files and next I’m scanning the corresponding implementation hotspots (`command_registry.cpp`, `window_type_registry.cpp`, and window lifecycle methods) so I can assess DRY and safety claims with concrete evidence.
+exec
+/bin/zsh -lc "sed -n '1,320p' app/command_registry.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,360p' app/window_type_registry.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '320,560p' tools/room/partykit_bridge.py" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '320,620p' tools/room/orchestrator.py" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc 'rg -n "registerWindow|winToId|idToWin|unregisterWindow|createWindow|insertWindow|validView|remove|close" app/test_pattern_app.cpp app/api_ipc.cpp app/window_type_registry.cpp' in /Users/james/Repos/wibandwob-dos succeeded in 50ms:
+#include "command_registry.h"
+
+#include "api_ipc.h"
+
+#include <sstream>
+
+extern void api_cascade(TTestPatternApp& app);
+extern void api_toggle_scramble(TTestPatternApp& app);
+extern void api_expand_scramble(TTestPatternApp& app);
+extern std::string api_scramble_say(TTestPatternApp& app, const std::string& text);
+extern std::string api_scramble_pet(TTestPatternApp& app);
+extern std::string api_chat_receive(TTestPatternApp& app, const std::string& sender, const std::string& text);
+extern void api_tile(TTestPatternApp& app);
+extern void api_close_all(TTestPatternApp& app);
+extern void api_save_workspace(TTestPatternApp& app);
+extern bool api_open_workspace_path(TTestPatternApp& app, const std::string& path);
+extern void api_screenshot(TTestPatternApp& app);
+extern void api_set_pattern_mode(TTestPatternApp& app, const std::string& mode);
+extern std::string api_set_theme_mode(TTestPatternApp& app, const std::string& mode);
+extern std::string api_set_theme_variant(TTestPatternApp& app, const std::string& variant);
+ succeeded in 51ms:
+// Window type registry — single source of truth for all spawnable window types.
+// Keeps api_ipc.cpp free of per-type knowledge: adding a new type only requires
+// a new entry in the k_specs table below.
+
+#include "window_type_registry.h"
+
+// tvision for TRect
+#define Uses_TRect
+#include <tvision/tv.h>
+
+#include <cstdlib>  // atoi
+#include <cstring>  // strcmp
+
+// ── Extern declarations for spawn helpers in test_pattern_app.cpp ─────────────
+
+class TTestPatternApp; // forward decl (full type used only by called functions)
+
+extern void api_spawn_test(TTestPatternApp&, const TRect*);
+extern void api_spawn_gradient(TTestPatternApp&, const std::string&, const TRect*);
+extern void api_open_animation_path(TTestPatternApp&, const std::string&, const TRect*);
+ succeeded in 52ms:
+
+    bridge = PartyKitBridge(instance_id, partykit_url, room)
+    try:
+        asyncio.run(bridge.run())
+    except KeyboardInterrupt:
+        pass
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+ succeeded in 51ms:
+
+    state = json.loads(state_file.read_text())
+    print(f"Rooms ({len(state['rooms'])}):")
+    for room_id, info in state["rooms"].items():
+        status = "running" if info["running"] else "stopped"
+        uptime = time.time() - info["start_time"]
+        print(f"  {room_id}: {status} pid={info['pid']} port={info['ttyd_port']} uptime={uptime:.0f}s restarts={info['restart_count']}")
+
+
+def cmd_stop(args):
+    """Signal running orchestrator to stop."""
+    state_file = Path("/tmp/wibwob_orchestrator.json")
+    if not state_file.exists():
+        print("[orch] No orchestrator running.")
+        return
+
+    state = json.loads(state_file.read_text())
+    for room_id, info in state["rooms"].items():
+        pid = info.get("pid")
+        if pid:
+ succeeded in 52ms:
+app/api_ipc.cpp:107:extern void api_close_all(TTestPatternApp& app);
+app/api_ipc.cpp:117:extern std::string api_close_window(TTestPatternApp& app, const std::string& id);
+app/api_ipc.cpp:264:    ::close(fd);
+app/api_ipc.cpp:301:        ::close(fd_listen_);
+app/api_ipc.cpp:306:        ::close(fd_listen_);
+app/api_ipc.cpp:329:            ::close(fd);
+app/api_ipc.cpp:338:        ::close(fd);
+app/api_ipc.cpp:389:    } else if (cmd == "close_all") {
+app/api_ipc.cpp:390:        api_close_all(*app_);
+app/api_ipc.cpp:439:    } else if (cmd == "close_window") {
+app/api_ipc.cpp:442:            resp = api_close_window(*app_, id->second) + "\n";
+app/api_ipc.cpp:541:                            out.close();
+app/api_ipc.cpp:574:        return; // do NOT write resp or close fd
+app/api_ipc.cpp:578:    ::close(fd);
+app/api_ipc.cpp:624:            ::close(fd);
+app/api_ipc.cpp:636:    for (int sub_fd : event_subscribers_) ::close(sub_fd);
+app/api_ipc.cpp:640:        ::close(fd_listen_);
+app/test_pattern_app.cpp:119:                closedir(dir);
+app/test_pattern_app.cpp:123:        closedir(dir);
+app/test_pattern_app.cpp:587:    void closeAll();
+
+thinking
+**Identifying key function excerpts**
+codex
+I found the core registry and window-type implementations; next I’m pulling the window ID lifecycle and IPC dispatch sections to validate safety and duplication around command parsing and JSON responses.
+exec
+/bin/zsh -lc "sed -n '600,760p' app/test_pattern_app.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '2400,2605p' app/test_pattern_app.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '300,760p' app/api_ipc.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "rg -n \"class .*: public T(View|Window)|virtual ~|~T|growMode|options|handleEvent\\(|draw\\(|changeBounds\\(\" app/*.h app/*.cpp | head -n 200" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+    static void skipWs(const std::string &s, size_t &pos);
+    static bool consume(const std::string &s, size_t &pos, char ch);
+    static bool parseKeyedString(const std::string &s, size_t objStart, const char *key, std::string &out);
+    static bool parseKeyedBool(const std::string &s, size_t objStart, const char *key, bool &out);
+    static bool parseBounds(const std::string &s, size_t objStart, int &x,int &y,int &w,int &h);
+    
+    int windowNumber;
+    static const int maxWindows = 99;
+
+    // Scramble cat overlay
+    TScrambleWindow* scrambleWindow;
+    ScrambleEngine scrambleEngine;
+    ScrambleDisplayState scrambleState;
+    void toggleScramble();
+    void toggleScrambleExpand();
+    void wireScrambleInput();
+
+    // Runtime API key (shared across all chat windows)
+    static std::string runtimeApiKey;
+    friend std::string getAppRuntimeApiKey();
+ succeeded in 51ms:
+    if (dynamic_cast<TTestPatternWindow*>(w))    return "test_pattern";
+    if (dynamic_cast<TGradientWindow*>(w))        return "gradient";
+    if (dynamic_cast<TBrowserWindow*>(w))         return "browser";
+    if (dynamic_cast<TTextEditorWindow*>(w))      return "text_editor";
+    if (dynamic_cast<TTransparentTextWindow*>(w)) return "text_view";
+    if (dynamic_cast<TFrameAnimationWindow*>(w))  return "frame_player";
+    if (dynamic_cast<TWibWobWindow*>(w))          return "wibwob";
+    if (dynamic_cast<TScrambleWindow*>(w))        return "scramble";
+
+    // Generative/animated window wrapper classes are local to their .cpp files
+    // and cannot be dynamic_cast from here. Identify them by their hosted
+    // child view type instead.
+#define HAS_CHILD_VIEW(ViewType) \
+    ([&]() -> bool { \
+        TView *_s = w->first(); \
+        if (!_s) return false; \
+        TView *_v = _s; \
+        do { if (dynamic_cast<ViewType*>(_v)) return true; _v = _v->next; } while (_v != _s); \
+        return false; \
+    }())
+ succeeded in 51ms:
+    if (::bind(fd_listen_, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
+        ::close(fd_listen_);
+        fd_listen_ = -1;
+        return false;
+    }
+    if (::listen(fd_listen_, 4) < 0) {
+        ::close(fd_listen_);
+        fd_listen_ = -1;
+        return false;
+    }
+    return true;
+#endif
+}
+
+void ApiIpcServer::poll() {
+#ifdef _WIN32
+    return;
+#else
+    if (fd_listen_ < 0 || !app_) return;
+    int fd = ::accept(fd_listen_, nullptr, nullptr);
+ succeeded in 52ms:
+app/animated_ascii_view.h:20:class TAnimatedAsciiView : public TView {
+app/animated_ascii_view.h:23:    virtual ~TAnimatedAsciiView();
+app/animated_ascii_view.h:25:    virtual void draw() override;
+app/animated_ascii_view.h:26:    virtual void handleEvent(TEvent &ev) override;
+app/animated_ascii_view.h:28:    virtual void changeBounds(const TRect& bounds) override;
+app/animated_blocks_view.h:19:class TAnimatedBlocksView : public TView {
+app/animated_blocks_view.h:22:    virtual ~TAnimatedBlocksView();
+app/animated_blocks_view.h:24:    virtual void draw() override;
+app/animated_blocks_view.h:25:    virtual void handleEvent(TEvent &ev) override;
+app/animated_blocks_view.h:27:    virtual void changeBounds(const TRect& bounds) override;
+app/animated_score_view.h:14:/*   - draw() composes each frame based on phase           */
+app/animated_score_view.h:28:class TAnimatedScoreView : public TView {
+app/animated_score_view.h:31:    virtual ~TAnimatedScoreView();
+app/animated_score_view.h:33:    virtual void draw() override;
+app/animated_score_view.h:34:    virtual void handleEvent(TEvent &ev) override;
+app/animated_score_view.h:36:    virtual void changeBounds(const TRect& bounds) override;
+app/ansi_view.h:60:    virtual void draw() override;
+app/ansi_view.h:73:class TAnsiMiniWindow : public TWindow {
+app/ascii_grid_view.h:16:class TAsciiGridView : public TView {
+app/ascii_grid_view.h:25:    virtual void draw() override;
+
+thinking
+**Assessing IPC class cleanup approach**
+exec
+/bin/zsh -lc "sed -n '1,260p' app/api_ipc.h" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,220p' tools/room/room_config.py" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba app/command_registry.cpp | sed -n '1,260p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba tools/room/state_diff.py | sed -n '1,320p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba app/api_ipc.cpp | sed -n '330,740p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba app/test_pattern_app.cpp | sed -n '630,740p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba app/test_pattern_app.cpp | sed -n '2430,2590p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba tools/room/orchestrator.py | sed -n '1,420p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba tools/room/partykit_bridge.py | sed -n '1,380p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba app/window_type_registry.cpp | sed -n '1,320p'" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+"""Room config parser for WibWob-DOS teleport rooms.
+
+Room configs are markdown files with YAML frontmatter.
+Settings live in frontmatter, rich content in markdown sections.
+"""
+
+import re
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Optional
+
+import yaml
+
+
+REQUIRED_FIELDS = {"room_id", "instance_id", "ttyd_port"}
+FIELD_TYPES = {
+    "room_id": str,
+    "display_name": str,
+    "instance_id": int,
+    "ttyd_port": int,
+ succeeded in 51ms:
+// Unix domain socket IPC server with optional HMAC challenge-response auth.
+// Protocol: cmd:<name> [key=value ...]\n
+// Auth: when WIBWOB_AUTH_SECRET is set, new connections must complete a
+//       challenge-response handshake before commands are accepted.
+#pragma once
+
+#include <string>
+#include <set>
+#include <vector>
+#include <cstdint>
+
+class TTestPatternApp;
+
+class ApiIpcServer {
+public:
+    explicit ApiIpcServer(TTestPatternApp* app);
+    ~ApiIpcServer();
+
+    // Start listening on a Unix socket path. Returns false on failure.
+    bool start(const std::string& path = "/tmp/test_pattern_app.sock");
+ succeeded in 51ms:
+     1	#include "command_registry.h"
+     2	
+     3	#include "api_ipc.h"
+     4	
+     5	#include <sstream>
+     6	
+     7	extern void api_cascade(TTestPatternApp& app);
+     8	extern void api_toggle_scramble(TTestPatternApp& app);
+     9	extern void api_expand_scramble(TTestPatternApp& app);
+    10	extern std::string api_scramble_say(TTestPatternApp& app, const std::string& text);
+    11	extern std::string api_scramble_pet(TTestPatternApp& app);
+    12	extern std::string api_chat_receive(TTestPatternApp& app, const std::string& sender, const std::string& text);
+    13	extern void api_tile(TTestPatternApp& app);
+    14	extern void api_close_all(TTestPatternApp& app);
+    15	extern void api_save_workspace(TTestPatternApp& app);
+    16	extern bool api_open_workspace_path(TTestPatternApp& app, const std::string& path);
+    17	extern void api_screenshot(TTestPatternApp& app);
+    18	extern void api_set_pattern_mode(TTestPatternApp& app, const std::string& mode);
+    19	extern std::string api_set_theme_mode(TTestPatternApp& app, const std::string& mode);
+    20	extern std::string api_set_theme_variant(TTestPatternApp& app, const std::string& variant);
+ succeeded in 50ms:
+     1	"""
+     2	State diffing utilities for WibWob-DOS multiplayer sync (E008 F03).
+     3	
+     4	Extracts window state from IPC get_state responses, computes minimal
+     5	add/remove/update deltas, and applies remote deltas to a local instance
+     6	via IPC commands.
+     7	
+     8	Used by partykit_bridge.py and any future sync transport.
+     9	"""
+    10	
+    11	import hashlib
+    12	import hmac as _hmac
+    13	import json
+    14	import socket
+    15	import os
+    16	from typing import Any
+    17	from urllib.parse import quote as _urlencode
+    18	
+    19	
+    20	IPC_TIMEOUT = 2.0
+ succeeded in 51ms:
+  2430	    if (HAS_CHILD_VIEW(TAnimatedHGradientView))       return "animated_gradient";
+  2431	    if (HAS_CHILD_VIEW(TGenerativeMonsterCamView))    return "monster_cam";
+  2432	    if (HAS_CHILD_VIEW(TGenerativeMonsterVerseView))  return "monster_verse";
+  2433	    if (HAS_CHILD_VIEW(TGenerativeMonsterPortalView)) return "monster_portal";
+  2434	
+  2435	#undef HAS_CHILD_VIEW
+  2436	    return "test_pattern";
+  2437	}
+  2438	
+  2439	std::string api_get_state(TTestPatternApp& app) {
+  2440	    // Collect currently visible windows in desktop Z-order.
+  2441	    // Do NOT clear winToId/idToWin here — that would reassign new IDs on
+  2442	    // every call, causing compute_delta to see "new" windows every poll.
+  2443	    std::vector<TWindow*> activeWins;
+  2444	    TView *start = app.deskTop->first();
+  2445	    if (start) {
+  2446	        TView *v = start;
+  2447	        do {
+  2448	            TWindow *w = dynamic_cast<TWindow*>(v);
+  2449	            if (w) activeWins.push_back(w);
+ succeeded in 52ms:
+     1	// Window type registry — single source of truth for all spawnable window types.
+     2	// Keeps api_ipc.cpp free of per-type knowledge: adding a new type only requires
+     3	// a new entry in the k_specs table below.
+     4	
+     5	#include "window_type_registry.h"
+     6	
+     7	// tvision for TRect
+     8	#define Uses_TRect
+     9	#include <tvision/tv.h>
+    10	
+    11	#include <cstdlib>  // atoi
+    12	#include <cstring>  // strcmp
+    13	
+    14	// ── Extern declarations for spawn helpers in test_pattern_app.cpp ─────────────
+    15	
+    16	class TTestPatternApp; // forward decl (full type used only by called functions)
+    17	
+    18	extern void api_spawn_test(TTestPatternApp&, const TRect*);
+    19	extern void api_spawn_gradient(TTestPatternApp&, const std::string&, const TRect*);
+    20	extern void api_open_animation_path(TTestPatternApp&, const std::string&, const TRect*);
+ succeeded in 52ms:
+   330	            return;
+   331	        }
+   332	    }
+   333	
+   334	    // Read a single line command.
+   335	    char buf[2048];
+   336	    ssize_t n = ::read(fd, buf, sizeof(buf)-1);
+   337	    if (n <= 0) {
+   338	        ::close(fd);
+   339	        return;
+   340	    }
+   341	    buf[n] = 0;
+   342	    std::string line(buf);
+   343	    // Simple trim
+   344	    while (!line.empty() && (line.back()=='\n' || line.back()=='\r' || line.back()==' ')) line.pop_back();
+   345	
+   346	    // Parse: "cmd:<name> k=v k=v"
+   347	    std::string cmd;
+   348	    std::map<std::string,std::string> kv;
+   349	    {
+ succeeded in 52ms:
+     1	#!/usr/bin/env python3
+     2	"""Room orchestrator for WibWob-DOS teleport rooms.
+     3	
+     4	Reads room configs (markdown + YAML frontmatter), spawns ttyd+WibWob
+     5	instance pairs, manages lifecycle (health check, restart on failure),
+     6	generates shared secrets for agent auth.
+     7	
+     8	Usage:
+     9	    ./tools/room/orchestrator.py start rooms/*.md
+    10	    ./tools/room/orchestrator.py stop
+    11	    ./tools/room/orchestrator.py status
+    12	"""
+    13	
+    14	import argparse
+    15	import json
+    16	import os
+    17	import secrets
+    18	import signal
+    19	import socket
+    20	import subprocess
+ succeeded in 52ms:
+     1	#!/usr/bin/env python3
+     2	# /// script
+     3	# requires-python = ">=3.11"
+     4	# dependencies = ["websockets>=12"]
+     5	# ///
+     6	"""
+     7	PartyKit bridge for WibWob-DOS multiplayer rooms (E008 F02).
+     8	
+     9	Runs as a sidecar alongside a WibWob instance. Polls local IPC state,
+    10	diffs it, and pushes state_delta messages to PartyKit. Also receives
+    11	remote deltas from PartyKit and applies them to the local instance via IPC.
+    12	
+    13	Usage (spawned by orchestrator):
+    14	    uv run tools/room/partykit_bridge.py
+    15	
+    16	Environment:
+    17	    WIBWOB_INSTANCE      — instance ID (e.g. "1"), drives /tmp/wibwob_1.sock
+    18	    WIBWOB_PARTYKIT_URL  — PartyKit server URL (e.g. https://wibwob.user.partykit.dev)
+    19	    WIBWOB_PARTYKIT_ROOM — PartyKit room/Durable Object key (e.g. "wibwob-shared")
+    20	    WIBWOB_AUTH_SECRET   — shared HMAC secret for IPC auth (optional)
+ succeeded in 52ms:
+   630	
+   631	    // Chat log for multiplayer relay (outgoing messages from local Scramble)
+   632	    struct ChatEntry { int seq; std::string sender; std::string text; };
+   633	    std::deque<ChatEntry> chatLog_;
+   634	    int chatSeq_ = 0;
+   635	    static constexpr int kChatLogMax = 50;
+   636	
+   637	    // API/IPC registry for per-window control
+   638	    int apiIdCounter = 1;
+   639	    std::map<TWindow*, std::string> winToId;
+   640	    std::map<std::string, TWindow*> idToWin;
+   641	    
+   642	    std::string registerWindow(TWindow* w) {
+   643	        if (!w) return std::string();
+   644	        auto it = winToId.find(w);
+   645	        if (it != winToId.end()) return it->second;
+   646	        char buf[32];
+   647	        std::snprintf(buf, sizeof(buf), "w%d", apiIdCounter++);
+   648	        std::string id(buf);
+   649	        winToId[w] = id;
+
+thinking
+**Considering destructor for RAII**
+codex
+I have enough context for most sections; I’m doing one final pass on destructor/lifecycle code to verify RAII and Turbo Vision ownership behavior before I deliver findings.
+exec
+/bin/zsh -lc "nl -ba app/test_pattern_app.cpp | sed -n '1480,1565p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba app/test_pattern_app.cpp | sed -n '2760,2825p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba app/test_pattern_app.cpp | sed -n '760,920p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba app/api_ipc.cpp | sed -n '160,340p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "rg -n \"TTestPatternApp::~TTestPatternApp|new ApiIpcServer|delete ipcServer|insertWindow\\(|new T[A-Za-z0-9_]+Window|ofTileable|growMode\" app/test_pattern_app.cpp app/*.cpp | head -n 240" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+  1480	        // Shrink: tall -> smol
+  1481	        TRect desktop = deskTop->getExtent();
+  1482	        int w = 28;
+  1483	        int h = 14;
+  1484	        TRect r(desktop.b.x - w - 1, desktop.b.y - h,
+  1485	                desktop.b.x - 1,     desktop.b.y);
+  1486	        scrambleWindow->setDisplayState(sdsSmol);
+  1487	        scrambleWindow->changeBounds(r);
+  1488	        scrambleState = sdsSmol;
+  1489	        // Put behind other windows
+  1490	        if (deskTop->background) {
+  1491	            scrambleWindow->putInFrontOf((TView*)deskTop->background);
+  1492	        }
+  1493	    }
+  1494	}
+  1495	
+  1496	void TTestPatternApp::cascade()
+  1497	{
+  1498	    deskTop->cascade(deskTop->getExtent());
+  1499	}
+ succeeded in 51ms:
+  2760	        messageBox("No windows in workspace.", mfError | mfOKButton);
+  2761	        return false;
+  2762	    }
+  2763	    size_t arrPos = data.find('[', winKey);
+  2764	    if (arrPos == std::string::npos) return false;
+  2765	    std::vector<std::string> objects;
+  2766	    size_t p = arrPos+1; bool inStr=false; int depth=0;
+  2767	    while (p < data.size()) {
+  2768	        char c = data[p];
+  2769	        if (c == '"') { inStr = !inStr; ++p; continue; }
+  2770	        if (!inStr) {
+  2771	            if (c == '{') {
+  2772	                int d=1; size_t q=p+1;
+  2773	                while (q<data.size() && d) {
+  2774	                    if (data[q] == '"') { ++q; while (q<data.size() && data[q] != '"') { if (data[q]=='\\') ++q; ++q; } ++q; continue; }
+  2775	                    if (data[q] == '{') d++; else if (data[q] == '}') d--; ++q;
+  2776	                }
+  2777	                objects.emplace_back(data.substr(p, q-p));
+  2778	                p = q; continue;
+  2779	            }
+ succeeded in 50ms:
+   760	    const char* inst = std::getenv("WIBWOB_INSTANCE");
+   761	    if (inst && inst[0] != '\0') {
+   762	        sockPath = std::string("/tmp/wibwob_") + inst + ".sock";
+   763	        fprintf(stderr, "[wibwob] instance=%s socket=%s\n", inst, sockPath.c_str());
+   764	    } else {
+   765	        fprintf(stderr, "[wibwob] instance=(none) socket=%s\n", sockPath.c_str());
+   766	    }
+   767	    if (!ipcServer->start(sockPath)) {
+   768	        fprintf(stderr, "[wibwob] ERROR: IPC server failed to start on %s\n", sockPath.c_str());
+   769	    } else {
+   770	        fprintf(stderr, "[wibwob] IPC server started on %s\n", sockPath.c_str());
+   771	    }
+   772	
+   773	    // Auto-restore layout from env var (room deployment).
+   774	    const char* layoutPath = std::getenv("WIBWOB_LAYOUT_PATH");
+   775	    if (layoutPath && layoutPath[0] != '\0') {
+   776	        fprintf(stderr, "[wibwob] Restoring layout from WIBWOB_LAYOUT_PATH=%s\n", layoutPath);
+   777	        if (!loadWorkspaceFromFile(layoutPath)) {
+   778	            fprintf(stderr, "[wibwob] WARNING: Failed to restore layout from %s\n", layoutPath);
+   779	        }
+ succeeded in 51ms:
+   160	           nonce.data(), nonce.size(),
+   161	           result);
+   162	#else
+   163	    unsigned int len = 32;
+   164	    HMAC(EVP_sha256(),
+   165	         auth_secret_.data(), auth_secret_.size(),
+   166	         reinterpret_cast<const unsigned char*>(nonce.data()), nonce.size(),
+   167	         result, &len);
+   168	#endif
+   169	    return bytes_to_hex(result, 32);
+   170	}
+   171	
+   172	bool ApiIpcServer::authenticate_connection(int fd) {
+   173	    if (!auth_required()) return true;
+   174	
+   175	    // Ensure the accepted fd is blocking for the auth handshake.
+   176	    int flags = ::fcntl(fd, F_GETFL, 0);
+   177	    if (flags & O_NONBLOCK)
+   178	        ::fcntl(fd, F_SETFL, flags & ~O_NONBLOCK);
+   179	
+ succeeded in 51ms:
+app/animated_blocks_view.cpp:39:    growMode = gfGrowHiX | gfGrowHiY;
+app/animated_blocks_view.cpp:135:        options |= ofTileable;
+app/animated_blocks_view.cpp:159:    auto *w = new TAnimatedBlocksWindow(bounds);
+app/ansi_view.cpp:211:    options |= ofTileable;
+app/animated_score_view.cpp:132:    growMode = gfGrowHiX | gfGrowHiY;
+app/animated_score_view.cpp:383:        options |= ofTileable;
+app/animated_score_view.cpp:400:    auto *w = new TAnimatedScoreWindow(bounds);
+app/ansi_viewer_main.cpp:77:    TAnsiMiniWindow *w = new TAnsiMiniWindow(r, "ANSI Art", path);
+app/test_pattern_app.cpp:381:        growMode = gfGrowHiX | gfGrowHiY;
+app/test_pattern_app.cpp:418:        options |= ofTileable;  // Enable cascade/tile functionality
+app/test_pattern_app.cpp:455:        options |= ofTileable;  // Enable cascade/tile functionality
+app/test_pattern_app.cpp:501:        options |= ofTileable;  // Enable cascade/tile functionality
+app/test_pattern_app.cpp:755:    ipcServer = new ApiIpcServer(this);
+app/test_pattern_app.cpp:1286:    TTestPatternWindow* window = new TTestPatternWindow(bounds, title.str().c_str());
+app/test_pattern_app.cpp:1298:    TTestPatternWindow* window = new TTestPatternWindow(bounds, title.str().c_str());
+app/test_pattern_app.cpp:1560:    TGradientWindow* window = new TGradientWindow(bounds, title.str().c_str(), type);
+app/test_pattern_app.cpp:1588:    TGradientWindow* window = new TGradientWindow(bounds, title.str().c_str(), type);
+app/test_pattern_app.cpp:1610://     TMechWindow* window = new TMechWindow(bounds, title.str().c_str(), windowNumber);
+app/test_pattern_app.cpp:1632:    TFrameAnimationWindow* window = new TFrameAnimationWindow(bounds, "", "donut.txt");
+app/test_pattern_app.cpp:1757:        TFrameAnimationWindow* window = new TFrameAnimationWindow(bounds, "", fileName);
+
+thinking
+**Verifying destructor presence**
+exec
+/bin/zsh -lc "rg -n \"~TTestPatternApp|delete ipcServer|void TTestPatternApp::shutDown|terminate\\(|stop\\(\\)\" app/test_pattern_app.cpp" in /Users/james/Repos/wibandwob-dos exited 1 in 50ms:
+
+
+thinking
+**Inspecting class destructor presence**
+codex
+I found no explicit `TTestPatternApp` destructor in the current file, so I’m checking the class declaration area to confirm whether `ApiIpcServer` cleanup relies on process teardown rather than explicit ownership.
+exec
+/bin/zsh -lc "nl -ba app/test_pattern_app.cpp | sed -n '520,640p'" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+   520	    virtual void changeBounds(const TRect& bounds) override
+   521	    {
+   522	        TWindow::changeBounds(bounds);
+   523	        
+   524	        // Force complete redraw after window is resized/moved (e.g., by tile operations)
+   525	        setState(sfExposed, True);
+   526	        
+   527	        // Ensure child views are properly notified of resize for text content redraw
+   528	        forEach([](TView* view, void*) {
+   529	            if (auto* textView = dynamic_cast<TTextFileView*>(view)) {
+   530	                // Force text view to redraw its content
+   531	                textView->drawView();
+   532	            }
+   533	        }, nullptr);
+   534	        
+   535	        redraw();
+   536	    }
+   537	    
+   538	    // Custom frame initializer
+   539	    static TFrame *initFrame(TRect r)
+
+thinking
+**Assessing naming and docs consistency**
+exec
+/bin/zsh -lc "rg --files | rg -n \"[A-Z].*\\.cpp"'$|[A-Z].*'"\\.h"'$|[A-Z].*'"\\.py"'$|'"\\.md"'$" | head -n 200' in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "rg -n \"cmd:get_state|create_window|exec_command|subscribe_events|state_delta|WIBWOB_PARTYKIT\" CLAUDE.md app tools docs .planning -g'*.md' -g'*.py' -g'*.cpp' -g'*.h' | head -n 200" in /Users/james/Repos/wibandwob-dos succeeded in 50ms:
+docs/migration/vnext-migration-plan.md:19:1. Route remaining mutating operations through unified `exec_command(name,args,actor)`.
+.planning/README.md:57:feat(registry): add CommandRegistry skeleton with exec_command dispatch
+.planning/README.md:237:3. **Authoritative engine state.** All state mutation goes through `exec_command(name, args, actor)`. No backdoor mutations.
+.planning/README.md:288:AC-2: Creating a window via REST /windows endpoint uses exec_command dispatch, not direct TView construction.
+.planning/README.md:328:- [ ] `exec_command(name, args, actor)` path works across UI, IPC, and API/MCP
+.planning/README.md:364:Commit:   feat(registry): add CommandRegistry skeleton with exec_command dispatch
+docs/architecture/refactor-brief-vnext.md:12:   - `cmd:exec_command name=<command>`
+docs/architecture/refactor-brief-vnext.md:15:   - `send_cmd("exec_command", ...)` for `/menu/command` dispatch
+.planning/spikes/spk-xterm-pty-validation/dev-log.md:43:echo 'cmd:create_window type=test_pattern x=5 y=3 w=60 h=25' | nc -U /tmp/test_pattern_app.sock
+.planning/spikes/spk-xterm-pty-validation/dev-log.md:44:echo 'cmd:create_window type=gradient gradient=horizontal x=70 y=3 w=60 h=25' | nc -U /tmp/test_pattern_app.sock
+.planning/spikes/spk-xterm-pty-validation/dev-log.md:47:echo 'cmd:exec_command name=set_theme_mode path=dark' | nc -U /tmp/test_pattern_app.sock
+.planning/spikes/spk-xterm-pty-validation/dev-log.md:48:echo 'cmd:exec_command name=set_theme_variant path=dark_pastel' | nc -U /tmp/test_pattern_app.sock
+.planning/spikes/spk-xterm-pty-validation/dev-log.md:64:| T8 Paint | **BLOCKED** | — | Paint code exists (`app/paint/`) but not integrated: menu items are stubs (`"coming soon!"`), IPC `create_window type=paint` returns `err unknown type`. Not a browser issue — same gap on local desktop |
+.planning/spikes/spk-xterm-pty-validation/dev-log.md:248:echo 'cmd:get_state' | nc -U /tmp/wibwob_1.sock
+tools/api_server/mcp_tools.py:61:        result = await controller.exec_command(command_name, {}, actor="mcp")
+tools/api_server/mcp_tools.py:74:        result = await controller.exec_command("tile", {"cols": columns or 2}, actor="mcp")
+tools/api_server/mcp_tools.py:93:        result = await controller.exec_command("pattern_mode", {"mode": mode}, actor="mcp")
+tools/api_server/mcp_tools.py:112:        result = await controller.exec_command("set_theme_mode", {"mode": mode}, actor="mcp")
+tools/api_server/mcp_tools.py:131:        result = await controller.exec_command("set_theme_variant", {"variant": variant}, actor="mcp")
+tools/api_server/mcp_tools.py:144:        result = await controller.exec_command("reset_theme", {}, actor="mcp")
+ succeeded in 52ms:
+1:CODEX-ANALYSIS-ROUND7-REVIEW.md
+4:CODEX-ANALYSIS-ARCHITECTURE-REVIEW.md
+7:CLAUDE.md
+9:README.md
+11:modules/README.md
+19:AGENTS.md
+21:CODEX-ANALYSIS-ROUND5-REVIEW.md
+22:docs/migration/vnext-migration-plan.md
+23:rooms/multiplayer-example.md
+24:rooms/example.md
+26:CODEX-ANALYSIS-ROUND6-REVIEW.md
+31:docs/manifestos/symbient-os-manifesto-template.md
+38:docs/architecture/parity-drift-audit.md
+39:docs/architecture/refactor-brief-vnext.md
+40:docs/architecture/phase-zero-canon-alignment.md
+42:CODEX-ANALYSIS-ROUND2-REVIEW.md
+43:docs/development/github-markdown-posting.md
+46:CODEX-ANALYSIS-ROUND8-REVIEW.md
+47:memories/2026/02/20260217-retro-browser-llm-tunnel-vision.md
+48:memories/2026/02/20260217-inter-instance-agent-chat.md
+
+thinking
+**Identifying critical async and resource management flaws**
+codex
+One important lifecycle concern surfaced in `tools/room/orchestrator.py`; I’m confirming it against the app shutdown path now so I can rank severity correctly (it affects sidecar process cleanup and restart behavior).
+exec
+/bin/zsh -lc "rg -n \"void TTestPatternApp::run\\(|void TTestPatternApp::idle\\(|ipcServer->poll|main\\(|return TProgInit\" app/test_pattern_app.cpp && nl -ba app/test_pattern_app.cpp | sed -n '1160,1325p' && nl -ba app/test_pattern_app.cpp | sed -n '2840,3095p'" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+2138:void TTestPatternApp::run()
+2242:void TTestPatternApp::idle()
+2246:    if (ipcServer) ipcServer->poll();
+2259:int main()
+  1160	            }
+  1161	            case cmGlitchRadialDistort: {
+  1162	                if (!getGlitchEngine().isGlitchModeEnabled()) {
+  1163	                    messageBox("Enable Glitch Mode first to use radial distortion.", mfWarning | mfOKButton);
+  1164	                } else {
+  1165	                    // Apply radial distortion to current active window
+  1166	                    if (TView* activeView = deskTop->current) {
+  1167	                        TRect bounds = activeView->getBounds();
+  1168	                        int centerX = bounds.a.x + (bounds.b.x - bounds.a.x) / 2;
+  1169	                        int centerY = bounds.a.y + (bounds.b.y - bounds.a.y) / 2;
+  1170	                        // Note: This would need integration with drawing system
+  1171	                        messageBox("Radial distortion applied from window center!", mfInformation | mfOKButton);
+  1172	                    } else {
+  1173	                        messageBox("No active window for radial distortion.", mfWarning | mfOKButton);
+  1174	                    }
+  1175	                }
+
+thinking
+**Identifying code snippet need**
+exec
+/bin/zsh -lc "nl -ba app/test_pattern_app.cpp | sed -n '2128,2275p'" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+  2128	TDeskTop* TTestPatternApp::initDeskTop(TRect r)
+  2129	{
+  2130	    r.a.y = 1;
+  2131	    r.b.y--;
+  2132	    // Create desktop with standard constructor (plain background)
+  2133	    TDeskTop* desktop = new TDeskTop(r);
+  2134	    return desktop;
+  2135	}
+  2136	
+  2137	
+  2138	void TTestPatternApp::run()
+  2139	{
+  2140	    // Call parent run to initialize everything first
+  2141	    TApplication::run();
+  2142	}
+  2143	
+  2144	TRect TTestPatternApp::calculateWindowBounds(const std::string& filePath)
+  2145	{
+  2146	    // If the file contains animation frame delimiters, size to the
+  2147	    // largest frame (width/height). Otherwise, size to full text
+
+thinking
+**Summarizing detailed IPC and architecture risks**
+codex
+1. **High: `orchestrator` can deadlock child process I/O and leak sidecars across restarts**
+- `subprocess.Popen(..., stdout=subprocess.PIPE, stderr=subprocess.PIPE)` is used for `ttyd` but never drained, so `ttyd` can block when pipe buffers fill (`tools/room/orchestrator.py:113`).
+- PartyKit bridge processes are spawned but never tracked/stopped; `stop_room`/`stop_all` only terminate `ttyd` (`tools/room/orchestrator.py:128`, `tools/room/orchestrator.py:196`).
+- Practical fix: redirect `ttyd` stdout/stderr to files or `DEVNULL`, store bridge `Popen` handles in `RoomProcess`, terminate/wait them in restart/stop.
+
+2. **High: IPC/command architecture has drift-prone duplicate dispatch paths**
+- You have canonical `exec_command` (`app/command_registry.cpp:78`), but `ApiIpcServer::poll()` still maintains a large separate command `if/else` tree (`app/api_ipc.cpp:365`).
+- This duplicates validation/default behavior and invites parity drift over time.
+- Practical fix: keep non-command transport ops (`get_state`, `create_window`, `subscribe_events`) in `api_ipc.cpp`, route command-like ops through `exec_command` only.
+
+3. **High: Window type identity is defined in multiple places**
+- Spawnable types are in `window_type_registry.cpp` (`app/window_type_registry.cpp:157`), but type reporting for state sync is separate in `windowTypeName` (`app/test_pattern_app.cpp:2439`).
+- If these diverge, multiplayer/apply-delta behavior breaks silently.
+- Practical fix: centralize type slug ownership (single canonical source), or generate one mapping from the other.
+
+4. **Medium: `registerWindow` has side effects that can create noisy/event-loop behavior**
+- `registerWindow` publishes `state_changed` (`app/test_pattern_app.cpp:651`), and `api_get_state` calls it for each active window (`app/test_pattern_app.cpp:2475`).
+- A read operation (`get_state`) can thus emit write-like events for previously unregistered windows.
+- Practical fix: split into `ensureWindowId()` (no event) and `registerWindow()` (eventful) to make behavior explicit.
+
+5. **Medium: RAII/lifecycle gap for IPC server ownership**
+- `ipcServer` is allocated with `new` (`app/test_pattern_app.cpp:755`) and no `TTestPatternApp` destructor exists in this file to `delete` it.
+- `ApiIpcServer::~ApiIpcServer()` does cleanup (`app/api_ipc.cpp:250`), but currently it depends on process teardown instead of object lifetime.
+- Practical fix: own it with `std::unique_ptr<ApiIpcServer>` or add explicit destructor cleanup.
+
+6. **Medium: Async bridge still performs blocking IPC calls in async loops**
+- `partykit_bridge.py` uses blocking `ipc_get_state` / `apply_delta_to_ipc` from `state_diff.py` inside async coroutines (`tools/room/partykit_bridge.py:145`, `tools/room/partykit_bridge.py:247`).
+- Under socket delays/timeouts this can stall the event loop.
+- Practical fix: move IPC calls to `asyncio.to_thread(...)` or provide async IPC helpers.
+
+7. **Medium: Error handling in room bridge path is mostly log-and-continue**
+- `apply_delta_to_ipc` returns `"FAIL ..."` tags (`tools/room/state_diff.py:273`), but bridge does not escalate or retry failed commands (`tools/room/partykit_bridge.py:247`).
+- Practical fix: count/emit failure metrics, optionally trigger state resync after N failures.
+
+8. **Low: Documentation is strong at high level, but protocol seams are under-specified for new devs**
+- `CLAUDE.md` explains architecture well, but there’s no single versioned IPC protocol doc covering:
+  - framing, auth handshake, percent-encoding/base64 rules (`app/api_ipc.cpp:346`, `app/api_ipc.cpp:456`)
+  - full command schema and event payload schema (`app/api_ipc.cpp:562`, `app/test_pattern_app.cpp:2507`)
+- Practical fix: add one `docs/architecture/ipc-protocol.md` with command/event tables and examples.
+
+9. **Low: Naming convention inconsistencies exist in Markdown files**
+- Repo includes uppercase non-canonical markdown names like `app/ASCII_IMAGE_VIEWER.md` and `app/FRAME_PLAYER.md`; AGENTS convention prefers kebab-case or canonical uppercase names like `README.md`.
+- Practical fix: rename to kebab-case when touching those docs.
+
+10. **Low: Minor DRY opportunity in window spawn wrappers**
+- `window_type_registry.cpp` has many near-identical wrappers (`app/window_type_registry.cpp:53` onward).
+- Practical fix: helper templates/lambdas for no-arg spawn wrappers only; keep path/param-specific ones explicit.
+
+**Documentation completeness verdict**
+- Strong overview exists (`CLAUDE.md`) and command/window registries are conceptually documented.
+- Biggest missing docs for onboarding: exact IPC protocol + event schemas + multiplayer state/delta contract and ID-remap behavior.
+
+**C++14 / Turbo Vision practices verdict**
+- Most view/window code follows TV conventions (`growMode`, `ofTileable`, `draw/handleEvent/changeBounds` usage is widespread).
+- Main concerns are lifecycle ownership (`ipcServer`) and registry/type duplication risks, not core TV API misuse.
+
+**Python best-practices verdict (`tools/room/`)**
+- Type hints are decent, but public helpers still use broad `dict`/`Any` in many signatures.
+- Main quality gaps are process lifecycle management (`orchestrator`) and blocking IPC in async bridge.
+
+**Single biggest architectural risk**
+- The most fragile part is the **stringly-typed IPC contract spread across C++ and Python with duplicated command/type knowledge** (`app/api_ipc.cpp`, `app/command_registry.cpp`, `app/window_type_registry.cpp`, `app/test_pattern_app.cpp`, `tools/room/state_diff.py`).  
+  This is where future breakage is most likely and hardest to debug without a canonical, versioned protocol spec and stricter single-source dispatch.
+tokens used
+92,920
+1. **High: `orchestrator` can deadlock child process I/O and leak sidecars across restarts**
+- `subprocess.Popen(..., stdout=subprocess.PIPE, stderr=subprocess.PIPE)` is used for `ttyd` but never drained, so `ttyd` can block when pipe buffers fill (`tools/room/orchestrator.py:113`).
+- PartyKit bridge processes are spawned but never tracked/stopped; `stop_room`/`stop_all` only terminate `ttyd` (`tools/room/orchestrator.py:128`, `tools/room/orchestrator.py:196`).
+- Practical fix: redirect `ttyd` stdout/stderr to files or `DEVNULL`, store bridge `Popen` handles in `RoomProcess`, terminate/wait them in restart/stop.
+
+2. **High: IPC/command architecture has drift-prone duplicate dispatch paths**
+- You have canonical `exec_command` (`app/command_registry.cpp:78`), but `ApiIpcServer::poll()` still maintains a large separate command `if/else` tree (`app/api_ipc.cpp:365`).
+- This duplicates validation/default behavior and invites parity drift over time.
+- Practical fix: keep non-command transport ops (`get_state`, `create_window`, `subscribe_events`) in `api_ipc.cpp`, route command-like ops through `exec_command` only.
+
+3. **High: Window type identity is defined in multiple places**
+- Spawnable types are in `window_type_registry.cpp` (`app/window_type_registry.cpp:157`), but type reporting for state sync is separate in `windowTypeName` (`app/test_pattern_app.cpp:2439`).
+- If these diverge, multiplayer/apply-delta behavior breaks silently.
+- Practical fix: centralize type slug ownership (single canonical source), or generate one mapping from the other.
+
+4. **Medium: `registerWindow` has side effects that can create noisy/event-loop behavior**
+- `registerWindow` publishes `state_changed` (`app/test_pattern_app.cpp:651`), and `api_get_state` calls it for each active window (`app/test_pattern_app.cpp:2475`).
+- A read operation (`get_state`) can thus emit write-like events for previously unregistered windows.
+- Practical fix: split into `ensureWindowId()` (no event) and `registerWindow()` (eventful) to make behavior explicit.
+
+5. **Medium: RAII/lifecycle gap for IPC server ownership**
+- `ipcServer` is allocated with `new` (`app/test_pattern_app.cpp:755`) and no `TTestPatternApp` destructor exists in this file to `delete` it.
+- `ApiIpcServer::~ApiIpcServer()` does cleanup (`app/api_ipc.cpp:250`), but currently it depends on process teardown instead of object lifetime.
+- Practical fix: own it with `std::unique_ptr<ApiIpcServer>` or add explicit destructor cleanup.
+
+6. **Medium: Async bridge still performs blocking IPC calls in async loops**
+- `partykit_bridge.py` uses blocking `ipc_get_state` / `apply_delta_to_ipc` from `state_diff.py` inside async coroutines (`tools/room/partykit_bridge.py:145`, `tools/room/partykit_bridge.py:247`).
+- Under socket delays/timeouts this can stall the event loop.
+- Practical fix: move IPC calls to `asyncio.to_thread(...)` or provide async IPC helpers.
+
+7. **Medium: Error handling in room bridge path is mostly log-and-continue**
+- `apply_delta_to_ipc` returns `"FAIL ..."` tags (`tools/room/state_diff.py:273`), but bridge does not escalate or retry failed commands (`tools/room/partykit_bridge.py:247`).
+- Practical fix: count/emit failure metrics, optionally trigger state resync after N failures.
+
+8. **Low: Documentation is strong at high level, but protocol seams are under-specified for new devs**
+- `CLAUDE.md` explains architecture well, but there’s no single versioned IPC protocol doc covering:
+  - framing, auth handshake, percent-encoding/base64 rules (`app/api_ipc.cpp:346`, `app/api_ipc.cpp:456`)
+  - full command schema and event payload schema (`app/api_ipc.cpp:562`, `app/test_pattern_app.cpp:2507`)
+- Practical fix: add one `docs/architecture/ipc-protocol.md` with command/event tables and examples.
+
+9. **Low: Naming convention inconsistencies exist in Markdown files**
+- Repo includes uppercase non-canonical markdown names like `app/ASCII_IMAGE_VIEWER.md` and `app/FRAME_PLAYER.md`; AGENTS convention prefers kebab-case or canonical uppercase names like `README.md`.
+- Practical fix: rename to kebab-case when touching those docs.
+
+10. **Low: Minor DRY opportunity in window spawn wrappers**
+- `window_type_registry.cpp` has many near-identical wrappers (`app/window_type_registry.cpp:53` onward).
+- Practical fix: helper templates/lambdas for no-arg spawn wrappers only; keep path/param-specific ones explicit.
+
+**Documentation completeness verdict**
+- Strong overview exists (`CLAUDE.md`) and command/window registries are conceptually documented.
+- Biggest missing docs for onboarding: exact IPC protocol + event schemas + multiplayer state/delta contract and ID-remap behavior.
+
+**C++14 / Turbo Vision practices verdict**
+- Most view/window code follows TV conventions (`growMode`, `ofTileable`, `draw/handleEvent/changeBounds` usage is widespread).
+- Main concerns are lifecycle ownership (`ipcServer`) and registry/type duplication risks, not core TV API misuse.
+
+**Python best-practices verdict (`tools/room/`)**
+- Type hints are decent, but public helpers still use broad `dict`/`Any` in many signatures.
+- Main quality gaps are process lifecycle management (`orchestrator`) and blocking IPC in async bridge.
+
+**Single biggest architectural risk**
+- The most fragile part is the **stringly-typed IPC contract spread across C++ and Python with duplicated command/type knowledge** (`app/api_ipc.cpp`, `app/command_registry.cpp`, `app/window_type_registry.cpp`, `app/test_pattern_app.cpp`, `tools/room/state_diff.py`).  
+  This is where future breakage is most likely and hardest to debug without a canonical, versioned protocol spec and stricter single-source dispatch.
