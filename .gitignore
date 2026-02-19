@@ -51,3 +51,4 @@ workspaces/*
 
 # CoPilot
 _codeql_build_dir/
+build-linux/

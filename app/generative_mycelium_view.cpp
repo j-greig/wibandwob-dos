@@ -15,6 +15,7 @@
 
 #include <vector>
 #include <cmath>
+#include <cstring>
 #include <algorithm>
 
 namespace {

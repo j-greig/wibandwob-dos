@@ -63,6 +63,12 @@ add_executable(test_pattern
 target_include_directories(test_pattern PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(test_pattern PRIVATE tvision)
 
+# On Linux, api_ipc.cpp uses OpenSSL for HMAC (macOS uses CommonCrypto)
+if(NOT APPLE)
+    find_package(OpenSSL REQUIRED)
+    target_link_libraries(test_pattern PRIVATE OpenSSL::Crypto)
+endif()
+
 # simple_tui (minimal reference app)
 add_executable(simple_tui
     simple_tui.cpp
