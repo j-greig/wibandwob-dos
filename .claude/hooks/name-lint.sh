@@ -35,6 +35,16 @@ case "$BASENAME" in
     ;;
 esac
 
+# Spike file location enforcement
+# spkNN-*.md files must live inside .planning/epics/<epic>/ or .planning/spikes/<name>/
+# (Cross-epic standalone spikes belong in .planning/spikes/spk-<name>/ directories.)
+if echo "$BASENAME" | grep -qE '^spk[0-9]'; then
+  if ! echo "$FILE_PATH" | grep -qE '\.planning/(epics|spikes)/'; then
+    echo "Spike file '$BASENAME' must live under .planning/epics/<epic>/ or .planning/spikes/<spike-name>/ — not in '$FILE_PATH'" >&2
+    exit 2
+  fi
+fi
+
 # Planning epic directory structure enforcement
 # Files under .planning/epics/ must follow prefix conventions:
 #   epic dir:    eNNN-<kebab>/          files: eNNN-<kebab>.md
