@@ -683,6 +683,19 @@ void ApiIpcServer::poll() {
                 resp = "ok\n";
             }
         }
+    } else if (cmd == "paint_clear") {
+        auto id_it = kv.find("id");
+        if (id_it == kv.end()) {
+            resp = "err missing id\n";
+        } else {
+            auto *canvas = api_find_paint_canvas(*app_, id_it->second);
+            if (!canvas) { resp = "err paint window not found\n"; }
+            else {
+                canvas->clear();
+                canvas->drawView();
+                resp = "ok\n";
+            }
+        }
     } else if (cmd == "paint_export") {
         auto id_it = kv.find("id");
         if (id_it == kv.end()) {
