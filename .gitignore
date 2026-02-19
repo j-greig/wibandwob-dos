@@ -52,3 +52,4 @@ workspaces/*
 # CoPilot
 _codeql_build_dir/
 build-linux/
+260219-*.txt
