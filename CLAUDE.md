@@ -38,7 +38,17 @@ uv run tools/api_server/test_move.py   # Test rapid window movement
 # API server smoke test (requires running API server)
 curl http://127.0.0.1:8089/health
 curl http://127.0.0.1:8089/state
+
+# TUI screenshot capture (requires running TUI + API server)
+curl -s -X POST http://127.0.0.1:8089/screenshot   # triggers C++ frame capture via IPC
+ls -t logs/screenshots/tui_*.txt | head -1           # latest plain-text capture
+cat "$(ls -t logs/screenshots/tui_*.txt | head -1)"  # read it — full screen buffer as text
+
+# Structural state (JSON: windows, positions, sizes)
+curl -s http://127.0.0.1:8089/state | python3 -m json.tool
 ```
+
+**Agent visual inspection**: to "see" the TUI, trigger a screenshot then read the `.txt` file. It contains every cell of the Turbo Vision screen buffer as plain text (187x63 at full-screen). The `.ans` variant has ANSI colour codes. `GET /state` returns a JSON structural view (window list, rects, canvas size) without visual rendering.
 
 No C++ unit test framework is configured. C++ testing is manual via UI interaction or API calls.
 
