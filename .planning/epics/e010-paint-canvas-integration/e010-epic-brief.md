@@ -49,6 +49,12 @@ Test: `tools/api_server/test_paint_ipc.py::test_canvas_resize_implemented`
 AC-7: Palette draw() renders FG/BG chip section before the swatch grid.
 Test: `tools/api_server/test_paint_ipc.py::test_palette_chip_implemented`
 
+AC-8: REST API endpoints exist for paint operations (cell, line, rect, clear, export).
+Test: `tools/api_server/test_paint_ipc.py::test_paint_rest_endpoints`
+
+AC-9: Pencil tool draws continuously on mouse drag (evMouseMove handled when left button held).
+Test: `tools/api_server/test_paint_ipc.py::test_canvas_resize_implemented` (code-presence check in paint_canvas.cpp for evMouseMove branch)
+
 ## Notes
 
 - C++ unit test framework not configured; IPC integration tests and grep-based code-presence tests serve as acceptance tests.

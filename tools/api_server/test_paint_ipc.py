@@ -126,11 +126,34 @@ def test_palette_chip_implemented():
     print("PASS AC-7: palette FG/BG chip implemented")
 
 
+def test_paint_rest_endpoints_exist():
+    """AC-8: REST routes for paint operations present in main.py."""
+    repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    src = open(os.path.join(repo_root, "tools/api_server/main.py")).read()
+    for route in ["/paint/cell", "/paint/line", "/paint/rect", "/paint/clear", "/paint/export"]:
+        assert route in src, f"REST route {route!r} not found in main.py"
+    print("PASS AC-8: paint REST endpoints present")
+
+
+def test_mouse_move_handled():
+    """AC-9: evMouseMove is handled in paint_canvas.cpp handleEvent (not just in eventMask)."""
+    repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    src = open(os.path.join(repo_root, "app/paint/paint_canvas.cpp")).read()
+    # Must appear after the handleEvent function definition, not just in constructor
+    handle_start = src.find("TPaintCanvasView::handleEvent")
+    assert handle_start != -1, "handleEvent not found in paint_canvas.cpp"
+    handle_body = src[handle_start:]
+    assert "evMouseMove" in handle_body, "evMouseMove not handled in handleEvent body"
+    print("PASS AC-9: evMouseMove handled in handleEvent")
+
+
 if __name__ == "__main__":
-    # AC-4, AC-6, AC-7 run without the app
+    # AC-4, AC-6, AC-7, AC-8, AC-9 run without the app
     test_no_debug_colours()
     test_canvas_resize_implemented()
     test_palette_chip_implemented()
+    test_paint_rest_endpoints_exist()
+    test_mouse_move_handled()
 
     # AC-1..3 require running app
     try:

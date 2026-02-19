@@ -368,6 +368,28 @@ class Controller:
         await self._events.emit("window.updated", self._serialize_window(win))
         return win
 
+    # ----- Paint IPC -----
+    async def paint_cell(self, win_id: str, x: int, y: int, fg: int = 15, bg: int = 0) -> str:
+        return send_cmd("paint_cell", {"id": win_id, "x": str(x), "y": str(y), "fg": str(fg), "bg": str(bg)})
+
+    async def paint_line(self, win_id: str, x0: int, y0: int, x1: int, y1: int, fg: int = 15, bg: int = 0) -> str:
+        return send_cmd("paint_line", {"id": win_id, "x0": str(x0), "y0": str(y0), "x1": str(x1), "y1": str(y1)})
+
+    async def paint_rect(self, win_id: str, x0: int, y0: int, x1: int, y1: int, fg: int = 15, bg: int = 0, fill: bool = False) -> str:
+        return send_cmd("paint_rect", {"id": win_id, "x0": str(x0), "y0": str(y0), "x1": str(x1), "y1": str(y1)})
+
+    async def paint_clear(self, win_id: str) -> str:
+        return send_cmd("paint_clear", {"id": win_id})
+
+    async def paint_export(self, win_id: str) -> Any:
+        resp = send_cmd("paint_export", {"id": win_id})
+        if isinstance(resp, str) and resp.lower().startswith("err"):
+            return resp
+        try:
+            return json.loads(resp)
+        except Exception:
+            return {"text": resp}
+
     async def send_text(self, win_id: str, content: str, mode: str = "append", position: str = "end") -> Dict[str, Any]:
         """Send text to a text editor window"""
         try:
