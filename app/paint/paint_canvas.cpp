@@ -299,6 +299,35 @@ void TPaintCanvasView::handleEvent(TEvent &ev)
         }
         clearEvent(ev);
     }
+    else if (ev.what == evMouseMove) {
+        TPoint m = makeLocal(ev.mouse.where);
+        bool shift = (ev.mouse.eventFlags & (kbShift)) != 0;
+        curX = std::max(0, std::min(cols - 1, m.x));
+        curY = std::max(0, std::min(rows - 1, m.y));
+
+        if (!ctx) {
+            if (shift || (ev.mouse.buttons & mbLeftButton))
+                put(curX, curY, true);
+            else if (ev.mouse.buttons & mbRightButton)
+                put(curX, curY, false);
+        } else {
+            auto tool = ctx->tool;
+            if (tool == PaintContext::Pencil || tool == PaintContext::Eraser) {
+                bool on = (tool == PaintContext::Pencil);
+                if (ev.mouse.buttons & mbRightButton) on = false;
+                if (shift || (ev.mouse.buttons & (mbLeftButton | mbRightButton)))
+                    put(curX, curY, on);
+            } else if ((tool == PaintContext::Line || tool == PaintContext::Rect) &&
+                       dragging && (ev.mouse.buttons & mbLeftButton)) {
+                // Track drag endpoint for live preview.
+                curX = std::max(0, std::min(cols - 1, m.x));
+                curY = std::max(0, std::min(rows - 1, m.y));
+            }
+        }
+
+        drawView();
+        clearEvent(ev);
+    }
 }
 
 void TPaintCanvasView::changeBounds(const TRect &bounds)
