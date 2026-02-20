@@ -1,0 +1,2106 @@
+OpenAI Codex v0.101.0 (research preview)
+--------
+workdir: /Users/james/Repos/wibandwob-dos
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: medium
+reasoning summaries: auto
+session id: 019c7a5e-ddcd-7300-ac82-f51c933a4cb3
+--------
+user
+DEVNOTE: Files matching codex-*.log are intentional run logs. Ignore completely.
+
+TASK: Produce a world-class, dev-review-canon megareport on the MicropolisCore game engine (SimCity Classic open-source recreation) — covering engine architecture, simulation mechanics, frontend design, rendering pipeline, save format, modding surface, and integration feasibility with WibWob-DOS. Save the report to `.planning/spikes/spk-micropolis-engine-review/spk02-codex-megareport.md`.
+
+---
+
+## YOUR DELIVERABLE
+
+Write a single comprehensive markdown file at `.planning/spikes/spk-micropolis-engine-review/spk02-codex-megareport.md` with the following structure and depth. This must be the definitive reference document — assume the reader is a senior C++ developer who will use this to build a custom city simulation.
+
+Required sections (expand each with maximum detail):
+
+1. **Executive Summary** — What MicropolisCore is, its lineage from SimCity 1989, licensing (GPL-3 + Micropolis name license), what it can and cannot be used for.
+
+2. **Repository Map** — Every directory and key file, what it does, line counts, dependencies.
+
+3. **The Micropolis God Object** — Complete anatomy of the `Micropolis` class:
+   - All public state variables with types, ranges, and what affects them
+   - All overlay maps (MapByte1/2/4, MapShort8) — what each one stores, resolution, update frequency
+   - The 16-bit tile format (LOMASK, PWRBIT, CONDBIT, BURNBIT, BULLBIT, ANIMBIT, ZONEBIT) with bit layout diagram
+   - Complete tile index catalogue (0-1023) with ranges for every category and building sizes
+
+4. **Simulation Loop Deep-Dive** — The 16-phase `simulate()` cycle:
+   - Phase-by-phase breakdown with frequency tables
+   - Speed system (simSpeed 0-3, speedCycle, frame skipping)
+   - `mapScan()` dispatch logic (what happens to each tile type)
+   - Phase timing relative to game calendar (cityTime units, months, years)
+
+5. **Zone Growth Model** — Complete economic simulation:
+   - `setValves()` — the supply/demand computation with all formulas, tax tables, game level multipliers
+   - Residential growth/decline: `doResidential()` → `doResIn()`/`doResOut()` — population levels, value levels, tile transitions
+   - Commercial growth/decline: same depth
+   - Industrial growth/decline: same depth
+   - Growth caps (resCap/comCap/indCap) and what unlocks them
+   - Traffic dependency: `makeTraffic()` pathfinding algorithm, MAX_TRAFFIC_DISTANCE, density updates
+   - External market model
+
+6. **Budget & Economy** — Tax collection, funding allocation, road/police/fire effect computation, game level multipliers (RLevels, FLevels), cash flow formula.
+
+7. **Power Grid** — Stack-based flood fill algorithm, CONDBIT/PWRBIT propagation, power plant types, zone power status effects.
+
+8. **Overlay Map Scans** — For each of pollution, crime, land value, population density, terrain density, fire/police coverage, rate of growth, traffic density, commercial rate:
+   - What generates the data
+   - Smoothing/decay algorithms
+   - How it feeds back into zone evaluation
+   - Map resolution (1:1, 2:2, 4:4, 8:8)
+
+9. **Disasters** — Every disaster type: trigger conditions, spread mechanics, damage model, recovery, scenario-specific disasters with delay tables.
+
+10. **Sprites** — All 8 sprite types: movement algorithms, collision, destruction, generation conditions, animation frames.
+
+11. **Terrain Generation** — `generateMap()`: island mode, river algorithm, lake placement, tree distribution, smoothing passes. Seed-based determinism.
+
+12. **Tools & Building Placement** — `doTool()` dispatch, `ToolEffects` pattern (deferred world modification), cost validation, `BuildingProperties`, auto-bulldoze, zone placement rules, wire/road/rail auto-connection (`connect.cpp`).
+
+13. **Save File Format** — Complete binary layout of .cty files (27,120 bytes): offsets, field sizes, endianness, miscHist encoding of game state, map data layout (column-major).
+
+14. **Callback Interface** — All 35+ callback methods grouped by category, when each fires, what data it carries, how the frontend should respond.
+
+15. **WASM/Embind Binding Layer** — What's exposed to JS, what's hidden, memory access pattern (HEAPU16 subarray), the JSCallback delegation pattern.
+
+16. **SvelteKit Frontend Architecture**:
+    - `MicropolisSimulator.ts`: singleton pattern, tick loop, multi-view support, speed/FPS tables
+    - `micropolisStore.ts`: Svelte 5 runes reactive bridge, state variables, actions
+    - `ReactiveMicropolisCallback.ts`: callback → runes wiring
+    - `WebGLTileRenderer.ts`: shader architecture, tile atlas texture, map texture, pan/zoom
+    - Tile atlas format requirements
+    - The MOP (overlay) layer
+
+17. **CLI Tool** — `micropolis.js` capabilities: city info, analyze, edit, patch-scenario, export, visualize (ASCII/emoji).
+
+18. **Modding Guide** — Categorised by difficulty:
+    - Easy (no engine changes): graphics swap, scenario creation, parameter tweaks
+    - Medium (engine changes): new zones, new buildings, map size, new overlays
+    - Hard: tile format expansion, 3D, multiplayer
+    - For each: what files to change, what constants to modify, what tests to add
+
+19. **Integration Paths for WibWob-DOS** — Four options analysed in depth:
+    - **Option A**: WASM engine + custom web frontend
+    - **Option B**: WASM/Node.js headless + WibWob-DOS TUI via IPC
+    - **Option C**: Native C++ engine compiled into WibWob-DOS (RECOMMENDED)
+    - **Option D**: Headless service + dual frontend
+    - For each: architecture diagram, effort estimate, pros/cons, risk register
+    - Specific Turbo Vision integration design for Option C:
+      - ASCII tile rendering strategy (tile index → glyph/fg/bg lookup table with examples for all major tile categories)
+      - TView subclass design for the map viewport
+      - Status bar layout (funds, date, population, RCI demand, score)
+      - Tool palette UI design for keyboard-driven interaction
+      - Callback → TView event bridge
+      - Module system integration for tile themes
+
+20. **Emscripten Decoupling Guide** — Step-by-step instructions to strip Emscripten dependencies from the C++ engine for native compilation:
+    - Which `#include` directives to guard
+    - The `emscripten::val` dependency in `Callback` class — how to replace
+    - `emscripten.cpp` exclusion from build
+    - CMake integration with WibWob-DOS's existing build
+
+21. **MOOLLM & AI Integration** — How the Micropolis skill works in MOOLLM, speed-of-light execution, schema mechanism for causal learning, experiment skill for simulation evaluation. Relevance to WibWob-DOS's symbient AI model.
+
+22. **Determinism & Testing** — PRNG system, seed-based reproducibility, how to build a test harness, snapshot comparison for regression testing.
+
+23. **Appendices**:
+    - A: Complete Tiles enum (0-1023) with tile index, name, category, building size, animation info
+    - B: Complete Callback interface method signatures
+    - C: Complete EditingTool enum with costs and sizes
+    - D: Complete message enum (MESSAGE_*) with text descriptions
+    - E: Scenario details (city, year, disaster, delay, score wait)
+    - F: Map constant reference (WORLD_W=120, WORLD_H=100, all derived sizes)
+    - G: Game level parameter tables (tax, road, fire, police multipliers)
+
+---
+
+## CONTEXT: WIBWOB-DOS (the target integration platform)
+
+WibWob-DOS is a symbient operating system — a text-native dual OS built on Turbo Vision (C++14/ncurses). Human and AI share equal control.
+
+Key facts:
+- C++14 core with Turbo Vision TUI (ncurses backend, 24-bit RGB, Unicode)
+- REST API + MCP for programmatic control (FastAPI/Python sidecar)
+- Multi-instance architecture with Unix socket IPC
+- Module system for content packs
+- 60+ menu commands, generative art engines, text editors, ASCII art, animation
+- Browser-accessible via ttyd PTY bridge
+- Command registry refactor in progress (single source of truth, parity enforcement)
+- Planning canon: epic/feature/story hierarchy, strict AC→Test traceability
+- ANSI guardrail: NEVER dump raw ANSI into TDrawBuffer — always parse to cell model (glyph, fg, bg) then use native TV draw calls
+
+The owner's intent:
+1. Use MicropolisCore's game engine to build a custom SimCity clone
+2. Same game mechanics (zones, traffic, power, budget, disasters, scoring)
+3. Different graphics/sprites — possibly ASCII art for TUI, possibly pixel art for web
+4. Maybe running INSIDE WibWob-DOS as a Turbo Vision sub-app
+5. Maybe having a web frontend (SvelteKit or similar) — TBC
+6. Modding potential — tweaking simulation rules, adding new zone types, custom disasters
+7. GPL-3 license compatibility needs to be assessed
+
+## CONTEXT: MICROPOLISCORE (the source repo)
+
+Cloned at `/tmp/MicropolisCore`. Key paths:
+- Engine: `/tmp/MicropolisCore/MicropolisEngine/src/` (all .cpp and .h files)
+- Frontend: `/tmp/MicropolisCore/micropolis/src/lib/` (TypeScript/Svelte)
+- CLI: `/tmp/MicropolisCore/micropolis/scripts/micropolis.js`
+- Notes: `/tmp/MicropolisCore/notes/` (SIMULATOR.txt, Tiles.txt, file-format.txt, etc.)
+- Resources: `/tmp/MicropolisCore/resources/cities/` (.cty save files)
+- README: `/tmp/MicropolisCore/README.md`
+
+## PRELIMINARY FINDINGS (from my initial review — use as foundation, go deeper)
+
+I've already done a first-pass review saved at `.planning/spikes/spk-micropolis-engine-review/spk01-findings.md`. Read that file first — it covers the architecture at a high level. Your job is to go MUCH deeper by reading the actual source code. Specifically:
+
+### Files you MUST read in full:
+- `/tmp/MicropolisCore/MicropolisEngine/src/micropolis.h` (2835 lines — the entire class definition)
+- `/tmp/MicropolisCore/MicropolisEngine/src/simulate.cpp` (16-phase sim loop, valves, census, tax)
+- `/tmp/MicropolisCore/MicropolisEngine/src/zone.cpp` (residential/commercial/industrial zone logic)
+- `/tmp/MicropolisCore/MicropolisEngine/src/traffic.cpp` (pathfinding, density)
+- `/tmp/MicropolisCore/MicropolisEngine/src/tool.cpp` (player tools, building placement)
+- `/tmp/MicropolisCore/MicropolisEngine/src/tool.h` (ToolEffects, BuildingProperties, tile bits)
+- `/tmp/MicropolisCore/MicropolisEngine/src/sprite.cpp` (all sprite types)
+- `/tmp/MicropolisCore/MicropolisEngine/src/scan.cpp` (pollution, crime, land value scans)
+- `/tmp/MicropolisCore/MicropolisEngine/src/power.cpp` (power grid)
+- `/tmp/MicropolisCore/MicropolisEngine/src/budget.cpp` (budget)
+- `/tmp/MicropolisCore/MicropolisEngine/src/evaluate.cpp` (city score, problems)
+- `/tmp/MicropolisCore/MicropolisEngine/src/disasters.cpp` (all disasters)
+- `/tmp/MicropolisCore/MicropolisEngine/src/generate.cpp` (terrain generation)
+- `/tmp/MicropolisCore/MicropolisEngine/src/connect.cpp` (auto-connection)
+- `/tmp/MicropolisCore/MicropolisEngine/src/fileio.cpp` (save/load)
+- `/tmp/MicropolisCore/MicropolisEngine/src/callback.h` (callback interface)
+- `/tmp/MicropolisCore/MicropolisEngine/src/emscripten.cpp` (WASM bindings)
+- `/tmp/MicropolisCore/MicropolisEngine/src/map_type.h` (Map template)
+- `/tmp/MicropolisCore/MicropolisEngine/src/data_types.h` (type aliases)
+- `/tmp/MicropolisCore/MicropolisEngine/src/position.h` and `position.cpp`
+- `/tmp/MicropolisCore/MicropolisEngine/src/text.h` (message enums)
+- `/tmp/MicropolisCore/MicropolisEngine/src/frontendmessage.h`
+- `/tmp/MicropolisCore/MicropolisEngine/src/animate.cpp`
+- `/tmp/MicropolisCore/MicropolisEngine/src/message.cpp`
+- `/tmp/MicropolisCore/MicropolisEngine/src/graph.cpp`
+- `/tmp/MicropolisCore/MicropolisEngine/src/update.cpp`
+- `/tmp/MicropolisCore/MicropolisEngine/src/random.cpp`
+- `/tmp/MicropolisCore/MicropolisEngine/src/allocate.cpp`
+- `/tmp/MicropolisCore/MicropolisEngine/src/initialize.cpp`
+- `/tmp/MicropolisCore/MicropolisEngine/src/micropolis.cpp`
+- `/tmp/MicropolisCore/MicropolisEngine/src/utilities.cpp`
+- `/tmp/MicropolisCore/micropolis/src/lib/MicropolisSimulator.ts`
+- `/tmp/MicropolisCore/micropolis/src/lib/micropolisStore.ts`
+- `/tmp/MicropolisCore/micropolis/src/lib/WebGLTileRenderer.ts`
+- `/tmp/MicropolisCore/micropolis/src/lib/ReactiveMicropolisCallback.ts`
+- `/tmp/MicropolisCore/micropolis/src/lib/TileRenderer.ts`
+- `/tmp/MicropolisCore/micropolis/src/lib/sprites.ts`
+- `/tmp/MicropolisCore/micropolis/scripts/constants.js`
+- `/tmp/MicropolisCore/notes/SIMULATOR.txt`
+- `/tmp/MicropolisCore/notes/Tiles.txt`
+- `/tmp/MicropolisCore/notes/file-format.txt`
+- `/tmp/MicropolisCore/notes/ROADMAP.txt`
+- `/tmp/MicropolisCore/notes/DevelopmentPlan.md`
+- `/tmp/MicropolisCore/README.md`
+
+Also read:
+- `.planning/spikes/spk-micropolis-engine-review/spk01-findings.md` (my preliminary findings)
+- `README.md` (WibWob-DOS overview)
+- `AGENTS.md` (development conventions)
+- `.planning/README.md` (planning canon)
+
+### Key formulas to extract and document:
+- `setValves()` demand computation (simulate.cpp)
+- `collectTax()` revenue computation (simulate.cpp)
+- `evalRes()`/`evalCom()`/`evalInd()` zone evaluation (zone.cpp)
+- `getScore()` city score computation (evaluate.cpp)
+- `pollutionTerrainLandValueScan()` (scan.cpp)
+- `crimeScan()` (scan.cpp)
+- Traffic pathfinding (`tryDrive()`, `tryGo()` in traffic.cpp)
+- Power flood fill (`doPowerScan()` in power.cpp)
+- Fire spread probability (simulate.cpp `doFire()`)
+- Meltdown probability tables (simulate.cpp `doSpecialZone()`)
+
+## QUALITY BAR
+
+This report should be:
+- **Code-grounded**: Every claim backed by file:line references or code snippets
+- **Formula-complete**: Every simulation formula written out with variable names matching the source
+- **Exhaustive**: Cover every subsystem, not just the highlights
+- **Actionable**: A developer should be able to implement a custom frontend or mod from this document alone
+- **Well-structured**: Deep hierarchy with clear section numbering, tables for reference data
+- **Cross-referenced**: Link sections to each other (e.g., "see §4.3 for how valves affect zone growth")
+
+Target length: 2000-4000 lines of markdown. Use the full depth of your context window.
+
+## FORMAT
+
+The file must have this header:
+
+```markdown
+# SPK02 — MicropolisCore Engine Megareport (Codex Deep Review)
+
+## Status
+
+Status: in-progress
+GitHub issue: —
+PR: —
+```
+
+Then the numbered sections as described above.
+mcp startup: no servers
+2026-02-20T09:26:03.519731Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c76ff-4405-7962-ae80-917da2e489f2
+
+thinking
+**Planning large doc generation**
+codex
+I’m going to build this as a source-grounded megareport by first harvesting exact formulas, constants, and interfaces from the required files, then drafting the document section-by-section with file/line citations. I’ll start by scanning `spk01-findings.md`, project canon docs, and line maps for all required MicropolisCore files.
+exec
+/bin/zsh -lc 'wc -l .planning/spikes/spk-micropolis-engine-review/spk01-findings.md README.md AGENTS.md .planning/README.md' in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc 'wc -l /tmp/MicropolisCore/MicropolisEngine/src/{micropolis.h,simulate.cpp,zone.cpp,traffic.cpp,tool.cpp,tool.h,sprite.cpp,scan.cpp,power.cpp,budget.cpp,evaluate.cpp,disasters.cpp,generate.cpp,connect.cpp,fileio.cpp,callback.h,emscripten.cpp,map_type.h,data_types.h,position.h,position.cpp,text.h,frontendmessage.h,animate.cpp,message.cpp,graph.cpp,update.cpp,random.cpp,allocate.cpp,initialize.cpp,micropolis.cpp,utilities.cpp} /tmp/MicropolisCore/micropolis/src/lib/{MicropolisSimulator.ts,micropolisStore.ts,WebGLTileRenderer.ts,ReactiveMicropolisCallback.ts,TileRenderer.ts,sprites.ts} /tmp/MicropolisCore/micropolis/scripts/constants.js /tmp/MicropolisCore/notes/{SIMULATOR.txt,Tiles.txt,file-format.txt,ROADMAP.txt,DevelopmentPlan.md} /tmp/MicropolisCore/README.md' in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+     878 .planning/spikes/spk-micropolis-engine-review/spk01-findings.md
+     260 README.md
+     117 AGENTS.md
+     374 .planning/README.md
+    1629 total
+exec
+/bin/zsh -lc 'ls -la .planning/spikes/spk-micropolis-engine-review && rg --files /tmp/MicropolisCore/MicropolisEngine/src | wc -l && rg --files /tmp/MicropolisCore/micropolis/src/lib | wc -l' in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+    2834 /tmp/MicropolisCore/MicropolisEngine/src/micropolis.h
+    1729 /tmp/MicropolisCore/MicropolisEngine/src/simulate.cpp
+    1039 /tmp/MicropolisCore/MicropolisEngine/src/zone.cpp
+     519 /tmp/MicropolisCore/MicropolisEngine/src/traffic.cpp
+    1617 /tmp/MicropolisCore/MicropolisEngine/src/tool.cpp
+     347 /tmp/MicropolisCore/MicropolisEngine/src/tool.h
+    2039 /tmp/MicropolisCore/MicropolisEngine/src/sprite.cpp
+     600 /tmp/MicropolisCore/MicropolisEngine/src/scan.cpp
+     195 /tmp/MicropolisCore/MicropolisEngine/src/power.cpp
+     352 /tmp/MicropolisCore/MicropolisEngine/src/budget.cpp
+     573 /tmp/MicropolisCore/MicropolisEngine/src/evaluate.cpp
+     418 /tmp/MicropolisCore/MicropolisEngine/src/disasters.cpp
+     761 /tmp/MicropolisCore/MicropolisEngine/src/generate.cpp
+     745 /tmp/MicropolisCore/MicropolisEngine/src/connect.cpp
+     676 /tmp/MicropolisCore/MicropolisEngine/src/fileio.cpp
+     177 /tmp/MicropolisCore/MicropolisEngine/src/callback.h
+    1265 /tmp/MicropolisCore/MicropolisEngine/src/emscripten.cpp
+     354 /tmp/MicropolisCore/MicropolisEngine/src/map_type.h
+      90 /tmp/MicropolisCore/MicropolisEngine/src/data_types.h
+     197 /tmp/MicropolisCore/MicropolisEngine/src/position.h
+ succeeded in 52ms:
+total 72
+drwxr-xr-x@  3 james  staff     96 Feb 20 09:23 .
+drwxr-xr-x@ 10 james  staff    320 Feb 20 09:19 ..
+-rw-r--r--@  1 james  staff  35633 Feb 20 09:23 spk01-findings.md
+      38
+      39
+
+thinking
+**Planning repository structure extraction**
+codex
+I’ve confirmed the required corpus is ~24.8k lines, so I’ll now extract a precise map (directories, build files, dependencies) and then mine subsystem formulas/constants directly from source to keep the report code-accurate.
+exec
+/bin/zsh -lc 'find /tmp/MicropolisCore -maxdepth 3 -type d | sort' in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "rg -n \"project\\(|cmake_minimum_required|add_library|add_executable|target_link_libraries|find_package|option\\(\" /tmp/MicropolisCore/MicropolisEngine -g 'CMakeLists.txt' && rg -n \"name|dependencies|devDependencies|scripts\" /tmp/MicropolisCore/micropolis/package.json /tmp/MicropolisCore/package.json" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc 'ls -la /tmp/MicropolisCore && ls -la /tmp/MicropolisCore/MicropolisEngine && ls -la /tmp/MicropolisCore/micropolis' in /Users/james/Repos/wibandwob-dos succeeded in 55ms:
+/tmp/MicropolisCore
+/tmp/MicropolisCore/.git
+/tmp/MicropolisCore/.git/hooks
+/tmp/MicropolisCore/.git/info
+/tmp/MicropolisCore/.git/logs
+/tmp/MicropolisCore/.git/logs/refs
+/tmp/MicropolisCore/.git/objects
+/tmp/MicropolisCore/.git/objects/info
+/tmp/MicropolisCore/.git/objects/pack
+/tmp/MicropolisCore/.git/refs
+/tmp/MicropolisCore/.git/refs/heads
+/tmp/MicropolisCore/.git/refs/remotes
+/tmp/MicropolisCore/.git/refs/tags
+/tmp/MicropolisCore/.github
+/tmp/MicropolisCore/.github/workflows
+/tmp/MicropolisCore/.vscode
+/tmp/MicropolisCore/Cursor
+/tmp/MicropolisCore/MicropolisEngine
+/tmp/MicropolisCore/MicropolisEngine/src
+/tmp/MicropolisCore/documentation
+ exited 1 in 50ms:
+
+ succeeded in 51ms:
+total 520
+drwxr-xr-x@  25 james  wheel    800 Feb 20 09:18 .
+drwxrwxrwt  133 root   wheel   4256 Feb 20 09:25 ..
+drwxr-xr-x@  13 james  wheel    416 Feb 20 09:18 .git
+drwxr-xr-x@   4 james  wheel    128 Feb 20 09:18 .github
+-rw-r--r--@   1 james  wheel    341 Feb 20 09:18 .gitignore
+drwxr-xr-x@   3 james  wheel     96 Feb 20 09:18 .vscode
+drwxr-xr-x@   5 james  wheel    160 Feb 20 09:18 Cursor
+-rw-r--r--@   1 james  wheel  62359 Feb 20 09:18 Doxyfile
+-rw-r--r--@   1 james  wheel  44930 Feb 20 09:18 LICENSE
+drwxr-xr-x@   5 james  wheel    160 Feb 20 09:18 MicropolisEngine
+-rw-r--r--@   1 james  wheel   3365 Feb 20 09:18 MicropolisGPLLicenseNotice.md
+-rw-r--r--@   1 james  wheel   5408 Feb 20 09:18 MicropolisPublicNameLicense.md
+-rw-r--r--@   1 james  wheel  20662 Feb 20 09:18 README.md
+drwxr-xr-x@  15 james  wheel    480 Feb 20 09:18 documentation
+-rw-r--r--@   1 james  wheel  59204 Feb 20 09:18 doxygen_warnings
+-rw-r--r--@   1 james  wheel  35149 Feb 20 09:18 gpl-3.0.txt
+drwxr-xr-x@ 289 james  wheel   9248 Feb 20 09:18 html
+drwxr-xr-x@   4 james  wheel    128 Feb 20 09:18 laszlo
+-rw-r--r--@   1 james  wheel   4388 Feb 20 09:18 makefile
+
+thinking
+**Isolating package.json issue**
+exec
+/bin/zsh -lc "rg -n \"project\\(|cmake_minimum_required|add_library|add_executable|target_link_libraries|find_package|option\\(\" /tmp/MicropolisCore/MicropolisEngine -g 'CMakeLists.txt' ; echo '---'; rg -n '\"name\"|\"dependencies\"|\"devDependencies\"|\"scripts\"' /tmp/MicropolisCore/micropolis/package.json /tmp/MicropolisCore/package.json" in /Users/james/Repos/wibandwob-dos exited 2 in 52ms:
+---
+rg: /tmp/MicropolisCore/package.json: No such file or directory (os error 2)
+/tmp/MicropolisCore/micropolis/package.json:2:	"name": "micropolis",
+/tmp/MicropolisCore/micropolis/package.json:4:	"scripts": {
+/tmp/MicropolisCore/micropolis/package.json:19:	"devDependencies": {
+/tmp/MicropolisCore/micropolis/package.json:37:	"dependencies": {
+
+thinking
+**Planning automated code extraction**
+codex
+Next I’m extracting exact symbols and formulas from the engine source (including `micropolis.h` enums, callbacks, constants, and key algorithms) so the megareport can cite concrete line references instead of summaries.
+exec
+/bin/zsh -lc "sed -n '1,220p' .planning/spikes/spk-micropolis-engine-review/spk01-findings.md" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,240p' /tmp/MicropolisCore/README.md" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,260p' /tmp/MicropolisCore/micropolis/README.md" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+# SPK01 — MicropolisCore Engine Review: Architecture, Game Mechanics & Integration Feasibility
+
+## Status
+
+Status: in-progress
+GitHub issue: —
+PR: —
+
+## Purpose & Intent
+
+**Goal**: Deep technical review of [SimHacker/MicropolisCore](https://github.com/SimHacker/MicropolisCore) — the open-source C++/WASM recreation of SimCity Classic (1989) — to assess feasibility and map out an integration path for building a custom city simulation with:
+
+1. **Same game mechanics** as classic SimCity (zones, traffic, power, budget, disasters, scoring)
+2. **Different graphics/sprites** — custom tile sets, ASCII art, or procedural rendering
+3. **Possible integration INTO WibWob-DOS** as a Turbo Vision sub-app (text-native city sim)
+4. **Possible web frontend** — SvelteKit, WebGL, or other modern web stack
+5. **Modding potential** — extending/tweaking simulation rules, adding new zone types, custom disasters
+
+This report is written to give Codex (and any future agent or human contributor) a **crystal-clear, code-grounded** understanding of how every subsystem works, where the rendering boundary sits, how to swap graphics, and what the realistic integration paths look like.
+
+ succeeded in 52ms:
+# create-svelte
+
+Everything you need to build a Svelte project, powered by [`create-svelte`](https://github.com/sveltejs/kit/tree/main/packages/create-svelte).
+
+## Creating a project
+
+If you're seeing this, you've probably already done this step. Congrats!
+
+```bash
+# create a new project in the current directory
+npm create svelte@latest
+
+# create a new project in my-app
+npm create svelte@latest my-app
+```
+
+## Developing
+
+Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+
+ succeeded in 52ms:
+# Micropolis
+
+**Open source city simulation, based on the original SimCity Classic by Will Wright.**
+
+C++ engine compiled to WebAssembly. Runs in any browser. Runs headless in Node.js. SvelteKit frontend with WebGL tile rendering. CLI tools for city file analysis and editing.
+
+**Live demo:** [micropolisweb.com](https://micropolisweb.com)
+
+**Video demos:**
+- [Micropolis Web Demo 1](https://www.youtube.com/watch?v=wlHGfNlE8Os) (how the engine and UI work)
+- [SimCity Tile Sets, Space Inventory, and Cellular Automata](https://www.youtube.com/watch?v=319i7slXcbI) (tile sets, CA rules, to music by Jerry Martin)
+
+## The Story
+
+Micropolis traces a line from Will Wright's SimCity (1989) through multiple platform ports, multiplayer experiments, and educational adaptations. Don Hopkins ported SimCity to Unix, built multiplayer SimCityNet (demoed at ACM InterCHI '93 in Amsterdam), and eventually convinced Electronic Arts to release the source code under GPL-3 for the One Laptop Per Child project in 2008.
+
+The name "Micropolis" was the original working title Will Wright suggested. EA granted the right to use the trademark "SimCity" only if the game passed their QA process -- and it was quite an ordeal hand-holding their QA department through running Linux in a VM on Windows to test it. Never wanting to go through that ever again, Don asked Will for an alternative name, and he recommended its original working title. Please call this game Micropolis, not SimCity, or EA's lawyers may come knocking. As Jeff Braun, CEO of Maxis, wrote:
+
+> "Maxis was sued by Toho. We never referred to the name Godzilla, our monster on the box cover was a T-Rex looking character, but... a few magazine reviews called the monster, Godzilla. That was all it took. Toho called it 'confusion in the marketplace'. We paid $50k for Godzilla to go away. In all honesty, Toho liked Maxis, they said $50k was the minimum they take for Godzilla infringement."
+
+
+thinking
+**Extracting include dependencies**
+exec
+/bin/zsh -lc "sed -n '1,200p' /tmp/MicropolisCore/MicropolisEngine/src/data_types.h; sed -n '1,220p' /tmp/MicropolisCore/MicropolisEngine/src/map_type.h; sed -n '1,220p' /tmp/MicropolisCore/MicropolisEngine/src/tool.h; sed -n '1,220p' /tmp/MicropolisCore/MicropolisEngine/src/callback.h" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc 'for f in /tmp/MicropolisCore/MicropolisEngine/src/*.{cpp,h}; do bn=$(basename "$f"); lc=$(wc -l < "$f" | tr -d '"' '); inc="'$(rg -N '"'"'^#include'"' \""'$f" | sed '"'s/"'^#include //g'"' | tr '\\n' ';'); echo \""'$bn|$lc|$inc"; done | sort > /tmp/micro_file_map.txt; sed -n '"'1,120p' /tmp/micro_file_map.txt" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc 'for f in /tmp/MicropolisCore/micropolis/src/lib/*.{ts,svelte,js}; do [ -f "$f" ] || continue; bn=$(basename "$f"); lc=$(wc -l < "$f" | tr -d '"' '); imp="'$(rg -N '"'"'^import '"' \""'$f" | tr '"'\\n' ';'); echo \""'$bn|$lc|$imp"; done | sort > /tmp/micro_frontend_map.txt; sed -n '"'1,120p' /tmp/micro_frontend_map.txt" in /Users/james/Repos/wibandwob-dos succeeded in 55ms:
+/* data_types.h
+ *
+ * Micropolis, Unix Version.  This game was released for the Unix platform
+ * in or about 1990 and has been modified for inclusion in the One Laptop
+ * Per Child program.  Copyright (C) 1989 - 2007 Electronic Arts Inc.  If
+ * you need assistance with this program, you may contact:
+ *   http://wiki.laptop.org/go/Micropolis  or email  micropolis@laptop.org.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or (at
+ * your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * General Public License for more details.  You should have received a
+ * copy of the GNU General Public License along with this program.  If
+ * not, see <http://www.gnu.org/licenses/>.
+ *
+ succeeded in 350ms:
+About.svelte|174|
+CanvasTileRenderer.ts|149|import { TileRenderer } from './TileRenderer';;
+MicropolisCallbackLog.ts|177|import type { Micropolis, JSCallback } from '../types/micropolisengine.d.js';;
+MicropolisSimulator.ts|325|import type { Micropolis, Callback, JSCallback } from '../types/micropolisengine.d.js';;import initModule from "$lib/micropolisengine.js";;
+MicropolisView.svelte|99|
+PieMenu.svelte|1622|
+ReactiveMicropolisCallback.ts|170|import type { JSCallback } from '../types/micropolisengine.d.js';;import { micropolisStore } from './micropolisStore';;
+SnapView.svelte|247|
+TileRenderer.ts|298|
+TileView.svelte|669|
+WebGLTileRenderer.ts|790|import { TileRenderer } from './TileRenderer';;
+WebGPUTileRenderer.ts|374|import { TileRenderer } from './TileRenderer';;
+decodeNavigationTree.js|0|
+micropolisStore.ts|341|import { state, effect, derived } from 'svelte/internal'; // Use 'svelte/internal' for runes until officially released if needed;import type { Micropolis, JSCallback, MicropolisConstructor } from '../types/micropolisengine.d.js';;import initModule from "$lib/micropolisengine.js";;import { ReactiveMicropolisCallback } from './ReactiveMicropolisCallback';;
+micropolisengine.js|7084|
+navigationTree.ts|138|import siteStructureData from './data/siteStructure.json';;
+navigationTreeData.js|286|
+sprites.ts|305|
+ succeeded in 685ms:
+allocate.cpp|188|"micropolis.h";
+animate.cpp|244|"micropolis.h";
+budget.cpp|352|"micropolis.h";
+callback.cpp|302|"micropolis.h";<emscripten.h>;
+callback.h|177|
+connect.cpp|745|"micropolis.h";
+data_types.h|90|
+disasters.cpp|418|"micropolis.h";
+emscripten.cpp|1265|<emscripten/bind.h>;"micropolis.h";"js_callback.h";
+evaluate.cpp|573|"micropolis.h";
+fileio.cpp|676|"micropolis.h";
+frontendmessage.cpp|149|"micropolis.h";
+frontendmessage.h|141|
+generate.cpp|761|"micropolis.h";
+graph.cpp|399|"micropolis.h";
+initialize.cpp|146|"micropolis.h";
+js_callback.h|158|<emscripten/val.h>;"callback.h";
+map.cpp|1025|"micropolis.h";
+map_type.h|354|
+message.cpp|477|"micropolis.h";"text.h";
+
+thinking
+**Planning extraction of public variables**
+exec
+/bin/zsh -lc "nl -ba /tmp/MicropolisCore/MicropolisEngine/src/micropolis.h | sed -n '1,260p'" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+     1	/* micropolis.h
+     2	 *
+     3	 * Micropolis, Unix Version.  This game was released for the Unix platform
+     4	 * in or about 1990 and has been modified for inclusion in the One Laptop
+     5	 * Per Child program.  Copyright (C) 1989 - 2007 Electronic Arts Inc.  If
+     6	 * you need assistance with this program, you may contact:
+     7	 *   http://wiki.laptop.org/go/Micropolis  or email  micropolis@laptop.org.
+     8	 *
+     9	 * This program is free software: you can redistribute it and/or modify
+    10	 * it under the terms of the GNU General Public License as published by
+    11	 * the Free Software Foundation, either version 3 of the License, or (at
+    12	 * your option) any later version.
+    13	 *
+    14	 * This program is distributed in the hope that it will be useful, but
+    15	 * WITHOUT ANY WARRANTY; without even the implied warranty of
+    16	 * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    17	 * General Public License for more details.  You should have received a
+    18	 * copy of the GNU General Public License along with this program.  If
+    19	 * not, see <http://www.gnu.org/licenses/>.
+    20	 *
+
+thinking
+**Inspecting class start and public vars**
+exec
+/bin/zsh -lc "rg -n \"class Micropolis|public:|private:|protected:\" /tmp/MicropolisCore/MicropolisEngine/src/micropolis.h | sed -n '1,200p'" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+869:class Micropolis;
+886:public:
+924:class Micropolis {
+927:public:
+942:private:
+949:public:
+1378:private:
+1410:public:
+1421:public:
+1487:private:
+1509:public:
+1532:  private:
+1546:public:
+1641:private:
+1667:public:
+1700:public:
+1764:private:
+1797:public:
+1846:private:
+1859:public:
+
+thinking
+**Planning class member extraction**
+exec
+/bin/zsh -lc "awk '
+BEGIN{in=0;acc=\"private\"}
+/class Micropolis \\{/ {in=1; next}
+in{
+ if("'$0 ~ /''^};/) {in=0}
+ if($0 ~ /''^[[:space:]]*public:/){acc="public"; next}
+ if($0 ~ /''^[[:space:]]*private:/){acc="private"; next}
+ if($0 ~ /''^[[:space:]]*protected:/){acc="protected"; next}
+ if(acc=="public") print NR":"$0
+}
+'"' /tmp/MicropolisCore/MicropolisEngine/src/micropolis.h > /tmp/mic_public_raw.txt; sed -n '1,260p' /tmp/mic_public_raw.txt" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+awk: syntax error at source line 2
+ context is
+	 >>> BEGIN{in <<< =0;acc="private"}
+awk: illegal statement at source line 2
+awk: illegal statement at source line 2
+
+thinking
+**Switching to in-class variable**
+exec
+/bin/zsh -lc "awk '
+BEGIN{inclass=0;acc=\"private\"}
+/class Micropolis \\{/ {inclass=1; next}
+inclass{
+ if("'$0 ~ /''^};/) {inclass=0}
+ if($0 ~ /''^[[:space:]]*public:/){acc="public"; next}
+ if($0 ~ /''^[[:space:]]*private:/){acc="private"; next}
+ if($0 ~ /''^[[:space:]]*protected:/){acc="protected"; next}
+ if(acc=="public") print NR":"$0
+}
+'"' /tmp/MicropolisCore/MicropolisEngine/src/micropolis.h > /tmp/mic_public_raw.txt; sed -n '1,260p' /tmp/mic_public_raw.txt" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+928:
+929:
+930:    ////////////////////////////////////////////////////////////////////////
+931:
+932:
+933:    Micropolis();
+934:
+935:    ~Micropolis();
+936:
+937:    void setCallback(Callback *callback, emscripten::val callbackVal);
+938:
+939:    void init();
+940:
+941:
+950:
+951:
+952:    /**
+953:     * Callback interface.
+954:     */
+955:    Callback *callback;
+
+thinking
+**Assessing file size and structure**
+exec
+/bin/zsh -lc "sed -n '260,620p' /tmp/mic_public_raw.txt" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+1195:     *
+1196:     * Depends on fire station population.
+1197:     */
+1198:    Quad fireFund;
+1199:
+1200:    /**
+1201:     * Ratio of road spending over road funding, times #MAX_ROAD_EFFECT.
+1202:     */
+1203:    Quad roadEffect;
+1204:
+1205:    /**
+1206:     * Ratio of police spending over police funding, times #MAX_POLICE_EFFECT.
+1207:     */
+1208:    Quad policeEffect;
+1209:
+1210:    /**
+1211:     * Ratio of fire spending over fire funding, times #MAX_FIRE_EFFECT.
+1212:     */
+1213:    Quad fireEffect;
+1214:
+exec
+/bin/zsh -lc "sed -n '620,980p' /tmp/mic_public_raw.txt" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+1627:
+1628:    void doScoreCard();
+1629:
+1630:    void changeEval();
+1631:
+1632:    void scoreDoer();
+1633:
+1634:    int countProblems();
+1635:
+1636:    int getProblemNumber(int i);
+1637:
+1638:    int getProblemVotes(int i);
+1639:
+1640:
+1668:
+1669:
+1670:    bool loadFileData(const std::string &filename);
+1671:
+1672:    bool loadFile(const std::string &filename);
+1673:
+exec
+/bin/zsh -lc "sed -n '980,1320p' /tmp/mic_public_raw.txt" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+2113:    short scoreWait; ///< Time to wait before computing the score
+2114:
+2115:    short poweredZoneCount; ///< Number of powered tiles in all zone
+2116:    short unpoweredZoneCount; ///< Number of unpowered tiles in all zones
+2117:
+2118:    bool newPower; /* post */
+2119:
+2120:    short cityTaxAverage;
+2121:
+2122:    short simCycle;
+2123:
+2124:    short phaseCycle;
+2125:
+2126:    short speedCycle;
+2127:
+2128:    bool doInitialEval; ///< Need to perform initial city evaluation.
+2129:
+2130:    int mapSerial; ///< The invalidateMaps method increases the map serial number every time the maps changes.
+2131:
+2133:
+exec
+/bin/zsh -lc "sed -n '1320,1660p' /tmp/mic_public_raw.txt" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+2660:    Quad indLast;
+2661:
+2662:
+2663:    void doUpdateHeads();
+2664:
+2665:    void updateMaps();
+2666:
+2667:    void updateGraphs();
+2668:
+2669:    void updateEvaluation();
+2670:
+2671:    void updateHeads();
+2672:
+2673:    void updateFunds();
+2674:
+2675:    void reallyUpdateFunds();
+2676:
+2677:    void doTimeStuff();
+2678:
+2679:    void updateDate();
+
+thinking
+**Planning enum extraction**
+codex
+I now have a machine-readable dump of `Micropolis` public members and will move into formula extraction (`simulate.cpp`, `zone.cpp`, `traffic.cpp`, `scan.cpp`, etc.) plus auto-generating enum appendices (tiles/tools/messages/scenarios) from source constants.
+exec
+/bin/zsh -lc "nl -ba /tmp/MicropolisCore/notes/Tiles.txt | sed -n '1,260p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba /tmp/MicropolisCore/micropolis/scripts/constants.js | sed -n '1,260p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba /tmp/MicropolisCore/notes/file-format.txt | sed -n '1,220p'; nl -ba /tmp/MicropolisCore/notes/SIMULATOR.txt | sed -n '1,240p'" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+     1	Analysis of MicropolisCore/images/tiles.xpm
+     2	===========================================
+     3	Image is 16 pixels wide, and 960*16 pixels high. Each 16x16 unit is one tile.
+     4	Tile N is copied at (0, N*16)--(16, N*16 + 16) exclusive from the tiles.xpm
+     5	image. Values N are shown below in hexadecimal notation, with an 'x' in front.
+     6	Decimal values are always 3 digits long (they are prefixed with leading 0's if
+     7	needed). The decimal values are derived from the hexadecimal values. In case
+     8	of conflict, the hexadecimal values should be trusted.
+     9	
+    10	Below, tiles are roughly grouped together.
+    11	
+    12	
+    13	000: x000 x001: Dirt
+    14	002: x002 x003: Water
+    15	
+    16	Coast:
+    17	004: x004:      Water (copy of x002??)
+    18	     x005 x006: Coast N
+    19	     x007 x008: Coast NE
+    20	     x009 x00a: Coast E
+ succeeded in 51ms:
+     1	/**
+     2	 * constants.js - Micropolis constants and configuration values
+     3	 * 
+     4	 * This is the single source of truth for all Micropolis constants,
+     5	 * designed to work with both CommonJS and ES Module imports.
+     6	 * 
+     7	 * Import in ESM: import { World, TileBits } from './constants.js';
+     8	 * Import in CJS: const { World, TileBits } = require('./constants.js');
+     9	 * Import in TS:  import { World, TileBits } from './constants.js';
+    10	 */
+    11	
+    12	/**
+    13	 * World dimensions and derived sizes
+    14	 */
+    15	export const World = {
+    16	    // Base map dimensions
+    17	    WIDTH: 120,
+    18	    HEIGHT: 100,
+    19	    
+    20	    // Derived dimensions for multi-resolution maps
+ succeeded in 51ms:
+     1	little endian
+     2	
+     3	
+     4	/**
+     5	 * The number of history entries.
+     6	 */
+     7	static const int HISTORY_LENGTH = 480;
+     8	
+     9	/**
+    10	 * The number of miscellaneous history entries.
+    11	 */
+    12	static const int MISC_HISTORY_LENGTH = 240;
+    13	
+    14	/**
+    15	 * Length of the history tables.
+    16	 * @todo It is not really a count of histories, rename to something else?
+    17	 */
+    18	static const int HISTORY_COUNT = 120;
+    19	
+    20	WORLD_W 120
+
+thinking
+**Noting need for more constants**
+exec
+/bin/zsh -lc "nl -ba /tmp/MicropolisCore/micropolis/scripts/constants.js | sed -n '260,520p'" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+   260	    FOUNTAIN_ANIMATION_END: 0x34B,
+   261	    EXPLOSION_START: 0x35C,
+   262	    EXPLOSION_END: 0x367,
+   263	    COALSMOKE_START: 0x394,
+   264	    COALSMOKE_END: 0x3A3,
+   265	    FOOTBALL_GAME_START: 0x3A4,
+   266	    FOOTBALL_GAME_END: 0x3B3,
+   267	    BRIDGE_ANIM2_START: 0x3B4,
+   268	    BRIDGE_ANIM2_END: 0x3B7,
+   269	    NUKESWIRL_START: 0x3B8,
+   270	    NUKESWIRL_END: 0x3BB
+   271	};
+   272	
+   273	/**
+   274	 * Game difficulty levels
+   275	 */
+   276	export const GameLevels = {
+   277	    EASY: 0,
+   278	    MEDIUM: 1,
+   279	    HARD: 2
+
+thinking
+**Inspecting key source functions**
+exec
+/bin/zsh -lc "nl -ba /tmp/MicropolisCore/MicropolisEngine/src/simulate.cpp | sed -n '1,360p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba /tmp/MicropolisCore/MicropolisEngine/src/simulate.cpp | sed -n '1320,1760p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba /tmp/MicropolisCore/MicropolisEngine/src/simulate.cpp | sed -n '360,840p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba /tmp/MicropolisCore/MicropolisEngine/src/simulate.cpp | sed -n '840,1320p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc 'rg -n "void Micropolis::(simulate|simFrame|mapScan|setValves|collectTax|takeCensus|take10Census|doDisasters|doFire|doSpecialZone|doZone|incRateOfGrowth|decROGMem|decTrafficMem|clearCensus|setCommonInits)" /tmp/MicropolisCore/MicropolisEngine/src/simulate.cpp' in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+  1320	                if (c & ZONEBIT) {
+  1321	                    // Neighbour is a zone and burnable
+  1322	                    fireZone(Position(xTem, yTem), c);
+  1323	
+  1324	                    if ((c & LOMASK) > IZB) { /* Explode */
+  1325	                          makeExplosionAt(xTem *16 + 8, yTem * 16 + 8);
+  1326	                    }
+  1327	                }
+  1328	
+  1329	                map[xTem][yTem] = randomFire();
+  1330	            }
+  1331	        }
+  1332	    }
+  1333	
+  1334	    // Compute likelyhood of fire running out of fuel
+  1335	    short rate = 10; // Likelyhood of extinguishing (bigger means less chance)
+  1336	    short z = fireStationEffectMap.worldGet(pos.posX, pos.posY);
+  1337	
+  1338	    if (z > 0) {
+  1339	        rate = 3;
+ succeeded in 53ms:
+     1	/* simulate.cpp
+     2	 *
+     3	 * Micropolis, Unix Version.  This game was released for the Unix platform
+     4	 * in or about 1990 and has been modified for inclusion in the One Laptop
+     5	 * Per Child program.  Copyright (C) 1989 - 2007 Electronic Arts Inc.  If
+     6	 * you need assistance with this program, you may contact:
+     7	 *   http://wiki.laptop.org/go/Micropolis  or email  micropolis@laptop.org.
+     8	 *
+     9	 * This program is free software: you can redistribute it and/or modify
+    10	 * it under the terms of the GNU General Public License as published by
+    11	 * the Free Software Foundation, either version 3 of the License, or (at
+    12	 * your option) any later version.
+    13	 *
+    14	 * This program is distributed in the hope that it will be useful, but
+    15	 * WITHOUT ANY WARRANTY; without even the implied warranty of
+    16	 * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    17	 * General Public License for more details.  You should have received a
+    18	 * copy of the GNU General Public License along with this program.  If
+    19	 * not, see <http://www.gnu.org/licenses/>.
+    20	 *
+ succeeded in 51ms:
+   360	            }
+   361	        }
+   362	    }
+   363	}
+   364	
+   365	
+   366	/**
+   367	 * Decrease rate of grow.
+   368	 * @todo Limiting rate should not be done here, but when we add a new value to
+   369	 *       it.
+   370	 */
+   371	void Micropolis::decRateOfGrowthMap()
+   372	{
+   373	    /* tends to empty rateOfGrowthMap */
+   374	    short x, y, z;
+   375	
+   376	    for (x = 0; x < rateOfGrowthMap.MAP_W; x++) {
+   377	        for (y = 0; y < rateOfGrowthMap.MAP_H; y++) {
+   378	            z = rateOfGrowthMap.get(x, y);
+   379	            if (z == 0) {
+ succeeded in 51ms:
+   840	    indHist[120] = indPop;
+   841	    crimeHist[120] = crimeHist[0] ;
+   842	    pollutionHist[120] = pollutionHist[0];
+   843	    moneyHist[120] = moneyHist[0];
+   844	    changeCensus();
+   845	}
+   846	
+   847	
+   848	/** Collect taxes
+   849	 * @bug Function seems to be doing different things depending on
+   850	 *      Micropolis::totalPop value. With an non-empty city it does fund
+   851	 *      calculations. For an empty city, it immediately sets effects of
+   852	 *      funding, which seems inconsistent at least, and may be wrong
+   853	 * @bug If Micropolis::taxFlag is set, no variable is touched which seems
+   854	 *      non-robust at least
+   855	 */
+   856	void Micropolis::collectTax()
+   857	{
+   858	    short z;
+   859	
+ succeeded in 52ms:
+108:void Micropolis::simFrame()
+132:void Micropolis::simulate()
+552:void Micropolis::setCommonInits()
+564:void Micropolis::setValves()
+692:void Micropolis::clearCensus()
+730:void Micropolis::take10Census()
+856:void Micropolis::collectTax()
+947:void Micropolis::mapScan(int x1, int x2)
+1300:void Micropolis::doFire(const Position &pos)
+1451:void Micropolis::doSpecialZone(const Position &pos, bool powerOn)
+exec
+/bin/zsh -lc 'rg -n "void Micropolis::(doZone|doResidential|doCommercial|doIndustrial|doResIn|doResOut|doComIn|doComOut|doIndIn|doIndOut|evalRes|evalCom|evalInd|getCRValue|getLandPollutionValue|zonePlop|setZonePower|doHospChur)" /tmp/MicropolisCore/MicropolisEngine/src/zone.cpp' in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba /tmp/MicropolisCore/MicropolisEngine/src/zone.cpp | sed -n '360,760p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba /tmp/MicropolisCore/MicropolisEngine/src/zone.cpp | sed -n '760,1120p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba /tmp/MicropolisCore/MicropolisEngine/src/zone.cpp | sed -n '1,360p'" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+91:void Micropolis::doZone(const Position &pos)
+548:void Micropolis::doResidential(const Position &pos, bool zonePower)
+614:void Micropolis::doResIn(const Position &pos, int pop, int value)
+655:void Micropolis::doResOut(const Position &pos, int pop, int value)
+765:void Micropolis::doCommercial(const Position &pos, bool zonePower)
+823:void Micropolis::doComIn(const Position &pos, int pop, int value)
+846:void Micropolis::doComOut(const Position &pos, int pop, int value)
+917:void Micropolis::doIndustrial(const Position &pos, bool zonePower)
+967:void Micropolis::doIndIn(const Position &pos, int pop, int value)
+981:void Micropolis::doIndOut(const Position &pos, int pop, int value)
+ succeeded in 52ms:
+   360	/**
+   361	 * Put down a 3x3 zone around the center tile at \a pos..
+   362	 * @param base Tile number of the top-left tile. @see Tiles
+   363	 * @return Build was a success.
+   364	 * @bug This function allows partial on-map construction. Is that intentional? No!
+   365	 */
+   366	bool Micropolis::zonePlop(const Position &pos, int base)
+   367	{
+   368	    short z, x;
+   369	    static const short Zx[9] = {-1, 0, 1,-1, 0, 1,-1, 0, 1};
+   370	    static const short Zy[9] = {-1,-1,-1, 0, 0, 0, 1, 1, 1};
+   371	
+   372	    for (z = 0; z < 9; z++) {             /* check for fire  */
+   373	        int xx = pos.posX + Zx[z];
+   374	        int yy = pos.posY + Zy[z];
+   375	
+   376	        if (testBounds(xx, yy)) {
+   377	            x = map[xx][yy] & LOMASK;
+   378	
+   379	            if ((x >= FLOOD) && (x < ROADBASE)) {
+ succeeded in 50ms:
+   760	 * Handle commercial zone.
+   761	 * @param pos        Position of the commercial zone.
+   762	 * @param zonePwrFlg Does the zone have power?
+   763	 * @todo Make zonePwrFlg a boolean.
+   764	 */
+   765	void Micropolis::doCommercial(const Position &pos, bool zonePower)
+   766	{
+   767	    short tpop, TrfGood;
+   768	    short zscore, locvalve, value;
+   769	
+   770	    MapTile tile = map[pos.posX][pos.posY] & LOMASK;
+   771	
+   772	    comZonePop++;
+   773	    tpop = getComZonePop(tile);
+   774	    comPop += tpop;
+   775	
+   776	    if (tpop > getRandom(5)) {
+   777	        /* Try driving from commercial to industrial */
+   778	        TrfGood = makeTraffic(pos, ZT_INDUSTRIAL);
+   779	    } else {
+ succeeded in 51ms:
+     1	/* zone.cpp
+     2	 *
+     3	 * Micropolis, Unix Version.  This game was released for the Unix platform
+     4	 * in or about 1990 and has been modified for inclusion in the One Laptop
+     5	 * Per Child program.  Copyright (C) 1989 - 2007 Electronic Arts Inc.  If
+     6	 * you need assistance with this program, you may contact:
+     7	 *   http://wiki.laptop.org/go/Micropolis  or email  micropolis@laptop.org.
+     8	 *
+     9	 * This program is free software: you can redistribute it and/or modify
+    10	 * it under the terms of the GNU General Public License as published by
+    11	 * the Free Software Foundation, either version 3 of the License, or (at
+    12	 * your option) any later version.
+    13	 *
+    14	 * This program is distributed in the hope that it will be useful, but
+    15	 * WITHOUT ANY WARRANTY; without even the implied warranty of
+    16	 * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    17	 * General Public License for more details.  You should have received a
+    18	 * copy of the GNU General Public License along with this program.  If
+    19	 * not, see <http://www.gnu.org/licenses/>.
+    20	 *
+exec
+/bin/zsh -lc 'rg -n "void Micropolis::(makeTraffic|addToTrafficDensityMap|tryDrive|tryGo|findPerimeterRoad)" /tmp/MicropolisCore/MicropolisEngine/src/traffic.cpp' in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+165:void Micropolis::addToTrafficDensityMap()
+exec
+/bin/zsh -lc "nl -ba /tmp/MicropolisCore/MicropolisEngine/src/traffic.cpp | sed -n '1,280p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba /tmp/MicropolisCore/MicropolisEngine/src/traffic.cpp | sed -n '280,560p'" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+     1	/* traffic.cpp
+     2	 *
+     3	 * Micropolis, Unix Version.  This game was released for the Unix platform
+     4	 * in or about 1990 and has been modified for inclusion in the One Laptop
+     5	 * Per Child program.  Copyright (C) 1989 - 2007 Electronic Arts Inc.  If
+     6	 * you need assistance with this program, you may contact:
+     7	 *   http://wiki.laptop.org/go/Micropolis  or email  micropolis@laptop.org.
+     8	 *
+     9	 * This program is free software: you can redistribute it and/or modify
+    10	 * it under the terms of the GNU General Public License as published by
+    11	 * the Free Software Foundation, either version 3 of the License, or (at
+    12	 * your option) any later version.
+    13	 *
+    14	 * This program is distributed in the hope that it will be useful, but
+    15	 * WITHOUT ANY WARRANTY; without even the implied warranty of
+    16	 * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    17	 * General Public License for more details.  You should have received a
+    18	 * copy of the GNU General Public License along with this program.  If
+    19	 * not, see <http://www.gnu.org/licenses/>.
+    20	 *
+ succeeded in 52ms:
+   280	
+   281	    for (short z = 0; z < 12; z++) {
+   282	
+   283	        tx = pos.posX + PerimX[z];
+   284	        ty = pos.posX + PerimY[z];
+   285	
+   286	        if (testBounds(tx, ty)) {
+   287	
+   288	            tile = map[tx][ty] & LOMASK;
+   289	            if (tile >= TELEBASE && tile <= TELELAST) {
+   290	                return true;
+   291	            }
+   292	        }
+   293	    }
+   294	
+   295	    return false;
+   296	}
+   297	
+   298	
+   299	/**
+exec
+/bin/zsh -lc "nl -ba /tmp/MicropolisCore/MicropolisEngine/src/scan.cpp | sed -n '340,680p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc 'rg -n "void Micropolis::(fireAnalysis|populationDensityScan|pollutionTerrainLandValueScan|crimeScan|smoothTerrain|doSmooth1|doSmooth2|computeComRateMap|distIntMarket|getCityCenterDistance|getPollutionValue)" /tmp/MicropolisCore/MicropolisEngine/src/scan.cpp' in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba /tmp/MicropolisCore/MicropolisEngine/src/scan.cpp | sed -n '1,340p'" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+120:void Micropolis::fireAnalysis()
+136:void Micropolis::populationDensityScan()
+227:void Micropolis::pollutionTerrainLandValueScan()
+413:void Micropolis::crimeScan()
+464:void Micropolis::smoothTerrain()
+568:void Micropolis::doSmooth1()
+575:void Micropolis::doSmooth2()
+585:void Micropolis::computeComRateMap()
+ succeeded in 51ms:
+   340	 */
+   341	int Micropolis::getPollutionValue(int loc)
+   342	{
+   343	    if (loc < POWERBASE) {
+   344	
+   345	        if (loc >= HTRFBASE) {
+   346	            return /* 25 */ 75;     /* heavy traf  */
+   347	        }
+   348	
+   349	        if (loc >= LTRFBASE) {
+   350	            return /* 10 */ 50;     /* light traf  */
+   351	        }
+   352	
+   353	        if (loc <  ROADBASE) {
+   354	
+   355	            if (loc > FIREBASE) {
+   356	                return /* 60 */ 90;
+   357	            }
+   358	
+   359	            /* XXX: Why negative pollution from radiation? */
+ succeeded in 51ms:
+     1	/* scan.cpp
+     2	 *
+     3	 * Micropolis, Unix Version.  This game was released for the Unix platform
+     4	 * in or about 1990 and has been modified for inclusion in the One Laptop
+     5	 * Per Child program.  Copyright (C) 1989 - 2007 Electronic Arts Inc.  If
+     6	 * you need assistance with this program, you may contact:
+     7	 *   http://wiki.laptop.org/go/Micropolis  or email  micropolis@laptop.org.
+     8	 *
+     9	 * This program is free software: you can redistribute it and/or modify
+    10	 * it under the terms of the GNU General Public License as published by
+    11	 * the Free Software Foundation, either version 3 of the License, or (at
+    12	 * your option) any later version.
+    13	 *
+    14	 * This program is distributed in the hope that it will be useful, but
+    15	 * WITHOUT ANY WARRANTY; without even the implied warranty of
+    16	 * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    17	 * General Public License for more details.  You should have received a
+    18	 * copy of the GNU General Public License along with this program.  If
+    19	 * not, see <http://www.gnu.org/licenses/>.
+    20	 *
+
+thinking
+**Listing key functions across files**
+exec
+/bin/zsh -lc "nl -ba /tmp/MicropolisCore/MicropolisEngine/src/evaluate.cpp | sed -n '420,700p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "rg -n \"void Micropolis::(doDisasters|scenarioDisaster|makeEarthquake|makeFlood|makeFireBombs|setFire|makeFire|doFlood|doMeltdown|makeMonster|makeTornado|fireBomb)\" /tmp/MicropolisCore/MicropolisEngine/src/disasters.cpp /tmp/MicropolisCore/MicropolisEngine/src/simulate.cpp /tmp/MicropolisCore/MicropolisEngine/src/sprite.cpp && nl -ba /tmp/MicropolisCore/MicropolisEngine/src/disasters.cpp | sed -n '1,480p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "rg -n \"void Micropolis::(doBudget|doBudgetNow|updateBudget|setCityTax|collectTax|updateFundEffects|mustDrawBudget)|RLevels|FLevels\" /tmp/MicropolisCore/MicropolisEngine/src/budget.cpp /tmp/MicropolisCore/MicropolisEngine/src/simulate.cpp && nl -ba /tmp/MicropolisCore/MicropolisEngine/src/budget.cpp | sed -n '1,380p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "rg -n \"void Micropolis::(cityEvaluation|scoreDoer|doScoreCard|changeEval)|int Micropolis::countProblems|short Micropolis::getTrafficAverage|CityClass|PROBNUM|problemTable\" /tmp/MicropolisCore/MicropolisEngine/src/evaluate.cpp && nl -ba /tmp/MicropolisCore/MicropolisEngine/src/evaluate.cpp | sed -n '1,420p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "rg -n \"void Micropolis::(doPowerScan|pushPowerStack|pullPowerStack)\" /tmp/MicropolisCore/MicropolisEngine/src/power.cpp && nl -ba /tmp/MicropolisCore/MicropolisEngine/src/power.cpp | sed -n '1,260p'" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+   420	
+   421	    if (comValve < -1000) {
+   422	        z = (int)(z * .85);
+   423	    }
+   424	
+   425	    if (indValve < -1000) {
+   426	        z = (int)(z * .85);
+   427	    }
+   428	
+   429	    float SM = 1.0;
+   430	    if (cityPop == 0 || cityPopDelta == 0) {
+   431	        SM = 1.0; // there is nobody or no migration happened
+   432	
+   433	    } else if (cityPopDelta == cityPop) {
+   434	        SM = 1.0; // city sprang into existence or doubled in size
+   435	
+   436	    } else if (cityPopDelta > 0) {
+   437	        SM = ((float)cityPopDelta / cityPop) + 1.0f;
+   438	
+   439	    } else if (cityPopDelta < 0) {
+ succeeded in 51ms:
+/tmp/MicropolisCore/MicropolisEngine/src/simulate.cpp:856:void Micropolis::collectTax()
+/tmp/MicropolisCore/MicropolisEngine/src/simulate.cpp:863:    static const float RLevels[3] = { 0.7, 0.9, 1.2 };
+/tmp/MicropolisCore/MicropolisEngine/src/simulate.cpp:864:    static const float FLevels[3] = { 1.4, 1.2, 0.8 };
+/tmp/MicropolisCore/MicropolisEngine/src/simulate.cpp:866:    assert(LEVEL_COUNT == LENGTH_OF(RLevels));
+/tmp/MicropolisCore/MicropolisEngine/src/simulate.cpp:867:    assert(LEVEL_COUNT == LENGTH_OF(FLevels));
+/tmp/MicropolisCore/MicropolisEngine/src/simulate.cpp:886:        roadFund = (long)((roadTotal + (railTotal * 2)) * RLevels[gameLevel]);
+/tmp/MicropolisCore/MicropolisEngine/src/simulate.cpp:887:        taxFund = (long)((((Quad)totalPop * landValueAverage) / 120) * cityTax * FLevels[gameLevel]);
+/tmp/MicropolisCore/MicropolisEngine/src/simulate.cpp:912:void Micropolis::updateFundEffects()
+/tmp/MicropolisCore/MicropolisEngine/src/budget.cpp:97:void Micropolis::doBudget()
+/tmp/MicropolisCore/MicropolisEngine/src/budget.cpp:104:void Micropolis::doBudgetFromMenu()
+/tmp/MicropolisCore/MicropolisEngine/src/budget.cpp:116:void Micropolis::doBudgetNow(bool fromMenu)
+/tmp/MicropolisCore/MicropolisEngine/src/budget.cpp:327:void Micropolis::updateBudget()
+/tmp/MicropolisCore/MicropolisEngine/src/budget.cpp:345:void Micropolis::setCityTax(short tax)
+     1	/* budget.cpp
+     2	 *
+     3	 * Micropolis, Unix Version.  This game was released for the Unix platform
+     4	 * in or about 1990 and has been modified for inclusion in the One Laptop
+     5	 * Per Child program.  Copyright (C) 1989 - 2007 Electronic Arts Inc.  If
+     6	 * you need assistance with this program, you may contact:
+     7	 *   http://wiki.laptop.org/go/Micropolis  or email  micropolis@laptop.org.
+ succeeded in 50ms:
+110:void Micropolis::cityEvaluation()
+114:        short problemTable[PROBNUM]; // Score for each problem, higher the more severe the problem is.
+115:        for (int z = 0; z < PROBNUM; z++) {
+116:            problemTable[z] = 0;
+121:        doProblems(problemTable);
+122:        getScore(problemTable);
+145:    for (int i = 0; i < PROBNUM; i++) {
+193:    cityClass = getCityClass(cityPop);
+210:CityClass Micropolis::getCityClass(Quad cityPopulation)
+212:    CityClass cityClassification = CC_VILLAGE;
+236: * @param problemTable Storage of how bad each problem is.
+237: * @post \a problemTable contains severity of each problem,
+241:void Micropolis::doProblems(short problemTable[PROBNUM])
+243:    bool problemTaken[PROBNUM]; // Which problems are taken?
+245:    for (int z = 0; z < PROBNUM; z++) {
+247:        problemTable[z] = 0;
+250:    problemTable[CVP_CRIME]        = crimeAverage;                /* Crime */
+251:    problemTable[CVP_POLLUTION]    = pollutionAverage;            /* Pollution */
+252:    problemTable[CVP_HOUSING]      = landValueAverage * 7 / 10;   /* Housing */
+253:    problemTable[CVP_TAXES]        = cityTax * 10;                /* Taxes */
+ succeeded in 51ms:
+/tmp/MicropolisCore/MicropolisEngine/src/simulate.cpp:1688:void Micropolis::doMeltdown(const Position &pos)
+/tmp/MicropolisCore/MicropolisEngine/src/disasters.cpp:92:void Micropolis::doDisasters()
+/tmp/MicropolisCore/MicropolisEngine/src/disasters.cpp:158:void Micropolis::scenarioDisaster()
+/tmp/MicropolisCore/MicropolisEngine/src/disasters.cpp:233:void Micropolis::fireBomb()
+/tmp/MicropolisCore/MicropolisEngine/src/disasters.cpp:243:void Micropolis::makeFireBombs()
+/tmp/MicropolisCore/MicropolisEngine/src/disasters.cpp:257:void Micropolis::makeEarthquake()
+/tmp/MicropolisCore/MicropolisEngine/src/disasters.cpp:285:void Micropolis::setFire()
+/tmp/MicropolisCore/MicropolisEngine/src/disasters.cpp:304:void Micropolis::makeFire()
+/tmp/MicropolisCore/MicropolisEngine/src/disasters.cpp:346:void Micropolis::makeFlood()
+/tmp/MicropolisCore/MicropolisEngine/src/disasters.cpp:385:void Micropolis::doFlood(const Position& pos)
+/tmp/MicropolisCore/MicropolisEngine/src/sprite.cpp:1917:void Micropolis::makeMonster()
+/tmp/MicropolisCore/MicropolisEngine/src/sprite.cpp:1956:void Micropolis::makeMonsterAt(int x, int y)
+/tmp/MicropolisCore/MicropolisEngine/src/sprite.cpp:1996:void Micropolis::makeTornado()
+     1	/* disasters.cpp
+     2	 *
+     3	 * Micropolis, Unix Version.  This game was released for the Unix platform
+     4	 * in or about 1990 and has been modified for inclusion in the One Laptop
+     5	 * Per Child program.  Copyright (C) 1989 - 2007 Electronic Arts Inc.  If
+     6	 * you need assistance with this program, you may contact:
+     7	 *   http://wiki.laptop.org/go/Micropolis  or email  micropolis@laptop.org.
+ succeeded in 51ms:
+125:void Micropolis::doPowerScan()
+173:void Micropolis::pushPowerStack(const Position &pos)
+     1	/* power.cpp
+     2	 *
+     3	 * Micropolis, Unix Version.  This game was released for the Unix platform
+     4	 * in or about 1990 and has been modified for inclusion in the One Laptop
+     5	 * Per Child program.  Copyright (C) 1989 - 2007 Electronic Arts Inc.  If
+     6	 * you need assistance with this program, you may contact:
+     7	 *   http://wiki.laptop.org/go/Micropolis  or email  micropolis@laptop.org.
+     8	 *
+     9	 * This program is free software: you can redistribute it and/or modify
+    10	 * it under the terms of the GNU General Public License as published by
+    11	 * the Free Software Foundation, either version 3 of the License, or (at
+    12	 * your option) any later version.
+    13	 *
+    14	 * This program is distributed in the hope that it will be useful, but
+    15	 * WITHOUT ANY WARRANTY; without even the implied warranty of
+    16	 * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    17	 * General Public License for more details.  You should have received a
+    18	 * copy of the GNU General Public License along with this program.  If
+
+thinking
+**Planning sprite enum extraction**
+exec
+/bin/zsh -lc "nl -ba /tmp/MicropolisCore/MicropolisEngine/src/sprite.cpp | sed -n '1,360p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba /tmp/MicropolisCore/MicropolisEngine/src/sprite.cpp | sed -n '1360,2060p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba /tmp/MicropolisCore/MicropolisEngine/src/sprite.cpp | sed -n '860,1360p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba /tmp/MicropolisCore/MicropolisEngine/src/sprite.cpp | sed -n '360,860p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "rg -n \"enum SpriteType|SPRITE_|class SimSprite|do.*Sprite\\(|generate(Train|Bus|Ship|Copter|Plane)|makeMonster|makeTornado|makeExplosion|checkSpriteCollision|explodeSprite\" /tmp/MicropolisCore/MicropolisEngine/src/micropolis.h /tmp/MicropolisCore/MicropolisEngine/src/sprite.cpp | sed -n '1,260p'" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+     1	/* sprite.cpp
+     2	 *
+     3	 * Micropolis, Unix Version.  This game was released for the Unix platform
+     4	 * in or about 1990 and has been modified for inclusion in the One Laptop
+     5	 * Per Child program.  Copyright (C) 1989 - 2007 Electronic Arts Inc.  If
+     6	 * you need assistance with this program, you may contact:
+     7	 *   http://wiki.laptop.org/go/Micropolis  or email  micropolis@laptop.org.
+     8	 *
+     9	 * This program is free software: you can redistribute it and/or modify
+    10	 * it under the terms of the GNU General Public License as published by
+    11	 * the Free Software Foundation, either version 3 of the License, or (at
+    12	 * your option) any later version.
+    13	 *
+    14	 * This program is distributed in the hope that it will be useful, but
+    15	 * WITHOUT ANY WARRANTY; without even the implied warranty of
+    16	 * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    17	 * General Public License for more details.  You should have received a
+    18	 * copy of the GNU General Public License along with this program.  If
+    19	 * not, see <http://www.gnu.org/licenses/>.
+    20	 *
+ succeeded in 52ms:
+  1360	
+  1361	            if (sprite->dir & 1) { /* up or down */
+  1362	                sprite->frame = 4;
+  1363	            } else { /* left or right */
+  1364	                sprite->frame = 3;
+  1365	            }
+  1366	
+  1367	            sprite->turn++;
+  1368	            sprite->dir = (sprite->dir - 1) & 3;
+  1369	
+  1370	        } else { /* cw */
+  1371	
+  1372	            if (sprite->dir & 1) { /* up or down */
+  1373	                sprite->frame = 3;
+  1374	            } else { /* left or right */
+  1375	                sprite->frame = 4;
+  1376	            }
+  1377	
+  1378	            sprite->turn--;
+  1379	            sprite->dir = (sprite->dir + 1) & 3;
+ succeeded in 51ms:
+   860	
+   861	
+   862	/**
+   863	 * Move ship sprite.
+   864	 * @param sprite Ship sprite.
+   865	 * @todo Remove local magic constants and document the code.
+   866	 */
+   867	void Micropolis::doShipSprite(SimSprite *sprite)
+   868	{
+   869	    static const short BDx[9] = { 0,  0,  1,  1,  1,  0, -1, -1, -1 };
+   870	    static const short BDy[9] = { 0, -1, -1,  0,  1,  1,  1,  0, -1 };
+   871	    static const short BPx[9] = { 0,  0,  2,  2,  2,  0, -2, -2, -2 };
+   872	    static const short BPy[9] = { 0, -2, -2,  0,  2,  2,  2,  0, -2 };
+   873	    static const short BtClrTab[8] = { RIVER, CHANNEL, POWERBASE, POWERBASE + 1,
+   874	                                       RAILBASE, RAILBASE + 1, BRWH, BRWV };
+   875	    short x, y, z, t = RIVER;
+   876	    short tem, pem;
+   877	
+   878	    if (sprite->soundCount > 0) {
+   879	        sprite->soundCount--;
+ succeeded in 51ms:
+   360	    if (sprite == NULL) {
+   361	        sprite = newSprite("", type, x, y);
+   362	    } else {
+   363	        initSprite(sprite, x, y);
+   364	    }
+   365	    return sprite;
+   366	}
+   367	
+   368	
+   369	/**
+   370	 * Get character from the map.
+   371	 * @param x X coordinate in pixels.
+   372	 * @param y Y coordinate in pixels.
+   373	 * @return Map character if on-map, or \c -1 if off-map.
+   374	 */
+   375	short Micropolis::getChar(int x, int y)
+   376	{
+   377	    // Convert sprite coordinates to tile coordinates.
+   378	    x >>= 4;
+   379	    y >>= 4;
+ succeeded in 51ms:
+/tmp/MicropolisCore/MicropolisEngine/src/sprite.cpp:162:        case SPRITE_TRAIN:
+/tmp/MicropolisCore/MicropolisEngine/src/sprite.cpp:173:        case SPRITE_SHIP:
+/tmp/MicropolisCore/MicropolisEngine/src/sprite.cpp:198:        case SPRITE_MONSTER:
+/tmp/MicropolisCore/MicropolisEngine/src/sprite.cpp:225:        case SPRITE_HELICOPTER:
+/tmp/MicropolisCore/MicropolisEngine/src/sprite.cpp:240:        case SPRITE_AIRPLANE:
+/tmp/MicropolisCore/MicropolisEngine/src/sprite.cpp:258:        case SPRITE_TORNADO:
+/tmp/MicropolisCore/MicropolisEngine/src/sprite.cpp:269:        case SPRITE_EXPLOSION:
+/tmp/MicropolisCore/MicropolisEngine/src/sprite.cpp:279:        case SPRITE_BUS:
+/tmp/MicropolisCore/MicropolisEngine/src/sprite.cpp:537:bool Micropolis::checkSpriteCollision(SimSprite *s1, SimSprite *s2)
+/tmp/MicropolisCore/MicropolisEngine/src/sprite.cpp:567:                case SPRITE_TRAIN:
+/tmp/MicropolisCore/MicropolisEngine/src/sprite.cpp:568:                    doTrainSprite(sprite);
+/tmp/MicropolisCore/MicropolisEngine/src/sprite.cpp:571:                case SPRITE_HELICOPTER:
+/tmp/MicropolisCore/MicropolisEngine/src/sprite.cpp:572:                    doCopterSprite(sprite);
+/tmp/MicropolisCore/MicropolisEngine/src/sprite.cpp:575:                case SPRITE_AIRPLANE:
+/tmp/MicropolisCore/MicropolisEngine/src/sprite.cpp:576:                    doAirplaneSprite(sprite);
+/tmp/MicropolisCore/MicropolisEngine/src/sprite.cpp:579:                case SPRITE_SHIP:
+/tmp/MicropolisCore/MicropolisEngine/src/sprite.cpp:580:                    doShipSprite(sprite);
+/tmp/MicropolisCore/MicropolisEngine/src/sprite.cpp:583:                case SPRITE_MONSTER:
+/tmp/MicropolisCore/MicropolisEngine/src/sprite.cpp:584:                    doMonsterSprite(sprite);
+/tmp/MicropolisCore/MicropolisEngine/src/sprite.cpp:587:                case SPRITE_TORNADO:
+
+thinking
+**Inspecting generation tooling**
+exec
+/bin/zsh -lc 'rg -n "void Micropolis::(generateMap|generateSomeCity|generateSomeRandomCity|makeIsland|makeNakedIsland|makeLakes|doRivers|doTrees|smoothRiver|smoothTrees|treeSplash|makeSingleLake|plopBRiver|plopSRiver|clearMap|clearUnnatural)" /tmp/MicropolisCore/MicropolisEngine/src/generate.cpp' in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba /tmp/MicropolisCore/MicropolisEngine/src/generate.cpp | sed -n '1,420p'" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+92:void Micropolis::generateSomeRandomCity()
+102:void Micropolis::generateSomeCity(int seed)
+129:void Micropolis::generateMap(int seed)
+175:void Micropolis::clearMap()
+188:void Micropolis::clearUnnatural()
+204:void Micropolis::makeNakedIsland()
+248:void Micropolis::makeIsland()
+259:void Micropolis::makeLakes()
+283:void Micropolis::makeSingleLake(const Position &pos)
+310:void Micropolis::treeSplash(short xloc, short yloc)
+340:void Micropolis::doTrees()
+361:void Micropolis::smoothRiver()
+416:void Micropolis::smoothTrees()
+429:void Micropolis::smoothTreesAt(int x, int y, bool preserve)
+441:void Micropolis::smoothTreesAt(int x, int y, bool preserve,
+489:void Micropolis::doRivers(const Position &terrainPos)
+623:void Micropolis::plopBRiver(const Position &pos)
+650:void Micropolis::plopSRiver(const Position &pos)
+exec
+/bin/zsh -lc "nl -ba /tmp/MicropolisCore/MicropolisEngine/src/generate.cpp | sed -n '420,860p'" in /Users/james/Repos/wibandwob-dos succeeded in 50ms:
+     1	/* generate.cpp
+     2	 *
+     3	 * Micropolis, Unix Version.  This game was released for the Unix platform
+     4	 * in or about 1990 and has been modified for inclusion in the One Laptop
+     5	 * Per Child program.  Copyright (C) 1989 - 2007 Electronic Arts Inc.  If
+     6	 * you need assistance with this program, you may contact:
+     7	 *   http://wiki.laptop.org/go/Micropolis  or email  micropolis@laptop.org.
+     8	 *
+     9	 * This program is free software: you can redistribute it and/or modify
+    10	 * it under the terms of the GNU General Public License as published by
+    11	 * the Free Software Foundation, either version 3 of the License, or (at
+    12	 * your option) any later version.
+    13	 *
+    14	 * This program is distributed in the hope that it will be useful, but
+    15	 * WITHOUT ANY WARRANTY; without even the implied warranty of
+    16	 * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    17	 * General Public License for more details.  You should have received a
+    18	 * copy of the GNU General Public License along with this program.  If
+    19	 * not, see <http://www.gnu.org/licenses/>.
+    20	 *
+ succeeded in 51ms:
+   420	        for (y = 0; y < WORLD_H; y++) {
+   421	            if (isTree(map[x][y])) {
+   422	                smoothTreesAt(x, y, false);
+   423	            }
+   424	        }
+   425	    }
+   426	}
+   427	
+   428	/** Temporary function to prevent breaking a lot of code. */
+   429	void Micropolis::smoothTreesAt(int x, int y, bool preserve)
+   430	{
+   431	    ToolEffects effects(this);
+   432	
+   433	    smoothTreesAt(x, y, preserve, &effects);
+   434	    effects.modifyWorld();
+   435	}
+   436	
+   437	
+   438	/**
+   439	 * Smooth trees at a position.
+
+thinking
+**Identifying missing core files**
+codex
+I’ve pulled core sim/economy/traffic/scan/power/disaster/sprite/terrain algorithms with line-accurate references. Next I’m extracting tooling/building placement, auto-connect logic, file format, callbacks/bindings, and frontend/CLI architecture to complete the integration and modding sections.
+exec
+/bin/zsh -lc "rg -n \"enum EditingTool|class ToolEffects|class BuildingProperties|TOOL_\" /tmp/MicropolisCore/MicropolisEngine/src/tool.h && nl -ba /tmp/MicropolisCore/MicropolisEngine/src/tool.h | sed -n '1,420p'" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+142:enum EditingTool {
+143:    TOOL_RESIDENTIAL,
+144:    TOOL_COMMERCIAL,
+145:    TOOL_INDUSTRIAL,
+146:    TOOL_FIRESTATION,
+147:    TOOL_POLICESTATION,
+148:    TOOL_QUERY,
+149:    TOOL_WIRE,
+150:    TOOL_BULLDOZER,
+151:    TOOL_RAILROAD,
+152:    TOOL_ROAD,
+153:    TOOL_STADIUM,
+154:    TOOL_PARK,
+155:    TOOL_SEAPORT,
+156:    TOOL_COALPOWER,
+157:    TOOL_NUCLEARPOWER,
+158:    TOOL_AIRPORT,
+159:    TOOL_NETWORK,
+160:    TOOL_WATER,
+161:    TOOL_LAND,
+exec
+/bin/zsh -lc "rg -n \"ToolResult Micropolis::doTool|toolDown|toolDrag|applyTool|connectTile|build(Building|Road|Rail|Wire)|bulldozerTool|zoneTool|putDownPark|autoBulldoze|BuildingProperties|ToolEffects::\" /tmp/MicropolisCore/MicropolisEngine/src/tool.cpp && nl -ba /tmp/MicropolisCore/MicropolisEngine/src/tool.cpp | sed -n '1,520p'" in /Users/james/Repos/wibandwob-dos succeeded in 53ms:
+86:ToolEffects::ToolEffects(Micropolis *mpolis)
+93:ToolEffects::~ToolEffects()
+103:void ToolEffects::clear()
+121:void ToolEffects::modifyWorld()
+152:bool ToolEffects::modifyIfEnoughFunding()
+169:MapValue ToolEffects::getMapValue(const Position &pos) const
+186:void ToolEffects::setMapValue(const Position &pos, MapValue mapVal)
+192:// BuildingProperties
+194:BuildingProperties::BuildingProperties(int xs, int ys, MapTile base,
+205:BuildingProperties::~BuildingProperties()
+214: * Maybe move this information to eg #BuildingProperties?
+228: * @todo This information is duplicated in the #BuildingProperties at least.
+252:ToolResult Micropolis::putDownPark(short mapH, short mapV, ToolEffects *effects)
+582:        connectTile(xMap + cnt, yMap - 1, CONNECT_TILE_FIX, effects);
+587:        connectTile(xMap - 1, yMap + cnt, CONNECT_TILE_FIX, effects);
+592:        connectTile(xMap + cnt, yMap + sizeY, CONNECT_TILE_FIX, effects);
+597:        connectTile(xMap + sizeX, yMap + cnt, CONNECT_TILE_FIX, effects);
+682:            if (!autoBulldoze) {
+708: * @todo Give #putBuilding a #BuildingProperties pointer instead.
+711:ToolResult Micropolis::buildBuilding(int mapH, int mapV,
+exec
+/bin/zsh -lc "nl -ba /tmp/MicropolisCore/MicropolisEngine/src/tool.cpp | sed -n '520,1120p'" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+   520	
+   521	    default:
+   522	        *deltaHPtr = 0;
+   523	        *deltaVPtr = 0;
+   524	        return 0;
+   525	
+   526	    }
+   527	}
+   528	
+   529	
+   530	/**
+   531	 * Can the tile be auto-bulldozed?.
+   532	 * @param tileValue Value of the tile.
+   533	 * @return \c True if the tile can be auto-bulldozed, else \c false.
+   534	 */
+   535	bool Micropolis::tally(short tileValue)
+   536	{
+   537	    return (tileValue >= FIRSTRIVEDGE  && tileValue <= LASTRUBBLE) ||
+   538	           (tileValue >= POWERBASE + 2 && tileValue <= POWERBASE + 12) ||
+   539	           (tileValue >= TINYEXP       && tileValue <= LASTTINYEXP + 2);
+exec
+/bin/zsh -lc "nl -ba /tmp/MicropolisCore/MicropolisEngine/src/tool.cpp | sed -n '1120,1720p'" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+  1120	ToolResult Micropolis::roadTool(short x, short y, ToolEffects *effects)
+  1121	{
+  1122	    if (!testBounds(x, y)) {
+  1123	        return TOOLRESULT_FAILED;
+  1124	    }
+  1125	
+  1126	    ToolResult result = connectTile(x, y, CONNECT_TILE_ROAD, effects);
+  1127	
+  1128	    if (result == TOOLRESULT_OK) {
+  1129	        /* send 'didtool' message */
+  1130	        FrontendMessage *didToolMsg;
+  1131	        didToolMsg = new FrontendMessageDidTool("Road", x, y);
+  1132	        effects->addFrontendMessage(didToolMsg);
+  1133	    }
+  1134	
+  1135	    return result;
+  1136	}
+  1137	
+  1138	
+  1139	/**
+exec
+/bin/zsh -lc "rg -n \"void Micropolis::(connectTile|fixZone|fixSingle|fixRoad|fixRail|fixWire|roadConnects(?:East|West|North|South)|railConnects|wireConnects|adjTile)\" /tmp/MicropolisCore/MicropolisEngine/src/connect.cpp && nl -ba /tmp/MicropolisCore/MicropolisEngine/src/connect.cpp | sed -n '1,820p'" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+565:void Micropolis::fixZone(int x, int y, ToolEffects *effects)
+593:void Micropolis::fixSingle(int x, int y, ToolEffects *effects)
+     1	/* connect.cpp
+     2	 *
+     3	 * Micropolis, Unix Version.  This game was released for the Unix platform
+     4	 * in or about 1990 and has been modified for inclusion in the One Laptop
+     5	 * Per Child program.  Copyright (C) 1989 - 2007 Electronic Arts Inc.  If
+     6	 * you need assistance with this program, you may contact:
+     7	 *   http://wiki.laptop.org/go/Micropolis  or email  micropolis@laptop.org.
+     8	 *
+     9	 * This program is free software: you can redistribute it and/or modify
+    10	 * it under the terms of the GNU General Public License as published by
+    11	 * the Free Software Foundation, either version 3 of the License, or (at
+    12	 * your option) any later version.
+    13	 *
+    14	 * This program is distributed in the hope that it will be useful, but
+    15	 * WITHOUT ANY WARRANTY; without even the implied warranty of
+    16	 * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    17	 * General Public License for more details.  You should have received a
+    18	 * copy of the GNU General Public License along with this program.  If
+
+thinking
+**Identifying required file IO and callbacks**
+exec
+/bin/zsh -lc 'rg -n "bool Micropolis::(loadCity|loadFile|loadFileDir|loadScenario|saveFile|saveCityAs|saveCity|loadFileData)|saveShort|loadShort|MISC_HISTORY_LENGTH|HISTORY_LENGTH|27120|mop|column" /tmp/MicropolisCore/MicropolisEngine/src/fileio.cpp /tmp/MicropolisCore/notes/file-format.txt' in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+/tmp/MicropolisCore/notes/file-format.txt:7:static const int HISTORY_LENGTH = 480;
+/tmp/MicropolisCore/notes/file-format.txt:12:static const int MISC_HISTORY_LENGTH = 240;
+/tmp/MicropolisCore/notes/file-format.txt:25:      (size == 27120) &&
+/tmp/MicropolisCore/notes/file-format.txt:26:      load_short(resHist, HISTORY_LENGTH / sizeof(short), f) &&
+/tmp/MicropolisCore/notes/file-format.txt:27:      load_short(comHist, HISTORY_LENGTH / sizeof(short), f) &&
+/tmp/MicropolisCore/notes/file-format.txt:28:      load_short(indHist, HISTORY_LENGTH / sizeof(short), f) &&
+/tmp/MicropolisCore/notes/file-format.txt:29:      load_short(crimeHist, HISTORY_LENGTH / sizeof(short), f) &&
+/tmp/MicropolisCore/notes/file-format.txt:30:      load_short(pollutionHist, HISTORY_LENGTH / sizeof(short), f) &&
+/tmp/MicropolisCore/notes/file-format.txt:31:      load_short(moneyHist, HISTORY_LENGTH / sizeof(short), f) &&
+/tmp/MicropolisCore/notes/file-format.txt:32:      load_short(miscHist, MISC_HISTORY_LENGTH / sizeof(short), f) &&
+/tmp/MicropolisCore/MicropolisEngine/src/fileio.cpp:213:bool Micropolis::loadFileData(const std::string &filename)
+/tmp/MicropolisCore/MicropolisEngine/src/fileio.cpp:235:      (6 * HISTORY_LENGTH) +
+/tmp/MicropolisCore/MicropolisEngine/src/fileio.cpp:236:       MISC_HISTORY_LENGTH;
+/tmp/MicropolisCore/MicropolisEngine/src/fileio.cpp:237:    int mapFileSize = // 27120
+/tmp/MicropolisCore/MicropolisEngine/src/fileio.cpp:239:    int mopFileSize = // 51120
+/tmp/MicropolisCore/MicropolisEngine/src/fileio.cpp:242:        size == mopFileSize;
+/tmp/MicropolisCore/MicropolisEngine/src/fileio.cpp:248:      load_short(resHist, HISTORY_LENGTH / sizeof(short), f) &&
+/tmp/MicropolisCore/MicropolisEngine/src/fileio.cpp:249:      load_short(comHist, HISTORY_LENGTH / sizeof(short), f) &&
+/tmp/MicropolisCore/MicropolisEngine/src/fileio.cpp:250:      load_short(indHist, HISTORY_LENGTH / sizeof(short), f) &&
+/tmp/MicropolisCore/MicropolisEngine/src/fileio.cpp:251:      load_short(crimeHist, HISTORY_LENGTH / sizeof(short), f) &&
+exec
+/bin/zsh -lc "nl -ba /tmp/MicropolisCore/MicropolisEngine/src/fileio.cpp | sed -n '1,420p'" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+     1	/* fileio.cpp
+     2	 *
+     3	 * Micropolis, Unix Version.  This game was released for the Unix platform
+     4	 * in or about 1990 and has been modified for inclusion in the One Laptop
+     5	 * Per Child program.  Copyright (C) 1989 - 2007 Electronic Arts Inc.  If
+     6	 * you need assistance with this program, you may contact:
+     7	 *   http://wiki.laptop.org/go/Micropolis  or email  micropolis@laptop.org.
+     8	 *
+     9	 * This program is free software: you can redistribute it and/or modify
+    10	 * it under the terms of the GNU General Public License as published by
+    11	 * the Free Software Foundation, either version 3 of the License, or (at
+    12	 * your option) any later version.
+    13	 *
+    14	 * This program is distributed in the hope that it will be useful, but
+    15	 * WITHOUT ANY WARRANTY; without even the implied warranty of
+    16	 * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    17	 * General Public License for more details.  You should have received a
+    18	 * copy of the GNU General Public License along with this program.  If
+    19	 * not, see <http://www.gnu.org/licenses/>.
+    20	 *
+exec
+/bin/zsh -lc "nl -ba /tmp/MicropolisCore/MicropolisEngine/src/fileio.cpp | sed -n '420,760p'" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+   420	    return result;
+   421	}
+   422	
+   423	
+   424	/**
+   425	 * Load a scenario.
+   426	 * @param s Scenario to load.
+   427	 * @note \a s cannot be \c SC_NONE.
+   428	 */
+   429	void Micropolis::loadScenario(Scenario s)
+   430	{
+   431	    std::string name = NULL;
+   432	    std::string fname = NULL;
+   433	
+   434	    cityFileName = "";
+   435	
+   436	    setGameLevel(LEVEL_EASY);
+   437	
+   438	    if (s < SC_DULLSVILLE || s > SC_RIO) {
+   439	        s = SC_DULLSVILLE;
+exec
+/bin/zsh -lc "nl -ba /tmp/MicropolisCore/MicropolisEngine/src/callback.h | sed -n '1,260p'; nl -ba /tmp/MicropolisCore/MicropolisEngine/src/callback.cpp | sed -n '1,380p'; nl -ba /tmp/MicropolisCore/MicropolisEngine/src/frontendmessage.h | sed -n '1,220p'; nl -ba /tmp/MicropolisCore/MicropolisEngine/src/frontendmessage.cpp | sed -n '1,240p'" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+     1	/* callback.h
+     2	 *
+     3	 * Micropolis, Unix Version.  This game was released for the Unix platform
+     4	 * in or about 1990 and has been modified for inclusion in the One Laptop
+     5	 * Per Child program.  Copyright (C) 1989 - 2007 Electronic Arts Inc.  If
+     6	 * you need assistance with this program, you may contact:
+     7	 *   http://wiki.laptop.org/go/Micropolis  or email  micropolis@laptop.org.
+     8	 *
+     9	 * This program is free software: you can redistribute it and/or modify
+    10	 * it under the terms of the GNU General Public License as published by
+    11	 * the Free Software Foundation, either version 3 of the License, or (at
+    12	 * your option) any later version.
+    13	 *
+    14	 * This program is distributed in the hope that it will be useful, but
+    15	 * WITHOUT ANY WARRANTY; without even the implied warranty of
+    16	 * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    17	 * General Public License for more details.  You should have received a
+    18	 * copy of the GNU General Public License along with this program.  If
+    19	 * not, see <http://www.gnu.org/licenses/>.
+    20	 *
+exec
+/bin/zsh -lc "nl -ba /tmp/MicropolisCore/MicropolisEngine/src/text.h | sed -n '1,280p'; nl -ba /tmp/MicropolisCore/MicropolisEngine/src/message.cpp | sed -n '1,520p'" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+     1	/* text.h
+     2	 *
+     3	 * Micropolis, Unix Version.  This game was released for the Unix platform
+     4	 * in or about 1990 and has been modified for inclusion in the One Laptop
+     5	 * Per Child program.  Copyright (C) 1989 - 2007 Electronic Arts Inc.  If
+     6	 * you need assistance with this program, you may contact:
+     7	 *   http://wiki.laptop.org/go/Micropolis  or email  micropolis@laptop.org.
+     8	 *
+     9	 * This program is free software: you can redistribute it and/or modify
+    10	 * it under the terms of the GNU General Public License as published by
+    11	 * the Free Software Foundation, either version 3 of the License, or (at
+    12	 * your option) any later version.
+    13	 *
+    14	 * This program is distributed in the hope that it will be useful, but
+    15	 * WITHOUT ANY WARRANTY; without even the implied warranty of
+    16	 * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    17	 * General Public License for more details.  You should have received a
+    18	 * copy of the GNU General Public License along with this program.  If
+    19	 * not, see <http://www.gnu.org/licenses/>.
+    20	 *
+
+thinking
+**Planning Emscripten bindings**
+exec
+/bin/zsh -lc "nl -ba /tmp/MicropolisCore/MicropolisEngine/src/emscripten.cpp | sed -n '920,1380p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba /tmp/MicropolisCore/MicropolisEngine/src/emscripten.cpp | sed -n '420,920p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba /tmp/MicropolisCore/MicropolisEngine/src/js_callback.h | sed -n '1,260p'; nl -ba /tmp/MicropolisCore/MicropolisEngine/src/emscripten.cpp | sed -n '1,420p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "rg -n \"EMSCRIPTEN_BINDINGS|class JSCallback|register_callback|function\\(|\\.property\\(|\\.constructor|getMapBuffer|getMop|HEAPU16|subarray|typed_memory_view|allow_raw_pointers|value_array|enum_\" /tmp/MicropolisCore/MicropolisEngine/src/emscripten.cpp /tmp/MicropolisCore/MicropolisEngine/src/js_callback.h /tmp/MicropolisCore/micropolis/src/lib/MicropolisSimulator.ts /tmp/MicropolisCore/micropolis/src/lib/ReactiveMicropolisCallback.ts /tmp/MicropolisCore/micropolis/src/lib/micropolisStore.ts" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+   920	    // tile 785 -- 799 ?
+   921	    .value("FULLSTADIUM", FULLSTADIUM) // 800
+   922	    // tile 801 -- 810 ?
+   923	    // Nuclear power plant (4x4).
+   924	    .value("NUCLEARBASE", NUCLEARBASE) // 811: First tile nuclear power plant.
+   925	    .value("NUCLEAR", NUCLEAR) // 816: 'Center' tile nuclear power plant.
+   926	    .value("LASTZONE", LASTZONE) // 826: Also last tile nuclear power plant.
+   927	    .value("LIGHTNINGBOLT", LIGHTNINGBOLT) // 827
+   928	    .value("HBRDG0", HBRDG0) // 828
+   929	    .value("HBRDG1", HBRDG1) // 829
+   930	    .value("HBRDG2", HBRDG2) // 830
+   931	    .value("HBRDG3", HBRDG3) // 831
+   932	    .value("HBRDG_END", HBRDG_END) // 832
+   933	    .value("RADAR0", RADAR0) // 832
+   934	    .value("RADAR1", RADAR1) // 833
+   935	    .value("RADAR2", RADAR2) // 834
+   936	    .value("RADAR3", RADAR3) // 835
+   937	    .value("RADAR4", RADAR4) // 836
+   938	    .value("RADAR5", RADAR5) // 837
+   939	    .value("RADAR6", RADAR6) // 838
+ succeeded in 51ms:
+   420	    //.function("getBase", &Map<Byte, 4>::getBase, allow_raw_pointers()) // TODO: wrap
+   421	    .function("getTotalByteSize", &Map<Byte, 4>::getTotalByteSize)
+   422	    ;
+   423	
+   424	  class_<Map<short, 8>>("MapShort8")
+   425	    .constructor<short>()
+   426	    .property("MAP_BLOCKSIZE", &Map<short, 8>::MAP_BLOCKSIZE)
+   427	    .property("MAP_W", &Map<short, 8>::MAP_W)
+   428	    .property("MAP_H", &Map<short, 8>::MAP_H)
+   429	    .function("fill", &Map<short, 8>::fill)
+   430	    .function("clear", &Map<short, 8>::clear)
+   431	    .function("set", &Map<short, 8>::set)
+   432	    .function("get", &Map<short, 8>::get)
+   433	    .function("onMap", &Map<short, 8>::onMap)
+   434	    .function("worldSet", &Map<short, 8>::worldSet)
+   435	    .function("worldGet", &Map<short, 8>::worldGet)
+   436	    .function("worldOnMap", &Map<short, 8>::worldOnMap)
+   437	    //.function("getBase", &Map<short, 8>::getBase, allow_raw_pointers()) // TODO: wrap
+   438	    .function("getTotalByteSize", &Map<short, 8>::getTotalByteSize)
+   439	    ;
+ succeeded in 52ms:
+     1	// src/js_callback.h
+     2	#ifndef JS_CALLBACK_H
+     3	#define JS_CALLBACK_H
+     4	
+     5	#include <emscripten/val.h>
+     6	#include "callback.h"
+     7	
+     8	class JSCallback : public Callback {
+     9	public:
+    10	    explicit JSCallback(emscripten::val jsCallback)
+    11	        : Callback(), jsCallback(jsCallback) {}
+    12	
+    13	    // Implement all pure virtual functions from Callback
+    14	    void autoGoto(Micropolis *micropolis, emscripten::val callbackVal, int x, int y, std::string message) override {
+    15	        jsCallback.call<void>("autoGoto", emscripten::val(micropolis), callbackVal, x, y, message);
+    16	    }
+    17	
+    18	    void didGenerateMap(Micropolis *micropolis, emscripten::val callbackVal, int seed) override {
+    19	        jsCallback.call<void>("didGenerateMap", emscripten::val(micropolis), callbackVal, seed);
+    20	    }
+ succeeded in 52ms:
+/tmp/MicropolisCore/MicropolisEngine/src/js_callback.h:8:class JSCallback : public Callback {
+/tmp/MicropolisCore/micropolis/src/lib/micropolisStore.ts:12:    HEAPU16: Uint16Array;
+/tmp/MicropolisCore/micropolis/src/lib/micropolisStore.ts:151:        const mopSizeBytes = micropolis.getMopSize();
+/tmp/MicropolisCore/micropolis/src/lib/micropolisStore.ts:153:        const mopStartAddress = micropolis.getMopAddress() / 2; // Divide by 2 for Uint16Array index
+/tmp/MicropolisCore/micropolis/src/lib/micropolisStore.ts:157:        mapData = engine.HEAPU16.subarray(mapStartAddress, mapEndAddress);
+/tmp/MicropolisCore/micropolis/src/lib/micropolisStore.ts:158:        mopData = engine.HEAPU16.subarray(mopStartAddress, mopEndAddress);
+/tmp/MicropolisCore/micropolis/src/lib/MicropolisSimulator.ts:144:        this.mapData = this.micropolisengine.HEAPU16.subarray(mapStartAddress, mapEndAddress);
+/tmp/MicropolisCore/micropolis/src/lib/MicropolisSimulator.ts:146:        const mopStartAddress = this.micropolis.getMopAddress() / 2;
+/tmp/MicropolisCore/micropolis/src/lib/MicropolisSimulator.ts:147:        const mopEndAddress = mopStartAddress + this.micropolis.getMopSize() / 2;
+/tmp/MicropolisCore/micropolis/src/lib/MicropolisSimulator.ts:148:        this.mopData = this.micropolisengine.HEAPU16.subarray(mopStartAddress, mopEndAddress);
+/tmp/MicropolisCore/MicropolisEngine/src/emscripten.cpp:178:// The enum_, class_, constructor, function, and property functions
+/tmp/MicropolisCore/MicropolisEngine/src/emscripten.cpp:286:EMSCRIPTEN_BINDINGS(MicropolisEngine) {
+/tmp/MicropolisCore/MicropolisEngine/src/emscripten.cpp:290:  enum_<Direction2>("Direction2")
+/tmp/MicropolisCore/MicropolisEngine/src/emscripten.cpp:303:    .constructor<>()
+/tmp/MicropolisCore/MicropolisEngine/src/emscripten.cpp:304:    .constructor<int, int>()
+/tmp/MicropolisCore/MicropolisEngine/src/emscripten.cpp:305:    .function("move", &Position::move)
+/tmp/MicropolisCore/MicropolisEngine/src/emscripten.cpp:306:    .function("testBounds", &Position::testBounds)
+/tmp/MicropolisCore/MicropolisEngine/src/emscripten.cpp:307:    .property("posX", &Position::posX)
+/tmp/MicropolisCore/MicropolisEngine/src/emscripten.cpp:308:    .property("posY", &Position::posY)
+/tmp/MicropolisCore/MicropolisEngine/src/emscripten.cpp:311:  function("increment45", &increment45);
+exec
+/bin/zsh -lc "nl -ba /tmp/MicropolisCore/micropolis/src/lib/MicropolisSimulator.ts | sed -n '1,380p'; nl -ba /tmp/MicropolisCore/micropolis/src/lib/micropolisStore.ts | sed -n '1,420p'; nl -ba /tmp/MicropolisCore/micropolis/src/lib/ReactiveMicropolisCallback.ts | sed -n '1,260p'; nl -ba /tmp/MicropolisCore/micropolis/src/lib/TileRenderer.ts | sed -n '1,360p'; nl -ba /tmp/MicropolisCore/micropolis/src/lib/WebGLTileRenderer.ts | sed -n '1,860p'; nl -ba /tmp/MicropolisCore/micropolis/src/lib/sprites.ts | sed -n '1,360p'" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+Total output lines: 2229
+
+     1	/// <reference path="../types/micropolisengine.d.ts" />
+     2	
+     3	import type { Micropolis, Callback, JSCallback } from '../types/micropolisengine.d.js';
+     4	import initModule from "$lib/micropolisengine.js";
+     5	
+     6	export let micropolisengine: any;
+     7	let sharedSimulator: MicropolisSimulator | null = null;
+     8	let viewCount = 0;
+     9	const GLOBAL_KEY = '__MICROPOLIS_SINGLETON__';
+    10	
+    11	function getGlobalStore(): { simulator?: MicropolisSimulator | null; engine?: any; viewCount?: number } {
+    12	  const g = (globalThis as any);
+    13	  if (!g[GLOBAL_KEY]) g[GLOBAL_KEY] = { simulator: null, engine: null, viewCount: 0 };
+    14	  return g[GLOBAL_KEY];
+    15	}
+    16	
+    17	let capacitorApp: boolean = 
+    18	    (typeof window != 'undefined') &&
+context compacted
+
+thinking
+**Preparing implementation approach**
+codex
+I’ve finished the code extraction pass and next I’m going to synthesize it into the requested megareport file with the exact header and all required sections, including formula tables and file:line citations. I’ll write directly to `.planning/spikes/spk-micropolis-engine-review/spk02-codex-megareport.md` and then run a quick structural check against your section list.
+
+thinking
+**Planning large markdown generation**
+exec
+/bin/zsh -lc 'ls -la .planning/spikes/spk-micropolis-engine-review && wc -l .planning/spikes/spk-micropolis-engine-review/spk01-findings.md' in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+total 72
+drwxr-xr-x@  3 james  staff     96 Feb 20 09:23 .
+drwxr-xr-x@ 10 james  staff    320 Feb 20 09:19 ..
+-rw-r--r--@  1 james  staff  35633 Feb 20 09:23 spk01-findings.md
+     878 .planning/spikes/spk-micropolis-engine-review/spk01-findings.md
+
+thinking
+**Planning detailed report structure**
+codex
+I’m now generating structured extracts (callbacks, tools, messages, scenarios, constants, and tile ranges) from the Micropolis sources so the appendices can be code-accurate without hand-copy errors.
+exec
+/bin/zsh -lc "rg -n \"enum class EditingTool|enum class ToolResult|enum class zoneType\" /tmp/MicropolisCore/MicropolisEngine/src/tool.h && rg -n \"toolSize\\[|toolCost\\[\" /tmp/MicropolisCore/MicropolisEngine/src/tool.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc 'rg -n "virtual void" /tmp/MicropolisCore/MicropolisEngine/src/callback.h' in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc 'rg -n "enum class MessageNumber|MESSAGE_" /tmp/MicropolisCore/MicropolisEngine/src/text.h | head -n 200' in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc 'rg -n "WORLD_W|WORLD_H|HISTORY_LENGTH|MISC_HISTORY_LENGTH|MAX_TRAFFIC_DISTANCE|POWER_STACK_SIZE|CENSUS_FREQUENCY_10|TAX_FREQUENCY" /tmp/MicropolisCore/MicropolisEngine/src/micropolis.h /tmp/MicropolisCore/MicropolisEngine/src/traffic.cpp /tmp/MicropolisCore/MicropolisEngine/src/power.cpp' in /Users/james/Repos/wibandwob-dos exited 1 in 51ms:
+
+ succeeded in 51ms:
+92:    virtual void autoGoto(Micropolis *micropolis, emscripten::val callbackVal, int x, int y, std::string message) = 0;
+93:    virtual void didGenerateMap(Micropolis *micropolis, emscripten::val callbackVal, int seed) = 0;
+94:    virtual void didLoadCity(Micropolis *micropolis, emscripten::val callbackVal, std::string filename) = 0;
+95:    virtual void didLoadScenario(Micropolis *micropolis, emscripten::val callbackVals, std::string name, std::string fname) = 0;
+96:    virtual void didLoseGame(Micropolis *micropolis, emscripten::val callbackVal) = 0;
+97:    virtual void didSaveCity(Micropolis *micropolis, emscripten::val callbackVal, std::string filename) = 0;
+98:    virtual void didTool(Micropolis *micropolis, emscripten::val callbackVal, std::string name, int x, int y) = 0;
+99:    virtual void didWinGame(Micropolis *micropolis, emscripten::val callbackVal) = 0;
+100:    virtual void didntLoadCity(Micropolis *micropolis, emscripten::val callbackVal, std::string filename) = 0;
+101:    virtual void didntSaveCity(Micropolis *micropolis, emscripten::val callbackVal, std::string filename) = 0;
+102:    virtual void makeSound(Micropolis *micropolis, emscripten::val callbackVal, std::string channel, std::string sound, int x, int y) = 0;
+103:    virtual void newGame(Micropolis *micropolis, emscripten::val callbackVal) = 0;
+104:    virtual void saveCityAs(Micropolis *micropolis, emscripten::val callbackVal, std::string filename) = 0;
+105:    virtual void sendMessage(Micropolis *micropolis, emscripten::val callbackVal, int messageIndex, int x, int y, bool picture, bool important) = 0;
+106:    virtual void showBudgetAndWait(Micropolis *micropolis, emscripten::val callbackVal) = 0;
+107:    virtual void showZoneStatus(Micropolis *micropolis, emscripten::val callbackVal, int tileCategoryIndex, int populationDensityIndex, int landValueIndex, int crimeRateIndex, int pollutionIndex, int growthRateIndex, int x, int y) = 0;
+108:    virtual void simulateRobots(Micropolis *micropolis, emscripten::val callbackVal) = 0;
+109:    virtual void simulateChurch(Micropolis *micropolis, emscripten::val callbackVal, int posX, int posY, int churchNumber) = 0;
+110:    virtual void startEarthquake(Micropolis *micropolis, emscripten::val callbackVal, int strength) = 0;
+111:    virtual void startGame(Micropolis *micropolis, emscripten::val callbackVal) = 0;
+ succeeded in 51ms:
+113:    MESSAGE_NEED_MORE_RESIDENTIAL = 1, ///< More residential zones needed.
+114:    MESSAGE_NEED_MORE_COMMERCIAL, ///< More commercial zones needed.
+115:    MESSAGE_NEED_MORE_INDUSTRIAL, ///< More industrial zones needed.
+116:    MESSAGE_NEED_MORE_ROADS, ///< More roads required.
+117:    MESSAGE_NEED_MORE_RAILS, ///< 5: Inadequate rail system.
+118:    MESSAGE_NEED_ELECTRICITY, ///< Build a Power Plant.
+119:    MESSAGE_NEED_STADIUM, ///< Residents demand a Stadium.
+120:    MESSAGE_NEED_SEAPORT, ///< Industry requires a Sea Port.
+121:    MESSAGE_NEED_AIRPORT, ///< Commerce requires an Airport.
+122:    MESSAGE_HIGH_POLLUTION, ///< 10: Pollution very high.
+123:    MESSAGE_HIGH_CRIME, ///< Crime very high.
+124:    MESSAGE_TRAFFIC_JAMS, ///< Frequent traffic jams reported.
+125:    MESSAGE_NEED_FIRE_STATION, ///< Citizens demand a Fire Department.
+126:    MESSAGE_NEED_POLICE_STATION, ///< Citizens demand a Police Department.
+127:    MESSAGE_BLACKOUTS_REPORTED, ///< 15: Blackouts reported. Check power map.
+128:    MESSAGE_TAX_TOO_HIGH, ///< Citizens upset. The tax rate is too high.
+129:    MESSAGE_ROAD_NEEDS_FUNDING, ///< Roads deteriorating, due to lack of funds.
+130:    MESSAGE_FIRE_STATION_NEEDS_FUNDING, ///< Fire departments need funding.
+131:    MESSAGE_POLICE_NEEDS_FUNDING, ///< Police departments need funding.
+132:    MESSAGE_FIRE_REPORTED, ///< 20: Fire reported !
+ succeeded in 51ms:
+/tmp/MicropolisCore/MicropolisEngine/src/power.cpp:175:    if (powerStackPointer < (POWER_STACK_SIZE - 2)) {
+/tmp/MicropolisCore/MicropolisEngine/src/traffic.cpp:213:    assert(curMapStackPointer < MAX_TRAFFIC_DISTANCE + 1);
+/tmp/MicropolisCore/MicropolisEngine/src/traffic.cpp:315:    for (short dist = 0; dist < MAX_TRAFFIC_DISTANCE; dist++) {
+/tmp/MicropolisCore/MicropolisEngine/src/traffic.cpp:346:    return false; /* gone MAX_TRAFFIC_DISTANCE */
+/tmp/MicropolisCore/MicropolisEngine/src/traffic.cpp:420:            if (pos.posX < WORLD_W - 1) {
+/tmp/MicropolisCore/MicropolisEngine/src/traffic.cpp:427:            if (pos.posY < WORLD_H - 1) {
+/tmp/MicropolisCore/MicropolisEngine/src/traffic.cpp:473:    if (pos.posX < (WORLD_W - 1)) {
+/tmp/MicropolisCore/MicropolisEngine/src/traffic.cpp:480:    if (pos.posY < (WORLD_H - 1)) {
+/tmp/MicropolisCore/MicropolisEngine/src/micropolis.h:151:static const int WORLD_W_2 = WORLD_W / 2;
+/tmp/MicropolisCore/MicropolisEngine/src/micropolis.h:157:static const int WORLD_H_2 = WORLD_H / 2;
+/tmp/MicropolisCore/MicropolisEngine/src/micropolis.h:165:static const int WORLD_W_4 = WORLD_W / 4;
+/tmp/MicropolisCore/MicropolisEngine/src/micropolis.h:171:static const int WORLD_H_4 = WORLD_H / 4;
+/tmp/MicropolisCore/MicropolisEngine/src/micropolis.h:179:static const int WORLD_W_8 = WORLD_W / 8;
+/tmp/MicropolisCore/MicropolisEngine/src/micropolis.h:185:static const int WORLD_H_8 = (WORLD_H + 7) / 8;
+/tmp/MicropolisCore/MicropolisEngine/src/micropolis.h:210:static const int HISTORY_LENGTH = 480;
+/tmp/MicropolisCore/MicropolisEngine/src/micropolis.h:215:static const int MISC_HISTORY_LENGTH = 240;
+/tmp/MicropolisCore/MicropolisEngine/src/micropolis.h:226:static const int POWER_STACK_SIZE = (WORLD_W * WORLD_H) / 4;
+/tmp/MicropolisCore/MicropolisEngine/src/micropolis.h:248:static const int MAX_TRAFFIC_DISTANCE = 30;
+/tmp/MicropolisCore/MicropolisEngine/src/micropolis.h:1121:    unsigned short *map[WORLD_W];
+/tmp/MicropolisCore/MicropolisEngine/src/micropolis.h:1122:    unsigned short *mop[WORLD_W];
+
+thinking
+**Isolating failing command behavior**
+exec
+/bin/zsh -lc 'rg -n "enum class EditingTool|enum class ToolResult|enum class ZoneType|enum class ConnectTileCommand" /tmp/MicropolisCore/MicropolisEngine/src/tool.h' in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba /tmp/MicropolisCore/MicropolisEngine/src/tool.cpp | sed -n '200,260p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "rg -n \"WORLD_W\\s*=|WORLD_H\\s*=|TILE_COUNT|LOMASK|PWRBIT|CONDBIT|BURNBIT|BULLBIT|ANIMBIT|ZONEBIT\" /tmp/MicropolisCore/MicropolisEngine/src/tool.h /tmp/MicropolisCore/MicropolisEngine/src/micropolis.h /tmp/MicropolisCore/micropolis/scripts/constants.js" in /Users/james/Repos/wibandwob-dos exited 1 in 51ms:
+
+ succeeded in 50ms:
+   200	        toolName(tName),
+   201	        buildingIsAnimated(anim)
+   202	{
+   203	}
+   204	
+   205	BuildingProperties::~BuildingProperties()
+   206	{
+   207	}
+   208	
+   209	
+   210	////////////////////////////////////////////////////////////////////////
+   211	
+   212	/**
+   213	 * Cost of each tool.
+   214	 * Maybe move this information to eg #BuildingProperties?
+   215	 */
+   216	static const short gCostOf[] = {
+   217	     100,    100,    100,    500, /* res, com, ind, fire */
+   218	     500,      0,      5,      1, /* police, query, wire, bulldozer */
+   219	      20,     10,   5000,     10, /* rail, road, stadium, park */
+ succeeded in 51ms:
+/tmp/MicropolisCore/MicropolisEngine/src/tool.h:115: * @todo Decide what to do with #ANIMBIT (since sim-backend may not be the
+/tmp/MicropolisCore/MicropolisEngine/src/tool.h:120:    PWRBIT  = 0x8000, ///< bit 15, tile has power.
+/tmp/MicropolisCore/MicropolisEngine/src/tool.h:121:    CONDBIT = 0x4000, ///< bit 14. tile can conduct electricity.
+/tmp/MicropolisCore/MicropolisEngine/src/tool.h:122:    BURNBIT = 0x2000, ///< bit 13, tile can be lit.
+/tmp/MicropolisCore/MicropolisEngine/src/tool.h:123:    BULLBIT = 0x1000, ///< bit 12, tile is bulldozable.
+/tmp/MicropolisCore/MicropolisEngine/src/tool.h:124:    ANIMBIT = 0x0800, ///< bit 11, tile is animated.
+/tmp/MicropolisCore/MicropolisEngine/src/tool.h:125:    ZONEBIT = 0x0400, ///< bit 10, tile is the center tile of the zone.
+/tmp/MicropolisCore/MicropolisEngine/src/tool.h:128:    ALLBITS = ZONEBIT | ANIMBIT | BULLBIT | BURNBIT | CONDBIT | PWRBIT,
+/tmp/MicropolisCore/MicropolisEngine/src/tool.h:129:    LOMASK = 0x03ff, ///< Mask for the #Tiles part of the tile
+/tmp/MicropolisCore/MicropolisEngine/src/tool.h:131:    BLBNBIT   = BULLBIT | BURNBIT,
+/tmp/MicropolisCore/MicropolisEngine/src/tool.h:132:    BLBNCNBIT = BULLBIT | BURNBIT | CONDBIT,
+/tmp/MicropolisCore/MicropolisEngine/src/tool.h:133:    BNCNBIT   =           BURNBIT | CONDBIT,
+/tmp/MicropolisCore/MicropolisEngine/src/tool.h:244:    return this->getMapValue(pos) & LOMASK;
+/tmp/MicropolisCore/MicropolisEngine/src/tool.h:258:    return this->getMapValue(Position(x, y)) & LOMASK;
+/tmp/MicropolisCore/MicropolisEngine/src/micropolis.h:373: * @see LOMASK MapTileBitmasks
+/tmp/MicropolisCore/MicropolisEngine/src/micropolis.h:665://    TILE_COUNT     = 960,
+/tmp/MicropolisCore/MicropolisEngine/src/micropolis.h:687:    USED_TILE_COUNT = 1019,
+/tmp/MicropolisCore/MicropolisEngine/src/micropolis.h:688:    TILE_COUNT      = 1024,
+/tmp/MicropolisCore/MicropolisEngine/src/micropolis.h:2149:        return (FIRE + (getRandom16() & 7)) | ANIMBIT;
+/tmp/MicropolisCore/MicropolisEngine/src/micropolis.h:2155:        return (RUBBLE + (getRandom16() & 3)) | BULLBIT;
+
+thinking
+**Identifying enum extraction issue**
+codex
+I’m filling in exact enum and scenario tables now; I hit one grep mismatch and am pulling those sections directly with line-numbered snippets to avoid omissions.
+exec
+/bin/zsh -lc "nl -ba /tmp/MicropolisCore/MicropolisEngine/src/tool.h | sed -n '1,260p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba /tmp/MicropolisCore/MicropolisEngine/src/simulate.cpp | sed -n '430,500p'" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+     1	/* tool.h
+     2	 *
+     3	 * Micropolis, Unix Version.  This game was released for the Unix platform
+     4	 * in or about 1990 and has been modified for inclusion in the One Laptop
+     5	 * Per Child program.  Copyright (C) 1989 - 2007 Electronic Arts Inc.  If
+     6	 * you need assistance with this program, you may contact:
+     7	 *   http://wiki.laptop.org/go/Micropolis  or email  micropolis@laptop.org.
+     8	 *
+     9	 * This program is free software: you can redistribute it and/or modify
+    10	 * it under the terms of the GNU General Public License as published by
+    11	 * the Free Software Foundation, either version 3 of the License, or (at
+    12	 * your option) any later version.
+    13	 *
+    14	 * This program is distributed in the hope that it will be useful, but
+    15	 * WITHOUT ANY WARRANTY; without even the implied warranty of
+    16	 * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    17	 * General Public License for more details.  You should have received a
+    18	 * copy of the GNU General Public License along with this program.  If
+    19	 * not, see <http://www.gnu.org/licenses/>.
+    20	 *
+exec
+/bin/zsh -lc "nl -ba /tmp/MicropolisCore/MicropolisEngine/src/text.h | sed -n '80,220p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba /tmp/MicropolisCore/MicropolisEngine/src/fileio.cpp | sed -n '420,540p'" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+   430	    /* This clears powermem */
+   431	    powerStackPointer = 0;
+   432	    doPowerScan();
+   433	    newPower = true; /* post rel */
+   434	
+   435	    initSimLoad = 0;
+   436	}
+   437	
+   438	
+   439	/* comefrom: doSimInit */
+   440	void Micropolis::simLoadInit()
+   441	{
+   442	    // Disaster delay table for each scenario
+   443	    static const short disasterWaitTable[SC_COUNT] = {
+   444	        0,          // No scenario (free playing)
+   445	        2,          // Dullsville (boredom)
+   446	        10,         // San francisco (earth quake)
+   447	        4 * 10,     // Hamburg (fire bombs)
+   448	        20,         // Bern (traffic)
+   449	        3,          // Tokyo (scary monster)
+ succeeded in 51ms:
+    80	////////////////////////////////////////////////////////////////////////
+    81	
+    82	
+    83	/** String numbers of score card. */
+    84	enum Stri202 {
+    85	    STR202_POPULATIONDENSITY_LOW = 0, ///< Low
+    86	    STR202_POPULATIONDENSITY_MEDIUM = 1, ///< Medium
+    87	    STR202_POPULATIONDENSITY_HIGH = 2, ///< High
+    88	    STR202_POPULATIONDENSITY_VERYHIGH = 3, ///< Very High
+    89	
+    90	    STR202_LANDVALUE_SLUM = 4, ///< Slum
+    91	    STR202_LANDVALUE_LOWER_CLASS = 5, ///< Lower Class
+    92	    STR202_LANDVALUE_MIDDLE_CLASS = 6, ///< Middle Class
+    93	    STR202_LANDVALUE_HIGH_CLASS = 7, ///< High
+    94	
+    95	    STR202_CRIME_NONE = 8, ///< Safe
+    96	    STR202_CRIME_LIGHT = 9, ///< Light
+    97	    STR202_CRIME_MODERATE = 10, ///< Moderate
+    98	    STR202_CRIME_DANGEROUS = 11, ///< Dangerous
+    99	
+ succeeded in 51ms:
+   420	    return result;
+   421	}
+   422	
+   423	
+   424	/**
+   425	 * Load a scenario.
+   426	 * @param s Scenario to load.
+   427	 * @note \a s cannot be \c SC_NONE.
+   428	 */
+   429	void Micropolis::loadScenario(Scenario s)
+   430	{
+   431	    std::string name = NULL;
+   432	    std::string fname = NULL;
+   433	
+   434	    cityFileName = "";
+   435	
+   436	    setGameLevel(LEVEL_EASY);
+   437	
+   438	    if (s < SC_DULLSVILLE || s > SC_RIO) {
+   439	        s = SC_DULLSVILLE;
+
+thinking
+**Reviewing constants in header**
+exec
+/bin/zsh -lc "nl -ba /tmp/MicropolisCore/MicropolisEngine/src/micropolis.h | sed -n '120,260p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba /tmp/MicropolisCore/MicropolisEngine/src/micropolis.h | sed -n '300,380p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba /tmp/MicropolisCore/MicropolisEngine/src/micropolis.h | sed -n '660,720p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba /tmp/MicropolisCore/MicropolisEngine/src/simulate.cpp | sed -n '540,940p'" in /Users/james/Repos/wibandwob-dos succeeded in 50ms:
+   120	
+   121	/**
+   122	 * Used to determine byte order.
+   123	 *
+   124	 * @todo Determine byte order a better way.
+   125	 */
+   126	#define IS_INTEL                        1
+   127	
+   128	
+   129	////////////////////////////////////////////////////////////////////////
+   130	// Constants
+   131	
+   132	
+   133	/**
+   134	 * The number of bits per tile.
+   135	 * @todo Only used in python/micropolisdrawingarea.py
+   136	 */
+   137	static const int BITS_PER_TILE = 16;
+   138	
+   139	/**
+ succeeded in 51ms:
+   300	    HISTORY_SCALE_COUNT, ///< Number of history scales available
+   301	};
+   302	
+   303	/**
+   304	 * Available map types.
+   305	 */
+   306	enum MapType {
+   307	    MAP_TYPE_ALL,                   ///< All zones
+   308	    MAP_TYPE_RES,                   ///< Residential zones
+   309	    MAP_TYPE_COM,                   ///< Commercial zones
+   310	    MAP_TYPE_IND,                   ///< Industrial zones
+   311	    MAP_TYPE_POWER,                 ///< Power connectivity
+   312	    MAP_TYPE_ROAD,                  ///< Roads
+   313	    MAP_TYPE_POPULATION_DENSITY,    ///< Population density
+   314	    MAP_TYPE_RATE_OF_GROWTH,        ///< Rate of growth
+   315	    MAP_TYPE_TRAFFIC_DENSITY,       ///< Traffic
+   316	    MAP_TYPE_POLLUTION,             ///< Pollution
+   317	    MAP_TYPE_CRIME,                 ///< Crime rate
+   318	    MAP_TYPE_LAND_VALUE,            ///< Land value
+   319	    MAP_TYPE_FIRE_RADIUS,           ///< Fire station coverage radius
+ succeeded in 51ms:
+   660	    NUKESWIRL2     = 953,
+   661	    NUKESWIRL3     = 954,
+   662	    NUKESWIRL4     = 955,
+   663	
+   664	    // Tiles 956-959 unused (originally)
+   665	//    TILE_COUNT     = 960,
+   666	
+   667	    // Extended zones: 956-1019
+   668	
+   669	    CHURCH1BASE    = 956,
+   670	    CHURCH1        = 960,
+   671	    CHURCH2BASE    = 965,
+   672	    CHURCH2        = 969,
+   673	    CHURCH3BASE    = 974,
+   674	    CHURCH3        = 978,
+   675	    CHURCH4BASE    = 983,
+   676	    CHURCH4        = 987,
+   677	    CHURCH5BASE    = 992,
+   678	    CHURCH5        = 996,
+   679	    CHURCH6BASE    = 1001,
+ succeeded in 51ms:
+   540	    } else {
+   541	        disasterEvent = SC_NONE;
+   542	        disasterWait = 0;
+   543	        scoreType = SC_NONE;
+   544	        scoreWait = 0;
+   545	    }
+   546	
+   547	    doStartGame();
+   548	}
+   549	
+   550	
+   551	/* comefrom: initSimMemory simLoadInit */
+   552	void Micropolis::setCommonInits()
+   553	{
+   554	    evalInit();
+   555	    roadEffect = MAX_ROAD_EFFECT;
+   556	    policeEffect = MAX_POLICE_STATION_EFFECT;
+   557	    fireEffect = MAX_FIRE_STATION_EFFECT;
+   558	    taxFlag = false;
+   559	    taxFund = 0;
+
+thinking
+**Searching for dimension definitions**
+exec
+/bin/zsh -lc "nl -ba /tmp/MicropolisCore/MicropolisEngine/src/position.h | sed -n '1,120p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba /tmp/MicropolisCore/MicropolisEngine/src/map_type.h | sed -n '1,220p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "rg -n \"WORLD_W\\s*=|WORLD_H\\s*=\" /tmp/MicropolisCore/MicropolisEngine/src/*.h /tmp/MicropolisCore/MicropolisEngine/src/*.cpp" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+     1	/* map_type.h
+     2	 *
+     3	 * Micropolis, Unix Version.  This game was released for the Unix platform
+     4	 * in or about 1990 and has been modified for inclusion in the One Laptop
+     5	 * Per Child program.  Copyright (C) 1989 - 2007 Electronic Arts Inc.  If
+     6	 * you need assistance with this program, you may contact:
+     7	 *   http://wiki.laptop.org/go/Micropolis  or email  micropolis@laptop.org.
+     8	 *
+     9	 * This program is free software: you can redistribute it and/or modify
+    10	 * it under the terms of the GNU General Public License as published by
+    11	 * the Free Software Foundation, either version 3 of the License, or (at
+    12	 * your option) any later version.
+    13	 *
+    14	 * This program is distributed in the hope that it will be useful, but
+    15	 * WITHOUT ANY WARRANTY; without even the implied warranty of
+    16	 * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    17	 * General Public License for more details.  You should have received a
+    18	 * copy of the GNU General Public License along with this program.  If
+    19	 * not, see <http://www.gnu.org/licenses/>.
+    20	 *
+ succeeded in 52ms:
+     1	/* position.h
+     2	 *
+     3	 * Micropolis, Unix Version.  This game was released for the Unix platform
+     4	 * in or about 1990 and has been modified for inclusion in the One Laptop
+     5	 * Per Child program.  Copyright (C) 1989 - 2007 Electronic Arts Inc.  If
+     6	 * you need assistance with this program, you may contact:
+     7	 *   http://wiki.laptop.org/go/Micropolis  or email  micropolis@laptop.org.
+     8	 *
+     9	 * This program is free software: you can redistribute it and/or modify
+    10	 * it under the terms of the GNU General Public License as published by
+    11	 * the Free Software Foundation, either version 3 of the License, or (at
+    12	 * your option) any later version.
+    13	 *
+    14	 * This program is distributed in the hope that it will be useful, but
+    15	 * WITHOUT ANY WARRANTY; without even the implied warranty of
+    16	 * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    17	 * General Public License for more details.  You should have received a
+    18	 * copy of the GNU General Public License along with this program.  If
+    19	 * not, see <http://www.gnu.org/licenses/>.
+    20	 *
+ succeeded in 51ms:
+/tmp/MicropolisCore/MicropolisEngine/src/map_type.h:90:static const int WORLD_W = 120;
+/tmp/MicropolisCore/MicropolisEngine/src/map_type.h:95:static const int WORLD_H = 100;
+
+thinking
+**Identifying references for phase simulation**
+exec
+/bin/zsh -lc "nl -ba /tmp/MicropolisCore/MicropolisEngine/src/simulate.cpp | sed -n '80,320p'" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+    80	#include "text.h"
+    81	
+    82	
+    83	////////////////////////////////////////////////////////////////////////
+    84	// Constants
+    85	
+    86	/**
+    87	 * How often to perform the short term census.
+    88	 * @todo Rename to CENSUS_MONTHLY_FREQUENCY or so?
+    89	 */
+    90	static const int CENSUS_FREQUENCY_10 = 4;
+    91	
+    92	/**
+    93	 * How often to perform the long term census.
+    94	 * @todo Rename to CENSUS_YEARLY_FREQUENCY or so?
+    95	 */
+    96	static const int CENSUS_FREQUENCY_120 = CENSUS_FREQUENCY_10 * 12;
+    97	
+    98	/**
+    99	 * How often to collect taxes.
