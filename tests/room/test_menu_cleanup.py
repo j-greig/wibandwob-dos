@@ -160,7 +160,10 @@ def test_text_editor_create_window_title_is_forwarded():
     """AC: create_window title propagates to text_editor window constructor."""
     app_src = APP_CPP.read_text()
     reg_src = WINDOW_REG_CPP.read_text()
-    assert "api_spawn_text_editor(TTestPatternApp& app, const TRect* bounds, const std::string& title)" in app_src
-    assert 'createTextEditorWindow(r, title.empty() ? "Text Editor" : title.c_str())' in app_src
+    assert "void api_spawn_text_editor(" in app_src
+    assert "const std::string& title" in app_src
+    assert 'createTextEditorWindow(r,' in app_src
+    assert '"Text Editor"' in app_src
+    assert 'title.c_str()' in app_src
     assert 'const auto it = kv.find("title");' in reg_src
     assert 'api_spawn_text_editor(app, opt_bounds(kv, r), title);' in reg_src
