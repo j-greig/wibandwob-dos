@@ -1,9 +1,9 @@
 # SPK04 — WibWobSimsity Barebones Playable
 
 ## Status
-Status: in-progress
+Status: done
 GitHub issue: #73
-PR: —
+PR: #74 (merged to main 2026-02-20)
 
 ## Goal
 Cursor + tool placement on the live Micropolis map inside WibWob-DOS. Proves the game loop is usable. No art polish, no dialogs, no MCP parity.
