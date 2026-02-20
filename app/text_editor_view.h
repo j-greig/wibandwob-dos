@@ -82,7 +82,7 @@ private:
 
 class TTextEditorWindow : public TWindow {
 public:
-    explicit TTextEditorWindow(const TRect &r);
+    TTextEditorWindow(const TRect &r, const char *title = "Text Editor");
     void setup();
     virtual void changeBounds(const TRect& b) override;
     
@@ -95,6 +95,6 @@ private:
 };
 
 // Factory function
-TWindow* createTextEditorWindow(const TRect &bounds);
+TWindow* createTextEditorWindow(const TRect &bounds, const char *title = "Text Editor");
 
 #endif // TEXT_EDITOR_VIEW_H

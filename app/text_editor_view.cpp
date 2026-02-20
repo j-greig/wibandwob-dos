@@ -427,8 +427,8 @@ void TTextEditorView::sendFigletText(const std::string& text, const std::string&
 }
 
 // Window wrapper implementation
-TTextEditorWindow::TTextEditorWindow(const TRect &r) 
-    : TWindow(r, "Text Editor", wnNoNumber), 
+TTextEditorWindow::TTextEditorWindow(const TRect &r, const char *title) 
+    : TWindow(r, title ? title : "Text Editor", wnNoNumber), 
       TWindowInit(&TTextEditorWindow::initFrame),
       editorView(nullptr)
 {
@@ -452,8 +452,8 @@ TFrame* TTextEditorWindow::initFrame(TRect r) {
     return new TFrame(r);
 }
 
-TWindow* createTextEditorWindow(const TRect &bounds) {
-    auto *w = new TTextEditorWindow(bounds);
+TWindow* createTextEditorWindow(const TRect &bounds, const char *title) {
+    auto *w = new TTextEditorWindow(bounds, title);
     w->setup();
     return w;
 }

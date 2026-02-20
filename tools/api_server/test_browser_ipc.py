@@ -12,6 +12,7 @@ import os
 import socket
 import sys
 import time
+from urllib.parse import quote
 
 
 def _sock_path():
@@ -75,11 +76,35 @@ def test_ac3_browser_fetch():
     print("AC-3: PASS")
 
 
+def test_ac4_text_editor_custom_title_roundtrip():
+    """AC: create_window type=text_editor title=... is reflected in get_state."""
+    print("\nAC: Testing text_editor custom title roundtrip ...")
+    custom_title = "✦ wib&wob ✦"
+    encoded_title = quote(custom_title, safe="")
+    created_id = None
+    resp = send_ipc(f"cmd:create_window type=text_editor title={encoded_title}")
+    assert resp.startswith("{") or resp == "ok", f"Expected JSON or 'ok', got: {resp}"
+    try:
+        if resp.startswith("{"):
+            created_id = json.loads(resp).get("id")
+        time.sleep(0.2)
+        state_resp = send_ipc("cmd:get_state")
+        state = json.loads(state_resp)
+        windows = state.get("windows", [])
+        matches = [w for w in windows if w.get("type") == "text_editor" and w.get("title") == custom_title]
+        assert len(matches) > 0, f"No text_editor with title '{custom_title}' found. Windows: {windows}"
+        print("AC: PASS")
+    finally:
+        if created_id is not None:
+            send_ipc(f"cmd:close_window id={created_id}")
+
+
 def main():
     print(f"Connecting to IPC socket: {SOCK_PATH}\n")
     try:
         test_ac1_create_browser_window()
         test_ac3_browser_fetch()
+        test_ac4_text_editor_custom_title_roundtrip()
         print("\n=== All IPC integration tests passed ===")
     except ConnectionRefusedError:
         print(f"\nERROR: Could not connect to {SOCK_PATH}")

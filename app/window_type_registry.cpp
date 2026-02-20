@@ -40,7 +40,7 @@ extern void api_spawn_test(TTestPatternApp&, const TRect*);
 extern void api_spawn_gradient(TTestPatternApp&, const std::string&, const TRect*);
 extern void api_open_animation_path(TTestPatternApp&, const std::string&, const TRect*);
 extern void api_open_text_view_path(TTestPatternApp&, const std::string&, const TRect*);
-extern void api_spawn_text_editor(TTestPatternApp&, const TRect*);
+extern void api_spawn_text_editor(TTestPatternApp&, const TRect*, const std::string&);
 extern void api_spawn_browser(TTestPatternApp&, const TRect*);
 extern void api_spawn_verse(TTestPatternApp&, const TRect*);
 extern void api_spawn_mycelium(TTestPatternApp&, const TRect*);
@@ -100,7 +100,9 @@ static const char* spawn_text_view(TTestPatternApp& app,
 
 static const char* spawn_text_editor(TTestPatternApp& app,
                                       const std::map<std::string, std::string>& kv) {
-    TRect r; api_spawn_text_editor(app, opt_bounds(kv, r)); return nullptr;
+    const auto it = kv.find("title");
+    const std::string title = (it != kv.end()) ? it->second : "";
+    TRect r; api_spawn_text_editor(app, opt_bounds(kv, r), title); return nullptr;
 }
 
 static const char* spawn_browser(TTestPatternApp& app,
