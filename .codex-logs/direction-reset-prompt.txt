@@ -1,0 +1,9 @@
+Read .planning/spikes/spk-direction-reset/spk01-direction-reset-brief.md in full, then answer the 6 questions in §5 (Open Questions for Codex Analysis Pass).
+
+Also read:
+- .planning/README.md
+- README.md
+
+And run: git log --oneline main..mvp/mvp001-wibwobcity
+
+Output a structured markdown analysis document with one section per question. Do not implement anything. Do not edit any files. Analysis only.

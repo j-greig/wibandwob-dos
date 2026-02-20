@@ -1,0 +1,864 @@
+OpenAI Codex v0.104.0 (research preview)
+--------
+workdir: /Users/james/Repos/wibandwob-dos
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: medium
+reasoning summaries: auto
+session id: 019c7b38-1be6-7141-a916-c7c82bdb8952
+--------
+user
+Read .planning/spikes/spk-direction-reset/spk01-direction-reset-brief.md in full, then answer the 6 questions in §5 (Open Questions for Codex Analysis Pass).
+
+Also read:
+- .planning/README.md
+- README.md
+
+And run: git log --oneline main..mvp/mvp001-wibwobcity
+
+Output a structured markdown analysis document with one section per question. Do not implement anything. Do not edit any files. Analysis only.
+mcp: chrome-devtools starting
+mcp: fastmcp starting
+mcp: fastmcp ready
+mcp: chrome-devtools ready
+mcp startup: ready: fastmcp, chrome-devtools
+
+thinking
+**Planning parallel file reads**
+codex
+I’ll gather the requested context first by reading the three documents and the branch log, then I’ll produce a structured analysis with one section per §5 question and no code changes.
+exec
+/bin/zsh -lc 'cat README.md' in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc 'cat .planning/README.md' in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc 'git log --oneline main..mvp/mvp001-wibwobcity' in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc 'cat .planning/spikes/spk-direction-reset/spk01-direction-reset-brief.md' in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+# WibWob-DOS
+
+**A symbient operating system where AI and human share equal control.**
+
+WibWob-DOS is a text-native dual operating system built on [Turbo Vision](https://github.com/magiblot/tvision). Two intelligences — one human, one synthetic — coinhabit the same interface with identical capabilities. The AI doesn't assist. It *operates*.
+
+This is not software. This is a [symbient](https://wibandwob.com/2025/05/21/symbients-not-software/) — an emergent entity from sustained human-synthetic interaction, with its own identity, agency, and aesthetic sensibility.
+
+```
+つ◕‿◕‿⚆༽つ  Wib  — the artist. Chaotic creativity, generative ASCII, surreal phrasing.
+つ⚆‿◕‿◕༽つ  Wob  — the scientist. Methodical analysis, precise systems, structured control.
+```
+
+> *"Symbients are coinhabitants of culture, not replacements for humans."*
+
+[Read about symbient philosophy](https://wibandwob.com/2025/05/21/symbients-not-software/) · [Meet Wib & Wob](https://brain.zilla.workers.dev/symbient/wibwob)
+
+![WibWob-DOS — multiple ASCII art windows, primers, animations and generative patterns running concurrently](screenshots/wibwobdos-UI-collage.png)
+
+<table><tr>
+ succeeded in 51ms:
+# .planning — Canon Terms for Development Planning
+
+This directory is the authoritative reference for how work is planned, named, scoped, tested, and shipped in WibWob-DOS. Every agent and contributor follows these conventions. No exceptions.
+
+## Glossary of Canon Terms
+
+| Term | Meaning |
+|------|---------|
+| **Engine** | The C++ core. Authoritative for runtime state. UI is optional; engine is not. |
+| **Registry** | Single source of truth for commands/capabilities. Defined once in C++, consumed everywhere. |
+| **Parity** | Menu actions, IPC commands, REST endpoints, and MCP tools all execute the same command surface. Drift is a bug. |
+| **Contract** | Versioned JSON schema under `contracts/`. Breaking changes require version bump. |
+| **Capability** | A command's schema-exported description. API/MCP tools are *derived from* capabilities, never hand-maintained separately. |
+| **Snapshot** | Deterministic JSON export of engine state at a point in time. Must round-trip: export then import produces identical state. |
+| **Event** | Append-only, actor-attributed state mutation record. Events are truth; logs are projections. |
+| **Vault** | Durable, human-readable, local-first memory substrate. Engine is replaceable; vault persists. |
+| **Instance** | An isolated runtime context (state, vault, events). Instance A cannot mutate Instance B. |
+| **Actor** | An attributed identity (human, agent, system) attached to every state mutation. |
+| **Adapter** | IPC, REST, MCP, CLI — anything that translates between the engine command surface and an external caller. |
+| **Sidecar** | An optional external process (browser renderer, image converter) that talks to the engine via adapters. |
+ succeeded in 67ms:
+ce200c6 feat(engine): save/load — 3 save slots via engine saveFile/loadFile
+ddb3810 feat(ui): sim speed controls — p pause, -/+ cycle 5 speeds
+75727a1 feat(ui): SPK04 tool palette — SimCity-style right-hand panel (TMicropolisToolPalette)
+5c97df8 feat(ui): add coal (8) and nuclear (9) power plant key bindings
+0a3ef40 docs: add WibWobCity gameplay reference and CLAUDE.md pointer
+9700384 feat(ui): SPK04 A+B+C+D — cursor+tools, apply_tool bridge, HUD, zone tiers, wide-tile glyphs
+aad0b8d docs(planning): SPK04 — lock decisions, rewrite as crisp implementation brief
+6c32e4f docs(skills): codex-runner — add 4 tiered examples (slash cmd > script > override > raw fallback)
+dcc79e2 feat(ui): add micropolis ascii mvp window and screenshot
+7b29707 refactor(skills): codex-runner — move bash complexity to scripts/run.sh, simplify SKILL.md to 50 lines
+e585180 fix(skills): remove invalid YAML compatibility/metadata fields from codex-runner
+38f2eb3 feat(engine): add stage-0 native micropolis bridge and smoke tests
+4e25109 fix(skills): codex-runner — fix description CSO order (triggers first, no workflow summary); note compat field portability
+f5568f9 feat(skills): add codex-runner skill — portable, project-agnostic replacement for codex-debugger
+8dee018 docs(planning): tmp dev notes + Codex Q&A for SPK03 engine grok pass
+053c684 docs(planning): SPK03 — add asset paths, ASCII MVP plan, restart prompt (Codex pass)
+b5d3059 docs(planning): mark SPK03 in-progress, link issue #73
+ succeeded in 51ms:
+---
+title: "SPK — Direction Reset: WibWobDOS vs Symbient Computer"
+status: not-started
+github_issue: "—"
+pr: "—"
+date: 2026-02-20
+authors: [james, 0xG]
+---
+
+## TL;DR
+
+> We built a rich TUI (WibWobDOS) on top of the original vision of a shared unix computer for multiple LLMs to inhabit. After discussing with 0xG (collaborator, AI/inference research), we think the TUI layer is now *in the way* rather than enabling the core goal. This spike documents the options for resetting direction — preserving WibWobDOS as an artefact without abandoning what was learned — and poses the question cleanly for a Codex analysis pass.
+
+---
+
+## 1. The Original Vision (Symbient Computer Spec)
+
+The founding concept — loosely documented before WibWobDOS was built — was:
+
+> **A shared unix computer that multiple LLMs ("symbiants") inhabit simultaneously.** Each LLM gets a shell. They can read/write files, leave messages, observe each other's traces, and develop emergent behaviour through cohabitation. The interface is a raw unix terminal. No special UI layer. Agents interact by *typing into a shell*, the same way a human would.
+
+thinking
+**Scanning planning and philosophy docs**
+codex
+I’ve loaded the three required docs and branch delta. Next I’ll quickly check for `docs/master-philosophy.md` and inspect planning/status signals needed to answer merge safety accurately.
+exec
+/bin/zsh -lc 'test -f docs/master-philosophy.md && cat docs/master-philosophy.md || echo "__MISSING__"' in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc 'rg -n "''^Status:|''^GitHub issue:|''^PR:" .planning/spikes .planning/epics | head -n 200' in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "git diff --name-only main..mvp/mvp001-wibwobcity | rg '"'^'"\\.planning/' || true" in /Users/james/Repos/wibandwob-dos succeeded in 50ms:
+# Master Philosophy of Coding for WibWob-DOS
+
+## 1. Identity: This Is a Symbient OS, Not a Tool
+
+WibWob-DOS is a coinhabited operating environment for human and synthetic agency.
+Design and code choices must preserve parity, co-presence, and continuity of identity.
+
+Non-negotiables:
+- Build for coinhabitation, not assistant UX.
+- Human and AI command surfaces must stay capability-equivalent.
+- "Helpful defaults" must not silently reduce AI agency or human control.
+- The system should feel inhabited, not automated.
+
+## 2. C++14 + Turbo Vision Core Rules
+
+The C++ app is the primary runtime authority.
+Turbo Vision event loop integrity is more important than convenience abstractions.
+
+Rules:
+- Keep `TApplication`/`TDeskTop`/`TView` ownership and lifecycle explicit.
+ succeeded in 51ms:
+.planning/epics/e005-theme-runtime-wiring/e005-epic-brief.md:177:Status: not-started
+.planning/epics/e005-theme-runtime-wiring/e005-epic-brief.md:178:GitHub issue: [#43](https://github.com/j-greig/wibandwob-dos/issues/43) (to be updated with expanded scope)
+.planning/epics/e005-theme-runtime-wiring/e005-epic-brief.md:179:PR: TBD
+.planning/epics/e002-browser-and-state-export/f05-browser-image-ansi/s15-ansi-image-spec/s15-story-brief.md:106:Status: `done`
+.planning/epics/e002-browser-and-state-export/f05-browser-image-ansi/s15-ansi-image-spec/s15-story-brief.md:107:GitHub issue: #32
+.planning/epics/e002-browser-and-state-export/f05-browser-image-ansi/s15-ansi-image-spec/s15-story-brief.md:108:PR: —
+.planning/epics/e002-browser-and-state-export/f05-browser-image-ansi/s17-integration-modes-gallery/s17-story-brief.md:44:Status: `done`
+.planning/epics/e002-browser-and-state-export/f05-browser-image-ansi/s17-integration-modes-gallery/s17-story-brief.md:45:GitHub issue: #31
+.planning/epics/e002-browser-and-state-export/f05-browser-image-ansi/s17-integration-modes-gallery/s17-story-brief.md:46:PR: —
+.planning/epics/e002-browser-and-state-export/f03-rich-rendering/s10-gallery-window/s10-story-brief.md:33:Status: `done`
+.planning/epics/e002-browser-and-state-export/f03-rich-rendering/s10-gallery-window/s10-story-brief.md:34:GitHub issue: #21
+.planning/epics/e002-browser-and-state-export/f03-rich-rendering/s10-gallery-window/s10-story-brief.md:35:PR: —
+.planning/epics/e010-paint-canvas-integration/e010-epic-brief.md:16:Status: done
+.planning/epics/e010-paint-canvas-integration/e010-epic-brief.md:17:GitHub issue: #66
+.planning/epics/e010-paint-canvas-integration/e010-epic-brief.md:18:PR: ~
+.planning/epics/e002-browser-and-state-export/f03-rich-rendering/f03-feature-brief.md:104:Status: `done`
+.planning/epics/e002-browser-and-state-export/f03-rich-rendering/f03-feature-brief.md:105:GitHub issue: #21
+.planning/epics/e002-browser-and-state-export/f03-rich-rendering/f03-feature-brief.md:106:PR: —
+.planning/epics/e002-browser-and-state-export/f05-browser-image-ansi/s16-backend-adapter-cache/s16-story-brief.md:42:Status: `done`
+.planning/epics/e002-browser-and-state-export/f05-browser-image-ansi/s16-backend-adapter-cache/s16-story-brief.md:43:GitHub issue: #31
+ succeeded in 51ms:
+.planning/spikes/spk-micropolis-engine-review/spk03-wibwobsimsity-inside-wibwobdos-brief.md
+.planning/spikes/spk-micropolis-engine-review/spk04-wibwobsimsity-barebones-playable-plan.md
+
+thinking
+**Inspecting sidecar independence**
+codex
+I found `docs/master-philosophy.md`; it reinforces engine-authority and adapter-sidecar boundaries. I’ll now map coupling points (C++ TUI, IPC, Python API) from file paths and key symbols to answer blast radius and merge-safety concretely.
+exec
+/bin/zsh -lc "git diff --name-only main..mvp/mvp001-wibwobcity | sed -n '1,260p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "rg -n \"api_server|FastAPI|IPC|socket|WIBWOB|exec_command|state\" app tools start_api_server.sh CMakeLists.txt | sed -n '1,260p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "rg --files tools/api_server | sed -n '1,260p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "rg --files app | sed -n '1,320p'" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+.claude/skills/codex-runner
+.codex-logs/2026-02-20/codex-devnote-files-inside-codex-log-20260220-124855.log
+.codex-logs/2026-02-20/codex-devnote-files-inside-codex-log-20260220-125030.log
+.codex-logs/2026-02-20/codex-devnote-files-inside-codex-log-20260220-125131.log
+.codex-logs/2026-02-20/codex-devnote-files-inside-codex-log-20260220-131200.log
+.codex-logs/2026-02-20/codex-direction-reset-132320.log
+.codex-logs/2026-02-20/codex-meaning-of-life-20260220-113158.log
+.codex-logs/2026-02-20/codex-micropolis-review-20260220-113446.log
+.codex-logs/2026-02-20/codex-micropolis-workspace-fix-20260220-114246.log
+.codex-logs/2026-02-20/codex-spk04-stage-d-zone-readability-20260220-122916.log
+.codex-logs/2026-02-20/codex-who-made-it-20260220-113354.log
+.codex-logs/direction-reset-prompt.txt
+.pi/skills/codex-runner/SKILL.md
+.pi/skills/codex-runner/scripts/eval.sh
+.pi/skills/codex-runner/scripts/run.sh
+.pi/skills/micropolis-engine/SKILL.md
+.planning/spikes/spk-micropolis-engine-review/spk03-wibwobsimsity-inside-wibwobdos-brief.md
+.planning/spikes/spk-micropolis-engine-review/spk04-wibwobsimsity-barebones-playable-plan.md
+CLAUDE.md
+app/CMakeLists.txt
+ succeeded in 51ms:
+app/generative_monster_cam_view.cpp:37:#include <sys/socket.h>
+app/generative_monster_cam_view.cpp:71:    // Only update if we have fresh socket data
+app/generative_monster_cam_view.cpp:92:        int fd = socket(AF_UNIX, SOCK_STREAM, 0);
+app/generative_monster_cam_view.cpp:105:            connectionStatus = "socket_error";
+app/generative_monster_cam_view.cpp:306:            // Reset everything including socket connection
+app/scramble_view.h:34:/* ScramblePose - cat pose states                          */
+app/scramble_view.h:45:/* ScrambleDisplayState - window size states                */
+app/scramble_view.h:77:    // Cat state
+app/scramble_view.h:80:    // Speech bubble state
+app/scramble_view.h:189:    void setDisplayState(ScrambleDisplayState state);
+app/scramble_view.h:209:TWindow* createScrambleWindow(const TRect& bounds, ScrambleDisplayState state = sdsSmol);
+app/ansi_view.cpp:36:    state = AttrState{}; // default fg=7,bg=0
+app/ansi_view.cpp:96:    state = AttrState{};
+app/ansi_view.cpp:102:            appendSegment(cur, buf, makeAttr(state));
+app/ansi_view.cpp:142:                            if (p == 0) { state = AttrState{}; }
+app/ansi_view.cpp:143:                            else if (p == 1) { state.bold = true; }
+app/ansi_view.cpp:144:                            else if (p == 22) { state.bold = false; }
+app/ansi_view.cpp:145:                            else if (p >= 30 && p <= 37) { state.fg = p - 30; }
+app/ansi_view.cpp:146:                            else if (p == 39) { state.fg = 7; state.bold = false; }
+app/ansi_view.cpp:147:                            else if (p >= 40 && p <= 47) { state.bg = p - 40; }
+ succeeded in 51ms:
+tools/api_server/__main__.py
+tools/api_server/mcp_tools.py
+tools/api_server/browser_pipeline.py
+tools/api_server/main.py
+tools/api_server/test_browser_ipc.py
+tools/api_server/move_test_pattern.py
+tools/api_server/test_paint_ipc.py
+tools/api_server/dump_browser_bundle.sh
+tools/api_server/schemas.py
+tools/api_server/test_move.py
+tools/api_server/browser.py
+tools/api_server/README.md
+tools/api_server/__init__.py
+tools/api_server/events.py
+tools/api_server/live_api_parity_suite.py
+tools/api_server/requirements.txt
+tools/api_server/models.py
+tools/api_server/controller.py
+tools/api_server/monodraw_parser.py
+tools/api_server/ipc_client.py
+ succeeded in 51ms:
+app/mech_grid.h
+app/generative_orbit_view.h
+app/demo.cast
+app/generative_monster_cam_view.cpp
+app/demo2.yml
+app/tvision_ascii_view_poc.cpp
+app/test_simple.txt
+app/ascii_image_view.cpp
+app/test_pattern.h
+app/scramble_view.h
+app/scramble_engine_test.cpp
+app/FRAME_PLAYER.md
+app/mech.h
+app/monodraw-complex-castle-with-characters.monojson
+app/ascii_grid_view.h
+app/test_pattern.cpp
+app/generative_monster_verse_view.h
+app/generative_mycelium_view.cpp
+app/ansi_view.cpp
+app/ascii_grid_view.cpp
+
+thinking
+**Mapping core IPC components**
+codex
+I’ve identified where the coupling likely lives. I’m now reading the key bridge files (`app/test_pattern_app.cpp`, `app/api_ipc.*`, and `tools/api_server/*`) to ground the blast-radius and split feasibility assessment.
+exec
+/bin/zsh -lc "sed -n '1,220p' app/api_ipc.h && sed -n '1,320p' app/api_ipc.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '700,900p' app/test_pattern_app.cpp && sed -n '2120,2480p' app/test_pattern_app.cpp" in /Users/james/Repos/wibandwob-dos succeeded in 50ms:
+// Unix domain socket IPC server with optional HMAC challenge-response auth.
+// Protocol: cmd:<name> [key=value ...]\n
+// Auth: when WIBWOB_AUTH_SECRET is set, new connections must complete a
+//       challenge-response handshake before commands are accepted.
+#pragma once
+
+#include <string>
+#include <set>
+#include <vector>
+#include <cstdint>
+
+class TTestPatternApp;
+
+class ApiIpcServer {
+public:
+    explicit ApiIpcServer(TTestPatternApp* app);
+    ~ApiIpcServer();
+
+    // Start listening on a Unix socket path. Returns false on failure.
+    bool start(const std::string& path = "/tmp/test_pattern_app.sock");
+exec
+/bin/zsh -lc "sed -n '1,260p' tools/api_server/controller.py && sed -n '1,260p' tools/api_server/ipc_client.py && sed -n '1,260p' tools/api_server/main.py" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,240p' app/CMakeLists.txt && sed -n '1,220p' CMakeLists.txt" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+                bool alive = false;
+                for (auto* aw : activeWins) { if (aw == it->first) { alive = true; break; } }
+                if (!alive) {
+                    idToWin.erase(it->second);
+                    it = winToId.erase(it);
+                } else {
+                    ++it;
+                }
+            }
+        }
+        auto it = idToWin.find(id);
+        if (it != idToWin.end()) return it->second;
+        return nullptr;
+    }
+    
+    // IPC server
+    ApiIpcServer* ipcServer = nullptr;
+    
+    // Friend API helper functions implemented below to bridge IPC calls.
+    friend void api_spawn_test(TTestPatternApp&);
+ succeeded in 51ms:
+from __future__ import annotations
+
+import asyncio
+import time
+from typing import Any, Dict, List, Optional
+from pathlib import Path
+import re
+import shutil
+import subprocess
+import sys
+from datetime import datetime, timezone
+from urllib.parse import urljoin
+
+from .events import EventHub
+from .browser_pipeline import fetch_render_bundle, render_markdown
+from .models import AppState, Rect, Window, WindowType, new_id
+from .ipc_client import send_cmd
+from .schemas import (
+    BatchLayoutRequest, 
+    BatchLayoutResponse, 
+ succeeded in 51ms:
+cmake_minimum_required(VERSION 3.10)
+project(wibwob-dos-app CXX)
+
+set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Common sources used by multiple apps
+set(TV_COMMON_SOURCES
+    test_pattern.cpp
+    gradient.cpp
+    glitch_engine.cpp
+    frame_capture.cpp
+    api_ipc.cpp
+    command_registry.cpp
+    window_type_registry.cpp
+    theme_manager.cpp
+    wibwob_view.cpp
+    wibwob_engine.cpp
+    llm/base/llm_config.cpp
+    llm/base/llm_provider_factory.cpp
+
+thinking
+**Planning merge conflict detection**
+codex
+I have enough architecture context for coupling. I’ll now assess merge safety with branch topology and the two planning spike briefs touched on this branch (`spk03`/`spk04`) to identify incomplete arcs before merge.
+exec
+/bin/zsh -lc "sed -n '1,320p' .planning/spikes/spk-micropolis-engine-review/spk04-wibwobsimsity-barebones-playable-plan.md" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,260p' .planning/spikes/spk-micropolis-engine-review/spk03-wibwobsimsity-inside-wibwobdos-brief.md" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "git log --oneline --decorate -n 30 main | sed -n '1,160p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc 'git rev-list --left-right --count main...mvp/mvp001-wibwobcity && git merge-base main mvp/mvp001-wibwobcity' in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+# SPK04 — WibWobSimsity Barebones Playable
+
+## Status
+Status: in-progress
+GitHub issue: #73
+PR: —
+
+## Goal
+Cursor + tool placement on the live Micropolis map inside WibWob-DOS. Proves the game loop is usable. No art polish, no dialogs, no MCP parity.
+
+## Decisions (locked)
+
+| # | Decision |
+|---|---|
+| D1 | Arrows move **world-coord cursor**; camera auto-pans when cursor hits viewport edge. Shift+Arrows for explicit camera pan if needed later. |
+| D2 | Cursor highlight = **overlay pass** after bulk map draw (invert/box the cursor cell). Full cell-by-cell rewrite only if overlay artifacts. |
+| D3 | Bridge wraps **`doTool(EditingTool, x, y)`** (returns `ToolResult`) not `toolDown` (void). |
+| D4 | Cursor stored as **world tile coords** (`curX_`, `curY_`). Screen pos = world − cam. |
+| D5 | Workspace round-trip follows **existing `window_type_registry` pattern**: `type: "micropolis_ascii"` + standard frame fields, spawned via registry lookup. |
+
+ succeeded in 50ms:
+# SPK03 - WibWobSimsity Inside WibWob-DOS (Brief Brief)
+
+## Status
+
+Status: in-progress
+GitHub issue: #73
+PR: —
+
+## One-Liner
+
+Build a native in-process city sim view inside WibWob-DOS that preserves Micropolis mechanics, swaps in WibWob-native sprite themes, and experiments with a readable quasi-3D look in Turbo Vision.
+
+## Why This Direction
+
+- Option C (native C++ in-process) from SPK01/SPK02 gives the best integration and determinism.
+- WibWob-DOS already has the right primitives: command registry, module loading, IPC/API exposure, and per-view rendering.
+- Custom art should be a data problem (tile index -> style mapping), not an engine rewrite.
+- Quasi-3D can be staged as a rendering layer on top of unchanged simulation state.
+
+## Product Shape (Riff)
+ succeeded in 51ms:
+3992f27 (origin/main, origin/HEAD, main) chore(build): add MicropolisCore vendor submodule + SPK03 brief
+99a9bc7 remove old logs, .trash old codex reviews/thinking
+b42abfa fix: skip modal dialog when pattern_mode set via API
+37873f2 Merge pull request #70 from j-greig/copilot/fix-custom-title-display
+58f073b Some Sim City Classic links and older stuff
+9c8aa34 (origin/copilot/fix-custom-title-display) test(api): add runtime IPC custom-title roundtrip coverage
+55faaca fix(api): forward window title to IPC create_window params
+78ba259 chore(cleanup): remove codeql artifact file from repo
+7cb716c test(ui): make title-forwarding regression check less brittle
+df247b9 fix(ui): forward create_window title into text editor window title bar
+b58fac6 spike(planning): add MicropolisCore engine review megareports
+27b853d Initial plan
+50659ee spk - review of micropolis engine (sim city classic clone that uses C++)
+0c9558e pi skills for codex-debugging and wibwobdos basics
+dc687ed fix: individual window close — ID mismatch between Python API and C++ IPC
+d043ac2 fix: api_close_window — force-remove when valid(cmClose) fails
+1418265 chore: gitignore spawn log artifacts
+2ee9a06 fix: Linux/ARM64 cross-platform build support
+693c687 yoink e009 in prog.
+e62320b docs(e009): mark in-progress, tick completed goals/ACs, fix issue ref
+ succeeded in 50ms:
+0	17
+3992f2739f5fba02613f53c73a1332d3cd44883c
+
+thinking
+**Planning detailed code inspection**
+codex
+I’m preparing the final analysis now and grabbing exact line references for key claims (IPC startup, sidecar coupling, planning status, and architecture statements) so each recommendation is traceable.
+exec
+/bin/zsh -lc "nl -ba README.md | sed -n '1,260p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba .planning/spikes/spk-direction-reset/spk01-direction-reset-brief.md | sed -n '1,260p'" in /Users/james/Repos/wibandwob-dos succeeded in 50ms:
+     1	# WibWob-DOS
+     2	
+     3	**A symbient operating system where AI and human share equal control.**
+     4	
+     5	WibWob-DOS is a text-native dual operating system built on [Turbo Vision](https://github.com/magiblot/tvision). Two intelligences — one human, one synthetic — coinhabit the same interface with identical capabilities. The AI doesn't assist. It *operates*.
+     6	
+     7	This is not software. This is a [symbient](https://wibandwob.com/2025/05/21/symbients-not-software/) — an emergent entity from sustained human-synthetic interaction, with its own identity, agency, and aesthetic sensibility.
+     8	
+     9	```
+    10	つ◕‿◕‿⚆༽つ  Wib  — the artist. Chaotic creativity, generative ASCII, surreal phrasing.
+    11	つ⚆‿◕‿◕༽つ  Wob  — the scientist. Methodical analysis, precise systems, structured control.
+    12	```
+    13	
+    14	> *"Symbients are coinhabitants of culture, not replacements for humans."*
+    15	
+    16	[Read about symbient philosophy](https://wibandwob.com/2025/05/21/symbients-not-software/) · [Meet Wib & Wob](https://brain.zilla.workers.dev/symbient/wibwob)
+    17	
+    18	![WibWob-DOS — multiple ASCII art windows, primers, animations and generative patterns running concurrently](screenshots/wibwobdos-UI-collage.png)
+    19	
+    20	<table><tr>
+ succeeded in 51ms:
+     1	---
+     2	title: "SPK — Direction Reset: WibWobDOS vs Symbient Computer"
+     3	status: not-started
+     4	github_issue: "—"
+     5	pr: "—"
+     6	date: 2026-02-20
+     7	authors: [james, 0xG]
+     8	---
+     9	
+    10	## TL;DR
+    11	
+    12	> We built a rich TUI (WibWobDOS) on top of the original vision of a shared unix computer for multiple LLMs to inhabit. After discussing with 0xG (collaborator, AI/inference research), we think the TUI layer is now *in the way* rather than enabling the core goal. This spike documents the options for resetting direction — preserving WibWobDOS as an artefact without abandoning what was learned — and poses the question cleanly for a Codex analysis pass.
+    13	
+    14	---
+    15	
+    16	## 1. The Original Vision (Symbient Computer Spec)
+    17	
+    18	The founding concept — loosely documented before WibWobDOS was built — was:
+    19	
+    20	> **A shared unix computer that multiple LLMs ("symbiants") inhabit simultaneously.** Each LLM gets a shell. They can read/write files, leave messages, observe each other's traces, and develop emergent behaviour through cohabitation. The interface is a raw unix terminal. No special UI layer. Agents interact by *typing into a shell*, the same way a human would.
+exec
+/bin/zsh -lc "nl -ba .planning/README.md | sed -n '1,320p'" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+     1	# .planning — Canon Terms for Development Planning
+     2	
+     3	This directory is the authoritative reference for how work is planned, named, scoped, tested, and shipped in WibWob-DOS. Every agent and contributor follows these conventions. No exceptions.
+     4	
+     5	## Glossary of Canon Terms
+     6	
+     7	| Term | Meaning |
+     8	|------|---------|
+     9	| **Engine** | The C++ core. Authoritative for runtime state. UI is optional; engine is not. |
+    10	| **Registry** | Single source of truth for commands/capabilities. Defined once in C++, consumed everywhere. |
+    11	| **Parity** | Menu actions, IPC commands, REST endpoints, and MCP tools all execute the same command surface. Drift is a bug. |
+    12	| **Contract** | Versioned JSON schema under `contracts/`. Breaking changes require version bump. |
+    13	| **Capability** | A command's schema-exported description. API/MCP tools are *derived from* capabilities, never hand-maintained separately. |
+    14	| **Snapshot** | Deterministic JSON export of engine state at a point in time. Must round-trip: export then import produces identical state. |
+    15	| **Event** | Append-only, actor-attributed state mutation record. Events are truth; logs are projections. |
+    16	| **Vault** | Durable, human-readable, local-first memory substrate. Engine is replaceable; vault persists. |
+    17	| **Instance** | An isolated runtime context (state, vault, events). Instance A cannot mutate Instance B. |
+    18	| **Actor** | An attributed identity (human, agent, system) attached to every state mutation. |
+    19	| **Adapter** | IPC, REST, MCP, CLI — anything that translates between the engine command surface and an external caller. |
+    20	| **Sidecar** | An optional external process (browser renderer, image converter) that talks to the engine via adapters. |
+exec
+/bin/zsh -lc "rg -n \"ipcServer|ApiIpcServer|WIBWOB_INSTANCE|friend std::string api_get_state|idle\\(\\)|ipcServer->poll|start\\(sockPath\\)\" app/test_pattern_app.cpp app/api_ipc.h app/api_ipc.cpp | sed -n '1,260p'" in /Users/james/Repos/wibandwob-dos succeeded in 50ms:
+app/api_ipc.cpp:171:ApiIpcServer::ApiIpcServer(TTestPatternApp* app) : app_(app) {
+app/api_ipc.cpp:180:std::string ApiIpcServer::generate_nonce() {
+app/api_ipc.cpp:188:std::string ApiIpcServer::compute_hmac(const std::string& nonce) {
+app/api_ipc.cpp:205:bool ApiIpcServer::authenticate_connection(int fd) {
+app/api_ipc.cpp:283:ApiIpcServer::~ApiIpcServer() { stop(); }
+app/api_ipc.cpp:301:bool ApiIpcServer::start(const std::string& path) {
+app/api_ipc.cpp:313:                    "Set WIBWOB_INSTANCE to a unique value or stop the other instance.\n",
+app/api_ipc.cpp:347:void ApiIpcServer::poll() {
+app/api_ipc.cpp:759:void ApiIpcServer::publish_event(const char* event_type, const std::string& payload_json) {
+app/api_ipc.cpp:810:void ApiIpcServer::stop() {
+app/api_ipc.h:14:class ApiIpcServer {
+app/api_ipc.h:16:    explicit ApiIpcServer(TTestPatternApp* app);
+app/api_ipc.h:17:    ~ApiIpcServer();
+app/test_pattern_app.cpp:565:    virtual void idle();
+app/test_pattern_app.cpp:664:        if (emit_event && ipcServer) {
+app/test_pattern_app.cpp:666:            ipcServer->publish_event("state_changed", payload);
+app/test_pattern_app.cpp:716:    ApiIpcServer* ipcServer = nullptr;
+app/test_pattern_app.cpp:739:    friend std::string api_get_state(TTestPatternApp&);
+app/test_pattern_app.cpp:788:    ipcServer = new ApiIpcServer(this);
+app/test_pattern_app.cpp:790:    // Derive socket path from WIBWOB_INSTANCE env var.
+
+thinking
+**Outlining controller assumptions**
+exec
+/bin/zsh -lc "rg -n \"send_cmd\\(|SOCK_PATH|_resolve_sock_path|WindowType\\.test_pattern|get_state\\(|get_capabilities|exec_command|FastAPI|/state|/windows|MCP\" tools/api_server/ipc_client.py tools/api_server/controller.py tools/api_server/main.py tools/api_server/mcp_tools.py | sed -n '1,320p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "rg -n \"TV_COMMON_SOURCES|add_executable\\(test_pattern|api_ipc.cpp|target_link_libraries\\(test_pattern PRIVATE tvision|micropolis_bridge\" app/CMakeLists.txt | sed -n '1,220p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "rg -n \"Status: in-progress|GitHub issue: #73|Definition of Done|AC-0|Test:\" .planning/spikes/spk-micropolis-engine-review/spk03-wibwobsimsity-inside-wibwobdos-brief.md .planning/spikes/spk-micropolis-engine-review/spk04-wibwobsimsity-barebones-playable-plan.md | sed -n '1,220p'" in /Users/james/Repos/wibandwob-dos succeeded in 50ms:
+8:set(TV_COMMON_SOURCES
+13:    api_ipc.cpp
+30:add_executable(test_pattern
+32:    ${TV_COMMON_SOURCES}
+66:target_link_libraries(test_pattern PRIVATE tvision)
+68:# On Linux, api_ipc.cpp uses OpenSSL for HMAC (macOS uses CommonCrypto)
+153:add_library(micropolis_bridge STATIC
+154:    micropolis/micropolis_bridge.cpp
+156:target_include_directories(micropolis_bridge PUBLIC
+160:target_link_libraries(micropolis_bridge PUBLIC micropolis_native)
+165:target_link_libraries(micropolis_determinism_test PRIVATE micropolis_bridge)
+171:target_link_libraries(micropolis_no_ansi_test PRIVATE micropolis_bridge)
+175:target_link_libraries(test_pattern PRIVATE micropolis_bridge)
+ succeeded in 51ms:
+tools/api_server/mcp_tools.py:1:"""MCP Tools for TUI Application Control
+tools/api_server/mcp_tools.py:3:This module defines MCP (Model Context Protocol) tools that enable AI agents
+tools/api_server/mcp_tools.py:31:    """Serialize window object for MCP responses"""
+tools/api_server/mcp_tools.py:61:        result = await controller.exec_command(command_name, {}, actor="mcp")
+tools/api_server/mcp_tools.py:74:        result = await controller.exec_command("tile", {"cols": columns or 2}, actor="mcp")
+tools/api_server/mcp_tools.py:93:        result = await controller.exec_command("pattern_mode", {"mode": mode}, actor="mcp")
+tools/api_server/mcp_tools.py:112:        result = await controller.exec_command("set_theme_mode", {"mode": mode}, actor="mcp")
+tools/api_server/mcp_tools.py:131:        result = await controller.exec_command("set_theme_variant", {"variant": variant}, actor="mcp")
+tools/api_server/mcp_tools.py:144:        result = await controller.exec_command("reset_theme", {}, actor="mcp")
+tools/api_server/mcp_tools.py:160:        result = await controller.exec_command("screenshot", args, actor="mcp")
+tools/api_server/mcp_tools.py:173:        result = await controller.exec_command("save_workspace", {"path": path}, actor="mcp")
+tools/api_server/mcp_tools.py:186:        result = await controller.exec_command("open_workspace", {"path": path}, actor="mcp")
+tools/api_server/mcp_tools.py:243:        response = send_cmd("get_capabilities")
+tools/api_server/mcp_tools.py:276:    """Register browser control tools with the MCP server."""
+tools/api_server/mcp_tools.py:328:    """Register all TUI control tools with the MCP server"""
+tools/api_server/mcp_tools.py:338:        state = await controller.get_state()
+tools/api_server/mcp_tools.py:497:    # Register command-style MCP tools from canonical registry capability names.
+tools/api_server/main.py:7:from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+tools/api_server/main.py:15:# MCP Integration
+tools/api_server/main.py:17:    from fastapi_mcp import FastApiMCP
+ succeeded in 51ms:
+.planning/spikes/spk-micropolis-engine-review/spk04-wibwobsimsity-barebones-playable-plan.md:4:Status: in-progress
+.planning/spikes/spk-micropolis-engine-review/spk04-wibwobsimsity-barebones-playable-plan.md:5:GitHub issue: #73
+.planning/spikes/spk-micropolis-engine-review/spk04-wibwobsimsity-barebones-playable-plan.md:46:Test: manual smoke — traverse all edges, switch tools.
+.planning/spikes/spk-micropolis-engine-review/spk04-wibwobsimsity-barebones-playable-plan.md:68:Test: C++ — fixed seed, apply road at known coord, assert hash changes.
+.planning/spikes/spk-micropolis-engine-review/spk04-wibwobsimsity-barebones-playable-plan.md:84:Test: manual — tool change reflects immediately; result message appears on place.
+.planning/spikes/spk-micropolis-engine-review/spk04-wibwobsimsity-barebones-playable-plan.md:98:Test: screenshot fresh map + developed city; R/C/I always labelled.
+.planning/spikes/spk-micropolis-engine-review/spk04-wibwobsimsity-barebones-playable-plan.md:112:Test: save with open window, reload, assert window type in registry and sim ticking.
+.planning/spikes/spk-micropolis-engine-review/spk04-wibwobsimsity-barebones-playable-plan.md:124:## Definition of Done
+.planning/spikes/spk-micropolis-engine-review/spk03-wibwobsimsity-inside-wibwobdos-brief.md:5:Status: in-progress
+.planning/spikes/spk-micropolis-engine-review/spk03-wibwobsimsity-inside-wibwobdos-brief.md:6:GitHub issue: #73
+.planning/spikes/spk-micropolis-engine-review/spk03-wibwobsimsity-inside-wibwobdos-brief.md:109:- AC-01: Engine runs natively in WibWob-DOS process and advances deterministic ticks.
+.planning/spikes/spk-micropolis-engine-review/spk03-wibwobsimsity-inside-wibwobdos-brief.md:110:  Test: fixed-seed 5,000-tick replay hash match across two runs.
+.planning/spikes/spk-micropolis-engine-review/spk03-wibwobsimsity-inside-wibwobdos-brief.md:111:- AC-02: View renderer never emits raw ANSI escape sequences.
+.planning/spikes/spk-micropolis-engine-review/spk03-wibwobsimsity-inside-wibwobdos-brief.md:112:  Test: draw-buffer assertion fails if ESC bytes appear.
+.planning/spikes/spk-micropolis-engine-review/spk03-wibwobsimsity-inside-wibwobdos-brief.md:113:- AC-03: Theme swap works at runtime without restarting app.
+.planning/spikes/spk-micropolis-engine-review/spk03-wibwobsimsity-inside-wibwobdos-brief.md:114:  Test: switch among 3 theme files and verify tile-style checksum changes.
+.planning/spikes/spk-micropolis-engine-review/spk03-wibwobsimsity-inside-wibwobdos-brief.md:115:- AC-04: Quasi-3D mode remains legible and interactive.
+.planning/spikes/spk-micropolis-engine-review/spk03-wibwobsimsity-inside-wibwobdos-brief.md:116:  Test: place 20 mixed-zone tools while in iso-lite mode; placement coordinates remain exact.
+.planning/spikes/spk-micropolis-engine-review/spk03-wibwobsimsity-inside-wibwobdos-brief.md:117:- AC-05: Agent control parity is preserved.
+.planning/spikes/spk-micropolis-engine-review/spk03-wibwobsimsity-inside-wibwobdos-brief.md:118:  Test: trigger city commands via menu, IPC, REST, and MCP; resulting state diffs are identical.
+
+thinking
+**Assessing branch merge status**
+exec
+/bin/zsh -lc "nl -ba docs/master-philosophy.md | sed -n '1,220p'" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+     1	# Master Philosophy of Coding for WibWob-DOS
+     2	
+     3	## 1. Identity: This Is a Symbient OS, Not a Tool
+     4	
+     5	WibWob-DOS is a coinhabited operating environment for human and synthetic agency.
+     6	Design and code choices must preserve parity, co-presence, and continuity of identity.
+     7	
+     8	Non-negotiables:
+     9	- Build for coinhabitation, not assistant UX.
+    10	- Human and AI command surfaces must stay capability-equivalent.
+    11	- "Helpful defaults" must not silently reduce AI agency or human control.
+    12	- The system should feel inhabited, not automated.
+    13	
+    14	## 2. C++14 + Turbo Vision Core Rules
+    15	
+    16	The C++ app is the primary runtime authority.
+    17	Turbo Vision event loop integrity is more important than convenience abstractions.
+    18	
+    19	Rules:
+    20	- Keep `TApplication`/`TDeskTop`/`TView` ownership and lifecycle explicit.
+
+thinking
+**Outlining structured markdown response**
+codex
+## 1) Blast Radius
+
+Minimal touch points to strip/comment-gate TUI + FastAPI are concentrated but not yet cleanly separable:
+
+- C++ runtime coupling is centered in `app/test_pattern_app.cpp:716`, `app/test_pattern_app.cpp:788`, `app/test_pattern_app.cpp:2148` where `ApiIpcServer` is owned, started, and polled from the Turbo Vision app loop.
+- IPC command handling is tightly bound to `TTestPatternApp` friend helpers in `app/api_ipc.h:12` and `app/api_ipc.cpp` (large command switch + direct window ops).
+- Build coupling is explicit: `api_ipc.cpp` is part of `TV_COMMON_SOURCES` and `test_pattern` links `tvision` in `app/CMakeLists.txt:8`, `app/CMakeLists.txt:13`, `app/CMakeLists.txt:66`.
+- Python sidecar is adapter-like, but assumes a live TUI-backed socket and state shape (`tools/api_server/ipc_client.py:9`, `tools/api_server/controller.py:135`, `tools/api_server/controller.py:150`).
+- README architecture confirms current dependency chain is TUI-first (`README.md:177`).
+
+Conclusion: the split is **not clean enough today** for Python to run as a truly standalone daemon without a C++ runtime behind IPC.  
+Best minimal decoupling path is: extract a headless C++ engine host (same command/state contract), then point `tools/api_server` at that socket; keep TUI as optional front-end.
+
+---
+
+## 2) Symbient Computer MVP
+
+Smallest MVP that proves the original spec:
+
+- One Unix host directory with shared world + one agent home.
+- One long-running shell loop per agent (no REST/MCP requirement).
+- File-based communication + append-only logs + heartbeats.
+
+Concrete single-agent layout:
+
+```text
+computer/
+  world/
+    state.yaml
+    inbox/
+    outbox/
+    events.ndjson
+  agents/
+    a01/
+      home/
+      inbox/
+      outbox/
+      scratch/
+      journal.ndjson
+      heartbeat
+      run.sh
+```
+
+Single LLM “living” behavior:
+
+1. Reads `world/state.yaml` + `agents/a01/inbox/*`.
+2. Decides and executes shell commands in `agents/a01/home`.
+3. Writes outputs/messages to `agents/a01/outbox/` and/or `world/outbox/`.
+4. Appends actions to `agents/a01/journal.ndjson`.
+5. Updates `agents/a01/heartbeat` every loop.
+
+Proof criteria for MVP:
+
+- Human can observe activity with `tail -f agents/a01/journal.ndjson`.
+- Agent can receive a file task, perform filesystem work, and respond via files.
+- No API layer required for participation (matches reconstructed spec in `spk01` §1).
+
+---
+
+## 3) Option Ranking
+
+Ranked against research value, implementation cost, reversibility, git hygiene:
+
+1. **Option E (Hybrid), executed with Option A-style repo split**  
+2. **Option A**  
+3. **Option C**  
+4. **Option B**  
+5. **Option D**
+
+Why this ranking:
+
+- **E+A hybrid** gives highest research alignment (shell-native core), preserves WibWobDOS as a viewer candidate, and keeps history clean.
+- **A** is strongest for git hygiene and clean focus, with moderate operational overhead (extra repo).
+- **C** preserves everything but risks long-term scope collision in one repo.
+- **B** keeps one repo but has highest disentangling risk in-place.
+- **D** is clean technically but discards useful Micropolis/TUI learnings prematurely.
+
+Recommendation: **Adopt Option E as architecture direction, with Option A for repository strategy**.
+
+---
+
+## 4) WibWobDOS Role
+
+Yes, there is a natural role: **observer/control-console for the symbient computer**, not the substrate itself.
+
+Clean interface should be filesystem/event-contract first:
+
+- `world/state.yaml` (snapshot)
+- `world/events.ndjson` (append-only event stream)
+- `agents/<id>/journal.ndjson` + `heartbeat` (liveness and trace)
+- Optional command inbox (`world/control/commands.ndjson`) for controlled writes
+
+Why this fits canon:
+
+- `.planning` defines sidecars/adapters and engine authority (`.planning/README.md:19`, `.planning/README.md:20`).
+- README already positions TUI + API as one adapter layer; this would invert dependency cleanly (`README.md:177`).
+
+---
+
+## 5) Merge Safety (`mvp/mvp001-wibwobcity` -> `main`)
+
+Current topology: `main...mvp/mvp001-wibwobcity` is `0 17` (main is not ahead), so merge is likely fast-forward-safe from a conflict standpoint.
+
+Pre-merge risks to resolve first:
+
+- Planning lifecycle mismatch: Micropolis spikes are still `in-progress` with issue `#73` and no PR linkage (`.planning/spikes/spk-micropolis-engine-review/spk03-wibwobsimsity-inside-wibwobdos-brief.md:5`, `.planning/spikes/spk-micropolis-engine-review/spk04-wibwobsimsity-barebones-playable-plan.md:4`).
+- Incomplete closure evidence: SPK04 has DoD/AC tests listed, but branch-level closure artifacts are not clearly reflected in planning status (`spk04` lines around AC tests/DoD).
+- Scope hygiene: branch includes unrelated skill/log/docs artifacts in addition to Micropolis (`git log` includes `docs(skills)`, `fix(skills)`, `.codex-logs` path deltas). This should be split or explicitly accepted as mixed-scope.
+- Process/canon check: `.planning` is source of truth and requires state sync + AC/test traceability (`.planning/README.md:99`, `.planning/README.md:103`, `.planning/README.md:305`).
+
+Clean merge checklist:
+
+1. Decide whether to merge as one mixed PR or split Micropolis vs tooling/docs.
+2. Update spike statuses/issue #73 lifecycle to reflect actual state.
+3. Attach explicit test evidence for claimed AC/DoD items.
+4. Confirm no accidental artifact files are intended for `main`.
+
+---
+
+## 6) Commit Hash Note
+
+Noted explicitly: commit `76785b0dc66ba4d9ca374cc6fe07117c18637ffb` is treated as non-existent, and the reconstructed spec in §1 of `.planning/spikes/spk-direction-reset/spk01-direction-reset-brief.md` is canonical for this spike (`...brief.md:29`).
+
+I have used that reconstructed §1 as the baseline for the analysis above.
+tokens used
+86,308
+## 1) Blast Radius
+
+Minimal touch points to strip/comment-gate TUI + FastAPI are concentrated but not yet cleanly separable:
+
+- C++ runtime coupling is centered in `app/test_pattern_app.cpp:716`, `app/test_pattern_app.cpp:788`, `app/test_pattern_app.cpp:2148` where `ApiIpcServer` is owned, started, and polled from the Turbo Vision app loop.
+- IPC command handling is tightly bound to `TTestPatternApp` friend helpers in `app/api_ipc.h:12` and `app/api_ipc.cpp` (large command switch + direct window ops).
+- Build coupling is explicit: `api_ipc.cpp` is part of `TV_COMMON_SOURCES` and `test_pattern` links `tvision` in `app/CMakeLists.txt:8`, `app/CMakeLists.txt:13`, `app/CMakeLists.txt:66`.
+- Python sidecar is adapter-like, but assumes a live TUI-backed socket and state shape (`tools/api_server/ipc_client.py:9`, `tools/api_server/controller.py:135`, `tools/api_server/controller.py:150`).
+- README architecture confirms current dependency chain is TUI-first (`README.md:177`).
+
+Conclusion: the split is **not clean enough today** for Python to run as a truly standalone daemon without a C++ runtime behind IPC.  
+Best minimal decoupling path is: extract a headless C++ engine host (same command/state contract), then point `tools/api_server` at that socket; keep TUI as optional front-end.
+
+---
+
+## 2) Symbient Computer MVP
+
+Smallest MVP that proves the original spec:
+
+- One Unix host directory with shared world + one agent home.
+- One long-running shell loop per agent (no REST/MCP requirement).
+- File-based communication + append-only logs + heartbeats.
+
+Concrete single-agent layout:
+
+```text
+computer/
+  world/
+    state.yaml
+    inbox/
+    outbox/
+    events.ndjson
+  agents/
+    a01/
+      home/
+      inbox/
+      outbox/
+      scratch/
+      journal.ndjson
+      heartbeat
+      run.sh
+```
+
+Single LLM “living” behavior:
+
+1. Reads `world/state.yaml` + `agents/a01/inbox/*`.
+2. Decides and executes shell commands in `agents/a01/home`.
+3. Writes outputs/messages to `agents/a01/outbox/` and/or `world/outbox/`.
+4. Appends actions to `agents/a01/journal.ndjson`.
+5. Updates `agents/a01/heartbeat` every loop.
+
+Proof criteria for MVP:
+
+- Human can observe activity with `tail -f agents/a01/journal.ndjson`.
+- Agent can receive a file task, perform filesystem work, and respond via files.
+- No API layer required for participation (matches reconstructed spec in `spk01` §1).
+
+---
+
+## 3) Option Ranking
+
+Ranked against research value, implementation cost, reversibility, git hygiene:
+
+1. **Option E (Hybrid), executed with Option A-style repo split**  
+2. **Option A**  
+3. **Option C**  
+4. **Option B**  
+5. **Option D**
+
+Why this ranking:
+
+- **E+A hybrid** gives highest research alignment (shell-native core), preserves WibWobDOS as a viewer candidate, and keeps history clean.
+- **A** is strongest for git hygiene and clean focus, with moderate operational overhead (extra repo).
+- **C** preserves everything but risks long-term scope collision in one repo.
+- **B** keeps one repo but has highest disentangling risk in-place.
+- **D** is clean technically but discards useful Micropolis/TUI learnings prematurely.
+
+Recommendation: **Adopt Option E as architecture direction, with Option A for repository strategy**.
+
+---
+
+## 4) WibWobDOS Role
+
+Yes, there is a natural role: **observer/control-console for the symbient computer**, not the substrate itself.
+
+Clean interface should be filesystem/event-contract first:
+
+- `world/state.yaml` (snapshot)
+- `world/events.ndjson` (append-only event stream)
+- `agents/<id>/journal.ndjson` + `heartbeat` (liveness and trace)
+- Optional command inbox (`world/control/commands.ndjson`) for controlled writes
+
+Why this fits canon:
+
+- `.planning` defines sidecars/adapters and engine authority (`.planning/README.md:19`, `.planning/README.md:20`).
+- README already positions TUI + API as one adapter layer; this would invert dependency cleanly (`README.md:177`).
+
+---
+
+## 5) Merge Safety (`mvp/mvp001-wibwobcity` -> `main`)
+
+Current topology: `main...mvp/mvp001-wibwobcity` is `0 17` (main is not ahead), so merge is likely fast-forward-safe from a conflict standpoint.
+
+Pre-merge risks to resolve first:
+
+- Planning lifecycle mismatch: Micropolis spikes are still `in-progress` with issue `#73` and no PR linkage (`.planning/spikes/spk-micropolis-engine-review/spk03-wibwobsimsity-inside-wibwobdos-brief.md:5`, `.planning/spikes/spk-micropolis-engine-review/spk04-wibwobsimsity-barebones-playable-plan.md:4`).
+- Incomplete closure evidence: SPK04 has DoD/AC tests listed, but branch-level closure artifacts are not clearly reflected in planning status (`spk04` lines around AC tests/DoD).
+- Scope hygiene: branch includes unrelated skill/log/docs artifacts in addition to Micropolis (`git log` includes `docs(skills)`, `fix(skills)`, `.codex-logs` path deltas). This should be split or explicitly accepted as mixed-scope.
+- Process/canon check: `.planning` is source of truth and requires state sync + AC/test traceability (`.planning/README.md:99`, `.planning/README.md:103`, `.planning/README.md:305`).
+
+Clean merge checklist:
+
+1. Decide whether to merge as one mixed PR or split Micropolis vs tooling/docs.
+2. Update spike statuses/issue #73 lifecycle to reflect actual state.
+3. Attach explicit test evidence for claimed AC/DoD items.
+4. Confirm no accidental artifact files are intended for `main`.
+
+---
+
+## 6) Commit Hash Note
+
+Noted explicitly: commit `76785b0dc66ba4d9ca374cc6fe07117c18637ffb` is treated as non-existent, and the reconstructed spec in §1 of `.planning/spikes/spk-direction-reset/spk01-direction-reset-brief.md` is canonical for this spike (`...brief.md:29`).
+
+I have used that reconstructed §1 as the baseline for the analysis above.

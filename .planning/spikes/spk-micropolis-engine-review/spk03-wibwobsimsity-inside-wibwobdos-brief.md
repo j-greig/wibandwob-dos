@@ -2,9 +2,9 @@
 
 ## Status
 
-Status: not-started
-GitHub issue: -
-PR: -
+Status: in-progress
+GitHub issue: #73
+PR: —
 
 ## One-Liner
 
@@ -82,6 +82,28 @@ Rule: simulation remains 2D Micropolis. Quasi-3D is view-only.
 - Command registry exposes actions (`micropolis_open`, `micropolis_tool`, `micropolis_speed`, `micropolis_theme`).
 - API/MCP mirror those commands so humans and agents can co-run the city.
 
+## Confirmed Asset Paths (Local Subrepo)
+
+Primary modern sources to anchor the MVP:
+
+- `vendor/MicropolisCore/micropolis/src/lib/images/tilesets/all.png`
+- `vendor/MicropolisCore/micropolis/src/lib/images/tilesets/classic.png`
+- `vendor/MicropolisCore/micropolis/src/lib/images/tilesets/future.png`
+- `vendor/MicropolisCore/micropolis/src/lib/images/tilesets/*.png`
+- `vendor/MicropolisCore/micropolis/src/lib/sprites.ts` (sprite IDs, frame counts, dimensions, offsets)
+- `vendor/MicropolisCore/MicropolisEngine/src/sprite.cpp` (runtime sprite behavior and frame updates)
+
+Legacy references (useful for archaeology, not required for MVP):
+
+- `vendor/MicropolisCore/laszlo/micropolis/resources/images/sprite_*.png`
+- `vendor/MicropolisCore/laszlo/micropolis/resources/images/tiles/micropolis_tiles.png`
+- `vendor/MicropolisCore/laszlo/micropolis/resources/images/tiles/micropolis_tile_*.png`
+
+Notes:
+
+- Modern web `TileView` currently imports `all.png` directly.
+- Sprite metadata in modern web code is structure/semantics, not the canonical behavior source; behavior source of truth is engine `sprite.cpp`.
+
 ## Spike Acceptance Checks
 
 - AC-01: Engine runs natively in WibWob-DOS process and advances deterministic ticks.
@@ -109,6 +131,82 @@ Rule: simulation remains 2D Micropolis. Quasi-3D is view-only.
 - Frame-time spikes if full-map redraw is done every tick
 - Over-styled quasi-3D harming readability in narrow terminals
 - Callback flood causing input latency without dirty-rect throttling
+
+## Barebones ASCII MVP Plan (Recommended First)
+
+Why this first:
+
+- Best fit for WibWob-DOS identity (in-process, text-native, deterministic).
+- Faster concept validation than full web stack if the goal is symbient co-control.
+
+Minimal implementation steps:
+
+1. Map renderer core:
+- Read per-cell map value and split into `tile = cell & 0x3FF`, `flags = cell & ~0x3FF`.
+- Map tile ranges to glyph+colour style in a lookup table.
+
+2. Sprite overlay layer:
+- Draw active sprites as single-character overlays at sprite hot positions mapped to tile coordinates.
+- Initial sprite glyph mapping:
+  - train `T`
+  - helicopter `H`
+  - airplane `A`
+  - ship `S`
+  - monster `M`
+  - tornado `@`
+  - explosion `*`
+  - bus `b`
+
+3. Minimal animation:
+- Frame parity or modulo-based glyph flip for visible motion (`*`/`x` explosions, `/|\\` tornado cadence).
+
+4. Safety invariant:
+- Turbo Vision-native draw only (`putChar`/`putAttribute`/`moveStr`), never raw ANSI strings.
+
+5. UX minimum:
+- One viewport, one status strip, basic speed controls, one mode toggle (`flat` / `iso-lite`).
+
+Comparison call:
+
+- Web frontend is still a valid parallel track for richer art fast.
+- For this spike's concept target, in-DOS ASCII MVP is the preferred first slice.
+
+## Restart Prompt (Next Pass)
+
+Use this prompt at the start of the next coding session:
+
+```text
+Continue SPK03 by implementing the smallest runnable in-DOS Micropolis ASCII slice in WibWob-DOS.
+
+Context and hard requirements:
+- Use native/in-process integration direction (Option C).
+- Renderer pipeline must be: map cell -> tile/flags -> style cell model -> Turbo Vision draw calls.
+- Never render raw ANSI escape sequences; treat visible ESC as a failure.
+- Source sprite behavior from vendor/MicropolisCore/MicropolisEngine/src/sprite.cpp.
+- Source sprite metadata and IDs from vendor/MicropolisCore/micropolis/src/lib/sprites.ts.
+- Source tile atlas references from vendor/MicropolisCore/micropolis/src/lib/images/tilesets/.
+
+Implement now:
+1) Draft concrete tile lookup table v0 in C++ (tile range -> glyph/fg/bg/category), covering dirt, water, woods, roads, rails, wires, low/high R/C/I, fire, rubble, police/fire stations, plants.
+2) Draft sprite lookup table v0 (sprite type + basic frame bucket -> overlay glyph/color).
+3) Create TMicropolisView draw loop pseudocode or scaffold with explicit phases:
+   - gather visible tile rect
+   - base tile paint
+   - sprite overlay pass
+   - status strip paint
+4) Add one guard test that fails if ESC bytes appear in rendered buffer/text output.
+5) Define first deterministic sanity test:
+   - fixed seed
+   - fixed tick count
+   - hash over map + core metrics
+   - compare two runs.
+
+Output format:
+- concise implementation notes
+- file-by-file patch plan
+- exact lookup tables v0
+- test commands to run.
+```
 
 ## Suggested Name Variants
 

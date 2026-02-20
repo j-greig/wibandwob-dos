@@ -1,0 +1,2738 @@
+OpenAI Codex v0.104.0 (research preview)
+--------
+workdir: /Users/james/Repos/wibandwob-dos
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: medium
+reasoning summaries: auto
+session id: 019c7b2d-bd38-7330-aacc-011549d4d492
+--------
+user
+DEVNOTE: Files inside .codex-logs/ are run logs — ignore them completely.
+
+== CONTEXT ==
+
+Repo: /Users/james/Repos/wibandwob-dos, branch mvp/mvp001-wibwobcity.
+C++14 Turbo Vision TUI + Micropolis engine. Key files:
+
+  app/micropolis/micropolis_bridge.h/.cpp   bridge to engine
+  app/micropolis_ascii_view.h/.cpp          TUI view + input
+  app/micropolis_tool_palette.h/.cpp        right-hand palette panel
+
+The Micropolis engine ALREADY has save/load fully implemented:
+  sim_->saveFile(std::string path) -> bool   writes binary .city file
+  sim_->loadFile(std::string path) -> bool   reads binary .city file, calls doSimInit()
+
+The engine callback is already wired: ConsoleCallback (from
+vendor/MicropolisCore/MicropolisEngine/src/callback.cpp) — all methods are
+no-op EM_ASM stubs in our native build. No crash risk. No callback changes needed.
+
+== TASK: Port save/load to the bridge and wire up the TUI ==
+
+This is a pure port — expose engine functionality that already exists.
+
+=== Step 1: Bridge — add save/load to micropolis_bridge.h/.cpp ===
+
+Add to MicropolisBridge public interface (micropolis_bridge.h):
+
+  struct CityIOResult {
+      bool ok;
+      std::string message;  // "Saved to saves/slot1.city", "Load failed: ...", etc.
+  };
+
+  CityIOResult save_city(const std::string &path);
+  CityIOResult load_city(const std::string &path);
+
+Implementations (micropolis_bridge.cpp):
+- save_city: call sim_->saveFile(path), return {true,"Saved"} or {false,"Save failed"}
+- load_city: call sim_->loadFile(path), return {true,"Loaded"} or {false,"Load failed"}
+  After successful load reset camera to centre (NOT the bridge job — do it in view)
+- Both: guard against !sim_, return {false,"No sim"}
+
+=== Step 2: Save slots — 3 named slots ===
+
+Slot filenames (relative to CWD, create saves/ dir if missing):
+  saves/slot1.city
+  saves/slot2.city
+  saves/slot3.city
+
+The view tracks int saveSlot_ {1} (1-3).
+
+=== Step 3: View — key bindings in micropolis_ascii_view.h/.cpp ===
+
+Add to private fields in TMicropolisAsciiView:
+  int saveSlot_ {1};
+
+Key bindings (add to handleEvent alongside existing tool keys):
+  F2  -> save to current slot, show result in lastResult_/lastResultTick_
+  F3  -> load from current slot, show result, on success reset camX_=0 camY_=0
+  Tab -> cycle saveSlot_ 1->2->3->1, show "Slot N" in lastResult_
+
+Also expose for palette display:
+  int saveSlot() const { return saveSlot_; }
+
+Show current slot in top HUD strip, e.g. append "  Slot:1  F2:save F3:load".
+
+=== Step 4: Ensure saves/ directory exists ===
+
+In TMicropolisAsciiView constructor (after bridge_.initialize_new_city), add:
+  system("mkdir -p saves");   // portable enough for macOS/Linux dev use
+
+=== Step 5: Update palette ===
+
+In TMicropolisToolPalette::draw(), add a footer section below the tool list
+(use remaining rows if any) showing:
+  "Slot: 1"
+  "F2 save"
+  "F3 load"
+  "Tab: slot"
+
+Use TColorAttr(0x08) (dark grey) for these hint rows.
+
+=== Step 6: Build and test ===
+
+  cmake --build build --target test_pattern -j4
+
+Run tests 3x:
+  for i in 1 2 3; do ctest --test-dir build --output-on-failure -R "micropolis_(determinism|no_ansi)"; done
+
+no_ansi must pass 3/3. determinism must pass 2+/3.
+
+Smoke test the save path:
+  ls saves/ 2>/dev/null || echo "saves/ dir not created yet (OK, created at runtime)"
+
+=== Guardrails ===
+- No raw ANSI escape bytes in any TDrawBuffer write
+- Do not modify the two test files
+- Do not change ConsoleCallback or callback.cpp
+- Files to touch: micropolis_bridge.h, micropolis_bridge.cpp,
+  micropolis_ascii_view.h, micropolis_ascii_view.cpp,
+  micropolis_tool_palette.h, micropolis_tool_palette.cpp
+- End with one-paragraph summary of what was built and any open questions
+mcp: chrome-devtools starting
+mcp: fastmcp starting
+mcp: fastmcp ready
+mcp: chrome-devtools ready
+mcp startup: ready: fastmcp, chrome-devtools
+
+thinking
+**Planning frequent update commentary**
+codex
+Implementing the save/load port exactly in the six files you listed, then I’ll build and run the specified test loop and report results. I’m starting by reading the current bridge/view/palette code to place the changes with minimal disruption.
+exec
+/bin/zsh -lc "rg --files app | rg 'micropolis_(bridge|ascii_view|tool_palette)\\.(h|cpp)"'$'"'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc 'git status --short' in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+app/micropolis_tool_palette.h
+app/micropolis/micropolis_bridge.cpp
+app/micropolis/micropolis_bridge.h
+app/micropolis_tool_palette.cpp
+app/micropolis_ascii_view.cpp
+app/micropolis_ascii_view.h
+ succeeded in 51ms:
+?? .codex-logs/2026-02-20/codex-devnote-files-inside-codex-log-20260220-124855.log
+?? .codex-logs/2026-02-20/codex-devnote-files-inside-codex-log-20260220-125030.log
+?? .codex-logs/2026-02-20/codex-devnote-files-inside-codex-log-20260220-125131.log
+?? .codex-logs/2026-02-20/codex-devnote-files-inside-codex-log-20260220-131200.log
+?? .planning/spikes/spk-direction-reset/
+?? build-asan/
+?? wibwob_crash.log
+
+thinking
+**Clarifying handling of untracked changes**
+exec
+/bin/zsh -lc "sed -n '1,240p' app/micropolis/micropolis_bridge.h" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+#pragma once
+
+#include <cstdint>
+#include <memory>
+#include <string>
+
+class Micropolis;
+
+struct MicropolisSnapshot {
+    std::uint64_t map_hash = 0;
+    short total_pop = 0;
+    short city_score = 0;
+    short res_valve = 0;
+    short com_valve = 0;
+    short ind_valve = 0;
+    long city_time = 0;
+    long total_funds = 0;
+};
+
+struct ToolApplyResult {
+exec
+/bin/zsh -lc "sed -n '1,320p' app/micropolis/micropolis_bridge.cpp" in /Users/james/Repos/wibandwob-dos succeeded in 53ms:
+#include "micropolis_bridge.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <cstring>
+
+#include "micropolis.h"
+#include "tool.h"
+
+namespace {
+constexpr std::uint64_t FNV_OFFSET = 1469598103934665603ull;
+constexpr std::uint64_t FNV_PRIME = 1099511628211ull;
+
+std::uint64_t fnv1a_64(const std::uint8_t *data, std::size_t size) {
+    std::uint64_t hash = FNV_OFFSET;
+    for (std::size_t i = 0; i < size; ++i) {
+        hash ^= static_cast<std::uint64_t>(data[i]);
+        hash *= FNV_PRIME;
+    }
+    return hash;
+exec
+/bin/zsh -lc "sed -n '1,280p' app/micropolis_ascii_view.h" in /Users/james/Repos/wibandwob-dos succeeded in 50ms:
+#ifndef MICROPOLIS_ASCII_VIEW_H
+#define MICROPOLIS_ASCII_VIEW_H
+
+#define Uses_TView
+#define Uses_TRect
+#define Uses_TEvent
+#define Uses_TKeys
+#include <tvision/tv.h>
+
+#include <string>
+#include "micropolis/micropolis_bridge.h"
+
+class TMicropolisAsciiView : public TView {
+public:
+    explicit TMicropolisAsciiView(const TRect &bounds);
+    virtual ~TMicropolisAsciiView();
+
+    virtual void draw() override;
+    virtual void handleEvent(TEvent &ev) override;
+    virtual void setState(ushort aState, Boolean enable) override;
+
+thinking
+**Noting additional file needs**
+exec
+/bin/zsh -lc "sed -n '1,420p' app/micropolis_ascii_view.cpp" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+#include "micropolis_ascii_view.h"
+#include "micropolis_tool_palette.h"
+
+#define Uses_TWindow
+#define Uses_TEvent
+#include <tvision/tv.h>
+
+#include <algorithm>
+#include <sstream>
+
+namespace {
+constexpr int kWorldW = 120;
+constexpr int kWorldH = 100;
+
+// Tool IDs matching EditingTool enum in vendor/MicropolisCore/MicropolisEngine/src/tool.h
+// Kept here to avoid pulling engine headers into the view
+constexpr int kToolRes      = 0;  // TOOL_RESIDENTIAL
+constexpr int kToolCom      = 1;  // TOOL_COMMERCIAL
+constexpr int kToolInd      = 2;  // TOOL_INDUSTRIAL
+constexpr int kToolQuery    = 5;  // TOOL_QUERY
+exec
+/bin/zsh -lc "sed -n '1,260p' app/micropolis_tool_palette.h" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+#ifndef MICROPOLIS_TOOL_PALETTE_H
+#define MICROPOLIS_TOOL_PALETTE_H
+
+#define Uses_TView
+#define Uses_TRect
+#define Uses_TEvent
+#include <tvision/tv.h>
+
+class TMicropolisAsciiView;
+
+class TMicropolisToolPalette : public TView {
+public:
+    TMicropolisToolPalette(const TRect &bounds, TMicropolisAsciiView *mapView);
+    virtual void draw() override;
+    virtual void handleEvent(TEvent &ev) override;
+
+private:
+    TMicropolisAsciiView *map_;
+};
+
+exec
+/bin/zsh -lc "sed -n '1,360p' app/micropolis_tool_palette.cpp" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+#include "micropolis_tool_palette.h"
+
+#include "micropolis_ascii_view.h"
+
+#include <algorithm>
+#include <sstream>
+#include <string>
+
+namespace {
+
+constexpr int kToolRes = 0;
+constexpr int kToolCom = 1;
+constexpr int kToolInd = 2;
+constexpr int kToolQuery = 5;
+constexpr int kToolWire = 6;
+constexpr int kToolBulldoze = 7;
+constexpr int kToolRoad = 9;
+constexpr int kToolCoalPower = 13;
+constexpr int kToolNucPower = 14;
+
+
+thinking
+**Planning UI and save/load integration**
+codex
+I’ve identified the exact insertion points and am now patching the bridge API plus view/palette key handling and HUD/footer rendering, keeping all changes confined to the six files you specified. After edits I’ll run the build and the 3x ctest loop exactly as requested.
+exec
+/bin/zsh -lc 'rg -n "kbF2|kbF3|kbTab" app | head' in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "rg -n \"system\\(\" app/micropolis_ascii_view.cpp" in /Users/james/Repos/wibandwob-dos exited 1 in 50ms:
+
+ succeeded in 50ms:
+app/paint/paint_app.cpp:87:                + *new TMenuItem("Toggle Subpixel ~Y~ (Tab)", 2311, kbTab)
+app/paint/paint_canvas.cpp:256:                        else if (ev.keyDown.keyCode == kbTab) { toggleSubpixelY(); clearEvent(ev); }
+app/paint/paint_canvas.cpp:261:                    else if (ev.keyDown.keyCode == kbTab) { toggleSubpixelY(); clearEvent(ev); }
+app/frame_file_player_view.cpp:684:                case kbTab:
+
+thinking
+**Choosing single patch call**
+file update
+M /Users/james/Repos/wibandwob-dos/app/micropolis/micropolis_bridge.h
+@@ -24,2 +24,7 @@
+ 
++struct CityIOResult {
++    bool ok;
++    std::string message;
++};
++
+ class MicropolisBridge {
+@@ -39,2 +44,4 @@
+     ToolApplyResult apply_tool(int tool_id, int x, int y);
++    CityIOResult save_city(const std::string &path);
++    CityIOResult load_city(const std::string &path);
+     std::string render_ascii_excerpt(int x, int y, int width, int height) const;
+apply_patch(auto_approved=true) exited 0 in 48ms:
+Success. Updated the following files:
+M app/micropolis/micropolis_bridge.h
+file update:
+diff --git a/app/micropolis/micropolis_bridge.h b/app/micropolis/micropolis_bridge.h
+index 31193232126f96096cf91ed3da9de848b9d00124..0e8c4d0cb670689c9701c75c25eff4962b3c916c
+--- a/app/micropolis/micropolis_bridge.h
++++ b/app/micropolis/micropolis_bridge.h
+@@ -22,6 +22,11 @@
+     std::string message;
+ };
+ 
++struct CityIOResult {
++    bool ok;
++    std::string message;
++};
++
+ class MicropolisBridge {
+ public:
+     MicropolisBridge();
+@@ -37,6 +42,8 @@
+ 
+     MicropolisSnapshot snapshot() const;
+     ToolApplyResult apply_tool(int tool_id, int x, int y);
++    CityIOResult save_city(const std::string &path);
++    CityIOResult load_city(const std::string &path);
+     std::string render_ascii_excerpt(int x, int y, int width, int height) const;
+ 
+ private:
+
+file update:
+diff --git a/app/micropolis/micropolis_bridge.h b/app/micropolis/micropolis_bridge.h
+index 31193232126f96096cf91ed3da9de848b9d00124..0e8c4d0cb670689c9701c75c25eff4962b3c916c
+--- a/app/micropolis/micropolis_bridge.h
++++ b/app/micropolis/micropolis_bridge.h
+@@ -22,6 +22,11 @@
+     std::string message;
+ };
+ 
++struct CityIOResult {
++    bool ok;
++    std::string message;
++};
++
+ class MicropolisBridge {
+ public:
+     MicropolisBridge();
+@@ -37,6 +42,8 @@
+ 
+     MicropolisSnapshot snapshot() const;
+     ToolApplyResult apply_tool(int tool_id, int x, int y);
++    CityIOResult save_city(const std::string &path);
++    CityIOResult load_city(const std::string &path);
+     std::string render_ascii_excerpt(int x, int y, int width, int height) const;
+ 
+ private:
+
+file update
+M /Users/james/Repos/wibandwob-dos/app/micropolis/micropolis_bridge.cpp
+@@ -267 +267,21 @@
+ }
++
++CityIOResult MicropolisBridge::save_city(const std::string &path) {
++    if (!sim_) {
++        return {false, "No sim"};
++    }
++    if (sim_->saveFile(path)) {
++        return {true, "Saved to " + path};
++    }
++    return {false, "Save failed: " + path};
++}
++
++CityIOResult MicropolisBridge::load_city(const std::string &path) {
++    if (!sim_) {
++        return {false, "No sim"};
++    }
++    if (sim_->loadFile(path)) {
++        return {true, "Loaded from " + path};
++    }
++    return {false, "Load failed: " + path};
++}
+apply_patch(auto_approved=true) exited 0 in 67ms:
+Success. Updated the following files:
+M app/micropolis/micropolis_bridge.cpp
+file update:
+diff --git a/app/micropolis/micropolis_bridge.cpp b/app/micropolis/micropolis_bridge.cpp
+index ba8d210dfa6ef276b06d2e1e159e3149484b65e4..d8241716c5fc7eeea66887484f9ae4a6fe274dd2
+--- a/app/micropolis/micropolis_bridge.cpp
++++ b/app/micropolis/micropolis_bridge.cpp
+@@ -265,3 +265,23 @@
+         default:                       return {0,  "?"};
+     }
+ }
++
++CityIOResult MicropolisBridge::save_city(const std::string &path) {
++    if (!sim_) {
++        return {false, "No sim"};
++    }
++    if (sim_->saveFile(path)) {
++        return {true, "Saved to " + path};
++    }
++    return {false, "Save failed: " + path};
++}
++
++CityIOResult MicropolisBridge::load_city(const std::string &path) {
++    if (!sim_) {
++        return {false, "No sim"};
++    }
++    if (sim_->loadFile(path)) {
++        return {true, "Loaded from " + path};
++    }
++    return {false, "Load failed: " + path};
++}
+diff --git a/app/micropolis/micropolis_bridge.h b/app/micropolis/micropolis_bridge.h
+index 31193232126f96096cf91ed3da9de848b9d00124..0e8c4d0cb670689c9701c75c25eff4962b3c916c
+--- a/app/micropolis/micropolis_bridge.h
++++ b/app/micropolis/micropolis_bridge.h
+@@ -22,6 +22,11 @@
+     std::string message;
+ };
+ 
++struct CityIOResult {
++    bool ok;
++    std::string message;
++};
++
+ class MicropolisBridge {
+ public:
+     MicropolisBridge();
+@@ -37,6 +42,8 @@
+ 
+     MicropolisSnapshot snapshot() const;
+     ToolApplyResult apply_tool(int tool_id, int x, int y);
++    CityIOResult save_city(const std::string &path);
++    CityIOResult load_city(const std::string &path);
+     std::string render_ascii_excerpt(int x, int y, int width, int height) const;
+ 
+ private:
+
+file update:
+diff --git a/app/micropolis/micropolis_bridge.cpp b/app/micropolis/micropolis_bridge.cpp
+index ba8d210dfa6ef276b06d2e1e159e3149484b65e4..d8241716c5fc7eeea66887484f9ae4a6fe274dd2
+--- a/app/micropolis/micropolis_bridge.cpp
++++ b/app/micropolis/micropolis_bridge.cpp
+@@ -265,3 +265,23 @@
+         default:                       return {0,  "?"};
+     }
+ }
++
++CityIOResult MicropolisBridge::save_city(const std::string &path) {
++    if (!sim_) {
++        return {false, "No sim"};
++    }
++    if (sim_->saveFile(path)) {
++        return {true, "Saved to " + path};
++    }
++    return {false, "Save failed: " + path};
++}
++
++CityIOResult MicropolisBridge::load_city(const std::string &path) {
++    if (!sim_) {
++        return {false, "No sim"};
++    }
++    if (sim_->loadFile(path)) {
++        return {true, "Loaded from " + path};
++    }
++    return {false, "Load failed: " + path};
++}
+diff --git a/app/micropolis/micropolis_bridge.h b/app/micropolis/micropolis_bridge.h
+index 31193232126f96096cf91ed3da9de848b9d00124..0e8c4d0cb670689c9701c75c25eff4962b3c916c
+--- a/app/micropolis/micropolis_bridge.h
++++ b/app/micropolis/micropolis_bridge.h
+@@ -22,6 +22,11 @@
+     std::string message;
+ };
+ 
++struct CityIOResult {
++    bool ok;
++    std::string message;
++};
++
+ class MicropolisBridge {
+ public:
+     MicropolisBridge();
+@@ -37,6 +42,8 @@
+ 
+     MicropolisSnapshot snapshot() const;
+     ToolApplyResult apply_tool(int tool_id, int x, int y);
++    CityIOResult save_city(const std::string &path);
++    CityIOResult load_city(const std::string &path);
+     std::string render_ascii_excerpt(int x, int y, int width, int height) const;
+ 
+ private:
+
+file update:
+diff --git a/app/micropolis/micropolis_bridge.cpp b/app/micropolis/micropolis_bridge.cpp
+index ba8d210dfa6ef276b06d2e1e159e3149484b65e4..d8241716c5fc7eeea66887484f9ae4a6fe274dd2
+--- a/app/micropolis/micropolis_bridge.cpp
++++ b/app/micropolis/micropolis_bridge.cpp
+@@ -265,3 +265,23 @@
+         default:                       return {0,  "?"};
+     }
+ }
++
++CityIOResult MicropolisBridge::save_city(const std::string &path) {
++    if (!sim_) {
++        return {false, "No sim"};
++    }
++    if (sim_->saveFile(path)) {
++        return {true, "Saved to " + path};
++    }
++    return {false, "Save failed: " + path};
++}
++
++CityIOResult MicropolisBridge::load_city(const std::string &path) {
++    if (!sim_) {
++        return {false, "No sim"};
++    }
++    if (sim_->loadFile(path)) {
++        return {true, "Loaded from " + path};
++    }
++    return {false, "Load failed: " + path};
++}
+diff --git a/app/micropolis/micropolis_bridge.h b/app/micropolis/micropolis_bridge.h
+index 31193232126f96096cf91ed3da9de848b9d00124..0e8c4d0cb670689c9701c75c25eff4962b3c916c
+--- a/app/micropolis/micropolis_bridge.h
++++ b/app/micropolis/micropolis_bridge.h
+@@ -22,6 +22,11 @@
+     std::string message;
+ };
+ 
++struct CityIOResult {
++    bool ok;
++    std::string message;
++};
++
+ class MicropolisBridge {
+ public:
+     MicropolisBridge();
+@@ -37,6 +42,8 @@
+ 
+     MicropolisSnapshot snapshot() const;
+     ToolApplyResult apply_tool(int tool_id, int x, int y);
++    CityIOResult save_city(const std::string &path);
++    CityIOResult load_city(const std::string &path);
+     std::string render_ascii_excerpt(int x, int y, int width, int height) const;
+ 
+ private:
+
+
+thinking
+**Locating string variable declaration**
+codex
+I hit a small patch context mismatch in the view header, so I’m re-reading the exact lines and applying a precise patch for `saveSlot()` and `saveSlot_`.
+exec
+/bin/zsh -lc "sed -n '1,220p' app/micropolis_ascii_view.h" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+#ifndef MICROPOLIS_ASCII_VIEW_H
+#define MICROPOLIS_ASCII_VIEW_H
+
+#define Uses_TView
+#define Uses_TRect
+#define Uses_TEvent
+#define Uses_TKeys
+#include <tvision/tv.h>
+
+#include <string>
+#include "micropolis/micropolis_bridge.h"
+
+class TMicropolisAsciiView : public TView {
+public:
+    explicit TMicropolisAsciiView(const TRect &bounds);
+    virtual ~TMicropolisAsciiView();
+
+    virtual void draw() override;
+    virtual void handleEvent(TEvent &ev) override;
+    virtual void setState(ushort aState, Boolean enable) override;
+file update:
+diff --git a/app/micropolis/micropolis_bridge.cpp b/app/micropolis/micropolis_bridge.cpp
+index ba8d210dfa6ef276b06d2e1e159e3149484b65e4..d8241716c5fc7eeea66887484f9ae4a6fe274dd2
+--- a/app/micropolis/micropolis_bridge.cpp
++++ b/app/micropolis/micropolis_bridge.cpp
+@@ -265,3 +265,23 @@
+         default:                       return {0,  "?"};
+     }
+ }
++
++CityIOResult MicropolisBridge::save_city(const std::string &path) {
++    if (!sim_) {
++        return {false, "No sim"};
++    }
++    if (sim_->saveFile(path)) {
++        return {true, "Saved to " + path};
++    }
++    return {false, "Save failed: " + path};
++}
++
++CityIOResult MicropolisBridge::load_city(const std::string &path) {
++    if (!sim_) {
++        return {false, "No sim"};
++    }
++    if (sim_->loadFile(path)) {
++        return {true, "Loaded from " + path};
++    }
++    return {false, "Load failed: " + path};
++}
+diff --git a/app/micropolis/micropolis_bridge.h b/app/micropolis/micropolis_bridge.h
+index 31193232126f96096cf91ed3da9de848b9d00124..0e8c4d0cb670689c9701c75c25eff4962b3c916c
+--- a/app/micropolis/micropolis_bridge.h
++++ b/app/micropolis/micropolis_bridge.h
+@@ -22,6 +22,11 @@
+     std::string message;
+ };
+ 
++struct CityIOResult {
++    bool ok;
++    std::string message;
++};
++
+ class MicropolisBridge {
+ public:
+     MicropolisBridge();
+@@ -37,6 +42,8 @@
+ 
+     MicropolisSnapshot snapshot() const;
+     ToolApplyResult apply_tool(int tool_id, int x, int y);
++    CityIOResult save_city(const std::string &path);
++    CityIOResult load_city(const std::string &path);
+     std::string render_ascii_excerpt(int x, int y, int width, int height) const;
+ 
+ private:
+
+file update
+M /Users/james/Repos/wibandwob-dos/app/micropolis_ascii_view.h
+@@ -24,2 +24,3 @@
+     int simSpeed() const { return simSpeed_; }
++    int saveSlot() const { return saveSlot_; }
+     MicropolisSnapshot snapshot() const { return bridge_.snapshot(); }
+@@ -42,2 +43,3 @@
+     int simSpeed_ {1};        // 0=pause 1=slow 2=medium 3=fast 4=ultra
++    int saveSlot_ {1};        // active save slot [1..3]
+     int seed_ {1337};
+apply_patch(auto_approved=true) exited 0 in 91ms:
+Success. Updated the following files:
+M app/micropolis_ascii_view.h
+file update:
+diff --git a/app/micropolis/micropolis_bridge.cpp b/app/micropolis/micropolis_bridge.cpp
+index ba8d210dfa6ef276b06d2e1e159e3149484b65e4..d8241716c5fc7eeea66887484f9ae4a6fe274dd2
+--- a/app/micropolis/micropolis_bridge.cpp
++++ b/app/micropolis/micropolis_bridge.cpp
+@@ -265,3 +265,23 @@
+         default:                       return {0,  "?"};
+     }
+ }
++
++CityIOResult MicropolisBridge::save_city(const std::string &path) {
++    if (!sim_) {
++        return {false, "No sim"};
++    }
++    if (sim_->saveFile(path)) {
++        return {true, "Saved to " + path};
++    }
++    return {false, "Save failed: " + path};
++}
++
++CityIOResult MicropolisBridge::load_city(const std::string &path) {
++    if (!sim_) {
++        return {false, "No sim"};
++    }
++    if (sim_->loadFile(path)) {
++        return {true, "Loaded from " + path};
++    }
++    return {false, "Load failed: " + path};
++}
+diff --git a/app/micropolis/micropolis_bridge.h b/app/micropolis/micropolis_bridge.h
+index 31193232126f96096cf91ed3da9de848b9d00124..0e8c4d0cb670689c9701c75c25eff4962b3c916c
+--- a/app/micropolis/micropolis_bridge.h
++++ b/app/micropolis/micropolis_bridge.h
+@@ -22,6 +22,11 @@
+     std::string message;
+ };
+ 
++struct CityIOResult {
++    bool ok;
++    std::string message;
++};
++
+ class MicropolisBridge {
+ public:
+     MicropolisBridge();
+@@ -37,6 +42,8 @@
+ 
+     MicropolisSnapshot snapshot() const;
+     ToolApplyResult apply_tool(int tool_id, int x, int y);
++    CityIOResult save_city(const std::string &path);
++    CityIOResult load_city(const std::string &path);
+     std::string render_ascii_excerpt(int x, int y, int width, int height) const;
+ 
+ private:
+diff --git a/app/micropolis_ascii_view.h b/app/micropolis_ascii_view.h
+index 7b2c4e102e3be6e02e5a6df9c014ec8c8f478662..73a5a550d4883c43a0b134e6737081de8fa23adf
+--- a/app/micropolis_ascii_view.h
++++ b/app/micropolis_ascii_view.h
+@@ -22,6 +22,7 @@
+     std::string lastResult() const { return lastResult_; }
+     int lastResultTick() const { return lastResultTick_; }
+     int simSpeed() const { return simSpeed_; }
++    int saveSlot() const { return saveSlot_; }
+     MicropolisSnapshot snapshot() const { return bridge_.snapshot(); }
+ 
+ private:
+@@ -40,6 +41,7 @@
+     int curY_ {50};
+     int activeTool_ {5};      // TOOL_QUERY=5 — no engine header needed in view
+     int simSpeed_ {1};        // 0=pause 1=slow 2=medium 3=fast 4=ultra
++    int saveSlot_ {1};        // active save slot [1..3]
+     int seed_ {1337};
+     TTimerId timerId_ {0};
+     std::string lastResult_;
+
+file update:
+diff --git a/app/micropolis/micropolis_bridge.cpp b/app/micropolis/micropolis_bridge.cpp
+index ba8d210dfa6ef276b06d2e1e159e3149484b65e4..d8241716c5fc7eeea66887484f9ae4a6fe274dd2
+--- a/app/micropolis/micropolis_bridge.cpp
++++ b/app/micropolis/micropolis_bridge.cpp
+@@ -265,3 +265,23 @@
+         default:                       return {0,  "?"};
+     }
+ }
++
++CityIOResult MicropolisBridge::save_city(const std::string &path) {
++    if (!sim_) {
++        return {false, "No sim"};
++    }
++    if (sim_->saveFile(path)) {
++        return {true, "Saved to " + path};
++    }
++    return {false, "Save failed: " + path};
++}
++
++CityIOResult MicropolisBridge::load_city(const std::string &path) {
++    if (!sim_) {
++        return {false, "No sim"};
++    }
++    if (sim_->loadFile(path)) {
++        return {true, "Loaded from " + path};
++    }
++    return {false, "Load failed: " + path};
++}
+diff --git a/app/micropolis/micropolis_bridge.h b/app/micropolis/micropolis_bridge.h
+index 31193232126f96096cf91ed3da9de848b9d00124..0e8c4d0cb670689c9701c75c25eff4962b3c916c
+--- a/app/micropolis/micropolis_bridge.h
++++ b/app/micropolis/micropolis_bridge.h
+@@ -22,6 +22,11 @@
+     std::string message;
+ };
+ 
++struct CityIOResult {
++    bool ok;
++    std::string message;
++};
++
+ class MicropolisBridge {
+ public:
+     MicropolisBridge();
+@@ -37,6 +42,8 @@
+ 
+     MicropolisSnapshot snapshot() const;
+     ToolApplyResult apply_tool(int tool_id, int x, int y);
++    CityIOResult save_city(const std::string &path);
++    CityIOResult load_city(const std::string &path);
+     std::string render_ascii_excerpt(int x, int y, int width, int height) const;
+ 
+ private:
+diff --git a/app/micropolis_ascii_view.h b/app/micropolis_ascii_view.h
+index 7b2c4e102e3be6e02e5a6df9c014ec8c8f478662..73a5a550d4883c43a0b134e6737081de8fa23adf
+--- a/app/micropolis_ascii_view.h
++++ b/app/micropolis_ascii_view.h
+@@ -22,6 +22,7 @@
+     std::string lastResult() const { return lastResult_; }
+     int lastResultTick() const { return lastResultTick_; }
+     int simSpeed() const { return simSpeed_; }
++    int saveSlot() const { return saveSlot_; }
+     MicropolisSnapshot snapshot() const { return bridge_.snapshot(); }
+ 
+ private:
+@@ -40,6 +41,7 @@
+     int curY_ {50};
+     int activeTool_ {5};      // TOOL_QUERY=5 — no engine header needed in view
+     int simSpeed_ {1};        // 0=pause 1=slow 2=medium 3=fast 4=ultra
++    int saveSlot_ {1};        // active save slot [1..3]
+     int seed_ {1337};
+     TTimerId timerId_ {0};
+     std::string lastResult_;
+
+
+thinking
+**Applying comprehensive C++ patch**
+file update
+M /Users/james/Repos/wibandwob-dos/app/micropolis_ascii_view.cpp
+@@ -8,2 +8,3 @@
+ #include <algorithm>
++#include <cstdlib>
+ #include <sstream>
+@@ -51,2 +52,8 @@
+ 
++std::string save_slot_path(int slot) {
++    if (slot < 1) slot = 1;
++    if (slot > 3) slot = 3;
++    return "saves/slot" + std::to_string(slot) + ".city";
++}
++
+ TColorAttr color_for_glyph(char ch, char zone_prefix = '\0') {
+@@ -100,2 +107,3 @@
+     bridge_.initialize_new_city(seed_, 2);
++    std::system("mkdir -p saves");
+ }
+@@ -175,3 +183,4 @@
+         << " I:" << (s.ind_valve >= 0 ? "+" : "") << s.ind_valve
+-        << "  [" << kSpeedNames[simSpeed_] << "] -/+";
++        << "  [" << kSpeedNames[simSpeed_] << "] -/+"
++        << "  Slot:" << saveSlot_ << "  F2:save F3:load";
+     std::string topLine = top.str();
+@@ -281,2 +290,23 @@
+ 
++        // Save/load slots
++        else if (key == kbF2) {
++            const auto result = bridge_.save_city(save_slot_path(saveSlot_));
++            lastResult_ = result.message;
++            lastResultTick_ = 25;
++        }
++        else if (key == kbF3) {
++            const auto result = bridge_.load_city(save_slot_path(saveSlot_));
++            lastResult_ = result.message;
++            lastResultTick_ = 25;
++            if (result.ok) {
++                camX_ = 0;
++                camY_ = 0;
++            }
++        }
++        else if (key == kbTab) {
++            saveSlot_ = (saveSlot_ % 3) + 1;
++            lastResult_ = "Slot " + std::to_string(saveSlot_);
++            lastResultTick_ = 25;
++        }
++
+         // Cancel / query mode
+apply_patch(auto_approved=true) exited 0 in 98ms:
+Success. Updated the following files:
+M app/micropolis_ascii_view.cpp
+file update:
+diff --git a/app/micropolis/micropolis_bridge.cpp b/app/micropolis/micropolis_bridge.cpp
+index ba8d210dfa6ef276b06d2e1e159e3149484b65e4..d8241716c5fc7eeea66887484f9ae4a6fe274dd2
+--- a/app/micropolis/micropolis_bridge.cpp
++++ b/app/micropolis/micropolis_bridge.cpp
+@@ -265,3 +265,23 @@
+         default:                       return {0,  "?"};
+     }
+ }
++
++CityIOResult MicropolisBridge::save_city(const std::string &path) {
++    if (!sim_) {
++        return {false, "No sim"};
++    }
++    if (sim_->saveFile(path)) {
++        return {true, "Saved to " + path};
++    }
++    return {false, "Save failed: " + path};
++}
++
++CityIOResult MicropolisBridge::load_city(const std::string &path) {
++    if (!sim_) {
++        return {false, "No sim"};
++    }
++    if (sim_->loadFile(path)) {
++        return {true, "Loaded from " + path};
++    }
++    return {false, "Load failed: " + path};
++}
+diff --git a/app/micropolis/micropolis_bridge.h b/app/micropolis/micropolis_bridge.h
+index 31193232126f96096cf91ed3da9de848b9d00124..0e8c4d0cb670689c9701c75c25eff4962b3c916c
+--- a/app/micropolis/micropolis_bridge.h
++++ b/app/micropolis/micropolis_bridge.h
+@@ -22,6 +22,11 @@
+     std::string message;
+ };
+ 
++struct CityIOResult {
++    bool ok;
++    std::string message;
++};
++
+ class MicropolisBridge {
+ public:
+     MicropolisBridge();
+@@ -37,6 +42,8 @@
+ 
+     MicropolisSnapshot snapshot() const;
+     ToolApplyResult apply_tool(int tool_id, int x, int y);
++    CityIOResult save_city(const std::string &path);
++    CityIOResult load_city(const std::string &path);
+     std::string render_ascii_excerpt(int x, int y, int width, int height) const;
+ 
+ private:
+diff --git a/app/micropolis_ascii_view.cpp b/app/micropolis_ascii_view.cpp
+index 30f19c02e1596c83b4376e15f0910b6bcb5990bf..228196b6fe1aac51c9869969630cc95cc98b819d
+--- a/app/micropolis_ascii_view.cpp
++++ b/app/micropolis_ascii_view.cpp
+@@ -6,6 +6,7 @@
+ #include <tvision/tv.h>
+ 
+ #include <algorithm>
++#include <cstdlib>
+ #include <sstream>
+ 
+ namespace {
+@@ -49,6 +50,12 @@
+ static const int kTicksPerFire[] = { 0, 1, 4, 16, 64 };
+ static const char* kSpeedNames[]  = { "||PAUSE", "1-SLOW", "2-MED", "3-FAST", "4-ULTRA" };
+ 
++std::string save_slot_path(int slot) {
++    if (slot < 1) slot = 1;
++    if (slot > 3) slot = 3;
++    return "saves/slot" + std::to_string(slot) + ".city";
++}
++
+ TColorAttr color_for_glyph(char ch, char zone_prefix = '\0') {
+     if ((ch == '1' || ch == '2' || ch == '3') &&
+         (zone_prefix == 'r' || zone_prefix == 'c' || zone_prefix == 'i')) {
+@@ -98,6 +105,7 @@
+     options |= ofSelectable;
+     eventMask |= evBroadcast;
+     bridge_.initialize_new_city(seed_, 2);
++    std::system("mkdir -p saves");
+ }
+ 
+ TMicropolisAsciiView::~TMicropolisAsciiView() {
+@@ -173,7 +181,8 @@
+         << "  R:" << (s.res_valve >= 0 ? "+" : "") << s.res_valve
+         << " C:" << (s.com_valve >= 0 ? "+" : "") << s.com_valve
+         << " I:" << (s.ind_valve >= 0 ? "+" : "") << s.ind_valve
+-        << "  [" << kSpeedNames[simSpeed_] << "] -/+";
++        << "  [" << kSpeedNames[simSpeed_] << "] -/+"
++        << "  Slot:" << saveSlot_ << "  F2:save F3:load";
+     std::string topLine = top.str();
+     if ((int)topLine.size() > size.x) topLine.resize(size.x);
+     b.moveChar(0, ' ', TColorAttr(0x70), size.x);
+@@ -279,6 +288,27 @@
+         // Apply tool
+         else if (key == kbEnter || ch == ' ') { applyActiveTool(); }
+ 
++        // Save/load slots
++        else if (key == kbF2) {
++            const auto result = bridge_.save_city(save_slot_path(saveSlot_));
++            lastResult_ = result.message;
++            lastResultTick_ = 25;
++        }
++        else if (key == kbF3) {
++            const auto result = bridge_.load_city(save_slot_path(saveSlot_));
++            lastResult_ = result.message;
++            lastResultTick_ = 25;
++            if (result.ok) {
++                camX_ = 0;
++                camY_ = 0;
++            }
++        }
++        else if (key == kbTab) {
++            saveSlot_ = (saveSlot_ % 3) + 1;
++            lastResult_ = "Slot " + std::to_string(saveSlot_);
++            lastResultTick_ = 25;
++        }
++
+         // Cancel / query mode
+         else if (key == kbEsc || ch == 'q') { activeTool_ = kToolQuery; lastResult_.clear(); lastResultTick_ = 0; }
+ 
+diff --git a/app/micropolis_ascii_view.h b/app/micropolis_ascii_view.h
+index 7b2c4e102e3be6e02e5a6df9c014ec8c8f478662..73a5a550d4883c43a0b134e6737081de8fa23adf
+--- a/app/micropolis_ascii_view.h
++++ b/app/micropolis_ascii_view.h
+@@ -22,6 +22,7 @@
+     std::string lastResult() const { return lastResult_; }
+     int lastResultTick() const { return lastResultTick_; }
+     int simSpeed() const { return simSpeed_; }
++    int saveSlot() const { return saveSlot_; }
+     MicropolisSnapshot snapshot() const { return bridge_.snapshot(); }
+ 
+ private:
+@@ -40,6 +41,7 @@
+     int curY_ {50};
+     int activeTool_ {5};      // TOOL_QUERY=5 — no engine header needed in view
+     int simSpeed_ {1};        // 0=pause 1=slow 2=medium 3=fast 4=ultra
++    int saveSlot_ {1};        // active save slot [1..3]
+     int seed_ {1337};
+     TTimerId timerId_ {0};
+     std::string lastResult_;
+
+file update:
+diff --git a/app/micropolis/micropolis_bridge.cpp b/app/micropolis/micropolis_bridge.cpp
+index ba8d210dfa6ef276b06d2e1e159e3149484b65e4..d8241716c5fc7eeea66887484f9ae4a6fe274dd2
+--- a/app/micropolis/micropolis_bridge.cpp
++++ b/app/micropolis/micropolis_bridge.cpp
+@@ -265,3 +265,23 @@
+         default:                       return {0,  "?"};
+     }
+ }
++
++CityIOResult MicropolisBridge::save_city(const std::string &path) {
++    if (!sim_) {
++        return {false, "No sim"};
++    }
++    if (sim_->saveFile(path)) {
++        return {true, "Saved to " + path};
++    }
++    return {false, "Save failed: " + path};
++}
++
++CityIOResult MicropolisBridge::load_city(const std::string &path) {
++    if (!sim_) {
++        return {false, "No sim"};
++    }
++    if (sim_->loadFile(path)) {
++        return {true, "Loaded from " + path};
++    }
++    return {false, "Load failed: " + path};
++}
+diff --git a/app/micropolis/micropolis_bridge.h b/app/micropolis/micropolis_bridge.h
+index 31193232126f96096cf91ed3da9de848b9d00124..0e8c4d0cb670689c9701c75c25eff4962b3c916c
+--- a/app/micropolis/micropolis_bridge.h
++++ b/app/micropolis/micropolis_bridge.h
+@@ -22,6 +22,11 @@
+     std::string message;
+ };
+ 
++struct CityIOResult {
++    bool ok;
++    std::string message;
++};
++
+ class MicropolisBridge {
+ public:
+     MicropolisBridge();
+@@ -37,6 +42,8 @@
+ 
+     MicropolisSnapshot snapshot() const;
+     ToolApplyResult apply_tool(int tool_id, int x, int y);
++    CityIOResult save_city(const std::string &path);
++    CityIOResult load_city(const std::string &path);
+     std::string render_ascii_excerpt(int x, int y, int width, int height) const;
+ 
+ private:
+diff --git a/app/micropolis_ascii_view.cpp b/app/micropolis_ascii_view.cpp
+index 30f19c02e1596c83b4376e15f0910b6bcb5990bf..228196b6fe1aac51c9869969630cc95cc98b819d
+--- a/app/micropolis_ascii_view.cpp
++++ b/app/micropolis_ascii_view.cpp
+@@ -6,6 +6,7 @@
+ #include <tvision/tv.h>
+ 
+ #include <algorithm>
++#include <cstdlib>
+ #include <sstream>
+ 
+ namespace {
+@@ -49,6 +50,12 @@
+ static const int kTicksPerFire[] = { 0, 1, 4, 16, 64 };
+ static const char* kSpeedNames[]  = { "||PAUSE", "1-SLOW", "2-MED", "3-FAST", "4-ULTRA" };
+ 
++std::string save_slot_path(int slot) {
++    if (slot < 1) slot = 1;
++    if (slot > 3) slot = 3;
++    return "saves/slot" + std::to_string(slot) + ".city";
++}
++
+ TColorAttr color_for_glyph(char ch, char zone_prefix = '\0') {
+     if ((ch == '1' || ch == '2' || ch == '3') &&
+         (zone_prefix == 'r' || zone_prefix == 'c' || zone_prefix == 'i')) {
+@@ -98,6 +105,7 @@
+     options |= ofSelectable;
+     eventMask |= evBroadcast;
+     bridge_.initialize_new_city(seed_, 2);
++    std::system("mkdir -p saves");
+ }
+ 
+ TMicropolisAsciiView::~TMicropolisAsciiView() {
+@@ -173,7 +181,8 @@
+         << "  R:" << (s.res_valve >= 0 ? "+" : "") << s.res_valve
+         << " C:" << (s.com_valve >= 0 ? "+" : "") << s.com_valve
+         << " I:" << (s.ind_valve >= 0 ? "+" : "") << s.ind_valve
+-        << "  [" << kSpeedNames[simSpeed_] << "] -/+";
++        << "  [" << kSpeedNames[simSpeed_] << "] -/+"
++        << "  Slot:" << saveSlot_ << "  F2:save F3:load";
+     std::string topLine = top.str();
+     if ((int)topLine.size() > size.x) topLine.resize(size.x);
+     b.moveChar(0, ' ', TColorAttr(0x70), size.x);
+@@ -279,6 +288,27 @@
+         // Apply tool
+         else if (key == kbEnter || ch == ' ') { applyActiveTool(); }
+ 
++        // Save/load slots
++        else if (key == kbF2) {
++            const auto result = bridge_.save_city(save_slot_path(saveSlot_));
++            lastResult_ = result.message;
++            lastResultTick_ = 25;
++        }
++        else if (key == kbF3) {
++            const auto result = bridge_.load_city(save_slot_path(saveSlot_));
++            lastResult_ = result.message;
++            lastResultTick_ = 25;
++            if (result.ok) {
++                camX_ = 0;
++                camY_ = 0;
++            }
++        }
++        else if (key == kbTab) {
++            saveSlot_ = (saveSlot_ % 3) + 1;
++            lastResult_ = "Slot " + std::to_string(saveSlot_);
++            lastResultTick_ = 25;
++        }
++
+         // Cancel / query mode
+         else if (key == kbEsc || ch == 'q') { activeTool_ = kToolQuery; lastResult_.clear(); lastResultTick_ = 0; }
+ 
+diff --git a/app/micropolis_ascii_view.h b/app/micropolis_ascii_view.h
+index 7b2c4e102e3be6e02e5a6df9c014ec8c8f478662..73a5a550d4883c43a0b134e6737081de8fa23adf
+--- a/app/micropolis_ascii_view.h
++++ b/app/micropolis_ascii_view.h
+@@ -22,6 +22,7 @@
+     std::string lastResult() const { return lastResult_; }
+     int lastResultTick() const { return lastResultTick_; }
+     int simSpeed() const { return simSpeed_; }
++    int saveSlot() const { return saveSlot_; }
+     MicropolisSnapshot snapshot() const { return bridge_.snapshot(); }
+ 
+ private:
+@@ -40,6 +41,7 @@
+     int curY_ {50};
+     int activeTool_ {5};      // TOOL_QUERY=5 — no engine header needed in view
+     int simSpeed_ {1};        // 0=pause 1=slow 2=medium 3=fast 4=ultra
++    int saveSlot_ {1};        // active save slot [1..3]
+     int seed_ {1337};
+     TTimerId timerId_ {0};
+     std::string lastResult_;
+
+
+thinking
+**Adding footer draw with saveSlot info**
+codex
+Bridge and view wiring are in place now; I’m editing palette rendering to add the slot/save/load footer hints in dark grey using leftover rows, then I’ll run the build/tests.
+file update
+M /Users/james/Repos/wibandwob-dos/app/micropolis_tool_palette.cpp
+@@ -114,2 +114,3 @@
+     const int activeTool = map_ ? map_->activeTool() : -1;
++    const int saveSlot = map_ ? map_->saveSlot() : 1;
+     const std::string result = map_ ? map_->lastResult() : std::string();
+@@ -140,2 +141,15 @@
+ 
++    const std::string footerLines[] = {
++        std::string("Slot: ") + std::to_string(saveSlot),
++        "F2 save",
++        "F3 load",
++        "Tab: slot",
++    };
++    for (const std::string &line : footerLines) {
++        if (y >= size.y) {
++            break;
++        }
++        writeFilledLine(this, y++, TColorAttr(0x08), fitLine(line, size.x));
++    }
++
+     for (; y < size.y; ++y) {
+apply_patch(auto_approved=true) exited 0 in 136ms:
+Success. Updated the following files:
+M app/micropolis_tool_palette.cpp
+file update:
+diff --git a/app/micropolis/micropolis_bridge.cpp b/app/micropolis/micropolis_bridge.cpp
+index ba8d210dfa6ef276b06d2e1e159e3149484b65e4..d8241716c5fc7eeea66887484f9ae4a6fe274dd2
+--- a/app/micropolis/micropolis_bridge.cpp
++++ b/app/micropolis/micropolis_bridge.cpp
+@@ -265,3 +265,23 @@
+         default:                       return {0,  "?"};
+     }
+ }
++
++CityIOResult MicropolisBridge::save_city(const std::string &path) {
++    if (!sim_) {
++        return {false, "No sim"};
++    }
++    if (sim_->saveFile(path)) {
++        return {true, "Saved to " + path};
++    }
++    return {false, "Save failed: " + path};
++}
++
++CityIOResult MicropolisBridge::load_city(const std::string &path) {
++    if (!sim_) {
++        return {false, "No sim"};
++    }
++    if (sim_->loadFile(path)) {
++        return {true, "Loaded from " + path};
++    }
++    return {false, "Load failed: " + path};
++}
+diff --git a/app/micropolis/micropolis_bridge.h b/app/micropolis/micropolis_bridge.h
+index 31193232126f96096cf91ed3da9de848b9d00124..0e8c4d0cb670689c9701c75c25eff4962b3c916c
+--- a/app/micropolis/micropolis_bridge.h
++++ b/app/micropolis/micropolis_bridge.h
+@@ -22,6 +22,11 @@
+     std::string message;
+ };
+ 
++struct CityIOResult {
++    bool ok;
++    std::string message;
++};
++
+ class MicropolisBridge {
+ public:
+     MicropolisBridge();
+@@ -37,6 +42,8 @@
+ 
+     MicropolisSnapshot snapshot() const;
+     ToolApplyResult apply_tool(int tool_id, int x, int y);
++    CityIOResult save_city(const std::string &path);
++    CityIOResult load_city(const std::string &path);
+     std::string render_ascii_excerpt(int x, int y, int width, int height) const;
+ 
+ private:
+diff --git a/app/micropolis_ascii_view.cpp b/app/micropolis_ascii_view.cpp
+index 30f19c02e1596c83b4376e15f0910b6bcb5990bf..228196b6fe1aac51c9869969630cc95cc98b819d
+--- a/app/micropolis_ascii_view.cpp
++++ b/app/micropolis_ascii_view.cpp
+@@ -6,6 +6,7 @@
+ #include <tvision/tv.h>
+ 
+ #include <algorithm>
++#include <cstdlib>
+ #include <sstream>
+ 
+ namespace {
+@@ -49,6 +50,12 @@
+ static const int kTicksPerFire[] = { 0, 1, 4, 16, 64 };
+ static const char* kSpeedNames[]  = { "||PAUSE", "1-SLOW", "2-MED", "3-FAST", "4-ULTRA" };
+ 
++std::string save_slot_path(int slot) {
++    if (slot < 1) slot = 1;
++    if (slot > 3) slot = 3;
++    return "saves/slot" + std::to_string(slot) + ".city";
++}
++
+ TColorAttr color_for_glyph(char ch, char zone_prefix = '\0') {
+     if ((ch == '1' || ch == '2' || ch == '3') &&
+         (zone_prefix == 'r' || zone_prefix == 'c' || zone_prefix == 'i')) {
+@@ -98,6 +105,7 @@
+     options |= ofSelectable;
+     eventMask |= evBroadcast;
+     bridge_.initialize_new_city(seed_, 2);
++    std::system("mkdir -p saves");
+ }
+ 
+ TMicropolisAsciiView::~TMicropolisAsciiView() {
+@@ -173,7 +181,8 @@
+         << "  R:" << (s.res_valve >= 0 ? "+" : "") << s.res_valve
+         << " C:" << (s.com_valve >= 0 ? "+" : "") << s.com_valve
+         << " I:" << (s.ind_valve >= 0 ? "+" : "") << s.ind_valve
+-        << "  [" << kSpeedNames[simSpeed_] << "] -/+";
++        << "  [" << kSpeedNames[simSpeed_] << "] -/+"
++        << "  Slot:" << saveSlot_ << "  F2:save F3:load";
+     std::string topLine = top.str();
+     if ((int)topLine.size() > size.x) topLine.resize(size.x);
+     b.moveChar(0, ' ', TColorAttr(0x70), size.x);
+@@ -279,6 +288,27 @@
+         // Apply tool
+         else if (key == kbEnter || ch == ' ') { applyActiveTool(); }
+ 
++        // Save/load slots
++        else if (key == kbF2) {
++            const auto result = bridge_.save_city(save_slot_path(saveSlot_));
++            lastResult_ = result.message;
++            lastResultTick_ = 25;
++        }
++        else if (key == kbF3) {
++            const auto result = bridge_.load_city(save_slot_path(saveSlot_));
++            lastResult_ = result.message;
++            lastResultTick_ = 25;
++            if (result.ok) {
++                camX_ = 0;
++                camY_ = 0;
++            }
++        }
++        else if (key == kbTab) {
++            saveSlot_ = (saveSlot_ % 3) + 1;
++            lastResult_ = "Slot " + std::to_string(saveSlot_);
++            lastResultTick_ = 25;
++        }
++
+         // Cancel / query mode
+         else if (key == kbEsc || ch == 'q') { activeTool_ = kToolQuery; lastResult_.clear(); lastResultTick_ = 0; }
+ 
+diff --git a/app/micropolis_ascii_view.h b/app/micropolis_ascii_view.h
+index 7b2c4e102e3be6e02e5a6df9c014ec8c8f478662..73a5a550d4883c43a0b134e6737081de8fa23adf
+--- a/app/micropolis_ascii_view.h
++++ b/app/micropolis_ascii_view.h
+@@ -22,6 +22,7 @@
+     std::string lastResult() const { return lastResult_; }
+     int lastResultTick() const { return lastResultTick_; }
+     int simSpeed() const { return simSpeed_; }
++    int saveSlot() const { return saveSlot_; }
+     MicropolisSnapshot snapshot() const { return bridge_.snapshot(); }
+ 
+ private:
+@@ -40,6 +41,7 @@
+     int curY_ {50};
+     int activeTool_ {5};      // TOOL_QUERY=5 — no engine header needed in view
+     int simSpeed_ {1};        // 0=pause 1=slow 2=medium 3=fast 4=ultra
++    int saveSlot_ {1};        // active save slot [1..3]
+     int seed_ {1337};
+     TTimerId timerId_ {0};
+     std::string lastResult_;
+diff --git a/app/micropolis_tool_palette.cpp b/app/micropolis_tool_palette.cpp
+index 31c199be95fdf7549ffd264e112826c4e366edb8..47695cc7b909f853f532bf70acf305cd3895e209
+--- a/app/micropolis_tool_palette.cpp
++++ b/app/micropolis_tool_palette.cpp
+@@ -112,6 +112,7 @@
+ void TMicropolisToolPalette::draw() {
+     const MicropolisSnapshot s = map_ ? map_->snapshot() : MicropolisSnapshot{};
+     const int activeTool = map_ ? map_->activeTool() : -1;
++    const int saveSlot = map_ ? map_->saveSlot() : 1;
+     const std::string result = map_ ? map_->lastResult() : std::string();
+     const int resultTick = map_ ? map_->lastResultTick() : 0;
+ 
+@@ -138,6 +139,19 @@
+         writeFilledLine(this, y++, TColorAttr(0x70), std::string());
+     }
+ 
++    const std::string footerLines[] = {
++        std::string("Slot: ") + std::to_string(saveSlot),
++        "F2 save",
++        "F3 load",
++        "Tab: slot",
++    };
++    for (const std::string &line : footerLines) {
++        if (y >= size.y) {
++            break;
++        }
++        writeFilledLine(this, y++, TColorAttr(0x08), fitLine(line, size.x));
++    }
++
+     for (; y < size.y; ++y) {
+         writeFilledLine(this, y, TColorAttr(0x07), std::string());
+     }
+
+file update:
+diff --git a/app/micropolis/micropolis_bridge.cpp b/app/micropolis/micropolis_bridge.cpp
+index ba8d210dfa6ef276b06d2e1e159e3149484b65e4..d8241716c5fc7eeea66887484f9ae4a6fe274dd2
+--- a/app/micropolis/micropolis_bridge.cpp
++++ b/app/micropolis/micropolis_bridge.cpp
+@@ -265,3 +265,23 @@
+         default:                       return {0,  "?"};
+     }
+ }
++
++CityIOResult MicropolisBridge::save_city(const std::string &path) {
++    if (!sim_) {
++        return {false, "No sim"};
++    }
++    if (sim_->saveFile(path)) {
++        return {true, "Saved to " + path};
++    }
++    return {false, "Save failed: " + path};
++}
++
++CityIOResult MicropolisBridge::load_city(const std::string &path) {
++    if (!sim_) {
++        return {false, "No sim"};
++    }
++    if (sim_->loadFile(path)) {
++        return {true, "Loaded from " + path};
++    }
++    return {false, "Load failed: " + path};
++}
+diff --git a/app/micropolis/micropolis_bridge.h b/app/micropolis/micropolis_bridge.h
+index 31193232126f96096cf91ed3da9de848b9d00124..0e8c4d0cb670689c9701c75c25eff4962b3c916c
+--- a/app/micropolis/micropolis_bridge.h
++++ b/app/micropolis/micropolis_bridge.h
+@@ -22,6 +22,11 @@
+     std::string message;
+ };
+ 
++struct CityIOResult {
++    bool ok;
++    std::string message;
++};
++
+ class MicropolisBridge {
+ public:
+     MicropolisBridge();
+@@ -37,6 +42,8 @@
+ 
+     MicropolisSnapshot snapshot() const;
+     ToolApplyResult apply_tool(int tool_id, int x, int y);
++    CityIOResult save_city(const std::string &path);
++    CityIOResult load_city(const std::string &path);
+     std::string render_ascii_excerpt(int x, int y, int width, int height) const;
+ 
+ private:
+diff --git a/app/micropolis_ascii_view.cpp b/app/micropolis_ascii_view.cpp
+index 30f19c02e1596c83b4376e15f0910b6bcb5990bf..228196b6fe1aac51c9869969630cc95cc98b819d
+--- a/app/micropolis_ascii_view.cpp
++++ b/app/micropolis_ascii_view.cpp
+@@ -6,6 +6,7 @@
+ #include <tvision/tv.h>
+ 
+ #include <algorithm>
++#include <cstdlib>
+ #include <sstream>
+ 
+ namespace {
+@@ -49,6 +50,12 @@
+ static const int kTicksPerFire[] = { 0, 1, 4, 16, 64 };
+ static const char* kSpeedNames[]  = { "||PAUSE", "1-SLOW", "2-MED", "3-FAST", "4-ULTRA" };
+ 
++std::string save_slot_path(int slot) {
++    if (slot < 1) slot = 1;
++    if (slot > 3) slot = 3;
++    return "saves/slot" + std::to_string(slot) + ".city";
++}
++
+ TColorAttr color_for_glyph(char ch, char zone_prefix = '\0') {
+     if ((ch == '1' || ch == '2' || ch == '3') &&
+         (zone_prefix == 'r' || zone_prefix == 'c' || zone_prefix == 'i')) {
+@@ -98,6 +105,7 @@
+     options |= ofSelectable;
+     eventMask |= evBroadcast;
+     bridge_.initialize_new_city(seed_, 2);
++    std::system("mkdir -p saves");
+ }
+ 
+ TMicropolisAsciiView::~TMicropolisAsciiView() {
+@@ -173,7 +181,8 @@
+         << "  R:" << (s.res_valve >= 0 ? "+" : "") << s.res_valve
+         << " C:" << (s.com_valve >= 0 ? "+" : "") << s.com_valve
+         << " I:" << (s.ind_valve >= 0 ? "+" : "") << s.ind_valve
+-        << "  [" << kSpeedNames[simSpeed_] << "] -/+";
++        << "  [" << kSpeedNames[simSpeed_] << "] -/+"
++        << "  Slot:" << saveSlot_ << "  F2:save F3:load";
+     std::string topLine = top.str();
+     if ((int)topLine.size() > size.x) topLine.resize(size.x);
+     b.moveChar(0, ' ', TColorAttr(0x70), size.x);
+@@ -279,6 +288,27 @@
+         // Apply tool
+         else if (key == kbEnter || ch == ' ') { applyActiveTool(); }
+ 
++        // Save/load slots
++        else if (key == kbF2) {
++            const auto result = bridge_.save_city(save_slot_path(saveSlot_));
++            lastResult_ = result.message;
++            lastResultTick_ = 25;
++        }
++        else if (key == kbF3) {
++            const auto result = bridge_.load_city(save_slot_path(saveSlot_));
++            lastResult_ = result.message;
++            lastResultTick_ = 25;
++            if (result.ok) {
++                camX_ = 0;
++                camY_ = 0;
++            }
++        }
++        else if (key == kbTab) {
++            saveSlot_ = (saveSlot_ % 3) + 1;
++            lastResult_ = "Slot " + std::to_string(saveSlot_);
++            lastResultTick_ = 25;
++        }
++
+         // Cancel / query mode
+         else if (key == kbEsc || ch == 'q') { activeTool_ = kToolQuery; lastResult_.clear(); lastResultTick_ = 0; }
+ 
+diff --git a/app/micropolis_ascii_view.h b/app/micropolis_ascii_view.h
+index 7b2c4e102e3be6e02e5a6df9c014ec8c8f478662..73a5a550d4883c43a0b134e6737081de8fa23adf
+--- a/app/micropolis_ascii_view.h
++++ b/app/micropolis_ascii_view.h
+@@ -22,6 +22,7 @@
+     std::string lastResult() const { return lastResult_; }
+     int lastResultTick() const { return lastResultTick_; }
+     int simSpeed() const { return simSpeed_; }
++    int saveSlot() const { return saveSlot_; }
+     MicropolisSnapshot snapshot() const { return bridge_.snapshot(); }
+ 
+ private:
+@@ -40,6 +41,7 @@
+     int curY_ {50};
+     int activeTool_ {5};      // TOOL_QUERY=5 — no engine header needed in view
+     int simSpeed_ {1};        // 0=pause 1=slow 2=medium 3=fast 4=ultra
++    int saveSlot_ {1};        // active save slot [1..3]
+     int seed_ {1337};
+     TTimerId timerId_ {0};
+     std::string lastResult_;
+diff --git a/app/micropolis_tool_palette.cpp b/app/micropolis_tool_palette.cpp
+index 31c199be95fdf7549ffd264e112826c4e366edb8..47695cc7b909f853f532bf70acf305cd3895e209
+--- a/app/micropolis_tool_palette.cpp
++++ b/app/micropolis_tool_palette.cpp
+@@ -112,6 +112,7 @@
+ void TMicropolisToolPalette::draw() {
+     const MicropolisSnapshot s = map_ ? map_->snapshot() : MicropolisSnapshot{};
+     const int activeTool = map_ ? map_->activeTool() : -1;
++    const int saveSlot = map_ ? map_->saveSlot() : 1;
+     const std::string result = map_ ? map_->lastResult() : std::string();
+     const int resultTick = map_ ? map_->lastResultTick() : 0;
+ 
+@@ -138,6 +139,19 @@
+         writeFilledLine(this, y++, TColorAttr(0x70), std::string());
+     }
+ 
++    const std::string footerLines[] = {
++        std::string("Slot: ") + std::to_string(saveSlot),
++        "F2 save",
++        "F3 load",
++        "Tab: slot",
++    };
++    for (const std::string &line : footerLines) {
++        if (y >= size.y) {
++            break;
++        }
++        writeFilledLine(this, y++, TColorAttr(0x08), fitLine(line, size.x));
++    }
++
+     for (; y < size.y; ++y) {
+         writeFilledLine(this, y, TColorAttr(0x07), std::string());
+     }
+
+
+thinking
+**Checking code declarations**
+exec
+/bin/zsh -lc 'rg -n "CityIOResult|save_city|load_city|saveSlot_|kbF2|kbF3|kbTab|mkdir -p saves|Slot:" app/micropolis app/micropolis_ascii_view.* app/micropolis_tool_palette.cpp' in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc 'git diff -- app/micropolis/micropolis_bridge.h app/micropolis/micropolis_bridge.cpp app/micropolis_ascii_view.h app/micropolis_ascii_view.cpp app/micropolis_tool_palette.cpp' in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+app/micropolis_tool_palette.cpp:143:        std::string("Slot: ") + std::to_string(saveSlot),
+app/micropolis_ascii_view.h:25:    int saveSlot() const { return saveSlot_; }
+app/micropolis_ascii_view.h:44:    int saveSlot_ {1};        // active save slot [1..3]
+app/micropolis_ascii_view.cpp:108:    std::system("mkdir -p saves");
+app/micropolis_ascii_view.cpp:185:        << "  Slot:" << saveSlot_ << "  F2:save F3:load";
+app/micropolis_ascii_view.cpp:292:        else if (key == kbF2) {
+app/micropolis_ascii_view.cpp:293:            const auto result = bridge_.save_city(save_slot_path(saveSlot_));
+app/micropolis_ascii_view.cpp:297:        else if (key == kbF3) {
+app/micropolis_ascii_view.cpp:298:            const auto result = bridge_.load_city(save_slot_path(saveSlot_));
+app/micropolis_ascii_view.cpp:306:        else if (key == kbTab) {
+app/micropolis_ascii_view.cpp:307:            saveSlot_ = (saveSlot_ % 3) + 1;
+app/micropolis_ascii_view.cpp:308:            lastResult_ = "Slot " + std::to_string(saveSlot_);
+app/micropolis/micropolis_bridge.cpp:269:CityIOResult MicropolisBridge::save_city(const std::string &path) {
+app/micropolis/micropolis_bridge.cpp:279:CityIOResult MicropolisBridge::load_city(const std::string &path) {
+app/micropolis/micropolis_bridge.h:25:struct CityIOResult {
+app/micropolis/micropolis_bridge.h:45:    CityIOResult save_city(const std::string &path);
+app/micropolis/micropolis_bridge.h:46:    CityIOResult load_city(const std::string &path);
+ succeeded in 51ms:
+diff --git a/app/micropolis/micropolis_bridge.cpp b/app/micropolis/micropolis_bridge.cpp
+index ba8d210..d824171 100644
+--- a/app/micropolis/micropolis_bridge.cpp
++++ b/app/micropolis/micropolis_bridge.cpp
+@@ -265,3 +265,23 @@ ToolApplyResult MicropolisBridge::apply_tool(int tool_id, int x, int y) {
+         default:                       return {0,  "?"};
+     }
+ }
++
++CityIOResult MicropolisBridge::save_city(const std::string &path) {
++    if (!sim_) {
++        return {false, "No sim"};
++    }
++    if (sim_->saveFile(path)) {
++        return {true, "Saved to " + path};
++    }
++    return {false, "Save failed: " + path};
++}
++
++CityIOResult MicropolisBridge::load_city(const std::string &path) {
+file update:
+diff --git a/app/micropolis/micropolis_bridge.cpp b/app/micropolis/micropolis_bridge.cpp
+index ba8d210dfa6ef276b06d2e1e159e3149484b65e4..d8241716c5fc7eeea66887484f9ae4a6fe274dd2
+--- a/app/micropolis/micropolis_bridge.cpp
++++ b/app/micropolis/micropolis_bridge.cpp
+@@ -265,3 +265,23 @@
+         default:                       return {0,  "?"};
+     }
+ }
++
++CityIOResult MicropolisBridge::save_city(const std::string &path) {
++    if (!sim_) {
++        return {false, "No sim"};
++    }
++    if (sim_->saveFile(path)) {
++        return {true, "Saved to " + path};
++    }
++    return {false, "Save failed: " + path};
++}
++
++CityIOResult MicropolisBridge::load_city(const std::string &path) {
++    if (!sim_) {
++        return {false, "No sim"};
++    }
++    if (sim_->loadFile(path)) {
++        return {true, "Loaded from " + path};
++    }
++    return {false, "Load failed: " + path};
++}
+diff --git a/app/micropolis/micropolis_bridge.h b/app/micropolis/micropolis_bridge.h
+index 31193232126f96096cf91ed3da9de848b9d00124..0e8c4d0cb670689c9701c75c25eff4962b3c916c
+--- a/app/micropolis/micropolis_bridge.h
++++ b/app/micropolis/micropolis_bridge.h
+@@ -22,6 +22,11 @@
+     std::string message;
+ };
+ 
++struct CityIOResult {
++    bool ok;
++    std::string message;
++};
++
+ class MicropolisBridge {
+ public:
+     MicropolisBridge();
+@@ -37,6 +42,8 @@
+ 
+     MicropolisSnapshot snapshot() const;
+     ToolApplyResult apply_tool(int tool_id, int x, int y);
++    CityIOResult save_city(const std::string &path);
++    CityIOResult load_city(const std::string &path);
+     std::string render_ascii_excerpt(int x, int y, int width, int height) const;
+ 
+ private:
+diff --git a/app/micropolis_ascii_view.cpp b/app/micropolis_ascii_view.cpp
+index 30f19c02e1596c83b4376e15f0910b6bcb5990bf..228196b6fe1aac51c9869969630cc95cc98b819d
+--- a/app/micropolis_ascii_view.cpp
++++ b/app/micropolis_ascii_view.cpp
+@@ -6,6 +6,7 @@
+ #include <tvision/tv.h>
+ 
+ #include <algorithm>
++#include <cstdlib>
+ #include <sstream>
+ 
+ namespace {
+@@ -49,6 +50,12 @@
+ static const int kTicksPerFire[] = { 0, 1, 4, 16, 64 };
+ static const char* kSpeedNames[]  = { "||PAUSE", "1-SLOW", "2-MED", "3-FAST", "4-ULTRA" };
+ 
++std::string save_slot_path(int slot) {
++    if (slot < 1) slot = 1;
++    if (slot > 3) slot = 3;
++    return "saves/slot" + std::to_string(slot) + ".city";
++}
++
+ TColorAttr color_for_glyph(char ch, char zone_prefix = '\0') {
+     if ((ch == '1' || ch == '2' || ch == '3') &&
+         (zone_prefix == 'r' || zone_prefix == 'c' || zone_prefix == 'i')) {
+@@ -98,6 +105,7 @@
+     options |= ofSelectable;
+     eventMask |= evBroadcast;
+     bridge_.initialize_new_city(seed_, 2);
++    std::system("mkdir -p saves");
+ }
+ 
+ TMicropolisAsciiView::~TMicropolisAsciiView() {
+@@ -173,7 +181,8 @@
+         << "  R:" << (s.res_valve >= 0 ? "+" : "") << s.res_valve
+         << " C:" << (s.com_valve >= 0 ? "+" : "") << s.com_valve
+         << " I:" << (s.ind_valve >= 0 ? "+" : "") << s.ind_valve
+-        << "  [" << kSpeedNames[simSpeed_] << "] -/+";
++        << "  [" << kSpeedNames[simSpeed_] << "] -/+"
++        << "  Slot:" << saveSlot_ << "  F2:save F3:load";
+     std::string topLine = top.str();
+     if ((int)topLine.size() > size.x) topLine.resize(size.x);
+     b.moveChar(0, ' ', TColorAttr(0x70), size.x);
+@@ -279,6 +288,27 @@
+         // Apply tool
+         else if (key == kbEnter || ch == ' ') { applyActiveTool(); }
+ 
++        // Save/load slots
++        else if (key == kbF2) {
++            const auto result = bridge_.save_city(save_slot_path(saveSlot_));
++            lastResult_ = result.message;
++            lastResultTick_ = 25;
++        }
++        else if (key == kbF3) {
++            const auto result = bridge_.load_city(save_slot_path(saveSlot_));
++            lastResult_ = result.message;
++            lastResultTick_ = 25;
++            if (result.ok) {
++                camX_ = 0;
++                camY_ = 0;
++            }
++        }
++        else if (key == kbTab) {
++            saveSlot_ = (saveSlot_ % 3) + 1;
++            lastResult_ = "Slot " + std::to_string(saveSlot_);
++            lastResultTick_ = 25;
++        }
++
+         // Cancel / query mode
+         else if (key == kbEsc || ch == 'q') { activeTool_ = kToolQuery; lastResult_.clear(); lastResultTick_ = 0; }
+ 
+diff --git a/app/micropolis_ascii_view.h b/app/micropolis_ascii_view.h
+index 7b2c4e102e3be6e02e5a6df9c014ec8c8f478662..73a5a550d4883c43a0b134e6737081de8fa23adf
+--- a/app/micropolis_ascii_view.h
++++ b/app/micropolis_ascii_view.h
+@@ -22,6 +22,7 @@
+     std::string lastResult() const { return lastResult_; }
+     int lastResultTick() const { return lastResultTick_; }
+     int simSpeed() const { return simSpeed_; }
++    int saveSlot() const { return saveSlot_; }
+     MicropolisSnapshot snapshot() const { return bridge_.snapshot(); }
+ 
+ private:
+@@ -40,6 +41,7 @@
+     int curY_ {50};
+     int activeTool_ {5};      // TOOL_QUERY=5 — no engine header needed in view
+     int simSpeed_ {1};        // 0=pause 1=slow 2=medium 3=fast 4=ultra
++    int saveSlot_ {1};        // active save slot [1..3]
+     int seed_ {1337};
+     TTimerId timerId_ {0};
+     std::string lastResult_;
+diff --git a/app/micropolis_tool_palette.cpp b/app/micropolis_tool_palette.cpp
+index 31c199be95fdf7549ffd264e112826c4e366edb8..47695cc7b909f853f532bf70acf305cd3895e209
+--- a/app/micropolis_tool_palette.cpp
++++ b/app/micropolis_tool_palette.cpp
+@@ -112,6 +112,7 @@
+ void TMicropolisToolPalette::draw() {
+     const MicropolisSnapshot s = map_ ? map_->snapshot() : MicropolisSnapshot{};
+     const int activeTool = map_ ? map_->activeTool() : -1;
++    const int saveSlot = map_ ? map_->saveSlot() : 1;
+     const std::string result = map_ ? map_->lastResult() : std::string();
+     const int resultTick = map_ ? map_->lastResultTick() : 0;
+ 
+@@ -138,6 +139,19 @@
+         writeFilledLine(this, y++, TColorAttr(0x70), std::string());
+     }
+ 
++    const std::string footerLines[] = {
++        std::string("Slot: ") + std::to_string(saveSlot),
++        "F2 save",
++        "F3 load",
++        "Tab: slot",
++    };
++    for (const std::string &line : footerLines) {
++        if (y >= size.y) {
++            break;
++        }
++        writeFilledLine(this, y++, TColorAttr(0x08), fitLine(line, size.x));
++    }
++
+     for (; y < size.y; ++y) {
+         writeFilledLine(this, y, TColorAttr(0x07), std::string());
+     }
+
+
+thinking
+**Clarifying file scope and build need**
+codex
+Edits are complete and compile-ready on diff; next I’m running the exact build target plus the requested 3x ctest loop, then the `saves/` smoke check.
+exec
+/bin/zsh -lc 'cmake --build build --target test_pattern -j4' in /Users/james/Repos/wibandwob-dos succeeded in 8.10s:
+[  9%] Built target micropolis_native
+[  9%] Building CXX object app/CMakeFiles/micropolis_bridge.dir/micropolis/micropolis_bridge.cpp.o
+[ 10%] Linking CXX static library libmicropolis_bridge.a
+[ 10%] Built target micropolis_bridge
+[ 82%] Built target tvision
+[ 83%] Building CXX object app/CMakeFiles/test_pattern.dir/test_pattern_app.cpp.o
+[ 83%] Building CXX object app/CMakeFiles/test_pattern.dir/window_type_registry.cpp.o
+[ 84%] Building CXX object app/CMakeFiles/test_pattern.dir/micropolis_ascii_view.cpp.o
+[ 84%] Building CXX object app/CMakeFiles/test_pattern.dir/micropolis_tool_palette.cpp.o
+[ 84%] Linking CXX executable test_pattern
+[100%] Built target test_pattern
+file update:
+diff --git a/app/micropolis/micropolis_bridge.cpp b/app/micropolis/micropolis_bridge.cpp
+index ba8d210dfa6ef276b06d2e1e159e3149484b65e4..d8241716c5fc7eeea66887484f9ae4a6fe274dd2
+--- a/app/micropolis/micropolis_bridge.cpp
++++ b/app/micropolis/micropolis_bridge.cpp
+@@ -265,3 +265,23 @@
+         default:                       return {0,  "?"};
+     }
+ }
++
++CityIOResult MicropolisBridge::save_city(const std::string &path) {
++    if (!sim_) {
++        return {false, "No sim"};
++    }
++    if (sim_->saveFile(path)) {
++        return {true, "Saved to " + path};
++    }
++    return {false, "Save failed: " + path};
++}
++
++CityIOResult MicropolisBridge::load_city(const std::string &path) {
++    if (!sim_) {
++        return {false, "No sim"};
++    }
++    if (sim_->loadFile(path)) {
++        return {true, "Loaded from " + path};
++    }
++    return {false, "Load failed: " + path};
++}
+diff --git a/app/micropolis/micropolis_bridge.h b/app/micropolis/micropolis_bridge.h
+index 31193232126f96096cf91ed3da9de848b9d00124..0e8c4d0cb670689c9701c75c25eff4962b3c916c
+--- a/app/micropolis/micropolis_bridge.h
++++ b/app/micropolis/micropolis_bridge.h
+@@ -22,6 +22,11 @@
+     std::string message;
+ };
+ 
++struct CityIOResult {
++    bool ok;
++    std::string message;
++};
++
+ class MicropolisBridge {
+ public:
+     MicropolisBridge();
+@@ -37,6 +42,8 @@
+ 
+     MicropolisSnapshot snapshot() const;
+     ToolApplyResult apply_tool(int tool_id, int x, int y);
++    CityIOResult save_city(const std::string &path);
++    CityIOResult load_city(const std::string &path);
+     std::string render_ascii_excerpt(int x, int y, int width, int height) const;
+ 
+ private:
+diff --git a/app/micropolis_ascii_view.cpp b/app/micropolis_ascii_view.cpp
+index 30f19c02e1596c83b4376e15f0910b6bcb5990bf..228196b6fe1aac51c9869969630cc95cc98b819d
+--- a/app/micropolis_ascii_view.cpp
++++ b/app/micropolis_ascii_view.cpp
+@@ -6,6 +6,7 @@
+ #include <tvision/tv.h>
+ 
+ #include <algorithm>
++#include <cstdlib>
+ #include <sstream>
+ 
+ namespace {
+@@ -49,6 +50,12 @@
+ static const int kTicksPerFire[] = { 0, 1, 4, 16, 64 };
+ static const char* kSpeedNames[]  = { "||PAUSE", "1-SLOW", "2-MED", "3-FAST", "4-ULTRA" };
+ 
++std::string save_slot_path(int slot) {
++    if (slot < 1) slot = 1;
++    if (slot > 3) slot = 3;
++    return "saves/slot" + std::to_string(slot) + ".city";
++}
++
+ TColorAttr color_for_glyph(char ch, char zone_prefix = '\0') {
+     if ((ch == '1' || ch == '2' || ch == '3') &&
+         (zone_prefix == 'r' || zone_prefix == 'c' || zone_prefix == 'i')) {
+@@ -98,6 +105,7 @@
+     options |= ofSelectable;
+     eventMask |= evBroadcast;
+     bridge_.initialize_new_city(seed_, 2);
++    std::system("mkdir -p saves");
+ }
+ 
+ TMicropolisAsciiView::~TMicropolisAsciiView() {
+@@ -173,7 +181,8 @@
+         << "  R:" << (s.res_valve >= 0 ? "+" : "") << s.res_valve
+         << " C:" << (s.com_valve >= 0 ? "+" : "") << s.com_valve
+         << " I:" << (s.ind_valve >= 0 ? "+" : "") << s.ind_valve
+-        << "  [" << kSpeedNames[simSpeed_] << "] -/+";
++        << "  [" << kSpeedNames[simSpeed_] << "] -/+"
++        << "  Slot:" << saveSlot_ << "  F2:save F3:load";
+     std::string topLine = top.str();
+     if ((int)topLine.size() > size.x) topLine.resize(size.x);
+     b.moveChar(0, ' ', TColorAttr(0x70), size.x);
+@@ -279,6 +288,27 @@
+         // Apply tool
+         else if (key == kbEnter || ch == ' ') { applyActiveTool(); }
+ 
++        // Save/load slots
++        else if (key == kbF2) {
++            const auto result = bridge_.save_city(save_slot_path(saveSlot_));
++            lastResult_ = result.message;
++            lastResultTick_ = 25;
++        }
++        else if (key == kbF3) {
++            const auto result = bridge_.load_city(save_slot_path(saveSlot_));
++            lastResult_ = result.message;
++            lastResultTick_ = 25;
++            if (result.ok) {
++                camX_ = 0;
++                camY_ = 0;
++            }
++        }
++        else if (key == kbTab) {
++            saveSlot_ = (saveSlot_ % 3) + 1;
++            lastResult_ = "Slot " + std::to_string(saveSlot_);
++            lastResultTick_ = 25;
++        }
++
+         // Cancel / query mode
+         else if (key == kbEsc || ch == 'q') { activeTool_ = kToolQuery; lastResult_.clear(); lastResultTick_ = 0; }
+ 
+diff --git a/app/micropolis_ascii_view.h b/app/micropolis_ascii_view.h
+index 7b2c4e102e3be6e02e5a6df9c014ec8c8f478662..73a5a550d4883c43a0b134e6737081de8fa23adf
+--- a/app/micropolis_ascii_view.h
++++ b/app/micropolis_ascii_view.h
+@@ -22,6 +22,7 @@
+     std::string lastResult() const { return lastResult_; }
+     int lastResultTick() const { return lastResultTick_; }
+     int simSpeed() const { return simSpeed_; }
++    int saveSlot() const { return saveSlot_; }
+     MicropolisSnapshot snapshot() const { return bridge_.snapshot(); }
+ 
+ private:
+@@ -40,6 +41,7 @@
+     int curY_ {50};
+     int activeTool_ {5};      // TOOL_QUERY=5 — no engine header needed in view
+     int simSpeed_ {1};        // 0=pause 1=slow 2=medium 3=fast 4=ultra
++    int saveSlot_ {1};        // active save slot [1..3]
+     int seed_ {1337};
+     TTimerId timerId_ {0};
+     std::string lastResult_;
+diff --git a/app/micropolis_tool_palette.cpp b/app/micropolis_tool_palette.cpp
+index 31c199be95fdf7549ffd264e112826c4e366edb8..47695cc7b909f853f532bf70acf305cd3895e209
+--- a/app/micropolis_tool_palette.cpp
++++ b/app/micropolis_tool_palette.cpp
+@@ -112,6 +112,7 @@
+ void TMicropolisToolPalette::draw() {
+     const MicropolisSnapshot s = map_ ? map_->snapshot() : MicropolisSnapshot{};
+     const int activeTool = map_ ? map_->activeTool() : -1;
++    const int saveSlot = map_ ? map_->saveSlot() : 1;
+     const std::string result = map_ ? map_->lastResult() : std::string();
+     const int resultTick = map_ ? map_->lastResultTick() : 0;
+ 
+@@ -138,6 +139,19 @@
+         writeFilledLine(this, y++, TColorAttr(0x70), std::string());
+     }
+ 
++    const std::string footerLines[] = {
++        std::string("Slot: ") + std::to_string(saveSlot),
++        "F2 save",
++        "F3 load",
++        "Tab: slot",
++    };
++    for (const std::string &line : footerLines) {
++        if (y >= size.y) {
++            break;
++        }
++        writeFilledLine(this, y++, TColorAttr(0x08), fitLine(line, size.x));
++    }
++
+     for (; y < size.y; ++y) {
+         writeFilledLine(this, y, TColorAttr(0x07), std::string());
+     }
+
+
+thinking
+**Executing run loop command**
+exec
+/bin/zsh -lc 'for i in 1 2 3; do echo "--- RUN $i ---"; ctest --test-dir build --output-on-failure -R "micropolis_(determinism|no_ansi)"; done' in /Users/james/Repos/wibandwob-dos succeeded in 71ms:
+    Start 3: micropolis_determinism
+1/2 Test #3: micropolis_determinism ...........   Passed    0.01 sec
+    Start 4: micropolis_no_ansi
+2/2 Test #4: micropolis_no_ansi ...............   Passed    0.00 sec
+
+100% tests passed, 0 tests failed out of 2
+
+Total Test time (real) =   0.02 sec
+file update:
+diff --git a/app/micropolis/micropolis_bridge.cpp b/app/micropolis/micropolis_bridge.cpp
+index ba8d210dfa6ef276b06d2e1e159e3149484b65e4..d8241716c5fc7eeea66887484f9ae4a6fe274dd2
+--- a/app/micropolis/micropolis_bridge.cpp
++++ b/app/micropolis/micropolis_bridge.cpp
+@@ -265,3 +265,23 @@
+         default:                       return {0,  "?"};
+     }
+ }
++
++CityIOResult MicropolisBridge::save_city(const std::string &path) {
++    if (!sim_) {
++        return {false, "No sim"};
++    }
++    if (sim_->saveFile(path)) {
++        return {true, "Saved to " + path};
++    }
++    return {false, "Save failed: " + path};
++}
++
++CityIOResult MicropolisBridge::load_city(const std::string &path) {
++    if (!sim_) {
++        return {false, "No sim"};
++    }
++    if (sim_->loadFile(path)) {
++        return {true, "Loaded from " + path};
++    }
++    return {false, "Load failed: " + path};
++}
+diff --git a/app/micropolis/micropolis_bridge.h b/app/micropolis/micropolis_bridge.h
+index 31193232126f96096cf91ed3da9de848b9d00124..0e8c4d0cb670689c9701c75c25eff4962b3c916c
+--- a/app/micropolis/micropolis_bridge.h
++++ b/app/micropolis/micropolis_bridge.h
+@@ -22,6 +22,11 @@
+     std::string message;
+ };
+ 
++struct CityIOResult {
++    bool ok;
++    std::string message;
++};
++
+ class MicropolisBridge {
+ public:
+     MicropolisBridge();
+@@ -37,6 +42,8 @@
+ 
+     MicropolisSnapshot snapshot() const;
+     ToolApplyResult apply_tool(int tool_id, int x, int y);
++    CityIOResult save_city(const std::string &path);
++    CityIOResult load_city(const std::string &path);
+     std::string render_ascii_excerpt(int x, int y, int width, int height) const;
+ 
+ private:
+diff --git a/app/micropolis_ascii_view.cpp b/app/micropolis_ascii_view.cpp
+index 30f19c02e1596c83b4376e15f0910b6bcb5990bf..228196b6fe1aac51c9869969630cc95cc98b819d
+--- a/app/micropolis_ascii_view.cpp
++++ b/app/micropolis_ascii_view.cpp
+@@ -6,6 +6,7 @@
+ #include <tvision/tv.h>
+ 
+ #include <algorithm>
++#include <cstdlib>
+ #include <sstream>
+ 
+ namespace {
+@@ -49,6 +50,12 @@
+ static const int kTicksPerFire[] = { 0, 1, 4, 16, 64 };
+ static const char* kSpeedNames[]  = { "||PAUSE", "1-SLOW", "2-MED", "3-FAST", "4-ULTRA" };
+ 
++std::string save_slot_path(int slot) {
++    if (slot < 1) slot = 1;
++    if (slot > 3) slot = 3;
++    return "saves/slot" + std::to_string(slot) + ".city";
++}
++
+ TColorAttr color_for_glyph(char ch, char zone_prefix = '\0') {
+     if ((ch == '1' || ch == '2' || ch == '3') &&
+         (zone_prefix == 'r' || zone_prefix == 'c' || zone_prefix == 'i')) {
+@@ -98,6 +105,7 @@
+     options |= ofSelectable;
+     eventMask |= evBroadcast;
+     bridge_.initialize_new_city(seed_, 2);
++    std::system("mkdir -p saves");
+ }
+ 
+ TMicropolisAsciiView::~TMicropolisAsciiView() {
+@@ -173,7 +181,8 @@
+         << "  R:" << (s.res_valve >= 0 ? "+" : "") << s.res_valve
+         << " C:" << (s.com_valve >= 0 ? "+" : "") << s.com_valve
+         << " I:" << (s.ind_valve >= 0 ? "+" : "") << s.ind_valve
+-        << "  [" << kSpeedNames[simSpeed_] << "] -/+";
++        << "  [" << kSpeedNames[simSpeed_] << "] -/+"
++        << "  Slot:" << saveSlot_ << "  F2:save F3:load";
+     std::string topLine = top.str();
+     if ((int)topLine.size() > size.x) topLine.resize(size.x);
+     b.moveChar(0, ' ', TColorAttr(0x70), size.x);
+@@ -279,6 +288,27 @@
+         // Apply tool
+         else if (key == kbEnter || ch == ' ') { applyActiveTool(); }
+ 
++        // Save/load slots
++        else if (key == kbF2) {
++            const auto result = bridge_.save_city(save_slot_path(saveSlot_));
++            lastResult_ = result.message;
++            lastResultTick_ = 25;
++        }
++        else if (key == kbF3) {
++            const auto result = bridge_.load_city(save_slot_path(saveSlot_));
++            lastResult_ = result.message;
++            lastResultTick_ = 25;
++            if (result.ok) {
++                camX_ = 0;
++                camY_ = 0;
++            }
++        }
++        else if (key == kbTab) {
++            saveSlot_ = (saveSlot_ % 3) + 1;
++            lastResult_ = "Slot " + std::to_string(saveSlot_);
++            lastResultTick_ = 25;
++        }
++
+         // Cancel / query mode
+         else if (key == kbEsc || ch == 'q') { activeTool_ = kToolQuery; lastResult_.clear(); lastResultTick_ = 0; }
+ 
+diff --git a/app/micropolis_ascii_view.h b/app/micropolis_ascii_view.h
+index 7b2c4e102e3be6e02e5a6df9c014ec8c8f478662..73a5a550d4883c43a0b134e6737081de8fa23adf
+--- a/app/micropolis_ascii_view.h
++++ b/app/micropolis_ascii_view.h
+@@ -22,6 +22,7 @@
+     std::string lastResult() const { return lastResult_; }
+     int lastResultTick() const { return lastResultTick_; }
+     int simSpeed() const { return simSpeed_; }
++    int saveSlot() const { return saveSlot_; }
+     MicropolisSnapshot snapshot() const { return bridge_.snapshot(); }
+ 
+ private:
+@@ -40,6 +41,7 @@
+     int curY_ {50};
+     int activeTool_ {5};      // TOOL_QUERY=5 — no engine header needed in view
+     int simSpeed_ {1};        // 0=pause 1=slow 2=medium 3=fast 4=ultra
++    int saveSlot_ {1};        // active save slot [1..3]
+     int seed_ {1337};
+     TTimerId timerId_ {0};
+     std::string lastResult_;
+diff --git a/app/micropolis_tool_palette.cpp b/app/micropolis_tool_palette.cpp
+index 31c199be95fdf7549ffd264e112826c4e366edb8..47695cc7b909f853f532bf70acf305cd3895e209
+--- a/app/micropolis_tool_palette.cpp
++++ b/app/micropolis_tool_palette.cpp
+@@ -112,6 +112,7 @@
+ void TMicropolisToolPalette::draw() {
+     const MicropolisSnapshot s = map_ ? map_->snapshot() : MicropolisSnapshot{};
+     const int activeTool = map_ ? map_->activeTool() : -1;
++    const int saveSlot = map_ ? map_->saveSlot() : 1;
+     const std::string result = map_ ? map_->lastResult() : std::string();
+     const int resultTick = map_ ? map_->lastResultTick() : 0;
+ 
+@@ -138,6 +139,19 @@
+         writeFilledLine(this, y++, TColorAttr(0x70), std::string());
+     }
+ 
++    const std::string footerLines[] = {
++        std::string("Slot: ") + std::to_string(saveSlot),
++        "F2 save",
++        "F3 load",
++        "Tab: slot",
++    };
++    for (const std::string &line : footerLines) {
++        if (y >= size.y) {
++            break;
++        }
++        writeFilledLine(this, y++, TColorAttr(0x08), fitLine(line, size.x));
++    }
++
+     for (; y < size.y; ++y) {
+         writeFilledLine(this, y, TColorAttr(0x07), std::string());
+     }
+
+
+thinking
+**Planning smoke test**
+exec
+/bin/zsh -lc 'ls saves/ 2>/dev/null || echo "saves/ dir not created yet (OK, created at runtime)"' in /Users/james/Repos/wibandwob-dos succeeded in 50ms:
+saves/ dir not created yet (OK, created at runtime)
+file update:
+diff --git a/app/micropolis/micropolis_bridge.cpp b/app/micropolis/micropolis_bridge.cpp
+index ba8d210dfa6ef276b06d2e1e159e3149484b65e4..d8241716c5fc7eeea66887484f9ae4a6fe274dd2
+--- a/app/micropolis/micropolis_bridge.cpp
++++ b/app/micropolis/micropolis_bridge.cpp
+@@ -265,3 +265,23 @@
+         default:                       return {0,  "?"};
+     }
+ }
++
++CityIOResult MicropolisBridge::save_city(const std::string &path) {
++    if (!sim_) {
++        return {false, "No sim"};
++    }
++    if (sim_->saveFile(path)) {
++        return {true, "Saved to " + path};
++    }
++    return {false, "Save failed: " + path};
++}
++
++CityIOResult MicropolisBridge::load_city(const std::string &path) {
++    if (!sim_) {
++        return {false, "No sim"};
++    }
++    if (sim_->loadFile(path)) {
++        return {true, "Loaded from " + path};
++    }
++    return {false, "Load failed: " + path};
++}
+diff --git a/app/micropolis/micropolis_bridge.h b/app/micropolis/micropolis_bridge.h
+index 31193232126f96096cf91ed3da9de848b9d00124..0e8c4d0cb670689c9701c75c25eff4962b3c916c
+--- a/app/micropolis/micropolis_bridge.h
++++ b/app/micropolis/micropolis_bridge.h
+@@ -22,6 +22,11 @@
+     std::string message;
+ };
+ 
++struct CityIOResult {
++    bool ok;
++    std::string message;
++};
++
+ class MicropolisBridge {
+ public:
+     MicropolisBridge();
+@@ -37,6 +42,8 @@
+ 
+     MicropolisSnapshot snapshot() const;
+     ToolApplyResult apply_tool(int tool_id, int x, int y);
++    CityIOResult save_city(const std::string &path);
++    CityIOResult load_city(const std::string &path);
+     std::string render_ascii_excerpt(int x, int y, int width, int height) const;
+ 
+ private:
+diff --git a/app/micropolis_ascii_view.cpp b/app/micropolis_ascii_view.cpp
+index 30f19c02e1596c83b4376e15f0910b6bcb5990bf..228196b6fe1aac51c9869969630cc95cc98b819d
+--- a/app/micropolis_ascii_view.cpp
++++ b/app/micropolis_ascii_view.cpp
+@@ -6,6 +6,7 @@
+ #include <tvision/tv.h>
+ 
+ #include <algorithm>
++#include <cstdlib>
+ #include <sstream>
+ 
+ namespace {
+@@ -49,6 +50,12 @@
+ static const int kTicksPerFire[] = { 0, 1, 4, 16, 64 };
+ static const char* kSpeedNames[]  = { "||PAUSE", "1-SLOW", "2-MED", "3-FAST", "4-ULTRA" };
+ 
++std::string save_slot_path(int slot) {
++    if (slot < 1) slot = 1;
++    if (slot > 3) slot = 3;
++    return "saves/slot" + std::to_string(slot) + ".city";
++}
++
+ TColorAttr color_for_glyph(char ch, char zone_prefix = '\0') {
+     if ((ch == '1' || ch == '2' || ch == '3') &&
+         (zone_prefix == 'r' || zone_prefix == 'c' || zone_prefix == 'i')) {
+@@ -98,6 +105,7 @@
+     options |= ofSelectable;
+     eventMask |= evBroadcast;
+     bridge_.initialize_new_city(seed_, 2);
++    std::system("mkdir -p saves");
+ }
+ 
+ TMicropolisAsciiView::~TMicropolisAsciiView() {
+@@ -173,7 +181,8 @@
+         << "  R:" << (s.res_valve >= 0 ? "+" : "") << s.res_valve
+         << " C:" << (s.com_valve >= 0 ? "+" : "") << s.com_valve
+         << " I:" << (s.ind_valve >= 0 ? "+" : "") << s.ind_valve
+-        << "  [" << kSpeedNames[simSpeed_] << "] -/+";
++        << "  [" << kSpeedNames[simSpeed_] << "] -/+"
++        << "  Slot:" << saveSlot_ << "  F2:save F3:load";
+     std::string topLine = top.str();
+     if ((int)topLine.size() > size.x) topLine.resize(size.x);
+     b.moveChar(0, ' ', TColorAttr(0x70), size.x);
+@@ -279,6 +288,27 @@
+         // Apply tool
+         else if (key == kbEnter || ch == ' ') { applyActiveTool(); }
+ 
++        // Save/load slots
++        else if (key == kbF2) {
++            const auto result = bridge_.save_city(save_slot_path(saveSlot_));
++            lastResult_ = result.message;
++            lastResultTick_ = 25;
++        }
++        else if (key == kbF3) {
++            const auto result = bridge_.load_city(save_slot_path(saveSlot_));
++            lastResult_ = result.message;
++            lastResultTick_ = 25;
++            if (result.ok) {
++                camX_ = 0;
++                camY_ = 0;
++            }
++        }
++        else if (key == kbTab) {
++            saveSlot_ = (saveSlot_ % 3) + 1;
++            lastResult_ = "Slot " + std::to_string(saveSlot_);
++            lastResultTick_ = 25;
++        }
++
+         // Cancel / query mode
+         else if (key == kbEsc || ch == 'q') { activeTool_ = kToolQuery; lastResult_.clear(); lastResultTick_ = 0; }
+ 
+diff --git a/app/micropolis_ascii_view.h b/app/micropolis_ascii_view.h
+index 7b2c4e102e3be6e02e5a6df9c014ec8c8f478662..73a5a550d4883c43a0b134e6737081de8fa23adf
+--- a/app/micropolis_ascii_view.h
++++ b/app/micropolis_ascii_view.h
+@@ -22,6 +22,7 @@
+     std::string lastResult() const { return lastResult_; }
+     int lastResultTick() const { return lastResultTick_; }
+     int simSpeed() const { return simSpeed_; }
++    int saveSlot() const { return saveSlot_; }
+     MicropolisSnapshot snapshot() const { return bridge_.snapshot(); }
+ 
+ private:
+@@ -40,6 +41,7 @@
+     int curY_ {50};
+     int activeTool_ {5};      // TOOL_QUERY=5 — no engine header needed in view
+     int simSpeed_ {1};        // 0=pause 1=slow 2=medium 3=fast 4=ultra
++    int saveSlot_ {1};        // active save slot [1..3]
+     int seed_ {1337};
+     TTimerId timerId_ {0};
+     std::string lastResult_;
+diff --git a/app/micropolis_tool_palette.cpp b/app/micropolis_tool_palette.cpp
+index 31c199be95fdf7549ffd264e112826c4e366edb8..47695cc7b909f853f532bf70acf305cd3895e209
+--- a/app/micropolis_tool_palette.cpp
++++ b/app/micropolis_tool_palette.cpp
+@@ -112,6 +112,7 @@
+ void TMicropolisToolPalette::draw() {
+     const MicropolisSnapshot s = map_ ? map_->snapshot() : MicropolisSnapshot{};
+     const int activeTool = map_ ? map_->activeTool() : -1;
++    const int saveSlot = map_ ? map_->saveSlot() : 1;
+     const std::string result = map_ ? map_->lastResult() : std::string();
+     const int resultTick = map_ ? map_->lastResultTick() : 0;
+ 
+@@ -138,6 +139,19 @@
+         writeFilledLine(this, y++, TColorAttr(0x70), std::string());
+     }
+ 
++    const std::string footerLines[] = {
++        std::string("Slot: ") + std::to_string(saveSlot),
++        "F2 save",
++        "F3 load",
++        "Tab: slot",
++    };
++    for (const std::string &line : footerLines) {
++        if (y >= size.y) {
++            break;
++        }
++        writeFilledLine(this, y++, TColorAttr(0x08), fitLine(line, size.x));
++    }
++
+     for (; y < size.y; ++y) {
+         writeFilledLine(this, y, TColorAttr(0x07), std::string());
+     }
+
+
+thinking
+**Confirming constructor execution and file changes**
+exec
+/bin/zsh -lc 'git status --short app/micropolis/micropolis_bridge.h app/micropolis/micropolis_bridge.cpp app/micropolis_ascii_view.h app/micropolis_ascii_view.cpp app/micropolis_tool_palette.h app/micropolis_tool_palette.cpp' in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+ M app/micropolis/micropolis_bridge.cpp
+ M app/micropolis/micropolis_bridge.h
+ M app/micropolis_ascii_view.cpp
+ M app/micropolis_ascii_view.h
+ M app/micropolis_tool_palette.cpp
+file update:
+diff --git a/app/micropolis/micropolis_bridge.cpp b/app/micropolis/micropolis_bridge.cpp
+index ba8d210dfa6ef276b06d2e1e159e3149484b65e4..d8241716c5fc7eeea66887484f9ae4a6fe274dd2
+--- a/app/micropolis/micropolis_bridge.cpp
++++ b/app/micropolis/micropolis_bridge.cpp
+@@ -265,3 +265,23 @@
+         default:                       return {0,  "?"};
+     }
+ }
++
++CityIOResult MicropolisBridge::save_city(const std::string &path) {
++    if (!sim_) {
++        return {false, "No sim"};
++    }
++    if (sim_->saveFile(path)) {
++        return {true, "Saved to " + path};
++    }
++    return {false, "Save failed: " + path};
++}
++
++CityIOResult MicropolisBridge::load_city(const std::string &path) {
++    if (!sim_) {
++        return {false, "No sim"};
++    }
++    if (sim_->loadFile(path)) {
++        return {true, "Loaded from " + path};
++    }
++    return {false, "Load failed: " + path};
++}
+diff --git a/app/micropolis/micropolis_bridge.h b/app/micropolis/micropolis_bridge.h
+index 31193232126f96096cf91ed3da9de848b9d00124..0e8c4d0cb670689c9701c75c25eff4962b3c916c
+--- a/app/micropolis/micropolis_bridge.h
++++ b/app/micropolis/micropolis_bridge.h
+@@ -22,6 +22,11 @@
+     std::string message;
+ };
+ 
++struct CityIOResult {
++    bool ok;
++    std::string message;
++};
++
+ class MicropolisBridge {
+ public:
+     MicropolisBridge();
+@@ -37,6 +42,8 @@
+ 
+     MicropolisSnapshot snapshot() const;
+     ToolApplyResult apply_tool(int tool_id, int x, int y);
++    CityIOResult save_city(const std::string &path);
++    CityIOResult load_city(const std::string &path);
+     std::string render_ascii_excerpt(int x, int y, int width, int height) const;
+ 
+ private:
+diff --git a/app/micropolis_ascii_view.cpp b/app/micropolis_ascii_view.cpp
+index 30f19c02e1596c83b4376e15f0910b6bcb5990bf..228196b6fe1aac51c9869969630cc95cc98b819d
+--- a/app/micropolis_ascii_view.cpp
++++ b/app/micropolis_ascii_view.cpp
+@@ -6,6 +6,7 @@
+ #include <tvision/tv.h>
+ 
+ #include <algorithm>
++#include <cstdlib>
+ #include <sstream>
+ 
+ namespace {
+@@ -49,6 +50,12 @@
+ static const int kTicksPerFire[] = { 0, 1, 4, 16, 64 };
+ static const char* kSpeedNames[]  = { "||PAUSE", "1-SLOW", "2-MED", "3-FAST", "4-ULTRA" };
+ 
++std::string save_slot_path(int slot) {
++    if (slot < 1) slot = 1;
++    if (slot > 3) slot = 3;
++    return "saves/slot" + std::to_string(slot) + ".city";
++}
++
+ TColorAttr color_for_glyph(char ch, char zone_prefix = '\0') {
+     if ((ch == '1' || ch == '2' || ch == '3') &&
+         (zone_prefix == 'r' || zone_prefix == 'c' || zone_prefix == 'i')) {
+@@ -98,6 +105,7 @@
+     options |= ofSelectable;
+     eventMask |= evBroadcast;
+     bridge_.initialize_new_city(seed_, 2);
++    std::system("mkdir -p saves");
+ }
+ 
+ TMicropolisAsciiView::~TMicropolisAsciiView() {
+@@ -173,7 +181,8 @@
+         << "  R:" << (s.res_valve >= 0 ? "+" : "") << s.res_valve
+         << " C:" << (s.com_valve >= 0 ? "+" : "") << s.com_valve
+         << " I:" << (s.ind_valve >= 0 ? "+" : "") << s.ind_valve
+-        << "  [" << kSpeedNames[simSpeed_] << "] -/+";
++        << "  [" << kSpeedNames[simSpeed_] << "] -/+"
++        << "  Slot:" << saveSlot_ << "  F2:save F3:load";
+     std::string topLine = top.str();
+     if ((int)topLine.size() > size.x) topLine.resize(size.x);
+     b.moveChar(0, ' ', TColorAttr(0x70), size.x);
+@@ -279,6 +288,27 @@
+         // Apply tool
+         else if (key == kbEnter || ch == ' ') { applyActiveTool(); }
+ 
++        // Save/load slots
++        else if (key == kbF2) {
++            const auto result = bridge_.save_city(save_slot_path(saveSlot_));
++            lastResult_ = result.message;
++            lastResultTick_ = 25;
++        }
++        else if (key == kbF3) {
++            const auto result = bridge_.load_city(save_slot_path(saveSlot_));
++            lastResult_ = result.message;
++            lastResultTick_ = 25;
++            if (result.ok) {
++                camX_ = 0;
++                camY_ = 0;
++            }
++        }
++        else if (key == kbTab) {
++            saveSlot_ = (saveSlot_ % 3) + 1;
++            lastResult_ = "Slot " + std::to_string(saveSlot_);
++            lastResultTick_ = 25;
++        }
++
+         // Cancel / query mode
+         else if (key == kbEsc || ch == 'q') { activeTool_ = kToolQuery; lastResult_.clear(); lastResultTick_ = 0; }
+ 
+diff --git a/app/micropolis_ascii_view.h b/app/micropolis_ascii_view.h
+index 7b2c4e102e3be6e02e5a6df9c014ec8c8f478662..73a5a550d4883c43a0b134e6737081de8fa23adf
+--- a/app/micropolis_ascii_view.h
++++ b/app/micropolis_ascii_view.h
+@@ -22,6 +22,7 @@
+     std::string lastResult() const { return lastResult_; }
+     int lastResultTick() const { return lastResultTick_; }
+     int simSpeed() const { return simSpeed_; }
++    int saveSlot() const { return saveSlot_; }
+     MicropolisSnapshot snapshot() const { return bridge_.snapshot(); }
+ 
+ private:
+@@ -40,6 +41,7 @@
+     int curY_ {50};
+     int activeTool_ {5};      // TOOL_QUERY=5 — no engine header needed in view
+     int simSpeed_ {1};        // 0=pause 1=slow 2=medium 3=fast 4=ultra
++    int saveSlot_ {1};        // active save slot [1..3]
+     int seed_ {1337};
+     TTimerId timerId_ {0};
+     std::string lastResult_;
+diff --git a/app/micropolis_tool_palette.cpp b/app/micropolis_tool_palette.cpp
+index 31c199be95fdf7549ffd264e112826c4e366edb8..47695cc7b909f853f532bf70acf305cd3895e209
+--- a/app/micropolis_tool_palette.cpp
++++ b/app/micropolis_tool_palette.cpp
+@@ -112,6 +112,7 @@
+ void TMicropolisToolPalette::draw() {
+     const MicropolisSnapshot s = map_ ? map_->snapshot() : MicropolisSnapshot{};
+     const int activeTool = map_ ? map_->activeTool() : -1;
++    const int saveSlot = map_ ? map_->saveSlot() : 1;
+     const std::string result = map_ ? map_->lastResult() : std::string();
+     const int resultTick = map_ ? map_->lastResultTick() : 0;
+ 
+@@ -138,6 +139,19 @@
+         writeFilledLine(this, y++, TColorAttr(0x70), std::string());
+     }
+ 
++    const std::string footerLines[] = {
++        std::string("Slot: ") + std::to_string(saveSlot),
++        "F2 save",
++        "F3 load",
++        "Tab: slot",
++    };
++    for (const std::string &line : footerLines) {
++        if (y >= size.y) {
++            break;
++        }
++        writeFilledLine(this, y++, TColorAttr(0x08), fitLine(line, size.x));
++    }
++
+     for (; y < size.y; ++y) {
+         writeFilledLine(this, y, TColorAttr(0x07), std::string());
+     }
+
+
+thinking
+**Finalizing concise summary and test results**
+codex
+Implemented the save/load port and TUI wiring in the requested files:
+
+- `app/micropolis/micropolis_bridge.h`: added `CityIOResult` plus `save_city(const std::string &path)` / `load_city(const std::string &path)`.
+- `app/micropolis/micropolis_bridge.cpp`: implemented both methods with `sim_` guard (`"No sim"`), engine passthrough to `saveFile`/`loadFile`, and user-facing messages (`Saved to ...`, `Loaded from ...`, `Save failed: ...`, `Load failed: ...`).
+- `app/micropolis_ascii_view.h`: added `saveSlot()` accessor and `saveSlot_ {1}` private state.
+- `app/micropolis_ascii_view.cpp`:
+  - added `std::system("mkdir -p saves");` in constructor after `initialize_new_city`.
+  - added slot-path helper for `saves/slot1.city`..`slot3.city`.
+  - added top HUD text: `Slot:N  F2:save F3:load`.
+  - keybindings: `F2` save current slot, `F3` load current slot (and on success `camX_=0; camY_=0;`), `Tab` cycles slot `1->2->3->1`; all update `lastResult_` / `lastResultTick_`.
+- `app/micropolis_tool_palette.cpp`: added footer hint rows in `TColorAttr(0x08)` showing slot and `F2/F3/Tab` controls using remaining rows.
+
+Validation run:
+- `cmake --build build --target test_pattern -j4`: passed.
+- `ctest --test-dir build --output-on-failure -R "micropolis_(determinism|no_ansi)"` run 3 times: `micropolis_no_ansi` passed `3/3`, `micropolis_determinism` passed `3/3` (meets requested thresholds).
+- `ls saves/ 2>/dev/null || echo ...`: reported runtime-not-created-yet message, which is expected until the view constructor runs.
+
+This port exposes existing engine city I/O through the bridge and wires it into the Micropolis TUI with 3 save slots, slot cycling, HUD/palette hints, and camera reset-on-load in the view as requested; open questions: none from implementation, unless you want different save/load status text wording in the HUD/palette feedback.
+file update:
+diff --git a/app/micropolis/micropolis_bridge.cpp b/app/micropolis/micropolis_bridge.cpp
+index ba8d210dfa6ef276b06d2e1e159e3149484b65e4..d8241716c5fc7eeea66887484f9ae4a6fe274dd2
+--- a/app/micropolis/micropolis_bridge.cpp
++++ b/app/micropolis/micropolis_bridge.cpp
+@@ -265,3 +265,23 @@
+         default:                       return {0,  "?"};
+     }
+ }
++
++CityIOResult MicropolisBridge::save_city(const std::string &path) {
++    if (!sim_) {
++        return {false, "No sim"};
++    }
++    if (sim_->saveFile(path)) {
++        return {true, "Saved to " + path};
++    }
++    return {false, "Save failed: " + path};
++}
++
++CityIOResult MicropolisBridge::load_city(const std::string &path) {
++    if (!sim_) {
++        return {false, "No sim"};
++    }
++    if (sim_->loadFile(path)) {
++        return {true, "Loaded from " + path};
++    }
++    return {false, "Load failed: " + path};
++}
+diff --git a/app/micropolis/micropolis_bridge.h b/app/micropolis/micropolis_bridge.h
+index 31193232126f96096cf91ed3da9de848b9d00124..0e8c4d0cb670689c9701c75c25eff4962b3c916c
+--- a/app/micropolis/micropolis_bridge.h
++++ b/app/micropolis/micropolis_bridge.h
+@@ -22,6 +22,11 @@
+     std::string message;
+ };
+ 
++struct CityIOResult {
++    bool ok;
++    std::string message;
++};
++
+ class MicropolisBridge {
+ public:
+     MicropolisBridge();
+@@ -37,6 +42,8 @@
+ 
+     MicropolisSnapshot snapshot() const;
+     ToolApplyResult apply_tool(int tool_id, int x, int y);
++    CityIOResult save_city(const std::string &path);
++    CityIOResult load_city(const std::string &path);
+     std::string render_ascii_excerpt(int x, int y, int width, int height) const;
+ 
+ private:
+diff --git a/app/micropolis_ascii_view.cpp b/app/micropolis_ascii_view.cpp
+index 30f19c02e1596c83b4376e15f0910b6bcb5990bf..228196b6fe1aac51c9869969630cc95cc98b819d
+--- a/app/micropolis_ascii_view.cpp
++++ b/app/micropolis_ascii_view.cpp
+@@ -6,6 +6,7 @@
+ #include <tvision/tv.h>
+ 
+ #include <algorithm>
++#include <cstdlib>
+ #include <sstream>
+ 
+ namespace {
+@@ -49,6 +50,12 @@
+ static const int kTicksPerFire[] = { 0, 1, 4, 16, 64 };
+ static const char* kSpeedNames[]  = { "||PAUSE", "1-SLOW", "2-MED", "3-FAST", "4-ULTRA" };
+ 
++std::string save_slot_path(int slot) {
++    if (slot < 1) slot = 1;
++    if (slot > 3) slot = 3;
++    return "saves/slot" + std::to_string(slot) + ".city";
++}
++
+ TColorAttr color_for_glyph(char ch, char zone_prefix = '\0') {
+     if ((ch == '1' || ch == '2' || ch == '3') &&
+         (zone_prefix == 'r' || zone_prefix == 'c' || zone_prefix == 'i')) {
+@@ -98,6 +105,7 @@
+     options |= ofSelectable;
+     eventMask |= evBroadcast;
+     bridge_.initialize_new_city(seed_, 2);
++    std::system("mkdir -p saves");
+ }
+ 
+ TMicropolisAsciiView::~TMicropolisAsciiView() {
+@@ -173,7 +181,8 @@
+         << "  R:" << (s.res_valve >= 0 ? "+" : "") << s.res_valve
+         << " C:" << (s.com_valve >= 0 ? "+" : "") << s.com_valve
+         << " I:" << (s.ind_valve >= 0 ? "+" : "") << s.ind_valve
+-        << "  [" << kSpeedNames[simSpeed_] << "] -/+";
++        << "  [" << kSpeedNames[simSpeed_] << "] -/+"
++        << "  Slot:" << saveSlot_ << "  F2:save F3:load";
+     std::string topLine = top.str();
+     if ((int)topLine.size() > size.x) topLine.resize(size.x);
+     b.moveChar(0, ' ', TColorAttr(0x70), size.x);
+@@ -279,6 +288,27 @@
+         // Apply tool
+         else if (key == kbEnter || ch == ' ') { applyActiveTool(); }
+ 
++        // Save/load slots
++        else if (key == kbF2) {
++            const auto result = bridge_.save_city(save_slot_path(saveSlot_));
++            lastResult_ = result.message;
++            lastResultTick_ = 25;
++        }
++        else if (key == kbF3) {
++            const auto result = bridge_.load_city(save_slot_path(saveSlot_));
++            lastResult_ = result.message;
++            lastResultTick_ = 25;
++            if (result.ok) {
++                camX_ = 0;
++                camY_ = 0;
++            }
++        }
++        else if (key == kbTab) {
++            saveSlot_ = (saveSlot_ % 3) + 1;
++            lastResult_ = "Slot " + std::to_string(saveSlot_);
++            lastResultTick_ = 25;
++        }
++
+         // Cancel / query mode
+         else if (key == kbEsc || ch == 'q') { activeTool_ = kToolQuery; lastResult_.clear(); lastResultTick_ = 0; }
+ 
+diff --git a/app/micropolis_ascii_view.h b/app/micropolis_ascii_view.h
+index 7b2c4e102e3be6e02e5a6df9c014ec8c8f478662..73a5a550d4883c43a0b134e6737081de8fa23adf
+--- a/app/micropolis_ascii_view.h
++++ b/app/micropolis_ascii_view.h
+@@ -22,6 +22,7 @@
+     std::string lastResult() const { return lastResult_; }
+     int lastResultTick() const { return lastResultTick_; }
+     int simSpeed() const { return simSpeed_; }
++    int saveSlot() const { return saveSlot_; }
+     MicropolisSnapshot snapshot() const { return bridge_.snapshot(); }
+ 
+ private:
+@@ -40,6 +41,7 @@
+     int curY_ {50};
+     int activeTool_ {5};      // TOOL_QUERY=5 — no engine header needed in view
+     int simSpeed_ {1};        // 0=pause 1=slow 2=medium 3=fast 4=ultra
++    int saveSlot_ {1};        // active save slot [1..3]
+     int seed_ {1337};
+     TTimerId timerId_ {0};
+     std::string lastResult_;
+diff --git a/app/micropolis_tool_palette.cpp b/app/micropolis_tool_palette.cpp
+index 31c199be95fdf7549ffd264e112826c4e366edb8..47695cc7b909f853f532bf70acf305cd3895e209
+--- a/app/micropolis_tool_palette.cpp
++++ b/app/micropolis_tool_palette.cpp
+@@ -112,6 +112,7 @@
+ void TMicropolisToolPalette::draw() {
+     const MicropolisSnapshot s = map_ ? map_->snapshot() : MicropolisSnapshot{};
+     const int activeTool = map_ ? map_->activeTool() : -1;
++    const int saveSlot = map_ ? map_->saveSlot() : 1;
+     const std::string result = map_ ? map_->lastResult() : std::string();
+     const int resultTick = map_ ? map_->lastResultTick() : 0;
+ 
+@@ -138,6 +139,19 @@
+         writeFilledLine(this, y++, TColorAttr(0x70), std::string());
+     }
+ 
++    const std::string footerLines[] = {
++        std::string("Slot: ") + std::to_string(saveSlot),
++        "F2 save",
++        "F3 load",
++        "Tab: slot",
++    };
++    for (const std::string &line : footerLines) {
++        if (y >= size.y) {
++            break;
++        }
++        writeFilledLine(this, y++, TColorAttr(0x08), fitLine(line, size.x));
++    }
++
+     for (; y < size.y; ++y) {
+         writeFilledLine(this, y, TColorAttr(0x07), std::string());
+     }
+
+tokens used
+55,307
+Implemented the save/load port and TUI wiring in the requested files:
+
+- `app/micropolis/micropolis_bridge.h`: added `CityIOResult` plus `save_city(const std::string &path)` / `load_city(const std::string &path)`.
+- `app/micropolis/micropolis_bridge.cpp`: implemented both methods with `sim_` guard (`"No sim"`), engine passthrough to `saveFile`/`loadFile`, and user-facing messages (`Saved to ...`, `Loaded from ...`, `Save failed: ...`, `Load failed: ...`).
+- `app/micropolis_ascii_view.h`: added `saveSlot()` accessor and `saveSlot_ {1}` private state.
+- `app/micropolis_ascii_view.cpp`:
+  - added `std::system("mkdir -p saves");` in constructor after `initialize_new_city`.
+  - added slot-path helper for `saves/slot1.city`..`slot3.city`.
+  - added top HUD text: `Slot:N  F2:save F3:load`.
+  - keybindings: `F2` save current slot, `F3` load current slot (and on success `camX_=0; camY_=0;`), `Tab` cycles slot `1->2->3->1`; all update `lastResult_` / `lastResultTick_`.
+- `app/micropolis_tool_palette.cpp`: added footer hint rows in `TColorAttr(0x08)` showing slot and `F2/F3/Tab` controls using remaining rows.
+
+Validation run:
+- `cmake --build build --target test_pattern -j4`: passed.
+- `ctest --test-dir build --output-on-failure -R "micropolis_(determinism|no_ansi)"` run 3 times: `micropolis_no_ansi` passed `3/3`, `micropolis_determinism` passed `3/3` (meets requested thresholds).
+- `ls saves/ 2>/dev/null || echo ...`: reported runtime-not-created-yet message, which is expected until the view constructor runs.
+
+This port exposes existing engine city I/O through the bridge and wires it into the Micropolis TUI with 3 save slots, slot cycling, HUD/palette hints, and camera reset-on-load in the view as requested; open questions: none from implementation, unless you want different save/load status text wording in the HUD/palette feedback.

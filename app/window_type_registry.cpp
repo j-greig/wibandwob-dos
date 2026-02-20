@@ -24,6 +24,7 @@
 #include "wibwob_view.h"
 #include "scramble_view.h"
 #include "paint/paint_window.h"
+#include "micropolis_ascii_view.h"
 
 // tvision for TRect
 #define Uses_TRect
@@ -56,6 +57,7 @@ extern void api_spawn_monster_cam(TTestPatternApp&, const TRect*);
 extern void api_spawn_monster_verse(TTestPatternApp&, const TRect*);
 extern void api_spawn_monster_portal(TTestPatternApp&, const TRect*);
 extern void api_spawn_paint(TTestPatternApp&, const TRect*);
+extern void api_spawn_micropolis_ascii(TTestPatternApp&, const TRect*);
 
 // ── Bounds helper ─────────────────────────────────────────────────────────────
 
@@ -180,6 +182,11 @@ static const char* spawn_paint(TTestPatternApp& app,
     TRect r; api_spawn_paint(app, opt_bounds(kv, r)); return nullptr;
 }
 
+static const char* spawn_micropolis_ascii(TTestPatternApp& app,
+                                           const std::map<std::string, std::string>& kv) {
+    TRect r; api_spawn_micropolis_ascii(app, opt_bounds(kv, r)); return nullptr;
+}
+
 template <typename ViewType>
 static bool has_child_view(TWindow* w) {
     if (!w) return false;
@@ -218,6 +225,7 @@ static bool match_monster_cam(TWindow* w) { return has_child_view<TGenerativeMon
 static bool match_monster_verse(TWindow* w) { return has_child_view<TGenerativeMonsterVerseView>(w); }
 static bool match_monster_portal(TWindow* w) { return has_child_view<TGenerativeMonsterPortalView>(w); }
 static bool match_paint(TWindow* w) { return dynamic_cast<TPaintWindow*>(w) != nullptr; }
+static bool match_micropolis_ascii(TWindow* w) { return has_child_view<TMicropolisAsciiView>(w); }
 static bool match_wibwob(TWindow* w) { return dynamic_cast<TWibWobWindow*>(w) != nullptr; }
 static bool match_scramble(TWindow* w) { return dynamic_cast<TScrambleWindow*>(w) != nullptr; }
 
@@ -245,6 +253,7 @@ static const WindowTypeSpec k_specs[] = {
     { "monster_verse",     spawn_monster_verse,     match_monster_verse     },
     { "monster_portal",    spawn_monster_portal,    match_monster_portal    },
     { "paint",             spawn_paint,             match_paint             },
+    { "micropolis_ascii",  spawn_micropolis_ascii,  match_micropolis_ascii  },
     // Internal-only types — recognised but not spawnable via IPC
     { "wibwob",            nullptr,                match_wibwob             },
     { "scramble",          nullptr,                match_scramble           },

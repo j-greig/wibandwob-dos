@@ -1,0 +1,23 @@
+OpenAI Codex v0.104.0 (research preview)
+--------
+workdir: /Users/james/Repos/wibandwob-dos
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: medium
+reasoning summaries: auto
+session id: 019c7ad3-e9ff-7bc0-8da9-fd31b08ed097
+--------
+user
+Who made you? Give a brief answer.
+mcp: fastmcp starting
+mcp: chrome-devtools starting
+mcp: fastmcp ready
+mcp: chrome-devtools ready
+mcp startup: ready: fastmcp, chrome-devtools
+codex
+I’m made by OpenAI.
+tokens used
+9,549
+I’m made by OpenAI.
