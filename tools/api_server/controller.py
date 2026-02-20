@@ -184,6 +184,8 @@ class Controller:
         # Try forwarding to the live app via IPC (best-effort)
         try:
             cmd_params = {"type": wtype.value}
+            if title:
+                cmd_params["title"] = title
             
             # Add positioning parameters if rect is provided
             if rect:
