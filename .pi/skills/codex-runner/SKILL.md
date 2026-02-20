@@ -1,7 +1,7 @@
 ---
 name: codex-runner
-description: Delegate analysis, debugging, code review, or multi-file implementation to the OpenAI Codex CLI as a background subagent. Read-only mode for investigation; workspace-write for edits. Unattended-safe with reliable log capture. Use when a task spans many files, needs a second opinion, or benefits from a separate agent pass.
-compatibility: Requires openai-codex CLI installed and authenticated (`codex --version` should work). Bash 3.2+. Git optional but recommended for repo-root detection.
+description: Use when delegating a task to the OpenAI Codex CLI as a background subagent. Best for multi-file debugging, root-cause analysis, cross-file refactors, code review, feature implementation, or architecture review — especially when stuck after 2+ fix attempts or when a fresh agent with isolated context would help.
+compatibility: Requires openai-codex CLI installed and authenticated (`codex --version` should work). Bash 3.2+. Git optional but recommended for repo-root detection. Note: compatibility and metadata fields are pi/Agent Skills spec extensions — silently ignored by Claude Code and other Anthropic-spec-only harnesses.
 metadata:
   CODEX_LOG_DIR: "override log output directory (default: <repo-root>/.codex-logs)"
   CODEX_REPO: "override working directory passed to codex (default: git repo root or $PWD)"
