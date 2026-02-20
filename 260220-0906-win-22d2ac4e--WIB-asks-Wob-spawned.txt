@@ -1,9 +1,0 @@
-╔═══════════════════════════╗
-║   WIB asks Wob:           ║
-║   "what is the speed      ║
-║    of smell?"             ║
-║                           ║
-║   Wob: ...calculating...  ║
-║   ...brl'zzzt...         ║
-║   Wib: nevermind, I left  ║
-╚═══════════════════════════╝
