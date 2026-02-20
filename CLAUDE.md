@@ -138,6 +138,20 @@ Use this kickoff prompt for any ANSI/image rendering task:
 
 Content packs in `modules/` (public, shipped) and `modules-private/` (user content, gitignored). Each module has a `module.json` manifest. Types: content, prompt, view, tool. See `modules/README.md`.
 
+### WibWobCity (Micropolis ASCII city-builder)
+
+An in-engine city-builder built on the open-source Micropolis (SimCity) engine.
+**Full gameplay reference — controls, glyphs, code map, tests:** `docs/wibwobcity-gameplay.md`
+
+Key files:
+- `app/micropolis_ascii_view.h/.cpp` — `TMicropolisAsciiView`: cursor, camera, tool select, HUD, draw
+- `app/micropolis/micropolis_bridge.h/.cpp` — thin C++ wrapper over Micropolis engine: tick, apply_tool, snapshot, glyphs
+- `app/micropolis/compat/emscripten.h` — shim allowing native build of MicropolisCore
+- `vendor/MicropolisCore/` — upstream engine (git submodule)
+- `.pi/skills/micropolis-engine/SKILL.md` — engine archaeology: tile ranges, zone tier formulae, tool API
+
+Opened via `open_micropolis_ascii` command. Guardrail: no raw ANSI bytes in any `TDrawBuffer` write — `micropolis_no_ansi` test must stay green.
+
 ## Key Configuration Files
 
 | File | Purpose |
