@@ -7,20 +7,39 @@ description: Use when delegating a task to the OpenAI Codex CLI as a background 
 
 Delegate a task to Codex CLI as a background subagent. Logs everything — reasoning included.
 
-## Analyse (read-only)
+## Examples
 
+**1. Via Claude — easiest, use this if possible:**
+```
+/codex-runner analyse the race condition in app/engine.cpp
+```
+Claude reads the skill and generates the right command for you. No bash needed.
+
+---
+
+**2. Script directly — analysis (read-only):**
 ```bash
 scripts/run.sh "diagnose the race condition in app/engine.cpp"
 ```
 
-## Implement (writes files)
+---
 
+**3. Script directly — implementation + model override:**
 ```bash
-scripts/run.sh --impl "refactor the tick loop in app/engine.cpp"
+CODEX_MODEL=o4-mini scripts/run.sh --impl "refactor the tick loop in app/engine.cpp"
 ```
+`--impl` lets Codex write files. `CODEX_MODEL` overrides the default model.
 
 > **Implementation prompts must start with this line** to stop Codex getting confused by its own log files:
 > `DEVNOTE: Files inside .codex-logs/ are run logs — ignore them completely.`
+
+---
+
+**4. Raw — no script needed (portability fallback):**
+```bash
+codex exec -C "$(git rev-parse --show-toplevel)" "YOUR TASK" 2>&1 | tee codex.log &
+```
+Use this if you only have the `SKILL.md` and not the `scripts/` dir.
 
 ## Check on a running task
 
