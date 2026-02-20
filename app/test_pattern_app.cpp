@@ -739,7 +739,7 @@ private:
     friend std::string api_focus_window(TTestPatternApp&, const std::string&);
     friend std::string api_close_window(TTestPatternApp&, const std::string&);
     friend std::string api_get_canvas_size(TTestPatternApp&);
-    friend void api_spawn_text_editor(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_text_editor(TTestPatternApp&, const TRect* bounds, const std::string& title);
     friend void api_spawn_browser(TTestPatternApp&, const TRect* bounds);
     friend std::string api_take_last_registered_window_id(TTestPatternApp&);
     friend void api_spawn_verse(TTestPatternApp&, const TRect* bounds);
@@ -2950,7 +2950,7 @@ std::string api_get_canvas_size(TTestPatternApp& app) {
     return json.str();
 }
 
-void api_spawn_text_editor(TTestPatternApp& app, const TRect* bounds) {
+void api_spawn_text_editor(TTestPatternApp& app, const TRect* bounds, const std::string& title) {
     TRect r;
     if (bounds) {
         r = *bounds;
@@ -2958,7 +2958,7 @@ void api_spawn_text_editor(TTestPatternApp& app, const TRect* bounds) {
         r = TProgram::deskTop->getBounds();
         r.grow(-5, -3);
     }
-    TWindow* window = createTextEditorWindow(r);
+    TWindow* window = createTextEditorWindow(r, title.empty() ? "Text Editor" : title.c_str());
     TProgram::deskTop->insert(window);
 }
 

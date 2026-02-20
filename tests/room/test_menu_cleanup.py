@@ -8,6 +8,7 @@ from pathlib import Path
 
 APP_CPP = Path(__file__).resolve().parents[2] / "app" / "test_pattern_app.cpp"
 SCRAMBLE_H = Path(__file__).resolve().parents[2] / "app" / "scramble_view.h"
+WINDOW_REG_CPP = Path(__file__).resolve().parents[2] / "app" / "window_type_registry.cpp"
 
 
 def _parse_command_ids():
@@ -153,3 +154,13 @@ def test_text_editor_has_register_window():
     block = src[idx : idx + 300]
     assert "registerWindow(" in block, \
         "registerWindow() not called in cmTextEditor handler"
+
+
+def test_text_editor_create_window_title_is_forwarded():
+    """AC: create_window title propagates to text_editor window constructor."""
+    app_src = APP_CPP.read_text()
+    reg_src = WINDOW_REG_CPP.read_text()
+    assert "api_spawn_text_editor(TTestPatternApp& app, const TRect* bounds, const std::string& title)" in app_src
+    assert 'createTextEditorWindow(r, title.empty() ? "Text Editor" : title.c_str())' in app_src
+    assert 'const auto it = kv.find("title");' in reg_src
+    assert 'api_spawn_text_editor(app, opt_bounds(kv, r), title);' in reg_src
