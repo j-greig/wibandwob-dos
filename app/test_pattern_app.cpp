@@ -2265,7 +2265,8 @@ void api_close_all(TTestPatternApp& app) { app.closeAll(); }
 
 void api_set_pattern_mode(TTestPatternApp& app, const std::string& mode) {
     bool continuous = (mode == "continuous");
-    app.setPatternMode(continuous);
+    // Set the mode directly without showing a modal dialog (which blocks the event loop).
+    USE_CONTINUOUS_PATTERN = continuous;
 }
 
 void api_save_workspace(TTestPatternApp& app) { app.saveWorkspace(); }
