@@ -57,3 +57,4 @@ build-linux/
 build-asan/
 wibwob_crash.log
 *.crash.log
+saves/

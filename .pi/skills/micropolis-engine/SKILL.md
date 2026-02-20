@@ -61,10 +61,10 @@ POWERPLANT  = 750
 LASTZONE    = 826
 ```
 
-### Zone development tiers (TODO — needs archaeology)
-- Residential: FREEZ=244 is empty centre. Tiles above FREEZ grow with density.
+### Zone development tiers (resolved in Stage D)
+- Residential: FREEZ=244 is empty centre. `r.` glyph = empty, `r1`/`r2`/`r3` = low/mid/high.
+- Tier mapping via `glyph_pair_for_tile()` in `micropolis_bridge.cpp` — linear bucket over tile range.
 - `getResZonePop(tile)` on Micropolis returns zone pop for a res tile.
-- Tier buckets: TBD — see Stage D zone readability work.
 
 ## Tool API
 ```cpp
@@ -89,32 +89,40 @@ TOOL_WIRE=6, TOOL_BULLDOZER=7, TOOL_RAILROAD=8, TOOL_ROAD=9, ...
 bool initialize_new_city(int seed, short speed);
 void tick(int tick_count);
 std::uint16_t cell_at(int x, int y) const;
-std::uint16_t tile_at(int x, int y) const;      // = cell & LOMASK
+std::uint16_t tile_at(int x, int y) const;          // = cell & LOMASK
 char glyph_for_tile(std::uint16_t tile) const;
-MicropolisSnapshot snapshot() const;             // pop, score, valves, funds, time
-ToolApplyResult apply_tool(int tool_id, int x, int y);  // added Stage B
+std::string glyph_pair_for_tile(std::uint16_t) const; // 2-char wide tile glyph
+MicropolisSnapshot snapshot() const;                // pop, score, valves, funds, time
+ToolApplyResult apply_tool(int tool_id, int x, int y);
+CityIOResult save_city(const std::string &path);    // wraps sim_->saveFile()
+CityIOResult load_city(const std::string &path);    // wraps sim_->loadFile()
 ```
 
-## View key bindings (SPK04)
+## View key bindings (current)
 ```
-1=Query 2=Bulldoze 3=Road 4=Wire 5=Res 6=Com 7=Ind
-Arrows = move cursor (world coords); camera auto-pans at edge
-Enter/Space = apply active tool
-Esc/q = back to Query
-PgUp/PgDn = scroll camera 8 rows
-Home = camera to 0,0
+Tools:  1=Query 2=Bulldoze 3=Road 4=Wire 5=Res 6=Com 7=Ind 8=CoalPwr 9=NucPwr
+Cursor: Arrows=move  PgUp/PgDn=±8rows  Home=recenter(60,50)
+Place:  Enter/Space=apply  Esc/q=cancel→Query
+Speed:  p=pause/resume  -=slower  +=faster  (PAUSE/SLOW/MED/FAST/ULTRA)
+Save:   F2=save  F3=load  Tab=cycle slot(1-3)  → saves/slotN.city
 ```
+
+## Full controls reference
+`docs/wibwobcity-gameplay.md`
 
 ## Guardrails
 - NEVER write raw ANSI bytes (`\x1b[`) into a TDrawBuffer — use `putChar`/`putAttribute`/`moveStr`
 - `micropolis_determinism` and `micropolis_no_ansi` tests must stay green
 - Feature stays behind `open_micropolis_ascii` command
 
-## TODO / open questions
-- [ ] Zone tier bucket boundaries for Stage D glyph mapping
-- [ ] `totalFunds` field: add to MicropolisSnapshot (it's `sim_->totalFunds`, a Quad/long)
-- [ ] Workspace round-trip pattern (Stage E) — see window_type_registry.cpp
-- [ ] Threading: is `simTick()` safe to call from TV timer callback thread?
+## Open questions / SPK05 work
+- [ ] Workspace round-trip (Stage E) — register `micropolis_ascii` in window_type_registry, persist seed/speed/cam
+- [ ] Game events panel (Stage F) — tap `ConsoleCallback::sendMessage` into a ring buffer, surface as scrolling log
+- [ ] Debug overlay (Stage G) — `d` key shows tile ID, power status, land value at cursor
+- [ ] Budget panel (Stage H) — `F4` shows tax/maintenance breakdown
+- [ ] Threading: `tick()` called from TV timer callback — no issues seen, but worth noting
+- [ ] Fire/police station full tile footprint ranges (currently just centre glyph `F`/`P`)
+- [ ] `COMBASE`/`INDBASE` vs `COMCLR`/`INDCLR` distinction for empty zone centres
 
 ## Codex notes (2026-02-20, append-only)
 - Current city generation is deterministic in MVP: `seed_` defaults to `1337` in `TMicropolisAsciiView`, and window init calls `initialize_new_city(seed_, 2)`.
