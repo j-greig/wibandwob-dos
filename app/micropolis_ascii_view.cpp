@@ -44,6 +44,11 @@ static const char* kMonthNames[] = {
     "Jul","Aug","Sep","Oct","Nov","Dec"
 };
 
+// Speed levels: index = simSpeed_ value (0-4)
+// Ticks fired per 120ms timer pulse
+static const int kTicksPerFire[] = { 0, 1, 4, 16, 64 };
+static const char* kSpeedNames[]  = { "||PAUSE", "1-SLOW", "2-MED", "3-FAST", "4-ULTRA" };
+
 TColorAttr color_for_glyph(char ch, char zone_prefix = '\0') {
     if ((ch == '1' || ch == '2' || ch == '3') &&
         (zone_prefix == 'r' || zone_prefix == 'c' || zone_prefix == 'i')) {
@@ -146,7 +151,8 @@ void TMicropolisAsciiView::applyActiveTool() {
 }
 
 void TMicropolisAsciiView::advanceSim() {
-    bridge_.tick(1);
+    const int ticks = kTicksPerFire[simSpeed_];
+    if (ticks > 0) bridge_.tick(ticks);
     if (lastResultTick_ > 0) --lastResultTick_;
 }
 
@@ -166,7 +172,8 @@ void TMicropolisAsciiView::draw() {
         << "  Score:" << s.city_score
         << "  R:" << (s.res_valve >= 0 ? "+" : "") << s.res_valve
         << " C:" << (s.com_valve >= 0 ? "+" : "") << s.com_valve
-        << " I:" << (s.ind_valve >= 0 ? "+" : "") << s.ind_valve;
+        << " I:" << (s.ind_valve >= 0 ? "+" : "") << s.ind_valve
+        << "  [" << kSpeedNames[simSpeed_] << "] -/+";
     std::string topLine = top.str();
     if ((int)topLine.size() > size.x) topLine.resize(size.x);
     b.moveChar(0, ' ', TColorAttr(0x70), size.x);
@@ -263,6 +270,11 @@ void TMicropolisAsciiView::handleEvent(TEvent &ev) {
         else if (ch == '7') { activeTool_ = kToolInd; }
         else if (ch == '8') { activeTool_ = kToolCoalPower; }
         else if (ch == '9') { activeTool_ = kToolNucPower; }
+
+        // Speed controls
+        else if (ch == 'p' || ch == 'P') { simSpeed_ = (simSpeed_ == 0) ? 1 : 0; }
+        else if (ch == '-' || ch == '_') { if (simSpeed_ > 0) --simSpeed_; }
+        else if (ch == '+' || ch == '=') { if (simSpeed_ < 4) ++simSpeed_; }
 
         // Apply tool
         else if (key == kbEnter || ch == ' ') { applyActiveTool(); }
