@@ -1,7 +1,7 @@
 ---
 title: WibWobCity — Gameplay Reference
 status: active
-last-updated: 2026-02-20
+last-updated: 2026-02-20 (speed + save/load added)
 ---
 
 # WibWobCity
@@ -42,10 +42,31 @@ Camera auto-pans when the cursor comes within 2 tiles of any viewport edge.
 
 Result feedback appears briefly in the bottom bar: `OK`, `No funds`, `Bulldoze first`, `Failed`.
 
+### Speed
+
+| Key | Action |
+|-----|--------|
+| `p` | Pause / resume |
+| `-` | Slower |
+| `+` or `=` | Faster |
+
+Speeds: `PAUSE` → `1-SLOW` (1 tick) → `2-MED` (4t) → `3-FAST` (16t) → `4-ULTRA` (64t per 120ms pulse). Current speed shown in top bar.
+
+### Save / Load
+
+| Key | Action |
+|-----|--------|
+| `F2` | Save city to current slot |
+| `F3` | Load city from current slot |
+| `Tab` | Cycle save slot (1 → 2 → 3) |
+
+Files: `saves/slot1.city`, `saves/slot2.city`, `saves/slot3.city` — standard SimCity binary format, compatible with other Micropolis ports.
+
 ### HUD
 
-- **Top bar** — `$<funds>  <Month> <Year>  Pop:<n>  Score:<n>  R:<±n> C:<±n> I:<±n>`
+- **Top bar** — `$<funds>  <Month> <Year>  Pop:<n>  Score:<n>  R:<±n> C:<±n> I:<±n>  [2-MED] -/+  Slot:1  F2:save F3:load`
 - **Bottom bar** — active tool + key hints + last result flash
+- **Right palette** — SimCity-style tool panel: funds/date/pop, tool list with costs, save slot hints
 
 ## Tile glyph legend
 
