@@ -36,6 +36,7 @@ docker compose logs wibwobdos         # startup log
 - [Cross-platform C++ build guide](references/cross-platform-cpp.md) — Linux deps, transitive include gotchas, CMake linking
 - [Docker operations](references/docker-ops.md) — startup sequence, SIGWINCH fix, troubleshooting table
 - [Screenshot workflows](references/screenshots.md) — piping patterns, formats, full open-windows-and-capture workflow
+- [Integrating vendor views](references/integrating-vendor-views.md) — 14-surface checklist, CMake gotchas, tvterm lessons learned
 
 ## Key files
 

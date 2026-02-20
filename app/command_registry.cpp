@@ -23,6 +23,7 @@ class TRect;
 extern void api_spawn_paint(TTestPatternApp& app, const TRect* bounds);
 extern void api_spawn_micropolis_ascii(TTestPatternApp& app, const TRect* bounds);
 extern void api_spawn_terminal(TTestPatternApp& app, const TRect* bounds);
+extern std::string api_terminal_write(TTestPatternApp& app, const std::string& text);
 
 const std::vector<CommandCapability>& get_command_capabilities() {
     static const std::vector<CommandCapability> capabilities = {
@@ -43,6 +44,7 @@ const std::vector<CommandCapability>& get_command_capabilities() {
         {"new_paint_canvas", "Open a new paint canvas window", false},
         {"open_micropolis_ascii", "Open Micropolis ASCII MVP window", false},
         {"open_terminal", "Open a terminal emulator window", false},
+        {"terminal_write", "Send text input to the terminal emulator (requires text param)", true},
         {"chat_receive", "Display a remote chat message in Scramble (sender + text params)", true},
     };
     return capabilities;
@@ -161,6 +163,12 @@ std::string exec_registry_command(
     if (name == "open_terminal") {
         api_spawn_terminal(app, nullptr);
         return "ok";
+    }
+    if (name == "terminal_write") {
+        auto it = kv.find("text");
+        if (it == kv.end() || it->second.empty())
+            return "err missing text";
+        return api_terminal_write(app, it->second);
     }
     if (name == "chat_receive") {
         auto itSender = kv.find("sender");

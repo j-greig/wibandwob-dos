@@ -9,6 +9,8 @@
 #include <tvterm/termwnd.h>
 #include <tvterm/consts.h>
 
+#include <string>
+
 class TWibWobTerminalWindow : public tvterm::BasicTerminalWindow
 {
 public:
@@ -18,6 +20,10 @@ public:
 
     void handleEvent(TEvent &ev) override;
     void sizeLimits(TPoint &min, TPoint &max) override;
+
+    // Send text as keyboard input to this terminal.
+    // Each byte is injected as a KeyDown event through the terminal controller.
+    void sendText(const std::string &text);
 
 private:
     using Super = tvterm::BasicTerminalWindow;

@@ -763,6 +763,7 @@ private:
     friend void api_spawn_monster_portal(TTestPatternApp&, const TRect* bounds);
     friend void api_spawn_micropolis_ascii(TTestPatternApp&, const TRect* bounds);
     friend void api_spawn_terminal(TTestPatternApp&, const TRect* bounds);
+    friend std::string api_terminal_write(TTestPatternApp&, const std::string& text);
     friend void api_spawn_paint(TTestPatternApp&, const TRect* bounds);
     friend TPaintCanvasView* api_find_paint_canvas(TTestPatternApp&, const std::string&);
     friend std::string api_browser_fetch(TTestPatternApp&, const std::string& url);
@@ -3269,6 +3270,25 @@ void api_spawn_terminal(TTestPatternApp& app, const TRect* bounds) {
         app.deskTop->insert(w);
         app.registerWindow(w);
     }
+}
+
+std::string api_terminal_write(TTestPatternApp& app, const std::string& text) {
+    // Find the most recently inserted terminal window
+    TView* start = app.deskTop->first();
+    TWibWobTerminalWindow* termWin = nullptr;
+    if (start) {
+        TView* v = start;
+        do {
+            if (auto *tw = dynamic_cast<TWibWobTerminalWindow*>(v)) {
+                termWin = tw;
+                break;
+            }
+            v = v->next;
+        } while (v != start);
+    }
+    if (!termWin) return "err no terminal window";
+    termWin->sendText(text);
+    return "ok";
 }
 
 std::string api_browser_fetch(TTestPatternApp& app, const std::string& url) {

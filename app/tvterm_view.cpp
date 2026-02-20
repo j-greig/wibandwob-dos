@@ -2,12 +2,15 @@
 #define Uses_TRect
 #define Uses_TPoint
 #define Uses_TWindow
+#define Uses_TKeys
 #define Uses_MsgBox
 #include <tvision/tv.h>
 
 #include "tvterm_view.h"
 #include <tvterm/termctrl.h>
+#include <tvterm/termview.h>
 #include <tvterm/vtermemu.h>
+#include <tvterm/termemu.h>
 
 // Command IDs for tvterm integration — must not collide with existing app commands.
 // These are wired through TVTermConstants so tvterm-core uses our IDs.
@@ -59,6 +62,38 @@ void TWibWobTerminalWindow::sizeLimits(TPoint &min, TPoint &max)
         max = owner->size;
         max.x += 2;
         max.y += 1;
+    }
+}
+
+void TWibWobTerminalWindow::sendText(const std::string &text)
+{
+    // Find the TerminalView child to access its controller.
+    tvterm::TerminalView *termView = nullptr;
+    TView *start = first();
+    if (start) {
+        TView *v = start;
+        do {
+            if (auto *tv = dynamic_cast<tvterm::TerminalView*>(v)) {
+                termView = tv;
+                break;
+            }
+            v = v->next;
+        } while (v != start);
+    }
+    if (!termView) return;
+
+    // Send each byte as a KeyDown event through the terminal controller.
+    for (unsigned char ch : text) {
+        tvterm::TerminalEvent termEvent;
+        termEvent.type = tvterm::TerminalEventType::KeyDown;
+        // Construct a minimal KeyDownEvent with the character.
+        memset(&termEvent.keyDown, 0, sizeof(termEvent.keyDown));
+        termEvent.keyDown.charScan.charCode = ch;
+        termEvent.keyDown.keyCode = ch;
+        // Set the text field directly (KeyDownEvent has no setText method).
+        termEvent.keyDown.text[0] = static_cast<char>(ch);
+        termEvent.keyDown.textLength = 1;
+        termView->termCtrl.sendEvent(termEvent);
     }
 }
 
