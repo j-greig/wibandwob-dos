@@ -10,3 +10,6 @@
 [submodule "vendor/MicropolisCore"]
 	path = vendor/MicropolisCore
 	url = https://github.com/SimHacker/MicropolisCore
+[submodule "vendor/tvterm"]
+	path = vendor/tvterm
+	url = https://github.com/magiblot/tvterm.git

@@ -86,6 +86,8 @@
 #include "paint/paint_window.h"
 // Micropolis ASCII MVP window
 #include "micropolis_ascii_view.h"
+// Terminal emulator window (tvterm)
+#include "tvterm_view.h"
 // Factory for ASCII grid demo window (implemented in ascii_grid_view.cpp).
 class TWindow; TWindow* createAsciiGridDemoWindow(const TRect &bounds);
 // #include "mech_window.h" // deferred feature; header not present yet
@@ -212,6 +214,7 @@ const ushort cmKeyboardShortcuts = 210;
 const ushort cmDebugInfo = 211;
 const ushort cmApiKeyHelp = 212;
 const ushort cmMicropolisAscii = 213;
+const ushort cmOpenTerminal = 214;
 
 // Glitch menu commands
 const ushort cmToggleGlitchMode = 140;
@@ -759,6 +762,7 @@ private:
     friend void api_spawn_monster_verse(TTestPatternApp&, const TRect* bounds);
     friend void api_spawn_monster_portal(TTestPatternApp&, const TRect* bounds);
     friend void api_spawn_micropolis_ascii(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_terminal(TTestPatternApp&, const TRect* bounds);
     friend void api_spawn_paint(TTestPatternApp&, const TRect* bounds);
     friend TPaintCanvasView* api_find_paint_canvas(TTestPatternApp&, const std::string&);
     friend std::string api_browser_fetch(TTestPatternApp&, const std::string& url);
@@ -1018,6 +1022,17 @@ void TTestPatternApp::handleEvent(TEvent& event)
                 TWindow* w = createMicropolisAsciiWindow(r);
                 deskTop->insert(w);
                 registerWindow(w);
+                clearEvent(event);
+                break;
+            }
+            case cmOpenTerminal: {
+                TRect r = deskTop->getExtent();
+                r.grow(-2, -1);
+                TWindow* w = createTerminalWindow(r);
+                if (w) {
+                    deskTop->insert(w);
+                    registerWindow(w);
+                }
                 clearEvent(event);
                 break;
             }
@@ -1983,6 +1998,7 @@ TMenuBar* TTestPatternApp::initMenuBar(TRect r)
         *new TSubMenu("~W~indow", kbAltW) +
             *new TMenuItem("~T~ext Editor", cmTextEditor, kbNoKey) +
             *new TMenuItem("~B~rowser", cmBrowser, kbCtrlB) +
+            *new TMenuItem("Te~r~minal", cmOpenTerminal, kbNoKey) +
             *new TMenuItem("~O~pen Text File (Transparent)...", cmOpenTransparentText, kbNoKey) +
             newLine() +
             *new TMenuItem("~C~ascade", cmCascade, kbNoKey) +
@@ -2155,7 +2171,8 @@ void TTestPatternApp::idle()
     //     }
     // }
 
-    // Idle: no default content window or wallpaper.
+    // Broadcast terminal update check so tvterm windows refresh
+    message(this, evBroadcast, TWibWobTerminalWindow::termConsts.cmCheckTerminalUpdates, nullptr);
 }
 
 int main()
@@ -3243,6 +3260,15 @@ void api_spawn_micropolis_ascii(TTestPatternApp& app, const TRect* bounds) {
     TWindow* w = createMicropolisAsciiWindow(r);
     app.deskTop->insert(w);
     app.registerWindow(w);
+}
+
+void api_spawn_terminal(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 80, 24);
+    TWindow* w = createTerminalWindow(r);
+    if (w) {
+        app.deskTop->insert(w);
+        app.registerWindow(w);
+    }
 }
 
 std::string api_browser_fetch(TTestPatternApp& app, const std::string& url) {

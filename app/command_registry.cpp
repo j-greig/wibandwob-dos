@@ -22,6 +22,7 @@ extern std::string api_reset_theme(TTestPatternApp& app);
 class TRect;
 extern void api_spawn_paint(TTestPatternApp& app, const TRect* bounds);
 extern void api_spawn_micropolis_ascii(TTestPatternApp& app, const TRect* bounds);
+extern void api_spawn_terminal(TTestPatternApp& app, const TRect* bounds);
 
 const std::vector<CommandCapability>& get_command_capabilities() {
     static const std::vector<CommandCapability> capabilities = {
@@ -41,6 +42,7 @@ const std::vector<CommandCapability>& get_command_capabilities() {
         {"scramble_pet", "Pet the cat. She allows it.", false},
         {"new_paint_canvas", "Open a new paint canvas window", false},
         {"open_micropolis_ascii", "Open Micropolis ASCII MVP window", false},
+        {"open_terminal", "Open a terminal emulator window", false},
         {"chat_receive", "Display a remote chat message in Scramble (sender + text params)", true},
     };
     return capabilities;
@@ -154,6 +156,10 @@ std::string exec_registry_command(
     }
     if (name == "open_micropolis_ascii") {
         api_spawn_micropolis_ascii(app, nullptr);
+        return "ok";
+    }
+    if (name == "open_terminal") {
+        api_spawn_terminal(app, nullptr);
         return "ok";
     }
     if (name == "chat_receive") {
