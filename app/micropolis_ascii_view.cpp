@@ -1,4 +1,5 @@
 #include "micropolis_ascii_view.h"
+#include "micropolis_tool_palette.h"
 
 #define Uses_TWindow
 #define Uses_TEvent
@@ -302,9 +303,18 @@ public:
 
     void setup() {
         options |= ofTileable;
-        TRect c = getExtent();
-        c.grow(-1, -1);
-        insert(new TMicropolisAsciiView(c));
+        TRect interior = getExtent();
+        interior.grow(-1, -1);
+        constexpr int kPaletteW = 16;
+        TRect mapRect = interior;
+        mapRect.b.x -= kPaletteW;
+        TRect palRect = interior;
+        palRect.a.x = interior.b.x - kPaletteW;
+
+        auto *mapView = new TMicropolisAsciiView(mapRect);
+        auto *palette = new TMicropolisToolPalette(palRect, mapView);
+        insert(mapView);
+        insert(palette);
     }
 };
 

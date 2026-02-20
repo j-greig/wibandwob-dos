@@ -18,6 +18,10 @@ public:
     virtual void draw() override;
     virtual void handleEvent(TEvent &ev) override;
     virtual void setState(ushort aState, Boolean enable) override;
+    int activeTool() const { return activeTool_; }
+    std::string lastResult() const { return lastResult_; }
+    int lastResultTick() const { return lastResultTick_; }
+    MicropolisSnapshot snapshot() const { return bridge_.snapshot(); }
 
 private:
     void startTimer();

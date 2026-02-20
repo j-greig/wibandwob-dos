@@ -26,9 +26,9 @@ scripts/run.sh "diagnose the race condition in app/engine.cpp"
 
 **3. Script directly — implementation + model override:**
 ```bash
-CODEX_MODEL=o4-mini scripts/run.sh --impl "refactor the tick loop in app/engine.cpp"
+CODEX_MODEL=gpt-5.3-codex scripts/run.sh --impl "refactor the tick loop in app/engine.cpp"
 ```
-`--impl` lets Codex write files. `CODEX_MODEL` overrides the default model.
+`--impl` lets Codex write files. Default model is `gpt-5.3-codex`; `CODEX_MODEL` overrides it.
 
 > **Implementation prompts must start with this line** to stop Codex getting confused by its own log files:
 > `DEVNOTE: Files inside .codex-logs/ are run logs — ignore them completely.`
@@ -39,7 +39,7 @@ CODEX_MODEL=o4-mini scripts/run.sh --impl "refactor the tick loop in app/engine.
 ```bash
 codex exec -C "$(git rev-parse --show-toplevel)" "YOUR TASK" 2>&1 | tee codex.log &
 ```
-Use this if you only have the `SKILL.md` and not the `scripts/` dir.
+Use this if as a direct approach that doesn't rely on your repo's scripts. You must specify the repo root with `-C` for correct relative paths.
 
 ## Check on a running task
 
@@ -54,7 +54,7 @@ Progress signals in the log: `thinking` = reasoning, `exec` = running commands, 
 ## Override defaults
 
 ```bash
-CODEX_MODEL=o4-mini scripts/run.sh "..."          # specific model
+CODEX_MODEL=gpt-5.3-codex scripts/run.sh "..."    # specific model override
 CODEX_LOG_DIR=~/logs scripts/run.sh "..."         # redirect logs
 CODEX_REPO=/other/repo scripts/run.sh "..."       # different repo
 ```

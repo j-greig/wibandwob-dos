@@ -9,7 +9,7 @@
 # Env var overrides (all optional):
 #   CODEX_LOG_DIR   where logs go (default: <repo-root>/.codex-logs)
 #   CODEX_REPO      repo codex operates in (default: git repo root or $PWD)
-#   CODEX_MODEL     model override, e.g. o4-mini (default: codex picks)
+#   CODEX_MODEL     model override, e.g. gpt-5.1-codex-mini (default: gpt-5.3-codex)
 
 set -uo pipefail
 
@@ -44,6 +44,7 @@ fi
 _REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || echo "$PWD")
 CODEX_REPO="${CODEX_REPO:-$_REPO_ROOT}"
 CODEX_LOG_DIR="${CODEX_LOG_DIR:-$_REPO_ROOT/.codex-logs}"
+CODEX_MODEL="${CODEX_MODEL:-gpt-5.3-codex}"
 
 # Auto-slug topic from prompt if not set
 if [[ -z "$TOPIC" ]]; then
@@ -54,8 +55,7 @@ LOG="$CODEX_LOG_DIR/$(date +%F)/codex-${TOPIC}-$(date +%Y%m%d-%H%M%S).log"
 mkdir -p "$(dirname "$LOG")"
 
 # Build codex command
-CMD=(codex)
-[[ -n "${CODEX_MODEL:-}" ]] && CMD+=(-m "$CODEX_MODEL")
+CMD=(codex -m "$CODEX_MODEL")
 if $IMPL; then
   CMD+=(-s workspace-write -a never)
 fi
