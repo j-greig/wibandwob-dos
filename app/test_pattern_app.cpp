@@ -2417,18 +2417,39 @@ std::string api_close_window(TTestPatternApp& app, const std::string& id) {
     TWindow* w = app.findWindowById(id);
     if (!w) return "{\"error\":\"Window not found\"}";
 
-    // Remove from registry
+    auto isWindowAlive = [&](TWindow* target) -> bool {
+        if (!target) return false;
+        TView* start = app.deskTop->first();
+        if (!start) return false;
+        TView* v = start;
+        do {
+            if (v == target) return true;
+            v = v->next;
+        } while (v != start);
+        return false;
+    };
+
+    // TWindow::close() can no-op when valid(cmClose) fails.
+    // For API semantics, ensure the target is actually removed.
+    w->close();
+    if (isWindowAlive(w)) {
+        if (w->owner)
+            w->owner->remove(w);
+        TObject::destroy(w);
+    }
+    if (isWindowAlive(w))
+        return "{\"error\":\"Close failed\"}";
+
+    // Remove from registry after successful removal.
     app.winToId.erase(w);
     app.idToWin.erase(id);
 
-    // Notify subscribers before closing
     if (app.ipcServer) {
         std::string payload = std::string("{\"id\":\"") + id + "\"}";
         app.ipcServer->publish_event("window_closed", payload);
+        app.ipcServer->publish_event("state_changed", payload);
     }
 
-    // Close the window
-    w->close();
     return "{\"success\":true}";
 }
 
