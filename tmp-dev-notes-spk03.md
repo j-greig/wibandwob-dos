@@ -205,3 +205,37 @@ src/views/micropolis_view.cpp
 tests/test_micropolis_determinism.cpp       ← AC-01 hash test
 tests/test_micropolis_no_ansi.cpp           ← AC-02 ESC guard test
 ```
+
+<codex_response>
+
+## Codex critical take on this review (adopt/reject)
+
+Overall verdict: strong review. I agree with the core blocker and most recommendations.
+
+### Adopt as-is
+
+1. Emscripten coupling is a real native-build blocker today.
+2. Stage 0-2 can poll core engine state directly (no callback/event plumbing required).
+3. Tile/range grounding is good enough to bootstrap ASCII style mapping.
+4. Deterministic hash check should be an early acceptance gate.
+
+### Adopt with adjustments
+
+1. Shim strategy: prefer include-path compat headers (`emscripten.h`, `emscripten/bind.h`) over global forced-include where possible, to reduce global side effects.
+2. Tier mapping: do not assume linear tile-range buckets for R/C/I maturity; use zone-pop helpers where available, then fallback to tile-range heuristics only if needed.
+3. Determinism hash scope: start with map + key core metrics; add mop/sprite state only if drift appears.
+
+### Pushback / caution
+
+1. "WASM-only" should be read as "WASM-only build tooling right now"; core engine remains native-portable with a compat layer and CMake wiring.
+2. Stage 0 file list can be trimmed: callback abstraction can be deferred until interaction stage.
+
+## Questions to resolve with Pi
+
+1. Should we standardize on include-path compat headers instead of forced-include to avoid hidden compile side effects?
+2. For tier labels, which canonical helper path should drive R/C/I display tiers in MVP: zone-pop helpers first, then density map fallback?
+3. For AC-01 determinism, should baseline hash include `mapBase` only first or `mapBase + mopBase` from day one?
+4. Are there known codepaths where sprite state mutates without map/metrics change, forcing sprite arrays into baseline hash?
+5. Do we explicitly defer callback/event queue plumbing until Stage 3 to keep Stage 0/1 risk low?
+
+</codex_response>

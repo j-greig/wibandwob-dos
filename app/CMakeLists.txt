@@ -133,3 +133,38 @@ add_executable(scramble_engine_test
 )
 
 add_test(NAME scramble_engine COMMAND scramble_engine_test)
+
+# Micropolis native Stage-0 integration (no wasm/embind glue)
+file(GLOB MICROPOLIS_ENGINE_SRCS
+    ${CMAKE_SOURCE_DIR}/vendor/MicropolisCore/MicropolisEngine/src/*.cpp
+)
+list(FILTER MICROPOLIS_ENGINE_SRCS EXCLUDE REGEX ".*emscripten\\.cpp$")
+
+add_library(micropolis_native STATIC
+    ${MICROPOLIS_ENGINE_SRCS}
+)
+target_include_directories(micropolis_native PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/micropolis/compat
+    ${CMAKE_SOURCE_DIR}/vendor/MicropolisCore/MicropolisEngine/src
+)
+
+add_library(micropolis_bridge STATIC
+    micropolis/micropolis_bridge.cpp
+)
+target_include_directories(micropolis_bridge PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/micropolis
+)
+target_link_libraries(micropolis_bridge PUBLIC micropolis_native)
+
+add_executable(micropolis_determinism_test
+    micropolis_determinism_test.cpp
+)
+target_link_libraries(micropolis_determinism_test PRIVATE micropolis_bridge)
+add_test(NAME micropolis_determinism COMMAND micropolis_determinism_test)
+
+add_executable(micropolis_no_ansi_test
+    micropolis_no_ansi_test.cpp
+)
+target_link_libraries(micropolis_no_ansi_test PRIVATE micropolis_bridge)
+add_test(NAME micropolis_no_ansi COMMAND micropolis_no_ansi_test)
