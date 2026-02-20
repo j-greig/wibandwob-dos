@@ -71,6 +71,15 @@ std::uint16_t MicropolisBridge::tile_at(int x, int y) const {
 }
 
 char MicropolisBridge::glyph_for_tile(std::uint16_t tile) const {
+    if (tile == HOSPITAL) {
+        return 'H';
+    }
+    if (tile == FIRESTATION) {
+        return 'F';
+    }
+    if (tile == POLICESTATION) {
+        return 'P';
+    }
     if (tile == DIRT) {
         return '.';
     }
@@ -94,15 +103,6 @@ char MicropolisBridge::glyph_for_tile(std::uint16_t tile) const {
     }
     if (tile >= INDBASE && tile <= LASTIND) {
         return 'I';
-    }
-    if (tile == HOSPITAL) {
-        return 'H';
-    }
-    if (tile == FIRESTATION) {
-        return 'F';
-    }
-    if (tile == POLICESTATION) {
-        return 'P';
     }
     if (tile >= FIREBASE && tile <= LASTFIRE) {
         return '*';

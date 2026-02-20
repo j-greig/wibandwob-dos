@@ -59,6 +59,7 @@ add_executable(test_pattern
     paint/paint_status.cpp
     paint/paint_tools.cpp
     paint/paint_window.cpp
+    micropolis_ascii_view.cpp
 )
 target_include_directories(test_pattern PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(test_pattern PRIVATE tvision)
@@ -168,3 +169,6 @@ add_executable(micropolis_no_ansi_test
 )
 target_link_libraries(micropolis_no_ansi_test PRIVATE micropolis_bridge)
 add_test(NAME micropolis_no_ansi COMMAND micropolis_no_ansi_test)
+
+# Main app can open the Micropolis ASCII MVP window.
+target_link_libraries(test_pattern PRIVATE micropolis_bridge)

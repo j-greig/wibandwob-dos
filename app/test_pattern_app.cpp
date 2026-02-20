@@ -84,6 +84,8 @@
 #include "scramble_engine.h"
 // Paint canvas window
 #include "paint/paint_window.h"
+// Micropolis ASCII MVP window
+#include "micropolis_ascii_view.h"
 // Factory for ASCII grid demo window (implemented in ascii_grid_view.cpp).
 class TWindow; TWindow* createAsciiGridDemoWindow(const TRect &bounds);
 // #include "mech_window.h" // deferred feature; header not present yet
@@ -209,6 +211,7 @@ const ushort cmAbout = 129;
 const ushort cmKeyboardShortcuts = 210;
 const ushort cmDebugInfo = 211;
 const ushort cmApiKeyHelp = 212;
+const ushort cmMicropolisAscii = 213;
 
 // Glitch menu commands
 const ushort cmToggleGlitchMode = 140;
@@ -755,6 +758,7 @@ private:
     friend void api_spawn_monster_cam(TTestPatternApp&, const TRect* bounds);
     friend void api_spawn_monster_verse(TTestPatternApp&, const TRect* bounds);
     friend void api_spawn_monster_portal(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_micropolis_ascii(TTestPatternApp&, const TRect* bounds);
     friend void api_spawn_paint(TTestPatternApp&, const TRect* bounds);
     friend TPaintCanvasView* api_find_paint_canvas(TTestPatternApp&, const std::string&);
     friend std::string api_browser_fetch(TTestPatternApp&, const std::string& url);
@@ -795,6 +799,10 @@ TTestPatternApp::TTestPatternApp() :
     }
     if (!ipcServer->start(sockPath)) {
         fprintf(stderr, "[wibwob] ERROR: IPC server failed to start on %s\n", sockPath.c_str());
+        // Hard-disable IPC on startup failure so later idle/event paths
+        // never touch a server that failed to bind.
+        delete ipcServer;
+        ipcServer = nullptr;
     } else {
         fprintf(stderr, "[wibwob] IPC server started on %s\n", sockPath.c_str());
     }
@@ -1001,6 +1009,15 @@ void TTestPatternApp::handleEvent(TEvent& event)
                 TRect r = deskTop->getExtent();
                 r.grow(-2, -1);
                 deskTop->insert(createGenerativeMonsterCamWindow(r));
+                clearEvent(event);
+                break;
+            }
+            case cmMicropolisAscii: {
+                TRect r = deskTop->getExtent();
+                r.grow(-2, -1);
+                TWindow* w = createMicropolisAsciiWindow(r);
+                deskTop->insert(w);
+                registerWindow(w);
                 clearEvent(event);
                 break;
             }
@@ -1956,6 +1973,7 @@ TMenuBar* TTestPatternApp::initMenuBar(TRect r)
             *new TMenuItem("Monster ~P~ortal (Generative)", cmMonsterPortal, kbNoKey) +
             *new TMenuItem("Monster Ve~r~se (Generative)", cmMonsterVerse, kbNoKey) +
             *new TMenuItem("Monster Cam (Emo~j~i)", cmMonsterCam, kbNoKey) +
+            *new TMenuItem("~M~icropolis ASCII MVP", cmMicropolisAscii, kbNoKey) +
             // REMOVED E009: ASCII Cam (disabled), Zoom In/Out/Actual Size/Full Screen (placeholders)
             newLine() +
             *new TMenuItem("Pa~i~nt Canvas", cmNewPaintCanvas, kbNoKey) +
@@ -2668,6 +2686,18 @@ bool TTestPatternApp::loadWorkspaceFromFile(const std::string& path)
 
     // Restore windows
     std::vector<TWindow*> created;
+    auto captureWindows = [this]() {
+        std::vector<TWindow*> out;
+        TView *start = deskTop->first();
+        if (!start) return out;
+        TView *v = start;
+        do {
+            if (TWindow *w = dynamic_cast<TWindow*>(v))
+                out.push_back(w);
+            v = v->next;
+        } while (v != start);
+        return out;
+    };
     for (const auto &obj : objects) {
         std::string type; if (!parseKeyedString(obj, 0, "type", type)) continue;
         std::string title; parseKeyedString(obj, 0, "title", title);
@@ -2702,9 +2732,37 @@ bool TTestPatternApp::loadWorkspaceFromFile(const std::string& path)
             else if (gtype == "diagonal") gt = TGradientWindow::gtDiagonal;
             win = new TGradientWindow(bounds, "", gt);
         } else {
-            continue;
+            const WindowTypeSpec* spec = find_window_type_by_name(type);
+            if (!spec || !spec->spawn) continue;
+
+            const std::vector<TWindow*> before = captureWindows();
+            std::map<std::string, std::string> kv;
+            kv["x"] = std::to_string(x);
+            kv["y"] = std::to_string(y);
+            kv["w"] = std::to_string(w);
+            kv["h"] = std::to_string(h);
+            if (!title.empty()) kv["title"] = title;
+            const char* err = spec->spawn(*this, kv);
+            if (err) continue;
+
+            const std::vector<TWindow*> after = captureWindows();
+            for (TWindow* candidate : after) {
+                bool existed = false;
+                for (TWindow* prior : before) {
+                    if (prior == candidate) {
+                        existed = true;
+                        break;
+                    }
+                }
+                if (!existed) {
+                    win = candidate;
+                    break;
+                }
+            }
+            if (!win) continue;
         }
-        deskTop->insert(win);
+        if (type == "test_pattern" || type == "gradient")
+            deskTop->insert(win);
         if (zoomed) win->zoom();
         created.push_back(win);
     }
@@ -2815,33 +2873,28 @@ std::string TTestPatternApp::buildWorkspaceJson()
         if (!w->getState(sfVisible)) { v = nextV; continue; }
 
         // Determine type and props
-        std::string type = "custom";
+        std::string type = windowTypeName(w);
         std::string props = "{}";
 
-        if (dynamic_cast<TTestPatternWindow*>(w)) {
-            type = "test_pattern";
+        if (type == "test_pattern") {
             props = "{}"; // Pattern mode is global in MVP
-        } else {
-            // Try to detect gradient by scanning child views (circular list)
-            bool isGradient = false;
+        } else if (type == "gradient") {
+            // Keep concrete gradient subtype in props for backward compatibility.
             TView *cStart = w->first();
             if (cStart) {
             TView *c = cStart;
             do {
                 if (dynamic_cast<THorizontalGradientView*>(c)) {
-                    type = "gradient"; props = "{\"gradientType\": \"horizontal\"}"; isGradient = true; break;
+                    props = "{\"gradientType\": \"horizontal\"}"; break;
                 } else if (dynamic_cast<TVerticalGradientView*>(c)) {
-                    type = "gradient"; props = "{\"gradientType\": \"vertical\"}"; isGradient = true; break;
+                    props = "{\"gradientType\": \"vertical\"}"; break;
                 } else if (dynamic_cast<TRadialGradientView*>(c)) {
-                    type = "gradient"; props = "{\"gradientType\": \"radial\"}"; isGradient = true; break;
+                    props = "{\"gradientType\": \"radial\"}"; break;
                 } else if (dynamic_cast<TDiagonalGradientView*>(c)) {
-                    type = "gradient"; props = "{\"gradientType\": \"diagonal\"}"; isGradient = true; break;
+                    props = "{\"gradientType\": \"diagonal\"}"; break;
                 }
                 c = c->next;
             } while (c != cStart);
-            }
-            if (!isGradient) {
-                // Unknown window type: keep as 'custom' with empty props
             }
         }
 
@@ -3181,6 +3234,13 @@ void api_spawn_monster_verse(TTestPatternApp& app, const TRect* bounds) {
 void api_spawn_monster_portal(TTestPatternApp& app, const TRect* bounds) {
     TRect r = bounds ? *bounds : api_centered_bounds(app, 96, 30);
     TWindow* w = createGenerativeMonsterPortalWindow(r);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
+}
+
+void api_spawn_micropolis_ascii(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 110, 34);
+    TWindow* w = createMicropolisAsciiWindow(r);
     app.deskTop->insert(w);
     app.registerWindow(w);
 }
