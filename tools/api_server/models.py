@@ -14,6 +14,7 @@ class WindowType(str, enum.Enum):
     text_view = "text_view"
     text_editor = "text_editor"
     browser = "browser"
+    terminal = "terminal"
     wallpaper = "wallpaper"
 
 

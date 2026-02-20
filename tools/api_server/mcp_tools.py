@@ -359,7 +359,7 @@ def register_tui_tools(mcp):
         """Create a new TUI window
         
         Args:
-            window_type: Type of window ('test_pattern', 'gradient', 'frame_player', 'text_view')
+            window_type: Type of window ('test_pattern', 'gradient', 'frame_player', 'text_view', 'text_editor', 'browser', 'terminal')
             title: Optional window title
             x, y: Optional position (defaults to cascade)
             width, height: Optional size (defaults to window type default)
