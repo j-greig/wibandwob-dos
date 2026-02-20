@@ -22,6 +22,11 @@ struct ToolApplyResult {
     std::string message;
 };
 
+struct CityIOResult {
+    bool ok;
+    std::string message;
+};
+
 class MicropolisBridge {
 public:
     MicropolisBridge();
@@ -37,6 +42,8 @@ public:
 
     MicropolisSnapshot snapshot() const;
     ToolApplyResult apply_tool(int tool_id, int x, int y);
+    CityIOResult save_city(const std::string &path);
+    CityIOResult load_city(const std::string &path);
     std::string render_ascii_excerpt(int x, int y, int width, int height) const;
 
 private:

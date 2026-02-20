@@ -6,6 +6,7 @@
 #include <tvision/tv.h>
 
 #include <algorithm>
+#include <cstdlib>
 #include <sstream>
 
 namespace {
@@ -48,6 +49,12 @@ static const char* kMonthNames[] = {
 // Ticks fired per 120ms timer pulse
 static const int kTicksPerFire[] = { 0, 1, 4, 16, 64 };
 static const char* kSpeedNames[]  = { "||PAUSE", "1-SLOW", "2-MED", "3-FAST", "4-ULTRA" };
+
+std::string save_slot_path(int slot) {
+    if (slot < 1) slot = 1;
+    if (slot > 3) slot = 3;
+    return "saves/slot" + std::to_string(slot) + ".city";
+}
 
 TColorAttr color_for_glyph(char ch, char zone_prefix = '\0') {
     if ((ch == '1' || ch == '2' || ch == '3') &&
@@ -98,6 +105,7 @@ TMicropolisAsciiView::TMicropolisAsciiView(const TRect &bounds) : TView(bounds) 
     options |= ofSelectable;
     eventMask |= evBroadcast;
     bridge_.initialize_new_city(seed_, 2);
+    std::system("mkdir -p saves");
 }
 
 TMicropolisAsciiView::~TMicropolisAsciiView() {
@@ -173,7 +181,8 @@ void TMicropolisAsciiView::draw() {
         << "  R:" << (s.res_valve >= 0 ? "+" : "") << s.res_valve
         << " C:" << (s.com_valve >= 0 ? "+" : "") << s.com_valve
         << " I:" << (s.ind_valve >= 0 ? "+" : "") << s.ind_valve
-        << "  [" << kSpeedNames[simSpeed_] << "] -/+";
+        << "  [" << kSpeedNames[simSpeed_] << "] -/+"
+        << "  Slot:" << saveSlot_ << "  F2:save F3:load";
     std::string topLine = top.str();
     if ((int)topLine.size() > size.x) topLine.resize(size.x);
     b.moveChar(0, ' ', TColorAttr(0x70), size.x);
@@ -278,6 +287,27 @@ void TMicropolisAsciiView::handleEvent(TEvent &ev) {
 
         // Apply tool
         else if (key == kbEnter || ch == ' ') { applyActiveTool(); }
+
+        // Save/load slots
+        else if (key == kbF2) {
+            const auto result = bridge_.save_city(save_slot_path(saveSlot_));
+            lastResult_ = result.message;
+            lastResultTick_ = 25;
+        }
+        else if (key == kbF3) {
+            const auto result = bridge_.load_city(save_slot_path(saveSlot_));
+            lastResult_ = result.message;
+            lastResultTick_ = 25;
+            if (result.ok) {
+                camX_ = 0;
+                camY_ = 0;
+            }
+        }
+        else if (key == kbTab) {
+            saveSlot_ = (saveSlot_ % 3) + 1;
+            lastResult_ = "Slot " + std::to_string(saveSlot_);
+            lastResultTick_ = 25;
+        }
 
         // Cancel / query mode
         else if (key == kbEsc || ch == 'q') { activeTool_ = kToolQuery; lastResult_.clear(); lastResultTick_ = 0; }

@@ -112,6 +112,7 @@ TMicropolisToolPalette::TMicropolisToolPalette(const TRect &bounds, TMicropolisA
 void TMicropolisToolPalette::draw() {
     const MicropolisSnapshot s = map_ ? map_->snapshot() : MicropolisSnapshot{};
     const int activeTool = map_ ? map_->activeTool() : -1;
+    const int saveSlot = map_ ? map_->saveSlot() : 1;
     const std::string result = map_ ? map_->lastResult() : std::string();
     const int resultTick = map_ ? map_->lastResultTick() : 0;
 
@@ -136,6 +137,19 @@ void TMicropolisToolPalette::draw() {
         writeFilledLine(this, y++, TColorAttr(0x70), fitLine(std::string(">> ") + result, size.x));
     } else {
         writeFilledLine(this, y++, TColorAttr(0x70), std::string());
+    }
+
+    const std::string footerLines[] = {
+        std::string("Slot: ") + std::to_string(saveSlot),
+        "F2 save",
+        "F3 load",
+        "Tab: slot",
+    };
+    for (const std::string &line : footerLines) {
+        if (y >= size.y) {
+            break;
+        }
+        writeFilledLine(this, y++, TColorAttr(0x08), fitLine(line, size.x));
     }
 
     for (; y < size.y; ++y) {

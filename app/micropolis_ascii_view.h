@@ -22,6 +22,7 @@ public:
     std::string lastResult() const { return lastResult_; }
     int lastResultTick() const { return lastResultTick_; }
     int simSpeed() const { return simSpeed_; }
+    int saveSlot() const { return saveSlot_; }
     MicropolisSnapshot snapshot() const { return bridge_.snapshot(); }
 
 private:
@@ -40,6 +41,7 @@ private:
     int curY_ {50};
     int activeTool_ {5};      // TOOL_QUERY=5 — no engine header needed in view
     int simSpeed_ {1};        // 0=pause 1=slow 2=medium 3=fast 4=ultra
+    int saveSlot_ {1};        // active save slot [1..3]
     int seed_ {1337};
     TTimerId timerId_ {0};
     std::string lastResult_;

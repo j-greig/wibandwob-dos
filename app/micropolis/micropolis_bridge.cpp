@@ -265,3 +265,23 @@ ToolApplyResult MicropolisBridge::apply_tool(int tool_id, int x, int y) {
         default:                       return {0,  "?"};
     }
 }
+
+CityIOResult MicropolisBridge::save_city(const std::string &path) {
+    if (!sim_) {
+        return {false, "No sim"};
+    }
+    if (sim_->saveFile(path)) {
+        return {true, "Saved to " + path};
+    }
+    return {false, "Save failed: " + path};
+}
+
+CityIOResult MicropolisBridge::load_city(const std::string &path) {
+    if (!sim_) {
+        return {false, "No sim"};
+    }
+    if (sim_->loadFile(path)) {
+        return {true, "Loaded from " + path};
+    }
+    return {false, "Load failed: " + path};
+}
