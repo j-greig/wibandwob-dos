@@ -19,17 +19,21 @@ constexpr int kToolInd      = 2;  // TOOL_INDUSTRIAL
 constexpr int kToolQuery    = 5;  // TOOL_QUERY
 constexpr int kToolWire     = 6;  // TOOL_WIRE
 constexpr int kToolBulldoze = 7;  // TOOL_BULLDOZER
-constexpr int kToolRoad     = 9;  // TOOL_ROAD
+constexpr int kToolRoad      = 9;  // TOOL_ROAD
+constexpr int kToolCoalPower = 13; // TOOL_COALPOWER   (4×4 footprint)
+constexpr int kToolNucPower  = 14; // TOOL_NUCLEARPOWER (4×4 footprint)
 
 const char* tool_name(int tool_id) {
     switch (tool_id) {
         case kToolQuery:    return "Query";
         case kToolBulldoze: return "Bulldoze";
-        case kToolRoad:     return "Road";
+        case kToolRoad:      return "Road";
         case kToolWire:     return "Wire";
         case kToolRes:      return "Res";
         case kToolCom:      return "Com";
         case kToolInd:      return "Ind";
+        case kToolCoalPower: return "CoalPwr";
+        case kToolNucPower:  return "NucPwr";
         default:            return "?";
     }
 }
@@ -209,7 +213,7 @@ void TMicropolisAsciiView::draw() {
     if (size.y >= 2) {
         std::ostringstream hint;
         hint << "[" << tool_name(activeTool_) << "]"
-             << " 1:Qry 2:Blz 3:Rd 4:Wr 5:R 6:C 7:I"
+             << " 1:Qry 2:Blz 3:Rd 4:Wr 5:R 6:C 7:I 8:Coal 9:Nuc"
              << "  Ent:place Esc:cancel";
         if (lastResultTick_ > 0 && !lastResult_.empty()) {
             hint << "  >> " << lastResult_;
@@ -256,6 +260,8 @@ void TMicropolisAsciiView::handleEvent(TEvent &ev) {
         else if (ch == '5') { activeTool_ = kToolRes; }
         else if (ch == '6') { activeTool_ = kToolCom; }
         else if (ch == '7') { activeTool_ = kToolInd; }
+        else if (ch == '8') { activeTool_ = kToolCoalPower; }
+        else if (ch == '9') { activeTool_ = kToolNucPower; }
 
         // Apply tool
         else if (key == kbEnter || ch == ' ') { applyActiveTool(); }
