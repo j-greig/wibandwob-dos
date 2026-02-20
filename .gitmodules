@@ -7,3 +7,6 @@
 [submodule "vendor/claude-system"]
 	path = vendor/claude-system
 	url = https://github.com/juanandresgs/claude-system
+[submodule "vendor/MicropolisCore"]
+	path = vendor/MicropolisCore
+	url = https://github.com/SimHacker/MicropolisCore
