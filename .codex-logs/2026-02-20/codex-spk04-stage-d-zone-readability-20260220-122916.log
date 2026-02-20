@@ -1,0 +1,4397 @@
+OpenAI Codex v0.104.0 (research preview)
+--------
+workdir: /Users/james/Repos/wibandwob-dos
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: medium
+reasoning summaries: auto
+session id: 019c7b06-9d69-70e2-841c-0121a34befe2
+--------
+user
+DEVNOTE: Files inside .codex-logs/ are run logs — ignore them completely.
+
+TASK: Implement Stage D zone readability for WibWobSimsity — improve glyph_for_tile() in app/micropolis/micropolis_bridge.cpp to show zone development tiers and better civic glyphs.
+
+Context:
+- Engine source: vendor/MicropolisCore/MicropolisEngine/src/micropolis.h (tile ranges), vendor/MicropolisCore/MicropolisEngine/src/zone.cpp (zone logic)
+- Current bridge: app/micropolis/micropolis_bridge.h/.cpp
+- Current view: app/micropolis_ascii_view.cpp (color_for_glyph() maps chars to colors)
+
+Required changes:
+
+1. In micropolis_bridge.cpp, improve glyph_for_tile() to return 2-char glyphs (or richer single chars) showing:
+   - Empty zone centres: FREEZ(244)='r.' COMBASE(423)='c.' INDBASE(612)='i.'
+   - Developed residential tiers (tiles 245-422, exclude hospital 405-413): r1/r2/r3 buckets by tile distance from RESBASE
+   - Developed commercial tiers (tiles 424-611): c1/c2/c3
+   - Developed industrial tiers (tiles 613-826, exclude power/fire/police): i1/i2/i3
+   - Hospital(405-413)='H' Police(770-774)='P' Fire(765-768)='F' PowerPlant(750-760)='*'
+   - Roads: use '-' '|' '+' for H/V/intersection (inspect ROADBASE ranges in micropolis.h)
+   - Rail: '#'
+   - Wire: '+'  (or 'w' if conflicts)
+   - Keep existing water='~' woods='"' dirt='.' fire='*' rubble=':'
+
+2. Since glyph_for_tile() currently returns char — either:
+   a. Change signature to return std::string (2 chars wide), OR
+   b. Keep char but use a separate method glyph_pair_for_tile() returning std::string
+   Prefer (b) so existing callers don't break. Add to bridge header too.
+
+3. Update color_for_glyph() in micropolis_ascii_view.cpp to handle the new glyph chars with good colors:
+   - 'r' prefix = green tones getting brighter with tier
+   - 'c' prefix = blue tones
+   - 'i' prefix = yellow/orange tones
+   - Civic buildings = distinct colors
+
+4. Update draw() in micropolis_ascii_view.cpp to use glyph_pair_for_tile() when available, rendering 2 chars per tile if viewport width allows, otherwise fall back to single char.
+
+Constraints:
+- NO raw ANSI in TDrawBuffer. Use putChar/putAttribute only.
+- Run: make -C build -j4 (or cmake --build build) to verify it compiles
+- Keep micropolis_determinism_test and micropolis_no_ansi_test passing
+- Do archaeology in zone.cpp and micropolis.h to get real tier boundaries before guessing
+
+Deliver:
+1) What tier boundaries you found in zone.cpp/micropolis.h
+2) File diffs / patches
+3) Build result
+4) Any open questions
+mcp: fastmcp starting
+mcp: chrome-devtools starting
+mcp: fastmcp ready
+mcp: chrome-devtools ready
+mcp startup: ready: fastmcp, chrome-devtools
+
+thinking
+**Preparing for parallel file inspection**
+codex
+I’ll inspect `micropolis.h`, `zone.cpp`, and the current bridge/view implementations first to pin exact tile boundaries, then patch bridge + view together and run a build and the two Micropolis tests.
+exec
+/bin/zsh -lc "sed -n '1,260p' vendor/MicropolisCore/MicropolisEngine/src/zone.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,280p' app/micropolis/micropolis_bridge.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,320p' app/micropolis_ascii_view.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc 'rg -n "FREEZ|RESBASE|COMBASE|INDBASE|HOSPITAL|POWER|POLICE|FIRE|ROADBASE|RAIL|WIRE|TILE|ZONE" vendor/MicropolisCore/MicropolisEngine/src/micropolis.h app/micropolis/micropolis_bridge.cpp app/micropolis/micropolis_bridge.h app/micropolis_ascii_view.cpp' in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,240p' app/micropolis/micropolis_bridge.h" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+/* zone.cpp
+ *
+ * Micropolis, Unix Version.  This game was released for the Unix platform
+ * in or about 1990 and has been modified for inclusion in the One Laptop
+ * Per Child program.  Copyright (C) 1989 - 2007 Electronic Arts Inc.  If
+ * you need assistance with this program, you may contact:
+ *   http://wiki.laptop.org/go/Micropolis  or email  micropolis@laptop.org.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or (at
+ * your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * General Public License for more details.  You should have received a
+ * copy of the GNU General Public License along with this program.  If
+ * not, see <http://www.gnu.org/licenses/>.
+ *
+ succeeded in 51ms:
+#include "micropolis_ascii_view.h"
+
+#define Uses_TWindow
+#define Uses_TEvent
+#include <tvision/tv.h>
+
+#include <algorithm>
+#include <sstream>
+
+namespace {
+constexpr int kWorldW = 120;
+constexpr int kWorldH = 100;
+
+TColorAttr color_for_glyph(char ch) {
+    switch (ch) {
+        case '~': return TColorAttr(0x1F); // water
+        case '"': return TColorAttr(0x2F); // woods
+        case '=': return TColorAttr(0x07); // road
+        case '#': return TColorAttr(0x08); // rail
+        case 'R': return TColorAttr(0x2A); // residential
+ succeeded in 51ms:
+#include "micropolis_bridge.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <cstring>
+
+#include "micropolis.h"
+#include "tool.h"
+
+namespace {
+constexpr std::uint64_t FNV_OFFSET = 1469598103934665603ull;
+constexpr std::uint64_t FNV_PRIME = 1099511628211ull;
+
+std::uint64_t fnv1a_64(const std::uint8_t *data, std::size_t size) {
+    std::uint64_t hash = FNV_OFFSET;
+    for (std::size_t i = 0; i < size; ++i) {
+        hash ^= static_cast<std::uint64_t>(data[i]);
+        hash *= FNV_PRIME;
+    }
+    return hash;
+ succeeded in 50ms:
+app/micropolis/micropolis_bridge.cpp:74:    if (tile == HOSPITAL) {
+app/micropolis/micropolis_bridge.cpp:77:    if (tile == FIRESTATION) {
+app/micropolis/micropolis_bridge.cpp:80:    if (tile == POLICESTATION) {
+app/micropolis/micropolis_bridge.cpp:92:    if (tile >= ROADBASE && tile <= LASTROAD) {
+app/micropolis/micropolis_bridge.cpp:95:    if (tile >= RAILBASE && tile <= LASTRAIL) {
+app/micropolis/micropolis_bridge.cpp:98:    if (tile >= RESBASE && tile < COMBASE) {
+app/micropolis/micropolis_bridge.cpp:101:    if (tile >= COMBASE && tile < INDBASE) {
+app/micropolis/micropolis_bridge.cpp:104:    if (tile >= INDBASE && tile <= LASTIND) {
+app/micropolis/micropolis_bridge.cpp:107:    if (tile >= FIREBASE && tile <= LASTFIRE) {
+vendor/MicropolisCore/MicropolisEngine/src/micropolis.h:137:static const int BITS_PER_TILE = 16;
+vendor/MicropolisCore/MicropolisEngine/src/micropolis.h:143:static const int BYTES_PER_TILE = 2;
+vendor/MicropolisCore/MicropolisEngine/src/micropolis.h:190:static const int EDITOR_TILE_SIZE = 16;
+vendor/MicropolisCore/MicropolisEngine/src/micropolis.h:226:static const int POWER_STACK_SIZE = (WORLD_W * WORLD_H) / 4;
+vendor/MicropolisCore/MicropolisEngine/src/micropolis.h:258:static const int MAX_POLICE_STATION_EFFECT = 1000;
+vendor/MicropolisCore/MicropolisEngine/src/micropolis.h:263:static const int MAX_FIRE_STATION_EFFECT = 1000;
+vendor/MicropolisCore/MicropolisEngine/src/micropolis.h:311:    MAP_TYPE_POWER,                 ///< Power connectivity
+vendor/MicropolisCore/MicropolisEngine/src/micropolis.h:319:    MAP_TYPE_FIRE_RADIUS,           ///< Fire station coverage radius
+vendor/MicropolisCore/MicropolisEngine/src/micropolis.h:320:    MAP_TYPE_POLICE_RADIUS,         ///< Police station coverage radius
+vendor/MicropolisCore/MicropolisEngine/src/micropolis.h:351:    CONNECT_TILE_FIX, ///< Fix zone (connect wire, road, and rail).
+vendor/MicropolisCore/MicropolisEngine/src/micropolis.h:352:    CONNECT_TILE_BULLDOZE, ///< Bulldoze and fix zone.
+ succeeded in 50ms:
+#pragma once
+
+#include <cstdint>
+#include <memory>
+#include <string>
+
+class Micropolis;
+
+struct MicropolisSnapshot {
+    std::uint64_t map_hash = 0;
+    short total_pop = 0;
+    short city_score = 0;
+    short res_valve = 0;
+    short com_valve = 0;
+    short ind_valve = 0;
+    long city_time = 0;
+};
+
+class MicropolisBridge {
+public:
+
+thinking
+**Investigating zone growth logic**
+codex
+I found the existing glyph mappings and view rendering path; next I’m tracing `zone.cpp` growth math to derive exact tier boundaries instead of inventing ranges.
+exec
+/bin/zsh -lc "sed -n '480,760p' vendor/MicropolisCore/MicropolisEngine/src/micropolis.h" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc 'rg -n "doResidential|doCommercial|doIndustrial|RESBASE|COMBASE|INDBASE|HOSPITALBASE|zonePlop|build|landValue|pop|density|get|tile -" vendor/MicropolisCore/MicropolisEngine/src/zone.cpp' in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '760,900p' vendor/MicropolisCore/MicropolisEngine/src/micropolis.h" in /Users/james/Repos/wibandwob-dos succeeded in 50ms:
+    LASTPOWER      = RAILVPOWERH,
+
+    UNUSED_TRASH6  = 223,
+
+    /* Rail */
+    HRAIL          = 224,
+    VRAIL          = 225,
+    LHRAIL         = 226,
+    LVRAIL         = 227,
+    LVRAIL2        = 228,
+    LVRAIL3        = 229,
+    LVRAIL4        = 230,
+    LVRAIL5        = 231,
+    LVRAIL6        = 232,
+    LVRAIL7        = 233,
+    LVRAIL8        = 234,
+    LVRAIL9        = 235,
+    LVRAIL10       = 236,
+    HRAILROAD      = 237,
+    VRAILROAD      = 238,
+ succeeded in 51ms:
+73: * and performing zone transformations such as building or demolishing
+116:        doResidential(pos, zonePowerFlag);
+121:    if ((tile < COMBASE) ||
+129:    if (tile < INDBASE)  {
+130:        doCommercial(pos, zonePowerFlag);
+136:        doIndustrial(pos, zonePowerFlag);
+160:            if (!getRandom(20)) {
+161:                zonePlop(pos, RESBASE); // Remove hospital.
+185:            if (!getRandom(20)) {
+186:                zonePlop(pos, RESBASE); // Remove church.
+253:    int z = (tile - IZB) >>3; /// @todo Why div 8? Industry is 9 tiles long!!
+295:        zonePlop(pos, HOSPITAL - 4);
+301:        int churchType = getRandom(7); // 0 to 7 inclusive
+311:        zonePlop(pos, tile - 4);
+323:short Micropolis::getLandPollutionValue(const Position &pos)
+327:    landVal =  landValueMap.worldGet(pos.posX, pos.posY);
+366:bool Micropolis::zonePlop(const Position &pos, int base)
+454: * Try to build a house at the zone at \a pos.
+456: * @param value Value to build (land value?)
+457: * @todo Have some form of looking around the center tile (like getFromMap())
+ succeeded in 52ms:
+};
+
+/** Game levels */
+enum GameLevel {
+    LEVEL_EASY,   ///< Simple game level
+    LEVEL_MEDIUM, ///< Intermediate game level
+    LEVEL_HARD,   ///< Difficult game level
+
+    LEVEL_COUNT,  ///< Number of game levels
+
+    LEVEL_FIRST = LEVEL_EASY, ///< First game level value
+    LEVEL_LAST  = LEVEL_HARD, ///< Last game level value
+};
+
+////////////////////////////////////////////////////////////////////////
+// Inline functions
+
+/**
+ * Compute minimal value.
+ * @param a First value.
+
+thinking
+**Inspecting tier calculation logic**
+exec
+/bin/zsh -lc "sed -n '520,1060p' vendor/MicropolisCore/MicropolisEngine/src/zone.cpp" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+    /* test for clear lot */
+    z = map[x][y] & LOMASK;
+
+    if (z && (z < RESBASE || z > RESBASE + 8)) {
+        return -1;
+    }
+
+    score = 1;
+
+    for (z = 0; z < 4; z++) {
+        int xx = x + DX[z];
+        int yy = y + DY[z];
+
+        if (testBounds(xx, yy) &&
+            map[xx][yy] != DIRT && (map[xx][yy] & LOMASK) <= LASTROAD) {
+            score++;          /* look for road */
+        }
+
+    }
+
+
+thinking
+**Reviewing road orientation constants**
+exec
+/bin/zsh -lc "sed -n '410,520p' vendor/MicropolisCore/MicropolisEngine/src/micropolis.h" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+
+    FLOOD          = 48,
+    // tile 49, 50 ?
+    LASTFLOOD      = 51,
+
+    RADTILE        = 52, ///< Radio-active contaminated tile
+
+    UNUSED_TRASH3  = 53,
+    UNUSED_TRASH4  = 54,
+    UNUSED_TRASH5  = 55,
+
+    /* Fire animation (8 tiles) */
+    FIRE           = 56,
+    FIREBASE       = FIRE,
+    LASTFIRE       = 63,
+
+    HBRIDGE        = 64, ///< Horizontal bridge
+    ROADBASE       = HBRIDGE,
+    VBRIDGE        = 65, ///< Vertical bridge
+    ROADS          = 66,
+
+thinking
+**Investigating road orientation logic**
+codex
+I’ve confirmed the zone density formulas from `zone.cpp`; now I’m checking how road tile IDs encode orientation so the `- | +` mapping is defensible for all road variants.
+exec
+/bin/zsh -lc 'rg -n "HBRIDGE|VBRIDGE|INTERSECTION|HROADPOWER|VROADPOWER|LTRFBASE|HTRFBASE|LASTROAD|road" vendor/MicropolisCore/MicropolisEngine/src/*.cpp | head -n 200' in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc 'rg -n "(RZB|CZB|IZB|resPlop|comPlop|indPlop|getResZonePop|getComZonePop|getIndZonePop)" vendor/MicropolisCore/MicropolisEngine/src/zone.cpp' in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+vendor/MicropolisCore/MicropolisEngine/src/budget.cpp:91:    roadPercent = 1.0;
+vendor/MicropolisCore/MicropolisEngine/src/budget.cpp:92:    roadValue = 0;
+vendor/MicropolisCore/MicropolisEngine/src/budget.cpp:114: *       assigning funds to road, fire, and police.
+vendor/MicropolisCore/MicropolisEngine/src/budget.cpp:120:    Quad roadInt   = (int)(roadFund   * roadPercent);
+vendor/MicropolisCore/MicropolisEngine/src/budget.cpp:122:    Quad total = fireInt + policeInt + roadInt;
+vendor/MicropolisCore/MicropolisEngine/src/budget.cpp:128:        // Enough yumDuckets to fully fund fire, police and road.
+vendor/MicropolisCore/MicropolisEngine/src/budget.cpp:132:        roadValue = roadInt;
+vendor/MicropolisCore/MicropolisEngine/src/budget.cpp:142:        // First spend on roads, then on fire, then on police.
+vendor/MicropolisCore/MicropolisEngine/src/budget.cpp:144:        if (yumDuckets > roadInt) {
+vendor/MicropolisCore/MicropolisEngine/src/budget.cpp:146:            // Enough yumDuckets to fully fund roads.
+vendor/MicropolisCore/MicropolisEngine/src/budget.cpp:148:            roadValue = roadInt;
+vendor/MicropolisCore/MicropolisEngine/src/budget.cpp:149:            yumDuckets -= roadInt;
+vendor/MicropolisCore/MicropolisEngine/src/budget.cpp:163:                    // (where total = fireInt + policeInt + roadInt),
+vendor/MicropolisCore/MicropolisEngine/src/budget.cpp:171:                    // Fuly funded roads and fire.
+vendor/MicropolisCore/MicropolisEngine/src/budget.cpp:198:                // No police after funding roads and fire.
+vendor/MicropolisCore/MicropolisEngine/src/budget.cpp:222:            // Not enough yumDuckets to fully fund roads.
+vendor/MicropolisCore/MicropolisEngine/src/budget.cpp:224:            roadValue = yumDuckets;
+vendor/MicropolisCore/MicropolisEngine/src/budget.cpp:226:            // No fire or police after funding roads.
+vendor/MicropolisCore/MicropolisEngine/src/budget.cpp:235:                // Scale back road percentage to available cash.
+vendor/MicropolisCore/MicropolisEngine/src/budget.cpp:237:                roadPercent = ((float)yumDuckets) / ((float)roadFund);
+ succeeded in 51ms:
+249:    if (tile < IZB) {
+253:    int z = (tile - IZB) >>3; /// @todo Why div 8? Industry is 9 tiles long!!
+559:        tpop = getResZonePop(tile);
+633:            resPlop(pos, 0, value);
+642:        resPlop(pos, (pop / 8) - 1, value);
+665:        resPlop(pos, (pop - 24) / 8, value);
+705: * (RZB, RZB+9, ..., HOSPITAL - 9).
+711:short Micropolis::getResZonePop(MapTile mapTile)
+713:    short CzDen = ((mapTile - RZB) / 9) % 4;
+724:void Micropolis::resPlop(const Position &pos, int den, int value)
+728:    base = ((value * 4 + den) * 9) + RZB - 4;
+773:    tpop = getComZonePop(tile);
+835:        comPlop(pos, pop, value);
+849:        comPlop(pos, pop - 2, value);
+866:short Micropolis::getComZonePop(MapTile tile)
+872:    short CzDen = ((tile - CZB) / 9) % 5 + 1;
+883:void Micropolis::comPlop(const Position &pos, int Den, int Value)
+887:    base = ((Value * 5) + Den) * 9 + CZB - 4;
+925:    tpop = getIndZonePop(tile);
+970:        indPlop(pos, pop, value);
+
+thinking
+**Examining adjacency table setup**
+exec
+/bin/zsh -lc "sed -n '70,170p' vendor/MicropolisCore/MicropolisEngine/src/connect.cpp" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+ * logic for determining the appropriate tile transformations when
+ * these elements are placed on the map, considering existing terrain
+ * and infrastructure. The file includes utilities for bulldozing,
+ * repairing, and modifying tiles to ensure correct connectivity and
+ * appearance on the game map.
+ */
+
+
+////////////////////////////////////////////////////////////////////////
+
+
+#include "micropolis.h"
+
+
+////////////////////////////////////////////////////////////////////////
+
+
+static const unsigned short RoadTable[16] = {
+    ROADS, ROADS2, ROADS, ROADS3,
+    ROADS2, ROADS2, ROADS4, ROADS8,
+
+thinking
+**Analyzing road orientation detection**
+codex
+I found the canonical connection tables in `connect.cpp`; I’m now using those to map road tile IDs to horizontal/vertical/intersection glyphs instead of ad-hoc ranges.
+exec
+/bin/zsh -lc "sed -n '560,700p' vendor/MicropolisCore/MicropolisEngine/src/connect.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '480,560p' vendor/MicropolisCore/MicropolisEngine/src/traffic.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "rg -n \"moveChar\\(|moveStr\\(|putChar\\(|putAttribute\\(\" app | head -n 80" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+ * Update connections (rails, and wire connections) to a zone.
+ * @param x X map coordinate
+ * @param y Y map coordinate.
+ * @param effects Modification collecting object.
+ */
+void Micropolis::fixZone(int x, int y, ToolEffects *effects)
+{
+    fixSingle(x, y, effects);
+
+    if (y > 0) {
+        fixSingle(x, y - 1, effects);
+    }
+
+    if (x < WORLD_W - 1) {
+        fixSingle(x + 1, y, effects);
+    }
+
+    if (y < WORLD_H - 1) {
+        fixSingle(x, y + 1, effects);
+    }
+ succeeded in 50ms:
+    if (pos.posY < (WORLD_H - 1)) {
+        MapTile z = map[pos.posX][pos.posY + 1] & LOMASK;
+        if (z >= l && z <= h) {
+            return true;
+        }
+    }
+
+    if (pos.posX > 0) {
+        MapTile z = map[pos.posX - 1][pos.posY] & LOMASK;
+        if (z >= l && z <= h) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+
+/**
+ * Can the given tile be used as road?
+ succeeded in 50ms:
+app/mech_grid.cpp:30:        buffer.moveChar(0, ' ', normalColor, size.x);
+app/mech_grid.cpp:56:                            buffer.putChar(mechStartX + i, mechLine[i]);
+app/wibwob_view.cpp:55:        buf.moveChar(0, ' ', normalColor, size.x);
+app/wibwob_view.cpp:60:            buf.moveStr(0, wl.text.c_str(), msgColor);
+app/wibwob_view.cpp:321:    buf.moveChar(0, ' ', statusColor, size.x);
+app/wibwob_view.cpp:335:    buf.moveStr(0, status.c_str(), statusColor);
+app/wibwob_view.cpp:343:    buf.moveChar(0, ' ', inputColor, size.x);
+app/wibwob_view.cpp:353:    buf.moveStr(0, display.c_str(), inputColor);
+app/wibwob_view.cpp:359:            buf.moveChar(cursorPos, display[cursorPos], inputColor | 0x80, 1);
+app/test_pattern_app.cpp:298:            b.moveChar(0, ' ', cNormal, kaomojiWidth);
+app/test_pattern_app.cpp:299:            b.moveStr(0, kaomoji, cNormal);
+app/browser_window.cpp:23:        b.moveChar(0, ' ', color, size.x);
+app/animated_score_view.cpp:176:            b.moveChar(written, ' ', textAttr, (ushort)(W - written));
+app/animated_score_view.cpp:481:            b.moveChar(0, ' ', TColorAttr(0x07), size.x);
+app/animated_score_view.cpp:493:                if (xPos < size.x) b.moveChar(xPos, ' ', attr, std::min(sw, size.x - xPos));
+app/animated_score_view.cpp:498:                    b.moveChar(xPos, '>', mk, 1);
+app/paint/paint_palette.cpp:23:    b.moveChar(0, ' ', frame, size.x);
+app/paint/paint_palette.cpp:24:    b.moveStr(1, "Palette", frame);
+app/paint/paint_palette.cpp:37:        b.moveChar(0, ' ', frame, size.x);
+app/paint/paint_palette.cpp:38:        b.moveChar(1, ' ', aFg, 3);
+
+thinking
+**Inspecting character drawing approach**
+exec
+/bin/zsh -lc 'rg -n "micropolis_determinism_test|micropolis_no_ansi_test|glyph_for_tile|render_ascii_excerpt|MicropolisBridge" test app | head -n 200' in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc 'rg --files | rg "micropolis.*test|determinism|ansi"' in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+rg: test: No such file or directory (os error 2)
+app/micropolis_determinism_test.cpp:6:    MicropolisBridge run_a;
+app/micropolis_determinism_test.cpp:7:    MicropolisBridge run_b;
+app/CMakeLists.txt:161:add_executable(micropolis_determinism_test
+app/CMakeLists.txt:162:    micropolis_determinism_test.cpp
+app/CMakeLists.txt:164:target_link_libraries(micropolis_determinism_test PRIVATE micropolis_bridge)
+app/CMakeLists.txt:165:add_test(NAME micropolis_determinism COMMAND micropolis_determinism_test)
+app/CMakeLists.txt:167:add_executable(micropolis_no_ansi_test
+app/CMakeLists.txt:168:    micropolis_no_ansi_test.cpp
+app/CMakeLists.txt:170:target_link_libraries(micropolis_no_ansi_test PRIVATE micropolis_bridge)
+app/CMakeLists.txt:171:add_test(NAME micropolis_no_ansi COMMAND micropolis_no_ansi_test)
+app/micropolis/micropolis_bridge.cpp:32:MicropolisBridge::MicropolisBridge() : sim_(new Micropolis()) {
+app/micropolis/micropolis_bridge.cpp:40:MicropolisBridge::~MicropolisBridge() = default;
+app/micropolis/micropolis_bridge.cpp:42:bool MicropolisBridge::initialize_new_city(int seed, short speed) {
+app/micropolis/micropolis_bridge.cpp:53:void MicropolisBridge::tick(int tick_count) {
+app/micropolis/micropolis_bridge.cpp:62:std::uint16_t MicropolisBridge::cell_at(int x, int y) const {
+app/micropolis/micropolis_bridge.cpp:69:std::uint16_t MicropolisBridge::tile_at(int x, int y) const {
+app/micropolis/micropolis_bridge.cpp:73:char MicropolisBridge::glyph_for_tile(std::uint16_t tile) const {
+app/micropolis/micropolis_bridge.cpp:116:std::uint64_t MicropolisBridge::hash_map_bytes() const {
+app/micropolis/micropolis_bridge.cpp:128:MicropolisSnapshot MicropolisBridge::snapshot() const {
+ succeeded in 51ms:
+Total output lines: 737
+
+tests/contract/test_state_roundtrip_determinism.py
+app/ansi_view.cpp
+app/ansi_view.h
+app/ansi_viewer_main.cpp
+app/micropolis_no_ansi_test.cpp
+app/micropolis_determinism_test.cpp
+build-asan/vendor/tvision/source/CMakeFiles/tvision.dir/platform/ansiwrit.cpp.o
+build-asan/vendor/tvision/source/CMakeFiles/tvision.dir/platform/ansiwrit.cpp.o.d
+build-asan/app/CMakeFiles/test_pattern.dir/ansi_view.cpp.o.d
+build-asan/app/CMakeFiles/test_pattern.dir/ansi_view.cpp.o
+build-asan/app/CMakeFiles/ansi_viewer.dir/flags.make
+build-asan/app/CMakeFiles/ansi_viewer.dir/build.make
+build-asan/app/CMakeFiles/ansi_viewer.dir/progress.make
+build-asan/app/CMakeFiles/ansi_viewer.dir/link.txt
+build-asan/app/CMakeFiles/ansi_viewer.dir/cmake_clean.cmake
+build-asan/app/CMakeFiles/ansi_viewer.dir/depend.make
+build-asan/app/CMakeFiles/ansi_viewer.dir/compiler_depend.make
+build-asan/app/CMakeFiles/ansi_viewer.dir/compiler_depend.ts
+exec
+/bin/zsh -lc "sed -n '1,220p' app/micropolis_no_ansi_test.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,220p' app/micropolis_determinism_test.cpp" in /Users/james/Repos/wibandwob-dos succeeded in 50ms:
+#include <iostream>
+
+#include "micropolis/micropolis_bridge.h"
+
+int main() {
+    MicropolisBridge sim;
+    if (!sim.initialize_new_city(2026, 1)) {
+        std::cerr << "failed to initialize sim\n";
+        return 1;
+    }
+
+    sim.tick(64);
+    const std::string text = sim.render_ascii_excerpt(0, 0, 80, 25);
+
+    if (text.find('\x1b') != std::string::npos) {
+        std::cerr << "escape byte found in ascii render output\n";
+        return 2;
+    }
+    if (text.find("\\x1b[") != std::string::npos) {
+        std::cerr << "escaped CSI marker found in ascii render output\n";
+ succeeded in 51ms:
+#include <iostream>
+
+#include "micropolis/micropolis_bridge.h"
+
+int main() {
+    MicropolisBridge run_a;
+    MicropolisBridge run_b;
+
+    const int seed = 1337;
+    const int ticks = 1200;
+
+    if (!run_a.initialize_new_city(seed, 2)) {
+        std::cerr << "failed to initialize run_a\n";
+        return 1;
+    }
+    if (!run_b.initialize_new_city(seed, 2)) {
+        std::cerr << "failed to initialize run_b\n";
+        return 1;
+    }
+
+
+thinking
+**Designing tile glyph pairing and tiers**
+codex
+I have enough to implement: I’ll add `glyph_pair_for_tile()` in the bridge (keeping `glyph_for_tile()` for compatibility), then switch the ASCII view to optional 2-column tile rendering with tier-aware coloring.
+file update
+M /Users/james/Repos/wibandwob-dos/app/micropolis/micropolis_bridge.h
+@@ -29,2 +29,3 @@
+     char glyph_for_tile(std::uint16_t tile) const;
++    std::string glyph_pair_for_tile(std::uint16_t tile) const;
+ 
+@@ -38,2 +39 @@
+ };
+-
+apply_patch(auto_approved=true) exited 0 in 47ms:
+Success. Updated the following files:
+M app/micropolis/micropolis_bridge.h
+file update:
+diff --git a/app/micropolis/micropolis_bridge.h b/app/micropolis/micropolis_bridge.h
+index f479fd5fb53c1b587c43ae9a0d8290a94211b035..8d1df444f75317dda3c2d636ac06caadb86992ab
+--- a/app/micropolis/micropolis_bridge.h
++++ b/app/micropolis/micropolis_bridge.h
+@@ -27,6 +27,7 @@
+     std::uint16_t cell_at(int x, int y) const;
+     std::uint16_t tile_at(int x, int y) const;
+     char glyph_for_tile(std::uint16_t tile) const;
++    std::string glyph_pair_for_tile(std::uint16_t tile) const;
+ 
+     MicropolisSnapshot snapshot() const;
+     std::string render_ascii_excerpt(int x, int y, int width, int height) const;
+@@ -36,4 +37,3 @@
+ 
+     std::unique_ptr<Micropolis> sim_;
+ };
+-
+
+file update:
+diff --git a/app/micropolis/micropolis_bridge.h b/app/micropolis/micropolis_bridge.h
+index f479fd5fb53c1b587c43ae9a0d8290a94211b035..8d1df444f75317dda3c2d636ac06caadb86992ab
+--- a/app/micropolis/micropolis_bridge.h
++++ b/app/micropolis/micropolis_bridge.h
+@@ -27,6 +27,7 @@
+     std::uint16_t cell_at(int x, int y) const;
+     std::uint16_t tile_at(int x, int y) const;
+     char glyph_for_tile(std::uint16_t tile) const;
++    std::string glyph_pair_for_tile(std::uint16_t tile) const;
+ 
+     MicropolisSnapshot snapshot() const;
+     std::string render_ascii_excerpt(int x, int y, int width, int height) const;
+@@ -36,4 +37,3 @@
+ 
+     std::unique_ptr<Micropolis> sim_;
+ };
+-
+
+
+thinking
+**Adding helper functions for tile glyphs**
+file update
+M /Users/james/Repos/wibandwob-dos/app/micropolis/micropolis_bridge.cpp
+@@ -29,2 +29,42 @@
+ }
++
++int tier_from_distance(std::uint16_t tile, std::uint16_t start, std::uint16_t end) {
++    if (tile < start || tile > end) {
++        return 0;
++    }
++    const int span = static_cast<int>(end - start + 1);
++    const int distance = static_cast<int>(tile - start);
++    const int cut1 = span / 3;
++    const int cut2 = (span * 2) / 3;
++    if (distance < cut1) {
++        return 1;
++    }
++    if (distance < cut2) {
++        return 2;
++    }
++    return 3;
++}
++
++std::uint16_t neutralized_road_tile(std::uint16_t tile) {
++    if (tile >= ROADBASE && tile <= LASTROAD) {
++        return static_cast<std::uint16_t>((tile & 0x000F) + ROADBASE);
++    }
++    return tile;
++}
++
++char road_glyph(std::uint16_t tile) {
++    if (tile == BRWV) {
++        return '|';
++    }
++
++    const auto normalized = neutralized_road_tile(tile);
++    if (normalized == HBRIDGE || normalized == ROADS || normalized == HROADPOWER ||
++        normalized == BRWH) {
++        return '-';
++    }
++    if (normalized == VBRIDGE || normalized == ROADS2 || normalized == VROADPOWER) {
++        return '|';
++    }
++    return '+';
++}
+ } // namespace
+@@ -73,42 +113,76 @@
+ char MicropolisBridge::glyph_for_tile(std::uint16_t tile) const {
+-    if (tile == HOSPITAL) {
+-        return 'H';
+-    }
+-    if (tile == FIRESTATION) {
+-        return 'F';
+-    }
+-    if (tile == POLICESTATION) {
+-        return 'P';
++    const std::string glyph_pair = glyph_pair_for_tile(tile);
++    if (glyph_pair.empty()) {
++        return '?';
+     }
++    return glyph_pair.front();
++}
++
++std::string MicropolisBridge::glyph_pair_for_tile(std::uint16_t tile) const {
+     if (tile == DIRT) {
+-        return '.';
++        return ". ";
+     }
+     if (tile >= RIVER && tile <= LASTRIVEDGE) {
+-        return '~';
++        return "~ ";
+     }
+     if (tile >= WOODS_LOW && tile <= WOODS_HIGH) {
+-        return '"';
++        return "\" ";
++    }
++    if (tile >= FIREBASE && tile <= LASTFIRE) {
++        return "* ";
++    }
++    if (tile >= RUBBLE && tile <= LASTRUBBLE) {
++        return ": ";
++    }
++
++    if (tile >= HOSPITALBASE && tile <= HOSPITALBASE + 8) {
++        return "H ";
++    }
++    if (tile >= POWERPLANT && tile <= LASTPOWERPLANT) {
++        return "* ";
++    }
++    if (tile >= FIRESTATION && tile <= 768) {
++        return "F ";
+     }
++    if (tile >= POLICESTBASE && tile <= POLICESTATION) {
++        return "P ";
++    }
++
++    if (tile == FREEZ) {
++        return "r.";
++    }
++    if (tile == COMBASE || tile == COMCLR) {
++        return "c.";
++    }
++    if (tile == INDBASE || tile == INDCLR) {
++        return "i.";
++    }
++
+     if (tile >= ROADBASE && tile <= LASTROAD) {
+-        return '=';
++        return std::string(1, road_glyph(tile)) + " ";
+     }
+     if (tile >= RAILBASE && tile <= LASTRAIL) {
+-        return '#';
++        return "# ";
+     }
+-    if (tile >= RESBASE && tile < COMBASE) {
+-        return 'R';
++    if (tile >= POWERBASE && tile <= LASTPOWER) {
++        return "w ";
+     }
+-    if (tile >= COMBASE && tile < INDBASE) {
+-        return 'C';
++
++    if (tile >= 245 && tile <= 422 && !(tile >= HOSPITALBASE && tile <= HOSPITALBASE + 8)) {
++        const int tier = tier_from_distance(tile, 245, 422);
++        return "r" + std::to_string(tier);
+     }
+-    if (tile >= INDBASE && tile <= LASTIND) {
+-        return 'I';
+-    }
+-    if (tile >= FIREBASE && tile <= LASTFIRE) {
+-        return '*';
++    if (tile >= 424 && tile <= 611) {
++        const int tier = tier_from_distance(tile, 424, 611);
++        return "c" + std::to_string(tier);
+     }
+-    if (tile >= RUBBLE && tile <= LASTRUBBLE) {
+-        return ':';
++    if (tile >= 613 && tile <= 826 &&
++        !(tile >= POWERPLANT && tile <= LASTPOWERPLANT) &&
++        !(tile >= FIRESTATION && tile <= 768) &&
++        !(tile >= POLICESTBASE && tile <= POLICESTATION)) {
++        const int tier = tier_from_distance(tile, 613, 826);
++        return "i" + std::to_string(tier);
+     }
+-    return '?';
++
++    return "? ";
+ }
+apply_patch(auto_approved=true) exited 0 in 111ms:
+Success. Updated the following files:
+M app/micropolis/micropolis_bridge.cpp
+file update:
+diff --git a/app/micropolis/micropolis_bridge.cpp b/app/micropolis/micropolis_bridge.cpp
+index c588654d96cd39efc730a238eeeb56c93dc7f5b5..22f7241662943f27d671dcf1660432c969f1bb7d
+--- a/app/micropolis/micropolis_bridge.cpp
++++ b/app/micropolis/micropolis_bridge.cpp
+@@ -27,6 +27,46 @@
+         hash *= FNV_PRIME;
+     }
+ }
++
++int tier_from_distance(std::uint16_t tile, std::uint16_t start, std::uint16_t end) {
++    if (tile < start || tile > end) {
++        return 0;
++    }
++    const int span = static_cast<int>(end - start + 1);
++    const int distance = static_cast<int>(tile - start);
++    const int cut1 = span / 3;
++    const int cut2 = (span * 2) / 3;
++    if (distance < cut1) {
++        return 1;
++    }
++    if (distance < cut2) {
++        return 2;
++    }
++    return 3;
++}
++
++std::uint16_t neutralized_road_tile(std::uint16_t tile) {
++    if (tile >= ROADBASE && tile <= LASTROAD) {
++        return static_cast<std::uint16_t>((tile & 0x000F) + ROADBASE);
++    }
++    return tile;
++}
++
++char road_glyph(std::uint16_t tile) {
++    if (tile == BRWV) {
++        return '|';
++    }
++
++    const auto normalized = neutralized_road_tile(tile);
++    if (normalized == HBRIDGE || normalized == ROADS || normalized == HROADPOWER ||
++        normalized == BRWH) {
++        return '-';
++    }
++    if (normalized == VBRIDGE || normalized == ROADS2 || normalized == VROADPOWER) {
++        return '|';
++    }
++    return '+';
++}
+ } // namespace
+ 
+ MicropolisBridge::MicropolisBridge() : sim_(new Micropolis()) {
+@@ -71,46 +111,80 @@
+ }
+ 
+ char MicropolisBridge::glyph_for_tile(std::uint16_t tile) const {
+-    if (tile == HOSPITAL) {
+-        return 'H';
+-    }
+-    if (tile == FIRESTATION) {
+-        return 'F';
+-    }
+-    if (tile == POLICESTATION) {
+-        return 'P';
++    const std::string glyph_pair = glyph_pair_for_tile(tile);
++    if (glyph_pair.empty()) {
++        return '?';
+     }
++    return glyph_pair.front();
++}
++
++std::string MicropolisBridge::glyph_pair_for_tile(std::uint16_t tile) const {
+     if (tile == DIRT) {
+-        return '.';
++        return ". ";
+     }
+     if (tile >= RIVER && tile <= LASTRIVEDGE) {
+-        return '~';
++        return "~ ";
+     }
+     if (tile >= WOODS_LOW && tile <= WOODS_HIGH) {
+-        return '"';
++        return "\" ";
++    }
++    if (tile >= FIREBASE && tile <= LASTFIRE) {
++        return "* ";
++    }
++    if (tile >= RUBBLE && tile <= LASTRUBBLE) {
++        return ": ";
++    }
++
++    if (tile >= HOSPITALBASE && tile <= HOSPITALBASE + 8) {
++        return "H ";
++    }
++    if (tile >= POWERPLANT && tile <= LASTPOWERPLANT) {
++        return "* ";
++    }
++    if (tile >= FIRESTATION && tile <= 768) {
++        return "F ";
+     }
++    if (tile >= POLICESTBASE && tile <= POLICESTATION) {
++        return "P ";
++    }
++
++    if (tile == FREEZ) {
++        return "r.";
++    }
++    if (tile == COMBASE || tile == COMCLR) {
++        return "c.";
++    }
++    if (tile == INDBASE || tile == INDCLR) {
++        return "i.";
++    }
++
+     if (tile >= ROADBASE && tile <= LASTROAD) {
+-        return '=';
++        return std::string(1, road_glyph(tile)) + " ";
+     }
+     if (tile >= RAILBASE && tile <= LASTRAIL) {
+-        return '#';
++        return "# ";
+     }
+-    if (tile >= RESBASE && tile < COMBASE) {
+-        return 'R';
++    if (tile >= POWERBASE && tile <= LASTPOWER) {
++        return "w ";
+     }
+-    if (tile >= COMBASE && tile < INDBASE) {
+-        return 'C';
++
++    if (tile >= 245 && tile <= 422 && !(tile >= HOSPITALBASE && tile <= HOSPITALBASE + 8)) {
++        const int tier = tier_from_distance(tile, 245, 422);
++        return "r" + std::to_string(tier);
+     }
+-    if (tile >= INDBASE && tile <= LASTIND) {
+-        return 'I';
+-    }
+-    if (tile >= FIREBASE && tile <= LASTFIRE) {
+-        return '*';
++    if (tile >= 424 && tile <= 611) {
++        const int tier = tier_from_distance(tile, 424, 611);
++        return "c" + std::to_string(tier);
+     }
+-    if (tile >= RUBBLE && tile <= LASTRUBBLE) {
+-        return ':';
++    if (tile >= 613 && tile <= 826 &&
++        !(tile >= POWERPLANT && tile <= LASTPOWERPLANT) &&
++        !(tile >= FIRESTATION && tile <= 768) &&
++        !(tile >= POLICESTBASE && tile <= POLICESTATION)) {
++        const int tier = tier_from_distance(tile, 613, 826);
++        return "i" + std::to_string(tier);
+     }
+-    return '?';
++
++    return "? ";
+ }
+ 
+ std::uint64_t MicropolisBridge::hash_map_bytes() const {
+diff --git a/app/micropolis/micropolis_bridge.h b/app/micropolis/micropolis_bridge.h
+index f479fd5fb53c1b587c43ae9a0d8290a94211b035..8d1df444f75317dda3c2d636ac06caadb86992ab
+--- a/app/micropolis/micropolis_bridge.h
++++ b/app/micropolis/micropolis_bridge.h
+@@ -27,6 +27,7 @@
+     std::uint16_t cell_at(int x, int y) const;
+     std::uint16_t tile_at(int x, int y) const;
+     char glyph_for_tile(std::uint16_t tile) const;
++    std::string glyph_pair_for_tile(std::uint16_t tile) const;
+ 
+     MicropolisSnapshot snapshot() const;
+     std::string render_ascii_excerpt(int x, int y, int width, int height) const;
+@@ -36,4 +37,3 @@
+ 
+     std::unique_ptr<Micropolis> sim_;
+ };
+-
+
+file update:
+diff --git a/app/micropolis/micropolis_bridge.cpp b/app/micropolis/micropolis_bridge.cpp
+index c588654d96cd39efc730a238eeeb56c93dc7f5b5..22f7241662943f27d671dcf1660432c969f1bb7d
+--- a/app/micropolis/micropolis_bridge.cpp
++++ b/app/micropolis/micropolis_bridge.cpp
+@@ -27,6 +27,46 @@
+         hash *= FNV_PRIME;
+     }
+ }
++
++int tier_from_distance(std::uint16_t tile, std::uint16_t start, std::uint16_t end) {
++    if (tile < start || tile > end) {
++        return 0;
++    }
++    const int span = static_cast<int>(end - start + 1);
++    const int distance = static_cast<int>(tile - start);
++    const int cut1 = span / 3;
++    const int cut2 = (span * 2) / 3;
++    if (distance < cut1) {
++        return 1;
++    }
++    if (distance < cut2) {
++        return 2;
++    }
++    return 3;
++}
++
++std::uint16_t neutralized_road_tile(std::uint16_t tile) {
++    if (tile >= ROADBASE && tile <= LASTROAD) {
++        return static_cast<std::uint16_t>((tile & 0x000F) + ROADBASE);
++    }
++    return tile;
++}
++
++char road_glyph(std::uint16_t tile) {
++    if (tile == BRWV) {
++        return '|';
++    }
++
++    const auto normalized = neutralized_road_tile(tile);
++    if (normalized == HBRIDGE || normalized == ROADS || normalized == HROADPOWER ||
++        normalized == BRWH) {
++        return '-';
++    }
++    if (normalized == VBRIDGE || normalized == ROADS2 || normalized == VROADPOWER) {
++        return '|';
++    }
++    return '+';
++}
+ } // namespace
+ 
+ MicropolisBridge::MicropolisBridge() : sim_(new Micropolis()) {
+@@ -71,46 +111,80 @@
+ }
+ 
+ char MicropolisBridge::glyph_for_tile(std::uint16_t tile) const {
+-    if (tile == HOSPITAL) {
+-        return 'H';
+-    }
+-    if (tile == FIRESTATION) {
+-        return 'F';
+-    }
+-    if (tile == POLICESTATION) {
+-        return 'P';
++    const std::string glyph_pair = glyph_pair_for_tile(tile);
++    if (glyph_pair.empty()) {
++        return '?';
+     }
++    return glyph_pair.front();
++}
++
++std::string MicropolisBridge::glyph_pair_for_tile(std::uint16_t tile) const {
+     if (tile == DIRT) {
+-        return '.';
++        return ". ";
+     }
+     if (tile >= RIVER && tile <= LASTRIVEDGE) {
+-        return '~';
++        return "~ ";
+     }
+     if (tile >= WOODS_LOW && tile <= WOODS_HIGH) {
+-        return '"';
++        return "\" ";
++    }
++    if (tile >= FIREBASE && tile <= LASTFIRE) {
++        return "* ";
++    }
++    if (tile >= RUBBLE && tile <= LASTRUBBLE) {
++        return ": ";
++    }
++
++    if (tile >= HOSPITALBASE && tile <= HOSPITALBASE + 8) {
++        return "H ";
++    }
++    if (tile >= POWERPLANT && tile <= LASTPOWERPLANT) {
++        return "* ";
++    }
++    if (tile >= FIRESTATION && tile <= 768) {
++        return "F ";
+     }
++    if (tile >= POLICESTBASE && tile <= POLICESTATION) {
++        return "P ";
++    }
++
++    if (tile == FREEZ) {
++        return "r.";
++    }
++    if (tile == COMBASE || tile == COMCLR) {
++        return "c.";
++    }
++    if (tile == INDBASE || tile == INDCLR) {
++        return "i.";
++    }
++
+     if (tile >= ROADBASE && tile <= LASTROAD) {
+-        return '=';
++        return std::string(1, road_glyph(tile)) + " ";
+     }
+     if (tile >= RAILBASE && tile <= LASTRAIL) {
+-        return '#';
++        return "# ";
+     }
+-    if (tile >= RESBASE && tile < COMBASE) {
+-        return 'R';
++    if (tile >= POWERBASE && tile <= LASTPOWER) {
++        return "w ";
+     }
+-    if (tile >= COMBASE && tile < INDBASE) {
+-        return 'C';
++
++    if (tile >= 245 && tile <= 422 && !(tile >= HOSPITALBASE && tile <= HOSPITALBASE + 8)) {
++        const int tier = tier_from_distance(tile, 245, 422);
++        return "r" + std::to_string(tier);
+     }
+-    if (tile >= INDBASE && tile <= LASTIND) {
+-        return 'I';
+-    }
+-    if (tile >= FIREBASE && tile <= LASTFIRE) {
+-        return '*';
++    if (tile >= 424 && tile <= 611) {
++        const int tier = tier_from_distance(tile, 424, 611);
++        return "c" + std::to_string(tier);
+     }
+-    if (tile >= RUBBLE && tile <= LASTRUBBLE) {
+-        return ':';
++    if (tile >= 613 && tile <= 826 &&
++        !(tile >= POWERPLANT && tile <= LASTPOWERPLANT) &&
++        !(tile >= FIRESTATION && tile <= 768) &&
++        !(tile >= POLICESTBASE && tile <= POLICESTATION)) {
++        const int tier = tier_from_distance(tile, 613, 826);
++        return "i" + std::to_string(tier);
+     }
+-    return '?';
++
++    return "? ";
+ }
+ 
+ std::uint64_t MicropolisBridge::hash_map_bytes() const {
+diff --git a/app/micropolis/micropolis_bridge.h b/app/micropolis/micropolis_bridge.h
+index f479fd5fb53c1b587c43ae9a0d8290a94211b035..8d1df444f75317dda3c2d636ac06caadb86992ab
+--- a/app/micropolis/micropolis_bridge.h
++++ b/app/micropolis/micropolis_bridge.h
+@@ -27,6 +27,7 @@
+     std::uint16_t cell_at(int x, int y) const;
+     std::uint16_t tile_at(int x, int y) const;
+     char glyph_for_tile(std::uint16_t tile) const;
++    std::string glyph_pair_for_tile(std::uint16_t tile) const;
+ 
+     MicropolisSnapshot snapshot() const;
+     std::string render_ascii_excerpt(int x, int y, int width, int height) const;
+@@ -36,4 +37,3 @@
+ 
+     std::unique_ptr<Micropolis> sim_;
+ };
+-
+
+
+thinking
+**Implementing glyph color mapping**
+file update
+M /Users/james/Repos/wibandwob-dos/app/micropolis_ascii_view.cpp
+@@ -13,3 +13,24 @@
+ 
+-TColorAttr color_for_glyph(char ch) {
++TColorAttr color_for_glyph(char ch, char zone_prefix = '\0') {
++    if ((ch == '1' || ch == '2' || ch == '3') &&
++        (zone_prefix == 'r' || zone_prefix == 'c' || zone_prefix == 'i')) {
++        if (zone_prefix == 'r') {
++            if (ch == '1') return TColorAttr(0x02);
++            if (ch == '2') return TColorAttr(0x0A);
++            return TColorAttr(0x0F);
++        }
++        if (zone_prefix == 'c') {
++            if (ch == '1') return TColorAttr(0x01);
++            if (ch == '2') return TColorAttr(0x09);
++            return TColorAttr(0x0B);
++        }
++        if (ch == '1') return TColorAttr(0x06);
++        if (ch == '2') return TColorAttr(0x0E);
++        return TColorAttr(0x0C);
++    }
++
++    if (ch == '.' && (zone_prefix == 'r' || zone_prefix == 'c' || zone_prefix == 'i')) {
++        return color_for_glyph(zone_prefix);
++    }
++
+     switch (ch) {
+@@ -17,11 +38,14 @@
+         case '"': return TColorAttr(0x2F); // woods
+-        case '=': return TColorAttr(0x07); // road
++        case '-': return TColorAttr(0x08); // road horizontal
++        case '|': return TColorAttr(0x08); // road vertical
++        case '+': return TColorAttr(0x08); // road intersections
+         case '#': return TColorAttr(0x08); // rail
+-        case 'R': return TColorAttr(0x2A); // residential
+-        case 'C': return TColorAttr(0x1B); // commercial
+-        case 'I': return TColorAttr(0x6E); // industrial
+-        case 'H': return TColorAttr(0x7C); // hospital
+-        case 'P': return TColorAttr(0x1F); // police
++        case 'w': return TColorAttr(0x0B); // wire
++        case 'r': return TColorAttr(0x02); // residential
++        case 'c': return TColorAttr(0x01); // commercial
++        case 'i': return TColorAttr(0x06); // industrial
++        case 'H': return TColorAttr(0x0D); // hospital
++        case 'P': return TColorAttr(0x1E); // police
+         case 'F': return TColorAttr(0x4F); // fire station
+-        case '*': return TColorAttr(0x4E); // fire
++        case '*': return TColorAttr(0x4E); // fire / power plant
+         case ':': return TColorAttr(0x08); // rubble
+@@ -57,3 +81,4 @@
+ void TMicropolisAsciiView::clampCamera() {
+-    const int viewW = std::max(1, size.x);
++    const bool useWideTiles = size.x >= 2;
++    const int viewW = std::max(1, useWideTiles ? size.x / 2 : size.x);
+     const int viewH = std::max(1, size.y - 1);
+@@ -71,2 +96,4 @@
+     TDrawBuffer b;
++    const bool useWideTiles = size.x >= 2;
++    const int visibleTiles = std::max(1, useWideTiles ? size.x / 2 : size.x);
+ 
+@@ -91,8 +118,26 @@
+         const int wy = camY_ + (y - 1);
+-        for (int x = 0; x < size.x; ++x) {
+-            const int wx = camX_ + x;
+-            if (wx < kWorldW && wy < kWorldH) {
+-                const char g = bridge_.glyph_for_tile(bridge_.tile_at(wx, wy));
+-                b.putChar(x, g);
+-                b.putAttribute(x, color_for_glyph(g));
++        if (useWideTiles) {
++            for (int tx = 0; tx < visibleTiles; ++tx) {
++                const int wx = camX_ + tx;
++                const int x = tx * 2;
++                if (wx < kWorldW && wy < kWorldH) {
++                    const std::string pair = bridge_.glyph_pair_for_tile(bridge_.tile_at(wx, wy));
++                    const char g0 = pair.empty() ? '?' : pair[0];
++                    const char g1 = pair.size() > 1 ? pair[1] : ' ';
++                    b.putChar(x, g0);
++                    b.putAttribute(x, color_for_glyph(g0));
++                    if (x + 1 < size.x) {
++                        b.putChar(x + 1, g1);
++                        b.putAttribute(x + 1, color_for_glyph(g1, g0));
++                    }
++                }
++            }
++        } else {
++            for (int x = 0; x < size.x; ++x) {
++                const int wx = camX_ + x;
++                if (wx < kWorldW && wy < kWorldH) {
++                    const char g = bridge_.glyph_for_tile(bridge_.tile_at(wx, wy));
++                    b.putChar(x, g);
++                    b.putAttribute(x, color_for_glyph(g));
++                }
+             }
+apply_patch(auto_approved=true) exited 0 in 84ms:
+Success. Updated the following files:
+M app/micropolis_ascii_view.cpp
+file update:
+diff --git a/app/micropolis/micropolis_bridge.cpp b/app/micropolis/micropolis_bridge.cpp
+index c588654d96cd39efc730a238eeeb56c93dc7f5b5..22f7241662943f27d671dcf1660432c969f1bb7d
+--- a/app/micropolis/micropolis_bridge.cpp
++++ b/app/micropolis/micropolis_bridge.cpp
+@@ -27,6 +27,46 @@
+         hash *= FNV_PRIME;
+     }
+ }
++
++int tier_from_distance(std::uint16_t tile, std::uint16_t start, std::uint16_t end) {
++    if (tile < start || tile > end) {
++        return 0;
++    }
++    const int span = static_cast<int>(end - start + 1);
++    const int distance = static_cast<int>(tile - start);
++    const int cut1 = span / 3;
++    const int cut2 = (span * 2) / 3;
++    if (distance < cut1) {
++        return 1;
++    }
++    if (distance < cut2) {
++        return 2;
++    }
++    return 3;
++}
++
++std::uint16_t neutralized_road_tile(std::uint16_t tile) {
++    if (tile >= ROADBASE && tile <= LASTROAD) {
++        return static_cast<std::uint16_t>((tile & 0x000F) + ROADBASE);
++    }
++    return tile;
++}
++
++char road_glyph(std::uint16_t tile) {
++    if (tile == BRWV) {
++        return '|';
++    }
++
++    const auto normalized = neutralized_road_tile(tile);
++    if (normalized == HBRIDGE || normalized == ROADS || normalized == HROADPOWER ||
++        normalized == BRWH) {
++        return '-';
++    }
++    if (normalized == VBRIDGE || normalized == ROADS2 || normalized == VROADPOWER) {
++        return '|';
++    }
++    return '+';
++}
+ } // namespace
+ 
+ MicropolisBridge::MicropolisBridge() : sim_(new Micropolis()) {
+@@ -71,46 +111,80 @@
+ }
+ 
+ char MicropolisBridge::glyph_for_tile(std::uint16_t tile) const {
+-    if (tile == HOSPITAL) {
+-        return 'H';
+-    }
+-    if (tile == FIRESTATION) {
+-        return 'F';
+-    }
+-    if (tile == POLICESTATION) {
+-        return 'P';
++    const std::string glyph_pair = glyph_pair_for_tile(tile);
++    if (glyph_pair.empty()) {
++        return '?';
+     }
++    return glyph_pair.front();
++}
++
++std::string MicropolisBridge::glyph_pair_for_tile(std::uint16_t tile) const {
+     if (tile == DIRT) {
+-        return '.';
++        return ". ";
+     }
+     if (tile >= RIVER && tile <= LASTRIVEDGE) {
+-        return '~';
++        return "~ ";
+     }
+     if (tile >= WOODS_LOW && tile <= WOODS_HIGH) {
+-        return '"';
++        return "\" ";
++    }
++    if (tile >= FIREBASE && tile <= LASTFIRE) {
++        return "* ";
++    }
++    if (tile >= RUBBLE && tile <= LASTRUBBLE) {
++        return ": ";
++    }
++
++    if (tile >= HOSPITALBASE && tile <= HOSPITALBASE + 8) {
++        return "H ";
++    }
++    if (tile >= POWERPLANT && tile <= LASTPOWERPLANT) {
++        return "* ";
++    }
++    if (tile >= FIRESTATION && tile <= 768) {
++        return "F ";
+     }
++    if (tile >= POLICESTBASE && tile <= POLICESTATION) {
++        return "P ";
++    }
++
++    if (tile == FREEZ) {
++        return "r.";
++    }
++    if (tile == COMBASE || tile == COMCLR) {
++        return "c.";
++    }
++    if (tile == INDBASE || tile == INDCLR) {
++        return "i.";
++    }
++
+     if (tile >= ROADBASE && tile <= LASTROAD) {
+-        return '=';
++        return std::string(1, road_glyph(tile)) + " ";
+     }
+     if (tile >= RAILBASE && tile <= LASTRAIL) {
+-        return '#';
++        return "# ";
+     }
+-    if (tile >= RESBASE && tile < COMBASE) {
+-        return 'R';
++    if (tile >= POWERBASE && tile <= LASTPOWER) {
++        return "w ";
+     }
+-    if (tile >= COMBASE && tile < INDBASE) {
+-        return 'C';
++
++    if (tile >= 245 && tile <= 422 && !(tile >= HOSPITALBASE && tile <= HOSPITALBASE + 8)) {
++        const int tier = tier_from_distance(tile, 245, 422);
++        return "r" + std::to_string(tier);
+     }
+-    if (tile >= INDBASE && tile <= LASTIND) {
+-        return 'I';
+-    }
+-    if (tile >= FIREBASE && tile <= LASTFIRE) {
+-        return '*';
++    if (tile >= 424 && tile <= 611) {
++        const int tier = tier_from_distance(tile, 424, 611);
++        return "c" + std::to_string(tier);
+     }
+-    if (tile >= RUBBLE && tile <= LASTRUBBLE) {
+-        return ':';
++    if (tile >= 613 && tile <= 826 &&
++        !(tile >= POWERPLANT && tile <= LASTPOWERPLANT) &&
++        !(tile >= FIRESTATION && tile <= 768) &&
++        !(tile >= POLICESTBASE && tile <= POLICESTATION)) {
++        const int tier = tier_from_distance(tile, 613, 826);
++        return "i" + std::to_string(tier);
+     }
+-    return '?';
++
++    return "? ";
+ }
+ 
+ std::uint64_t MicropolisBridge::hash_map_bytes() const {
+diff --git a/app/micropolis/micropolis_bridge.h b/app/micropolis/micropolis_bridge.h
+index f479fd5fb53c1b587c43ae9a0d8290a94211b035..8d1df444f75317dda3c2d636ac06caadb86992ab
+--- a/app/micropolis/micropolis_bridge.h
++++ b/app/micropolis/micropolis_bridge.h
+@@ -27,6 +27,7 @@
+     std::uint16_t cell_at(int x, int y) const;
+     std::uint16_t tile_at(int x, int y) const;
+     char glyph_for_tile(std::uint16_t tile) const;
++    std::string glyph_pair_for_tile(std::uint16_t tile) const;
+ 
+     MicropolisSnapshot snapshot() const;
+     std::string render_ascii_excerpt(int x, int y, int width, int height) const;
+@@ -36,4 +37,3 @@
+ 
+     std::unique_ptr<Micropolis> sim_;
+ };
+-
+diff --git a/app/micropolis_ascii_view.cpp b/app/micropolis_ascii_view.cpp
+index 7455d91549d6aa538def8524b3f111d2cfbc03b4..1796aeb1622187a6e538a3633e624dd4335388fe
+--- a/app/micropolis_ascii_view.cpp
++++ b/app/micropolis_ascii_view.cpp
+@@ -11,19 +11,43 @@
+ constexpr int kWorldW = 120;
+ constexpr int kWorldH = 100;
+ 
+-TColorAttr color_for_glyph(char ch) {
++TColorAttr color_for_glyph(char ch, char zone_prefix = '\0') {
++    if ((ch == '1' || ch == '2' || ch == '3') &&
++        (zone_prefix == 'r' || zone_prefix == 'c' || zone_prefix == 'i')) {
++        if (zone_prefix == 'r') {
++            if (ch == '1') return TColorAttr(0x02);
++            if (ch == '2') return TColorAttr(0x0A);
++            return TColorAttr(0x0F);
++        }
++        if (zone_prefix == 'c') {
++            if (ch == '1') return TColorAttr(0x01);
++            if (ch == '2') return TColorAttr(0x09);
++            return TColorAttr(0x0B);
++        }
++        if (ch == '1') return TColorAttr(0x06);
++        if (ch == '2') return TColorAttr(0x0E);
++        return TColorAttr(0x0C);
++    }
++
++    if (ch == '.' && (zone_prefix == 'r' || zone_prefix == 'c' || zone_prefix == 'i')) {
++        return color_for_glyph(zone_prefix);
++    }
++
+     switch (ch) {
+         case '~': return TColorAttr(0x1F); // water
+         case '"': return TColorAttr(0x2F); // woods
+-        case '=': return TColorAttr(0x07); // road
++        case '-': return TColorAttr(0x08); // road horizontal
++        case '|': return TColorAttr(0x08); // road vertical
++        case '+': return TColorAttr(0x08); // road intersections
+         case '#': return TColorAttr(0x08); // rail
+-        case 'R': return TColorAttr(0x2A); // residential
+-        case 'C': return TColorAttr(0x1B); // commercial
+-        case 'I': return TColorAttr(0x6E); // industrial
+-        case 'H': return TColorAttr(0x7C); // hospital
+-        case 'P': return TColorAttr(0x1F); // police
++        case 'w': return TColorAttr(0x0B); // wire
++        case 'r': return TColorAttr(0x02); // residential
++        case 'c': return TColorAttr(0x01); // commercial
++        case 'i': return TColorAttr(0x06); // industrial
++        case 'H': return TColorAttr(0x0D); // hospital
++        case 'P': return TColorAttr(0x1E); // police
+         case 'F': return TColorAttr(0x4F); // fire station
+-        case '*': return TColorAttr(0x4E); // fire
++        case '*': return TColorAttr(0x4E); // fire / power plant
+         case ':': return TColorAttr(0x08); // rubble
+         default: return TColorAttr(0x07);
+     }
+@@ -55,7 +79,8 @@
+ }
+ 
+ void TMicropolisAsciiView::clampCamera() {
+-    const int viewW = std::max(1, size.x);
++    const bool useWideTiles = size.x >= 2;
++    const int viewW = std::max(1, useWideTiles ? size.x / 2 : size.x);
+     const int viewH = std::max(1, size.y - 1);
+     const int maxX = std::max(0, kWorldW - viewW);
+     const int maxY = std::max(0, kWorldH - viewH);
+@@ -69,6 +94,8 @@
+ 
+ void TMicropolisAsciiView::draw() {
+     TDrawBuffer b;
++    const bool useWideTiles = size.x >= 2;
++    const int visibleTiles = std::max(1, useWideTiles ? size.x / 2 : size.x);
+ 
+     const auto s = bridge_.snapshot();
+     std::ostringstream status;
+@@ -89,12 +116,30 @@
+     for (int y = 1; y < size.y; ++y) {
+         b.moveChar(0, ' ', TColorAttr(0x07), size.x);
+         const int wy = camY_ + (y - 1);
+-        for (int x = 0; x < size.x; ++x) {
+-            const int wx = camX_ + x;
+-            if (wx < kWorldW && wy < kWorldH) {
+-                const char g = bridge_.glyph_for_tile(bridge_.tile_at(wx, wy));
+-                b.putChar(x, g);
+-                b.putAttribute(x, color_for_glyph(g));
++        if (useWideTiles) {
++            for (int tx = 0; tx < visibleTiles; ++tx) {
++                const int wx = camX_ + tx;
++                const int x = tx * 2;
++                if (wx < kWorldW && wy < kWorldH) {
++                    const std::string pair = bridge_.glyph_pair_for_tile(bridge_.tile_at(wx, wy));
++                    const char g0 = pair.empty() ? '?' : pair[0];
++                    const char g1 = pair.size() > 1 ? pair[1] : ' ';
++                    b.putChar(x, g0);
++                    b.putAttribute(x, color_for_glyph(g0));
++                    if (x + 1 < size.x) {
++                        b.putChar(x + 1, g1);
++                        b.putAttribute(x + 1, color_for_glyph(g1, g0));
++                    }
++                }
++            }
++        } else {
++            for (int x = 0; x < size.x; ++x) {
++                const int wx = camX_ + x;
++                if (wx < kWorldW && wy < kWorldH) {
++                    const char g = bridge_.glyph_for_tile(bridge_.tile_at(wx, wy));
++                    b.putChar(x, g);
++                    b.putAttribute(x, color_for_glyph(g));
++                }
+             }
+         }
+         writeLine(0, y, size.x, 1, b);
+
+file update:
+diff --git a/app/micropolis/micropolis_bridge.cpp b/app/micropolis/micropolis_bridge.cpp
+index c588654d96cd39efc730a238eeeb56c93dc7f5b5..22f7241662943f27d671dcf1660432c969f1bb7d
+--- a/app/micropolis/micropolis_bridge.cpp
++++ b/app/micropolis/micropolis_bridge.cpp
+@@ -27,6 +27,46 @@
+         hash *= FNV_PRIME;
+     }
+ }
++
++int tier_from_distance(std::uint16_t tile, std::uint16_t start, std::uint16_t end) {
++    if (tile < start || tile > end) {
++        return 0;
++    }
++    const int span = static_cast<int>(end - start + 1);
++    const int distance = static_cast<int>(tile - start);
++    const int cut1 = span / 3;
++    const int cut2 = (span * 2) / 3;
++    if (distance < cut1) {
++        return 1;
++    }
++    if (distance < cut2) {
++        return 2;
++    }
++    return 3;
++}
++
++std::uint16_t neutralized_road_tile(std::uint16_t tile) {
++    if (tile >= ROADBASE && tile <= LASTROAD) {
++        return static_cast<std::uint16_t>((tile & 0x000F) + ROADBASE);
++    }
++    return tile;
++}
++
++char road_glyph(std::uint16_t tile) {
++    if (tile == BRWV) {
++        return '|';
++    }
++
++    const auto normalized = neutralized_road_tile(tile);
++    if (normalized == HBRIDGE || normalized == ROADS || normalized == HROADPOWER ||
++        normalized == BRWH) {
++        return '-';
++    }
++    if (normalized == VBRIDGE || normalized == ROADS2 || normalized == VROADPOWER) {
++        return '|';
++    }
++    return '+';
++}
+ } // namespace
+ 
+ MicropolisBridge::MicropolisBridge() : sim_(new Micropolis()) {
+@@ -71,46 +111,80 @@
+ }
+ 
+ char MicropolisBridge::glyph_for_tile(std::uint16_t tile) const {
+-    if (tile == HOSPITAL) {
+-        return 'H';
+-    }
+-    if (tile == FIRESTATION) {
+-        return 'F';
+-    }
+-    if (tile == POLICESTATION) {
+-        return 'P';
++    const std::string glyph_pair = glyph_pair_for_tile(tile);
++    if (glyph_pair.empty()) {
++        return '?';
+     }
++    return glyph_pair.front();
++}
++
++std::string MicropolisBridge::glyph_pair_for_tile(std::uint16_t tile) const {
+     if (tile == DIRT) {
+-        return '.';
++        return ". ";
+     }
+     if (tile >= RIVER && tile <= LASTRIVEDGE) {
+-        return '~';
++        return "~ ";
+     }
+     if (tile >= WOODS_LOW && tile <= WOODS_HIGH) {
+-        return '"';
++        return "\" ";
++    }
++    if (tile >= FIREBASE && tile <= LASTFIRE) {
++        return "* ";
++    }
++    if (tile >= RUBBLE && tile <= LASTRUBBLE) {
++        return ": ";
++    }
++
++    if (tile >= HOSPITALBASE && tile <= HOSPITALBASE + 8) {
++        return "H ";
++    }
++    if (tile >= POWERPLANT && tile <= LASTPOWERPLANT) {
++        return "* ";
++    }
++    if (tile >= FIRESTATION && tile <= 768) {
++        return "F ";
+     }
++    if (tile >= POLICESTBASE && tile <= POLICESTATION) {
++        return "P ";
++    }
++
++    if (tile == FREEZ) {
++        return "r.";
++    }
++    if (tile == COMBASE || tile == COMCLR) {
++        return "c.";
++    }
++    if (tile == INDBASE || tile == INDCLR) {
++        return "i.";
++    }
++
+     if (tile >= ROADBASE && tile <= LASTROAD) {
+-        return '=';
++        return std::string(1, road_glyph(tile)) + " ";
+     }
+     if (tile >= RAILBASE && tile <= LASTRAIL) {
+-        return '#';
++        return "# ";
+     }
+-    if (tile >= RESBASE && tile < COMBASE) {
+-        return 'R';
++    if (tile >= POWERBASE && tile <= LASTPOWER) {
++        return "w ";
+     }
+-    if (tile >= COMBASE && tile < INDBASE) {
+-        return 'C';
++
++    if (tile >= 245 && tile <= 422 && !(tile >= HOSPITALBASE && tile <= HOSPITALBASE + 8)) {
++        const int tier = tier_from_distance(tile, 245, 422);
++        return "r" + std::to_string(tier);
+     }
+-    if (tile >= INDBASE && tile <= LASTIND) {
+-        return 'I';
+-    }
+-    if (tile >= FIREBASE && tile <= LASTFIRE) {
+-        return '*';
++    if (tile >= 424 && tile <= 611) {
++        const int tier = tier_from_distance(tile, 424, 611);
++        return "c" + std::to_string(tier);
+     }
+-    if (tile >= RUBBLE && tile <= LASTRUBBLE) {
+-        return ':';
++    if (tile >= 613 && tile <= 826 &&
++        !(tile >= POWERPLANT && tile <= LASTPOWERPLANT) &&
++        !(tile >= FIRESTATION && tile <= 768) &&
++        !(tile >= POLICESTBASE && tile <= POLICESTATION)) {
++        const int tier = tier_from_distance(tile, 613, 826);
++        return "i" + std::to_string(tier);
+     }
+-    return '?';
++
++    return "? ";
+ }
+ 
+ std::uint64_t MicropolisBridge::hash_map_bytes() const {
+diff --git a/app/micropolis/micropolis_bridge.h b/app/micropolis/micropolis_bridge.h
+index f479fd5fb53c1b587c43ae9a0d8290a94211b035..8d1df444f75317dda3c2d636ac06caadb86992ab
+--- a/app/micropolis/micropolis_bridge.h
++++ b/app/micropolis/micropolis_bridge.h
+@@ -27,6 +27,7 @@
+     std::uint16_t cell_at(int x, int y) const;
+     std::uint16_t tile_at(int x, int y) const;
+     char glyph_for_tile(std::uint16_t tile) const;
++    std::string glyph_pair_for_tile(std::uint16_t tile) const;
+ 
+     MicropolisSnapshot snapshot() const;
+     std::string render_ascii_excerpt(int x, int y, int width, int height) const;
+@@ -36,4 +37,3 @@
+ 
+     std::unique_ptr<Micropolis> sim_;
+ };
+-
+diff --git a/app/micropolis_ascii_view.cpp b/app/micropolis_ascii_view.cpp
+index 7455d91549d6aa538def8524b3f111d2cfbc03b4..1796aeb1622187a6e538a3633e624dd4335388fe
+--- a/app/micropolis_ascii_view.cpp
++++ b/app/micropolis_ascii_view.cpp
+@@ -11,19 +11,43 @@
+ constexpr int kWorldW = 120;
+ constexpr int kWorldH = 100;
+ 
+-TColorAttr color_for_glyph(char ch) {
++TColorAttr color_for_glyph(char ch, char zone_prefix = '\0') {
++    if ((ch == '1' || ch == '2' || ch == '3') &&
++        (zone_prefix == 'r' || zone_prefix == 'c' || zone_prefix == 'i')) {
++        if (zone_prefix == 'r') {
++            if (ch == '1') return TColorAttr(0x02);
++            if (ch == '2') return TColorAttr(0x0A);
++            return TColorAttr(0x0F);
++        }
++        if (zone_prefix == 'c') {
++            if (ch == '1') return TColorAttr(0x01);
++            if (ch == '2') return TColorAttr(0x09);
++            return TColorAttr(0x0B);
++        }
++        if (ch == '1') return TColorAttr(0x06);
++        if (ch == '2') return TColorAttr(0x0E);
++        return TColorAttr(0x0C);
++    }
++
++    if (ch == '.' && (zone_prefix == 'r' || zone_prefix == 'c' || zone_prefix == 'i')) {
++        return color_for_glyph(zone_prefix);
++    }
++
+     switch (ch) {
+         case '~': return TColorAttr(0x1F); // water
+         case '"': return TColorAttr(0x2F); // woods
+-        case '=': return TColorAttr(0x07); // road
++        case '-': return TColorAttr(0x08); // road horizontal
++        case '|': return TColorAttr(0x08); // road vertical
++        case '+': return TColorAttr(0x08); // road intersections
+         case '#': return TColorAttr(0x08); // rail
+-        case 'R': return TColorAttr(0x2A); // residential
+-        case 'C': return TColorAttr(0x1B); // commercial
+-        case 'I': return TColorAttr(0x6E); // industrial
+-        case 'H': return TColorAttr(0x7C); // hospital
+-        case 'P': return TColorAttr(0x1F); // police
++        case 'w': return TColorAttr(0x0B); // wire
++        case 'r': return TColorAttr(0x02); // residential
++        case 'c': return TColorAttr(0x01); // commercial
++        case 'i': return TColorAttr(0x06); // industrial
++        case 'H': return TColorAttr(0x0D); // hospital
++        case 'P': return TColorAttr(0x1E); // police
+         case 'F': return TColorAttr(0x4F); // fire station
+-        case '*': return TColorAttr(0x4E); // fire
++        case '*': return TColorAttr(0x4E); // fire / power plant
+         case ':': return TColorAttr(0x08); // rubble
+         default: return TColorAttr(0x07);
+     }
+@@ -55,7 +79,8 @@
+ }
+ 
+ void TMicropolisAsciiView::clampCamera() {
+-    const int viewW = std::max(1, size.x);
++    const bool useWideTiles = size.x >= 2;
++    const int viewW = std::max(1, useWideTiles ? size.x / 2 : size.x);
+     const int viewH = std::max(1, size.y - 1);
+     const int maxX = std::max(0, kWorldW - viewW);
+     const int maxY = std::max(0, kWorldH - viewH);
+@@ -69,6 +94,8 @@
+ 
+ void TMicropolisAsciiView::draw() {
+     TDrawBuffer b;
++    const bool useWideTiles = size.x >= 2;
++    const int visibleTiles = std::max(1, useWideTiles ? size.x / 2 : size.x);
+ 
+     const auto s = bridge_.snapshot();
+     std::ostringstream status;
+@@ -89,12 +116,30 @@
+     for (int y = 1; y < size.y; ++y) {
+         b.moveChar(0, ' ', TColorAttr(0x07), size.x);
+         const int wy = camY_ + (y - 1);
+-        for (int x = 0; x < size.x; ++x) {
+-            const int wx = camX_ + x;
+-            if (wx < kWorldW && wy < kWorldH) {
+-                const char g = bridge_.glyph_for_tile(bridge_.tile_at(wx, wy));
+-                b.putChar(x, g);
+-                b.putAttribute(x, color_for_glyph(g));
++        if (useWideTiles) {
++            for (int tx = 0; tx < visibleTiles; ++tx) {
++                const int wx = camX_ + tx;
++                const int x = tx * 2;
++                if (wx < kWorldW && wy < kWorldH) {
++                    const std::string pair = bridge_.glyph_pair_for_tile(bridge_.tile_at(wx, wy));
++                    const char g0 = pair.empty() ? '?' : pair[0];
++                    const char g1 = pair.size() > 1 ? pair[1] : ' ';
++                    b.putChar(x, g0);
++                    b.putAttribute(x, color_for_glyph(g0));
++                    if (x + 1 < size.x) {
++                        b.putChar(x + 1, g1);
++                        b.putAttribute(x + 1, color_for_glyph(g1, g0));
++                    }
++                }
++            }
++        } else {
++            for (int x = 0; x < size.x; ++x) {
++                const int wx = camX_ + x;
++                if (wx < kWorldW && wy < kWorldH) {
++                    const char g = bridge_.glyph_for_tile(bridge_.tile_at(wx, wy));
++                    b.putChar(x, g);
++                    b.putAttribute(x, color_for_glyph(g));
++                }
+             }
+         }
+         writeLine(0, y, size.x, 1, b);
+
+
+thinking
+**Reviewing constants and includes**
+codex
+I’ve applied the bridge + view changes; next I’m compiling and running `micropolis_determinism_test` and `micropolis_no_ansi_test` to confirm no regressions.
+exec
+/bin/zsh -lc 'cmake --build build -j4' in /Users/james/Repos/wibandwob-dos exited 2 in 4.65s:
+[  1%] Built target command_registry_test
+[  2%] Built target ascii_dump
+[  2%] Building CXX object app/CMakeFiles/scramble_engine_test.dir/scramble_engine_test.cpp.o
+[  3%] Building CXX object app/CMakeFiles/scramble_engine_test.dir/command_registry.cpp.o
+[ 12%] Built target micropolis_native
+[ 12%] Building CXX object app/CMakeFiles/micropolis_bridge.dir/micropolis/micropolis_bridge.cpp.o
+[ 13%] Linking CXX static library libmicropolis_bridge.a
+[ 13%] Built target micropolis_bridge
+[ 13%] Building CXX object app/CMakeFiles/micropolis_determinism_test.dir/micropolis_determinism_test.cpp.o
+[ 79%] Built target tvision
+[ 79%] Building CXX object app/CMakeFiles/micropolis_no_ansi_test.dir/micropolis_no_ansi_test.cpp.o
+[ 79%] Linking CXX executable scramble_engine_test
+ld: Undefined symbols:
+  api_spawn_micropolis_ascii(TTestPatternApp&, TRect const*), referenced from:
+      exec_registry_command(TTestPatternApp&, std::__1::basic_string<char, std::__1::char_traits<char>, std::__1::allocator<char>> const&, std::__1::map<std::__1::basic_string<char, std::__1::char_traits<char>, std::__1::allocator<char>>, std::__1::basic_string<char, std::__1::char_traits<char>, std::__1::allocator<char>>, std::__1::less<std::__1::basic_string<char, std::__1::char_traits<char>, std::__1::allocator<char>>>, std::__1::allocator<std::__1::pair<std::__1::basic_string<char, std::__1::char_traits<char>, std::__1::allocator<char>> const, std::__1::basic_string<char, std::__1::char_traits<char>, std::__1::allocator<char>>>>> const&) in command_registry.cpp.o
+clang: error: linker command failed with exit code 1 (use -v to see invocation)
+make[2]: *** [app/scramble_engine_test] Error 1
+make[1]: *** [app/CMakeFiles/scramble_engine_test.dir/all] Error 2
+make[1]: *** Waiting for unfinished jobs....
+[ 79%] Linking CXX executable micropolis_determinism_test
+file update:
+diff --git a/app/micropolis/micropolis_bridge.cpp b/app/micropolis/micropolis_bridge.cpp
+index c588654d96cd39efc730a238eeeb56c93dc7f5b5..22f7241662943f27d671dcf1660432c969f1bb7d
+--- a/app/micropolis/micropolis_bridge.cpp
++++ b/app/micropolis/micropolis_bridge.cpp
+@@ -27,6 +27,46 @@
+         hash *= FNV_PRIME;
+     }
+ }
++
++int tier_from_distance(std::uint16_t tile, std::uint16_t start, std::uint16_t end) {
++    if (tile < start || tile > end) {
++        return 0;
++    }
++    const int span = static_cast<int>(end - start + 1);
++    const int distance = static_cast<int>(tile - start);
++    const int cut1 = span / 3;
++    const int cut2 = (span * 2) / 3;
++    if (distance < cut1) {
++        return 1;
++    }
++    if (distance < cut2) {
++        return 2;
++    }
++    return 3;
++}
++
++std::uint16_t neutralized_road_tile(std::uint16_t tile) {
++    if (tile >= ROADBASE && tile <= LASTROAD) {
++        return static_cast<std::uint16_t>((tile & 0x000F) + ROADBASE);
++    }
++    return tile;
++}
++
++char road_glyph(std::uint16_t tile) {
++    if (tile == BRWV) {
++        return '|';
++    }
++
++    const auto normalized = neutralized_road_tile(tile);
++    if (normalized == HBRIDGE || normalized == ROADS || normalized == HROADPOWER ||
++        normalized == BRWH) {
++        return '-';
++    }
++    if (normalized == VBRIDGE || normalized == ROADS2 || normalized == VROADPOWER) {
++        return '|';
++    }
++    return '+';
++}
+ } // namespace
+ 
+ MicropolisBridge::MicropolisBridge() : sim_(new Micropolis()) {
+@@ -71,46 +111,80 @@
+ }
+ 
+ char MicropolisBridge::glyph_for_tile(std::uint16_t tile) const {
+-    if (tile == HOSPITAL) {
+-        return 'H';
+-    }
+-    if (tile == FIRESTATION) {
+-        return 'F';
+-    }
+-    if (tile == POLICESTATION) {
+-        return 'P';
++    const std::string glyph_pair = glyph_pair_for_tile(tile);
++    if (glyph_pair.empty()) {
++        return '?';
+     }
++    return glyph_pair.front();
++}
++
++std::string MicropolisBridge::glyph_pair_for_tile(std::uint16_t tile) const {
+     if (tile == DIRT) {
+-        return '.';
++        return ". ";
+     }
+     if (tile >= RIVER && tile <= LASTRIVEDGE) {
+-        return '~';
++        return "~ ";
+     }
+     if (tile >= WOODS_LOW && tile <= WOODS_HIGH) {
+-        return '"';
++        return "\" ";
++    }
++    if (tile >= FIREBASE && tile <= LASTFIRE) {
++        return "* ";
++    }
++    if (tile >= RUBBLE && tile <= LASTRUBBLE) {
++        return ": ";
++    }
++
++    if (tile >= HOSPITALBASE && tile <= HOSPITALBASE + 8) {
++        return "H ";
++    }
++    if (tile >= POWERPLANT && tile <= LASTPOWERPLANT) {
++        return "* ";
++    }
++    if (tile >= FIRESTATION && tile <= 768) {
++        return "F ";
+     }
++    if (tile >= POLICESTBASE && tile <= POLICESTATION) {
++        return "P ";
++    }
++
++    if (tile == FREEZ) {
++        return "r.";
++    }
++    if (tile == COMBASE || tile == COMCLR) {
++        return "c.";
++    }
++    if (tile == INDBASE || tile == INDCLR) {
++        return "i.";
++    }
++
+     if (tile >= ROADBASE && tile <= LASTROAD) {
+-        return '=';
++        return std::string(1, road_glyph(tile)) + " ";
+     }
+     if (tile >= RAILBASE && tile <= LASTRAIL) {
+-        return '#';
++        return "# ";
+     }
+-    if (tile >= RESBASE && tile < COMBASE) {
+-        return 'R';
++    if (tile >= POWERBASE && tile <= LASTPOWER) {
++        return "w ";
+     }
+-    if (tile >= COMBASE && tile < INDBASE) {
+-        return 'C';
++
++    if (tile >= 245 && tile <= 422 && !(tile >= HOSPITALBASE && tile <= HOSPITALBASE + 8)) {
++        const int tier = tier_from_distance(tile, 245, 422);
++        return "r" + std::to_string(tier);
+     }
+-    if (tile >= INDBASE && tile <= LASTIND) {
+-        return 'I';
+-    }
+-    if (tile >= FIREBASE && tile <= LASTFIRE) {
+-        return '*';
++    if (tile >= 424 && tile <= 611) {
++        const int tier = tier_from_distance(tile, 424, 611);
++        return "c" + std::to_string(tier);
+     }
+-    if (tile >= RUBBLE && tile <= LASTRUBBLE) {
+-        return ':';
++    if (tile >= 613 && tile <= 826 &&
++        !(tile >= POWERPLANT && tile <= LASTPOWERPLANT) &&
++        !(tile >= FIRESTATION && tile <= 768) &&
++        !(tile >= POLICESTBASE && tile <= POLICESTATION)) {
++        const int tier = tier_from_distance(tile, 613, 826);
++        return "i" + std::to_string(tier);
+     }
+-    return '?';
++
++    return "? ";
+ }
+ 
+ std::uint64_t MicropolisBridge::hash_map_bytes() const {
+diff --git a/app/micropolis/micropolis_bridge.h b/app/micropolis/micropolis_bridge.h
+index f479fd5fb53c1b587c43ae9a0d8290a94211b035..8d1df444f75317dda3c2d636ac06caadb86992ab
+--- a/app/micropolis/micropolis_bridge.h
++++ b/app/micropolis/micropolis_bridge.h
+@@ -27,6 +27,7 @@
+     std::uint16_t cell_at(int x, int y) const;
+     std::uint16_t tile_at(int x, int y) const;
+     char glyph_for_tile(std::uint16_t tile) const;
++    std::string glyph_pair_for_tile(std::uint16_t tile) const;
+ 
+     MicropolisSnapshot snapshot() const;
+     std::string render_ascii_excerpt(int x, int y, int width, int height) const;
+@@ -36,4 +37,3 @@
+ 
+     std::unique_ptr<Micropolis> sim_;
+ };
+-
+diff --git a/app/micropolis_ascii_view.cpp b/app/micropolis_ascii_view.cpp
+index 7455d91549d6aa538def8524b3f111d2cfbc03b4..1796aeb1622187a6e538a3633e624dd4335388fe
+--- a/app/micropolis_ascii_view.cpp
++++ b/app/micropolis_ascii_view.cpp
+@@ -11,19 +11,43 @@
+ constexpr int kWorldW = 120;
+ constexpr int kWorldH = 100;
+ 
+-TColorAttr color_for_glyph(char ch) {
++TColorAttr color_for_glyph(char ch, char zone_prefix = '\0') {
++    if ((ch == '1' || ch == '2' || ch == '3') &&
++        (zone_prefix == 'r' || zone_prefix == 'c' || zone_prefix == 'i')) {
++        if (zone_prefix == 'r') {
++            if (ch == '1') return TColorAttr(0x02);
++            if (ch == '2') return TColorAttr(0x0A);
++            return TColorAttr(0x0F);
++        }
++        if (zone_prefix == 'c') {
++            if (ch == '1') return TColorAttr(0x01);
++            if (ch == '2') return TColorAttr(0x09);
++            return TColorAttr(0x0B);
++        }
++        if (ch == '1') return TColorAttr(0x06);
++        if (ch == '2') return TColorAttr(0x0E);
++        return TColorAttr(0x0C);
++    }
++
++    if (ch == '.' && (zone_prefix == 'r' || zone_prefix == 'c' || zone_prefix == 'i')) {
++        return color_for_glyph(zone_prefix);
++    }
++
+     switch (ch) {
+         case '~': return TColorAttr(0x1F); // water
+         case '"': return TColorAttr(0x2F); // woods
+-        case '=': return TColorAttr(0x07); // road
++        case '-': return TColorAttr(0x08); // road horizontal
++        case '|': return TColorAttr(0x08); // road vertical
++        case '+': return TColorAttr(0x08); // road intersections
+         case '#': return TColorAttr(0x08); // rail
+-        case 'R': return TColorAttr(0x2A); // residential
+-        case 'C': return TColorAttr(0x1B); // commercial
+-        case 'I': return TColorAttr(0x6E); // industrial
+-        case 'H': return TColorAttr(0x7C); // hospital
+-        case 'P': return TColorAttr(0x1F); // police
++        case 'w': return TColorAttr(0x0B); // wire
++        case 'r': return TColorAttr(0x02); // residential
++        case 'c': return TColorAttr(0x01); // commercial
++        case 'i': return TColorAttr(0x06); // industrial
++        case 'H': return TColorAttr(0x0D); // hospital
++        case 'P': return TColorAttr(0x1E); // police
+         case 'F': return TColorAttr(0x4F); // fire station
+-        case '*': return TColorAttr(0x4E); // fire
++        case '*': return TColorAttr(0x4E); // fire / power plant
+         case ':': return TColorAttr(0x08); // rubble
+         default: return TColorAttr(0x07);
+     }
+@@ -55,7 +79,8 @@
+ }
+ 
+ void TMicropolisAsciiView::clampCamera() {
+-    const int viewW = std::max(1, size.x);
++    const bool useWideTiles = size.x >= 2;
++    const int viewW = std::max(1, useWideTiles ? size.x / 2 : size.x);
+     const int viewH = std::max(1, size.y - 1);
+     const int maxX = std::max(0, kWorldW - viewW);
+     const int maxY = std::max(0, kWorldH - viewH);
+@@ -69,6 +94,8 @@
+ 
+ void TMicropolisAsciiView::draw() {
+     TDrawBuffer b;
++    const bool useWideTiles = size.x >= 2;
++    const int visibleTiles = std::max(1, useWideTiles ? size.x / 2 : size.x);
+ 
+     const auto s = bridge_.snapshot();
+     std::ostringstream status;
+@@ -89,12 +116,30 @@
+     for (int y = 1; y < size.y; ++y) {
+         b.moveChar(0, ' ', TColorAttr(0x07), size.x);
+         const int wy = camY_ + (y - 1);
+-        for (int x = 0; x < size.x; ++x) {
+-            const int wx = camX_ + x;
+-            if (wx < kWorldW && wy < kWorldH) {
+-                const char g = bridge_.glyph_for_tile(bridge_.tile_at(wx, wy));
+-                b.putChar(x, g);
+-                b.putAttribute(x, color_for_glyph(g));
++        if (useWideTiles) {
++            for (int tx = 0; tx < visibleTiles; ++tx) {
++                const int wx = camX_ + tx;
++                const int x = tx * 2;
++                if (wx < kWorldW && wy < kWorldH) {
++                    const std::string pair = bridge_.glyph_pair_for_tile(bridge_.tile_at(wx, wy));
++                    const char g0 = pair.empty() ? '?' : pair[0];
++                    const char g1 = pair.size() > 1 ? pair[1] : ' ';
++                    b.putChar(x, g0);
++                    b.putAttribute(x, color_for_glyph(g0));
++                    if (x + 1 < size.x) {
++                        b.putChar(x + 1, g1);
++                        b.putAttribute(x + 1, color_for_glyph(g1, g0));
++                    }
++                }
++            }
++        } else {
++            for (int x = 0; x < size.x; ++x) {
++                const int wx = camX_ + x;
++                if (wx < kWorldW && wy < kWorldH) {
++                    const char g = bridge_.glyph_for_tile(bridge_.tile_at(wx, wy));
++                    b.putChar(x, g);
++                    b.putAttribute(x, color_for_glyph(g));
++                }
+             }
+         }
+         writeLine(0, y, size.x, 1, b);
+
+
+thinking
+**Verifying test target builds**
+codex
+The full build fails on an existing unrelated linker issue in `scramble_engine_test`, but the Micropolis targets did build. I’ll run the two required Micropolis tests directly now.
+exec
+/bin/zsh -lc 'cd build && ctest --output-on-failure -R "micropolis_(determinism|no_ansi)"' in /Users/james/Repos/wibandwob-dos succeeded in 1.08s:
+1/2 Test #3: micropolis_determinism ...........   Passed    0.66 sec
+    Start 4: micropolis_no_ansi
+2/2 Test #4: micropolis_no_ansi ...............   Passed    0.40 sec
+
+100% tests passed, 0 tests failed out of 2
+
+Total Test time (real) =   1.07 sec
+file update:
+diff --git a/app/micropolis/micropolis_bridge.cpp b/app/micropolis/micropolis_bridge.cpp
+index c588654d96cd39efc730a238eeeb56c93dc7f5b5..22f7241662943f27d671dcf1660432c969f1bb7d
+--- a/app/micropolis/micropolis_bridge.cpp
++++ b/app/micropolis/micropolis_bridge.cpp
+@@ -27,6 +27,46 @@
+         hash *= FNV_PRIME;
+     }
+ }
++
++int tier_from_distance(std::uint16_t tile, std::uint16_t start, std::uint16_t end) {
++    if (tile < start || tile > end) {
++        return 0;
++    }
++    const int span = static_cast<int>(end - start + 1);
++    const int distance = static_cast<int>(tile - start);
++    const int cut1 = span / 3;
++    const int cut2 = (span * 2) / 3;
++    if (distance < cut1) {
++        return 1;
++    }
++    if (distance < cut2) {
++        return 2;
++    }
++    return 3;
++}
++
++std::uint16_t neutralized_road_tile(std::uint16_t tile) {
++    if (tile >= ROADBASE && tile <= LASTROAD) {
++        return static_cast<std::uint16_t>((tile & 0x000F) + ROADBASE);
++    }
++    return tile;
++}
++
++char road_glyph(std::uint16_t tile) {
++    if (tile == BRWV) {
++        return '|';
++    }
++
++    const auto normalized = neutralized_road_tile(tile);
++    if (normalized == HBRIDGE || normalized == ROADS || normalized == HROADPOWER ||
++        normalized == BRWH) {
++        return '-';
++    }
++    if (normalized == VBRIDGE || normalized == ROADS2 || normalized == VROADPOWER) {
++        return '|';
++    }
++    return '+';
++}
+ } // namespace
+ 
+ MicropolisBridge::MicropolisBridge() : sim_(new Micropolis()) {
+@@ -71,46 +111,80 @@
+ }
+ 
+ char MicropolisBridge::glyph_for_tile(std::uint16_t tile) const {
+-    if (tile == HOSPITAL) {
+-        return 'H';
+-    }
+-    if (tile == FIRESTATION) {
+-        return 'F';
+-    }
+-    if (tile == POLICESTATION) {
+-        return 'P';
++    const std::string glyph_pair = glyph_pair_for_tile(tile);
++    if (glyph_pair.empty()) {
++        return '?';
+     }
++    return glyph_pair.front();
++}
++
++std::string MicropolisBridge::glyph_pair_for_tile(std::uint16_t tile) const {
+     if (tile == DIRT) {
+-        return '.';
++        return ". ";
+     }
+     if (tile >= RIVER && tile <= LASTRIVEDGE) {
+-        return '~';
++        return "~ ";
+     }
+     if (tile >= WOODS_LOW && tile <= WOODS_HIGH) {
+-        return '"';
++        return "\" ";
++    }
++    if (tile >= FIREBASE && tile <= LASTFIRE) {
++        return "* ";
++    }
++    if (tile >= RUBBLE && tile <= LASTRUBBLE) {
++        return ": ";
++    }
++
++    if (tile >= HOSPITALBASE && tile <= HOSPITALBASE + 8) {
++        return "H ";
++    }
++    if (tile >= POWERPLANT && tile <= LASTPOWERPLANT) {
++        return "* ";
++    }
++    if (tile >= FIRESTATION && tile <= 768) {
++        return "F ";
+     }
++    if (tile >= POLICESTBASE && tile <= POLICESTATION) {
++        return "P ";
++    }
++
++    if (tile == FREEZ) {
++        return "r.";
++    }
++    if (tile == COMBASE || tile == COMCLR) {
++        return "c.";
++    }
++    if (tile == INDBASE || tile == INDCLR) {
++        return "i.";
++    }
++
+     if (tile >= ROADBASE && tile <= LASTROAD) {
+-        return '=';
++        return std::string(1, road_glyph(tile)) + " ";
+     }
+     if (tile >= RAILBASE && tile <= LASTRAIL) {
+-        return '#';
++        return "# ";
+     }
+-    if (tile >= RESBASE && tile < COMBASE) {
+-        return 'R';
++    if (tile >= POWERBASE && tile <= LASTPOWER) {
++        return "w ";
+     }
+-    if (tile >= COMBASE && tile < INDBASE) {
+-        return 'C';
++
++    if (tile >= 245 && tile <= 422 && !(tile >= HOSPITALBASE && tile <= HOSPITALBASE + 8)) {
++        const int tier = tier_from_distance(tile, 245, 422);
++        return "r" + std::to_string(tier);
+     }
+-    if (tile >= INDBASE && tile <= LASTIND) {
+-        return 'I';
+-    }
+-    if (tile >= FIREBASE && tile <= LASTFIRE) {
+-        return '*';
++    if (tile >= 424 && tile <= 611) {
++        const int tier = tier_from_distance(tile, 424, 611);
++        return "c" + std::to_string(tier);
+     }
+-    if (tile >= RUBBLE && tile <= LASTRUBBLE) {
+-        return ':';
++    if (tile >= 613 && tile <= 826 &&
++        !(tile >= POWERPLANT && tile <= LASTPOWERPLANT) &&
++        !(tile >= FIRESTATION && tile <= 768) &&
++        !(tile >= POLICESTBASE && tile <= POLICESTATION)) {
++        const int tier = tier_from_distance(tile, 613, 826);
++        return "i" + std::to_string(tier);
+     }
+-    return '?';
++
++    return "? ";
+ }
+ 
+ std::uint64_t MicropolisBridge::hash_map_bytes() const {
+diff --git a/app/micropolis/micropolis_bridge.h b/app/micropolis/micropolis_bridge.h
+index f479fd5fb53c1b587c43ae9a0d8290a94211b035..8d1df444f75317dda3c2d636ac06caadb86992ab
+--- a/app/micropolis/micropolis_bridge.h
++++ b/app/micropolis/micropolis_bridge.h
+@@ -27,6 +27,7 @@
+     std::uint16_t cell_at(int x, int y) const;
+     std::uint16_t tile_at(int x, int y) const;
+     char glyph_for_tile(std::uint16_t tile) const;
++    std::string glyph_pair_for_tile(std::uint16_t tile) const;
+ 
+     MicropolisSnapshot snapshot() const;
+     std::string render_ascii_excerpt(int x, int y, int width, int height) const;
+@@ -36,4 +37,3 @@
+ 
+     std::unique_ptr<Micropolis> sim_;
+ };
+-
+diff --git a/app/micropolis_ascii_view.cpp b/app/micropolis_ascii_view.cpp
+index 7455d91549d6aa538def8524b3f111d2cfbc03b4..1796aeb1622187a6e538a3633e624dd4335388fe
+--- a/app/micropolis_ascii_view.cpp
++++ b/app/micropolis_ascii_view.cpp
+@@ -11,19 +11,43 @@
+ constexpr int kWorldW = 120;
+ constexpr int kWorldH = 100;
+ 
+-TColorAttr color_for_glyph(char ch) {
++TColorAttr color_for_glyph(char ch, char zone_prefix = '\0') {
++    if ((ch == '1' || ch == '2' || ch == '3') &&
++        (zone_prefix == 'r' || zone_prefix == 'c' || zone_prefix == 'i')) {
++        if (zone_prefix == 'r') {
++            if (ch == '1') return TColorAttr(0x02);
++            if (ch == '2') return TColorAttr(0x0A);
++            return TColorAttr(0x0F);
++        }
++        if (zone_prefix == 'c') {
++            if (ch == '1') return TColorAttr(0x01);
++            if (ch == '2') return TColorAttr(0x09);
++            return TColorAttr(0x0B);
++        }
++        if (ch == '1') return TColorAttr(0x06);
++        if (ch == '2') return TColorAttr(0x0E);
++        return TColorAttr(0x0C);
++    }
++
++    if (ch == '.' && (zone_prefix == 'r' || zone_prefix == 'c' || zone_prefix == 'i')) {
++        return color_for_glyph(zone_prefix);
++    }
++
+     switch (ch) {
+         case '~': return TColorAttr(0x1F); // water
+         case '"': return TColorAttr(0x2F); // woods
+-        case '=': return TColorAttr(0x07); // road
++        case '-': return TColorAttr(0x08); // road horizontal
++        case '|': return TColorAttr(0x08); // road vertical
++        case '+': return TColorAttr(0x08); // road intersections
+         case '#': return TColorAttr(0x08); // rail
+-        case 'R': return TColorAttr(0x2A); // residential
+-        case 'C': return TColorAttr(0x1B); // commercial
+-        case 'I': return TColorAttr(0x6E); // industrial
+-        case 'H': return TColorAttr(0x7C); // hospital
+-        case 'P': return TColorAttr(0x1F); // police
++        case 'w': return TColorAttr(0x0B); // wire
++        case 'r': return TColorAttr(0x02); // residential
++        case 'c': return TColorAttr(0x01); // commercial
++        case 'i': return TColorAttr(0x06); // industrial
++        case 'H': return TColorAttr(0x0D); // hospital
++        case 'P': return TColorAttr(0x1E); // police
+         case 'F': return TColorAttr(0x4F); // fire station
+-        case '*': return TColorAttr(0x4E); // fire
++        case '*': return TColorAttr(0x4E); // fire / power plant
+         case ':': return TColorAttr(0x08); // rubble
+         default: return TColorAttr(0x07);
+     }
+@@ -55,7 +79,8 @@
+ }
+ 
+ void TMicropolisAsciiView::clampCamera() {
+-    const int viewW = std::max(1, size.x);
++    const bool useWideTiles = size.x >= 2;
++    const int viewW = std::max(1, useWideTiles ? size.x / 2 : size.x);
+     const int viewH = std::max(1, size.y - 1);
+     const int maxX = std::max(0, kWorldW - viewW);
+     const int maxY = std::max(0, kWorldH - viewH);
+@@ -69,6 +94,8 @@
+ 
+ void TMicropolisAsciiView::draw() {
+     TDrawBuffer b;
++    const bool useWideTiles = size.x >= 2;
++    const int visibleTiles = std::max(1, useWideTiles ? size.x / 2 : size.x);
+ 
+     const auto s = bridge_.snapshot();
+     std::ostringstream status;
+@@ -89,12 +116,30 @@
+     for (int y = 1; y < size.y; ++y) {
+         b.moveChar(0, ' ', TColorAttr(0x07), size.x);
+         const int wy = camY_ + (y - 1);
+-        for (int x = 0; x < size.x; ++x) {
+-            const int wx = camX_ + x;
+-            if (wx < kWorldW && wy < kWorldH) {
+-                const char g = bridge_.glyph_for_tile(bridge_.tile_at(wx, wy));
+-                b.putChar(x, g);
+-                b.putAttribute(x, color_for_glyph(g));
++        if (useWideTiles) {
++            for (int tx = 0; tx < visibleTiles; ++tx) {
++                const int wx = camX_ + tx;
++                const int x = tx * 2;
++                if (wx < kWorldW && wy < kWorldH) {
++                    const std::string pair = bridge_.glyph_pair_for_tile(bridge_.tile_at(wx, wy));
++                    const char g0 = pair.empty() ? '?' : pair[0];
++                    const char g1 = pair.size() > 1 ? pair[1] : ' ';
++                    b.putChar(x, g0);
++                    b.putAttribute(x, color_for_glyph(g0));
++                    if (x + 1 < size.x) {
++                        b.putChar(x + 1, g1);
++                        b.putAttribute(x + 1, color_for_glyph(g1, g0));
++                    }
++                }
++            }
++        } else {
++            for (int x = 0; x < size.x; ++x) {
++                const int wx = camX_ + x;
++                if (wx < kWorldW && wy < kWorldH) {
++                    const char g = bridge_.glyph_for_tile(bridge_.tile_at(wx, wy));
++                    b.putChar(x, g);
++                    b.putAttribute(x, color_for_glyph(g));
++                }
+             }
+         }
+         writeLine(0, y, size.x, 1, b);
+
+
+thinking
+**Planning precise diff and range capture**
+exec
+/bin/zsh -lc 'git diff -- app/micropolis/micropolis_bridge.h app/micropolis/micropolis_bridge.cpp app/micropolis_ascii_view.cpp' in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba vendor/MicropolisCore/MicropolisEngine/src/zone.cpp | sed -n '700,910p'" in /Users/james/Repos/wibandwob-dos succeeded in 50ms:
+diff --git a/app/micropolis/micropolis_bridge.cpp b/app/micropolis/micropolis_bridge.cpp
+index c588654..22f7241 100644
+--- a/app/micropolis/micropolis_bridge.cpp
++++ b/app/micropolis/micropolis_bridge.cpp
+@@ -27,6 +27,46 @@ void hash_mix(std::uint64_t &hash, const void *value, std::size_t size) {
+         hash *= FNV_PRIME;
+     }
+ }
++
++int tier_from_distance(std::uint16_t tile, std::uint16_t start, std::uint16_t end) {
++    if (tile < start || tile > end) {
++        return 0;
++    }
++    const int span = static_cast<int>(end - start + 1);
++    const int distance = static_cast<int>(tile - start);
++    const int cut1 = span / 3;
++    const int cut2 = (span * 2) / 3;
++    if (distance < cut1) {
++        return 1;
++    }
+ succeeded in 50ms:
+   700	}
+   701	
+   702	
+   703	/**
+   704	 * Return population of a residential zone center tile
+   705	 * (RZB, RZB+9, ..., HOSPITAL - 9).
+   706	 *
+   707	 * @param mapTile Center tile of a residential zone.
+   708	 * @return Population of the residential zone.
+   709	 *         (16, 24, 32, 40, 16, ..., 40 )
+   710	 */
+   711	short Micropolis::getResZonePop(MapTile mapTile)
+   712	{
+   713	    short CzDen = ((mapTile - RZB) / 9) % 4;
+   714	
+   715	    return CzDen * 8 + 16;
+   716	}
+   717	
+   718	/**
+   719	 * Put down a residential zone.
+exec
+/bin/zsh -lc "nl -ba vendor/MicropolisCore/MicropolisEngine/src/zone.cpp | sed -n '990,1045p'" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+   990	        zonePlop(pos, INDBASE); // empty industrial zone
+   991	        incRateOfGrowth(pos, -8);
+   992	    }
+   993	}
+   994	
+   995	
+   996	/**
+   997	 * Get the population value for the given industrial tile.
+   998	 * @param tile Center tile value of the industrial zone.
+   999	 * @return Population value.
+  1000	 */
+  1001	short Micropolis::getIndZonePop(MapTile tile)
+  1002	{
+  1003	    if (tile == INDCLR) {
+  1004	        return 0;
+  1005	    }
+  1006	
+  1007	    short CzDen = (((tile - IZB) / 9) % 4) + 1;
+  1008	    return CzDen;
+  1009	}
+exec
+/bin/zsh -lc "nl -ba vendor/MicropolisCore/MicropolisEngine/src/micropolis.h | sed -n '500,620p'" in /Users/james/Repos/wibandwob-dos succeeded in 50ms:
+   500	    RAILBASE       = HRAIL,
+   501	    LASTRAIL       = 238,
+   502	
+   503	    ROADVPOWERH    = 239, /* bogus? */
+   504	
+   505	    // Residential zone tiles
+   506	
+   507	    RESBASE        = 240, // Empty residential, tiles 240--248
+   508	    FREEZ          = 244, // center-tile of 3x3 empty residential
+   509	
+   510	    HOUSE          = 249, // Single tile houses until 260
+   511	    LHTHR          = HOUSE,
+   512	    HHTHR          = 260,
+   513	
+   514	    RZB            = 265, // center tile first 3x3 tile residential
+   515	
+   516	    HOSPITALBASE   = 405, // Center of hospital (tiles 405--413)
+   517	    HOSPITAL       = 409, // Center of hospital (tiles 405--413)
+   518	
+   519	    CHURCHBASE     = 414, // Center of church (tiles 414--422)
+file update:
+diff --git a/app/micropolis/micropolis_bridge.cpp b/app/micropolis/micropolis_bridge.cpp
+index c588654d96cd39efc730a238eeeb56c93dc7f5b5..22f7241662943f27d671dcf1660432c969f1bb7d
+--- a/app/micropolis/micropolis_bridge.cpp
++++ b/app/micropolis/micropolis_bridge.cpp
+@@ -27,6 +27,46 @@
+         hash *= FNV_PRIME;
+     }
+ }
++
++int tier_from_distance(std::uint16_t tile, std::uint16_t start, std::uint16_t end) {
++    if (tile < start || tile > end) {
++        return 0;
++    }
++    const int span = static_cast<int>(end - start + 1);
++    const int distance = static_cast<int>(tile - start);
++    const int cut1 = span / 3;
++    const int cut2 = (span * 2) / 3;
++    if (distance < cut1) {
++        return 1;
++    }
++    if (distance < cut2) {
++        return 2;
++    }
++    return 3;
++}
++
++std::uint16_t neutralized_road_tile(std::uint16_t tile) {
++    if (tile >= ROADBASE && tile <= LASTROAD) {
++        return static_cast<std::uint16_t>((tile & 0x000F) + ROADBASE);
++    }
++    return tile;
++}
++
++char road_glyph(std::uint16_t tile) {
++    if (tile == BRWV) {
++        return '|';
++    }
++
++    const auto normalized = neutralized_road_tile(tile);
++    if (normalized == HBRIDGE || normalized == ROADS || normalized == HROADPOWER ||
++        normalized == BRWH) {
++        return '-';
++    }
++    if (normalized == VBRIDGE || normalized == ROADS2 || normalized == VROADPOWER) {
++        return '|';
++    }
++    return '+';
++}
+ } // namespace
+ 
+ MicropolisBridge::MicropolisBridge() : sim_(new Micropolis()) {
+@@ -71,46 +111,80 @@
+ }
+ 
+ char MicropolisBridge::glyph_for_tile(std::uint16_t tile) const {
+-    if (tile == HOSPITAL) {
+-        return 'H';
+-    }
+-    if (tile == FIRESTATION) {
+-        return 'F';
+-    }
+-    if (tile == POLICESTATION) {
+-        return 'P';
++    const std::string glyph_pair = glyph_pair_for_tile(tile);
++    if (glyph_pair.empty()) {
++        return '?';
+     }
++    return glyph_pair.front();
++}
++
++std::string MicropolisBridge::glyph_pair_for_tile(std::uint16_t tile) const {
+     if (tile == DIRT) {
+-        return '.';
++        return ". ";
+     }
+     if (tile >= RIVER && tile <= LASTRIVEDGE) {
+-        return '~';
++        return "~ ";
+     }
+     if (tile >= WOODS_LOW && tile <= WOODS_HIGH) {
+-        return '"';
++        return "\" ";
++    }
++    if (tile >= FIREBASE && tile <= LASTFIRE) {
++        return "* ";
++    }
++    if (tile >= RUBBLE && tile <= LASTRUBBLE) {
++        return ": ";
++    }
++
++    if (tile >= HOSPITALBASE && tile <= HOSPITALBASE + 8) {
++        return "H ";
++    }
++    if (tile >= POWERPLANT && tile <= LASTPOWERPLANT) {
++        return "* ";
++    }
++    if (tile >= FIRESTATION && tile <= 768) {
++        return "F ";
+     }
++    if (tile >= POLICESTBASE && tile <= POLICESTATION) {
++        return "P ";
++    }
++
++    if (tile == FREEZ) {
++        return "r.";
++    }
++    if (tile == COMBASE || tile == COMCLR) {
++        return "c.";
++    }
++    if (tile == INDBASE || tile == INDCLR) {
++        return "i.";
++    }
++
+     if (tile >= ROADBASE && tile <= LASTROAD) {
+-        return '=';
++        return std::string(1, road_glyph(tile)) + " ";
+     }
+     if (tile >= RAILBASE && tile <= LASTRAIL) {
+-        return '#';
++        return "# ";
+     }
+-    if (tile >= RESBASE && tile < COMBASE) {
+-        return 'R';
++    if (tile >= POWERBASE && tile <= LASTPOWER) {
++        return "w ";
+     }
+-    if (tile >= COMBASE && tile < INDBASE) {
+-        return 'C';
++
++    if (tile >= 245 && tile <= 422 && !(tile >= HOSPITALBASE && tile <= HOSPITALBASE + 8)) {
++        const int tier = tier_from_distance(tile, 245, 422);
++        return "r" + std::to_string(tier);
+     }
+-    if (tile >= INDBASE && tile <= LASTIND) {
+-        return 'I';
+-    }
+-    if (tile >= FIREBASE && tile <= LASTFIRE) {
+-        return '*';
++    if (tile >= 424 && tile <= 611) {
++        const int tier = tier_from_distance(tile, 424, 611);
++        return "c" + std::to_string(tier);
+     }
+-    if (tile >= RUBBLE && tile <= LASTRUBBLE) {
+-        return ':';
++    if (tile >= 613 && tile <= 826 &&
++        !(tile >= POWERPLANT && tile <= LASTPOWERPLANT) &&
++        !(tile >= FIRESTATION && tile <= 768) &&
++        !(tile >= POLICESTBASE && tile <= POLICESTATION)) {
++        const int tier = tier_from_distance(tile, 613, 826);
++        return "i" + std::to_string(tier);
+     }
+-    return '?';
++
++    return "? ";
+ }
+ 
+ std::uint64_t MicropolisBridge::hash_map_bytes() const {
+diff --git a/app/micropolis/micropolis_bridge.h b/app/micropolis/micropolis_bridge.h
+index f479fd5fb53c1b587c43ae9a0d8290a94211b035..8d1df444f75317dda3c2d636ac06caadb86992ab
+--- a/app/micropolis/micropolis_bridge.h
++++ b/app/micropolis/micropolis_bridge.h
+@@ -27,6 +27,7 @@
+     std::uint16_t cell_at(int x, int y) const;
+     std::uint16_t tile_at(int x, int y) const;
+     char glyph_for_tile(std::uint16_t tile) const;
++    std::string glyph_pair_for_tile(std::uint16_t tile) const;
+ 
+     MicropolisSnapshot snapshot() const;
+     std::string render_ascii_excerpt(int x, int y, int width, int height) const;
+@@ -36,4 +37,3 @@
+ 
+     std::unique_ptr<Micropolis> sim_;
+ };
+-
+diff --git a/app/micropolis_ascii_view.cpp b/app/micropolis_ascii_view.cpp
+index 7455d91549d6aa538def8524b3f111d2cfbc03b4..1796aeb1622187a6e538a3633e624dd4335388fe
+--- a/app/micropolis_ascii_view.cpp
++++ b/app/micropolis_ascii_view.cpp
+@@ -11,19 +11,43 @@
+ constexpr int kWorldW = 120;
+ constexpr int kWorldH = 100;
+ 
+-TColorAttr color_for_glyph(char ch) {
++TColorAttr color_for_glyph(char ch, char zone_prefix = '\0') {
++    if ((ch == '1' || ch == '2' || ch == '3') &&
++        (zone_prefix == 'r' || zone_prefix == 'c' || zone_prefix == 'i')) {
++        if (zone_prefix == 'r') {
++            if (ch == '1') return TColorAttr(0x02);
++            if (ch == '2') return TColorAttr(0x0A);
++            return TColorAttr(0x0F);
++        }
++        if (zone_prefix == 'c') {
++            if (ch == '1') return TColorAttr(0x01);
++            if (ch == '2') return TColorAttr(0x09);
++            return TColorAttr(0x0B);
++        }
++        if (ch == '1') return TColorAttr(0x06);
++        if (ch == '2') return TColorAttr(0x0E);
++        return TColorAttr(0x0C);
++    }
++
++    if (ch == '.' && (zone_prefix == 'r' || zone_prefix == 'c' || zone_prefix == 'i')) {
++        return color_for_glyph(zone_prefix);
++    }
++
+     switch (ch) {
+         case '~': return TColorAttr(0x1F); // water
+         case '"': return TColorAttr(0x2F); // woods
+-        case '=': return TColorAttr(0x07); // road
++        case '-': return TColorAttr(0x08); // road horizontal
++        case '|': return TColorAttr(0x08); // road vertical
++        case '+': return TColorAttr(0x08); // road intersections
+         case '#': return TColorAttr(0x08); // rail
+-        case 'R': return TColorAttr(0x2A); // residential
+-        case 'C': return TColorAttr(0x1B); // commercial
+-        case 'I': return TColorAttr(0x6E); // industrial
+-        case 'H': return TColorAttr(0x7C); // hospital
+-        case 'P': return TColorAttr(0x1F); // police
++        case 'w': return TColorAttr(0x0B); // wire
++        case 'r': return TColorAttr(0x02); // residential
++        case 'c': return TColorAttr(0x01); // commercial
++        case 'i': return TColorAttr(0x06); // industrial
++        case 'H': return TColorAttr(0x0D); // hospital
++        case 'P': return TColorAttr(0x1E); // police
+         case 'F': return TColorAttr(0x4F); // fire station
+-        case '*': return TColorAttr(0x4E); // fire
++        case '*': return TColorAttr(0x4E); // fire / power plant
+         case ':': return TColorAttr(0x08); // rubble
+         default: return TColorAttr(0x07);
+     }
+@@ -55,7 +79,8 @@
+ }
+ 
+ void TMicropolisAsciiView::clampCamera() {
+-    const int viewW = std::max(1, size.x);
++    const bool useWideTiles = size.x >= 2;
++    const int viewW = std::max(1, useWideTiles ? size.x / 2 : size.x);
+     const int viewH = std::max(1, size.y - 1);
+     const int maxX = std::max(0, kWorldW - viewW);
+     const int maxY = std::max(0, kWorldH - viewH);
+@@ -69,6 +94,8 @@
+ 
+ void TMicropolisAsciiView::draw() {
+     TDrawBuffer b;
++    const bool useWideTiles = size.x >= 2;
++    const int visibleTiles = std::max(1, useWideTiles ? size.x / 2 : size.x);
+ 
+     const auto s = bridge_.snapshot();
+     std::ostringstream status;
+@@ -89,12 +116,30 @@
+     for (int y = 1; y < size.y; ++y) {
+         b.moveChar(0, ' ', TColorAttr(0x07), size.x);
+         const int wy = camY_ + (y - 1);
+-        for (int x = 0; x < size.x; ++x) {
+-            const int wx = camX_ + x;
+-            if (wx < kWorldW && wy < kWorldH) {
+-                const char g = bridge_.glyph_for_tile(bridge_.tile_at(wx, wy));
+-                b.putChar(x, g);
+-                b.putAttribute(x, color_for_glyph(g));
++        if (useWideTiles) {
++            for (int tx = 0; tx < visibleTiles; ++tx) {
++                const int wx = camX_ + tx;
++                const int x = tx * 2;
++                if (wx < kWorldW && wy < kWorldH) {
++                    const std::string pair = bridge_.glyph_pair_for_tile(bridge_.tile_at(wx, wy));
++                    const char g0 = pair.empty() ? '?' : pair[0];
++                    const char g1 = pair.size() > 1 ? pair[1] : ' ';
++                    b.putChar(x, g0);
++                    b.putAttribute(x, color_for_glyph(g0));
++                    if (x + 1 < size.x) {
++                        b.putChar(x + 1, g1);
++                        b.putAttribute(x + 1, color_for_glyph(g1, g0));
++                    }
++                }
++            }
++        } else {
++            for (int x = 0; x < size.x; ++x) {
++                const int wx = camX_ + x;
++                if (wx < kWorldW && wy < kWorldH) {
++                    const char g = bridge_.glyph_for_tile(bridge_.tile_at(wx, wy));
++                    b.putChar(x, g);
++                    b.putAttribute(x, color_for_glyph(g));
++                }
+             }
+         }
+         writeLine(0, y, size.x, 1, b);
+
+
+thinking
+**Reviewing road boundary constants**
+codex
+I’m collecting a final reference snippet for road/wire/rail tile ranges, then I’ll send the requested summary with boundaries, diffs, build/test results, and open questions.
+exec
+/bin/zsh -lc "nl -ba vendor/MicropolisCore/MicropolisEngine/src/micropolis.h | sed -n '420,506p'" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+   420	
+   421	    /* Fire animation (8 tiles) */
+   422	    FIRE           = 56,
+   423	    FIREBASE       = FIRE,
+   424	    LASTFIRE       = 63,
+   425	
+   426	    HBRIDGE        = 64, ///< Horizontal bridge
+   427	    ROADBASE       = HBRIDGE,
+   428	    VBRIDGE        = 65, ///< Vertical bridge
+   429	    ROADS          = 66,
+   430	    ROADS2         = 67,
+   431	    ROADS3         = 68,
+   432	    ROADS4         = 69,
+   433	    ROADS5         = 70,
+   434	    ROADS6         = 71,
+   435	    ROADS7         = 72,
+   436	    ROADS8         = 73,
+   437	    ROADS9         = 74,
+   438	    ROADS10        = 75,
+   439	    INTERSECTION   = 76,
+file update:
+diff --git a/app/micropolis/micropolis_bridge.cpp b/app/micropolis/micropolis_bridge.cpp
+index c588654d96cd39efc730a238eeeb56c93dc7f5b5..22f7241662943f27d671dcf1660432c969f1bb7d
+--- a/app/micropolis/micropolis_bridge.cpp
++++ b/app/micropolis/micropolis_bridge.cpp
+@@ -27,6 +27,46 @@
+         hash *= FNV_PRIME;
+     }
+ }
++
++int tier_from_distance(std::uint16_t tile, std::uint16_t start, std::uint16_t end) {
++    if (tile < start || tile > end) {
++        return 0;
++    }
++    const int span = static_cast<int>(end - start + 1);
++    const int distance = static_cast<int>(tile - start);
++    const int cut1 = span / 3;
++    const int cut2 = (span * 2) / 3;
++    if (distance < cut1) {
++        return 1;
++    }
++    if (distance < cut2) {
++        return 2;
++    }
++    return 3;
++}
++
++std::uint16_t neutralized_road_tile(std::uint16_t tile) {
++    if (tile >= ROADBASE && tile <= LASTROAD) {
++        return static_cast<std::uint16_t>((tile & 0x000F) + ROADBASE);
++    }
++    return tile;
++}
++
++char road_glyph(std::uint16_t tile) {
++    if (tile == BRWV) {
++        return '|';
++    }
++
++    const auto normalized = neutralized_road_tile(tile);
++    if (normalized == HBRIDGE || normalized == ROADS || normalized == HROADPOWER ||
++        normalized == BRWH) {
++        return '-';
++    }
++    if (normalized == VBRIDGE || normalized == ROADS2 || normalized == VROADPOWER) {
++        return '|';
++    }
++    return '+';
++}
+ } // namespace
+ 
+ MicropolisBridge::MicropolisBridge() : sim_(new Micropolis()) {
+@@ -71,46 +111,80 @@
+ }
+ 
+ char MicropolisBridge::glyph_for_tile(std::uint16_t tile) const {
+-    if (tile == HOSPITAL) {
+-        return 'H';
+-    }
+-    if (tile == FIRESTATION) {
+-        return 'F';
+-    }
+-    if (tile == POLICESTATION) {
+-        return 'P';
++    const std::string glyph_pair = glyph_pair_for_tile(tile);
++    if (glyph_pair.empty()) {
++        return '?';
+     }
++    return glyph_pair.front();
++}
++
++std::string MicropolisBridge::glyph_pair_for_tile(std::uint16_t tile) const {
+     if (tile == DIRT) {
+-        return '.';
++        return ". ";
+     }
+     if (tile >= RIVER && tile <= LASTRIVEDGE) {
+-        return '~';
++        return "~ ";
+     }
+     if (tile >= WOODS_LOW && tile <= WOODS_HIGH) {
+-        return '"';
++        return "\" ";
++    }
++    if (tile >= FIREBASE && tile <= LASTFIRE) {
++        return "* ";
++    }
++    if (tile >= RUBBLE && tile <= LASTRUBBLE) {
++        return ": ";
++    }
++
++    if (tile >= HOSPITALBASE && tile <= HOSPITALBASE + 8) {
++        return "H ";
++    }
++    if (tile >= POWERPLANT && tile <= LASTPOWERPLANT) {
++        return "* ";
++    }
++    if (tile >= FIRESTATION && tile <= 768) {
++        return "F ";
+     }
++    if (tile >= POLICESTBASE && tile <= POLICESTATION) {
++        return "P ";
++    }
++
++    if (tile == FREEZ) {
++        return "r.";
++    }
++    if (tile == COMBASE || tile == COMCLR) {
++        return "c.";
++    }
++    if (tile == INDBASE || tile == INDCLR) {
++        return "i.";
++    }
++
+     if (tile >= ROADBASE && tile <= LASTROAD) {
+-        return '=';
++        return std::string(1, road_glyph(tile)) + " ";
+     }
+     if (tile >= RAILBASE && tile <= LASTRAIL) {
+-        return '#';
++        return "# ";
+     }
+-    if (tile >= RESBASE && tile < COMBASE) {
+-        return 'R';
++    if (tile >= POWERBASE && tile <= LASTPOWER) {
++        return "w ";
+     }
+-    if (tile >= COMBASE && tile < INDBASE) {
+-        return 'C';
++
++    if (tile >= 245 && tile <= 422 && !(tile >= HOSPITALBASE && tile <= HOSPITALBASE + 8)) {
++        const int tier = tier_from_distance(tile, 245, 422);
++        return "r" + std::to_string(tier);
+     }
+-    if (tile >= INDBASE && tile <= LASTIND) {
+-        return 'I';
+-    }
+-    if (tile >= FIREBASE && tile <= LASTFIRE) {
+-        return '*';
++    if (tile >= 424 && tile <= 611) {
++        const int tier = tier_from_distance(tile, 424, 611);
++        return "c" + std::to_string(tier);
+     }
+-    if (tile >= RUBBLE && tile <= LASTRUBBLE) {
+-        return ':';
++    if (tile >= 613 && tile <= 826 &&
++        !(tile >= POWERPLANT && tile <= LASTPOWERPLANT) &&
++        !(tile >= FIRESTATION && tile <= 768) &&
++        !(tile >= POLICESTBASE && tile <= POLICESTATION)) {
++        const int tier = tier_from_distance(tile, 613, 826);
++        return "i" + std::to_string(tier);
+     }
+-    return '?';
++
++    return "? ";
+ }
+ 
+ std::uint64_t MicropolisBridge::hash_map_bytes() const {
+diff --git a/app/micropolis/micropolis_bridge.h b/app/micropolis/micropolis_bridge.h
+index f479fd5fb53c1b587c43ae9a0d8290a94211b035..8d1df444f75317dda3c2d636ac06caadb86992ab
+--- a/app/micropolis/micropolis_bridge.h
++++ b/app/micropolis/micropolis_bridge.h
+@@ -27,6 +27,7 @@
+     std::uint16_t cell_at(int x, int y) const;
+     std::uint16_t tile_at(int x, int y) const;
+     char glyph_for_tile(std::uint16_t tile) const;
++    std::string glyph_pair_for_tile(std::uint16_t tile) const;
+ 
+     MicropolisSnapshot snapshot() const;
+     std::string render_ascii_excerpt(int x, int y, int width, int height) const;
+@@ -36,4 +37,3 @@
+ 
+     std::unique_ptr<Micropolis> sim_;
+ };
+-
+diff --git a/app/micropolis_ascii_view.cpp b/app/micropolis_ascii_view.cpp
+index 7455d91549d6aa538def8524b3f111d2cfbc03b4..1796aeb1622187a6e538a3633e624dd4335388fe
+--- a/app/micropolis_ascii_view.cpp
++++ b/app/micropolis_ascii_view.cpp
+@@ -11,19 +11,43 @@
+ constexpr int kWorldW = 120;
+ constexpr int kWorldH = 100;
+ 
+-TColorAttr color_for_glyph(char ch) {
++TColorAttr color_for_glyph(char ch, char zone_prefix = '\0') {
++    if ((ch == '1' || ch == '2' || ch == '3') &&
++        (zone_prefix == 'r' || zone_prefix == 'c' || zone_prefix == 'i')) {
++        if (zone_prefix == 'r') {
++            if (ch == '1') return TColorAttr(0x02);
++            if (ch == '2') return TColorAttr(0x0A);
++            return TColorAttr(0x0F);
++        }
++        if (zone_prefix == 'c') {
++            if (ch == '1') return TColorAttr(0x01);
++            if (ch == '2') return TColorAttr(0x09);
++            return TColorAttr(0x0B);
++        }
++        if (ch == '1') return TColorAttr(0x06);
++        if (ch == '2') return TColorAttr(0x0E);
++        return TColorAttr(0x0C);
++    }
++
++    if (ch == '.' && (zone_prefix == 'r' || zone_prefix == 'c' || zone_prefix == 'i')) {
++        return color_for_glyph(zone_prefix);
++    }
++
+     switch (ch) {
+         case '~': return TColorAttr(0x1F); // water
+         case '"': return TColorAttr(0x2F); // woods
+-        case '=': return TColorAttr(0x07); // road
++        case '-': return TColorAttr(0x08); // road horizontal
++        case '|': return TColorAttr(0x08); // road vertical
++        case '+': return TColorAttr(0x08); // road intersections
+         case '#': return TColorAttr(0x08); // rail
+-        case 'R': return TColorAttr(0x2A); // residential
+-        case 'C': return TColorAttr(0x1B); // commercial
+-        case 'I': return TColorAttr(0x6E); // industrial
+-        case 'H': return TColorAttr(0x7C); // hospital
+-        case 'P': return TColorAttr(0x1F); // police
++        case 'w': return TColorAttr(0x0B); // wire
++        case 'r': return TColorAttr(0x02); // residential
++        case 'c': return TColorAttr(0x01); // commercial
++        case 'i': return TColorAttr(0x06); // industrial
++        case 'H': return TColorAttr(0x0D); // hospital
++        case 'P': return TColorAttr(0x1E); // police
+         case 'F': return TColorAttr(0x4F); // fire station
+-        case '*': return TColorAttr(0x4E); // fire
++        case '*': return TColorAttr(0x4E); // fire / power plant
+         case ':': return TColorAttr(0x08); // rubble
+         default: return TColorAttr(0x07);
+     }
+@@ -55,7 +79,8 @@
+ }
+ 
+ void TMicropolisAsciiView::clampCamera() {
+-    const int viewW = std::max(1, size.x);
++    const bool useWideTiles = size.x >= 2;
++    const int viewW = std::max(1, useWideTiles ? size.x / 2 : size.x);
+     const int viewH = std::max(1, size.y - 1);
+     const int maxX = std::max(0, kWorldW - viewW);
+     const int maxY = std::max(0, kWorldH - viewH);
+@@ -69,6 +94,8 @@
+ 
+ void TMicropolisAsciiView::draw() {
+     TDrawBuffer b;
++    const bool useWideTiles = size.x >= 2;
++    const int visibleTiles = std::max(1, useWideTiles ? size.x / 2 : size.x);
+ 
+     const auto s = bridge_.snapshot();
+     std::ostringstream status;
+@@ -89,12 +116,30 @@
+     for (int y = 1; y < size.y; ++y) {
+         b.moveChar(0, ' ', TColorAttr(0x07), size.x);
+         const int wy = camY_ + (y - 1);
+-        for (int x = 0; x < size.x; ++x) {
+-            const int wx = camX_ + x;
+-            if (wx < kWorldW && wy < kWorldH) {
+-                const char g = bridge_.glyph_for_tile(bridge_.tile_at(wx, wy));
+-                b.putChar(x, g);
+-                b.putAttribute(x, color_for_glyph(g));
++        if (useWideTiles) {
++            for (int tx = 0; tx < visibleTiles; ++tx) {
++                const int wx = camX_ + tx;
++                const int x = tx * 2;
++                if (wx < kWorldW && wy < kWorldH) {
++                    const std::string pair = bridge_.glyph_pair_for_tile(bridge_.tile_at(wx, wy));
++                    const char g0 = pair.empty() ? '?' : pair[0];
++                    const char g1 = pair.size() > 1 ? pair[1] : ' ';
++                    b.putChar(x, g0);
++                    b.putAttribute(x, color_for_glyph(g0));
++                    if (x + 1 < size.x) {
++                        b.putChar(x + 1, g1);
++                        b.putAttribute(x + 1, color_for_glyph(g1, g0));
++                    }
++                }
++            }
++        } else {
++            for (int x = 0; x < size.x; ++x) {
++                const int wx = camX_ + x;
++                if (wx < kWorldW && wy < kWorldH) {
++                    const char g = bridge_.glyph_for_tile(bridge_.tile_at(wx, wy));
++                    b.putChar(x, g);
++                    b.putAttribute(x, color_for_glyph(g));
++                }
+             }
+         }
+         writeLine(0, y, size.x, 1, b);
+
+exec
+/bin/zsh -lc 'git status --short app/micropolis/micropolis_bridge.h app/micropolis/micropolis_bridge.cpp app/micropolis_ascii_view.cpp' in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+ M app/micropolis/micropolis_bridge.cpp
+ M app/micropolis/micropolis_bridge.h
+ M app/micropolis_ascii_view.cpp
+file update:
+diff --git a/app/micropolis/micropolis_bridge.cpp b/app/micropolis/micropolis_bridge.cpp
+index c588654d96cd39efc730a238eeeb56c93dc7f5b5..22f7241662943f27d671dcf1660432c969f1bb7d
+--- a/app/micropolis/micropolis_bridge.cpp
++++ b/app/micropolis/micropolis_bridge.cpp
+@@ -27,6 +27,46 @@
+         hash *= FNV_PRIME;
+     }
+ }
++
++int tier_from_distance(std::uint16_t tile, std::uint16_t start, std::uint16_t end) {
++    if (tile < start || tile > end) {
++        return 0;
++    }
++    const int span = static_cast<int>(end - start + 1);
++    const int distance = static_cast<int>(tile - start);
++    const int cut1 = span / 3;
++    const int cut2 = (span * 2) / 3;
++    if (distance < cut1) {
++        return 1;
++    }
++    if (distance < cut2) {
++        return 2;
++    }
++    return 3;
++}
++
++std::uint16_t neutralized_road_tile(std::uint16_t tile) {
++    if (tile >= ROADBASE && tile <= LASTROAD) {
++        return static_cast<std::uint16_t>((tile & 0x000F) + ROADBASE);
++    }
++    return tile;
++}
++
++char road_glyph(std::uint16_t tile) {
++    if (tile == BRWV) {
++        return '|';
++    }
++
++    const auto normalized = neutralized_road_tile(tile);
++    if (normalized == HBRIDGE || normalized == ROADS || normalized == HROADPOWER ||
++        normalized == BRWH) {
++        return '-';
++    }
++    if (normalized == VBRIDGE || normalized == ROADS2 || normalized == VROADPOWER) {
++        return '|';
++    }
++    return '+';
++}
+ } // namespace
+ 
+ MicropolisBridge::MicropolisBridge() : sim_(new Micropolis()) {
+@@ -71,46 +111,80 @@
+ }
+ 
+ char MicropolisBridge::glyph_for_tile(std::uint16_t tile) const {
+-    if (tile == HOSPITAL) {
+-        return 'H';
+-    }
+-    if (tile == FIRESTATION) {
+-        return 'F';
+-    }
+-    if (tile == POLICESTATION) {
+-        return 'P';
++    const std::string glyph_pair = glyph_pair_for_tile(tile);
++    if (glyph_pair.empty()) {
++        return '?';
+     }
++    return glyph_pair.front();
++}
++
++std::string MicropolisBridge::glyph_pair_for_tile(std::uint16_t tile) const {
+     if (tile == DIRT) {
+-        return '.';
++        return ". ";
+     }
+     if (tile >= RIVER && tile <= LASTRIVEDGE) {
+-        return '~';
++        return "~ ";
+     }
+     if (tile >= WOODS_LOW && tile <= WOODS_HIGH) {
+-        return '"';
++        return "\" ";
++    }
++    if (tile >= FIREBASE && tile <= LASTFIRE) {
++        return "* ";
++    }
++    if (tile >= RUBBLE && tile <= LASTRUBBLE) {
++        return ": ";
++    }
++
++    if (tile >= HOSPITALBASE && tile <= HOSPITALBASE + 8) {
++        return "H ";
++    }
++    if (tile >= POWERPLANT && tile <= LASTPOWERPLANT) {
++        return "* ";
++    }
++    if (tile >= FIRESTATION && tile <= 768) {
++        return "F ";
+     }
++    if (tile >= POLICESTBASE && tile <= POLICESTATION) {
++        return "P ";
++    }
++
++    if (tile == FREEZ) {
++        return "r.";
++    }
++    if (tile == COMBASE || tile == COMCLR) {
++        return "c.";
++    }
++    if (tile == INDBASE || tile == INDCLR) {
++        return "i.";
++    }
++
+     if (tile >= ROADBASE && tile <= LASTROAD) {
+-        return '=';
++        return std::string(1, road_glyph(tile)) + " ";
+     }
+     if (tile >= RAILBASE && tile <= LASTRAIL) {
+-        return '#';
++        return "# ";
+     }
+-    if (tile >= RESBASE && tile < COMBASE) {
+-        return 'R';
++    if (tile >= POWERBASE && tile <= LASTPOWER) {
++        return "w ";
+     }
+-    if (tile >= COMBASE && tile < INDBASE) {
+-        return 'C';
++
++    if (tile >= 245 && tile <= 422 && !(tile >= HOSPITALBASE && tile <= HOSPITALBASE + 8)) {
++        const int tier = tier_from_distance(tile, 245, 422);
++        return "r" + std::to_string(tier);
+     }
+-    if (tile >= INDBASE && tile <= LASTIND) {
+-        return 'I';
+-    }
+-    if (tile >= FIREBASE && tile <= LASTFIRE) {
+-        return '*';
++    if (tile >= 424 && tile <= 611) {
++        const int tier = tier_from_distance(tile, 424, 611);
++        return "c" + std::to_string(tier);
+     }
+-    if (tile >= RUBBLE && tile <= LASTRUBBLE) {
+-        return ':';
++    if (tile >= 613 && tile <= 826 &&
++        !(tile >= POWERPLANT && tile <= LASTPOWERPLANT) &&
++        !(tile >= FIRESTATION && tile <= 768) &&
++        !(tile >= POLICESTBASE && tile <= POLICESTATION)) {
++        const int tier = tier_from_distance(tile, 613, 826);
++        return "i" + std::to_string(tier);
+     }
+-    return '?';
++
++    return "? ";
+ }
+ 
+ std::uint64_t MicropolisBridge::hash_map_bytes() const {
+diff --git a/app/micropolis/micropolis_bridge.h b/app/micropolis/micropolis_bridge.h
+index f479fd5fb53c1b587c43ae9a0d8290a94211b035..8d1df444f75317dda3c2d636ac06caadb86992ab
+--- a/app/micropolis/micropolis_bridge.h
++++ b/app/micropolis/micropolis_bridge.h
+@@ -27,6 +27,7 @@
+     std::uint16_t cell_at(int x, int y) const;
+     std::uint16_t tile_at(int x, int y) const;
+     char glyph_for_tile(std::uint16_t tile) const;
++    std::string glyph_pair_for_tile(std::uint16_t tile) const;
+ 
+     MicropolisSnapshot snapshot() const;
+     std::string render_ascii_excerpt(int x, int y, int width, int height) const;
+@@ -36,4 +37,3 @@
+ 
+     std::unique_ptr<Micropolis> sim_;
+ };
+-
+diff --git a/app/micropolis_ascii_view.cpp b/app/micropolis_ascii_view.cpp
+index 7455d91549d6aa538def8524b3f111d2cfbc03b4..1796aeb1622187a6e538a3633e624dd4335388fe
+--- a/app/micropolis_ascii_view.cpp
++++ b/app/micropolis_ascii_view.cpp
+@@ -11,19 +11,43 @@
+ constexpr int kWorldW = 120;
+ constexpr int kWorldH = 100;
+ 
+-TColorAttr color_for_glyph(char ch) {
++TColorAttr color_for_glyph(char ch, char zone_prefix = '\0') {
++    if ((ch == '1' || ch == '2' || ch == '3') &&
++        (zone_prefix == 'r' || zone_prefix == 'c' || zone_prefix == 'i')) {
++        if (zone_prefix == 'r') {
++            if (ch == '1') return TColorAttr(0x02);
++            if (ch == '2') return TColorAttr(0x0A);
++            return TColorAttr(0x0F);
++        }
++        if (zone_prefix == 'c') {
++            if (ch == '1') return TColorAttr(0x01);
++            if (ch == '2') return TColorAttr(0x09);
++            return TColorAttr(0x0B);
++        }
++        if (ch == '1') return TColorAttr(0x06);
++        if (ch == '2') return TColorAttr(0x0E);
++        return TColorAttr(0x0C);
++    }
++
++    if (ch == '.' && (zone_prefix == 'r' || zone_prefix == 'c' || zone_prefix == 'i')) {
++        return color_for_glyph(zone_prefix);
++    }
++
+     switch (ch) {
+         case '~': return TColorAttr(0x1F); // water
+         case '"': return TColorAttr(0x2F); // woods
+-        case '=': return TColorAttr(0x07); // road
++        case '-': return TColorAttr(0x08); // road horizontal
++        case '|': return TColorAttr(0x08); // road vertical
++        case '+': return TColorAttr(0x08); // road intersections
+         case '#': return TColorAttr(0x08); // rail
+-        case 'R': return TColorAttr(0x2A); // residential
+-        case 'C': return TColorAttr(0x1B); // commercial
+-        case 'I': return TColorAttr(0x6E); // industrial
+-        case 'H': return TColorAttr(0x7C); // hospital
+-        case 'P': return TColorAttr(0x1F); // police
++        case 'w': return TColorAttr(0x0B); // wire
++        case 'r': return TColorAttr(0x02); // residential
++        case 'c': return TColorAttr(0x01); // commercial
++        case 'i': return TColorAttr(0x06); // industrial
++        case 'H': return TColorAttr(0x0D); // hospital
++        case 'P': return TColorAttr(0x1E); // police
+         case 'F': return TColorAttr(0x4F); // fire station
+-        case '*': return TColorAttr(0x4E); // fire
++        case '*': return TColorAttr(0x4E); // fire / power plant
+         case ':': return TColorAttr(0x08); // rubble
+         default: return TColorAttr(0x07);
+     }
+@@ -55,7 +79,8 @@
+ }
+ 
+ void TMicropolisAsciiView::clampCamera() {
+-    const int viewW = std::max(1, size.x);
++    const bool useWideTiles = size.x >= 2;
++    const int viewW = std::max(1, useWideTiles ? size.x / 2 : size.x);
+     const int viewH = std::max(1, size.y - 1);
+     const int maxX = std::max(0, kWorldW - viewW);
+     const int maxY = std::max(0, kWorldH - viewH);
+@@ -69,6 +94,8 @@
+ 
+ void TMicropolisAsciiView::draw() {
+     TDrawBuffer b;
++    const bool useWideTiles = size.x >= 2;
++    const int visibleTiles = std::max(1, useWideTiles ? size.x / 2 : size.x);
+ 
+     const auto s = bridge_.snapshot();
+     std::ostringstream status;
+@@ -89,12 +116,30 @@
+     for (int y = 1; y < size.y; ++y) {
+         b.moveChar(0, ' ', TColorAttr(0x07), size.x);
+         const int wy = camY_ + (y - 1);
+-        for (int x = 0; x < size.x; ++x) {
+-            const int wx = camX_ + x;
+-            if (wx < kWorldW && wy < kWorldH) {
+-                const char g = bridge_.glyph_for_tile(bridge_.tile_at(wx, wy));
+-                b.putChar(x, g);
+-                b.putAttribute(x, color_for_glyph(g));
++        if (useWideTiles) {
++            for (int tx = 0; tx < visibleTiles; ++tx) {
++                const int wx = camX_ + tx;
++                const int x = tx * 2;
++                if (wx < kWorldW && wy < kWorldH) {
++                    const std::string pair = bridge_.glyph_pair_for_tile(bridge_.tile_at(wx, wy));
++                    const char g0 = pair.empty() ? '?' : pair[0];
++                    const char g1 = pair.size() > 1 ? pair[1] : ' ';
++                    b.putChar(x, g0);
++                    b.putAttribute(x, color_for_glyph(g0));
++                    if (x + 1 < size.x) {
++                        b.putChar(x + 1, g1);
++                        b.putAttribute(x + 1, color_for_glyph(g1, g0));
++                    }
++                }
++            }
++        } else {
++            for (int x = 0; x < size.x; ++x) {
++                const int wx = camX_ + x;
++                if (wx < kWorldW && wy < kWorldH) {
++                    const char g = bridge_.glyph_for_tile(bridge_.tile_at(wx, wy));
++                    b.putChar(x, g);
++                    b.putAttribute(x, color_for_glyph(g));
++                }
+             }
+         }
+         writeLine(0, y, size.x, 1, b);
+
+
+thinking
+**Ensuring compilation of relevant target**
+codex
+I’m doing one focused target build to make sure `micropolis_ascii_view.cpp` itself compiles, since the full build aborts on an unrelated test target.
+exec
+/bin/zsh -lc 'cmake --build build --target test_pattern -j4' in /Users/james/Repos/wibandwob-dos succeeded in 7.86s:
+[  9%] Built target micropolis_native
+[ 10%] Built target micropolis_bridge
+[ 83%] Built target tvision
+[ 83%] Building CXX object app/CMakeFiles/test_pattern.dir/test_pattern_app.cpp.o
+[ 83%] Building CXX object app/CMakeFiles/test_pattern.dir/window_type_registry.cpp.o
+[ 84%] Building CXX object app/CMakeFiles/test_pattern.dir/micropolis_ascii_view.cpp.o
+[ 84%] Linking CXX executable test_pattern
+[100%] Built target test_pattern
+file update:
+diff --git a/app/micropolis/micropolis_bridge.cpp b/app/micropolis/micropolis_bridge.cpp
+index c588654d96cd39efc730a238eeeb56c93dc7f5b5..22f7241662943f27d671dcf1660432c969f1bb7d
+--- a/app/micropolis/micropolis_bridge.cpp
++++ b/app/micropolis/micropolis_bridge.cpp
+@@ -27,6 +27,46 @@
+         hash *= FNV_PRIME;
+     }
+ }
++
++int tier_from_distance(std::uint16_t tile, std::uint16_t start, std::uint16_t end) {
++    if (tile < start || tile > end) {
++        return 0;
++    }
++    const int span = static_cast<int>(end - start + 1);
++    const int distance = static_cast<int>(tile - start);
++    const int cut1 = span / 3;
++    const int cut2 = (span * 2) / 3;
++    if (distance < cut1) {
++        return 1;
++    }
++    if (distance < cut2) {
++        return 2;
++    }
++    return 3;
++}
++
++std::uint16_t neutralized_road_tile(std::uint16_t tile) {
++    if (tile >= ROADBASE && tile <= LASTROAD) {
++        return static_cast<std::uint16_t>((tile & 0x000F) + ROADBASE);
++    }
++    return tile;
++}
++
++char road_glyph(std::uint16_t tile) {
++    if (tile == BRWV) {
++        return '|';
++    }
++
++    const auto normalized = neutralized_road_tile(tile);
++    if (normalized == HBRIDGE || normalized == ROADS || normalized == HROADPOWER ||
++        normalized == BRWH) {
++        return '-';
++    }
++    if (normalized == VBRIDGE || normalized == ROADS2 || normalized == VROADPOWER) {
++        return '|';
++    }
++    return '+';
++}
+ } // namespace
+ 
+ MicropolisBridge::MicropolisBridge() : sim_(new Micropolis()) {
+@@ -71,46 +111,80 @@
+ }
+ 
+ char MicropolisBridge::glyph_for_tile(std::uint16_t tile) const {
+-    if (tile == HOSPITAL) {
+-        return 'H';
+-    }
+-    if (tile == FIRESTATION) {
+-        return 'F';
+-    }
+-    if (tile == POLICESTATION) {
+-        return 'P';
++    const std::string glyph_pair = glyph_pair_for_tile(tile);
++    if (glyph_pair.empty()) {
++        return '?';
+     }
++    return glyph_pair.front();
++}
++
++std::string MicropolisBridge::glyph_pair_for_tile(std::uint16_t tile) const {
+     if (tile == DIRT) {
+-        return '.';
++        return ". ";
+     }
+     if (tile >= RIVER && tile <= LASTRIVEDGE) {
+-        return '~';
++        return "~ ";
+     }
+     if (tile >= WOODS_LOW && tile <= WOODS_HIGH) {
+-        return '"';
++        return "\" ";
++    }
++    if (tile >= FIREBASE && tile <= LASTFIRE) {
++        return "* ";
++    }
++    if (tile >= RUBBLE && tile <= LASTRUBBLE) {
++        return ": ";
++    }
++
++    if (tile >= HOSPITALBASE && tile <= HOSPITALBASE + 8) {
++        return "H ";
++    }
++    if (tile >= POWERPLANT && tile <= LASTPOWERPLANT) {
++        return "* ";
++    }
++    if (tile >= FIRESTATION && tile <= 768) {
++        return "F ";
+     }
++    if (tile >= POLICESTBASE && tile <= POLICESTATION) {
++        return "P ";
++    }
++
++    if (tile == FREEZ) {
++        return "r.";
++    }
++    if (tile == COMBASE || tile == COMCLR) {
++        return "c.";
++    }
++    if (tile == INDBASE || tile == INDCLR) {
++        return "i.";
++    }
++
+     if (tile >= ROADBASE && tile <= LASTROAD) {
+-        return '=';
++        return std::string(1, road_glyph(tile)) + " ";
+     }
+     if (tile >= RAILBASE && tile <= LASTRAIL) {
+-        return '#';
++        return "# ";
+     }
+-    if (tile >= RESBASE && tile < COMBASE) {
+-        return 'R';
++    if (tile >= POWERBASE && tile <= LASTPOWER) {
++        return "w ";
+     }
+-    if (tile >= COMBASE && tile < INDBASE) {
+-        return 'C';
++
++    if (tile >= 245 && tile <= 422 && !(tile >= HOSPITALBASE && tile <= HOSPITALBASE + 8)) {
++        const int tier = tier_from_distance(tile, 245, 422);
++        return "r" + std::to_string(tier);
+     }
+-    if (tile >= INDBASE && tile <= LASTIND) {
+-        return 'I';
+-    }
+-    if (tile >= FIREBASE && tile <= LASTFIRE) {
+-        return '*';
++    if (tile >= 424 && tile <= 611) {
++        const int tier = tier_from_distance(tile, 424, 611);
++        return "c" + std::to_string(tier);
+     }
+-    if (tile >= RUBBLE && tile <= LASTRUBBLE) {
+-        return ':';
++    if (tile >= 613 && tile <= 826 &&
++        !(tile >= POWERPLANT && tile <= LASTPOWERPLANT) &&
++        !(tile >= FIRESTATION && tile <= 768) &&
++        !(tile >= POLICESTBASE && tile <= POLICESTATION)) {
++        const int tier = tier_from_distance(tile, 613, 826);
++        return "i" + std::to_string(tier);
+     }
+-    return '?';
++
++    return "? ";
+ }
+ 
+ std::uint64_t MicropolisBridge::hash_map_bytes() const {
+diff --git a/app/micropolis/micropolis_bridge.h b/app/micropolis/micropolis_bridge.h
+index f479fd5fb53c1b587c43ae9a0d8290a94211b035..8d1df444f75317dda3c2d636ac06caadb86992ab
+--- a/app/micropolis/micropolis_bridge.h
++++ b/app/micropolis/micropolis_bridge.h
+@@ -27,6 +27,7 @@
+     std::uint16_t cell_at(int x, int y) const;
+     std::uint16_t tile_at(int x, int y) const;
+     char glyph_for_tile(std::uint16_t tile) const;
++    std::string glyph_pair_for_tile(std::uint16_t tile) const;
+ 
+     MicropolisSnapshot snapshot() const;
+     std::string render_ascii_excerpt(int x, int y, int width, int height) const;
+@@ -36,4 +37,3 @@
+ 
+     std::unique_ptr<Micropolis> sim_;
+ };
+-
+diff --git a/app/micropolis_ascii_view.cpp b/app/micropolis_ascii_view.cpp
+index 7455d91549d6aa538def8524b3f111d2cfbc03b4..1796aeb1622187a6e538a3633e624dd4335388fe
+--- a/app/micropolis_ascii_view.cpp
++++ b/app/micropolis_ascii_view.cpp
+@@ -11,19 +11,43 @@
+ constexpr int kWorldW = 120;
+ constexpr int kWorldH = 100;
+ 
+-TColorAttr color_for_glyph(char ch) {
++TColorAttr color_for_glyph(char ch, char zone_prefix = '\0') {
++    if ((ch == '1' || ch == '2' || ch == '3') &&
++        (zone_prefix == 'r' || zone_prefix == 'c' || zone_prefix == 'i')) {
++        if (zone_prefix == 'r') {
++            if (ch == '1') return TColorAttr(0x02);
++            if (ch == '2') return TColorAttr(0x0A);
++            return TColorAttr(0x0F);
++        }
++        if (zone_prefix == 'c') {
++            if (ch == '1') return TColorAttr(0x01);
++            if (ch == '2') return TColorAttr(0x09);
++            return TColorAttr(0x0B);
++        }
++        if (ch == '1') return TColorAttr(0x06);
++        if (ch == '2') return TColorAttr(0x0E);
++        return TColorAttr(0x0C);
++    }
++
++    if (ch == '.' && (zone_prefix == 'r' || zone_prefix == 'c' || zone_prefix == 'i')) {
++        return color_for_glyph(zone_prefix);
++    }
++
+     switch (ch) {
+         case '~': return TColorAttr(0x1F); // water
+         case '"': return TColorAttr(0x2F); // woods
+-        case '=': return TColorAttr(0x07); // road
++        case '-': return TColorAttr(0x08); // road horizontal
++        case '|': return TColorAttr(0x08); // road vertical
++        case '+': return TColorAttr(0x08); // road intersections
+         case '#': return TColorAttr(0x08); // rail
+-        case 'R': return TColorAttr(0x2A); // residential
+-        case 'C': return TColorAttr(0x1B); // commercial
+-        case 'I': return TColorAttr(0x6E); // industrial
+-        case 'H': return TColorAttr(0x7C); // hospital
+-        case 'P': return TColorAttr(0x1F); // police
++        case 'w': return TColorAttr(0x0B); // wire
++        case 'r': return TColorAttr(0x02); // residential
++        case 'c': return TColorAttr(0x01); // commercial
++        case 'i': return TColorAttr(0x06); // industrial
++        case 'H': return TColorAttr(0x0D); // hospital
++        case 'P': return TColorAttr(0x1E); // police
+         case 'F': return TColorAttr(0x4F); // fire station
+-        case '*': return TColorAttr(0x4E); // fire
++        case '*': return TColorAttr(0x4E); // fire / power plant
+         case ':': return TColorAttr(0x08); // rubble
+         default: return TColorAttr(0x07);
+     }
+@@ -55,7 +79,8 @@
+ }
+ 
+ void TMicropolisAsciiView::clampCamera() {
+-    const int viewW = std::max(1, size.x);
++    const bool useWideTiles = size.x >= 2;
++    const int viewW = std::max(1, useWideTiles ? size.x / 2 : size.x);
+     const int viewH = std::max(1, size.y - 1);
+     const int maxX = std::max(0, kWorldW - viewW);
+     const int maxY = std::max(0, kWorldH - viewH);
+@@ -69,6 +94,8 @@
+ 
+ void TMicropolisAsciiView::draw() {
+     TDrawBuffer b;
++    const bool useWideTiles = size.x >= 2;
++    const int visibleTiles = std::max(1, useWideTiles ? size.x / 2 : size.x);
+ 
+     const auto s = bridge_.snapshot();
+     std::ostringstream status;
+@@ -89,12 +116,30 @@
+     for (int y = 1; y < size.y; ++y) {
+         b.moveChar(0, ' ', TColorAttr(0x07), size.x);
+         const int wy = camY_ + (y - 1);
+-        for (int x = 0; x < size.x; ++x) {
+-            const int wx = camX_ + x;
+-            if (wx < kWorldW && wy < kWorldH) {
+-                const char g = bridge_.glyph_for_tile(bridge_.tile_at(wx, wy));
+-                b.putChar(x, g);
+-                b.putAttribute(x, color_for_glyph(g));
++        if (useWideTiles) {
++            for (int tx = 0; tx < visibleTiles; ++tx) {
++                const int wx = camX_ + tx;
++                const int x = tx * 2;
++                if (wx < kWorldW && wy < kWorldH) {
++                    const std::string pair = bridge_.glyph_pair_for_tile(bridge_.tile_at(wx, wy));
++                    const char g0 = pair.empty() ? '?' : pair[0];
++                    const char g1 = pair.size() > 1 ? pair[1] : ' ';
++                    b.putChar(x, g0);
++                    b.putAttribute(x, color_for_glyph(g0));
++                    if (x + 1 < size.x) {
++                        b.putChar(x + 1, g1);
++                        b.putAttribute(x + 1, color_for_glyph(g1, g0));
++                    }
++                }
++            }
++        } else {
++            for (int x = 0; x < size.x; ++x) {
++                const int wx = camX_ + x;
++                if (wx < kWorldW && wy < kWorldH) {
++                    const char g = bridge_.glyph_for_tile(bridge_.tile_at(wx, wy));
++                    b.putChar(x, g);
++                    b.putAttribute(x, color_for_glyph(g));
++                }
+             }
+         }
+         writeLine(0, y, size.x, 1, b);
+
+
+thinking
+**Summarizing final analysis details**
+exec
+/bin/zsh -lc "nl -ba app/micropolis/micropolis_bridge.h | sed -n '20,45p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba app/micropolis/micropolis_bridge.cpp | sed -n '20,240p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba app/micropolis_ascii_view.cpp | sed -n '1,220p'" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+    20	public:
+    21	    MicropolisBridge();
+    22	    ~MicropolisBridge();
+    23	
+    24	    bool initialize_new_city(int seed, short speed);
+    25	    void tick(int tick_count);
+    26	
+    27	    std::uint16_t cell_at(int x, int y) const;
+    28	    std::uint16_t tile_at(int x, int y) const;
+    29	    char glyph_for_tile(std::uint16_t tile) const;
+    30	    std::string glyph_pair_for_tile(std::uint16_t tile) const;
+    31	
+    32	    MicropolisSnapshot snapshot() const;
+    33	    std::string render_ascii_excerpt(int x, int y, int width, int height) const;
+    34	
+    35	private:
+    36	    std::uint64_t hash_map_bytes() const;
+    37	
+    38	    std::unique_ptr<Micropolis> sim_;
+    39	};
+ succeeded in 50ms:
+    20	    return hash;
+    21	}
+    22	
+    23	void hash_mix(std::uint64_t &hash, const void *value, std::size_t size) {
+    24	    const auto *bytes = static_cast<const std::uint8_t *>(value);
+    25	    for (std::size_t i = 0; i < size; ++i) {
+    26	        hash ^= static_cast<std::uint64_t>(bytes[i]);
+    27	        hash *= FNV_PRIME;
+    28	    }
+    29	}
+    30	
+    31	int tier_from_distance(std::uint16_t tile, std::uint16_t start, std::uint16_t end) {
+    32	    if (tile < start || tile > end) {
+    33	        return 0;
+    34	    }
+    35	    const int span = static_cast<int>(end - start + 1);
+    36	    const int distance = static_cast<int>(tile - start);
+    37	    const int cut1 = span / 3;
+    38	    const int cut2 = (span * 2) / 3;
+    39	    if (distance < cut1) {
+ succeeded in 51ms:
+     1	#include "micropolis_ascii_view.h"
+     2	
+     3	#define Uses_TWindow
+     4	#define Uses_TEvent
+     5	#include <tvision/tv.h>
+     6	
+     7	#include <algorithm>
+     8	#include <sstream>
+     9	
+    10	namespace {
+    11	constexpr int kWorldW = 120;
+    12	constexpr int kWorldH = 100;
+    13	
+    14	TColorAttr color_for_glyph(char ch, char zone_prefix = '\0') {
+    15	    if ((ch == '1' || ch == '2' || ch == '3') &&
+    16	        (zone_prefix == 'r' || zone_prefix == 'c' || zone_prefix == 'i')) {
+    17	        if (zone_prefix == 'r') {
+    18	            if (ch == '1') return TColorAttr(0x02);
+    19	            if (ch == '2') return TColorAttr(0x0A);
+    20	            return TColorAttr(0x0F);
+file update:
+diff --git a/app/micropolis/micropolis_bridge.cpp b/app/micropolis/micropolis_bridge.cpp
+index c588654d96cd39efc730a238eeeb56c93dc7f5b5..22f7241662943f27d671dcf1660432c969f1bb7d
+--- a/app/micropolis/micropolis_bridge.cpp
++++ b/app/micropolis/micropolis_bridge.cpp
+@@ -27,6 +27,46 @@
+         hash *= FNV_PRIME;
+     }
+ }
++
++int tier_from_distance(std::uint16_t tile, std::uint16_t start, std::uint16_t end) {
++    if (tile < start || tile > end) {
++        return 0;
++    }
++    const int span = static_cast<int>(end - start + 1);
++    const int distance = static_cast<int>(tile - start);
++    const int cut1 = span / 3;
++    const int cut2 = (span * 2) / 3;
++    if (distance < cut1) {
++        return 1;
++    }
++    if (distance < cut2) {
++        return 2;
++    }
++    return 3;
++}
++
++std::uint16_t neutralized_road_tile(std::uint16_t tile) {
++    if (tile >= ROADBASE && tile <= LASTROAD) {
++        return static_cast<std::uint16_t>((tile & 0x000F) + ROADBASE);
++    }
++    return tile;
++}
++
++char road_glyph(std::uint16_t tile) {
++    if (tile == BRWV) {
++        return '|';
++    }
++
++    const auto normalized = neutralized_road_tile(tile);
++    if (normalized == HBRIDGE || normalized == ROADS || normalized == HROADPOWER ||
++        normalized == BRWH) {
++        return '-';
++    }
++    if (normalized == VBRIDGE || normalized == ROADS2 || normalized == VROADPOWER) {
++        return '|';
++    }
++    return '+';
++}
+ } // namespace
+ 
+ MicropolisBridge::MicropolisBridge() : sim_(new Micropolis()) {
+@@ -71,46 +111,80 @@
+ }
+ 
+ char MicropolisBridge::glyph_for_tile(std::uint16_t tile) const {
+-    if (tile == HOSPITAL) {
+-        return 'H';
+-    }
+-    if (tile == FIRESTATION) {
+-        return 'F';
+-    }
+-    if (tile == POLICESTATION) {
+-        return 'P';
++    const std::string glyph_pair = glyph_pair_for_tile(tile);
++    if (glyph_pair.empty()) {
++        return '?';
+     }
++    return glyph_pair.front();
++}
++
++std::string MicropolisBridge::glyph_pair_for_tile(std::uint16_t tile) const {
+     if (tile == DIRT) {
+-        return '.';
++        return ". ";
+     }
+     if (tile >= RIVER && tile <= LASTRIVEDGE) {
+-        return '~';
++        return "~ ";
+     }
+     if (tile >= WOODS_LOW && tile <= WOODS_HIGH) {
+-        return '"';
++        return "\" ";
++    }
++    if (tile >= FIREBASE && tile <= LASTFIRE) {
++        return "* ";
++    }
++    if (tile >= RUBBLE && tile <= LASTRUBBLE) {
++        return ": ";
++    }
++
++    if (tile >= HOSPITALBASE && tile <= HOSPITALBASE + 8) {
++        return "H ";
++    }
++    if (tile >= POWERPLANT && tile <= LASTPOWERPLANT) {
++        return "* ";
++    }
++    if (tile >= FIRESTATION && tile <= 768) {
++        return "F ";
+     }
++    if (tile >= POLICESTBASE && tile <= POLICESTATION) {
++        return "P ";
++    }
++
++    if (tile == FREEZ) {
++        return "r.";
++    }
++    if (tile == COMBASE || tile == COMCLR) {
++        return "c.";
++    }
++    if (tile == INDBASE || tile == INDCLR) {
++        return "i.";
++    }
++
+     if (tile >= ROADBASE && tile <= LASTROAD) {
+-        return '=';
++        return std::string(1, road_glyph(tile)) + " ";
+     }
+     if (tile >= RAILBASE && tile <= LASTRAIL) {
+-        return '#';
++        return "# ";
+     }
+-    if (tile >= RESBASE && tile < COMBASE) {
+-        return 'R';
++    if (tile >= POWERBASE && tile <= LASTPOWER) {
++        return "w ";
+     }
+-    if (tile >= COMBASE && tile < INDBASE) {
+-        return 'C';
++
++    if (tile >= 245 && tile <= 422 && !(tile >= HOSPITALBASE && tile <= HOSPITALBASE + 8)) {
++        const int tier = tier_from_distance(tile, 245, 422);
++        return "r" + std::to_string(tier);
+     }
+-    if (tile >= INDBASE && tile <= LASTIND) {
+-        return 'I';
+-    }
+-    if (tile >= FIREBASE && tile <= LASTFIRE) {
+-        return '*';
++    if (tile >= 424 && tile <= 611) {
++        const int tier = tier_from_distance(tile, 424, 611);
++        return "c" + std::to_string(tier);
+     }
+-    if (tile >= RUBBLE && tile <= LASTRUBBLE) {
+-        return ':';
++    if (tile >= 613 && tile <= 826 &&
++        !(tile >= POWERPLANT && tile <= LASTPOWERPLANT) &&
++        !(tile >= FIRESTATION && tile <= 768) &&
++        !(tile >= POLICESTBASE && tile <= POLICESTATION)) {
++        const int tier = tier_from_distance(tile, 613, 826);
++        return "i" + std::to_string(tier);
+     }
+-    return '?';
++
++    return "? ";
+ }
+ 
+ std::uint64_t MicropolisBridge::hash_map_bytes() const {
+diff --git a/app/micropolis/micropolis_bridge.h b/app/micropolis/micropolis_bridge.h
+index f479fd5fb53c1b587c43ae9a0d8290a94211b035..8d1df444f75317dda3c2d636ac06caadb86992ab
+--- a/app/micropolis/micropolis_bridge.h
++++ b/app/micropolis/micropolis_bridge.h
+@@ -27,6 +27,7 @@
+     std::uint16_t cell_at(int x, int y) const;
+     std::uint16_t tile_at(int x, int y) const;
+     char glyph_for_tile(std::uint16_t tile) const;
++    std::string glyph_pair_for_tile(std::uint16_t tile) const;
+ 
+     MicropolisSnapshot snapshot() const;
+     std::string render_ascii_excerpt(int x, int y, int width, int height) const;
+@@ -36,4 +37,3 @@
+ 
+     std::unique_ptr<Micropolis> sim_;
+ };
+-
+diff --git a/app/micropolis_ascii_view.cpp b/app/micropolis_ascii_view.cpp
+index 7455d91549d6aa538def8524b3f111d2cfbc03b4..1796aeb1622187a6e538a3633e624dd4335388fe
+--- a/app/micropolis_ascii_view.cpp
++++ b/app/micropolis_ascii_view.cpp
+@@ -11,19 +11,43 @@
+ constexpr int kWorldW = 120;
+ constexpr int kWorldH = 100;
+ 
+-TColorAttr color_for_glyph(char ch) {
++TColorAttr color_for_glyph(char ch, char zone_prefix = '\0') {
++    if ((ch == '1' || ch == '2' || ch == '3') &&
++        (zone_prefix == 'r' || zone_prefix == 'c' || zone_prefix == 'i')) {
++        if (zone_prefix == 'r') {
++            if (ch == '1') return TColorAttr(0x02);
++            if (ch == '2') return TColorAttr(0x0A);
++            return TColorAttr(0x0F);
++        }
++        if (zone_prefix == 'c') {
++            if (ch == '1') return TColorAttr(0x01);
++            if (ch == '2') return TColorAttr(0x09);
++            return TColorAttr(0x0B);
++        }
++        if (ch == '1') return TColorAttr(0x06);
++        if (ch == '2') return TColorAttr(0x0E);
++        return TColorAttr(0x0C);
++    }
++
++    if (ch == '.' && (zone_prefix == 'r' || zone_prefix == 'c' || zone_prefix == 'i')) {
++        return color_for_glyph(zone_prefix);
++    }
++
+     switch (ch) {
+         case '~': return TColorAttr(0x1F); // water
+         case '"': return TColorAttr(0x2F); // woods
+-        case '=': return TColorAttr(0x07); // road
++        case '-': return TColorAttr(0x08); // road horizontal
++        case '|': return TColorAttr(0x08); // road vertical
++        case '+': return TColorAttr(0x08); // road intersections
+         case '#': return TColorAttr(0x08); // rail
+-        case 'R': return TColorAttr(0x2A); // residential
+-        case 'C': return TColorAttr(0x1B); // commercial
+-        case 'I': return TColorAttr(0x6E); // industrial
+-        case 'H': return TColorAttr(0x7C); // hospital
+-        case 'P': return TColorAttr(0x1F); // police
++        case 'w': return TColorAttr(0x0B); // wire
++        case 'r': return TColorAttr(0x02); // residential
++        case 'c': return TColorAttr(0x01); // commercial
++        case 'i': return TColorAttr(0x06); // industrial
++        case 'H': return TColorAttr(0x0D); // hospital
++        case 'P': return TColorAttr(0x1E); // police
+         case 'F': return TColorAttr(0x4F); // fire station
+-        case '*': return TColorAttr(0x4E); // fire
++        case '*': return TColorAttr(0x4E); // fire / power plant
+         case ':': return TColorAttr(0x08); // rubble
+         default: return TColorAttr(0x07);
+     }
+@@ -55,7 +79,8 @@
+ }
+ 
+ void TMicropolisAsciiView::clampCamera() {
+-    const int viewW = std::max(1, size.x);
++    const bool useWideTiles = size.x >= 2;
++    const int viewW = std::max(1, useWideTiles ? size.x / 2 : size.x);
+     const int viewH = std::max(1, size.y - 1);
+     const int maxX = std::max(0, kWorldW - viewW);
+     const int maxY = std::max(0, kWorldH - viewH);
+@@ -69,6 +94,8 @@
+ 
+ void TMicropolisAsciiView::draw() {
+     TDrawBuffer b;
++    const bool useWideTiles = size.x >= 2;
++    const int visibleTiles = std::max(1, useWideTiles ? size.x / 2 : size.x);
+ 
+     const auto s = bridge_.snapshot();
+     std::ostringstream status;
+@@ -89,12 +116,30 @@
+     for (int y = 1; y < size.y; ++y) {
+         b.moveChar(0, ' ', TColorAttr(0x07), size.x);
+         const int wy = camY_ + (y - 1);
+-        for (int x = 0; x < size.x; ++x) {
+-            const int wx = camX_ + x;
+-            if (wx < kWorldW && wy < kWorldH) {
+-                const char g = bridge_.glyph_for_tile(bridge_.tile_at(wx, wy));
+-                b.putChar(x, g);
+-                b.putAttribute(x, color_for_glyph(g));
++        if (useWideTiles) {
++            for (int tx = 0; tx < visibleTiles; ++tx) {
++                const int wx = camX_ + tx;
++                const int x = tx * 2;
++                if (wx < kWorldW && wy < kWorldH) {
++                    const std::string pair = bridge_.glyph_pair_for_tile(bridge_.tile_at(wx, wy));
++                    const char g0 = pair.empty() ? '?' : pair[0];
++                    const char g1 = pair.size() > 1 ? pair[1] : ' ';
++                    b.putChar(x, g0);
++                    b.putAttribute(x, color_for_glyph(g0));
++                    if (x + 1 < size.x) {
++                        b.putChar(x + 1, g1);
++                        b.putAttribute(x + 1, color_for_glyph(g1, g0));
++                    }
++                }
++            }
++        } else {
++            for (int x = 0; x < size.x; ++x) {
++                const int wx = camX_ + x;
++                if (wx < kWorldW && wy < kWorldH) {
++                    const char g = bridge_.glyph_for_tile(bridge_.tile_at(wx, wy));
++                    b.putChar(x, g);
++                    b.putAttribute(x, color_for_glyph(g));
++                }
+             }
+         }
+         writeLine(0, y, size.x, 1, b);
+
+
+thinking
+**Preparing concise final summary**
+codex
+1) Tier boundaries found (`zone.cpp` / `micropolis.h`)
+- Residential density buckets are encoded as `((mapTile - RZB) / 9) % 4` (`vendor/MicropolisCore/MicropolisEngine/src/zone.cpp:711`), with placement via `base = ((value * 4 + den) * 9) + RZB - 4` (`vendor/MicropolisCore/MicropolisEngine/src/zone.cpp:724`).
+- Commercial density buckets are `((tile - CZB) / 9) % 5 + 1` with empty center `COMCLR` (`vendor/MicropolisCore/MicropolisEngine/src/zone.cpp:866`, `vendor/MicropolisCore/MicropolisEngine/src/zone.cpp:868`) and placement `((Value * 5) + Den) * 9 + CZB - 4` (`vendor/MicropolisCore/MicropolisEngine/src/zone.cpp:883`).
+- Industrial density buckets are `(((tile - IZB) / 9) % 4) + 1` with empty center `INDCLR` (`vendor/MicropolisCore/MicropolisEngine/src/zone.cpp:1001`, `vendor/MicropolisCore/MicropolisEngine/src/zone.cpp:1003`) and placement `((value * 4) + den) * 9 + IND1` (`vendor/MicropolisCore/MicropolisEngine/src/zone.cpp:1017`).
+- Tile range constants used:
+  - Roads/wires/rails/fire: `vendor/MicropolisCore/MicropolisEngine/src/micropolis.h:422`
+  - Zone/civic ranges: `vendor/MicropolisCore/MicropolisEngine/src/micropolis.h:507`
+
+2) File diffs / patches
+- `app/micropolis/micropolis_bridge.h:30`
+  - Added `std::string glyph_pair_for_tile(std::uint16_t tile) const;`
+- `app/micropolis/micropolis_bridge.cpp:31`
+  - Added tier helper + road normalization/orientation helper.
+  - `glyph_for_tile` now delegates to `glyph_pair_for_tile` first char (`app/micropolis/micropolis_bridge.cpp:113`).
+  - New `glyph_pair_for_tile` implementation with:
+    - Empty centers: `r.`, `c.`, `i.` (`app/micropolis/micropolis_bridge.cpp:151`)
+    - Tier glyphs: `r1/r2/r3`, `c1/c2/c3`, `i1/i2/i3` (`app/micropolis/micropolis_bridge.cpp:171`)
+    - Civic/specials: `H`, `P`, `F`, `*`, roads `- | +`, rail `#`, wire `w` (`app/micropolis/micropolis_bridge.cpp:138`)
+- `app/micropolis_ascii_view.cpp:14`
+  - Extended `color_for_glyph` to support new prefixes/tier digits and civic colors.
+  - `draw()` now renders 2 chars per tile when width allows, otherwise falls back to 1-char mode (`app/micropolis_ascii_view.cpp:95`).
+  - `clampCamera()` updated to camera width in tiles under 2-char mode (`app/micropolis_ascii_view.cpp:81`).
+
+3) Build result
+- `cmake --build build -j4`:
+  - Micropolis targets built, but full build failed on unrelated linker error in `scramble_engine_test` (`api_spawn_micropolis_ascii(...)` undefined).
+- Verified changed code compiles:
+  - `cmake --build build --target test_pattern -j4` passed.
+- Required tests:
+  - `ctest --output-on-failure -R "micropolis_(determinism|no_ansi)"` passed (2/2).
+
+4) Open questions
+- Fire/police range interpretation: requirement says `Fire(765-768)` and `Police(770-774)`; I implemented exactly those ranges, not full 3x3 station footprints.
+- Empty commercial/industrial center IDs: requirement names `COMBASE(423)` / `INDBASE(612)`, while engine center empties are `COMCLR(427)` / `INDCLR(616)`; I mapped both to `c.` / `i.`.
+file update:
+diff --git a/app/micropolis/micropolis_bridge.cpp b/app/micropolis/micropolis_bridge.cpp
+index c588654d96cd39efc730a238eeeb56c93dc7f5b5..22f7241662943f27d671dcf1660432c969f1bb7d
+--- a/app/micropolis/micropolis_bridge.cpp
++++ b/app/micropolis/micropolis_bridge.cpp
+@@ -27,6 +27,46 @@
+         hash *= FNV_PRIME;
+     }
+ }
++
++int tier_from_distance(std::uint16_t tile, std::uint16_t start, std::uint16_t end) {
++    if (tile < start || tile > end) {
++        return 0;
++    }
++    const int span = static_cast<int>(end - start + 1);
++    const int distance = static_cast<int>(tile - start);
++    const int cut1 = span / 3;
++    const int cut2 = (span * 2) / 3;
++    if (distance < cut1) {
++        return 1;
++    }
++    if (distance < cut2) {
++        return 2;
++    }
++    return 3;
++}
++
++std::uint16_t neutralized_road_tile(std::uint16_t tile) {
++    if (tile >= ROADBASE && tile <= LASTROAD) {
++        return static_cast<std::uint16_t>((tile & 0x000F) + ROADBASE);
++    }
++    return tile;
++}
++
++char road_glyph(std::uint16_t tile) {
++    if (tile == BRWV) {
++        return '|';
++    }
++
++    const auto normalized = neutralized_road_tile(tile);
++    if (normalized == HBRIDGE || normalized == ROADS || normalized == HROADPOWER ||
++        normalized == BRWH) {
++        return '-';
++    }
++    if (normalized == VBRIDGE || normalized == ROADS2 || normalized == VROADPOWER) {
++        return '|';
++    }
++    return '+';
++}
+ } // namespace
+ 
+ MicropolisBridge::MicropolisBridge() : sim_(new Micropolis()) {
+@@ -71,46 +111,80 @@
+ }
+ 
+ char MicropolisBridge::glyph_for_tile(std::uint16_t tile) const {
+-    if (tile == HOSPITAL) {
+-        return 'H';
+-    }
+-    if (tile == FIRESTATION) {
+-        return 'F';
+-    }
+-    if (tile == POLICESTATION) {
+-        return 'P';
++    const std::string glyph_pair = glyph_pair_for_tile(tile);
++    if (glyph_pair.empty()) {
++        return '?';
+     }
++    return glyph_pair.front();
++}
++
++std::string MicropolisBridge::glyph_pair_for_tile(std::uint16_t tile) const {
+     if (tile == DIRT) {
+-        return '.';
++        return ". ";
+     }
+     if (tile >= RIVER && tile <= LASTRIVEDGE) {
+-        return '~';
++        return "~ ";
+     }
+     if (tile >= WOODS_LOW && tile <= WOODS_HIGH) {
+-        return '"';
++        return "\" ";
++    }
++    if (tile >= FIREBASE && tile <= LASTFIRE) {
++        return "* ";
++    }
++    if (tile >= RUBBLE && tile <= LASTRUBBLE) {
++        return ": ";
++    }
++
++    if (tile >= HOSPITALBASE && tile <= HOSPITALBASE + 8) {
++        return "H ";
++    }
++    if (tile >= POWERPLANT && tile <= LASTPOWERPLANT) {
++        return "* ";
++    }
++    if (tile >= FIRESTATION && tile <= 768) {
++        return "F ";
+     }
++    if (tile >= POLICESTBASE && tile <= POLICESTATION) {
++        return "P ";
++    }
++
++    if (tile == FREEZ) {
++        return "r.";
++    }
++    if (tile == COMBASE || tile == COMCLR) {
++        return "c.";
++    }
++    if (tile == INDBASE || tile == INDCLR) {
++        return "i.";
++    }
++
+     if (tile >= ROADBASE && tile <= LASTROAD) {
+-        return '=';
++        return std::string(1, road_glyph(tile)) + " ";
+     }
+     if (tile >= RAILBASE && tile <= LASTRAIL) {
+-        return '#';
++        return "# ";
+     }
+-    if (tile >= RESBASE && tile < COMBASE) {
+-        return 'R';
++    if (tile >= POWERBASE && tile <= LASTPOWER) {
++        return "w ";
+     }
+-    if (tile >= COMBASE && tile < INDBASE) {
+-        return 'C';
++
++    if (tile >= 245 && tile <= 422 && !(tile >= HOSPITALBASE && tile <= HOSPITALBASE + 8)) {
++        const int tier = tier_from_distance(tile, 245, 422);
++        return "r" + std::to_string(tier);
+     }
+-    if (tile >= INDBASE && tile <= LASTIND) {
+-        return 'I';
+-    }
+-    if (tile >= FIREBASE && tile <= LASTFIRE) {
+-        return '*';
++    if (tile >= 424 && tile <= 611) {
++        const int tier = tier_from_distance(tile, 424, 611);
++        return "c" + std::to_string(tier);
+     }
+-    if (tile >= RUBBLE && tile <= LASTRUBBLE) {
+-        return ':';
++    if (tile >= 613 && tile <= 826 &&
++        !(tile >= POWERPLANT && tile <= LASTPOWERPLANT) &&
++        !(tile >= FIRESTATION && tile <= 768) &&
++        !(tile >= POLICESTBASE && tile <= POLICESTATION)) {
++        const int tier = tier_from_distance(tile, 613, 826);
++        return "i" + std::to_string(tier);
+     }
+-    return '?';
++
++    return "? ";
+ }
+ 
+ std::uint64_t MicropolisBridge::hash_map_bytes() const {
+diff --git a/app/micropolis/micropolis_bridge.h b/app/micropolis/micropolis_bridge.h
+index f479fd5fb53c1b587c43ae9a0d8290a94211b035..8d1df444f75317dda3c2d636ac06caadb86992ab
+--- a/app/micropolis/micropolis_bridge.h
++++ b/app/micropolis/micropolis_bridge.h
+@@ -27,6 +27,7 @@
+     std::uint16_t cell_at(int x, int y) const;
+     std::uint16_t tile_at(int x, int y) const;
+     char glyph_for_tile(std::uint16_t tile) const;
++    std::string glyph_pair_for_tile(std::uint16_t tile) const;
+ 
+     MicropolisSnapshot snapshot() const;
+     std::string render_ascii_excerpt(int x, int y, int width, int height) const;
+@@ -36,4 +37,3 @@
+ 
+     std::unique_ptr<Micropolis> sim_;
+ };
+-
+diff --git a/app/micropolis_ascii_view.cpp b/app/micropolis_ascii_view.cpp
+index 7455d91549d6aa538def8524b3f111d2cfbc03b4..1796aeb1622187a6e538a3633e624dd4335388fe
+--- a/app/micropolis_ascii_view.cpp
++++ b/app/micropolis_ascii_view.cpp
+@@ -11,19 +11,43 @@
+ constexpr int kWorldW = 120;
+ constexpr int kWorldH = 100;
+ 
+-TColorAttr color_for_glyph(char ch) {
++TColorAttr color_for_glyph(char ch, char zone_prefix = '\0') {
++    if ((ch == '1' || ch == '2' || ch == '3') &&
++        (zone_prefix == 'r' || zone_prefix == 'c' || zone_prefix == 'i')) {
++        if (zone_prefix == 'r') {
++            if (ch == '1') return TColorAttr(0x02);
++            if (ch == '2') return TColorAttr(0x0A);
++            return TColorAttr(0x0F);
++        }
++        if (zone_prefix == 'c') {
++            if (ch == '1') return TColorAttr(0x01);
++            if (ch == '2') return TColorAttr(0x09);
++            return TColorAttr(0x0B);
++        }
++        if (ch == '1') return TColorAttr(0x06);
++        if (ch == '2') return TColorAttr(0x0E);
++        return TColorAttr(0x0C);
++    }
++
++    if (ch == '.' && (zone_prefix == 'r' || zone_prefix == 'c' || zone_prefix == 'i')) {
++        return color_for_glyph(zone_prefix);
++    }
++
+     switch (ch) {
+         case '~': return TColorAttr(0x1F); // water
+         case '"': return TColorAttr(0x2F); // woods
+-        case '=': return TColorAttr(0x07); // road
++        case '-': return TColorAttr(0x08); // road horizontal
++        case '|': return TColorAttr(0x08); // road vertical
++        case '+': return TColorAttr(0x08); // road intersections
+         case '#': return TColorAttr(0x08); // rail
+-        case 'R': return TColorAttr(0x2A); // residential
+-        case 'C': return TColorAttr(0x1B); // commercial
+-        case 'I': return TColorAttr(0x6E); // industrial
+-        case 'H': return TColorAttr(0x7C); // hospital
+-        case 'P': return TColorAttr(0x1F); // police
++        case 'w': return TColorAttr(0x0B); // wire
++        case 'r': return TColorAttr(0x02); // residential
++        case 'c': return TColorAttr(0x01); // commercial
++        case 'i': return TColorAttr(0x06); // industrial
++        case 'H': return TColorAttr(0x0D); // hospital
++        case 'P': return TColorAttr(0x1E); // police
+         case 'F': return TColorAttr(0x4F); // fire station
+-        case '*': return TColorAttr(0x4E); // fire
++        case '*': return TColorAttr(0x4E); // fire / power plant
+         case ':': return TColorAttr(0x08); // rubble
+         default: return TColorAttr(0x07);
+     }
+@@ -55,7 +79,8 @@
+ }
+ 
+ void TMicropolisAsciiView::clampCamera() {
+-    const int viewW = std::max(1, size.x);
++    const bool useWideTiles = size.x >= 2;
++    const int viewW = std::max(1, useWideTiles ? size.x / 2 : size.x);
+     const int viewH = std::max(1, size.y - 1);
+     const int maxX = std::max(0, kWorldW - viewW);
+     const int maxY = std::max(0, kWorldH - viewH);
+@@ -69,6 +94,8 @@
+ 
+ void TMicropolisAsciiView::draw() {
+     TDrawBuffer b;
++    const bool useWideTiles = size.x >= 2;
++    const int visibleTiles = std::max(1, useWideTiles ? size.x / 2 : size.x);
+ 
+     const auto s = bridge_.snapshot();
+     std::ostringstream status;
+@@ -89,12 +116,30 @@
+     for (int y = 1; y < size.y; ++y) {
+         b.moveChar(0, ' ', TColorAttr(0x07), size.x);
+         const int wy = camY_ + (y - 1);
+-        for (int x = 0; x < size.x; ++x) {
+-            const int wx = camX_ + x;
+-            if (wx < kWorldW && wy < kWorldH) {
+-                const char g = bridge_.glyph_for_tile(bridge_.tile_at(wx, wy));
+-                b.putChar(x, g);
+-                b.putAttribute(x, color_for_glyph(g));
++        if (useWideTiles) {
++            for (int tx = 0; tx < visibleTiles; ++tx) {
++                const int wx = camX_ + tx;
++                const int x = tx * 2;
++                if (wx < kWorldW && wy < kWorldH) {
++                    const std::string pair = bridge_.glyph_pair_for_tile(bridge_.tile_at(wx, wy));
++                    const char g0 = pair.empty() ? '?' : pair[0];
++                    const char g1 = pair.size() > 1 ? pair[1] : ' ';
++                    b.putChar(x, g0);
++                    b.putAttribute(x, color_for_glyph(g0));
++                    if (x + 1 < size.x) {
++                        b.putChar(x + 1, g1);
++                        b.putAttribute(x + 1, color_for_glyph(g1, g0));
++                    }
++                }
++            }
++        } else {
++            for (int x = 0; x < size.x; ++x) {
++                const int wx = camX_ + x;
++                if (wx < kWorldW && wy < kWorldH) {
++                    const char g = bridge_.glyph_for_tile(bridge_.tile_at(wx, wy));
++                    b.putChar(x, g);
++                    b.putAttribute(x, color_for_glyph(g));
++                }
+             }
+         }
+         writeLine(0, y, size.x, 1, b);
+
+tokens used
+86,136
+1) Tier boundaries found (`zone.cpp` / `micropolis.h`)
+- Residential density buckets are encoded as `((mapTile - RZB) / 9) % 4` (`vendor/MicropolisCore/MicropolisEngine/src/zone.cpp:711`), with placement via `base = ((value * 4 + den) * 9) + RZB - 4` (`vendor/MicropolisCore/MicropolisEngine/src/zone.cpp:724`).
+- Commercial density buckets are `((tile - CZB) / 9) % 5 + 1` with empty center `COMCLR` (`vendor/MicropolisCore/MicropolisEngine/src/zone.cpp:866`, `vendor/MicropolisCore/MicropolisEngine/src/zone.cpp:868`) and placement `((Value * 5) + Den) * 9 + CZB - 4` (`vendor/MicropolisCore/MicropolisEngine/src/zone.cpp:883`).
+- Industrial density buckets are `(((tile - IZB) / 9) % 4) + 1` with empty center `INDCLR` (`vendor/MicropolisCore/MicropolisEngine/src/zone.cpp:1001`, `vendor/MicropolisCore/MicropolisEngine/src/zone.cpp:1003`) and placement `((value * 4) + den) * 9 + IND1` (`vendor/MicropolisCore/MicropolisEngine/src/zone.cpp:1017`).
+- Tile range constants used:
+  - Roads/wires/rails/fire: `vendor/MicropolisCore/MicropolisEngine/src/micropolis.h:422`
+  - Zone/civic ranges: `vendor/MicropolisCore/MicropolisEngine/src/micropolis.h:507`
+
+2) File diffs / patches
+- `app/micropolis/micropolis_bridge.h:30`
+  - Added `std::string glyph_pair_for_tile(std::uint16_t tile) const;`
+- `app/micropolis/micropolis_bridge.cpp:31`
+  - Added tier helper + road normalization/orientation helper.
+  - `glyph_for_tile` now delegates to `glyph_pair_for_tile` first char (`app/micropolis/micropolis_bridge.cpp:113`).
+  - New `glyph_pair_for_tile` implementation with:
+    - Empty centers: `r.`, `c.`, `i.` (`app/micropolis/micropolis_bridge.cpp:151`)
+    - Tier glyphs: `r1/r2/r3`, `c1/c2/c3`, `i1/i2/i3` (`app/micropolis/micropolis_bridge.cpp:171`)
+    - Civic/specials: `H`, `P`, `F`, `*`, roads `- | +`, rail `#`, wire `w` (`app/micropolis/micropolis_bridge.cpp:138`)
+- `app/micropolis_ascii_view.cpp:14`
+  - Extended `color_for_glyph` to support new prefixes/tier digits and civic colors.
+  - `draw()` now renders 2 chars per tile when width allows, otherwise falls back to 1-char mode (`app/micropolis_ascii_view.cpp:95`).
+  - `clampCamera()` updated to camera width in tiles under 2-char mode (`app/micropolis_ascii_view.cpp:81`).
+
+3) Build result
+- `cmake --build build -j4`:
+  - Micropolis targets built, but full build failed on unrelated linker error in `scramble_engine_test` (`api_spawn_micropolis_ascii(...)` undefined).
+- Verified changed code compiles:
+  - `cmake --build build --target test_pattern -j4` passed.
+- Required tests:
+  - `ctest --output-on-failure -R "micropolis_(determinism|no_ansi)"` passed (2/2).
+
+4) Open questions
+- Fire/police range interpretation: requirement says `Fire(765-768)` and `Police(770-774)`; I implemented exactly those ranges, not full 3x3 station footprints.
+- Empty commercial/industrial center IDs: requirement names `COMBASE(423)` / `INDBASE(612)`, while engine center empties are `COMCLR(427)` / `INDCLR(616)`; I mapped both to `c.` / `i.`.

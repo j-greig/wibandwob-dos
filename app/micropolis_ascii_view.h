@@ -7,6 +7,7 @@
 #define Uses_TKeys
 #include <tvision/tv.h>
 
+#include <string>
 #include "micropolis/micropolis_bridge.h"
 
 class TMicropolisAsciiView : public TView {
@@ -23,12 +24,20 @@ private:
     void stopTimer();
     void advanceSim();
     void clampCamera();
+    void clampCursor();
+    void applyActiveTool();
+    void autopanTowardCursor();
 
     MicropolisBridge bridge_;
     int camX_ {0};
     int camY_ {0};
+    int curX_ {60};           // cursor world coord
+    int curY_ {50};
+    int activeTool_ {5};      // TOOL_QUERY=5 — no engine header needed in view
     int seed_ {1337};
     TTimerId timerId_ {0};
+    std::string lastResult_;
+    int lastResultTick_ {0};  // ticks remaining to show lastResult_
 };
 
 class TWindow;

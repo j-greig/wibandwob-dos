@@ -27,6 +27,46 @@ void hash_mix(std::uint64_t &hash, const void *value, std::size_t size) {
         hash *= FNV_PRIME;
     }
 }
+
+int tier_from_distance(std::uint16_t tile, std::uint16_t start, std::uint16_t end) {
+    if (tile < start || tile > end) {
+        return 0;
+    }
+    const int span = static_cast<int>(end - start + 1);
+    const int distance = static_cast<int>(tile - start);
+    const int cut1 = span / 3;
+    const int cut2 = (span * 2) / 3;
+    if (distance < cut1) {
+        return 1;
+    }
+    if (distance < cut2) {
+        return 2;
+    }
+    return 3;
+}
+
+std::uint16_t neutralized_road_tile(std::uint16_t tile) {
+    if (tile >= ROADBASE && tile <= LASTROAD) {
+        return static_cast<std::uint16_t>((tile & 0x000F) + ROADBASE);
+    }
+    return tile;
+}
+
+char road_glyph(std::uint16_t tile) {
+    if (tile == BRWV) {
+        return '|';
+    }
+
+    const auto normalized = neutralized_road_tile(tile);
+    if (normalized == HBRIDGE || normalized == ROADS || normalized == HROADPOWER ||
+        normalized == BRWH) {
+        return '-';
+    }
+    if (normalized == VBRIDGE || normalized == ROADS2 || normalized == VROADPOWER) {
+        return '|';
+    }
+    return '+';
+}
 } // namespace
 
 MicropolisBridge::MicropolisBridge() : sim_(new Micropolis()) {
@@ -71,46 +111,80 @@ std::uint16_t MicropolisBridge::tile_at(int x, int y) const {
 }
 
 char MicropolisBridge::glyph_for_tile(std::uint16_t tile) const {
-    if (tile == HOSPITAL) {
-        return 'H';
+    const std::string glyph_pair = glyph_pair_for_tile(tile);
+    if (glyph_pair.empty()) {
+        return '?';
     }
-    if (tile == FIRESTATION) {
-        return 'F';
-    }
-    if (tile == POLICESTATION) {
-        return 'P';
-    }
+    return glyph_pair.front();
+}
+
+std::string MicropolisBridge::glyph_pair_for_tile(std::uint16_t tile) const {
     if (tile == DIRT) {
-        return '.';
+        return ". ";
     }
     if (tile >= RIVER && tile <= LASTRIVEDGE) {
-        return '~';
+        return "~ ";
     }
     if (tile >= WOODS_LOW && tile <= WOODS_HIGH) {
-        return '"';
-    }
-    if (tile >= ROADBASE && tile <= LASTROAD) {
-        return '=';
-    }
-    if (tile >= RAILBASE && tile <= LASTRAIL) {
-        return '#';
-    }
-    if (tile >= RESBASE && tile < COMBASE) {
-        return 'R';
-    }
-    if (tile >= COMBASE && tile < INDBASE) {
-        return 'C';
-    }
-    if (tile >= INDBASE && tile <= LASTIND) {
-        return 'I';
+        return "\" ";
     }
     if (tile >= FIREBASE && tile <= LASTFIRE) {
-        return '*';
+        return "* ";
     }
     if (tile >= RUBBLE && tile <= LASTRUBBLE) {
-        return ':';
+        return ": ";
     }
-    return '?';
+
+    if (tile >= HOSPITALBASE && tile <= HOSPITALBASE + 8) {
+        return "H ";
+    }
+    if (tile >= POWERPLANT && tile <= LASTPOWERPLANT) {
+        return "* ";
+    }
+    if (tile >= FIRESTATION && tile <= 768) {
+        return "F ";
+    }
+    if (tile >= POLICESTBASE && tile <= POLICESTATION) {
+        return "P ";
+    }
+
+    if (tile == FREEZ) {
+        return "r.";
+    }
+    if (tile == COMBASE || tile == COMCLR) {
+        return "c.";
+    }
+    if (tile == INDBASE || tile == INDCLR) {
+        return "i.";
+    }
+
+    if (tile >= ROADBASE && tile <= LASTROAD) {
+        return std::string(1, road_glyph(tile)) + " ";
+    }
+    if (tile >= RAILBASE && tile <= LASTRAIL) {
+        return "# ";
+    }
+    if (tile >= POWERBASE && tile <= LASTPOWER) {
+        return "w ";
+    }
+
+    if (tile >= 245 && tile <= 422 && !(tile >= HOSPITALBASE && tile <= HOSPITALBASE + 8)) {
+        const int tier = tier_from_distance(tile, 245, 422);
+        return "r" + std::to_string(tier);
+    }
+    if (tile >= 424 && tile <= 611) {
+        const int tier = tier_from_distance(tile, 424, 611);
+        return "c" + std::to_string(tier);
+    }
+    if (tile >= 613 && tile <= 826 &&
+        !(tile >= POWERPLANT && tile <= LASTPOWERPLANT) &&
+        !(tile >= FIRESTATION && tile <= 768) &&
+        !(tile >= POLICESTBASE && tile <= POLICESTATION)) {
+        const int tier = tier_from_distance(tile, 613, 826);
+        return "i" + std::to_string(tier);
+    }
+
+    return "? ";
 }
 
 std::uint64_t MicropolisBridge::hash_map_bytes() const {
@@ -138,6 +212,7 @@ MicropolisSnapshot MicropolisBridge::snapshot() const {
     out.com_valve = sim_->comValve;
     out.ind_valve = sim_->indValve;
     out.city_time = static_cast<long>(sim_->cityTime);
+    out.total_funds = static_cast<long>(sim_->totalFunds);
 
     std::uint64_t mixed = out.map_hash;
     hash_mix(mixed, &out.total_pop, sizeof(out.total_pop));
@@ -166,4 +241,27 @@ std::string MicropolisBridge::render_ascii_excerpt(int x, int y, int width, int 
         out.push_back('\n');
     }
     return out;
+}
+
+ToolApplyResult MicropolisBridge::apply_tool(int tool_id, int x, int y) {
+    if (!sim_) {
+        return {0, "No sim"};
+    }
+    if (x < 0 || y < 0 || x >= WORLD_W || y >= WORLD_H) {
+        return {0, "Out of bounds"};
+    }
+    if (tool_id < TOOL_FIRST || tool_id > TOOL_LAST) {
+        return {0, "Unknown tool"};
+    }
+
+    const auto tool = static_cast<EditingTool>(tool_id);
+    const ToolResult result = sim_->doTool(tool, static_cast<short>(x), static_cast<short>(y));
+
+    switch (result) {
+        case TOOLRESULT_OK:            return {1,  "OK"};
+        case TOOLRESULT_FAILED:        return {0,  "Failed"};
+        case TOOLRESULT_NEED_BULLDOZE: return {-1, "Bulldoze first"};
+        case TOOLRESULT_NO_MONEY:      return {-2, "No funds"};
+        default:                       return {0,  "?"};
+    }
 }

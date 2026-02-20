@@ -14,6 +14,12 @@ struct MicropolisSnapshot {
     short com_valve = 0;
     short ind_valve = 0;
     long city_time = 0;
+    long total_funds = 0;
+};
+
+struct ToolApplyResult {
+    int code;          // -2 no money, -1 need bulldoze, 0 failed, 1 ok
+    std::string message;
 };
 
 class MicropolisBridge {
@@ -27,8 +33,10 @@ public:
     std::uint16_t cell_at(int x, int y) const;
     std::uint16_t tile_at(int x, int y) const;
     char glyph_for_tile(std::uint16_t tile) const;
+    std::string glyph_pair_for_tile(std::uint16_t tile) const;
 
     MicropolisSnapshot snapshot() const;
+    ToolApplyResult apply_tool(int tool_id, int x, int y);
     std::string render_ascii_excerpt(int x, int y, int width, int height) const;
 
 private:
@@ -36,4 +44,3 @@ private:
 
     std::unique_ptr<Micropolis> sim_;
 };
-

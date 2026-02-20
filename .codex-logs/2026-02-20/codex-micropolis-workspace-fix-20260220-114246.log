@@ -1,0 +1,1492 @@
+OpenAI Codex v0.104.0 (research preview)
+--------
+workdir: /Users/james/Repos/wibandwob-dos
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: medium
+reasoning summaries: auto
+session id: 019c7adc-0a32-7580-8fcd-edae787ff0b1
+--------
+user
+DEVNOTE: Files matching codex-*.log or inside .codex-logs/ are intentional run logs. Ignore them completely.
+
+TASK: Fix workspace save/load to support micropolis_ascii windows.
+
+Background: A prior analysis found that TMicropolisAsciiView windows are silently dropped when a workspace is saved and reloaded. The save path serialises unknown window types as 'custom', and the load path only knows how to restore a small set of hardcoded types. Micropolis windows are never restored.
+
+Key lines identified:
+- Save path: app/test_pattern_app.cpp ~2836, ~2862 (buildWorkspaceJson / windowTypeName)
+- Load path: app/test_pattern_app.cpp ~2707, ~2723 (loadWorkspaceFromFile type dispatch)
+- Window type registry: app/window_type_registry.cpp (already has micropolis_ascii registered with spawn support)
+
+Constraints:
+- Minimal change only. Do not refactor unrelated code.
+- The window type registry already has spawnByType support for micropolis_ascii — use it in the load path rather than writing a new spawn inline.
+- Do not add new files.
+
+Do:
+1) Read the save path (buildWorkspaceJson / windowTypeName) and confirm how window type strings are emitted.
+2) Read the load path (loadWorkspaceFromFile) and confirm the type dispatch switch/if chain.
+3) Read window_type_registry.cpp to confirm the spawnByType API for micropolis_ascii.
+4) Make the minimal changes: ensure 'micropolis_ascii' is emitted correctly on save and restored correctly on load using spawnByType.
+5) Build: cmake --build build --target test_pattern -j4
+6) Test: cd build && ctest --output-on-failure -R micropolis
+7) Summarise exactly what lines changed and why.
+mcp: chrome-devtools starting
+mcp: fastmcp starting
+mcp: fastmcp ready
+mcp: chrome-devtools ready
+mcp startup: ready: fastmcp, chrome-devtools
+
+thinking
+**Preparing initial commentary update**
+codex
+I’m going to inspect the save/load code paths in `app/test_pattern_app.cpp` and the registry in `app/window_type_registry.cpp`, then make the smallest possible patch to emit and restore `micropolis_ascii` via the existing registry spawn path.
+exec
+/bin/zsh -lc "sed -n '2660,2895p' app/test_pattern_app.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,260p' app/window_type_registry.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc 'rg -n "windowTypeName|buildWorkspaceJson|loadWorkspaceFromFile|spawnByType|micropolis_ascii|custom" app/test_pattern_app.cpp app/window_type_registry.cpp' in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+    if (arrPos == std::string::npos) return false;
+    std::vector<std::string> objects;
+    size_t p = arrPos+1; bool inStr=false; int depth=0;
+    while (p < data.size()) {
+        char c = data[p];
+        if (c == '"') { inStr = !inStr; ++p; continue; }
+        if (!inStr) {
+            if (c == '{') {
+                int d=1; size_t q=p+1;
+                while (q<data.size() && d) {
+                    if (data[q] == '"') { ++q; while (q<data.size() && data[q] != '"') { if (data[q]=='\\') ++q; ++q; } ++q; continue; }
+                    if (data[q] == '{') d++; else if (data[q] == '}') d--; ++q;
+                }
+                objects.emplace_back(data.substr(p, q-p));
+                p = q; continue;
+            }
+            if (c == ']') break;
+        }
+        ++p;
+    }
+ succeeded in 51ms:
+// Window type registry — single source of truth for all spawnable window types.
+// Keeps api_ipc.cpp free of per-type knowledge: adding a new type only requires
+// a new entry in the k_specs table below.
+
+#include "window_type_registry.h"
+#include "gradient.h"
+#include "frame_file_player_view.h"
+#include "transparent_text_view.h"
+#include "text_editor_view.h"
+#include "browser_view.h"
+#include "generative_verse_view.h"
+#include "generative_mycelium_view.h"
+#include "generative_orbit_view.h"
+#include "generative_torus_view.h"
+#include "generative_cube_view.h"
+#include "game_of_life_view.h"
+#include "animated_blocks_view.h"
+#include "animated_score_view.h"
+#include "animated_ascii_view.h"
+#include "animated_gradient_view.h"
+ succeeded in 52ms:
+app/window_type_registry.cpp:27:#include "micropolis_ascii_view.h"
+app/window_type_registry.cpp:60:extern void api_spawn_micropolis_ascii(TTestPatternApp&, const TRect*);
+app/window_type_registry.cpp:185:static const char* spawn_micropolis_ascii(TTestPatternApp& app,
+app/window_type_registry.cpp:187:    TRect r; api_spawn_micropolis_ascii(app, opt_bounds(kv, r)); return nullptr;
+app/window_type_registry.cpp:228:static bool match_micropolis_ascii(TWindow* w) { return has_child_view<TMicropolisAsciiView>(w); }
+app/window_type_registry.cpp:256:    { "micropolis_ascii",  spawn_micropolis_ascii,  match_micropolis_ascii  },
+app/test_pattern_app.cpp:88:#include "micropolis_ascii_view.h"
+app/test_pattern_app.cpp:601:    std::string buildWorkspaceJson();
+app/test_pattern_app.cpp:603:    bool loadWorkspaceFromFile(const std::string& path);
+app/test_pattern_app.cpp:631:            auto* customMenuBar = dynamic_cast<TCustomMenuBar*>(menuBar);
+app/test_pattern_app.cpp:632:            if (customMenuBar) {
+app/test_pattern_app.cpp:633:                customMenuBar->setMood(mood, durationMs);
+app/test_pattern_app.cpp:761:    friend void api_spawn_micropolis_ascii(TTestPatternApp&, const TRect* bounds);
+app/test_pattern_app.cpp:814:        if (!loadWorkspaceFromFile(layoutPath)) {
+app/test_pattern_app.cpp:2152:    //     auto* customMenuBar = dynamic_cast<TCustomMenuBar*>(menuBar);
+app/test_pattern_app.cpp:2153:    //     if (customMenuBar) {
+app/test_pattern_app.cpp:2154:    //         customMenuBar->update();
+app/test_pattern_app.cpp:2305:static const char* windowTypeName(TWindow* w) {
+app/test_pattern_app.cpp:2353:             << ",\"type\":\"" << windowTypeName(w) << "\""
+app/test_pattern_app.cpp:2625:bool TTestPatternApp::loadWorkspaceFromFile(const std::string& path)
+
+thinking
+**Inspecting registry-related includes**
+codex
+I confirmed the registry already includes `micropolis_ascii` with both matcher and `spawnByType` support. Next I’m checking whether `test_pattern_app.cpp` is already wired to use registry helpers in save/load, then I’ll patch only those call sites.
+exec
+/bin/zsh -lc "sed -n '2580,2745p' app/test_pattern_app.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,140p' app/test_pattern_app.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '2260,2395p' app/test_pattern_app.cpp" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+        skipWs(s, pos); if (pos<s.size() && s[pos]==',') ++pos;
+    }
+    return false;
+}
+
+bool TTestPatternApp::parseBounds(const std::string &s, size_t objStart, int &x,int &y,int &w,int &h)
+{
+    size_t pos = objStart;
+    while (pos < s.size()) {
+        skipWs(s, pos);
+        if (s[pos] == '}' || s[pos] == ']') return false;
+        std::string k; size_t kpos = pos;
+        if (!parseString(s, kpos, k)) { ++pos; continue; }
+        pos = kpos; skipWs(s, pos);
+        if (!consume(s, pos, ':')) continue;
+        if (k == "bounds") {
+            skipWs(s, pos);
+            if (!consume(s, pos, '{')) return false;
+            int tx=0,ty=0,tw=0,th=0; bool okX=false,okY=false,okW=false,okH=false;
+            while (pos < s.size()) {
+ succeeded in 51ms:
+    };
+    std::string response = petReactions[std::rand() % 5];
+
+    if (app.scrambleWindow->getView()) {
+        app.scrambleWindow->getView()->setPose(spDefault);
+        app.scrambleWindow->getView()->say(response);
+    }
+    auto* msgView = app.scrambleWindow->getMessageView();
+    if (msgView) msgView->addMessage("scramble", response);
+    return response;
+}
+
+std::string api_chat_receive(TTestPatternApp& app, const std::string& sender, const std::string& text) {
+    // Display a remote chat message in Scramble without AI processing.
+    if (!app.scrambleWindow) return "err scramble not open";
+    auto* msgView = app.scrambleWindow->getMessageView();
+    if (!msgView) return "err no message view";
+    msgView->addMessage(sender, text);
+    return "ok";
+}
+ succeeded in 51ms:
+/*---------------------------------------------------------*/
+/*                                                         */
+/*   test_pattern_app.cpp - Test Pattern Window Spawner   */
+/*   Unlimited resizable windows with test patterns       */
+/*                                                         */
+/*---------------------------------------------------------*/
+
+#define Uses_TKeys
+#define Uses_TApplication
+#define Uses_TEvent
+#define Uses_TRect
+#define Uses_TDialog
+#define Uses_TStaticText
+#define Uses_TButton
+#define Uses_TMenuBar
+#define Uses_TSubMenu
+#define Uses_TMenuItem
+#define Uses_TMenu
+#define Uses_TStatusLine
+#define Uses_TStatusItem
+
+thinking
+**Planning minimal save/load refactor**
+exec
+/bin/zsh -lc "sed -n '1,220p' app/window_type_registry.h" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '220,360p' app/window_type_registry.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "rg -n \"spawnByType\\(|all_window_type_specs\\(|window_type_name_for\\(\" app -g'*.cpp' -g'*.h'" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+// Data-driven registry mapping window type slugs to spawn callbacks.
+// Eliminates the if-else dispatch chain and extern declarations in api_ipc.cpp.
+// To add a new window type: add ONE entry in window_type_registry.cpp.
+#pragma once
+
+#include <string>
+#include <vector>
+#include <map>
+
+class TTestPatternApp;
+class TWindow;
+
+// Spawn callback: return nullptr on success, a static error string on failure.
+using WinSpawnFn = const char* (*)(TTestPatternApp&,
+                                   const std::map<std::string, std::string>&);
+using WinMatchFn = bool (*)(TWindow*);
+
+struct WindowTypeSpec {
+    const char* type;    // canonical slug, e.g. "verse", "gradient"
+    WinSpawnFn  spawn;   // nullptr = recognised but not creatable via IPC
+ succeeded in 51ms:
+static bool match_blocks(TWindow* w) { return has_child_view<TAnimatedBlocksView>(w); }
+static bool match_score(TWindow* w) { return has_child_view<TAnimatedScoreView>(w); }
+static bool match_ascii(TWindow* w) { return has_child_view<TAnimatedAsciiView>(w); }
+static bool match_animated_gradient(TWindow* w) { return has_child_view<TAnimatedHGradientView>(w); }
+static bool match_monster_cam(TWindow* w) { return has_child_view<TGenerativeMonsterCamView>(w); }
+static bool match_monster_verse(TWindow* w) { return has_child_view<TGenerativeMonsterVerseView>(w); }
+static bool match_monster_portal(TWindow* w) { return has_child_view<TGenerativeMonsterPortalView>(w); }
+static bool match_paint(TWindow* w) { return dynamic_cast<TPaintWindow*>(w) != nullptr; }
+static bool match_micropolis_ascii(TWindow* w) { return has_child_view<TMicropolisAsciiView>(w); }
+static bool match_wibwob(TWindow* w) { return dynamic_cast<TWibWobWindow*>(w) != nullptr; }
+static bool match_scramble(TWindow* w) { return dynamic_cast<TScrambleWindow*>(w) != nullptr; }
+
+// ── Registry table ────────────────────────────────────────────────────────────
+// Add new window types here — nowhere else.
+
+static const WindowTypeSpec k_specs[] = {
+    { "test_pattern",      spawn_test,              match_test_pattern      },
+    { "gradient",          spawn_gradient,          match_gradient          },
+    { "frame_player",      spawn_frame_player,      match_frame_player      },
+    { "text_view",         spawn_text_view,         match_text_view         },
+ succeeded in 51ms:
+app/window_type_registry.h:28:const std::vector<WindowTypeSpec>& all_window_type_specs();
+app/window_type_registry.cpp:264:const std::vector<WindowTypeSpec>& all_window_type_specs() {
+app/window_type_registry.cpp:271:    for (const auto& spec : all_window_type_specs())
+app/test_pattern_app.cpp:2306:    const auto& specs = all_window_type_specs();
+
+thinking
+**Searching global for function**
+codex
+I found `all_window_type_specs()` and `find_window_type_by_name()` in the registry header, but not yet `spawnByType`; I’m now locating where that API is defined so I can call exactly the intended loader path.
+exec
+/bin/zsh -lc "rg -n \"spawnByType|spawn_by_type|find_window_type_by_name\\(|spec\\.spawn|WindowTypeSpec\" app" in /Users/james/Repos/wibandwob-dos succeeded in 90ms:
+app/window_type_registry.cpp:235:static const WindowTypeSpec k_specs[] = {
+app/window_type_registry.cpp:264:const std::vector<WindowTypeSpec>& all_window_type_specs() {
+app/window_type_registry.cpp:265:    static std::vector<WindowTypeSpec> specs(
+app/window_type_registry.cpp:270:const WindowTypeSpec* find_window_type_by_name(const std::string& name) {
+app/api_ipc.cpp:409:        const WindowTypeSpec* spec = find_window_type_by_name(type);
+app/window_type_registry.h:18:struct WindowTypeSpec {
+app/window_type_registry.h:25:const WindowTypeSpec* find_window_type_by_name(const std::string& name);
+app/window_type_registry.h:28:const std::vector<WindowTypeSpec>& all_window_type_specs();
+
+thinking
+**Assessing window spawn approach**
+exec
+/bin/zsh -lc "sed -n '360,470p' app/api_ipc.cpp" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+            std::string err = "{\"error\":\"auth_failed\"}\n";
+            (void)safe_write(fd, err.c_str(), err.size());
+            ::close(fd);
+            return;
+        }
+    }
+
+    // Read a single line command.
+    char buf[2048];
+    ssize_t n = ::read(fd, buf, sizeof(buf)-1);
+    if (n <= 0) {
+        ::close(fd);
+        return;
+    }
+    buf[n] = 0;
+    std::string line(buf);
+    // Simple trim
+    while (!line.empty() && (line.back()=='\n' || line.back()=='\r' || line.back()==' ')) line.pop_back();
+
+    // Parse: "cmd:<name> k=v k=v"
+
+thinking
+**Implementing spawnByType fallback**
+codex
+I’ve confirmed there isn’t a separate `spawnByType` symbol; the existing typed spawn path is `find_window_type_by_name(type)` + `spec->spawn(...)` (already used by IPC). I’m now applying a minimal patch so workspace save emits registry type slugs (including `micropolis_ascii`) and workspace load uses that same registry spawn path for non-hardcoded types.
+
+thinking
+**Locating exact patch failure sections**
+exec
+/bin/zsh -lc "nl -ba app/test_pattern_app.cpp | sed -n '2610,2738p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba app/test_pattern_app.cpp | sed -n '2805,2888p'" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+  2610	            return false;
+  2611	        }
+  2612	        // Skip value
+  2613	        skipWs(s, pos);
+  2614	        if (pos>=s.size()) break;
+  2615	        if (s[pos] == '"') { std::string tmp; parseString(s, pos, tmp); }
+  2616	        else if ((s[pos] >= '0' && s[pos] <= '9') || s[pos]=='-' || s[pos]=='+') { int dummy; parseNumber(s, pos, dummy); }
+  2617	        else if (s[pos] == 't' || s[pos] == 'f') { bool db; parseBool(s, pos, db); }
+  2618	        else if (s[pos] == '{') { int depth=1; ++pos; while (pos<s.size()&&depth){ if(s[pos]=='"'){ ++pos; while(pos<s.size()&&s[pos]!='"'){ if(s[pos]=='\\') ++pos; ++pos;} ++pos; continue;} if(s[pos]=='{')depth++; else if(s[pos]=='}')depth--; ++pos; } }
+  2619	        else if (s[pos] == '[') { int depth=1; ++pos; while (pos<s.size()&&depth){ if(s[pos]=='"'){ ++pos; while(pos<s.size()&&s[pos]!='"'){ if(s[pos]=='\\') ++pos; ++pos;} ++pos; continue;} if(s[pos]=='[')depth++; else if(s[pos]==']')depth--; ++pos; } }
+  2620	        skipWs(s, pos); if (pos<s.size() && s[pos]==',') ++pos;
+  2621	    }
+  2622	    return false;
+  2623	}
+  2624	
+  2625	bool TTestPatternApp::loadWorkspaceFromFile(const std::string& path)
+  2626	{
+  2627	    std::ifstream in(path);
+  2628	    if (!in) {
+  2629	        std::string msg = std::string("Failed to open ") + path;
+ succeeded in 51ms:
+  2805	    int sw = ext.b.x - ext.a.x;
+  2806	    int sh = ext.b.y - ext.a.y;
+  2807	
+  2808	    // Timestamp (basic)
+  2809	    char ts[64];
+  2810	    std::time_t t = std::time(nullptr);
+  2811	    std::tm *lt = std::localtime(&t);
+  2812	    std::strftime(ts, sizeof(ts), "%Y-%m-%dT%H:%M:%S", lt);
+  2813	
+  2814	    std::string json;
+  2815	    json += "{\n";
+  2816	    json += "  \"version\": 1,\n";
+  2817	    json += "  \"app\": \"test_pattern\",\n";
+  2818	    json += std::string("  \"timestamp\": \"") + ts + "\",\n";
+  2819	    json += "  \"screen\": { \"width\": " + std::to_string(sw) + ", \"height\": " + std::to_string(sh) + " },\n";
+  2820	    json += std::string("  \"globals\": { \"patternMode\": \"") + (USE_CONTINUOUS_PATTERN ? "continuous" : "tiled") + "\" },\n";
+  2821	    json += "  \"windows\": [\n";
+  2822	
+  2823	    // Collect windows in current z-order (child list is circular)
+  2824	    int idx = 0;
+
+thinking
+**Refining patch context size**
+file update
+M /Users/james/Repos/wibandwob-dos/app/test_pattern_app.cpp
+@@ -2835,11 +2835,9 @@
+         // Determine type and props
+-        std::string type = "custom";
++        std::string type = windowTypeName(w);
+         std::string props = "{}";
+ 
+-        if (dynamic_cast<TTestPatternWindow*>(w)) {
+-            type = "test_pattern";
++        if (type == "test_pattern") {
+             props = "{}"; // Pattern mode is global in MVP
+-        } else {
+-            // Try to detect gradient by scanning child views (circular list)
+-            bool isGradient = false;
++        } else if (type == "gradient") {
++            // Keep concrete gradient subtype in props for backward compatibility.
+             TView *cStart = w->first();
+@@ -2849,9 +2847,9 @@
+                 if (dynamic_cast<THorizontalGradientView*>(c)) {
+-                    type = "gradient"; props = "{\"gradientType\": \"horizontal\"}"; isGradient = true; break;
++                    props = "{\"gradientType\": \"horizontal\"}"; break;
+                 } else if (dynamic_cast<TVerticalGradientView*>(c)) {
+-                    type = "gradient"; props = "{\"gradientType\": \"vertical\"}"; isGradient = true; break;
++                    props = "{\"gradientType\": \"vertical\"}"; break;
+                 } else if (dynamic_cast<TRadialGradientView*>(c)) {
+-                    type = "gradient"; props = "{\"gradientType\": \"radial\"}"; isGradient = true; break;
++                    props = "{\"gradientType\": \"radial\"}"; break;
+                 } else if (dynamic_cast<TDiagonalGradientView*>(c)) {
+-                    type = "gradient"; props = "{\"gradientType\": \"diagonal\"}"; isGradient = true; break;
++                    props = "{\"gradientType\": \"diagonal\"}"; break;
+                 }
+@@ -2859,5 +2857,2 @@
+             } while (c != cStart);
+-            }
+-            if (!isGradient) {
+-                // Unknown window type: keep as 'custom' with empty props
+             }
+apply_patch(auto_approved=true) exited 0 in 48ms:
+Success. Updated the following files:
+M app/test_pattern_app.cpp
+file update:
+diff --git a/app/test_pattern_app.cpp b/app/test_pattern_app.cpp
+index 8fca4d860e82bf0598a51d653dd778bf105c3a9d..9ca13bf183fa1ee771b3fd41df6f718f48fb205b
+--- a/app/test_pattern_app.cpp
++++ b/app/test_pattern_app.cpp
+@@ -2833,33 +2833,28 @@
+         if (!w->getState(sfVisible)) { v = nextV; continue; }
+ 
+         // Determine type and props
+-        std::string type = "custom";
++        std::string type = windowTypeName(w);
+         std::string props = "{}";
+ 
+-        if (dynamic_cast<TTestPatternWindow*>(w)) {
+-            type = "test_pattern";
++        if (type == "test_pattern") {
+             props = "{}"; // Pattern mode is global in MVP
+-        } else {
+-            // Try to detect gradient by scanning child views (circular list)
+-            bool isGradient = false;
++        } else if (type == "gradient") {
++            // Keep concrete gradient subtype in props for backward compatibility.
+             TView *cStart = w->first();
+             if (cStart) {
+             TView *c = cStart;
+             do {
+                 if (dynamic_cast<THorizontalGradientView*>(c)) {
+-                    type = "gradient"; props = "{\"gradientType\": \"horizontal\"}"; isGradient = true; break;
++                    props = "{\"gradientType\": \"horizontal\"}"; break;
+                 } else if (dynamic_cast<TVerticalGradientView*>(c)) {
+-                    type = "gradient"; props = "{\"gradientType\": \"vertical\"}"; isGradient = true; break;
++                    props = "{\"gradientType\": \"vertical\"}"; break;
+                 } else if (dynamic_cast<TRadialGradientView*>(c)) {
+-                    type = "gradient"; props = "{\"gradientType\": \"radial\"}"; isGradient = true; break;
++                    props = "{\"gradientType\": \"radial\"}"; break;
+                 } else if (dynamic_cast<TDiagonalGradientView*>(c)) {
+-                    type = "gradient"; props = "{\"gradientType\": \"diagonal\"}"; isGradient = true; break;
++                    props = "{\"gradientType\": \"diagonal\"}"; break;
+                 }
+                 c = c->next;
+             } while (c != cStart);
+-            }
+-            if (!isGradient) {
+-                // Unknown window type: keep as 'custom' with empty props
+             }
+         }
+ 
+
+file update:
+diff --git a/app/test_pattern_app.cpp b/app/test_pattern_app.cpp
+index 8fca4d860e82bf0598a51d653dd778bf105c3a9d..9ca13bf183fa1ee771b3fd41df6f718f48fb205b
+--- a/app/test_pattern_app.cpp
++++ b/app/test_pattern_app.cpp
+@@ -2833,33 +2833,28 @@
+         if (!w->getState(sfVisible)) { v = nextV; continue; }
+ 
+         // Determine type and props
+-        std::string type = "custom";
++        std::string type = windowTypeName(w);
+         std::string props = "{}";
+ 
+-        if (dynamic_cast<TTestPatternWindow*>(w)) {
+-            type = "test_pattern";
++        if (type == "test_pattern") {
+             props = "{}"; // Pattern mode is global in MVP
+-        } else {
+-            // Try to detect gradient by scanning child views (circular list)
+-            bool isGradient = false;
++        } else if (type == "gradient") {
++            // Keep concrete gradient subtype in props for backward compatibility.
+             TView *cStart = w->first();
+             if (cStart) {
+             TView *c = cStart;
+             do {
+                 if (dynamic_cast<THorizontalGradientView*>(c)) {
+-                    type = "gradient"; props = "{\"gradientType\": \"horizontal\"}"; isGradient = true; break;
++                    props = "{\"gradientType\": \"horizontal\"}"; break;
+                 } else if (dynamic_cast<TVerticalGradientView*>(c)) {
+-                    type = "gradient"; props = "{\"gradientType\": \"vertical\"}"; isGradient = true; break;
++                    props = "{\"gradientType\": \"vertical\"}"; break;
+                 } else if (dynamic_cast<TRadialGradientView*>(c)) {
+-                    type = "gradient"; props = "{\"gradientType\": \"radial\"}"; isGradient = true; break;
++                    props = "{\"gradientType\": \"radial\"}"; break;
+                 } else if (dynamic_cast<TDiagonalGradientView*>(c)) {
+-                    type = "gradient"; props = "{\"gradientType\": \"diagonal\"}"; isGradient = true; break;
++                    props = "{\"gradientType\": \"diagonal\"}"; break;
+                 }
+                 c = c->next;
+             } while (c != cStart);
+-            }
+-            if (!isGradient) {
+-                // Unknown window type: keep as 'custom' with empty props
+             }
+         }
+ 
+
+codex
+I’ve patched the save path so type emission now uses the registry matcher (`windowTypeName`), which means Micropolis windows now serialize as `micropolis_ascii`. I’m now patching the load dispatch to use the same registry spawn callback for non-hardcoded types, including Micropolis.
+file update
+M /Users/james/Repos/wibandwob-dos/app/test_pattern_app.cpp
+@@ -2688,2 +2688,14 @@
+     std::vector<TWindow*> created;
++    auto captureWindows = [this]() {
++        std::vector<TWindow*> out;
++        TView *start = deskTop->first();
++        if (!start) return out;
++        TView *v = start;
++        do {
++            if (TWindow *w = dynamic_cast<TWindow*>(v))
++                out.push_back(w);
++            v = v->next;
++        } while (v != start);
++        return out;
++    };
+     for (const auto &obj : objects) {
+@@ -2722,5 +2734,33 @@
+         } else {
+-            continue;
++            const WindowTypeSpec* spec = find_window_type_by_name(type);
++            if (!spec || !spec->spawn) continue;
++
++            const std::vector<TWindow*> before = captureWindows();
++            std::map<std::string, std::string> kv;
++            kv["x"] = std::to_string(x);
++            kv["y"] = std::to_string(y);
++            kv["w"] = std::to_string(w);
++            kv["h"] = std::to_string(h);
++            if (!title.empty()) kv["title"] = title;
++            const char* err = spec->spawn(*this, kv);
++            if (err) continue;
++
++            const std::vector<TWindow*> after = captureWindows();
++            for (TWindow* candidate : after) {
++                bool existed = false;
++                for (TWindow* prior : before) {
++                    if (prior == candidate) {
++                        existed = true;
++                        break;
++                    }
++                }
++                if (!existed) {
++                    win = candidate;
++                    break;
++                }
++            }
++            if (!win) continue;
+         }
+-        deskTop->insert(win);
++        if (type == "test_pattern" || type == "gradient")
++            deskTop->insert(win);
+         if (zoomed) win->zoom();
+apply_patch(auto_approved=true) exited 0 in 62ms:
+Success. Updated the following files:
+M app/test_pattern_app.cpp
+file update:
+diff --git a/app/test_pattern_app.cpp b/app/test_pattern_app.cpp
+index 8fca4d860e82bf0598a51d653dd778bf105c3a9d..21a131afe0a936b16e882f729127d3b79d9b7922
+--- a/app/test_pattern_app.cpp
++++ b/app/test_pattern_app.cpp
+@@ -2686,6 +2686,18 @@
+ 
+     // Restore windows
+     std::vector<TWindow*> created;
++    auto captureWindows = [this]() {
++        std::vector<TWindow*> out;
++        TView *start = deskTop->first();
++        if (!start) return out;
++        TView *v = start;
++        do {
++            if (TWindow *w = dynamic_cast<TWindow*>(v))
++                out.push_back(w);
++            v = v->next;
++        } while (v != start);
++        return out;
++    };
+     for (const auto &obj : objects) {
+         std::string type; if (!parseKeyedString(obj, 0, "type", type)) continue;
+         std::string title; parseKeyedString(obj, 0, "title", title);
+@@ -2720,9 +2732,37 @@
+             else if (gtype == "diagonal") gt = TGradientWindow::gtDiagonal;
+             win = new TGradientWindow(bounds, "", gt);
+         } else {
+-            continue;
++            const WindowTypeSpec* spec = find_window_type_by_name(type);
++            if (!spec || !spec->spawn) continue;
++
++            const std::vector<TWindow*> before = captureWindows();
++            std::map<std::string, std::string> kv;
++            kv["x"] = std::to_string(x);
++            kv["y"] = std::to_string(y);
++            kv["w"] = std::to_string(w);
++            kv["h"] = std::to_string(h);
++            if (!title.empty()) kv["title"] = title;
++            const char* err = spec->spawn(*this, kv);
++            if (err) continue;
++
++            const std::vector<TWindow*> after = captureWindows();
++            for (TWindow* candidate : after) {
++                bool existed = false;
++                for (TWindow* prior : before) {
++                    if (prior == candidate) {
++                        existed = true;
++                        break;
++                    }
++                }
++                if (!existed) {
++                    win = candidate;
++                    break;
++                }
++            }
++            if (!win) continue;
+         }
+-        deskTop->insert(win);
++        if (type == "test_pattern" || type == "gradient")
++            deskTop->insert(win);
+         if (zoomed) win->zoom();
+         created.push_back(win);
+     }
+@@ -2833,33 +2873,28 @@
+         if (!w->getState(sfVisible)) { v = nextV; continue; }
+ 
+         // Determine type and props
+-        std::string type = "custom";
++        std::string type = windowTypeName(w);
+         std::string props = "{}";
+ 
+-        if (dynamic_cast<TTestPatternWindow*>(w)) {
+-            type = "test_pattern";
++        if (type == "test_pattern") {
+             props = "{}"; // Pattern mode is global in MVP
+-        } else {
+-            // Try to detect gradient by scanning child views (circular list)
+-            bool isGradient = false;
++        } else if (type == "gradient") {
++            // Keep concrete gradient subtype in props for backward compatibility.
+             TView *cStart = w->first();
+             if (cStart) {
+             TView *c = cStart;
+             do {
+                 if (dynamic_cast<THorizontalGradientView*>(c)) {
+-                    type = "gradient"; props = "{\"gradientType\": \"horizontal\"}"; isGradient = true; break;
++                    props = "{\"gradientType\": \"horizontal\"}"; break;
+                 } else if (dynamic_cast<TVerticalGradientView*>(c)) {
+-                    type = "gradient"; props = "{\"gradientType\": \"vertical\"}"; isGradient = true; break;
++                    props = "{\"gradientType\": \"vertical\"}"; break;
+                 } else if (dynamic_cast<TRadialGradientView*>(c)) {
+-                    type = "gradient"; props = "{\"gradientType\": \"radial\"}"; isGradient = true; break;
++                    props = "{\"gradientType\": \"radial\"}"; break;
+                 } else if (dynamic_cast<TDiagonalGradientView*>(c)) {
+-                    type = "gradient"; props = "{\"gradientType\": \"diagonal\"}"; isGradient = true; break;
++                    props = "{\"gradientType\": \"diagonal\"}"; break;
+                 }
+                 c = c->next;
+             } while (c != cStart);
+-            }
+-            if (!isGradient) {
+-                // Unknown window type: keep as 'custom' with empty props
+             }
+         }
+ 
+
+file update:
+diff --git a/app/test_pattern_app.cpp b/app/test_pattern_app.cpp
+index 8fca4d860e82bf0598a51d653dd778bf105c3a9d..21a131afe0a936b16e882f729127d3b79d9b7922
+--- a/app/test_pattern_app.cpp
++++ b/app/test_pattern_app.cpp
+@@ -2686,6 +2686,18 @@
+ 
+     // Restore windows
+     std::vector<TWindow*> created;
++    auto captureWindows = [this]() {
++        std::vector<TWindow*> out;
++        TView *start = deskTop->first();
++        if (!start) return out;
++        TView *v = start;
++        do {
++            if (TWindow *w = dynamic_cast<TWindow*>(v))
++                out.push_back(w);
++            v = v->next;
++        } while (v != start);
++        return out;
++    };
+     for (const auto &obj : objects) {
+         std::string type; if (!parseKeyedString(obj, 0, "type", type)) continue;
+         std::string title; parseKeyedString(obj, 0, "title", title);
+@@ -2720,9 +2732,37 @@
+             else if (gtype == "diagonal") gt = TGradientWindow::gtDiagonal;
+             win = new TGradientWindow(bounds, "", gt);
+         } else {
+-            continue;
++            const WindowTypeSpec* spec = find_window_type_by_name(type);
++            if (!spec || !spec->spawn) continue;
++
++            const std::vector<TWindow*> before = captureWindows();
++            std::map<std::string, std::string> kv;
++            kv["x"] = std::to_string(x);
++            kv["y"] = std::to_string(y);
++            kv["w"] = std::to_string(w);
++            kv["h"] = std::to_string(h);
++            if (!title.empty()) kv["title"] = title;
++            const char* err = spec->spawn(*this, kv);
++            if (err) continue;
++
++            const std::vector<TWindow*> after = captureWindows();
++            for (TWindow* candidate : after) {
++                bool existed = false;
++                for (TWindow* prior : before) {
++                    if (prior == candidate) {
++                        existed = true;
++                        break;
++                    }
++                }
++                if (!existed) {
++                    win = candidate;
++                    break;
++                }
++            }
++            if (!win) continue;
+         }
+-        deskTop->insert(win);
++        if (type == "test_pattern" || type == "gradient")
++            deskTop->insert(win);
+         if (zoomed) win->zoom();
+         created.push_back(win);
+     }
+@@ -2833,33 +2873,28 @@
+         if (!w->getState(sfVisible)) { v = nextV; continue; }
+ 
+         // Determine type and props
+-        std::string type = "custom";
++        std::string type = windowTypeName(w);
+         std::string props = "{}";
+ 
+-        if (dynamic_cast<TTestPatternWindow*>(w)) {
+-            type = "test_pattern";
++        if (type == "test_pattern") {
+             props = "{}"; // Pattern mode is global in MVP
+-        } else {
+-            // Try to detect gradient by scanning child views (circular list)
+-            bool isGradient = false;
++        } else if (type == "gradient") {
++            // Keep concrete gradient subtype in props for backward compatibility.
+             TView *cStart = w->first();
+             if (cStart) {
+             TView *c = cStart;
+             do {
+                 if (dynamic_cast<THorizontalGradientView*>(c)) {
+-                    type = "gradient"; props = "{\"gradientType\": \"horizontal\"}"; isGradient = true; break;
++                    props = "{\"gradientType\": \"horizontal\"}"; break;
+                 } else if (dynamic_cast<TVerticalGradientView*>(c)) {
+-                    type = "gradient"; props = "{\"gradientType\": \"vertical\"}"; isGradient = true; break;
++                    props = "{\"gradientType\": \"vertical\"}"; break;
+                 } else if (dynamic_cast<TRadialGradientView*>(c)) {
+-                    type = "gradient"; props = "{\"gradientType\": \"radial\"}"; isGradient = true; break;
++                    props = "{\"gradientType\": \"radial\"}"; break;
+                 } else if (dynamic_cast<TDiagonalGradientView*>(c)) {
+-                    type = "gradient"; props = "{\"gradientType\": \"diagonal\"}"; isGradient = true; break;
++                    props = "{\"gradientType\": \"diagonal\"}"; break;
+                 }
+                 c = c->next;
+             } while (c != cStart);
+-            }
+-            if (!isGradient) {
+-                // Unknown window type: keep as 'custom' with empty props
+             }
+         }
+ 
+
+
+thinking
+**Running build and tests**
+codex
+The load-path patch is in place: unknown-but-registered window types now restore through `find_window_type_by_name(...)->spawn(...)`, with bounds passed through and created-window tracking preserved for zoom/focus handling. I’m building and running the requested micropolis test filter now.
+exec
+/bin/zsh -lc 'cmake --build build --target test_pattern -j4' in /Users/james/Repos/wibandwob-dos succeeded in 8.60s:
+[  9%] Built target micropolis_native
+[ 10%] Built target micropolis_bridge
+[ 83%] Built target tvision
+[ 83%] Building CXX object app/CMakeFiles/test_pattern.dir/test_pattern_app.cpp.o
+[ 83%] Linking CXX executable test_pattern
+[100%] Built target test_pattern
+file update:
+diff --git a/app/test_pattern_app.cpp b/app/test_pattern_app.cpp
+index 8fca4d860e82bf0598a51d653dd778bf105c3a9d..21a131afe0a936b16e882f729127d3b79d9b7922
+--- a/app/test_pattern_app.cpp
++++ b/app/test_pattern_app.cpp
+@@ -2686,6 +2686,18 @@
+ 
+     // Restore windows
+     std::vector<TWindow*> created;
++    auto captureWindows = [this]() {
++        std::vector<TWindow*> out;
++        TView *start = deskTop->first();
++        if (!start) return out;
++        TView *v = start;
++        do {
++            if (TWindow *w = dynamic_cast<TWindow*>(v))
++                out.push_back(w);
++            v = v->next;
++        } while (v != start);
++        return out;
++    };
+     for (const auto &obj : objects) {
+         std::string type; if (!parseKeyedString(obj, 0, "type", type)) continue;
+         std::string title; parseKeyedString(obj, 0, "title", title);
+@@ -2720,9 +2732,37 @@
+             else if (gtype == "diagonal") gt = TGradientWindow::gtDiagonal;
+             win = new TGradientWindow(bounds, "", gt);
+         } else {
+-            continue;
++            const WindowTypeSpec* spec = find_window_type_by_name(type);
++            if (!spec || !spec->spawn) continue;
++
++            const std::vector<TWindow*> before = captureWindows();
++            std::map<std::string, std::string> kv;
++            kv["x"] = std::to_string(x);
++            kv["y"] = std::to_string(y);
++            kv["w"] = std::to_string(w);
++            kv["h"] = std::to_string(h);
++            if (!title.empty()) kv["title"] = title;
++            const char* err = spec->spawn(*this, kv);
++            if (err) continue;
++
++            const std::vector<TWindow*> after = captureWindows();
++            for (TWindow* candidate : after) {
++                bool existed = false;
++                for (TWindow* prior : before) {
++                    if (prior == candidate) {
++                        existed = true;
++                        break;
++                    }
++                }
++                if (!existed) {
++                    win = candidate;
++                    break;
++                }
++            }
++            if (!win) continue;
+         }
+-        deskTop->insert(win);
++        if (type == "test_pattern" || type == "gradient")
++            deskTop->insert(win);
+         if (zoomed) win->zoom();
+         created.push_back(win);
+     }
+@@ -2833,33 +2873,28 @@
+         if (!w->getState(sfVisible)) { v = nextV; continue; }
+ 
+         // Determine type and props
+-        std::string type = "custom";
++        std::string type = windowTypeName(w);
+         std::string props = "{}";
+ 
+-        if (dynamic_cast<TTestPatternWindow*>(w)) {
+-            type = "test_pattern";
++        if (type == "test_pattern") {
+             props = "{}"; // Pattern mode is global in MVP
+-        } else {
+-            // Try to detect gradient by scanning child views (circular list)
+-            bool isGradient = false;
++        } else if (type == "gradient") {
++            // Keep concrete gradient subtype in props for backward compatibility.
+             TView *cStart = w->first();
+             if (cStart) {
+             TView *c = cStart;
+             do {
+                 if (dynamic_cast<THorizontalGradientView*>(c)) {
+-                    type = "gradient"; props = "{\"gradientType\": \"horizontal\"}"; isGradient = true; break;
++                    props = "{\"gradientType\": \"horizontal\"}"; break;
+                 } else if (dynamic_cast<TVerticalGradientView*>(c)) {
+-                    type = "gradient"; props = "{\"gradientType\": \"vertical\"}"; isGradient = true; break;
++                    props = "{\"gradientType\": \"vertical\"}"; break;
+                 } else if (dynamic_cast<TRadialGradientView*>(c)) {
+-                    type = "gradient"; props = "{\"gradientType\": \"radial\"}"; isGradient = true; break;
++                    props = "{\"gradientType\": \"radial\"}"; break;
+                 } else if (dynamic_cast<TDiagonalGradientView*>(c)) {
+-                    type = "gradient"; props = "{\"gradientType\": \"diagonal\"}"; isGradient = true; break;
++                    props = "{\"gradientType\": \"diagonal\"}"; break;
+                 }
+                 c = c->next;
+             } while (c != cStart);
+-            }
+-            if (!isGradient) {
+-                // Unknown window type: keep as 'custom' with empty props
+             }
+         }
+ 
+
+exec
+/bin/zsh -lc 'ctest --output-on-failure -R micropolis' in /Users/james/Repos/wibandwob-dos/build succeeded in 363ms:
+Setting up EMSDK environment (suppress these messages with EMSDK_QUIET=1)
+Setting environment variables:
+PATH = /Users/james/emsdk:/Users/james/emsdk/upstream/emscripten:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/Library/Apple/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/Users/james/.codex/tmp/arg0/codex-arg0Y2ntqP:/Users/james/.bun/install/global/node_modules/@openai/codex-darwin-x64/vendor/x86_64-apple-darwin/path:/Users/james/.pyenv/shims:/Users/james/.rbenv/shims:/Users/james/.rbenv/bin:/Users/james/.bun/bin:/Users/james/.npm-global/bin:/Users/james/.local/bin:/Users/james/Library/Application Support/Code/User/globalStorage/github.copilot-chat/debugCommand:/Users/james/Library/Application Support/Code/User/globalStorage/github.copilot-chat/copilotCli:/Users/james/.cargo/bin:/Users/james/.composer/vendor/bin:/Users/james/.vscode/extensions/ms-python.debugpy-2025.18.0-darwin-x64/bundled/scripts/noConfigScripts
+Test project /Users/james/Repos/wibandwob-dos/build
+    Start 3: micropolis_determinism
+1/2 Test #3: micropolis_determinism ...........   Passed    0.01 sec
+    Start 4: micropolis_no_ansi
+2/2 Test #4: micropolis_no_ansi ...............   Passed    0.01 sec
+
+100% tests passed, 0 tests failed out of 2
+
+Total Test time (real) =   0.03 sec
+file update:
+diff --git a/app/test_pattern_app.cpp b/app/test_pattern_app.cpp
+index 8fca4d860e82bf0598a51d653dd778bf105c3a9d..21a131afe0a936b16e882f729127d3b79d9b7922
+--- a/app/test_pattern_app.cpp
++++ b/app/test_pattern_app.cpp
+@@ -2686,6 +2686,18 @@
+ 
+     // Restore windows
+     std::vector<TWindow*> created;
++    auto captureWindows = [this]() {
++        std::vector<TWindow*> out;
++        TView *start = deskTop->first();
++        if (!start) return out;
++        TView *v = start;
++        do {
++            if (TWindow *w = dynamic_cast<TWindow*>(v))
++                out.push_back(w);
++            v = v->next;
++        } while (v != start);
++        return out;
++    };
+     for (const auto &obj : objects) {
+         std::string type; if (!parseKeyedString(obj, 0, "type", type)) continue;
+         std::string title; parseKeyedString(obj, 0, "title", title);
+@@ -2720,9 +2732,37 @@
+             else if (gtype == "diagonal") gt = TGradientWindow::gtDiagonal;
+             win = new TGradientWindow(bounds, "", gt);
+         } else {
+-            continue;
++            const WindowTypeSpec* spec = find_window_type_by_name(type);
++            if (!spec || !spec->spawn) continue;
++
++            const std::vector<TWindow*> before = captureWindows();
++            std::map<std::string, std::string> kv;
++            kv["x"] = std::to_string(x);
++            kv["y"] = std::to_string(y);
++            kv["w"] = std::to_string(w);
++            kv["h"] = std::to_string(h);
++            if (!title.empty()) kv["title"] = title;
++            const char* err = spec->spawn(*this, kv);
++            if (err) continue;
++
++            const std::vector<TWindow*> after = captureWindows();
++            for (TWindow* candidate : after) {
++                bool existed = false;
++                for (TWindow* prior : before) {
++                    if (prior == candidate) {
++                        existed = true;
++                        break;
++                    }
++                }
++                if (!existed) {
++                    win = candidate;
++                    break;
++                }
++            }
++            if (!win) continue;
+         }
+-        deskTop->insert(win);
++        if (type == "test_pattern" || type == "gradient")
++            deskTop->insert(win);
+         if (zoomed) win->zoom();
+         created.push_back(win);
+     }
+@@ -2833,33 +2873,28 @@
+         if (!w->getState(sfVisible)) { v = nextV; continue; }
+ 
+         // Determine type and props
+-        std::string type = "custom";
++        std::string type = windowTypeName(w);
+         std::string props = "{}";
+ 
+-        if (dynamic_cast<TTestPatternWindow*>(w)) {
+-            type = "test_pattern";
++        if (type == "test_pattern") {
+             props = "{}"; // Pattern mode is global in MVP
+-        } else {
+-            // Try to detect gradient by scanning child views (circular list)
+-            bool isGradient = false;
++        } else if (type == "gradient") {
++            // Keep concrete gradient subtype in props for backward compatibility.
+             TView *cStart = w->first();
+             if (cStart) {
+             TView *c = cStart;
+             do {
+                 if (dynamic_cast<THorizontalGradientView*>(c)) {
+-                    type = "gradient"; props = "{\"gradientType\": \"horizontal\"}"; isGradient = true; break;
++                    props = "{\"gradientType\": \"horizontal\"}"; break;
+                 } else if (dynamic_cast<TVerticalGradientView*>(c)) {
+-                    type = "gradient"; props = "{\"gradientType\": \"vertical\"}"; isGradient = true; break;
++                    props = "{\"gradientType\": \"vertical\"}"; break;
+                 } else if (dynamic_cast<TRadialGradientView*>(c)) {
+-                    type = "gradient"; props = "{\"gradientType\": \"radial\"}"; isGradient = true; break;
++                    props = "{\"gradientType\": \"radial\"}"; break;
+                 } else if (dynamic_cast<TDiagonalGradientView*>(c)) {
+-                    type = "gradient"; props = "{\"gradientType\": \"diagonal\"}"; isGradient = true; break;
++                    props = "{\"gradientType\": \"diagonal\"}"; break;
+                 }
+                 c = c->next;
+             } while (c != cStart);
+-            }
+-            if (!isGradient) {
+-                // Unknown window type: keep as 'custom' with empty props
+             }
+         }
+ 
+
+
+thinking
+**Planning precise diff line reporting**
+codex
+Build and micropolis tests both passed. I’m grabbing exact changed hunks and line numbers so I can give you a precise line-by-line summary of what changed and why.
+exec
+/bin/zsh -lc "nl -ba app/test_pattern_app.cpp | sed -n '2680,2765p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba app/test_pattern_app.cpp | sed -n '2830,2875p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc 'git diff -- app/test_pattern_app.cpp' in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+  2680	
+  2681	    // Close current windows
+  2682	    closeAll();
+  2683	
+  2684	    // Apply globals
+  2685	    USE_CONTINUOUS_PATTERN = continuous;
+  2686	
+  2687	    // Restore windows
+  2688	    std::vector<TWindow*> created;
+  2689	    auto captureWindows = [this]() {
+  2690	        std::vector<TWindow*> out;
+  2691	        TView *start = deskTop->first();
+  2692	        if (!start) return out;
+  2693	        TView *v = start;
+  2694	        do {
+  2695	            if (TWindow *w = dynamic_cast<TWindow*>(v))
+  2696	                out.push_back(w);
+  2697	            v = v->next;
+  2698	        } while (v != start);
+  2699	        return out;
+ succeeded in 51ms:
+  2830	            default:
+  2831	                if (c < 0x20) {
+  2832	                    char buf[7];
+  2833	                    std::snprintf(buf, sizeof(buf), "\\u%04x", c);
+  2834	                    out += buf;
+  2835	                } else out += char(c);
+  2836	        }
+  2837	    }
+  2838	    return out;
+  2839	}
+  2840	
+  2841	std::string TTestPatternApp::buildWorkspaceJson()
+  2842	{
+  2843	    // Screen size
+  2844	    TRect ext = deskTop->getExtent();
+  2845	    int sw = ext.b.x - ext.a.x;
+  2846	    int sh = ext.b.y - ext.a.y;
+  2847	
+  2848	    // Timestamp (basic)
+  2849	    char ts[64];
+ succeeded in 51ms:
+diff --git a/app/test_pattern_app.cpp b/app/test_pattern_app.cpp
+index 0b16159..21a131a 100644
+--- a/app/test_pattern_app.cpp
++++ b/app/test_pattern_app.cpp
+@@ -84,6 +84,8 @@
+ #include "scramble_engine.h"
+ // Paint canvas window
+ #include "paint/paint_window.h"
++// Micropolis ASCII MVP window
++#include "micropolis_ascii_view.h"
+ // Factory for ASCII grid demo window (implemented in ascii_grid_view.cpp).
+ class TWindow; TWindow* createAsciiGridDemoWindow(const TRect &bounds);
+ // #include "mech_window.h" // deferred feature; header not present yet
+@@ -209,6 +211,7 @@ const ushort cmAbout = 129;
+ const ushort cmKeyboardShortcuts = 210;
+ const ushort cmDebugInfo = 211;
+ const ushort cmApiKeyHelp = 212;
++const ushort cmMicropolisAscii = 213;
+ 
+ // Glitch menu commands
+file update:
+diff --git a/app/test_pattern_app.cpp b/app/test_pattern_app.cpp
+index 8fca4d860e82bf0598a51d653dd778bf105c3a9d..21a131afe0a936b16e882f729127d3b79d9b7922
+--- a/app/test_pattern_app.cpp
++++ b/app/test_pattern_app.cpp
+@@ -2686,6 +2686,18 @@
+ 
+     // Restore windows
+     std::vector<TWindow*> created;
++    auto captureWindows = [this]() {
++        std::vector<TWindow*> out;
++        TView *start = deskTop->first();
++        if (!start) return out;
++        TView *v = start;
++        do {
++            if (TWindow *w = dynamic_cast<TWindow*>(v))
++                out.push_back(w);
++            v = v->next;
++        } while (v != start);
++        return out;
++    };
+     for (const auto &obj : objects) {
+         std::string type; if (!parseKeyedString(obj, 0, "type", type)) continue;
+         std::string title; parseKeyedString(obj, 0, "title", title);
+@@ -2720,9 +2732,37 @@
+             else if (gtype == "diagonal") gt = TGradientWindow::gtDiagonal;
+             win = new TGradientWindow(bounds, "", gt);
+         } else {
+-            continue;
++            const WindowTypeSpec* spec = find_window_type_by_name(type);
++            if (!spec || !spec->spawn) continue;
++
++            const std::vector<TWindow*> before = captureWindows();
++            std::map<std::string, std::string> kv;
++            kv["x"] = std::to_string(x);
++            kv["y"] = std::to_string(y);
++            kv["w"] = std::to_string(w);
++            kv["h"] = std::to_string(h);
++            if (!title.empty()) kv["title"] = title;
++            const char* err = spec->spawn(*this, kv);
++            if (err) continue;
++
++            const std::vector<TWindow*> after = captureWindows();
++            for (TWindow* candidate : after) {
++                bool existed = false;
++                for (TWindow* prior : before) {
++                    if (prior == candidate) {
++                        existed = true;
++                        break;
++                    }
++                }
++                if (!existed) {
++                    win = candidate;
++                    break;
++                }
++            }
++            if (!win) continue;
+         }
+-        deskTop->insert(win);
++        if (type == "test_pattern" || type == "gradient")
++            deskTop->insert(win);
+         if (zoomed) win->zoom();
+         created.push_back(win);
+     }
+@@ -2833,33 +2873,28 @@
+         if (!w->getState(sfVisible)) { v = nextV; continue; }
+ 
+         // Determine type and props
+-        std::string type = "custom";
++        std::string type = windowTypeName(w);
+         std::string props = "{}";
+ 
+-        if (dynamic_cast<TTestPatternWindow*>(w)) {
+-            type = "test_pattern";
++        if (type == "test_pattern") {
+             props = "{}"; // Pattern mode is global in MVP
+-        } else {
+-            // Try to detect gradient by scanning child views (circular list)
+-            bool isGradient = false;
++        } else if (type == "gradient") {
++            // Keep concrete gradient subtype in props for backward compatibility.
+             TView *cStart = w->first();
+             if (cStart) {
+             TView *c = cStart;
+             do {
+                 if (dynamic_cast<THorizontalGradientView*>(c)) {
+-                    type = "gradient"; props = "{\"gradientType\": \"horizontal\"}"; isGradient = true; break;
++                    props = "{\"gradientType\": \"horizontal\"}"; break;
+                 } else if (dynamic_cast<TVerticalGradientView*>(c)) {
+-                    type = "gradient"; props = "{\"gradientType\": \"vertical\"}"; isGradient = true; break;
++                    props = "{\"gradientType\": \"vertical\"}"; break;
+                 } else if (dynamic_cast<TRadialGradientView*>(c)) {
+-                    type = "gradient"; props = "{\"gradientType\": \"radial\"}"; isGradient = true; break;
++                    props = "{\"gradientType\": \"radial\"}"; break;
+                 } else if (dynamic_cast<TDiagonalGradientView*>(c)) {
+-                    type = "gradient"; props = "{\"gradientType\": \"diagonal\"}"; isGradient = true; break;
++                    props = "{\"gradientType\": \"diagonal\"}"; break;
+                 }
+                 c = c->next;
+             } while (c != cStart);
+-            }
+-            if (!isGradient) {
+-                // Unknown window type: keep as 'custom' with empty props
+             }
+         }
+ 
+
+
+thinking
+**Extending log retrieval range**
+exec
+/bin/zsh -lc "nl -ba app/test_pattern_app.cpp | sed -n '2870,2925p'" in /Users/james/Repos/wibandwob-dos succeeded in 50ms:
+  2870	        TView *nextV = v->next; // Always advance even on skips
+  2871	        TWindow *w = dynamic_cast<TWindow*>(v);
+  2872	        if (!w) { v = nextV; continue; } // Skip non-window views (e.g., wallpaper)
+  2873	        if (!w->getState(sfVisible)) { v = nextV; continue; }
+  2874	
+  2875	        // Determine type and props
+  2876	        std::string type = windowTypeName(w);
+  2877	        std::string props = "{}";
+  2878	
+  2879	        if (type == "test_pattern") {
+  2880	            props = "{}"; // Pattern mode is global in MVP
+  2881	        } else if (type == "gradient") {
+  2882	            // Keep concrete gradient subtype in props for backward compatibility.
+  2883	            TView *cStart = w->first();
+  2884	            if (cStart) {
+  2885	            TView *c = cStart;
+  2886	            do {
+  2887	                if (dynamic_cast<THorizontalGradientView*>(c)) {
+  2888	                    props = "{\"gradientType\": \"horizontal\"}"; break;
+  2889	                } else if (dynamic_cast<TVerticalGradientView*>(c)) {
+file update:
+diff --git a/app/test_pattern_app.cpp b/app/test_pattern_app.cpp
+index 8fca4d860e82bf0598a51d653dd778bf105c3a9d..21a131afe0a936b16e882f729127d3b79d9b7922
+--- a/app/test_pattern_app.cpp
++++ b/app/test_pattern_app.cpp
+@@ -2686,6 +2686,18 @@
+ 
+     // Restore windows
+     std::vector<TWindow*> created;
++    auto captureWindows = [this]() {
++        std::vector<TWindow*> out;
++        TView *start = deskTop->first();
++        if (!start) return out;
++        TView *v = start;
++        do {
++            if (TWindow *w = dynamic_cast<TWindow*>(v))
++                out.push_back(w);
++            v = v->next;
++        } while (v != start);
++        return out;
++    };
+     for (const auto &obj : objects) {
+         std::string type; if (!parseKeyedString(obj, 0, "type", type)) continue;
+         std::string title; parseKeyedString(obj, 0, "title", title);
+@@ -2720,9 +2732,37 @@
+             else if (gtype == "diagonal") gt = TGradientWindow::gtDiagonal;
+             win = new TGradientWindow(bounds, "", gt);
+         } else {
+-            continue;
++            const WindowTypeSpec* spec = find_window_type_by_name(type);
++            if (!spec || !spec->spawn) continue;
++
++            const std::vector<TWindow*> before = captureWindows();
++            std::map<std::string, std::string> kv;
++            kv["x"] = std::to_string(x);
++            kv["y"] = std::to_string(y);
++            kv["w"] = std::to_string(w);
++            kv["h"] = std::to_string(h);
++            if (!title.empty()) kv["title"] = title;
++            const char* err = spec->spawn(*this, kv);
++            if (err) continue;
++
++            const std::vector<TWindow*> after = captureWindows();
++            for (TWindow* candidate : after) {
++                bool existed = false;
++                for (TWindow* prior : before) {
++                    if (prior == candidate) {
++                        existed = true;
++                        break;
++                    }
++                }
++                if (!existed) {
++                    win = candidate;
++                    break;
++                }
++            }
++            if (!win) continue;
+         }
+-        deskTop->insert(win);
++        if (type == "test_pattern" || type == "gradient")
++            deskTop->insert(win);
+         if (zoomed) win->zoom();
+         created.push_back(win);
+     }
+@@ -2833,33 +2873,28 @@
+         if (!w->getState(sfVisible)) { v = nextV; continue; }
+ 
+         // Determine type and props
+-        std::string type = "custom";
++        std::string type = windowTypeName(w);
+         std::string props = "{}";
+ 
+-        if (dynamic_cast<TTestPatternWindow*>(w)) {
+-            type = "test_pattern";
++        if (type == "test_pattern") {
+             props = "{}"; // Pattern mode is global in MVP
+-        } else {
+-            // Try to detect gradient by scanning child views (circular list)
+-            bool isGradient = false;
++        } else if (type == "gradient") {
++            // Keep concrete gradient subtype in props for backward compatibility.
+             TView *cStart = w->first();
+             if (cStart) {
+             TView *c = cStart;
+             do {
+                 if (dynamic_cast<THorizontalGradientView*>(c)) {
+-                    type = "gradient"; props = "{\"gradientType\": \"horizontal\"}"; isGradient = true; break;
++                    props = "{\"gradientType\": \"horizontal\"}"; break;
+                 } else if (dynamic_cast<TVerticalGradientView*>(c)) {
+-                    type = "gradient"; props = "{\"gradientType\": \"vertical\"}"; isGradient = true; break;
++                    props = "{\"gradientType\": \"vertical\"}"; break;
+                 } else if (dynamic_cast<TRadialGradientView*>(c)) {
+-                    type = "gradient"; props = "{\"gradientType\": \"radial\"}"; isGradient = true; break;
++                    props = "{\"gradientType\": \"radial\"}"; break;
+                 } else if (dynamic_cast<TDiagonalGradientView*>(c)) {
+-                    type = "gradient"; props = "{\"gradientType\": \"diagonal\"}"; isGradient = true; break;
++                    props = "{\"gradientType\": \"diagonal\"}"; break;
+                 }
+                 c = c->next;
+             } while (c != cStart);
+-            }
+-            if (!isGradient) {
+-                // Unknown window type: keep as 'custom' with empty props
+             }
+         }
+ 
+
+
+thinking
+**Clarifying exact code changes**
+codex
+Implemented with minimal changes in `app/test_pattern_app.cpp` only.
+
+### What changed
+
+1. **Save path now emits registry type slugs (including `micropolis_ascii`)**
+- `app/test_pattern_app.cpp:2876`
+  - Changed:
+  - from `std::string type = "custom";`
+  - to `std::string type = windowTypeName(w);`
+- Why:
+  - `windowTypeName()` already resolves via `all_window_type_specs()` matchers, so Micropolis windows now serialize as `"type":"micropolis_ascii"` instead of falling back to `"custom"`.
+
+2. **Kept gradient props behavior intact**
+- `app/test_pattern_app.cpp:2879-2899`
+  - Kept gradient subtype detection for `props.gradientType`, but now only when `type == "gradient"`.
+- Why:
+  - Preserves existing workspace compatibility while changing only type emission source.
+
+3. **Load path now restores registry-registered types via registry spawn callback**
+- `app/test_pattern_app.cpp:2689-2700`
+  - Added local `captureWindows` helper to snapshot current windows.
+- `app/test_pattern_app.cpp:2735-2763`
+  - Replaced unknown-type `continue` with registry dispatch:
+  - `const WindowTypeSpec* spec = find_window_type_by_name(type);`
+  - `spec->spawn(*this, kv)` with bounds in `kv` (`x,y,w,h`).
+  - Detects newly created window by before/after snapshot and uses it for zoom/focus bookkeeping.
+- `app/test_pattern_app.cpp:2764-2765`
+  - Inserts only manually constructed windows (`test_pattern`, `gradient`), since registry spawns insert internally.
+- Why:
+  - Uses the existing registry spawn path (same model as IPC) to restore `micropolis_ascii` without adding inline per-type loader code.
+
+### Confirmed registry support
+- `app/window_type_registry.cpp` already has:
+  - `spawn_micropolis_ascii(...)`
+  - `match_micropolis_ascii(...)`
+  - spec entry `{ "micropolis_ascii", spawn_micropolis_ascii, match_micropolis_ascii }`
+
+### Build and test
+- Build passed:
+  - `cmake --build build --target test_pattern -j4`
+- Tests passed:
+  - `cd build && ctest --output-on-failure -R micropolis`
+  - `micropolis_determinism` passed
+  - `micropolis_no_ansi` passed
+file update:
+diff --git a/app/test_pattern_app.cpp b/app/test_pattern_app.cpp
+index 8fca4d860e82bf0598a51d653dd778bf105c3a9d..21a131afe0a936b16e882f729127d3b79d9b7922
+--- a/app/test_pattern_app.cpp
++++ b/app/test_pattern_app.cpp
+@@ -2686,6 +2686,18 @@
+ 
+     // Restore windows
+     std::vector<TWindow*> created;
++    auto captureWindows = [this]() {
++        std::vector<TWindow*> out;
++        TView *start = deskTop->first();
++        if (!start) return out;
++        TView *v = start;
++        do {
++            if (TWindow *w = dynamic_cast<TWindow*>(v))
++                out.push_back(w);
++            v = v->next;
++        } while (v != start);
++        return out;
++    };
+     for (const auto &obj : objects) {
+         std::string type; if (!parseKeyedString(obj, 0, "type", type)) continue;
+         std::string title; parseKeyedString(obj, 0, "title", title);
+@@ -2720,9 +2732,37 @@
+             else if (gtype == "diagonal") gt = TGradientWindow::gtDiagonal;
+             win = new TGradientWindow(bounds, "", gt);
+         } else {
+-            continue;
++            const WindowTypeSpec* spec = find_window_type_by_name(type);
++            if (!spec || !spec->spawn) continue;
++
++            const std::vector<TWindow*> before = captureWindows();
++            std::map<std::string, std::string> kv;
++            kv["x"] = std::to_string(x);
++            kv["y"] = std::to_string(y);
++            kv["w"] = std::to_string(w);
++            kv["h"] = std::to_string(h);
++            if (!title.empty()) kv["title"] = title;
++            const char* err = spec->spawn(*this, kv);
++            if (err) continue;
++
++            const std::vector<TWindow*> after = captureWindows();
++            for (TWindow* candidate : after) {
++                bool existed = false;
++                for (TWindow* prior : before) {
++                    if (prior == candidate) {
++                        existed = true;
++                        break;
++                    }
++                }
++                if (!existed) {
++                    win = candidate;
++                    break;
++                }
++            }
++            if (!win) continue;
+         }
+-        deskTop->insert(win);
++        if (type == "test_pattern" || type == "gradient")
++            deskTop->insert(win);
+         if (zoomed) win->zoom();
+         created.push_back(win);
+     }
+@@ -2833,33 +2873,28 @@
+         if (!w->getState(sfVisible)) { v = nextV; continue; }
+ 
+         // Determine type and props
+-        std::string type = "custom";
++        std::string type = windowTypeName(w);
+         std::string props = "{}";
+ 
+-        if (dynamic_cast<TTestPatternWindow*>(w)) {
+-            type = "test_pattern";
++        if (type == "test_pattern") {
+             props = "{}"; // Pattern mode is global in MVP
+-        } else {
+-            // Try to detect gradient by scanning child views (circular list)
+-            bool isGradient = false;
++        } else if (type == "gradient") {
++            // Keep concrete gradient subtype in props for backward compatibility.
+             TView *cStart = w->first();
+             if (cStart) {
+             TView *c = cStart;
+             do {
+                 if (dynamic_cast<THorizontalGradientView*>(c)) {
+-                    type = "gradient"; props = "{\"gradientType\": \"horizontal\"}"; isGradient = true; break;
++                    props = "{\"gradientType\": \"horizontal\"}"; break;
+                 } else if (dynamic_cast<TVerticalGradientView*>(c)) {
+-                    type = "gradient"; props = "{\"gradientType\": \"vertical\"}"; isGradient = true; break;
++                    props = "{\"gradientType\": \"vertical\"}"; break;
+                 } else if (dynamic_cast<TRadialGradientView*>(c)) {
+-                    type = "gradient"; props = "{\"gradientType\": \"radial\"}"; isGradient = true; break;
++                    props = "{\"gradientType\": \"radial\"}"; break;
+                 } else if (dynamic_cast<TDiagonalGradientView*>(c)) {
+-                    type = "gradient"; props = "{\"gradientType\": \"diagonal\"}"; isGradient = true; break;
++                    props = "{\"gradientType\": \"diagonal\"}"; break;
+                 }
+                 c = c->next;
+             } while (c != cStart);
+-            }
+-            if (!isGradient) {
+-                // Unknown window type: keep as 'custom' with empty props
+             }
+         }
+ 
+
+tokens used
+72,962
+Implemented with minimal changes in `app/test_pattern_app.cpp` only.
+
+### What changed
+
+1. **Save path now emits registry type slugs (including `micropolis_ascii`)**
+- `app/test_pattern_app.cpp:2876`
+  - Changed:
+  - from `std::string type = "custom";`
+  - to `std::string type = windowTypeName(w);`
+- Why:
+  - `windowTypeName()` already resolves via `all_window_type_specs()` matchers, so Micropolis windows now serialize as `"type":"micropolis_ascii"` instead of falling back to `"custom"`.
+
+2. **Kept gradient props behavior intact**
+- `app/test_pattern_app.cpp:2879-2899`
+  - Kept gradient subtype detection for `props.gradientType`, but now only when `type == "gradient"`.
+- Why:
+  - Preserves existing workspace compatibility while changing only type emission source.
+
+3. **Load path now restores registry-registered types via registry spawn callback**
+- `app/test_pattern_app.cpp:2689-2700`
+  - Added local `captureWindows` helper to snapshot current windows.
+- `app/test_pattern_app.cpp:2735-2763`
+  - Replaced unknown-type `continue` with registry dispatch:
+  - `const WindowTypeSpec* spec = find_window_type_by_name(type);`
+  - `spec->spawn(*this, kv)` with bounds in `kv` (`x,y,w,h`).
+  - Detects newly created window by before/after snapshot and uses it for zoom/focus bookkeeping.
+- `app/test_pattern_app.cpp:2764-2765`
+  - Inserts only manually constructed windows (`test_pattern`, `gradient`), since registry spawns insert internally.
+- Why:
+  - Uses the existing registry spawn path (same model as IPC) to restore `micropolis_ascii` without adding inline per-type loader code.
+
+### Confirmed registry support
+- `app/window_type_registry.cpp` already has:
+  - `spawn_micropolis_ascii(...)`
+  - `match_micropolis_ascii(...)`
+  - spec entry `{ "micropolis_ascii", spawn_micropolis_ascii, match_micropolis_ascii }`
+
+### Build and test
+- Build passed:
+  - `cmake --build build --target test_pattern -j4`
+- Tests passed:
+  - `cd build && ctest --output-on-failure -R micropolis`
+  - `micropolis_determinism` passed
+  - `micropolis_no_ansi` passed
