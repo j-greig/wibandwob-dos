@@ -152,8 +152,8 @@ class Controller:
                             rect=Rect(
                                 x=win_data["x"],
                                 y=win_data["y"],
-                                w=win_data["width"],
-                                h=win_data["height"]
+                                w=win_data.get("width", win_data.get("w", 40)),
+                                h=win_data.get("height", win_data.get("h", 12))
                             ),
                             z=0,  # C++ doesn't provide z-order
                             focused=False,  # Will be determined later
@@ -209,25 +209,42 @@ class Controller:
                 send_cmd("create_window", cmd_params)
         except Exception:
             pass
+
+        # Sync state from C++ to get the real window ID it assigned.
+        # Snapshot IDs before sync so we can find the newly added one.
         async with self._lock:
-            win_id = new_id("win")
-            if not rect:
-                rect = Rect(3 + len(self._state.windows) * 2, 2 + len(self._state.windows) * 1, 40, 12)
-            t = title or wtype.value
-            win = Window(
-                id=win_id,
-                type=wtype,
-                title=t,
-                rect=rect,
-                z=self._state.next_z,
-                focused=True,
-                props=props or {},
-            )
-            self._state.next_z += 1
-            # unfocus others
-            for w in self._state.windows:
-                w.focused = False
-            self._state.windows.append(win)
+            old_ids = {w.id for w in self._state.windows}
+        await self._sync_state()
+        async with self._lock:
+            new_wins = [w for w in self._state.windows if w.id not in old_ids]
+        
+        if new_wins:
+            win = new_wins[-1]  # Most recently added
+            # Enrich with caller's metadata
+            win.type = wtype
+            if title:
+                win.title = title
+            if props:
+                win.props = props
+        else:
+            # Fallback: C++ didn't report a new window; build a local one
+            async with self._lock:
+                win_id = new_id("win")
+                if not rect:
+                    rect = Rect(3 + len(self._state.windows) * 2, 2 + len(self._state.windows) * 1, 40, 12)
+                t = title or wtype.value
+                win = Window(
+                    id=win_id,
+                    type=wtype,
+                    title=t,
+                    rect=rect,
+                    z=self._state.next_z,
+                    focused=True,
+                    props=props or {},
+                )
+                self._state.next_z += 1
+                self._state.windows.append(win)
+
         await self._events.emit("window.created", self._serialize_window(win))
         self._append_state_event("window.created", {"window_id": win.id, "type": win.type.value}, actor="api")
         return win
@@ -301,11 +318,13 @@ class Controller:
     async def close(self, win_id: str) -> None:
         # Send close command to C++ app
         try:
-            send_cmd("close_window", {"id": win_id})
-        except Exception:
-            pass
+            resp = send_cmd("close_window", {"id": win_id})
+            if resp and "error" in resp.lower():
+                print(f"[close] C++ close_window failed for {win_id}: {resp}")
+        except Exception as e:
+            print(f"[close] IPC exception for {win_id}: {e}")
         
-        # Sync state and emit event
+        # Sync state from C++ (source of truth) and emit event
         await self._sync_state()
         await self._events.emit("window.closed", {"id": win_id})
         self._append_state_event("window.closed", {"window_id": win_id}, actor="api")

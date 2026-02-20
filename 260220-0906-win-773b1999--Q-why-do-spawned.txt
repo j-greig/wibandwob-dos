@@ -1,0 +1,8 @@
+╔═══════════════════════════╗
+║  Q: why do farts smell?   ║
+║  A: for the benefit of    ║
+║     the deaf              ║
+║                           ║
+║  Wob: { deaf: true,       ║
+║    olfactory_msg: sent }  ║
+╚═══════════════════════════╝
