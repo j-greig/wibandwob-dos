@@ -100,6 +100,7 @@
 #include "desktop_icon.h"
 #include "desktop_folder.h"
 #include "desktop_theme.h"
+#include "app_launcher_view.h"
 // Factory for ASCII grid demo window (implemented in ascii_grid_view.cpp).
 class TWindow; TWindow* createAsciiGridDemoWindow(const TRect &bounds);
 // #include "mech_window.h" // deferred feature; header not present yet
@@ -235,6 +236,7 @@ const ushort cmDeepSignalTerminal = 220;
 const ushort cmOpenTerminal = 214;
 const ushort cmToggleDesktop = 230;  // Toggle desktop icon layer
 const ushort cmOpenFolder = 231;     // Open a folder window (E011)
+const ushort cmAppLauncher = 232;    // Applications folder browser
 
 // Glitch menu commands
 const ushort cmToggleGlitchMode = 140;
@@ -789,6 +791,7 @@ private:
     friend void api_spawn_snake(TTestPatternApp&, const TRect* bounds);
     friend void api_spawn_rogue(TTestPatternApp&, const TRect* bounds);
     friend void api_spawn_deep_signal(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_app_launcher(TTestPatternApp&, const TRect* bounds);
     friend void api_spawn_terminal(TTestPatternApp&, const TRect* bounds);
     friend std::string api_terminal_write(TTestPatternApp&, const std::string& text, const std::string& window_id);
     friend std::string api_terminal_read(TTestPatternApp&, const std::string& window_id);
@@ -1138,6 +1141,16 @@ void TTestPatternApp::handleEvent(TEvent& event)
                     deskTop->insert(w);
                     registerWindow(w);
                 }
+                clearEvent(event);
+                break;
+            }
+            case cmAppLauncher: {
+                TRect r = deskTop->getExtent();
+                r.a.x += 4; r.a.y += 1;
+                r.b.x -= 4; r.b.y -= 2;
+                TWindow* w = createAppLauncherWindow(r);
+                deskTop->insert(w);
+                registerWindow(w);
                 clearEvent(event);
                 break;
             }
@@ -2279,6 +2292,8 @@ TMenuBar* TTestPatternApp::initMenuBar(TRect r)
             *new TMenuItem("Monster ~P~ortal (Generative)", cmMonsterPortal, kbNoKey) +
             *new TMenuItem("Monster Ve~r~se (Generative)", cmMonsterVerse, kbNoKey) +
             *new TMenuItem("Monster Cam (Emo~j~i)", cmMonsterCam, kbNoKey) +
+            newLine() +
+            *new TMenuItem("~A~pplications", cmAppLauncher, kbNoKey) +
             newLine() +
             (TMenuItem&)(
                 *new TSubMenu("~G~ames", kbNoKey) +
@@ -3586,6 +3601,13 @@ void api_spawn_rogue(TTestPatternApp& app, const TRect* bounds) {
 void api_spawn_deep_signal(TTestPatternApp& app, const TRect* bounds) {
     TRect r = bounds ? *bounds : api_centered_bounds(app, 70, 34);
     TWindow* w = createDeepSignalWindow(r);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
+}
+
+void api_spawn_app_launcher(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 64, 24);
+    TWindow* w = createAppLauncherWindow(r);
     app.deskTop->insert(w);
     app.registerWindow(w);
 }

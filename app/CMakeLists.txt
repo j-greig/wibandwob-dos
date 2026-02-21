@@ -42,6 +42,7 @@ add_executable(test_pattern
     snake_view.cpp
     rogue_view.cpp
     deep_signal_view.cpp
+    app_launcher_view.cpp
     generative_verse_view.cpp
     generative_orbit_view.cpp
     generative_mycelium_view.cpp
