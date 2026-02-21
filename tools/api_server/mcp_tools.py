@@ -193,7 +193,70 @@ def _make_open_workspace_handler() -> CommandToolHandler:
     return _handler
 
 
+def _make_parameterised_command_handler(command_name: str, param_name: str, success_message: str) -> CommandToolHandler:
+    """Handler for commands that take a single required text parameter."""
+    async def _handler(**kwargs: Any) -> Dict[str, Any]:
+        value = kwargs.get(param_name, "")
+        controller = get_controller()
+        result = await controller.exec_command(command_name, {param_name: value}, actor="mcp")
+        if not result.get("ok"):
+            return _exec_result_error(result)
+        return {"success": True, "message": success_message}
+    # Set parameter annotations so MCP introspects them
+    import inspect
+    _handler.__annotations__ = {param_name: str, "return": Dict[str, Any]}
+    return _handler
+
+
+def _make_terminal_write_handler() -> CommandToolHandler:
+    async def _handler(text: str, window_id: str = "") -> Dict[str, Any]:
+        args: Dict[str, Any] = {"text": text}
+        if window_id:
+            args["window_id"] = window_id
+        controller = get_controller()
+        result = await controller.exec_command("terminal_write", args, actor="mcp")
+        if not result.get("ok"):
+            return _exec_result_error(result)
+        return {"success": True, "message": "Text sent to terminal"}
+    return _handler
+
+
+def _make_terminal_read_handler() -> CommandToolHandler:
+    async def _handler(window_id: str = "") -> Dict[str, Any]:
+        args: Dict[str, Any] = {}
+        if window_id:
+            args["window_id"] = window_id
+        controller = get_controller()
+        result = await controller.exec_command("terminal_read", args, actor="mcp")
+        if not result.get("ok"):
+            return _exec_result_error(result)
+        return {"success": True, "content": result.get("output", "")}
+    return _handler
+
+
+def _make_scramble_say_handler() -> CommandToolHandler:
+    async def _handler(text: str) -> Dict[str, Any]:
+        controller = get_controller()
+        result = await controller.exec_command("scramble_say", {"text": text}, actor="mcp")
+        if not result.get("ok"):
+            return _exec_result_error(result)
+        return {"success": True, "message": "Message sent to Scramble"}
+    return _handler
+
+
+def _make_chat_receive_handler() -> CommandToolHandler:
+    async def _handler(sender: str, text: str) -> Dict[str, Any]:
+        controller = get_controller()
+        result = await controller.exec_command("chat_receive", {"sender": sender, "text": text}, actor="mcp")
+        if not result.get("ok"):
+            return _exec_result_error(result)
+        return {"success": True, "message": "Chat message delivered"}
+    return _handler
+
+
 def _command_tool_builders() -> Dict[str, Dict[str, Any]]:
+    # Keep in sync with get_command_capabilities() in app/command_registry.cpp.
+    # Parity enforced by tests/contract/test_surface_parity_matrix.py.
     return {
         "cascade": {
             "tool_name": "tui_cascade_windows",
@@ -234,6 +297,68 @@ def _command_tool_builders() -> Dict[str, Dict[str, Any]]:
         "open_workspace": {
             "tool_name": "tui_open_workspace",
             "handler": _make_open_workspace_handler(),
+        },
+        # ── Window/app launchers (simple, no params) ──────────────────
+        "open_scramble": {
+            "tool_name": "tui_open_scramble",
+            "handler": _make_simple_command_handler("open_scramble", "Scramble cat toggled"),
+        },
+        "scramble_expand": {
+            "tool_name": "tui_scramble_expand",
+            "handler": _make_simple_command_handler("scramble_expand", "Scramble mode toggled"),
+        },
+        "scramble_pet": {
+            "tool_name": "tui_scramble_pet",
+            "handler": _make_simple_command_handler("scramble_pet", "Cat has been petted"),
+        },
+        "new_paint_canvas": {
+            "tool_name": "tui_new_paint_canvas",
+            "handler": _make_simple_command_handler("new_paint_canvas", "Paint canvas opened"),
+        },
+        "open_micropolis_ascii": {
+            "tool_name": "tui_open_micropolis",
+            "handler": _make_simple_command_handler("open_micropolis_ascii", "Micropolis city builder opened"),
+        },
+        "open_quadra": {
+            "tool_name": "tui_open_quadra",
+            "handler": _make_simple_command_handler("open_quadra", "Quadra falling blocks opened"),
+        },
+        "open_snake": {
+            "tool_name": "tui_open_snake",
+            "handler": _make_simple_command_handler("open_snake", "Snake game opened"),
+        },
+        "open_rogue": {
+            "tool_name": "tui_open_rogue",
+            "handler": _make_simple_command_handler("open_rogue", "WibWob Rogue opened"),
+        },
+        "open_deep_signal": {
+            "tool_name": "tui_open_deep_signal",
+            "handler": _make_simple_command_handler("open_deep_signal", "Deep Signal opened"),
+        },
+        "open_apps": {
+            "tool_name": "tui_open_apps",
+            "handler": _make_simple_command_handler("open_apps", "Applications browser opened"),
+        },
+        "open_terminal": {
+            "tool_name": "tui_open_terminal",
+            "handler": _make_simple_command_handler("open_terminal", "Terminal emulator opened"),
+        },
+        # ── Parameterised commands ────────────────────────────────────
+        "terminal_write": {
+            "tool_name": "tui_terminal_write_cmd",
+            "handler": _make_terminal_write_handler(),
+        },
+        "terminal_read": {
+            "tool_name": "tui_terminal_read_cmd",
+            "handler": _make_terminal_read_handler(),
+        },
+        "scramble_say": {
+            "tool_name": "tui_scramble_say",
+            "handler": _make_scramble_say_handler(),
+        },
+        "chat_receive": {
+            "tool_name": "tui_chat_receive",
+            "handler": _make_chat_receive_handler(),
         },
     }
 
