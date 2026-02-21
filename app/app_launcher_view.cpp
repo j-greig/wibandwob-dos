@@ -104,28 +104,7 @@ void TCategoryBar::handleEvent(TEvent& event)
         }
     }
 
-    if (event.what == evKeyDown) {
-        bool changed = false;
-        switch (event.keyDown.keyCode) {
-            case kbTab:
-                selected = (selected + 1) % NUM_CATEGORIES;
-                changed = true;
-                break;
-            case kbShiftTab:
-                selected = (selected + NUM_CATEGORIES - 1) % NUM_CATEGORIES;
-                changed = true;
-                break;
-        }
-        if (changed) {
-            drawView();
-            TEvent notify;
-            notify.what = evCommand;
-            notify.message.command = cmCategoryChanged;
-            notify.message.infoInt = selected;
-            putEvent(notify);
-            clearEvent(event);
-        }
-    }
+    // Tab/number key handling moved to TAppLauncherWindow::handleEvent
 }
 
 // ═══════════════════════════════════════════════════
@@ -464,6 +443,42 @@ void TAppLauncherWindow::handleEvent(TEvent& event)
         }
         clearEvent(event);
         return;
+    }
+
+    // Intercept Tab/Shift-Tab and number keys 1-5 for category switching
+    // before child views can eat them
+    if (event.what == evKeyDown) {
+        bool changed = false;
+        int newCat = categoryBar->selected;
+
+        switch (event.keyDown.keyCode) {
+            case kbTab:
+                newCat = (newCat + 1) % TCategoryBar::NUM_CATEGORIES;
+                changed = true;
+                break;
+            case kbShiftTab:
+                newCat = (newCat + TCategoryBar::NUM_CATEGORIES - 1) % TCategoryBar::NUM_CATEGORIES;
+                changed = true;
+                break;
+            default: {
+                // Number keys 1-5
+                char ch = event.keyDown.charScan.charCode;
+                if (ch >= '1' && ch <= '5') {
+                    newCat = ch - '1';
+                    changed = true;
+                }
+                break;
+            }
+        }
+
+        if (changed) {
+            categoryBar->selected = newCat;
+            categoryBar->drawView();
+            const char* cats[] = {"", "games", "tools", "creative", "demos"};
+            grid->setFilter(cats[newCat]);
+            clearEvent(event);
+            return;
+        }
     }
 
     TWindow::handleEvent(event);
