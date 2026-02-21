@@ -572,3 +572,558 @@ const {z} = require('./app/llm/sdk_bridge/node_modules/zod');
   }
 })();
 NODE" in /Users/james/repos/wibandwob-dos
+thinking
+**Considering session termination approach**
+
+thinking
+**Investigating message format mismatch**
+exec
+/bin/zsh -lc "rg -n \"type SDKUserMessage|interface SDKUserMessage|type SDKMessage|SDKAssistantMessage|type:\\s*'user'\" app/llm/sdk_bridge/node_modules/@anthropic-ai/claude-agent-sdk/sdk.d.ts" in /Users/james/repos/wibandwob-dos succeeded in 52ms:
+322:type SDKUserMessageContent = {
+323:    type: 'user';
+340:export type SDKUserMessage = SDKUserMessageContent & {
+344:export type SDKUserMessageReplay = SDKUserMessageContent & {
+353:export type SDKAssistantMessageError = 'authentication_failed' | 'billing_error' | 'rate_limit' | 'invalid_request' | 'server_error' | 'unknown';
+354:export type SDKAssistantMessage = {
+358:    error?: SDKAssistantMessageError;
+478:export type SDKMessage = SDKAssistantMessage | SDKUserMessage | SDKUserMessageReplay | SDKResultMessage | SDKSystemMessage | SDKPartialAssistantMessage | SDKCompactBoundaryMessage | SDKStatusMessage | SDKHookResponseMessage | SDKToolProgressMessage | SDKAuthStatusMessage;
+621:     * The message ID is expected to be from SDKAssistantMessage.uuid.
+exec
+/bin/zsh -lc "sed -n '300,390p' app/llm/sdk_bridge/node_modules/@anthropic-ai/claude-agent-sdk/sdk.d.ts" in /Users/james/repos/wibandwob-dos succeeded in 51ms:
+};
+export type ModelInfo = {
+    value: string;
+    displayName: string;
+    description: string;
+};
+/** Information about the logged in user's account. */
+export type AccountInfo = {
+    email?: string;
+    organization?: string;
+    subscriptionType?: string;
+    tokenSource?: string;
+    apiKeySource?: string;
+};
+export type McpServerStatus = {
+    name: string;
+    status: 'connected' | 'failed' | 'needs-auth' | 'pending';
+    serverInfo?: {
+        name: string;
+        version: string;
+
+thinking
+**Analyzing tool list and module loading inconsistencies**
+exec
+/bin/zsh -lc "nl -ba app/llm/sdk_bridge/claude_sdk_bridge.js | sed -n '186,220p'" in /Users/james/repos/wibandwob-dos succeeded in 51ms:
+   186	                query: data.query 
+   187	            });
+   188	            let fullResponse = '';
+   189	            let finishReason = null;
+   190	            
+   191	            // Use Claude Agent SDK with proper messages + MCP tools
+   192	            console.error('DEBUG: About to query with model:', this.sessionConfig.model);
+   193	            console.error('DEBUG: MCP server initialized:', !!this.mcpServer);
+   194	            
+   195	            // Build allowed tools list including MCP tool IDs
+   196	            const baseTools = this.sessionConfig.allowedTools || [];
+   197	            const mcpTools = [
+   198	                "mcp__tui-control__tui_create_window",
+   199	                "mcp__tui-control__tui_move_window", 
+   200	                "mcp__tui-control__tui_get_state",
+   201	                "mcp__tui-control__tui_close_window",
+   202	                "mcp__tui-control__tui_cascade_windows",
+   203	                "mcp__tui-control__tui_tile_windows",
+   204	                "mcp__tui-control__tui_send_text",
+   205	                "mcp__tui-control__tui_send_figlet"
+
+thinking
+**Checking branch and commit alignment**
+codex
+I found a concrete mismatch: `claude_sdk_bridge.js` currently does not include the terminal MCP IDs in its `mcpTools` list (only up to `tui_send_figlet`). I’m checking branch state now, then I’ll patch both JS and C++ tool whitelists consistently.
+exec
+/bin/zsh -lc 'git branch --show-current && git status --short' in /Users/james/repos/wibandwob-dos succeeded in 116ms:
+ M codex-wibwob-mcp-fix-20260221-125722.log
+?? .claude/worktrees/
+
+thinking
+**Adjusting tool whitelist to fix offering**
+codex
+I’m applying a focused fix now: add `tui_terminal_write`/`tui_terminal_read` to the bridge `allowedTools` MCP list and to the C++ `START_SESSION` whitelist so the SDK can expose and permit them end-to-end.
+file update
+M /Users/james/repos/wibandwob-dos/app/llm/sdk_bridge/claude_sdk_bridge.js
+@@ -204,3 +204,5 @@
+                 "mcp__tui-control__tui_send_text",
+-                "mcp__tui-control__tui_send_figlet"
++                "mcp__tui-control__tui_send_figlet",
++                "mcp__tui-control__tui_terminal_write",
++                "mcp__tui-control__tui_terminal_read"
+             ];
+apply_patch(auto_approved=true) exited 0 in 48ms:
+Success. Updated the following files:
+M app/llm/sdk_bridge/claude_sdk_bridge.js
+file update:
+diff --git a/app/llm/sdk_bridge/claude_sdk_bridge.js b/app/llm/sdk_bridge/claude_sdk_bridge.js
+index f22a361e10e3ce605a6e83cb65af670b45d4b6cd..f7cee786a191a22aafd8330d3287c5fa4571e91d
+--- a/app/llm/sdk_bridge/claude_sdk_bridge.js
++++ b/app/llm/sdk_bridge/claude_sdk_bridge.js
+@@ -202,7 +202,9 @@
+                 "mcp__tui-control__tui_cascade_windows",
+                 "mcp__tui-control__tui_tile_windows",
+                 "mcp__tui-control__tui_send_text",
+-                "mcp__tui-control__tui_send_figlet"
++                "mcp__tui-control__tui_send_figlet",
++                "mcp__tui-control__tui_terminal_write",
++                "mcp__tui-control__tui_terminal_read"
+             ];
+             const toolList = [...new Set([...baseTools, ...mcpTools])];
+             const modelId = this.normalizeModelId(this.sessionConfig.model);
+
+file update:
+diff --git a/app/llm/sdk_bridge/claude_sdk_bridge.js b/app/llm/sdk_bridge/claude_sdk_bridge.js
+index f22a361e10e3ce605a6e83cb65af670b45d4b6cd..f7cee786a191a22aafd8330d3287c5fa4571e91d
+--- a/app/llm/sdk_bridge/claude_sdk_bridge.js
++++ b/app/llm/sdk_bridge/claude_sdk_bridge.js
+@@ -202,7 +202,9 @@
+                 "mcp__tui-control__tui_cascade_windows",
+                 "mcp__tui-control__tui_tile_windows",
+                 "mcp__tui-control__tui_send_text",
+-                "mcp__tui-control__tui_send_figlet"
++                "mcp__tui-control__tui_send_figlet",
++                "mcp__tui-control__tui_terminal_write",
++                "mcp__tui-control__tui_terminal_read"
+             ];
+             const toolList = [...new Set([...baseTools, ...mcpTools])];
+             const modelId = this.normalizeModelId(this.sessionConfig.model);
+
+
+thinking
+**Modifying C++ code**
+file update
+M /Users/james/repos/wibandwob-dos/app/llm/providers/claude_code_sdk_provider.cpp
+@@ -326,7 +326,7 @@
+ 
+-    std::ostringstream command;
+-    command << R"({"type":"START_SESSION","data":{"customSystemPrompt":")"
+-            << escapedPrompt << R"(","maxTurns":)" << maxTurns
+-            << R"(,"allowedTools":["Read","Write","Grep","Bash","LS","WebSearch","WebFetch","mcp__tui-control__tui_create_window","mcp__tui-control__tui_move_window","mcp__tui-control__tui_get_state","mcp__tui-control__tui_close_window","mcp__tui-control__tui_cascade_windows","mcp__tui-control__tui_tile_windows","mcp__tui-control__tui_send_text","mcp__tui-control__tui_send_figlet"],"model":")"
+-            << configuredModel << R"("}})";
++    std::ostringstream command;
++    command << R"({"type":"START_SESSION","data":{"customSystemPrompt":")"
++            << escapedPrompt << R"(","maxTurns":)" << maxTurns
++            << R"(,"allowedTools":["Read","Write","Grep","Bash","LS","WebSearch","WebFetch","mcp__tui-control__tui_create_window","mcp__tui-control__tui_move_window","mcp__tui-control__tui_get_state","mcp__tui-control__tui_close_window","mcp__tui-control__tui_cascade_windows","mcp__tui-control__tui_tile_windows","mcp__tui-control__tui_send_text","mcp__tui-control__tui_send_figlet","mcp__tui-control__tui_terminal_write","mcp__tui-control__tui_terminal_read"],"model":")"
++            << configuredModel << R"("}})";
+ 
+apply_patch(auto_approved=true) exited 0 in 104ms:
+Success. Updated the following files:
+M app/llm/providers/claude_code_sdk_provider.cpp
+file update:
+diff --git a/app/llm/providers/claude_code_sdk_provider.cpp b/app/llm/providers/claude_code_sdk_provider.cpp
+index 4de8879d383d2eababdcdbf44264e1681aaea2e2..b6e799ba87c940d5d4c3a4c1fcaafb26a07657e5
+--- a/app/llm/providers/claude_code_sdk_provider.cpp
++++ b/app/llm/providers/claude_code_sdk_provider.cpp
+@@ -324,11 +324,11 @@
+     fprintf(stderr, "[SDK] Escaped prompt: %zu chars -> %zu chars\n",
+             customSystemPrompt.size(), escapedPrompt.size());
+ 
+-    std::ostringstream command;
+-    command << R"({"type":"START_SESSION","data":{"customSystemPrompt":")"
+-            << escapedPrompt << R"(","maxTurns":)" << maxTurns
+-            << R"(,"allowedTools":["Read","Write","Grep","Bash","LS","WebSearch","WebFetch","mcp__tui-control__tui_create_window","mcp__tui-control__tui_move_window","mcp__tui-control__tui_get_state","mcp__tui-control__tui_close_window","mcp__tui-control__tui_cascade_windows","mcp__tui-control__tui_tile_windows","mcp__tui-control__tui_send_text","mcp__tui-control__tui_send_figlet"],"model":")"
+-            << configuredModel << R"("}})";
++    std::ostringstream command;
++    command << R"({"type":"START_SESSION","data":{"customSystemPrompt":")"
++            << escapedPrompt << R"(","maxTurns":)" << maxTurns
++            << R"(,"allowedTools":["Read","Write","Grep","Bash","LS","WebSearch","WebFetch","mcp__tui-control__tui_create_window","mcp__tui-control__tui_move_window","mcp__tui-control__tui_get_state","mcp__tui-control__tui_close_window","mcp__tui-control__tui_cascade_windows","mcp__tui-control__tui_tile_windows","mcp__tui-control__tui_send_text","mcp__tui-control__tui_send_figlet","mcp__tui-control__tui_terminal_write","mcp__tui-control__tui_terminal_read"],"model":")"
++            << configuredModel << R"("}})";
+ 
+     std::string cmdStr = command.str();
+     fprintf(stderr, "[SDK] Sending START_SESSION: %zu bytes\n", cmdStr.size());
+diff --git a/app/llm/sdk_bridge/claude_sdk_bridge.js b/app/llm/sdk_bridge/claude_sdk_bridge.js
+index f22a361e10e3ce605a6e83cb65af670b45d4b6cd..f7cee786a191a22aafd8330d3287c5fa4571e91d
+--- a/app/llm/sdk_bridge/claude_sdk_bridge.js
++++ b/app/llm/sdk_bridge/claude_sdk_bridge.js
+@@ -202,7 +202,9 @@
+                 "mcp__tui-control__tui_cascade_windows",
+                 "mcp__tui-control__tui_tile_windows",
+                 "mcp__tui-control__tui_send_text",
+-                "mcp__tui-control__tui_send_figlet"
++                "mcp__tui-control__tui_send_figlet",
++                "mcp__tui-control__tui_terminal_write",
++                "mcp__tui-control__tui_terminal_read"
+             ];
+             const toolList = [...new Set([...baseTools, ...mcpTools])];
+             const modelId = this.normalizeModelId(this.sessionConfig.model);
+
+file update:
+diff --git a/app/llm/providers/claude_code_sdk_provider.cpp b/app/llm/providers/claude_code_sdk_provider.cpp
+index 4de8879d383d2eababdcdbf44264e1681aaea2e2..b6e799ba87c940d5d4c3a4c1fcaafb26a07657e5
+--- a/app/llm/providers/claude_code_sdk_provider.cpp
++++ b/app/llm/providers/claude_code_sdk_provider.cpp
+@@ -324,11 +324,11 @@
+     fprintf(stderr, "[SDK] Escaped prompt: %zu chars -> %zu chars\n",
+             customSystemPrompt.size(), escapedPrompt.size());
+ 
+-    std::ostringstream command;
+-    command << R"({"type":"START_SESSION","data":{"customSystemPrompt":")"
+-            << escapedPrompt << R"(","maxTurns":)" << maxTurns
+-            << R"(,"allowedTools":["Read","Write","Grep","Bash","LS","WebSearch","WebFetch","mcp__tui-control__tui_create_window","mcp__tui-control__tui_move_window","mcp__tui-control__tui_get_state","mcp__tui-control__tui_close_window","mcp__tui-control__tui_cascade_windows","mcp__tui-control__tui_tile_windows","mcp__tui-control__tui_send_text","mcp__tui-control__tui_send_figlet"],"model":")"
+-            << configuredModel << R"("}})";
++    std::ostringstream command;
++    command << R"({"type":"START_SESSION","data":{"customSystemPrompt":")"
++            << escapedPrompt << R"(","maxTurns":)" << maxTurns
++            << R"(,"allowedTools":["Read","Write","Grep","Bash","LS","WebSearch","WebFetch","mcp__tui-control__tui_create_window","mcp__tui-control__tui_move_window","mcp__tui-control__tui_get_state","mcp__tui-control__tui_close_window","mcp__tui-control__tui_cascade_windows","mcp__tui-control__tui_tile_windows","mcp__tui-control__tui_send_text","mcp__tui-control__tui_send_figlet","mcp__tui-control__tui_terminal_write","mcp__tui-control__tui_terminal_read"],"model":")"
++            << configuredModel << R"("}})";
+ 
+     std::string cmdStr = command.str();
+     fprintf(stderr, "[SDK] Sending START_SESSION: %zu bytes\n", cmdStr.size());
+diff --git a/app/llm/sdk_bridge/claude_sdk_bridge.js b/app/llm/sdk_bridge/claude_sdk_bridge.js
+index f22a361e10e3ce605a6e83cb65af670b45d4b6cd..f7cee786a191a22aafd8330d3287c5fa4571e91d
+--- a/app/llm/sdk_bridge/claude_sdk_bridge.js
++++ b/app/llm/sdk_bridge/claude_sdk_bridge.js
+@@ -202,7 +202,9 @@
+                 "mcp__tui-control__tui_cascade_windows",
+                 "mcp__tui-control__tui_tile_windows",
+                 "mcp__tui-control__tui_send_text",
+-                "mcp__tui-control__tui_send_figlet"
++                "mcp__tui-control__tui_send_figlet",
++                "mcp__tui-control__tui_terminal_write",
++                "mcp__tui-control__tui_terminal_read"
+             ];
+             const toolList = [...new Set([...baseTools, ...mcpTools])];
+             const modelId = this.normalizeModelId(this.sessionConfig.model);
+
+
+thinking
+**Planning targeted tests and linting**
+exec
+/bin/zsh -lc "nl -ba app/llm/sdk_bridge/claude_sdk_bridge.js | sed -n '194,212p'" in /Users/james/repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba app/llm/providers/claude_code_sdk_provider.cpp | sed -n '324,336p'" in /Users/james/repos/wibandwob-dos succeeded in 51ms:
+   194	            
+   195	            // Build allowed tools list including MCP tool IDs
+   196	            const baseTools = this.sessionConfig.allowedTools || [];
+   197	            const mcpTools = [
+   198	                "mcp__tui-control__tui_create_window",
+   199	                "mcp__tui-control__tui_move_window", 
+   200	                "mcp__tui-control__tui_get_state",
+   201	                "mcp__tui-control__tui_close_window",
+   202	                "mcp__tui-control__tui_cascade_windows",
+   203	                "mcp__tui-control__tui_tile_windows",
+   204	                "mcp__tui-control__tui_send_text",
+   205	                "mcp__tui-control__tui_send_figlet",
+   206	                "mcp__tui-control__tui_terminal_write",
+   207	                "mcp__tui-control__tui_terminal_read"
+   208	            ];
+   209	            const toolList = [...new Set([...baseTools, ...mcpTools])];
+   210	            const modelId = this.normalizeModelId(this.sessionConfig.model);
+   211	
+   212	            const queryOptions = {
+ succeeded in 50ms:
+   324	    fprintf(stderr, "[SDK] Escaped prompt: %zu chars -> %zu chars\n",
+   325	            customSystemPrompt.size(), escapedPrompt.size());
+   326	
+   327	    std::ostringstream command;
+   328	    command << R"({"type":"START_SESSION","data":{"customSystemPrompt":")"
+   329	            << escapedPrompt << R"(","maxTurns":)" << maxTurns
+   330	            << R"(,"allowedTools":["Read","Write","Grep","Bash","LS","WebSearch","WebFetch","mcp__tui-control__tui_create_window","mcp__tui-control__tui_move_window","mcp__tui-control__tui_get_state","mcp__tui-control__tui_close_window","mcp__tui-control__tui_cascade_windows","mcp__tui-control__tui_tile_windows","mcp__tui-control__tui_send_text","mcp__tui-control__tui_send_figlet","mcp__tui-control__tui_terminal_write","mcp__tui-control__tui_terminal_read"],"model":")"
+   331	            << configuredModel << R"("}})";
+   332	
+   333	    std::string cmdStr = command.str();
+   334	    fprintf(stderr, "[SDK] Sending START_SESSION: %zu bytes\n", cmdStr.size());
+   335	
+   336	    if (!nodeBridge->sendCommand(cmdStr)) {
+exec
+/bin/zsh -lc 'node app/llm/sdk_bridge/test_mcp_tools.js' in /Users/james/repos/wibandwob-dos exited 1 in 52ms:
+node:internal/modules/cjs/loader:1450
+  throw err;
+  ^
+
+Error: Cannot find module '/Users/james/Repos/wibandwob-dos/app/llm/sdk_bridge/test_mcp_tools.js'
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1447:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1058:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1063:22)
+    at Module._load (node:internal/modules/cjs/loader:1233:25)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
+    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+    at node:internal/main/run_main_module:33:47 {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: []
+}
+
+Node.js v25.5.0
+file update:
+diff --git a/app/llm/providers/claude_code_sdk_provider.cpp b/app/llm/providers/claude_code_sdk_provider.cpp
+index 4de8879d383d2eababdcdbf44264e1681aaea2e2..b6e799ba87c940d5d4c3a4c1fcaafb26a07657e5
+--- a/app/llm/providers/claude_code_sdk_provider.cpp
++++ b/app/llm/providers/claude_code_sdk_provider.cpp
+@@ -324,11 +324,11 @@
+     fprintf(stderr, "[SDK] Escaped prompt: %zu chars -> %zu chars\n",
+             customSystemPrompt.size(), escapedPrompt.size());
+ 
+-    std::ostringstream command;
+-    command << R"({"type":"START_SESSION","data":{"customSystemPrompt":")"
+-            << escapedPrompt << R"(","maxTurns":)" << maxTurns
+-            << R"(,"allowedTools":["Read","Write","Grep","Bash","LS","WebSearch","WebFetch","mcp__tui-control__tui_create_window","mcp__tui-control__tui_move_window","mcp__tui-control__tui_get_state","mcp__tui-control__tui_close_window","mcp__tui-control__tui_cascade_windows","mcp__tui-control__tui_tile_windows","mcp__tui-control__tui_send_text","mcp__tui-control__tui_send_figlet"],"model":")"
+-            << configuredModel << R"("}})";
++    std::ostringstream command;
++    command << R"({"type":"START_SESSION","data":{"customSystemPrompt":")"
++            << escapedPrompt << R"(","maxTurns":)" << maxTurns
++            << R"(,"allowedTools":["Read","Write","Grep","Bash","LS","WebSearch","WebFetch","mcp__tui-control__tui_create_window","mcp__tui-control__tui_move_window","mcp__tui-control__tui_get_state","mcp__tui-control__tui_close_window","mcp__tui-control__tui_cascade_windows","mcp__tui-control__tui_tile_windows","mcp__tui-control__tui_send_text","mcp__tui-control__tui_send_figlet","mcp__tui-control__tui_terminal_write","mcp__tui-control__tui_terminal_read"],"model":")"
++            << configuredModel << R"("}})";
+ 
+     std::string cmdStr = command.str();
+     fprintf(stderr, "[SDK] Sending START_SESSION: %zu bytes\n", cmdStr.size());
+diff --git a/app/llm/sdk_bridge/claude_sdk_bridge.js b/app/llm/sdk_bridge/claude_sdk_bridge.js
+index f22a361e10e3ce605a6e83cb65af670b45d4b6cd..f7cee786a191a22aafd8330d3287c5fa4571e91d
+--- a/app/llm/sdk_bridge/claude_sdk_bridge.js
++++ b/app/llm/sdk_bridge/claude_sdk_bridge.js
+@@ -202,7 +202,9 @@
+                 "mcp__tui-control__tui_cascade_windows",
+                 "mcp__tui-control__tui_tile_windows",
+                 "mcp__tui-control__tui_send_text",
+-                "mcp__tui-control__tui_send_figlet"
++                "mcp__tui-control__tui_send_figlet",
++                "mcp__tui-control__tui_terminal_write",
++                "mcp__tui-control__tui_terminal_read"
+             ];
+             const toolList = [...new Set([...baseTools, ...mcpTools])];
+             const modelId = this.normalizeModelId(this.sessionConfig.model);
+
+
+thinking
+**Investigating file path casing issue**
+codex
+I’ve applied the whitelist fixes; I’m now re-running validation and noticed the test script path changed/doesn’t exist at the expected location, so I’m locating the actual test file to verify with the right command.
+exec
+/bin/zsh -lc "rg --files | rg 'test_mcp_tools\\.js|mcp_tools\\.js"'$'"'" in /Users/james/repos/wibandwob-dos succeeded in 52ms:
+app/llm/sdk_bridge/mcp_tools.js
+file update:
+diff --git a/app/llm/providers/claude_code_sdk_provider.cpp b/app/llm/providers/claude_code_sdk_provider.cpp
+index 4de8879d383d2eababdcdbf44264e1681aaea2e2..b6e799ba87c940d5d4c3a4c1fcaafb26a07657e5
+--- a/app/llm/providers/claude_code_sdk_provider.cpp
++++ b/app/llm/providers/claude_code_sdk_provider.cpp
+@@ -324,11 +324,11 @@
+     fprintf(stderr, "[SDK] Escaped prompt: %zu chars -> %zu chars\n",
+             customSystemPrompt.size(), escapedPrompt.size());
+ 
+-    std::ostringstream command;
+-    command << R"({"type":"START_SESSION","data":{"customSystemPrompt":")"
+-            << escapedPrompt << R"(","maxTurns":)" << maxTurns
+-            << R"(,"allowedTools":["Read","Write","Grep","Bash","LS","WebSearch","WebFetch","mcp__tui-control__tui_create_window","mcp__tui-control__tui_move_window","mcp__tui-control__tui_get_state","mcp__tui-control__tui_close_window","mcp__tui-control__tui_cascade_windows","mcp__tui-control__tui_tile_windows","mcp__tui-control__tui_send_text","mcp__tui-control__tui_send_figlet"],"model":")"
+-            << configuredModel << R"("}})";
++    std::ostringstream command;
++    command << R"({"type":"START_SESSION","data":{"customSystemPrompt":")"
++            << escapedPrompt << R"(","maxTurns":)" << maxTurns
++            << R"(,"allowedTools":["Read","Write","Grep","Bash","LS","WebSearch","WebFetch","mcp__tui-control__tui_create_window","mcp__tui-control__tui_move_window","mcp__tui-control__tui_get_state","mcp__tui-control__tui_close_window","mcp__tui-control__tui_cascade_windows","mcp__tui-control__tui_tile_windows","mcp__tui-control__tui_send_text","mcp__tui-control__tui_send_figlet","mcp__tui-control__tui_terminal_write","mcp__tui-control__tui_terminal_read"],"model":")"
++            << configuredModel << R"("}})";
+ 
+     std::string cmdStr = command.str();
+     fprintf(stderr, "[SDK] Sending START_SESSION: %zu bytes\n", cmdStr.size());
+diff --git a/app/llm/sdk_bridge/claude_sdk_bridge.js b/app/llm/sdk_bridge/claude_sdk_bridge.js
+index f22a361e10e3ce605a6e83cb65af670b45d4b6cd..f7cee786a191a22aafd8330d3287c5fa4571e91d
+--- a/app/llm/sdk_bridge/claude_sdk_bridge.js
++++ b/app/llm/sdk_bridge/claude_sdk_bridge.js
+@@ -202,7 +202,9 @@
+                 "mcp__tui-control__tui_cascade_windows",
+                 "mcp__tui-control__tui_tile_windows",
+                 "mcp__tui-control__tui_send_text",
+-                "mcp__tui-control__tui_send_figlet"
++                "mcp__tui-control__tui_send_figlet",
++                "mcp__tui-control__tui_terminal_write",
++                "mcp__tui-control__tui_terminal_read"
+             ];
+             const toolList = [...new Set([...baseTools, ...mcpTools])];
+             const modelId = this.normalizeModelId(this.sessionConfig.model);
+
+
+thinking
+**Confirming test script absence and commit plan**
+exec
+/bin/zsh -lc 'git status --short app/llm/sdk_bridge/claude_sdk_bridge.js app/llm/providers/claude_code_sdk_provider.cpp && git diff -- app/llm/sdk_bridge/claude_sdk_bridge.js app/llm/providers/claude_code_sdk_provider.cpp' in /Users/james/repos/wibandwob-dos succeeded in 51ms:
+ M app/llm/providers/claude_code_sdk_provider.cpp
+ M app/llm/sdk_bridge/claude_sdk_bridge.js
+diff --git a/app/llm/providers/claude_code_sdk_provider.cpp b/app/llm/providers/claude_code_sdk_provider.cpp
+index 4de8879..b6e799b 100644
+--- a/app/llm/providers/claude_code_sdk_provider.cpp
++++ b/app/llm/providers/claude_code_sdk_provider.cpp
+@@ -324,11 +324,11 @@ bool ClaudeCodeSDKProvider::startStreamingSession(const std::string& customSyste
+     fprintf(stderr, "[SDK] Escaped prompt: %zu chars -> %zu chars\n",
+             customSystemPrompt.size(), escapedPrompt.size());
+ 
+-    std::ostringstream command;
+-    command << R"({"type":"START_SESSION","data":{"customSystemPrompt":")"
+-            << escapedPrompt << R"(","maxTurns":)" << maxTurns
+-            << R"(,"allowedTools":["Read","Write","Grep","Bash","LS","WebSearch","WebFetch","mcp__tui-control__tui_create_window","mcp__tui-control__tui_move_window","mcp__tui-control__tui_get_state","mcp__tui-control__tui_close_window","mcp__tui-control__tui_cascade_windows","mcp__tui-control__tui_tile_windows","mcp__tui-control__tui_send_text","mcp__tui-control__tui_send_figlet"],"model":")"
+-            << configuredModel << R"("}})";
++    std::ostringstream command;
++    command << R"({"type":"START_SESSION","data":{"customSystemPrompt":")"
++            << escapedPrompt << R"(","maxTurns":)" << maxTurns
++            << R"(,"allowedTools":["Read","Write","Grep","Bash","LS","WebSearch","WebFetch","mcp__tui-control__tui_create_window","mcp__tui-control__tui_move_window","mcp__tui-control__tui_get_state","mcp__tui-control__tui_close_window","mcp__tui-control__tui_cascade_windows","mcp__tui-control__tui_tile_windows","mcp__tui-control__tui_send_text","mcp__tui-control__tui_send_figlet","mcp__tui-control__tui_terminal_write","mcp__tui-control__tui_terminal_read"],"model":")"
++            << configuredModel << R"("}})";
+file update:
+diff --git a/app/llm/providers/claude_code_sdk_provider.cpp b/app/llm/providers/claude_code_sdk_provider.cpp
+index 4de8879d383d2eababdcdbf44264e1681aaea2e2..b6e799ba87c940d5d4c3a4c1fcaafb26a07657e5
+--- a/app/llm/providers/claude_code_sdk_provider.cpp
++++ b/app/llm/providers/claude_code_sdk_provider.cpp
+@@ -324,11 +324,11 @@
+     fprintf(stderr, "[SDK] Escaped prompt: %zu chars -> %zu chars\n",
+             customSystemPrompt.size(), escapedPrompt.size());
+ 
+-    std::ostringstream command;
+-    command << R"({"type":"START_SESSION","data":{"customSystemPrompt":")"
+-            << escapedPrompt << R"(","maxTurns":)" << maxTurns
+-            << R"(,"allowedTools":["Read","Write","Grep","Bash","LS","WebSearch","WebFetch","mcp__tui-control__tui_create_window","mcp__tui-control__tui_move_window","mcp__tui-control__tui_get_state","mcp__tui-control__tui_close_window","mcp__tui-control__tui_cascade_windows","mcp__tui-control__tui_tile_windows","mcp__tui-control__tui_send_text","mcp__tui-control__tui_send_figlet"],"model":")"
+-            << configuredModel << R"("}})";
++    std::ostringstream command;
++    command << R"({"type":"START_SESSION","data":{"customSystemPrompt":")"
++            << escapedPrompt << R"(","maxTurns":)" << maxTurns
++            << R"(,"allowedTools":["Read","Write","Grep","Bash","LS","WebSearch","WebFetch","mcp__tui-control__tui_create_window","mcp__tui-control__tui_move_window","mcp__tui-control__tui_get_state","mcp__tui-control__tui_close_window","mcp__tui-control__tui_cascade_windows","mcp__tui-control__tui_tile_windows","mcp__tui-control__tui_send_text","mcp__tui-control__tui_send_figlet","mcp__tui-control__tui_terminal_write","mcp__tui-control__tui_terminal_read"],"model":")"
++            << configuredModel << R"("}})";
+ 
+     std::string cmdStr = command.str();
+     fprintf(stderr, "[SDK] Sending START_SESSION: %zu bytes\n", cmdStr.size());
+diff --git a/app/llm/sdk_bridge/claude_sdk_bridge.js b/app/llm/sdk_bridge/claude_sdk_bridge.js
+index f22a361e10e3ce605a6e83cb65af670b45d4b6cd..f7cee786a191a22aafd8330d3287c5fa4571e91d
+--- a/app/llm/sdk_bridge/claude_sdk_bridge.js
++++ b/app/llm/sdk_bridge/claude_sdk_bridge.js
+@@ -202,7 +202,9 @@
+                 "mcp__tui-control__tui_cascade_windows",
+                 "mcp__tui-control__tui_tile_windows",
+                 "mcp__tui-control__tui_send_text",
+-                "mcp__tui-control__tui_send_figlet"
++                "mcp__tui-control__tui_send_figlet",
++                "mcp__tui-control__tui_terminal_write",
++                "mcp__tui-control__tui_terminal_read"
+             ];
+             const toolList = [...new Set([...baseTools, ...mcpTools])];
+             const modelId = this.normalizeModelId(this.sessionConfig.model);
+
+
+thinking
+**Noticing newline style changes**
+codex
+I’ve confirmed the patch is scoped to two files and directly addresses tool allowlisting on both sides of the bridge. I’m committing now with your required commit format and co-author trailer.
+exec
+/bin/zsh -lc 'git add app/llm/sdk_bridge/claude_sdk_bridge.js app/llm/providers/claude_code_sdk_provider.cpp && git commit -m "fix(sdk): allow terminal MCP tools in embedded bridge sessions" -m "Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"' in /Users/james/repos/wibandwob-dos succeeded in 52ms:
+[main 7a54e10] fix(sdk): allow terminal MCP tools in embedded bridge sessions
+ 2 files changed, 8 insertions(+), 6 deletions(-)
+file update:
+diff --git a/app/llm/providers/claude_code_sdk_provider.cpp b/app/llm/providers/claude_code_sdk_provider.cpp
+index 4de8879d383d2eababdcdbf44264e1681aaea2e2..b6e799ba87c940d5d4c3a4c1fcaafb26a07657e5
+--- a/app/llm/providers/claude_code_sdk_provider.cpp
++++ b/app/llm/providers/claude_code_sdk_provider.cpp
+@@ -324,11 +324,11 @@
+     fprintf(stderr, "[SDK] Escaped prompt: %zu chars -> %zu chars\n",
+             customSystemPrompt.size(), escapedPrompt.size());
+ 
+-    std::ostringstream command;
+-    command << R"({"type":"START_SESSION","data":{"customSystemPrompt":")"
+-            << escapedPrompt << R"(","maxTurns":)" << maxTurns
+-            << R"(,"allowedTools":["Read","Write","Grep","Bash","LS","WebSearch","WebFetch","mcp__tui-control__tui_create_window","mcp__tui-control__tui_move_window","mcp__tui-control__tui_get_state","mcp__tui-control__tui_close_window","mcp__tui-control__tui_cascade_windows","mcp__tui-control__tui_tile_windows","mcp__tui-control__tui_send_text","mcp__tui-control__tui_send_figlet"],"model":")"
+-            << configuredModel << R"("}})";
++    std::ostringstream command;
++    command << R"({"type":"START_SESSION","data":{"customSystemPrompt":")"
++            << escapedPrompt << R"(","maxTurns":)" << maxTurns
++            << R"(,"allowedTools":["Read","Write","Grep","Bash","LS","WebSearch","WebFetch","mcp__tui-control__tui_create_window","mcp__tui-control__tui_move_window","mcp__tui-control__tui_get_state","mcp__tui-control__tui_close_window","mcp__tui-control__tui_cascade_windows","mcp__tui-control__tui_tile_windows","mcp__tui-control__tui_send_text","mcp__tui-control__tui_send_figlet","mcp__tui-control__tui_terminal_write","mcp__tui-control__tui_terminal_read"],"model":")"
++            << configuredModel << R"("}})";
+ 
+     std::string cmdStr = command.str();
+     fprintf(stderr, "[SDK] Sending START_SESSION: %zu bytes\n", cmdStr.size());
+diff --git a/app/llm/sdk_bridge/claude_sdk_bridge.js b/app/llm/sdk_bridge/claude_sdk_bridge.js
+index f22a361e10e3ce605a6e83cb65af670b45d4b6cd..f7cee786a191a22aafd8330d3287c5fa4571e91d
+--- a/app/llm/sdk_bridge/claude_sdk_bridge.js
++++ b/app/llm/sdk_bridge/claude_sdk_bridge.js
+@@ -202,7 +202,9 @@
+                 "mcp__tui-control__tui_cascade_windows",
+                 "mcp__tui-control__tui_tile_windows",
+                 "mcp__tui-control__tui_send_text",
+-                "mcp__tui-control__tui_send_figlet"
++                "mcp__tui-control__tui_send_figlet",
++                "mcp__tui-control__tui_terminal_write",
++                "mcp__tui-control__tui_terminal_read"
+             ];
+             const toolList = [...new Set([...baseTools, ...mcpTools])];
+             const modelId = this.normalizeModelId(this.sessionConfig.model);
+
+
+thinking
+**Summarizing root cause and findings**
+codex
+Root cause found and fixed.
+
+- `createSdkMcpServer` exists and is valid (`typeof createSdkMcpServer === "function"`).
+- SDK exports are correct and include `createSdkMcpServer`, `query`, `tool`.
+- SDK `query()` does accept `options.mcpServers` in the exact `Record<string, McpServerConfig>` shape you’re using (verified in `sdk.d.ts` and `sdk.mjs`).
+- The blocker was allowlisting: terminal MCP tool IDs were not actually present in the runtime hardcoded allowlists in this checkout, so Claude could not call them and fell back to textual/hallucinated pseudo-tool calls.
+
+Changes made:
+- Added terminal tool IDs to bridge MCP allowlist in `app/llm/sdk_bridge/claude_sdk_bridge.js:197`.
+- Added terminal tool IDs to C++ START_SESSION allowlist in `app/llm/providers/claude_code_sdk_provider.cpp:330`.
+
+Commit:
+- `7a54e10`
+- Message: `fix(sdk): allow terminal MCP tools in embedded bridge sessions`
+- Includes required co-author trailer.
+
+Validation:
+- SDK API shape checks passed.
+- `node app/llm/sdk_bridge/test_mcp_tools.js` is not present in this checkout right now (command fails with module-not-found), so I could not run that exact script here.
+file update:
+diff --git a/app/llm/providers/claude_code_sdk_provider.cpp b/app/llm/providers/claude_code_sdk_provider.cpp
+index 4de8879d383d2eababdcdbf44264e1681aaea2e2..b6e799ba87c940d5d4c3a4c1fcaafb26a07657e5
+--- a/app/llm/providers/claude_code_sdk_provider.cpp
++++ b/app/llm/providers/claude_code_sdk_provider.cpp
+@@ -324,11 +324,11 @@
+     fprintf(stderr, "[SDK] Escaped prompt: %zu chars -> %zu chars\n",
+             customSystemPrompt.size(), escapedPrompt.size());
+ 
+-    std::ostringstream command;
+-    command << R"({"type":"START_SESSION","data":{"customSystemPrompt":")"
+-            << escapedPrompt << R"(","maxTurns":)" << maxTurns
+-            << R"(,"allowedTools":["Read","Write","Grep","Bash","LS","WebSearch","WebFetch","mcp__tui-control__tui_create_window","mcp__tui-control__tui_move_window","mcp__tui-control__tui_get_state","mcp__tui-control__tui_close_window","mcp__tui-control__tui_cascade_windows","mcp__tui-control__tui_tile_windows","mcp__tui-control__tui_send_text","mcp__tui-control__tui_send_figlet"],"model":")"
+-            << configuredModel << R"("}})";
++    std::ostringstream command;
++    command << R"({"type":"START_SESSION","data":{"customSystemPrompt":")"
++            << escapedPrompt << R"(","maxTurns":)" << maxTurns
++            << R"(,"allowedTools":["Read","Write","Grep","Bash","LS","WebSearch","WebFetch","mcp__tui-control__tui_create_window","mcp__tui-control__tui_move_window","mcp__tui-control__tui_get_state","mcp__tui-control__tui_close_window","mcp__tui-control__tui_cascade_windows","mcp__tui-control__tui_tile_windows","mcp__tui-control__tui_send_text","mcp__tui-control__tui_send_figlet","mcp__tui-control__tui_terminal_write","mcp__tui-control__tui_terminal_read"],"model":")"
++            << configuredModel << R"("}})";
+ 
+     std::string cmdStr = command.str();
+     fprintf(stderr, "[SDK] Sending START_SESSION: %zu bytes\n", cmdStr.size());
+diff --git a/app/llm/sdk_bridge/claude_sdk_bridge.js b/app/llm/sdk_bridge/claude_sdk_bridge.js
+index f22a361e10e3ce605a6e83cb65af670b45d4b6cd..f7cee786a191a22aafd8330d3287c5fa4571e91d
+--- a/app/llm/sdk_bridge/claude_sdk_bridge.js
++++ b/app/llm/sdk_bridge/claude_sdk_bridge.js
+@@ -202,7 +202,9 @@
+                 "mcp__tui-control__tui_cascade_windows",
+                 "mcp__tui-control__tui_tile_windows",
+                 "mcp__tui-control__tui_send_text",
+-                "mcp__tui-control__tui_send_figlet"
++                "mcp__tui-control__tui_send_figlet",
++                "mcp__tui-control__tui_terminal_write",
++                "mcp__tui-control__tui_terminal_read"
+             ];
+             const toolList = [...new Set([...baseTools, ...mcpTools])];
+             const modelId = this.normalizeModelId(this.sessionConfig.model);
+
+tokens used
+94,333
+Root cause found and fixed.
+
+- `createSdkMcpServer` exists and is valid (`typeof createSdkMcpServer === "function"`).
+- SDK exports are correct and include `createSdkMcpServer`, `query`, `tool`.
+- SDK `query()` does accept `options.mcpServers` in the exact `Record<string, McpServerConfig>` shape you’re using (verified in `sdk.d.ts` and `sdk.mjs`).
+- The blocker was allowlisting: terminal MCP tool IDs were not actually present in the runtime hardcoded allowlists in this checkout, so Claude could not call them and fell back to textual/hallucinated pseudo-tool calls.
+
+Changes made:
+- Added terminal tool IDs to bridge MCP allowlist in `app/llm/sdk_bridge/claude_sdk_bridge.js:197`.
+- Added terminal tool IDs to C++ START_SESSION allowlist in `app/llm/providers/claude_code_sdk_provider.cpp:330`.
+
+Commit:
+- `7a54e10`
+- Message: `fix(sdk): allow terminal MCP tools in embedded bridge sessions`
+- Includes required co-author trailer.
+
+Validation:
+- SDK API shape checks passed.
+- `node app/llm/sdk_bridge/test_mcp_tools.js` is not present in this checkout right now (command fails with module-not-found), so I could not run that exact script here.
