@@ -2591,7 +2591,8 @@ std::string api_take_last_registered_window_id(TTestPatternApp& app) {
 static const char* windowTypeName(TWindow* w) {
     const auto& specs = all_window_type_specs();
     for (const auto& spec : specs) {
-        if (spec.matches && spec.matches(w)) return spec.type;
+        if (spec.matches && spec.matches(w))
+            return spec.type;
     }
     // Fallback to first registry entry (canonical default type slug).
     return specs.empty() ? "test_pattern" : specs.front().type;

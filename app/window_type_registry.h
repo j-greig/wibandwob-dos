@@ -26,3 +26,7 @@ const WindowTypeSpec* find_window_type_by_name(const std::string& name);
 
 // All registered specs — useful for capability listings or help text.
 const std::vector<WindowTypeSpec>& all_window_type_specs();
+
+// JSON manifest of all window types — canonical source of truth for API/MCP.
+// Returns: {"window_types":[{"type":"gradient","spawnable":true}, ...]}
+std::string get_window_types_json();

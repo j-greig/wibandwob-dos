@@ -281,3 +281,18 @@ const WindowTypeSpec* find_window_type_by_name(const std::string& name) {
         if (name == spec.type) return &spec;
     return nullptr;
 }
+
+std::string get_window_types_json() {
+    const auto& specs = all_window_type_specs();
+    std::string json = "{\"window_types\":[";
+    for (size_t i = 0; i < specs.size(); ++i) {
+        if (i > 0) json += ",";
+        json += "{\"type\":\"";
+        json += specs[i].type;
+        json += "\",\"spawnable\":";
+        json += specs[i].spawn ? "true" : "false";
+        json += "}";
+    }
+    json += "]}";
+    return json;
+}

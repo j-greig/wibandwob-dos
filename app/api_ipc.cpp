@@ -397,6 +397,8 @@ void ApiIpcServer::poll() {
     std::string resp = "ok\n";
     if (cmd == "get_capabilities") {
         resp = get_command_capabilities_json() + "\n";
+    } else if (cmd == "get_window_types") {
+        resp = get_window_types_json() + "\n";
     } else if (cmd == "exec_command") {
         auto it = kv.find("name");
         if (it == kv.end() || it->second.empty()) {
