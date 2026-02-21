@@ -409,16 +409,16 @@ private:
 
         if (status.api_active) {
             fg = TColorRGB(0, 160, 0);       // green
-            label = "API \xE2\x97\x8F";      // API ●
+            label = "API ON";
         } else if (status.listening) {
             fg = TColorRGB(120, 120, 120);    // grey
-            label = "API \xE2\x97\x8B";      // API ○
+            label = "API IDLE";
         } else {
             fg = TColorRGB(180, 50, 50);      // red
-            label = "API \xE2\x9C\x97";      // API ✗
+            label = "API OFF";
         }
 
-        int labelLen = 5; // "API " + 1 UTF-8 symbol (occupies 1 cell)
+        int labelLen = strlen(label);
         int xPos = size.x - labelLen - 1;
         if (xPos < 1) return;
 
