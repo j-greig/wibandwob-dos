@@ -60,6 +60,7 @@ extern void api_spawn_monster_portal(TTestPatternApp&, const TRect*);
 extern void api_spawn_paint(TTestPatternApp&, const TRect*);
 extern void api_spawn_micropolis_ascii(TTestPatternApp&, const TRect*);
 extern void api_spawn_terminal(TTestPatternApp&, const TRect*);
+extern void api_spawn_wibwob(TTestPatternApp&, const TRect*);
 
 // ── Bounds helper ─────────────────────────────────────────────────────────────
 
@@ -264,7 +265,9 @@ static const WindowTypeSpec k_specs[] = {
     { "micropolis_ascii",  spawn_micropolis_ascii,  match_micropolis_ascii  },
     { "terminal",          spawn_terminal,          match_terminal          },
     // Internal-only types — recognised but not spawnable via IPC
-    { "wibwob",            nullptr,                match_wibwob             },
+    { "wibwob",            [](TTestPatternApp& app, const std::map<std::string,std::string>& kv) -> const char* {
+                               TRect r; api_spawn_wibwob(app, opt_bounds(kv, r)); return nullptr;
+                           },                       match_wibwob             },
     { "scramble",          nullptr,                match_scramble           },
 };
 

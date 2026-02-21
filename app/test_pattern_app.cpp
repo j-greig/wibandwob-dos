@@ -828,6 +828,7 @@ private:
     friend void api_spawn_deep_signal(TTestPatternApp&, const TRect* bounds);
     friend void api_spawn_app_launcher(TTestPatternApp&, const TRect* bounds);
     friend void api_spawn_terminal(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_wibwob(TTestPatternApp&, const TRect* bounds);
     friend std::string api_terminal_write(TTestPatternApp&, const std::string& text, const std::string& window_id);
     friend std::string api_terminal_read(TTestPatternApp&, const std::string& window_id);
     friend void api_spawn_paint(TTestPatternApp&, const TRect* bounds);
@@ -3658,6 +3659,18 @@ void api_spawn_app_launcher(TTestPatternApp& app, const TRect* bounds) {
     TWindow* w = createAppLauncherWindow(r);
     app.deskTop->insert(w);
     app.registerWindow(w);
+}
+
+void api_spawn_wibwob(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : TRect(2, 1, 82, 28);
+    app.windowNumber++;
+    std::string title = "Wib&Wob Chat " + std::to_string(app.windowNumber);
+    TWindow* w = createWibWobWindow(r, title);
+    if (w) {
+        app.deskTop->insert(w);
+        app.registerWindow(w);
+        w->select();
+    }
 }
 
 void api_spawn_terminal(TTestPatternApp& app, const TRect* bounds) {

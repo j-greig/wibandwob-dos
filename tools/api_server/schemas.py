@@ -38,6 +38,7 @@ class WindowCreate(BaseModel):
         "paint",
         "micropolis_ascii",
         "terminal",
+        "wibwob",
     ]
     title: Optional[str] = None
     rect: Optional[RectModel] = None
