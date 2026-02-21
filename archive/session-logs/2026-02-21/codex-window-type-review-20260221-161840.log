@@ -1,0 +1,969 @@
+OpenAI Codex v0.101.0 (research preview)
+--------
+workdir: /Users/james/Repos/wibandwob-dos
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: medium
+reasoning summaries: auto
+session id: 019c80ff-53c4-7df3-b438-85ffe034793f
+--------
+user
+
+TASK: Deep review of a debugging mission plan for a window-type-reporting bug.
+
+CONTEXT:
+The file workings/window-type-fix/MISSION.md contains a structured debugging plan for a bug where GET /state returns type=test_pattern for ALL windows regardless of actual type.
+
+Key source files:
+- app/window_type_registry.cpp — registry table, matchers (dynamic_cast + has_child_view), all_window_type_specs()
+- app/test_pattern_app.cpp — windowTypeName() at line 2591, api_get_state() at line 2605
+- app/window_type_registry.h — WindowTypeSpec struct definition
+
+The bug: windowTypeName() iterates all_window_type_specs(), calls spec.matches(w), but EVERY matcher returns false, so the fallback (specs.front().type = test_pattern) always wins.
+
+The existing MISSION.md has:
+- 5 hypotheses (H1-H5)
+- 6 tasks (T01-T06)
+- T01 debug logging is already applied in the source code
+
+YOUR JOB:
+1. Read MISSION.md, window_type_registry.cpp, test_pattern_app.cpp (around lines 2585-2670), and window_type_registry.h
+2. Review the existing hypotheses and tasks for completeness
+3. Identify any MISSED hypotheses or investigation tasks that should be added
+4. Think about: cross-TU RTTI issues, linker visibility, DSO boundaries, vtable duplication, the fact that match_test_pattern always returns false (so it can never match its own type — is that correct?), circular TGroup::first() iteration edge cases, whether the debug log from T01 was actually captured and examined yet, thread safety of api_get_state being called from the HTTP thread vs TUI main thread, whether TWindow* coming from desktop iteration could be a different TWindow than the one matchers cast to
+5. Also consider: are there window types that exist in the app but are NOT in the registry (missing matchers)?
+
+DELIVER:
+A list of additional tasks (continuing from T06) in the same JSON format used in MISSION.md, with:
+- id: T07, T08, etc.
+- title: concise description
+- status: todo
+- hypothesis: which hypothesis it addresses (add new H6, H7 etc. if needed)
+- instructions: step-by-step array
+- expected_output: what success looks like
+
+Also list any new hypotheses as a markdown table row (H6, H7, etc.) with status 'todo'.
+
+mcp startup: no servers
+2026-02-21T16:19:02.776970Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c76ff-4405-7962-ae80-917da2e489f2
+codex
+I’ll inspect `workings/window-type-fix/MISSION.md` and the three source files you listed, then map gaps in the current hypotheses/tasks and propose concrete follow-on tasks starting at `T07`.
+exec
+/bin/zsh -lc "sed -n '1,260p' app/window_type_registry.h" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,260p' workings/window-type-fix/MISSION.md" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,320p' app/window_type_registry.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '2560,2710p' app/test_pattern_app.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "rg --files workings/window-type-fix app | rg 'MISSION.md|window_type_registry\\.(cpp|h)|test_pattern_app\\.cpp'" in /Users/james/Repos/wibandwob-dos succeeded in 53ms:
+// Data-driven registry mapping window type slugs to spawn callbacks.
+// Eliminates the if-else dispatch chain and extern declarations in api_ipc.cpp.
+// To add a new window type: add ONE entry in window_type_registry.cpp.
+#pragma once
+
+#include <string>
+#include <vector>
+#include <map>
+
+class TTestPatternApp;
+class TWindow;
+
+// Spawn callback: return nullptr on success, a static error string on failure.
+using WinSpawnFn = const char* (*)(TTestPatternApp&,
+                                   const std::map<std::string, std::string>&);
+using WinMatchFn = bool (*)(TWindow*);
+
+struct WindowTypeSpec {
+    const char* type;    // canonical slug, e.g. "verse", "gradient"
+    WinSpawnFn  spawn;   // nullptr = recognised but not creatable via IPC
+ succeeded in 51ms:
+    if (!app.scrambleWindow) return "err scramble not open";
+    auto* msgView = app.scrambleWindow->getMessageView();
+    if (!msgView) return "err no message view";
+    msgView->addMessage(sender, text);
+    return "ok";
+}
+
+void api_tile(TTestPatternApp& app) { app.tile(); }
+void api_close_all(TTestPatternApp& app) { app.closeAll(); }
+
+void api_set_pattern_mode(TTestPatternApp& app, const std::string& mode) {
+    bool continuous = (mode == "continuous");
+    // Set the mode directly without showing a modal dialog (which blocks the event loop).
+    USE_CONTINUOUS_PATTERN = continuous;
+}
+
+void api_save_workspace(TTestPatternApp& app) { app.saveWorkspace(); }
+bool api_save_workspace_path(TTestPatternApp& app, const std::string& path) { return app.saveWorkspacePath(path); }
+
+bool api_open_workspace_path(TTestPatternApp& app, const std::string& path) {
+ succeeded in 51ms:
+# MISSION: Fix window type reporting bug
+
+> **For the next Claude session**: Read this entire file before doing anything.
+> Find the first task with status `todo`, execute it, update this file, continue.
+> Never skip a task. Never guess — validate with API calls and screenshots.
+
+---
+
+## The Bug
+
+`GET /state` returns `"type": "test_pattern"` for ALL windows regardless of actual type.
+Terminal windows, Wib&Wob chat, generative art windows — all report as `test_pattern`.
+
+**Impact**: Wib&Wob agent can't distinguish window types. Feature is broken.
+
+**Reproduction**:
+```bash
+curl -sf http://127.0.0.1:8089/state | python3 -m json.tool | grep '"type"'
+# Expected: "terminal", "wibwob", "gradient", etc.
+# Actual:   all show "test_pattern"
+ succeeded in 51ms:
+// Window type registry — single source of truth for all spawnable window types.
+// Keeps api_ipc.cpp free of per-type knowledge: adding a new type only requires
+// a new entry in the k_specs table below.
+
+#include "window_type_registry.h"
+#include "gradient.h"
+#include "frame_file_player_view.h"
+#include "transparent_text_view.h"
+#include "text_editor_view.h"
+#include "browser_view.h"
+#include "generative_verse_view.h"
+#include "generative_mycelium_view.h"
+#include "generative_orbit_view.h"
+#include "generative_torus_view.h"
+#include "generative_cube_view.h"
+#include "game_of_life_view.h"
+#include "animated_blocks_view.h"
+#include "animated_score_view.h"
+#include "animated_ascii_view.h"
+#include "animated_gradient_view.h"
+ succeeded in 52ms:
+workings/window-type-fix/MISSION.md
+app/window_type_registry.cpp
+app/window_type_registry.h
+app/test_pattern_app.cpp
+
+thinking
+**Investigating API threading and window classes**
+codex
+I’ve confirmed the current code: debug logging is present, fallback still defaults to `specs.front()`, and `match_test_pattern` is hardcoded false. Next I’m checking thread/call boundaries and whether any window classes are missing from the registry.
+exec
+/bin/zsh -lc "rg -n \"api_get_state\\(|windowTypeName\\(|all_window_type_specs\\(|match_test_pattern|TWibWobTerminalWindow|class .*Window\" app/test_pattern_app.cpp app/window_type_registry.cpp app/*.h app/*.cpp | head -n 240" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc 'rg -n "state|/state|api_get_state|http|thread|mutex|lock|ipcServer|publish_event" app | head -n 260' in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "rg -n \"new [A-Za-z0-9_]*Window\\(|class [A-Za-z0-9_]*Window\" app | head -n 320" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+app/ansi_view.h:73:class TAnsiMiniWindow : public TWindow {
+app/generative_monster_verse_view.h:50:class TWindow; TWindow* createGenerativeMonsterVerseWindow(const TRect &bounds);
+app/token_tracker_view.h:95:class TWindow; TWindow* createTokenTrackerWindow(const TRect &bounds);
+app/animated_blocks_view.cpp:127:class TAnimatedBlocksWindow : public TWindow {
+app/ascii_image_view.cpp:89:class TAsciiImageWindow : public TWindow{
+app/frame_file_player_main.cpp:30:class AnimWindow : public TWindow {
+app/generative_orbit_view.cpp:127:class TGenerativeOrbitWindow : public TWindow {
+app/window_type_registry.cpp:210:static bool match_test_pattern(TWindow*) {
+app/window_type_registry.cpp:236:static bool match_terminal(TWindow* w) { return dynamic_cast<TWibWobTerminalWindow*>(w) != nullptr; }
+app/window_type_registry.cpp:244:    { "test_pattern",      spawn_test,              match_test_pattern      },
+app/window_type_registry.cpp:273:const std::vector<WindowTypeSpec>& all_window_type_specs() {
+app/window_type_registry.cpp:280:    for (const auto& spec : all_window_type_specs())
+app/generative_mycelium_view.cpp:108:class TGenerativeMyceliumWindow : public TWindow{
+app/rogue_view.h:168:class TWindow;
+app/animated_ascii_view.cpp:295:class TAnimatedAsciiWindow : public TWindow {
+app/generative_monster_portal_view.h:62:class TWindow; TWindow* createGenerativeMonsterPortalWindow(const TRect &bounds);
+app/animated_score_view.h:63:class TWindow; TWindow* createAnimatedScoreWindow(const TRect &bounds);
+app/deep_signal_view.cpp:852:class TDeepSignalWindow : public TWindow {
+app/generative_monster_verse_view.cpp:255:class TGenerativeMonsterVerseWindow : public TWindow{
+app/rogue_view.cpp:859:class TRogueWindow : public TWindow {
+ succeeded in 51ms:
+app/token_tracker_view.cpp:265:        // Render row A buttons with stateful color
+app/ansi_view.cpp:36:    state = AttrState{}; // default fg=7,bg=0
+app/ansi_view.cpp:96:    state = AttrState{};
+app/ansi_view.cpp:102:            appendSegment(cur, buf, makeAttr(state));
+app/ansi_view.cpp:142:                            if (p == 0) { state = AttrState{}; }
+app/ansi_view.cpp:143:                            else if (p == 1) { state.bold = true; }
+app/ansi_view.cpp:144:                            else if (p == 22) { state.bold = false; }
+app/ansi_view.cpp:145:                            else if (p >= 30 && p <= 37) { state.fg = p - 30; }
+app/ansi_view.cpp:146:                            else if (p == 39) { state.fg = 7; state.bold = false; }
+app/ansi_view.cpp:147:                            else if (p >= 40 && p <= 47) { state.bg = p - 40; }
+app/ansi_view.cpp:148:                            else if (p == 49) { state.bg = 0; }
+app/animated_blocks_view.h:3:/*   animated_blocks_view.h - Zigzag Block Animation View  */
+app/animated_blocks_view.h:16:// Simple animated view that renders colored block characters. On each
+app/animated_blocks_view.h:19:class TAnimatedBlocksView : public TView {
+app/animated_blocks_view.h:21:    explicit TAnimatedBlocksView(const TRect &bounds, unsigned periodMs = 42);
+app/animated_blocks_view.h:22:    virtual ~TAnimatedBlocksView();
+app/animated_blocks_view.h:43:class TWindow; TWindow* createAnimatedBlocksWindow(const TRect &bounds);
+app/animated_blocks_view.h:44:class TWindow; TWindow* createAnimatedBlocksWindow(const TRect &bounds, unsigned periodMs);
+app/generative_monster_portal_view.cpp:114:            // Sparse placement: use hashed tile block to enable/disable head for this tile
+app/scramble_view.h:34:/* ScramblePose - cat pose states                          */
+ succeeded in 52ms:
+app/generative_orbit_view.h:42:class TWindow; TWindow* createGenerativeOrbitWindow(const TRect &bounds);
+app/token_tracker_view.cpp:661:class TTokenTrackerWindow : public TWindow {
+app/token_tracker_view.cpp:679:    auto *w = new TTokenTrackerWindow(bounds);
+app/rogue_view.h:168:class TWindow;
+app/generative_monster_portal_view.cpp:248:class TGenerativeMonsterPortalWindow : public TWindow{
+app/generative_monster_portal_view.cpp:258:TWindow* createGenerativeMonsterPortalWindow(const TRect &bounds){ auto *w=new TGenerativeMonsterPortalWindow(bounds); w->setup(90); return w; }
+app/scramble_view.cpp:837:    return new TScrambleWindow(bounds, state);
+app/animated_blocks_view.cpp:127:class TAnimatedBlocksWindow : public TWindow {
+app/animated_blocks_view.cpp:159:    auto *w = new TAnimatedBlocksWindow(bounds);
+app/window_type_registry.h:11:class TWindow;
+app/wibwob_view.cpp:1139:    return new TWibWobWindow(bounds, title);
+app/animated_blocks_view.h:43:class TWindow; TWindow* createAnimatedBlocksWindow(const TRect &bounds);
+app/animated_blocks_view.h:44:class TWindow; TWindow* createAnimatedBlocksWindow(const TRect &bounds, unsigned periodMs);
+app/wibwob_scroll_test.cpp:505:    TWibWobWindow* win = new TWibWobWindow(bounds, title);
+app/animated_score_view.cpp:376:class TAnimatedScoreWindow : public TWindow {
+app/animated_score_view.cpp:400:    auto *w = new TAnimatedScoreWindow(bounds);
+app/animated_ascii_view.h:70:class TWindow; 
+app/tvterm_view.h:14:class TWibWobTerminalWindow : public tvterm::BasicTerminalWindow
+app/generative_cube_view.cpp:119:class TGenerativeCubeWindow : public TWindow{
+app/generative_cube_view.cpp:133:TWindow* createGenerativeCubeWindow(const TRect &bounds){ auto *w=new TGenerativeCubeWindow(bounds); w->setup(45); return w; }
+
+thinking
+**Inspecting IPC and HTTP server threading**
+exec
+/bin/zsh -lc "sed -n '700,860p' app/api_ipc.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,260p' app/api_ipc.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "rg -n \"class ApiIpcServer|poll\\(|start\\(|listen|thread|std::thread|mutex|lock\" app/api_ipc.h app/api_ipc.cpp app/test_pattern_app.cpp | head -n 260" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc 'rg -n "8089|httplib|Http|REST|/state|menu/command|mcp" app | head -n 240' in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+#include "api_ipc.h"
+#include "command_registry.h"
+#include "window_type_registry.h"
+
+#ifndef _WIN32
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/un.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <errno.h>
+#endif
+
+#ifdef __APPLE__
+#include <CommonCrypto/CommonHMAC.h>
+#else
+#include <openssl/hmac.h>
+#endif
+
+#include <cstring>
+ succeeded in 52ms:
+        auto id_it = kv.find("id");
+        if (id_it == kv.end()) {
+            resp = "err missing id\n";
+        } else {
+            auto *canvas = api_find_paint_canvas(*app_, id_it->second);
+            if (!canvas) { resp = "err paint window not found\n"; }
+            else {
+                std::string text = canvas->exportText();
+                auto path_it = kv.find("path");
+                if (path_it != kv.end() && !path_it->second.empty()) {
+                    // Write to file
+                    std::ofstream out(path_it->second.c_str());
+                    if (out.is_open()) {
+                        out << text;
+                        out.close();
+                        resp = "ok\n";
+                    } else {
+                        resp = "err cannot write file\n";
+                    }
+                } else {
+ succeeded in 52ms:
+app/test_pattern_app.cpp:45:// Animated blocks view/window
+app/test_pattern_app.cpp:46:#include "animated_blocks_view.h"
+app/test_pattern_app.cpp:89:// Quadra falling blocks game
+app/test_pattern_app.cpp:189:const ushort cmAnimatedBlocks = 134;
+app/test_pattern_app.cpp:298:        auto now = std::chrono::steady_clock::now();
+app/test_pattern_app.cpp:327:            moodEndTime = std::chrono::steady_clock::now() + std::chrono::milliseconds(durationMs);
+app/test_pattern_app.cpp:333:        auto now = std::chrono::steady_clock::now();
+app/test_pattern_app.cpp:343:    std::chrono::steady_clock::time_point blinkStartTime;
+app/test_pattern_app.cpp:344:    std::chrono::steady_clock::time_point nextBlinkTime;
+app/test_pattern_app.cpp:345:    std::chrono::steady_clock::time_point moodEndTime;
+app/test_pattern_app.cpp:350:        nextBlinkTime = std::chrono::steady_clock::now() + std::chrono::milliseconds(interval);
+app/test_pattern_app.cpp:774:    friend void api_spawn_blocks(TTestPatternApp&, const TRect* bounds);
+app/test_pattern_app.cpp:828:    if (!ipcServer->start(sockPath)) {
+app/test_pattern_app.cpp:966:            case cmAnimatedBlocks: {
+app/test_pattern_app.cpp:969:                deskTop->insert(createAnimatedBlocksWindow(r));
+app/test_pattern_app.cpp:2239:            *new TMenuItem("~A~nimated Blocks", cmAnimatedBlocks, kbNoKey) +
+app/test_pattern_app.cpp:2257:                    *new TMenuItem("~Q~uadra (Falling Blocks)", cmQuadra, kbNoKey) +
+app/test_pattern_app.cpp:2433:    if (ipcServer) ipcServer->poll();
+app/test_pattern_app.cpp:2572:    // Set the mode directly without showing a modal dialog (which blocks the event loop).
+app/test_pattern_app.cpp:3483:void api_spawn_blocks(TTestPatternApp& app, const TRect* bounds) {
+ succeeded in 52ms:
+app/micropolis/micropolis_bridge.cpp:144:    if (tile >= FIRESTATION && tile <= 768) {
+app/micropolis/micropolis_bridge.cpp:181:        !(tile >= FIRESTATION && tile <= 768) &&
+app/wibwob-mcp-native-tools-prd.md:4:- Today the TUI exposes tools via MCP (FastAPI at `/tools/api_server`, `mcp_tools.py`), wired into the Agent SDK bridge as an in-proc MCP server. It “works ok-ish” but is brittle and doesn’t use the Agent SDK’s native custom tools interface.
+app/wibwob-mcp-native-tools-prd.md:25:2) Transport: tools call the existing API server at `http://127.0.0.1:8089` (as today) unless superseded by a native invocation path.  
+app/wibwob-mcp-native-tools-prd.md:34:- Tool definitions: mirror `mcp_tools.py` actions as Agent SDK `tool()` definitions in the bridge (or a shared module). Use zod schemas consistent with API payloads.
+app/browser_view.cpp:716:    std::string cmd = "curl -s -X POST http://127.0.0.1:8089/browser/fetch_ext "
+app/README-CLAUDE-CONFIG.md:25:     "args": ["-p", "--model", "sonnet", "--mcp-config", ".claude/settings.json", ...]
+app/README-CLAUDE-CONFIG.md:31:   claude -p --model sonnet --mcp-config .claude/settings.json --output-format json "<user message>"
+app/README-CLAUDE-CONFIG.md:58:  ./start_api_server.sh  # Starts tui-control MCP server on port 8089
+app/README.md:72:The test_pattern app can be controlled remotely via a REST API + MCP server:
+app/README.md:83:./tools/api_server/venv/bin/python -m tools.api_server.main --port=8089
+app/README.md:90:**Interactive Docs**: http://127.0.0.1:8089/docs
+app/README.md:91:**MCP Integration**: http://127.0.0.1:8089/mcp (for Claude Code / AI agents)
+app/stb_image.h:1236:         memcpy(temp, row0, bytes_copy);
+app/stb_image.h:1237:         memcpy(row0, row1, bytes_copy);
+app/stb_image.h:1238:         memcpy(row1, temp, bytes_copy);
+app/stb_image.h:1673:         memcpy(buffer, s->img_buffer, blen);
+app/stb_image.h:1683:      memcpy(buffer, s->img_buffer, n);
+app/stb_image.h:2932:#define STBI__RESTART(x)     ((x) >= 0xd0 && (x) <= 0xd7)
+app/stb_image.h:2973:                  if (!STBI__RESTART(z->marker)) return 1;
+
+thinking
+**Assessing API server threading**
+codex
+I’ve verified IPC in C++ is polled on the TUI thread. I’ll now check `tools/api_server` to confirm whether HTTP `/state` runs through that IPC path and whether any thread-safety assumptions were missed in the mission plan.
+exec
+/bin/zsh -lc "sed -n '1,320p' tools/api_server/tui_api.py" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,260p' tools/api_server/main.py" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "rg -n \"@app\\.get\\(\\\"/state\\\"|/state|menu/command|socket|test_pattern_app\\.sock|get_state\" tools/api_server -g '*.py' | head -n 240" in /Users/james/Repos/wibandwob-dos exited 1 in 53ms:
+sed: tools/api_server/tui_api.py: No such file or directory
+ succeeded in 52ms:
+from __future__ import annotations
+
+import asyncio
+import time
+from typing import Any, Dict, Optional
+
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+
+from .controller import Controller
+from .events import EventHub
+from .models import Rect, WindowType
+
+# MCP Integration
+try:
+    from fastapi_mcp import FastApiMCP
+    MCP_AVAILABLE = True
+except ImportError:
+    MCP_AVAILABLE = False
+ succeeded in 55ms:
+tools/api_server/events.py:7:from starlette.websockets import WebSocket
+tools/api_server/mcp_tools.py:330:    @mcp.tool("tui_get_state")
+tools/api_server/mcp_tools.py:338:        state = await controller.get_state()
+tools/api_server/live_api_parity_suite.py:56:    _, st0 = api.get("/state")
+tools/api_server/live_api_parity_suite.py:62:    _, st1 = api.get("/state")
+tools/api_server/live_api_parity_suite.py:81:    _, st2 = api.get("/state")
+tools/api_server/live_api_parity_suite.py:86:    _, st3 = api.get("/state")
+tools/api_server/live_api_parity_suite.py:107:    parser = argparse.ArgumentParser(description="Live API parity suite for create/state/save/open workflow.")
+tools/api_server/browser_pipeline.py:390:    budget_state: Dict[str, int],
+tools/api_server/browser_pipeline.py:408:    if budget_state["remaining_ms"] <= 0:
+tools/api_server/browser_pipeline.py:436:    timeout_ms = min(PER_IMAGE_RENDER_TIMEOUT_MS, budget_state["remaining_ms"])
+tools/api_server/browser_pipeline.py:439:    budget_state["remaining_ms"] = max(0, budget_state["remaining_ms"] - duration_ms)
+tools/api_server/browser_pipeline.py:560:    budget_state = {"remaining_ms": TOTAL_IMAGE_RENDER_BUDGET_MS}
+tools/api_server/browser_pipeline.py:574:        rendered_assets.append(_render_asset(asset, image_mode, width_cells, image_cache_root, budget_state))
+tools/api_server/browser_pipeline.py:695:            budget_state = {"remaining_ms": TOTAL_IMAGE_RENDER_BUDGET_MS}
+tools/api_server/browser_pipeline.py:696:            assets = [_render_asset(assets[0], image_mode, _clamp_width(width), image_cache_root, budget_state)]
+tools/api_server/test_browser_ipc.py:6:AC-1: create_window type=browser → get_state shows browser window
+tools/api_server/test_browser_ipc.py:12:import socket
+tools/api_server/test_browser_ipc.py:22:    return "/tmp/test_pattern_app.sock"
+tools/api_server/test_browser_ipc.py:30:    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+
+thinking
+**Noting missing controller file**
+codex
+The HTTP server is Python/FastAPI; `/state` awaits controller calls into IPC, so C++ handling still appears on the TUI poll path. I’m reading the controller implementation next to confirm request serialization and command framing.
+exec
+/bin/zsh -lc "sed -n '1,260p' tools/api_server/controller.py" in /Users/james/Repos/wibandwob-dos succeeded in 54ms:
+from __future__ import annotations
+
+import asyncio
+import time
+from typing import Any, Dict, List, Optional
+from pathlib import Path
+import re
+import shutil
+import subprocess
+import sys
+from datetime import datetime, timezone
+from urllib.parse import urljoin
+
+from .events import EventHub
+from .browser_pipeline import fetch_render_bundle, render_markdown
+from .models import AppState, Rect, Window, WindowType, new_id
+from .ipc_client import send_cmd
+from .schemas import (
+    BatchLayoutRequest, 
+    BatchLayoutResponse, 
+
+thinking
+**Investigating multiple definitions risk**
+codex
+I’m now checking build/link structure for ODR/RTTI edge cases (duplicate class definitions across translation units, static libs, or linker visibility), since that’s a likely missing branch in the mission.
+exec
+/bin/zsh -lc "sed -n '1,280p' app/CMakeLists.txt" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '280,620p' app/CMakeLists.txt" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+cmake_minimum_required(VERSION 3.10)
+project(wibwob-dos-app CXX)
+
+set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Common sources used by multiple apps
+set(TV_COMMON_SOURCES
+    test_pattern.cpp
+    gradient.cpp
+    glitch_engine.cpp
+    frame_capture.cpp
+    api_ipc.cpp
+    command_registry.cpp
+    window_type_registry.cpp
+    theme_manager.cpp
+    wibwob_view.cpp
+    wibwob_engine.cpp
+    llm/base/llm_config.cpp
+    llm/base/llm_provider_factory.cpp
+exec
+/bin/zsh -lc "rg -n \"add_library|add_executable|window_type_registry|tvterm_view|test_pattern_app|fno-rtti|visibility|hidden|BUILD_SHARED_LIBS|target_compile_options|target_link_libraries\" CMakeLists.txt app/CMakeLists.txt vendor -g 'CMakeLists.txt' | head -n 300" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+
+ succeeded in 52ms:
+app/CMakeLists.txt:15:    window_type_registry.cpp
+app/CMakeLists.txt:30:add_executable(test_pattern
+app/CMakeLists.txt:31:    test_pattern_app.cpp
+app/CMakeLists.txt:69:    tvterm_view.cpp
+app/CMakeLists.txt:72:target_link_libraries(test_pattern PRIVATE tvision tvterm-core)
+app/CMakeLists.txt:77:    target_link_libraries(test_pattern PRIVATE OpenSSL::Crypto)
+app/CMakeLists.txt:81:add_executable(simple_tui
+app/CMakeLists.txt:84:target_link_libraries(simple_tui PRIVATE tvision)
+app/CMakeLists.txt:87:add_executable(frame_file_player
+app/CMakeLists.txt:91:target_link_libraries(frame_file_player PRIVATE tvision)
+app/CMakeLists.txt:95:    add_executable(ansi_viewer
+app/CMakeLists.txt:99:    target_link_libraries(ansi_viewer PRIVATE tvision)
+app/CMakeLists.txt:103:add_executable(paint_tui
+app/CMakeLists.txt:112:target_link_libraries(paint_tui PRIVATE tvision)
+app/CMakeLists.txt:115:add_executable(tv_ascii_view
+app/CMakeLists.txt:120:target_link_libraries(tv_ascii_view PRIVATE tvision)
+app/CMakeLists.txt:123:add_executable(ascii_dump
+app/CMakeLists.txt:129:add_executable(command_registry_test
+app/CMakeLists.txt:137:add_executable(scramble_engine_test
+app/CMakeLists.txt:151:add_library(micropolis_native STATIC
+
+thinking
+**Inspecting top-level CMake for duplicates**
+exec
+/bin/zsh -lc "sed -n '1,260p' CMakeLists.txt" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+cmake_minimum_required(VERSION 3.10)
+project(wibwob-dos CXX C)
+enable_testing()
+
+# Build Turbo Vision library from submodule
+# Disable examples — we only need the library
+set(TV_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+add_subdirectory(vendor/tvision)
+
+# Build libvterm (C library used by tvterm-core for terminal emulation)
+add_subdirectory(vendor/tvterm/deps/vterm EXCLUDE_FROM_ALL)
+
+# Build tvterm-core library (terminal emulator widget for Turbo Vision)
+# We build it ourselves rather than using tvterm's CMakeLists.txt to avoid
+# a duplicate tvision target (tvterm bundles its own copy).
+file(GLOB TVTERM_CORE_SRCS vendor/tvterm/source/tvterm-core/*.cc)
+add_library(tvterm-core STATIC ${TVTERM_CORE_SRCS})
+target_include_directories(tvterm-core PUBLIC
+    ${CMAKE_SOURCE_DIR}/vendor/tvterm/include
+)
+
+thinking
+**Inspecting window type usage**
+codex
+I found a key build detail: top-level CMake explicitly avoids a duplicate `tvision` target, which lowers (but doesn’t eliminate) the cross-RTTI risk. I’ll inspect the other `windowTypeName()` call sites to see if behavior diverges by code path.
+exec
+/bin/zsh -lc "sed -n '3120,3225p' app/test_pattern_app.cpp" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+            case '\t': out += "\\t"; break;
+            default:
+                if (c < 0x20) {
+                    char buf[7];
+                    std::snprintf(buf, sizeof(buf), "\\u%04x", c);
+                    out += buf;
+                } else out += char(c);
+        }
+    }
+    return out;
+}
+
+std::string TTestPatternApp::buildWorkspaceJson()
+{
+    // Screen size
+    TRect ext = deskTop->getExtent();
+    int sw = ext.b.x - ext.a.x;
+    int sh = ext.b.y - ext.a.y;
+
+    // Timestamp (basic)
+
+thinking
+**Inspecting thread crossing note**
+exec
+/bin/zsh -lc "sed -n '3628,3710p' app/test_pattern_app.cpp" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+    if (start) {
+        TView* v = start;
+        do {
+            TBrowserWindow* candidate = dynamic_cast<TBrowserWindow*>(v);
+            if (candidate) {
+                browserWin = candidate;
+            }
+            v = v->next;
+        } while (v != start);
+    }
+
+    if (!browserWin) {
+        return "err no browser window";
+    }
+
+    browserWin->fetchUrl(url);
+    return "ok";
+}
+
+std::string api_set_theme_mode(TTestPatternApp& app, const std::string& mode) {
+
+thinking
+**Reviewing log status and findings**
+codex
+I noticed a mismatch: `windowTypeName()` already contains `WINTYPE` logging in source, while `MISSION.md` still marks T01 as todo. I’ll check whether any captured log/evidence file already exists to avoid duplicating work.
+exec
+/bin/zsh -lc "[ -f workings/window-type-fix/FINDINGS.md ] && sed -n '1,260p' workings/window-type-fix/FINDINGS.md || echo 'NO_FINDINGS'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc 'ls -la workings/window-type-fix' in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "[ -f /tmp/wibwob_debug.log ] && tail -n 120 /tmp/wibwob_debug.log || echo 'NO_TMP_DEBUG_LOG'" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+NO_FINDINGS
+ succeeded in 51ms:
+[WINTYPE] w=0x6000013d81e0 type=blocks               match=0
+[WINTYPE] w=0x6000013d81e0 type=score                match=0
+[WINTYPE] w=0x6000013d81e0 type=ascii                match=0
+[WINTYPE] w=0x6000013d81e0 type=animated_gradient    match=0
+[WINTYPE] w=0x6000013d81e0 type=monster_cam          match=0
+[WINTYPE] w=0x6000013d81e0 type=monster_verse        match=0
+[WINTYPE] w=0x6000013d81e0 type=monster_portal       match=0
+[WINTYPE] w=0x6000013d81e0 type=paint                match=0
+[WINTYPE] w=0x6000013d81e0 type=micropolis_ascii     match=0
+[WINTYPE] w=0x6000013d81e0 type=terminal             match=1
+[WINTYPE] w=0x6000013d81e0 type=test_pattern         match=0
+[WINTYPE] w=0x6000013d81e0 type=gradient             match=0
+[WINTYPE] w=0x6000013d81e0 type=frame_player         match=0
+[WINTYPE] w=0x6000013d81e0 type=text_view            match=0
+[WINTYPE] w=0x6000013d81e0 type=text_editor          match=0
+[WINTYPE] w=0x6000013d81e0 type=browser              match=0
+[WINTYPE] w=0x6000013d81e0 type=verse                match=0
+[WINTYPE] w=0x6000013d81e0 type=mycelium             match=0
+[WINTYPE] w=0x6000013d81e0 type=orbit                match=0
+[WINTYPE] w=0x6000013d81e0 type=torus                match=0
+ succeeded in 52ms:
+total 24
+drwxr-xr-x@  3 james  staff    96 Feb 21 16:19 .
+drwxr-xr-x@ 10 james  staff   320 Feb 21 16:14 ..
+-rw-r--r--@  1 james  staff  8373 Feb 21 16:19 MISSION.md
+exec
+/bin/zsh -lc 'rg -n "WINTYPE" workings/window-type-fix /tmp/wibwob_debug.log 2>/dev/null | head -n 120 || true' in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+workings/window-type-fix/MISSION.md:98:      "Read debug log: cat /tmp/wibwob_debug.log | grep WINTYPE",
+workings/window-type-fix/MISSION.md:174:            fprintf(stderr, "[WINTYPE] w=%p type=%s match=%d\n", (void*)w, spec.type, hit ? 1 : 0);
+workings/window-type-fix/MISSION.md:178:    fprintf(stderr, "[WINTYPE] w=%p NO MATCH -> fallback to test_pattern (specs.size=%zu)\n", (void*)w, specs.size());
+/tmp/wibwob_debug.log:5:[WINTYPE] w=0x6000013d81e0 type=test_pattern         match=0
+/tmp/wibwob_debug.log:6:[WINTYPE] w=0x6000013d81e0 type=gradient             match=0
+/tmp/wibwob_debug.log:7:[WINTYPE] w=0x6000013d81e0 type=frame_player         match=0
+/tmp/wibwob_debug.log:8:[WINTYPE] w=0x6000013d81e0 type=text_view            match=0
+/tmp/wibwob_debug.log:9:[WINTYPE] w=0x6000013d81e0 type=text_editor          match=0
+/tmp/wibwob_debug.log:10:[WINTYPE] w=0x6000013d81e0 type=browser              match=0
+/tmp/wibwob_debug.log:11:[WINTYPE] w=0x6000013d81e0 type=verse                match=0
+/tmp/wibwob_debug.log:12:[WINTYPE] w=0x6000013d81e0 type=mycelium             match=0
+/tmp/wibwob_debug.log:13:[WINTYPE] w=0x6000013d81e0 type=orbit                match=0
+/tmp/wibwob_debug.log:14:[WINTYPE] w=0x6000013d81e0 type=torus                match=0
+/tmp/wibwob_debug.log:15:[WINTYPE] w=0x6000013d81e0 type=cube                 match=0
+/tmp/wibwob_debug.log:16:[WINTYPE] w=0x6000013d81e0 type=life                 match=0
+/tmp/wibwob_debug.log:17:[WINTYPE] w=0x6000013d81e0 type=blocks               match=0
+/tmp/wibwob_debug.log:18:[WINTYPE] w=0x6000013d81e0 type=score                match=0
+/tmp/wibwob_debug.log:19:[WINTYPE] w=0x6000013d81e0 type=ascii                match=0
+/tmp/wibwob_debug.log:20:[WINTYPE] w=0x6000013d81e0 type=animated_gradient    match=0
+/tmp/wibwob_debug.log:21:[WINTYPE] w=0x6000013d81e0 type=monster_cam          match=0
+
+thinking
+**Planning state reconciliation tasks**
+exec
+/bin/zsh -lc "curl -sf http://127.0.0.1:8089/state | python3 -m json.tool | rg '\"type\"' -n | head -n 60" in /Users/james/Repos/wibandwob-dos succeeded in 84ms:
+Expecting value: line 1 column 1 (char 0)
+
+thinking
+**Identifying enum mismatch causing fallback**
+codex
+I found existing debug evidence in `/tmp/wibwob_debug.log` showing `match_terminal=1`, which directly contradicts the mission’s “all matchers false” premise. I’m checking the Python API enum mapping next, since `/state` may be coercing unknown types to `test_pattern`.
+exec
+/bin/zsh -lc "sed -n '1,260p' tools/api_server/models.py" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,260p' tools/api_server/schemas.py" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "rg -n \"WindowType\\(|raw_type|test_pattern|type.value|window_types\" tools/api_server -g '*.py' | head -n 260" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+from __future__ import annotations
+
+from typing import Any, Dict, List, Literal, Optional, Union
+
+from pydantic import BaseModel, Field
+
+
+class RectModel(BaseModel):
+    x: int
+    y: int
+    w: int
+    h: int
+
+
+class WindowCreate(BaseModel):
+    type: Literal[
+        "test_pattern",
+        "gradient",
+        "frame_player",
+        "text_view",
+ succeeded in 54ms:
+from __future__ import annotations
+
+import enum
+import time
+import uuid
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional
+
+
+class WindowType(str, enum.Enum):
+    test_pattern = "test_pattern"
+    gradient = "gradient"
+    frame_player = "frame_player"
+    text_view = "text_view"
+    text_editor = "text_editor"
+    browser = "browser"
+    terminal = "terminal"
+    wallpaper = "wallpaper"
+
+
+ succeeded in 51ms:
+tools/api_server/schemas.py:17:        "test_pattern",
+tools/api_server/schemas.py:69:    window_types: Optional[Dict[str, str]] = None
+tools/api_server/schemas.py:169:    window_types: List[str]
+tools/api_server/live_api_parity_suite.py:60:    c1_code, c1 = api.post("/windows", {"type": "test_pattern"})
+tools/api_server/models.py:10:class WindowType(str, enum.Enum):
+tools/api_server/models.py:11:    test_pattern = "test_pattern"
+tools/api_server/test_paint_ipc.py:27:    return "/tmp/test_pattern_app.sock"
+tools/api_server/mcp_tools.py:34:        "type": window.type.value,
+tools/api_server/mcp_tools.py:362:            window_type: Type of window ('test_pattern', 'gradient', 'frame_player', 'text_view', 'text_editor', 'browser', 'terminal')
+tools/api_server/mcp_tools.py:374:            wtype = WindowType(window_type)
+tools/api_server/mcp_tools.py:523:                "defaults": {"view_type": "test_pattern"},
+tools/api_server/controller.py:124:            "window_types": [t.value for t in WindowType],
+tools/api_server/controller.py:128:                "test_pattern": {"variant": {"type": "string"}},
+tools/api_server/controller.py:148:                        raw_type = win_data.get("type", "test_pattern")
+tools/api_server/controller.py:150:                            wtype = WindowType(raw_type)
+tools/api_server/controller.py:152:                            wtype = WindowType.test_pattern
+tools/api_server/controller.py:191:            cmd_params = {"type": wtype.value}
+tools/api_server/controller.py:204:            if wtype == WindowType.test_pattern:
+tools/api_server/controller.py:244:                t = title or wtype.value
+tools/api_server/controller.py:258:        self._append_state_event("window.created", {"window_id": win.id, "type": win.type.value}, actor="api")
+
+thinking
+**Planning IPC state inspection**
+exec
+/bin/zsh -lc "python3 - <<'PY'
+from tools.api_server.ipc_client import send_cmd
+try:
+    r=send_cmd('get_state')
+    print(r[:1000])
+except Exception as e:
+    print('ERR',e)
+PY" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+[IPC] → get_state((no params))
+ERR [Errno 1] Operation not permitted
+
+thinking
+**Investigating window type support**
+exec
+/bin/zsh -lc "sed -n '1,340p' app/command_registry.cpp" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+#include "command_registry.h"
+
+#include "api_ipc.h"
+
+#include <sstream>
+
+extern void api_cascade(TTestPatternApp& app);
+extern void api_toggle_scramble(TTestPatternApp& app);
+extern void api_expand_scramble(TTestPatternApp& app);
+extern std::string api_scramble_say(TTestPatternApp& app, const std::string& text);
+extern std::string api_scramble_pet(TTestPatternApp& app);
+extern std::string api_chat_receive(TTestPatternApp& app, const std::string& sender, const std::string& text);
+extern void api_tile(TTestPatternApp& app);
+extern void api_close_all(TTestPatternApp& app);
+extern void api_save_workspace(TTestPatternApp& app);
+extern bool api_open_workspace_path(TTestPatternApp& app, const std::string& path);
+extern void api_screenshot(TTestPatternApp& app);
+extern void api_set_pattern_mode(TTestPatternApp& app, const std::string& mode);
+extern std::string api_set_theme_mode(TTestPatternApp& app, const std::string& mode);
+extern std::string api_set_theme_variant(TTestPatternApp& app, const std::string& variant);
+
+thinking
+**Inspecting window creation support**
+exec
+/bin/zsh -lc 'rg -n "create_window|get_capabilities|window type|find_window_type_by_name|all_window_type_specs" app/api_ipc.cpp app/window_type_registry.cpp app/test_pattern_app.cpp | head -n 200' in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+app/test_pattern_app.cpp:2592:    const auto& specs = all_window_type_specs();
+app/test_pattern_app.cpp:2659:        // Emit path for file-backed window types (needed for remote create_window)
+app/test_pattern_app.cpp:3026:            const WindowTypeSpec* spec = find_window_type_by_name(type);
+app/test_pattern_app.cpp:3429:// Generative / animated art windows — spawnable via IPC create_window type=X
+app/window_type_registry.cpp:1:// Window type registry — single source of truth for all spawnable window types.
+app/window_type_registry.cpp:241:// Add new window types here — nowhere else.
+app/window_type_registry.cpp:273:const std::vector<WindowTypeSpec>& all_window_type_specs() {
+app/window_type_registry.cpp:279:const WindowTypeSpec* find_window_type_by_name(const std::string& name) {
+app/window_type_registry.cpp:280:    for (const auto& spec : all_window_type_specs())
+app/api_ipc.cpp:398:    if (cmd == "get_capabilities") {
+app/api_ipc.cpp:407:    } else if (cmd == "create_window") {
+app/api_ipc.cpp:409:        const WindowTypeSpec* spec = find_window_type_by_name(type);
+exec
+/bin/zsh -lc "sed -n '372,470p' app/api_ipc.cpp" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+        return;
+    }
+    buf[n] = 0;
+    std::string line(buf);
+    // Simple trim
+    while (!line.empty() && (line.back()=='\n' || line.back()=='\r' || line.back()==' ')) line.pop_back();
+
+    // Parse: "cmd:<name> k=v k=v"
+    std::string cmd;
+    std::map<std::string,std::string> kv;
+    {
+        std::istringstream iss(line);
+        std::string tok;
+        while (iss >> tok) {
+            if (tok.rfind("cmd:", 0) == 0) {
+                cmd = tok.substr(4);
+            } else {
+                auto eq = tok.find('=');
+                if (eq != std::string::npos) {
+                    kv[tok.substr(0, eq)] = percent_decode(tok.substr(eq+1));
+
+thinking
+**Drafting detailed investigation tasks**
+codex
+| # | Hypothesis | Status |
+|---|---|---|
+| H6 | The C++ matcher path is partially working (e.g., `terminal` hits), but the bug is in API translation (`tools/api_server/controller.py`) where unknown `raw_type` values are coerced to `WindowType.test_pattern`. | todo |
+| H7 | Registry coverage is incomplete: active window classes in the app have no `WindowTypeSpec` matcher, so legitimate windows always fall back to `test_pattern`. | todo |
+| H8 | The fallback policy (`specs.front().type`) masks classification failures; even one missed matcher is silently misreported as `test_pattern`. | todo |
+| H9 | RTTI/ABI mismatch across translation units or linked libs (typeinfo/vtable identity mismatch) causes some `dynamic_cast` checks to fail despite correct inheritance. | todo |
+| H10 | `api_get_state` iteration and matching may run during concurrent window list mutation, yielding unstable pointers/child traversal and false negatives. | todo |
+| H11 | `has_child_view` assumptions about circular child list traversal may fail for specific window compositions, causing false negatives for view-based matchers. | todo |
+
+```json
+[
+  {
+    "id": "T07",
+    "title": "Reconcile existing debug evidence before new code changes",
+    "status": "todo",
+    "hypothesis": "H6",
+    "instructions": [
+      "Collect and snapshot existing matcher logs (e.g. /tmp/wibwob_debug.log) into workings/window-type-fix/FINDINGS.md.",
+      "Extract at least 3 concrete examples showing matcher outcomes per pointer, including any match=1 entries.",
+      "Mark whether H1 ('all dynamic_cast fail') is still plausible based on captured evidence.",
+      "Update MISSION.md findings section with evidence timestamps and exact command used to capture logs."
+    ],
+    "expected_output": "FINDINGS.md contains concrete matcher evidence; H1 is either downgraded or narrowed with proof."
+  },
+  {
+    "id": "T08",
+    "title": "Validate raw IPC /state payload vs HTTP /state payload",
+    "status": "todo",
+    "hypothesis": "H6",
+    "instructions": [
+      "Capture raw IPC response from cmd:get_state (direct socket client) and save it.",
+      "Capture HTTP GET /state response from tools/api_server and save it.",
+      "Diff window type fields between the two payloads.",
+      "If IPC has non-test_pattern values but HTTP does not, record API-layer transformation as root-cause candidate."
+    ],
+    "expected_output": "A side-by-side payload comparison proving whether misclassification originates in C++ or Python API translation."
+  },
+  {
+    "id": "T09",
+    "title": "Audit API enum coercion and unknown-type handling",
+    "status": "todo",
+    "hypothesis": "H6",
+    "instructions": [
+      "Review tools/api_server/models.py WindowType enum and controller.py _sync_state conversion logic.",
+      "List all C++ type slugs from window_type_registry.cpp and compare against Python WindowType values.",
+      "Create a focused test demonstrating current behavior when raw_type is unrecognized (fallback to test_pattern).",
+      "Define desired behavior (preserve raw string, map to unknown, or expand enum) and record in FINDINGS.md."
+    ],
+    "expected_output": "Confirmed/denied API coercion bug with a reproducible test and explicit remediation direction."
+  },
+  {
+    "id": "T10",
+    "title": "Perform full registry coverage audit for runtime window classes",
+    "status": "todo",
+    "hypothesis": "H7",
+    "instructions": [
+      "Enumerate all window classes/factories reachable from app menus and exec_command handlers.",
+      "Map each runtime window to a registry matcher in app/window_type_registry.cpp.",
+      "Produce a 'covered vs missing' table in FINDINGS.md.",
+      "For missing classes, classify as intentional (internal/unsupported) or bug (should be reported via /state)."
+    ],
+    "expected_output": "Definitive coverage matrix identifying which window types are currently unclassifiable by design vs defect."
+  },
+  {
+    "id": "T11",
+    "title": "Verify fallback semantics and test_pattern self-identification",
+    "status": "todo",
+    "hypothesis": "H8",
+    "instructions": [
+      "Document why match_test_pattern always returns false and whether true matching is possible from current TU boundaries.",
+      "Add a temporary assertion/log counter for fallback usage in windowTypeName().",
+      "Run scenarios with mixed known/unknown windows and measure fallback frequency.",
+      "Propose replacement behavior for unmatched windows (e.g., 'unknown') to avoid silent mislabeling."
+    ],
+    "expected_output": "Clear decision on fallback policy with evidence; silent 'first-entry' fallback is either justified or replaced."
+  },
+  {
+    "id": "T12",
+    "title": "Run RTTI/ABI integrity checks across translation units",
+    "status": "todo",
+    "hypothesis": "H9",
+    "instructions": [
+      "Inspect compile/link settings to confirm RTTI is enabled everywhere and no duplicate TVision ABI targets are linked.",
+      "Inspect final binary symbols for relevant typeinfo/vtable entries (TWindow, TWibWobTerminalWindow, TWibWobWindow).",
+      "Add temporary runtime logs printing typeid(*w).name() and matcher cast outcomes for same pointer.",
+      "Record whether cast failures correlate with ABI/typeinfo mismatch."
+    ],
+    "expected_output": "RTTI/ABI mismatch either eliminated with hard evidence or confirmed with symbol/runtime proof."
+  },
+  {
+    "id": "T13",
+    "title": "Validate thread affinity and window-list stability during /state",
+    "status": "todo",
+    "hypothesis": "H10",
+    "instructions": [
+      "Instrument api_get_state and window mutation paths to log thread IDs and timestamps.",
+      "Confirm whether get_state handling executes on the TUI main loop thread or a separate thread.",
+      "Stress with rapid create/close while polling /state and watch for inconsistent type results.",
+      "If cross-thread access exists, document required synchronization or marshal-to-main-thread fix."
+    ],
+    "expected_output": "Documented thread model for /state with proof; race-related misclassification either confirmed or ruled out."
+  },
+  {
+    "id": "T14",
+    "title": "Probe has_child_view traversal edge cases",
+    "status": "todo",
+    "hypothesis": "H11",
+    "instructions": [
+      "Create targeted checks for windows matched via has_child_view (gradient, verse, orbit, etc.).",
+      "Log child traversal start pointer, visited count, and first few dynamic types for each candidate window.",
+      "Verify single-child and multi-child circular traversal behaves as expected (no early exit, no stale next pointers).",
+      "Record any window whose expected child type exists but matcher still returns false."
+    ],
+    "expected_output": "Concrete evidence that has_child_view traversal is either sound or failing for specific window structures."
+  }
+]
+```
+tokens used
+118,817
+| # | Hypothesis | Status |
+|---|---|---|
+| H6 | The C++ matcher path is partially working (e.g., `terminal` hits), but the bug is in API translation (`tools/api_server/controller.py`) where unknown `raw_type` values are coerced to `WindowType.test_pattern`. | todo |
+| H7 | Registry coverage is incomplete: active window classes in the app have no `WindowTypeSpec` matcher, so legitimate windows always fall back to `test_pattern`. | todo |
+| H8 | The fallback policy (`specs.front().type`) masks classification failures; even one missed matcher is silently misreported as `test_pattern`. | todo |
+| H9 | RTTI/ABI mismatch across translation units or linked libs (typeinfo/vtable identity mismatch) causes some `dynamic_cast` checks to fail despite correct inheritance. | todo |
+| H10 | `api_get_state` iteration and matching may run during concurrent window list mutation, yielding unstable pointers/child traversal and false negatives. | todo |
+| H11 | `has_child_view` assumptions about circular child list traversal may fail for specific window compositions, causing false negatives for view-based matchers. | todo |
+
+```json
+[
+  {
+    "id": "T07",
+    "title": "Reconcile existing debug evidence before new code changes",
+    "status": "todo",
+    "hypothesis": "H6",
+    "instructions": [
+      "Collect and snapshot existing matcher logs (e.g. /tmp/wibwob_debug.log) into workings/window-type-fix/FINDINGS.md.",
+      "Extract at least 3 concrete examples showing matcher outcomes per pointer, including any match=1 entries.",
+      "Mark whether H1 ('all dynamic_cast fail') is still plausible based on captured evidence.",
+      "Update MISSION.md findings section with evidence timestamps and exact command used to capture logs."
+    ],
+    "expected_output": "FINDINGS.md contains concrete matcher evidence; H1 is either downgraded or narrowed with proof."
+  },
+  {
+    "id": "T08",
+    "title": "Validate raw IPC /state payload vs HTTP /state payload",
+    "status": "todo",
+    "hypothesis": "H6",
+    "instructions": [
+      "Capture raw IPC response from cmd:get_state (direct socket client) and save it.",
+      "Capture HTTP GET /state response from tools/api_server and save it.",
+      "Diff window type fields between the two payloads.",
+      "If IPC has non-test_pattern values but HTTP does not, record API-layer transformation as root-cause candidate."
+    ],
+    "expected_output": "A side-by-side payload comparison proving whether misclassification originates in C++ or Python API translation."
+  },
+  {
+    "id": "T09",
+    "title": "Audit API enum coercion and unknown-type handling",
+    "status": "todo",
+    "hypothesis": "H6",
+    "instructions": [
+      "Review tools/api_server/models.py WindowType enum and controller.py _sync_state conversion logic.",
+      "List all C++ type slugs from window_type_registry.cpp and compare against Python WindowType values.",
+      "Create a focused test demonstrating current behavior when raw_type is unrecognized (fallback to test_pattern).",
+      "Define desired behavior (preserve raw string, map to unknown, or expand enum) and record in FINDINGS.md."
+    ],
+    "expected_output": "Confirmed/denied API coercion bug with a reproducible test and explicit remediation direction."
+  },
+  {
+    "id": "T10",
+    "title": "Perform full registry coverage audit for runtime window classes",
+    "status": "todo",
+    "hypothesis": "H7",
+    "instructions": [
+      "Enumerate all window classes/factories reachable from app menus and exec_command handlers.",
+      "Map each runtime window to a registry matcher in app/window_type_registry.cpp.",
+      "Produce a 'covered vs missing' table in FINDINGS.md.",
+      "For missing classes, classify as intentional (internal/unsupported) or bug (should be reported via /state)."
+    ],
+    "expected_output": "Definitive coverage matrix identifying which window types are currently unclassifiable by design vs defect."
+  },
+  {
+    "id": "T11",
+    "title": "Verify fallback semantics and test_pattern self-identification",
+    "status": "todo",
+    "hypothesis": "H8",
+    "instructions": [
+      "Document why match_test_pattern always returns false and whether true matching is possible from current TU boundaries.",
+      "Add a temporary assertion/log counter for fallback usage in windowTypeName().",
+      "Run scenarios with mixed known/unknown windows and measure fallback frequency.",
+      "Propose replacement behavior for unmatched windows (e.g., 'unknown') to avoid silent mislabeling."
+    ],
+    "expected_output": "Clear decision on fallback policy with evidence; silent 'first-entry' fallback is either justified or replaced."
+  },
+  {
+    "id": "T12",
+    "title": "Run RTTI/ABI integrity checks across translation units",
+    "status": "todo",
+    "hypothesis": "H9",
+    "instructions": [
+      "Inspect compile/link settings to confirm RTTI is enabled everywhere and no duplicate TVision ABI targets are linked.",
+      "Inspect final binary symbols for relevant typeinfo/vtable entries (TWindow, TWibWobTerminalWindow, TWibWobWindow).",
+      "Add temporary runtime logs printing typeid(*w).name() and matcher cast outcomes for same pointer.",
+      "Record whether cast failures correlate with ABI/typeinfo mismatch."
+    ],
+    "expected_output": "RTTI/ABI mismatch either eliminated with hard evidence or confirmed with symbol/runtime proof."
+  },
+  {
+    "id": "T13",
+    "title": "Validate thread affinity and window-list stability during /state",
+    "status": "todo",
+    "hypothesis": "H10",
+    "instructions": [
+      "Instrument api_get_state and window mutation paths to log thread IDs and timestamps.",
+      "Confirm whether get_state handling executes on the TUI main loop thread or a separate thread.",
+      "Stress with rapid create/close while polling /state and watch for inconsistent type results.",
+      "If cross-thread access exists, document required synchronization or marshal-to-main-thread fix."
+    ],
+    "expected_output": "Documented thread model for /state with proof; race-related misclassification either confirmed or ruled out."
+  },
+  {
+    "id": "T14",
+    "title": "Probe has_child_view traversal edge cases",
+    "status": "todo",
+    "hypothesis": "H11",
+    "instructions": [
+      "Create targeted checks for windows matched via has_child_view (gradient, verse, orbit, etc.).",
+      "Log child traversal start pointer, visited count, and first few dynamic types for each candidate window.",
+      "Verify single-child and multi-child circular traversal behaves as expected (no early exit, no stale next pointers).",
+      "Record any window whose expected child type exists but matcher still returns false."
+    ],
+    "expected_output": "Concrete evidence that has_child_view traversal is either sound or failing for specific window structures."
+  }
+]
+```

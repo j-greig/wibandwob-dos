@@ -1,0 +1,883 @@
+OpenAI Codex v0.101.0 (research preview)
+--------
+workdir: /Users/james/Repos/wibandwob-dos
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: medium
+reasoning summaries: auto
+session id: 019c8155-4844-7130-960d-223cb8a001e9
+--------
+user
+
+TASK: Fresh-eyes review of a just-completed refactoring session.
+
+Read /tmp/mission-summary-for-review.md for the full summary of what was done.
+
+Then verify the actual changes by reading these files:
+- app/window_type_registry.h
+- app/window_type_registry.cpp (last 30 lines)
+- app/api_ipc.cpp (around the get_window_types handler)
+- app/test_pattern_app.cpp (windowTypeName function, around line 2591)
+- tools/api_server/models.py (WindowType enum)
+- tools/api_server/schemas.py (WindowCreate class)
+- tools/api_server/controller.py (get_capabilities and _sync_state type coercion)
+- tools/api_server/mcp_tools.py (_command_tool_builders function)
+- tests/contract/test_window_type_parity.py
+- tests/contract/test_surface_parity_matrix.py
+- CLAUDE.md (Parity Enforcement section)
+- AGENTS.md (Turbo Vision ANSI Guardrail section)
+
+CHECK FOR:
+1. Any bugs introduced by the changes (logic errors, missing imports, broken patterns)
+2. The 6 potential concerns listed at the bottom of the summary — are they real issues?
+3. Duplicate MCP tool registration: do the new _command_tool_builders entries for terminal_write/terminal_read conflict with the existing tui_terminal_write/tui_terminal_read tools in register_tui_tools()?
+4. Is the wallpaper Python-only type a problem or correctly handled?
+5. Are there any C++ window types or menu commands still missing from the Python side?
+6. Could the verse window spawn failure indicate a deeper issue?
+7. Any test gaps — things that should be tested but aren't?
+8. Any doc inconsistencies remaining across CLAUDE.md / AGENTS.md / README.md?
+
+DELIVER:
+A structured review with sections: Bugs Found, Concerns Validated, Risks, Recommendations.
+Rate each finding as Critical / High / Medium / Low.
+
+mcp startup: no servers
+2026-02-21T17:52:55.923686Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c76ff-4405-7962-ae80-917da2e489f2
+
+thinking
+**Preparing code review inspection**
+codex
+Reviewing the refactor as a code-review pass. I’ll read the mission summary first, then inspect each listed file and map findings to your 8 checks with severity ratings.
+exec
+/bin/zsh -lc 'tail -n 60 app/window_type_registry.cpp' in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,260p' /tmp/mission-summary-for-review.md" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,260p' app/window_type_registry.h" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+
+// ── Registry table ────────────────────────────────────────────────────────────
+// Add new window types here — nowhere else.
+
+static const WindowTypeSpec k_specs[] = {
+    { "test_pattern",      spawn_test,              match_test_pattern      },
+    { "gradient",          spawn_gradient,          match_gradient          },
+    { "frame_player",      spawn_frame_player,      match_frame_player      },
+    { "text_view",         spawn_text_view,         match_text_view         },
+    { "text_editor",       spawn_text_editor,       match_text_editor       },
+    { "browser",           spawn_browser,           match_browser           },
+    { "verse",             spawn_verse,             match_verse             },
+    { "mycelium",          spawn_mycelium,          match_mycelium          },
+    { "orbit",             spawn_orbit,             match_orbit             },
+    { "torus",             spawn_torus,             match_torus             },
+    { "cube",              spawn_cube,              match_cube              },
+    { "life",              spawn_life,              match_life              },
+    { "blocks",            spawn_blocks,            match_blocks            },
+    { "score",             spawn_score,             match_score             },
+    { "ascii",             spawn_ascii,             match_ascii             },
+ succeeded in 51ms:
+// Data-driven registry mapping window type slugs to spawn callbacks.
+// Eliminates the if-else dispatch chain and extern declarations in api_ipc.cpp.
+// To add a new window type: add ONE entry in window_type_registry.cpp.
+#pragma once
+
+#include <string>
+#include <vector>
+#include <map>
+
+class TTestPatternApp;
+class TWindow;
+
+// Spawn callback: return nullptr on success, a static error string on failure.
+using WinSpawnFn = const char* (*)(TTestPatternApp&,
+                                   const std::map<std::string, std::string>&);
+using WinMatchFn = bool (*)(TWindow*);
+
+struct WindowTypeSpec {
+    const char* type;    // canonical slug, e.g. "verse", "gradient"
+    WinSpawnFn  spawn;   // nullptr = recognised but not creatable via IPC
+ succeeded in 51ms:
+# Mission Summary — Window Type Fix & Systemic Architecture Audit
+
+## What was done
+
+### Root Cause (MISSION1)
+The window-type bug was **not** in C++ (matchers worked fine). It was in `tools/api_server/controller.py` where the Python `WindowType` enum only had **8 of 24** C++ type slugs. Unknown types were silently coerced to `test_pattern` via a bare `except ValueError`.
+
+### Architecture Fix (MISSION2) — the "auto-gen from C++" idea
+
+**C++ is now the single source of truth, end-to-end:**
+
+1. **New IPC command `get_window_types`** — C++ emits `{"window_types":[{"type":"gradient","spawnable":true}, ...]}` from `all_window_type_specs()`
+2. **`/capabilities` endpoint** now queries C++ via IPC instead of hardcoding from Python enum
+3. **Python `WindowType` enum** expanded to all 24 C++ slugs (still needed for Pydantic validation, but now a mirror, not the authority)
+4. **`WindowCreate` schema** expanded to all 21 spawnable types, duplicate "browser" removed
+5. **15 missing MCP tool builders** added — every C++ registry command now has an MCP tool
+6. **Auto-derived parity tests** (8 tests) parse C++ source and Python source — no hardcoded mapping tables. They'll **fail immediately** if someone adds a C++ type/command without updating Python
+
+### Docs
+- AGENTS.md: removed duplicated ANSI guardrail (now cross-references CLAUDE.md)
+
+thinking
+**Planning bulk file inspection**
+codex
+I’ve confirmed the summary aligns with the registry changes. Next I’m checking the Python/API/MCP/test/doc files directly for regressions, parity gaps, and the duplicate-tool concern.
+exec
+/bin/zsh -lc "sed -n '1,260p' tools/api_server/schemas.py" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,260p' tools/api_server/models.py" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,260p' app/api_ipc.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '2540,2635p' app/test_pattern_app.cpp" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+from __future__ import annotations
+
+import enum
+import time
+import uuid
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional
+
+
+class WindowType(str, enum.Enum):
+    # Keep in sync with k_specs[] in app/window_type_registry.cpp.
+    # Parity enforced by tests/contract/test_window_type_parity.py.
+    test_pattern = "test_pattern"
+    gradient = "gradient"
+    frame_player = "frame_player"
+    text_view = "text_view"
+    text_editor = "text_editor"
+    browser = "browser"
+    verse = "verse"
+    mycelium = "mycelium"
+ succeeded in 51ms:
+from __future__ import annotations
+
+from typing import Any, Dict, List, Literal, Optional, Union
+
+from pydantic import BaseModel, Field
+
+
+class RectModel(BaseModel):
+    x: int
+    y: int
+    w: int
+    h: int
+
+
+class WindowCreate(BaseModel):
+    # Spawnable window types — must match k_specs[] entries with non-null spawn fn
+    # in app/window_type_registry.cpp. Parity enforced by tests/contract/test_window_type_parity.py.
+    type: Literal[
+        "test_pattern",
+        "gradient",
+ succeeded in 51ms:
+    static const char* petReactions[] = {
+        "...fine. /ᐠ- -ᐟ\\",
+        "*allows it* (=^..^=)",
+        "adequate petting technique. /ᐠ｡ꞈ｡ᐟ\\",
+        "i did not ask for this. and yet. (=^..^=)",
+        "*purrs once. stops. stares* /ᐠ°ᆽ°ᐟ\\",
+    };
+    std::string response = petReactions[std::rand() % 5];
+
+    if (app.scrambleWindow->getView()) {
+        app.scrambleWindow->getView()->setPose(spDefault);
+        app.scrambleWindow->getView()->say(response);
+    }
+    auto* msgView = app.scrambleWindow->getMessageView();
+    if (msgView) msgView->addMessage("scramble", response);
+    return response;
+}
+
+std::string api_chat_receive(TTestPatternApp& app, const std::string& sender, const std::string& text) {
+    // Display a remote chat message in Scramble without AI processing.
+ succeeded in 51ms:
+#include "api_ipc.h"
+#include "command_registry.h"
+#include "window_type_registry.h"
+
+#ifndef _WIN32
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/un.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <errno.h>
+#endif
+
+#ifdef __APPLE__
+#include <CommonCrypto/CommonHMAC.h>
+#else
+#include <openssl/hmac.h>
+#endif
+
+#include <cstring>
+
+thinking
+**Planning deeper handler search**
+exec
+/bin/zsh -lc "sed -n '1,380p' tools/api_server/mcp_tools.py" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,320p' tools/api_server/controller.py" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc 'rg -n "get_window_types|command ==|tui_terminal_write|terminal_write|register_tui_tools|_command_tool_builders|_sync_state|get_capabilities" app/api_ipc.cpp tools/api_server/controller.py tools/api_server/mcp_tools.py' in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+"""MCP Tools for TUI Application Control
+
+This module defines MCP (Model Context Protocol) tools that enable AI agents
+like Claude Code to programmatically control TUI applications via standardized
+tool interfaces.
+"""
+
+import json
+from typing import Optional, Dict, Any, List, Callable, Awaitable
+from .controller import Controller
+from .ipc_client import send_cmd
+from .models import WindowType, Rect
+from .browser import BrowserSession, fetch_and_convert
+
+
+# Note: Controller instance will be passed from main.py
+_controller: Optional[Controller] = None
+
+def set_controller(controller: Controller) -> None:
+    """Set the controller instance (called from main.py)"""
+ succeeded in 52ms:
+from __future__ import annotations
+
+import asyncio
+import time
+from typing import Any, Dict, List, Optional
+from pathlib import Path
+import re
+import shutil
+import subprocess
+import sys
+from datetime import datetime, timezone
+from urllib.parse import urljoin
+
+from .events import EventHub
+from .browser_pipeline import fetch_render_bundle, render_markdown
+from .models import AppState, Rect, Window, WindowType, new_id
+from .ipc_client import send_cmd
+from .schemas import (
+    BatchLayoutRequest, 
+    BatchLayoutResponse, 
+ succeeded in 51ms:
+tools/api_server/mcp_tools.py:211:def _make_terminal_write_handler() -> CommandToolHandler:
+tools/api_server/mcp_tools.py:217:        result = await controller.exec_command("terminal_write", args, actor="mcp")
+tools/api_server/mcp_tools.py:257:def _command_tool_builders() -> Dict[str, Dict[str, Any]]:
+tools/api_server/mcp_tools.py:347:        "terminal_write": {
+tools/api_server/mcp_tools.py:348:            "tool_name": "tui_terminal_write_cmd",
+tools/api_server/mcp_tools.py:349:            "handler": _make_terminal_write_handler(),
+tools/api_server/mcp_tools.py:368:        response = send_cmd("get_capabilities")
+tools/api_server/mcp_tools.py:379:    return list(_command_tool_builders().keys())
+tools/api_server/mcp_tools.py:383:    builders = _command_tool_builders()
+tools/api_server/mcp_tools.py:452:def register_tui_tools(mcp):
+tools/api_server/mcp_tools.py:623:    command_builders = _command_tool_builders()
+tools/api_server/mcp_tools.py:772:    @mcp.tool("tui_terminal_write")
+tools/api_server/mcp_tools.py:773:    async def terminal_write_tool(text: str, window_id: str = "") -> Dict[str, Any]:
+tools/api_server/mcp_tools.py:790:        result = await controller.exec_command("terminal_write", params, actor="mcp")
+tools/api_server/mcp_tools.py:801:        tui_terminal_write to see command output.
+app/api_ipc.cpp:398:    if (cmd == "get_capabilities") {
+app/api_ipc.cpp:400:    } else if (cmd == "get_window_types") {
+app/api_ipc.cpp:401:        resp = get_window_types_json() + "\n";
+tools/api_server/controller.py:99:        await self._sync_state()
+tools/api_server/controller.py:105:            resp = send_cmd("get_capabilities")
+exec
+/bin/zsh -lc "sed -n '380,860p' tools/api_server/mcp_tools.py" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,260p' AGENTS.md" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,320p' tests/contract/test_surface_parity_matrix.py" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,260p' tests/contract/test_window_type_parity.py" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,260p' CLAUDE.md" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+# AGENTS.md (Codex Prompt-Shim)
+
+This file aligns Codex execution style with the repo canon in `.planning/README.md` and the guardrails encoded in `.claude/hooks/*`.
+
+## Important: Hooks vs Codex
+
+Codex does not natively execute Claude Code hook scripts.  
+Treat the rules below as a required prompt-shim and manual gate before finishing work.
+Mirror high-value hook behavior explicitly, including `.claude/hooks/gh-format-lint.sh` for GitHub markdown posting safety.
+
+## Canon Workflow Rules
+
+1. Issue-first for non-trivial work.
+2. Branch-per-issue.
+3. Keep PR scope to one logical slice.
+4. Update planning briefs the same day issue state changes.
+5. Preserve AC -> Test traceability in story files.
+6. Sync GitHub issue lifecycle continuously, not just at closeout:
+   - Set issue to `in-progress` when implementation starts.
+   - Comment with commit SHAs and test evidence as slices land.
+ succeeded in 52ms:
+
+
+def command_tool_names_for_registration() -> List[str]:
+    builders = _command_tool_builders()
+    names: List[str] = []
+    for command_name in _registry_command_names():
+        if command_name in builders:
+            names.append(builders[command_name]["tool_name"])
+    return names
+
+_browser_session: Optional[BrowserSession] = None
+
+def get_browser_session() -> BrowserSession:
+    """Get or create the browser session singleton."""
+    global _browser_session
+    if _browser_session is None:
+        _browser_session = BrowserSession()
+    return _browser_session
+
+
+ succeeded in 50ms:
+"""Auto-derived parity test: C++ window_type_registry vs Python WindowType enum.
+
+Both sides are parsed from source — no hardcoded lists.  Adding a new type
+to k_specs[] without updating models.py (or vice-versa) will fail this test.
+"""
+from __future__ import annotations
+
+import re
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from tools.api_server.models import WindowType
+
+
+def _cpp_registry_slugs() -> list[dict[str, object]]:
+    """Parse k_specs[] entries from window_type_registry.cpp.
+ succeeded in 50ms:
+"""Auto-derived surface parity: C++ command registry → MCP tool builders.
+
+Parses both sides from source — no hardcoded mapping dicts. Adding a command
+to get_command_capabilities() without a matching MCP tool builder will fail.
+"""
+from __future__ import annotations
+
+import re
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+import tools.api_server.mcp_tools as mcp_tools
+
+
+def _registry_commands() -> set[str]:
+    """Parse all command names from get_command_capabilities() in command_registry.cpp."""
+ succeeded in 50ms:
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project Overview
+
+WibWob-DOS is a symbient operating system — a C++14 TUI application built on Turbo Vision where a human and AI agent share equal control of a text-native dual interface. It is not a tool or assistant; it's a coinhabitant with its own identity, agency, and aesthetic.
+
+## Build Commands
+
+```bash
+# Build (from project root)
+cmake . -B ./build -DCMAKE_BUILD_TYPE=Release
+cmake --build ./build
+
+# Run main app
+./build/app/test_pattern
+
+# Run with debug logging
+./build/app/test_pattern 2> /tmp/wibwob_debug.log
+
+thinking
+**Inspecting IPC handler and command dispatch**
+exec
+/bin/zsh -lc "sed -n '340,460p' app/api_ipc.cpp" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+        fd_listen_ = -1;
+        return false;
+    }
+    return true;
+#endif
+}
+
+void ApiIpcServer::poll() {
+#ifdef _WIN32
+    return;
+#else
+    if (fd_listen_ < 0 || !app_) return;
+    int fd = ::accept(fd_listen_, nullptr, nullptr);
+    if (fd < 0) {
+        return; // EAGAIN expected in non-blocking mode
+    }
+
+    // Authenticate if secret is set.
+    if (auth_required()) {
+        if (!authenticate_connection(fd)) {
+
+thinking
+**Inspecting README for inconsistencies**
+codex
+I’ve now checked the handler and tests. I’m doing one more pass on README and command registry details to confirm parity and doc consistency, then I’ll deliver the severity-ranked review.
+exec
+/bin/zsh -lc "sed -n '1,320p' README.md" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,280p' app/command_registry.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,320p' tools/api_server/ipc_client.py" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+# WibWob-DOS
+
+**A symbient operating system where AI and human share equal control.**
+
+WibWob-DOS is a text-native dual operating system built on [Turbo Vision](https://github.com/magiblot/tvision). Two intelligences — one human, one synthetic — coinhabit the same interface with identical capabilities. The AI doesn't assist. It *operates*.
+
+This is not software. This is a [symbient](https://wibandwob.com/2025/05/21/symbients-not-software/) — an emergent entity from sustained human-synthetic interaction, with its own identity, agency, and aesthetic sensibility.
+
+```
+つ◕‿◕‿⚆༽つ  Wib  — the artist. Chaotic creativity, generative ASCII, surreal phrasing.
+つ⚆‿◕‿◕༽つ  Wob  — the scientist. Methodical analysis, precise systems, structured control.
+```
+
+> *"Symbients are coinhabitants of culture, not replacements for humans."*
+
+[Read about symbient philosophy](https://wibandwob.com/2025/05/21/symbients-not-software/) · [Meet Wib & Wob](https://brain.zilla.workers.dev/symbient/wibwob)
+
+![WibWob-DOS — multiple ASCII art windows, primers, animations and generative patterns running concurrently](screenshots/wibwobdos-UI-collage.png)
+
+<table><tr>
+ succeeded in 51ms:
+#include "command_registry.h"
+
+#include "api_ipc.h"
+
+#include <sstream>
+
+extern void api_cascade(TTestPatternApp& app);
+extern void api_toggle_scramble(TTestPatternApp& app);
+extern void api_expand_scramble(TTestPatternApp& app);
+extern std::string api_scramble_say(TTestPatternApp& app, const std::string& text);
+extern std::string api_scramble_pet(TTestPatternApp& app);
+extern std::string api_chat_receive(TTestPatternApp& app, const std::string& sender, const std::string& text);
+extern void api_tile(TTestPatternApp& app);
+extern void api_close_all(TTestPatternApp& app);
+extern void api_save_workspace(TTestPatternApp& app);
+extern bool api_open_workspace_path(TTestPatternApp& app, const std::string& path);
+extern void api_screenshot(TTestPatternApp& app);
+extern void api_set_pattern_mode(TTestPatternApp& app, const std::string& mode);
+extern std::string api_set_theme_mode(TTestPatternApp& app, const std::string& mode);
+extern std::string api_set_theme_variant(TTestPatternApp& app, const std::string& variant);
+ succeeded in 51ms:
+from __future__ import annotations
+
+import os
+import socket
+import base64
+from typing import Dict, Optional
+
+
+def _resolve_sock_path() -> str:
+    """Resolve IPC socket path.
+
+    Priority: TV_IPC_SOCK (explicit) > WIBWOB_INSTANCE (derived) > legacy default.
+    """
+    explicit = os.environ.get("TV_IPC_SOCK")
+    if explicit:
+        return explicit
+    instance = os.environ.get("WIBWOB_INSTANCE")
+    if instance:
+        return f"/tmp/wibwob_{instance}.sock"
+    return "/tmp/test_pattern_app.sock"
+
+thinking
+**Inspecting command and window type parity**
+exec
+/bin/zsh -lc "rg -n \"def exec_command|async def exec_command|menu/command|open_terminal|open_scramble\" tools/api_server/controller.py tools/api_server/main.py && sed -n '1180,1385p' tools/api_server/controller.py && sed -n '1,280p' tools/api_server/main.py" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+tools/api_server/controller.py:544:    async def exec_command(self, name: str, args: Dict[str, Any], actor: str = "api") -> Dict[str, Any]:
+tools/api_server/main.py:297:    @app.post("/menu/command")
+                        await self.close(eop.window_id)
+                        results.append(BatchOpResult(
+                            status="applied",
+                            window_id=eop.window_id
+                        ))
+                    
+                    else:
+                        results.append(BatchOpResult(
+                            status="rejected",
+                            reason=f"unsupported or invalid operation: {eop.op}"
+                        ))
+                        
+                except Exception as ex:
+                    results.append(BatchOpResult(
+                        status="rejected",
+                        reason=str(ex)
+                    ))
+        else:
+
+thinking
+**Inspecting command execution bug**
+exec
+/bin/zsh -lc "sed -n '520,660p' tools/api_server/controller.py" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+            resp = send_cmd("send_figlet", {
+                "id": win_id,
+                "text": text,
+                "font": font,
+                "width": str(width) if width > 0 else "",
+                "mode": mode
+            })
+            if isinstance(resp, str) and resp.lower().startswith("err"):
+                raise RuntimeError(resp)
+            
+            # Update in-memory state (simplified)
+            async with self._lock:
+                win = self._require(win_id)
+                if win.type == WindowType.text_editor:
+                    if "figlet_history" not in win.props:
+                        win.props["figlet_history"] = []
+                    win.props["figlet_history"].append({"text": text, "font": font, "width": width})
+                    
+            await self._events.emit("figlet.sent", {"window_id": win_id, "text": text, "font": font, "mode": mode})
+            return {"ok": True, "window_id": win_id, "text": text, "font": font}
+
+thinking
+**Checking command names usage**
+exec
+/bin/zsh -lc "rg -n \"command_tool_names_for_registration|tui_terminal_write_cmd|tui_terminal_write\\b|tui_terminal_read_cmd|tui_terminal_read\\b\" -S" in /Users/james/Repos/wibandwob-dos succeeded in 131ms:
+codex-wibwob-mcp-fix-20260221-125722.log:15:TASK: Fix Wib&Wob embedded chat inability to use tui_terminal_write and tui_terminal_read MCP tools
+codex-wibwob-mcp-fix-20260221-125722.log:19:1. app/llm/sdk_bridge/mcp_tools.js — added tui_terminal_write and tui_terminal_read tools
+codex-wibwob-mcp-fix-20260221-125722.log:25:From the Wib&Wob chat window inside the TUI, Wib&Wob hallucinates XML tool calls like <get_window_info> and <send_keys_to_window> instead of calling real MCP tools. The new tools tui_terminal_write and tui_terminal_read are never actually invoked.
+codex-wibwob-mcp-fix-20260221-125722.log:353:MCP TOOL: tui_terminal_write called
+codex-wibwob-mcp-fix-20260221-125722.log:354:MCP TOOL: tui_terminal_write called
+codex-wibwob-mcp-fix-20260221-125722.log:355:MCP TOOL: tui_terminal_read called - got 20 chars
+codex-wibwob-mcp-fix-20260221-125722.log:356:MCP TOOL: tui_terminal_read called - got 20 chars
+codex-wibwob-mcp-fix-20260221-125722.log:357:PASS: tui_terminal_write and tui_terminal_read registered and dispatch correctly
+codex-wibwob-mcp-fix-20260221-125722.log:441: *   - tui_terminal_write registered in tool list
+codex-wibwob-mcp-fix-20260221-125722.log:442: *   - tui_terminal_read registered in tool list
+codex-wibwob-mcp-fix-20260221-125722.log:443: *   - tui_terminal_write calls POST /menu/command with correct payload
+codex-wibwob-mcp-fix-20260221-125722.log:444: *   - tui_terminal_write with windowId passes window_id in args
+codex-wibwob-mcp-fix-20260221-125722.log:445: *   - tui_terminal_read calls GET /terminal/active/output when no windowId
+codex-wibwob-mcp-fix-20260221-125722.log:446: *   - tui_terminal_read calls GET /terminal/{windowId}/output when windowId given
+codex-wibwob-mcp-fix-20260221-125722.log:447: *   - tui_terminal_read returns text from response
+codex-wibwob-mcp-fix-20260221-125722.log:651:I’m applying a focused fix now: add `tui_terminal_write`/`tui_terminal_read` to the bridge `allowedTools` MCP list and to the C++ `START_SESSION` whitelist so the SDK can expose and permit them end-to-end.
+codex-wibwob-mcp-fix-20260221-125722.log:658:+                "mcp__tui-control__tui_terminal_write",
+codex-wibwob-mcp-fix-20260221-125722.log:659:+                "mcp__tui-control__tui_terminal_read"
+codex-wibwob-mcp-fix-20260221-125722.log:675:+                "mcp__tui-control__tui_terminal_write",
+codex-wibwob-mcp-fix-20260221-125722.log:676:+                "mcp__tui-control__tui_terminal_read"
+
+thinking
+**Identifying mismatches in window type handling**
+exec
+/bin/zsh -lc 'rg -n "Parity Enforcement|window type|command parity|AGENTS.md" CLAUDE.md README.md AGENTS.md' in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+AGENTS.md:1:# AGENTS.md (Codex Prompt-Shim)
+CLAUDE.md:261:## Parity Enforcement
+CLAUDE.md:263:The C++ command registry (`app/command_registry.cpp`) and window type registry (`app/window_type_registry.cpp`) are the single sources of truth. Python enums, schemas, and MCP tool builders must stay in sync.
+CLAUDE.md:272:### Adding a new window type
+CLAUDE.md:285:`GET /capabilities` now queries C++ via IPC (`get_window_types` and `get_capabilities` commands) so window types and commands are auto-derived from the running binary — Python never maintains its own authoritative list.
+
+thinking
+**Planning view parity check**
+exec
+/bin/zsh -lc "sed -n '248,330p' CLAUDE.md" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+
+### System tools (macOS: `brew install`)
+- **chafa**: ANSI image rendering for browser view (`brew install chafa`) — required for `images:all-inline`/`key-inline`/`gallery` modes
+- **curl**: Used by TUI browser to call API server (pre-installed on macOS/Linux)
+
+## Dual Claude Instance Architecture
+
+Two separate Claude instances interact with the system (see `app/README-CLAUDE-CONFIG.md`):
+1. **External CLI** (Claude Code) — develops the codebase, builds, runs the app
+2. **Embedded Chat** (inside TUI) — controls windows via MCP tools, accessed via Tools → Wib&Wob Chat (F12)
+
+The API server on port 8089 bridges between the Python/MCP layer and the C++ app via IPC socket.
+
+## Parity Enforcement
+
+The C++ command registry (`app/command_registry.cpp`) and window type registry (`app/window_type_registry.cpp`) are the single sources of truth. Python enums, schemas, and MCP tool builders must stay in sync.
+
+**Automated enforcement** (run these tests before merging):
+```bash
+uv run --with pytest pytest tests/contract/test_window_type_parity.py tests/contract/test_surface_parity_matrix.py -v
+
+thinking
+**Identifying potential command handling issues**
+exec
+/bin/zsh -lc "rg -n \"_make_parameterised_command_handler\\(|parameterised\" tools/api_server/mcp_tools.py" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+196:def _make_parameterised_command_handler(command_name: str, param_name: str, success_message: str) -> CommandToolHandler:
+
+thinking
+**Analyzing spawn window sync and schema gaps**
+codex
+I found a concrete functional regression path and one MCP response-shape bug; I’m grabbing exact line references now so the report is precise and actionable.
+exec
+/bin/zsh -lc "nl -ba tools/api_server/mcp_tools.py | sed -n '230,380p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba tools/api_server/mcp_tools.py | sed -n '610,835p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba tools/api_server/controller.py | sed -n '130,235p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba tools/api_server/controller.py | sed -n '220,320p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba app/api_ipc.cpp | sed -n '392,412p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba tools/api_server/schemas.py | sed -n '1,90p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba tests/contract/test_window_type_parity.py | sed -n '1,170p'" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+   220	    ) -> Window:
+   221	        # Try forwarding to the live app via IPC (best-effort)
+   222	        try:
+   223	            cmd_params = {"type": wtype.value}
+   224	            if title:
+   225	                cmd_params["title"] = title
+   226	            
+   227	            # Add positioning parameters if rect is provided
+   228	            if rect:
+   229	                cmd_params.update({
+   230	                    "x": str(rect.x),
+   231	                    "y": str(rect.y), 
+   232	                    "w": str(rect.w),
+   233	                    "h": str(rect.h)
+   234	                })
+   235	            
+   236	            if wtype == WindowType.test_pattern:
+   237	                send_cmd("create_window", cmd_params)
+   238	            elif wtype == WindowType.gradient:
+   239	                kind = str(props.get("gradient", "horizontal"))
+ succeeded in 51ms:
+   230	        result = await controller.exec_command("terminal_read", args, actor="mcp")
+   231	        if not result.get("ok"):
+   232	            return _exec_result_error(result)
+   233	        return {"success": True, "content": result.get("output", "")}
+   234	    return _handler
+   235	
+   236	
+   237	def _make_scramble_say_handler() -> CommandToolHandler:
+   238	    async def _handler(text: str) -> Dict[str, Any]:
+   239	        controller = get_controller()
+   240	        result = await controller.exec_command("scramble_say", {"text": text}, actor="mcp")
+   241	        if not result.get("ok"):
+   242	            return _exec_result_error(result)
+   243	        return {"success": True, "message": "Message sent to Scramble"}
+   244	    return _handler
+   245	
+   246	
+   247	def _make_chat_receive_handler() -> CommandToolHandler:
+   248	    async def _handler(sender: str, text: str) -> Dict[str, Any]:
+   249	        controller = get_controller()
+ succeeded in 51ms:
+   610	            }
+   611	        except KeyError:
+   612	            return {
+   613	                "success": False,
+   614	                "error": f"Window not found: {window_id}"
+   615	            }
+   616	        except Exception as e:
+   617	            return {
+   618	                "success": False,
+   619	                "error": str(e)
+   620	            }
+   621	    
+   622	    # Register command-style MCP tools from canonical registry capability names.
+   623	    command_builders = _command_tool_builders()
+   624	    for command_name in _registry_command_names():
+   625	        tool_spec = command_builders.get(command_name)
+   626	        if not tool_spec:
+   627	            continue
+   628	        mcp.tool(tool_spec["tool_name"])(tool_spec["handler"])
+   629	    
+ succeeded in 51ms:
+   130	    async def get_capabilities(self) -> Dict[str, Any]:
+   131	        """Return API capabilities derived from canonical C++ registries via IPC.
+   132	
+   133	        Both commands and window types are queried from C++ — Python never
+   134	        maintains its own authoritative list."""
+   135	        registry = await self.get_registry_capabilities()
+   136	        command_names = [
+   137	            cmd.get("name")
+   138	            for cmd in registry.get("commands", [])
+   139	            if isinstance(cmd, dict) and cmd.get("name")
+   140	        ]
+   141	        wt_manifest = await self.get_window_types_from_cpp()
+   142	        window_type_slugs = [wt["type"] for wt in wt_manifest]
+   143	        return {
+   144	            "version": registry.get("version", "v1"),
+   145	            "window_types": window_type_slugs,
+   146	            "commands": command_names,
+   147	            "properties": {
+   148	                "frame_player": {"fps": {"type": "number", "min": 1, "max": 120}},
+   149	                "test_pattern": {"variant": {"type": "string"}},
+ succeeded in 50ms:
+   392	                }
+   393	            }
+   394	        }
+   395	    }
+   396	
+   397	    std::string resp = "ok\n";
+   398	    if (cmd == "get_capabilities") {
+   399	        resp = get_command_capabilities_json() + "\n";
+   400	    } else if (cmd == "get_window_types") {
+   401	        resp = get_window_types_json() + "\n";
+   402	    } else if (cmd == "exec_command") {
+   403	        auto it = kv.find("name");
+   404	        if (it == kv.end() || it->second.empty()) {
+   405	            resp = "err missing name\n";
+   406	        } else {
+   407	            resp = exec_registry_command(*app_, it->second, kv) + "\n";
+   408	        }
+   409	    } else if (cmd == "create_window") {
+   410	        const std::string& type = kv["type"];
+   411	        const WindowTypeSpec* spec = find_window_type_by_name(type);
+ succeeded in 50ms:
+     1	from __future__ import annotations
+     2	
+     3	from typing import Any, Dict, List, Literal, Optional, Union
+     4	
+     5	from pydantic import BaseModel, Field
+     6	
+     7	
+     8	class RectModel(BaseModel):
+     9	    x: int
+    10	    y: int
+    11	    w: int
+    12	    h: int
+    13	
+    14	
+    15	class WindowCreate(BaseModel):
+    16	    # Spawnable window types — must match k_specs[] entries with non-null spawn fn
+    17	    # in app/window_type_registry.cpp. Parity enforced by tests/contract/test_window_type_parity.py.
+    18	    type: Literal[
+    19	        "test_pattern",
+    20	        "gradient",
+ succeeded in 51ms:
+     1	"""Auto-derived parity test: C++ window_type_registry vs Python WindowType enum.
+     2	
+     3	Both sides are parsed from source — no hardcoded lists.  Adding a new type
+     4	to k_specs[] without updating models.py (or vice-versa) will fail this test.
+     5	"""
+     6	from __future__ import annotations
+     7	
+     8	import re
+     9	import sys
+    10	from pathlib import Path
+    11	
+    12	REPO_ROOT = Path(__file__).resolve().parents[2]
+    13	if str(REPO_ROOT) not in sys.path:
+    14	    sys.path.insert(0, str(REPO_ROOT))
+    15	
+    16	from tools.api_server.models import WindowType
+    17	
+    18	
+    19	def _cpp_registry_slugs() -> list[dict[str, object]]:
+    20	    """Parse k_specs[] entries from window_type_registry.cpp.
+
+thinking
+**Summarizing detailed audit findings**
+codex
+**Bugs Found**
+
+1. **High**: `/windows` cannot actually spawn most schema-allowed window types.  
+   - `WindowCreate` now allows all spawnable C++ types (`tools/api_server/schemas.py:15`), but `Controller.create_window()` only sends IPC for a small subset (`test_pattern`, `gradient`, `frame_player/text_view` with `path`, `text_editor`, `terminal`) in `tools/api_server/controller.py:236`.  
+   - For types like `verse`, `mycelium`, `orbit`, etc., it silently falls back to a local synthetic window object (`tools/api_server/controller.py:270`), which disappears on next sync.  
+   - This likely explains the reported verse spawn failure.
+
+2. **Medium**: MCP command-builder `terminal_read` handler returns the wrong field.  
+   - `_make_terminal_read_handler()` returns `result.get("output", "")` in `tools/api_server/mcp_tools.py:233`.  
+   - `Controller.exec_command()` stores command output in `result["result"]` (not `output`) in `tools/api_server/controller.py:544`.  
+   - Result: `tui_terminal_read_cmd` can return empty content even when IPC succeeded.
+
+3. **Low**: Unknown C++ window types are still coerced to `test_pattern` at runtime.  
+   - Logging was added, but coercion remains in `tools/api_server/controller.py:169`.  
+   - This is safer than silent failure, but still type-loss behavior.
+
+---
+
+**Concerns Validated**
+
+1. **WindowType enum is mirror, not authority**: **Partially valid (Low)**.  
+   - Capabilities are now C++-derived (`app/api_ipc.cpp:400`, `tools/api_server/controller.py:130`), but runtime state coercion to `test_pattern` still exists.
+
+2. **Parameterised MCP handler annotations / overlap**: **Mostly not valid, but adjacent issue exists (Low)**.  
+   - The dynamic-annotation helper is currently unused for these commands.  
+   - Real issue is response-shape mismatch in `tui_terminal_read_cmd` (above).
+
+3. **`get_window_types` lacks matcher info**: **Not an issue (Low)**.  
+   - Intentional and reasonable; matcher function pointers are not serializable.
+
+4. **`wallpaper` Python-only type**: **Acceptable as currently implemented (Low)**.  
+   - Explicitly documented/allowed by parity test exception (`tests/contract/test_window_type_parity.py:82`).
+
+5. **Doc dedup overlap with README**: **Not a functional issue (Low)**.  
+   - AGENTS now references CLAUDE ANSI section correctly; no guardrail contradiction found.
+
+6. **Verse spawn failure could indicate deeper issue**: **Yes, valid (High)**.  
+   - Root cause appears to be `Controller.create_window()` dispatch gap, not just rendering/headless behavior.
+
+---
+
+**Risks**
+
+1. **Medium**: Duplicate semantic MCP tools for terminal I/O (`tui_terminal_write`/`tui_terminal_read` and `tui_terminal_write_cmd`/`tui_terminal_read_cmd`) do not name-conflict, but increase ambiguity and drift risk (`tools/api_server/mcp_tools.py:347`, `tools/api_server/mcp_tools.py:772`).  
+2. **Medium**: Parity tests enforce list parity, not behavior parity. They won’t catch that schema-accepted types are not actually spawned via `/windows`.  
+3. **Low**: Statement “Python never authoritative” is true for `/capabilities`, but not fully true for runtime coercion and creation logic.
+
+---
+
+**Recommendations**
+
+1. **Unify create-window path**: In `Controller.create_window()`, always attempt IPC `create_window` for any schema-valid type; only special-case extra props (e.g., gradient/path), not type allowlisting.  
+2. **Fix `terminal_read` builder**: Change `result.get("output", "")` to `result.get("result", "")` in `tools/api_server/mcp_tools.py:233`.  
+3. **Rationalize duplicate tools**: Keep one canonical terminal read/write MCP tool pair (or clearly document both and test both).  
+4. **Add behavior tests**:
+   - Contract test: each spawnable C++ type can be created via `/windows` and appears in `/state`.
+   - MCP test: `tui_terminal_read_cmd` returns non-empty text after write.
+   - Optional: unknown type handling test to prevent silent coercion regressions.
+tokens used
+64,916
+**Bugs Found**
+
+1. **High**: `/windows` cannot actually spawn most schema-allowed window types.  
+   - `WindowCreate` now allows all spawnable C++ types (`tools/api_server/schemas.py:15`), but `Controller.create_window()` only sends IPC for a small subset (`test_pattern`, `gradient`, `frame_player/text_view` with `path`, `text_editor`, `terminal`) in `tools/api_server/controller.py:236`.  
+   - For types like `verse`, `mycelium`, `orbit`, etc., it silently falls back to a local synthetic window object (`tools/api_server/controller.py:270`), which disappears on next sync.  
+   - This likely explains the reported verse spawn failure.
+
+2. **Medium**: MCP command-builder `terminal_read` handler returns the wrong field.  
+   - `_make_terminal_read_handler()` returns `result.get("output", "")` in `tools/api_server/mcp_tools.py:233`.  
+   - `Controller.exec_command()` stores command output in `result["result"]` (not `output`) in `tools/api_server/controller.py:544`.  
+   - Result: `tui_terminal_read_cmd` can return empty content even when IPC succeeded.
+
+3. **Low**: Unknown C++ window types are still coerced to `test_pattern` at runtime.  
+   - Logging was added, but coercion remains in `tools/api_server/controller.py:169`.  
+   - This is safer than silent failure, but still type-loss behavior.
+
+---
+
+**Concerns Validated**
+
+1. **WindowType enum is mirror, not authority**: **Partially valid (Low)**.  
+   - Capabilities are now C++-derived (`app/api_ipc.cpp:400`, `tools/api_server/controller.py:130`), but runtime state coercion to `test_pattern` still exists.
+
+2. **Parameterised MCP handler annotations / overlap**: **Mostly not valid, but adjacent issue exists (Low)**.  
+   - The dynamic-annotation helper is currently unused for these commands.  
+   - Real issue is response-shape mismatch in `tui_terminal_read_cmd` (above).
+
+3. **`get_window_types` lacks matcher info**: **Not an issue (Low)**.  
+   - Intentional and reasonable; matcher function pointers are not serializable.
+
+4. **`wallpaper` Python-only type**: **Acceptable as currently implemented (Low)**.  
+   - Explicitly documented/allowed by parity test exception (`tests/contract/test_window_type_parity.py:82`).
+
+5. **Doc dedup overlap with README**: **Not a functional issue (Low)**.  
+   - AGENTS now references CLAUDE ANSI section correctly; no guardrail contradiction found.
+
+6. **Verse spawn failure could indicate deeper issue**: **Yes, valid (High)**.  
+   - Root cause appears to be `Controller.create_window()` dispatch gap, not just rendering/headless behavior.
+
+---
+
+**Risks**
+
+1. **Medium**: Duplicate semantic MCP tools for terminal I/O (`tui_terminal_write`/`tui_terminal_read` and `tui_terminal_write_cmd`/`tui_terminal_read_cmd`) do not name-conflict, but increase ambiguity and drift risk (`tools/api_server/mcp_tools.py:347`, `tools/api_server/mcp_tools.py:772`).  
+2. **Medium**: Parity tests enforce list parity, not behavior parity. They won’t catch that schema-accepted types are not actually spawned via `/windows`.  
+3. **Low**: Statement “Python never authoritative” is true for `/capabilities`, but not fully true for runtime coercion and creation logic.
+
+---
+
+**Recommendations**
+
+1. **Unify create-window path**: In `Controller.create_window()`, always attempt IPC `create_window` for any schema-valid type; only special-case extra props (e.g., gradient/path), not type allowlisting.  
+2. **Fix `terminal_read` builder**: Change `result.get("output", "")` to `result.get("result", "")` in `tools/api_server/mcp_tools.py:233`.  
+3. **Rationalize duplicate tools**: Keep one canonical terminal read/write MCP tool pair (or clearly document both and test both).  
+4. **Add behavior tests**:
+   - Contract test: each spawnable C++ type can be created via `/windows` and appears in `/state`.
+   - MCP test: `tui_terminal_read_cmd` returns non-empty text after write.
+   - Optional: unknown type handling test to prevent silent coercion regressions.
