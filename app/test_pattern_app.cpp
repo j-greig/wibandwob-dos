@@ -96,6 +96,8 @@
 #include "deep_signal_view.h"
 // Terminal emulator window (tvterm)
 #include "tvterm_view.h"
+// Desktop icon layer (E011)
+#include "desktop_icon.h"
 // Factory for ASCII grid demo window (implemented in ascii_grid_view.cpp).
 class TWindow; TWindow* createAsciiGridDemoWindow(const TRect &bounds);
 // #include "mech_window.h" // deferred feature; header not present yet
@@ -229,6 +231,7 @@ const ushort cmRogueHackTerminal = 218;
 const ushort cmDeepSignal = 219;
 const ushort cmDeepSignalTerminal = 220;
 const ushort cmOpenTerminal = 214;
+const ushort cmToggleDesktop = 230;  // Toggle desktop icon layer
 
 // Glitch menu commands
 const ushort cmToggleGlitchMode = 140;
@@ -630,6 +633,9 @@ private:
     int windowNumber;
     static const int maxWindows = 99;
 
+    // Desktop icon layer (E011)
+    TDesktopIconView* desktopIcons;
+
     // Scramble cat overlay
     TScrambleWindow* scrambleWindow;
     ScrambleEngine scrambleEngine;
@@ -805,6 +811,7 @@ TTestPatternApp::TTestPatternApp() :
               &TTestPatternApp::initMenuBar,
               &TTestPatternApp::initDeskTop),
     windowNumber(0),
+    desktopIcons(nullptr),
     scrambleWindow(nullptr),
     scrambleState(sdsHidden)
 {
@@ -838,6 +845,17 @@ TTestPatternApp::TTestPatternApp() :
         if (!loadWorkspaceFromFile(layoutPath)) {
             fprintf(stderr, "[wibwob] WARNING: Failed to restore layout from %s\n", layoutPath);
         }
+    }
+
+    // Desktop icon layer (E011) — insert behind all windows
+    {
+        TRect r = deskTop->getExtent();
+        desktopIcons = createDesktopIconView(r);
+        populateDefaultIcons(desktopIcons);
+        deskTop->insert(desktopIcons);
+        // Push to back so windows render on top
+        if (deskTop->background)
+            desktopIcons->putInFrontOf((TView*)deskTop->background);
     }
 
     // Init Scramble engine (KB + Haiku client).
@@ -1078,6 +1096,17 @@ void TTestPatternApp::handleEvent(TEvent& event)
                 TWindow* w = createDeepSignalWindow(r);
                 deskTop->insert(w);
                 registerWindow(w);
+                clearEvent(event);
+                break;
+            }
+            case cmDesktopLaunch: {
+                // Desktop icon launched a command — dispatch via registry
+                const char *cmd = (const char *)event.message.infoPtr;
+                if (cmd && cmd[0] != '\0')
+                {
+                    std::map<std::string, std::string> kv;
+                    exec_registry_command(*this, std::string(cmd), kv);
+                }
                 clearEvent(event);
                 break;
             }
