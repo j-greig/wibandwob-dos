@@ -68,6 +68,7 @@ add_executable(test_pattern
     tvterm_view.cpp
     desktop_icon.cpp
     desktop_folder.cpp
+    desktop_theme.cpp
 )
 target_include_directories(test_pattern PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(test_pattern PRIVATE tvision tvterm-core)

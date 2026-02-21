@@ -99,6 +99,7 @@
 // Desktop shell (E011)
 #include "desktop_icon.h"
 #include "desktop_folder.h"
+#include "desktop_theme.h"
 // Factory for ASCII grid demo window (implemented in ascii_grid_view.cpp).
 class TWindow; TWindow* createAsciiGridDemoWindow(const TRect &bounds);
 // #include "mech_window.h" // deferred feature; header not present yet
@@ -2340,12 +2341,38 @@ TStatusLine* TTestPatternApp::initStatusLine(TRect r)
     );
 }
 
+// Custom background that uses the desktop theme pattern
+class TThemedBackground : public TBackground
+{
+public:
+    TThemedBackground(const TRect &bounds) :
+        TBackground(bounds, desktopTheme().bgPattern)
+    {
+    }
+
+    virtual void draw() override
+    {
+        const DesktopTheme &t = desktopTheme();
+        TDrawBuffer b;
+        b.moveChar(0, t.bgPattern, t.bgAttr, size.x);
+        writeLine(0, 0, size.x, size.y, b);
+    }
+};
+
 TDeskTop* TTestPatternApp::initDeskTop(TRect r)
 {
     r.a.y = 1;
     r.b.y--;
-    // Create desktop with standard constructor (plain background)
     TDeskTop* desktop = new TDeskTop(r);
+    // Replace the default background with our themed one
+    if (desktop->background)
+    {
+        TRect bgBounds = desktop->background->getBounds();
+        desktop->remove(desktop->background);
+        destroy(desktop->background);
+        desktop->background = new TThemedBackground(bgBounds);
+        desktop->insert(desktop->background);
+    }
     return desktop;
 }
 

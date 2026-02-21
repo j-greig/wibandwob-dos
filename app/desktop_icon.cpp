@@ -15,6 +15,7 @@
 #include <tvision/tv.h>
 
 #include "desktop_icon.h"
+#include "desktop_theme.h"
 
 #include <algorithm>
 #include <cstring>
@@ -214,19 +215,7 @@ void TDesktopIconView::drawIcon(TDrawBuffer &, const DesktopIcon &,
 
 void TDesktopIconView::draw()
 {
-    // Normal: light grey text on black bg (monochrome, matches desktop)
-    TColorAttr normalBorder = TColorAttr(TColorRGB(170, 170, 170), TColorRGB(0, 0, 0));
-    TColorAttr normalFill   = TColorAttr(TColorRGB(170, 170, 170), TColorRGB(0, 0, 0));
-    TColorAttr normalArt    = TColorAttr(TColorRGB(210, 210, 210), TColorRGB(0, 0, 0));
-
-    // Selected: bright white on dark blue (classic TV highlight)
-    TColorAttr selBorder = TColorAttr(TColorRGB(255, 255, 255), TColorRGB(0, 0, 128));
-    TColorAttr selFill   = TColorAttr(TColorRGB(255, 255, 255), TColorRGB(0, 0, 128));
-    TColorAttr selArt    = TColorAttr(TColorRGB(255, 255, 255), TColorRGB(0, 0, 128));
-
-    // Replicate the desktop background: light grey ░ on black.
-    // Must match TBackground output exactly so our view is seamless.
-    TColorAttr bgAttr = TColorAttr(0x07); // light grey on black (monochrome theme)
+    const DesktopTheme &t = desktopTheme();
 
     // Border characters (box-drawing)
     static const char *topLeft    = "\xe2\x94\x8c"; // ┌
@@ -250,15 +239,14 @@ void TDesktopIconView::draw()
 
         if (!hasIcon)
         {
-            // Don't paint — let TBackground show through
-            // Write a blank transparent line (spaces with default attr)
-            buf.moveChar(0, ' ', bgAttr, size.x);
+            // Same pattern as background — seamless
+            buf.moveChar(0, t.bgPattern, t.bgAttr, size.x);
             writeLine(0, y, size.x, 1, buf);
             continue;
         }
 
-        // Start with desktop pattern, then paint icons on top
-        buf.moveChar(0, ' ', bgAttr, size.x);
+        // Desktop background pattern from theme
+        buf.moveChar(0, t.bgPattern, t.bgAttr, size.x);
 
         for (int i = 0; i < (int)icons_.size(); ++i)
         {
@@ -273,9 +261,9 @@ void TDesktopIconView::draw()
                 continue;
 
             bool sel = (i == selectedIdx_);
-            TColorAttr borderAttr = sel ? selBorder : normalBorder;
-            TColorAttr fillAttr   = sel ? selFill   : normalFill;
-            TColorAttr artAttr    = sel ? selArt    : normalArt;
+            TColorAttr borderAttr = sel ? t.selBorder : t.iconBorder;
+            TColorAttr fillAttr   = sel ? t.selFill   : t.iconFill;
+            TColorAttr artAttr    = sel ? t.selArt    : t.iconArt;
             int innerW = ICON_WIDTH - 2;
 
             if (localY == 0)
