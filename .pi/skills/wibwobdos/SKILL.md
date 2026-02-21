@@ -37,6 +37,7 @@ docker compose logs wibwobdos         # startup log
 - [Docker operations](references/docker-ops.md) — startup sequence, SIGWINCH fix, troubleshooting table
 - [Screenshot workflows](references/screenshots.md) — piping patterns, formats, full open-windows-and-capture workflow
 - [Integrating vendor views](references/integrating-vendor-views.md) — 14-surface checklist, CMake gotchas, tvterm lessons learned
+- **[Turbo Vision built-in widgets](references/tvision-builtin-widgets.md)** — ⚠️ READ BEFORE BUILDING CUSTOM VIEWS. Full inventory of TV's ready-made components (TListViewer, TScroller, TTerminal, TOutlineViewer, TDialog, etc). Don't reinvent what Borland already built.
 
 ## Key files
 

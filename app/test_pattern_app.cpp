@@ -96,8 +96,9 @@
 #include "deep_signal_view.h"
 // Terminal emulator window (tvterm)
 #include "tvterm_view.h"
-// Desktop icon layer (E011)
+// Desktop shell (E011)
 #include "desktop_icon.h"
+#include "desktop_folder.h"
 // Factory for ASCII grid demo window (implemented in ascii_grid_view.cpp).
 class TWindow; TWindow* createAsciiGridDemoWindow(const TRect &bounds);
 // #include "mech_window.h" // deferred feature; header not present yet
@@ -232,6 +233,7 @@ const ushort cmDeepSignal = 219;
 const ushort cmDeepSignalTerminal = 220;
 const ushort cmOpenTerminal = 214;
 const ushort cmToggleDesktop = 230;  // Toggle desktop icon layer
+const ushort cmOpenFolder = 231;     // Open a folder window (E011)
 
 // Glitch menu commands
 const ushort cmToggleGlitchMode = 140;
@@ -1101,11 +1103,27 @@ void TTestPatternApp::handleEvent(TEvent& event)
             }
             case cmDesktopLaunch: {
                 // Desktop icon launched a command — dispatch via registry
+                // Special prefix "open_folder:" opens a folder window
                 const char *cmd = (const char *)event.message.infoPtr;
                 if (cmd && cmd[0] != '\0')
                 {
-                    std::map<std::string, std::string> kv;
-                    exec_registry_command(*this, std::string(cmd), kv);
+                    std::string cmdStr(cmd);
+                    if (cmdStr.substr(0, 12) == "open_folder:")
+                    {
+                        std::string cat = cmdStr.substr(12);
+                        TRect r = deskTop->getExtent();
+                        r.grow(-8, -4);
+                        auto *fw = createFolderWindow(r, cat,
+                            desktopIcons ? desktopIcons->icons()
+                                         : std::vector<DesktopIcon>());
+                        deskTop->insert(fw);
+                        registerWindow(fw);
+                    }
+                    else
+                    {
+                        std::map<std::string, std::string> kv;
+                        exec_registry_command(*this, cmdStr, kv);
+                    }
                 }
                 clearEvent(event);
                 break;

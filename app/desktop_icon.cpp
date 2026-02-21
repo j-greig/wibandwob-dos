@@ -570,6 +570,29 @@ void populateDefaultIcons(TDesktopIconView *view)
         "   `---'   ",
     }));
 
+    // ── Folders (open folder windows) ───────────────────
+
+    view->addIcon(make("folder_apps", "Apps", "open_folder:apps", "", bright, {
+        " .-------. ",
+        " | .---. | ",
+        " | |   | | ",
+        " |_`---'_| ",
+    }));
+
+    view->addIcon(make("folder_games", "Games", "open_folder:games", "", gold, {
+        " .-------. ",
+        " | .---. | ",
+        " | |   | | ",
+        " |_`---'_| ",
+    }));
+
+    view->addIcon(make("folder_art", "Art", "open_folder:art", "", cyan, {
+        " .-------. ",
+        " | .---. | ",
+        " | |   | | ",
+        " |_`---'_| ",
+    }));
+
     // ── Scramble (always on desktop) ──────────────────────
 
     view->addIcon(make("scramble", "Scramble", "open_scramble", "", pink, {

@@ -67,6 +67,7 @@ add_executable(test_pattern
     micropolis_tool_palette.cpp
     tvterm_view.cpp
     desktop_icon.cpp
+    desktop_folder.cpp
 )
 target_include_directories(test_pattern PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(test_pattern PRIVATE tvision tvterm-core)
