@@ -209,6 +209,8 @@ class Controller:
                     send_cmd("create_window", cmd_params)
             elif wtype == WindowType.text_editor:
                 send_cmd("create_window", cmd_params)
+            elif wtype == WindowType.terminal:
+                send_cmd("create_window", cmd_params)
         except Exception:
             pass
 

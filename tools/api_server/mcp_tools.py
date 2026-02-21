@@ -359,7 +359,7 @@ def register_tui_tools(mcp):
         """Create a new TUI window
         
         Args:
-            window_type: Type of window ('test_pattern', 'gradient', 'frame_player', 'text_view')
+            window_type: Type of window ('test_pattern', 'gradient', 'frame_player', 'text_view', 'text_editor', 'browser', 'terminal')
             title: Optional window title
             x, y: Optional position (defaults to cascade)
             width, height: Optional size (defaults to window type default)
@@ -642,7 +642,28 @@ def register_tui_tools(mcp):
             return {
                 "success": False,
                 "error": str(e)
-            }    
+            }
+
+    @mcp.tool("tui_terminal_write")
+    async def terminal_write_tool(text: str) -> Dict[str, Any]:
+        """Send text as keyboard input to the active terminal emulator window
+
+        Injects each character as a KeyDown event into the first open
+        terminal window. Opens a terminal first with tui_create_window if
+        none is open.
+
+        Args:
+            text: Text to send to the terminal (e.g. 'ls -la\\n')
+
+        Returns:
+            Dictionary with success status
+        """
+        controller = get_controller()
+        result = await controller.exec_command("terminal_write", {"text": text}, actor="mcp")
+        if not result.get("ok"):
+            return _exec_result_error(result)
+        return {"success": True}
+
     @mcp.tool("tui_send_figlet")
     async def send_figlet_to_window(
         window_id: str,

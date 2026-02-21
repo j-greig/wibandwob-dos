@@ -27,6 +27,12 @@ std::string api_scramble_say(TTestPatternApp&, const std::string&) { return "ok"
 std::string api_scramble_pet(TTestPatternApp&) { return "ok"; }
 class TRect;
 void api_spawn_paint(TTestPatternApp&, const TRect*) {}
+void api_spawn_micropolis_ascii(TTestPatternApp&, const TRect*) {}
+void api_spawn_quadra(TTestPatternApp&, const TRect*) {}
+void api_spawn_snake(TTestPatternApp&, const TRect*) {}
+void api_spawn_rogue(TTestPatternApp&, const TRect*) {}
+void api_spawn_terminal(TTestPatternApp&, const TRect*) {}
+std::string api_terminal_write(TTestPatternApp&, const std::string&) { return "ok"; }
 std::string api_chat_receive(TTestPatternApp&, const std::string&, const std::string&) { return "ok"; }
 
 static int failures = 0;

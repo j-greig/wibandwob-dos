@@ -38,6 +38,9 @@ add_executable(test_pattern
     animated_score_view.cpp
     animated_ascii_view.cpp
     game_of_life_view.cpp
+    quadra_view.cpp
+    snake_view.cpp
+    rogue_view.cpp
     generative_verse_view.cpp
     generative_orbit_view.cpp
     generative_mycelium_view.cpp
@@ -61,9 +64,10 @@ add_executable(test_pattern
     paint/paint_window.cpp
     micropolis_ascii_view.cpp
     micropolis_tool_palette.cpp
+    tvterm_view.cpp
 )
 target_include_directories(test_pattern PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(test_pattern PRIVATE tvision)
+target_link_libraries(test_pattern PRIVATE tvision tvterm-core)
 
 # On Linux, api_ipc.cpp uses OpenSSL for HMAC (macOS uses CommonCrypto)
 if(NOT APPLE)

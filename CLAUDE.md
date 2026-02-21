@@ -55,6 +55,69 @@ Primary automated regression coverage for multiplayer/IPC lives in `tests/room/`
 uv run --with pytest pytest tests/room/ -q
 ```
 
+## Running the Live TUI in Claude Code (headless/tmux)
+
+When running inside Claude Code on the web (or any headless environment), use this exact sequence to start the TUI app, API server, and verify via screenshots. All commands assume the project is already built (`cmake --build ./build`).
+
+### 1. Start TUI in tmux
+
+```bash
+# Kill any stale sessions, then launch with a fixed terminal size
+tmux kill-server 2>/dev/null
+tmux new-session -d -s wibwob -x 120 -y 40 ./build/app/test_pattern
+
+# Verify it's running (should show menu bar + desktop)
+tmux capture-pane -t wibwob -p | head -5
+```
+
+### 2. Start API server
+
+Wait for the IPC socket to appear, then start the FastAPI server with all deps:
+
+```bash
+# Confirm socket exists
+ls /tmp/test_pattern_app.sock
+
+# Start API server (uv resolves all deps from requirements.txt)
+WIBWOB_REPO_ROOT=$(pwd) uv run \
+  --with-requirements tools/api_server/requirements.txt \
+  python3 -m uvicorn tools.api_server.main:app \
+  --host 127.0.0.1 --port 8089 &
+
+# Wait for startup then health check (~5-8s for dependency install on first run)
+sleep 8 && curl -sf http://127.0.0.1:8089/health
+# Expected: {"ok":true}
+```
+
+### 3. Interact and screenshot
+
+```bash
+# Get state (windows, canvas size, theme)
+curl -sf http://127.0.0.1:8089/state | python3 -m json.tool
+
+# Take a screenshot (text dump)
+curl -sf -X POST http://127.0.0.1:8089/screenshot
+cat "$(ls -t logs/screenshots/tui_*.txt | head -1)"
+
+# Open windows via command registry
+curl -sf -X POST http://127.0.0.1:8089/menu/command \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"open_terminal"}'
+
+# Type into a terminal window
+curl -sf -X POST http://127.0.0.1:8089/menu/command \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"terminal_write","args":{"text":"ls\n"}}'
+```
+
+### Gotchas
+
+- **uv bytecache**: if you edit Python files (e.g. `models.py`) while the API server is running, you must restart uvicorn. The `uv run` environment caches bytecode. Kill with `pkill -f uvicorn`, wait 2s, relaunch.
+- **tmux terminal size**: always pass `-x` and `-y` to `tmux new-session`. Without them, the TUI gets a 0x0 canvas and nothing renders.
+- **Socket path**: the default socket is `/tmp/test_pattern_app.sock`. If using multi-instance, set `WIBWOB_INSTANCE=N` for `/tmp/wibwob_N.sock`.
+- **First run dependency install**: `uv run --with-requirements` downloads packages on first invocation (~3-8s). Subsequent runs use cache.
+- **`/menu/command` vs `/windows`**: use `/menu/command` for the command registry (C++ dispatch, works for all commands). The `/windows` endpoint validates against the Python `WindowType` enum which may lag behind C++ if the server was started before code changes.
+
 ## Architecture
 
 ```

@@ -86,6 +86,14 @@
 #include "paint/paint_window.h"
 // Micropolis ASCII MVP window
 #include "micropolis_ascii_view.h"
+// Quadra falling blocks game
+#include "quadra_view.h"
+// Snake game
+#include "snake_view.h"
+// WibWob Rogue dungeon crawler
+#include "rogue_view.h"
+// Terminal emulator window (tvterm)
+#include "tvterm_view.h"
 // Factory for ASCII grid demo window (implemented in ascii_grid_view.cpp).
 class TWindow; TWindow* createAsciiGridDemoWindow(const TRect &bounds);
 // #include "mech_window.h" // deferred feature; header not present yet
@@ -212,6 +220,11 @@ const ushort cmKeyboardShortcuts = 210;
 const ushort cmDebugInfo = 211;
 const ushort cmApiKeyHelp = 212;
 const ushort cmMicropolisAscii = 213;
+const ushort cmQuadra = 215;
+const ushort cmSnake = 216;
+const ushort cmRogue = 217;
+const ushort cmRogueHackTerminal = 218;
+const ushort cmOpenTerminal = 214;
 
 // Glitch menu commands
 const ushort cmToggleGlitchMode = 140;
@@ -759,6 +772,11 @@ private:
     friend void api_spawn_monster_verse(TTestPatternApp&, const TRect* bounds);
     friend void api_spawn_monster_portal(TTestPatternApp&, const TRect* bounds);
     friend void api_spawn_micropolis_ascii(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_quadra(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_snake(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_rogue(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_terminal(TTestPatternApp&, const TRect* bounds);
+    friend std::string api_terminal_write(TTestPatternApp&, const std::string& text);
     friend void api_spawn_paint(TTestPatternApp&, const TRect* bounds);
     friend TPaintCanvasView* api_find_paint_canvas(TTestPatternApp&, const std::string&);
     friend std::string api_browser_fetch(TTestPatternApp&, const std::string& url);
@@ -1018,6 +1036,95 @@ void TTestPatternApp::handleEvent(TEvent& event)
                 TWindow* w = createMicropolisAsciiWindow(r);
                 deskTop->insert(w);
                 registerWindow(w);
+                clearEvent(event);
+                break;
+            }
+            case cmQuadra: {
+                TRect r = deskTop->getExtent();
+                r.grow(-2, -1);
+                TWindow* w = createQuadraWindow(r);
+                deskTop->insert(w);
+                registerWindow(w);
+                clearEvent(event);
+                break;
+            }
+            case cmSnake: {
+                TRect r = deskTop->getExtent();
+                r.grow(-2, -1);
+                TWindow* w = createSnakeWindow(r);
+                deskTop->insert(w);
+                registerWindow(w);
+                clearEvent(event);
+                break;
+            }
+            case cmRogue: {
+                TRect r = deskTop->getExtent();
+                r.grow(-2, -1);
+                TWindow* w = createRogueWindow(r);
+                deskTop->insert(w);
+                registerWindow(w);
+                clearEvent(event);
+                break;
+            }
+            case cmOpenTerminal: {
+                TRect r = deskTop->getExtent();
+                r.grow(-2, -1);
+                TWindow* w = createTerminalWindow(r);
+                if (w) {
+                    deskTop->insert(w);
+                    registerWindow(w);
+                }
+                clearEvent(event);
+                break;
+            }
+            case cmRogueHackTerminal: {
+                // Spawn a small terminal window for roguelike hacking
+                TRect desk = deskTop->getExtent();
+                int tw = 52, th = 18;
+                int tx = desk.b.x - tw - 1;
+                int ty = 1;
+                if (tx < 0) tx = 0;
+                TRect termBounds(tx, ty, tx + tw, ty + th);
+                TWindow* tw2 = createTerminalWindow(termBounds);
+                if (tw2) {
+                    deskTop->insert(tw2);
+                    registerWindow(tw2);
+                    auto* termWin = dynamic_cast<TWibWobTerminalWindow*>(tw2);
+                    if (termWin) {
+                        bool hackSuccess = (event.message.infoInt != 0);
+                        if (hackSuccess) {
+                            termWin->sendText(
+                                "clear && echo '=== DUNGEON TERMINAL v2.7 ===' && "
+                                "echo '> Inserting data chip...' && "
+                                "sleep 0.3 && echo '> AUTHENTICATION: GRANTED' && "
+                                "sleep 0.2 && echo '> Downloading floor map...' && "
+                                "sleep 0.3 && echo '  [########----------] 42%%' && "
+                                "sleep 0.2 && echo '  [################--] 84%%' && "
+                                "sleep 0.1 && echo '  [####################] 100%%' && "
+                                "sleep 0.2 && echo '> MAP DATA EXTRACTED' && "
+                                "echo '> Patching health subsystem...' && "
+                                "sleep 0.2 && echo '  +10 HP restored' && "
+                                "echo '> Mining XP cache...' && "
+                                "sleep 0.1 && echo '  +5 XP acquired' && "
+                                "sleep 0.2 && echo '' && "
+                                "echo '=== HACK COMPLETE ===' && "
+                                "echo '' && echo 'Type exit to close terminal'\n"
+                            );
+                        } else {
+                            termWin->sendText(
+                                "clear && echo '=== DUNGEON TERMINAL v2.7 ===' && "
+                                "echo '> Scanning credentials...' && "
+                                "sleep 0.3 && echo '> ERROR: No data chip detected' && "
+                                "sleep 0.2 && echo '' && "
+                                "echo '  *** ACCESS DENIED ***' && "
+                                "echo '' && "
+                                "echo 'Insert a data chip (d) to hack this terminal.' && "
+                                "echo 'Find data chips scattered in the dungeon.' && "
+                                "echo '' && echo 'Type exit to close terminal'\n"
+                            );
+                        }
+                    }
+                }
                 clearEvent(event);
                 break;
             }
@@ -1974,6 +2081,9 @@ TMenuBar* TTestPatternApp::initMenuBar(TRect r)
             *new TMenuItem("Monster Ve~r~se (Generative)", cmMonsterVerse, kbNoKey) +
             *new TMenuItem("Monster Cam (Emo~j~i)", cmMonsterCam, kbNoKey) +
             *new TMenuItem("~M~icropolis ASCII MVP", cmMicropolisAscii, kbNoKey) +
+            *new TMenuItem("~Q~uadra (Falling Blocks)", cmQuadra, kbNoKey) +
+            *new TMenuItem("~S~nake", cmSnake, kbNoKey) +
+            *new TMenuItem("Wib~W~ob Rogue", cmRogue, kbNoKey) +
             // REMOVED E009: ASCII Cam (disabled), Zoom In/Out/Actual Size/Full Screen (placeholders)
             newLine() +
             *new TMenuItem("Pa~i~nt Canvas", cmNewPaintCanvas, kbNoKey) +
@@ -1983,6 +2093,7 @@ TMenuBar* TTestPatternApp::initMenuBar(TRect r)
         *new TSubMenu("~W~indow", kbAltW) +
             *new TMenuItem("~T~ext Editor", cmTextEditor, kbNoKey) +
             *new TMenuItem("~B~rowser", cmBrowser, kbCtrlB) +
+            *new TMenuItem("Te~r~minal", cmOpenTerminal, kbNoKey) +
             *new TMenuItem("~O~pen Text File (Transparent)...", cmOpenTransparentText, kbNoKey) +
             newLine() +
             *new TMenuItem("~C~ascade", cmCascade, kbNoKey) +
@@ -2155,7 +2266,8 @@ void TTestPatternApp::idle()
     //     }
     // }
 
-    // Idle: no default content window or wallpaper.
+    // Broadcast terminal update check so tvterm windows refresh
+    message(this, evBroadcast, TWibWobTerminalWindow::termConsts.cmCheckTerminalUpdates, nullptr);
 }
 
 int main()
@@ -3243,6 +3355,55 @@ void api_spawn_micropolis_ascii(TTestPatternApp& app, const TRect* bounds) {
     TWindow* w = createMicropolisAsciiWindow(r);
     app.deskTop->insert(w);
     app.registerWindow(w);
+}
+
+void api_spawn_quadra(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 42, 26);
+    TWindow* w = createQuadraWindow(r);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
+}
+
+void api_spawn_snake(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 60, 30);
+    TWindow* w = createSnakeWindow(r);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
+}
+
+void api_spawn_rogue(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 80, 38);
+    TWindow* w = createRogueWindow(r);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
+}
+
+void api_spawn_terminal(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 80, 24);
+    TWindow* w = createTerminalWindow(r);
+    if (w) {
+        app.deskTop->insert(w);
+        app.registerWindow(w);
+    }
+}
+
+std::string api_terminal_write(TTestPatternApp& app, const std::string& text) {
+    // Find the first open terminal window on the desktop
+    TView* start = app.deskTop->first();
+    TWibWobTerminalWindow* termWin = nullptr;
+    if (start) {
+        TView* v = start;
+        do {
+            if (auto *tw = dynamic_cast<TWibWobTerminalWindow*>(v)) {
+                termWin = tw;
+                break;
+            }
+            v = v->next;
+        } while (v != start);
+    }
+    if (!termWin) return "err no terminal window";
+    termWin->sendText(text);
+    return "ok";
 }
 
 std::string api_browser_fetch(TTestPatternApp& app, const std::string& url) {
