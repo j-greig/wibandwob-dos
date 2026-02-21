@@ -8,13 +8,32 @@ from typing import Any, Dict, List, Optional
 
 
 class WindowType(str, enum.Enum):
+    # Keep in sync with k_specs[] in app/window_type_registry.cpp.
+    # Parity enforced by tests/contract/test_window_type_parity.py.
     test_pattern = "test_pattern"
     gradient = "gradient"
     frame_player = "frame_player"
     text_view = "text_view"
     text_editor = "text_editor"
     browser = "browser"
+    verse = "verse"
+    mycelium = "mycelium"
+    orbit = "orbit"
+    torus = "torus"
+    cube = "cube"
+    life = "life"
+    blocks = "blocks"
+    score = "score"
+    ascii = "ascii"
+    animated_gradient = "animated_gradient"
+    monster_cam = "monster_cam"
+    monster_verse = "monster_verse"
+    monster_portal = "monster_portal"
+    paint = "paint"
+    micropolis_ascii = "micropolis_ascii"
     terminal = "terminal"
+    wibwob = "wibwob"
+    scramble = "scramble"
     wallpaper = "wallpaper"
 
 

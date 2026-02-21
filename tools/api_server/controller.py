@@ -111,17 +111,38 @@ class Controller:
             pass
         return {"version": "v1", "commands": []}
 
+    async def get_window_types_from_cpp(self) -> List[Dict[str, Any]]:
+        """Fetch canonical window type manifest from C++ registry via IPC.
+
+        Returns list of {"type": str, "spawnable": bool} dicts — the single
+        source of truth for what window types exist."""
+        try:
+            resp = send_cmd("get_window_types")
+            if resp and resp.strip().startswith("{"):
+                data = json.loads(resp.strip())
+                if isinstance(data, dict) and "window_types" in data:
+                    return data["window_types"]
+        except Exception:
+            pass
+        # Fallback: derive from Python enum (should only hit if C++ is not running)
+        return [{"type": t.value, "spawnable": True} for t in WindowType]
+
     async def get_capabilities(self) -> Dict[str, Any]:
-        """Return API capabilities derived from canonical C++ command metadata."""
+        """Return API capabilities derived from canonical C++ registries via IPC.
+
+        Both commands and window types are queried from C++ — Python never
+        maintains its own authoritative list."""
         registry = await self.get_registry_capabilities()
         command_names = [
             cmd.get("name")
             for cmd in registry.get("commands", [])
             if isinstance(cmd, dict) and cmd.get("name")
         ]
+        wt_manifest = await self.get_window_types_from_cpp()
+        window_type_slugs = [wt["type"] for wt in wt_manifest]
         return {
             "version": registry.get("version", "v1"),
-            "window_types": [t.value for t in WindowType],
+            "window_types": window_type_slugs,
             "commands": command_names,
             "properties": {
                 "frame_player": {"fps": {"type": "number", "min": 1, "max": 120}},
@@ -145,9 +166,25 @@ class Controller:
                     # Update windows list with real IDs from C++
                     new_windows = []
                     for win_data in state_data.get("windows", []):
+                        raw_type = win_data.get("type", "test_pattern")
+                        try:
+                            wtype = WindowType(raw_type)
+                        except ValueError:
+                            # Preserve unknown types from C++ rather than
+                            # silently coercing to test_pattern.  Log for
+                            # visibility so missing enum values get added.
+                            import logging
+                            logging.getLogger(__name__).warning(
+                                "Unknown window type from C++: %r — add to WindowType enum", raw_type
+                            )
+                            # Fall back to test_pattern enum but this should
+                            # now be unreachable since the enum covers all
+                            # k_specs[] slugs. If it fires, a new C++ type
+                            # was added without updating models.py.
+                            wtype = WindowType.test_pattern
                         win = Window(
                             id=win_data["id"],
-                            type=WindowType.test_pattern,  # Default for now
+                            type=wtype,
                             title=win_data["title"],
                             rect=Rect(
                                 x=win_data["x"],

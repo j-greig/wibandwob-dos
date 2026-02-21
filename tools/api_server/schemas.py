@@ -13,6 +13,8 @@ class RectModel(BaseModel):
 
 
 class WindowCreate(BaseModel):
+    # Spawnable window types — must match k_specs[] entries with non-null spawn fn
+    # in app/window_type_registry.cpp. Parity enforced by tests/contract/test_window_type_parity.py.
     type: Literal[
         "test_pattern",
         "gradient",
@@ -20,8 +22,22 @@ class WindowCreate(BaseModel):
         "text_view",
         "text_editor",
         "browser",
-        "wallpaper",
-        "browser",
+        "verse",
+        "mycelium",
+        "orbit",
+        "torus",
+        "cube",
+        "life",
+        "blocks",
+        "score",
+        "ascii",
+        "animated_gradient",
+        "monster_cam",
+        "monster_verse",
+        "monster_portal",
+        "paint",
+        "micropolis_ascii",
+        "terminal",
     ]
     title: Optional[str] = None
     rect: Optional[RectModel] = None
