@@ -12,6 +12,7 @@
 #include <tvterm/termview.h>
 #include <tvterm/vtermemu.h>
 #include <tvterm/termemu.h>
+#include <algorithm>
 #include <cstring>
 
 // Command IDs for tvterm integration — must not collide with existing app commands.
@@ -137,6 +138,8 @@ std::string TWibWobTerminalWindow::getOutputText() const
                     row.append(sv.data(), sv.size());
                 }
             }
+            // Strip null bytes that may appear in empty cells
+            row.erase(std::remove(row.begin(), row.end(), '\0'), row.end());
             // Strip trailing whitespace per row
             size_t last = row.find_last_not_of(" \t");
             if (last != std::string::npos)

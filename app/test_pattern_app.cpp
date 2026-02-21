@@ -2623,7 +2623,19 @@ void api_set_pattern_mode(TTestPatternApp& app, const std::string& mode) {
     USE_CONTINUOUS_PATTERN = continuous;
 }
 
-void api_save_workspace(TTestPatternApp& app) { app.saveWorkspace(); }
+void api_save_workspace(TTestPatternApp& app) {
+    // Use saveWorkspacePath instead of saveWorkspace() to avoid modal dialog
+    // that blocks the IPC thread when triggered via API.
+    mkdir("workspaces", 0755);
+    app.saveWorkspacePath("workspaces/last_workspace.json");
+    // Also write a timestamped snapshot (matching saveWorkspace behaviour)
+    char tsName[32];
+    std::time_t t = std::time(nullptr);
+    std::tm *lt = std::localtime(&t);
+    std::strftime(tsName, sizeof(tsName), "%y%m%d_%H%M", lt);
+    std::string snapPath = std::string("workspaces/last_workspace_") + tsName + ".json";
+    app.saveWorkspacePath(snapPath);
+}
 bool api_save_workspace_path(TTestPatternApp& app, const std::string& path) { return app.saveWorkspacePath(path); }
 
 bool api_open_workspace_path(TTestPatternApp& app, const std::string& path) {
