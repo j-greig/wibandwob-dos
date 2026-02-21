@@ -2080,11 +2080,14 @@ TMenuBar* TTestPatternApp::initMenuBar(TRect r)
             *new TMenuItem("Monster ~P~ortal (Generative)", cmMonsterPortal, kbNoKey) +
             *new TMenuItem("Monster Ve~r~se (Generative)", cmMonsterVerse, kbNoKey) +
             *new TMenuItem("Monster Cam (Emo~j~i)", cmMonsterCam, kbNoKey) +
-            *new TMenuItem("~M~icropolis ASCII MVP", cmMicropolisAscii, kbNoKey) +
-            *new TMenuItem("~Q~uadra (Falling Blocks)", cmQuadra, kbNoKey) +
-            *new TMenuItem("~S~nake", cmSnake, kbNoKey) +
-            *new TMenuItem("Wib~W~ob Rogue", cmRogue, kbNoKey) +
-            // REMOVED E009: ASCII Cam (disabled), Zoom In/Out/Actual Size/Full Screen (placeholders)
+            newLine() +
+            (TMenuItem&)(
+                *new TSubMenu("~G~ames", kbNoKey) +
+                    *new TMenuItem("~M~icropolis City Builder", cmMicropolisAscii, kbNoKey) +
+                    *new TMenuItem("~Q~uadra (Falling Blocks)", cmQuadra, kbNoKey) +
+                    *new TMenuItem("~S~nake", cmSnake, kbNoKey) +
+                    *new TMenuItem("Wib~W~ob Rogue", cmRogue, kbNoKey)
+            ) +
             newLine() +
             *new TMenuItem("Pa~i~nt Canvas", cmNewPaintCanvas, kbNoKey) +
             newLine() +

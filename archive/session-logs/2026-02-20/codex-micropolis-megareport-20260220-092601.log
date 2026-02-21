@@ -2104,3 +2104,1507 @@ exec
     97	
     98	/**
     99	 * How often to collect taxes.
+
+thinking
+**Gathering code line counts**
+codex
+I have the core formulas and enum tables pinned; next I’m generating a concise repository inventory (engine/frontend/notes/resources) so section 2 is complete with concrete counts and dependency entry points.
+exec
+/bin/zsh -lc 'cd /tmp/MicropolisCore && find resources/cities -maxdepth 1 -type f | wc -l && ls -1 resources/cities | head -n 40' in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "cd /tmp/MicropolisCore && find micropolis/src/lib -maxdepth 1 -type f \\( -name '*.ts' -o -name '*.svelte' -o -name '*.js' \\) | sort | xargs wc -l > /tmp/micro_front_loc.txt && cat /tmp/micro_front_loc.txt" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc 'cd /tmp/MicropolisCore && find notes -maxdepth 1 -type f | sort | xargs wc -l > /tmp/micro_notes_loc.txt && cat /tmp/micro_notes_loc.txt' in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "cd /tmp/MicropolisCore && find MicropolisEngine/src -maxdepth 1 -type f \\( -name '*.cpp' -o -name '*.h' \\) | sort | xargs wc -l > /tmp/micro_engine_loc.txt && head -n 80 /tmp/micro_engine_loc.txt" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+      32
+about.cty
+badnews.cty
+bluebird.cty
+bruce.cty
+deadwood.cty
+finnigan.cty
+freds.cty
+haight.cty
+happisle.cty
+joffburg.cty
+kamakura.cty
+kobe.cty
+kowloon.cty
+kyoto.cty
+linecity.cty
+med_isle.cty
+ndulls.cty
+neatmap.cty
+radial.cty
+ succeeded in 51ms:
+     174 micropolis/src/lib/About.svelte
+     149 micropolis/src/lib/CanvasTileRenderer.ts
+     177 micropolis/src/lib/MicropolisCallbackLog.ts
+     325 micropolis/src/lib/MicropolisSimulator.ts
+      99 micropolis/src/lib/MicropolisView.svelte
+    1622 micropolis/src/lib/PieMenu.svelte
+     170 micropolis/src/lib/ReactiveMicropolisCallback.ts
+     247 micropolis/src/lib/SnapView.svelte
+     298 micropolis/src/lib/TileRenderer.ts
+     669 micropolis/src/lib/TileView.svelte
+     790 micropolis/src/lib/WebGLTileRenderer.ts
+     374 micropolis/src/lib/WebGPUTileRenderer.ts
+       0 micropolis/src/lib/decodeNavigationTree.js
+     341 micropolis/src/lib/micropolisStore.ts
+    7084 micropolis/src/lib/micropolisengine.js
+     138 micropolis/src/lib/navigationTree.ts
+     286 micropolis/src/lib/navigationTreeData.js
+     305 micropolis/src/lib/sprites.ts
+   13248 total
+ succeeded in 52ms:
+     322 notes/ASSETS.txt
+     197 notes/AnimationSequences.txt
+      79 notes/CALLBACKS.txt
+      57 notes/CODING-STYLE.txt
+      48 notes/DevelopmentPlan.md
+      88 notes/DocTCL.txt
+     474 notes/MultiPlayerIdeas.txt
+     366 notes/OLPC-notes.txt
+     266 notes/PIE-TAB-WINDOWS.md
+     317 notes/PLAN.txt
+     263 notes/ROADMAP.txt
+      96 notes/SIMULATOR.txt
+      62 notes/SharedData.txt
+      68 notes/TODO.txt
+     305 notes/Tiles.txt
+     262 notes/UserInterfacePlan.txt
+      77 notes/file-format.txt
+     475 notes/outline.txt
+      12 notes/prompt-code-review-file.txt
+      18 notes/prompt-code-review-member.txt
+ succeeded in 52ms:
+     188 MicropolisEngine/src/allocate.cpp
+     244 MicropolisEngine/src/animate.cpp
+     352 MicropolisEngine/src/budget.cpp
+     302 MicropolisEngine/src/callback.cpp
+     177 MicropolisEngine/src/callback.h
+     745 MicropolisEngine/src/connect.cpp
+      90 MicropolisEngine/src/data_types.h
+     418 MicropolisEngine/src/disasters.cpp
+    1265 MicropolisEngine/src/emscripten.cpp
+     573 MicropolisEngine/src/evaluate.cpp
+     676 MicropolisEngine/src/fileio.cpp
+     149 MicropolisEngine/src/frontendmessage.cpp
+     141 MicropolisEngine/src/frontendmessage.h
+     761 MicropolisEngine/src/generate.cpp
+     399 MicropolisEngine/src/graph.cpp
+     146 MicropolisEngine/src/initialize.cpp
+     158 MicropolisEngine/src/js_callback.h
+    1025 MicropolisEngine/src/map.cpp
+     354 MicropolisEngine/src/map_type.h
+     477 MicropolisEngine/src/message.cpp
+
+thinking
+**Scanning frontend architecture files**
+codex
+I’m now locking down the frontend and WASM sections with direct line references for the singleton tick loop, callback bridge, HEAP access, and renderer pipeline before I write the full markdown.
+exec
+/bin/zsh -lc "nl -ba /tmp/MicropolisCore/micropolis/src/lib/MicropolisSimulator.ts | sed -n '1,260p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba /tmp/MicropolisCore/micropolis/src/lib/MicropolisSimulator.ts | sed -n '260,380p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba /tmp/MicropolisCore/micropolis/src/lib/ReactiveMicropolisCallback.ts | sed -n '1,260p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba /tmp/MicropolisCore/micropolis/src/lib/micropolisStore.ts | sed -n '1,260p'" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+     1	/// <reference path="../types/micropolisengine.d.ts" />
+     2	
+     3	import type { JSCallback } from '../types/micropolisengine.d.js';
+     4	import { micropolisStore } from './micropolisStore';
+     5	
+     6	/**
+     7	 * Implementation of the JSCallback interface that bridges calls from the C++
+     8	 * Micropolis engine back into the reactive Svelte store.
+     9	 */
+    10	export class ReactiveMicropolisCallback implements JSCallback {
+    11	
+    12	    constructor() {
+    13	        console.log("ReactiveMicropolisCallback created");
+    14	    }
+    15	
+    16	    print(message: string): void {
+    17	        console.log("callback print:", message);
+    18	    }
+    19	
+    20	    log(message: string): void {
+ succeeded in 51ms:
+     1	/// <reference path="../types/micropolisengine.d.ts" />
+     2	
+     3	import type { Micropolis, Callback, JSCallback } from '../types/micropolisengine.d.js';
+     4	import initModule from "$lib/micropolisengine.js";
+     5	
+     6	export let micropolisengine: any;
+     7	let sharedSimulator: MicropolisSimulator | null = null;
+     8	let viewCount = 0;
+     9	const GLOBAL_KEY = '__MICROPOLIS_SINGLETON__';
+    10	
+    11	function getGlobalStore(): { simulator?: MicropolisSimulator | null; engine?: any; viewCount?: number } {
+    12	  const g = (globalThis as any);
+    13	  if (!g[GLOBAL_KEY]) g[GLOBAL_KEY] = { simulator: null, engine: null, viewCount: 0 };
+    14	  return g[GLOBAL_KEY];
+    15	}
+    16	
+    17	let capacitorApp: boolean = 
+    18	    (typeof window != 'undefined') &&
+    19	    (window.location.href == 'capacitor://localhost');
+    20	console.log(`MicropolisSimulator.ts: capacitorApp: ${capacitorApp}`);
+ succeeded in 52ms:
+   260	        this.render = () => {};
+   261	        // Release wasm/embind objects
+   262	        try { this.callback?.delete?.(); } catch {}
+   263	        try { this.micropolis?.delete?.(); } catch {}
+   264	        this.callback = null;
+   265	        this.micropolis = null;
+   266	        this.mapData = null;
+   267	        this.mopData = null;
+   268	        this.isInitialized = false;
+   269	        this.hasLoadedCity = false;
+   270	        this.renderCallbacks.clear();
+   271	      }
+   272	
+   273	      registerRenderCallback(fn: () => void) {
+   274	        if (fn) this.renderCallbacks.add(fn);
+   275	      }
+   276	      unregisterRenderCallback(fn: () => void) {
+   277	        if (fn) this.renderCallbacks.delete(fn);
+   278	      }
+   279	      loadDefaultCityOnce() {
+ succeeded in 51ms:
+     1	/// <reference path="../types/micropolisengine.d.ts" />
+     2	
+     3	import { state, effect, derived } from 'svelte/internal'; // Use 'svelte/internal' for runes until officially released if needed
+     4	import type { Micropolis, JSCallback, MicropolisConstructor } from '../types/micropolisengine.d.js';
+     5	import initModule from "$lib/micropolisengine.js";
+     6	import { ReactiveMicropolisCallback } from './ReactiveMicropolisCallback';
+     7	
+     8	// --- Types ----
+     9	interface MicropolisEngineModule {
+    10	    Micropolis: MicropolisConstructor;
+    11	    JSCallback: new (callbackImpl: JSCallback) => JSCallback;
+    12	    HEAPU16: Uint16Array;
+    13	    // Add other necessary types/functions from the module
+    14	    locateFile: (path: string, prefix: string) => string;
+    15	    print: (message: string) => void;
+    16	    printErr: (message: string) => void;
+    17	    setStatus: (status: string) => void;
+    18	    onRuntimeInitialized: (() => void) | null;
+    19	    WORLD_W: number;
+    20	    WORLD_H: number;
+
+thinking
+**Identifying WebGL renderer key**
+exec
+/bin/zsh -lc "nl -ba /tmp/MicropolisCore/micropolis/src/lib/WebGLTileRenderer.ts | sed -n '1,260p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba /tmp/MicropolisCore/micropolis/src/lib/WebGLTileRenderer.ts | sed -n '260,560p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba /tmp/MicropolisCore/micropolis/src/lib/WebGLTileRenderer.ts | sed -n '560,860p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba /tmp/MicropolisCore/micropolis/scripts/micropolis.js | sed -n '1,260p'" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+     1	// WebGLTileRenderer implementation class
+     2	
+     3	
+     4	import { TileRenderer } from './TileRenderer';
+     5	
+     6	
+     7	/**
+     8	 * WebGLTileRenderer is a concrete implementation of the TileRenderer abstract class.
+     9	 * It specializes in rendering tile maps using WebGL. This class manages the WebGL
+    10	 * context, textures, and shaders required to draw the map onto a canvas element.
+    11	 *
+    12	 * The WebGLTileRenderer assumes that tiles are square and can be panned and zoomed.
+    13	 * Panning is anchored at the center of the canvas, and the map can be interactively
+    14	 * navigated by dragging and zooming.
+    15	 *
+    16	 * Upon initialization, a texture for the tiles is loaded from a provided URL. The
+    17	 * rendering context and initial state are set up. The map can then be rendered onto
+    18	 * the canvas by invoking the render method.
+    19	 * 
+    20	 */
+ succeeded in 50ms:
+   260	            if (url) {
+   261	
+   262	                const promise = new Promise<void>((resolve, reject) => {
+   263	                    if (!this.context) {
+   264	                        reject(new Error('GL context is not initialized.'));
+   265	                        return;
+   266	                    }
+   267	            
+   268	                    this.context.bindTexture(
+   269	                        this.context.TEXTURE_2D, 
+   270	                        texture);
+   271	
+   272	                    // Initialize the texture with a 1x1 pixel to prevent issues on slow networks
+   273	                    this.context.texImage2D(
+   274	                        this.context.TEXTURE_2D,
+   275	                        0,
+   276	                        this.context.RGBA,
+   277	                        1,
+   278	                        1,
+   279	                        0, 
+ succeeded in 51ms:
+   560	                this.context.FRAGMENT_SHADER, 
+   561	                fsSource);
+   562	
+   563	        // Create the shader program
+   564	        const program = 
+   565	            this.context.createProgram();
+   566	        if (!program) {
+   567	            throw new Error('Unable to create shader program');
+   568	        }
+   569	
+   570	        // Attach the vertex and fragment shaders to the program
+   571	        this.context.attachShader(
+   572	            program, 
+   573	            vertexShader);
+   574	        this.context.attachShader(
+   575	            program, 
+   576	            fragmentShader);
+   577	
+   578	        // Link the program
+   579	        this.context.linkProgram(
+ succeeded in 52ms:
+     1	#!/usr/bin/env node
+     2	
+     3	/**
+     4	 * micropolis.js - Micropolis save file management and analysis tool
+     5	 * 
+     6	 * This utility provides command-line tools for working with SimCity/Micropolis save files.
+     7	 * It can read, analyze, visualize, and manipulate .cty and .mop files, offering various
+     8	 * representations and export formats suitable for both human and AI analysis.
+     9	 * 
+    10	 * Integrated with the Micropolis SvelteKit application.
+    11	 * 
+    12	 * Usage from project root:
+    13	 * npm run micropolis -- <command> [subcommand] [options]
+    14	 * npm run micropolis:info -- <file> [options]
+    15	 * 
+    16	 * Supports reading city files from stdin with '-' as the file parameter.
+    17	 */
+    18	
+    19	import fs from 'fs';
+    20	import path from 'path';
+
+thinking
+**Planning CLI commands extraction**
+exec
+/bin/zsh -lc "rg -n \"command\\(|\\.option\\(|visualize|analyze|edit|patch-scenario|export|info\" /tmp/MicropolisCore/micropolis/scripts/micropolis.js | head -n 200" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+7: * It can read, analyze, visualize, and manipulate .cty and .mop files, offering various
+8: * representations and export formats suitable for both human and AI analysis.
+14: * npm run micropolis:info -- <file> [options]
+1148:     * @param {Object} bounds - The bounds of the region to analyze
+1279:        .option('row', {
+1284:        .option('col', {
+1289:        .option('width', {
+1294:        .option('height', {
+1307:        .option('v', {
+1314:        .command('city', 'City operations (file handling and analysis)', (yargs) => {
+1317:                .command('dump [file]', 'Dump raw city data', (yargs) => {
+1324:                        .option('brief', {
+1328:                            describe: 'Show only summary information'
+1373:                .command('export [file]', 'Export city data', (yargs) => {
+1380:                        .option('format', {
+1386:                        .option('include-map', {
+1389:                            describe: 'Include full map data in export'
+1391:                        .option('output', {
+1421:                        console.error('CSV export not yet implemented');
+1426:                .command('info [file]', 'Display city information and statistics', (yargs) => {
+
+thinking
+**Searching for MOOLLM references**
+exec
+/bin/zsh -lc "rg -n \"MOOLLM|moollm|schema|experiment skill|micropolis skill|speed-of-light|symbient|skill\" /tmp/MicropolisCore -g '"'!**/node_modules/**'"'" in /Users/james/Repos/wibandwob-dos succeeded in 103ms:
+/tmp/MicropolisCore/micropolis/website/vendor/bundle/ruby/3.2.0/gems/http_parser.rb-0.8.0/ext/ruby_http_parser/vendor/http-parser-java/http_parser.c:258:  , s_req_schema
+/tmp/MicropolisCore/micropolis/website/vendor/bundle/ruby/3.2.0/gems/http_parser.rb-0.8.0/ext/ruby_http_parser/vendor/http-parser-java/http_parser.c:259:  , s_req_schema_slash
+/tmp/MicropolisCore/micropolis/website/vendor/bundle/ruby/3.2.0/gems/http_parser.rb-0.8.0/ext/ruby_http_parser/vendor/http-parser-java/http_parser.c:260:  , s_req_schema_slash_slash
+/tmp/MicropolisCore/micropolis/website/vendor/bundle/ruby/3.2.0/gems/http_parser.rb-0.8.0/ext/ruby_http_parser/vendor/http-parser-java/http_parser.c:448:        return s_req_schema;
+/tmp/MicropolisCore/micropolis/website/vendor/bundle/ruby/3.2.0/gems/http_parser.rb-0.8.0/ext/ruby_http_parser/vendor/http-parser-java/http_parser.c:453:    case s_req_schema:
+/tmp/MicropolisCore/micropolis/website/vendor/bundle/ruby/3.2.0/gems/http_parser.rb-0.8.0/ext/ruby_http_parser/vendor/http-parser-java/http_parser.c:459:        return s_req_schema_slash;
+/tmp/MicropolisCore/micropolis/website/vendor/bundle/ruby/3.2.0/gems/http_parser.rb-0.8.0/ext/ruby_http_parser/vendor/http-parser-java/http_parser.c:464:    case s_req_schema_slash:
+/tmp/MicropolisCore/micropolis/website/vendor/bundle/ruby/3.2.0/gems/http_parser.rb-0.8.0/ext/ruby_http_parser/vendor/http-parser-java/http_parser.c:466:        return s_req_schema_slash_slash;
+/tmp/MicropolisCore/micropolis/website/vendor/bundle/ruby/3.2.0/gems/http_parser.rb-0.8.0/ext/ruby_http_parser/vendor/http-parser-java/http_parser.c:471:    case s_req_schema_slash_slash:
+/tmp/MicropolisCore/micropolis/website/vendor/bundle/ruby/3.2.0/gems/http_parser.rb-0.8.0/ext/ruby_http_parser/vendor/http-parser-java/http_parser.c:618:  case s_req_schema:
+/tmp/MicropolisCore/micropolis/website/vendor/bundle/ruby/3.2.0/gems/http_parser.rb-0.8.0/ext/ruby_http_parser/vendor/http-parser-java/http_parser.c:619:  case s_req_schema_slash:
+/tmp/MicropolisCore/micropolis/website/vendor/bundle/ruby/3.2.0/gems/http_parser.rb-0.8.0/ext/ruby_http_parser/vendor/http-parser-java/http_parser.c:620:  case s_req_schema_slash_slash:
+/tmp/MicropolisCore/micropolis/website/vendor/bundle/ruby/3.2.0/gems/http_parser.rb-0.8.0/ext/ruby_http_parser/vendor/http-parser-java/http_parser.c:997:      case s_req_schema:
+/tmp/MicropolisCore/micropolis/website/vendor/bundle/ruby/3.2.0/gems/http_parser.rb-0.8.0/ext/ruby_http_parser/vendor/http-parser-java/http_parser.c:998:      case s_req_schema_slash:
+/tmp/MicropolisCore/micropolis/website/vendor/bundle/ruby/3.2.0/gems/http_parser.rb-0.8.0/ext/ruby_http_parser/vendor/http-parser-java/http_parser.c:999:      case s_req_schema_slash_slash:
+/tmp/MicropolisCore/micropolis/website/vendor/bundle/ruby/3.2.0/gems/http_parser.rb-0.8.0/ext/ruby_http_parser/vendor/http-parser-java/http_parser.c:2081:      case s_req_schema_slash:
+/tmp/MicropolisCore/micropolis/website/vendor/bundle/ruby/3.2.0/gems/http_parser.rb-0.8.0/ext/ruby_http_parser/vendor/http-parser-java/http_parser.c:2082:      case s_req_schema_slash_slash:
+/tmp/MicropolisCore/micropolis/website/vendor/bundle/ruby/3.2.0/gems/http_parser.rb-0.8.0/ext/ruby_http_parser/vendor/http-parser-java/http_parser.c:2088:      case s_req_schema:
+/tmp/MicropolisCore/micropolis/website/vendor/bundle/ruby/3.2.0/gems/http_parser.rb-0.8.0/ext/ruby_http_parser/vendor/http-parser-java/http_parser.c:2130:  /* host must be present if there is a schema */
+/tmp/MicropolisCore/micropolis/website/vendor/bundle/ruby/3.2.0/gems/http_parser.rb-0.8.0/ext/ruby_http_parser/vendor/http-parser-java/test.c:965:         "<SOAP-ENV:Envelope xmlns:SOAP-ENV=\"http://schemas.xmlsoap.org/soap/envelope/\">\n"
+
+thinking
+**Extracting README snippet with line numbers**
+exec
+/bin/zsh -lc "nl -ba /tmp/MicropolisCore/README.md | sed -n '1,260p'" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+     1	# Micropolis
+     2	
+     3	**Open source city simulation, based on the original SimCity Classic by Will Wright.**
+     4	
+     5	C++ engine compiled to WebAssembly. Runs in any browser. Runs headless in Node.js. SvelteKit frontend with WebGL tile rendering. CLI tools for city file analysis and editing.
+     6	
+     7	**Live demo:** [micropolisweb.com](https://micropolisweb.com)
+     8	
+     9	**Video demos:**
+    10	- [Micropolis Web Demo 1](https://www.youtube.com/watch?v=wlHGfNlE8Os) (how the engine and UI work)
+    11	- [SimCity Tile Sets, Space Inventory, and Cellular Automata](https://www.youtube.com/watch?v=319i7slXcbI) (tile sets, CA rules, to music by Jerry Martin)
+    12	
+    13	## The Story
+    14	
+    15	Micropolis traces a line from Will Wright's SimCity (1989) through multiple platform ports, multiplayer experiments, and educational adaptations. Don Hopkins ported SimCity to Unix, built multiplayer SimCityNet (demoed at ACM InterCHI '93 in Amsterdam), and eventually convinced Electronic Arts to release the source code under GPL-3 for the One Laptop Per Child project in 2008.
+    16	
+    17	The name "Micropolis" was the original working title Will Wright suggested. EA granted the right to use the trademark "SimCity" only if the game passed their QA process -- and it was quite an ordeal hand-holding their QA department through running Linux in a VM on Windows to test it. Never wanting to go through that ever again, Don asked Will for an alternative name, and he recommended its original working title. Please call this game Micropolis, not SimCity, or EA's lawyers may come knocking. As Jeff Braun, CEO of Maxis, wrote:
+    18	
+    19	> "Maxis was sued by Toho. We never referred to the name Godzilla, our monster on the box cover was a T-Rex looking character, but... a few magazine reviews called the monster, Godzilla. That was all it took. Toho called it 'confusion in the marketplace'. We paid $50k for Godzilla to go away. In all honesty, Toho liked Maxis, they said $50k was the minimum they take for Godzilla infringement."
+    20	
+
+thinking
+**Planning detailed appendix inclusion**
+codex
+I’m starting the report write now. I’ll include all required numbered sections plus appendices, and I’ll embed canonical source-derived tables where full enumeration is impractical to maintain manually.
+exec
+/bin/zsh -lc "nl -ba /tmp/MicropolisCore/notes/Tiles.txt | sed -n '1,220p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba /tmp/MicropolisCore/notes/file-format.txt | sed -n '1,220p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba /tmp/MicropolisCore/notes/SIMULATOR.txt | sed -n '1,220p'" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+     1	Analysis of MicropolisCore/images/tiles.xpm
+     2	===========================================
+     3	Image is 16 pixels wide, and 960*16 pixels high. Each 16x16 unit is one tile.
+     4	Tile N is copied at (0, N*16)--(16, N*16 + 16) exclusive from the tiles.xpm
+     5	image. Values N are shown below in hexadecimal notation, with an 'x' in front.
+     6	Decimal values are always 3 digits long (they are prefixed with leading 0's if
+     7	needed). The decimal values are derived from the hexadecimal values. In case
+     8	of conflict, the hexadecimal values should be trusted.
+     9	
+    10	Below, tiles are roughly grouped together.
+    11	
+    12	
+    13	000: x000 x001: Dirt
+    14	002: x002 x003: Water
+    15	
+    16	Coast:
+    17	004: x004:      Water (copy of x002??)
+    18	     x005 x006: Coast N
+    19	     x007 x008: Coast NE
+    20	     x009 x00a: Coast E
+ succeeded in 50ms:
+     1	little endian
+     2	
+     3	
+     4	/**
+     5	 * The number of history entries.
+     6	 */
+     7	static const int HISTORY_LENGTH = 480;
+     8	
+     9	/**
+    10	 * The number of miscellaneous history entries.
+    11	 */
+    12	static const int MISC_HISTORY_LENGTH = 240;
+    13	
+    14	/**
+    15	 * Length of the history tables.
+    16	 * @todo It is not really a count of histories, rename to something else?
+    17	 */
+    18	static const int HISTORY_COUNT = 120;
+    19	
+    20	WORLD_W 120
+ succeeded in 51ms:
+     1	Micropolis City Simulation Algorithm Description.
+     2	
+     3	SimFrame
+     4	
+     5	  If SimSpeed is 0, then return.
+     6	
+     7	  Increment Spdcycle mod 1024.
+     8	  
+     9	  If SimSpeed is 1, then return every 4 out of 5 frames.
+    10	
+    11	  If SimSpeed is 2, then return every 2 out of 3 frames.
+    12	
+    13	  Increment Fcycle mod 1024.
+    14	
+    15	  Call Simulate, passing the phase parameter of (Fcycle mod 16).
+    16	
+    17	
+    18	Simulate
+    19	
+    20	  Passed the phase parameter, which switches through 16 phases (0 to 15).
+
+thinking
+**Scoping large file content**
+exec
+/bin/zsh -lc 'test -f /tmp/mic_public_raw.txt && wc -l /tmp/mic_public_raw.txt && head -n 20 /tmp/mic_public_raw.txt' in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+    1409 /tmp/mic_public_raw.txt
+928:
+929:
+930:    ////////////////////////////////////////////////////////////////////////
+931:
+932:
+933:    Micropolis();
+934:
+935:    ~Micropolis();
+936:
+937:    void setCallback(Callback *callback, emscripten::val callbackVal);
+938:
+939:    void init();
+940:
+941:
+950:
+951:
+952:    /**
+953:     * Callback interface.
+954:     */
+
+thinking
+**Planning comprehensive single report**
+exec
+/bin/zsh -lc "cat > .planning/spikes/spk-micropolis-engine-review/spk02-codex-megareport.md <<'EOF'
+# SPK02 — MicropolisCore Engine Megareport (Codex Deep Review)
+
+## Status
+
+Status: in-progress
+GitHub issue: —
+PR: —
+
+## 1. Executive Summary
+
+MicropolisCore is a modernized extraction of the original SimCity Classic simulation lineage, with a C++ engine compiled to WebAssembly and wrapped by a SvelteKit/WebGL frontend ("'`/tmp/MicropolisCore/README.md:3-6`, `/tmp/MicropolisCore/README.md:23-47`).
+
+Lineage and intent:
+- Original mechanics derive from SimCity (1989), with the open-source release path through Don Hopkins/OLPC (`/tmp/MicropolisCore/README.md:15-16`).
+- The project explicitly positions itself as “Micropolis” (not “SimCity”) and documents naming/legal constraints (`/tmp/MicropolisCore/README.md:17-22`, `/tmp/MicropolisCore/MicropolisEngine/src/tool.h:21-39`).
+
+Licensing reality:
+- Engine sources are GPL-3-or-later with EA additional terms and name/trademark restrictions in file headers (`/tmp/MicropolisCore/MicropolisEngine/src/tool.h:9-39`).
+- “Micropolis” name usage depends on Micropolis Public Name License noted in repo docs (`/tmp/MicropolisCore/README.md:21`).
+
+Practical use boundary:
+- You can build derivative engines/frontends if you comply with GPL obligations for distribution.
+- You should not market or represent the derivative as EA SimCity; trademark/publicity rights are not granted (`/tmp/MicropolisCore/MicropolisEngine/src/tool.h:23-27`).
+- For WibWob-DOS integration, native C++ reuse is technically straightforward but legally inherits GPL copyleft at distribution boundaries.
+
+## 2. Repository Map
+
+### 2.1 Top-Level Functional Layout
+
+- `MicropolisEngine/src/`: simulation core, tools, save/load, bindings.
+- `micropolis/src/lib/`: Svelte runtime bridge + renderers.
+- `micropolis/scripts/`: CLI and constants.
+- `resources/cities/`: canonical `.cty` scenarios/saves.
+- `notes/`: algorithm, tile, format, roadmap notes.
+
+Source: `/tmp/MicropolisCore/README.md:27-52`.
+
+### 2.2 Engine File Inventory (LOC)
+
+Engine totals: `22649` LOC across `.cpp/.h` (`/tmp/micro_engine_loc.txt`).
+
+Key files:
+- `micropolis.h` 2834
+- `sprite.cpp` 2039
+- `simulate.cpp` 1729
+- `tool.cpp` 1617
+- `micropolis.cpp` 1578
+- `emscripten.cpp` 1265
+- `zone.cpp` 1039
+- `map.cpp` 1025
+- `generate.cpp` 761
+- `connect.cpp` 745
+- `fileio.cpp` 676
+- `scan.cpp` 600
+- `evaluate.cpp` 573
+- `traffic.cpp` 519
+- `message.cpp` 477
+- `utilities.cpp` 435
+- `disasters.cpp` 418
+- `graph.cpp` 399
+- `budget.cpp` 352
+- `map_type.h` 354
+
+### 2.3 Frontend File Inventory (LOC)
+
+Frontend/lib totals: `13248` LOC (`/tmp/micro_front_loc.txt`).
+
+Key files:
+- `micropolisengine.js` 7084 (generated wasm JS glue)
+- `PieMenu.svelte` 1622
+- `WebGLTileRenderer.ts` 790
+- `TileView.svelte` 669
+- `micropolisStore.ts` 341
+- `MicropolisSimulator.ts` 325
+- `sprites.ts` 305
+- `TileRenderer.ts` 298
+- `ReactiveMicropolisCallback.ts` 170
+
+### 2.4 Notes/Reference Corpus
+
+Notes totals: `3852` LOC (`/tmp/micro_notes_loc.txt`).
+Critical docs:
+- `notes/SIMULATOR.txt` phase flow (`/tmp/MicropolisCore/notes/SIMULATOR.txt:18-95`)
+- `notes/Tiles.txt` tile grouping/ranges (`/tmp/MicropolisCore/notes/Tiles.txt:13-220`)
+- `notes/file-format.txt` cty size and offsets (`/tmp/MicropolisCore/notes/file-format.txt:24-73`)
+
+### 2.5 Dependency Surfaces
+
+Engine includes:
+- Internal: map, tool, text, callback, frontendmessage, random.
+- External stdlib only in native core.
+- Emscripten-specific surface isolated mostly in callback/binding (`callback.h`, `js_callback.h`, `emscripten.cpp`).
+
+Frontend deps:
+- Svelte runes (`svelte/internal`) in store (`micropolisStore.ts:3`).
+- WebGL2 pipeline in renderer (`WebGLTileRenderer.ts:50`).
+- Embind-generated module bridge in simulator (`MicropolisSimulator.ts:3-5`).
+
+## 3. The Micropolis God Object
+
+## 3.1 Class Role
+
+`Micropolis` is a large stateful god object: simulation clock, world map, overlays, economy, disasters, sprites, callbacks, persistence, tools, and UI signaling all sit on one class (`/tmp/MicropolisCore/MicropolisEngine/src/micropolis.h:933+`).
+
+## 3.2 Public State (Representative + High-Impact)
+
+The full public declaration surface is massive; high-impact public fields include:
+- Calendar/time: `cityTime`, derived `cityYear/cityMonth` accessors and callbacks (`simulate.cpp:172-174`, `callback.h:115`).
+- Economy: `totalFunds`, `cityTax`, `taxFund`, `cashFlow`, `roadFund/fireFund/policeFund`, spends and percents (`simulate.cpp:884-892`, `fileio.cpp:378-405`).
+- Demand valves: `resValve/comValve/indValve` (`simulate.cpp:671-673`).
+- Pop/census: `resPop/comPop/indPop`, total/pop class (`simulate.cpp:611-614`, `evaluate.cpp`).
+- Feature caps: `resCap/comCap/indCap` gating growth (`simulate.cpp:675-685`).
+- Effects: `roadEffect/policeEffect/fireEffect` (`simulate.cpp:915-933`).
+- Automation options: auto-bulldoze/budget/goto/sound from `miscHist` (`fileio.cpp:387-396`).
+
+## 3.3 Overlay Maps and Resolutions
+
+Map template is block-based and column-major (`map_type.h:105-147`).
+
+Canonical overlay types in `micropolis.h` use different granularities:
+- `MapByte1` / `MapShort1`: full resolution 1:1 (120x100).
+- `MapByte2` / `MapShort2`: 2x2 blocks (60x50).
+- `MapByte4` / `MapShort4`: 4x4 blocks (30x25).
+- `MapShort8`: 8x8 blocks (15x13, due ceil on height) (`micropolis.h:179-185`).
+
+Important maps:
+- `populationDensityMap` (2x2), `trafficDensityMap` (2x2)
+- `pollutionDensityMap` (2x2), `landValueMap` (2x2)
+- `crimeRateMap` (2x2)
+- `terrainDensityMap` (4x4)
+- `rateOfGrowthMap` (8x8)
+- station effect maps (8x8)
+
+## 3.4 16-bit Tile Encoding
+
+Bits are defined in `MapTileBits` (`tool.h:119-134`):
+
+| Bit | Mask | Meaning |
+|---|---|---|
+| 15 | `0x8000` | `PWRBIT` tile currently powered |
+| 14 | `0x4000` | `CONDBIT` conducts power |
+| 13 | `0x2000` | `BURNBIT` flammable |
+| 12 | `0x1000` | `BULLBIT` bulldozable |
+| 11 | `0x0800` | `ANIMBIT` animated |
+| 10 | `0x0400` | `ZONEBIT` zone center |
+| 9..0 | `0x03ff` | tile index (`LOMASK`) |
+
+Bit layout:
+
+```text
+15      14       13       12       11       10       9 ... 0
+[PWRBIT][CONDBIT][BURNBIT][BULLBIT][ANIMBIT][ZONEBIT][ TILE ID ]
+```
+
+## 3.5 Tile Catalogue Envelope (0-1023)
+
+Core enum ends at `TILE_COUNT=1024`, with `USED_TILE_COUNT=1019` (`micropolis.h:687-689`).
+
+High-level ranges:
+- Terrain/water/coast/trees/rubble/fire: low indices (0x000+)
+- Roads/traffic variants: ~0x040-0x0cf (see grouped notes)
+- Power/rail infra: 0x0d0-0x0ef
+- R/C/I zone blocks: start 0x0f0 upward in fixed 3x3 blocks
+- Special facilities: port/airport/stadium/power plants
+- Extended church tiles: 956-1018 (`micropolis.h:667-684`)
+
+Full grouped canonical list is in `notes/Tiles.txt` (`/tmp/MicropolisCore/notes/Tiles.txt:13-305`).
+
+## 4. Simulation Loop Deep-Dive
+
+## 4.1 Speed Gate (`simFrame`)
+
+- `simSpeed=0`: full pause.
+- `simSpeed=1`: run 1 of every 5 frames.
+- `simSpeed=2`: run 1 of every 3 frames.
+- `simSpeed>=3`: run every frame.
+
+Source: `simulate.cpp:111-128`.
+
+## 4.2 16-Phase Scheduler (`simulate`)
+
+Phase model (`phaseCycle & 15`) (`simulate.cpp:149-281`):
+1. Phase 0: increment time/tax accumulator, valves on even `simCycle`, clear census.
+2. Phases 1-8: `mapScan()` each horizontal eighth of world.
+3. Phase 9: short census (every 4), long census (every 48), tax+evaluation (every 48).
+4. Phase 10: decay growth/traffic and send messages.
+5. Phase 11: power scan at speed-dependent cadence.
+6. Phase 12: pollution+terrain+land value scan cadence.
+7. Phase 13: crime scan cadence.
+8. Phase 14: pop density scan cadence.
+9. Phase 15: fire analysis cadence + disasters.
+
+Speed-dependent cadence tables (`simulate.cpp:134-143`):
+- Power: `{2,4,5}`
+- PTL: `{2,7,17}`
+- Crime: `{1,8,18}`
+- Pop density: `{1,9,19}`
+- Fire analysis: `{1,10,20}`
+
+## 4.3 Time Units and Calendar
+
+- `PASSES_PER_CITYTIME=16` (`micropolis.h:195`)
+- `CITYTIMES_PER_MONTH=4` (`micropolis.h:200`)
+- `CITYTIMES_PER_YEAR=48` (`micropolis.h:205`)
+
+Tax and yearly systems key off these units:
+- Monthly census every `4` cityTime (`simulate.cpp:90`, `198-200`)
+- Yearly census/tax every `48` cityTime (`simulate.cpp:96`, `206-208`)
+
+## 4.4 `mapScan()` Dispatch
+
+`mapScan(startX, endX)` reads each tile, strips low index, and dispatches by tile class/range into handlers:
+- Fires, roads/rails, power conductors, zones, hospitals/churches, special zones, etc.
+- Also updates census counters and map overlays per tile class.
+
+Source: `simulate.cpp:947-1017` with sub-calls in `zone.cpp`, `traffic.cpp`, `power.cpp`, `simulate.cpp` special handlers.
+
+## 5. Zone Growth Model
+
+## 5.1 `setValves()` Demand Equations
+
+Source: `simulate.cpp:564-688`.
+
+Core constants:
+- `taxTable[21]={200..-600}`
+- `extMarketParamTable={1.2,1.1,0.98}` by difficulty
+- `resPopDenom=8`, `birthRate=0.02`, `laborBaseMax=1.3`, `internalMarketDenom=3.7`
+
+Key equations:
+- `normalizedResPop = resPop / 8`
+- `employment = (comHist[1]+indHist[1]) / normalizedResPop` (if resPop>0 else 1)
+- `migration = normalizedResPop * (employment - 1)`
+- `births = normalizedResPop * 0.02`
+- `projectedResPop = normalizedResPop + migration + births`
+- `laborBase = clamp(resHist[1] / (comHist[1]+indHist[1]), 0, 1.3)`
+- `internalMarket = (normalizedResPop + comPop + indPop)/3.7`
+- `projectedComPop = internalMarket * laborBase`
+- `projectedIndPop = max(indPop * laborBase * extMarketParam[level], 5.0)`
+
+Ratios and tax transform:
+- `resRatio = projectedResPop/normalizedResPop` (fallback 1.3)
+- `comRatio = projectedComPop/comPop` (or projectedComPop)
+- `indRatio = projectedIndPop/indPop` (or projectedIndPop)
+- Clamp ratio maxima to 2.0
+- `z=min(cityTax + gameLevel,20)`
+- `ratio = (ratio - 1) * 600 + taxTable[z]`
+
+Valve integration:
+- `resValve = clamp(resValve + (short)resRatio, -RES_VALVE_RANGE, RES_VALVE_RANGE)`
+- same for com/ind.
+- Positive valves are zeroed when caps are active (`resCap/comCap/indCap`).
+
+Note: apparent bug at `simulate.cpp:662` where `resRatio = min(indRatio, indRatioMax)` likely intended `indRatio`.
+
+## 5.2 Residential
+
+Flow:
+- `doResidential()` computes local pop/traffic, power, valve gate, then calls `doResIn` or `doResOut` (`zone.cpp:548-605`).
+- Traffic requirement uses `makeTraffic()` toward commercial destination classes (`zone.cpp:574-577`, `traffic.cpp:134-157`).
+
+Evaluation:
+- `evalRes = clamp((landValue - pollution)*32,0,6000)-3000`.
+- if no traffic route: `-3000` (`zone.cpp:736-756`).
+
+Growth transitions:
+- Empty zone -> houses -> denser 3x3 layouts according to value and pop thresholds (`zone.cpp:614-700`).
+- Decline uses inverse transitions + rubble/empty as needed.
+
+## 5.3 Commercial
+
+Flow:
+- `doCommercial()` with traffic requirement toward industrial destinations (`zone.cpp:765-814`).
+- Growth/decline via `doComIn()/doComOut()` (`zone.cpp:823-858`).
+
+Evaluation:
+- `evalCom` reads `comRateMap`, traffic failure forces `-3000` (`zone.cpp:897-908`, `scan.cpp:585-597`).
+
+## 5.4 Industrial
+
+Flow:
+- `doIndustrial()` traffic requirement toward residential (`zone.cpp:917-958`).
+- `doIndIn()/doIndOut()` manage level transitions (`zone.cpp:967-993`).
+
+Evaluation:
+- If traffic fails, `-1000`; otherwise neutral baseline (`zone.cpp:1029-1036`).
+
+## 5.5 Growth Caps
+
+Caps lock positive valve motion:
+- `resCap` requires stadium to continue growth.
+- `indCap` requires seaport.
+- `comCap` requires airport.
+
+Valve cap enforcement: `simulate.cpp:675-685`.
+Scenario/user message pressure in `message.cpp` and `text.h` (e.g., NEED_STADIUM/SEAPORT/AIRPORT).
+
+## 5.6 Traffic Model
+
+Pathing parameters:
+- `MAX_TRAFFIC_DISTANCE=30` (`micropolis.h:248`).
+- `findPerimeterRoad` probes 12 offsets around zone (`traffic.cpp:239-264`).
+- `tryDrive` random walk, avoiding immediate reversal (`traffic.cpp:309-347`, `356-395`).
+- Route success by `driveDone` destination range checks (`traffic.cpp:453-495`).
+
+Density feedback:
+- successful routes increment traffic memory (+50 up to 240) and can retarget helicopter on congestion (`traffic.cpp:165-202`).
+
+## 5.7 External Market
+
+Difficulty modifies industrial projection multiplier through `extMarketParamTable` in `setValves()` (`simulate.cpp:571-573`, `639-640`).
+Lower difficulties subsidize industrial demand.
+
+## 6. Budget & Economy
+
+Revenue and obligations (`simulate.cpp:856-900`):
+- `policeFund = policeStationPop * 100`
+- `fireFund = fireStationPop * 100`
+- `roadFund = (roadTotal + railTotal*2) * RLevels[level]`
+- `taxFund = (((totalPop * landValueAverage)/120) * cityTax * FLevels[level])`
+- `cashFlow = taxFund - (policeFund + fireFund + roadFund)`
+
+Difficulty multipliers:
+- `RLevels={0.7,0.9,1.2}`
+- `FLevels={1.4,1.2,0.8}`
+
+Funding-to-effect conversion (`simulate.cpp:912-933`):
+- `roadEffect = MAX_ROAD_EFFECT * roadSpend/roadFund`
+- `policeEffect = MAX_POLICE_STATION_EFFECT * policeSpend/policeFund`
+- `fireEffect = MAX_FIRE_STATION_EFFECT * fireSpend/fireFund`
+
+Allocation policy is in `budget.cpp`:
+- Manual vs auto-budget paths.
+- Priority reductions under deficits (road/fire/police sequencing) (`budget.cpp:116-324`).
+
+## 7. Power Grid
+
+Algorithm: stack flood-fill from power plants (`power.cpp:125-166`).
+- Start from conductive neighbors of coal/nuclear plants.
+- Carry available power budget (`700` coal, `2000` nuclear) (`power.cpp:85-90`).
+- Set/clear `PWRBIT` during scan via zone and conductor checks.
+- Emit `MESSAGE_NOT_ENOUGH_POWER` on exhaustion (`power.cpp:159-165`).
+
+Zone power state then influences growth viability (`zone.cpp:setZonePower`, `zone.cpp:433-450`).
+
+## 8. Overlay Map Scans
+
+## 8.1 Pollution / Terrain / Land Value
+
+`pollutionTerrainLandValueScan()` (`scan.cpp:227-333`):
+- Pollution sources sampled by `getPollutionValue` (`scan.cpp:341-381`).
+- Terrain density sampled from neighboring trees/water.
+- Land value formula roughly:
+  - center-distance bonus
+  - plus terrain
+  - minus pollution
+  - minus crime interaction
+  - clamped [1,250]
+- Pollution hotspot tracked for evaluation/messages.
+
+Resolution: mostly 2x2 maps with world→block mapping.
+
+## 8.2 Crime
+
+`crimeScan()` (`scan.cpp:413-460`):
+- Station effect maps smoothed 3 times (`scan.cpp:90-114`, `120-130`).
+- Crime base formula:
+  - `crime = 128 - landValue + popDensity`
+  - cap 300
+  - subtract police effect
+  - clamp [0,250] (`scan.cpp:423-433`).
+
+## 8.3 Population Density
+
+`populationDensityScan()` computes zone-based density, then smoothes and recenters (`scan.cpp:136-189`).
+Feeds: land value/crime and city-center estimate.
+
+## 8.4 Fire/Police Coverage
+
+Station maps build from building counts and funding-scaled effects, then smooth passes. These values directly feed fire suppression and crime reduction (`scan.cpp:90-130`, `413-460`, `simulate.cpp:922-933`).
+
+## 8.5 Rate of Growth
+
+ROG stored at 8x8 granularity (`MapShort8`).
+- incremented by zone growth via `incRateOfGrowth()` (`zone.cpp:351-357`)
+- decayed periodically at phase 10 (`simulate.cpp:215-217`).
+
+## 8.6 Traffic Density
+
+Traffic map decays each phase-10 pass and accumulates from successful trips (`simulate.cpp:219`, `traffic.cpp:165-202`).
+
+## 8.7 Commercial Rate
+
+`computeComRateMap()` computes center-distance gradient `64..-64` (`scan.cpp:585-597`). This becomes a key term in `evalCom()` (`zone.cpp:897-908`).
+
+## 9. Disasters
+
+Random disaster chance by level (`disasters.cpp:95-99`):
+- lower interval => more disasters.
+
+Disaster types and mechanics:
+- Fire: spread probability from `doFire` local random checks and flammability bits (`simulate.cpp:1300-1352`).
+- Flood: river-edge water expansion (`disasters.cpp`).
+- Tornado: sprite-driven destruction (`sprite.cpp`).
+- Earthquake: random damage swath + callback `startEarthquake` (`disasters.cpp`, `callback.h:110`).
+- Monster: sprite spawn and movement destroying tiles (`sprite.cpp`).
+- Nuclear meltdown: probability by level table `{30000,20000,10000}` during nuclear special-zone processing (`simulate.cpp:1453-1479`).
+
+Scenario-triggered events:
+- Delay table and score wait table loaded in `simLoadInit()` (`simulate.cpp:442-466`).
+
+## 10. Sprites
+
+Sprite enum (`micropolis.h:328-341`):
+- train, helicopter, airplane, ship, monster, tornado, explosion, bus.
+
+Engine loop:
+- `moveObjects` dispatches per-sprite behavior (`sprite.cpp:553-615`).
+
+Highlights:
+- Train/bus follow transport graph, can crash with effects.
+- Helicopter patrols traffic/crime events; retargets congestion.
+- Airplane flight pathing and crash conditions.
+- Ship constrained to channels/edges.
+- Monster/tornado apply destruction per tick.
+- Explosion is timed effect + message mapping (`sprite.cpp:1654-1693`).
+
+Generation conditions include city population/random gates and infrastructure existence (`sprite.cpp` creation functions around object-specific handlers).
+
+## 11. Terrain Generation
+
+`generateMap(seed)` is deterministic with PRNG seeding (`generate.cpp:129-134`).
+
+Pipeline:
+- optional island synthesis (modes).
+- river carving and branching.
+- lake placement.
+- tree planting/distribution.
+- smoothing/erosion-like cleanup passes.
+
+Relevant files:
+- `generate.cpp`, `random.cpp`, and map editing helpers in `utilities.cpp`.
+
+## 12. Tools & Building Placement
+
+`doTool()` dispatches editing commands (`tool.cpp:1397-1506`).
+
+`ToolEffects` transaction pattern (`tool.h:178-229`):
+- collect world modifications + cost + frontend messages first.
+- apply only if funding is sufficient.
+- prevents partial writes during validation.
+
+Tool metadata:
+- cost table `gCostOf[]` (`tool.cpp:216-223`).
+- size table `gToolSize[]` (`tool.cpp:230-237`).
+- building footprints in `BuildingProperties` (`tool.cpp:1242-1279`).
+
+Placement semantics:
+- auto-bulldoze checks and site prep (`tool.cpp:657-697`).
+- zone center constraints and footprint write masks.
+- `connect.cpp` normalizes adjacent road/rail/wire topology after placement.
+
+Auto-connect details:
+- fixed adjacency tables and commands per infrastructure type (`connect.cpp:87-106`, `133+`, `271+`, `364+`, `460+`, `565+`).
+
+## 13. Save File Format
+
+## 13.1 File Sizes
+
+From `fileio.cpp`:
+- standard `.cty`: `27120` bytes
+- extended with mop: `51120` bytes (`fileio.cpp:230-242`)
+
+Breakdown:
+- 6 history arrays: `6 * 480 * 2 = 5760`
+- misc history: `240 * 2 = 480`
+- map: `120 * 100 * 2 = 24000`
+- optional mop: `24000`
+
+## 13.2 Load/Save Order
+
+Order (`fileio.cpp:247-258`):
+1. `resHist`
+2. `comHist`
+3. `indHist`
+4. `crimeHist`
+5. `pollutionHist`
+6. `moneyHist`
+7. `miscHist`
+8. map
+9. optional mop
+
+## 13.3 Endianness
+
+Endian conversion macros perform short and half-long swaps (`fileio.cpp:85-160`).
+Notes also call out little-endian assumptions (`notes/file-format.txt:1`).
+
+## 13.4 `miscHist` Encodings
+
+Critical offsets (read/write path):
+- city time at words 8/9 (32-bit via half-swap)
+- funds at words 50/51 (32-bit)
+- options/tax/speed in words 52-55
+- funding percents fixed-point in words 58/60/62 (`fileio.cpp:289-329`, `378-405`).
+
+## 13.5 Map Layout
+
+Map arrays are column-major in engine map template (`map_type.h:145-147`) and frontend renderer adapts width/height swap accordingly (`WebGLTileRenderer.ts:170-171`, `739-743`, `770-771`).
+
+## 14. Callback Interface
+
+Canonical interface has 35 methods in `callback.h` (`callback.h:92-126`).
+
+Categories:
+- Lifecycle: `newGame`, `startGame`, `startScenario`, `didLoadCity`, `didSaveCity`, fail callbacks.
+- UI state: `updateFunds`, `updateDate`, `updateDemand`, `updateTaxRate`, `updateSpeed`, `updatePaused`, `updateOptions`, `updateMap`, `updateHistory`, `updateEvaluation`, `updateBudget`.
+- UX actions: `sendMessage`, `showBudgetAndWait`, `showZoneStatus`, `autoGoto`, `makeSound`.
+- Scenario/disaster: `startEarthquake`, `didWinGame`, `didLoseGame`, `simulateRobots`, `simulateChurch`.
+
+Frontend response contract:
+- Treat callback thread as state-delta stream.
+- Avoid heavy recompute in callback itself; enqueue changes and repaint once per tick.
+
+## 15. WASM/Embind Binding Layer
+
+Binding entrypoint: `emscripten.cpp` with `EMSCRIPTEN_BINDINGS` (`emscripten.cpp:1071+`).
+
+Exposed:
+- enums (tiles, tools, messages, scenarios, map types).
+- `Micropolis` methods/properties.
+- callback wrapper types.
+
+Bridge pattern:
+- `JSCallback` C++ class delegates every callback into JS method calls (`js_callback.h:8-156`).
+
+Memory access:
+- frontend computes addresses/sizes via `getMapAddress/getMapSize`, then uses `HEAPU16.subarray` for zero-copy views (`MicropolisSimulator.ts:142-148`, `micropolisStore.ts:150-158`).
+
+## 16. SvelteKit Frontend Architecture
+
+## 16.1 `MicropolisSimulator.ts`
+
+Pattern:
+- singleton/shared simulator with global key and multi-view reference count (`MicropolisSimulator.ts:9-15`, `288-324`).
+- tick loop calls `simTick()` then `animateTiles()` (`184-189`).
+- speed table:
+  - FPS: `[1,5,10,30,60,120,120,120,120]`
+  - passes: `[1,1,1,1,1,1,4,10,50]` (`95-97`).
+
+## 16.2 `micropolisStore.ts`
+
+- Uses Svelte runes state/effect/derived (`micropolisStore.ts:3`).
+- Maintains reactive game state (funds/date/demand/speed/tax).
+- effects manage tick interval and pass updates (`102-132`).
+
+## 16.3 `ReactiveMicropolisCallback.ts`
+
+- Implements JS callback interface and mutates store on each event (`ReactiveMicropolisCallback.ts:10-170`).
+- Main map redraw trigger is callback `onUpdateMapWindow` -> `micropolisStore.triggerMapUpdate()` (`98-101`).
+
+## 16.4 `WebGLTileRenderer.ts`
+
+Pipeline:
+- Upload map and mop as `R16UI` integer textures (`166-175`, `230-239`).
+- Fragment shader samples `u_map`, `u_mop`, and tile atlas array `u_tiles[8]` (`374-485`).
+- Pan/zoom encoded by dynamic `screenTileArray` update (`689-716`).
+- Render path updates textures every frame with `texSubImage2D` (`736-757`).
+
+Tile atlas requirements:
+- nearest-neighbor sampling (`191`, `195`, `324`, `329`).
+- square tile assumptions and set packing derived in shader (`439-450`).
+
+MOP usage:
+- `mopValue & 0xff` selects tile set/layer set row (`417-421`, `449-450`).
+
+## 17. CLI Tool (`micropolis.js`)
+
+Purpose: headless save analysis/edit/export/visualization (`micropolis.js:4-17`).
+
+Command surfaces (yargs):
+- `city dump`
+- `city export`
+- `city info`
+- `city analyze`
+- `city edit`
+- `city patch-scenario`
+- `visualize ascii|emoji|mono|map|filter`
+
+Refs: `micropolis.js:1314-2055` (command declarations).
+
+Scenario patch logic mirrors engine defaults (`micropolis.js:37-80`).
+
+## 18. Modding Guide
+
+## 18.1 Easy (No Core Engine Refactor)
+
+Examples:
+- Replace tile atlases and sprites.
+- Add/edit scenario files `.cty`.
+- Tune tax/difficulty and frontend speed/pass presets.
+
+Files:
+- graphics: frontend assets + `WebGLTileRenderer.ts`
+- scenarios: `resources/cities/*.cty`
+- simple params: `simulate.cpp` constants, `micropolis/scripts/constants.js`
+
+Tests:
+- load city, run 10 years deterministic seed, snapshot key metrics.
+- visual smoke for atlas validity.
+
+## 18.2 Medium (Engine Changes)
+
+Examples:
+- New zone/building categories.
+- New overlays/maps.
+- World size changes.
+
+Files:
+- enums/constants: `micropolis.h`, `tool.h`, `text.h`, `constants.js`
+- sim logic: `zone.cpp`, `simulate.cpp`, `scan.cpp`, `tool.cpp`, `connect.cpp`
+- bindings: `emscripten.cpp`, TS typings.
+
+Tests:
+- save/load roundtrip.
+- zone growth regression.
+- callback parity tests.
+
+## 18.3 Hard (Architectural)
+
+Examples:
+- tile format expansion beyond 16-bit.
+- 3D renderer with true elevation.
+- multiplayer deterministic lockstep.
+
+Required work:
+- rewrite serialization, bit masks, render codecs, network state sync.
+- strict determinism harness and replay diffing.
+
+## 19. Integration Paths for WibWob-DOS
+
+## 19.1 Option A: WASM Engine + Custom Web Frontend
+
+```text
+WibWob-DOS (menu/launcher) -> browser client -> wasm Micropolis + WebGL
+```
+
+Pros:
+- reuse existing Micropolis frontend.
+- fast proof-of-concept.
+
+Cons:
+- dual UI stack (Turbo Vision + web).
+- weaker integration with text-native workflows.
+
+Effort: medium.
+Risk: medium (coordination complexity).
+
+## 19.2 Option B: WASM/Node Headless + TUI via IPC
+
+```text
+Turbo Vision TUI -> IPC -> Node host -> wasm engine
+```
+
+Pros:
+- isolates engine process.
+- easier crash containment.
+
+Cons:
+- IPC protocol and performance overhead.
+- embind/JS callback marshaling in tight loops.
+
+Effort: medium-high.
+Risk: medium-high.
+
+## 19.3 Option C: Native C++ Engine In-Process (Recommended)
+
+```text
+WibWob-DOS C++ process
+  |- Micropolis core (native objects)
+  |- TV view(s): map, status, tools
+  |- callback bridge -> event queue
+```
+
+Pros:
+- one runtime/language for core and UI.
+- no wasm boundary, direct memory access.
+- easiest deterministic testing and instrumentation.
+
+Cons:
+- requires Emscripten decoupling in callback layer.
+- GPL scope applies directly to shipped binary.
+
+Effort: high initial, best long-term.
+Risk: low-medium after decoupling.
+
+## 19.4 Option D: Headless Service + Dual Frontends
+
+```text
+Micropolis service (native/wasm)
+  |- API/MCP/IPC
+  |- Web UI + TUI client
+```
+
+Pros:
+- flexible clients, remote control.
+- aligns with existing sidecar API patterns.
+
+Cons:
+- highest architecture complexity.
+- consistency and latency concerns.
+
+Effort: high.
+Risk: high.
+
+## 19.5 Turbo Vision Design for Option C
+
+### ASCII Tile Rendering Strategy
+
+Use `tile = mapValue & LOMASK`, flags from high bits.
+
+Lookup table example:
+- Terrain/water -> `.` `~`
+- Roads -> box-drawing or `+|-`
+- Rails -> `=` `#`
+- Power lines -> `:` or light box glyphs
+- Residential -> `r/R`
+- Commercial -> `c/C`
+- Industrial -> `i/I`
+- Fire -> `*` with red/yellow cycle
+- Rubble -> `,;`
+- Plants -> `P/N`
+- Police/Fire -> `p/f`
+
+Coloring from category + flags:
+- powered zones tint brighter.
+- unpowered zones dim + warning marker.
+
+### `TView` Subclass
+
+`class TMicropolisMapView : public TView`:
+- viewport pan/zoom in tile units.
+- `draw()` pulls visible cells and writes via `TDrawBuffer` per-cell glyph/color attrs.
+- no raw ANSI streams; direct cell model mapping (aligns with guardrail).
+
+### Status Bar
+
+Single-line fixed fields:
+- `Funds`
+- `Date`
+- `Pop`
+- `R C I` valve bars
+- `Score`
+- `Speed/Paused`
+
+### Tool Palette
+
+Keyboard-driven:
+- numeric hotkeys `1..0` for primary tools.
+- shifted layer for power/transport/special buildings.
+- preview footprint overlay before commit.
+
+### Callback Bridge
+
+`Micropolis::callback` implementation pushes typed events into lock-free/single-thread queue consumed by UI tick.
+
+### Module Integration
+
+Tile theme packs as WibWob modules:
+- mapping file: `tile-index -> glyph, fg, bg`
+- optional animation rules.
+- load at runtime, fallback to default theme.
+
+## 20. Emscripten Decoupling Guide
+
+Goal: build Micropolis engine natively with WibWob-DOS CMake/C++14.
+
+Steps:
+1. Guard includes:
+- wrap `#include <emscripten/val.h>` and embind-only headers with `#ifdef MICROPOLIS_EMSCRIPTEN`.
+
+2. Callback abstraction:
+- replace `emscripten::val callbackVal` in `Callback` interface with opaque native context pointer or `std::any`-like adapter.
+- keep a wasm adapter subclass for web builds.
+
+3. Exclude `emscripten.cpp` from native target.
+- It is binding glue only.
+
+4. Provide native callback implementation for Turbo Vision.
+
+5. Build integration:
+- add Micropolis sources to WibWob target or static lib.
+- define compile flags enabling native callback path.
+
+6. Verify:
+- compile passes.
+- deterministic simulation parity against wasm baseline for fixed seeds.
+
+## 21. MOOLLM & AI Integration
+
+MicropolisCore README defines MOOLLM coupling explicitly (`README.md:116-198`):
+- micropolis skill composed with `schema-mechanism`, `experiment`, `speed-of-light` and others (`README.md:161-174`).
+- speed-of-light model: multi-agent turns in one LLM call (`README.md:176`).
+- schema mechanism framing: learned causal triples context+action->result (`README.md:178`).
+- experiment cycle: simulate/evaluate/iterate/analyze (`README.md:180`).
+
+Relevance to WibWob-DOS symbient model:
+- maps naturally to equal human/AI control with shared world state.
+- WibWob command registry + MCP can expose deterministic sim actions as AI tools.
+
+## 22. Determinism & Testing
+
+PRNG:
+- seeded generation path in `generateMap` and random helpers (`generate.cpp:129-134`, `random.cpp`).
+
+Determinism harness proposal:
+1. Load fixed seed and map.
+2. Run N ticks with fixed tool actions.
+3. Snapshot:
+- map hash
+- funds/date/pop/valves/score
+- overlay checksums
+4. Compare against golden snapshots.
+
+Regression suites:
+- zone growth parity (R/C/I counts over time)
+- budget parity (cashFlow/fund effects)
+- save/load round-trip equivalence (`fileio.cpp`)
+- callback event sequence tests.
+
+## 23. Appendices
+
+## Appendix A: Tile Enum Reference
+
+`TILE_COUNT=1024`, `USED_TILE_COUNT=1019`, extended church tiles `956-1018` (`micropolis.h:667-689`).
+
+Grouped canonical catalogue:
+- `notes/Tiles.txt` provides authoritative grouped mappings and building footprints (`/tmp/MicropolisCore/notes/Tiles.txt:13-305`).
+
+Key size anchors:
+- R/C/I zones: 3x3 blocks from base tile bands.
+- Seaport/coal/nuclear/stadium: 4x4.
+- Airport: 6x6.
+- Anim groups include fire and special effects.
+
+## Appendix B: Callback Method Signatures (Complete)
+
+From `callback.h:92-126`:
+- `autoGoto(Micropolis*, emscripten::val, int x, int y, std::string message)`
+- `didGenerateMap(Micropolis*, emscripten::val, int seed)`
+- `didLoadCity(Micropolis*, emscripten::val, std::string filename)`
+- `didLoadScenario(Micropolis*, emscripten::val, std::string name, std::string fname)`
+- `didLoseGame(Micropolis*, emscripten::val)`
+- `didSaveCity(Micropolis*, emscripten::val, std::string filename)`
+- `didTool(Micropolis*, emscripten::val, std::string name, int x, int y)`
+- `didWinGame(Micropolis*, emscripten::val)`
+- `didntLoadCity(Micropolis*, emscripten::val, std::string filename)`
+- `didntSaveCity(Micropolis*, emscripten::val, std::string filename)`
+- `makeSound(Micropolis*, emscripten::val, std::string channel, std::string sound, int x, int y)`
+- `newGame(Micropolis*, emscripten::val)`
+- `saveCityAs(Micropolis*, emscripten::val, std::string filename)`
+- `sendMessage(Micropolis*, emscripten::val, int messageIndex, int x, int y, bool picture, bool important)`
+- `showBudgetAndWait(Micropolis*, emscripten::val)`
+- `showZoneStatus(Micropolis*, emscripten::val, int tileCategoryIndex, int populationDensityIndex, int landValueIndex, int crimeRateIndex, int pollutionIndex, int growthRateIndex, int x, int y)`
+- `simulateRobots(Micropolis*, emscripten::val)`
+- `simulateChurch(Micropolis*, emscripten::val, int posX, int posY, int churchNumber)`
+- `startEarthquake(Micropolis*, emscripten::val, int strength)`
+- `startGame(Micropolis*, emscripten::val)`
+- `startScenario(Micropolis*, emscripten::val, int scenario)`
+- `updateBudget(Micropolis*, emscripten::val)`
+- `updateCityName(Micropolis*, emscripten::val, std::string cityName)`
+- `updateDate(Micropolis*, emscripten::val, int cityYear, int cityMonth)`
+- `updateDemand(Micropolis*, emscripten::val, float r, float c, float i)`
+- `updateEvaluation(Micropolis*, emscripten::val)`
+- `updateFunds(Micropolis*, emscripten::val, int totalFunds)`
+- `updateGameLevel(Micropolis*, emscripten::val, int gameLevel)`
+- `updateHistory(Micropolis*, emscripten::val)`
+- `updateMap(Micropolis*, emscripten::val)`
+- `updateOptions(Micropolis*, emscripten::val)`
+- `updatePasses(Micropolis*, emscripten::val, int passes)`
+- `updatePaused(Micropolis*, emscripten::val, bool simPaused)`
+- `updateSpeed(Micropolis*, emscripten::val, int speed)`
+- `updateTaxRate(Micropolis*, emscripten::val, int cityTax)`
+
+## Appendix C: EditingTool Enum + Costs + Sizes
+
+Enum order (`tool.h:142-167`):
+- `TOOL_RESIDENTIAL`
+- `TOOL_COMMERCIAL`
+- `TOOL_INDUSTRIAL`
+- `TOOL_FIRESTATION`
+- `TOOL_POLICESTATION`
+- `TOOL_QUERY`
+- `TOOL_WIRE`
+- `TOOL_BULLDOZER`
+- `TOOL_RAILROAD`
+- `TOOL_ROAD`
+- `TOOL_STADIUM`
+- `TOOL_PARK`
+- `TOOL_SEAPORT`
+- `TOOL_COALPOWER`
+- `TOOL_NUCLEARPOWER`
+- `TOOL_AIRPORT`
+- `TOOL_NETWORK`
+- `TOOL_WATER`
+- `TOOL_LAND`
+- `TOOL_FOREST`
+
+Costs (`tool.cpp:216-223`):
+`[100,100,100,500,500,0,5,1,20,10,5000,10,3000,3000,5000,10000,100,0,0,0]`
+
+Sizes (`tool.cpp:230-237`):
+`[3,3,3,3,3,1,1,1,1,1,4,1,4,4,4,6,1,1,1,1]`
+
+## Appendix D: Message Enum (`MESSAGE_*`)
+
+Complete numeric range and text intent in `text.h:112-171`.
+- First: `MESSAGE_NEED_MORE_RESIDENTIAL = 1`
+- Last: `MESSAGE_SCENARIO_RIO_DE_JANEIRO = 57`
+- `MESSAGE_LAST = 57`
+
+Notable groups:
+- Infrastructure demand (res/com/ind/roads/rails/electricity/stadium/seaport/airport)
+- City risks (pollution/crime/traffic/fire/meltdown/flooding)
+- Financial alerts (tax too high/no money/not enough funds)
+- Milestones (town/city/capital/metropolis/megalopolis)
+- Scenario lifecycle (won/lost and scenario titles)
+
+## Appendix E: Scenario Details
+
+Scenario load defaults from `fileio.cpp:442-498`:
+
+| Scenario | Start Year | Funds | File |
+|---|---:|---:|---|
+| Dullsville | 1900 | 5000 | `scenario_dullsville.cty` |
+| San Francisco | 1906 | 20000 | `scenario_san_francisco.cty` |
+| Hamburg | 1944 | 20000 | `scenario_hamburg.cty` |
+| Bern | 1965 | 20000 | `scenario_bern.cty` |
+| Tokyo | 1957 | 20000 | `scenario_tokyo.cty` |
+| Detroit | 1972 | 20000 | `scenario_detroit.cty` |
+| Boston | 2010 | 20000 | `scenario_boston.cty` |
+| Rio de Janeiro | 2047 | 20000 | `scenario_rio_de_janeiro.cty` |
+
+Scenario disaster delays and scoring windows from `simulate.cpp:442-466`.
+
+## Appendix F: Map Constant Reference
+
+From `map_type.h` and `micropolis.h`:
+- `WORLD_W=120` (`map_type.h:90`)
+- `WORLD_H=100` (`map_type.h:95`)
+- `WORLD_W_2=60`, `WORLD_H_2=50` (`micropolis.h:151-157`)
+- `WORLD_W_4=30`, `WORLD_H_4=25` (`micropolis.h:165-171`)
+- `WORLD_W_8=15`, `WORLD_H_8=13` (`micropolis.h:179-185`)
+- `HISTORY_LENGTH=480` (`micropolis.h:210`)
+- `MISC_HISTORY_LENGTH=240` (`micropolis.h:215`)
+- `POWER_STACK_SIZE=(120*100)/4=3000` (`micropolis.h:226`)
+- `MAX_TRAFFIC_DISTANCE=30` (`micropolis.h:248`)
+- `TILE_COUNT=1024`, `USED_TILE_COUNT=1019` (`micropolis.h:687-688`)
+
+## Appendix G: Game Level Parameter Tables
+
+From `simulate.cpp`:
+- Valves external market params: `{1.2,1.1,0.98}` (`simulate.cpp:571-573`)
+- Road multiplier `RLevels={0.7,0.9,1.2}` (`simulate.cpp:863`)
+- Tax multiplier `FLevels={1.4,1.2,0.8}` (`simulate.cpp:864`)
+- Tax table (0..20):
+`[200,150,120,100,80,50,30,0,-10,-40,-100,-150,-200,-250,-300,-350,-400,-450,-500,-550,-600]` (`simulate.cpp:567-570`)
+
+---
+
+## Cross-Section Notes and Risks
+
+- `setValves()` appears to contain one likely typo/bug in ratio clamp assignment (`simulate.cpp:662`). Validate before adopting formulas verbatim in a rewrite.
+- Save format docs in `notes/file-format.txt` are useful but partial; `fileio.cpp` is source of truth for offsets and conversions.
+- Existing JS callback naming in `ReactiveMicropolisCallback.ts` is not a perfect mirror of the C++ callback names; treat it as frontend adapter, not authoritative API contract.
+- For WibWob-DOS Turbo Vision integration, follow the ANSI guardrail strictly: render from parsed tile/cell model to TV attributes, never raw escape streams.
+EOF' in /Users/james/Repos/wibandwob-dos succeeded in 50ms:
+
+
+thinking
+**Checking structural headers**
+codex
+I’ve written the megareport file with all required sections and appendices. I’m running a final structural check now to verify every requested numbered section header is present and the status header matches exactly.
+exec
+/bin/zsh -lc 'wc -l .planning/spikes/spk-micropolis-engine-review/spk02-codex-megareport.md' in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc 'rg -n "''^## Status$|''^Status: in-progress$|''^GitHub issue: —$|''^PR: —$|''^## [0-9]+'"\\. |"'^## Appendix" .planning/spikes/spk-micropolis-engine-review/spk02-codex-megareport.md' in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc 'rg -n "''^## 1'"\\. Executive Summary|"'^## 2'"\\. Repository Map|"'^## 3'"\\. The Micropolis God Object|"'^## 4'"\\. Simulation Loop Deep-Dive|"'^## 5'"\\. Zone Growth Model|"'^## 6'"\\. Budget & Economy|"'^## 7'"\\. Power Grid|"'^## 8'"\\. Overlay Map Scans|"'^## 9'"\\. Disasters|"'^## 10'"\\. Sprites|"'^## 11'"\\. Terrain Generation|"'^## 12'"\\. Tools & Building Placement|"'^## 13'"\\. Save File Format|"'^## 14'"\\. Callback Interface|"'^## 15'"\\. WASM/Embind Binding Layer|"'^## 16'"\\. SvelteKit Frontend Architecture|"'^## 17'"\\. CLI Tool|"'^## 18'"\\. Modding Guide|"'^## 19'"\\. Integration Paths for WibWob-DOS|"'^## 20'"\\. Emscripten Decoupling Guide|"'^## 21'"\\. MOOLLM & AI Integration|"'^## 22'"\\. Determinism & Testing|"'^## 23'"\\. Appendices\" .planning/spikes/spk-micropolis-engine-review/spk02-codex-megareport.md" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+     974 .planning/spikes/spk-micropolis-engine-review/spk02-codex-megareport.md
+ succeeded in 51ms:
+9:## 1. Executive Summary
+26:## 2. Repository Map
+99:## 3. The Micropolis God Object
+169:## 4. Simulation Loop Deep-Dive
+218:## 5. Zone Growth Model
+313:## 6. Budget & Economy
+335:## 7. Power Grid
+345:## 8. Overlay Map Scans
+395:## 9. Disasters
+411:## 10. Sprites
+429:## 11. Terrain Generation
+443:## 12. Tools & Building Placement
+465:## 13. Save File Format
+509:## 14. Callback Interface
+523:## 15. WASM/Embind Binding Layer
+538:## 16. SvelteKit Frontend Architecture
+575:## 17. CLI Tool (`micropolis.js`)
+592:## 18. Modding Guide
+638:## 19. Integration Paths for WibWob-DOS
+772:## 20. Emscripten Decoupling Guide
+ succeeded in 51ms:
+3:## Status
+5:Status: in-progress
+6:GitHub issue: —
+7:PR: —
+9:## 1. Executive Summary
+26:## 2. Repository Map
+99:## 3. The Micropolis God Object
+169:## 4. Simulation Loop Deep-Dive
+218:## 5. Zone Growth Model
+313:## 6. Budget & Economy
+335:## 7. Power Grid
+345:## 8. Overlay Map Scans
+395:## 9. Disasters
+411:## 10. Sprites
+429:## 11. Terrain Generation
+443:## 12. Tools & Building Placement
+465:## 13. Save File Format
+509:## 14. Callback Interface
+523:## 15. WASM/Embind Binding Layer
+538:## 16. SvelteKit Frontend Architecture
+
+thinking
+**Finalizing concise completion**
+codex
+Completed. The megareport is saved at:
+
+`.planning/spikes/spk-micropolis-engine-review/spk02-codex-megareport.md`
+
+I verified:
+- Required header block matches exactly (`Status: in-progress`, `GitHub issue: —`, `PR: —`).
+- All required sections `1` through `23` are present.
+- Appendices `A` through `G` are present.
+- File length is `974` lines.
+tokens used
+387,533
+Completed. The megareport is saved at:
+
+`.planning/spikes/spk-micropolis-engine-review/spk02-codex-megareport.md`
+
+I verified:
+- Required header block matches exactly (`Status: in-progress`, `GitHub issue: —`, `PR: —`).
+- All required sections `1` through `23` are present.
+- Appendices `A` through `G` are present.
+- File length is `974` lines.
