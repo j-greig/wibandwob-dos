@@ -1097,8 +1097,13 @@ void TTestPatternApp::handleEvent(TEvent& event)
                 break;
             }
             case cmAppLauncher: {
-                TRect r = deskTop->getExtent();
-                r.grow(-1, 0);
+                TRect desk = deskTop->getExtent();
+                int ww = 63, hh = 20;
+                int x = (desk.b.x - ww) / 2;
+                int y = (desk.b.y - hh) / 2;
+                if (x < 0) x = 0;
+                if (y < 0) y = 0;
+                TRect r(x, y, x + ww, y + hh);
                 TWindow* w = createAppLauncherWindow(r);
                 deskTop->insert(w);
                 registerWindow(w);
@@ -3555,13 +3560,7 @@ void api_spawn_deep_signal(TTestPatternApp& app, const TRect* bounds) {
 }
 
 void api_spawn_app_launcher(TTestPatternApp& app, const TRect* bounds) {
-    TRect r;
-    if (bounds) {
-        r = *bounds;
-    } else {
-        r = app.deskTop->getExtent();
-        r.grow(-1, 0);
-    }
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 63, 20);
     TWindow* w = createAppLauncherWindow(r);
     app.deskTop->insert(w);
     app.registerWindow(w);
