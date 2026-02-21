@@ -31,7 +31,7 @@ const DesktopTheme& desktopTheme()
 
 void setDesktopThemeMonochrome()
 {
-    currentTheme.bgPattern = '\xB1'; // ▒ medium shade checkerboard
+    currentTheme.bgPattern = '\xB0'; // ░ light shade — the classic TV desktop dither
 
     currentTheme.bgAttr    = TColorAttr(TColorRGB(100, 100, 100),
                                         TColorRGB(0, 0, 0));
