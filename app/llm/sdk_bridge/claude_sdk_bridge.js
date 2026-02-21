@@ -169,7 +169,21 @@ class ClaudeSDKBridge {
     async _injectCapabilities() {
         try {
             const axios = require('axios');
-            const resp = await axios.get('http://127.0.0.1:8089/capabilities', { timeout: 3000 });
+            // Retry up to 3 times — API server may still be starting
+            let resp;
+            for (let attempt = 1; attempt <= 3; attempt++) {
+                try {
+                    resp = await axios.get('http://127.0.0.1:8089/capabilities', { timeout: 5000 });
+                    break;
+                } catch (retryErr) {
+                    if (attempt < 3) {
+                        console.error(`[BRIDGE] Capabilities attempt ${attempt} failed, retrying in 2s...`);
+                        await new Promise(r => setTimeout(r, 2000));
+                    } else {
+                        throw retryErr;
+                    }
+                }
+            }
             const caps = resp.data;
 
             const windowTypes = (caps.window_types || []).map(t => t.name || t).join(', ');
