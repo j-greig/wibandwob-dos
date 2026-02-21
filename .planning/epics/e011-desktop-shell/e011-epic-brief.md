@@ -1,13 +1,13 @@
 ---
 id: E011
-title: Desktop Shell — Icons, Folders, Trash & App Launcher
+title: Desktop Shell — Icons, Folders, Trash, App Launcher & Desktop Apps
 status: not-started
 issue: 78
 pr: ~
 depends_on: [E009]
 ---
 
-# E011 — Desktop Shell: Icons, Folders, Trash & App Launcher
+# E011 — Desktop Shell: Icons, Folders, Trash, App Launcher & Desktop Apps
 
 ## Objective
 
@@ -151,6 +151,120 @@ Stories:
 - [ ] S25: Wallpaper selection from existing generative art engines
 - [ ] S26: API surface (`set_wallpaper`, `get_wallpaper`)
 
+### F07: Figlet Clock App
+
+A desktop clock widget rendered in large figlet-style ASCII art. The AI's bedside clock.
+
+- Displays current time (HH:MM:SS) rendered through figlet fonts
+- Runs as a `TWindow` subclass, auto-refreshes every second
+- Default font: `banner` or `big` — something chunky and retro
+- **Stretch goal**: Font selector (cycle through installed figlet fonts via menu or API)
+- **Stretch goal**: Date display toggle, 12/24hr toggle
+- Clock is a natural "desktop furniture" item — always visible, makes the OS feel alive
+
+Implementation notes:
+- Figlet rendering in C++: either shell out to `figlet` binary, or embed a minimal figlet font parser (`.flf` format is simple — header + character definitions)
+- Embedding is preferred for portability (no runtime dependency)
+- Available fonts on macOS: `/opt/homebrew/Cellar/figlet/2.2.5/share/figlet/fonts/` (~150+ fonts)
+- Window auto-sizes to fit rendered text
+
+Stories:
+- [ ] S27: Figlet font parser (load `.flf` file, render string → multi-line ASCII)
+- [ ] S28: Clock window (TWindow subclass, timer-driven redraw)
+- [ ] S29: Font selection (menu or API command `set_clock_font`)
+- [ ] S30: API surface (`open_clock`, `set_clock_font`, `list_clock_fonts`)
+
+### F08: WibWob World Map App
+
+A map viewer showing the geography of WibWob World — locations of Wib, Wob, Scramble, other symbients, and points of interest.
+
+- ASCII/box-drawing map rendered in a `TWindow`
+- Shows named locations, symbient positions (updated via state/API)
+- Scrollable if map exceeds window size
+- Symbient positions update in real-time (or on refresh) from the game state
+- Map data defined in a simple format (ASCII art + coordinate metadata)
+- Pre-1993 aesthetic: no fancy graphics, just text, borders, and symbols
+
+Stories:
+- [ ] S31: Map data format and loader (ASCII art map + named POI coordinates)
+- [ ] S32: Map viewer window (TWindow with scroll, symbient markers)
+- [ ] S33: Real-time symbient position overlay (query game state, update markers)
+- [ ] S34: API surface (`open_map`, `get_map_state`, `set_symbient_location`)
+
+### F09: Neural Lace Mail App
+
+A messaging app for reading and composing neural lace messages — something between email and a bulletin board. Plain text always, pre-1993 tech aesthetic.
+
+- Dual-pane view: message list (top/left) + message body (bottom/right)
+- Messages have: sender (symbient name), subject, timestamp, body (plain text)
+- Inbox shows unread count, sorted by date
+- Compose mode: plain text editor, recipient picker from known symbients
+- Messages stored locally as flat files or simple JSON (one file per message, maildir-style)
+- **Not networked** — messages are local state, created by AI agents via API or by human
+- Bulletin board mode: shared messages visible to all symbients (like a town notice board)
+- Read/unread tracking, delete/archive
+
+Design aesthetic: Think `pine`, `elm`, or early BBS mail readers. No MIME, no HTML, no attachments. Just text.
+
+Stories:
+- [ ] S35: Message data model and storage (maildir-style flat files)
+- [ ] S36: Mail list view (TWindow with TListViewer or similar)
+- [ ] S37: Message body viewer (TWindow with scrollable text)
+- [ ] S38: Compose mode (simple text input, recipient, subject)
+- [ ] S39: Unread tracking and notification (badge on desktop icon)
+- [ ] S40: Bulletin board mode (shared inbox visible to all symbients)
+- [ ] S41: API surface (`send_message`, `list_messages`, `read_message`, `delete_message`, `list_unread`)
+
+### F10: Session Tape Recorder
+
+Record entire WibWobDOS sessions to disk for replay, sharing, and debugging. Inspired by [TUIOS tape recording](https://github.com/Gaurav-Gosain/tuios/blob/main/docs/TAPE_RECORDING.md) and [asciinema](https://github.com/asciinema/asciinema).
+
+Two recording modes:
+1. **Action tape** (TUIOS-style): Records commands/actions, not raw output. Portable, editable, replayable. Good for tutorials and automated workflows.
+2. **Screen tape** (asciinema-style): Records raw terminal output + timing. Exact visual replay. Good for demos and debugging.
+
+- Start/stop recording via menu or API
+- Status indicator when recording (e.g. `●REC` in status bar)
+- Tapes saved to `~/.wibwobdos/tapes/` or workspace directory
+- Playback: replay in a window, or export to asciinema `.cast` format for web sharing
+
+Implementation notes:
+- **Action tape in C++**: Hook into command registry — log every command dispatch with timestamp. On replay, feed commands back through the registry with timing delays.
+- **Screen tape in C++**: Capture the TScreen buffer at intervals or on damage, store as timestamped frames. Similar to asciinema v2 format (newline-delimited JSON: `[time, "o", "data"]`).
+- TUIOS does this in Go with Bubble Tea's `tea.Program` — we'd hook into Turbo Vision's event loop instead.
+- asciinema `.cast` format is simple and well-documented: https://docs.asciinema.org/manual/asciicast/v2/
+
+Stories:
+- [ ] S42: Action recorder (hook command registry, log with timestamps)
+- [ ] S43: Screen recorder (capture TScreen buffer, store as timestamped frames)
+- [ ] S44: Start/stop UI (menu item, status bar indicator)
+- [ ] S45: Action tape playback (feed commands with timing)
+- [ ] S46: Screen tape playback (render frames in a window)
+- [ ] S47: Export to asciinema `.cast` format
+- [ ] S48: API surface (`tape_start`, `tape_stop`, `tape_play`, `tape_list`, `tape_export`)
+
+### F11: Browser Improvements
+
+Port ideas from [TUIOS web terminal architecture](https://github.com/Gaurav-Gosain/tuios/blob/main/docs/WEB.md) to improve WibWobDOS's existing browser view. Current browser is MVP — these bring it closer to usable.
+
+Key ideas to steal from TUIOS-web:
+- **WebGL/Canvas rendering pipeline** — TUIOS uses xterm.js with WebGL addon for 60fps. Our browser-hosted mode should evaluate the same stack.
+- **Dual transport** — WebTransport (QUIC/UDP) with WebSocket fallback. Lower latency for the hosted web version.
+- **Mouse deduplication** — Only send mouse events when cell position changes (80-95% reduction). Our browser may be sending too many.
+- **requestAnimationFrame batching** — Batch terminal writes per frame instead of per-event.
+- **Settings panel** — Transport, renderer, font size controls accessible in-browser.
+- **Read-only mode** — For public demos and spectating.
+
+This feature is about the **browser-hosted WibWobDOS experience** (when accessed via web), not the in-app text-mode browser for visiting URLs.
+
+Stories:
+- [ ] S49: Audit current browser transport — identify latency bottlenecks
+- [ ] S50: Implement mouse event deduplication (cell-change-only)
+- [ ] S51: requestAnimationFrame write batching
+- [ ] S52: Evaluate xterm.js WebGL addon for rendering
+- [ ] S53: Read-only spectator mode
+- [ ] S54: In-browser settings panel (font size, renderer)
+
 ## Non-Goals
 
 - **File manager** — Not building a full file browser. Folder views show launchable items, not arbitrary filesystem contents.
@@ -249,13 +363,29 @@ New command surface (all go through command registry):
 
 Recommended implementation order:
 
+### Phase 1: Foundation (shell infrastructure)
 1. **F01 S01–S02**: Desktop icon layer + keyboard nav (foundation)
 2. **F04 S16–S17**: App manifest + launcher (makes icons useful)
 3. **F02 S06–S07**: Folder views with built-in categories
-4. **F01 S03–S05**: Icon drag, persistence, API
-5. **F03 S11–S15**: Trash view
-6. **F05 S21–S23**: Minimise-to-icon
-7. **F06 S24–S26**: Wallpaper (stretch goal)
+
+### Phase 2: Desktop Apps (make it feel alive)
+4. **F07 S27–S28**: Figlet clock (quick win, instant desktop furniture)
+5. **F09 S35–S38**: Neural lace mail (core read/compose loop)
+6. **F08 S31–S32**: WibWob world map (static map + POI)
+
+### Phase 3: Polish & Infra
+7. **F01 S03–S05**: Icon drag, persistence, API
+8. **F03 S11–S15**: Trash view
+9. **F05 S21–S23**: Minimise-to-icon
+10. **F10 S42–S44**: Session tape recorder (record + stop)
+
+### Phase 4: Stretch
+11. **F06 S24–S26**: Wallpaper
+12. **F07 S29–S30**: Clock font selector
+13. **F08 S33–S34**: Real-time symbient positions on map
+14. **F09 S39–S41**: Mail unread badges, bulletin board mode
+15. **F10 S45–S48**: Tape playback, asciinema export
+16. **F11 S49–S54**: Browser improvements (web-hosted experience)
 
 ## Risks
 
@@ -271,6 +401,15 @@ Recommended implementation order:
 
 All changes are additive. The existing flat menu and window system continue to work. Feature can be disabled by reverting to standard `TDeskTop` class.
 
+## Research References
+
+- **TUIOS Tape Recording**: https://github.com/Gaurav-Gosain/tuios/blob/main/docs/TAPE_RECORDING.md — action-level recording (commands, not raw bytes), `.tape` file format, playback architecture. Port concept to C++/Turbo Vision event loop.
+- **TUIOS Web Terminal**: https://github.com/Gaurav-Gosain/tuios/blob/main/docs/WEB.md — xterm.js + WebGL rendering, WebTransport/WebSocket dual protocol, mouse deduplication, rAF batching. Steal for our browser-hosted mode.
+- **asciinema**: https://github.com/asciinema/asciinema (16.8k⭐, Rust) — screen-level recording, `.cast` v2 format (newline-delimited JSON), web player. Export target for F10.
+- **Awesome TUIs survey**: See `RESEARCH-awesome-tuis.md` in tvterm repo notes branch for full landscape analysis.
+- **Figlet fonts**: `.flf` format spec at http://www.jave.de/figlet/figfont.html — simple enough to embed a parser in C++ (header line + character blocks).
+- **Desktop-TUI**: https://github.com/Julien-cpsn/desktop-tui — Go-based terminal desktop env, for reference only (different stack).
+
 ## Parking Lot
 
 - [ ] Icon drag-and-drop between desktop and folders
@@ -280,3 +419,16 @@ All changes are additive. The existing flat menu and window system continue to w
 - [ ] Start menu (Windows 95 style)
 - [ ] File associations (open .txt → text editor, .cty → Micropolis)
 - [ ] Right-click context menus on icons
+- [ ] Clock: alarm/timer mode (pomodoro for symbients)
+- [ ] Clock: timezone display (WibWob Standard Time vs Earth time)
+- [ ] Mail: message threading / reply chains
+- [ ] Mail: message forwarding between symbients
+- [ ] Mail: mail notification sound (terminal bell)
+- [ ] Map: fog of war (unexplored areas hidden)
+- [ ] Map: clickable locations to teleport/navigate
+- [ ] Tape: live streaming mode (stream session to web viewer)
+- [ ] Tape: tape editing TUI (trim, cut, annotate)
+- [ ] Calendar app (complements clock — symbient schedule)
+- [ ] Address book (complements mail — symbient contacts)
+- [ ] Calculator (desk accessory, like Windows 3.1)
+- [ ] Notepad (simple text editor, desk accessory)
