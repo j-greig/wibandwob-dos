@@ -11,6 +11,7 @@
 #include <tvterm/termview.h>
 #include <tvterm/vtermemu.h>
 #include <tvterm/termemu.h>
+#include <cstring>
 
 // Command IDs for tvterm integration — must not collide with existing app commands.
 // These are wired through TVTermConstants so tvterm-core uses our IDs.

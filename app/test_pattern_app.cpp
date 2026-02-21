@@ -3388,7 +3388,7 @@ void api_spawn_terminal(TTestPatternApp& app, const TRect* bounds) {
 }
 
 std::string api_terminal_write(TTestPatternApp& app, const std::string& text) {
-    // Find the most recently inserted terminal window
+    // Find the first open terminal window on the desktop
     TView* start = app.deskTop->first();
     TWibWobTerminalWindow* termWin = nullptr;
     if (start) {
