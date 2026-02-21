@@ -2614,6 +2614,28 @@ std::string api_chat_receive(TTestPatternApp& app, const std::string& sender, co
     return "ok";
 }
 
+std::string api_wibwob_ask(TTestPatternApp& app, const std::string& text) {
+    // Inject a user message into the Wib&Wob chat window, triggering LLM response.
+    // Find the first TWibWobWindow on the desktop.
+    TWibWobWindow* chatWin = nullptr;
+    if (app.deskTop) {
+        TView* v = app.deskTop->first();
+        if (v) {
+            TView* start = v;
+            do {
+                if (auto* ww = dynamic_cast<TWibWobWindow*>(v)) {
+                    chatWin = ww;
+                    break;
+                }
+                v = v->next;
+            } while (v != start);
+        }
+    }
+    if (!chatWin) return "err no wibwob chat window open";
+    chatWin->injectUserMessage(text);
+    return "ok";
+}
+
 void api_tile(TTestPatternApp& app) { app.tile(); }
 void api_close_all(TTestPatternApp& app) { app.closeAll(); }
 

@@ -150,6 +150,9 @@ public:
     TWibWobMessageView* getMessageView() { return messageView; }
     TWibWobInputView* getInputView() { return inputView; }
 
+    // API: inject a user message and trigger LLM response
+    void injectUserMessage(const std::string& text) { processUserInput(text); }
+
 private:
     static TFrame* initFrame(TRect r);
 

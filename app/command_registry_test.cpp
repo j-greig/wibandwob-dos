@@ -31,6 +31,7 @@ void api_spawn_terminal(TTestPatternApp&, const TRect*) {}
 std::string api_terminal_write(TTestPatternApp&, const std::string&, const std::string&) { return "ok"; }
 std::string api_terminal_read(TTestPatternApp&, const std::string&) { return ""; }
 std::string api_chat_receive(TTestPatternApp&, const std::string&, const std::string&) { return "ok"; }
+std::string api_wibwob_ask(TTestPatternApp&, const std::string&) { return "ok"; }
 
 int main() {
     const std::string payload = get_command_capabilities_json();

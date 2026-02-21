@@ -10,6 +10,7 @@ extern void api_expand_scramble(TTestPatternApp& app);
 extern std::string api_scramble_say(TTestPatternApp& app, const std::string& text);
 extern std::string api_scramble_pet(TTestPatternApp& app);
 extern std::string api_chat_receive(TTestPatternApp& app, const std::string& sender, const std::string& text);
+extern std::string api_wibwob_ask(TTestPatternApp& app, const std::string& text);
 extern void api_tile(TTestPatternApp& app);
 extern void api_close_all(TTestPatternApp& app);
 extern void api_save_workspace(TTestPatternApp& app);
@@ -58,6 +59,7 @@ const std::vector<CommandCapability>& get_command_capabilities() {
         {"terminal_write", "Send text input to the terminal emulator (requires text param; optional window_id)", true},
         {"terminal_read", "Read the visible text content of a terminal window (optional window_id param)", false},
         {"chat_receive", "Display a remote chat message in Scramble (sender + text params)", true},
+        {"wibwob_ask", "Send a user message to the Wib&Wob chat window, triggering an AI response (text param)", true},
     };
     return capabilities;
 }
@@ -216,6 +218,12 @@ std::string exec_registry_command(
             return "err missing text";
         std::string sender = (itSender != kv.end()) ? itSender->second : "remote";
         return api_chat_receive(app, sender, itText->second);
+    }
+    if (name == "wibwob_ask") {
+        auto itText = kv.find("text");
+        if (itText == kv.end() || itText->second.empty())
+            return "err missing text";
+        return api_wibwob_ask(app, itText->second);
     }
     return "err unknown command";
 }
