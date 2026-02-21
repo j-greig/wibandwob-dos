@@ -7,9 +7,19 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
+PORT="${WIBWOB_API_PORT:-8089}"
+
+# Kill any stale server on this port
+STALE_PID=$(lsof -ti :"$PORT" 2>/dev/null || true)
+if [ -n "$STALE_PID" ]; then
+    echo "🧹 Killing stale process on port $PORT (PID: $STALE_PID)"
+    kill $STALE_PID 2>/dev/null || true
+    sleep 1
+fi
+
 echo "🚀 Starting TUI Control API Server"
-echo "   Port: 8089"
-echo "   MCP Endpoint: http://127.0.0.1:8089/mcp"
+echo "   Port: $PORT"
+echo "   MCP Endpoint: http://127.0.0.1:$PORT/mcp"
 echo ""
 
 # Check if venv exists
@@ -27,4 +37,4 @@ echo "✅ Dependencies ready"
 # Run the server
 echo "🔌 Server starting (Ctrl+C to stop)"
 echo ""
-WIBWOB_REPO_ROOT="$SCRIPT_DIR" ./tools/api_server/venv/bin/python -m tools.api_server.main --port=8089
+WIBWOB_REPO_ROOT="$SCRIPT_DIR" ./tools/api_server/venv/bin/python -m tools.api_server.main --port="$PORT"
