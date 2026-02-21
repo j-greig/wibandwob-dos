@@ -136,6 +136,11 @@ class ClaudeSDKBridge {
 
             console.error('DEBUG: Starting session with systemPrompt length:', this.systemPrompt?.length || 0);
 
+            // Inject live capabilities from the API into the system prompt.
+            // This is a "Lego brick" module — the capabilities block is appended
+            // to whatever base prompt was loaded from the .md file.
+            await this._injectCapabilities();
+
             // Store session configuration
             this.sessionConfig = {
                 systemPrompt: this.systemPrompt,
@@ -154,6 +159,43 @@ class ClaudeSDKBridge {
 
         } catch (error) {
             this.sendError('SESSION_START_ERROR', error.message);
+        }
+    }
+
+    /**
+     * Fetch live capabilities from the API and append to the system prompt.
+     * Gracefully skips if the API isn't running.
+     */
+    async _injectCapabilities() {
+        try {
+            const axios = require('axios');
+            const resp = await axios.get('http://127.0.0.1:8089/capabilities', { timeout: 3000 });
+            const caps = resp.data;
+
+            const windowTypes = (caps.window_types || []).map(t => t.name || t).join(', ');
+            const commands = (caps.commands || []).map(c => c.name || c).join(', ');
+
+            if (!windowTypes && !commands) {
+                console.error('[BRIDGE] Capabilities empty, skipping injection');
+                return;
+            }
+
+            const block = [
+                '',
+                '## Available TUI Capabilities (auto-derived from C++ registry)',
+                '',
+                '### Window Types (use with tui_create_window tool)',
+                windowTypes || '(none)',
+                '',
+                '### Commands (available as tui_* tools)',
+                commands || '(none)',
+                ''
+            ].join('\n');
+
+            this.systemPrompt = (this.systemPrompt || '') + '\n' + block;
+            console.error(`[BRIDGE] Injected capabilities: ${(caps.window_types || []).length} types, ${(caps.commands || []).length} commands`);
+        } catch (err) {
+            console.error(`[BRIDGE] Capabilities fetch failed (API may not be running): ${err.message}`);
         }
     }
     
@@ -192,20 +234,20 @@ class ClaudeSDKBridge {
             console.error('DEBUG: About to query with model:', this.sessionConfig.model);
             console.error('DEBUG: MCP server initialized:', !!this.mcpServer);
             
-            // Build allowed tools list including MCP tool IDs
+            // Build allowed tools list — auto-derive MCP tool names from the server
             const baseTools = this.sessionConfig.allowedTools || [];
-            const mcpTools = [
-                "mcp__tui-control__tui_create_window",
-                "mcp__tui-control__tui_move_window", 
-                "mcp__tui-control__tui_get_state",
-                "mcp__tui-control__tui_close_window",
-                "mcp__tui-control__tui_cascade_windows",
-                "mcp__tui-control__tui_tile_windows",
-                "mcp__tui-control__tui_send_text",
-                "mcp__tui-control__tui_send_figlet",
-                "mcp__tui-control__tui_terminal_write",
-                "mcp__tui-control__tui_terminal_read"
-            ];
+            let mcpTools = [];
+            if (this.mcpServer && this.mcpServer.tools) {
+                // Auto-derive from whatever tools mcp_tools.js defines
+                const toolArray = Array.isArray(this.mcpServer.tools)
+                    ? this.mcpServer.tools
+                    : Object.values(this.mcpServer.tools);
+                mcpTools = toolArray.map(t => {
+                    const name = t.name || t.toolName || (typeof t === 'string' ? t : '');
+                    return `mcp__tui-control__${name}`;
+                }).filter(n => n !== 'mcp__tui-control__');
+                console.error(`[BRIDGE] Auto-derived ${mcpTools.length} MCP tool names from server`);
+            }
             const toolList = [...new Set([...baseTools, ...mcpTools])];
             const modelId = this.normalizeModelId(this.sessionConfig.model);
 
