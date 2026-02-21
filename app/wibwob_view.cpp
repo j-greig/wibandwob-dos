@@ -723,6 +723,9 @@ void TWibWobWindow::processUserInput(const std::string& input) {
         return;
     }
 
+    // Bring chat window to front so it's visible
+    select();
+
     // Add user message
     messageView->addMessage("User", input);
     logMessage("User", input);
