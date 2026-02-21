@@ -266,7 +266,7 @@ The C++ command registry (`app/command_registry.cpp`) and window type registry (
 
 **Automated enforcement** (run these tests before merging):
 ```bash
-uv run --with pytest pytest tests/contract/test_window_type_parity.py tests/contract/test_surface_parity_matrix.py -v
+uv run --with pytest pytest tests/contract/test_window_type_parity.py tests/contract/test_surface_parity_matrix.py tests/contract/test_node_mcp_parity.py -v
 ```
 
 These tests auto-derive from C++ source — no hardcoded mapping tables. They will fail immediately if a new C++ type or command is added without updating the Python side.
@@ -281,7 +281,15 @@ These tests auto-derive from C++ source — no hardcoded mapping tables. They wi
 1. Add to `get_command_capabilities()` in `app/command_registry.cpp`
 2. Add dispatch in `exec_registry_command()` in same file
 3. Add MCP tool builder in `_command_tool_builders()` in `tools/api_server/mcp_tools.py`
-4. Run: `pytest tests/contract/test_surface_parity_matrix.py`
+4. Add matching tool in `app/llm/sdk_bridge/mcp_tools.js` (Node MCP for embedded agent)
+5. Run: `pytest tests/contract/test_surface_parity_matrix.py tests/contract/test_node_mcp_parity.py`
+
+### Node MCP bridge (embedded Wib&Wob agent)
+The embedded agent uses `app/llm/sdk_bridge/mcp_tools.js` for TUI control tools.
+- Window types use `z.string()` (not `z.enum`) — validated by C++ registry, not JS
+- Tool whitelist in `claude_sdk_bridge.js` is auto-derived from `mcpServer.tools` (no hardcoding)
+- System prompt is augmented at session start with live capabilities from `GET /capabilities`
+- Parity test: `pytest tests/contract/test_node_mcp_parity.py`
 
 ### Capabilities endpoint
 `GET /capabilities` now queries C++ via IPC (`get_window_types` and `get_capabilities` commands) so window types and commands are auto-derived from the running binary — Python never maintains its own authoritative list.

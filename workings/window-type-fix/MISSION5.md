@@ -80,7 +80,7 @@ Two approaches:
   {
     "id": "M5-T01",
     "title": "Relax tui_create_window type enum to accept all types",
-    "status": "todo",
+    "status": "done",
     "instructions": [
       "Edit app/llm/sdk_bridge/mcp_tools.js",
       "Change tui_create_window type parameter from z.enum([...5 types...]) to z.string().describe('Window type slug — see /capabilities for full list')",
@@ -92,7 +92,7 @@ Two approaches:
   {
     "id": "M5-T02",
     "title": "Add missing tools to mcp_tools.js matching Python MCP surface",
-    "status": "todo",
+    "status": "done",
     "instructions": [
       "Read the Python _command_tool_builders() in tools/api_server/mcp_tools.py for the full list",
       "Add matching tools to mcp_tools.js for at least:",
@@ -115,7 +115,7 @@ Two approaches:
   {
     "id": "M5-T03",
     "title": "Auto-build mcpTools whitelist from mcp_tools.js tool names",
-    "status": "todo",
+    "status": "done",
     "instructions": [
       "Edit app/llm/sdk_bridge/claude_sdk_bridge.js",
       "Replace hardcoded mcpTools array with dynamic extraction from this.mcpServer",
@@ -130,7 +130,7 @@ Two approaches:
   {
     "id": "M5-T04",
     "title": "Inject capabilities block into system prompt at session start",
-    "status": "todo",
+    "status": "done",
     "instructions": [
       "Edit app/llm/sdk_bridge/claude_sdk_bridge.js startSession() or sendQuery()",
       "Before first query, fetch GET http://127.0.0.1:8089/capabilities",
@@ -149,7 +149,7 @@ Two approaches:
   {
     "id": "M5-T05",
     "title": "Add auto-derived parity test for Node MCP tools",
-    "status": "todo",
+    "status": "done",
     "instructions": [
       "Create tests/contract/test_node_mcp_parity.py",
       "Parse tool names from app/llm/sdk_bridge/mcp_tools.js using regex",
@@ -181,7 +181,7 @@ Two approaches:
   {
     "id": "M5-T07",
     "title": "Document the auto-derive architecture and commit",
-    "status": "todo",
+    "status": "done",
     "instructions": [
       "Update CLAUDE.md Parity Enforcement section to mention the Node bridge",
       "Add checklist item: when adding a new command, also add to mcp_tools.js",
