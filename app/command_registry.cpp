@@ -26,6 +26,7 @@ extern void api_spawn_quadra(TTestPatternApp& app, const TRect* bounds);
 extern void api_spawn_snake(TTestPatternApp& app, const TRect* bounds);
 extern void api_spawn_rogue(TTestPatternApp& app, const TRect* bounds);
 extern void api_spawn_deep_signal(TTestPatternApp& app, const TRect* bounds);
+extern void api_spawn_app_launcher(TTestPatternApp& app, const TRect* bounds);
 extern void api_spawn_terminal(TTestPatternApp& app, const TRect* bounds);
 extern std::string api_terminal_write(TTestPatternApp& app, const std::string& text, const std::string& window_id);
 extern std::string api_terminal_read(TTestPatternApp& app, const std::string& window_id);
@@ -52,6 +53,7 @@ const std::vector<CommandCapability>& get_command_capabilities() {
         {"open_snake", "Open Snake game", false},
         {"open_rogue", "Open WibWob Rogue dungeon crawler", false},
         {"open_deep_signal", "Open Deep Signal space scanner game", false},
+        {"open_apps", "Open the Applications folder browser", false},
         {"open_terminal", "Open a terminal emulator window", false},
         {"terminal_write", "Send text input to the terminal emulator (requires text param; optional window_id)", true},
         {"terminal_read", "Read the visible text content of a terminal window (optional window_id param)", false},
@@ -184,6 +186,10 @@ std::string exec_registry_command(
     }
     if (name == "open_deep_signal") {
         api_spawn_deep_signal(app, nullptr);
+        return "ok";
+    }
+    if (name == "open_apps") {
+        api_spawn_app_launcher(app, nullptr);
         return "ok";
     }
     if (name == "open_terminal") {

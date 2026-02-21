@@ -1,0 +1,574 @@
+OpenAI Codex v0.101.0 (research preview)
+--------
+workdir: /Users/james/repos/wibandwob-dos
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: medium
+reasoning summaries: auto
+session id: 019c8046-b82e-76f0-acec-3b8cb05b5e5e
+--------
+user
+DEVNOTE: Files matching codex-*.log are Codex output logs — intentionally untracked. Ignore them completely. Do not mention them or ask about them.
+
+TASK: Fix Wib&Wob embedded chat inability to use tui_terminal_write and tui_terminal_read MCP tools
+
+## What was done (committed to feat/e011-desktop-shell)
+
+1. app/llm/sdk_bridge/mcp_tools.js — added tui_terminal_write and tui_terminal_read tools
+2. app/llm/sdk_bridge/claude_sdk_bridge.js — added their IDs to hardcoded mcpTools allowedTools list (~line 197)
+3. REST API works: GET /terminal/w3/output returns terminal text correctly
+
+## What is NOT working
+
+From the Wib&Wob chat window inside the TUI, Wib&Wob hallucinates XML tool calls like <get_window_info> and <send_keys_to_window> instead of calling real MCP tools. The new tools tui_terminal_write and tui_terminal_read are never actually invoked.
+
+## Architecture
+
+- C++ spawns Node.js: app/llm/sdk_bridge/claude_sdk_bridge.js
+- Bridge calls createTuiMcpServer() from mcp_tools.js
+- Tools passed via queryOptions.mcpServers = { 'tui-control': this.mcpServer }
+- allowedTools hardcoded list gates which tools Claude can call
+
+## What to do
+
+1. Read app/llm/sdk_bridge/claude_sdk_bridge.js (full file)
+2. Read app/llm/sdk_bridge/mcp_tools.js (full file)
+3. Read app/llm/sdk_bridge/sdk_loader.js (full file)
+4. Read app/llm/providers/claude_code_sdk_provider.cpp (how bridge is spawned, path resolution)
+5. Check: does createSdkMcpServer from @anthropic-ai/claude-agent-sdk actually accept the config format used? Run: node -e "const {createSdkMcpServer} = require('./app/llm/sdk_bridge/node_modules/@anthropic-ai/claude-agent-sdk'); console.log(typeof createSdkMcpServer)" to check if it exists
+6. Check the actual SDK API: node -e "console.log(Object.keys(require('./app/llm/sdk_bridge/node_modules/@anthropic-ai/claude-agent-sdk')))"
+7. Check what mcpServers option the SDK query() actually accepts — look in node_modules/@anthropic-ai/claude-agent-sdk/ source
+8. Run node app/llm/sdk_bridge/test_mcp_tools.js to verify tool registration
+9. Find the root cause of why MCP tools are not being offered to Wib&Wob
+10. Fix it — likely either: wrong SDK API shape for mcpServers, createSdkMcpServer doesn't exist or returns wrong shape, or the tool calling mechanism is not wired correctly
+11. Commit fix with message: fix(sdk): [description] — no emoji, plain text
+
+## Commit format
+type(scope): summary
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+mcp startup: no servers
+2026-02-21T12:57:24.309496Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c76ff-4405-7962-ae80-917da2e489f2
+
+thinking
+**Confirming approach and next steps**
+codex
+I’m going to trace the SDK bridge end-to-end first: read the four files you listed, then verify the installed SDK exports and `query()` option shape in `node_modules`, and reproduce with the MCP test script before patching.
+
+thinking
+**Planning parallel file reads**
+exec
+/bin/zsh -lc "sed -n '1,260p' app/llm/sdk_bridge/claude_sdk_bridge.js" in /Users/james/repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,260p' app/llm/sdk_bridge/mcp_tools.js" in /Users/james/repos/wibandwob-dos succeeded in 52ms:
+#!/usr/bin/env node
+/**
+ * Claude Code SDK Bridge for C++ TUI Applications
+ * 
+ * Provides streaming interface between C++ and Claude Code SDK
+ * Supports customSystemPrompt and real-time response streaming
+ */
+
+const process = require('process');
+const readline = require('readline');
+const { createTuiMcpServer } = require('./mcp_tools');
+const { loadSdk } = require('./sdk_loader');
+
+class ClaudeSDKBridge {
+    constructor() {
+        this.activeSession = null;
+        this.sessionId = null;           // Our internal session ID
+        this.sdkSessionId = null;        // SDK session ID for resume
+        this.systemPrompt = null;        // Agent SDK uses 'systemPrompt' not 'customSystemPrompt'
+        // this.allowedTools = ['Read', 'Write', 'Grep', 'Bash', 'LS', 'WebSearch', 'WebFetch'];
+exec
+/bin/zsh -lc 'wc -l app/llm/sdk_bridge/claude_sdk_bridge.js app/llm/sdk_bridge/mcp_tools.js app/llm/sdk_bridge/sdk_loader.js app/llm/providers/claude_code_sdk_provider.cpp' in /Users/james/repos/wibandwob-dos succeeded in 52ms:
+/**
+ * MCP Tools for TUI Application Control
+ * 
+ * Provides type-safe custom tools for Claude Code SDK that interface
+ * with the TUI application's API server for programmatic control.
+ */
+
+const { createSdkMcpServer, tool } = require('@anthropic-ai/claude-agent-sdk');
+const { z } = require('zod');
+const axios = require('axios');
+
+// API Server base URL (assuming running on default port)
+const API_BASE_URL = 'http://127.0.0.1:8089';
+
+// HTTP client with error handling
+const apiClient = axios.create({
+    baseURL: API_BASE_URL,
+    timeout: 5000,
+    headers: {
+        'Content-Type': 'application/json'
+ succeeded in 51ms:
+     490 app/llm/sdk_bridge/claude_sdk_bridge.js
+     375 app/llm/sdk_bridge/mcp_tools.js
+      32 app/llm/sdk_bridge/sdk_loader.js
+     699 app/llm/providers/claude_code_sdk_provider.cpp
+    1596 total
+
+thinking
+**Preparing to read remaining files**
+codex
+I’ve confirmed the bridge and MCP tool files are sizable; I’m now reading the remaining halves plus `sdk_loader.js` and the C++ provider to verify runtime wiring and path usage before touching code.
+exec
+/bin/zsh -lc "sed -n '261,520p' app/llm/sdk_bridge/mcp_tools.js" in /Users/james/repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,260p' app/llm/providers/claude_code_sdk_provider.cpp" in /Users/james/repos/wibandwob-dos succeeded in 59ms:
+                        
+                        const payload = {
+                            content: args.content,
+                            mode: args.mode
+                        };
+                        
+                        await apiClient.post(endpoint, payload);
+                        return {
+                            content: [{
+                                type: "text",
+                                text: `Text sent to ${args.windowId || 'auto-created'} text editor window (${args.mode} mode)`
+                            }]
+                        };
+                    } catch (error) {
+                        return {
+                            content: [{
+                                type: "text",
+                                text: `Error sending text: ${error.message}`
+                            }],
+                            isError: true
+ succeeded in 50ms:
+/*---------------------------------------------------------*/
+/*                                                         */
+/*   claude_code_sdk_provider.cpp - Claude Code SDK Provider*/
+/*   Streaming mode with customSystemPrompt support       */
+/*                                                         */
+/*---------------------------------------------------------*/
+
+#include "claude_code_sdk_provider.h"
+#include "claude_code_provider.h" // Fallback
+#include "../base/llm_provider_factory.h"
+#include "../base/path_search.h"
+
+#include <cstdio>
+#include <cstdlib>
+#include <memory>
+#include <sstream>
+#include <algorithm>
+#include <chrono>
+#include <iomanip>
+#include <unistd.h>
+exec
+/bin/zsh -lc "sed -n '261,520p' app/llm/sdk_bridge/claude_sdk_bridge.js" in /Users/james/repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,220p' app/llm/sdk_bridge/sdk_loader.js" in /Users/james/repos/wibandwob-dos succeeded in 53ms:
+            };
+
+            let messageCount = 0;
+            try {
+                if (!this.queryFn) {
+                    throw new Error('SDK query function not loaded');
+                }
+
+                const promptStream = this.buildPromptStream(messages);
+
+                for await (const message of this.queryFn({
+                    prompt: promptStream,
+                    options: queryOptions
+                })) {
+                    messageCount++;
+                    console.error('=== SDK MESSAGE DEBUG #' + messageCount + ' ===');
+                    console.error('Message type:', message.type);
+                    console.error('Message data:', JSON.stringify(message, null, 2));
+                    console.error('=== END SDK MESSAGE DEBUG ===');
+
+ succeeded in 52ms:
+/**
+ * SDK loader for the Agent SDK (@anthropic-ai/claude-agent-sdk).
+ * Returns a query function and source label for diagnostics.
+ */
+
+function loadSdk() {
+    let pkg = null;
+    let source = null;
+
+    try {
+        pkg = require('@anthropic-ai/claude-agent-sdk');
+        source = 'claude-agent-sdk';
+    } catch (_) {
+        // ignore
+    }
+
+    if (!pkg) {
+        throw new Error('No Claude SDK found. Install @anthropic-ai/claude-agent-sdk.');
+    }
+
+
+thinking
+**Preparing targeted code inspection**
+exec
+/bin/zsh -lc 'rg -n "nodeScriptPath|sdk_bridge|START_SESSION|SEND_QUERY|allowedTools|mcp|claude_sdk_bridge" app/llm/providers/claude_code_sdk_provider.cpp' in /Users/james/repos/wibandwob-dos succeeded in 52ms:
+203:    nodeScriptPath = "llm/sdk_bridge/claude_sdk_bridge.js";
+223:    const std::string resolvedScriptPath = ww_find_first_existing_upwards({nodeScriptPath}, 6);
+225:        fprintf(stderr, "DEBUG: Bridge script not found (searched upwards). Configured path: %s\n", nodeScriptPath.c_str());
+328:    command << R"({"type":"START_SESSION","data":{"customSystemPrompt":")"
+330:            << R"(,"allowedTools":["Read","Write","Grep","Bash","LS","WebSearch","WebFetch","mcp__tui-control__tui_create_window","mcp__tui-control__tui_move_window","mcp__tui-control__tui_get_state","mcp__tui-control__tui_close_window","mcp__tui-control__tui_cascade_windows","mcp__tui-control__tui_tile_windows","mcp__tui-control__tui_send_text","mcp__tui-control__tui_send_figlet"],"model":")"
+334:    fprintf(stderr, "[SDK] Sending START_SESSION: %zu bytes\n", cmdStr.size());
+404:    command << R"({"type":"SEND_QUERY","data":{"query":")" << escapeJsonString(query) << R"("}})";
+406:    fprintf(stderr, "[SDK] Sending SEND_QUERY: %zu bytes\n", cmdStr.size());
+523:    return nodeBridge->start(nodeScriptPath);
+608:    // nodeScriptPath (resolve relative path by searching upward from CWD).
+609:    nodeScriptPath = parseStringField("nodeScriptPath", nodeScriptPath);
+611:        const std::string resolved = ww_find_first_existing_upwards({nodeScriptPath}, 6);
+613:            nodeScriptPath = resolved;
+631:    // allowedTools: if present, keep defaults for now
+632:    allowedTools.clear();
+633:    if (config.find("allowedTools") != std::string::npos) {
+634:        allowedTools = {"Read", "Write", "Grep", "Bash", "LS", "WebSearch", "WebFetch"};
+
+thinking
+**Inspecting potential missing terminal tools**
+codex
+I found a suspicious hardcoded tool list in the C++ provider’s `START_SESSION` payload; I’m inspecting those exact lines plus SDK internals now to confirm whether this is the blocker versus an SDK API shape mismatch.
+exec
+/bin/zsh -lc "sed -n '580,660p' app/llm/providers/claude_code_sdk_provider.cpp" in /Users/james/repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '300,360p' app/llm/providers/claude_code_sdk_provider.cpp" in /Users/james/repos/wibandwob-dos succeeded in 50ms:
+        return false;
+    }
+    
+    useFallback = true;
+    return fallbackProvider->sendQuery(request, callback);
+}
+
+bool ClaudeCodeSDKProvider::startStreamingSession(const std::string& customSystemPrompt) {
+    fprintf(stderr, "[SDK] startStreamingSession called, prompt=%zu chars\n", customSystemPrompt.size());
+
+    if (streamingActive) {
+        fprintf(stderr, "[SDK] Session already active, reusing\n");
+        return true;
+    }
+
+    if (!initializeSDK()) {
+        fprintf(stderr, "[SDK] ERROR: initializeSDK failed\n");
+        setError("Failed to initialize Claude Code SDK");
+        return false;
+    }
+ succeeded in 52ms:
+            }
+            if (endPos == valPos) return defaultValue;
+            numStr = config.substr(valPos, endPos - valPos);
+        }
+
+        try {
+            return std::stoi(numStr);
+        } catch (...) {
+            return defaultValue;
+        }
+    };
+
+    auto parseStringField = [&config](const std::string& key, std::string defaultValue) -> std::string {
+        size_t keyPos = config.find(key);
+        if (keyPos == std::string::npos) return defaultValue;
+        size_t colonPos = config.find(":", keyPos);
+        if (colonPos == std::string::npos) return defaultValue;
+        size_t startQuote = config.find('"', colonPos);
+        if (startQuote == std::string::npos) return defaultValue;
+        ++startQuote;
+exec
+/bin/zsh -lc "node -e \"const {createSdkMcpServer} = require('./app/llm/sdk_bridge/node_modules/@anthropic-ai/claude-agent-sdk'); console.log(typeof createSdkMcpServer)\"" in /Users/james/repos/wibandwob-dosexec
+/bin/zsh -lc "node -e \"console.log(Object.keys(require('./app/llm/sdk_bridge/node_modules/@anthropic-ai/claude-agent-sdk')))\"" in /Users/james/repos/wibandwob-dos succeeded in 273ms:
+[
+  'AbortError',
+  'EXIT_REASONS',
+  'HOOK_EVENTS',
+  'createSdkMcpServer',
+  'query',
+  'tool',
+  'unstable_v2_createSession',
+  'unstable_v2_prompt',
+  'unstable_v2_resumeSession'
+]
+ succeeded in 276ms:
+function
+
+thinking
+**Inspecting SDK query format**
+exec
+/bin/zsh -lc "rg -n \"mcpServers|createSdkMcpServer|allowedTools|options\" app/llm/sdk_bridge/node_modules/@anthropic-ai/claude-agent-sdk -g '*.js' -g '*.mjs' -g '*.ts' -g '*.d.ts'" in /Users/james/repos/wibandwob-dos succeeded in 51ms:
+Total output lines: 364
+
+app/llm/sdk_bridge/node_modules/@anthropic-ai/claude-agent-sdk/sdk-tools.d.ts:305:           * The available choices for this question. Must have 2-4 options. Each option should be a distinct, mutually exclusive choice (unless multiSelect is enabled). There should be no 'Other' option, that will be provided automatically.
+app/llm/sdk_bridge/node_modules/@anthropic-ai/claude-agent-sdk/sdk-tools.d.ts:310:          options:
+app/llm/sdk_bridge/node_modules/@anthropic-ai/claude-agent-sdk/sdk-tools.d.ts:408:           * Set to true to allow the user to select multiple options instead of just one. Use when choices are not mutually exclusive.
+app/llm/sdk_bridge/node_modules/@anthropic-ai/claude-agent-sdk/sdk-tools.d.ts:424:           * The available choices for this question. Must have 2-4 options. Each option should be a distinct, mutually exclusive choice (unless multiSelect is enabled). There should be no 'Other' option, that will be provided automatically.
+app/llm/sdk_bridge/node_modules/@anthropic-ai/claude-agent-sdk/sdk-tools.d.ts:429:          options:
+app/llm/sdk_bridge/node_modules/@anthropic-ai/claude-agent-sdk/sdk-tools.d.ts:527:           * Set to true to allow the user to select multiple options instead of just one. Use when choices are not mutually exclusive.
+app/llm/sdk_bridge/node_modules/@anthropic-ai/claude-agent-sdk/sdk-tools.d.ts:541:           * The available choices for this question. Must have 2-4 options. Each option should be a distinct, mutually exclusive choice (unless multiSelect is enabled). There should be no 'Other' option, that will be provided automatically.
+app/llm/sdk_bridge/node_modules/@anthropic-ai/claude-agent-sdk/sdk-tools.d.ts:546:          options:
+app/llm/sdk_bridge/node_modules/@anthropic-ai/claude-agent-sdk/sdk-tools.d.ts:644:           * Set to true to allow the user to select multiple options instead of just one. Use when choices are not mutually exclusive.
+app/llm/sdk_bridge/node_modules/@anthropic-ai/claude-agent-sdk/sdk-tools.d.ts:660:           * The available choices for this question. Must have 2-4 options. Each option should be a distinct, mutually exclusive choice (unless multiSelect is enabled). There should be no 'Other' option, that will be provided automatically.
+app/llm/sdk_bridge/node_modules/@anthropic-ai/claude-agent-sdk/sdk-tools.d.ts:665:          options:
+app/llm/sdk_bridge/node_modules/@anthropic-ai/claude-agent-sdk/sdk-tools.d.ts:763:           * Set to true to allow the user to select multiple options instead of just one. Use when choices are not mutually exclusive.
+app/llm/sdk_bridge/node_modules/@anthropic-ai/claude-agent-sdk/sdk-tools.d.ts:777:           * The available choices for this question. Must have 2-4 options. Each option should be a distinct, mutually exclusive choice (unless multiSelect is enabled). There should be no 'Other' option, that will be provided automatically.
+app/llm/sdk_bridge/node_modules/@anthropic-ai/claude-agent-sdk/sdk-tools.d.ts:782:          options:
+app/llm/sdk_bridge/node_modules/@anthropic-ai/claude-agent-sdk/sdk-tools.d.ts:880:           * Set to true to allow the user to select multiple options instead of just one. Use when choices are not mutually exclusive.
+app/llm/sdk_bridge/node_modules/@anthropic-ai/claude-agent-sdk/sdk-tools.d.ts:894:           * The available choices for this question. Must have 2-4 options. Each option should be a distinct, mutually exclusive choice (unless multiSelect is enabled). There should be no 'Other' option, that will be provided automatically.
+app/llm/sdk_bridge/node_modules/@anthropic-ai/claude-agent-sdk/sdk-tools.d.ts:899:          options:
+app/llm/sdk_bridge/node_modules/@anthropic-ai/claude-agent-sdk/sdk-tools.d.ts:997:           * Set to true to allow the user to select multiple options instead of just one. Use when choices are not mutually exclusive.
+
+thinking
+**Planning focused code search**
+exec
+/bin/zsh -lc "sed -n '520,640p' app/llm/sdk_bridge/node_modules/@anthropic-ai/claude-agent-sdk/sdk.d.ts" in /Users/james/repos/wibandwob-dosexec
+/bin/zsh -lc "rg -n \"function query|type Options|mcpServers\\?:|createSdkMcpServer|McpServerConfig|McpSdkServerConfigWithInstance\" app/llm/sdk_bridge/node_modules/@anthropic-ai/claude-agent-sdk/sdk.d.ts" in /Users/james/repos/wibandwob-dos succeeded in 52ms:
+    executableArgs?: string[];
+};
+/**
+ * V2 API - UNSTABLE
+ * Session interface for multi-turn conversations
+ */
+export interface SDKSession {
+    /** Send a message to the agent */
+    send(message: string | SDKUserMessage): Promise<void>;
+    /** Receive messages from the agent */
+    receive(): AsyncGenerator<SDKMessage, void>;
+    /** Close the session */
+    close(): void;
+    /** Async disposal support (calls close if not already closed) */
+    [Symbol.asyncDispose](): Promise<void>;
+}
+type SdkMcpToolDefinition<Schema extends ZodRawShape = ZodRawShape> = {
+    name: string;
+    description: string;
+    inputSchema: Schema;
+ succeeded in 51ms:
+50:export type McpSdkServerConfigWithInstance = McpSdkServerConfig & {
+53:export type McpServerConfig = McpStdioServerConfig | McpSSEServerConfig | McpHttpServerConfig | McpSdkServerConfigWithInstance;
+54:export type McpServerConfigForProcessTransport = McpStdioServerConfig | McpSSEServerConfig | McpHttpServerConfig | McpSdkServerConfig;
+554:export declare function createSdkMcpServer(_options: CreateSdkMcpServerOptions): McpSdkServerConfigWithInstance;
+569:export type Options = {
+595:    mcpServers?: Record<string, McpServerConfig>;
+633:export declare function query(_params: {
+exec
+/bin/zsh -lc 'node app/llm/sdk_bridge/test_mcp_tools.js' in /Users/james/repos/wibandwob-dos succeeded in 53ms:
+MCP TOOL: tui_terminal_write called
+MCP TOOL: tui_terminal_write called
+MCP TOOL: tui_terminal_read called - got 20 chars
+MCP TOOL: tui_terminal_read called - got 20 chars
+PASS: tui_terminal_write and tui_terminal_read registered and dispatch correctly
+
+thinking
+**Planning full file read and SDK inspection**
+codex
+The SDK checks passed: `createSdkMcpServer` exists and the local MCP test passes, so registration itself works. Next I’m validating the bridge call path in detail, including full provider file scan and where `allowedTools` is assembled across C++ and JS.
+exec
+/bin/zsh -lc "sed -n '1,220p' app/llm/sdk_bridge/node_modules/@anthropic-ai/claude-agent-sdk/sdk.d.ts" in /Users/james/repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,760p' app/llm/providers/claude_code_sdk_provider.cpp" in /Users/james/repos/wibandwob-dosexec
+/bin/zsh -lc "rg -n \"createSdkMcpServer\\(|mcpServers|allowedTools|mcp__\" app/llm/sdk_bridge/node_modules/@anthropic-ai/claude-agent-sdk/sdk.mjs | head -n 80" in /Users/james/repos/wibandwob-dos succeeded in 50ms:
+import type { MessageParam as APIUserMessage } from '@anthropic-ai/sdk/resources';
+import type { BetaMessage as APIAssistantMessage, BetaUsage as Usage, BetaRawMessageStreamEvent as RawMessageStreamEvent } from '@anthropic-ai/sdk/resources/beta/messages/messages.mjs';
+import type { UUID } from 'crypto';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import { type McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { type z, type ZodRawShape, type ZodObject } from 'zod';
+export type NonNullableUsage = {
+    [K in keyof Usage]: NonNullable<Usage[K]>;
+};
+export type ModelUsage = {
+    inputTokens: number;
+    outputTokens: number;
+    cacheReadInputTokens: number;
+    cacheCreationInputTokens: number;
+    webSearchRequests: number;
+    costUSD: number;
+    contextWindow: number;
+};
+export type OutputFormatType = 'json_schema';
+export type BaseOutputFormat = {
+ succeeded in 51ms:
+/*---------------------------------------------------------*/
+/*                                                         */
+/*   claude_code_sdk_provider.cpp - Claude Code SDK Provider*/
+/*   Streaming mode with customSystemPrompt support       */
+/*                                                         */
+/*---------------------------------------------------------*/
+
+#include "claude_code_sdk_provider.h"
+#include "claude_code_provider.h" // Fallback
+#include "../base/llm_provider_factory.h"
+#include "../base/path_search.h"
+
+#include <cstdio>
+#include <cstdlib>
+#include <memory>
+#include <sstream>
+#include <algorithm>
+#include <chrono>
+#include <iomanip>
+#include <unistd.h>
+ succeeded in 52ms:
+6501:        allowedTools = [],
+6502:        disallowedTools = [],
+6503:        mcpServers,
+6544:      if (allowedTools.length > 0) {
+6545:        args.push("--allowedTools", allowedTools.join(","));
+6547:      if (disallowedTools.length > 0) {
+6548:        args.push("--disallowedTools", disallowedTools.join(","));
+6550:      if (mcpServers && Object.keys(mcpServers).length > 0) {
+6551:        args.push("--mcp-config", JSON.stringify({ mcpServers }));
+7961:    return mcpStatusResponse.mcpServers;
+8111:      allowedTools: [],
+8112:      disallowedTools: [],
+8113:      mcpServers: {},
+15032:function createSdkMcpServer(options) {
+15078:    allowedTools = [],
+15082:    disallowedTools = [],
+15094:    mcpServers,
+15119:  if (mcpServers) {
+15120:    for (const [name, config] of Object.entries(mcpServers)) {
+15157:    allowedTools,
+
+thinking
+**Inspecting key code sections**
+exec
+/bin/zsh -lc 'cat app/llm/sdk_bridge/test_mcp_tools.js' in /Users/james/repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '6460,6585p' app/llm/sdk_bridge/node_modules/@anthropic-ai/claude-agent-sdk/sdk.mjs" in /Users/james/repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '14990,15190p' app/llm/sdk_bridge/node_modules/@anthropic-ai/claude-agent-sdk/sdk.mjs" in /Users/james/repos/wibandwob-dos succeeded in 52ms:
+#!/usr/bin/env node
+/**
+ * Unit tests for mcp_tools.js — terminal_write and terminal_read tools.
+ *
+ * AC coverage (issue #80, Node.js MCP bridge layer):
+ *   - tui_terminal_write registered in tool list
+ *   - tui_terminal_read registered in tool list
+ *   - tui_terminal_write calls POST /menu/command with correct payload
+ *   - tui_terminal_write with windowId passes window_id in args
+ *   - tui_terminal_read calls GET /terminal/active/output when no windowId
+ *   - tui_terminal_read calls GET /terminal/{windowId}/output when windowId given
+ *   - tui_terminal_read returns text from response
+ */
+
+const assert = require('assert');
+
+// --- Minimal mock of axios and SDK ---
+const calls = [];
+
+const fakeClient = {
+ succeeded in 50ms:
+
+// ../src/transport/ProcessTransport.ts
+class ProcessTransport {
+  options;
+  child;
+  childStdin;
+  childStdout;
+  ready = false;
+  abortController;
+  exitError;
+  exitListeners = [];
+  processExitHandler;
+  abortHandler;
+  constructor(options) {
+    this.options = options;
+    this.abortController = options.abortController || createAbortController();
+    this.initialize();
+  }
+  initialize() {
+    try {
+ succeeded in 50ms:
+  }
+}
+var EMPTY_OBJECT_JSON_SCHEMA = {
+  type: "object",
+  properties: {}
+};
+function isZodRawShape(obj) {
+  if (typeof obj !== "object" || obj === null)
+    return false;
+  const isEmptyObject = Object.keys(obj).length === 0;
+  return isEmptyObject || Object.values(obj).some(isZodTypeLike);
+}
+function isZodTypeLike(value) {
+  return value !== null && typeof value === "object" && "parse" in value && typeof value.parse === "function" && "safeParse" in value && typeof value.safeParse === "function";
+}
+function promptArgumentsFromSchema(schema) {
+  return Object.entries(schema.shape).map(([name, field]) => ({
+    name,
+    description: field.description,
+    required: !field.isOptional()
+
+thinking
+**Investigating MCP tool name sanitization**
+codex
+I’ve isolated a likely naming bug: MCP server name includes a hyphen (`tui-control`), and the SDK appears to sanitize MCP tool IDs internally. I’m now verifying the exact transformed tool name format before patching.
+exec
+/bin/zsh -lc "rg -n \"mcp__tui[-_]control__|tui-control|tui_control|mcp__\" app -g '*.js' -g '*.cpp' -g '*.h'" in /Users/james/repos/wibandwob-dos succeeded in 51ms:
+app/llm/sdk_bridge/mcp_tools.js:40:        name: "tui-control",
+app/llm/sdk_bridge/claude_sdk_bridge.js:198:                "mcp__tui-control__tui_create_window",
+app/llm/sdk_bridge/claude_sdk_bridge.js:199:                "mcp__tui-control__tui_move_window", 
+app/llm/sdk_bridge/claude_sdk_bridge.js:200:                "mcp__tui-control__tui_get_state",
+app/llm/sdk_bridge/claude_sdk_bridge.js:201:                "mcp__tui-control__tui_close_window",
+app/llm/sdk_bridge/claude_sdk_bridge.js:202:                "mcp__tui-control__tui_cascade_windows",
+app/llm/sdk_bridge/claude_sdk_bridge.js:203:                "mcp__tui-control__tui_tile_windows",
+app/llm/sdk_bridge/claude_sdk_bridge.js:204:                "mcp__tui-control__tui_send_text",
+app/llm/sdk_bridge/claude_sdk_bridge.js:205:                "mcp__tui-control__tui_send_figlet"
+app/llm/sdk_bridge/claude_sdk_bridge.js:227:                queryOptions.mcpServers = { "tui-control": this.mcpServer };
+app/llm/providers/claude_code_sdk_provider.cpp:330:            << R"(,"allowedTools":["Read","Write","Grep","Bash","LS","WebSearch","WebFetch","mcp__tui-control__tui_create_window","mcp__tui-control__tui_move_window","mcp__tui-control__tui_get_state","mcp__tui-control__tui_close_window","mcp__tui-control__tui_cascade_windows","mcp__tui-control__tui_tile_windows","mcp__tui-control__tui_send_text","mcp__tui-control__tui_send_figlet"],"model":")"
+
+thinking
+**Inspecting sanitize function**
+exec
+/bin/zsh -lc "rg -n \"function f7\\(|const f7|mcp__\\"'$'"\\{f7|sanitize\" app/llm/sdk_bridge/node_modules/@anthropic-ai/claude-agent-sdk/sdk.mjs | head -n 20" in /Users/james/repos/wibandwob-dos succeeded in 51ms:
+
+
+thinking
+**Inspecting CLI for sanitize function**
+exec
+/bin/zsh -lc "rg -n \"function f7\\(|= f7|mcp__\\"'$'"\\{f7|f7\\(\" app/llm/sdk_bridge/node_modules/@anthropic-ai/claude-agent-sdk/cli.js | head -n 40" in /Users/james/repos/wibandwob-dos succeeded in 51ms:
+Total output lines: 6
+
+397:`,I};XiA.publicKeyToOpenSSH=function(A,Q){var B="ssh-rsa";Q=Q||"";var G=jX.util.createBuffer();return _3A(G,B),Ek(G,A.e),Ek(G,A.n),B+" "+jX.util.encode64(G.bytes())+" "+Q};XiA.privateKeyToOpenSSH=function(A,Q){if(!Q)return jX.pki.privateKeyToPem(A);return jX.pki.encryptRsaPrivateKey(A,Q,{legacy:!0,algorithm:"aes128"})};XiA.getPublicKeyFingerprint=function(A,Q){Q=Q||{};var B=Q.md||jX.md.md5.create(),G="ssh-rsa",Z=jX.util.createBuffer();_3A(Z,G),Ek(Z,A.e),Ek(Z,A.n),B.start(),B.update(Z.getBytes());var I=B.digest();if(Q.encoding==="hex"){var Y=I.toHex();if(Q.delimiter)return Y.match(/.{2}/g).join(Q.delimiter);return Y}else if(Q.encoding==="binary")return I.getBytes();else if(Q.encoding)throw Error('Unknown encoding "'+Q.encoding+'".');return I};function Ek(A,Q){var B=Q.toString(16);if(B[0]>="8")B="00"+B;var G=jX.util.hexToBytes(B);A.putInt32(G.length),A.putBytes(G)}function _3A(A,Q){A.putInt32(Q.length),A.putString(Q)}function WiA(){var A=jX.md.sha1.create(),Q=arguments.length;for(var B=0;B<Q;++B)A.update(arguments[B]);return A.digest()}});var G8B=z((qO7,B8B)=>{B8B.exports=a8();$c();O4B();QT();_lA();DzA();d4B();$3A();i4B();a4B();r4B();gx1();clA();ho();_x1();dx1();e4B();px1();xx1();Mx1();rlA();iL();Tx1();Q8B();rx1();T3()});import{execFile as ir8}from"child_process";import{promisify as ar8}from"util";var nr8,MO7;var Hv1=M(()=>{nr8=BA(G8B(),1),MO7=ar8(ir8)});var Cv1=M(()=>{Hv1()});var Z8B,rr8,or8,tr8,er8,Ao8,Qo8,Bo8,Go8,Zo8,kO7,Io8,_O7;var I8B=M(()=>{p2();Z8B=t$({command:EQ(),args:HJ(EQ()).optional(),env:qR(EQ(),EQ()).optional()}),rr8=t$({name:EQ(),email:EQ().email().optional(),url:EQ().url().optional()}),or8=t$({type:EQ(),url:EQ().url()}),tr8=Z8B.partial(),er8=Z8B.extend({platform_overrides:qR(EQ(),tr8).optional()}),Ao8=t$({type:NR(["python","node","binary"]),entry_point:EQ(),mcp_config:er8}),Qo8=t$({claude_desktop:EQ().optional(),platforms:HJ(NR(["darwin","win32","linux"])).optional(),runtimes:t$({python:EQ().optional(),node:EQ().optional()}).optional()}).passthrough(),Bo8=t$({name:EQ(),description:EQ().optional()}),Go8=t$({name:EQ(),description:EQ().optional(),arguments:HJ(EQ()).optional(),text:EQ()}),Zo8=t$({type:NR(["string","number","boolean","directory","file"]),title:EQ(),description:EQ(),required:EV().optional(),default:os([EQ(),hN(),EV(),HJ(EQ())]).optional(),multiple:EV().optional(),sensitive:EV().optional(),min:hN().optional(),max:hN().optional()}),kO7=qR(EQ(),os([EQ(),hN(),EV(),HJ(EQ())])),Io8=t$({$schema:EQ().optional(),dxt_version:EQ().optional().describe("@deprecated Use manifest_version instead"),manifest_version:EQ().optional(),name:EQ(),display_name:EQ().optional(),version:EQ(),description:EQ(),long_description:EQ().optional(),author:rr8,repository:or8.optional(),homepage:EQ().url().optional(),documentation:EQ().url().optional(),support:EQ().url().optional(),icon:EQ().optional(),screenshots:HJ(EQ()).optional(),server:Ao8,tools:HJ(Bo8).optional(),tools_generated:EV().optional(),prompts:HJ(Go8).optional(),prompts_generated:EV().optional(),keywords:HJ(EQ()).optional(),license:EQ().optional(),compatibility:Qo8.optional(),user_config:qR(EQ(),Zo8).optional()}).refine((A)=>!!(A.dxt_version||A.manifest_version),{message:"Either 'dxt_version' (deprecated) or 'manifest_version' must be provided"}),_O7=t$({status:NR(["signed","unsigned","self-signed"]),publisher:EQ().optional(),issuer:EQ().optional(),valid_from:EQ().optional(),valid_to:EQ().optional(),fingerprint:EQ().optional()})});var Yo8,Jo8;var Ev1=M(()=>{Cv1();oEA();I8B();Yo8=BA(d2B(),1),Jo8=BA(l2B(),1)});var Y8B=M(()=>{ly1();Ev1();oEA();vy1()});function zv1(A,Q){if(typeof A==="string"){let B=A;for(let[G,Z]of Object.entries(Q)){let I=new RegExp(`\\$\\{${G}\\}`,"g");if(B.match(I))if(Array.isArray(Z))console.warn(`Cannot replace ${G} with array value in string context: "${A}"`,{key:G,replacement:Z});else B=B.replace(I,Z)}return B}else if(Array.isArray(A)){let B=[];for(let G of A)if(typeof G==="string"&&G.match(/^\$\{user_config\.[^}]+\}$/)){let Z=G.match(/^\$\{([^}]+)\}$/)?.[1];if(Z&&Q[Z]){let I=Q[Z];if(Array.isArray(I))B.push(...I);else B.push(I)}else B.push(G)}else B.push(zv1(G,Q));return B}else if(A&&typeof A==="object"){let B={};for(let[G,Z]of Object.entries(A))B[G]=zv1(Z,Q);return B}return A}async function y3A(A){let{manifest:Q,extensionPath:B,systemDirs:G,userConfig:Z,pathSeparator:I,logger:Y}=A,J=Q.server?.mcp_config;if(!J)return;let W={...J};if(J.platform_overrides){if(process.platform in J.platform_overrides){let V=J.platform_overrides[process.platform];W.command=V.command||W.command,W.args=V.args||W.args,W.env=V.env||W.env}}if(Wo8({manifest:Q,userConfig:Z})){Y?.warn(`Extension ${Q.name} has missing required configuration, skipping MCP config`);return}let X={__dirname:B,pathSeparator:I,"/":I,...G},F={};if(Q.user_config){for(let[V,K]of Object.entries(Q.user_config))if(K.default!==void 0)F[V]=K.default}if(Z)Object.assign(F,Z);for(let[V,K]of Object.entries(F)){let D=`user_config.${V}`;if(Array.isArray(K))X[D]=K.map(String);else if(typeof K==="boolean")X[D]=K?"true":"false";else X[D]=String(K)}return W=zv1(W,X),W}function J8B(A){return A===void 0||A===null||A===""}function Wo8({manifest:A,userConfig:Q}){if(!A.user_config)return!1;let B=Q||{};for(let[G,Z]of Object.entries(A.user_config))if(Z.required){let I=B[G];if(J8B(I)||Array.isArray(I)&&(I.length===0||I.some(J8B)))return!0}return!1}var W8B=()=>{};var LzA=M(()=>{vy1();Y8B();Cv1();ly1();Hv1();Ev1();oEA();W8B()});function X8B(A){let Q=JlA.safeParse(A);if(!Q.success){let B=Q.error.flatten(),G=[...Object.entries(B.fieldErrors).map(([Z,I])=>`${Z}: ${I?.join(", ")}`),...B.formErrors||[]].filter(Boolean).join("; ");throw Error(`Invalid manifest: ${G}`)}return Q.data}function Xo8(A){let Q;try{Q=JSON.parse(A)}catch(B){throw Error(`Invalid JSON in manifest.json: ${B instanceof Error?B.message:String(B)}`)}return X8B(Q)}function FiA(A){let Q=new TextDecoder().decode(A);return Xo8(Q)}var Uv1=M(()=>{LzA()});import*as ViA from"path";function Fo8(A){if(H9A(A))return!1;let Q=ViA.normalize(A);if(ViA.isAbsolute(Q))return!1;return!0}function Vo8(A,Q){Q.fileCount++;let B;if(Q.fileCount>Pc.MAX_FILE_COUNT)B=`Archive contains too many files: ${Q.fileCount} (max: ${Pc.MAX_FILE_COUNT})`;if(!Fo8(A.name))B=`Unsafe file path detected: "${A.name}". Path traversal or absolute paths are not allowed.`;let G=A.originalSize||0;if(G>Pc.MAX_FILE_SIZE)B=`File "${A.name}" is too large: ${Math.round(G/1024/1024)}MB (max: ${Math.round(Pc.MAX_FILE_SIZE/1024/1024)}MB)`;if(Q.totalUncompressedSize+=G,Q.totalUncompressedSize>Pc.MAX_TOTAL_SIZE)B=`Archive total size is too large: ${Math.round(Q.totalUncompressedSize/1024/1024)}MB (max: ${Math.round(Pc.MAX_TOTAL_SIZE/1024/1024)}MB)`;let Z=Q.totalUncompressedSize/Q.compressedSize;if(Z>Pc.MAX_COMPRESSION_RATIO)B=`Suspicious compression ratio detected: ${Z.toFixed(1)}:1 (max: ${Pc.MAX_COMPRESSION_RATIO}:1). This may be a zip bomb.`;return B?{isValid:!1,error:B}:{isValid:!0}}async function $v1(A){let Q=MA();if(!Q.existsSync(A))throw Error(`Zip file does not exist: ${A}`);try{let B=Q.readFileBytesSync(A),G=B.length;return await new Promise((I,Y)=>{let J={fileCount:0,totalUncompressedSize:0,compressedSize:G,errors:[]},W=EQB(new Uint8Array(B),{filter:(X)=>{let F=Vo8(X,J);if(!F.isValid)return Y(Error(F.error)),W(),!1;return!0}},(X,F)=>{if(X)Y(Error(`Failed to unzip file: ${X.message||String(X)}`));else u(`Zip extraction completed: ${J.fileCount} files, ${Math.round(J.totalUncompressedSize/1024)}KB uncompressed`),I(F)})})}catch(B){let G=B instanceof Error?B.message:String(B);throw Error(`Failed to read or unzip file: ${G}`)}}var Pc;var wv1=M(()=>{zQB();V0();t0();jI();Pc={MAX_FILE_SIZE:536870912,MAX_TOTAL_SIZE:1073741824,MAX_FILE_COUNT:1e5,MAX_COMPRESSION_RATIO:50,MIN_COMPRESSION_RATIO:0.5}});import*as F8B from"os";import*as ao from"path";function jc(){let A=gQ(),Q=F8B.homedir(),B={HOME:Q,DESKTOP:ao.join(Q,"Desktop"),DOCUMENTS:ao.join(Q,"Documents"),DOWNLOADS:ao.join(Q,"Downloads")};switch(A){case"windows":{let G=process.env.USERPROFILE||Q;return{HOME:Q,DESKTOP:ao.join(G,"Desktop"),DOCUMENTS:ao.join(G,"Documents"),DOWNLOADS:ao.join(G,"Downloads")}}case"linux":case"wsl":return{HOME:Q,DESKTOP:process.env.XDG_DESKTOP_DIR||B.DESKTOP,DOCUMENTS:process.env.XDG_DOCUMENTS_DIR||B.DOCUMENTS,DOWNLOADS:process.env.XDG_DOWNLOAD_DIR||B.DOWNLOADS};case"macos":default:{if(A==="unknown")u("Unknown platform detected, using default paths");return B}}}var MzA=M(()=>{r5();V0()});import{createHash as Nv1}from"crypto";import{join as Sc,dirname as Ko8}from"path";import{writeFileSync as C8B}from"fs";function eL(A){return A.endsWith(".mcpb")||A.endsWith(".dxt")}function E8B(A){return A.startsWith("http://")||A.startsWith("https://")}function Do8(A){return Nv1("sha256").update(A).digest("hex").substring(0,16)}function z8B(A){return Sc(A,".mcpb-cache")}function U8B(A,Q){let B=Nv1("md5").update(Q).digest("hex").substring(0,8);return Sc(A,`${B}.metadata.json`)}function V8B(A,Q){try{let G=p0().pluginConfigs?.[A]?.mcpServers?.[Q];if(!G)return null;return u(`Loaded user config for ${A}/${Q} from settings`),G}catch(B){let G=B instanceof Error?B:Error(String(B));return t(G),u(`Failed to load user config for ${A}/${Q}: ${B}`,{level:"error"}),null}}function K8B(A,Q,B){try{let G=p0();if(!G.pluginConfigs)G.pluginConfigs={};if(!G.pluginConfigs[A])G.pluginConfigs[A]={};if(!G.pluginConfigs[A].mcpServers)G.pluginConfigs[A].mcpServers={};G.pluginConfigs[A].mcpServers[Q]=B;let Z=cB("userSettings",G);if(Z.error)throw Z.error;u(`Saved user config for ${A}/${Q} to user settings`)}catch(G){let Z=G instanceof Error?G:Error(String(G));throw t(Z),Error(`Failed to save user configuration for ${A}/${Q}: ${Z.message}`)}}function D8B(A,Q){let B=[];for(let[G,Z]of Object.entries(Q)){let I=A[G];if(Z.required&&(I===void 0||I==="")){B.push(`${Z.title||G} is required but not provided`);continue}if(I===void 0||I==="")continue;if(Z.type==="string"){if(Array.isArray(I)){if(!Z.multiple)B.push(`${Z.title||G} must be a string, not an array`);else if(!I.every((Y)=>typeof Y==="string"))B.push(`${Z.title||G} must be an array of strings`)}else if(typeof I!=="string")B.push(`${Z.title||G} must be a string`)}else if(Z.type==="number"&&typeof I!=="number")B.push(`${Z.title||G} must be a number`);else if(Z.type==="boolean"&&typeof I!=="boolean")B.push(`${Z.title||G} must be a boolean`);else if((Z.type==="file"||Z.type==="directory")&&typeof I!=="string")B.push(`${Z.title||G} must be a path string`);if(Z.type==="number"&&typeof I==="number"){if(Z.min!==void 0&&I<Z.min)B.push(`${Z.title||G} must be at least ${Z.min}`);if(Z.max!==void 0&&I>Z.max)B.push(`${Z.title||G} must be at most ${Z.max}`)}}return{valid:B.length===0,errors:B}}async function H8B(A,Q){let B=await y3A({manifest:A,extensionPath:Q,systemDirs:jc(),userConfig:{},pathSeparator:"/"});if(!B){let G=Error(`Failed to generate MCP server configuration from manifest "${A.name}"`);throw t(G),G}return B}async function $8B(A,Q){let B=MA(),G=U8B(A,Q);if(!B.existsSync(G))return null;try{let Z=B.readFileSync(G,{encoding:"utf-8"});return JSON.parse(Z)}catch(Z){let I=Z instanceof Error?Z:Error(String(Z));return t(I),u(`Failed to load MCPB cache metadata: ${Z}`,{level:"error"}),null}}async function qv1(A,Q,B){let G=MA(),Z=U8B(A,Q);G.mkdirSync(A),G.writeFileSync(Z,JSON.stringify(B,null,2),{encoding:"utf-8",flush:!1})}async function Ho8(A,Q,B){if(u(`Downloading MCPB from ${A}`),B)B(`Downloading ${A}...`);try{let G=await IQ.get(A,{timeout:120000,responseType:"arraybuffer",maxRedirects:5,onDownloadProgress:(I)=>{if(I.total&&B){let Y=Math.round(I.loaded/I.total*100);B(`Downloading... ${Y}%`)}}}),Z=new Uint8Array(G.data);if(C8B(Q,Buffer.from(Z)),u(`Downloaded ${Z.length} bytes to ${Q}`),B)B("Download complete");return Z}catch(G){let Z=G instanceof Error?G.message:String(G),I=Error(`Failed to download MCPB file from ${A}: ${Z}`);throw t(I),I}}async function Co8(A,Q,B){let G=MA();if(B)B("Extracting files...");G.mkdirSync(Q);let Z=0,I=Object.keys(A).length;for(let[Y,J]of Object.entries(A)){let W=Sc(Q,Y),X=Ko8(W);if(X!==Q&&!G.existsSync(X))G.mkdirSync(X);if(Y.endsWith(".json")||Y.endsWith(".js")||Y.endsWith(".ts")||Y.endsWith(".txt")||Y.endsWith(".md")||Y.endsWith(".yml")||Y.endsWith(".yaml")){let V=new TextDecoder().decode(J);G.writeFileSync(W,V,{encoding:"utf-8",flush:!1})}else C8B(W,Buffer.from(J));if(Z++,B&&Z%10===0)B(`Extracted ${Z}/${I} files`)}if(u(`Extracted ${Z} files to ${Q}`),B)B(`Extraction complete (${Z} files)`)}async function Eo8(A,Q){let B=MA(),G=z8B(Q),Z=await $8B(G,A);if(!Z)return!0;if(!B.existsSync(Z.extractedPath))return u(`MCPB extraction path missing: ${Z.extractedPath}`),!0;if(!E8B(A)){let I=Sc(Q,A);if(!B.existsSync(I))return u(`MCPB source file missing: ${I}`),!0;let Y=B.statSync(I),J=new Date(Z.cachedAt).getTime(),W=Y.mtimeMs;if(W>J)return u(`MCPB file modified: ${new Date(W)} > ${new Date(J)}`),!0}return!1}async function OzA(A,Q,B,G,Z,I){let Y=MA(),J=z8B(Q);Y.mkdirSync(J),u(`Loading MCPB from source: ${A}`);let W=await $8B(J,A);if(W&&!await Eo8(A,Q)){u(`Using cached MCPB from ${W.extractedPath} (hash: ${W.contentHash})`);let w=Sc(W.extractedPath,"manifest.json");if(!Y.existsSync(w)){let y=Error(`Cached manifest not found: ${w}`);throw t(y),y}let q=Y.readFileSync(w,{encoding:"utf-8"}),N=new TextEncoder().encode(q),R=FiA(N);if(R.user_config&&Object.keys(R.user_config).length>0){let y=R.name,v=V8B(B,y),x=Z||v||{},p=D8B(x,R.user_config);if(I||!p.valid)return{status:"needs-config",manifest:R,extractedPath:W.extractedPath,contentHash:W.contentHash,configSchema:R.user_config,existingConfig:v||{},validationErrors:p.valid?[]:p.errors};if(Z)K8B(B,y,Z);let g=await y3A({manifest:R,extensionPath:W.extractedPath,systemDirs:jc(),userConfig:x,pathSeparator:"/"});if(!g){let AA=Error(`Failed to generate MCP server configuration from manifest "${R.name}"`);throw t(AA),AA}return{manifest:R,mcpConfig:g,extractedPath:W.extractedPath,contentHash:W.contentHash}}let P=await H8B(R,W.extractedPath);return{manifest:R,mcpConfig:P,extractedPath:W.extractedPath,contentHash:W.contentHash}}let X,F;if(E8B(A)){let w=Nv1("md5").update(A).digest("hex").substring(0,8);F=Sc(J,`${w}.mcpb`),X=await Ho8(A,F,G)}else{let w=Sc(Q,A);if(!Y.existsSync(w)){let q=Error(`MCPB file not found: ${w}`);throw t(q),q}if(G)G(`Loading ${A}...`);X=Y.readFileBytesSync(w),F=w}let V=Do8(X);if(u(`MCPB content hash: ${V}`),G)G("Extracting MCPB archive...");let K=await $v1(F),D=K["manifest.json"];if(!D){let w=Error("No manifest.json found in MCPB file");throw t(w),w}let H=FiA(D);if(u(`MCPB manifest: ${H.name} v${H.version} by ${H.author.name}`),!H.server){let w=Error(`MCPB manifest for "${H.name}" does not define a server configuration`);throw t(w),w}let C=Sc(J,V);if(await Co8(K,C,G),H.user_config&&Object.keys(H.user_config).length>0){let w=H.name,q=V8B(B,w),N=Z||q||{},R=D8B(N,H.user_config);if(!R.valid){let v={source:A,contentHash:V,extractedPath:C,cachedAt:new Date().toISOString(),lastChecked:new Date().toISOString()};return await qv1(J,A,v),{status:"needs-config",manifest:H,extractedPath:C,contentHash:V,configSchema:H.user_config,existingConfig:q||{},validationErrors:R.errors}}if(Z)K8B(B,w,Z);if(G)G("Generating MCP server configuration...");let P=await y3A({manifest:H,extensionPath:C,systemDirs:jc(),userConfig:N,pathSeparator:"/"});if(!P){let v=Error(`Failed to generate MCP server configuration from manifest "${H.name}"`);throw t(v),v}let y={source:A,contentHash:V,extractedPath:C,cachedAt:new Date().toISOString(),lastChecked:new Date().toISOString()};return await qv1(J,A,y),{manifest:H,mcpConfig:P,extractedPath:C,contentHash:V}}if(G)G("Generating MCP server configuration...");let E=await H8B(H,C),U={source:A,contentHash:V,extractedPath:C,cachedAt:new Date().toISOString(),lastChecked:new Date().toISOString()};return await qv1(J,A,U),u(`Successfully loaded MCPB: ${H.name} (extracted to ${C})`),{manifest:H,mcpConfig:E,extractedPath:C,contentHash:V}}var Lv1=M(()=>{w3();LzA();Uv1();wv1();t0();V0();u1();MzA();LB()});import{join as zo8}from"path";async function w8B(A,Q,B){try{u(`Loading MCP servers from MCPB: ${Q}`);let G=A.repository,Z=await OzA(Q,A.path,G,(J)=>{u(`MCPB [${A.name}]: ${J}`)});if("status"in Z&&Z.status==="needs-config")return u(`MCPB ${Q} requires user configuration. `+`User can configure via: /plugin → Manage plugins → ${A.name} → Configure`),null;let I=Z,Y=I.manifest.name;return u(`Loaded MCP server "${Y}" from MCPB (extracted to ${I.extractedPath})`),{[Y]:I.mcpConfig}}catch(G){let Z=G instanceof Error?G.message:String(G);u(`Failed to load MCPB ${Q}: ${Z}`,{level:"error"});let I=`${A.name}@${A.repository}`;if(Q.startsWith("http")&&(Z.includes("download")||Z.includes("network")))B.push({type:"mcpb-download-failed",source:I,plugin:A.name,url:Q,reason:Z});else if(Z.includes("manifest")||Z.includes("user configuration"))B.push({type:"mcpb-invalid-manifest",source:I,plugin:A.name,mcpbPath:Q,validationError:Z});else B.push({type:"mcpb-extract-failed",source:I,plugin:A.name,mcpbPath:Q,reason:Z});return null}}async function Uo8(A,Q=[]){let B={},G=Mv1(A.path,".mcp.json");if(G)B={...B,...G};if(A.manifest.mcpServers){let Z=A.manifest.mcpServers;if(typeof Z==="string")if(eL(Z)){let I=await w8B(A,Z,Q);if(I)B={...B,...I}}else{let I=Mv1(A.path,Z);if(I)B={...B,...I}}else if(Array.isArray(Z))for(let I of Z)if(typeof I==="string")if(eL(I)){let Y=await w8B(A,I,Q);if(Y)B={...B,...Y}}else{let Y=Mv1(A.path,I);if(Y)B={...B,...Y}}else B={...B,...I};else B={...B,...Z}}return Object.keys(B).length>0?B:void 0}function Mv1(A,Q){let B=MA(),G=zo8(A,Q);if(!B.existsSync(G))return null;try{let Z=B.readFileSync(G,{encoding:"utf-8"}),I=JSON.parse(Z),Y=I.mcpServers||I,J={};for(let[W,X]of Object.entries(Y)){let F=qm.safeParse(X);if(F.success)J[W]=F.data;else u(`Invalid MCP server config for ${W} in ${G}: ${F.error.message}`,{level:"error"})}return J}catch(Z){return u(`Failed to load MCP servers from ${G}: ${Z}`,{level:"error"}),null}}function $o8(A,Q){let B={};for(let[G,Z]of Object.entries(A)){let I=`plugin:${Q}:${G}`;B[I]={...Z,scope:"dynamic"}}return B}function Ov1(A,Q){return A.replace(/\$\{CLAUDE_PLUGIN_ROOT\}/g,Q)}function wo8(A,Q){return A.replace(/\$\{user_config\.([^}]+)\}/g,(B,G)=>{let Z=Q[G];if(Z===void 0)throw Error(`Missing required user configuration value: ${G}. This should have been validated before variable substitution.`);return String(Z)})}function qo8(A,Q,B,G){let Z=[],I=(Y)=>{let J=Ov1(Y,Q);if(B)J=wo8(J,B);let{expanded:W,missingVars:X}=uEA(J);return Z.push(...X),W};if(A.type==="stdio"||!A.type){let Y={...A};if(Y.command)Y.command=I(Y.command);if(Y.args)Y.args=Y.args.map((W)=>I(W));let J={CLAUDE_PLUGIN_ROOT:Q,...Y.env||{}};for(let[W,X]of Object.entries(J))if(W!=="CLAUDE_PLUGIN_ROOT")J[W]=I(X);if(Y.env=J,G&&Z.length>0){let W=[...new Set(Z)];u(`Missing environment variables in plugin MCP config: ${W.join(", ")}`,{level:"warn"})}return Y}if(G&&Z.length>0){let Y=[...new Set(Z)];u(`Missing environment variables in plugin MCP config: ${Y.join(", ")}`,{level:"warn"})}return A}async function q8B(A,Q=[]){if(!A.enabled)return;let B=A.mcpServers||await Uo8(A,Q);if(!B)return;let G={};for(let[Z,I]of Object.entries(B))G[Z]=qo8(I,A.path,void 0,Q);return $o8(G,A.name)}var Rv1=M(()=>{t0();V0();g9A();Lv1()});function AM(A){switch(A.type){case"generic-error":return A.error;case"path-not-found":return`Path not found: ${A.path} (${A.component})`;case"git-auth-failed":return`Git authentication failed (${A.authType}): ${A.gitUrl}`;case"git-timeout":return`Git ${A.operation} timeout: ${A.gitUrl}`;case"network-error":return`Network error: ${A.url}${A.details?` - ${A.details}`:""}`;case"manifest-parse-error":return`Manifest parse error: ${A.parseError}`;case"manifest-validation-error":return`Manifest validation failed: ${A.validationErrors.join(", ")}`;case"plugin-not-found":return`Plugin ${A.pluginId} not found in marketplace ${A.marketplace}`;case"marketplace-not-found":return`Marketplace ${A.marketplace} not found`;case"marketplace-load-failed":return`Marketplace ${A.marketplace} failed to load: ${A.reas…18234 tokens truncated…X))}catch(J){let W=500;if(J instanceof SyntaxError)W=400;else if(J&&typeof J==="object"&&"name"in J){if(J.name==="ZodError")W=400}Q.writeHead(W,{"Content-Type":"application/json"}),Q.end(JSON.stringify({error:J instanceof Error?J.message:"Unknown error",type:J instanceof Error?J.constructor.name:"Error"})),t(J instanceof Error?J:Error(String(J)))}}),A.on("error",(J)=>{if(t(J),!Q.headersSent)Q.writeHead(500,{"Content-Type":"application/json"}),Q.end(JSON.stringify({error:"Internal Server Error"}))})}validateSecret(A){try{let Q=Buffer.from(A),B=Buffer.from(this.secret);if(Q.length!==B.length)return!1;return vv3(Q,B)}catch{return!1}}async handleCommand(A){let Q=Date.now(),B=A.command==="call"?`mcp__${A.params.server}__${A.params.tool}`:void 0;try{let{data:G,metadata:Z}=await this.executeCommand(A),I=Date.now()-Q;if(A.command==="call")GA("tengu_tool_use_success",{toolName:B,isMcp:!0,durationMs:I});return GA("tengu_mcp_cli_command_executed",{command:A.command,success:!0,duration_ms:I,...Z}),G}catch(G){let Z=G instanceof Error?G:Error(String(G)),I=Date.now()-Q,Y=String(G).slice(0,2000);if(A.command==="call")GA("tengu_tool_use_error",{toolName:B,isMcp:!0,error:Y,durationMs:I});throw GA("tengu_mcp_cli_command_executed",{command:A.command,success:!1,error_type:A.command==="call"?"tool_execution_failed":Z.constructor,duration_ms:Date.now()-Q}),G}}async executeCommand(A){switch(A.command){case"servers":{let Q=jY1(this.mcpClients);return{data:Q,metadata:{server_count:Q.length}}}case"tools":{let Q=SY1(this.availableTools,A.params);return{data:Q,metadata:{tool_count:Q.length,filtered:!!A.params?.server}}}case"info":{let Q=await kY1(this.availableTools,A.params);if(!Q){let B=rjA(this.mcpClients,A.params.server,this.getNormalizedNames()),G=jQA(A.params.server,B?.type);if(G)throw G;throw new JK0(`Tool '${A.params.toolName}' not found on server '${A.params.server}'`)}return{data:Q,metadata:{tool_found:!0}}}case"grep":{let Q=_Y1(this.availableTools,A.params);return{data:Q,metadata:{match_count:Q.length}}}case"resources":{let Q=yY1(this.resources,A.params,this.getNormalizedNames());return{data:Q,metadata:{resource_count:Q.length,filtered:!!A.params?.server}}}case"call":{let{server:Q,tool:B}=A.params;return{data:await this.callTool(A.params),metadata:{tool_name:`mcp__${Q}__${B}`}}}case"read":return{data:await this.readResource(A.params),metadata:{server:A.params.server}};default:{let Q=A;throw Error("Unknown command")}}}getConnectedClient(A){let Q=rjA(this.mcpClients,A,this.getNormalizedNames()),B=jQA(A,Q?.type);if(B)throw B;return Q}async callTool({server:A,tool:Q,args:B,timeoutMs:G}){let Z=this.getConnectedClient(A),I=`mcp__${A}__${Q}`,Y=this.availableTools.find((X)=>X.name===I);if(this.availableTools.length>0&&!Y)throw new JK0(`Tool '${Q}' not found on server '${A}'`);let J=Y?.originalMcpToolName||Q;return await Z.client.request({method:"tools/call",params:{name:J,arguments:B}},nT,G?{signal:AbortSignal.timeout(G)}:void 0)}async readResource({server:A,uri:Q,timeoutMs:B}){return await this.getConnectedClient(A).client.readResource({uri:Q},B?{signal:AbortSignal.timeout(B)}:void 0)}async stop(){if(!this.server)return;return new Promise((A,Q)=>{this.server.close((B)=>{if(B)Q(B);else u("[MCP CLI Endpoint] Stopped"),this.server=null,this.port=null,A()})})}updateClients(A){this.mcpClients=A}updateTools(A){this.availableTools=A}updateResources(A){this.resources=A}getNormalizedNames(){let A={};for(let Q of this.mcpClients)A[f7(Q.name)]=Q.name;return A}}var JK0;var Dz9=M(()=>{TD();kV0();_V0();yV0();xV0();vV0();V0();u1();q0();bV0();JK0=class JK0 extends Error{constructor(A){super(A);this.name="ToolNotFoundError"}}});var Uz9={};nG(Uz9,{showSetupScreens:()=>zz9,setup:()=>tY1,main:()=>sv3,completeOnboarding:()=>Ez9});import{ReadStream as bv3}from"tty";import{openSync as fv3,existsSync as oY1,readFileSync as Hz9,writeFileSync as hv3}from"fs";import{cwd as XK0}from"process";import{resolve as FK0}from"path";function gv3(){try{let A=NB("policySettings");if(A){let Q=lK9(A);GA("tengu_managed_settings_loaded",{keyCount:Q.length,keys:Q.join(",")})}}catch{}}function uv3(){let A=hs(),Q=process.execArgv.some((G)=>{if(A)return/--inspect(-brk)?/.test(G);else return/--inspect(-brk)?|--debug(-brk)?/.test(G)}),B=process.env.NODE_OPTIONS&&/--inspect(-brk)?|--debug(-brk)?/.test(process.env.NODE_OPTIONS);try{return!!global.require("inspector").url()||Q||B}catch{return Q||B}}function Ez9(){let A=L1();l0({...A,hasCompletedOnboarding:!0,lastOnboardingVersion:{ISSUES_EXPLAINER:"report the issue at https://github.com/anthropics/claude-code/issues",PACKAGE_URL:"@anthropic-ai/claude-code",README_URL:"https://docs.claude.com/s/claude-code",VERSION:"2.0.56",FEEDBACK_CHANNEL:"https://github.com/anthropics/claude-code/issues"}.VERSION})}async function zz9(A,Q,B){if(X0(!1)||process.env.IS_DEMO)return!1;let G=L1(),Z=!1;if(!G.theme||!G.hasCompletedOnboarding)Z=!0,await jJ(),await new Promise(async(I)=>{let{unmount:Y}=await P5(p5.default.createElement(N7,{onChangeAppState:mg},p5.default.createElement($C9,{onDone:async()=>{Ez9(),Y(),await jJ(),I()}})),{exitOnCtrlC:!1})});if(A!=="bypassPermissions"&&process.env.CLAUBBIT!=="true"){let I=PX(!1);if(await new Promise(async(W)=>{let{unmount:X}=await P5(p5.default.createElement(N7,null,p5.default.createElement(vC9,{commands:B,onDone:async()=>{if(X(),!I)await jJ();W()}})),{exitOnCtrlC:!1})}),gEA())fH9();gD();let{errors:J}=Ga();if(J.length===0)await KE9();if(await BG2())await new Promise(async(W)=>{let{unmount:X}=await P5(p5.default.createElement(N7,null,p5.default.createElement(jI1,{onDone:()=>{X(),W()},isStandaloneDialog:!0})),{exitOnCtrlC:!1})})}if(await VYA())await new Promise(async(I)=>{let{unmount:Y}=await P5(p5.default.createElement(N7,null,p5.default.createElement(oI1,{showIfAlreadyViewed:!1,location:Z?"onboarding":"policy_update_modal",onDone:async(J)=>{if(J==="escape"){GA("tengu_grove_policy_exited",{}),d8(0);return}if(Y(),J!=="skip_rendering")await jJ();I()}})),{exitOnCtrlC:!1})});if(process.env.ANTHROPIC_API_KEY){let I=_w(process.env.ANTHROPIC_API_KEY);if(opA(I)==="new")await new Promise(async(J)=>{let{unmount:W}=await P5(p5.default.createElement(N7,{onChangeAppState:mg},p5.default.createElement(dY1,{customApiKeyTruncated:I,onDone:async()=>{W(),await jJ(),J()}})),{exitOnCtrlC:!1})})}if(uV0(),(A==="bypassPermissions"||Q)&&!L1().bypassPermissionsModeAccepted)await new Promise(async(I)=>{let{unmount:Y}=await P5(p5.default.createElement(N7,null,p5.default.createElement(CE9,{onAccept:()=>{Y(),I()}})))});return Z}async function Cz9(A,Q){try{let B=await kIA(A,Q);if(B.type==="connected")return"✓ Connected";else if(B.type==="needs-auth")return"⚠ Needs authentication";else return"✗ Failed to connect"}catch(B){return"✗ Connection error"}}function mv3(){let A=L1();l0({...A,numStartups:(A.numStartups??0)+1}),dv3(),EC0()?.add(1)}async function dv3(){let[A,Q]=await Promise.all([WT(),IUA()]);GA("tengu_startup_telemetry",{is_git:A,worktree_count:Q,sandbox_enabled:pQ.isSandboxingEnabled(),are_unsandboxed_commands_allowed:pQ.areUnsandboxedCommandsAllowed(),is_auto_bash_allowed_if_sandbox_enabled:pQ.isAutoAllowBashIfSandboxedEnabled()})}function cv3(){UE9(),wE9(),NE9(),RE9(),PE9(),ME9()}function pv3(){if(D5()){gD();return}if(PX(!0))gD()}async function tY1(A,Q,B,G,Z){let I=process.version.match(/^v(\d+)\./)?.[1];if(!I||parseInt(I)<18)console.error(sA.bold.red("Error: Claude Code requires Node.js version 18 or higher.")),process.exit(1);if(Z)WR(Z);E10();let Y=fPB();if(Y.status==="restored")console.log(sA.yellow("Detected an interrupted iTerm2 setup. Your original settings have been restored. You may need to restart iTerm2 for the changes to take effect."));else if(Y.status==="failed")console.error(sA.red(`Failed to restore iTerm2 settings. Please manually restore your original settings with: defaults import com.googlecode.iterm2 ${Y.backupPath}.`));try{let F=await qrA();if(F.status==="restored")console.log(sA.yellow("Detected an interrupted Terminal.app setup. Your original settings have been restored. You may need to restart Terminal.app for the changes to take effect."));else if(F.status==="failed")console.error(sA.red(`Failed to restore Terminal.app settings. Please manually restore your original settings with: defaults import com.apple.Terminal ${F.backupPath}.`))}catch(F){t(F instanceof Error?F:Error(String(F)))}if(ew(A),aH9(),tH9(),QC9(),Ex2(),qx2(),AE9(),a70(),s70(),x4("setup_before_prefetch"),uH9(),dMB(),lE(),rZ1(),K1A(),F99(),JK(),pv3(),hg(),PD9(),fD9(),$0B(D5()),X0(process.env.CLAUDE_CODE_USE_BEDROCK)&&!X0(process.env.CLAUDE_CODE_SKIP_BEDROCK_AUTH))q0B();u$A().catch((F)=>t(F)),iIA([],Z0()),wjB(),x4("setup_after_prefetch");let{hasReleaseNotes:J}=nPA(L1().lastReleaseNotesSeen);if(J)await T49();let W=I4();if(setTimeout(()=>W.abort(),3000),oyA(K0(),W.signal,[]),Q==="bypassPermissions"||B){if(process.platform!=="win32"&&typeof process.getuid==="function"&&process.getuid()===0&&!process.env.IS_SANDBOX)console.error("--dangerously-skip-permissions cannot be used with root/sudo privileges for security reasons"),process.exit(1)}let X=M5();if(X.lastCost!==void 0&&X.lastDuration!==void 0)GA("tengu_exit",{last_session_cost:X.lastCost,last_session_api_duration:X.lastAPIDuration,last_session_tool_duration:X.lastToolDuration,last_session_duration:X.lastDuration,last_session_lines_added:X.lastLinesAdded,last_session_lines_removed:X.lastLinesRemoved,last_session_total_input_tokens:X.lastTotalInputTokens,last_session_total_output_tokens:X.lastTotalOutputTokens,last_session_total_cache_creation_input_tokens:X.lastTotalCacheCreationInputTokens,last_session_total_cache_read_input_tokens:X.lastTotalCacheReadInputTokens,last_session_id:X.lastSessionId}),aI({...X,lastCost:void 0,lastAPIDuration:void 0,lastToolDuration:void 0,lastDuration:void 0,lastLinesAdded:void 0,lastLinesRemoved:void 0,lastTotalInputTokens:void 0,lastTotalOutputTokens:void 0,lastTotalCacheCreationInputTokens:void 0,lastTotalCacheReadInputTokens:void 0,lastSessionId:void 0})}function lv3(A){try{let Q=A.trim(),B=Q.startsWith("{")&&Q.endsWith("}"),G;if(B){if(!k7(Q))process.stderr.write(sA.red(`Error: Invalid JSON provided to --settings
+4628:`));await new Promise(async(Y)=>{let{unmount:J}=await P5(p5.default.createElement(N7,{onChangeAppState:mg},p5.default.createElement(j,{flexDirection:"column",gap:1},p5.default.createElement(nc,{items:[p5.default.createElement(pY1,{key:"welcome"})]},(W)=>W),p5.default.createElement(ai,{onDone:()=>{J(),Y()},mode:"setup-token",startingMessage:"This will guide you through long-lived (1-year) auth token setup for your Claude account. Claude subscription required."}))))}),process.exit(0)});function I({onDone:Y}){return xZ1(),p5.default.createElement(bI1,{onDone:Y})}return A.command("doctor").description("Check the health of your Claude Code auto-updater").helpOption("-h, --help","Display help for command").action(async()=>{GA("tengu_doctor_command",{}),await new Promise(async(Y)=>{let{unmount:J}=await P5(p5.default.createElement(N7,null,p5.default.createElement(nG1,{dynamicMcpConfig:void 0,isStrictMcpConfig:!1},p5.default.createElement(I,{onDone:()=>{J(),Y()}}))),{exitOnCtrlC:!1})}),process.exit(0)}),A.command("update").description("Check for updates and install if available").helpOption("-h, --help","Display help for command").action(rE9),A.command("install [target]").description("Install Claude Code native build. Use [target] to specify version (stable, latest, or specific version)").option("--force","Force installation even if already installed").helpOption("-h, --help","Display help for command").action(async(Y,J)=>{await tY1(XK0(),"default",!1,!1,void 0),await new Promise((W)=>{let X=[];if(Y)X.push(Y);if(J.force)X.push("--force");eE9.call(()=>{W(),process.exit(0)},{},X)})}),x4("run_before_parse"),await A.parseAsync(process.argv),x4("run_after_parse"),x4("main_after_run"),cD9(),A}async function ev3({hasInitialPrompt:A,hasStdin:Q,verbose:B,debug:G,debugToStderr:Z,print:I,outputFormat:Y,inputFormat:J,numAllowedTools:W,numDisallowedTools:X,mcpClientCount:F,worktree:V,skipWebFetchPreflight:K,githubActionInputs:D,dangerouslySkipPermissionsPassed:H,modeIsBypass:C,allowDangerouslySkipPermissionsPassed:E,systemPromptFlag:U,appendSystemPromptFlag:w}){try{let q=await T7B();GA("tengu_init",{entrypoint:"claude",hasInitialPrompt:A,hasStdin:Q,verbose:B,debug:G,debugToStderr:Z,print:I,outputFormat:Y,inputFormat:J,numAllowedTools:W,numDisallowedTools:X,mcpClientCount:F,worktree:V,skipWebFetchPreflight:K,...D&&{githubActionInputs:D},dangerouslySkipPermissionsPassed:H,modeIsBypass:C,allowDangerouslySkipPermissionsPassed:E,...U&&{systemPromptFlag:U},...w&&{appendSystemPromptFlag:w},...q&&{rh:q}})}catch(q){t(q instanceof Error?q:Error(String(q)))}}function Ab3(){(process.stderr.isTTY?process.stderr:process.stdout.isTTY?process.stdout:void 0)?.write(`\x1B[?25h${Th1}`)}var p5;var $z9=M(()=>{nt();OH9();gH9();mH9();fB();h5();ht();mV0();sH9();eH9();BC9();x50();g50();QlA();hA();JI1();Cy();mZ1();SV0();Tq();hXA();F9();DC9();EC9();XsA();rI1();r5();kQ();fB();xEA();KYA();om1();rm1();u1();YG();Ki();YG();wC9();sOA();RX0();vJ0();lV0();bC9();gI1();CX0();fE();r2();LB();fC9();gC9();iC9();bF0();fQ();pE();wy();JMA();kF0();kH();RQA();TF0();tC9();a2();QE9();GE9();CD();JE9();fQ();CV();fh();_70();YG();GI();h80();DE9();y9();q0();q0();NJ0();WaA();KIA();lT();_P();of();HE9();Aw();EE9();O_();GWA();mj();XYA();D1A();gk();ab();k0();E9();BQA();zE9();Xi();cIA();k0();qF();V0();$E9();qE9();LE9();OE9();TE9();jE9();hrA();aE9();oE9();QjA();PE();z6();Az9();A0A();hY1();Bz9();Xz9();HU();SJ();WH();qZ();QM();kX();n10();t0();gk();T2();tI1();zPA();tJ0();zF();iV0();OXA();bh();Kz9();LJ();Dz9();DE();bY1();jIA();p5=BA(KA(),1);x4("main_tsx_entry");x4("main_tsx_imports_loaded");if(uv3())process.exit(1)});nt();V0();DE();SV0();ZFA();F9();O_();TD();kQ();y9();q0();w3();kV0();_V0();yV0();xV0();vV0();bV0();DE();bY1();import{readFileSync as hy3,existsSync as gy3}from"fs";var hV0,HH9=!1;function CH9(){if(hV0===void 0)hV0=DH9();return hV0}function MC(){let A=VGA(),Q=CH9();if(!HH9){if(HH9=!0,A&&Q===null){let B=xY1(),G=GFA();console.error(sA.yellow(`Warning: MCP endpoint file not found at ${B} (session: ${G}). Falling back to state file.`))}}return A&&Q!==null}class ojA extends Error{constructor(A){super(A);this.name="ConnectionFailedError"}}async function tjA(A,Q,B,G){let Z=Date.now();try{let I=await Q();if(!MC()){let Y=typeof B==="function"?B(I):B||{};await Ca("tengu_mcp_cli_command_executed",{command:A,success:!0,duration_ms:Date.now()-Z,...Y})}return{success:!0,data:I}}catch(I){let Y=I instanceof Error?I:Error(String(I));if(console.error(sA.red("Error:"),Y.message),!MC()){let J=typeof B==="object"?B:{};await Ca("tengu_mcp_cli_command_executed",{command:A,success:!1,error_type:Y.constructor.name,duration_ms:Date.now()-Z,...J,...G})}return{success:!1,error:Y}}}function Ea(){let A=BV0();if(!gy3(A)){let Q=GFA();throw Error(`MCP state file not found at ${A} (session: ${Q}). Is Claude Code running?`)}try{return JSON.parse(hy3(A,"utf-8"))}catch(Q){throw Error(`Error reading MCP state file ${A}: ${Q instanceof Error?Q.message:String(Q)}`)}}function EH9(A,Q){if(A.configs?.[Q])return A.configs[Q];let B=A.normalizedNames?.[Q];if(B&&A.configs?.[B])return A.configs[B];return}function uy3(A,Q){if(A.resources?.[Q])return A.resources[Q];let B=A.normalizedNames?.[Q];if(B&&A.resources?.[B])return A.resources[B];return[]}function gV0(A){let Q=A.split("/");if(Q.length!==2||!Q[0]||!Q[1])throw Error(`Invalid tool identifier '${A}'. Expected format: <server>/<tool>`);return{server:Q[0],tool:Q[1]}}async function SQA(A,Q,B=1e4){let G=CH9();if(!G)throw Error("MCP CLI endpoint not enabled");try{let Z=await IQ({method:"POST",url:`${G.url}/mcp`,data:Q,headers:{Authorization:`Bearer ${G.key}`,"Content-Type":"application/json"},timeout:B,validateStatus:()=>!0});if(Z.status>=400){let I=Z.data,Y=Error(I.error||`HTTP ${Z.status}: ${Z.statusText}`);if(I.type)Y.name=I.type;throw Y}return A.parse(Z.data)}catch(Z){if(IQ.isAxiosError(Z)){if(Z.code==="ECONNREFUSED")throw Error("Connection refused - is the MCP endpoint running?");if(Z.code==="ETIMEDOUT"||Z.message.includes("timeout"))throw Error("Request timeout");if(Z.message.startsWith("HTTP "))throw Z;throw Error(`Network error: ${Z.message}`)}throw Z}}var za=new PY1().name("mcp-cli").description("Interact with MCP servers and tools").version("1.0.0");za.command("servers").description("List all connected MCP servers").option("--json","Output in JSON format").action(async(A)=>{let Q=await tjA("servers",async()=>{return MC()?await SQA(JH9,{command:"servers"}):jY1(Ea().clients)},(G)=>({server_count:G.length}));if(!Q.success)process.exit(1);let B=Q.data;if(A.json)console.log(JSON.stringify(B));else B.forEach((G)=>{let Z=G.type==="connected"?sA.green("connected"):G.type==="failed"?sA.red("failed"):sA.yellow(G.type),I="";if(G.type==="connected"){let Y=[];if(G.hasTools)Y.push("tools");if(G.hasResources)Y.push("resources");if(G.hasPrompts)Y.push("prompts");if(Y.length>0)I=` (${Y.join(", ")})`}console.log(`${G.name} - ${Z}${I}`)})});za.command("tools").description("List all available tools").argument("[server]","Filter by server name").option("--json","Output in JSON format").action(async(A,Q)=>{let B={server:A},G=await tjA("tools",async()=>{return MC()?await SQA(WH9,{command:"tools",params:B}):SY1(Ea().tools,B)},(I)=>({tool_count:I.length,filtered:!!A}));if(!G.success)process.exit(1);let Z=G.data;if(Q.json)console.log(JSON.stringify(Z));else if(A)Z.forEach((I)=>console.log(I.name));else Z.forEach((I)=>console.log(`${I.server}/${I.name}`))});za.command("info").description("Get detailed information about a tool").argument("<tool>","Tool identifier in format <server>/<tool>").option("--json","Output in JSON format").action(async(A,Q)=>{let B=await tjA("info",async()=>{let{server:Z,tool:I}=gV0(A),Y={server:Z,toolName:I};if(MC())return await SQA(XH9,{command:"info",params:Y});let J=Ea(),W=await kY1(J.tools,Y);if(!W){let X=rjA(J.clients,Z,J.normalizedNames),F=jQA(Z,X?.type);if(F)throw F;throw Error(`Tool '${I}' not found on server '${Z}'`)}return W},()=>({tool_found:!0}),{tool_found:!1});if(!B.success)process.exit(1);let G=B.data;if(Q.json)console.log(JSON.stringify(G));else{if(console.log(sA.bold(`Tool: ${A}`)),console.log(sA.dim(`Server: ${G.server}`)),G.description)console.log(sA.dim(`Description: ${G.description}`));console.log(),console.log(sA.bold("Input Schema:")),console.log(JSON.stringify(G.inputSchema,null,2))}});async function my3(A,Q,B,G){let Z=Ea(),I=EH9(Z,Q);if(!I)throw Error(`Server '${Q}' not found`);if(G.debug)console.error(`Connecting to ${Q} (${I.type})...`);let Y=await nAA(Q,I);if(Y.client.type!=="connected")throw jQA(Q,Y.client.type)??new ojA(`Failed to connect to server '${Q}'`);let J=(()=>{let F=`mcp__${f7(Q)}__${f7(A)}`;return Z.tools.find((K)=>K.name===F)?.originalToolName||A})();if(G.debug)console.error(`Calling tool ${J}...`);let W=await Y.client.client.request({method:"tools/call",params:{name:J,arguments:B}},nT,{signal:AbortSignal.timeout(parseInt(G.timeout,10))});return Y.client.client.close(),W}za.command("call").description("Invoke an MCP tool").argument("<tool>","Tool identifier in format <server>/<tool>").argument("<args>",'Tool arguments as JSON string or "-" for stdin').option("--json","Output in JSON format").option("--timeout <ms>","Timeout in milliseconds","30000").option("--debug","Show debug output").action(async(A,Q,B)=>{let{server:G,tool:Z}=gV0(A);if(Q==="-"){let W=[];for await(let X of process.stdin)W.push(X);Q=Buffer.concat(W).toString("utf-8").trim()}let I;try{I=JSON.parse(Q)}catch(W){console.error(sA.red("Error: Invalid JSON arguments")),console.error(String(W)),process.exit(1)}let Y=`mcp__${f7(G)}__${f7(Z)}`,J=Date.now();try{let W=parseInt(B.timeout,10),X={server:G,tool:Z,args:I,timeoutMs:W},F=MC()?await SQA(nT,{command:"call",params:X},W):await my3(Z,G,I,B),V=B.json?JSON.stringify(F):typeof F==="string"?F:JSON.stringify(F,null,2);if(await new Promise((K)=>{process.stdout.write(V+`
+
+thinking
+**Analyzing tool name sanitization**
+codex
+I verified the SDK APIs are valid; now I’m proving the exact MCP tool-ID normalization path in the bundled CLI code, since a mismatched `allowedTools` ID format would silently block all MCP calls.
+exec
+/bin/zsh -lc "rg -n \"mcp__\\"'$'"\\{|replace\\(/\\[\\"'^a-zA-Z0-9_'"\\]|sanitize|normalizedNames|originalMcpToolName|originalToolName\" app/llm/sdk_bridge/node_modules/@anthropic-ai/claude-agent-sdk/cli.js | head -n 80" in /Users/james/repos/wibandwob-dos succeeded in 52ms:
+Total output lines: 24
+
+28:`).map((Q)=>Q.trim()).join(" ")};oU0.O=function(A){return this.inspectOpts.colors=this.useColors,K_A.inspect(A,this.inspectOpts)}});var ws=z((Tp3,wX1)=>{if(typeof process>"u"||process.type==="renderer"||!1||process.__nwjs)wX1.exports=iU0();else wX1.exports=A$0()});var B$0=z((Pp3,Q$0)=>{var FVA;Q$0.exports=function(){if(!FVA){try{FVA=ws()("follow-redirects")}catch(A){}if(typeof FVA!=="function")FVA=function(){}}FVA.apply(null,arguments)}});var J$0=z((jp3,_X1)=>{var KVA=UA("url"),VVA=KVA.URL,IP9=UA("http"),YP9=UA("https"),OX1=UA("stream").Writable,RX1=UA("assert"),G$0=B$0();(function(){var Q=typeof process<"u",B=typeof window<"u"&&typeof document<"u",G=Ns(Error.captureStackTrace);if(!Q&&(B||!G))console.warn("The follow-redirects package should be excluded from browser builds.")})();var TX1=!1;try{RX1(new VVA(""))}catch(A){TX1=A.code==="ERR_INVALID_URL"}var JP9=["auth","host","hostname","href","path","pathname","port","protocol","query","search","hash"],PX1=["abort","aborted","connect","error","socket","timeout"],jX1=Object.create(null);PX1.forEach(function(A){jX1[A]=function(Q,B,G){this._redirectable.emit(A,Q,B,G)}});var NX1=DVA("ERR_INVALID_URL","Invalid URL",TypeError),LX1=DVA("ERR_FR_REDIRECTION_FAILURE","Redirected request failed"),WP9=DVA("ERR_FR_TOO_MANY_REDIRECTS","Maximum number of redirects exceeded",LX1),XP9=DVA("ERR_FR_MAX_BODY_LENGTH_EXCEEDED","Request body larger than maxBodyLength limit"),FP9=DVA("ERR_STREAM_WRITE_AFTER_END","write after end"),VP9=OX1.prototype.destroy||I$0;function _z(A,Q){if(OX1.call(this),this._sanitizeOptions(A),this._options=A,this._ended=!1,this._ending=!1,this._redirectCount=0,this._redirects=[],this._requestBodyLength=0,this._requestBodyBuffers=[],Q)this.on("response",Q);var B=this;this._onNativeResponse=function(G){try{B._processResponse(G)}catch(Z){B.emit("error",Z instanceof LX1?Z:new LX1({cause:Z}))}},this._performRequest()}_z.prototype=Object.create(OX1.prototype);_z.prototype.abort=function(){kX1(this._currentRequest),this._currentRequest.abort(),this.emit("abort")};_z.prototype.destroy=function(A){return kX1(this._currentRequest,A),VP9.call(this,A),this};_z.prototype.write=function(A,Q,B){if(this._ending)throw new FP9;if(!qs(A)&&!HP9(A))throw TypeError("data should be a string, Buffer or Uint8Array");if(Ns(Q))B=Q,Q=null;if(A.length===0){if(B)B();return}if(this._requestBodyLength+A.length<=this._options.maxBodyLength)this._requestBodyLength+=A.length,this._requestBodyBuffers.push({data:A,encoding:Q}),this._currentRequest.write(A,Q,B);else this.emit("error",new XP9),this.abort()};_z.prototype.end=function(A,Q,B){if(Ns(A))B=A,A=Q=null;else if(Ns(Q))B=Q,Q=null;if(!A)this._ended=this._ending=!0,this._currentRequest.end(null,null,B);else{var G=this,Z=this._currentRequest;this.write(A,Q,function(){G._ended=!0,Z.end(null,null,B)}),this._ending=!0}};_z.prototype.setHeader=function(A,Q){this._options.headers[A]=Q,this._currentRequest.setHeader(A,Q)};_z.prototype.removeHeader=function(A){delete this._options.headers[A],this._currentRequest.removeHeader(A)};_z.prototype.setTimeout=function(A,Q){var B=this;function G(Y){Y.setTimeout(A),Y.removeListener("timeout",Y.destroy),Y.addListener("timeout",Y.destroy)}function Z(Y){if(B._timeout)clearTimeout(B._timeout);B._timeout=setTimeout(function(){B.emit("timeout"),I()},A),G(Y)}function I(){if(B._timeout)clearTimeout(B._timeout),B._timeout=null;if(B.removeListener("abort",I),B.removeListener("error",I),B.removeListener("response",I),B.removeListener("close",I),Q)B.removeListener("timeout",Q);if(!B.socket)B._currentRequest.removeListener("socket",Z)}if(Q)this.on("timeout",Q);if(this.socket)Z(this.socket);else this._currentRequest.once("socket",Z);return this.on("socket",G),this.on("abort",I),this.on("error",I),this.on("response",I),this.on("close",I),this};["flushHeaders","getHeader","setNoDelay","setSocketKeepAlive"].forEach(function(A){_z.prototype[A]=function(Q,B){return this._currentRequest[A](Q,B)}});["aborted","connection","socket"].forEach(function(A){Object.defineProperty(_z.prototype,A,{get:function(){return this._currentRequest[A]}})});_z.prototype._sanitizeOptions=function(A){if(!A.headers)A.headers={};if(A.host){if(!A.hostname)A.hostname=A.host;delete A.host}if(!A.pathname&&A.path){var Q=A.path.indexOf("?");if(Q<0)A.pathname=A.path;else A.pathname=A.path.substring(0,Q),A.search=A.path.substring(Q)}};_z.prototype._performRequest=function(){var A=this._options.protocol,Q=this._options.nativeProtocols[A];if(!Q)throw TypeError("Unsupported protocol "+A);if(this._options.agents){var B=A.slice(0,-1);this._options.agent=this._options.agents[B]}var G=this._currentRequest=Q.request(this._options,this._onNativeResponse);G._redirectable=this;for(var Z of PX1)G.on(Z,jX1[Z]);if(this._currentUrl=/^\//.test(this._options.path)?KVA.format(this._options):this._options.path,this._isRedirect){var I=0,Y=this,J=this._requestBodyBuffers;(function W(X){if(G===Y._currentRequest){if(X)Y.emit("error",X);else if(I<J.length){var F=J[I++];if(!G.finished)G.write(F.data,F.encoding,W)}else if(Y._ended)G.end()}})()}};_z.prototype._processResponse=function(A){var Q=A.statusCode;if(this._options.trackRedirects)this._redirects.push({url:this._currentUrl,headers:A.headers,statusCode:Q});var B=A.headers.location;if(!B||this._options.followRedirects===!1||Q<300||Q>=400){A.responseUrl=this._currentUrl,A.redirects=this._redirects,this.emit("response",A),this._requestBodyBuffers=[];return}if(kX1(this._currentRequest),A.destroy(),++this._redirectCount>this._options.maxRedirects)throw new WP9;var G,Z=this._options.beforeRedirect;if(Z)G=Object.assign({Host:A.req.getHeader("host")},this._options.headers);var I=this._options.method;if((Q===301||Q===302)&&this._options.method==="POST"||Q===303&&!/^(?:GET|HEAD)$/.test(this._options.method))this._options.method="GET",this._requestBodyBuffers=[],qX1(/^content-/i,this._options.headers);var Y=qX1(/^host$/i,this._options.headers),J=SX1(this._currentUrl),W=Y||J.host,X=/^\w+:/.test(B)?this._currentUrl:KVA.format(Object.assign(J,{host:W})),F=KP9(B,X);if(G$0("redirecting to",F.href),this._isRedirect=!0,MX1(F,this._options),F.protocol!==J.protocol&&F.protocol!=="https:"||F.host!==W&&!DP9(F.host,W))qX1(/^(?:(?:proxy-)?authorization|cookie)$/i,this._options.headers);if(Ns(Z)){var V={headers:A.headers,statusCode:Q},K={url:X,method:I,headers:G};Z(this._options,V,K),this._sanitizeOptions(this._options)}this._performRequest()};function Z$0(A){var Q={maxRedirects:21,maxBodyLength:10485760},B={};return Object.keys(A).forEach(function(G){var Z=G+":",I=B[Z]=A[G],Y=Q[G]=Object.create(I);function J(X,F,V){if(CP9(X))X=MX1(X);else if(qs(X))X=MX1(SX1(X));else V=F,F=Y$0(X),X={protocol:Z};if(Ns(F))V=F,F=null;if(F=Object.assign({maxRedirects:Q.maxRedirects,maxBodyLength:Q.maxBodyLength},X,F),F.nativeProtocols=B,!qs(F.host)&&!qs(F.hostname))F.hostname="::1";return RX1.equal(F.protocol,Z,"protocol mismatch"),G$0("options",F),new _z(F,V)}function W(X,F,V){var K=Y.request(X,F,V);return K.end(),K}Object.defineProperties(Y,{request:{value:J,configurable:!0,enumerable:!0,writable:!0},get:{value:W,configurable:!0,enumerable:!0,writable:!0}})}),Q}function I$0(){}function SX1(A){var Q;if(TX1)Q=new VVA(A);else if(Q=Y$0(KVA.parse(A)),!qs(Q.protocol))throw new NX1({input:A});return Q}function KP9(A,Q){return TX1?new VVA(A,Q):SX1(KVA.resolve(Q,A))}function Y$0(A){if(/^\[/.test(A.hostname)&&!/^\[[:0-9a-f]+\]$/i.test(A.hostname))throw new NX1({input:A.href||A});if(/^\[/.test(A.host)&&!/^\[[:0-9a-f]+\](:\d+)?$/i.test(A.host))throw new NX1({input:A.href||A});return A}function MX1(A,Q){var B=Q||{};for(var G of JP9)B[G]=A[G];if(B.hostname.startsWith("["))B.hostname=B.hostname.slice(1,-1);if(B.port!=="")B.port=Number(B.port);return B.path=B.search?B.pathname+B.search:B.pathname,B}function qX1(A,Q){var B;for(var G in Q)if(A.test(G))B=Q[G],delete Q[G];return B===null||typeof B>"u"?void 0:String(B).trim()}function DVA(A,Q,B){function G(Z){if(Ns(Error.captureStackTrace))Error.captureStackTrace(this,this.constructor);Object.assign(this,Z||{}),this.code=A,this.message=this.cause?Q+": "+this.cause.message:Q}return G.prototype=new(B||Error),Object.defineProperties(G.prototype,{constructor:{value:G,enumerable:!1},name:{value:"Error ["+A+"]",enumerable:!1}}),G}function kX1(A,Q){for(var B of PX1)A.removeListener(B,jX1[B]);A.on("error",I$0),A.destroy(Q)}function DP9(A,Q){RX1(qs(A)&&qs(Q));var B=A.length-Q.length-1;return B>0&&A[B]==="."&&A.endsWith(Q)}function qs(A){return typeof A==="string"||A instanceof String}function Ns(A){return typeof A==="function"}function HP9(A){return typeof A==="object"&&"length"in A}function CP9(A){return VVA&&A instanceof VVA}_X1.exports=Z$0({http:IP9,https:YP9});_X1.exports.wrap=Z$0});var Ls="1.8.4";function HVA(A){let Q=/^([-+\w]{1,25})(:?\/\/|:)/.exec(A);return Q&&Q[1]||""}function yX1(A,Q,B){let G=B&&B.Blob||d3.classes.Blob,Z=HVA(A);if(Q===void 0&&G)Q=!0;if(Z==="data"){A=Z.length?A.slice(Z.length+1):A;let I=EP9.exec(A);if(!I)throw new $B("Invalid URL",$B.ERR_INVALID_URL);let Y=I[1],J=I[2],W=I[3],X=Buffer.from(decodeURIComponent(W),J?"base64":"utf8");if(Q){if(!G)throw new $B("Blob is not supported",$B.ERR_NOT_SUPPORT);return new G([X],{type:Y})}return X}throw new $B("Unsupported protocol "+Z,$B.ERR_NOT_SUPPORT)}var EP9;var W$0=M(()=>{i$();VR();EP9=/^(?:([^;]+);)?(?:[^;]+;)?(base64|),([\s\S]*)$/});import zP9 from"stream";var xX1,X$0,vX1;var F$0=M(()=>{aG();xX1=Symbol("internals");X$0=class X$0 extends zP9.Transform{constructor(A){A=f1.toFlatObject(A,{maxRate:0,chunkSize:65536,minChunkSize:100,timeWindow:500,ticksRate:2,samplesCount:15},null,(B,G)=>{return!f1.isUndefined(G[B])});super({readableHighWaterMark:A.chunkSize});let Q=this[xX1]={timeWindow:A.timeWindow,chunkSize:A.chunkSize,maxRate:A.maxRate,minChunkSize:A.minChunkSize,bytesSeen:0,isCaptured:!1,notifiedBytesLoaded:0,ts:Date.now(),bytes:0,onReadCallback:null};this.on("newListener",(B)=>{if(B==="progress"){if(!Q.isCaptured)Q.isCaptured=!0}})}_read(A){let Q=this[xX1];if(Q.onReadCallback)Q.onReadCallback();return super._read(A)}_transform(A,Q,B){let G=this[xX1],Z=G.maxRate,I=this.readableHighWaterMark,Y=G.timeWindow,J=1000/Y,W=Z/J,X=G.minChunkSize!==!1?Math.max(G.minChunkSize,W*0.01):0,F=(K,D)=>{let H=Buffer.byteLength(K);if(G.bytesSeen+=H,G.bytes+=H,G.isCaptured&&this.emit("progress",G.bytesSeen),this.push(K))process.nextTick(D);else G.onReadCallback=()=>{G.onReadCallback=null,process.nextTick(D)}},V=(K,D)=>{let H=Buffer.byteLength(K),C=null,E=I,U,w=0;if(Z){let q=Date.now();if(!G.ts||(w=q-G.ts)>=Y)G.ts=q,U=W-G.bytes,G.bytes=U<0?-U:0,w=0;U=W-G.bytes}if(Z){if(U<=0)return setTimeout(()=>{D(null,K)},Y-w);if(U<E)E=U}if(E&&H>E&&H-E>X)C=K.subarray(E),K=K.subarray(0,E);F(K,C?()=>{process.nextTick(D,null,C)}:D)};V(A,function K(D,H){if(D)return B(D);if(H)V(H,K);else B(null)})}};vX1=X$0});var V$0,UP9=async function*(A){if(A.stream)yield*A.stream();else if(A.arrayBuffer)yield await A.arrayBuffer();else if(A[V$0])yield*A[V$0]();else yield A},H_A;var bX1=M(()=>{({asyncIterator:V$0}=Symbol),H_A=UP9});import $P9 from"util";import{Readable as wP9}from"stream";class K$0{constructor(A,Q){let{escapeName:B}=this.constructor,G=f1.isString(Q),Z=`Content-Disposition: form-data; name="${B(A)}"${!G&&Q.name?`; filename="${B(Q.name)}"`:""}${xu}`;if(G)Q=CVA.encode(String(Q).replace(/\r?\n|\r\n?/g,xu));else Z+=`Content-Type: ${Q.type||"application/octet-stream"}${xu}`;this.headers=CVA.encode(Z+xu),this.contentLength=G?Q.byteLength:Q.size,this.size=this.headers.byteLength+this.contentLength+LP9,this.name=A,this.value=Q}async*encode(){yield this.headers;let{value:A}=this;if(f1.isTypedArray(A))yield A;else yield*H_A(A);yield NP9}static escapeName(A){return String(A).replace(/[\r\n"]/g,(Q)=>({"\r":"%0D","\n":"%0A",'"':"%22"})[Q])}}var qP9,CVA,xu=`\r
+51:`},X]}}yh0.exports=JB4});var bh0=z((eB7,vh0)=>{function WB4(A){let Z={$pattern:"[a-zA-Z_][\\w.]*|&[lg]t;",literal:"true false none minimal full all void and or not bw nbw ew new cn ncn lt lte gt gte eq neq rx nrx ft",built_in:"array date decimal duration integer map pair string tag xml null boolean bytes keyword list locale queue set stack staticarray local var variable global data self inherited currentcapture givenblock",keyword:"cache database_names database_schemanames database_tablenames define_tag define_type email_batch encode_set html_comment handle handle_error header if inline iterate ljax_target link link_currentaction link_currentgroup link_currentrecord link_detail link_firstgroup link_firstrecord link_lastgroup link_lastrecord link_nextgroup link_nextrecord link_prevgroup link_prevrecord log loop namespace_using output_none portal private protect records referer referrer repeating resultset rows search_args search_arguments select sort_args sort_arguments thread_atomic value_list while abort case else fail_if fail_ifnot fail if_empty if_false if_null if_true loop_abort loop_continue loop_count params params_up return return_value run_children soap_definetag soap_lastrequest soap_lastresponse tag_name ascending average by define descending do equals frozen group handle_failure import in into join let match max min on order parent protected provide public require returnhome skip split_thread sum take thread to trait type where with yield yieldhome"},I=A.COMMENT("<!--","-->",{relevance:0}),Y={className:"meta",begin:"\\[noprocess\\]",starts:{end:"\\[/noprocess\\]",returnEnd:!0,contains:[I]}},J={className:"meta",begin:"\\[/noprocess|<\\?(lasso(script)?|=)"},W={className:"symbol",begin:"'[a-zA-Z_][\\w.]*'"},X=[A.C_LINE_COMMENT_MODE,A.C_BLOCK_COMMENT_MODE,A.inherit(A.C_NUMBER_MODE,{begin:A.C_NUMBER_RE+"|(-?infinity|NaN)\\b"}),A.inherit(A.APOS_STRING_MODE,{illegal:null}),A.inherit(A.QUOTE_STRING_MODE,{illegal:null}),{className:"string",begin:"`",end:"`"},{variants:[{begin:"[#$][a-zA-Z_][\\w.]*"},{begin:"#",end:"\\d+",illegal:"\\W"}]},{className:"type",begin:"::\\s*",end:"[a-zA-Z_][\\w.]*",illegal:"\\W"},{className:"params",variants:[{begin:"-(?!infinity)[a-zA-Z_][\\w.]*",relevance:0},{begin:"(\\.\\.\\.)"}]},{begin:/(->|\.)\s*/,relevance:0,contains:[W]},{className:"class",beginKeywords:"define",returnEnd:!0,end:"\\(|=>",contains:[A.inherit(A.TITLE_MODE,{begin:"[a-zA-Z_][\\w.]*(=(?!>))?|[-+*/%](?!>)"})]}];return{name:"Lasso",aliases:["ls","lassoscript"],case_insensitive:!0,keywords:Z,contains:[{className:"meta",begin:"\\]|\\?>",relevance:0,starts:{end:"\\[|<\\?(lasso(script)?|=)",returnEnd:!0,relevance:0,contains:[I]}},Y,J,{className:"meta",begin:"\\[no_square_brackets",starts:{end:"\\[/no_square_brackets\\]",keywords:Z,contains:[{className:"meta",begin:"\\]|\\?>",relevance:0,starts:{end:"\\[noprocess\\]|<\\?(lasso(script)?|=)",returnEnd:!0,contains:[I]}},Y,J].concat(X)}},{className:"meta",begin:"\\[",relevance:0},{className:"meta",begin:"^#!",end:"lasso9$",relevance:10}].concat(X)}}vh0.exports=WB4});var hh0=z((A27,fh0)=>{function XB4(A){if(!A)return null;if(typeof A==="string")return A;return A.source}function FB4(...A){return"("+A.map((B)=>XB4(B)).join("|")+")"}function VB4(A){let Q=FB4(...["(?:NeedsTeXFormat|RequirePackage|GetIdInfo)","Provides(?:Expl)?(?:Package|Class|File)","(?:DeclareOption|ProcessOptions)","(?:documentclass|usepackage|input|include)","makeat(?:letter|other)","ExplSyntax(?:On|Off)","(?:new|renew|provide)?command","(?:re)newenvironment","(?:New|Renew|Provide|Declare)(?:Expandable)?DocumentCommand","(?:New|Renew|Provide|Declare)DocumentEnvironment","(?:(?:e|g|x)?def|let)","(?:begin|end)","(?:part|chapter|(?:sub){0,2}section|(?:sub)?paragraph)","caption","(?:label|(?:eq|page|name)?ref|(?:paren|foot|super)?cite)","(?:alpha|beta|[Gg]amma|[Dd]elta|(?:var)?epsilon|zeta|eta|[Tt]heta|vartheta)","(?:iota|(?:var)?kappa|[Ll]ambda|mu|nu|[Xx]i|[Pp]i|varpi|(?:var)rho)","(?:[Ss]igma|varsigma|tau|[Uu]psilon|[Pp]hi|varphi|chi|[Pp]si|[Oo]mega)","(?:frac|sum|prod|lim|infty|times|sqrt|leq|geq|left|right|middle|[bB]igg?)","(?:[lr]angle|q?quad|[lcvdi]?dots|d?dot|hat|tilde|bar)"].map((x)=>x+"(?![a-zA-Z@:_])")),B=new RegExp(["(?:__)?[a-zA-Z]{2,}_[a-zA-Z](?:_?[a-zA-Z])+:[a-zA-Z]*","[lgc]__?[a-zA-Z](?:_?[a-zA-Z])*_[a-zA-Z]{2,}","[qs]__?[a-zA-Z](?:_?[a-zA-Z])+","use(?:_i)?:[a-zA-Z]*","(?:else|fi|or):","(?:if|cs|exp):w","(?:hbox|vbox):n","::[a-zA-Z]_unbraced","::[a-zA-Z:]"].map((x)=>x+"(?![a-zA-Z:_])").join("|")),G=[{begin:/[a-zA-Z@]+/},{begin:/[^a-zA-Z@]?/}],Z=[{begin:/\^{6}[0-9a-f]{6}/},{begin:/\^{5}[0-9a-f]{5}/},{begin:/\^{4}[0-9a-f]{4}/},{begin:/\^{3}[0-9a-f]{3}/},{begin:/\^{2}[0-9a-f]{2}/},{begin:/\^{2}[\u0000-\u007f]/}],I={className:"keyword",begin:/\\/,relevance:0,contains:[{endsParent:!0,begin:Q},{endsParent:!0,begin:B},{endsParent:!0,variants:Z},{endsParent:!0,relevance:0,variants:G}]},Y={className:"params",relevance:0,begin:/#+\d?/},J={variants:Z},W={className:"built_in",relevance:0,begin:/[$&^_]/},X={className:"meta",begin:"% !TeX",end:"$",relevance:10},F=A.COMMENT("%","$",{relevance:0}),V=[I,Y,J,W,X,F],K={begin:/\{/,end:/\}/,relevance:0,contains:["self",...V]},D=A.inherit(K,{relevance:0,endsParent:!0,contains:[K,...V]}),H={begin:/\[/,end:/\]/,endsParent:!0,relevance:0,contains:[K,...V]},C={begin:/\s+/,relevance:0},E=[D],U=[H],w=function(x,p){return{contains:[C],starts:{relevance:0,contains:x,starts:p}}},q=function(x,p){return{begin:"\\\\"+x+"(?![a-zA-Z@:_])",keywords:{$pattern:/\\[a-zA-Z]+/,keyword:"\\"+x},relevance:0,contains:[C],starts:p}},N=function(x,p){return A.inherit({begin:"\\\\begin(?=[ \t]*(\\r?\\n[ \t]*)?\\{"+x+"\\})",keywords:{$pattern:/\\[a-zA-Z]+/,keyword:"\\begin"},relevance:0},w(E,p))},R=(x="string")=>{return A.END_SAME_AS_BEGIN({className:x,begin:/(.|\r?\n)/,end:/(.|\r?\n)/,excludeBegin:!0,excludeEnd:!0,endsParent:!0})},P=function(x){return{className:"string",end:"(?=\\\\end\\{"+x+"\\})"}},y=(x="string")=>{return{relevance:0,begin:/\{/,starts:{endsParent:!0,contains:[{className:x,end:/(?=\})/,endsParent:!0,contains:[{begin:/\{/,end:/\}/,relevance:0,contains:["self"]}]}]}}},v=[...["verb","lstinline"].map((x)=>q(x,{contains:[R()]})),q("mint",w(E,{contains:[R()]})),q("mintinline",w(E,{contains:[y(),R()]})),q("url",{contains:[y("link"),y("link")]}),q("hyperref",{contains:[y("link")]}),q("href",w(U,{contains:[y("link")]})),...[].concat(...["","\\*"].map((x)=>[N("verbatim"+x,P("verbatim"+x)),N("filecontents"+x,w(E,P("filecontents"+x))),...["","B","L"].map((p)=>N(p+"Verbatim"+x,w(U,P(p+"Verbatim"+x))))])),N("minted",w(U,w(E,P("minted"))))];return{name:"LaTeX",aliases:["tex"],contains:[...v,...V]}}fh0.exports=VB4});var uh0=z((Q27,gh0)=>{function KB4(A){return{name:"LDIF",contains:[{className:"attribute",begin:"^dn",end:": ",excludeEnd:!0,starts:{end:"$",relevance:0},relevance:10},{className:"attribute",begin:"^\\w",end:": ",excludeEnd:!0,starts:{end:"$",relevance:0}},{className:"literal",begin:"^-",end:"$"},A.HASH_COMMENT_MODE]}}gh0.exports=KB4});var dh0=z((B27,mh0)=>{function DB4(A){return{name:"Leaf",contains:[{className:"function",begin:"#+[A-Za-z_0-9]*\\(",end:/ \{/,returnBegin:!0,excludeEnd:!0,contains:[{className:"keyword",begin:"#+"},{className:"title",begin:"[A-Za-z_][A-Za-z_0-9]*"},{className:"params",begin:"\\(",end:"\\)",endsParent:!0,contains:[{className:"string",begin:'"',end:'"'},{className:"variable",begin:"[A-Za-z_][A-Za-z_0-9]*"}]}]}]}}mh0.exports=DB4});var ih0=z((G27,lh0)=>{var HB4=(A)=>{return{IMPORTANT:{className:"meta",begin:"!important"},HEXCOLOR:{className:"number",begin:"#([a-fA-F0-9]{6}|[a-fA-F0-9]{3})"},ATTRIBUTE_SELECTOR_MODE:{className:"selector-attr",begin:/\[/,end:/\]/,illegal:"$",contains:[A.APOS_STRING_MODE,A.QUOTE_STRING_MODE]}}},CB4=["a","abbr","address","article","aside","audio","b","blockquote","body","button","canvas","caption","cite","code","dd","del","details","dfn","div","dl","dt","em","fieldset","figcaption","figure","footer","form","h1","h2","h3","h4","h5","h6","header","hgroup","html","i","iframe","img","input","ins","kbd","label","legend","li","main","mark","menu","nav","object","ol","p","q","quote","samp","section","span","strong","summary","sup","table","tbody","td","textarea","tfoot","th","thead","time","tr","ul","v…246570 tokens truncated…fault.createElement(CE9,{onAccept:()=>{Y(),I()}})))});return Z}async function Cz9(A,Q){try{let B=await kIA(A,Q);if(B.type==="connected")return"✓ Connected";else if(B.type==="needs-auth")return"⚠ Needs authentication";else return"✗ Failed to connect"}catch(B){return"✗ Connection error"}}function mv3(){let A=L1();l0({...A,numStartups:(A.numStartups??0)+1}),dv3(),EC0()?.add(1)}async function dv3(){let[A,Q]=await Promise.all([WT(),IUA()]);GA("tengu_startup_telemetry",{is_git:A,worktree_count:Q,sandbox_enabled:pQ.isSandboxingEnabled(),are_unsandboxed_commands_allowed:pQ.areUnsandboxedCommandsAllowed(),is_auto_bash_allowed_if_sandbox_enabled:pQ.isAutoAllowBashIfSandboxedEnabled()})}function cv3(){UE9(),wE9(),NE9(),RE9(),PE9(),ME9()}function pv3(){if(D5()){gD();return}if(PX(!0))gD()}async function tY1(A,Q,B,G,Z){let I=process.version.match(/^v(\d+)\./)?.[1];if(!I||parseInt(I)<18)console.error(sA.bold.red("Error: Claude Code requires Node.js version 18 or higher.")),process.exit(1);if(Z)WR(Z);E10();let Y=fPB();if(Y.status==="restored")console.log(sA.yellow("Detected an interrupted iTerm2 setup. Your original settings have been restored. You may need to restart iTerm2 for the changes to take effect."));else if(Y.status==="failed")console.error(sA.red(`Failed to restore iTerm2 settings. Please manually restore your original settings with: defaults import com.googlecode.iterm2 ${Y.backupPath}.`));try{let F=await qrA();if(F.status==="restored")console.log(sA.yellow("Detected an interrupted Terminal.app setup. Your original settings have been restored. You may need to restart Terminal.app for the changes to take effect."));else if(F.status==="failed")console.error(sA.red(`Failed to restore Terminal.app settings. Please manually restore your original settings with: defaults import com.apple.Terminal ${F.backupPath}.`))}catch(F){t(F instanceof Error?F:Error(String(F)))}if(ew(A),aH9(),tH9(),QC9(),Ex2(),qx2(),AE9(),a70(),s70(),x4("setup_before_prefetch"),uH9(),dMB(),lE(),rZ1(),K1A(),F99(),JK(),pv3(),hg(),PD9(),fD9(),$0B(D5()),X0(process.env.CLAUDE_CODE_USE_BEDROCK)&&!X0(process.env.CLAUDE_CODE_SKIP_BEDROCK_AUTH))q0B();u$A().catch((F)=>t(F)),iIA([],Z0()),wjB(),x4("setup_after_prefetch");let{hasReleaseNotes:J}=nPA(L1().lastReleaseNotesSeen);if(J)await T49();let W=I4();if(setTimeout(()=>W.abort(),3000),oyA(K0(),W.signal,[]),Q==="bypassPermissions"||B){if(process.platform!=="win32"&&typeof process.getuid==="function"&&process.getuid()===0&&!process.env.IS_SANDBOX)console.error("--dangerously-skip-permissions cannot be used with root/sudo privileges for security reasons"),process.exit(1)}let X=M5();if(X.lastCost!==void 0&&X.lastDuration!==void 0)GA("tengu_exit",{last_session_cost:X.lastCost,last_session_api_duration:X.lastAPIDuration,last_session_tool_duration:X.lastToolDuration,last_session_duration:X.lastDuration,last_session_lines_added:X.lastLinesAdded,last_session_lines_removed:X.lastLinesRemoved,last_session_total_input_tokens:X.lastTotalInputTokens,last_session_total_output_tokens:X.lastTotalOutputTokens,last_session_total_cache_creation_input_tokens:X.lastTotalCacheCreationInputTokens,last_session_total_cache_read_input_tokens:X.lastTotalCacheReadInputTokens,last_session_id:X.lastSessionId}),aI({...X,lastCost:void 0,lastAPIDuration:void 0,lastToolDuration:void 0,lastDuration:void 0,lastLinesAdded:void 0,lastLinesRemoved:void 0,lastTotalInputTokens:void 0,lastTotalOutputTokens:void 0,lastTotalCacheCreationInputTokens:void 0,lastTotalCacheReadInputTokens:void 0,lastSessionId:void 0})}function lv3(A){try{let Q=A.trim(),B=Q.startsWith("{")&&Q.endsWith("}"),G;if(B){if(!k7(Q))process.stderr.write(sA.red(`Error: Invalid JSON provided to --settings
+4628:`));await new Promise(async(Y)=>{let{unmount:J}=await P5(p5.default.createElement(N7,{onChangeAppState:mg},p5.default.createElement(j,{flexDirection:"column",gap:1},p5.default.createElement(nc,{items:[p5.default.createElement(pY1,{key:"welcome"})]},(W)=>W),p5.default.createElement(ai,{onDone:()=>{J(),Y()},mode:"setup-token",startingMessage:"This will guide you through long-lived (1-year) auth token setup for your Claude account. Claude subscription required."}))))}),process.exit(0)});function I({onDone:Y}){return xZ1(),p5.default.createElement(bI1,{onDone:Y})}return A.command("doctor").description("Check the health of your Claude Code auto-updater").helpOption("-h, --help","Display help for command").action(async()=>{GA("tengu_doctor_command",{}),await new Promise(async(Y)=>{let{unmount:J}=await P5(p5.default.createElement(N7,null,p5.default.createElement(nG1,{dynamicMcpConfig:void 0,isStrictMcpConfig:!1},p5.default.createElement(I,{onDone:()=>{J(),Y()}}))),{exitOnCtrlC:!1})}),process.exit(0)}),A.command("update").description("Check for updates and install if available").helpOption("-h, --help","Display help for command").action(rE9),A.command("install [target]").description("Install Claude Code native build. Use [target] to specify version (stable, latest, or specific version)").option("--force","Force installation even if already installed").helpOption("-h, --help","Display help for command").action(async(Y,J)=>{await tY1(XK0(),"default",!1,!1,void 0),await new Promise((W)=>{let X=[];if(Y)X.push(Y);if(J.force)X.push("--force");eE9.call(()=>{W(),process.exit(0)},{},X)})}),x4("run_before_parse"),await A.parseAsync(process.argv),x4("run_after_parse"),x4("main_after_run"),cD9(),A}async function ev3({hasInitialPrompt:A,hasStdin:Q,verbose:B,debug:G,debugToStderr:Z,print:I,outputFormat:Y,inputFormat:J,numAllowedTools:W,numDisallowedTools:X,mcpClientCount:F,worktree:V,skipWebFetchPreflight:K,githubActionInputs:D,dangerouslySkipPermissionsPassed:H,modeIsBypass:C,allowDangerouslySkipPermissionsPassed:E,systemPromptFlag:U,appendSystemPromptFlag:w}){try{let q=await T7B();GA("tengu_init",{entrypoint:"claude",hasInitialPrompt:A,hasStdin:Q,verbose:B,debug:G,debugToStderr:Z,print:I,outputFormat:Y,inputFormat:J,numAllowedTools:W,numDisallowedTools:X,mcpClientCount:F,worktree:V,skipWebFetchPreflight:K,...D&&{githubActionInputs:D},dangerouslySkipPermissionsPassed:H,modeIsBypass:C,allowDangerouslySkipPermissionsPassed:E,...U&&{systemPromptFlag:U},...w&&{appendSystemPromptFlag:w},...q&&{rh:q}})}catch(q){t(q instanceof Error?q:Error(String(q)))}}function Ab3(){(process.stderr.isTTY?process.stderr:process.stdout.isTTY?process.stdout:void 0)?.write(`\x1B[?25h${Th1}`)}var p5;var $z9=M(()=>{nt();OH9();gH9();mH9();fB();h5();ht();mV0();sH9();eH9();BC9();x50();g50();QlA();hA();JI1();Cy();mZ1();SV0();Tq();hXA();F9();DC9();EC9();XsA();rI1();r5();kQ();fB();xEA();KYA();om1();rm1();u1();YG();Ki();YG();wC9();sOA();RX0();vJ0();lV0();bC9();gI1();CX0();fE();r2();LB();fC9();gC9();iC9();bF0();fQ();pE();wy();JMA();kF0();kH();RQA();TF0();tC9();a2();QE9();GE9();CD();JE9();fQ();CV();fh();_70();YG();GI();h80();DE9();y9();q0();q0();NJ0();WaA();KIA();lT();_P();of();HE9();Aw();EE9();O_();GWA();mj();XYA();D1A();gk();ab();k0();E9();BQA();zE9();Xi();cIA();k0();qF();V0();$E9();qE9();LE9();OE9();TE9();jE9();hrA();aE9();oE9();QjA();PE();z6();Az9();A0A();hY1();Bz9();Xz9();HU();SJ();WH();qZ();QM();kX();n10();t0();gk();T2();tI1();zPA();tJ0();zF();iV0();OXA();bh();Kz9();LJ();Dz9();DE();bY1();jIA();p5=BA(KA(),1);x4("main_tsx_entry");x4("main_tsx_imports_loaded");if(uv3())process.exit(1)});nt();V0();DE();SV0();ZFA();F9();O_();TD();kQ();y9();q0();w3();kV0();_V0();yV0();xV0();vV0();bV0();DE();bY1();import{readFileSync as hy3,existsSync as gy3}from"fs";var hV0,HH9=!1;function CH9(){if(hV0===void 0)hV0=DH9();return hV0}function MC(){let A=VGA(),Q=CH9();if(!HH9){if(HH9=!0,A&&Q===null){let B=xY1(),G=GFA();console.error(sA.yellow(`Warning: MCP endpoint file not found at ${B} (session: ${G}). Falling back to state file.`))}}return A&&Q!==null}class ojA extends Error{constructor(A){super(A);this.name="ConnectionFailedError"}}async function tjA(A,Q,B,G){let Z=Date.now();try{let I=await Q();if(!MC()){let Y=typeof B==="function"?B(I):B||{};await Ca("tengu_mcp_cli_command_executed",{command:A,success:!0,duration_ms:Date.now()-Z,...Y})}return{success:!0,data:I}}catch(I){let Y=I instanceof Error?I:Error(String(I));if(console.error(sA.red("Error:"),Y.message),!MC()){let J=typeof B==="object"?B:{};await Ca("tengu_mcp_cli_command_executed",{command:A,success:!1,error_type:Y.constructor.name,duration_ms:Date.now()-Z,...J,...G})}return{success:!1,error:Y}}}function Ea(){let A=BV0();if(!gy3(A)){let Q=GFA();throw Error(`MCP state file not found at ${A} (session: ${Q}). Is Claude Code running?`)}try{return JSON.parse(hy3(A,"utf-8"))}catch(Q){throw Error(`Error reading MCP state file ${A}: ${Q instanceof Error?Q.message:String(Q)}`)}}function EH9(A,Q){if(A.configs?.[Q])return A.configs[Q];let B=A.normalizedNames?.[Q];if(B&&A.configs?.[B])return A.configs[B];return}function uy3(A,Q){if(A.resources?.[Q])return A.resources[Q];let B=A.normalizedNames?.[Q];if(B&&A.resources?.[B])return A.resources[B];return[]}function gV0(A){let Q=A.split("/");if(Q.length!==2||!Q[0]||!Q[1])throw Error(`Invalid tool identifier '${A}'. Expected format: <server>/<tool>`);return{server:Q[0],tool:Q[1]}}async function SQA(A,Q,B=1e4){let G=CH9();if(!G)throw Error("MCP CLI endpoint not enabled");try{let Z=await IQ({method:"POST",url:`${G.url}/mcp`,data:Q,headers:{Authorization:`Bearer ${G.key}`,"Content-Type":"application/json"},timeout:B,validateStatus:()=>!0});if(Z.status>=400){let I=Z.data,Y=Error(I.error||`HTTP ${Z.status}: ${Z.statusText}`);if(I.type)Y.name=I.type;throw Y}return A.parse(Z.data)}catch(Z){if(IQ.isAxiosError(Z)){if(Z.code==="ECONNREFUSED")throw Error("Connection refused - is the MCP endpoint running?");if(Z.code==="ETIMEDOUT"||Z.message.includes("timeout"))throw Error("Request timeout");if(Z.message.startsWith("HTTP "))throw Z;throw Error(`Network error: ${Z.message}`)}throw Z}}var za=new PY1().name("mcp-cli").description("Interact with MCP servers and tools").version("1.0.0");za.command("servers").description("List all connected MCP servers").option("--json","Output in JSON format").action(async(A)=>{let Q=await tjA("servers",async()=>{return MC()?await SQA(JH9,{command:"servers"}):jY1(Ea().clients)},(G)=>({server_count:G.length}));if(!Q.success)process.exit(1);let B=Q.data;if(A.json)console.log(JSON.stringify(B));else B.forEach((G)=>{let Z=G.type==="connected"?sA.green("connected"):G.type==="failed"?sA.red("failed"):sA.yellow(G.type),I="";if(G.type==="connected"){let Y=[];if(G.hasTools)Y.push("tools");if(G.hasResources)Y.push("resources");if(G.hasPrompts)Y.push("prompts");if(Y.length>0)I=` (${Y.join(", ")})`}console.log(`${G.name} - ${Z}${I}`)})});za.command("tools").description("List all available tools").argument("[server]","Filter by server name").option("--json","Output in JSON format").action(async(A,Q)=>{let B={server:A},G=await tjA("tools",async()=>{return MC()?await SQA(WH9,{command:"tools",params:B}):SY1(Ea().tools,B)},(I)=>({tool_count:I.length,filtered:!!A}));if(!G.success)process.exit(1);let Z=G.data;if(Q.json)console.log(JSON.stringify(Z));else if(A)Z.forEach((I)=>console.log(I.name));else Z.forEach((I)=>console.log(`${I.server}/${I.name}`))});za.command("info").description("Get detailed information about a tool").argument("<tool>","Tool identifier in format <server>/<tool>").option("--json","Output in JSON format").action(async(A,Q)=>{let B=await tjA("info",async()=>{let{server:Z,tool:I}=gV0(A),Y={server:Z,toolName:I};if(MC())return await SQA(XH9,{command:"info",params:Y});let J=Ea(),W=await kY1(J.tools,Y);if(!W){let X=rjA(J.clients,Z,J.normalizedNames),F=jQA(Z,X?.type);if(F)throw F;throw Error(`Tool '${I}' not found on server '${Z}'`)}return W},()=>({tool_found:!0}),{tool_found:!1});if(!B.success)process.exit(1);let G=B.data;if(Q.json)console.log(JSON.stringify(G));else{if(console.log(sA.bold(`Tool: ${A}`)),console.log(sA.dim(`Server: ${G.server}`)),G.description)console.log(sA.dim(`Description: ${G.description}`));console.log(),console.log(sA.bold("Input Schema:")),console.log(JSON.stringify(G.inputSchema,null,2))}});async function my3(A,Q,B,G){let Z=Ea(),I=EH9(Z,Q);if(!I)throw Error(`Server '${Q}' not found`);if(G.debug)console.error(`Connecting to ${Q} (${I.type})...`);let Y=await nAA(Q,I);if(Y.client.type!=="connected")throw jQA(Q,Y.client.type)??new ojA(`Failed to connect to server '${Q}'`);let J=(()=>{let F=`mcp__${f7(Q)}__${f7(A)}`;return Z.tools.find((K)=>K.name===F)?.originalToolName||A})();if(G.debug)console.error(`Calling tool ${J}...`);let W=await Y.client.client.request({method:"tools/call",params:{name:J,arguments:B}},nT,{signal:AbortSignal.timeout(parseInt(G.timeout,10))});return Y.client.client.close(),W}za.command("call").description("Invoke an MCP tool").argument("<tool>","Tool identifier in format <server>/<tool>").argument("<args>",'Tool arguments as JSON string or "-" for stdin').option("--json","Output in JSON format").option("--timeout <ms>","Timeout in milliseconds","30000").option("--debug","Show debug output").action(async(A,Q,B)=>{let{server:G,tool:Z}=gV0(A);if(Q==="-"){let W=[];for await(let X of process.stdin)W.push(X);Q=Buffer.concat(W).toString("utf-8").trim()}let I;try{I=JSON.parse(Q)}catch(W){console.error(sA.red("Error: Invalid JSON arguments")),console.error(String(W)),process.exit(1)}let Y=`mcp__${f7(G)}__${f7(Z)}`,J=Date.now();try{let W=parseInt(B.timeout,10),X={server:G,tool:Z,args:I,timeoutMs:W},F=MC()?await SQA(nT,{command:"call",params:X},W):await my3(Z,G,I,B),V=B.json?JSON.stringify(F):typeof F==="string"?F:JSON.stringify(F,null,2);if(await new Promise((K)=>{process.stdout.write(V+`
+4629:`,()=>K())}),!MC())await Ca("tengu_mcp_cli_command_executed",{command:"call",tool_name:Y,success:!0,duration_ms:Date.now()-J});process.exit(0)}catch(W){console.error(sA.red("Error calling tool:"),String(W));let X=Date.now()-J,F=String(W).slice(0,2000);if(!MC())await Ca("tengu_tool_use_error",{toolName:Y,isMcp:!0,error:F,durationMs:X}),await Ca("tengu_mcp_cli_command_executed",{command:"call",tool_name:Y,success:!1,error_type:W instanceof ojA?"connection_failed":"tool_execution_failed",duration_ms:Date.now()-J});process.exit(1)}});za.command("grep").description("Search tool names and descriptions using regex patterns").argument("<pattern>","Regex pattern to search for").option("--json","Output in JSON format").option("-i, --ignore-case","Case insensitive search (default: true)",!0).action(async(A,Q)=>{let B=await tjA("grep",async()=>{try{new RegExp(A,Q.ignoreCase?"i":"")}catch(I){throw Error(`Invalid regex pattern: ${I instanceof Error?I.message:String(I)}`)}let Z={pattern:A,ignoreCase:Q.ignoreCase};return MC()?await SQA(FH9,{command:"grep",params:Z}):_Y1(Ea().tools,Z)},(Z)=>({match_count:Z.length}));if(!B.success)process.exit(1);let G=B.data;if(Q.json)console.log(JSON.stringify(G));else if(G.length===0)console.log(sA.yellow("No tools found matching pattern"));else G.forEach((Z)=>{if(console.log(sA.bold(`${Z.server}/${Z.name}`)),Z.description){let I=Z.description.length>100?Z.description.slice(0,100)+"...":Z.description;console.log(sA.dim(`  ${I}`))}console.log()})});za.command("resources").description("List MCP resources").argument("[server]","Filter by server name").option("--json","Output in JSON format").action(async(A,Q)=>{let B={server:A},G=await tjA("resources",async()=>{if(MC())return await SQA(VH9,{command:"resources",params:B});else{let I=Ea();return yY1(I.resources,B,I.normalizedNames)}},(I)=>({resource_count:I.length,filtered:!!A}));if(!G.success)process.exit(1);let Z=G.data;if(Q.json)console.log(JSON.stringify(Z));else Z.forEach((I)=>{console.log(`${I.server}/${I.name||I.uri}`)})});async function dy3(A,Q,B){let G=Ea(),Z=EH9(G,A);if(!Z)throw Error(`Server '${A}' not found`);if(B.debug)console.error(`Connecting to ${A} (${Z.type})...`);let I=await nAA(A,Z);if(I.client.type!=="connected")throw jQA(A,I.client.type)??new ojA(`Failed to connect to server '${A}'`);if(B.debug)console.error(`Reading resource: ${Q}`);let Y=await I.client.client.readResource({uri:Q},{signal:AbortSignal.timeout(parseInt(B.timeout,10))});return I.client.client.close(),Y}za.command("read").description("Read an MCP resource").argument("<resource>","Resource identifier in format <server>/<resource> or <server> <uri>").argument("[uri]","Optional: Direct resource URI (file://, https://, etc.)").option("--json","Output in JSON format").option("--timeout <ms>","Timeout in milliseconds","30000").option("--debug","Show debug output").action(async(A,Q,B)=>{let G,Z,I;if(Q)G=A,I=Q;else{let W=gV0(A);G=W.server,Z=W.tool}let Y;if(I){if(Y=I,B.debug)console.log(`Using direct URI: ${Y}`)}else{let W=Ea(),F=uy3(W,G).find((V)=>V.name===Z||V.uri===Z);if(!F)console.error(sA.red(`Error: Resource '${Z}' not found on server '${G}'`)),process.exit(1);Y=F.uri}let J=Date.now();try{let W=parseInt(B.timeout,10),X={server:G,uri:Y,timeoutMs:W},F=MC()?await SQA(ll,{command:"read",params:X},W):await dy3(G,Y,B);if(B.json)console.log(JSON.stringify(F));else if(F.contents&&Array.isArray(F.contents))F.contents.forEach((V)=>{if(V&&typeof V==="object"){if("text"in V)console.log(V.text);else if("blob"in V){console.log(sA.yellow("[Binary blob content]"));let K="mimeType"in V?V.mimeType:void 0;console.log(sA.dim(`MIME type: ${K||"unknown"}`))}}});else console.log(JSON.stringify(F,null,2));if(!MC())await Ca("tengu_mcp_cli_command_executed",{command:"read",success:!0,duration_ms:Date.now()-J});process.exit(0)}catch(W){if(console.error(sA.red("Error reading resource:"),String(W)),!MC())await Ca("tengu_mcp_cli_command_executed",{command:"read",success:!1,error_type:W instanceof ojA?"connection_failed":"read_failed",duration_ms:Date.now()-J});process.exit(1)}});async function zH9(A){if(tpA(),!MC())hg();try{if(await za.parseAsync(A,{from:"user"}),!MC())await(await hg())?.flush();return 0}catch(Q){if(console.error(sA.red("Error:"),Q),!MC())await(await hg())?.flush();return 1}}var UH9=1048576;function cy3(A,...Q){console.error(`[Claude Chrome Native Host] ${A}`,...Q)}class py3{buffer=Buffer.alloc(0);pendingResolve=null;closed=!1;constructor(){process.stdin.on("data",(A)=>{this.buffer=Buffer.concat([this.buffer,A]),this.tryProcessMessage()}),process.stdin.on("end",()=>{if(this.closed=!0,this.pendingResolve)this.pendingResolve(null),this.pendingResolve=null}),process.stdin.on("error",()=>{if(this.closed=!0,this.pendingResolve)this.pendingResolve(null),this.pendingResolve=null})}tryProcessMessage(){if(!this.pendingResolve)return;if(this.buffer.length<4)return;let A=this.buffer.readUInt32LE(0);if(A===0||A>UH9){cy3(`Invalid message length: ${A}`),this.pendingResolve(null),this.pendingResolve=null;return}if(this.buffer.length<4+A)return;let Q=this.buffer.subarray(4,4+A);this.buffer=this.buffer.subarray(4+A);let B=Q.toString("utf-8");this.pendingResolve(B),this.pendingResolve=null}async read(){if(this.closed)return null;if(this.buffer.length>=4){let A=this.buffer.readUInt32LE(0);if(A>0&&A<=UH9&&this.buffer.length>=4+A){let Q=this.buffer.subarray(4,4+A);return this.buffer=this.buffer.subarray(4+A),Q.toString("utf-8")}}return new Promise((A)=>{this.pendingResolve=A,this.tryProcessMessage()})}}process.env.COREPACK_ENABLE_AUTO_PIN="0";x4("cli_entry");x4("cli_imports_loaded");async function Qb3(){let A=process.argv.slice(2);if(A.length===1&&(A[0]==="--version"||A[0]==="-v"||A[0]==="-V")){x4("cli_version_fast_path"),console.log(`${{ISSUES_EXPLAINER:"report the issue at https://github.com/anthropics/claude-code/issues",PACKAGE_URL:"@anthropic-ai/claude-code",README_URL:"https://docs.claude.com/s/claude-code",VERSION:"2.0.56",FEEDBACK_CHANNEL:"https://github.com/anthropics/claude-code/issues"}.VERSION} (Claude Code)`);return}if(OJ()&&A[0]==="--mcp-cli"){let B=A.slice(1);process.exit(await zH9(B))}if(A[0]==="--ripgrep"){x4("cli_ripgrep_path");let B=A.slice(1),{ripgrepMain:G}=await Promise.resolve().then(() => (wH9(),$H9));process.exitCode=G(B);return}x4("cli_before_main_import");let{main:Q}=await Promise.resolve().then(() => ($z9(),Uz9));x4("cli_after_main_import"),await Q(),x4("cli_after_main_complete")}Qb3();
+
+thinking
+**Diagnosing tool name mismatch**
+exec
+/bin/zsh -lc "node - <<'NODE'
+const {query, createSdkMcpServer, tool} = require('./app/llm/sdk_bridge/node_modules/@anthropic-ai/claude-agent-sdk');
+const {z} = require('./app/llm/sdk_bridge/node_modules/zod');
+(async () => {
+  const server = createSdkMcpServer({
+    name: 'tui-control',
+    tools: [tool('tui_ping','ping',{}, async()=>({content:[{type:'text',text:'pong'}]}))]
+  });
+  const opts = {
+    maxTurns: 1,
+    model: 'claude-haiku-4-5',
+    mcpServers: {'tui-control': server},
+    allowedTools: ['mcp__tui-control__tui_ping'],
+    stderr: (msg)=>process.stderr.write('[sdk-stderr] '+String(msg))
+  };
+  let count = 0;
+  try {
+    for await (const m of query({prompt:'Say hi', options: opts})) {
+      count++;
+      if (count < 4) console.log(JSON.stringify({type:m.type, subtype:m.subtype, result:m.result, err:m.error?.message||null}));
+      if (count > 20) break;
+    }
+  } catch (e) {
+    console.error('ERR', e.message);
+  }
+})();
+NODE" in /Users/james/repos/wibandwob-dos
