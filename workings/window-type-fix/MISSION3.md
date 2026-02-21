@@ -315,8 +315,8 @@ Terminal write/read round-trip works. Text editor send_text/send_figlet work. Th
 
 ### Follow-up Tasks
 
-- **M3-T12**: Fix `save_workspace` / `open_workspace` modal dialog blocking IPC. When triggered via API/IPC, either auto-close the dialog after ~5 seconds, or suppress the dialog entirely and return the result directly. This blocks headless/agent use of workspace commands.
-- **M3-T13**: Strip null bytes from `terminal_read` response before returning to API caller.
+- **M3-T12**: ✅ DONE — `api_save_workspace` now uses `saveWorkspacePath()` which skips the modal dialog. Also writes timestamped snapshot. Commit `4ee1dee`.
+- **M3-T13**: ✅ DONE — `getOutputText()` now strips null bytes via `std::remove` before returning. Commit `4ee1dee`.
 
 ---
 
