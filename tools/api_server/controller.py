@@ -233,21 +233,16 @@ class Controller:
                     "h": str(rect.h)
                 })
             
-            if wtype == WindowType.test_pattern:
-                send_cmd("create_window", cmd_params)
-            elif wtype == WindowType.gradient:
-                kind = str(props.get("gradient", "horizontal"))
-                cmd_params["gradient"] = kind
-                send_cmd("create_window", cmd_params)
+            # Forward type-specific props that C++ spawn functions expect.
+            if wtype == WindowType.gradient:
+                cmd_params["gradient"] = str(props.get("gradient", "horizontal"))
             elif wtype in (WindowType.frame_player, WindowType.text_view):
                 path = str(props.get("path", ""))
                 if path:
                     cmd_params["path"] = path
-                    send_cmd("create_window", cmd_params)
-            elif wtype == WindowType.text_editor:
-                send_cmd("create_window", cmd_params)
-            elif wtype == WindowType.terminal:
-                send_cmd("create_window", cmd_params)
+            # Always send create_window — C++ handles all registered types
+            # via find_window_type_by_name() in api_ipc.cpp.
+            send_cmd("create_window", cmd_params)
         except Exception:
             pass
 

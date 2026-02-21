@@ -230,7 +230,7 @@ def _make_terminal_read_handler() -> CommandToolHandler:
         result = await controller.exec_command("terminal_read", args, actor="mcp")
         if not result.get("ok"):
             return _exec_result_error(result)
-        return {"success": True, "content": result.get("output", "")}
+        return {"success": True, "content": result.get("result", result.get("output", ""))}
     return _handler
 
 
