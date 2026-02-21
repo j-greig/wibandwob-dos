@@ -342,8 +342,11 @@ bool ClaudeCodeSDKProvider::startStreamingSession(const std::string& customSyste
     }
     fprintf(stderr, "[SDK] Command sent, waiting for SESSION_STARTED...\n");
 
-    // Wait for session confirmation
-    for (int i = 0; i < 50; ++i) { // 5 second timeout
+    // Wait for session confirmation.
+    // The bridge sends BRIDGE_READY first (immediate), then does async work
+    // (capabilities fetch with retries can take ~6s), then SESSION_STARTED.
+    // We need a generous timeout to accommodate the capabilities retry loop.
+    for (int i = 0; i < 150; ++i) { // 15 second timeout
         std::string response = nodeBridge->readResponse();
         if (!response.empty()) {
             fprintf(stderr, "[SDK] Got response: %.80s%s\n",
@@ -367,6 +370,11 @@ bool ClaudeCodeSDKProvider::startStreamingSession(const std::string& customSyste
                 }
                 
                 return true;
+            } else if (response.find("BRIDGE_READY") != std::string::npos) {
+                // Bridge is alive, capabilities fetch + SDK init in progress.
+                // Keep waiting for SESSION_STARTED.
+                fprintf(stderr, "[SDK] Bridge ready, waiting for session...\n");
+                continue;
             } else if (response.find("ERROR") != std::string::npos) {
                 setError("Session start failed: " + response);
                 return false;
