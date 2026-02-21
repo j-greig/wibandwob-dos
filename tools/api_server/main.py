@@ -515,7 +515,8 @@ def make_app() -> FastAPI:
         res = await ctl.exec_command("terminal_read", params, actor="api")
         if not res.get("ok"):
             raise HTTPException(status_code=404, detail=res.get("error", "no terminal window"))
-        return {"window_id": window_id, "text": res.get("result", "")}
+        text = res.get("result", "").replace("\x00", "")
+        return {"window_id": window_id, "text": text}
 
     @app.post("/screenshot")
     async def screenshot(payload: Optional[ScreenshotReq] = None) -> Dict[str, Any]:

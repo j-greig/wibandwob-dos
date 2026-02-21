@@ -689,7 +689,7 @@ def register_tui_tools(mcp):
         result = await controller.exec_command("terminal_read", params, actor="mcp")
         if not result.get("ok"):
             return _exec_result_error(result)
-        return {"success": True, "text": result.get("result", "")}
+        return {"success": True, "text": result.get("result", "").replace("\x00", "")}
 
     @mcp.tool("tui_send_figlet")
     async def send_figlet_to_window(
