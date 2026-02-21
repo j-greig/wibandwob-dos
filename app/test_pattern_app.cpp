@@ -2632,8 +2632,17 @@ std::string api_wibwob_ask(TTestPatternApp& app, const std::string& text) {
         }
     }
     if (!chatWin) return "err no wibwob chat window open";
-    chatWin->injectUserMessage(text);
-    return "ok";
+    // Fire-and-forget: post a custom event so processUserInput runs on the
+    // next event loop iteration, not blocking the IPC handler thread.
+    // We stash the text in a static so the event handler can grab it.
+    static std::string pendingAsk;
+    pendingAsk = text;
+    TEvent ev;
+    ev.what = evBroadcast;
+    ev.message.command = 0xF0F0; // cmWibWobAskPending — unique sentinel
+    ev.message.infoPtr = &pendingAsk;
+    TProgram::application->putEvent(ev);
+    return "ok queued";
 }
 
 void api_tile(TTestPatternApp& app) { app.tile(); }

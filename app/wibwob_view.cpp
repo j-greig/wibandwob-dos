@@ -580,6 +580,15 @@ void TWibWobWindow::handleEvent(TEvent& event) {
             engine->poll();
         }
     }
+
+    // Handle injected wibwob_ask messages from API
+    if (event.what == evBroadcast && event.message.command == 0xF0F0) {
+        auto* text = static_cast<std::string*>(event.message.infoPtr);
+        if (text && !text->empty()) {
+            processUserInput(*text);
+            clearEvent(event);
+        }
+    }
 }
 
 void TWibWobWindow::ensureEngineInitialized() {
