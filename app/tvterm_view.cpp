@@ -88,12 +88,18 @@ void TWibWobTerminalWindow::sendText(const std::string &text)
     for (unsigned char ch : text) {
         tvterm::TerminalEvent termEvent;
         termEvent.type = tvterm::TerminalEventType::KeyDown;
-        // Construct a minimal KeyDownEvent with the character.
         memset(&termEvent.keyDown, 0, sizeof(termEvent.keyDown));
-        termEvent.keyDown.charScan.charCode = ch;
-        termEvent.keyDown.keyCode = ch;
-        // Set the text field directly (KeyDownEvent has no setText method).
-        termEvent.keyDown.text[0] = static_cast<char>(ch);
+
+        if (ch == '\n' || ch == '\r') {
+            // Enter key: send \r with proper kbEnter scancode (0x1c0d)
+            termEvent.keyDown.charScan.charCode = '\r';
+            termEvent.keyDown.keyCode = 0x1c0d; // kbEnter
+            termEvent.keyDown.text[0] = '\r';
+        } else {
+            termEvent.keyDown.charScan.charCode = ch;
+            termEvent.keyDown.keyCode = ch;
+            termEvent.keyDown.text[0] = static_cast<char>(ch);
+        }
         termEvent.keyDown.textLength = 1;
         termView->termCtrl.sendEvent(termEvent);
     }
