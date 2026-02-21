@@ -260,6 +260,8 @@ The API server on port 8089 bridges between the Python/MCP layer and the C++ app
 
 ## Parity Enforcement
 
+> Canon terms: **Registry**, **Parity**, **Capability** — see `.planning/README.md` for formal definitions.
+
 The C++ command registry (`app/command_registry.cpp`) and window type registry (`app/window_type_registry.cpp`) are the single sources of truth. Python enums, schemas, and MCP tool builders must stay in sync.
 
 **Automated enforcement** (run these tests before merging):
