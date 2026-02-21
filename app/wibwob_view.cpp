@@ -586,6 +586,7 @@ void TWibWobWindow::handleEvent(TEvent& event) {
             if (!pendingAsk_.empty() && !engine->isBusy()) {
                 std::string msg = std::move(pendingAsk_);
                 pendingAsk_.clear();
+                speakNextUserMessage_ = true;
                 processUserInput(msg);
             }
         }
@@ -725,6 +726,25 @@ void TWibWobWindow::processUserInput(const std::string& input) {
     // Add user message
     messageView->addMessage("User", input);
     logMessage("User", input);
+
+    // Speak self-prompted messages in a "human" voice (Daniel = en_GB)
+    if (speakNextUserMessage_) {
+        speakNextUserMessage_ = false;
+        std::string filtered = filterTextForSpeech(input);
+        if (!filtered.empty()) {
+            // Inline shell escape (single quotes)
+            std::string escaped;
+            for (char c : filtered) {
+                if (c == '\'') escaped += "'\"'\"'";
+                else escaped += c;
+            }
+            std::thread([escaped]() {
+                std::ostringstream cmd;
+                cmd << "say -v \"Daniel\" -r 190 -- '" << escaped << "'";
+                system(cmd.str().c_str());
+            }).detach();
+        }
+    }
 
     // Set status and start spinner
     static const char* statusOptions[] = {

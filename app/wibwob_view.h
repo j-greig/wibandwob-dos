@@ -173,6 +173,7 @@ private:
     // Logging
     std::string sessionId;
     std::string pendingAsk_;  // queued self-prompt, drained when engine idle
+    bool speakNextUserMessage_ = false;  // TTS the self-prompted user message
     std::string logFilePath;
 
     void ensureEngineInitialized();
