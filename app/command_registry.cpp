@@ -27,7 +27,8 @@ extern void api_spawn_snake(TTestPatternApp& app, const TRect* bounds);
 extern void api_spawn_rogue(TTestPatternApp& app, const TRect* bounds);
 extern void api_spawn_deep_signal(TTestPatternApp& app, const TRect* bounds);
 extern void api_spawn_terminal(TTestPatternApp& app, const TRect* bounds);
-extern std::string api_terminal_write(TTestPatternApp& app, const std::string& text);
+extern std::string api_terminal_write(TTestPatternApp& app, const std::string& text, const std::string& window_id);
+extern std::string api_terminal_read(TTestPatternApp& app, const std::string& window_id);
 
 const std::vector<CommandCapability>& get_command_capabilities() {
     static const std::vector<CommandCapability> capabilities = {
@@ -52,7 +53,8 @@ const std::vector<CommandCapability>& get_command_capabilities() {
         {"open_rogue", "Open WibWob Rogue dungeon crawler", false},
         {"open_deep_signal", "Open Deep Signal space scanner game", false},
         {"open_terminal", "Open a terminal emulator window", false},
-        {"terminal_write", "Send text input to the terminal emulator (requires text param)", true},
+        {"terminal_write", "Send text input to the terminal emulator (requires text param; optional window_id)", true},
+        {"terminal_read", "Read the visible text content of a terminal window (optional window_id param)", false},
         {"chat_receive", "Display a remote chat message in Scramble (sender + text params)", true},
     };
     return capabilities;
@@ -192,7 +194,14 @@ std::string exec_registry_command(
         auto it = kv.find("text");
         if (it == kv.end() || it->second.empty())
             return "err missing text";
-        return api_terminal_write(app, it->second);
+        auto wid = kv.find("window_id");
+        std::string window_id = (wid != kv.end()) ? wid->second : "";
+        return api_terminal_write(app, it->second, window_id);
+    }
+    if (name == "terminal_read") {
+        auto wid = kv.find("window_id");
+        std::string window_id = (wid != kv.end()) ? wid->second : "";
+        return api_terminal_read(app, window_id);
     }
     if (name == "chat_receive") {
         auto itSender = kv.find("sender");

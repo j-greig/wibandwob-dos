@@ -781,7 +781,8 @@ private:
     friend void api_spawn_rogue(TTestPatternApp&, const TRect* bounds);
     friend void api_spawn_deep_signal(TTestPatternApp&, const TRect* bounds);
     friend void api_spawn_terminal(TTestPatternApp&, const TRect* bounds);
-    friend std::string api_terminal_write(TTestPatternApp&, const std::string& text);
+    friend std::string api_terminal_write(TTestPatternApp&, const std::string& text, const std::string& window_id);
+    friend std::string api_terminal_read(TTestPatternApp&, const std::string& window_id);
     friend void api_spawn_paint(TTestPatternApp&, const TRect* bounds);
     friend TPaintCanvasView* api_find_paint_canvas(TTestPatternApp&, const std::string&);
     friend std::string api_browser_fetch(TTestPatternApp&, const std::string& url);
@@ -3547,23 +3548,45 @@ void api_spawn_terminal(TTestPatternApp& app, const TRect* bounds) {
     }
 }
 
-std::string api_terminal_write(TTestPatternApp& app, const std::string& text) {
-    // Find the most recently inserted terminal window
+static TWibWobTerminalWindow* find_terminal_by_zorder(TTestPatternApp& app) {
     TView* start = app.deskTop->first();
+    if (!start) return nullptr;
+    TView* v = start;
+    do {
+        if (auto *tw = dynamic_cast<TWibWobTerminalWindow*>(v))
+            return tw;
+        v = v->next;
+    } while (v != start);
+    return nullptr;
+}
+
+std::string api_terminal_write(TTestPatternApp& app, const std::string& text, const std::string& window_id) {
     TWibWobTerminalWindow* termWin = nullptr;
-    if (start) {
-        TView* v = start;
-        do {
-            if (auto *tw = dynamic_cast<TWibWobTerminalWindow*>(v)) {
-                termWin = tw;
-                break;
-            }
-            v = v->next;
-        } while (v != start);
+    if (!window_id.empty()) {
+        auto it = app.idToWin.find(window_id);
+        if (it != app.idToWin.end())
+            termWin = dynamic_cast<TWibWobTerminalWindow*>(it->second);
+        if (!termWin) return "err window not found or not a terminal";
+    } else {
+        termWin = find_terminal_by_zorder(app);
     }
     if (!termWin) return "err no terminal window";
     termWin->sendText(text);
     return "ok";
+}
+
+std::string api_terminal_read(TTestPatternApp& app, const std::string& window_id) {
+    TWibWobTerminalWindow* termWin = nullptr;
+    if (!window_id.empty()) {
+        auto it = app.idToWin.find(window_id);
+        if (it != app.idToWin.end())
+            termWin = dynamic_cast<TWibWobTerminalWindow*>(it->second);
+        if (!termWin) return "err window not found or not a terminal";
+    } else {
+        termWin = find_terminal_by_zorder(app);
+    }
+    if (!termWin) return "err no terminal window";
+    return termWin->getOutputText();
 }
 
 std::string api_browser_fetch(TTestPatternApp& app, const std::string& url) {

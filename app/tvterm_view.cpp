@@ -4,6 +4,7 @@
 #define Uses_TWindow
 #define Uses_TKeys
 #define Uses_MsgBox
+#define Uses_TScreenCell
 #include <tvision/tv.h>
 
 #include "tvterm_view.h"
@@ -96,6 +97,51 @@ void TWibWobTerminalWindow::sendText(const std::string &text)
         termEvent.keyDown.textLength = 1;
         termView->termCtrl.sendEvent(termEvent);
     }
+}
+
+std::string TWibWobTerminalWindow::getOutputText() const
+{
+    // Find the TerminalView child to access its controller.
+    tvterm::TerminalView *termView = nullptr;
+    TView *start = const_cast<TWibWobTerminalWindow*>(this)->first();
+    if (start) {
+        TView *v = start;
+        do {
+            if (auto *tv = dynamic_cast<tvterm::TerminalView*>(v)) {
+                termView = tv;
+                break;
+            }
+            v = v->next;
+        } while (v != start);
+    }
+    if (!termView) return "";
+
+    std::string result;
+    termView->termCtrl.lockState([&](tvterm::TerminalState &state) {
+        int rows = state.surface.size.y;
+        int cols  = state.surface.size.x;
+        for (int y = 0; y < rows; ++y) {
+            std::string row;
+            row.reserve(cols);
+            for (int x = 0; x < cols; ++x) {
+                const TScreenCell &cell = state.surface.at(y, x);
+                const TCellChar   &ch   = cell._ch;
+                if (!ch.isWideCharTrail()) {
+                    TStringView sv = ch.getText();
+                    row.append(sv.data(), sv.size());
+                }
+            }
+            // Strip trailing whitespace per row
+            size_t last = row.find_last_not_of(" \t");
+            if (last != std::string::npos)
+                row.erase(last + 1);
+            else
+                row.clear();
+            result += row;
+            result += '\n';
+        }
+    });
+    return result;
 }
 
 static void onTermError(const char *reason)

@@ -25,6 +25,10 @@ public:
     // Each byte is injected as a KeyDown event through the terminal controller.
     void sendText(const std::string &text);
 
+    // Return the visible text content of this terminal as a UTF-8 string.
+    // Each row is newline-terminated; trailing whitespace per row is stripped.
+    std::string getOutputText() const;
+
 private:
     using Super = tvterm::BasicTerminalWindow;
 };
