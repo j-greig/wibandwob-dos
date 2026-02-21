@@ -203,7 +203,7 @@ void TWibWobMessageView::rebuildWrappedLines() {
         if (msg.sender == "User" && !wrappedLines.empty()) {
             wrappedLines.push_back({"", "", false});
         }
-        std::string displayText = msg.sender + ": " + msg.content;
+        std::string displayText = msg.sender.empty() ? msg.content : (msg.sender + ": " + msg.content);
         auto wrapped = wrapText(displayText, size.x > 0 ? size.x : 80);
         for (const auto& line : wrapped) {
             wrappedLines.push_back({line, msg.sender, msg.is_error});
@@ -803,7 +803,7 @@ void TWibWobWindow::processUserInput(const std::string& input) {
     auto* sdkProvider = dynamic_cast<ClaudeCodeSDKProvider*>(provider);
     if (sdkProvider && sdkProvider->isAvailable()) {
         logMessage("Stream", "[streaming] Trying SDK provider...");
-        messageView->startStreamingMessage("Wib&Wob");
+        messageView->startStreamingMessage("");
         // Pass system prompt for auto-session-start
         streamingStarted = sdkProvider->sendStreamingQuery(input, streamCallback, engine->getSystemPrompt());
         logMessage("Stream", "[streaming] SDK sendStreamingQuery: " + std::string(streamingStarted ? "started" : "failed"));
@@ -815,7 +815,7 @@ void TWibWobWindow::processUserInput(const std::string& input) {
         if (cliProvider && cliProvider->isAvailable()) {
             logMessage("Stream", "[streaming] Trying CLI provider...");
             if (!sdkProvider) {  // Only start message if SDK didn't already
-                messageView->startStreamingMessage("Wib&Wob");
+                messageView->startStreamingMessage("");
             }
             streamingStarted = cliProvider->sendStreamingQuery(input, streamCallback, engine->getSystemPrompt());
             logMessage("Stream", "[streaming] CLI sendStreamingQuery: " + std::string(streamingStarted ? "started" : "failed"));
@@ -846,7 +846,7 @@ void TWibWobWindow::fallbackToRegularQuery(const std::string& input,
             logMessage("Debug", "Response length: " + std::to_string(response.result.length()) + " chars");
             logMessage("Debug", "Provider: " + response.provider_name + ", Model: " + response.model_used);
 
-            messageView->addMessage("Wib&Wob", response.result);
+            messageView->addMessage("", response.result);
             logMessage("Wib&Wob", response.result);
             inputView->setStatus("Ready (" + std::to_string(duration.count()) + "ms) - Type a message and press Enter");
         }
