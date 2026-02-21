@@ -202,7 +202,9 @@ class ClaudeSDKBridge {
                 "mcp__tui-control__tui_cascade_windows",
                 "mcp__tui-control__tui_tile_windows",
                 "mcp__tui-control__tui_send_text",
-                "mcp__tui-control__tui_send_figlet"
+                "mcp__tui-control__tui_send_figlet",
+                "mcp__tui-control__tui_terminal_write",
+                "mcp__tui-control__tui_terminal_read"
             ];
             const toolList = [...new Set([...baseTools, ...mcpTools])];
             const modelId = this.normalizeModelId(this.sessionConfig.model);

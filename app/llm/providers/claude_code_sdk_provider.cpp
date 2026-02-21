@@ -327,7 +327,7 @@ bool ClaudeCodeSDKProvider::startStreamingSession(const std::string& customSyste
     std::ostringstream command;
     command << R"({"type":"START_SESSION","data":{"customSystemPrompt":")"
             << escapedPrompt << R"(","maxTurns":)" << maxTurns
-            << R"(,"allowedTools":["Read","Write","Grep","Bash","LS","WebSearch","WebFetch","mcp__tui-control__tui_create_window","mcp__tui-control__tui_move_window","mcp__tui-control__tui_get_state","mcp__tui-control__tui_close_window","mcp__tui-control__tui_cascade_windows","mcp__tui-control__tui_tile_windows","mcp__tui-control__tui_send_text","mcp__tui-control__tui_send_figlet"],"model":")"
+            << R"(,"allowedTools":["Read","Write","Grep","Bash","LS","WebSearch","WebFetch","mcp__tui-control__tui_create_window","mcp__tui-control__tui_move_window","mcp__tui-control__tui_get_state","mcp__tui-control__tui_close_window","mcp__tui-control__tui_cascade_windows","mcp__tui-control__tui_tile_windows","mcp__tui-control__tui_send_text","mcp__tui-control__tui_send_figlet","mcp__tui-control__tui_terminal_write","mcp__tui-control__tui_terminal_read"],"model":")"
             << configuredModel << R"("}})";
 
     std::string cmdStr = command.str();
