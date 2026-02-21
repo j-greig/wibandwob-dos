@@ -254,6 +254,16 @@ def _make_chat_receive_handler() -> CommandToolHandler:
     return _handler
 
 
+def _make_wibwob_ask_handler() -> CommandToolHandler:
+    async def _handler(text: str) -> Dict[str, Any]:
+        controller = get_controller()
+        result = await controller.exec_command("wibwob_ask", {"text": text}, actor="mcp")
+        if not result.get("ok"):
+            return _exec_result_error(result)
+        return {"success": True, "message": "Message sent to Wib&Wob chat"}
+    return _handler
+
+
 def _command_tool_builders() -> Dict[str, Dict[str, Any]]:
     # Keep in sync with get_command_capabilities() in app/command_registry.cpp.
     # Parity enforced by tests/contract/test_surface_parity_matrix.py.
@@ -359,6 +369,10 @@ def _command_tool_builders() -> Dict[str, Dict[str, Any]]:
         "chat_receive": {
             "tool_name": "tui_chat_receive",
             "handler": _make_chat_receive_handler(),
+        },
+        "wibwob_ask": {
+            "tool_name": "tui_wibwob_ask",
+            "handler": _make_wibwob_ask_handler(),
         },
     }
 

@@ -545,6 +545,22 @@ function createTuiMcpServer() {
                 }
             ),
 
+            tool(
+                "tui_wibwob_ask",
+                "Send a user message to the Wib&Wob chat window, triggering an AI response. Use this to prompt yourself or relay information back into the chat.",
+                {
+                    text: z.string().describe("The message to inject as a user message")
+                },
+                async (args) => {
+                    try {
+                        await execCommand("wibwob_ask", { text: args.text });
+                        return mcpResult(`Message sent to Wib&Wob chat`);
+                    } catch (error) {
+                        return mcpError(`Error: ${error.message}`);
+                    }
+                }
+            ),
+
             // ── Workspace ──────────────────────────────────────────────
 
             tool(
