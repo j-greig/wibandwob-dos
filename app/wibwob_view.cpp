@@ -596,13 +596,21 @@ void TWibWobWindow::ensureEngineInitialized() {
             pollTimerId = setTimer(50, 50);
         }
 
-        // Inject runtime API key if set (e.g. from Tools > API Key dialog)
+        // Inject runtime API key only when anthropic_api is the active provider.
+        // Do not switch providers implicitly here: chat MCP tool execution relies
+        // on claude_code_sdk/claude_code paths.
         {
             extern std::string getAppRuntimeApiKey();
             std::string rtKey = getAppRuntimeApiKey();
             if (!rtKey.empty()) {
-                engine->setApiKey(rtKey);
-                fprintf(stderr, "DEBUG: Injected runtime API key into chat engine\n");
+                std::string activeProvider = engine->getCurrentProvider();
+                if (activeProvider == "anthropic_api") {
+                    engine->setApiKey(rtKey);
+                    fprintf(stderr, "DEBUG: Injected runtime API key into anthropic_api provider\n");
+                } else {
+                    fprintf(stderr, "DEBUG: Runtime API key present; keeping active provider '%s'\n",
+                            activeProvider.c_str());
+                }
             }
         }
 

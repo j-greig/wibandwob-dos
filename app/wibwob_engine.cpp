@@ -262,15 +262,16 @@ void WibWobEngine::loadConfiguration() {
     std::string desiredProvider = config->getActiveProvider();
     fprintf(stderr, "DEBUG: Config activeProvider: %s\n", desiredProvider.c_str());
 
-    // Only auto-switch to anthropic if key is present - otherwise respect config
-    if (hasAnthropicKey() && config->hasProvider("anthropic_api")) {
-        desiredProvider = "anthropic_api";
-        fprintf(stderr, "DEBUG: Overriding to anthropic_api (API key present)\n");
-    }
-    // Only fall back to claude_code if no provider configured
-    else if (desiredProvider.empty() && config->hasProvider("claude_code")) {
-        desiredProvider = "claude_code";
-        fprintf(stderr, "DEBUG: Falling back to claude_code (no provider configured)\n");
+    // Respect configured provider selection.
+    // Only pick a provider automatically when no active provider is configured.
+    if (desiredProvider.empty()) {
+        if (hasAnthropicKey() && config->hasProvider("anthropic_api")) {
+            desiredProvider = "anthropic_api";
+            fprintf(stderr, "DEBUG: Auto-selecting anthropic_api (no active provider + API key present)\n");
+        } else if (config->hasProvider("claude_code")) {
+            desiredProvider = "claude_code";
+            fprintf(stderr, "DEBUG: Falling back to claude_code (no provider configured)\n");
+        }
     }
     if (!desiredProvider.empty())
         config->setActiveProvider(desiredProvider);
