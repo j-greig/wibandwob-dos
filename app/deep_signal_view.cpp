@@ -242,7 +242,7 @@ void TDeepSignalView::placeSignals() {
     signals.clear();
     // 5 signals spread across map quadrants + center
     struct { int x, y; } positions[] = {
-        {18, 10}, {65, 8}, {12, 35}, {68, 34}, {42, 22}
+        {18, 10}, {65, 8}, {12, 35}, {68, 34}, {55, 15}
     };
     for (int i = 0; i < 5; i++) {
         int sx = positions[i].x, sy = positions[i].y;
@@ -499,8 +499,8 @@ void TDeepSignalView::checkDiscoveries() {
         if (lastScanned[sig.y * MAP_W + sig.x] == turn) {
             sig.decoded = true;
             signalsDecoded++;
-            addLog("SIGNAL " + std::to_string(sig.signalId + 1) +
-                   "/5 DECODED! Spawning analyzer...", 4);
+            addLog("SIGNAL DECODED! (" + std::to_string(signalsDecoded) +
+                   "/5 total) Spawning analyzer...", 4);
 
             // Broadcast to app: spawn terminal with signal analysis
             TEvent termEvent;

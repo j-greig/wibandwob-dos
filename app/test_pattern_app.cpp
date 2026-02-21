@@ -1265,6 +1265,14 @@ void TTestPatternApp::handleEvent(TEvent& event)
                                 termWin->sendText(anomScripts[aIdx]);
                         }
                     }
+                    // Re-select the Deep Signal game window so it keeps focus
+                    deskTop->forEach([](TView *v, void *) {
+                        auto *w = dynamic_cast<TWindow*>(v);
+                        if (w && w->title) {
+                            std::string t(w->title);
+                            if (t == "Deep Signal") w->select();
+                        }
+                    }, nullptr);
                 }
                 clearEvent(event);
                 break;
