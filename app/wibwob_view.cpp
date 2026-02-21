@@ -1033,7 +1033,7 @@ void TWibWobWindow::speakResponse(const std::string& text) {
             std::ostringstream cmd;
             cmd << "say -v \"" << seg.first << "\" ";
             if (kTtsRate > 0) cmd << "-r " << kTtsRate << " ";
-            cmd << "'" << escaped << "'";
+            cmd << "-- '" << escaped << "'";
             // Run sequentially inside this background thread (no overlap between Wib/Wob lines)
             std::system(cmd.str().c_str());
             // Small gap between lines to avoid rushing
