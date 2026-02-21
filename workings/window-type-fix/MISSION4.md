@@ -26,6 +26,8 @@ Two candidates — implement **both** and pick the one that feels right:
 ```
 The kaomoji already draws at `size.x - 12`. Place the API indicator at `size.x - 18` or so.
 
+JAMES: DO OPTION B ONLY! Remove quantum print from bottom line too to make room. remove F10/menu from bottom line too
+
 **Option B — Status line, far right** (bottom-right):
 ```
  Alt-X Exit  Ctrl-N New  F5 Repaint  F6 Next  ...          IPC ● MCP ●
@@ -76,7 +78,7 @@ For API health: the Python server periodically calls `get_state` via IPC. Track 
   {
     "id": "M4-T01",
     "title": "Add connection state tracking to ApiIpcServer",
-    "status": "todo",
+    "status": "done",
     "instructions": [
       "Edit app/api_ipc.h:",
       "  Add public struct ConnectionStatus { bool listening; bool api_active; int client_count; }",
@@ -92,7 +94,7 @@ For API health: the Python server periodically calls `get_state` via IPC. Track 
   {
     "id": "M4-T02",
     "title": "Draw API status indicator in menu bar next to kaomoji",
-    "status": "todo",
+    "status": "done",
     "instructions": [
       "Edit app/test_pattern_app.cpp TCustomMenuBar::draw()",
       "After the kaomoji drawing block, add API indicator drawing:",

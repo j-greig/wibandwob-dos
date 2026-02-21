@@ -164,7 +164,7 @@ Two approaches:
   {
     "id": "M5-T06",
     "title": "Verify end-to-end: Wib&Wob agent can use new tools",
-    "status": "todo",
+    "status": "blocked",
     "instructions": [
       "Rebuild C++ if any C++ changes: cmake --build build",
       "Restart TUI and API server",
@@ -253,7 +253,7 @@ Two approaches:
 ## HOW TO CONTINUE THIS MISSION (for new Claude sessions)
 
 1. Read this file completely
-2. Find first task with `"status": "todo"` in the Task Queue JSON
+2. Find first task with `"status": "done"` in the Task Queue JSON
 3. Follow its `instructions` array step by step
 4. After completing, update the task's `"status"` to `"done"` in the JSON
 5. Write findings to the Findings Log section
