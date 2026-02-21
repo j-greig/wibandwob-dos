@@ -199,6 +199,10 @@ void TWibWobMessageView::rebuildWrappedLines() {
     wrappedLines.clear();
 
     for (const auto& msg : messages) {
+        // Add blank line before User messages for visual clarity
+        if (msg.sender == "User" && !wrappedLines.empty()) {
+            wrappedLines.push_back({"", "", false});
+        }
         std::string displayText = msg.sender + ": " + msg.content;
         auto wrapped = wrapText(displayText, size.x > 0 ? size.x : 80);
         for (const auto& line : wrapped) {
