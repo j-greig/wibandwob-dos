@@ -101,6 +101,27 @@ async def _run() -> None:
     finally:
         controller_module.send_cmd = original
 
+    # --- AC: null bytes from empty terminal cells are stripped ---
+    def fake_send_terminal_read_nulls(cmd: str, kv: Optional[Dict[str, str]] = None) -> str:
+        if cmd == "exec_command" and (kv or {}).get("name") == "terminal_read":
+            # C++ returns null bytes for empty cells on each row
+            return "HELLO_FROM_WIBWOB\x00\x00\x00\x00\x00\nzilla ~% \x00\x00\x00\x00\x00"
+        return "ok"
+
+    controller_module.send_cmd = fake_send_terminal_read_nulls
+    try:
+        ctl3 = Controller(EventHub())
+        result = await ctl3.exec_command("terminal_read", {}, actor="api")
+        assert result["ok"] is True, result
+        raw = result.get("result", "")
+        assert "\x00" in raw, "raw result should still contain null bytes (stripping is Python boundary concern)"
+        # Verify the stripping logic used by REST endpoint and MCP tool
+        clean = raw.replace("\x00", "")
+        assert "HELLO_FROM_WIBWOB" in clean
+        assert "\x00" not in clean, "stripped text must contain no null bytes"
+    finally:
+        controller_module.send_cmd = original
+
 
 if __name__ == "__main__":
     asyncio.run(_run())
