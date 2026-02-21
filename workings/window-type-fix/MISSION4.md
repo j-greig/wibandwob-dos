@@ -111,7 +111,7 @@ For API health: the Python server periodically calls `get_state` via IPC. Track 
   {
     "id": "M4-T03",
     "title": "Make indicator update live without full redraw",
-    "status": "todo",
+    "status": "done",
     "instructions": [
       "The menu bar's draw() is called during update() which runs on idle",
       "Verify the indicator changes state when API server starts/stops",
@@ -124,8 +124,9 @@ For API health: the Python server periodically calls `get_state` via IPC. Track 
   },
   {
     "id": "M4-T04",
+
     "title": "Add MCP indicator (optional, if space permits)",
-    "status": "todo",
+    "status": "done",
     "instructions": [
       "The MCP server is mounted on the Python side — C++ can't directly detect it",
       "Option: when API is active and responding to commands, assume MCP is mounted (it's wired in main.py)",
@@ -139,7 +140,7 @@ For API health: the Python server periodically calls `get_state` via IPC. Track 
   {
     "id": "M4-T05",
     "title": "Final polish and commit",
-    "status": "todo",
+    "status": "done",
     "instructions": [
       "Review the indicator at different terminal widths (80, 120, 160 cols)",
       "Ensure it gracefully hides when terminal is too narrow (< 80 cols)",

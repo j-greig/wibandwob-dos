@@ -164,7 +164,7 @@ Two approaches:
   {
     "id": "M5-T06",
     "title": "Verify end-to-end: Wib&Wob agent can use new tools",
-    "status": "blocked",
+    "status": "done",
     "instructions": [
       "Rebuild C++ if any C++ changes: cmake --build build",
       "Restart TUI and API server",
