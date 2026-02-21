@@ -849,9 +849,10 @@ TTestPatternApp::TTestPatternApp() :
         }
     }
 
-    // Desktop icon layer (E011) — insert behind all windows
+    // Desktop icon layer (E011) — inset with padding, behind all windows
     {
         TRect r = deskTop->getExtent();
+        r.grow(-3, -1); // 3 chars horizontal padding, 1 row vertical
         desktopIcons = createDesktopIconView(r);
         populateDefaultIcons(desktopIcons);
         deskTop->insert(desktopIcons);

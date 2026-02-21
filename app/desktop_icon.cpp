@@ -214,18 +214,19 @@ void TDesktopIconView::drawIcon(TDrawBuffer &, const DesktopIcon &,
 
 void TDesktopIconView::draw()
 {
-    // Normal: black icons on grey, matching the TV desktop pattern
-    TColorAttr normalBorder = TColorAttr(TColorRGB(60, 60, 60),   TColorRGB(176, 176, 176));
-    TColorAttr normalFill   = TColorAttr(TColorRGB(0, 0, 0),      TColorRGB(200, 200, 200));
-    TColorAttr normalArt    = TColorAttr(TColorRGB(0, 0, 0),      TColorRGB(200, 200, 200));
+    // Normal: light grey text on black bg (monochrome, matches desktop)
+    TColorAttr normalBorder = TColorAttr(TColorRGB(170, 170, 170), TColorRGB(0, 0, 0));
+    TColorAttr normalFill   = TColorAttr(TColorRGB(170, 170, 170), TColorRGB(0, 0, 0));
+    TColorAttr normalArt    = TColorAttr(TColorRGB(210, 210, 210), TColorRGB(0, 0, 0));
 
-    // Selected: white-on-blue (classic TV highlight, colour only here)
-    TColorAttr selBorder = TColorAttr(TColorRGB(255, 255, 255), TColorRGB(0, 0, 170));
-    TColorAttr selFill   = TColorAttr(TColorRGB(255, 255, 255), TColorRGB(0, 0, 170));
-    TColorAttr selArt    = TColorAttr(TColorRGB(255, 255, 100), TColorRGB(0, 0, 170));
+    // Selected: bright white on dark blue (classic TV highlight)
+    TColorAttr selBorder = TColorAttr(TColorRGB(255, 255, 255), TColorRGB(0, 0, 128));
+    TColorAttr selFill   = TColorAttr(TColorRGB(255, 255, 255), TColorRGB(0, 0, 128));
+    TColorAttr selArt    = TColorAttr(TColorRGB(255, 255, 255), TColorRGB(0, 0, 128));
 
-    // Background: grey desktop pattern (░ char like original TV)
-    TColorAttr bgAttr = TColorAttr(TColorRGB(128, 128, 128), TColorRGB(0, 0, 170));
+    // Replicate the desktop background: light grey ░ on black.
+    // Must match TBackground output exactly so our view is seamless.
+    TColorAttr bgAttr = TColorAttr(0x07); // light grey on black (monochrome theme)
 
     // Border characters (box-drawing)
     static const char *topLeft    = "\xe2\x94\x8c"; // ┌
@@ -238,8 +239,26 @@ void TDesktopIconView::draw()
     TDrawBuffer buf;
     for (int y = 0; y < size.y; ++y)
     {
-        // Grey pattern background like original TV desktop
-        buf.moveChar(0, '\xB0', bgAttr, size.x); // ░
+        // Check if any icon touches this row
+        bool hasIcon = false;
+        for (int i = 0; i < (int)icons_.size(); ++i)
+        {
+            int localY = y - icons_[i].position.y;
+            if (localY >= 0 && localY < ICON_HEIGHT)
+            { hasIcon = true; break; }
+        }
+
+        if (!hasIcon)
+        {
+            // Don't paint — let TBackground show through
+            // Write a blank transparent line (spaces with default attr)
+            buf.moveChar(0, ' ', bgAttr, size.x);
+            writeLine(0, y, size.x, 1, buf);
+            continue;
+        }
+
+        // Start with desktop pattern, then paint icons on top
+        buf.moveChar(0, ' ', bgAttr, size.x);
 
         for (int i = 0; i < (int)icons_.size(); ++i)
         {
