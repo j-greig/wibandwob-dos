@@ -92,6 +92,8 @@
 #include "snake_view.h"
 // WibWob Rogue dungeon crawler
 #include "rogue_view.h"
+// Deep Signal space scanner game
+#include "deep_signal_view.h"
 // Terminal emulator window (tvterm)
 #include "tvterm_view.h"
 // Factory for ASCII grid demo window (implemented in ascii_grid_view.cpp).
@@ -224,6 +226,8 @@ const ushort cmQuadra = 215;
 const ushort cmSnake = 216;
 const ushort cmRogue = 217;
 const ushort cmRogueHackTerminal = 218;
+const ushort cmDeepSignal = 219;
+const ushort cmDeepSignalTerminal = 220;
 const ushort cmOpenTerminal = 214;
 
 // Glitch menu commands
@@ -775,6 +779,7 @@ private:
     friend void api_spawn_quadra(TTestPatternApp&, const TRect* bounds);
     friend void api_spawn_snake(TTestPatternApp&, const TRect* bounds);
     friend void api_spawn_rogue(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_deep_signal(TTestPatternApp&, const TRect* bounds);
     friend void api_spawn_terminal(TTestPatternApp&, const TRect* bounds);
     friend std::string api_terminal_write(TTestPatternApp&, const std::string& text);
     friend void api_spawn_paint(TTestPatternApp&, const TRect* bounds);
@@ -1066,6 +1071,15 @@ void TTestPatternApp::handleEvent(TEvent& event)
                 clearEvent(event);
                 break;
             }
+            case cmDeepSignal: {
+                TRect r = deskTop->getExtent();
+                r.grow(-2, -1);
+                TWindow* w = createDeepSignalWindow(r);
+                deskTop->insert(w);
+                registerWindow(w);
+                clearEvent(event);
+                break;
+            }
             case cmOpenTerminal: {
                 TRect r = deskTop->getExtent();
                 r.grow(-2, -1);
@@ -1124,6 +1138,141 @@ void TTestPatternApp::handleEvent(TEvent& event)
                             );
                         }
                     }
+                }
+                clearEvent(event);
+                break;
+            }
+            case cmDeepSignalTerminal: {
+                // Spawn a terminal window for signal/anomaly analysis
+                TRect desk = deskTop->getExtent();
+                int tw = 56, th = 20;
+                int tx = desk.b.x - tw - 1;
+                int ty = 1;
+                if (tx < 0) tx = 0;
+                TRect termBounds(tx, ty, tx + tw, ty + th);
+                TWindow* tw2 = createTerminalWindow(termBounds);
+                if (tw2) {
+                    deskTop->insert(tw2);
+                    registerWindow(tw2);
+                    auto* termWin = dynamic_cast<TWibWobTerminalWindow*>(tw2);
+                    if (termWin) {
+                        int sigId = event.message.infoInt;
+                        if (sigId >= 0 && sigId <= 4) {
+                            // Signal decode animations (5 unique sequences)
+                            const char* scripts[] = {
+                                // Signal 0: Nav Beacon
+                                "clear && echo '=== SIGNAL ANALYZER v3.1 ===' && echo '' && "
+                                "echo 'Scanning frequency bands...' && sleep 0.4 && "
+                                "echo '  _/\\  /\\  /\\  /\\  /\\_' && "
+                                "echo ' /    \\/  \\/  \\/  \\/   ' && sleep 0.3 && "
+                                "echo '' && echo 'Signal type: NAVIGATION BEACON' && "
+                                "echo 'Origin: Automated relay station' && "
+                                "echo 'Message: SAFE HARBOR AT SECTOR 0,0' && "
+                                "echo '' && echo '[SIGNAL 1/5 DECODED]' && "
+                                "echo '' && echo 'Type exit to close'\n",
+                                // Signal 1: Distress Call
+                                "clear && echo '=== SIGNAL ANALYZER v3.1 ===' && echo '' && "
+                                "echo 'Intercepting transmission...' && sleep 0.3 && "
+                                "echo '...---... ...---... ...---...' && sleep 0.4 && "
+                                "echo '' && echo 'Pattern: SOS (universal distress)' && "
+                                "echo 'Signal age: 847 standard years' && sleep 0.3 && "
+                                "echo 'Origin: Colony ship MERIDIAN' && "
+                                "echo 'Status: No life signs detected' && "
+                                "echo '' && echo '[SIGNAL 2/5 DECODED]' && "
+                                "echo '' && echo 'Type exit to close'\n",
+                                // Signal 2: Science Data
+                                "clear && echo '=== SIGNAL ANALYZER v3.1 ===' && echo '' && "
+                                "echo 'Receiving data burst...' && sleep 0.3 && "
+                                "echo '01001000 01000101 01001100' && sleep 0.2 && "
+                                "echo '01010000 00100000 01010101' && sleep 0.2 && "
+                                "echo '01010011 00100000 01010000' && sleep 0.3 && "
+                                "echo '' && echo 'Decoding binary stream...' && sleep 0.4 && "
+                                "echo 'Content: STELLAR CARTOGRAPHY DATA' && "
+                                "echo 'Catalog: 2,847 uncharted systems' && "
+                                "echo '' && echo '[SIGNAL 3/5 DECODED]' && "
+                                "echo '' && echo 'Type exit to close'\n",
+                                // Signal 3: Warning
+                                "clear && echo '=== SIGNAL ANALYZER v3.1 ===' && echo '' && "
+                                "echo 'Encrypted signal detected!' && sleep 0.3 && "
+                                "echo 'Attempting decryption...' && sleep 0.2 && "
+                                "echo '  [####----------] 28%%' && sleep 0.3 && "
+                                "echo '  [########------] 57%%' && sleep 0.2 && "
+                                "echo '  [############--] 85%%' && sleep 0.2 && "
+                                "echo '  [################] 100%%' && sleep 0.3 && "
+                                "echo '' && echo '*** WARNING BUOY ***' && "
+                                "echo 'ANOMALOUS REGION - DO NOT APPROACH' && "
+                                "echo 'SPATIAL DISTORTION DETECTED' && "
+                                "echo '' && echo '[SIGNAL 4/5 DECODED]' && "
+                                "echo '' && echo 'Type exit to close'\n",
+                                // Signal 4: First Contact
+                                "clear && echo '=== SIGNAL ANALYZER v3.1 ===' && echo '' && "
+                                "echo 'Unknown modulation detected!' && sleep 0.5 && "
+                                "echo 'Frequency: Non-standard' && sleep 0.3 && "
+                                "echo 'Pattern analysis...' && sleep 0.4 && "
+                                "echo '' && echo '  *   *   *' && sleep 0.2 && "
+                                "echo '   * * * *' && sleep 0.2 && "
+                                "echo '    * * *' && sleep 0.2 && "
+                                "echo '   * * * *' && sleep 0.2 && "
+                                "echo '  *   *   *' && sleep 0.3 && "
+                                "echo '' && echo 'Mathematical structure detected!' && "
+                                "echo 'Content: PRIME SEQUENCE + COORDINATES' && "
+                                "echo 'Assessment: FIRST CONTACT PROTOCOL' && "
+                                "echo '' && echo '=== ALL 5 SIGNALS DECODED ===' && "
+                                "echo 'MISSION COMPLETE!' && "
+                                "echo '' && echo 'Type exit to close'\n",
+                            };
+                            termWin->sendText(scripts[sigId]);
+                        } else if (sigId >= 10 && sigId <= 12) {
+                            // Anomaly analysis (3 unique)
+                            const char* anomScripts[] = {
+                                // Anomaly 0: Spatial Rift
+                                "clear && echo '=== ANOMALY SCANNER ===' && echo '' && "
+                                "echo 'Spatial distortion detected!' && sleep 0.3 && "
+                                "echo '' && echo '     .  * .     ' && "
+                                "echo '   ~~ * ~~ ~~   ' && "
+                                "echo '  ~~~~ * ~~~~   ' && "
+                                "echo '   ~~ * ~~ ~~   ' && "
+                                "echo '     .  * .     ' && "
+                                "echo '' && echo 'Type: Spatial Rift' && "
+                                "echo 'Diameter: 4.7 AU' && "
+                                "echo 'Status: Stable but impassable' && "
+                                "echo '' && echo 'Type exit to close'\n",
+                                // Anomaly 1: Energy Signature
+                                "clear && echo '=== ANOMALY SCANNER ===' && echo '' && "
+                                "echo 'Unidentified energy source!' && sleep 0.3 && "
+                                "echo 'Power output: 4.2 x 10^26 watts' && sleep 0.2 && "
+                                "echo '' && echo 'Spectrum analysis:' && "
+                                "echo '  low  |####          |' && "
+                                "echo '  mid  |########      |' && "
+                                "echo '  high |##############|' && "
+                                "echo '' && echo 'Type: Unknown - possibly artificial' && "
+                                "echo 'Origin: Pre-dates known civilizations' && "
+                                "echo '' && echo 'Type exit to close'\n",
+                                // Anomaly 2: Temporal Echo
+                                "clear && echo '=== ANOMALY SCANNER ===' && echo '' && "
+                                "echo 'Chronometric disturbance!' && sleep 0.4 && "
+                                "echo '' && echo 'Temporal readings:' && sleep 0.2 && "
+                                "echo '  Past:    ##########' && sleep 0.2 && "
+                                "echo '  Present: ####' && sleep 0.2 && "
+                                "echo '  Future:  ########' && sleep 0.3 && "
+                                "echo '' && echo 'Type: Temporal Echo' && "
+                                "echo 'Events from multiple timelines' && "
+                                "echo 'overlap at this coordinate.' && "
+                                "echo '' && echo 'Type exit to close'\n",
+                            };
+                            int aIdx = sigId - 10;
+                            if (aIdx >= 0 && aIdx < 3)
+                                termWin->sendText(anomScripts[aIdx]);
+                        }
+                    }
+                    // Re-select the Deep Signal game window so it keeps focus
+                    deskTop->forEach([](TView *v, void *) {
+                        auto *w = dynamic_cast<TWindow*>(v);
+                        if (w && w->title) {
+                            std::string t(w->title);
+                            if (t == "Deep Signal") w->select();
+                        }
+                    }, nullptr);
                 }
                 clearEvent(event);
                 break;
@@ -3377,6 +3526,13 @@ void api_spawn_snake(TTestPatternApp& app, const TRect* bounds) {
 void api_spawn_rogue(TTestPatternApp& app, const TRect* bounds) {
     TRect r = bounds ? *bounds : api_centered_bounds(app, 80, 38);
     TWindow* w = createRogueWindow(r);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
+}
+
+void api_spawn_deep_signal(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 80, 38);
+    TWindow* w = createDeepSignalWindow(r);
     app.deskTop->insert(w);
     app.registerWindow(w);
 }
