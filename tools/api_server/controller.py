@@ -515,6 +515,8 @@ class Controller:
             if isinstance(resp, str) and resp.lower().startswith("err"):
                 handled["ok"] = False
                 handled["error"] = resp
+            else:
+                handled["result"] = resp
         except Exception as exc:
             handled["ok"] = False
             handled["error"] = str(exc)

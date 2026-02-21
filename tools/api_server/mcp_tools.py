@@ -645,24 +645,51 @@ def register_tui_tools(mcp):
             }
 
     @mcp.tool("tui_terminal_write")
-    async def terminal_write_tool(text: str) -> Dict[str, Any]:
-        """Send text as keyboard input to the active terminal emulator window
+    async def terminal_write_tool(text: str, window_id: str = "") -> Dict[str, Any]:
+        """Send text as keyboard input to a terminal emulator window
 
-        Injects each character as a KeyDown event into the first open
-        terminal window. Opens a terminal first with tui_create_window if
-        none is open.
+        Injects each character as a KeyDown event into the terminal.
 
         Args:
             text: Text to send to the terminal (e.g. 'ls -la\\n')
+            window_id: Optional window ID to target a specific terminal.
+                       If omitted, writes to the first open terminal.
 
         Returns:
             Dictionary with success status
         """
         controller = get_controller()
-        result = await controller.exec_command("terminal_write", {"text": text}, actor="mcp")
+        params: Dict[str, Any] = {"text": text}
+        if window_id:
+            params["window_id"] = window_id
+        result = await controller.exec_command("terminal_write", params, actor="mcp")
         if not result.get("ok"):
             return _exec_result_error(result)
         return {"success": True}
+
+    @mcp.tool("tui_terminal_read")
+    async def terminal_read_tool(window_id: str = "") -> Dict[str, Any]:
+        """Read the visible text content of a terminal emulator window
+
+        Returns the current cell grid of the terminal as plain UTF-8 text,
+        one row per line with trailing whitespace stripped. Use this after
+        tui_terminal_write to see command output.
+
+        Args:
+            window_id: Optional window ID to target a specific terminal.
+                       If omitted, reads from the first open terminal.
+
+        Returns:
+            Dictionary with 'text' key containing terminal output.
+        """
+        controller = get_controller()
+        params: Dict[str, Any] = {}
+        if window_id:
+            params["window_id"] = window_id
+        result = await controller.exec_command("terminal_read", params, actor="mcp")
+        if not result.get("ok"):
+            return _exec_result_error(result)
+        return {"success": True, "text": result.get("result", "").replace("\x00", "")}
 
     @mcp.tool("tui_send_figlet")
     async def send_figlet_to_window(
