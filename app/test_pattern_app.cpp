@@ -382,17 +382,55 @@ public:
         TColorRGB trueWhite(255, 255, 255);
         
         // Status line uses different indices than menu bar
-        // Try common status line color indices for hotkeys
         switch(index) {
-            case 1:  // Try index 1
-            case 2:  // Try index 2  
-            case 3:  // Try index 3
-            case 4:  // Try index 4
-                return TColorAttr(trueBlack, trueWhite);  // BLACK ON TRUE WHITE
+            case 1:  case 2:  case 3:  case 4:
+                return TColorAttr(trueBlack, trueWhite);
             default:
-                return TStatusLine::mapColor(index);  // Use parent's mapping for others
+                return TStatusLine::mapColor(index);
         }
     }
+
+    virtual void draw() override
+    {
+        TStatusLine::draw();
+        drawApiIndicator();
+    }
+
+private:
+    void drawApiIndicator()
+    {
+        // TTestPatternApp is incomplete here — use the opaque helper
+        auto status = getAppIpcStatus(TApplication::application);
+
+        // Build indicator string and pick colour
+        TColorRGB bg(255, 255, 255);
+        TColorRGB fg;
+        const char* label;
+
+        if (status.api_active) {
+            fg = TColorRGB(0, 160, 0);       // green
+            label = "API \xE2\x97\x8F";      // API ●
+        } else if (status.listening) {
+            fg = TColorRGB(120, 120, 120);    // grey
+            label = "API \xE2\x97\x8B";      // API ○
+        } else {
+            fg = TColorRGB(180, 50, 50);      // red
+            label = "API \xE2\x9C\x97";      // API ✗
+        }
+
+        int labelLen = 5; // "API " + 1 UTF-8 symbol (occupies 1 cell)
+        int xPos = size.x - labelLen - 1;
+        if (xPos < 1) return;
+
+        TDrawBuffer b;
+        TColorAttr attr(fg, bg);
+        b.moveChar(0, ' ', attr, labelLen + 1);
+        b.moveStr(0, label, attr);
+        writeBuf(xPos, 0, labelLen + 1, 1, b);
+    }
+
+    // Forward-declared helper — implemented after TTestPatternApp is defined
+    static ApiIpcServer::ConnectionStatus getAppIpcStatus(void* app);
 };
 
 /*---------------------------------------------------------*/
@@ -588,6 +626,11 @@ public:
     static TMenuBar* initMenuBar(TRect);
     static TStatusLine* initStatusLine(TRect);
     static TDeskTop* initDeskTop(TRect);
+
+    /// Connection status for the API indicator in the status line.
+    ApiIpcServer::ConnectionStatus getIpcStatus() const {
+        return ipcServer ? ipcServer->getConnectionStatus() : ApiIpcServer::ConnectionStatus{};
+    }
     
 private:
     void newTestWindow();
@@ -2303,13 +2346,20 @@ TStatusLine* TTestPatternApp::initStatusLine(TRect r)
         *new TStatusDef(0, 0xFFFF) +
             *new TStatusItem("~Alt-X~ Exit", kbAltX, cmQuit) +
             *new TStatusItem("~Ctrl-N~ New Window", kbCtrlN, cmNewWindow) +
-        *new TStatusItem("~F5~ Repaint", kbF5, cmRepaint) +
+            *new TStatusItem("~F5~ Repaint", kbF5, cmRepaint) +
             *new TStatusItem("~F6~ Next", kbF6, cmNext) +
             *new TStatusItem("~Alt-F3~ Close", kbAltF3, cmClose) +
-            *new TStatusItem("~F8~ Scramble", kbF8, cmScrambleCat) +
-            *new TStatusItem("~F10~ Menu", kbF10, cmMenu) +
-            *new TStatusItem("~F11~ Quantum Printer", kbF11, cmMenu)
+            *new TStatusItem("~F8~ Scramble", kbF8, cmScrambleCat)
     );
+}
+
+// Implemented here because TTestPatternApp must be fully defined first.
+ApiIpcServer::ConnectionStatus TCustomStatusLine::getAppIpcStatus(void* appPtr) {
+    auto* app = dynamic_cast<TTestPatternApp*>(static_cast<TApplication*>(appPtr));
+    if (app) {
+        return app->getIpcStatus();
+    }
+    return {};
 }
 
 TDeskTop* TTestPatternApp::initDeskTop(TRect r)

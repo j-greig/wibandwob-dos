@@ -753,9 +753,23 @@ void ApiIpcServer::poll() {
         return; // do NOT write resp or close fd
     }
 
+    // Track command timestamp for connection status indicator
+    last_command_time_ = std::chrono::steady_clock::now();
+    ++total_commands_;
+
     (void)safe_write(fd, resp.c_str(), resp.size());
     ::close(fd);
 #endif
+}
+
+ApiIpcServer::ConnectionStatus ApiIpcServer::getConnectionStatus() const {
+    ConnectionStatus s;
+    s.listening = (fd_listen_ >= 0);
+    auto now = std::chrono::steady_clock::now();
+    auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - last_command_time_).count();
+    s.api_active = (total_commands_ > 0 && elapsed < 10);
+    s.client_count = static_cast<int>(event_subscribers_.size());
+    return s;
 }
 
 void ApiIpcServer::publish_event(const char* event_type, const std::string& payload_json) {

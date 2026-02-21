@@ -8,11 +8,19 @@
 #include <set>
 #include <vector>
 #include <cstdint>
+#include <chrono>
 
 class TTestPatternApp;
 
 class ApiIpcServer {
 public:
+    /// Connection state for the status indicator.
+    struct ConnectionStatus {
+        bool listening   = false;  ///< Socket is open and accepting connections
+        bool api_active  = false;  ///< API server sent a command recently (< 10 s)
+        int  client_count = 0;     ///< Number of persistent event subscribers
+    };
+
     explicit ApiIpcServer(TTestPatternApp* app);
     ~ApiIpcServer();
 
@@ -27,6 +35,9 @@ public:
     // Cleans up disconnected subscriber fds automatically.
     void publish_event(const char* event_type, const std::string& payload_json = "{}");
 
+    /// Query current connection state (thread-safe read of atomic-like fields).
+    ConnectionStatus getConnectionStatus() const;
+
 private:
     TTestPatternApp* app_ = nullptr;
     int fd_listen_ = -1;
@@ -37,6 +48,10 @@ private:
     // Event push: persistent subscriber connections
     std::vector<int> event_subscribers_;
     uint64_t next_event_seq_ = 1;
+
+    // Connection tracking for status indicator
+    std::chrono::steady_clock::time_point last_command_time_{};
+    int total_commands_ = 0;
 
     // Auth helpers
     bool auth_required() const { return !auth_secret_.empty(); }
