@@ -514,7 +514,7 @@ def make_app() -> FastAPI:
             params["window_id"] = window_id
         res = await ctl.exec_command("terminal_read", params, actor="api")
         if not res.get("ok"):
-            raise HTTPException(status_code=404, detail=res.get("result", "no terminal window"))
+            raise HTTPException(status_code=404, detail=res.get("error", "no terminal window"))
         return {"window_id": window_id, "text": res.get("result", "")}
 
     @app.post("/screenshot")
