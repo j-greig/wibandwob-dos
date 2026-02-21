@@ -46,8 +46,8 @@ A persistent icon layer rendered on the `TDeskTop` background, beneath all windo
 - Icons can overlap windows; windows render on top.
 
 Stories:
-- [ ] S01: Desktop icon data model and renderer (TDeskTop subclass with icon layer)
-- [ ] S02: Icon selection, keyboard navigation (arrows between icons, Enter to launch)
+- [x] S01: Desktop icon data model and renderer (TDeskTop subclass with icon layer)
+- [x] S02: Icon selection, keyboard navigation (arrows between icons, Enter to launch)
 - [ ] S03: Icon drag-move (mouse drag or API `move_icon`)
 - [ ] S04: Desktop state persistence (save/load icon positions)
 - [ ] S05: API surface (`create_icon`, `move_icon`, `delete_icon`, `list_icons`, `launch_icon`)
@@ -64,8 +64,8 @@ Folder windows that display a collection of launchable items as icons in a grid.
 - Folder contents defined by manifest files or dynamic command registry queries.
 
 Stories:
-- [ ] S06: Folder view window (TWindow with icon grid layout)
-- [ ] S07: Built-in folders populated from command registry categories
+- [x] S06: Folder view window (TWindow with icon grid layout)
+- [x] S07: Built-in folders populated from command registry categories
 - [ ] S08: Custom folder creation and item management
 - [ ] S09: Folder state persistence
 - [ ] S10: API surface (`create_folder`, `add_to_folder`, `remove_from_folder`, `open_folder`)
