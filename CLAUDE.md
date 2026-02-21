@@ -258,9 +258,31 @@ Two separate Claude instances interact with the system (see `app/README-CLAUDE-C
 
 The API server on port 8089 bridges between the Python/MCP layer and the C++ app via IPC socket.
 
-## Current Known Gaps
+## Parity Enforcement
 
-Menu/API/MCP parity drift was resolved by E001 (command registry). The unified `CommandRegistry` in C++ is now the single source for commands — menu items, IPC handlers, and MCP tools derive from it. Parity is enforced by automated drift tests. See `.planning/epics/e001-command-parity-refactor/` for the full epic record.
+The C++ command registry (`app/command_registry.cpp`) and window type registry (`app/window_type_registry.cpp`) are the single sources of truth. Python enums, schemas, and MCP tool builders must stay in sync.
+
+**Automated enforcement** (run these tests before merging):
+```bash
+uv run --with pytest pytest tests/contract/test_window_type_parity.py tests/contract/test_surface_parity_matrix.py -v
+```
+
+These tests auto-derive from C++ source — no hardcoded mapping tables. They will fail immediately if a new C++ type or command is added without updating the Python side.
+
+### Adding a new window type
+1. Add entry to `k_specs[]` in `app/window_type_registry.cpp` (type slug, spawn fn, match fn)
+2. Add value to `WindowType` enum in `tools/api_server/models.py`
+3. If spawnable: add to `WindowCreate` Literal in `tools/api_server/schemas.py`
+4. Run: `pytest tests/contract/test_window_type_parity.py`
+
+### Adding a new command
+1. Add to `get_command_capabilities()` in `app/command_registry.cpp`
+2. Add dispatch in `exec_registry_command()` in same file
+3. Add MCP tool builder in `_command_tool_builders()` in `tools/api_server/mcp_tools.py`
+4. Run: `pytest tests/contract/test_surface_parity_matrix.py`
+
+### Capabilities endpoint
+`GET /capabilities` now queries C++ via IPC (`get_window_types` and `get_capabilities` commands) so window types and commands are auto-derived from the running binary — Python never maintains its own authoritative list.
 
 ## Agent Workflow
 
