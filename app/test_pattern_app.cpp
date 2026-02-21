@@ -2235,7 +2235,8 @@ TMenuBar* TTestPatternApp::initMenuBar(TRect r)
                     *new TMenuItem("~M~icropolis City Builder", cmMicropolisAscii, kbNoKey) +
                     *new TMenuItem("~Q~uadra (Falling Blocks)", cmQuadra, kbNoKey) +
                     *new TMenuItem("~S~nake", cmSnake, kbNoKey) +
-                    *new TMenuItem("Wib~W~ob Rogue", cmRogue, kbNoKey)
+                    *new TMenuItem("Wib~W~ob Rogue", cmRogue, kbNoKey) +
+                    *new TMenuItem("~D~eep Signal", cmDeepSignal, kbNoKey)
             ) +
             newLine() +
             *new TMenuItem("Pa~i~nt Canvas", cmNewPaintCanvas, kbNoKey) +
@@ -3531,7 +3532,7 @@ void api_spawn_rogue(TTestPatternApp& app, const TRect* bounds) {
 }
 
 void api_spawn_deep_signal(TTestPatternApp& app, const TRect* bounds) {
-    TRect r = bounds ? *bounds : api_centered_bounds(app, 80, 38);
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 70, 34);
     TWindow* w = createDeepSignalWindow(r);
     app.deskTop->insert(w);
     app.registerWindow(w);
@@ -3547,7 +3548,7 @@ void api_spawn_terminal(TTestPatternApp& app, const TRect* bounds) {
 }
 
 std::string api_terminal_write(TTestPatternApp& app, const std::string& text) {
-    // Find the first open terminal window on the desktop
+    // Find the most recently inserted terminal window
     TView* start = app.deskTop->first();
     TWibWobTerminalWindow* termWin = nullptr;
     if (start) {

@@ -1,7 +1,7 @@
 ---
 id: E009
 title: Menu System Redesign
-status: in-progress
+status: done
 issue: 67
 pr: —
 depends_on: [E001, E008]

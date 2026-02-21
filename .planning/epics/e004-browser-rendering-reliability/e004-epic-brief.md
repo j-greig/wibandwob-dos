@@ -1,7 +1,7 @@
 ---
 id: E004
 title: Browser Rendering Reliability
-status: not-started
+status: dropped
 issue: 49
 pr: ~
 depends_on: [E002]
