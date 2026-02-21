@@ -217,6 +217,10 @@ void TDesktopIconView::draw()
 {
     const DesktopTheme &t = desktopTheme();
 
+    // Use the palette colour that TV's TBackground uses (entry 1),
+    // so we always match the actual desktop regardless of theme/palette.
+    TColorAttr bgAttr = getColor(1);
+
     // Border characters (box-drawing)
     static const char *topLeft    = "\xe2\x94\x8c"; // ┌
     static const char *topRight   = "\xe2\x94\x90"; // ┐

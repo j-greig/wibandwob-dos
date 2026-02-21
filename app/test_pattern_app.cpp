@@ -2341,38 +2341,14 @@ TStatusLine* TTestPatternApp::initStatusLine(TRect r)
     );
 }
 
-// Custom background that uses the desktop theme pattern
-class TThemedBackground : public TBackground
-{
-public:
-    TThemedBackground(const TRect &bounds) :
-        TBackground(bounds, desktopTheme().bgPattern)
-    {
-    }
-
-    virtual void draw() override
-    {
-        const DesktopTheme &t = desktopTheme();
-        TDrawBuffer b;
-        b.moveChar(0, t.bgPattern, t.bgAttr, size.x);
-        writeLine(0, 0, size.x, size.y, b);
-    }
-};
-
 TDeskTop* TTestPatternApp::initDeskTop(TRect r)
 {
     r.a.y = 1;
     r.b.y--;
     TDeskTop* desktop = new TDeskTop(r);
-    // Replace the default background with our themed one
+    // Just set the pattern char — let TV's palette handle the colour
     if (desktop->background)
-    {
-        TRect bgBounds = desktop->background->getBounds();
-        desktop->remove(desktop->background);
-        destroy(desktop->background);
-        desktop->background = new TThemedBackground(bgBounds);
-        desktop->insert(desktop->background);
-    }
+        desktop->background->pattern = desktopTheme().bgPattern;
     return desktop;
 }
 
