@@ -325,9 +325,11 @@ bool ClaudeCodeSDKProvider::startStreamingSession(const std::string& customSyste
             customSystemPrompt.size(), escapedPrompt.size());
 
     std::ostringstream command;
+    // Only send base SDK tools here — MCP tool names are auto-derived
+    // by the bridge from mcpServer.tools (see claude_sdk_bridge.js).
     command << R"({"type":"START_SESSION","data":{"customSystemPrompt":")"
             << escapedPrompt << R"(","maxTurns":)" << maxTurns
-            << R"(,"allowedTools":["Read","Write","Grep","Bash","LS","WebSearch","WebFetch","mcp__tui-control__tui_create_window","mcp__tui-control__tui_move_window","mcp__tui-control__tui_get_state","mcp__tui-control__tui_close_window","mcp__tui-control__tui_cascade_windows","mcp__tui-control__tui_tile_windows","mcp__tui-control__tui_send_text","mcp__tui-control__tui_send_figlet","mcp__tui-control__tui_terminal_write","mcp__tui-control__tui_terminal_read"],"model":")"
+            << R"(,"allowedTools":["Read","Write","Grep","WebSearch","WebFetch"],"model":")"
             << configuredModel << R"("}})";
 
     std::string cmdStr = command.str();

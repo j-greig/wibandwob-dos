@@ -256,7 +256,9 @@ class ClaudeSDKBridge {
                 maxTurns: this.sessionConfig.maxTurns,
                 model: modelId,
                 allowedTools: toolList,
-                includePartialMessages: true,  // Enable partial events
+                permissionMode: 'bypassPermissions',           // MCP tools are safe (localhost HTTP only)
+                allowDangerouslySkipPermissions: true,          // SDK Options field name
+                includePartialMessages: true,
                 stderr: (msg) => console.error('[CLAUDE STDERR]', String(msg).trim())
             };
 
