@@ -1006,18 +1006,28 @@ void TWibWobWindow::speakResponse(const std::string& text) {
     std::string line;
     std::vector<std::pair<std::string, std::string>> segments;
 
+    std::string activeVoice = kVoiceWob;  // track which voice is "speaking"
     while (std::getline(iss, line)) {
-        std::string voice = kVoiceWob;
         std::string content = line;
+        // Detect voice from kaomoji tags or **Wib**/**Wob** markdown markers.
+        // Once a voice is detected, it persists for subsequent lines until
+        // the other voice is detected (handles multi-line paragraphs).
         if (line.find(wibTag) != std::string::npos) {
-            voice = kVoiceWib;
+            activeVoice = kVoiceWib;
             auto pos = content.find(wibTag);
             if (pos != std::string::npos) content.erase(pos, wibTag.size());
         } else if (line.find(wobTag) != std::string::npos) {
-            voice = kVoiceWob;
+            activeVoice = kVoiceWob;
             auto pos = content.find(wobTag);
             if (pos != std::string::npos) content.erase(pos, wobTag.size());
+        } else if (line.find("**Wib**") != std::string::npos || line.find("*Wib*") != std::string::npos
+                   || line.find("Wib:") != std::string::npos || line.find("[Wib]") != std::string::npos) {
+            activeVoice = kVoiceWib;
+        } else if (line.find("**Wob**") != std::string::npos || line.find("*Wob*") != std::string::npos
+                   || line.find("Wob:") != std::string::npos || line.find("[Wob]") != std::string::npos) {
+            activeVoice = kVoiceWob;
         }
+        std::string voice = activeVoice;
         while (!content.empty() && std::isspace((unsigned char)content.front())) content.erase(content.begin());
         while (!content.empty() && std::isspace((unsigned char)content.back())) content.pop_back();
         if (!content.empty()) {

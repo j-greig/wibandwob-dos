@@ -259,11 +259,13 @@ function createTuiMcpServer() {
 
             tool(
                 "tui_terminal_write",
-                "Write text/commands to the terminal window",
-                { text: z.string().describe("Text to write to terminal (include \\n for enter)") },
+                "Write text/commands to the terminal window. Use a real newline character (not literal backslash-n) to press Enter.",
+                { text: z.string().describe("Text to write to terminal. Include a newline to press Enter.") },
                 async (args) => {
                     try {
-                        await execCommand("terminal_write", { text: args.text });
+                        // Unescape literal \n and \r that the LLM may produce
+                        const text = args.text.replace(/\\n/g, '\n').replace(/\\r/g, '\r');
+                        await execCommand("terminal_write", { text });
                         return mcpResult(`Wrote to terminal: ${args.text.substring(0, 60)}`);
                     } catch (error) {
                         return mcpError(`Error: ${error.message}`);
