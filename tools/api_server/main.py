@@ -503,6 +503,20 @@ def make_app() -> FastAPI:
             raise HTTPException(status_code=400, detail=res.get("error", "browser_gallery_failed"))
         return res
 
+    @app.get("/terminal/{window_id}/output")
+    async def terminal_output(window_id: str) -> Dict[str, Any]:
+        """Read the visible text content of a terminal window.
+
+        Use 'active' as window_id to target the first open terminal.
+        """
+        params: Dict[str, Any] = {}
+        if window_id and window_id != "active":
+            params["window_id"] = window_id
+        res = await ctl.exec_command("terminal_read", params, actor="api")
+        if not res.get("ok"):
+            raise HTTPException(status_code=404, detail=res.get("result", "no terminal window"))
+        return {"window_id": window_id, "text": res.get("result", "")}
+
     @app.post("/screenshot")
     async def screenshot(payload: Optional[ScreenshotReq] = None) -> Dict[str, Any]:
         res = await ctl.screenshot((payload or ScreenshotReq()).path)
