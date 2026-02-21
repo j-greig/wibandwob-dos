@@ -284,6 +284,51 @@ function createTuiMcpServer() {
             ),
 
             tool(
+                "tui_terminal_write",
+                "Send text as keyboard input to a terminal emulator window",
+                {
+                    text: z.string().describe("Text to send to the terminal (e.g. 'ls -la\\n')"),
+                    windowId: z.string().optional().describe("ID of terminal window to target. If omitted, writes to the first open terminal.")
+                },
+                async (args) => {
+                    try {
+                        const payload = {
+                            command: "terminal_write",
+                            args: { text: args.text }
+                        };
+                        if (args.windowId) payload.args.window_id = args.windowId;
+                        await apiClient.post('/menu/command', payload);
+                        console.error(`MCP TOOL: tui_terminal_write called`);
+                        return {
+                            content: [{ type: "text", text: `Text sent to terminal${args.windowId ? ' ' + args.windowId : ''}` }]
+                        };
+                    } catch (error) {
+                        return { content: [{ type: "text", text: `Error writing to terminal: ${error.message}` }], isError: true };
+                    }
+                }
+            ),
+
+            tool(
+                "tui_terminal_read",
+                "Read the visible text content of a terminal emulator window",
+                {
+                    windowId: z.string().optional().describe("ID of terminal window to read. If omitted, reads from the first open terminal.")
+                },
+                async (args) => {
+                    try {
+                        const winId = args.windowId || 'active';
+                        const response = await apiClient.get(`/terminal/${winId}/output`);
+                        console.error(`MCP TOOL: tui_terminal_read called - got ${response.data.text?.length || 0} chars`);
+                        return {
+                            content: [{ type: "text", text: response.data.text || '(empty terminal)' }]
+                        };
+                    } catch (error) {
+                        return { content: [{ type: "text", text: `Error reading terminal: ${error.message}` }], isError: true };
+                    }
+                }
+            ),
+
+            tool(
                 "tui_send_figlet",
                 "Send ASCII art text using figlet to a text editor window",
                 {
