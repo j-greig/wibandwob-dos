@@ -578,6 +578,12 @@ void TWibWobWindow::handleEvent(TEvent& event) {
     if (event.what == evBroadcast && event.message.command == cmTimerExpired) {
         if (event.message.infoPtr == pollTimerId && engineInitialized && engine) {
             engine->poll();
+            // Drain queued self-prompt when engine is idle
+            if (!pendingAsk_.empty() && !engine->isBusy()) {
+                std::string msg = std::move(pendingAsk_);
+                pendingAsk_.clear();
+                processUserInput(msg);
+            }
         }
     }
 
@@ -585,7 +591,7 @@ void TWibWobWindow::handleEvent(TEvent& event) {
     if (event.what == evBroadcast && event.message.command == 0xF0F0) {
         auto* text = static_cast<std::string*>(event.message.infoPtr);
         if (text && !text->empty()) {
-            processUserInput(*text);
+            pendingAsk_ = *text;  // queue it, don't process immediately
             clearEvent(event);
         }
     }

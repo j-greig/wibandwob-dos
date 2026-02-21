@@ -150,8 +150,8 @@ public:
     TWibWobMessageView* getMessageView() { return messageView; }
     TWibWobInputView* getInputView() { return inputView; }
 
-    // API: inject a user message and trigger LLM response
-    void injectUserMessage(const std::string& text) { processUserInput(text); }
+    // API: queue a user message to be processed when the engine is idle
+    void injectUserMessage(const std::string& text) { pendingAsk_ = text; }
 
 private:
     static TFrame* initFrame(TRect r);
@@ -172,6 +172,7 @@ private:
 
     // Logging
     std::string sessionId;
+    std::string pendingAsk_;  // queued self-prompt, drained when engine idle
     std::string logFilePath;
 
     void ensureEngineInitialized();
