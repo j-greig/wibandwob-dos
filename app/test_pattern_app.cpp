@@ -88,6 +88,8 @@
 #include "micropolis_ascii_view.h"
 // Quadra falling blocks game
 #include "quadra_view.h"
+// Snake game
+#include "snake_view.h"
 // Terminal emulator window (tvterm)
 #include "tvterm_view.h"
 // Factory for ASCII grid demo window (implemented in ascii_grid_view.cpp).
@@ -217,6 +219,7 @@ const ushort cmDebugInfo = 211;
 const ushort cmApiKeyHelp = 212;
 const ushort cmMicropolisAscii = 213;
 const ushort cmQuadra = 215;
+const ushort cmSnake = 216;
 const ushort cmOpenTerminal = 214;
 
 // Glitch menu commands
@@ -766,6 +769,7 @@ private:
     friend void api_spawn_monster_portal(TTestPatternApp&, const TRect* bounds);
     friend void api_spawn_micropolis_ascii(TTestPatternApp&, const TRect* bounds);
     friend void api_spawn_quadra(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_snake(TTestPatternApp&, const TRect* bounds);
     friend void api_spawn_terminal(TTestPatternApp&, const TRect* bounds);
     friend std::string api_terminal_write(TTestPatternApp&, const std::string& text);
     friend void api_spawn_paint(TTestPatternApp&, const TRect* bounds);
@@ -1034,6 +1038,15 @@ void TTestPatternApp::handleEvent(TEvent& event)
                 TRect r = deskTop->getExtent();
                 r.grow(-2, -1);
                 TWindow* w = createQuadraWindow(r);
+                deskTop->insert(w);
+                registerWindow(w);
+                clearEvent(event);
+                break;
+            }
+            case cmSnake: {
+                TRect r = deskTop->getExtent();
+                r.grow(-2, -1);
+                TWindow* w = createSnakeWindow(r);
                 deskTop->insert(w);
                 registerWindow(w);
                 clearEvent(event);
@@ -2004,6 +2017,7 @@ TMenuBar* TTestPatternApp::initMenuBar(TRect r)
             *new TMenuItem("Monster Cam (Emo~j~i)", cmMonsterCam, kbNoKey) +
             *new TMenuItem("~M~icropolis ASCII MVP", cmMicropolisAscii, kbNoKey) +
             *new TMenuItem("~Q~uadra (Falling Blocks)", cmQuadra, kbNoKey) +
+            *new TMenuItem("~S~nake", cmSnake, kbNoKey) +
             // REMOVED E009: ASCII Cam (disabled), Zoom In/Out/Actual Size/Full Screen (placeholders)
             newLine() +
             *new TMenuItem("Pa~i~nt Canvas", cmNewPaintCanvas, kbNoKey) +
@@ -3280,6 +3294,13 @@ void api_spawn_micropolis_ascii(TTestPatternApp& app, const TRect* bounds) {
 void api_spawn_quadra(TTestPatternApp& app, const TRect* bounds) {
     TRect r = bounds ? *bounds : api_centered_bounds(app, 42, 26);
     TWindow* w = createQuadraWindow(r);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
+}
+
+void api_spawn_snake(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 60, 30);
+    TWindow* w = createSnakeWindow(r);
     app.deskTop->insert(w);
     app.registerWindow(w);
 }

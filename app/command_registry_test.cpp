@@ -23,6 +23,7 @@ class TRect;
 void api_spawn_paint(TTestPatternApp&, const TRect*) {}
 void api_spawn_micropolis_ascii(TTestPatternApp&, const TRect*) {}
 void api_spawn_quadra(TTestPatternApp&, const TRect*) {}
+void api_spawn_snake(TTestPatternApp&, const TRect*) {}
 void api_spawn_terminal(TTestPatternApp&, const TRect*) {}
 std::string api_terminal_write(TTestPatternApp&, const std::string&) { return "ok"; }
 std::string api_chat_receive(TTestPatternApp&, const std::string&, const std::string&) { return "ok"; }
@@ -48,6 +49,7 @@ int main() {
         "\"name\":\"new_paint_canvas\"",
         "\"name\":\"open_micropolis_ascii\"",
         "\"name\":\"open_quadra\"",
+        "\"name\":\"open_snake\"",
         "\"name\":\"open_terminal\"",
         "\"name\":\"terminal_write\"",
         "\"name\":\"chat_receive\"",
