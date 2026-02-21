@@ -40,6 +40,7 @@ add_executable(test_pattern
     game_of_life_view.cpp
     quadra_view.cpp
     snake_view.cpp
+    rogue_view.cpp
     generative_verse_view.cpp
     generative_orbit_view.cpp
     generative_mycelium_view.cpp

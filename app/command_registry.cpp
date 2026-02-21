@@ -24,6 +24,7 @@ extern void api_spawn_paint(TTestPatternApp& app, const TRect* bounds);
 extern void api_spawn_micropolis_ascii(TTestPatternApp& app, const TRect* bounds);
 extern void api_spawn_quadra(TTestPatternApp& app, const TRect* bounds);
 extern void api_spawn_snake(TTestPatternApp& app, const TRect* bounds);
+extern void api_spawn_rogue(TTestPatternApp& app, const TRect* bounds);
 extern void api_spawn_terminal(TTestPatternApp& app, const TRect* bounds);
 extern std::string api_terminal_write(TTestPatternApp& app, const std::string& text);
 
@@ -47,6 +48,7 @@ const std::vector<CommandCapability>& get_command_capabilities() {
         {"open_micropolis_ascii", "Open Micropolis ASCII MVP window", false},
         {"open_quadra", "Open Quadra falling blocks game", false},
         {"open_snake", "Open Snake game", false},
+        {"open_rogue", "Open WibWob Rogue dungeon crawler", false},
         {"open_terminal", "Open a terminal emulator window", false},
         {"terminal_write", "Send text input to the terminal emulator (requires text param)", true},
         {"chat_receive", "Display a remote chat message in Scramble (sender + text params)", true},
@@ -170,6 +172,10 @@ std::string exec_registry_command(
     }
     if (name == "open_snake") {
         api_spawn_snake(app, nullptr);
+        return "ok";
+    }
+    if (name == "open_rogue") {
+        api_spawn_rogue(app, nullptr);
         return "ok";
     }
     if (name == "open_terminal") {

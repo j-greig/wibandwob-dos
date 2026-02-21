@@ -90,6 +90,8 @@
 #include "quadra_view.h"
 // Snake game
 #include "snake_view.h"
+// WibWob Rogue dungeon crawler
+#include "rogue_view.h"
 // Terminal emulator window (tvterm)
 #include "tvterm_view.h"
 // Factory for ASCII grid demo window (implemented in ascii_grid_view.cpp).
@@ -220,6 +222,8 @@ const ushort cmApiKeyHelp = 212;
 const ushort cmMicropolisAscii = 213;
 const ushort cmQuadra = 215;
 const ushort cmSnake = 216;
+const ushort cmRogue = 217;
+const ushort cmRogueHackTerminal = 218;
 const ushort cmOpenTerminal = 214;
 
 // Glitch menu commands
@@ -770,6 +774,7 @@ private:
     friend void api_spawn_micropolis_ascii(TTestPatternApp&, const TRect* bounds);
     friend void api_spawn_quadra(TTestPatternApp&, const TRect* bounds);
     friend void api_spawn_snake(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_rogue(TTestPatternApp&, const TRect* bounds);
     friend void api_spawn_terminal(TTestPatternApp&, const TRect* bounds);
     friend std::string api_terminal_write(TTestPatternApp&, const std::string& text);
     friend void api_spawn_paint(TTestPatternApp&, const TRect* bounds);
@@ -1052,6 +1057,15 @@ void TTestPatternApp::handleEvent(TEvent& event)
                 clearEvent(event);
                 break;
             }
+            case cmRogue: {
+                TRect r = deskTop->getExtent();
+                r.grow(-2, -1);
+                TWindow* w = createRogueWindow(r);
+                deskTop->insert(w);
+                registerWindow(w);
+                clearEvent(event);
+                break;
+            }
             case cmOpenTerminal: {
                 TRect r = deskTop->getExtent();
                 r.grow(-2, -1);
@@ -1059,6 +1073,57 @@ void TTestPatternApp::handleEvent(TEvent& event)
                 if (w) {
                     deskTop->insert(w);
                     registerWindow(w);
+                }
+                clearEvent(event);
+                break;
+            }
+            case cmRogueHackTerminal: {
+                // Spawn a small terminal window for roguelike hacking
+                TRect desk = deskTop->getExtent();
+                int tw = 52, th = 18;
+                int tx = desk.b.x - tw - 1;
+                int ty = 1;
+                if (tx < 0) tx = 0;
+                TRect termBounds(tx, ty, tx + tw, ty + th);
+                TWindow* tw2 = createTerminalWindow(termBounds);
+                if (tw2) {
+                    deskTop->insert(tw2);
+                    registerWindow(tw2);
+                    auto* termWin = dynamic_cast<TWibWobTerminalWindow*>(tw2);
+                    if (termWin) {
+                        bool hackSuccess = (event.message.infoInt != 0);
+                        if (hackSuccess) {
+                            termWin->sendText(
+                                "clear && echo '=== DUNGEON TERMINAL v2.7 ===' && "
+                                "echo '> Inserting data chip...' && "
+                                "sleep 0.3 && echo '> AUTHENTICATION: GRANTED' && "
+                                "sleep 0.2 && echo '> Downloading floor map...' && "
+                                "sleep 0.3 && echo '  [########----------] 42%%' && "
+                                "sleep 0.2 && echo '  [################--] 84%%' && "
+                                "sleep 0.1 && echo '  [####################] 100%%' && "
+                                "sleep 0.2 && echo '> MAP DATA EXTRACTED' && "
+                                "echo '> Patching health subsystem...' && "
+                                "sleep 0.2 && echo '  +10 HP restored' && "
+                                "echo '> Mining XP cache...' && "
+                                "sleep 0.1 && echo '  +5 XP acquired' && "
+                                "sleep 0.2 && echo '' && "
+                                "echo '=== HACK COMPLETE ===' && "
+                                "echo '' && echo 'Type exit to close terminal'\n"
+                            );
+                        } else {
+                            termWin->sendText(
+                                "clear && echo '=== DUNGEON TERMINAL v2.7 ===' && "
+                                "echo '> Scanning credentials...' && "
+                                "sleep 0.3 && echo '> ERROR: No data chip detected' && "
+                                "sleep 0.2 && echo '' && "
+                                "echo '  *** ACCESS DENIED ***' && "
+                                "echo '' && "
+                                "echo 'Insert a data chip (d) to hack this terminal.' && "
+                                "echo 'Find data chips scattered in the dungeon.' && "
+                                "echo '' && echo 'Type exit to close terminal'\n"
+                            );
+                        }
+                    }
                 }
                 clearEvent(event);
                 break;
@@ -2018,6 +2083,7 @@ TMenuBar* TTestPatternApp::initMenuBar(TRect r)
             *new TMenuItem("~M~icropolis ASCII MVP", cmMicropolisAscii, kbNoKey) +
             *new TMenuItem("~Q~uadra (Falling Blocks)", cmQuadra, kbNoKey) +
             *new TMenuItem("~S~nake", cmSnake, kbNoKey) +
+            *new TMenuItem("Wib~W~ob Rogue", cmRogue, kbNoKey) +
             // REMOVED E009: ASCII Cam (disabled), Zoom In/Out/Actual Size/Full Screen (placeholders)
             newLine() +
             *new TMenuItem("Pa~i~nt Canvas", cmNewPaintCanvas, kbNoKey) +
@@ -3301,6 +3367,13 @@ void api_spawn_quadra(TTestPatternApp& app, const TRect* bounds) {
 void api_spawn_snake(TTestPatternApp& app, const TRect* bounds) {
     TRect r = bounds ? *bounds : api_centered_bounds(app, 60, 30);
     TWindow* w = createSnakeWindow(r);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
+}
+
+void api_spawn_rogue(TTestPatternApp& app, const TRect* bounds) {
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 80, 38);
+    TWindow* w = createRogueWindow(r);
     app.deskTop->insert(w);
     app.registerWindow(w);
 }
