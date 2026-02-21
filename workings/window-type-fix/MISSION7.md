@@ -130,3 +130,63 @@ Pi's steering works by appending instructions to the system context that the mod
 ## Reference: Pi Steering
 
 Pi's steering is set via the session control interface. It persists until replaced. The model sees it as additional system-level context on every turn. It's invisible in the conversation transcript but shapes behaviour. Key insight: it's not a message, it's context.
+
+## Claude Agent SDK Hooks (key discovery)
+
+The SDK has built-in hook events that are perfect for steering:
+
+### Available Hook Events
+  PreToolUse, PostToolUse, PostToolUseFailure, Notification,
+  UserPromptSubmit, SessionStart, SessionEnd, Stop,
+  SubagentStart, SubagentStop, PreCompact, PermissionRequest
+
+### UserPromptSubmit Hook (the one we want)
+Fires when a user message is about to be sent to the model. The hook callback receives the prompt and can return:
+
+```js
+{
+  hookSpecificOutput: {
+    hookEventName: 'UserPromptSubmit',
+    additionalContext: 'focus on generative art ideas'  // <-- STEERING
+  }
+}
+```
+
+The `additionalContext` string gets injected by the SDK alongside the user prompt. The model sees it as extra context. This is exactly the steering mechanism we need.
+
+### SessionStart Hook
+Same pattern — can inject `additionalContext` at session start. Could be used for persistent steering that survives across turns.
+
+### Implementation Sketch
+
+```js
+// In claude_sdk_bridge.js
+let steeringBuffer = '';  // Set by wibwob_steer command
+
+// Register hook with SDK query options
+queryOptions.hooks = {
+  'UserPromptSubmit': [{
+    hooks: [async (input) => {
+      if (!steeringBuffer) return { continue: true };
+      const ctx = steeringBuffer;
+      steeringBuffer = '';  // one-shot, clear after use
+      return {
+        continue: true,
+        hookSpecificOutput: {
+          hookEventName: 'UserPromptSubmit',
+          additionalContext: ctx
+        }
+      };
+    }]
+  }]
+};
+```
+
+This approach is cleaner than prompt hacking — the SDK handles injection natively. The steering text never appears in chat, never in the conversation transcript, but the model sees it on that turn.
+
+### Advantages over prompt prefix approach
+1. No need to modify processUserInput or prepend to user messages
+2. SDK-native — works with the streaming/session model
+3. Can be set from Node bridge directly (no C++ round-trip needed for the injection)
+4. One-shot or persistent — our choice per steer call
+5. Works even if engine is mid-turn (hook fires on next turn automatically)
