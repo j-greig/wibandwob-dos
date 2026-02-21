@@ -3782,3 +3782,46 @@ TPaintCanvasView* api_find_paint_canvas(TTestPatternApp& app, const std::string&
     if (!pw) return nullptr;
     return pw->getCanvas();
 }
+
+// Paint wrappers for command_registry (avoids tvision include dependency)
+std::string api_paint_cell(TTestPatternApp& app, const std::string& id, int x, int y, uint8_t fg, uint8_t bg) {
+    auto *canvas = api_find_paint_canvas(app, id);
+    if (!canvas) return "err paint window not found";
+    canvas->putCell(x, y, fg, bg);
+    return "ok";
+}
+
+std::string api_paint_text(TTestPatternApp& app, const std::string& id, int x, int y, const std::string& text, uint8_t fg, uint8_t bg) {
+    auto *canvas = api_find_paint_canvas(app, id);
+    if (!canvas) return "err paint window not found";
+    canvas->putText(x, y, text, fg, bg);
+    return "ok";
+}
+
+std::string api_paint_line(TTestPatternApp& app, const std::string& id, int x0, int y0, int x1, int y1, bool erase) {
+    auto *canvas = api_find_paint_canvas(app, id);
+    if (!canvas) return "err paint window not found";
+    canvas->putLine(x0, y0, x1, y1, erase);
+    return "ok";
+}
+
+std::string api_paint_rect(TTestPatternApp& app, const std::string& id, int x0, int y0, int x1, int y1, bool erase) {
+    auto *canvas = api_find_paint_canvas(app, id);
+    if (!canvas) return "err paint window not found";
+    canvas->putRect(x0, y0, x1, y1, erase);
+    return "ok";
+}
+
+std::string api_paint_clear(TTestPatternApp& app, const std::string& id) {
+    auto *canvas = api_find_paint_canvas(app, id);
+    if (!canvas) return "err paint window not found";
+    canvas->clear();
+    canvas->drawView();
+    return "ok";
+}
+
+std::string api_paint_export(TTestPatternApp& app, const std::string& id) {
+    auto *canvas = api_find_paint_canvas(app, id);
+    if (!canvas) return "err paint window not found";
+    return canvas->exportText();
+}

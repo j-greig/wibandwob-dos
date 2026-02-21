@@ -889,6 +889,136 @@ def register_tui_tools(mcp):
                 "error": str(e)
             }
 
+    # ── Paint canvas tools ─────────────────────────────────────────
+
+    @mcp.tool("tui_paint_cell")
+    async def paint_cell_tool(
+        window_id: str, x: int, y: int, fg: int = 15, bg: int = 0
+    ) -> Dict[str, Any]:
+        """Set a single cell on the paint canvas
+
+        Places a filled block character at (x, y) with the given foreground
+        and background colours. Coordinates are 0-indexed from top-left.
+
+        Args:
+            window_id: ID of the paint canvas window (from tui_get_state)
+            x: Column (0 = left edge)
+            y: Row (0 = top edge)
+            fg: Foreground colour 0-15 (CGA palette, default 15=white)
+            bg: Background colour 0-15 (CGA palette, default 0=black)
+
+        Colour reference: 0=black 1=dark blue 2=dark green 3=dark cyan
+        4=dark red 5=dark magenta 6=brown 7=light grey 8=dark grey
+        9=blue 10=green 11=cyan 12=red 13=magenta 14=yellow 15=white
+        """
+        controller = get_controller()
+        result = await controller.paint_cell(window_id, x, y, fg, bg)
+        if isinstance(result, str) and result.startswith("err"):
+            return {"success": False, "error": result}
+        return {"success": True, "message": f"Cell set at ({x},{y})"}
+
+    @mcp.tool("tui_paint_text")
+    async def paint_text_tool(
+        window_id: str, x: int, y: int, text: str, fg: int = 15, bg: int = 0
+    ) -> Dict[str, Any]:
+        """Write text on the paint canvas at a given position
+
+        Draws a string horizontally starting at (x, y). Each character
+        occupies one cell.
+
+        Args:
+            window_id: ID of the paint canvas window
+            x: Starting column
+            y: Row
+            text: The string to draw
+            fg: Foreground colour 0-15 (default 15=white)
+            bg: Background colour 0-15 (default 0=black)
+        """
+        controller = get_controller()
+        result = await controller.paint_text(window_id, x, y, text, fg, bg)
+        if isinstance(result, str) and result.startswith("err"):
+            return {"success": False, "error": result}
+        return {"success": True, "message": f"Text drawn at ({x},{y})"}
+
+    @mcp.tool("tui_paint_line")
+    async def paint_line_tool(
+        window_id: str, x0: int, y0: int, x1: int, y1: int, erase: bool = False
+    ) -> Dict[str, Any]:
+        """Draw a line on the paint canvas between two points
+
+        Draws a filled line from (x0,y0) to (x1,y1). Set erase=true to
+        clear cells along the line instead.
+
+        Args:
+            window_id: ID of the paint canvas window
+            x0: Start column
+            y0: Start row
+            x1: End column
+            y1: End row
+            erase: If true, erase instead of draw
+        """
+        controller = get_controller()
+        result = await controller.paint_line(window_id, x0, y0, x1, y1, erase)
+        if isinstance(result, str) and result.startswith("err"):
+            return {"success": False, "error": result}
+        return {"success": True, "message": f"Line drawn ({x0},{y0})->({x1},{y1})"}
+
+    @mcp.tool("tui_paint_rect")
+    async def paint_rect_tool(
+        window_id: str, x0: int, y0: int, x1: int, y1: int, erase: bool = False
+    ) -> Dict[str, Any]:
+        """Draw a rectangle outline on the paint canvas
+
+        Draws the outline of a rectangle from corner (x0,y0) to corner (x1,y1).
+        Set erase=true to clear the rectangle instead.
+
+        Args:
+            window_id: ID of the paint canvas window
+            x0: Left column
+            y0: Top row
+            x1: Right column
+            y1: Bottom row
+            erase: If true, erase instead of draw
+        """
+        controller = get_controller()
+        result = await controller.paint_rect(window_id, x0, y0, x1, y1, erase)
+        if isinstance(result, str) and result.startswith("err"):
+            return {"success": False, "error": result}
+        return {"success": True, "message": f"Rectangle drawn ({x0},{y0})->({x1},{y1})"}
+
+    @mcp.tool("tui_paint_clear")
+    async def paint_clear_tool(window_id: str) -> Dict[str, Any]:
+        """Clear the entire paint canvas
+
+        Erases all content on the canvas, resetting it to blank.
+
+        Args:
+            window_id: ID of the paint canvas window
+        """
+        controller = get_controller()
+        result = await controller.paint_clear(window_id)
+        if isinstance(result, str) and result.startswith("err"):
+            return {"success": False, "error": result}
+        return {"success": True, "message": "Canvas cleared"}
+
+    @mcp.tool("tui_paint_read")
+    async def paint_read_tool(window_id: str) -> Dict[str, Any]:
+        """Read the paint canvas content as text
+
+        Exports the current canvas as a text representation so you can
+        see what has been drawn. Useful for verifying your artwork.
+
+        Args:
+            window_id: ID of the paint canvas window
+        """
+        controller = get_controller()
+        result = await controller.paint_export(window_id)
+        if isinstance(result, str) and result.startswith("err"):
+            return {"success": False, "error": result}
+        return {"success": True, "canvas": result}
+
+    # ── Browser tools ─────────────────────────────────────────────
+
     @mcp.tool("browser.open")
     async def browser_open_tool(url: str, window_id: Optional[str] = None, mode: str = "new") -> Dict[str, Any]:
         controller = get_controller()

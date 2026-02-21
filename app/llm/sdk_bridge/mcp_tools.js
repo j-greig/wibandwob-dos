@@ -440,6 +440,121 @@ function createTuiMcpServer() {
                 }
             ),
 
+            tool(
+                "tui_paint_cell",
+                "Set a single cell on the paint canvas. Colours 0-15 (CGA): 0=black 1=dark blue 2=dark green 3=dark cyan 4=dark red 5=dark magenta 6=brown 7=light grey 8=dark grey 9=blue 10=green 11=cyan 12=red 13=magenta 14=yellow 15=white",
+                {
+                    window_id: z.string().describe("Paint canvas window ID"),
+                    x: z.number().describe("Column (0=left)"),
+                    y: z.number().describe("Row (0=top)"),
+                    fg: z.number().optional().describe("Foreground colour 0-15 (default 15)"),
+                    bg: z.number().optional().describe("Background colour 0-15 (default 0)"),
+                },
+                async ({ window_id, x, y, fg, bg }) => {
+                    try {
+                        await execCommand("paint_cell", { id: window_id, x: String(x), y: String(y), fg: String(fg ?? 15), bg: String(bg ?? 0) });
+                        return mcpResult(`Cell set at (${x},${y})`);
+                    } catch (error) {
+                        return mcpError(`Error: ${error.message}`);
+                    }
+                }
+            ),
+
+            tool(
+                "tui_paint_text",
+                "Write text on the paint canvas at a given position",
+                {
+                    window_id: z.string().describe("Paint canvas window ID"),
+                    x: z.number().describe("Starting column"),
+                    y: z.number().describe("Row"),
+                    text: z.string().describe("Text to draw"),
+                    fg: z.number().optional().describe("Foreground colour 0-15 (default 15)"),
+                    bg: z.number().optional().describe("Background colour 0-15 (default 0)"),
+                },
+                async ({ window_id, x, y, text, fg, bg }) => {
+                    try {
+                        await execCommand("paint_text", { id: window_id, x: String(x), y: String(y), text, fg: String(fg ?? 15), bg: String(bg ?? 0) });
+                        return mcpResult(`Text drawn at (${x},${y})`);
+                    } catch (error) {
+                        return mcpError(`Error: ${error.message}`);
+                    }
+                }
+            ),
+
+            tool(
+                "tui_paint_line",
+                "Draw a line on the paint canvas between two points",
+                {
+                    window_id: z.string().describe("Paint canvas window ID"),
+                    x0: z.number().describe("Start column"),
+                    y0: z.number().describe("Start row"),
+                    x1: z.number().describe("End column"),
+                    y1: z.number().describe("End row"),
+                    erase: z.boolean().optional().describe("Erase instead of draw (default false)"),
+                },
+                async ({ window_id, x0, y0, x1, y1, erase }) => {
+                    try {
+                        await execCommand("paint_line", { id: window_id, x0: String(x0), y0: String(y0), x1: String(x1), y1: String(y1), erase: erase ? "1" : "0" });
+                        return mcpResult(`Line drawn (${x0},${y0})->(${x1},${y1})`);
+                    } catch (error) {
+                        return mcpError(`Error: ${error.message}`);
+                    }
+                }
+            ),
+
+            tool(
+                "tui_paint_rect",
+                "Draw a rectangle outline on the paint canvas",
+                {
+                    window_id: z.string().describe("Paint canvas window ID"),
+                    x0: z.number().describe("Left column"),
+                    y0: z.number().describe("Top row"),
+                    x1: z.number().describe("Right column"),
+                    y1: z.number().describe("Bottom row"),
+                    erase: z.boolean().optional().describe("Erase instead of draw (default false)"),
+                },
+                async ({ window_id, x0, y0, x1, y1, erase }) => {
+                    try {
+                        await execCommand("paint_rect", { id: window_id, x0: String(x0), y0: String(y0), x1: String(x1), y1: String(y1), erase: erase ? "1" : "0" });
+                        return mcpResult(`Rectangle drawn (${x0},${y0})->(${x1},${y1})`);
+                    } catch (error) {
+                        return mcpError(`Error: ${error.message}`);
+                    }
+                }
+            ),
+
+            tool(
+                "tui_paint_clear",
+                "Clear the entire paint canvas",
+                {
+                    window_id: z.string().describe("Paint canvas window ID"),
+                },
+                async ({ window_id }) => {
+                    try {
+                        await execCommand("paint_clear", { id: window_id });
+                        return mcpResult("Canvas cleared");
+                    } catch (error) {
+                        return mcpError(`Error: ${error.message}`);
+                    }
+                }
+            ),
+
+            tool(
+                "tui_paint_read",
+                "Read the paint canvas content as text. Use to see what has been drawn.",
+                {
+                    window_id: z.string().describe("Paint canvas window ID"),
+                },
+                async ({ window_id }) => {
+                    try {
+                        const result = await execCommand("paint_export", { id: window_id });
+                        return mcpResult(result);
+                    } catch (error) {
+                        return mcpError(`Error: ${error.message}`);
+                    }
+                }
+            ),
+
             // ── Apps & Games ───────────────────────────────────────────
 
             tool(

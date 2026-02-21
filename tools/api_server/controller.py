@@ -427,11 +427,14 @@ class Controller:
     async def paint_cell(self, win_id: str, x: int, y: int, fg: int = 15, bg: int = 0) -> str:
         return send_cmd("paint_cell", {"id": win_id, "x": str(x), "y": str(y), "fg": str(fg), "bg": str(bg)})
 
-    async def paint_line(self, win_id: str, x0: int, y0: int, x1: int, y1: int, fg: int = 15, bg: int = 0) -> str:
-        return send_cmd("paint_line", {"id": win_id, "x0": str(x0), "y0": str(y0), "x1": str(x1), "y1": str(y1)})
+    async def paint_text(self, win_id: str, x: int, y: int, text: str, fg: int = 15, bg: int = 0) -> str:
+        return send_cmd("paint_text", {"id": win_id, "x": str(x), "y": str(y), "text": text, "fg": str(fg), "bg": str(bg)})
 
-    async def paint_rect(self, win_id: str, x0: int, y0: int, x1: int, y1: int, fg: int = 15, bg: int = 0, fill: bool = False) -> str:
-        return send_cmd("paint_rect", {"id": win_id, "x0": str(x0), "y0": str(y0), "x1": str(x1), "y1": str(y1)})
+    async def paint_line(self, win_id: str, x0: int, y0: int, x1: int, y1: int, erase: bool = False) -> str:
+        return send_cmd("paint_line", {"id": win_id, "x0": str(x0), "y0": str(y0), "x1": str(x1), "y1": str(y1), "erase": "1" if erase else "0"})
+
+    async def paint_rect(self, win_id: str, x0: int, y0: int, x1: int, y1: int, erase: bool = False) -> str:
+        return send_cmd("paint_rect", {"id": win_id, "x0": str(x0), "y0": str(y0), "x1": str(x1), "y1": str(y1), "erase": "1" if erase else "0"})
 
     async def paint_clear(self, win_id: str) -> str:
         return send_cmd("paint_clear", {"id": win_id})

@@ -32,6 +32,12 @@ std::string api_terminal_write(TTestPatternApp&, const std::string&, const std::
 std::string api_terminal_read(TTestPatternApp&, const std::string&) { return ""; }
 std::string api_chat_receive(TTestPatternApp&, const std::string&, const std::string&) { return "ok"; }
 std::string api_wibwob_ask(TTestPatternApp&, const std::string&) { return "ok"; }
+std::string api_paint_cell(TTestPatternApp&, const std::string&, int, int, uint8_t, uint8_t) { return "ok"; }
+std::string api_paint_text(TTestPatternApp&, const std::string&, int, int, const std::string&, uint8_t, uint8_t) { return "ok"; }
+std::string api_paint_line(TTestPatternApp&, const std::string&, int, int, int, int, bool) { return "ok"; }
+std::string api_paint_rect(TTestPatternApp&, const std::string&, int, int, int, int, bool) { return "ok"; }
+std::string api_paint_clear(TTestPatternApp&, const std::string&) { return "ok"; }
+std::string api_paint_export(TTestPatternApp&, const std::string&) { return "ok"; }
 
 int main() {
     const std::string payload = get_command_capabilities_json();
@@ -61,6 +67,12 @@ int main() {
         "\"name\":\"open_terminal\"",
         "\"name\":\"terminal_write\"",
         "\"name\":\"chat_receive\"",
+        "\"name\":\"paint_cell\"",
+        "\"name\":\"paint_text\"",
+        "\"name\":\"paint_line\"",
+        "\"name\":\"paint_rect\"",
+        "\"name\":\"paint_clear\"",
+        "\"name\":\"paint_export\"",
     };
 
     for (const char* token : required) {

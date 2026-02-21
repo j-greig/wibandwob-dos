@@ -2,6 +2,8 @@
 
 #include "api_ipc.h"
 
+#include <cstdint>
+
 #include <sstream>
 
 extern void api_cascade(TTestPatternApp& app);
@@ -32,6 +34,14 @@ extern void api_spawn_terminal(TTestPatternApp& app, const TRect* bounds);
 extern std::string api_terminal_write(TTestPatternApp& app, const std::string& text, const std::string& window_id);
 extern std::string api_terminal_read(TTestPatternApp& app, const std::string& window_id);
 
+// Paint canvas wrappers (defined in test_pattern_app.cpp, avoid tvision dependency)
+extern std::string api_paint_cell(TTestPatternApp& app, const std::string& id, int x, int y, uint8_t fg, uint8_t bg);
+extern std::string api_paint_text(TTestPatternApp& app, const std::string& id, int x, int y, const std::string& text, uint8_t fg, uint8_t bg);
+extern std::string api_paint_line(TTestPatternApp& app, const std::string& id, int x0, int y0, int x1, int y1, bool erase);
+extern std::string api_paint_rect(TTestPatternApp& app, const std::string& id, int x0, int y0, int x1, int y1, bool erase);
+extern std::string api_paint_clear(TTestPatternApp& app, const std::string& id);
+extern std::string api_paint_export(TTestPatternApp& app, const std::string& id);
+
 const std::vector<CommandCapability>& get_command_capabilities() {
     static const std::vector<CommandCapability> capabilities = {
         {"cascade", "Cascade all windows on desktop", false},
@@ -60,6 +70,12 @@ const std::vector<CommandCapability>& get_command_capabilities() {
         {"terminal_read", "Read the visible text content of a terminal window (optional window_id param)", false},
         {"chat_receive", "Display a remote chat message in Scramble (sender + text params)", true},
         {"wibwob_ask", "Send a user message to the Wib&Wob chat window, triggering an AI response (text param)", true},
+        {"paint_cell", "Set a single cell on a paint canvas (id, x, y, fg, bg params)", true},
+        {"paint_text", "Write text on a paint canvas (id, x, y, text, fg, bg params)", true},
+        {"paint_line", "Draw a line on a paint canvas (id, x0, y0, x1, y1, erase params)", true},
+        {"paint_rect", "Draw a rectangle on a paint canvas (id, x0, y0, x1, y1, erase params)", true},
+        {"paint_clear", "Clear a paint canvas (id param)", true},
+        {"paint_export", "Export paint canvas as text (id param)", true},
     };
     return capabilities;
 }
@@ -224,6 +240,57 @@ std::string exec_registry_command(
         if (itText == kv.end() || itText->second.empty())
             return "err missing text";
         return api_wibwob_ask(app, itText->second);
+    }
+    if (name == "paint_cell") {
+        auto id_it = kv.find("id");
+        auto x_it = kv.find("x"); auto y_it = kv.find("y");
+        if (id_it == kv.end() || x_it == kv.end() || y_it == kv.end())
+            return "err missing id/x/y";
+        auto fg_it = kv.find("fg"); auto bg_it = kv.find("bg");
+        uint8_t fg = fg_it != kv.end() ? std::atoi(fg_it->second.c_str()) : 15;
+        uint8_t bg = bg_it != kv.end() ? std::atoi(bg_it->second.c_str()) : 0;
+        return api_paint_cell(app, id_it->second, std::atoi(x_it->second.c_str()), std::atoi(y_it->second.c_str()), fg, bg);
+    }
+    if (name == "paint_text") {
+        auto id_it = kv.find("id");
+        auto x_it = kv.find("x"); auto y_it = kv.find("y");
+        auto text_it = kv.find("text");
+        if (id_it == kv.end() || x_it == kv.end() || y_it == kv.end() || text_it == kv.end())
+            return "err missing id/x/y/text";
+        auto fg_it = kv.find("fg"); auto bg_it = kv.find("bg");
+        uint8_t fg = fg_it != kv.end() ? std::atoi(fg_it->second.c_str()) : 15;
+        uint8_t bg = bg_it != kv.end() ? std::atoi(bg_it->second.c_str()) : 0;
+        return api_paint_text(app, id_it->second, std::atoi(x_it->second.c_str()), std::atoi(y_it->second.c_str()), text_it->second, fg, bg);
+    }
+    if (name == "paint_line") {
+        auto id_it = kv.find("id");
+        auto x0_it = kv.find("x0"); auto y0_it = kv.find("y0");
+        auto x1_it = kv.find("x1"); auto y1_it = kv.find("y1");
+        if (id_it == kv.end() || x0_it == kv.end() || y0_it == kv.end() || x1_it == kv.end() || y1_it == kv.end())
+            return "err missing id/x0/y0/x1/y1";
+        auto erase_it = kv.find("erase");
+        bool erase = (erase_it != kv.end() && erase_it->second == "1");
+        return api_paint_line(app, id_it->second, std::atoi(x0_it->second.c_str()), std::atoi(y0_it->second.c_str()), std::atoi(x1_it->second.c_str()), std::atoi(y1_it->second.c_str()), erase);
+    }
+    if (name == "paint_rect") {
+        auto id_it = kv.find("id");
+        auto x0_it = kv.find("x0"); auto y0_it = kv.find("y0");
+        auto x1_it = kv.find("x1"); auto y1_it = kv.find("y1");
+        if (id_it == kv.end() || x0_it == kv.end() || y0_it == kv.end() || x1_it == kv.end() || y1_it == kv.end())
+            return "err missing id/x0/y0/x1/y1";
+        auto erase_it = kv.find("erase");
+        bool erase = (erase_it != kv.end() && erase_it->second == "1");
+        return api_paint_rect(app, id_it->second, std::atoi(x0_it->second.c_str()), std::atoi(y0_it->second.c_str()), std::atoi(x1_it->second.c_str()), std::atoi(y1_it->second.c_str()), erase);
+    }
+    if (name == "paint_clear") {
+        auto id_it = kv.find("id");
+        if (id_it == kv.end()) return "err missing id";
+        return api_paint_clear(app, id_it->second);
+    }
+    if (name == "paint_export") {
+        auto id_it = kv.find("id");
+        if (id_it == kv.end()) return "err missing id";
+        return api_paint_export(app, id_it->second);
     }
     return "err unknown command";
 }
