@@ -315,7 +315,8 @@ Terminal write/read round-trip works. Text editor send_text/send_figlet work. Th
 
 ### Follow-up Tasks
 
-None required — no regressions found.
+- **M3-T12**: Fix `save_workspace` / `open_workspace` modal dialog blocking IPC. When triggered via API/IPC, either auto-close the dialog after ~5 seconds, or suppress the dialog entirely and return the result directly. This blocks headless/agent use of workspace commands.
+- **M3-T13**: Strip null bytes from `terminal_read` response before returning to API caller.
 
 ---
 
