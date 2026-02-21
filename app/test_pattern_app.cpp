@@ -3797,9 +3797,19 @@ TPaintCanvasView* api_find_paint_canvas(TTestPatternApp& app, const std::string&
 }
 
 // Paint wrappers for command_registry (avoids tvision include dependency)
+// Clamp paint coordinates to canvas bounds to prevent crashes
+static bool clampXY(TPaintCanvasView* c, int& x, int& y) {
+    if (x < 0) x = 0;
+    if (y < 0) y = 0;
+    if (x >= c->getCols()) x = c->getCols() - 1;
+    if (y >= c->getRows()) y = c->getRows() - 1;
+    return c->getCols() > 0 && c->getRows() > 0;
+}
+
 std::string api_paint_cell(TTestPatternApp& app, const std::string& id, int x, int y, uint8_t fg, uint8_t bg) {
     auto *canvas = api_find_paint_canvas(app, id);
     if (!canvas) return "err paint window not found";
+    if (!clampXY(canvas, x, y)) return "err canvas has zero size";
     canvas->putCell(x, y, fg, bg);
     return "ok";
 }
@@ -3807,6 +3817,7 @@ std::string api_paint_cell(TTestPatternApp& app, const std::string& id, int x, i
 std::string api_paint_text(TTestPatternApp& app, const std::string& id, int x, int y, const std::string& text, uint8_t fg, uint8_t bg) {
     auto *canvas = api_find_paint_canvas(app, id);
     if (!canvas) return "err paint window not found";
+    if (!clampXY(canvas, x, y)) return "err canvas has zero size";
     canvas->putText(x, y, text, fg, bg);
     return "ok";
 }
@@ -3814,6 +3825,8 @@ std::string api_paint_text(TTestPatternApp& app, const std::string& id, int x, i
 std::string api_paint_line(TTestPatternApp& app, const std::string& id, int x0, int y0, int x1, int y1, bool erase) {
     auto *canvas = api_find_paint_canvas(app, id);
     if (!canvas) return "err paint window not found";
+    if (!clampXY(canvas, x0, y0)) return "err canvas has zero size";
+    clampXY(canvas, x1, y1);
     canvas->putLine(x0, y0, x1, y1, erase);
     return "ok";
 }
@@ -3821,6 +3834,8 @@ std::string api_paint_line(TTestPatternApp& app, const std::string& id, int x0, 
 std::string api_paint_rect(TTestPatternApp& app, const std::string& id, int x0, int y0, int x1, int y1, bool erase) {
     auto *canvas = api_find_paint_canvas(app, id);
     if (!canvas) return "err paint window not found";
+    if (!clampXY(canvas, x0, y0)) return "err canvas has zero size";
+    clampXY(canvas, x1, y1);
     canvas->putRect(x0, y0, x1, y1, erase);
     return "ok";
 }
