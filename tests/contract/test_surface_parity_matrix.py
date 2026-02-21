@@ -1,3 +1,8 @@
+"""Auto-derived surface parity: C++ command registry → MCP tool builders.
+
+Parses both sides from source — no hardcoded mapping dicts. Adding a command
+to get_command_capabilities() without a matching MCP tool builder will fail.
+"""
 from __future__ import annotations
 
 import re
@@ -11,39 +16,50 @@ if str(REPO_ROOT) not in sys.path:
 import tools.api_server.mcp_tools as mcp_tools
 
 
-MENU_TO_REGISTRY = {
-    "cmCascade": "cascade",
-    "cmTile": "tile",
-    "cmCloseAll": "close_all",
-    "cmSaveWorkspace": "save_workspace",
-    "cmOpenWorkspace": "open_workspace",
-    "cmScreenshot": "screenshot",
-    "cmPatternContinuous": "pattern_mode",
-    "cmPatternTiled": "pattern_mode",
-}
-
-
-def _menu_symbols() -> set[str]:
-    src = Path("app/test_pattern_app.cpp").read_text(encoding="utf-8")
-    return set(re.findall(r"case (cm[A-Za-z0-9_]+):", src))
-
-
 def _registry_commands() -> set[str]:
-    src = Path("app/command_registry.cpp").read_text(encoding="utf-8")
+    """Parse all command names from get_command_capabilities() in command_registry.cpp."""
+    src = (REPO_ROOT / "app" / "command_registry.cpp").read_text(encoding="utf-8")
     return set(re.findall(r'\{"([a-z_]+)"\s*,\s*"[^"]+"\s*,\s*(?:true|false)\}', src))
 
 
-def test_surface_parity_matrix() -> None:
-    menu_symbols = _menu_symbols()
-    registry_commands = _registry_commands()
-    builder_map = mcp_tools._command_tool_builders()
+def _menu_handled_symbols() -> set[str]:
+    """Parse all `case cmXxx:` symbols from test_pattern_app.cpp."""
+    src = (REPO_ROOT / "app" / "test_pattern_app.cpp").read_text(encoding="utf-8")
+    return set(re.findall(r"case (cm[A-Za-z0-9_]+):", src))
 
-    # Menu -> registry mapping must exist.
-    for menu_symbol, command_name in MENU_TO_REGISTRY.items():
-        assert menu_symbol in menu_symbols, f"Menu symbol missing: {menu_symbol}"
-        assert command_name in registry_commands, f"Registry command missing for {menu_symbol}: {command_name}"
 
-    # Registry commands in migrated set must have MCP command-tool mapping.
-    migrated_registry_set = set(MENU_TO_REGISTRY.values())
-    missing_mcp = sorted(migrated_registry_set - set(builder_map.keys()))
-    assert not missing_mcp, f"MCP command-tool mapping missing for: {missing_mcp}"
+def _mcp_tool_builder_commands() -> set[str]:
+    """Commands that have an MCP tool builder in mcp_tools.py."""
+    return set(mcp_tools._command_tool_builders().keys())
+
+
+# ── Tests ──────────────────────────────────────────────────────────────────────
+
+
+def test_registry_is_nonempty():
+    cmds = _registry_commands()
+    assert len(cmds) >= 15, f"Expected >=15 registry commands, got {len(cmds)}"
+
+
+def test_every_registry_command_has_mcp_tool():
+    """Every C++ command registry entry must have a corresponding MCP tool builder."""
+    registry = _registry_commands()
+    mcp_cmds = _mcp_tool_builder_commands()
+    missing = sorted(registry - mcp_cmds)
+    assert not missing, (
+        f"C++ registry commands missing MCP tool builders: {missing}\n"
+        f"Add entries to _command_tool_builders() in tools/api_server/mcp_tools.py."
+    )
+
+
+def test_no_phantom_mcp_tools():
+    """MCP tool builders should not reference commands absent from C++ registry."""
+    registry = _registry_commands()
+    mcp_cmds = _mcp_tool_builder_commands()
+    # Some MCP tools may be Python-only (theme commands routed differently)
+    # but _command_tool_builders specifically wraps registry commands.
+    phantom = sorted(mcp_cmds - registry)
+    assert not phantom, (
+        f"MCP tool builders reference commands not in C++ registry: {phantom}\n"
+        f"Either add to command_registry.cpp or remove from mcp_tools.py."
+    )
