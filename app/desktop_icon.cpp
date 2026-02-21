@@ -214,21 +214,18 @@ void TDesktopIconView::drawIcon(TDrawBuffer &, const DesktopIcon &,
 
 void TDesktopIconView::draw()
 {
-    // Desktop background colour (dark blue, Lisa-inspired)
-    TColorAttr bgAttr = TColorAttr(
-        TColorRGB(140, 140, 140),
-        TColorRGB(0, 0, 80)
-    );
+    // Normal: black icons on grey, matching the TV desktop pattern
+    TColorAttr normalBorder = TColorAttr(TColorRGB(60, 60, 60),   TColorRGB(176, 176, 176));
+    TColorAttr normalFill   = TColorAttr(TColorRGB(0, 0, 0),      TColorRGB(200, 200, 200));
+    TColorAttr normalArt    = TColorAttr(TColorRGB(0, 0, 0),      TColorRGB(200, 200, 200));
 
-    // Selection highlight
-    TColorAttr selBorder = TColorAttr(
-        TColorRGB(255, 255, 100),
-        TColorRGB(40, 40, 120)
-    );
-    TColorAttr selFill = TColorAttr(
-        TColorRGB(255, 255, 255),
-        TColorRGB(40, 40, 120)
-    );
+    // Selected: white-on-blue (classic TV highlight, colour only here)
+    TColorAttr selBorder = TColorAttr(TColorRGB(255, 255, 255), TColorRGB(0, 0, 170));
+    TColorAttr selFill   = TColorAttr(TColorRGB(255, 255, 255), TColorRGB(0, 0, 170));
+    TColorAttr selArt    = TColorAttr(TColorRGB(255, 255, 100), TColorRGB(0, 0, 170));
+
+    // Background: grey desktop pattern (░ char like original TV)
+    TColorAttr bgAttr = TColorAttr(TColorRGB(128, 128, 128), TColorRGB(0, 0, 170));
 
     // Border characters (box-drawing)
     static const char *topLeft    = "\xe2\x94\x8c"; // ┌
@@ -241,7 +238,8 @@ void TDesktopIconView::draw()
     TDrawBuffer buf;
     for (int y = 0; y < size.y; ++y)
     {
-        buf.moveChar(0, ' ', bgAttr, size.x);
+        // Grey pattern background like original TV desktop
+        buf.moveChar(0, '\xB0', bgAttr, size.x); // ░
 
         for (int i = 0; i < (int)icons_.size(); ++i)
         {
@@ -256,10 +254,10 @@ void TDesktopIconView::draw()
                 continue;
 
             bool sel = (i == selectedIdx_);
-            TColorAttr borderAttr = sel ? selBorder : ic.color;
-            TColorAttr fillAttr = sel ? selFill : ic.color;
-            TColorAttr artAttr = sel ? selFill : ic.artColor;
-            int innerW = ICON_WIDTH - 2; // inside the borders
+            TColorAttr borderAttr = sel ? selBorder : normalBorder;
+            TColorAttr fillAttr   = sel ? selFill   : normalFill;
+            TColorAttr artAttr    = sel ? selArt    : normalArt;
+            int innerW = ICON_WIDTH - 2;
 
             if (localY == 0)
             {
