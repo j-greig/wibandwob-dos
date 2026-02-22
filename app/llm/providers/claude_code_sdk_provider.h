@@ -72,10 +72,15 @@ private:
     // Session state
     bool streamingActive = false;
     bool sessionStarted = false;
+    bool sessionStarting = false;  // Async startup in progress
     std::string currentSessionId;
     std::string currentSystemPrompt;
     std::string configuredModel = "haiku";  // Default to haiku
     std::string lastError;
+    
+    // Pending query (queued during async session startup)
+    std::string pendingQuery;
+    StreamingCallback pendingStreamCallback;
     
     // Tool support
     std::vector<Tool> registeredTools;

@@ -311,6 +311,11 @@ bool ClaudeCodeSDKProvider::startStreamingSession(const std::string& customSyste
         return true;
     }
 
+    if (sessionStarting) {
+        fprintf(stderr, "[SDK] Session already starting (async), waiting for poll\n");
+        return true;
+    }
+
     if (!initializeSDK()) {
         fprintf(stderr, "[SDK] ERROR: initializeSDK failed\n");
         setError("Failed to initialize Claude Code SDK");
@@ -320,70 +325,27 @@ bool ClaudeCodeSDKProvider::startStreamingSession(const std::string& customSyste
 
     // Send session start command (escape prompt for JSON)
     std::string escapedPrompt = escapeJsonString(customSystemPrompt);
-    fprintf(stderr, "[SDK] Escaped prompt: %zu chars -> %zu chars\n",
-            customSystemPrompt.size(), escapedPrompt.size());
 
     std::ostringstream command;
-    // Only send base SDK tools here — MCP tool names are auto-derived
-    // by the bridge from mcpServer.tools (see claude_sdk_bridge.js).
     command << R"({"type":"START_SESSION","data":{"customSystemPrompt":")"
             << escapedPrompt << R"(","maxTurns":)" << maxTurns
             << R"(,"allowedTools":["Read","Write","Grep","WebSearch","WebFetch"],"model":")"
             << configuredModel << R"("}})";
 
     std::string cmdStr = command.str();
-    fprintf(stderr, "[SDK] Sending START_SESSION: %zu bytes\n", cmdStr.size());
+    fprintf(stderr, "[SDK] Sending START_SESSION: %zu bytes (non-blocking)\n", cmdStr.size());
 
     if (!nodeBridge->sendCommand(cmdStr)) {
         fprintf(stderr, "[SDK] ERROR: sendCommand failed\n");
         setError("Failed to send session start command");
         return false;
     }
-    fprintf(stderr, "[SDK] Command sent, waiting for SESSION_STARTED...\n");
 
-    // Wait for session confirmation.
-    // The bridge sends BRIDGE_READY first (immediate), then does async work
-    // (capabilities fetch with retries can take ~6s), then SESSION_STARTED.
-    // We need a generous timeout to accommodate the capabilities retry loop.
-    for (int i = 0; i < 150; ++i) { // 15 second timeout
-        std::string response = nodeBridge->readResponse();
-        if (!response.empty()) {
-            fprintf(stderr, "[SDK] Got response: %.80s%s\n",
-                    response.c_str(), response.size() > 80 ? "..." : "");
-
-            // Parse JSON response (simplified)
-            if (response.find("SESSION_STARTED") != std::string::npos) {
-                fprintf(stderr, "[SDK] Session started OK!\n");
-                streamingActive = true;
-                sessionStarted = true;
-                currentSystemPrompt = customSystemPrompt;
-                
-                // Extract session ID (simplified JSON parsing)
-                size_t idPos = response.find("\"sessionId\":\"");
-                if (idPos != std::string::npos) {
-                    idPos += 13; // Length of "sessionId":"
-                    size_t endPos = response.find("\"", idPos);
-                    if (endPos != std::string::npos) {
-                        currentSessionId = response.substr(idPos, endPos - idPos);
-                    }
-                }
-                
-                return true;
-            } else if (response.find("BRIDGE_READY") != std::string::npos) {
-                // Bridge is alive, capabilities fetch + SDK init in progress.
-                // Keep waiting for SESSION_STARTED.
-                fprintf(stderr, "[SDK] Bridge ready, waiting for session...\n");
-                continue;
-            } else if (response.find("ERROR") != std::string::npos) {
-                setError("Session start failed: " + response);
-                return false;
-            }
-        }
-        usleep(100000); // 100ms delay
-    }
-    
-    setError("Session start timeout");
-    return false;
+    // Non-blocking: poll() will detect SESSION_STARTED and send any pending query.
+    sessionStarting = true;
+    currentSystemPrompt = customSystemPrompt;
+    fprintf(stderr, "[SDK] Session start initiated (async), poll() will complete it\n");
+    return true;
 }
 
 bool ClaudeCodeSDKProvider::sendStreamingQuery(const std::string& query, StreamingCallback streamCallback,
@@ -402,7 +364,16 @@ bool ClaudeCodeSDKProvider::sendStreamingQuery(const std::string& query, Streami
             fprintf(stderr, "[SDK] ERROR: Failed to auto-start session\n");
             return false;
         }
-        fprintf(stderr, "[SDK] Session auto-started OK\n");
+    }
+
+    // If session is starting asynchronously, queue the query for later.
+    if (sessionStarting && !streamingActive) {
+        fprintf(stderr, "[SDK] Session starting async — queuing query for later\n");
+        pendingQuery = query;
+        pendingStreamCallback = streamCallback;
+        activeStreamCallback = streamCallback;
+        busy.store(true);
+        return true;  // Caller sees "started" — poll() will send when ready
     }
 
     busy.store(true);
@@ -440,41 +411,37 @@ void ClaudeCodeSDKProvider::processStreamingThread() {
         
         if (!response.empty()) {
             StreamChunk chunk;
+            bool terminal = false;
             
             // Parse response (lightweight JSON parsing)
             if (response.find("CONTENT_DELTA") != std::string::npos) {
                 chunk.type = StreamChunk::CONTENT_DELTA;
                 chunk.content = extractJsonStringField(response, "content");
 
-                if (activeStreamCallback) {
-                    activeStreamCallback(chunk);
-                }
-
             } else if (response.find("MESSAGE_COMPLETE") != std::string::npos) {
                 chunk.type = StreamChunk::MESSAGE_COMPLETE;
                 chunk.session_id = currentSessionId;
                 chunk.content = extractJsonStringField(response, "fullResponse");
-
-                if (activeStreamCallback) {
-                    activeStreamCallback(chunk);
-                }
-
-                busy.store(false);
-                activeStreamCallback = nullptr;
-                break;
+                terminal = true;
 
             } else if (response.find("ERROR") != std::string::npos) {
                 chunk.type = StreamChunk::ERROR_OCCURRED;
                 chunk.error_message = extractJsonStringField(response, "message");
                 if (chunk.error_message.empty())
                     chunk.error_message = response;
+                terminal = true;
+            }
 
-                if (activeStreamCallback) {
-                    activeStreamCallback(chunk);
-                }
+            // Enqueue for main-thread delivery via poll().
+            // NEVER call activeStreamCallback from this thread — that causes
+            // use-after-free when the window is destroyed mid-stream.
+            {
+                std::lock_guard<std::mutex> lock(queueMutex);
+                streamQueue.push(chunk);
+            }
 
+            if (terminal) {
                 busy.store(false);
-                activeStreamCallback = nullptr;
                 break;
             }
         }
@@ -521,7 +488,88 @@ void ClaudeCodeSDKProvider::poll() {
     if (useFallback && fallbackProvider) {
         fallbackProvider->poll();
     }
-    // SDK version doesn't need polling - uses threads
+
+    // Handle async session startup: read bridge responses until SESSION_STARTED.
+    if (sessionStarting && !streamingActive && nodeBridge && nodeBridge->active) {
+        std::string response = nodeBridge->readResponse();
+        if (!response.empty()) {
+            fprintf(stderr, "[SDK] poll session-start response: %.80s%s\n",
+                    response.c_str(), response.size() > 80 ? "..." : "");
+
+            if (response.find("SESSION_STARTED") != std::string::npos) {
+                fprintf(stderr, "[SDK] Session started OK (async)!\n");
+                streamingActive = true;
+                sessionStarted = true;
+                sessionStarting = false;
+
+                // Extract session ID
+                size_t idPos = response.find("\"sessionId\":\"");
+                if (idPos != std::string::npos) {
+                    idPos += 13;
+                    size_t endPos = response.find("\"", idPos);
+                    if (endPos != std::string::npos) {
+                        currentSessionId = response.substr(idPos, endPos - idPos);
+                    }
+                }
+
+                // Send any queued query now that session is ready.
+                if (!pendingQuery.empty()) {
+                    fprintf(stderr, "[SDK] Sending queued query: %.60s...\n", pendingQuery.c_str());
+                    std::string query = std::move(pendingQuery);
+                    pendingQuery.clear();
+                    StreamingCallback cb = std::move(pendingStreamCallback);
+                    pendingStreamCallback = nullptr;
+                    // Dispatch the query (this calls sendStreamingQuery which will
+                    // now see streamingActive==true and proceed normally).
+                    sendStreamingQuery(query, cb);
+                }
+            } else if (response.find("BRIDGE_READY") != std::string::npos) {
+                fprintf(stderr, "[SDK] Bridge ready (async), waiting for session...\n");
+                // Keep polling
+            } else if (response.find("ERROR") != std::string::npos) {
+                fprintf(stderr, "[SDK] Session start failed (async): %s\n", response.c_str());
+                setError("Session start failed: " + response);
+                sessionStarting = false;
+                busy.store(false);
+
+                // Notify waiting callback of the error
+                if (activeStreamCallback) {
+                    StreamChunk errorChunk;
+                    errorChunk.type = StreamChunk::ERROR_OCCURRED;
+                    errorChunk.error_message = "Session start failed";
+                    activeStreamCallback(errorChunk);
+                    activeStreamCallback = nullptr;
+                }
+                pendingQuery.clear();
+                pendingStreamCallback = nullptr;
+            }
+        }
+    }
+
+    // Deliver queued stream chunks on the main thread.
+    // processStreamingThread enqueues; we dequeue here so the callback
+    // runs safely in the TV event loop (no cross-thread UI access).
+    std::queue<StreamChunk> batch;
+    {
+        std::lock_guard<std::mutex> lock(queueMutex);
+        std::swap(batch, streamQueue);
+    }
+
+    while (!batch.empty()) {
+        StreamChunk chunk = std::move(batch.front());
+        batch.pop();
+
+        bool terminal = (chunk.type == StreamChunk::MESSAGE_COMPLETE ||
+                         chunk.type == StreamChunk::ERROR_OCCURRED);
+
+        if (activeStreamCallback) {
+            activeStreamCallback(chunk);
+        }
+
+        if (terminal) {
+            activeStreamCallback = nullptr;
+        }
+    }
 }
 
 bool ClaudeCodeSDKProvider::initializeSDK() {
@@ -542,6 +590,9 @@ void ClaudeCodeSDKProvider::shutdownSDK() {
     nodeBridge->shutdown();
     streamingActive = false;
     sessionStarted = false;
+    sessionStarting = false;
+    pendingQuery.clear();
+    pendingStreamCallback = nullptr;
 }
 
 std::string ClaudeCodeSDKProvider::getVersion() const {
@@ -652,15 +703,18 @@ void ClaudeCodeSDKProvider::resetSession() {
 }
 
 void ClaudeCodeSDKProvider::endStreamingSession() {
-    if (!streamingActive) return;
+    if (!streamingActive && !sessionStarting) return;
     
-    if (nodeBridge->active) {
+    if (nodeBridge && nodeBridge->active) {
         nodeBridge->sendCommand(R"({"type":"END_SESSION","data":{}})");
     }
     
     streamingActive = false;
     sessionStarted = false;
+    sessionStarting = false;
     currentSessionId.clear();
+    pendingQuery.clear();
+    pendingStreamCallback = nullptr;
 }
 
 bool ClaudeCodeSDKProvider::updateSystemPrompt(const std::string& customSystemPrompt) {

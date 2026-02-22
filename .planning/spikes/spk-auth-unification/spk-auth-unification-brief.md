@@ -1,121 +1,67 @@
 # Spike: Unified Auth for Wib&Wob + Scramble
 
-Status: in-progress  
+Status: done  
 GitHub issue: —  
 PR: —  
 
 ## Goal
 
 One auth config. Both Wib&Wob Chat and Scramble Cat use it. No legacy paths.
+Additionally: make all LLM calls non-blocking so the TUI never freezes.
 
-## Current Mess
+## Outcome
 
-- Wib&Wob has 3 providers with complex fallback logic
-- Scramble has its own completely separate `ANTHROPIC_API_KEY` curl path
-- `claude_code_sdk` silently falls back to `claude_code` (CLI subprocess)
-- Provider selection is config-file-first but also env-var-sniffing
-- Nobody surfaces auth failures clearly
+All 5 tasks completed plus two bonus non-blocking fixes:
+
+| Commit | Description |
+|--------|-------------|
+| `bb4bbe6` | spike(llm): unified AuthConfig singleton for all LLM consumers |
+| `5200faf` | fix(llm): address Codex review findings for auth unification |
+| `cfeee82` | chore(llm): final Codex sweep cleanup |
+| `d00113e` | feat(llm): proper auth probe, LLM AUTH/KEY/OFF labels, Help > LLM Status dialog |
+| `9dd1fd7` | fix(llm): make Scramble LLM calls non-blocking with async popen+poll |
+| (pending) | fix(llm): SDK session startup + streaming callback thread safety |
+
+### Non-blocking fixes (bonus)
+
+1. **Scramble async**: `popen` + `fcntl(O_NONBLOCK)` + `poll()` from idle loop — no more TUI freeze on Scramble chat.
+2. **SDK session startup**: `startStreamingSession()` no longer blocks 5-15s. Sends `START_SESSION`, returns immediately; `poll()` detects `SESSION_STARTED` and sends queued query.
+3. **SDK streaming callback**: `processStreamingThread` no longer calls `activeStreamCallback` directly. Enqueues `StreamChunk`s into `streamQueue`; `poll()` delivers them on the main thread. Eliminates use-after-free race when window is destroyed mid-stream.
 
 ## New Design
 
 ### One global auth mode
 
-Detected at startup. Stored in a singleton. Both consumers read from it.
+Detected at startup (including `claude auth status` probe). Stored in `AuthConfig` singleton.
 
 ```
-1. If `claude` CLI is available and logged in → Claude Code Auth (SDK) ← DEFAULT
+1. If `claude` CLI is available AND logged in → Claude Code Auth (SDK) ← DEFAULT
 2. If ANTHROPIC_API_KEY is set → API Key mode (direct curl, fallback only)
 3. Otherwise → No Auth (disabled, show message)
 ```
-
-Claude Code Auth (SDK) is the default. It's free, it's what the user uses for Claude Code and Pi, and it gives MCP tools, sessions, streaming. API key mode exists only as a fallback for environments without Claude CLI.
 
 ### Both consumers use the same mode
 
 | Mode | Wib&Wob | Scramble |
 |------|---------|----------|
-| Claude Code | `claude_code_sdk` provider (Agent SDK, full features) | `claude -p --model haiku "prompt"` (CLI subprocess) |
-| API Key | `anthropic_api` provider (direct curl) | Direct curl (as today) |
+| Claude Code | `claude_code_sdk` provider (Agent SDK, full features) | `claude -p --model haiku "prompt"` (async CLI subprocess) |
+| API Key | `anthropic_api` provider (direct curl) | Direct curl (async) |
 | No Auth | Disabled, show message in chat | Disabled, show message |
 
-### What gets deleted
+### TUI status indicators
 
-- `claude_code` provider (old CLI subprocess for Wib&Wob) — replaced by `claude_code_sdk`
-- `claude_code_sdk → claude_code` silent fallback — just fail clearly
-- `anthropic_api_provider_broken.cpp` — dead code
-- `WibWobEngine` multi-provider fallback cascade — replaced by single mode switch
-- Scramble's independent `ANTHROPIC_API_KEY` probing — reads from shared AuthConfig
-- `ApiConfig::anthropicApiKey()` runtime injection complexity
-
-### What gets added
-
-- `AuthConfig` singleton (~50 lines): detect mode, expose key/CLI path
-- Scramble CLI mode: spawn `claude -p --model haiku "prompt"` when in Claude Code Auth mode
-- Bridge: handle `auth_status` SDK event, surface `authentication_failed` errors
-- Status line: `LLM ON` / `LLM OFF` / `LLM AUTH` (extend existing API indicator)
+- Status bar: `LLM AUTH` (green) / `LLM KEY` (amber) / `LLM OFF` (red)
+- Help > LLM Status: full diagnostics dialog (`AuthConfig::statusSummary()`)
 
 ## Task Queue
 
 ```json
 [
-  {
-    "id": "SPK-AUTH-01",
-    "status": "done",
-    "title": "Create AuthConfig singleton",
-    "steps": [
-      "app/llm/base/auth_config.h + .cpp",
-      "detectMode(): check claude CLI, then ANTHROPIC_API_KEY",
-      "getApiKey(), getClaudePath(), getMode()",
-      "Call once at app startup before any LLM init"
-    ]
-  },
-  {
-    "id": "SPK-AUTH-02",
-    "status": "done",
-    "title": "Simplify WibWobEngine to use AuthConfig",
-    "steps": [
-      "Remove multi-provider fallback cascade",
-      "Claude Code mode → claude_code_sdk only",
-      "API Key mode → anthropic_api only",
-      "No Auth → show error in chat, don't init provider",
-      "Delete claude_code provider from CMakeLists"
-    ]
-  },
-  {
-    "id": "SPK-AUTH-03",
-    "status": "done",
-    "title": "Make Scramble use AuthConfig",
-    "steps": [
-      "ScrambleHaikuClient reads AuthConfig instead of getenv",
-      "Claude Code mode: spawn claude -p --model haiku",
-      "API Key mode: direct curl (as today)",
-      "No Auth: return cat quip, don't attempt LLM call",
-      "Handle CLI stderr/exit code for auth failures"
-    ]
-  },
-  {
-    "id": "SPK-AUTH-04",
-    "status": "done",
-    "title": "Surface auth errors in TUI",
-    "steps": [
-      "Bridge: handle auth_status SDK event → send ERROR to C++",
-      "Bridge: call accountInfo() at session start, log auth source",
-      "Chat window: show 'run claude /login' on auth failure",
-      "Status line: LLM ON / LLM OFF / LLM AUTH indicator"
-    ]
-  },
-  {
-    "id": "SPK-AUTH-05",
-    "status": "done",
-    "title": "Clean up dead code",
-    "steps": [
-      "Delete claude_code_provider.cpp/.h",
-      "Delete anthropic_api_provider_broken.cpp",
-      "Remove claude_code from llm_config.json",
-      "Remove silent sdk→cli fallback in claude_code_sdk_provider",
-      "Remove ApiConfig runtime key injection paths"
-    ]
-  }
+  { "id": "SPK-AUTH-01", "status": "done", "title": "Create AuthConfig singleton" },
+  { "id": "SPK-AUTH-02", "status": "done", "title": "Simplify WibWobEngine to use AuthConfig" },
+  { "id": "SPK-AUTH-03", "status": "done", "title": "Make Scramble use AuthConfig" },
+  { "id": "SPK-AUTH-04", "status": "done", "title": "Surface auth errors in TUI" },
+  { "id": "SPK-AUTH-05", "status": "done", "title": "Clean up dead code" }
 ]
 ```
 
@@ -133,41 +79,14 @@ Claude Code Auth (SDK) is the default. It's free, it's what the user uses for Cl
 - AC-4: Status line shows LLM auth state  
   Test: visual check each mode
 
-## Post-Coding Refactor Sweeps
+## Files Changed
 
-After implementation, do fresh-eyes passes to catch legacy crud:
+- **New**: `app/llm/base/auth_config.h`, `app/llm/base/auth_config.cpp`
+- **Modified**: `app/wibwob_engine.cpp/.h`, `app/wibwob_view.cpp`, `app/scramble_engine.cpp/.h`, `app/test_pattern_app.cpp`, `app/llm/providers/claude_code_sdk_provider.cpp/.h`, `app/llm/providers/anthropic_api_provider.cpp`, `app/llm/base/llm_config.cpp`, `app/llm/config/llm_config.json`, `app/CMakeLists.txt`, `CLAUDE.md`, `README.md`
+- **Deleted**: `app/llm/providers/claude_code_provider.cpp/.h`, `app/llm/providers/anthropic_api_provider_broken.cpp`, `README-CLAUDE-CONFIG.md`
+- **Diff stats**: ~+1200 / −1800 lines (net reduction of ~600 lines)
 
-### Sweep 1: Dead code removal
-- grep for `anthropic_api_provider_broken`, `claude_code_provider`, `ApiConfig` — delete all references
-- grep for `OPENROUTER_API_KEY` — remove if unused
-- Check `llm_config.json` for stale provider entries
-- Check CMakeLists.txt for files that no longer exist
+## Known remaining items
 
-### Sweep 2: Docs and README cleanup
-- CLAUDE.md: remove any references to old provider names or multi-provider setup
-- README.md: simplify auth section — just "run `claude /login`"
-- Wib&Wob prompt: remove extradiegetic API key references
-- `.env.example` or `.env` templates: simplify to just optional `ANTHROPIC_API_KEY`
-- Remove debug fprintf lines added during provider development
-
-### Sweep 3: Config file cleanup
-- `llm_config.json`: should only have `claude_code_sdk` and `anthropic_api` (fallback)
-- Remove `claude_code` provider config section entirely
-- Remove any `apiKeyEnv` config fields that reference nonexistent env vars
-
-### Sweep 4: Test parity
-- Update contract tests if provider surface changed
-- Verify `test_window_type_parity.py` and `test_surface_parity_matrix.py` still pass
-- Add auth mode detection test (mock env vars, verify correct mode)
-
-### Sweep 5: Codex final review
-- Run Codex in read-only mode over the full diff
-- Ask: "any remaining references to deleted providers, stale comments, or TODO/FIXME related to auth?"
-
-## Notes from Codex Review
-
-- Use `--model haiku` not `claude-haiku` for CLI mode
-- Agent SDK `accountInfo()` can detect auth state proactively at session start
-- Agent SDK `auth_status` event type exists but bridge currently ignores it
-- Don't auto-downgrade to API key when both are present — Claude Code is richer
-- Installed SDK: `@anthropic-ai/claude-agent-sdk@0.1.56`
+- `probeClaudeAuth()` runs synchronously at startup (~1s). Acceptable since it's pre-TUI.
+- `AuthConfig::detect()` is not re-callable at runtime (if user runs `claude /login` while app is running). Could add `redetect()` in future.
