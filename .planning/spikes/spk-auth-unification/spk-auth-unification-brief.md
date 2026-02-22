@@ -23,12 +23,12 @@ One auth config. Both Wib&Wob Chat and Scramble Cat use it. No legacy paths.
 Detected at startup. Stored in a singleton. Both consumers read from it.
 
 ```
-1. If `claude` CLI is available and logged in → Claude Code Auth (SDK)
-2. If ANTHROPIC_API_KEY is set → API Key mode (direct curl)
+1. If `claude` CLI is available and logged in → Claude Code Auth (SDK) ← DEFAULT
+2. If ANTHROPIC_API_KEY is set → API Key mode (direct curl, fallback only)
 3. Otherwise → No Auth (disabled, show message)
 ```
 
-Claude Code Auth is preferred because it gives MCP tools, sessions, streaming. API key is fallback.
+Claude Code Auth (SDK) is the default. It's free, it's what the user uses for Claude Code and Pi, and it gives MCP tools, sessions, streaming. API key mode exists only as a fallback for environments without Claude CLI.
 
 ### Both consumers use the same mode
 
@@ -132,6 +132,37 @@ Claude Code Auth is preferred because it gives MCP tools, sessions, streaming. A
 
 - AC-4: Status line shows LLM auth state  
   Test: visual check each mode
+
+## Post-Coding Refactor Sweeps
+
+After implementation, do fresh-eyes passes to catch legacy crud:
+
+### Sweep 1: Dead code removal
+- grep for `anthropic_api_provider_broken`, `claude_code_provider`, `ApiConfig` — delete all references
+- grep for `OPENROUTER_API_KEY` — remove if unused
+- Check `llm_config.json` for stale provider entries
+- Check CMakeLists.txt for files that no longer exist
+
+### Sweep 2: Docs and README cleanup
+- CLAUDE.md: remove any references to old provider names or multi-provider setup
+- README.md: simplify auth section — just "run `claude /login`"
+- Wib&Wob prompt: remove extradiegetic API key references
+- `.env.example` or `.env` templates: simplify to just optional `ANTHROPIC_API_KEY`
+- Remove debug fprintf lines added during provider development
+
+### Sweep 3: Config file cleanup
+- `llm_config.json`: should only have `claude_code_sdk` and `anthropic_api` (fallback)
+- Remove `claude_code` provider config section entirely
+- Remove any `apiKeyEnv` config fields that reference nonexistent env vars
+
+### Sweep 4: Test parity
+- Update contract tests if provider surface changed
+- Verify `test_window_type_parity.py` and `test_surface_parity_matrix.py` still pass
+- Add auth mode detection test (mock env vars, verify correct mode)
+
+### Sweep 5: Codex final review
+- Run Codex in read-only mode over the full diff
+- Ask: "any remaining references to deleted providers, stale comments, or TODO/FIXME related to auth?"
 
 ## Notes from Codex Review
 
