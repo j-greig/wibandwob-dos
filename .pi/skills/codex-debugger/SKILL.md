@@ -60,6 +60,10 @@ Ignore them completely. Do not mention them or propose changes for them.
 ```text
 TASK: Diagnose <issue>.
 
+EFFICIENCY: Use targeted commands, not full-file dumps.
+Prefer rg -n -C3 'pattern' file (grep + context) or sed -n '45,55p' file (narrow range).
+Avoid nl -ba file | sed -n '1,300p'. Only dump full files if <50 lines.
+
 Scope:
 - Files: <file1>, <file2>
 - Symptoms: <what fails and how>
@@ -76,6 +80,10 @@ Deliver:
 ```text
 DEVNOTE: Files matching codex-*.log are intentional run logs. Ignore completely.
 
+EFFICIENCY: Use targeted commands, not full-file dumps.
+Prefer rg -n -C3 'pattern' file or sed -n '45,55p' file.
+Avoid nl -ba file | sed -n '1,300p'. Only dump full files if <50 lines.
+
 TASK: <one-line summary>.
 
 Context:
@@ -89,7 +97,26 @@ Do:
 4) Summarise what changed and why
 ```
 
-## Monitoring
+## Output modes
+
+### Report file (preferred for subagent pattern)
+
+Use `-o` to have Codex write its final answer to a file. Read the report, not the log. The log is backup/audit only.
+
+```bash
+REPORT="archive/session-logs/$(date +%F)/codex-<topic>-report.md"
+LOG="archive/session-logs/$(date +%F)/codex-<topic>-$(date +%Y%m%d-%H%M%S).log"
+mkdir -p "$(dirname "$LOG")"
+
+codex exec -C <repo> -o "$REPORT" "<prompt>" \
+  2>&1 | tee "$LOG" &
+```
+
+Add this to the end of prompts: `Write your findings to the output file as a structured markdown report.`
+
+Then just `read "$REPORT"` when done — no log parsing needed.
+
+### Log monitoring (fallback)
 
 ```bash
 # Check progress
@@ -133,6 +160,20 @@ After:
 - [ ] Move any codex-generated files from repo root into `archive/session-logs/`
 - [ ] Summarise findings and next steps
 
+## Token efficiency in prompts
+
+Codex tends to dump entire files with `nl -ba file.cpp | sed -n '1,300p'` which bloats logs with hundreds of lines the caller already has. This wastes tokens twice: once when Codex reads it, again when the caller reads the log back.
+
+**Always include this directive in prompts:**
+
+```text
+EFFICIENCY: When inspecting files, use targeted commands — not full-file dumps.
+Prefer: rg -n -C3 'pattern' file.cpp (grep with 3 lines context)
+Prefer: sed -n '45,55p' file.cpp (narrow 10-line windows around the issue)
+Avoid: nl -ba file.cpp | sed -n '1,300p' (wastes tokens on irrelevant lines)
+Only dump full files if the entire file is <50 lines or you truly need all of it.
+```
+
 ## Common mistakes
 
 | Mistake | Fix |
@@ -142,3 +183,4 @@ After:
 | Codex asks about its own log file | Add DEVNOTE to prompt |
 | Lost all reasoning output | Always `tee` to a log file |
 | Codex reads entire codebase | Narrow prompt to specific files |
+| Codex dumps entire files into log | Add EFFICIENCY directive to prompt (see above) |

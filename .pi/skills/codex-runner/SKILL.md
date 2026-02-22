@@ -59,6 +59,16 @@ CODEX_LOG_DIR=~/logs scripts/run.sh "..."         # redirect logs
 CODEX_REPO=/other/repo scripts/run.sh "..."       # different repo
 ```
 
+## Token efficiency
+
+Codex tends to dump entire files (`nl -ba file | sed -n '1,300p'`) which bloats logs. Add this to prompts:
+
+```text
+EFFICIENCY: Use targeted commands, not full-file dumps.
+Prefer rg -n -C3 'pattern' file or sed -n '45,55p' file.
+Avoid nl -ba file | sed -n '1,300p'. Only dump full files if <50 lines.
+```
+
 ## Common mistakes
 
 | Problem | Fix |
@@ -66,4 +76,5 @@ CODEX_REPO=/other/repo scripts/run.sh "..."       # different repo
 | Codex blocks mid-run | Always use `--impl` for background writes (sets `-a never`) |
 | Lost output | Log path is printed at start — always `tee`d |
 | Codex edits its own logs | Add DEVNOTE to top of implementation prompt |
+| Codex dumps entire files | Add EFFICIENCY directive to prompt |
 | Wrong repo | Set `CODEX_REPO` or run from the right directory |

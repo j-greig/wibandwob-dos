@@ -1,0 +1,499 @@
+OpenAI Codex v0.101.0 (research preview)
+--------
+workdir: /Users/james/Repos/wibandwob-dos
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: medium
+reasoning summaries: auto
+session id: 019c84f6-ba12-7661-84b9-d9ea8b1b8614
+--------
+user
+TASK: Diagnose Scramble cat blocking and a segfault in WibWob-DOS auth unification spike.
+
+## Issue 1: Scramble blocks TUI main loop
+
+ScrambleHaikuClient::askViaCli() and askViaCurl() both call popen() + synchronous fgets() loop on the Turbo Vision main event loop thread (test_pattern_app.cpp:~1674 calls scrambleEngine.ask(input) inline in onSubmit lambda).
+
+This freezes the entire TUI for 1-15 seconds while waiting for claude CLI or curl.
+
+The anthropic_api_provider.cpp already solved this pattern: non-blocking popen + fcntl(O_NONBLOCK) + poll() from the TV idle loop.
+
+Files to examine:
+- app/scramble_engine.h/cpp (ScrambleHaikuClient::ask/askViaCli/askViaCurl)
+- app/scramble_view.h/cpp (TScrambleWindow, timer events)
+- app/test_pattern_app.cpp:1598-1680 (onSubmit lambda)
+- app/llm/providers/anthropic_api_provider.cpp (reference async pattern)
+
+Propose the minimal change to make Scramble LLM calls non-blocking. Key constraints:
+- C++14 (no std::filesystem, no std::optional)
+- Turbo Vision event loop: use setTimer + handleEvent for polling, not threads
+- ScrambleHaikuClient is currently stateless per-call. It needs to become stateful (activePipe, outputBuffer, pendingCallback)
+- The onSubmit lambda should start the async call and return immediately
+- A poll() or timer tick should check for completion and display the response
+
+## Issue 2: Segfault after ~430 SDK messages
+
+Debug log: /tmp/wibwob_debug_postrefactor_postpromptupdate_3.log (44k lines)
+Last SDK message was #430 (tool result for creating browser window w16).
+Crash is zsh: segmentation fault.
+
+This may be the known streaming-thread use-after-free when TWibWobWindow is destroyed while the SDK processing thread is still running. The windowAlive_ atomic guard exists but may have a race.
+
+Files:
+- app/llm/providers/claude_code_sdk_provider.cpp (processStreamingThread, activeStreamCallback)
+- app/wibwob_view.cpp (~line 780: streaming callback captures 'this')
+
+Deliver:
+1. Scramble async design: which structs/methods to add, where poll() hooks in
+2. Segfault root cause hypothesis with file:line references
+3. Minimal fix for each
+mcp startup: no servers
+2026-02-22T10:48:07.997362Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c76ff-4405-7962-ae80-917da2e489f2
+2026-02-22T10:48:08.019385Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c84e5-edab-76e1-b0c0-96e4d21e2286
+
+thinking
+**Planning diagnosis and proposals**
+codex
+I’ll inspect the referenced files and trace the existing async pipe pattern in the Anthropic provider, then map the minimal changes into Scramble and the SDK streaming path.
+exec
+/bin/zsh -lc 'rg -n "ScrambleHaikuClient|askViaCli|askViaCurl|class TScrambleWindow|setTimer|onSubmit" app/scramble_engine.h app/scramble_engine.cpp app/scramble_view.h app/scramble_view.cpp app/test_pattern_app.cpp' in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "rg -n \"O_NONBLOCK|poll\\(|popen|activePipe|setTimer|handleEvent\" app/llm/providers/anthropic_api_provider.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "rg -n \"processStreamingThread|activeStreamCallback|windowAlive_|capture.*this|this\\]\" app/llm/providers/claude_code_sdk_provider.cpp app/wibwob_view.cpp" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+102:    // Start async execution (non-blocking read in poll()).
+103:    activePipe = popen(curlCmd.c_str(), "r");
+104:    if (!activePipe) {
+119:    int fd = fileno(activePipe);
+121:    fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+144:    if (activePipe) {
+145:        pclose(activePipe);
+146:        activePipe = nullptr;
+167:void AnthropicAPIProvider::poll() {
+168:    if (!busy || !activePipe) {
+174:    clearerr(activePipe);
+175:    size_t bytesRead = fread(buffer, 1, sizeof(buffer) - 1, activePipe);
+182:    if (feof(activePipe)) {
+183:        int exitCode = pclose(activePipe);
+184:        activePipe = nullptr;
+339:    FILE* pipe = popen(curlCmd.c_str(), "r");
+ succeeded in 51ms:
+app/scramble_engine.h:17:/* ScrambleHaikuClient - curl-based Haiku LLM calls        */
+app/scramble_engine.h:20:class ScrambleHaikuClient {
+app/scramble_engine.h:22:    ScrambleHaikuClient();
+app/scramble_engine.h:59:    std::string askViaCli(const std::string& question) const;
+app/scramble_engine.h:60:    std::string askViaCurl(const std::string& question) const;
+app/scramble_engine.h:86:    const ScrambleHaikuClient& haiku() const { return haikuClient; }
+app/scramble_engine.h:95:    ScrambleHaikuClient haikuClient;
+app/scramble_engine.cpp:18:/* ScrambleHaikuClient                                     */
+app/scramble_engine.cpp:21:ScrambleHaikuClient::ScrambleHaikuClient()
+app/scramble_engine.cpp:29:bool ScrambleHaikuClient::configure()
+app/scramble_engine.cpp:57:void ScrambleHaikuClient::setApiKey(const std::string& key)
+app/scramble_engine.cpp:64:bool ScrambleHaikuClient::canCall() const
+app/scramble_engine.cpp:71:void ScrambleHaikuClient::markCalled()
+app/scramble_engine.cpp:76:std::string ScrambleHaikuClient::buildSystemPrompt() const
+app/scramble_engine.cpp:87:std::string ScrambleHaikuClient::jsonEscape(const std::string& s)
+app/scramble_engine.cpp:105:std::string ScrambleHaikuClient::askViaCli(const std::string& question) const
+app/scramble_engine.cpp:151:std::string ScrambleHaikuClient::askViaCurl(const std::string& question) const
+app/scramble_engine.cpp:221:std::string ScrambleHaikuClient::ask(const std::string& question) const
+app/scramble_engine.cpp:226:        return askViaCli(question);
+app/scramble_engine.cpp:228:    return askViaCurl(question);
+ succeeded in 51ms:
+app/llm/providers/claude_code_sdk_provider.cpp:409:    activeStreamCallback = streamCallback;
+app/llm/providers/claude_code_sdk_provider.cpp:432:    processingThread = std::make_unique<std::thread>(&ClaudeCodeSDKProvider::processStreamingThread, this);
+app/llm/providers/claude_code_sdk_provider.cpp:437:void ClaudeCodeSDKProvider::processStreamingThread() {
+app/llm/providers/claude_code_sdk_provider.cpp:449:                if (activeStreamCallback) {
+app/llm/providers/claude_code_sdk_provider.cpp:450:                    activeStreamCallback(chunk);
+app/llm/providers/claude_code_sdk_provider.cpp:458:                if (activeStreamCallback) {
+app/llm/providers/claude_code_sdk_provider.cpp:459:                    activeStreamCallback(chunk);
+app/llm/providers/claude_code_sdk_provider.cpp:463:                activeStreamCallback = nullptr;
+app/llm/providers/claude_code_sdk_provider.cpp:472:                if (activeStreamCallback) {
+app/llm/providers/claude_code_sdk_provider.cpp:473:                    activeStreamCallback(chunk);
+app/llm/providers/claude_code_sdk_provider.cpp:477:                activeStreamCallback = nullptr;
+app/llm/providers/claude_code_sdk_provider.cpp:509:    if (activeStreamCallback) {
+app/llm/providers/claude_code_sdk_provider.cpp:513:        activeStreamCallback(chunk);
+app/llm/providers/claude_code_sdk_provider.cpp:514:        activeStreamCallback = nullptr;
+app/wibwob_view.cpp:547:    inputView->onSubmit = [this](const std::string& input) {
+app/wibwob_view.cpp:558:    windowAlive_.store(false);
+app/wibwob_view.cpp:787:        if (!windowAlive_.load()) return;
+
+thinking
+**Planning quick content inspection**
+codex
+I found the exact hooks. Next I’ll read the relevant code blocks around those call sites to confirm lifecycle and where the timer poll should attach.
+exec
+/bin/zsh -lc "nl -ba app/scramble_engine.cpp | sed -n '1,320p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba app/scramble_engine.h | sed -n '1,180p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba app/test_pattern_app.cpp | sed -n '1588,1705p'" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+     1	/*---------------------------------------------------------*/
+     2	/*                                                         */
+     3	/*   scramble_engine.h - Scramble Brain                    */
+     4	/*   Slash commands + Haiku LLM chat                       */
+     5	/*                                                         */
+     6	/*---------------------------------------------------------*/
+     7	
+     8	#ifndef SCRAMBLE_ENGINE_H
+     9	#define SCRAMBLE_ENGINE_H
+    10	
+    11	#include <string>
+    12	#include <vector>
+    13	#include <ctime>
+    14	#include <cstdlib>
+    15	
+    16	/*---------------------------------------------------------*/
+    17	/* ScrambleHaikuClient - curl-based Haiku LLM calls        */
+    18	/*---------------------------------------------------------*/
+    19	
+    20	class ScrambleHaikuClient {
+ succeeded in 51ms:
+     1	/*---------------------------------------------------------*/
+     2	/*                                                         */
+     3	/*   scramble_engine.cpp - Scramble Brain                  */
+     4	/*   Slash commands + Haiku LLM chat                       */
+     5	/*                                                         */
+     6	/*---------------------------------------------------------*/
+     7	
+     8	#include "scramble_engine.h"
+     9	#include "command_registry.h"
+    10	#include "llm/base/auth_config.h"
+    11	
+    12	#include <cstdio>
+    13	#include <cstring>
+    14	#include <fstream>
+    15	#include <sstream>
+    16	
+    17	/*---------------------------------------------------------*/
+    18	/* ScrambleHaikuClient                                     */
+    19	/*---------------------------------------------------------*/
+    20	
+ succeeded in 51ms:
+  1588	void TTestPatternApp::newBrowserWindow(const TRect& bounds)
+  1589	{
+  1590	    TWindow* window = createBrowserWindow(bounds);
+  1591	    deskTop->insert(window);
+  1592	    registerWindow(window);
+  1593	    if (auto* browser = dynamic_cast<TBrowserWindow*>(window))
+  1594	        browser->fetchUrl("https://symbient.life");
+  1595	}
+  1596	
+  1597	void TTestPatternApp::wireScrambleInput()
+  1598	{
+  1599	    if (!scrambleWindow || !scrambleWindow->getInputView()) return;
+  1600	
+  1601	    scrambleWindow->getInputView()->onSubmit = [this](const std::string& input) {
+  1602	        if (!scrambleWindow) return;
+  1603	
+  1604	        // Add user message to history
+  1605	        if (scrambleWindow->getMessageView()) {
+  1606	            scrambleWindow->getMessageView()->addMessage("you", input);
+  1607	        }
+
+thinking
+**Planning event timer completion**
+codex
+I’ve confirmed the blocking call is exactly inline in the submit lambda. Next I’m checking `TScrambleWindow` timer handling to place a poll hook without introducing another event source.
+exec
+/bin/zsh -lc "nl -ba app/scramble_view.h | sed -n '1,320p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba app/scramble_view.cpp | sed -n '1,760p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba app/llm/providers/anthropic_api_provider.cpp | sed -n '1,260p'" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+     1	/*---------------------------------------------------------*/
+     2	/*                                                         */
+     3	/*   scramble_view.h - Scramble the Symbient Cat           */
+     4	/*   ASCII cat presence with speech bubbles                */
+     5	/*                                                         */
+     6	/*---------------------------------------------------------*/
+     7	
+     8	#ifndef SCRAMBLE_VIEW_H
+     9	#define SCRAMBLE_VIEW_H
+    10	
+    11	#define Uses_TRect
+    12	#define Uses_TView
+    13	#define Uses_TDrawBuffer
+    14	#define Uses_TEvent
+    15	#define Uses_TWindow
+    16	#define Uses_TFrame
+    17	#define Uses_TKeys
+    18	#define Uses_TProgram
+    19	#define Uses_TDeskTop
+    20	#define Uses_TBackground
+ succeeded in 52ms:
+     1	/*---------------------------------------------------------*/
+     2	/*                                                         */
+     3	/*   scramble_view.cpp - Scramble the Symbient Cat         */
+     4	/*   ASCII cat presence with speech bubbles                */
+     5	/*   + expand states: smol / tall with message history     */
+     6	/*                                                         */
+     7	/*---------------------------------------------------------*/
+     8	
+     9	#include "scramble_view.h"
+    10	#include "scramble_engine.h"
+    11	#include <algorithm>
+    12	#include <cstdlib>
+    13	#include <ctime>
+    14	
+    15	/*---------------------------------------------------------*/
+    16	/* Cat Art - static string art per pose                    */
+    17	/*---------------------------------------------------------*/
+    18	
+    19	static const std::vector<std::string> catDefault = {
+    20	    "   /\\_/\\   ",
+ succeeded in 51ms:
+     1	/*---------------------------------------------------------*/
+     2	/*                                                         */
+     3	/*   anthropic_api_provider_simple.cpp - Simple Version   */
+     4	/*                                                         */
+     5	/*---------------------------------------------------------*/
+     6	
+     7	#include "anthropic_api_provider.h"
+     8	#include "../base/llm_provider_factory.h"
+     9	
+    10	#include <cstdio>
+    11	#include <cstdlib>
+    12	#include <memory>
+    13	#include <sstream>
+    14	#include <chrono>
+    15	#include <fstream>
+    16	#include <algorithm>
+    17	#include <fcntl.h>
+    18	#include <unistd.h>
+    19	
+    20	// Register this provider with the factory
+
+thinking
+**Inspecting streaming callback internals**
+codex
+I have the Scramble side. Next I’ll trace the SDK streaming callback ownership and teardown path to pin the use-after-free window.
+exec
+/bin/zsh -lc "nl -ba app/wibwob_view.cpp | sed -n '520,860p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba app/llm/providers/claude_code_sdk_provider.cpp | sed -n '360,560p'" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+   520	    insert(messagePane);
+   521	
+   522	    // Input view: 2 lines at bottom (status + input)
+   523	    TRect inputRect = client;
+   524	    inputRect.a.y = inputRect.b.y - 2;
+   525	    inputView = new TWibWobInputView(inputRect);
+   526	    inputView->growMode = gfGrowHiX | gfGrowLoY | gfGrowHiY;
+   527	    insert(inputView);
+   528	
+   529	    // Inside the message pane: dedicated scrollbar and scroller
+   530	    TRect paneBounds = messagePane->getExtent();
+   531	    paneBounds.move(-paneBounds.a.x, -paneBounds.a.y);
+   532	
+   533	    TRect sbRect = paneBounds;
+   534	    sbRect.a.x = sbRect.b.x - 1;
+   535	    vScrollBar = new TScrollBar(sbRect);
+   536	    vScrollBar->options |= ofPostProcess; // Allow keyboard to reach the bar (sbHandleKeyboard equivalent)
+   537	    vScrollBar->growMode = gfGrowLoX | gfGrowHiX | gfGrowHiY;
+   538	    messagePane->insert(vScrollBar);
+   539	
+ succeeded in 51ms:
+   360	                
+   361	                // Extract session ID (simplified JSON parsing)
+   362	                size_t idPos = response.find("\"sessionId\":\"");
+   363	                if (idPos != std::string::npos) {
+   364	                    idPos += 13; // Length of "sessionId":"
+   365	                    size_t endPos = response.find("\"", idPos);
+   366	                    if (endPos != std::string::npos) {
+   367	                        currentSessionId = response.substr(idPos, endPos - idPos);
+   368	                    }
+   369	                }
+   370	                
+   371	                return true;
+   372	            } else if (response.find("BRIDGE_READY") != std::string::npos) {
+   373	                // Bridge is alive, capabilities fetch + SDK init in progress.
+   374	                // Keep waiting for SESSION_STARTED.
+   375	                fprintf(stderr, "[SDK] Bridge ready, waiting for session...\n");
+   376	                continue;
+   377	            } else if (response.find("ERROR") != std::string::npos) {
+   378	                setError("Session start failed: " + response);
+   379	                return false;
+
+thinking
+**Planning inspection of provider header**
+codex
+The callback does capture `this` directly and runs from the provider thread. I’m checking the provider destructor and callback storage type next, because the race likely includes an unsynchronized callback pointer.
+exec
+/bin/zsh -lc "nl -ba app/llm/providers/claude_code_sdk_provider.h | sed -n '1,280p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc 'rg -n "~ClaudeCodeSDKProvider|activeStreamCallback|std::function|processingActive|shouldCancel|mutex" app/llm/providers/claude_code_sdk_provider.h app/llm/providers/claude_code_sdk_provider.cpp' in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+     1	/*---------------------------------------------------------*/
+     2	/*                                                         */
+     3	/*   claude_code_sdk_provider.h - Claude Code SDK Provider*/
+     4	/*   Streaming mode with customSystemPrompt support       */
+     5	/*                                                         */
+     6	/*---------------------------------------------------------*/
+     7	
+     8	#ifndef CLAUDE_CODE_SDK_PROVIDER_H
+     9	#define CLAUDE_CODE_SDK_PROVIDER_H
+    10	
+    11	#include "../base/illm_provider.h"
+    12	#include <string>
+    13	#include <memory>
+    14	#include <functional>
+    15	#include <thread>
+    16	#include <atomic>
+    17	#include <queue>
+    18	#include <mutex>
+    19	#include <condition_variable>
+    20	
+ succeeded in 51ms:
+app/llm/providers/claude_code_sdk_provider.cpp:208:ClaudeCodeSDKProvider::~ClaudeCodeSDKProvider() {
+app/llm/providers/claude_code_sdk_provider.cpp:409:    activeStreamCallback = streamCallback;
+app/llm/providers/claude_code_sdk_provider.cpp:427:        processingActive.store(false);
+app/llm/providers/claude_code_sdk_provider.cpp:431:    processingActive.store(true);
+app/llm/providers/claude_code_sdk_provider.cpp:438:    while (processingActive.load() && !shouldCancel.load()) {
+app/llm/providers/claude_code_sdk_provider.cpp:449:                if (activeStreamCallback) {
+app/llm/providers/claude_code_sdk_provider.cpp:450:                    activeStreamCallback(chunk);
+app/llm/providers/claude_code_sdk_provider.cpp:458:                if (activeStreamCallback) {
+app/llm/providers/claude_code_sdk_provider.cpp:459:                    activeStreamCallback(chunk);
+app/llm/providers/claude_code_sdk_provider.cpp:463:                activeStreamCallback = nullptr;
+app/llm/providers/claude_code_sdk_provider.cpp:472:                if (activeStreamCallback) {
+app/llm/providers/claude_code_sdk_provider.cpp:473:                    activeStreamCallback(chunk);
+app/llm/providers/claude_code_sdk_provider.cpp:477:                activeStreamCallback = nullptr;
+app/llm/providers/claude_code_sdk_provider.cpp:485:    processingActive.store(false);
+app/llm/providers/claude_code_sdk_provider.cpp:501:    shouldCancel.store(true);
+app/llm/providers/claude_code_sdk_provider.cpp:509:    if (activeStreamCallback) {
+app/llm/providers/claude_code_sdk_provider.cpp:513:        activeStreamCallback(chunk);
+app/llm/providers/claude_code_sdk_provider.cpp:514:        activeStreamCallback = nullptr;
+app/llm/providers/claude_code_sdk_provider.cpp:517:    shouldCancel.store(false);
+app/llm/providers/claude_code_sdk_provider.cpp:537:        processingActive.store(false);
+
+thinking
+**Inspecting potential destructor location**
+codex
+I also need the provider destructor/reset path around `~ClaudeCodeSDKProvider()` to validate whether teardown joins before the callback target is destroyed.
+exec
+/bin/zsh -lc "nl -ba app/llm/providers/claude_code_sdk_provider.cpp | sed -n '180,250p'" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+   180	        return true;
+   181	    }
+   182	    
+   183	    std::string readResponse() {
+   184	        if (!active || !output) return "";
+   185	        
+   186	        char buffer[4096];
+   187	        if (fgets(buffer, sizeof(buffer), output)) {
+   188	            std::string result(buffer);
+   189	            if (!result.empty() && result.back() == '\n') {
+   190	                result.pop_back();
+   191	            }
+   192	            return result;
+   193	        }
+   194	        return "";
+   195	    }
+   196	};
+   197	
+   198	ClaudeCodeSDKProvider::ClaudeCodeSDKProvider() 
+   199	    : nodeBridge(std::make_unique<NodeBridge>()) {
+
+thinking
+**Analyzing unsafe UI callback threading and UAF risks**
+codex
+I’ve got enough for the blocking path. I’m reading the rest of `ScrambleEngine::ask()` to preserve the current slash/rate-limit/fallback behaviour in the async version.
+exec
+/bin/zsh -lc "nl -ba app/scramble_engine.cpp | sed -n '300,420p'" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+   300	
+   301	    return "unknown: /" + cmd + " — try /help (=^..^=)";
+   302	}
+   303	
+   304	std::string ScrambleEngine::ask(const std::string& input)
+   305	{
+   306	    if (input.empty()) return "";
+   307	
+   308	    // Slash commands are instant — no LLM needed.
+   309	    if (input[0] == '/') {
+   310	        fprintf(stderr, "[scramble] slash command: %s\n", input.c_str());
+   311	        return handleSlashCommand(input);
+   312	    }
+   313	
+   314	    fprintf(stderr, "[scramble] ask: haiku_available=%d can_call=%d input=%.40s\n",
+   315	            haikuClient.isAvailable() ? 1 : 0,
+   316	            haikuClient.canCall() ? 1 : 0,
+   317	            input.c_str());
+   318	
+   319	    // Free text → Haiku.
+
+thinking
+**Searching scramble timer hook**
+codex
+I need one more pass through the app’s timer loop to see where Scramble polling can be integrated with minimum surface area (existing timer vs new timer).
+exec
+/bin/zsh -lc 'rg -n "cmTimerExpired|scrambleWindow|wireScrambleInput|scrambleEngine" app/test_pattern_app.cpp | head -n 80' in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+715:    TScrambleWindow* scrambleWindow;
+716:    ScrambleEngine scrambleEngine;
+720:    void wireScrambleInput();
+891:    scrambleWindow(nullptr),
+927:    scrambleEngine.init(".");
+1597:void TTestPatternApp::wireScrambleInput()
+1599:    if (!scrambleWindow || !scrambleWindow->getInputView()) return;
+1601:    scrambleWindow->getInputView()->onSubmit = [this](const std::string& input) {
+1602:        if (!scrambleWindow) return;
+1605:        if (scrambleWindow->getMessageView()) {
+1606:            scrambleWindow->getMessageView()->addMessage("you", input);
+1659:                        if (scrambleWindow->getView()) {
+1660:                            scrambleWindow->getView()->say(ack);
+1662:                        if (scrambleWindow->getMessageView()) {
+1663:                            scrambleWindow->getMessageView()->addMessage("scramble", ack);
+1673:        std::string response = scrambleEngine.ask(input);
+1679:        if (scrambleWindow->getView()) {
+1680:            scrambleWindow->getView()->setPose(spCurious);
+1681:            scrambleWindow->getView()->say(response);
+1683:        if (scrambleWindow->getMessageView()) {
+
+thinking
+**Inspecting existing timer handling**
+exec
+/bin/zsh -lc "rg -n \"cmTimerExpired|setTimer\\(\" app/test_pattern_app.cpp | sed -n '1,120p'" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+
+
+thinking
+**Planning nonblocking polling integration**
+codex
+There’s another direct `scrambleEngine.ask(...)` path in the registry command handler (`scramble_say` helper around `test_pattern_app.cpp:2621`). I’m checking it so the “minimal fix” doesn’t leave a second blocking entry point.
+exec
+/bin/zsh -lc "nl -ba app/test_pattern_app.cpp | sed -n '2598,2668p'" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+  2598	    TTransparentTextWindow* window = new TTransparentTextWindow(r, title, path);
+  2599	    app.deskTop->insert(window);
+  2600	    app.registerWindow(window);
+  2601	}
+  2602	
+  2603	void api_open_animation_path(TTestPatternApp& app, const std::string& path, const TRect* bounds) {
+  2604	    if (bounds) {
+  2605	        app.openAnimationFilePath(path, *bounds);
+  2606	    } else {
+  2607	        app.openAnimationFilePath(path);
+  2608	    }
+  2609	}
+  2610	
+  2611	void api_cascade(TTestPatternApp& app) { app.cascade(); }
+  2612	void api_toggle_scramble(TTestPatternApp& app) { app.toggleScramble(); }
+  2613	void api_expand_scramble(TTestPatternApp& app) { app.toggleScrambleExpand(); }
+  2614	
+  2615	std::string api_scramble_say(TTestPatternApp& app, const std::string& text) {
+  2616	    if (!app.scrambleWindow) return "err scramble not open";
+  2617	    // Simulate user sending a message — same as onSubmit
+
+thinking
+**Outlining minimal thread-safety fixes**
+codex
+The crash diagnosis is already visible from code, but I’m going to glance at the tail of the provided log to confirm the last event aligns with the streaming callback path.
+exec
+/bin/zsh -lc 'tail -n 80 /tmp/wibwob_debug_postrefactor_postpromptupdate_3.log' in /Users/james/Repos/wibandwob-dos succeeded in 53ms:
+}
+=== END SDK MESSAGE DEBUG ===
+=== SDK MESSAGE DEBUG #427 ===
+Message type: stream_event
+Message data: {
+  "type": "stream_event",
+  "event": {
+    "type": "content_block_stop",
+    "index": 3
+  },
+  "session_id": "d0e0ae96-5af1-420a-83ca-5eabfacb8cd1",
+  "parent_tool_use_id": null,
+  "uuid": "25c81681-a154-416e-b43c-bacbc02b4f57"
+}
+=== END SDK MESSAGE DEBUG ===
+=== SDK MESSAGE DEBUG #428 ===
+Message type: stream_event
+Message data: {
+  "type": "stream_event",
+  "event": {

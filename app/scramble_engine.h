@@ -10,26 +10,35 @@
 
 #include <string>
 #include <vector>
+#include <functional>
 #include <ctime>
 #include <cstdlib>
+#include <cstdio>
 
 /*---------------------------------------------------------*/
-/* ScrambleHaikuClient - curl-based Haiku LLM calls        */
+/* ScrambleHaikuClient - curl/CLI Haiku LLM calls          */
 /*---------------------------------------------------------*/
 
 class ScrambleHaikuClient {
 public:
     ScrambleHaikuClient();
+    ~ScrambleHaikuClient();
 
-    // Configure from environment. Returns true if API key found.
+    // Configure from AuthConfig singleton. Returns true if auth available.
     bool configure();
 
     // Set key directly at runtime (e.g. from Tools > API Key dialog).
     void setApiKey(const std::string& key);
 
-    // Send a question to Haiku. Returns response text, or empty on failure.
-    // Blocks until curl completes (typically 1-3 seconds).
+    // Synchronous ask (BLOCKS — only use from tests or background threads).
     std::string ask(const std::string& question) const;
+
+    // Async ask: starts subprocess, returns immediately. Call poll() from event loop.
+    using ResponseCallback = std::function<void(const std::string&)>;
+    bool startAsync(const std::string& question, ResponseCallback callback);
+    void poll();       // Non-blocking check for completion
+    bool isBusy() const { return activePipe != nullptr; }
+    void cancelAsync();
 
     // Check if client is usable (API key or CLI mode).
     bool isAvailable() const { return !apiKey.empty() || useCliMode; }
@@ -52,12 +61,25 @@ private:
     bool useCliMode = false;
     std::string claudeCliPath;
 
+    // Async state
+    FILE* activePipe = nullptr;
+    std::string outputBuffer;
+    ResponseCallback pendingCallback;
+    bool asyncIsCliMode = false;  // Which backend the active pipe uses
+
     // Scramble system prompt (personality + context).
     std::string buildSystemPrompt() const;
 
-    // Backend-specific ask implementations.
+    // Backend-specific command builders (return the popen command string).
+    std::string buildCliCommand(const std::string& question) const;
+    std::string buildCurlCommand(const std::string& question) const;
+
+    // Synchronous implementations (kept for tests).
     std::string askViaCli(const std::string& question) const;
     std::string askViaCurl(const std::string& question) const;
+
+    // Parse curl JSON response → text.
+    std::string parseCurlResponse(const std::string& raw) const;
 
     // JSON helpers.
     static std::string jsonEscape(const std::string& s);
@@ -74,10 +96,20 @@ public:
     // Initialise: load command list, configure Haiku client.
     void init(const std::string& projectRoot);
 
-    // Process user input.
-    // - Starts with '/'  → slash command (instant, preset response)
-    // - Everything else  → Haiku API (or fallback if no key)
+    // Synchronous process user input (blocks on LLM — use askAsync instead).
     std::string ask(const std::string& input);
+
+    // Async ask: starts LLM call, returns "" for slash commands handled inline,
+    // or starts async and returns empty. Callback fires when done.
+    // Returns true if async started, false if handled synchronously (check syncResult).
+    bool askAsync(const std::string& input, std::string& syncResult,
+                  ScrambleHaikuClient::ResponseCallback callback);
+
+    // Poll async completion. Call from timer/idle loop.
+    void poll();
+
+    // Is the engine waiting for an async LLM response?
+    bool isBusy() const { return haikuClient.isBusy(); }
 
     // Get an idle observation (for unprompted speech).
     std::string idleObservation();

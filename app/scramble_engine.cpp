@@ -13,6 +13,8 @@
 #include <cstring>
 #include <fstream>
 #include <sstream>
+#include <fcntl.h>
+#include <unistd.h>
 
 /*---------------------------------------------------------*/
 /* ScrambleHaikuClient                                     */
@@ -24,6 +26,11 @@ ScrambleHaikuClient::ScrambleHaikuClient()
       maxTokens(200),
       lastCallTime(0)
 {
+}
+
+ScrambleHaikuClient::~ScrambleHaikuClient()
+{
+    cancelAsync();
 }
 
 bool ScrambleHaikuClient::configure()
@@ -229,6 +236,164 @@ std::string ScrambleHaikuClient::ask(const std::string& question) const
 }
 
 /*---------------------------------------------------------*/
+/* Async LLM calls (non-blocking popen + poll)             */
+/*---------------------------------------------------------*/
+
+std::string ScrambleHaikuClient::buildCliCommand(const std::string& question) const
+{
+    std::string sysPrompt = buildSystemPrompt();
+    std::ostringstream cmd;
+    cmd << claudeCliPath << " -p --model haiku --output-format text";
+    cmd << " --append-system-prompt \"";
+    for (char c : sysPrompt) {
+        if (c == '"' || c == '\\' || c == '$' || c == '`') cmd << '\\';
+        cmd << c;
+    }
+    cmd << "\" \"";
+    for (char c : question) {
+        if (c == '"' || c == '\\' || c == '$' || c == '`') cmd << '\\';
+        cmd << c;
+    }
+    cmd << "\" 2>/dev/null";
+    return cmd.str();
+}
+
+std::string ScrambleHaikuClient::buildCurlCommand(const std::string& question) const
+{
+    std::string sysPrompt = buildSystemPrompt();
+    std::ostringstream json;
+    json << "{\n";
+    json << "  \"model\": \"" << model << "\",\n";
+    json << "  \"max_tokens\": " << maxTokens << ",\n";
+    json << "  \"system\": \"" << jsonEscape(sysPrompt) << "\",\n";
+    json << "  \"messages\": [\n";
+    json << "    {\"role\": \"user\", \"content\": \"" << jsonEscape(question) << "\"}\n";
+    json << "  ]\n";
+    json << "}\n";
+
+    std::string tempFile = "/tmp/scramble_haiku.json";
+    {
+        std::ofstream out(tempFile);
+        out << json.str();
+    }
+
+    std::string cmd = "curl -sS --max-time 15 ";
+    cmd += "-H \"Content-Type: application/json\" ";
+    cmd += "-H \"x-api-key: " + apiKey + "\" ";
+    cmd += "-H \"anthropic-version: 2023-06-01\" ";
+    cmd += "-X POST \"" + endpoint + "\" ";
+    cmd += "--data @" + tempFile + " 2>/dev/null";
+    return cmd;
+}
+
+std::string ScrambleHaikuClient::parseCurlResponse(const std::string& raw) const
+{
+    if (raw.empty()) return "";
+    size_t textPos = raw.find("\"text\":");
+    if (textPos == std::string::npos) return "";
+    size_t start = raw.find("\"", textPos + 7);
+    if (start == std::string::npos) return "";
+    start++;
+    std::string result;
+    for (size_t i = start; i < raw.size(); ++i) {
+        if (raw[i] == '\\' && i + 1 < raw.size()) {
+            char next = raw[i + 1];
+            if (next == '"') { result += '"'; i++; }
+            else if (next == 'n') { result += '\n'; i++; }
+            else if (next == '\\') { result += '\\'; i++; }
+            else if (next == 't') { result += '\t'; i++; }
+            else { result += raw[i]; }
+        } else if (raw[i] == '"') {
+            break;
+        } else {
+            result += raw[i];
+        }
+    }
+    return result;
+}
+
+bool ScrambleHaikuClient::startAsync(const std::string& question, ResponseCallback callback)
+{
+    if (activePipe) return false;  // Already busy
+    if (!isAvailable()) return false;
+
+    std::string cmd;
+    if (useCliMode) {
+        cmd = buildCliCommand(question);
+        asyncIsCliMode = true;
+    } else {
+        cmd = buildCurlCommand(question);
+        asyncIsCliMode = false;
+    }
+
+    fprintf(stderr, "[scramble] async start: %.80s...\n", cmd.c_str());
+
+    activePipe = popen(cmd.c_str(), "r");
+    if (!activePipe) {
+        fprintf(stderr, "[scramble] async popen failed\n");
+        return false;
+    }
+
+    // Set non-blocking
+    int fd = fileno(activePipe);
+    int flags = fcntl(fd, F_GETFL, 0);
+    fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+
+    outputBuffer.clear();
+    pendingCallback = callback;
+    return true;
+}
+
+void ScrambleHaikuClient::poll()
+{
+    if (!activePipe) return;
+
+    char buffer[4096];
+    clearerr(activePipe);
+    size_t bytesRead = fread(buffer, 1, sizeof(buffer) - 1, activePipe);
+    if (bytesRead > 0) {
+        buffer[bytesRead] = '\0';
+        outputBuffer += buffer;
+    }
+
+    if (feof(activePipe)) {
+        int exitCode = pclose(activePipe);
+        activePipe = nullptr;
+
+        std::string result;
+        if (exitCode == 0 && !outputBuffer.empty()) {
+            if (asyncIsCliMode) {
+                // CLI output is plain text
+                result = outputBuffer;
+                while (!result.empty() && (result.back() == '\n' || result.back() == '\r'))
+                    result.pop_back();
+            } else {
+                // Curl output is JSON
+                result = parseCurlResponse(outputBuffer);
+            }
+        }
+
+        fprintf(stderr, "[scramble] async done: exit=%d result_len=%zu\n",
+                exitCode, result.size());
+
+        outputBuffer.clear();
+        ResponseCallback cb = pendingCallback;
+        pendingCallback = nullptr;
+        if (cb) cb(result);
+    }
+}
+
+void ScrambleHaikuClient::cancelAsync()
+{
+    if (activePipe) {
+        pclose(activePipe);
+        activePipe = nullptr;
+    }
+    outputBuffer.clear();
+    pendingCallback = nullptr;
+}
+
+/*---------------------------------------------------------*/
 /* ScrambleEngine                                          */
 /*---------------------------------------------------------*/
 
@@ -335,6 +500,54 @@ std::string ScrambleEngine::ask(const std::string& input)
 
     // Rate-limited.
     return "... /ᐠ- -ᐟ\\";
+}
+
+bool ScrambleEngine::askAsync(const std::string& input, std::string& syncResult,
+                              ScrambleHaikuClient::ResponseCallback callback)
+{
+    syncResult.clear();
+
+    if (input.empty()) return false;
+
+    // Slash commands are instant — handle synchronously.
+    if (input[0] == '/') {
+        fprintf(stderr, "[scramble] slash command: %s\n", input.c_str());
+        syncResult = handleSlashCommand(input);
+        return false;  // Not async
+    }
+
+    // No LLM available — synchronous fallback.
+    if (!haikuClient.isAvailable()) {
+        syncResult = "... (no auth — Help > LLM Status) /ᐠ- -ᐟ\\";
+        return false;
+    }
+
+    // Rate-limited — synchronous fallback.
+    if (!haikuClient.canCall()) {
+        syncResult = "... /ᐠ- -ᐟ\\";
+        return false;
+    }
+
+    fprintf(stderr, "[scramble] askAsync: starting non-blocking haiku call\n");
+    haikuClient.markCalled();
+
+    // Wrap callback with voice filter
+    auto filteredCallback = [this, callback](const std::string& raw) {
+        std::string result = raw;
+        if (result.empty()) {
+            result = "... /ᐠ- -ᐟ\\";
+        } else {
+            result = voiceFilter(result);
+        }
+        if (callback) callback(result);
+    };
+
+    return haikuClient.startAsync(input, filteredCallback);
+}
+
+void ScrambleEngine::poll()
+{
+    haikuClient.poll();
 }
 
 std::string ScrambleEngine::idleObservation()
