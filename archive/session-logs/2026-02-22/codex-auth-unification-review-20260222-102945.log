@@ -1,0 +1,412 @@
+OpenAI Codex v0.101.0 (research preview)
+--------
+workdir: /Users/james/Repos/wibandwob-dos
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: medium
+reasoning summaries: auto
+session id: 019c84e5-edab-76e1-b0c0-96e4d21e2286
+--------
+user
+TASK: Review the auth unification spike (commit bb4bbe6 on branch spike/spk-auth-unification).
+
+Context: We unified all LLM auth into a single AuthConfig singleton. Both WibWobEngine (C++ SDK chat) and ScrambleEngine (curl/CLI haiku cat) now read from it. Dead providers (claude_code, openrouter, anthropic_api_provider_broken) were deleted. Silent SDK→CLI fallback removed.
+
+Files changed:
+- app/llm/base/auth_config.h + .cpp (NEW)
+- app/llm/base/llm_config.cpp (cleaned defaults, removed openrouter/claude_code)
+- app/llm/config/llm_config.json (simplified)
+- app/llm/providers/claude_code_sdk_provider.cpp (removed fallback)
+- app/wibwob_engine.cpp (AuthConfig-driven provider selection)
+- app/wibwob_view.cpp (NoAuth guard, removed CLI provider path)
+- app/scramble_engine.h + .cpp (CLI mode via AuthConfig)
+- app/test_pattern_app.cpp (AuthConfig::detect() at startup, LLM status line)
+- app/CMakeLists.txt (removed claude_code_provider.cpp, added auth_config.cpp)
+
+Check for:
+1. Any remaining references to deleted providers (claude_code_provider, anthropic_api_provider_broken, openrouter)
+2. Stale comments or TODO/FIXME related to auth
+3. Missing includes or forward declarations that would break other build targets
+4. Logic errors in AuthConfig detection (e.g. race conditions, missing null checks)
+5. ScrambleHaikuClient::askViaCli shell injection risks
+6. Any broken patterns in the WibWobEngine loadConfiguration rewrite
+
+Deliver: findings list with file:line references and severity (critical/medium/low).
+mcp startup: no servers
+2026-02-22T10:29:47.089513Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c76ff-4405-7962-ae80-917da2e489f2
+
+thinking
+**Preparing commit review**
+codex
+Reviewing commit `bb4bbe6` for auth unification regressions and cleanup issues. I’ll inspect the diff and changed files first, then check the specific risk areas you listed (deleted provider references, auth detection logic, CLI injection, and the WibWobEngine config rewrite).
+exec
+/bin/zsh -lc 'git rev-parse --abbrev-ref HEAD' in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc 'git show --stat --oneline --name-only bb4bbe6' in /Users/james/Repos/wibandwob-dos succeeded in 53ms:
+spike/spk-auth-unification
+ succeeded in 53ms:
+bb4bbe6 spike(llm): unified AuthConfig singleton for all LLM consumers
+.planning/spikes/spk-auth-unification/spk-auth-unification-brief.md
+app/CMakeLists.txt
+app/llm/base/auth_config.cpp
+app/llm/base/auth_config.h
+app/llm/base/llm_config.cpp
+app/llm/config/llm_config.json
+app/llm/providers/anthropic_api_provider_broken.cpp
+app/llm/providers/claude_code_provider.cpp
+app/llm/providers/claude_code_provider.h
+app/llm/providers/claude_code_sdk_provider.cpp
+app/scramble_engine.cpp
+app/scramble_engine.h
+app/test_pattern_app.cpp
+app/wibwob_engine.cpp
+app/wibwob_view.cpp
+
+thinking
+**Reviewing commit diff and references**
+codex
+I confirmed the branch/commit. Next I’m pulling the full patch and running a repo-wide search for deleted provider names to catch any leftovers outside the touched files.
+exec
+/bin/zsh -lc 'git show --unified=3 --no-color bb4bbe6' in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "rg -n \"claude_code_provider|anthropic_api_provider_broken|openrouter|claude_code\\b\" app | head -200" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+commit bb4bbe6fe783b46fd3a465d9989adc5b6ab697c9
+Author: James Greig <3stripe@gmail.com>
+Date:   Sun Feb 22 10:29:22 2026 +0000
+
+    spike(llm): unified AuthConfig singleton for all LLM consumers
+    
+    - SPK-AUTH-01: AuthConfig singleton detects ClaudeCode/ApiKey/NoAuth at startup
+    - SPK-AUTH-02: WibWobEngine uses AuthConfig instead of multi-provider fallback cascade
+    - SPK-AUTH-03: ScrambleHaikuClient uses AuthConfig; CLI mode for Claude Code auth
+    - SPK-AUTH-04: Status line shows LLM ON/LLM KEY/LLM OFF; chat shows auth errors
+    - SPK-AUTH-05: Delete claude_code_provider, anthropic_api_provider_broken, openrouter;
+      remove silent SDK→CLI fallback; clean llm_config.json
+    
+    All 4 ctests pass. Build clean on arm64 macOS.
+
+diff --git a/.planning/spikes/spk-auth-unification/spk-auth-unification-brief.md b/.planning/spikes/spk-auth-unification/spk-auth-unification-brief.md
+index 7217301..c1d089a 100644
+--- a/.planning/spikes/spk-auth-unification/spk-auth-unification-brief.md
++++ b/.planning/spikes/spk-auth-unification/spk-auth-unification-brief.md
+@@ -1,6 +1,6 @@
+ succeeded in 53ms:
+app/wibwob_view.cpp:621:        // on claude_code_sdk/claude_code paths.
+app/llm/base/llm_config.cpp:307:        // (No command-based provider validation needed — claude_code removed)
+app/wibwob_engine.cpp:131:    // Legacy compatibility - update claude_code provider configuration if active
+app/wibwob_engine.cpp:134:    if (currentProvider && currentProvider->getProviderName() == "claude_code") {
+app/README-CLAUDE-CONFIG.md:14:   - Launched by C++ provider: `llm/providers/claude_code_provider.cpp`
+app/README-CLAUDE-CONFIG.md:22:   "claude_code": {
+app/README-CLAUDE-CONFIG.md:29:2. **Claude CLI invoked**: `claude_code_provider.cpp:334` builds command:
+app/README-CLAUDE-CONFIG.md:39:4. **System prompt loaded**: `claude_code_provider.cpp:358` checks for:
+app/README-CLAUDE-CONFIG.md:50:| `llm/providers/claude_code_provider.cpp` | C++ code that invokes Claude CLI |
+
+thinking
+**Inspecting source references and dependencies**
+codex
+I found leftover `claude_code` references outside the main rewrite, including one in `wibwob_engine.cpp`. Next I’m reading the touched files with line numbers to verify whether those are harmless compatibility code or actual regressions, and to inspect the CLI command construction.
+exec
+/bin/zsh -lc "nl -ba app/llm/base/auth_config.cpp | sed -n '1,220p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba app/llm/base/auth_config.h | sed -n '1,220p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba app/scramble_engine.h | sed -n '1,220p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba app/scramble_engine.cpp | sed -n '1,320p'" in /Users/james/Repos/wibandwob-dos succeeded in 53ms:
+     1	/*---------------------------------------------------------*/
+     2	/*                                                         */
+     3	/*   scramble_engine.h - Scramble Brain                    */
+     4	/*   Slash commands + Haiku LLM chat                       */
+     5	/*                                                         */
+     6	/*---------------------------------------------------------*/
+     7	
+     8	#ifndef SCRAMBLE_ENGINE_H
+     9	#define SCRAMBLE_ENGINE_H
+    10	
+    11	#include <string>
+    12	#include <vector>
+    13	#include <ctime>
+    14	#include <cstdlib>
+    15	
+    16	/*---------------------------------------------------------*/
+    17	/* ScrambleHaikuClient - curl-based Haiku LLM calls        */
+    18	/*---------------------------------------------------------*/
+    19	
+    20	class ScrambleHaikuClient {
+ succeeded in 52ms:
+     1	/*---------------------------------------------------------*/
+     2	/*                                                         */
+     3	/*   scramble_engine.cpp - Scramble Brain                  */
+     4	/*   Slash commands + Haiku LLM chat                       */
+     5	/*                                                         */
+     6	/*---------------------------------------------------------*/
+     7	
+     8	#include "scramble_engine.h"
+     9	#include "command_registry.h"
+    10	#include "llm/base/auth_config.h"
+    11	
+    12	#include <cstdio>
+    13	#include <cstring>
+    14	#include <fstream>
+    15	#include <sstream>
+    16	
+    17	/*---------------------------------------------------------*/
+    18	/* ScrambleHaikuClient                                     */
+    19	/*---------------------------------------------------------*/
+    20	
+ succeeded in 53ms:
+     1	/*---------------------------------------------------------*/
+     2	/*                                                         */
+     3	/*   auth_config.h - Unified Auth Configuration            */
+     4	/*                                                         */
+     5	/*   Single auth mode for all LLM consumers.               */
+     6	/*   Detect once at startup, read everywhere.              */
+     7	/*                                                         */
+     8	/*---------------------------------------------------------*/
+     9	
+    10	#ifndef AUTH_CONFIG_H
+    11	#define AUTH_CONFIG_H
+    12	
+    13	#include <string>
+    14	
+    15	enum class AuthMode {
+    16	    ClaudeCode,   // claude CLI logged in → SDK + CLI subprocess
+    17	    ApiKey,       // ANTHROPIC_API_KEY set → direct curl fallback
+    18	    NoAuth        // Nothing available → disabled
+    19	};
+    20	
+ succeeded in 53ms:
+     1	/*---------------------------------------------------------*/
+     2	/*                                                         */
+     3	/*   auth_config.cpp - Unified Auth Configuration          */
+     4	/*                                                         */
+     5	/*---------------------------------------------------------*/
+     6	
+     7	#include "auth_config.h"
+     8	#include <cstdlib>
+     9	#include <cstdio>
+    10	#include <unistd.h>
+    11	#include <string>
+    12	
+    13	AuthConfig& AuthConfig::instance() {
+    14	    static AuthConfig singleton;
+    15	    return singleton;
+    16	}
+    17	
+    18	void AuthConfig::detect() {
+    19	    // Priority 1: Claude CLI logged in → Claude Code Auth (richest path)
+    20	    if (detectClaudeCli()) {
+
+thinking
+**Inspecting engine and view logic**
+codex
+I’ve verified the Scramble changes enough to flag security concerns. Next I’m checking `wibwob_engine`/`wibwob_view` for provider-selection regressions, stale compatibility paths, and include/build-target breakage.
+exec
+/bin/zsh -lc "nl -ba app/wibwob_view.cpp | sed -n '600,900p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba app/wibwob_engine.cpp | sed -n '100,360p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba app/llm/providers/claude_code_sdk_provider.cpp | sed -n '680,720p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "rg -n \"#include \\\"llm/base/auth_config.h\\\"|AuthConfig::instance\\(\\)\\.detect\\(\" app/*.cpp app/**/*.cpp | sort" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+   600	            clearEvent(event);
+   601	        }
+   602	    }
+   603	}
+   604	
+   605	void TWibWobWindow::ensureEngineInitialized() {
+   606	    if (!engineInitialized) {
+   607	        // Initialize logging first
+   608	        if (logFilePath.empty()) {
+   609	            initializeLogging();
+   610	        }
+   611	
+   612	        engine = new WibWobEngine();
+   613	
+   614	        // Ensure we poll providers frequently (some providers rely on poll() to read subprocess output).
+   615	        if (!pollTimerId) {
+   616	            pollTimerId = setTimer(50, 50);
+   617	        }
+   618	
+   619	        // Inject runtime API key only when anthropic_api is the active provider.
+ succeeded in 52ms:
+   680	    
+   681	    return success;
+   682	}
+   683	
+   684	void ClaudeCodeSDKProvider::registerTool(const Tool& tool) {
+   685	    registeredTools.push_back(tool);
+   686	}
+   687	
+   688	void ClaudeCodeSDKProvider::clearTools() {
+   689	    registeredTools.clear();
+   690	}
+   691	
+   692	void ClaudeCodeSDKProvider::setError(const std::string& error) {
+   693	    lastError = error;
+   694	}
+   695	
+   696	void ClaudeCodeSDKProvider::clearError() {
+   697	    lastError.clear();
+   698	}
+   699	
+ succeeded in 52ms:
+   100	    };
+   101	    
+   102	    // Send to current provider (synchronous or provider-managed async)
+   103	    return currentProvider->sendQuery(request, wrappedCallback);
+   104	}
+   105	
+   106	void WibWobEngine::poll() {
+   107	    if (currentProvider) {
+   108	        currentProvider->poll();
+   109	    }
+   110	}
+   111	
+   112	void WibWobEngine::cancel() {
+   113	    if (currentProvider) {
+   114	        currentProvider->cancel();
+   115	    }
+   116	}
+   117	
+   118	bool WibWobEngine::isClaudeAvailable() const {
+   119	    // Load configuration on first check
+ succeeded in 51ms:
+app/scramble_engine.cpp:10:#include "llm/base/auth_config.h"
+app/scramble_engine.cpp:10:#include "llm/base/auth_config.h"
+app/test_pattern_app.cpp:2538:    AuthConfig::instance().detect();
+app/test_pattern_app.cpp:2538:    AuthConfig::instance().detect();
+app/test_pattern_app.cpp:73:#include "llm/base/auth_config.h"
+app/test_pattern_app.cpp:73:#include "llm/base/auth_config.h"
+app/wibwob_engine.cpp:9:#include "llm/base/auth_config.h"
+app/wibwob_engine.cpp:9:#include "llm/base/auth_config.h"
+app/wibwob_view.cpp:10:#include "llm/base/auth_config.h"
+app/wibwob_view.cpp:10:#include "llm/base/auth_config.h"
+
+thinking
+**Analyzing detect() usage and auth logic**
+codex
+I’ve identified a likely behavior regression in `AuthConfig` detection (it treats “`claude` exists” as “Claude auth available,” which can preempt a valid API key). I’m doing one more repo-wide pass for deleted-provider references and TODO/FIXME auth comments before I finalize findings.
+exec
+/bin/zsh -lc "nl -ba app/CMakeLists.txt | sed -n '1,190p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc 'rg -n "TODO|FIXME" app/llm app/wibwob_engine.cpp app/wibwob_view.cpp app/scramble_engine.* app/test_pattern_app.cpp | head -200' in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+     1	cmake_minimum_required(VERSION 3.10)
+     2	project(wibwob-dos-app CXX)
+     3	
+     4	set(CMAKE_CXX_STANDARD 14)
+     5	set(CMAKE_CXX_STANDARD_REQUIRED ON)
+     6	
+     7	# Common sources used by multiple apps
+     8	set(TV_COMMON_SOURCES
+     9	    test_pattern.cpp
+    10	    gradient.cpp
+    11	    glitch_engine.cpp
+    12	    frame_capture.cpp
+    13	    api_ipc.cpp
+    14	    command_registry.cpp
+    15	    window_type_registry.cpp
+    16	    theme_manager.cpp
+    17	    wibwob_view.cpp
+    18	    wibwob_engine.cpp
+    19	    llm/base/auth_config.cpp
+    20	    llm/base/llm_config.cpp
+ succeeded in 52ms:
+
+exec
+/bin/zsh -lc 'rg -n "claude_code_provider|anthropic_api_provider_broken|openrouter" . | head -200' in /Users/james/Repos/wibandwob-dos succeeded in 167ms:
+./codex-wibwob-mcp-fix-20260221-125722.log:149:#include "claude_code_provider.h" // Fallback
+./codex-wibwob-mcp-fix-20260221-125722.log:396:#include "claude_code_provider.h" // Fallback
+./docs/codex-reviews/codex-chat-bugs-20260218-214708.log:6:- `app/llm/providers/claude_code_provider.cpp` also had prompt-file checks that were effectively CWD-relative (and inconsistent between non-streaming vs streaming).
+./docs/codex-reviews/codex-chat-bugs-20260218-214708.log:288:### `app/llm/providers/claude_code_provider.cpp` — prompt file resolution + streaming prompt support
+./archive/session-logs/2026-02-22/codex-auth-unification-review-20260222-102945.log:15:Context: We unified all LLM auth into a single AuthConfig singleton. Both WibWobEngine (C++ SDK chat) and ScrambleEngine (curl/CLI haiku cat) now read from it. Dead providers (claude_code, openrouter, anthropic_api_provider_broken) were deleted. Silent SDK→CLI fallback removed.
+./archive/session-logs/2026-02-22/codex-auth-unification-review-20260222-102945.log:19:- app/llm/base/llm_config.cpp (cleaned defaults, removed openrouter/claude_code)
+./archive/session-logs/2026-02-22/codex-auth-unification-review-20260222-102945.log:26:- app/CMakeLists.txt (removed claude_code_provider.cpp, added auth_config.cpp)
+./archive/session-logs/2026-02-22/codex-auth-unification-review-20260222-102945.log:29:1. Any remaining references to deleted providers (claude_code_provider, anthropic_api_provider_broken, openrouter)
+./archive/session-logs/2026-02-22/codex-auth-unification-review-20260222-102945.log:56:app/llm/providers/anthropic_api_provider_broken.cpp
+./archive/session-logs/2026-02-22/codex-auth-unification-review-20260222-102945.log:57:app/llm/providers/claude_code_provider.cpp
+./archive/session-logs/2026-02-22/codex-auth-unification-review-20260222-102945.log:58:app/llm/providers/claude_code_provider.h
+./archive/session-logs/2026-02-22/codex-auth-unification-review-20260222-102945.log:72:/bin/zsh -lc "rg -n \"claude_code_provider|anthropic_api_provider_broken|openrouter|claude_code\\b\" app | head -200" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+./archive/session-logs/2026-02-22/codex-auth-unification-review-20260222-102945.log:83:    - SPK-AUTH-05: Delete claude_code_provider, anthropic_api_provider_broken, openrouter;
+./archive/session-logs/2026-02-22/codex-auth-unification-review-20260222-102945.log:98:app/README-CLAUDE-CONFIG.md:14:   - Launched by C++ provider: `llm/providers/claude_code_provider.cpp`
+./archive/session-logs/2026-02-22/codex-auth-unification-review-20260222-102945.log:100:app/README-CLAUDE-CONFIG.md:29:2. **Claude CLI invoked**: `claude_code_provider.cpp:334` builds command:
+./archive/session-logs/2026-02-22/codex-auth-unification-review-20260222-102945.log:101:app/README-CLAUDE-CONFIG.md:39:4. **System prompt loaded**: `claude_code_provider.cpp:358` checks for:
+./archive/session-logs/2026-02-22/codex-auth-unification-review-20260222-102945.log:102:app/README-CLAUDE-CONFIG.md:50:| `llm/providers/claude_code_provider.cpp` | C++ code that invokes Claude CLI |
+./app/README-CLAUDE-CONFIG.md:14:   - Launched by C++ provider: `llm/providers/claude_code_provider.cpp`
+./app/README-CLAUDE-CONFIG.md:29:2. **Claude CLI invoked**: `claude_code_provider.cpp:334` builds command:
+./app/README-CLAUDE-CONFIG.md:39:4. **System prompt loaded**: `claude_code_provider.cpp:358` checks for:
+
+thinking
+**Flagging race conditions and shell injection risks**
+codex
+I found a more significant regression: the new `NoAuth` UI guard can block the existing runtime API-key workflow because `AuthConfig` is only detected once at startup and never updated when a key is entered later. I’m pulling exact line references for the stale comments/docs and then I’ll format the findings list.
+exec
+/bin/zsh -lc "nl -ba app/README-CLAUDE-CONFIG.md | sed -n '1,90p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba app/test_pattern_app.cpp | sed -n '2528,2544p'" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+     1	# Claude Code Configuration for Test-TUI
+     2	
+     3	## Two Separate Claude Instances
+     4	
+     5	There are **two different Claude Code instances** when working with test-tui:
+     6	
+     7	1. **External Claude Code** (your IDE/terminal session)
+     8	   - Uses project-level config: `/Users/james/Repos/tvision/test-tui/.claude/settings.json`
+     9	   - Controlled by your IDE or CLI invocations
+    10	
+    11	2. **Embedded Chat Window** (inside the TVision app)
+    12	   - Uses the same config: `/Users/james/Repos/tvision/test-tui/.claude/settings.json`
+    13	   - Configured via: `llm/config/llm_config.json`
+    14	   - Launched by C++ provider: `llm/providers/claude_code_provider.cpp`
+    15	
+    16	## How the Embedded Chat Works
+    17	
+    18	When you open "Wib&Wob Chat" inside the test_pattern app:
+    19	
+    20	1. **Config loaded**: `llm/config/llm_config.json` (line 12-16)
+ succeeded in 52ms:
+  2528	    //     }
+  2529	    // }
+  2530	
+  2531	    // Broadcast terminal update check so tvterm windows refresh
+  2532	    message(this, evBroadcast, TWibWobTerminalWindow::termConsts.cmCheckTerminalUpdates, nullptr);
+  2533	}
+  2534	
+  2535	int main()
+  2536	{
+  2537	    // Detect auth mode once before any LLM consumer initialises.
+  2538	    AuthConfig::instance().detect();
+  2539	
+  2540	    TTestPatternApp app;
+  2541	    app.run();
+  2542	    return 0;
+  2543	}
+  2544	
+exec
+/bin/zsh -lc "git grep -n \"anthropic_api_provider_broken\\|openrouter\\|claude_code_provider\" bb4bbe6 -- app ':"'!app/README-CLAUDE-CONFIG.md'"'" in /Users/james/Repos/wibandwob-dos exited 1 in 784ms:
+
+
+thinking
+**Searching test for build target logic**
+exec
+/bin/zsh -lc "rg -n \"AuthConfig::instance\\(\\)\\.detect\\(|ScrambleHaikuClient::configure\\(|ScrambleEngine::init\\(\" app/scramble_engine_test.cpp" in /Users/james/Repos/wibandwob-dos exited 1 in 52ms:
+
+
+thinking
+**Inspecting test for context**
+codex
+I confirmed `scramble_engine_test.cpp` doesn’t call `AuthConfig::detect()`. I’m checking whether that test actually exercises `configure()`/LLM paths before I classify the startup-detection dependency as a cross-target regression risk.
+exec
+/bin/zsh -lc "nl -ba app/scramble_engine_test.cpp | sed -n '1,260p'" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+     1	/*---------------------------------------------------------*/
+     2	/*   scramble_engine_test.cpp - ctest for engine           */
+     3	/*---------------------------------------------------------*/
+     4	
+     5	#include "scramble_engine.h"
+     6	#include "command_registry.h"
+     7	
+     8	#include <iostream>
+     9	#include <string>
+    10	#include <cstdlib>
+    11	
+    12	// Stubs for command_registry.cpp link dependencies
+    13	class TTestPatternApp {};
+    14	void api_cascade(TTestPatternApp&) {}
+    15	void api_tile(TTestPatternApp&) {}
+    16	void api_close_all(TTestPatternApp&) {}
+    17	void api_save_workspace(TTestPatternApp&) {}
+    18	bool api_open_workspace_path(TTestPatternApp&, const std::string&) { return true; }
+    19	void api_screenshot(TTestPatternApp&) {}
+    20	void api_set_pattern_mode(TTestPatternApp&, const std::string&) {}

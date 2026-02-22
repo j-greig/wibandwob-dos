@@ -617,8 +617,6 @@ void TWibWobWindow::ensureEngineInitialized() {
         }
 
         // Inject runtime API key only when anthropic_api is the active provider.
-        // Do not switch providers implicitly here: chat MCP tool execution relies
-        // on claude_code_sdk/claude_code paths.
         {
             extern std::string getAppRuntimeApiKey();
             std::string rtKey = getAppRuntimeApiKey();
@@ -683,8 +681,9 @@ void TWibWobWindow::processUserInput(const std::string& input) {
         return;
     }
 
-    // Check auth state — give clear guidance if no auth available
-    if (!AuthConfig::instance().hasAuth()) {
+    // Check auth state — give clear guidance if no auth available.
+    // Allow through if engine has a provider (e.g. API key injected at runtime).
+    if (!AuthConfig::instance().hasAuth() && !engine->isClaudeAvailable()) {
         messageView->addMessage("System",
             "No LLM auth available. Run 'claude /login' or set ANTHROPIC_API_KEY.");
         inputView->setStatus("LLM disabled — no auth");

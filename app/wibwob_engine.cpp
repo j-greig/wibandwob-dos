@@ -128,13 +128,8 @@ void WibWobEngine::setSystemPrompt(const std::string& prompt) {
 }
 
 void WibWobEngine::setClaudePath(const std::string& path) {
-    // Legacy compatibility - update claude_code provider configuration if active
+    // Legacy compatibility stub — claude_code provider removed.
     claudePath = path;
-    
-    if (currentProvider && currentProvider->getProviderName() == "claude_code") {
-        // Would need to reconfigure the provider - for now just store the path
-        // In production, this would update the provider's configuration
-    }
 }
 
 bool WibWobEngine::switchProvider(const std::string& providerName) {
