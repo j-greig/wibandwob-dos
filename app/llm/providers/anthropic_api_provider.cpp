@@ -275,7 +275,7 @@ bool AnthropicAPIProvider::configure(const std::string& config) {
     if (envVal) {
         apiKey = envVal;
     }
-    // Note: ApiConfig fallback removed - use environment variable only
+    // API key sourced from environment variable (or injected at runtime via setApiKey)
 
     if (apiKey.empty()) {
         fprintf(stderr, "INFO: Anthropic API key not in env (%s) — can be set at runtime via setApiKey()\n", keyEnv.c_str());

@@ -40,7 +40,6 @@ public:
     // Configuration
     void setSystemPrompt(const std::string& prompt);
     const std::string& getSystemPrompt() const { return systemPrompt; }
-    void setClaudePath(const std::string& path);  // Legacy compatibility
     
     // Provider management
     bool switchProvider(const std::string& providerName);
@@ -68,9 +67,6 @@ private:
     std::unique_ptr<LLMConfig> config;
     std::unique_ptr<ILLMProvider> currentProvider;
     std::string systemPrompt;
-    
-    // Legacy compatibility
-    std::string claudePath = "claude";
     
     // Provider management
     bool initializeProvider(const std::string& providerName);

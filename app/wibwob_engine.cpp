@@ -127,11 +127,6 @@ void WibWobEngine::setSystemPrompt(const std::string& prompt) {
     systemPrompt = prompt;
 }
 
-void WibWobEngine::setClaudePath(const std::string& path) {
-    // Legacy compatibility stub — claude_code provider removed.
-    claudePath = path;
-}
-
 bool WibWobEngine::switchProvider(const std::string& providerName) {
     return initializeProvider(providerName);
 }
