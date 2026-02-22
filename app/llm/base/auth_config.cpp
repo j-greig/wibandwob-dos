@@ -9,6 +9,7 @@
 #include <cstdio>
 #include <unistd.h>
 #include <string>
+#include <sstream>
 
 AuthConfig& AuthConfig::instance() {
     static AuthConfig singleton;
@@ -16,10 +17,12 @@ AuthConfig& AuthConfig::instance() {
 }
 
 void AuthConfig::detect() {
-    // Priority 1: Claude CLI logged in → Claude Code Auth (richest path)
-    if (detectClaudeCli()) {
+    // Priority 1: Claude CLI present AND logged in → Claude Code Auth
+    if (detectClaudeCli() && probeClaudeAuth()) {
         currentMode = AuthMode::ClaudeCode;
-        fprintf(stderr, "[auth] mode: ClaudeCode (claude CLI at: %s)\n", cachedClaudePath.c_str());
+        fprintf(stderr, "[auth] mode: ClaudeCode (cli=%s, email=%s, method=%s)\n",
+                cachedClaudePath.c_str(), cachedClaudeEmail.c_str(),
+                cachedClaudeAuthMethod.c_str());
         return;
     }
 
@@ -32,16 +35,81 @@ void AuthConfig::detect() {
 
     // Priority 3: Nothing available
     currentMode = AuthMode::NoAuth;
-    fprintf(stderr, "[auth] mode: NoAuth — no claude CLI, no ANTHROPIC_API_KEY\n");
+    if (!cachedClaudePath.empty()) {
+        fprintf(stderr, "[auth] mode: NoAuth — claude CLI found but not logged in. "
+                        "Run 'claude /login'.\n");
+    } else {
+        fprintf(stderr, "[auth] mode: NoAuth — no claude CLI, no ANTHROPIC_API_KEY\n");
+    }
 }
 
 const char* AuthConfig::modeName() const {
     switch (currentMode) {
-        case AuthMode::ClaudeCode: return "ClaudeCode";
-        case AuthMode::ApiKey:     return "ApiKey";
-        case AuthMode::NoAuth:     return "NoAuth";
+        case AuthMode::ClaudeCode: return "LLM AUTH";
+        case AuthMode::ApiKey:     return "LLM KEY";
+        case AuthMode::NoAuth:     return "LLM OFF";
     }
-    return "Unknown";
+    return "LLM ???";
+}
+
+std::string AuthConfig::statusSummary() const {
+    std::ostringstream ss;
+
+    ss << "LLM Authentication Status\n";
+    ss << "=========================\n\n";
+
+    // Current mode
+    ss << "Mode: " << modeName() << "\n\n";
+
+    // Claude Code status
+    ss << "Claude Code CLI\n";
+    if (cachedClaudePath.empty()) {
+        ss << "  Binary:  not found on PATH\n";
+        ss << "  Status:  unavailable\n";
+    } else {
+        ss << "  Binary:  " << cachedClaudePath << "\n";
+        if (!cachedClaudeEmail.empty()) {
+            ss << "  Logged in: yes\n";
+            ss << "  Account:   " << cachedClaudeEmail << "\n";
+            ss << "  Auth via:  " << cachedClaudeAuthMethod << "\n";
+        } else {
+            ss << "  Logged in: no\n";
+            ss << "  Fix: run 'claude /login'\n";
+        }
+    }
+
+    ss << "\n";
+
+    // API key status
+    ss << "Anthropic API Key\n";
+    if (!cachedApiKey.empty()) {
+        std::string masked = cachedApiKey.substr(0, 8) + "..." +
+            cachedApiKey.substr(cachedApiKey.size() > 4 ? cachedApiKey.size() - 4 : 0);
+        ss << "  ANTHROPIC_API_KEY: set (" << masked << ")\n";
+    } else {
+        ss << "  ANTHROPIC_API_KEY: not set\n";
+    }
+
+    ss << "\n";
+
+    // Active consumer mapping
+    ss << "Active Configuration\n";
+    switch (currentMode) {
+        case AuthMode::ClaudeCode:
+            ss << "  Wib&Wob Chat: claude_code_sdk (Agent SDK)\n";
+            ss << "  Scramble Cat: claude -p --model haiku\n";
+            break;
+        case AuthMode::ApiKey:
+            ss << "  Wib&Wob Chat: anthropic_api (direct HTTP)\n";
+            ss << "  Scramble Cat: curl to Messages API\n";
+            break;
+        case AuthMode::NoAuth:
+            ss << "  Wib&Wob Chat: disabled\n";
+            ss << "  Scramble Cat: disabled (quips only)\n";
+            break;
+    }
+
+    return ss.str();
 }
 
 bool AuthConfig::detectClaudeCli() {
@@ -76,4 +144,53 @@ bool AuthConfig::detectApiKey() {
         return true;
     }
     return false;
+}
+
+bool AuthConfig::probeClaudeAuth() {
+    if (cachedClaudePath.empty()) return false;
+
+    // Run `claude auth status` and parse JSON output
+    std::string cmd = cachedClaudePath + " auth status 2>/dev/null";
+    FILE* pipe = popen(cmd.c_str(), "r");
+    if (!pipe) return false;
+
+    std::string output;
+    char buffer[1024];
+    while (fgets(buffer, sizeof(buffer), pipe) != nullptr) {
+        output += buffer;
+    }
+    int exitCode = pclose(pipe);
+
+    if (exitCode != 0 || output.empty()) {
+        fprintf(stderr, "[auth] claude auth status failed (exit=%d)\n", exitCode);
+        return false;
+    }
+
+    // Simple JSON parsing — look for "loggedIn": true
+    if (output.find("\"loggedIn\": true") == std::string::npos &&
+        output.find("\"loggedIn\":true") == std::string::npos) {
+        fprintf(stderr, "[auth] claude auth status: not logged in\n");
+        return false;
+    }
+
+    // Extract email
+    auto extractField = [&output](const std::string& key) -> std::string {
+        std::string pattern = "\"" + key + "\": \"";
+        size_t pos = output.find(pattern);
+        if (pos == std::string::npos) {
+            // Try without space after colon
+            pattern = "\"" + key + "\":\"";
+            pos = output.find(pattern);
+        }
+        if (pos == std::string::npos) return "";
+        pos += pattern.size();
+        size_t end = output.find("\"", pos);
+        if (end == std::string::npos) return "";
+        return output.substr(pos, end - pos);
+    };
+
+    cachedClaudeEmail = extractField("email");
+    cachedClaudeAuthMethod = extractField("authMethod");
+
+    return true;
 }

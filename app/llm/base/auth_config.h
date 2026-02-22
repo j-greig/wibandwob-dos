@@ -31,8 +31,15 @@ public:
     const std::string& apiKey() const { return cachedApiKey; }
     const std::string& claudePath() const { return cachedClaudePath; }
 
-    // Human-readable mode name
+    // Claude auth detail (populated when mode == ClaudeCode)
+    const std::string& claudeEmail() const { return cachedClaudeEmail; }
+    const std::string& claudeAuthMethod() const { return cachedClaudeAuthMethod; }
+
+    // Human-readable mode name (for status bar)
     const char* modeName() const;
+
+    // Human-readable status summary (for Help > LLM Status dialog)
+    std::string statusSummary() const;
 
     // Convenience checks
     bool hasAuth() const { return currentMode != AuthMode::NoAuth; }
@@ -48,10 +55,15 @@ private:
     AuthMode currentMode = AuthMode::NoAuth;
     std::string cachedApiKey;
     std::string cachedClaudePath;
+    std::string cachedClaudeEmail;
+    std::string cachedClaudeAuthMethod;
 
     // Detection helpers
     bool detectClaudeCli();
     bool detectApiKey();
+
+    // Probe claude auth status (runs `claude auth status`)
+    bool probeClaudeAuth();
 };
 
 #endif // AUTH_CONFIG_H

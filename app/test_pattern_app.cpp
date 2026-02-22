@@ -225,6 +225,7 @@ const ushort cmAbout = 129;
 const ushort cmKeyboardShortcuts = 210;
 const ushort cmDebugInfo = 211;
 const ushort cmApiKeyHelp = 212;
+const ushort cmLlmStatus = 230;
 const ushort cmMicropolisAscii = 213;
 const ushort cmQuadra = 215;
 const ushort cmSnake = 216;
@@ -405,20 +406,17 @@ private:
         const AuthConfig& auth = AuthConfig::instance();
         TColorRGB bg(255, 255, 255);
         TColorRGB fg;
-        const char* label;
+        const char* label = auth.modeName();  // "LLM AUTH" / "LLM KEY" / "LLM OFF"
 
         switch (auth.mode()) {
             case AuthMode::ClaudeCode:
                 fg = TColorRGB(0, 160, 0);       // green
-                label = "LLM ON";
                 break;
             case AuthMode::ApiKey:
                 fg = TColorRGB(180, 140, 0);      // amber
-                label = "LLM KEY";
                 break;
             case AuthMode::NoAuth:
                 fg = TColorRGB(180, 50, 50);      // red
-                label = "LLM OFF";
                 break;
         }
 
@@ -1469,21 +1467,25 @@ void TTestPatternApp::handleEvent(TEvent& event)
             case cmApiKeyHelp:
                 messageBox(
                     "API Key (ANTHROPIC_API_KEY)\n\n"
-                    "Powers two features:\n"
-                    "  Scramble Cat - Claude Haiku brain\n"
-                    "  Wib&Wob Chat - if anthropic_api\n"
-                    "    provider is active in config\n\n"
+                    "Fallback auth for Scramble Cat and\n"
+                    "Wib&Wob Chat when Claude Code CLI\n"
+                    "is not logged in.\n\n"
                     "Set via:\n"
                     "  1. ANTHROPIC_API_KEY env var\n"
-                    "     (in ~/.zshrc or .env file)\n"
-                    "  2. Tools > API Key dialog\n"
-                    "     (in-memory only, lost on exit)\n\n"
-                    "Dialog overrides env var at runtime.\n"
-                    "Neither is saved to app config.\n\n"
-                    "Provider: app/llm/config/llm_config.json",
+                    "  2. Tools > API Key dialog\n\n"
+                    "Preferred: run 'claude /login'\n"
+                    "See Help > LLM Status for details.",
                     mfInformation | mfOKButton);
                 clearEvent(event);
                 break;
+            case cmLlmStatus:
+            {
+                std::string summary = AuthConfig::instance().statusSummary();
+                messageBox(summary.c_str(),
+                    mfInformation | mfOKButton);
+                clearEvent(event);
+                break;
+            }
 
             // REMOVED E009: entire Glitch Effects submenu handlers
             // (cmToggleGlitchMode, cmGlitchScatter, cmGlitchColorBleed,
@@ -2373,7 +2375,8 @@ TMenuBar* TTestPatternApp::initMenuBar(TRect r)
         *new TSubMenu("~H~elp", kbAltH) +
             *new TMenuItem("~A~bout WIBWOBWORLD", cmAbout, kbNoKey) +
             *new TMenuItem("~K~eyboard Shortcuts", cmKeyboardShortcuts, kbNoKey) +
-            *new TMenuItem("A~P~I Key Help", cmApiKeyHelp, kbNoKey)
+            *new TMenuItem("A~P~I Key Help", cmApiKeyHelp, kbNoKey) +
+            *new TMenuItem("~L~LM Status", cmLlmStatus, kbNoKey)
     );
 }
 

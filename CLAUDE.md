@@ -165,16 +165,20 @@ Human / AI Agent
 
 ### Scramble (`app/scramble_view.h/cpp`, `app/scramble_engine.h/cpp`)
 
-Symbient cat. Three window states: hidden / smol (28×14, cat + bubble) / tall (full height, message history + input). Slash commands typed in Scramble's input check the command registry first — `/cascade`, `/screenshot`, `/scramble_pet` etc all execute. Commands not in registry fall through to `ScrambleEngine` for `/help`, `/who`, `/cmds`, or Haiku chat. API key for Haiku set via Tools > API Key or `ANTHROPIC_API_KEY` env var.
+Symbient cat. Three window states: hidden / smol (28×14, cat + bubble) / tall (full height, message history + input). Slash commands typed in Scramble's input check the command registry first — `/cascade`, `/screenshot`, `/scramble_pet` etc all execute. Commands not in registry fall through to `ScrambleEngine` for `/help`, `/who`, `/cmds`, or Haiku chat. Auth is shared with Wib&Wob via `AuthConfig` — Claude Code mode uses `claude -p --model haiku`, API Key mode uses direct curl. Fallback: `ANTHROPIC_API_KEY` env var or Tools > API Key at runtime.
 
-### LLM Provider System (`app/llm/`)
+### LLM Auth & Provider System (`app/llm/`)
 
-Abstract provider interface (`ILLMProvider`) with factory dispatch. Active provider configured in `app/llm/config/llm_config.json`. Available providers:
-- **`claude_code_sdk`** (active) — Node.js bridge with streaming, uses `app/llm/sdk_bridge/claude_sdk_bridge.js`
-- **`claude_code`** — CLI wrapper via `claude -p` command
-- **`anthropic_api`** — Direct HTTP (disabled)
+**Auth** is unified via `AuthConfig` singleton (`app/llm/base/auth_config.h`), detected once at startup:
+1. **Claude Code** (default) — `claude` CLI logged in → SDK provider + CLI subprocess for Scramble
+2. **API Key** — `ANTHROPIC_API_KEY` set → direct HTTP provider + curl for Scramble
+3. **No Auth** — disabled, clear error messages in both chat windows
 
-Note: `llm_config.json` may reference providers not yet registered in C++. Only providers with `REGISTER_LLM_PROVIDER()` in `app/llm/providers/` are actually available.
+Status line shows: `LLM ON` (Claude Code) / `LLM KEY` (API Key) / `LLM OFF` (No Auth).
+
+**Providers** use abstract `ILLMProvider` with factory dispatch. Config in `app/llm/config/llm_config.json`:
+- **`claude_code_sdk`** — Node.js bridge with streaming, uses `app/llm/sdk_bridge/claude_sdk_bridge.js`
+- **`anthropic_api`** — Direct HTTP fallback (curl-based, async)
 
 ### View System
 

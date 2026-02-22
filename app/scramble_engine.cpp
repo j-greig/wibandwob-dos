@@ -330,7 +330,7 @@ std::string ScrambleEngine::ask(const std::string& input)
 
     // No LLM available.
     if (!haikuClient.isAvailable()) {
-        return "... (no api key) /ᐠ- -ᐟ\\";
+        return "... (no auth — Help > LLM Status) /ᐠ- -ᐟ\\";
     }
 
     // Rate-limited.

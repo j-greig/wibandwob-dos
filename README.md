@@ -88,7 +88,9 @@ cmake --build ./build
 ./build/app/test_pattern 2> /tmp/wibwob_debug.log
 ```
 
-### Enable AI Control
+### Enable AI Chat
+
+LLM auth is auto-detected at startup. Just run `claude /login` once — both Wib&Wob Chat and Scramble Cat will use it. Alternatively, set `ANTHROPIC_API_KEY` for direct API mode. The status line shows `LLM AUTH` / `LLM KEY` / `LLM OFF`. See Help > LLM Status for full diagnostics.
 
 ```bash
 # Terminal 1: Start API server

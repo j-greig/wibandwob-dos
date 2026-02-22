@@ -685,8 +685,9 @@ void TWibWobWindow::processUserInput(const std::string& input) {
     // Allow through if engine has a provider (e.g. API key injected at runtime).
     if (!AuthConfig::instance().hasAuth() && !engine->isClaudeAvailable()) {
         messageView->addMessage("System",
-            "No LLM auth available. Run 'claude /login' or set ANTHROPIC_API_KEY.");
-        inputView->setStatus("LLM disabled — no auth");
+            "No LLM auth. Run 'claude /login' or set ANTHROPIC_API_KEY. "
+            "See Help > LLM Status for details.");
+        inputView->setStatus("LLM OFF — see Help > LLM Status");
         return;
     }
 
