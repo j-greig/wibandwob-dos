@@ -6,7 +6,6 @@
 /*---------------------------------------------------------*/
 
 #include "claude_code_sdk_provider.h"
-#include "claude_code_provider.h" // Fallback
 #include "../base/llm_provider_factory.h"
 #include "../base/path_search.h"
 
@@ -699,11 +698,7 @@ void ClaudeCodeSDKProvider::clearError() {
 }
 
 bool ClaudeCodeSDKProvider::initializeFallback() {
-    try {
-        fallbackProvider = std::make_unique<ClaudeCodeProvider>();
-        return fallbackProvider->isAvailable();
-    } catch (...) {
-        fallbackProvider.reset();
-        return false;
-    }
+    // No silent fallback — fail clearly instead of degrading to CLI subprocess.
+    fallbackProvider.reset();
+    return false;
 }

@@ -24,25 +24,6 @@
       "apiKeyEnv": "ANTHROPIC_API_KEY",
       "maxTokens": "8000",
       "temperature": "1.0"
-    },
-    "claude_code": {
-      "enabled": false,
-      "command": "claude",
-      "args": [
-        "-p",
-        "--model",
-        "claude-sonnet-4-6",
-        "--mcp-config",
-        ".claude/settings.json",
-        "--output-format",
-        "json"
-      ]
-    },
-    "openrouter": {
-      "enabled": false,
-      "model": "anthropic/claude-haiku-4-5",
-      "endpoint": "https://openrouter.ai/api/v1/chat/completions",
-      "apiKeyEnv": "OPENROUTER_API_KEY"
     }
   }
 }

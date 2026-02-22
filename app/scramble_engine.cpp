@@ -7,6 +7,7 @@
 
 #include "scramble_engine.h"
 #include "command_registry.h"
+#include "llm/base/auth_config.h"
 
 #include <cstdio>
 #include <cstring>
@@ -27,14 +28,29 @@ ScrambleHaikuClient::ScrambleHaikuClient()
 
 bool ScrambleHaikuClient::configure()
 {
-    const char* key = std::getenv("ANTHROPIC_API_KEY");
-    if (key && key[0] != '\0') {
-        apiKey = key;
-        fprintf(stderr, "[scramble] api key loaded from env ANTHROPIC_API_KEY (len=%zu)\n",
-                apiKey.size());
-        return true;
+    const AuthConfig& auth = AuthConfig::instance();
+
+    switch (auth.mode()) {
+        case AuthMode::ClaudeCode:
+            // Claude Code auth: we'll use CLI subprocess, mark as available
+            // (apiKey stays empty — ask() checks useCliMode)
+            useCliMode = true;
+            claudeCliPath = auth.claudePath();
+            fprintf(stderr, "[scramble] Claude Code mode → CLI at %s\n", claudeCliPath.c_str());
+            return true;
+
+        case AuthMode::ApiKey:
+            apiKey = auth.apiKey();
+            useCliMode = false;
+            fprintf(stderr, "[scramble] API Key mode (len=%zu)\n", apiKey.size());
+            return true;
+
+        case AuthMode::NoAuth:
+            useCliMode = false;
+            fprintf(stderr, "[scramble] No auth — haiku unavailable. "
+                            "Run 'claude /login' or set ANTHROPIC_API_KEY.\n");
+            return false;
     }
-    fprintf(stderr, "[scramble] ANTHROPIC_API_KEY not set — haiku unavailable\n");
     return false;
 }
 
@@ -86,10 +102,54 @@ std::string ScrambleHaikuClient::jsonEscape(const std::string& s)
     return out;
 }
 
-std::string ScrambleHaikuClient::ask(const std::string& question) const
+std::string ScrambleHaikuClient::askViaCli(const std::string& question) const
 {
-    if (!isAvailable()) return "";
+    // Claude Code mode: spawn `claude -p --model haiku "prompt"`
+    std::string sysPrompt = buildSystemPrompt();
 
+    std::ostringstream cmd;
+    cmd << claudeCliPath << " -p --model haiku --output-format text";
+    cmd << " --append-system-prompt \"";
+    for (char c : sysPrompt) {
+        if (c == '"' || c == '\\' || c == '$' || c == '`') cmd << '\\';
+        cmd << c;
+    }
+    cmd << "\" \"";
+    for (char c : question) {
+        if (c == '"' || c == '\\' || c == '$' || c == '`') cmd << '\\';
+        cmd << c;
+    }
+    cmd << "\" 2>/dev/null";
+
+    fprintf(stderr, "[scramble] CLI cmd: %.120s...\n", cmd.str().c_str());
+
+    FILE* pipe = popen(cmd.str().c_str(), "r");
+    if (!pipe) {
+        fprintf(stderr, "[scramble] CLI popen failed\n");
+        return "";
+    }
+
+    std::string response;
+    char buffer[4096];
+    while (fgets(buffer, sizeof(buffer), pipe) != nullptr) {
+        response += buffer;
+    }
+    int exitCode = pclose(pipe);
+
+    if (exitCode != 0) {
+        fprintf(stderr, "[scramble] CLI exit code %d\n", exitCode);
+        return "";
+    }
+
+    // Trim trailing whitespace
+    while (!response.empty() && (response.back() == '\n' || response.back() == '\r'))
+        response.pop_back();
+
+    return response;
+}
+
+std::string ScrambleHaikuClient::askViaCurl(const std::string& question) const
+{
     std::string sysPrompt = buildSystemPrompt();
 
     // Build JSON request
@@ -156,6 +216,16 @@ std::string ScrambleHaikuClient::ask(const std::string& question) const
     }
 
     return result;
+}
+
+std::string ScrambleHaikuClient::ask(const std::string& question) const
+{
+    if (!isAvailable()) return "";
+
+    if (useCliMode) {
+        return askViaCli(question);
+    }
+    return askViaCurl(question);
 }
 
 /*---------------------------------------------------------*/

@@ -7,8 +7,8 @@
 
 #include "wibwob_view.h"
 #include "wibwob_engine.h"
+#include "llm/base/auth_config.h"
 #include "llm/providers/claude_code_sdk_provider.h"  // For SDK streaming
-#include "llm/providers/claude_code_provider.h"      // For CLI streaming
 #include "llm/base/path_search.h"
 
 #define Uses_TKeys
@@ -683,6 +683,14 @@ void TWibWobWindow::processUserInput(const std::string& input) {
         return;
     }
 
+    // Check auth state — give clear guidance if no auth available
+    if (!AuthConfig::instance().hasAuth()) {
+        messageView->addMessage("System",
+            "No LLM auth available. Run 'claude /login' or set ANTHROPIC_API_KEY.");
+        inputView->setStatus("LLM disabled — no auth");
+        return;
+    }
+
     // Handle slash commands
     if (input == "/clear") {
         messageView->clear();
@@ -832,20 +840,7 @@ void TWibWobWindow::processUserInput(const std::string& input) {
         logMessage("Stream", "[streaming] SDK sendStreamingQuery: " + std::string(streamingStarted ? "started" : "failed"));
     }
 
-    // Try CLI provider (uses OAuth, no API key needed)
-    if (!streamingStarted) {
-        auto* cliProvider = dynamic_cast<ClaudeCodeProvider*>(provider);
-        if (cliProvider && cliProvider->isAvailable()) {
-            logMessage("Stream", "[streaming] Trying CLI provider...");
-            if (!sdkProvider) {  // Only start message if SDK didn't already
-                messageView->startStreamingMessage("");
-            }
-            streamingStarted = cliProvider->sendStreamingQuery(input, streamCallback, engine->getSystemPrompt());
-            logMessage("Stream", "[streaming] CLI sendStreamingQuery: " + std::string(streamingStarted ? "started" : "failed"));
-        }
-    }
-
-    // Fall back to non-streaming if neither worked
+    // Fall back to non-streaming if SDK streaming didn't work
     if (!streamingStarted) {
         logMessage("Stream", "[streaming] No streaming provider available, using fallback");
         messageView->cancelStreamingMessage();

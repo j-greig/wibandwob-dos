@@ -69,6 +69,8 @@
 // DISABLED: #include "generative_ascii_cam_view.h"
 // API-controllable text editor
 #include "text_editor_view.h"
+// Unified auth config
+#include "llm/base/auth_config.h"
 // Wib&Wob AI chat interface
 #include "wibwob_view.h"
 // Scrollbar fix prototypes (test versions)
@@ -393,10 +395,45 @@ public:
     virtual void draw() override
     {
         TStatusLine::draw();
+        drawLlmIndicator();
         drawApiIndicator();
     }
 
 private:
+    void drawLlmIndicator()
+    {
+        const AuthConfig& auth = AuthConfig::instance();
+        TColorRGB bg(255, 255, 255);
+        TColorRGB fg;
+        const char* label;
+
+        switch (auth.mode()) {
+            case AuthMode::ClaudeCode:
+                fg = TColorRGB(0, 160, 0);       // green
+                label = "LLM ON";
+                break;
+            case AuthMode::ApiKey:
+                fg = TColorRGB(180, 140, 0);      // amber
+                label = "LLM KEY";
+                break;
+            case AuthMode::NoAuth:
+                fg = TColorRGB(180, 50, 50);      // red
+                label = "LLM OFF";
+                break;
+        }
+
+        // Place to the left of the API indicator (API indicator ~8 chars from right)
+        int labelLen = static_cast<int>(strlen(label));
+        int xPos = size.x - labelLen - 10;  // 10 = API indicator width + gap
+        if (xPos < 1) return;
+
+        TDrawBuffer b;
+        TColorAttr attr(fg, bg);
+        b.moveChar(0, ' ', attr, labelLen + 1);
+        b.moveStr(0, label, attr);
+        writeBuf(xPos, 0, labelLen + 1, 1, b);
+    }
+
     void drawApiIndicator()
     {
         // TTestPatternApp is incomplete here — use the opaque helper
@@ -2497,6 +2534,9 @@ void TTestPatternApp::idle()
 
 int main()
 {
+    // Detect auth mode once before any LLM consumer initialises.
+    AuthConfig::instance().detect();
+
     TTestPatternApp app;
     app.run();
     return 0;

@@ -1,6 +1,6 @@
 # Spike: Unified Auth for Wib&Wob + Scramble
 
-Status: not-started  
+Status: in-progress  
 GitHub issue: —  
 PR: —  
 
@@ -60,7 +60,7 @@ Claude Code Auth (SDK) is the default. It's free, it's what the user uses for Cl
 [
   {
     "id": "SPK-AUTH-01",
-    "status": "todo",
+    "status": "done",
     "title": "Create AuthConfig singleton",
     "steps": [
       "app/llm/base/auth_config.h + .cpp",
@@ -71,7 +71,7 @@ Claude Code Auth (SDK) is the default. It's free, it's what the user uses for Cl
   },
   {
     "id": "SPK-AUTH-02",
-    "status": "todo",
+    "status": "done",
     "title": "Simplify WibWobEngine to use AuthConfig",
     "steps": [
       "Remove multi-provider fallback cascade",
@@ -83,7 +83,7 @@ Claude Code Auth (SDK) is the default. It's free, it's what the user uses for Cl
   },
   {
     "id": "SPK-AUTH-03",
-    "status": "todo",
+    "status": "done",
     "title": "Make Scramble use AuthConfig",
     "steps": [
       "ScrambleHaikuClient reads AuthConfig instead of getenv",
@@ -95,7 +95,7 @@ Claude Code Auth (SDK) is the default. It's free, it's what the user uses for Cl
   },
   {
     "id": "SPK-AUTH-04",
-    "status": "todo",
+    "status": "done",
     "title": "Surface auth errors in TUI",
     "steps": [
       "Bridge: handle auth_status SDK event → send ERROR to C++",
@@ -106,7 +106,7 @@ Claude Code Auth (SDK) is the default. It's free, it's what the user uses for Cl
   },
   {
     "id": "SPK-AUTH-05",
-    "status": "todo",
+    "status": "done",
     "title": "Clean up dead code",
     "steps": [
       "Delete claude_code_provider.cpp/.h",

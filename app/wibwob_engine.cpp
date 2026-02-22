@@ -6,6 +6,7 @@
 
 #include "wibwob_engine.h"
 #include "llm/base/llm_provider_factory.h"
+#include "llm/base/auth_config.h"
 #include "llm/base/path_search.h"
 
 #include <cstdio>
@@ -159,10 +160,8 @@ std::string WibWobEngine::getCurrentModel() const {
 
     ProviderConfig providerConfig = config->getProviderConfig(provider);
 
-    // For claude_code and claude_code_sdk, return appropriate model name
-    if (provider == "claude_code") {
-        return "Claude Code";
-    } else if (provider == "claude_code_sdk") {
+    // For claude_code_sdk, return appropriate model name
+    if (provider == "claude_code_sdk") {
         return "sonnet";  // Show the actual alias we send to Claude Code
     }
 
@@ -253,82 +252,36 @@ void WibWobEngine::loadConfiguration() {
             loadResult ? "SUCCESS " : "FAILED",
             loadResult ? ("(" + usedPath + ")").c_str() : "");
 
-    // Pick desired provider based on env/config
-    // Only override if ANTHROPIC_API_KEY is set and anthropic_api is configured
-    auto hasAnthropicKey = []() -> bool {
-        const char* v = std::getenv("ANTHROPIC_API_KEY");
-        return v && *v;
-    };
-    std::string desiredProvider = config->getActiveProvider();
-    fprintf(stderr, "DEBUG: Config activeProvider: %s\n", desiredProvider.c_str());
-
-    // Respect configured provider selection.
-    // Only pick a provider automatically when no active provider is configured.
-    if (desiredProvider.empty()) {
-        if (hasAnthropicKey() && config->hasProvider("anthropic_api")) {
-            desiredProvider = "anthropic_api";
-            fprintf(stderr, "DEBUG: Auto-selecting anthropic_api (no active provider + API key present)\n");
-        } else if (config->hasProvider("claude_code")) {
-            desiredProvider = "claude_code";
-            fprintf(stderr, "DEBUG: Falling back to claude_code (no provider configured)\n");
-        }
-    }
-    if (!desiredProvider.empty())
-        config->setActiveProvider(desiredProvider);
-
-    if (loadResult) {
-        fprintf(stderr, "DEBUG: Config loaded successfully, active provider: %s\n", desiredProvider.c_str());
-    } else {
-        // Config file missing or invalid - create default but DON'T overwrite existing file
-        fprintf(stderr, "ERROR: Failed to load llm/config/llm_config.json\n");
-        fprintf(stderr, "DEBUG: Using default config with activeProvider: %s\n", desiredProvider.c_str());
-        
-        // Check validation errors
-        auto errors = config->getValidationErrors();
-        for (const auto& error : errors) {
-            fprintf(stderr, "Config error: %s\n", error.c_str());
-        }
+    if (!loadResult) {
         std::string defaultJson = LLMConfig::getDefaultConfigJson();
         config->loadFromString(defaultJson);
-        
-        // Only save if file doesn't exist at all
-        FILE* check = fopen("llm/config/llm_config.json", "r");
-        if (!check) {
-            config->saveToFile("llm/config/llm_config.json");
-        } else {
-            fclose(check);
-        }
-        
-        // Try the default active provider
-        std::string defaultProvider = desiredProvider.empty() ? config->getActiveProvider() : desiredProvider;
-        if (!initializeProvider(defaultProvider)) {
-            // If default provider fails, try any available provider
-            auto availableProviders = config->getAvailableProviders();
-            for (const auto& provider : availableProviders) {
-                if (initializeProvider(provider)) {
-                    fprintf(stderr, "Fallback: Using provider '%s' instead of '%s'\n", provider.c_str(), defaultProvider.c_str());
-                    break;
-                }
-            }
-        }
     }
 
-    // Initialize desired provider with fallback sequence: desired first, then the rest.
-    std::vector<std::string> candidates;
-    if (!desiredProvider.empty())
-        candidates.push_back(desiredProvider);
-    auto available = config->getAvailableProviders();
-    for (const auto& p : available) {
-        if (std::find(candidates.begin(), candidates.end(), p) == candidates.end())
-            candidates.push_back(p);
-    }
-    for (const auto& name : candidates) {
-        if (initializeProvider(name)) {
-            fprintf(stderr, "DEBUG: Successfully initialized provider: %s\n", name.c_str());
+    // Use AuthConfig singleton to pick the single correct provider.
+    const AuthConfig& auth = AuthConfig::instance();
+    std::string desiredProvider;
+
+    switch (auth.mode()) {
+        case AuthMode::ClaudeCode:
+            desiredProvider = "claude_code_sdk";
             break;
-        } else {
-            fprintf(stderr, "ERROR: Failed to initialize provider: %s\n", name.c_str());
-        }
+        case AuthMode::ApiKey:
+            desiredProvider = "anthropic_api";
+            break;
+        case AuthMode::NoAuth:
+            fprintf(stderr, "[wibwob] No auth available — LLM disabled. "
+                            "Run 'claude /login' or set ANTHROPIC_API_KEY.\n");
+            return;  // No provider to initialise
+    }
+
+    config->setActiveProvider(desiredProvider);
+    fprintf(stderr, "[wibwob] Auth mode %s → provider %s\n",
+            auth.modeName(), desiredProvider.c_str());
+
+    if (initializeProvider(desiredProvider)) {
+        fprintf(stderr, "[wibwob] Provider %s initialized OK\n", desiredProvider.c_str());
+    } else {
+        fprintf(stderr, "[wibwob] ERROR: Failed to initialize provider %s\n", desiredProvider.c_str());
     }
 }
 

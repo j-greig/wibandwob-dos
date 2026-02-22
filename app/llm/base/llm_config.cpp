@@ -160,9 +160,7 @@ bool LLMConfig::parseJson(const std::string& json) {
     
     // Parse each provider
     parseProvider(json, "claude_code_sdk");
-    parseProvider(json, "claude_code");
-    parseProvider(json, "anthropic_api");  
-    parseProvider(json, "openrouter");
+    parseProvider(json, "anthropic_api");
     
     validateConfiguration();
     return validationErrors.empty();
@@ -294,7 +292,7 @@ void LLMConfig::validateConfiguration() {
         if (!config.enabled) continue;
         
         // Validate API-based providers
-        if (name == "anthropic_api" || name == "openrouter") {
+        if (name == "anthropic_api") {
             if (config.endpoint.empty()) {
                 validationErrors.push_back("Provider '" + name + "' missing endpoint");
             }
@@ -306,12 +304,7 @@ void LLMConfig::validateConfiguration() {
             }
         }
         
-        // Validate command-based providers
-        if (name == "claude_code") {
-            if (config.command.empty()) {
-                validationErrors.push_back("Provider '" + name + "' missing command");
-            }
-        }
+        // (No command-based provider validation needed — claude_code removed)
     }
 }
 
@@ -358,11 +351,6 @@ std::string LLMConfig::getDefaultConfigJson() {
       "nodeScriptPath": "llm/sdk_bridge/claude_sdk_bridge.js",
       "sessionTimeout": 3600
     },
-    "claude_code": {
-      "enabled": true,
-      "command": "claude",
-      "args": ["-p"]
-    },
     "anthropic_api": {
       "enabled": true,
       "model": "claude-haiku-4-5",
@@ -370,12 +358,6 @@ std::string LLMConfig::getDefaultConfigJson() {
       "apiKeyEnv": "ANTHROPIC_API_KEY",
       "maxTokens": "4096",
       "temperature": "0.7"
-    },
-    "openrouter": {
-      "enabled": true,
-      "model": "anthropic/claude-haiku-4-5",
-      "endpoint": "https://openrouter.ai/api/v1/chat/completions",
-      "apiKeyEnv": "OPENROUTER_API_KEY"
     }
   }
 })";

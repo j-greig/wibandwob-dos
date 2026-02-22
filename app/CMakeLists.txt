@@ -16,10 +16,10 @@ set(TV_COMMON_SOURCES
     theme_manager.cpp
     wibwob_view.cpp
     wibwob_engine.cpp
+    llm/base/auth_config.cpp
     llm/base/llm_config.cpp
     llm/base/llm_provider_factory.cpp
     llm/base/tool_executor.cpp
-    llm/providers/claude_code_provider.cpp
     llm/providers/claude_code_sdk_provider.cpp
     llm/providers/anthropic_api_provider.cpp
     llm/tools/time_tools.cpp
@@ -138,6 +138,7 @@ add_executable(scramble_engine_test
     scramble_engine_test.cpp
     scramble_engine.cpp
     command_registry.cpp
+    llm/base/auth_config.cpp
 )
 
 add_test(NAME scramble_engine COMMAND scramble_engine_test)

@@ -31,8 +31,8 @@ public:
     // Blocks until curl completes (typically 1-3 seconds).
     std::string ask(const std::string& question) const;
 
-    // Check if client has API key and is usable.
-    bool isAvailable() const { return !apiKey.empty(); }
+    // Check if client is usable (API key or CLI mode).
+    bool isAvailable() const { return !apiKey.empty() || useCliMode; }
 
     // Rate limiting: returns true if enough time has passed since last call.
     bool canCall() const;
@@ -48,8 +48,16 @@ private:
     mutable time_t lastCallTime;
     static const int kRateLimitSeconds = 3;  // min gap between Haiku calls
 
+    // Claude Code CLI mode (when logged in via `claude /login`)
+    bool useCliMode = false;
+    std::string claudeCliPath;
+
     // Scramble system prompt (personality + context).
     std::string buildSystemPrompt() const;
+
+    // Backend-specific ask implementations.
+    std::string askViaCli(const std::string& question) const;
+    std::string askViaCurl(const std::string& question) const;
 
     // JSON helpers.
     static std::string jsonEscape(const std::string& s);
