@@ -3422,25 +3422,12 @@ std::string TTestPatternApp::buildWorkspaceJson()
         if (type == "test_pattern") {
             props = "{}"; // Pattern mode is global in MVP
         } else if (type == "frame_player") {
-            // Walk child views to find the FrameFilePlayerView
-            TView *cStart = w->first();
-            if (cStart) { TView *c = cStart; do {
-                if (auto *fp = dynamic_cast<FrameFilePlayerView*>(c)) {
-                    props = "{\"path\": \"" + jsonEscape(fp->getFilePath()) +
-                            "\", \"periodMs\": " + std::to_string(fp->getPeriodMs()) + "}";
-                    break;
-                }
-                c = c->next;
-            } while (c != cStart); }
-        } else if (type == "text_view") {
-            TView *cStart = w->first();
-            if (cStart) { TView *c = cStart; do {
-                if (auto *tv = dynamic_cast<TTextFileView*>(c)) {
-                    props = "{\"path\": \"" + jsonEscape(tv->getFilePath()) + "\"}";
-                    break;
-                }
-                c = c->next;
-            } while (c != cStart); }
+            // TFrameAnimationWindow stores the path directly — use its getter
+            if (auto *faw = dynamic_cast<TFrameAnimationWindow*>(w)) {
+                const std::string& fp = faw->getFilePath();
+                if (!fp.empty())
+                    props = "{\"path\": \"" + jsonEscape(fp) + "\"}";
+            }
         } else if (type == "gradient") {
             // Keep concrete gradient subtype in props for backward compatibility.
             TView *cStart = w->first();
