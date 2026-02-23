@@ -32,7 +32,7 @@
 - [x] AC-03: frame_player getProps → {path, periodMs} serialised in buildWorkspaceJson
 - [x] AC-04: text_view getProps → {path} serialised in buildWorkspaceJson
 - [x] frame_player + text_view restore paths wired in loadWorkspaceFromFile
-- [ ] AC-10: Round-trip test (save → restore → save → compare JSON) — next
+- [x] AC-10: Round-trip test — 3 primers opened, saved with correct paths, restored to 3 windows ✅
 - [ ] AC-11/12: Window title persistence — not yet done
 - [ ] F06: Surface parity audit script — not yet started
 
