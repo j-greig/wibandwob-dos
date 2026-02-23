@@ -746,7 +746,7 @@ def build_algo_map(primers_meta, canvas_w, canvas_h, padding, margin, opts) -> d
                                   rows=opts.get("rows", 4),
                                   turns=float(opts.get("turns", 3.0)),
                                   anchor=opts.get("anchor", "center"),
-                                  scale=int(opts.get("dot_size", 1))),
+                                  dot_size=int(opts.get("dot_size", 1))),
         "cluster":            lambda: _layout_cluster(
                                   primers_meta, canvas_w, canvas_h,
                                   padding=opts.get("padding", padding),
