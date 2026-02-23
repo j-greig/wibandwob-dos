@@ -147,7 +147,13 @@ x=2                      x=61
 
 Only run after TEST-01–04 all PASS.
 
-**Result**: 🔍 NOT RUN YET
+**Result**: ✅ PASS — 2026-02-23
+
+10 real wibwobworld primers (glum-face, iso-cube-cornered, mini-herbivore, cat-cat-simple, 3dboy,
+recursive-disco-cat, reading-reality, wobs-group, ouija-board, flatboy-2d-3d) arranged via
+`POST /gallery/arrange` masonry on 157×60 canvas. 0 overlaps. Canvas utilisation 34.4%.
+Windows placed across 3 columns; content fully readable; gallery-wall feel confirmed via
+TUI screenshot + SVG: `logs/snapshots/e012-real-gallery-wall.{json,svg,txt}`
 
 ---
 
