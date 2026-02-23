@@ -1,0 +1,24 @@
+OpenAI Codex v0.53.0 (research preview)
+--------
+workdir: /Users/james/Repos/wibandwob-dos
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: medium
+reasoning summaries: auto
+session id: 019c8b08-5e0d-70f0-9a5c-e7faabd77533
+--------
+user
+EFFICIENCY: Use targeted rg/sed/grep, not full-file dumps. Max 20 lines per file shown.
+Audit — read only, no writes.
+Find every class in app/ inheriting TWindow or TView (directly or indirectly).
+For each: does it override getProps()? setProps()? What state does it hold (file path, fps, tab, etc)?
+Output a markdown table: class | file | getProps? | setProps? | state_fields
+Then list classes MISSING getProps/setProps that should have them.
+Re-connecting... 1/5
+Re-connecting... 2/5
+Re-connecting... 3/5
+Re-connecting... 4/5
+Re-connecting... 5/5
+ERROR: stream disconnected before completion: The model `gpt-5.3-codex` does not exist or you do not have access to it.

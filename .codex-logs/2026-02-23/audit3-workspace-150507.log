@@ -1,0 +1,24 @@
+OpenAI Codex v0.53.0 (research preview)
+--------
+workdir: /Users/james/Repos/wibandwob-dos
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: medium
+reasoning summaries: auto
+session id: 019c8b08-5e10-7072-8ef8-62657763af6b
+--------
+user
+EFFICIENCY: Use targeted rg/sed/grep, not full-file dumps. Max 20 lines per file shown.
+Audit — read only, no writes.
+Find all .json files in workspaces/ and logs/.
+For each: count windows by type, count empty props {}, count empty titles.
+For frame_player windows: which props keys are present?
+Output a summary table then root-cause sentences for each gap.
+Re-connecting... 1/5
+Re-connecting... 2/5
+Re-connecting... 3/5
+Re-connecting... 4/5
+Re-connecting... 5/5
+ERROR: stream disconnected before completion: The model `gpt-5.3-codex` does not exist or you do not have access to it.

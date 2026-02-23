@@ -132,7 +132,7 @@ namespace {
 }
 
 FrameFilePlayerView::FrameFilePlayerView(const TRect &bounds, const std::string &path, unsigned periodMs)
-    : TView(bounds), periodMs(periodMs) {
+    : TView(bounds), filePath_(path), periodMs(periodMs) {
     growMode = gfGrowHiX | gfGrowHiY;
     // Receive timer expirations via broadcast events (cmTimerExpired).
     // See TProgram::idle() and TTimerQueue in the library.
@@ -362,7 +362,7 @@ void FrameFilePlayerView::setState(ushort aState, Boolean enable) {
 }
 
 // TTextFileView implementation
-TTextFileView::TTextFileView(const TRect &bounds, const std::string &path) : TGroup(bounds)
+TTextFileView::TTextFileView(const TRect &bounds, const std::string &path) : TGroup(bounds), filePath_(path)
 {
     growMode = gfGrowHiX | gfGrowHiY;
     options |= ofSelectable;

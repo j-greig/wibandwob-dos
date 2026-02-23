@@ -69,9 +69,12 @@ public:
     void setBackgroundConfig(const TBackgroundConfig& config);
     const TBackgroundConfig& getBackgroundConfig() const { return bgConfig; }
     bool openBackgroundDialog();
+    const std::string &getFilePath() const { return filePath_; }
+    unsigned getPeriodMs() const { return periodMs; }
 
 private:
     // Data
+    std::string filePath_;  // stored for workspace serialisation
     std::string fileData;
     std::vector<Span> frames;
     size_t frameIndex {0};
@@ -111,8 +114,10 @@ public:
     void setBackgroundConfig(const TBackgroundConfig& config);
     const TBackgroundConfig& getBackgroundConfig() const { return bgConfig; }
     bool openBackgroundDialog();
+    const std::string &getFilePath() const { return filePath_; }
 
 private:
+    std::string filePath_;  // stored for workspace serialisation
     std::vector<std::string> lines;
     int topLine {0};
     bool loadOk {false};

@@ -3251,6 +3251,29 @@ bool TTestPatternApp::loadWorkspaceFromFile(const std::string& path)
             else if (gtype == "radial") gt = TGradientWindow::gtRadial;
             else if (gtype == "diagonal") gt = TGradientWindow::gtDiagonal;
             win = new TGradientWindow(bounds, "", gt);
+        } else if (type == "frame_player") {
+            std::string path; unsigned pms = 300;
+            size_t propsPos = obj.find("\"props\"");
+            if (propsPos != std::string::npos) {
+                size_t brace = obj.find('{', propsPos);
+                if (brace != std::string::npos) {
+                    parseKeyedString(obj, brace+1, "path", path);
+                    std::string pmsStr;
+                    parseKeyedString(obj, brace+1, "periodMs", pmsStr);
+                    if (!pmsStr.empty()) pms = (unsigned)std::stoul(pmsStr);
+                }
+            }
+            if (!path.empty()) openAnimationFilePath(path, bounds, false, false);
+            continue; // openAnimationFilePath handles insert + register
+        } else if (type == "text_view") {
+            std::string path;
+            size_t propsPos = obj.find("\"props\"");
+            if (propsPos != std::string::npos) {
+                size_t brace = obj.find('{', propsPos);
+                if (brace != std::string::npos)
+                    parseKeyedString(obj, brace+1, "path", path);
+            }
+            if (!path.empty()) { api_open_text_view_path(*this, path, &bounds); continue; }
         } else {
             const WindowTypeSpec* spec = find_window_type_by_name(type);
             if (!spec || !spec->spawn) continue;
@@ -3398,6 +3421,26 @@ std::string TTestPatternApp::buildWorkspaceJson()
 
         if (type == "test_pattern") {
             props = "{}"; // Pattern mode is global in MVP
+        } else if (type == "frame_player") {
+            // Walk child views to find the FrameFilePlayerView
+            TView *cStart = w->first();
+            if (cStart) { TView *c = cStart; do {
+                if (auto *fp = dynamic_cast<FrameFilePlayerView*>(c)) {
+                    props = "{\"path\": \"" + jsonEscape(fp->getFilePath()) +
+                            "\", \"periodMs\": " + std::to_string(fp->getPeriodMs()) + "}";
+                    break;
+                }
+                c = c->next;
+            } while (c != cStart); }
+        } else if (type == "text_view") {
+            TView *cStart = w->first();
+            if (cStart) { TView *c = cStart; do {
+                if (auto *tv = dynamic_cast<TTextFileView*>(c)) {
+                    props = "{\"path\": \"" + jsonEscape(tv->getFilePath()) + "\"}";
+                    break;
+                }
+                c = c->next;
+            } while (c != cStart); }
         } else if (type == "gradient") {
             // Keep concrete gradient subtype in props for backward compatibility.
             TView *cStart = w->first();

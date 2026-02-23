@@ -22,6 +22,12 @@
 #include "generative_monster_verse_view.h"
 #include "generative_monster_portal_view.h"
 #include "wibwob_view.h"
+#include "quadra_view.h"
+#include "snake_view.h"
+#include "rogue_view.h"
+#include "deep_signal_view.h"
+#include "app_launcher_view.h"
+#include "ascii_gallery_view.h"
 #include "scramble_view.h"
 #include "paint/paint_window.h"
 #include "micropolis_ascii_view.h"
@@ -61,6 +67,12 @@ extern void api_spawn_paint(TTestPatternApp&, const TRect*);
 extern void api_spawn_micropolis_ascii(TTestPatternApp&, const TRect*);
 extern void api_spawn_terminal(TTestPatternApp&, const TRect*);
 extern void api_spawn_wibwob(TTestPatternApp&, const TRect*);
+extern void api_spawn_quadra(TTestPatternApp&, const TRect*);
+extern void api_spawn_snake(TTestPatternApp&, const TRect*);
+extern void api_spawn_rogue(TTestPatternApp&, const TRect*);
+extern void api_spawn_deep_signal(TTestPatternApp&, const TRect*);
+extern void api_spawn_app_launcher(TTestPatternApp&, const TRect*);
+extern void api_spawn_gallery(TTestPatternApp&, const TRect*);
 
 // ── Bounds helper ─────────────────────────────────────────────────────────────
 
@@ -200,6 +212,18 @@ static const char* spawn_terminal(TTestPatternApp& app,
                                    const std::map<std::string, std::string>& kv) {
     TRect r; api_spawn_terminal(app, opt_bounds(kv, r)); return nullptr;
 }
+static const char* spawn_quadra(TTestPatternApp& app, const std::map<std::string,std::string>& kv) {
+    TRect r; api_spawn_quadra(app, opt_bounds(kv, r)); return nullptr; }
+static const char* spawn_snake(TTestPatternApp& app, const std::map<std::string,std::string>& kv) {
+    TRect r; api_spawn_snake(app, opt_bounds(kv, r)); return nullptr; }
+static const char* spawn_rogue(TTestPatternApp& app, const std::map<std::string,std::string>& kv) {
+    TRect r; api_spawn_rogue(app, opt_bounds(kv, r)); return nullptr; }
+static const char* spawn_deep_signal(TTestPatternApp& app, const std::map<std::string,std::string>& kv) {
+    TRect r; api_spawn_deep_signal(app, opt_bounds(kv, r)); return nullptr; }
+static const char* spawn_app_launcher(TTestPatternApp& app, const std::map<std::string,std::string>& kv) {
+    TRect r; api_spawn_app_launcher(app, opt_bounds(kv, r)); return nullptr; }
+static const char* spawn_gallery(TTestPatternApp& app, const std::map<std::string,std::string>& kv) {
+    TRect r; api_spawn_gallery(app, opt_bounds(kv, r)); return nullptr; }
 
 template <typename ViewType>
 static bool has_child_view(TWindow* w) {
@@ -242,7 +266,13 @@ static bool match_paint(TWindow* w) { return dynamic_cast<TPaintWindow*>(w) != n
 static bool match_micropolis_ascii(TWindow* w) { return has_child_view<TMicropolisAsciiView>(w); }
 static bool match_terminal(TWindow* w) { return dynamic_cast<TWibWobTerminalWindow*>(w) != nullptr; }
 static bool match_wibwob(TWindow* w) { return dynamic_cast<TWibWobWindow*>(w) != nullptr; }
-static bool match_scramble(TWindow* w) { return dynamic_cast<TScrambleWindow*>(w) != nullptr; }
+static bool match_scramble(TWindow* w)    { return dynamic_cast<TScrambleWindow*>(w) != nullptr; }
+static bool match_quadra(TWindow* w)      { return has_child_view<TQuadraView>(w); }
+static bool match_snake(TWindow* w)       { return has_child_view<TSnakeView>(w); }
+static bool match_rogue(TWindow* w)       { return has_child_view<TRogueView>(w); }
+static bool match_deep_signal(TWindow* w) { return has_child_view<TDeepSignalView>(w); }
+static bool match_app_launcher(TWindow* w){ return dynamic_cast<TAppLauncherWindow*>(w) != nullptr; }
+static bool match_gallery(TWindow* w)     { return dynamic_cast<TGalleryWindow*>(w) != nullptr; }
 
 // ── Registry table ────────────────────────────────────────────────────────────
 // Add new window types here — nowhere else.
@@ -275,6 +305,12 @@ static const WindowTypeSpec k_specs[] = {
                                TRect r; api_spawn_wibwob(app, opt_bounds(kv, r)); return nullptr;
                            },                       match_wibwob             },
     { "scramble",          nullptr,                match_scramble           },
+    { "quadra",            spawn_quadra,           match_quadra             },
+    { "snake",             spawn_snake,            match_snake              },
+    { "rogue",             spawn_rogue,            match_rogue              },
+    { "deep_signal",       spawn_deep_signal,      match_deep_signal        },
+    { "app_launcher",      spawn_app_launcher,     match_app_launcher       },
+    { "gallery",           spawn_gallery,          match_gallery            },
 };
 
 // ── Lookup implementations ────────────────────────────────────────────────────
