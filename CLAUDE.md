@@ -250,6 +250,37 @@ All views are TView subclasses — resizable, movable, stackable:
 - **Utility**: Text editor, ANSI viewer, ASCII image, grid, transparent text, token tracker
 - **Paint**: Full pixel-level drawing system (`app/paint/`)
 
+### Primer Window Chrome
+
+Primer windows (`TFrameAnimationWindow`) have three **independent** display flags — mix freely:
+
+| `frameless` | `shadowless` | result |
+|---|---|---|
+| false | false | normal framed window with drop shadow (default) |
+| true  | false | ghost frame (invisible border) + shadow still visible |
+| false | true  | normal frame, no drop shadow |
+| true  | true  | fully chromeless — no border, no shadow (pure art/gallery mode) |
+
+`show_title=true` — shows primer filename (without `.txt`) in the top border.
+No-op on frameless windows: `TGhostFrame` has no title bar to render into.
+
+**API usage** (`/gallery/arrange` or direct `/menu/command open_primer`):
+```bash
+# ghost frame only
+curl -X POST .../gallery/arrange -d '{"frameless":true,"shadowless":false,...}'
+
+# fully chromeless
+curl -X POST .../gallery/arrange -d '{"frameless":true,"shadowless":true,...}'
+
+# titled framed window
+curl -X POST .../gallery/arrange -d '{"show_title":true,...}'
+```
+
+**C++ location**: `TFrameAnimationWindow` constructor in `app/test_pattern_app.cpp`.
+`frameless` → chooses `TGhostFrame` vs `TFrame` via `TWindowInit`.
+`shadowless` → clears `sfShadow` state flag post-construction.
+`title` kv arg → passed as `aTitle` to `TWindow`; visible only when framed.
+
 ### Turbo Vision ANSI Rendering Rule
 
 When implementing image/terminal-rich rendering in Turbo Vision views:

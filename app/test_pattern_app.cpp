@@ -592,14 +592,23 @@ public:
 /*---------------------------------------------------------*/
 /* TFrameAnimationWindow - Window containing animation    */
 /*---------------------------------------------------------*/
-
+//
+// Window chrome has three independent axes — mix freely:
+//
+//   frameless=false, shadowless=false  → normal framed window with shadow (default)
+//   frameless=true,  shadowless=false  → TGhostFrame (invisible border, shadow still visible)
+//   frameless=false, shadowless=true   → normal frame, no drop shadow
+//   frameless=true,  shadowless=true   → fully chromeless: no border, no shadow (gallery/art mode)
+//
+//   show_title (aTitle != "")          → primer stem shown in top border.
+//                                        No-op on frameless windows: TGhostFrame has no title bar.
+//
+// TGhostFrame uses the full bounds for content (no 1-char inset).
+// Standard frame shrinks content by 1 char on every side.
+//
 class TFrameAnimationWindow : public TWindow
 {
 public:
-    // frameless=false  → standard 1-char border (no title, notitle frame)
-    // frameless=true   → TGhostFrame + content fills full bounds (gallery mode)
-    // shadowless=true  → clears sfShadow flag so TV draws no drop shadow
-    //                    (frameless=true implies shadowless=true automatically)
     TFrameAnimationWindow(const TRect& bounds, const char* aTitle,
                           const std::string& filePath,
                           bool frameless = false, bool shadowless = false) :
@@ -611,7 +620,7 @@ public:
     {
         options |= ofTileable;  // Enable cascade/tile functionality
 
-        // Remove drop shadow when requested, or whenever frameless (no chrome = no shadow)
+        // shadowless is independent of frameless — clear sfShadow only when explicitly requested
         if (shadowless)
             state &= ~sfShadow;
 
