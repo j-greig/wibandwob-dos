@@ -40,7 +40,7 @@ class TTestPatternApp; // forward decl (full type used only by called functions)
 
 extern void api_spawn_test(TTestPatternApp&, const TRect*);
 extern void api_spawn_gradient(TTestPatternApp&, const std::string&, const TRect*);
-extern void api_open_animation_path(TTestPatternApp&, const std::string&, const TRect*);
+extern void api_open_animation_path(TTestPatternApp&, const std::string&, const TRect*, bool frameless);
 extern void api_open_text_view_path(TTestPatternApp&, const std::string&, const TRect*);
 extern void api_spawn_text_editor(TTestPatternApp&, const TRect*, const std::string&);
 extern void api_spawn_browser(TTestPatternApp&, const TRect*);
@@ -93,7 +93,9 @@ static const char* spawn_frame_player(TTestPatternApp& app,
                                        const std::map<std::string, std::string>& kv) {
     auto it = kv.find("path");
     if (it == kv.end() || it->second.empty()) return "err missing path";
-    TRect r; api_open_animation_path(app, it->second, opt_bounds(kv, r)); return nullptr;
+    auto fi = kv.find("frameless");
+    bool frameless = (fi != kv.end() && (fi->second == "1" || fi->second == "true"));
+    TRect r; api_open_animation_path(app, it->second, opt_bounds(kv, r), frameless); return nullptr;
 }
 
 static const char* spawn_text_view(TTestPatternApp& app,
