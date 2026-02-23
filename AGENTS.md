@@ -10,8 +10,8 @@ Mirror high-value hook behavior explicitly, including `.claude/hooks/gh-format-l
 
 ## Canon Workflow Rules
 
-1. Issue-first for non-trivial work.
-2. Branch-per-issue.
+1. Issue-first for non-trivial work. Exception: spikes (`.planning/` doc-only investigations) only need a branch — no GitHub issue required.
+2. Branch-per-issue (or branch-per-spike for spikes).
 3. Keep PR scope to one logical slice.
 4. Update planning briefs the same day issue state changes.
 5. Preserve AC -> Test traceability in story files.

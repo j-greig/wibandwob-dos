@@ -612,7 +612,7 @@ public:
         options |= ofTileable;  // Enable cascade/tile functionality
 
         // Remove drop shadow when requested, or whenever frameless (no chrome = no shadow)
-        if (shadowless || frameless)
+        if (shadowless)
             state &= ~sfShadow;
 
         // Frameless: content occupies full window bounds (no 1-char frame inset).
@@ -700,7 +700,7 @@ private:
     void newWibWobTestWindowC();
     void openAnimationFile();
     void openAnimationFilePath(const std::string& path);
-    void openAnimationFilePath(const std::string& path, const TRect& bounds, bool frameless = false, bool shadowless = false);
+    void openAnimationFilePath(const std::string& path, const TRect& bounds, bool frameless = false, bool shadowless = false, const std::string& title = "");
     void openTransparentTextFile();
     void openMonodrawFile(const char* fileName);
     void openWorkspace();
@@ -840,7 +840,7 @@ private:
     friend void api_open_text_view_path(TTestPatternApp&, const std::string&, const TRect* bounds);
     friend void api_spawn_test(TTestPatternApp&, const TRect* bounds);
     friend void api_spawn_gradient(TTestPatternApp&, const std::string&, const TRect* bounds);
-    friend void api_open_animation_path(TTestPatternApp&, const std::string&, const TRect* bounds, bool frameless, bool shadowless);
+    friend void api_open_animation_path(TTestPatternApp&, const std::string&, const TRect* bounds, bool frameless, bool shadowless, const std::string& title);
     friend void api_cascade(TTestPatternApp&);
     friend void api_toggle_scramble(TTestPatternApp&);
     friend void api_expand_scramble(TTestPatternApp&);
@@ -2129,23 +2129,11 @@ void TTestPatternApp::openAnimationFilePath(const std::string& filePath)
     registerWindow(window);
 }
 
-void TTestPatternApp::openAnimationFilePath(const std::string& filePath, const TRect& bounds, bool frameless, bool shadowless)
+void TTestPatternApp::openAnimationFilePath(const std::string& filePath, const TRect& bounds, bool frameless, bool shadowless, const std::string& title)
 {
-    // Determine file type and create appropriate title
     windowNumber++;
-    std::stringstream title;
-
-    if (hasFrameDelimiters(filePath)) {
-        title << "Animation " << windowNumber;
-    } else {
-        // Extract filename without path for text files
-        size_t lastSlash = filePath.find_last_of("/\\");
-        std::string baseName = (lastSlash != std::string::npos) ? filePath.substr(lastSlash + 1) : filePath;
-        title << baseName << " - Text " << windowNumber;
-    }
-
     // Create and insert window with provided bounds
-    TFrameAnimationWindow* window = new TFrameAnimationWindow(bounds, "", filePath, frameless, shadowless);
+    TFrameAnimationWindow* window = new TFrameAnimationWindow(bounds, title.c_str(), filePath, frameless, shadowless);
     deskTop->insert(window);
     registerWindow(window);
 }
@@ -2676,13 +2664,12 @@ void api_open_text_view_path(TTestPatternApp& app, const std::string& path, cons
     app.registerWindow(window);
 }
 
-void api_open_animation_path(TTestPatternApp& app, const std::string& path, const TRect* bounds, bool frameless, bool shadowless) {
+void api_open_animation_path(TTestPatternApp& app, const std::string& path, const TRect* bounds, bool frameless, bool shadowless, const std::string& title) {
     if (bounds) {
-        app.openAnimationFilePath(path, *bounds, frameless, shadowless);
+        app.openAnimationFilePath(path, *bounds, frameless, shadowless, title);
     } else if (frameless || shadowless) {
-        // Auto-size bounds, but still respect display flags
         TRect autoBounds = app.calculateWindowBounds(path);
-        app.openAnimationFilePath(path, autoBounds, frameless, shadowless);
+        app.openAnimationFilePath(path, autoBounds, frameless, shadowless, title);
     } else {
         app.openAnimationFilePath(path);
     }

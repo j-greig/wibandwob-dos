@@ -805,9 +805,9 @@ def make_app() -> FastAPI:
         # 5. Apply (unless preview)
         applied = False
         if not payload.preview:
-            # Detect duplicate filenames → open-fresh mode (stamp, text-pixel art, etc.)
+            # open-fresh when: duplicates in this call, OR caller explicitly wants fresh windows
             all_fnames = [a.filename for a in arrangement]
-            has_dupes  = len(all_fnames) != len(set(all_fnames))
+            has_dupes  = payload.force_open or len(all_fnames) != len(set(all_fnames))
 
             # Build map: basename-without-ext → window id  (unique-filename mode only)
             win_map: dict[str, str] = {}
@@ -847,9 +847,10 @@ def make_app() -> FastAPI:
                         }
                         if payload.frameless:
                             open_args["frameless"] = "true"
-                        # frameless always implies shadowless (no chrome = no shadow)
-                        if payload.shadowless or payload.frameless:
+                        if payload.shadowless:
                             open_args["shadowless"] = "true"
+                        if payload.show_title:
+                            open_args["title"] = place.filename.removesuffix(".txt")
                         res = await ctl.exec_command("open_primer", open_args, actor="gallery_arrange")
                         if res.get("ok"):
                             new_state = await ctl.get_state()

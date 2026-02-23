@@ -438,6 +438,16 @@ class GalleryArrangeRequest(BaseModel):
     canvas_width: int = Field(0, description="Override canvas width (0 = auto-query from TUI state)")
     canvas_height: int = Field(0, description="Override canvas height (0 = auto-query from TUI state)")
     preview: bool = Field(False, description="If true, return the plan without applying it")
+    show_title: bool = Field(False, description=(
+        "Show the primer filename (without .txt) in the window title bar. "
+        "Off by default — primers are often narrower than their filename. "
+        "No-op on frameless windows (no frame = nowhere to render the title)."
+    ))
+    force_open: bool = Field(False, description=(
+        "Always open a fresh window for every placement, even if a window with "
+        "that filename is already open. Required when calling gallery/arrange "
+        "multiple times to place the same primer with different display modes."
+    ))
     frameless: bool = Field(False, description=(
         "Open primers as ghost-frame windows — no visible border chrome. "
         "Content fills the full window bounds. Automatically implies shadowless=true. "
