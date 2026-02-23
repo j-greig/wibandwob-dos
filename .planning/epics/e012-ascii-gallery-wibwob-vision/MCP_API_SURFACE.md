@@ -1,397 +1,261 @@
-# MCP API Surface Analysis — WibWob TUI
-
-## Current Tools & Their Signatures
-
-### Window Management
-
-#### `tui_create_window`
-```
-Input: { type, title?, x?, y?, width?, height?, props? }
-Output: { window_id }
-Notes: Creates any window type. No validation of dimensions.
-```
-
-#### `tui_move_window`
-```
-Input: { window_id, x?, y?, width?, height? }
-Output: { ok }
-Notes: Only accepts partial updates (send only fields you want to change).
-```
-
-#### `tui_get_state`
-```
-Input: {}
-Output: {
-  canvas: { width, height },
-  windows: [{ id, type, title, x, y, width, height }],
-  pattern_mode, theme
-}
-Notes: Read-only. Reflects current layout state.
-```
-
-### Content & Rendering
-
-#### `tui_menu_command`
-```
-Input: { command: string, args: object }
-Output: { ok, result? }
-Notes: Generic dispatcher. Commands are discovered via `tui_list_commands`.
-```
-
-Available commands (relevant to gallery):
-- `open_primer` — args: { path: "filename.txt" }
-- `gallery_list` — args: {} (optional tab param)
-- `open_gallery` — args: {}
-
-#### `tui_screenshot`
-```
-Input: {}
-Output: (image file written; can be read via Read tool)
-Notes: Captures entire canvas as text/image. Useful for visual verification.
-```
-
-### Current Gaps for Gallery Layout System
-
-1. **No primer metadata endpoint**
-   - Cannot query dimensions of artwork before opening
-   - Would need to either:
-     a. Add new command `primer_metadata { filename }`
-     b. Extend `/api` surface (if backend REST API exposed)
-
-2. **No window introspection per-window**
-   - Can't ask "what is the natural width of content in window X?"
-   - Would need frame_player to expose this, or screenshot + parse
-
-3. **No batch window operations**
-   - Can only move one window at a time
-   - Applying Masonry arrangement = N sequential `tui_move_window` calls
-   - Could batch, but not critical (network overhead negligible in local TUI)
-
-4. **No layout serialization**
-   - No command to export/import window arrangements
-   - Would need to add `save_gallery_layout` / `load_gallery_layout` commands
+# Gallery API Surface — WibWob TUI
+**Last updated**: 2026-02-23 (E012 sprint 2)
+**Status**: Core layout engine DONE. 5 algorithms live. Poetry mode implemented, not yet visually tested.
 
 ---
 
-## Proposed API Extensions
-
-### 1. Primer Metadata Query
-
-**Command**: `primer_metadata`
-```
-POST /menu/command
-{
-  "command": "primer_metadata",
-  "args": { "filename": "reality-breaks-apart-abstract.txt" }
-}
-
-Response:
-{
-  "ok": true,
-  "result": {
-    "filename": "reality-breaks-apart-abstract.txt",
-    "width": 78,
-    "height": 42,
-    "aspect_ratio": 1.86,
-    "line_count": 42,
-    "max_line_width": 78
-  }
-}
-```
-
-**Implementation**:
-- Backend parses primer files on first load, caches metadata
-- Metadata file: `.metadata.json` per primer or single index
-- Response time: <10ms (cached)
-
----
-
-### 2. Smart Gallery Arrangement
-
-**Command**: `smart_gallery_arrange`
-```
-POST /menu/command
-{
-  "command": "smart_gallery_arrange",
-  "args": {
-    "filenames": ["file1.txt", "file2.txt", "file3.txt"],
-    "algorithm": "masonry",
-    "padding": 2,
-    "preview": false
-  }
-}
-
-Response (preview=false):
-{
-  "ok": true,
-  "result": "arranged"
-}
-
-Response (preview=true):
-{
-  "ok": true,
-  "result": {
-    "arrangement": [
-      { "filename": "file1.txt", "x": 0, "y": 0, "width": 78, "height": 42 },
-      { "filename": "file2.txt", "x": 80, "y": 0, "width": 68, "height": 35 }
-    ],
-    "utilization": 0.87,
-    "overlaps": 0
-  }
-}
-```
-
-**Implementation**:
-- New TUI command handler
-- Calls `primer_metadata` for each file
-- Runs Masonry algorithm (Python or C++ impl)
-- Calls `tui_move_window` for each placement
-- Returns placement report
-
-**Complexity**: ~200 lines of code (algorithm + integration)
-
----
-
-### 3. Layout Persistence
-
-**Command**: `save_gallery_layout`
-```
-POST /menu/command
-{
-  "command": "save_gallery_layout",
-  "args": { "name": "my-curated-show" }
-}
-
-Response:
-{
-  "ok": true,
-  "result": {
-    "layout_id": "my-curated-show",
-    "windows_saved": 5,
-    "path": "~/.wibwob/layouts/my-curated-show.json"
-  }
-}
-```
-
-**Command**: `load_gallery_layout`
-```
-POST /menu/command
-{
-  "command": "load_gallery_layout",
-  "args": { "name": "my-curated-show" }
-}
-
-Response:
-{
-  "ok": true,
-  "result": "layout restored; 5 windows repositioned"
-}
-```
-
-**Implementation**:
-- Serialize `tui_get_state()` windows by filename
-- Write JSON to `~/.wibwob/layouts/{name}.json`
-- On load, close current primer windows, re-open, apply positions
-
----
-
-### 4. Enhanced tui_move_window (Optional)
+## TL;DR — What's Built
 
 ```
-POST /tui/window/{window_id}
-{
-  "x": 0,
-  "y": 0,
-  "width": 78,
-  "height": 42,
-  "fit_to_content": true,
-  "preserve_aspect_ratio": true
-}
-```
-
-**Parameters**:
-- `fit_to_content`: If true, snap width/height to nearest sensible size for the window's content
-- `preserve_aspect_ratio`: If resizing, maintain aspect ratio by adjusting the non-specified dimension [zilla: not posssible with ascii art is it, thinka bout it!]
-
-**Implementation**: ~50 lines (logic in window manager)
-
----
-
-## Architecture Diagram
-
-```
-User calls smart_gallery_arrange
-         ↓
-   tui_menu_command dispatcher
-         ↓
-   [new] GalleryCommand handler
-         ├─→ primer_metadata (x N filenames)
-         │    └─→ cached metadata index
-         ├─→ Masonry algorithm
-         │    └─→ calculates placements
-         └─→ apply via tui_move_window (batch)
-         ↓
-   Windows repositioned on canvas
-         ↓
-   User sees beautifully arranged gallery
+POST /gallery/arrange        ← main entry point — layout + open + place in one call
+GET  /primers/list           ← all primers with wcwidth-accurate dimensions
+GET  /primers/{name}/metadata ← single primer dimensions
+POST /windows/close_all      ← clear canvas
+GET  /state                  ← canvas size + all open windows
 ```
 
 ---
 
-## Implementation Effort Estimate
+## POST /gallery/arrange
 
-| Feature | Effort | Blocking |
-|---------|--------|----------|
-| Primer metadata endpoint | 1-2 hours | No |
-| Masonry algorithm | 1-2 hours | Yes (needs metadata) |
-| Smart arrange command | 1 hour | No (depends on above) |
-| Layout persistence | 1-2 hours | No |
-| Enhanced move_window flags | 30 mins | No |
-| **Total** | **5-9 hours** | — |
+The core gallery command. Measures primers, runs layout algorithm, opens windows, applies positions.
 
----
+### Request
 
-## Tool Limitations & Workarounds
-
-### Limitation 1: Frame Player Windows Don't Expose Content Dimensions
-
-**Problem**: We can't ask a frame_player what its intrinsic content width is.
-
-**Workaround A** (Recommended): Metadata endpoint reads source files
-- Pro: Reliable, fast, decoupled
-- Con: Requires backend work
-
-**Workaround B**: Screenshot + OCR/Analysis
-- Pro: Works with existing API surface
-- Con: Fragile, slow, depends on renderer output
-
-### Limitation 2: No Batch Window Operations
-
-**Problem**: Masonry of 20 pieces = 20 sequential API calls.
-
-**Workaround**: Add batch command
-```
-{
-  "command": "batch_move_windows",
-  "args": {
-    "operations": [
-      { "window_id": "w1", "x": 0, "y": 0, "width": 78, "height": 42 },
-      { "window_id": "w2", "x": 80, "y": 0, "width": 68, "height": 35 }
-    ]
-  }
-}
-```
-
-**Current Impact**: Negligible (TUI is local, latency <1ms per call).
-
-### Limitation 3: Canvas Dimensions Are Fixed at Runtime
-
-**Problem**: Can't detect user resizing canvas.
-
-**Workaround**:
-- Call `tui_get_state` periodically or on demand
-- Re-run layout if canvas dimensions change
-- User hits a "re-arrange" hotkey or command
-
----
-
-## Recommended Implementation Order
-
-1. **Metadata endpoint** — foundation, enables everything else
-2. **Masonry algorithm** — core layout logic, testable independently
-3. **Smart arrange command** — user-facing feature, integrates 1+2
-4. **Layout persistence** — nice-to-have, low complexity - [zilla: we have save workspace already use that!]
-5. **Enhanced move_window** — polish, optional
-
----
-
-## Testing Strategy
-
-### Unit Tests
-- Metadata parsing: 10 sample primers
-- Masonry algorithm: 5 layout scenarios (narrow, wide, mixed, tall, short)
-- No overlaps, no out-of-bounds placements
-
-### Integration Tests
-- Open 5 primers → smart_arrange → verify positions via tui_get_state
-- Save layout → close primers → load layout → verify restoration
-- Canvas resize → re-arrange → verify fit
-
-### Visual Inspection
-- Screenshot after each arrangement
-- Manual aesthetic review (Wib: does it look intentional and beautiful?)
-
----
-
-## Edge Cases to Handle
-
-1. **Piece wider than canvas**: Scale down or crop?
-   - Recommendation: Keep aspect ratio, shrink to fit, show warning
-
-2. **Piece taller than canvas**:
-   - Recommendation: Show warning, place anyway (user can scroll or resize canvas)
-
-3. **Canvas with no room left**:
-   - Recommendation: Cascade instead of Masonry
-
-4. **Empty filenames or duplicates**:
-   - Validation: Filter; deduplicate by filename
-
-5. **Metadata file corrupted**:
-   - Fallback: Re-parse source file, cache result
-
----
-
-## Appendix: Current Tool JSON Examples
-
-### tui_get_state response (current)
 ```json
 {
-  "canvas": { "width": 320, "height": 78 },
-  "windows": [
+  "filenames": ["foo.txt", "bar.txt"],
+  "algorithm": "packery",
+  "padding": 2,
+  "margin": 1,
+  "preview": false,
+  "frameless": false,
+  "canvas_width": 0,
+  "canvas_height": 0,
+  "options": {}
+}
+```
+
+| Field | Default | Notes |
+|---|---|---|
+| `filenames` | required | Basenames only, e.g. `"foo.txt"`. Resolved across `modules-private/` and `modules/` automatically. |
+| `algorithm` | `"masonry"` | See algorithms below. |
+| `padding` | `2` | Gap between windows (chars). 2 = exactly fills TV drop shadow — never go lower. |
+| `margin` | `1` | Gap between window shadow edge and canvas edge. 1 aligns left edge with the File menu 'F'. |
+| `preview` | `false` | If true, return plan without applying it. |
+| `frameless` | `false` | Open primers without TV title/border chrome (`TGhostFrame`). |
+| `canvas_width/height` | `0` | 0 = auto-query from `/state`. Always use 0 unless overriding for testing. |
+| `options` | `{}` | Per-algorithm params — see below. |
+
+### Response
+
+```json
+{
+  "ok": true,
+  "algorithm": "packery",
+  "arrangement": [
+    { "filename": "foo.txt", "x": 1, "y": 1, "width": 45, "height": 13, "window_id": "w12" }
+  ],
+  "canvas_width": 362,
+  "canvas_height": 96,
+  "canvas_utilization": 0.704,
+  "overlaps": 0,
+  "out_of_bounds": 0,
+  "applied": true,
+  "preview": false
+}
+```
+
+`out_of_bounds` counts windows whose shadow would clip the canvas edge. Should always be 0. Check this after any layout change.
+
+---
+
+## Algorithms
+
+### `masonry` — vertical columns, shortest-first
+
+Pinterest-style. N fixed columns, items drop into shortest column. Items sorted by area DESC.
+
+```json
+{ "algorithm": "masonry" }
+{ "algorithm": "masonry", "options": { "clamp": true } }
+{ "algorithm": "masonry", "options": { "n_cols": 4 } }
+```
+
+| Option | Default | Effect |
+|---|---|---|
+| `clamp` | `false` | `false` = columns sized to widest item, full natural widths. `true` = columns sized to median width, items cropped at slot edge (more columns, denser). |
+| `n_cols` | auto | Override column count. Auto = `usable_w // (max_or_median_w + padding)`. |
+
+**Best for**: Any mix, 10+ items, predictable reading order.
+
+---
+
+### `fit_rows` — left-to-right, wrap on overflow
+
+Items placed L→R, wrap to next row when full. Row height = tallest item in that row. Sorted tallest-first within rows.
+
+```json
+{ "algorithm": "fit_rows" }
+```
+
+**Best for**: Wide items, horizontal feel, items of similar height.
+
+---
+
+### `masonry_horizontal` — horizontal waterfall
+
+Masonry rotated 90°. N fixed rows, items drop into shortest row (by accumulated width). Symmetric with `masonry` — same `clamp` / `n_rows` options.
+
+```json
+{ "algorithm": "masonry_horizontal" }
+{ "algorithm": "masonry_horizontal", "options": { "clamp": true } }
+{ "algorithm": "masonry_horizontal", "options": { "n_rows": 3 } }
+```
+
+**Default (clamp=false)**: rows sized to tallest item, even visual gaps, nothing clips.
+**clamp=true**: more rows, taller items cropped at slot height.
+
+**Best for**: Tall items, landscape canvases, horizontal flow.
+
+---
+
+### `packery` ⭐ — 2D guillotine bin-pack
+
+True 2D free-rect bin-packing (Packery.js / Jake Gordon binary-tree approach). Items placed at ANY (x,y) position — not snapped to column rails. Large items to the top-left, small items fill the gaps.
+
+```json
+{ "algorithm": "packery" }
+```
+
+Items that find no fitting free rect are silently dropped (check `placed` vs input count). More items = better gap-filling.
+
+**Best for**: Mixed sizes, organic/dense look, large canvases, main gallery mode.
+
+**Key insight**: sort order matters. Largest-area-first gives best packing. Future improvement: try multiple sort orders and pick best.
+
+---
+
+### `cells_by_row` — uniform grid
+
+All cells the same size (`max_w × max_h`). Items centred within their cell. Predictable, formal.
+
+```json
+{ "algorithm": "cells_by_row" }
+```
+
+**Best for**: Items of similar scale. Wastes space with mixed sizes (one outlier inflates all cells).
+
+---
+
+### `poetry` — packery + breathing room
+
+Packery base with double padding and wide/tall item interleaving for open-gallery feel.
+
+```json
+{ "algorithm": "poetry" }
+```
+
+**Status**: Implemented, not yet visually verified on large canvas.
+
+---
+
+## GET /primers/list
+
+Returns all primers with `wcwidth`-accurate display dimensions (outer, including TV frame border).
+
+```json
+{
+  "primers": [
     {
-      "id": "w1",
-      "type": "wibwob",
-      "title": "Wib&Wob Chat 1",
-      "x": 160,
-      "y": 0,
-      "width": 160,
-      "height": 19
-    },
-    {
-      "id": "w3",
-      "type": "frame_player",
-      "title": "",
-      "x": 0,
-      "y": 0,
-      "width": 160,
-      "height": 25
+      "name": "flatboy-2d-3d",
+      "path": "modules-private/wibwobworld/primers/flatboy-2d-3d.txt",
+      "size_kb": 0.7,
+      "width": 45,
+      "height": 13,
+      "aspect_ratio": 3.462
     }
   ],
-  "pattern_mode": "continuous",
-  "theme_mode": "light"
+  "count": 172
 }
 ```
 
-### tui_move_window call (current)
-```json
-{
-  "windowId": "w3",
-  "x": 0,
-  "y": 0,
-  "width": 78,
-  "height": 42
-}
-```
+**Note**: `width` and `height` are **outer** dimensions (content + 2 for TV frame border). Pass directly to `open_primer` / `resize_window`.
 
-### tui_menu_command call (current)
-```json
-{
-  "command": "open_primer",
-  "args": { "path": "reality-breaks-apart-abstract.txt" }
-}
+Width uses `wcwidth.wcswidth()` not `len()` — handles wide Unicode chars (emoji, some box-drawing) that occupy 2 terminal columns correctly.
+
+---
+
+## GET /primers/{filename}/metadata
+
+Single primer. Same fields as list. Cached after first read.
+
+```
+GET /primers/flatboy-2d-3d.txt/metadata
 ```
 
 ---
 
-**Document Status**: Ready for architectural review & sprint planning
+## Key Constants (hardcoded, never change)
+
+```python
+SHADOW_W = 2           # TV drop shadow width (right edge)
+SHADOW_H = 1           # TV drop shadow height (bottom edge)
+CANVAS_BOTTOM_EXTRA = 1  # status bar occupies last canvas row
+DEFAULT_MARGIN = 1     # gap between shadow edge and canvas edge
+```
+
+Shadow formula — verify after any placement:
+```
+shadow_right  = x + w + SHADOW_W        → must be ≤ canvas_w - margin
+shadow_bottom = y + h + SHADOW_H + 1    → must be ≤ canvas_h - margin
+```
+
+---
+
+## Canvas Dimensions
+
+Always query from `/state`. Never hardcode. Current session: **362×96** (27" Cinema Display, small font, full screen).
+
+```bash
+curl -s http://127.0.0.1:8089/state | python3 -c \
+  "import json,sys; d=json.load(sys.stdin); print(d['canvas']['width'], d['canvas']['height'])"
+```
+
+---
+
+## Typical Workflow
+
+```bash
+# 1. Check canvas
+curl -s http://127.0.0.1:8089/state | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['canvas'])"
+
+# 2. List available primers with dimensions
+curl -s http://127.0.0.1:8089/primers/list | python3 -c \
+  "import json,sys; [print(p['name'], p['width'], p['height']) for p in json.load(sys.stdin)['primers']]"
+
+# 3. Close everything
+curl -s -X POST http://127.0.0.1:8089/windows/close_all
+
+# 4. Arrange (packery recommended for mixed sets)
+curl -s -X POST http://127.0.0.1:8089/gallery/arrange \
+  -H "Content-Type: application/json" \
+  -d '{"filenames":["foo.txt","bar.txt"],"algorithm":"packery","padding":2,"margin":1}'
+
+# 5. Snap and verify
+./scripts/snap.sh my-layout
+```
+
+---
+
+## What's NOT Yet Built (Future)
+
+| Feature | Notes |
+|---|---|
+| Packery: drop fewer items | Improve free-rect merging / retry with different sort orders |
+| `poetry` visual verification | Run on 362×96 canvas |
+| Theme/type-based curation | Auto-select primers by tag (monsters, geometry, folk-punk, etc.) |
+| `/windows/{id}/resize` REST endpoint | Currently only via IPC controller `move_resize()` |
+| Layout save/restore | Use existing workspace save — see E013 |
+| Scramble/responsive re-arrange on resize | Watch `/state` canvas dims, auto re-run |
+| Chaos mode | Packery + deliberate random offsets + overlap allowed |

@@ -388,6 +388,32 @@ screenshot → confirm with eyes. Text output alone is insufficient for visual f
 | 🟡 | Unit test: open primer → assert props.path non-empty | 20 min |
 | 🟡 | Investigate MCP /mcp errors | TBD |
 | 🟢 | Pre-commit hook: reject direct commits to main for app/ changes | 30 min |
+| 🟠 | API server: always use `--reload` for agentic dev workflow | 5 min |
+
+---
+
+## 15. API server not running with --reload — agents must restart manually after edits
+
+**What happened**: API server launched without `--reload`, so any Python file edit by an
+agent requires a manual server restart to take effect. In agentic sessions this is
+significant friction — agents edit `gallery.py`, `controller.py`, etc. and then
+silently hit the old code.
+
+**Fix**: Always start uvicorn with `--reload`:
+
+```bash
+WIBWOB_INSTANCE=1 ./tools/api_server/venv/bin/uvicorn \
+  tools.api_server.main:app \
+  --host 127.0.0.1 --port 8089 --reload
+```
+
+Update `dev-start.sh` and CLAUDE.md startup recipe to use `--reload`. Note: `--reload`
+watches for file changes under the working directory — confirm `tools/api_server/` is
+covered (it will be if launched from repo root).
+
+**Note**: CLAUDE.md already warns "if you edit Python files while the API server is
+running, you must restart uvicorn" — that warning becomes unnecessary once `--reload`
+is the default.
 
 ---
 
@@ -528,9 +554,43 @@ Each stub is independent unless marked `[blocks N]`. Check off as done. Do not a
             Delegates to: controller move_resize()
             Test: POST /windows/1/resize {w:40,h:20} → GET /state → assert dimensions
 
+[ ] STUB-13 Add --reload to API server launch in dev-start.sh and CLAUDE.md
+            File: scripts/dev-start.sh (uvicorn line), CLAUDE.md (startup recipe)
+            Change: append --reload to uvicorn invocation
+            Also: remove the "must restart uvicorn" warning from CLAUDE.md gotchas
+            Test: edit a .py file → curl endpoint → verify change took effect without restart
+
 [ ] STUB-12 Reproduce and fix MCP /mcp errors
             Start: curl http://127.0.0.1:8089/mcp → capture error
             Log finding in this doc under item 6
 ```
 
 </planofaction>
+
+---
+
+## Session 2 — 2026-02-23 afternoon (E012 layout engine sprint)
+
+### What was built
+- 5 layout algorithms: `masonry`, `fit_rows`, `masonry_horizontal`, `packery`, `cells_by_row`
+- `poetry` mode (packery + breathing room) — implemented, not yet visually tested
+- `options` dict on `GalleryArrangeRequest` for per-algo params (e.g. `clamp`, `n_cols`, `n_rows`)
+- `out_of_bounds` field on response — shadow-aware bounds check, catches off-canvas placements
+- `wcwidth` for display-accurate primer measurement (replaces `len()`)
+- `masonry` + `masonry_horizontal` both support `clamp` option (dense vs natural)
+- All modes human-verified via screenshot on 157×60 canvas
+- Expanded to 362×96 (27" Cinema Display, small font) — packery with 40 items looks great
+
+### Friction resolved
+- Stale `/tmp/wibwob_12.sock` caused API to talk to wrong TUI instance → nuked sock, API now auto-finds correct instance
+- `WIBWOB_INSTANCE=1` must be set when running `start_api_server.sh` — not set in script
+- uvicorn `--reload` via venv CLI eliminates restart friction: `WIBWOB_INSTANCE=1 ./tools/api_server/venv/bin/uvicorn tools.api_server.main:app --host 127.0.0.1 --port 8089 --reload`
+
+### Friction remaining
+- `start_api_server.sh` does not set `WIBWOB_INSTANCE` — should default to 1 or read from env
+- `masonry` `clamp=true` with median column count still clips wide items visually — acceptable, documented
+- `packery` drops items when free rects fragment — 18/40 on a mixed set. Needs free-rect merging or multi-sort retry
+
+### Canvas size note
+After iTerm2 resize, always: Ctrl+B D → tmux attach -t wibwob → detach again → canvas locks to new size.
+Current session canvas: **362×96**. Use `/state` to query before every gallery run.
