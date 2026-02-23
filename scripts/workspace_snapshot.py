@@ -114,7 +114,9 @@ def detect_overlaps(windows: list[dict]) -> set[str]:
 
 
 MENU_ROWS   = 1   # menu bar rows above the desktop (screen row 0)
-STATUS_ROWS = 1   # status bar rows below the desktop (screen last row)
+# STATUS_ROWS = 0 intentionally — the TV status bar is canvas row 59,
+# already inside canvas.height=60. deskTop->getBounds() includes it.
+# Total screen rows = MENU_ROWS + canvas.height = 1 + 60 = 61 = tmux pane height. ✓
 
 
 def build_svg(snapshot: dict) -> str:
@@ -123,9 +125,9 @@ def build_svg(snapshot: dict) -> str:
     wins = snapshot["windows"]
     overlapping = detect_overlaps(wins)
 
-    # SVG shows full screen: menu bar + desktop + status bar
+    # SVG total = menu bar + canvas (canvas already includes TV status bar row)
     svg_w = cw * CELL_W
-    svg_h = (ch + MENU_ROWS + STATUS_ROWS) * CELL_H
+    svg_h = (MENU_ROWS + ch) * CELL_H
 
     # Y offset for the desktop area within the SVG
     desk_y0 = MENU_ROWS * CELL_H
@@ -153,13 +155,7 @@ def build_svg(snapshot: dict) -> str:
     lines.append(f'  <text x="4" y="{desk_y0 - 3}" fill="{COL_WIN_META}" font-size="9">'
                  f'  File  Edit  View  Window  Tools  Help</text>')
 
-    # Status bar (below desktop)
-    status_y = desk_y0 + ch * CELL_H
-    lines.append(f'  <!-- Status bar -->')
-    lines.append(f'  <rect x="0" y="{status_y}" width="{svg_w}" height="{STATUS_ROWS * CELL_H}" '
-                 f'fill="{COL_MENU_FILL}"/>')
-    lines.append(f'  <text x="4" y="{status_y + CELL_H - 4}" fill="{COL_WIN_META}" font-size="9">'
-                 f'  Alt-X Exit  Ctrl-N New Window  F5 Repaint  F6 Next  Alt-F3 Close</text>')
+    # Note: TV status bar is canvas row 59 — already inside the canvas rect above.
 
     # Canvas dimension label (top-right)
     lines.append(f'  <text x="{svg_w - 4}" y="{desk_y0 + 12}" text-anchor="end" '
