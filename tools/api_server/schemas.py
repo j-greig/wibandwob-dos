@@ -417,7 +417,15 @@ class GalleryArrangement(BaseModel):
 
 class GalleryArrangeRequest(BaseModel):
     filenames: List[str] = Field(..., description="List of primer filenames to arrange (just basenames, e.g. 'foo.txt')")
-    algorithm: str = Field("masonry", description="Layout algorithm: 'masonry' | 'poetry' | 'cascade'")
+    algorithm: str = Field("masonry", description=(
+        "Layout algorithm: "
+        "'masonry' (vertical columns, shortest-first) | "
+        "'fit_rows' (L→R rows, wrap on overflow) | "
+        "'masonry_horizontal' (horizontal masonry, shortest-row-first) | "
+        "'packery' (2D guillotine bin-pack, fills gaps) | "
+        "'cells_by_row' (uniform grid cells) | "
+        "'poetry' (packery + breathing room + wide/tall interleave)"
+    ))
     padding: int = Field(2, description="Character gap between windows")
     margin: int = Field(1, description=(
         "Gap (chars) between the window shadow edge and the canvas edge on all sides. "
@@ -429,6 +437,13 @@ class GalleryArrangeRequest(BaseModel):
     canvas_height: int = Field(0, description="Override canvas height (0 = auto-query from TUI state)")
     preview: bool = Field(False, description="If true, return the plan without applying it")
     frameless: bool = Field(False, description="Open primers without title/border chrome")
+    options: Dict[str, Any] = Field(default_factory=dict, description=(
+        "Per-algorithm options dict. "
+        "masonry: clamp (bool, default False) — if True, items are clamped to slot width "
+        "(more columns, content cropped); if False (default), columns sized to widest item "
+        "(fewer columns, full natural width). "
+        "masonry/masonry_horizontal: n_cols / n_rows (int) to override auto column/row count."
+    ))
 
 
 class GalleryArrangeResponse(BaseModel):
@@ -439,6 +454,7 @@ class GalleryArrangeResponse(BaseModel):
     canvas_height: int
     canvas_utilization: float
     overlaps: int
+    out_of_bounds: int = 0
     applied: bool
     preview: bool
 

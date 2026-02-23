@@ -99,9 +99,25 @@ def _measure_primer(path: str) -> dict:
     This matches what C++ calculateWindowBounds() produces, so values returned
     here can be passed directly to open_primer / resize_window without adjustment.
 
+    Uses wcwidth.wcswidth() for display-accurate column counting — handles
+    wide Unicode chars (emoji, some box-drawing) that occupy 2 terminal columns.
+    Falls back to len() if wcswidth returns -1 (non-printable / control chars).
+
     Stops at the first '----' frame delimiter (measures the first frame only).
     Strips trailing CR so Windows line endings don't inflate widths.
     """
+    try:
+        from wcwidth import wcswidth as _wcswidth
+    except ImportError:
+        _wcswidth = None  # type: ignore
+
+    def _line_width(s: str) -> int:
+        if _wcswidth is not None:
+            w = _wcswidth(s)
+            if w >= 0:
+                return w
+        return len(s)  # fallback: code-point count
+
     try:
         content_w = content_h = 0
         with open(path, "r", encoding="utf-8", errors="replace") as f:
@@ -110,15 +126,14 @@ def _measure_primer(path: str) -> dict:
                 if line == "----":
                     break
                 content_h += 1
-                content_w = max(content_w, len(line))
-        # Outer dimensions: +2 each axis for the window frame border
+                content_w = max(content_w, _line_width(line))
         outer_w = content_w + 2
         outer_h = content_h + 2
         aspect  = round(outer_w / outer_h, 3) if outer_h else 0.0
         return {
-            "width":         outer_w,    # outer (pass to open/resize directly)
+            "width":         outer_w,
             "height":        outer_h,
-            "content_width": content_w,  # raw text dimensions
+            "content_width": content_w,
             "content_height":content_h,
             "max_line_width":content_w,
             "line_count":    content_h,
@@ -140,104 +155,353 @@ def _get_primer_metadata(path: str) -> dict:
     return _primer_meta_cache[path]
 
 
-def _masonry_layout(
-    primers: list[dict],  # [{filename, width, height}]
+# ─── Layout helpers ─────────────────────────────────────────────────────────
+
+def _usable(canvas_w: int, canvas_h: int, margin: int) -> tuple[int, int, int, int]:
+    """Return (x, y, w, h) of the usable canvas area, inset for margin + shadow + status bar."""
+    ux = margin
+    uy = margin
+    uw = canvas_w - SHADOW_W - margin * 2
+    uh = canvas_h - SHADOW_H - CANVAS_BOTTOM_EXTRA - margin * 2
+    return ux, uy, uw, uh
+
+
+def _prep_pieces(primers: list[dict], uw: int, uh: int) -> list[dict]:
+    """Clamp primer dimensions to the usable area; preserve filename."""
+    return [
+        {
+            "filename": p["filename"],
+            "width":    min(p["width"]  or 40, uw),
+            "height":   min(p["height"] or 20, uh),
+        }
+        for p in primers
+    ]
+
+
+# ─── Layout algorithms ───────────────────────────────────────────────────────
+
+def _layout_masonry(
+    primers: list[dict],
     canvas_w: int,
     canvas_h: int,
     padding: int = 2,
     margin: int = 1,
     n_cols: int | None = None,
+    clamp: bool = False,
 ) -> list[dict]:
-    """Pinterest/gallery-wall masonry: N fixed columns, items drop into shortest.
+    """Vertical masonry: N fixed columns, items drop into the shortest column.
 
-    margin controls the gap between the window shadow edge and the canvas edge:
-      - Left/top:   window starts at x=margin, y=margin
-      - Right/bottom: usable area shrinks by SHADOW_W/SHADOW_H + margin so the
-                      drop shadow is never clipped by the canvas edge
-
-    Returns list of {filename, x, y, width, height}, no overlaps, shadow fits.
+    clamp=False (default): columns sized to widest item — fewer columns, every
+      item rendered at full natural width. Best for readability.
+    clamp=True: columns sized to median width — more columns, items wider than
+      their slot are cropped at the boundary. Best for dense layouts.
+    Pass options={"clamp": true} via the API to toggle.
     """
-    if not primers:
+    ux, uy, uw, uh = _usable(canvas_w, canvas_h, margin)
+    pieces = _prep_pieces(primers, uw, uh)
+    if not pieces:
         return []
 
-    # Usable area — inset from canvas edges to respect margin + shadow + status bar
-    usable_x = margin
-    usable_y = margin
-    usable_w = canvas_w - SHADOW_W - margin * 2
-    usable_h = canvas_h - SHADOW_H - CANVAS_BOTTOM_EXTRA - margin * 2
-
-    # Natural dimensions, clamped to usable area
-    pieces = [
-        {
-            "filename": p["filename"],
-            "width":  min(p["width"]  or 40, usable_w),
-            "height": min(p["height"] or 20, usable_h),
-        }
-        for p in primers
-    ]
-
-    # ── Column count ────────────────────────────────────────────────────────
-    # Drive n_cols from the widest item so columns are always wide enough to
-    # show each piece without overlap with its neighbour.
     if n_cols is None:
-        max_w  = max(p["width"] for p in pieces)
-        n_cols = max(2, min(6, usable_w // (max_w + padding)))
+        if clamp:
+            ref_w = sorted(p["width"] for p in pieces)[len(pieces) // 2]
+        else:
+            ref_w = max(p["width"] for p in pieces)
+        n_cols = max(2, min(6, uw // (ref_w + padding)))
 
-    # Column slot width (used for X spacing only; items keep natural width)
-    slot_w = (usable_w - padding * (n_cols + 1)) // n_cols
-    col_x  = [usable_x + padding + i * (slot_w + padding) for i in range(n_cols)]
-    col_h  = [0] * n_cols   # running fill height (relative to usable_y)
+    slot_w = (uw - padding * (n_cols + 1)) // n_cols
+    col_x  = [ux + padding + i * (slot_w + padding) for i in range(n_cols)]
+    col_h  = [0] * n_cols
 
-    # Sort tallest first → anchor the tallest pieces in the visual centre
-    pieces.sort(key=lambda p: p["height"], reverse=True)
+    pieces.sort(key=lambda p: p["width"] * p["height"], reverse=True)
 
     placements: list[dict] = []
     for piece in pieces:
-        pw, ph = piece["width"], piece["height"]
-
-        # Drop into the shortest column
+        pw = min(piece["width"], slot_w) if clamp else piece["width"]
+        ph = piece["height"]
         i   = col_h.index(min(col_h))
         gap = padding if col_h[i] > 0 else 0
-        y   = usable_y + col_h[i] + gap
-
-        # Hard-skip if it would fall entirely below the usable area
-        if y >= usable_y + usable_h:
+        y   = uy + col_h[i] + gap
+        if y >= uy + uh:
             continue
-
-        # Clip height if it overruns the usable bottom
-        visible_h = min(ph, usable_y + usable_h - y)
-
-        placements.append({
-            "filename": piece["filename"],
-            "x":        col_x[i],
-            "y":        y,
-            "width":    pw,
-            "height":   visible_h,
-        })
-        col_h[i] = (y - usable_y) + visible_h
-
+        visible_h = min(ph, uy + uh - y)
+        placements.append({"filename": piece["filename"], "x": col_x[i], "y": y,
+                           "width": pw, "height": visible_h})
+        col_h[i] = (y - uy) + visible_h
     return placements
 
 
-def _poetry_layout(
+def _layout_fit_rows(
     primers: list[dict],
     canvas_w: int,
     canvas_h: int,
     padding: int = 2,
+    margin: int = 1,
 ) -> list[dict]:
-    """Poetry layout: centred vertical stack, one piece per 'stanza'.
+    """Horizontal row packing: items placed L→R; wrap to next row when full.
 
-    Pieces scroll vertically — canvas height is a soft limit (pieces extend below if needed).
+    Row height = tallest item in that row. Items sorted tallest-first so each
+    row's height is anchored by its biggest piece.
     """
-    placements = []
-    y = 0
-    for p in primers:
-        w = min(p["width"] or 40, canvas_w)
-        h = p["height"] or 20
-        x = max(0, (canvas_w - w) // 2)
-        placements.append({"filename": p["filename"], "x": x, "y": y, "width": w, "height": h})
-        y += h + padding
+    ux, uy, uw, uh = _usable(canvas_w, canvas_h, margin)
+    pieces = _prep_pieces(primers, uw, uh)
+    if not pieces:
+        return []
+
+    pieces.sort(key=lambda p: p["height"], reverse=True)
+
+    placements: list[dict] = []
+    x = ux + padding
+    y = uy + padding
+    row_h = 0
+
+    for piece in pieces:
+        pw, ph = piece["width"], piece["height"]
+        # Wrap if this item doesn't fit on the current row
+        if x + pw > ux + uw and row_h > 0:
+            y += row_h + padding
+            x = ux + padding
+            row_h = 0
+        if y + ph > uy + uh:
+            break
+        visible_h = min(ph, uy + uh - y)
+        placements.append({"filename": piece["filename"], "x": x, "y": y,
+                           "width": pw, "height": visible_h})
+        x += pw + padding
+        row_h = max(row_h, ph)
     return placements
+
+
+def _layout_masonry_horizontal(
+    primers: list[dict],
+    canvas_w: int,
+    canvas_h: int,
+    padding: int = 2,
+    margin: int = 1,
+    n_rows: int | None = None,
+    clamp: bool = False,
+) -> list[dict]:
+    """Horizontal masonry: N fixed rows, items drop into the shortest row (by width).
+
+    Masonry rotated 90°. Symmetric with _layout_masonry:
+    clamp=False (default): rows sized to tallest item — fewer rows, every item
+      rendered at full natural height, gaps always even.
+    clamp=True: rows sized to median height — more rows, items taller than their
+      slot are cropped. Pass options={"clamp": true} via the API.
+    """
+    ux, uy, uw, uh = _usable(canvas_w, canvas_h, margin)
+    pieces = _prep_pieces(primers, uw, uh)
+    if not pieces:
+        return []
+
+    if n_rows is None:
+        if clamp:
+            ref_h = sorted(p["height"] for p in pieces)[len(pieces) // 2]
+        else:
+            ref_h = max(p["height"] for p in pieces)
+        n_rows = max(2, min(6, uh // (ref_h + padding)))
+
+    slot_h = (uh - padding * (n_rows + 1)) // n_rows
+    row_y  = [uy + padding + i * (slot_h + padding) for i in range(n_rows)]
+    row_w  = [0] * n_rows
+
+    pieces.sort(key=lambda p: p["width"] * p["height"], reverse=True)
+
+    placements: list[dict] = []
+    for piece in pieces:
+        pw, ph = piece["width"], piece["height"]
+        # Clamp height to slot so rows below never get squeezed
+        if clamp:
+            ph = min(ph, slot_h)
+        i   = row_w.index(min(row_w))
+        gap = padding if row_w[i] > 0 else 0
+        x   = ux + row_w[i] + gap
+        if x >= ux + uw:
+            continue
+        # Safety clip to canvas right + bottom
+        visible_w = min(pw, ux + uw - x)
+        visible_h = min(ph, uy + uh - row_y[i])
+        placements.append({"filename": piece["filename"], "x": x, "y": row_y[i],
+                           "width": visible_w, "height": visible_h})
+        row_w[i] = (x - ux) + visible_w
+    return placements
+
+
+def _layout_packery(
+    primers: list[dict],
+    canvas_w: int,
+    canvas_h: int,
+    padding: int = 2,
+    margin: int = 1,
+) -> list[dict]:
+    """2D guillotine bin-pack (Packery / Jake Gordon style).
+
+    Maintains a live list of free rectangles covering the usable canvas.
+    For each item (largest-area first):
+      1. Find the best-fit free rect (smallest area that still fits).
+      2. Place item at top-left of that rect.
+      3. Guillotine-cut the remainder into a right strip + a bottom strip.
+      4. Sort free list top-left first for natural reading order.
+
+    Items are NOT snapped to fixed column rails — they fill real 2D space.
+    A narrow item can appear right-of a wide item; small items fill gaps.
+    """
+    ux, uy, uw, uh = _usable(canvas_w, canvas_h, margin)
+    pieces = _prep_pieces(primers, uw, uh)
+    if not pieces:
+        return []
+
+    pieces.sort(key=lambda p: p["width"] * p["height"], reverse=True)
+
+    # Free rects: list of (x, y, w, h)
+    free: list[tuple[int, int, int, int]] = [(ux, uy, uw, uh)]
+
+    placements: list[dict] = []
+    for piece in pieces:
+        pw, ph = piece["width"], piece["height"]
+        pw_p   = pw + padding   # space reserved (item + gap)
+        ph_p   = ph + padding
+
+        # Best-fit: smallest free rect that fits pw_p × ph_p
+        best: tuple[int, int, int, int] | None = None
+        best_area = float("inf")
+        for rect in free:
+            rx, ry, rw, rh = rect
+            if rw >= pw_p and rh >= ph_p:
+                area = rw * rh
+                if area < best_area:
+                    best_area = area
+                    best = rect
+
+        if best is None:
+            continue  # doesn't fit anywhere — skip
+
+        rx, ry, rw, rh = best
+        placements.append({"filename": piece["filename"], "x": rx, "y": ry,
+                           "width": pw, "height": ph})
+
+        # Guillotine cut: remove best, add right strip + bottom strip
+        free.remove(best)
+        right_w = rw - pw_p
+        if right_w > 0:
+            free.append((rx + pw_p, ry, right_w, ph_p))  # right of item
+        below_h = rh - ph_p
+        if below_h > 0:
+            free.append((rx, ry + ph_p, rw, below_h))    # below item
+
+        # Keep free list sorted top-left first (y first, then x)
+        free.sort(key=lambda r: (r[1], r[0]))
+
+    return placements
+
+
+def _layout_cells_by_row(
+    primers: list[dict],
+    canvas_w: int,
+    canvas_h: int,
+    padding: int = 2,
+    margin: int = 1,
+) -> list[dict]:
+    """Uniform grid: all cells the same size (max_w × max_h), items centred within.
+
+    Clean, rigid, predictable. Good for comparing items of similar scale.
+    """
+    ux, uy, uw, uh = _usable(canvas_w, canvas_h, margin)
+    pieces = _prep_pieces(primers, uw, uh)
+    if not pieces:
+        return []
+
+    cell_w = max(p["width"]  for p in pieces) + padding
+    cell_h = max(p["height"] for p in pieces) + padding
+    cols   = max(1, uw // cell_w)
+    rows   = max(1, uh // cell_h)
+
+    placements: list[dict] = []
+    for idx, piece in enumerate(pieces):
+        col = idx % cols
+        row = idx // cols
+        if row >= rows:
+            break
+        cx = ux + col * cell_w + (cell_w - piece["width"])  // 2
+        cy = uy + row * cell_h + (cell_h - piece["height"]) // 2
+        placements.append({"filename": piece["filename"], "x": cx, "y": cy,
+                           "width": piece["width"], "height": piece["height"]})
+    return placements
+
+
+def _layout_poetry(
+    primers: list[dict],
+    canvas_w: int,
+    canvas_h: int,
+    padding: int = 2,
+    margin: int = 1,
+) -> list[dict]:
+    """Organic gallery: packery bin-pack with deliberate breathing room.
+
+    Builds on _layout_packery but adds:
+    - Extra padding between items (padding * 2) for open-gallery feel.
+    - Sorts by aspect ratio alternating wide/tall to break visual monotony.
+    """
+    # Alternate wide/tall items for visual rhythm
+    pieces_raw = _prep_pieces(primers, *_usable(canvas_w, canvas_h, margin)[2:])
+    wide  = sorted([p for p in pieces_raw if p["width"] >= p["height"]],
+                   key=lambda p: p["width"] * p["height"], reverse=True)
+    tall  = sorted([p for p in pieces_raw if p["width"] < p["height"]],
+                   key=lambda p: p["width"] * p["height"], reverse=True)
+    # Interleave: wide, tall, wide, tall ...
+    interleaved: list[dict] = []
+    for a, b in zip(wide, tall):
+        interleaved.extend([a, b])
+    interleaved.extend(wide[len(tall):])
+    interleaved.extend(tall[len(wide):])
+
+    ux, uy, uw, uh = _usable(canvas_w, canvas_h, margin)
+    poetry_pad = padding * 2
+    pw_offset  = poetry_pad
+    ph_offset  = poetry_pad
+
+    free: list[tuple[int, int, int, int]] = [(ux, uy, uw, uh)]
+    placements: list[dict] = []
+
+    for piece in interleaved:
+        pw, ph = piece["width"], piece["height"]
+        pw_p   = pw + pw_offset
+        ph_p   = ph + ph_offset
+
+        best: tuple[int, int, int, int] | None = None
+        best_area = float("inf")
+        for rect in free:
+            rx, ry, rw, rh = rect
+            if rw >= pw_p and rh >= ph_p:
+                area = rw * rh
+                if area < best_area:
+                    best_area = area
+                    best = rect
+
+        if best is None:
+            continue
+
+        rx, ry, rw, rh = best
+        placements.append({"filename": piece["filename"], "x": rx, "y": ry,
+                           "width": pw, "height": ph})
+        free.remove(best)
+        right_w = rw - pw_p
+        if right_w > 0:
+            free.append((rx + pw_p, ry, right_w, ph_p))
+        below_h = rh - ph_p
+        if below_h > 0:
+            free.append((rx, ry + ph_p, rw, below_h))
+        free.sort(key=lambda r: (r[1], r[0]))
+
+    return placements
+
+
+# ─── Back-compat aliases (tests / external callers) ─────────────────────────
+def _masonry_layout(primers, canvas_w, canvas_h, padding=2, margin=1, n_cols=None, clamp=False):
+    return _layout_masonry(primers, canvas_w, canvas_h, padding, margin, n_cols, clamp)
+
+def _poetry_layout(primers, canvas_w, canvas_h, padding=2):
+    return _layout_poetry(primers, canvas_w, canvas_h, padding)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -914,13 +1178,21 @@ def make_app() -> FastAPI:
         algo    = payload.algorithm.lower()
         padding = payload.padding
         margin  = payload.margin
-        if algo == "poetry":
-            raw_placements = _poetry_layout(primers_meta, canvas_w, canvas_h, padding)
-        else:
-            # Default: masonry
+
+        opts = payload.options or {}
+        _algo_map = {
+            "masonry":            lambda: _layout_masonry(primers_meta, canvas_w, canvas_h, padding, margin,
+                                                          n_cols=opts.get("n_cols"), clamp=opts.get("clamp", False)),
+            "fit_rows":           lambda: _layout_fit_rows(primers_meta, canvas_w, canvas_h, padding, margin),
+            "masonry_horizontal": lambda: _layout_masonry_horizontal(primers_meta, canvas_w, canvas_h, padding, margin,
+                                                                      n_rows=opts.get("n_rows"), clamp=opts.get("clamp", False)),
+            "packery":            lambda: _layout_packery(primers_meta, canvas_w, canvas_h, padding, margin),
+            "cells_by_row":       lambda: _layout_cells_by_row(primers_meta, canvas_w, canvas_h, padding, margin),
+            "poetry":             lambda: _layout_poetry(primers_meta, canvas_w, canvas_h, padding, margin),
+        }
+        if algo not in _algo_map:
             algo = "masonry"
-            raw_placements = _masonry_layout(primers_meta, canvas_w, canvas_h,
-                                             padding=padding, margin=margin)
+        raw_placements = _algo_map[algo]()
 
         # 4. Build arrangement objects + compute stats
         arrangement = [GalleryArrangement(**p) for p in raw_placements]
@@ -938,6 +1210,21 @@ def make_app() -> FastAPI:
                 bx1, by1, bx2, by2 = rects[j]
                 if ax1 < bx2 and ax2 > bx1 and ay1 < by2 and ay2 > by1:
                     overlaps += 1
+
+        # Bounds check — window + shadow must stay within canvas
+        out_of_bounds = 0
+        for a in arrangement:
+            if (a.x < 0 or a.y < 0
+                    or a.x + a.width  + SHADOW_W > canvas_w
+                    or a.y + a.height + SHADOW_H + CANVAS_BOTTOM_EXTRA > canvas_h):
+                out_of_bounds += 1
+                import logging
+                logging.warning(
+                    "OOB %s: x=%d y=%d w=%d h=%d shadow_right=%d shadow_bottom=%d canvas=%dx%d",
+                    a.filename, a.x, a.y, a.width, a.height,
+                    a.x + a.width + SHADOW_W, a.y + a.height + SHADOW_H + CANVAS_BOTTOM_EXTRA,
+                    canvas_w, canvas_h,
+                )
 
         # 5. Apply (unless preview)
         applied = False
@@ -1003,6 +1290,7 @@ def make_app() -> FastAPI:
             canvas_height=canvas_h,
             canvas_utilization=utilization,
             overlaps=overlaps,
+            out_of_bounds=out_of_bounds,
             applied=applied,
             preview=payload.preview,
         )
