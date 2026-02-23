@@ -37,9 +37,6 @@ from .schemas import (
     BrowserFetchRequest,
     CanvasInfo,
     Capabilities,
-    GalleryArrangeRequest,
-    GalleryArrangeResponse,
-    GalleryArrangement,
     MenuCommand,
     MonodrawLoadRequest,
     MonodrawParseRequest,
@@ -51,7 +48,6 @@ from .schemas import (
     ThemeMode,
     ThemeVariant,
     PrimerInfo,
-    PrimerMetadata,
     PrimersListResponse,
     RenderBundle,
     ScreenshotReq,
@@ -70,141 +66,6 @@ from .schemas import (
 )
 from .browser import BrowserSession, fetch_and_convert
 from pydantic import BaseModel
-
-
-# ─── Gallery helpers ────────────────────────────────────────────────────────
-
-def _measure_primer(path: str) -> dict:
-    """Read a primer file and return {width, height, line_count, max_line_width}.
-
-    Stops at the first '----' frame delimiter so we measure only the first frame.
-    Strips trailing CR so Windows line endings don't inflate widths.
-    """
-    try:
-        width = height = 0
-        with open(path, "r", encoding="utf-8", errors="replace") as f:
-            for line in f:
-                line = line.rstrip("\r\n")
-                if line == "----":
-                    break
-                height += 1
-                width = max(width, len(line))
-        aspect = round(width / height, 3) if height else 0.0
-        return {"width": width, "height": height, "max_line_width": width, "line_count": height, "aspect_ratio": aspect}
-    except Exception:
-        return {"width": 0, "height": 0, "max_line_width": 0, "line_count": 0, "aspect_ratio": 0.0}
-
-
-# Simple LRU-style cache (filename → metadata dict)
-_primer_meta_cache: dict = {}
-
-
-def _get_primer_metadata(path: str) -> dict:
-    if path not in _primer_meta_cache:
-        _primer_meta_cache[path] = _measure_primer(path)
-    return _primer_meta_cache[path]
-
-
-def _masonry_layout(
-    primers: list[dict],  # [{filename, width, height}]
-    canvas_w: int,
-    canvas_h: int,
-    padding: int = 2,
-) -> list[dict]:
-    """Masonry layout: tall-first, multi-column bin-packing.
-
-    Returns list of {filename, x, y, width, height}.
-    Guarantees no overlap and no out-of-bounds placements.
-    """
-    if not primers:
-        return []
-
-    # Clamp pieces to canvas dimensions
-    pieces = []
-    for p in primers:
-        w = min(p["width"] or 40, canvas_w)
-        h = min(p["height"] or 20, canvas_h)
-        pieces.append({"filename": p["filename"], "width": w, "height": h})
-
-    # Sort tallest first (better packing)
-    pieces.sort(key=lambda p: p["height"], reverse=True)
-
-    # Build columns greedily
-    col_x: list[int] = []     # x origin of each column
-    col_h: list[int] = []     # current filled height of each column
-    col_w: list[int] = []     # width of each column (max piece width in column)
-    placements: list[dict] = []
-
-    for piece in pieces:
-        pw, ph = piece["width"], piece["height"]
-
-        # Try to place in the shortest column that has room
-        placed = False
-        best_col = -1
-        best_height = canvas_h + 1
-
-        for i, (cx, ch, cw) in enumerate(zip(col_x, col_h, col_w)):
-            if ch + ph + (padding if ch > 0 else 0) <= canvas_h:
-                if ch < best_height:
-                    best_height = ch
-                    best_col = i
-
-        if best_col >= 0:
-            # Place in existing column
-            gap = padding if col_h[best_col] > 0 else 0
-            y = col_h[best_col] + gap
-            placements.append({
-                "filename": piece["filename"],
-                "x": col_x[best_col],
-                "y": y,
-                "width": pw,
-                "height": ph,
-            })
-            col_h[best_col] = y + ph
-            col_w[best_col] = max(col_w[best_col], pw)
-            placed = True
-
-        if not placed:
-            # Start a new column
-            next_x = sum(w + padding for w in col_w) if col_w else 0
-            if next_x + pw <= canvas_w:
-                col_x.append(next_x)
-                col_h.append(ph)
-                col_w.append(pw)
-                placements.append({
-                    "filename": piece["filename"],
-                    "x": next_x,
-                    "y": 0,
-                    "width": pw,
-                    "height": ph,
-                })
-            # else: piece doesn't fit anywhere — skip (logged by caller)
-
-    return placements
-
-
-def _poetry_layout(
-    primers: list[dict],
-    canvas_w: int,
-    canvas_h: int,
-    padding: int = 2,
-) -> list[dict]:
-    """Poetry layout: centred vertical stack, one piece per 'stanza'.
-
-    Pieces scroll vertically — canvas height is a soft limit (pieces extend below if needed).
-    """
-    placements = []
-    y = 0
-    for p in primers:
-        w = min(p["width"] or 40, canvas_w)
-        h = p["height"] or 20
-        x = max(0, (canvas_w - w) // 2)
-        placements.append({"filename": p["filename"], "x": x, "y": y, "width": w, "height": h})
-        y += h + padding
-    return placements
-
-
-# ─────────────────────────────────────────────────────────────────────────────
 
 
 def make_app() -> FastAPI:
@@ -746,14 +607,10 @@ def make_app() -> FastAPI:
                         seen.add(basename)
                         stat = os.stat(primer_path)
                         name = basename.replace('.txt', '')
-                        meta = _get_primer_metadata(primer_path)
                         primers.append(PrimerInfo(
                             name=name,
                             path=primer_path,
-                            size_kb=round(stat.st_size / 1024, 1),
-                            width=meta["width"],
-                            height=meta["height"],
-                            aspect_ratio=meta["aspect_ratio"],
+                            size_kb=round(stat.st_size / 1024, 1)
                         ))
                     except Exception:
                         continue
@@ -770,204 +627,15 @@ def make_app() -> FastAPI:
                     seen.add(basename)
                     stat = os.stat(primer_path)
                     name = basename.replace('.txt', '')
-                    meta = _get_primer_metadata(primer_path)
                     primers.append(PrimerInfo(
                         name=name,
                         path=primer_path,
-                        size_kb=round(stat.st_size / 1024, 1),
-                        width=meta["width"],
-                        height=meta["height"],
-                        aspect_ratio=meta["aspect_ratio"],
+                        size_kb=round(stat.st_size / 1024, 1)
                     ))
                 except Exception:
                     continue
 
         return PrimersListResponse(primers=primers, count=len(primers))
-
-    @app.get("/primers/{filename}/metadata", response_model=PrimerMetadata,
-             summary="Get intrinsic dimensions of a single primer file",
-             description="Returns width (max line length), height (line count of first frame), "
-                         "and aspect_ratio. Cached after first read. Filename is the basename, e.g. 'foo.txt'.")
-    async def primer_metadata(filename: str) -> PrimerMetadata:
-        """Dimension lookup for a single primer — foundation for smart_gallery_arrange."""
-        import os, glob
-
-        # Find the primer across module dirs
-        found_path: str | None = None
-        for base in ["modules-private", "modules"]:
-            if not os.path.isdir(base):
-                continue
-            for module in sorted(os.listdir(base)):
-                candidate = os.path.join(base, module, "primers", filename)
-                if os.path.isfile(candidate):
-                    found_path = candidate
-                    break
-            if found_path:
-                break
-        if not found_path:
-            legacy = os.path.join("app", "primers", filename)
-            if os.path.isfile(legacy):
-                found_path = legacy
-        if not found_path:
-            raise HTTPException(status_code=404, detail=f"primer not found: {filename}")
-
-        meta = _get_primer_metadata(found_path)
-        size_kb = round(os.path.getsize(found_path) / 1024, 1)
-        return PrimerMetadata(
-            filename=filename,
-            width=meta["width"],
-            height=meta["height"],
-            aspect_ratio=meta["aspect_ratio"],
-            line_count=meta["line_count"],
-            max_line_width=meta["max_line_width"],
-            size_kb=size_kb,
-        )
-
-    @app.post("/gallery/arrange", response_model=GalleryArrangeResponse,
-              summary="Arrange open primer windows using a layout algorithm",
-              description="Fetches primer metadata, runs the chosen layout algorithm (masonry or poetry), "
-                          "then applies window positions via tui_move_window. "
-                          "Pass preview=true to get the plan without applying it.")
-    async def gallery_arrange(payload: GalleryArrangeRequest) -> GalleryArrangeResponse:
-        """Smart gallery arrangement — E012 core feature.
-
-        1. Resolve each filename to a full path and measure its dimensions.
-        2. Run the requested layout algorithm.
-        3. Apply via tui_move_window (unless preview=true).
-        4. Return the arrangement plan + utilisation stats.
-        """
-        import os
-
-        # 1. Resolve canvas dimensions
-        canvas_w = payload.canvas_width
-        canvas_h = payload.canvas_height
-        if canvas_w == 0 or canvas_h == 0:
-            state = await ctl.get_state()
-            canvas_w = canvas_w or state.canvas_width or 320
-            canvas_h = canvas_h or state.canvas_height or 78
-
-        # 2. Gather metadata for each requested filename
-        primers_meta: list[dict] = []
-        for filename in payload.filenames:
-            found: str | None = None
-            for base in ["modules-private", "modules"]:
-                if not os.path.isdir(base):
-                    continue
-                for module in sorted(os.listdir(base)):
-                    candidate = os.path.join(base, module, "primers", filename)
-                    if os.path.isfile(candidate):
-                        found = candidate
-                        break
-                if found:
-                    break
-            if not found:
-                legacy = os.path.join("app", "primers", filename)
-                if os.path.isfile(legacy):
-                    found = legacy
-            if found:
-                meta = _get_primer_metadata(found)
-                primers_meta.append({
-                    "filename": filename,
-                    "path": found,
-                    "width": meta["width"] or 80,
-                    "height": meta["height"] or 24,
-                })
-            # Silently skip missing primers (caller can check count vs input)
-
-        # 3. Run layout algorithm
-        algo = payload.algorithm.lower()
-        padding = payload.padding
-        if algo == "poetry":
-            raw_placements = _poetry_layout(primers_meta, canvas_w, canvas_h, padding)
-        else:
-            # Default: masonry
-            algo = "masonry"
-            raw_placements = _masonry_layout(primers_meta, canvas_w, canvas_h, padding)
-
-        # 4. Build arrangement objects + compute stats
-        arrangement = [GalleryArrangement(**p) for p in raw_placements]
-
-        total_area = sum(a.width * a.height for a in arrangement)
-        canvas_area = canvas_w * canvas_h
-        utilization = round(total_area / canvas_area, 3) if canvas_area > 0 else 0.0
-
-        # Overlap detection
-        overlaps = 0
-        rects = [(a.x, a.y, a.x + a.width, a.y + a.height) for a in arrangement]
-        for i in range(len(rects)):
-            for j in range(i + 1, len(rects)):
-                ax1, ay1, ax2, ay2 = rects[i]
-                bx1, by1, bx2, by2 = rects[j]
-                if ax1 < bx2 and ax2 > bx1 and ay1 < by2 and ay2 > by1:
-                    overlaps += 1
-
-        # 5. Apply (unless preview)
-        applied = False
-        if not payload.preview:
-            # Get current open windows to match filenames → window IDs
-            state = await ctl.get_state()
-            # Build map: basename-without-ext → window id
-            win_map: dict[str, str] = {}
-            for w in state.windows:
-                if w.props and "path" in w.props:
-                    basename = os.path.basename(w.props["path"]).replace(".txt", "").lower()
-                    win_map[basename] = w.id
-                # Also index by title fragment as fallback
-                title_key = (w.title or "").lower().replace(".txt", "").split(" - ")[0].strip()
-                if title_key and w.id not in win_map.values():
-                    win_map[title_key] = w.id
-
-            for place in arrangement:
-                key = place.filename.replace(".txt", "").lower()
-                win_id = win_map.get(key)
-
-                if not win_id:
-                    # Window not open — find path and open it (with frameless if requested)
-                    primer_path = next(
-                        (p["path"] for p in primers_meta if p["filename"] == place.filename),
-                        None
-                    )
-                    if primer_path:
-                        open_args: dict = {
-                            "path": primer_path,
-                            "x": place.x, "y": place.y,
-                            "w": place.width, "h": place.height,
-                        }
-                        if payload.frameless:
-                            open_args["frameless"] = "true"
-                        res = await ctl.exec_command("open_primer", open_args, actor="gallery_arrange")
-                        if res.get("ok"):
-                            # Re-query state to find the new window ID
-                            new_state = await ctl.get_state()
-                            for nw in new_state.windows:
-                                if nw.props and "path" in nw.props:
-                                    nb = os.path.basename(nw.props["path"]).replace(".txt", "").lower()
-                                    if nb == key and nb not in win_map:
-                                        win_id = nw.id
-                                        place.window_id = nw.id
-                                        break
-                            # Window was opened at the requested position — no need to move
-                            continue
-
-                if win_id:
-                    try:
-                        await ctl.move_resize(win_id, x=place.x, y=place.y, w=place.width, h=place.height)
-                        place.window_id = win_id
-                    except Exception:
-                        pass
-            applied = True
-
-        return GalleryArrangeResponse(
-            ok=True,
-            algorithm=algo,
-            arrangement=arrangement,
-            canvas_width=canvas_w,
-            canvas_height=canvas_h,
-            canvas_utilization=utilization,
-            overlaps=overlaps,
-            applied=applied,
-            preview=payload.preview,
-        )
 
     @app.post("/timeline/cancel")
     async def timeline_cancel(body: Dict[str, Any]) -> Dict[str, Any]:

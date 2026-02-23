@@ -386,55 +386,11 @@ class PrimerInfo(BaseModel):
     name: str
     path: str
     size_kb: float
-    width: int = 0        # Intrinsic character width of first frame (0 = unmeasured)
-    height: int = 0       # Intrinsic line count of first frame (0 = unmeasured)
-    aspect_ratio: float = 0.0  # width / height (0.0 = unmeasured)
-
-
-class PrimerMetadata(BaseModel):
-    filename: str
-    width: int
-    height: int
-    aspect_ratio: float
-    line_count: int
-    max_line_width: int
-    size_kb: float
-
+    
 
 class PrimersListResponse(BaseModel):
     primers: List[PrimerInfo]
     count: int
-
-
-class GalleryArrangement(BaseModel):
-    filename: str
-    x: int
-    y: int
-    width: int
-    height: int
-    window_id: Optional[str] = None
-
-
-class GalleryArrangeRequest(BaseModel):
-    filenames: List[str] = Field(..., description="List of primer filenames to arrange (just basenames, e.g. 'foo.txt')")
-    algorithm: str = Field("masonry", description="Layout algorithm: 'masonry' | 'poetry' | 'cascade'")
-    padding: int = Field(2, description="Character gap between windows")
-    canvas_width: int = Field(0, description="Override canvas width (0 = auto-query from TUI state)")
-    canvas_height: int = Field(0, description="Override canvas height (0 = auto-query from TUI state)")
-    preview: bool = Field(False, description="If true, return the plan without applying it")
-    frameless: bool = Field(False, description="Open primers without title/border chrome")
-
-
-class GalleryArrangeResponse(BaseModel):
-    ok: bool
-    algorithm: str
-    arrangement: List[GalleryArrangement]
-    canvas_width: int
-    canvas_height: int
-    canvas_utilization: float
-    overlaps: int
-    applied: bool
-    preview: bool
 
 
 # ----- Browser Models -----
