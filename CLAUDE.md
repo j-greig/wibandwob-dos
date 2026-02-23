@@ -103,6 +103,8 @@ cat "$(ls -t logs/screenshots/tui_*.txt | head -1)"
 
 **Agent visual inspection**: use `/screenshot` skill (`.claude/skills/screenshot/`) which handles capture, state JSON, diff, window crop, and auto-recovery. See SKILL.md there for all modes.
 
+**Post-implementation parity audit**: use `/ww-audit` skill (`.claude/skills/ww-audit/`) to verify a window type has registry slug, props save/restore, and correct screen position — or run `/ww-audit` (no args) for a full gap matrix across all types.
+
 No C++ unit test framework is configured. C++ testing is manual via UI interaction or API calls.
 
 Primary automated regression coverage for multiplayer/IPC lives in `tests/room/` (Python, 160 tests). Run for all boundary/contract changes:
