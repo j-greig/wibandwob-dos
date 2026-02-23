@@ -282,8 +282,8 @@ void TScrambleView::draw()
     TColorAttr catAttr = bgAttr;
 
     // Bubble colours: warm text on dark bg
-    TColorAttr bubbleTextAttr = TColorAttr(TColorRGB(240, 240, 200), TColorRGB(40, 40, 50));
-    TColorAttr bubbleBorderAttr = TColorAttr(TColorRGB(140, 140, 160), TColorRGB(40, 40, 50));
+    TColorAttr bubbleTextAttr = TColorAttr(TColorRGB(240, 240, 200), TColorRGB(0, 0, 0));
+    TColorAttr bubbleBorderAttr = TColorAttr(TColorRGB(140, 140, 160), TColorRGB(0, 0, 0));
 
     // Word-wrap bubble text
     std::vector<std::string> bubbleLines;
@@ -471,9 +471,9 @@ void TScrambleMessageView::draw()
     TDrawBuffer b;
 
     // Colours
-    TColorAttr bgAttr = TColorAttr(TColorRGB(160, 160, 170), TColorRGB(30, 30, 40));
-    TColorAttr senderAttr = TColorAttr(TColorRGB(200, 180, 120), TColorRGB(30, 30, 40));
-    TColorAttr textAttr = TColorAttr(TColorRGB(190, 190, 200), TColorRGB(30, 30, 40));
+    TColorAttr bgAttr = TColorAttr(TColorRGB(160, 160, 170), TColorRGB(0, 0, 0));
+    TColorAttr senderAttr = TColorAttr(TColorRGB(200, 180, 120), TColorRGB(0, 0, 0));
+    TColorAttr textAttr = TColorAttr(TColorRGB(190, 190, 200), TColorRGB(0, 0, 0));
 
     // Show last N lines that fit in the view
     int totalLines = static_cast<int>(wrappedLines.size());
@@ -560,12 +560,12 @@ void TScrambleInputView::draw()
     TDrawBuffer b;
 
     // Colours
-    TColorAttr promptAttr = TColorAttr(TColorRGB(200, 180, 120), TColorRGB(25, 25, 35));
-    TColorAttr inputAttr = TColorAttr(TColorRGB(220, 220, 230), TColorRGB(25, 25, 35));
+    TColorAttr promptAttr = TColorAttr(TColorRGB(200, 180, 120), TColorRGB(0, 0, 0));
+    TColorAttr inputAttr = TColorAttr(TColorRGB(220, 220, 230), TColorRGB(0, 0, 0));
     TColorAttr cursorAttr = TColorAttr(TColorRGB(25, 25, 35), TColorRGB(220, 220, 230));
 
     // Separator line on row 0
-    TColorAttr sepAttr = TColorAttr(TColorRGB(80, 80, 100), TColorRGB(25, 25, 35));
+    TColorAttr sepAttr = TColorAttr(TColorRGB(80, 80, 100), TColorRGB(0, 0, 0));
     b.moveChar(0, '\xC4', sepAttr, size.x);
     writeLine(0, 0, size.x, 1, b);
 
@@ -732,6 +732,27 @@ void TScrambleWindow::setDisplayState(ScrambleDisplayState state)
     }
 
     layoutChildren();
+
+    TRect newBounds = getBounds();
+    if (displayState == sdsSmol) {
+        int smolH = kCatViewHeight + 2; // frame height
+        int currentH = newBounds.b.y - newBounds.a.y;
+        if (currentH != smolH) {
+            newBounds.a.y = newBounds.b.y - smolH;
+            changeBounds(newBounds);
+        }
+    } else if (displayState == sdsTall) {
+        if (owner) {
+            TRect ownerRect = owner->getExtent();
+            int tallH = ownerRect.b.y - ownerRect.a.y;
+            int currentH = newBounds.b.y - newBounds.a.y;
+            if (currentH != tallH || newBounds.a.y != ownerRect.a.y) {
+                newBounds.a.y = ownerRect.a.y;
+                newBounds.b.y = ownerRect.a.y + tallH;
+                changeBounds(newBounds);
+            }
+        }
+    }
 }
 
 void TScrambleWindow::layoutChildren()
