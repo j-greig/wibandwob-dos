@@ -182,6 +182,13 @@ class Controller:
                             # k_specs[] slugs. If it fires, a new C++ type
                             # was added without updating models.py.
                             wtype = WindowType.test_pattern
+                        # Carry through any props the C++ side emits (e.g. path for
+                        # frame_player / text_view windows) while preserving any
+                        # Python-side props already attached to the same window id.
+                        existing = next((w for w in self._state.windows if w.id == win_data["id"]), None)
+                        props: Dict[str, Any] = dict(existing.props) if existing else {}
+                        if "path" in win_data:
+                            props["path"] = win_data["path"]
                         win = Window(
                             id=win_data["id"],
                             type=wtype,
@@ -194,7 +201,7 @@ class Controller:
                             ),
                             z=0,  # C++ doesn't provide z-order
                             focused=False,  # Will be determined later
-                            props={}
+                            props=props,
                         )
                         new_windows.append(win)
 

@@ -110,75 +110,69 @@ def _masonry_layout(
     canvas_w: int,
     canvas_h: int,
     padding: int = 2,
+    n_cols: int | None = None,
 ) -> list[dict]:
-    """Masonry layout: tall-first, multi-column bin-packing.
+    """Pinterest/gallery-wall masonry: N fixed columns, items drop into shortest.
 
-    Returns list of {filename, x, y, width, height}.
-    Guarantees no overlap and no out-of-bounds placements.
+    Column count is derived from canvas width and median item width so there are
+    always multiple columns — even when all items would fit vertically in one.
+    Items keep their natural ASCII width; column X positions are evenly spaced.
+
+    Returns list of {filename, x, y, width, height}, no overlaps, no OOB.
     """
     if not primers:
         return []
 
-    # Clamp pieces to canvas dimensions
-    pieces = []
-    for p in primers:
-        w = min(p["width"] or 40, canvas_w)
-        h = min(p["height"] or 20, canvas_h)
-        pieces.append({"filename": p["filename"], "width": w, "height": h})
+    # Natural dimensions, clamped to canvas
+    pieces = [
+        {
+            "filename": p["filename"],
+            "width":  min(p["width"]  or 40, canvas_w),
+            "height": min(p["height"] or 20, canvas_h),
+        }
+        for p in primers
+    ]
 
-    # Sort tallest first (better packing)
+    # ── Column count ────────────────────────────────────────────────────────
+    # Drive n_cols from the widest item so columns are always wide enough to
+    # show each piece without overlap with its neighbour.
+    if n_cols is None:
+        max_w   = max(p["width"] for p in pieces)
+        # How many columns of (max_w + padding) fit?  Minimum 2, maximum 6.
+        n_cols = max(2, min(6, canvas_w // (max_w + padding)))
+
+    # Column slot width (used for X spacing only; items keep natural width)
+    slot_w = (canvas_w - padding * (n_cols + 1)) // n_cols
+    col_x  = [padding + i * (slot_w + padding) for i in range(n_cols)]
+    col_h  = [0] * n_cols                     # running fill height per column
+
+    # Sort tallest first → anchor the tallest pieces in the visual centre
     pieces.sort(key=lambda p: p["height"], reverse=True)
 
-    # Build columns greedily
-    col_x: list[int] = []     # x origin of each column
-    col_h: list[int] = []     # current filled height of each column
-    col_w: list[int] = []     # width of each column (max piece width in column)
     placements: list[dict] = []
-
     for piece in pieces:
         pw, ph = piece["width"], piece["height"]
 
-        # Try to place in the shortest column that has room
-        placed = False
-        best_col = -1
-        best_height = canvas_h + 1
+        # Drop into the shortest column
+        i   = col_h.index(min(col_h))
+        gap = padding if col_h[i] > 0 else 0
+        y   = col_h[i] + gap
 
-        for i, (cx, ch, cw) in enumerate(zip(col_x, col_h, col_w)):
-            if ch + ph + (padding if ch > 0 else 0) <= canvas_h:
-                if ch < best_height:
-                    best_height = ch
-                    best_col = i
+        # Hard-skip if it would fall entirely below the canvas
+        if y >= canvas_h:
+            continue
 
-        if best_col >= 0:
-            # Place in existing column
-            gap = padding if col_h[best_col] > 0 else 0
-            y = col_h[best_col] + gap
-            placements.append({
-                "filename": piece["filename"],
-                "x": col_x[best_col],
-                "y": y,
-                "width": pw,
-                "height": ph,
-            })
-            col_h[best_col] = y + ph
-            col_w[best_col] = max(col_w[best_col], pw)
-            placed = True
+        # Clip height if it overruns the bottom (partial display is fine)
+        visible_h = min(ph, canvas_h - y)
 
-        if not placed:
-            # Start a new column
-            next_x = sum(w + padding for w in col_w) if col_w else 0
-            if next_x + pw <= canvas_w:
-                col_x.append(next_x)
-                col_h.append(ph)
-                col_w.append(pw)
-                placements.append({
-                    "filename": piece["filename"],
-                    "x": next_x,
-                    "y": 0,
-                    "width": pw,
-                    "height": ph,
-                })
-            # else: piece doesn't fit anywhere — skip (logged by caller)
+        placements.append({
+            "filename": piece["filename"],
+            "x":        col_x[i],
+            "y":        y,
+            "width":    pw,
+            "height":   visible_h,
+        })
+        col_h[i] = y + visible_h
 
     return placements
 
