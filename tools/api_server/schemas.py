@@ -419,6 +419,12 @@ class GalleryArrangeRequest(BaseModel):
     filenames: List[str] = Field(..., description="List of primer filenames to arrange (just basenames, e.g. 'foo.txt')")
     algorithm: str = Field("masonry", description="Layout algorithm: 'masonry' | 'poetry' | 'cascade'")
     padding: int = Field(2, description="Character gap between windows")
+    margin: int = Field(1, description=(
+        "Gap (chars) between the window shadow edge and the canvas edge on all sides. "
+        "Default 1 aligns left edge with the 'F' of the File menu. "
+        "0 = flush to canvas, 2 = spacious, etc. "
+        "Shadow offsets (TV fixed): right +2 cols, bottom +1 row — these are added automatically."
+    ))
     canvas_width: int = Field(0, description="Override canvas width (0 = auto-query from TUI state)")
     canvas_height: int = Field(0, description="Override canvas height (0 = auto-query from TUI state)")
     preview: bool = Field(False, description="If true, return the plan without applying it")

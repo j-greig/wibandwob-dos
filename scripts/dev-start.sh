@@ -42,7 +42,10 @@ rm -f "$SOCKET"
 # ── TUI ──────────────────────────────────────────────────────────────────────
 
 echo "🖥   Starting TUI (instance=$INSTANCE)..."
-tmux new-session -d -s "$TUI_SESSION" -x 220 -y 50 \
+# No -x/-y: tmux will inherit your terminal's actual dimensions when you attach.
+# Forcing a size (e.g. -x 320 -y 78) makes the canvas bigger than your viewport
+# and windows render partially off-screen.
+tmux new-session -d -s "$TUI_SESSION" \
   "WIBWOB_INSTANCE=$INSTANCE $BINARY 2>/tmp/wibwob_debug.log; echo '[TUI exited — press any key]'; read"
 
 echo "⏳  Waiting for IPC socket at $SOCKET ..."

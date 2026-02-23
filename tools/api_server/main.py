@@ -72,30 +72,65 @@ from .browser import BrowserSession, fetch_and_convert
 from pydantic import BaseModel
 
 
+# ─── Gallery constants ──────────────────────────────────────────────────────
+
+# Turbo Vision window drop shadow dimensions (fixed by the TV widget toolkit)
+SHADOW_W = 2   # chars — shadow extends this many cols to the RIGHT of the window
+SHADOW_H = 1   # chars — shadow extends this many rows BELOW the window
+
+# The TV status bar occupies the last row of the canvas as reported by /state.
+# Add 1 extra row of clearance at the bottom so windows don't sit on top of it.
+CANVAS_BOTTOM_EXTRA = 1
+
+# Default margin: 1 char gap between the shadow edge and the canvas edge.
+# Aligns left edges with the 'F' of the 'File' menu item (col 2 in TV).
+# Pass margin= to gallery/arrange to override (0 = flush, 2 = spacious, etc.)
+DEFAULT_MARGIN = 1
+
 # ─── Gallery helpers ────────────────────────────────────────────────────────
 
 def _measure_primer(path: str) -> dict:
-    """Read a primer file and return {width, height, line_count, max_line_width}.
+    """Read a primer file and return OUTER window dimensions (content + 2 for frame).
 
-    Stops at the first '----' frame delimiter so we measure only the first frame.
+    Turbo Vision TWindow always adds a 1-cell border on each side, so:
+        outer_width  = content_width  + 2
+        outer_height = content_height + 2
+
+    This matches what C++ calculateWindowBounds() produces, so values returned
+    here can be passed directly to open_primer / resize_window without adjustment.
+
+    Stops at the first '----' frame delimiter (measures the first frame only).
     Strips trailing CR so Windows line endings don't inflate widths.
     """
     try:
-        width = height = 0
+        content_w = content_h = 0
         with open(path, "r", encoding="utf-8", errors="replace") as f:
             for line in f:
                 line = line.rstrip("\r\n")
                 if line == "----":
                     break
-                height += 1
-                width = max(width, len(line))
-        aspect = round(width / height, 3) if height else 0.0
-        return {"width": width, "height": height, "max_line_width": width, "line_count": height, "aspect_ratio": aspect}
+                content_h += 1
+                content_w = max(content_w, len(line))
+        # Outer dimensions: +2 each axis for the window frame border
+        outer_w = content_w + 2
+        outer_h = content_h + 2
+        aspect  = round(outer_w / outer_h, 3) if outer_h else 0.0
+        return {
+            "width":         outer_w,    # outer (pass to open/resize directly)
+            "height":        outer_h,
+            "content_width": content_w,  # raw text dimensions
+            "content_height":content_h,
+            "max_line_width":content_w,
+            "line_count":    content_h,
+            "aspect_ratio":  aspect,
+        }
     except Exception:
-        return {"width": 0, "height": 0, "max_line_width": 0, "line_count": 0, "aspect_ratio": 0.0}
+        return {"width": 2, "height": 2, "content_width": 0, "content_height": 0,
+                "max_line_width": 0, "line_count": 0, "aspect_ratio": 0.0}
 
 
 # Simple LRU-style cache (filename → metadata dict)
+# Values are OUTER window dimensions (content + 2 for frame) — see _measure_primer.
 _primer_meta_cache: dict = {}
 
 
@@ -110,25 +145,33 @@ def _masonry_layout(
     canvas_w: int,
     canvas_h: int,
     padding: int = 2,
+    margin: int = 1,
     n_cols: int | None = None,
 ) -> list[dict]:
     """Pinterest/gallery-wall masonry: N fixed columns, items drop into shortest.
 
-    Column count is derived from canvas width and median item width so there are
-    always multiple columns — even when all items would fit vertically in one.
-    Items keep their natural ASCII width; column X positions are evenly spaced.
+    margin controls the gap between the window shadow edge and the canvas edge:
+      - Left/top:   window starts at x=margin, y=margin
+      - Right/bottom: usable area shrinks by SHADOW_W/SHADOW_H + margin so the
+                      drop shadow is never clipped by the canvas edge
 
-    Returns list of {filename, x, y, width, height}, no overlaps, no OOB.
+    Returns list of {filename, x, y, width, height}, no overlaps, shadow fits.
     """
     if not primers:
         return []
 
-    # Natural dimensions, clamped to canvas
+    # Usable area — inset from canvas edges to respect margin + shadow + status bar
+    usable_x = margin
+    usable_y = margin
+    usable_w = canvas_w - SHADOW_W - margin * 2
+    usable_h = canvas_h - SHADOW_H - CANVAS_BOTTOM_EXTRA - margin * 2
+
+    # Natural dimensions, clamped to usable area
     pieces = [
         {
             "filename": p["filename"],
-            "width":  min(p["width"]  or 40, canvas_w),
-            "height": min(p["height"] or 20, canvas_h),
+            "width":  min(p["width"]  or 40, usable_w),
+            "height": min(p["height"] or 20, usable_h),
         }
         for p in primers
     ]
@@ -137,14 +180,13 @@ def _masonry_layout(
     # Drive n_cols from the widest item so columns are always wide enough to
     # show each piece without overlap with its neighbour.
     if n_cols is None:
-        max_w   = max(p["width"] for p in pieces)
-        # How many columns of (max_w + padding) fit?  Minimum 2, maximum 6.
-        n_cols = max(2, min(6, canvas_w // (max_w + padding)))
+        max_w  = max(p["width"] for p in pieces)
+        n_cols = max(2, min(6, usable_w // (max_w + padding)))
 
     # Column slot width (used for X spacing only; items keep natural width)
-    slot_w = (canvas_w - padding * (n_cols + 1)) // n_cols
-    col_x  = [padding + i * (slot_w + padding) for i in range(n_cols)]
-    col_h  = [0] * n_cols                     # running fill height per column
+    slot_w = (usable_w - padding * (n_cols + 1)) // n_cols
+    col_x  = [usable_x + padding + i * (slot_w + padding) for i in range(n_cols)]
+    col_h  = [0] * n_cols   # running fill height (relative to usable_y)
 
     # Sort tallest first → anchor the tallest pieces in the visual centre
     pieces.sort(key=lambda p: p["height"], reverse=True)
@@ -156,14 +198,14 @@ def _masonry_layout(
         # Drop into the shortest column
         i   = col_h.index(min(col_h))
         gap = padding if col_h[i] > 0 else 0
-        y   = col_h[i] + gap
+        y   = usable_y + col_h[i] + gap
 
-        # Hard-skip if it would fall entirely below the canvas
-        if y >= canvas_h:
+        # Hard-skip if it would fall entirely below the usable area
+        if y >= usable_y + usable_h:
             continue
 
-        # Clip height if it overruns the bottom (partial display is fine)
-        visible_h = min(ph, canvas_h - y)
+        # Clip height if it overruns the usable bottom
+        visible_h = min(ph, usable_y + usable_h - y)
 
         placements.append({
             "filename": piece["filename"],
@@ -172,7 +214,7 @@ def _masonry_layout(
             "width":    pw,
             "height":   visible_h,
         })
-        col_h[i] = y + visible_h
+        col_h[i] = (y - usable_y) + visible_h
 
     return placements
 
@@ -869,14 +911,16 @@ def make_app() -> FastAPI:
             # Silently skip missing primers (caller can check count vs input)
 
         # 3. Run layout algorithm
-        algo = payload.algorithm.lower()
+        algo    = payload.algorithm.lower()
         padding = payload.padding
+        margin  = payload.margin
         if algo == "poetry":
             raw_placements = _poetry_layout(primers_meta, canvas_w, canvas_h, padding)
         else:
             # Default: masonry
             algo = "masonry"
-            raw_placements = _masonry_layout(primers_meta, canvas_w, canvas_h, padding)
+            raw_placements = _masonry_layout(primers_meta, canvas_w, canvas_h,
+                                             padding=padding, margin=margin)
 
         # 4. Build arrangement objects + compute stats
         arrangement = [GalleryArrangement(**p) for p in raw_placements]
@@ -931,7 +975,9 @@ def make_app() -> FastAPI:
                             open_args["frameless"] = "true"
                         res = await ctl.exec_command("open_primer", open_args, actor="gallery_arrange")
                         if res.get("ok"):
-                            # Re-query state to find the new window ID
+                            # Re-query state to find the new window ID, then
+                            # fall through to move_resize below (open_primer
+                            # ignores x/y/w/h bounds — we must move explicitly)
                             new_state = await ctl.get_state()
                             for nw in new_state.windows:
                                 if nw.props and "path" in nw.props:
@@ -940,8 +986,6 @@ def make_app() -> FastAPI:
                                         win_id = nw.id
                                         place.window_id = nw.id
                                         break
-                            # Window was opened at the requested position — no need to move
-                            continue
 
                 if win_id:
                     try:

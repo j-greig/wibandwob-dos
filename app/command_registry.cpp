@@ -7,6 +7,11 @@
 
 #include <sstream>
 
+// TRect for window bounds
+#define Uses_TRect
+#define Uses_TPoint
+#include <tvision/tv.h>
+
 extern void api_cascade(TTestPatternApp& app);
 extern void api_toggle_scramble(TTestPatternApp& app);
 extern void api_expand_scramble(TTestPatternApp& app);
@@ -23,7 +28,7 @@ extern void api_set_pattern_mode(TTestPatternApp& app, const std::string& mode);
 extern std::string api_set_theme_mode(TTestPatternApp& app, const std::string& mode);
 extern std::string api_set_theme_variant(TTestPatternApp& app, const std::string& variant);
 extern std::string api_reset_theme(TTestPatternApp& app);
-class TRect;
+extern void api_open_animation_path(TTestPatternApp& app, const std::string& path, const TRect* bounds, bool frameless);
 extern void api_spawn_paint(TTestPatternApp& app, const TRect* bounds);
 extern void api_spawn_micropolis_ascii(TTestPatternApp& app, const TRect* bounds);
 extern void api_spawn_quadra(TTestPatternApp& app, const TRect* bounds);
@@ -245,10 +250,19 @@ std::string exec_registry_command(
         // Frameless mode: open primer without visible border/title chrome
         auto fi = kv.find("frameless");
         bool frameless = (fi != kv.end() && (fi->second == "1" || fi->second == "true"));
-        if (frameless) {
-            api_open_animation_path(app, path, nullptr, true);
+
+        // Optional explicit placement: x, y (top-left), w, h (outer incl. frame)
+        auto xi = kv.find("x"), yi = kv.find("y");
+        auto wi = kv.find("w"), hi = kv.find("h");
+        if (xi != kv.end() && yi != kv.end() && wi != kv.end() && hi != kv.end()) {
+            int x = std::atoi(xi->second.c_str());
+            int y = std::atoi(yi->second.c_str());
+            int w = std::atoi(wi->second.c_str());
+            int h = std::atoi(hi->second.c_str());
+            TRect bounds(x, y, x + w, y + h);
+            api_open_animation_path(app, path, &bounds, frameless);
         } else {
-            api_open_animation_path(app, path);
+            api_open_animation_path(app, path, nullptr, frameless);
         }
         return "ok";
     }

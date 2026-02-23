@@ -206,6 +206,165 @@ _sync_state` was silently dropping the `path` field emitted by C++ for all
 declaring done. A single-column result is visually obvious as wrong. Also: always
 verify that C++ JSON fields actually reach Python state before writing matching code.
 
+**Drop shadow insight** (from TEST-02 human confirmation): Turbo Vision windows
+have a 2-char drop shadow on the right/bottom edge. `padding=2` in the gallery
+layout is therefore the exact minimum to prevent visual overlap — the shadow fills
+the gap cleanly. This is a design constraint, not an arbitrary value. Hardcode as
+`GALLERY_PADDING = 2` and never go lower.
+
+---
+
+---
+
+## 14. Three different "terminal size" values — know which one you need
+
+**What happened**: Confusion between three different size sources during the session:
+
+| Source | Value | What it is |
+|--------|-------|------------|
+| `stty size` in pi pane | 41×77 | The terminal pane running the pi CLI |
+| `tmux display-message #{pane_width}x#{pane_height}` | 157×61 | The TUI tmux session |
+| `GET /state` → `canvas.width/height` | 157×60 | TUI desktop area (excl. menu+status bars) |
+| `osascript iTerm2 bounds` | 1595×1273 px | Physical pixel size of the iTerm2 window |
+
+**Rule**: Always use `/state` canvas dimensions for layout. The TUI canvas is 1 row
+shorter than the tmux pane (menu bar row consumed). Never use `stty size` from the
+pi pane — it's a different terminal.
+
+**Cell size** (from osascript): 1595px / 157cols ≈ 10px wide, 1273px / 60rows ≈ 21px tall.
+Updated `workspace_snapshot.py` CELL_W/CELL_H to match — SVGs now render at true scale.
+
+---
+
+## 13. Turbo Vision window shadow must be accounted for in layout margins
+
+**What happened**: The 4-corner test revealed windows placed at `canvas_w - w - 2`
+were having their right shadow clipped (shadow = 2 chars wide). Bottom windows at
+`canvas_h - h - 1` were clipped on the bottom shadow (shadow = 1 row tall). The
+gallery looked slightly wrong — borders flush but shadow cut off.
+
+**Root cause**: Layout algorithm used content/canvas bounds with no shadow allowance.
+
+**Fix**: Defined `SHADOW_W = 2, SHADOW_H = 1` constants (Turbo Vision fixed values).
+Added `margin` param (default=1) to `GalleryArrangeRequest`. Masonry now computes:
+- `usable_x = margin, usable_y = margin`
+- `usable_w = canvas_w - SHADOW_W - margin * 2`
+- `usable_h = canvas_h - SHADOW_H - margin * 2`
+
+**Design note**: margin=1 aligns left window edges with the 'F' of the 'File' menu
+item — a happy accident that makes the gallery feel intentionally designed.
+
+**Verification formula** (check after any placement):
+```
+shadow_right  = x + w + SHADOW_W  →  should be ≤ canvas_w - margin
+shadow_bottom = y + h + SHADOW_H  →  should be ≤ canvas_h - margin
+```
+
+---
+
+## 12. Always work from actual iTerm2 viewport size — never force tmux canvas bigger
+
+**What happened**: `dev-start.sh` was starting tmux with `-x 320 -y 78`, making
+the TUI render a canvas bigger than the user's actual iTerm2 window. Gallery
+layout computed correctly for 320×77 but user could only see ~157×61 — windows
+appeared cut off or completely off-screen to the right.
+
+**Rule**: Never hardcode a tmux canvas size larger than the user's terminal.
+The TUI should fill whatever the user can actually see. `dev-start.sh` now
+starts tmux without `-x`/`-y` so it inherits the real terminal dimensions
+on first attach. Gallery arrange always reads canvas size from `/state` so
+layout is always computed for the actual viewport.
+
+**Workflow after `dev-start.sh`**:
+```
+tmux attach -t wibwob   # session resizes to your actual terminal
+Ctrl-B D                # detach — canvas size now locked to your viewport
+./scripts/snap.sh       # verify canvas width/height matches what you see
+```
+
+---
+
+## 11. tmux crash shrinks all TUI windows — fix: resize + SIGWINCH
+
+**What happened**: tmux session crashed mid-session. When it came back, the
+terminal reported a smaller size. Turbo Vision received SIGWINCH and
+squashed all windows to fit the smaller canvas (e.g. 59×18 → 29×14).
+Canvas shrank from 320×77 to 157×60.
+
+**Fix** (two commands, ~1 second):
+```bash
+tmux resize-window -t wibwob -x 320 -y 78
+kill -WINCH $(pgrep -f test_pattern | head -1)
+```
+Turbo Vision re-queries the terminal size, restores all windows to their
+full logical dimensions. Windows are NOT destroyed — just clipped while
+the canvas was small. After SIGWINCH they snap back.
+
+**Add to `dev-start.sh`**: check canvas size after startup and send SIGWINCH
+if it doesn't match the expected 320×78.
+
+**Also noted**: `/windows/{id}/resize` endpoint does not exist in the API —
+resize only works via IPC `resize_window` command through the controller's
+`move_resize()`. Add a REST endpoint for this (backlog item).
+
+---
+
+## 10. Three compounding placement bugs meant windows were never where we thought
+
+**What happened**: After implementing masonry and seeing the screenshot
+(`weird-placement.png`), all windows were crammed into the bottom-right corner.
+Spent significant time debugging what turned out to be three separate bugs that
+all had to exist simultaneously to produce the symptom:
+
+1. **`open_primer` C++ ignores x,y,w,h kv args** — always passes `nullptr`
+   bounds to `api_open_animation_path`. Windows open at Turbo Vision's default
+   position (roughly centred). No amount of Python-side logic can fix this
+   without a C++ change OR a follow-up `move_resize`.
+
+2. **Python `gallery/arrange` skips `move_resize` for newly-opened windows** —
+   the `continue` statement after finding the new window ID assumes the window
+   opened at the right place (it didn't, due to Bug 1).
+
+3. **Window size passed = content size, not outer-frame size** — `_measure_primer`
+   returns raw content dimensions; `resize_window` treats them as outer bounds,
+   so a 33-wide file ends up with 31 visible chars (frame eats 1 cell each side).
+
+**Time lost**: ~1.5 hours of algorithm iteration, screenshot checking, and
+confusion about coordinate systems — all caused by never verifying a single
+known placement first.
+
+**Lesson**: **Always run TEST-01 (single window, known position) before building
+any multi-window algorithm.** The snap.sh + SVG workflow (`./scripts/snap.sh`)
+was not in place; adding it is itself a friction fix. The arrangement-tests.md
+log is now the required gate before any gallery work.
+
+**Artefact**: `.planning/audits/placement-bug-analysis.md` — full root cause
+write-up with fix plan.
+
+---
+
+## 9. User reference images clarified two distinct layout algorithms
+
+**What happened**: I called both "masonry" but they're different things:
+
+- **CSS masonry** (css-irl, brickjs refs): N fixed columns, items drop into
+  shortest column. Variable heights. This is `algorithm=masonry` — now working.
+  Looks sparse with 5 test primers; becomes visually rich with 20+ pieces.
+
+- **Justified row / salon hanging** (gallery wall refs — Desenio, Shopify):
+  Items packed into ROWS that fill the exact canvas width. Window widths adjusted
+  (stretched/shrunk) to justify each row. Equal gutters everywhere. All items in a
+  row share the same height. This is a different algorithm — `algorithm=justified`
+  or `algorithm=gallery_wall`. Not yet implemented.
+
+**Fix needed**: implement `_justified_row_layout` and expose as
+`algorithm=gallery_wall`. Key steps:
+1. Group items into rows (greedy: add until row would exceed canvas_w)
+2. Scale window widths proportionally to justify the row to canvas_w
+3. Row height = max(natural heights in row)
+4. Place with equal horizontal + vertical gutters
+ASCII content clips/pads at window edge — acceptable, curators can tune.
+
 ---
 
 ## 8. `preview=true` / poetry layout verified but not visually confirmed
@@ -229,3 +388,149 @@ screenshot → confirm with eyes. Text output alone is insufficient for visual f
 | 🟡 | Unit test: open primer → assert props.path non-empty | 20 min |
 | 🟡 | Investigate MCP /mcp errors | TBD |
 | 🟢 | Pre-commit hook: reject direct commits to main for app/ changes | 30 min |
+
+---
+
+<planofaction>
+
+## Plan of Action — Ranked by Impact
+
+Context: gallery display is the active goal (E012). Rankings weight AI-agent unblocking, gallery correctness, and display-tool vision.
+
+### Tier 1 — Do immediately (unblock everything)
+
+**1. Fix CLAUDE.md startup recipe — remove hardcoded -x/-y**
+The existing "Running the Live TUI" section in CLAUDE.md hardcodes `-x 120 -y 40`. Item 12 proves this is wrong and causes off-screen gallery placement. Fix before anything else or every agent session starts broken.
+Effort: 5 min. File: `CLAUDE.md` (Running the Live TUI section).
+
+**2. `scripts/dev-start.sh` + `dev-stop.sh`**
+Single-command start eliminates ~30 min of per-session friction for any AI agent. No hardcoded canvas size — inherits real terminal on first attach. Biggest multiplier for all future gallery/E012 work.
+Effort: 30 min. Already drafted in this doc — just needs emoji stripped and committed.
+
+**3. CLAUDE.md: branch-before-code + screenshot-before-commit as session-start stop-gates**
+Not a doc mention — these need to be in the opening paragraph of CLAUDE.md as hard rules, not buried in workflow sections. The pre-commit hook (Tier 2) enforces it mechanically.
+Effort: 5 min.
+
+### Tier 2 — High leverage, do this sprint
+
+**4. Fix C++ `open_primer` to respect x,y,w,h args**
+Root cause of item 10's three compounding bugs. Every gallery placement currently requires a follow-up `move_resize` round-trip. Fix this once in C++ and all Python gallery code simplifies. Without it, gallery_wall and any future layout algorithm carry hidden complexity.
+Effort: 1-2 hours. File: `app/command_registry.cpp` / `app/test_pattern_app.cpp` — `api_open_animation_path` call site.
+
+**5. `algorithm=gallery_wall` (justified-row layout)**
+Masonry is done. Gallery_wall is the correct algorithm for a curated display — rows fill canvas width, widths scaled proportionally, equal gutters. This is the visual target for the display tool vision. Item 9 has the algorithm fully specified, just needs implementing.
+Effort: 2-3 hours. File: `tools/api_server/gallery.py` or equivalent.
+
+**6. `scripts/init-submodules.sh`**
+Silent build failures on fresh clone burn any new agent or CI run. Script should handle the tvterm SHA fetch workaround robustly. Add one-liner to README and CLAUDE.md first-build section.
+Effort: 20 min.
+
+### Tier 3 — Quality / regression prevention
+
+**7. Unit test: open primer → GET /state → assert props.path non-empty**
+The props={} bug (item 4) was silent and caused hours of confusion. A test catches any regression immediately.
+Effort: 20 min. File: `tests/` — new test alongside room tests or contract tests.
+
+**8. `snap.sh` workflow + TEST-01 gate documented in CLAUDE.md**
+The lesson from item 10: always verify a single known placement before any multi-window algorithm. Document snap.sh usage and the TEST-01 requirement as a mandatory step in gallery development workflow.
+Effort: 15 min.
+
+**9. wibwobdos skill: local macOS dev section**
+The full startup snippet from item 5 should live in the skill so any agent invoking wibwobdos gets it. Complements dev-start.sh — skill explains why, script does it.
+Effort: 15 min.
+
+**10. Pre-commit hook: reject app/ commits directly to main**
+Mechanical enforcement of the branch-before-code rule. Catches the item 3 failure mode automatically.
+Effort: 30 min.
+
+### Tier 4 — Backlog / investigate
+
+**11. `/windows/{id}/resize` REST endpoint**
+Currently resize only works via IPC through the controller. A REST endpoint makes gallery testing from curl simpler and removes the controller dependency.
+Effort: 1 hour. Filed as backlog in item 11.
+
+**12. Investigate and fix MCP /mcp errors**
+Item 6 — unresolved. Low priority until gallery core is solid, but MCP errors will matter when the embedded Wib&Wob agent drives gallery layout autonomously.
+Effort: TBD.
+
+### Gallery display vision — specific notes
+
+- `GALLERY_PADDING = 2` and `SHADOW_W = 2, SHADOW_H = 1` are Turbo Vision hard constraints, not config. They should be constants in the layout code and documented in any gallery API reference.
+- Cell size (10px wide × 21px tall) from iTerm2 calibration — lock into `workspace_snapshot.py` and keep updated. This is the foundation for any SVG/image export pipeline.
+- Masonry (N columns, bin-pack shortest) suits large collections (20+ pieces). Gallery_wall (justified rows) suits curated displays (5-15 pieces). Both should exist; endpoint should accept `algorithm=` param.
+- The display tool vision (any screen showing complex arrangements) needs `open_primer` x,y fix (#4 above) as a prerequisite. Without it, arrangement is a two-phase operation that's fragile under reorder.
+
+---
+
+### Actionable stubs — for agent pickup
+
+Each stub is independent unless marked `[blocks N]`. Check off as done. Do not action without reading the full item above first.
+
+```
+[ ] STUB-1  Fix CLAUDE.md: remove -x 120 -y 40 from "Running the Live TUI" tmux command
+            File: CLAUDE.md line ~60 (tmux new-session line)
+            Change: drop -x and -y flags entirely
+            Gate: none — do first
+            [blocks STUB-2, STUB-8]
+
+[ ] STUB-2  Write scripts/dev-start.sh + scripts/dev-stop.sh
+            Source: draft already in this doc (strip emoji from echo lines)
+            Gate: STUB-1 done (no hardcoded canvas)
+            Test: run script, curl /health returns {"ok":true}
+
+[ ] STUB-3  Add branch-before-code + screenshot-before-commit rules to top of CLAUDE.md
+            File: CLAUDE.md — add as "Session start rules" block near top, not buried
+            Gate: none
+            Test: n/a (doc change)
+
+[ ] STUB-4  Fix C++ open_primer to pass x,y,w,h to api_open_animation_path
+            Files: app/command_registry.cpp, app/test_pattern_app.cpp
+            Search for: api_open_animation_path call inside open_primer dispatch
+            Change: parse kv args "x","y","w","h", pass as bounds not nullptr
+            Gate: none (but gallery_wall depends on this)
+            Test: POST /gallery/arrange → GET /state → assert window.x matches requested
+            [blocks STUB-5]
+
+[ ] STUB-5  Implement algorithm=gallery_wall (justified-row layout)
+            File: tools/api_server/gallery.py (or wherever _masonry_layout lives)
+            Spec: item 9 in this doc — greedy row packing, proportional width scaling,
+                  row height = max(natural heights), equal gutters
+            Gate: STUB-4 done (accurate placement)
+            Test: POST /gallery/arrange algorithm=gallery_wall → screenshot → assert
+                  rows fill canvas width, no overlaps, gutters equal
+
+[ ] STUB-6  Write scripts/init-submodules.sh
+            Logic: git submodule update --init; if tvterm fails, cd vendor/tvterm &&
+                   git fetch origin && git checkout origin/master && cd .. &&
+                   git submodule update --init vendor/tvterm
+            Add one-liner to README and CLAUDE.md first-build section
+            Test: delete vendor/tvterm contents, run script, cmake succeeds
+
+[ ] STUB-7  Add unit test: open primer → GET /state → assert props.path non-empty
+            File: tests/ — alongside room tests or new tests/gallery/
+            Test command: uv run --with pytest pytest tests/gallery/ -q
+
+[ ] STUB-8  Document snap.sh + TEST-01 gate in CLAUDE.md gallery dev section
+            Gate: STUB-1 done
+            Content: before any multi-window layout work, run TEST-01 (single window,
+                     known position, verify via snap.sh screenshot)
+
+[ ] STUB-9  Update wibwobdos skill with local macOS dev section
+            File: .claude/skills/wibwobdos/ (or wherever skill lives)
+            Content: full startup snippet from item 5 of this doc
+
+[ ] STUB-10 Pre-commit hook: reject direct commits to app/ on main branch
+            File: .git/hooks/pre-commit (or .claude/hooks/)
+            Logic: if on main && staged files match app/ or tools/api_server/ → exit 1
+
+[ ] STUB-11 Add REST endpoint /windows/{id}/resize
+            File: tools/api_server/main.py
+            Delegates to: controller move_resize()
+            Test: POST /windows/1/resize {w:40,h:20} → GET /state → assert dimensions
+
+[ ] STUB-12 Reproduce and fix MCP /mcp errors
+            Start: curl http://127.0.0.1:8089/mcp → capture error
+            Log finding in this doc under item 6
+```
+
+</planofaction>
