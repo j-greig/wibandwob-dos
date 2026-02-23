@@ -484,6 +484,43 @@ TGalleryWindow::TGalleryWindow(const TRect& bounds, const std::string& aPrimerDi
     fileList->select();
 }
 
+int TGalleryWindow::getSelected() const
+{
+    return tabBar ? tabBar->selected : 0;
+}
+
+const std::string& TGalleryWindow::getSearchText() const
+{
+    return lastSearchText;
+}
+
+void TGalleryWindow::setSelected(int tabIndex)
+{
+    if (!tabBar)
+        return;
+
+    if (tabIndex < 0)
+        tabIndex = 0;
+    if (tabIndex >= TGalleryTabBar::NUM_TABS)
+        tabIndex = TGalleryTabBar::NUM_TABS - 1;
+
+    tabBar->selected = tabIndex;
+    tabBar->drawView();
+    showSearchInput(tabIndex == 5);
+    applyFilter();
+    if (tabIndex == 5 && searchInput)
+        searchInput->select();
+}
+
+void TGalleryWindow::setSearchText(const std::string& text)
+{
+    lastSearchText = text;
+    if (searchInput)
+        searchInput->setData(const_cast<char*>(text.c_str()));
+    if (tabBar && tabBar->selected == 5)
+        applySearch();
+}
+
 void TGalleryWindow::scanFiles()
 {
     allFiles.clear();

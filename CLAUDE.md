@@ -176,6 +176,7 @@ curl -sf -X POST http://127.0.0.1:8089/menu/command \
 
 ### Gotchas
 
+- **SDK bridge npm install**: if the Wib&Wob chat window silently times out, run `cd app/llm/sdk_bridge && npm install`. The `node_modules/` dir is gitignored and must be installed on each fresh clone.
 - **API hot-reload**: always start uvicorn with `--reload` (see above). Python edits take effect automatically — no restart needed.
 - **tmux terminal size**: do NOT pass `-x`/`-y` to `tmux new-session`. Let the session inherit your real terminal dimensions on first attach. Hardcoding a size larger than your terminal causes gallery placements to appear off-screen. After `tmux attach -t wibwob && Ctrl-B D`, the canvas locks to your viewport.
 - **Socket path**: the default socket is `/tmp/test_pattern_app.sock`. If using multi-instance, set `WIBWOB_INSTANCE=N` for `/tmp/wibwob_N.sock`.
@@ -343,7 +344,14 @@ Launch multiple instances: `./tools/scripts/launch_tmux.sh [N]` (tmux + monitor 
 
 ### Runtime
 - **Python 3.x + FastAPI stack**: API server (`tools/api_server/`), auto-creates venv via `start_api_server.sh`
-- **Node.js**: Claude SDK bridge (`app/llm/sdk_bridge/`)
+- **Node.js**: Claude SDK bridge (`app/llm/sdk_bridge/`) — **must `npm install` before first use**:
+  ```bash
+  cd app/llm/sdk_bridge && npm install
+  ```
+  Without this, the Wib&Wob chat window silently times out. Verify with:
+  ```bash
+  node app/llm/sdk_bridge/smoke_test.js
+  ```
 
 ### System tools (macOS: `brew install`)
 - **chafa**: ANSI image rendering for browser view (`brew install chafa`) — required for `images:all-inline`/`key-inline`/`gallery` modes

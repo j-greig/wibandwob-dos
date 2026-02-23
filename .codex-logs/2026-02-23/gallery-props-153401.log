@@ -1,0 +1,7 @@
+error: unexpected argument '--approval-mode' found
+
+  tip: to pass '--approval-mode' as a value, use '-- --approval-mode'
+
+Usage: codex exec --config <key=value> [PROMPT]
+
+For more information, try '--help'.

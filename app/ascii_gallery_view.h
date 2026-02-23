@@ -86,6 +86,10 @@ class TGalleryWindow : public TWindow {
 public:
     TGalleryWindow(const TRect& bounds, const std::string& primerDir);
     virtual void handleEvent(TEvent& event) override;
+    int getSelected() const;
+    const std::string& getSearchText() const;
+    void setSelected(int tabIndex);
+    void setSearchText(const std::string& text);
 
 private:
     TGalleryTabBar* tabBar;

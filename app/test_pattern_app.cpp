@@ -732,6 +732,7 @@ private:
     static void skipWs(const std::string &s, size_t &pos);
     static bool consume(const std::string &s, size_t &pos, char ch);
     static bool parseKeyedString(const std::string &s, size_t objStart, const char *key, std::string &out);
+    static bool parseKeyedNumber(const std::string &s, size_t objStart, const char *key, int &out);
     static bool parseKeyedBool(const std::string &s, size_t objStart, const char *key, bool &out);
     static bool parseBounds(const std::string &s, size_t objStart, int &x,int &y,int &w,int &h);
     
@@ -3076,6 +3077,32 @@ bool TTestPatternApp::parseKeyedString(const std::string &s, size_t objStart, co
     return false;
 }
 
+bool TTestPatternApp::parseKeyedNumber(const std::string &s, size_t objStart, const char *key, int &out)
+{
+    size_t pos = objStart;
+    while (pos < s.size()) {
+        skipWs(s, pos);
+        if (s[pos] == '}' || s[pos] == ']') return false;
+        std::string k; size_t kpos = pos;
+        if (!parseString(s, kpos, k)) { ++pos; continue; }
+        pos = kpos; skipWs(s, pos);
+        if (!consume(s, pos, ':')) continue;
+        if (k == key) {
+            return parseNumber(s, pos, out);
+        }
+        // Skip value
+        skipWs(s, pos);
+        if (pos>=s.size()) break;
+        if (s[pos] == '"') { std::string tmp; parseString(s, pos, tmp); }
+        else if ((s[pos] >= '0' && s[pos] <= '9') || s[pos]=='-' || s[pos]=='+') { int dummy; parseNumber(s, pos, dummy); }
+        else if (s[pos] == 't' || s[pos] == 'f') { bool db; parseBool(s, pos, db); }
+        else if (s[pos] == '{') { int depth=1; ++pos; while (pos<s.size()&&depth){ if(s[pos]=='"'){ ++pos; while(pos<s.size()&&s[pos]!='"'){ if(s[pos]=='\\') ++pos; ++pos;} ++pos; continue;} if(s[pos]=='{')depth++; else if(s[pos]=='}')depth--; ++pos; } }
+        else if (s[pos] == '[') { int depth=1; ++pos; while (pos<s.size()&&depth){ if(s[pos]=='"'){ ++pos; while(pos<s.size()&&s[pos]!='"'){ if(s[pos]=='\\') ++pos; ++pos;} ++pos; continue;} if(s[pos]=='[')depth++; else if(s[pos]==']')depth--; ++pos; } }
+        skipWs(s, pos); if (pos<s.size() && s[pos]==',') ++pos;
+    }
+    return false;
+}
+
 bool TTestPatternApp::parseKeyedBool(const std::string &s, size_t objStart, const char *key, bool &out)
 {
     size_t pos = objStart;
@@ -3274,6 +3301,53 @@ bool TTestPatternApp::loadWorkspaceFromFile(const std::string& path)
                     parseKeyedString(obj, brace+1, "path", path);
             }
             if (!path.empty()) { api_open_text_view_path(*this, path, &bounds); continue; }
+        } else if (type == "gallery") {
+            int tabIndex = 0;
+            std::string searchText;
+            size_t propsPos = obj.find("\"props\"");
+            if (propsPos != std::string::npos) {
+                size_t brace = obj.find('{', propsPos);
+                if (brace != std::string::npos) {
+                    parseKeyedNumber(obj, brace+1, "tab", tabIndex);
+                    parseKeyedString(obj, brace+1, "search", searchText);
+                }
+            }
+
+            const WindowTypeSpec* spec = find_window_type_by_name(type);
+            if (!spec || !spec->spawn) continue;
+
+            const std::vector<TWindow*> before = captureWindows();
+            std::map<std::string, std::string> kv;
+            kv["x"] = std::to_string(x);
+            kv["y"] = std::to_string(y);
+            kv["w"] = std::to_string(w);
+            kv["h"] = std::to_string(h);
+            if (!title.empty()) kv["title"] = title;
+            const char* err = spec->spawn(*this, kv);
+            if (err) continue;
+
+            const std::vector<TWindow*> after = captureWindows();
+            for (TWindow* candidate : after) {
+                bool existed = false;
+                for (TWindow* prior : before) {
+                    if (prior == candidate) {
+                        existed = true;
+                        break;
+                    }
+                }
+                if (!existed) {
+                    win = candidate;
+                    break;
+                }
+            }
+            if (!win) continue;
+            if (auto *gallery = dynamic_cast<TGalleryWindow*>(win)) {
+                gallery->setSearchText(searchText);
+                gallery->setSelected(tabIndex);
+            }
+            if (zoomed) win->zoom();
+            created.push_back(win);
+            continue;
         } else {
             const WindowTypeSpec* spec = find_window_type_by_name(type);
             if (!spec || !spec->spawn) continue;
@@ -3445,6 +3519,12 @@ std::string TTestPatternApp::buildWorkspaceJson()
                 }
                 c = c->next;
             } while (c != cStart);
+            }
+        } else if (type == "gallery") {
+            if (auto *gallery = dynamic_cast<TGalleryWindow*>(w)) {
+                props = std::string("{\"tab\": ") + std::to_string(gallery->getSelected());
+                const std::string& searchText = gallery->getSearchText();
+                props += std::string(", \"search\": \"") + jsonEscape(searchText) + "\"}";
             }
         }
 
