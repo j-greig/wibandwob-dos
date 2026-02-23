@@ -33,6 +33,7 @@ extern void api_spawn_deep_signal(TTestPatternApp& app, const TRect* bounds);
 extern void api_spawn_app_launcher(TTestPatternApp& app, const TRect* bounds);
 extern void api_spawn_gallery(TTestPatternApp& app, const TRect* bounds);
 extern void api_open_animation_path(TTestPatternApp& app, const std::string& path);
+extern void api_open_animation_path(TTestPatternApp& app, const std::string& path, const TRect* bounds, bool frameless);
 extern std::string api_gallery_list(TTestPatternApp& app, const std::string& tab);
 extern void api_spawn_terminal(TTestPatternApp& app, const TRect* bounds);
 extern std::string api_terminal_write(TTestPatternApp& app, const std::string& text, const std::string& window_id);
@@ -241,7 +242,14 @@ std::string exec_registry_command(
         struct stat st;
         if (stat(path.c_str(), &st) != 0)
             return "err file not found: " + path;
-        api_open_animation_path(app, path);
+        // Frameless mode: open primer without visible border/title chrome
+        auto fi = kv.find("frameless");
+        bool frameless = (fi != kv.end() && (fi->second == "1" || fi->second == "true"));
+        if (frameless) {
+            api_open_animation_path(app, path, nullptr, true);
+        } else {
+            api_open_animation_path(app, path);
+        }
         return "ok";
     }
     if (name == "open_terminal") {

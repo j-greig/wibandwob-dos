@@ -596,17 +596,23 @@ public:
 class TFrameAnimationWindow : public TWindow
 {
 public:
-    TFrameAnimationWindow(const TRect& bounds, const char* aTitle, const std::string& filePath) :
+    // frameless=false  → standard 1-char border (no title, notitle frame)
+    // frameless=true   → TGhostFrame + content fills full bounds (gallery mode)
+    TFrameAnimationWindow(const TRect& bounds, const char* aTitle,
+                          const std::string& filePath, bool frameless = false) :
         TWindow(bounds, aTitle, wnNoNumber),
-        TWindowInit(&TFrameAnimationWindow::initFrame),
-        filePath_(filePath)
+        TWindowInit(frameless ? &TFrameAnimationWindow::initFrameless
+                              : &TFrameAnimationWindow::initFrame),
+        filePath_(filePath),
+        frameless_(frameless)
     {
         options |= ofTileable;  // Enable cascade/tile functionality
-        
-        // Get the interior bounds (excluding frame)
+
+        // Frameless: content occupies full window bounds (no 1-char frame inset).
+        // Framed: content shrinks 1 char on each side for the border.
         TRect interior = getExtent();
-        interior.grow(-1, -1);
-        
+        if (!frameless) interior.grow(-1, -1);
+
         // Check if file has frame delimiters to decide which view to use
         if (hasFrameDelimiters(filePath)) {
             // Animation file - use frame player
@@ -618,15 +624,15 @@ public:
             insert(textView);
         }
     }
-    
+
     // Override changeBounds to fix tile redraw issue
     virtual void changeBounds(const TRect& bounds) override
     {
         TWindow::changeBounds(bounds);
-        
+
         // Force complete redraw after window is resized/moved (e.g., by tile operations)
         setState(sfExposed, True);
-        
+
         // Ensure child views are properly notified of resize for text content redraw
         forEach([](TView* view, void*) {
             if (auto* textView = dynamic_cast<TTextFileView*>(view)) {
@@ -634,20 +640,22 @@ public:
                 textView->drawView();
             }
         }, nullptr);
-        
+
         redraw();
     }
-    
-    // Custom frame initializer
-    static TFrame *initFrame(TRect r)
-    {
-        return new TNoTitleFrame(r);
-    }
+
+    // Standard frame (no title, but visible 1-char border)
+    static TFrame* initFrame(TRect r)    { return new TNoTitleFrame(r); }
+
+    // Ghost frame for frameless gallery mode — border is invisible
+    static TFrame* initFrameless(TRect r) { return new TGhostFrame(r); }
 
     const std::string& getFilePath() const { return filePath_; }
+    bool isFrameless() const { return frameless_; }
 
 private:
     std::string filePath_;
+    bool frameless_ {false};
 };
 
 /*---------------------------------------------------------*/
@@ -685,7 +693,7 @@ private:
     void newWibWobTestWindowC();
     void openAnimationFile();
     void openAnimationFilePath(const std::string& path);
-    void openAnimationFilePath(const std::string& path, const TRect& bounds);
+    void openAnimationFilePath(const std::string& path, const TRect& bounds, bool frameless = false);
     void openTransparentTextFile();
     void openMonodrawFile(const char* fileName);
     void openWorkspace();
@@ -825,7 +833,7 @@ private:
     friend void api_open_text_view_path(TTestPatternApp&, const std::string&, const TRect* bounds);
     friend void api_spawn_test(TTestPatternApp&, const TRect* bounds);
     friend void api_spawn_gradient(TTestPatternApp&, const std::string&, const TRect* bounds);
-    friend void api_open_animation_path(TTestPatternApp&, const std::string&, const TRect* bounds);
+    friend void api_open_animation_path(TTestPatternApp&, const std::string&, const TRect* bounds, bool frameless);
     friend void api_cascade(TTestPatternApp&);
     friend void api_toggle_scramble(TTestPatternApp&);
     friend void api_expand_scramble(TTestPatternApp&);
@@ -2114,12 +2122,12 @@ void TTestPatternApp::openAnimationFilePath(const std::string& filePath)
     registerWindow(window);
 }
 
-void TTestPatternApp::openAnimationFilePath(const std::string& filePath, const TRect& bounds)
+void TTestPatternApp::openAnimationFilePath(const std::string& filePath, const TRect& bounds, bool frameless)
 {
     // Determine file type and create appropriate title
     windowNumber++;
     std::stringstream title;
-    
+
     if (hasFrameDelimiters(filePath)) {
         title << "Animation " << windowNumber;
     } else {
@@ -2128,9 +2136,9 @@ void TTestPatternApp::openAnimationFilePath(const std::string& filePath, const T
         std::string baseName = (lastSlash != std::string::npos) ? filePath.substr(lastSlash + 1) : filePath;
         title << baseName << " - Text " << windowNumber;
     }
-    
+
     // Create and insert window with provided bounds
-    TFrameAnimationWindow* window = new TFrameAnimationWindow(bounds, "", filePath);
+    TFrameAnimationWindow* window = new TFrameAnimationWindow(bounds, "", filePath, frameless);
     deskTop->insert(window);
     registerWindow(window);
 }
@@ -2661,9 +2669,13 @@ void api_open_text_view_path(TTestPatternApp& app, const std::string& path, cons
     app.registerWindow(window);
 }
 
-void api_open_animation_path(TTestPatternApp& app, const std::string& path, const TRect* bounds) {
+void api_open_animation_path(TTestPatternApp& app, const std::string& path, const TRect* bounds, bool frameless) {
     if (bounds) {
-        app.openAnimationFilePath(path, *bounds);
+        app.openAnimationFilePath(path, *bounds, frameless);
+    } else if (frameless) {
+        // Auto-size bounds, but still respect frameless flag
+        TRect autoBounds = app.calculateWindowBounds(path);
+        app.openAnimationFilePath(path, autoBounds, true);
     } else {
         app.openAnimationFilePath(path);
     }
