@@ -423,9 +423,9 @@ _PIXEL_FONT: dict[str, list[str]] = {
     'R': ["110","101","110","101","101"],
     'S': ["011","100","010","001","110"],
     'T': ["111","010","010","010","010"],
-    'U': ["101","101","101","101","010"],
+    'U': ["101","101","101","101","011"],
     'V': ["101","101","101","010","010"],
-    'W': ["101","101","101","111","010"],
+    'W': ["101","101","111","111","101"],
     'X': ["101","101","010","101","101"],
     'Y': ["101","101","010","010","010"],
     'Z': ["111","001","010","100","111"],
@@ -451,14 +451,18 @@ _PIXEL_FONT: dict[str, list[str]] = {
 }
 
 
-def _text_to_pixel_positions(text: str) -> list[tuple[int, int]]:
+def _text_to_pixel_positions(text: str, dot_size: int = 1) -> list[tuple[int, int]]:
     """Return (col, row) pixel positions for `text` in 3×5 font.
 
     Multi-line via '|' separator, 2-row gap between lines.
     Unknown chars → space.
+    scale: each dot becomes a scale×scale block of positions.
     """
     positions: list[tuple[int, int]] = []
-    line_height = 7   # 5 pixel rows + 2-row gap
+    char_w   = 3 * dot_size
+    gap      = max(1, dot_size)        # gap between chars scales too
+    line_gap = max(2, dot_size * 2)    # gap between lines
+    line_height = 5 * dot_size + line_gap
     for line_idx, line in enumerate(text.upper().split('|')):
         cursor_x = 0
         y_offset  = line_idx * line_height
@@ -467,8 +471,13 @@ def _text_to_pixel_positions(text: str) -> list[tuple[int, int]]:
             for row_idx, row in enumerate(rows):
                 for col_idx, bit in enumerate(row):
                     if bit == '1':
-                        positions.append((cursor_x + col_idx, y_offset + row_idx))
-            cursor_x += 4   # 3 pixel cols + 1 gap
+                        # expand each font pixel into dot_size×dot_size primer windows
+                        bx = cursor_x + col_idx * dot_size
+                        by = y_offset + row_idx * dot_size
+                        for dy in range(dot_size):
+                            for dx in range(dot_size):
+                                positions.append((bx + dx, by + dy))
+            cursor_x += char_w + gap
     return positions
 
 
@@ -504,6 +513,7 @@ def _layout_stamp(
     rows: int = 4,
     turns: float = 3.0,
     anchor: str = "center",
+    dot_size: int = 1,
 ) -> list[dict]:
     """Stamp layout — primers as repeating stamps on a pattern.
 
@@ -522,7 +532,7 @@ def _layout_stamp(
     step_y = sh + padding
 
     if pattern == "text":
-        pixel_positions = _text_to_pixel_positions(text or "WIB")
+        pixel_positions = _text_to_pixel_positions(text or "WIB", dot_size=dot_size)
 
     elif pattern == "grid":
         pixel_positions = [(c, r) for r in range(rows) for c in range(cols)]
@@ -574,7 +584,7 @@ def _layout_stamp(
         pixel_positions += [(max_c - 1, r) for r in range(1, max_r - 1)]
 
     else:
-        pixel_positions = _text_to_pixel_positions(text or "WIB")
+        pixel_positions = _text_to_pixel_positions(text or "WIB", dot_size=dot_size)
 
     if not pixel_positions:
         return []
@@ -735,7 +745,8 @@ def build_algo_map(primers_meta, canvas_w, canvas_h, padding, margin, opts) -> d
                                   cols=opts.get("cols", 8),
                                   rows=opts.get("rows", 4),
                                   turns=float(opts.get("turns", 3.0)),
-                                  anchor=opts.get("anchor", "center")),
+                                  anchor=opts.get("anchor", "center"),
+                                  scale=int(opts.get("dot_size", 1))),
         "cluster":            lambda: _layout_cluster(
                                   primers_meta, canvas_w, canvas_h,
                                   padding=opts.get("padding", padding),
