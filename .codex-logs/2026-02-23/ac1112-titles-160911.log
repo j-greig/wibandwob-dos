@@ -1,0 +1,592 @@
+OpenAI Codex v0.53.0 (research preview)
+--------
+workdir: /Users/james/Repos/wibandwob-dos
+model: gpt-5.2-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: medium
+reasoning summaries: auto
+session id: 019c8b43-088d-7123-bea9-b6ced4cbacae
+--------
+user
+DEVNOTE: Files inside .codex-logs/ are run logs — ignore them completely.
+EFFICIENCY: Use rg -n -C3 or sed -n 'N,Mp'. Never dump full files.
+
+Task: implement window title persistence for frame_player workspace save/restore (issue #84, AC-11/AC-12).
+
+Context:
+- Workspace save: buildWorkspaceJson() in app/test_pattern_app.cpp
+- Workspace restore: loadWorkspaceFromFile() in app/test_pattern_app.cpp
+- frame_player windows (TFrameAnimationWindow) currently save title: "" because w->getTitle() returns empty string
+- TFrameAnimationWindow has getFilePath() which returns the full file path
+- The top-level "title" field in the workspace JSON is the right place (not props)
+
+Find the frame_player save block in buildWorkspaceJson (search for type == "frame_player" near buildWorkspaceJson).
+The JSON builder writes something like: << ",\"title\":\"" then calls w->getTitle().
+For frame_player: if w->getTitle() is empty, derive title from getFilePath() stem:
+  e.g. "modules-private/wibwobworld/primers/cat-in-space.txt" → "cat-in-space"
+
+Two places need changing:
+
+1. WHERE TITLE IS WRITTEN IN THE JSON (in buildWorkspaceJson, near the title serialisation):
+   Find where the code writes the window title to JSON. For frame_player windows,
+   if the title is empty, substitute the filename stem derived from getFilePath().
+   Use existing jsonEscape() helper. Pattern: basename = last path component, strip extension.
+
+2. WHERE frame_player IS RESTORED (in loadWorkspaceFromFile, the frame_player case):
+   Currently: openAnimationFilePath(path, bounds, false, false);
+   The function signature is: openAnimationFilePath(path, bounds, frameless, shadowless, title="")
+   Parse the top-level "title" string from the workspace JSON object (use parseKeyedString
+   on the top-level obj, not inside props). Pass it to openAnimationFilePath.
+
+Steps:
+1. rg -n 'getTitle\|title.*json\|json.*title' app/test_pattern_app.cpp | head -20
+   Find where title is written in buildWorkspaceJson
+2. rg -n 'openAnimationFilePath' app/test_pattern_app.cpp
+   Find the restore call site
+3. Make both changes
+4. cmake --build ./build --target test_pattern -j4 2>&1 | grep -E "error:|Linking"
+5. Verify no errors
+
+Do not change props. Do not touch gallery or text_view cases.
+
+thinking
+**Planning agent location**
+
+I'm prioritizing finding the agents first to build an efficient command-based approach.
+exec
+rg -n --files -g AGENTS.md . in /Users/james/Repos/wibandwob-dos succeeded in 63ms:
+./AGENTS.md
+exec
+cat AGENTS.md in /Users/james/Repos/wibandwob-dos succeeded in 27ms:
+# AGENTS.md (Codex Prompt-Shim)
+
+This file aligns Codex execution style with the repo canon in `.planning/README.md` and the guardrails encoded in `.claude/hooks/*`.
+
+## Important: Hooks vs Codex
+
+Codex does not natively execute Claude Code hook scripts.  
+Treat the rules below as a required prompt-shim and manual gate before finishing work.
+Mirror high-value hook behavior explicitly, including `.claude/hooks/gh-format-lint.sh` for GitHub markdown posting safety.
+
+## Canon Workflow Rules
+
+1. Issue-first for non-trivial work. Exception: spikes (`.planning/` doc-only investigations) only need a branch — no GitHub issue required.
+2. Branch-per-issue (or branch-per-spike for spikes).
+3. Keep PR scope to one logical slice.
+4. Update planning briefs the same day issue state changes.
+5. Preserve AC -> Test traceability in story files.
+6. Sync GitHub issue lifecycle continuously, not just at closeout:
+   - Set issue to `in-progress` when implementation starts.
+   - Comment with commit SHAs and test evidence as slices land.
+
+thinking
+**Preparing to run targeted searches**
+exec
+rg -n 'getTitle|title.*json|json.*title' app/test_pattern_app.cpp in /Users/james/Repos/wibandwob-dos succeeded in 23ms:
+3548:        const char *title = w->getTitle(0);
+3549:        std::string safeTitle = title ? jsonEscape(title) : std::string("");
+3550:        json += "      \"title\": \"" + safeTitle + "\",\n";
+
+thinking
+**Preparing to extract surrounding context**
+
+I'm planning to use sed to capture surrounding lines for better context in the current exploration.
+exec
+sed -n '3515,3585p' app/test_pattern_app.cpp in /Users/james/Repos/wibandwob-dos succeeded in 17ms:
+                } else if (dynamic_cast<TRadialGradientView*>(c)) {
+                    props = "{\"gradientType\": \"radial\"}"; break;
+                } else if (dynamic_cast<TDiagonalGradientView*>(c)) {
+                    props = "{\"gradientType\": \"diagonal\"}"; break;
+                }
+                c = c->next;
+            } while (c != cStart);
+            }
+        } else if (type == "gallery") {
+            if (auto *gallery = dynamic_cast<TGalleryWindow*>(w)) {
+                props = std::string("{\"tab\": ") + std::to_string(gallery->getSelected());
+                const std::string& searchText = gallery->getSearchText();
+                props += std::string(", \"search\": \"") + jsonEscape(searchText) + "\"}";
+            }
+        }
+
+        // Bounds (outer window rect)
+        TRect b = w->getBounds();
+        int x = b.a.x, y = b.a.y, ww = b.b.x - b.a.x, hh = b.b.y - b.a.y;
+
+
+thinking
+**Locating frame_player block for title update**
+exec
+rg -n frame_player app/test_pattern_app.cpp in /Users/james/Repos/wibandwob-dos succeeded in 40ms:
+3281:        } else if (type == "frame_player") {
+3498:        } else if (type == "frame_player") {
+exec
+sed -n '3260,3325p' app/test_pattern_app.cpp in /Users/james/Repos/wibandwob-dos succeeded in 15ms:
+        if (x < 0) x = 0; if (y < 0) y = 0;
+        if (x + w > maxW) x = std::max(0, maxW - w);
+        if (y + h > maxH) y = std::max(0, maxH - h);
+        TRect bounds(x,y,x+w,y+h);
+
+        TWindow *win = nullptr;
+        if (type == "test_pattern") {
+            win = new TTestPatternWindow(bounds, "");
+        } else if (type == "gradient") {
+            std::string gtype; // props.gradientType preferred
+            size_t propsPos = obj.find("\"props\"");
+            if (propsPos != std::string::npos) {
+                size_t brace = obj.find('{', propsPos);
+                if (brace != std::string::npos)
+                    parseKeyedString(obj, brace+1, "gradientType", gtype);
+            }
+            TGradientWindow::GradientType gt = TGradientWindow::gtHorizontal;
+            if (gtype == "vertical") gt = TGradientWindow::gtVertical;
+            else if (gtype == "radial") gt = TGradientWindow::gtRadial;
+            else if (gtype == "diagonal") gt = TGradientWindow::gtDiagonal;
+
+thinking
+**Planning title serialization update**
+
+I need to modify title serialization in buildWorkspaceJson to use getFilePath and stem. Next, I'll locate the TFrameAnimationWindow class and consider adding a helper, starting by searching for getFilePath.
+exec
+rg -n getFilePath app/test_pattern_app.cpp in /Users/james/Repos/wibandwob-dos succeeded in 18ms:
+669:    const std::string& getFilePath() const { return filePath_; }
+2891:            const std::string& p = ttw->getFilePath();
+2894:            const std::string& p = faw->getFilePath();
+3501:                const std::string& fp = faw->getFilePath();
+exec
+sed -n '2865,2925p' app/test_pattern_app.cpp in /Users/james/Repos/wibandwob-dos succeeded in 17ms:
+
+    std::stringstream json;
+    json << "{\"windows\":[";
+
+    bool first = true;
+    for (TWindow* w : activeWins) {
+        std::string id = app.registerWindow(w, false);
+        if (!first) json << ",";
+        json << "{\"id\":\"" << id << "\""
+             << ",\"type\":\"" << windowTypeName(w) << "\""
+             << ",\"x\":" << w->origin.x
+             << ",\"y\":" << w->origin.y
+             << ",\"w\":" << w->size.x
+             << ",\"h\":" << w->size.y
+             << ",\"title\":\"";
+        if (w->title) {
+            std::string title(w->title);
+            for (char c : title) {
+                if (c == '"') json << "\\\"";
+                else if (c == '\\') json << "\\\\";
+
+thinking
+**Checking frame_player block**
+
+I'm verifying the frame_player block around line 3498 in buildWorkspaceJson to confirm if it handles title writing, aiming to update it to use the file path stem and apply JSON escaping when the title is empty.
+exec
+sed -n '3460,3525p' app/test_pattern_app.cpp in /Users/james/Repos/wibandwob-dos succeeded in 16ms:
+    // Screen size
+    TRect ext = deskTop->getExtent();
+    int sw = ext.b.x - ext.a.x;
+    int sh = ext.b.y - ext.a.y;
+
+    // Timestamp (basic)
+    char ts[64];
+    std::time_t t = std::time(nullptr);
+    std::tm *lt = std::localtime(&t);
+    std::strftime(ts, sizeof(ts), "%Y-%m-%dT%H:%M:%S", lt);
+
+    std::string json;
+    json += "{\n";
+    json += "  \"version\": 1,\n";
+    json += "  \"app\": \"test_pattern\",\n";
+    json += std::string("  \"timestamp\": \"") + ts + "\",\n";
+    json += "  \"screen\": { \"width\": " + std::to_string(sw) + ", \"height\": " + std::to_string(sh) + " },\n";
+    json += std::string("  \"globals\": { \"patternMode\": \"") + (USE_CONTINUOUS_PATTERN ? "continuous" : "tiled") + "\" },\n";
+    json += "  \"windows\": [\n";
+
+
+thinking
+**Planning title derivation on restore**
+
+I'm investigating using the file path to derive the title if it's missing and considering introducing a helper for the frame_player to parse the top-level title during workspace restoration, focusing around loadWorkspaceFromFile to leverage existing title handling.
+exec
+rg -n "parseKeyedString\\(obj, .*\"title\"" app/test_pattern_app.cpp in /Users/james/Repos/wibandwob-dos succeeded in 22ms:
+3250:        std::string title; parseKeyedString(obj, 0, "title", title);
+exec
+sed -n '3225,3275p' app/test_pattern_app.cpp in /Users/james/Repos/wibandwob-dos succeeded in 17ms:
+        ++p;
+    }
+
+    // Close current windows
+    closeAll();
+
+    // Apply globals
+    USE_CONTINUOUS_PATTERN = continuous;
+
+    // Restore windows
+    std::vector<TWindow*> created;
+    auto captureWindows = [this]() {
+        std::vector<TWindow*> out;
+        TView *start = deskTop->first();
+        if (!start) return out;
+        TView *v = start;
+        do {
+            if (TWindow *w = dynamic_cast<TWindow*>(v))
+                out.push_back(w);
+            v = v->next;
+
+
+thinking
+**Planning title fallback logic**
+
+I'm outlining a fallback for empty titles in frame_player type by extracting the file path stem, ensuring JSON-safe output with jsonEscape, and avoiding property changes by only applying it during title writing.
+thinking
+**Implementing and applying title fallback patch**
+
+I'm coding the fallback logic that extracts and cleans the filename stem for frame_player titles when missing, ensuring safe JSON output, then integrating it into the openAnimationFilePath call only if the path exists. Next, I'll build the project to verify changes.
+file update
+M /Users/james/Repos/wibandwob-dos/app/test_pattern_app.cpp
+@@ -3548,3 +3548,20 @@
+         const char *title = w->getTitle(0);
+-        std::string safeTitle = title ? jsonEscape(title) : std::string("");
++        std::string titleValue;
++        if (title && *title) {
++            titleValue = title;
++        } else if (type == "frame_player") {
++            if (auto *faw = dynamic_cast<TFrameAnimationWindow*>(w)) {
++                const std::string& fp = faw->getFilePath();
++                if (!fp.empty()) {
++                    size_t slash = fp.find_last_of("/\\");
++                    size_t start = (slash == std::string::npos) ? 0 : slash + 1;
++                    std::string base = fp.substr(start);
++                    size_t dot = base.find_last_of('.');
++                    if (dot != std::string::npos && dot != 0)
++                        base = base.substr(0, dot);
++                    titleValue = base;
++                }
++            }
++        }
++        std::string safeTitle = jsonEscape(titleValue);
+         json += "      \"title\": \"" + safeTitle + "\",\n";
+apply_patch(auto_approved=true) exited 0 in 49ms:
+Success. Updated the following files:
+M app/test_pattern_app.cpp
+file update:
+diff --git a/app/test_pattern_app.cpp b/app/test_pattern_app.cpp
+index 5fc673172ded561bb9fc69375d023c62c98399a8..41799bc9e2d264130a6675c4c8c7e9e3833fdb3a
+--- a/app/test_pattern_app.cpp
++++ b/app/test_pattern_app.cpp
+@@ -3546,7 +3546,24 @@
+         json += "      \"id\": \"w" + std::to_string(idx) + "\",\n";
+         json += "      \"type\": \"" + type + "\",\n";
+         const char *title = w->getTitle(0);
+-        std::string safeTitle = title ? jsonEscape(title) : std::string("");
++        std::string titleValue;
++        if (title && *title) {
++            titleValue = title;
++        } else if (type == "frame_player") {
++            if (auto *faw = dynamic_cast<TFrameAnimationWindow*>(w)) {
++                const std::string& fp = faw->getFilePath();
++                if (!fp.empty()) {
++                    size_t slash = fp.find_last_of("/\\");
++                    size_t start = (slash == std::string::npos) ? 0 : slash + 1;
++                    std::string base = fp.substr(start);
++                    size_t dot = base.find_last_of('.');
++                    if (dot != std::string::npos && dot != 0)
++                        base = base.substr(0, dot);
++                    titleValue = base;
++                }
++            }
++        }
++        std::string safeTitle = jsonEscape(titleValue);
+         json += "      \"title\": \"" + safeTitle + "\",\n";
+         json += "      \"bounds\": { \"x\": " + std::to_string(x) + ", \"y\": " + std::to_string(y) + ", \"w\": " + std::to_string(ww) + ", \"h\": " + std::to_string(hh) + " },\n";
+         json += std::string("      \"zoomed\": ") + (zoomed ? "true" : "false") + ",\n";
+
+file update:
+diff --git a/app/test_pattern_app.cpp b/app/test_pattern_app.cpp
+index 5fc673172ded561bb9fc69375d023c62c98399a8..41799bc9e2d264130a6675c4c8c7e9e3833fdb3a
+--- a/app/test_pattern_app.cpp
++++ b/app/test_pattern_app.cpp
+@@ -3546,7 +3546,24 @@
+         json += "      \"id\": \"w" + std::to_string(idx) + "\",\n";
+         json += "      \"type\": \"" + type + "\",\n";
+         const char *title = w->getTitle(0);
+-        std::string safeTitle = title ? jsonEscape(title) : std::string("");
++        std::string titleValue;
++        if (title && *title) {
++            titleValue = title;
++        } else if (type == "frame_player") {
++            if (auto *faw = dynamic_cast<TFrameAnimationWindow*>(w)) {
++                const std::string& fp = faw->getFilePath();
++                if (!fp.empty()) {
++                    size_t slash = fp.find_last_of("/\\");
++                    size_t start = (slash == std::string::npos) ? 0 : slash + 1;
++                    std::string base = fp.substr(start);
++                    size_t dot = base.find_last_of('.');
++                    if (dot != std::string::npos && dot != 0)
++                        base = base.substr(0, dot);
++                    titleValue = base;
++                }
++            }
++        }
++        std::string safeTitle = jsonEscape(titleValue);
+         json += "      \"title\": \"" + safeTitle + "\",\n";
+         json += "      \"bounds\": { \"x\": " + std::to_string(x) + ", \"y\": " + std::to_string(y) + ", \"w\": " + std::to_string(ww) + ", \"h\": " + std::to_string(hh) + " },\n";
+         json += std::string("      \"zoomed\": ") + (zoomed ? "true" : "false") + ",\n";
+
+
+thinking
+**Updating restore call for patch**
+file update
+M /Users/james/Repos/wibandwob-dos/app/test_pattern_app.cpp
+@@ -3292,3 +3292,3 @@
+             }
+-            if (!path.empty()) openAnimationFilePath(path, bounds, false, false);
++            if (!path.empty()) openAnimationFilePath(path, bounds, false, false, title);
+             continue; // openAnimationFilePath handles insert + register
+apply_patch(auto_approved=true) exited 0 in 47ms:
+Success. Updated the following files:
+M app/test_pattern_app.cpp
+file update:
+diff --git a/app/test_pattern_app.cpp b/app/test_pattern_app.cpp
+index 5fc673172ded561bb9fc69375d023c62c98399a8..210fd22093f321e826f4f4906546c2696cc04743
+--- a/app/test_pattern_app.cpp
++++ b/app/test_pattern_app.cpp
+@@ -3290,7 +3290,7 @@
+                     if (!pmsStr.empty()) pms = (unsigned)std::stoul(pmsStr);
+                 }
+             }
+-            if (!path.empty()) openAnimationFilePath(path, bounds, false, false);
++            if (!path.empty()) openAnimationFilePath(path, bounds, false, false, title);
+             continue; // openAnimationFilePath handles insert + register
+         } else if (type == "text_view") {
+             std::string path;
+@@ -3546,7 +3546,24 @@
+         json += "      \"id\": \"w" + std::to_string(idx) + "\",\n";
+         json += "      \"type\": \"" + type + "\",\n";
+         const char *title = w->getTitle(0);
+-        std::string safeTitle = title ? jsonEscape(title) : std::string("");
++        std::string titleValue;
++        if (title && *title) {
++            titleValue = title;
++        } else if (type == "frame_player") {
++            if (auto *faw = dynamic_cast<TFrameAnimationWindow*>(w)) {
++                const std::string& fp = faw->getFilePath();
++                if (!fp.empty()) {
++                    size_t slash = fp.find_last_of("/\\");
++                    size_t start = (slash == std::string::npos) ? 0 : slash + 1;
++                    std::string base = fp.substr(start);
++                    size_t dot = base.find_last_of('.');
++                    if (dot != std::string::npos && dot != 0)
++                        base = base.substr(0, dot);
++                    titleValue = base;
++                }
++            }
++        }
++        std::string safeTitle = jsonEscape(titleValue);
+         json += "      \"title\": \"" + safeTitle + "\",\n";
+         json += "      \"bounds\": { \"x\": " + std::to_string(x) + ", \"y\": " + std::to_string(y) + ", \"w\": " + std::to_string(ww) + ", \"h\": " + std::to_string(hh) + " },\n";
+         json += std::string("      \"zoomed\": ") + (zoomed ? "true" : "false") + ",\n";
+
+file update:
+diff --git a/app/test_pattern_app.cpp b/app/test_pattern_app.cpp
+index 5fc673172ded561bb9fc69375d023c62c98399a8..210fd22093f321e826f4f4906546c2696cc04743
+--- a/app/test_pattern_app.cpp
++++ b/app/test_pattern_app.cpp
+@@ -3290,7 +3290,7 @@
+                     if (!pmsStr.empty()) pms = (unsigned)std::stoul(pmsStr);
+                 }
+             }
+-            if (!path.empty()) openAnimationFilePath(path, bounds, false, false);
++            if (!path.empty()) openAnimationFilePath(path, bounds, false, false, title);
+             continue; // openAnimationFilePath handles insert + register
+         } else if (type == "text_view") {
+             std::string path;
+@@ -3546,7 +3546,24 @@
+         json += "      \"id\": \"w" + std::to_string(idx) + "\",\n";
+         json += "      \"type\": \"" + type + "\",\n";
+         const char *title = w->getTitle(0);
+-        std::string safeTitle = title ? jsonEscape(title) : std::string("");
++        std::string titleValue;
++        if (title && *title) {
++            titleValue = title;
++        } else if (type == "frame_player") {
++            if (auto *faw = dynamic_cast<TFrameAnimationWindow*>(w)) {
++                const std::string& fp = faw->getFilePath();
++                if (!fp.empty()) {
++                    size_t slash = fp.find_last_of("/\\");
++                    size_t start = (slash == std::string::npos) ? 0 : slash + 1;
++                    std::string base = fp.substr(start);
++                    size_t dot = base.find_last_of('.');
++                    if (dot != std::string::npos && dot != 0)
++                        base = base.substr(0, dot);
++                    titleValue = base;
++                }
++            }
++        }
++        std::string safeTitle = jsonEscape(titleValue);
+         json += "      \"title\": \"" + safeTitle + "\",\n";
+         json += "      \"bounds\": { \"x\": " + std::to_string(x) + ", \"y\": " + std::to_string(y) + ", \"w\": " + std::to_string(ww) + ", \"h\": " + std::to_string(hh) + " },\n";
+         json += std::string("      \"zoomed\": ") + (zoomed ? "true" : "false") + ",\n";
+
+
+thinking
+**Preparing to add build command**
+exec
+/bin/sh -c 'cmake --build ./build --target test_pattern -j4 2>&1 | grep -E "error:|Linking"' in /Users/james/Repos/wibandwob-dos succeeded in 11.64s:
+[ 84%] Linking CXX executable test_pattern
+file update:
+diff --git a/app/test_pattern_app.cpp b/app/test_pattern_app.cpp
+index 5fc673172ded561bb9fc69375d023c62c98399a8..210fd22093f321e826f4f4906546c2696cc04743
+--- a/app/test_pattern_app.cpp
++++ b/app/test_pattern_app.cpp
+@@ -3290,7 +3290,7 @@
+                     if (!pmsStr.empty()) pms = (unsigned)std::stoul(pmsStr);
+                 }
+             }
+-            if (!path.empty()) openAnimationFilePath(path, bounds, false, false);
++            if (!path.empty()) openAnimationFilePath(path, bounds, false, false, title);
+             continue; // openAnimationFilePath handles insert + register
+         } else if (type == "text_view") {
+             std::string path;
+@@ -3546,7 +3546,24 @@
+         json += "      \"id\": \"w" + std::to_string(idx) + "\",\n";
+         json += "      \"type\": \"" + type + "\",\n";
+         const char *title = w->getTitle(0);
+-        std::string safeTitle = title ? jsonEscape(title) : std::string("");
++        std::string titleValue;
++        if (title && *title) {
++            titleValue = title;
++        } else if (type == "frame_player") {
++            if (auto *faw = dynamic_cast<TFrameAnimationWindow*>(w)) {
++                const std::string& fp = faw->getFilePath();
++                if (!fp.empty()) {
++                    size_t slash = fp.find_last_of("/\\");
++                    size_t start = (slash == std::string::npos) ? 0 : slash + 1;
++                    std::string base = fp.substr(start);
++                    size_t dot = base.find_last_of('.');
++                    if (dot != std::string::npos && dot != 0)
++                        base = base.substr(0, dot);
++                    titleValue = base;
++                }
++            }
++        }
++        std::string safeTitle = jsonEscape(titleValue);
+         json += "      \"title\": \"" + safeTitle + "\",\n";
+         json += "      \"bounds\": { \"x\": " + std::to_string(x) + ", \"y\": " + std::to_string(y) + ", \"w\": " + std::to_string(ww) + ", \"h\": " + std::to_string(hh) + " },\n";
+         json += std::string("      \"zoomed\": ") + (zoomed ? "true" : "false") + ",\n";
+
+
+thinking
+**Planning for line-numbered summaries**
+
+I'm deciding to use rg -n to find lines with titleValue for accurate line-numbered change summaries and to compute precise line numbers for the final test and code additions.
+exec
+rg -n "titleValue|openAnimationFilePath\\(path, bounds, false, false, title\\)" app/test_pattern_app.cpp in /Users/james/Repos/wibandwob-dos succeeded in 37ms:
+3293:            if (!path.empty()) openAnimationFilePath(path, bounds, false, false, title);
+3549:        std::string titleValue;
+3551:            titleValue = title;
+3562:                    titleValue = base;
+3566:        std::string safeTitle = jsonEscape(titleValue);
+file update:
+diff --git a/app/test_pattern_app.cpp b/app/test_pattern_app.cpp
+index 5fc673172ded561bb9fc69375d023c62c98399a8..210fd22093f321e826f4f4906546c2696cc04743
+--- a/app/test_pattern_app.cpp
++++ b/app/test_pattern_app.cpp
+@@ -3290,7 +3290,7 @@
+                     if (!pmsStr.empty()) pms = (unsigned)std::stoul(pmsStr);
+                 }
+             }
+-            if (!path.empty()) openAnimationFilePath(path, bounds, false, false);
++            if (!path.empty()) openAnimationFilePath(path, bounds, false, false, title);
+             continue; // openAnimationFilePath handles insert + register
+         } else if (type == "text_view") {
+             std::string path;
+@@ -3546,7 +3546,24 @@
+         json += "      \"id\": \"w" + std::to_string(idx) + "\",\n";
+         json += "      \"type\": \"" + type + "\",\n";
+         const char *title = w->getTitle(0);
+-        std::string safeTitle = title ? jsonEscape(title) : std::string("");
++        std::string titleValue;
++        if (title && *title) {
++            titleValue = title;
++        } else if (type == "frame_player") {
++            if (auto *faw = dynamic_cast<TFrameAnimationWindow*>(w)) {
++                const std::string& fp = faw->getFilePath();
++                if (!fp.empty()) {
++                    size_t slash = fp.find_last_of("/\\");
++                    size_t start = (slash == std::string::npos) ? 0 : slash + 1;
++                    std::string base = fp.substr(start);
++                    size_t dot = base.find_last_of('.');
++                    if (dot != std::string::npos && dot != 0)
++                        base = base.substr(0, dot);
++                    titleValue = base;
++                }
++            }
++        }
++        std::string safeTitle = jsonEscape(titleValue);
+         json += "      \"title\": \"" + safeTitle + "\",\n";
+         json += "      \"bounds\": { \"x\": " + std::to_string(x) + ", \"y\": " + std::to_string(y) + ", \"w\": " + std::to_string(ww) + ", \"h\": " + std::to_string(hh) + " },\n";
+         json += std::string("      \"zoomed\": ") + (zoomed ? "true" : "false") + ",\n";
+
+codex
+**Summary**
+- Add frame_player title fallback to file stem when empty, then JSON-escape before save in `app/test_pattern_app.cpp:3549`.
+- Pass workspace `title` into `openAnimationFilePath` for frame_player restore in `app/test_pattern_app.cpp:3293`.
+
+**Tests**
+- `cmake --build ./build --target test_pattern -j4 2>&1 | grep -E "error:|Linking"`
+
+Want me to run any additional tests or handle the issue/PR lifecycle updates for #84?
+file update:
+diff --git a/app/test_pattern_app.cpp b/app/test_pattern_app.cpp
+index 5fc673172ded561bb9fc69375d023c62c98399a8..210fd22093f321e826f4f4906546c2696cc04743
+--- a/app/test_pattern_app.cpp
++++ b/app/test_pattern_app.cpp
+@@ -3290,7 +3290,7 @@
+                     if (!pmsStr.empty()) pms = (unsigned)std::stoul(pmsStr);
+                 }
+             }
+-            if (!path.empty()) openAnimationFilePath(path, bounds, false, false);
++            if (!path.empty()) openAnimationFilePath(path, bounds, false, false, title);
+             continue; // openAnimationFilePath handles insert + register
+         } else if (type == "text_view") {
+             std::string path;
+@@ -3546,7 +3546,24 @@
+         json += "      \"id\": \"w" + std::to_string(idx) + "\",\n";
+         json += "      \"type\": \"" + type + "\",\n";
+         const char *title = w->getTitle(0);
+-        std::string safeTitle = title ? jsonEscape(title) : std::string("");
++        std::string titleValue;
++        if (title && *title) {
++            titleValue = title;
++        } else if (type == "frame_player") {
++            if (auto *faw = dynamic_cast<TFrameAnimationWindow*>(w)) {
++                const std::string& fp = faw->getFilePath();
++                if (!fp.empty()) {
++                    size_t slash = fp.find_last_of("/\\");
++                    size_t start = (slash == std::string::npos) ? 0 : slash + 1;
++                    std::string base = fp.substr(start);
++                    size_t dot = base.find_last_of('.');
++                    if (dot != std::string::npos && dot != 0)
++                        base = base.substr(0, dot);
++                    titleValue = base;
++                }
++            }
++        }
++        std::string safeTitle = jsonEscape(titleValue);
+         json += "      \"title\": \"" + safeTitle + "\",\n";
+         json += "      \"bounds\": { \"x\": " + std::to_string(x) + ", \"y\": " + std::to_string(y) + ", \"w\": " + std::to_string(ww) + ", \"h\": " + std::to_string(hh) + " },\n";
+         json += std::string("      \"zoomed\": ") + (zoomed ? "true" : "false") + ",\n";
+
+tokens used
+30,885
+**Summary**
+- Add frame_player title fallback to file stem when empty, then JSON-escape before save in `app/test_pattern_app.cpp:3549`.
+- Pass workspace `title` into `openAnimationFilePath` for frame_player restore in `app/test_pattern_app.cpp:3293`.
+
+**Tests**
+- `cmake --build ./build --target test_pattern -j4 2>&1 | grep -E "error:|Linking"`
+
+Want me to run any additional tests or handle the issue/PR lifecycle updates for #84?

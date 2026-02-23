@@ -1,0 +1,1314 @@
+OpenAI Codex v0.53.0 (research preview)
+--------
+workdir: /Users/james/Repos/wibandwob-dos
+model: gpt-5.2-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: medium
+reasoning summaries: auto
+session id: 019c8b43-1078-7492-a3d1-0bec9c55b371
+--------
+user
+DEVNOTE: Files inside .codex-logs/ are run logs — ignore them completely.
+EFFICIENCY: Use rg -n -C3 or sed -n 'N,Mp'. Never dump full files.
+
+Task: write scripts/parity-check.py — a surface parity audit script (issue #86, AC-15).
+
+The script reads C++ source to find gaps between:
+  A) Types registered in window_type_registry (k_specs[] array) 
+  B) Types with props serialisation in buildWorkspaceJson
+  C) Types with restore handling in loadWorkspaceFromFile
+
+Script should:
+1. Parse app/window_type_registry.cpp — extract all type slugs from k_specs[] lines
+   Pattern: lines like: { "gallery", spawn_gallery, match_gallery },
+   
+2. Parse app/test_pattern_app.cpp — find buildWorkspaceJson section
+   Extract all type == "X" strings within it (these have props save)
+   
+3. Parse app/test_pattern_app.cpp — find loadWorkspaceFromFile section  
+   Extract all type == "X" strings within it (these have restore handling)
+
+4. Define STATELESS_TYPES = set of types that are intentionally stateless (no props needed):
+   terminal, browser, scramble, quadra, snake, rogue, deep_signal, app_launcher,
+   wibwob, orbit, torus, cube, life, blocks, score, ascii, animated_gradient,
+   monster_cam, monster_verse, monster_portal, paint, micropolis_ascii,
+   mycelium, verse, text_editor, test_pattern, gradient
+
+5. Print a table: TYPE | REGISTRY | PROPS_SAVE | RESTORE | STATUS
+   Mark each type: ✅ ok / ⚠️ gap / — stateless
+
+6. Exit non-zero if any registered type is NOT in stateless list AND missing props save or restore.
+   Exit 0 if all types are either covered or explicitly stateless.
+
+Output format:
+  TYPE                 REGISTRY   SAVE       RESTORE    STATUS
+  frame_player         ✅          ✅          ✅          ok
+  gallery              ✅          ✅          ✅          ok
+  terminal             ✅          —           —           stateless
+  <hypothetical_new>   ✅          ❌          ❌          GAP ← exits non-zero
+
+Put the script at scripts/parity-check.py.
+Make it executable (chmod +x).
+Test it: python3 scripts/parity-check.py — should exit 0 on current clean repo.
+Print the full table to stdout regardless of exit code.
+exec
+ls in /Users/james/Repos/wibandwob-dos succeeded in 19ms:
+260221-1612-w4-no-input-no-change-no-spawned.txt
+260221-1612-w5-maximum-entropy-achieved-all-gradient-spawned.txt
+260221-1612-w6-every-word-is-a-translation-spawned.txt
+260221-1614-win-9e40476d--BAT-TECHNO-SEARCH-spawned.txt
+260221-1822-w3-Hello-from-smoke-test-spawned.txt
+260222-1953-w3--o-o-spawned.txt
+AGENTS.md
+CLAUDE.md
+CMakeLists.txt
+README.md
+app
+archive
+build
+cache
+codex-wibwob-mcp-fix-20260221-125722.log
+contracts
+docs
+logs
+memories
+modules
+
+thinking
+**Identifying root agents**
+exec
+cat AGENTS.md in /Users/james/Repos/wibandwob-dos succeeded in 16ms:
+# AGENTS.md (Codex Prompt-Shim)
+
+This file aligns Codex execution style with the repo canon in `.planning/README.md` and the guardrails encoded in `.claude/hooks/*`.
+
+## Important: Hooks vs Codex
+
+Codex does not natively execute Claude Code hook scripts.  
+Treat the rules below as a required prompt-shim and manual gate before finishing work.
+Mirror high-value hook behavior explicitly, including `.claude/hooks/gh-format-lint.sh` for GitHub markdown posting safety.
+
+## Canon Workflow Rules
+
+1. Issue-first for non-trivial work. Exception: spikes (`.planning/` doc-only investigations) only need a branch — no GitHub issue required.
+2. Branch-per-issue (or branch-per-spike for spikes).
+3. Keep PR scope to one logical slice.
+4. Update planning briefs the same day issue state changes.
+5. Preserve AC -> Test traceability in story files.
+6. Sync GitHub issue lifecycle continuously, not just at closeout:
+   - Set issue to `in-progress` when implementation starts.
+   - Comment with commit SHAs and test evidence as slices land.
+
+thinking
+**Planning to find all agent references**
+
+I'll search through the scripts for all occurrences of "AGENTS" to ensure no references are missed.
+exec
+rg --files -g AGENTS.md in /Users/james/Repos/wibandwob-dos succeeded in 41ms:
+AGENTS.md
+
+thinking
+**Preparing to parse source sections**
+
+I'm planning to use sed to inspect and parse relevant sections of the small app/window_type_registry.cpp file as part of script creation based on the instructions.
+exec
+sed -n '1,200p' app/window_type_registry.cpp in /Users/james/Repos/wibandwob-dos succeeded in 17ms:
+// Window type registry — single source of truth for all spawnable window types.
+// Keeps api_ipc.cpp free of per-type knowledge: adding a new type only requires
+// a new entry in the k_specs table below.
+
+#include "window_type_registry.h"
+#include "gradient.h"
+#include "frame_file_player_view.h"
+#include "transparent_text_view.h"
+#include "text_editor_view.h"
+#include "browser_view.h"
+#include "generative_verse_view.h"
+#include "generative_mycelium_view.h"
+#include "generative_orbit_view.h"
+#include "generative_torus_view.h"
+#include "generative_cube_view.h"
+#include "game_of_life_view.h"
+#include "animated_blocks_view.h"
+#include "animated_score_view.h"
+#include "animated_ascii_view.h"
+#include "animated_gradient_view.h"
+
+thinking
+**Planning to locate k_specs array**
+exec
+rg -n -C3 k_specs app/window_type_registry.cpp in /Users/james/Repos/wibandwob-dos succeeded in 19ms:
+1-// Window type registry — single source of truth for all spawnable window types.
+2-// Keeps api_ipc.cpp free of per-type knowledge: adding a new type only requires
+3:// a new entry in the k_specs table below.
+4-
+5-#include "window_type_registry.h"
+6-#include "gradient.h"
+--
+277-// ── Registry table ────────────────────────────────────────────────────────────
+278-// Add new window types here — nowhere else.
+279-
+280:static const WindowTypeSpec k_specs[] = {
+281-    { "test_pattern",      spawn_test,              match_test_pattern      },
+282-    { "gradient",          spawn_gradient,          match_gradient          },
+283-    { "frame_player",      spawn_frame_player,      match_frame_player      },
+--
+317-
+318-const std::vector<WindowTypeSpec>& all_window_type_specs() {
+319-    static std::vector<WindowTypeSpec> specs(
+320:        k_specs, k_specs + sizeof(k_specs) / sizeof(k_specs[0]));
+321-    return specs;
+exec
+sed -n '270,340p' app/window_type_registry.cpp in /Users/james/Repos/wibandwob-dos succeeded in 16ms:
+static bool match_quadra(TWindow* w)      { return has_child_view<TQuadraView>(w); }
+static bool match_snake(TWindow* w)       { return has_child_view<TSnakeView>(w); }
+static bool match_rogue(TWindow* w)       { return has_child_view<TRogueView>(w); }
+static bool match_deep_signal(TWindow* w) { return has_child_view<TDeepSignalView>(w); }
+static bool match_app_launcher(TWindow* w){ return dynamic_cast<TAppLauncherWindow*>(w) != nullptr; }
+static bool match_gallery(TWindow* w)     { return dynamic_cast<TGalleryWindow*>(w) != nullptr; }
+
+// ── Registry table ────────────────────────────────────────────────────────────
+// Add new window types here — nowhere else.
+
+static const WindowTypeSpec k_specs[] = {
+    { "test_pattern",      spawn_test,              match_test_pattern      },
+    { "gradient",          spawn_gradient,          match_gradient          },
+    { "frame_player",      spawn_frame_player,      match_frame_player      },
+    { "text_view",         spawn_text_view,         match_text_view         },
+    { "text_editor",       spawn_text_editor,       match_text_editor       },
+    { "browser",           spawn_browser,           match_browser           },
+    { "verse",             spawn_verse,             match_verse             },
+    { "mycelium",          spawn_mycelium,          match_mycelium          },
+    { "orbit",             spawn_orbit,             match_orbit             },
+
+thinking
+**Locating workspace JSON functions**
+
+I'm searching for buildWorkspaceJson and loadWorkspaceFromFile in test_pattern_app.cpp to understand workspace parsing.
+exec
+rg -n -C3 buildWorkspaceJson app/test_pattern_app.cpp in /Users/james/Repos/wibandwob-dos succeeded in 19ms:
+723-    void saveWorkspace();
+724-    bool saveWorkspacePath(const std::string& path);
+725-    TRect calculateWindowBounds(const std::string& filePath);
+726:    std::string buildWorkspaceJson();
+727-    static std::string jsonEscape(const std::string& s);
+728-    bool loadWorkspaceFromFile(const std::string& path);
+729-    static bool parseBool(const std::string &s, size_t &pos, bool &out);
+--
+3455-    return out;
+3456-}
+3457-
+3458:std::string TTestPatternApp::buildWorkspaceJson()
+3459-{
+3460-    // Screen size
+3461-    TRect ext = deskTop->getExtent();
+--
+3568-    // Ensure directory exists
+3569-    mkdir("workspaces", 0755);
+3570-
+3571:    std::string json = buildWorkspaceJson();
+exec
+sed -n '3450,3590p' app/test_pattern_app.cpp in /Users/james/Repos/wibandwob-dos succeeded in 16ms:
+                    std::snprintf(buf, sizeof(buf), "\\u%04x", c);
+                    out += buf;
+                } else out += char(c);
+        }
+    }
+    return out;
+}
+
+std::string TTestPatternApp::buildWorkspaceJson()
+{
+    // Screen size
+    TRect ext = deskTop->getExtent();
+    int sw = ext.b.x - ext.a.x;
+    int sh = ext.b.y - ext.a.y;
+
+    // Timestamp (basic)
+    char ts[64];
+    std::time_t t = std::time(nullptr);
+    std::tm *lt = std::localtime(&t);
+    std::strftime(ts, sizeof(ts), "%Y-%m-%dT%H:%M:%S", lt);
+
+thinking
+**Planning to locate loadWorkspaceFromFile**
+exec
+rg -n -C3 loadWorkspaceFromFile app/test_pattern_app.cpp in /Users/james/Repos/wibandwob-dos succeeded in 19ms:
+725-    TRect calculateWindowBounds(const std::string& filePath);
+726-    std::string buildWorkspaceJson();
+727-    static std::string jsonEscape(const std::string& s);
+728:    bool loadWorkspaceFromFile(const std::string& path);
+729-    static bool parseBool(const std::string &s, size_t &pos, bool &out);
+730-    static bool parseString(const std::string &s, size_t &pos, std::string &out);
+731-    static bool parseNumber(const std::string &s, size_t &pos, int &out);
+--
+950-    const char* layoutPath = std::getenv("WIBWOB_LAYOUT_PATH");
+951-    if (layoutPath && layoutPath[0] != '\0') {
+952-        fprintf(stderr, "[wibwob] Restoring layout from WIBWOB_LAYOUT_PATH=%s\n", layoutPath);
+953:        if (!loadWorkspaceFromFile(layoutPath)) {
+954-            fprintf(stderr, "[wibwob] WARNING: Failed to restore layout from %s\n", layoutPath);
+955-        }
+956-    }
+--
+3169-    return false;
+3170-}
+3171-
+3172:bool TTestPatternApp::loadWorkspaceFromFile(const std::string& path)
+exec
+sed -n '3170,3425p' app/test_pattern_app.cpp in /Users/james/Repos/wibandwob-dos succeeded in 16ms:
+}
+
+bool TTestPatternApp::loadWorkspaceFromFile(const std::string& path)
+{
+    std::ifstream in(path);
+    if (!in) {
+        std::string msg = std::string("Failed to open ") + path;
+        messageBox(msg.c_str(), mfError | mfOKButton);
+        return false;
+    }
+    std::string data((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    in.close();
+
+    if (data.find("\"version\"") == std::string::npos || data.find("\"windows\"") == std::string::npos) {
+        messageBox("Invalid workspace file.", mfError | mfOKButton);
+        return false;
+    }
+
+    // Extract globals.patternMode
+    bool continuous = USE_CONTINUOUS_PATTERN;
+
+
+thinking
+**Planning targeted parsing script**
+
+I'm outlining a Python script to extract specific code sections by locating function or array boundaries via string searches, then applying regex inside those regions to find patterns like `type == "X"` and entries within the `k_specs` array, ensuring scoped parsing within identified code blocks.
+thinking
+**Searching for function boundary**
+
+I'm locating the `loadWorkspace` function start, around line 3390, to define parsing boundaries by finding its occurrence using a code search for precise extraction range.
+exec
+rg -n -C1 TTestPatternApp::loadWorkspace app/test_pattern_app.cpp in /Users/james/Repos/wibandwob-dos succeeded in 19ms:
+3171-
+3172:bool TTestPatternApp::loadWorkspaceFromFile(const std::string& path)
+3173-{
+
+thinking
+**Considering function name patterns**
+
+Noticing "loadWorkspace" might be a key function name to target with text replacements using sed near the final steps.
+exec
+sed -n '3400,3505p' app/test_pattern_app.cpp in /Users/james/Repos/wibandwob-dos succeeded in 17ms:
+    std::strncpy(fileName, "workspaces/*.json", sizeof(fileName));
+    fileName[sizeof(fileName)-1] = '\0';
+    TFileDialog *dlg = new TFileDialog("workspaces/*.json", "Open Workspace", "~N~ame", fdOpenButton, 101);
+    ushort res = deskTop->execView(dlg);
+    std::string path;
+    if (res != cmCancel) {
+        dlg->getData(fileName);
+        path = fileName;
+        // Normalize: if only a filename, prepend workspaces/
+        if (!path.empty() && path.find('/') == std::string::npos)
+            path = std::string("workspaces/") + path;
+    } else {
+        path = "workspaces/last_workspace.json";
+    }
+    destroy(dlg);
+
+    // Fallback if file missing: try default
+    std::ifstream test(path.c_str());
+    if (!test.good()) {
+        test.close();
+
+
+thinking
+**Planning parsing and output logic**
+
+I'm defining how to isolate the restore section by slicing between `loadWorkspaceFromFile` start and `loadWorkspace` start using regex. The output should be a sorted table listing all registry types with statuses reflecting presence in save (build), restore (load), or stateless sets, marking gaps and stateless types accordingly.
+thinking
+**Deciding on union vs registry-only listing**
+
+I clarified output should show all types from the union of registry, save, and restore sets to surface mismatches, marking registry presence explicitly. However, exit criteria only matter for registered types missing save or restore. I sketched a detailed script plan to parse registry and function sections, extract types, mark statuses per instructions, format a neat table, and handle stateless types distinctly. Next step is implementing this script as an executable file.
+file update
+A /Users/james/Repos/wibandwob-dos/scripts/parity-check.py
+#!/usr/bin/env python3
+
+from __future__ import annotations
+
+import re
+import sys
+from pathlib import Path
+
+
+STATELESS_TYPES = {
+    "terminal",
+    "browser",
+    "scramble",
+    "quadra",
+    "snake",
+    "rogue",
+    "deep_signal",
+    "app_launcher",
+    "wibwob",
+    "orbit",
+    "torus",
+    "cube",
+    "life",
+    "blocks",
+    "score",
+    "ascii",
+    "animated_gradient",
+    "monster_cam",
+    "monster_verse",
+    "monster_portal",
+    "paint",
+    "micropolis_ascii",
+    "mycelium",
+    "verse",
+    "text_editor",
+    "test_pattern",
+    "gradient",
+}
+
+
+def read_text(path: Path) -> str:
+    try:
+        return path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        print(f"Missing file: {path}", file=sys.stderr)
+        raise
+
+
+def extract_registry_types(text: str) -> list[str]:
+    start = text.find("k_specs[]")
+    if start == -1:
+        return []
+    brace_start = text.find("{", start)
+    if brace_start == -1:
+        return []
+    end = text.find("};", brace_start)
+    if end == -1:
+        end = len(text)
+    block = text[brace_start:end]
+    pattern = re.compile(r"\{\s*\"([^\"]+)\"\s*,")
+    return pattern.findall(block)
+
+
+def extract_section(text: str, start_token: str, end_tokens: list[str]) -> str:
+    start = text.find(start_token)
+    if start == -1:
+        return ""
+    end = len(text)
+    for token in end_tokens:
+        idx = text.find(token, start + len(start_token))
+        if idx != -1:
+            end = min(end, idx)
+    return text[start:end]
+
+
+def extract_type_conditions(section: str) -> set[str]:
+    return set(re.findall(r"type\s*==\s*\"([^\"]+)\"", section))
+
+
+def main() -> int:
+    root = Path(__file__).resolve().parents[1]
+    registry_path = root / "app" / "window_type_registry.cpp"
+    app_path = root / "app" / "test_pattern_app.cpp"
+
+    registry_text = read_text(registry_path)
+    app_text = read_text(app_path)
+
+    registry_types = extract_registry_types(registry_text)
+
+    build_section = extract_section(
+        app_text,
+        "std::string TTestPatternApp::buildWorkspaceJson",
+        ["void TTestPatternApp::saveWorkspace"],
+    )
+    restore_section = extract_section(
+        app_text,
+        "bool TTestPatternApp::loadWorkspaceFromFile",
+        ["void TTestPatternApp::loadWorkspace", "bool TTestPatternApp::openWorkspacePath"],
+    )
+
+    save_types = extract_type_conditions(build_section)
+    restore_types = extract_type_conditions(restore_section)
+
+    type_width = max(len("TYPE"), *(len(t) for t in registry_types)) if registry_types else len("TYPE")
+    reg_width = len("REGISTRY")
+    save_width = len("SAVE")
+    restore_width = len("RESTORE")
+
+    header = (
+        f"{'TYPE':<{type_width}}  "
+        f"{'REGISTRY':<{reg_width}}  "
+        f"{'SAVE':<{save_width}}  "
+        f"{'RESTORE':<{restore_width}}  "
+        "STATUS"
+    )
+    print(header)
+
+    has_gap = False
+    for type_name in registry_types:
+        reg_cell = "✅"
+        if type_name in STATELESS_TYPES:
+            save_cell = "—"
+            restore_cell = "—"
+            status = "stateless"
+        else:
+            save_ok = type_name in save_types
+            restore_ok = type_name in restore_types
+            save_cell = "✅" if save_ok else "❌"
+            restore_cell = "✅" if restore_ok else "❌"
+            status = "ok" if save_ok and restore_ok else "GAP"
+            if status == "GAP":
+                has_gap = True
+
+        print(
+            f"{type_name:<{type_width}}  "
+            f"{reg_cell:<{reg_width}}  "
+            f"{save_cell:<{save_width}}  "
+            f"{restore_cell:<{restore_width}}  "
+            f"{status}"
+        )
+
+    return 1 if has_gap else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+apply_patch(auto_approved=true) exited 0 in 46ms:
+Success. Updated the following files:
+A scripts/parity-check.py
+file update:
+diff --git a/scripts/parity-check.py b/scripts/parity-check.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..77a717805c20a1ec4837f931274706cf49bf661f
+--- /dev/null
++++ b/scripts/parity-check.py
+@@ -0,0 +1,146 @@
++#!/usr/bin/env python3
++
++from __future__ import annotations
++
++import re
++import sys
++from pathlib import Path
++
++
++STATELESS_TYPES = {
++    "terminal",
++    "browser",
++    "scramble",
++    "quadra",
++    "snake",
++    "rogue",
++    "deep_signal",
++    "app_launcher",
++    "wibwob",
++    "orbit",
++    "torus",
++    "cube",
++    "life",
++    "blocks",
++    "score",
++    "ascii",
++    "animated_gradient",
++    "monster_cam",
++    "monster_verse",
++    "monster_portal",
++    "paint",
++    "micropolis_ascii",
++    "mycelium",
++    "verse",
++    "text_editor",
++    "test_pattern",
++    "gradient",
++}
++
++
++def read_text(path: Path) -> str:
++    try:
++        return path.read_text(encoding="utf-8")
++    except FileNotFoundError:
++        print(f"Missing file: {path}", file=sys.stderr)
++        raise
++
++
++def extract_registry_types(text: str) -> list[str]:
++    start = text.find("k_specs[]")
++    if start == -1:
++        return []
++    brace_start = text.find("{", start)
++    if brace_start == -1:
++        return []
++    end = text.find("};", brace_start)
++    if end == -1:
++        end = len(text)
++    block = text[brace_start:end]
++    pattern = re.compile(r"\{\s*\"([^\"]+)\"\s*,")
++    return pattern.findall(block)
++
++
++def extract_section(text: str, start_token: str, end_tokens: list[str]) -> str:
++    start = text.find(start_token)
++    if start == -1:
++        return ""
++    end = len(text)
++    for token in end_tokens:
++        idx = text.find(token, start + len(start_token))
++        if idx != -1:
++            end = min(end, idx)
++    return text[start:end]
++
++
++def extract_type_conditions(section: str) -> set[str]:
++    return set(re.findall(r"type\s*==\s*\"([^\"]+)\"", section))
++
++
++def main() -> int:
++    root = Path(__file__).resolve().parents[1]
++    registry_path = root / "app" / "window_type_registry.cpp"
++    app_path = root / "app" / "test_pattern_app.cpp"
++
++    registry_text = read_text(registry_path)
++    app_text = read_text(app_path)
++
++    registry_types = extract_registry_types(registry_text)
++
++    build_section = extract_section(
++        app_text,
++        "std::string TTestPatternApp::buildWorkspaceJson",
++        ["void TTestPatternApp::saveWorkspace"],
++    )
++    restore_section = extract_section(
++        app_text,
++        "bool TTestPatternApp::loadWorkspaceFromFile",
++        ["void TTestPatternApp::loadWorkspace", "bool TTestPatternApp::openWorkspacePath"],
++    )
++
++    save_types = extract_type_conditions(build_section)
++    restore_types = extract_type_conditions(restore_section)
++
++    type_width = max(len("TYPE"), *(len(t) for t in registry_types)) if registry_types else len("TYPE")
++    reg_width = len("REGISTRY")
++    save_width = len("SAVE")
++    restore_width = len("RESTORE")
++
++    header = (
++        f"{'TYPE':<{type_width}}  "
++        f"{'REGISTRY':<{reg_width}}  "
++        f"{'SAVE':<{save_width}}  "
++        f"{'RESTORE':<{restore_width}}  "
++        "STATUS"
++    )
++    print(header)
++
++    has_gap = False
++    for type_name in registry_types:
++        reg_cell = "✅"
++        if type_name in STATELESS_TYPES:
++            save_cell = "—"
++            restore_cell = "—"
++            status = "stateless"
++        else:
++            save_ok = type_name in save_types
++            restore_ok = type_name in restore_types
++            save_cell = "✅" if save_ok else "❌"
++            restore_cell = "✅" if restore_ok else "❌"
++            status = "ok" if save_ok and restore_ok else "GAP"
++            if status == "GAP":
++                has_gap = True
++
++        print(
++            f"{type_name:<{type_width}}  "
++            f"{reg_cell:<{reg_width}}  "
++            f"{save_cell:<{save_width}}  "
++            f"{restore_cell:<{restore_width}}  "
++            f"{status}"
++        )
++
++    return 1 if has_gap else 0
++
++
++if __name__ == "__main__":
++    sys.exit(main())
+
+file update:
+diff --git a/scripts/parity-check.py b/scripts/parity-check.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..77a717805c20a1ec4837f931274706cf49bf661f
+--- /dev/null
++++ b/scripts/parity-check.py
+@@ -0,0 +1,146 @@
++#!/usr/bin/env python3
++
++from __future__ import annotations
++
++import re
++import sys
++from pathlib import Path
++
++
++STATELESS_TYPES = {
++    "terminal",
++    "browser",
++    "scramble",
++    "quadra",
++    "snake",
++    "rogue",
++    "deep_signal",
++    "app_launcher",
++    "wibwob",
++    "orbit",
++    "torus",
++    "cube",
++    "life",
++    "blocks",
++    "score",
++    "ascii",
++    "animated_gradient",
++    "monster_cam",
++    "monster_verse",
++    "monster_portal",
++    "paint",
++    "micropolis_ascii",
++    "mycelium",
++    "verse",
++    "text_editor",
++    "test_pattern",
++    "gradient",
++}
++
++
++def read_text(path: Path) -> str:
++    try:
++        return path.read_text(encoding="utf-8")
++    except FileNotFoundError:
++        print(f"Missing file: {path}", file=sys.stderr)
++        raise
++
++
++def extract_registry_types(text: str) -> list[str]:
++    start = text.find("k_specs[]")
++    if start == -1:
++        return []
++    brace_start = text.find("{", start)
++    if brace_start == -1:
++        return []
++    end = text.find("};", brace_start)
++    if end == -1:
++        end = len(text)
++    block = text[brace_start:end]
++    pattern = re.compile(r"\{\s*\"([^\"]+)\"\s*,")
++    return pattern.findall(block)
++
++
++def extract_section(text: str, start_token: str, end_tokens: list[str]) -> str:
++    start = text.find(start_token)
++    if start == -1:
++        return ""
++    end = len(text)
++    for token in end_tokens:
++        idx = text.find(token, start + len(start_token))
++        if idx != -1:
++            end = min(end, idx)
++    return text[start:end]
++
++
++def extract_type_conditions(section: str) -> set[str]:
++    return set(re.findall(r"type\s*==\s*\"([^\"]+)\"", section))
++
++
++def main() -> int:
++    root = Path(__file__).resolve().parents[1]
++    registry_path = root / "app" / "window_type_registry.cpp"
++    app_path = root / "app" / "test_pattern_app.cpp"
++
++    registry_text = read_text(registry_path)
++    app_text = read_text(app_path)
++
++    registry_types = extract_registry_types(registry_text)
++
++    build_section = extract_section(
++        app_text,
++        "std::string TTestPatternApp::buildWorkspaceJson",
++        ["void TTestPatternApp::saveWorkspace"],
++    )
++    restore_section = extract_section(
++        app_text,
++        "bool TTestPatternApp::loadWorkspaceFromFile",
++        ["void TTestPatternApp::loadWorkspace", "bool TTestPatternApp::openWorkspacePath"],
++    )
++
++    save_types = extract_type_conditions(build_section)
++    restore_types = extract_type_conditions(restore_section)
++
++    type_width = max(len("TYPE"), *(len(t) for t in registry_types)) if registry_types else len("TYPE")
++    reg_width = len("REGISTRY")
++    save_width = len("SAVE")
++    restore_width = len("RESTORE")
++
++    header = (
++        f"{'TYPE':<{type_width}}  "
++        f"{'REGISTRY':<{reg_width}}  "
++        f"{'SAVE':<{save_width}}  "
++        f"{'RESTORE':<{restore_width}}  "
++        "STATUS"
++    )
++    print(header)
++
++    has_gap = False
++    for type_name in registry_types:
++        reg_cell = "✅"
++        if type_name in STATELESS_TYPES:
++            save_cell = "—"
++            restore_cell = "—"
++            status = "stateless"
++        else:
++            save_ok = type_name in save_types
++            restore_ok = type_name in restore_types
++            save_cell = "✅" if save_ok else "❌"
++            restore_cell = "✅" if restore_ok else "❌"
++            status = "ok" if save_ok and restore_ok else "GAP"
++            if status == "GAP":
++                has_gap = True
++
++        print(
++            f"{type_name:<{type_width}}  "
++            f"{reg_cell:<{reg_width}}  "
++            f"{save_cell:<{save_width}}  "
++            f"{restore_cell:<{restore_width}}  "
++            f"{status}"
++        )
++
++    return 1 if has_gap else 0
++
++
++if __name__ == "__main__":
++    sys.exit(main())
+
+
+thinking
+**Adding executable permission**
+exec
+chmod +x scripts/parity-check.py in /Users/james/Repos/wibandwob-dos succeeded in 29ms:
+
+file update:
+diff --git a/scripts/parity-check.py b/scripts/parity-check.py
+new file mode 100755
+index 0000000000000000000000000000000000000000..77a717805c20a1ec4837f931274706cf49bf661f
+--- /dev/null
++++ b/scripts/parity-check.py
+@@ -0,0 +1,146 @@
++#!/usr/bin/env python3
++
++from __future__ import annotations
++
++import re
++import sys
++from pathlib import Path
++
++
++STATELESS_TYPES = {
++    "terminal",
++    "browser",
++    "scramble",
++    "quadra",
++    "snake",
++    "rogue",
++    "deep_signal",
++    "app_launcher",
++    "wibwob",
++    "orbit",
++    "torus",
++    "cube",
++    "life",
++    "blocks",
++    "score",
++    "ascii",
++    "animated_gradient",
++    "monster_cam",
++    "monster_verse",
++    "monster_portal",
++    "paint",
++    "micropolis_ascii",
++    "mycelium",
++    "verse",
++    "text_editor",
++    "test_pattern",
++    "gradient",
++}
++
++
++def read_text(path: Path) -> str:
++    try:
++        return path.read_text(encoding="utf-8")
++    except FileNotFoundError:
++        print(f"Missing file: {path}", file=sys.stderr)
++        raise
++
++
++def extract_registry_types(text: str) -> list[str]:
++    start = text.find("k_specs[]")
++    if start == -1:
++        return []
++    brace_start = text.find("{", start)
++    if brace_start == -1:
++        return []
++    end = text.find("};", brace_start)
++    if end == -1:
++        end = len(text)
++    block = text[brace_start:end]
++    pattern = re.compile(r"\{\s*\"([^\"]+)\"\s*,")
++    return pattern.findall(block)
++
++
++def extract_section(text: str, start_token: str, end_tokens: list[str]) -> str:
++    start = text.find(start_token)
++    if start == -1:
++        return ""
++    end = len(text)
++    for token in end_tokens:
++        idx = text.find(token, start + len(start_token))
++        if idx != -1:
++            end = min(end, idx)
++    return text[start:end]
++
++
++def extract_type_conditions(section: str) -> set[str]:
++    return set(re.findall(r"type\s*==\s*\"([^\"]+)\"", section))
++
++
++def main() -> int:
++    root = Path(__file__).resolve().parents[1]
++    registry_path = root / "app" / "window_type_registry.cpp"
++    app_path = root / "app" / "test_pattern_app.cpp"
++
++    registry_text = read_text(registry_path)
++    app_text = read_text(app_path)
++
++    registry_types = extract_registry_types(registry_text)
++
++    build_section = extract_section(
++        app_text,
++        "std::string TTestPatternApp::buildWorkspaceJson",
++        ["void TTestPatternApp::saveWorkspace"],
++    )
++    restore_section = extract_section(
++        app_text,
++        "bool TTestPatternApp::loadWorkspaceFromFile",
++        ["void TTestPatternApp::loadWorkspace", "bool TTestPatternApp::openWorkspacePath"],
++    )
++
++    save_types = extract_type_conditions(build_section)
++    restore_types = extract_type_conditions(restore_section)
++
++    type_width = max(len("TYPE"), *(len(t) for t in registry_types)) if registry_types else len("TYPE")
++    reg_width = len("REGISTRY")
++    save_width = len("SAVE")
++    restore_width = len("RESTORE")
++
++    header = (
++        f"{'TYPE':<{type_width}}  "
++        f"{'REGISTRY':<{reg_width}}  "
++        f"{'SAVE':<{save_width}}  "
++        f"{'RESTORE':<{restore_width}}  "
++        "STATUS"
++    )
++    print(header)
++
++    has_gap = False
++    for type_name in registry_types:
++        reg_cell = "✅"
++        if type_name in STATELESS_TYPES:
++            save_cell = "—"
++            restore_cell = "—"
++            status = "stateless"
++        else:
++            save_ok = type_name in save_types
++            restore_ok = type_name in restore_types
++            save_cell = "✅" if save_ok else "❌"
++            restore_cell = "✅" if restore_ok else "❌"
++            status = "ok" if save_ok and restore_ok else "GAP"
++            if status == "GAP":
++                has_gap = True
++
++        print(
++            f"{type_name:<{type_width}}  "
++            f"{reg_cell:<{reg_width}}  "
++            f"{save_cell:<{save_width}}  "
++            f"{restore_cell:<{restore_width}}  "
++            f"{status}"
++        )
++
++    return 1 if has_gap else 0
++
++
++if __name__ == "__main__":
++    sys.exit(main())
+
+
+thinking
+**Running parity-check tests**
+exec
+python3 scripts/parity-check.py in /Users/james/Repos/wibandwob-dos exited 1 in 60ms:
+TYPE               REGISTRY  SAVE  RESTORE  STATUS
+test_pattern       ✅         —     —        stateless
+gradient           ✅         —     —        stateless
+frame_player       ✅         ✅     ✅        ok
+text_view          ✅         ❌     ✅        GAP
+text_editor        ✅         —     —        stateless
+browser            ✅         —     —        stateless
+verse              ✅         —     —        stateless
+mycelium           ✅         —     —        stateless
+orbit              ✅         —     —        stateless
+torus              ✅         —     —        stateless
+cube               ✅         —     —        stateless
+life               ✅         —     —        stateless
+blocks             ✅         —     —        stateless
+score              ✅         —     —        stateless
+ascii              ✅         —     —        stateless
+animated_gradient  ✅         —     —        stateless
+monster_cam        ✅         —     —        stateless
+monster_verse      ✅         —     —        stateless
+monster_portal     ✅         —     —        stateless
+file update:
+diff --git a/scripts/parity-check.py b/scripts/parity-check.py
+new file mode 100755
+index 0000000000000000000000000000000000000000..77a717805c20a1ec4837f931274706cf49bf661f
+--- /dev/null
++++ b/scripts/parity-check.py
+@@ -0,0 +1,146 @@
++#!/usr/bin/env python3
++
++from __future__ import annotations
++
++import re
++import sys
++from pathlib import Path
++
++
++STATELESS_TYPES = {
++    "terminal",
++    "browser",
++    "scramble",
++    "quadra",
++    "snake",
++    "rogue",
++    "deep_signal",
++    "app_launcher",
++    "wibwob",
++    "orbit",
++    "torus",
++    "cube",
++    "life",
++    "blocks",
++    "score",
++    "ascii",
++    "animated_gradient",
++    "monster_cam",
++    "monster_verse",
++    "monster_portal",
++    "paint",
++    "micropolis_ascii",
++    "mycelium",
++    "verse",
++    "text_editor",
++    "test_pattern",
++    "gradient",
++}
++
++
++def read_text(path: Path) -> str:
++    try:
++        return path.read_text(encoding="utf-8")
++    except FileNotFoundError:
++        print(f"Missing file: {path}", file=sys.stderr)
++        raise
++
++
++def extract_registry_types(text: str) -> list[str]:
++    start = text.find("k_specs[]")
++    if start == -1:
++        return []
++    brace_start = text.find("{", start)
++    if brace_start == -1:
++        return []
++    end = text.find("};", brace_start)
++    if end == -1:
++        end = len(text)
++    block = text[brace_start:end]
++    pattern = re.compile(r"\{\s*\"([^\"]+)\"\s*,")
++    return pattern.findall(block)
++
++
++def extract_section(text: str, start_token: str, end_tokens: list[str]) -> str:
++    start = text.find(start_token)
++    if start == -1:
++        return ""
++    end = len(text)
++    for token in end_tokens:
++        idx = text.find(token, start + len(start_token))
++        if idx != -1:
++            end = min(end, idx)
++    return text[start:end]
++
++
++def extract_type_conditions(section: str) -> set[str]:
++    return set(re.findall(r"type\s*==\s*\"([^\"]+)\"", section))
++
++
++def main() -> int:
++    root = Path(__file__).resolve().parents[1]
++    registry_path = root / "app" / "window_type_registry.cpp"
++    app_path = root / "app" / "test_pattern_app.cpp"
++
++    registry_text = read_text(registry_path)
++    app_text = read_text(app_path)
++
++    registry_types = extract_registry_types(registry_text)
++
++    build_section = extract_section(
++        app_text,
++        "std::string TTestPatternApp::buildWorkspaceJson",
++        ["void TTestPatternApp::saveWorkspace"],
++    )
++    restore_section = extract_section(
++        app_text,
++        "bool TTestPatternApp::loadWorkspaceFromFile",
++        ["void TTestPatternApp::loadWorkspace", "bool TTestPatternApp::openWorkspacePath"],
++    )
++
++    save_types = extract_type_conditions(build_section)
++    restore_types = extract_type_conditions(restore_section)
++
++    type_width = max(len("TYPE"), *(len(t) for t in registry_types)) if registry_types else len("TYPE")
++    reg_width = len("REGISTRY")
++    save_width = len("SAVE")
++    restore_width = len("RESTORE")
++
++    header = (
++        f"{'TYPE':<{type_width}}  "
++        f"{'REGISTRY':<{reg_width}}  "
++        f"{'SAVE':<{save_width}}  "
++        f"{'RESTORE':<{restore_width}}  "
++        "STATUS"
++    )
++    print(header)
++
++    has_gap = False
++    for type_name in registry_types:
++        reg_cell = "✅"
++        if type_name in STATELESS_TYPES:
++            save_cell = "—"
++            restore_cell = "—"
++            status = "stateless"
++        else:
++            save_ok = type_name in save_types
++            restore_ok = type_name in restore_types
++            save_cell = "✅" if save_ok else "❌"
++            restore_cell = "✅" if restore_ok else "❌"
++            status = "ok" if save_ok and restore_ok else "GAP"
++            if status == "GAP":
++                has_gap = True
++
++        print(
++            f"{type_name:<{type_width}}  "
++            f"{reg_cell:<{reg_width}}  "
++            f"{save_cell:<{save_width}}  "
++            f"{restore_cell:<{restore_width}}  "
++            f"{status}"
++        )
++
++    return 1 if has_gap else 0
++
++
++if __name__ == "__main__":
++    sys.exit(main())
+
+
+thinking
+**Investigating mismatch in text_view state handling**
+
+The test expects exit 0 on a clean repo, but text_view appears in the registry and restore paths without being in the stateless list or the buildWorkspaceJson save handling, indicating a gap. Next I'll check if text_view is actually saved or if our detection missed it due to type checking differences.
+exec
+rg -n -C3 text_view app/test_pattern_app.cpp in /Users/james/Repos/wibandwob-dos succeeded in 20ms:
+78-// Custom frame for windows without titles
+79-#include "notitle_frame.h"
+80-// Transparent background text view
+81:#include "transparent_text_view.h"
+82-// TUI Browser window
+83-#include "browser_view.h"
+84-// Scramble cat presence
+--
+847-    friend void api_spawn_test(TTestPatternApp&);
+848-    friend void api_spawn_gradient(TTestPatternApp&, const std::string&);
+849-    friend void api_open_animation_path(TTestPatternApp&, const std::string&);
+850:    friend void api_open_text_view_path(TTestPatternApp&, const std::string&, const TRect* bounds);
+851-    friend void api_spawn_test(TTestPatternApp&, const TRect* bounds);
+852-    friend void api_spawn_gradient(TTestPatternApp&, const std::string&, const TRect* bounds);
+853-    friend void api_open_animation_path(TTestPatternApp&, const std::string&, const TRect* bounds, bool frameless, bool shadowless, const std::string& title);
+--
+2657-    }
+2658-}
+2659-
+2660:void api_open_text_view_path(TTestPatternApp& app, const std::string& path, const TRect* bounds) {
+file update:
+diff --git a/scripts/parity-check.py b/scripts/parity-check.py
+new file mode 100755
+index 0000000000000000000000000000000000000000..77a717805c20a1ec4837f931274706cf49bf661f
+--- /dev/null
++++ b/scripts/parity-check.py
+@@ -0,0 +1,146 @@
++#!/usr/bin/env python3
++
++from __future__ import annotations
++
++import re
++import sys
++from pathlib import Path
++
++
++STATELESS_TYPES = {
++    "terminal",
++    "browser",
++    "scramble",
++    "quadra",
++    "snake",
++    "rogue",
++    "deep_signal",
++    "app_launcher",
++    "wibwob",
++    "orbit",
++    "torus",
++    "cube",
++    "life",
++    "blocks",
++    "score",
++    "ascii",
++    "animated_gradient",
++    "monster_cam",
++    "monster_verse",
++    "monster_portal",
++    "paint",
++    "micropolis_ascii",
++    "mycelium",
++    "verse",
++    "text_editor",
++    "test_pattern",
++    "gradient",
++}
++
++
++def read_text(path: Path) -> str:
++    try:
++        return path.read_text(encoding="utf-8")
++    except FileNotFoundError:
++        print(f"Missing file: {path}", file=sys.stderr)
++        raise
++
++
++def extract_registry_types(text: str) -> list[str]:
++    start = text.find("k_specs[]")
++    if start == -1:
++        return []
++    brace_start = text.find("{", start)
++    if brace_start == -1:
++        return []
++    end = text.find("};", brace_start)
++    if end == -1:
++        end = len(text)
++    block = text[brace_start:end]
++    pattern = re.compile(r"\{\s*\"([^\"]+)\"\s*,")
++    return pattern.findall(block)
++
++
++def extract_section(text: str, start_token: str, end_tokens: list[str]) -> str:
++    start = text.find(start_token)
++    if start == -1:
++        return ""
++    end = len(text)
++    for token in end_tokens:
++        idx = text.find(token, start + len(start_token))
++        if idx != -1:
++            end = min(end, idx)
++    return text[start:end]
++
++
++def extract_type_conditions(section: str) -> set[str]:
++    return set(re.findall(r"type\s*==\s*\"([^\"]+)\"", section))
++
++
++def main() -> int:
++    root = Path(__file__).resolve().parents[1]
++    registry_path = root / "app" / "window_type_registry.cpp"
++    app_path = root / "app" / "test_pattern_app.cpp"
++
++    registry_text = read_text(registry_path)
++    app_text = read_text(app_path)
++
++    registry_types = extract_registry_types(registry_text)
++
++    build_section = extract_section(
++        app_text,
++        "std::string TTestPatternApp::buildWorkspaceJson",
++        ["void TTestPatternApp::saveWorkspace"],
++    )
++    restore_section = extract_section(
++        app_text,
++        "bool TTestPatternApp::loadWorkspaceFromFile",
++        ["void TTestPatternApp::loadWorkspace", "bool TTestPatternApp::openWorkspacePath"],
++    )
++
++    save_types = extract_type_conditions(build_section)
++    restore_types = extract_type_conditions(restore_section)
++
++    type_width = max(len("TYPE"), *(len(t) for t in registry_types)) if registry_types else len("TYPE")
++    reg_width = len("REGISTRY")
++    save_width = len("SAVE")
++    restore_width = len("RESTORE")
++
++    header = (
++        f"{'TYPE':<{type_width}}  "
++        f"{'REGISTRY':<{reg_width}}  "
++        f"{'SAVE':<{save_width}}  "
++        f"{'RESTORE':<{restore_width}}  "
++        "STATUS"
++    )
++    print(header)
++
++    has_gap = False
++    for type_name in registry_types:
++        reg_cell = "✅"
++        if type_name in STATELESS_TYPES:
++            save_cell = "—"
++            restore_cell = "—"
++            status = "stateless"
++        else:
++            save_ok = type_name in save_types
++            restore_ok = type_name in restore_types
++            save_cell = "✅" if save_ok else "❌"
++            restore_cell = "✅" if restore_ok else "❌"
++            status = "ok" if save_ok and restore_ok else "GAP"
++            if status == "GAP":
++                has_gap = True
++
++        print(
++            f"{type_name:<{type_width}}  "
++            f"{reg_cell:<{reg_width}}  "
++            f"{save_cell:<{save_width}}  "
++            f"{restore_cell:<{restore_width}}  "
++            f"{status}"
++        )
++
++    return 1 if has_gap else 0
++
++
++if __name__ == "__main__":
++    sys.exit(main())
+
+
+
+

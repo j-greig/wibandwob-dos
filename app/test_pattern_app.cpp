@@ -1985,7 +1985,8 @@ void TTestPatternApp::newDonutWindow()
     );
     
     // Create and insert window with donut.txt file (no title for minimalist aesthetic)
-    TFrameAnimationWindow* window = new TFrameAnimationWindow(bounds, "", "donut.txt");
+    // Path is relative to repo root (CWD when launched via ./build/app/test_pattern)
+    TFrameAnimationWindow* window = new TFrameAnimationWindow(bounds, "", "app/donut.txt");
     deskTop->insert(window);
     registerWindow(window);
 }
@@ -3290,7 +3291,7 @@ bool TTestPatternApp::loadWorkspaceFromFile(const std::string& path)
                     if (!pmsStr.empty()) pms = (unsigned)std::stoul(pmsStr);
                 }
             }
-            if (!path.empty()) openAnimationFilePath(path, bounds, false, false);
+            if (!path.empty()) openAnimationFilePath(path, bounds, false, false, title);
             continue; // openAnimationFilePath handles insert + register
         } else if (type == "text_view") {
             std::string path;
@@ -3520,6 +3521,12 @@ std::string TTestPatternApp::buildWorkspaceJson()
                 c = c->next;
             } while (c != cStart);
             }
+        } else if (type == "text_view") {
+            if (auto *ttw = dynamic_cast<TTransparentTextWindow*>(w)) {
+                const std::string& fp = ttw->getFilePath();
+                if (!fp.empty())
+                    props = "{\"path\": \"" + jsonEscape(fp) + "\"}";
+            }
         } else if (type == "gallery") {
             if (auto *gallery = dynamic_cast<TGalleryWindow*>(w)) {
                 props = std::string("{\"tab\": ") + std::to_string(gallery->getSelected());
@@ -3546,7 +3553,24 @@ std::string TTestPatternApp::buildWorkspaceJson()
         json += "      \"id\": \"w" + std::to_string(idx) + "\",\n";
         json += "      \"type\": \"" + type + "\",\n";
         const char *title = w->getTitle(0);
-        std::string safeTitle = title ? jsonEscape(title) : std::string("");
+        std::string titleValue;
+        if (title && *title) {
+            titleValue = title;
+        } else if (type == "frame_player") {
+            if (auto *faw = dynamic_cast<TFrameAnimationWindow*>(w)) {
+                const std::string& fp = faw->getFilePath();
+                if (!fp.empty()) {
+                    size_t slash = fp.find_last_of("/\\");
+                    size_t start = (slash == std::string::npos) ? 0 : slash + 1;
+                    std::string base = fp.substr(start);
+                    size_t dot = base.find_last_of('.');
+                    if (dot != std::string::npos && dot != 0)
+                        base = base.substr(0, dot);
+                    titleValue = base;
+                }
+            }
+        }
+        std::string safeTitle = jsonEscape(titleValue);
         json += "      \"title\": \"" + safeTitle + "\",\n";
         json += "      \"bounds\": { \"x\": " + std::to_string(x) + ", \"y\": " + std::to_string(y) + ", \"w\": " + std::to_string(ww) + ", \"h\": " + std::to_string(hh) + " },\n";
         json += std::string("      \"zoomed\": ") + (zoomed ? "true" : "false") + ",\n";
