@@ -693,3 +693,41 @@ Fix: document in stamp.sh header — for complex opts, prefer the Python driver 
 
 ### Canvas note
 Session 3 canvas: **362×96** throughout. Confirmed stable after Cinema Display font-size lock.
+
+---
+
+## Session 4 friction — chrome flags, shadowless, 4-up comparison
+
+**F6 — WIBWOB_INSTANCE mismatch: silent IPC failure**
+TUI started without `WIBWOB_INSTANCE=1` → socket `/tmp/test_pattern_app.sock`.
+API started with `WIBWOB_INSTANCE=1` → expects `/tmp/wibwob_1.sock`.
+Health check passes (API is up), but every IPC call returns `Connection refused`.
+No obvious error in API logs until you check `tail /tmp/wibwob_debug.log`.
+Fix: quick-start section added to CLAUDE.md with exact copy-paste commands.
+Diagnostic: `tail -3 /tmp/wibwob_debug.log` — if `socket=/tmp/test_pattern_app.sock`, restart TUI with `WIBWOB_INSTANCE=1`.
+
+**F7 — `menu/command open_primer` needs fully resolved path**
+Passing `path=iso-cube-cornered.txt` (bare filename) fails with "file not found".
+`gallery/arrange` resolves paths internally before sending to IPC — `menu/command` does not.
+Fix: use `realpath` or `find` to get the absolute path before passing to `menu/command`.
+Confirmed: `/Users/james/Repos/wibandwob-dos/modules-private/wibwobworld/primers/<name>.txt`.
+
+**F8 — frameless incorrectly auto-implied shadowless (design error)**
+C++ originally had `if (shadowless || frameless) state &= ~sfShadow`.
+This made frameless+shadow and frameless-only look identical — caught immediately
+in the 4-up visual comparison.
+Fix: `if (shadowless)` only — the two flags are now fully independent orthogonal axes.
+Truth table documented in CLAUDE.md and as a C++ class comment.
+
+**F9 — `show_title` is a no-op on frameless windows (expected, but surprising)**
+`TGhostFrame` has no title bar, so `aTitle` is set but never rendered.
+The 4-up comparison made this obvious: only the two framed windows showed their labels.
+Fix: documented in schema description and CLAUDE.md chrome table.
+
+### Helper patterns added this session
+- `force_open=true` on `gallery/arrange` → always opens fresh window (needed for multi-call same-primer 4-up)
+- 4-up comparison pattern: `close_all` + 4× `open_primer` with absolute path + different chrome flags
+- `WIBWOB_INSTANCE=1` must be on **both** TUI start command and API start command
+
+### Canvas note
+Session 4 canvas: **362×84** (Cinema Display, font size slightly larger than session 3).
