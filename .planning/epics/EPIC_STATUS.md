@@ -23,7 +23,7 @@
 
 | Epic | Status | Effort |
 |---|---|---|
-| E006 scramble TUI presence | in-progress | medium |
+| E006 scramble TUI presence | done | medium |
 | E005 theme runtime wiring | not-started | small |
 | E008 multiplayer PartyKit | in-progress | unknown |
 | E011 desktop shell | deferred | large |
@@ -34,13 +34,13 @@
 ## Active
 
 e005-theme-runtime-wiring — not-started
-e006-scramble-tui-presence — in-progress
 e008-multiplayer-partykit — in-progress
 e011-desktop-shell — not-started
 
 ## Done / Dropped
 
 e001-command-parity-refactor — done
+e006-scramble-tui-presence — done
 e002-browser-and-state-export — done
 e003-dark-pastel-theme — done
 e004-browser-rendering-reliability — dropped
