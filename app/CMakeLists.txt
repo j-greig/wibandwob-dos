@@ -44,6 +44,19 @@ add_executable(test_pattern
     deep_signal_view.cpp
     app_launcher_view.cpp
     ascii_gallery_view.cpp
+    drum_machine_view.cpp
+    drum808/amp_env.cpp
+    drum808/clap.cpp
+    drum808/closed_hat.cpp
+    drum808/drum_engine.cpp
+    drum808/envelope.cpp
+    drum808/filter.cpp
+    drum808/instrument.cpp
+    drum808/kick.cpp
+    drum808/pitch_env.cpp
+    drum808/sequencer.cpp
+    drum808/snare.cpp
+    drum808/audio_output.cpp
     generative_verse_view.cpp
     generative_orbit_view.cpp
     generative_mycelium_view.cpp
@@ -72,6 +85,11 @@ add_executable(test_pattern
 )
 target_include_directories(test_pattern PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(test_pattern PRIVATE tvision tvterm-core)
+
+# CoreAudio for drum machine audio output (macOS)
+if(APPLE)
+    target_link_libraries(test_pattern PRIVATE "-framework AudioToolbox")
+endif()
 
 # On Linux, api_ipc.cpp uses OpenSSL for HMAC (macOS uses CommonCrypto)
 if(NOT APPLE)

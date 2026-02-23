@@ -1,0 +1,6344 @@
+OpenAI Codex v0.101.0 (research preview)
+--------
+workdir: /Users/james/Repos/wibandwob-dos
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: medium
+reasoning summaries: auto
+session id: 019c89d1-1902-73e0-a0ea-cccef4ddbd26
+--------
+user
+DEVNOTE: Files inside .codex-logs/ are run logs — ignore them completely.
+
+EFFICIENCY: Use targeted commands, not full-file dumps. Prefer rg -n -C3 'pattern' file.
+
+TASK: Port the jc-808 TR-808 drum synthesis engine into app/drum808/.
+
+SOURCE FILES (already cloned at /tmp/jc-808/):
+- instrument.h, instrument.cpp — base class, sine synthesis, envelope application
+- kick.h, kick.cpp — Kick drum
+- snare.h, snare.cpp — Snare with noise + bandpass filter
+- clap.h, clap.cpp — Clap with filtered noise bursts
+- closed_hat.h, closed_hat.cpp — Closed hi-hat with 6 harmonics
+- amp_env.h, amp_env.cpp — Amplitude envelope: attack + decay
+- pitch_env.h, pitch_env.cpp — Pitch envelope: peak to release
+- envelope.h, envelope.cpp — Base envelope class
+- filter.h, filter.cpp — Biquad filter: bandpass, highpass
+- sequencer.h, sequencer.cpp — 16-step sequencer with tempo
+
+OUTPUT: Create files under app/drum808/:
+1. Copy each .h and .cpp file from /tmp/jc-808/
+2. Strip ALL SDL dependencies. Replace SDL types with cstdint (int16_t, uint8_t, uint32_t)
+3. Wrap everything in namespace drum808 {}
+4. The Sequencer should NOT hardcode a pattern in init(). Make init() create 4 empty instrument slots (kick, snare, clap, closed_hat). Add methods:
+   - void toggleNote(int instrumentIndex, int step)
+   - int getPosition() const
+   - int getInstrumentCount() const
+   - const char* getInstrumentName(int index) const
+   - bool getNoteState(int instrumentIndex, int step) const
+5. Keep SAMPLE_RATE = 44100
+6. Add DrumEngine class (drum_engine.h/cpp):
+   - Owns the Sequencer
+   - fillBuffer(int16_t* output, int numSamples) — renders audio samples
+   - start()/stop()/isPlaying()/setTempo(double bpm)/getTempo()
+   - toggleNote(int instrument, int step) delegating to sequencer
+   - getPosition(), getInstrumentCount(), getInstrumentName(), getNoteState() from sequencer
+
+Do NOT create audio output code.
+Do NOT modify files outside app/drum808/.
+Do NOT touch CMakeLists.txt.
+
+After creating all files, verify: g++ -std=c++14 -fsyntax-only app/drum808/*.cpp -I app/drum808/
+mcp startup: no servers
+2026-02-23T09:25:08.013899Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c84f6-ba12-7661-84b9-d9ea8b1b8614
+2026-02-23T09:25:08.040038Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c84e5-edab-76e1-b0c0-96e4d21e2286
+
+thinking
+**Preparing source inspection**
+codex
+Porting the `jc-808` synth engine into `app/drum808/` only, with SDL types removed, namespaced code, sequencer API changes, and a new `DrumEngine` wrapper. I’ll inspect the source files and the target folder structure first, then patch in the translated files and run the requested syntax check.
+exec
+/bin/zsh -lc "rg --files app | rg '"'^app/drum808/'"'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "rg --files /tmp/jc-808 | rg '/(instrument|kick|snare|clap|closed_hat|amp_env|pitch_env|envelope|filter|sequencer)\\\\.(h|cpp)"'$'"'" in /Users/james/Repos/wibandwob-dos exited 1 in 51ms:
+
+ exited 1 in 51ms:
+
+
+thinking
+**Inspecting temporary files for issues**
+codex
+The initial file query returned nothing, so I’m checking the exact `/tmp/jc-808` layout and whether `app/drum808/` exists before proceeding with targeted reads.
+exec
+/bin/zsh -lc 'ls -la /tmp/jc-808' in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+total 216
+drwxr-xr-x@  31 james  wheel   992 Feb 23 09:22 .
+drwxrwxrwt  137 root   wheel  4384 Feb 23 09:22 ..
+drwxr-xr-x@  13 james  wheel   416 Feb 23 09:22 .git
+-rw-r--r--@   1 james  wheel    80 Feb 23 09:22 .gitignore
+drwxr-xr-x@   5 james  wheel   160 Feb 23 09:22 .vscode
+-rw-r--r--@   1 james  wheel   411 Feb 23 09:22 Makefile
+-rw-r--r--@   1 james  wheel   315 Feb 23 09:22 amp_env.cpp
+-rw-r--r--@   1 james  wheel   325 Feb 23 09:22 amp_env.h
+-rw-r--r--@   1 james  wheel  2707 Feb 23 09:22 audio_engine.cpp
+-rw-r--r--@   1 james  wheel   846 Feb 23 09:22 audio_engine.h
+-rw-r--r--@   1 james  wheel  1343 Feb 23 09:22 clap.cpp
+-rw-r--r--@   1 james  wheel   532 Feb 23 09:22 clap.h
+-rw-r--r--@   1 james  wheel  1362 Feb 23 09:22 closed_hat.cpp
+-rw-r--r--@   1 james  wheel   546 Feb 23 09:22 closed_hat.h
+-rw-r--r--@   1 james  wheel   999 Feb 23 09:22 envelope.cpp
+-rw-r--r--@   1 james  wheel   715 Feb 23 09:22 envelope.h
+-rw-r--r--@   1 james  wheel   963 Feb 23 09:22 filter.cpp
+-rw-r--r--@   1 james  wheel   417 Feb 23 09:22 filter.h
+-rw-r--r--@   1 james  wheel  1346 Feb 23 09:22 instrument.cpp
+exec
+/bin/zsh -lc 'ls -la app' in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+Total output lines: 138
+
+total 47880
+drwxr-xr-x@ 137 james  staff      4384 Feb 23 09:00 .
+drwxr-xr-x@ 113 james  staff      3616 Feb 23 09:01 ..
+-rw-r--r--@   1 james  staff      6148 Feb 15 09:03 .DS_Store
+-rw-r--r--@   1 james  staff       888 Feb 15 06:40 ASCII_IMAGE_VIEWER.md
+-rw-r--r--@   1 james  staff      5482 Feb 23 09:00 CMakeLists.txt
+-rw-r--r--@   1 james  staff      1814 Feb 15 06:40 FRAME_PLAYER.md
+-rw-r--r--@   1 james  staff      3770 Feb 15 06:40 README.md
+-rw-r--r--@   1 james  staff     12708 Feb 15 06:40 animated_ascii_view.cpp
+-rw-r--r--@   1 james  staff      2561 Feb 15 06:40 animated_ascii_view.h
+-rw-r--r--@   1 james  staff      5411 Feb 15 06:40 animated_blocks_view.cpp
+-rw-r--r--@   1 james  staff      1559 Feb 15 06:40 animated_blocks_view.h
+-rw-r--r--@   1 james  staff      5270 Feb 15 06:40 animated_gradient_view.cpp
+-rw-r--r--@   1 james  staff      1852 Feb 15 06:40 animated_gradient_view.h
+-rw-r--r--@   1 james  staff     20704 Feb 15 06:40 animated_score_view.cpp
+-rw-r--r--@   1 james  staff      2520 Feb 15 06:40 animated_score_view.h
+-rw-r--r--@   1 james  staff      8518 Feb 15 06:40 ansi_view.cpp
+-rw-r--r--@   1 james  staff      2975 Feb 15 06:40 ansi_view.h
+
+thinking
+**Planning source inspection and scripting**
+codex
+I’ve confirmed the source files are in `/tmp/jc-808` and `app/drum808/` does not exist yet. Next I’m reading just the relevant definitions/usages so I can port them cleanly without dragging in SDL or the demo/audio code.
+exec
+/bin/zsh -lc 'ls -ld app/drum808 || true' in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "rg -n -C2 'SDL_|Uint|Sint|class |struct |SAMPLE_RATE|namespace' /tmp/jc-808/{instrument.h,instrument.cpp,kick.h,kick.cpp,snare.h,snare.cpp,clap.h,clap.cpp,closed_hat.h,closed_hat.cpp,amp_env.h,amp_env.cpp,pitch_env.h,pitch_env.cpp,envelope.h,envelope.cpp,filter.h,filter.cpp,sequencer.h,sequencer.cpp}" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+ls: app/drum808: No such file or directory
+ succeeded in 51ms:
+/tmp/jc-808/snare.h-5-#include "instrument.h"
+/tmp/jc-808/snare.h-6-
+/tmp/jc-808/snare.h:7:class Snare : public Instrument
+/tmp/jc-808/snare.h-8-{
+/tmp/jc-808/snare.h-9-public:
+--
+/tmp/jc-808/clap.h-5-#include "instrument.h"
+/tmp/jc-808/clap.h-6-
+/tmp/jc-808/clap.h:7:class Clap : public Instrument
+/tmp/jc-808/clap.h-8-{
+/tmp/jc-808/clap.h-9-public:
+--
+/tmp/jc-808/kick.h-4-#include "instrument.h"
+/tmp/jc-808/kick.h-5-
+/tmp/jc-808/kick.h:6:class Kick : public Instrument
+/tmp/jc-808/kick.h-7-{
+/tmp/jc-808/kick.h-8-public:
+--
+/tmp/jc-808/pitch_env.h-4-#include "envelope.h"
+/tmp/jc-808/pitch_env.h-5-
+
+thinking
+**Planning SDL token inspection**
+codex
+The source scan shows the expected classes and `SAMPLE_RATE = 44100`. I still need the exact method signatures and SDL type usage, so I’m pulling focused snippets from each file before generating the port.
+exec
+/bin/zsh -lc "for f in /tmp/jc-808/{instrument.h,instrument.cpp,envelope.h,envelope.cpp,amp_env.h,amp_env.cpp,pitch_env.h,pitch_env.cpp,filter.h,filter.cpp}; do echo '###' "'$(basename "$f"); rg -n -C3 '"'SDL_|Uint|Sint|class |struct |::|#include|SAMPLE_RATE' \""'$f"; done' in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "for f in /tmp/jc-808/{kick.h,kick.cpp,snare.h,snare.cpp,clap.h,clap.cpp,closed_hat.h,closed_hat.cpp,sequencer.h,sequencer.cpp}; do echo '###' "'$(basename "$f"); rg -n -C3 '"'SDL_|Uint|Sint|class |struct |::|#include|SAMPLE_RATE|init\\(|pattern|vector|bool ' \""'$f"; done' in /Users/james/Repos/wibandwob-dos succeeded in 137ms:
+1-#ifndef CLAP_H
+2-#define CLAP_H
+3-
+4:#include "filter.h"
+5:#include "instrument.h"
+6-
+7:class Clap : public Instrument
+8-{
+9-public:
+10-    Clap();
+--
+18-    double getSample() override;
+19-
+20-private:
+21:    const std::string m_defaultName = "Clap";
+22-
+23-    static const int m_defaultPitch = 200;
+24-
+### clap.cpp
+1:#include <iostream>
+ succeeded in 141ms:
+1-#ifndef AMP_ENV_H
+2-#define AMP_ENV_H
+3-
+4:#include "envelope.h"
+5-
+6:class AmpEnv : public Envelope
+7-{
+8-public:
+9:    struct AmpEnvSettings {
+10-        double startAmp;
+11-        double peakAmp;
+12-        double releaseAmp;
+### amp_env.cpp
+1:#include <iostream>
+2:#include "amp_env.h"
+3-
+4:AmpEnv::AmpEnv(AmpEnvSettings &settings)
+5-: Envelope()
+6-{
+7-    m_attack = settings.attack;
+
+thinking
+**Planning bulk file extraction**
+codex
+I have the class map and know `sequencer.h` is the only SDL include point. Next I’m reading the full source files (they’re small) so I can preserve behavior while changing only the requested interfaces.
+exec
+/bin/zsh -lc "for f in /tmp/jc-808/{kick.h,kick.cpp,snare.h,snare.cpp,clap.h,clap.cpp,closed_hat.h,closed_hat.cpp,sequencer.h,sequencer.cpp}; do printf '\\n===== %s =====\\n' \""'$(basename "$f")"; sed -n '"'1,260p' \""'$f"; done' in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "for f in /tmp/jc-808/{instrument.h,instrument.cpp,envelope.h,envelope.cpp,amp_env.h,amp_env.cpp,pitch_env.h,pitch_env.cpp,filter.h,filter.cpp}; do printf '\\n===== %s =====\\n' \""'$(basename "$f")"; sed -n '"'1,220p' \""'$f"; done' in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+
+===== kick.h =====
+#ifndef KICK_H
+#define KICK_H
+
+#include "instrument.h"
+
+class Kick : public Instrument
+{
+public:
+    Kick();
+    ~Kick() = default;
+
+    void setDefaults() override;
+
+private:
+    const std::string m_defaultName = "Kick";
+    const int m_defaultPitch = 47;
+};
+
+ succeeded in 52ms:
+
+===== instrument.h =====
+#ifndef INSTRUMENT_H
+#define INSTRUMENT_H
+
+#include <cmath>
+#include <optional>
+#include <string>
+#include "amp_env.h"
+#include "pitch_env.h"
+
+#define SEMITONE_HZ 1.06
+
+class Instrument
+{
+public:
+    Instrument() = default;
+    ~Instrument() = default;
+
+    int getPitch();
+
+thinking
+**Inspecting sequencer tail and C++14 compatibility**
+codex
+I have the core source now. One important issue: the original code uses C99-style designated initializers (e.g. `.peakAmp = ...`), which are not valid under `g++ -std=c++14`, so I’ll normalize those while porting.
+exec
+/bin/zsh -lc "sed -n '260,340p' /tmp/jc-808/sequencer.cpp" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+
+
+thinking
+**Planning namespace wrapping and cleanup**
+codex
+I’m starting file edits now. I’ll bulk-copy the requested source pairs into `app/drum808/`, apply mechanical fixes (namespace wrapping, SDL include removal), then hand-patch the sequencer and the few C++14 incompatibilities.
+exec
+/bin/zsh -lc 'mkdir -p app/drum808 && cp /tmp/jc-808/{instrument.h,instrument.cpp,kick.h,kick.cpp,snare.h,snare.cpp,clap.h,clap.cpp,closed_hat.h,closed_hat.cpp,amp_env.h,amp_env.cpp,pitch_env.h,pitch_env.cpp,envelope.h,envelope.cpp,filter.h,filter.cpp,sequencer.h,sequencer.cpp} app/drum808/' in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+
+
+thinking
+**Planning mechanical transform**
+codex
+The files are copied into `app/drum808/`. Next I’m applying a mechanical pass to remove the SDL include and wrap all copied files in `namespace drum808`, then I’ll replace the sequencer implementation with the requested slot-based API.
+exec
+/bin/zsh -lc "for f in app/drum808/*; do 
+  perl -0pi -e 's@#include <SDL2/SDL\\.h>\\n@#include <cstdint>\\n@g' \""'$f";
+  if [[ "$f" == *.h ]]; then
+    awk '"'
+      BEGIN{n=0; lastinc=0; lastendif=0}
+      {lines[++n]="'$0; if ($0 ~ /''^#include /) lastinc=n; if ($0 ~ /''^#endif$/) lastendif=n}
+      END{
+        for (i=1; i<=n; ++i) {
+          print lines[i];
+          if (i==lastinc) { print ""; print "namespace drum808 {"; }
+          if (i==lastendif-1) { print ""; print "} // namespace drum808"; }
+        }
+      }
+    '"' \""'$f" > "$f.tmp" && mv "$f.tmp" "$f"
+  else
+    awk '"'
+      BEGIN{n=0; lastinc=0}
+      {lines[++n]="'$0; if ($0 ~ /''^#include /) lastinc=n}
+      END{
+        for (i=1; i<=n; ++i) {
+          print lines[i];
+          if (i==lastinc) { print ""; print "namespace drum808 {"; }
+        }
+        print "";
+        print "} // namespace drum808";
+      }
+    '"' \""'$f" > "$f.tmp" && mv "$f.tmp" "$f"
+  fi
+done' in /Users/james/Repos/wibandwob-dos succeeded in 973ms:
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LC_ALL = "C.UTF-8",
+	LC_CTYPE = "C.UTF-8",
+	LANG = "en_US.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to a fallback locale ("en_US.UTF-8").
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LC_ALL = "C.UTF-8",
+	LC_CTYPE = "C.UTF-8",
+	LANG = "en_US.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to a fallback locale ("en_US.UTF-8").
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LC_ALL = "C.UTF-8",
+	LC_CTYPE = "C.UTF-8",
+	LANG = "en_US.UTF-8"
+    are supported and installed on your system.
+
+thinking
+**Inspecting header closure correctness**
+codex
+The bulk pass completed (with harmless locale warnings). I’m validating the generated files now before doing the manual fixes, because namespace insertion in headers can go wrong if a file layout differs.
+exec
+/bin/zsh -lc "sed -n '1,120p' app/drum808/instrument.h" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,220p' app/drum808/sequencer.h" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,120p' app/drum808/kick.cpp" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+#ifndef INSTRUMENT_H
+#define INSTRUMENT_H
+
+#include <cmath>
+#include <optional>
+#include <string>
+#include "amp_env.h"
+#include "pitch_env.h"
+
+namespace drum808 {
+
+#define SEMITONE_HZ 1.06
+
+class Instrument
+{
+public:
+    Instrument() = default;
+    ~Instrument() = default;
+
+    int getPitch();
+ succeeded in 52ms:
+#ifndef SEQUENCER_H
+#define SEQUENCER_H
+
+#include <cstdint>
+#include <array>
+#include <vector>
+#include "instrument.h"
+
+namespace drum808 {
+
+#define SUBDIVISION 16
+
+using std::array;
+using std::vector;
+
+const int SAMPLE_RATE = 44100;
+
+class Sequencer
+{
+public:
+ succeeded in 51ms:
+#include <cmath>
+#include <iostream>
+#include "kick.h"
+
+namespace drum808 {
+
+Kick::Kick() : Instrument()
+{
+    m_name = m_defaultName;
+    m_pitch = m_defaultPitch;
+}
+
+void Kick::setDefaults()
+{
+    AmpEnv::AmpEnvSettings envSettings = {
+        .peakAmp = 0.8,
+        .decay = 0.25,
+    };
+    AmpEnv *ampEnv = new AmpEnv(envSettings);
+    setAmpEnv(ampEnv);
+
+thinking
+**Planning comprehensive multi-file patch**
+codex
+I’m about to replace the copied `sequencer` with the requested slot/grid version and patch the synth files for C++14 (`<optional>` removal, designated initializer fixes, safer getters). I’ll also add `drum_engine.h/cpp` and keep everything scoped to `app/drum808/`.
+
+thinking
+**Switching to selective overwrite and patching**
+codex
+The previous patch failed because `sequencer.cpp` had already been mechanically wrapped, so the exact match didn’t line up. I’m switching to a safer approach: overwrite `sequencer.*` and `drum_engine.*` directly, then patch the remaining copied files in smaller, targeted edits.
+exec
+/bin/zsh -lc "sed -n '1,220p' app/drum808/sequencer.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "rg -n -C2 'AmpEnv::AmpEnvSettings envSettings =|PitchEnv::EnvSettings pitchEnvSettings =|\\.peakAmp|\\.decay|\\.attack' app/drum808/{kick.cpp,snare.cpp,clap.cpp,closed_hat.cpp}" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "rg -n -C2 '"'^class Instrument|~Instrument|<optional>|std::string getName|int getPitch'"\\(|bool isPlaying\\(' app/drum808/instrument.h app/drum808/instrument.cpp" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+#include <iostream>
+#include "clap.h"
+#include "closed_hat.h"
+#include "envelope.h"
+#include "filter.h"
+#include "kick.h"
+#include "pitch_env.h"
+#include "sequencer.h"
+#include "snare.h"
+
+namespace drum808 {
+
+#define MS_PER_MINUTE 60000.0
+
+using std::cout;
+using std::endl;
+
+/**
+ *  0 1
+ *  1 e
+ succeeded in 51ms:
+app/drum808/closed_hat.cpp-22-void ClosedHat::setDefaults()
+app/drum808/closed_hat.cpp-23-{
+app/drum808/closed_hat.cpp:24:    AmpEnv::AmpEnvSettings envSettings = {
+app/drum808/closed_hat.cpp:25:        .peakAmp = 0.8,
+app/drum808/closed_hat.cpp:26:        .decay = 0.2
+app/drum808/closed_hat.cpp-27-    };
+app/drum808/closed_hat.cpp-28-    AmpEnv *ampEnv = new AmpEnv(envSettings);
+--
+app/drum808/snare.cpp-16-{
+app/drum808/snare.cpp-17-    AmpEnv::AmpEnvSettings toneAmpEnvSettings = {
+app/drum808/snare.cpp:18:        .peakAmp = 0.1,
+app/drum808/snare.cpp:19:        .attack = 0.01,
+app/drum808/snare.cpp:20:        .decay = 0.25,
+app/drum808/snare.cpp-21-    };
+app/drum808/snare.cpp-22-    AmpEnv *toneEnv = new AmpEnv(toneAmpEnvSettings);
+app/drum808/snare.cpp-23-    setAmpEnv(toneEnv);
+app/drum808/snare.cpp-24-
+app/drum808/snare.cpp:25:    PitchEnv::EnvSettings pitchEnvSettings = {
+app/drum808/snare.cpp-26-        .startPitch = (double)getPitch(),
+app/drum808/snare.cpp-27-        .peakPitch = getPitch() + SEMITONE_HZ * 24.0,
+ succeeded in 51ms:
+app/drum808/instrument.h-3-
+app/drum808/instrument.h-4-#include <cmath>
+app/drum808/instrument.h:5:#include <optional>
+app/drum808/instrument.h-6-#include <string>
+app/drum808/instrument.h-7-#include "amp_env.h"
+--
+app/drum808/instrument.h-12-#define SEMITONE_HZ 1.06
+app/drum808/instrument.h-13-
+app/drum808/instrument.h:14:class Instrument
+app/drum808/instrument.h-15-{
+app/drum808/instrument.h-16-public:
+app/drum808/instrument.h-17-    Instrument() = default;
+app/drum808/instrument.h:18:    ~Instrument() = default;
+app/drum808/instrument.h-19-
+app/drum808/instrument.h:20:    int getPitch();
+app/drum808/instrument.h-21-    void setPitch(int pitch);
+app/drum808/instrument.h-22-
+--
+app/drum808/instrument.h-32-    void release();
+app/drum808/instrument.h-33-    bool isTriggered();
+
+thinking
+**Planning file rewrites and patches**
+codex
+I’m replacing `sequencer.h/cpp` outright now to avoid incremental patch churn. Then I’ll patch the remaining synth files for C++14 and safety, and run the syntax check.
+exec
+/bin/zsh -lc "cat > app/drum808/sequencer.h <<'EOF'
+#ifndef SEQUENCER_H
+#define SEQUENCER_H
+
+#include <array>
+#include <memory>
+#include <vector>
+#include \"instrument.h\"
+
+namespace drum808 {
+
+#define SUBDIVISION 16
+
+const int SAMPLE_RATE = 44100;
+
+class Sequencer
+{
+public:
+    Sequencer() = default;
+    ~Sequencer() = default;
+
+    void init();
+
+    void setTempo(double tempo);
+    double getTempo() const;
+
+    void toggleNote(int instrumentIndex, int step);
+    int getPosition() const;
+    int getInstrumentCount() const;
+    const char* getInstrumentName(int index) const;
+    bool getNoteState(int instrumentIndex, int step) const;
+
+    void start();
+    void stop();
+    void updateBy(double time);
+
+    const std::vector<Instrument *> &getActiveSamples() const;
+
+    bool isPlaying() const;
+
+private:
+    void triggerCurrentStep();
+    bool isValidInstrumentIndex(int index) const;
+    bool isValidStep(int step) const;
+
+    std::array<std::array<bool, SUBDIVISION>, 4> m_pattern{};
+    std::vector<std::unique_ptr<Instrument>> m_instruments;
+    std::vector<Instrument *> m_activeSamples;
+
+    bool m_playing {false};
+
+    double m_tempo {};
+    double m_tempoStep {};
+    double m_elapsed {};
+
+    int m_pos {};
+};
+
+} // namespace drum808
+#endif
+EOF
+
+cat > app/drum808/sequencer.cpp <<'EOF'
+#include \"clap.h\"
+#include \"closed_hat.h\"
+#include \"kick.h\"
+#include \"sequencer.h\"
+#include \"snare.h\"
+
+namespace drum808 {
+
+#define MS_PER_MINUTE 60000.0
+
+void Sequencer::init()
+{
+    stop();
+    for (auto &row : m_pattern) {
+        row.fill(false);
+    }
+
+    m_instruments.clear();
+    m_instruments.reserve(4);
+
+    std::unique_ptr<Kick> kick(new Kick());
+    kick->setDefaults();
+    m_instruments.push_back(std::move(kick));
+
+    std::unique_ptr<Snare> snare(new Snare());
+    snare->setDefaults();
+    m_instruments.push_back(std::move(snare));
+
+    std::unique_ptr<Clap> clap(new Clap());
+    clap->setDefaults();
+    m_instruments.push_back(std::move(clap));
+
+    std::unique_ptr<ClosedHat> closedHat(new ClosedHat());
+    closedHat->setDefaults();
+    m_instruments.push_back(std::move(closedHat));
+}
+
+void Sequencer::setTempo(double tempo)
+{
+    m_tempo = tempo;
+    if (tempo <= 0.0) {
+        m_tempoStep = 0.0;
+        return;
+    }
+    m_tempoStep = MS_PER_MINUTE / (tempo * 4.0) / 1000.0;
+}
+
+double Sequencer::getTempo() const
+{
+    return m_tempo;
+}
+
+void Sequencer::toggleNote(int instrumentIndex, int step)
+{
+    if ("'!isValidInstrumentIndex(instrumentIndex) || !isValidStep(step)) {
+        return;
+    }
+    std::size_t i = static_cast<std::size_t>(instrumentIndex);
+    std::size_t s = static_cast<std::size_t>(step);
+    m_pattern[i][s] = !m_pattern[i][s];
+}
+
+int Sequencer::getPosition() const
+{
+    return m_pos;
+}
+
+int Sequencer::getInstrumentCount() const
+{
+    return static_cast<int>(m_instruments.size());
+}
+
+const char *Sequencer::getInstrumentName(int index) const
+{
+    if (!isValidInstrumentIndex(index)) return "";
+    return m_instruments[static_cast<std::size_t>(index)]->getName().c_str();
+}
+
+bool Sequencer::getNoteState(int instrumentIndex, int step) const
+{
+    if (!isValidInstrumentIndex(instrumentIndex) || !isValidStep(step)) return false;
+    return m_pattern[static_cast<std::size_t>(instrumentIndex)][static_cast<std::size_t>(step)];
+}
+
+void Sequencer::start()
+{
+    if (m_tempoStep <= 0.0) return;
+    m_playing = true;
+    m_elapsed = 0.0;
+    m_pos = 0;
+    m_activeSamples.clear();
+    triggerCurrentStep();
+}
+
+void Sequencer::stop()
+{
+    m_playing = false;
+    m_elapsed = 0.0;
+    m_pos = 0;
+    m_activeSamples.clear();
+}
+
+void Sequencer::updateBy(double time)
+{
+    if (!m_playing) return;
+
+    for (auto it = m_activeSamples.begin(); it != m_activeSamples.end();) {
+        Instrument *inst = *it;
+        inst->updateBy(time);
+        if (!inst->isPlaying()) {
+            inst->release();
+            it = m_activeSamples.erase(it);
+        } else {
+            ++it;
+        }
+    }
+
+    if (m_tempoStep <= 0.0) return;
+
+    m_elapsed += time;
+    while (m_elapsed > m_tempoStep) {
+        m_elapsed -= m_tempoStep;
+        ++m_pos;
+        if (m_pos >= SUBDIVISION) m_pos = 0;
+        triggerCurrentStep();
+    }
+}
+
+const std::vector<Instrument *> &Sequencer::getActiveSamples() const
+{
+    return m_activeSamples;
+}
+
+bool Sequencer::isPlaying() const
+{
+    return m_playing;
+}
+
+void Sequencer::triggerCurrentStep()
+{
+    for (std::size_t instrumentIndex = 0; instrumentIndex < m_instruments.size(); ++instrumentIndex) {
+        if (!m_pattern[instrumentIndex][static_cast<std::size_t>(m_pos)]) {
+            continue;
+        }
+
+        Instrument *inst = m_instruments[instrumentIndex].get();
+        if (inst == nullptr) continue;
+
+        inst->trigger();
+
+        bool found = false;
+        for (Instrument *active : m_activeSamples) {
+            if (active == inst) {
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            m_activeSamples.push_back(inst);
+        }
+    }
+}
+
+bool Sequencer::isValidInstrumentIndex(int index) const
+{
+    return index >= 0 && index < static_cast<int>(m_instruments.size());
+}
+
+bool Sequencer::isValidStep(int step) const
+{
+    return step >= 0 && step < SUBDIVISION;
+}
+
+} // namespace drum808
+EOF
+
+cat > app/drum808/drum_engine.h <<'"'EOF'
+#ifndef DRUM_ENGINE_H
+#define DRUM_ENGINE_H
+
+#include <cstdint>
+#include \"sequencer.h\"
+
+namespace drum808 {
+
+class DrumEngine
+{
+public:
+    DrumEngine();
+    ~DrumEngine() = default;
+
+    void fillBuffer(int16_t* output, int numSamples);
+
+    void start();
+    void stop();
+    bool isPlaying() const;
+
+    void setTempo(double bpm);
+    double getTempo() const;
+
+    void toggleNote(int instrument, int step);
+    int getPosition() const;
+    int getInstrumentCount() const;
+    const char* getInstrumentName(int index) const;
+    bool getNoteState(int instrumentIndex, int step) const;
+
+private:
+    Sequencer m_sequencer;
+};
+
+} // namespace drum808
+
+#endif
+EOF
+
+cat > app/drum808/drum_engine.cpp <<'EOF'
+#include <cstdint>
+#include <limits>
+#include \"drum_engine.h\"
+
+namespace drum808 {
+
+namespace {
+double clampSample(double value)
+{
+    if (value > 1.0) return 1.0;
+    if (value < -1.0) return -1.0;
+    return value;
+}
+} // namespace
+
+DrumEngine::DrumEngine()
+{
+    m_sequencer.init();
+    m_sequencer.setTempo(120.0);
+}
+
+void DrumEngine::fillBuffer(int16_t* output, int numSamples)
+{
+    if (output == nullptr || numSamples <= 0) return;
+
+    const double dt = 1.0 / static_cast<double>(SAMPLE_RATE);
+    for (int i = 0; i < numSamples; ++i) {
+        double mix = 0.0;
+        if (m_sequencer.isPlaying()) {
+            m_sequencer.updateBy(dt);
+            for (Instrument* inst : m_sequencer.getActiveSamples()) {
+                if (inst "'!= nullptr) {
+                    mix += inst->getSample();
+                }
+            }
+        }
+
+        output[i] = static_cast<int16_t>(
+            clampSample(mix) * static_cast<double>(std::numeric_limits<int16_t>::max()));
+    }
+}
+
+void DrumEngine::start()
+{
+    m_sequencer.start();
+}
+
+void DrumEngine::stop()
+{
+    m_sequencer.stop();
+}
+
+bool DrumEngine::isPlaying() const
+{
+    return m_sequencer.isPlaying();
+}
+
+void DrumEngine::setTempo(double bpm)
+{
+    m_sequencer.setTempo(bpm);
+}
+
+double DrumEngine::getTempo() const
+{
+    return m_sequencer.getTempo();
+}
+
+void DrumEngine::toggleNote(int instrument, int step)
+{
+    m_sequencer.toggleNote(instrument, step);
+}
+
+int DrumEngine::getPosition() const
+{
+    return m_sequencer.getPosition();
+}
+
+int DrumEngine::getInstrumentCount() const
+{
+    return m_sequencer.getInstrumentCount();
+}
+
+const char* DrumEngine::getInstrumentName(int index) const
+{
+    return m_sequencer.getInstrumentName(index);
+}
+
+bool DrumEngine::getNoteState(int instrumentIndex, int step) const
+{
+    return m_sequencer.getNoteState(instrumentIndex, step);
+}
+
+} // namespace drum808
+EOF' in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+
+
+thinking
+**Prioritizing batch patching excluding sequencer**
+codex
+The new `sequencer` and `drum_engine` files are in place. I’m patching the copied instrument/envelope/filter files now for C++14 compatibility and stable runtime behavior (no SDL, no `<optional>`, no designated initializers, safe defaults).
+file update
+M /Users/james/Repos/wibandwob-dos/app/drum808/instrument.h
+@@ -4,3 +4,2 @@
+ #include <cmath>
+-#include <optional>
+ #include <string>
+@@ -17,5 +16,5 @@
+     Instrument() = default;
+-    ~Instrument() = default;
++    virtual ~Instrument();
+ 
+-    int getPitch();
++    int getPitch() const;
+     void setPitch(int pitch);
+@@ -32,4 +31,4 @@
+     void release();
+-    bool isTriggered();
+-    bool isPlaying();
++    bool isTriggered() const;
++    bool isPlaying() const;
+ 
+@@ -39,3 +38,3 @@
+ 
+-    std::string getName();
++    const std::string &getName() const;
+ 
+@@ -47,9 +46,9 @@
+ 
+-    double m_duration;
+-    double m_elapsed;
++    double m_duration = 0.0;
++    double m_elapsed = 0.0;
+ 
+-    int m_pitch;
++    int m_pitch = 0;
+ 
+-    bool m_triggered;
+-    bool m_playing;
++    bool m_triggered = false;
++    bool m_playing = false;
+ 
+M /Users/james/Repos/wibandwob-dos/app/drum808/envelope.h
+@@ -12,3 +12,3 @@
+     Envelope() = default;
+-    ~Envelope() = default;
++    virtual ~Envelope() = default;
+ 
+@@ -26,9 +26,9 @@
+ protected:
+-    double m_attack;
+-    double m_decay;
+-    double m_duration;
++    double m_attack = 0.0;
++    double m_decay = 0.0;
++    double m_duration = 0.0;
+ 
+-    double m_start;
+-    double m_peak;
+-    double m_release;
++    double m_start = 0.0;
++    double m_peak = 0.0;
++    double m_release = 0.0;
+ 
+M /Users/james/Repos/wibandwob-dos/app/drum808/closed_hat.h
+@@ -29,4 +29,4 @@
+ 
+-    Filter *m_bandPass;
+-    Filter *m_highPass;
++    Filter *m_bandPass = nullptr;
++    Filter *m_highPass = nullptr;
+ };
+M /Users/james/Repos/wibandwob-dos/app/drum808/snare.h
+@@ -31,4 +31,4 @@
+ 
+-    Filter *m_bandPass;
+-    Filter *m_highPass;
++    Filter *m_bandPass = nullptr;
++    Filter *m_highPass = nullptr;
+ 
+@@ -39,2 +39 @@
+ #endif
+-
+M /Users/james/Repos/wibandwob-dos/app/drum808/envelope.cpp
+@@ -39,2 +39,7 @@
+ 
++    if (m_attack <= 0.0) {
++        if (m_decay <= 0.0) return m_release;
++        return decayRamp(time);
++    }
++
+     if (time <= m_attack) {
+@@ -51,2 +56,3 @@
+ {
++    if (m_attack <= 0.0) return m_peak;
+     return (m_peak - m_start) / m_attack * time + m_start;
+@@ -56,2 +62,3 @@
+ {
++    if (m_decay <= 0.0) return m_release;
+     return (m_release - m_peak) / m_decay * (time - m_attack) + m_peak;
+M /Users/james/Repos/wibandwob-dos/app/drum808/instrument.cpp
+@@ -9,3 +9,9 @@
+ 
+-int Instrument::getPitch()
++Instrument::~Instrument()
++{
++    delete m_ampEnv;
++    delete m_pitchEnv;
++}
++
++int Instrument::getPitch() const
+ {
+@@ -47,3 +53,3 @@
+ 
+-bool Instrument::isTriggered()
++bool Instrument::isTriggered() const
+ {
+@@ -52,3 +58,3 @@
+ 
+-bool Instrument::isPlaying()
++bool Instrument::isPlaying() const
+ {
+@@ -85,3 +91,3 @@
+ 
+-std::string Instrument::getName()
++const std::string &Instrument::getName() const
+ {
+M /Users/james/Repos/wibandwob-dos/app/drum808/clap.h
+@@ -29,4 +29,4 @@
+ 
+-    Filter *m_highPass;
+-    Filter *m_bandPass;
++    Filter *m_highPass = nullptr;
++    Filter *m_bandPass = nullptr;
+ };
+M /Users/james/Repos/wibandwob-dos/app/drum808/filter.h
+@@ -25,4 +25,4 @@
+ 
+-    double a0, a1, a2, b1, b2;
+-    double z1, z2;
++    double a0 = 0.0, a1 = 0.0, a2 = 0.0, b1 = 0.0, b2 = 0.0;
++    double z1 = 0.0, z2 = 0.0;
+ 
+apply_patch(auto_approved=true) exited 0 in 238ms:
+Success. Updated the following files:
+M app/drum808/instrument.h
+M app/drum808/instrument.cpp
+M app/drum808/envelope.h
+M app/drum808/envelope.cpp
+M app/drum808/filter.h
+M app/drum808/snare.h
+M app/drum808/clap.h
+M app/drum808/closed_hat.h
+file update:
+diff --git a/app/drum808/clap.h b/app/drum808/clap.h
+index faad2b019afe6a2f98ef6444fcda2bdcbd33454e..31af137bf3b8b7c297c8a4d198e98cad9a25d1c2
+--- a/app/drum808/clap.h
++++ b/app/drum808/clap.h
+@@ -27,8 +27,8 @@
+     // 10 ms between claps
+     static constexpr double m_interval = 0.01;
+ 
+-    Filter *m_highPass;
+-    Filter *m_bandPass;
++    Filter *m_highPass = nullptr;
++    Filter *m_bandPass = nullptr;
+ };
+ 
+ 
+diff --git a/app/drum808/closed_hat.h b/app/drum808/closed_hat.h
+index 444472b295f00fc806a610a3a9334052232b0f62..164cbd02d747084a50c8f72281d17d804abcc755
+--- a/app/drum808/closed_hat.h
++++ b/app/drum808/closed_hat.h
+@@ -27,8 +27,8 @@
+ 
+     std::array<double, 6> m_harmonics;
+ 
+-    Filter *m_bandPass;
+-    Filter *m_highPass;
++    Filter *m_bandPass = nullptr;
++    Filter *m_highPass = nullptr;
+ };
+ 
+ 
+diff --git a/app/drum808/envelope.cpp b/app/drum808/envelope.cpp
+index 849e7fb3a4a16aca7350c302bbd9ff99fc5fe2ea..fac7705393fc872697c4e5442a547fd1878adf21
+--- a/app/drum808/envelope.cpp
++++ b/app/drum808/envelope.cpp
+@@ -37,6 +37,11 @@
+ {
+     if (time > m_duration) return m_release;
+ 
++    if (m_attack <= 0.0) {
++        if (m_decay <= 0.0) return m_release;
++        return decayRamp(time);
++    }
++
+     if (time <= m_attack) {
+         return attackRamp(time);
+     } else if (time <= (m_attack + m_decay)) {
+@@ -49,11 +54,13 @@
+ 
+ double Envelope::attackRamp(double time)
+ {
++    if (m_attack <= 0.0) return m_peak;
+     return (m_peak - m_start) / m_attack * time + m_start;
+ }
+ 
+ double Envelope::decayRamp(double time)
+ {
++    if (m_decay <= 0.0) return m_release;
+     return (m_release - m_peak) / m_decay * (time - m_attack) + m_peak;
+ }
+ 
+diff --git a/app/drum808/envelope.h b/app/drum808/envelope.h
+index 46da18ce3d119eaf713d3202bacb2ad9b0637a7e..48e79c8e4370abd3f1db4efe935168c8fb80abe5
+--- a/app/drum808/envelope.h
++++ b/app/drum808/envelope.h
+@@ -10,7 +10,7 @@
+ {
+ public:
+     Envelope() = default;
+-    ~Envelope() = default;
++    virtual ~Envelope() = default;
+ 
+     double getDuration();
+ 
+@@ -24,13 +24,13 @@
+     double getEnvValue(double time);
+ 
+ protected:
+-    double m_attack;
+-    double m_decay;
+-    double m_duration;
++    double m_attack = 0.0;
++    double m_decay = 0.0;
++    double m_duration = 0.0;
+ 
+-    double m_start;
+-    double m_peak;
+-    double m_release;
++    double m_start = 0.0;
++    double m_peak = 0.0;
++    double m_release = 0.0;
+ 
+ private:
+     double attackRamp(double time);
+diff --git a/app/drum808/filter.h b/app/drum808/filter.h
+index 39f2d673a2bc54bb97d9962113876846c5a42318..d948dcd18af12306900ede3e71b9b00216648803
+--- a/app/drum808/filter.h
++++ b/app/drum808/filter.h
+@@ -23,8 +23,8 @@
+     double m_freq;
+     double m_q;
+ 
+-    double a0, a1, a2, b1, b2;
+-    double z1, z2;
++    double a0 = 0.0, a1 = 0.0, a2 = 0.0, b1 = 0.0, b2 = 0.0;
++    double z1 = 0.0, z2 = 0.0;
+ 
+     void calcFilter();
+ };
+diff --git a/app/drum808/instrument.cpp b/app/drum808/instrument.cpp
+index 9a3390feca3887e82cae6c385e466cb18c870f7e..019705a3569e523c51eacd7eb87cefd16e97e4f4
+--- a/app/drum808/instrument.cpp
++++ b/app/drum808/instrument.cpp
+@@ -7,7 +7,13 @@
+ using std::cout;
+ using std::endl;
+ 
+-int Instrument::getPitch()
++Instrument::~Instrument()
++{
++    delete m_ampEnv;
++    delete m_pitchEnv;
++}
++
++int Instrument::getPitch() const
+ {
+     return m_pitch;
+ }
+@@ -45,12 +51,12 @@
+     m_triggered = false;
+ }
+ 
+-bool Instrument::isTriggered()
++bool Instrument::isTriggered() const
+ {
+     return m_triggered;
+ }
+ 
+-bool Instrument::isPlaying()
++bool Instrument::isPlaying() const
+ {
+     return m_playing;
+ }
+@@ -83,7 +89,7 @@
+     return value;
+ }
+ 
+-std::string Instrument::getName()
++const std::string &Instrument::getName() const
+ {
+     return m_name;
+ }
+diff --git a/app/drum808/instrument.h b/app/drum808/instrument.h
+index bc10977365c6e31a160e421e431f67aaa661a9f2..9e970887b18ec3038f44aeffe8648804f9afb7f3
+--- a/app/drum808/instrument.h
++++ b/app/drum808/instrument.h
+@@ -2,7 +2,6 @@
+ #define INSTRUMENT_H
+ 
+ #include <cmath>
+-#include <optional>
+ #include <string>
+ #include "amp_env.h"
+ #include "pitch_env.h"
+@@ -15,9 +14,9 @@
+ {
+ public:
+     Instrument() = default;
+-    ~Instrument() = default;
++    virtual ~Instrument();
+ 
+-    int getPitch();
++    int getPitch() const;
+     void setPitch(int pitch);
+ 
+     void setLevel(double level);
+@@ -30,14 +29,14 @@
+ 
+     void trigger();
+     void release();
+-    bool isTriggered();
+-    bool isPlaying();
++    bool isTriggered() const;
++    bool isPlaying() const;
+ 
+     void updateBy(double time);
+ 
+     virtual double getSample();
+ 
+-    std::string getName();
++    const std::string &getName() const;
+ 
+     static constexpr double TAU = M_PI * 2.0;
+ 
+@@ -45,13 +44,13 @@
+     AmpEnv *m_ampEnv = nullptr;
+     PitchEnv *m_pitchEnv = nullptr;
+ 
+-    double m_duration;
+-    double m_elapsed;
++    double m_duration = 0.0;
++    double m_elapsed = 0.0;
+ 
+-    int m_pitch;
++    int m_pitch = 0;
+ 
+-    bool m_triggered;
+-    bool m_playing;
++    bool m_triggered = false;
++    bool m_playing = false;
+ 
+     std::string m_name;
+ };
+diff --git a/app/drum808/snare.h b/app/drum808/snare.h
+index 3575e10fb587369b7d8ed93df0469cef31bb5b7a..7a3d39f79199e5451d38b5db384173cd76693d00
+--- a/app/drum808/snare.h
++++ b/app/drum808/snare.h
+@@ -29,12 +29,11 @@
+     const std::string m_defaultName = "Snare";
+     const int m_defaultPitch = 160;
+ 
+-    Filter *m_bandPass;
+-    Filter *m_highPass;
++    Filter *m_bandPass = nullptr;
++    Filter *m_highPass = nullptr;
+ 
+ };
+ 
+ 
+ } // namespace drum808
+ #endif
+-
+
+file update:
+diff --git a/app/drum808/clap.h b/app/drum808/clap.h
+index faad2b019afe6a2f98ef6444fcda2bdcbd33454e..31af137bf3b8b7c297c8a4d198e98cad9a25d1c2
+--- a/app/drum808/clap.h
++++ b/app/drum808/clap.h
+@@ -27,8 +27,8 @@
+     // 10 ms between claps
+     static constexpr double m_interval = 0.01;
+ 
+-    Filter *m_highPass;
+-    Filter *m_bandPass;
++    Filter *m_highPass = nullptr;
++    Filter *m_bandPass = nullptr;
+ };
+ 
+ 
+diff --git a/app/drum808/closed_hat.h b/app/drum808/closed_hat.h
+index 444472b295f00fc806a610a3a9334052232b0f62..164cbd02d747084a50c8f72281d17d804abcc755
+--- a/app/drum808/closed_hat.h
++++ b/app/drum808/closed_hat.h
+@@ -27,8 +27,8 @@
+ 
+     std::array<double, 6> m_harmonics;
+ 
+-    Filter *m_bandPass;
+-    Filter *m_highPass;
++    Filter *m_bandPass = nullptr;
++    Filter *m_highPass = nullptr;
+ };
+ 
+ 
+diff --git a/app/drum808/envelope.cpp b/app/drum808/envelope.cpp
+index 849e7fb3a4a16aca7350c302bbd9ff99fc5fe2ea..fac7705393fc872697c4e5442a547fd1878adf21
+--- a/app/drum808/envelope.cpp
++++ b/app/drum808/envelope.cpp
+@@ -37,6 +37,11 @@
+ {
+     if (time > m_duration) return m_release;
+ 
++    if (m_attack <= 0.0) {
++        if (m_decay <= 0.0) return m_release;
++        return decayRamp(time);
++    }
++
+     if (time <= m_attack) {
+         return attackRamp(time);
+     } else if (time <= (m_attack + m_decay)) {
+@@ -49,11 +54,13 @@
+ 
+ double Envelope::attackRamp(double time)
+ {
++    if (m_attack <= 0.0) return m_peak;
+     return (m_peak - m_start) / m_attack * time + m_start;
+ }
+ 
+ double Envelope::decayRamp(double time)
+ {
++    if (m_decay <= 0.0) return m_release;
+     return (m_release - m_peak) / m_decay * (time - m_attack) + m_peak;
+ }
+ 
+diff --git a/app/drum808/envelope.h b/app/drum808/envelope.h
+index 46da18ce3d119eaf713d3202bacb2ad9b0637a7e..48e79c8e4370abd3f1db4efe935168c8fb80abe5
+--- a/app/drum808/envelope.h
++++ b/app/drum808/envelope.h
+@@ -10,7 +10,7 @@
+ {
+ public:
+     Envelope() = default;
+-    ~Envelope() = default;
++    virtual ~Envelope() = default;
+ 
+     double getDuration();
+ 
+@@ -24,13 +24,13 @@
+     double getEnvValue(double time);
+ 
+ protected:
+-    double m_attack;
+-    double m_decay;
+-    double m_duration;
++    double m_attack = 0.0;
++    double m_decay = 0.0;
++    double m_duration = 0.0;
+ 
+-    double m_start;
+-    double m_peak;
+-    double m_release;
++    double m_start = 0.0;
++    double m_peak = 0.0;
++    double m_release = 0.0;
+ 
+ private:
+     double attackRamp(double time);
+diff --git a/app/drum808/filter.h b/app/drum808/filter.h
+index 39f2d673a2bc54bb97d9962113876846c5a42318..d948dcd18af12306900ede3e71b9b00216648803
+--- a/app/drum808/filter.h
++++ b/app/drum808/filter.h
+@@ -23,8 +23,8 @@
+     double m_freq;
+     double m_q;
+ 
+-    double a0, a1, a2, b1, b2;
+-    double z1, z2;
++    double a0 = 0.0, a1 = 0.0, a2 = 0.0, b1 = 0.0, b2 = 0.0;
++    double z1 = 0.0, z2 = 0.0;
+ 
+     void calcFilter();
+ };
+diff --git a/app/drum808/instrument.cpp b/app/drum808/instrument.cpp
+index 9a3390feca3887e82cae6c385e466cb18c870f7e..019705a3569e523c51eacd7eb87cefd16e97e4f4
+--- a/app/drum808/instrument.cpp
++++ b/app/drum808/instrument.cpp
+@@ -7,7 +7,13 @@
+ using std::cout;
+ using std::endl;
+ 
+-int Instrument::getPitch()
++Instrument::~Instrument()
++{
++    delete m_ampEnv;
++    delete m_pitchEnv;
++}
++
++int Instrument::getPitch() const
+ {
+     return m_pitch;
+ }
+@@ -45,12 +51,12 @@
+     m_triggered = false;
+ }
+ 
+-bool Instrument::isTriggered()
++bool Instrument::isTriggered() const
+ {
+     return m_triggered;
+ }
+ 
+-bool Instrument::isPlaying()
++bool Instrument::isPlaying() const
+ {
+     return m_playing;
+ }
+@@ -83,7 +89,7 @@
+     return value;
+ }
+ 
+-std::string Instrument::getName()
++const std::string &Instrument::getName() const
+ {
+     return m_name;
+ }
+diff --git a/app/drum808/instrument.h b/app/drum808/instrument.h
+index bc10977365c6e31a160e421e431f67aaa661a9f2..9e970887b18ec3038f44aeffe8648804f9afb7f3
+--- a/app/drum808/instrument.h
++++ b/app/drum808/instrument.h
+@@ -2,7 +2,6 @@
+ #define INSTRUMENT_H
+ 
+ #include <cmath>
+-#include <optional>
+ #include <string>
+ #include "amp_env.h"
+ #include "pitch_env.h"
+@@ -15,9 +14,9 @@
+ {
+ public:
+     Instrument() = default;
+-    ~Instrument() = default;
++    virtual ~Instrument();
+ 
+-    int getPitch();
++    int getPitch() const;
+     void setPitch(int pitch);
+ 
+     void setLevel(double level);
+@@ -30,14 +29,14 @@
+ 
+     void trigger();
+     void release();
+-    bool isTriggered();
+-    bool isPlaying();
++    bool isTriggered() const;
++    bool isPlaying() const;
+ 
+     void updateBy(double time);
+ 
+     virtual double getSample();
+ 
+-    std::string getName();
++    const std::string &getName() const;
+ 
+     static constexpr double TAU = M_PI * 2.0;
+ 
+@@ -45,13 +44,13 @@
+     AmpEnv *m_ampEnv = nullptr;
+     PitchEnv *m_pitchEnv = nullptr;
+ 
+-    double m_duration;
+-    double m_elapsed;
++    double m_duration = 0.0;
++    double m_elapsed = 0.0;
+ 
+-    int m_pitch;
++    int m_pitch = 0;
+ 
+-    bool m_triggered;
+-    bool m_playing;
++    bool m_triggered = false;
++    bool m_playing = false;
+ 
+     std::string m_name;
+ };
+diff --git a/app/drum808/snare.h b/app/drum808/snare.h
+index 3575e10fb587369b7d8ed93df0469cef31bb5b7a..7a3d39f79199e5451d38b5db384173cd76693d00
+--- a/app/drum808/snare.h
++++ b/app/drum808/snare.h
+@@ -29,12 +29,11 @@
+     const std::string m_defaultName = "Snare";
+     const int m_defaultPitch = 160;
+ 
+-    Filter *m_bandPass;
+-    Filter *m_highPass;
++    Filter *m_bandPass = nullptr;
++    Filter *m_highPass = nullptr;
+ 
+ };
+ 
+ 
+ } // namespace drum808
+ #endif
+-
+
+
+thinking
+**Patch init and includes with guards**
+file update
+M /Users/james/Repos/wibandwob-dos/app/drum808/clap.cpp
+@@ -1,3 +1,5 @@
++#include <cmath>
++#include <cstdlib>
++#include <ctime>
+ #include <iostream>
+-#include <cmath>
+ #include "clap.h"
+@@ -16,6 +18,8 @@
+ {
+-    AmpEnv::AmpEnvSettings envSettings = {
+-        .peakAmp = 0.8,
+-        .decay = 0.3
+-    };
++    AmpEnv::AmpEnvSettings envSettings{};
++    envSettings.startAmp = 0.0;
++    envSettings.peakAmp = 0.8;
++    envSettings.releaseAmp = 0.0;
++    envSettings.attack = 0.0;
++    envSettings.decay = 0.3;
+     AmpEnv *ampEnv = new AmpEnv(envSettings);
+@@ -60,2 +64,3 @@
+ 
++    if (m_bandPass == nullptr || m_highPass == nullptr) return sample;
+     return m_highPass->filter(m_bandPass->filter(sample));
+M /Users/james/Repos/wibandwob-dos/app/drum808/kick.cpp
+@@ -14,6 +14,8 @@
+ {
+-    AmpEnv::AmpEnvSettings envSettings = {
+-        .peakAmp = 0.8,
+-        .decay = 0.25,
+-    };
++    AmpEnv::AmpEnvSettings envSettings{};
++    envSettings.startAmp = 0.0;
++    envSettings.peakAmp = 0.8;
++    envSettings.releaseAmp = 0.0;
++    envSettings.attack = 0.0;
++    envSettings.decay = 0.25;
+     AmpEnv *ampEnv = new AmpEnv(envSettings);
+@@ -21,8 +23,8 @@
+ 
+-    PitchEnv::EnvSettings pitchEnvSettings = {
+-        .startPitch = (double)getPitch(),
+-        .peakPitch = getPitch() + SEMITONE_HZ * 48.0,
+-        .releasePitch = (double)getPitch(),
+-        .decay = 0.02,
+-    };
++    PitchEnv::EnvSettings pitchEnvSettings{};
++    pitchEnvSettings.startPitch = (double)getPitch();
++    pitchEnvSettings.peakPitch = getPitch() + SEMITONE_HZ * 48.0;
++    pitchEnvSettings.releasePitch = (double)getPitch();
++    pitchEnvSettings.attack = 0.0;
++    pitchEnvSettings.decay = 0.02;
+     PitchEnv *pitchEnv = new PitchEnv(pitchEnvSettings);
+M /Users/james/Repos/wibandwob-dos/app/drum808/closed_hat.cpp
+@@ -23,6 +23,8 @@
+ {
+-    AmpEnv::AmpEnvSettings envSettings = {
+-        .peakAmp = 0.8,
+-        .decay = 0.2
+-    };
++    AmpEnv::AmpEnvSettings envSettings{};
++    envSettings.startAmp = 0.0;
++    envSettings.peakAmp = 0.8;
++    envSettings.releaseAmp = 0.0;
++    envSettings.attack = 0.0;
++    envSettings.decay = 0.2;
+     AmpEnv *ampEnv = new AmpEnv(envSettings);
+@@ -56,2 +58,5 @@
+     amp /= m_harmonics.size();
++    if (m_bandPass == nullptr || m_highPass == nullptr || m_ampEnv == nullptr) {
++        return amp;
++    }
+     double firstStep = m_bandPass->filter(amp);
+M /Users/james/Repos/wibandwob-dos/app/drum808/snare.cpp
+@@ -2,2 +2,3 @@
+ #include <cmath>
++#include <cstdlib>
+ #include <ctime>
+@@ -16,7 +17,8 @@
+ {
+-    AmpEnv::AmpEnvSettings toneAmpEnvSettings = {
+-        .peakAmp = 0.1,
+-        .attack = 0.01,
+-        .decay = 0.25,
+-    };
++    AmpEnv::AmpEnvSettings toneAmpEnvSettings{};
++    toneAmpEnvSettings.startAmp = 0.0;
++    toneAmpEnvSettings.peakAmp = 0.1;
++    toneAmpEnvSettings.releaseAmp = 0.0;
++    toneAmpEnvSettings.attack = 0.01;
++    toneAmpEnvSettings.decay = 0.25;
+     AmpEnv *toneEnv = new AmpEnv(toneAmpEnvSettings);
+@@ -24,8 +26,8 @@
+ 
+-    PitchEnv::EnvSettings pitchEnvSettings = {
+-        .startPitch = (double)getPitch(),
+-        .peakPitch = getPitch() + SEMITONE_HZ * 24.0,
+-        .releasePitch = (double)getPitch(),
+-        .decay = 0.04,
+-    };
++    PitchEnv::EnvSettings pitchEnvSettings{};
++    pitchEnvSettings.startPitch = (double)getPitch();
++    pitchEnvSettings.peakPitch = getPitch() + SEMITONE_HZ * 24.0;
++    pitchEnvSettings.releasePitch = (double)getPitch();
++    pitchEnvSettings.attack = 0.0;
++    pitchEnvSettings.decay = 0.04;
+     PitchEnv *pitchEnv = new PitchEnv(pitchEnvSettings);
+@@ -33,6 +35,8 @@
+ 
+-    AmpEnv::AmpEnvSettings noiseAmpEnvSettings = {
+-        .peakAmp = 0.6,
+-        .decay = 0.25,
+-    };
++    AmpEnv::AmpEnvSettings noiseAmpEnvSettings{};
++    noiseAmpEnvSettings.startAmp = 0.0;
++    noiseAmpEnvSettings.peakAmp = 0.6;
++    noiseAmpEnvSettings.releaseAmp = 0.0;
++    noiseAmpEnvSettings.attack = 0.0;
++    noiseAmpEnvSettings.decay = 0.25;
+     AmpEnv *noiseEnv = new AmpEnv(noiseAmpEnvSettings);
+@@ -81,2 +85,5 @@
+ 
++    if (m_bandPass == nullptr || m_noiseEnv == nullptr) {
++        return tone * toneAmp;
++    }
+     double noise = m_bandPass->filter((double)rand() / RAND_MAX);
+apply_patch(auto_approved=true) exited 0 in 364ms:
+Success. Updated the following files:
+M app/drum808/kick.cpp
+M app/drum808/snare.cpp
+M app/drum808/clap.cpp
+M app/drum808/closed_hat.cpp
+file update:
+diff --git a/app/drum808/clap.cpp b/app/drum808/clap.cpp
+index 6e612e9eedc14a0e18413e406c162cfe6a48c606..1c3f169f00779631d448cba432dca61e32ebf46e
+--- a/app/drum808/clap.cpp
++++ b/app/drum808/clap.cpp
+@@ -1,5 +1,7 @@
++#include <cmath>
++#include <cstdlib>
++#include <ctime>
+ #include <iostream>
+-#include <cmath>
+ #include "clap.h"
+ 
+ namespace drum808 {
+@@ -14,10 +16,12 @@
+ 
+ void Clap::setDefaults()
+ {
+-    AmpEnv::AmpEnvSettings envSettings = {
+-        .peakAmp = 0.8,
+-        .decay = 0.3
+-    };
++    AmpEnv::AmpEnvSettings envSettings{};
++    envSettings.startAmp = 0.0;
++    envSettings.peakAmp = 0.8;
++    envSettings.releaseAmp = 0.0;
++    envSettings.attack = 0.0;
++    envSettings.decay = 0.3;
+     AmpEnv *ampEnv = new AmpEnv(envSettings);
+     setAmpEnv(ampEnv);
+ 
+@@ -58,6 +62,7 @@
+         sample = noise * decay;
+     }
+ 
++    if (m_bandPass == nullptr || m_highPass == nullptr) return sample;
+     return m_highPass->filter(m_bandPass->filter(sample));
+ }
+ 
+diff --git a/app/drum808/clap.h b/app/drum808/clap.h
+index faad2b019afe6a2f98ef6444fcda2bdcbd33454e..31af137bf3b8b7c297c8a4d198e98cad9a25d1c2
+--- a/app/drum808/clap.h
++++ b/app/drum808/clap.h
+@@ -27,8 +27,8 @@
+     // 10 ms between claps
+     static constexpr double m_interval = 0.01;
+ 
+-    Filter *m_highPass;
+-    Filter *m_bandPass;
++    Filter *m_highPass = nullptr;
++    Filter *m_bandPass = nullptr;
+ };
+ 
+ 
+diff --git a/app/drum808/closed_hat.cpp b/app/drum808/closed_hat.cpp
+index f0796853e6813cc7163a1053de0228aca5b02aa3..87cbc065b72ed3629d9e466836634a7652de2fab
+--- a/app/drum808/closed_hat.cpp
++++ b/app/drum808/closed_hat.cpp
+@@ -21,10 +21,12 @@
+ 
+ void ClosedHat::setDefaults()
+ {
+-    AmpEnv::AmpEnvSettings envSettings = {
+-        .peakAmp = 0.8,
+-        .decay = 0.2
+-    };
++    AmpEnv::AmpEnvSettings envSettings{};
++    envSettings.startAmp = 0.0;
++    envSettings.peakAmp = 0.8;
++    envSettings.releaseAmp = 0.0;
++    envSettings.attack = 0.0;
++    envSettings.decay = 0.2;
+     AmpEnv *ampEnv = new AmpEnv(envSettings);
+     setAmpEnv(ampEnv);
+ 
+@@ -54,6 +56,9 @@
+         amp += value;
+     }
+     amp /= m_harmonics.size();
++    if (m_bandPass == nullptr || m_highPass == nullptr || m_ampEnv == nullptr) {
++        return amp;
++    }
+     double firstStep = m_bandPass->filter(amp);
+     double secondStep = m_highPass->filter(firstStep);
+     return secondStep * m_ampEnv->getEnvValue(m_elapsed);
+diff --git a/app/drum808/closed_hat.h b/app/drum808/closed_hat.h
+index 444472b295f00fc806a610a3a9334052232b0f62..164cbd02d747084a50c8f72281d17d804abcc755
+--- a/app/drum808/closed_hat.h
++++ b/app/drum808/closed_hat.h
+@@ -27,8 +27,8 @@
+ 
+     std::array<double, 6> m_harmonics;
+ 
+-    Filter *m_bandPass;
+-    Filter *m_highPass;
++    Filter *m_bandPass = nullptr;
++    Filter *m_highPass = nullptr;
+ };
+ 
+ 
+diff --git a/app/drum808/envelope.cpp b/app/drum808/envelope.cpp
+index 849e7fb3a4a16aca7350c302bbd9ff99fc5fe2ea..fac7705393fc872697c4e5442a547fd1878adf21
+--- a/app/drum808/envelope.cpp
++++ b/app/drum808/envelope.cpp
+@@ -37,6 +37,11 @@
+ {
+     if (time > m_duration) return m_release;
+ 
++    if (m_attack <= 0.0) {
++        if (m_decay <= 0.0) return m_release;
++        return decayRamp(time);
++    }
++
+     if (time <= m_attack) {
+         return attackRamp(time);
+     } else if (time <= (m_attack + m_decay)) {
+@@ -49,11 +54,13 @@
+ 
+ double Envelope::attackRamp(double time)
+ {
++    if (m_attack <= 0.0) return m_peak;
+     return (m_peak - m_start) / m_attack * time + m_start;
+ }
+ 
+ double Envelope::decayRamp(double time)
+ {
++    if (m_decay <= 0.0) return m_release;
+     return (m_release - m_peak) / m_decay * (time - m_attack) + m_peak;
+ }
+ 
+diff --git a/app/drum808/envelope.h b/app/drum808/envelope.h
+index 46da18ce3d119eaf713d3202bacb2ad9b0637a7e..48e79c8e4370abd3f1db4efe935168c8fb80abe5
+--- a/app/drum808/envelope.h
++++ b/app/drum808/envelope.h
+@@ -10,7 +10,7 @@
+ {
+ public:
+     Envelope() = default;
+-    ~Envelope() = default;
++    virtual ~Envelope() = default;
+ 
+     double getDuration();
+ 
+@@ -24,13 +24,13 @@
+     double getEnvValue(double time);
+ 
+ protected:
+-    double m_attack;
+-    double m_decay;
+-    double m_duration;
++    double m_attack = 0.0;
++    double m_decay = 0.0;
++    double m_duration = 0.0;
+ 
+-    double m_start;
+-    double m_peak;
+-    double m_release;
++    double m_start = 0.0;
++    double m_peak = 0.0;
++    double m_release = 0.0;
+ 
+ private:
+     double attackRamp(double time);
+diff --git a/app/drum808/filter.h b/app/drum808/filter.h
+index 39f2d673a2bc54bb97d9962113876846c5a42318..d948dcd18af12306900ede3e71b9b00216648803
+--- a/app/drum808/filter.h
++++ b/app/drum808/filter.h
+@@ -23,8 +23,8 @@
+     double m_freq;
+     double m_q;
+ 
+-    double a0, a1, a2, b1, b2;
+-    double z1, z2;
++    double a0 = 0.0, a1 = 0.0, a2 = 0.0, b1 = 0.0, b2 = 0.0;
++    double z1 = 0.0, z2 = 0.0;
+ 
+     void calcFilter();
+ };
+diff --git a/app/drum808/instrument.cpp b/app/drum808/instrument.cpp
+index 9a3390feca3887e82cae6c385e466cb18c870f7e..019705a3569e523c51eacd7eb87cefd16e97e4f4
+--- a/app/drum808/instrument.cpp
++++ b/app/drum808/instrument.cpp
+@@ -7,7 +7,13 @@
+ using std::cout;
+ using std::endl;
+ 
+-int Instrument::getPitch()
++Instrument::~Instrument()
++{
++    delete m_ampEnv;
++    delete m_pitchEnv;
++}
++
++int Instrument::getPitch() const
+ {
+     return m_pitch;
+ }
+@@ -45,12 +51,12 @@
+     m_triggered = false;
+ }
+ 
+-bool Instrument::isTriggered()
++bool Instrument::isTriggered() const
+ {
+     return m_triggered;
+ }
+ 
+-bool Instrument::isPlaying()
++bool Instrument::isPlaying() const
+ {
+     return m_playing;
+ }
+@@ -83,7 +89,7 @@
+     return value;
+ }
+ 
+-std::string Instrument::getName()
++const std::string &Instrument::getName() const
+ {
+     return m_name;
+ }
+diff --git a/app/drum808/instrument.h b/app/drum808/instrument.h
+index bc10977365c6e31a160e421e431f67aaa661a9f2..9e970887b18ec3038f44aeffe8648804f9afb7f3
+--- a/app/drum808/instrument.h
++++ b/app/drum808/instrument.h
+@@ -2,7 +2,6 @@
+ #define INSTRUMENT_H
+ 
+ #include <cmath>
+-#include <optional>
+ #include <string>
+ #include "amp_env.h"
+ #include "pitch_env.h"
+@@ -15,9 +14,9 @@
+ {
+ public:
+     Instrument() = default;
+-    ~Instrument() = default;
++    virtual ~Instrument();
+ 
+-    int getPitch();
++    int getPitch() const;
+     void setPitch(int pitch);
+ 
+     void setLevel(double level);
+@@ -30,14 +29,14 @@
+ 
+     void trigger();
+     void release();
+-    bool isTriggered();
+-    bool isPlaying();
++    bool isTriggered() const;
++    bool isPlaying() const;
+ 
+     void updateBy(double time);
+ 
+     virtual double getSample();
+ 
+-    std::string getName();
++    const std::string &getName() const;
+ 
+     static constexpr double TAU = M_PI * 2.0;
+ 
+@@ -45,13 +44,13 @@
+     AmpEnv *m_ampEnv = nullptr;
+     PitchEnv *m_pitchEnv = nullptr;
+ 
+-    double m_duration;
+-    double m_elapsed;
++    double m_duration = 0.0;
++    double m_elapsed = 0.0;
+ 
+-    int m_pitch;
++    int m_pitch = 0;
+ 
+-    bool m_triggered;
+-    bool m_playing;
++    bool m_triggered = false;
++    bool m_playing = false;
+ 
+     std::string m_name;
+ };
+diff --git a/app/drum808/kick.cpp b/app/drum808/kick.cpp
+index ab3187d3c1421d0fb56b0024b2dc2100d3334f4d..caed91d337febc424e0dea49b25c4bcf85d23463
+--- a/app/drum808/kick.cpp
++++ b/app/drum808/kick.cpp
+@@ -12,19 +12,21 @@
+ 
+ void Kick::setDefaults()
+ {
+-    AmpEnv::AmpEnvSettings envSettings = {
+-        .peakAmp = 0.8,
+-        .decay = 0.25,
+-    };
++    AmpEnv::AmpEnvSettings envSettings{};
++    envSettings.startAmp = 0.0;
++    envSettings.peakAmp = 0.8;
++    envSettings.releaseAmp = 0.0;
++    envSettings.attack = 0.0;
++    envSettings.decay = 0.25;
+     AmpEnv *ampEnv = new AmpEnv(envSettings);
+     setAmpEnv(ampEnv);
+ 
+-    PitchEnv::EnvSettings pitchEnvSettings = {
+-        .startPitch = (double)getPitch(),
+-        .peakPitch = getPitch() + SEMITONE_HZ * 48.0,
+-        .releasePitch = (double)getPitch(),
+-        .decay = 0.02,
+-    };
++    PitchEnv::EnvSettings pitchEnvSettings{};
++    pitchEnvSettings.startPitch = (double)getPitch();
++    pitchEnvSettings.peakPitch = getPitch() + SEMITONE_HZ * 48.0;
++    pitchEnvSettings.releasePitch = (double)getPitch();
++    pitchEnvSettings.attack = 0.0;
++    pitchEnvSettings.decay = 0.02;
+     PitchEnv *pitchEnv = new PitchEnv(pitchEnvSettings);
+     setPitchEnv(pitchEnv);
+ }
+diff --git a/app/drum808/snare.cpp b/app/drum808/snare.cpp
+index f044bfe6bae8a768c4cbf4c10a7b0f9b6b009dd4..350f3efc4d4a93f935756b31e5b9b3e1a1a2f4b9
+--- a/app/drum808/snare.cpp
++++ b/app/drum808/snare.cpp
+@@ -1,5 +1,6 @@
+ #include <algorithm>
+ #include <cmath>
++#include <cstdlib>
+ #include <ctime>
+ #include <iostream>
+ #include "snare.h"
+@@ -14,27 +15,30 @@
+ 
+ void Snare::setDefaults()
+ {
+-    AmpEnv::AmpEnvSettings toneAmpEnvSettings = {
+-        .peakAmp = 0.1,
+-        .attack = 0.01,
+-        .decay = 0.25,
+-    };
++    AmpEnv::AmpEnvSettings toneAmpEnvSettings{};
++    toneAmpEnvSettings.startAmp = 0.0;
++    toneAmpEnvSettings.peakAmp = 0.1;
++    toneAmpEnvSettings.releaseAmp = 0.0;
++    toneAmpEnvSettings.attack = 0.01;
++    toneAmpEnvSettings.decay = 0.25;
+     AmpEnv *toneEnv = new AmpEnv(toneAmpEnvSettings);
+     setAmpEnv(toneEnv);
+ 
+-    PitchEnv::EnvSettings pitchEnvSettings = {
+-        .startPitch = (double)getPitch(),
+-        .peakPitch = getPitch() + SEMITONE_HZ * 24.0,
+-        .releasePitch = (double)getPitch(),
+-        .decay = 0.04,
+-    };
++    PitchEnv::EnvSettings pitchEnvSettings{};
++    pitchEnvSettings.startPitch = (double)getPitch();
++    pitchEnvSettings.peakPitch = getPitch() + SEMITONE_HZ * 24.0;
++    pitchEnvSettings.releasePitch = (double)getPitch();
++    pitchEnvSettings.attack = 0.0;
++    pitchEnvSettings.decay = 0.04;
+     PitchEnv *pitchEnv = new PitchEnv(pitchEnvSettings);
+     setPitchEnv(pitchEnv);
+ 
+-    AmpEnv::AmpEnvSettings noiseAmpEnvSettings = {
+-        .peakAmp = 0.6,
+-        .decay = 0.25,
+-    };
++    AmpEnv::AmpEnvSettings noiseAmpEnvSettings{};
++    noiseAmpEnvSettings.startAmp = 0.0;
++    noiseAmpEnvSettings.peakAmp = 0.6;
++    noiseAmpEnvSettings.releaseAmp = 0.0;
++    noiseAmpEnvSettings.attack = 0.0;
++    noiseAmpEnvSettings.decay = 0.25;
+     AmpEnv *noiseEnv = new AmpEnv(noiseAmpEnvSettings);
+     setNoiseEnv(noiseEnv);
+ 
+@@ -79,6 +83,9 @@
+     double tone = sin(pitch * TAU * m_elapsed);
+     double toneAmp = m_ampEnv->getEnvValue(m_elapsed);
+ 
++    if (m_bandPass == nullptr || m_noiseEnv == nullptr) {
++        return tone * toneAmp;
++    }
+     double noise = m_bandPass->filter((double)rand() / RAND_MAX);
+     double noiseAmp = m_noiseEnv->getEnvValue(m_elapsed);
+     return (tone * toneAmp) + (noise * noiseAmp);
+diff --git a/app/drum808/snare.h b/app/drum808/snare.h
+index 3575e10fb587369b7d8ed93df0469cef31bb5b7a..7a3d39f79199e5451d38b5db384173cd76693d00
+--- a/app/drum808/snare.h
++++ b/app/drum808/snare.h
+@@ -29,12 +29,11 @@
+     const std::string m_defaultName = "Snare";
+     const int m_defaultPitch = 160;
+ 
+-    Filter *m_bandPass;
+-    Filter *m_highPass;
++    Filter *m_bandPass = nullptr;
++    Filter *m_highPass = nullptr;
+ 
+ };
+ 
+ 
+ } // namespace drum808
+ #endif
+-
+
+file update:
+diff --git a/app/drum808/clap.cpp b/app/drum808/clap.cpp
+index 6e612e9eedc14a0e18413e406c162cfe6a48c606..1c3f169f00779631d448cba432dca61e32ebf46e
+--- a/app/drum808/clap.cpp
++++ b/app/drum808/clap.cpp
+@@ -1,5 +1,7 @@
++#include <cmath>
++#include <cstdlib>
++#include <ctime>
+ #include <iostream>
+-#include <cmath>
+ #include "clap.h"
+ 
+ namespace drum808 {
+@@ -14,10 +16,12 @@
+ 
+ void Clap::setDefaults()
+ {
+-    AmpEnv::AmpEnvSettings envSettings = {
+-        .peakAmp = 0.8,
+-        .decay = 0.3
+-    };
++    AmpEnv::AmpEnvSettings envSettings{};
++    envSettings.startAmp = 0.0;
++    envSettings.peakAmp = 0.8;
++    envSettings.releaseAmp = 0.0;
++    envSettings.attack = 0.0;
++    envSettings.decay = 0.3;
+     AmpEnv *ampEnv = new AmpEnv(envSettings);
+     setAmpEnv(ampEnv);
+ 
+@@ -58,6 +62,7 @@
+         sample = noise * decay;
+     }
+ 
++    if (m_bandPass == nullptr || m_highPass == nullptr) return sample;
+     return m_highPass->filter(m_bandPass->filter(sample));
+ }
+ 
+diff --git a/app/drum808/clap.h b/app/drum808/clap.h
+index faad2b019afe6a2f98ef6444fcda2bdcbd33454e..31af137bf3b8b7c297c8a4d198e98cad9a25d1c2
+--- a/app/drum808/clap.h
++++ b/app/drum808/clap.h
+@@ -27,8 +27,8 @@
+     // 10 ms between claps
+     static constexpr double m_interval = 0.01;
+ 
+-    Filter *m_highPass;
+-    Filter *m_bandPass;
++    Filter *m_highPass = nullptr;
++    Filter *m_bandPass = nullptr;
+ };
+ 
+ 
+diff --git a/app/drum808/closed_hat.cpp b/app/drum808/closed_hat.cpp
+index f0796853e6813cc7163a1053de0228aca5b02aa3..87cbc065b72ed3629d9e466836634a7652de2fab
+--- a/app/drum808/closed_hat.cpp
++++ b/app/drum808/closed_hat.cpp
+@@ -21,10 +21,12 @@
+ 
+ void ClosedHat::setDefaults()
+ {
+-    AmpEnv::AmpEnvSettings envSettings = {
+-        .peakAmp = 0.8,
+-        .decay = 0.2
+-    };
++    AmpEnv::AmpEnvSettings envSettings{};
++    envSettings.startAmp = 0.0;
++    envSettings.peakAmp = 0.8;
++    envSettings.releaseAmp = 0.0;
++    envSettings.attack = 0.0;
++    envSettings.decay = 0.2;
+     AmpEnv *ampEnv = new AmpEnv(envSettings);
+     setAmpEnv(ampEnv);
+ 
+@@ -54,6 +56,9 @@
+         amp += value;
+     }
+     amp /= m_harmonics.size();
++    if (m_bandPass == nullptr || m_highPass == nullptr || m_ampEnv == nullptr) {
++        return amp;
++    }
+     double firstStep = m_bandPass->filter(amp);
+     double secondStep = m_highPass->filter(firstStep);
+     return secondStep * m_ampEnv->getEnvValue(m_elapsed);
+diff --git a/app/drum808/closed_hat.h b/app/drum808/closed_hat.h
+index 444472b295f00fc806a610a3a9334052232b0f62..164cbd02d747084a50c8f72281d17d804abcc755
+--- a/app/drum808/closed_hat.h
++++ b/app/drum808/closed_hat.h
+@@ -27,8 +27,8 @@
+ 
+     std::array<double, 6> m_harmonics;
+ 
+-    Filter *m_bandPass;
+-    Filter *m_highPass;
++    Filter *m_bandPass = nullptr;
++    Filter *m_highPass = nullptr;
+ };
+ 
+ 
+diff --git a/app/drum808/envelope.cpp b/app/drum808/envelope.cpp
+index 849e7fb3a4a16aca7350c302bbd9ff99fc5fe2ea..fac7705393fc872697c4e5442a547fd1878adf21
+--- a/app/drum808/envelope.cpp
++++ b/app/drum808/envelope.cpp
+@@ -37,6 +37,11 @@
+ {
+     if (time > m_duration) return m_release;
+ 
++    if (m_attack <= 0.0) {
++        if (m_decay <= 0.0) return m_release;
++        return decayRamp(time);
++    }
++
+     if (time <= m_attack) {
+         return attackRamp(time);
+     } else if (time <= (m_attack + m_decay)) {
+@@ -49,11 +54,13 @@
+ 
+ double Envelope::attackRamp(double time)
+ {
++    if (m_attack <= 0.0) return m_peak;
+     return (m_peak - m_start) / m_attack * time + m_start;
+ }
+ 
+ double Envelope::decayRamp(double time)
+ {
++    if (m_decay <= 0.0) return m_release;
+     return (m_release - m_peak) / m_decay * (time - m_attack) + m_peak;
+ }
+ 
+diff --git a/app/drum808/envelope.h b/app/drum808/envelope.h
+index 46da18ce3d119eaf713d3202bacb2ad9b0637a7e..48e79c8e4370abd3f1db4efe935168c8fb80abe5
+--- a/app/drum808/envelope.h
++++ b/app/drum808/envelope.h
+@@ -10,7 +10,7 @@
+ {
+ public:
+     Envelope() = default;
+-    ~Envelope() = default;
++    virtual ~Envelope() = default;
+ 
+     double getDuration();
+ 
+@@ -24,13 +24,13 @@
+     double getEnvValue(double time);
+ 
+ protected:
+-    double m_attack;
+-    double m_decay;
+-    double m_duration;
++    double m_attack = 0.0;
++    double m_decay = 0.0;
++    double m_duration = 0.0;
+ 
+-    double m_start;
+-    double m_peak;
+-    double m_release;
++    double m_start = 0.0;
++    double m_peak = 0.0;
++    double m_release = 0.0;
+ 
+ private:
+     double attackRamp(double time);
+diff --git a/app/drum808/filter.h b/app/drum808/filter.h
+index 39f2d673a2bc54bb97d9962113876846c5a42318..d948dcd18af12306900ede3e71b9b00216648803
+--- a/app/drum808/filter.h
++++ b/app/drum808/filter.h
+@@ -23,8 +23,8 @@
+     double m_freq;
+     double m_q;
+ 
+-    double a0, a1, a2, b1, b2;
+-    double z1, z2;
++    double a0 = 0.0, a1 = 0.0, a2 = 0.0, b1 = 0.0, b2 = 0.0;
++    double z1 = 0.0, z2 = 0.0;
+ 
+     void calcFilter();
+ };
+diff --git a/app/drum808/instrument.cpp b/app/drum808/instrument.cpp
+index 9a3390feca3887e82cae6c385e466cb18c870f7e..019705a3569e523c51eacd7eb87cefd16e97e4f4
+--- a/app/drum808/instrument.cpp
++++ b/app/drum808/instrument.cpp
+@@ -7,7 +7,13 @@
+ using std::cout;
+ using std::endl;
+ 
+-int Instrument::getPitch()
++Instrument::~Instrument()
++{
++    delete m_ampEnv;
++    delete m_pitchEnv;
++}
++
++int Instrument::getPitch() const
+ {
+     return m_pitch;
+ }
+@@ -45,12 +51,12 @@
+     m_triggered = false;
+ }
+ 
+-bool Instrument::isTriggered()
++bool Instrument::isTriggered() const
+ {
+     return m_triggered;
+ }
+ 
+-bool Instrument::isPlaying()
++bool Instrument::isPlaying() const
+ {
+     return m_playing;
+ }
+@@ -83,7 +89,7 @@
+     return value;
+ }
+ 
+-std::string Instrument::getName()
++const std::string &Instrument::getName() const
+ {
+     return m_name;
+ }
+diff --git a/app/drum808/instrument.h b/app/drum808/instrument.h
+index bc10977365c6e31a160e421e431f67aaa661a9f2..9e970887b18ec3038f44aeffe8648804f9afb7f3
+--- a/app/drum808/instrument.h
++++ b/app/drum808/instrument.h
+@@ -2,7 +2,6 @@
+ #define INSTRUMENT_H
+ 
+ #include <cmath>
+-#include <optional>
+ #include <string>
+ #include "amp_env.h"
+ #include "pitch_env.h"
+@@ -15,9 +14,9 @@
+ {
+ public:
+     Instrument() = default;
+-    ~Instrument() = default;
++    virtual ~Instrument();
+ 
+-    int getPitch();
++    int getPitch() const;
+     void setPitch(int pitch);
+ 
+     void setLevel(double level);
+@@ -30,14 +29,14 @@
+ 
+     void trigger();
+     void release();
+-    bool isTriggered();
+-    bool isPlaying();
++    bool isTriggered() const;
++    bool isPlaying() const;
+ 
+     void updateBy(double time);
+ 
+     virtual double getSample();
+ 
+-    std::string getName();
++    const std::string &getName() const;
+ 
+     static constexpr double TAU = M_PI * 2.0;
+ 
+@@ -45,13 +44,13 @@
+     AmpEnv *m_ampEnv = nullptr;
+     PitchEnv *m_pitchEnv = nullptr;
+ 
+-    double m_duration;
+-    double m_elapsed;
++    double m_duration = 0.0;
++    double m_elapsed = 0.0;
+ 
+-    int m_pitch;
++    int m_pitch = 0;
+ 
+-    bool m_triggered;
+-    bool m_playing;
++    bool m_triggered = false;
++    bool m_playing = false;
+ 
+     std::string m_name;
+ };
+diff --git a/app/drum808/kick.cpp b/app/drum808/kick.cpp
+index ab3187d3c1421d0fb56b0024b2dc2100d3334f4d..caed91d337febc424e0dea49b25c4bcf85d23463
+--- a/app/drum808/kick.cpp
++++ b/app/drum808/kick.cpp
+@@ -12,19 +12,21 @@
+ 
+ void Kick::setDefaults()
+ {
+-    AmpEnv::AmpEnvSettings envSettings = {
+-        .peakAmp = 0.8,
+-        .decay = 0.25,
+-    };
++    AmpEnv::AmpEnvSettings envSettings{};
++    envSettings.startAmp = 0.0;
++    envSettings.peakAmp = 0.8;
++    envSettings.releaseAmp = 0.0;
++    envSettings.attack = 0.0;
++    envSettings.decay = 0.25;
+     AmpEnv *ampEnv = new AmpEnv(envSettings);
+     setAmpEnv(ampEnv);
+ 
+-    PitchEnv::EnvSettings pitchEnvSettings = {
+-        .startPitch = (double)getPitch(),
+-        .peakPitch = getPitch() + SEMITONE_HZ * 48.0,
+-        .releasePitch = (double)getPitch(),
+-        .decay = 0.02,
+-    };
++    PitchEnv::EnvSettings pitchEnvSettings{};
++    pitchEnvSettings.startPitch = (double)getPitch();
++    pitchEnvSettings.peakPitch = getPitch() + SEMITONE_HZ * 48.0;
++    pitchEnvSettings.releasePitch = (double)getPitch();
++    pitchEnvSettings.attack = 0.0;
++    pitchEnvSettings.decay = 0.02;
+     PitchEnv *pitchEnv = new PitchEnv(pitchEnvSettings);
+     setPitchEnv(pitchEnv);
+ }
+diff --git a/app/drum808/snare.cpp b/app/drum808/snare.cpp
+index f044bfe6bae8a768c4cbf4c10a7b0f9b6b009dd4..350f3efc4d4a93f935756b31e5b9b3e1a1a2f4b9
+--- a/app/drum808/snare.cpp
++++ b/app/drum808/snare.cpp
+@@ -1,5 +1,6 @@
+ #include <algorithm>
+ #include <cmath>
++#include <cstdlib>
+ #include <ctime>
+ #include <iostream>
+ #include "snare.h"
+@@ -14,27 +15,30 @@
+ 
+ void Snare::setDefaults()
+ {
+-    AmpEnv::AmpEnvSettings toneAmpEnvSettings = {
+-        .peakAmp = 0.1,
+-        .attack = 0.01,
+-        .decay = 0.25,
+-    };
++    AmpEnv::AmpEnvSettings toneAmpEnvSettings{};
++    toneAmpEnvSettings.startAmp = 0.0;
++    toneAmpEnvSettings.peakAmp = 0.1;
++    toneAmpEnvSettings.releaseAmp = 0.0;
++    toneAmpEnvSettings.attack = 0.01;
++    toneAmpEnvSettings.decay = 0.25;
+     AmpEnv *toneEnv = new AmpEnv(toneAmpEnvSettings);
+     setAmpEnv(toneEnv);
+ 
+-    PitchEnv::EnvSettings pitchEnvSettings = {
+-        .startPitch = (double)getPitch(),
+-        .peakPitch = getPitch() + SEMITONE_HZ * 24.0,
+-        .releasePitch = (double)getPitch(),
+-        .decay = 0.04,
+-    };
++    PitchEnv::EnvSettings pitchEnvSettings{};
++    pitchEnvSettings.startPitch = (double)getPitch();
++    pitchEnvSettings.peakPitch = getPitch() + SEMITONE_HZ * 24.0;
++    pitchEnvSettings.releasePitch = (double)getPitch();
++    pitchEnvSettings.attack = 0.0;
++    pitchEnvSettings.decay = 0.04;
+     PitchEnv *pitchEnv = new PitchEnv(pitchEnvSettings);
+     setPitchEnv(pitchEnv);
+ 
+-    AmpEnv::AmpEnvSettings noiseAmpEnvSettings = {
+-        .peakAmp = 0.6,
+-        .decay = 0.25,
+-    };
++    AmpEnv::AmpEnvSettings noiseAmpEnvSettings{};
++    noiseAmpEnvSettings.startAmp = 0.0;
++    noiseAmpEnvSettings.peakAmp = 0.6;
++    noiseAmpEnvSettings.releaseAmp = 0.0;
++    noiseAmpEnvSettings.attack = 0.0;
++    noiseAmpEnvSettings.decay = 0.25;
+     AmpEnv *noiseEnv = new AmpEnv(noiseAmpEnvSettings);
+     setNoiseEnv(noiseEnv);
+ 
+@@ -79,6 +83,9 @@
+     double tone = sin(pitch * TAU * m_elapsed);
+     double toneAmp = m_ampEnv->getEnvValue(m_elapsed);
+ 
++    if (m_bandPass == nullptr || m_noiseEnv == nullptr) {
++        return tone * toneAmp;
++    }
+     double noise = m_bandPass->filter((double)rand() / RAND_MAX);
+     double noiseAmp = m_noiseEnv->getEnvValue(m_elapsed);
+     return (tone * toneAmp) + (noise * noiseAmp);
+diff --git a/app/drum808/snare.h b/app/drum808/snare.h
+index 3575e10fb587369b7d8ed93df0469cef31bb5b7a..7a3d39f79199e5451d38b5db384173cd76693d00
+--- a/app/drum808/snare.h
++++ b/app/drum808/snare.h
+@@ -29,12 +29,11 @@
+     const std::string m_defaultName = "Snare";
+     const int m_defaultPitch = 160;
+ 
+-    Filter *m_bandPass;
+-    Filter *m_highPass;
++    Filter *m_bandPass = nullptr;
++    Filter *m_highPass = nullptr;
+ 
+ };
+ 
+ 
+ } // namespace drum808
+ #endif
+-
+
+
+thinking
+**Reviewing namespace and includes**
+codex
+The bulk port is in place. I’m running a quick static grep pass now for leftover SDL includes, designated initializers, and `<optional>`, then I’ll run the requested `g++ -fsyntax-only` verification.
+exec
+/bin/zsh -lc "rg -n 'SDL2/SDL|\\.<[A-Za-z_]+\\s*=|#include <optional>' app/drum808" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc 'rg --files app/drum808 | sort' in /Users/james/Repos/wibandwob-dos exited 1 in 52ms:
+
+ succeeded in 56ms:
+app/drum808/amp_env.cpp
+app/drum808/amp_env.h
+app/drum808/clap.cpp
+app/drum808/clap.h
+app/drum808/closed_hat.cpp
+app/drum808/closed_hat.h
+app/drum808/drum_engine.cpp
+app/drum808/drum_engine.h
+app/drum808/envelope.cpp
+app/drum808/envelope.h
+app/drum808/filter.cpp
+app/drum808/filter.h
+app/drum808/instrument.cpp
+app/drum808/instrument.h
+app/drum808/kick.cpp
+app/drum808/kick.h
+app/drum808/pitch_env.cpp
+app/drum808/pitch_env.h
+app/drum808/sequencer.cpp
+app/drum808/sequencer.h
+file update:
+diff --git a/app/drum808/clap.cpp b/app/drum808/clap.cpp
+index 6e612e9eedc14a0e18413e406c162cfe6a48c606..1c3f169f00779631d448cba432dca61e32ebf46e
+--- a/app/drum808/clap.cpp
++++ b/app/drum808/clap.cpp
+@@ -1,5 +1,7 @@
++#include <cmath>
++#include <cstdlib>
++#include <ctime>
+ #include <iostream>
+-#include <cmath>
+ #include "clap.h"
+ 
+ namespace drum808 {
+@@ -14,10 +16,12 @@
+ 
+ void Clap::setDefaults()
+ {
+-    AmpEnv::AmpEnvSettings envSettings = {
+-        .peakAmp = 0.8,
+-        .decay = 0.3
+-    };
++    AmpEnv::AmpEnvSettings envSettings{};
++    envSettings.startAmp = 0.0;
++    envSettings.peakAmp = 0.8;
++    envSettings.releaseAmp = 0.0;
++    envSettings.attack = 0.0;
++    envSettings.decay = 0.3;
+     AmpEnv *ampEnv = new AmpEnv(envSettings);
+     setAmpEnv(ampEnv);
+ 
+@@ -58,6 +62,7 @@
+         sample = noise * decay;
+     }
+ 
++    if (m_bandPass == nullptr || m_highPass == nullptr) return sample;
+     return m_highPass->filter(m_bandPass->filter(sample));
+ }
+ 
+diff --git a/app/drum808/clap.h b/app/drum808/clap.h
+index faad2b019afe6a2f98ef6444fcda2bdcbd33454e..31af137bf3b8b7c297c8a4d198e98cad9a25d1c2
+--- a/app/drum808/clap.h
++++ b/app/drum808/clap.h
+@@ -27,8 +27,8 @@
+     // 10 ms between claps
+     static constexpr double m_interval = 0.01;
+ 
+-    Filter *m_highPass;
+-    Filter *m_bandPass;
++    Filter *m_highPass = nullptr;
++    Filter *m_bandPass = nullptr;
+ };
+ 
+ 
+diff --git a/app/drum808/closed_hat.cpp b/app/drum808/closed_hat.cpp
+index f0796853e6813cc7163a1053de0228aca5b02aa3..87cbc065b72ed3629d9e466836634a7652de2fab
+--- a/app/drum808/closed_hat.cpp
++++ b/app/drum808/closed_hat.cpp
+@@ -21,10 +21,12 @@
+ 
+ void ClosedHat::setDefaults()
+ {
+-    AmpEnv::AmpEnvSettings envSettings = {
+-        .peakAmp = 0.8,
+-        .decay = 0.2
+-    };
++    AmpEnv::AmpEnvSettings envSettings{};
++    envSettings.startAmp = 0.0;
++    envSettings.peakAmp = 0.8;
++    envSettings.releaseAmp = 0.0;
++    envSettings.attack = 0.0;
++    envSettings.decay = 0.2;
+     AmpEnv *ampEnv = new AmpEnv(envSettings);
+     setAmpEnv(ampEnv);
+ 
+@@ -54,6 +56,9 @@
+         amp += value;
+     }
+     amp /= m_harmonics.size();
++    if (m_bandPass == nullptr || m_highPass == nullptr || m_ampEnv == nullptr) {
++        return amp;
++    }
+     double firstStep = m_bandPass->filter(amp);
+     double secondStep = m_highPass->filter(firstStep);
+     return secondStep * m_ampEnv->getEnvValue(m_elapsed);
+diff --git a/app/drum808/closed_hat.h b/app/drum808/closed_hat.h
+index 444472b295f00fc806a610a3a9334052232b0f62..164cbd02d747084a50c8f72281d17d804abcc755
+--- a/app/drum808/closed_hat.h
++++ b/app/drum808/closed_hat.h
+@@ -27,8 +27,8 @@
+ 
+     std::array<double, 6> m_harmonics;
+ 
+-    Filter *m_bandPass;
+-    Filter *m_highPass;
++    Filter *m_bandPass = nullptr;
++    Filter *m_highPass = nullptr;
+ };
+ 
+ 
+diff --git a/app/drum808/envelope.cpp b/app/drum808/envelope.cpp
+index 849e7fb3a4a16aca7350c302bbd9ff99fc5fe2ea..fac7705393fc872697c4e5442a547fd1878adf21
+--- a/app/drum808/envelope.cpp
++++ b/app/drum808/envelope.cpp
+@@ -37,6 +37,11 @@
+ {
+     if (time > m_duration) return m_release;
+ 
++    if (m_attack <= 0.0) {
++        if (m_decay <= 0.0) return m_release;
++        return decayRamp(time);
++    }
++
+     if (time <= m_attack) {
+         return attackRamp(time);
+     } else if (time <= (m_attack + m_decay)) {
+@@ -49,11 +54,13 @@
+ 
+ double Envelope::attackRamp(double time)
+ {
++    if (m_attack <= 0.0) return m_peak;
+     return (m_peak - m_start) / m_attack * time + m_start;
+ }
+ 
+ double Envelope::decayRamp(double time)
+ {
++    if (m_decay <= 0.0) return m_release;
+     return (m_release - m_peak) / m_decay * (time - m_attack) + m_peak;
+ }
+ 
+diff --git a/app/drum808/envelope.h b/app/drum808/envelope.h
+index 46da18ce3d119eaf713d3202bacb2ad9b0637a7e..48e79c8e4370abd3f1db4efe935168c8fb80abe5
+--- a/app/drum808/envelope.h
++++ b/app/drum808/envelope.h
+@@ -10,7 +10,7 @@
+ {
+ public:
+     Envelope() = default;
+-    ~Envelope() = default;
++    virtual ~Envelope() = default;
+ 
+     double getDuration();
+ 
+@@ -24,13 +24,13 @@
+     double getEnvValue(double time);
+ 
+ protected:
+-    double m_attack;
+-    double m_decay;
+-    double m_duration;
++    double m_attack = 0.0;
++    double m_decay = 0.0;
++    double m_duration = 0.0;
+ 
+-    double m_start;
+-    double m_peak;
+-    double m_release;
++    double m_start = 0.0;
++    double m_peak = 0.0;
++    double m_release = 0.0;
+ 
+ private:
+     double attackRamp(double time);
+diff --git a/app/drum808/filter.h b/app/drum808/filter.h
+index 39f2d673a2bc54bb97d9962113876846c5a42318..d948dcd18af12306900ede3e71b9b00216648803
+--- a/app/drum808/filter.h
++++ b/app/drum808/filter.h
+@@ -23,8 +23,8 @@
+     double m_freq;
+     double m_q;
+ 
+-    double a0, a1, a2, b1, b2;
+-    double z1, z2;
++    double a0 = 0.0, a1 = 0.0, a2 = 0.0, b1 = 0.0, b2 = 0.0;
++    double z1 = 0.0, z2 = 0.0;
+ 
+     void calcFilter();
+ };
+diff --git a/app/drum808/instrument.cpp b/app/drum808/instrument.cpp
+index 9a3390feca3887e82cae6c385e466cb18c870f7e..019705a3569e523c51eacd7eb87cefd16e97e4f4
+--- a/app/drum808/instrument.cpp
++++ b/app/drum808/instrument.cpp
+@@ -7,7 +7,13 @@
+ using std::cout;
+ using std::endl;
+ 
+-int Instrument::getPitch()
++Instrument::~Instrument()
++{
++    delete m_ampEnv;
++    delete m_pitchEnv;
++}
++
++int Instrument::getPitch() const
+ {
+     return m_pitch;
+ }
+@@ -45,12 +51,12 @@
+     m_triggered = false;
+ }
+ 
+-bool Instrument::isTriggered()
++bool Instrument::isTriggered() const
+ {
+     return m_triggered;
+ }
+ 
+-bool Instrument::isPlaying()
++bool Instrument::isPlaying() const
+ {
+     return m_playing;
+ }
+@@ -83,7 +89,7 @@
+     return value;
+ }
+ 
+-std::string Instrument::getName()
++const std::string &Instrument::getName() const
+ {
+     return m_name;
+ }
+diff --git a/app/drum808/instrument.h b/app/drum808/instrument.h
+index bc10977365c6e31a160e421e431f67aaa661a9f2..9e970887b18ec3038f44aeffe8648804f9afb7f3
+--- a/app/drum808/instrument.h
++++ b/app/drum808/instrument.h
+@@ -2,7 +2,6 @@
+ #define INSTRUMENT_H
+ 
+ #include <cmath>
+-#include <optional>
+ #include <string>
+ #include "amp_env.h"
+ #include "pitch_env.h"
+@@ -15,9 +14,9 @@
+ {
+ public:
+     Instrument() = default;
+-    ~Instrument() = default;
++    virtual ~Instrument();
+ 
+-    int getPitch();
++    int getPitch() const;
+     void setPitch(int pitch);
+ 
+     void setLevel(double level);
+@@ -30,14 +29,14 @@
+ 
+     void trigger();
+     void release();
+-    bool isTriggered();
+-    bool isPlaying();
++    bool isTriggered() const;
++    bool isPlaying() const;
+ 
+     void updateBy(double time);
+ 
+     virtual double getSample();
+ 
+-    std::string getName();
++    const std::string &getName() const;
+ 
+     static constexpr double TAU = M_PI * 2.0;
+ 
+@@ -45,13 +44,13 @@
+     AmpEnv *m_ampEnv = nullptr;
+     PitchEnv *m_pitchEnv = nullptr;
+ 
+-    double m_duration;
+-    double m_elapsed;
++    double m_duration = 0.0;
++    double m_elapsed = 0.0;
+ 
+-    int m_pitch;
++    int m_pitch = 0;
+ 
+-    bool m_triggered;
+-    bool m_playing;
++    bool m_triggered = false;
++    bool m_playing = false;
+ 
+     std::string m_name;
+ };
+diff --git a/app/drum808/kick.cpp b/app/drum808/kick.cpp
+index ab3187d3c1421d0fb56b0024b2dc2100d3334f4d..caed91d337febc424e0dea49b25c4bcf85d23463
+--- a/app/drum808/kick.cpp
++++ b/app/drum808/kick.cpp
+@@ -12,19 +12,21 @@
+ 
+ void Kick::setDefaults()
+ {
+-    AmpEnv::AmpEnvSettings envSettings = {
+-        .peakAmp = 0.8,
+-        .decay = 0.25,
+-    };
++    AmpEnv::AmpEnvSettings envSettings{};
++    envSettings.startAmp = 0.0;
++    envSettings.peakAmp = 0.8;
++    envSettings.releaseAmp = 0.0;
++    envSettings.attack = 0.0;
++    envSettings.decay = 0.25;
+     AmpEnv *ampEnv = new AmpEnv(envSettings);
+     setAmpEnv(ampEnv);
+ 
+-    PitchEnv::EnvSettings pitchEnvSettings = {
+-        .startPitch = (double)getPitch(),
+-        .peakPitch = getPitch() + SEMITONE_HZ * 48.0,
+-        .releasePitch = (double)getPitch(),
+-        .decay = 0.02,
+-    };
++    PitchEnv::EnvSettings pitchEnvSettings{};
++    pitchEnvSettings.startPitch = (double)getPitch();
++    pitchEnvSettings.peakPitch = getPitch() + SEMITONE_HZ * 48.0;
++    pitchEnvSettings.releasePitch = (double)getPitch();
++    pitchEnvSettings.attack = 0.0;
++    pitchEnvSettings.decay = 0.02;
+     PitchEnv *pitchEnv = new PitchEnv(pitchEnvSettings);
+     setPitchEnv(pitchEnv);
+ }
+diff --git a/app/drum808/snare.cpp b/app/drum808/snare.cpp
+index f044bfe6bae8a768c4cbf4c10a7b0f9b6b009dd4..350f3efc4d4a93f935756b31e5b9b3e1a1a2f4b9
+--- a/app/drum808/snare.cpp
++++ b/app/drum808/snare.cpp
+@@ -1,5 +1,6 @@
+ #include <algorithm>
+ #include <cmath>
++#include <cstdlib>
+ #include <ctime>
+ #include <iostream>
+ #include "snare.h"
+@@ -14,27 +15,30 @@
+ 
+ void Snare::setDefaults()
+ {
+-    AmpEnv::AmpEnvSettings toneAmpEnvSettings = {
+-        .peakAmp = 0.1,
+-        .attack = 0.01,
+-        .decay = 0.25,
+-    };
++    AmpEnv::AmpEnvSettings toneAmpEnvSettings{};
++    toneAmpEnvSettings.startAmp = 0.0;
++    toneAmpEnvSettings.peakAmp = 0.1;
++    toneAmpEnvSettings.releaseAmp = 0.0;
++    toneAmpEnvSettings.attack = 0.01;
++    toneAmpEnvSettings.decay = 0.25;
+     AmpEnv *toneEnv = new AmpEnv(toneAmpEnvSettings);
+     setAmpEnv(toneEnv);
+ 
+-    PitchEnv::EnvSettings pitchEnvSettings = {
+-        .startPitch = (double)getPitch(),
+-        .peakPitch = getPitch() + SEMITONE_HZ * 24.0,
+-        .releasePitch = (double)getPitch(),
+-        .decay = 0.04,
+-    };
++    PitchEnv::EnvSettings pitchEnvSettings{};
++    pitchEnvSettings.startPitch = (double)getPitch();
++    pitchEnvSettings.peakPitch = getPitch() + SEMITONE_HZ * 24.0;
++    pitchEnvSettings.releasePitch = (double)getPitch();
++    pitchEnvSettings.attack = 0.0;
++    pitchEnvSettings.decay = 0.04;
+     PitchEnv *pitchEnv = new PitchEnv(pitchEnvSettings);
+     setPitchEnv(pitchEnv);
+ 
+-    AmpEnv::AmpEnvSettings noiseAmpEnvSettings = {
+-        .peakAmp = 0.6,
+-        .decay = 0.25,
+-    };
++    AmpEnv::AmpEnvSettings noiseAmpEnvSettings{};
++    noiseAmpEnvSettings.startAmp = 0.0;
++    noiseAmpEnvSettings.peakAmp = 0.6;
++    noiseAmpEnvSettings.releaseAmp = 0.0;
++    noiseAmpEnvSettings.attack = 0.0;
++    noiseAmpEnvSettings.decay = 0.25;
+     AmpEnv *noiseEnv = new AmpEnv(noiseAmpEnvSettings);
+     setNoiseEnv(noiseEnv);
+ 
+@@ -79,6 +83,9 @@
+     double tone = sin(pitch * TAU * m_elapsed);
+     double toneAmp = m_ampEnv->getEnvValue(m_elapsed);
+ 
++    if (m_bandPass == nullptr || m_noiseEnv == nullptr) {
++        return tone * toneAmp;
++    }
+     double noise = m_bandPass->filter((double)rand() / RAND_MAX);
+     double noiseAmp = m_noiseEnv->getEnvValue(m_elapsed);
+     return (tone * toneAmp) + (noise * noiseAmp);
+diff --git a/app/drum808/snare.h b/app/drum808/snare.h
+index 3575e10fb587369b7d8ed93df0469cef31bb5b7a..7a3d39f79199e5451d38b5db384173cd76693d00
+--- a/app/drum808/snare.h
++++ b/app/drum808/snare.h
+@@ -29,12 +29,11 @@
+     const std::string m_defaultName = "Snare";
+     const int m_defaultPitch = 160;
+ 
+-    Filter *m_bandPass;
+-    Filter *m_highPass;
++    Filter *m_bandPass = nullptr;
++    Filter *m_highPass = nullptr;
+ 
+ };
+ 
+ 
+ } // namespace drum808
+ #endif
+-
+
+
+thinking
+**Performing syntax check**
+codex
+No leftover SDL includes or C99 designated initializers are present in `app/drum808/`. I’m running the exact syntax-only compile command now.
+exec
+/bin/zsh -lc 'g++ -std=c++14 -fsyntax-only app/drum808/*.cpp -I app/drum808/' in /Users/james/Repos/wibandwob-dosfile update:
+diff --git a/app/drum808/clap.cpp b/app/drum808/clap.cpp
+index 6e612e9eedc14a0e18413e406c162cfe6a48c606..1c3f169f00779631d448cba432dca61e32ebf46e
+--- a/app/drum808/clap.cpp
++++ b/app/drum808/clap.cpp
+@@ -1,5 +1,7 @@
++#include <cmath>
++#include <cstdlib>
++#include <ctime>
+ #include <iostream>
+-#include <cmath>
+ #include "clap.h"
+ 
+ namespace drum808 {
+@@ -14,10 +16,12 @@
+ 
+ void Clap::setDefaults()
+ {
+-    AmpEnv::AmpEnvSettings envSettings = {
+-        .peakAmp = 0.8,
+-        .decay = 0.3
+-    };
++    AmpEnv::AmpEnvSettings envSettings{};
++    envSettings.startAmp = 0.0;
++    envSettings.peakAmp = 0.8;
++    envSettings.releaseAmp = 0.0;
++    envSettings.attack = 0.0;
++    envSettings.decay = 0.3;
+     AmpEnv *ampEnv = new AmpEnv(envSettings);
+     setAmpEnv(ampEnv);
+ 
+@@ -58,6 +62,7 @@
+         sample = noise * decay;
+     }
+ 
++    if (m_bandPass == nullptr || m_highPass == nullptr) return sample;
+     return m_highPass->filter(m_bandPass->filter(sample));
+ }
+ 
+diff --git a/app/drum808/clap.h b/app/drum808/clap.h
+index faad2b019afe6a2f98ef6444fcda2bdcbd33454e..31af137bf3b8b7c297c8a4d198e98cad9a25d1c2
+--- a/app/drum808/clap.h
++++ b/app/drum808/clap.h
+@@ -27,8 +27,8 @@
+     // 10 ms between claps
+     static constexpr double m_interval = 0.01;
+ 
+-    Filter *m_highPass;
+-    Filter *m_bandPass;
++    Filter *m_highPass = nullptr;
++    Filter *m_bandPass = nullptr;
+ };
+ 
+ 
+diff --git a/app/drum808/closed_hat.cpp b/app/drum808/closed_hat.cpp
+index f0796853e6813cc7163a1053de0228aca5b02aa3..87cbc065b72ed3629d9e466836634a7652de2fab
+--- a/app/drum808/closed_hat.cpp
++++ b/app/drum808/closed_hat.cpp
+@@ -21,10 +21,12 @@
+ 
+ void ClosedHat::setDefaults()
+ {
+-    AmpEnv::AmpEnvSettings envSettings = {
+-        .peakAmp = 0.8,
+-        .decay = 0.2
+-    };
++    AmpEnv::AmpEnvSettings envSettings{};
++    envSettings.startAmp = 0.0;
++    envSettings.peakAmp = 0.8;
++    envSettings.releaseAmp = 0.0;
++    envSettings.attack = 0.0;
++    envSettings.decay = 0.2;
+     AmpEnv *ampEnv = new AmpEnv(envSettings);
+     setAmpEnv(ampEnv);
+ 
+@@ -54,6 +56,9 @@
+         amp += value;
+     }
+     amp /= m_harmonics.size();
++    if (m_bandPass == nullptr || m_highPass == nullptr || m_ampEnv == nullptr) {
++        return amp;
++    }
+     double firstStep = m_bandPass->filter(amp);
+     double secondStep = m_highPass->filter(firstStep);
+     return secondStep * m_ampEnv->getEnvValue(m_elapsed);
+diff --git a/app/drum808/closed_hat.h b/app/drum808/closed_hat.h
+index 444472b295f00fc806a610a3a9334052232b0f62..164cbd02d747084a50c8f72281d17d804abcc755
+--- a/app/drum808/closed_hat.h
++++ b/app/drum808/closed_hat.h
+@@ -27,8 +27,8 @@
+ 
+     std::array<double, 6> m_harmonics;
+ 
+-    Filter *m_bandPass;
+-    Filter *m_highPass;
++    Filter *m_bandPass = nullptr;
++    Filter *m_highPass = nullptr;
+ };
+ 
+ 
+diff --git a/app/drum808/envelope.cpp b/app/drum808/envelope.cpp
+index 849e7fb3a4a16aca7350c302bbd9ff99fc5fe2ea..fac7705393fc872697c4e5442a547fd1878adf21
+--- a/app/drum808/envelope.cpp
++++ b/app/drum808/envelope.cpp
+@@ -37,6 +37,11 @@
+ {
+     if (time > m_duration) return m_release;
+ 
++    if (m_attack <= 0.0) {
++        if (m_decay <= 0.0) return m_release;
++        return decayRamp(time);
++    }
++
+     if (time <= m_attack) {
+         return attackRamp(time);
+     } else if (time <= (m_attack + m_decay)) {
+@@ -49,11 +54,13 @@
+ 
+ double Envelope::attackRamp(double time)
+ {
++    if (m_attack <= 0.0) return m_peak;
+     return (m_peak - m_start) / m_attack * time + m_start;
+ }
+ 
+ double Envelope::decayRamp(double time)
+ {
++    if (m_decay <= 0.0) return m_release;
+     return (m_release - m_peak) / m_decay * (time - m_attack) + m_peak;
+ }
+ 
+diff --git a/app/drum808/envelope.h b/app/drum808/envelope.h
+index 46da18ce3d119eaf713d3202bacb2ad9b0637a7e..48e79c8e4370abd3f1db4efe935168c8fb80abe5
+--- a/app/drum808/envelope.h
++++ b/app/drum808/envelope.h
+@@ -10,7 +10,7 @@
+ {
+ public:
+     Envelope() = default;
+-    ~Envelope() = default;
++    virtual ~Envelope() = default;
+ 
+     double getDuration();
+ 
+@@ -24,13 +24,13 @@
+     double getEnvValue(double time);
+ 
+ protected:
+-    double m_attack;
+-    double m_decay;
+-    double m_duration;
++    double m_attack = 0.0;
++    double m_decay = 0.0;
++    double m_duration = 0.0;
+ 
+-    double m_start;
+-    double m_peak;
+-    double m_release;
++    double m_start = 0.0;
++    double m_peak = 0.0;
++    double m_release = 0.0;
+ 
+ private:
+     double attackRamp(double time);
+diff --git a/app/drum808/filter.h b/app/drum808/filter.h
+index 39f2d673a2bc54bb97d9962113876846c5a42318..d948dcd18af12306900ede3e71b9b00216648803
+--- a/app/drum808/filter.h
++++ b/app/drum808/filter.h
+@@ -23,8 +23,8 @@
+     double m_freq;
+     double m_q;
+ 
+-    double a0, a1, a2, b1, b2;
+-    double z1, z2;
++    double a0 = 0.0, a1 = 0.0, a2 = 0.0, b1 = 0.0, b2 = 0.0;
++    double z1 = 0.0, z2 = 0.0;
+ 
+     void calcFilter();
+ };
+diff --git a/app/drum808/instrument.cpp b/app/drum808/instrument.cpp
+index 9a3390feca3887e82cae6c385e466cb18c870f7e..019705a3569e523c51eacd7eb87cefd16e97e4f4
+--- a/app/drum808/instrument.cpp
++++ b/app/drum808/instrument.cpp
+@@ -7,7 +7,13 @@
+ using std::cout;
+ using std::endl;
+ 
+-int Instrument::getPitch()
++Instrument::~Instrument()
++{
++    delete m_ampEnv;
++    delete m_pitchEnv;
++}
++
++int Instrument::getPitch() const
+ {
+     return m_pitch;
+ }
+@@ -45,12 +51,12 @@
+     m_triggered = false;
+ }
+ 
+-bool Instrument::isTriggered()
++bool Instrument::isTriggered() const
+ {
+     return m_triggered;
+ }
+ 
+-bool Instrument::isPlaying()
++bool Instrument::isPlaying() const
+ {
+     return m_playing;
+ }
+@@ -83,7 +89,7 @@
+     return value;
+ }
+ 
+-std::string Instrument::getName()
++const std::string &Instrument::getName() const
+ {
+     return m_name;
+ }
+diff --git a/app/drum808/instrument.h b/app/drum808/instrument.h
+index bc10977365c6e31a160e421e431f67aaa661a9f2..9e970887b18ec3038f44aeffe8648804f9afb7f3
+--- a/app/drum808/instrument.h
++++ b/app/drum808/instrument.h
+@@ -2,7 +2,6 @@
+ #define INSTRUMENT_H
+ 
+ #include <cmath>
+-#include <optional>
+ #include <string>
+ #include "amp_env.h"
+ #include "pitch_env.h"
+@@ -15,9 +14,9 @@
+ {
+ public:
+     Instrument() = default;
+-    ~Instrument() = default;
++    virtual ~Instrument();
+ 
+-    int getPitch();
++    int getPitch() const;
+     void setPitch(int pitch);
+ 
+     void setLevel(double level);
+@@ -30,14 +29,14 @@
+ 
+     void trigger();
+     void release();
+-    bool isTriggered();
+-    bool isPlaying();
++    bool isTriggered() const;
++    bool isPlaying() const;
+ 
+     void updateBy(double time);
+ 
+     virtual double getSample();
+ 
+-    std::string getName();
++    const std::string &getName() const;
+ 
+     static constexpr double TAU = M_PI * 2.0;
+ 
+@@ -45,13 +44,13 @@
+     AmpEnv *m_ampEnv = nullptr;
+     PitchEnv *m_pitchEnv = nullptr;
+ 
+-    double m_duration;
+-    double m_elapsed;
++    double m_duration = 0.0;
++    double m_elapsed = 0.0;
+ 
+-    int m_pitch;
++    int m_pitch = 0;
+ 
+-    bool m_triggered;
+-    bool m_playing;
++    bool m_triggered = false;
++    bool m_playing = false;
+ 
+     std::string m_name;
+ };
+diff --git a/app/drum808/kick.cpp b/app/drum808/kick.cpp
+index ab3187d3c1421d0fb56b0024b2dc2100d3334f4d..caed91d337febc424e0dea49b25c4bcf85d23463
+--- a/app/drum808/kick.cpp
++++ b/app/drum808/kick.cpp
+@@ -12,19 +12,21 @@
+ 
+ void Kick::setDefaults()
+ {
+-    AmpEnv::AmpEnvSettings envSettings = {
+-        .peakAmp = 0.8,
+-        .decay = 0.25,
+-    };
++    AmpEnv::AmpEnvSettings envSettings{};
++    envSettings.startAmp = 0.0;
++    envSettings.peakAmp = 0.8;
++    envSettings.releaseAmp = 0.0;
++    envSettings.attack = 0.0;
++    envSettings.decay = 0.25;
+     AmpEnv *ampEnv = new AmpEnv(envSettings);
+     setAmpEnv(ampEnv);
+ 
+-    PitchEnv::EnvSettings pitchEnvSettings = {
+-        .startPitch = (double)getPitch(),
+-        .peakPitch = getPitch() + SEMITONE_HZ * 48.0,
+-        .releasePitch = (double)getPitch(),
+-        .decay = 0.02,
+-    };
++    PitchEnv::EnvSettings pitchEnvSettings{};
++    pitchEnvSettings.startPitch = (double)getPitch();
++    pitchEnvSettings.peakPitch = getPitch() + SEMITONE_HZ * 48.0;
++    pitchEnvSettings.releasePitch = (double)getPitch();
++    pitchEnvSettings.attack = 0.0;
++    pitchEnvSettings.decay = 0.02;
+     PitchEnv *pitchEnv = new PitchEnv(pitchEnvSettings);
+     setPitchEnv(pitchEnv);
+ }
+diff --git a/app/drum808/snare.cpp b/app/drum808/snare.cpp
+index f044bfe6bae8a768c4cbf4c10a7b0f9b6b009dd4..350f3efc4d4a93f935756b31e5b9b3e1a1a2f4b9
+--- a/app/drum808/snare.cpp
++++ b/app/drum808/snare.cpp
+@@ -1,5 +1,6 @@
+ #include <algorithm>
+ #include <cmath>
++#include <cstdlib>
+ #include <ctime>
+ #include <iostream>
+ #include "snare.h"
+@@ -14,27 +15,30 @@
+ 
+ void Snare::setDefaults()
+ {
+-    AmpEnv::AmpEnvSettings toneAmpEnvSettings = {
+-        .peakAmp = 0.1,
+-        .attack = 0.01,
+-        .decay = 0.25,
+-    };
++    AmpEnv::AmpEnvSettings toneAmpEnvSettings{};
++    toneAmpEnvSettings.startAmp = 0.0;
++    toneAmpEnvSettings.peakAmp = 0.1;
++    toneAmpEnvSettings.releaseAmp = 0.0;
++    toneAmpEnvSettings.attack = 0.01;
++    toneAmpEnvSettings.decay = 0.25;
+     AmpEnv *toneEnv = new AmpEnv(toneAmpEnvSettings);
+     setAmpEnv(toneEnv);
+ 
+-    PitchEnv::EnvSettings pitchEnvSettings = {
+-        .startPitch = (double)getPitch(),
+-        .peakPitch = getPitch() + SEMITONE_HZ * 24.0,
+-        .releasePitch = (double)getPitch(),
+-        .decay = 0.04,
+-    };
++    PitchEnv::EnvSettings pitchEnvSettings{};
++    pitchEnvSettings.startPitch = (double)getPitch();
++    pitchEnvSettings.peakPitch = getPitch() + SEMITONE_HZ * 24.0;
++    pitchEnvSettings.releasePitch = (double)getPitch();
++    pitchEnvSettings.attack = 0.0;
++    pitchEnvSettings.decay = 0.04;
+     PitchEnv *pitchEnv = new PitchEnv(pitchEnvSettings);
+     setPitchEnv(pitchEnv);
+ 
+-    AmpEnv::AmpEnvSettings noiseAmpEnvSettings = {
+-        .peakAmp = 0.6,
+-        .decay = 0.25,
+-    };
++    AmpEnv::AmpEnvSettings noiseAmpEnvSettings{};
++    noiseAmpEnvSettings.startAmp = 0.0;
++    noiseAmpEnvSettings.peakAmp = 0.6;
++    noiseAmpEnvSettings.releaseAmp = 0.0;
++    noiseAmpEnvSettings.attack = 0.0;
++    noiseAmpEnvSettings.decay = 0.25;
+     AmpEnv *noiseEnv = new AmpEnv(noiseAmpEnvSettings);
+     setNoiseEnv(noiseEnv);
+ 
+@@ -79,6 +83,9 @@
+     double tone = sin(pitch * TAU * m_elapsed);
+     double toneAmp = m_ampEnv->getEnvValue(m_elapsed);
+ 
++    if (m_bandPass == nullptr || m_noiseEnv == nullptr) {
++        return tone * toneAmp;
++    }
+     double noise = m_bandPass->filter((double)rand() / RAND_MAX);
+     double noiseAmp = m_noiseEnv->getEnvValue(m_elapsed);
+     return (tone * toneAmp) + (noise * noiseAmp);
+diff --git a/app/drum808/snare.h b/app/drum808/snare.h
+index 3575e10fb587369b7d8ed93df0469cef31bb5b7a..7a3d39f79199e5451d38b5db384173cd76693d00
+--- a/app/drum808/snare.h
++++ b/app/drum808/snare.h
+@@ -29,12 +29,11 @@
+     const std::string m_defaultName = "Snare";
+     const int m_defaultPitch = 160;
+ 
+-    Filter *m_bandPass;
+-    Filter *m_highPass;
++    Filter *m_bandPass = nullptr;
++    Filter *m_highPass = nullptr;
+ 
+ };
+ 
+ 
+ } // namespace drum808
+ #endif
+-
+
+
+thinking
+**Identifying misplaced namespace closures**
+ exited 1 in 5.46s:
+In file included from app/drum808/amp_env.cpp:2:
+In file included from app/drum808/amp_env.h:4:
+app/drum808/envelope.h:43:1: error: extraneous closing brace ('}')
+   43 | } // namespace drum808
+      | ^
+1 error generated.
+In file included from app/drum808/clap.cpp:5:
+In file included from app/drum808/clap.h:4:
+app/drum808/filter.h:33:1: error: extraneous closing brace ('}')
+   33 | } // namespace drum808
+      | ^
+In file included from app/drum808/clap.cpp:5:
+In file included from app/drum808/clap.h:5:
+In file included from app/drum808/instrument.h:6:
+In file included from app/drum808/amp_env.h:4:
+app/drum808/envelope.h:43:1: error: extraneous closing brace ('}')
+   43 | } // namespace drum808
+      | ^
+2 errors generated.
+In file included from app/drum808/closed_hat.cpp:2:
+codex
+The syntax check exposed a mechanical wrapper bug: headers with no `#include` lines (at least `envelope.h`, likely `filter.h`) got a closing namespace brace without an opening one. I’m fixing those headers and rerunning the compile.
+exec
+/bin/zsh -lc "sed -n '1,120p' app/drum808/envelope.h" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,120p' app/drum808/filter.h" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+#ifndef ENVELOPE_H
+#define ENVELOPE_H
+
+/**
+ * This abstract class is the base for all ADSR implementations.
+ *
+ * For now it only supports attack and decay stages.
+ **/
+class Envelope
+{
+public:
+    Envelope() = default;
+    virtual ~Envelope() = default;
+
+    double getDuration();
+
+    void setAttack(double attack);
+    void setDecay(double decay);
+
+    void setStart(double start);
+ succeeded in 51ms:
+#ifndef FILTER_H
+#define FILTER_H
+
+enum {
+    BANDPASS = 0,
+    HIGHPASS,
+};
+
+class Filter
+{
+public:
+    Filter(int type);
+    ~Filter() = default;
+
+    void setFilter(double freq, double q);
+
+    double filter(double input);
+
+private:
+    static const int m_sampleRate = 44100;
+file update:
+diff --git a/app/drum808/clap.cpp b/app/drum808/clap.cpp
+index 6e612e9eedc14a0e18413e406c162cfe6a48c606..1c3f169f00779631d448cba432dca61e32ebf46e
+--- a/app/drum808/clap.cpp
++++ b/app/drum808/clap.cpp
+@@ -1,5 +1,7 @@
++#include <cmath>
++#include <cstdlib>
++#include <ctime>
+ #include <iostream>
+-#include <cmath>
+ #include "clap.h"
+ 
+ namespace drum808 {
+@@ -14,10 +16,12 @@
+ 
+ void Clap::setDefaults()
+ {
+-    AmpEnv::AmpEnvSettings envSettings = {
+-        .peakAmp = 0.8,
+-        .decay = 0.3
+-    };
++    AmpEnv::AmpEnvSettings envSettings{};
++    envSettings.startAmp = 0.0;
++    envSettings.peakAmp = 0.8;
++    envSettings.releaseAmp = 0.0;
++    envSettings.attack = 0.0;
++    envSettings.decay = 0.3;
+     AmpEnv *ampEnv = new AmpEnv(envSettings);
+     setAmpEnv(ampEnv);
+ 
+@@ -58,6 +62,7 @@
+         sample = noise * decay;
+     }
+ 
++    if (m_bandPass == nullptr || m_highPass == nullptr) return sample;
+     return m_highPass->filter(m_bandPass->filter(sample));
+ }
+ 
+diff --git a/app/drum808/clap.h b/app/drum808/clap.h
+index faad2b019afe6a2f98ef6444fcda2bdcbd33454e..31af137bf3b8b7c297c8a4d198e98cad9a25d1c2
+--- a/app/drum808/clap.h
++++ b/app/drum808/clap.h
+@@ -27,8 +27,8 @@
+     // 10 ms between claps
+     static constexpr double m_interval = 0.01;
+ 
+-    Filter *m_highPass;
+-    Filter *m_bandPass;
++    Filter *m_highPass = nullptr;
++    Filter *m_bandPass = nullptr;
+ };
+ 
+ 
+diff --git a/app/drum808/closed_hat.cpp b/app/drum808/closed_hat.cpp
+index f0796853e6813cc7163a1053de0228aca5b02aa3..87cbc065b72ed3629d9e466836634a7652de2fab
+--- a/app/drum808/closed_hat.cpp
++++ b/app/drum808/closed_hat.cpp
+@@ -21,10 +21,12 @@
+ 
+ void ClosedHat::setDefaults()
+ {
+-    AmpEnv::AmpEnvSettings envSettings = {
+-        .peakAmp = 0.8,
+-        .decay = 0.2
+-    };
++    AmpEnv::AmpEnvSettings envSettings{};
++    envSettings.startAmp = 0.0;
++    envSettings.peakAmp = 0.8;
++    envSettings.releaseAmp = 0.0;
++    envSettings.attack = 0.0;
++    envSettings.decay = 0.2;
+     AmpEnv *ampEnv = new AmpEnv(envSettings);
+     setAmpEnv(ampEnv);
+ 
+@@ -54,6 +56,9 @@
+         amp += value;
+     }
+     amp /= m_harmonics.size();
++    if (m_bandPass == nullptr || m_highPass == nullptr || m_ampEnv == nullptr) {
++        return amp;
++    }
+     double firstStep = m_bandPass->filter(amp);
+     double secondStep = m_highPass->filter(firstStep);
+     return secondStep * m_ampEnv->getEnvValue(m_elapsed);
+diff --git a/app/drum808/closed_hat.h b/app/drum808/closed_hat.h
+index 444472b295f00fc806a610a3a9334052232b0f62..164cbd02d747084a50c8f72281d17d804abcc755
+--- a/app/drum808/closed_hat.h
++++ b/app/drum808/closed_hat.h
+@@ -27,8 +27,8 @@
+ 
+     std::array<double, 6> m_harmonics;
+ 
+-    Filter *m_bandPass;
+-    Filter *m_highPass;
++    Filter *m_bandPass = nullptr;
++    Filter *m_highPass = nullptr;
+ };
+ 
+ 
+diff --git a/app/drum808/envelope.cpp b/app/drum808/envelope.cpp
+index 849e7fb3a4a16aca7350c302bbd9ff99fc5fe2ea..fac7705393fc872697c4e5442a547fd1878adf21
+--- a/app/drum808/envelope.cpp
++++ b/app/drum808/envelope.cpp
+@@ -37,6 +37,11 @@
+ {
+     if (time > m_duration) return m_release;
+ 
++    if (m_attack <= 0.0) {
++        if (m_decay <= 0.0) return m_release;
++        return decayRamp(time);
++    }
++
+     if (time <= m_attack) {
+         return attackRamp(time);
+     } else if (time <= (m_attack + m_decay)) {
+@@ -49,11 +54,13 @@
+ 
+ double Envelope::attackRamp(double time)
+ {
++    if (m_attack <= 0.0) return m_peak;
+     return (m_peak - m_start) / m_attack * time + m_start;
+ }
+ 
+ double Envelope::decayRamp(double time)
+ {
++    if (m_decay <= 0.0) return m_release;
+     return (m_release - m_peak) / m_decay * (time - m_attack) + m_peak;
+ }
+ 
+diff --git a/app/drum808/envelope.h b/app/drum808/envelope.h
+index 46da18ce3d119eaf713d3202bacb2ad9b0637a7e..48e79c8e4370abd3f1db4efe935168c8fb80abe5
+--- a/app/drum808/envelope.h
++++ b/app/drum808/envelope.h
+@@ -10,7 +10,7 @@
+ {
+ public:
+     Envelope() = default;
+-    ~Envelope() = default;
++    virtual ~Envelope() = default;
+ 
+     double getDuration();
+ 
+@@ -24,13 +24,13 @@
+     double getEnvValue(double time);
+ 
+ protected:
+-    double m_attack;
+-    double m_decay;
+-    double m_duration;
++    double m_attack = 0.0;
++    double m_decay = 0.0;
++    double m_duration = 0.0;
+ 
+-    double m_start;
+-    double m_peak;
+-    double m_release;
++    double m_start = 0.0;
++    double m_peak = 0.0;
++    double m_release = 0.0;
+ 
+ private:
+     double attackRamp(double time);
+diff --git a/app/drum808/filter.h b/app/drum808/filter.h
+index 39f2d673a2bc54bb97d9962113876846c5a42318..d948dcd18af12306900ede3e71b9b00216648803
+--- a/app/drum808/filter.h
++++ b/app/drum808/filter.h
+@@ -23,8 +23,8 @@
+     double m_freq;
+     double m_q;
+ 
+-    double a0, a1, a2, b1, b2;
+-    double z1, z2;
++    double a0 = 0.0, a1 = 0.0, a2 = 0.0, b1 = 0.0, b2 = 0.0;
++    double z1 = 0.0, z2 = 0.0;
+ 
+     void calcFilter();
+ };
+diff --git a/app/drum808/instrument.cpp b/app/drum808/instrument.cpp
+index 9a3390feca3887e82cae6c385e466cb18c870f7e..019705a3569e523c51eacd7eb87cefd16e97e4f4
+--- a/app/drum808/instrument.cpp
++++ b/app/drum808/instrument.cpp
+@@ -7,7 +7,13 @@
+ using std::cout;
+ using std::endl;
+ 
+-int Instrument::getPitch()
++Instrument::~Instrument()
++{
++    delete m_ampEnv;
++    delete m_pitchEnv;
++}
++
++int Instrument::getPitch() const
+ {
+     return m_pitch;
+ }
+@@ -45,12 +51,12 @@
+     m_triggered = false;
+ }
+ 
+-bool Instrument::isTriggered()
++bool Instrument::isTriggered() const
+ {
+     return m_triggered;
+ }
+ 
+-bool Instrument::isPlaying()
++bool Instrument::isPlaying() const
+ {
+     return m_playing;
+ }
+@@ -83,7 +89,7 @@
+     return value;
+ }
+ 
+-std::string Instrument::getName()
++const std::string &Instrument::getName() const
+ {
+     return m_name;
+ }
+diff --git a/app/drum808/instrument.h b/app/drum808/instrument.h
+index bc10977365c6e31a160e421e431f67aaa661a9f2..9e970887b18ec3038f44aeffe8648804f9afb7f3
+--- a/app/drum808/instrument.h
++++ b/app/drum808/instrument.h
+@@ -2,7 +2,6 @@
+ #define INSTRUMENT_H
+ 
+ #include <cmath>
+-#include <optional>
+ #include <string>
+ #include "amp_env.h"
+ #include "pitch_env.h"
+@@ -15,9 +14,9 @@
+ {
+ public:
+     Instrument() = default;
+-    ~Instrument() = default;
++    virtual ~Instrument();
+ 
+-    int getPitch();
++    int getPitch() const;
+     void setPitch(int pitch);
+ 
+     void setLevel(double level);
+@@ -30,14 +29,14 @@
+ 
+     void trigger();
+     void release();
+-    bool isTriggered();
+-    bool isPlaying();
++    bool isTriggered() const;
++    bool isPlaying() const;
+ 
+     void updateBy(double time);
+ 
+     virtual double getSample();
+ 
+-    std::string getName();
++    const std::string &getName() const;
+ 
+     static constexpr double TAU = M_PI * 2.0;
+ 
+@@ -45,13 +44,13 @@
+     AmpEnv *m_ampEnv = nullptr;
+     PitchEnv *m_pitchEnv = nullptr;
+ 
+-    double m_duration;
+-    double m_elapsed;
++    double m_duration = 0.0;
++    double m_elapsed = 0.0;
+ 
+-    int m_pitch;
++    int m_pitch = 0;
+ 
+-    bool m_triggered;
+-    bool m_playing;
++    bool m_triggered = false;
++    bool m_playing = false;
+ 
+     std::string m_name;
+ };
+diff --git a/app/drum808/kick.cpp b/app/drum808/kick.cpp
+index ab3187d3c1421d0fb56b0024b2dc2100d3334f4d..caed91d337febc424e0dea49b25c4bcf85d23463
+--- a/app/drum808/kick.cpp
++++ b/app/drum808/kick.cpp
+@@ -12,19 +12,21 @@
+ 
+ void Kick::setDefaults()
+ {
+-    AmpEnv::AmpEnvSettings envSettings = {
+-        .peakAmp = 0.8,
+-        .decay = 0.25,
+-    };
++    AmpEnv::AmpEnvSettings envSettings{};
++    envSettings.startAmp = 0.0;
++    envSettings.peakAmp = 0.8;
++    envSettings.releaseAmp = 0.0;
++    envSettings.attack = 0.0;
++    envSettings.decay = 0.25;
+     AmpEnv *ampEnv = new AmpEnv(envSettings);
+     setAmpEnv(ampEnv);
+ 
+-    PitchEnv::EnvSettings pitchEnvSettings = {
+-        .startPitch = (double)getPitch(),
+-        .peakPitch = getPitch() + SEMITONE_HZ * 48.0,
+-        .releasePitch = (double)getPitch(),
+-        .decay = 0.02,
+-    };
++    PitchEnv::EnvSettings pitchEnvSettings{};
++    pitchEnvSettings.startPitch = (double)getPitch();
++    pitchEnvSettings.peakPitch = getPitch() + SEMITONE_HZ * 48.0;
++    pitchEnvSettings.releasePitch = (double)getPitch();
++    pitchEnvSettings.attack = 0.0;
++    pitchEnvSettings.decay = 0.02;
+     PitchEnv *pitchEnv = new PitchEnv(pitchEnvSettings);
+     setPitchEnv(pitchEnv);
+ }
+diff --git a/app/drum808/snare.cpp b/app/drum808/snare.cpp
+index f044bfe6bae8a768c4cbf4c10a7b0f9b6b009dd4..350f3efc4d4a93f935756b31e5b9b3e1a1a2f4b9
+--- a/app/drum808/snare.cpp
++++ b/app/drum808/snare.cpp
+@@ -1,5 +1,6 @@
+ #include <algorithm>
+ #include <cmath>
++#include <cstdlib>
+ #include <ctime>
+ #include <iostream>
+ #include "snare.h"
+@@ -14,27 +15,30 @@
+ 
+ void Snare::setDefaults()
+ {
+-    AmpEnv::AmpEnvSettings toneAmpEnvSettings = {
+-        .peakAmp = 0.1,
+-        .attack = 0.01,
+-        .decay = 0.25,
+-    };
++    AmpEnv::AmpEnvSettings toneAmpEnvSettings{};
++    toneAmpEnvSettings.startAmp = 0.0;
++    toneAmpEnvSettings.peakAmp = 0.1;
++    toneAmpEnvSettings.releaseAmp = 0.0;
++    toneAmpEnvSettings.attack = 0.01;
++    toneAmpEnvSettings.decay = 0.25;
+     AmpEnv *toneEnv = new AmpEnv(toneAmpEnvSettings);
+     setAmpEnv(toneEnv);
+ 
+-    PitchEnv::EnvSettings pitchEnvSettings = {
+-        .startPitch = (double)getPitch(),
+-        .peakPitch = getPitch() + SEMITONE_HZ * 24.0,
+-        .releasePitch = (double)getPitch(),
+-        .decay = 0.04,
+-    };
++    PitchEnv::EnvSettings pitchEnvSettings{};
++    pitchEnvSettings.startPitch = (double)getPitch();
++    pitchEnvSettings.peakPitch = getPitch() + SEMITONE_HZ * 24.0;
++    pitchEnvSettings.releasePitch = (double)getPitch();
++    pitchEnvSettings.attack = 0.0;
++    pitchEnvSettings.decay = 0.04;
+     PitchEnv *pitchEnv = new PitchEnv(pitchEnvSettings);
+     setPitchEnv(pitchEnv);
+ 
+-    AmpEnv::AmpEnvSettings noiseAmpEnvSettings = {
+-        .peakAmp = 0.6,
+-        .decay = 0.25,
+-    };
++    AmpEnv::AmpEnvSettings noiseAmpEnvSettings{};
++    noiseAmpEnvSettings.startAmp = 0.0;
++    noiseAmpEnvSettings.peakAmp = 0.6;
++    noiseAmpEnvSettings.releaseAmp = 0.0;
++    noiseAmpEnvSettings.attack = 0.0;
++    noiseAmpEnvSettings.decay = 0.25;
+     AmpEnv *noiseEnv = new AmpEnv(noiseAmpEnvSettings);
+     setNoiseEnv(noiseEnv);
+ 
+@@ -79,6 +83,9 @@
+     double tone = sin(pitch * TAU * m_elapsed);
+     double toneAmp = m_ampEnv->getEnvValue(m_elapsed);
+ 
++    if (m_bandPass == nullptr || m_noiseEnv == nullptr) {
++        return tone * toneAmp;
++    }
+     double noise = m_bandPass->filter((double)rand() / RAND_MAX);
+     double noiseAmp = m_noiseEnv->getEnvValue(m_elapsed);
+     return (tone * toneAmp) + (noise * noiseAmp);
+diff --git a/app/drum808/snare.h b/app/drum808/snare.h
+index 3575e10fb587369b7d8ed93df0469cef31bb5b7a..7a3d39f79199e5451d38b5db384173cd76693d00
+--- a/app/drum808/snare.h
++++ b/app/drum808/snare.h
+@@ -29,12 +29,11 @@
+     const std::string m_defaultName = "Snare";
+     const int m_defaultPitch = 160;
+ 
+-    Filter *m_bandPass;
+-    Filter *m_highPass;
++    Filter *m_bandPass = nullptr;
++    Filter *m_highPass = nullptr;
+ 
+ };
+ 
+ 
+ } // namespace drum808
+ #endif
+-
+
+
+thinking
+**Planning namespace additions**
+exec
+/bin/zsh -lc 'for f in app/drum808/*.h; do if ! rg -q '"'"'^namespace drum808 '"\\{' \""'$f"; then echo "$f"; fi; done' in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+app/drum808/envelope.h
+app/drum808/filter.h
+file update:
+diff --git a/app/drum808/clap.cpp b/app/drum808/clap.cpp
+index 6e612e9eedc14a0e18413e406c162cfe6a48c606..1c3f169f00779631d448cba432dca61e32ebf46e
+--- a/app/drum808/clap.cpp
++++ b/app/drum808/clap.cpp
+@@ -1,5 +1,7 @@
++#include <cmath>
++#include <cstdlib>
++#include <ctime>
+ #include <iostream>
+-#include <cmath>
+ #include "clap.h"
+ 
+ namespace drum808 {
+@@ -14,10 +16,12 @@
+ 
+ void Clap::setDefaults()
+ {
+-    AmpEnv::AmpEnvSettings envSettings = {
+-        .peakAmp = 0.8,
+-        .decay = 0.3
+-    };
++    AmpEnv::AmpEnvSettings envSettings{};
++    envSettings.startAmp = 0.0;
++    envSettings.peakAmp = 0.8;
++    envSettings.releaseAmp = 0.0;
++    envSettings.attack = 0.0;
++    envSettings.decay = 0.3;
+     AmpEnv *ampEnv = new AmpEnv(envSettings);
+     setAmpEnv(ampEnv);
+ 
+@@ -58,6 +62,7 @@
+         sample = noise * decay;
+     }
+ 
++    if (m_bandPass == nullptr || m_highPass == nullptr) return sample;
+     return m_highPass->filter(m_bandPass->filter(sample));
+ }
+ 
+diff --git a/app/drum808/clap.h b/app/drum808/clap.h
+index faad2b019afe6a2f98ef6444fcda2bdcbd33454e..31af137bf3b8b7c297c8a4d198e98cad9a25d1c2
+--- a/app/drum808/clap.h
++++ b/app/drum808/clap.h
+@@ -27,8 +27,8 @@
+     // 10 ms between claps
+     static constexpr double m_interval = 0.01;
+ 
+-    Filter *m_highPass;
+-    Filter *m_bandPass;
++    Filter *m_highPass = nullptr;
++    Filter *m_bandPass = nullptr;
+ };
+ 
+ 
+diff --git a/app/drum808/closed_hat.cpp b/app/drum808/closed_hat.cpp
+index f0796853e6813cc7163a1053de0228aca5b02aa3..87cbc065b72ed3629d9e466836634a7652de2fab
+--- a/app/drum808/closed_hat.cpp
++++ b/app/drum808/closed_hat.cpp
+@@ -21,10 +21,12 @@
+ 
+ void ClosedHat::setDefaults()
+ {
+-    AmpEnv::AmpEnvSettings envSettings = {
+-        .peakAmp = 0.8,
+-        .decay = 0.2
+-    };
++    AmpEnv::AmpEnvSettings envSettings{};
++    envSettings.startAmp = 0.0;
++    envSettings.peakAmp = 0.8;
++    envSettings.releaseAmp = 0.0;
++    envSettings.attack = 0.0;
++    envSettings.decay = 0.2;
+     AmpEnv *ampEnv = new AmpEnv(envSettings);
+     setAmpEnv(ampEnv);
+ 
+@@ -54,6 +56,9 @@
+         amp += value;
+     }
+     amp /= m_harmonics.size();
++    if (m_bandPass == nullptr || m_highPass == nullptr || m_ampEnv == nullptr) {
++        return amp;
++    }
+     double firstStep = m_bandPass->filter(amp);
+     double secondStep = m_highPass->filter(firstStep);
+     return secondStep * m_ampEnv->getEnvValue(m_elapsed);
+diff --git a/app/drum808/closed_hat.h b/app/drum808/closed_hat.h
+index 444472b295f00fc806a610a3a9334052232b0f62..164cbd02d747084a50c8f72281d17d804abcc755
+--- a/app/drum808/closed_hat.h
++++ b/app/drum808/closed_hat.h
+@@ -27,8 +27,8 @@
+ 
+     std::array<double, 6> m_harmonics;
+ 
+-    Filter *m_bandPass;
+-    Filter *m_highPass;
++    Filter *m_bandPass = nullptr;
++    Filter *m_highPass = nullptr;
+ };
+ 
+ 
+diff --git a/app/drum808/envelope.cpp b/app/drum808/envelope.cpp
+index 849e7fb3a4a16aca7350c302bbd9ff99fc5fe2ea..fac7705393fc872697c4e5442a547fd1878adf21
+--- a/app/drum808/envelope.cpp
++++ b/app/drum808/envelope.cpp
+@@ -37,6 +37,11 @@
+ {
+     if (time > m_duration) return m_release;
+ 
++    if (m_attack <= 0.0) {
++        if (m_decay <= 0.0) return m_release;
++        return decayRamp(time);
++    }
++
+     if (time <= m_attack) {
+         return attackRamp(time);
+     } else if (time <= (m_attack + m_decay)) {
+@@ -49,11 +54,13 @@
+ 
+ double Envelope::attackRamp(double time)
+ {
++    if (m_attack <= 0.0) return m_peak;
+     return (m_peak - m_start) / m_attack * time + m_start;
+ }
+ 
+ double Envelope::decayRamp(double time)
+ {
++    if (m_decay <= 0.0) return m_release;
+     return (m_release - m_peak) / m_decay * (time - m_attack) + m_peak;
+ }
+ 
+diff --git a/app/drum808/envelope.h b/app/drum808/envelope.h
+index 46da18ce3d119eaf713d3202bacb2ad9b0637a7e..48e79c8e4370abd3f1db4efe935168c8fb80abe5
+--- a/app/drum808/envelope.h
++++ b/app/drum808/envelope.h
+@@ -10,7 +10,7 @@
+ {
+ public:
+     Envelope() = default;
+-    ~Envelope() = default;
++    virtual ~Envelope() = default;
+ 
+     double getDuration();
+ 
+@@ -24,13 +24,13 @@
+     double getEnvValue(double time);
+ 
+ protected:
+-    double m_attack;
+-    double m_decay;
+-    double m_duration;
++    double m_attack = 0.0;
++    double m_decay = 0.0;
++    double m_duration = 0.0;
+ 
+-    double m_start;
+-    double m_peak;
+-    double m_release;
++    double m_start = 0.0;
++    double m_peak = 0.0;
++    double m_release = 0.0;
+ 
+ private:
+     double attackRamp(double time);
+diff --git a/app/drum808/filter.h b/app/drum808/filter.h
+index 39f2d673a2bc54bb97d9962113876846c5a42318..d948dcd18af12306900ede3e71b9b00216648803
+--- a/app/drum808/filter.h
++++ b/app/drum808/filter.h
+@@ -23,8 +23,8 @@
+     double m_freq;
+     double m_q;
+ 
+-    double a0, a1, a2, b1, b2;
+-    double z1, z2;
++    double a0 = 0.0, a1 = 0.0, a2 = 0.0, b1 = 0.0, b2 = 0.0;
++    double z1 = 0.0, z2 = 0.0;
+ 
+     void calcFilter();
+ };
+diff --git a/app/drum808/instrument.cpp b/app/drum808/instrument.cpp
+index 9a3390feca3887e82cae6c385e466cb18c870f7e..019705a3569e523c51eacd7eb87cefd16e97e4f4
+--- a/app/drum808/instrument.cpp
++++ b/app/drum808/instrument.cpp
+@@ -7,7 +7,13 @@
+ using std::cout;
+ using std::endl;
+ 
+-int Instrument::getPitch()
++Instrument::~Instrument()
++{
++    delete m_ampEnv;
++    delete m_pitchEnv;
++}
++
++int Instrument::getPitch() const
+ {
+     return m_pitch;
+ }
+@@ -45,12 +51,12 @@
+     m_triggered = false;
+ }
+ 
+-bool Instrument::isTriggered()
++bool Instrument::isTriggered() const
+ {
+     return m_triggered;
+ }
+ 
+-bool Instrument::isPlaying()
++bool Instrument::isPlaying() const
+ {
+     return m_playing;
+ }
+@@ -83,7 +89,7 @@
+     return value;
+ }
+ 
+-std::string Instrument::getName()
++const std::string &Instrument::getName() const
+ {
+     return m_name;
+ }
+diff --git a/app/drum808/instrument.h b/app/drum808/instrument.h
+index bc10977365c6e31a160e421e431f67aaa661a9f2..9e970887b18ec3038f44aeffe8648804f9afb7f3
+--- a/app/drum808/instrument.h
++++ b/app/drum808/instrument.h
+@@ -2,7 +2,6 @@
+ #define INSTRUMENT_H
+ 
+ #include <cmath>
+-#include <optional>
+ #include <string>
+ #include "amp_env.h"
+ #include "pitch_env.h"
+@@ -15,9 +14,9 @@
+ {
+ public:
+     Instrument() = default;
+-    ~Instrument() = default;
++    virtual ~Instrument();
+ 
+-    int getPitch();
++    int getPitch() const;
+     void setPitch(int pitch);
+ 
+     void setLevel(double level);
+@@ -30,14 +29,14 @@
+ 
+     void trigger();
+     void release();
+-    bool isTriggered();
+-    bool isPlaying();
++    bool isTriggered() const;
++    bool isPlaying() const;
+ 
+     void updateBy(double time);
+ 
+     virtual double getSample();
+ 
+-    std::string getName();
++    const std::string &getName() const;
+ 
+     static constexpr double TAU = M_PI * 2.0;
+ 
+@@ -45,13 +44,13 @@
+     AmpEnv *m_ampEnv = nullptr;
+     PitchEnv *m_pitchEnv = nullptr;
+ 
+-    double m_duration;
+-    double m_elapsed;
++    double m_duration = 0.0;
++    double m_elapsed = 0.0;
+ 
+-    int m_pitch;
++    int m_pitch = 0;
+ 
+-    bool m_triggered;
+-    bool m_playing;
++    bool m_triggered = false;
++    bool m_playing = false;
+ 
+     std::string m_name;
+ };
+diff --git a/app/drum808/kick.cpp b/app/drum808/kick.cpp
+index ab3187d3c1421d0fb56b0024b2dc2100d3334f4d..caed91d337febc424e0dea49b25c4bcf85d23463
+--- a/app/drum808/kick.cpp
++++ b/app/drum808/kick.cpp
+@@ -12,19 +12,21 @@
+ 
+ void Kick::setDefaults()
+ {
+-    AmpEnv::AmpEnvSettings envSettings = {
+-        .peakAmp = 0.8,
+-        .decay = 0.25,
+-    };
++    AmpEnv::AmpEnvSettings envSettings{};
++    envSettings.startAmp = 0.0;
++    envSettings.peakAmp = 0.8;
++    envSettings.releaseAmp = 0.0;
++    envSettings.attack = 0.0;
++    envSettings.decay = 0.25;
+     AmpEnv *ampEnv = new AmpEnv(envSettings);
+     setAmpEnv(ampEnv);
+ 
+-    PitchEnv::EnvSettings pitchEnvSettings = {
+-        .startPitch = (double)getPitch(),
+-        .peakPitch = getPitch() + SEMITONE_HZ * 48.0,
+-        .releasePitch = (double)getPitch(),
+-        .decay = 0.02,
+-    };
++    PitchEnv::EnvSettings pitchEnvSettings{};
++    pitchEnvSettings.startPitch = (double)getPitch();
++    pitchEnvSettings.peakPitch = getPitch() + SEMITONE_HZ * 48.0;
++    pitchEnvSettings.releasePitch = (double)getPitch();
++    pitchEnvSettings.attack = 0.0;
++    pitchEnvSettings.decay = 0.02;
+     PitchEnv *pitchEnv = new PitchEnv(pitchEnvSettings);
+     setPitchEnv(pitchEnv);
+ }
+diff --git a/app/drum808/snare.cpp b/app/drum808/snare.cpp
+index f044bfe6bae8a768c4cbf4c10a7b0f9b6b009dd4..350f3efc4d4a93f935756b31e5b9b3e1a1a2f4b9
+--- a/app/drum808/snare.cpp
++++ b/app/drum808/snare.cpp
+@@ -1,5 +1,6 @@
+ #include <algorithm>
+ #include <cmath>
++#include <cstdlib>
+ #include <ctime>
+ #include <iostream>
+ #include "snare.h"
+@@ -14,27 +15,30 @@
+ 
+ void Snare::setDefaults()
+ {
+-    AmpEnv::AmpEnvSettings toneAmpEnvSettings = {
+-        .peakAmp = 0.1,
+-        .attack = 0.01,
+-        .decay = 0.25,
+-    };
++    AmpEnv::AmpEnvSettings toneAmpEnvSettings{};
++    toneAmpEnvSettings.startAmp = 0.0;
++    toneAmpEnvSettings.peakAmp = 0.1;
++    toneAmpEnvSettings.releaseAmp = 0.0;
++    toneAmpEnvSettings.attack = 0.01;
++    toneAmpEnvSettings.decay = 0.25;
+     AmpEnv *toneEnv = new AmpEnv(toneAmpEnvSettings);
+     setAmpEnv(toneEnv);
+ 
+-    PitchEnv::EnvSettings pitchEnvSettings = {
+-        .startPitch = (double)getPitch(),
+-        .peakPitch = getPitch() + SEMITONE_HZ * 24.0,
+-        .releasePitch = (double)getPitch(),
+-        .decay = 0.04,
+-    };
++    PitchEnv::EnvSettings pitchEnvSettings{};
++    pitchEnvSettings.startPitch = (double)getPitch();
++    pitchEnvSettings.peakPitch = getPitch() + SEMITONE_HZ * 24.0;
++    pitchEnvSettings.releasePitch = (double)getPitch();
++    pitchEnvSettings.attack = 0.0;
++    pitchEnvSettings.decay = 0.04;
+     PitchEnv *pitchEnv = new PitchEnv(pitchEnvSettings);
+     setPitchEnv(pitchEnv);
+ 
+-    AmpEnv::AmpEnvSettings noiseAmpEnvSettings = {
+-        .peakAmp = 0.6,
+-        .decay = 0.25,
+-    };
++    AmpEnv::AmpEnvSettings noiseAmpEnvSettings{};
++    noiseAmpEnvSettings.startAmp = 0.0;
++    noiseAmpEnvSettings.peakAmp = 0.6;
++    noiseAmpEnvSettings.releaseAmp = 0.0;
++    noiseAmpEnvSettings.attack = 0.0;
++    noiseAmpEnvSettings.decay = 0.25;
+     AmpEnv *noiseEnv = new AmpEnv(noiseAmpEnvSettings);
+     setNoiseEnv(noiseEnv);
+ 
+@@ -79,6 +83,9 @@
+     double tone = sin(pitch * TAU * m_elapsed);
+     double toneAmp = m_ampEnv->getEnvValue(m_elapsed);
+ 
++    if (m_bandPass == nullptr || m_noiseEnv == nullptr) {
++        return tone * toneAmp;
++    }
+     double noise = m_bandPass->filter((double)rand() / RAND_MAX);
+     double noiseAmp = m_noiseEnv->getEnvValue(m_elapsed);
+     return (tone * toneAmp) + (noise * noiseAmp);
+diff --git a/app/drum808/snare.h b/app/drum808/snare.h
+index 3575e10fb587369b7d8ed93df0469cef31bb5b7a..7a3d39f79199e5451d38b5db384173cd76693d00
+--- a/app/drum808/snare.h
++++ b/app/drum808/snare.h
+@@ -29,12 +29,11 @@
+     const std::string m_defaultName = "Snare";
+     const int m_defaultPitch = 160;
+ 
+-    Filter *m_bandPass;
+-    Filter *m_highPass;
++    Filter *m_bandPass = nullptr;
++    Filter *m_highPass = nullptr;
+ 
+ };
+ 
+ 
+ } // namespace drum808
+ #endif
+-
+
+codex
+Only `envelope.h` and `filter.h` were affected. I’m adding the missing `namespace drum808 {` wrappers there and rerunning the syntax check.
+file update
+M /Users/james/Repos/wibandwob-dos/app/drum808/envelope.h
+@@ -3,2 +3,4 @@
+ 
++namespace drum808 {
++
+ /**
+M /Users/james/Repos/wibandwob-dos/app/drum808/filter.h
+@@ -3,2 +3,4 @@
+ 
++namespace drum808 {
++
+ enum {
+apply_patch(auto_approved=true) exited 0 in 406ms:
+Success. Updated the following files:
+M app/drum808/envelope.h
+M app/drum808/filter.h
+file update:
+diff --git a/app/drum808/clap.cpp b/app/drum808/clap.cpp
+index 6e612e9eedc14a0e18413e406c162cfe6a48c606..1c3f169f00779631d448cba432dca61e32ebf46e
+--- a/app/drum808/clap.cpp
++++ b/app/drum808/clap.cpp
+@@ -1,5 +1,7 @@
++#include <cmath>
++#include <cstdlib>
++#include <ctime>
+ #include <iostream>
+-#include <cmath>
+ #include "clap.h"
+ 
+ namespace drum808 {
+@@ -14,10 +16,12 @@
+ 
+ void Clap::setDefaults()
+ {
+-    AmpEnv::AmpEnvSettings envSettings = {
+-        .peakAmp = 0.8,
+-        .decay = 0.3
+-    };
++    AmpEnv::AmpEnvSettings envSettings{};
++    envSettings.startAmp = 0.0;
++    envSettings.peakAmp = 0.8;
++    envSettings.releaseAmp = 0.0;
++    envSettings.attack = 0.0;
++    envSettings.decay = 0.3;
+     AmpEnv *ampEnv = new AmpEnv(envSettings);
+     setAmpEnv(ampEnv);
+ 
+@@ -58,6 +62,7 @@
+         sample = noise * decay;
+     }
+ 
++    if (m_bandPass == nullptr || m_highPass == nullptr) return sample;
+     return m_highPass->filter(m_bandPass->filter(sample));
+ }
+ 
+diff --git a/app/drum808/clap.h b/app/drum808/clap.h
+index faad2b019afe6a2f98ef6444fcda2bdcbd33454e..31af137bf3b8b7c297c8a4d198e98cad9a25d1c2
+--- a/app/drum808/clap.h
++++ b/app/drum808/clap.h
+@@ -27,8 +27,8 @@
+     // 10 ms between claps
+     static constexpr double m_interval = 0.01;
+ 
+-    Filter *m_highPass;
+-    Filter *m_bandPass;
++    Filter *m_highPass = nullptr;
++    Filter *m_bandPass = nullptr;
+ };
+ 
+ 
+diff --git a/app/drum808/closed_hat.cpp b/app/drum808/closed_hat.cpp
+index f0796853e6813cc7163a1053de0228aca5b02aa3..87cbc065b72ed3629d9e466836634a7652de2fab
+--- a/app/drum808/closed_hat.cpp
++++ b/app/drum808/closed_hat.cpp
+@@ -21,10 +21,12 @@
+ 
+ void ClosedHat::setDefaults()
+ {
+-    AmpEnv::AmpEnvSettings envSettings = {
+-        .peakAmp = 0.8,
+-        .decay = 0.2
+-    };
++    AmpEnv::AmpEnvSettings envSettings{};
++    envSettings.startAmp = 0.0;
++    envSettings.peakAmp = 0.8;
++    envSettings.releaseAmp = 0.0;
++    envSettings.attack = 0.0;
++    envSettings.decay = 0.2;
+     AmpEnv *ampEnv = new AmpEnv(envSettings);
+     setAmpEnv(ampEnv);
+ 
+@@ -54,6 +56,9 @@
+         amp += value;
+     }
+     amp /= m_harmonics.size();
++    if (m_bandPass == nullptr || m_highPass == nullptr || m_ampEnv == nullptr) {
++        return amp;
++    }
+     double firstStep = m_bandPass->filter(amp);
+     double secondStep = m_highPass->filter(firstStep);
+     return secondStep * m_ampEnv->getEnvValue(m_elapsed);
+diff --git a/app/drum808/closed_hat.h b/app/drum808/closed_hat.h
+index 444472b295f00fc806a610a3a9334052232b0f62..164cbd02d747084a50c8f72281d17d804abcc755
+--- a/app/drum808/closed_hat.h
++++ b/app/drum808/closed_hat.h
+@@ -27,8 +27,8 @@
+ 
+     std::array<double, 6> m_harmonics;
+ 
+-    Filter *m_bandPass;
+-    Filter *m_highPass;
++    Filter *m_bandPass = nullptr;
++    Filter *m_highPass = nullptr;
+ };
+ 
+ 
+diff --git a/app/drum808/envelope.cpp b/app/drum808/envelope.cpp
+index 849e7fb3a4a16aca7350c302bbd9ff99fc5fe2ea..fac7705393fc872697c4e5442a547fd1878adf21
+--- a/app/drum808/envelope.cpp
++++ b/app/drum808/envelope.cpp
+@@ -37,6 +37,11 @@
+ {
+     if (time > m_duration) return m_release;
+ 
++    if (m_attack <= 0.0) {
++        if (m_decay <= 0.0) return m_release;
++        return decayRamp(time);
++    }
++
+     if (time <= m_attack) {
+         return attackRamp(time);
+     } else if (time <= (m_attack + m_decay)) {
+@@ -49,11 +54,13 @@
+ 
+ double Envelope::attackRamp(double time)
+ {
++    if (m_attack <= 0.0) return m_peak;
+     return (m_peak - m_start) / m_attack * time + m_start;
+ }
+ 
+ double Envelope::decayRamp(double time)
+ {
++    if (m_decay <= 0.0) return m_release;
+     return (m_release - m_peak) / m_decay * (time - m_attack) + m_peak;
+ }
+ 
+diff --git a/app/drum808/envelope.h b/app/drum808/envelope.h
+index 46da18ce3d119eaf713d3202bacb2ad9b0637a7e..482f31db047b46aad3bdcfc533023befe00ab150
+--- a/app/drum808/envelope.h
++++ b/app/drum808/envelope.h
+@@ -1,6 +1,8 @@
+ #ifndef ENVELOPE_H
+ #define ENVELOPE_H
+ 
++namespace drum808 {
++
+ /**
+  * This abstract class is the base for all ADSR implementations.
+  *
+@@ -10,7 +12,7 @@
+ {
+ public:
+     Envelope() = default;
+-    ~Envelope() = default;
++    virtual ~Envelope() = default;
+ 
+     double getDuration();
+ 
+@@ -24,13 +26,13 @@
+     double getEnvValue(double time);
+ 
+ protected:
+-    double m_attack;
+-    double m_decay;
+-    double m_duration;
++    double m_attack = 0.0;
++    double m_decay = 0.0;
++    double m_duration = 0.0;
+ 
+-    double m_start;
+-    double m_peak;
+-    double m_release;
++    double m_start = 0.0;
++    double m_peak = 0.0;
++    double m_release = 0.0;
+ 
+ private:
+     double attackRamp(double time);
+diff --git a/app/drum808/filter.h b/app/drum808/filter.h
+index 39f2d673a2bc54bb97d9962113876846c5a42318..20ba48f49395f71ca5e8de237dbe889dc5740339
+--- a/app/drum808/filter.h
++++ b/app/drum808/filter.h
+@@ -1,6 +1,8 @@
+ #ifndef FILTER_H
+ #define FILTER_H
+ 
++namespace drum808 {
++
+ enum {
+     BANDPASS = 0,
+     HIGHPASS,
+@@ -23,8 +25,8 @@
+     double m_freq;
+     double m_q;
+ 
+-    double a0, a1, a2, b1, b2;
+-    double z1, z2;
++    double a0 = 0.0, a1 = 0.0, a2 = 0.0, b1 = 0.0, b2 = 0.0;
++    double z1 = 0.0, z2 = 0.0;
+ 
+     void calcFilter();
+ };
+diff --git a/app/drum808/instrument.cpp b/app/drum808/instrument.cpp
+index 9a3390feca3887e82cae6c385e466cb18c870f7e..019705a3569e523c51eacd7eb87cefd16e97e4f4
+--- a/app/drum808/instrument.cpp
++++ b/app/drum808/instrument.cpp
+@@ -7,7 +7,13 @@
+ using std::cout;
+ using std::endl;
+ 
+-int Instrument::getPitch()
++Instrument::~Instrument()
++{
++    delete m_ampEnv;
++    delete m_pitchEnv;
++}
++
++int Instrument::getPitch() const
+ {
+     return m_pitch;
+ }
+@@ -45,12 +51,12 @@
+     m_triggered = false;
+ }
+ 
+-bool Instrument::isTriggered()
++bool Instrument::isTriggered() const
+ {
+     return m_triggered;
+ }
+ 
+-bool Instrument::isPlaying()
++bool Instrument::isPlaying() const
+ {
+     return m_playing;
+ }
+@@ -83,7 +89,7 @@
+     return value;
+ }
+ 
+-std::string Instrument::getName()
++const std::string &Instrument::getName() const
+ {
+     return m_name;
+ }
+diff --git a/app/drum808/instrument.h b/app/drum808/instrument.h
+index bc10977365c6e31a160e421e431f67aaa661a9f2..9e970887b18ec3038f44aeffe8648804f9afb7f3
+--- a/app/drum808/instrument.h
++++ b/app/drum808/instrument.h
+@@ -2,7 +2,6 @@
+ #define INSTRUMENT_H
+ 
+ #include <cmath>
+-#include <optional>
+ #include <string>
+ #include "amp_env.h"
+ #include "pitch_env.h"
+@@ -15,9 +14,9 @@
+ {
+ public:
+     Instrument() = default;
+-    ~Instrument() = default;
++    virtual ~Instrument();
+ 
+-    int getPitch();
++    int getPitch() const;
+     void setPitch(int pitch);
+ 
+     void setLevel(double level);
+@@ -30,14 +29,14 @@
+ 
+     void trigger();
+     void release();
+-    bool isTriggered();
+-    bool isPlaying();
++    bool isTriggered() const;
++    bool isPlaying() const;
+ 
+     void updateBy(double time);
+ 
+     virtual double getSample();
+ 
+-    std::string getName();
++    const std::string &getName() const;
+ 
+     static constexpr double TAU = M_PI * 2.0;
+ 
+@@ -45,13 +44,13 @@
+     AmpEnv *m_ampEnv = nullptr;
+     PitchEnv *m_pitchEnv = nullptr;
+ 
+-    double m_duration;
+-    double m_elapsed;
++    double m_duration = 0.0;
++    double m_elapsed = 0.0;
+ 
+-    int m_pitch;
++    int m_pitch = 0;
+ 
+-    bool m_triggered;
+-    bool m_playing;
++    bool m_triggered = false;
++    bool m_playing = false;
+ 
+     std::string m_name;
+ };
+diff --git a/app/drum808/kick.cpp b/app/drum808/kick.cpp
+index ab3187d3c1421d0fb56b0024b2dc2100d3334f4d..caed91d337febc424e0dea49b25c4bcf85d23463
+--- a/app/drum808/kick.cpp
++++ b/app/drum808/kick.cpp
+@@ -12,19 +12,21 @@
+ 
+ void Kick::setDefaults()
+ {
+-    AmpEnv::AmpEnvSettings envSettings = {
+-        .peakAmp = 0.8,
+-        .decay = 0.25,
+-    };
++    AmpEnv::AmpEnvSettings envSettings{};
++    envSettings.startAmp = 0.0;
++    envSettings.peakAmp = 0.8;
++    envSettings.releaseAmp = 0.0;
++    envSettings.attack = 0.0;
++    envSettings.decay = 0.25;
+     AmpEnv *ampEnv = new AmpEnv(envSettings);
+     setAmpEnv(ampEnv);
+ 
+-    PitchEnv::EnvSettings pitchEnvSettings = {
+-        .startPitch = (double)getPitch(),
+-        .peakPitch = getPitch() + SEMITONE_HZ * 48.0,
+-        .releasePitch = (double)getPitch(),
+-        .decay = 0.02,
+-    };
++    PitchEnv::EnvSettings pitchEnvSettings{};
++    pitchEnvSettings.startPitch = (double)getPitch();
++    pitchEnvSettings.peakPitch = getPitch() + SEMITONE_HZ * 48.0;
++    pitchEnvSettings.releasePitch = (double)getPitch();
++    pitchEnvSettings.attack = 0.0;
++    pitchEnvSettings.decay = 0.02;
+     PitchEnv *pitchEnv = new PitchEnv(pitchEnvSettings);
+     setPitchEnv(pitchEnv);
+ }
+diff --git a/app/drum808/snare.cpp b/app/drum808/snare.cpp
+index f044bfe6bae8a768c4cbf4c10a7b0f9b6b009dd4..350f3efc4d4a93f935756b31e5b9b3e1a1a2f4b9
+--- a/app/drum808/snare.cpp
++++ b/app/drum808/snare.cpp
+@@ -1,5 +1,6 @@
+ #include <algorithm>
+ #include <cmath>
++#include <cstdlib>
+ #include <ctime>
+ #include <iostream>
+ #include "snare.h"
+@@ -14,27 +15,30 @@
+ 
+ void Snare::setDefaults()
+ {
+-    AmpEnv::AmpEnvSettings toneAmpEnvSettings = {
+-        .peakAmp = 0.1,
+-        .attack = 0.01,
+-        .decay = 0.25,
+-    };
++    AmpEnv::AmpEnvSettings toneAmpEnvSettings{};
++    toneAmpEnvSettings.startAmp = 0.0;
++    toneAmpEnvSettings.peakAmp = 0.1;
++    toneAmpEnvSettings.releaseAmp = 0.0;
++    toneAmpEnvSettings.attack = 0.01;
++    toneAmpEnvSettings.decay = 0.25;
+     AmpEnv *toneEnv = new AmpEnv(toneAmpEnvSettings);
+     setAmpEnv(toneEnv);
+ 
+-    PitchEnv::EnvSettings pitchEnvSettings = {
+-        .startPitch = (double)getPitch(),
+-        .peakPitch = getPitch() + SEMITONE_HZ * 24.0,
+-        .releasePitch = (double)getPitch(),
+-        .decay = 0.04,
+-    };
++    PitchEnv::EnvSettings pitchEnvSettings{};
++    pitchEnvSettings.startPitch = (double)getPitch();
++    pitchEnvSettings.peakPitch = getPitch() + SEMITONE_HZ * 24.0;
++    pitchEnvSettings.releasePitch = (double)getPitch();
++    pitchEnvSettings.attack = 0.0;
++    pitchEnvSettings.decay = 0.04;
+     PitchEnv *pitchEnv = new PitchEnv(pitchEnvSettings);
+     setPitchEnv(pitchEnv);
+ 
+-    AmpEnv::AmpEnvSettings noiseAmpEnvSettings = {
+-        .peakAmp = 0.6,
+-        .decay = 0.25,
+-    };
++    AmpEnv::AmpEnvSettings noiseAmpEnvSettings{};
++    noiseAmpEnvSettings.startAmp = 0.0;
++    noiseAmpEnvSettings.peakAmp = 0.6;
++    noiseAmpEnvSettings.releaseAmp = 0.0;
++    noiseAmpEnvSettings.attack = 0.0;
++    noiseAmpEnvSettings.decay = 0.25;
+     AmpEnv *noiseEnv = new AmpEnv(noiseAmpEnvSettings);
+     setNoiseEnv(noiseEnv);
+ 
+@@ -79,6 +83,9 @@
+     double tone = sin(pitch * TAU * m_elapsed);
+     double toneAmp = m_ampEnv->getEnvValue(m_elapsed);
+ 
++    if (m_bandPass == nullptr || m_noiseEnv == nullptr) {
++        return tone * toneAmp;
++    }
+     double noise = m_bandPass->filter((double)rand() / RAND_MAX);
+     double noiseAmp = m_noiseEnv->getEnvValue(m_elapsed);
+     return (tone * toneAmp) + (noise * noiseAmp);
+diff --git a/app/drum808/snare.h b/app/drum808/snare.h
+index 3575e10fb587369b7d8ed93df0469cef31bb5b7a..7a3d39f79199e5451d38b5db384173cd76693d00
+--- a/app/drum808/snare.h
++++ b/app/drum808/snare.h
+@@ -29,12 +29,11 @@
+     const std::string m_defaultName = "Snare";
+     const int m_defaultPitch = 160;
+ 
+-    Filter *m_bandPass;
+-    Filter *m_highPass;
++    Filter *m_bandPass = nullptr;
++    Filter *m_highPass = nullptr;
+ 
+ };
+ 
+ 
+ } // namespace drum808
+ #endif
+-
+
+file update:
+diff --git a/app/drum808/clap.cpp b/app/drum808/clap.cpp
+index 6e612e9eedc14a0e18413e406c162cfe6a48c606..1c3f169f00779631d448cba432dca61e32ebf46e
+--- a/app/drum808/clap.cpp
++++ b/app/drum808/clap.cpp
+@@ -1,5 +1,7 @@
++#include <cmath>
++#include <cstdlib>
++#include <ctime>
+ #include <iostream>
+-#include <cmath>
+ #include "clap.h"
+ 
+ namespace drum808 {
+@@ -14,10 +16,12 @@
+ 
+ void Clap::setDefaults()
+ {
+-    AmpEnv::AmpEnvSettings envSettings = {
+-        .peakAmp = 0.8,
+-        .decay = 0.3
+-    };
++    AmpEnv::AmpEnvSettings envSettings{};
++    envSettings.startAmp = 0.0;
++    envSettings.peakAmp = 0.8;
++    envSettings.releaseAmp = 0.0;
++    envSettings.attack = 0.0;
++    envSettings.decay = 0.3;
+     AmpEnv *ampEnv = new AmpEnv(envSettings);
+     setAmpEnv(ampEnv);
+ 
+@@ -58,6 +62,7 @@
+         sample = noise * decay;
+     }
+ 
++    if (m_bandPass == nullptr || m_highPass == nullptr) return sample;
+     return m_highPass->filter(m_bandPass->filter(sample));
+ }
+ 
+diff --git a/app/drum808/clap.h b/app/drum808/clap.h
+index faad2b019afe6a2f98ef6444fcda2bdcbd33454e..31af137bf3b8b7c297c8a4d198e98cad9a25d1c2
+--- a/app/drum808/clap.h
++++ b/app/drum808/clap.h
+@@ -27,8 +27,8 @@
+     // 10 ms between claps
+     static constexpr double m_interval = 0.01;
+ 
+-    Filter *m_highPass;
+-    Filter *m_bandPass;
++    Filter *m_highPass = nullptr;
++    Filter *m_bandPass = nullptr;
+ };
+ 
+ 
+diff --git a/app/drum808/closed_hat.cpp b/app/drum808/closed_hat.cpp
+index f0796853e6813cc7163a1053de0228aca5b02aa3..87cbc065b72ed3629d9e466836634a7652de2fab
+--- a/app/drum808/closed_hat.cpp
++++ b/app/drum808/closed_hat.cpp
+@@ -21,10 +21,12 @@
+ 
+ void ClosedHat::setDefaults()
+ {
+-    AmpEnv::AmpEnvSettings envSettings = {
+-        .peakAmp = 0.8,
+-        .decay = 0.2
+-    };
++    AmpEnv::AmpEnvSettings envSettings{};
++    envSettings.startAmp = 0.0;
++    envSettings.peakAmp = 0.8;
++    envSettings.releaseAmp = 0.0;
++    envSettings.attack = 0.0;
++    envSettings.decay = 0.2;
+     AmpEnv *ampEnv = new AmpEnv(envSettings);
+     setAmpEnv(ampEnv);
+ 
+@@ -54,6 +56,9 @@
+         amp += value;
+     }
+     amp /= m_harmonics.size();
++    if (m_bandPass == nullptr || m_highPass == nullptr || m_ampEnv == nullptr) {
++        return amp;
++    }
+     double firstStep = m_bandPass->filter(amp);
+     double secondStep = m_highPass->filter(firstStep);
+     return secondStep * m_ampEnv->getEnvValue(m_elapsed);
+diff --git a/app/drum808/closed_hat.h b/app/drum808/closed_hat.h
+index 444472b295f00fc806a610a3a9334052232b0f62..164cbd02d747084a50c8f72281d17d804abcc755
+--- a/app/drum808/closed_hat.h
++++ b/app/drum808/closed_hat.h
+@@ -27,8 +27,8 @@
+ 
+     std::array<double, 6> m_harmonics;
+ 
+-    Filter *m_bandPass;
+-    Filter *m_highPass;
++    Filter *m_bandPass = nullptr;
++    Filter *m_highPass = nullptr;
+ };
+ 
+ 
+diff --git a/app/drum808/envelope.cpp b/app/drum808/envelope.cpp
+index 849e7fb3a4a16aca7350c302bbd9ff99fc5fe2ea..fac7705393fc872697c4e5442a547fd1878adf21
+--- a/app/drum808/envelope.cpp
++++ b/app/drum808/envelope.cpp
+@@ -37,6 +37,11 @@
+ {
+     if (time > m_duration) return m_release;
+ 
++    if (m_attack <= 0.0) {
++        if (m_decay <= 0.0) return m_release;
++        return decayRamp(time);
++    }
++
+     if (time <= m_attack) {
+         return attackRamp(time);
+     } else if (time <= (m_attack + m_decay)) {
+@@ -49,11 +54,13 @@
+ 
+ double Envelope::attackRamp(double time)
+ {
++    if (m_attack <= 0.0) return m_peak;
+     return (m_peak - m_start) / m_attack * time + m_start;
+ }
+ 
+ double Envelope::decayRamp(double time)
+ {
++    if (m_decay <= 0.0) return m_release;
+     return (m_release - m_peak) / m_decay * (time - m_attack) + m_peak;
+ }
+ 
+diff --git a/app/drum808/envelope.h b/app/drum808/envelope.h
+index 46da18ce3d119eaf713d3202bacb2ad9b0637a7e..482f31db047b46aad3bdcfc533023befe00ab150
+--- a/app/drum808/envelope.h
++++ b/app/drum808/envelope.h
+@@ -1,6 +1,8 @@
+ #ifndef ENVELOPE_H
+ #define ENVELOPE_H
+ 
++namespace drum808 {
++
+ /**
+  * This abstract class is the base for all ADSR implementations.
+  *
+@@ -10,7 +12,7 @@
+ {
+ public:
+     Envelope() = default;
+-    ~Envelope() = default;
++    virtual ~Envelope() = default;
+ 
+     double getDuration();
+ 
+@@ -24,13 +26,13 @@
+     double getEnvValue(double time);
+ 
+ protected:
+-    double m_attack;
+-    double m_decay;
+-    double m_duration;
++    double m_attack = 0.0;
++    double m_decay = 0.0;
++    double m_duration = 0.0;
+ 
+-    double m_start;
+-    double m_peak;
+-    double m_release;
++    double m_start = 0.0;
++    double m_peak = 0.0;
++    double m_release = 0.0;
+ 
+ private:
+     double attackRamp(double time);
+diff --git a/app/drum808/filter.h b/app/drum808/filter.h
+index 39f2d673a2bc54bb97d9962113876846c5a42318..20ba48f49395f71ca5e8de237dbe889dc5740339
+--- a/app/drum808/filter.h
++++ b/app/drum808/filter.h
+@@ -1,6 +1,8 @@
+ #ifndef FILTER_H
+ #define FILTER_H
+ 
++namespace drum808 {
++
+ enum {
+     BANDPASS = 0,
+     HIGHPASS,
+@@ -23,8 +25,8 @@
+     double m_freq;
+     double m_q;
+ 
+-    double a0, a1, a2, b1, b2;
+-    double z1, z2;
++    double a0 = 0.0, a1 = 0.0, a2 = 0.0, b1 = 0.0, b2 = 0.0;
++    double z1 = 0.0, z2 = 0.0;
+ 
+     void calcFilter();
+ };
+diff --git a/app/drum808/instrument.cpp b/app/drum808/instrument.cpp
+index 9a3390feca3887e82cae6c385e466cb18c870f7e..019705a3569e523c51eacd7eb87cefd16e97e4f4
+--- a/app/drum808/instrument.cpp
++++ b/app/drum808/instrument.cpp
+@@ -7,7 +7,13 @@
+ using std::cout;
+ using std::endl;
+ 
+-int Instrument::getPitch()
++Instrument::~Instrument()
++{
++    delete m_ampEnv;
++    delete m_pitchEnv;
++}
++
++int Instrument::getPitch() const
+ {
+     return m_pitch;
+ }
+@@ -45,12 +51,12 @@
+     m_triggered = false;
+ }
+ 
+-bool Instrument::isTriggered()
++bool Instrument::isTriggered() const
+ {
+     return m_triggered;
+ }
+ 
+-bool Instrument::isPlaying()
++bool Instrument::isPlaying() const
+ {
+     return m_playing;
+ }
+@@ -83,7 +89,7 @@
+     return value;
+ }
+ 
+-std::string Instrument::getName()
++const std::string &Instrument::getName() const
+ {
+     return m_name;
+ }
+diff --git a/app/drum808/instrument.h b/app/drum808/instrument.h
+index bc10977365c6e31a160e421e431f67aaa661a9f2..9e970887b18ec3038f44aeffe8648804f9afb7f3
+--- a/app/drum808/instrument.h
++++ b/app/drum808/instrument.h
+@@ -2,7 +2,6 @@
+ #define INSTRUMENT_H
+ 
+ #include <cmath>
+-#include <optional>
+ #include <string>
+ #include "amp_env.h"
+ #include "pitch_env.h"
+@@ -15,9 +14,9 @@
+ {
+ public:
+     Instrument() = default;
+-    ~Instrument() = default;
++    virtual ~Instrument();
+ 
+-    int getPitch();
++    int getPitch() const;
+     void setPitch(int pitch);
+ 
+     void setLevel(double level);
+@@ -30,14 +29,14 @@
+ 
+     void trigger();
+     void release();
+-    bool isTriggered();
+-    bool isPlaying();
++    bool isTriggered() const;
++    bool isPlaying() const;
+ 
+     void updateBy(double time);
+ 
+     virtual double getSample();
+ 
+-    std::string getName();
++    const std::string &getName() const;
+ 
+     static constexpr double TAU = M_PI * 2.0;
+ 
+@@ -45,13 +44,13 @@
+     AmpEnv *m_ampEnv = nullptr;
+     PitchEnv *m_pitchEnv = nullptr;
+ 
+-    double m_duration;
+-    double m_elapsed;
++    double m_duration = 0.0;
++    double m_elapsed = 0.0;
+ 
+-    int m_pitch;
++    int m_pitch = 0;
+ 
+-    bool m_triggered;
+-    bool m_playing;
++    bool m_triggered = false;
++    bool m_playing = false;
+ 
+     std::string m_name;
+ };
+diff --git a/app/drum808/kick.cpp b/app/drum808/kick.cpp
+index ab3187d3c1421d0fb56b0024b2dc2100d3334f4d..caed91d337febc424e0dea49b25c4bcf85d23463
+--- a/app/drum808/kick.cpp
++++ b/app/drum808/kick.cpp
+@@ -12,19 +12,21 @@
+ 
+ void Kick::setDefaults()
+ {
+-    AmpEnv::AmpEnvSettings envSettings = {
+-        .peakAmp = 0.8,
+-        .decay = 0.25,
+-    };
++    AmpEnv::AmpEnvSettings envSettings{};
++    envSettings.startAmp = 0.0;
++    envSettings.peakAmp = 0.8;
++    envSettings.releaseAmp = 0.0;
++    envSettings.attack = 0.0;
++    envSettings.decay = 0.25;
+     AmpEnv *ampEnv = new AmpEnv(envSettings);
+     setAmpEnv(ampEnv);
+ 
+-    PitchEnv::EnvSettings pitchEnvSettings = {
+-        .startPitch = (double)getPitch(),
+-        .peakPitch = getPitch() + SEMITONE_HZ * 48.0,
+-        .releasePitch = (double)getPitch(),
+-        .decay = 0.02,
+-    };
++    PitchEnv::EnvSettings pitchEnvSettings{};
++    pitchEnvSettings.startPitch = (double)getPitch();
++    pitchEnvSettings.peakPitch = getPitch() + SEMITONE_HZ * 48.0;
++    pitchEnvSettings.releasePitch = (double)getPitch();
++    pitchEnvSettings.attack = 0.0;
++    pitchEnvSettings.decay = 0.02;
+     PitchEnv *pitchEnv = new PitchEnv(pitchEnvSettings);
+     setPitchEnv(pitchEnv);
+ }
+diff --git a/app/drum808/snare.cpp b/app/drum808/snare.cpp
+index f044bfe6bae8a768c4cbf4c10a7b0f9b6b009dd4..350f3efc4d4a93f935756b31e5b9b3e1a1a2f4b9
+--- a/app/drum808/snare.cpp
++++ b/app/drum808/snare.cpp
+@@ -1,5 +1,6 @@
+ #include <algorithm>
+ #include <cmath>
++#include <cstdlib>
+ #include <ctime>
+ #include <iostream>
+ #include "snare.h"
+@@ -14,27 +15,30 @@
+ 
+ void Snare::setDefaults()
+ {
+-    AmpEnv::AmpEnvSettings toneAmpEnvSettings = {
+-        .peakAmp = 0.1,
+-        .attack = 0.01,
+-        .decay = 0.25,
+-    };
++    AmpEnv::AmpEnvSettings toneAmpEnvSettings{};
++    toneAmpEnvSettings.startAmp = 0.0;
++    toneAmpEnvSettings.peakAmp = 0.1;
++    toneAmpEnvSettings.releaseAmp = 0.0;
++    toneAmpEnvSettings.attack = 0.01;
++    toneAmpEnvSettings.decay = 0.25;
+     AmpEnv *toneEnv = new AmpEnv(toneAmpEnvSettings);
+     setAmpEnv(toneEnv);
+ 
+-    PitchEnv::EnvSettings pitchEnvSettings = {
+-        .startPitch = (double)getPitch(),
+-        .peakPitch = getPitch() + SEMITONE_HZ * 24.0,
+-        .releasePitch = (double)getPitch(),
+-        .decay = 0.04,
+-    };
++    PitchEnv::EnvSettings pitchEnvSettings{};
++    pitchEnvSettings.startPitch = (double)getPitch();
++    pitchEnvSettings.peakPitch = getPitch() + SEMITONE_HZ * 24.0;
++    pitchEnvSettings.releasePitch = (double)getPitch();
++    pitchEnvSettings.attack = 0.0;
++    pitchEnvSettings.decay = 0.04;
+     PitchEnv *pitchEnv = new PitchEnv(pitchEnvSettings);
+     setPitchEnv(pitchEnv);
+ 
+-    AmpEnv::AmpEnvSettings noiseAmpEnvSettings = {
+-        .peakAmp = 0.6,
+-        .decay = 0.25,
+-    };
++    AmpEnv::AmpEnvSettings noiseAmpEnvSettings{};
++    noiseAmpEnvSettings.startAmp = 0.0;
++    noiseAmpEnvSettings.peakAmp = 0.6;
++    noiseAmpEnvSettings.releaseAmp = 0.0;
++    noiseAmpEnvSettings.attack = 0.0;
++    noiseAmpEnvSettings.decay = 0.25;
+     AmpEnv *noiseEnv = new AmpEnv(noiseAmpEnvSettings);
+     setNoiseEnv(noiseEnv);
+ 
+@@ -79,6 +83,9 @@
+     double tone = sin(pitch * TAU * m_elapsed);
+     double toneAmp = m_ampEnv->getEnvValue(m_elapsed);
+ 
++    if (m_bandPass == nullptr || m_noiseEnv == nullptr) {
++        return tone * toneAmp;
++    }
+     double noise = m_bandPass->filter((double)rand() / RAND_MAX);
+     double noiseAmp = m_noiseEnv->getEnvValue(m_elapsed);
+     return (tone * toneAmp) + (noise * noiseAmp);
+diff --git a/app/drum808/snare.h b/app/drum808/snare.h
+index 3575e10fb587369b7d8ed93df0469cef31bb5b7a..7a3d39f79199e5451d38b5db384173cd76693d00
+--- a/app/drum808/snare.h
++++ b/app/drum808/snare.h
+@@ -29,12 +29,11 @@
+     const std::string m_defaultName = "Snare";
+     const int m_defaultPitch = 160;
+ 
+-    Filter *m_bandPass;
+-    Filter *m_highPass;
++    Filter *m_bandPass = nullptr;
++    Filter *m_highPass = nullptr;
+ 
+ };
+ 
+ 
+ } // namespace drum808
+ #endif
+-
+
+
+thinking
+**Rerunning compilation**
+exec
+/bin/zsh -lc 'g++ -std=c++14 -fsyntax-only app/drum808/*.cpp -I app/drum808/' in /Users/james/Repos/wibandwob-dosfile update:
+diff --git a/app/drum808/clap.cpp b/app/drum808/clap.cpp
+index 6e612e9eedc14a0e18413e406c162cfe6a48c606..1c3f169f00779631d448cba432dca61e32ebf46e
+--- a/app/drum808/clap.cpp
++++ b/app/drum808/clap.cpp
+@@ -1,5 +1,7 @@
++#include <cmath>
++#include <cstdlib>
++#include <ctime>
+ #include <iostream>
+-#include <cmath>
+ #include "clap.h"
+ 
+ namespace drum808 {
+@@ -14,10 +16,12 @@
+ 
+ void Clap::setDefaults()
+ {
+-    AmpEnv::AmpEnvSettings envSettings = {
+-        .peakAmp = 0.8,
+-        .decay = 0.3
+-    };
++    AmpEnv::AmpEnvSettings envSettings{};
++    envSettings.startAmp = 0.0;
++    envSettings.peakAmp = 0.8;
++    envSettings.releaseAmp = 0.0;
++    envSettings.attack = 0.0;
++    envSettings.decay = 0.3;
+     AmpEnv *ampEnv = new AmpEnv(envSettings);
+     setAmpEnv(ampEnv);
+ 
+@@ -58,6 +62,7 @@
+         sample = noise * decay;
+     }
+ 
++    if (m_bandPass == nullptr || m_highPass == nullptr) return sample;
+     return m_highPass->filter(m_bandPass->filter(sample));
+ }
+ 
+diff --git a/app/drum808/clap.h b/app/drum808/clap.h
+index faad2b019afe6a2f98ef6444fcda2bdcbd33454e..31af137bf3b8b7c297c8a4d198e98cad9a25d1c2
+--- a/app/drum808/clap.h
++++ b/app/drum808/clap.h
+@@ -27,8 +27,8 @@
+     // 10 ms between claps
+     static constexpr double m_interval = 0.01;
+ 
+-    Filter *m_highPass;
+-    Filter *m_bandPass;
++    Filter *m_highPass = nullptr;
++    Filter *m_bandPass = nullptr;
+ };
+ 
+ 
+diff --git a/app/drum808/closed_hat.cpp b/app/drum808/closed_hat.cpp
+index f0796853e6813cc7163a1053de0228aca5b02aa3..87cbc065b72ed3629d9e466836634a7652de2fab
+--- a/app/drum808/closed_hat.cpp
++++ b/app/drum808/closed_hat.cpp
+@@ -21,10 +21,12 @@
+ 
+ void ClosedHat::setDefaults()
+ {
+-    AmpEnv::AmpEnvSettings envSettings = {
+-        .peakAmp = 0.8,
+-        .decay = 0.2
+-    };
++    AmpEnv::AmpEnvSettings envSettings{};
++    envSettings.startAmp = 0.0;
++    envSettings.peakAmp = 0.8;
++    envSettings.releaseAmp = 0.0;
++    envSettings.attack = 0.0;
++    envSettings.decay = 0.2;
+     AmpEnv *ampEnv = new AmpEnv(envSettings);
+     setAmpEnv(ampEnv);
+ 
+@@ -54,6 +56,9 @@
+         amp += value;
+     }
+     amp /= m_harmonics.size();
++    if (m_bandPass == nullptr || m_highPass == nullptr || m_ampEnv == nullptr) {
++        return amp;
++    }
+     double firstStep = m_bandPass->filter(amp);
+     double secondStep = m_highPass->filter(firstStep);
+     return secondStep * m_ampEnv->getEnvValue(m_elapsed);
+diff --git a/app/drum808/closed_hat.h b/app/drum808/closed_hat.h
+index 444472b295f00fc806a610a3a9334052232b0f62..164cbd02d747084a50c8f72281d17d804abcc755
+--- a/app/drum808/closed_hat.h
++++ b/app/drum808/closed_hat.h
+@@ -27,8 +27,8 @@
+ 
+     std::array<double, 6> m_harmonics;
+ 
+-    Filter *m_bandPass;
+-    Filter *m_highPass;
++    Filter *m_bandPass = nullptr;
++    Filter *m_highPass = nullptr;
+ };
+ 
+ 
+diff --git a/app/drum808/envelope.cpp b/app/drum808/envelope.cpp
+index 849e7fb3a4a16aca7350c302bbd9ff99fc5fe2ea..fac7705393fc872697c4e5442a547fd1878adf21
+--- a/app/drum808/envelope.cpp
++++ b/app/drum808/envelope.cpp
+@@ -37,6 +37,11 @@
+ {
+     if (time > m_duration) return m_release;
+ 
++    if (m_attack <= 0.0) {
++        if (m_decay <= 0.0) return m_release;
++        return decayRamp(time);
++    }
++
+     if (time <= m_attack) {
+         return attackRamp(time);
+     } else if (time <= (m_attack + m_decay)) {
+@@ -49,11 +54,13 @@
+ 
+ double Envelope::attackRamp(double time)
+ {
++    if (m_attack <= 0.0) return m_peak;
+     return (m_peak - m_start) / m_attack * time + m_start;
+ }
+ 
+ double Envelope::decayRamp(double time)
+ {
++    if (m_decay <= 0.0) return m_release;
+     return (m_release - m_peak) / m_decay * (time - m_attack) + m_peak;
+ }
+ 
+diff --git a/app/drum808/envelope.h b/app/drum808/envelope.h
+index 46da18ce3d119eaf713d3202bacb2ad9b0637a7e..482f31db047b46aad3bdcfc533023befe00ab150
+--- a/app/drum808/envelope.h
++++ b/app/drum808/envelope.h
+@@ -1,6 +1,8 @@
+ #ifndef ENVELOPE_H
+ #define ENVELOPE_H
+ 
++namespace drum808 {
++
+ /**
+  * This abstract class is the base for all ADSR implementations.
+  *
+@@ -10,7 +12,7 @@
+ {
+ public:
+     Envelope() = default;
+-    ~Envelope() = default;
++    virtual ~Envelope() = default;
+ 
+     double getDuration();
+ 
+@@ -24,13 +26,13 @@
+     double getEnvValue(double time);
+ 
+ protected:
+-    double m_attack;
+-    double m_decay;
+-    double m_duration;
++    double m_attack = 0.0;
++    double m_decay = 0.0;
++    double m_duration = 0.0;
+ 
+-    double m_start;
+-    double m_peak;
+-    double m_release;
++    double m_start = 0.0;
++    double m_peak = 0.0;
++    double m_release = 0.0;
+ 
+ private:
+     double attackRamp(double time);
+diff --git a/app/drum808/filter.h b/app/drum808/filter.h
+index 39f2d673a2bc54bb97d9962113876846c5a42318..20ba48f49395f71ca5e8de237dbe889dc5740339
+--- a/app/drum808/filter.h
++++ b/app/drum808/filter.h
+@@ -1,6 +1,8 @@
+ #ifndef FILTER_H
+ #define FILTER_H
+ 
++namespace drum808 {
++
+ enum {
+     BANDPASS = 0,
+     HIGHPASS,
+@@ -23,8 +25,8 @@
+     double m_freq;
+     double m_q;
+ 
+-    double a0, a1, a2, b1, b2;
+-    double z1, z2;
++    double a0 = 0.0, a1 = 0.0, a2 = 0.0, b1 = 0.0, b2 = 0.0;
++    double z1 = 0.0, z2 = 0.0;
+ 
+     void calcFilter();
+ };
+diff --git a/app/drum808/instrument.cpp b/app/drum808/instrument.cpp
+index 9a3390feca3887e82cae6c385e466cb18c870f7e..019705a3569e523c51eacd7eb87cefd16e97e4f4
+--- a/app/drum808/instrument.cpp
++++ b/app/drum808/instrument.cpp
+@@ -7,7 +7,13 @@
+ using std::cout;
+ using std::endl;
+ 
+-int Instrument::getPitch()
++Instrument::~Instrument()
++{
++    delete m_ampEnv;
++    delete m_pitchEnv;
++}
++
++int Instrument::getPitch() const
+ {
+     return m_pitch;
+ }
+@@ -45,12 +51,12 @@
+     m_triggered = false;
+ }
+ 
+-bool Instrument::isTriggered()
++bool Instrument::isTriggered() const
+ {
+     return m_triggered;
+ }
+ 
+-bool Instrument::isPlaying()
++bool Instrument::isPlaying() const
+ {
+     return m_playing;
+ }
+@@ -83,7 +89,7 @@
+     return value;
+ }
+ 
+-std::string Instrument::getName()
++const std::string &Instrument::getName() const
+ {
+     return m_name;
+ }
+diff --git a/app/drum808/instrument.h b/app/drum808/instrument.h
+index bc10977365c6e31a160e421e431f67aaa661a9f2..9e970887b18ec3038f44aeffe8648804f9afb7f3
+--- a/app/drum808/instrument.h
++++ b/app/drum808/instrument.h
+@@ -2,7 +2,6 @@
+ #define INSTRUMENT_H
+ 
+ #include <cmath>
+-#include <optional>
+ #include <string>
+ #include "amp_env.h"
+ #include "pitch_env.h"
+@@ -15,9 +14,9 @@
+ {
+ public:
+     Instrument() = default;
+-    ~Instrument() = default;
++    virtual ~Instrument();
+ 
+-    int getPitch();
++    int getPitch() const;
+     void setPitch(int pitch);
+ 
+     void setLevel(double level);
+@@ -30,14 +29,14 @@
+ 
+     void trigger();
+     void release();
+-    bool isTriggered();
+-    bool isPlaying();
++    bool isTriggered() const;
++    bool isPlaying() const;
+ 
+     void updateBy(double time);
+ 
+     virtual double getSample();
+ 
+-    std::string getName();
++    const std::string &getName() const;
+ 
+     static constexpr double TAU = M_PI * 2.0;
+ 
+@@ -45,13 +44,13 @@
+     AmpEnv *m_ampEnv = nullptr;
+     PitchEnv *m_pitchEnv = nullptr;
+ 
+-    double m_duration;
+-    double m_elapsed;
++    double m_duration = 0.0;
++    double m_elapsed = 0.0;
+ 
+-    int m_pitch;
++    int m_pitch = 0;
+ 
+-    bool m_triggered;
+-    bool m_playing;
++    bool m_triggered = false;
++    bool m_playing = false;
+ 
+     std::string m_name;
+ };
+diff --git a/app/drum808/kick.cpp b/app/drum808/kick.cpp
+index ab3187d3c1421d0fb56b0024b2dc2100d3334f4d..caed91d337febc424e0dea49b25c4bcf85d23463
+--- a/app/drum808/kick.cpp
++++ b/app/drum808/kick.cpp
+@@ -12,19 +12,21 @@
+ 
+ void Kick::setDefaults()
+ {
+-    AmpEnv::AmpEnvSettings envSettings = {
+-        .peakAmp = 0.8,
+-        .decay = 0.25,
+-    };
++    AmpEnv::AmpEnvSettings envSettings{};
++    envSettings.startAmp = 0.0;
++    envSettings.peakAmp = 0.8;
++    envSettings.releaseAmp = 0.0;
++    envSettings.attack = 0.0;
++    envSettings.decay = 0.25;
+     AmpEnv *ampEnv = new AmpEnv(envSettings);
+     setAmpEnv(ampEnv);
+ 
+-    PitchEnv::EnvSettings pitchEnvSettings = {
+-        .startPitch = (double)getPitch(),
+-        .peakPitch = getPitch() + SEMITONE_HZ * 48.0,
+-        .releasePitch = (double)getPitch(),
+-        .decay = 0.02,
+-    };
++    PitchEnv::EnvSettings pitchEnvSettings{};
++    pitchEnvSettings.startPitch = (double)getPitch();
++    pitchEnvSettings.peakPitch = getPitch() + SEMITONE_HZ * 48.0;
++    pitchEnvSettings.releasePitch = (double)getPitch();
++    pitchEnvSettings.attack = 0.0;
++    pitchEnvSettings.decay = 0.02;
+     PitchEnv *pitchEnv = new PitchEnv(pitchEnvSettings);
+     setPitchEnv(pitchEnv);
+ }
+diff --git a/app/drum808/snare.cpp b/app/drum808/snare.cpp
+index f044bfe6bae8a768c4cbf4c10a7b0f9b6b009dd4..350f3efc4d4a93f935756b31e5b9b3e1a1a2f4b9
+--- a/app/drum808/snare.cpp
++++ b/app/drum808/snare.cpp
+@@ -1,5 +1,6 @@
+ #include <algorithm>
+ #include <cmath>
++#include <cstdlib>
+ #include <ctime>
+ #include <iostream>
+ #include "snare.h"
+@@ -14,27 +15,30 @@
+ 
+ void Snare::setDefaults()
+ {
+-    AmpEnv::AmpEnvSettings toneAmpEnvSettings = {
+-        .peakAmp = 0.1,
+-        .attack = 0.01,
+-        .decay = 0.25,
+-    };
++    AmpEnv::AmpEnvSettings toneAmpEnvSettings{};
++    toneAmpEnvSettings.startAmp = 0.0;
++    toneAmpEnvSettings.peakAmp = 0.1;
++    toneAmpEnvSettings.releaseAmp = 0.0;
++    toneAmpEnvSettings.attack = 0.01;
++    toneAmpEnvSettings.decay = 0.25;
+     AmpEnv *toneEnv = new AmpEnv(toneAmpEnvSettings);
+     setAmpEnv(toneEnv);
+ 
+-    PitchEnv::EnvSettings pitchEnvSettings = {
+-        .startPitch = (double)getPitch(),
+-        .peakPitch = getPitch() + SEMITONE_HZ * 24.0,
+-        .releasePitch = (double)getPitch(),
+-        .decay = 0.04,
+-    };
++    PitchEnv::EnvSettings pitchEnvSettings{};
++    pitchEnvSettings.startPitch = (double)getPitch();
++    pitchEnvSettings.peakPitch = getPitch() + SEMITONE_HZ * 24.0;
++    pitchEnvSettings.releasePitch = (double)getPitch();
++    pitchEnvSettings.attack = 0.0;
++    pitchEnvSettings.decay = 0.04;
+     PitchEnv *pitchEnv = new PitchEnv(pitchEnvSettings);
+     setPitchEnv(pitchEnv);
+ 
+-    AmpEnv::AmpEnvSettings noiseAmpEnvSettings = {
+-        .peakAmp = 0.6,
+-        .decay = 0.25,
+-    };
++    AmpEnv::AmpEnvSettings noiseAmpEnvSettings{};
++    noiseAmpEnvSettings.startAmp = 0.0;
++    noiseAmpEnvSettings.peakAmp = 0.6;
++    noiseAmpEnvSettings.releaseAmp = 0.0;
++    noiseAmpEnvSettings.attack = 0.0;
++    noiseAmpEnvSettings.decay = 0.25;
+     AmpEnv *noiseEnv = new AmpEnv(noiseAmpEnvSettings);
+     setNoiseEnv(noiseEnv);
+ 
+@@ -79,6 +83,9 @@
+     double tone = sin(pitch * TAU * m_elapsed);
+     double toneAmp = m_ampEnv->getEnvValue(m_elapsed);
+ 
++    if (m_bandPass == nullptr || m_noiseEnv == nullptr) {
++        return tone * toneAmp;
++    }
+     double noise = m_bandPass->filter((double)rand() / RAND_MAX);
+     double noiseAmp = m_noiseEnv->getEnvValue(m_elapsed);
+     return (tone * toneAmp) + (noise * noiseAmp);
+diff --git a/app/drum808/snare.h b/app/drum808/snare.h
+index 3575e10fb587369b7d8ed93df0469cef31bb5b7a..7a3d39f79199e5451d38b5db384173cd76693d00
+--- a/app/drum808/snare.h
++++ b/app/drum808/snare.h
+@@ -29,12 +29,11 @@
+     const std::string m_defaultName = "Snare";
+     const int m_defaultPitch = 160;
+ 
+-    Filter *m_bandPass;
+-    Filter *m_highPass;
++    Filter *m_bandPass = nullptr;
++    Filter *m_highPass = nullptr;
+ 
+ };
+ 
+ 
+ } // namespace drum808
+ #endif
+-
+
+
+thinking
+**Requesting poll session**
+codex
+The compiler command is still running without immediate diagnostics, which is a good sign. I’m polling for completion now to confirm exit status.
+ succeeded in 5.26s:
+
+file update:
+diff --git a/app/drum808/clap.cpp b/app/drum808/clap.cpp
+index 6e612e9eedc14a0e18413e406c162cfe6a48c606..1c3f169f00779631d448cba432dca61e32ebf46e
+--- a/app/drum808/clap.cpp
++++ b/app/drum808/clap.cpp
+@@ -1,5 +1,7 @@
++#include <cmath>
++#include <cstdlib>
++#include <ctime>
+ #include <iostream>
+-#include <cmath>
+ #include "clap.h"
+ 
+ namespace drum808 {
+@@ -14,10 +16,12 @@
+ 
+ void Clap::setDefaults()
+ {
+-    AmpEnv::AmpEnvSettings envSettings = {
+-        .peakAmp = 0.8,
+-        .decay = 0.3
+-    };
++    AmpEnv::AmpEnvSettings envSettings{};
++    envSettings.startAmp = 0.0;
++    envSettings.peakAmp = 0.8;
++    envSettings.releaseAmp = 0.0;
++    envSettings.attack = 0.0;
++    envSettings.decay = 0.3;
+     AmpEnv *ampEnv = new AmpEnv(envSettings);
+     setAmpEnv(ampEnv);
+ 
+@@ -58,6 +62,7 @@
+         sample = noise * decay;
+     }
+ 
++    if (m_bandPass == nullptr || m_highPass == nullptr) return sample;
+     return m_highPass->filter(m_bandPass->filter(sample));
+ }
+ 
+diff --git a/app/drum808/clap.h b/app/drum808/clap.h
+index faad2b019afe6a2f98ef6444fcda2bdcbd33454e..31af137bf3b8b7c297c8a4d198e98cad9a25d1c2
+--- a/app/drum808/clap.h
++++ b/app/drum808/clap.h
+@@ -27,8 +27,8 @@
+     // 10 ms between claps
+     static constexpr double m_interval = 0.01;
+ 
+-    Filter *m_highPass;
+-    Filter *m_bandPass;
++    Filter *m_highPass = nullptr;
++    Filter *m_bandPass = nullptr;
+ };
+ 
+ 
+diff --git a/app/drum808/closed_hat.cpp b/app/drum808/closed_hat.cpp
+index f0796853e6813cc7163a1053de0228aca5b02aa3..87cbc065b72ed3629d9e466836634a7652de2fab
+--- a/app/drum808/closed_hat.cpp
++++ b/app/drum808/closed_hat.cpp
+@@ -21,10 +21,12 @@
+ 
+ void ClosedHat::setDefaults()
+ {
+-    AmpEnv::AmpEnvSettings envSettings = {
+-        .peakAmp = 0.8,
+-        .decay = 0.2
+-    };
++    AmpEnv::AmpEnvSettings envSettings{};
++    envSettings.startAmp = 0.0;
++    envSettings.peakAmp = 0.8;
++    envSettings.releaseAmp = 0.0;
++    envSettings.attack = 0.0;
++    envSettings.decay = 0.2;
+     AmpEnv *ampEnv = new AmpEnv(envSettings);
+     setAmpEnv(ampEnv);
+ 
+@@ -54,6 +56,9 @@
+         amp += value;
+     }
+     amp /= m_harmonics.size();
++    if (m_bandPass == nullptr || m_highPass == nullptr || m_ampEnv == nullptr) {
++        return amp;
++    }
+     double firstStep = m_bandPass->filter(amp);
+     double secondStep = m_highPass->filter(firstStep);
+     return secondStep * m_ampEnv->getEnvValue(m_elapsed);
+diff --git a/app/drum808/closed_hat.h b/app/drum808/closed_hat.h
+index 444472b295f00fc806a610a3a9334052232b0f62..164cbd02d747084a50c8f72281d17d804abcc755
+--- a/app/drum808/closed_hat.h
++++ b/app/drum808/closed_hat.h
+@@ -27,8 +27,8 @@
+ 
+     std::array<double, 6> m_harmonics;
+ 
+-    Filter *m_bandPass;
+-    Filter *m_highPass;
++    Filter *m_bandPass = nullptr;
++    Filter *m_highPass = nullptr;
+ };
+ 
+ 
+diff --git a/app/drum808/envelope.cpp b/app/drum808/envelope.cpp
+index 849e7fb3a4a16aca7350c302bbd9ff99fc5fe2ea..fac7705393fc872697c4e5442a547fd1878adf21
+--- a/app/drum808/envelope.cpp
++++ b/app/drum808/envelope.cpp
+@@ -37,6 +37,11 @@
+ {
+     if (time > m_duration) return m_release;
+ 
++    if (m_attack <= 0.0) {
++        if (m_decay <= 0.0) return m_release;
++        return decayRamp(time);
++    }
++
+     if (time <= m_attack) {
+         return attackRamp(time);
+     } else if (time <= (m_attack + m_decay)) {
+@@ -49,11 +54,13 @@
+ 
+ double Envelope::attackRamp(double time)
+ {
++    if (m_attack <= 0.0) return m_peak;
+     return (m_peak - m_start) / m_attack * time + m_start;
+ }
+ 
+ double Envelope::decayRamp(double time)
+ {
++    if (m_decay <= 0.0) return m_release;
+     return (m_release - m_peak) / m_decay * (time - m_attack) + m_peak;
+ }
+ 
+diff --git a/app/drum808/envelope.h b/app/drum808/envelope.h
+index 46da18ce3d119eaf713d3202bacb2ad9b0637a7e..482f31db047b46aad3bdcfc533023befe00ab150
+--- a/app/drum808/envelope.h
++++ b/app/drum808/envelope.h
+@@ -1,6 +1,8 @@
+ #ifndef ENVELOPE_H
+ #define ENVELOPE_H
+ 
++namespace drum808 {
++
+ /**
+  * This abstract class is the base for all ADSR implementations.
+  *
+@@ -10,7 +12,7 @@
+ {
+ public:
+     Envelope() = default;
+-    ~Envelope() = default;
++    virtual ~Envelope() = default;
+ 
+     double getDuration();
+ 
+@@ -24,13 +26,13 @@
+     double getEnvValue(double time);
+ 
+ protected:
+-    double m_attack;
+-    double m_decay;
+-    double m_duration;
++    double m_attack = 0.0;
++    double m_decay = 0.0;
++    double m_duration = 0.0;
+ 
+-    double m_start;
+-    double m_peak;
+-    double m_release;
++    double m_start = 0.0;
++    double m_peak = 0.0;
++    double m_release = 0.0;
+ 
+ private:
+     double attackRamp(double time);
+diff --git a/app/drum808/filter.h b/app/drum808/filter.h
+index 39f2d673a2bc54bb97d9962113876846c5a42318..20ba48f49395f71ca5e8de237dbe889dc5740339
+--- a/app/drum808/filter.h
++++ b/app/drum808/filter.h
+@@ -1,6 +1,8 @@
+ #ifndef FILTER_H
+ #define FILTER_H
+ 
++namespace drum808 {
++
+ enum {
+     BANDPASS = 0,
+     HIGHPASS,
+@@ -23,8 +25,8 @@
+     double m_freq;
+     double m_q;
+ 
+-    double a0, a1, a2, b1, b2;
+-    double z1, z2;
++    double a0 = 0.0, a1 = 0.0, a2 = 0.0, b1 = 0.0, b2 = 0.0;
++    double z1 = 0.0, z2 = 0.0;
+ 
+     void calcFilter();
+ };
+diff --git a/app/drum808/instrument.cpp b/app/drum808/instrument.cpp
+index 9a3390feca3887e82cae6c385e466cb18c870f7e..019705a3569e523c51eacd7eb87cefd16e97e4f4
+--- a/app/drum808/instrument.cpp
++++ b/app/drum808/instrument.cpp
+@@ -7,7 +7,13 @@
+ using std::cout;
+ using std::endl;
+ 
+-int Instrument::getPitch()
++Instrument::~Instrument()
++{
++    delete m_ampEnv;
++    delete m_pitchEnv;
++}
++
++int Instrument::getPitch() const
+ {
+     return m_pitch;
+ }
+@@ -45,12 +51,12 @@
+     m_triggered = false;
+ }
+ 
+-bool Instrument::isTriggered()
++bool Instrument::isTriggered() const
+ {
+     return m_triggered;
+ }
+ 
+-bool Instrument::isPlaying()
++bool Instrument::isPlaying() const
+ {
+     return m_playing;
+ }
+@@ -83,7 +89,7 @@
+     return value;
+ }
+ 
+-std::string Instrument::getName()
++const std::string &Instrument::getName() const
+ {
+     return m_name;
+ }
+diff --git a/app/drum808/instrument.h b/app/drum808/instrument.h
+index bc10977365c6e31a160e421e431f67aaa661a9f2..9e970887b18ec3038f44aeffe8648804f9afb7f3
+--- a/app/drum808/instrument.h
++++ b/app/drum808/instrument.h
+@@ -2,7 +2,6 @@
+ #define INSTRUMENT_H
+ 
+ #include <cmath>
+-#include <optional>
+ #include <string>
+ #include "amp_env.h"
+ #include "pitch_env.h"
+@@ -15,9 +14,9 @@
+ {
+ public:
+     Instrument() = default;
+-    ~Instrument() = default;
++    virtual ~Instrument();
+ 
+-    int getPitch();
++    int getPitch() const;
+     void setPitch(int pitch);
+ 
+     void setLevel(double level);
+@@ -30,14 +29,14 @@
+ 
+     void trigger();
+     void release();
+-    bool isTriggered();
+-    bool isPlaying();
++    bool isTriggered() const;
++    bool isPlaying() const;
+ 
+     void updateBy(double time);
+ 
+     virtual double getSample();
+ 
+-    std::string getName();
++    const std::string &getName() const;
+ 
+     static constexpr double TAU = M_PI * 2.0;
+ 
+@@ -45,13 +44,13 @@
+     AmpEnv *m_ampEnv = nullptr;
+     PitchEnv *m_pitchEnv = nullptr;
+ 
+-    double m_duration;
+-    double m_elapsed;
++    double m_duration = 0.0;
++    double m_elapsed = 0.0;
+ 
+-    int m_pitch;
++    int m_pitch = 0;
+ 
+-    bool m_triggered;
+-    bool m_playing;
++    bool m_triggered = false;
++    bool m_playing = false;
+ 
+     std::string m_name;
+ };
+diff --git a/app/drum808/kick.cpp b/app/drum808/kick.cpp
+index ab3187d3c1421d0fb56b0024b2dc2100d3334f4d..caed91d337febc424e0dea49b25c4bcf85d23463
+--- a/app/drum808/kick.cpp
++++ b/app/drum808/kick.cpp
+@@ -12,19 +12,21 @@
+ 
+ void Kick::setDefaults()
+ {
+-    AmpEnv::AmpEnvSettings envSettings = {
+-        .peakAmp = 0.8,
+-        .decay = 0.25,
+-    };
++    AmpEnv::AmpEnvSettings envSettings{};
++    envSettings.startAmp = 0.0;
++    envSettings.peakAmp = 0.8;
++    envSettings.releaseAmp = 0.0;
++    envSettings.attack = 0.0;
++    envSettings.decay = 0.25;
+     AmpEnv *ampEnv = new AmpEnv(envSettings);
+     setAmpEnv(ampEnv);
+ 
+-    PitchEnv::EnvSettings pitchEnvSettings = {
+-        .startPitch = (double)getPitch(),
+-        .peakPitch = getPitch() + SEMITONE_HZ * 48.0,
+-        .releasePitch = (double)getPitch(),
+-        .decay = 0.02,
+-    };
++    PitchEnv::EnvSettings pitchEnvSettings{};
++    pitchEnvSettings.startPitch = (double)getPitch();
++    pitchEnvSettings.peakPitch = getPitch() + SEMITONE_HZ * 48.0;
++    pitchEnvSettings.releasePitch = (double)getPitch();
++    pitchEnvSettings.attack = 0.0;
++    pitchEnvSettings.decay = 0.02;
+     PitchEnv *pitchEnv = new PitchEnv(pitchEnvSettings);
+     setPitchEnv(pitchEnv);
+ }
+diff --git a/app/drum808/snare.cpp b/app/drum808/snare.cpp
+index f044bfe6bae8a768c4cbf4c10a7b0f9b6b009dd4..350f3efc4d4a93f935756b31e5b9b3e1a1a2f4b9
+--- a/app/drum808/snare.cpp
++++ b/app/drum808/snare.cpp
+@@ -1,5 +1,6 @@
+ #include <algorithm>
+ #include <cmath>
++#include <cstdlib>
+ #include <ctime>
+ #include <iostream>
+ #include "snare.h"
+@@ -14,27 +15,30 @@
+ 
+ void Snare::setDefaults()
+ {
+-    AmpEnv::AmpEnvSettings toneAmpEnvSettings = {
+-        .peakAmp = 0.1,
+-        .attack = 0.01,
+-        .decay = 0.25,
+-    };
++    AmpEnv::AmpEnvSettings toneAmpEnvSettings{};
++    toneAmpEnvSettings.startAmp = 0.0;
++    toneAmpEnvSettings.peakAmp = 0.1;
++    toneAmpEnvSettings.releaseAmp = 0.0;
++    toneAmpEnvSettings.attack = 0.01;
++    toneAmpEnvSettings.decay = 0.25;
+     AmpEnv *toneEnv = new AmpEnv(toneAmpEnvSettings);
+     setAmpEnv(toneEnv);
+ 
+-    PitchEnv::EnvSettings pitchEnvSettings = {
+-        .startPitch = (double)getPitch(),
+-        .peakPitch = getPitch() + SEMITONE_HZ * 24.0,
+-        .releasePitch = (double)getPitch(),
+-        .decay = 0.04,
+-    };
++    PitchEnv::EnvSettings pitchEnvSettings{};
++    pitchEnvSettings.startPitch = (double)getPitch();
++    pitchEnvSettings.peakPitch = getPitch() + SEMITONE_HZ * 24.0;
++    pitchEnvSettings.releasePitch = (double)getPitch();
++    pitchEnvSettings.attack = 0.0;
++    pitchEnvSettings.decay = 0.04;
+     PitchEnv *pitchEnv = new PitchEnv(pitchEnvSettings);
+     setPitchEnv(pitchEnv);
+ 
+-    AmpEnv::AmpEnvSettings noiseAmpEnvSettings = {
+-        .peakAmp = 0.6,
+-        .decay = 0.25,
+-    };
++    AmpEnv::AmpEnvSettings noiseAmpEnvSettings{};
++    noiseAmpEnvSettings.startAmp = 0.0;
++    noiseAmpEnvSettings.peakAmp = 0.6;
++    noiseAmpEnvSettings.releaseAmp = 0.0;
++    noiseAmpEnvSettings.attack = 0.0;
++    noiseAmpEnvSettings.decay = 0.25;
+     AmpEnv *noiseEnv = new AmpEnv(noiseAmpEnvSettings);
+     setNoiseEnv(noiseEnv);
+ 
+@@ -79,6 +83,9 @@
+     double tone = sin(pitch * TAU * m_elapsed);
+     double toneAmp = m_ampEnv->getEnvValue(m_elapsed);
+ 
++    if (m_bandPass == nullptr || m_noiseEnv == nullptr) {
++        return tone * toneAmp;
++    }
+     double noise = m_bandPass->filter((double)rand() / RAND_MAX);
+     double noiseAmp = m_noiseEnv->getEnvValue(m_elapsed);
+     return (tone * toneAmp) + (noise * noiseAmp);
+diff --git a/app/drum808/snare.h b/app/drum808/snare.h
+index 3575e10fb587369b7d8ed93df0469cef31bb5b7a..7a3d39f79199e5451d38b5db384173cd76693d00
+--- a/app/drum808/snare.h
++++ b/app/drum808/snare.h
+@@ -29,12 +29,11 @@
+     const std::string m_defaultName = "Snare";
+     const int m_defaultPitch = 160;
+ 
+-    Filter *m_bandPass;
+-    Filter *m_highPass;
++    Filter *m_bandPass = nullptr;
++    Filter *m_highPass = nullptr;
+ 
+ };
+ 
+ 
+ } // namespace drum808
+ #endif
+-
+
+
+thinking
+**Summarizing final changes**
+codex
+Implemented the `jc-808` port under `app/drum808/` and kept changes scoped there.
+
+What’s done:
+- Copied and ported all requested source/header pairs into `app/drum808/`
+- Removed SDL dependency from the sequencer (`<SDL2/SDL.h>` gone)
+- Wrapped all code in `namespace drum808`
+- Kept `SAMPLE_RATE = 44100` in `app/drum808/sequencer.h`
+- Reworked `Sequencer` to use 4 empty instrument slots (`Kick`, `Snare`, `Clap`, `ClosedHat`) and added:
+  - `toggleNote(int instrumentIndex, int step)`
+  - `getPosition() const`
+  - `getInstrumentCount() const`
+  - `getInstrumentName(int index) const`
+  - `getNoteState(int instrumentIndex, int step) const`
+- Added `DrumEngine` in `app/drum808/drum_engine.h` and `app/drum808/drum_engine.cpp` with the requested API (no audio output backend code)
+- Fixed C++14 compatibility issues from upstream source (`<optional>`, designated initializers)
+
+Verification:
+- `g++ -std=c++14 -fsyntax-only app/drum808/*.cpp -I app/drum808/` ✅ passed
+
+Key files:
+- `app/drum808/sequencer.h`
+- `app/drum808/sequencer.cpp`
+- `app/drum808/drum_engine.h`
+- `app/drum808/drum_engine.cpp`
+file update:
+diff --git a/app/drum808/clap.cpp b/app/drum808/clap.cpp
+index 6e612e9eedc14a0e18413e406c162cfe6a48c606..1c3f169f00779631d448cba432dca61e32ebf46e
+--- a/app/drum808/clap.cpp
++++ b/app/drum808/clap.cpp
+@@ -1,5 +1,7 @@
++#include <cmath>
++#include <cstdlib>
++#include <ctime>
+ #include <iostream>
+-#include <cmath>
+ #include "clap.h"
+ 
+ namespace drum808 {
+@@ -14,10 +16,12 @@
+ 
+ void Clap::setDefaults()
+ {
+-    AmpEnv::AmpEnvSettings envSettings = {
+-        .peakAmp = 0.8,
+-        .decay = 0.3
+-    };
++    AmpEnv::AmpEnvSettings envSettings{};
++    envSettings.startAmp = 0.0;
++    envSettings.peakAmp = 0.8;
++    envSettings.releaseAmp = 0.0;
++    envSettings.attack = 0.0;
++    envSettings.decay = 0.3;
+     AmpEnv *ampEnv = new AmpEnv(envSettings);
+     setAmpEnv(ampEnv);
+ 
+@@ -58,6 +62,7 @@
+         sample = noise * decay;
+     }
+ 
++    if (m_bandPass == nullptr || m_highPass == nullptr) return sample;
+     return m_highPass->filter(m_bandPass->filter(sample));
+ }
+ 
+diff --git a/app/drum808/clap.h b/app/drum808/clap.h
+index faad2b019afe6a2f98ef6444fcda2bdcbd33454e..31af137bf3b8b7c297c8a4d198e98cad9a25d1c2
+--- a/app/drum808/clap.h
++++ b/app/drum808/clap.h
+@@ -27,8 +27,8 @@
+     // 10 ms between claps
+     static constexpr double m_interval = 0.01;
+ 
+-    Filter *m_highPass;
+-    Filter *m_bandPass;
++    Filter *m_highPass = nullptr;
++    Filter *m_bandPass = nullptr;
+ };
+ 
+ 
+diff --git a/app/drum808/closed_hat.cpp b/app/drum808/closed_hat.cpp
+index f0796853e6813cc7163a1053de0228aca5b02aa3..87cbc065b72ed3629d9e466836634a7652de2fab
+--- a/app/drum808/closed_hat.cpp
++++ b/app/drum808/closed_hat.cpp
+@@ -21,10 +21,12 @@
+ 
+ void ClosedHat::setDefaults()
+ {
+-    AmpEnv::AmpEnvSettings envSettings = {
+-        .peakAmp = 0.8,
+-        .decay = 0.2
+-    };
++    AmpEnv::AmpEnvSettings envSettings{};
++    envSettings.startAmp = 0.0;
++    envSettings.peakAmp = 0.8;
++    envSettings.releaseAmp = 0.0;
++    envSettings.attack = 0.0;
++    envSettings.decay = 0.2;
+     AmpEnv *ampEnv = new AmpEnv(envSettings);
+     setAmpEnv(ampEnv);
+ 
+@@ -54,6 +56,9 @@
+         amp += value;
+     }
+     amp /= m_harmonics.size();
++    if (m_bandPass == nullptr || m_highPass == nullptr || m_ampEnv == nullptr) {
++        return amp;
++    }
+     double firstStep = m_bandPass->filter(amp);
+     double secondStep = m_highPass->filter(firstStep);
+     return secondStep * m_ampEnv->getEnvValue(m_elapsed);
+diff --git a/app/drum808/closed_hat.h b/app/drum808/closed_hat.h
+index 444472b295f00fc806a610a3a9334052232b0f62..164cbd02d747084a50c8f72281d17d804abcc755
+--- a/app/drum808/closed_hat.h
++++ b/app/drum808/closed_hat.h
+@@ -27,8 +27,8 @@
+ 
+     std::array<double, 6> m_harmonics;
+ 
+-    Filter *m_bandPass;
+-    Filter *m_highPass;
++    Filter *m_bandPass = nullptr;
++    Filter *m_highPass = nullptr;
+ };
+ 
+ 
+diff --git a/app/drum808/envelope.cpp b/app/drum808/envelope.cpp
+index 849e7fb3a4a16aca7350c302bbd9ff99fc5fe2ea..fac7705393fc872697c4e5442a547fd1878adf21
+--- a/app/drum808/envelope.cpp
++++ b/app/drum808/envelope.cpp
+@@ -37,6 +37,11 @@
+ {
+     if (time > m_duration) return m_release;
+ 
++    if (m_attack <= 0.0) {
++        if (m_decay <= 0.0) return m_release;
++        return decayRamp(time);
++    }
++
+     if (time <= m_attack) {
+         return attackRamp(time);
+     } else if (time <= (m_attack + m_decay)) {
+@@ -49,11 +54,13 @@
+ 
+ double Envelope::attackRamp(double time)
+ {
++    if (m_attack <= 0.0) return m_peak;
+     return (m_peak - m_start) / m_attack * time + m_start;
+ }
+ 
+ double Envelope::decayRamp(double time)
+ {
++    if (m_decay <= 0.0) return m_release;
+     return (m_release - m_peak) / m_decay * (time - m_attack) + m_peak;
+ }
+ 
+diff --git a/app/drum808/envelope.h b/app/drum808/envelope.h
+index 46da18ce3d119eaf713d3202bacb2ad9b0637a7e..482f31db047b46aad3bdcfc533023befe00ab150
+--- a/app/drum808/envelope.h
++++ b/app/drum808/envelope.h
+@@ -1,6 +1,8 @@
+ #ifndef ENVELOPE_H
+ #define ENVELOPE_H
+ 
++namespace drum808 {
++
+ /**
+  * This abstract class is the base for all ADSR implementations.
+  *
+@@ -10,7 +12,7 @@
+ {
+ public:
+     Envelope() = default;
+-    ~Envelope() = default;
++    virtual ~Envelope() = default;
+ 
+     double getDuration();
+ 
+@@ -24,13 +26,13 @@
+     double getEnvValue(double time);
+ 
+ protected:
+-    double m_attack;
+-    double m_decay;
+-    double m_duration;
++    double m_attack = 0.0;
++    double m_decay = 0.0;
++    double m_duration = 0.0;
+ 
+-    double m_start;
+-    double m_peak;
+-    double m_release;
++    double m_start = 0.0;
++    double m_peak = 0.0;
++    double m_release = 0.0;
+ 
+ private:
+     double attackRamp(double time);
+diff --git a/app/drum808/filter.h b/app/drum808/filter.h
+index 39f2d673a2bc54bb97d9962113876846c5a42318..20ba48f49395f71ca5e8de237dbe889dc5740339
+--- a/app/drum808/filter.h
++++ b/app/drum808/filter.h
+@@ -1,6 +1,8 @@
+ #ifndef FILTER_H
+ #define FILTER_H
+ 
++namespace drum808 {
++
+ enum {
+     BANDPASS = 0,
+     HIGHPASS,
+@@ -23,8 +25,8 @@
+     double m_freq;
+     double m_q;
+ 
+-    double a0, a1, a2, b1, b2;
+-    double z1, z2;
++    double a0 = 0.0, a1 = 0.0, a2 = 0.0, b1 = 0.0, b2 = 0.0;
++    double z1 = 0.0, z2 = 0.0;
+ 
+     void calcFilter();
+ };
+diff --git a/app/drum808/instrument.cpp b/app/drum808/instrument.cpp
+index 9a3390feca3887e82cae6c385e466cb18c870f7e..019705a3569e523c51eacd7eb87cefd16e97e4f4
+--- a/app/drum808/instrument.cpp
++++ b/app/drum808/instrument.cpp
+@@ -7,7 +7,13 @@
+ using std::cout;
+ using std::endl;
+ 
+-int Instrument::getPitch()
++Instrument::~Instrument()
++{
++    delete m_ampEnv;
++    delete m_pitchEnv;
++}
++
++int Instrument::getPitch() const
+ {
+     return m_pitch;
+ }
+@@ -45,12 +51,12 @@
+     m_triggered = false;
+ }
+ 
+-bool Instrument::isTriggered()
++bool Instrument::isTriggered() const
+ {
+     return m_triggered;
+ }
+ 
+-bool Instrument::isPlaying()
++bool Instrument::isPlaying() const
+ {
+     return m_playing;
+ }
+@@ -83,7 +89,7 @@
+     return value;
+ }
+ 
+-std::string Instrument::getName()
++const std::string &Instrument::getName() const
+ {
+     return m_name;
+ }
+diff --git a/app/drum808/instrument.h b/app/drum808/instrument.h
+index bc10977365c6e31a160e421e431f67aaa661a9f2..9e970887b18ec3038f44aeffe8648804f9afb7f3
+--- a/app/drum808/instrument.h
++++ b/app/drum808/instrument.h
+@@ -2,7 +2,6 @@
+ #define INSTRUMENT_H
+ 
+ #include <cmath>
+-#include <optional>
+ #include <string>
+ #include "amp_env.h"
+ #include "pitch_env.h"
+@@ -15,9 +14,9 @@
+ {
+ public:
+     Instrument() = default;
+-    ~Instrument() = default;
++    virtual ~Instrument();
+ 
+-    int getPitch();
++    int getPitch() const;
+     void setPitch(int pitch);
+ 
+     void setLevel(double level);
+@@ -30,14 +29,14 @@
+ 
+     void trigger();
+     void release();
+-    bool isTriggered();
+-    bool isPlaying();
++    bool isTriggered() const;
++    bool isPlaying() const;
+ 
+     void updateBy(double time);
+ 
+     virtual double getSample();
+ 
+-    std::string getName();
++    const std::string &getName() const;
+ 
+     static constexpr double TAU = M_PI * 2.0;
+ 
+@@ -45,13 +44,13 @@
+     AmpEnv *m_ampEnv = nullptr;
+     PitchEnv *m_pitchEnv = nullptr;
+ 
+-    double m_duration;
+-    double m_elapsed;
++    double m_duration = 0.0;
++    double m_elapsed = 0.0;
+ 
+-    int m_pitch;
++    int m_pitch = 0;
+ 
+-    bool m_triggered;
+-    bool m_playing;
++    bool m_triggered = false;
++    bool m_playing = false;
+ 
+     std::string m_name;
+ };
+diff --git a/app/drum808/kick.cpp b/app/drum808/kick.cpp
+index ab3187d3c1421d0fb56b0024b2dc2100d3334f4d..caed91d337febc424e0dea49b25c4bcf85d23463
+--- a/app/drum808/kick.cpp
++++ b/app/drum808/kick.cpp
+@@ -12,19 +12,21 @@
+ 
+ void Kick::setDefaults()
+ {
+-    AmpEnv::AmpEnvSettings envSettings = {
+-        .peakAmp = 0.8,
+-        .decay = 0.25,
+-    };
++    AmpEnv::AmpEnvSettings envSettings{};
++    envSettings.startAmp = 0.0;
++    envSettings.peakAmp = 0.8;
++    envSettings.releaseAmp = 0.0;
++    envSettings.attack = 0.0;
++    envSettings.decay = 0.25;
+     AmpEnv *ampEnv = new AmpEnv(envSettings);
+     setAmpEnv(ampEnv);
+ 
+-    PitchEnv::EnvSettings pitchEnvSettings = {
+-        .startPitch = (double)getPitch(),
+-        .peakPitch = getPitch() + SEMITONE_HZ * 48.0,
+-        .releasePitch = (double)getPitch(),
+-        .decay = 0.02,
+-    };
++    PitchEnv::EnvSettings pitchEnvSettings{};
++    pitchEnvSettings.startPitch = (double)getPitch();
++    pitchEnvSettings.peakPitch = getPitch() + SEMITONE_HZ * 48.0;
++    pitchEnvSettings.releasePitch = (double)getPitch();
++    pitchEnvSettings.attack = 0.0;
++    pitchEnvSettings.decay = 0.02;
+     PitchEnv *pitchEnv = new PitchEnv(pitchEnvSettings);
+     setPitchEnv(pitchEnv);
+ }
+diff --git a/app/drum808/snare.cpp b/app/drum808/snare.cpp
+index f044bfe6bae8a768c4cbf4c10a7b0f9b6b009dd4..350f3efc4d4a93f935756b31e5b9b3e1a1a2f4b9
+--- a/app/drum808/snare.cpp
++++ b/app/drum808/snare.cpp
+@@ -1,5 +1,6 @@
+ #include <algorithm>
+ #include <cmath>
++#include <cstdlib>
+ #include <ctime>
+ #include <iostream>
+ #include "snare.h"
+@@ -14,27 +15,30 @@
+ 
+ void Snare::setDefaults()
+ {
+-    AmpEnv::AmpEnvSettings toneAmpEnvSettings = {
+-        .peakAmp = 0.1,
+-        .attack = 0.01,
+-        .decay = 0.25,
+-    };
++    AmpEnv::AmpEnvSettings toneAmpEnvSettings{};
++    toneAmpEnvSettings.startAmp = 0.0;
++    toneAmpEnvSettings.peakAmp = 0.1;
++    toneAmpEnvSettings.releaseAmp = 0.0;
++    toneAmpEnvSettings.attack = 0.01;
++    toneAmpEnvSettings.decay = 0.25;
+     AmpEnv *toneEnv = new AmpEnv(toneAmpEnvSettings);
+     setAmpEnv(toneEnv);
+ 
+-    PitchEnv::EnvSettings pitchEnvSettings = {
+-        .startPitch = (double)getPitch(),
+-        .peakPitch = getPitch() + SEMITONE_HZ * 24.0,
+-        .releasePitch = (double)getPitch(),
+-        .decay = 0.04,
+-    };
++    PitchEnv::EnvSettings pitchEnvSettings{};
++    pitchEnvSettings.startPitch = (double)getPitch();
++    pitchEnvSettings.peakPitch = getPitch() + SEMITONE_HZ * 24.0;
++    pitchEnvSettings.releasePitch = (double)getPitch();
++    pitchEnvSettings.attack = 0.0;
++    pitchEnvSettings.decay = 0.04;
+     PitchEnv *pitchEnv = new PitchEnv(pitchEnvSettings);
+     setPitchEnv(pitchEnv);
+ 
+-    AmpEnv::AmpEnvSettings noiseAmpEnvSettings = {
+-        .peakAmp = 0.6,
+-        .decay = 0.25,
+-    };
++    AmpEnv::AmpEnvSettings noiseAmpEnvSettings{};
++    noiseAmpEnvSettings.startAmp = 0.0;
++    noiseAmpEnvSettings.peakAmp = 0.6;
++    noiseAmpEnvSettings.releaseAmp = 0.0;
++    noiseAmpEnvSettings.attack = 0.0;
++    noiseAmpEnvSettings.decay = 0.25;
+     AmpEnv *noiseEnv = new AmpEnv(noiseAmpEnvSettings);
+     setNoiseEnv(noiseEnv);
+ 
+@@ -79,6 +83,9 @@
+     double tone = sin(pitch * TAU * m_elapsed);
+     double toneAmp = m_ampEnv->getEnvValue(m_elapsed);
+ 
++    if (m_bandPass == nullptr || m_noiseEnv == nullptr) {
++        return tone * toneAmp;
++    }
+     double noise = m_bandPass->filter((double)rand() / RAND_MAX);
+     double noiseAmp = m_noiseEnv->getEnvValue(m_elapsed);
+     return (tone * toneAmp) + (noise * noiseAmp);
+diff --git a/app/drum808/snare.h b/app/drum808/snare.h
+index 3575e10fb587369b7d8ed93df0469cef31bb5b7a..7a3d39f79199e5451d38b5db384173cd76693d00
+--- a/app/drum808/snare.h
++++ b/app/drum808/snare.h
+@@ -29,12 +29,11 @@
+     const std::string m_defaultName = "Snare";
+     const int m_defaultPitch = 160;
+ 
+-    Filter *m_bandPass;
+-    Filter *m_highPass;
++    Filter *m_bandPass = nullptr;
++    Filter *m_highPass = nullptr;
+ 
+ };
+ 
+ 
+ } // namespace drum808
+ #endif
+-
+
+tokens used
+62,026
+Implemented the `jc-808` port under `app/drum808/` and kept changes scoped there.
+
+What’s done:
+- Copied and ported all requested source/header pairs into `app/drum808/`
+- Removed SDL dependency from the sequencer (`<SDL2/SDL.h>` gone)
+- Wrapped all code in `namespace drum808`
+- Kept `SAMPLE_RATE = 44100` in `app/drum808/sequencer.h`
+- Reworked `Sequencer` to use 4 empty instrument slots (`Kick`, `Snare`, `Clap`, `ClosedHat`) and added:
+  - `toggleNote(int instrumentIndex, int step)`
+  - `getPosition() const`
+  - `getInstrumentCount() const`
+  - `getInstrumentName(int index) const`
+  - `getNoteState(int instrumentIndex, int step) const`
+- Added `DrumEngine` in `app/drum808/drum_engine.h` and `app/drum808/drum_engine.cpp` with the requested API (no audio output backend code)
+- Fixed C++14 compatibility issues from upstream source (`<optional>`, designated initializers)
+
+Verification:
+- `g++ -std=c++14 -fsyntax-only app/drum808/*.cpp -I app/drum808/` ✅ passed
+
+Key files:
+- `app/drum808/sequencer.h`
+- `app/drum808/sequencer.cpp`
+- `app/drum808/drum_engine.h`
+- `app/drum808/drum_engine.cpp`

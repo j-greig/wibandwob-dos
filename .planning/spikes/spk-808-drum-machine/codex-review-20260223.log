@@ -1,0 +1,605 @@
+OpenAI Codex v0.101.0 (research preview)
+--------
+workdir: /Users/james/Repos/wibandwob-dos
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: medium
+reasoning summaries: auto
+session id: 019c89e1-70e5-7b31-97ac-28363b32cb48
+--------
+user
+EFFICIENCY: Use targeted commands, not full-file dumps. Prefer rg -n -C3 'pattern' file.
+
+TASK: Code review the TR-808 drum machine integration. Files to review:
+
+1. app/drum808/ — all files (ported synthesis engine from jc-808)
+2. app/drum_machine_view.h + app/drum_machine_view.cpp — TUI view
+3. app/drum808/audio_output.h + app/drum808/audio_output.cpp — CoreAudio backend
+
+Check for:
+- Thread safety: audio callback runs on CoreAudio thread, calls fillBuffer() which reads sequencer state. Is this safe? The TUI thread calls toggleNote/start/stop. Race conditions?
+- Memory leaks: Instrument classes use raw new. Are they cleaned up?
+- Division by zero: envelope ramps, filter calculations
+- Null pointer derefs: especially in getSample() chains
+- C++14 compatibility issues
+- Missing namespace closings
+- Playhead animation: TDrumMachineWindow polls playhead in handleEvent but has no timer — will it animate smoothly or only on user input?
+- CoreAudio buffer underrun risk with BUFFER_SAMPLES=1024 at 44100Hz
+- The sequencer's updateBy() and getActiveSamples() — is the active samples vector safe to iterate while audio callback may modify it?
+
+Output a prioritised list of issues: CRITICAL (will crash/corrupt), HIGH (race condition/leak), MEDIUM (suboptimal), LOW (style).
+mcp startup: no servers
+2026-02-23T09:42:59.088980Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c84f6-ba12-7661-84b9-d9ea8b1b8614
+2026-02-23T09:42:59.120652Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c84e5-edab-76e1-b0c0-96e4d21e2286
+
+thinking
+**Preparing targeted code inspection**
+codex
+Reviewing the TR-808 integration for concurrency, lifetime, and runtime risks. I’ll inspect the listed files with targeted searches first, then verify the highest-risk paths in the audio callback and sequencer state access.
+exec
+/bin/zsh -lc "rg --files app/drum808 app | rg 'app/drum808/|app/drum_machine_view\\.(h|cpp)"'$'"'" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+app/drum808/audio_output.cpp
+app/drum808/envelope.cpp
+app/drum808/closed_hat.h
+app/drum808/snare.h
+app/drum808/filter.h
+app/drum808/envelope.h
+app/drum808/sequencer.h
+app/drum808/closed_hat.cpp
+app/drum808/drum_engine.cpp
+app/drum808/pitch_env.cpp
+app/drum808/filter.cpp
+app/drum808/instrument.h
+app/drum808/audio_output.h
+app/drum808/amp_env.cpp
+app/drum808/clap.cpp
+app/drum808/snare.cpp
+app/drum808/drum_engine.h
+app/drum808/sequencer.cpp
+app/drum808/amp_env.h
+app/drum808/pitch_env.h
+exec
+/bin/zsh -lc 'git status --short' in /Users/james/Repos/wibandwob-dos succeeded in 166ms:
+ M app/CMakeLists.txt
+ M app/app_launcher_view.cpp
+ M app/command_registry.cpp
+ M app/test_pattern_app.cpp
+?? .codex-logs/2026-02-23/
+?? .planning/spikes/spk-808-drum-machine/
+?? app/drum808/
+?? app/drum_machine_view.cpp
+?? app/drum_machine_view.h
+
+thinking
+**Searching key code patterns**
+codex
+I’ve confirmed the review scope and the TR-808 files are new/uncommitted. Next I’m tracing the callback path (`AudioUnit` -> `fillBuffer()` -> sequencer/instruments) and the TUI event/update path to identify data races and lifetime gaps.
+exec
+/bin/zsh -lc "rg -n -C2 'new |delete|~[A-Za-z_][A-Za-z0-9_]*\\(' app/drum808/*.cpp app/drum808/*.h app/drum_machine_view.cpp app/drum_machine_view.h" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "rg -n -C3 'fillBuffer|getSample|toggleNote|start\\(|stop\\(|updateBy|getActiveSamples|AudioUnit|renderCallback|BUFFER_SAMPLES|playhead|handleEvent' app/drum808/*.cpp app/drum808/*.h app/drum_machine_view.cpp app/drum_machine_view.h" in /Users/james/Repos/wibandwob-dos succeeded in 50ms:
+app/drum808/closed_hat.cpp-28-    envSettings.attack = 0.0;
+app/drum808/closed_hat.cpp-29-    envSettings.decay = 0.2;
+app/drum808/closed_hat.cpp:30:    AmpEnv *ampEnv = new AmpEnv(envSettings);
+app/drum808/closed_hat.cpp-31-    setAmpEnv(ampEnv);
+app/drum808/closed_hat.cpp-32-
+app/drum808/closed_hat.cpp:33:    Filter *bandPass = new Filter(BANDPASS);
+app/drum808/closed_hat.cpp-34-    bandPass->setFilter(8000.0, 8.0);
+app/drum808/closed_hat.cpp-35-    setBandPassFilter(bandPass);
+app/drum808/closed_hat.cpp:36:    Filter *highPass = new Filter(HIGHPASS);
+app/drum808/closed_hat.cpp-37-    highPass->setFilter(7000.0, 1.0);
+app/drum808/closed_hat.cpp-38-    setHighPassFilter(highPass);
+--
+app/drum808/clap.cpp-23-    envSettings.attack = 0.0;
+app/drum808/clap.cpp-24-    envSettings.decay = 0.3;
+app/drum808/clap.cpp:25:    AmpEnv *ampEnv = new AmpEnv(envSettings);
+app/drum808/clap.cpp-26-    setAmpEnv(ampEnv);
+app/drum808/clap.cpp-27-
+app/drum808/clap.cpp:28:    Filter *bandPass = new Filter(BANDPASS);
+app/drum808/clap.cpp-29-    bandPass->setFilter(1500.0, 1.5);
+app/drum808/clap.cpp-30-    setBandPassFilter(bandPass);
+ succeeded in 51ms:
+app/drum808/audio_output.cpp-10-namespace drum808 {
+app/drum808/audio_output.cpp-11-
+app/drum808/audio_output.cpp-12-static const int NUM_BUFFERS = 3;
+app/drum808/audio_output.cpp:13:static const int BUFFER_SAMPLES = 1024;
+app/drum808/audio_output.cpp-14-
+app/drum808/audio_output.cpp-15-struct AudioOutputImpl {
+app/drum808/audio_output.cpp-16-    AudioQueueRef queue;
+--
+app/drum808/audio_output.cpp-24-    int numSamples = buf->mAudioDataBytesCapacity / sizeof(int16_t);
+app/drum808/audio_output.cpp-25-    auto* out = static_cast<int16_t*>(buf->mAudioData);
+app/drum808/audio_output.cpp-26-
+app/drum808/audio_output.cpp:27:    impl->engine->fillBuffer(out, numSamples);
+app/drum808/audio_output.cpp-28-
+app/drum808/audio_output.cpp-29-    buf->mAudioDataByteSize = numSamples * sizeof(int16_t);
+app/drum808/audio_output.cpp-30-    AudioQueueEnqueueBuffer(queue, buf, 0, nullptr);
+--
+app/drum808/audio_output.cpp-37-
+app/drum808/audio_output.cpp-38-AudioOutput::~AudioOutput()
+app/drum808/audio_output.cpp-39-{
+app/drum808/audio_output.cpp:40:    stop();
+
+thinking
+**Planning targeted code inspection**
+codex
+The initial scan already shows two likely high-risk areas: unsynchronized shared sequencer state and raw filter allocations in instrument subclasses. I’m opening the exact implementations now to confirm whether there are safeguards or cleanup paths.
+exec
+/bin/zsh -lc "nl -ba app/drum808/sequencer.h | sed -n '1,220p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba app/drum808/sequencer.cpp | sed -n '1,260p'" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+     1	#ifndef SEQUENCER_H
+     2	#define SEQUENCER_H
+     3	
+     4	#include <array>
+     5	#include <memory>
+     6	#include <vector>
+     7	#include "instrument.h"
+     8	
+     9	namespace drum808 {
+    10	
+    11	#define SUBDIVISION 16
+    12	
+    13	const int SAMPLE_RATE = 44100;
+    14	
+    15	class Sequencer
+    16	{
+    17	public:
+    18	    Sequencer() = default;
+    19	    ~Sequencer() = default;
+    20	
+exec
+/bin/zsh -lc "nl -ba app/drum808/drum_engine.cpp | sed -n '1,220p'" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+     1	#include "clap.h"
+     2	#include "closed_hat.h"
+     3	#include "kick.h"
+     4	#include "sequencer.h"
+     5	#include "snare.h"
+     6	
+     7	namespace drum808 {
+     8	
+     9	#define MS_PER_MINUTE 60000.0
+    10	
+    11	void Sequencer::init()
+    12	{
+    13	    stop();
+    14	    for (auto &row : m_pattern) {
+    15	        row.fill(false);
+    16	    }
+    17	
+    18	    m_instruments.clear();
+    19	    m_instruments.reserve(4);
+    20	
+ succeeded in 51ms:
+     1	#include <cstdint>
+     2	#include <limits>
+     3	#include "drum_engine.h"
+     4	
+     5	namespace drum808 {
+     6	
+     7	namespace {
+     8	double clampSample(double value)
+     9	{
+    10	    if (value > 1.0) return 1.0;
+    11	    if (value < -1.0) return -1.0;
+    12	    return value;
+    13	}
+    14	} // namespace
+    15	
+    16	DrumEngine::DrumEngine()
+    17	{
+    18	    m_sequencer.init();
+    19	    m_sequencer.setTempo(120.0);
+    20	}
+
+thinking
+**Reviewing code for div zero and leaks**
+codex
+I’ve confirmed the sequencer exposes raw mutable state with no locking and returns a live vector reference, so I’m now checking the instrument/envelope/filter math and destructor ownership to separate crash bugs from simple leaks.
+exec
+/bin/zsh -lc "nl -ba app/drum808/instrument.h | sed -n '1,240p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba app/drum808/instrument.cpp | sed -n '1,260p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba app/drum808/envelope.h | sed -n '1,240p' && nl -ba app/drum808/envelope.cpp | sed -n '1,260p'" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+     1	#ifndef INSTRUMENT_H
+     2	#define INSTRUMENT_H
+     3	
+     4	#include <cmath>
+     5	#include <string>
+     6	#include "amp_env.h"
+     7	#include "pitch_env.h"
+     8	
+     9	namespace drum808 {
+    10	
+    11	#define SEMITONE_HZ 1.06
+    12	
+    13	class Instrument
+    14	{
+    15	public:
+    16	    Instrument() = default;
+    17	    virtual ~Instrument();
+    18	
+    19	    int getPitch() const;
+    20	    void setPitch(int pitch);
+ succeeded in 51ms:
+     1	#include <cmath>
+     2	#include <iostream>
+     3	#include "instrument.h"
+     4	
+     5	namespace drum808 {
+     6	
+     7	using std::cout;
+     8	using std::endl;
+     9	
+    10	Instrument::~Instrument()
+    11	{
+    12	    delete m_ampEnv;
+    13	    delete m_pitchEnv;
+    14	}
+    15	
+    16	int Instrument::getPitch() const
+    17	{
+    18	    return m_pitch;
+    19	}
+    20	
+ succeeded in 51ms:
+     1	#ifndef ENVELOPE_H
+     2	#define ENVELOPE_H
+     3	
+     4	namespace drum808 {
+     5	
+     6	/**
+     7	 * This abstract class is the base for all ADSR implementations.
+     8	 *
+     9	 * For now it only supports attack and decay stages.
+    10	 **/
+    11	class Envelope
+    12	{
+    13	public:
+    14	    Envelope() = default;
+    15	    virtual ~Envelope() = default;
+    16	
+    17	    double getDuration();
+    18	
+    19	    void setAttack(double attack);
+    20	    void setDecay(double decay);
+
+thinking
+**Adding destructors for leak checks**
+exec
+/bin/zsh -lc "nl -ba app/drum808/filter.h | sed -n '1,240p' && nl -ba app/drum808/filter.cpp | sed -n '1,280p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba app/drum808/kick.cpp | sed -n '1,240p' && nl -ba app/drum808/snare.cpp | sed -n '1,320p' && nl -ba app/drum808/clap.cpp | sed -n '1,260p' && nl -ba app/drum808/closed_hat.cpp | sed -n '1,280p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba app/drum808/amp_env.h | sed -n '1,220p' && nl -ba app/drum808/amp_env.cpp | sed -n '1,220p' && nl -ba app/drum808/pitch_env.h | sed -n '1,220p' && nl -ba app/drum808/pitch_env.cpp | sed -n '1,240p'" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+     1	#ifndef FILTER_H
+     2	#define FILTER_H
+     3	
+     4	namespace drum808 {
+     5	
+     6	enum {
+     7	    BANDPASS = 0,
+     8	    HIGHPASS,
+     9	};
+    10	
+    11	class Filter
+    12	{
+    13	public:
+    14	    Filter(int type);
+    15	    ~Filter() = default;
+    16	
+    17	    void setFilter(double freq, double q);
+    18	
+    19	    double filter(double input);
+    20	
+ succeeded in 50ms:
+     1	#include <cmath>
+     2	#include <iostream>
+     3	#include "kick.h"
+     4	
+     5	namespace drum808 {
+     6	
+     7	Kick::Kick() : Instrument()
+     8	{
+     9	    m_name = m_defaultName;
+    10	    m_pitch = m_defaultPitch;
+    11	}
+    12	
+    13	void Kick::setDefaults()
+    14	{
+    15	    AmpEnv::AmpEnvSettings envSettings{};
+    16	    envSettings.startAmp = 0.0;
+    17	    envSettings.peakAmp = 0.8;
+    18	    envSettings.releaseAmp = 0.0;
+    19	    envSettings.attack = 0.0;
+    20	    envSettings.decay = 0.25;
+ succeeded in 51ms:
+     1	#ifndef AMP_ENV_H
+     2	#define AMP_ENV_H
+     3	
+     4	#include "envelope.h"
+     5	
+     6	namespace drum808 {
+     7	
+     8	class AmpEnv : public Envelope
+     9	{
+    10	public:
+    11	    struct AmpEnvSettings {
+    12	        double startAmp;
+    13	        double peakAmp;
+    14	        double releaseAmp;
+    15	
+    16	        double attack;
+    17	        double decay;
+    18	    };
+    19	
+    20	    AmpEnv(AmpEnvSettings &);
+
+thinking
+**Reviewing subclass destructor needs**
+exec
+/bin/zsh -lc "nl -ba app/drum808/snare.h | sed -n '1,260p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba app/drum808/clap.h | sed -n '1,220p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba app/drum808/closed_hat.h | sed -n '1,240p' && nl -ba app/drum808/kick.h | sed -n '1,220p'" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+     1	#ifndef CLAP_H
+     2	#define CLAP_H
+     3	
+     4	#include "filter.h"
+     5	#include "instrument.h"
+     6	
+     7	namespace drum808 {
+     8	
+     9	class Clap : public Instrument
+    10	{
+    11	public:
+    12	    Clap();
+    13	    ~Clap() = default;
+    14	
+    15	    void setDefaults() override;
+    16	
+    17	    void setBandPassFilter(Filter *);
+    18	    void setHighPassFilter(Filter *);
+    19	
+    20	    double getSample() override;
+ succeeded in 52ms:
+     1	#ifndef SNARE_H
+     2	#define SNARE_H
+     3	
+     4	#include "filter.h"
+     5	#include "instrument.h"
+     6	
+     7	namespace drum808 {
+     8	
+     9	class Snare : public Instrument
+    10	{
+    11	public:
+    12	    Snare();
+    13	    ~Snare() = default;
+    14	
+    15	    void setDefaults() override;
+    16	
+    17	    void setSnappy(double snappy);
+    18	
+    19	    void setNoiseEnv(AmpEnv *);
+    20	
+ succeeded in 50ms:
+     1	#ifndef CLOSED_HAT_H
+     2	#define CLOSED_HAT_H
+     3	
+     4	#include <array>
+     5	#include "filter.h"
+     6	#include "instrument.h"
+     7	
+     8	namespace drum808 {
+     9	
+    10	class ClosedHat : public Instrument
+    11	{
+    12	public:
+    13	    ClosedHat();
+    14	    ~ClosedHat() = default;
+    15	
+    16	    void setDefaults() override;
+    17	
+    18	    void setBandPassFilter(Filter *);
+    19	    void setHighPassFilter(Filter *);
+    20	
+
+thinking
+**Planning audio output integration**
+codex
+Next I’m validating the CoreAudio backend shutdown/startup behavior and whether the callback can outlive the engine/window during teardown, plus checking the view for actual playhead refresh behavior.
+exec
+/bin/zsh -lc "nl -ba app/drum808/drum_engine.h | sed -n '1,220p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba app/drum808/audio_output.h | sed -n '1,240p' && nl -ba app/drum808/audio_output.cpp | sed -n '1,320p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba app/drum_machine_view.h | sed -n '1,260p' && nl -ba app/drum_machine_view.cpp | sed -n '1,380p'" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+     1	#ifndef DRUM_ENGINE_H
+     2	#define DRUM_ENGINE_H
+     3	
+     4	#include <cstdint>
+     5	#include "sequencer.h"
+     6	
+     7	namespace drum808 {
+     8	
+     9	class DrumEngine
+    10	{
+    11	public:
+    12	    DrumEngine();
+    13	    ~DrumEngine() = default;
+    14	
+    15	    void fillBuffer(int16_t* output, int numSamples);
+    16	
+    17	    void start();
+    18	    void stop();
+    19	    bool isPlaying() const;
+    20	
+ succeeded in 52ms:
+     1	#ifndef DRUM808_AUDIO_OUTPUT_H
+     2	#define DRUM808_AUDIO_OUTPUT_H
+     3	
+     4	#include "drum_engine.h"
+     5	
+     6	namespace drum808 {
+     7	
+     8	// Platform audio output — calls engine.fillBuffer() from audio thread
+     9	class AudioOutput {
+    10	public:
+    11	    AudioOutput(DrumEngine& engine);
+    12	    ~AudioOutput();
+    13	
+    14	    bool start();
+    15	    void stop();
+    16	    bool isRunning() const;
+    17	
+    18	private:
+    19	    DrumEngine& m_engine;
+    20	    void* m_impl; // opaque platform handle
+ succeeded in 51ms:
+     1	/*---------------------------------------------------------*/
+     2	/*   drum_machine_view.h — TR-808 Drum Machine TUI        */
+     3	/*   16-step sequencer grid with live audio output         */
+     4	/*---------------------------------------------------------*/
+     5	
+     6	#ifndef DRUM_MACHINE_VIEW_H
+     7	#define DRUM_MACHINE_VIEW_H
+     8	
+     9	#define Uses_TWindow
+    10	#define Uses_TView
+    11	#define Uses_TDrawBuffer
+    12	#define Uses_TKeys
+    13	#define Uses_TEvent
+    14	#define Uses_TRect
+    15	#include <tvision/tv.h>
+    16	
+    17	#include "drum808/drum_engine.h"
+    18	#include "drum808/audio_output.h"
+    19	
+    20	// ── Step grid view ──────────────────────────────────────
+
+thinking
+**Summarizing concurrency and safety risks**
+codex
+**CRITICAL**
+
+1. **Unsynchronized cross-thread access to sequencer state (undefined behavior; possible crash/corruption)**
+   - CoreAudio callback thread reads/writes sequencer state via `fillBuffer()` -> `isPlaying()`, `updateBy()`, `getActiveSamples()` (`app/drum808/drum_engine.cpp:29`, `app/drum808/drum_engine.cpp:30`, `app/drum808/drum_engine.cpp:31`).
+   - TUI thread mutates the same state via `toggleNote`, `setTempo`, `start`, `stop` (`app/drum_machine_view.cpp:143`, `app/drum_machine_view.cpp:177`, `app/drum_machine_view.cpp:188`, `app/drum_machine_view.cpp:193`, `app/drum_machine_view.cpp:246`, `app/drum_machine_view.cpp:250`).
+   - `Sequencer` has no mutex/atomics; shared fields include `m_pattern`, `m_activeSamples` (vector), `m_playing`, `m_pos`, `m_elapsed`, `m_tempoStep` (`app/drum808/sequencer.h:45` to `app/drum808/sequencer.h:55`).
+   - Worst case: UI thread `stop()` clears `m_activeSamples` while audio thread is iterating the live vector reference (`app/drum808/sequencer.cpp:100`, `app/drum808/sequencer.cpp:129`, `app/drum808/drum_engine.cpp:31`).
+
+2. **Stop path mutates engine before stopping audio callback (widens race window)**
+   - `engine.stop()` runs before `audio.stop()` in window handler (`app/drum_machine_view.cpp:245` to `app/drum_machine_view.cpp:248`).
+   - That means the UI thread can clear sequencer state while callback is still active.
+
+**HIGH**
+
+3. **Memory leaks in instrument subclasses (raw `new` filters/envs never deleted)**
+   - Base `Instrument` only deletes `m_ampEnv` and `m_pitchEnv` (`app/drum808/instrument.cpp:10` to `app/drum808/instrument.cpp:14`).
+   - `Snare` leaks `m_noiseEnv`, `m_bandPass` (and potentially `m_highPass`) (`app/drum808/snare.h:27`, `app/drum808/snare.h:32`, `app/drum808/snare.cpp:42`, `app/drum808/snare.cpp:50`).
+   - `Clap` leaks `m_bandPass` + `m_highPass` (`app/drum808/clap.h:30`, `app/drum808/clap.h:31`, `app/drum808/clap.cpp:28`, `app/drum808/clap.cpp:32`).
+   - `ClosedHat` leaks `m_bandPass` + `m_highPass` (`app/drum808/closed_hat.h:30`, `app/drum808/closed_hat.h:31`, `app/drum808/closed_hat.cpp:33`, `app/drum808/closed_hat.cpp:36`).
+
+4. **Unchecked CoreAudio buffer allocation/enqueue results can lead to null deref/crash on error paths**
+   - `AudioQueueAllocateBuffer(...)` and `AudioQueueEnqueueBuffer(...)` return statuses are ignored (`app/drum808/audio_output.cpp:68`, `app/drum808/audio_output.cpp:71`).
+   - Code immediately dereferences `impl->buffers[i]` (`app/drum808/audio_output.cpp:69`, `app/drum808/audio_output.cpp:70`).
+
+**MEDIUM**
+
+5. **Playhead animation only updates on incoming events (not timer-driven)**
+   - Polling happens only in `TDrumMachineWindow::handleEvent()` (`app/drum_machine_view.cpp:238`, `app/drum_machine_view.cpp:257`).
+   - No timer/idle tick is installed, so playhead redraw will typically stall unless the user generates input events. Not smooth animation.
+
+6. **`getActiveSamples()` live-vector iteration is only safe intra-callback, unsafe across threads**
+   - `updateBy()` mutates `m_activeSamples` before iteration, then `fillBuffer()` iterates returned reference (`app/drum808/sequencer.cpp:103` to `app/drum808/sequencer.cpp:116`, `app/drum808/sequencer.cpp:129`, `app/drum808/drum_engine.cpp:30` to `app/drum808/drum_engine.cpp:33`).
+   - This is fine on the same thread in current call order.
+   - It is not safe against concurrent UI-thread `start/stop`/future mutations (same root race as #1).
+
+7. **Division-by-zero / invalid math risk in filter coefficient calculation (API-unsafe)**
+   - `Filter::calcFilter()` divides by `m_q` with no validation (`app/drum808/filter.cpp:32`, `app/drum808/filter.cpp:41`).
+   - Current call sites pass positive `q`, so not an immediate bug, but public `setFilter(freq, q)` allows `q <= 0` (`app/drum808/filter.h:17`).
+
+8. **Audio callback uses non-real-time-friendly code paths (`rand()`)**
+   - `Snare::getSample()` and `Clap::getSample()` call `rand()` from audio generation path (`app/drum808/snare.cpp:89`, `app/drum808/clap.cpp:53`).
+   - Usually works, but `rand()` is global-state libc and not ideal for real-time callback determinism/jitter.
+
+9. **Buffer size is latency-heavy, not underrun-prone**
+   - `BUFFER_SAMPLES=1024` at 44.1 kHz is ~23.2 ms per callback (`app/drum808/audio_output.cpp:13`, `app/drum808/audio_output.cpp:68`).
+   - With `NUM_BUFFERS=3`, queue depth is ~69.7 ms (`app/drum808/audio_output.cpp:12`).
+   - This lowers underrun risk (CPU budget is generous) but increases start/stop and perceived timing latency.
+
+**LOW**
+
+10. **Potential null deref in helper setters if called before initialization**
+   - `Instrument::setLevel()` dereferences `m_ampEnv` without null check (`app/drum808/instrument.cpp:26` to `app/drum808/instrument.cpp:29`).
+   - `Snare::setSnappy()` dereferences `m_noiseEnv` without null check (`app/drum808/snare.cpp:60` to `app/drum808/snare.cpp:63`).
+   - Current init flow calls `setDefaults()` first, so this is mostly API hardening.
+
+11. **C++14 portability issue: `M_PI` is non-standard**
+   - Used in `app/drum808/instrument.h:41`, `app/drum808/filter.cpp:28`, `app/drum808/clap.cpp:58`.
+   - Works on many POSIX toolchains, but not guaranteed by standard C++14 (notably stricter/MSVC builds).
+
+12. **Missing namespace closings**
+   - No issues found. Namespace closings appear correct in reviewed files.
+
+If you want, I can follow up with a minimal fix plan for the race (lock-free command queue or mutexed state snapshot) and a cleanup patch for the leaked filters/env pointers.
+tokens used
+35,191
+**CRITICAL**
+
+1. **Unsynchronized cross-thread access to sequencer state (undefined behavior; possible crash/corruption)**
+   - CoreAudio callback thread reads/writes sequencer state via `fillBuffer()` -> `isPlaying()`, `updateBy()`, `getActiveSamples()` (`app/drum808/drum_engine.cpp:29`, `app/drum808/drum_engine.cpp:30`, `app/drum808/drum_engine.cpp:31`).
+   - TUI thread mutates the same state via `toggleNote`, `setTempo`, `start`, `stop` (`app/drum_machine_view.cpp:143`, `app/drum_machine_view.cpp:177`, `app/drum_machine_view.cpp:188`, `app/drum_machine_view.cpp:193`, `app/drum_machine_view.cpp:246`, `app/drum_machine_view.cpp:250`).
+   - `Sequencer` has no mutex/atomics; shared fields include `m_pattern`, `m_activeSamples` (vector), `m_playing`, `m_pos`, `m_elapsed`, `m_tempoStep` (`app/drum808/sequencer.h:45` to `app/drum808/sequencer.h:55`).
+   - Worst case: UI thread `stop()` clears `m_activeSamples` while audio thread is iterating the live vector reference (`app/drum808/sequencer.cpp:100`, `app/drum808/sequencer.cpp:129`, `app/drum808/drum_engine.cpp:31`).
+
+2. **Stop path mutates engine before stopping audio callback (widens race window)**
+   - `engine.stop()` runs before `audio.stop()` in window handler (`app/drum_machine_view.cpp:245` to `app/drum_machine_view.cpp:248`).
+   - That means the UI thread can clear sequencer state while callback is still active.
+
+**HIGH**
+
+3. **Memory leaks in instrument subclasses (raw `new` filters/envs never deleted)**
+   - Base `Instrument` only deletes `m_ampEnv` and `m_pitchEnv` (`app/drum808/instrument.cpp:10` to `app/drum808/instrument.cpp:14`).
+   - `Snare` leaks `m_noiseEnv`, `m_bandPass` (and potentially `m_highPass`) (`app/drum808/snare.h:27`, `app/drum808/snare.h:32`, `app/drum808/snare.cpp:42`, `app/drum808/snare.cpp:50`).
+   - `Clap` leaks `m_bandPass` + `m_highPass` (`app/drum808/clap.h:30`, `app/drum808/clap.h:31`, `app/drum808/clap.cpp:28`, `app/drum808/clap.cpp:32`).
+   - `ClosedHat` leaks `m_bandPass` + `m_highPass` (`app/drum808/closed_hat.h:30`, `app/drum808/closed_hat.h:31`, `app/drum808/closed_hat.cpp:33`, `app/drum808/closed_hat.cpp:36`).
+
+4. **Unchecked CoreAudio buffer allocation/enqueue results can lead to null deref/crash on error paths**
+   - `AudioQueueAllocateBuffer(...)` and `AudioQueueEnqueueBuffer(...)` return statuses are ignored (`app/drum808/audio_output.cpp:68`, `app/drum808/audio_output.cpp:71`).
+   - Code immediately dereferences `impl->buffers[i]` (`app/drum808/audio_output.cpp:69`, `app/drum808/audio_output.cpp:70`).
+
+**MEDIUM**
+
+5. **Playhead animation only updates on incoming events (not timer-driven)**
+   - Polling happens only in `TDrumMachineWindow::handleEvent()` (`app/drum_machine_view.cpp:238`, `app/drum_machine_view.cpp:257`).
+   - No timer/idle tick is installed, so playhead redraw will typically stall unless the user generates input events. Not smooth animation.
+
+6. **`getActiveSamples()` live-vector iteration is only safe intra-callback, unsafe across threads**
+   - `updateBy()` mutates `m_activeSamples` before iteration, then `fillBuffer()` iterates returned reference (`app/drum808/sequencer.cpp:103` to `app/drum808/sequencer.cpp:116`, `app/drum808/sequencer.cpp:129`, `app/drum808/drum_engine.cpp:30` to `app/drum808/drum_engine.cpp:33`).
+   - This is fine on the same thread in current call order.
+   - It is not safe against concurrent UI-thread `start/stop`/future mutations (same root race as #1).
+
+7. **Division-by-zero / invalid math risk in filter coefficient calculation (API-unsafe)**
+   - `Filter::calcFilter()` divides by `m_q` with no validation (`app/drum808/filter.cpp:32`, `app/drum808/filter.cpp:41`).
+   - Current call sites pass positive `q`, so not an immediate bug, but public `setFilter(freq, q)` allows `q <= 0` (`app/drum808/filter.h:17`).
+
+8. **Audio callback uses non-real-time-friendly code paths (`rand()`)**
+   - `Snare::getSample()` and `Clap::getSample()` call `rand()` from audio generation path (`app/drum808/snare.cpp:89`, `app/drum808/clap.cpp:53`).
+   - Usually works, but `rand()` is global-state libc and not ideal for real-time callback determinism/jitter.
+
+9. **Buffer size is latency-heavy, not underrun-prone**
+   - `BUFFER_SAMPLES=1024` at 44.1 kHz is ~23.2 ms per callback (`app/drum808/audio_output.cpp:13`, `app/drum808/audio_output.cpp:68`).
+   - With `NUM_BUFFERS=3`, queue depth is ~69.7 ms (`app/drum808/audio_output.cpp:12`).
+   - This lowers underrun risk (CPU budget is generous) but increases start/stop and perceived timing latency.
+
+**LOW**
+
+10. **Potential null deref in helper setters if called before initialization**
+   - `Instrument::setLevel()` dereferences `m_ampEnv` without null check (`app/drum808/instrument.cpp:26` to `app/drum808/instrument.cpp:29`).
+   - `Snare::setSnappy()` dereferences `m_noiseEnv` without null check (`app/drum808/snare.cpp:60` to `app/drum808/snare.cpp:63`).
+   - Current init flow calls `setDefaults()` first, so this is mostly API hardening.
+
+11. **C++14 portability issue: `M_PI` is non-standard**
+   - Used in `app/drum808/instrument.h:41`, `app/drum808/filter.cpp:28`, `app/drum808/clap.cpp:58`.
+   - Works on many POSIX toolchains, but not guaranteed by standard C++14 (notably stricter/MSVC builds).
+
+12. **Missing namespace closings**
+   - No issues found. Namespace closings appear correct in reviewed files.
+
+If you want, I can follow up with a minimal fix plan for the race (lock-free command queue or mutexed state snapshot) and a cleanup patch for the leaked filters/env pointers.

@@ -32,6 +32,7 @@ extern void api_spawn_rogue(TTestPatternApp& app, const TRect* bounds);
 extern void api_spawn_deep_signal(TTestPatternApp& app, const TRect* bounds);
 extern void api_spawn_app_launcher(TTestPatternApp& app, const TRect* bounds);
 extern void api_spawn_gallery(TTestPatternApp& app, const TRect* bounds);
+extern void api_spawn_drum_machine(TTestPatternApp& app, const TRect* bounds);
 extern void api_open_animation_path(TTestPatternApp& app, const std::string& path);
 extern std::string api_gallery_list(TTestPatternApp& app, const std::string& tab);
 extern void api_spawn_terminal(TTestPatternApp& app, const TRect* bounds);
@@ -70,6 +71,7 @@ const std::vector<CommandCapability>& get_command_capabilities() {
         {"open_deep_signal", "Open Deep Signal space scanner game", false},
         {"open_apps", "Open the Applications folder browser", false},
         {"open_gallery", "Open the ASCII Art Gallery browser with tabbed primer explorer", false},
+        {"open_drum_machine", "Open the TR-808 drum machine (Space=play/stop, Enter=toggle, +/-=tempo)", false},
         {"gallery_list", "List available primer filenames (optional tab param: 1/#-C, 2/D-L, 3/M, 4/N-S, 5/T-Z, 6/Find with search param)", false},
         {"open_primer", "Open a primer file by name in a viewer window (requires path param, e.g. 'wibwob-faces.txt')", true},
         {"open_terminal", "Open a terminal emulator window", false},
@@ -219,6 +221,10 @@ std::string exec_registry_command(
     }
     if (name == "open_gallery") {
         api_spawn_gallery(app, nullptr);
+        return "ok";
+    }
+    if (name == "open_drum_machine") {
+        api_spawn_drum_machine(app, nullptr);
         return "ok";
     }
     if (name == "gallery_list") {

@@ -101,6 +101,7 @@
 // App launcher (E011)
 #include "app_launcher_view.h"
 #include "ascii_gallery_view.h"
+#include "drum_machine_view.h"
 // Factory for ASCII grid demo window (implemented in ascii_grid_view.cpp).
 class TWindow; TWindow* createAsciiGridDemoWindow(const TRect &bounds);
 // #include "mech_window.h" // deferred feature; header not present yet
@@ -238,6 +239,7 @@ const ushort cmOpenTerminal = 214;
 const ushort cmAppLauncher = 232;    // Applications folder browser
 const ushort cmScrambleReply = 233;  // Async Scramble LLM response ready
 const ushort cmAsciiGallery = 234;   // ASCII Art Gallery browser
+const ushort cmDrumMachine = 235;   // TR-808 Drum Machine
 
 // Glitch menu commands
 const ushort cmToggleGlitchMode = 140;
@@ -868,6 +870,7 @@ private:
     friend void api_spawn_deep_signal(TTestPatternApp&, const TRect* bounds);
     friend void api_spawn_app_launcher(TTestPatternApp&, const TRect* bounds);
     friend void api_spawn_gallery(TTestPatternApp&, const TRect* bounds);
+    friend void api_spawn_drum_machine(TTestPatternApp&, const TRect* bounds);
     friend std::string api_gallery_list(TTestPatternApp&, const std::string& tab);
     friend void api_spawn_terminal(TTestPatternApp&, const TRect* bounds);
     friend void api_spawn_wibwob(TTestPatternApp&, const TRect* bounds);
@@ -1211,6 +1214,11 @@ void TTestPatternApp::handleEvent(TEvent& event)
                 TWindow* w = createAsciiGalleryWindow(r);
                 deskTop->insert(w);
                 registerWindow(w);
+                clearEvent(event);
+                break;
+            }
+            case cmDrumMachine: {
+                api_spawn_drum_machine(*this, nullptr);
                 clearEvent(event);
                 break;
             }
@@ -2391,6 +2399,7 @@ TMenuBar* TTestPatternApp::initMenuBar(TRect r)
             newLine() +
             *new TMenuItem("~A~pplications", cmAppLauncher, kbNoKey) +
             *new TMenuItem("ASCII ~G~allery", cmAsciiGallery, kbNoKey) +
+            *new TMenuItem("TR-~8~08", cmDrumMachine, kbNoKey) +
             newLine() +
             (TMenuItem&)(
                 *new TSubMenu("~G~ames", kbNoKey) +
@@ -3781,6 +3790,15 @@ void api_spawn_deep_signal(TTestPatternApp& app, const TRect* bounds) {
 void api_spawn_app_launcher(TTestPatternApp& app, const TRect* bounds) {
     TRect r = bounds ? *bounds : api_centered_bounds(app, 63, 20);
     TWindow* w = createAppLauncherWindow(r);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
+}
+
+void api_spawn_drum_machine(TTestPatternApp& app, const TRect* bounds) {
+    TRect desk = app.deskTop->getExtent();
+    // 16 steps * 3 chars + 10 label + 4 frame = ~62 wide, 4 instruments + header + status + 2 frame = 8 high
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 64, 9);
+    TWindow* w = createDrumMachineWindow(r);
     app.deskTop->insert(w);
     app.registerWindow(w);
 }
