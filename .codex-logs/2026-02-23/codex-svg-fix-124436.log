@@ -1,0 +1,68 @@
+OpenAI Codex v0.53.0 (research preview)
+--------
+workdir: /Users/james/Repos/wibandwob-dos
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: medium
+reasoning summaries: auto
+session id: 019c8a87-bb73-7560-a1ca-1e2ee99b6e69
+--------
+user
+DEVNOTE: Files inside .codex-logs/ are run logs — ignore them completely.
+EFFICIENCY: Use targeted commands. Prefer rg -n -C3 or sed -n 'X,Yp'. No full-file dumps unless <50 lines.
+
+## Task: Fix SVG coordinate system in scripts/workspace_snapshot.py
+
+### What we know about the TUI layout (SOURCE OF TRUTH)
+- tmux pane size: 157×61 (from `tmux display-message`)
+- The TUI app is Turbo Vision (C++). It has:
+  - 1 row menu bar at the TOP of the screen (screen row 0)
+  - 1 row status bar at the BOTTOM of the screen (screen row 60)
+  - Desktop in between: screen rows 1..59 = 59 rows? or rows 1..60?
+- The API endpoint GET /state (port 8089) returns canvas.width=157, canvas.height=60
+- Window x,y coordinates from /state are DESKTOP-RELATIVE (y=0 = first row of desktop)
+
+### The bug
+windows/workspace_snapshot.py builds an SVG from the /state JSON snapshot.
+Currently windows placed at TUI y=45 appear ~2 rows TOO HIGH in the SVG.
+Windows placed at TUI y=1 appear correct (or close).
+
+The SVG draws:
+  - Menu bar band: y=0, height=MENU_ROWS*CELL_H
+  - Desktop area: y=desk_y0 (= MENU_ROWS*CELL_H)
+  - Windows at: py = desk_y0 + w["y"] * CELL_H
+
+### What to investigate
+1. Read app/test_pattern_app.cpp — find api_get_state() — understand:
+   - How canvas.width/height is calculated (deskTop->getBounds()? screen size?)
+   - How window x,y is calculated (w->origin.x/y — are these desktop-relative or screen-relative?)
+2. Check if canvas.height=60 includes the menu bar row, the status bar row, both, or neither
+3. Determine the correct SVG formula so that a window at TUI desktop y=N appears at the same visual row in the SVG
+
+### Fix
+Edit scripts/workspace_snapshot.py ONLY. Do NOT touch any C++ files or main.py.
+
+Correct MENU_ROWS, STATUS_ROWS constants and the desk_y0 offset so the SVG matches the TUI exactly.
+Run: python scripts/workspace_snapshot.py --port 8089 --out logs/snapshots --stem svg-codex-fix
+Then verify the output JSON still parses and SVG file is created.
+
+The SVG should show:
+  - Full screen height including menu + desktop + status bars
+  - Windows positioned so their visual row in SVG matches their desktop y coordinate in the TUI
+  - Grey shadow rectangles offset by SHADOW_W=2 cols right, SHADOW_H=1 row down
+
+### Current state of workspace_snapshot.py
+Located at: scripts/workspace_snapshot.py
+Key constants to check/fix: MENU_ROWS, STATUS_ROWS, desk_y0, svg_h calculation, py formula
+
+### Verification
+After fix: window at JSON y=1 should appear at SVG row 2 from top (row 0=menu, row 1=first desktop row, row 2=second desktop row = y=1 desktop coord).
+Window at JSON y=45 should appear at SVG row 46 from top.
+Re-connecting... 1/5
+Re-connecting... 2/5
+Re-connecting... 3/5
+Re-connecting... 4/5
+Re-connecting... 5/5
+ERROR: stream disconnected before completion: The model `gpt-5.3-codex` does not exist or you do not have access to it.

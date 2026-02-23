@@ -2,92 +2,80 @@
 # dev-start.sh — start WibWobDOS TUI + API locally (macOS, non-Docker)
 #
 # Usage:
-#   ./scripts/dev-start.sh           # start both with defaults
-#   WIBWOB_INSTANCE=2 ./scripts/dev-start.sh  # different instance slot
+#   ./scripts/dev-start.sh          # start both
+#   WIBWOB_INSTANCE=2 ./scripts/dev-start.sh  # second instance on port 8090
 #
 # After running:
-#   tmux attach -t wibwob           # see the TUI
-#   tmux attach -t wibwob-api       # see API logs (Ctrl+B D to detach)
-#   ./scripts/dev-stop.sh           # tear everything down
+#   tmux attach -t wibwob           # see TUI (Ctrl-B D to detach)
+#   tmux attach -t wibwob-api       # see API log
+#   ./scripts/dev-stop.sh           # kill both cleanly
 
 set -euo pipefail
 
-INSTANCE=${WIBWOB_INSTANCE:-1}
-PORT=${WIBWOB_API_PORT:-8089}
+INSTANCE="${WIBWOB_INSTANCE:-1}"
+PORT="${WIBWOB_API_PORT:-8089}"
 BINARY="./build/app/test_pattern"
 SOCKET="/tmp/wibwob_${INSTANCE}.sock"
-VENV="./tools/api_server/venv/bin/python"
-TUI_SESSION="wibwob"
-API_SESSION="wibwob-api"
+VENV_UVICORN="./tools/api_server/venv/bin/uvicorn"
 
-# ── Preflight ────────────────────────────────────────────────────────────────
-
-if [ ! -x "$BINARY" ]; then
-  echo "❌  Binary not found: $BINARY"
-  echo "    Run: cmake . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build --target test_pattern -j\$(sysctl -n hw.logicalcpu)"
+# ── Preflight ─────────────────────────────────────────────────────────────────
+[ -x "$BINARY" ] || {
+  echo "❌ Binary not found: $BINARY"
+  echo "   Build first: cmake --build ./build --target test_pattern -j\$(nproc)"
   exit 1
-fi
-
-if [ ! -x "$VENV" ]; then
-  echo "❌  Python venv not found: $VENV"
-  echo "    Run: cd tools/api_server && python3 -m venv venv && venv/bin/pip install -r requirements.txt"
+}
+[ -x "$VENV_UVICORN" ] || {
+  echo "❌ Venv not found: $VENV_UVICORN"
+  echo "   Run: cd tools/api_server && python3 -m venv venv && venv/bin/pip install -r requirements.txt"
   exit 1
-fi
+}
 
-# Kill stale sessions cleanly
-tmux kill-session -t "$TUI_SESSION" 2>/dev/null && echo "🧹  Killed stale $TUI_SESSION session" || true
-tmux kill-session -t "$API_SESSION" 2>/dev/null && echo "🧹  Killed stale $API_SESSION session" || true
+# ── Kill stale sessions ───────────────────────────────────────────────────────
+tmux kill-session -t wibwob     2>/dev/null || true
+tmux kill-session -t wibwob-api 2>/dev/null || true
 rm -f "$SOCKET"
 
-# ── TUI ──────────────────────────────────────────────────────────────────────
+# ── Start TUI (no -x/-y — inherits real terminal on first attach) ─────────────
+echo "🖥  Starting TUI (tmux session: wibwob)..."
+WIBWOB_INSTANCE="$INSTANCE" tmux new-session -d -s wibwob \
+  "$BINARY 2>/tmp/wibwob_debug.log"
 
-echo "🖥   Starting TUI (instance=$INSTANCE)..."
-# No -x/-y: tmux will inherit your terminal's actual dimensions when you attach.
-# Forcing a size (e.g. -x 320 -y 78) makes the canvas bigger than your viewport
-# and windows render partially off-screen.
-tmux new-session -d -s "$TUI_SESSION" \
-  "WIBWOB_INSTANCE=$INSTANCE $BINARY 2>/tmp/wibwob_debug.log; echo '[TUI exited — press any key]'; read"
-
-echo "⏳  Waiting for IPC socket at $SOCKET ..."
+# ── Wait for IPC socket ───────────────────────────────────────────────────────
+echo "⏳ Waiting for socket $SOCKET..."
 for i in $(seq 1 30); do
   [ -S "$SOCKET" ] && break
-  sleep 0.3
+  sleep 0.5
 done
-
-if [ ! -S "$SOCKET" ]; then
-  echo "❌  Socket never appeared. TUI log:"
-  tail -20 /tmp/wibwob_debug.log 2>/dev/null || echo "(no log)"
+[ -S "$SOCKET" ] || {
+  echo "❌ Socket never appeared. Check: cat /tmp/wibwob_debug.log"
   exit 1
-fi
-echo "✅  TUI ready (socket: $SOCKET)"
+}
+echo "   Socket ready."
 
-# ── API ──────────────────────────────────────────────────────────────────────
+# ── Start API server with --reload ────────────────────────────────────────────
+echo "🌐 Starting API (tmux session: wibwob-api, port $PORT)..."
+tmux new-session -d -s wibwob-api \
+  "WIBWOB_INSTANCE=$INSTANCE $VENV_UVICORN tools.api_server.main:app \
+   --host 127.0.0.1 --port $PORT --reload 2>&1 | tee /tmp/wibwob_api.log"
 
-echo "🌐  Starting API (port=$PORT)..."
-tmux new-session -d -s "$API_SESSION" \
-  "WIBWOB_INSTANCE=$INSTANCE $VENV -m tools.api_server.main --port=$PORT 2>&1 | tee /tmp/wibwob_api.log; echo '[API exited — press any key]'; read"
-
-echo "⏳  Waiting for API health ..."
-for i in $(seq 1 30); do
-  curl -sf "http://127.0.0.1:$PORT/health" > /dev/null 2>&1 && break
-  sleep 0.3
+# ── Wait for API health ───────────────────────────────────────────────────────
+echo "⏳ Waiting for API health..."
+for i in $(seq 1 20); do
+  curl -sf "http://127.0.0.1:$PORT/health" >/dev/null 2>&1 && break
+  sleep 0.5
 done
-
-if ! curl -sf "http://127.0.0.1:$PORT/health" > /dev/null 2>&1; then
-  echo "❌  API not healthy. Logs:"
-  tail -20 /tmp/wibwob_api.log 2>/dev/null || echo "(no log)"
+curl -sf "http://127.0.0.1:$PORT/health" >/dev/null || {
+  echo "❌ API not healthy. Check: tmux attach -t wibwob-api"
   exit 1
-fi
-echo "✅  API ready (http://127.0.0.1:$PORT)"
-
-# ── Done ─────────────────────────────────────────────────────────────────────
+}
 
 echo ""
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo " WibWobDOS running  (instance $INSTANCE)"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "  TUI  →  tmux attach -t $TUI_SESSION"
-echo "  API  →  http://127.0.0.1:$PORT"
-echo "  Logs →  tmux attach -t $API_SESSION"
-echo "  Stop →  ./scripts/dev-stop.sh"
+echo "✅ WibWobDOS running (instance=$INSTANCE)"
 echo ""
+echo "   TUI:   tmux attach -t wibwob         (Ctrl-B D to detach)"
+echo "   API:   http://127.0.0.1:$PORT"
+echo "   Logs:  tmux attach -t wibwob-api     or  cat /tmp/wibwob_api.log"
+echo "   Stop:  ./scripts/dev-stop.sh"
+echo ""
+echo "   ⚠️  Attach to TUI once so canvas locks to your terminal size:"
+echo "      tmux attach -t wibwob   # then Ctrl-B D"

@@ -1,17 +1,10 @@
 #!/usr/bin/env bash
-# dev-stop.sh — stop WibWobDOS TUI + API tmux sessions
+# dev-stop.sh — kill WibWobDOS TUI + API cleanly
 
 set -euo pipefail
+INSTANCE="${WIBWOB_INSTANCE:-1}"
 
-PORT=${WIBWOB_API_PORT:-8089}
-
-tmux kill-session -t wibwob     2>/dev/null && echo "🛑  Killed TUI session"     || echo "   (wibwob not running)"
-tmux kill-session -t wibwob-api 2>/dev/null && echo "🛑  Killed API session"     || echo "   (wibwob-api not running)"
-
-# Kill anything still on the port
-STALE=$(lsof -ti ":$PORT" 2>/dev/null || true)
-if [ -n "$STALE" ]; then
-  kill "$STALE" 2>/dev/null && echo "🧹  Killed stale process on :$PORT"
-fi
-
-echo "✅  Done"
+tmux kill-session -t wibwob     2>/dev/null && echo "  stopped: TUI (wibwob)"     || echo "  not running: wibwob"
+tmux kill-session -t wibwob-api 2>/dev/null && echo "  stopped: API (wibwob-api)" || echo "  not running: wibwob-api"
+rm -f "/tmp/wibwob_${INSTANCE}.sock" && echo "  removed: /tmp/wibwob_${INSTANCE}.sock" || true
+echo "done."

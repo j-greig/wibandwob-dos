@@ -1,40 +1,45 @@
 #!/usr/bin/env bash
-# init-submodules.sh — robustly initialise all nested submodules
+# init-submodules.sh — initialise all git submodules robustly
 #
-# Run once after a fresh clone, or if build fails with:
-#   "add_subdirectory given source ... which is not an existing directory"
+# Handles the tvterm pinned-SHA quirk: if the standard init fails because
+# the pinned commit isn't on any remote branch, fetches from origin/master.
 #
-# Why not plain `git submodule update --init --recursive`?
-# vendor/tvterm pins a SHA that isn't on a named branch; plain init fails.
-# This script handles the non-standard tvterm init separately.
+# Run once after first clone, or after pulling commits that update submodule pins.
+# Also safe to re-run at any time.
 
 set -euo pipefail
-cd "$(dirname "$0")/.."
 
-echo "📦  Initialising submodules..."
+echo "🔗 Initialising submodules..."
 
-# Standard ones (tvision, claude-system, MicropolisCore)
-for mod in vendor/tvision vendor/claude-system vendor/MicropolisCore; do
-  if [ -z "$(ls -A "$mod" 2>/dev/null)" ]; then
-    echo "  → $mod"
-    cd "$mod"
-    git fetch origin --depth=1 2>/dev/null || true
-    git checkout "$(git branch -r | grep -E 'HEAD|main|master' | tail -1 | sed 's|.*origin/||')" 2>/dev/null || true
-    cd - > /dev/null
+# Standard init — covers most submodules
+git submodule update --init --recursive 2>&1 | grep -v "^$" || true
+
+# tvterm needs special handling if pinned SHA isn't on a branch
+TVTERM="vendor/tvterm"
+if [ -d "$TVTERM" ] && [ -z "$(ls -A $TVTERM 2>/dev/null)" ]; then
+  echo "⚠️  $TVTERM empty — trying origin/master fetch workaround..."
+  cd "$TVTERM"
+  git fetch origin
+  git checkout origin/master
+  git submodule update --init --recursive
+  cd - > /dev/null
+  echo "   tvterm: ok"
+fi
+
+# Verify key submodules are populated
+REQUIRED=("vendor/tvterm" "vendor/MicropolisCore")
+ALL_OK=true
+for d in "${REQUIRED[@]}"; do
+  if [ -z "$(ls -A $d 2>/dev/null)" ]; then
+    echo "❌ Still empty after init: $d"
+    ALL_OK=false
   else
-    echo "  ✓ $mod (already populated)"
+    echo "   $d: ok"
   fi
 done
 
-# tvterm: pinned SHA may not be fetchable; use origin/master instead
-echo "  → vendor/tvterm (special case)"
-cd vendor/tvterm
-git fetch origin --depth=1 2>/dev/null || true
-git checkout origin/master 2>/dev/null || true
-git submodule update --init 2>/dev/null || true
-cd - > /dev/null
-
-echo ""
-echo "✅  All submodules ready. You can now run:"
-echo "   cmake . -B build -DCMAKE_BUILD_TYPE=Release"
-echo "   cmake --build build --target test_pattern -j\$(sysctl -n hw.logicalcpu)"
+$ALL_OK && echo "" && echo "✅ All submodules ready." || {
+  echo ""
+  echo "❌ Some submodules still empty. Check git submodule status and retry."
+  exit 1
+}

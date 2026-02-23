@@ -315,7 +315,8 @@ def make_app() -> FastAPI:
         await ctl.tile(cols)
         return {"ok": True}
 
-    @app.post("/windows/close_all")
+    @app.post("/windows/close_all", operation_id="canvas_clear",
+              summary="Close all open windows and clear the canvas")
     async def close_all() -> Dict[str, Any]:
         await ctl.close_all()
         return {"ok": True}
@@ -701,10 +702,17 @@ def make_app() -> FastAPI:
         )
 
     @app.post("/gallery/arrange", response_model=GalleryArrangeResponse,
-              summary="Arrange open primer windows using a layout algorithm",
-              description="Fetches primer metadata, runs the chosen layout algorithm (masonry or poetry), "
-                          "then applies window positions via tui_move_window. "
-                          "Pass preview=true to get the plan without applying it.")
+              operation_id="gallery_arrange",
+              summary="Arrange primers on the canvas using a layout algorithm",
+              description=(
+                  "Opens primer files and positions them on the TUI canvas using one of 8 layout algorithms. "
+                  "Set frameless=true + shadowless=true for a pure art-installation look (no border, no shadow). "
+                  "Algorithms: masonry | fit_rows | masonry_horizontal | packery | cells_by_row | poetry | "
+                  "cluster (rectpack MaxRects, organic, use for gallery walls) | "
+                  "stamp (repeat one primer as text/grid/wave/spiral/cross/border/diagonal pattern). "
+                  "Pass preview=true to get placement plan without opening windows. "
+                  "Use options={} for per-algorithm params — see options field description for full reference."
+              ))
     async def gallery_arrange(payload: GalleryArrangeRequest) -> GalleryArrangeResponse:
         """Smart gallery arrangement — E012 core feature.
 
@@ -839,6 +847,9 @@ def make_app() -> FastAPI:
                         }
                         if payload.frameless:
                             open_args["frameless"] = "true"
+                        # frameless always implies shadowless (no chrome = no shadow)
+                        if payload.shadowless or payload.frameless:
+                            open_args["shadowless"] = "true"
                         res = await ctl.exec_command("open_primer", open_args, actor="gallery_arrange")
                         if res.get("ok"):
                             new_state = await ctl.get_state()
@@ -871,6 +882,14 @@ def make_app() -> FastAPI:
             applied=applied,
             preview=payload.preview,
         )
+
+    @app.post("/gallery/clear", operation_id="gallery_clear",
+              summary="Close all windows and clear the canvas",
+              description="Alias for /windows/close_all in the gallery namespace. "
+                          "Always call this before a new gallery/arrange run.")
+    async def gallery_clear() -> Dict[str, Any]:
+        await ctl.close_all()
+        return {"ok": True}
 
     @app.post("/timeline/cancel")
     async def timeline_cancel(body: Dict[str, Any]) -> Dict[str, Any]:

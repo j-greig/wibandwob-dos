@@ -598,8 +598,11 @@ class TFrameAnimationWindow : public TWindow
 public:
     // frameless=false  → standard 1-char border (no title, notitle frame)
     // frameless=true   → TGhostFrame + content fills full bounds (gallery mode)
+    // shadowless=true  → clears sfShadow flag so TV draws no drop shadow
+    //                    (frameless=true implies shadowless=true automatically)
     TFrameAnimationWindow(const TRect& bounds, const char* aTitle,
-                          const std::string& filePath, bool frameless = false) :
+                          const std::string& filePath,
+                          bool frameless = false, bool shadowless = false) :
         TWindow(bounds, aTitle, wnNoNumber),
         TWindowInit(frameless ? &TFrameAnimationWindow::initFrameless
                               : &TFrameAnimationWindow::initFrame),
@@ -607,6 +610,10 @@ public:
         frameless_(frameless)
     {
         options |= ofTileable;  // Enable cascade/tile functionality
+
+        // Remove drop shadow when requested, or whenever frameless (no chrome = no shadow)
+        if (shadowless || frameless)
+            state &= ~sfShadow;
 
         // Frameless: content occupies full window bounds (no 1-char frame inset).
         // Framed: content shrinks 1 char on each side for the border.
@@ -693,7 +700,7 @@ private:
     void newWibWobTestWindowC();
     void openAnimationFile();
     void openAnimationFilePath(const std::string& path);
-    void openAnimationFilePath(const std::string& path, const TRect& bounds, bool frameless = false);
+    void openAnimationFilePath(const std::string& path, const TRect& bounds, bool frameless = false, bool shadowless = false);
     void openTransparentTextFile();
     void openMonodrawFile(const char* fileName);
     void openWorkspace();
@@ -833,7 +840,7 @@ private:
     friend void api_open_text_view_path(TTestPatternApp&, const std::string&, const TRect* bounds);
     friend void api_spawn_test(TTestPatternApp&, const TRect* bounds);
     friend void api_spawn_gradient(TTestPatternApp&, const std::string&, const TRect* bounds);
-    friend void api_open_animation_path(TTestPatternApp&, const std::string&, const TRect* bounds, bool frameless);
+    friend void api_open_animation_path(TTestPatternApp&, const std::string&, const TRect* bounds, bool frameless, bool shadowless);
     friend void api_cascade(TTestPatternApp&);
     friend void api_toggle_scramble(TTestPatternApp&);
     friend void api_expand_scramble(TTestPatternApp&);
@@ -2122,7 +2129,7 @@ void TTestPatternApp::openAnimationFilePath(const std::string& filePath)
     registerWindow(window);
 }
 
-void TTestPatternApp::openAnimationFilePath(const std::string& filePath, const TRect& bounds, bool frameless)
+void TTestPatternApp::openAnimationFilePath(const std::string& filePath, const TRect& bounds, bool frameless, bool shadowless)
 {
     // Determine file type and create appropriate title
     windowNumber++;
@@ -2138,7 +2145,7 @@ void TTestPatternApp::openAnimationFilePath(const std::string& filePath, const T
     }
 
     // Create and insert window with provided bounds
-    TFrameAnimationWindow* window = new TFrameAnimationWindow(bounds, "", filePath, frameless);
+    TFrameAnimationWindow* window = new TFrameAnimationWindow(bounds, "", filePath, frameless, shadowless);
     deskTop->insert(window);
     registerWindow(window);
 }
@@ -2669,13 +2676,13 @@ void api_open_text_view_path(TTestPatternApp& app, const std::string& path, cons
     app.registerWindow(window);
 }
 
-void api_open_animation_path(TTestPatternApp& app, const std::string& path, const TRect* bounds, bool frameless) {
+void api_open_animation_path(TTestPatternApp& app, const std::string& path, const TRect* bounds, bool frameless, bool shadowless) {
     if (bounds) {
-        app.openAnimationFilePath(path, *bounds, frameless);
-    } else if (frameless) {
-        // Auto-size bounds, but still respect frameless flag
+        app.openAnimationFilePath(path, *bounds, frameless, shadowless);
+    } else if (frameless || shadowless) {
+        // Auto-size bounds, but still respect display flags
         TRect autoBounds = app.calculateWindowBounds(path);
-        app.openAnimationFilePath(path, autoBounds, true);
+        app.openAnimationFilePath(path, autoBounds, frameless, shadowless);
     } else {
         app.openAnimationFilePath(path);
     }

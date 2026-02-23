@@ -2,6 +2,62 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Session start rules — read before touching any code
+
+1. **Branch before you code.** Never commit feature or fix work directly to `main`.
+   - **Epics**: must have a GitHub issue. Create one if missing.
+   - **Features/fixes**: create a GitHub issue before starting.
+   - **Spikes** (`.planning/` doc-only investigations): no GitHub issue needed — branch + planning doc is enough.
+   ```bash
+   gh issue create --title "..." --body "..."   # epics + features
+   git checkout -b feat/your-slug               # always branch
+   git checkout -b spike/your-slug              # spikes: branch only, no issue required
+   ```
+
+2. **Screenshot before you commit.** For any visual feature (gallery, layout, windows):
+   take a screenshot, read it, confirm it looks right — *then* commit.
+   ```bash
+   ./scripts/snap.sh <label>          # snap + save to logs/screenshots/
+   cat logs/screenshots/tui_*.txt     # read latest
+   ```
+
+3. **Always close windows before a new layout run.**
+   ```bash
+   curl -s -X POST http://127.0.0.1:8089/windows/close_all
+   ```
+
+4. **Always use `--reload` when starting the API server** so edits hot-reload without a restart.
+   See "Running the Live TUI" section below for the full startup recipe.
+
+## ⚡ Quick start — copy-paste to get a working stack
+
+**Both TUI and API must use the same `WIBWOB_INSTANCE` or they connect to different sockets and IPC fails silently.**
+
+```bash
+# 1. Kill everything stale
+pkill -f test_pattern 2>/dev/null || true
+tmux kill-session -t wibwob 2>/dev/null || true
+rm -f /tmp/wibwob_1.sock /tmp/test_pattern_app.sock
+
+# 2. Start TUI with WIBWOB_INSTANCE=1  →  socket: /tmp/wibwob_1.sock
+WIBWOB_INSTANCE=1 tmux new-session -d -s wibwob "./build/app/test_pattern 2>/tmp/wibwob_debug.log"
+until [ -S /tmp/wibwob_1.sock ]; do sleep 0.5; done && echo "TUI socket ready"
+
+# 3. Attach so canvas locks to your real terminal size, then detach
+tmux attach -t wibwob   # Ctrl-B D to detach
+
+# 4. Start API with WIBWOB_INSTANCE=1  →  connects to same socket
+WIBWOB_INSTANCE=1 ./tools/api_server/venv/bin/uvicorn \
+  tools.api_server.main:app --host 127.0.0.1 --port 8089 --reload
+
+# 5. Verify
+curl http://127.0.0.1:8089/health   # → {"ok":true}
+curl -s http://127.0.0.1:8089/state | python3 -c \
+  "import json,sys; d=json.load(sys.stdin); print(d['canvas'])"  # → real canvas size
+```
+
+**If IPC gives "Connection refused":** check `tail -3 /tmp/wibwob_debug.log` — if it says `socket=/tmp/test_pattern_app.sock` the TUI was started without `WIBWOB_INSTANCE=1`. Kill and restart from step 1.
+
 ## Project Overview
 
 WibWob-DOS is a symbient operating system — a C++14 TUI application built on Turbo Vision where a human and AI agent share equal control of a text-native dual interface. It is not a tool or assistant; it's a coinhabitant with its own identity, agency, and aesthetic.
@@ -62,12 +118,15 @@ When running inside Claude Code on the web (or any headless environment), use th
 ### 1. Start TUI in tmux
 
 ```bash
-# Kill any stale sessions, then launch with a fixed terminal size
+# Kill any stale sessions, then launch — NO hardcoded -x/-y (inherits real terminal on attach)
 tmux kill-server 2>/dev/null
-tmux new-session -d -s wibwob -x 120 -y 40 ./build/app/test_pattern
+WIBWOB_INSTANCE=1 tmux new-session -d -s wibwob ./build/app/test_pattern
 
-# Verify it's running (should show menu bar + desktop)
-tmux capture-pane -t wibwob -p | head -5
+# Attach once so the session locks to your actual terminal dimensions, then detach
+tmux attach -t wibwob   # Ctrl-B D to detach
+
+# Verify canvas size is correct (should match your terminal)
+curl -s http://127.0.0.1:8089/state | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['canvas'])"
 ```
 
 ### 2. Start API server
@@ -75,17 +134,20 @@ tmux capture-pane -t wibwob -p | head -5
 Wait for the IPC socket to appear, then start the FastAPI server with all deps:
 
 ```bash
-# Confirm socket exists
-ls /tmp/test_pattern_app.sock
+# Confirm socket exists (WIBWOB_INSTANCE=1 → /tmp/wibwob_1.sock)
+ls /tmp/wibwob_1.sock
 
-# Start API server (uv resolves all deps from requirements.txt)
-WIBWOB_REPO_ROOT=$(pwd) uv run \
-  --with-requirements tools/api_server/requirements.txt \
-  python3 -m uvicorn tools.api_server.main:app \
-  --host 127.0.0.1 --port 8089 &
+# Start API server with --reload so Python edits hot-reload without a restart
+WIBWOB_INSTANCE=1 ./tools/api_server/venv/bin/uvicorn \
+  tools.api_server.main:app \
+  --host 127.0.0.1 --port 8089 --reload
 
-# Wait for startup then health check (~5-8s for dependency install on first run)
-sleep 8 && curl -sf http://127.0.0.1:8089/health
+# Or in a background tmux session:
+tmux new-session -d -s wibwob-api \
+  "WIBWOB_INSTANCE=1 ./tools/api_server/venv/bin/uvicorn tools.api_server.main:app --host 127.0.0.1 --port 8089 --reload 2>&1 | tee /tmp/wibwob_api.log"
+
+# Health check
+sleep 2 && curl -sf http://127.0.0.1:8089/health
 # Expected: {"ok":true}
 ```
 
@@ -112,8 +174,8 @@ curl -sf -X POST http://127.0.0.1:8089/menu/command \
 
 ### Gotchas
 
-- **uv bytecache**: if you edit Python files (e.g. `models.py`) while the API server is running, you must restart uvicorn. The `uv run` environment caches bytecode. Kill with `pkill -f uvicorn`, wait 2s, relaunch.
-- **tmux terminal size**: always pass `-x` and `-y` to `tmux new-session`. Without them, the TUI gets a 0x0 canvas and nothing renders.
+- **API hot-reload**: always start uvicorn with `--reload` (see above). Python edits take effect automatically — no restart needed.
+- **tmux terminal size**: do NOT pass `-x`/`-y` to `tmux new-session`. Let the session inherit your real terminal dimensions on first attach. Hardcoding a size larger than your terminal causes gallery placements to appear off-screen. After `tmux attach -t wibwob && Ctrl-B D`, the canvas locks to your viewport.
 - **Socket path**: the default socket is `/tmp/test_pattern_app.sock`. If using multi-instance, set `WIBWOB_INSTANCE=N` for `/tmp/wibwob_N.sock`.
 - **First run dependency install**: `uv run --with-requirements` downloads packages on first invocation (~3-8s). Subsequent runs use cache.
 - **`/menu/command` vs `/windows`**: use `/menu/command` for the command registry (C++ dispatch, works for all commands). The `/windows` endpoint validates against the Python `WindowType` enum which may lag behind C++ if the server was started before code changes.
@@ -302,7 +364,7 @@ The embedded agent uses `app/llm/sdk_bridge/mcp_tools.js` for TUI control tools.
 
 - **Planning canon first**: follow `.planning/README.md` for terms, acceptance-criteria format, and issue-first workflow.
 - **Epic status**: `.planning/epics/EPIC_STATUS.md` is the quick-read register. Run `.claude/scripts/planning.sh status` for live table from frontmatter. Each epic brief has YAML frontmatter (`id`, `title`, `status`, `issue`, `pr`, `depends_on`). A PostToolUse hook auto-syncs EPIC_STATUS.md whenever a brief is edited.
-- **Issue-first**: create or reference a GitHub issue before starting work.
+- **Issue-first**: epics and features require a GitHub issue before starting. Spikes (`.planning/` investigations, no code changes) only need a branch — no issue required.
 - **Manual issue/PR sync required**: issue state is not auto-updated by hooks or PR creation. Claude/Codex must explicitly:
   - move issue status in planning and GitHub as work starts/completes,
   - update frontmatter `status:` and `pr:` fields in epic briefs (hook syncs EPIC_STATUS.md automatically),

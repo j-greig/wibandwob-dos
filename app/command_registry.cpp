@@ -28,7 +28,7 @@ extern void api_set_pattern_mode(TTestPatternApp& app, const std::string& mode);
 extern std::string api_set_theme_mode(TTestPatternApp& app, const std::string& mode);
 extern std::string api_set_theme_variant(TTestPatternApp& app, const std::string& variant);
 extern std::string api_reset_theme(TTestPatternApp& app);
-extern void api_open_animation_path(TTestPatternApp& app, const std::string& path, const TRect* bounds, bool frameless);
+extern void api_open_animation_path(TTestPatternApp& app, const std::string& path, const TRect* bounds, bool frameless, bool shadowless);
 extern void api_spawn_paint(TTestPatternApp& app, const TRect* bounds);
 extern void api_spawn_micropolis_ascii(TTestPatternApp& app, const TRect* bounds);
 extern void api_spawn_quadra(TTestPatternApp& app, const TRect* bounds);
@@ -38,7 +38,7 @@ extern void api_spawn_deep_signal(TTestPatternApp& app, const TRect* bounds);
 extern void api_spawn_app_launcher(TTestPatternApp& app, const TRect* bounds);
 extern void api_spawn_gallery(TTestPatternApp& app, const TRect* bounds);
 extern void api_open_animation_path(TTestPatternApp& app, const std::string& path);
-extern void api_open_animation_path(TTestPatternApp& app, const std::string& path, const TRect* bounds, bool frameless);
+extern void api_open_animation_path(TTestPatternApp& app, const std::string& path, const TRect* bounds, bool frameless, bool shadowless);
 extern std::string api_gallery_list(TTestPatternApp& app, const std::string& tab);
 extern void api_spawn_terminal(TTestPatternApp& app, const TRect* bounds);
 extern std::string api_terminal_write(TTestPatternApp& app, const std::string& text, const std::string& window_id);
@@ -247,9 +247,11 @@ std::string exec_registry_command(
         struct stat st;
         if (stat(path.c_str(), &st) != 0)
             return "err file not found: " + path;
-        // Frameless mode: open primer without visible border/title chrome
+        // Display mode flags
         auto fi = kv.find("frameless");
-        bool frameless = (fi != kv.end() && (fi->second == "1" || fi->second == "true"));
+        auto si = kv.find("shadowless");
+        bool frameless  = (fi != kv.end() && (fi->second == "1" || fi->second == "true"));
+        bool shadowless = (si != kv.end() && (si->second == "1" || si->second == "true"));
 
         // Optional explicit placement: x, y (top-left), w, h (outer incl. frame)
         auto xi = kv.find("x"), yi = kv.find("y");
@@ -260,9 +262,9 @@ std::string exec_registry_command(
             int w = std::atoi(wi->second.c_str());
             int h = std::atoi(hi->second.c_str());
             TRect bounds(x, y, x + w, y + h);
-            api_open_animation_path(app, path, &bounds, frameless);
+            api_open_animation_path(app, path, &bounds, frameless, shadowless);
         } else {
-            api_open_animation_path(app, path, nullptr, frameless);
+            api_open_animation_path(app, path, nullptr, frameless, shadowless);
         }
         return "ok";
     }

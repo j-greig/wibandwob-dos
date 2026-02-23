@@ -579,7 +579,7 @@ Each stub is independent unless marked `[blocks N]`. Check off as done. Do not a
             Delegates to: controller move_resize()
             Test: POST /windows/1/resize {w:40,h:20} → GET /state → assert dimensions
 
-[ ] STUB-14 Extract gallery layout engine from main.py → tools/api_server/gallery.py
+[x] STUB-14 Extract gallery layout engine from main.py → tools/api_server/gallery.py
             Problem: ~700 lines of constants, helpers, and 8 layout algorithms live in
             main.py (lines 75-~800 of 1723). No separation from routing/API layer.
             Pattern: browser.py, controller.py, models.py already exist — follow same.

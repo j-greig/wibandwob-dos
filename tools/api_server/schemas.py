@@ -425,7 +425,8 @@ class GalleryArrangeRequest(BaseModel):
         "'packery' (2D guillotine bin-pack, fills gaps) | "
         "'cells_by_row' (uniform grid cells) | "
         "'poetry' (packery + breathing room + wide/tall interleave) | "
-        "'cluster' (rectpack MaxRects → centred bbox, organic, no fixed rows/cols)"
+        "'cluster' (rectpack MaxRects → centred bbox, organic, no fixed rows/cols) | "
+        "'stamp' (repeat one primer as a stamp on a pattern — text/grid/wave/spiral/cross/border/diagonal)"
     ))
     padding: int = Field(2, description="Character gap between windows")
     margin: int = Field(1, description=(
@@ -437,13 +438,32 @@ class GalleryArrangeRequest(BaseModel):
     canvas_width: int = Field(0, description="Override canvas width (0 = auto-query from TUI state)")
     canvas_height: int = Field(0, description="Override canvas height (0 = auto-query from TUI state)")
     preview: bool = Field(False, description="If true, return the plan without applying it")
-    frameless: bool = Field(False, description="Open primers without title/border chrome")
+    frameless: bool = Field(False, description=(
+        "Open primers as ghost-frame windows — no visible border chrome. "
+        "Content fills the full window bounds. Automatically implies shadowless=true. "
+        "Best combined with tight padding (0-1) for a pure art-installation look."
+    ))
+    shadowless: bool = Field(False, description=(
+        "Remove the Turbo Vision drop shadow (2-col right, 1-row bottom). "
+        "Use with frameless=true for completely chromeless primers that tile "
+        "seamlessly edge-to-edge with no visual artefacts between windows."
+    ))
     options: Dict[str, Any] = Field(default_factory=dict, description=(
-        "Per-algorithm options dict. "
-        "masonry: clamp (bool, default False) — if True, items are clamped to slot width "
-        "(more columns, content cropped); if False (default), columns sized to widest item "
-        "(fewer columns, full natural width). "
-        "masonry/masonry_horizontal: n_cols / n_rows (int) to override auto column/row count."
+        "Per-algorithm options dict. Keys vary by algorithm:\n"
+        "  masonry / masonry_horizontal:\n"
+        "    clamp (bool, default false) — true: columns sized to median width, items cropped\n"
+        "    n_cols / n_rows (int) — override auto column/row count\n"
+        "  cluster:\n"
+        "    anchor (str) — canvas position: center|tl|tr|bl|br|top|bottom|left|right\n"
+        "    inner_algo (str) — maxrects_bssf|maxrects_bl|skyline_bl|guillotine\n"
+        "    margin (int) — breathing room around cluster (overrides top-level margin)\n"
+        "  stamp:\n"
+        "    pattern (str) — text|grid|wave|diagonal|cross|border|spiral\n"
+        "    text (str) — text to render in 3x5 pixel font, '|' for multi-line\n"
+        "    cols (int) — grid columns, or stamp count for wave/spiral\n"
+        "    rows (int) — grid rows\n"
+        "    turns (float) — spiral turns (default 3.0)\n"
+        "    anchor (str) — same 9-position system as cluster"
     ))
 
 
