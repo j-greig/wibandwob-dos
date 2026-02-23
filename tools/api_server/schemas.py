@@ -424,7 +424,8 @@ class GalleryArrangeRequest(BaseModel):
         "'masonry_horizontal' (horizontal masonry, shortest-row-first) | "
         "'packery' (2D guillotine bin-pack, fills gaps) | "
         "'cells_by_row' (uniform grid cells) | "
-        "'poetry' (packery + breathing room + wide/tall interleave)"
+        "'poetry' (packery + breathing room + wide/tall interleave) | "
+        "'cluster' (rectpack MaxRects → centred bbox, organic, no fixed rows/cols)"
     ))
     padding: int = Field(2, description="Character gap between windows")
     margin: int = Field(1, description=(

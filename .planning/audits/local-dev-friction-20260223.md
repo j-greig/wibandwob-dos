@@ -389,6 +389,31 @@ screenshot → confirm with eyes. Text output alone is insufficient for visual f
 | 🟡 | Investigate MCP /mcp errors | TBD |
 | 🟢 | Pre-commit hook: reject direct commits to main for app/ changes | 30 min |
 | 🟠 | API server: always use `--reload` for agentic dev workflow | 5 min |
+| 🟠 | Extract gallery layout engine from main.py → gallery.py | 1 hr |
+
+---
+
+## 16. Gallery layout engine crammed into main.py — no module separation
+
+**What happened**: All gallery/layout code lives inline in `main.py` starting at line 75.
+By line ~800, 8 layout algorithms, measurement helpers, and layout constants have all
+accumulated before the first API route. The file is 1723 lines total.
+
+**Problem for agents**: any agent asked to "work on the gallery layout" has to navigate
+a 1700-line file mixing FastAPI routing, IPC plumbing, browser logic, and layout maths.
+Finding `_layout_packery` requires knowing it's around line 330, not in a module named
+after what it does.
+
+**Fix**: extract to `tools/api_server/gallery.py`. Move:
+- `SHADOW_W`, `SHADOW_H`, `CANVAS_BOTTOM_EXTRA`, `GALLERY_PADDING` constants
+- `_measure_primer`, `_get_primer_metadata` helpers
+- All `_layout_*` functions (8 algorithms)
+- `_algo_map` dispatch dict (or a `run_layout(algo, primers, ...)` wrapper)
+
+`main.py` keeps the `/gallery/arrange` route handler and imports from `.gallery`.
+Follows the existing pattern: `browser.py`, `controller.py`, `models.py`.
+
+**Effort**: ~1 hour. Pure refactor, no behaviour change.
 
 ---
 
@@ -554,6 +579,17 @@ Each stub is independent unless marked `[blocks N]`. Check off as done. Do not a
             Delegates to: controller move_resize()
             Test: POST /windows/1/resize {w:40,h:20} → GET /state → assert dimensions
 
+[ ] STUB-14 Extract gallery layout engine from main.py → tools/api_server/gallery.py
+            Problem: ~700 lines of constants, helpers, and 8 layout algorithms live in
+            main.py (lines 75-~800 of 1723). No separation from routing/API layer.
+            Pattern: browser.py, controller.py, models.py already exist — follow same.
+            Move: SHADOW_W/H/CANVAS_BOTTOM_EXTRA constants, _measure_primer,
+                  _get_primer_metadata, all _layout_* functions, _algo_map dispatch
+            main.py import: from .gallery import run_layout, SHADOW_W, SHADOW_H, ...
+            Keep: the /gallery/arrange route handler + request/response models in main.py
+            Gate: none (pure refactor, no behaviour change)
+            Test: existing gallery arrange calls return identical output before/after
+
 [ ] STUB-13 Add --reload to API server launch in dev-start.sh and CLAUDE.md
             File: scripts/dev-start.sh (uvicorn line), CLAUDE.md (startup recipe)
             Change: append --reload to uvicorn invocation
@@ -594,3 +630,66 @@ Each stub is independent unless marked `[blocks N]`. Check off as done. Do not a
 ### Canvas size note
 After iTerm2 resize, always: Ctrl+B D → tmux attach -t wibwob → detach again → canvas locks to new size.
 Current session canvas: **362×96**. Use `/state` to query before every gallery run.
+
+---
+
+## Session 3 — 2026-02-23 afternoon (stamp mode + cluster sprint)
+
+### What was built
+- `cluster` algorithm: rectpack MaxRects true 2D bin-pack → bounding-box centred on canvas  
+  - `anchor` option (9 positions: center/tl/tr/bl/br/top/bottom/left/right + compass aliases)  
+  - `margin` slider: 0=flush, 8=default, 20=airy — single knob for breathing room  
+  - `inner_algo` option: maxrects_bssf / maxrects_bl / skyline_bl / guillotine  
+  - Placed 20/20 items vs packery's 15/20 — MaxRects > guillotine by 30%+
+- `stamp` algorithm: primers as repeating stamps on a pattern  
+  - Patterns: `text` (3×5 pixel font), `grid`, `wave`, `diagonal`, `cross`, `border`, `spiral`  
+  - Multi-line text via `|` separator (e.g. `"WIB|WOB|DOS"`)  
+  - Cycling primers: pass multiple filenames, they rotate across stamp positions  
+  - `anchor` same as cluster — 9 canvas positions  
+- `rectpack` installed into venv + added to `requirements.txt`  
+- `scripts/stamp.sh` — one-liner wrapper: label / primer / pattern / opts → arrange + snap  
+- 29 total stamp experiments across 2 sessions, all snapped, 0 overlaps, 0 OOB throughout
+
+### Friction encountered
+
+**F1 — `win_map` keyed by basename broke duplicate filenames**  
+Stamp mode opens the same primer 20–100 times. Old apply logic used `dict[basename → win_id]`
+so the 2nd–Nth window of the same file was never matched, leaving placements unpositioned.  
+Fix: detect `has_dupes = len(all_fnames) != len(set(all_fnames))` → open-fresh mode, track
+`used_ids: set[str]` to prevent reusing the same window ID across placements.  
+**Lesson**: any algo that repeats a primer (stamp, pattern fill, mosaic) needs open-fresh mode.
+
+**F2 — rectpack y-axis is bottom-up; TV is top-down**  
+rectpack places (0,0) at bottom-left. TV canvas has (0,0) at top-left.
+Without flipping, all windows appeared at wrong vertical positions.  
+Fix: `tv_y = uh - ry - rh` (flip within usable height). Add to any future rectpack usage.
+
+**F3 — snap.sh timing miss on heavy loads**  
+Run 12 (29 windows opened rapidly) snapped an empty/transitional screen.  
+Fix: added 0.5s sleep before snap in Python driver. For >25 windows, use 0.8s.
+
+**F4 — `opts` not in scope inside layout functions for `turns` param**  
+Spiral pattern's `turns` was hardcoded `if False else 3`. `opts` dict only exists in the
+route handler closure — layout functions take explicit kwargs.  
+Fix: thread `turns=float(opts.get("turns", 3.0))` through dispatch lambda.  
+**Pattern**: always pass every option as an explicit kwarg, never read `opts` inside `_layout_*`.
+
+**F5 — `scripts/stamp.sh` shell quoting fragile with nested JSON**  
+The helper uses `python3 -c` to merge opts JSON but complex nested values with apostrophes
+break the shell interpolation. Fine for simple cases; for complex opts use the Python driver.  
+Fix: document in stamp.sh header — for complex opts, prefer the Python driver pattern.
+
+### Helper scripts added
+- `scripts/stamp.sh` — one-liner stamp experiments (simple opts, no nested quotes)
+
+### Remaining friction
+- No `scripts/gallery.sh` equivalent for `cluster` mode — easy follow-on
+- `stamp` spiral places fewer stamps than expected when `turns` is high because
+  deduplication removes overlapping grid positions — could use float positions instead of int
+- `_layout_stamp` wave uses `cols` as width, which is unintuitive (it means "number of stamps
+  across the wave", not "number of grid columns") — rename param to `count` for wave/spiral
+- Gallery layout engine still in `main.py` (STUB-14 from session 2) — now ~800 lines of layout
+  code before the first route. Extracting to `gallery.py` is increasingly urgent.
+
+### Canvas note
+Session 3 canvas: **362×96** throughout. Confirmed stable after Cinema Display font-size lock.

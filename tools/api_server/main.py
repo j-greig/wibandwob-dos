@@ -496,6 +496,353 @@ def _layout_poetry(
     return placements
 
 
+# ─── Stamp / pixel-font layout ───────────────────────────────────────────────
+
+# 3×5 pixel font — each char is 5 rows of 3-bit strings
+_PIXEL_FONT: dict[str, list[str]] = {
+    ' ': ["000","000","000","000","000"],
+    'A': ["010","101","111","101","101"],
+    'B': ["110","101","110","101","110"],
+    'C': ["011","100","100","100","011"],
+    'D': ["110","101","101","101","110"],
+    'E': ["111","100","110","100","111"],
+    'F': ["111","100","110","100","100"],
+    'G': ["011","100","101","101","011"],
+    'H': ["101","101","111","101","101"],
+    'I': ["111","010","010","010","111"],
+    'J': ["001","001","001","101","010"],
+    'K': ["101","110","100","110","101"],
+    'L': ["100","100","100","100","111"],
+    'M': ["101","111","101","101","101"],
+    'N': ["101","110","101","101","101"],
+    'O': ["010","101","101","101","010"],
+    'P': ["110","101","110","100","100"],
+    'Q': ["010","101","101","011","001"],
+    'R': ["110","101","110","101","101"],
+    'S': ["011","100","010","001","110"],
+    'T': ["111","010","010","010","010"],
+    'U': ["101","101","101","101","010"],
+    'V': ["101","101","101","010","010"],
+    'W': ["101","101","101","111","010"],
+    'X': ["101","101","010","101","101"],
+    'Y': ["101","101","010","010","010"],
+    'Z': ["111","001","010","100","111"],
+    '0': ["010","101","101","101","010"],
+    '1': ["010","110","010","010","111"],
+    '2': ["110","001","010","100","111"],
+    '3': ["110","001","010","001","110"],
+    '4': ["101","101","111","001","001"],
+    '5': ["111","100","110","001","110"],
+    '6': ["011","100","110","101","010"],
+    '7': ["111","001","010","010","010"],
+    '8': ["010","101","010","101","010"],
+    '9': ["010","101","011","001","110"],
+    '!': ["010","010","010","000","010"],
+    '?': ["110","001","010","000","010"],
+    '&': ["010","101","010","101","011"],
+    '#': ["101","111","101","111","101"],
+    '+': ["000","010","111","010","000"],
+    '-': ["000","000","111","000","000"],
+    '.': ["000","000","000","000","010"],
+    '*': ["101","010","111","010","101"],
+    ':': ["000","010","000","010","000"],
+}
+
+def _text_to_pixel_positions(text: str) -> list[tuple[int, int]]:
+    """Return list of (col, row) pixel positions for rendering `text` in 3×5 font.
+
+    Supports multi-line via '|' separator — each line stacked with a 2-row gap.
+    Characters placed left-to-right, one column gap between them.
+    Unknown chars rendered as space.
+    """
+    positions: list[tuple[int, int]] = []
+    line_height = 5 + 2   # 5 pixel rows + 2-row gap between lines
+    for line_idx, line in enumerate(text.upper().split('|')):
+        cursor_x = 0
+        y_offset  = line_idx * line_height
+        for ch in line:
+            rows = _PIXEL_FONT.get(ch, _PIXEL_FONT[' '])
+            for row_idx, row in enumerate(rows):
+                for col_idx, bit in enumerate(row):
+                    if bit == '1':
+                        positions.append((cursor_x + col_idx, y_offset + row_idx))
+            cursor_x += 4   # 3 pixel cols + 1 gap between letters
+    return positions
+
+
+def _layout_stamp(
+    primers: list[dict],
+    canvas_w: int,
+    canvas_h: int,
+    padding: int = 1,
+    margin: int = 4,
+    pattern: str = "text",
+    text: str = "WIB",
+    cols: int = 8,
+    rows: int = 4,
+    turns: float = 3.0,
+    anchor: str = "center",
+) -> list[dict]:
+    """Stamp layout — use primers as repeating stamps on a pattern.
+
+    The same primer (or cycling set) is stamped at every position defined by
+    the pattern. Think: Illustrator stamp tool, but the brush is an ASCII window.
+
+    patterns:
+      text      — render `text` using 3×5 pixel font; each 'on' pixel = one stamp
+      grid      — uniform cols×rows grid of stamps
+      wave      — stamps along a sine wave
+      diagonal  — stamps along a diagonal line
+      cross     — horizontal + vertical centre lines
+      border    — stamps around the canvas edge
+
+    options (via options={}):
+      pattern   str   "text" | "grid" | "wave" | "diagonal" | "cross" | "border"
+      text      str   text to render (pattern=text only)
+      cols      int   grid columns (pattern=grid)
+      rows      int   grid rows (pattern=grid)
+      anchor    str   same as cluster — where to place the stamped pattern
+    """
+    ux, uy, uw, uh = _usable(canvas_w, canvas_h, margin)
+    if not primers:
+        return []
+
+    stamp = primers[0]   # first primer is the stamp
+    sw = stamp["width"]
+    sh = stamp["height"]
+    step_x = sw + padding
+    step_y = sh + padding
+
+    # ── Generate pixel positions ──────────────────────────────────────────────
+    if pattern == "text":
+        pixel_positions = _text_to_pixel_positions(text or "WIB")
+
+    elif pattern == "grid":
+        pixel_positions = [(c, r) for r in range(rows) for c in range(cols)]
+
+    elif pattern == "wave":
+        import math
+        amplitude = max(1, (uh // step_y) // 3)
+        wave_len   = max(1, cols)
+        pixel_positions = []
+        for c in range(wave_len):
+            r_center = (uh // step_y) // 2
+            r = r_center + int(amplitude * math.sin(2 * math.pi * c / max(wave_len, 1) * 2))
+            pixel_positions.append((c, r))
+
+    elif pattern == "spiral":
+        import math
+        # Archimedean spiral — stamps placed at increasing angle + radius
+        max_r_px  = min(uw, uh * 2) // 2          # max spiral radius in canvas chars
+        # turns is a param — Archimedean spiral density
+        n_stamps  = cols                            # reuse cols param as stamp count
+        positions_raw: list[tuple[int,int]] = []
+        for i in range(n_stamps):
+            t     = i / max(n_stamps - 1, 1)
+            angle = t * turns * 2 * math.pi
+            r_px  = t * max_r_px
+            cx_px = (uw // step_x) // 2
+            cy_px = (uh // step_y) // 2
+            col   = cx_px + int(r_px / step_x * math.cos(angle))
+            row   = cy_px + int(r_px / step_y * math.sin(angle))
+            positions_raw.append((col, row))
+        # deduplicate while preserving order
+        seen: set[tuple[int,int]] = set()
+        pixel_positions = []
+        for pos in positions_raw:
+            if pos not in seen:
+                seen.add(pos)
+                pixel_positions.append(pos)
+
+    elif pattern == "diagonal":
+        n = min(uw // step_x, uh // step_y)
+        pixel_positions = [(i, i) for i in range(n)]
+
+    elif pattern == "cross":
+        max_c = uw // step_x
+        max_r = uh // step_y
+        mid_r = max_r // 2
+        mid_c = max_c // 2
+        pixel_positions  = [(c, mid_r) for c in range(max_c)]   # horizontal
+        pixel_positions += [(mid_c, r) for r in range(max_r) if r != mid_r]  # vertical
+
+    elif pattern == "border":
+        max_c = uw // step_x
+        max_r = uh // step_y
+        top    = [(c, 0)         for c in range(max_c)]
+        bottom = [(c, max_r - 1) for c in range(max_c)]
+        left   = [(0, r)         for r in range(1, max_r - 1)]
+        right  = [(max_c - 1, r) for r in range(1, max_r - 1)]
+        pixel_positions = top + bottom + left + right
+
+    else:
+        pixel_positions = _text_to_pixel_positions(text or "WIB")
+
+    if not pixel_positions:
+        return []
+
+    # ── Convert pixel positions → canvas coordinates ──────────────────────────
+    raw = [(col * step_x, row * step_y) for col, row in pixel_positions]
+
+    # Compute bounding box, apply anchor (same logic as cluster)
+    min_x = min(x for x, _ in raw)
+    min_y = min(y for _, y in raw)
+    bbox_w = max(x + sw for x, _ in raw) - min_x
+    bbox_h = max(y + sh for _, y in raw) - min_y
+
+    ax, ay  = _cluster_anchor(anchor)
+    slack_x = max(0, uw - bbox_w)
+    slack_y = max(0, uh - bbox_h)
+    ox = ux + int(slack_x * ax) - min_x
+    oy = uy + int(slack_y * ay) - min_y
+
+    # Cycle through provided primers as stamps (allows variety: ["cat.txt","cat.txt",...])
+    n_primers = max(1, len(primers))
+    placements = []
+    for i, (x, y) in enumerate(raw):
+        px, py = x + ox, y + oy
+        # bounds check — skip stamps that would go off canvas
+        if (px < 0 or py < 0
+                or px + sw + SHADOW_W > canvas_w
+                or py + sh + SHADOW_H + CANVAS_BOTTOM_EXTRA > canvas_h):
+            continue
+        p = primers[i % n_primers]
+        placements.append({"filename": p["filename"], "x": px, "y": py,
+                           "width": sw, "height": sh})
+    return placements
+
+
+def _cluster_anchor(anchor: str) -> tuple[float, float]:
+    """Map anchor name → (ax, ay) weights in [0.0, 1.0].
+
+    ax=0.0 = left edge,  ax=0.5 = centre,  ax=1.0 = right edge
+    ay=0.0 = top edge,   ay=0.5 = centre,  ay=1.0 = bottom edge
+    """
+    _map: dict[str, tuple[float, float]] = {
+        # corners
+        "tl": (0.0, 0.0), "top-left":     (0.0, 0.0), "nw": (0.0, 0.0),
+        "tr": (1.0, 0.0), "top-right":    (1.0, 0.0), "ne": (1.0, 0.0),
+        "bl": (0.0, 1.0), "bottom-left":  (0.0, 1.0), "sw": (0.0, 1.0),
+        "br": (1.0, 1.0), "bottom-right": (1.0, 1.0), "se": (1.0, 1.0),
+        # edges
+        "top":    (0.5, 0.0), "tc": (0.5, 0.0), "n": (0.5, 0.0),
+        "bottom": (0.5, 1.0), "bc": (0.5, 1.0), "s": (0.5, 1.0),
+        "left":   (0.0, 0.5), "cl": (0.0, 0.5), "w": (0.0, 0.5),
+        "right":  (1.0, 0.5), "cr": (1.0, 0.5), "e": (1.0, 0.5),
+        # centre (default)
+        "center": (0.5, 0.5), "centre": (0.5, 0.5), "c": (0.5, 0.5),
+    }
+    return _map.get(anchor.lower(), (0.5, 0.5))
+
+
+def _layout_cluster(
+    primers: list[dict],
+    canvas_w: int,
+    canvas_h: int,
+    padding: int = 1,
+    margin: int = 8,
+    inner_algo: str = "maxrects_bssf",
+    anchor: str = "center",
+) -> list[dict]:
+    """Gallery-wall cluster: rectpack MaxRects → position on canvas.
+
+    No fixed rows or column rails at all. Items placed at any (x, y) using
+    the best-fit free rectangle — organic, dense, real gallery-wall feel.
+
+    Steps:
+      1. Pack into usable bin (canvas − margin on all sides) via rectpack.
+      2. Flip y-axis (rectpack bottom-up → TV top-down).
+      3. Compute bounding box of placed cluster.
+      4. Position bbox on canvas using `anchor` (default: centred).
+
+    API options (pass via options={}):
+      padding     (int, default 1)  gutter between frames — tight like a real wall
+      margin      (int, default 8)  breathing room slider: 0=flush, 8=default, 20=airy
+      anchor      (str, default "center")  where to sit on canvas:
+                    center / c                    — default, balanced
+                    tl / tr / bl / br             — corners
+                    top / bottom / left / right   — edge-centred
+                    nw / ne / sw / se             — compass aliases
+      inner_algo  (str, default "maxrects_bssf")  packing shape:
+                    maxrects_bssf  densest, most compact
+                    maxrects_bl    bottom-left bias, slightly more regular
+                    skyline_bl     skyline algorithm, jagged organic perimeter
+                    guillotine     faster, less dense
+    """
+    try:
+        from rectpack import newPacker, PackingMode, SORT_AREA
+        from rectpack.maxrects import MaxRectsBssf, MaxRectsBl
+        from rectpack.skyline import SkylineBl
+        from rectpack.guillotine import GuillotineBssfSas
+    except ImportError:
+        return _layout_packery(primers, canvas_w, canvas_h, padding, margin)
+
+    _algo_lookup = {
+        "maxrects_bssf": MaxRectsBssf,
+        "maxrects_bl":   MaxRectsBl,
+        "skyline_bl":    SkylineBl,
+        "guillotine":    GuillotineBssfSas,
+    }
+    pack_algo = _algo_lookup.get(inner_algo, MaxRectsBssf)
+
+    ux, uy, uw, uh = _usable(canvas_w, canvas_h, margin)
+    pieces = _prep_pieces(primers, uw, uh)
+    if not pieces:
+        return []
+
+    id_map = {i: p for i, p in enumerate(pieces)}
+
+    packer = newPacker(
+        mode=PackingMode.Offline,
+        pack_algo=pack_algo,
+        sort_algo=SORT_AREA,
+        rotation=False,
+    )
+    for i, piece in enumerate(pieces):
+        pw = piece["width"]  + padding
+        ph = piece["height"] + padding
+        if pw <= uw and ph <= uh:
+            packer.add_rect(pw, ph, rid=i)
+
+    packer.add_bin(uw, uh)
+    packer.pack()
+
+    packed = packer.rect_list()
+    if not packed:
+        return _layout_packery(primers, canvas_w, canvas_h, padding, margin)
+
+    # Flip y: rectpack y=0 is bottom-left; TV y=0 is top-left
+    flipped = []
+    for _b, rx, ry, rw, rh, rid in packed:
+        tv_y = uh - ry - rh
+        piece = id_map[rid]
+        flipped.append({
+            "filename": piece["filename"],
+            "x": rx,
+            "y": tv_y,
+            "width":  rw - padding,
+            "height": rh - padding,
+        })
+
+    # Bounding box of placed cluster
+    min_x = min(p["x"] for p in flipped)
+    min_y = min(p["y"] for p in flipped)
+    bbox_w = max(p["x"] + p["width"]  for p in flipped) - min_x
+    bbox_h = max(p["y"] + p["height"] for p in flipped) - min_y
+
+    # Anchor: translate bbox within usable area
+    ax, ay   = _cluster_anchor(anchor)
+    slack_x  = max(0, uw - bbox_w)
+    slack_y  = max(0, uh - bbox_h)
+    offset_x = ux + int(slack_x * ax) - min_x
+    offset_y = uy + int(slack_y * ay) - min_y
+
+    return [
+        {**p, "x": p["x"] + offset_x, "y": p["y"] + offset_y}
+        for p in flipped
+    ]
+
+
 # ─── Back-compat aliases (tests / external callers) ─────────────────────────
 def _masonry_layout(primers, canvas_w, canvas_h, padding=2, margin=1, n_cols=None, clamp=False):
     return _layout_masonry(primers, canvas_w, canvas_h, padding, margin, n_cols, clamp)
@@ -1189,6 +1536,20 @@ def make_app() -> FastAPI:
             "packery":            lambda: _layout_packery(primers_meta, canvas_w, canvas_h, padding, margin),
             "cells_by_row":       lambda: _layout_cells_by_row(primers_meta, canvas_w, canvas_h, padding, margin),
             "poetry":             lambda: _layout_poetry(primers_meta, canvas_w, canvas_h, padding, margin),
+            "stamp":              lambda: _layout_stamp(primers_meta, canvas_w, canvas_h,
+                                                         padding=opts.get("padding", padding),
+                                                         margin=opts.get("margin", margin),
+                                                         pattern=opts.get("pattern", "text"),
+                                                         text=opts.get("text", "WIB"),
+                                                         cols=opts.get("cols", 8),
+                                                         rows=opts.get("rows", 4),
+                                                         turns=float(opts.get("turns", 3.0)),
+                                                         anchor=opts.get("anchor", "center")),
+            "cluster":            lambda: _layout_cluster(primers_meta, canvas_w, canvas_h,
+                                                          padding=opts.get("padding", padding),
+                                                          margin=opts.get("margin", margin),
+                                                          inner_algo=opts.get("inner_algo", "maxrects_bssf"),
+                                                          anchor=opts.get("anchor", "center")),
         }
         if algo not in _algo_map:
             algo = "masonry"
@@ -1229,25 +1590,36 @@ def make_app() -> FastAPI:
         # 5. Apply (unless preview)
         applied = False
         if not payload.preview:
-            # Get current open windows to match filenames → window IDs
-            state = await ctl.get_state()
-            # Build map: basename-without-ext → window id
+            # Detect duplicate filenames → open-fresh mode (stamp, text-pixel art, etc.)
+            all_fnames = [a.filename for a in arrangement]
+            has_dupes  = len(all_fnames) != len(set(all_fnames))
+
+            # Build map: basename-without-ext → window id  (unique-filename mode only)
             win_map: dict[str, str] = {}
-            for w in state.windows:
-                if w.props and "path" in w.props:
-                    basename = os.path.basename(w.props["path"]).replace(".txt", "").lower()
-                    win_map[basename] = w.id
-                # Also index by title fragment as fallback
-                title_key = (w.title or "").lower().replace(".txt", "").split(" - ")[0].strip()
-                if title_key and w.id not in win_map.values():
-                    win_map[title_key] = w.id
+            if not has_dupes:
+                state = await ctl.get_state()
+                for w in state.windows:
+                    if w.props and "path" in w.props:
+                        basename = os.path.basename(w.props["path"]).replace(".txt", "").lower()
+                        win_map[basename] = w.id
+                    title_key = (w.title or "").lower().replace(".txt", "").split(" - ")[0].strip()
+                    if title_key and w.id not in win_map.values():
+                        win_map[title_key] = w.id
+
+            # Track used window IDs so duplicates don't reuse the same one
+            used_ids: set[str] = set()
 
             for place in arrangement:
-                key = place.filename.replace(".txt", "").lower()
-                win_id = win_map.get(key)
+                key     = place.filename.replace(".txt", "").lower()
+                win_id  = None
+
+                if not has_dupes:
+                    candidate = win_map.get(key)
+                    if candidate and candidate not in used_ids:
+                        win_id = candidate
 
                 if not win_id:
-                    # Window not open — find path and open it (with frameless if requested)
+                    # Open a fresh window for this placement
                     primer_path = next(
                         (p["path"] for p in primers_meta if p["filename"] == place.filename),
                         None
@@ -1262,14 +1634,11 @@ def make_app() -> FastAPI:
                             open_args["frameless"] = "true"
                         res = await ctl.exec_command("open_primer", open_args, actor="gallery_arrange")
                         if res.get("ok"):
-                            # Re-query state to find the new window ID, then
-                            # fall through to move_resize below (open_primer
-                            # ignores x/y/w/h bounds — we must move explicitly)
                             new_state = await ctl.get_state()
                             for nw in new_state.windows:
                                 if nw.props and "path" in nw.props:
                                     nb = os.path.basename(nw.props["path"]).replace(".txt", "").lower()
-                                    if nb == key and nb not in win_map:
+                                    if nb == key and nw.id not in used_ids:
                                         win_id = nw.id
                                         place.window_id = nw.id
                                         break
@@ -1278,6 +1647,7 @@ def make_app() -> FastAPI:
                     try:
                         await ctl.move_resize(win_id, x=place.x, y=place.y, w=place.width, h=place.height)
                         place.window_id = win_id
+                        used_ids.add(win_id)
                     except Exception:
                         pass
             applied = True

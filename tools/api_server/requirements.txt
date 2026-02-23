@@ -7,3 +7,4 @@ markdownify>=0.14
 requests>=2.31
 trafilatura>=1.9
 wcwidth>=0.2.13
+rectpack>=0.2.2
