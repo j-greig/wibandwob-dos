@@ -6,7 +6,7 @@
 > When done or dropped mv epic dir and contents to .planning/epics/.trash/
 
 e005-theme-runtime-wiring — not-started
-e006-scramble-tui-presence — in-progress
+e006-scramble-tui-presence — done
 e008-multiplayer-partykit — in-progress
 e011-desktop-shell — not-started
 e012-app-modularisation — done
