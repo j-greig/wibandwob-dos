@@ -23,8 +23,8 @@ def test_theme_commands_in_registry() -> None:
 
 
 def test_theme_api_functions_exist() -> None:
-    """Verify theme API functions are declared in test_pattern_app.cpp"""
-    source = Path("app/test_pattern_app.cpp").read_text(encoding="utf-8")
+    """Verify theme API functions are declared in wwdos_app.cpp"""
+    source = Path("app/wwdos_app.cpp").read_text(encoding="utf-8")
 
     # Check friend declarations
     assert "friend std::string api_set_theme_mode" in source
@@ -39,7 +39,7 @@ def test_theme_api_functions_exist() -> None:
 
 def test_theme_state_in_app() -> None:
     """Verify theme state fields exist in TWwdosApp"""
-    source = Path("app/test_pattern_app.cpp").read_text(encoding="utf-8")
+    source = Path("app/wwdos_app.cpp").read_text(encoding="utf-8")
 
     assert 'std::string themeMode' in source
     assert 'std::string themeVariant' in source
@@ -110,7 +110,7 @@ def test_theme_schemas_exist() -> None:
 
 def test_theme_in_get_state() -> None:
     """Verify theme fields are included in get_state response"""
-    source = Path("app/test_pattern_app.cpp").read_text(encoding="utf-8")
+    source = Path("app/wwdos_app.cpp").read_text(encoding="utf-8")
 
     # Check JSON construction includes theme fields
     assert '\\"theme_mode\\"' in source
@@ -119,7 +119,7 @@ def test_theme_in_get_state() -> None:
 
 def test_theme_in_workspace_persistence() -> None:
     """Verify theme state is persisted in workspace files"""
-    source = Path("app/test_pattern_app.cpp").read_text(encoding="utf-8")
+    source = Path("app/wwdos_app.cpp").read_text(encoding="utf-8")
 
     # Check save includes theme in globals
     assert '"themeMode"' in source or 'themeMode' in source

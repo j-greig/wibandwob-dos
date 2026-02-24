@@ -42,7 +42,7 @@
 #include <cstdlib>  // atoi
 #include <cstring>  // strcmp
 
-// ── Extern declarations for spawn helpers in test_pattern_app.cpp ─────────────
+// ── Extern declarations for spawn helpers in wwdos_app.cpp ─────────────
 
 class TWwdosApp; // forward decl (full type used only by called functions)
 
@@ -262,7 +262,7 @@ static bool has_child_view(TWindow* w) {
 }
 
 static bool match_test_pattern(TWindow*) {
-    // TTestPatternWindow/TTestPatternView are local to test_pattern_app.cpp.
+    // TTestPatternWindow/TTestPatternView are local to wwdos_app.cpp.
     // The app falls back to this registry's first entry when no matcher hits.
     return false;
 }

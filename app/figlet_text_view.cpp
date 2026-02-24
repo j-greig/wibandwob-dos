@@ -19,7 +19,7 @@
 #include <cstring>
 #include <algorithm>
 
-// Context menu commands — must match test_pattern_app.cpp values
+// Context menu commands — must match wwdos_app.cpp values
 static const ushort cmCtxToggleShadow  = 250;
 static const ushort cmCtxClearTitle    = 251;
 static const ushort cmCtxToggleFrame   = 252;

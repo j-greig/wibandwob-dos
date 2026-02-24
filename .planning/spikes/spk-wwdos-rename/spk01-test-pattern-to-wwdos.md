@@ -58,7 +58,7 @@ Grep counts below are for live/actionable files and exclude noise/artifacts:
 - `scripts/dev-start.sh` (build target/path messaging)
 - `tools/scripts/launch_tmux.sh` (binary path)
 - `tools/room/orchestrator.py` (binary path segment `"test_pattern"`)
-- `app/run_test_pattern_logged.sh` (invokes `./build/test_pattern`; see also Phase 4 for script filename question)
+- `app/run_wwdos_logged.sh` (invokes `./build/test_pattern`; see also Phase 4 for script filename question)
 
 **Notes**
 - This phase is bigger than the original spike implied because launcher/orchestration paths exist outside the originally listed scripts.
@@ -79,7 +79,7 @@ Grep counts below are for live/actionable files and exclude noise/artifacts:
 - `tools/api_server/test_paint_ipc.py`
 - `tools/api_server/test_browser_ipc.py`
 - `tools/api_server/test_move.py`
-- `tools/api_server/move_test_pattern.py`
+- `tools/api_server/move_wwdos.py`
 - `tools/monitor/instance_monitor.py`
 - `tests/test_paint_ipc.py`
 - `start_api_server.sh`
@@ -130,18 +130,15 @@ Grep counts below are for live/actionable files and exclude noise/artifacts:
 - Test stubs (`command_registry_test.cpp`, `scramble_engine_test.cpp`) are easy to miss and were not called out in the original spike.
 - A temporary alias (`using TTestPatternApp = TWwdosApp;`) can reduce churn but may complicate cleanup and grep validation. Prefer one-shot rename unless branch pressure is high.
 
-### [ ] Phase 4: Source file rename (medium risk; path/string fallout)
+### [x] Phase 4: Source file rename (medium risk; path/string fallout)
 
 **Estimate**: 0.5-1.0 day
 
 **Grep-verified facts**
-- Filenames containing `test_pattern` today: **5**
-  - `app/test_pattern_app.cpp` (required rename candidate)
+- Filenames containing `test_pattern` today: **2**
   - `app/test_pattern.cpp` (KEEP)
   - `app/test_pattern.h` (KEEP)
-  - `app/run_test_pattern_logged.sh` (optional rename/polish)
-  - `tools/api_server/move_test_pattern.py` (optional rename/polish)
-- Code/tests/scripts filename-token refs (`test_pattern_app.cpp`, `run_test_pattern_logged.sh`, `move_test_pattern.py`): **30 matches / 18 files**
+- Code/tests/scripts filename-token refs (`wwdos_app.cpp`, `run_wwdos_logged.sh`, `move_wwdos.py`): **31 matches / 19 files**
 
 **Manifest (required for `test_pattern_app.cpp -> wwdos_app.cpp`)**
 - `app/test_pattern_app.cpp` (rename to `app/wwdos_app.cpp`)
@@ -154,6 +151,7 @@ Grep counts below are for live/actionable files and exclude noise/artifacts:
 - `app/wibwob_background.cpp`
 - `app/app_launcher_view.cpp`
 - `app/figlet_text_view.cpp`
+- `app/windows/frame_animation_window.cpp` (additional comment/path reference found during execution)
 - `scripts/parity-check.py`
 - `tests/room/test_menu_cleanup.py`
 - `tests/contract/test_browser_copy_ui_contract.py`
@@ -165,7 +163,7 @@ Grep counts below are for live/actionable files and exclude noise/artifacts:
 
 **Optional sub-phase (script filename polish)**
 - `app/run_test_pattern_logged.sh` -> `app/run_wwdos_logged.sh`
-- `tools/api_server/move_test_pattern.py` -> `tools/api_server/move_wwdos.py` (or keep if script semantics remain “move test-pattern window”)
+- `tools/api_server/move_test_pattern.py` -> `tools/api_server/move_wwdos.py` (done; script semantics still target the `"test_pattern"` window type)
 
 ### [ ] Phase 5: Documentation / Skills / Planning Sweep
 
@@ -217,7 +215,7 @@ Grep counts below are for live/actionable files and exclude noise/artifacts:
 
 1. Is the socket migration limited to the legacy default (`/tmp/test_pattern_app.sock -> /tmp/wwdos.sock`) while keeping `WIBWOB_INSTANCE` sockets as `/tmp/wibwob_N.sock`? (recommended)
 2. Should Phase 3 + Phase 4 be one PR (class + file rename together) or two PRs to reduce review noise?
-3. Do we rename the two script filenames (`run_test_pattern_logged.sh`, `move_test_pattern.py`) in this spike, or leave them for a follow-up polish pass?
+3. Do we rename the two script filenames (`run_wwdos_logged.sh`, `move_wwdos.py`) in this spike, or leave them for a follow-up polish pass?
 4. Should historical/template docs (`HANDOVER.md`, retros, old retrospectives) be updated, or explicitly left as historical snapshots?
 
 ## References

@@ -6,7 +6,7 @@ by parsing the C++ source directly (static analysis).
 import re
 from pathlib import Path
 
-APP_CPP = Path(__file__).resolve().parents[2] / "app" / "test_pattern_app.cpp"
+APP_CPP = Path(__file__).resolve().parents[2] / "app" / "wwdos_app.cpp"
 SCRAMBLE_H = Path(__file__).resolve().parents[2] / "app" / "scramble_view.h"
 WINDOW_REG_CPP = Path(__file__).resolve().parents[2] / "app" / "window_type_registry.cpp"
 

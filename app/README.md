@@ -12,7 +12,7 @@ Multi-window test pattern generator with gradients and wallpaper:
 - **Background**: ASCII art wallpaper with custom desktop
 - **Build**: `cmake . -B ./build && cmake --build ./build`
 - **Run**: `./build/test_pattern`
-- **Debug logging**: `./run_test_pattern_logged.sh` (logs to `test_pattern_debug.log` for session IDs, raw JSON, IPC traces)
+- **Debug logging**: `./run_wwdos_logged.sh` (logs to `test_pattern_debug.log` for session IDs, raw JSON, IPC traces)
 
 ### simple_tui
 Basic TUI application demonstrating fundamental Turbo Vision usage:
@@ -48,7 +48,7 @@ cmake --build ./build
 ## Files Structure
 
 **Core Applications:**
-- `test_pattern_app.cpp` - Main test pattern application
+- `wwdos_app.cpp` - Main test pattern application
 - `simple_tui.cpp` - Basic TUI example
 - `frame_file_player_main.cpp` - Frame animation player
 

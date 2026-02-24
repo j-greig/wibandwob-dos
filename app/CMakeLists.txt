@@ -30,7 +30,7 @@ set(TV_COMMON_SOURCES
 
 # wwdos app (primary playground)
 add_executable(wwdos
-    test_pattern_app.cpp
+    wwdos_app.cpp
     ${TV_COMMON_SOURCES}
     ascii_grid_view.cpp
     ascii_image_view.cpp

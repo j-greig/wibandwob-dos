@@ -23,8 +23,8 @@ def _registry_commands() -> set[str]:
 
 
 def _menu_handled_symbols() -> set[str]:
-    """Parse all `case cmXxx:` symbols from test_pattern_app.cpp."""
-    src = (REPO_ROOT / "app" / "test_pattern_app.cpp").read_text(encoding="utf-8")
+    """Parse all `case cmXxx:` symbols from wwdos_app.cpp."""
+    src = (REPO_ROOT / "app" / "wwdos_app.cpp").read_text(encoding="utf-8")
     return set(re.findall(r"case (cm[A-Za-z0-9_]+):", src))
 
 

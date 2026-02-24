@@ -1,6 +1,6 @@
 /*---------------------------------------------------------*/
 /*                                                         */
-/*   test_pattern_app.cpp - Test Pattern Window Spawner   */
+/*   wwdos_app.cpp - Test Pattern Window Spawner   */
 /*   Unlimited resizable windows with test patterns       */
 /*                                                         */
 /*---------------------------------------------------------*/

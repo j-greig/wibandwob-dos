@@ -25,6 +25,6 @@ def test_browser_copy_payload_prefers_markdown_and_image_urls() -> None:
 
 
 def test_edit_menu_wires_copy_page_command() -> None:
-    source = Path("app/test_pattern_app.cpp").read_text(encoding="utf-8")
+    source = Path("app/wwdos_app.cpp").read_text(encoding="utf-8")
     assert "~C~opy Page" in source
     assert "cmCopy" in source

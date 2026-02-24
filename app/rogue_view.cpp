@@ -16,7 +16,7 @@
 #include <cstdio>
 #include <cmath>
 
-// Forward: spawn terminal window (defined in test_pattern_app.cpp)
+// Forward: spawn terminal window (defined in wwdos_app.cpp)
 class TWwdosApp;
 extern void api_spawn_terminal(TWwdosApp& app, const TRect* bounds);
 

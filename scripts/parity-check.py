@@ -80,7 +80,7 @@ def extract_type_conditions(section: str) -> set[str]:
 def main() -> int:
     root = Path(__file__).resolve().parents[1]
     registry_path = root / "app" / "window_type_registry.cpp"
-    app_path = root / "app" / "test_pattern_app.cpp"
+    app_path = root / "app" / "wwdos_app.cpp"
 
     registry_text = read_text(registry_path)
     app_text = read_text(app_path)

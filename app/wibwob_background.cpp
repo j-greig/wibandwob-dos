@@ -12,7 +12,7 @@
 
 #include "wibwob_background.h"
 
-// Must match constants in test_pattern_app.cpp
+// Must match constants in wwdos_app.cpp
 static const ushort cmDeskPresetBase = 260;
 static const ushort cmDeskGallery = 270;
 

@@ -15,7 +15,7 @@ MENU_SYMBOL_TO_REGISTRY_NAME = {
 
 
 def test_menu_vs_capabilities_parity() -> None:
-    menu_src = Path("app/test_pattern_app.cpp").read_text(encoding="utf-8")
+    menu_src = Path("app/wwdos_app.cpp").read_text(encoding="utf-8")
     registry_src = Path("app/command_registry.cpp").read_text(encoding="utf-8")
 
     for menu_symbol in MENU_SYMBOL_TO_REGISTRY_NAME:

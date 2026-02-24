@@ -16,7 +16,7 @@
 #include <algorithm>
 #include <cstring>
 
-// ── Command IDs (must match test_pattern_app.cpp) ──
+// ── Command IDs (must match wwdos_app.cpp) ──
 // We reference these via the AppEntry.command field.
 
 // ── Palette ──
@@ -353,7 +353,7 @@ void TAppGridView::handleEvent(TEvent& event)
 //  TAppLauncherWindow
 // ═══════════════════════════════════════════════════
 
-// Command IDs — must match test_pattern_app.cpp
+// Command IDs — must match wwdos_app.cpp
 static const ushort cmNewPaintCanvas   = 113;
 static const ushort cmTextEditor       = 130;
 static const ushort cmVerseField       = 138;

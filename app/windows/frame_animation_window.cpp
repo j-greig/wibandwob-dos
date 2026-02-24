@@ -3,7 +3,7 @@
 #include "frame_file_player_view.h"
 #include "notitle_frame.h"
 
-// Keep these IDs aligned with test_pattern_app.cpp context-menu commands.
+// Keep these IDs aligned with wwdos_app.cpp context-menu commands.
 static const ushort cmCtxToggleShadow = 250;
 static const ushort cmCtxClearTitle = 251;
 static const ushort cmCtxToggleFrame = 252;

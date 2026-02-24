@@ -132,7 +132,7 @@ static bool safe_write(int fd, const void* buf, size_t len) {
 
 #include "paint/paint_window.h"
 
-// Forward declarations of helper methods implemented in test_pattern_app.cpp.
+// Forward declarations of helper methods implemented in wwdos_app.cpp.
 // Note: window spawn functions are now in window_type_registry.cpp — not listed here.
 extern void api_cascade(TWwdosApp& app);
 extern void api_tile(TWwdosApp& app);

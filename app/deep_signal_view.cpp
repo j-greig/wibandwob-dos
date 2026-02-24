@@ -14,7 +14,7 @@
 #include <cmath>
 #include <cstring>
 
-// cmDeepSignalTerminal defined in test_pattern_app.cpp (= 220)
+// cmDeepSignalTerminal defined in wwdos_app.cpp (= 220)
 
 // ── ASCII Art Definitions ────────────────────────────────
 // Art pieces embedded in the star field. Revealed through scanning.

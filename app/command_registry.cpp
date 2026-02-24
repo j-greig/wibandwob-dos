@@ -61,7 +61,7 @@ extern void api_spawn_terminal(TWwdosApp& app, const TRect* bounds);
 extern std::string api_terminal_write(TWwdosApp& app, const std::string& text, const std::string& window_id);
 extern std::string api_terminal_read(TWwdosApp& app, const std::string& window_id);
 
-// Paint canvas wrappers (defined in test_pattern_app.cpp, avoid tvision dependency)
+// Paint canvas wrappers (defined in wwdos_app.cpp, avoid tvision dependency)
 extern std::string api_paint_cell(TWwdosApp& app, const std::string& id, int x, int y, uint8_t fg, uint8_t bg);
 extern std::string api_paint_text(TWwdosApp& app, const std::string& id, int x, int y, const std::string& text, uint8_t fg, uint8_t bg);
 extern std::string api_paint_line(TWwdosApp& app, const std::string& id, int x0, int y0, int x1, int y1, bool erase);
@@ -287,7 +287,7 @@ std::string exec_registry_command(
         std::string path = it->second;
         if (path.find('/') == std::string::npos && path.find('\\') == std::string::npos) {
             // Bare filename — prepend primer dir
-            extern std::string findPrimerDir();  // defined in test_pattern_app.cpp
+            extern std::string findPrimerDir();  // defined in wwdos_app.cpp
             path = findPrimerDir() + "/" + path;
         }
         // Validate file exists

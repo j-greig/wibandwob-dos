@@ -2,7 +2,7 @@
 # Run wwdos with debug logging to file + live tail capability
 #
 # Usage:
-#   cd test-tui && ./run_test_pattern_logged.sh    # Run with logging
+#   cd test-tui && ./run_wwdos_logged.sh    # Run with logging
 #   tail -f test-tui/test_pattern_debug.log        # Watch logs live (separate terminal)
 #
 # IMPORTANT: Must be run from test-tui directory (where .env and wibandwob.prompt.md are located)
@@ -18,7 +18,7 @@ cd "$SCRIPT_DIR"
 # Check we're in the right directory
 if [[ ! -f "wibandwob.prompt.md" ]] || [[ ! -f "../.env" ]]; then
     echo "❌ Error: Must run from test-tui directory"
-    echo "   Usage: cd test-tui && ./run_test_pattern_logged.sh"
+    echo "   Usage: cd test-tui && ./run_wwdos_logged.sh"
     exit 1
 fi
 
