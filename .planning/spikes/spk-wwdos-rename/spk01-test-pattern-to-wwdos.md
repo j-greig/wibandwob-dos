@@ -2,7 +2,7 @@
 
 **tl;dr**: Rename the main binary from `test_pattern` to `wwdos` and the main app class from `TTestPatternApp` to `TWwdosApp`, without changing the `"test_pattern"` window-type protocol slug. A grep audit shows the class rename is much larger than originally estimated, and file-path/script/docs fallout is broader than the old spike suggested.
 
-**status**: in-progress
+**status**: done
 **severity**: housekeeping (no functional change intended)
 **depends_on**: E009 (still recommended first; `app/test_pattern_app.cpp` remains a merge hotspot)
 
