@@ -18,7 +18,7 @@ set -euo pipefail
 SESSION="wibwob"
 WINDOW=0
 API="${WIBWOB_API:-http://127.0.0.1:8089}"
-REPO_DIR="$(cd "$(dirname "$0")/../../.." && pwd)"
+REPO_DIR="$(cd "$(dirname "$0")/../../../.." && pwd)"
 
 # ── guards ────────────────────────────────────────────────────────────────────
 if ! tmux has-session -t "$SESSION" 2>/dev/null; then
@@ -45,14 +45,27 @@ fi
 CHATLOG=$(ls "$REPO_DIR"/logs/chat_*.log 2>/dev/null | tail -1 || true)
 if [ -z "$CHATLOG" ]; then
   echo "⚠️   No chat log found yet — top-right pane will wait for first session."
-  CHAT_CMD="echo 'Waiting for first chat session...' && until ls $REPO_DIR/logs/chat_*.log 2>/dev/null | tail -1 | grep -q .; do sleep 1; done && tail -f \$(ls $REPO_DIR/logs/chat_*.log | tail -1)"
 else
-  CHAT_CMD="echo '── CHAT LOG: $(basename "$CHATLOG") ──' && tail -f '$CHATLOG'"
+  echo "   Chat log: $(basename "$CHATLOG")"
 fi
 
+# Always use a self-refreshing bash loop — finds newest log and re-tails on restart.
+# Wrapped in bash -c so it works regardless of the user's shell (fish, zsh, etc).
+CHAT_CMD="bash -c 'while true; do \
+  LATEST=\$(ls $REPO_DIR/logs/chat_*.log 2>/dev/null | tail -1); \
+  if [ -n \"\$LATEST\" ]; then \
+    echo \"── CHAT LOG: \$(basename \$LATEST) ──\"; \
+    tail -f \"\$LATEST\" & TAIL_PID=\$!; \
+    while [ \"\$(ls $REPO_DIR/logs/chat_*.log 2>/dev/null | tail -1)\" = \"\$LATEST\" ]; do sleep 1; done; \
+    kill \$TAIL_PID 2>/dev/null; \
+  else \
+    echo \"Waiting for first chat session...\"; sleep 2; \
+  fi; \
+done'"
+
 # ── build layout ─────────────────────────────────────────────────────────────
-# Split right column off TUI pane
-tmux split-window -t "$SESSION:$WINDOW.0" -h -l 48 -c "$REPO_DIR"
+# Split right column off TUI pane — 50/50
+tmux split-window -t "$SESSION:$WINDOW.0" -h -p 50 -c "$REPO_DIR"
 
 # Split right column into 3 rows
 tmux split-window -t "$SESSION:$WINDOW.1" -v -c "$REPO_DIR"
@@ -60,12 +73,15 @@ tmux split-window -t "$SESSION:$WINDOW.2" -v -c "$REPO_DIR"
 
 # ── start log tails ───────────────────────────────────────────────────────────
 tmux send-keys -t "$SESSION:$WINDOW.1" "$CHAT_CMD" Enter
-tmux send-keys -t "$SESSION:$WINDOW.2" "echo '── APP DEBUG ──' && tail -f /tmp/wibwob_debug.log" Enter
-tmux send-keys -t "$SESSION:$WINDOW.3" "echo '── COMMANDS (API: $API) ──'" Enter
+tmux send-keys -t "$SESSION:$WINDOW.2" "bash -c 'echo \"── APP DEBUG ──\" && tail -f /tmp/wibwob_debug.log'" Enter
+tmux send-keys -t "$SESSION:$WINDOW.3" "echo '── COMMANDS  API: $API ──'" Enter
 
 # ── pane titles ───────────────────────────────────────────────────────────────
 tmux set-option -t "$SESSION" pane-border-status top
 tmux set-option -t "$SESSION" pane-border-format "#{pane_index}: #{pane_title}"
+tmux set-window-option -t "$SESSION:$WINDOW" allow-rename off
+tmux set-window-option -t "$SESSION:$WINDOW" automatic-rename off
+sleep 0.5   # let processes settle before overwriting their auto-title
 tmux select-pane -t "$SESSION:$WINDOW.0" -T "TUI"
 tmux select-pane -t "$SESSION:$WINDOW.1" -T "CHAT LOG  (logs/chat_*.log)"
 tmux select-pane -t "$SESSION:$WINDOW.2" -T "APP DEBUG (/tmp/wibwob_debug.log)"
