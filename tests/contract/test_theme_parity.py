@@ -67,24 +67,16 @@ def test_theme_controller_methods_exist() -> None:
     assert "async def reset_theme(" in source
 
 
-def test_theme_mcp_tools_exist() -> None:
-    """Verify MCP tools for theme exist in mcp_tools.py"""
-    source = Path("tools/api_server/mcp_tools.py").read_text(encoding="utf-8")
+def test_theme_commands_in_registry() -> None:
+    """Verify theme commands exist in C++ command registry.
 
-    # Check tool builders
-    assert '"set_theme_mode": {' in source
-    assert '"set_theme_variant": {' in source
-    assert '"reset_theme": {' in source
-
-    # Check tool names
-    assert '"tool_name": "tui_set_theme_mode"' in source
-    assert '"tool_name": "tui_set_theme_variant"' in source
-    assert '"tool_name": "tui_reset_theme"' in source
-
-    # Check handler functions
-    assert "def _make_theme_mode_handler(" in source
-    assert "def _make_theme_variant_handler(" in source
-    assert "def _make_reset_theme_handler(" in source
+    NOTE: There is no mcp_tools.py. Python MCP auto-derives from FastAPI routes.
+    Theme commands are available via POST /menu/command (C++ registry dispatch).
+    """
+    source = Path("app/command_registry.cpp").read_text(encoding="utf-8")
+    assert '"set_theme_mode"' in source, "set_theme_mode missing from C++ registry"
+    assert '"set_theme_variant"' in source, "set_theme_variant missing from C++ registry"
+    assert '"reset_theme"' in source, "reset_theme missing from C++ registry"
 
 
 def test_theme_state_fields_in_models() -> None:

@@ -330,31 +330,14 @@ All batch operations return:
 
 ## MCP Integration
 
-When MCP is available (`pip install fastapi-mcp`), these tools are exposed for AI agents:
+When MCP is available (`pip install fastapi-mcp`), `FastApiMCP(app)` auto-exposes all FastAPI routes as MCP tools at `/mcp`. No manual tool builders — adding a new REST endpoint automatically creates an MCP tool.
 
-- `tui_get_state` — Get current TUI state (maps to `/state`)
-- `tui_create_window` — Create windows (maps to `/windows`)
-- `tui_move_window` — Move/resize windows (maps to `/windows/{id}/move`)
-- `tui_focus_window` — Focus windows (maps to `/windows/{id}/focus`)
-- `tui_close_window` — Close windows (maps to `/windows/{id}/close`)
-- `tui_cascade_windows` — Cascade layout (maps to `/windows/cascade`)
-- `tui_tile_windows` — Tile layout (maps to `/windows/tile`)
-- `tui_close_all_windows` — Close all windows (maps to `/windows/close_all`)
-- `tui_set_pattern_mode` — Set pattern mode (maps to `/pattern_mode`)
-- `tui_screenshot` — Take screenshots (maps to `/screenshot`)
-- `tui_send_text` — Send text to text editor (maps to `/windows/{id}/send_text`)
-- `tui_send_figlet` — Generate and send FIGlet ASCII art (maps to `/windows/{id}/send_figlet`)
-- `tui_batch_layout` — Batch window operations (maps to `/windows/batch_layout`)
-- `tui_timeline_cancel` — Cancel timeline operations 
-- `tui_timeline_status` — Check timeline status
+The embedded Wib&Wob agent uses a separate Node MCP bridge (`app/llm/sdk_bridge/mcp_tools.js`) with 2 generic tools:
+- `tui_list_commands` — discovers all C++ registry commands via `GET /commands`
+- `tui_menu_command` — executes any command by name via `POST /menu/command`
 
-### MCP Example Usage (Claude Code)
-```bash
-# Via Claude Code MCP integration
-claude -p --mcp-config=.mcp.json "Create a 4x3 grid of gradient windows with 2-pixel gaps"
-claude -p --mcp-config=.mcp.json "Send HELLO WORLD in bubble font to a text editor"
-claude -p --mcp-config=.mcp.json "Load the monster emoji primer file"
-```
+### Adding new features
+New window types or commands are automatically available to agents — no MCP files to edit. See `CLAUDE.md` "Parity Law" for the full wiring checklist.
 
 Design Notes and Next Steps
 - Localhost-only, no authentication (v1 scope). API keys and remote binding come in v2.
