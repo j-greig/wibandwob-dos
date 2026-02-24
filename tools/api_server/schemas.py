@@ -498,6 +498,55 @@ class GalleryArrangeResponse(BaseModel):
     preview: bool
 
 
+# ----- FIGlet Arrange Models -----
+
+class FigletPiece(BaseModel):
+    text: str = Field(..., description="Text to render in FIGlet")
+    font: str = Field("standard", description="FIGlet font name (use list_figlet_fonts to see available)")
+
+
+class FigletArrangement(BaseModel):
+    text: str
+    font: str
+    x: int
+    y: int
+    width: int
+    height: int
+    window_id: Optional[str] = None
+
+
+class FigletArrangeRequest(BaseModel):
+    pieces: List[FigletPiece] = Field(..., description="List of text+font pairs to arrange")
+    algorithm: str = Field("cluster", description=(
+        "Layout algorithm — same as gallery/arrange: "
+        "'masonry' | 'fit_rows' | 'masonry_horizontal' | 'packery' | "
+        "'cells_by_row' | 'poetry' | 'cluster' | 'stamp'"
+    ))
+    padding: int = Field(2, description="Character gap between windows")
+    margin: int = Field(1, description="Gap from canvas edge")
+    canvas_width: int = Field(0, description="Override canvas width (0 = auto)")
+    canvas_height: int = Field(0, description="Override canvas height (0 = auto)")
+    preview: bool = Field(False, description="Return plan without opening windows")
+    frameless: bool = Field(False, description="Open as ghost-frame windows")
+    shadowless: bool = Field(False, description="Remove drop shadows")
+    options: Dict[str, Any] = Field(default_factory=dict, description=(
+        "Per-algorithm options — same as gallery/arrange (anchor, inner_algo, etc.)"
+    ))
+
+
+class FigletArrangeResponse(BaseModel):
+    ok: bool
+    algorithm: str
+    arrangement: List[FigletArrangement]
+    canvas_width: int
+    canvas_height: int
+    canvas_utilization: float
+    overlaps: int
+    out_of_bounds: int = 0
+    applied: bool
+    preview: bool
+
+
 # ----- Browser Models -----
 
 class BrowserFetchRequest(BaseModel):

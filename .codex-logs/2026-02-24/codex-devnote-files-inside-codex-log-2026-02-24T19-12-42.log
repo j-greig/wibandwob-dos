@@ -1,0 +1,161 @@
+[stderr] OpenAI Codex v0.101.0 (research preview)
+--------
+[stderr] workdir: /Users/james/Repos/wibandwob-dos
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: medium
+reasoning summaries: auto
+session id: 019c9111-6d56-71e0-b877-cf37e07af9a3
+--------
+user
+DEVNOTE: Files inside .codex-logs/ are run logs — ignore them completely.
+
+EFFICIENCY: Use targeted commands, not full-file dumps.
+Prefer rg -n -C3 'pattern' file or sed -n '45,55p' file.
+Avoid nl -ba file | sed -n '1,300p'. Only dump full files if <50 lines.
+
+Make the smallest correct changes. Build and test when done.
+Summarise what changed and why.
+
+Focus files: tools/api_server/gallery.py, tools/api_server/main.py, tools/api_server/schemas.py, tools/api_server/controller.py, app/command_registry.cpp, app/figlet_text_view.cpp
+
+TASK: DEVNOTE: Files inside .codex-logs/ are run logs — ignore them completely.
+
+EFFICIENCY: Use targeted commands, not full-file dumps. Prefer rg -n -C3 'pattern' file or sed -n '45,55p' file.
+
+# Add figlet layout arrangement endpoint — reuse gallery layout algorithms
+
+## Context
+We have 8 layout algorithms in `tools/api_server/gallery.py` (masonry, fit_rows, masonry_horizontal, packery, cells_by_row, poetry, stamp, cluster). Currently they're used only by `/gallery/arrange` which arranges primer TEXT FILES.
+
+We just added `open_figlet_text` command that spawns FIGlet text windows. The user wants ALL the same layout algorithms to work for figlet windows too.
+
+## Architecture — DRY lego bricks
+
+The layout algorithms in gallery.py already take generic pieces `[{filename, width, height}]` and return `[{filename, x, y, width, height}]`. They don't care what the pieces ARE.
+
+The primer-specific code is only in:
+1. `_measure_primer()` — reads a .txt file to get dimensions
+2. `_get_primer_metadata()` — cached version
+3. The `/gallery/arrange` endpoint in main.py — resolves filenames to paths, opens with `open_primer`
+
+## What to build
+
+### 1. Add a figlet measurement function to gallery.py
+
+```python
+def _measure_figlet(text: str, font: str = "standard") -> dict:
+    """Estimate outer window dimensions for a FIGlet text window.
+    
+    Uses preview_figlet command or pyfiglet to render and measure.
+    Returns same format as _measure_primer: {width, height, content_width, content_height, ...}
+    """
+```
+
+The C++ side has `preview_figlet` command (returns rendered text). OR use pyfiglet in Python. Check if pyfiglet is available:
+```bash
+rg -n "pyfiglet\|figlet" tools/api_server/ --type py
+```
+
+If not, use the REST API: `POST /menu/command {"command":"preview_figlet","args":{"text":"X","font":"standard"}}` to get rendered output and measure it.
+
+Actually simplest: just use pyfiglet directly. Check if it's in requirements. If not, estimate: figlet fonts are typically 5-8 lines tall, width ≈ len(text) * 8-12 chars. The C++ FIGlet view adds a 2-cell TV frame. But BETTER: call the C++ preview_figlet via IPC since it's already there.
+
+### 2. Add FigletArrangeRequest/Response schemas to schemas.py
+
+```python
+class FigletPiece(BaseModel):
+    text: str
+    font: str = "standard"
+
+class FigletArrangeRequest(BaseModel):
+    pieces: List[FigletPiece]  # text+font for each window
+    algorithm: str = "cluster"  # same algos as gallery
+    padding: int = 2
+    margin: int = 1
+    canvas_width: int = 0
+    canvas_height: int = 0
+    preview: bool = False
+    frameless: bool = False
+    shadowless: bool = False
+    options: Dict[str, Any] = Field(default_factory=dict)
+
+class FigletArrangement(BaseModel):
+    text: str
+    font: str
+    x: int
+    y: int
+    width: int
+    height: int
+    window_id: Optional[str] = None
+
+class FigletArrangeResponse(BaseModel):
+    ok: bool
+    algorithm: str
+    arrangement: List[FigletArrangement]
+    canvas_width: int
+    canvas_height: int
+    canvas_utilization: float
+    overlaps: int
+    out_of_bounds: int = 0
+    applied: bool
+    preview: bool
+```
+
+### 3. Add `/figlet/arrange` endpoint to main.py
+
+Follow the same pattern as `/gallery/arrange` but:
+- Instead of measuring primer files, measure figlet text (via preview_figlet or estimation)
+- Use the SAME `build_algo_map()` from gallery.py for layout
+- Spawn with `open_figlet_text` command instead of `open_primer`
+- Position with move_window/resize_window
+
+The key insight: the layout algorithms work on generic `[{filename, width, height}]` pieces. For figlet, `filename` can be `text|font` as a key.
+
+### 4. Add `/figlet/clear` endpoint (alias for close_all, same as gallery/clear)
+
+### 5. Also add a command registry entry so the agent can use it
+
+Add `figlet_arrange` to the C++ command registry? NO — this is a Python-only orchestration endpoint. The agent can call it via the Python MCP (FastApiMCP auto-exposes it). But for the Node MCP agent, we need... actually the agent can use tui_menu_command to call individual open_figlet_text + cascade. The /figlet/arrange endpoint is for the Python MCP / direct API.
+
+## Measuring figlet text
+
+The simplest approach that works NOW:
+1. Call `send_cmd("preview_figlet", {"text": text, "font": font, "width": "200"})` via IPC
+2. Split result by newlines, measure max line width and line count  
+3. Add +2 for TV frame border
+
+Check how preview_figlet works:
+```bash
+rg -n "preview_figlet" app/command_registry.cpp
+```
+
+## Files to modify
+- `tools/api_server/gallery.py` — add `_measure_figlet()` and export it
+- `tools/api_server/schemas.py` — add FigletPiece, FigletArrangeRequest, FigletArrangement, FigletArrangeResponse
+- `tools/api_server/main.py` — add `/figlet/arrange` and `/figlet/clear` endpoints
+
+## Testing
+After making changes, verify:
+```bash
+uv run --with pytest pytest tests/contract/test_window_type_parity.py tests/contract/test_surface_parity_matrix.py tests/contract/test_node_mcp_parity.py -v
+```
+
+Also do a quick smoke test that the endpoint schema is valid:
+```bash
+uv run python -c "from tools.api_server.schemas import FigletArrangeRequest; print('OK')"
+```
+[stderr] mcp startup: no servers
+[stderr] 2026-02-24T19:12:44.425910Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c90e0-9bb5-7532-8b22-119b6ecfe17f
+[stderr] 2026-02-24T19:12:44.452866Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c8ef4-8b7d-7571-9fce-9b170371defc
+[stderr] 2026-02-24T19:12:44.478744Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c8e8b-7e82-7d73-ab48-16d3170d0685
+[stderr] 2026-02-24T19:12:44.503629Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c84f6-ba12-7661-84b9-d9ea8b1b8614
+[stderr] 2026-02-24T19:12:44.518982Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c84e5-edab-76e1-b0c0-96e4d21e2286
+[stderr] 2026-02-24T19:12:44.544331Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c90f6-e6bd-74a3-a5a3-cf41de182a00
+[stderr] 2026-02-24T19:12:44.570450Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c90f0-2bed-7740-82dd-e87d5ecc1f9d
+[stderr] 2026-02-24T19:12:44.592759Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c9104-bfb2-72e0-8e3f-8ed6b0f6e8e0
+[stderr] 2026-02-24T19:12:44.617315Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c8ebd-0fa5-74b1-a66e-f335b40de74a
+[stderr] 2026-02-24T19:12:44.632072Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c90ee-44d2-7952-b58a-34569d027e0f
+[stderr] ERROR: You've hit your usage limit. Upgrade to Pro (https://chatgpt.com/explore/pro), visit https://chatgpt.com/codex/settings/usage to purchase more credits or try again at Feb 25th, 2026 7:13 PM.

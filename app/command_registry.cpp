@@ -85,7 +85,7 @@ const std::vector<CommandCapability>& get_command_capabilities() {
     static const std::vector<CommandCapability> capabilities = {
         {"cascade", "Cascade all windows on desktop", false},
         {"tile", "Tile all windows on desktop", false},
-        {"close_all", "Close all windows", false},
+        {"close_all", "Close all windows EXCEPT Wib&Wob chat (safe to call — your own window is preserved)", false},
         {"save_workspace", "Save current workspace", false},
         {"open_workspace", "Open workspace from a path", true},
         {"screenshot", "Capture screen to a text snapshot", false},

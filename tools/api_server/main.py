@@ -40,6 +40,10 @@ from .schemas import (
     GalleryArrangeRequest,
     GalleryArrangeResponse,
     GalleryArrangement,
+    FigletPiece,
+    FigletArrangeRequest,
+    FigletArrangeResponse,
+    FigletArrangement,
     MenuCommand,
     MonodrawLoadRequest,
     MonodrawParseRequest,
@@ -81,6 +85,7 @@ from .gallery import (
     _layout_stamp, _layout_cluster,
     _masonry_layout, _poetry_layout,
     build_algo_map,
+    measure_figlet,
 )
 
 
@@ -889,6 +894,132 @@ def make_app() -> FastAPI:
               description="Alias for /windows/close_all in the gallery namespace. "
                           "Always call this before a new gallery/arrange run.")
     async def gallery_clear() -> Dict[str, Any]:
+        await ctl.close_all()
+        return {"ok": True}
+
+    # ─── FIGlet layout endpoints ──────────────────────────────────────────────
+    # Same layout algorithms as gallery/arrange, but for FIGlet text windows.
+    # Measures rendered figlet text via C++ IPC, then uses the shared layout engine.
+
+    @app.post("/figlet/arrange", response_model=FigletArrangeResponse,
+              operation_id="figlet_arrange",
+              summary="Arrange FIGlet text windows using a layout algorithm",
+              description=(
+                  "Opens FIGlet text windows and positions them on the TUI canvas using the same "
+                  "8 layout algorithms as gallery/arrange. Each piece is a text+font pair. "
+                  "Windows are auto-sized to fit their rendered content. "
+                  "Algorithms: masonry | fit_rows | masonry_horizontal | packery | cells_by_row | "
+                  "poetry | cluster | stamp."
+              ))
+    async def figlet_arrange(payload: FigletArrangeRequest) -> FigletArrangeResponse:
+        """FIGlet arrangement — reuses gallery layout engine with figlet measurement."""
+
+        # 1. Canvas dimensions
+        canvas_w = payload.canvas_width
+        canvas_h = payload.canvas_height
+        if canvas_w == 0 or canvas_h == 0:
+            state = await ctl.get_state()
+            canvas_w = canvas_w or state.canvas_width or 320
+            canvas_h = canvas_h or state.canvas_height or 78
+
+        # 2. Measure each piece via C++ preview_figlet
+        pieces_meta: list[dict] = []
+        for piece in payload.pieces:
+            meta = measure_figlet(piece.text, piece.font)
+            # Use "text|font" as the filename key for the layout engine
+            pieces_meta.append({
+                "filename": f"{piece.text}|{piece.font}",
+                "width": meta["width"],
+                "height": meta["height"],
+                "_text": piece.text,
+                "_font": piece.font,
+            })
+
+        # 3. Run layout algorithm (same engine as gallery)
+        algo = payload.algorithm.lower()
+        padding = payload.padding
+        margin = payload.margin
+        opts = payload.options or {}
+        _algo_map = build_algo_map(pieces_meta, canvas_w, canvas_h, padding, margin, opts)
+        if algo not in _algo_map:
+            algo = "cluster"
+        raw_placements = _algo_map[algo]()
+
+        # 4. Build arrangement + stats
+        # Re-attach text/font from pieces_meta
+        meta_by_key = {p["filename"]: p for p in pieces_meta}
+        arrangement: list[FigletArrangement] = []
+        for p in raw_placements:
+            meta = meta_by_key.get(p["filename"], {})
+            arrangement.append(FigletArrangement(
+                text=meta.get("_text", p["filename"].split("|")[0]),
+                font=meta.get("_font", "standard"),
+                x=p["x"], y=p["y"],
+                width=p["width"], height=p["height"],
+            ))
+
+        total_area = sum(a.width * a.height for a in arrangement)
+        canvas_area = canvas_w * canvas_h
+        utilization = round(total_area / canvas_area, 3) if canvas_area > 0 else 0.0
+
+        overlaps = 0
+        rects = [(a.x, a.y, a.x + a.width, a.y + a.height) for a in arrangement]
+        for i in range(len(rects)):
+            for j in range(i + 1, len(rects)):
+                ax1, ay1, ax2, ay2 = rects[i]
+                bx1, by1, bx2, by2 = rects[j]
+                if ax1 < bx2 and ax2 > bx1 and ay1 < by2 and ay2 > by1:
+                    overlaps += 1
+
+        out_of_bounds = 0
+        for a in arrangement:
+            if (a.x < 0 or a.y < 0
+                    or a.x + a.width + SHADOW_W > canvas_w
+                    or a.y + a.height + SHADOW_H + CANVAS_BOTTOM_EXTRA > canvas_h):
+                out_of_bounds += 1
+
+        # 5. Apply (open figlet windows at computed positions)
+        applied = False
+        if not payload.preview:
+            for place in arrangement:
+                open_args: dict = {
+                    "text": place.text,
+                    "font": place.font,
+                }
+                res = await ctl.exec_command("open_figlet_text", open_args, actor="figlet_arrange")
+                if res.get("ok"):
+                    # Find the newly created window and move it to position
+                    new_state = await ctl.get_state()
+                    for nw in reversed(new_state.windows):
+                        if nw.type == "figlet_text" and nw.title == place.text:
+                            if place.window_id is None:
+                                try:
+                                    await ctl.move_resize(
+                                        nw.id, x=place.x, y=place.y,
+                                        w=place.width, h=place.height)
+                                    place.window_id = nw.id
+                                except Exception:
+                                    pass
+                                break
+            applied = True
+
+        return FigletArrangeResponse(
+            ok=True,
+            algorithm=algo,
+            arrangement=arrangement,
+            canvas_width=canvas_w,
+            canvas_height=canvas_h,
+            canvas_utilization=utilization,
+            overlaps=overlaps,
+            out_of_bounds=out_of_bounds,
+            applied=applied,
+            preview=payload.preview,
+        )
+
+    @app.post("/figlet/clear", operation_id="figlet_clear",
+              summary="Close all windows and clear the canvas",
+              description="Alias for /windows/close_all. Call before a new figlet/arrange run.")
+    async def figlet_clear() -> Dict[str, Any]:
         await ctl.close_all()
         return {"ok": True}
 

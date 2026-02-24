@@ -1987,7 +1987,8 @@ void TWwdosApp::tile()
 
 void TWwdosApp::closeAll()
 {
-    // Close all regular windows on the desktop (iterating safely over circular list)
+    // Close all regular windows on the desktop (iterating safely over circular list).
+    // Preserves the Wib&Wob chat window — closing it kills the active agent session.
     std::vector<TWindow*> toClose;
     TView *start = deskTop->first();
     if (start) {
@@ -1995,8 +1996,9 @@ void TWwdosApp::closeAll()
         do {
             TView *nextV = v->next; // cache next to avoid invalidation issues
             if (TWindow *w = dynamic_cast<TWindow*>(v)) {
-                // Skip non-user windows if any (none expected here)
-                toClose.push_back(w);
+                // Never close the Wib&Wob chat — it's the agent's own window
+                if (dynamic_cast<TWibWobWindow*>(w) == nullptr)
+                    toClose.push_back(w);
             }
             v = nextV;
         } while (v != start);
@@ -4766,9 +4768,32 @@ void api_spawn_figlet_text(TWwdosApp& app, const TRect* bounds,
     const std::string& text, const std::string& font,
     bool frameless, bool shadowless) {
     TRect desk = app.deskTop->getExtent();
-    TRect r = bounds ? *bounds : TRect(
-        desk.b.x / 6, desk.b.y / 4,
-        desk.b.x * 5 / 6, desk.b.y * 3 / 4);
+    TRect r;
+    if (bounds) {
+        r = *bounds;
+    } else {
+        // Auto-size: render the text to measure it, then fit the window exactly.
+        // Use a large width (999) so figlet doesn't wrap — we want natural width.
+        auto lines = figlet::renderLines(text, font, 999);
+        int contentW = 0, contentH = (int)lines.size();
+        for (const auto& line : lines)
+            contentW = std::max(contentW, (int)line.size());
+        if (contentW == 0 || contentH == 0) {
+            // Fallback if render failed
+            contentW = (int)text.size() * 10;
+            contentH = 6;
+        }
+        // Frame adds 2 (1 each side), plus a little breathing room
+        int outerW = contentW + 2 + 2;   // +2 frame +2 padding
+        int outerH = contentH + 2 + 1;   // +2 frame +1 padding
+        // Clamp to desktop
+        outerW = std::min(outerW, (int)desk.b.x - 4);
+        outerH = std::min(outerH, (int)desk.b.y - 2);
+        // Centre on desktop
+        int x = (desk.b.x - outerW) / 2;
+        int y = (desk.b.y - outerH) / 2;
+        r = TRect(x, y, x + outerW, y + outerH);
+    }
     TFigletTextWindow* w = new TFigletTextWindow(r, text, font, frameless, shadowless);
     app.deskTop->insert(w);
     app.registerWindow(w);

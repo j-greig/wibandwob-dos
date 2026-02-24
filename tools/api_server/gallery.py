@@ -94,6 +94,46 @@ def _get_primer_metadata(path: str) -> dict:
     return _primer_meta_cache[path]
 
 
+# ─── FIGlet measurement ───────────────────────────────────────────────────────
+
+def measure_figlet(text: str, font: str = "standard") -> dict:
+    """Measure outer window dimensions for a FIGlet text window via C++ IPC.
+
+    Calls preview_figlet to get the actual rendered output, then measures it.
+    Falls back to heuristic estimation if IPC is unavailable.
+    Returns same shape as _measure_primer for layout algorithm compatibility.
+    """
+    from .ipc_client import send_cmd
+
+    content_w = content_h = 0
+    try:
+        rendered = send_cmd("preview_figlet", {"text": text, "font": font, "width": "200"})
+        if rendered and not rendered.startswith("err"):
+            lines = rendered.rstrip("\n").split("\n")
+            content_h = len(lines)
+            content_w = max((len(line) for line in lines), default=0)
+    except Exception:
+        pass
+
+    # Fallback heuristic if IPC failed
+    if content_w == 0:
+        content_w = len(text) * 10  # rough figlet char width
+        content_h = 6               # typical figlet height
+
+    outer_w = content_w + 2  # TV frame border
+    outer_h = content_h + 2
+    aspect = round(outer_w / outer_h, 3) if outer_h else 0.0
+    return {
+        "width": outer_w,
+        "height": outer_h,
+        "content_width": content_w,
+        "content_height": content_h,
+        "max_line_width": content_w,
+        "line_count": content_h,
+        "aspect_ratio": aspect,
+    }
+
+
 # ─── Layout helpers ───────────────────────────────────────────────────────────
 
 def _usable(canvas_w: int, canvas_h: int, margin: int) -> tuple[int, int, int, int]:
