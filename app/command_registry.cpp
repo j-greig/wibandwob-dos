@@ -21,6 +21,7 @@ extern std::string api_scramble_say(TTestPatternApp& app, const std::string& tex
 extern std::string api_scramble_pet(TTestPatternApp& app);
 extern std::string api_chat_receive(TTestPatternApp& app, const std::string& sender, const std::string& text);
 extern std::string api_wibwob_ask(TTestPatternApp& app, const std::string& text);
+extern std::string api_get_chat_history(TTestPatternApp& app);
 extern void api_tile(TTestPatternApp& app);
 extern void api_close_all(TTestPatternApp& app);
 extern void api_save_workspace(TTestPatternApp& app);
@@ -104,6 +105,7 @@ const std::vector<CommandCapability>& get_command_capabilities() {
         {"terminal_read", "Read the visible text content of a terminal window (optional window_id param)", false},
         {"chat_receive", "Display a remote chat message in Scramble (sender + text params)", true},
         {"wibwob_ask", "Send a user message to the Wib&Wob chat window, triggering an AI response (text param)", true},
+        {"get_chat_history", "Return Wib&Wob chat history as JSON array of {role, content} messages", false},
         {"paint_cell", "Set a single cell on a paint canvas (id, x, y, fg, bg params)", true},
         {"paint_text", "Write text on a paint canvas (id, x, y, text, fg, bg params)", true},
         {"paint_line", "Draw a line on a paint canvas (id, x0, y0, x1, y1, erase params)", true},
@@ -332,6 +334,9 @@ std::string exec_registry_command(
             return "err missing text";
         std::string sender = (itSender != kv.end()) ? itSender->second : "remote";
         return api_chat_receive(app, sender, itText->second);
+    }
+    if (name == "get_chat_history") {
+        return api_get_chat_history(app);
     }
     if (name == "wibwob_ask") {
         auto itText = kv.find("text");

@@ -69,7 +69,17 @@ public:
     // Access for window
     const std::vector<ChatMessage>& getMessages() const { return messages; }
 
+    // Chat history (role-mapped, JSON-exportable for get_chat_history IPC)
+    std::string getHistoryJson() const;
+
 private:
+    struct HistoryEntry {
+        std::string role;     // "user" | "assistant" | "system"
+        std::string content;
+    };
+    std::vector<HistoryEntry> chatHistory_;
+    void recordHistoryMessage(const std::string& sender, const std::string& content, bool is_error);
+    static std::string mapSenderToRole(const std::string& sender, bool is_error);
     struct WrappedLine {
         std::string text;
         std::string sender;

@@ -1,7 +1,7 @@
 ---
 id: E014
 title: Inter-Instance Group Chat — get_chat_history + Broker
-status: not-started
+status: done
 issue: 91
 pr: ~
 depends_on: []
@@ -12,7 +12,7 @@ branch: epic/e014-inter-instance-chat
 
 ## TL;DR
 
-AC-1/AC-2 already shipped. Land `get_chat_history` (C++, ~50 lines) and a Python group-chat broker so multiple WibWob-DOS instances share one conversation.
+AC-1/AC-2 already shipped. Land `get_chat_history` (C++, ~50 lines) then wire inter-instance fanout through the existing PartyKit bridge (E008) — one `--ai-relay` flag swaps `chat_receive` for `wibwob_ask` so receiving instances actually respond. `chat_coordinator.py` (Unix socket broker) ships as local/offline fallback.
 
 ## Source Spike
 
@@ -29,21 +29,23 @@ AC-1/AC-2 already shipped. Land `get_chat_history` (C++, ~50 lines) and a Python
 
 ### F01 — get_chat_history C++
 
-- [ ] S01: Add `HistoryEntry` struct + `chatHistory_` buffer + `getHistoryJson()` to `TWibWobMessageView` (`wibwob_view.h`)
+- [x] S01: Add `HistoryEntry` struct + `chatHistory_` buffer + `getHistoryJson()` to `TWibWobMessageView` (`wibwob_view.h`)
   Test: method compiles, returns `[]` on empty history
-- [ ] S02: Hook history recording into `addMessage()` and `clear()` (`wibwob_view.cpp`)
+- [x] S02: Hook history recording into `addMessage()` and `clear()` (`wibwob_view.cpp`)
   Test: user messages appear in `get_chat_history` output
-- [ ] S03: Mirror streaming lifecycle into `chatHistory_` — `startStreamingMessage`, `appendToStreamingMessage`, `finishStreamingMessage`, `cancelStreamingMessage`
+- [x] S03: Mirror streaming lifecycle into `chatHistory_` — `startStreamingMessage`, `appendToStreamingMessage`, `finishStreamingMessage`, `cancelStreamingMessage`
   Test: streamed assistant replies appear in history after completion; cancelled streams are removed
-- [ ] S04: Add `api_get_chat_history()` IPC bridge near `api_wibwob_ask` (`test_pattern_app.cpp:3026`)
+- [x] S04: Add `api_get_chat_history()` IPC bridge near `api_wibwob_ask` (`test_pattern_app.cpp`)
   Test: returns `{"messages":[...]}` JSON; returns `err no wibwob chat window open` when none open
-- [ ] S05: Register `get_chat_history` in capabilities + dispatch (`command_registry.cpp`)
+- [x] S05: Register `get_chat_history` in capabilities + dispatch (`command_registry.cpp`)
   Test: appears in `GET /api/capabilities`; `cmd:exec_command name=get_chat_history` dispatches correctly
 
-### F02 — Python Group Chat Broker
+### F02 — Broker
 
-- [ ] S06: Create `tools/monitor/chat_coordinator.py` (full script in spike brief)
-  Test: runs with no third-party deps; broadcasts user + assistant messages between 2 instances with attribution; dedup suppresses broker-echo copies; `--max-turns`, `--cooldown`, `--token-budget` each stop/throttle as documented
+- [x] S06: Create `tools/monitor/chat_coordinator.py` — local Unix socket broker, offline fallback
+  Test: runs with no third-party deps; `--max-turns`, `--cooldown`, `--token-budget` all work
+- [x] S07: Add `WIBWOB_AI_RELAY=1` env flag to `tools/room/partykit_bridge.py` — swap `chat_receive` for `wibwob_ask` on incoming remote `chat_msg` events so the receiving W&W AI actually responds (not just displays)
+  Test: two instances connected to same PartyKit room; inject message in A; B's W&W responds; broker log shows `wibwob_ask` calls not `chat_receive`
 
 ## Acceptance Criteria
 
@@ -63,6 +65,12 @@ AC-1/AC-2 already shipped. Land `get_chat_history` (C++, ~50 lines) and a Python
 3. **Percent-encode `text=`** in broker — NOT base64 (base64 only applies to `send_text content=`)
 4. **`wibwob_ask` requires chat window open** — broker logs rejects if target has no open chat window
 5. **History reset detection** — broker handles `len(history) < last_seen` by resetting that socket cursor
+
+## Running Notes
+
+- [S01-S05] `get_chat_history` C++ landed clean, build passed first time — `HistoryEntry` + streaming lifecycle hooks all in `wibwob_view.cpp/h`, IPC bridge in `test_pattern_app.cpp`, registered in `command_registry.cpp`
+- [S06] `chat_coordinator.py` Unix socket broker built as local/offline fallback — useful for dev without PartyKit running
+- [S07] Discovered E008 PartyKit bridge already does 90% of this — only gap was `chat_receive` vs `wibwob_ask`; added `WIBWOB_AI_RELAY=1` env flag to `tools/room/partykit_bridge.py` to switch modes; PartyKit is the right production broker (cloud, push-based, presence, persistent history); local broker stays as fallback
 
 ## Rollback
 

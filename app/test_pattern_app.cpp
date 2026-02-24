@@ -3073,6 +3073,25 @@ std::string api_wibwob_ask(TTestPatternApp& app, const std::string& text) {
     return "ok queued";
 }
 
+std::string api_get_chat_history(TTestPatternApp& app) {
+    // Find the first TWibWobWindow on the desktop (read-only, synchronous).
+    TWibWobWindow* chatWin = nullptr;
+    if (app.deskTop) {
+        TView* v = app.deskTop->first();
+        if (v) {
+            TView* start = v;
+            do {
+                if (auto* ww = dynamic_cast<TWibWobWindow*>(v)) { chatWin = ww; break; }
+                v = v->next;
+            } while (v != start);
+        }
+    }
+    if (!chatWin) return "err no wibwob chat window open";
+    auto* msgView = chatWin->getMessageView();
+    if (!msgView) return "err no wibwob message view";
+    return std::string("{\"messages\":") + msgView->getHistoryJson() + "}";
+}
+
 void api_tile(TTestPatternApp& app) { app.tile(); }
 void api_close_all(TTestPatternApp& app) { app.closeAll(); }
 

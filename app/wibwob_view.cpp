@@ -33,6 +33,28 @@
 #include <thread>
 
 /*---------------------------------------------------------*/
+/*  JSON helpers (history export)                          */
+/*---------------------------------------------------------*/
+
+static std::string jsonEscapeStr(const std::string& s) {
+    std::string out;
+    out.reserve(s.size() + 8);
+    for (unsigned char c : s) {
+        switch (c) {
+            case '"':  out += "\\\""; break;
+            case '\\': out += "\\\\"; break;
+            case '\n': out += "\\n";  break;
+            case '\r': out += "\\r";  break;
+            case '\t': out += "\\t";  break;
+            default:
+                if (c < 0x20) { char buf[7]; std::snprintf(buf,sizeof(buf),"\\u%04x",c); out+=buf; }
+                else out += char(c);
+        }
+    }
+    return out;
+}
+
+/*---------------------------------------------------------*/
 /*  TWibWobMessageView Implementation                      */
 /*---------------------------------------------------------*/
 
@@ -84,6 +106,7 @@ void TWibWobMessageView::addMessage(const std::string& sender, const std::string
     msg.timestamp = oss.str();
 
     messages.push_back(msg);
+    recordHistoryMessage(sender, content, is_error);
     rebuildWrappedLines();
     scrollToBottom();
     drawView();
@@ -92,6 +115,7 @@ void TWibWobMessageView::addMessage(const std::string& sender, const std::string
 void TWibWobMessageView::clear() {
     messages.clear();
     wrappedLines.clear();
+    chatHistory_.clear();
     scrollTo(0, 0);
     setLimit(size.x, 0);
     drawView();
@@ -153,6 +177,12 @@ void TWibWobMessageView::startStreamingMessage(const std::string& sender) {
     isReceivingStream = true;
     lastStreamUpdate = std::chrono::steady_clock::now();
 
+    // History: placeholder entry for the streaming assistant reply
+    HistoryEntry he;
+    he.role = mapSenderToRole(sender, false);
+    he.content = "";
+    chatHistory_.push_back(he);
+
     // Auto-scroll to show new message
     scrollToBottom();
 }
@@ -164,6 +194,9 @@ void TWibWobMessageView::appendToStreamingMessage(const std::string& content) {
 
     messages[streamingMessageIndex].content += content;
     lastStreamUpdate = std::chrono::steady_clock::now();
+
+    // Mirror to history placeholder
+    if (!chatHistory_.empty()) chatHistory_.back().content += content;
 
     // Trigger incremental redraw
     rebuildWrappedLines();
@@ -179,6 +212,10 @@ void TWibWobMessageView::finishStreamingMessage() {
     messages[streamingMessageIndex].is_streaming = false;
     messages[streamingMessageIndex].is_complete = true;
 
+    // Final sync: ensure history entry has the complete content
+    if (!chatHistory_.empty())
+        chatHistory_.back().content = messages[streamingMessageIndex].content;
+
     isReceivingStream = false;
     rebuildWrappedLines();
     drawView();
@@ -189,11 +226,44 @@ void TWibWobMessageView::cancelStreamingMessage() {
         return;
     }
 
-    // Remove the incomplete streaming message
+    // Remove the incomplete streaming message and its history placeholder
     messages.erase(messages.begin() + streamingMessageIndex);
+    if (!chatHistory_.empty()) chatHistory_.pop_back();
     isReceivingStream = false;
     rebuildWrappedLines();
     drawView();
+}
+
+// --- History methods ---
+
+std::string TWibWobMessageView::mapSenderToRole(const std::string& sender, bool is_error) {
+    if (is_error) return "system";
+    if (sender.empty()) return "assistant";
+    std::string s = sender;
+    for (auto& c : s) c = std::tolower((unsigned char)c);
+    if (s == "user") return "user";
+    if (s == "system") return "system";
+    if (s == "wib" || s == "wib&wob" || s == "wib and wob") return "assistant";
+    return "assistant";
+}
+
+void TWibWobMessageView::recordHistoryMessage(const std::string& sender, const std::string& content, bool is_error) {
+    HistoryEntry e;
+    e.role = mapSenderToRole(sender, is_error);
+    e.content = content;
+    chatHistory_.push_back(e);
+}
+
+std::string TWibWobMessageView::getHistoryJson() const {
+    std::string out = "[";
+    bool first = true;
+    for (const auto& e : chatHistory_) {
+        if (!first) out += ",";
+        out += "{\"role\":\"" + e.role + "\",\"content\":\"" + jsonEscapeStr(e.content) + "\"}";
+        first = false;
+    }
+    out += "]";
+    return out;
 }
 
 void TWibWobMessageView::rebuildWrappedLines() {

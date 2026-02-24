@@ -98,10 +98,11 @@ def build_ws_url(partykit_url: str, room: str) -> str:
 
 
 class PartyKitBridge:
-    def __init__(self, instance_id: str, partykit_url: str, room: str):
+    def __init__(self, instance_id: str, partykit_url: str, room: str, ai_relay: bool = False):
         self.sock_path = ipc_sock_path(instance_id)
         self.ws_url = build_ws_url(partykit_url, room)
         self.instance_id = instance_id
+        self.ai_relay = ai_relay  # True = use wibwob_ask (AI responds); False = chat_receive (display only)
         self.last_windows: dict[str, dict] = {}
         self.last_chat_seq: int = 0
         self.id_map: dict[str, str] = {}  # remote window id -> local IPC id
@@ -275,13 +276,23 @@ class PartyKitBridge:
                 # Only apply messages from other instances (skip our own echo)
                 if text and origin_instance != self.instance_id:
                     self.log(f"chat from {sender}: {text[:60]}")
-                    # chat_receive is in the command registry, not a direct IPC branch.
-                    await asyncio.to_thread(
-                        ipc_command,
-                        self.sock_path,
-                        "exec_command",
-                        {"name": "chat_receive", "sender": sender, "text": text},
-                    )
+                    if self.ai_relay:
+                        # ai_relay mode: inject as user prompt so W&W AI responds
+                        relay_text = f"[{sender} says]: {text}"
+                        await asyncio.to_thread(
+                            ipc_command,
+                            self.sock_path,
+                            "exec_command",
+                            {"name": "wibwob_ask", "text": relay_text},
+                        )
+                    else:
+                        # Default: display-only (no AI response triggered)
+                        await asyncio.to_thread(
+                            ipc_command,
+                            self.sock_path,
+                            "exec_command",
+                            {"name": "chat_receive", "sender": sender, "text": text},
+                        )
 
     async def _request_state_sync(self, ws, reason: str) -> None:
         if ws is None:
@@ -351,7 +362,10 @@ def main() -> int:
         print("ERROR: WIBWOB_PARTYKIT_ROOM not set", file=sys.stderr)
         return 1
 
-    bridge = PartyKitBridge(instance_id, partykit_url, room)
+    ai_relay = os.environ.get("WIBWOB_AI_RELAY", "").lower() in ("1", "true", "yes")
+    if ai_relay:
+        print("[bridge] ai_relay=ON — remote messages will trigger W&W AI response via wibwob_ask")
+    bridge = PartyKitBridge(instance_id, partykit_url, room, ai_relay=ai_relay)
     try:
         asyncio.run(bridge.run())
     except KeyboardInterrupt:
