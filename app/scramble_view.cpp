@@ -840,6 +840,17 @@ void TScrambleWindow::focusInput()
     }
 }
 
+void TScrambleWindow::draw()
+{
+    if (displayState == sdsSmol) {
+        TDrawBuffer b;
+        TColorAttr black = TColorAttr(TColorRGB(0, 0, 0), TColorRGB(0, 0, 0));
+        b.moveChar(0, ' ', black, size.x);
+        for (int i = 0; i < size.y; i++) writeLine(0, i, size.x, 1, b);
+    }
+    TWindow::draw();
+}
+
 void TScrambleWindow::handleEvent(TEvent& event)
 {
     // Close button → toggle off via app command (prevents dangling pointer)
