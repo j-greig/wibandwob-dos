@@ -1,6 +1,6 @@
 ---
 name: ww-launch
-description: Launch WibWob-DOS (TUI + API server), open W&W chat window, self-prompt W&W to confirm it's alive. Wraps scripts/dev-start.sh — the canonical local dev launcher. Use when you need a live instance for debugging, IPC testing, or screenshot verification. Triggers on "launch wwdos", "start wibwob", "open wibwobdos", "ww-launch".
+description: Launch WibWob-DOS (TUI + API server), open W&W chat window, self-prompt W&W to confirm it's alive. Open a 4-pane tmux monitor (TUI + chat log + debug log + command pane). Wraps scripts/dev-start.sh — the canonical local dev launcher. Use when you need a live instance for debugging, IPC testing, or screenshot verification. Triggers on "launch wwdos", "start wibwob", "open wibwobdos", "ww-launch", "4-pane monitor", "open monitor", "tmux monitor".
 ---
 
 # ww-launch
@@ -10,17 +10,40 @@ Canonical local dev launcher: TUI + API + chat open + self-prompt.
 ## Quick start
 
 ```bash
-# Start everything (instance 1, port 8089)
+# 1. Start everything (instance 1, port 8089)
 ./scripts/dev-start.sh
 
-# Second instance (port 8090)
-WIBWOB_INSTANCE=2 WIBWOB_API_PORT=8090 ./scripts/dev-start.sh
+# 2. Attach to TUI once so canvas locks to your terminal size, then Ctrl-B D
+tmux attach -t wibwob
 
-# Then run this to open chat + self-prompt
-.agents/skills/ww-launch/scripts/open-chat.sh
+# 3. Open the 4-pane monitor (TUI + logs + command pane), then attach
+.agents/skills/ww-launch/scripts/monitor.sh
 ```
 
-## Attach to TUI
+## 4-pane tmux monitor
+
+Opens a split view inside the existing `wibwob` tmux session:
+
+```
+┌─────────────────────┬──────────────────┐
+│                     │  CHAT LOG tail   │
+│   TUI (live)        ├──────────────────┤
+│                     │  APP DEBUG tail  │
+│                     ├──────────────────┤
+│                     │  COMMANDS        │
+└─────────────────────┴──────────────────┘
+```
+
+```bash
+.agents/skills/ww-launch/scripts/monitor.sh            # builds layout + attaches
+.agents/skills/ww-launch/scripts/monitor.sh --no-attach  # build only
+```
+
+Pane navigation once attached:
+- `Ctrl-B ←→` — move between panes  
+- `Ctrl-B 0` — jump to TUI window if on a different window
+
+## Attach to TUI only
 
 ```bash
 tmux attach -t wibwob        # Ctrl-B D to detach
