@@ -59,7 +59,7 @@ curl -sf -X POST http://127.0.0.1:8089/browser/fetch_ext \
 ### 7. Parity check (strict only)
 Read `app/command_registry.cpp` capabilities, compare against:
 - Menu items in `wwdos_app.cpp`
-- MCP tools in `tools/api_server/mcp_tools.py`
+- MCP auto-derived from FastAPI routes (no manual tool builders)
 Report symmetric diff.
 
 ### 8. Planning brief check (strict only)
@@ -94,7 +94,7 @@ TESTS
   state:     VALID / SKIPPED / FAIL
   browser:   OK / SKIPPED / FAIL
 
-PARITY (strict only)
+PARITY (standard+)
   drift:     NONE / [list missing surfaces]
 
 PLANNING (strict only)

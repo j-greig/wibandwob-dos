@@ -21,9 +21,10 @@ Adding a vendor TView subclass (e.g. tvterm's `BasicTerminalWindow`) touches exa
 | 11 | Test stubs | `command_registry_test.cpp`, `scramble_engine_test.cpp` | Stub for each new extern |
 | 12 | Python model | `tools/api_server/models.py` | Add to `WindowType` enum |
 | 13 | Python controller | `tools/api_server/controller.py` | Dispatch in `create_window()` |
-| 14 | MCP docstring | `tools/api_server/mcp_tools.py` | Update `tui_create_window` docstring |
+| 14 | Python schema | `tools/api_server/schemas.py` | Add to `WindowCreate.type` Literal |
 
-All 14 surfaces must be touched or the drift tests / link will fail.
+All 14 surfaces must be touched or the parity tests will fail.
+**No MCP files to edit** — Python MCP auto-derives from FastAPI routes, Node MCP discovers commands at runtime.
 
 ## Gotchas discovered
 
@@ -77,8 +78,8 @@ uv run --with pytest pytest tests/room/ -q
 ./build/app/wwdos
 
 # 5. API test: open terminal via IPC
-curl -X POST http://127.0.0.1:8089/exec -d '{"command":"open_terminal"}'
-curl -X POST http://127.0.0.1:8089/exec -d '{"command":"terminal_write","args":{"text":"ls\n"}}'
+curl -X POST http://127.0.0.1:8089/menu/command -H 'Content-Type: application/json' -d '{"command":"open_terminal"}'
+curl -X POST http://127.0.0.1:8089/menu/command -H 'Content-Type: application/json' -d '{"command":"terminal_write","args":{"text":"ls\n"}}'
 ```
 
 ## Template for future integrations

@@ -16,7 +16,7 @@ Ask for any not provided:
 | `view_name` | yes | `particle_field` | snake_case, becomes `TParticleFieldView` |
 | `window_title` | yes | `"Particle Field"` | Human-readable for TWindow |
 | `type` | yes | `view-only` | `view-only`, `window+view`, `browser-like`, `animation-like` |
-| `parity_scope` | no | `ui+registry` | `ui-only`, `ui+registry`, `full-parity`. Default: `ui+registry` |
+| `parity_scope` | no | `full-parity` | `ui-only` (spike only), `ui+registry`, `full-parity`. Default: `full-parity` |
 | `issue_id` | no | `#42` | Required for non-trivial work per repo canon |
 | `description` | no | `Animated particle system` | One-line for comments and registry |
 
@@ -46,22 +46,28 @@ Add `{name}_view.cpp` to `test_pattern` sources in `app/CMakeLists.txt`.
 4. Menu item under View (Generative/Animated/Utility)
 5. `handleEvent` case dispatching to factory
 
-### 5. Patch registry (if `ui+registry` or `full-parity`)
+### 5. Patch window type registry (ALL scopes)
+In `app/window_type_registry.cpp`:
+- Add spawn function: `static const char* spawn_{name}(TWwdosApp& app, const std::map<std::string,std::string>& kv) { ... }`
+- Add match function: `static bool match_{name}(TWindow* w) { return dynamic_cast<T{PascalName}View*>(w) != nullptr; }`
+- Add entry to `k_specs[]`: `{ "{name}", spawn_{name}, match_{name} },`
+
+### 6. Patch command registry (if `ui+registry` or `full-parity`)
 In `app/command_registry.cpp`:
 - Add capability: `{"open_{name}", "Open {title} window", false}`
 - Add dispatch case in `exec_registry_command()`
 
-### 6. Patch Python surfaces (only `full-parity`)
-- `tools/api_server/models.py` — `WindowType` enum value
-- `tools/api_server/controller.py` — `create_window()` case
-- `tools/api_server/mcp_tools.py` — update valid types in docstring
+### 7. Patch Python surfaces (if `full-parity` — default)
+- `tools/api_server/models.py` — add to `WindowType` enum
+- `tools/api_server/schemas.py` — add to `WindowCreate.type` Literal (**people forget this one!**)
+- *(No MCP file changes needed — FastApiMCP auto-derives from routes, Node MCP discovers at runtime)*
 
-### 7. Build
+### 8. Build
 ```bash
 cmake --build ./build --target wwdos 2>&1
 ```
 
-### 8. Parity report
+### 9. Parity report
 ```
 PARITY REPORT: {name}_view
 ============================

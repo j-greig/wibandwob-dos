@@ -1,0 +1,171 @@
+[stderr] OpenAI Codex v0.101.0 (research preview)
+--------
+[stderr] workdir: /Users/james/Repos/wibandwob-dos
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: medium
+reasoning summaries: auto
+session id: 019c90f0-2bed-7740-82dd-e87d5ecc1f9d
+--------
+user
+DEVNOTE: Files inside .codex-logs/ are run logs — ignore them completely.
+
+EFFICIENCY: Use targeted commands, not full-file dumps.
+Prefer rg -n -C3 'pattern' file or sed -n '45,55p' file.
+Avoid nl -ba file | sed -n '1,300p'. Only dump full files if <50 lines.
+
+Make the smallest correct changes. Build and test when done.
+Summarise what changed and why.
+
+Focus files: CLAUDE.md, AGENTS.md, .claude/skills/ww-scaffold-view/SKILL.md, .claude/skills/ww-build-test/SKILL.md, .claude/skills/ww-build-game/SKILL.md, .claude/skills/ww-audit/SKILL.md, .pi/skills/wibwobdos/SKILL.md, .pi/skills/wibwobdos/references/integrating-vendor-views.md, tests/contract/test_surface_parity_matrix.py, tests/contract/test_node_mcp_parity.py, tests/contract/test_window_type_parity.py, app/llm/sdk_bridge/mcp_tools.js, app/llm/sdk_bridge/claude_sdk_bridge.js, tools/api_server/main.py, tools/api_server/models.py, tools/api_server/schemas.py, app/command_registry.cpp, app/window_type_registry.cpp, .planning/audits/command-surface-audit-20260224.md
+
+TASK: DEVNOTE: Files inside .codex-logs/ are run logs — ignore them completely.
+
+EFFICIENCY: Use targeted commands, not full-file dumps. Prefer rg -n -C3 'pattern' file or sed -n '45,55p' file.
+
+# Task: Fix parity guardrails + broken tests against ACTUAL architecture
+
+You are on branch `fix/parity-guardrails-v2`.
+
+## Context: The ACTUAL MCP architecture
+
+There is NO `tools/api_server/mcp_tools.py`. It was planned but never built. The real architecture is:
+
+1. **Embedded Wib&Wob agent** uses Node MCP (`app/llm/sdk_bridge/mcp_tools.js`) which has exactly 2 tools:
+   - `tui_list_commands` → calls `GET /commands` (discovers C++ registry)
+   - `tui_menu_command` → calls `POST /menu/command` (executes any registry command)
+
+2. **External MCP clients** use `FastApiMCP(app)` which auto-exposes all FastAPI routes as MCP tools at `/mcp`. No custom tool builders needed — it derives from the OpenAPI spec.
+
+3. **REST API** (`tools/api_server/main.py`) has both:
+   - Direct endpoints (`/windows`, `/paint/*`, etc.) with Pydantic schemas
+   - Registry gateway (`POST /menu/command`) which dispatches to C++ via IPC
+
+4. The C++ command registry (`app/command_registry.cpp`) is the source of truth for commands.
+   The C++ window type registry (`app/window_type_registry.cpp`) is the source of truth for window types.
+
+## What to fix (3 commits)
+
+### Commit 1: Fix broken parity tests
+
+**`tests/contract/test_surface_parity_matrix.py`** — completely rewrite. Remove the import of nonexistent `mcp_tools`. The test should now verify:
+- C++ command registry is non-empty (parse from source)
+- Every registry command can be dispatched via `exec_registry_command` (parse dispatch cases from `command_registry.cpp`)
+- Menu `cm*` symbols exist for window-opening commands (parse from `wwdos_app.cpp`)
+- Keep the existing `_registry_commands()` and `_menu_handled_symbols()` parsers — they work
+
+Do NOT test Python MCP tool builders (they don't exist). The FastAPI MCP auto-derives from routes.
+
+**`tests/contract/test_node_mcp_parity.py`** — completely rewrite. Remove references to nonexistent `mcp_tools.py`. The test should now verify:
+- Node MCP has exactly 2 tools: `tui_list_commands` and `tui_menu_command`
+- `tui_list_commands` calls `GET /commands` (parse from mcp_tools.js)
+- `tui_menu_command` calls `POST /menu/command` (parse from mcp_tools.js)
+- Bridge does NOT hardcode MCP tool names (existing test is good, keep it)
+- Bridge does NOT reference nonexistent tools like `tui_create_window` (check `claude_sdk_bridge.js`)
+
+**`tests/contract/test_window_type_parity.py`** — this one mostly works but the regex for C++ may need updating. Verify it still parses `k_specs[]` correctly by running it:
+```bash
+uv run --with pytest pytest tests/contract/test_window_type_parity.py -v
+```
+If it passes, leave it alone. If not, fix the regex.
+
+After rewriting, run ALL parity tests and confirm they pass:
+```bash
+uv run --with pytest pytest tests/contract/test_surface_parity_matrix.py tests/contract/test_node_mcp_parity.py tests/contract/test_window_type_parity.py -v
+```
+
+### Commit 2: Fix all docs/skills that reference nonexistent mcp_tools.py
+
+Search the entire repo for references to `mcp_tools.py` or `_command_tool_builders`:
+```bash
+rg -n "mcp_tools\.py|_command_tool_builders" --type md --type py -g '!.codex-logs' -g '!tests/contract/'
+```
+
+For each hit, replace with the correct guidance. The correct MCP story is:
+- Python MCP: `FastApiMCP(app)` auto-exposes routes. No manual tool builders needed. Adding a new REST endpoint automatically creates an MCP tool.
+- Node MCP: 2 generic tools. Adding a new C++ command automatically makes it available (via `/commands` discovery + `/menu/command` execution). No changes to `mcp_tools.js` needed.
+
+Files to update (check each):
+- `CLAUDE.md` — "Adding a new command" checklist step 3 references `mcp_tools.py`. Remove it. The correct steps are: (1) add to C++ registry, (2) add dispatch, (3) if the command needs a typed REST endpoint add it to main.py, (4) run parity tests. No MCP file to touch.
+- `.claude/skills/ww-scaffold-view/SKILL.md` — step 6 references `mcp_tools.py`. Remove that line.
+- `.claude/skills/ww-build-game/SKILL.md` — check for mcp_tools refs and fix.
+- `.pi/skills/wibwobdos/references/integrating-vendor-views.md` — check for mcp_tools refs and fix. Also fix the `/exec` endpoint reference → should be `/menu/command`.
+
+### Commit 3: Comprehensive parity guardrails in all agent touchpoints
+
+Now add the guardrails properly, based on the REAL architecture:
+
+**CLAUDE.md** — rewrite the "Parity Law" section and checklists:
+
+"Adding a new window type" checklist (ALL steps mandatory):
+1. `app/window_type_registry.cpp` — add to `k_specs[]`
+2. `app/wwdos_app.cpp` — include, command constant, factory, menu item, handleEvent
+3. `app/CMakeLists.txt` — add .cpp to wwdos sources
+4. `app/command_registry.cpp` — add `open_<name>` capability + dispatch
+5. `tools/api_server/models.py` — add to WindowType enum
+6. `tools/api_server/schemas.py` — add to WindowCreate.type Literal
+7. Run parity gate: `uv run --with pytest pytest tests/contract/test_window_type_parity.py tests/contract/test_surface_parity_matrix.py -v`
+
+"Adding a new command" checklist (ALL steps mandatory):
+1. `app/command_registry.cpp` — add to `get_command_capabilities()` with description
+2. `app/command_registry.cpp` — add dispatch in `exec_registry_command()`
+3. (Optional) `tools/api_server/main.py` — add typed REST endpoint if command needs structured params
+4. Run parity gate: `uv run --with pytest pytest tests/contract/test_surface_parity_matrix.py -v`
+
+NOTE: No MCP files to touch! Python MCP auto-derives from FastAPI routes. Node MCP uses generic tools that discover commands at runtime.
+
+**AGENTS.md** — update Parity Law section same way
+
+**`.claude/skills/ww-scaffold-view/SKILL.md`**:
+- Change default parity_scope to `full-parity`
+- Add `window_type_registry.cpp` as mandatory step (currently missing!)
+- Fix step numbering
+- Add parity gate as final mandatory step
+- Remove all mcp_tools.py references
+
+**`.claude/skills/ww-build-test/SKILL.md`**:
+- Parity gate in standard+ mode
+- Fix output format label from `(strict only)` to `(standard+)`
+- Use the actual working test command
+
+**`.claude/skills/ww-build-game/SKILL.md`**:
+- Find where it marks Python parity as optional and make it mandatory
+- Fix any mcp_tools.py references
+
+**`.claude/skills/ww-audit/SKILL.md`**:
+- Add parity contract tests as first audit step
+
+**`.pi/skills/wibwobdos/SKILL.md`**:
+- Add parity enforcement section
+
+**`.pi/skills/wibwobdos/references/integrating-vendor-views.md`**:
+- Fix mcp_tools.py refs
+- Fix `/exec` endpoint → `/menu/command`
+
+**`tools/api_server/README.md`**:
+- Add contributor note about parity when adding types/commands
+
+**`app/README.md`**:
+- Add one-line parity note for new views
+
+## Commit messages:
+1. `test(contracts): rewrite parity tests for actual MCP architecture (no mcp_tools.py)`
+2. `docs(planning): remove all references to nonexistent mcp_tools.py`  
+3. `docs(planning): add comprehensive Parity Law guardrails to all agent touchpoints`
+
+## CRITICAL: After all commits, verify the parity gate actually works:
+```bash
+uv run --with pytest pytest tests/contract/test_window_type_parity.py tests/contract/test_surface_parity_matrix.py tests/contract/test_node_mcp_parity.py -v 2>&1 | tail -30
+```
+Report the output. ALL tests must pass.
+[stderr] mcp startup: no servers
+[stderr] 2026-02-24T18:36:24.991320Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c90e0-9bb5-7532-8b22-119b6ecfe17f
+[stderr] 2026-02-24T18:36:25.015779Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c8ef4-8b7d-7571-9fce-9b170371defc
+[stderr] 2026-02-24T18:36:25.042648Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c8e8b-7e82-7d73-ab48-16d3170d0685
+[stderr] 2026-02-24T18:36:25.068995Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c84f6-ba12-7661-84b9-d9ea8b1b8614
+[stderr] 2026-02-24T18:36:25.092538Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c84e5-edab-76e1-b0c0-96e4d21e2286
+[stderr] 2026-02-24T18:36:25.118518Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c8ebd-0fa5-74b1-a66e-f335b40de74a
+[stderr] 2026-02-24T18:36:25.131692Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c90ee-44d2-7952-b58a-34569d027e0f
+[stderr] ERROR: You've hit your usage limit. Upgrade to Pro (https://chatgpt.com/explore/pro), visit https://chatgpt.com/codex/settings/usage to purchase more credits or try again at Feb 25th, 2026 7:13 PM.

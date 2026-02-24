@@ -1,0 +1,596 @@
+[stderr] OpenAI Codex v0.101.0 (research preview)
+--------
+[stderr] workdir: /Users/james/Repos/wibandwob-dos
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: medium
+reasoning summaries: auto
+session id: 019c90e0-9bb5-7532-8b22-119b6ecfe17f
+--------
+user
+DEVNOTE: Files inside .codex-logs/ are run logs — ignore them completely.
+
+EFFICIENCY: Use targeted commands, not full-file dumps.
+Prefer rg -n -C3 'pattern' file or sed -n '45,55p' file.
+Avoid nl -ba file | sed -n '1,300p'. Only dump full files if <50 lines.
+
+Make the smallest correct changes. Build and test when done.
+Summarise what changed and why.
+
+Focus files: app/command_registry.h, app/command_registry.cpp, app/api_ipc.cpp, app/api_ipc.h, tools/api_server/controller.py, tools/api_server/main.py, tools/api_server/ipc_client.py, tools/api_server/models.py, tools/api_server/schemas.py, app/llm/sdk_bridge/mcp_tools.js, app/llm/sdk_bridge/claude_sdk_bridge.js, app/window_type_registry.cpp, .planning/audits/command-surface-audit-20260224.md
+
+TASK: DEVNOTE: Files inside .codex-logs/ are run logs — ignore them completely.
+
+EFFICIENCY: Use targeted commands, not full-file dumps. Prefer rg -n -C3 'pattern' file or sed -n '45,55p' file. Avoid nl -ba file | sed -n '1,300p'. Only dump full files if under 50 lines.
+
+# Task: Fix all 11 bugs from command surface audit
+
+You are on branch `fix/command-surface-audit-p0p1p2`. Read `.planning/audits/command-surface-audit-20260224.md` for full context.
+
+Fix ALL 11 issues in priority order. Make separate commits per logical fix group.
+
+## P0 fixes (commits 1-2)
+
+### Bug 1: IPC auth — silent failure on get_capabilities/get_commands
+
+The issue is that `controller.py` `get_registry_capabilities()` calls `send_cmd("get_capabilities")` and if it gets back `{"error":"auth_failed"}` or any non-commands JSON, it falls through to `{"version": "v1", "commands": []}`.
+
+Fix approach — DON'T implement HMAC (too complex for this PR). Instead:
+- In `controller.py`, after parsing the IPC response JSON, check for `"error"` key and log a WARNING with the error message
+- If the response has an `"error"` key, raise or log clearly — don't silently return empty
+- Same for `get_window_types_from_cpp()`
+- Also check: does the IPC response from C++ actually WORK when no auth is set? Test by running `echo 'cmd:get_capabilities' | nc -U /tmp/wibwob_1.sock` or equivalent. The bug might be simpler than auth — it could be a response parsing issue.
+
+### Bug 2+3: /capabilities strips descriptions + silent swallowing
+
+In `controller.py` `get_capabilities()`:
+- Change `commands` from extracting just names to returning full command objects: `{"name": str, "description": str, "dangerous": bool, "params": [...]}`
+- Update `schemas.py` `Capabilities` model: change `commands: List[str]` to `commands: List[CommandInfo]` where `CommandInfo` has `name`, `description`, `dangerous`, `params`
+- Keep backward compat: add a `command_names: List[str]` field for anything that just wants the list
+
+In `main.py`, update the `/capabilities` endpoint to use the new schema.
+
+## P1 fixes (commits 3-5)
+
+### Bug 4: /paint/line and /paint/rect broken params
+
+Check what controller methods `paint_line` and `paint_rect` actually accept, then fix the route handlers in `main.py` to match. If the controller only accepts `erase`, then the route should only accept `erase` (remove fg/bg/fill from the route schema or make them no-ops with a deprecation comment).
+
+### Bug 5: Python window type enum stale
+
+Add these to `WindowType` enum in `models.py` and `WindowCreate` literal in `schemas.py`:
+- `quadra`, `snake`, `rogue`, `deep_signal`, `app_launcher`, `gallery`, `figlet_text`
+
+Remove `wallpaper` from `WindowType` if it's not in C++.
+
+BUT: check if removing `wallpaper` would break anything (state sync, saved workspaces). If it would, keep it but mark it as deprecated.
+
+### Bug 6: Embedded bridge stale tool reference
+
+In `claude_sdk_bridge.js`, find references to `tui_create_window` and fix them to reference `tui_menu_command` (or explain the correct way to create windows).
+
+### Bug 7: requires_path → structured params
+
+In `command_registry.h`, expand `CommandCapability`:
+```cpp
+struct CommandParam {
+    const char* name;
+    const char* type;      // "string", "number", "boolean"
+    bool required;
+};
+
+struct CommandCapability {
+    const char* name;
+    const char* description;
+    bool dangerous;
+    const CommandParam* params;  // null-terminated array, or nullptr if no params
+    int param_count;
+};
+```
+
+Update `command_registry.cpp` — define params for EVERY command that takes them. Use the parameter names from the audit table. Mark these commands as dangerous:
+- `close_all`, `inject_command`, `paint_clear`, `paint_save`, `paint_load`, `open_paint_file`, `desktop_gallery`
+
+Update `get_command_capabilities_json()` to serialize params and dangerous flag.
+
+## P2 fixes (commits 6-7)
+
+### Bug 8: IPC read framing
+
+In `api_ipc.cpp`, change the command read path to read byte-by-byte (or use a buffer) until newline instead of a single 2048-byte read. Look at how the auth handshake path already reads — it likely has a better pattern you can reuse.
+
+### Bug 9: Dangerous metadata — already done in Bug 7
+
+### Bug 10: Menu bypass — DON'T fix in this PR (too risky, document only)
+
+Add a comment in `wwdos_app.cpp` near the menu event handler noting that menu actions should eventually route through registry. Don't refactor now.
+
+### Bug 11: id vs win_id naming
+
+In the REST route schemas (`schemas.py`), rename `win_id` to `id` for paint routes to match the registry parameter names. Update `main.py` route handlers accordingly. Keep `win_id` as an alias in the Pydantic model for backward compat if needed.
+
+## Commit plan
+
+1. `fix(api): P0 — fix IPC capability discovery and stop silent failures`
+2. `fix(api): P0 — expose command descriptions and params in /capabilities`
+3. `fix(api): P1 — fix /paint/line and /paint/rect broken route params`
+4. `fix(api): P1 — sync Python window type enum with C++ registry`
+5. `fix(api): P1 — fix embedded bridge stale tool ref + add structured command params`
+6. `fix(engine): P2 — robust IPC read framing (read until newline)`
+7. `fix(api): P2 — normalise param names (win_id → id) + document menu bypass`
+
+After ALL fixes, attempt a build: `cmake --build ./build --target wwdos -j$(nproc) 2>&1 | tail -20`
+
+## CRITICAL RULES
+- Do NOT break the `"test_pattern"` window type protocol slug
+- Do NOT rename any IPC command names
+- Keep backward compatibility where possible
+- Test each C++ change compiles before committing
+[stderr] mcp startup: no servers
+[stderr] 2026-02-24T18:19:25.059478Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c8ef4-8b7d-7571-9fce-9b170371defc
+[stderr] 2026-02-24T18:19:25.075164Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c8e8b-7e82-7d73-ab48-16d3170d0685
+[stderr] 2026-02-24T18:19:25.099688Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c84f6-ba12-7661-84b9-d9ea8b1b8614
+[stderr] 2026-02-24T18:19:25.125104Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c84e5-edab-76e1-b0c0-96e4d21e2286
+[stderr] 2026-02-24T18:19:25.141199Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c8ebd-0fa5-74b1-a66e-f335b40de74a
+[stderr] 
+[stderr] thinking
+**Planning local code modifications**
+[stderr] codex
+Working the audit items in the order you specified, with small grouped commits. I’ll first inspect the audit notes and the targeted files to confirm the exact failures and current signatures before patching.
+[stderr] exec
+/bin/zsh -lc 'rg -n -C3 "Bug 1|Bug 2|Bug 3|Bug 4|Bug 5|Bug 6|Bug 7|Bug 8|Bug 10|Bug 11" .planning/audits/command-surface-audit-20260224.md' in /Users/james/Repos/wibandwob-dos[stderr]  exited 1 in 51ms:
+
+[stderr] exec
+/bin/zsh -lc 'git status --short --branch' in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 200ms:[stderr] 
+## fix/command-surface-audit-p0p1p2
+?? .codex-logs/2026-02-24/codex-devnote-files-inside-codex-log-2026-02-24T18-19-23.log
+[stderr] 
+[stderr] thinking[stderr] 
+**Inspecting audit head target**
+[stderr] codex
+I confirmed the branch. Next I’m pulling only the relevant sections from the audit and the exact function definitions in the focus files so the fixes match current signatures.
+[stderr] exec
+/bin/zsh -lc "rg -n \"def get_registry_capabilities|def get_window_types_from_cpp|def get_capabilities\\(|def paint_line|def paint_rect\" tools/api_server/controller.py tools/api_server/main.py" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc 'rg -n -C2 "P0|P1|P2|get_capabilities|paint/line|paint/rect|win_id|tui_create_window|requires_path|framing" .planning/audits/command-surface-audit-20260224.md' in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 52ms:
+65-             │ - inline dispatch (create_window, move, etc) │
+66-             │ - exec_command → registry dispatch            │
+67:             │ - get_capabilities / get_window_types JSON    │
+68-             └──────────┬───────────────────────┬──────────┘
+69-                        │                       │
+--
+82-## Known Bugs & Gaps
+83-
+84:### P0 — Critical (blocks agent usability)
+85-
+86-**1. IPC auth handshake mismatch → empty command discovery**
+--
+104-- Fix: reject `{"error":...}` responses explicitly; add `registry_source: live|fallback` to response
+105-
+106:### P1 — High (broken features / parity drift)
+107-
+108:**4. `/paint/line` and `/paint/rect` routes pass wrong params to controller**
+109-- REST routes pass `fg/bg/fill` but controller expects only `erase`
+110-- Result: `TypeError` at runtime — endpoints are broken
+--
+ succeeded in 52ms:
+tools/api_server/main.py:403:    async def paint_line(payload: PaintLineRequest) -> Dict[str, Any]:
+tools/api_server/main.py:410:    async def paint_rect(payload: PaintRectRequest) -> Dict[str, Any]:
+tools/api_server/controller.py:102:    async def get_registry_capabilities(self) -> Dict[str, Any]:
+tools/api_server/controller.py:114:    async def get_window_types_from_cpp(self) -> List[Dict[str, Any]]:
+tools/api_server/controller.py:130:    async def get_capabilities(self) -> Dict[str, Any]:
+tools/api_server/controller.py:446:    async def paint_line(self, win_id: str, x0: int, y0: int, x1: int, y1: int, erase: bool = False) -> str:
+tools/api_server/controller.py:449:    async def paint_rect(self, win_id: str, x0: int, y0: int, x1: int, y1: int, erase: bool = False) -> str:
+[stderr] 
+[stderr] thinking
+**Planning targeted inspection**
+[stderr] codex
+I have the audit anchors and the function locations. Next I’m reading only the affected code blocks to patch signatures and serialization without touching unrelated paths.
+[stderr] exec
+/bin/zsh -lc "sed -n '80,180p' tools/api_server/controller.py" in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc "sed -n '380,460p' tools/api_server/main.py" in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc "sed -n '1,220p' tools/api_server/schemas.py" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 51ms:
+        self._events = events
+        self._lock = asyncio.Lock()
+        # Batch layout support
+        self._requests: Dict[str, BatchLayoutResponse] = {}
+        self._timelines: Dict[str, List[asyncio.Task]] = {}
+        # Repo root: prefer env var, fall back to two levels up from this file.
+        # IMPORTANT: start_api_server.sh sets WIBWOB_REPO_ROOT to avoid cross-checkout
+        # mismatch (e.g. API server in wibandwob-dos-xterm, TUI in wibandwob-dos).
+        env_root = os.environ.get("WIBWOB_REPO_ROOT")
+        if env_root:
+            self._repo_root = Path(env_root).resolve()
+        else:
+            self._repo_root = Path(__file__).resolve().parents[2]
+        print(f"[controller] repo_root={self._repo_root}")
+        default_log_path = self._repo_root / "logs" / "state" / "events.ndjson"
+        self._state_event_log_path = Path(os.environ.get("WWD_STATE_EVENT_LOG_PATH", str(default_log_path)))
+
+    # ----- Query -----
+    async def get_state(self) -> AppState:
+        await self._sync_state()
+[stderr]  succeeded in 51ms:
+
+    @app.post("/state/export")
+    async def state_export(payload: StateExportReq) -> Dict[str, Any]:
+        res = await ctl.export_state(payload.path, payload.format)
+        if not res.get("ok"):
+            raise HTTPException(status_code=400, detail=res.get("error", "export_failed"))
+        return res
+
+    @app.post("/state/import")
+    async def state_import(payload: StateImportReq) -> Dict[str, Any]:
+        res = await ctl.import_state(payload.path, payload.mode)
+        if not res.get("ok"):
+            raise HTTPException(status_code=400, detail=res.get("error", "import_failed"))
+        return res
+
+    @app.post("/paint/cell")
+    async def paint_cell(payload: PaintCellRequest) -> Dict[str, Any]:
+        resp = await ctl.paint_cell(payload.win_id, payload.x, payload.y, payload.fg, payload.bg)
+        if isinstance(resp, str) and resp.lower().startswith("err"):
+            raise HTTPException(status_code=422, detail=resp)
+[stderr]  succeeded in 52ms:
+from __future__ import annotations
+
+from typing import Any, Dict, List, Literal, Optional, Union
+
+from pydantic import BaseModel, Field
+
+
+class RectModel(BaseModel):
+    x: int
+    y: int
+    w: int
+    h: int
+
+
+class WindowCreate(BaseModel):
+    # Spawnable window types — must match k_specs[] entries with non-null spawn fn
+    # in app/window_type_registry.cpp. Parity enforced by tests/contract/test_window_type_parity.py.
+    type: Literal[
+        "test_pattern",
+        "gradient",
+[stderr] exec[stderr] 
+/bin/zsh -lc "sed -n '1,220p' tools/api_server/models.py" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 52ms:
+from __future__ import annotations
+
+import enum
+import time
+import uuid
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional
+
+
+class WindowType(str, enum.Enum):
+    # Keep in sync with k_specs[] in app/window_type_registry.cpp.
+    # Parity enforced by tests/contract/test_window_type_parity.py.
+    test_pattern = "test_pattern"
+    gradient = "gradient"
+    frame_player = "frame_player"
+    text_view = "text_view"
+    text_editor = "text_editor"
+    browser = "browser"
+    verse = "verse"
+    mycelium = "mycelium"
+[stderr] 
+[stderr] thinking
+**Planning targeted code inspection**
+[stderr] codex[stderr] 
+I’ve confirmed the current breakage in `paint_line/rect`, `/capabilities`, and the stale window enum. Next I’m reading the C++ registry and IPC code to implement structured params and the framing fix without changing command names.
+[stderr] exec
+/bin/zsh -lc "sed -n '1,220p' tools/api_server/ipc_client.py" in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc "sed -n '1,240p' app/command_registry.h" in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc 'rg -n -C3 "CommandCapability|requires_path|get_command_capabilities_json|dangerous|get_capabilities" app/command_registry.cpp app/api_ipc.cpp app/api_ipc.h' in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc 'rg -n -C3 "tui_create_window|tui_menu_command|tui_list_commands" app/llm/sdk_bridge/claude_sdk_bridge.js app/llm/sdk_bridge/mcp_tools.js' in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 51ms:
+from __future__ import annotations
+
+import os
+import socket
+import base64
+from typing import Dict, Optional
+
+
+def _resolve_sock_path() -> str:
+    """Resolve IPC socket path.
+
+    Priority: TV_IPC_SOCK (explicit) > WIBWOB_INSTANCE (derived) > default.
+    """
+    explicit = os.environ.get("TV_IPC_SOCK")
+    if explicit:
+        return explicit
+    instance = os.environ.get("WIBWOB_INSTANCE")
+    if instance:
+        return f"/tmp/wibwob_{instance}.sock"
+    return "/tmp/wwdos.sock"
+[stderr]  succeeded in 50ms:
+#pragma once
+
+#include <map>
+#include <string>
+#include <vector>
+
+class TWwdosApp;
+
+struct CommandCapability {
+    const char* name;
+    const char* description;
+    bool requires_path;
+};
+
+const std::vector<CommandCapability>& get_command_capabilities();
+std::string get_command_capabilities_json();
+std::string exec_registry_command(
+    TWwdosApp& app,
+    const std::string& name,
+    const std::map<std::string, std::string>& kv);
+[stderr]  succeeded in 50ms:
+app/api_ipc.cpp-400-    }
+app/api_ipc.cpp-401-
+app/api_ipc.cpp-402-    std::string resp = "ok\n";
+app/api_ipc.cpp:403:    if (cmd == "get_capabilities") {
+app/api_ipc.cpp:404:        resp = get_command_capabilities_json() + "\n";
+app/api_ipc.cpp-405-    } else if (cmd == "get_window_types") {
+app/api_ipc.cpp-406-        resp = get_window_types_json() + "\n";
+app/api_ipc.cpp-407-    } else if (cmd == "exec_command") {
+--
+app/command_registry.cpp-77-extern std::string api_list_figlet_fonts();
+app/command_registry.cpp-78-extern std::string api_preview_figlet(const std::string& text, const std::string& font, int width);
+app/command_registry.cpp-79-
+app/command_registry.cpp:80:const std::vector<CommandCapability>& get_command_capabilities() {
+app/command_registry.cpp:81:    static const std::vector<CommandCapability> capabilities = {
+app/command_registry.cpp-82-        {"cascade", "Cascade all windows on desktop", false},
+app/command_registry.cpp-83-        {"tile", "Tile all windows on desktop", false},
+app/command_registry.cpp-84-        {"close_all", "Close all windows", false},
+--
+app/command_registry.cpp-140-    return capabilities;
+app/command_registry.cpp-141-}
+[stderr]  succeeded in 51ms:
+app/llm/sdk_bridge/claude_sdk_bridge.js-198-                '',
+app/llm/sdk_bridge/claude_sdk_bridge.js-199-                '## Available TUI Capabilities (auto-derived from C++ registry)',
+app/llm/sdk_bridge/claude_sdk_bridge.js-200-                '',
+app/llm/sdk_bridge/claude_sdk_bridge.js:201:                '### Window Types (use with tui_create_window tool)',
+app/llm/sdk_bridge/claude_sdk_bridge.js-202-                windowTypes || '(none)',
+app/llm/sdk_bridge/claude_sdk_bridge.js-203-                '',
+app/llm/sdk_bridge/claude_sdk_bridge.js-204-                '### Commands (available as tui_* tools)',
+--
+app/llm/sdk_bridge/mcp_tools.js-3- *
+app/llm/sdk_bridge/mcp_tools.js-4- * ARCHITECTURE:
+app/llm/sdk_bridge/mcp_tools.js-5- *   Two tools. That's it.
+app/llm/sdk_bridge/mcp_tools.js:6: *   - tui_list_commands: discovers all available commands from the C++ registry
+app/llm/sdk_bridge/mcp_tools.js:7: *   - tui_menu_command: executes any command by name with args
+app/llm/sdk_bridge/mcp_tools.js-8- *
+app/llm/sdk_bridge/mcp_tools.js-9- *   New C++ commands are instantly available. Never touch this file.
+app/llm/sdk_bridge/mcp_tools.js-10- */
+--
+app/llm/sdk_bridge/mcp_tools.js-46-
+app/llm/sdk_bridge/mcp_tools.js-47-        tools: [
+app/llm/sdk_bridge/mcp_tools.js-48-            tool(
+[stderr] 
+[stderr] thinking
+**Preparing detailed code inspection**
+[stderr] codex
+The next step is patching the C++ metadata and IPC framing, but I need the exact current command table and socket read loop first. I’m pulling those sections plus the window registry list to sync Python enums safely.
+[stderr] exec
+/bin/zsh -lc "sed -n '70,220p' app/command_registry.cpp" in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc "sed -n '320,470p' app/api_ipc.cpp" in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc 'rg -n -C3 "menu event|cmMenu|handleEvent|route through registry" app/wwdos_app.cpp' in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc "rg -n \"k_specs\\[]|\\{\" app/window_type_registry.cpp | head -40" in [stderr] /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 52ms:
+extern std::string api_paint_export(TWwdosApp& app, const std::string& id);
+extern std::string api_paint_save(TWwdosApp& app, const std::string& id, const std::string& path);
+extern std::string api_paint_load(TWwdosApp& app, const std::string& id, const std::string& path);
+extern void api_spawn_paint_with_file(TWwdosApp& app, const std::string& path);
+extern std::string api_paint_stamp_figlet(TWwdosApp& app, const std::string& id,
+    const std::string& text, const std::string& font,
+    int x, int y, uint8_t fg, uint8_t bg);
+extern std::string api_list_figlet_fonts();
+extern std::string api_preview_figlet(const std::string& text, const std::string& font, int width);
+
+const std::vector<CommandCapability>& get_command_capabilities() {
+    static const std::vector<CommandCapability> capabilities = {
+        {"cascade", "Cascade all windows on desktop", false},
+        {"tile", "Tile all windows on desktop", false},
+        {"close_all", "Close all windows", false},
+        {"save_workspace", "Save current workspace", false},
+        {"open_workspace", "Open workspace from a path", true},
+        {"screenshot", "Capture screen to a text snapshot", false},
+        {"pattern_mode", "Set pattern mode: continuous or tiled", false},
+        {"set_theme_mode", "Set theme mode: light or dark", true},
+[stderr]  succeeded in 50ms:
+            return false;
+        }
+        // Stale socket (no listener) — safe to clean up.
+        fprintf(stderr, "[ipc] Cleaning up stale socket: %s\n", sock_path_.c_str());
+        ::unlink(sock_path_.c_str());
+    }
+
+    fd_listen_ = ::socket(AF_UNIX, SOCK_STREAM, 0);
+    if (fd_listen_ < 0)
+        return false;
+    // Non-blocking
+    int flags = ::fcntl(fd_listen_, F_GETFL, 0);
+    ::fcntl(fd_listen_, F_SETFL, flags | O_NONBLOCK);
+
+    struct sockaddr_un addr;
+    std::memset(&addr, 0, sizeof(addr));
+    addr.sun_family = AF_UNIX;
+    std::snprintf(addr.sun_path, sizeof(addr.sun_path), "%s", sock_path_.c_str());
+    if (::bind(fd_listen_, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
+        ::close(fd_listen_);
+[stderr]  succeeded in 51ms:
+718-{
+719-public:
+720-    TWwdosApp();
+721:    virtual void handleEvent(TEvent& event);
+722-    virtual void idle();
+723-    virtual void run();
+724-    virtual TPalette& getPalette() const;
+--
+1038-    scrambleEngine.init(".");
+1039-}
+1040-
+1041:void TWwdosApp::handleEvent(TEvent& event)
+1042-{
+1043:    TApplication::handleEvent(event);
+1044-    
+1045-    if (event.what == evCommand)
+1046-    {
+--
+4193-        updatePreview();
+4194-    }
+[stderr]  succeeded in 51ms:
+85:static const TRect* opt_bounds(const std::map<std::string, std::string>& kv, TRect& buf) {
+99:                               const std::map<std::string, std::string>& kv) {
+104:                                   const std::map<std::string, std::string>& kv) {
+111:                                       const std::map<std::string, std::string>& kv) {
+124:                                    const std::map<std::string, std::string>& kv) {
+131:                                      const std::map<std::string, std::string>& kv) {
+138:                                  const std::map<std::string, std::string>& kv) {
+143:                                const std::map<std::string, std::string>& kv) {
+148:                                   const std::map<std::string, std::string>& kv) {
+153:                                const std::map<std::string, std::string>& kv) {
+158:                                const std::map<std::string, std::string>& kv) {
+163:                               const std::map<std::string, std::string>& kv) {
+168:                               const std::map<std::string, std::string>& kv) {
+173:                                 const std::map<std::string, std::string>& kv) {
+178:                                const std::map<std::string, std::string>& kv) {
+183:                                const std::map<std::string, std::string>& kv) {
+188:                                            const std::map<std::string, std::string>& kv) {
+193:                                      const std::map<std::string, std::string>& kv) {
+198:                                        const std::map<std::string, std::string>& kv) {
+203:                                         const std::map<std::string, std::string>& kv) {
+[stderr] 
+[stderr] thinking
+**Inspecting event handling and registry specs**
+[stderr] codex
+I found the C++ command table and the fragile single `read()`. Next I’ll inspect the `handleEvent` menu block and the `k_specs` entries so the enum sync and the menu-bypass documentation are accurate.
+[stderr] exec
+/bin/zsh -lc "sed -n '300,390p' app/window_type_registry.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1040,1165p' app/wwdos_app.cpp" in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc "rg -n \"app.post\\(\\\"/capabilities\\\"|Capabilities\\)\" tools/api_server/main.py" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 51ms:
+
+void TWwdosApp::handleEvent(TEvent& event)
+{
+    TApplication::handleEvent(event);
+    
+    if (event.what == evCommand)
+    {
+        // Handle font selection from Edit → FIGlet Font → Category submenus
+        // (range check before switch — can't use case for ranges)
+        ushort cmd = event.message.command;
+        if (cmd >= cmFigletCatFontBase && cmd < cmFigletCatFontBase + 200) {
+            TFigletTextWindow* fw = dynamic_cast<TFigletTextWindow*>(
+                deskTop->current);
+            if (fw && fw->getFigletView()) {
+                const std::string& fname = figlet::fontByIndex(cmd - cmFigletCatFontBase);
+                if (!fname.empty())
+                    fw->getFigletView()->setFont(fname);
+            }
+            clearEvent(event);
+            return;
+ succeeded in 51ms:
+static bool match_figlet_text(TWindow* w) { return dynamic_cast<TFigletTextWindow*>(w) != nullptr; }
+
+// ── Registry table ────────────────────────────────────────────────────────────
+// Add new window types here — nowhere else.
+
+static const WindowTypeSpec k_specs[] = {
+    { "test_pattern",      spawn_test,              match_test_pattern      },
+    { "gradient",          spawn_gradient,          match_gradient          },
+    { "frame_player",      spawn_frame_player,      match_frame_player      },
+    { "text_view",         spawn_text_view,         match_text_view         },
+    { "text_editor",       spawn_text_editor,       match_text_editor       },
+    { "browser",           spawn_browser,           match_browser           },
+    { "verse",             spawn_verse,             match_verse             },
+    { "mycelium",          spawn_mycelium,          match_mycelium          },
+    { "orbit",             spawn_orbit,             match_orbit             },
+    { "torus",             spawn_torus,             match_torus             },
+    { "cube",              spawn_cube,              match_cube              },
+    { "life",              spawn_life,              match_life              },
+    { "blocks",            spawn_blocks,            match_blocks            },
+    { "score",             spawn_score,             match_score             },
+[stderr]  succeeded in 51ms:
+131:    @app.get("/capabilities", response_model=Capabilities)
+[stderr] 
+[stderr] thinking
+**Identifying capabilities handler**
+[stderr] exec
+/bin/zsh -lc "sed -n '120,145p' tools/api_server/main.py" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 52ms:
+            ],
+            last_workspace=st.last_workspace,
+            last_screenshot=st.last_screenshot,
+            uptime_sec=time.time() - st.started_at,
+        )
+
+    # ----- Routes -----
+    @app.get("/health")
+    async def health() -> Dict[str, Any]:
+        return {"ok": True}
+
+    @app.get("/capabilities", response_model=Capabilities)
+    async def capabilities() -> Capabilities:
+        caps = await ctl.get_capabilities()
+        return Capabilities(
+            version=str(caps.get("version", "v1")),
+            window_types=list(caps.get("window_types", [t.value for t in WindowType])),
+            commands=list(caps.get("commands", [])),
+            properties=dict(caps.get("properties", {})),
+        )
+[stderr] 
+[stderr] thinking
+**Searching for command schema**
+[stderr] codex
+I’ve confirmed the C++ window types list and the `/capabilities` response construction. Next I’m checking existing command-info schemas/routes so I can reuse them instead of creating duplicate Pydantic types.
+[stderr] exec
+/bin/zsh -lc "sed -n '145,240p' tools/api_server/main.py" in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc "rg -n \"class .*Command.*Info|commands: List\\[.*\\]|/commands\" tools/api_server/schemas.py tools/api_server/main.py" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 51ms:
+                         "Use POST /menu/command to execute any command by name.")
+    async def list_commands() -> Dict[str, Any]:
+        """Agent-friendly command discovery endpoint.
+
+        Returns the full command manifest so agents can discover what
+        actions are available without hardcoding command names."""
+        registry = await ctl.get_registry_capabilities()
+        commands = registry.get("commands", [])
+        return {
+            "count": len(commands),
+            "commands": commands,
+            "execute_via": "POST /menu/command {command: '<name>', args: {key: value}}",
+        }
+
+    @app.get("/state", response_model=AppStateModel)
+    async def state() -> AppStateModel:
+        st = await ctl.get_state()
+        return AppStateModel(
+            pattern_mode=st.pattern_mode,
+            theme_mode=st.theme_mode,
+[stderr]  succeeded in 51ms:
+tools/api_server/main.py:141:    @app.get("/commands",
+tools/api_server/schemas.py:188:    commands: List[str]
+[stderr] 
+[stderr] thinking
+**Inspecting helper declarations**
+[stderr] exec
+/bin/zsh -lc "sed -n '1,220p' app/api_ipc.h" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 52ms:
+// Unix domain socket IPC server with optional HMAC challenge-response auth.
+// Protocol: cmd:<name> [key=value ...]\n
+// Auth: when WIBWOB_AUTH_SECRET is set, new connections must complete a
+//       challenge-response handshake before commands are accepted.
+#pragma once
+
+#include <string>
+#include <set>
+#include <vector>
+#include <cstdint>
+#include <chrono>
+
+class TWwdosApp;
+
+class ApiIpcServer {
+public:
+    /// Connection state for the status indicator.
+    struct ConnectionStatus {
+        bool listening   = false;  ///< Socket is open and accepting connections
+        bool api_active  = false;  ///< API server sent a command recently (< 10 s)

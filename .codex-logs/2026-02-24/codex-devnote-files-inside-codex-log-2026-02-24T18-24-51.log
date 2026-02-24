@@ -1,0 +1,1818 @@
+[stderr] OpenAI Codex v0.101.0 (research preview)
+--------
+workdir: /Users/james/Repos/wibandwob-dos
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: medium
+reasoning summaries: auto
+session id: 019c90e5-9707-74d0-8823-bbd871763ebd
+--------
+user
+You are a code analyst. Investigate the codebase, diagnose issues, and report findings.
+
+EFFICIENCY: Use targeted commands, not full-file dumps.
+Prefer rg -n -C3 'pattern' file or sed -n '45,55p' file.
+Avoid nl -ba file | sed -n '1,300p'. Only dump full files if <50 lines.
+
+Deliver:
+1. Root cause
+2. Fix options with tradeoffs
+3. Risks and tests to add
+
+Focus files: CLAUDE.md, AGENTS.md, .claude/skills/ww-scaffold-view/SKILL.md, .claude/skills/ww-build-test/SKILL.md, .claude/skills/ww-build-game/SKILL.md, .claude/skills/ww-audit/SKILL.md, .claude/skills/ww-api-smoke/SKILL.md, .claude/skills/ww-launch/SKILL.md, .pi/skills/wibwobdos/SKILL.md, .pi/skills/wibwobdos/references/integrating-vendor-views.md, .planning/README.md, .planning/audits/command-surface-audit-20260224.md, app/README.md, tools/api_server/README.md, README.md
+
+TASK: DEVNOTE: Files inside .codex-logs/ are run logs — ignore them completely.
+
+EFFICIENCY: Use targeted commands, not full-file dumps. Prefer rg -n -C3 'pattern' file or sed -n '45,55p' file.
+
+# Task: Triple-check parity guardrail coverage + doc coherence audit
+
+We just added "Parity Law" guardrails to CLAUDE.md, AGENTS.md, ww-scaffold-view, ww-build-test, and wibwobdos SKILL.md. I need you to verify we didn't miss anything and that the overall doc/skill architecture is coherent.
+
+## Part 1: Find EVERY doc/skill that should reference parity
+
+Search the entire repo for files that:
+1. Mention adding window types, commands, views, or features
+2. Contain build/test/verification instructions
+3. Are agent skills that might be invoked during development
+
+For each one, check: does it mention the parity gate or link to the Parity Law? If not, flag it.
+
+Specifically check these files we might have missed:
+- `.claude/skills/ww-build-game/SKILL.md` — does it mention parity?
+- `.claude/skills/ww-audit/SKILL.md` — does it reference the parity tests?
+- `.claude/skills/ww-api-smoke/SKILL.md` — does it test command discovery?
+- `.claude/skills/ww-launch/SKILL.md` — does it verify capabilities after launch?
+- `.pi/skills/wibwobdos/references/integrating-vendor-views.md` — does it mention parity wiring?
+- `app/README.md` — does it mention parity for new views?
+- `tools/api_server/README.md` — does it mention updating models.py/schemas.py?
+- `.planning/README.md` — should it reference parity as a quality gate?
+- `README.md` (root) — should it mention parity at all?
+
+## Part 2: Trace the developer journey
+
+Walk through these scenarios and identify gaps:
+
+### Scenario A: Agent adds a new generative art view (e.g. "plasma_field")
+1. What skill would they load? (ww-scaffold-view)
+2. Does that skill tell them EVERY file to touch?
+3. After implementation, what test skill do they run? (ww-build-test)
+4. Does that test skill run parity checks?
+5. Before PR, what audit skill verifies completeness? (ww-audit)
+6. Does the PR template remind them about parity?
+
+### Scenario B: Agent adds a new IPC command (e.g. "get_desktop_info")
+1. What tells them where to add it? (CLAUDE.md "Adding a new command")
+2. Does it list ALL files to touch including Node MCP?
+3. What tests catch if they forget the MCP tool builder?
+4. What if they forget schemas.py — is that caught?
+
+### Scenario C: Agent modifies an existing command's parameters
+1. What tells them to update the REST route schema?
+2. What catches param name mismatches (id vs win_id)?
+3. Is there any test for this?
+
+### Scenario D: External contributor reads only README.md
+1. Do they know parity exists?
+2. Can they find the checklist?
+
+## Part 3: Check for contradictions and stale content
+
+Look for:
+1. Any doc that still says `test_pattern` for the CMake target (should be `wwdos`)
+2. Any skill that references `mcp_tools.py` `_command_tool_builders()` — does this function still exist and work?
+3. Any doc that says parity is "strict only" (we just changed it to "standard")
+4. Any doc that contradicts the new Parity Law (e.g. says parity is optional)
+5. Cross-references that point to wrong files or deleted content
+
+## Part 4: Recommend improvements
+
+Based on your findings, output a prioritised list of:
+1. **Must fix** — gaps that will cause the exact parity drift bug to recur
+2. **Should fix** — docs that are stale or misleading but won't directly cause drift
+3. **Nice to have** — improvements to the developer journey
+
+Format each as: `FILE:LINE — issue — recommended fix`
+
+Be exhaustive. The goal is that after this review, no agent or contributor can add a window type or command without hitting a guardrail that tells them to wire all surfaces.
+mcp startup: no servers
+[stderr] 2026-02-24T18:24:51.503628Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c90e0-9bb5-7532-8b22-119b6ecfe17f
+[stderr] 2026-02-24T18:24:51.533138Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c8ef4-8b7d-7571-9fce-9b170371defc
+[stderr] 2026-02-24T18:24:51.560074Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c8e8b-7e82-7d73-ab48-16d3170d0685
+[stderr] 2026-02-24T18:24:51.586018Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c84f6-ba12-7661-84b9-d9ea8b1b8614
+[stderr] 2026-02-24T18:24:51.610343Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c84e5-edab-76e1-b0c0-96e4d21e2286
+[stderr] 2026-02-24T18:24:51.637520Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c8ebd-0fa5-74b1-a66e-f335b40de74a
+[stderr] 
+[stderr] thinking
+**Planning targeted repository inspection**
+[stderr] codex
+Investigating parity guardrail coverage and doc coherence across the requested docs plus adjacent workflow docs/skills. I’ll start with targeted searches for parity references, command/view scaffolding guidance, and known stale markers (`test_pattern`, `mcp_tools.py` builder references), then trace the developer scenarios against the actual docs.
+[stderr] 
+[stderr] thinking
+**Running parallel file searches**
+[stderr] exec[stderr] 
+/bin/zsh -lc "rg -n --glob '"'!.codex-logs/**'"' \"Parity Law|parity gate|parity\" CLAUDE.md AGENTS.md .claude/skills/ww-scaffold-view/SKILL.md .claude/skills/ww-build-test/SKILL.md .claude/skills/ww-build-game/SKILL.md .claude/skills/ww-audit/SKILL.md .claude/skills/ww-api-smoke/SKILL.md .claude/skills/ww-launch/SKILL.md .pi/skills/wibwobdos/SKILL.md .pi/skills/wibwobdos/references/integrating-vendor-views.md .planning/README.md .planning/audits/command-surface-audit-20260224.md app/README.md tools/api_server/README.md README.md" in /Users/james/Repos/wibandwob-dos[stderr] exec[stderr] 
+/bin/zsh -lc "rg -n --glob '"'!.codex-logs/**'"' \"test_pattern\" CLAUDE.md AGENTS.md .claude/skills .pi/skills .planning README.md app/README.md tools/api_server/README.md" in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc "rg -n --glob '"'!.codex-logs/**'"' \"_command_tool_builders\\(|mcp_tools\\.py\" .claude/skills CLAUDE.md .pi/skills README.md .planning -g '*.md'" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 50ms:
+Total output lines: 207
+
+app/README.md:58:- `test_pattern.h`, `test_pattern.cpp` - Test pattern generation
+tools/api_server/README.md:42:- **test_pattern** — Test pattern generator with gradients and wallpaper (protocol slug)
+tools/api_server/README.md:99:  - `curl -X POST localhost:8089/windows -H 'Content-Type: application/json' -d '{"type":"test_pattern","title":"TP #1","rect":{"x":2,"y":1,"w":40,"h":12}}'`
+tools/api_server/README.md:255:    "defaults": {"view_type": "test_pattern"},
+.planning/parking-lot.md:18:- [x] `spike` #100 — rename test_pattern binary/class to wwdos + DRY docs pass (merged 2026-02-24)
+.planning/retros/retro-figlet-catalogue-menu-wiring.md:45:- pi1 and pi2 both editing `test_pattern_app.cpp` → lost work
+.claude/skills/ww-build-test/SKILL.md:119:- Socket: `/tmp/wwdos.sock` (legacy fallback: `/tmp/test_pattern_app.sock`)
+.claude/skills/ww-audit/SKILL.md:34:1. Registry gap — type has no slug → saves as `test_pattern` fallback silently
+.claude/skills/ww-audit/SKILL.md:53:Fail signal: no output → type saves as `test_pattern`.
+.claude/skills/ww-audit/SKILL.md:239:  (`test_pattern`) when no match. No warning. Always check the saved JSON `type` field.
+.planning/audits/command-surface-audit-20260224.md:218:| `test_pattern` | ✅ | ✅ | ✅ | Protocol slug (kept) |
+.claude/skills/ww-build-game/SKILL.md:367:| 6 | Socket "already in use" | TUI won't start, no IPC | Stale socket from crashed session | `rm -f /tmp/wwdos.sock* /tmp/test_pattern_app.sock*` |
+.claude/skills/ww-build-game/SKILL.md:391:rm -f /tmp/wwdos.sock /tmp/wwdos.sock.lock /tmp/test_pattern_app.sock /tmp/test_pattern_app.sock.lock
+.claude/skills/ww-build-game/SKILL.md:451:rm -f /tmp/wwdos.sock* /tmp/test_pattern_app.sock*
+.planning/audits/codex-e009-menu-review-20260219-102942.log:13:Read the uncommitted git diff (run: git diff) on branch feat/e009-menu-system-redesign. The diff touches app/test_pattern_app.cpp (menu cleanup, dead-end removal, new Help items, registerWindow fix, API Key dialog enhancement). Also read the full current state of app/test_pattern_app.cpp lines 140-220 (command constants) and the menu construction function initMenuBar(). Check for these specific correctness issues: (1) Any remaining command ID collisions among all cmXxx constants (2) Menu accelerator key conflicts (the tilde-marked letters like ~T~ must be unique within each menu) (3) Whether the registerWindow(w) call for cmTextEditor is correct — check what createTextEditorWindow returns and whether registerWindow expects a TWindow* (4) Any dispatch case handlers left orphaned without corresponding menu items, or menu items without handlers (5) Dialog layout correctness for the enhanced API Key dialog — verify TRect coordinates don't overlap and buttons are inside the dialog bounds (56x14). Focus ONLY on correctness bugs, not style.
+.planning/audits/codex-e009-menu-review-20260219-102942.log:23:I’ll inspect the current `git diff`, then read `app/test_pattern_app.cpp` around the command constants and `initMenuBar()` to verify the five correctness checks you listed. I’ll report only concrete bugs and mismatches.
+.planning/audits/codex-e009-menu-review-20260219-102942.log:25:/bin/zsh -lc 'git diff -- app/test_pattern_app.cpp' in /Users/james/Repos/wibandwob-dosexec
+.planning/audits/codex-e009-menu-review-20260219-102942.log:26:/bin/zsh -lc "nl -ba app/test_pattern_app.cpp | sed -n '140,260p'" in /Users/james/Repos/wibandwob-dos succeeded in 161ms:
+ succeeded in 52ms:
+.claude/skills/ww-scaffold-view/SKILL.md:3:description: Scaffold a new TView window type for WibWob-DOS. Generates C++ header/implementation, patches CMakeLists.txt, and optionally wires menu, command registry, IPC, REST, and MCP surfaces based on requested parity scope. Use when user says "scaffold view", "new view", "add window type", "ww-scaffold-view", or describes wanting a new TView subclass in the TUI app.
+.claude/skills/ww-scaffold-view/SKILL.md:19:| `parity_scope` | no | `ui+registry` | `ui-only`, `ui+registry`, `full-parity`. Default: `ui+registry` |
+.claude/skills/ww-scaffold-view/SKILL.md:29:| `full-parity` | yes | yes | yes | yes | yes | yes | yes | yes |
+.claude/skills/ww-scaffold-view/SKILL.md:49:### 5. Patch registry (if `ui+registry` or `full-parity`)
+.claude/skills/ww-scaffold-view/SKILL.md:54:### 6. Patch Python surfaces (only `full-parity`)
+.claude/skills/ww-scaffold-view/SKILL.md:85:uv run --with pytest pytest tests/contract/test_window_type_parity.py tests/contract/test_surface_parity_matrix.py -v
+.claude/skills/ww-scaffold-view/SKILL.md:87:If this fails, you missed a surface. Fix it before committing. See `CLAUDE.md` "Parity Law" section.
+AGENTS.md:100:3. Add tests for parity/contracts/state sanity when refactoring command surfaces.
+AGENTS.md:103:## Parity Law (MANDATORY)
+AGENTS.md:105:Every new window type or command must be wired across ALL surfaces in one PR: C++ registry, Python enum/schema, MCP tools, Node MCP. Run the parity gate before committing:
+AGENTS.md:107:uv run --with pytest pytest tests/contract/test_window_type_parity.py tests/contract/test_surface_parity_matrix.py tests/contract/test_node_mcp_parity.py -v
+AGENTS.md:109:Full checklists: `CLAUDE.md` "Parity Law" section. Architecture: `.planning/audits/command-surface-audit-20260224.md`.
+.planning/audits/command-surface-audit-20260224.md:5:**Scope:** All command/control surfaces, discovery paths, parity gaps, and bugs
+.planning/audits/command-surface-audit-20260224.md:106:### P1 — High (broken features / parity drift)
+.planning/README.md:41:- `refactor/parity-audit`
+.planning/README.md:60:test(contracts): add parity validation for menu vs capabilities
+.planning/README.md:82:| Epic | `eNNN-` | `e001-command-parity-refactor/` | `e001-epic-brief.md` |
+.planning/README.md:255:1. Epic: command/capability parity refactor
+.planning/README.md:257:3. Story PR-1: registry skeleton + first capability-driven path + parity/schema tests
+.planning/README.md:258:4. Story PR-2+: expand parity coverage and enforce drift tests
+[stderr]  succeeded in 52ms:[stderr] 
+CLAUDE.md:376:| 3 | `tools/api_server/mcp_tools.py` | Add MCP tool builder in `_command_tool_builders()` |
+.planning/epics/e005-theme-runtime-wiring/e005-epic-brief.md:45:| MCP tools | Done — `tools/api_server/mcp_tools.py:214-220` | None |
+.planning/epics/e005-theme-runtime-wiring/e005-epic-brief.md:83:| `tools/api_server/mcp_tools.py:214-220` | MCP tool registration — working, no changes needed |
+.pi/skills/wibwobdos/references/integrating-vendor-views.md:24:| 14 | MCP docstring | `tools/api_server/mcp_tools.py` | Update `tui_create_window` docstring |
+.claude/skills/ww-scaffold-view/SKILL.md:58:- `tools/api_server/mcp_tools.py` — update valid types in docstring
+[stderr] 
+[stderr] thinking
+**Planning exhaustive parity search**
+[stderr] codex
+I found parity references in the newly touched files, plus several likely gaps in adjacent docs (`ww-build-game`, `ww-audit`, `ww-api-smoke`, `ww-launch`, `app/README.md`, `tools/api_server/README.md`, vendor integration notes). Next I’m pulling targeted snippets around those sections and the command-addition guidance in `CLAUDE.md` to trace the end-to-end developer path.
+[stderr] exec
+/bin/zsh -lc 'rg -n -C3 "Adding a new command|_command_tool_builders|schemas.py|models.py|id vs win_id|Parity Law" CLAUDE.md' in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '340,405p' CLAUDE.md" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc 'rg -n -C3 "parity|pytest tests/contract|standard|strict" .claude/skills/ww-build-test/SKILL.md' in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,120p' .claude/skills/ww-build-test/SKILL.md" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 52ms:
+347-
+348-These tests auto-derive from C++ source — no hardcoded mapping tables. They will fail immediately if a new C++ type or command is added without updating the Python side.
+349-
+350:### ⛔ Parity Law — read this before adding ANY window type or command
+351-
+352-**Every new window type or command MUST be wired across ALL surfaces in one PR.** Partial wiring is a bug. The parity tests enforce this — run them before committing.
+353-
+--
+361-| 2 | `app/wwdos_app.cpp` | Add `#include`, command constant, factory function, menu item, `handleEvent` case |
+362-| 3 | `app/CMakeLists.txt` | Add `.cpp` to `wwdos` target sources |
+363-| 4 | `app/command_registry.cpp` | Add `open_<name>` capability + dispatch case |
+364:| 5 | `tools/api_server/models.py` | Add to `WindowType` enum |
+365:| 6 | `tools/api_server/schemas.py` | Add to `WindowCreate.type` Literal |
+366-| 7 | Run parity gate | `uv run --with pytest pytest tests/contract/test_window_type_parity.py tests/contract/test_surface_parity_matrix.py -v` |
+367-
+368-If step 7 fails, you missed a surface. Fix it before committing.
+369-
+370:### Adding a new command (ALL steps mandatory)
+371-
+372-| # | File | What |
+ succeeded in 52ms:
+---
+name: ww-build-test
+description: Build and verify WibWob-DOS in one shot. Compiles C++ TUI app, runs ctests, checks API health, runs IPC smoke tests, validates state JSON, and optionally captures screenshots for visual review. Use when user says "build", "build and test", "verify build", "ww-build-test", or after editing C++ files that need compilation.
+---
+
+# ww-build-test
+
+One-shot build, test, and verify cycle for WibWob-DOS.
+
+## Modes
+
+| Mode | What runs |
+|------|-----------|
+| `quick` | build + ctest + health check |
+| `standard` | quick + API smoke + IPC smoke + **parity gate** |
+| `strict` | standard + planning brief validation + `gh status` |
+| `screenshot` | quick + TUI screenshot capture for visual review |
+
+Default: `quick`
+
+ succeeded in 52ms:
+12-| Mode | What runs |
+13-|------|-----------|
+14-| `quick` | build + ctest + health check |
+15:| `standard` | quick + API smoke + IPC smoke + **parity gate** |
+16:| `strict` | standard + planning brief validation + `gh status` |
+17-| `screenshot` | quick + TUI screenshot capture for visual review |
+18-
+19-Default: `quick`
+--
+36-```bash
+37-curl -sf http://127.0.0.1:8089/health
+38-```
+39:If not running and mode >= `standard`: `./start_api_server.sh &` then retry.
+40-
+41:### 4. IPC smoke (standard+)
+42-Requires TUI app + API server running:
+43-```bash
+44-uv run tools/api_server/test_ipc.py 2>&1
+45-```
+46-
+ succeeded in 52ms:
+
+The C++ command registry (`app/command_registry.cpp`) and window type registry (`app/window_type_registry.cpp`) are the single sources of truth. Python enums, schemas, and MCP tool builders must stay in sync.
+
+**Automated enforcement** (run these tests before merging):
+```bash
+uv run --with pytest pytest tests/contract/test_window_type_parity.py tests/contract/test_surface_parity_matrix.py tests/contract/test_node_mcp_parity.py -v
+```
+
+These tests auto-derive from C++ source — no hardcoded mapping tables. They will fail immediately if a new C++ type or command is added without updating the Python side.
+
+### ⛔ Parity Law — read this before adding ANY window type or command
+
+**Every new window type or command MUST be wired across ALL surfaces in one PR.** Partial wiring is a bug. The parity tests enforce this — run them before committing.
+
+Detailed checklist: `.claude/skills/ww-scaffold-view/SKILL.md` (window types) or the command checklist below.
+
+### Adding a new window type (ALL steps mandatory)
+
+| # | File | What |
+|---|------|------|
+[stderr] 
+[stderr] thinking
+**Searching PR template files**
+[stderr] codex
+I’ve confirmed `CLAUDE.md` and `ww-build-test` now carry the new parity gate clearly. Next I’m checking the adjacent skills/docs and PR template to see where the developer journey still has blind spots (especially game scaffolding, launch/smoke flows, and external-facing READMEs).
+[stderr] exec
+/bin/zsh -lc 'rg -n -C3 "WindowType|schemas.py|models.py|parity|new view|window type|command" app/README.md tools/api_server/README.md README.md .planning/README.md' in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc 'rg -n -C3 "parity|models.py|schemas.py|mcp_tools|Node MCP|full-parity" .claude/skills/ww-scaffold-view/SKILL.md .claude/skills/ww-build-game/SKILL.md .claude/skills/ww-audit/SKILL.md .claude/skills/ww-api-smoke/SKILL.md .claude/skills/ww-launch/SKILL.md .pi/skills/wibwobdos/SKILL.md .pi/skills/wibwobdos/references/integrating-vendor-views.md' in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc "rg --files .github | rg 'pull|PULL|template'" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 51ms:
+.github/pull_request_template.md
+[stderr]  succeeded in 51ms:
+README.md-32-|---|---|---|
+README.md-33-| Spawn windows | Menu / keyboard | MCP tools / REST API |
+README.md-34-| Arrange layouts | Drag, cascade, tile | Programmatic positioning |
+README.md:35:| Create generative art | Menu commands | API calls with parameters |
+README.md-36-| Write text to editors | Type directly | `send_text` / `send_figlet` |
+README.md-37-| Save/load workspaces | File menu | API endpoints |
+README.md-38-| Capture screenshots | Ctrl+P | `POST /screenshot` (`.txt`/`.ans` canonical output) |
+--
+README.md-48-Embedded Wib&Wob chat powered by Claude Code SDK with MCP tool access. The agent sees the desktop state, spawns windows, populates them with art and text, and persists memory across sessions via [symbient-brain](https://brain.zilla.workers.dev/symbient/wibwob).
+README.md-49-
+README.md-50-### Text-Native Web Browser
+README.md:51:Open web pages directly in Turbo Vision with readable markdown rendering, link navigation/history, figlet heading modes, ANSI image modes (`none`, `key-inline`, `all-inline`, `gallery`), and companion gallery sync. Browser control is available to both human and AI via menu commands, REST API, and MCP tools.
+README.md-52-
+README.md-53-### 8+ Generative Art Engines
+README.md-54-Verse Field (flow/swirl/weave) · Mycelium Field · Monster Portal · Monster Verse · Torus Field · Cube Spinner · Orbit Field · Monster Cam · Game of Life
+--
+README.md-196-
+README.md-197-**Core stack**: C++14 / Turbo Vision / ncurses · Python / FastAPI / MCP · Claude Code SDK · Node.js bridge
+README.md-198-
+README.md:199:Detailed agent-facing architecture (command registry, IPC surfaces, auth/providers) is documented in `CLAUDE.md`.
+ succeeded in 51ms:
+.pi/skills/wibwobdos/SKILL.md-238-
+.pi/skills/wibwobdos/SKILL.md-239-Before merging any PR that touches commands or window types:
+.pi/skills/wibwobdos/SKILL.md-240-```bash
+.pi/skills/wibwobdos/SKILL.md:241:uv run --with pytest pytest tests/contract/test_window_type_parity.py tests/contract/test_surface_parity_matrix.py tests/contract/test_node_mcp_parity.py -v
+.pi/skills/wibwobdos/SKILL.md-242-```
+.pi/skills/wibwobdos/SKILL.md-243-
+.pi/skills/wibwobdos/SKILL.md-244-Full wiring checklists: see `CLAUDE.md` "Parity Law" section.
+--
+.pi/skills/wibwobdos/SKILL.md-255-| `ww-api-smoke` | "smoke test", "check API" | Quick pass/fail sweep of all API endpoints |
+.pi/skills/wibwobdos/SKILL.md-256-| `ww-build-test` | "build and test", "verify build" | Compile C++ + ctests + API health + IPC smoke |
+.pi/skills/wibwobdos/SKILL.md-257-| `screenshot` | "take a screenshot", "what does the TUI look like" | Capture TUI screen buffer as text + state JSON |
+.pi/skills/wibwobdos/SKILL.md:258:| `ww-audit` | "parity audit", "did this work" | Post-implementation gap matrix across registry / API / workspace / screenshot |
+--
+.claude/skills/ww-scaffold-view/SKILL.md-1----
+.claude/skills/ww-scaffold-view/SKILL.md-2-name: ww-scaffold-view
+.claude/skills/ww-scaffold-view/SKILL.md:3:description: Scaffold a new TView window type for WibWob-DOS. Generates C++ header/implementation, patches CMakeLists.txt, and optionally wires menu, command registry, IPC, REST, and MCP surfaces based on requested parity scope. Use when user says "scaffold view", "new view", "add window type", "ww-scaffold-view", or describes wanting a new TView subclass in the TUI app.
+.claude/skills/ww-scaffold-view/SKILL.md-4----
+.claude/skills/ww-scaffold-view/SKILL.md-5-
+.claude/skills/ww-scaffold-view/SKILL.md-6-# ww-scaffold-view
+--
+[stderr] 
+[stderr] thinking
+**Planning exhaustive parity scan**
+[stderr] codex
+I’ve identified likely gaps, but to avoid missing any hidden workflow docs I’m doing one repo-wide markdown scan for “developer-path” docs/skills (scaffold/build/test/verify/add command/view) and cross-checking which of those still have no parity mention. Then I’ll trace each requested scenario against the exact docs.
+[stderr] exec
+/bin/zsh -lc "zsh -lc '
+files="'$(rg --files -g "*.md" . | rg -v "''^'"\\.codex-logs/\")
+for f in "'$files; do
+  if rg -qi "(new window|window type|new view|add(ing)? (a )?command|command registry|build and test|verify build|smoke test|parity audit|scaffold|create.*window|MCP tools|REST API|skills?)" "$f"; then
+    if ! rg -qi "Parity Law|parity gate|parity" "$f"; then
+      print -r -- "$f"
+    fi
+  fi
+done | sort -u
+'"'" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 105ms:
+rg: ./tui-screenshot-20260221_160432.md
+./HANDOVER.md
+./README.md
+./CLAUDE.md
+./AGENTS.md
+./modules/README.md
+./rooms/multiplayer-example.md
+./rooms/example.md
+./modules/wibwob-figlet-fonts/README.md
+./docs/migration/vnext-migration-plan.md
+./memories/2026/02/20260217-teleport-rooms.md
+./memories/2026/02/20260217-183200-headless-tui-testing.md
+./memories/2026/02/20260217-tmux-dashboard-plan.md
+./memories/2026/02/20260217-retro-browser-llm-tunnel-vision.md
+./memories/2026/02/20260217-inter-instance-agent-chat.md
+./docs/readme-stub.md
+./docs/manifestos/symbient-os-manifesto-template.md
+./docs/CODEX-RETRO-20260218.md
+./docs/readme-improvement-prompt.md
+./docs/architecture/parity-drift-audit.md
+[stderr] 
+[stderr] thinking
+**Refining targeted file scanning**
+[stderr] codex
+The broad scan was too noisy because it pulled in archives/vendor docs. I’m narrowing it to first-party agent skills and top-level project docs so the parity coverage audit maps to real contributor paths instead of historical logs.
+[stderr] exec
+/bin/zsh -lc "zsh -lc '
+rg --files CLAUDE.md AGENTS.md .claude/skills .pi/skills .planning app tools/api_server README.md -g \"*.md\" 2>/dev/null \\
+| rg -v \""'^'"\\.codex-logs/|"'^'"\\.planning/(audits|retros|parking-lot)|"'^'"\\.planning/epics/|"'^'"\\.pi/skills/.*/artifacts/\" \\
+| while IFS= read -r f; do
+    if rg -qi \"(new window|window type|new view|add(ing)? a new command|command registry|build and test|verify build|smoke-test|smoke test|launch|scaffold|MCP|REST API|create_window\\(|tool builder|parity audit)\" \""'$f"; then
+      if ! rg -qi "Parity Law|parity gate|parity" "$f"; then
+        print -r -- "$f"
+      fi
+    fi
+  done | sort -u
+'"'" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 1.03s:
+.claude/skills/doc-coauthoring/SKILL.md
+.claude/skills/hook-creator/SKILL.md
+.claude/skills/hook-creator/references/hook-events.md
+.claude/skills/hook-creator/references/patterns.md
+.claude/skills/ww-api-smoke/SKILL.md
+.claude/skills/ww-launch/SKILL.md
+.pi/skills/wibwobdos/references/cross-platform-cpp.md
+README.md
+app/README.md
+app/wibwob-mcp-native-tools-prd.md
+tools/api_server/README.md
+[stderr] 
+[stderr] thinking
+**Reviewing skill and doc coverage**
+[stderr] exec
+/bin/zsh -lc 'rg -n -C4 "capabilities|command discovery|get_capabilities|parity|/capabilities|menu/command|registry" .claude/skills/ww-api-smoke/SKILL.md' in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc 'rg -n -C4 "pytest|parity|contract|test_window_type_parity|test_surface_parity_matrix|test_node_mcp_parity" .claude/skills/ww-audit/SKILL.md' in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc 'rg -n -C4 "parity|models.py|schemas.py|mcp_tools.py|test_window_type_parity|test_surface_parity_matrix|test_node_mcp_parity|full-parity" .claude/skills/ww-build-game/SKILL.md' in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc 'rg -n -C4 "capabilities|verify|smoke|parity|health|/capabilities|ww-build-test|ww-audit" .claude/skills/ww-launch/SKILL.md' in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 51ms:
+1----
+2-name: ww-audit
+3-description: >
+4:  Post-implementation parity audit for WibWobDOS. Checks that a window type
+5-  (or the whole system) has full coverage across: registry slug, workspace save
+6-  props, workspace restore, API state props, and screenshot truth. Also supports
+7-  workspace-diff mode (live state vs saved JSON) and a full system gap matrix.
+8:  Use after implementing any new window type, after E013-style parity work, or
+9-  whenever "did this actually work?" is the question.
+10-triggers:
+11-  - /ww-audit
+12-  - /audit
+13-  - /sensecheck
+14-  - "audit <type>"
+15:  - "parity check"
+16-  - "did workspace save work"
+17-  - "check registry gaps"
+18-usage: |
+19-  /ww-audit                        # full system: registry + props + screenshot[stderr] 
+ succeeded in 51ms:
+63-- metadata (timestamp, endpoint, status, window_id)
+64-- raw response body
+65-- extracted field (if available)
+66-
+67:## ⚠️ /menu/command response envelope
+68-
+69:`POST /menu/command` returns a double-wrapped envelope — the C++ IPC result
+70-is a **JSON string** inside `outer["result"]`, not a top-level object:
+71-
+72-```json
+73-{"ok": true, "result": "{\"messages\":[...]}"}
+ succeeded in 51ms:
+117-```bash
+118-API=http://127.0.0.1:8089
+119-
+120-# Health
+121:curl -s $API/health
+122-
+123-# App state — lists all open windows with id, type, focused flag
+124-curl -s $API/state | python3 -m json.tool
+125-
+--
+142-
+143-# ── Other window types ──────────────────────────────────────────────────────
+144-curl -s $API/windows -X POST -H "Content-Type: application/json" -d '{"type":"paint"}'
+145-curl -s $API/windows -X POST -H "Content-Type: application/json" -d '{"type":"browser"}'
+146:# Full list: curl -s $API/capabilities | python3 -m json.tool | grep '"type"'
+147-
+148-# ── Close a window ──────────────────────────────────────────────────────────
+149-curl -s $API/windows/$WIN_ID/close -X POST
+150-
+ succeeded in 51ms:
+327-| 4 | `app/command_registry.cpp` | **3 spots**: `extern void api_spawn_*(...)`, capability `{"open_*", "description", false}`, dispatch `if (name == "open_*") { api_spawn_*(app, boundsPtr); return "ok"; }` |
+328-| 5 | `app/CMakeLists.txt` | Add `game_view.cpp` to wwdos sources list |
+329-| 6 | `app/command_registry_test.cpp` | Stub `void api_spawn_*(TWwdosApp&, const TRect*) {}` AND test token `"\"name\":\"open_*\""` |
+330-| 7 | `app/scramble_engine_test.cpp` | Same stub (both test executables link command_registry.cpp) |
+331:| 8 | (Optional) `tools/api_server/models.py` | `WindowType` enum for REST/MCP parity |
+332-
+333-### Finding the Next Command ID
+334-
+335-Scan for highest `const ushort cm* = NNN;` in `app/wwdos_app.cpp` (around line 225). Use NNN+1. Current highest: `cmRogueHackTerminal = 218`.
+[stderr] 
+[stderr] thinking
+**Investigating parity test mentions**
+[stderr] codex
+The initial snippets confirm `ww-build-game` still treats Python parity wiring as optional, and `ww-api-smoke`/`ww-launch` appear to reference capabilities but not the parity gate. I’m reading just the relevant sections to pin exact line refs and verify what they actually instruct the agent to validate.
+[stderr] exec
+/bin/zsh -lc "sed -n '300,380p' .claude/skills/ww-build-game/SKILL.md" in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc "sed -n '1,120p' .claude/skills/ww-audit/SKILL.md" in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc "sed -n '1,140p' .claude/skills/ww-api-smoke/SKILL.md" in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc "sed -n '1,180p' .claude/skills/ww-launch/SKILL.md" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 51ms:
+**Step 3**: Handle in wwdos_app.cpp:
+```cpp
+case cmRogueHackTerminal: {
+    TRect desk = deskTop->getExtent();
+    TRect termBounds(desk.b.x - 52, 1, desk.b.x - 1, 19);
+    TWindow* tw = createTerminalWindow(termBounds);
+    if (tw) {
+        deskTop->insert(tw);
+        registerWindow(tw);
+        auto* termWin = dynamic_cast<TWibWobTerminalWindow*>(tw);
+        if (termWin)
+            termWin->sendText("echo '=== HACK COMPLETE ==='\n");
+    }
+    clearEvent(event);
+    break;
+}
+```
+
+`sendText()` injects text byte-by-byte as keyboard events into the terminal emulator. Include `"tvterm_view.h"` for `TWibWobTerminalWindow`.
+
+[stderr]  succeeded in 51ms:
+---
+name: ww-audit
+description: >
+  Post-implementation parity audit for WibWobDOS. Checks that a window type
+  (or the whole system) has full coverage across: registry slug, workspace save
+  props, workspace restore, API state props, and screenshot truth. Also supports
+  workspace-diff mode (live state vs saved JSON) and a full system gap matrix.
+  Use after implementing any new window type, after E013-style parity work, or
+  whenever "did this actually work?" is the question.
+triggers:
+  - /ww-audit
+  - /audit
+  - /sensecheck
+  - "audit <type>"
+  - "parity check"
+  - "did workspace save work"
+  - "check registry gaps"
+usage: |
+  /ww-audit                        # full system: registry + props + screenshot
+  /ww-audit <type>                 # single type: registry + save/restore + props
+[stderr]  succeeded in 52ms:
+---
+name: ww-api-smoke
+description: Smoke-test WibWob-DOS API endpoints and dump timestamped response files. Quick pass/fail for any endpoint, plus browser open->get_content auto-flow.
+---
+
+# ww-api-smoke
+
+Run deterministic API smoke checks and save results for review.
+
+## Use when
+- You need a quick pass/fail check on one endpoint or a small flow.
+- You want reproducible debug artifacts in files (raw + extracted output).
+- You need browser API verification (`/browser/open`, `/browser/get_content`) without manual copying.
+
+## Fast path
+
+```bash
+# From repo root:
+.claude/skills/ww-api-smoke/scripts/smoke_api.sh \
+  --base http://127.0.0.1:8089 \
+[stderr]  succeeded in 51ms:
+---
+name: ww-launch
+description: Launch WibWob-DOS (TUI + API server), open W&W chat window, self-prompt W&W to confirm it's alive. Open a 4-pane tmux monitor (TUI + chat log + debug log + command pane). Wraps scripts/dev-start.sh — the canonical local dev launcher. Use when you need a live instance for debugging, IPC testing, or screenshot verification. Triggers on "launch wwdos", "start wibwob", "open wibwobdos", "ww-launch", "4-pane monitor", "open monitor", "tmux monitor".
+---
+
+# ww-launch
+
+Canonical local dev launcher: TUI + API + chat open + self-prompt.
+
+## Quick start
+
+```bash
+# 1. Start everything (instance 1, port 8089)
+./scripts/dev-start.sh
+
+# 2. Attach to TUI once so canvas locks to your terminal size, then Ctrl-B D
+tmux attach -t wibwob
+
+# 3. Open the 4-pane monitor (TUI + logs + command pane), then attach
+.agents/skills/ww-launch/scripts/monitor.sh
+[stderr] 
+[stderr] thinking
+**Inspecting vendor and skill docs**
+[stderr] exec
+/bin/zsh -lc "sed -n '220,275p' .pi/skills/wibwobdos/SKILL.md" in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc "sed -n '1,120p' app/README.md" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,140p' .pi/skills/wibwobdos/references/integrating-vendor-views.md" in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc "sed -n '1,140p' tools/api_server/README.md" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 51ms:
+# Send a command  ← result is DOUBLE-WRAPPED: json.loads(outer['result'])
+curl -s $API/menu/command -X POST -H "Content-Type: application/json" \
+  -d '{"command":"get_chat_history"}' \
+  | python3 -c "import sys,json; outer=json.load(sys.stdin); print(json.loads(outer['result']))"
+
+# Chat
+curl -s $API/menu/command -X POST -H "Content-Type: application/json" \
+  -d '{"command":"wibwob_ask","args":{"text":"hello"}}'
+```
+
+### Window IDs
+
+Windows are assigned IDs `w1`, `w2`, etc. in creation order per session.  
+Always read current IDs from `GET /state` — they reset on restart.
+
+## Parity enforcement
+
+The C++ command registry and window type registry are the single source of truth. Python enums, schemas, MCP tools, and Node bridge tools must stay in sync. **Parity drift is the #1 recurring bug in this repo.**
+
+Before merging any PR that touches commands or window types:
+ succeeded in 50ms:
+# Integrating Vendor View Libraries into WibWob-DOS
+
+Retrospective from tvterm integration (Feb 2026). Applies to any external Turbo Vision widget library.
+
+## The checklist
+
+Adding a vendor TView subclass (e.g. tvterm's `BasicTerminalWindow`) touches exactly these surfaces:
+
+| # | Surface | File(s) | Notes |
+|---|---------|---------|-------|
+| 1 | Git submodule | `.gitmodules`, `vendor/<lib>` | `git submodule add <url> vendor/<name>` |
+| 2 | CMake build | root `CMakeLists.txt` | Build the vendor lib as a static lib target |
+| 3 | CMake link | `app/CMakeLists.txt` | Add .cpp to sources, link the new target |
+| 4 | C++ wrapper | `app/<name>_view.h`, `app/<name>_view.cpp` | Thin subclass + factory function |
+| 5 | Command ID | `wwdos_app.cpp` | New `cmXxx` constant in the 100-299 range |
+| 6 | Menu item | `wwdos_app.cpp` `initMenuBar()` | Under appropriate menu (Window, Tools, etc.) |
+| 7 | handleEvent | `wwdos_app.cpp` | Case for new command ID |
+| 8 | API function | `wwdos_app.cpp` | `api_spawn_xxx()` + `friend` declaration |
+| 9 | Command registry | `app/command_registry.cpp` | Capability entry + dispatch case |
+| 10 | Window type registry | `app/window_type_registry.cpp` | spawn/match + k_specs table entry |
+[stderr]  succeeded in 50ms:
+# TUI Applications (C++ Source Guide)
+
+This directory contains the C++ Turbo Vision applications built in this repo.
+
+Operational run recipes (tmux, API, screenshots, Docker) are documented in `.pi/skills/wibwobdos/SKILL.md`. API server behavior and endpoints live in `../tools/api_server/README.md`.
+
+## Applications
+
+### wwdos
+Multi-window test pattern generator with gradients and wallpaper:
+- **Features**: Creates unlimited resizable windows with test patterns, gradient windows (horizontal, vertical, radial, diagonal), cascading/tiling window management, screenshot capability
+- **Animations**: View → Animated Blocks, Animated Gradient, Animated Score (musical ASCII score)
+- **Pattern modes**: Continuous (diagonal flowing patterns) or Tiled (cropped at window edges)
+- **Background**: ASCII art wallpaper with custom desktop
+- **Build**: `cmake . -B ./build && cmake --build ./build`
+- **Run**: `./build/app/wwdos`
+- **Debug logging**: `./run_wwdos_logged.sh` (logs to `wibwob_debug.log` for session IDs, raw JSON, IPC traces)
+
+### simple_tui
+Basic TUI application demonstrating fundamental Turbo Vision usage:
+[stderr]  succeeded in 51ms:
+FastAPI MVP for Programmatic Control API (v1)
+
+Overview
+- Local-only FastAPI server that implements the v1 API described in `prds/programmatic-control-api-prd.md`.
+- In-memory controller models windows, layout, menu commands, properties, workspace, screenshots, and pattern mode.
+- WebSocket event stream broadcasts state changes for reactive clients (humans or LLM tools).
+- Designed for a clean swap to an IPC or in-process adapter that talks to the Turbo Vision app.
+
+Structure
+- `tools/api_server/main.py`: FastAPI app, routes, and WebSocket endpoint.
+- `tools/api_server/controller.py`: In-memory controller; replace with C++ IPC/in-process bridge later.
+- `tools/api_server/models.py`: Domain entities (Window, Rect, AppState, WindowType).
+- `tools/api_server/schemas.py`: Pydantic request/response models (create, move, props, state, etc.).
+- `tools/api_server/events.py`: Broadcast hub for `/ws` clients.
+- `tools/api_server/requirements.txt`: Python dependencies.
+- `tools/api_server/README.md`: This guide.
+
+Install and Run
+- Python: 3.9+ (3.11 recommended). The code is 3.9-compatible.
+- Create venv in API server dir: `cd tools/api_server && python3 -m venv venv`
+[stderr] 
+[stderr] thinking
+**Inspecting README and templates parity**
+[stderr] codex[stderr] 
+I’ve now confirmed the main gap pattern: internal agent docs mention parity, but several execution skills and contributor-facing READMEs don’t surface it where people actually act. Next I’m checking the PR template and contribution paths, plus the command/MCP implementation reality (`_command_tool_builders`) and available contract tests for parameter mismatches.
+[stderr] exec
+/bin/zsh -lc "sed -n '1,220p' .github/pull_request_template.md" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 52ms:
+## Summary
+
+-
+
+## Linked Issue
+
+Closes #
+
+## Scope
+
+- In:
+- Out:
+
+## Acceptance Criteria Checks
+
+- [ ] Every acceptance criterion has at least one test.
+- [ ] Contract/schema changes validated (or no contract changes).
+- [ ] Parity impact reviewed (menu, IPC/API, tool surfaces).
+- [ ] Snapshot/event sanity preserved (or not impacted).
+
+[stderr] exec
+/bin/zsh -lc 'rg -n -C3 "Contributing|CLAUDE.md|Parity|parity" README.md' in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc "rg -n \"win_id|window_id|id\\b|schemas.py|menu/command|param|args\" tests/contract/test_surface_parity_matrix.py tests/contract/test_node_mcp_parity.py tests/contract/test_window_type_parity.py tools/api_server/schemas.py app/command_registry.cpp app/llm/sdk_bridge/mcp_tools.js tools/api_server/mcp_tools.py" in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc "rg -n \"def _command_tool_builders|_command_tool_builders\\(\" tools/api_server/mcp_tools.py app/llm/sdk_bridge/mcp_tools.js tests/contract/test_node_mcp_parity.py tests/contract/test_surface_parity_matrix.py" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 52ms:
+85-./build/app/wwdos
+86-```
+87-
+88:For agent/dev workflows (tmux headless launch, API hot-reload, screenshots, multi-instance socket rules), see `CLAUDE.md` and `.pi/skills/wibwobdos/SKILL.md`.
+89-
+90-### Enable AI Chat
+91-
+--
+113-
+114-## Power User Operations
+115-
+116:Detailed multi-instance, tmux, and browser/PTTY workflows live in `CLAUDE.md` and `.pi/skills/wibwobdos/SKILL.md`.
+117-
+118-### Multi-Instance (Power Users)
+119-
+--
+196-
+197-**Core stack**: C++14 / Turbo Vision / ncurses · Python / FastAPI / MCP · Claude Code SDK · Node.js bridge
+198-
+199:Detailed agent-facing architecture (command registry, IPC surfaces, auth/providers) is documented in `CLAUDE.md`.
+[stderr]  exited 2 in 50ms:
+rg: tools/api_server/mcp_tools.py: No such file or directory (os error 2)
+tests/contract/test_surface_parity_matrix.py:33:    return set(mcp_tools._command_tool_builders().keys())
+tests/contract/test_surface_parity_matrix.py:51:        f"Add entries to _command_tool_builders() in tools/api_server/mcp_tools.py."
+ exited 2 in 51ms:
+rg: tools/api_server/mcp_tools.py: No such file or directory (os error 2)
+tools/api_server/schemas.py:50:    id: str
+tools/api_server/schemas.py:66:    args: Dict[str, Any] = Field(default_factory=dict)
+tools/api_server/schemas.py:129:    win_id: str
+tools/api_server/schemas.py:137:    win_id: str
+tools/api_server/schemas.py:147:    win_id: str
+tools/api_server/schemas.py:158:    win_id: str
+tools/api_server/schemas.py:193:    id: str
+tools/api_server/schemas.py:223:    window_id: Optional[str] = None
+tools/api_server/schemas.py:228:    window_id: str
+tools/api_server/schemas.py:232:    window_id: str
+tools/api_server/schemas.py:238:    window_id: str
+tools/api_server/schemas.py:259:    window_id: str
+tools/api_server/schemas.py:264:    window_id: str
+tools/api_server/schemas.py:315:    op: Literal["create", "move_resize", "close", "zorder", "macro.create_grid", "macro.create_ring"]
+tools/api_server/schemas.py:316:    window_id: Optional[str] = None
+tools/api_server/schemas.py:323:    grid: Optional[GridMacro] = None
+tools/api_server/schemas.py:335:    request_id: str
+tools/api_server/schemas.py:337:    group_id: Optional[str] = None
+tools/api_server/schemas.py:347:    window_id: Optional[str] = None
+[stderr] 
+[stderr] thinking
+**Checking strict mode references**
+[stderr] exec
+/bin/zsh -lc "rg -n --glob '"'!.codex-logs/**'"' \"strict mode|strict only|ww-build-test.*strict|parity.*strict\" CLAUDE.md AGENTS.md .claude/skills .pi/skills README.md .planning -g '*.md'" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 52ms:
+CLAUDE.md:388:This is also run by `ww-build-test` in `strict` mode. **Do not merge PRs that touch command or window type surfaces without a green parity gate.**
+.claude/skills/ww-build-test/SKILL.md:66:### 8. Planning brief check (strict only)
+.claude/skills/ww-build-test/SKILL.md:98:PARITY (strict only)
+.claude/skills/ww-build-test/SKILL.md:101:PLANNING (strict only)
+[stderr] 
+[stderr] thinking[stderr] 
+**Auditing parity and command scope contradictions**
+[stderr] exec[stderr] 
+/bin/zsh -lc "sed -n '1,140p' .claude/skills/ww-scaffold-view/SKILL.md" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 52ms:
+---
+name: ww-scaffold-view
+description: Scaffold a new TView window type for WibWob-DOS. Generates C++ header/implementation, patches CMakeLists.txt, and optionally wires menu, command registry, IPC, REST, and MCP surfaces based on requested parity scope. Use when user says "scaffold view", "new view", "add window type", "ww-scaffold-view", or describes wanting a new TView subclass in the TUI app.
+---
+
+# ww-scaffold-view
+
+Scaffold a new TView window type across WibWob-DOS command surfaces.
+
+## Inputs
+
+Ask for any not provided:
+
+| Input | Required | Example | Notes |
+|-------|----------|---------|-------|
+| `view_name` | yes | `particle_field` | snake_case, becomes `TParticleFieldView` |
+| `window_title` | yes | `"Particle Field"` | Human-readable for TWindow |
+| `type` | yes | `view-only` | `view-only`, `window+view`, `browser-like`, `animation-like` |
+| `parity_scope` | no | `ui+registry` | `ui-only`, `ui+registry`, `full-parity`. Default: `ui+registry` |
+| `issue_id` | no | `#42` | Required for non-trivial work per repo canon |
+[stderr] 
+[stderr] thinking
+**Identifying incomplete parity coverage**
+[stderr] exec[stderr] 
+/bin/zsh -lc 'rg -n -C3 "pytest|ctest|ww-build-test|ww-audit|parity|models.py|schemas.py|window_type_registry|controller.py|mcp_tools.py|test_window_type_parity|test_surface_parity_matrix|test_node_mcp_parity" .claude/skills/ww-build-game/SKILL.md' in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 52ms:
+328-| 5 | `app/CMakeLists.txt` | Add `game_view.cpp` to wwdos sources list |
+329-| 6 | `app/command_registry_test.cpp` | Stub `void api_spawn_*(TWwdosApp&, const TRect*) {}` AND test token `"\"name\":\"open_*\""` |
+330-| 7 | `app/scramble_engine_test.cpp` | Same stub (both test executables link command_registry.cpp) |
+331:| 8 | (Optional) `tools/api_server/models.py` | `WindowType` enum for REST/MCP parity |
+332-
+333-### Finding the Next Command ID
+334-
+--
+379-cmake --build ./build 2>&1 | tail -20
+380-```
+381-
+382:### 2. Run ctests (catches linker/stub issues)
+383-```bash
+384:cd /path/to/repo/build && ctest --output-on-failure
+385-```
+386-
+387-### 3. Start TUI in tmux
+--
+499-## Acceptance Criteria
+500-
+[stderr] 
+[stderr] thinking
+[stderr] **Confirming no parity test references**
+[stderr] codex
+I found a more serious gap than expected: `ww-scaffold-view` still omits `app/window_type_registry.cpp`, which directly reintroduces the classic “saves as fallback type” parity drift. I’m now validating route/function reality (`/commands` vs `/capabilities`, `mcp_tools.py` path/name) and checking what the contract tests actually catch for command parameter mismatches.
+[stderr] exec
+/bin/zsh -lc 'rg -n "_command_tool_builders|command_tool_builders|tui_menu_command|tui_create_window" tools/api_server/*.py app/llm/sdk_bridge/mcp_tools.js' in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc "rg -n \"@app\\.(get|post)\\(\\\"/(commands|capabilities)\\\"\" tools/api_server/main.py" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc 'rg -n -C3 "param|args|window_id|id|schema|mismatch|discover|capabilities" tests/contract/test_surface_parity_matrix.py tests/contract/test_node_mcp_parity.py' in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "ls tools/api_server | rg 'mcp'" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 51ms:
+app/llm/sdk_bridge/mcp_tools.js:7: *   - tui_menu_command: executes any command by name with args
+app/llm/sdk_bridge/mcp_tools.js:50:                "Discover ALL available TUI commands with descriptions and parameter hints. Call this FIRST to see what you can do, then use tui_menu_command to execute any command by name. Returns the full live C++ command registry.",
+app/llm/sdk_bridge/mcp_tools.js:63:                "tui_menu_command",
+[stderr]  exited 1 in 52ms:
+
+ succeeded in 52ms:
+131:    @app.get("/capabilities", response_model=Capabilities)
+141:    @app.get("/commands",
+ succeeded in 52ms:
+tests/contract/test_surface_parity_matrix.py-1-"""Auto-derived surface parity: C++ command registry → MCP tool builders.
+tests/contract/test_surface_parity_matrix.py-2-
+tests/contract/test_surface_parity_matrix.py:3:Parses both sides from source — no hardcoded mapping dicts. Adding a command
+tests/contract/test_surface_parity_matrix.py:4:to get_command_capabilities() without a matching MCP tool builder will fail.
+tests/contract/test_surface_parity_matrix.py-5-"""
+tests/contract/test_surface_parity_matrix.py-6-from __future__ import annotations
+tests/contract/test_surface_parity_matrix.py-7-
+--
+tests/contract/test_surface_parity_matrix.py-17-
+tests/contract/test_surface_parity_matrix.py-18-
+tests/contract/test_surface_parity_matrix.py-19-def _registry_commands() -> set[str]:
+tests/contract/test_surface_parity_matrix.py:20:    """Parse all command names from get_command_capabilities() in command_registry.cpp."""
+tests/contract/test_surface_parity_matrix.py-21-    src = (REPO_ROOT / "app" / "command_registry.cpp").read_text(encoding="utf-8")
+tests/contract/test_surface_parity_matrix.py-22-    return set(re.findall(r'\{"([a-z_]+)"\s*,\s*"[^"]+"\s*,\s*(?:true|false)\}', src))
+tests/contract/test_surface_parity_matrix.py-23-
+--
+tests/contract/test_node_mcp_parity.py-2-
+tests/contract/test_node_mcp_parity.py-3-These tests parse source files directly — no running servers needed.
+tests/contract/test_node_mcp_parity.py-4-They catch drift between:
+tests/contract/test_node_mcp_parity.py:5:  - app/llm/sdk_bridge/mcp_tools.js (Node MCP tools for embedded agent)
+[stderr] 
+[stderr] thinking
+**Noticing missing referenced file**
+[stderr] exec
+/bin/zsh -lc "ls -1 tools/api_server | sed -n '1,120p'" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 52ms:
+README.md
+__init__.py
+__main__.py
+__pycache__
+browser.py
+browser_pipeline.py
+controller.py
+dump_browser_bundle.sh
+events.py
+gallery.py
+ipc_client.py
+live_api_parity_suite.py
+main.py
+models.py
+monodraw_parser.py
+move_wwdos.py
+requirements.txt
+schemas.py
+test_browser_ipc.py
+test_ipc.py
+[stderr] 
+[stderr] thinking[stderr] 
+**Searching for MCP tools references**
+[stderr] codex
+There’s a larger coherence break: `tools/api_server/mcp_tools.py` does not exist in this checkout, but the new Parity Law docs and parity tests still reference it. I’m tracing where Python MCP tooling actually lives now and whether the tests/docs were updated incompletely.
+[stderr] exec
+/bin/zsh -lc "sed -n '1,240p' tests/contract/test_node_mcp_parity.py" in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc "sed -n '1,220p' tests/contract/test_surface_parity_matrix.py" in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc 'rg -n "fastapi-mcp|FastAPI-MCP|mcp|tui_create_window|@mcp|MCP" tools/api_server/main.py tools/api_server/*.py' in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 51ms:
+"""Contract tests: Node MCP tools must stay in sync with Python MCP surface.
+
+These tests parse source files directly — no running servers needed.
+They catch drift between:
+  - app/llm/sdk_bridge/mcp_tools.js (Node MCP tools for embedded agent)
+  - tools/api_server/mcp_tools.py (Python MCP tools for external clients)
+  - app/llm/sdk_bridge/claude_sdk_bridge.js (SDK bridge tool whitelist)
+"""
+from __future__ import annotations
+
+import re
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+NODE_MCP = ROOT / "app" / "llm" / "sdk_bridge" / "mcp_tools.js"
+PY_MCP = ROOT / "tools" / "api_server" / "mcp_tools.py"
+BRIDGE = ROOT / "app" / "llm" / "sdk_bridge" / "claude_sdk_bridge.js"
+
+
+def _node_tool_names() -> set[str]:
+[stderr]  succeeded in 51ms:
+"""Auto-derived surface parity: C++ command registry → MCP tool builders.
+
+Parses both sides from source — no hardcoded mapping dicts. Adding a command
+to get_command_capabilities() without a matching MCP tool builder will fail.
+"""
+from __future__ import annotations
+
+import re
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+import tools.api_server.mcp_tools as mcp_tools
+
+
+def _registry_commands() -> set[str]:
+    """Parse all command names from get_command_capabilities() in command_registry.cpp."""
+[stderr]  succeeded in 53ms:
+tools/api_server/test_terminal_read.py:118:        # Verify the stripping logic used by REST endpoint and MCP tool
+tools/api_server/main.py:15:# MCP Integration
+tools/api_server/main.py:17:    from fastapi_mcp import FastApiMCP
+tools/api_server/main.py:18:    MCP_AVAILABLE = True
+tools/api_server/main.py:20:    MCP_AVAILABLE = False
+tools/api_server/main.py:971:    # MCP Integration
+tools/api_server/main.py:972:    if MCP_AVAILABLE:
+tools/api_server/main.py:973:        mcp = FastApiMCP(app)
+tools/api_server/main.py:974:        mcp.mount_http()  # Mounts MCP server at /mcp with HTTP transport
+tools/api_server/main.py:975:        print("✅ MCP server mounted at /mcp")
+tools/api_server/main.py:976:        print("🔗 MCP URL: http://127.0.0.1:8089/mcp")
+tools/api_server/main.py:978:        print("⚠️  MCP not available - install 'fastapi-mcp' for MCP support")
+tools/api_server/main.py:15:# MCP Integration
+tools/api_server/main.py:17:    from fastapi_mcp import FastApiMCP
+tools/api_server/main.py:18:    MCP_AVAILABLE = True
+tools/api_server/main.py:20:    MCP_AVAILABLE = False
+tools/api_server/main.py:971:    # MCP Integration
+tools/api_server/main.py:972:    if MCP_AVAILABLE:
+tools/api_server/main.py:973:        mcp = FastApiMCP(app)
+tools/api_server/main.py:974:        mcp.mount_http()  # Mounts MCP server at /mcp with HTTP transport
+[stderr] 
+[stderr] thinking
+**Identifying stale parity references and testing gaps**
+[stderr] exec
+/bin/zsh -lc "rg -n \"@app\\.post\\(\\\"/exec\\\"|/exec\\\"\" tools/api_server/main.py" in /Users/james/Repos/wibandwob-dos[stderr]  exited 1 in 52ms:
+[stderr] 
+[stderr] 
+[stderr] thinking
+**Inspecting README for parity notes**
+[stderr] exec
+/bin/zsh -lc "sed -n '70,220p' README.md" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 52ms:
+
+---
+
+## Quick Start
+
+```bash
+# Clone with submodules (Turbo Vision library)
+git clone --recursive https://github.com/j-greig/wibandwob-dos.git
+cd wibandwob-dos
+
+# Build
+cmake . -B ./build -DCMAKE_BUILD_TYPE=Release
+cmake --build ./build
+
+# Run WibWob-DOS
+./build/app/wwdos
+```
+
+For agent/dev workflows (tmux headless launch, API hot-reload, screenshots, multi-instance socket rules), see `CLAUDE.md` and `.pi/skills/wibwobdos/SKILL.md`.
+
+[stderr] 
+[stderr] thinking
+**Assessing parity mentions and audit alignment**
+[stderr] exec
+/bin/zsh -lc 'rg -n -C3 "mcp_tools.py|mcp_tools.js|_command_tool_builders|Parity Law|tools/api_server/mcp_tools.py" .planning/audits/command-surface-audit-20260224.md' in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 52ms:
+24-                                               v
+25-┌─────────────────────────────┐      ┌─────────────────────────────┐
+26-│ Embedded Claude SDK Bridge  │─────▶│ Node MCP tools (2 tools)    │
+27:│ claude_sdk_bridge.js        │      │ mcp_tools.js                │
+28-│ - injects /capabilities     │      │ - tui_list_commands → GET /commands
+29-│ - refs nonexistent tool     │      │ - tui_menu_command → POST /menu/command
+30-└──────────────┬──────────────┘      └──────────────┬──────────────┘
+--
+118-**6. Embedded bridge references nonexistent `tui_create_window` tool**
+119-- Node MCP only has `tui_list_commands` and `tui_menu_command`
+120-- Bridge prompt text references `tui_create_window` → agent hallucinates
+121:- Files: `claude_sdk_bridge.js:199-201`, `mcp_tools.js:6-67`
+122-
+123-**7. `CommandCapability.requires_path` is semantically wrong**
+124-- Named `requires_path` but means "has required args" — used for `wibwob_ask`, `set_theme_mode`, etc.
+[stderr] 
+[stderr] thinking
+**Flagging outdated architecture audit**
+[stderr] exec
+/bin/zsh -lc "sed -n '120,160p' tools/api_server/main.py" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 52ms:
+            ],
+            last_workspace=st.last_workspace,
+            last_screenshot=st.last_screenshot,
+            uptime_sec=time.time() - st.started_at,
+        )
+
+    # ----- Routes -----
+    @app.get("/health")
+    async def health() -> Dict[str, Any]:
+        return {"ok": True}
+
+    @app.get("/capabilities", response_model=Capabilities)
+    async def capabilities() -> Capabilities:
+        caps = await ctl.get_capabilities()
+        return Capabilities(
+            version=str(caps.get("version", "v1")),
+            window_types=list(caps.get("window_types", [t.value for t in WindowType])),
+            commands=list(caps.get("commands", [])),
+            properties=dict(caps.get("properties", {})),
+        )
+[stderr] 
+[stderr] thinking
+**Reviewing parity documentation gaps**
+[stderr] exec
+/bin/zsh -lc 'rg -n "Contributing|Development|Parity|CLAUDE.md|AGENTS.md" README.md' in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 52ms:
+88:For agent/dev workflows (tmux headless launch, API hot-reload, screenshots, multi-instance socket rules), see `CLAUDE.md` and `.pi/skills/wibwobdos/SKILL.md`.
+116:Detailed multi-instance, tmux, and browser/PTTY workflows live in `CLAUDE.md` and `.pi/skills/wibwobdos/SKILL.md`.
+199:Detailed agent-facing architecture (command registry, IPC surfaces, auth/providers) is documented in `CLAUDE.md`.
+[stderr] 
+[stderr] thinking
+**Confirming test failure due to missing module**
+[stderr] codex
+I’ve isolated the biggest coherence break: the Parity Law docs/tests still point to `tools/api_server/mcp_tools.py`, but that file is gone. I’m running a single contract test to confirm the failure mode and then I’ll map exactly which docs/tests need to be updated vs which code should be restored.
+[stderr] exec
+[stderr] /bin/zsh -lc 'uv run --with pytest pytest tests/contract/test_surface_parity_matrix.py -q' in /Users/james/Repos/wibandwob-dos[stderr]  exited 2 in 1.44s:
+
+==================================== ERRORS ====================================
+________ ERROR collecting tests/contract/test_surface_parity_matrix.py _________
+ImportError while importing test module '/Users/james/Repos/wibandwob-dos/tests/contract/test_surface_parity_matrix.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.2_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/contract/test_surface_parity_matrix.py:16: in <module>
+    import tools.api_server.mcp_tools as mcp_tools
+E   ModuleNotFoundError: No module named 'tools.api_server.mcp_tools'
+=========================== short test summary info ============================
+ERROR tests/contract/test_surface_parity_matrix.py
+!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+1 error in 0.16s
+[stderr] 
+[stderr] thinking
+**Requesting poll implementation**
+[stderr] 
+[stderr] thinking
+**Considering node parity test failure**
+[stderr] exec
+/bin/zsh -lc 'uv run --with pytest pytest tests/contract/test_node_mcp_parity.py -q' in /Users/james/Repos/wibandwob-dos[stderr]  exited 1 in 854ms:
+[stderr] FFFF.                                                                    [100%]
+=================================== FAILURES ===================================
+___________________________ test_node_tools_nonempty ___________________________
+
+    def test_node_tools_nonempty():
+        names = _node_tool_names()
+>       assert len(names) >= 10, f"Expected >=10 Node MCP tools, got {len(names)}: {names}"
+E       AssertionError: Expected >=10 Node MCP tools, got 2: {'tui_list_commands', 'tui_menu_command'}
+E       assert 2 >= 10
+E        +  where 2 = len({'tui_list_commands', 'tui_menu_command'})
+
+tests/contract/test_node_mcp_parity.py:41: AssertionError
+__________________________ test_python_tools_nonempty __________________________
+
+    def test_python_tools_nonempty():
+>       names = _python_tool_names()
+                ^^^^^^^^^^^^^^^^^^^^
+
+tests/contract/test_node_mcp_parity.py:45: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+[stderr] 
+[stderr] thinking[stderr] 
+**Auditing parity guardrail documentation**
+[stderr] exec
+/bin/zsh -lc "sed -n '240,265p' tools/api_server/README.md" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 52ms:
+- extracted `tui_text` and markdown text files
+- compact asset summaries
+- optional state snapshot and edge markdown probe headers/body
+
+## Batch Layout (LLM-Optimized)
+
+The batch layout endpoint enables AI agents to create complex window arrangements in a single call, following MCP "second wave" principles:
+
+### Create a 3x2 Grid of Test Pattern Windows
+```bash
+curl -X POST localhost:8089/windows/batch_layout \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "request_id": "grid-demo-001",
+    "group_id": "demo-scene", 
+    "defaults": {"view_type": "test_pattern"},
+    "ops": [{
+      "op": "macro.create_grid",
+      "title": "Demo Window",
+      "grid": {
+[stderr] 
+[stderr] thinking
+**Assessing test_pattern usage**
+[stderr] exec
+/bin/zsh -lc "rg -n --glob '"'!.codex-logs/**'"' \"--target test_pattern|build/app/test_pattern|test_pattern_app\\b|cmake --build .*test_pattern|target test_pattern\" CLAUDE.md AGENTS.md .claude/skills .pi/skills .planning README.md app/README.md tools/api_server/README.md -g '*.md'" in /Users/james/Repos/wibandwob-dos[stderr]  exited 2 in 52ms:
+rg: unrecognized flag --target test_pattern|build/app/test_pattern|test_pattern_app\b|cmake --build .*test_pattern|target test_pattern
+[stderr] 
+[stderr] thinking[stderr] 
+**Correcting command flag syntax**
+[stderr] exec
+/bin/zsh -lc "rg -n --glob '"'!.codex-logs/**'"' -- \"--target test_pattern|build/app/test_pattern|test_pattern_app\\\\b|cmake --build .*test_pattern|target test_pattern\" CLAUDE.md AGENTS.md .claude/skills .pi/skills .planning README.md app/README.md tools/api_server/README.md -g '*.md'" in /Users/james/Repos/wibandwob-dos[stderr]  exited 2 in 52ms:
+Total output lines: 195
+
+rg: -g: No such file or directory (os error 2)
+rg: *.md: No such file or directory (os error 2)
+.planning/retros/retro-figlet-catalogue-menu-wiring.md:45:- pi1 and pi2 both editing `test_pattern_app.cpp` → lost work
+.planning/audits/codex-e009-menu-review-20260219-102942.log:13:Read the uncommitted git diff (run: git diff) on branch feat/e009-menu-system-redesign. The diff touches app/test_pattern_app.cpp (menu cleanup, dead-end removal, new Help items, registerWindow fix, API Key dialog enhancement). Also read the full current state of app/test_pattern_app.cpp lines 140-220 (command constants) and the menu construction function initMenuBar(). Check for these specific correctness issues: (1) Any remaining command ID collisions among all cmXxx constants (2) Menu accelerator key conflicts (the tilde-marked letters like ~T~ must be unique within each menu) (3) Whether the registerWindow(w) call for cmTextEditor is correct — check what createTextEditorWindow returns and whether registerWindow expects a TWindow* (4) Any dispatch case handlers left orphaned without corresponding menu items, or menu items without handlers (5) Dialog layout correctness for the enhanced API Key dialog — verify TRect coordinates don't overlap and buttons are inside the dialog bounds (56x14). Focus ONLY on correctness bugs, not style.
+.planning/audits/codex-e009-menu-review-20260219-102942.log:23:I’ll inspect the current `git diff`, then read `app/test_pattern_app.cpp` around the command constants and `initMenuBar()` to verify the five correctness checks you listed. I’ll report only concrete bugs and mismatches.
+.planning/audits/codex-e009-menu-review-20260219-102942.log:25:/bin/zsh -lc 'git diff -- app/test_pattern_app.cpp' in /Users/james/Repos/wibandwob-dosexec
+.planning/audits/codex-e009-menu-review-20260219-102942.log:26:/bin/zsh -lc "nl -ba app/test_pattern_app.cpp | sed -n '140,260p'" in /Users/james/Repos/wibandwob-dos succeeded in 161ms:
+.planning/audits/codex-e009-menu-review-20260219-102942.log:53:/bin/zsh -lc "rg -n \"initMenuBar|handleEvent|case cm|registerWindow\\(|createTextEditorWindow|cmTextEditor|API Key|TDialog|cmApiKey|new TSubMenu|~\" app/test_pattern_app.cpp" in /Users/james/Repos/wibandwob-dos succeeded in 927ms:
+.planning/audits/codex-e009-menu-review-20260219-102942.log:83:/bin/zsh -lc 'TMPDIR=$PWD/.tmp mkdir -p .tmp && TMPDIR=$PWD/.tmp git diff -- app/test_pattern_app.cpp' in /Users/james/Repos/wibandwob-dos exited 1 in 416ms:
+.planning/audits/codex-e009-menu-review-20260219-102942.log:102:diff --git a/app/test_pattern_app.cpp b/app/test_pattern_app.cpp
+.planning/audits/codex-e009-menu-review-20260219-102942.log:104:--- a/app/test_pattern_app.cpp
+.planning/audits/codex-e009-menu-review-20260219-102942.log:105:+++ b/app/test_pattern_app.cpp
+.planning/audits/codex-e009-menu-review-20260219-102942.log:113:/bin/zsh -lc 'GIT_PAGER=cat git --no-pager diff -- app/test_pattern_app.cpp' in /Users/james/Repos/wibandwob-dos succeeded in 5.67s:
+.planning/audits/codex-e009-menu-review-20260219-102942.log:127:diff --git a/app/test_pattern_app.cpp b/app/test_pattern_app.cpp
+.planning/audits/codex-e009-menu-review-20260219-102942.log:129:--- a/app/test_pattern_app.cpp
+.planning/audits/codex-e009-menu-review-20260219-102942.log:130:+++ b/app/test_pattern_app.cpp
+.planning/audits/codex-e009-menu-review-20260219-102942.log:140:/bin/zsh -lc "nl -ba app/test_pattern_app.cpp | sed -n '1888,2015p'" in /Users/james/Repos/wibandwob-dosexec
+.planning/audits/codex-e009-menu-review-20260219-102942.log:141:/bin/zsh -lc "nl -ba app/test_pattern_app.cpp | sed -n '800,1165p'" in /Users/james/Repos/wibandwob-dosexec
+[stderr] 
+[stderr] thinking
+**Searching for stale test_pattern references**
+[stderr] exec
+/bin/zsh -lc "rg -n --glob '"'!.codex-logs/**'"' --glob '"'!vendor/**'"' --glob '"'!archive/**'"' --glob '"'!*.log'"' --glob '*.md' -- \"--target test_pattern|\\./build/app/test_pattern\\b|target test_pattern\\b\" ." in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 52ms:
+./memories/2026/02/20260217-tmux-dashboard-plan.md:69:   ./build/app/test_pattern &
+./memories/2026/02/20260217-tmux-dashboard-plan.md:74:   WIBWOB_INSTANCE=1 ./build/app/test_pattern &
+./memories/2026/02/20260217-tmux-dashboard-plan.md:79:   WIBWOB_INSTANCE=2 ./build/app/test_pattern &
+./memories/2026/02/20260217-tmux-dashboard-plan.md:126:   WIBWOB_INSTANCE=3 ./build/app/test_pattern &
+./memories/2026/02/20260217-tmux-dashboard-plan.md:167:   WIBWOB_INSTANCE=1 ./build/app/test_pattern &
+./memories/2026/02/20260217-tmux-dashboard-plan.md:352:   WIBWOB_INSTANCE=1 ./build/app/test_pattern &
+./memories/2026/02/20260217-tmux-dashboard-plan.md:353:   WIBWOB_INSTANCE=2 ./build/app/test_pattern &
+./memories/2026/02/20260217-tmux-dashboard-plan.md:467:   - ttyd compatibility: ttyd wraps in bash -c, so WIBWOB_INSTANCE=1 bash -c '... ./build/app/test_pattern ...' propagates the env var correctly.
+./docs/CODEX-RETRO-20260218.md:222:   ./build/app/test_pattern 2> /tmp/wibwob_debug.log
+./workings/window-type-fix/MISSION2.md:129:      "Start TUI: ./build/app/test_pattern 2>/tmp/wibwob_debug.log &",
+./HANDOVER.md:32:These were applied by a Codex run (`scramble-polish-162832.log`) and **successfully compiled** — binary at `./build/app/test_pattern`. The session ended before the visual test step.
+./HANDOVER.md:56:1. Start the TUI: `tmux new-session -s wibwob ./build/app/test_pattern`
+./HANDOVER.md:81:tmux new-session -s wibwob ./build/app/test_pattern
+./HANDOVER.md:89:cmake --build build --target test_pattern -j4
+./HANDOVER.md:92:./build/app/test_pattern   # NOT ./build/test_pattern (friction log #17)
+./HANDOVER.md:121:- Build is clean (cmake --build build --target test_pattern -j4)
+./HANDOVER.md:122:- Binary: ./build/app/test_pattern
+./workings/window-type-fix/MISSION3.md:23:- TUI running: `./build/app/test_pattern 2>/tmp/wibwob_debug_postrefactor.log`
+./workings/window-type-fix/SESSION-HANDOFF.md:41:TUI: `./build/app/test_pattern 2>/tmp/wibwob_debug.log`
+[stderr] 
+[stderr] thinking
+**Adjusting search to include hidden files**
+[stderr] codex
+I’m doing one final hidden-file scan for stale binary/target naming because that’s another common source of wrong follow-on instructions (`test_pattern` vs `wwdos`). Then I’ll write up the audit with exact file:line findings and scenario-by-scenario gaps.
+[stderr] exec
+/bin/zsh -lc "rg -n --hidden --glob '"'!.git/**'"' --glob '"'!.codex-logs/**'"' --glob '"'!vendor/**'"' --glob '"'!archive/**'"' --glob '"'!*.log'"' --glob '*.md' -- \"--target test_pattern|\\./build/app/test_pattern\\b|target test_pattern\\b\" .claude .pi .planning CLAUDE.md AGENTS.md README.md app/README.md tools/api_server/README.md HANDOVER.md" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 52ms:
+HANDOVER.md:32:These were applied by a Codex run (`scramble-polish-162832.log`) and **successfully compiled** — binary at `./build/app/test_pattern`. The session ended before the visual test step.
+HANDOVER.md:56:1. Start the TUI: `tmux new-session -s wibwob ./build/app/test_pattern`
+HANDOVER.md:81:tmux new-session -s wibwob ./build/app/test_pattern
+HANDOVER.md:89:cmake --build build --target test_pattern -j4
+HANDOVER.md:92:./build/app/test_pattern   # NOT ./build/test_pattern (friction log #17)
+HANDOVER.md:121:- Build is clean (cmake --build build --target test_pattern -j4)
+HANDOVER.md:122:- Binary: ./build/app/test_pattern
+.planning/.trash/spk-window-sizing-helpers/spk01-window-sizing-helpers.md:221:cmake --build build --target test_pattern -j4 2>&1 | grep error:
+.planning/.trash/spk-window-sizing-helpers/spk01-window-sizing-helpers.md:243:  - Test: `cmake --build build --target test_pattern -j4` → zero errors
+.planning/.trash/spk-inter-instance-chat/spike-brief.md:655:cmake --build build --target test_pattern -j4
+.planning/.trash/spk-inter-instance-chat/spike-brief.md:661:WIBWOB_INSTANCE=1 ./build/app/test_pattern 2>/tmp/wibwob_1.log
+.planning/.trash/spk-inter-instance-chat/spike-brief.md:706:WIBWOB_INSTANCE=1 ./build/app/test_pattern 2>/tmp/wibwob_1.log
+.planning/.trash/spk-inter-instance-chat/spike-brief.md:712:WIBWOB_INSTANCE=2 ./build/app/test_pattern 2>/tmp/wibwob_2.log
+.planning/audits/local-dev-friction-20260223.md:97:cmake . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build --target test_pattern -j$(sysctl -n hw.logicalcpu)
+.planning/audits/local-dev-friction-20260223.md:101:  "WIBWOB_INSTANCE=1 ./build/app/test_pattern 2>/tmp/wibwob_debug.log"
+.planning/audits/local-dev-friction-20260223.md:136:BINARY="./build/app/test_pattern"
+.planning/audits/local-dev-friction-20260223.md:138:[ -x "$BINARY" ] || { echo "❌ Binary not found. Run: cmake --build build --target test_pattern"; exit 1; }
+.planning/audits/local-dev-friction-20260223.md:739:**What happened**: Agent repeatedly tried `./build/test_pattern` (not found) instead of `./build/app/test_pattern`. Caused a full session of "command aborted" errors, broken TUI restarts, and wasted time before reading CLAUDE.md.
+.planning/audits/local-dev-friction-20260223.md:743:cmake --build ./build         # binary lands at ./build/app/test_pattern
+.planning/audits/local-dev-friction-20260223.md:744:./build/app/test_pattern      # ← correct path, always
+[stderr] 
+[stderr] thinking
+**Auditing docs and test parity**
+[stderr] exec[stderr] 
+/bin/zsh -lc 'rg -n -C2 "schemas.py|route schema|REST route|menu/command|args" CLAUDE.md' in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 51ms:
+106-**Agent visual inspection**: use `/screenshot` skill (`.claude/skills/screenshot/`) which handles capture, state JSON, diff, window crop, and auto-recovery. See SKILL.md there for all modes.
+107-
+108:**Post-implementation parity audit**: use `/ww-audit` skill (`.claude/skills/ww-audit/`) to verify a window type has registry slug, props save/restore, and correct screen position — or run `/ww-audit` (no args) for a full gap matrix across all types.
+109-
+110-**C++ build & edit rules**: load `.pi/skills/wibwobdos/SKILL.md` before editing C++ files. Covers mandatory build-after-edit, tvision Z-order gotchas (frame insertion, `insertBefore` semantics), and frameless right-click coverage rule. Hard-won lessons — don't skip it.
+--
+151-- **Socket path**: the default socket is `/tmp/wwdos.sock`. If using multi-instance, set `WIBWOB_INSTANCE=N` for `/tmp/wibwob_N.sock`.
+152-- **First run dependency install**: `uv run --with-requirements` downloads packages on first invocation (~3-8s). Subsequent runs use cache.
+153:- **`/menu/command` vs `/windows`**: use `/menu/command` for the command registry (C++ dispatch, works for all commands). The `/windows` endpoint validates against the Python `WindowType` enum which may lag behind C++ if the server was started before code changes.
+154-
+155-## Architecture
+--
+237-No-op on frameless windows: `TGhostFrame` has no title bar to render into.
+238-
+239:**API usage** (`/gallery/arrange` or direct `/menu/command open_primer`):
+240-```bash
+241-# ghost frame only
+--
+363-| 4 | `app/command_registry.cpp` | Add `open_<name>` capability + dispatch case |
+364-| 5 | `tools/api_server/models.py` | Add to `WindowType` enum |
+[stderr] 
+[stderr] thinking[stderr] 
+**Scoping parameter validation gaps**
+[stderr] exec[stderr] 
+/bin/zsh -lc "rg -n \"id vs win_id|win_id.*id|window_id.*id|menu/command.*args|terminal_write|paint_cell|schemas\" tests tools/api_server/test_*.py tests/contract -g '*.py'" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 52ms:
+tools/api_server/test_move.py:36:        win_id = data["windows"][0]["id"]
+tools/api_server/test_terminal_read.py:2:"""Tests for terminal_read / terminal_write Python layer (issue #80).
+tools/api_server/test_terminal_read.py:6:  - terminal_write with window_id passes window_id through to IPC
+tools/api_server/test_terminal_read.py:32:            {"name": "terminal_write", "description": "Send text input to the terminal emulator", "requires_path": False},
+tools/api_server/test_terminal_read.py:47:        if cmd == "exec_command" and (kv or {}).get("name") == "terminal_write":
+tools/api_server/test_terminal_read.py:70:        assert sent[0][1].get("window_id") == "win_3", f"window_id not passed: {sent}"
+tools/api_server/test_terminal_read.py:72:        # AC: terminal_write with window_id passes it through
+tools/api_server/test_terminal_read.py:74:        result = await ctl.exec_command("terminal_write", {"text": "echo hi\n", "window_id": "win_3"}, actor="api")
+tools/api_server/test_terminal_read.py:76:        assert sent[0][1].get("name") == "terminal_write", sent
+tools/api_server/test_terminal_read.py:77:        assert sent[0][1].get("window_id") == "win_3", f"window_id not passed to terminal_write: {sent}"
+tools/api_server/test_terminal_read.py:83:        assert "terminal_write" in caps["commands"], f"terminal_write missing from caps: {caps}"
+tools/api_server/test_terminal_read.py:128:    print("PASS: terminal_read/terminal_write dispatch, window_id routing, capabilities, error propagation")
+tools/api_server/test_paint_ipc.py:9:AC-2: paint_cell + paint_export returns a non-empty text grid
+tools/api_server/test_paint_ipc.py:65:def test_paint_cell_and_export():
+tools/api_server/test_paint_ipc.py:66:    """AC-2: paint_cell writes a cell; paint_export returns a non-empty grid."""
+tools/api_server/test_paint_ipc.py:68:    resp = _send(f"cmd:paint_cell id={wid} x=0 y=0 fg=15 bg=0")
+tools/api_server/test_paint_ipc.py:69:    assert resp == "ok", f"paint_cell failed: {resp!r}"
+tools/api_server/test_paint_ipc.py:78:    print("PASS AC-2: paint_cell + paint_export")
+tools/api_server/test_paint_ipc.py:204:        test_paint_cell_and_export()
+tests/test_paint_ipc.py:4:Exercises: create_window type=paint, paint_cell, paint_text,
+[stderr] 
+[stderr] thinking
+**Identifying gaps in command parameter tests**
+[stderr] exec[stderr] 
+/bin/zsh -lc 'rg -n "mcp_tools.py|models.py|schemas.py|WindowType|WindowCreate|parity" tools/api_server/README.md' in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 52ms:
+12:- `tools/api_server/models.py`: Domain entities (Window, Rect, AppState, WindowType).
+13:- `tools/api_server/schemas.py`: Pydantic request/response models (create, move, props, state, etc.).
+[stderr] 
+[stderr] thinking[stderr] 
+**Checking parity gate instructions**
+[stderr] exec
+/bin/zsh -lc 'rg -n "test_window_type_parity|test_surface_parity_matrix|test_node_mcp_parity|Parity Law" .planning/README.md' in /Users/james/Repos/wibandwob-dos[stderr]  exited 1 in 51ms:
+
+[stderr] 
+[stderr] thinking
+**Assessing parity inconsistencies**
+[stderr] exec
+/bin/zsh -lc 'ls -ld .agents .claude/skills/ww-launch/scripts 2>/dev/null' in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 52ms:
+drwxr-xr-x@ 3 james  staff   96 Feb 16 08:49 .agents
+drwxr-xr-x@ 5 james  staff  160 Feb 24 16:40 .claude/skills/ww-launch/scripts
+[stderr] 
+[stderr] thinking
+**Checking existence of skill directory**
+[stderr] exec
+/bin/zsh -lc 'ls -ld .agents/skills/ww-launch .agents/skills 2>/dev/null' in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 51ms:
+lrwxr-xr-x@ 1 james  staff   17 Feb 16 08:49 .agents/skills -> ../.claude/skills
+drwxr-xr-x@ 4 james  staff  128 Feb 24 16:40 .agents/skills/ww-launch
+[stderr] 
+[stderr] thinking
+**Identifying parity test inconsistencies**
+[stderr] codex
+I’ve got enough evidence for the doc-level gaps. I’m pulling one last snippet from `schemas.py` to illustrate the parameter-name inconsistency risk (`id` / `win_id` / `window_id`) and confirm why the current parity tests won’t catch command-parameter drift.
+[stderr] exec
+/bin/zsh -lc "sed -n '120,170p' tools/api_server/schemas.py" in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc "sed -n '214,270p' tools/api_server/schemas.py" in /Users/james/Repos/wibandwob-dos[stderr] exec[stderr] 
+/bin/zsh -lc "rg -n -C2 \"MenuCommandRequest|args: Dict\\[str, Any\\]\" tools/api_server/schemas.py" in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc 'rg -n -C2 "terminal_write.*window_id|window_id not passed|capabilities" tools/api_server/test_terminal_read.py' in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 51ms:
+    path: str
+    mode: Literal["replace", "merge"] = "replace"
+
+
+class ScreenshotReq(BaseModel):
+    path: Optional[str] = None
+
+
+class PaintCellRequest(BaseModel):
+    win_id: str
+    x: int
+    y: int
+    fg: int = 15
+    bg: int = 0
+
+
+class PaintLineRequest(BaseModel):
+    win_id: str
+    x0: int
+    y0: int
+[stderr]  succeeded in 52ms:
+    windows: List[WindowState]
+    canvas: CanvasInfo
+    last_workspace: Optional[str] = None
+    last_screenshot: Optional[str] = None
+    uptime_sec: float
+
+
+class BrowserOpenReq(BaseModel):
+    url: str
+    window_id: Optional[str] = None
+    mode: Literal["same", "new"] = "new"
+
+
+class BrowserWindowReq(BaseModel):
+    window_id: str
+
+
+class BrowserFindReq(BaseModel):
+    window_id: str
+    query: str
+[stderr]  succeeded in 51ms:
+64-class MenuCommand(BaseModel):
+65-    command: str
+66:    args: Dict[str, Any] = Field(default_factory=dict)
+67-    actor: Optional[str] = "api"
+68-
+[stderr]  succeeded in 52ms:
+4-AC coverage:
+5-  - terminal_read dispatches with correct command + window_id param
+6:  - terminal_write with window_id passes window_id through to IPC
+7-  - terminal_read ok=True → result string returned in 'result' key
+8-  - terminal_read ok=False (no terminal) → ok=False propagated
+9:  - terminal_read command appears in capabilities list
+10-"""
+11-from __future__ import annotations
+--
+26-
+27-
+28:def _capabilities_with_terminal_read() -> Dict[str, object]:
+29-    return {
+30-        "version": "v1",
+--
+47-        if cmd == "exec_command" and (kv or {}).get("name") == "terminal_write":
+48-            return "ok"
+49:        if cmd == "get_capabilities":
+50:            return json.dumps(_capabilities_with_terminal_read())
+51-        return "ok"
+[stderr] 
+[stderr] thinking
+**Reviewing key doc inconsistencies**
+[stderr] exec
+/bin/zsh -lc "sed -n '96,112p' AGENTS.md" in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc "sed -n '100,116p' CLAUDE.md" in /Users/james/Repos/wibandwob-dos[stderr] exec[stderr] 
+/bin/zsh -lc "sed -n '372,392p' CLAUDE.md" in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc "sed -n '92,112p' .planning/README.md" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 52ms:
+## Codex Execution Defaults for This Repo
+
+1. Prefer smallest vertical slice proving direction.
+2. Keep behavior compatible unless explicitly scoped as breaking.
+3. Add tests for parity/contracts/state sanity when refactoring command surfaces.
+4. Include rollback notes in issue/PR artifacts.
+
+## Parity Law (MANDATORY)
+
+Every new window type or command must be wired across ALL surfaces in one PR: C++ registry, Python enum/schema, MCP tools, Node MCP. Run the parity gate before committing:
+```bash
+uv run --with pytest pytest tests/contract/test_window_type_parity.py tests/contract/test_surface_parity_matrix.py tests/contract/test_node_mcp_parity.py -v
+```
+Full checklists: `CLAUDE.md` "Parity Law" section. Architecture: `.planning/audits/command-surface-audit-20260224.md`.
+
+## Turbo Vision ANSI Guardrail
+
+[stderr]  succeeded in 51ms:[stderr] 
+curl -s -X POST http://127.0.0.1:8089/screenshot
+cat "$(ls -t logs/screenshots/tui_*.txt | head -1)"
+```
+
+> Full API reference and operational cheat sheet: `.pi/skills/wibwobdos/SKILL.md`.
+
+**Agent visual inspection**: use `/screenshot` skill (`.claude/skills/screenshot/`) which handles capture, state JSON, diff, window crop, and auto-recovery. See SKILL.md there for all modes.
+
+**Post-implementation parity audit**: use `/ww-audit` skill (`.claude/skills/ww-audit/`) to verify a window type has registry slug, props save/restore, and correct screen position — or run `/ww-audit` (no args) for a full gap matrix across all types.
+
+**C++ build & edit rules**: load `.pi/skills/wibwobdos/SKILL.md` before editing C++ files. Covers mandatory build-after-edit, tvision Z-order gotchas (frame insertion, `insertBefore` semantics), and frameless right-click coverage rule. Hard-won lessons — don't skip it.
+
+No C++ unit test framework is configured. C++ testing is manual via UI interaction or API calls.
+
+Primary automated regression coverage for multiplayer/IPC lives in `tests/room/` (Python, 160 tests). Run for all boundary/contract changes:
+
+```bash
+[stderr]  succeeded in 52ms:[stderr] 
+| # | File | What |
+|---|------|------|
+| 1 | `app/command_registry.cpp` | Add to `get_command_capabilities()` with name, description, params, dangerous flag |
+| 2 | `app/command_registry.cpp` | Add dispatch in `exec_registry_command()` |
+| 3 | `tools/api_server/mcp_tools.py` | Add MCP tool builder in `_command_tool_builders()` |
+| 4 | `app/llm/sdk_bridge/mcp_tools.js` | Add matching tool (Node MCP for embedded agent) |
+| 5 | Run parity gate | `uv run --with pytest pytest tests/contract/test_surface_parity_matrix.py tests/contract/test_node_mcp_parity.py -v` |
+
+If step 5 fails, you missed a surface. Fix it before committing.
+
+### Parity gate (run after ANY registry/surface change)
+
+```bash
+uv run --with pytest pytest tests/contract/test_window_type_parity.py tests/contract/test_surface_parity_matrix.py tests/contract/test_node_mcp_parity.py -v
+```
+
+This is also run by `ww-build-test` in `strict` mode. **Do not merge PRs that touch command or window type surfaces without a green parity gate.**
+
+### Node MCP bridge (embedded Wib&Wob agent)
+The embedded agent uses `app/llm/sdk_bridge/mcp_tools.js` for TUI control tools.
+[stderr]  succeeded in 51ms:
+
+The hook enforces: any file named `spk[0-9]*.md` must live under `.planning/spikes/` — rejected everywhere else.
+
+## Progress Tracking
+
+### Authority Rule
+
+**`.planning/` docs are the source of truth for work state.** Feature briefs, story briefs, and their checkboxes are where design, scope, ACs, and progress live. GitHub issues exist at the epic level for board-level visibility and PR linkage (`closes #N`). Do not duplicate feature/story/task tracking as separate GitHub issues — the briefs already carry more context than issue bodies ever will.
+
+### Status Header
+
+Every epic brief, feature brief, story brief, and spike file must have status metadata.
+
+**Epic briefs** use YAML frontmatter (preferred — enables `.claude/scripts/planning.sh` and auto-sync to `EPIC_STATUS.md`):
+
+```yaml
+---
+id: E005
+title: Theme Runtime Wiring
+status: not-started
+[stderr] 
+[stderr] thinking[stderr] 
+**Reviewing audit checklist relevance**
+[stderr] exec
+/bin/zsh -lc "sed -n '1,40p' .planning/audits/command-surface-audit-20260224.md" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 51ms:
+# Command Surface Audit — WibWob-DOS
+
+**Date:** 2026-02-24
+**Author:** Codex analyst + Claude Code
+**Scope:** All command/control surfaces, discovery paths, parity gaps, and bugs
+
+## TL;DR
+
+1. **C++ command registry is the real source of truth** (57 commands with descriptions), but the API/MCP layers currently lose or hide that metadata in multiple places.
+2. **Biggest live failure: IPC auth mismatch** — C++ can require HMAC auth, but `ipc_client.py` doesn't implement the handshake, so capability discovery silently degrades to empty command lists (`/commands` and `/capabilities` return `commands: []`).
+3. **`/capabilities` intentionally strips descriptions/params** down to names only — and when IPC fails, even names are empty. Agents are flying blind.
+4. **Python window type enum is stale** — 7 spawnable C++ types (`quadra`, `snake`, `rogue`, `deep_signal`, `app_launcher`, `gallery`, `figlet_text`) are rejected by `POST /windows`.
+5. **No machine-readable parameter schemas exist anywhere** — agents must guess param names from free-text descriptions or trial and error.
+
+## Architecture Diagram
+
+```
+                                ┌─────────────────────────────┐
+                                │      Keyboard / Menus       │
+                                │   app/wwdos_app.cpp         │
+[stderr] 
+[stderr] thinking
+**Planning comprehensive audit steps**
+[stderr] codex
+I’m at the reporting stage. I’m pulling one last set of exact line numbers for the missing parity mentions in the target skills/READMEs so the recommendations section can be precise and patchable.
+[stderr] exec
+/bin/zsh -lc 'rg -n "What this skill does|Covers the four failure modes|Mode 1|Registry check|tmux capture-pane|MCP|test_window_type_parity|test_surface_parity_matrix|test_node_mcp_parity" .claude/skills/ww-audit/SKILL.md' in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "rg -n \"Wiring Checklist \\(8 Files\\)|Optional\\) "'`tools/api_server/models.py`|Run ctests|Acceptance Criteria|ctest --output-on-failure" .claude/skills/ww-build-game/SKILL.md' in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc 'rg -n "Fast path|This will:|Generic endpoint mode|/health|/capabilities|/commands|Guardrails" .claude/skills/ww-api-smoke/SKILL.md' in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc 'rg -n "Quick start|/health|/state|/capabilities|/commands|ww-build-test|ww-audit|Screen capture" .claude/skills/ww-launch/SKILL.md' in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 51ms:
+15:## Fast path
+25:This will:
+26:1. Check `/health`
+31:## Generic endpoint mode
+80:## Guardrails
+84:- Prefer `/health` preflight before endpoint calls.
+ succeeded in 51ms:
+28:## What this skill does
+33:Covers the four failure modes surfaced in `local-dev-friction-20260223.md`:
+41:## Mode 1 — Single type audit: `/ww-audit <type>`
+48:**1. Registry check**
+119:tmux capture-pane -t wibwob -p -S - | head -40
+206:tmux capture-pane -t wibwob -p | head -30 && \
+ succeeded in 51ms:
+zsh:1: permission denied: tools/api_server/models.py
+320:## Wiring Checklist (8 Files)
+331:| 8 | (Optional) `tools/api_server/models.py` | `WindowType` enum for REST/MCP parity |
+382:### 2. Run ctests (catches linker/stub issues)
+384:cd /path/to/repo/build && ctest --output-on-failure
+499:## Acceptance Criteria
+502:- [ ] `ctest --output-on-failure` — all pass (especially `command_registry` and `scramble_engine`)
+[stderr]  succeeded in 52ms:
+10:## Quick start
+121:curl -s $API/health
+124:curl -s $API/state | python3 -m json.tool
+146:# Full list: curl -s $API/capabilities | python3 -m json.tool | grep '"type"'
+161:curl -s $API/commands | python3 -m json.tool
+164:## Screen capture — do this first, always
+[stderr] 
+[stderr] thinking
+**Gathering exact line numbers**
+[stderr] exec
+/bin/zsh -lc "rg -n \"Parity Law|ui\\+registry|full-parity|window_type_registry\\.cpp|tools/api_server/mcp_tools.py|Parity gate|test_window_type_parity|test_node_mcp_parity\" .claude/skills/ww-scaffold-view/SKILL.md" in /Users/james/Repos/wibandwob-dos[stderr] exec[stderr] 
+/bin/zsh -lc 'rg -n "WindowType|schemas.py|mcp_tools.py|All 14 surfaces|Verification sequence|/exec|/menu/command|/windows" .pi/skills/wibwobdos/references/integrating-vendor-views.md' in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc 'rg -n "Parity Law|test_node_mcp_parity|command-surface-audit" AGENTS.md' in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc 'rg -n "ww-build-test.*strict|mcp_tools.py|_command_tool_builders|Adding a new command|Run parity gate|test_node_mcp_parity" CLAUDE.md' in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 51ms:
+19:| `parity_scope` | no | `ui+registry` | `ui-only`, `ui+registry`, `full-parity`. Default: `ui+registry` |
+28:| `ui+registry` | yes | yes | yes | yes | - | - | - | - |
+29:| `full-parity` | yes | yes | yes | yes | yes | yes | yes | yes |
+49:### 5. Patch registry (if `ui+registry` or `full-parity`)
+54:### 6. Patch Python surfaces (only `full-parity`)
+58:- `tools/api_server/mcp_tools.py` — update valid types in docstring
+83:### 9. Parity gate (MANDATORY — all scopes)
+85:uv run --with pytest pytest tests/contract/test_window_type_parity.py tests/contract/test_surface_parity_matrix.py -v
+87:If this fails, you missed a surface. Fix it before committing. See `CLAUDE.md` "Parity Law" section.
+92:- Parity gate green
+[stderr]  succeeded in 51ms:
+22:| 12 | Python model | `tools/api_server/models.py` | Add to `WindowType` enum |
+24:| 14 | MCP docstring | `tools/api_server/mcp_tools.py` | Update `tui_create_window` docstring |
+26:All 14 surfaces must be touched or the drift tests / link will fail.
+64:## Verification sequence
+80:curl -X POST http://127.0.0.1:8089/exec -d '{"command":"open_terminal"}'
+81:curl -X POST http://127.0.0.1:8089/exec -d '{"command":"terminal_write","args":{"text":"ls\n"}}'
+[stderr]  succeeded in 51ms:
+103:## Parity Law (MANDATORY)
+107:uv run --with pytest pytest tests/contract/test_window_type_parity.py tests/contract/test_surface_parity_matrix.py tests/contract/test_node_mcp_parity.py -v
+109:Full checklists: `CLAUDE.md` "Parity Law" section. Architecture: `.planning/audits/command-surface-audit-20260224.md`.
+[stderr]  succeeded in 51ms:
+345:uv run --with pytest pytest tests/contract/test_window_type_parity.py tests/contract/test_surface_parity_matrix.py tests/contract/test_node_mcp_parity.py -v
+366:| 7 | Run parity gate | `uv run --with pytest pytest tests/contract/test_window_type_parity.py tests/contract/test_surface_parity_matrix.py -v` |
+370:### Adding a new command (ALL steps mandatory)
+376:| 3 | `tools/api_server/mcp_tools.py` | Add MCP tool builder in `_command_tool_builders()` |
+378:| 5 | Run parity gate | `uv run --with pytest pytest tests/contract/test_surface_parity_matrix.py tests/contract/test_node_mcp_parity.py -v` |
+385:uv run --with pytest pytest tests/contract/test_window_type_parity.py tests/contract/test_surface_parity_matrix.py tests/contract/test_node_mcp_parity.py -v
+388:This is also run by `ww-build-test` in `strict` mode. **Do not merge PRs that touch command or window type surfaces without a green parity gate.**
+395:- Parity test: `pytest tests/contract/test_node_mcp_parity.py`
+[stderr] 
+[stderr] thinking
+**Summarizing comprehensive parity doc audit**
+[stderr] codex
+**Root Cause**
+
+Parity guardrails were added to some top-level docs/skills, but the underlying implementation/test surface is not aligned and several high-traffic skills still encode the old workflow.
+
+The result is a split-brain state:
+- Policy says parity is mandatory (`AGENTS.md`, `CLAUDE.md`)
+- Some skills still allow partial/optional parity (`ww-scaffold-view`, `ww-build-game`)
+- The parity tests/docs reference a Python MCP module that does not exist (`tools/api_server/mcp_tools.py`)
+- The build/test skill says parity runs in `standard`, but other docs still say `strict`
+
+I also confirmed the parity gate is currently nonfunctional:
+- `tests/contract/test_surface_parity_matrix.py` fails at import (`ModuleNotFoundError: tools.api_server.mcp_tools`)
+- `tests/contract/test_node_mcp_parity.py` fails (expects Python MCP file + richer Node MCP toolset than exists)
+
+**Part 1: Coverage Audit (what should mention parity, and whether it does)**
+
+Checked requested files plus adjacent workflow entrypoints.
+
+Present and useful:
+- `AGENTS.md:103` — has mandatory Parity Law + test command
+- `CLAUDE.md:350` — has Parity Law + window/command checklists (but stale refs, see below)
+- `.claude/skills/ww-build-test/SKILL.md:15` and `:59` — parity gate explicitly included
+- `.pi/skills/wibwobdos/SKILL.md:236` — parity enforcement section present
+- `.planning/README.md:328` — parity is in quality checklist
+- `.planning/audits/command-surface-audit-20260224.md:5` — parity-focused audit doc
+
+Missing / weak parity guidance on likely dev paths:
+- `.claude/skills/ww-build-game/SKILL.md` — no parity gate; parity wiring listed as optional/incomplete
+- `.claude/skills/ww-audit/SKILL.md` — parity runtime audit only; no contract parity tests or MCP/Node surface coverage
+- `.claude/skills/ww-api-smoke/SKILL.md` — no discovery/parity smoke (`/commands`/`/capabilities`) recipe
+- `.claude/skills/ww-launch/SKILL.md` — shows capability endpoints, but no explicit post-launch parity verification step
+- `.pi/skills/wibwobdos/references/integrating-vendor-views.md` — parity wording exists, but checklist is stale/incomplete
+- `app/README.md` — points devs to ops/API docs but no parity warning/checklist pointer
+- `tools/api_server/README.md` — no “if you add window types/commands, update models/schemas + run parity gate” guidance
+- `README.md` — contributor-facing entrypoints point to `CLAUDE.md`, but parity is not mentioned explicitly
+
+**Part 2: Developer Journey Trace (gaps)**
+
+**Scenario A: Add new generative art view (`plasma_field`)**
+1. Skill loaded: `ww-scaffold-view` (correct).
+2. Does it tell every file to touch: No.
+- Missing `app/window_type_registry.cpp` entirely (`.claude/skills/ww-scaffold-view/SKILL.md:49-58`)
+- Missing test stubs (`app/command_registry_test.cpp`, `app/scramble_engine_test.cpp`) unlike `ww-build-game`
+- References nonexistent `tools/api_server/mcp_tools.py` (`.claude/skills/ww-scaffold-view/SKILL.md:58`)
+- Defaults to partial parity (`ui+registry`) (`.claude/skills/ww-scaffold-view/SKILL.md:19`)
+3. Test skill after implementation: `ww-build-test` (correct).
+4. Does it run parity checks: Yes in `standard+` (`.claude/skills/ww-build-test/SKILL.md:15`, `:59`) but docs elsewhere say `strict`, causing confusion.
+5. Audit skill before PR: `ww-audit` (runtime completeness only).
+- It does not verify MCP/Node/schema parity surfaces (`.claude/skills/ww-audit/SKILL.md:4-8`)
+6. PR template reminder: Yes, generic parity checkbox exists (`.github/pull_request_template.md` “Parity impact reviewed”).
+
+**Scenario B: Add new IPC command (`get_desktop_info`)**
+1. Guidance source: `CLAUDE.md` “Adding a new command” (correct entrypoint).
+2. Does it list all files incl Node MCP: It lists Node MCP, but points to nonexistent Python MCP file (`CLAUDE.md:376`).
+3. Tests that catch missing MCP tool builder: Intended `test_surface_parity_matrix` / `test_node_mcp_parity`, but both are currently broken due missing `tools/api_server/mcp_tools.py`.
+4. Forgetting `schemas.py`: Not generally caught.
+- `/menu/command` schema is free-form `args: Dict[str, Any]` (`tools/api_server/schemas.py:64-67`)
+- Only typed REST endpoints have explicit schema checks, and coverage is command-specific
+
+**Scenario C: Modify existing command parameters**
+1. What tells them to update REST route schema: No central parity checklist does.
+- `CLAUDE.md` command checklist does not mention route-specific `schemas.py` updates for param changes
+2. What catches param mismatches (`id` vs `win_id`): No generic contract test.
+- Mixed naming exists in schemas (`tools/api_server/schemas.py:129`, `:223`, etc.)
+- Some command-specific tests exist (e.g. terminal `window_id` passthrough in `tools/api_server/test_terminal_read.py:68-83`)
+3. Is there any test for this: Only scattered endpoint-specific tests, not a parity-wide parameter contract test.
+
+**Scenario D: External contributor reads only `README.md`**
+1. Do they know parity exists: No (not explicitly).
+2. Can they find the checklist: Only indirectly by opening `CLAUDE.md` (`README.md:88`, `:116`, `:199`).
+
+**Part 3: Contradictions / Stale Content**
+
+1. `test_pattern` CMake target stale docs
+- In requested focus files: I did not find `--target test_pattern`.
+- I did find stale references in active-ish non-focus docs:
+  - `HANDOVER.md:89` / `:121`
+  - `.planning/audits/local-dev-friction-20260223.md:97`, `:138`
+- `tools/api_server/README.md` references `test_pattern` as a protocol/window slug (`tools/api_server/README.md:42`, `:99`, `:255`), which appears intentional, not a CMake target issue.
+
+2. `_command_tool_builders()` / `mcp_tools.py` references
+- Docs/tests still reference `tools/api_server/mcp_tools.py` and `_command_tool_builders()`
+- Actual file is missing (`ls tools/api_server` shows no `mcp_tools.py`)
+- `tests/contract/test_surface_parity_matrix.py:16` imports it and fails collection
+- `CLAUDE.md:376`, `.claude/skills/ww-scaffold-view/SKILL.md:58`, vendor integration ref `:24` are stale
+
+3. “parity is strict only” stale wording
+- `CLAUDE.md:388` says parity gate is run by `ww-build-test` in `strict` mode
+- `ww-build-test` now runs parity in `standard+` (`.claude/skills/ww-build-test/SKILL.md:15`, `:59`)
+- `ww-build-test` output block still says `PARITY (strict only)` (`.claude/skills/ww-build-test/SKILL.md:98`) which is internally inconsistent
+
+4. Docs contradicting mandatory Parity Law / parity optionality
+- `.claude/skills/ww-scaffold-view/SKILL.md:19` defaults to `ui+registry` (partial parity)
+- `.claude/skills/ww-scaffold-view/SKILL.md:28-29` offers non-full parity scopes without a strong “spike only” warning
+- `.claude/skills/ww-build-game/SKILL.md:331` marks Python parity as optional
+- These conflict with `AGENTS.md:103-109` mandatory Parity Law
+
+5. Wrong/deleted cross-references
+- `CLAUDE.md:376` → `tools/api_server/mcp_tools.py` (missing file)
+- `.claude/skills/ww-scaffold-view/SKILL.md:58` → `tools/api_server/mcp_tools.py` (missing file)
+- `.pi/skills/wibwobdos/references/integrating-vendor-views.md:24` → `tools/api_server/mcp_tools.py` (missing file)
+- `.pi/skills/wibwobdos/references/integrating-vendor-views.md:80-81` uses `/exec` endpoint (no route in `tools/api_server/main.py`; current endpoints include `/menu/command`, `/commands`, `/capabilities`)
+
+**Fix Options (with tradeoffs)**
+
+1. Align docs/tests to current architecture (FastAPI auto-MCP + minimal Node MCP)
+- Fix docs to stop referencing `tools/api_server/mcp_tools.py`
+- Rewrite parity tests to validate current surfaces (`/commands` and Node MCP minimal bridge assumptions)
+- Tradeoff: fastest coherence fix, but weakens “all surfaces in one PR” enforcement until a richer MCP layer exists
+
+2. Restore/implement Python MCP tool layer (`tools/api_server/mcp_tools.py`) and match docs/tests
+- Reintroduce `mcp_tools.py` + `_command_tool_builders()`, expand Node MCP tools to parity expectations
+- Tradeoff: strongest guardrail consistency, but materially larger engineering change
+
+3. Hybrid (recommended short-term)
+- Immediately patch docs/skills to remove false instructions and make parity policy accurate
+- Mark broken parity tests as `xfail/skip` with explicit TODO issue, or update them to fail with a clearer message
+- Add a temporary “current architecture” note in Parity Law sections
+- Tradeoff: preserves momentum and reduces drift risk now, but still leaves incomplete enforcement until code/tests are finished
+
+**Risks and Tests to Add**
+
+Risks if left as-is:
+- Agents will follow `ww-scaffold-view`/`ww-build-game` and reintroduce window-type drift (missing `window_type_registry.cpp`, schemas)
+- “Green build” claims may ignore parity because docs disagree on when parity runs
+- Contributors lose confidence because parity gate command currently errors before collection
+- Param name drift (`id`/`win_id`/`window_id`) will keep escaping unless command-specific tests happen to exist
+
+Tests/guards to add:
+- Doc lint: fail CI if docs mention nonexistent `tools/api_server/mcp_tools.py` unless file exists
+- Skill lint: any skill mentioning “new window/view/command” or “build/test” must include parity gate or link to `CLAUDE.md` Parity Law
+- Parity workflow smoke: run the exact Parity Law command in CI and assert no import/collection errors
+- Schema/param contract tests for representative commands (at least one per naming style) and typed REST routes
+- Optional stronger test: parse command registry param hints + route schemas and assert mapped endpoint arg names match (where applicable)
+
+**Prioritized Recommendations**
+
+**Must Fix**
+- `.claude/skills/ww-scaffold-view/SKILL.md:19` — default scope is partial parity (`ui+registry`) despite mandatory Parity Law — change default to `full-parity` or mark non-full scopes as spike-only with explicit warning/block for production work.
+- `.claude/skills/ww-scaffold-view/SKILL.md:49` — window scaffolding checklist omits `app/window_type_registry.cpp` — add mandatory step for `window_type_registry.cpp` wiring (spawn/match/spec) before parity gate.
+- `.claude/skills/ww-scaffold-view/SKILL.md:58` — references deleted `tools/api_server/mcp_tools.py` — replace with the actual MCP integration path/strategy or remove until Python MCP tool file exists.
+- `.claude/skills/ww-build-game/SKILL.md:331` — marks Python parity wiring as optional for a new game window type — make parity surfaces mandatory (registry + window type registry + models + schemas + tests) or clearly split “prototype-only” vs “ship-ready” paths.
+- `CLAUDE.md:376` — command checklist points to nonexistent `tools/api_server/mcp_tools.py::_command_tool_builders()` — update checklist to current implementation location or restore the module; current instruction is unexecutable.
+- `tests/contract/test_surface_parity_matrix.py:16` — imports nonexistent `tools.api_server.mcp_tools` and breaks parity gate collection — update test to current MCP implementation or restore module so the parity gate actually runs.
+- `tests/contract/test_node_mcp_parity.py:16` — hardcodes missing Python MCP file and outdated Node MCP tool expectations — update to current architecture or restore intended Python/Node MCP surfaces before treating Parity Law as enforceable.
+
+**Should Fix**
+- `CLAUDE.md:388` — says `ww-build-test` runs parity gate in `strict` mode — change to `standard` (or `standard+`) to match `.claude/skills/ww-build-test/SKILL.md`.
+- `.claude/skills/ww-build-test/SKILL.md:98` — output format labels `PARITY (strict only)` while pipeline runs parity in `standard+` — relabel to `standard+` (and keep `PLANNING` as strict-only).
+- `.claude/skills/ww-audit/SKILL.md:4` — “parity audit” description only covers runtime window surfaces, not MCP/Node/schema parity — rename/scope it as runtime parity audit or add a first step that runs contract parity tests.
+- `.claude/skills/ww-api-smoke/SKILL.md:15` — fast path skips discovery endpoints (`/commands`, `/capabilities`) — add a discovery smoke preset (or a documented command) to catch command discovery regressions.
+- `.claude/skills/ww-launch/SKILL.md:10` — launch flow lacks explicit post-launch capability verification — add a “Post-launch verify” block (`/health`, `/commands`, `/capabilities`, then parity gate or `ww-build-test standard`).
+- `.pi/skills/wibwobdos/references/integrating-vendor-views.md:24` — references deleted `tools/api_server/mcp_tools.py` — update checklist to current MCP surface and include `tools/api_server/schemas.py`.
+- `.pi/skills/wibwobdos/references/integrating-vendor-views.md:80` — verification sequence uses nonexistent `/exec` endpoint — replace with current `/menu/command` and `/windows` examples.
+- `tools/api_server/README.md:12` — lists `models.py` / `schemas.py` but gives no contributor parity wiring guidance — add a “When adding window types/commands” note with Parity Law test command and required files.
+- `README.md:88` — root contributor path points to `CLAUDE.md` but does not mention parity drift guardrail — add a brief contributor note linking “Parity Law” for window/command changes.
+
+**Nice to Have**
+- `.planning/README.md:328` — parity quality gate checklist exists but no exact parity command — add the canonical `pytest tests/contract/...` command so planning docs directly encode the runnable gate.
+- `app/README.md:75` — programmatic-control pointers are good, but no parity warning for new views — add a one-line “new view/window changes must follow Parity Law in `CLAUDE.md`”.
+- `.github/pull_request_template.md:13` — parity checkbox is present but generic — add a line for “Paste parity gate command output (or N/A with reason)” to improve enforcement.
+- `.planning/audits/command-surface-audit-20260224.md:5` — linked as architecture reference but also documents transient failures — add a banner noting it is a dated audit snapshot, not normative implementation docs.
+
+**Evidence run**
+- `uv run --with pytest pytest tests/contract/test_surface_parity_matrix.py -q` → import error (`tools.api_server.mcp_tools` missing)
+- `uv run --with pytest pytest tests/contract/test_node_mcp_parity.py -q` → 4 failures (missing Python MCP file, Node MCP tool-count expectation mismatch, missing `tui_create_window`)
+[stderr] tokens used[stderr] 
+96,310
+**Root Cause**
+
+Parity guardrails were added to some top-level docs/skills, but the underlying implementation/test surface is not aligned and several high-traffic skills still encode the old workflow.
+
+The result is a split-brain state:
+- Policy says parity is mandatory (`AGENTS.md`, `CLAUDE.md`)
+- Some skills still allow partial/optional parity (`ww-scaffold-view`, `ww-build-game`)
+- The parity tests/docs reference a Python MCP module that does not exist (`tools/api_server/mcp_tools.py`)
+- The build/test skill says parity runs in `standard`, but other docs still say `strict`
+
+I also confirmed the parity gate is currently nonfunctional:
+- `tests/contract/test_surface_parity_matrix.py` fails at import (`ModuleNotFoundError: tools.api_server.mcp_tools`)
+- `tests/contract/test_node_mcp_parity.py` fails (expects Python MCP file + richer Node MCP toolset than exists)
+
+**Part 1: Coverage Audit (what should mention parity, and whether it does)**
+
+Checked requested files plus adjacent workflow entrypoints.
+
+Present and useful:
+- `AGENTS.md:103` — has mandatory Parity Law + test command
+- `CLAUDE.md:350` — has Parity Law + window/command checklists (but stale refs, see below)
+- `.claude/skills/ww-build-test/SKILL.md:15` and `:59` — parity gate explicitly included
+- `.pi/skills/wibwobdos/SKILL.md:236` — parity enforcement section present
+- `.planning/README.md:328` — parity is in quality checklist
+- `.planning/audits/command-surface-audit-20260224.md:5` — parity-focused audit doc
+
+Missing / weak parity guidance on likely dev paths:
+- `.claude/skills/ww-build-game/SKILL.md` — no parity gate; parity wiring listed as optional/incomplete
+- `.claude/skills/ww-audit/SKILL.md` — parity runtime audit only; no contract parity tests or MCP/Node surface coverage
+- `.claude/skills/ww-api-smoke/SKILL.md` — no discovery/parity smoke (`/commands`/`/capabilities`) recipe
+- `.claude/skills/ww-launch/SKILL.md` — shows capability endpoints, but no explicit post-launch parity verification step
+- `.pi/skills/wibwobdos/references/integrating-vendor-views.md` — parity wording exists, but checklist is stale/incomplete
+- `app/README.md` — points devs to ops/API docs but no parity warning/checklist pointer
+- `tools/api_server/README.md` — no “if you add window types/commands, update models/schemas + run parity gate” guidance
+- `README.md` — contributor-facing entrypoints point to `CLAUDE.md`, but parity is not mentioned explicitly
+
+**Part 2: Developer Journey Trace (gaps)**
+
+**Scenario A: Add new generative art view (`plasma_field`)**
+1. Skill loaded: `ww-scaffold-view` (correct).
+2. Does it tell every file to touch: No.
+- Missing `app/window_type_registry.cpp` entirely (`.claude/skills/ww-scaffold-view/SKILL.md:49-58`)
+- Missing test stubs (`app/command_registry_test.cpp`, `app/scramble_engine_test.cpp`) unlike `ww-build-game`
+- References nonexistent `tools/api_server/mcp_tools.py` (`.claude/skills/ww-scaffold-view/SKILL.md:58`)
+- Defaults to partial parity (`ui+registry`) (`.claude/skills/ww-scaffold-view/SKILL.md:19`)
+3. Test skill after implementation: `ww-build-test` (correct).
+4. Does it run parity checks: Yes in `standard+` (`.claude/skills/ww-build-test/SKILL.md:15`, `:59`) but docs elsewhere say `strict`, causing confusion.
+5. Audit skill before PR: `ww-audit` (runtime completeness only).
+- It does not verify MCP/Node/schema parity surfaces (`.claude/skills/ww-audit/SKILL.md:4-8`)
+6. PR template reminder: Yes, generic parity checkbox exists (`.github/pull_request_template.md` “Parity impact reviewed”).
+
+**Scenario B: Add new IPC command (`get_desktop_info`)**
+1. Guidance source: `CLAUDE.md` “Adding a new command” (correct entrypoint).
+2. Does it list all files incl Node MCP: It lists Node MCP, but points to nonexistent Python MCP file (`CLAUDE.md:376`).
+3. Tests that catch missing MCP tool builder: Intended `test_surface_parity_matrix` / `test_node_mcp_parity`, but both are currently broken due missing `tools/api_server/mcp_tools.py`.
+4. Forgetting `schemas.py`: Not generally caught.
+- `/menu/command` schema is free-form `args: Dict[str, Any]` (`tools/api_server/schemas.py:64-67`)
+- Only typed REST endpoints have explicit schema checks, and coverage is command-specific
+
+**Scenario C: Modify existing command parameters**
+1. What tells them to update REST route schema: No central parity checklist does.
+- `CLAUDE.md` command checklist does not mention route-specific `schemas.py` updates for param changes
+2. What catches param mismatches (`id` vs `win_id`): No generic contract test.
+- Mixed naming exists in schemas (`tools/api_server/schemas.py:129`, `:223`, etc.)
+- Some command-specific tests exist (e.g. terminal `window_id` passthrough in `tools/api_server/test_terminal_read.py:68-83`)
+3. Is there any test for this: Only scattered endpoint-specific tests, not a parity-wide parameter contract test.
+
+**Scenario D: External contributor reads only `README.md`**
+1. Do they know parity exists: No (not explicitly).
+2. Can they find the checklist: Only indirectly by opening `CLAUDE.md` (`README.md:88`, `:116`, `:199`).
+
+**Part 3: Contradictions / Stale Content**
+
+1. `test_pattern` CMake target stale docs
+- In requested focus files: I did not find `--target test_pattern`.
+- I did find stale references in active-ish non-focus docs:
+  - `HANDOVER.md:89` / `:121`
+  - `.planning/audits/local-dev-friction-20260223.md:97`, `:138`
+- `tools/api_server/README.md` references `test_pattern` as a protocol/window slug (`tools/api_server/README.md:42`, `:99`, `:255`), which appears intentional, not a CMake target issue.
+
+2. `_command_tool_builders()` / `mcp_tools.py` references
+- Docs/tests still reference `tools/api_server/mcp_tools.py` and `_command_tool_builders()`
+- Actual file is missing (`ls tools/api_server` shows no `mcp_tools.py`)
+- `tests/contract/test_surface_parity_matrix.py:16` imports it and fails collection
+- `CLAUDE.md:376`, `.claude/skills/ww-scaffold-view/SKILL.md:58`, vendor integration ref `:24` are stale
+
+3. “parity is strict only” stale wording
+- `CLAUDE.md:388` says parity gate is run by `ww-build-test` in `strict` mode
+- `ww-build-test` now runs parity in `standard+` (`.claude/skills/ww-build-test/SKILL.md:15`, `:59`)
+- `ww-build-test` output block still says `PARITY (strict only)` (`.claude/skills/ww-build-test/SKILL.md:98`) which is internally inconsistent
+
+4. Docs contradicting mandatory Parity Law / parity optionality
+- `.claude/skills/ww-scaffold-view/SKILL.md:19` defaults to `ui+registry` (partial parity)
+- `.claude/skills/ww-scaffold-view/SKILL.md:28-29` offers non-full parity scopes without a strong “spike only” warning
+- `.claude/skills/ww-build-game/SKILL.md:331` marks Python parity as optional
+- These conflict with `AGENTS.md:103-109` mandatory Parity Law
+
+5. Wrong/deleted cross-references
+- `CLAUDE.md:376` → `tools/api_server/mcp_tools.py` (missing file)
+- `.claude/skills/ww-scaffold-view/SKILL.md:58` → `tools/api_server/mcp_tools.py` (missing file)
+- `.pi/skills/wibwobdos/references/integrating-vendor-views.md:24` → `tools/api_server/mcp_tools.py` (missing file)
+- `.pi/skills/wibwobdos/references/integrating-vendor-views.md:80-81` uses `/exec` endpoint (no route in `tools/api_server/main.py`; current endpoints include `/menu/command`, `/commands`, `/capabilities`)
+
+**Fix Options (with tradeoffs)**
+
+1. Align docs/tests to current architecture (FastAPI auto-MCP + minimal Node MCP)
+- Fix docs to stop referencing `tools/api_server/mcp_tools.py`
+- Rewrite parity tests to validate current surfaces (`/commands` and Node MCP minimal bridge assumptions)
+- Tradeoff: fastest coherence fix, but weakens “all surfaces in one PR” enforcement until a richer MCP layer exists
+
+2. Restore/implement Python MCP tool layer (`tools/api_server/mcp_tools.py`) and match docs/tests
+- Reintroduce `mcp_tools.py` + `_command_tool_builders()`, expand Node MCP tools to parity expectations
+- Tradeoff: strongest guardrail consistency, but materially larger engineering change
+
+3. Hybrid (recommended short-term)
+- Immediately patch docs/skills to remove false instructions and make parity policy accurate
+- Mark broken parity tests as `xfail/skip` with explicit TODO issue, or update them to fail with a clearer message
+- Add a temporary “current architecture” note in Parity Law sections
+- Tradeoff: preserves momentum and reduces drift risk now, but still leaves incomplete enforcement until code/tests are finished
+
+**Risks and Tests to Add**
+
+Risks if left as-is:
+- Agents will follow `ww-scaffold-view`/`ww-build-game` and reintroduce window-type drift (missing `window_type_registry.cpp`, schemas)
+- “Green build” claims may ignore parity because docs disagree on when parity runs
+- Contributors lose confidence because parity gate command currently errors before collection
+- Param name drift (`id`/`win_id`/`window_id`) will keep escaping unless command-specific tests happen to exist
+
+Tests/guards to add:
+- Doc lint: fail CI if docs mention nonexistent `tools/api_server/mcp_tools.py` unless file exists
+- Skill lint: any skill mentioning “new window/view/command” or “build/test” must include parity gate or link to `CLAUDE.md` Parity Law
+- Parity workflow smoke: run the exact Parity Law command in CI and assert no import/collection errors
+- Schema/param contract tests for representative commands (at least one per naming style) and typed REST routes
+- Optional stronger test: parse command registry param hints + route schemas and assert mapped endpoint arg names match (where applicable)
+
+**Prioritized Recommendations**
+
+**Must Fix**
+- `.claude/skills/ww-scaffold-view/SKILL.md:19` — default scope is partial parity (`ui+registry`) despite mandatory Parity Law — change default to `full-parity` or mark non-full scopes as spike-only with explicit warning/block for production work.
+- `.claude/skills/ww-scaffold-view/SKILL.md:49` — window scaffolding checklist omits `app/window_type_registry.cpp` — add mandatory step for `window_type_registry.cpp` wiring (spawn/match/spec) before parity gate.
+- `.claude/skills/ww-scaffold-view/SKILL.md:58` — references deleted `tools/api_server/mcp_tools.py` — replace with the actual MCP integration path/strategy or remove until Python MCP tool file exists.
+- `.claude/skills/ww-build-game/SKILL.md:331` — marks Python parity wiring as optional for a new game window type — make parity surfaces mandatory (registry + window type registry + models + schemas + tests) or clearly split “prototype-only” vs “ship-ready” paths.
+- `CLAUDE.md:376` — command checklist points to nonexistent `tools/api_server/mcp_tools.py::_command_tool_builders()` — update checklist to current implementation location or restore the module; current instruction is unexecutable.
+- `tests/contract/test_surface_parity_matrix.py:16` — imports nonexistent `tools.api_server.mcp_tools` and breaks parity gate collection — update test to current MCP implementation or restore module so the parity gate actually runs.
+- `tests/contract/test_node_mcp_parity.py:16` — hardcodes missing Python MCP file and outdated Node MCP tool expectations — update to current architecture or restore intended Python/Node MCP surfaces before treating Parity Law as enforceable.
+
+**Should Fix**
+- `CLAUDE.md:388` — says `ww-build-test` runs parity gate in `strict` mode — change to `standard` (or `standard+`) to match `.claude/skills/ww-build-test/SKILL.md`.
+- `.claude/skills/ww-build-test/SKILL.md:98` — output format labels `PARITY (strict only)` while pipeline runs parity in `standard+` — relabel to `standard+` (and keep `PLANNING` as strict-only).
+- `.claude/skills/ww-audit/SKILL.md:4` — “parity audit” description only covers runtime window surfaces, not MCP/Node/schema parity — rename/scope it as runtime parity audit or add a first step that runs contract parity tests.
+- `.claude/skills/ww-api-smoke/SKILL.md:15` — fast path skips discovery endpoints (`/commands`, `/capabilities`) — add a discovery smoke preset (or a documented command) to catch command discovery regressions.
+- `.claude/skills/ww-launch/SKILL.md:10` — launch flow lacks explicit post-launch capability verification — add a “Post-launch verify” block (`/health`, `/commands`, `/capabilities`, then parity gate or `ww-build-test standard`).
+- `.pi/skills/wibwobdos/references/integrating-vendor-views.md:24` — references deleted `tools/api_server/mcp_tools.py` — update checklist to current MCP surface and include `tools/api_server/schemas.py`.
+- `.pi/skills/wibwobdos/references/integrating-vendor-views.md:80` — verification sequence uses nonexistent `/exec` endpoint — replace with current `/menu/command` and `/windows` examples.
+- `tools/api_server/README.md:12` — lists `models.py` / `schemas.py` but gives no contributor parity wiring guidance — add a “When adding window types/commands” note with Parity Law test command and required files.
+- `README.md:88` — root contributor path points to `CLAUDE.md` but does not mention parity drift guardrail — add a brief contributor note linking “Parity Law” for window/command changes.
+
+**Nice to Have**
+- `.planning/README.md:328` — parity quality gate checklist exists but no exact parity command — add the canonical `pytest tests/contract/...` command so planning docs directly encode the runnable gate.
+- `app/README.md:75` — programmatic-control pointers are good, but no parity warning for new views — add a one-line “new view/window changes must follow Parity Law in `CLAUDE.md`”.
+- `.github/pull_request_template.md:13` — parity checkbox is present but generic — add a line for “Paste parity gate command output (or N/A with reason)” to improve enforcement.
+- `.planning/audits/command-surface-audit-20260224.md:5` — linked as architecture reference but also documents transient failures — add a banner noting it is a dated audit snapshot, not normative implementation docs.
+
+**Evidence run**
+- `uv run --with pytest pytest tests/contract/test_surface_parity_matrix.py -q` → import error (`tools.api_server.mcp_tools` missing)
+- `uv run --with pytest pytest tests/contract/test_node_mcp_parity.py -q` → 4 failures (missing Python MCP file, Node MCP tool-count expectation mismatch, missing `tui_create_window`)
