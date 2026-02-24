@@ -2,7 +2,7 @@
 
 **tl;dr**: Rename the main binary from `test_pattern` to `wwdos` and the main app class from `TTestPatternApp` to `TWwdosApp`, without changing the `"test_pattern"` window-type protocol slug. A grep audit shows the class rename is much larger than originally estimated, and file-path/script/docs fallout is broader than the old spike suggested.
 
-**status**: not-started
+**status**: in-progress
 **severity**: housekeeping (no functional change intended)
 **depends_on**: E009 (still recommended first; `app/test_pattern_app.cpp` remains a merge hotspot)
 
@@ -45,7 +45,7 @@ Grep counts below are for live/actionable files and exclude noise/artifacts:
 
 ## Implementation Sequence
 
-### Phase 1: Binary + CMake (low code risk, high workflow visibility)
+### [ ] Phase 1: Binary + CMake (low code risk, high workflow visibility)
 
 **Estimate**: 0.5 day
 
@@ -62,7 +62,7 @@ Grep counts below are for live/actionable files and exclude noise/artifacts:
 - This phase is bigger than the original spike implied because launcher/orchestration paths exist outside the originally listed scripts.
 - `app/CMakeLists.txt` is also touched again in Phase 4 if `test_pattern_app.cpp` is renamed.
 
-### Phase 2: Socket path (medium risk; compatibility-sensitive)
+### [ ] Phase 2: Socket path (medium risk; compatibility-sensitive)
 
 **Estimate**: 0.5 day (with fallback), 1 day (if changing instance naming convention too)
 
@@ -90,7 +90,7 @@ Grep counts below are for live/actionable files and exclude noise/artifacts:
 - Keep legacy fallback (`/tmp/test_pattern_app.sock`) for at least one transition cycle to avoid breaking existing scripts and stale local habits.
 - Decide whether `WIBWOB_INSTANCE` naming remains `/tmp/wibwob_N.sock` (recommended: keep) vs switching instance sockets to `/tmp/wwdos_N.sock` (higher blast radius).
 
-### Phase 3: Class rename (highest risk; signature-heavy)
+### [ ] Phase 3: Class rename (highest risk; signature-heavy)
 
 **Estimate**: 1.0-1.5 days
 
@@ -128,7 +128,7 @@ Grep counts below are for live/actionable files and exclude noise/artifacts:
 - Test stubs (`command_registry_test.cpp`, `scramble_engine_test.cpp`) are easy to miss and were not called out in the original spike.
 - A temporary alias (`using TTestPatternApp = TWwdosApp;`) can reduce churn but may complicate cleanup and grep validation. Prefer one-shot rename unless branch pressure is high.
 
-### Phase 4: Source file rename (medium risk; path/string fallout)
+### [ ] Phase 4: Source file rename (medium risk; path/string fallout)
 
 **Estimate**: 0.5-1.0 day
 
@@ -165,7 +165,7 @@ Grep counts below are for live/actionable files and exclude noise/artifacts:
 - `app/run_test_pattern_logged.sh` -> `app/run_wwdos_logged.sh`
 - `tools/api_server/move_test_pattern.py` -> `tools/api_server/move_wwdos.py` (or keep if script semantics remain “move test-pattern window”)
 
-### Phase 5: Documentation / Skills / Planning Sweep
+### [ ] Phase 5: Documentation / Skills / Planning Sweep
 
 **Estimate**: 0.5-1.0 day (depending on historical docs scope)
 
