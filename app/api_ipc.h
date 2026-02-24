@@ -10,7 +10,7 @@
 #include <cstdint>
 #include <chrono>
 
-class TTestPatternApp;
+class TWwdosApp;
 
 class ApiIpcServer {
 public:
@@ -21,7 +21,7 @@ public:
         int  client_count = 0;     ///< Number of persistent event subscribers
     };
 
-    explicit ApiIpcServer(TTestPatternApp* app);
+    explicit ApiIpcServer(TWwdosApp* app);
     ~ApiIpcServer();
 
     // Start listening on a Unix socket path. Returns false on failure.
@@ -39,7 +39,7 @@ public:
     ConnectionStatus getConnectionStatus() const;
 
 private:
-    TTestPatternApp* app_ = nullptr;
+    TWwdosApp* app_ = nullptr;
     int fd_listen_ = -1;
     std::string sock_path_;
     std::string auth_secret_;       // from WIBWOB_AUTH_SECRET env var (empty = no auth)

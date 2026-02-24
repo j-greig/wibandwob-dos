@@ -12,7 +12,7 @@ import tempfile
 import pytest
 
 
-# Workspace JSON format contract (from TTestPatternApp::buildWorkspaceJson)
+# Workspace JSON format contract (from TWwdosApp::buildWorkspaceJson)
 VALID_WORKSPACE = {
     "version": 1,
     "app": "test_pattern",

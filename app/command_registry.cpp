@@ -15,63 +15,63 @@
 #define Uses_TProgram
 #include <tvision/tv.h>
 
-extern void api_cascade(TTestPatternApp& app);
-extern void api_toggle_scramble(TTestPatternApp& app);
-extern void api_expand_scramble(TTestPatternApp& app);
-extern std::string api_scramble_say(TTestPatternApp& app, const std::string& text);
-extern std::string api_scramble_pet(TTestPatternApp& app);
-extern void api_spawn_room_chat(TTestPatternApp& app, const TRect* bounds);
-extern std::string api_room_chat_receive(TTestPatternApp& app, const std::string& sender, const std::string& text, const std::string& ts);
-extern std::string api_room_presence(TTestPatternApp& app, const std::string& participants_json);
-extern std::string api_chat_receive(TTestPatternApp& app, const std::string& sender, const std::string& text);
-extern std::string api_wibwob_ask(TTestPatternApp& app, const std::string& text);
-extern std::string api_get_chat_history(TTestPatternApp& app);
-extern void api_tile(TTestPatternApp& app);
-extern void api_close_all(TTestPatternApp& app);
-extern void api_save_workspace(TTestPatternApp& app);
-extern bool api_open_workspace_path(TTestPatternApp& app, const std::string& path);
-extern void api_screenshot(TTestPatternApp& app);
-extern void api_set_pattern_mode(TTestPatternApp& app, const std::string& mode);
-extern std::string api_set_theme_mode(TTestPatternApp& app, const std::string& mode);
-extern std::string api_set_theme_variant(TTestPatternApp& app, const std::string& variant);
-extern std::string api_reset_theme(TTestPatternApp& app);
-extern std::string api_window_shadow(TTestPatternApp& app, const std::string& id, bool on);
-extern std::string api_window_title(TTestPatternApp& app, const std::string& id, const std::string& title);
-extern std::string api_desktop_preset(TTestPatternApp& app, const std::string& preset);
-extern std::string api_desktop_texture(TTestPatternApp& app, const std::string& ch);
-extern std::string api_desktop_color(TTestPatternApp& app, int fg, int bg);
-extern std::string api_desktop_gallery(TTestPatternApp& app, bool on);
-extern std::string api_desktop_get(TTestPatternApp& app);
-extern std::string api_figlet_set_text(TTestPatternApp& app, const std::string& id, const std::string& text);
-extern std::string api_figlet_set_font(TTestPatternApp& app, const std::string& id, const std::string& font);
-extern std::string api_figlet_set_color(TTestPatternApp& app, const std::string& id, const std::string& fg, const std::string& bg);
+extern void api_cascade(TWwdosApp& app);
+extern void api_toggle_scramble(TWwdosApp& app);
+extern void api_expand_scramble(TWwdosApp& app);
+extern std::string api_scramble_say(TWwdosApp& app, const std::string& text);
+extern std::string api_scramble_pet(TWwdosApp& app);
+extern void api_spawn_room_chat(TWwdosApp& app, const TRect* bounds);
+extern std::string api_room_chat_receive(TWwdosApp& app, const std::string& sender, const std::string& text, const std::string& ts);
+extern std::string api_room_presence(TWwdosApp& app, const std::string& participants_json);
+extern std::string api_chat_receive(TWwdosApp& app, const std::string& sender, const std::string& text);
+extern std::string api_wibwob_ask(TWwdosApp& app, const std::string& text);
+extern std::string api_get_chat_history(TWwdosApp& app);
+extern void api_tile(TWwdosApp& app);
+extern void api_close_all(TWwdosApp& app);
+extern void api_save_workspace(TWwdosApp& app);
+extern bool api_open_workspace_path(TWwdosApp& app, const std::string& path);
+extern void api_screenshot(TWwdosApp& app);
+extern void api_set_pattern_mode(TWwdosApp& app, const std::string& mode);
+extern std::string api_set_theme_mode(TWwdosApp& app, const std::string& mode);
+extern std::string api_set_theme_variant(TWwdosApp& app, const std::string& variant);
+extern std::string api_reset_theme(TWwdosApp& app);
+extern std::string api_window_shadow(TWwdosApp& app, const std::string& id, bool on);
+extern std::string api_window_title(TWwdosApp& app, const std::string& id, const std::string& title);
+extern std::string api_desktop_preset(TWwdosApp& app, const std::string& preset);
+extern std::string api_desktop_texture(TWwdosApp& app, const std::string& ch);
+extern std::string api_desktop_color(TWwdosApp& app, int fg, int bg);
+extern std::string api_desktop_gallery(TWwdosApp& app, bool on);
+extern std::string api_desktop_get(TWwdosApp& app);
+extern std::string api_figlet_set_text(TWwdosApp& app, const std::string& id, const std::string& text);
+extern std::string api_figlet_set_font(TWwdosApp& app, const std::string& id, const std::string& font);
+extern std::string api_figlet_set_color(TWwdosApp& app, const std::string& id, const std::string& fg, const std::string& bg);
 extern std::string api_figlet_list_fonts();
-extern void api_open_animation_path(TTestPatternApp& app, const std::string& path, const TRect* bounds, bool frameless, bool shadowless, const std::string& title);
-extern void api_spawn_paint(TTestPatternApp& app, const TRect* bounds);
-extern void api_spawn_micropolis_ascii(TTestPatternApp& app, const TRect* bounds);
-extern void api_spawn_quadra(TTestPatternApp& app, const TRect* bounds);
-extern void api_spawn_snake(TTestPatternApp& app, const TRect* bounds);
-extern void api_spawn_rogue(TTestPatternApp& app, const TRect* bounds);
-extern void api_spawn_deep_signal(TTestPatternApp& app, const TRect* bounds);
-extern void api_spawn_app_launcher(TTestPatternApp& app, const TRect* bounds);
-extern void api_spawn_gallery(TTestPatternApp& app, const TRect* bounds);
-extern void api_open_animation_path(TTestPatternApp& app, const std::string& path);
-extern std::string api_gallery_list(TTestPatternApp& app, const std::string& tab);
-extern void api_spawn_terminal(TTestPatternApp& app, const TRect* bounds);
-extern std::string api_terminal_write(TTestPatternApp& app, const std::string& text, const std::string& window_id);
-extern std::string api_terminal_read(TTestPatternApp& app, const std::string& window_id);
+extern void api_open_animation_path(TWwdosApp& app, const std::string& path, const TRect* bounds, bool frameless, bool shadowless, const std::string& title);
+extern void api_spawn_paint(TWwdosApp& app, const TRect* bounds);
+extern void api_spawn_micropolis_ascii(TWwdosApp& app, const TRect* bounds);
+extern void api_spawn_quadra(TWwdosApp& app, const TRect* bounds);
+extern void api_spawn_snake(TWwdosApp& app, const TRect* bounds);
+extern void api_spawn_rogue(TWwdosApp& app, const TRect* bounds);
+extern void api_spawn_deep_signal(TWwdosApp& app, const TRect* bounds);
+extern void api_spawn_app_launcher(TWwdosApp& app, const TRect* bounds);
+extern void api_spawn_gallery(TWwdosApp& app, const TRect* bounds);
+extern void api_open_animation_path(TWwdosApp& app, const std::string& path);
+extern std::string api_gallery_list(TWwdosApp& app, const std::string& tab);
+extern void api_spawn_terminal(TWwdosApp& app, const TRect* bounds);
+extern std::string api_terminal_write(TWwdosApp& app, const std::string& text, const std::string& window_id);
+extern std::string api_terminal_read(TWwdosApp& app, const std::string& window_id);
 
 // Paint canvas wrappers (defined in test_pattern_app.cpp, avoid tvision dependency)
-extern std::string api_paint_cell(TTestPatternApp& app, const std::string& id, int x, int y, uint8_t fg, uint8_t bg);
-extern std::string api_paint_text(TTestPatternApp& app, const std::string& id, int x, int y, const std::string& text, uint8_t fg, uint8_t bg);
-extern std::string api_paint_line(TTestPatternApp& app, const std::string& id, int x0, int y0, int x1, int y1, bool erase);
-extern std::string api_paint_rect(TTestPatternApp& app, const std::string& id, int x0, int y0, int x1, int y1, bool erase);
-extern std::string api_paint_clear(TTestPatternApp& app, const std::string& id);
-extern std::string api_paint_export(TTestPatternApp& app, const std::string& id);
-extern std::string api_paint_save(TTestPatternApp& app, const std::string& id, const std::string& path);
-extern std::string api_paint_load(TTestPatternApp& app, const std::string& id, const std::string& path);
-extern void api_spawn_paint_with_file(TTestPatternApp& app, const std::string& path);
-extern std::string api_paint_stamp_figlet(TTestPatternApp& app, const std::string& id,
+extern std::string api_paint_cell(TWwdosApp& app, const std::string& id, int x, int y, uint8_t fg, uint8_t bg);
+extern std::string api_paint_text(TWwdosApp& app, const std::string& id, int x, int y, const std::string& text, uint8_t fg, uint8_t bg);
+extern std::string api_paint_line(TWwdosApp& app, const std::string& id, int x0, int y0, int x1, int y1, bool erase);
+extern std::string api_paint_rect(TWwdosApp& app, const std::string& id, int x0, int y0, int x1, int y1, bool erase);
+extern std::string api_paint_clear(TWwdosApp& app, const std::string& id);
+extern std::string api_paint_export(TWwdosApp& app, const std::string& id);
+extern std::string api_paint_save(TWwdosApp& app, const std::string& id, const std::string& path);
+extern std::string api_paint_load(TWwdosApp& app, const std::string& id, const std::string& path);
+extern void api_spawn_paint_with_file(TWwdosApp& app, const std::string& path);
+extern std::string api_paint_stamp_figlet(TWwdosApp& app, const std::string& id,
     const std::string& text, const std::string& font,
     int x, int y, uint8_t fg, uint8_t bg);
 extern std::string api_list_figlet_fonts();
@@ -159,7 +159,7 @@ std::string get_command_capabilities_json() {
 }
 
 std::string exec_registry_command(
-    TTestPatternApp& app,
+    TWwdosApp& app,
     const std::string& name,
     const std::map<std::string, std::string>& kv) {
     if (name == "cascade") {

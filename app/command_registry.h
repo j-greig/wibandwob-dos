@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-class TTestPatternApp;
+class TWwdosApp;
 
 struct CommandCapability {
     const char* name;
@@ -15,6 +15,6 @@ struct CommandCapability {
 const std::vector<CommandCapability>& get_command_capabilities();
 std::string get_command_capabilities_json();
 std::string exec_registry_command(
-    TTestPatternApp& app,
+    TWwdosApp& app,
     const std::string& name,
     const std::map<std::string, std::string>& kv);

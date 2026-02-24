@@ -30,7 +30,7 @@ def _parse_menu_items():
     """Extract menu item labels from initMenuBar() in source."""
     src = APP_CPP.read_text()
     # Find initMenuBar function
-    start = src.find("TTestPatternApp::initMenuBar")
+    start = src.find("TWwdosApp::initMenuBar")
     if start == -1:
         return []
     # Find next function definition (initStatusLine follows initMenuBar)
@@ -46,7 +46,7 @@ def _parse_menu_items():
 def _parse_menu_accelerators():
     """Extract per-menu accelerator keys from initMenuBar()."""
     src = APP_CPP.read_text()
-    start = src.find("TTestPatternApp::initMenuBar")
+    start = src.find("TWwdosApp::initMenuBar")
     if start == -1:
         return {}
     end = src.find("\nTStatusLine*", start)

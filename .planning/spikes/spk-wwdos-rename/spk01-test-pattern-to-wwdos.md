@@ -92,7 +92,7 @@ Grep counts below are for live/actionable files and exclude noise/artifacts:
 - Keep legacy fallback (`/tmp/test_pattern_app.sock`) for at least one transition cycle to avoid breaking existing scripts and stale local habits.
 - Decide whether `WIBWOB_INSTANCE` naming remains `/tmp/wibwob_N.sock` (recommended: keep) vs switching instance sockets to `/tmp/wwdos_N.sock` (higher blast radius).
 
-### [ ] Phase 3: Class rename (highest risk; signature-heavy)
+### [x] Phase 3: Class rename (highest risk; signature-heavy)
 
 **Estimate**: 1.0-1.5 days
 

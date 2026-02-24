@@ -7,11 +7,11 @@
 #include <vector>
 #include <map>
 
-class TTestPatternApp;
+class TWwdosApp;
 class TWindow;
 
 // Spawn callback: return nullptr on success, a static error string on failure.
-using WinSpawnFn = const char* (*)(TTestPatternApp&,
+using WinSpawnFn = const char* (*)(TWwdosApp&,
                                    const std::map<std::string, std::string>&);
 using WinMatchFn = bool (*)(TWindow*);
 

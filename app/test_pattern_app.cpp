@@ -376,7 +376,7 @@ static TMenuItem* buildRecentWorkspacesSubmenuItem()
 class TTestPatternView;
 class TTestPatternWindow;
 class TGradientWindow;
-class TTestPatternApp;
+class TWwdosApp;
 class TCustomMenuBar;
 class TCustomStatusLine;
 
@@ -559,7 +559,7 @@ private:
 
     void drawApiIndicator()
     {
-        // TTestPatternApp is incomplete here — use the opaque helper
+        // TWwdosApp is incomplete here — use the opaque helper
         auto status = getAppIpcStatus(TApplication::application);
 
         // Build indicator string and pick colour
@@ -589,7 +589,7 @@ private:
         writeBuf(xPos, 0, labelLen + 1, 1, b);
     }
 
-    // Forward-declared helper — implemented after TTestPatternApp is defined
+    // Forward-declared helper — implemented after TWwdosApp is defined
     static ApiIpcServer::ConnectionStatus getAppIpcStatus(void* app);
 };
 
@@ -712,12 +712,12 @@ public:
 };
 
 /*---------------------------------------------------------*/
-/* TTestPatternApp - Main application class               */
+/* TWwdosApp - Main application class               */
 /*---------------------------------------------------------*/
-class TTestPatternApp : public TApplication
+class TWwdosApp : public TApplication
 {
 public:
-    TTestPatternApp();
+    TWwdosApp();
     virtual void handleEvent(TEvent& event);
     virtual void idle();
     virtual void run();
@@ -887,101 +887,101 @@ private:
     ApiIpcServer* ipcServer = nullptr;
     
     // Friend API helper functions implemented below to bridge IPC calls.
-    friend void api_spawn_test(TTestPatternApp&);
-    friend void api_spawn_gradient(TTestPatternApp&, const std::string&);
-    friend void api_open_animation_path(TTestPatternApp&, const std::string&);
-    friend void api_open_text_view_path(TTestPatternApp&, const std::string&, const TRect* bounds);
-    friend void api_spawn_test(TTestPatternApp&, const TRect* bounds);
-    friend void api_spawn_gradient(TTestPatternApp&, const std::string&, const TRect* bounds);
-    friend void api_open_animation_path(TTestPatternApp&, const std::string&, const TRect* bounds, bool frameless, bool shadowless, const std::string& title);
-    friend void api_cascade(TTestPatternApp&);
-    friend void api_toggle_scramble(TTestPatternApp&);
-    friend void api_expand_scramble(TTestPatternApp&);
-    friend std::string api_scramble_say(TTestPatternApp&, const std::string&);
-    friend std::string api_scramble_pet(TTestPatternApp&);
-    friend std::string api_chat_receive(TTestPatternApp&, const std::string&, const std::string&);
-    friend void api_tile(TTestPatternApp&);
-    friend void api_close_all(TTestPatternApp&);
-    friend void api_set_pattern_mode(TTestPatternApp&, const std::string&);
-    friend void api_save_workspace(TTestPatternApp&);
-    friend bool api_save_workspace_path(TTestPatternApp&, const std::string&);
-    friend bool api_open_workspace_path(TTestPatternApp&, const std::string&);
-    friend void api_screenshot(TTestPatternApp&);
-    friend std::string api_get_state(TTestPatternApp&);
-    friend std::string api_move_window(TTestPatternApp&, const std::string&, int, int);
-    friend std::string api_resize_window(TTestPatternApp&, const std::string&, int, int);
-    friend std::string api_focus_window(TTestPatternApp&, const std::string&);
-    friend std::string api_close_window(TTestPatternApp&, const std::string&);
-    friend std::string api_get_canvas_size(TTestPatternApp&);
-    friend void api_spawn_text_editor(TTestPatternApp&, const TRect* bounds, const std::string& title);
-    friend void api_spawn_browser(TTestPatternApp&, const TRect* bounds);
-    friend void api_spawn_room_chat(TTestPatternApp&, const TRect* bounds);
-    friend std::string api_room_chat_receive(TTestPatternApp&, const std::string& sender, const std::string& text, const std::string& ts);
-    friend std::string api_room_presence(TTestPatternApp&, const std::string& participants_json);
-    friend std::string api_get_room_chat_pending(TTestPatternApp&);
-    friend std::string api_take_last_registered_window_id(TTestPatternApp&);
-    friend void api_spawn_verse(TTestPatternApp&, const TRect* bounds);
-    friend void api_spawn_mycelium(TTestPatternApp&, const TRect* bounds);
-    friend void api_spawn_orbit(TTestPatternApp&, const TRect* bounds);
-    friend void api_spawn_torus(TTestPatternApp&, const TRect* bounds);
-    friend void api_spawn_cube(TTestPatternApp&, const TRect* bounds);
-    friend void api_spawn_life(TTestPatternApp&, const TRect* bounds);
-    friend void api_spawn_blocks(TTestPatternApp&, const TRect* bounds);
-    friend void api_spawn_score(TTestPatternApp&, const TRect* bounds);
-    friend void api_spawn_ascii(TTestPatternApp&, const TRect* bounds);
-    friend void api_spawn_animated_gradient(TTestPatternApp&, const TRect* bounds);
-    friend void api_spawn_monster_cam(TTestPatternApp&, const TRect* bounds);
-    friend void api_spawn_monster_verse(TTestPatternApp&, const TRect* bounds);
-    friend void api_spawn_monster_portal(TTestPatternApp&, const TRect* bounds);
-    friend void api_spawn_micropolis_ascii(TTestPatternApp&, const TRect* bounds);
-    friend void api_spawn_quadra(TTestPatternApp&, const TRect* bounds);
-    friend void api_spawn_snake(TTestPatternApp&, const TRect* bounds);
-    friend void api_spawn_rogue(TTestPatternApp&, const TRect* bounds);
-    friend void api_spawn_deep_signal(TTestPatternApp&, const TRect* bounds);
-    friend void api_spawn_app_launcher(TTestPatternApp&, const TRect* bounds);
-    friend void api_spawn_gallery(TTestPatternApp&, const TRect* bounds);
-    friend void api_spawn_figlet_text(TTestPatternApp&, const TRect*,
+    friend void api_spawn_test(TWwdosApp&);
+    friend void api_spawn_gradient(TWwdosApp&, const std::string&);
+    friend void api_open_animation_path(TWwdosApp&, const std::string&);
+    friend void api_open_text_view_path(TWwdosApp&, const std::string&, const TRect* bounds);
+    friend void api_spawn_test(TWwdosApp&, const TRect* bounds);
+    friend void api_spawn_gradient(TWwdosApp&, const std::string&, const TRect* bounds);
+    friend void api_open_animation_path(TWwdosApp&, const std::string&, const TRect* bounds, bool frameless, bool shadowless, const std::string& title);
+    friend void api_cascade(TWwdosApp&);
+    friend void api_toggle_scramble(TWwdosApp&);
+    friend void api_expand_scramble(TWwdosApp&);
+    friend std::string api_scramble_say(TWwdosApp&, const std::string&);
+    friend std::string api_scramble_pet(TWwdosApp&);
+    friend std::string api_chat_receive(TWwdosApp&, const std::string&, const std::string&);
+    friend void api_tile(TWwdosApp&);
+    friend void api_close_all(TWwdosApp&);
+    friend void api_set_pattern_mode(TWwdosApp&, const std::string&);
+    friend void api_save_workspace(TWwdosApp&);
+    friend bool api_save_workspace_path(TWwdosApp&, const std::string&);
+    friend bool api_open_workspace_path(TWwdosApp&, const std::string&);
+    friend void api_screenshot(TWwdosApp&);
+    friend std::string api_get_state(TWwdosApp&);
+    friend std::string api_move_window(TWwdosApp&, const std::string&, int, int);
+    friend std::string api_resize_window(TWwdosApp&, const std::string&, int, int);
+    friend std::string api_focus_window(TWwdosApp&, const std::string&);
+    friend std::string api_close_window(TWwdosApp&, const std::string&);
+    friend std::string api_get_canvas_size(TWwdosApp&);
+    friend void api_spawn_text_editor(TWwdosApp&, const TRect* bounds, const std::string& title);
+    friend void api_spawn_browser(TWwdosApp&, const TRect* bounds);
+    friend void api_spawn_room_chat(TWwdosApp&, const TRect* bounds);
+    friend std::string api_room_chat_receive(TWwdosApp&, const std::string& sender, const std::string& text, const std::string& ts);
+    friend std::string api_room_presence(TWwdosApp&, const std::string& participants_json);
+    friend std::string api_get_room_chat_pending(TWwdosApp&);
+    friend std::string api_take_last_registered_window_id(TWwdosApp&);
+    friend void api_spawn_verse(TWwdosApp&, const TRect* bounds);
+    friend void api_spawn_mycelium(TWwdosApp&, const TRect* bounds);
+    friend void api_spawn_orbit(TWwdosApp&, const TRect* bounds);
+    friend void api_spawn_torus(TWwdosApp&, const TRect* bounds);
+    friend void api_spawn_cube(TWwdosApp&, const TRect* bounds);
+    friend void api_spawn_life(TWwdosApp&, const TRect* bounds);
+    friend void api_spawn_blocks(TWwdosApp&, const TRect* bounds);
+    friend void api_spawn_score(TWwdosApp&, const TRect* bounds);
+    friend void api_spawn_ascii(TWwdosApp&, const TRect* bounds);
+    friend void api_spawn_animated_gradient(TWwdosApp&, const TRect* bounds);
+    friend void api_spawn_monster_cam(TWwdosApp&, const TRect* bounds);
+    friend void api_spawn_monster_verse(TWwdosApp&, const TRect* bounds);
+    friend void api_spawn_monster_portal(TWwdosApp&, const TRect* bounds);
+    friend void api_spawn_micropolis_ascii(TWwdosApp&, const TRect* bounds);
+    friend void api_spawn_quadra(TWwdosApp&, const TRect* bounds);
+    friend void api_spawn_snake(TWwdosApp&, const TRect* bounds);
+    friend void api_spawn_rogue(TWwdosApp&, const TRect* bounds);
+    friend void api_spawn_deep_signal(TWwdosApp&, const TRect* bounds);
+    friend void api_spawn_app_launcher(TWwdosApp&, const TRect* bounds);
+    friend void api_spawn_gallery(TWwdosApp&, const TRect* bounds);
+    friend void api_spawn_figlet_text(TWwdosApp&, const TRect*,
         const std::string& text, const std::string& font,
         bool frameless, bool shadowless);
-    friend std::string api_figlet_set_text(TTestPatternApp&, const std::string& id, const std::string& text);
-    friend std::string api_figlet_set_font(TTestPatternApp&, const std::string& id, const std::string& font);
-    friend std::string api_figlet_set_color(TTestPatternApp&, const std::string& id, const std::string& fg, const std::string& bg);
-    friend std::string api_gallery_list(TTestPatternApp&, const std::string& tab);
-    friend void api_spawn_terminal(TTestPatternApp&, const TRect* bounds);
-    friend void api_spawn_wibwob(TTestPatternApp&, const TRect* bounds);
-    friend std::string api_terminal_write(TTestPatternApp&, const std::string& text, const std::string& window_id);
-    friend std::string api_terminal_read(TTestPatternApp&, const std::string& window_id);
-    friend void api_spawn_paint(TTestPatternApp&, const TRect* bounds);
-    friend TPaintCanvasView* api_find_paint_canvas(TTestPatternApp&, const std::string&);
-    friend std::string api_browser_fetch(TTestPatternApp&, const std::string& url);
-    friend std::string api_send_text(TTestPatternApp&, const std::string&, const std::string&, 
+    friend std::string api_figlet_set_text(TWwdosApp&, const std::string& id, const std::string& text);
+    friend std::string api_figlet_set_font(TWwdosApp&, const std::string& id, const std::string& font);
+    friend std::string api_figlet_set_color(TWwdosApp&, const std::string& id, const std::string& fg, const std::string& bg);
+    friend std::string api_gallery_list(TWwdosApp&, const std::string& tab);
+    friend void api_spawn_terminal(TWwdosApp&, const TRect* bounds);
+    friend void api_spawn_wibwob(TWwdosApp&, const TRect* bounds);
+    friend std::string api_terminal_write(TWwdosApp&, const std::string& text, const std::string& window_id);
+    friend std::string api_terminal_read(TWwdosApp&, const std::string& window_id);
+    friend void api_spawn_paint(TWwdosApp&, const TRect* bounds);
+    friend TPaintCanvasView* api_find_paint_canvas(TWwdosApp&, const std::string&);
+    friend std::string api_browser_fetch(TWwdosApp&, const std::string& url);
+    friend std::string api_send_text(TWwdosApp&, const std::string&, const std::string&, 
                                      const std::string&, const std::string&);
-    friend std::string api_send_figlet(TTestPatternApp&, const std::string&, const std::string&, 
+    friend std::string api_send_figlet(TWwdosApp&, const std::string&, const std::string&, 
                                        const std::string&, int, const std::string&);
     // Per-window toggles
-    friend std::string api_window_shadow(TTestPatternApp&, const std::string&, bool);
-    friend std::string api_window_title(TTestPatternApp&, const std::string&, const std::string&);
+    friend std::string api_window_shadow(TWwdosApp&, const std::string&, bool);
+    friend std::string api_window_title(TWwdosApp&, const std::string&, const std::string&);
     // Desktop texture & gallery mode
-    friend std::string api_desktop_preset(TTestPatternApp&, const std::string&);
-    friend std::string api_desktop_texture(TTestPatternApp&, const std::string&);
-    friend std::string api_desktop_color(TTestPatternApp&, int, int);
-    friend std::string api_desktop_gallery(TTestPatternApp&, bool);
-    friend std::string api_desktop_get(TTestPatternApp&);
+    friend std::string api_desktop_preset(TWwdosApp&, const std::string&);
+    friend std::string api_desktop_texture(TWwdosApp&, const std::string&);
+    friend std::string api_desktop_color(TWwdosApp&, int, int);
+    friend std::string api_desktop_gallery(TWwdosApp&, bool);
+    friend std::string api_desktop_get(TWwdosApp&);
     bool galleryMode_ = false;
 };
 
 // Static member definition
-std::string TTestPatternApp::runtimeApiKey;
+std::string TWwdosApp::runtimeApiKey;
 
 // Accessor for runtime API key (used by wibwob_view.cpp)
 std::string getAppRuntimeApiKey() {
-    return TTestPatternApp::runtimeApiKey;
+    return TWwdosApp::runtimeApiKey;
 }
 
-TTestPatternApp::TTestPatternApp() :
-    TProgInit(&TTestPatternApp::initStatusLine,
-              &TTestPatternApp::initMenuBar,
-              &TTestPatternApp::initDeskTop),
+TWwdosApp::TWwdosApp() :
+    TProgInit(&TWwdosApp::initStatusLine,
+              &TWwdosApp::initMenuBar,
+              &TWwdosApp::initDeskTop),
     windowNumber(0),
     scrambleWindow(nullptr),
     scrambleState(sdsHidden)
@@ -1038,7 +1038,7 @@ TTestPatternApp::TTestPatternApp() :
     scrambleEngine.init(".");
 }
 
-void TTestPatternApp::handleEvent(TEvent& event)
+void TWwdosApp::handleEvent(TEvent& event)
 {
     TApplication::handleEvent(event);
     
@@ -1760,7 +1760,7 @@ void TTestPatternApp::handleEvent(TEvent& event)
     }
 }
 
-void TTestPatternApp::newTestWindow()
+void TWwdosApp::newTestWindow()
 {
     // Create window title
     windowNumber++;
@@ -1781,7 +1781,7 @@ void TTestPatternApp::newTestWindow()
     deskTop->insert(window);
 }
 
-void TTestPatternApp::newTestWindow(const TRect& bounds)
+void TWwdosApp::newTestWindow(const TRect& bounds)
 {
     // Create window title
     windowNumber++;
@@ -1794,7 +1794,7 @@ void TTestPatternApp::newTestWindow(const TRect& bounds)
     registerWindow(window);
 }
 
-void TTestPatternApp::newBrowserWindow()
+void TWwdosApp::newBrowserWindow()
 {
     TRect r = deskTop->getExtent();
     r.grow(-3, -2);
@@ -1805,7 +1805,7 @@ void TTestPatternApp::newBrowserWindow()
         browser->fetchUrl("https://symbient.life");
 }
 
-void TTestPatternApp::newBrowserWindow(const TRect& bounds)
+void TWwdosApp::newBrowserWindow(const TRect& bounds)
 {
     TWindow* window = createBrowserWindow(bounds);
     deskTop->insert(window);
@@ -1814,7 +1814,7 @@ void TTestPatternApp::newBrowserWindow(const TRect& bounds)
         browser->fetchUrl("https://symbient.life");
 }
 
-void TTestPatternApp::deliverScrambleReply()
+void TWwdosApp::deliverScrambleReply()
 {
     if (pendingScrambleReply.empty() || !scrambleWindow) return;
     std::string reply = std::move(pendingScrambleReply);
@@ -1829,7 +1829,7 @@ void TTestPatternApp::deliverScrambleReply()
     }
 }
 
-void TTestPatternApp::wireScrambleInput()
+void TWwdosApp::wireScrambleInput()
 {
     if (!scrambleWindow || !scrambleWindow->getInputView()) return;
 
@@ -1931,7 +1931,7 @@ void TTestPatternApp::wireScrambleInput()
     };
 }
 
-void TTestPatternApp::cycleScramble()
+void TWwdosApp::cycleScramble()
 {
     if (!scrambleWindow || scrambleState == sdsHidden) {
         // Create at bottom-right corner of desktop in smol mode
@@ -1975,17 +1975,17 @@ void TTestPatternApp::cycleScramble()
     }
 }
 
-void TTestPatternApp::cascade()
+void TWwdosApp::cascade()
 {
     deskTop->cascade(deskTop->getExtent());
 }
 
-void TTestPatternApp::tile()
+void TWwdosApp::tile()
 {
     deskTop->tile(deskTop->getExtent());
 }
 
-void TTestPatternApp::closeAll()
+void TWwdosApp::closeAll()
 {
     // Close all regular windows on the desktop (iterating safely over circular list)
     std::vector<TWindow*> toClose;
@@ -2007,7 +2007,7 @@ void TTestPatternApp::closeAll()
     }
 }
 
-void TTestPatternApp::newGradientWindow(TGradientWindow::GradientType type)
+void TWwdosApp::newGradientWindow(TGradientWindow::GradientType type)
 {
     // Create window title
     windowNumber++;
@@ -2044,7 +2044,7 @@ void TTestPatternApp::newGradientWindow(TGradientWindow::GradientType type)
     registerWindow(window);
 }
 
-void TTestPatternApp::newGradientWindow(TGradientWindow::GradientType type, const TRect& bounds)
+void TWwdosApp::newGradientWindow(TGradientWindow::GradientType type, const TRect& bounds)
 {
     // Create window title
     windowNumber++;
@@ -2072,7 +2072,7 @@ void TTestPatternApp::newGradientWindow(TGradientWindow::GradientType type, cons
     registerWindow(window);
 }
 
-// void TTestPatternApp::newMechWindow()
+// void TWwdosApp::newMechWindow()
 // {
 //     // Create window title
 //     windowNumber++;
@@ -2094,7 +2094,7 @@ void TTestPatternApp::newGradientWindow(TGradientWindow::GradientType type, cons
 //     registerWindow(window);
 // }
 
-void TTestPatternApp::newDonutWindow()
+void TWwdosApp::newDonutWindow()
 {
     // Create window title
     windowNumber++;
@@ -2117,7 +2117,7 @@ void TTestPatternApp::newDonutWindow()
     registerWindow(window);
 }
 
-void TTestPatternApp::newWibWobWindow()
+void TWwdosApp::newWibWobWindow()
 {
     // Only one W&W chat window per instance — raise existing if already open.
     if (deskTop) {
@@ -2146,7 +2146,7 @@ void TTestPatternApp::newWibWobWindow()
     window->select();
 }
 
-void TTestPatternApp::newRoomChatWindow()
+void TWwdosApp::newRoomChatWindow()
 {
     windowNumber++;
     int offset = (windowNumber - 1) % 8;
@@ -2166,7 +2166,7 @@ void TTestPatternApp::newRoomChatWindow()
     window->select();
 }
 
-void TTestPatternApp::newWibWobTestWindowA()
+void TWwdosApp::newWibWobTestWindowA()
 {
     // Test window A: standardScrollBar() fix (minimal change approach)
     windowNumber++;
@@ -2192,7 +2192,7 @@ void TTestPatternApp::newWibWobTestWindowA()
     window->select();
 }
 
-void TTestPatternApp::newWibWobTestWindowB()
+void TWwdosApp::newWibWobTestWindowB()
 {
     // Test window B: TScroller-based (proper TV architecture)
     windowNumber++;
@@ -2218,7 +2218,7 @@ void TTestPatternApp::newWibWobTestWindowB()
     window->select();
 }
 
-void TTestPatternApp::newWibWobTestWindowC()
+void TWwdosApp::newWibWobTestWindowC()
 {
     // Test window C: Split view architecture (MessageView + InputView)
     windowNumber++;
@@ -2244,7 +2244,7 @@ void TTestPatternApp::newWibWobTestWindowC()
     window->select();
 }
 
-void TTestPatternApp::openAnimationFile()
+void TWwdosApp::openAnimationFile()
 {
     char fileName[MAXPATH];
     std::string primerGlob = findPrimerDir() + "/*.txt";
@@ -2264,7 +2264,7 @@ void TTestPatternApp::openAnimationFile()
     }
 }
 
-void TTestPatternApp::openAnimationFilePath(const std::string& filePath)
+void TWwdosApp::openAnimationFilePath(const std::string& filePath)
 {
     // Determine file type and create appropriate title
     windowNumber++;
@@ -2287,7 +2287,7 @@ void TTestPatternApp::openAnimationFilePath(const std::string& filePath)
     registerWindow(window);
 }
 
-void TTestPatternApp::openAnimationFilePath(const std::string& filePath, const TRect& bounds, bool frameless, bool shadowless, const std::string& title)
+void TWwdosApp::openAnimationFilePath(const std::string& filePath, const TRect& bounds, bool frameless, bool shadowless, const std::string& title)
 {
     windowNumber++;
     // Create and insert window with provided bounds
@@ -2296,7 +2296,7 @@ void TTestPatternApp::openAnimationFilePath(const std::string& filePath, const T
     registerWindow(window);
 }
 
-void TTestPatternApp::openTransparentTextFile()
+void TWwdosApp::openTransparentTextFile()
 {
     char fileName[MAXPATH];
     std::string primerGlob = findPrimerDir() + "/*.txt";
@@ -2331,7 +2331,7 @@ void TTestPatternApp::openTransparentTextFile()
     }
 }
 
-void TTestPatternApp::openMonodrawFile(const char* fileName)
+void TWwdosApp::openMonodrawFile(const char* fileName)
 {
     // Use curl to call the Monodraw API endpoint
     std::stringstream cmd;
@@ -2354,7 +2354,7 @@ void TTestPatternApp::openMonodrawFile(const char* fileName)
     }
 }
 
-void TTestPatternApp::setPatternMode(bool continuous)
+void TWwdosApp::setPatternMode(bool continuous)
 {
     USE_CONTINUOUS_PATTERN = continuous;
 
@@ -2366,7 +2366,7 @@ void TTestPatternApp::setPatternMode(bool continuous)
 }
 
 
-void TTestPatternApp::showApiKeyDialog()
+void TWwdosApp::showApiKeyDialog()
 {
     // Build dialog
     TRect dlgRect(0, 0, 56, 14);
@@ -2427,7 +2427,7 @@ void TTestPatternApp::showApiKeyDialog()
     TObject::destroy(dlg);
 }
 
-void TTestPatternApp::takeScreenshot(bool showDialog)
+void TWwdosApp::takeScreenshot(bool showDialog)
 {
     // Create logs/screenshots/ directory if it doesn't exist.
     mkdir("logs", 0755);
@@ -2495,7 +2495,7 @@ void TTestPatternApp::takeScreenshot(bool showDialog)
     "\x0F\x0F\x0F\x70\x0F\x07\x70\x70\x70\x07\x70\x0F\x07\x07\x78\x00" \
     "\x07\x0F\x07\x70\x70\x07\x0F\x70"
 
-TPalette& TTestPatternApp::getPalette() const
+TPalette& TWwdosApp::getPalette() const
 {
     static TPalette palette(cpMonochrome, sizeof(cpMonochrome)-1);
     return palette;
@@ -2531,7 +2531,7 @@ static TMenuItem& buildFigletFontSubMenu() {
     return *new TMenuItem("FIGlet ~F~ont", kbNoKey, fontMenu, hcNoContext, nullptr);
 }
 
-TMenuBar* TTestPatternApp::initMenuBar(TRect r)
+TMenuBar* TWwdosApp::initMenuBar(TRect r)
 {
     r.b.y = r.a.y + 1;
     TMenuItem* recentSubmenu = buildRecentWorkspacesSubmenuItem();
@@ -2637,7 +2637,7 @@ TMenuBar* TTestPatternApp::initMenuBar(TRect r)
     );
 }
 
-TStatusLine* TTestPatternApp::initStatusLine(TRect r)
+TStatusLine* TWwdosApp::initStatusLine(TRect r)
 {
     r.a.y = r.b.y - 1;
     return new TCustomStatusLine(r,
@@ -2651,16 +2651,16 @@ TStatusLine* TTestPatternApp::initStatusLine(TRect r)
     );
 }
 
-// Implemented here because TTestPatternApp must be fully defined first.
+// Implemented here because TWwdosApp must be fully defined first.
 ApiIpcServer::ConnectionStatus TCustomStatusLine::getAppIpcStatus(void* appPtr) {
-    auto* app = dynamic_cast<TTestPatternApp*>(static_cast<TApplication*>(appPtr));
+    auto* app = dynamic_cast<TWwdosApp*>(static_cast<TApplication*>(appPtr));
     if (app) {
         return app->getIpcStatus();
     }
     return {};
 }
 
-TDeskTop* TTestPatternApp::initDeskTop(TRect r)
+TDeskTop* TWwdosApp::initDeskTop(TRect r)
 {
     r.a.y = 1;
     r.b.y--;
@@ -2681,13 +2681,13 @@ TDeskTop* TTestPatternApp::initDeskTop(TRect r)
 }
 
 
-void TTestPatternApp::run()
+void TWwdosApp::run()
 {
     // Call parent run to initialize everything first
     TApplication::run();
 }
 
-TRect TTestPatternApp::calculateWindowBounds(const std::string& filePath)
+TRect TWwdosApp::calculateWindowBounds(const std::string& filePath)
 {
     // If the file contains animation frame delimiters, size to the
     // largest frame (width/height). Otherwise, size to full text
@@ -2785,7 +2785,7 @@ TRect TTestPatternApp::calculateWindowBounds(const std::string& filePath)
     return TRect(x, y, x + windowWidth, y + windowHeight);
 }
 
-void TTestPatternApp::idle()
+void TWwdosApp::idle()
 {
     TApplication::idle();
 
@@ -2811,27 +2811,27 @@ int main()
     // Detect auth mode once before any LLM consumer initialises.
     AuthConfig::instance().detect();
 
-    TTestPatternApp app;
+    TWwdosApp app;
     app.run();
     return 0;
 }
 
 // ---- IPC API helper functions (friend) ----
 // Backward compatibility overloads
-void api_spawn_test(TTestPatternApp& app) { app.newTestWindow(); }
-void api_spawn_gradient(TTestPatternApp& app, const std::string& kind) {
+void api_spawn_test(TWwdosApp& app) { app.newTestWindow(); }
+void api_spawn_gradient(TWwdosApp& app, const std::string& kind) {
     if (kind == "horizontal") app.newGradientWindow(TGradientWindow::gtHorizontal);
     else if (kind == "vertical") app.newGradientWindow(TGradientWindow::gtVertical);
     else if (kind == "radial") app.newGradientWindow(TGradientWindow::gtRadial);
     else if (kind == "diagonal") app.newGradientWindow(TGradientWindow::gtDiagonal);
     else app.newGradientWindow(TGradientWindow::gtHorizontal);
 }
-void api_open_animation_path(TTestPatternApp& app, const std::string& path) {
+void api_open_animation_path(TWwdosApp& app, const std::string& path) {
     app.openAnimationFilePath(path);
 }
 
 // New overloads with bounds support
-void api_spawn_test(TTestPatternApp& app, const TRect* bounds) { 
+void api_spawn_test(TWwdosApp& app, const TRect* bounds) { 
     if (bounds) {
         app.newTestWindow(*bounds);
     } else {
@@ -2839,7 +2839,7 @@ void api_spawn_test(TTestPatternApp& app, const TRect* bounds) {
     }
 }
 
-void api_spawn_gradient(TTestPatternApp& app, const std::string& kind, const TRect* bounds) {
+void api_spawn_gradient(TWwdosApp& app, const std::string& kind, const TRect* bounds) {
     TGradientWindow::GradientType type = TGradientWindow::gtHorizontal;
     if (kind == "horizontal") type = TGradientWindow::gtHorizontal;
     else if (kind == "vertical") type = TGradientWindow::gtVertical;
@@ -2853,7 +2853,7 @@ void api_spawn_gradient(TTestPatternApp& app, const std::string& kind, const TRe
     }
 }
 
-void api_open_text_view_path(TTestPatternApp& app, const std::string& path, const TRect* bounds) {
+void api_open_text_view_path(TWwdosApp& app, const std::string& path, const TRect* bounds) {
     if (path.empty()) return;
     app.windowNumber++;
     size_t lastSlash = path.find_last_of("/\\");
@@ -2871,7 +2871,7 @@ void api_open_text_view_path(TTestPatternApp& app, const std::string& path, cons
     app.registerWindow(window);
 }
 
-void api_open_animation_path(TTestPatternApp& app, const std::string& path, const TRect* bounds, bool frameless, bool shadowless, const std::string& title) {
+void api_open_animation_path(TWwdosApp& app, const std::string& path, const TRect* bounds, bool frameless, bool shadowless, const std::string& title) {
     if (bounds) {
         app.openAnimationFilePath(path, *bounds, frameless, shadowless, title);
     } else if (frameless || shadowless) {
@@ -2882,11 +2882,11 @@ void api_open_animation_path(TTestPatternApp& app, const std::string& path, cons
     }
 }
 
-void api_cascade(TTestPatternApp& app) { app.cascade(); }
-void api_toggle_scramble(TTestPatternApp& app) { app.cycleScramble(); }
-void api_expand_scramble(TTestPatternApp& app) { app.cycleScramble(); }
+void api_cascade(TWwdosApp& app) { app.cascade(); }
+void api_toggle_scramble(TWwdosApp& app) { app.cycleScramble(); }
+void api_expand_scramble(TWwdosApp& app) { app.cycleScramble(); }
 
-std::string api_scramble_say(TTestPatternApp& app, const std::string& text) {
+std::string api_scramble_say(TWwdosApp& app, const std::string& text) {
     if (!app.scrambleWindow) return "err scramble not open";
     // Simulate user sending a message — same as onSubmit
     auto* msgView = app.scrambleWindow->getMessageView();
@@ -2914,7 +2914,7 @@ std::string api_scramble_say(TTestPatternApp& app, const std::string& text) {
 
     return "*thinking* /ᐠ｡ꞈ｡ᐟ\\";  // Async started — response will arrive via event
 }
-std::string api_scramble_pet(TTestPatternApp& app) {
+std::string api_scramble_pet(TWwdosApp& app) {
     if (!app.scrambleWindow) return "err scramble not open";
 
     static const char* petReactions[] = {
@@ -2935,7 +2935,7 @@ std::string api_scramble_pet(TTestPatternApp& app) {
     return response;
 }
 
-std::string api_chat_receive(TTestPatternApp& app, const std::string& sender, const std::string& text) {
+std::string api_chat_receive(TWwdosApp& app, const std::string& sender, const std::string& text) {
     // Display a remote chat message in Scramble without AI processing.
     if (!app.scrambleWindow) return "err scramble not open";
     auto* msgView = app.scrambleWindow->getMessageView();
@@ -2944,7 +2944,7 @@ std::string api_chat_receive(TTestPatternApp& app, const std::string& sender, co
     return "ok";
 }
 
-static TWibWobWindow* findTargetWibWobWindow(TTestPatternApp& app) {
+static TWibWobWindow* findTargetWibWobWindow(TWwdosApp& app) {
     if (!app.deskTop) return nullptr;
 
     // Prefer the focused Wib&Wob window so ask/history operate on the same UI.
@@ -2965,7 +2965,7 @@ static TWibWobWindow* findTargetWibWobWindow(TTestPatternApp& app) {
     return nullptr;
 }
 
-std::string api_wibwob_ask(TTestPatternApp& app, const std::string& text) {
+std::string api_wibwob_ask(TWwdosApp& app, const std::string& text) {
     // Inject a user message into the Wib&Wob chat window, triggering LLM response.
     fprintf(stderr, "[wibwob_ask] called, text_len=%zu text=%.60s\n",
             text.size(), text.c_str());
@@ -2999,7 +2999,7 @@ std::string api_wibwob_ask(TTestPatternApp& app, const std::string& text) {
     return "ok queued";
 }
 
-std::string api_get_chat_history(TTestPatternApp& app) {
+std::string api_get_chat_history(TWwdosApp& app) {
     // Use the same target selection as api_wibwob_ask() to avoid reading the
     // history from a different Wib&Wob window than the one that processed input.
     TWibWobWindow* chatWin = findTargetWibWobWindow(app);
@@ -3009,16 +3009,16 @@ std::string api_get_chat_history(TTestPatternApp& app) {
     return std::string("{\"messages\":") + msgView->getHistoryJson() + "}";
 }
 
-void api_tile(TTestPatternApp& app) { app.tile(); }
-void api_close_all(TTestPatternApp& app) { app.closeAll(); }
+void api_tile(TWwdosApp& app) { app.tile(); }
+void api_close_all(TWwdosApp& app) { app.closeAll(); }
 
-void api_set_pattern_mode(TTestPatternApp& app, const std::string& mode) {
+void api_set_pattern_mode(TWwdosApp& app, const std::string& mode) {
     bool continuous = (mode == "continuous");
     // Set the mode directly without showing a modal dialog (which blocks the event loop).
     USE_CONTINUOUS_PATTERN = continuous;
 }
 
-void api_save_workspace(TTestPatternApp& app) {
+void api_save_workspace(TWwdosApp& app) {
     // Use saveWorkspacePath instead of saveWorkspace() to avoid modal dialog
     // that blocks the IPC thread when triggered via API.
     mkdir("workspaces", 0755);
@@ -3031,15 +3031,15 @@ void api_save_workspace(TTestPatternApp& app) {
     std::string snapPath = std::string("workspaces/last_workspace_") + tsName + ".json";
     app.saveWorkspacePath(snapPath);
 }
-bool api_save_workspace_path(TTestPatternApp& app, const std::string& path) { return app.saveWorkspacePath(path); }
+bool api_save_workspace_path(TWwdosApp& app, const std::string& path) { return app.saveWorkspacePath(path); }
 
-bool api_open_workspace_path(TTestPatternApp& app, const std::string& path) {
+bool api_open_workspace_path(TWwdosApp& app, const std::string& path) {
     return app.openWorkspacePath(path);
 }
 
-void api_screenshot(TTestPatternApp& app) { app.takeScreenshot(false); }
+void api_screenshot(TWwdosApp& app) { app.takeScreenshot(false); }
 
-std::string api_take_last_registered_window_id(TTestPatternApp& app) {
+std::string api_take_last_registered_window_id(TWwdosApp& app) {
     std::string out = app.lastRegisteredWindowId_;
     app.lastRegisteredWindowId_.clear();
     return out;
@@ -3055,7 +3055,7 @@ static const char* windowTypeName(TWindow* w) {
     return specs.empty() ? "test_pattern" : specs.front().type;
 }
 
-std::string api_get_state(TTestPatternApp& app) {
+std::string api_get_state(TWwdosApp& app) {
     // Collect currently visible windows in desktop Z-order.
     // Do NOT clear winToId/idToWin here — that would reassign new IDs on
     // every call, causing compute_delta to see "new" windows every poll.
@@ -3137,7 +3137,7 @@ std::string api_get_state(TTestPatternApp& app) {
     return json.str();
 }
 
-std::string api_move_window(TTestPatternApp& app, const std::string& id, int x, int y) {
+std::string api_move_window(TWwdosApp& app, const std::string& id, int x, int y) {
     TWindow* w = app.findWindowById(id);
     if (!w) return "{\"error\":\"Window not found\"}";
 
@@ -3152,7 +3152,7 @@ std::string api_move_window(TTestPatternApp& app, const std::string& id, int x, 
     return "{\"success\":true}";
 }
 
-std::string api_resize_window(TTestPatternApp& app, const std::string& id, int width, int height) {
+std::string api_resize_window(TWwdosApp& app, const std::string& id, int width, int height) {
     TWindow* w = app.findWindowById(id);
     if (!w) return "{\"error\":\"Window not found\"}";
 
@@ -3168,7 +3168,7 @@ std::string api_resize_window(TTestPatternApp& app, const std::string& id, int w
     return "{\"success\":true}";
 }
 
-std::string api_focus_window(TTestPatternApp& app, const std::string& id) {
+std::string api_focus_window(TWwdosApp& app, const std::string& id) {
     TWindow* w = app.findWindowById(id);
     if (!w) return "{\"error\":\"Window not found\"}";
     
@@ -3176,7 +3176,7 @@ std::string api_focus_window(TTestPatternApp& app, const std::string& id) {
     return "{\"success\":true}";
 }
 
-std::string api_close_window(TTestPatternApp& app, const std::string& id) {
+std::string api_close_window(TWwdosApp& app, const std::string& id) {
     TWindow* w = app.findWindowById(id);
     if (!w) return "{\"error\":\"Window not found\"}";
 
@@ -3216,7 +3216,7 @@ std::string api_close_window(TTestPatternApp& app, const std::string& id) {
     return "{\"success\":true}";
 }
 
-std::string api_window_shadow(TTestPatternApp& app, const std::string& id, bool on) {
+std::string api_window_shadow(TWwdosApp& app, const std::string& id, bool on) {
     TWindow* w = app.findWindowById(id);
     if (!w) return "err window not found";
     w->setState(sfShadow, on);
@@ -3224,7 +3224,7 @@ std::string api_window_shadow(TTestPatternApp& app, const std::string& id, bool 
     return "ok";
 }
 
-std::string api_window_title(TTestPatternApp& app, const std::string& id, const std::string& title) {
+std::string api_window_title(TWwdosApp& app, const std::string& id, const std::string& title) {
     TWindow* w = app.findWindowById(id);
     if (!w) return "err window not found";
     delete[] (char*)w->title;
@@ -3234,19 +3234,19 @@ std::string api_window_title(TTestPatternApp& app, const std::string& id, const 
 }
 
 // --- Minimal JSON parsing helpers (subset tailored to our schema) ---
-void TTestPatternApp::skipWs(const std::string &s, size_t &pos)
+void TWwdosApp::skipWs(const std::string &s, size_t &pos)
 {
     while (pos < s.size() && (s[pos] == ' ' || s[pos] == '\n' || s[pos] == '\r' || s[pos] == '\t')) ++pos;
 }
 
-bool TTestPatternApp::consume(const std::string &s, size_t &pos, char ch)
+bool TWwdosApp::consume(const std::string &s, size_t &pos, char ch)
 {
     skipWs(s, pos);
     if (pos < s.size() && s[pos] == ch) { ++pos; return true; }
     return false;
 }
 
-bool TTestPatternApp::parseString(const std::string &s, size_t &pos, std::string &out)
+bool TWwdosApp::parseString(const std::string &s, size_t &pos, std::string &out)
 {
     skipWs(s, pos);
     if (pos >= s.size() || s[pos] != '"') return false;
@@ -3271,7 +3271,7 @@ bool TTestPatternApp::parseString(const std::string &s, size_t &pos, std::string
     return false;
 }
 
-bool TTestPatternApp::parseNumber(const std::string &s, size_t &pos, int &out)
+bool TWwdosApp::parseNumber(const std::string &s, size_t &pos, int &out)
 {
     skipWs(s, pos);
     bool neg = false;
@@ -3283,7 +3283,7 @@ bool TTestPatternApp::parseNumber(const std::string &s, size_t &pos, int &out)
     return true;
 }
 
-bool TTestPatternApp::parseBool(const std::string &s, size_t &pos, bool &out)
+bool TWwdosApp::parseBool(const std::string &s, size_t &pos, bool &out)
 {
     skipWs(s, pos);
     if (s.compare(pos, 4, "true") == 0) { out = true; pos += 4; return true; }
@@ -3291,7 +3291,7 @@ bool TTestPatternApp::parseBool(const std::string &s, size_t &pos, bool &out)
     return false;
 }
 
-bool TTestPatternApp::parseKeyedString(const std::string &s, size_t objStart, const char *key, std::string &out)
+bool TWwdosApp::parseKeyedString(const std::string &s, size_t objStart, const char *key, std::string &out)
 {
     size_t pos = objStart;
     while (pos < s.size()) {
@@ -3317,7 +3317,7 @@ bool TTestPatternApp::parseKeyedString(const std::string &s, size_t objStart, co
     return false;
 }
 
-bool TTestPatternApp::parseKeyedNumber(const std::string &s, size_t objStart, const char *key, int &out)
+bool TWwdosApp::parseKeyedNumber(const std::string &s, size_t objStart, const char *key, int &out)
 {
     size_t pos = objStart;
     while (pos < s.size()) {
@@ -3343,7 +3343,7 @@ bool TTestPatternApp::parseKeyedNumber(const std::string &s, size_t objStart, co
     return false;
 }
 
-bool TTestPatternApp::parseKeyedBool(const std::string &s, size_t objStart, const char *key, bool &out)
+bool TWwdosApp::parseKeyedBool(const std::string &s, size_t objStart, const char *key, bool &out)
 {
     size_t pos = objStart;
     while (pos < s.size()) {
@@ -3369,7 +3369,7 @@ bool TTestPatternApp::parseKeyedBool(const std::string &s, size_t objStart, cons
     return false;
 }
 
-bool TTestPatternApp::parseBounds(const std::string &s, size_t objStart, int &x,int &y,int &w,int &h)
+bool TWwdosApp::parseBounds(const std::string &s, size_t objStart, int &x,int &y,int &w,int &h)
 {
     size_t pos = objStart;
     while (pos < s.size()) {
@@ -3409,7 +3409,7 @@ bool TTestPatternApp::parseBounds(const std::string &s, size_t objStart, int &x,
     return false;
 }
 
-bool TTestPatternApp::loadWorkspaceFromFile(const std::string& path)
+bool TWwdosApp::loadWorkspaceFromFile(const std::string& path)
 {
     std::ifstream in(path);
     if (!in) {
@@ -3701,7 +3701,7 @@ bool TTestPatternApp::loadWorkspaceFromFile(const std::string& path)
     return true;
 }
 
-void TTestPatternApp::openWorkspace()
+void TWwdosApp::openWorkspace()
 {
     // Open a dialog rooted at workspaces/ listing JSON files
     char fileName[260];
@@ -3733,14 +3733,14 @@ void TTestPatternApp::openWorkspace()
     messageBox("Workspace loaded.", mfInformation | mfOKButton);
 }
 
-bool TTestPatternApp::openWorkspacePath(const std::string& path)
+bool TWwdosApp::openWorkspacePath(const std::string& path)
 {
     bool ok = loadWorkspaceFromFile(path);
     fprintf(stderr, "[workspace] open path=%s ok=%s\n", path.c_str(), ok ? "true" : "false");
     return ok;
 }
 
-std::string TTestPatternApp::buildWorkspaceJson()
+std::string TWwdosApp::buildWorkspaceJson()
 {
     // Screen size
     TRect ext = deskTop->getExtent();
@@ -3908,7 +3908,7 @@ std::string TTestPatternApp::buildWorkspaceJson()
     return json;
 }
 
-void TTestPatternApp::saveWorkspace()
+void TWwdosApp::saveWorkspace()
 {
     // Ensure directory exists
     mkdir("workspaces", 0755);
@@ -3949,7 +3949,7 @@ void TTestPatternApp::saveWorkspace()
     messageBox(ok.c_str(), mfInformation | mfOKButton);
 }
 
-void TTestPatternApp::saveWorkspaceAs()
+void TWwdosApp::saveWorkspaceAs()
 {
     // Pre-fill with current workspace name (filename without path/extension)
     std::string defaultName;
@@ -4019,8 +4019,8 @@ static std::vector<WsPreviewWindow> parseWorkspaceWindows(const std::string& pat
         if (cpos != std::string::npos) {
             size_t brace = data.find('{', cpos);
             if (brace != std::string::npos) {
-                TTestPatternApp::parseKeyedNumber(data, brace+1, "width", canvasW);
-                TTestPatternApp::parseKeyedNumber(data, brace+1, "height", canvasH);
+                TWwdosApp::parseKeyedNumber(data, brace+1, "width", canvasW);
+                TWwdosApp::parseKeyedNumber(data, brace+1, "height", canvasH);
             }
         }
     }
@@ -4052,11 +4052,11 @@ static std::vector<WsPreviewWindow> parseWorkspaceWindows(const std::string& pat
 
         WsPreviewWindow pw;
         pw.x = 0; pw.y = 0; pw.w = 20; pw.h = 10;
-        TTestPatternApp::parseKeyedString(obj, 0, "type", pw.type);
-        TTestPatternApp::parseKeyedNumber(obj, 0, "x", pw.x);
-        TTestPatternApp::parseKeyedNumber(obj, 0, "y", pw.y);
-        TTestPatternApp::parseKeyedNumber(obj, 0, "w", pw.w);
-        TTestPatternApp::parseKeyedNumber(obj, 0, "h", pw.h);
+        TWwdosApp::parseKeyedString(obj, 0, "type", pw.type);
+        TWwdosApp::parseKeyedNumber(obj, 0, "x", pw.x);
+        TWwdosApp::parseKeyedNumber(obj, 0, "y", pw.y);
+        TWwdosApp::parseKeyedNumber(obj, 0, "w", pw.w);
+        TWwdosApp::parseKeyedNumber(obj, 0, "h", pw.h);
         wins.push_back(pw);
 
         pos = realEnd + 1;
@@ -4219,7 +4219,7 @@ public:
     }
 };
 
-void TTestPatternApp::manageWorkspaces()
+void TWwdosApp::manageWorkspaces()
 {
     std::vector<std::string> paths = scanRecentWorkspacePaths("workspaces", 50);
     if (paths.empty()) {
@@ -4339,7 +4339,7 @@ void TTestPatternApp::manageWorkspaces()
     destroy(dlg);
 }
 
-bool TTestPatternApp::saveWorkspacePath(const std::string& path)
+bool TWwdosApp::saveWorkspacePath(const std::string& path)
 {
     if (path.empty())
         return false;
@@ -4363,7 +4363,7 @@ bool TTestPatternApp::saveWorkspacePath(const std::string& path)
     return ok;
 }
 
-std::string api_get_canvas_size(TTestPatternApp& app) {
+std::string api_get_canvas_size(TWwdosApp& app) {
     TRect desktop = TProgram::deskTop->getBounds();
     std::stringstream json;
     json << "{\"width\":" << desktop.b.x 
@@ -4373,7 +4373,7 @@ std::string api_get_canvas_size(TTestPatternApp& app) {
     return json.str();
 }
 
-void api_spawn_text_editor(TTestPatternApp& app, const TRect* bounds, const std::string& title) {
+void api_spawn_text_editor(TWwdosApp& app, const TRect* bounds, const std::string& title) {
     TRect r;
     if (bounds) {
         r = *bounds;
@@ -4385,7 +4385,7 @@ void api_spawn_text_editor(TTestPatternApp& app, const TRect* bounds, const std:
     TProgram::deskTop->insert(window);
 }
 
-std::string api_send_text(TTestPatternApp& app, const std::string& id,
+std::string api_send_text(TWwdosApp& app, const std::string& id,
                          const std::string& content, const std::string& mode,
                          const std::string& position) {
     fprintf(stderr, "[api_send_text] START: id=%s, content_len=%zu, mode=%s\n",
@@ -4453,7 +4453,7 @@ std::string api_send_text(TTestPatternApp& app, const std::string& id,
     return "err no text editor available";
 }
 
-std::string api_send_figlet(TTestPatternApp& app, const std::string& id, const std::string& text, 
+std::string api_send_figlet(TWwdosApp& app, const std::string& id, const std::string& text, 
                            const std::string& font, int width, const std::string& mode) {
     // Special case: if id is "auto" or no text editor exists, create one
     bool autoSpawn = (id == "auto" || id == "text_editor");
@@ -4496,7 +4496,7 @@ std::string api_send_figlet(TTestPatternApp& app, const std::string& id, const s
     return "err no text editor available";
 }
 
-void api_spawn_browser(TTestPatternApp& app, const TRect* bounds) {
+void api_spawn_browser(TWwdosApp& app, const TRect* bounds) {
     if (bounds) {
         app.newBrowserWindow(*bounds);
     } else {
@@ -4504,7 +4504,7 @@ void api_spawn_browser(TTestPatternApp& app, const TRect* bounds) {
     }
 }
 
-void api_spawn_room_chat(TTestPatternApp& app, const TRect* bounds) {
+void api_spawn_room_chat(TWwdosApp& app, const TRect* bounds) {
     TRect r;
     if (bounds) {
         r = *bounds;
@@ -4523,7 +4523,7 @@ void api_spawn_room_chat(TTestPatternApp& app, const TRect* bounds) {
     app.registerWindow(window);
 }
 
-std::string api_room_chat_receive(TTestPatternApp& /*app*/,
+std::string api_room_chat_receive(TWwdosApp& /*app*/,
                                   const std::string& sender,
                                   const std::string& text,
                                   const std::string& ts) {
@@ -4543,7 +4543,7 @@ std::string api_room_chat_receive(TTestPatternApp& /*app*/,
     return "ok";
 }
 
-std::string api_room_presence(TTestPatternApp& /*app*/,
+std::string api_room_presence(TWwdosApp& /*app*/,
                               const std::string& participants_json) {
     TRoomChatWindow* win = getRoomChatWindow();
     if (!win) return "err no room_chat window open";
@@ -4587,7 +4587,7 @@ std::string api_room_presence(TTestPatternApp& /*app*/,
     return "ok";
 }
 
-std::string api_get_room_chat_pending(TTestPatternApp& /*app*/) {
+std::string api_get_room_chat_pending(TWwdosApp& /*app*/) {
     TRoomChatWindow* win = getRoomChatWindow();
     if (!win) return "[]";
     auto msgs = win->drainPending();
@@ -4608,7 +4608,7 @@ std::string api_get_room_chat_pending(TTestPatternApp& /*app*/) {
 }
 
 // Generative / animated art windows — spawnable via IPC create_window type=X
-static TRect api_centered_bounds(TTestPatternApp& app, int width, int height) {
+static TRect api_centered_bounds(TWwdosApp& app, int width, int height) {
     TRect d = app.deskTop->getExtent();
     int dw = d.b.x - d.a.x;
     int dh = d.b.y - d.a.y;
@@ -4619,140 +4619,140 @@ static TRect api_centered_bounds(TTestPatternApp& app, int width, int height) {
     return TRect(left, top, left + width, top + height);
 }
 
-void api_spawn_verse(TTestPatternApp& app, const TRect* bounds) {
+void api_spawn_verse(TWwdosApp& app, const TRect* bounds) {
     TRect r = bounds ? *bounds : api_centered_bounds(app, 96, 30);
     TWindow* w = createGenerativeVerseWindow(r);
     app.deskTop->insert(w);
     app.registerWindow(w);
 }
 
-void api_spawn_mycelium(TTestPatternApp& app, const TRect* bounds) {
+void api_spawn_mycelium(TWwdosApp& app, const TRect* bounds) {
     TRect r = bounds ? *bounds : api_centered_bounds(app, 96, 30);
     TWindow* w = createGenerativeMyceliumWindow(r);
     app.deskTop->insert(w);
     app.registerWindow(w);
 }
 
-void api_spawn_orbit(TTestPatternApp& app, const TRect* bounds) {
+void api_spawn_orbit(TWwdosApp& app, const TRect* bounds) {
     TRect r = bounds ? *bounds : api_centered_bounds(app, 96, 30);
     TWindow* w = createGenerativeOrbitWindow(r);
     app.deskTop->insert(w);
     app.registerWindow(w);
 }
 
-void api_spawn_torus(TTestPatternApp& app, const TRect* bounds) {
+void api_spawn_torus(TWwdosApp& app, const TRect* bounds) {
     TRect r = bounds ? *bounds : api_centered_bounds(app, 90, 28);
     TWindow* w = createGenerativeTorusWindow(r);
     app.deskTop->insert(w);
     app.registerWindow(w);
 }
 
-void api_spawn_cube(TTestPatternApp& app, const TRect* bounds) {
+void api_spawn_cube(TWwdosApp& app, const TRect* bounds) {
     TRect r = bounds ? *bounds : api_centered_bounds(app, 90, 28);
     TWindow* w = createGenerativeCubeWindow(r);
     app.deskTop->insert(w);
     app.registerWindow(w);
 }
 
-void api_spawn_life(TTestPatternApp& app, const TRect* bounds) {
+void api_spawn_life(TWwdosApp& app, const TRect* bounds) {
     TRect r = bounds ? *bounds : api_centered_bounds(app, 90, 28);
     TWindow* w = createGameOfLifeWindow(r);
     app.deskTop->insert(w);
     app.registerWindow(w);
 }
 
-void api_spawn_blocks(TTestPatternApp& app, const TRect* bounds) {
+void api_spawn_blocks(TWwdosApp& app, const TRect* bounds) {
     TRect r = bounds ? *bounds : api_centered_bounds(app, 84, 24);
     TWindow* w = createAnimatedBlocksWindow(r);
     app.deskTop->insert(w);
     app.registerWindow(w);
 }
 
-void api_spawn_score(TTestPatternApp& app, const TRect* bounds) {
+void api_spawn_score(TWwdosApp& app, const TRect* bounds) {
     TRect r = bounds ? *bounds : api_centered_bounds(app, 108, 34);
     TWindow* w = createAnimatedScoreWindow(r);
     app.deskTop->insert(w);
     app.registerWindow(w);
 }
 
-void api_spawn_ascii(TTestPatternApp& app, const TRect* bounds) {
+void api_spawn_ascii(TWwdosApp& app, const TRect* bounds) {
     TRect r = bounds ? *bounds : api_centered_bounds(app, 96, 30);
     TWindow* w = createAnimatedAsciiWindow(r);
     app.deskTop->insert(w);
     app.registerWindow(w);
 }
 
-void api_spawn_animated_gradient(TTestPatternApp& app, const TRect* bounds) {
+void api_spawn_animated_gradient(TWwdosApp& app, const TRect* bounds) {
     TRect r = bounds ? *bounds : api_centered_bounds(app, 84, 24);
     TWindow* w = createAnimatedGradientWindow(r);
     app.deskTop->insert(w);
     app.registerWindow(w);
 }
 
-void api_spawn_monster_cam(TTestPatternApp& app, const TRect* bounds) {
+void api_spawn_monster_cam(TWwdosApp& app, const TRect* bounds) {
     TRect r = bounds ? *bounds : api_centered_bounds(app, 96, 30);
     TWindow* w = createGenerativeMonsterCamWindow(r);
     app.deskTop->insert(w);
     app.registerWindow(w);
 }
 
-void api_spawn_monster_verse(TTestPatternApp& app, const TRect* bounds) {
+void api_spawn_monster_verse(TWwdosApp& app, const TRect* bounds) {
     TRect r = bounds ? *bounds : api_centered_bounds(app, 96, 30);
     TWindow* w = createGenerativeMonsterVerseWindow(r);
     app.deskTop->insert(w);
     app.registerWindow(w);
 }
 
-void api_spawn_monster_portal(TTestPatternApp& app, const TRect* bounds) {
+void api_spawn_monster_portal(TWwdosApp& app, const TRect* bounds) {
     TRect r = bounds ? *bounds : api_centered_bounds(app, 96, 30);
     TWindow* w = createGenerativeMonsterPortalWindow(r);
     app.deskTop->insert(w);
     app.registerWindow(w);
 }
 
-void api_spawn_micropolis_ascii(TTestPatternApp& app, const TRect* bounds) {
+void api_spawn_micropolis_ascii(TWwdosApp& app, const TRect* bounds) {
     TRect r = bounds ? *bounds : api_centered_bounds(app, 110, 34);
     TWindow* w = createMicropolisAsciiWindow(r);
     app.deskTop->insert(w);
     app.registerWindow(w);
 }
 
-void api_spawn_quadra(TTestPatternApp& app, const TRect* bounds) {
+void api_spawn_quadra(TWwdosApp& app, const TRect* bounds) {
     TRect r = bounds ? *bounds : api_centered_bounds(app, 42, 26);
     TWindow* w = createQuadraWindow(r);
     app.deskTop->insert(w);
     app.registerWindow(w);
 }
 
-void api_spawn_snake(TTestPatternApp& app, const TRect* bounds) {
+void api_spawn_snake(TWwdosApp& app, const TRect* bounds) {
     TRect r = bounds ? *bounds : api_centered_bounds(app, 60, 30);
     TWindow* w = createSnakeWindow(r);
     app.deskTop->insert(w);
     app.registerWindow(w);
 }
 
-void api_spawn_rogue(TTestPatternApp& app, const TRect* bounds) {
+void api_spawn_rogue(TWwdosApp& app, const TRect* bounds) {
     TRect r = bounds ? *bounds : api_centered_bounds(app, 80, 38);
     TWindow* w = createRogueWindow(r);
     app.deskTop->insert(w);
     app.registerWindow(w);
 }
 
-void api_spawn_deep_signal(TTestPatternApp& app, const TRect* bounds) {
+void api_spawn_deep_signal(TWwdosApp& app, const TRect* bounds) {
     TRect r = bounds ? *bounds : api_centered_bounds(app, 70, 34);
     TWindow* w = createDeepSignalWindow(r);
     app.deskTop->insert(w);
     app.registerWindow(w);
 }
 
-void api_spawn_app_launcher(TTestPatternApp& app, const TRect* bounds) {
+void api_spawn_app_launcher(TWwdosApp& app, const TRect* bounds) {
     TRect r = bounds ? *bounds : api_centered_bounds(app, 63, 20);
     TWindow* w = createAppLauncherWindow(r);
     app.deskTop->insert(w);
     app.registerWindow(w);
 }
 
-void api_spawn_gallery(TTestPatternApp& app, const TRect* bounds) {
+void api_spawn_gallery(TWwdosApp& app, const TRect* bounds) {
     TRect desk = app.deskTop->getExtent();
     TRect r = bounds ? *bounds : api_centered_bounds(app, desk.b.x * 9 / 10, desk.b.y * 9 / 10);
     TWindow* w = createAsciiGalleryWindow(r);
@@ -4762,7 +4762,7 @@ void api_spawn_gallery(TTestPatternApp& app, const TRect* bounds) {
 
 // ── FIGlet text window spawn + control API ────────────────────────────────────
 
-void api_spawn_figlet_text(TTestPatternApp& app, const TRect* bounds,
+void api_spawn_figlet_text(TWwdosApp& app, const TRect* bounds,
     const std::string& text, const std::string& font,
     bool frameless, bool shadowless) {
     TRect desk = app.deskTop->getExtent();
@@ -4774,7 +4774,7 @@ void api_spawn_figlet_text(TTestPatternApp& app, const TRect* bounds,
     app.registerWindow(w);
 }
 
-static TFigletTextWindow* findFigletWindow(TTestPatternApp& app, const std::string& id) {
+static TFigletTextWindow* findFigletWindow(TWwdosApp& app, const std::string& id) {
     TView* v = app.deskTop->first();
     for (; v; v = v->nextView()) {
         TFigletTextWindow* fw = dynamic_cast<TFigletTextWindow*>(v);
@@ -4787,14 +4787,14 @@ static TFigletTextWindow* findFigletWindow(TTestPatternApp& app, const std::stri
     return nullptr;
 }
 
-std::string api_figlet_set_text(TTestPatternApp& app, const std::string& id, const std::string& text) {
+std::string api_figlet_set_text(TWwdosApp& app, const std::string& id, const std::string& text) {
     TFigletTextWindow* w = findFigletWindow(app, id);
     if (!w || !w->getFigletView()) return "err no figlet window found";
     w->getFigletView()->setText(text);
     return "ok";
 }
 
-std::string api_figlet_set_font(TTestPatternApp& app, const std::string& id, const std::string& font) {
+std::string api_figlet_set_font(TWwdosApp& app, const std::string& id, const std::string& font) {
     TFigletTextWindow* w = findFigletWindow(app, id);
     if (!w || !w->getFigletView()) return "err no figlet window found";
     w->getFigletView()->setFont(font);
@@ -4808,7 +4808,7 @@ static uint32_t parseHexColor(const std::string& s) {
     return (uint32_t)strtoul(hex.c_str(), nullptr, 16);
 }
 
-std::string api_figlet_set_color(TTestPatternApp& app, const std::string& id,
+std::string api_figlet_set_color(TWwdosApp& app, const std::string& id,
                                  const std::string& fg, const std::string& bg) {
     TFigletTextWindow* w = findFigletWindow(app, id);
     if (!w || !w->getFigletView()) return "err no figlet window found";
@@ -4835,7 +4835,7 @@ std::string api_figlet_list_fonts() {
     return json;
 }
 
-std::string api_gallery_list(TTestPatternApp& app, const std::string& tab) {
+std::string api_gallery_list(TWwdosApp& app, const std::string& tab) {
     (void)app;
     // Find primer dir
     std::string primerDir = findPrimerDir();
@@ -4892,7 +4892,7 @@ std::string api_gallery_list(TTestPatternApp& app, const std::string& tab) {
     return os.str();
 }
 
-void api_spawn_wibwob(TTestPatternApp& app, const TRect* bounds) {
+void api_spawn_wibwob(TWwdosApp& app, const TRect* bounds) {
     TRect r = bounds ? *bounds : TRect(2, 1, 82, 28);
     app.windowNumber++;
     std::string title = "Wib&Wob Chat " + std::to_string(app.windowNumber);
@@ -4904,7 +4904,7 @@ void api_spawn_wibwob(TTestPatternApp& app, const TRect* bounds) {
     }
 }
 
-void api_spawn_terminal(TTestPatternApp& app, const TRect* bounds) {
+void api_spawn_terminal(TWwdosApp& app, const TRect* bounds) {
     TRect r = bounds ? *bounds : api_centered_bounds(app, 80, 24);
     TWindow* w = createTerminalWindow(r);
     if (w) {
@@ -4913,7 +4913,7 @@ void api_spawn_terminal(TTestPatternApp& app, const TRect* bounds) {
     }
 }
 
-static TWibWobTerminalWindow* find_terminal_by_zorder(TTestPatternApp& app) {
+static TWibWobTerminalWindow* find_terminal_by_zorder(TWwdosApp& app) {
     TView* start = app.deskTop->first();
     if (!start) return nullptr;
     TView* v = start;
@@ -4925,7 +4925,7 @@ static TWibWobTerminalWindow* find_terminal_by_zorder(TTestPatternApp& app) {
     return nullptr;
 }
 
-std::string api_terminal_write(TTestPatternApp& app, const std::string& text, const std::string& window_id) {
+std::string api_terminal_write(TWwdosApp& app, const std::string& text, const std::string& window_id) {
     TWibWobTerminalWindow* termWin = nullptr;
     if (!window_id.empty()) {
         auto it = app.idToWin.find(window_id);
@@ -4940,7 +4940,7 @@ std::string api_terminal_write(TTestPatternApp& app, const std::string& text, co
     return "ok";
 }
 
-std::string api_terminal_read(TTestPatternApp& app, const std::string& window_id) {
+std::string api_terminal_read(TWwdosApp& app, const std::string& window_id) {
     TWibWobTerminalWindow* termWin = nullptr;
     if (!window_id.empty()) {
         auto it = app.idToWin.find(window_id);
@@ -4954,7 +4954,7 @@ std::string api_terminal_read(TTestPatternApp& app, const std::string& window_id
     return termWin->getOutputText();
 }
 
-std::string api_browser_fetch(TTestPatternApp& app, const std::string& url) {
+std::string api_browser_fetch(TWwdosApp& app, const std::string& url) {
     // Find the most recently inserted browser window and trigger a fetch
     TView* start = app.deskTop->first();
     TBrowserWindow* browserWin = nullptr;
@@ -4977,32 +4977,32 @@ std::string api_browser_fetch(TTestPatternApp& app, const std::string& url) {
     return "ok";
 }
 
-std::string api_set_theme_mode(TTestPatternApp& app, const std::string& mode) {
+std::string api_set_theme_mode(TWwdosApp& app, const std::string& mode) {
     (void)app;
     if (mode != "light" && mode != "dark")
         return "err invalid theme mode";
     return "ok";
 }
 
-std::string api_set_theme_variant(TTestPatternApp& app, const std::string& variant) {
+std::string api_set_theme_variant(TWwdosApp& app, const std::string& variant) {
     (void)app;
     if (variant != "monochrome" && variant != "dark_pastel")
         return "err invalid theme variant";
     return "ok";
 }
 
-std::string api_reset_theme(TTestPatternApp& app) {
+std::string api_reset_theme(TWwdosApp& app) {
     (void)app;
     return "ok";
 }
 
 // --- Desktop texture, colour & gallery mode ---
 
-static TWibWobBackground* getWibWobBg(TTestPatternApp& app) {
+static TWibWobBackground* getWibWobBg(TWwdosApp& app) {
     return dynamic_cast<TWibWobBackground*>(app.deskTop->background);
 }
 
-std::string api_desktop_preset(TTestPatternApp& app, const std::string& preset) {
+std::string api_desktop_preset(TWwdosApp& app, const std::string& preset) {
     auto* bg = getWibWobBg(app);
     if (!bg) return "err no TWibWobBackground";
     // Validate preset name
@@ -5015,7 +5015,7 @@ std::string api_desktop_preset(TTestPatternApp& app, const std::string& preset) 
     return "err unknown preset";
 }
 
-std::string api_desktop_texture(TTestPatternApp& app, const std::string& ch) {
+std::string api_desktop_texture(TWwdosApp& app, const std::string& ch) {
     auto* bg = getWibWobBg(app);
     if (!bg) return "err no TWibWobBackground";
     if (ch.empty()) return "err empty char";
@@ -5023,7 +5023,7 @@ std::string api_desktop_texture(TTestPatternApp& app, const std::string& ch) {
     return "ok";
 }
 
-std::string api_desktop_color(TTestPatternApp& app, int fg, int bg_color) {
+std::string api_desktop_color(TWwdosApp& app, int fg, int bg_color) {
     auto* bg = getWibWobBg(app);
     if (!bg) return "err no TWibWobBackground";
     if (fg < 0 || fg > 15 || bg_color < 0 || bg_color > 15) return "err color out of range 0-15";
@@ -5031,7 +5031,7 @@ std::string api_desktop_color(TTestPatternApp& app, int fg, int bg_color) {
     return "ok";
 }
 
-std::string api_desktop_gallery(TTestPatternApp& app, bool on) {
+std::string api_desktop_gallery(TWwdosApp& app, bool on) {
     if (!app.menuBar || !app.statusLine) return "err no chrome views";
 
     app.galleryMode_ = on;
@@ -5051,7 +5051,7 @@ std::string api_desktop_gallery(TTestPatternApp& app, bool on) {
     return "ok";
 }
 
-std::string api_desktop_get(TTestPatternApp& app) {
+std::string api_desktop_get(TWwdosApp& app) {
     auto* bg = getWibWobBg(app);
     if (!bg) return "{}";
     std::string json = "{";
@@ -5069,7 +5069,7 @@ std::string api_desktop_get(TTestPatternApp& app) {
     return json;
 }
 
-void api_spawn_paint(TTestPatternApp& app, const TRect* bounds) {
+void api_spawn_paint(TWwdosApp& app, const TRect* bounds) {
     TRect r;
     if (bounds) {
         r = *bounds;
@@ -5092,7 +5092,7 @@ void api_spawn_paint(TTestPatternApp& app, const TRect* bounds) {
     app.registerWindow(pw);
 }
 
-void api_spawn_paint_with_file(TTestPatternApp& app, const std::string& path) {
+void api_spawn_paint_with_file(TWwdosApp& app, const std::string& path) {
     api_spawn_paint(app, nullptr);
     // Find the just-created paint window (last inserted)
     TView* v = app.deskTop->last;
@@ -5117,7 +5117,7 @@ void api_spawn_paint_with_file(TTestPatternApp& app, const std::string& path) {
     } while (p != v);
 }
 
-TPaintCanvasView* api_find_paint_canvas(TTestPatternApp& app, const std::string& id) {
+TPaintCanvasView* api_find_paint_canvas(TWwdosApp& app, const std::string& id) {
     TWindow* w = app.findWindowById(id);
     if (!w) return nullptr;
     auto *pw = dynamic_cast<TPaintWindow*>(w);
@@ -5135,7 +5135,7 @@ static bool clampXY(TPaintCanvasView* c, int& x, int& y) {
     return c->getCols() > 0 && c->getRows() > 0;
 }
 
-std::string api_paint_cell(TTestPatternApp& app, const std::string& id, int x, int y, uint8_t fg, uint8_t bg) {
+std::string api_paint_cell(TWwdosApp& app, const std::string& id, int x, int y, uint8_t fg, uint8_t bg) {
     auto *canvas = api_find_paint_canvas(app, id);
     if (!canvas) return "err paint window not found";
     if (!clampXY(canvas, x, y)) return "err canvas has zero size";
@@ -5143,7 +5143,7 @@ std::string api_paint_cell(TTestPatternApp& app, const std::string& id, int x, i
     return "ok";
 }
 
-std::string api_paint_text(TTestPatternApp& app, const std::string& id, int x, int y, const std::string& text, uint8_t fg, uint8_t bg) {
+std::string api_paint_text(TWwdosApp& app, const std::string& id, int x, int y, const std::string& text, uint8_t fg, uint8_t bg) {
     auto *canvas = api_find_paint_canvas(app, id);
     if (!canvas) return "err paint window not found";
     if (!clampXY(canvas, x, y)) return "err canvas has zero size";
@@ -5151,7 +5151,7 @@ std::string api_paint_text(TTestPatternApp& app, const std::string& id, int x, i
     return "ok";
 }
 
-std::string api_paint_line(TTestPatternApp& app, const std::string& id, int x0, int y0, int x1, int y1, bool erase) {
+std::string api_paint_line(TWwdosApp& app, const std::string& id, int x0, int y0, int x1, int y1, bool erase) {
     auto *canvas = api_find_paint_canvas(app, id);
     if (!canvas) return "err paint window not found";
     if (!clampXY(canvas, x0, y0)) return "err canvas has zero size";
@@ -5160,7 +5160,7 @@ std::string api_paint_line(TTestPatternApp& app, const std::string& id, int x0, 
     return "ok";
 }
 
-std::string api_paint_rect(TTestPatternApp& app, const std::string& id, int x0, int y0, int x1, int y1, bool erase) {
+std::string api_paint_rect(TWwdosApp& app, const std::string& id, int x0, int y0, int x1, int y1, bool erase) {
     auto *canvas = api_find_paint_canvas(app, id);
     if (!canvas) return "err paint window not found";
     if (!clampXY(canvas, x0, y0)) return "err canvas has zero size";
@@ -5169,7 +5169,7 @@ std::string api_paint_rect(TTestPatternApp& app, const std::string& id, int x0, 
     return "ok";
 }
 
-std::string api_paint_clear(TTestPatternApp& app, const std::string& id) {
+std::string api_paint_clear(TWwdosApp& app, const std::string& id) {
     auto *canvas = api_find_paint_canvas(app, id);
     if (!canvas) return "err paint window not found";
     canvas->clear();
@@ -5177,13 +5177,13 @@ std::string api_paint_clear(TTestPatternApp& app, const std::string& id) {
     return "ok";
 }
 
-std::string api_paint_export(TTestPatternApp& app, const std::string& id) {
+std::string api_paint_export(TWwdosApp& app, const std::string& id) {
     auto *canvas = api_find_paint_canvas(app, id);
     if (!canvas) return "err paint window not found";
     return canvas->exportText();
 }
 
-std::string api_paint_save(TTestPatternApp& app, const std::string& id, const std::string& path) {
+std::string api_paint_save(TWwdosApp& app, const std::string& id, const std::string& path) {
     auto *canvas = api_find_paint_canvas(app, id);
     if (!canvas) return "err paint window not found";
     if (path.empty()) return "err path required";
@@ -5194,7 +5194,7 @@ std::string api_paint_save(TTestPatternApp& app, const std::string& id, const st
     return "ok saved " + path;
 }
 
-std::string api_paint_load(TTestPatternApp& app, const std::string& id, const std::string& path) {
+std::string api_paint_load(TWwdosApp& app, const std::string& id, const std::string& path) {
     auto *canvas = api_find_paint_canvas(app, id);
     if (!canvas) return "err paint window not found";
     if (path.empty()) return "err path required";
@@ -5212,7 +5212,7 @@ std::string api_paint_load(TTestPatternApp& app, const std::string& id, const st
     return "ok loaded " + path;
 }
 
-std::string api_paint_stamp_figlet(TTestPatternApp& app, const std::string& id,
+std::string api_paint_stamp_figlet(TWwdosApp& app, const std::string& id,
     const std::string& text, const std::string& font,
     int x, int y, uint8_t fg, uint8_t bg)
 {

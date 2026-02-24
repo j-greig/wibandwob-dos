@@ -38,7 +38,7 @@ def test_theme_api_functions_exist() -> None:
 
 
 def test_theme_state_in_app() -> None:
-    """Verify theme state fields exist in TTestPatternApp"""
+    """Verify theme state fields exist in TWwdosApp"""
     source = Path("app/test_pattern_app.cpp").read_text(encoding="utf-8")
 
     assert 'std::string themeMode' in source

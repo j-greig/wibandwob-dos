@@ -45,7 +45,7 @@ This avoids the "target tvision already defined" CMake error.
 - tvterm uses `TVTermConstants` struct to receive command IDs at construction time, which is the clean pattern
 
 ### idle() broadcast requirement
-Some vendor widgets need periodic refresh (e.g. tvterm needs `cmCheckTerminalUpdates` broadcast). Add the broadcast to `TTestPatternApp::idle()`. This is easy to forget and causes the view to appear frozen.
+Some vendor widgets need periodic refresh (e.g. tvterm needs `cmCheckTerminalUpdates` broadcast). Add the broadcast to `TWwdosApp::idle()`. This is easy to forget and causes the view to appear frozen.
 
 ### KeyDownEvent has no setText()
 The tvision `KeyDownEvent` struct exposes `text[maxCharSize]` and `textLength` fields directly. There is a `getText()` method but no `setText()`. For programmatic input, set the fields directly:

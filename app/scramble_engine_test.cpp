@@ -10,40 +10,40 @@
 #include <cstdlib>
 
 // Stubs for command_registry.cpp link dependencies
-class TTestPatternApp {};
-void api_cascade(TTestPatternApp&) {}
-void api_tile(TTestPatternApp&) {}
-void api_close_all(TTestPatternApp&) {}
-void api_save_workspace(TTestPatternApp&) {}
-bool api_open_workspace_path(TTestPatternApp&, const std::string&) { return true; }
-void api_screenshot(TTestPatternApp&) {}
-void api_set_pattern_mode(TTestPatternApp&, const std::string&) {}
-std::string api_set_theme_mode(TTestPatternApp&, const std::string&) { return "ok"; }
-std::string api_set_theme_variant(TTestPatternApp&, const std::string&) { return "ok"; }
-std::string api_reset_theme(TTestPatternApp&) { return "ok"; }
-void api_toggle_scramble(TTestPatternApp&) {}
-void api_expand_scramble(TTestPatternApp&) {}
-std::string api_scramble_say(TTestPatternApp&, const std::string&) { return "ok"; }
-std::string api_scramble_pet(TTestPatternApp&) { return "ok"; }
+class TWwdosApp {};
+void api_cascade(TWwdosApp&) {}
+void api_tile(TWwdosApp&) {}
+void api_close_all(TWwdosApp&) {}
+void api_save_workspace(TWwdosApp&) {}
+bool api_open_workspace_path(TWwdosApp&, const std::string&) { return true; }
+void api_screenshot(TWwdosApp&) {}
+void api_set_pattern_mode(TWwdosApp&, const std::string&) {}
+std::string api_set_theme_mode(TWwdosApp&, const std::string&) { return "ok"; }
+std::string api_set_theme_variant(TWwdosApp&, const std::string&) { return "ok"; }
+std::string api_reset_theme(TWwdosApp&) { return "ok"; }
+void api_toggle_scramble(TWwdosApp&) {}
+void api_expand_scramble(TWwdosApp&) {}
+std::string api_scramble_say(TWwdosApp&, const std::string&) { return "ok"; }
+std::string api_scramble_pet(TWwdosApp&) { return "ok"; }
 class TRect;
-void api_spawn_paint(TTestPatternApp&, const TRect*) {}
-void api_spawn_micropolis_ascii(TTestPatternApp&, const TRect*) {}
-void api_spawn_quadra(TTestPatternApp&, const TRect*) {}
-void api_spawn_snake(TTestPatternApp&, const TRect*) {}
-void api_spawn_rogue(TTestPatternApp&, const TRect*) {}
-void api_spawn_deep_signal(TTestPatternApp&, const TRect*) {}
-void api_spawn_app_launcher(TTestPatternApp&, const TRect*) {}
-void api_spawn_terminal(TTestPatternApp&, const TRect*) {}
-std::string api_terminal_write(TTestPatternApp&, const std::string&, const std::string&) { return "ok"; }
-std::string api_terminal_read(TTestPatternApp&, const std::string&) { return ""; }
-std::string api_chat_receive(TTestPatternApp&, const std::string&, const std::string&) { return "ok"; }
-std::string api_wibwob_ask(TTestPatternApp&, const std::string&) { return "ok"; }
-std::string api_paint_cell(TTestPatternApp&, const std::string&, int, int, uint8_t, uint8_t) { return "ok"; }
-std::string api_paint_text(TTestPatternApp&, const std::string&, int, int, const std::string&, uint8_t, uint8_t) { return "ok"; }
-std::string api_paint_line(TTestPatternApp&, const std::string&, int, int, int, int, bool) { return "ok"; }
-std::string api_paint_rect(TTestPatternApp&, const std::string&, int, int, int, int, bool) { return "ok"; }
-std::string api_paint_clear(TTestPatternApp&, const std::string&) { return "ok"; }
-std::string api_paint_export(TTestPatternApp&, const std::string&) { return "ok"; }
+void api_spawn_paint(TWwdosApp&, const TRect*) {}
+void api_spawn_micropolis_ascii(TWwdosApp&, const TRect*) {}
+void api_spawn_quadra(TWwdosApp&, const TRect*) {}
+void api_spawn_snake(TWwdosApp&, const TRect*) {}
+void api_spawn_rogue(TWwdosApp&, const TRect*) {}
+void api_spawn_deep_signal(TWwdosApp&, const TRect*) {}
+void api_spawn_app_launcher(TWwdosApp&, const TRect*) {}
+void api_spawn_terminal(TWwdosApp&, const TRect*) {}
+std::string api_terminal_write(TWwdosApp&, const std::string&, const std::string&) { return "ok"; }
+std::string api_terminal_read(TWwdosApp&, const std::string&) { return ""; }
+std::string api_chat_receive(TWwdosApp&, const std::string&, const std::string&) { return "ok"; }
+std::string api_wibwob_ask(TWwdosApp&, const std::string&) { return "ok"; }
+std::string api_paint_cell(TWwdosApp&, const std::string&, int, int, uint8_t, uint8_t) { return "ok"; }
+std::string api_paint_text(TWwdosApp&, const std::string&, int, int, const std::string&, uint8_t, uint8_t) { return "ok"; }
+std::string api_paint_line(TWwdosApp&, const std::string&, int, int, int, int, bool) { return "ok"; }
+std::string api_paint_rect(TWwdosApp&, const std::string&, int, int, int, int, bool) { return "ok"; }
+std::string api_paint_clear(TWwdosApp&, const std::string&) { return "ok"; }
+std::string api_paint_export(TWwdosApp&, const std::string&) { return "ok"; }
 
 static int failures = 0;
 

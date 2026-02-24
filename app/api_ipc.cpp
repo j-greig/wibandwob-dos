@@ -134,31 +134,31 @@ static bool safe_write(int fd, const void* buf, size_t len) {
 
 // Forward declarations of helper methods implemented in test_pattern_app.cpp.
 // Note: window spawn functions are now in window_type_registry.cpp — not listed here.
-extern void api_cascade(TTestPatternApp& app);
-extern void api_tile(TTestPatternApp& app);
-extern void api_close_all(TTestPatternApp& app);
-extern void api_set_pattern_mode(TTestPatternApp& app, const std::string& mode);
-extern void api_save_workspace(TTestPatternApp& app);
-extern bool api_save_workspace_path(TTestPatternApp& app, const std::string& path);
-extern bool api_open_workspace_path(TTestPatternApp& app, const std::string& path);
-extern void api_screenshot(TTestPatternApp& app);
-extern std::string api_take_last_registered_window_id(TTestPatternApp& app);
-extern std::string api_get_state(TTestPatternApp& app);
-extern std::string api_move_window(TTestPatternApp& app, const std::string& id, int x, int y);
-extern std::string api_resize_window(TTestPatternApp& app, const std::string& id, int width, int height);
-extern std::string api_focus_window(TTestPatternApp& app, const std::string& id);
-extern std::string api_close_window(TTestPatternApp& app, const std::string& id);
-extern std::string api_get_canvas_size(TTestPatternApp& app);
-extern void api_spawn_paint(TTestPatternApp& app, const TRect* bounds);
-extern TPaintCanvasView* api_find_paint_canvas(TTestPatternApp& app, const std::string& id);
-extern std::string api_room_chat_receive(TTestPatternApp& app, const std::string& sender, const std::string& text, const std::string& ts);
-extern std::string api_room_presence(TTestPatternApp& app, const std::string& participants_json);
-extern std::string api_get_room_chat_pending(TTestPatternApp& app);
-extern std::string api_browser_fetch(TTestPatternApp& app, const std::string& url);
-extern std::string api_send_text(TTestPatternApp& app, const std::string& id, 
+extern void api_cascade(TWwdosApp& app);
+extern void api_tile(TWwdosApp& app);
+extern void api_close_all(TWwdosApp& app);
+extern void api_set_pattern_mode(TWwdosApp& app, const std::string& mode);
+extern void api_save_workspace(TWwdosApp& app);
+extern bool api_save_workspace_path(TWwdosApp& app, const std::string& path);
+extern bool api_open_workspace_path(TWwdosApp& app, const std::string& path);
+extern void api_screenshot(TWwdosApp& app);
+extern std::string api_take_last_registered_window_id(TWwdosApp& app);
+extern std::string api_get_state(TWwdosApp& app);
+extern std::string api_move_window(TWwdosApp& app, const std::string& id, int x, int y);
+extern std::string api_resize_window(TWwdosApp& app, const std::string& id, int width, int height);
+extern std::string api_focus_window(TWwdosApp& app, const std::string& id);
+extern std::string api_close_window(TWwdosApp& app, const std::string& id);
+extern std::string api_get_canvas_size(TWwdosApp& app);
+extern void api_spawn_paint(TWwdosApp& app, const TRect* bounds);
+extern TPaintCanvasView* api_find_paint_canvas(TWwdosApp& app, const std::string& id);
+extern std::string api_room_chat_receive(TWwdosApp& app, const std::string& sender, const std::string& text, const std::string& ts);
+extern std::string api_room_presence(TWwdosApp& app, const std::string& participants_json);
+extern std::string api_get_room_chat_pending(TWwdosApp& app);
+extern std::string api_browser_fetch(TWwdosApp& app, const std::string& url);
+extern std::string api_send_text(TWwdosApp& app, const std::string& id, 
                                  const std::string& content, const std::string& mode, 
                                  const std::string& position);
-extern std::string api_send_figlet(TTestPatternApp& app, const std::string& id, const std::string& text,
+extern std::string api_send_figlet(TWwdosApp& app, const std::string& id, const std::string& text,
                                    const std::string& font, int width, const std::string& mode);
 
 // Convert bytes to hex string.
@@ -173,7 +173,7 @@ static std::string bytes_to_hex(const unsigned char* data, size_t len) {
     return out;
 }
 
-ApiIpcServer::ApiIpcServer(TTestPatternApp* app) : app_(app) {
+ApiIpcServer::ApiIpcServer(TWwdosApp* app) : app_(app) {
     // Read auth secret from environment.
     const char* secret = std::getenv("WIBWOB_AUTH_SECRET");
     if (secret && secret[0] != '\0') {

@@ -44,39 +44,39 @@
 
 // ── Extern declarations for spawn helpers in test_pattern_app.cpp ─────────────
 
-class TTestPatternApp; // forward decl (full type used only by called functions)
+class TWwdosApp; // forward decl (full type used only by called functions)
 
-extern void api_spawn_test(TTestPatternApp&, const TRect*);
-extern void api_spawn_gradient(TTestPatternApp&, const std::string&, const TRect*);
-extern void api_open_animation_path(TTestPatternApp&, const std::string&, const TRect*, bool frameless, bool shadowless, const std::string& title);
-extern void api_open_text_view_path(TTestPatternApp&, const std::string&, const TRect*);
-extern void api_spawn_text_editor(TTestPatternApp&, const TRect*, const std::string&);
-extern void api_spawn_browser(TTestPatternApp&, const TRect*);
-extern void api_spawn_verse(TTestPatternApp&, const TRect*);
-extern void api_spawn_mycelium(TTestPatternApp&, const TRect*);
-extern void api_spawn_orbit(TTestPatternApp&, const TRect*);
-extern void api_spawn_torus(TTestPatternApp&, const TRect*);
-extern void api_spawn_cube(TTestPatternApp&, const TRect*);
-extern void api_spawn_life(TTestPatternApp&, const TRect*);
-extern void api_spawn_blocks(TTestPatternApp&, const TRect*);
-extern void api_spawn_score(TTestPatternApp&, const TRect*);
-extern void api_spawn_ascii(TTestPatternApp&, const TRect*);
-extern void api_spawn_animated_gradient(TTestPatternApp&, const TRect*);
-extern void api_spawn_monster_cam(TTestPatternApp&, const TRect*);
-extern void api_spawn_monster_verse(TTestPatternApp&, const TRect*);
-extern void api_spawn_monster_portal(TTestPatternApp&, const TRect*);
-extern void api_spawn_paint(TTestPatternApp&, const TRect*);
-extern void api_spawn_micropolis_ascii(TTestPatternApp&, const TRect*);
-extern void api_spawn_terminal(TTestPatternApp&, const TRect*);
-extern void api_spawn_wibwob(TTestPatternApp&, const TRect*);
-extern void api_spawn_room_chat(TTestPatternApp&, const TRect*);
-extern void api_spawn_quadra(TTestPatternApp&, const TRect*);
-extern void api_spawn_snake(TTestPatternApp&, const TRect*);
-extern void api_spawn_rogue(TTestPatternApp&, const TRect*);
-extern void api_spawn_deep_signal(TTestPatternApp&, const TRect*);
-extern void api_spawn_app_launcher(TTestPatternApp&, const TRect*);
-extern void api_spawn_gallery(TTestPatternApp&, const TRect*);
-extern void api_spawn_figlet_text(TTestPatternApp&, const TRect*,
+extern void api_spawn_test(TWwdosApp&, const TRect*);
+extern void api_spawn_gradient(TWwdosApp&, const std::string&, const TRect*);
+extern void api_open_animation_path(TWwdosApp&, const std::string&, const TRect*, bool frameless, bool shadowless, const std::string& title);
+extern void api_open_text_view_path(TWwdosApp&, const std::string&, const TRect*);
+extern void api_spawn_text_editor(TWwdosApp&, const TRect*, const std::string&);
+extern void api_spawn_browser(TWwdosApp&, const TRect*);
+extern void api_spawn_verse(TWwdosApp&, const TRect*);
+extern void api_spawn_mycelium(TWwdosApp&, const TRect*);
+extern void api_spawn_orbit(TWwdosApp&, const TRect*);
+extern void api_spawn_torus(TWwdosApp&, const TRect*);
+extern void api_spawn_cube(TWwdosApp&, const TRect*);
+extern void api_spawn_life(TWwdosApp&, const TRect*);
+extern void api_spawn_blocks(TWwdosApp&, const TRect*);
+extern void api_spawn_score(TWwdosApp&, const TRect*);
+extern void api_spawn_ascii(TWwdosApp&, const TRect*);
+extern void api_spawn_animated_gradient(TWwdosApp&, const TRect*);
+extern void api_spawn_monster_cam(TWwdosApp&, const TRect*);
+extern void api_spawn_monster_verse(TWwdosApp&, const TRect*);
+extern void api_spawn_monster_portal(TWwdosApp&, const TRect*);
+extern void api_spawn_paint(TWwdosApp&, const TRect*);
+extern void api_spawn_micropolis_ascii(TWwdosApp&, const TRect*);
+extern void api_spawn_terminal(TWwdosApp&, const TRect*);
+extern void api_spawn_wibwob(TWwdosApp&, const TRect*);
+extern void api_spawn_room_chat(TWwdosApp&, const TRect*);
+extern void api_spawn_quadra(TWwdosApp&, const TRect*);
+extern void api_spawn_snake(TWwdosApp&, const TRect*);
+extern void api_spawn_rogue(TWwdosApp&, const TRect*);
+extern void api_spawn_deep_signal(TWwdosApp&, const TRect*);
+extern void api_spawn_app_launcher(TWwdosApp&, const TRect*);
+extern void api_spawn_gallery(TWwdosApp&, const TRect*);
+extern void api_spawn_figlet_text(TWwdosApp&, const TRect*,
     const std::string& text, const std::string& font,
     bool frameless, bool shadowless);
 
@@ -95,19 +95,19 @@ static const TRect* opt_bounds(const std::map<std::string, std::string>& kv, TRe
 
 // ── Spawn wrappers ────────────────────────────────────────────────────────────
 
-static const char* spawn_test(TTestPatternApp& app,
+static const char* spawn_test(TWwdosApp& app,
                                const std::map<std::string, std::string>& kv) {
     TRect r; api_spawn_test(app, opt_bounds(kv, r)); return nullptr;
 }
 
-static const char* spawn_gradient(TTestPatternApp& app,
+static const char* spawn_gradient(TWwdosApp& app,
                                    const std::map<std::string, std::string>& kv) {
     auto it = kv.find("gradient");
     std::string kind = (it != kv.end()) ? it->second : "horizontal";
     TRect r; api_spawn_gradient(app, kind, opt_bounds(kv, r)); return nullptr;
 }
 
-static const char* spawn_frame_player(TTestPatternApp& app,
+static const char* spawn_frame_player(TWwdosApp& app,
                                        const std::map<std::string, std::string>& kv) {
     auto it = kv.find("path");
     if (it == kv.end() || it->second.empty()) return "err missing path";
@@ -120,121 +120,121 @@ static const char* spawn_frame_player(TTestPatternApp& app,
     TRect r; api_open_animation_path(app, it->second, opt_bounds(kv, r), frameless, shadowless, title); return nullptr;
 }
 
-static const char* spawn_text_view(TTestPatternApp& app,
+static const char* spawn_text_view(TWwdosApp& app,
                                     const std::map<std::string, std::string>& kv) {
     auto it = kv.find("path");
     if (it == kv.end() || it->second.empty()) return "err missing path";
     TRect r; api_open_text_view_path(app, it->second, opt_bounds(kv, r)); return nullptr;
 }
 
-static const char* spawn_text_editor(TTestPatternApp& app,
+static const char* spawn_text_editor(TWwdosApp& app,
                                       const std::map<std::string, std::string>& kv) {
     const auto it = kv.find("title");
     const std::string title = (it != kv.end()) ? it->second : "";
     TRect r; api_spawn_text_editor(app, opt_bounds(kv, r), title); return nullptr;
 }
 
-static const char* spawn_browser(TTestPatternApp& app,
+static const char* spawn_browser(TWwdosApp& app,
                                   const std::map<std::string, std::string>& kv) {
     TRect r; api_spawn_browser(app, opt_bounds(kv, r)); return nullptr;
 }
 
-static const char* spawn_verse(TTestPatternApp& app,
+static const char* spawn_verse(TWwdosApp& app,
                                 const std::map<std::string, std::string>& kv) {
     TRect r; api_spawn_verse(app, opt_bounds(kv, r)); return nullptr;
 }
 
-static const char* spawn_mycelium(TTestPatternApp& app,
+static const char* spawn_mycelium(TWwdosApp& app,
                                    const std::map<std::string, std::string>& kv) {
     TRect r; api_spawn_mycelium(app, opt_bounds(kv, r)); return nullptr;
 }
 
-static const char* spawn_orbit(TTestPatternApp& app,
+static const char* spawn_orbit(TWwdosApp& app,
                                 const std::map<std::string, std::string>& kv) {
     TRect r; api_spawn_orbit(app, opt_bounds(kv, r)); return nullptr;
 }
 
-static const char* spawn_torus(TTestPatternApp& app,
+static const char* spawn_torus(TWwdosApp& app,
                                 const std::map<std::string, std::string>& kv) {
     TRect r; api_spawn_torus(app, opt_bounds(kv, r)); return nullptr;
 }
 
-static const char* spawn_cube(TTestPatternApp& app,
+static const char* spawn_cube(TWwdosApp& app,
                                const std::map<std::string, std::string>& kv) {
     TRect r; api_spawn_cube(app, opt_bounds(kv, r)); return nullptr;
 }
 
-static const char* spawn_life(TTestPatternApp& app,
+static const char* spawn_life(TWwdosApp& app,
                                const std::map<std::string, std::string>& kv) {
     TRect r; api_spawn_life(app, opt_bounds(kv, r)); return nullptr;
 }
 
-static const char* spawn_blocks(TTestPatternApp& app,
+static const char* spawn_blocks(TWwdosApp& app,
                                  const std::map<std::string, std::string>& kv) {
     TRect r; api_spawn_blocks(app, opt_bounds(kv, r)); return nullptr;
 }
 
-static const char* spawn_score(TTestPatternApp& app,
+static const char* spawn_score(TWwdosApp& app,
                                 const std::map<std::string, std::string>& kv) {
     TRect r; api_spawn_score(app, opt_bounds(kv, r)); return nullptr;
 }
 
-static const char* spawn_ascii(TTestPatternApp& app,
+static const char* spawn_ascii(TWwdosApp& app,
                                 const std::map<std::string, std::string>& kv) {
     TRect r; api_spawn_ascii(app, opt_bounds(kv, r)); return nullptr;
 }
 
-static const char* spawn_animated_gradient(TTestPatternApp& app,
+static const char* spawn_animated_gradient(TWwdosApp& app,
                                             const std::map<std::string, std::string>& kv) {
     TRect r; api_spawn_animated_gradient(app, opt_bounds(kv, r)); return nullptr;
 }
 
-static const char* spawn_monster_cam(TTestPatternApp& app,
+static const char* spawn_monster_cam(TWwdosApp& app,
                                       const std::map<std::string, std::string>& kv) {
     TRect r; api_spawn_monster_cam(app, opt_bounds(kv, r)); return nullptr;
 }
 
-static const char* spawn_monster_verse(TTestPatternApp& app,
+static const char* spawn_monster_verse(TWwdosApp& app,
                                         const std::map<std::string, std::string>& kv) {
     TRect r; api_spawn_monster_verse(app, opt_bounds(kv, r)); return nullptr;
 }
 
-static const char* spawn_monster_portal(TTestPatternApp& app,
+static const char* spawn_monster_portal(TWwdosApp& app,
                                          const std::map<std::string, std::string>& kv) {
     TRect r; api_spawn_monster_portal(app, opt_bounds(kv, r)); return nullptr;
 }
 
-static const char* spawn_paint(TTestPatternApp& app,
+static const char* spawn_paint(TWwdosApp& app,
                                 const std::map<std::string, std::string>& kv) {
     TRect r; api_spawn_paint(app, opt_bounds(kv, r)); return nullptr;
 }
 
-static const char* spawn_micropolis_ascii(TTestPatternApp& app,
+static const char* spawn_micropolis_ascii(TWwdosApp& app,
                                            const std::map<std::string, std::string>& kv) {
     TRect r; api_spawn_micropolis_ascii(app, opt_bounds(kv, r)); return nullptr;
 }
 
-static const char* spawn_terminal(TTestPatternApp& app,
+static const char* spawn_terminal(TWwdosApp& app,
                                    const std::map<std::string, std::string>& kv) {
     TRect r; api_spawn_terminal(app, opt_bounds(kv, r)); return nullptr;
 }
-static const char* spawn_room_chat(TTestPatternApp& app,
+static const char* spawn_room_chat(TWwdosApp& app,
                                    const std::map<std::string, std::string>& kv) {
     TRect r; api_spawn_room_chat(app, opt_bounds(kv, r)); return nullptr;
 }
-static const char* spawn_quadra(TTestPatternApp& app, const std::map<std::string,std::string>& kv) {
+static const char* spawn_quadra(TWwdosApp& app, const std::map<std::string,std::string>& kv) {
     TRect r; api_spawn_quadra(app, opt_bounds(kv, r)); return nullptr; }
-static const char* spawn_snake(TTestPatternApp& app, const std::map<std::string,std::string>& kv) {
+static const char* spawn_snake(TWwdosApp& app, const std::map<std::string,std::string>& kv) {
     TRect r; api_spawn_snake(app, opt_bounds(kv, r)); return nullptr; }
-static const char* spawn_rogue(TTestPatternApp& app, const std::map<std::string,std::string>& kv) {
+static const char* spawn_rogue(TWwdosApp& app, const std::map<std::string,std::string>& kv) {
     TRect r; api_spawn_rogue(app, opt_bounds(kv, r)); return nullptr; }
-static const char* spawn_deep_signal(TTestPatternApp& app, const std::map<std::string,std::string>& kv) {
+static const char* spawn_deep_signal(TWwdosApp& app, const std::map<std::string,std::string>& kv) {
     TRect r; api_spawn_deep_signal(app, opt_bounds(kv, r)); return nullptr; }
-static const char* spawn_app_launcher(TTestPatternApp& app, const std::map<std::string,std::string>& kv) {
+static const char* spawn_app_launcher(TWwdosApp& app, const std::map<std::string,std::string>& kv) {
     TRect r; api_spawn_app_launcher(app, opt_bounds(kv, r)); return nullptr; }
-static const char* spawn_gallery(TTestPatternApp& app, const std::map<std::string,std::string>& kv) {
+static const char* spawn_gallery(TWwdosApp& app, const std::map<std::string,std::string>& kv) {
     TRect r; api_spawn_gallery(app, opt_bounds(kv, r)); return nullptr; }
-static const char* spawn_figlet_text(TTestPatternApp& app, const std::map<std::string,std::string>& kv) {
+static const char* spawn_figlet_text(TWwdosApp& app, const std::map<std::string,std::string>& kv) {
     auto ti = kv.find("text");
     if (ti == kv.end() || ti->second.empty()) return "err missing text param";
     auto fi = kv.find("font");
@@ -327,7 +327,7 @@ static const WindowTypeSpec k_specs[] = {
     { "terminal",          spawn_terminal,          match_terminal          },
     { "room_chat",         spawn_room_chat,         match_room_chat         },
     // Internal-only types — recognised but not spawnable via IPC
-    { "wibwob",            [](TTestPatternApp& app, const std::map<std::string,std::string>& kv) -> const char* {
+    { "wibwob",            [](TWwdosApp& app, const std::map<std::string,std::string>& kv) -> const char* {
                                TRect r; api_spawn_wibwob(app, opt_bounds(kv, r)); return nullptr;
                            },                       match_wibwob             },
     { "scramble",          nullptr,                match_scramble           },

@@ -326,7 +326,7 @@ case cmRogueHackTerminal: {
 | 3 | `app/test_pattern_app.cpp` | **6 spots**: include, `cmConstant`, menu item `*new TMenuItem("~N~ame", cmFoo, kbNoKey) +`, handleEvent case, friend decl, `api_spawn_*` function |
 | 4 | `app/command_registry.cpp` | **3 spots**: `extern void api_spawn_*(...)`, capability `{"open_*", "description", false}`, dispatch `if (name == "open_*") { api_spawn_*(app, boundsPtr); return "ok"; }` |
 | 5 | `app/CMakeLists.txt` | Add `game_view.cpp` to test_pattern sources list |
-| 6 | `app/command_registry_test.cpp` | Stub `void api_spawn_*(TTestPatternApp&, const TRect*) {}` AND test token `"\"name\":\"open_*\""` |
+| 6 | `app/command_registry_test.cpp` | Stub `void api_spawn_*(TWwdosApp&, const TRect*) {}` AND test token `"\"name\":\"open_*\""` |
 | 7 | `app/scramble_engine_test.cpp` | Same stub (both test executables link command_registry.cpp) |
 | 8 | (Optional) `tools/api_server/models.py` | `WindowType` enum for REST/MCP parity |
 
