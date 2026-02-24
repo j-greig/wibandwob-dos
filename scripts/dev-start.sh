@@ -30,15 +30,24 @@ VENV_UVICORN="./tools/api_server/venv/bin/uvicorn"
   exit 1
 }
 
-# ── Kill stale sessions ───────────────────────────────────────────────────────
-tmux kill-session -t wibwob     2>/dev/null || true
+# ── Kill stale API session only ───────────────────────────────────────────────
 tmux kill-session -t wibwob-api 2>/dev/null || true
 rm -f "$SOCKET"
 
-# ── Start TUI (no -x/-y — inherits real terminal on first attach) ─────────────
+# ── Start TUI ─────────────────────────────────────────────────────────────────
 echo "🖥  Starting TUI (tmux session: wibwob)..."
-tmux new-session -d -s wibwob \
-  "WIBWOB_INSTANCE=$INSTANCE $BINARY 2>/tmp/wibwob_debug.log"
+if tmux has-session -t wibwob 2>/dev/null; then
+  # Session exists (monitor layout intact) — restart TUI in pane 0
+  echo "   (reusing existing wibwob session, monitor layout preserved)"
+  tmux send-keys -t wibwob:0.0 "" C-c 2>/dev/null || true
+  sleep 0.3
+  tmux send-keys -t wibwob:0.0 \
+    "WIBWOB_INSTANCE=$INSTANCE $BINARY 2>/tmp/wibwob_debug.log" Enter
+else
+  # Fresh start
+  tmux new-session -d -s wibwob \
+    "WIBWOB_INSTANCE=$INSTANCE $BINARY 2>/tmp/wibwob_debug.log"
+fi
 
 # ── Wait for IPC socket ───────────────────────────────────────────────────────
 echo "⏳ Waiting for socket $SOCKET..."

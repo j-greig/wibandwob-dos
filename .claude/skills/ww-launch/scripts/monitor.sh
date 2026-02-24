@@ -63,6 +63,14 @@ tmux send-keys -t "$SESSION:$WINDOW.1" "$CHAT_CMD" Enter
 tmux send-keys -t "$SESSION:$WINDOW.2" "echo '── APP DEBUG ──' && tail -f /tmp/wibwob_debug.log" Enter
 tmux send-keys -t "$SESSION:$WINDOW.3" "echo '── COMMANDS (API: $API) ──'" Enter
 
+# ── pane titles ───────────────────────────────────────────────────────────────
+tmux set-option -t "$SESSION" pane-border-status top
+tmux set-option -t "$SESSION" pane-border-format "#{pane_index}: #{pane_title}"
+tmux select-pane -t "$SESSION:$WINDOW.0" -T "TUI"
+tmux select-pane -t "$SESSION:$WINDOW.1" -T "CHAT LOG  (logs/chat_*.log)"
+tmux select-pane -t "$SESSION:$WINDOW.2" -T "APP DEBUG (/tmp/wibwob_debug.log)"
+tmux select-pane -t "$SESSION:$WINDOW.3" -T "COMMANDS  (API: $API)"
+
 # Focus command pane
 tmux select-pane -t "$SESSION:$WINDOW.3"
 
