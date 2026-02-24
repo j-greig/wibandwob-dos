@@ -1,5 +1,7 @@
 # WibWob-DOS: Codex Retro & Agent Guide
 
+> **Note:** This retro predates the `test_pattern` → `wwdos` rename. File/binary references below reflect the state at time of writing.
+
 ## TL;DR (max 200 words)
 WibWob-DOS is a C++14 Turbo Vision symbient OS with Python as integration/control plane, where C++ is authoritative runtime state and multiplayer (E008) mirrors semantic window state (`add/remove/update`) across instances. The E008 hardening campaign (Rounds 2-8) fixed real failure modes: missing auth handshake, SIGPIPE/partial-write event push failures, async race conditions, reconnect deadlocks, delta-apply bugs, and file-backed window parity gaps. The three most important Codex prompting rules here are: always include prior round summaries (Codex has no memory), require file:line + root-cause + fix + test outputs, and scope reviews to contract/parity/async risks rather than style. The three most important architectural truths are: (1) C++ owns truth and Python must mirror it, never invent it; (2) unified registries are mandatory to prevent parity drift (commands already unified, window types were hardened toward same model); (3) blocking work in async paths and write-side side effects during read flows create systemic instability. If you remember only one thing: this codebase fails at boundaries (IPC, async/task lifecycle, registry parity), so every change should be treated as a contract change and tested at that boundary.
 

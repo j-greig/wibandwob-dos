@@ -1,4 +1,7 @@
 # Dev Handover — WibWobDOS
+
+> **Note:** This handover predates the `test_pattern` → `wwdos` rename. File/binary references below reflect the state at time of writing.
+
 **Date:** 2026-02-23  
 **Branch:** `feat/scramble-visual-polish`  
 **Status:** Build clean ✅ — uncommitted Codex changes, needs visual test + commit
