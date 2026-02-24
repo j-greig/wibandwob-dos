@@ -4,15 +4,15 @@ This directory contains test TUI applications built with Turbo Vision.
 
 ## Applications
 
-### test_pattern
+### wwdos
 Multi-window test pattern generator with gradients and wallpaper:
 - **Features**: Creates unlimited resizable windows with test patterns, gradient windows (horizontal, vertical, radial, diagonal), cascading/tiling window management, screenshot capability
 - **Animations**: View → Animated Blocks, Animated Gradient, Animated Score (musical ASCII score)
 - **Pattern modes**: Continuous (diagonal flowing patterns) or Tiled (cropped at window edges)
 - **Background**: ASCII art wallpaper with custom desktop
 - **Build**: `cmake . -B ./build && cmake --build ./build`
-- **Run**: `./build/test_pattern`
-- **Debug logging**: `./run_wwdos_logged.sh` (logs to `test_pattern_debug.log` for session IDs, raw JSON, IPC traces)
+- **Run**: `./build/app/wwdos`
+- **Debug logging**: `./run_wwdos_logged.sh` (logs to `wibwob_debug.log` for session IDs, raw JSON, IPC traces)
 
 ### simple_tui
 Basic TUI application demonstrating fundamental Turbo Vision usage:
@@ -53,7 +53,7 @@ cmake --build ./build
 - `frame_file_player_main.cpp` - Frame animation player
 
 **Support Files:**
-- `test_pattern.{h,cpp}` - Test pattern generation
+- `test_pattern.h`, `test_pattern.cpp` - Test pattern generation
 - `gradient.{h,cpp}` - Gradient rendering views  
 - `wallpaper.{h,cpp}` - ASCII art wallpaper
 - `frame_file_player_view.{h,cpp}` - Animation player view
@@ -69,7 +69,7 @@ cmake --build ./build
 
 ## Programmatic Control API
 
-The test_pattern app can be controlled remotely via a REST API + MCP server:
+The WibWob-DOS app can be controlled remotely via a REST API + MCP server:
 
 ```bash
 # 1. Setup API server (one-time)
@@ -82,8 +82,8 @@ pip install -r requirements.txt
 cd /path/to/tvision
 ./tools/api_server/venv/bin/python -m tools.api_server.main --port=8089
 
-# 3. Run test_pattern app (separate terminal)
-cd test-tui && ./build/test_pattern
+# 3. Run wwdos app (separate terminal)
+cd .. && ./build/app/wwdos
 ```
 
 **API Documentation**: See [../tools/api_server/README.md](../tools/api_server/README.md)

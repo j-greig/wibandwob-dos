@@ -10,7 +10,7 @@ sequenceDiagram
     participant PY as FastAPI :8089<br/>(tools/api_server/)
     participant IPC as Unix socket<br/>/tmp/wibwob_1.sock
     participant REG as command_registry.cpp
-    participant APP as test_pattern_app.cpp<br/>api_wibwob_ask()
+    participant APP as wwdos_app.cpp<br/>api_wibwob_ask()
     participant TV as Turbo Vision<br/>main UI thread
     participant WIN as TWibWobWindow<br/>handleEvent()
     participant MV as TWibWobMessageView<br/>chatHistory_

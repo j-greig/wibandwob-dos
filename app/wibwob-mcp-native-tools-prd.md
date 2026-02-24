@@ -49,5 +49,5 @@
 
 ## Rollout & Testing
 - Implement native tools and prompt streaming in the bridge; keep MCP fallback switch.
-- Manual tests: run `./build/app/test_pattern 2> /tmp/sdk_debug.log`, send tool-using prompts (“open a gradient window”, “tile windows”), verify tool results and streaming text.
+- Manual tests: run `./build/app/wwdos 2> /tmp/sdk_debug.log`, send tool-using prompts (“open a gradient window”, “tile windows”), verify tool results and streaming text.
 - Log review: check tool registration and call logs; ensure no “Expected message role 'user'” or streaming iterator errors.

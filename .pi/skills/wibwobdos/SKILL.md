@@ -73,7 +73,7 @@ instead of adding code back into the god-object:
 | `app/paint/` | Paint canvas, tools, palette, status — already well-organised |
 
 **Known pre-existing build issue:** `paint_tui` target fails to link (missing figlet symbols).
-This predates E012. Build `test_pattern` target only — it is the main binary.
+This predates E012. Build `wwdos` target only — it is the main binary.
 
 ## C++ edit rules
 

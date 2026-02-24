@@ -4,7 +4,7 @@
 
 1. Install Python deps from `requirements.txt`
 2. Detect binary: check `build-linux/app/wwdos` is ELF, build if missing
-3. Start `test_pattern` with `WIBWOB_INSTANCE=N`, wait for IPC socket
+3. Start `wwdos` with `WIBWOB_INSTANCE=N`, wait for IPC socket
 4. Set terminal size (120×40) and SIGWINCH the app
 5. Start uvicorn on `0.0.0.0:8089`
 6. Trap EXIT/INT/TERM for clean shutdown

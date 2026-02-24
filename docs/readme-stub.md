@@ -28,7 +28,7 @@ cd wibandwob-dos
 cmake . -B ./build -DCMAKE_BUILD_TYPE=Release
 cmake --build ./build
 
-./build/app/test_pattern
+./build/app/wwdos
 ```
 
 Run API bridge:
@@ -63,7 +63,7 @@ Build and run:
 ```bash
 cmake . -B ./build -DCMAKE_BUILD_TYPE=Release
 cmake --build ./build
-./build/app/test_pattern
+./build/app/wwdos
 ```
 
 API smoke:
@@ -79,8 +79,8 @@ uv run --with pytest --with fastapi pytest tests/contract -q
 
 Multi-instance example:
 ```bash
-WIBWOB_INSTANCE=1 ./build/app/test_pattern
-WIBWOB_INSTANCE=2 ./build/app/test_pattern
+WIBWOB_INSTANCE=1 ./build/app/wwdos
+WIBWOB_INSTANCE=2 ./build/app/wwdos
 ```
 
 ## Contributing
