@@ -2,7 +2,7 @@
   "version": 1,
   "description": "FIGlet font catalogue with categories based on rendered height and visual style",
   "source": "Measured from pyfiglet rendering of 'Ag' \u2014 heights match figlet CLI output",
-  "total_fonts": 183,
+  "total_fonts": 190,
   "categories": [
     {
       "id": "compact",
@@ -81,6 +81,7 @@
         "contrast",
         "cosmic",
         "cosmike",
+        "Dancing_Font",
         "eftirobot",
         "goofy",
         "graffiti",
@@ -113,6 +114,7 @@
       "description": "7\u20138 lines high. Bold presence, good for headers and titles.",
       "fonts": [
         "3-d",
+        "3d",
         "5lineoblique",
         "alligator",
         "alligator2",
@@ -126,6 +128,7 @@
         "bigchief",
         "block",
         "catwalk",
+        "Chiseled",
         "coinstak",
         "crawford",
         "cricket",
@@ -154,6 +157,7 @@
         "smisome1",
         "stellar",
         "stop",
+        "swampland",
         "tanja",
         "tinker-toy"
       ]
@@ -163,7 +167,9 @@
       "name": "Huge",
       "description": "9+ lines high. Maximum impact, needs large windows.",
       "fonts": [
+        "3D-ASCII",
         "acrobatic",
+        "Bloody",
         "broadway",
         "calgphy2",
         "caligraphy",
@@ -213,6 +219,7 @@
         "barbwire",
         "calgphy2",
         "caligraphy",
+        "DANC4",
         "diamond",
         "doh",
         "fire_font-k",
