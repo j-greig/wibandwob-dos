@@ -80,3 +80,49 @@ def test_menu_has_window_commands():
     assert not missing, (
         f"Essential menu symbols missing from handleEvent: {missing}"
     )
+
+
+def _ipc_commands() -> set[str]:
+    """Parse all command names handled directly in api_ipc.cpp dispatch."""
+    src = (REPO_ROOT / "app" / "api_ipc.cpp").read_text(encoding="utf-8")
+    return set(re.findall(r'cmd\s*==\s*"([a-z_]+)"', src))
+
+
+# IPC-level meta commands that intentionally stay out of the registry.
+# Each must have a comment here explaining WHY.
+IPC_ONLY_EXCEPTIONS = {
+    "exec_command",       # meta-dispatcher: forwards to exec_registry_command()
+    "subscribe_events",   # WebSocket push, not a user command
+    "room_chat_pending",  # internal polling for chat bridge, not user-facing
+    "browser_fetch",      # internal browser engine fetch, called by browser view
+}
+
+
+def test_every_ipc_command_in_registry():
+    """Every IPC command must also exist in the command registry.
+
+    The embedded agent can ONLY reach commands through the registry
+    (tui_menu_command → exec_registry_command). If a command exists in
+    api_ipc.cpp but not in the registry, the agent is blind to it.
+
+    If this test fails, either:
+    1. Add the command to get_command_capabilities() AND exec_registry_command()
+    2. Or add to IPC_ONLY_EXCEPTIONS with a comment explaining why
+    """
+    ipc = _ipc_commands()
+    registry = _registry_commands()
+    missing = sorted((ipc - registry) - IPC_ONLY_EXCEPTIONS)
+    assert not missing, (
+        f"IPC commands missing from command registry (agent-blind): {missing}\n"
+        f"Add to get_command_capabilities() + exec_registry_command() in command_registry.cpp,\n"
+        f"or add to IPC_ONLY_EXCEPTIONS in this test with a reason."
+    )
+
+
+def test_no_stale_ipc_exceptions():
+    """IPC_ONLY_EXCEPTIONS should not list commands that ARE in the registry."""
+    registry = _registry_commands()
+    stale = sorted(IPC_ONLY_EXCEPTIONS & registry)
+    assert not stale, (
+        f"IPC exceptions that are now in the registry (remove from exceptions): {stale}"
+    )

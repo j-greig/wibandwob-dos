@@ -1,6 +1,7 @@
 #include "command_registry.h"
 
 #include "api_ipc.h"
+#include "window_type_registry.h"
 #include "core/json_utils.h"
 
 #include <cstdint>
@@ -29,6 +30,7 @@ extern std::string api_get_chat_history(TWwdosApp& app);
 extern void api_tile(TWwdosApp& app);
 extern void api_close_all(TWwdosApp& app);
 extern void api_save_workspace(TWwdosApp& app);
+extern bool api_save_workspace_path(TWwdosApp& app, const std::string& path);
 extern bool api_open_workspace_path(TWwdosApp& app, const std::string& path);
 extern void api_screenshot(TWwdosApp& app);
 extern void api_set_pattern_mode(TWwdosApp& app, const std::string& mode);
@@ -62,6 +64,19 @@ extern void api_spawn_text_editor(TWwdosApp& app, const TRect* bounds, const std
 extern void api_spawn_figlet_text(TWwdosApp& app, const TRect* bounds,
     const std::string& text, const std::string& font, bool frameless, bool shadowless);
 extern void api_spawn_wibwob(TWwdosApp& app, const TRect* bounds);
+// Window management — these were IPC-only, now also in registry for agent access
+extern std::string api_get_state(TWwdosApp& app);
+extern std::string api_move_window(TWwdosApp& app, const std::string& id, int x, int y);
+extern std::string api_resize_window(TWwdosApp& app, const std::string& id, int width, int height);
+extern std::string api_focus_window(TWwdosApp& app, const std::string& id);
+extern std::string api_close_window(TWwdosApp& app, const std::string& id);
+extern std::string api_get_canvas_size(TWwdosApp& app);
+extern std::string api_take_last_registered_window_id(TWwdosApp& app);
+extern std::string api_send_text(TWwdosApp& app, const std::string& id,
+                                 const std::string& content, const std::string& mode,
+                                 const std::string& position);
+extern std::string api_send_figlet(TWwdosApp& app, const std::string& id, const std::string& text,
+                                   const std::string& font, int width, const std::string& mode);
 extern std::string api_terminal_write(TWwdosApp& app, const std::string& text, const std::string& window_id);
 extern std::string api_terminal_read(TWwdosApp& app, const std::string& window_id);
 
@@ -83,11 +98,26 @@ extern std::string api_preview_figlet(const std::string& text, const std::string
 
 const std::vector<CommandCapability>& get_command_capabilities() {
     static const std::vector<CommandCapability> capabilities = {
+        // ── Window management ────────────────────────────────────────────
+        {"get_state", "Get full desktop state: all windows (id, type, title, x, y, w, h), canvas size, theme. Returns JSON.", false},
+        {"get_capabilities", "List all available commands with descriptions. Returns JSON. (You're already using this if you can see these descriptions.)", false},
+        {"get_window_types", "List all available window types with spawnable flag. Returns JSON.", false},
+        {"get_canvas_size", "Get canvas dimensions (cols, rows). Returns JSON.", false},
+        {"create_window", "Create a window by type slug (type param, plus type-specific params). Returns JSON with window id.", false},
+        {"move_window", "Move a window (id, x, y params). Position is top-left corner.", true},
+        {"resize_window", "Resize a window (id, width, height params). Outer dimensions including frame.", true},
+        {"focus_window", "Focus/select a window by id (id param).", true},
+        {"close_window", "Close a specific window by id (id param). Returns ok or err.", true},
         {"cascade", "Cascade all windows on desktop", false},
         {"tile", "Tile all windows on desktop", false},
         {"close_all", "Close all windows EXCEPT Wib&Wob chat (safe to call — your own window is preserved)", false},
+        {"send_text", "Send text content to a text_editor or text_view window (id, text params).", true},
+        {"send_figlet", "Send FIGlet text to a figlet_text window (id, text, font params).", true},
+        // ── State persistence ────────────────────────────────────────────
         {"save_workspace", "Save current workspace", false},
         {"open_workspace", "Open workspace from a path", true},
+        {"export_state", "Export desktop state to a file (path, format params). Snapshot for restore.", true},
+        {"import_state", "Import desktop state from a file (path, mode params). Restore a snapshot.", true},
         {"screenshot", "Capture screen to a text snapshot", false},
         {"pattern_mode", "Set pattern mode: continuous or tiled", false},
         {"set_theme_mode", "Set theme mode: light or dark", true},
@@ -545,5 +575,86 @@ std::string exec_registry_command(
     if (name == "figlet_list_fonts") {
         return api_figlet_list_fonts();
     }
+
+    // ── Window management (was IPC-only, now agent-reachable) ────────────
+    if (name == "get_state") {
+        return api_get_state(app);
+    }
+    if (name == "get_window_types") {
+        return get_window_types_json();
+    }
+    if (name == "get_canvas_size") {
+        return api_get_canvas_size(app);
+    }
+    if (name == "get_capabilities") {
+        return get_command_capabilities_json();
+    }
+    if (name == "create_window") {
+        auto type_it = kv.find("type");
+        if (type_it == kv.end() || type_it->second.empty())
+            return "err missing type";
+        const WindowTypeSpec* spec = find_window_type_by_name(type_it->second);
+        if (!spec) return "err unknown type";
+        if (!spec->spawn) return "err unsupported type";
+        (void)api_take_last_registered_window_id(app);
+        const char* err = spec->spawn(app, kv);
+        if (err) return std::string(err);
+        std::string id = api_take_last_registered_window_id(app);
+        return id.empty() ? "ok" : "{\"ok\":true,\"id\":\"" + id + "\"}";
+    }
+    if (name == "move_window") {
+        auto id = kv.find("id"), x_it = kv.find("x"), y_it = kv.find("y");
+        if (id == kv.end() || x_it == kv.end() || y_it == kv.end())
+            return "err missing id/x/y";
+        return api_move_window(app, id->second,
+            std::atoi(x_it->second.c_str()), std::atoi(y_it->second.c_str()));
+    }
+    if (name == "resize_window") {
+        auto id = kv.find("id"), w_it = kv.find("width"), h_it = kv.find("height");
+        if (id == kv.end() || w_it == kv.end() || h_it == kv.end())
+            return "err missing id/width/height";
+        return api_resize_window(app, id->second,
+            std::atoi(w_it->second.c_str()), std::atoi(h_it->second.c_str()));
+    }
+    if (name == "focus_window") {
+        auto id = kv.find("id");
+        if (id == kv.end()) return "err missing id";
+        return api_focus_window(app, id->second);
+    }
+    if (name == "close_window") {
+        auto id = kv.find("id");
+        if (id == kv.end()) return "err missing id";
+        return api_close_window(app, id->second);
+    }
+    if (name == "send_text") {
+        auto id_it = kv.find("id"), content_it = kv.find("content");
+        if (id_it == kv.end() || content_it == kv.end())
+            return "err missing id or content";
+        auto mode_it = kv.find("mode"), pos_it = kv.find("position");
+        std::string mode = (mode_it != kv.end()) ? mode_it->second : "append";
+        std::string pos  = (pos_it  != kv.end()) ? pos_it->second  : "end";
+        return api_send_text(app, id_it->second, content_it->second, mode, pos);
+    }
+    if (name == "send_figlet") {
+        auto id_it = kv.find("id"), text_it = kv.find("text");
+        if (id_it == kv.end() || text_it == kv.end())
+            return "err missing id or text";
+        auto font_it = kv.find("font"), width_it = kv.find("width"), mode_it = kv.find("mode");
+        std::string font = (font_it != kv.end()) ? font_it->second : "standard";
+        int width = (width_it != kv.end()) ? std::atoi(width_it->second.c_str()) : 0;
+        std::string mode = (mode_it != kv.end()) ? mode_it->second : "append";
+        return api_send_figlet(app, id_it->second, text_it->second, font, width, mode);
+    }
+    if (name == "export_state") {
+        auto it = kv.find("path");
+        std::string path = (it != kv.end() && !it->second.empty()) ? it->second : "workspace_state.json";
+        return api_save_workspace_path(app, path) ? "ok" : "err export failed";
+    }
+    if (name == "import_state") {
+        auto it = kv.find("path");
+        if (it == kv.end() || it->second.empty()) return "err missing path";
+        return api_open_workspace_path(app, it->second) ? "ok" : "err import failed";
+    }
+
     return "err unknown command";
 }
