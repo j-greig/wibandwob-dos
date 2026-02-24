@@ -27,9 +27,10 @@
 #include <chrono>
 #include <fstream>
 #include <random>
+#include <mutex>
+#include <vector>
 #include <sys/stat.h>
 #include <iterator>
-#include <thread>
 #include <thread>
 
 /*---------------------------------------------------------*/
@@ -986,8 +987,44 @@ std::string TWibWobWindow::getCurrentTime() const {
 namespace {
     const bool kTtsEnabled = true;
     const int kTtsRate = 205; // 0 = default rate
-    const char* kVoiceWib = "Sandy";
-    const char* kVoiceWob = "Grandpa";
+
+    // Voice preference lists — first available wins at runtime.
+    // Eloquence voices (Sandy, Grandpa) require Apple Silicon; Intel Macs fall back.
+    const std::vector<const char*> kVoicesWib = {"Sandy", "Daniel"};
+    const std::vector<const char*> kVoicesWob = {"Grandpa (English (UK))", "Fiona (Enhanced)"};
+
+    // Test whether a voice is actually installed by checking say's stderr output.
+    // Returns true if the voice works (no "Could not retrieve voice" error).
+    bool voiceWorks(const char* voice) {
+        std::string errFile = "/tmp/wibwob_voice_probe.err";
+        std::string cmd = std::string("say -v \"") + voice + "\" \"\" 2>" + errFile;
+        std::system(cmd.c_str());
+        std::ifstream f(errFile);
+        std::string content((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+        return content.find("Could not retrieve voice") == std::string::npos;
+    }
+
+    // Resolve the best available voice from a preference list. Cached per session.
+    std::string resolveVoice(const std::vector<const char*>& candidates) {
+        for (const char* v : candidates) {
+            if (voiceWorks(v)) return v;
+        }
+        return candidates.back(); // last resort — may still fail, but we tried
+    }
+
+    // Resolved at first use via std::call_once — thread-safe.
+    static std::string sVoiceWib;
+    static std::string sVoiceWob;
+    static std::once_flag sVoiceOnce;
+
+    void ensureVoicesResolved() {
+        std::call_once(sVoiceOnce, []() {
+            sVoiceWib = resolveVoice(kVoicesWib);
+            sVoiceWob = resolveVoice(kVoicesWob);
+            fprintf(stderr, "[tts] Wib voice: %s  Wob voice: %s\n",
+                    sVoiceWib.c_str(), sVoiceWob.c_str());
+        });
+    }
 
     std::string escapeForShell(const std::string& text) {
         // Escape single quotes for sh: 'foo' -> 'foo'\''bar'
@@ -1047,26 +1084,27 @@ void TWibWobWindow::speakResponse(const std::string& text) {
     std::string line;
     std::vector<std::pair<std::string, std::string>> segments;
 
-    std::string activeVoice = kVoiceWob;  // track which voice is "speaking"
+    ensureVoicesResolved();
+    std::string activeVoice = sVoiceWob;  // track which voice is "speaking"
     while (std::getline(iss, line)) {
         std::string content = line;
         // Detect voice from kaomoji tags or **Wib**/**Wob** markdown markers.
         // Once a voice is detected, it persists for subsequent lines until
         // the other voice is detected (handles multi-line paragraphs).
         if (line.find(wibTag) != std::string::npos) {
-            activeVoice = kVoiceWib;
+            activeVoice = sVoiceWib;
             auto pos = content.find(wibTag);
             if (pos != std::string::npos) content.erase(pos, wibTag.size());
         } else if (line.find(wobTag) != std::string::npos) {
-            activeVoice = kVoiceWob;
+            activeVoice = sVoiceWob;
             auto pos = content.find(wobTag);
             if (pos != std::string::npos) content.erase(pos, wobTag.size());
         } else if (line.find("**Wib**") != std::string::npos || line.find("*Wib*") != std::string::npos
                    || line.find("Wib:") != std::string::npos || line.find("[Wib]") != std::string::npos) {
-            activeVoice = kVoiceWib;
+            activeVoice = sVoiceWib;
         } else if (line.find("**Wob**") != std::string::npos || line.find("*Wob*") != std::string::npos
                    || line.find("Wob:") != std::string::npos || line.find("[Wob]") != std::string::npos) {
-            activeVoice = kVoiceWob;
+            activeVoice = sVoiceWob;
         }
         // Strip voice markers from spoken content — no need to read "Wib:" aloud
         for (const char* marker : {"**Wib**", "**Wob**", "*Wib*", "*Wob*",
