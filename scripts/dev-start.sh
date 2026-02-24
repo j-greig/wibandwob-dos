@@ -37,8 +37,8 @@ rm -f "$SOCKET"
 
 # ── Start TUI (no -x/-y — inherits real terminal on first attach) ─────────────
 echo "🖥  Starting TUI (tmux session: wibwob)..."
-WIBWOB_INSTANCE="$INSTANCE" tmux new-session -d -s wibwob \
-  "$BINARY 2>/tmp/wibwob_debug.log"
+tmux new-session -d -s wibwob \
+  "WIBWOB_INSTANCE=$INSTANCE $BINARY 2>/tmp/wibwob_debug.log"
 
 # ── Wait for IPC socket ───────────────────────────────────────────────────────
 echo "⏳ Waiting for socket $SOCKET..."

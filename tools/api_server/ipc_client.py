@@ -67,7 +67,13 @@ def send_cmd(cmd: str, kv: Optional[Dict[str, str]] = None) -> str:
                 parts.append(f"{k}={escaped}")
         line = " ".join(parts) + "\n"
         s.sendall(line.encode("utf-8"))
-        data = s.recv(4096)
+        chunks = []
+        while True:
+            chunk = s.recv(4096)
+            if not chunk:
+                break
+            chunks.append(chunk)
+        data = b"".join(chunks)
 
         # Parse response and show meaningful summary
         response = data.decode("utf-8", errors="ignore").strip()

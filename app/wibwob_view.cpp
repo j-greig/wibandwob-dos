@@ -598,6 +598,9 @@ void TWibWobWindow::handleEvent(TEvent& event) {
         auto* text = static_cast<std::string*>(event.message.infoPtr);
         if (text && !text->empty()) {
             pendingAsk_ = *text;  // queue it, don't process immediately
+            // Ensure engine + poll timer are running so the pending ask is drained
+            // even in headless / API-only sessions where no human has typed yet.
+            ensureEngineInitialized();
             clearEvent(event);
         }
     }

@@ -2231,22 +2231,23 @@ void TTestPatternApp::newDonutWindow()
 
 void TTestPatternApp::newWibWobWindow()
 {
-    // Create window title
-    windowNumber++;
-    std::stringstream title;
-    title << "Wib&Wob Chat " << windowNumber;
-    
-    // Calculate window position (cascade effect) - make it much larger for chat
-    int offset = (windowNumber - 1) % 10;
-    TRect bounds(
-        2 + offset * 2,           // left
-        1 + offset,               // top  
-        82 + offset * 2,          // right (much wider for chat)
-        28 + offset               // bottom (much taller for chat)
-    );
+    // Only one W&W chat window per instance — raise existing if already open.
+    if (deskTop) {
+        TView* v = deskTop->first();
+        if (v) {
+            TView* start = v;
+            do {
+                if (auto* ww = dynamic_cast<TWibWobWindow*>(v)) {
+                    deskTop->setCurrent(ww, TDeskTop::normalSelect);
+                    return;
+                }
+                v = v->next;
+            } while (v != start);
+        }
+    }
 
-    std::string windowTitle = title.str();
-    TWindow* window = createWibWobWindow(bounds, windowTitle);
+    TRect bounds(2, 1, 82, 28);
+    TWindow* window = createWibWobWindow(bounds, "Wib&Wob Chat");
     if (!window) {
         messageBox("Failed to create Wib&Wob Chat window.", mfError | mfOKButton);
         return;
@@ -3034,11 +3035,32 @@ std::string api_chat_receive(TTestPatternApp& app, const std::string& sender, co
     return "ok";
 }
 
+static TWibWobWindow* findTargetWibWobWindow(TTestPatternApp& app) {
+    if (!app.deskTop) return nullptr;
+
+    // Prefer the focused Wib&Wob window so ask/history operate on the same UI.
+    if (auto* ww = dynamic_cast<TWibWobWindow*>(app.deskTop->current)) {
+        return ww;
+    }
+
+    // Fallback: first Wib&Wob window on the desktop.
+    TView* v = app.deskTop->first();
+    if (!v) return nullptr;
+    TView* start = v;
+    do {
+        if (auto* ww = dynamic_cast<TWibWobWindow*>(v)) {
+            return ww;
+        }
+        v = v->next;
+    } while (v != start);
+    return nullptr;
+}
+
 std::string api_wibwob_ask(TTestPatternApp& app, const std::string& text) {
     // Inject a user message into the Wib&Wob chat window, triggering LLM response.
     fprintf(stderr, "[wibwob_ask] called, text_len=%zu text=%.60s\n",
             text.size(), text.c_str());
-    // Find the first TWibWobWindow on the desktop.
+    // Find the target Wib&Wob window (prefer current/focused).
     TWibWobWindow* chatWin = nullptr;
     int windowCount = 0;
     if (app.deskTop) {
@@ -3047,45 +3069,31 @@ std::string api_wibwob_ask(TTestPatternApp& app, const std::string& text) {
             TView* start = v;
             do {
                 windowCount++;
-                if (auto* ww = dynamic_cast<TWibWobWindow*>(v)) {
-                    chatWin = ww;
-                    break;
-                }
+                if (!chatWin) chatWin = dynamic_cast<TWibWobWindow*>(v);
                 v = v->next;
             } while (v != start);
         }
+    }
+    if (auto* preferred = findTargetWibWobWindow(app)) {
+        chatWin = preferred;
     }
     if (!chatWin) {
         fprintf(stderr, "[wibwob_ask] ERROR: no TWibWobWindow found (%d views on desktop)\n", windowCount);
         return "err no wibwob chat window open";
     }
-    fprintf(stderr, "[wibwob_ask] found chat window, posting event\n");
-    // Fire-and-forget: post a custom event so processUserInput runs on the
-    // next event loop iteration, not blocking the IPC handler thread.
-    // We stash the text in a static so the event handler can grab it.
+    fprintf(stderr, "[wibwob_ask] target chatWin=%p, sending window event\n", (void*)chatWin);
+    // Send to the chosen Wib&Wob window only. ApiIpcServer::poll() runs on the
+    // Turbo Vision thread, so direct delivery is safe and avoids cross-window drift.
     static std::string pendingAsk;
     pendingAsk = text;
-    TEvent ev;
-    ev.what = evBroadcast;
-    ev.message.command = 0xF0F0; // cmWibWobAskPending — unique sentinel
-    ev.message.infoPtr = &pendingAsk;
-    TProgram::application->putEvent(ev);
+    message(chatWin, evBroadcast, 0xF0F0, &pendingAsk); // cmWibWobAskPending
     return "ok queued";
 }
 
 std::string api_get_chat_history(TTestPatternApp& app) {
-    // Find the first TWibWobWindow on the desktop (read-only, synchronous).
-    TWibWobWindow* chatWin = nullptr;
-    if (app.deskTop) {
-        TView* v = app.deskTop->first();
-        if (v) {
-            TView* start = v;
-            do {
-                if (auto* ww = dynamic_cast<TWibWobWindow*>(v)) { chatWin = ww; break; }
-                v = v->next;
-            } while (v != start);
-        }
-    }
+    // Use the same target selection as api_wibwob_ask() to avoid reading the
+    // history from a different Wib&Wob window than the one that processed input.
+    TWibWobWindow* chatWin = findTargetWibWobWindow(app);
     if (!chatWin) return "err no wibwob chat window open";
     auto* msgView = chatWin->getMessageView();
     if (!msgView) return "err no wibwob message view";

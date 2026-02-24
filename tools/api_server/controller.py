@@ -288,6 +288,12 @@ class Controller:
                 self._state.next_z += 1
                 self._state.windows.append(win)
 
+        # Auto-focus the new window so it becomes deskTop->current immediately.
+        try:
+            send_cmd("focus_window", {"id": win.id})
+        except Exception:
+            pass
+
         await self._events.emit("window.created", self._serialize_window(win))
         self._append_state_event("window.created", {"window_id": win.id, "type": win.type.value}, actor="api")
         return win

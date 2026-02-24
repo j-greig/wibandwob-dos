@@ -1,0 +1,1201 @@
+OpenAI Codex v0.104.0 (research preview)
+--------
+workdir: /Users/james/Repos/wibandwob-dos
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: medium
+reasoning summaries: auto
+session id: 019c8f83-75eb-7390-b451-ab90f25ef2ef
+--------
+user
+EFFICIENCY: Use targeted commands, not full-file dumps.
+Prefer rg -n -C3 'pattern' file or sed -n 'X,Yp' file. Avoid full file dumps unless <50 lines.
+
+TASK: Diagnose why get_chat_history IPC command always returns {"messages":[]} even though the TUI visibly shows messages in the W&W chat window.
+
+Symptoms:
+- POST http://127.0.0.1:8089/menu/command {"command":"get_chat_history"} returns {"messages":[]}
+- tmux capture-pane shows the chat window with System, User, and assistant messages all visible
+- wibwob_ask injects correctly, LLM replies correctly, all visible in TUI
+- But chatHistory_ appears empty to the IPC thread
+
+Key files to inspect:
+- app/wibwob_view.cpp: addMessage() line ~95, recordHistoryMessage() line ~250, getHistoryJson() line ~257
+- app/wibwob_view.h: chatHistory_ declaration
+- app/test_pattern_app.cpp: api_get_chat_history() line ~3076, and how IPC dispatch works (look for the IPC server thread and how it calls api_get_chat_history)
+
+Specific questions:
+1. Is api_get_chat_history() called directly from the IPC background thread, or marshalled to the main UI thread? Look for the IPC server thread loop and dispatch mechanism.
+2. Is there a mutex or any synchronisation protecting chatHistory_?
+3. Could chatHistory_ on the TWibWobMessageView returned by getMessageView() differ from the one addMessage() writes to? (e.g. two different object instances)
+4. Is there any code path where chatHistory_ gets cleared after messages are added?
+
+Deliver:
+1) Root cause with file:line evidence
+2) Minimal fix
+3) Any thread-safety risks to flag
+
+Write your findings to the output file as a structured markdown report.
+mcp: fastmcp starting
+mcp: chrome-devtools starting
+mcp: fastmcp ready
+mcp: chrome-devtools ready
+mcp startup: ready: fastmcp, chrome-devtools
+
+thinking
+**Planning initial code inspection**
+codex
+I’m going to inspect the specific IPC and chat-history code paths you pointed out, then trace which thread owns the chat state and where `get_chat_history` reads from. I’ll keep the reads targeted and write a structured markdown report once the root cause is pinned down.
+exec
+/bin/zsh -lc "rg -n -C3 \"api_get_chat_history\\(|get_chat_history|IPC|server thread|dispatch\" app/test_pattern_app.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "rg -n -C3 \"addMessage\\(|recordHistoryMessage\\(|getHistoryJson\\(|chatHistory_\" app/wibwob_view.cpp app/wibwob_view.h" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+126-#include <deque>
+127-#include <dirent.h>
+128-#include <algorithm>
+129:// Local API IPC bridge (Unix domain socket)
+130-#include "api_ipc.h"
+131-#include "command_registry.h"
+132-#include "window_type_registry.h"
+--
+230-const ushort cmBrowser = 170;      // Browser window
+231-const ushort cmApiKey = 171;       // API key entry dialog
+232-// cmScrambleToggle (180) defined in scramble_view.h
+233:const ushort cmScrambleCat = cmScrambleToggle;  // alias for menu/IPC
+234-
+235-// Help menu commands
+236-const ushort cmAbout = 129;
+--
+967-    int chatSeq_ = 0;
+968-    static constexpr int kChatLogMax = 50;
+969-
+970:    // API/IPC registry for per-window control
+ succeeded in 51ms:
+app/wibwob_view.h-51-    virtual void changeBounds(const TRect& bounds) override;
+app/wibwob_view.h-52-
+app/wibwob_view.h-53-    // Message operations
+app/wibwob_view.h:54:    void addMessage(const std::string& sender, const std::string& content, bool is_error = false);
+app/wibwob_view.h-55-    void clear();
+app/wibwob_view.h-56-    void scrollToBottom();
+app/wibwob_view.h-57-    void scrollToTop();
+--
+app/wibwob_view.h-70-    const std::vector<ChatMessage>& getMessages() const { return messages; }
+app/wibwob_view.h-71-
+app/wibwob_view.h-72-    // Chat history (role-mapped, JSON-exportable for get_chat_history IPC)
+app/wibwob_view.h:73:    std::string getHistoryJson() const;
+app/wibwob_view.h-74-
+app/wibwob_view.h-75-private:
+app/wibwob_view.h-76-    struct HistoryEntry {
+app/wibwob_view.h-77-        std::string role;     // "user" | "assistant" | "system"
+app/wibwob_view.h-78-        std::string content;
+app/wibwob_view.h-79-    };
+app/wibwob_view.h:80:    std::vector<HistoryEntry> chatHistory_;
+app/wibwob_view.h:81:    void recordHistoryMessage(const std::string& sender, const std::string& content, bool is_error);
+
+thinking
+**Planning inspection of API and IPC code**
+codex
+I’ve confirmed `get_chat_history` has a dedicated helper, but I still need the exact IPC execution context and the `TWibWobWindow` access path (`getMessageView()`) to prove whether this is cross-thread state access or a wrong-instance issue. Next I’ll pull just those bodies and the IPC server implementation.
+exec
+/bin/zsh -lc "sed -n '3048,3115p' app/test_pattern_app.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "rg -n -C3 \"getMessageView\\(|class TWibWobWindow|messageView\" app/wibwob_view.h app/wibwob_view.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "rg -n -C4 \"class ApiIpcServer|start\\(|poll\\(|thread|std::thread|handle.*command|get_chat_history\" app/api_ipc.*" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+            do {
+                windowCount++;
+                if (auto* ww = dynamic_cast<TWibWobWindow*>(v)) {
+                    chatWin = ww;
+                    break;
+                }
+                v = v->next;
+            } while (v != start);
+        }
+    }
+    if (!chatWin) {
+        fprintf(stderr, "[wibwob_ask] ERROR: no TWibWobWindow found (%d views on desktop)\n", windowCount);
+        return "err no wibwob chat window open";
+    }
+    fprintf(stderr, "[wibwob_ask] found chat window, posting event\n");
+    // Fire-and-forget: post a custom event so processUserInput runs on the
+    // next event loop iteration, not blocking the IPC handler thread.
+    // We stash the text in a static so the event handler can grab it.
+    static std::string pendingAsk;
+    pendingAsk = text;
+ succeeded in 51ms:
+app/wibwob_view.h-28-
+app/wibwob_view.h-29-// Forward declarations
+app/wibwob_view.h-30-class WibWobEngine;
+app/wibwob_view.h:31:class TWibWobWindow;
+app/wibwob_view.h-32-
+app/wibwob_view.h-33-struct ChatMessage {
+app/wibwob_view.h-34-    std::string sender;  // "User" or "Wib"
+--
+app/wibwob_view.h-146-/*  TWibWobWindow - Coordinates message + input views      */
+app/wibwob_view.h-147-/*  Owns the engine and logging                            */
+app/wibwob_view.h-148-/*---------------------------------------------------------*/
+app/wibwob_view.h:149:class TWibWobWindow : public TWindow {
+app/wibwob_view.h-150-public:
+app/wibwob_view.h-151-    TWibWobWindow(const TRect& bounds, const std::string& title);
+app/wibwob_view.h-152-    virtual ~TWibWobWindow();
+--
+app/wibwob_view.h-156-    void updateTitleWithSession(const std::string& sessionId);
+app/wibwob_view.h-157-
+app/wibwob_view.h-158-    // Public access to views for external control
+app/wibwob_view.h:159:    TWibWobMessageView* getMessageView() { return messageView; }
+ succeeded in 51ms:
+app/api_ipc.h-11-#include <chrono>
+app/api_ipc.h-12-
+app/api_ipc.h-13-class TTestPatternApp;
+app/api_ipc.h-14-
+app/api_ipc.h:15:class ApiIpcServer {
+app/api_ipc.h-16-public:
+app/api_ipc.h-17-    /// Connection state for the status indicator.
+app/api_ipc.h-18-    struct ConnectionStatus {
+app/api_ipc.h-19-        bool listening   = false;  ///< Socket is open and accepting connections
+--
+app/api_ipc.h-24-    explicit ApiIpcServer(TTestPatternApp* app);
+app/api_ipc.h-25-    ~ApiIpcServer();
+app/api_ipc.h-26-
+app/api_ipc.h-27-    // Start listening on a Unix socket path. Returns false on failure.
+app/api_ipc.h:28:    bool start(const std::string& path = "/tmp/test_pattern_app.sock");
+app/api_ipc.h:29:    // Poll for new connections and handle a single command per connection.
+app/api_ipc.h:30:    void poll();
+app/api_ipc.h-31-    // Stop and clean up.
+app/api_ipc.h-32-    void stop();
+app/api_ipc.h-33-
+
+thinking
+**Inspecting IPC poll and dispatch**
+codex
+The IPC server appears to be polled from `TTestPatternApp::idle()` on the UI loop, which already weakens the “background thread” hypothesis. I still need the exact `poll()` implementation and any async worker that might mutate/read chat state concurrently before I call the root cause.
+exec
+/bin/zsh -lc "sed -n '347,520p' app/api_ipc.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "rg -n -C3 \"std::thread|thread\\(|detach\\(|async|sendStreamingQuery|streamCallback|poll\\(\" app/wibwob_view.cpp app/test_pattern_app.cpp app/api_ipc.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "rg -n -C3 \"get_chat_history|api_get_chat_history\\(\" app/api_ipc.cpp app/test_pattern_app.cpp" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+void ApiIpcServer::poll() {
+#ifdef _WIN32
+    return;
+#else
+    if (fd_listen_ < 0 || !app_) return;
+    int fd = ::accept(fd_listen_, nullptr, nullptr);
+    if (fd < 0) {
+        return; // EAGAIN expected in non-blocking mode
+    }
+
+    // Authenticate if secret is set.
+    if (auth_required()) {
+        if (!authenticate_connection(fd)) {
+            std::string err = "{\"error\":\"auth_failed\"}\n";
+            (void)safe_write(fd, err.c_str(), err.size());
+            ::close(fd);
+            return;
+        }
+    }
+
+ succeeded in 51ms:
+app/test_pattern_app.cpp-3073-    return "ok queued";
+app/test_pattern_app.cpp-3074-}
+app/test_pattern_app.cpp-3075-
+app/test_pattern_app.cpp:3076:std::string api_get_chat_history(TTestPatternApp& app) {
+app/test_pattern_app.cpp-3077-    // Find the first TWibWobWindow on the desktop (read-only, synchronous).
+app/test_pattern_app.cpp-3078-    TWibWobWindow* chatWin = nullptr;
+app/test_pattern_app.cpp-3079-    if (app.deskTop) {
+ succeeded in 51ms:
+app/api_ipc.cpp-344-#endif
+app/api_ipc.cpp-345-}
+app/api_ipc.cpp-346-
+app/api_ipc.cpp:347:void ApiIpcServer::poll() {
+app/api_ipc.cpp-348-#ifdef _WIN32
+app/api_ipc.cpp-349-    return;
+app/api_ipc.cpp-350-#else
+--
+app/wibwob_view.cpp-582-    // Poll engine on timer broadcasts
+app/wibwob_view.cpp-583-    if (event.what == evBroadcast && event.message.command == cmTimerExpired) {
+app/wibwob_view.cpp-584-        if (event.message.infoPtr == pollTimerId && engineInitialized && engine) {
+app/wibwob_view.cpp:585:            engine->poll();
+app/wibwob_view.cpp-586-            // Drain queued self-prompt when engine is idle
+app/wibwob_view.cpp-587-            if (!pendingAsk_.empty() && !engine->isBusy()) {
+app/wibwob_view.cpp-588-                std::string msg = std::move(pendingAsk_);
+--
+app/wibwob_view.cpp-615-
+app/wibwob_view.cpp-616-        engine = new WibWobEngine();
+app/wibwob_view.cpp-617-
+app/wibwob_view.cpp:618:        // Ensure we poll providers frequently (some providers rely on poll() to read subprocess output).
+
+thinking
+**Tracing command registry flow**
+codex
+I’ve now confirmed the low-level IPC socket path is polled on the UI thread, not a dedicated background thread. The remaining gap is your `/menu/command` path: I need to trace which handler that HTTP endpoint invokes and whether it hits `api_get_chat_history()` at all or a different code path that reads a different/empty state.
+exec
+/bin/zsh -lc "rg -n -C3 \"recordHistoryMessage\\(|getHistoryJson\\(\" app/wibwob_view.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc 'rg -n -C4 "menu/command|exec_command|command_registry|POST .*menu" app scripts | head -120' in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc 'rg -n -C4 "get_chat_history" app | head -40' in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+106-    msg.timestamp = oss.str();
+107-
+108-    messages.push_back(msg);
+109:    recordHistoryMessage(sender, content, is_error);
+110-    rebuildWrappedLines();
+111-    scrollToBottom();
+112-    drawView();
+--
+247-    return "assistant";
+248-}
+249-
+250:void TWibWobMessageView::recordHistoryMessage(const std::string& sender, const std::string& content, bool is_error) {
+251-    HistoryEntry e;
+252-    e.role = mapSenderToRole(sender, is_error);
+253-    e.content = content;
+254-    chatHistory_.push_back(e);
+255-}
+256-
+257:std::string TWibWobMessageView::getHistoryJson() const {
+258-    std::string out = "[";
+ succeeded in 51ms:
+app/CMakeLists.txt-10-    gradient.cpp
+app/CMakeLists.txt-11-    glitch_engine.cpp
+app/CMakeLists.txt-12-    frame_capture.cpp
+app/CMakeLists.txt-13-    api_ipc.cpp
+app/CMakeLists.txt:14:    command_registry.cpp
+app/CMakeLists.txt-15-    wibwob_background.cpp
+app/CMakeLists.txt-16-    window_type_registry.cpp
+app/CMakeLists.txt-17-    theme_manager.cpp
+app/CMakeLists.txt-18-    wibwob_view.cpp
+--
+app/CMakeLists.txt-131-    tvision_ascii_view_poc.cpp
+app/CMakeLists.txt-132-)
+app/CMakeLists.txt-133-target_include_directories(ascii_dump PRIVATE ${CMAKE_CURRENT_LIST_DIR})
+app/CMakeLists.txt-134-
+app/CMakeLists.txt:135:# command_registry_test (native ctest coverage for registry capability payload)
+app/CMakeLists.txt:136:add_executable(command_registry_test
+app/CMakeLists.txt:137:    command_registry_test.cpp
+app/CMakeLists.txt:138:    command_registry.cpp
+app/CMakeLists.txt-139-)
+app/CMakeLists.txt-140-
+ succeeded in 51ms:
+app/test_pattern_app.cpp-3072-    TProgram::application->putEvent(ev);
+app/test_pattern_app.cpp-3073-    return "ok queued";
+app/test_pattern_app.cpp-3074-}
+app/test_pattern_app.cpp-3075-
+app/test_pattern_app.cpp:3076:std::string api_get_chat_history(TTestPatternApp& app) {
+app/test_pattern_app.cpp-3077-    // Find the first TWibWobWindow on the desktop (read-only, synchronous).
+app/test_pattern_app.cpp-3078-    TWibWobWindow* chatWin = nullptr;
+app/test_pattern_app.cpp-3079-    if (app.deskTop) {
+app/test_pattern_app.cpp-3080-        TView* v = app.deskTop->first();
+--
+app/wibwob_view.h-68-
+app/wibwob_view.h-69-    // Access for window
+app/wibwob_view.h-70-    const std::vector<ChatMessage>& getMessages() const { return messages; }
+app/wibwob_view.h-71-
+app/wibwob_view.h:72:    // Chat history (role-mapped, JSON-exportable for get_chat_history IPC)
+app/wibwob_view.h-73-    std::string getHistoryJson() const;
+app/wibwob_view.h-74-
+app/wibwob_view.h-75-private:
+app/wibwob_view.h-76-    struct HistoryEntry {
+--
+
+thinking
+**Identifying menu command endpoint**
+codex
+The `/menu/command` endpoint is likely the actual culprit path, because the low-level socket `exec_command` is UI-thread-polled and should see the same `TWibWobMessageView` instance. I’m now tracing the HTTP server handler to see if it forwards to the same in-process app instance or to a separate process/socket with stale state.
+exec
+/bin/zsh -lc "sed -n '240,420p' app/command_registry.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,240p' app/command_registry.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "rg -n -C4 \"@app\\.post\\(\\\"/menu/command\\\"|def .*menu.*command|menu/command\" -g'*.py' ." in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+        return "ok";
+    }
+    if (name == "open_micropolis_ascii") {
+        api_spawn_micropolis_ascii(app, nullptr);
+        return "ok";
+    }
+    if (name == "open_quadra") {
+        api_spawn_quadra(app, nullptr);
+        return "ok";
+    }
+    if (name == "open_snake") {
+        api_spawn_snake(app, nullptr);
+        return "ok";
+    }
+    if (name == "open_rogue") {
+        api_spawn_rogue(app, nullptr);
+        return "ok";
+    }
+    if (name == "open_deep_signal") {
+        api_spawn_deep_signal(app, nullptr);
+ succeeded in 50ms:
+#include "command_registry.h"
+
+#include "api_ipc.h"
+
+#include <cstdint>
+#include <sys/stat.h>
+
+#include <sstream>
+
+// TRect for window bounds
+#define Uses_TRect
+#define Uses_TPoint
+#define Uses_TEvent
+#define Uses_TProgram
+#include <tvision/tv.h>
+
+extern void api_cascade(TTestPatternApp& app);
+extern void api_toggle_scramble(TTestPatternApp& app);
+extern void api_expand_scramble(TTestPatternApp& app);
+extern std::string api_scramble_say(TTestPatternApp& app, const std::string& text);
+ succeeded in 50ms:
+./tests/contract/test_browser_copy_ui_contract.py-23-    assert "flattenMarkdownLinks" in source
+./tests/contract/test_browser_copy_ui_contract.py-24-    assert "\"source_url\"" in source
+./tests/contract/test_browser_copy_ui_contract.py-25-
+./tests/contract/test_browser_copy_ui_contract.py-26-
+./tests/contract/test_browser_copy_ui_contract.py:27:def test_edit_menu_wires_copy_page_command() -> None:
+./tests/contract/test_browser_copy_ui_contract.py-28-    source = Path("app/test_pattern_app.cpp").read_text(encoding="utf-8")
+./tests/contract/test_browser_copy_ui_contract.py-29-    assert "~C~opy Page" in source
+./tests/contract/test_browser_copy_ui_contract.py-30-    assert "cmCopy" in source
+--
+./tools/api_server/main.py-141-    @app.get("/commands",
+./tools/api_server/main.py-142-             summary="List all available commands with descriptions and parameter hints",
+./tools/api_server/main.py-143-             description="Returns the full command registry from the C++ TUI app. "
+./tools/api_server/main.py-144-                         "Each command has a name, description, and whether it requires parameters. "
+./tools/api_server/main.py:145:                         "Use POST /menu/command to execute any command by name.")
+./tools/api_server/main.py-146-    async def list_commands() -> Dict[str, Any]:
+./tools/api_server/main.py-147-        """Agent-friendly command discovery endpoint.
+./tools/api_server/main.py-148-
+./tools/api_server/main.py-149-        Returns the full command manifest so agents can discover what
+--
+./tools/api_server/main.py-152-        commands = registry.get("commands", [])
+
+thinking
+**Inspecting command execution and response parsing**
+codex
+The registry dispatch does call `api_get_chat_history()` directly, so the remaining likely causes are (a) the HTTP server is talking to a different WibWob instance/socket than the tmux-visible one, or (b) a race/undefined behavior from cross-thread UI access elsewhere is corrupting history reads. I’m checking the API server controller transport next because your symptom (`{"messages":[]}` rather than an error) strongly suggests “correct command, wrong instance”.
+exec
+/bin/zsh -lc "sed -n '1,240p' tools/api_server/main.py" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "rg -n -C4 \"class .*Controller|def exec_command\\(|cmd:exec_command|get_chat_history|socket\" tools/api_server -g'*.py'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '240,420p' tools/api_server/main.py" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+from __future__ import annotations
+
+import asyncio
+import time
+from typing import Any, Dict, Optional
+
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+
+from .controller import Controller
+from .events import EventHub
+from .models import Rect, WindowType
+
+# MCP Integration
+try:
+    from fastapi_mcp import FastApiMCP
+    MCP_AVAILABLE = True
+except ImportError:
+    MCP_AVAILABLE = False
+ succeeded in 51ms:
+            props=win.props,
+        )
+
+    @app.post("/windows/{win_id}/clone", response_model=WindowState)
+    async def clone(win_id: str) -> WindowState:
+        try:
+            win = await ctl.clone(win_id)
+        except KeyError:
+            raise HTTPException(status_code=404, detail="window not found")
+        return WindowState(
+            id=win.id,
+            type=win.type.value,
+            title=win.title,
+            rect=RectModel(x=win.rect.x, y=win.rect.y, w=win.rect.w, h=win.rect.h),
+            z=win.z,
+            focused=win.focused,
+            zoomed=win.zoomed,
+            props=win.props,
+        )
+
+ succeeded in 51ms:
+tools/api_server/test_move.py-1-#!/usr/bin/env python3
+tools/api_server/test_move.py-2-import os
+tools/api_server/test_move.py:3:import socket
+tools/api_server/test_move.py-4-import time
+tools/api_server/test_move.py-5-
+tools/api_server/test_move.py-6-
+tools/api_server/test_move.py-7-def _sock_path():
+--
+tools/api_server/test_move.py-11-    return "/tmp/test_pattern_app.sock"
+tools/api_server/test_move.py-12-
+tools/api_server/test_move.py-13-
+tools/api_server/test_move.py-14-def send_ipc_cmd(cmd_str):
+tools/api_server/test_move.py:15:    """Send command directly to IPC socket"""
+tools/api_server/test_move.py-16-    sock_path = _sock_path()
+tools/api_server/test_move.py:17:    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+tools/api_server/test_move.py-18-    try:
+tools/api_server/test_move.py-19-        s.connect(sock_path)
+tools/api_server/test_move.py-20-        s.sendall((cmd_str + "\n").encode("utf-8"))
+tools/api_server/test_move.py-21-        response = s.recv(4096).decode("utf-8", errors="ignore")
+--
+
+thinking
+**Planning command execution and parsing**
+exec
+/bin/zsh -lc "sed -n '520,640p' tools/api_server/controller.py" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,180p' tools/api_server/ipc_client.py" in /Users/james/Repos/wibandwob-dos succeeded in 76ms:
+from __future__ import annotations
+
+import os
+import socket
+import base64
+from typing import Dict, Optional
+
+
+def _resolve_sock_path() -> str:
+    """Resolve IPC socket path.
+
+    Priority: TV_IPC_SOCK (explicit) > WIBWOB_INSTANCE (derived) > legacy default.
+    """
+    explicit = os.environ.get("TV_IPC_SOCK")
+    if explicit:
+        return explicit
+    instance = os.environ.get("WIBWOB_INSTANCE")
+    if instance:
+        return f"/tmp/wibwob_{instance}.sock"
+    return "/tmp/test_pattern_app.sock"
+ succeeded in 88ms:
+
+    async def send_figlet(self, win_id: str, text: str, font: str = "standard", width: int = 0, mode: str = "append") -> Dict[str, Any]:
+        """Send figlet ASCII art to a text editor window"""
+        try:
+            # Forward to the live app via IPC
+            resp = send_cmd("send_figlet", {
+                "id": win_id,
+                "text": text,
+                "font": font,
+                "width": str(width) if width > 0 else "",
+                "mode": mode
+            })
+            if isinstance(resp, str) and resp.lower().startswith("err"):
+                raise RuntimeError(resp)
+            
+            # Update in-memory state (simplified)
+            async with self._lock:
+                win = self._require(win_id)
+                if win.type == WindowType.text_editor:
+                    if "figlet_history" not in win.props:
+
+thinking
+**Investigating API response parsing**
+codex
+I found the FastAPI controller just forwards `exec_command` to IPC and wraps the raw string result under `result`; it doesn’t fabricate `{"messages":[]}` for `get_chat_history`. I need one more pass through the chat view’s mutation sites to see if `chatHistory_` is actually being bypassed during the visible message path (especially streaming and any direct `messages.push_back` paths).
+exec
+/bin/zsh -lc "sed -n '88,220p' app/wibwob_view.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '220,285p' app/wibwob_view.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "rg -n \"messages\\.push_back\\(|chatHistory_\\.push_back\\(|clear\\(\" app/wibwob_view.cpp | head -80" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+}
+
+void TWibWobMessageView::changeBounds(const TRect& bounds) {
+    TScroller::changeBounds(bounds);
+    rebuildWrappedLines();
+}
+
+void TWibWobMessageView::addMessage(const std::string& sender, const std::string& content, bool is_error) {
+    ChatMessage msg;
+    msg.sender = sender;
+    msg.content = content;
+    msg.is_error = is_error;
+
+    // Get timestamp
+    std::time_t now = std::time(nullptr);
+    std::tm* local = std::localtime(&now);
+    std::ostringstream oss;
+    oss << std::put_time(local, "%H:%M:%S");
+    msg.timestamp = oss.str();
+
+ succeeded in 51ms:
+    rebuildWrappedLines();
+    drawView();
+}
+
+void TWibWobMessageView::cancelStreamingMessage() {
+    if (!isReceivingStream || streamingMessageIndex >= messages.size()) {
+        return;
+    }
+
+    // Remove the incomplete streaming message and its history placeholder
+    messages.erase(messages.begin() + streamingMessageIndex);
+    if (!chatHistory_.empty()) chatHistory_.pop_back();
+    isReceivingStream = false;
+    rebuildWrappedLines();
+    drawView();
+}
+
+// --- History methods ---
+
+std::string TWibWobMessageView::mapSenderToRole(const std::string& sender, bool is_error) {
+ succeeded in 53ms:
+108:    messages.push_back(msg);
+115:void TWibWobMessageView::clear() {
+116:    messages.clear();
+117:    wrappedLines.clear();
+118:    chatHistory_.clear();
+175:    messages.push_back(msg);
+184:    chatHistory_.push_back(he);
+254:    chatHistory_.push_back(e);
+270:    wrappedLines.clear();
+415:                    currentInput.clear();
+589:                pendingAsk_.clear();
+700:        messageView->clear();
+
+thinking
+**Examining socket path mismatch**
+codex
+The message view code itself is consistent: every visible W&W message path I checked appends to `chatHistory_`, and the only clear path is `/clear`. The strongest remaining root cause is instance/socket mismatch between the FastAPI process and the tmux TUI process, so I’m pulling the exact socket-resolution code on both sides to prove it with file:line references.
+exec
+/bin/zsh -lc "sed -n '1138,1168p' app/test_pattern_app.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "rg -n -C3 \"def _sync_state|send_cmd\\(\" tools/api_server/controller.py" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "rg -n -C3 \"WIBWOB_INSTANCE|TV_IPC_SOCK|sockPath|wibwob_.*\\.sock|test_pattern_app\\.sock\" app/test_pattern_app.cpp tools/api_server/ipc_client.py" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+    scrambleState(sdsHidden)
+{
+    recentWorkspaces_ = scanRecentWorkspacePaths("workspaces", kMaxRecentWorkspaces);
+
+    // Start IPC server for local API control (best-effort; ignore failures)
+    ipcServer = new ApiIpcServer(this);
+
+    // Derive socket path from WIBWOB_INSTANCE env var.
+    // Unset or empty: legacy path for backward compat.
+    std::string sockPath = "/tmp/test_pattern_app.sock";
+    const char* inst = std::getenv("WIBWOB_INSTANCE");
+    if (inst && inst[0] != '\0') {
+        sockPath = std::string("/tmp/wibwob_") + inst + ".sock";
+        fprintf(stderr, "[wibwob] instance=%s socket=%s\n", inst, sockPath.c_str());
+    } else {
+        fprintf(stderr, "[wibwob] instance=(none) socket=%s\n", sockPath.c_str());
+    }
+    if (!ipcServer->start(sockPath)) {
+        fprintf(stderr, "[wibwob] ERROR: IPC server failed to start on %s\n", sockPath.c_str());
+        // Hard-disable IPC on startup failure so later idle/event paths
+ succeeded in 51ms:
+102-    async def get_registry_capabilities(self) -> Dict[str, Any]:
+103-        """Fetch canonical command capabilities from the C++ registry via IPC."""
+104-        try:
+105:            resp = send_cmd("get_capabilities")
+106-            if resp and resp.strip().startswith("{"):
+107-                data = json.loads(resp.strip())
+108-                if isinstance(data, dict):
+--
+117-        Returns list of {"type": str, "spawnable": bool} dicts — the single
+118-        source of truth for what window types exist."""
+119-        try:
+120:            resp = send_cmd("get_window_types")
+121-            if resp and resp.strip().startswith("{"):
+122-                data = json.loads(resp.strip())
+123-                if isinstance(data, dict) and "window_types" in data:
+--
+150-            },
+151-        }
+152-
+153:    async def _sync_state(self) -> None:
+ succeeded in 50ms:
+tools/api_server/ipc_client.py-9-def _resolve_sock_path() -> str:
+tools/api_server/ipc_client.py-10-    """Resolve IPC socket path.
+tools/api_server/ipc_client.py-11-
+tools/api_server/ipc_client.py:12:    Priority: TV_IPC_SOCK (explicit) > WIBWOB_INSTANCE (derived) > legacy default.
+tools/api_server/ipc_client.py-13-    """
+tools/api_server/ipc_client.py:14:    explicit = os.environ.get("TV_IPC_SOCK")
+tools/api_server/ipc_client.py-15-    if explicit:
+tools/api_server/ipc_client.py-16-        return explicit
+tools/api_server/ipc_client.py:17:    instance = os.environ.get("WIBWOB_INSTANCE")
+tools/api_server/ipc_client.py-18-    if instance:
+tools/api_server/ipc_client.py:19:        return f"/tmp/wibwob_{instance}.sock"
+tools/api_server/ipc_client.py:20:    return "/tmp/test_pattern_app.sock"
+tools/api_server/ipc_client.py-21-
+tools/api_server/ipc_client.py-22-
+tools/api_server/ipc_client.py-23-SOCK_PATH = _resolve_sock_path()
+--
+app/test_pattern_app.cpp-1142-    // Start IPC server for local API control (best-effort; ignore failures)
+app/test_pattern_app.cpp-1143-    ipcServer = new ApiIpcServer(this);
+app/test_pattern_app.cpp-1144-
+app/test_pattern_app.cpp:1145:    // Derive socket path from WIBWOB_INSTANCE env var.
+
+thinking
+**Analyzing multiple window interference**
+codex
+There’s one more code-level explanation that fits your exact symptom better than threading: `api_get_chat_history()` returns the first `TWibWobWindow` on the desktop, not the focused/visible one. If multiple W&W windows can exist, it can deterministically read an empty instance while you’re looking at a populated one. I’m checking the WibWob window creation paths to see if the app commonly creates more than one chat window.
+exec
+/bin/zsh -lc "rg -n -C3 \"TWibWobWindow\\(|new.*WibWob|cmWibWob|wibwob\" app/test_pattern_app.cpp | head -120" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "rg -n -C3 \"insert\\(.*TWibWobWindow|new TWibWobWindow\" app | head -80" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+75-// Unified auth config
+76-#include "llm/base/auth_config.h"
+77-// Wib&Wob AI chat interface
+78:#include "wibwob_view.h"
+79-// Scrollbar fix prototypes (test versions)
+80:#include "wibwob_scroll_test.h"
+81-// Custom frame for windows without titles
+82-#include "notitle_frame.h"
+83-// Transparent background text view
+--
+102-// Terminal emulator window (tvterm)
+103-#include "tvterm_view.h"
+104-// Desktop texture & gallery mode
+105:#include "wibwob_background.h"
+106-// App launcher (E011)
+107-#include "app_launcher_view.h"
+108-#include "ascii_gallery_view.h"
+--
+221-const ushort cmPaintTools = 126;
+222-const ushort cmAnimationStudio = 127;
+ succeeded in 51ms:
+app/wibwob_view.cpp-1194-}
+app/wibwob_view.cpp-1195-
+app/wibwob_view.cpp-1196-TWindow* createWibWobWindow(const TRect& bounds, const std::string& title) {
+app/wibwob_view.cpp:1197:    return new TWibWobWindow(bounds, title);
+app/wibwob_view.cpp-1198-}
+--
+app/wibwob_scroll_test.cpp-411-
+app/wibwob_scroll_test.cpp-412-TWindow* createWibWobTestWindowC(const TRect& bounds, const std::string& title) {
+app/wibwob_scroll_test.cpp-413-    // Create the actual production window
+app/wibwob_scroll_test.cpp:414:    TWibWobWindow* win = new TWibWobWindow(bounds, title);
+app/wibwob_scroll_test.cpp-415-
+app/wibwob_scroll_test.cpp-416-    // Get the message view and prepopulate with test content
+app/wibwob_scroll_test.cpp-417-    TWibWobMessageView* msgView = win->getMessageView();
+
+thinking
+**Assessing window auto-open behavior**
+exec
+/bin/zsh -lc "sed -n '2228,2262p' app/test_pattern_app.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "rg -n -C3 \"newWibWobWindow\\(\\);|cmWibWobChat|createWibWobWindow|loadWorkspaceFromFile\\(\" app/test_pattern_app.cpp | head -80" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+    deskTop->insert(window);
+    registerWindow(window);
+}
+
+void TTestPatternApp::newWibWobWindow()
+{
+    // Create window title
+    windowNumber++;
+    std::stringstream title;
+    title << "Wib&Wob Chat " << windowNumber;
+    
+    // Calculate window position (cascade effect) - make it much larger for chat
+    int offset = (windowNumber - 1) % 10;
+    TRect bounds(
+        2 + offset * 2,           // left
+        1 + offset,               // top  
+        82 + offset * 2,          // right (much wider for chat)
+        28 + offset               // bottom (much taller for chat)
+    );
+
+ succeeded in 51ms:
+221-const ushort cmPaintTools = 126;
+222-const ushort cmAnimationStudio = 127;
+223-const ushort cmQuantumPrinter = 128;
+224:const ushort cmWibWobChat = 131;
+225-const ushort cmSendToBack = 133;
+226-const ushort cmWibWobTestA = 148;  // Scrollbar test: standardScrollBar fix
+227-const ushort cmWibWobTestB = 149;  // Scrollbar test: TScroller refactor
+--
+895-    void newDonutWindow();
+896-    void newBrowserWindow();
+897-    void newBrowserWindow(const TRect& bounds);
+898:    void newWibWobWindow();
+899-    void newWibWobTestWindowA();
+900-    void newWibWobTestWindowB();
+901-    void newWibWobTestWindowC();
+--
+919-    TRect calculateWindowBounds(const std::string& filePath);
+920-    std::string buildWorkspaceJson();
+921-    static std::string jsonEscape(const std::string& s);
+922:    bool loadWorkspaceFromFile(const std::string& path);
+
+thinking
+**Diagnosing chat history sync and thread safety**
+codex
+I can now answer your thread questions for the C++ IPC path. Before I write the report, I’m pulling the streaming callback lines because there is a real thread-safety risk there: the code comments themselves indicate a streaming thread may touch the chat view directly.
+exec
+/bin/zsh -lc "sed -n '780,835p' app/wibwob_view.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "rg -n -C3 \"TWibWobMessageView\\* getMessageView\\(|std::vector<HistoryEntry> chatHistory_|std::string getHistoryJson\\(\\) const\" app/wibwob_view.h" in /Users/james/Repos/wibandwob-dos succeeded in 50ms:
+    }
+
+    logMessage("System", "Using provider: " + engine->getCurrentProvider() + ", model: " + engine->getCurrentModel());
+
+    auto start = std::chrono::steady_clock::now();
+
+    // Streaming callback - shared between SDK and CLI providers
+    auto streamCallback = [this, start](const StreamChunk& chunk) {
+        // Guard: if the window is being destroyed, bail immediately.
+        // The streaming thread may still be running when ~TWibWobWindow fires;
+        // touching child views after they are deleted causes use-after-free crashes.
+        if (!windowAlive_.load()) return;
+
+        // Log all chunks for debugging
+        std::string chunkType;
+        switch (chunk.type) {
+            case StreamChunk::CONTENT_DELTA: chunkType = "CONTENT_DELTA"; break;
+            case StreamChunk::MESSAGE_COMPLETE: chunkType = "MESSAGE_COMPLETE"; break;
+            case StreamChunk::ERROR_OCCURRED: chunkType = "ERROR_OCCURRED"; break;
+            case StreamChunk::SESSION_UPDATE: chunkType = "SESSION_UPDATE"; break;
+ succeeded in 51ms:
+70-    const std::vector<ChatMessage>& getMessages() const { return messages; }
+71-
+72-    // Chat history (role-mapped, JSON-exportable for get_chat_history IPC)
+73:    std::string getHistoryJson() const;
+74-
+75-private:
+76-    struct HistoryEntry {
+77-        std::string role;     // "user" | "assistant" | "system"
+78-        std::string content;
+79-    };
+80:    std::vector<HistoryEntry> chatHistory_;
+81-    void recordHistoryMessage(const std::string& sender, const std::string& content, bool is_error);
+82-    static std::string mapSenderToRole(const std::string& sender, bool is_error);
+83-    struct WrappedLine {
+--
+156-    void updateTitleWithSession(const std::string& sessionId);
+157-
+158-    // Public access to views for external control
+159:    TWibWobMessageView* getMessageView() { return messageView; }
+160-    TWibWobInputView* getInputView() { return inputView; }
+
+thinking
+**Identifying exact dispatch lines**
+codex
+I’ve got enough to write the diagnosis: the low-level IPC command runs on the UI thread, there’s no mutex on `chatHistory_`, and the main code bug is window selection (`first TWibWobWindow`) rather than message recording. I’ll write the report now with file/line evidence plus a minimal patch recommendation.
+exec
+/bin/zsh -lc "rg -n \"if \\(ipcServer\\) ipcServer->poll\\(\\);|std::string api_get_chat_history\\(|getMessageView\\(\\) \\{ return messageView; \\}|chatHistory_\\.clear\\(\\);|chatHistory_\\.push_back\\(|std::string TWibWobMessageView::getHistoryJson\\(\\) const|auto streamCallback = \\[this, start\\]\" app/test_pattern_app.cpp app/api_ipc.cpp app/command_registry.cpp app/wibwob_view.h app/wibwob_view.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "rg -n \"if \\(name == \\\"get_chat_history\\\"\\)\" app/command_registry.cpp" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+app/wibwob_view.h:159:    TWibWobMessageView* getMessageView() { return messageView; }
+app/test_pattern_app.cpp:2883:    if (ipcServer) ipcServer->poll();
+app/test_pattern_app.cpp:3076:std::string api_get_chat_history(TTestPatternApp& app) {
+app/wibwob_view.cpp:118:    chatHistory_.clear();
+app/wibwob_view.cpp:184:    chatHistory_.push_back(he);
+app/wibwob_view.cpp:254:    chatHistory_.push_back(e);
+app/wibwob_view.cpp:257:std::string TWibWobMessageView::getHistoryJson() const {
+app/wibwob_view.cpp:787:    auto streamCallback = [this, start](const StreamChunk& chunk) {
+app/command_registry.cpp:24:extern std::string api_get_chat_history(TTestPatternApp& app);
+ succeeded in 50ms:
+338:    if (name == "get_chat_history") {
+
+thinking
+**Identifying dispatch call location**
+exec
+/bin/zsh -lc "rg -n \"void ApiIpcServer::poll\\(|resp = exec_registry_command\\(\\*app_\" app/api_ipc.cpp" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+347:void ApiIpcServer::poll() {
+408:            resp = exec_registry_command(*app_, it->second, kv) + "\n";
+
+thinking
+**Confirming return statement detail**
+exec
+/bin/zsh -lc "rg -n \"return api_get_chat_history\\(app\\);\" app/command_registry.cpp" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+339:        return api_get_chat_history(app);
+
+thinking
+**Inspecting environment for output path**
+codex
+I’m about to write the report, but the prompt says “output file” without a path. I’m checking for an `OUTPUT_FILE` env var first; if none exists, I’ll place it in the repo root as a markdown diagnostic file and tell you the exact path.
+exec
+/bin/zsh -lc 'env | rg -n "''^(OUTPUT_FILE|REPORT_FILE|OUTFILE)="' in /Users/james/Repos/wibandwob-dos exited 1 in 50ms:
+
+
+thinking
+**Planning detailed diagnostic report**
+exec
+/bin/zsh -lc "nl -ba app/wibwob_view.cpp | sed -n '95,120p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba app/test_pattern_app.cpp | sed -n '3076,3094p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba app/wibwob_view.cpp | sed -n '175,206p'" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+  3076	std::string api_get_chat_history(TTestPatternApp& app) {
+  3077	    // Find the first TWibWobWindow on the desktop (read-only, synchronous).
+  3078	    TWibWobWindow* chatWin = nullptr;
+  3079	    if (app.deskTop) {
+  3080	        TView* v = app.deskTop->first();
+  3081	        if (v) {
+  3082	            TView* start = v;
+  3083	            do {
+  3084	                if (auto* ww = dynamic_cast<TWibWobWindow*>(v)) { chatWin = ww; break; }
+  3085	                v = v->next;
+  3086	            } while (v != start);
+  3087	        }
+  3088	    }
+  3089	    if (!chatWin) return "err no wibwob chat window open";
+  3090	    auto* msgView = chatWin->getMessageView();
+  3091	    if (!msgView) return "err no wibwob message view";
+  3092	    return std::string("{\"messages\":") + msgView->getHistoryJson() + "}";
+  3093	}
+  3094	
+ succeeded in 51ms:
+    95	void TWibWobMessageView::addMessage(const std::string& sender, const std::string& content, bool is_error) {
+    96	    ChatMessage msg;
+    97	    msg.sender = sender;
+    98	    msg.content = content;
+    99	    msg.is_error = is_error;
+   100	
+   101	    // Get timestamp
+   102	    std::time_t now = std::time(nullptr);
+   103	    std::tm* local = std::localtime(&now);
+   104	    std::ostringstream oss;
+   105	    oss << std::put_time(local, "%H:%M:%S");
+   106	    msg.timestamp = oss.str();
+   107	
+   108	    messages.push_back(msg);
+   109	    recordHistoryMessage(sender, content, is_error);
+   110	    rebuildWrappedLines();
+   111	    scrollToBottom();
+   112	    drawView();
+   113	}
+   114	
+ succeeded in 51ms:
+   175	    messages.push_back(msg);
+   176	    streamingMessageIndex = messages.size() - 1;
+   177	    isReceivingStream = true;
+   178	    lastStreamUpdate = std::chrono::steady_clock::now();
+   179	
+   180	    // History: placeholder entry for the streaming assistant reply
+   181	    HistoryEntry he;
+   182	    he.role = mapSenderToRole(sender, false);
+   183	    he.content = "";
+   184	    chatHistory_.push_back(he);
+   185	
+   186	    // Auto-scroll to show new message
+   187	    scrollToBottom();
+   188	}
+   189	
+   190	void TWibWobMessageView::appendToStreamingMessage(const std::string& content) {
+   191	    if (!isReceivingStream || streamingMessageIndex >= messages.size()) {
+   192	        return;
+   193	    }
+   194	
+exec
+/bin/zsh -lc "nl -ba app/wibwob_view.cpp | sed -n '212,266p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba app/wibwob_view.cpp | sed -n '787,830p'" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "nl -ba app/api_ipc.cpp | sed -n '347,412p'" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+   212	    messages[streamingMessageIndex].is_streaming = false;
+   213	    messages[streamingMessageIndex].is_complete = true;
+   214	
+   215	    // Final sync: ensure history entry has the complete content
+   216	    if (!chatHistory_.empty())
+   217	        chatHistory_.back().content = messages[streamingMessageIndex].content;
+   218	
+   219	    isReceivingStream = false;
+   220	    rebuildWrappedLines();
+   221	    drawView();
+   222	}
+   223	
+   224	void TWibWobMessageView::cancelStreamingMessage() {
+   225	    if (!isReceivingStream || streamingMessageIndex >= messages.size()) {
+   226	        return;
+   227	    }
+   228	
+   229	    // Remove the incomplete streaming message and its history placeholder
+   230	    messages.erase(messages.begin() + streamingMessageIndex);
+   231	    if (!chatHistory_.empty()) chatHistory_.pop_back();
+ succeeded in 52ms:
+   787	    auto streamCallback = [this, start](const StreamChunk& chunk) {
+   788	        // Guard: if the window is being destroyed, bail immediately.
+   789	        // The streaming thread may still be running when ~TWibWobWindow fires;
+   790	        // touching child views after they are deleted causes use-after-free crashes.
+   791	        if (!windowAlive_.load()) return;
+   792	
+   793	        // Log all chunks for debugging
+   794	        std::string chunkType;
+   795	        switch (chunk.type) {
+   796	            case StreamChunk::CONTENT_DELTA: chunkType = "CONTENT_DELTA"; break;
+   797	            case StreamChunk::MESSAGE_COMPLETE: chunkType = "MESSAGE_COMPLETE"; break;
+   798	            case StreamChunk::ERROR_OCCURRED: chunkType = "ERROR_OCCURRED"; break;
+   799	            case StreamChunk::SESSION_UPDATE: chunkType = "SESSION_UPDATE"; break;
+   800	            default: chunkType = "UNKNOWN"; break;
+   801	        }
+   802	        logMessage("Stream", "[chunk] type=" + chunkType +
+   803	                  " content_len=" + std::to_string(chunk.content.length()) +
+   804	                  (chunk.content.empty() ? "" : " content=" + chunk.content) +
+   805	                  (chunk.error_message.empty() ? "" : " err=" + chunk.error_message));
+   806	
+ succeeded in 51ms:
+   347	void ApiIpcServer::poll() {
+   348	#ifdef _WIN32
+   349	    return;
+   350	#else
+   351	    if (fd_listen_ < 0 || !app_) return;
+   352	    int fd = ::accept(fd_listen_, nullptr, nullptr);
+   353	    if (fd < 0) {
+   354	        return; // EAGAIN expected in non-blocking mode
+   355	    }
+   356	
+   357	    // Authenticate if secret is set.
+   358	    if (auth_required()) {
+   359	        if (!authenticate_connection(fd)) {
+   360	            std::string err = "{\"error\":\"auth_failed\"}\n";
+   361	            (void)safe_write(fd, err.c_str(), err.size());
+   362	            ::close(fd);
+   363	            return;
+   364	        }
+   365	    }
+   366	
+
+thinking
+**Adding idle poll line numbering**
+exec
+/bin/zsh -lc "nl -ba app/test_pattern_app.cpp | sed -n '2878,2886p'" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+  2878	void TTestPatternApp::idle()
+  2879	{
+  2880	    TApplication::idle();
+  2881	
+  2882	    // Poll IPC server for incoming API commands
+  2883	    if (ipcServer) ipcServer->poll();
+  2884	    // Poll Scramble async LLM calls (non-blocking)
+  2885	    scrambleEngine.poll();
+  2886	
+
+thinking
+**Locating chat history dispatch**
+exec
+/bin/zsh -lc "nl -ba app/command_registry.cpp | sed -n '332,342p'" in /Users/james/Repos/wibandwob-dos succeeded in 52ms:
+   332	        auto itText = kv.find("text");
+   333	        if (itText == kv.end() || itText->second.empty())
+   334	            return "err missing text";
+   335	        std::string sender = (itSender != kv.end()) ? itSender->second : "remote";
+   336	        return api_chat_receive(app, sender, itText->second);
+   337	    }
+   338	    if (name == "get_chat_history") {
+   339	        return api_get_chat_history(app);
+   340	    }
+   341	    if (name == "wibwob_ask") {
+   342	        auto itText = kv.find("text");
+
+thinking
+**Confirming absence of mutex usage**
+exec
+/bin/zsh -lc 'rg -n "mutex|lock_guard|scoped_lock" app/wibwob_view.h app/wibwob_view.cpp' in /Users/james/Repos/wibandwob-dos exited 1 in 51ms:
+
+
+thinking
+**Assessing root cause and socket mismatch**
+codex
+I’m double-checking one remaining angle before finalizing: whether some automatic flow clears the chat after display updates (which would make `chatHistory_` empty while the terminal still shows stale screen content). I’ll search for all `messageView->clear()` call sites and any redraw behavior that could leave old text on screen.
+exec
+/bin/zsh -lc "rg -n -C2 \"messageView->clear\\(|getMessageView\\(\\)->clear\\(\" app/wibwob_view.cpp app/test_pattern_app.cpp app/*.cpp" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+app/wibwob_view.cpp-698-    // Handle slash commands
+app/wibwob_view.cpp-699-    if (input == "/clear") {
+app/wibwob_view.cpp:700:        messageView->clear();
+app/wibwob_view.cpp-701-        messageView->addMessage("System", "Chat cleared");
+app/wibwob_view.cpp-702-        return;
+--
+app/wibwob_view.cpp-698-    // Handle slash commands
+app/wibwob_view.cpp-699-    if (input == "/clear") {
+app/wibwob_view.cpp:700:        messageView->clear();
+app/wibwob_view.cpp-701-        messageView->addMessage("System", "Chat cleared");
+app/wibwob_view.cpp-702-        return;
+
+thinking
+**Diagnosing chat history IPC bug**
+codex
+I’m writing the report to `get_chat_history_ipc_diagnosis.md` in the repo root (no `OUTPUT_FILE` env var was present). The report includes direct answers to your four questions, code evidence, a minimal fix, and thread-safety risks.
+exec
+/bin/zsh -lc "cat > get_chat_history_ipc_diagnosis.md <<'EOF'
+# "'`get_chat_history` IPC Diagnosis
+
+## Executive Summary
+
+The C++ IPC `get_chat_history` path is **not marshalled to a background thread**; it runs during the app'"'s main "'`idle()` loop and dispatches synchronously into `api_get_chat_history()`.
+
+The most likely code-level root cause for `{"messages":[]}` while a chat window visibly shows messages is **window selection**, not message recording:
+
+- `api_get_chat_history()` returns the history from the **first** `TWibWobWindow` found on the desktop iteration, not the focused/visible/targeted chat window.
+- If more than one Wib&Wob chat window exists, it can read an empty instance even while another visible one has messages.
+
+Separately, there is a real thread-safety risk in Wib&Wob streaming: a provider callback (explicitly noted as a streaming thread) directly mutates `messageView` and `chatHistory_` without synchronization.
+
+## Answers To Specific Questions
+
+### 1) Is `api_get_chat_history()` called directly from the IPC background thread, or marshalled to the main UI thread?
+
+### Finding
+
+For the C++ Unix-socket IPC path, `api_get_chat_history()` is effectively executed on the **main UI thread** (inside the app'"'s "'`idle()` loop), not a dedicated IPC worker thread.
+
+### Evidence
+
+- `TTestPatternApp::idle()` polls the IPC server from the UI loop: `app/test_pattern_app.cpp:2878`, `app/test_pattern_app.cpp:2883`
+- `ApiIpcServer::poll()` accepts and dispatches commands synchronously: `app/api_ipc.cpp:347`, `app/api_ipc.cpp:402`, `app/api_ipc.cpp:408`
+- Registry dispatch calls `api_get_chat_history(app)` directly: `app/command_registry.cpp:338`, `app/command_registry.cpp:339`
+- `api_get_chat_history()` itself is a direct synchronous read: `app/test_pattern_app.cpp:3076`
+
+### Conclusion
+
+`get_chat_history` is **not** being marshalled via `putEvent()` like `wibwob_ask`; it is a direct synchronous read during `idle()`. So the “IPC background thread sees empty state” theory is not supported by this code path.
+
+## 2) Is there a mutex or any synchronisation protecting `chatHistory_`?
+
+### Finding
+
+No. `chatHistory_` has **no mutex/lock protection**.
+
+### Evidence
+
+- Declaration is a plain vector: `app/wibwob_view.h:80`
+- Reads/writes occur directly:
+  - add message path pushes history: `app/wibwob_view.cpp:109`, `app/wibwob_view.cpp:250`, `app/wibwob_view.cpp:254`
+  - streaming path mutates history: `app/wibwob_view.cpp:184`, `app/wibwob_view.cpp:199`, `app/wibwob_view.cpp:216`, `app/wibwob_view.cpp:231`
+  - IPC read serializes history: `app/wibwob_view.cpp:257`, `app/wibwob_view.cpp:260`
+- No `mutex`/`lock_guard` usage in `app/wibwob_view.h` or `app/wibwob_view.cpp` (searched).
+
+## 3) Could `chatHistory_` on the `TWibWobMessageView` returned by `getMessageView()` differ from the one `addMessage()` writes to? (e.g. two different object instances)
+
+### Within a single `TWibWobWindow`: No
+
+`getMessageView()` returns the window member pointer, and `TWibWobWindow` message paths use that same member.
+
+### Evidence
+
+- `getMessageView()` returns `messageView`: `app/wibwob_view.h:159`
+- `api_get_chat_history()` uses `chatWin->getMessageView()`: `app/test_pattern_app.cpp:3090`
+- `TWibWobWindow` uses its `messageView` member for user/system/assistant display operations, including `addMessage(...)`: e.g. `app/wibwob_view.cpp:742`, `app/wibwob_view.cpp:825`, `app/wibwob_view.cpp:871`
+
+### Across multiple `TWibWobWindow` instances: Yes (this is the likely bug)
+
+`api_get_chat_history()` selects the **first** `TWibWobWindow` found during desktop iteration and returns that window'"'s history, regardless of focus/visibility/which chat the user is looking at.
+
+### Evidence
+
+- Iterates desktop views and breaks on the first "'`TWibWobWindow`: `app/test_pattern_app.cpp:3080`, `app/test_pattern_app.cpp:3083`, `app/test_pattern_app.cpp:3084`
+- No focus check, no window ID parameter, no attempt to choose the active chat window: `app/test_pattern_app.cpp:3076`
+
+### Likely symptom match
+
+If an empty Wib&Wob chat window exists (for example from layout restore, manual extra chat creation, or another session flow), `get_chat_history` can consistently return `[]` while another visible Wib&Wob window contains messages.
+
+## 4) Is there any code path where `chatHistory_` gets cleared after messages are added?
+
+### Finding
+
+Yes, but only explicitly via `TWibWobMessageView::clear()` (e.g. `/clear`). I did not find an automatic clear path specific to IPC history reads.
+
+### Evidence
+
+- `clear()` clears `chatHistory_`: `app/wibwob_view.cpp:115`, `app/wibwob_view.cpp:118`
+- `/clear` command invokes `messageView->clear()`: `app/wibwob_view.cpp:699`, `app/wibwob_view.cpp:700`
+- No other `messageView->clear()` call sites found in the searched code.
+
+## Root Cause (with file:line evidence)
+
+### Primary root cause (code bug)
+
+`get_chat_history` is not keyed to a specific chat window and instead returns history from the **first** `TWibWobWindow` encountered on the desktop.
+
+- Selection bug: `app/test_pattern_app.cpp:3077`, `app/test_pattern_app.cpp:3080`, `app/test_pattern_app.cpp:3084`
+- Read of selected window history: `app/test_pattern_app.cpp:3090`, `app/test_pattern_app.cpp:3092`
+
+### Why this is more likely than a history-recording bug
+
+The message view code clearly records history whenever messages are displayed:
+
+- Normal messages: `addMessage()` records history immediately after pushing to `messages`: `app/wibwob_view.cpp:95`, `app/wibwob_view.cpp:108`, `app/wibwob_view.cpp:109`
+- Streaming assistant messages: history placeholder + incremental updates + final sync are all present: `app/wibwob_view.cpp:180`, `app/wibwob_view.cpp:184`, `app/wibwob_view.cpp:199`, `app/wibwob_view.cpp:216`
+
+## Minimal Fix
+
+### Recommended minimal change
+
+Make `api_get_chat_history()` prefer the **focused** `TWibWobWindow` (or accept an explicit `window_id`) instead of the first one in desktop iteration.
+
+### Smallest behavior-preserving improvement
+
+- Scan all `TWibWobWindow`s.
+- Prefer the focused/selected chat window.
+- Fallback to first found for backward compatibility.
+
+### Better API fix (slightly larger, more robust)
+
+Add optional `window_id` to `get_chat_history` registry command, so callers can request the exact chat window.
+
+## Thread-Safety Risks To Flag
+
+### 1) Unsynchronised access to `chatHistory_` (data race risk)
+
+`chatHistory_` is a plain vector with no locking, and it is read/written from code paths that may run on different threads.
+
+### 2) Streaming callback appears to run off the UI thread and mutates UI directly
+
+The code comment explicitly says the streaming thread may still be running, and the callback directly calls `messageView`/`inputView` methods and mutates history transitively.
+
+- Streaming-thread comment and callback: `app/wibwob_view.cpp:787`, `app/wibwob_view.cpp:789`
+- Direct UI mutations from callback: `app/wibwob_view.cpp:808`, `app/wibwob_view.cpp:815`, `app/wibwob_view.cpp:824`, `app/wibwob_view.cpp:825`
+
+This is a broader UI-thread-affinity problem (not just `chatHistory_`), and can produce intermittent crashes or corrupted state.
+
+### Recommended follow-up hardening
+
+- Marshal streaming chunks onto the UI thread (similar in spirit to `wibwob_ask` using `putEvent()`), then update `messageView` there.
+- If cross-thread reads must remain, protect `chatHistory_` (and likely `messages`) with a mutex and avoid UI drawing calls off-thread.
+
+## Suggested Debug Confirmation (fast)
+
+To confirm the primary root cause in your current repro, add temporary logging in `api_get_chat_history()` to print:
+
+- number of `TWibWobWindow`s found
+- each window title / pointer
+- focused flag (if available)
+- `msgView->getMessages().size()` and `msgView->getHistoryJson().size()`
+
+If you see multiple Wib&Wob windows and the first one is empty, this diagnosis is confirmed.
+EOF' in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+
+
+thinking
+**Considering file existence check**
+codex
+The report is written. I’ll do a quick targeted readback to verify formatting and then I’ll summarize the conclusions here.
+exec
+/bin/zsh -lc "sed -n '1,80p' get_chat_history_ipc_diagnosis.md" in /Users/james/Repos/wibandwob-dos succeeded in 51ms:
+# `get_chat_history` IPC Diagnosis
+
+## Executive Summary
+
+The C++ IPC `get_chat_history` path is **not marshalled to a background thread**; it runs during the app's main `idle()` loop and dispatches synchronously into `api_get_chat_history()`.
+
+The most likely code-level root cause for `{"messages":[]}` while a chat window visibly shows messages is **window selection**, not message recording:
+
+- `api_get_chat_history()` returns the history from the **first** `TWibWobWindow` found on the desktop iteration, not the focused/visible/targeted chat window.
+- If more than one Wib&Wob chat window exists, it can read an empty instance even while another visible one has messages.
+
+Separately, there is a real thread-safety risk in Wib&Wob streaming: a provider callback (explicitly noted as a streaming thread) directly mutates `messageView` and `chatHistory_` without synchronization.
+
+## Answers To Specific Questions
+
+### 1) Is `api_get_chat_history()` called directly from the IPC background thread, or marshalled to the main UI thread?
+
+### Finding
+
+For the C++ Unix-socket IPC path, `api_get_chat_history()` is effectively executed on the **main UI thread** (inside the app's `idle()` loop), not a dedicated IPC worker thread.
+
+thinking
+**Preparing final summary with file path**
+codex
+Report written to `get_chat_history_ipc_diagnosis.md`.
+
+Key conclusions:
+- `get_chat_history` is executed synchronously from the app’s `idle()` loop (`app/test_pattern_app.cpp:2883` -> `app/api_ipc.cpp:347` / `:408` -> `app/command_registry.cpp:339`), not marshalled to a background IPC thread.
+- `chatHistory_` has no synchronization (`app/wibwob_view.h:80`; no mutex/lock usage in `wibwob_view.*`).
+- `addMessage()` and streaming paths do populate `chatHistory_` (`app/wibwob_view.cpp:109`, `:184`, `:199`, `:216`), so the recording path looks correct.
+- Most likely root cause: `api_get_chat_history()` reads the first `TWibWobWindow` found on the desktop, not the focused/visible one (`app/test_pattern_app.cpp:3080`-`:3084`), so it can return the wrong (empty) chat instance.
+
+Minimal fix recommended in the report:
+- Make `get_chat_history` target the focused Wib&Wob window (or accept an optional `window_id`), with fallback to first-found for compatibility.
+
+Thread-safety risk flagged:
+- Streaming callback appears to run on a non-UI thread and directly mutates `messageView`/`chatHistory_` (`app/wibwob_view.cpp:787` onward), which is a data-race/UI-thread-affinity hazard.
+
+If you want, I can patch the minimal focused-window fix next.
+tokens used
+133,557
+Report written to `get_chat_history_ipc_diagnosis.md`.
+
+Key conclusions:
+- `get_chat_history` is executed synchronously from the app’s `idle()` loop (`app/test_pattern_app.cpp:2883` -> `app/api_ipc.cpp:347` / `:408` -> `app/command_registry.cpp:339`), not marshalled to a background IPC thread.
+- `chatHistory_` has no synchronization (`app/wibwob_view.h:80`; no mutex/lock usage in `wibwob_view.*`).
+- `addMessage()` and streaming paths do populate `chatHistory_` (`app/wibwob_view.cpp:109`, `:184`, `:199`, `:216`), so the recording path looks correct.
+- Most likely root cause: `api_get_chat_history()` reads the first `TWibWobWindow` found on the desktop, not the focused/visible one (`app/test_pattern_app.cpp:3080`-`:3084`), so it can return the wrong (empty) chat instance.
+
+Minimal fix recommended in the report:
+- Make `get_chat_history` target the focused Wib&Wob window (or accept an optional `window_id`), with fallback to first-found for compatibility.
+
+Thread-safety risk flagged:
+- Streaming callback appears to run on a non-UI thread and directly mutates `messageView`/`chatHistory_` (`app/wibwob_view.cpp:787` onward), which is a data-race/UI-thread-affinity hazard.
+
+If you want, I can patch the minimal focused-window fix next.
