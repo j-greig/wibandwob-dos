@@ -142,3 +142,15 @@ Canvas buffer is allocated at construction. On resize, `size` grows but buffer s
 | `Dockerfile.wibwobdos` | Real mode image |
 | `docker-compose.real.yml` | Real mode override |
 | `skills/wibwobdos-api/SKILL.md` | Symbient-facing API skill (separate) |
+
+## Related skills (`.agents/skills/`)
+
+> These are Claude Code / Codex agent skills, not pi skills — stored in `.agents/skills/` rather than `.pi/skills/`. Load them when the task matches.
+
+| Skill | Trigger | What it does |
+|---|---|---|
+| `ww-launch` | "launch wibwob", "start wibwobdos", "open monitor", "4-pane tmux monitor" | `dev-start.sh` + chat open + self-prompt + 4-pane tmux layout (TUI / chat log / debug log / command pane). **Start here for any live testing.** |
+| `ww-api-smoke` | "smoke test", "check API" | Quick pass/fail sweep of all API endpoints |
+| `ww-build-test` | "build and test", "verify build" | Compile C++ + ctests + API health + IPC smoke |
+| `screenshot` | "take a screenshot", "what does the TUI look like" | Capture TUI screen buffer as text + state JSON |
+| `ww-audit` | "parity audit", "did this work" | Post-implementation gap matrix across registry / API / workspace / screenshot |
