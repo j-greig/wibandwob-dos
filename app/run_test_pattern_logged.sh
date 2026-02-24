@@ -1,5 +1,5 @@
 #!/bin/bash
-# Run test_pattern with debug logging to file + live tail capability
+# Run wwdos with debug logging to file + live tail capability
 #
 # Usage:
 #   cd test-tui && ./run_test_pattern_logged.sh    # Run with logging
@@ -22,8 +22,8 @@ if [[ ! -f "wibandwob.prompt.md" ]] || [[ ! -f "../.env" ]]; then
     exit 1
 fi
 
-if [[ ! -f "build/test_pattern" ]]; then
-    echo "❌ Error: build/test_pattern not found"
+if [[ ! -f "build/wwdos" ]]; then
+    echo "❌ Error: build/wwdos not found"
     echo "   Build first: cmake . -B ./build && cmake --build ./build"
     exit 1
 fi
@@ -35,7 +35,7 @@ mkdir -p logs
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 LOG_FILE="logs/test_pattern_${TIMESTAMP}.log"
 
-echo "🚀 Starting test_pattern with debug logging"
+echo "🚀 Starting wwdos with debug logging"
 echo "   Working dir: $(pwd)"
 echo "   Debug log: $LOG_FILE"
 echo "   Tip: Run 'tail -f $LOG_FILE' in another terminal to watch live"
@@ -44,4 +44,4 @@ echo ""
 # Run with stderr redirected to log file AND still visible on quit
 # The process substitution ensures logs are written immediately to file
 # while still being available in terminal when app exits
-./build/test_pattern 2> >(tee "$LOG_FILE" >&2)
+./build/wwdos 2> >(tee "$LOG_FILE" >&2)

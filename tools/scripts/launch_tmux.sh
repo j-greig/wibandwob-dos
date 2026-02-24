@@ -7,7 +7,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 N=${1:-4}
 SESSION="wibwob"
-BINARY="$REPO_ROOT/build/app/test_pattern"
+BINARY="$REPO_ROOT/build/app/wwdos"
 
 if [ ! -f "$BINARY" ]; then
     echo "Binary not found: $BINARY"

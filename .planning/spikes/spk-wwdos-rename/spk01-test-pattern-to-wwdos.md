@@ -6,6 +6,8 @@
 **severity**: housekeeping (no functional change intended)
 **depends_on**: E009 (still recommended first; `app/test_pattern_app.cpp` remains a merge hotspot)
 
+> Phase 0 note (2026-02-24): `gh pr list` / `gh issue list` could not be queried from this environment (`error connecting to api.github.com`), so in-flight PR conflict checks could not be confirmed from GitHub during this pass.
+
 ---
 
 ## Blast Radius Summary
@@ -26,11 +28,11 @@ Grep counts below are for live/actionable files and exclude noise/artifacts:
 | Category | What | Spike claimed | Actual now (live/actionable scope) | Risk |
 |----------|------|---------------|------------------------------------|------|
 | A | Binary/executable name (`test_pattern` target/path/process refs) | `~11` | Core runtime/build refs: **11 matches / 4 files**, plus **1 launcher path-segment file** (`tools/room/orchestrator.py`), plus many docs/skills refs | Medium (larger docs/tooling sweep than implied) |
-| B | C++ class name (`TTestPatternApp`) | `~26+` | **445 matches / 15 files** (including tests + skill docs); **439 matches / 10 app files** in core code/test harness | High |
+| B | C++ class name (`TTestPatternApp`) | `~26+` | **465 matches / 15 files** (including tests + skill docs); **459 matches / 10 app files** in core code/test harness | High |
 | C | Window type string `"test_pattern"` | `~5` | **34 exact `"test_pattern"` literals** in `app/`, `tools/`, `tests/`, `scripts/` (DO NOT RENAME) | Critical if touched accidentally |
 | D | Socket path (`/tmp/test_pattern_app.sock`) | `~14` | **24 matches / 16 files** (excluding this spike file) | Medium |
 | E | Source filenames containing `test_pattern` | `~8` | **5 filenames** currently contain `test_pattern`; only **1 required code rename**, **2 keep**, **2 optional script renames** | Medium |
-| F | Docs/skills/planning references | `~12` | **24 docs/skills/planning files** mention rename-related tokens (18 operational + 5 historical/template + this spike) | Low/Medium |
+| F | Docs/skills/planning references | `~12` | **22 docs/skills/planning files** mention rename-related tokens (17 operational + 4 historical/template + this spike) | Low/Medium |
 
 ## Proposed Names
 
@@ -45,7 +47,7 @@ Grep counts below are for live/actionable files and exclude noise/artifacts:
 
 ## Implementation Sequence
 
-### [ ] Phase 1: Binary + CMake (low code risk, high workflow visibility)
+### [x] Phase 1: Binary + CMake (low code risk, high workflow visibility)
 
 **Estimate**: 0.5 day
 
@@ -94,15 +96,15 @@ Grep counts below are for live/actionable files and exclude noise/artifacts:
 
 **Estimate**: 1.0-1.5 days
 
-**Grep-verified count**: 445 matches across 15 files.
-- Core app/C++ + test harness: 439 matches across 10 `app/*` files
+**Grep-verified count**: 465 matches across 15 files.
+- Core app/C++ + test harness: 459 matches across 10 `app/*` files
 - External tests/skills/docs: 6 matches across 5 files
 
 **Why it is large (not just “26+”)**
-- `app/test_pattern_app.cpp`: 234 matches
+- `app/test_pattern_app.cpp`: 242 matches
 - `app/window_type_registry.cpp`: 61 matches
-- `app/command_registry.cpp`: 48 matches
-- `app/api_ipc.cpp`: 21 matches
+- `app/command_registry.cpp`: 55 matches
+- `app/api_ipc.cpp`: 24 matches
 - `app/command_registry_test.cpp`: 33 matches (stubbed symbols)
 - `app/scramble_engine_test.cpp`: 33 matches (stubbed symbols)
 - `app/test_pattern_app.cpp` includes ~70 `friend` declarations and ~71 `TTestPatternApp::` method definitions
@@ -169,9 +171,9 @@ Grep counts below are for live/actionable files and exclude noise/artifacts:
 
 **Estimate**: 0.5-1.0 day (depending on historical docs scope)
 
-**Grep-verified count (docs/skills/planning union)**: 24 files with rename-related tokens
-- 18 operational docs/skills/planning files
-- 5 historical/template/session docs (optional to update)
+**Grep-verified count (docs/skills/planning union)**: 22 files with rename-related tokens
+- 17 operational docs/skills/planning files
+- 4 historical/template/session docs (optional to update)
 - 1 current spike file (this file)
 
 **Manifest (operational docs/skills/planning to update)**
@@ -187,10 +189,8 @@ Grep counts below are for live/actionable files and exclude noise/artifacts:
 - `.pi/skills/wibwobdos/references/cross-platform-cpp.md`
 - `.pi/skills/wibwobdos/references/docker-ops.md`
 - `.pi/skills/wibwobdos/references/integrating-vendor-views.md`
-- `.planning/cross-platform-tvision-linux.md`
 - `.planning/epics/e005-theme-runtime-wiring/e005-epic-brief.md`
 - `.planning/epics/e008-multiplayer-partykit/f04-chat-relay/f04-feature-brief.md`
-- `.planning/spikes/spk-inter-instance-chat/spike-brief.md`
 - `docs/architecture/parity-drift-audit.md`
 - `docs/architecture/phase-zero-canon-alignment.md`
 

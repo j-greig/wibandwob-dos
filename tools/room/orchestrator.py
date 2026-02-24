@@ -95,7 +95,7 @@ class Orchestrator:
             env["WIBWOB_PARTYKIT_ROOM"] = config.partykit_room
 
         # Build ttyd command
-        app_path = str(self.project_root / "build" / "app" / "test_pattern")
+        app_path = str(self.project_root / "build" / "app" / "wwdos")
         log_path = f"/tmp/wibwob_{config.instance_id}.log"
 
         ttyd_cmd = [

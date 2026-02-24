@@ -14,7 +14,7 @@ set -euo pipefail
 
 INSTANCE="${WIBWOB_INSTANCE:-1}"
 PORT="${WIBWOB_API_PORT:-8089}"
-BINARY="./build/app/test_pattern"
+BINARY="./build/app/wwdos"
 SOCKET="/tmp/wibwob_${INSTANCE}.sock"
 VENV_UVICORN="./tools/api_server/venv/bin/uvicorn"
 # Session names are instance-scoped so multiple instances coexist
@@ -25,7 +25,7 @@ API_SESSION="wibwob${INSTANCE}-api"
 # ── Preflight ─────────────────────────────────────────────────────────────────
 [ -x "$BINARY" ] || {
   echo "❌ Binary not found: $BINARY"
-  echo "   Build first: cmake --build ./build --target test_pattern -j\$(nproc)"
+  echo "   Build first: cmake --build ./build --target wwdos -j\$(nproc)"
   exit 1
 }
 [ -x "$VENV_UVICORN" ] || {

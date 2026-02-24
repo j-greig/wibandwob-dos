@@ -28,8 +28,8 @@ set(TV_COMMON_SOURCES
     llm/tools/tui_tools.cpp
 )
 
-# test_pattern app (primary playground)
-add_executable(test_pattern
+# wwdos app (primary playground)
+add_executable(wwdos
     test_pattern_app.cpp
     ${TV_COMMON_SOURCES}
     ascii_grid_view.cpp
@@ -77,13 +77,13 @@ add_executable(test_pattern
     figlet_utils.cpp
     figlet_text_view.cpp
 )
-target_include_directories(test_pattern PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(test_pattern PRIVATE tvision tvterm-core)
+target_include_directories(wwdos PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(wwdos PRIVATE tvision tvterm-core)
 
 # On Linux, api_ipc.cpp uses OpenSSL for HMAC (macOS uses CommonCrypto)
 if(NOT APPLE)
     find_package(OpenSSL REQUIRED)
-    target_link_libraries(test_pattern PRIVATE OpenSSL::Crypto)
+    target_link_libraries(wwdos PRIVATE OpenSSL::Crypto)
 endif()
 
 # simple_tui (minimal reference app)
@@ -190,4 +190,4 @@ target_link_libraries(micropolis_no_ansi_test PRIVATE micropolis_bridge)
 add_test(NAME micropolis_no_ansi COMMAND micropolis_no_ansi_test)
 
 # Main app can open the Micropolis ASCII MVP window.
-target_link_libraries(test_pattern PRIVATE micropolis_bridge)
+target_link_libraries(wwdos PRIVATE micropolis_bridge)
