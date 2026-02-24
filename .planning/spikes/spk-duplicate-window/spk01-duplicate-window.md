@@ -160,6 +160,271 @@ State to clone: deep copy of cell buffer, canvas dimensions, pixel mode, fg/bg c
 
 This is the most complex clone — needs a `TPaintCanvasView::cloneBuffer()` method or constructor that accepts an existing buffer.
 
+## Codex Implementation Audit (codebase-verified 2026-02-24)
+
+### NOTE: binary and class renamed
+
+Pi1 renamed `test_pattern_app.cpp` → `wwdos_app.cpp` and `TTestPatternApp` → `TWwdosApp`. All references below use the new names.
+
+### 1. WindowTypeSpec struct
+
+File: `app/window_type_registry.h:18`
+
+```cpp
+struct WindowTypeSpec {
+    const char* type;
+    WinSpawnFn  spawn;
+    WinMatchFn  matches;
+};
+```
+
+**Change needed:** Add `WinDuplicateFn duplicate;` field:
+
+```cpp
+using WinDuplicateFn = TWindow* (*)(TWindow* source);
+
+struct WindowTypeSpec {
+    const char* type;
+    WinSpawnFn     spawn;
+    WinMatchFn     matches;
+    WinDuplicateFn duplicate;  // nullptr = not duplicatable
+};
+```
+
+### 2. k_specs[] table
+
+File: `app/window_type_registry.cpp:305-340`
+
+30 entries. Every entry needs a 4th field. Phase 1 types get their function, everything else gets `nullptr`.
+
+```cpp
+// Before:
+{ "figlet_text", spawn_figlet_text, match_figlet_text },
+
+// After:
+{ "figlet_text", spawn_figlet_text, match_figlet_text, duplicate_figlet_text },
+```
+
+Phase 1 entries to wire (line numbers approximate — verify with `rg`):
+- `"text_view"` (~line 309) → `duplicate_text_view`
+- `"text_editor"` (~line 310) → `duplicate_text_editor`
+- `"frame_player"` (~line 308) → `duplicate_frame_player`
+- `"figlet_text"` (~line 340) → `duplicate_figlet_text`
+- `"paint"` (~line 325) → `duplicate_paint`
+
+All other 25 entries → `nullptr`.
+
+### 3. State accessors per Phase 1 type (what exists, what's missing)
+
+#### `text_view` (TTransparentTextWindow)
+
+File: `app/transparent_text_view.h`
+
+| Need | Accessor | Exists? |
+|------|----------|---------|
+| File path | `getTextView()->getFileName()` | ✅ |
+| Raw lines | `rawLines` | ❌ **private**, no getter |
+| Title | `TWindow::title` | ✅ public field |
+| Background colour | `getTextView()->getBackgroundColor()` | ✅ |
+| Custom bg flag | `getTextView()->hasCustomBackground()` | ✅ |
+| Word wrap | `getTextView()->getWordWrap()` | ✅ |
+| Shadow | `state & sfShadow` | ✅ readable on any TWindow |
+
+**Missing:** `rawLines` is private. Two options:
+- Add `const std::vector<std::string>& getRawLines() const { return rawLines; }` to `TTransparentTextView` (1 line)
+- Or: if `getFileName()` is non-empty, duplicate by re-reading the file
+
+**Recommendation:** Add getter. Covers both file-based and in-memory text.
+
+#### `text_editor` (TTextEditorWindow)
+
+File: `app/text_editor_view.h`
+
+| Need | Accessor | Exists? |
+|------|----------|---------|
+| Text lines | `getEditorView()->getLines()` | ✅ `const vector<string>&` |
+| Title | `TWindow::title` | ✅ |
+
+**No missing accessors.** Clone: create new window, call `sendText()` with joined lines.
+
+#### `frame_player` (TFrameAnimationWindow)
+
+File: `app/windows/frame_animation_window.h`
+
+| Need | Accessor | Exists? |
+|------|----------|---------|
+| File path | `getFilePath()` | ✅ |
+| Title | `TWindow::title` | ✅ |
+| Frameless | `isFrameless()` | ✅ |
+| Shadow | `state & sfShadow` | ✅ |
+
+**No missing accessors.** Clone: `new TFrameAnimationWindow(bounds, title, filePath, frameless, shadowless)`.
+
+#### `figlet_text` (TFigletTextWindow)
+
+File: `app/figlet_text_view.h`
+
+| Need | Accessor | Exists? |
+|------|----------|---------|
+| Text | `getFigletView()->getText()` | ✅ |
+| Font | `getFigletView()->getFont()` | ✅ |
+| FG colour | `getFigletView()->getFgColor()` | ✅ |
+| BG colour | `getFigletView()->getBgColor()` | ✅ |
+| Frameless | `isFrameless()` | ✅ |
+| Shadow | `state & sfShadow` | ✅ |
+
+**No missing accessors.** Best-covered type.
+
+#### `paint` (TPaintWindow / TPaintCanvasView)
+
+Files: `app/paint/paint_window.h`, `app/paint/paint_canvas.h`
+
+| Need | Accessor | Exists? |
+|------|----------|---------|
+| Cell buffer | `getCanvas()->buffer` | ✅ public `std::vector<PaintCell>` |
+| Dimensions | `getCanvas()->cols`, `rows` | ✅ public ints |
+| Pixel mode | `getCanvas()->getPixelMode()` | ✅ |
+| File path | `getFilePath()` | ✅ |
+| PaintContext (fg/bg) | `ctx` | ❌ **private** in TPaintWindow (line 49) |
+
+**Missing:** `PaintContext ctx` is private. Add:
+```cpp
+const PaintContext& getContext() const { return ctx; }
+```
+
+**Deep copy strategy:**
+1. Create new `TPaintWindow(offsetBounds)` — this calls `buildLayout()` internally, creates default canvas
+2. Ensure canvas dimensions match: if source has different cols/rows, may need `changeBounds()` first
+3. Deep copy buffer: `clone->getCanvas()->buffer = source->getCanvas()->buffer`
+4. Copy pixel mode: `clone->getCanvas()->setPixelMode(source->getCanvas()->getPixelMode())`
+5. Clone gets title "untitled" (it's a copy, not the same file)
+
+### 4. Command ID
+
+```cpp
+const ushort cmDuplicateWindow = 290;
+```
+
+Range 284–299 is free (283 is `cmWsDelete`, 300+ is figlet).
+
+### 5. Window menu insertion point
+
+File: `app/wwdos_app.cpp:2606-2620`
+
+Add "Duplicate" after "Send to Back":
+
+```cpp
+*new TMenuItem("Send to Bac~k~", cmSendToBack, kbNoKey) +
+*new TMenuItem("~D~uplicate", cmDuplicateWindow, kbCtrlD) +  // NEW
+newLine() +
+```
+
+### 6. handleEvent insertion point
+
+File: `app/wwdos_app.cpp` — find `cmSendToBack` or `cmCloseAll` handler:
+
+```bash
+rg -n "cmSendToBack|cmCloseAll" app/wwdos_app.cpp
+```
+
+Add new case:
+
+```cpp
+case cmDuplicateWindow: {
+    TWindow* focused = dynamic_cast<TWindow*>(deskTop->current);
+    if (focused) {
+        TWindow* clone = duplicateWindow(focused);
+        if (clone)
+            deskTop->insert(clone);  // insert() = front of Z-order ✓
+    }
+    clearEvent(event);
+    break;
+}
+```
+
+### 7. `duplicateWindow()` dispatch function
+
+Add to `app/window_type_registry.cpp`:
+
+```cpp
+TWindow* duplicateWindow(TWindow* source) {
+    if (!source) return nullptr;
+    for (const auto& spec : all_window_type_specs()) {
+        if (spec.matches && spec.matches(source) && spec.duplicate)
+            return spec.duplicate(source);
+    }
+    return nullptr;
+}
+```
+
+Declare in `app/window_type_registry.h`:
+```cpp
+TWindow* duplicateWindow(TWindow* source);
+```
+
+### 8. Z-order confirmed
+
+`TGroup::insert(TView*)` inserts at **front** of Z-order. Clone appears on top of source automatically. No special handling needed.
+
+### 9. Offset helper (shared across all duplicate functions)
+
+```cpp
+static TRect offsetBounds(TWindow* source) {
+    TRect r = source->getBounds();
+    r.move(1, 1);  // Illustrator style: +1 col, +1 row
+    TRect desk = TProgram::deskTop->getExtent();
+    if (r.b.x > desk.b.x) r.move(desk.b.x - r.b.x, 0);
+    if (r.b.y > desk.b.y) r.move(0, desk.b.y - r.b.y);
+    return r;
+}
+```
+
+### 10. IPC command
+
+File: `app/command_registry.cpp`
+
+Add extern:
+```cpp
+extern std::string api_duplicate_window(TWwdosApp& app, const std::string& id);
+```
+
+Add capability row:
+```cpp
+{"duplicate_window", "Duplicate a window by ID, returns new window ID", true},
+```
+
+Add dispatch:
+```cpp
+if (name == "duplicate_window") {
+    auto it = kv.find("id");
+    if (it == kv.end()) return "err missing id";
+    return api_duplicate_window(app, it->second);
+}
+```
+
+### 11. Files to modify (complete manifest)
+
+| File | Change | Lines |
+|------|--------|-------|
+| `app/window_type_registry.h` | Add `WinDuplicateFn`, struct field, declare `duplicateWindow()` | ~5 |
+| `app/window_type_registry.cpp` | 5 duplicate functions + `offsetBounds` helper + `duplicateWindow()` dispatch + wire k_specs | ~120 |
+| `app/wwdos_app.cpp` | `cmDuplicateWindow` constant, menu item, handleEvent case, `api_duplicate_window()` | ~25 |
+| `app/command_registry.cpp` | extern, capability, dispatch | ~8 |
+| `app/transparent_text_view.h` | Add `getRawLines()` getter | 1 |
+| `app/paint/paint_window.h` | Add `getContext()` getter | 1 |
+
+**Total new/changed lines: ~160**
+
+### 12. Gotchas
+
+1. **rawLines is private** in `TTransparentTextView` — must add getter
+2. **PaintContext ctx is private** in `TPaintWindow` — must add getter
+3. **Paint buffer size mismatch** — clone creates default canvas, must match cols/rows before copying buffer
+4. **TWindow::title is `const char*`** — copy with `newStr(source->title)`, don't free source's pointer
+5. **Shadow default varies** — some windows default ON, some OFF. Read `state & sfShadow` from source and apply to clone explicitly
+6. **Ctrl+D conflict** — check if `TTextEditorView::handleEvent` intercepts Ctrl+D. If so, use Alt+D or only fire duplicate when editor interior is not focused
+7. **Repeated duplicate = staircase** — each Ctrl+D reads focused window (which is now the clone), so repeated dupes naturally cascade +1,+1 each time ✓
+
 ## Dev Handover (Codex Execution Notes)
 
 ### Preflight
