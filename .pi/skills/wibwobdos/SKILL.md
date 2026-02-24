@@ -145,8 +145,26 @@ Canvas buffer is allocated at construction. On resize, `size` grows but buffer s
 
 ## REST API cheat sheet
 
-Base URL: `http://127.0.0.1:8089`  
-Discover everything: `curl -s $API/openapi.json | python3 -m json.tool`
+Base URL: `http://127.0.0.1:8089`
+
+### ⚡ Start here — list everything the app can do
+
+```bash
+curl -s http://127.0.0.1:8089/capabilities | python3 -c "
+import sys,json
+caps=json.load(sys.stdin)
+print('window_types:', caps['window_types'])
+print('commands:', caps['commands'])
+print('properties:', list(caps['properties'].keys()))
+"
+```
+
+Returns:
+- **`window_types`** — every window you can open (`wibwob`, `scramble`, `paint`, `terminal`, …)
+- **`commands`** — every IPC command available (`wibwob_ask`, `get_chat_history`, `scramble_pet`, …)
+- **`properties`** — per-window-type configurable props (fps, variant, etc.)
+
+Full HTTP endpoint list: `curl -s $API/openapi.json | python3 -c "import sys,json; [print(m.upper(), p) for p,ms in json.load(sys.stdin)['paths'].items() for m in ms if m!='parameters']"`
 
 ### Windows
 
