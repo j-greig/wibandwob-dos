@@ -58,6 +58,10 @@ extern void api_spawn_gallery(TWwdosApp& app, const TRect* bounds);
 extern void api_open_animation_path(TWwdosApp& app, const std::string& path);
 extern std::string api_gallery_list(TWwdosApp& app, const std::string& tab);
 extern void api_spawn_terminal(TWwdosApp& app, const TRect* bounds);
+extern void api_spawn_text_editor(TWwdosApp& app, const TRect* bounds, const std::string& title);
+extern void api_spawn_figlet_text(TWwdosApp& app, const TRect* bounds,
+    const std::string& text, const std::string& font, bool frameless, bool shadowless);
+extern void api_spawn_wibwob(TWwdosApp& app, const TRect* bounds);
 extern std::string api_terminal_write(TWwdosApp& app, const std::string& text, const std::string& window_id);
 extern std::string api_terminal_read(TWwdosApp& app, const std::string& window_id);
 
@@ -106,6 +110,9 @@ const std::vector<CommandCapability>& get_command_capabilities() {
         {"open_gallery", "Open the ASCII Art Gallery browser with tabbed primer explorer", false},
         {"gallery_list", "List available primer filenames (optional tab param: 1/#-C, 2/D-L, 3/M, 4/N-S, 5/T-Z, 6/Find with search param)", false},
         {"open_primer", "Open a primer file by name in a viewer window (requires path param, e.g. 'wibwob-faces.txt')", true},
+        {"open_text_editor", "Open a text editor window (optional title param)", false},
+        {"open_figlet_text", "Open a FIGlet text window (optional text, font params; defaults to 'Hello' in 'standard')", false},
+        {"open_wibwob", "Open the Wib&Wob chat window", false},
         {"open_terminal", "Open a terminal emulator window", false},
         {"terminal_write", "Send text input to the terminal emulator (requires text param; optional window_id)", true},
         {"terminal_read", "Read the visible text content of a terminal window (optional window_id param)", false},
@@ -315,6 +322,24 @@ std::string exec_registry_command(
         } else {
             api_open_animation_path(app, path, nullptr, frameless, shadowless, title);
         }
+        return "ok";
+    }
+    if (name == "open_text_editor") {
+        auto ti = kv.find("title");
+        std::string title = (ti != kv.end()) ? ti->second : "Untitled";
+        api_spawn_text_editor(app, nullptr, title);
+        return "ok";
+    }
+    if (name == "open_figlet_text") {
+        auto ti = kv.find("text");
+        auto fi = kv.find("font");
+        std::string text = (ti != kv.end()) ? ti->second : "Hello";
+        std::string font = (fi != kv.end()) ? fi->second : "standard";
+        api_spawn_figlet_text(app, nullptr, text, font, false, false);
+        return "ok";
+    }
+    if (name == "open_wibwob") {
+        api_spawn_wibwob(app, nullptr);
         return "ok";
     }
     if (name == "open_terminal") {

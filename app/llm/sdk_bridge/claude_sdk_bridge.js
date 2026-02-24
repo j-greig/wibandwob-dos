@@ -187,7 +187,12 @@ class ClaudeSDKBridge {
             const caps = resp.data;
 
             const windowTypes = (caps.window_types || []).map(t => t.name || t).join(', ');
-            const commands = (caps.commands || []).map(c => c.name || c).join(', ');
+            const commands = (caps.commands || []).map(c => {
+                if (typeof c === 'object' && c.name) {
+                    return c.description ? `${c.name} — ${c.description}` : c.name;
+                }
+                return c;
+            }).join('\n');
 
             if (!windowTypes && !commands) {
                 console.error('[BRIDGE] Capabilities empty, skipping injection');
@@ -198,10 +203,11 @@ class ClaudeSDKBridge {
                 '',
                 '## Available TUI Capabilities (auto-derived from C++ registry)',
                 '',
-                '### Window Types (use tui_menu_command with open_* commands, e.g. {command: "open_terminal"})',
+                '### Window Types',
+                'To open: use tui_menu_command with open_<type>, e.g. {command: "open_terminal"} or {command: "open_figlet_text", args: {text: "HELLO", font: "banner"}}',
                 windowTypes || '(none)',
                 '',
-                '### Commands (available as tui_* tools)',
+                '### Commands (use tui_menu_command to execute any of these by name)',
                 commands || '(none)',
                 ''
             ].join('\n');

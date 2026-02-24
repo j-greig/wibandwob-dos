@@ -1,0 +1,61 @@
+[stderr] OpenAI Codex v0.101.0 (research preview)
+--------
+workdir: /Users/james/Repos/wibandwob-dos
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: medium
+reasoning summaries: auto
+session id: 019c9104-bfb2-72e0-8e3f-8ed6b0f6e8e0
+--------
+user
+You are a code analyst. Investigate the codebase, diagnose issues, and report findings.
+
+EFFICIENCY: Use targeted commands, not full-file dumps.
+Prefer rg -n -C3 'pattern' file or sed -n '45,55p' file.
+Avoid nl -ba file | sed -n '1,300p'. Only dump full files if <50 lines.
+
+Deliver:
+1. Root cause
+2. Fix options with tradeoffs
+3. Risks and tests to add
+
+Focus files: app/command_registry.cpp, app/window_type_registry.cpp, app/wwdos_app.cpp, app/api_ipc.cpp, app/llm/sdk_bridge/mcp_tools.js, tools/api_server/controller.py, tools/api_server/main.py, tests/contract/test_window_type_parity.py, tests/contract/test_surface_parity_matrix.py
+
+TASK: DEVNOTE: Files inside .codex-logs/ are run logs — ignore them completely.
+
+EFFICIENCY: Use targeted commands, not full-file dumps. Prefer rg -n -C3 'pattern' file or sed -n '45,55p' file.
+
+# Find ALL agent-facing gaps in the command surface
+
+We just found that 23 out of 32 window types are unreachable by the embedded Wib&Wob agent because the Node MCP bridge only has tui_menu_command → POST /menu/command → command_registry. Window types need open_* commands to be agent-spawnable.
+
+We're fixing figlet_text, text_editor, wibwob now. But I need you to find ALL other similar "fuckups" — places where something exists in one layer but is broken/missing/unreachable from another.
+
+## Specific checks needed:
+
+1. **Commands that exist in command_registry but are BROKEN** — e.g. dispatch returns wrong value, references non-existent function, wrong parameter parsing. Check every dispatch case in exec_registry_command().
+
+2. **IPC commands in api_ipc.cpp that aren't in command_registry** — things like `create_window`, `get_state`, `cascade` that are handled directly in api_ipc.cpp but NOT in exec_registry_command(). These are reachable via Python but NOT via the embedded agent's tui_menu_command.
+
+3. **Python REST endpoints with no C++ backing** — routes in main.py that call controller methods which silently fail because the IPC command doesn't exist or auth fails.
+
+4. **The IPC auth bug** — api_ipc.cpp has optional HMAC auth (lines 178-364), Python ipc_client.py doesn't do the handshake, controller.py swallows {"error":"auth_failed"} via except Exception: pass. Trace exactly which commands are affected.
+
+5. **Commands the agent SAYS it can do but actually can't** — check the system prompt augmentation in claude_sdk_bridge.js. Does it tell the agent about commands from GET /capabilities that are actually broken?
+
+6. **Parameter mismatches** — commands where the C++ dispatch expects different param names than what the Python API sends or what the MCP tool schema says.
+
+Output as a numbered list with file:line, severity (P0/P1/P2), and one-line fix description.
+[stderr] mcp startup: no servers
+[stderr] 2026-02-24T18:58:53.532181Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c90e0-9bb5-7532-8b22-119b6ecfe17f
+[stderr] 2026-02-24T18:58:53.557191Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c8ef4-8b7d-7571-9fce-9b170371defc
+[stderr] 2026-02-24T18:58:53.583030Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c8e8b-7e82-7d73-ab48-16d3170d0685
+[stderr] 2026-02-24T18:58:53.606777Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c84f6-ba12-7661-84b9-d9ea8b1b8614
+[stderr] 2026-02-24T18:58:53.632103Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c84e5-edab-76e1-b0c0-96e4d21e2286
+[stderr] 2026-02-24T18:58:53.645550Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c90f6-e6bd-74a3-a5a3-cf41de182a00
+[stderr] 2026-02-24T18:58:53.659168Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c90f0-2bed-7740-82dd-e87d5ecc1f9d
+[stderr] 2026-02-24T18:58:53.685257Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c8ebd-0fa5-74b1-a66e-f335b40de74a
+[stderr] 2026-02-24T18:58:53.711442Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c90ee-44d2-7952-b58a-34569d027e0f
+[stderr] ERROR: You've hit your usage limit. Upgrade to Pro (https://chatgpt.com/explore/pro), visit https://chatgpt.com/codex/settings/usage to purchase more credits or try again at Feb 25th, 2026 7:13 PM.

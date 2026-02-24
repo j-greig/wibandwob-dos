@@ -1,61 +1,161 @@
 {
   "version": 1,
   "description": "FIGlet font catalogue with categories based on rendered height and visual style",
-  "source": "Measured from pyfiglet rendering of 'Ag' — heights match figlet CLI output",
-  "total_fonts": 148,
+  "source": "Measured from pyfiglet rendering of 'Ag' \u2014 heights match figlet CLI output",
+  "total_fonts": 183,
   "categories": [
     {
       "id": "compact",
       "name": "Compact",
-      "description": "1–3 lines high. Minimal vertical space, good for tight layouts.",
+      "description": "1\u20133 lines high. Minimal vertical space, good for tight layouts.",
       "fonts": [
-        "binary", "cybersmall", "cyberlarge", "cybermedium", "decimal",
-        "digital", "eftipiti", "hex", "linux", "mike",
-        "octal", "pyramid", "short", "threepoint", "twopoint"
+        "binary",
+        "cybersmall",
+        "cyberlarge",
+        "cybermedium",
+        "decimal",
+        "digital",
+        "eftipiti",
+        "hex",
+        "linux",
+        "mike",
+        "octal",
+        "pyramid",
+        "short",
+        "threepoint",
+        "twopoint"
       ]
     },
     {
       "id": "small",
       "name": "Small",
-      "description": "4–5 lines high. Readable at small sizes, good default choice.",
+      "description": "4\u20135 lines high. Readable at small sizes, good default choice.",
       "fonts": [
-        "avatar", "bubble", "bulbhead", "chunky", "contessa",
-        "double", "drpepper", "eftichess", "eftifont", "eftiwall",
-        "eftiwater", "eftitalic", "fourtops", "graceful", "italic",
-        "lcd", "lockergnome", "madrid", "maxfour", "mini",
-        "pepper", "rowancap", "sblood", "serifcap", "shadow",
-        "small", "smkeyboard", "smscript", "smshadow", "smslant",
-        "straight", "thick", "tombstone", "trek", "tsalagi",
+        "avatar",
+        "bubble",
+        "bulbhead",
+        "chunky",
+        "contessa",
+        "double",
+        "drpepper",
+        "eftichess",
+        "eftifont",
+        "eftiwall",
+        "eftiwater",
+        "eftitalic",
+        "fourtops",
+        "graceful",
+        "italic",
+        "lcd",
+        "lockergnome",
+        "madrid",
+        "maxfour",
+        "mini",
+        "pepper",
+        "rowancap",
+        "sblood",
+        "serifcap",
+        "shadow",
+        "small",
+        "smkeyboard",
+        "smscript",
+        "smshadow",
+        "smslant",
+        "straight",
+        "thick",
+        "tombstone",
+        "trek",
+        "tsalagi",
         "usaflag"
       ]
     },
     {
       "id": "standard",
       "name": "Standard",
-      "description": "6 lines high. The classic FIGlet size — standard, slant, doom live here.",
+      "description": "6 lines high. The classic FIGlet size \u2014 standard, slant, doom live here.",
       "fonts": [
-        "3x5", "basic", "bell", "computer", "contrast",
-        "cosmic", "cosmike", "eftirobot", "goofy", "graffiti",
-        "invita", "ivrit", "kban", "letters", "mirror",
-        "ogre", "rectangles", "runyc", "slant", "slide",
-        "slscript", "speed", "stacey", "stampatello", "standard",
-        "starwars", "thin", "ticks", "ticksslant", "weird"
+        "3x5",
+        "basic",
+        "bell",
+        "computer",
+        "contrast",
+        "cosmic",
+        "cosmike",
+        "eftirobot",
+        "goofy",
+        "graffiti",
+        "invita",
+        "ivrit",
+        "kban",
+        "letters",
+        "mirror",
+        "modular",
+        "ogre",
+        "rectangles",
+        "runyc",
+        "slant",
+        "slide",
+        "slscript",
+        "speed",
+        "stacey",
+        "stampatello",
+        "standard",
+        "starwars",
+        "thin",
+        "ticks",
+        "ticksslant",
+        "weird"
       ]
     },
     {
       "id": "large",
       "name": "Large",
-      "description": "7–8 lines high. Bold presence, good for headers and titles.",
+      "description": "7\u20138 lines high. Bold presence, good for headers and titles.",
       "fonts": [
-        "3-d", "5lineoblique", "alligator", "alligator2", "alphabet",
-        "banner", "banner3", "banner3-D", "banner4", "barbwire",
-        "big", "bigchief", "block", "catwalk", "coinstak",
-        "crawford", "cricket", "diamond", "doom", "epic",
-        "fender", "fuzzy", "gradient", "katakana", "lean",
-        "marquee", "nancyj", "nancyj-fancy", "nancyj-underlined", "nipples",
-        "os2", "peaks", "puffy", "relief", "relief2",
-        "rounded", "rozzo", "sblood", "script", "smisome1",
-        "stellar", "stop", "tanja", "tinker-toy"
+        "3-d",
+        "5lineoblique",
+        "alligator",
+        "alligator2",
+        "alphabet",
+        "banner",
+        "banner3",
+        "banner3-D",
+        "banner4",
+        "barbwire",
+        "big",
+        "bigchief",
+        "block",
+        "catwalk",
+        "coinstak",
+        "crawford",
+        "cricket",
+        "diamond",
+        "doom",
+        "epic",
+        "fender",
+        "fuzzy",
+        "gradient",
+        "katakana",
+        "lean",
+        "marquee",
+        "nancyj",
+        "nancyj-fancy",
+        "nancyj-underlined",
+        "nipples",
+        "os2",
+        "peaks",
+        "puffy",
+        "relief",
+        "relief2",
+        "rounded",
+        "rozzo",
+        "sblood",
+        "script",
+        "smisome1",
+        "stellar",
+        "stop",
+        "tanja",
+        "tinker-toy"
       ]
     },
     {
@@ -63,188 +163,694 @@
       "name": "Huge",
       "description": "9+ lines high. Maximum impact, needs large windows.",
       "fonts": [
-        "acrobatic", "broadway", "calgphy2", "caligraphy", "colossal",
-        "doh", "dotmatrix", "fraktur", "gothic", "hollywood",
-        "isometric1", "isometric2", "isometric3", "isometric4", "jazmine",
-        "larry3d", "nvscript", "pawp", "pebbles", "poison",
-        "rev", "roman", "univers", "whimsy"
+        "acrobatic",
+        "broadway",
+        "calgphy2",
+        "caligraphy",
+        "colossal",
+        "doh",
+        "dotmatrix",
+        "fraktur",
+        "gothic",
+        "hollywood",
+        "isometric1",
+        "isometric2",
+        "isometric3",
+        "isometric4",
+        "jazmine",
+        "larry3d",
+        "nvscript",
+        "pawp",
+        "pebbles",
+        "poison",
+        "rev",
+        "roman",
+        "univers",
+        "whimsy"
       ]
     },
     {
       "id": "data",
       "name": "Data / Code",
-      "description": "Numeric and technical styles — good for counters, clocks, dashboards.",
+      "description": "Numeric and technical styles \u2014 good for counters, clocks, dashboards.",
       "fonts": [
-        "binary", "decimal", "digital", "hex", "lcd", "octal"
+        "binary",
+        "decimal",
+        "digital",
+        "hex",
+        "lcd",
+        "octal"
       ]
     },
     {
       "id": "decorative",
       "name": "Decorative",
-      "description": "Ornamental and novelty fonts — artistic flair over readability.",
+      "description": "Ornamental and novelty fonts \u2014 artistic flair over readability.",
       "fonts": [
-        "acrobatic", "alligator", "alligator2", "barbwire", "calgphy2",
-        "caligraphy", "diamond", "doh", "fraktur", "hollywood",
-        "isometric1", "isometric2", "isometric3", "isometric4", "jazmine",
-        "marquee", "nipples", "nvscript", "peaks", "poison",
-        "stellar", "tinker-toy", "usaflag", "weird", "whimsy"
+        "acrobatic",
+        "alligator",
+        "alligator2",
+        "barbwire",
+        "calgphy2",
+        "caligraphy",
+        "diamond",
+        "doh",
+        "fire_font-k",
+        "fraktur",
+        "funfaces",
+        "hollywood",
+        "isometric1",
+        "isometric2",
+        "isometric3",
+        "isometric4",
+        "jazmine",
+        "marquee",
+        "nipples",
+        "nvscript",
+        "peaks",
+        "poison",
+        "stellar",
+        "tinker-toy",
+        "usaflag",
+        "weird",
+        "whimsy"
       ]
     }
   ],
   "favourites": [
-    "standard", "big", "banner", "block", "doom", "slant",
-    "shadow", "small", "mini", "digital", "graffiti", "gothic",
-    "script", "lean", "speed", "starwars", "larry3d", "isometric1",
-    "thin", "bubble"
+    "standard",
+    "big",
+    "banner",
+    "block",
+    "doom",
+    "slant",
+    "shadow",
+    "small",
+    "mini",
+    "digital",
+    "graffiti",
+    "gothic",
+    "script",
+    "lean",
+    "speed",
+    "starwars",
+    "larry3d",
+    "isometric1",
+    "thin",
+    "bubble"
   ],
   "font_metadata": {
-    "3-d":               { "height": 8,  "width": 19 },
-    "3x5":               { "height": 6,  "width": 8  },
-    "5lineoblique":      { "height": 7,  "width": 20 },
-    "acrobatic":         { "height": 12, "width": 31 },
-    "alligator":         { "height": 7,  "width": 27 },
-    "alligator2":        { "height": 7,  "width": 22 },
-    "alphabet":          { "height": 7,  "width": 9  },
-    "avatar":            { "height": 5,  "width": 12 },
-    "banner":            { "height": 7,  "width": 15 },
-    "banner3":           { "height": 7,  "width": 20 },
-    "banner3-D":         { "height": 8,  "width": 22 },
-    "banner4":           { "height": 7,  "width": 20 },
-    "barbwire":          { "height": 8,  "width": 24 },
-    "basic":             { "height": 6,  "width": 16 },
-    "bell":              { "height": 6,  "width": 16 },
-    "big":               { "height": 8,  "width": 15 },
-    "bigchief":          { "height": 8,  "width": 14 },
-    "binary":            { "height": 1,  "width": 17 },
-    "block":             { "height": 8,  "width": 20 },
-    "broadway":          { "height": 11, "width": 37 },
-    "bubble":            { "height": 4,  "width": 9  },
-    "bulbhead":          { "height": 4,  "width": 13 },
-    "calgphy2":          { "height": 20, "width": 30 },
-    "caligraphy":        { "height": 20, "width": 32 },
-    "catwalk":           { "height": 8,  "width": 24 },
-    "chunky":            { "height": 5,  "width": 16 },
-    "coinstak":          { "height": 8,  "width": 24 },
-    "colossal":          { "height": 11, "width": 21 },
-    "computer":          { "height": 6,  "width": 13 },
-    "contessa":          { "height": 4,  "width": 7  },
-    "contrast":          { "height": 6,  "width": 16 },
-    "cosmic":            { "height": 6,  "width": 23 },
-    "cosmike":           { "height": 6,  "width": 23 },
-    "crawford":          { "height": 7,  "width": 14 },
-    "cricket":           { "height": 7,  "width": 15 },
-    "cyberlarge":        { "height": 3,  "width": 16 },
-    "cybermedium":       { "height": 3,  "width": 10 },
-    "cybersmall":        { "height": 2,  "width": 10 },
-    "decimal":           { "height": 1,  "width": 6  },
-    "diamond":           { "height": 8,  "width": 24 },
-    "digital":           { "height": 3,  "width": 5  },
-    "doh":               { "height": 25, "width": 50 },
-    "doom":              { "height": 8,  "width": 13 },
-    "dotmatrix":         { "height": 10, "width": 32 },
-    "double":            { "height": 4,  "width": 11 },
-    "drpepper":          { "height": 5,  "width": 10 },
-    "eftichess":         { "height": 5,  "width": 72 },
-    "eftifont":          { "height": 5,  "width": 7  },
-    "eftipiti":          { "height": 2,  "width": 4  },
-    "eftirobot":         { "height": 6,  "width": 10 },
-    "eftitalic":         { "height": 5,  "width": 10 },
-    "eftiwall":          { "height": 4,  "width": 28 },
-    "eftiwater":         { "height": 4,  "width": 10 },
-    "epic":              { "height": 8,  "width": 18 },
-    "fender":            { "height": 7,  "width": 21 },
-    "fourtops":          { "height": 4,  "width": 10 },
-    "fraktur":           { "height": 15, "width": 33 },
-    "fuzzy":             { "height": 7,  "width": 12 },
-    "goofy":             { "height": 6,  "width": 23 },
-    "gothic":            { "height": 9,  "width": 15 },
-    "graceful":          { "height": 4,  "width": 12 },
-    "gradient":          { "height": 8,  "width": 18 },
-    "graffiti":          { "height": 6,  "width": 19 },
-    "hex":               { "height": 1,  "width": 5  },
-    "hollywood":         { "height": 10, "width": 22 },
-    "invita":            { "height": 6,  "width": 14 },
-    "isometric1":        { "height": 11, "width": 28 },
-    "isometric2":        { "height": 11, "width": 28 },
-    "isometric3":        { "height": 11, "width": 28 },
-    "isometric4":        { "height": 11, "width": 28 },
-    "italic":            { "height": 4,  "width": 7  },
-    "ivrit":             { "height": 6,  "width": 79 },
-    "jazmine":           { "height": 10, "width": 16 },
-    "katakana":          { "height": 7,  "width": 22 },
-    "kban":              { "height": 6,  "width": 18 },
-    "larry3d":           { "height": 9,  "width": 21 },
-    "lcd":               { "height": 5,  "width": 12 },
-    "lean":              { "height": 8,  "width": 24 },
-    "letters":           { "height": 6,  "width": 16 },
-    "linux":             { "height": 3,  "width": 10 },
-    "lockergnome":       { "height": 4,  "width": 12 },
-    "madrid":            { "height": 4,  "width": 8  },
-    "marquee":           { "height": 8,  "width": 24 },
-    "maxfour":           { "height": 4,  "width": 10 },
-    "mike":              { "height": 3,  "width": 7  },
-    "mini":              { "height": 4,  "width": 8  },
-    "mirror":            { "height": 6,  "width": 79 },
-    "nancyj":            { "height": 8,  "width": 20 },
-    "nancyj-fancy":      { "height": 8,  "width": 22 },
-    "nancyj-underlined": { "height": 8,  "width": 20 },
-    "nipples":           { "height": 8,  "width": 24 },
-    "nvscript":          { "height": 16, "width": 30 },
-    "octal":             { "height": 1,  "width": 7  },
-    "ogre":              { "height": 6,  "width": 13 },
-    "os2":               { "height": 7,  "width": 18 },
-    "pawp":              { "height": 9,  "width": 16 },
-    "peaks":             { "height": 8,  "width": 24 },
-    "pebbles":           { "height": 10, "width": 15 },
-    "pepper":            { "height": 4,  "width": 6  },
-    "poison":            { "height": 11, "width": 21 },
-    "puffy":             { "height": 8,  "width": 14 },
-    "pyramid":           { "height": 3,  "width": 10 },
-    "rectangles":        { "height": 6,  "width": 11 },
-    "relief":            { "height": 7,  "width": 22 },
-    "relief2":           { "height": 7,  "width": 22 },
-    "rev":               { "height": 11, "width": 17 },
-    "roman":             { "height": 9,  "width": 27 },
-    "rounded":           { "height": 7,  "width": 15 },
-    "rowancap":          { "height": 5,  "width": 20 },
-    "rozzo":             { "height": 7,  "width": 23 },
-    "runyc":             { "height": 6,  "width": 8  },
-    "sblood":            { "height": 5,  "width": 19 },
-    "script":            { "height": 7,  "width": 13 },
-    "serifcap":          { "height": 4,  "width": 10 },
-    "shadow":            { "height": 5,  "width": 15 },
-    "short":             { "height": 3,  "width": 5  },
-    "slant":             { "height": 6,  "width": 15 },
-    "slide":             { "height": 6,  "width": 12 },
-    "slscript":          { "height": 6,  "width": 9  },
-    "small":             { "height": 5,  "width": 12 },
-    "smisome1":          { "height": 7,  "width": 20 },
-    "smkeyboard":        { "height": 4,  "width": 11 },
-    "smscript":          { "height": 5,  "width": 11 },
-    "smshadow":          { "height": 4,  "width": 13 },
-    "smslant":           { "height": 5,  "width": 12 },
-    "speed":             { "height": 6,  "width": 16 },
-    "stacey":            { "height": 6,  "width": 14 },
-    "stampatello":       { "height": 6,  "width": 13 },
-    "standard":          { "height": 6,  "width": 14 },
-    "starwars":          { "height": 6,  "width": 23 },
-    "stellar":           { "height": 8,  "width": 24 },
-    "stop":              { "height": 7,  "width": 14 },
-    "straight":          { "height": 4,  "width": 8  },
-    "tanja":             { "height": 8,  "width": 17 },
-    "thick":             { "height": 5,  "width": 14 },
-    "thin":              { "height": 6,  "width": 10 },
-    "threepoint":        { "height": 3,  "width": 7  },
-    "ticks":             { "height": 6,  "width": 26 },
-    "ticksslant":        { "height": 6,  "width": 31 },
-    "tinker-toy":        { "height": 7,  "width": 10 },
-    "tombstone":         { "height": 4,  "width": 8  },
-    "trek":              { "height": 5,  "width": 20 },
-    "tsalagi":           { "height": 5,  "width": 14 },
-    "twopoint":          { "height": 2,  "width": 6  },
-    "univers":           { "height": 11, "width": 29 },
-    "usaflag":           { "height": 5,  "width": 19 },
-    "weird":             { "height": 6,  "width": 10 },
-    "whimsy":            { "height": 10, "width": 20 }
+    "3-d": {
+      "height": 8,
+      "width": 19
+    },
+    "3x5": {
+      "height": 6,
+      "width": 8
+    },
+    "5lineoblique": {
+      "height": 7,
+      "width": 20
+    },
+    "acrobatic": {
+      "height": 12,
+      "width": 31
+    },
+    "alligator": {
+      "height": 7,
+      "width": 27
+    },
+    "alligator2": {
+      "height": 7,
+      "width": 22
+    },
+    "alphabet": {
+      "height": 7,
+      "width": 9
+    },
+    "avatar": {
+      "height": 5,
+      "width": 12
+    },
+    "banner": {
+      "height": 7,
+      "width": 15
+    },
+    "banner3": {
+      "height": 7,
+      "width": 20
+    },
+    "banner3-D": {
+      "height": 8,
+      "width": 22
+    },
+    "banner4": {
+      "height": 7,
+      "width": 20
+    },
+    "barbwire": {
+      "height": 8,
+      "width": 24
+    },
+    "basic": {
+      "height": 6,
+      "width": 16
+    },
+    "bell": {
+      "height": 6,
+      "width": 16
+    },
+    "big": {
+      "height": 8,
+      "width": 15
+    },
+    "bigchief": {
+      "height": 8,
+      "width": 14
+    },
+    "binary": {
+      "height": 1,
+      "width": 17
+    },
+    "block": {
+      "height": 8,
+      "width": 20
+    },
+    "broadway": {
+      "height": 11,
+      "width": 37
+    },
+    "bubble": {
+      "height": 4,
+      "width": 9
+    },
+    "bulbhead": {
+      "height": 4,
+      "width": 13
+    },
+    "calgphy2": {
+      "height": 20,
+      "width": 30
+    },
+    "caligraphy": {
+      "height": 20,
+      "width": 32
+    },
+    "catwalk": {
+      "height": 8,
+      "width": 24
+    },
+    "chunky": {
+      "height": 5,
+      "width": 16
+    },
+    "coinstak": {
+      "height": 8,
+      "width": 24
+    },
+    "colossal": {
+      "height": 11,
+      "width": 21
+    },
+    "computer": {
+      "height": 6,
+      "width": 13
+    },
+    "contessa": {
+      "height": 4,
+      "width": 7
+    },
+    "contrast": {
+      "height": 6,
+      "width": 16
+    },
+    "cosmic": {
+      "height": 6,
+      "width": 23
+    },
+    "cosmike": {
+      "height": 6,
+      "width": 23
+    },
+    "crawford": {
+      "height": 7,
+      "width": 14
+    },
+    "cricket": {
+      "height": 7,
+      "width": 15
+    },
+    "cyberlarge": {
+      "height": 3,
+      "width": 16
+    },
+    "cybermedium": {
+      "height": 3,
+      "width": 10
+    },
+    "cybersmall": {
+      "height": 2,
+      "width": 10
+    },
+    "decimal": {
+      "height": 1,
+      "width": 6
+    },
+    "diamond": {
+      "height": 8,
+      "width": 24
+    },
+    "digital": {
+      "height": 3,
+      "width": 5
+    },
+    "doh": {
+      "height": 25,
+      "width": 50
+    },
+    "doom": {
+      "height": 8,
+      "width": 13
+    },
+    "dotmatrix": {
+      "height": 10,
+      "width": 32
+    },
+    "double": {
+      "height": 4,
+      "width": 11
+    },
+    "drpepper": {
+      "height": 5,
+      "width": 10
+    },
+    "eftichess": {
+      "height": 5,
+      "width": 72
+    },
+    "eftifont": {
+      "height": 5,
+      "width": 7
+    },
+    "eftipiti": {
+      "height": 2,
+      "width": 4
+    },
+    "eftirobot": {
+      "height": 6,
+      "width": 10
+    },
+    "eftitalic": {
+      "height": 5,
+      "width": 10
+    },
+    "eftiwall": {
+      "height": 4,
+      "width": 28
+    },
+    "eftiwater": {
+      "height": 4,
+      "width": 10
+    },
+    "epic": {
+      "height": 8,
+      "width": 18
+    },
+    "fender": {
+      "height": 7,
+      "width": 21
+    },
+    "fourtops": {
+      "height": 4,
+      "width": 10
+    },
+    "fraktur": {
+      "height": 15,
+      "width": 33
+    },
+    "fuzzy": {
+      "height": 7,
+      "width": 12
+    },
+    "goofy": {
+      "height": 6,
+      "width": 23
+    },
+    "gothic": {
+      "height": 9,
+      "width": 15
+    },
+    "graceful": {
+      "height": 4,
+      "width": 12
+    },
+    "gradient": {
+      "height": 8,
+      "width": 18
+    },
+    "graffiti": {
+      "height": 6,
+      "width": 19
+    },
+    "hex": {
+      "height": 1,
+      "width": 5
+    },
+    "hollywood": {
+      "height": 10,
+      "width": 22
+    },
+    "invita": {
+      "height": 6,
+      "width": 14
+    },
+    "isometric1": {
+      "height": 11,
+      "width": 28
+    },
+    "isometric2": {
+      "height": 11,
+      "width": 28
+    },
+    "isometric3": {
+      "height": 11,
+      "width": 28
+    },
+    "isometric4": {
+      "height": 11,
+      "width": 28
+    },
+    "italic": {
+      "height": 4,
+      "width": 7
+    },
+    "ivrit": {
+      "height": 6,
+      "width": 79
+    },
+    "jazmine": {
+      "height": 10,
+      "width": 16
+    },
+    "katakana": {
+      "height": 7,
+      "width": 22
+    },
+    "kban": {
+      "height": 6,
+      "width": 18
+    },
+    "larry3d": {
+      "height": 9,
+      "width": 21
+    },
+    "lcd": {
+      "height": 5,
+      "width": 12
+    },
+    "lean": {
+      "height": 8,
+      "width": 24
+    },
+    "letters": {
+      "height": 6,
+      "width": 16
+    },
+    "linux": {
+      "height": 3,
+      "width": 10
+    },
+    "lockergnome": {
+      "height": 4,
+      "width": 12
+    },
+    "madrid": {
+      "height": 4,
+      "width": 8
+    },
+    "marquee": {
+      "height": 8,
+      "width": 24
+    },
+    "maxfour": {
+      "height": 4,
+      "width": 10
+    },
+    "mike": {
+      "height": 3,
+      "width": 7
+    },
+    "mini": {
+      "height": 4,
+      "width": 8
+    },
+    "mirror": {
+      "height": 6,
+      "width": 79
+    },
+    "nancyj": {
+      "height": 8,
+      "width": 20
+    },
+    "nancyj-fancy": {
+      "height": 8,
+      "width": 22
+    },
+    "nancyj-underlined": {
+      "height": 8,
+      "width": 20
+    },
+    "nipples": {
+      "height": 8,
+      "width": 24
+    },
+    "nvscript": {
+      "height": 16,
+      "width": 30
+    },
+    "octal": {
+      "height": 1,
+      "width": 7
+    },
+    "ogre": {
+      "height": 6,
+      "width": 13
+    },
+    "os2": {
+      "height": 7,
+      "width": 18
+    },
+    "pawp": {
+      "height": 9,
+      "width": 16
+    },
+    "peaks": {
+      "height": 8,
+      "width": 24
+    },
+    "pebbles": {
+      "height": 10,
+      "width": 15
+    },
+    "pepper": {
+      "height": 4,
+      "width": 6
+    },
+    "poison": {
+      "height": 11,
+      "width": 21
+    },
+    "puffy": {
+      "height": 8,
+      "width": 14
+    },
+    "pyramid": {
+      "height": 3,
+      "width": 10
+    },
+    "rectangles": {
+      "height": 6,
+      "width": 11
+    },
+    "relief": {
+      "height": 7,
+      "width": 22
+    },
+    "relief2": {
+      "height": 7,
+      "width": 22
+    },
+    "rev": {
+      "height": 11,
+      "width": 17
+    },
+    "roman": {
+      "height": 9,
+      "width": 27
+    },
+    "rounded": {
+      "height": 7,
+      "width": 15
+    },
+    "rowancap": {
+      "height": 5,
+      "width": 20
+    },
+    "rozzo": {
+      "height": 7,
+      "width": 23
+    },
+    "runyc": {
+      "height": 6,
+      "width": 8
+    },
+    "sblood": {
+      "height": 5,
+      "width": 19
+    },
+    "script": {
+      "height": 7,
+      "width": 13
+    },
+    "serifcap": {
+      "height": 4,
+      "width": 10
+    },
+    "shadow": {
+      "height": 5,
+      "width": 15
+    },
+    "short": {
+      "height": 3,
+      "width": 5
+    },
+    "slant": {
+      "height": 6,
+      "width": 15
+    },
+    "slide": {
+      "height": 6,
+      "width": 12
+    },
+    "slscript": {
+      "height": 6,
+      "width": 9
+    },
+    "small": {
+      "height": 5,
+      "width": 12
+    },
+    "smisome1": {
+      "height": 7,
+      "width": 20
+    },
+    "smkeyboard": {
+      "height": 4,
+      "width": 11
+    },
+    "smscript": {
+      "height": 5,
+      "width": 11
+    },
+    "smshadow": {
+      "height": 4,
+      "width": 13
+    },
+    "smslant": {
+      "height": 5,
+      "width": 12
+    },
+    "speed": {
+      "height": 6,
+      "width": 16
+    },
+    "stacey": {
+      "height": 6,
+      "width": 14
+    },
+    "stampatello": {
+      "height": 6,
+      "width": 13
+    },
+    "standard": {
+      "height": 6,
+      "width": 14
+    },
+    "starwars": {
+      "height": 6,
+      "width": 23
+    },
+    "stellar": {
+      "height": 8,
+      "width": 24
+    },
+    "stop": {
+      "height": 7,
+      "width": 14
+    },
+    "straight": {
+      "height": 4,
+      "width": 8
+    },
+    "tanja": {
+      "height": 8,
+      "width": 17
+    },
+    "thick": {
+      "height": 5,
+      "width": 14
+    },
+    "thin": {
+      "height": 6,
+      "width": 10
+    },
+    "threepoint": {
+      "height": 3,
+      "width": 7
+    },
+    "ticks": {
+      "height": 6,
+      "width": 26
+    },
+    "ticksslant": {
+      "height": 6,
+      "width": 31
+    },
+    "tinker-toy": {
+      "height": 7,
+      "width": 10
+    },
+    "tombstone": {
+      "height": 4,
+      "width": 8
+    },
+    "trek": {
+      "height": 5,
+      "width": 20
+    },
+    "tsalagi": {
+      "height": 5,
+      "width": 14
+    },
+    "twopoint": {
+      "height": 2,
+      "width": 6
+    },
+    "univers": {
+      "height": 11,
+      "width": 29
+    },
+    "usaflag": {
+      "height": 5,
+      "width": 19
+    },
+    "weird": {
+      "height": 6,
+      "width": 10
+    },
+    "whimsy": {
+      "height": 10,
+      "width": 20
+    }
   }
 }

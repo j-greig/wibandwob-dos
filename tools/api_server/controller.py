@@ -133,8 +133,8 @@ class Controller:
         Both commands and window types are queried from C++ — Python never
         maintains its own authoritative list."""
         registry = await self.get_registry_capabilities()
-        command_names = [
-            cmd.get("name")
+        commands = [
+            {"name": cmd.get("name"), "description": cmd.get("description", ""), "dangerous": cmd.get("dangerous", False)}
             for cmd in registry.get("commands", [])
             if isinstance(cmd, dict) and cmd.get("name")
         ]
@@ -143,7 +143,7 @@ class Controller:
         return {
             "version": registry.get("version", "v1"),
             "window_types": window_type_slugs,
-            "commands": command_names,
+            "commands": commands,
             "properties": {
                 "frame_player": {"fps": {"type": "number", "min": 1, "max": 120}},
                 "test_pattern": {"variant": {"type": "string"}},
