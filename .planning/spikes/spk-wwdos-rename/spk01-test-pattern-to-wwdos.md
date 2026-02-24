@@ -64,7 +64,7 @@ Grep counts below are for live/actionable files and exclude noise/artifacts:
 - This phase is bigger than the original spike implied because launcher/orchestration paths exist outside the originally listed scripts.
 - `app/CMakeLists.txt` is also touched again in Phase 4 if `test_pattern_app.cpp` is renamed.
 
-### [ ] Phase 2: Socket path (medium risk; compatibility-sensitive)
+### [x] Phase 2: Socket path (medium risk; compatibility-sensitive)
 
 **Estimate**: 0.5 day (with fallback), 1 day (if changing instance naming convention too)
 

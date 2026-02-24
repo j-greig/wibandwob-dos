@@ -12,7 +12,7 @@ INSTANCE="${WIBWOB_INSTANCE:-1}"
 
 # WIBWOB_INSTANCE must match what the TUI was started with.
 # Default is 1 → socket /tmp/wibwob_1.sock.
-# If TUI was started without WIBWOB_INSTANCE it uses /tmp/test_pattern_app.sock — set WIBWOB_INSTANCE=0 to match.
+# If TUI was started without WIBWOB_INSTANCE it uses /tmp/wwdos.sock (legacy fallback: /tmp/test_pattern_app.sock).
 export WIBWOB_INSTANCE="$INSTANCE"
 
 # Kill any stale server on this port

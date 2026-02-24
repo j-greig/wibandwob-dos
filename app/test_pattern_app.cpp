@@ -992,23 +992,37 @@ TTestPatternApp::TTestPatternApp() :
     ipcServer = new ApiIpcServer(this);
 
     // Derive socket path from WIBWOB_INSTANCE env var.
-    // Unset or empty: legacy path for backward compat.
-    std::string sockPath = "/tmp/test_pattern_app.sock";
+    // Unset or empty: new default path with one-cycle legacy fallback.
+    std::string sockPath = "/tmp/wwdos.sock";
     const char* inst = std::getenv("WIBWOB_INSTANCE");
+    bool usedLegacyDefaultSock = false;
     if (inst && inst[0] != '\0') {
         sockPath = std::string("/tmp/wibwob_") + inst + ".sock";
         fprintf(stderr, "[wibwob] instance=%s socket=%s\n", inst, sockPath.c_str());
     } else {
         fprintf(stderr, "[wibwob] instance=(none) socket=%s\n", sockPath.c_str());
     }
-    if (!ipcServer->start(sockPath)) {
+    bool ipcStarted = ipcServer->start(sockPath);
+    if (!ipcStarted && (!inst || inst[0] == '\0') && sockPath == "/tmp/wwdos.sock") {
+        const std::string legacySockPath = "/tmp/test_pattern_app.sock";
+        fprintf(stderr, "[wibwob] WARN: IPC start failed on %s, retrying legacy socket %s\n",
+                sockPath.c_str(), legacySockPath.c_str());
+        sockPath = legacySockPath;
+        ipcStarted = ipcServer->start(sockPath);
+        usedLegacyDefaultSock = ipcStarted;
+    }
+    if (!ipcStarted) {
         fprintf(stderr, "[wibwob] ERROR: IPC server failed to start on %s\n", sockPath.c_str());
         // Hard-disable IPC on startup failure so later idle/event paths
         // never touch a server that failed to bind.
         delete ipcServer;
         ipcServer = nullptr;
     } else {
-        fprintf(stderr, "[wibwob] IPC server started on %s\n", sockPath.c_str());
+        if (usedLegacyDefaultSock) {
+            fprintf(stderr, "[wibwob] IPC server started on legacy socket %s\n", sockPath.c_str());
+        } else {
+            fprintf(stderr, "[wibwob] IPC server started on %s\n", sockPath.c_str());
+        }
     }
 
     // Auto-restore layout from env var (room deployment).

@@ -115,4 +115,4 @@ Each failed stage includes:
 - API: `./start_api_server.sh` (port 8089)
 - Screenshots: `./logs/screenshots/`
 - Debug: `./build/app/test_pattern 2> /tmp/wibwob_debug.log`
-- Socket: `/tmp/test_pattern_app.sock`
+- Socket: `/tmp/wwdos.sock` (legacy fallback: `/tmp/test_pattern_app.sock`)

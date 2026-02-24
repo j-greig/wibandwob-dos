@@ -24,7 +24,7 @@ def _sock_path():
     inst = os.environ.get("WIBWOB_INSTANCE")
     if inst:
         return f"/tmp/wibwob_{inst}.sock"
-    return "/tmp/test_pattern_app.sock"
+    return "/tmp/wwdos.sock"
 
 
 def _send(cmd: str) -> str:

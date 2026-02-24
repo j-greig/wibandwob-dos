@@ -78,20 +78,29 @@ private:
         if (sock < 0) return "";
 
         // Derive socket path from same env var as main app
-        std::string sockPath = "/tmp/test_pattern_app.sock";
+        std::string sockPath = "/tmp/wwdos.sock";
         const char* inst = std::getenv("WIBWOB_INSTANCE");
         if (inst && inst[0] != '\0') {
             sockPath = std::string("/tmp/wibwob_") + inst + ".sock";
         }
-
-        struct sockaddr_un addr;
-        memset(&addr, 0, sizeof(addr));
-        addr.sun_family = AF_UNIX;
-        strncpy(addr.sun_path, sockPath.c_str(), sizeof(addr.sun_path) - 1);
-        
-        if (connect(sock, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
-            close(sock);
-            return "";
+        auto tryConnect = [&](const std::string& path) {
+            struct sockaddr_un addr;
+            memset(&addr, 0, sizeof(addr));
+            addr.sun_family = AF_UNIX;
+            strncpy(addr.sun_path, path.c_str(), sizeof(addr.sun_path) - 1);
+            return connect(sock, (struct sockaddr*)&addr, sizeof(addr)) == 0;
+        };
+        if (!tryConnect(sockPath)) {
+            if ((!inst || inst[0] == '\0') && sockPath == "/tmp/wwdos.sock") {
+                const std::string legacySockPath = "/tmp/test_pattern_app.sock";
+                if (!tryConnect(legacySockPath)) {
+                    close(sock);
+                    return "";
+                }
+            } else {
+                close(sock);
+                return "";
+            }
         }
         
         send(sock, command.c_str(), command.length(), 0);

@@ -37,7 +37,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # 1. Kill everything stale
 pkill -f test_pattern 2>/dev/null || true
 tmux kill-session -t wibwob 2>/dev/null || true
-rm -f /tmp/wibwob_1.sock /tmp/test_pattern_app.sock
+rm -f /tmp/wibwob_1.sock /tmp/wwdos.sock /tmp/test_pattern_app.sock
 
 # 2. Start TUI with WIBWOB_INSTANCE=1  →  socket: /tmp/wibwob_1.sock
 WIBWOB_INSTANCE=1 tmux new-session -d -s wibwob "./build/app/test_pattern 2>/tmp/wibwob_debug.log"
@@ -56,7 +56,7 @@ curl -s http://127.0.0.1:8089/state | python3 -c \
   "import json,sys; d=json.load(sys.stdin); print(d['canvas'])"  # → real canvas size
 ```
 
-**If IPC gives "Connection refused":** check `tail -3 /tmp/wibwob_debug.log` — if it says `socket=/tmp/test_pattern_app.sock` the TUI was started without `WIBWOB_INSTANCE=1`. Kill and restart from step 1.
+**If IPC gives "Connection refused":** check `tail -3 /tmp/wibwob_debug.log` — if it says `socket=/tmp/wwdos.sock` (or legacy `/tmp/test_pattern_app.sock`) the TUI was started without `WIBWOB_INSTANCE=1`. Kill and restart from step 1.
 
 ## Project Overview
 
@@ -181,7 +181,7 @@ curl -sf -X POST http://127.0.0.1:8089/menu/command \
 - **SDK bridge npm install**: if the Wib&Wob chat window silently times out, run `cd app/llm/sdk_bridge && npm install`. The `node_modules/` dir is gitignored and must be installed on each fresh clone.
 - **API hot-reload**: always start uvicorn with `--reload` (see above). Python edits take effect automatically — no restart needed.
 - **tmux terminal size**: do NOT pass `-x`/`-y` to `tmux new-session`. Let the session inherit your real terminal dimensions on first attach. Hardcoding a size larger than your terminal causes gallery placements to appear off-screen. After `tmux attach -t wibwob && Ctrl-B D`, the canvas locks to your viewport.
-- **Socket path**: the default socket is `/tmp/test_pattern_app.sock`. If using multi-instance, set `WIBWOB_INSTANCE=N` for `/tmp/wibwob_N.sock`.
+- **Socket path**: the default socket is `/tmp/wwdos.sock` (legacy fallback: `/tmp/test_pattern_app.sock`). If using multi-instance, set `WIBWOB_INSTANCE=N` for `/tmp/wibwob_N.sock`.
 - **First run dependency install**: `uv run --with-requirements` downloads packages on first invocation (~3-8s). Subsequent runs use cache.
 - **`/menu/command` vs `/windows`**: use `/menu/command` for the command registry (C++ dispatch, works for all commands). The `/windows` endpoint validates against the Python `WindowType` enum which may lag behind C++ if the server was started before code changes.
 
@@ -203,7 +203,7 @@ Human / AI Agent
               │  ├─ Chat interface (wibwob_view)  │
               │  └─ IPC socket listener           │
               └───────────┬──────────────────────┘
-                          │ Unix socket (/tmp/wibwob_N.sock or legacy /tmp/test_pattern_app.sock)
+                          │ Unix socket (/tmp/wibwob_N.sock or default /tmp/wwdos.sock, legacy /tmp/test_pattern_app.sock)
               ┌───────────▼──────────────────────┐
               │  FastAPI Server (Python)          │
               │  tools/api_server/main.py         │
@@ -331,7 +331,7 @@ Opened via `open_micropolis_ascii` command. Guardrail: no raw ANSI bytes in any 
 
 | Variable | Effect |
 |----------|--------|
-| `WIBWOB_INSTANCE` | Instance ID (e.g. `1`, `2`). Drives socket path `/tmp/wibwob_N.sock`. Unset = legacy `/tmp/test_pattern_app.sock` |
+| `WIBWOB_INSTANCE` | Instance ID (e.g. `1`, `2`). Drives socket path `/tmp/wibwob_N.sock`. Unset = default `/tmp/wwdos.sock` (legacy fallback `/tmp/test_pattern_app.sock`) |
 | `TV_IPC_SOCK` | Explicit socket path override (Python only, takes priority over `WIBWOB_INSTANCE`) |
 | `WIBWOB_REPO_ROOT` | Repo root for API server (set automatically by `start_api_server.sh`). Prevents cross-checkout path mismatch when API server and TUI run from different repo copies |
 

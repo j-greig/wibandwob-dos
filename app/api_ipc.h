@@ -25,7 +25,7 @@ public:
     ~ApiIpcServer();
 
     // Start listening on a Unix socket path. Returns false on failure.
-    bool start(const std::string& path = "/tmp/test_pattern_app.sock");
+    bool start(const std::string& path = "/tmp/wwdos.sock");
     // Poll for new connections and handle a single command per connection.
     void poll();
     // Stop and clean up.
@@ -59,4 +59,3 @@ private:
     std::string compute_hmac(const std::string& nonce);
     bool authenticate_connection(int fd);
 };
-

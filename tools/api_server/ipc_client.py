@@ -9,7 +9,7 @@ from typing import Dict, Optional
 def _resolve_sock_path() -> str:
     """Resolve IPC socket path.
 
-    Priority: TV_IPC_SOCK (explicit) > WIBWOB_INSTANCE (derived) > legacy default.
+    Priority: TV_IPC_SOCK (explicit) > WIBWOB_INSTANCE (derived) > default.
     """
     explicit = os.environ.get("TV_IPC_SOCK")
     if explicit:
@@ -17,7 +17,7 @@ def _resolve_sock_path() -> str:
     instance = os.environ.get("WIBWOB_INSTANCE")
     if instance:
         return f"/tmp/wibwob_{instance}.sock"
-    return "/tmp/test_pattern_app.sock"
+    return "/tmp/wwdos.sock"
 
 
 SOCK_PATH = _resolve_sock_path()
@@ -51,7 +51,23 @@ def send_cmd(cmd: str, kv: Optional[Dict[str, str]] = None) -> str:
 
     s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     s.settimeout(5.0)  # 5 second timeout
-    s.connect(path)
+    try:
+        s.connect(path)
+    except OSError:
+        can_fallback = (
+            path == "/tmp/wwdos.sock"
+            and "TV_IPC_SOCK" not in os.environ
+            and not os.environ.get("WIBWOB_INSTANCE")
+        )
+        if not can_fallback:
+            s.close()
+            raise
+        s.close()
+        legacy_path = "/tmp/test_pattern_app.sock"
+        print(f"[IPC] fallback → {legacy_path}")
+        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        s.settimeout(5.0)
+        s.connect(legacy_path)
     try:
         parts = [f"cmd:{cmd}"]
         for k, v in (kv or {}).items():

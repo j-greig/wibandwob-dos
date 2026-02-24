@@ -364,7 +364,7 @@ This was the actual segfault that crashed the roguelike on first open. The BSP s
 | 3 | Linker error: undefined reference | Build fails at link stage | Missing stub in test .cpp files | Add stub in BOTH test files |
 | 4 | HUD not visible | Game renders but no stats shown | Width check `hudX + HUD_WIDTH <= W` too strict | Use actual minimum text width, not constant |
 | 5 | Timer keeps running when hidden | Game state drifts while minimized | No `setState(sfExposed)` override | Stop timer on `!enable`, start on `enable` |
-| 6 | Socket "already in use" | TUI won't start, no IPC | Stale socket from crashed session | `rm -f /tmp/test_pattern_app.sock*` |
+| 6 | Socket "already in use" | TUI won't start, no IPC | Stale socket from crashed session | `rm -f /tmp/wwdos.sock* /tmp/test_pattern_app.sock*` |
 | 7 | Game doesn't redraw | State changes but screen is stale | Missing `drawView()` call | Call after EVERY state change |
 | 8 | 180-degree death in Snake | Pressing opposite direction kills | No direction buffer | Use `nextDir` vs `dir` pattern |
 | 9 | `duplicate session: ww` | tmux won't create new session | Previous tmux session still alive | `tmux kill-server` before creating |
@@ -388,7 +388,7 @@ cd /path/to/repo/build && ctest --output-on-failure
 ```bash
 # MUST kill everything first — stale sockets and sessions cause failures
 tmux kill-server 2>/dev/null
-rm -f /tmp/test_pattern_app.sock /tmp/test_pattern_app.sock.lock
+rm -f /tmp/wwdos.sock /tmp/wwdos.sock.lock /tmp/test_pattern_app.sock /tmp/test_pattern_app.sock.lock
 sleep 2
 
 # MUST specify -x and -y — without them TUI gets 0x0 canvas
@@ -400,7 +400,7 @@ tmux send-keys -t ww "./build/app/test_pattern 2>/tmp/wibwob_debug.log" Enter
 sleep 5
 
 # Verify socket exists before proceeding
-ls /tmp/test_pattern_app.sock
+ls /tmp/wwdos.sock
 ```
 
 **Why stderr redirect?** The IPC listener logs to stderr. Without redirect, the TTY fights with Turbo Vision's screen buffer and the socket listener fails silently.
@@ -448,7 +448,7 @@ If the TUI segfaults (check with `tmux capture-pane` — look for shell prompt o
 ```bash
 pkill -f uvicorn 2>/dev/null
 tmux kill-server 2>/dev/null
-rm -f /tmp/test_pattern_app.sock*
+rm -f /tmp/wwdos.sock* /tmp/test_pattern_app.sock*
 # Check debug log for clues:
 tail -20 /tmp/wibwob_debug.log
 # Then restart from step 3
