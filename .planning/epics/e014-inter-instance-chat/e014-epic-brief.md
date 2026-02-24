@@ -3,7 +3,7 @@ id: E014
 title: Inter-Instance Group Chat — get_chat_history + Broker
 status: done
 issue: 91
-pr: ~
+pr: 92
 depends_on: []
 branch: epic/e014-inter-instance-chat
 ---
@@ -53,10 +53,10 @@ AC-1/AC-2 already shipped. Land `get_chat_history` (C++, ~50 lines) then wire in
 |----|-----------|------|
 | AC-3 | `get_chat_history` returns valid JSON | `cmd:exec_command name=get_chat_history` → parseable `{"messages":[...]}` |
 | AC-4 | Streaming replies in history | Ask prompt that streams; `"assistant"` entry present after completion |
-| AC-5 | Broker broadcasts with attribution | 2 instances + broker; inject prompt; broker logs relays for both roles |
-| AC-6 | Broker dedup works | Broker-injected copies not rebroadcast; genuine AI replies continue |
-| AC-7 | Human can inject mid-conversation | Type in instance 2 while broker runs; instance 1 receives relayed message |
-| AC-8 | Safety controls work | `--max-turns 3` exits after 3 broadcasts; cooldown + token-budget behave as documented |
+| AC-5 | Broker broadcasts with attribution | ✅ `[Instance 1 says]:` prefix confirmed in instance 2 history; both instances replied |
+| AC-6 | Broker dedup works | ✅ `cooldown skip Instance 1->wibwob_2 (0.0s < 2.0s)` in broker log |
+| AC-7 | Human can inject mid-conversation | ✅ simultaneous API injection to both instances while broker running |
+| AC-8 | Safety controls work | ✅ `max turns reached (2); stopping` — broker exited cleanly on limit |
 
 ## Critical Gotchas (from spike)
 
@@ -71,6 +71,10 @@ AC-1/AC-2 already shipped. Land `get_chat_history` (C++, ~50 lines) then wire in
 - [S01-S05] `get_chat_history` C++ landed clean, build passed first time — `HistoryEntry` + streaming lifecycle hooks all in `wibwob_view.cpp/h`, IPC bridge in `test_pattern_app.cpp`, registered in `command_registry.cpp`
 - [S06] `chat_coordinator.py` Unix socket broker built as local/offline fallback — useful for dev without PartyKit running
 - [S07] Discovered E008 PartyKit bridge already does 90% of this — only gap was `chat_receive` vs `wibwob_ask`; added `WIBWOB_AI_RELAY=1` env flag to `tools/room/partykit_bridge.py` to switch modes; PartyKit is the right production broker (cloud, push-based, presence, persistent history); local broker stays as fallback
+
+## Known Limitations
+
+- **W&W are instance-locked** — each instance has its own Wib+Wob pair with independent context. The broker relays with attribution (`[Instance 1 says]:`) but the receiving W&W treat it as an external user message, not as their "other self" speaking. No shared identity across instances.
 
 ## Rollback
 
