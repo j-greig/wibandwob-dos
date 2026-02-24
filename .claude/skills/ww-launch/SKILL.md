@@ -27,6 +27,68 @@ tmux attach -t wibwob        # Ctrl-B D to detach
 tmux attach -t wibwob-api    # API server log
 ```
 
+## ⚠️ API response envelope — read this before parsing anything
+
+`POST /menu/command` wraps the raw C++ IPC result in a Python envelope:
+
+```json
+{
+  "command": "get_chat_history",
+  "ok": true,
+  "actor": "api",
+  "result": "{\"messages\":[{\"role\":\"system\",\"content\":\"...\"}]}"
+}
+```
+
+**`result` is a JSON string, not an object.** Always double-parse:
+
+```python
+import json, subprocess, sys
+
+def menu_cmd(command, args=None, port=8089):
+    """Call /menu/command and return the parsed inner result."""
+    payload = {"command": command}
+    if args:
+        payload["args"] = args
+    raw = subprocess.check_output([
+        "curl", "-s", f"http://127.0.0.1:{port}/menu/command",
+        "-X", "POST", "-H", "Content-Type: application/json",
+        "-d", json.dumps(payload)
+    ])
+    outer = json.loads(raw)
+    if not outer.get("ok"):
+        raise RuntimeError(outer.get("error", outer))
+    result = outer["result"]
+    # result may be plain "ok", or a JSON string
+    try:
+        return json.loads(result)
+    except (json.JSONDecodeError, TypeError):
+        return result   # plain string like "ok queued"
+
+# Usage:
+history = menu_cmd("get_chat_history")   # returns {"messages":[...]}
+msgs    = history["messages"]            # ✅ correct
+```
+
+One-liner in bash:
+```bash
+curl -s http://127.0.0.1:8089/menu/command -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"command":"get_chat_history"}' \
+  | python3 -c "
+import sys,json
+outer=json.load(sys.stdin)
+msgs=json.loads(outer['result'])['messages']
+for m in msgs: print(m['role'], '|', m['content'][:60])
+"
+```
+
+**Common wrong pattern** (causes silent empty results):
+```python
+obj = json.loads(raw)
+msgs = obj.get('messages', [])   # ❌ always [] — messages are inside result
+```
+
 ## Opening windwoze (windows) — correct API endpoints
 
 ```bash

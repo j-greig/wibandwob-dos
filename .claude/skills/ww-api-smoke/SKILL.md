@@ -64,6 +64,19 @@ Report contains:
 - raw response body
 - extracted field (if available)
 
+## ⚠️ /menu/command response envelope
+
+`POST /menu/command` returns a double-wrapped envelope — the C++ IPC result
+is a **JSON string** inside `outer["result"]`, not a top-level object:
+
+```json
+{"ok": true, "result": "{\"messages\":[...]}"}
+```
+
+Always extract with `json.loads(outer["result"])`. Using `outer.get("messages")`
+will silently return `[]` even when data exists. This burned a full day of
+debugging — don't repeat it.
+
 ## Guardrails
 - Never assume API response JSON is valid; browser open can return malformed JSON if server escapes are wrong.
 - Parse `window_id` with JSON first, regex fallback second.

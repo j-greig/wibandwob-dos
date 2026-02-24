@@ -24,6 +24,34 @@ make up                               # mock (default)
 make up-real && make provision && make deploy && make test   # full gate
 ```
 
+## ⚠️ API response envelope — always double-parse /menu/command
+
+`POST /menu/command` wraps the C++ IPC result in an outer Python envelope.
+The **inner** result is a JSON string nested inside `outer["result"]`.
+
+```
+POST /menu/command {"command":"get_chat_history"}
+→ {"ok":true, "result": "{\"messages\":[...]}" }   ← result is a STRING
+                           ↑ parse this too
+```
+
+**Correct pattern:**
+```python
+outer = json.loads(raw)
+inner = json.loads(outer["result"])   # double-parse
+msgs  = inner["messages"]             # ✅
+```
+
+**Wrong pattern (silent empty results):**
+```python
+obj  = json.loads(raw)
+msgs = obj.get("messages", [])        # ❌ always []
+```
+
+Applies to: `get_chat_history`, `frame_capture`, `paint_export`, any command
+returning structured JSON. Commands returning plain strings (`"ok"`, `"ok queued"`)
+don't need the inner parse — wrap in `try/except json.JSONDecodeError`.
+
 ## Quick health check
 
 ```bash
