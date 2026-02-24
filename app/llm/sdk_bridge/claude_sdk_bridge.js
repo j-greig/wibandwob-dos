@@ -198,7 +198,7 @@ class ClaudeSDKBridge {
                 '',
                 '## Available TUI Capabilities (auto-derived from C++ registry)',
                 '',
-                '### Window Types (use with tui_create_window tool)',
+                '### Window Types (use tui_menu_command with open_* commands, e.g. {command: "open_terminal"})',
                 windowTypes || '(none)',
                 '',
                 '### Commands (available as tui_* tools)',

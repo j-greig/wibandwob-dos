@@ -23,16 +23,17 @@ def _cpp_registry_slugs() -> list[dict[str, object]]:
     Spawnable = spawn function is not 'nullptr'.
     """
     src = (REPO_ROOT / "app" / "window_type_registry.cpp").read_text(encoding="utf-8")
-    # Match lines like:  { "gradient",  spawn_gradient,  match_gradient  },
-    # or:                { "wibwob",   nullptr,          match_wibwob    },
-    pattern = re.compile(
-        r'\{\s*"([a-z_]+)"\s*,\s*(\w+)\s*,\s*\w+\s*\}',
-    )
+    # Match k_specs entries. Two forms:
+    #   { "gradient",  spawn_gradient,  match_gradient  },     (simple)
+    #   { "wibwob",    [](TWwdosApp&...) { ... },  match_wibwob },  (lambda)
+    # Strategy: find all { "slug" entries, then check if spawn is nullptr
     results = []
-    for m in pattern.finditer(src):
+    for m in re.finditer(r'\{\s*"([a-z_]+)"\s*,', src):
         slug = m.group(1)
-        spawn_fn = m.group(2)
-        results.append({"slug": slug, "spawnable": spawn_fn != "nullptr"})
+        # Look at what follows the slug — is it nullptr?
+        after = src[m.end():m.end()+50]
+        spawnable = "nullptr" not in after.split(",")[0]
+        results.append({"slug": slug, "spawnable": spawnable})
     return results
 
 

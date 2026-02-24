@@ -1,10 +1,13 @@
-"""Contract tests: Node MCP tools must stay in sync with Python MCP surface.
+"""Contract tests: Node MCP bridge architecture invariants.
 
-These tests parse source files directly — no running servers needed.
-They catch drift between:
-  - app/llm/sdk_bridge/mcp_tools.js (Node MCP tools for embedded agent)
-  - tools/api_server/mcp_tools.py (Python MCP tools for external clients)
-  - app/llm/sdk_bridge/claude_sdk_bridge.js (SDK bridge tool whitelist)
+The embedded Wib&Wob agent uses exactly 2 generic MCP tools that discover
+and execute commands at runtime via the REST API. This test ensures:
+  - mcp_tools.js has exactly the expected tools
+  - Tools call the correct REST endpoints
+  - claude_sdk_bridge.js does not hardcode tool names or reference phantom tools
+
+There is NO tools/api_server/mcp_tools.py — Python MCP is auto-derived
+from FastAPI routes via FastApiMCP(app).
 """
 from __future__ import annotations
 
@@ -13,82 +16,44 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 NODE_MCP = ROOT / "app" / "llm" / "sdk_bridge" / "mcp_tools.js"
-PY_MCP = ROOT / "tools" / "api_server" / "mcp_tools.py"
 BRIDGE = ROOT / "app" / "llm" / "sdk_bridge" / "claude_sdk_bridge.js"
 
 
 def _node_tool_names() -> set[str]:
     """Extract tool names from mcp_tools.js tool() calls."""
     src = NODE_MCP.read_text()
-    # Pattern: tool(\n  "tui_xxx",  or tool("tui_xxx",
     return set(re.findall(r'tool\(\s*["\']([a-z_]+)["\']', src))
 
 
-def _python_tool_names() -> set[str]:
-    """Extract tool names from Python MCP registrations."""
-    src = PY_MCP.read_text()
-    # tool_name fields from _command_tool_builders
-    names = set(re.findall(r'"tool_name":\s*"([^"]+)"', src))
-    # @mcp.tool("tui_xxx") decorators
-    names |= set(re.findall(r'@mcp\.tool\(\s*"([^"]+)"', src))
-    return names
+# ── Tests ──────────────────────────────────────────────────────────────────────
 
 
-# --- Tests ---
-
-def test_node_tools_nonempty():
+def test_node_mcp_has_expected_tools():
+    """Node MCP should have exactly 2 generic tools."""
     names = _node_tool_names()
-    assert len(names) >= 10, f"Expected >=10 Node MCP tools, got {len(names)}: {names}"
-
-
-def test_python_tools_nonempty():
-    names = _python_tool_names()
-    assert len(names) >= 10, f"Expected >=10 Python MCP tools, got {len(names)}: {names}"
-
-
-def test_every_python_command_tool_has_node_equivalent():
-    """Every Python MCP command tool should have a matching Node tool."""
-    py = _python_tool_names()
-    node = _node_tool_names()
-    # Some Python tools are intentionally not in the Node bridge:
-    # - browser.* tools: complex multi-step browser control (agent uses tui_create_window type=browser)
-    # - browser_* legacy aliases
-    # - tui_terminal_*_cmd: duplicates of tui_terminal_write/read
-    # - tui_batch_layout, tui_focus_window, tui_timeline_*: specialist/advanced tools
-    allowed_python_only = {
-        "tui_terminal_write_cmd",
-        "tui_terminal_read_cmd",
-        "tui_batch_layout",
-        "tui_focus_window",
-        "tui_timeline_cancel",
-        "tui_timeline_status",
-    }
-    # Browser tools use dot-notation or legacy underscored names
-    allowed_python_only |= {n for n in py if n.startswith("browser")}
-    missing = py - node - allowed_python_only
-    assert not missing, (
-        f"Python MCP tools missing from Node mcp_tools.js:\n"
-        f"  {sorted(missing)}\n"
-        f"Node has: {sorted(node)}\n"
-        f"Python has: {sorted(py)}"
+    expected = {"tui_list_commands", "tui_menu_command"}
+    assert names == expected, (
+        f"Node MCP tools changed!\n"
+        f"  Expected: {sorted(expected)}\n"
+        f"  Got: {sorted(names)}\n"
+        f"The Node MCP is intentionally generic (2 tools). "
+        f"New commands are discovered at runtime via GET /commands."
     )
 
 
-def test_create_window_not_restrictive_enum():
-    """tui_create_window should use z.string(), not z.enum() for type."""
+def test_tui_list_commands_calls_commands_endpoint():
+    """tui_list_commands must call GET /commands to discover the registry."""
     src = NODE_MCP.read_text()
-    # Find the tui_create_window tool definition and check its type field
-    # Should NOT have z.enum for the type parameter
-    match = re.search(
-        r'tool\(\s*"tui_create_window".*?type:\s*(z\.\w+)',
-        src,
-        re.DOTALL
+    assert "/commands" in src, (
+        "tui_list_commands should call GET /commands for registry discovery"
     )
-    assert match, "Could not find tui_create_window tool definition"
-    validator = match.group(1)
-    assert validator != "z.enum", (
-        f"tui_create_window type uses {validator} — should be z.string() "
-        f"to avoid hardcoding window types"
+
+
+def test_tui_menu_command_calls_menu_endpoint():
+    """tui_menu_command must call POST /menu/command to execute."""
+    src = NODE_MCP.read_text()
+    assert "/menu/command" in src, (
+        "tui_menu_command should call POST /menu/command for execution"
     )
 
 
@@ -100,4 +65,21 @@ def test_bridge_no_hardcoded_mcp_tool_names():
         f"Bridge still has {len(hardcoded)} hardcoded MCP tool names — "
         f"should auto-derive from mcpServer.tools:\n"
         f"  {hardcoded[:5]}..."
+    )
+
+
+def test_bridge_no_phantom_tool_references():
+    """Bridge should not reference tools that don't exist in mcp_tools.js."""
+    bridge_src = BRIDGE.read_text()
+    node_tools = _node_tool_names()
+    # Check for references to old/phantom tool names
+    phantom_patterns = ["tui_create_window", "tui_open_window", "tui_close_window"]
+    found_phantoms = []
+    for phantom in phantom_patterns:
+        if phantom in bridge_src and phantom not in node_tools:
+            found_phantoms.append(phantom)
+    assert not found_phantoms, (
+        f"Bridge references phantom tools not in mcp_tools.js: {found_phantoms}\n"
+        f"Actual Node MCP tools: {sorted(node_tools)}\n"
+        f"Fix claude_sdk_bridge.js to use tui_menu_command instead."
     )

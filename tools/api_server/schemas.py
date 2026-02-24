@@ -40,6 +40,13 @@ class WindowCreate(BaseModel):
         "terminal",
         "wibwob",
         "room_chat",
+        "quadra",
+        "snake",
+        "rogue",
+        "deep_signal",
+        "app_launcher",
+        "gallery",
+        "figlet_text",
     ]
     title: Optional[str] = None
     rect: Optional[RectModel] = None

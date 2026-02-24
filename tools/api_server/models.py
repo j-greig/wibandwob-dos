@@ -34,8 +34,14 @@ class WindowType(str, enum.Enum):
     terminal = "terminal"
     wibwob = "wibwob"
     scramble = "scramble"
-    wallpaper = "wallpaper"
     room_chat = "room_chat"
+    quadra = "quadra"
+    snake = "snake"
+    rogue = "rogue"
+    deep_signal = "deep_signal"
+    app_launcher = "app_launcher"
+    gallery = "gallery"
+    figlet_text = "figlet_text"
 
 
 @dataclass
