@@ -281,10 +281,10 @@ No pause state for turn-based games — the game is always "paused" between keyp
 
 Games can spawn other TUI windows. The pattern uses Turbo Vision's event system:
 
-**Step 1**: Declare command constant (in header or test_pattern_app.cpp):
+**Step 1**: Declare command constant (in header or wwdos_app.cpp):
 ```cpp
 extern const ushort cmRogueHackTerminal;  // in rogue_view.h
-const ushort cmRogueHackTerminal = 218;   // in test_pattern_app.cpp
+const ushort cmRogueHackTerminal = 218;   // in wwdos_app.cpp
 ```
 
 **Step 2**: Post event from game view:
@@ -297,7 +297,7 @@ termEvent.message.infoPtr = nullptr;
 putEvent(termEvent);
 ```
 
-**Step 3**: Handle in test_pattern_app.cpp:
+**Step 3**: Handle in wwdos_app.cpp:
 ```cpp
 case cmRogueHackTerminal: {
     TRect desk = deskTop->getExtent();
@@ -323,16 +323,16 @@ case cmRogueHackTerminal: {
 |---|------|-------------|
 | 1 | `app/game_view.h` | New header with `#define Uses_*`, class decl, factory prototype |
 | 2 | `app/game_view.cpp` | Implementation with `#define Uses_TWindow/TEvent/TKeys` |
-| 3 | `app/test_pattern_app.cpp` | **6 spots**: include, `cmConstant`, menu item `*new TMenuItem("~N~ame", cmFoo, kbNoKey) +`, handleEvent case, friend decl, `api_spawn_*` function |
+| 3 | `app/wwdos_app.cpp` | **6 spots**: include, `cmConstant`, menu item `*new TMenuItem("~N~ame", cmFoo, kbNoKey) +`, handleEvent case, friend decl, `api_spawn_*` function |
 | 4 | `app/command_registry.cpp` | **3 spots**: `extern void api_spawn_*(...)`, capability `{"open_*", "description", false}`, dispatch `if (name == "open_*") { api_spawn_*(app, boundsPtr); return "ok"; }` |
-| 5 | `app/CMakeLists.txt` | Add `game_view.cpp` to test_pattern sources list |
+| 5 | `app/CMakeLists.txt` | Add `game_view.cpp` to wwdos sources list |
 | 6 | `app/command_registry_test.cpp` | Stub `void api_spawn_*(TWwdosApp&, const TRect*) {}` AND test token `"\"name\":\"open_*\""` |
 | 7 | `app/scramble_engine_test.cpp` | Same stub (both test executables link command_registry.cpp) |
 | 8 | (Optional) `tools/api_server/models.py` | `WindowType` enum for REST/MCP parity |
 
 ### Finding the Next Command ID
 
-Scan for highest `const ushort cm* = NNN;` in `app/test_pattern_app.cpp` (around line 225). Use NNN+1. Current highest: `cmRogueHackTerminal = 218`.
+Scan for highest `const ushort cm* = NNN;` in `app/wwdos_app.cpp` (around line 225). Use NNN+1. Current highest: `cmRogueHackTerminal = 218`.
 
 ### Menu Item Syntax
 
@@ -396,7 +396,7 @@ tmux new-session -d -s ww -x 120 -y 40
 sleep 0.5
 
 # MUST redirect stderr — IPC socket won't appear without it
-tmux send-keys -t ww "./build/app/test_pattern 2>/tmp/wibwob_debug.log" Enter
+tmux send-keys -t ww "./build/app/wwdos 2>/tmp/wibwob_debug.log" Enter
 sleep 5
 
 # Verify socket exists before proceeding

@@ -12,10 +12,10 @@ Adding a vendor TView subclass (e.g. tvterm's `BasicTerminalWindow`) touches exa
 | 2 | CMake build | root `CMakeLists.txt` | Build the vendor lib as a static lib target |
 | 3 | CMake link | `app/CMakeLists.txt` | Add .cpp to sources, link the new target |
 | 4 | C++ wrapper | `app/<name>_view.h`, `app/<name>_view.cpp` | Thin subclass + factory function |
-| 5 | Command ID | `test_pattern_app.cpp` | New `cmXxx` constant in the 100-299 range |
-| 6 | Menu item | `test_pattern_app.cpp` `initMenuBar()` | Under appropriate menu (Window, Tools, etc.) |
-| 7 | handleEvent | `test_pattern_app.cpp` | Case for new command ID |
-| 8 | API function | `test_pattern_app.cpp` | `api_spawn_xxx()` + `friend` declaration |
+| 5 | Command ID | `wwdos_app.cpp` | New `cmXxx` constant in the 100-299 range |
+| 6 | Menu item | `wwdos_app.cpp` `initMenuBar()` | Under appropriate menu (Window, Tools, etc.) |
+| 7 | handleEvent | `wwdos_app.cpp` | Case for new command ID |
+| 8 | API function | `wwdos_app.cpp` | `api_spawn_xxx()` + `friend` declaration |
 | 9 | Command registry | `app/command_registry.cpp` | Capability entry + dispatch case |
 | 10 | Window type registry | `app/window_type_registry.cpp` | spawn/match + k_specs table entry |
 | 11 | Test stubs | `command_registry_test.cpp`, `scramble_engine_test.cpp` | Stub for each new extern |
@@ -74,7 +74,7 @@ ctest --test-dir build --output-on-failure
 uv run --with pytest pytest tests/room/ -q
 
 # 4. Manual: launch app, open terminal from Window menu, type in it
-./build/app/test_pattern
+./build/app/wwdos
 
 # 5. API test: open terminal via IPC
 curl -X POST http://127.0.0.1:8089/exec -d '{"command":"open_terminal"}'

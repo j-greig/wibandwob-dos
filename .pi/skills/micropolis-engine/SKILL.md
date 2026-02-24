@@ -130,7 +130,7 @@ Save:   F2=save  F3=load  Tab=cycle slot(1-3)  → saves/slotN.city
   - random seed per new Micropolis window, or
   - keep deterministic default and add a "new random city" command/key.
 - Crash-log reminder for fish/zsh:
-  - Correct: `WIBWOB_INSTANCE=12 ./build/app/test_pattern 2> /tmp/wibwob_micropolis_crash.log`
+  - Correct: `WIBWOB_INSTANCE=12 ./build/app/wwdos 2> /tmp/wibwob_micropolis_crash.log`
   - Wrong: redirecting to `/tmp/` (directory) causes shell error before app run.
 - Multi-instance run hygiene:
   - If IPC socket conflict appears, set unique `WIBWOB_INSTANCE`.

@@ -177,7 +177,7 @@ reg = subprocess.check_output(
 registered = sorted(set(r.strip('"') for r in reg if len(r) > 3))
 
 # 2. Get types with props serialisation (buildWorkspaceJson)
-cpp = open("app/test_pattern_app.cpp").read()
+cpp = open("app/wwdos_app.cpp").read()
 serialised = re.findall(r'type == "([a-z_]+)"', cpp)
 
 # 3. Get types with restore cases (loadWorkspaceFromFile)

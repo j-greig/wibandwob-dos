@@ -17,7 +17,7 @@ apt-get install -y cmake build-essential libncursesw5-dev libgpm-dev libssl-dev
 ```bash
 cmake . -B build-linux -DCMAKE_BUILD_TYPE=Release
 cmake --build build-linux -j$(nproc)
-file build-linux/app/test_pattern   # must say ELF, not Mach-O
+file build-linux/app/wwdos   # must say ELF, not Mach-O
 ```
 
 Always use `build-linux/` — never share build dirs with macOS `build/`.

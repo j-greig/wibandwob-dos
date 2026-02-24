@@ -61,14 +61,14 @@ docker compose logs wibwobdos         # startup log
 
 ## Module layout (post-E012)
 
-`test_pattern_app.cpp` is being progressively extracted. New shared modules — include these
+`wwdos_app.cpp` is being progressively extracted. New shared modules — include these
 instead of adding code back into the god-object:
 
 | Path | Contents |
 |---|---|
 | `app/core/json_utils.h` | `inline json_escape(s)` — use everywhere, do not re-implement |
 | `app/ui/ui_helpers.h` | `makeStringCollection(vector<string>)` — builds `TStringCollection*` |
-| `app/windows/frame_animation_window.h/.cpp` | `TFrameAnimationWindow` — extracted from `test_pattern_app.cpp` |
+| `app/windows/frame_animation_window.h/.cpp` | `TFrameAnimationWindow` — extracted from `wwdos_app.cpp` |
 | `app/paint/paint_wwp_codec.h/.cpp` | `.wwp` JSON codec: `buildWwpJson`, `saveWwpFile`, `loadWwpFromString` |
 | `app/paint/` | Paint canvas, tools, palette, status — already well-organised |
 
@@ -80,7 +80,7 @@ This predates E012. Build `test_pattern` target only — it is the main binary.
 **Always build after editing C++ files.** Do not report success without a clean build.
 
 ```bash
-cmake --build ./build --target test_pattern 2>&1 | tail -5
+cmake --build ./build --target wwdos 2>&1 | tail -5
 ```
 
 If there are errors, fix them before proceeding. Most common issues:

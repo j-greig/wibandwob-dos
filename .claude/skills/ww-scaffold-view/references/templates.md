@@ -96,7 +96,7 @@ For `browser-like`, `draw()` includes:
     // WARNING: Never write raw ANSI escape sequences to TDrawBuffer
 ```
 
-## handleEvent case (test_pattern_app.cpp)
+## handleEvent case (wwdos_app.cpp)
 
 ```cpp
 case cm{PascalName}: {

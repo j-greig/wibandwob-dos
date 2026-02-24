@@ -165,7 +165,7 @@ Grep counts below are for live/actionable files and exclude noise/artifacts:
 - `app/run_test_pattern_logged.sh` -> `app/run_wwdos_logged.sh`
 - `tools/api_server/move_test_pattern.py` -> `tools/api_server/move_wwdos.py` (done; script semantics still target the `"test_pattern"` window type)
 
-### [ ] Phase 5: Documentation / Skills / Planning Sweep
+### [x] Phase 5: Documentation / Skills / Planning Sweep
 
 **Estimate**: 0.5-1.0 day (depending on historical docs scope)
 

@@ -35,12 +35,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 # 1. Kill everything stale
-pkill -f test_pattern 2>/dev/null || true
+pkill -f wwdos 2>/dev/null || true
 tmux kill-session -t wibwob 2>/dev/null || true
 rm -f /tmp/wibwob_1.sock /tmp/wwdos.sock /tmp/test_pattern_app.sock
 
 # 2. Start TUI with WIBWOB_INSTANCE=1  →  socket: /tmp/wibwob_1.sock
-WIBWOB_INSTANCE=1 tmux new-session -d -s wibwob "./build/app/test_pattern 2>/tmp/wibwob_debug.log"
+WIBWOB_INSTANCE=1 tmux new-session -d -s wibwob "./build/app/wwdos 2>/tmp/wibwob_debug.log"
 until [ -S /tmp/wibwob_1.sock ]; do sleep 0.5; done && echo "TUI socket ready"
 
 # 3. Attach so canvas locks to your real terminal size, then detach
@@ -70,10 +70,10 @@ cmake . -B ./build -DCMAKE_BUILD_TYPE=Release
 cmake --build ./build
 
 # Run main app
-./build/app/test_pattern
+./build/app/wwdos
 
 # Run with debug logging
-./build/app/test_pattern 2> /tmp/wibwob_debug.log
+./build/app/wwdos 2> /tmp/wibwob_debug.log
 
 # Start API server (auto-creates venv, installs deps)
 ./start_api_server.sh
@@ -124,7 +124,7 @@ When running inside Claude Code on the web (or any headless environment), use th
 ```bash
 # Kill any stale sessions, then launch — NO hardcoded -x/-y (inherits real terminal on attach)
 tmux kill-server 2>/dev/null
-WIBWOB_INSTANCE=1 tmux new-session -d -s wibwob ./build/app/test_pattern
+WIBWOB_INSTANCE=1 tmux new-session -d -s wibwob ./build/app/wwdos
 
 # Attach once so the session locks to your actual terminal dimensions, then detach
 tmux attach -t wibwob   # Ctrl-B D to detach
@@ -196,7 +196,7 @@ Human / AI Agent
                               │
               ┌───────────────▼──────────────────┐
               │  C++ TUI App (Turbo Vision)      │
-              │  test_pattern_app.cpp (~2600 LOC) │
+              │  wwdos_app.cpp (~2600 LOC) │
               │  ├─ Window management             │
               │  ├─ Generative art engines (8+)   │
               │  ├─ WibWobEngine (LLM dispatch)   │
@@ -220,7 +220,7 @@ Human / AI Agent
 
 ### Key Entry Points
 
-- **`app/test_pattern_app.cpp`** — Main TUI app: desktop, menus, window management, chat integration
+- **`app/wwdos_app.cpp`** — Main TUI app: desktop, menus, window management, chat integration
 - **`app/wibwob_engine.h/cpp`** — LLM provider lifecycle, tool execution, system prompts
 - **`app/wibwob_view.h/cpp`** — Chat interface: TWibWobWindow (MessageView + InputView), streaming support
 - **`app/api_ipc.h/cpp`** — Unix socket listener, JSON command/response protocol
@@ -281,7 +281,7 @@ curl -X POST .../gallery/arrange -d '{"frameless":true,"shadowless":true,...}'
 curl -X POST .../gallery/arrange -d '{"show_title":true,...}'
 ```
 
-**C++ location**: `TFrameAnimationWindow` constructor in `app/test_pattern_app.cpp`.
+**C++ location**: `TFrameAnimationWindow` constructor in `app/wwdos_app.cpp`.
 `frameless` → chooses `TGhostFrame` vs `TFrame` via `TWindowInit`.
 `shadowless` → clears `sfShadow` state flag post-construction.
 `title` kv arg → passed as `aTitle` to `TWindow`; visible only when framed.

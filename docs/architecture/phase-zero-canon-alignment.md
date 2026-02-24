@@ -20,7 +20,7 @@ Scope: S01 PR-1 vertical slice only
 
 ## Invariants Applied to This Repo
 
-1. Engine command authority remains in C++ (`app/test_pattern_app.cpp` handlers).
+1. Engine command authority remains in C++ (`app/wwdos_app.cpp` handlers).
 2. API/MCP command exposure must derive from a canonical source, not hardcoded duplicates.
 3. Existing behavior is preserved where possible; PR-1 migrates a single vertical path.
 4. Contracts live under versioned `contracts/` and are validated in tests.

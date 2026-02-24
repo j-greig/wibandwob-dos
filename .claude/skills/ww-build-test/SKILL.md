@@ -58,7 +58,7 @@ curl -sf -X POST http://127.0.0.1:8089/browser/fetch_ext \
 
 ### 7. Parity check (strict only)
 Read `app/command_registry.cpp` capabilities, compare against:
-- Menu items in `test_pattern_app.cpp`
+- Menu items in `wwdos_app.cpp`
 - MCP tools in `tools/api_server/mcp_tools.py`
 Report symmetric diff.
 
@@ -111,8 +111,8 @@ Each failed stage includes:
 
 ## Paths
 - Build: `./build`
-- Binary: `./build/app/test_pattern`
+- Binary: `./build/app/wwdos`
 - API: `./start_api_server.sh` (port 8089)
 - Screenshots: `./logs/screenshots/`
-- Debug: `./build/app/test_pattern 2> /tmp/wibwob_debug.log`
+- Debug: `./build/app/wwdos 2> /tmp/wibwob_debug.log`
 - Socket: `/tmp/wwdos.sock` (legacy fallback: `/tmp/test_pattern_app.sock`)

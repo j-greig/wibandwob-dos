@@ -3,9 +3,9 @@
 ## Command Definition Surfaces (Current)
 
 1. Turbo Vision menu command IDs and handlers are defined in C++:
-   - `app/test_pattern_app.cpp:126` (command constants)
-   - `app/test_pattern_app.cpp:677` (command dispatch switch)
-   - `app/test_pattern_app.cpp:1655` (menu item bindings)
+   - `app/wwdos_app.cpp:126` (command constants)
+   - `app/wwdos_app.cpp:677` (command dispatch switch)
+   - `app/wwdos_app.cpp:1655` (menu item bindings)
 2. IPC command parsing and dispatch exists independently:
    - `app/api_ipc.cpp:151` (line protocol parse)
    - `app/api_ipc.cpp:169` (IPC command dispatch switch)

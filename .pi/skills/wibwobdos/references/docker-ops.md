@@ -3,7 +3,7 @@
 ## Startup sequence (start-wibwobdos.sh)
 
 1. Install Python deps from `requirements.txt`
-2. Detect binary: check `build-linux/app/test_pattern` is ELF, build if missing
+2. Detect binary: check `build-linux/app/wwdos` is ELF, build if missing
 3. Start `test_pattern` with `WIBWOB_INSTANCE=N`, wait for IPC socket
 4. Set terminal size (120×40) and SIGWINCH the app
 5. Start uvicorn on `0.0.0.0:8089`
@@ -24,7 +24,7 @@ Docker PTYs often start at 0×0 → empty screenshots. Fix:
 ```bash
 docker compose exec wibwobdos bash -c '
   stty -F /dev/pts/0 rows 40 cols 120
-  kill -WINCH $(pgrep test_pattern)
+  kill -WINCH $(pgrep wwdos)
 '
 ```
 

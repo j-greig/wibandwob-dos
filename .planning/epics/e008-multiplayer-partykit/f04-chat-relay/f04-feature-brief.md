@@ -55,7 +55,7 @@ Scramble chat messages from one WibWob instance appear in the Scramble window of
 ## Tests
 
 - `tests/room/test_chat_relay.py` — 11 tests, all passing
-- C++ builds clean: `cmake --build ./build --target test_pattern`
+- C++ builds clean: `cmake --build ./build --target wwdos`
 
 ## Status
 

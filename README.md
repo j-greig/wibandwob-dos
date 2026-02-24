@@ -82,10 +82,10 @@ cmake . -B ./build -DCMAKE_BUILD_TYPE=Release
 cmake --build ./build
 
 # Run WibWob-DOS
-./build/app/test_pattern
+./build/app/wwdos
 
 # With debug logging
-./build/app/test_pattern 2> /tmp/wibwob_debug.log
+./build/app/wwdos 2> /tmp/wibwob_debug.log
 ```
 
 ### Enable AI Chat
@@ -97,7 +97,7 @@ LLM auth is auto-detected at startup. Just run `claude /login` once — both Wib
 ./start_api_server.sh
 
 # Terminal 2: Run WibWob-DOS
-./build/app/test_pattern
+./build/app/wwdos
 # Then: Tools > Wib&Wob Chat (F12)
 ```
 
@@ -119,10 +119,10 @@ Run multiple isolated WibWob-DOS instances side by side, each with its own IPC s
 
 ```bash
 # Instance 1
-WIBWOB_INSTANCE=1 ./build/app/test_pattern 2>/tmp/wibwob_1.log
+WIBWOB_INSTANCE=1 ./build/app/wwdos 2>/tmp/wibwob_1.log
 
 # Instance 2
-WIBWOB_INSTANCE=2 ./build/app/test_pattern 2>/tmp/wibwob_2.log
+WIBWOB_INSTANCE=2 ./build/app/wwdos 2>/tmp/wibwob_2.log
 
 # Monitor dashboard (discovers all running instances)
 python3 tools/monitor/instance_monitor.py
@@ -138,7 +138,7 @@ Serve WibWob-DOS to a web browser via [ttyd](https://github.com/nicm/ttyd) PTY b
 ```bash
 brew install ttyd  # macOS
 ttyd --port 7681 --writable -t fontSize=14 -t 'theme={"background":"#000000"}' \
-  bash -c 'cd /path/to/repo && TERM=xterm-256color WIBWOB_INSTANCE=1 exec ./build/app/test_pattern'
+  bash -c 'cd /path/to/repo && TERM=xterm-256color WIBWOB_INSTANCE=1 exec ./build/app/wwdos'
 # Open http://localhost:7681 in browser
 ```
 

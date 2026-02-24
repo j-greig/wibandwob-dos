@@ -31,7 +31,7 @@ Ask for any not provided:
 ## Procedure
 
 ### 1. Find next command ID
-Scan `app/test_pattern_app.cpp` for highest `const ushort cm* = NNN;`, use NNN+1.
+Scan `app/wwdos_app.cpp` for highest `const ushort cm* = NNN;`, use NNN+1.
 
 ### 2. Generate C++ files
 Create `app/{name}_view.h` and `app/{name}_view.cpp`. See `references/templates.md` for exact templates by type.
@@ -39,7 +39,7 @@ Create `app/{name}_view.h` and `app/{name}_view.cpp`. See `references/templates.
 ### 3. Patch CMakeLists
 Add `{name}_view.cpp` to `test_pattern` sources in `app/CMakeLists.txt`.
 
-### 4. Patch test_pattern_app.cpp
+### 4. Patch wwdos_app.cpp
 1. `#include "{name}_view.h"` near other view includes (~line 77)
 2. `const ushort cm{PascalName} = {next_id};` with command constants
 3. Forward-declare factory: `class TWindow; TWindow* create{PascalName}Window(const TRect &bounds);`
@@ -58,7 +58,7 @@ In `app/command_registry.cpp`:
 
 ### 7. Build
 ```bash
-cmake --build ./build --target test_pattern 2>&1
+cmake --build ./build --target wwdos 2>&1
 ```
 
 ### 8. Parity report
@@ -80,6 +80,6 @@ schemas:   yes/no
 - Animated types use `TTimerId` pattern from `animated_blocks_view`.
 
 ## Acceptance
-- `cmake --build ./build --target test_pattern` passes
+- `cmake --build ./build --target wwdos` passes
 - No unused command IDs
 - Parity report clean for requested scope

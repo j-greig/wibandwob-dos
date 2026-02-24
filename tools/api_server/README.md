@@ -35,7 +35,7 @@ Alternative using uv (faster):
 Run the C++ App (for live control)
 - Build once (from repo root): `cmake -S . -B build && cmake --build build -j`
 - Build test app (from `test-tui`): `mkdir -p build && cd build && cmake .. && cmake --build . -j`
-- Run the app: `./test_pattern`
+- Run the app: `./wwdos`
 - Verify socket exists (new terminal): `ls -l /tmp/wwdos.sock` (legacy fallback: `/tmp/test_pattern_app.sock`)
 
 Window Types
@@ -47,7 +47,7 @@ Window Types
 - **wallpaper** — Static wallpaper patterns
 
 IPC Bridge to the C++ App
-- The C++ `test_pattern` app now starts a Unix-domain socket listener at `/tmp/wwdos.sock` (legacy fallback: `/tmp/test_pattern_app.sock`).
+- The C++ `wwdos` app now starts a Unix-domain socket listener at `/tmp/wwdos.sock` (legacy fallback: `/tmp/test_pattern_app.sock`).
 - This FastAPI server auto-forwards core commands to the live app when the socket is available.
 - To change the socket path, set `TV_IPC_SOCK=/custom/path.sock` (in both app and server if changed).
 
@@ -361,4 +361,4 @@ Design Notes and Next Steps
 - The `Controller` is the swap point for a C++ bridge:
   - Option A: In-process HTTP server embedded into the TV app and route directly to UI-thread handlers.
   - Option B: IPC (Unix domain socket / named pipe) where Python speaks JSON-RPC to the app; `Controller` forwards calls and mirrors state.
-- Once bridged, endpoints should call into actual menu commands and window factories from `test_pattern_app.cpp` and related modules.
+- Once bridged, endpoints should call into actual menu commands and window factories from `wwdos_app.cpp` and related modules.

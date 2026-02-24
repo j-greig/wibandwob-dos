@@ -49,8 +49,8 @@ PR #42 was marked done with ACs ticked, but the C++ IPC handlers are no-ops. The
 | Contract schema | Done — `contracts/state/v1/snapshot.schema.json` has `theme_mode`/`theme_variant` | None |
 | Command registry entries | Done — `app/command_registry.cpp:27-29` | None |
 | Command registry dispatch | Done — `app/command_registry.cpp:104-117` calls `api_set_theme_*` | None |
-| **IPC handlers (C++ impl)** | **Stubs** — `app/test_pattern_app.cpp:2748-2765` | **Wire to app state** |
-| **App state storage** | **Missing** — `TTestPatternApp` (line 534) has no theme members | **Add `ThemeMode`/`ThemeVariant` members** |
+| **IPC handlers (C++ impl)** | **Stubs** — `app/wwdos_app.cpp:2748-2765` | **Wire to app state** |
+| **App state storage** | **Missing** — `TWwdosApp` (line 534) has no theme members | **Add `ThemeMode`/`ThemeVariant` members** |
 | **`get_state` JSON output** | **Missing** — `api_get_state` (line 2008) emits only `windows` array | **Add `theme_mode`/`theme_variant` fields** |
 | **Surface application** | **Missing** — no draw calls reference `ThemeManager` | **Apply to desktop bg, frames, menus, status** |
 | **Repaint on change** | **Missing** | **Trigger `redraw()` after state mutation** |
@@ -63,9 +63,9 @@ PR #42 was marked done with ACs ticked, but the C++ IPC handlers are no-ops. The
 
 | File | What's there | What to change |
 |------|-------------|----------------|
-| `app/test_pattern_app.cpp:534` | `TTestPatternApp` class definition | Add `ThemeMode currentThemeMode` + `ThemeVariant currentThemeVariant` members |
-| `app/test_pattern_app.cpp:2748-2765` | Stub IPC handlers: `api_set_theme_mode`, `api_set_theme_variant`, `api_reset_theme` | Store values on `app`, call `ThemeManager::getColor()`, trigger repaint |
-| `app/test_pattern_app.cpp:2008-2051` | `api_get_state` — builds JSON with `windows` only | Add `"theme_mode":"<val>","theme_variant":"<val>"` to output |
+| `app/wwdos_app.cpp:534` | `TWwdosApp` class definition | Add `ThemeMode currentThemeMode` + `ThemeVariant currentThemeVariant` members |
+| `app/wwdos_app.cpp:2748-2765` | Stub IPC handlers: `api_set_theme_mode`, `api_set_theme_variant`, `api_reset_theme` | Store values on `app`, call `ThemeManager::getColor()`, trigger repaint |
+| `app/wwdos_app.cpp:2008-2051` | `api_get_state` — builds JSON with `windows` only | Add `"theme_mode":"<val>","theme_variant":"<val>"` to output |
 | `app/theme_manager.h` | `ThemeMode`, `ThemeVariant` enums; `ThemeManager` static class | No changes needed |
 | `app/theme_manager.cpp` | `getColor()`, parse/toString helpers | No changes needed |
 | `app/command_registry.cpp:14-16` | `extern` declarations for stub handlers | No changes needed |
@@ -92,7 +92,7 @@ Turbo Vision uses `mapColor()` and palette overrides for theming. Key surfaces t
 - **Status line**: `TCustomStatusLine` — may need `mapColor` override
 - **Dialog boxes**: palette inheritance from `TApplication::getPalette()` (line 541)
 
-The `TTestPatternApp::getPalette()` (line 541) is the master palette — modifying it and calling `redraw()` on the desktop should cascade to all surfaces.
+The `TWwdosApp::getPalette()` (line 541) is the master palette — modifying it and calling `redraw()` on the desktop should cascade to all surfaces.
 
 ## Features
 
@@ -143,7 +143,7 @@ Test: mock time near dusk, set mode auto, assert resolved mode == dark.
 
 ## Rollback
 
-Revert IPC handler bodies in `app/test_pattern_app.cpp:2748-2765` to stubs. Remove any new app members. ThemeManager, API endpoints, Python controller, MCP tools, and routing from E003 remain untouched.
+Revert IPC handler bodies in `app/wwdos_app.cpp:2748-2765` to stubs. Remove any new app members. ThemeManager, API endpoints, Python controller, MCP tools, and routing from E003 remain untouched.
 
 ## Build & Verify
 
@@ -152,7 +152,7 @@ Revert IPC handler bodies in `app/test_pattern_app.cpp:2748-2765` to stubs. Remo
 cmake . -B ./build -DCMAKE_BUILD_TYPE=Release && cmake --build ./build
 
 # Run TUI (terminal 1)
-./build/app/test_pattern
+./build/app/wwdos
 
 # Start API (terminal 2)
 ./start_api_server.sh
