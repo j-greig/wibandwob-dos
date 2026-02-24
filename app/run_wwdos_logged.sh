@@ -2,12 +2,10 @@
 # Run wwdos with debug logging to file + live tail capability
 #
 # Usage:
-#   cd test-tui && ./run_wwdos_logged.sh    # Run with logging
-#   tail -f test-tui/test_pattern_debug.log        # Watch logs live (separate terminal)
+#   cd app && ./run_wwdos_logged.sh         # Run with logging
+#   tail -f app/logs/wwdos_*.log            # Watch logs live (separate terminal)
 #
-# IMPORTANT: Must be run from test-tui directory (where .env and wibandwob.prompt.md are located)
-#
-# Debug logs written to: test_pattern_debug.log
+# Debug logs written to: app/logs/wwdos_<timestamp>.log
 # On quit, logs will also appear in terminal
 
 set -e
@@ -15,16 +13,15 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-# Check we're in the right directory
-if [[ ! -f "wibandwob.prompt.md" ]] || [[ ! -f "../.env" ]]; then
-    echo "❌ Error: Must run from test-tui directory"
-    echo "   Usage: cd test-tui && ./run_wwdos_logged.sh"
-    exit 1
+BINARY="../build/app/wwdos"
+if [[ ! -f "$BINARY" ]]; then
+    # Fallback: check local build dir (if built from app/)
+    BINARY="build/wwdos"
 fi
 
-if [[ ! -f "build/wwdos" ]]; then
-    echo "❌ Error: build/wwdos not found"
-    echo "   Build first: cmake . -B ./build && cmake --build ./build"
+if [[ ! -f "$BINARY" ]]; then
+    echo "❌ Error: wwdos binary not found"
+    echo "   Build first: cmake . -B ./build && cmake --build ./build --target wwdos"
     exit 1
 fi
 
@@ -33,7 +30,7 @@ mkdir -p logs
 
 # Generate timestamped log filename
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
-LOG_FILE="logs/test_pattern_${TIMESTAMP}.log"
+LOG_FILE="logs/wwdos_${TIMESTAMP}.log"
 
 echo "🚀 Starting wwdos with debug logging"
 echo "   Working dir: $(pwd)"
@@ -42,6 +39,4 @@ echo "   Tip: Run 'tail -f $LOG_FILE' in another terminal to watch live"
 echo ""
 
 # Run with stderr redirected to log file AND still visible on quit
-# The process substitution ensures logs are written immediately to file
-# while still being available in terminal when app exits
-./build/wwdos 2> >(tee "$LOG_FILE" >&2)
+$BINARY 2> >(tee "$LOG_FILE" >&2)

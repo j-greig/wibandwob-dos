@@ -19,9 +19,9 @@ import time
 def discover_sockets():
     """Find all /tmp/wibwob_*.sock files plus default and legacy paths."""
     socks = sorted(glob.glob("/tmp/wibwob_*.sock"))
-    for path in ("/tmp/wwdos.sock", "/tmp/test_pattern_app.sock"):
-        if os.path.exists(path) and path not in socks:
-            socks.insert(0, path)
+    defaults = [p for p in ("/tmp/wwdos.sock", "/tmp/test_pattern_app.sock")
+                if os.path.exists(p) and p not in socks]
+    socks = defaults + socks
     return socks
 
 
