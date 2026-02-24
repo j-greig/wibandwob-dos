@@ -8,7 +8,7 @@ GitHub issue: —
 PR: —
 
 ## Active Items
-- —
+- `spike` — Pi-in-tvterm as agentic hands for W&W: rather than inter-instance chat, run a Pi/Claude agent inside a tvterm window, give it access to the WibWob API, and let it operate the DOS autonomously — spawning windows, painting canvases, calling MCP tools — as a "body" layer separate from the W&W chat "voice" layer; Pi inter-instance protocol is a poor fit for symbient identity but a natural fit for task handoff between agents sharing a session
 
 ## Completed Items
 - [x] `task` #36 — always-on Codex<>Claude mailbox daemon with unread notifications
