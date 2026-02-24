@@ -143,6 +143,51 @@ Canvas buffer is allocated at construction. On resize, `size` grows but buffer s
 | `docker-compose.real.yml` | Real mode override |
 | `skills/wibwobdos-api/SKILL.md` | Symbient-facing API skill (separate) |
 
+## REST API cheat sheet
+
+Base URL: `http://127.0.0.1:8089`  
+Discover everything: `curl -s $API/openapi.json | python3 -m json.tool`
+
+### Windows
+
+```bash
+# Current state of all windows (positions, sizes, types) — USE THIS not GET /windows
+curl -s $API/state | python3 -c "import sys,json; [print(w) for w in json.load(sys.stdin)['windows']]"
+
+# Open a window
+curl -s $API/windows -X POST -H "Content-Type: application/json" -d '{"type":"wibwob"}'
+
+# Move AND/OR resize a window  (all fields optional)
+curl -s $API/windows/w1/move -X POST -H "Content-Type: application/json" \
+  -d '{"x":2,"y":1,"w":70,"h":27}'
+
+# Focus, close, clone
+curl -s $API/windows/w1/focus -X POST
+curl -s $API/windows/w1/close -X POST
+curl -s $API/windows/close_all -X POST
+```
+
+### IPC commands (exec via /menu/command)
+
+```bash
+# List all available commands
+curl -s $API/capabilities | python3 -c "import sys,json; print('\n'.join(json.load(sys.stdin)['commands']))"
+
+# Send a command  ← result is DOUBLE-WRAPPED: json.loads(outer['result'])
+curl -s $API/menu/command -X POST -H "Content-Type: application/json" \
+  -d '{"command":"get_chat_history"}' \
+  | python3 -c "import sys,json; outer=json.load(sys.stdin); print(json.loads(outer['result']))"
+
+# Chat
+curl -s $API/menu/command -X POST -H "Content-Type: application/json" \
+  -d '{"command":"wibwob_ask","args":{"text":"hello"}}'
+```
+
+### Window IDs
+
+Windows are assigned IDs `w1`, `w2`, etc. in creation order per session.  
+Always read current IDs from `GET /state` — they reset on restart.
+
 ## Related skills (`.agents/skills/`)
 
 > These are Claude Code / Codex agent skills, not pi skills — stored in `.agents/skills/` rather than `.pi/skills/`. Load them when the task matches.
