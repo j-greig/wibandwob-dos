@@ -12,8 +12,8 @@ One-shot build, test, and verify cycle for WibWob-DOS.
 | Mode | What runs |
 |------|-----------|
 | `quick` | build + ctest + health check |
-| `standard` | quick + API smoke + IPC smoke |
-| `strict` | standard + parity checks + planning brief validation + `gh status` |
+| `standard` | quick + API smoke + IPC smoke + **parity gate** |
+| `strict` | standard + planning brief validation + `gh status` |
 | `screenshot` | quick + TUI screenshot capture for visual review |
 
 Default: `quick`
@@ -56,11 +56,12 @@ curl -sf -X POST http://127.0.0.1:8089/browser/fetch_ext \
   -d '{"url":"https://example.com","reader":"readability"}'
 ```
 
-### 7. Parity check (strict only)
-Read `app/command_registry.cpp` capabilities, compare against:
-- Menu items in `wwdos_app.cpp`
-- MCP tools in `tools/api_server/mcp_tools.py`
-Report symmetric diff.
+### 7. Parity gate (standard+, MANDATORY for any registry/surface changes)
+```bash
+uv run --with pytest pytest tests/contract/test_window_type_parity.py tests/contract/test_surface_parity_matrix.py tests/contract/test_node_mcp_parity.py -v
+```
+This catches: C++ window types missing from Python enum/schema, commands missing MCP tool builders, Node MCP drift.
+**If this fails, the build is NOT green.** See `CLAUDE.md` "Parity Law" for the full wiring checklist.
 
 ### 8. Planning brief check (strict only)
 For any changed `*-brief.md` files (via `git diff --name-only`):

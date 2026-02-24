@@ -347,18 +347,45 @@ uv run --with pytest pytest tests/contract/test_window_type_parity.py tests/cont
 
 These tests auto-derive from C++ source — no hardcoded mapping tables. They will fail immediately if a new C++ type or command is added without updating the Python side.
 
-### Adding a new window type
-1. Add entry to `k_specs[]` in `app/window_type_registry.cpp` (type slug, spawn fn, match fn)
-2. Add value to `WindowType` enum in `tools/api_server/models.py`
-3. If spawnable: add to `WindowCreate` Literal in `tools/api_server/schemas.py`
-4. Run: `pytest tests/contract/test_window_type_parity.py`
+### ⛔ Parity Law — read this before adding ANY window type or command
 
-### Adding a new command
-1. Add to `get_command_capabilities()` in `app/command_registry.cpp`
-2. Add dispatch in `exec_registry_command()` in same file
-3. Add MCP tool builder in `_command_tool_builders()` in `tools/api_server/mcp_tools.py`
-4. Add matching tool in `app/llm/sdk_bridge/mcp_tools.js` (Node MCP for embedded agent)
-5. Run: `pytest tests/contract/test_surface_parity_matrix.py tests/contract/test_node_mcp_parity.py`
+**Every new window type or command MUST be wired across ALL surfaces in one PR.** Partial wiring is a bug. The parity tests enforce this — run them before committing.
+
+Detailed checklist: `.claude/skills/ww-scaffold-view/SKILL.md` (window types) or the command checklist below.
+
+### Adding a new window type (ALL steps mandatory)
+
+| # | File | What |
+|---|------|------|
+| 1 | `app/window_type_registry.cpp` | Add entry to `k_specs[]` (slug, spawn fn, match fn) |
+| 2 | `app/wwdos_app.cpp` | Add `#include`, command constant, factory function, menu item, `handleEvent` case |
+| 3 | `app/CMakeLists.txt` | Add `.cpp` to `wwdos` target sources |
+| 4 | `app/command_registry.cpp` | Add `open_<name>` capability + dispatch case |
+| 5 | `tools/api_server/models.py` | Add to `WindowType` enum |
+| 6 | `tools/api_server/schemas.py` | Add to `WindowCreate.type` Literal |
+| 7 | Run parity gate | `uv run --with pytest pytest tests/contract/test_window_type_parity.py tests/contract/test_surface_parity_matrix.py -v` |
+
+If step 7 fails, you missed a surface. Fix it before committing.
+
+### Adding a new command (ALL steps mandatory)
+
+| # | File | What |
+|---|------|------|
+| 1 | `app/command_registry.cpp` | Add to `get_command_capabilities()` with name, description, params, dangerous flag |
+| 2 | `app/command_registry.cpp` | Add dispatch in `exec_registry_command()` |
+| 3 | `tools/api_server/mcp_tools.py` | Add MCP tool builder in `_command_tool_builders()` |
+| 4 | `app/llm/sdk_bridge/mcp_tools.js` | Add matching tool (Node MCP for embedded agent) |
+| 5 | Run parity gate | `uv run --with pytest pytest tests/contract/test_surface_parity_matrix.py tests/contract/test_node_mcp_parity.py -v` |
+
+If step 5 fails, you missed a surface. Fix it before committing.
+
+### Parity gate (run after ANY registry/surface change)
+
+```bash
+uv run --with pytest pytest tests/contract/test_window_type_parity.py tests/contract/test_surface_parity_matrix.py tests/contract/test_node_mcp_parity.py -v
+```
+
+This is also run by `ww-build-test` in `strict` mode. **Do not merge PRs that touch command or window type surfaces without a green parity gate.**
 
 ### Node MCP bridge (embedded Wib&Wob agent)
 The embedded agent uses `app/llm/sdk_bridge/mcp_tools.js` for TUI control tools.

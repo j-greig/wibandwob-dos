@@ -100,6 +100,14 @@ When asked to "tidy", "polish", or "close out" an epic/feature, treat it as a ca
 3. Add tests for parity/contracts/state sanity when refactoring command surfaces.
 4. Include rollback notes in issue/PR artifacts.
 
+## Parity Law (MANDATORY)
+
+Every new window type or command must be wired across ALL surfaces in one PR: C++ registry, Python enum/schema, MCP tools, Node MCP. Run the parity gate before committing:
+```bash
+uv run --with pytest pytest tests/contract/test_window_type_parity.py tests/contract/test_surface_parity_matrix.py tests/contract/test_node_mcp_parity.py -v
+```
+Full checklists: `CLAUDE.md` "Parity Law" section. Architecture: `.planning/audits/command-surface-audit-20260224.md`.
+
 ## Turbo Vision ANSI Guardrail
 
 See CLAUDE.md "Turbo Vision ANSI Rendering Rule" section for the full guardrail and prompt template. Summary: never write raw ANSI escapes to `TDrawBuffer`; always parse to cell model first.

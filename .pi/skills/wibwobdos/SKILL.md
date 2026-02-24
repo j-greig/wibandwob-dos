@@ -232,6 +232,19 @@ curl -s $API/menu/command -X POST -H "Content-Type: application/json" \
 Windows are assigned IDs `w1`, `w2`, etc. in creation order per session.  
 Always read current IDs from `GET /state` — they reset on restart.
 
+## Parity enforcement
+
+The C++ command registry and window type registry are the single source of truth. Python enums, schemas, MCP tools, and Node bridge tools must stay in sync. **Parity drift is the #1 recurring bug in this repo.**
+
+Before merging any PR that touches commands or window types:
+```bash
+uv run --with pytest pytest tests/contract/test_window_type_parity.py tests/contract/test_surface_parity_matrix.py tests/contract/test_node_mcp_parity.py -v
+```
+
+Full wiring checklists: see `CLAUDE.md` "Parity Law" section.
+Scaffold helper: `.claude/skills/ww-scaffold-view/SKILL.md`.
+Architecture audit: `.planning/audits/command-surface-audit-20260224.md`.
+
 ## Related skills (`.agents/skills/`)
 
 > These are Claude Code / Codex agent skills, not pi skills — stored in `.agents/skills/` rather than `.pi/skills/`. Load them when the task matches.

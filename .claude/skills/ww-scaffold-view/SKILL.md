@@ -37,7 +37,7 @@ Scan `app/wwdos_app.cpp` for highest `const ushort cm* = NNN;`, use NNN+1.
 Create `app/{name}_view.h` and `app/{name}_view.cpp`. See `references/templates.md` for exact templates by type.
 
 ### 3. Patch CMakeLists
-Add `{name}_view.cpp` to `test_pattern` sources in `app/CMakeLists.txt`.
+Add `{name}_view.cpp` to `wwdos` target sources in `app/CMakeLists.txt`.
 
 ### 4. Patch wwdos_app.cpp
 1. `#include "{name}_view.h"` near other view includes (~line 77)
@@ -52,8 +52,9 @@ In `app/command_registry.cpp`:
 - Add dispatch case in `exec_registry_command()`
 
 ### 6. Patch Python surfaces (only `full-parity`)
-- `tools/api_server/models.py` — `WindowType` enum value
-- `tools/api_server/controller.py` — `create_window()` case
+- `tools/api_server/models.py` — add to `WindowType` enum
+- `tools/api_server/schemas.py` — add to `WindowCreate.type` Literal (⚠️ this is the one people forget!)
+- `tools/api_server/controller.py` — `create_window()` case if needed
 - `tools/api_server/mcp_tools.py` — update valid types in docstring
 
 ### 7. Build
@@ -79,7 +80,14 @@ schemas:   yes/no
 - `gfGrowHiX | gfGrowHiY` growMode. `ofTileable` on TWindow.
 - Animated types use `TTimerId` pattern from `animated_blocks_view`.
 
+### 9. Parity gate (MANDATORY — all scopes)
+```bash
+uv run --with pytest pytest tests/contract/test_window_type_parity.py tests/contract/test_surface_parity_matrix.py -v
+```
+If this fails, you missed a surface. Fix it before committing. See `CLAUDE.md` "Parity Law" section.
+
 ## Acceptance
 - `cmake --build ./build --target wwdos` passes
 - No unused command IDs
+- Parity gate green
 - Parity report clean for requested scope
