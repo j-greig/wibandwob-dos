@@ -27,7 +27,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
    ```
 
 4. **Always use `--reload` when starting the API server** so edits hot-reload without a restart.
-   See "Running the Live TUI" section below for the full startup recipe.
+   See the "Quick start" section below for the authoritative startup recipe. The headless/tmux section only adds environment-specific notes.
 
 ## ⚡ Quick start — copy-paste to get a working stack
 
@@ -101,6 +101,8 @@ curl -s -X POST http://127.0.0.1:8089/screenshot
 cat "$(ls -t logs/screenshots/tui_*.txt | head -1)"
 ```
 
+> Full API reference and operational cheat sheet: `.pi/skills/wibwobdos/SKILL.md`.
+
 **Agent visual inspection**: use `/screenshot` skill (`.claude/skills/screenshot/`) which handles capture, state JSON, diff, window crop, and auto-recovery. See SKILL.md there for all modes.
 
 **Post-implementation parity audit**: use `/ww-audit` skill (`.claude/skills/ww-audit/`) to verify a window type has registry slug, props save/restore, and correct screen position — or run `/ww-audit` (no args) for a full gap matrix across all types.
@@ -117,64 +119,29 @@ uv run --with pytest pytest tests/room/ -q
 
 ## Running the Live TUI in Claude Code (headless/tmux)
 
-When running inside Claude Code on the web (or any headless environment), use this exact sequence to start the TUI app, API server, and verify via screenshots. All commands assume the project is already built (`cmake --build ./build`).
+Use the **Quick start** section above as the authoritative startup recipe (TUI + API + socket alignment). This section only adds headless/tmux-specific steps and a minimal verification loop.
 
-### 1. Start TUI in tmux
+### Headless/tmux addendum
 
 ```bash
-# Kill any stale sessions, then launch — NO hardcoded -x/-y (inherits real terminal on attach)
-tmux kill-server 2>/dev/null
-WIBWOB_INSTANCE=1 tmux new-session -d -s wibwob ./build/app/wwdos
-
-# Attach once so the session locks to your actual terminal dimensions, then detach
+# After starting the stack from Quick start, attach once so the canvas locks to your real terminal size
 tmux attach -t wibwob   # Ctrl-B D to detach
 
-# Verify canvas size is correct (should match your terminal)
-curl -s http://127.0.0.1:8089/state | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['canvas'])"
-```
-
-### 2. Start API server
-
-Wait for the IPC socket to appear, then start the FastAPI server with all deps:
-
-```bash
-# Confirm socket exists (WIBWOB_INSTANCE=1 → /tmp/wibwob_1.sock)
-ls /tmp/wibwob_1.sock
-
-# Start API server with --reload so Python edits hot-reload without a restart
-WIBWOB_INSTANCE=1 ./tools/api_server/venv/bin/uvicorn \
-  tools.api_server.main:app \
-  --host 127.0.0.1 --port 8089 --reload
-
-# Or in a background tmux session:
+# Optional: run API in background tmux (same WIBWOB_INSTANCE as the TUI)
 tmux new-session -d -s wibwob-api \
   "WIBWOB_INSTANCE=1 ./tools/api_server/venv/bin/uvicorn tools.api_server.main:app --host 127.0.0.1 --port 8089 --reload 2>&1 | tee /tmp/wibwob_api.log"
-
-# Health check
-sleep 2 && curl -sf http://127.0.0.1:8089/health
-# Expected: {"ok":true}
 ```
 
-### 3. Interact and screenshot
+### Minimal verification loop
 
 ```bash
-# Get state (windows, canvas size, theme)
+curl -sf http://127.0.0.1:8089/health
 curl -sf http://127.0.0.1:8089/state | python3 -m json.tool
-
-# Take a screenshot (text dump)
 curl -sf -X POST http://127.0.0.1:8089/screenshot
 cat "$(ls -t logs/screenshots/tui_*.txt | head -1)"
-
-# Open windows via command registry
-curl -sf -X POST http://127.0.0.1:8089/menu/command \
-  -H 'Content-Type: application/json' \
-  -d '{"command":"open_terminal"}'
-
-# Type into a terminal window
-curl -sf -X POST http://127.0.0.1:8089/menu/command \
-  -H 'Content-Type: application/json' \
-  -d '{"command":"terminal_write","args":{"text":"ls\n"}}'
 ```
+
+> Full API reference and curl recipes: see `.pi/skills/wibwobdos/SKILL.md` (authoritative ops manual) and `tools/api_server/README.md`.
 
 ### Gotchas
 
