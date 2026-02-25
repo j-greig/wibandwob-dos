@@ -58,6 +58,22 @@ extern void api_spawn_deep_signal(TWwdosApp& app, const TRect* bounds);
 extern void api_spawn_app_launcher(TWwdosApp& app, const TRect* bounds);
 extern void api_spawn_gallery(TWwdosApp& app, const TRect* bounds);
 extern void api_open_animation_path(TWwdosApp& app, const std::string& path);
+// Generative art windows — previously only reachable via create_window
+extern void api_spawn_verse(TWwdosApp& app, const TRect* bounds);
+extern void api_spawn_mycelium(TWwdosApp& app, const TRect* bounds);
+extern void api_spawn_orbit(TWwdosApp& app, const TRect* bounds);
+extern void api_spawn_torus(TWwdosApp& app, const TRect* bounds);
+extern void api_spawn_cube(TWwdosApp& app, const TRect* bounds);
+extern void api_spawn_life(TWwdosApp& app, const TRect* bounds);
+extern void api_spawn_blocks(TWwdosApp& app, const TRect* bounds);
+extern void api_spawn_score(TWwdosApp& app, const TRect* bounds);
+extern void api_spawn_ascii(TWwdosApp& app, const TRect* bounds);
+extern void api_spawn_animated_gradient(TWwdosApp& app, const TRect* bounds);
+extern void api_spawn_gradient(TWwdosApp& app, const std::string& kind, const TRect* bounds);
+extern void api_spawn_monster_cam(TWwdosApp& app, const TRect* bounds);
+extern void api_spawn_monster_verse(TWwdosApp& app, const TRect* bounds);
+extern void api_spawn_monster_portal(TWwdosApp& app, const TRect* bounds);
+extern void api_spawn_browser(TWwdosApp& app, const TRect* bounds);
 extern std::string api_gallery_list(TWwdosApp& app, const std::string& tab);
 extern void api_spawn_terminal(TWwdosApp& app, const TRect* bounds);
 extern void api_spawn_text_editor(TWwdosApp& app, const TRect* bounds, const std::string& title);
@@ -131,6 +147,23 @@ const std::vector<CommandCapability>& get_command_capabilities() {
         {"room_chat_receive", "Deliver incoming chat message to RoomChatView {sender, text, ts?}", true},
         {"room_presence", "Update participant list in RoomChatView {participants: JSON array}", true},
         {"new_paint_canvas", "Open a new paint canvas window", false},
+        // ── Generative art windows ───────────────────────────────────────
+        {"open_verse", "Open Verse Field generative poetry window", false},
+        {"open_mycelium", "Open Mycelium organic growth simulation", false},
+        {"open_orbit", "Open Orbit hypnotic geometry window", false},
+        {"open_torus", "Open Torus spinning 3D shape", false},
+        {"open_cube", "Open Cube rotating 3D wireframe", false},
+        {"open_life", "Open Conway's Game of Life simulation", false},
+        {"open_blocks", "Open Blocks abstract pattern generator", false},
+        {"open_score", "Open Score musical notation display", false},
+        {"open_ascii", "Open ASCII art display window", false},
+        {"open_animated_gradient", "Open animated colour gradient", false},
+        {"open_gradient", "Open static gradient window", false},
+        {"open_monster_cam", "Open Monster Camera window", false},
+        {"open_monster_verse", "Open Monster Verse eldritch poetry", false},
+        {"open_monster_portal", "Open Monster Portal dimensional rift", false},
+        {"open_browser", "Open the in-terminal web browser", false},
+        // ── Games ────────────────────────────────────────────────────────
         {"open_micropolis_ascii", "Open Micropolis ASCII MVP window", false},
         {"open_quadra", "Open Quadra falling blocks game", false},
         {"open_snake", "Open Snake game", false},
@@ -305,6 +338,69 @@ std::string exec_registry_command(
     }
     if (name == "open_apps") {
         api_spawn_app_launcher(app, nullptr);
+        return "ok";
+    }
+    // ── Generative art shortcuts ─────────────────────────────────────
+    if (name == "open_verse") {
+        api_spawn_verse(app, nullptr);
+        return "ok";
+    }
+    if (name == "open_mycelium") {
+        api_spawn_mycelium(app, nullptr);
+        return "ok";
+    }
+    if (name == "open_orbit") {
+        api_spawn_orbit(app, nullptr);
+        return "ok";
+    }
+    if (name == "open_torus") {
+        api_spawn_torus(app, nullptr);
+        return "ok";
+    }
+    if (name == "open_cube") {
+        api_spawn_cube(app, nullptr);
+        return "ok";
+    }
+    if (name == "open_life") {
+        api_spawn_life(app, nullptr);
+        return "ok";
+    }
+    if (name == "open_blocks") {
+        api_spawn_blocks(app, nullptr);
+        return "ok";
+    }
+    if (name == "open_score") {
+        api_spawn_score(app, nullptr);
+        return "ok";
+    }
+    if (name == "open_ascii") {
+        api_spawn_ascii(app, nullptr);
+        return "ok";
+    }
+    if (name == "open_animated_gradient") {
+        api_spawn_animated_gradient(app, nullptr);
+        return "ok";
+    }
+    if (name == "open_gradient") {
+        auto it = kv.find("kind");
+        std::string kind = (it != kv.end()) ? it->second : "";
+        api_spawn_gradient(app, kind, nullptr);
+        return "ok";
+    }
+    if (name == "open_monster_cam") {
+        api_spawn_monster_cam(app, nullptr);
+        return "ok";
+    }
+    if (name == "open_monster_verse") {
+        api_spawn_monster_verse(app, nullptr);
+        return "ok";
+    }
+    if (name == "open_monster_portal") {
+        api_spawn_monster_portal(app, nullptr);
+        return "ok";
+    }
+    if (name == "open_browser") {
+        api_spawn_browser(app, nullptr);
         return "ok";
     }
     if (name == "open_gallery") {
