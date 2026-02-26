@@ -12,6 +12,8 @@
 #define BACKROOMS_TV_VIEW_H
 
 #define Uses_TView
+#define Uses_TScroller
+#define Uses_TScrollBar
 #define Uses_TDrawBuffer
 #define Uses_TRect
 #include <tvision/tv.h>
@@ -59,12 +61,12 @@ private:
 // TBackroomsTvView — scrolling text view fed by BackroomsBridge pipe.
 // ---------------------------------------------------------------------------
 
-class TBackroomsTvView : public TView {
+class TBackroomsTvView : public TScroller {
 public:
     static const int kPadding = 3;      // cells of padding on each edge
     static const int kMaxLines = 500;   // ring buffer cap
 
-    explicit TBackroomsTvView(const TRect &bounds);
+    TBackroomsTvView(const TRect &bounds, TScrollBar *vsb);
     virtual ~TBackroomsTvView();
 
     virtual void draw() override;
@@ -85,13 +87,19 @@ private:
     void stopTimer();
     void pollPipe();
     void appendText(const std::string &text);
+    void updateScrollLimit();
+    void scrollToBottom();
+    void openLogFile();
+    void writeToLog(const std::string &text);
 
     BackroomsBridge bridge_;
     BackroomsChannel channel_;
+    std::string logPath_;              // path to session log file
+    int logFd_ = -1;                   // log file descriptor
 
     std::deque<std::string> lines_;     // ring buffer of display lines
     std::string partial_;               // incomplete line accumulator
-    int scrollOffset_ = 0;             // 0 = pinned to bottom (auto-scroll)
+    bool autoScroll_ = true;            // snap to bottom on new content
     bool paused_ = false;
 
     unsigned periodMs_ = 50;

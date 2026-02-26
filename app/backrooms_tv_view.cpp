@@ -20,6 +20,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/wait.h>
+#include <sys/stat.h>
 
 // Jet black background (#000), white foreground (#FFF)
 static const TColorAttr kTextAttr =
@@ -143,8 +144,8 @@ int BackroomsBridge::readAvailable(std::string &out) {
 
 // ===== TBackroomsTvView =====
 
-TBackroomsTvView::TBackroomsTvView(const TRect &bounds)
-    : TView(bounds)
+TBackroomsTvView::TBackroomsTvView(const TRect &bounds, TScrollBar *vsb)
+    : TScroller(bounds, nullptr, vsb)
 {
     growMode = gfGrowHiX | gfGrowHiY;
     eventMask |= evBroadcast | evKeyboard;
@@ -153,6 +154,42 @@ TBackroomsTvView::TBackroomsTvView(const TRect &bounds)
 TBackroomsTvView::~TBackroomsTvView() {
     stopTimer();
     bridge_.stop();
+    if (logFd_ >= 0) {
+        close(logFd_);
+        logFd_ = -1;
+    }
+}
+
+void TBackroomsTvView::openLogFile() {
+    // Create logs/backrooms-tv/ directory
+    std::string dir = "logs/backrooms-tv";
+    mkdir("logs", 0755);
+    mkdir(dir.c_str(), 0755);
+
+    // Timestamp filename
+    time_t now = time(nullptr);
+    struct tm *t = localtime(&now);
+    char buf[128];
+    strftime(buf, sizeof(buf), "%Y%m%dT%H%M%S", t);
+
+    // Sanitise theme for filename
+    std::string safeTheme;
+    for (char c : channel_.theme) {
+        if (std::isalnum((unsigned char)c) || c == '-' || c == '_')
+            safeTheme += c;
+        else if (c == ' ')
+            safeTheme += '-';
+    }
+    if (safeTheme.size() > 30) safeTheme.resize(30);
+
+    logPath_ = dir + "/" + std::string(buf) + "_" + safeTheme + ".txt";
+    logFd_ = open(logPath_.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
+}
+
+void TBackroomsTvView::writeToLog(const std::string &text) {
+    if (logFd_ >= 0) {
+        ::write(logFd_, text.data(), text.size());
+    }
 }
 
 void TBackroomsTvView::startTimer() {
@@ -167,14 +204,32 @@ void TBackroomsTvView::stopTimer() {
     }
 }
 
+void TBackroomsTvView::updateScrollLimit() {
+    int contentH = size.y - kPadding * 2 - 1;
+    int maxScroll = std::max(0, (int)lines_.size() - contentH);
+    setLimit(0, maxScroll);
+}
+
+void TBackroomsTvView::scrollToBottom() {
+    updateScrollLimit();
+    scrollTo(0, limit.y);
+}
+
 void TBackroomsTvView::play(const BackroomsChannel &channel) {
     channel_ = channel;
     lines_.clear();
     partial_.clear();
-    scrollOffset_ = 0;
+    autoScroll_ = true;
     paused_ = false;
+
+    // Close previous log, open new one
+    if (logFd_ >= 0) { close(logFd_); logFd_ = -1; }
+    openLogFile();
+
     bridge_.start(channel_);
     startTimer();
+    scrollTo(0, 0);
+    setLimit(0, 0);
     drawView();
 }
 
@@ -187,7 +242,8 @@ void TBackroomsTvView::pause() {
 
 void TBackroomsTvView::resume() {
     paused_ = false;
-    scrollOffset_ = 0;  // snap back to bottom
+    autoScroll_ = true;
+    scrollToBottom();
     drawView();
 }
 
@@ -202,9 +258,12 @@ void TBackroomsTvView::pollPipe() {
     int n = bridge_.readAvailable(data);
 
     if (n > 0) {
+        writeToLog(data);
         appendText(data);
-        if (!paused_) {
-            scrollOffset_ = 0;  // auto-scroll to bottom
+        if (autoScroll_) {
+            scrollToBottom();
+        } else {
+            updateScrollLimit();
         }
         drawView();
     } else if (n < 0) {
@@ -243,7 +302,7 @@ void TBackroomsTvView::draw() {
     TDrawBuffer buf;
 
     const int pad = kPadding;
-    const int contentH = H - pad * 2 - 1;  // -1 for status bar at bottom
+    const int contentH = H - pad * 2 - 2;  // -2 for 2-row status bar at bottom
 
     // Helper: fill a full row with blank (black) cells
     auto blankRow = [&](int y) {
@@ -255,11 +314,10 @@ void TBackroomsTvView::draw() {
     for (int y = 0; y < pad && y < H; ++y)
         blankRow(y);
 
-    // Content area
+    // Content area — delta.y is the top visible line index (managed by TScroller)
     if (contentH > 0) {
         int totalLines = (int)lines_.size();
-        int bottomLine = totalLines - 1 - scrollOffset_;
-        int topLine = bottomLine - contentH + 1;
+        int topLine = delta.y;
 
         for (int row = 0; row < contentH && (pad + row) < H; ++row) {
             int lineIdx = topLine + row;
@@ -278,16 +336,17 @@ void TBackroomsTvView::draw() {
     }
 
     // Bottom padding rows (before status bar)
-    for (int y = pad + contentH; y < H - 1; ++y)
+    for (int y = pad + contentH; y < H - 2; ++y)
         blankRow(y);
 
-    // Status bar (last row) — dark bg, dim text, controls hint right-aligned
-    if (H > 0) {
-        // Status bar colours: slightly brighter bg to distinguish from content
+    // 2-row status bar at bottom
+    if (H >= 2) {
         static const TColorAttr kBarBg =
             TColorAttr(TColorRGB(0x88, 0x88, 0x88), TColorRGB(0x1A, 0x1A, 0x1A));
         static const TColorAttr kBarLabel =
             TColorAttr(TColorRGB(0xFF, 0xFF, 0xFF), TColorRGB(0x1A, 0x1A, 0x1A));
+        static const TColorAttr kBarDim =
+            TColorAttr(TColorRGB(0x66, 0x66, 0x66), TColorRGB(0x1A, 0x1A, 0x1A));
         static const TColorAttr kBarLive =
             TColorAttr(TColorRGB(0x00, 0xFF, 0x66), TColorRGB(0x1A, 0x1A, 0x1A));
         static const TColorAttr kBarPaused =
@@ -295,40 +354,45 @@ void TBackroomsTvView::draw() {
         static const TColorAttr kBarIdle =
             TColorAttr(TColorRGB(0x66, 0x66, 0x66), TColorRGB(0x1A, 0x1A, 0x1A));
 
+        // ── Row 1: state + theme + turns + primers ──
         buf.moveChar(0, ' ', kBarBg, W);
-
         ushort x = 1;
 
-        // State indicator
         if (bridge_.isRunning()) {
-            if (paused_) {
-                x = buf.moveStr(x, " PAUSED ", kBarPaused);
-            } else {
-                x = buf.moveStr(x, " LIVE ", kBarLive);
-            }
+            x = buf.moveStr(x, paused_ ? " PAUSED " : " LIVE ", paused_ ? kBarPaused : kBarLive);
         } else {
             x = buf.moveStr(x, " IDLE ", kBarIdle);
         }
 
-        // Theme
         x = buf.moveStr(x, "  ", kBarBg);
         x = buf.moveStr(x, TStringView(channel_.theme), kBarLabel);
 
-        // Turns
         std::string turnsStr = "  " + std::to_string(channel_.turns) + " turns";
-        x = buf.moveStr(x, TStringView(turnsStr), kBarBg);
+        x = buf.moveStr(x, TStringView(turnsStr), kBarDim);
 
-        // Primers (if any)
         if (!channel_.primers.empty()) {
-            std::string pStr = "  primers:" + channel_.primers;
-            x = buf.moveStr(x, TStringView(pStr), kBarBg);
+            std::string pStr = "  primers: " + channel_.primers;
+            // Truncate if too long
+            int maxPW = W - (int)x - 2;
+            if ((int)pStr.size() > maxPW && maxPW > 5)
+                pStr = pStr.substr(0, maxPW - 3) + "...";
+            x = buf.moveStr(x, TStringView(pStr), kBarDim);
         }
 
-        // Controls hint — right-aligned
-        std::string hint = " Esc:close  Spc:pause  N:next ";
+        writeLine(0, H - 2, W, 1, buf);
+
+        // ── Row 2: log path (left) + controls (right) ──
+        buf.moveChar(0, ' ', kBarBg, W);
+
+        if (!logPath_.empty()) {
+            std::string logStr = " \xF0 " + logPath_;  // ≡ prefix
+            buf.moveStr(1, TStringView(logStr), kBarDim);
+        }
+
+        std::string hint = " Esc:close  Spc:pause  N:next  R:new ";
         int hintW = (int)hint.size();
-        if (W - hintW > (int)x + 2)
-            buf.moveStr(W - hintW, TStringView(hint), kBarBg);
+        if (W - hintW >= 1)
+            buf.moveStr(W - hintW, TStringView(hint), kBarDim);
 
         writeLine(0, H - 1, W, 1, buf);
     }
@@ -346,53 +410,44 @@ void TBackroomsTvView::handleEvent(TEvent &ev) {
         }
     }
 
-    // Keyboard
+    // Keyboard — TScroller handles ↑↓ PgUp PgDn Home End automatically
     if (ev.what == evKeyDown) {
-        // Space: check charCode since kbSpace doesn't exist in TV
+        // Space: pause/resume
         if (ev.keyDown.charScan.charCode == ' ') {
             if (paused_) resume(); else pause();
             clearEvent(ev);
             return;
         }
-        switch (ev.keyDown.keyCode) {
+        char ch = ev.keyDown.charScan.charCode;
+        switch (ch) {
             case 'n':
             case 'N':
                 next();
                 clearEvent(ev);
                 return;
 
-            case kbUp:
-                // Scroll up (back in history)
-                if (scrollOffset_ < (int)lines_.size() - 1) {
-                    ++scrollOffset_;
-                    drawView();
+            case 'r':
+            case 'R': {
+                // Reopen config dialog for a new channel
+                bridge_.stop();
+                BackroomsChannel newChannel;
+                if (showBackroomsTvDialog(newChannel)) {
+                    play(newChannel);
                 }
                 clearEvent(ev);
                 return;
-
-            case kbDown:
-                // Scroll down (towards live)
-                if (scrollOffset_ > 0) {
-                    --scrollOffset_;
-                    drawView();
-                }
-                clearEvent(ev);
-                return;
-
-            case kbHome:
-                // Jump to top of buffer
-                scrollOffset_ = (int)lines_.size() - 1;
-                drawView();
-                clearEvent(ev);
-                return;
-
-            case kbEnd:
-                // Snap to live (bottom)
-                scrollOffset_ = 0;
-                drawView();
-                clearEvent(ev);
-                return;
+            }
         }
+
+        // Detect manual scroll — disable auto-scroll if user scrolls up
+        int prevY = delta.y;
+        TScroller::handleEvent(ev);
+        if (delta.y != prevY && delta.y < limit.y) {
+            autoScroll_ = false;
+        } else if (delta.y >= limit.y) {
+            autoScroll_ = true;
+        }
+        return;
     }
 }
 
@@ -425,7 +480,18 @@ public:
         options |= ofTileable;
         TRect c = getExtent();
         c.grow(-1, -1);  // inside the frame
-        auto *view = new TBackroomsTvView(c);
+
+        // Vertical scrollbar on right edge
+        TRect sbRect = c;
+        sbRect.a.x = sbRect.b.x - 1;
+        auto *vsb = new TScrollBar(sbRect);
+        vsb->growMode = gfGrowLoX | gfGrowHiX | gfGrowHiY;
+        insert(vsb);
+
+        // View takes remaining space (minus scrollbar)
+        TRect viewRect = c;
+        viewRect.b.x -= 1;
+        auto *view = new TBackroomsTvView(viewRect, vsb);
         insert(view);
         view->play(channel);
     }

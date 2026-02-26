@@ -938,6 +938,7 @@ private:
     friend void api_spawn_animated_gradient(TWwdosApp&, const TRect* bounds);
     friend void api_spawn_monster_cam(TWwdosApp&, const TRect* bounds);
     friend void api_spawn_backrooms_tv(TWwdosApp&, const TRect* bounds);
+    friend void api_spawn_backrooms_tv(TWwdosApp&, const TRect* bounds, const BackroomsChannel* ch);
     friend void api_spawn_monster_verse(TWwdosApp&, const TRect* bounds);
     friend void api_spawn_monster_portal(TWwdosApp&, const TRect* bounds);
     friend void api_spawn_micropolis_ascii(TWwdosApp&, const TRect* bounds);
@@ -4800,14 +4801,24 @@ void api_spawn_monster_cam(TWwdosApp& app, const TRect* bounds) {
     app.registerWindow(w);
 }
 
-void api_spawn_backrooms_tv(TWwdosApp& app, const TRect* bounds) {
+// Overload: with explicit channel (for API/IPC — no dialog)
+void api_spawn_backrooms_tv(TWwdosApp& app, const TRect* bounds, const BackroomsChannel* ch) {
     BackroomsChannel channel;
-    if (showBackroomsTvDialog(channel)) {
-        TRect r = bounds ? *bounds : api_centered_bounds(app, 100, 35);
-        TWindow* w = createBackroomsTvWindow(r, channel);
-        app.deskTop->insert(w);
-        app.registerWindow(w);
+    if (ch) {
+        channel = *ch;
+    } else {
+        // No channel provided — show config dialog (menu path)
+        if (!showBackroomsTvDialog(channel)) return;
     }
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 100, 35);
+    TWindow* w = createBackroomsTvWindow(r, channel);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
+}
+
+// Original signature for backward compat (registry dispatch calls this)
+void api_spawn_backrooms_tv(TWwdosApp& app, const TRect* bounds) {
+    api_spawn_backrooms_tv(app, bounds, nullptr);
 }
 
 void api_spawn_monster_verse(TWwdosApp& app, const TRect* bounds) {

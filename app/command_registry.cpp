@@ -1,6 +1,7 @@
 #include "command_registry.h"
 
 #include "api_ipc.h"
+#include "backrooms_tv_view.h"
 #include "core/json_utils.h"
 #include "figlet_utils.h"
 
@@ -73,6 +74,7 @@ extern void api_spawn_monster_cam(TWwdosApp& app, const TRect* bounds);
 extern void api_spawn_monster_verse(TWwdosApp& app, const TRect* bounds);
 extern void api_spawn_monster_portal(TWwdosApp& app, const TRect* bounds);
 extern void api_spawn_backrooms_tv(TWwdosApp& app, const TRect* bounds);
+extern void api_spawn_backrooms_tv(TWwdosApp& app, const TRect* bounds, const BackroomsChannel* ch);
 extern void api_spawn_browser(TWwdosApp& app, const TRect* bounds);
 extern void api_spawn_figlet_text(TWwdosApp& app, const TRect* bounds,
     const std::string& text, const std::string& font, bool frameless, bool shadowless);
@@ -141,7 +143,7 @@ const std::vector<CommandCapability>& get_command_capabilities() {
         {"open_animated_gradient", "Open animated colour gradient", false},
         {"open_gradient", "Open static gradient window", false},
         {"open_monster_cam", "Open Monster Camera window", false},
-        {"open_backrooms_tv", "Open Backrooms TV — live streaming ASCII art generator", false},
+        {"open_backrooms_tv", "Open Backrooms TV — live streaming ASCII art generator (optional params: theme, turns, primers, model; omit theme to show config dialog)", false},
         {"open_monster_verse", "Open Monster Verse eldritch poetry", false},
         {"open_monster_portal", "Open Monster Portal dimensional rift", false},
         {"open_browser", "Open the in-terminal web browser", false},
@@ -381,7 +383,23 @@ std::string exec_registry_command(
         return "ok";
     }
     if (name == "open_backrooms_tv") {
-        api_spawn_backrooms_tv(app, nullptr);
+        // Parse optional channel params from kv
+        auto theme_it = kv.find("theme");
+        auto turns_it = kv.find("turns");
+        auto primers_it = kv.find("primers");
+        auto model_it = kv.find("model");
+        if (theme_it != kv.end()) {
+            BackroomsChannel ch;
+            ch.theme = theme_it->second;
+            if (turns_it != kv.end()) ch.turns = std::atoi(turns_it->second.c_str());
+            if (primers_it != kv.end()) ch.primers = primers_it->second;
+            if (model_it != kv.end()) ch.model = model_it->second;
+            if (ch.turns < 1) ch.turns = 1;
+            api_spawn_backrooms_tv(app, nullptr, &ch);
+        } else {
+            // No theme — show dialog (menu path)
+            api_spawn_backrooms_tv(app, nullptr);
+        }
         return "ok";
     }
     if (name == "open_monster_verse") {
