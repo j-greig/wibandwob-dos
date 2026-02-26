@@ -1003,7 +1003,14 @@ std::string TWibWobWindow::getCurrentTime() const {
 
 // ---------- TTS helpers ----------
 namespace {
-    const bool kTtsEnabled = true;
+    // Default: on. Set WIBWOB_TTS=0 or WIBWOB_TTS=off to disable.
+    bool resolveTtsEnabled() {
+        const char* env = std::getenv("WIBWOB_TTS");
+        if (!env) return true;
+        std::string v(env);
+        return !(v == "0" || v == "off" || v == "false" || v == "no");
+    }
+    const bool kTtsEnabled = resolveTtsEnabled();
     const int kTtsRate = 205; // 0 = default rate
 
     // Voice preference lists — first available wins at runtime.
