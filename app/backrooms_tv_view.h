@@ -96,8 +96,6 @@ private:
 
     unsigned periodMs_ = 50;
     TTimerId timerId_ = 0;
-
-    std::vector<TScreenCell> lineBuf_;  // reusable draw buffer
 };
 
 // Factory — creates a titled, tileable window hosting the view.

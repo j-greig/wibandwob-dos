@@ -9,6 +9,8 @@
 #define Uses_TWindow
 #define Uses_TEvent
 #define Uses_TKeys
+#define Uses_TText
+#define Uses_TDrawBuffer
 #include <tvision/tv.h>
 
 #include <cstdlib>
@@ -238,18 +240,15 @@ void TBackroomsTvView::draw() {
     const int H = size.y;
     if (W <= 0 || H <= 0) return;
 
-    if ((int)lineBuf_.size() < W)
-        lineBuf_.resize(W);
+    TDrawBuffer buf;
 
     const int pad = kPadding;
-    const int contentW = W - pad * 2;  // usable text width
     const int contentH = H - pad * 2 - 1;  // -1 for status bar at bottom
 
     // Helper: fill a full row with blank (black) cells
     auto blankRow = [&](int y) {
-        for (int x = 0; x < W; ++x)
-            setCell(lineBuf_[x], ' ', kBlankAttr);
-        writeLine(0, y, W, 1, lineBuf_.data());
+        buf.moveChar(0, ' ', kBlankAttr, W);
+        writeLine(0, y, W, 1, buf);
     };
 
     // Top padding rows
@@ -257,28 +256,24 @@ void TBackroomsTvView::draw() {
         blankRow(y);
 
     // Content area
-    if (contentW > 0 && contentH > 0) {
+    if (contentH > 0) {
         int totalLines = (int)lines_.size();
-        // Which line in our buffer corresponds to the bottom of the view?
         int bottomLine = totalLines - 1 - scrollOffset_;
         int topLine = bottomLine - contentH + 1;
 
         for (int row = 0; row < contentH && (pad + row) < H; ++row) {
             int lineIdx = topLine + row;
 
-            // Fill entire row black first
-            for (int x = 0; x < W; ++x)
-                setCell(lineBuf_[x], ' ', kBlankAttr);
+            // Fill row black, then draw text with UTF-8 support
+            buf.moveChar(0, ' ', kBlankAttr, W);
 
-            // Write text content with padding offset
             if (lineIdx >= 0 && lineIdx < totalLines) {
                 const std::string &line = lines_[lineIdx];
-                for (int x = 0; x < contentW && x < (int)line.size(); ++x) {
-                    setCell(lineBuf_[pad + x], line[x], kTextAttr);
-                }
+                // moveStr handles UTF-8 multi-byte characters correctly
+                buf.moveStr(pad, TStringView(line), kTextAttr);
             }
 
-            writeLine(0, pad + row, W, 1, lineBuf_.data());
+            writeLine(0, pad + row, W, 1, buf);
         }
     }
 
@@ -286,27 +281,56 @@ void TBackroomsTvView::draw() {
     for (int y = pad + contentH; y < H - 1; ++y)
         blankRow(y);
 
-    // Status bar (last row)
+    // Status bar (last row) — dark bg, dim text, controls hint right-aligned
     if (H > 0) {
-        for (int x = 0; x < W; ++x)
-            setCell(lineBuf_[x], ' ', kBlankAttr);
+        // Status bar colours: slightly brighter bg to distinguish from content
+        static const TColorAttr kBarBg =
+            TColorAttr(TColorRGB(0x88, 0x88, 0x88), TColorRGB(0x1A, 0x1A, 0x1A));
+        static const TColorAttr kBarLabel =
+            TColorAttr(TColorRGB(0xFF, 0xFF, 0xFF), TColorRGB(0x1A, 0x1A, 0x1A));
+        static const TColorAttr kBarLive =
+            TColorAttr(TColorRGB(0x00, 0xFF, 0x66), TColorRGB(0x1A, 0x1A, 0x1A));
+        static const TColorAttr kBarPaused =
+            TColorAttr(TColorRGB(0xFF, 0xCC, 0x00), TColorRGB(0x1A, 0x1A, 0x1A));
+        static const TColorAttr kBarIdle =
+            TColorAttr(TColorRGB(0x66, 0x66, 0x66), TColorRGB(0x1A, 0x1A, 0x1A));
 
-        std::string status;
+        buf.moveChar(0, ' ', kBarBg, W);
+
+        ushort x = 1;
+
+        // State indicator
         if (bridge_.isRunning()) {
-            status = paused_ ? " [PAUSED]" : " [LIVE]";
+            if (paused_) {
+                x = buf.moveStr(x, " PAUSED ", kBarPaused);
+            } else {
+                x = buf.moveStr(x, " LIVE ", kBarLive);
+            }
         } else {
-            status = " [IDLE]";
+            x = buf.moveStr(x, " IDLE ", kBarIdle);
         }
-        status += "  " + channel_.theme;
-        status += "  " + std::to_string(channel_.turns) + " turns";
-        if (!channel_.primers.empty())
-            status += "  primers: " + channel_.primers;
 
-        // Write status with padding
-        for (int x = 0; x < (int)status.size() && (pad + x) < W; ++x)
-            setCell(lineBuf_[pad + x], status[x], kStatusAttr);
+        // Theme
+        x = buf.moveStr(x, "  ", kBarBg);
+        x = buf.moveStr(x, TStringView(channel_.theme), kBarLabel);
 
-        writeLine(0, H - 1, W, 1, lineBuf_.data());
+        // Turns
+        std::string turnsStr = "  " + std::to_string(channel_.turns) + " turns";
+        x = buf.moveStr(x, TStringView(turnsStr), kBarBg);
+
+        // Primers (if any)
+        if (!channel_.primers.empty()) {
+            std::string pStr = "  primers:" + channel_.primers;
+            x = buf.moveStr(x, TStringView(pStr), kBarBg);
+        }
+
+        // Controls hint — right-aligned
+        std::string hint = " Esc:close  Spc:pause  N:next ";
+        int hintW = (int)hint.size();
+        if (W - hintW > (int)x + 2)
+            buf.moveStr(W - hintW, TStringView(hint), kBarBg);
+
+        writeLine(0, H - 1, W, 1, buf);
     }
 }
 
@@ -331,19 +355,6 @@ void TBackroomsTvView::handleEvent(TEvent &ev) {
             return;
         }
         switch (ev.keyDown.keyCode) {
-            case kbEsc:
-                // Escape: kill subprocess and close the window
-                bridge_.stop();
-                // Send close command to parent window
-                {
-                    TEvent closeEv;
-                    closeEv.what = evCommand;
-                    closeEv.message.command = cmClose;
-                    putEvent(closeEv);
-                }
-                clearEvent(ev);
-                return;
-
             case 'n':
             case 'N':
                 next();
@@ -670,8 +681,11 @@ bool showBackroomsTvDialog(BackroomsChannel &outChannel) {
     std::string backroomsPath = bridge.resolveBackroomsPath();
     std::vector<std::string> primers = scanPrimerNames(backroomsPath);
 
-    int dlgW = 60;
-    int dlgH = 28;
+    // Size dialog to 70% of desktop, min 60x28
+    int deskW = TProgram::deskTop->size.x;
+    int deskH = TProgram::deskTop->size.y;
+    int dlgW = std::max(60, deskW * 7 / 10);
+    int dlgH = std::max(28, deskH * 7 / 10);
     TRect r(0, 0, dlgW, dlgH);
     r.move((TProgram::deskTop->size.x - dlgW) / 2,
            (TProgram::deskTop->size.y - dlgH) / 2);
