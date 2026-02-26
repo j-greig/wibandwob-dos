@@ -1,0 +1,98 @@
+{
+  "meta": {
+    "title": "the bus does not stop here anymore",
+    "author": "wib & wob",
+    "canvas": { "width": 178, "height": 79 },
+    "bg": { "fg": 0, "bg": 0, "texture": " " },
+    "gallery_mode": true,
+    "audio": {
+      "backing": "audio/11-bubblegum-stampede.mp3"
+    }
+  },
+  "frames": [
+    {
+      "t": 0.0,
+      "transition": "typewriter",
+      "typewriter_delay": 0.8,
+      "primer": "texture-grid.txt",
+      "primer_pos": { "x": 2, "y": 2 },
+      "words": [
+        { "text": "THE",      "font": "banner3",    "x": 38, "y": 2 },
+        { "text": "bus",      "font": "weird",      "x": 2,  "y": 12 },
+        { "text": "DOES NOT", "font": "threepoint", "x": 38, "y": 10 }
+      ]
+    },
+    {
+      "t": 4.0,
+      "transition": "typewriter",
+      "typewriter_delay": 0.6,
+      "primers": [
+        { "path": "chaos.txt",            "x": 100, "y": 1 },
+        { "path": "iso-cube-cornered.txt", "x": 2,  "y": 14 }
+      ],
+      "words": [
+        { "text": "STOP",     "font": "colossal",   "x": 60, "y": 1 },
+        { "text": "stop",     "font": "shadow",     "x": 115, "y": 12 },
+        { "text": "stop",     "font": "threepoint", "x": 142, "y": 11 }
+      ]
+    },
+    {
+      "t": 8.0,
+      "transition": "typewriter",
+      "typewriter_delay": 0.5,
+      "primer": "starry-sky.txt",
+      "primer_pos": { "x": 78, "y": 18 },
+      "words": [
+        { "text": "here",     "font": "poison",     "x": 2,  "y": 18 },
+        { "text": "here",     "font": "tinker-toy", "x": 45, "y": 22 },
+        { "text": "HERE",     "font": "digital",    "x": 45, "y": 28 },
+        { "text": "anymore",  "font": "gothic",     "x": 2,  "y": 30 }
+      ]
+    },
+    {
+      "t": 13.0,
+      "transition": "typewriter",
+      "typewriter_delay": 0.4,
+      "primers": [
+        { "path": "paradox.txt",         "x": 72, "y": 40 },
+        { "path": "cat-cat-simple.txt",  "x": 48, "y": 38 },
+        { "path": "micropanels.txt",     "x": 2,  "y": 38 }
+      ],
+      "words": [
+        { "text": "waited",   "font": "lean",       "x": 2,  "y": 42 },
+        { "text": "17",       "font": "colossal",   "x": 50, "y": 46 },
+        { "text": "years",    "font": "graffiti",   "x": 2,  "y": 50 },
+        { "text": "the rain", "font": "bell",       "x": 48, "y": 51 },
+        { "text": "kept",     "font": "weird",      "x": 90, "y": 45 }
+      ]
+    },
+    {
+      "t": 17.0,
+      "transition": "typewriter",
+      "typewriter_delay": 0.3,
+      "primers": [
+        { "path": "step-sequencer-rebirth.txt", "x": 108, "y": 40 },
+        { "path": "exit-start.txt",             "x": 130, "y": 18 }
+      ],
+      "words": [
+        { "text": "its",          "font": "threepoint", "x": 90, "y": 48 },
+        { "text": "PROMISE",      "font": "banner3",    "x": 2,  "y": 54 },
+        { "text": "schedule",     "font": "rectangles", "x": 90, "y": 54 },
+        { "text": "was a",        "font": "weird",      "x": 90, "y": 59 }
+      ]
+    },
+    {
+      "t": 21.0,
+      "transition": "typewriter",
+      "typewriter_delay": 0.5,
+      "primers": [
+        { "path": "reality-breaks-apart-abstract.txt", "x": 56, "y": 68 },
+        { "path": "mini-herbivore.txt",                "x": 150, "y": 68 }
+      ],
+      "words": [
+        { "text": "PROPHECY",     "font": "poison",     "x": 2,  "y": 66 },
+        { "text": "?",            "font": "colossal",   "x": 150, "y": 58 }
+      ]
+    }
+  ]
+}

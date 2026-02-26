@@ -19,7 +19,7 @@ import sys
 import time
 import urllib.request
 
-API = "http://127.0.0.1:8089"
+API = os.environ.get("WIBWOB_API", "http://127.0.0.1:8089")
 
 # Track child processes for cleanup
 _children: list[subprocess.Popen] = []
@@ -312,14 +312,24 @@ def play_frame(frame, speech_cfg, mute, stingers, primer_ids):
         print(f"    ♫ stinger: {cue}")
         play_audio(stingers[cue])
 
-    # Primer (placed before words, then raised to front after)
+    # Primers (placed before words, then raised to front after)
+    frame_primer_wids = []
+
+    # Single primer (legacy format)
     primer = frame.get("primer")
-    primer_wid = None
     if primer:
         pos = frame.get("primer_pos", {"x": 0, "y": 0})
-        primer_wid = place_primer(primer, pos["x"], pos["y"], primer_ids)
-        if primer_wid:
-            primer_ids.add(primer_wid)
+        wid = place_primer(primer, pos["x"], pos["y"], primer_ids)
+        if wid:
+            primer_ids.add(wid)
+            frame_primer_wids.append(wid)
+
+    # Multiple primers (extended format)
+    for p in frame.get("primers", []):
+        wid = place_primer(p["path"], p["x"], p["y"], primer_ids)
+        if wid:
+            primer_ids.add(wid)
+            frame_primer_wids.append(wid)
 
     # Words
     transition = frame.get("transition", "cut")
@@ -331,9 +341,9 @@ def play_frame(frame, speech_cfg, mute, stingers, primer_ids):
         place_word(word, speech_cfg)
         time.sleep(delay)
 
-    # Raise primer above words so art is visible
-    if primer_wid:
-        post("raise_window", {"id": primer_wid})
+    # Raise all primers above words so art is visible
+    for wid in frame_primer_wids:
+        post("raise_window", {"id": wid})
 
 
 def play_timeline(timeline, mute=False, dry_run=False, loop=False, layout=False):

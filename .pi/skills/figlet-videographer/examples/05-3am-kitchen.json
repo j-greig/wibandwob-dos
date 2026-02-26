@@ -1,0 +1,64 @@
+{
+  "meta": {
+    "title": "3am library",
+    "author": "wib & wob",
+    "canvas": { "width": 162, "height": 69 },
+    "bg": { "fg": 0, "bg": 0, "texture": " " },
+    "gallery_mode": true,
+    "audio": {
+      "backing": "audio/09-concrete-lullaby.mp3"
+    }
+  },
+  "frames": [
+    {
+      "t": 0.0,
+      "transition": "typewriter",
+      "typewriter_delay": 3.0,
+      "primer": "iso-library.txt",
+      "primer_pos": { "x": 4, "y": 2 },
+      "words": [
+        { "text": "hum", "font": "gothic", "x": 56, "y": 6 }
+      ]
+    },
+    {
+      "t": 6.0,
+      "transition": "typewriter",
+      "typewriter_delay": 2.5,
+      "primer": "cat-cat-simple.txt",
+      "primer_pos": { "x": 100, "y": 2 },
+      "words": [
+        { "text": "something", "font": "gothic", "x": 120, "y": 4 }
+      ]
+    },
+    {
+      "t": 12.0,
+      "transition": "typewriter",
+      "typewriter_delay": 2.0,
+      "primer": "jellyfish.txt",
+      "primer_pos": { "x": 62, "y": 24 },
+      "words": [
+        { "text": "opens", "font": "poison", "x": 62, "y": 42 }
+      ]
+    },
+    {
+      "t": 17.0,
+      "transition": "typewriter",
+      "typewriter_delay": 2.5,
+      "primer": "ouija-board.txt",
+      "primer_pos": { "x": 4, "y": 46 },
+      "words": [
+        { "text": "the book", "font": "gothic", "x": 4, "y": 58 }
+      ]
+    },
+    {
+      "t": 22.0,
+      "transition": "typewriter",
+      "typewriter_delay": 2.0,
+      "primer": "glum-face.txt",
+      "primer_pos": { "x": 140, "y": 46 },
+      "words": [
+        { "text": "speaks", "font": "poison", "x": 115, "y": 56 }
+      ]
+    }
+  ]
+}

@@ -6,7 +6,7 @@
     "bg": { "fg": 0, "bg": 0, "texture": " " },
     "gallery_mode": true,
     "audio": {
-      "backing": "audio/01-sparse-industrial.mp3"
+      "backing": "audio/11-bubblegum-stampede.mp3"
     }
   },
   "frames": [
