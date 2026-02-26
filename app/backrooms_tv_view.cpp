@@ -205,7 +205,7 @@ void TBackroomsTvView::stopTimer() {
 }
 
 void TBackroomsTvView::updateScrollLimit() {
-    int contentH = size.y - kPadding * 2 - 1;
+    int contentH = size.y - kPadding * 2 - 2;  // must match draw(): -2 for 2-row status bar
     int maxScroll = std::max(0, (int)lines_.size() - contentH);
     setLimit(0, maxScroll);
 }
@@ -399,9 +399,7 @@ void TBackroomsTvView::draw() {
 }
 
 void TBackroomsTvView::handleEvent(TEvent &ev) {
-    TView::handleEvent(ev);
-
-    // Timer tick — poll the pipe
+    // Timer tick — poll the pipe (handle before TScroller)
     if (ev.what == evBroadcast && ev.message.command == cmTimerExpired) {
         if (timerId_ != 0 && ev.message.infoPtr == timerId_) {
             pollPipe();
@@ -410,49 +408,42 @@ void TBackroomsTvView::handleEvent(TEvent &ev) {
         }
     }
 
-    // Keyboard — TScroller handles ↑↓ PgUp PgDn Home End automatically
+    // Our custom keys — intercept before TScroller eats them
     if (ev.what == evKeyDown) {
-        // Space: pause/resume
         if (ev.keyDown.charScan.charCode == ' ') {
             if (paused_) resume(); else pause();
             clearEvent(ev);
             return;
         }
         char ch = ev.keyDown.charScan.charCode;
-        switch (ch) {
-            case 'n':
-            case 'N':
-                next();
-                clearEvent(ev);
-                return;
-
-            case 'r':
-            case 'R': {
-                // Reopen config dialog for a new channel
-                bridge_.stop();
-                BackroomsChannel newChannel;
-                if (showBackroomsTvDialog(newChannel)) {
-                    play(newChannel);
-                }
-                clearEvent(ev);
-                return;
+        if (ch == 'n' || ch == 'N') {
+            next();
+            clearEvent(ev);
+            return;
+        }
+        if (ch == 'r' || ch == 'R') {
+            bridge_.stop();
+            BackroomsChannel newChannel;
+            if (showBackroomsTvDialog(newChannel)) {
+                play(newChannel);
             }
+            clearEvent(ev);
+            return;
         }
+    }
 
-        // Detect manual scroll — disable auto-scroll if user scrolls up
-        int prevY = delta.y;
-        TScroller::handleEvent(ev);
-        if (delta.y != prevY && delta.y < limit.y) {
-            autoScroll_ = false;
-        } else if (delta.y >= limit.y) {
-            autoScroll_ = true;
-        }
-        return;
+    // Let TScroller handle everything else: ↑↓ PgUp PgDn Home End + scrollbar clicks
+    int prevY = delta.y;
+    TScroller::handleEvent(ev);
+
+    // Track auto-scroll state after TScroller processes the event
+    if (delta.y != prevY) {
+        autoScroll_ = (delta.y >= limit.y);
     }
 }
 
 void TBackroomsTvView::setState(ushort aState, Boolean enable) {
-    TView::setState(aState, enable);
+    TScroller::setState(aState, enable);
     if ((aState & sfExposed) != 0) {
         if (enable) {
             startTimer();
@@ -464,7 +455,8 @@ void TBackroomsTvView::setState(ushort aState, Boolean enable) {
 }
 
 void TBackroomsTvView::changeBounds(const TRect &bounds) {
-    TView::changeBounds(bounds);
+    TScroller::changeBounds(bounds);
+    updateScrollLimit();
     drawView();
 }
 
