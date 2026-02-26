@@ -72,6 +72,7 @@ extern void api_spawn_gradient(TWwdosApp& app, const std::string& kind, const TR
 extern void api_spawn_monster_cam(TWwdosApp& app, const TRect* bounds);
 extern void api_spawn_monster_verse(TWwdosApp& app, const TRect* bounds);
 extern void api_spawn_monster_portal(TWwdosApp& app, const TRect* bounds);
+extern void api_spawn_backrooms_tv(TWwdosApp& app, const TRect* bounds);
 extern void api_spawn_browser(TWwdosApp& app, const TRect* bounds);
 extern void api_spawn_figlet_text(TWwdosApp& app, const TRect* bounds,
     const std::string& text, const std::string& font, bool frameless, bool shadowless);
@@ -140,6 +141,7 @@ const std::vector<CommandCapability>& get_command_capabilities() {
         {"open_animated_gradient", "Open animated colour gradient", false},
         {"open_gradient", "Open static gradient window", false},
         {"open_monster_cam", "Open Monster Camera window", false},
+        {"open_backrooms_tv", "Open Backrooms TV — live streaming ASCII art generator", false},
         {"open_monster_verse", "Open Monster Verse eldritch poetry", false},
         {"open_monster_portal", "Open Monster Portal dimensional rift", false},
         {"open_browser", "Open the in-terminal web browser", false},
@@ -376,6 +378,10 @@ std::string exec_registry_command(
     }
     if (name == "open_monster_cam") {
         api_spawn_monster_cam(app, nullptr);
+        return "ok";
+    }
+    if (name == "open_backrooms_tv") {
+        api_spawn_backrooms_tv(app, nullptr);
         return "ok";
     }
     if (name == "open_monster_verse") {
