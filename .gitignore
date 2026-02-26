@@ -63,3 +63,5 @@ tools/api_server/venv/
 workspaces/
 tools/room/__pycache__/
 .env
+scratch/
+logs/backrooms-tv/
