@@ -1272,9 +1272,14 @@ void TWwdosApp::handleEvent(TEvent& event)
                 break;
             }
             case cmBackroomsTv: {
-                TRect r = deskTop->getExtent();
-                r.grow(-2, -1);
-                deskTop->insert(createBackroomsTvWindow(r));
+                BackroomsChannel channel;
+                if (showBackroomsTvDialog(channel)) {
+                    TRect r = deskTop->getExtent();
+                    r.grow(-2, -1);
+                    TWindow *w = createBackroomsTvWindow(r, channel);
+                    deskTop->insert(w);
+                    registerWindow(w);
+                }
                 clearEvent(event);
                 break;
             }
@@ -4796,10 +4801,13 @@ void api_spawn_monster_cam(TWwdosApp& app, const TRect* bounds) {
 }
 
 void api_spawn_backrooms_tv(TWwdosApp& app, const TRect* bounds) {
-    TRect r = bounds ? *bounds : api_centered_bounds(app, 100, 35);
-    TWindow* w = createBackroomsTvWindow(r);
-    app.deskTop->insert(w);
-    app.registerWindow(w);
+    BackroomsChannel channel;
+    if (showBackroomsTvDialog(channel)) {
+        TRect r = bounds ? *bounds : api_centered_bounds(app, 100, 35);
+        TWindow* w = createBackroomsTvWindow(r, channel);
+        app.deskTop->insert(w);
+        app.registerWindow(w);
+    }
 }
 
 void api_spawn_monster_verse(TWwdosApp& app, const TRect* bounds) {

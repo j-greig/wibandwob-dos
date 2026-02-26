@@ -48,8 +48,9 @@ public:
     bool isRunning() const { return pid_ > 0; }
     pid_t pid() const { return pid_; }
 
-private:
     std::string resolveBackroomsPath() const;
+
+private:
     pid_t pid_  = -1;
     int   fd_   = -1;   // stdout pipe read-end
 };
@@ -103,5 +104,9 @@ private:
 class TWindow;
 TWindow* createBackroomsTvWindow(const TRect &bounds);
 TWindow* createBackroomsTvWindow(const TRect &bounds, const BackroomsChannel &channel);
+
+// Config dialog — returns true if user clicked Play, fills channel config.
+// Reads primer list from the backrooms repo primers/ directory.
+bool showBackroomsTvDialog(BackroomsChannel &outChannel);
 
 #endif // BACKROOMS_TV_VIEW_H

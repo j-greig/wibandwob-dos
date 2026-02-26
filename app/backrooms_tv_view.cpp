@@ -69,7 +69,7 @@ bool BackroomsBridge::start(const BackroomsChannel &channel) {
         cmd += " --primers \"" + channel.primers + "\"";
     }
     cmd += " --model " + channel.model;
-    cmd += " --silent";    // suppress logger output, just get content
+    cmd += " --raw";       // stream only LLM deltas to stdout, no formatting
     cmd += " 2>/dev/null"; // suppress stderr
 
     // Create pipe
@@ -331,6 +331,19 @@ void TBackroomsTvView::handleEvent(TEvent &ev) {
             return;
         }
         switch (ev.keyDown.keyCode) {
+            case kbEsc:
+                // Escape: kill subprocess and close the window
+                bridge_.stop();
+                // Send close command to parent window
+                {
+                    TEvent closeEv;
+                    closeEv.what = evCommand;
+                    closeEv.message.command = cmClose;
+                    putEvent(closeEv);
+                }
+                clearEvent(ev);
+                return;
+
             case 'n':
             case 'N':
                 next();
@@ -422,4 +435,256 @@ TWindow* createBackroomsTvWindow(const TRect &bounds, const BackroomsChannel &ch
     auto *w = new TBackroomsTvWindow(bounds);
     w->setup(channel);
     return w;
+}
+
+// ===== Config dialog =====
+
+#define Uses_TDialog
+#define Uses_TStaticText
+#define Uses_TButton
+#define Uses_TLabel
+#define Uses_TInputLine
+#define Uses_TRadioButtons
+#define Uses_TListBox
+#define Uses_TScrollBar
+#define Uses_TSItem
+#define Uses_TStringCollection
+#define Uses_TProgram
+#define Uses_TDeskTop
+#include <tvision/tv.h>
+
+#include <dirent.h>
+#include <sys/stat.h>
+#include <algorithm>
+
+// Custom command IDs for dialog buttons
+static const ushort cmBktvAdd     = 900;
+static const ushort cmBktvRemove  = 901;
+static const ushort cmBktvRandom  = 902;
+static const ushort cmBktvPlay    = 903;
+
+// Helper: scan backrooms primers/ directory for .txt files
+static std::vector<std::string> scanPrimerNames(const std::string &backroomsPath) {
+    std::vector<std::string> names;
+    std::string dir = backroomsPath + "/primers";
+    DIR *d = opendir(dir.c_str());
+    if (!d) return names;
+    struct dirent *entry;
+    while ((entry = readdir(d)) != nullptr) {
+        std::string name(entry->d_name);
+        if (name.size() > 4 && name.substr(name.size() - 4) == ".txt") {
+            names.push_back(name.substr(0, name.size() - 4)); // strip .txt
+        }
+    }
+    closedir(d);
+    std::sort(names.begin(), names.end());
+    return names;
+}
+
+static TStringCollection* makeStringCol(const std::vector<std::string> &items) {
+    TStringCollection *col = new TStringCollection(
+        std::max((int)items.size(), 1), 10);
+    for (auto &s : items)
+        col->insert(newStr(s.c_str()));
+    return col;
+}
+
+class TBackroomsTvDialog : public TDialog {
+public:
+    TInputLine      *themeInput;
+    TInputLine      *turnsInput;
+    TRadioButtons   *modelRadio;
+    TListBox        *availList;
+    TListBox        *selectedList;
+    TScrollBar      *availSB;
+    TScrollBar      *selectedSB;
+
+    std::vector<std::string> availPrimers;
+    std::vector<std::string> selectedPrimers;
+
+    TBackroomsTvDialog(const TRect &bounds, const std::vector<std::string> &primers)
+        : TDialog(bounds, "Backrooms TV")
+        , TWindowInit(&TBackroomsTvDialog::initFrame)
+        , availPrimers(primers)
+    {
+        const int W = bounds.b.x - bounds.a.x;
+
+        // Theme
+        insert(new TLabel(TRect(3, 2, 10, 3), "~T~heme", nullptr));
+        themeInput = new TInputLine(TRect(3, 3, W - 3, 4), 256);
+        insert(themeInput);
+
+        // Turns
+        insert(new TLabel(TRect(3, 5, 10, 6), "T~u~rns", nullptr));
+        turnsInput = new TInputLine(TRect(3, 6, 13, 7), 4);
+        insert(turnsInput);
+
+        // Model radio buttons
+        insert(new TLabel(TRect(16, 5, 23, 6), "~M~odel", nullptr));
+        modelRadio = new TRadioButtons(TRect(16, 6, 40, 9),
+            new TSItem("Haiku  (fastest)",
+            new TSItem("Sonnet (default)",
+            new TSItem("Opus   (slowest)",
+            nullptr))));
+        insert(modelRadio);
+
+        // Primer lists
+        const int listTop = 10;
+        const int listH = 10;
+        const int listMid = W / 2;
+
+        insert(new TLabel(TRect(3, listTop - 1, listMid - 2, listTop), "A~v~ailable", nullptr));
+        availSB = new TScrollBar(TRect(listMid - 3, listTop, listMid - 2, listTop + listH));
+        insert(availSB);
+        availList = new TListBox(TRect(3, listTop, listMid - 3, listTop + listH), 1, availSB);
+        insert(availList);
+
+        insert(new TLabel(TRect(listMid + 1, listTop - 1, W - 3, listTop), "~S~elected", nullptr));
+        selectedSB = new TScrollBar(TRect(W - 4, listTop, W - 3, listTop + listH));
+        insert(selectedSB);
+        selectedList = new TListBox(TRect(listMid + 1, listTop, W - 4, listTop + listH), 1, selectedSB);
+        insert(selectedList);
+
+        // Buttons between lists
+        int btnY = listTop + listH + 1;
+        insert(new TButton(TRect(3,           btnY, 14,          btnY + 2), "~A~dd →",   cmBktvAdd,    bfNormal));
+        insert(new TButton(TRect(15,          btnY, 28,          btnY + 2), "← ~R~emove",cmBktvRemove, bfNormal));
+        insert(new TButton(TRect(29,          btnY, 44,          btnY + 2), "Ran~d~om 3", cmBktvRandom, bfNormal));
+
+        // Play / Cancel
+        int playY = btnY + 3;
+        insert(new TButton(TRect(W/2 - 14, playY, W/2 - 2, playY + 2), " \x10 ~P~lay", cmBktvPlay, bfDefault));
+        insert(new TButton(TRect(W/2 + 2,  playY, W/2 + 14, playY + 2), "Cancel",       cmCancel,   bfNormal));
+
+        // Set defaults
+        char defaultTheme[] = "liminal spaces";
+        themeInput->setData(defaultTheme);
+        char defaultTurns[] = "3";
+        turnsInput->setData(defaultTurns);
+        modelRadio->press(1); // Sonnet
+
+        rebuildLists();
+    }
+
+    void rebuildLists() {
+        availList->newList(makeStringCol(availPrimers));
+        selectedList->newList(makeStringCol(selectedPrimers));
+    }
+
+    void addSelected() {
+        int idx = availList->focused;
+        if (idx < 0 || idx >= (int)availPrimers.size()) return;
+        std::string name = availPrimers[idx];
+        // Don't add duplicates
+        for (auto &s : selectedPrimers)
+            if (s == name) return;
+        selectedPrimers.push_back(name);
+        rebuildLists();
+    }
+
+    void removeSelected() {
+        int idx = selectedList->focused;
+        if (idx < 0 || idx >= (int)selectedPrimers.size()) return;
+        selectedPrimers.erase(selectedPrimers.begin() + idx);
+        rebuildLists();
+    }
+
+    void randomThree() {
+        selectedPrimers.clear();
+        if (availPrimers.size() <= 3) {
+            selectedPrimers = availPrimers;
+        } else {
+            // Fisher-Yates partial shuffle for 3 picks
+            std::vector<int> indices(availPrimers.size());
+            for (int i = 0; i < (int)indices.size(); ++i) indices[i] = i;
+            for (int i = 0; i < 3; ++i) {
+                int j = i + (std::rand() % (indices.size() - i));
+                std::swap(indices[i], indices[j]);
+                selectedPrimers.push_back(availPrimers[indices[i]]);
+            }
+        }
+        rebuildLists();
+    }
+
+    virtual void handleEvent(TEvent &event) override {
+        TDialog::handleEvent(event);
+        if (event.what == evCommand) {
+            switch (event.message.command) {
+                case cmBktvAdd:
+                    addSelected();
+                    clearEvent(event);
+                    break;
+                case cmBktvRemove:
+                    removeSelected();
+                    clearEvent(event);
+                    break;
+                case cmBktvRandom:
+                    randomThree();
+                    clearEvent(event);
+                    break;
+                case cmBktvPlay:
+                    endModal(cmBktvPlay);
+                    clearEvent(event);
+                    break;
+            }
+        }
+    }
+
+    BackroomsChannel getChannel() const {
+        BackroomsChannel ch;
+
+        // Theme
+        char buf[256] = {};
+        themeInput->getData(buf);
+        ch.theme = std::string(buf);
+        if (ch.theme.empty()) ch.theme = "liminal spaces";
+
+        // Turns
+        char turnsBuf[8] = {};
+        turnsInput->getData(turnsBuf);
+        ch.turns = std::atoi(turnsBuf);
+        if (ch.turns < 1) ch.turns = 1;
+        if (ch.turns > 20) ch.turns = 20;
+
+        // Model
+        const char* models[] = {"haiku", "sonnet", "opus"};
+        ushort modelIdx = 1;
+        modelRadio->getData(&modelIdx);
+        ch.model = models[modelIdx < 3 ? modelIdx : 1];
+
+        // Primers (comma-separated)
+        std::string primers;
+        for (size_t i = 0; i < selectedPrimers.size(); ++i) {
+            if (i > 0) primers += ",";
+            primers += selectedPrimers[i];
+        }
+        ch.primers = primers;
+
+        return ch;
+    }
+};
+
+bool showBackroomsTvDialog(BackroomsChannel &outChannel) {
+    // Resolve backrooms path for primer scanning
+    BackroomsBridge bridge;
+    std::string backroomsPath = bridge.resolveBackroomsPath();
+    std::vector<std::string> primers = scanPrimerNames(backroomsPath);
+
+    int dlgW = 60;
+    int dlgH = 28;
+    TRect r(0, 0, dlgW, dlgH);
+    r.move((TProgram::deskTop->size.x - dlgW) / 2,
+           (TProgram::deskTop->size.y - dlgH) / 2);
+
+    auto *dlg = new TBackroomsTvDialog(r, primers);
+    ushort result = TProgram::deskTop->execView(dlg);
+
+    if (result == cmBktvPlay) {
+        outChannel = dlg->getChannel();
+        TObject::destroy(dlg);
+        return true;
+    }
+
+    TObject::destroy(dlg);
+    return false;
 }
