@@ -280,7 +280,13 @@ void TBackroomsTvView::appendText(const std::string &text) {
     for (size_t i = 0; i < text.size(); ++i) {
         char c = text[i];
         if (c == '\n') {
-            lines_.push_back(partial_);
+            // Skip triple-backtick lines from display (kept in raw log)
+            std::string trimmed = partial_;
+            size_t start = trimmed.find_first_not_of(" \t");
+            if (start != std::string::npos) trimmed = trimmed.substr(start);
+            if (trimmed.substr(0, 3) != "```") {
+                lines_.push_back(partial_);
+            }
             partial_.clear();
             // Cap ring buffer
             while ((int)lines_.size() > kMaxLines) {
