@@ -50,7 +50,12 @@ def send_cmd(cmd: str, kv: Optional[Dict[str, str]] = None) -> str:
     s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     s.settimeout(5.0)  # 5 second timeout
     s.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 65536)
-    s.connect(path)
+    try:
+        s.connect(path)
+    except (FileNotFoundError, ConnectionRefusedError) as e:
+        s.close()
+        print(f"[IPC] ✗ socket unavailable: {e}")
+        return None
     try:
         parts = [f"cmd:{cmd}"]
         for k, v in (kv or {}).items():

@@ -333,6 +333,7 @@ class BatchOp(BaseModel):
     view_type: Optional[str] = None
     title: Optional[str] = None
     bounds: Optional[BoundsModel] = None
+    aspect: Optional[str] = None  # e.g. "16:9", "square", "golden" — applied to bounds.w/h
     z: Optional[Union[int, Literal["raise", "lower", "topmost"]]] = None
     options: Dict[str, Any] = Field(default_factory=dict)
     schedule: Optional[ScheduleModel] = None

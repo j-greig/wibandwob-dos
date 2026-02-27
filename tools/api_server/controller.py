@@ -101,6 +101,7 @@ class Controller:
 
     async def get_registry_capabilities(self) -> Dict[str, Any]:
         """Fetch canonical command capabilities from the C++ registry via IPC."""
+        resp = None
         try:
             resp = send_cmd("get_capabilities")
             if resp and resp.strip().startswith("{"):
