@@ -91,15 +91,39 @@ curl -s -X POST http://127.0.0.1:8089/screenshot
 cat "$(ls -t logs/screenshots/tui_*.txt | head -1)"
 ```
 
-> Full API reference and operational cheat sheet: `.pi/skills/wibwobdos/SKILL.md`.
+> Full operational cheat sheet: `.claude/skills/ww-ops/SKILL.md`.
 
-**Agent visual inspection**: use `/screenshot` skill (`.claude/skills/screenshot/`) which handles capture, state JSON, diff, window crop, and auto-recovery. See SKILL.md there for all modes.
+**Contract parity tests** (no running TUI needed — parses source only):
 
-**Post-implementation parity audit**: use `/ww-audit` skill (`.claude/skills/ww-audit/`) to verify a window type has registry slug, props save/restore, and correct screen position — or run `/ww-audit` (no args) for a full gap matrix across all types.
+```bash
+# Window type parity (C++ registry vs Python enum/schema)
+tools/api_server/venv/bin/pytest tests/contract/test_window_type_parity.py -v
 
-**C++ build & edit rules**: load `.pi/skills/wibwobdos/SKILL.md` before editing C++ files. Covers mandatory build-after-edit, tvision Z-order gotchas (frame insertion, `insertBefore` semantics), and frameless right-click coverage rule. Hard-won lessons — don't skip it.
+# Timer cleanup (every setTimer has matching killTimer in destructor)
+tools/api_server/venv/bin/pytest tests/contract/test_timer_cleanup_parity.py -v
 
-No C++ unit test framework is configured. C++ testing is manual via UI interaction or API calls.
+# Full CI suite (11 tests, ~0.8s)
+tools/api_server/venv/bin/pytest tests/contract/ -v --tb=short \
+  -k "window_type_parity or parity_drift or capabilities_schema or no_hardcoded or timer_cleanup"
+```
+
+**Smoke parade** (visual integration test, requires running TUI + API):
+
+```bash
+python3 tools/smoke_parade.py --delay 1.5          # full run, 29 windows + 15 commands
+python3 tools/smoke_parade.py --delay 1.0 --start 28  # jump to step 28
+# Results: logs/smoke_parade/<timestamp>/parade.json + per-step .txt screenshots
+```
+
+**Post-implementation parity audit**: use `/ww-audit` skill to verify a window type has registry slug, props save/restore, and correct screen position.
+
+**C++ build & edit rules**: load `.pi/skills/wibwobdos/SKILL.md` before editing C++ files. Covers mandatory build-after-edit, tvision Z-order gotchas (frame insertion, `insertBefore` semantics), and frameless right-click coverage rule.
+
+**Known crashers** (skip in automated tests):
+- `micropolis_ascii`: SIGBUS in Micropolis::clearMap() during init. 100% reproducible.
+- `room_chat`: blink timer UAF partially fixed. Timer cleanup added but rapid close still risky.
+
+**close_all preserves session windows**: TWibWobWindow, TWibWobTerminalWindow, and TScrambleWindow survive close_all. Agents can safely call close_all without losing their own chat or terminal.
 
 Primary automated regression coverage for multiplayer/IPC lives in `tests/room/` (Python, 160 tests). Run for all boundary/contract changes:
 
