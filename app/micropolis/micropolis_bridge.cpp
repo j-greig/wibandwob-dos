@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstring>
+#include <new>
 
 #include "micropolis.h"
 #include "tool.h"
@@ -67,9 +68,28 @@ char road_glyph(std::uint16_t tile) {
     }
     return '+';
 }
+
+void destroy_micropolis(Micropolis *sim) {
+    if (!sim) {
+        return;
+    }
+    sim->~Micropolis();
+    ::operator delete(static_cast<void *>(sim));
+}
+
+Micropolis *create_zeroed_micropolis() {
+    void *storage = ::operator new(sizeof(Micropolis));
+    std::memset(storage, 0, sizeof(Micropolis));
+    try {
+        return new (storage) Micropolis();
+    } catch (...) {
+        ::operator delete(storage);
+        throw;
+    }
+}
 } // namespace
 
-MicropolisBridge::MicropolisBridge() : sim_(new Micropolis()) {
+MicropolisBridge::MicropolisBridge() : sim_(create_zeroed_micropolis(), destroy_micropolis) {
     // Micropolis leaves callback pointers uninitialized before setCallback.
     sim_->callback = nullptr;
     sim_->callbackData = nullptr;

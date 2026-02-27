@@ -3271,21 +3271,13 @@ std::string api_close_window(TWwdosApp& app, const std::string& id) {
         return false;
     };
 
-    // Two-phase close:
-    // 1) Ask the window to close itself gracefully. This lets destructors
-    //    run in the correct order (sub-views kill timers, threads, etc.).
-    // 2) Only force-remove+destroy if close() was a no-op (e.g. the window
-    //    returned false from valid(cmClose)). The force path is a last
-    //    resort — it can bypass deferred teardown contracts.
+    // Ask the window to close itself through Turbo Vision's normal flow.
+    // This lets destructors run in the correct order (sub-views kill timers,
+    // threads, etc.). We do NOT force-remove+destroy if close() is rejected
+    // — that path caused UAF with timer callbacks in room_chat and similar.
     w->close();
-    if (isWindowAlive(w)) {
-        // Graceful close was rejected. Force removal.
-        if (w->owner)
-            w->owner->remove(w);
-        TObject::destroy(w);
-    }
     if (isWindowAlive(w))
-        return "{\"error\":\"Close failed\"}";
+        return "{\"error\":\"Window rejected close\"}";
 
     // Remove from registry after successful removal.
     app.winToId.erase(w);

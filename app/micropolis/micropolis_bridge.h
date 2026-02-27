@@ -49,5 +49,6 @@ public:
 private:
     std::uint64_t hash_map_bytes() const;
 
-    std::unique_ptr<Micropolis> sim_;
+    using MicropolisDeleter = void (*)(Micropolis *);
+    std::unique_ptr<Micropolis, MicropolisDeleter> sim_;
 };
