@@ -30,4 +30,4 @@ jobs:
             -v \
             --tb=short \
             -x \
-            -k "window_type_parity or parity_drift or capabilities_schema or no_hardcoded or timer_cleanup"
+            -k "window_type_parity or parity_drift or capabilities_schema or no_hardcoded or timer_cleanup or skill_references"

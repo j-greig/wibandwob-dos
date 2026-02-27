@@ -188,7 +188,8 @@ def run_parade(api: API, delay: float, start_at: int = 1):
         print("!! Cannot reach API. Is the server running?")
         sys.exit(1)
 
-    total_steps = len(SPAWNABLE_TYPES) + len(COMMAND_SEQUENCE) + 3  # +clean start, tile, clean end
+    # +1 clean start, +1 compose desktop, +1 figlet tricks, +1 clean end = +4
+    total_steps = len(SPAWNABLE_TYPES) + len(COMMAND_SEQUENCE) + 4
 
     banner("SMOKE PARADE — WibWob-DOS Integration Test")
     print(f"  API:    {api.base}")
@@ -218,8 +219,10 @@ def run_parade(api: API, delay: float, start_at: int = 1):
         }
         log_entries.append(entry)
 
+    bailed = False
+
     def should_run() -> bool:
-        return step_num >= start_at
+        return step_num >= start_at and not bailed
 
     # ── Phase 1: Clean slate ────────────────────────────────────────────
     step_num += 1
@@ -242,6 +245,7 @@ def run_parade(api: API, delay: float, start_at: int = 1):
 
         win = api.create_window(wtype)
         if win == "BAIL":
+            bailed = True
             break
         if win and isinstance(win, dict) and win.get("id"):
             wid = win["id"]
@@ -312,10 +316,13 @@ def run_parade(api: API, delay: float, start_at: int = 1):
 
     for cmd_name, cmd_args, cmd_desc in COMMAND_SEQUENCE:
         step_num += 1
+        if not should_run():
+            continue
         step(step_num, total_steps, cmd_desc)
 
         result = api.run_command(cmd_name, cmd_args)
         if result == "BAIL":
+            bailed = True
             break
         if result:
             detail = str(result)[:80] if isinstance(result, dict) else str(result)[:80]

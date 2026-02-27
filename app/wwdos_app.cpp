@@ -759,7 +759,7 @@ private:
     bool openWorkspacePath(const std::string& path);
     void cascade();
     void tile();
-    void closeAll();
+    void closeAll(bool preserveSession = true);
     void takeScreenshot(bool showDialog = true);
     void setPatternMode(bool continuous);
     void showApiKeyDialog();
@@ -2022,12 +2022,14 @@ void TWwdosApp::tile()
     deskTop->tile(deskTop->getExtent());
 }
 
-void TWwdosApp::closeAll()
+void TWwdosApp::closeAll(bool preserveSession)
 {
-    // Close all regular windows on the desktop, but preserve windows that
-    // are essential to the agent/human session: Wib&Wob chat, terminals,
-    // and Scramble. Without these, the agent loses its communication
-    // channel and the human loses any shell they are working in.
+    // Close windows on the desktop.
+    // When preserveSession=true (default, used by menu and API close_all):
+    //   Keeps Wib&Wob chat, terminals, and Scramble alive so the agent
+    //   does not lose its communication channel.
+    // When preserveSession=false (used by workspace restore):
+    //   Closes everything for a clean slate.
     std::vector<TWindow*> toClose;
     TView *start = deskTop->first();
     if (start) {
@@ -2035,10 +2037,10 @@ void TWwdosApp::closeAll()
         do {
             TView *nextV = v->next;
             if (TWindow *w = dynamic_cast<TWindow*>(v)) {
-                // Preserve session-critical window types
-                if (dynamic_cast<TWibWobWindow*>(w) ||
-                    dynamic_cast<TWibWobTerminalWindow*>(w) ||
-                    dynamic_cast<TScrambleWindow*>(w)) {
+                if (preserveSession &&
+                    (dynamic_cast<TWibWobWindow*>(w) ||
+                     dynamic_cast<TWibWobTerminalWindow*>(w) ||
+                     dynamic_cast<TScrambleWindow*>(w))) {
                     v = nextV;
                     continue;
                 }
@@ -3573,8 +3575,8 @@ bool TWwdosApp::loadWorkspaceFromFile(const std::string& path)
         ++p;
     }
 
-    // Close current windows
-    closeAll();
+    // Close ALL windows for clean workspace restore (including session windows)
+    closeAll(false);
 
     // Apply globals
     USE_CONTINUOUS_PATTERN = continuous;

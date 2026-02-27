@@ -85,8 +85,7 @@ uv run tools/api_server/test_move.py   # Test rapid window movement
 curl http://127.0.0.1:8089/health
 curl http://127.0.0.1:8089/state
 
-# TUI screenshot — use /screenshot skill for full pipeline
-# Quick manual: trigger capture, read latest text dump
+# TUI screenshot — trigger capture, read latest text dump
 curl -s -X POST http://127.0.0.1:8089/screenshot
 cat "$(ls -t logs/screenshots/tui_*.txt | head -1)"
 ```
