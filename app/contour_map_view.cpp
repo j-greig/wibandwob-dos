@@ -292,7 +292,7 @@ void TContourMapView::draw() {
     static const TColorAttr kBarLabel =
         TColorAttr(TColorRGB(0xFF, 0xFF, 0xFF), TColorRGB(0x1A, 0x1A, 0x1A));
     static const TColorAttr kBarDim =
-        TColorAttr(TColorRGB(0x66, 0x66, 0x66), TColorRGB(0x1A, 0x1A, 0x1A));
+        TColorAttr(TColorRGB(0x99, 0x99, 0x99), TColorRGB(0x1A, 0x1A, 0x1A));
 
     auto blankRow = [&](int y) {
         buf.moveChar(0, ' ', kBg, W);
@@ -300,9 +300,9 @@ void TContourMapView::draw() {
     };
 
     static const TColorAttr kBtnBg =
-        TColorAttr(TColorRGB(0xAA, 0xAA, 0xAA), TColorRGB(0x2A, 0x2A, 0x2A));
+        TColorAttr(TColorRGB(0xBB, 0xBB, 0xBB), TColorRGB(0x33, 0x33, 0x33));
     static const TColorAttr kBtnActive =
-        TColorAttr(TColorRGB(0xFF, 0xFF, 0x00), TColorRGB(0x2A, 0x2A, 0x2A));
+        TColorAttr(TColorRGB(0xFF, 0xFF, 0x00), TColorRGB(0x33, 0x33, 0x33));
     static const TColorAttr kFlash =
         TColorAttr(TColorRGB(0x00, 0xFF, 0x66), TColorRGB(0x1A, 0x1A, 0x1A));
 
@@ -326,83 +326,100 @@ void TContourMapView::draw() {
     // ── Button strip (H-2) ──
     {
         buf.moveChar(0, ' ', kBtnBg, W);
-        ushort bx = 1;
 
-        // Terrain number buttons
+        // Build full button string, then write in one moveStr call
+        std::string bar = " ";
+        int activeStart = -1, activeEnd = -1;
         for (int i = 0; i < kTerrainCount; ++i) {
-            std::string btn = "[" + std::to_string(i + 1) + "]";
-            TColorAttr col = (i == terrainIdx_) ? kBtnActive : kBtnBg;
-            bx = buf.moveStr(bx, TStringView(btn), col);
+            if (i == terrainIdx_) activeStart = (int)bar.size();
+            bar += "[" + std::to_string(i + 1) + "]";
+            if (i == terrainIdx_) activeEnd = (int)bar.size();
         }
-        bx = buf.moveStr(bx, " ", kBtnBg);
+        bar += " ";
 
-        // Mode buttons
-        {
-            TColorAttr gc = grow_ ? kBtnActive : kBtnBg;
-            bx = buf.moveStr(bx, "[G:Grow]", gc);
-            bx = buf.moveStr(bx, " ", kBtnBg);
-        }
-        {
-            TColorAttr tc = triptych_ ? kBtnActive : kBtnBg;
-            bx = buf.moveStr(bx, "[T:Tri]", tc);
-            bx = buf.moveStr(bx, " ", kBtnBg);
-        }
+        int growStart = (int)bar.size();
+        bar += "[G:Grow]";
+        int growEnd = (int)bar.size();
+        bar += " ";
 
-        // Pause (grow only)
+        int triStart = (int)bar.size();
+        bar += "[T:Tri]";
+        int triEnd = (int)bar.size();
+        bar += " ";
+
+        int pauseStart = -1, pauseEnd = -1;
         if (grow_) {
-            TColorAttr pc = bridge_.isPaused() ? kBtnActive : kBtnBg;
-            bx = buf.moveStr(bx, "[Spc:Pause]", pc);
-            bx = buf.moveStr(bx, " ", kBtnBg);
+            pauseStart = (int)bar.size();
+            bar += "[Spc:Pause]";
+            pauseEnd = (int)bar.size();
+            bar += " ";
         }
 
-        bx = buf.moveStr(bx, "[R:New]", kBtnBg);
-        bx = buf.moveStr(bx, " ", kBtnBg);
-        bx = buf.moveStr(bx, "[S:Save]", kBtnBg);
-        bx = buf.moveStr(bx, " ", kBtnBg);
-        bx = buf.moveStr(bx, "[?:Help]", kBtnBg);
+        bar += "[R:New] [S:Save] [H:Help]";
+
+        // Write base text in default button colour
+        buf.moveStr(0, TStringView(bar), kBtnBg);
+
+        // Highlight active terrain button
+        if (activeStart >= 0) {
+            std::string seg = bar.substr(activeStart, activeEnd - activeStart);
+            buf.moveStr(activeStart, TStringView(seg), kBtnActive);
+        }
+        // Highlight grow if active
+        if (grow_) {
+            std::string seg = bar.substr(growStart, growEnd - growStart);
+            buf.moveStr(growStart, TStringView(seg), kBtnActive);
+        }
+        // Highlight triptych if active
+        if (triptych_) {
+            std::string seg = bar.substr(triStart, triEnd - triStart);
+            buf.moveStr(triStart, TStringView(seg), kBtnActive);
+        }
+        // Highlight pause if paused
+        if (pauseStart >= 0 && bridge_.isPaused()) {
+            std::string seg = bar.substr(pauseStart, pauseEnd - pauseStart);
+            buf.moveStr(pauseStart, TStringView(seg), kBtnActive);
+        }
 
         writeLine(0, H - 2, W, 1, buf);
     }
 
     // ── Status bar (H-1) ──
-    buf.moveChar(0, ' ', kBarBg, W);
-    ushort x = 1;
+    {
+        buf.moveChar(0, ' ', kBarBg, W);
 
-    // Terrain name
-    std::string tname = (terrainIdx_ >= 0 && terrainIdx_ < kTerrainCount)
-        ? kTerrainNames[terrainIdx_] : "?";
-    for (auto& c : tname) c = toupper(c);
-    x = buf.moveStr(x, TStringView(tname), kBarLabel);
+        // Build status text as one string
+        std::string tname = (terrainIdx_ >= 0 && terrainIdx_ < kTerrainCount)
+            ? kTerrainNames[terrainIdx_] : "?";
+        for (auto& c : tname) c = toupper(c);
 
-    // Seed
-    std::string seedStr = "  seed:" + std::to_string(seed_);
-    x = buf.moveStr(x, TStringView(seedStr), kBarDim);
-
-    // Levels
-    std::string lvlStr = "  " + std::to_string(levels_) + "lvl";
-    x = buf.moveStr(x, TStringView(lvlStr), kBarDim);
-
-    // Mode
-    if (grow_) {
-        if (bridge_.isPaused()) {
-            x = buf.moveStr(x, "  PAUSED", kBtnActive);
-        } else if (bridge_.isRunning()) {
-            x = buf.moveStr(x, "  GROWING", kBarDim);
+        std::string mode;
+        if (grow_) {
+            if (bridge_.isPaused()) mode = "PAUSED";
+            else if (bridge_.isRunning()) mode = "GROWING";
+            else mode = "DONE";
         } else {
-            x = buf.moveStr(x, "  DONE", kBarDim);
+            mode = "STATIC";
         }
-    } else {
-        x = buf.moveStr(x, "  STATIC", kBarDim);
-    }
 
-    // Flash message (overrides right side for 3 seconds)
-    if (!flashMsg_.empty() && (time(nullptr) - flashTime_) < 3) {
-        int fx = W - (int)flashMsg_.size() - 2;
-        if (fx > (int)x + 2)
-            buf.moveStr(fx, TStringView(flashMsg_), kFlash);
-    }
+        std::string status = " " + tname
+            + "  seed:" + std::to_string(seed_)
+            + "  " + std::to_string(levels_) + "lvl"
+            + "  " + mode;
 
-    writeLine(0, H - 1, W, 1, buf);
+        buf.moveStr(0, TStringView(status), kBarDim);
+        // Overwrite terrain name in bright white
+        buf.moveStr(1, TStringView(tname), kBarLabel);
+
+        // Flash message (overrides right side for 3 seconds)
+        if (!flashMsg_.empty() && (time(nullptr) - flashTime_) < 3) {
+            int fx = W - (int)flashMsg_.size() - 2;
+            if (fx > (int)status.size() + 2)
+                buf.moveStr(fx, TStringView(flashMsg_), kFlash);
+        }
+
+        writeLine(0, H - 1, W, 1, buf);
+    }
 }
 
 void TContourMapView::handleEvent(TEvent& ev) {
