@@ -46,7 +46,8 @@ public:
     bool start(int width, int height, int seed,
                const std::string& preset, int maxTicks,
                const std::string& snapshotPath = "",
-               const std::vector<GenStamp>& stamps = {});
+               const std::vector<GenStamp>& stamps = {},
+               bool canvasMode = false);
     void stop();
     void pause();
     void resume();
@@ -102,6 +103,7 @@ private:
     int presetIdx_ = 0;   // 0-9 = named presets, 10 = random
     int maxTicks_ = 2000;
     std::vector<GenStamp> stamps_;  // primers stamped before generation
+    bool canvasMode_ = false;      // primer IS the grid, rules operate on art
 
     // Display state
     std::vector<std::string> lines_;

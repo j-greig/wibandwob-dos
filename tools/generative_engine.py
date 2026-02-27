@@ -259,11 +259,29 @@ def substrate_glyph(grid: Grid, rng: random.Random) -> List[str]:
     return lines
 
 
+def substrate_raw(grid: Grid, rng: random.Random) -> List[str]:
+    """Render cell values directly — no borders, no transformation.
+    Used for 'canvas' mode where the primer IS the grid.
+    Born cells inherit a character from their nearest alive neighbour."""
+    lines = []
+    for y in range(grid.h):
+        row = []
+        for x in range(grid.w):
+            c = grid.cells[y][x]
+            if c.alive():
+                row.append(c.value if c.value and c.value != ' ' else '.')
+            else:
+                row.append(' ')
+        lines.append(''.join(row))
+    return lines
+
+
 SUBSTRATES = {
     'binary': substrate_binary,
     'block': substrate_block,
     'contour': substrate_contour,
     'glyph': substrate_glyph,
+    'raw': substrate_raw,
 }
 
 
@@ -372,6 +390,26 @@ SEEDERS = {
 
 # ── Rules ─────────────────────────────────────────────────
 
+def _inherit_char(grid: Grid, x: int, y: int, rng: random.Random,
+                  palette: Optional[List[str]] = None) -> str:
+    """Pick a character from alive Moore neighbours. Falls back to
+    palette (if canvas mode) or checkerboard."""
+    chars = []
+    for dy in (-1, 0, 1):
+        for dx in (-1, 0, 1):
+            if dx == 0 and dy == 0:
+                continue
+            nx, ny = (x + dx) % grid.w, (y + dy) % grid.h
+            c = grid.cells[ny][nx]
+            if c.alive() and c.value and c.value.strip():
+                chars.append(c.value)
+    if chars:
+        return rng.choice(chars)
+    if palette:
+        return rng.choice(palette)
+    return str((x + y) % 2)
+
+
 def rule_grow_life(grid: Grid, params: Dict, rng: random.Random, tick: int) -> Grid:
     """Conway-style birth/survival."""
     born = set(params.get('born', [3]))
@@ -388,7 +426,7 @@ def rule_grow_life(grid: Grid, params: Dict, rng: random.Random, tick: int) -> G
             else:
                 if n in born:
                     new.set_state(x, y, 1)
-                    new.cells[y][x].value = str((x + y) % 2)
+                    new.cells[y][x].value = _inherit_char(grid, x, y, rng)
     return new
 
 
@@ -402,7 +440,7 @@ def rule_grow_brian(grid: Grid, params: Dict, rng: random.Random, tick: int) -> 
                 n = grid.neighbours(x, y)
                 if n == 2:
                     new.set_state(x, y, 1)
-                    new.cells[y][x].value = '1'
+                    new.cells[y][x].value = _inherit_char(grid, x, y, rng)
             elif s == 1:
                 new.cells[y][x].state = 2
                 new.cells[y][x].value = '0'
@@ -436,7 +474,7 @@ def rule_grow_flood(grid: Grid, params: Dict, rng: random.Random, tick: int) -> 
                     if 0 <= nx < grid.w and 0 <= ny < grid.h:
                         if not grid.cells[ny][nx].alive() and rng.random() < bp:
                             new.set_state(nx, ny, 1)
-                            new.cells[ny][nx].value = str((nx + ny) % 2)
+                            new.cells[ny][nx].value = _inherit_char(grid, nx, ny, rng)
     return new
 
 
@@ -453,7 +491,7 @@ def rule_grow_diffuse(grid: Grid, params: Dict, rng: random.Random, tick: int) -
                 if 0 <= nx < grid.w and 0 <= ny < grid.h:
                     if not new.cells[ny][nx].alive():
                         new.set_state(nx, ny, 1)
-                        new.cells[ny][nx].value = str((nx + ny) % 2)
+                        new.cells[ny][nx].value = _inherit_char(grid, nx, ny, rng)
     return new
 
 
@@ -554,7 +592,7 @@ def rule_flip_threshold(grid: Grid, params: Dict, rng: random.Random, tick: int)
                     c.value = ' '
                 else:
                     c.state = 1
-                    c.value = str((x + y) % 2)
+                    c.value = _inherit_char(grid, x, y, rng)
     return new
 
 
@@ -656,7 +694,7 @@ def rule_branch(grid: Grid, params: Dict, rng: random.Random, tick: int) -> Grid
                 if 0 <= nx < grid.w and 0 <= ny < grid.h:
                     if not new.cells[ny][nx].alive():
                         new.set_state(nx, ny, 1)
-                        new.cells[ny][nx].value = str((nx + ny) % 2)
+                        new.cells[ny][nx].value = _inherit_char(grid, nx, ny, rng)
     return new
 
 
@@ -685,7 +723,7 @@ def rule_smooth(grid: Grid, params: Dict, rng: random.Random, tick: int) -> Grid
                 n = prev.neighbours(x, y)
                 if n >= 5:
                     new.set_state(x, y, 1)
-                    new.cells[y][x].value = str((x + y) % 2)
+                    new.cells[y][x].value = _inherit_char(prev, x, y, rng)
                 elif n <= 2:
                     new.cells[y][x].state = 0
                     new.cells[y][x].value = ' '
@@ -779,26 +817,34 @@ class Engine:
     """Runs a generative system from a preset + seed. Fully reproducible."""
 
     def __init__(self, w: int, h: int, seed: int, preset: Preset,
-                 stamps: Optional[List[Dict]] = None):
+                 stamps: Optional[List[Dict]] = None,
+                 canvas_mode: bool = False):
         """
         stamps: list of dicts with keys:
             path: str (file path) OR text: str (raw ASCII)
             x: int, y: int (grid coordinates)
             locked: bool (default True — immune to rules)
+        canvas_mode: if True, first stamp replaces the entire grid.
+            Substrate forced to 'raw', no normal seeding, stamp is
+            seeded (not locked) so rules operate on the art itself.
         """
         self.w = w
         self.h = h
         self.seed = seed
         self.preset = preset
         self.stamps = stamps or []
+        self.canvas_mode = canvas_mode
         self.tick = 0
         self.rng = random.Random(seed)
         self.done = False
         self.paused = False
 
+        # Canvas mode: force raw substrate, full-size grid
+        if canvas_mode:
+            preset.substrate = 'raw'
+
         # Grid dimensions depend on substrate
         if preset.substrate == 'binary':
-            # Binary needs half-size grid (each cell = 2x2 screen chars)
             gw = max(2, w // 2)
             gh = max(2, h // 2)
         else:
@@ -809,18 +855,36 @@ class Engine:
         # Deep-copy rule params so mutations don't pollute the preset
         self.rule_params = [(name, dict(params)) for name, params in preset.rules]
 
-        # Seed
-        seeder_fn = SEEDERS.get(preset.seeder, seed_random)
-        seeder_fn(self.grid, preset.seeder_params, self.rng)
+        if canvas_mode and self.stamps:
+            # Canvas mode: first stamp IS the grid. Seeded, not locked.
+            st = self.stamps[0]
+            path = st.get('path', '')
+            text = st.get('text', '')
+            if path:
+                self.grid.stamp_file(path, 0, 0, locked=False)
+            elif text:
+                self.grid.stamp_text(text, 0, 0, locked=False)
+            # Build a palette of characters from the stamp for new births
+            self._char_palette = []
+            for row in self.grid.cells:
+                for c in row:
+                    if c.alive() and c.value and c.value.strip():
+                        self._char_palette.append(c.value)
+            if not self._char_palette:
+                self._char_palette = ['.']
+        else:
+            self._char_palette = None
+            # Normal mode: seed then stamp
+            seeder_fn = SEEDERS.get(preset.seeder, seed_random)
+            seeder_fn(self.grid, preset.seeder_params, self.rng)
 
-        # Apply stamps after seeding
-        for st in self.stamps:
-            locked = st.get('locked', True)
-            ox, oy = st.get('x', 0), st.get('y', 0)
-            if 'path' in st:
-                self.grid.stamp_file(st['path'], ox, oy, locked)
-            elif 'text' in st:
-                self.grid.stamp_text(st['text'], ox, oy, locked)
+            for st in self.stamps:
+                locked = st.get('locked', True)
+                ox, oy = st.get('x', 0), st.get('y', 0)
+                if 'path' in st:
+                    self.grid.stamp_file(st['path'], ox, oy, locked)
+                elif 'text' in st:
+                    self.grid.stamp_text(st['text'], ox, oy, locked)
 
     def step(self) -> bool:
         """Advance one tick. Returns True if changed."""
@@ -901,6 +965,7 @@ class Engine:
             'width': self.w,
             'height': self.h,
             'tick': self.tick,
+            'canvas_mode': self.canvas_mode,
             'coverage': round(self.grid.coverage(), 3),
             'locked_cells': len(self.grid.locked),
             'preset': self.preset.to_dict(),

@@ -46,7 +46,7 @@ def parse_stamp_arg(s: str) -> dict:
 
 
 def stream(width, height, seed, preset_name, max_ticks, snapshot_file,
-           stamps=None, stamp_stdin=False):
+           stamps=None, stamp_stdin=False, canvas_mode=False):
     if preset_name == 'random':
         preset = random_preset(random.Random(seed))
     else:
@@ -67,7 +67,8 @@ def stream(width, height, seed, preset_name, max_ticks, snapshot_file,
         except json.JSONDecodeError as e:
             print(f"Bad stamp JSON on stdin: {e}", file=sys.stderr)
 
-    engine = Engine(width, height, seed, preset, stamps=stamp_list)
+    engine = Engine(width, height, seed, preset, stamps=stamp_list,
+                    canvas_mode=canvas_mode)
     tick_s = preset.tick_ms / 1000.0
 
     frame_count = 0
@@ -119,6 +120,8 @@ def main():
                         help='Stamp: PATH:X:Y[:locked|seeded] (repeatable)')
     parser.add_argument('--stamp-stdin', action='store_true',
                         help='Read stamps as JSON array from stdin')
+    parser.add_argument('--canvas', action='store_true',
+                        help='Canvas mode: first stamp IS the grid, rules operate on art')
     parser.add_argument('--list-presets', action='store_true')
     args = parser.parse_args()
 
@@ -132,7 +135,8 @@ def main():
     seed = args.seed if args.seed is not None else random.randint(0, 99999)
     stamps = [parse_stamp_arg(s) for s in args.stamp]
     stream(args.width, args.height, seed, args.preset, args.max_ticks,
-           args.snapshot, stamps=stamps, stamp_stdin=args.stamp_stdin)
+           args.snapshot, stamps=stamps, stamp_stdin=args.stamp_stdin,
+           canvas_mode=args.canvas)
 
 
 if __name__ == '__main__':

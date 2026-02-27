@@ -59,7 +59,8 @@ std::string GenerativeBridge::resolveScriptPath() {
 bool GenerativeBridge::start(int width, int height, int seed,
                               const std::string& preset, int maxTicks,
                               const std::string& snapshotPath,
-                              const std::vector<GenStamp>& stamps) {
+                              const std::vector<GenStamp>& stamps,
+                              bool canvasMode) {
     stop();
     paused_ = false;
 
@@ -81,6 +82,9 @@ bool GenerativeBridge::start(int width, int height, int seed,
                 + (st.locked ? "locked" : "seeded") + "\"";
         }
     }
+
+    if (canvasMode)
+        cmd += " --canvas";
 
     cmd += " 2>/tmp/generative_bridge_err.log";
 
@@ -200,7 +204,8 @@ void TGenerativeLabView::launch() {
     std::string snapPath = snapDir + "/" + std::string(ts)
         + "_" + presetName() + "_s" + std::to_string(seed_) + ".yml";
 
-    bridge_.start(contentW, contentH, seed_, presetName(), maxTicks_, snapPath, stamps_);
+    bridge_.start(contentW, contentH, seed_, presetName(), maxTicks_, snapPath,
+                  stamps_, canvasMode_);
     startTimer();
     drawView();
 }
@@ -481,9 +486,10 @@ public:
 
         // Mode row
         int optY2 = optY + 4;
-        modeRadio = new TRadioButtons(TRect(3, optY2, 50, optY2 + 1),
+        modeRadio = new TRadioButtons(TRect(3, optY2, W - 3, optY2 + 1),
             new TSItem("~L~ocked (immune to rules)",
-            new TSItem("Se~e~ded (rules can modify)", nullptr)));
+            new TSItem("Se~e~ded (rules can modify)",
+            new TSItem("Can~v~as (primer IS the grid — art evolves)", nullptr))));
         ushort modeVal = 0;
         modeRadio->setData(&modeVal);
         insert(modeRadio);
@@ -586,6 +592,12 @@ public:
         return "@C";
     }
 
+    bool isCanvasMode() const {
+        ushort lockMode = 0;
+        modeRadio->getData(&lockMode);
+        return lockMode == 2;
+    }
+
     std::vector<GenStamp> getStamps(int canvasW, int canvasH) const {
         std::vector<GenStamp> stamps;
         ushort posMode = 0;
@@ -593,6 +605,8 @@ public:
         ushort lockMode = 0;
         modeRadio->getData(&lockMode);
         bool locked = (lockMode == 0);
+        // Canvas mode: force seeded (not locked), ignore position
+        if (lockMode == 2) locked = false;
 
         char xbuf[8] = {}, ybuf[8] = {};
         xInput->getData(xbuf);
@@ -674,13 +688,23 @@ void TGenerativeLabView::openStampPicker() {
         int gw = canvasW / 2;
         int gh = canvasH / 2;
 
-        auto newStamps = dlg->getStamps(gw, gh);
+        bool isCanvas = dlg->isCanvasMode();
+        auto newStamps = dlg->getStamps(isCanvas ? canvasW : gw,
+                                         isCanvas ? canvasH : gh);
         if (!newStamps.empty()) {
-            // Append to existing stamps (additive)
-            for (auto& s : newStamps)
-                stamps_.push_back(s);
-            flashMsg_ = "Stamped " + std::to_string(newStamps.size())
-                + " primer" + (newStamps.size() > 1 ? "s" : "");
+            if (isCanvas) {
+                // Canvas mode: replace all stamps with just the first
+                stamps_.clear();
+                stamps_.push_back(newStamps[0]);
+                canvasMode_ = true;
+                flashMsg_ = "Canvas: " + dlg->selNames[0] + " (art evolves)";
+            } else {
+                canvasMode_ = false;
+                for (auto& s : newStamps)
+                    stamps_.push_back(s);
+                flashMsg_ = "Stamped " + std::to_string(newStamps.size())
+                    + " primer" + (newStamps.size() > 1 ? "s" : "");
+            }
             flashTime_ = time(nullptr);
             relaunch();
         }
@@ -691,6 +715,7 @@ void TGenerativeLabView::openStampPicker() {
 
 void TGenerativeLabView::clearStamps() {
     stamps_.clear();
+    canvasMode_ = false;
     flashMsg_ = "Stamps cleared";
     flashTime_ = time(nullptr);
     relaunch();
