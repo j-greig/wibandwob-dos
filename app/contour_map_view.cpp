@@ -262,8 +262,10 @@ void TContourMapView::draw() {
 
     // Mode
     if (grow_) {
-        std::string mode = bridge_.isRunning() ? "  GROWING" : "  DONE";
+        std::string mode = bridge_.isRunning() ? "  GROWING" : "  PAUSED";
         x = buf.moveStr(x, TStringView(mode), kBarDim);
+    } else {
+        x = buf.moveStr(x, "  STATIC", kBarDim);
     }
 
     // Controls hint — right-aligned
@@ -339,9 +341,17 @@ void TContourMapView::handleEvent(TEvent& ev) {
             clearEvent(ev); return;
         }
 
-        // Space — (in grow mode, just restarts for now)
+        // Space — pause/resume grow mode
         if (ch == ' ' && grow_) {
-            relaunch();
+            if (bridge_.isRunning()) {
+                // Pause: kill subprocess, keep current frame
+                bridge_.stop();
+                stopTimer();
+            } else {
+                // Resume: relaunch
+                relaunch();
+            }
+            drawView();
             clearEvent(ev); return;
         }
 
