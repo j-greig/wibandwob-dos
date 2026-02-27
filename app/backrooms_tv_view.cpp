@@ -980,3 +980,20 @@ bool showBackroomsTvDialog(BackroomsChannel &outChannel) {
     TObject::destroy(dlg);
     return false;
 }
+
+void syncModulePrimers() {
+    BackroomsBridge bridge;
+    std::string backroomsPath = bridge.resolveBackroomsPath();
+    // scanPrimerNames populates g_modulePrimerPaths as a side effect
+    scanPrimerNames(backroomsPath);
+    // Symlink all module primers into backrooms/primers/ now
+    if (!g_modulePrimerPaths.empty()) {
+        std::string primersDir = backroomsPath + "/primers/";
+        for (auto &kv : g_modulePrimerPaths) {
+            std::string linkPath = primersDir + kv.first + ".txt";
+            struct stat lst;
+            if (lstat(linkPath.c_str(), &lst) != 0)
+                symlink(kv.second.c_str(), linkPath.c_str());
+        }
+    }
+}

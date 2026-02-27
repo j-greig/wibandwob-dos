@@ -115,4 +115,9 @@ TWindow* createBackroomsTvWindow(const TRect &bounds, const BackroomsChannel &ch
 // Reads primer list from the backrooms repo primers/ directory.
 bool showBackroomsTvDialog(BackroomsChannel &outChannel);
 
+// Scan modules-private/*/primers/ and symlink any new files into the
+// backrooms primers/ dir. Call once at app startup so module primers are
+// immediately available without opening the config dialog first.
+void syncModulePrimers();
+
 #endif // BACKROOMS_TV_VIEW_H

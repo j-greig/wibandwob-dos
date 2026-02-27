@@ -999,6 +999,10 @@ TWwdosApp::TWwdosApp() :
 {
     recentWorkspaces_ = scanRecentWorkspacePaths("workspaces", kMaxRecentWorkspaces);
 
+    // Sync module primers (modules-private/*/primers/) into backrooms primers/
+    // so they appear in the TV dialog and the CLI can resolve them immediately.
+    syncModulePrimers();
+
     // Start IPC server for local API control (best-effort; ignore failures)
     ipcServer = new ApiIpcServer(this);
 
