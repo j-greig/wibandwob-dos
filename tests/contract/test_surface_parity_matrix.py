@@ -5,6 +5,7 @@ to get_command_capabilities() without a matching MCP tool builder will fail.
 """
 from __future__ import annotations
 
+import pytest
 import re
 import sys
 from pathlib import Path
@@ -13,7 +14,13 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-import tools.api_server.mcp_tools as mcp_tools
+try:
+    import tools.api_server.mcp_tools as mcp_tools
+except ModuleNotFoundError:
+    pytest.skip(
+        "tools.api_server.mcp_tools removed — MCP moved to Node bridge (SPK-03)",
+        allow_module_level=True,
+    )
 
 
 def _registry_commands() -> set[str]:
