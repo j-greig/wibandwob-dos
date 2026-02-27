@@ -1,0 +1,998 @@
+[stderr] OpenAI Codex v0.101.0 (research preview)
+--------
+[stderr] workdir: /Users/james/Repos/wibandwob-dos
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: medium
+reasoning summaries: auto
+session id: 019ca056-3ccb-74f1-b7fc-f43f1a407d1e
+--------
+user
+You are a code analyst. Investigate the codebase, diagnose issues, and report findings.
+
+EFFICIENCY: Use targeted commands, not full-file dumps.
+Prefer rg -n -C3 'pattern' file or sed -n '45,55p' file.
+Avoid nl -ba file | sed -n '1,300p'. Only dump full files if <50 lines.
+
+Deliver:
+1. Root cause
+2. Fix options with tradeoffs
+3. Risks and tests to add
+
+Focus files: app/api_ipc.cpp, app/wwdos_app.cpp, app/command_registry.cpp, app/window_type_registry.cpp
+
+TASK: Investigate potential crashes in the WibWob-DOS TUI when rapidly spawning and closing windows via IPC.
+
+Context: A smoke test script spawns ~31 window types one by one via the REST API (which calls IPC to the C++ TUI), screenshots each, then closes each via close_window command. After about 28 close_window calls the TUI process dies silently, leaving a stale /tmp/wwdos.sock.
+
+Key files to examine:
+- app/api_ipc.cpp — IPC command handler, socket server
+- app/wwdos_app.cpp — window creation/destruction, the close_window handler
+- app/command_registry.cpp — command dispatch including close_window
+- app/window_type_registry.cpp — spawn functions for each window type
+
+Look for:
+1. Use-after-free in window destructors (TView::destroy, close handlers)
+2. Race conditions between IPC thread and TUI event loop
+3. Any window type whose destructor does something dangerous (frees shared resources, timers, threads)
+4. Whether close_window properly handles windows that are mid-render or mid-animation
+5. Stack overflow from deeply nested destroy calls
+6. Any window type that spawns background threads or subprocesses that outlive the window
+
+List the top 5 most likely crash causes ranked by probability, with file:line references.
+mcp startup: no servers
+[stderr] 2026-02-27T18:22:12.206778Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c90e0-9bb5-7532-8b22-119b6ecfe17f
+[stderr] 2026-02-27T18:22:12.233111Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c9111-6d56-71e0-b877-cf37e07af9a3
+[stderr] 2026-02-27T18:22:12.258217Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c90f6-e6bd-74a3-a5a3-cf41de182a00
+[stderr] 2026-02-27T18:22:12.283410Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c90f0-2bed-7740-82dd-e87d5ecc1f9d
+[stderr] 2026-02-27T18:22:12.307670Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c9124-f8a7-7783-b397-eb2f4b1d31ed
+[stderr] 2026-02-27T18:22:12.332685Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c9104-bfb2-72e0-8e3f-8ed6b0f6e8e0
+[stderr] 2026-02-27T18:22:12.357741Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c90ee-44d2-7952-b58a-34569d027e0f
+[stderr] 
+[stderr] thinking
+**Planning targeted code inspection**
+[stderr] codex
+I’ll inspect the four focus files with targeted searches for close/destroy/threading paths, then trace how `close_window` flows from IPC to command dispatch to actual destruction. I’ll rank likely crash causes with precise file:line references and include mitigation/testing options.
+[stderr] 
+[stderr] thinking
+**Searching key concurrency patterns**
+[stderr] exec
+/bin/zsh -lc "rg --files app | rg \"(view|window|ipc|registry|app)\\.cpp"'$|'"\\.h"'$"' in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "rg -n \"close_window|destroy|TView::destroy|remove|delete|close\\(|shutdown|thread|std::thread|async|timer|socket|ipc|event|post|enqueue|mutex|lock\" app/api_ipc.cpp app/wwdos_app.cpp app/command_registry.cpp app/window_type_registry.cpp" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 52ms:
+app/generative_lab_view.cpp
+app/text_doc_window.cpp
+app/contour_map_view.cpp
+app/text_editor_view.cpp
+app/animated_score_view.h
+app/generative_torus_view.h
+app/generative_lab_view.h
+app/app_launcher_view.cpp
+app/mech_grid.h
+app/generative_orbit_view.h
+app/generative_monster_cam_view.cpp
+app/figlet_text_view.cpp
+app/ascii_image_view.cpp
+app/test_pattern.h
+app/room_chat_view.cpp
+app/scramble_view.h
+app/tvterm_view.cpp
+app/mech.h
+app/ascii_grid_view.h
+app/generative_monster_verse_view.h
+ succeeded in 52ms:
+app/window_type_registry.cpp:2:// Keeps api_ipc.cpp free of per-type knowledge: adding a new type only requires
+app/window_type_registry.cpp:17:#include "animated_blocks_view.h"
+app/window_type_registry.cpp:63:extern void api_spawn_blocks(TWwdosApp&, const TRect*);
+app/window_type_registry.cpp:176:static const char* spawn_blocks(TWwdosApp& app,
+app/window_type_registry.cpp:178:    TRect r; api_spawn_blocks(app, opt_bounds(kv, r)); return nullptr;
+app/window_type_registry.cpp:293:static bool match_blocks(TWindow* w) { return has_child_view<TAnimatedBlocksView>(w); }
+app/window_type_registry.cpp:332:    { "blocks",            spawn_blocks,            match_blocks            },
+app/api_ipc.cpp:1:#include "api_ipc.h"
+app/api_ipc.cpp:9:#include <sys/socket.h>
+app/api_ipc.cpp:151:extern std::string api_close_window(TWwdosApp& app, const std::string& id);
+app/api_ipc.cpp:184:        fprintf(stderr, "[ipc] Auth enabled (secret length=%zu)\n", auth_secret_.size());
+app/api_ipc.cpp:216:    // Ensure the accepted fd is blocking for the auth handshake.
+app/api_ipc.cpp:221:    // Set a short read timeout — failed probes must not freeze the TUI event loop.
+app/api_ipc.cpp:236:            fprintf(stderr, "[ipc] Auth read returned %zd (errno=%d)\n", n, errno);
+app/api_ipc.cpp:242:            fprintf(stderr, "[ipc] Auth response too large\n");
+app/api_ipc.cpp:246:    fprintf(stderr, "[ipc] Auth response (%zu bytes): %s\n", response.size(), response.c_str());
+app/api_ipc.cpp:251:        fprintf(stderr, "[ipc] Auth failed: no hmac field in response\n");
+app/api_ipc.cpp:263:        fprintf(stderr, "[ipc] Auth failed: nonce replay detected\n");
+app/api_ipc.cpp:270:        fprintf(stderr, "[ipc] Auth failed: HMAC mismatch\n");
+app/api_ipc.cpp:287:    fprintf(stderr, "[ipc] Auth OK for connection\n");
+[stderr] 
+[stderr] thinking
+**Inspecting IPC poll handling**
+[stderr] codex
+I’ve identified the key `close_window` and IPC touchpoints. Next I’m reading the exact code paths around `api_close_window`, IPC polling, and event publishing to find lifetime/race hazards.
+[stderr] exec
+/bin/zsh -lc "sed -n '140,260p' app/api_ipc.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '293,410p' app/api_ipc.cpp" in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc "sed -n '775,910p' app/api_ipc.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '500,620p' app/api_ipc.cpp" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 51ms:
+extern void api_close_all(TWwdosApp& app);
+extern void api_set_pattern_mode(TWwdosApp& app, const std::string& mode);
+extern void api_save_workspace(TWwdosApp& app);
+extern bool api_save_workspace_path(TWwdosApp& app, const std::string& path);
+extern bool api_open_workspace_path(TWwdosApp& app, const std::string& path);
+extern void api_screenshot(TWwdosApp& app);
+extern std::string api_take_last_registered_window_id(TWwdosApp& app);
+extern std::string api_get_state(TWwdosApp& app);
+extern std::string api_move_window(TWwdosApp& app, const std::string& id, int x, int y);
+extern std::string api_resize_window(TWwdosApp& app, const std::string& id, int width, int height);
+extern std::string api_focus_window(TWwdosApp& app, const std::string& id);
+extern std::string api_close_window(TWwdosApp& app, const std::string& id);
+extern std::string api_get_canvas_size(TWwdosApp& app);
+extern void api_spawn_paint(TWwdosApp& app, const TRect* bounds);
+extern TPaintCanvasView* api_find_paint_canvas(TWwdosApp& app, const std::string& id);
+extern TGenerativeLabView* api_find_gen_lab_view(TWwdosApp& app, const std::string& id);
+extern std::string api_room_chat_receive(TWwdosApp& app, const std::string& sender, const std::string& text, const std::string& ts);
+extern std::string api_room_presence(TWwdosApp& app, const std::string& participants_json);
+extern std::string api_get_room_chat_pending(TWwdosApp& app);
+extern std::string api_get_room_chat_display_name(TWwdosApp& app);
+ succeeded in 51ms:
+// Probe a Unix socket to check if a listener is active.
+// Returns true if a process is listening (connection succeeds).
+static bool probe_socket_live(const std::string& path) {
+    int fd = ::socket(AF_UNIX, SOCK_STREAM, 0);
+    if (fd < 0) return false;
+
+    struct sockaddr_un addr;
+    std::memset(&addr, 0, sizeof(addr));
+    addr.sun_family = AF_UNIX;
+    std::snprintf(addr.sun_path, sizeof(addr.sun_path), "%s", path.c_str());
+
+    bool live = (::connect(fd, (struct sockaddr*)&addr, sizeof(addr)) == 0);
+    ::close(fd);
+    return live;
+}
+
+bool ApiIpcServer::start(const std::string& path) {
+#ifdef _WIN32
+    (void)path; return false;
+#else
+[stderr]  succeeded in 50ms:
+    if (cmd == "subscribe_events") {
+        // Keep this fd open — the client will receive pushed events.
+#ifdef SO_NOSIGPIPE
+        int one = 1;
+        ::setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &one, sizeof(one));
+#endif
+        // Send initial ack so the client knows subscription is active.
+        const char* ack = "{\"type\":\"subscribed\"}\n";
+        if (!safe_write(fd, ack, std::strlen(ack))) {
+            ::close(fd);
+            return;
+        }
+        // Set non-blocking so publish_event doesn't stall the event loop.
+        ::fcntl(fd, F_SETFL, ::fcntl(fd, F_GETFL, 0) | O_NONBLOCK);
+        event_subscribers_.push_back(fd);
+        return; // do NOT write resp or close fd
+    }
+
+    // Track command timestamp for connection status indicator
+    last_command_time_ = std::chrono::steady_clock::now();
+[stderr]  succeeded in 50ms:
+    } else if (cmd == "close_window") {
+        auto id = kv.find("id");
+        if (id != kv.end()) {
+            resp = api_close_window(*app_, id->second) + "\n";
+        } else {
+            resp = "err missing id\n";
+        }
+    } else if (cmd == "send_text") {
+        auto id_it = kv.find("id");
+        auto content_it = kv.find("content");
+        auto mode_it = kv.find("mode");
+        auto pos_it = kv.find("position");
+
+        if (id_it != kv.end() && content_it != kv.end()) {
+            std::string mode = (mode_it != kv.end()) ? mode_it->second : "append";
+            std::string position = (pos_it != kv.end()) ? pos_it->second : "end";
+
+            // Decode content if base64-encoded (prefix: "base64:")
+            std::string content = content_it->second;
+            fprintf(stderr, "[C++ IPC] send_text: id=%s, content_len=%zu, encoded=%s\n",
+[stderr] 
+[stderr] thinking
+**Planning API close inspection**
+[stderr] exec
+/bin/zsh -lc "sed -n '3180,3315p' app/wwdos_app.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '780,910p' app/wwdos_app.cpp" in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc "sed -n '2000,2065p' app/wwdos_app.cpp" in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc "sed -n '2820,2865p' app/wwdos_app.cpp" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 51ms:
+    for (const auto& entry : app.chatLog_) {
+        if (!firstChat) json << ",";
+        json << "{\"seq\":" << entry.seq
+             << ",\"sender\":\"" << json_escape(entry.sender) << "\""
+             << ",\"text\":\"" << json_escape(entry.text) << "\"}";
+        firstChat = false;
+    }
+    json << "]}";
+    return json.str();
+}
+
+std::string api_move_window(TWwdosApp& app, const std::string& id, int x, int y) {
+    TWindow* w = app.findWindowById(id);
+    if (!w) return "{\"error\":\"Window not found\"}";
+
+    TRect newBounds = w->getBounds();
+    newBounds.move(x - newBounds.a.x, y - newBounds.a.y);
+    w->locate(newBounds);
+
+    if (app.ipcServer) {
+ succeeded in 51ms:
+    static bool parseKeyedString(const std::string &s, size_t objStart, const char *key, std::string &out);
+    static bool parseKeyedNumber(const std::string &s, size_t objStart, const char *key, int &out);
+    static bool parseKeyedBool(const std::string &s, size_t objStart, const char *key, bool &out);
+    static bool parseBounds(const std::string &s, size_t objStart, int &x,int &y,int &w,int &h);
+private:
+    
+    int windowNumber;
+    static const int maxWindows = 99;
+
+    // Scramble cat overlay
+    TScrambleWindow* scrambleWindow;
+    ScrambleEngine scrambleEngine;
+    std::string pendingScrambleReply;  // Queued async response for event-loop delivery
+    ScrambleDisplayState scrambleState;
+    void cycleScramble();
+    void wireScrambleInput();
+    void deliverScrambleReply();
+
+    // Runtime API key (shared across all chat windows)
+    static std::string runtimeApiKey;
+[stderr]  succeeded in 51ms:
+        scrambleState = sdsTall;
+        scrambleWindow->focusInput();
+        // Welcome message if history is empty
+        if (scrambleWindow->getMessageView() &&
+            scrambleWindow->getMessageView()->getMessages().empty()) {
+            scrambleWindow->getMessageView()->addMessage("scramble", "mrrp! ask me anything (=^..^=)");
+        }
+    } else if (scrambleState == sdsTall) {
+        // Remove existing Scramble window
+        destroy(scrambleWindow);
+        scrambleWindow = nullptr;
+        scrambleState = sdsHidden;
+    }
+}
+
+void TWwdosApp::cascade()
+{
+    deskTop->cascade(deskTop->getExtent());
+}
+
+[stderr]  succeeded in 51ms:
+    // Add padding for window frame (borders): +2 width, +2 height
+    int windowWidth = maxWidth + 2;
+    int windowHeight = maxHeight + 2;
+    capToDesktop(windowWidth, windowHeight);
+
+    // Center on desktop
+    TRect screenBounds = deskTop->getExtent();
+    int screenWidth = screenBounds.b.x;
+    int screenHeight = screenBounds.b.y;
+    int x = std::max(0, (screenWidth - windowWidth) / 2);
+    int y = std::max(0, (screenHeight - windowHeight) / 2);
+    return TRect(x, y, x + windowWidth, y + windowHeight);
+}
+
+void TWwdosApp::idle()
+{
+    TApplication::idle();
+
+    // Poll IPC server for incoming API commands
+    if (ipcServer) ipcServer->poll();
+[stderr] 
+[stderr] thinking
+**Assessing command registry closure**
+[stderr] exec
+/bin/zsh -lc "sed -n '700,780p' app/command_registry.cpp" in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc "sed -n '1,250p' app/window_type_registry.cpp" in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc "sed -n '250,380p' app/window_type_registry.cpp" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 52ms:
+        auto fg_it = kv.find("fg");
+        auto bg_it = kv.find("bg");
+        if (id_it == kv.end()) return "err missing id";
+        return api_figlet_set_color(app, id_it->second,
+            (fg_it != kv.end()) ? fg_it->second : "",
+            (bg_it != kv.end()) ? bg_it->second : "");
+    }
+    if (name == "figlet_list_fonts") {
+        return api_figlet_list_fonts();
+    }
+    // ── Window management ────────────────────────────────────────────
+    if (name == "move_window") {
+        auto id = kv.find("id");
+        auto xi = kv.find("x");
+        auto yi = kv.find("y");
+        if (id == kv.end()) return "err missing id";
+        if (xi == kv.end() || yi == kv.end()) return "err missing x or y";
+        return api_move_window(app, id->second, std::stoi(xi->second), std::stoi(yi->second));
+    }
+    if (name == "resize_window") {
+[stderr]  succeeded in 51ms:
+// Window type registry — single source of truth for all spawnable window types.
+// Keeps api_ipc.cpp free of per-type knowledge: adding a new type only requires
+// a new entry in the k_specs table below.
+
+#include "window_type_registry.h"
+#include "gradient.h"
+#include "frame_file_player_view.h"
+#include "transparent_text_view.h"
+#include "text_editor_view.h"
+#include "browser_view.h"
+#include "generative_verse_view.h"
+#include "generative_mycelium_view.h"
+#include "generative_orbit_view.h"
+#include "generative_torus_view.h"
+#include "generative_cube_view.h"
+#include "game_of_life_view.h"
+#include "animated_blocks_view.h"
+#include "animated_score_view.h"
+#include "animated_ascii_view.h"
+#include "animated_gradient_view.h"
+[stderr]  succeeded in 51ms:
+    auto ti = kv.find("text");
+    if (ti == kv.end() || ti->second.empty()) return "err missing text param";
+    auto fi = kv.find("font");
+    std::string font = (fi != kv.end()) ? fi->second : "standard";
+    auto fli = kv.find("frameless");
+    auto si = kv.find("shadowless");
+    bool frameless  = (fli != kv.end() && (fli->second == "1" || fli->second == "true"));
+    bool shadowless = (si != kv.end() && (si->second == "1" || si->second == "true"));
+    TRect r;
+    api_spawn_figlet_text(app, opt_bounds(kv, r), ti->second, font, frameless, shadowless);
+    return nullptr;
+}
+
+template <typename ViewType>
+static bool has_child_view(TWindow* w) {
+    if (!w) return false;
+    TView* start = w->first();
+    if (!start) return false;
+    TView* v = start;
+    do {
+[stderr] 
+[stderr] thinking
+**Investigating destructors and threads**
+[stderr] codex
+I confirmed `close_window` forcibly removes/destroys windows and then still touches registry/events. I’m now checking window classes for background workers/destructors that could make that forced destroy path unsafe.
+[stderr] exec
+/bin/zsh -lc 'rg -n "class TWibWobTerminalWindow|class TRoomChatWindow|class TPaintWindow|class TAppLauncherWindow|class TGalleryWindow|class TQuadraView|class TSnakeView|class TRogueView|class TDeepSignalView" app/*.h app/*.cpp app/windows/*.h app/windows/*.cpp' in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc "rg -n \"std::thread|pthread|detach\\(|join\\(|~[A-Za-z0-9_]+\\(|close\\(\\)|destroy\\(|~T|kill\\(|terminate|putEvent|message\\(\" app/*.cpp app/*.h app/windows/*.cpp app/windows/*.h" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 51ms:
+app/app_launcher_view.h:58:    friend class TAppLauncherWindow;
+app/app_launcher_view.h:78:class TAppLauncherWindow : public TWindow {
+app/ascii_gallery_view.h:61:    friend class TGalleryWindow;
+app/ascii_gallery_view.h:85:class TGalleryWindow : public TWindow {
+app/rogue_view.h:101:class TRogueView : public TView {
+app/snake_view.h:26:class TSnakeView : public TView {
+app/deep_signal_view.h:75:class TDeepSignalView : public TView {
+app/room_chat_view.h:101:class TRoomChatWindow : public TWindow {
+app/quadra_view.h:34:class TQuadraView : public TView {
+app/tvterm_view.h:14:class TWibWobTerminalWindow : public tvterm::BasicTerminalWindow
+[stderr]  succeeded in 51ms:
+app/api_ipc.cpp:230:    // Read auth response — loop until we have a full newline-terminated frame.
+app/api_ipc.cpp:291:ApiIpcServer::~ApiIpcServer() { stop(); }
+app/api_ipc.cpp:602:                            out.close();
+app/api_ipc.cpp:747:                        out.close();
+app/api_ipc.cpp:799:    // For large responses, set SO_LINGER so close() blocks until all
+app/command_registry.cpp:642:        TProgram::application->putEvent(ev);
+app/ansi_viewer_main.cpp:71:        TObject::destroy(dlg);
+app/animated_ascii_view.cpp:63:TAnimatedAsciiView::~TAnimatedAsciiView() {
+app/ansi_view.cpp:61:    in.close();
+app/animated_blocks_view.cpp:44:TAnimatedBlocksView::~TAnimatedBlocksView() {
+app/animated_gradient_view.cpp:29:TAnimatedHGradientView::~TAnimatedHGradientView() {
+app/animated_score_view.cpp:137:TAnimatedScoreView::~TAnimatedScoreView() {
+app/animated_score_view.cpp:538:    TObject::destroy(d);
+app/app_launcher_view.cpp:98:                    putEvent(notify);
+app/app_launcher_view.cpp:308:                    putEvent(launch);
+app/app_launcher_view.cpp:341:                    putEvent(launch);
+app/frame_file_player_view.cpp:143:FrameFilePlayerView::~FrameFilePlayerView() {
+app/frame_file_player_view.cpp:380:TTextFileView::~TTextFileView()
+app/frame_file_player_view.cpp:722:    TObject::destroy(dlg);
+app/frame_file_player_view.cpp:740:    TObject::destroy(dlg);
+[stderr] 
+[stderr] thinking
+**Analyzing window registration and cleanup**
+[stderr] exec
+/bin/zsh -lc "rg -n \"registerWindow\\(|findWindowById\\(|idToWin\\[|winToId\\[|lastRegisteredWindowId_\" app/wwdos_app.cpp app/api_ipc.cpp app/command_registry.cpp" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 52ms:
+app/wwdos_app.cpp:824:    std::string lastRegisteredWindowId_;
+app/wwdos_app.cpp:826:    std::string registerWindow(TWindow* w, bool emit_event = true) {
+app/wwdos_app.cpp:830:            lastRegisteredWindowId_ = it->second;
+app/wwdos_app.cpp:836:        winToId[w] = id;
+app/wwdos_app.cpp:837:        idToWin[id] = w;
+app/wwdos_app.cpp:838:        lastRegisteredWindowId_ = id;
+app/wwdos_app.cpp:847:    TWindow* findWindowById(const std::string& id) {
+app/wwdos_app.cpp:865:                        winToId[w] = new_id;
+app/wwdos_app.cpp:866:                        idToWin[new_id] = w;
+app/wwdos_app.cpp:1178:                registerWindow(w);
+app/wwdos_app.cpp:1293:                registerWindow(w);
+app/wwdos_app.cpp:1302:                registerWindow(w);
+app/wwdos_app.cpp:1311:                registerWindow(w);
+app/wwdos_app.cpp:1320:                registerWindow(w);
+app/wwdos_app.cpp:1329:                registerWindow(w);
+app/wwdos_app.cpp:1339:                    registerWindow(w);
+app/wwdos_app.cpp:1354:                registerWindow(w);
+app/wwdos_app.cpp:1373:                registerWindow(w);
+app/wwdos_app.cpp:1388:                    registerWindow(tw2);
+app/wwdos_app.cpp:1439:                    registerWindow(tw2);
+[stderr] 
+[stderr] thinking
+**Analyzing window close and SIGPIPE crash**
+[stderr] codex
+I’m now validating whether the crash could be process termination from socket writes (`SIGPIPE`) rather than a C++ memory fault, since that would look exactly like a silent death plus stale socket file.
+[stderr] exec
+/bin/zsh -lc "sed -n '1,140p' app/api_ipc.cpp" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 52ms:
+#include "api_ipc.h"
+#include "command_registry.h"
+#include "core/json_utils.h"
+#include "generative_lab_view.h"
+#include "room_chat_view.h"
+#include "window_type_registry.h"
+
+#ifndef _WIN32
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/un.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <errno.h>
+#endif
+
+#ifdef __APPLE__
+#include <CommonCrypto/CommonHMAC.h>
+#else
+#include <openssl/hmac.h>
+[stderr] 
+[stderr] thinking
+**Analyzing destructor safety and message broadcasts**
+[stderr] codex
+I found several non-trivial window types with subprocess or async behavior. I’m drilling into those destructors (`terminal`, `room_chat`, `contour_map`, `generative_lab`, `wibwob`) to isolate which close path can crash under rapid teardown.
+[stderr] exec
+/bin/zsh -lc "sed -n '1,260p' app/room_chat_view.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,220p' app/tvterm_view.cpp" in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc "sed -n '260,520p' app/room_chat_view.cpp" in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc "sed -n '1,230p' app/generative_lab_view.cpp" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 52ms:
+#define Uses_TEvent
+#define Uses_TRect
+#define Uses_TPoint
+#define Uses_TWindow
+#define Uses_TKeys
+#define Uses_MsgBox
+#define Uses_TScreenCell
+#include <tvision/tv.h>
+
+#include "tvterm_view.h"
+#include <tvterm/termctrl.h>
+#include <tvterm/termview.h>
+#include <tvterm/vtermemu.h>
+#include <tvterm/termemu.h>
+#include <algorithm>
+#include <cstring>
+
+// Command IDs for tvterm integration — must not collide with existing app commands.
+// These are wired through TVTermConstants so tvterm-core uses our IDs.
+enum : ushort
+ succeeded in 52ms:
+/*---------------------------------------------------------*/
+/*                                                         */
+/*   room_chat_view.cpp — Multi-user PartyKit room chat   */
+/*                                                         */
+/*---------------------------------------------------------*/
+
+#include "room_chat_view.h"
+
+#define Uses_TKeys
+#define Uses_TDrawBuffer
+#define Uses_TColorAttr
+#define Uses_TWindow
+#define Uses_TFrame
+#define Uses_TScrollBar
+#define Uses_TScroller
+#define Uses_TProgram
+#define Uses_TDeskTop
+#define Uses_TGroup
+#include <tvision/tv.h>
+
+[stderr]  succeeded in 50ms:
+        TColorAttr cursorAttr = TColorAttr(TColorRGB(25, 25, 35), TColorRGB(220, 220, 230));
+        b.moveChar(0, ' ', attr, size.x);
+        std::string prompt = "> " + buf;
+        if ((int)prompt.size() > size.x - 1) prompt = prompt.substr(0, size.x - 1);
+        b.moveStr(0, prompt.c_str(), attr);
+        // Blinking block cursor
+        if (cursorVisible && (state & sfFocused)) {
+            int cx = (int)prompt.size();
+            if (cx < size.x)
+                b.moveStr(cx, " ", cursorAttr);
+        }
+        writeLine(0, 0, size.x, 1, b);
+    }
+
+private:
+    bool cursorVisible = true;
+    void* blinkTimer = nullptr;
+
+    virtual void handleEvent(TEvent& event) override {
+        if (event.what == evKeyboard) {
+[stderr]  succeeded in 51ms:
+#include "generative_lab_view.h"
+
+#include <cstdlib>
+#include <cstring>
+#include <mach-o/dyld.h>
+#include <ctime>
+#include <unistd.h>
+#include <fcntl.h>
+#include <signal.h>
+#include <sys/wait.h>
+#include <sys/stat.h>
+#include <dirent.h>
+#include <algorithm>
+#include <set>
+
+#define Uses_TDialog
+#define Uses_TButton
+#define Uses_TStaticText
+#define Uses_TLabel
+#define Uses_TListBox
+[stderr] 
+[stderr] thinking
+**Planning contour map processing**
+[stderr] exec
+/bin/zsh -lc "sed -n '1,240p' app/contour_map_view.cpp" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 51ms:
+#include "contour_map_view.h"
+
+#include <cstdlib>
+#include <cstring>
+#include <mach-o/dyld.h>
+#include <ctime>
+#include <unistd.h>
+#include <fcntl.h>
+#include <signal.h>
+#include <sys/wait.h>
+#include <sys/stat.h>
+#include <algorithm>
+
+// ── ContourBridge ────────────────────────────────────────
+
+ContourBridge::~ContourBridge() { stop(); }
+
+std::string ContourBridge::resolveScriptPath() {
+    // 1. Explicit env var
+    const char* root = std::getenv("WIBWOB_REPO_ROOT");
+[stderr] 
+[stderr] thinking
+**Assessing spawn and close safety**
+[stderr] codex
+I found a likely mismatch in the window type registry comments vs behavior (`wibwob` appears to have a live spawn function). I’m verifying how `spawnable` is computed, because that can pull risky internal windows into the smoke loop.
+[stderr] exec
+/bin/zsh -lc "sed -n '380,470p' app/window_type_registry.cpp" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 52ms:
+        json += "\",\"spawnable\":";
+        json += specs[i].spawn ? "true" : "false";
+        json += "}";
+    }
+    json += "]}";
+    return json;
+}
+[stderr] 
+[stderr] thinking
+**Investigating spawnable wibwob risks**
+[stderr] exec
+/bin/zsh -lc "sed -n '520,860p' app/wibwob_view.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '2880,2975p' app/wwdos_app.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '4680,4765p' app/wwdos_app.cpp" in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc "rg -n \"api_spawn_wibwob|createWibWobWindow|TWibWobWindow::~|detach\\(|streaming thread|putEvent\\(|cmWibWob|wibwob\" app/wwdos_app.cpp app/wibwob_view.cpp app/wibwob_view.h" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 51ms:
+                if (nend != std::string::npos)
+                    p.name = json.substr(nstart, nend - nstart);
+            }
+        }
+        participants->push_back(p);
+        pos = end + 1;
+    }
+
+    TEvent ev;
+    ev.what = evCommand;
+    ev.message.command = cmRoomPresence;
+    ev.message.infoPtr = participants;
+    TProgram::application->putEvent(ev);
+    return "ok";
+}
+
+std::string api_get_room_chat_pending(TWwdosApp& /*app*/) {
+    TRoomChatWindow* win = getRoomChatWindow();
+    if (!win) return "[]";
+    auto msgs = win->drainPending();
+ succeeded in 51ms:
+void api_spawn_test(TWwdosApp& app, const TRect* bounds) { 
+    if (bounds) {
+        app.newTestWindow(*bounds);
+    } else {
+        app.newTestWindow();
+    }
+}
+
+void api_spawn_gradient(TWwdosApp& app, const std::string& kind, const TRect* bounds) {
+    TGradientWindow::GradientType type = TGradientWindow::gtHorizontal;
+    if (kind == "horizontal") type = TGradientWindow::gtHorizontal;
+    else if (kind == "vertical") type = TGradientWindow::gtVertical;
+    else if (kind == "radial") type = TGradientWindow::gtRadial;
+    else if (kind == "diagonal") type = TGradientWindow::gtDiagonal;
+    
+    if (bounds) {
+        app.newGradientWindow(type, *bounds);
+    } else {
+        app.newGradientWindow(type);
+    }
+[stderr]  succeeded in 51ms:
+
+    messagePane = new TGroup(msgPaneRect);
+    messagePane->growMode = gfGrowHiX | gfGrowHiY;
+    insert(messagePane);
+
+    // Input view: 2 lines at bottom (status + input)
+    TRect inputRect = client;
+    inputRect.a.y = inputRect.b.y - 2;
+    inputView = new TWibWobInputView(inputRect);
+    inputView->growMode = gfGrowHiX | gfGrowLoY | gfGrowHiY;
+    insert(inputView);
+
+    // Inside the message pane: dedicated scrollbar and scroller
+    TRect paneBounds = messagePane->getExtent();
+    paneBounds.move(-paneBounds.a.x, -paneBounds.a.y);
+
+    TRect sbRect = paneBounds;
+    sbRect.a.x = sbRect.b.x - 1;
+    vScrollBar = new TScrollBar(sbRect);
+    vScrollBar->options |= ofPostProcess; // Allow keyboard to reach the bar (sbHandleKeyboard equivalent)
+[stderr]  succeeded in 51ms:
+app/wibwob_view.cpp:3:/*   wibwob_view.cpp - Wib&Wob AI Chat Interface          */
+app/wibwob_view.cpp:8:#include "wibwob_view.h"
+app/wibwob_view.cpp:9:#include "wibwob_engine.h"
+app/wibwob_view.cpp:558:TWibWobWindow::~TWibWobWindow() {
+app/wibwob_view.cpp:609:                fprintf(stderr, "[wibwob] API key updated via broadcast (len=%zu)\n", key.size());
+app/wibwob_view.cpp:615:    // Handle injected wibwob_ask messages from API
+app/wibwob_view.cpp:661:            "modules-private/wibwob-prompts/wibandwob.prompt.md",
+app/wibwob_view.cpp:662:            "modules/wibwob-prompts/wibandwob.prompt.md",
+app/wibwob_view.cpp:779:            }).detach();
+app/wibwob_view.cpp:808:        // The streaming thread may still be running when ~TWibWobWindow fires;
+app/wibwob_view.cpp:1017:        std::string errFile = "/tmp/wibwob_voice_probe.err";
+app/wibwob_view.cpp:1156:    }).detach();
+app/wibwob_view.cpp:1252:TWindow* createWibWobWindow(const TRect& bounds, const std::string& title) {
+app/wibwob_view.h:3:/*   wibwob_view.h - Wib&Wob AI Chat Interface            */
+app/wibwob_view.h:217:TWindow* createWibWobWindow(const TRect& bounds, const std::string& title);
+app/wwdos_app.cpp:82:#include "wibwob_view.h"
+app/wwdos_app.cpp:84:#include "wibwob_scroll_test.h"
+app/wwdos_app.cpp:113:#include "wibwob_background.h"
+app/wwdos_app.cpp:234:const ushort cmWibWobChat = 131;
+app/wwdos_app.cpp:236:const ushort cmWibWobTestA = 148;  // Scrollbar test: standardScrollBar fix
+[stderr] 
+[stderr] thinking
+**Reviewing event callback threading**
+[stderr] exec
+/bin/zsh -lc "sed -n '860,1035p' app/wibwob_view.cpp" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 51ms:
+        messageView->startStreamingMessage("");
+        // Pass system prompt for auto-session-start
+        streamingStarted = sdkProvider->sendStreamingQuery(input, streamCallback, engine->getSystemPrompt());
+        logMessage("Stream", "[streaming] SDK sendStreamingQuery: " + std::string(streamingStarted ? "started" : "failed"));
+    }
+
+    // Fall back to non-streaming if SDK streaming didn't work
+    if (!streamingStarted) {
+        logMessage("Stream", "[streaming] No streaming provider available, using fallback");
+        messageView->cancelStreamingMessage();
+        fallbackToRegularQuery(input, start);
+    }
+}
+
+void TWibWobWindow::fallbackToRegularQuery(const std::string& input,
+                                           std::chrono::steady_clock::time_point start) {
+    engine->sendQuery(input, [this, start](const ClaudeResponse& response) {
+        auto end = std::chrono::steady_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+
+[stderr] 
+[stderr] thinking
+**Identifying unsafe timer usage risks**
+[stderr] codex
+I found a strong candidate: `TRoomInputView` creates a repeating timer but does not cancel it in destruction. I’m checking for the same timer-lifecycle bug pattern across other window/view classes to rank probability correctly.
+[stderr] exec
+/bin/zsh -lc "rg -n \"setTimer\\(|killTimer\\(|timerId_|blinkTimer|cmTimerExpired\" app/*.cpp app/*.h | head -n 200" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 51ms:
+app/animated_gradient_view.cpp:25:    // Receive timer expirations via broadcast events (cmTimerExpired)
+app/animated_gradient_view.cpp:48:        timerId = setTimer(periodMs, (int)periodMs);
+app/animated_gradient_view.cpp:53:        killTimer(timerId);
+app/animated_gradient_view.cpp:114:    if (ev.what == evBroadcast && ev.message.command == cmTimerExpired) {
+app/animated_score_view.cpp:151:        timerId = setTimer(periodMs, (int)periodMs);
+app/animated_score_view.cpp:156:        killTimer(timerId);
+app/animated_score_view.cpp:324:    if (ev.what == evBroadcast && ev.message.command == cmTimerExpired) {
+app/animated_blocks_view.cpp:40:    // Receive timer expirations via broadcast events (cmTimerExpired)
+app/animated_blocks_view.cpp:58:        timerId = setTimer(periodMs, (int)periodMs);
+app/animated_blocks_view.cpp:63:        killTimer(timerId);
+app/animated_blocks_view.cpp:97:    if (ev.what == evBroadcast && ev.message.command == cmTimerExpired) {
+app/animated_ascii_view.cpp:57:    // Receive timer expirations via broadcast events (cmTimerExpired)
+app/animated_ascii_view.cpp:77:        timerId = setTimer(periodMs, (int)periodMs);
+app/animated_ascii_view.cpp:82:        killTimer(timerId);
+app/animated_ascii_view.cpp:266:    if (ev.what == evBroadcast && ev.message.command == cmTimerExpired) {
+app/game_of_life_view.cpp:103:        timerId = setTimer(periodMs, (int)periodMs);
+app/game_of_life_view.cpp:108:        killTimer(timerId);
+app/game_of_life_view.cpp:263:    if (ev.what == evBroadcast && ev.message.command == cmTimerExpired) {
+app/generative_mycelium_view.cpp:54:void TGenerativeMyceliumView::startTimer(){ if(!timerId) timerId=setTimer(periodMs,(int)periodMs);}    
+app/generative_mycelium_view.cpp:55:void TGenerativeMyceliumView::stopTimer(){ if(timerId){ killTimer(timerId); timerId=0; }}
+[stderr] 
+[stderr] thinking
+**Mapping timer leak around window close**
+[stderr] exec
+/bin/zsh -lc "rg -n \"wibwob|Internal-only|spawnable|close_window|TWindow::close\\(\\) can no-op|owner->remove|TObject::destroy\\(|if \\(cmd == \\\"close_window\\\"\\)|ipcServer->poll\\(\\)|message\\(this, evBroadcast, TWibWobTerminalWindow::termConsts.cmCheckTerminalUpdates\" app/window_type_registry.cpp app/wwdos_app.cpp app/api_ipc.cpp app/room_chat_view.cpp" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 52ms:
+app/api_ipc.cpp:151:extern std::string api_close_window(TWwdosApp& app, const std::string& id);
+app/api_ipc.cpp:500:    } else if (cmd == "close_window") {
+app/api_ipc.cpp:503:            resp = api_close_window(*app_, id->second) + "\n";
+app/window_type_registry.cpp:1:// Window type registry — single source of truth for all spawnable window types.
+app/window_type_registry.cpp:26:#include "wibwob_view.h"
+app/window_type_registry.cpp:75:extern void api_spawn_wibwob(TWwdosApp&, const TRect*);
+app/window_type_registry.cpp:305:static bool match_wibwob(TWindow* w) { return dynamic_cast<TWibWobWindow*>(w) != nullptr; }
+app/window_type_registry.cpp:345:    // Internal-only types — recognised but not spawnable via IPC
+app/window_type_registry.cpp:346:    { "wibwob",            [](TWwdosApp& app, const std::map<std::string,std::string>& kv) -> const char* {
+app/window_type_registry.cpp:347:                               TRect r; api_spawn_wibwob(app, opt_bounds(kv, r)); return nullptr;
+app/window_type_registry.cpp:348:                           },                       match_wibwob             },
+app/window_type_registry.cpp:380:        json += "\",\"spawnable\":";
+app/wwdos_app.cpp:82:#include "wibwob_view.h"
+app/wwdos_app.cpp:84:#include "wibwob_scroll_test.h"
+app/wwdos_app.cpp:113:#include "wibwob_background.h"
+app/wwdos_app.cpp:921:    friend std::string api_close_window(TWwdosApp&, const std::string&);
+app/wwdos_app.cpp:964:    friend void api_spawn_wibwob(TWwdosApp&, const TRect* bounds);
+app/wwdos_app.cpp:990:// Accessor for runtime API key (used by wibwob_view.cpp)
+app/wwdos_app.cpp:1008:    // Socket path: /tmp/wwdos.sock (default) or /tmp/wibwob_N.sock (multi-instance).
+app/wwdos_app.cpp:1012:        sockPath = std::string("/tmp/wibwob_") + inst + ".sock";
+[stderr] 
+[stderr] thinking
+**Analyzing potential concurrency and signal hazards**
+[stderr] exec
+/bin/zsh -lc "sed -n '4590,4710p' app/wwdos_app.cpp" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 52ms:
+    if (editorWindow) {
+        // Focus the window
+        editorWindow->select();
+        
+        // Send the figlet text
+        TTextEditorView* editorView = editorWindow->getEditorView();
+        if (editorView) {
+            editorView->sendFigletText(text, font, width, mode);
+            return "ok";
+        }
+    }
+
+    return "err no text editor available";
+}
+
+void api_spawn_browser(TWwdosApp& app, const TRect* bounds) {
+    if (bounds) {
+        app.newBrowserWindow(*bounds);
+    } else {
+        app.newBrowserWindow();
+[stderr] 
+[stderr] thinking
+**Inspecting event dispatch near window closure**
+[stderr] exec
+/bin/zsh -lc "sed -n '1598,1642p' app/wwdos_app.cpp" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 52ms:
+                }
+                clearEvent(event);
+                break;
+            }
+            // REMOVED E009: cmWindowBgColor (Background Color retired, no menu item)
+                
+            // Tools menu commands
+            case cmWibWobChat:
+                newWibWobWindow();
+                clearEvent(event);
+                break;
+            case cmRoomChat:
+                newRoomChatWindow();
+                clearEvent(event);
+                break;
+            case cmRoomPresence: {
+                auto* participants =
+                    static_cast<std::vector<RoomParticipant>*>(event.message.infoPtr);
+                if (participants) {
+                    if (TRoomChatWindow* win = getRoomChatWindow())
+[stderr] 
+[stderr] thinking
+**Analyzing window close UAF causes**
+[stderr] exec
+/bin/zsh -lc "sed -n '80,125p' app/quadra_view.cpp" in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc "sed -n '48,82p' app/snake_view.cpp" in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc "sed -n '90,135p' app/browser_view.cpp" in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc "sed -n '380,430p' app/browser_view.cpp" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 51ms:
+    static std::mt19937 gen(std::random_device{}());
+    return gen;
+}
+
+// ── TQuadraView ───────────────────────────────────────────
+
+TQuadraView::TQuadraView(const TRect &bounds, unsigned periodMs_)
+    : TView(bounds), periodMs(periodMs_)
+{
+    growMode = gfGrowHiX | gfGrowHiY;
+    options |= ofSelectable | ofFirstClick;
+    eventMask |= evBroadcast | evKeyDown;
+    newGame();
+}
+
+TQuadraView::~TQuadraView() {
+    stopTimer();
+}
+
+void TQuadraView::startTimer() {
+[stderr]  succeeded in 50ms:
+
+TSnakeView::TSnakeView(const TRect &bounds, unsigned periodMs_)
+    : TView(bounds), basePeriodMs(periodMs_)
+{
+    growMode = gfGrowHiX | gfGrowHiY;
+    options |= ofSelectable | ofFirstClick;
+    eventMask |= evBroadcast | evKeyDown;
+    newGame();
+}
+
+TSnakeView::~TSnakeView() {
+    stopTimer();
+}
+
+void TSnakeView::startTimer() {
+    if (timerId == 0) {
+        unsigned speed = currentSpeed();
+        timerId = setTimer(speed, (int)speed);
+    }
+}
+[stderr]  succeeded in 51ms:
+    if (buf.empty()) return;
+    TColorRGB fg = state.fg;
+    if (state.bold) {
+        fg = TColorRGB(
+            (uint8_t) std::min(255, (int) fg.r + 32),
+            (uint8_t) std::min(255, (int) fg.g + 32),
+            (uint8_t) std::min(255, (int) fg.b + 32)
+        );
+    }
+    TColorAttr attr(fg, state.bg);
+    if (!line.segs.empty() && line.segs.back().attr == attr) {
+        line.segs.back().text += buf;
+    } else {
+        line.segs.push_back({buf, attr});
+    }
+    line.length += (int) buf.size();
+    buf.clear();
+}
+
+static void applySgr(const std::vector<int> &params, AnsiRgbState &state) {
+[stderr]  succeeded in 52ms:
+
+    // Create content view (interior minus URL bar, status, hints, scrollbar)
+    TRect contentRect = getExtent();
+    contentRect.grow(-1, -1);  // Shrink by frame
+    contentRect.a.y += 1;     // Below URL bar
+    contentRect.b.y -= 2;     // Above status bar + key hints
+    contentRect.b.x -= 1;     // Room for scrollbar
+    contentView = new TBrowserContentView(contentRect, nullptr, vScrollBar);
+    insert(contentView);
+}
+
+TBrowserWindow::~TBrowserWindow() {
+    cancelFetch();
+    stopPollTimer();
+}
+
+TFrame* TBrowserWindow::initFrame(TRect r) {
+    return new TFrame(r);
+}
+
+[stderr] 
+[stderr] thinking
+**Inspecting event usage for safety**
+[stderr] exec
+/bin/zsh -lc "sed -n '60,360p' app/app_launcher_view.cpp" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 52ms:
+    int x = 1;
+    for (int i = 0; i < NUM_CATEGORIES; i++) {
+        TColorAttr attr = (i == selected) ? sel : normal;
+        const char* label = categories[i];
+        int len = (int)strlen(label);
+
+        // Pad: " Label "
+        if (x < size.x) buf.moveChar(x, ' ', attr, 1);
+        x++;
+        if (x + len <= size.x) buf.moveStr(x, label, attr);
+        x += len;
+        if (x < size.x) buf.moveChar(x, ' ', attr, 1);
+        x++;
+        // Gap
+        x++;
+    }
+
+    writeLine(0, 0, size.x, 1, buf);
+}
+
+[stderr] 
+[stderr] thinking
+**Analyzing crash root causes**
+[stderr] codex
+1. **Leaked timer in `room_chat` input view (most likely root cause)**  
+   `TRoomInputView` starts a repeating timer but never kills it before destruction, so `cmTimerExpired` can target freed memory later. The delayed timing fits “dies after ~28 closes,” not exactly at the close call.  
+   Refs: [room_chat_view.cpp:254](/Users/james/Repos/wibandwob-dos/app/room_chat_view.cpp:254), [room_chat_view.cpp:276](/Users/james/Repos/wibandwob-dos/app/room_chat_view.cpp:276), [room_chat_view.cpp:308](/Users/james/Repos/wibandwob-dos/app/room_chat_view.cpp:308), [room_chat_view.cpp:427](/Users/james/Repos/wibandwob-dos/app/room_chat_view.cpp:427)
+
+2. **Force-destroy path in `api_close_window` can violate window shutdown contracts**  
+   After `w->close()`, code forcibly `remove`+`destroy`s if still present. If a window expects deferred close/event-driven teardown, this can cause double-teardown or teardown-while-active behavior.  
+   Refs: [wwdos_app.cpp:3263](/Users/james/Repos/wibandwob-dos/app/wwdos_app.cpp:3263), [wwdos_app.cpp:3268](/Users/james/Repos/wibandwob-dos/app/wwdos_app.cpp:3268), [wwdos_app.cpp:3269](/Users/james/Repos/wibandwob-dos/app/wwdos_app.cpp:3269)
+
+3. **“Internal-only” `wibwob` is actually exposed as spawnable**  
+   Registry comment says not spawnable, but it has a spawn function and JSON marks `spawnable` from `spawn != nullptr`. Smoke scripts using `get_window_types` may include `wibwob` unexpectedly.  
+   Refs: [window_type_registry.cpp:345](/Users/james/Repos/wibandwob-dos/app/window_type_registry.cpp:345), [window_type_registry.cpp:346](/Users/james/Repos/wibandwob-dos/app/window_type_registry.cpp:346), [window_type_registry.cpp:380](/Users/james/Repos/wibandwob-dos/app/window_type_registry.cpp:380)
+
+4. **`wibwob` async lifecycle has detached threads/callbacks that can outlive UI teardown**  
+   Detached threads and callbacks capture/use window state; destructor sets a flag but does not synchronize thread completion. If this window is spawned/closed by automation, it increases UAF risk.  
+   Refs: [wibwob_view.cpp:558](/Users/james/Repos/wibandwob-dos/app/wibwob_view.cpp:558), [wibwob_view.cpp:779](/Users/james/Repos/wibandwob-dos/app/wibwob_view.cpp:779), [wibwob_view.cpp:808](/Users/james/Repos/wibandwob-dos/app/wibwob_view.cpp:808), [wibwob_view.cpp:1156](/Users/james/Repos/wibandwob-dos/app/wibwob_view.cpp:1156)
+
+5. **IPC/event-loop race is unlikely (single-threaded), so crashes are more likely lifetime bugs than mutex bugs**  
+   IPC is polled from `idle()` on the TUI thread, not a separate worker; this reduces classic data races and points back to teardown/timer issues.  
+   Refs: [wwdos_app.cpp:2839](/Users/james/Repos/wibandwob-dos/app/wwdos_app.cpp:2839), [api_ipc.cpp:351](/Users/james/Repos/wibandwob-dos/app/api_ipc.cpp:351)
+
+## Root cause
+Most probable primary root cause: **timer UAF in `TRoomInputView`** during/after `close_window` of `room_chat`, with `api_close_window` force-destroy behavior as an amplifier.
+
+## Fix options with tradeoffs
+1. Add `TRoomInputView` destructor that `killTimer(blinkTimer)` and nulls it.  
+Tradeoff: minimal risk, very targeted.
+2. Make `api_close_window` two-phase: request close first, only hard-destroy if explicitly forced or after safe timeout/next tick.  
+Tradeoff: safer lifetimes, but slightly changes API semantics/timing.
+3. Mark internal types (`wibwob`, maybe `scramble`) as truly non-spawnable in registry output.  
+Tradeoff: may break scripts relying on current accidental behavior.
+4. For async windows, replace detached work with joinable/cancelable worker lifecycle tied to window destructor.  
+Tradeoff: larger refactor.
+
+## Risks and tests to add
+1. Stress test: spawn/close every reported spawnable type for 3+ full cycles (100+ closes) with ASan/UBSan.
+2. Focused regression: open/close `room_chat` repeatedly with short sleeps to let timer fire after close.
+3. Contract test: `get_window_types` must report internal windows as `spawnable:false`.
+4. Close semantics test: `close_window` on non-closeable/deferred-close windows must not hard-destroy immediately.
+5. IPC soak test with event subscribers connected/disconnecting during rapid create/close.
+[stderr] tokens used
+74,943
+1. **Leaked timer in `room_chat` input view (most likely root cause)**  
+   `TRoomInputView` starts a repeating timer but never kills it before destruction, so `cmTimerExpired` can target freed memory later. The delayed timing fits “dies after ~28 closes,” not exactly at the close call.  
+   Refs: [room_chat_view.cpp:254](/Users/james/Repos/wibandwob-dos/app/room_chat_view.cpp:254), [room_chat_view.cpp:276](/Users/james/Repos/wibandwob-dos/app/room_chat_view.cpp:276), [room_chat_view.cpp:308](/Users/james/Repos/wibandwob-dos/app/room_chat_view.cpp:308), [room_chat_view.cpp:427](/Users/james/Repos/wibandwob-dos/app/room_chat_view.cpp:427)
+
+2. **Force-destroy path in `api_close_window` can violate window shutdown contracts**  
+   After `w->close()`, code forcibly `remove`+`destroy`s if still present. If a window expects deferred close/event-driven teardown, this can cause double-teardown or teardown-while-active behavior.  
+   Refs: [wwdos_app.cpp:3263](/Users/james/Repos/wibandwob-dos/app/wwdos_app.cpp:3263), [wwdos_app.cpp:3268](/Users/james/Repos/wibandwob-dos/app/wwdos_app.cpp:3268), [wwdos_app.cpp:3269](/Users/james/Repos/wibandwob-dos/app/wwdos_app.cpp:3269)
+
+3. **“Internal-only” `wibwob` is actually exposed as spawnable**  
+   Registry comment says not spawnable, but it has a spawn function and JSON marks `spawnable` from `spawn != nullptr`. Smoke scripts using `get_window_types` may include `wibwob` unexpectedly.  
+   Refs: [window_type_registry.cpp:345](/Users/james/Repos/wibandwob-dos/app/window_type_registry.cpp:345), [window_type_registry.cpp:346](/Users/james/Repos/wibandwob-dos/app/window_type_registry.cpp:346), [window_type_registry.cpp:380](/Users/james/Repos/wibandwob-dos/app/window_type_registry.cpp:380)
+
+4. **`wibwob` async lifecycle has detached threads/callbacks that can outlive UI teardown**  
+   Detached threads and callbacks capture/use window state; destructor sets a flag but does not synchronize thread completion. If this window is spawned/closed by automation, it increases UAF risk.  
+   Refs: [wibwob_view.cpp:558](/Users/james/Repos/wibandwob-dos/app/wibwob_view.cpp:558), [wibwob_view.cpp:779](/Users/james/Repos/wibandwob-dos/app/wibwob_view.cpp:779), [wibwob_view.cpp:808](/Users/james/Repos/wibandwob-dos/app/wibwob_view.cpp:808), [wibwob_view.cpp:1156](/Users/james/Repos/wibandwob-dos/app/wibwob_view.cpp:1156)
+
+5. **IPC/event-loop race is unlikely (single-threaded), so crashes are more likely lifetime bugs than mutex bugs**  
+   IPC is polled from `idle()` on the TUI thread, not a separate worker; this reduces classic data races and points back to teardown/timer issues.  
+   Refs: [wwdos_app.cpp:2839](/Users/james/Repos/wibandwob-dos/app/wwdos_app.cpp:2839), [api_ipc.cpp:351](/Users/james/Repos/wibandwob-dos/app/api_ipc.cpp:351)
+
+## Root cause
+Most probable primary root cause: **timer UAF in `TRoomInputView`** during/after `close_window` of `room_chat`, with `api_close_window` force-destroy behavior as an amplifier.
+
+## Fix options with tradeoffs
+1. Add `TRoomInputView` destructor that `killTimer(blinkTimer)` and nulls it.  
+Tradeoff: minimal risk, very targeted.
+2. Make `api_close_window` two-phase: request close first, only hard-destroy if explicitly forced or after safe timeout/next tick.  
+Tradeoff: safer lifetimes, but slightly changes API semantics/timing.
+3. Mark internal types (`wibwob`, maybe `scramble`) as truly non-spawnable in registry output.  
+Tradeoff: may break scripts relying on current accidental behavior.
+4. For async windows, replace detached work with joinable/cancelable worker lifecycle tied to window destructor.  
+Tradeoff: larger refactor.
+
+## Risks and tests to add
+1. Stress test: spawn/close every reported spawnable type for 3+ full cycles (100+ closes) with ASan/UBSan.
+2. Focused regression: open/close `room_chat` repeatedly with short sleeps to let timer fire after close.
+3. Contract test: `get_window_types` must report internal windows as `spawnable:false`.
+4. Close semantics test: `close_window` on non-closeable/deferred-close windows must not hard-destroy immediately.
+5. IPC soak test with event subscribers connected/disconnecting during rapid create/close.

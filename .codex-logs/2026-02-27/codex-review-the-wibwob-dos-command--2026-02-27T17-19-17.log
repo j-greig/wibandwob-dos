@@ -1,0 +1,813 @@
+[stderr] OpenAI Codex v0.101.0 (research preview)
+--------
+workdir: /Users/james/Repos/wibandwob-dos
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: medium
+reasoning summaries: auto
+session id: 019ca01c-a628-7d72-add5-11361fe69b85
+--------
+user
+You are a code analyst. Investigate the codebase, diagnose issues, and report findings.
+
+EFFICIENCY: Use targeted commands, not full-file dumps.
+Prefer rg -n -C3 'pattern' file or sed -n '45,55p' file.
+Avoid nl -ba file | sed -n '1,300p'. Only dump full files if <50 lines.
+
+Deliver:
+1. Root cause
+2. Fix options with tradeoffs
+3. Risks and tests to add
+
+Focus files: tools/api_server/models.py, tools/api_server/schemas.py, tools/api_server/controller.py, app/window_type_registry.cpp, app/command_registry.cpp, app/llm/sdk_bridge/mcp_tools.js, tests/contract/test_window_type_parity.py, .planning/audits/command-surface-audit-20260224.md
+
+TASK: Review the WibWob-DOS command/window type parity architecture and propose the best centralisation strategy.
+
+CONTEXT: This app has a C++ TUI (Turbo Vision) with a command registry (app/command_registry.cpp, app/window_type_registry.cpp), a Python FastAPI server (tools/api_server/main.py, tools/api_server/controller.py, tools/api_server/models.py, tools/api_server/schemas.py), and a Node.js MCP bridge (app/llm/sdk_bridge/mcp_tools.js).
+
+PROBLEM: Window types and commands are defined in BOTH C++ and Python. They drift apart constantly. Right now 9 C++ window types are missing from Python's WindowType enum, causing the API to report them all as "test_pattern". This breaks agent workflows. E001 (Command Parity Refactor) was completed but drift resumed immediately because no CI gate enforces parity.
+
+Contract tests exist at tests/contract/test_window_type_parity.py and catch the drift perfectly, but 40 out of ~50 contract tests are currently failing (some can't even import due to moved modules).
+
+QUESTIONS TO ANSWER:
+1. What is the simplest change to fix the immediate test_pattern fallback bug?
+2. What is the best long-term strategy to define window types ONCE and derive everywhere else? Consider: (A) Python reads from C++ at startup, (B) code generation from C++ source, (C) remove Python enum entirely, (D) just enforce CI gates.
+3. Are there any other places where types/commands are duplicated that we haven't found?
+4. What would a concrete implementation plan look like for the recommended approach?
+
+Focus on: models.py WindowType enum, schemas.py WindowCreate, controller.py type fallback logic, mcp_tools.js, and the test suite.
+[stderr] mcp startup: no servers
+[stderr] 2026-02-27T17:19:18.086727Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c90e0-9bb5-7532-8b22-119b6ecfe17f
+[stderr] 2026-02-27T17:19:18.111976Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c9111-6d56-71e0-b877-cf37e07af9a3
+[stderr] 2026-02-27T17:19:18.136544Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c90f6-e6bd-74a3-a5a3-cf41de182a00
+[stderr] 2026-02-27T17:19:18.161634Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c90f0-2bed-7740-82dd-e87d5ecc1f9d
+[stderr] 2026-02-27T17:19:18.186788Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c9124-f8a7-7783-b397-eb2f4b1d31ed
+[stderr] 2026-02-27T17:19:18.211855Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c9104-bfb2-72e0-8e3f-8ed6b0f6e8e0
+[stderr] 2026-02-27T17:19:18.235301Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c90ee-44d2-7952-b58a-34569d027e0f
+[stderr] 
+[stderr] thinking
+**Planning targeted file inspection**
+[stderr] codex
+I’m going to inspect the specific parity-related files and trace where window types/commands are duplicated and where fallback to `test_pattern` happens, then I’ll map immediate and long-term fixes with concrete tradeoffs. I’ll use targeted greps/snippets only.
+[stderr] exec
+/bin/zsh -lc 'rg -n -C3 "class WindowType|Enum|test_pattern|WindowCreate|fallback|window type|window_type" tools/api_server/models.py tools/api_server/schemas.py tools/api_server/controller.py tests/contract/test_window_type_parity.py app/window_type_registry.cpp app/command_registry.cpp app/llm/sdk_bridge/mcp_tools.js .planning/audits/command-surface-audit-20260224.md' in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc "sed -n '1,220p' tools/api_server/models.py" in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc "sed -n '1,260p' tools/api_server/schemas.py" in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc "sed -n '1,320p' tools/api_server/controller.py" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 52ms:
+tools/api_server/models.py-7-from typing import Any, Dict, List, Optional
+tools/api_server/models.py-8-
+tools/api_server/models.py-9-
+tools/api_server/models.py:10:class WindowType(str, enum.Enum):
+tools/api_server/models.py:11:    # Keep in sync with k_specs[] in app/window_type_registry.cpp.
+tools/api_server/models.py:12:    # Parity enforced by tests/contract/test_window_type_parity.py.
+tools/api_server/models.py:13:    test_pattern = "test_pattern"
+tools/api_server/models.py-14-    gradient = "gradient"
+tools/api_server/models.py-15-    frame_player = "frame_player"
+tools/api_server/models.py-16-    text_view = "text_view"
+--
+tests/contract/test_window_type_parity.py:1:"""Auto-derived parity test: C++ window_type_registry vs Python WindowType enum.
+tests/contract/test_window_type_parity.py-2-
+tests/contract/test_window_type_parity.py-3-Both sides are parsed from source — no hardcoded lists.  Adding a new type
+tests/contract/test_window_type_parity.py-4-to k_specs[] without updating models.py (or vice-versa) will fail this test.
+--
+tests/contract/test_window_type_parity.py-17-
+tests/contract/test_window_type_parity.py-18-
+tests/contract/test_window_type_parity.py-19-def _cpp_registry_slugs() -> list[dict[str, object]]:
+tests/contract/test_window_type_parity.py:20:    """Parse k_specs[] entries from window_type_registry.cpp.
+[stderr]  succeeded in 51ms:
+from __future__ import annotations
+
+import enum
+import time
+import uuid
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional
+
+
+class WindowType(str, enum.Enum):
+    # Keep in sync with k_specs[] in app/window_type_registry.cpp.
+    # Parity enforced by tests/contract/test_window_type_parity.py.
+    test_pattern = "test_pattern"
+    gradient = "gradient"
+    frame_player = "frame_player"
+    text_view = "text_view"
+    text_editor = "text_editor"
+    browser = "browser"
+    verse = "verse"
+    mycelium = "mycelium"
+[stderr]  succeeded in 51ms:
+from __future__ import annotations
+
+from typing import Any, Dict, List, Literal, Optional, Union
+
+from pydantic import BaseModel, Field
+
+
+class RectModel(BaseModel):
+    x: int
+    y: int
+    w: int
+    h: int
+
+
+class WindowCreate(BaseModel):
+    # Spawnable window types — must match k_specs[] entries with non-null spawn fn
+    # in app/window_type_registry.cpp. Parity enforced by tests/contract/test_window_type_parity.py.
+    type: Literal[
+        "test_pattern",
+        "gradient",
+[stderr]  succeeded in 51ms:
+from __future__ import annotations
+
+import asyncio
+import time
+from typing import Any, Dict, List, Optional
+from pathlib import Path
+import re
+import shutil
+import subprocess
+import sys
+from datetime import datetime, timezone
+from urllib.parse import urljoin
+
+from .events import EventHub
+from .browser_pipeline import fetch_render_bundle, render_markdown
+from .models import AppState, Rect, Window, WindowType, new_id
+from .ipc_client import send_cmd
+from .schemas import (
+    BatchLayoutRequest, 
+    BatchLayoutResponse, 
+[stderr] 
+[stderr] thinking
+**Inspecting registry and module snippets**
+[stderr] codex
+I’ve confirmed the fallback path in `controller.py` and current Python enum/schema contents. Next I’m pulling the C++ registry entries, command registry surfaces, MCP bridge tool mappings, and parity test details to identify all duplication points and breakpoints.
+[stderr] exec
+/bin/zsh -lc "sed -n '300,390p' app/window_type_registry.cpp" in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc 'rg -n -C2 "register|capabilit|command|get_capabilities|menu_command|create_window|window_type|k_specs|slug|type" app/command_registry.cpp' in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc "sed -n '1,260p' app/llm/sdk_bridge/mcp_tools.js" in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc "sed -n '1,260p' tests/contract/test_window_type_parity.py" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 51ms:
+static bool match_generative_lab(TWindow* w) { return has_child_view<TGenerativeLabView>(w); }
+static bool match_monster_portal(TWindow* w) { return has_child_view<TGenerativeMonsterPortalView>(w); }
+static bool match_paint(TWindow* w) { return dynamic_cast<TPaintWindow*>(w) != nullptr; }
+static bool match_micropolis_ascii(TWindow* w) { return has_child_view<TMicropolisAsciiView>(w); }
+static bool match_terminal(TWindow* w) { return dynamic_cast<TWibWobTerminalWindow*>(w) != nullptr; }
+static bool match_wibwob(TWindow* w) { return dynamic_cast<TWibWobWindow*>(w) != nullptr; }
+static bool match_room_chat(TWindow* w) { return dynamic_cast<TRoomChatWindow*>(w) != nullptr; }
+static bool match_scramble(TWindow* w)    { return dynamic_cast<TScrambleWindow*>(w) != nullptr; }
+static bool match_quadra(TWindow* w)      { return has_child_view<TQuadraView>(w); }
+static bool match_snake(TWindow* w)       { return has_child_view<TSnakeView>(w); }
+static bool match_rogue(TWindow* w)       { return has_child_view<TRogueView>(w); }
+static bool match_deep_signal(TWindow* w) { return has_child_view<TDeepSignalView>(w); }
+static bool match_app_launcher(TWindow* w){ return dynamic_cast<TAppLauncherWindow*>(w) != nullptr; }
+static bool match_gallery(TWindow* w)     { return dynamic_cast<TGalleryWindow*>(w) != nullptr; }
+static bool match_figlet_text(TWindow* w) { return dynamic_cast<TFigletTextWindow*>(w) != nullptr; }
+
+// ── Registry table ────────────────────────────────────────────────────────────
+// Add new window types here — nowhere else.
+
+static const WindowTypeSpec k_specs[] = {
+[stderr]  succeeded in 51ms:
+/**
+ * MCP Tools for TUI Application Control (SDK Bridge)
+ *
+ * ARCHITECTURE:
+ *   Two tools. That's it.
+ *   - tui_list_commands: discovers all available commands from the C++ registry
+ *   - tui_menu_command: executes any command by name with args
+ *
+ *   New C++ commands are instantly available. Never touch this file.
+ */
+
+const { createSdkMcpServer, tool } = require('@anthropic-ai/claude-agent-sdk');
+const { z } = require('zod');
+const axios = require('axios');
+
+const API_BASE_URL = 'http://127.0.0.1:8089';
+
+const apiClient = axios.create({
+    baseURL: API_BASE_URL,
+    timeout: 5000,
+[stderr]  succeeded in 51ms:
+1:#include "command_registry.h"
+2-
+3-#include "api_ipc.h"
+--
+60-extern void api_spawn_gallery(TWwdosApp& app, const TRect* bounds);
+61-extern void api_open_animation_path(TWwdosApp& app, const std::string& path);
+62:// Generative art windows — previously only reachable via create_window
+63-extern void api_spawn_verse(TWwdosApp& app, const TRect* bounds);
+64-extern void api_spawn_mycelium(TWwdosApp& app, const TRect* bounds);
+--
+110-extern std::string api_close_window(TWwdosApp& app, const std::string& id);
+111-
+112:const std::vector<CommandCapability>& get_command_capabilities() {
+113:    static const std::vector<CommandCapability> capabilities = {
+114-        {"cascade", "Cascade all windows on desktop", false},
+115-        {"tile", "Tile all windows on desktop", false},
+--
+179-        {"list_figlet_fonts", "List all available FIGlet font names (JSON array)", false},
+180-        {"preview_figlet", "Render FIGlet text (text,font,width params) — returns rendered text", false},
+181:        {"inject_command", "Inject a raw IPC command string for internal testing", true},
+[stderr]  succeeded in 50ms:
+"""Auto-derived parity test: C++ window_type_registry vs Python WindowType enum.
+
+Both sides are parsed from source — no hardcoded lists.  Adding a new type
+to k_specs[] without updating models.py (or vice-versa) will fail this test.
+"""
+from __future__ import annotations
+
+import re
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from tools.api_server.models import WindowType
+
+
+def _cpp_registry_slugs() -> list[dict[str, object]]:
+    """Parse k_specs[] entries from window_type_registry.cpp.
+[stderr] 
+[stderr] thinking
+**Investigating import failures and duplicate lists**
+[stderr] exec
+/bin/zsh -lc "rg -n \"WindowType\\(|class WindowType|Literal\\[.*(test_pattern|gradient|room_chat|wibwob)|\\\"test_pattern\\\"|window_types\\]|open_[a-z_]+|tui_create_window|commands\\s*=\\s*\\[\" tools/api_server app tests | head -n 250" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 52ms:
+tests/run_ipc_chain.py:209:def test_exec_open_figlet():
+tests/run_ipc_chain.py:211:        "command": "open_figlet_text",
+tests/run_ipc_chain.py:229:def test_exec_open_verse():
+tests/run_ipc_chain.py:230:    d = api_post("/menu/command", {"command": "open_verse"})
+tests/run_ipc_chain.py:277:        "command": "open_figlet_text",
+tests/run_ipc_chain.py:334:    if t == "exec_open_figlet":
+tests/run_ipc_chain.py:335:        return test_exec_open_figlet()
+tests/run_ipc_chain.py:336:    if t == "exec_open_verse":
+tests/run_ipc_chain.py:337:        return test_exec_open_verse()
+tests/test_ipc_chain.sh:81:for CMD in open_figlet_text open_verse open_browser open_wibwob get_state cascade; do
+tests/test_ipc_chain.sh:101:# ── 8. Execute open_figlet_text ──
+tests/test_ipc_chain.sh:106:    -d '{"command": "open_figlet_text", "args": {"text": "TEST", "font": "standard"}}' 2>/dev/null || echo "FAIL")
+tests/test_ipc_chain.sh:108:    pass "open_figlet_text created window"
+tests/test_ipc_chain.sh:115:    fail "open_figlet_text" "$(echo "$FIGLET_RESP" | head -c 200)"
+tests/ipc_chain_stories.json:67:    "name": "open_figlet_text in command registry",
+tests/ipc_chain_stories.json:68:    "test": "cmd_exists:open_figlet_text",
+tests/ipc_chain_stories.json:70:    "detail": "'open_figlet_text' present"
+tests/ipc_chain_stories.json:74:    "name": "open_verse in command registry",
+tests/ipc_chain_stories.json:75:    "test": "cmd_exists:open_verse",
+tests/ipc_chain_stories.json:77:    "detail": "'open_verse' present"
+[stderr] 
+[stderr] thinking
+**Inspecting test failures and module imports**
+[stderr] codex
+I found additional parity surfaces beyond the requested files, including contract tests that still expect `tui_create_window` and older bridge behavior. I’m now checking those specific tests and the alternate bridge file to pinpoint where drift is currently guaranteed.
+[stderr] exec
+/bin/zsh -lc "sed -n '1,220p' tests/contract/test_mcp_tool_registration.py" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,240p' tests/contract/test_node_mcp_parity.py" in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc "sed -n '150,260p' app/llm/sdk_bridge/claude_sdk_bridge.js" in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc 'pytest -q tests/contract/test_window_type_parity.py -q' in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc "rg -n \"from tools\\.api_server|import tools\\.api_server|from app\\.llm\\.sdk_bridge|tui_create_window|WindowType\" tests/contract -g '*.py'" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 52ms:
+from __future__ import annotations
+
+import json
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+import tools.api_server.mcp_tools as mcp_tools
+
+
+class FakeMCP:
+    def __init__(self) -> None:
+        self.names = []
+
+    def tool(self, name: str):
+        self.names.append(name)
+
+ succeeded in 52ms:
+            };
+
+            this.sendResponse('SESSION_STARTED', {
+                sessionId: this.sessionId,
+                systemPrompt: this.systemPrompt,
+                configuration: this.sessionConfig
+            });
+
+            console.error('DEBUG: Session started with model:', this.sessionConfig.model);
+
+        } catch (error) {
+            this.sendError('SESSION_START_ERROR', error.message);
+        }
+    }
+
+    /**
+     * Fetch live capabilities from the API and append to the system prompt.
+     * Gracefully skips if the API isn't running.
+     */
+    async _injectCapabilities() {
+ succeeded in 52ms:
+"""Contract tests: Node MCP tools must stay in sync with Python MCP surface.
+
+These tests parse source files directly — no running servers needed.
+They catch drift between:
+  - app/llm/sdk_bridge/mcp_tools.js (Node MCP tools for embedded agent)
+  - tools/api_server/mcp_tools.py (Python MCP tools for external clients)
+  - app/llm/sdk_bridge/claude_sdk_bridge.js (SDK bridge tool whitelist)
+"""
+from __future__ import annotations
+
+import re
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+NODE_MCP = ROOT / "app" / "llm" / "sdk_bridge" / "mcp_tools.js"
+PY_MCP = ROOT / "tools" / "api_server" / "mcp_tools.py"
+BRIDGE = ROOT / "app" / "llm" / "sdk_bridge" / "claude_sdk_bridge.js"
+
+
+def _node_tool_names() -> set[str]:
+[stderr]  exited 127 in 51ms:
+zsh:1: command not found: pytest
+[stderr]  succeeded in 51ms:
+tests/contract/test_browser_image_modes.py:11:import tools.api_server.controller as controller_module
+tests/contract/test_browser_image_modes.py:12:from tools.api_server.controller import Controller
+tests/contract/test_browser_image_modes.py:13:from tools.api_server.events import EventHub
+tests/contract/test_browser_render_bundle_schema.py:10:import tools.api_server.browser_pipeline as pipeline
+tests/contract/test_browser_cache.py:10:import tools.api_server.browser_pipeline as pipeline
+tests/contract/test_mcp_tool_registration.py:11:import tools.api_server.mcp_tools as mcp_tools
+tests/contract/test_actor_attribution.py:13:import tools.api_server.controller as controller_module
+tests/contract/test_actor_attribution.py:14:from tools.api_server.controller import Controller
+tests/contract/test_actor_attribution.py:15:from tools.api_server.events import EventHub
+tests/contract/test_browser_core.py:11:import tools.api_server.controller as controller_module
+tests/contract/test_browser_core.py:12:from tools.api_server.controller import Controller
+tests/contract/test_browser_core.py:13:from tools.api_server.events import EventHub
+tests/contract/test_browser_image_backend.py:12:import tools.api_server.browser_pipeline as pipeline
+tests/contract/test_snapshot_event_sanity.py:15:import tools.api_server.controller as controller_module
+tests/contract/test_snapshot_event_sanity.py:16:from tools.api_server.controller import Controller
+tests/contract/test_snapshot_event_sanity.py:17:from tools.api_server.events import EventHub
+tests/contract/test_state_roundtrip_determinism.py:12:import tools.api_server.controller as controller_module
+tests/contract/test_state_roundtrip_determinism.py:13:from tools.api_server.controller import Controller
+tests/contract/test_state_roundtrip_determinism.py:14:from tools.api_server.events import EventHub
+tests/contract/test_state_roundtrip_determinism.py:15:from tools.api_server.models import Rect, WindowType
+[stderr] 
+[stderr] thinking
+**Noting missing pytest and targeting tool code scan**
+[stderr] exec
+/bin/zsh -lc "rg -n -C2 \"@mcp\\.tool|tool_name|tui_create_window|WindowType|/windows|Literal\\[|open_workspace|fallback\" tools/api_server/mcp_tools.py" in /Users/james/Repos/wibandwob-dos[stderr]  exited 2 in 52ms:
+rg: tools/api_server/mcp_tools.py: IO error for operation on tools/api_server/mcp_tools.py: No such file or directory (os error 2)
+[stderr] 
+[stderr] thinking
+**Checking missing files causing import failures**
+[stderr] codex
+I hit a key discrepancy: `tests/contract/test_mcp_tool_registration.py` imports `tools.api_server.mcp_tools`, but that file path doesn’t exist now. I’m checking the current API server module layout to confirm whether tests are pointing at moved modules.
+[stderr] exec
+/bin/zsh -lc 'rg --files tools/api_server | rg -n "mcp|tool|main.py|controller.py|models.py|schemas.py|__init__"' in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 50ms:
+1:tools/api_server/__main__.py
+2:tools/api_server/browser_pipeline.py
+3:tools/api_server/gallery.py
+4:tools/api_server/main.py
+5:tools/api_server/test_browser_ipc.py
+6:tools/api_server/test_paint_ipc.py
+7:tools/api_server/dump_browser_bundle.sh
+8:tools/api_server/test_terminal_read.py
+9:tools/api_server/schemas.py
+10:tools/api_server/test_move.py
+11:tools/api_server/browser.py
+12:tools/api_server/README.md
+13:tools/api_server/snap_window.py
+14:tools/api_server/__init__.py
+15:tools/api_server/move_wwdos.py
+16:tools/api_server/events.py
+17:tools/api_server/live_api_parity_suite.py
+18:tools/api_server/requirements.txt
+19:tools/api_server/models.py
+20:tools/api_server/controller.py
+[stderr] 
+[stderr] thinking
+**Confirming module relocation**
+[stderr] exec
+/bin/zsh -lc "rg -n \"def register_tui_tools|class .*MCP|@mcp\\.tool|tui_list_commands|tui_menu_command\" tools app | head -n 200" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 52ms:
+app/llm/sdk_bridge/mcp_tools.js:6: *   - tui_list_commands: discovers all available commands from the C++ registry
+app/llm/sdk_bridge/mcp_tools.js:7: *   - tui_menu_command: executes any command by name with args
+app/llm/sdk_bridge/mcp_tools.js:49:                "tui_list_commands",
+app/llm/sdk_bridge/mcp_tools.js:50:                "Discover ALL available TUI commands with descriptions and parameter hints. Call this FIRST to see what you can do, then use tui_menu_command to execute any command by name. Returns the full live C++ command registry.",
+app/llm/sdk_bridge/mcp_tools.js:63:                "tui_menu_command",
+app/llm/sdk_bridge/mcp_tools.js:64:                "Execute any TUI command by name. Use tui_list_commands first to discover available commands. Covers everything: window management (cascade, tile, close_all), apps (open_gallery, open_terminal, open_scramble), text (send_text, send_figlet), paint canvas, screenshots, themes, and more.",
+app/llm/sdk_bridge/mcp_tools.js:66:                    command: z.string().describe("Command name from tui_list_commands"),
+[stderr] 
+[stderr] thinking
+**Identifying test update need**
+[stderr] exec
+/bin/zsh -lc "rg -n -C3 \"@app.post\\(\\\"/windows\\\"|WindowCreate|WindowType\\(|create_window\\(|capabilities|commands|get_window_types\" tools/api_server/main.py" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 52ms:
+60-    SendMultiFigletReq,
+61-    StateExportReq,
+62-    StateImportReq,
+63:    WindowCreate,
+64-    WindowMoveResize,
+65-    WindowPropsUpdate,
+66-    WindowState,
+--
+128-    async def health() -> Dict[str, Any]:
+129-        return {"ok": True}
+130-
+131:    @app.get("/capabilities", response_model=Capabilities)
+132:    async def capabilities() -> Capabilities:
+133:        caps = await ctl.get_capabilities()
+134-        return Capabilities(
+135-            version=str(caps.get("version", "v1")),
+136-            window_types=list(caps.get("window_types", [t.value for t in WindowType])),
+137:            commands=list(caps.get("commands", [])),
+138-            properties=dict(caps.get("properties", {})),
+139-        )
+[stderr] 
+[stderr] thinking
+**Reviewing fallback and audit markdown**
+[stderr] exec
+/bin/zsh -lc "sed -n '90,190p' .planning/audits/command-surface-audit-20260224.md" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 51ms:
+- **Result:** `GET /capabilities` and `GET /commands` return empty commands
+- Files: `api_ipc.cpp:178-364`, `ipc_client.py:26-85`, `controller.py:102-112`
+- Fix: implement HMAC in `ipc_client.py` OR disable auth for local; fail loudly on `{"error":...}`
+
+**2. `/capabilities` strips command descriptions by design**
+- `controller.py:136-146` extracts only `cmd.get("name")` from registry
+- `Capabilities` schema only allows `commands: List[str]`
+- Embedded bridge injects this into system prompt → agent sees names only, no descriptions
+- Files: `controller.py:130-146`, `schemas.py:185-188`, `claude_sdk_bridge.js:199-201`
+- Fix: expand `Capabilities.commands` to include descriptions + params
+
+**3. Silent exception swallowing in capability fetchers**
+- `controller.py:110` — bare `except Exception: pass` on IPC failure
+- No logging, no degraded-mode indicator
+- Fix: reject `{"error":...}` responses explicitly; add `registry_source: live|fallback` to response
+
+### P1 — High (broken features / parity drift)
+
+**4. `/paint/line` and `/paint/rect` routes pass wrong params to controller**
+- REST routes pass `fg/bg/fill` but controller expects only `erase`
+[stderr] 
+[stderr] thinking
+**Analyzing duplicate mappings and schema drift**
+[stderr] exec
+/bin/zsh -lc "python3 - <<'PY'
+import re, pathlib
+root=pathlib.Path('/Users/james/Repos/wibandwob-dos')
+cpp=(root/'app/window_type_registry.cpp').read_text()
+py=(root/'tools/api_server/models.py').read_text()
+sc=(root/'tools/api_server/schemas.py').read_text()
+cpp_slugs=[]
+for m in re.finditer(r'\\{\\s*\"([a-z_]+)\"\\s*,\\s*(\\w+)', cpp):
+    cpp_slugs.append((m.group(1), m.group(2)"'!='"'nullptr'))
+cpp_set={s for s,_ in cpp_slugs}
+spawn={s for s,b in cpp_slugs if b}
+py_set=set(re.findall(r'\\n\\s+([a-z_]+)\\s*=\\s*\"[a-z_]+\"', py))
+m=re.search(r'class WindowCreate.*?Literal\\[(.*?)\\]', sc, re.S)
+sc_set=set(re.findall(r'\"([a-z_]+)\"', m.group(1)))
+print('cpp',len(cpp_set))
+print('python_missing',sorted(cpp_set-py_set))
+print('python_extra',sorted(py_set-cpp_set))
+print('schema_missing_spawnable',sorted(spawn-sc_set))
+print('schema_extra',sorted(sc_set-spawn))
+PY" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 51ms:
+cpp 33
+python_missing ['app_launcher', 'contour_map', 'deep_signal', 'figlet_text', 'gallery', 'generative_lab', 'quadra', 'rogue', 'snake']
+python_extra ['wallpaper', 'wibwob']
+schema_missing_spawnable ['app_launcher', 'contour_map', 'deep_signal', 'figlet_text', 'gallery', 'generative_lab', 'quadra', 'rogue', 'snake']
+schema_extra ['wibwob']
+[stderr] 
+[stderr] thinking
+**Identifying test regex blind spot**
+[stderr] codex
+I’ve identified another important defect: the parity test regex currently misses the `wibwob` registry entry because that entry uses an inline lambda spawn function, not a plain identifier. I’m pulling exact snippets for this and the second fallback path so the recommendation covers both drift and test blind spots.
+[stderr] exec
+/bin/zsh -lc "sed -n '160,210p' tools/api_server/controller.py" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1078,1102p' tools/api_server/controller.py" in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc "sed -n '20,42p' tests/contract/test_window_type_parity.py" in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc "sed -n '314,352p' app/window_type_registry.cpp" in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc "sed -n '110,170p' app/command_registry.cpp" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 51ms:
+[stderr]         self._state.pattern_mode = payload.get("pattern_mode", self._state.pattern_mode)
+        self._state.theme_mode = payload.get("theme_mode", self._state.theme_mode)
+        self._state.theme_variant = payload.get("theme_variant", self._state.theme_variant)
+        canvas = payload.get("canvas", {})
+        self._state.canvas_width = int(canvas.get("w", self._state.canvas_width))
+        self._state.canvas_height = int(canvas.get("h", self._state.canvas_height))
+
+        for item in payload.get("windows", []):
+            rect = item.get("rect", {})
+            wtype_raw = item.get("type", "test_pattern")
+            try:
+                wtype = WindowType(wtype_raw)
+            except ValueError:
+                wtype = WindowType.test_pattern
+            win = Window(
+                id=item.get("id", new_id("win")),
+                type=wtype,
+                title=item.get("title", ""),
+                rect=Rect(
+                    x=int(rect.get("x", 0)),
+ succeeded in 52ms:
+                state_data = json.loads(resp.strip())
+                
+                async with self._lock:
+                    # Update theme state from C++
+                    self._state.theme_mode = state_data.get("theme_mode", "light")
+                    self._state.theme_variant = state_data.get("theme_variant", "monochrome")
+
+                    # Update windows list with real IDs from C++
+                    new_windows = []
+                    for win_data in state_data.get("windows", []):
+                        raw_type = win_data.get("type", "test_pattern")
+                        try:
+                            wtype = WindowType(raw_type)
+                        except ValueError:
+                            # Preserve unknown types from C++ rather than
+                            # silently coercing to test_pattern.  Log for
+                            # visibility so missing enum values get added.
+                            import logging
+                            logging.getLogger(__name__).warning(
+                                "Unknown window type from C++: %r — add to WindowType enum", raw_type
+[stderr]  succeeded in 51ms:
+    """Parse k_specs[] entries from window_type_registry.cpp.
+
+    Returns list of {"slug": str, "spawnable": bool} dicts.
+    Spawnable = spawn function is not 'nullptr'.
+    """
+    src = (REPO_ROOT / "app" / "window_type_registry.cpp").read_text(encoding="utf-8")
+    # Match lines like:  { "gradient",  spawn_gradient,  match_gradient  },
+    # or:                { "wibwob",   nullptr,          match_wibwob    },
+    pattern = re.compile(
+        r'\{\s*"([a-z_]+)"\s*,\s*(\w+)\s*,\s*\w+\s*\}',
+    )
+    results = []
+    for m in pattern.finditer(src):
+        slug = m.group(1)
+        spawn_fn = m.group(2)
+        results.append({"slug": slug, "spawnable": spawn_fn != "nullptr"})
+    return results
+
+
+def _python_enum_slugs() -> set[str]:
+[stderr]  succeeded in 51ms:
+static bool match_figlet_text(TWindow* w) { return dynamic_cast<TFigletTextWindow*>(w) != nullptr; }
+
+// ── Registry table ────────────────────────────────────────────────────────────
+// Add new window types here — nowhere else.
+
+static const WindowTypeSpec k_specs[] = {
+    { "test_pattern",      spawn_test,              match_test_pattern      },
+    { "gradient",          spawn_gradient,          match_gradient          },
+    { "frame_player",      spawn_frame_player,      match_frame_player      },
+    { "text_view",         spawn_text_view,         match_text_view         },
+    { "text_editor",       spawn_text_editor,       match_text_editor       },
+    { "browser",           spawn_browser,           match_browser           },
+    { "verse",             spawn_verse,             match_verse             },
+    { "mycelium",          spawn_mycelium,          match_mycelium          },
+    { "orbit",             spawn_orbit,             match_orbit             },
+    { "torus",             spawn_torus,             match_torus             },
+    { "cube",              spawn_cube,              match_cube              },
+    { "life",              spawn_life,              match_life              },
+    { "blocks",            spawn_blocks,            match_blocks            },
+    { "score",             spawn_score,             match_score             },
+[stderr]  succeeded in 51ms:
+extern std::string api_close_window(TWwdosApp& app, const std::string& id);
+
+const std::vector<CommandCapability>& get_command_capabilities() {
+    static const std::vector<CommandCapability> capabilities = {
+        {"cascade", "Cascade all windows on desktop", false},
+        {"tile", "Tile all windows on desktop", false},
+        {"close_all", "Close all windows", false},
+        {"save_workspace", "Save current workspace", false},
+        {"open_workspace", "Open workspace from a path", true},
+        {"screenshot", "Capture screen to a text snapshot", false},
+        {"pattern_mode", "Set pattern mode: continuous or tiled", false},
+        {"set_theme_mode", "Set theme mode: light or dark", true},
+        {"set_theme_variant", "Set theme variant: monochrome or dark_pastel", true},
+        {"reset_theme", "Reset theme to default (monochrome + light)", false},
+        {"open_scramble", "Toggle Scramble cat overlay", false},
+        {"scramble_expand", "Toggle Scramble between smol and tall mode", false},
+        {"scramble_say", "Send a message to Scramble chat (requires text param)", true},
+        {"scramble_pet", "Pet the cat. She allows it.", false},
+        {"open_room_chat", "Open Room Chat window (multi-user PartyKit room)", false},
+        {"room_chat_receive", "Deliver incoming chat message to RoomChatView {sender, text, ts?}", true},
+[stderr] 
+[stderr] thinking
+**Inspecting command-to-spawn mappings**
+[stderr] exec
+/bin/zsh -lc "sed -n '300,460p' app/command_registry.cpp" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 51ms:
+            return "err missing text";
+        return api_room_chat_receive(app, sender, text, ts);
+    }
+    if (name == "room_presence") {
+        auto participants = kv.count("participants") ? kv.at("participants") : std::string("[]");
+        return api_room_presence(app, participants);
+    }
+    if (name == "new_paint_canvas") {
+        api_spawn_paint(app, nullptr);
+        return "ok";
+    }
+    if (name == "open_micropolis_ascii") {
+        api_spawn_micropolis_ascii(app, nullptr);
+        return "ok";
+    }
+    if (name == "open_quadra") {
+        api_spawn_quadra(app, nullptr);
+        return "ok";
+    }
+    if (name == "open_snake") {
+[stderr] 
+[stderr] thinking
+**Summarizing root cause and fixes**
+[stderr] codex
+**Root Cause**
+1. Window types are duplicated in Python and C++, and Python is stale.
+- C++ canonical list has 33 slugs in [`app/window_type_registry.cpp`](/Users/james/Repos/wibandwob-dos/app/window_type_registry.cpp:319), including `contour_map`, `generative_lab`, `quadra`, `snake`, `rogue`, `deep_signal`, `app_launcher`, `gallery`, `figlet_text`.
+- Python enum misses those in [`tools/api_server/models.py`](/Users/james/Repos/wibandwob-dos/tools/api_server/models.py:10).
+- `POST /windows` schema also misses them in [`tools/api_server/schemas.py`](/Users/james/Repos/wibandwob-dos/tools/api_server/schemas.py:15).
+
+2. Unknown C++ types are coerced to `test_pattern` in controller.
+- Sync path fallback in [`tools/api_server/controller.py`](/Users/james/Repos/wibandwob-dos/tools/api_server/controller.py:170).
+- Snapshot import fallback in [`tools/api_server/controller.py`](/Users/james/Repos/wibandwob-dos/tools/api_server/controller.py:1087).
+
+3. Current parity tests are not a full guard.
+- Regex in [`tests/contract/test_window_type_parity.py`](/Users/james/Repos/wibandwob-dos/tests/contract/test_window_type_parity.py:25) only matches `(\w+)` spawn functions, so lambda-based entries (notably `wibwob`) are skipped.
+- Many contract tests are currently broken by moved/removed MCP module assumptions (for example, tests importing `tools.api_server.mcp_tools`, which does not exist now).
+
+---
+
+**Fix Options (with tradeoffs)**
+
+1. **Immediate hotfix (simplest): update Python lists + keep fallback**
+- Add missing 9 slugs to `WindowType` and `WindowCreate.type`.
+- Tradeoff: fast and low-risk, but drift will recur.
+
+2. **A: Python reads live C++ manifest at runtime (`get_window_types`)**
+- Make `WindowCreate.type` a plain `str`; validate against live spawnable manifest in controller/main.
+- Remove coercion to `test_pattern`; preserve unknown type string or reject explicitly.
+- Tradeoff: true runtime source-of-truth, but depends on IPC availability.
+
+3. **B: Codegen from C++ source**
+- Generate Python/JS artifacts from `k_specs[]` during build/CI.
+- Tradeoff: deterministic and offline-friendly, but adds generation pipeline complexity and parser maintenance.
+
+4. **C: Remove Python enum entirely (recommended core)**
+- Replace `WindowType` enum usage with string types + registry validation.
+- Tradeoff: loses static enum ergonomics, but eliminates dual-definition drift completely.
+
+5. **D: CI gate only**
+- Keep architecture as-is and enforce tests.
+- Tradeoff: detects drift after the fact; doesn’t remove root cause.
+
+**Best strategy:** **C + A + D**  
+Single source remains C++ registry; Python validates dynamically against C++ manifest; CI enforces behavior and no hardcoded mirrors.
+
+---
+
+**Other Duplication Found**
+1. Command definitions duplicated inside C++ itself:
+- Capability list and dispatch chain in [`app/command_registry.cpp`](/Users/james/Repos/wibandwob-dos/app/command_registry.cpp:112) and [`app/command_registry.cpp`](/Users/james/Repos/wibandwob-dos/app/command_registry.cpp:223).
+
+2. Bridge/tool expectation drift:
+- Node bridge is now 2-tool generic in [`app/llm/sdk_bridge/mcp_tools.js`](/Users/james/Repos/wibandwob-dos/app/llm/sdk_bridge/mcp_tools.js:1), while contract tests still expect legacy `tui_create_window` surfaces.
+
+3. Planning audit is stale vs current reality:
+- Audit says 7 missing; current gap is 9 plus regex blind spot in parity test.
+
+---
+
+**Concrete Implementation Plan**
+1. Immediate bug stop:
+- Add missing 9 window types to Python enum and `WindowCreate` literal.
+- Remove/soften `test_pattern` coercion in both controller paths.
+
+2. Centralize:
+- Change API input type to `str` (not enum/literal).
+- Add registry cache/service in API:
+  - primary: IPC `get_window_types`
+  - fallback: parse `app/window_type_registry.cpp` locally
+- Validate spawnability at request time from that manifest.
+
+3. Clean drift-prone contracts:
+- Replace literal/enum parity tests with behavior tests:
+  - unknown type must return explicit 400, not mutate to `test_pattern`
+  - every C++ spawnable slug accepted by `POST /windows`
+- Fix parity parser regex to include lambda entries.
+
+4. CI gate restore:
+- Reconcile/repair broken MCP contract tests to current 2-tool architecture or restore missing module intentionally.
+- Make parity/contract suite required before merge.
+
+---
+
+**Risks and Tests to Add**
+1. Risk: IPC unavailable at startup.
+- Test: manifest fallback path from C++ source parser works and is logged as fallback.
+
+2. Risk: unknown types silently mutate again.
+- Test: controller sync/import preserve raw unknown type or reject, never force `test_pattern`.
+
+3. Risk: parser misses non-identifier spawn expressions.
+- Test: parity parser captures lambda-based registry entries (`wibwob` case).
+
+4. Risk: MCP/bridge drift.
+- Test: Node tool list, bridge prompt/tool whitelist, and contract expectations are aligned.
+
+I could not run `pytest` locally because `pytest` is not installed in this environment (`command not found`).
+[stderr] tokens used
+52,049
+**Root Cause**
+1. Window types are duplicated in Python and C++, and Python is stale.
+- C++ canonical list has 33 slugs in [`app/window_type_registry.cpp`](/Users/james/Repos/wibandwob-dos/app/window_type_registry.cpp:319), including `contour_map`, `generative_lab`, `quadra`, `snake`, `rogue`, `deep_signal`, `app_launcher`, `gallery`, `figlet_text`.
+- Python enum misses those in [`tools/api_server/models.py`](/Users/james/Repos/wibandwob-dos/tools/api_server/models.py:10).
+- `POST /windows` schema also misses them in [`tools/api_server/schemas.py`](/Users/james/Repos/wibandwob-dos/tools/api_server/schemas.py:15).
+
+2. Unknown C++ types are coerced to `test_pattern` in controller.
+- Sync path fallback in [`tools/api_server/controller.py`](/Users/james/Repos/wibandwob-dos/tools/api_server/controller.py:170).
+- Snapshot import fallback in [`tools/api_server/controller.py`](/Users/james/Repos/wibandwob-dos/tools/api_server/controller.py:1087).
+
+3. Current parity tests are not a full guard.
+- Regex in [`tests/contract/test_window_type_parity.py`](/Users/james/Repos/wibandwob-dos/tests/contract/test_window_type_parity.py:25) only matches `(\w+)` spawn functions, so lambda-based entries (notably `wibwob`) are skipped.
+- Many contract tests are currently broken by moved/removed MCP module assumptions (for example, tests importing `tools.api_server.mcp_tools`, which does not exist now).
+
+---
+
+**Fix Options (with tradeoffs)**
+
+1. **Immediate hotfix (simplest): update Python lists + keep fallback**
+- Add missing 9 slugs to `WindowType` and `WindowCreate.type`.
+- Tradeoff: fast and low-risk, but drift will recur.
+
+2. **A: Python reads live C++ manifest at runtime (`get_window_types`)**
+- Make `WindowCreate.type` a plain `str`; validate against live spawnable manifest in controller/main.
+- Remove coercion to `test_pattern`; preserve unknown type string or reject explicitly.
+- Tradeoff: true runtime source-of-truth, but depends on IPC availability.
+
+3. **B: Codegen from C++ source**
+- Generate Python/JS artifacts from `k_specs[]` during build/CI.
+- Tradeoff: deterministic and offline-friendly, but adds generation pipeline complexity and parser maintenance.
+
+4. **C: Remove Python enum entirely (recommended core)**
+- Replace `WindowType` enum usage with string types + registry validation.
+- Tradeoff: loses static enum ergonomics, but eliminates dual-definition drift completely.
+
+5. **D: CI gate only**
+- Keep architecture as-is and enforce tests.
+- Tradeoff: detects drift after the fact; doesn’t remove root cause.
+
+**Best strategy:** **C + A + D**  
+Single source remains C++ registry; Python validates dynamically against C++ manifest; CI enforces behavior and no hardcoded mirrors.
+
+---
+
+**Other Duplication Found**
+1. Command definitions duplicated inside C++ itself:
+- Capability list and dispatch chain in [`app/command_registry.cpp`](/Users/james/Repos/wibandwob-dos/app/command_registry.cpp:112) and [`app/command_registry.cpp`](/Users/james/Repos/wibandwob-dos/app/command_registry.cpp:223).
+
+2. Bridge/tool expectation drift:
+- Node bridge is now 2-tool generic in [`app/llm/sdk_bridge/mcp_tools.js`](/Users/james/Repos/wibandwob-dos/app/llm/sdk_bridge/mcp_tools.js:1), while contract tests still expect legacy `tui_create_window` surfaces.
+
+3. Planning audit is stale vs current reality:
+- Audit says 7 missing; current gap is 9 plus regex blind spot in parity test.
+
+---
+
+**Concrete Implementation Plan**
+1. Immediate bug stop:
+- Add missing 9 window types to Python enum and `WindowCreate` literal.
+- Remove/soften `test_pattern` coercion in both controller paths.
+
+2. Centralize:
+- Change API input type to `str` (not enum/literal).
+- Add registry cache/service in API:
+  - primary: IPC `get_window_types`
+  - fallback: parse `app/window_type_registry.cpp` locally
+- Validate spawnability at request time from that manifest.
+
+3. Clean drift-prone contracts:
+- Replace literal/enum parity tests with behavior tests:
+  - unknown type must return explicit 400, not mutate to `test_pattern`
+  - every C++ spawnable slug accepted by `POST /windows`
+- Fix parity parser regex to include lambda entries.
+
+4. CI gate restore:
+- Reconcile/repair broken MCP contract tests to current 2-tool architecture or restore missing module intentionally.
+- Make parity/contract suite required before merge.
+
+---
+
+**Risks and Tests to Add**
+1. Risk: IPC unavailable at startup.
+- Test: manifest fallback path from C++ source parser works and is logged as fallback.
+
+2. Risk: unknown types silently mutate again.
+- Test: controller sync/import preserve raw unknown type or reject, never force `test_pattern`.
+
+3. Risk: parser misses non-identifier spawn expressions.
+- Test: parity parser captures lambda-based registry entries (`wibwob` case).
+
+4. Risk: MCP/bridge drift.
+- Test: Node tool list, bridge prompt/tool whitelist, and contract expectations are aligned.
+
+I could not run `pytest` locally because `pytest` is not installed in this environment (`command not found`).

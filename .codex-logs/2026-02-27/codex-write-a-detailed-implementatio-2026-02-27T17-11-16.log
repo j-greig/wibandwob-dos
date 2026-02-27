@@ -1,0 +1,2617 @@
+[stderr] OpenAI Codex v0.101.0 (research preview)
+--------
+workdir: /Users/james/Repos/tvterm
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: medium
+reasoning summaries: auto
+session id: 019ca015-54a9-73f3-8f33-991ef11ef589
+--------
+user
+You are a code analyst. Investigate the codebase, diagnose issues, and report findings.
+
+EFFICIENCY: Use targeted commands, not full-file dumps.
+Prefer rg -n -C3 'pattern' file or sed -n '45,55p' file.
+Avoid nl -ba file | sed -n '1,300p'. Only dump full files if <50 lines.
+
+Deliver:
+1. Root cause
+2. Fix options with tradeoffs
+3. Risks and tests to add
+
+Focus files: AGENTS.md, PLAN-text-selection.md, include/tvterm/termemu.h, include/tvterm/termview.h, include/tvterm/consts.h, source/tvterm-core/termview.cc, source/tvterm-core/vtermemu.cc, source/tvterm-core/termctrl.cc, source/tvterm/app.cc, source/tvterm/cmds.h, source/tvterm/wnd.cc, include/tvterm/termctrl.h
+
+TASK: Write a detailed implementation spec (like PLAN-text-selection.md) for adding PASTE support to tvterm. This has TWO parts:
+
+PART 1: Basic paste-in (read system clipboard, send text to PTY as keyboard input)
+PART 2: Bracketed paste (wrap pasted text in ESC[200~ / ESC[201~ markers when the terminal app has enabled mode 2004)
+
+Key design constraints:
+- Must branch from upstream master (magiblot/tvterm), NOT from feature/text-selection. The paste feature is completely independent.
+- Follow the same architectural patterns as the text-selection implementation.
+- tvterm-core changes should be in termview.cc/termctrl.cc/vtermemu.cc. App-level command wiring in source/tvterm/.
+- Clipboard reading: platform-native tools (pbpaste on macOS, xclip/xsel on Linux). Mirror the write path from text-selection but in reverse.
+- Bracketed paste mode 2004: libvterm tracks terminal modes. Find how to query whether the child app has enabled bracketed paste mode, and wrap accordingly.
+- Threading: paste is initiated from the main thread (UI event). Text must be sent to the PTY via the existing event/write path (TerminalController::sendEvent or similar). Do NOT write directly to PTY from main thread.
+- Add cmPaste command constant to TVTermConstants following existing pattern (cmCopySelection etc).
+- Menu item "Paste" alongside existing "Copy Selection".
+- Key binding: Shift+Insert (standard terminal paste).
+
+Research and document:
+1. Exact code paths for sending text to PTY (how does keyboard input flow today?)
+2. How libvterm exposes mode 2004 (bracketed paste mode) state
+3. Whether TerminalEvent needs a new event type for paste, or if we can reuse KeyDown
+4. Platform clipboard read implementation (reverse of the write in termview.cc copySelection)
+5. Wide character / UTF-8 handling considerations
+6. Security considerations (paste bombing, control characters)
+
+Output a single markdown file PLAN-paste.md with the same structure and quality as PLAN-text-selection.md. Include design decisions, implementation steps, file-by-file changes, and test scenarios.
+[stderr] mcp startup: no servers
+[stderr] 2026-02-27T17:11:18.473486Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c90e0-9bb5-7532-8b22-119b6ecfe17f
+[stderr] 2026-02-27T17:11:18.496874Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c8ef4-8b7d-7571-9fce-9b170371defc
+[stderr] 2026-02-27T17:11:18.521651Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c8e8b-7e82-7d73-ab48-16d3170d0685
+[stderr] 2026-02-27T17:11:18.546206Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c84f6-ba12-7661-84b9-d9ea8b1b8614
+[stderr] 2026-02-27T17:11:18.570442Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c9111-6d56-71e0-b877-cf37e07af9a3
+[stderr] 2026-02-27T17:11:18.595948Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c84e5-edab-76e1-b0c0-96e4d21e2286
+[stderr] 2026-02-27T17:11:18.621683Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c90f6-e6bd-74a3-a5a3-cf41de182a00
+[stderr] 2026-02-27T17:11:18.647011Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c90f0-2bed-7740-82dd-e87d5ecc1f9d
+[stderr] 2026-02-27T17:11:18.672262Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c9124-f8a7-7783-b397-eb2f4b1d31ed
+[stderr] 2026-02-27T17:11:18.697641Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c9104-bfb2-72e0-8e3f-8ed6b0f6e8e0
+[stderr] 2026-02-27T17:11:18.723135Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c8ebd-0fa5-74b1-a66e-f335b40de74a
+[stderr] 2026-02-27T17:11:18.748719Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c90ee-44d2-7952-b58a-34569d027e0f
+[stderr] 
+[stderr] thinking
+**Planning code analysis steps**
+[stderr] codex
+I’m going to inspect the focused files for existing input flow, copy-selection plumbing, command wiring, and libvterm mode handling, then I’ll draft `PLAN-paste.md` in the same style as `PLAN-text-selection.md`. I’ll keep to targeted snippets so we can identify exact integration points quickly.
+[stderr] exec
+/bin/zsh -lc 'rg -n "copySelection|cmCopySelection|cmCheckTerminalUpdates|sendEvent|KeyDown|ClientDataRead|Writer|clipboard|pbcopy|xclip|xsel|bracket|2004|settermprop|MODE" AGENTS.md PLAN-text-selection.md include/tvterm/termemu.h include/tvterm/termview.h include/tvterm/consts.h source/tvterm-core/termview.cc source/tvterm-core/vtermemu.cc source/tvterm-core/termctrl.cc source/tvterm/app.cc source/tvterm/cmds.h source/tvterm/wnd.cc include/tvterm/termctrl.h' in /Users/james/Repos/tvterm[stderr] exec
+/bin/zsh -lc "sed -n '1,220p' PLAN-text-selection.md" in /Users/james/Repos/tvterm[stderr]  succeeded in 51ms:
+PLAN-text-selection.md:4:Add mouse-based text selection to tvterm's terminal view, allowing users to click-drag to highlight text and copy it to clipboard. Self-contained within `TerminalView` + supporting state, builds on existing mouse event plumbing.
+PLAN-text-selection.md:45:- Copy is triggered by a new command `cmCopySelection` (added to `TVTermConstants`), accessible via menu only (no keybinding in MVP to avoid Ctrl+C/SIGINT conflicts).
+PLAN-text-selection.md:48:- For MVP: write to stdout via OSC 52 is risky in a Turbo Vision app. Instead, use platform clipboard: `pbcopy` pipe on macOS, `xclip`/`xsel` on Linux. Windows uses `SetClipboardData`. Fallback: store in internal buffer, print on exit.
+PLAN-text-selection.md:143:    void copySelection() noexcept;  // called from command handler
+PLAN-text-selection.md:160:            if (ev.message.command == consts.cmCopySelection)
+PLAN-text-selection.md:162:                copySelection();
+PLAN-text-selection.md:168:            if ( ev.message.command == consts.cmCheckTerminalUpdates &&
+PLAN-text-selection.md:173:        case evKeyDown:
+PLAN-text-selection.md:184:            termEvent.type = TerminalEventType::KeyDown;
+PLAN-text-selection.md:186:            termCtrl.sendEvent(termEvent);
+PLAN-text-selection.md:397:#### 4h. copySelection — with proper lock discipline
+PLAN-text-selection.md:399:void TerminalView::copySelection() noexcept
+PLAN-text-selection.md:449:    // Platform clipboard (MVP: macOS pbcopy)
+PLAN-text-selection.md:453:        FILE *pipe = popen("pbcopy 2>/dev/null || xclip -selection clipboard 2>/dev/null || xsel --clipboard --input 2>/dev/null", "w");
+PLAN-text-selection.md:460:        // Windows clipboard: OpenClipboard/SetClipboardData
+PLAN-text-selection.md:467:### 5. `include/tvterm/consts.h` — Add cmCopySelection to TVTermConstants
+PLAN-text-selection.md:473:    ushort cmCheckTerminalUpdates;
+PLAN-text-selection.md:478:    ushort cmCopySelection;  // NEW — also a focused command
+PLAN-text-selection.md:484:        // cmGrabInput, cmReleaseInput, cmCopySelection are contiguous
+PLAN-text-selection.md:485:        return {&cmGrabInput, size_t(&cmCopySelection + 1 - &cmGrabInput)};
+[stderr]  succeeded in 50ms:
+# Text Selection Implementation Plan (v3 — Codex-approved)
+
+## Overview
+Add mouse-based text selection to tvterm's terminal view, allowing users to click-drag to highlight text and copy it to clipboard. Self-contained within `TerminalView` + supporting state, builds on existing mouse event plumbing.
+
+## Review Feedback Incorporated
+This is v2, addressing all 5 required fixes from Codex review:
+1. ✅ Highlight rendering redesigned — uses `reverseAttribute()` on surface cells, written via `writeLine` (deterministic, no owner buffer mutation)
+2. ✅ Full redraw forced when selection is active — `ownerBufferChanged = true` before `drawView()` to bypass damage-reuse
+3. ✅ Copy trigger defined — explicit copy via command + lock discipline via `lockState`
+4. ✅ TScreenCell API corrected — use `cell._ch.getText()` and `::getAttr()`/`::reverseAttribute()`
+5. ✅ Selection restricted to left-button drag only
+
+---
+
+## Design Decisions
+
+### D1: Selection state lives in TerminalView (main thread only)
+Selection is purely UI state — no threading/synchronization needed. The view already owns the mouse interaction and the draw path. We do NOT put selection into `TerminalState` (which crosses thread boundaries).
+
+[stderr] exec
+/bin/zsh -lc "sed -n '1,240p' include/tvterm/termemu.h" in /Users/james/Repos/tvterm[stderr] exec
+/bin/zsh -lc "sed -n '1,240p' source/tvterm-core/termctrl.cc" in /Users/james/Repos/tvterm[stderr]  succeeded in 52ms:
+#ifndef TVTERM_TERMEMU_H
+#define TVTERM_TERMEMU_H
+
+#include <tvterm/pty.h>
+#include <tvterm/array.h>
+#include <tvterm/mutex.h>
+#include <vector>
+
+#define Uses_TDrawSurface
+#define Uses_TEvent
+#include <tvision/tv.h>
+
+namespace tvterm
+{
+
+class TerminalSurface : private TDrawSurface
+{
+    // A TDrawSurface that can keep track of the areas that were modified.
+    // Otherwise, the view displaying this surface would have to copy all of
+    // it every time, which doesn't scale well when using big resolutions.
+[stderr]  succeeded in 52ms:
+#include <tvterm/termctrl.h>
+
+#define Uses_TEventQueue
+#include <tvision/tv.h>
+
+#include <condition_variable>
+#include <chrono>
+#include <thread>
+#include <mutex>
+#include <queue>
+
+namespace tvterm
+{
+
+class GrowArrayWriter final : public Writer
+{
+public:
+
+    GrowArray buffer;
+
+[stderr] exec
+/bin/zsh -lc "sed -n '240,420p' source/tvterm-core/termctrl.cc" in /Users/james/Repos/tvterm[stderr]  succeeded in 51ms:
+                eventQueue.pop();
+            }
+        });
+
+        if (!hasEvent)
+            break;
+
+        switch (event.type)
+        {
+            case TerminalEventType::ViewportResize:
+                // Do not resize the client yet. We will handle this later.
+                viewportSize = {event.viewportResize.x, event.viewportResize.y};
+                viewportResized = true;
+                break;
+
+            default:
+                ctrl.terminalEmulator.handleEvent(event);
+                break;
+        }
+    }
+[stderr] 
+[stderr] thinking
+**Planning targeted code inspection**
+[stderr] codex
+I’ve confirmed the event-loop path: main thread enqueues `TerminalEvent`, writer loop processes it, and PTY writes happen only from the loop via `clientDataWriter`. Next I’m extracting the exact keyboard, mouse, and copy wiring points plus vterm mode handling to map paste integration cleanly.
+[stderr] exec
+/bin/zsh -lc "sed -n '1,260p' include/tvterm/termview.h" in /Users/james/Repos/tvtermexec
+/bin/zsh -lc "sed -n '1,240p' include/tvterm/termctrl.h" in /Users/james/Repos/tvterm[stderr] exec
+/bin/zsh -lc "sed -n '1,280p' source/tvterm-core/termview.cc" in /Users/james/Repos/tvterm[stderr] exec
+/bin/zsh -lc "sed -n '1,240p' source/tvterm-core/vtermemu.cc" in /Users/james/Repos/tvterm[stderr]  succeeded in 52ms:
+#ifndef TVTERM_TERMCTRL_H
+#define TVTERM_TERMCTRL_H
+
+#define Uses_TPoint
+#include <tvision/tv.h>
+
+#include <tvterm/termemu.h>
+#include <tvterm/pty.h>
+#include <atomic>
+#include <memory>
+
+namespace tvterm
+{
+
+class TerminalController
+{
+public:
+
+    // Returns a new-allocated TerminalController.
+    // On error, invokes the 'onError' callback and returns null.
+ succeeded in 52ms:
+[stderr] #ifndef TVTERM_TERMVIEW_H
+#define TVTERM_TERMVIEW_H
+
+#define Uses_TView
+#define Uses_TGroup
+#include <tvision/tv.h>
+
+struct MouseEventType;
+
+namespace tvterm
+{
+
+class TerminalController;
+class TerminalSurface;
+struct TerminalState;
+struct TVTermConstants;
+
+class TerminalView : public TView
+{
+    const TVTermConstants &consts;
+ succeeded in 51ms:
+#define Uses_TText
+#define Uses_TKeys
+#define Uses_TEvent
+#include <tvision/tv.h>
+
+#include "util.h"
+#include <tvterm/vtermemu.h>
+#include <tvterm/debug.h>
+#include <unordered_map>
+
+namespace tvterm
+{
+
+const VTermScreenCallbacks VTermEmulator::callbacks =
+{
+    _static_wrap(&VTermEmulator::damage),
+    _static_wrap(&VTermEmulator::moverect),
+    _static_wrap(&VTermEmulator::movecursor),
+    _static_wrap(&VTermEmulator::settermprop),
+    _static_wrap(&VTermEmulator::bell),
+ succeeded in 51ms:
+#include <tvterm/termview.h>
+#include <tvterm/termctrl.h>
+#include <tvterm/consts.h>
+
+#define Uses_TKeys
+#define Uses_TEvent
+#include <tvision/tv.h>
+
+namespace tvterm
+{
+
+TerminalView::TerminalView( const TRect &bounds, TerminalController &aTermCtrl,
+                            const TVTermConstants &aConsts ) noexcept :
+    TView(bounds),
+    consts(aConsts),
+    termCtrl(aTermCtrl)
+{
+    growMode = gfGrowHiX | gfGrowHiY;
+    options |= ofSelectable | ofFirstClick;
+    eventMask |= evMouseMove | evMouseAuto | evMouseWheel | evBroadcast;
+[stderr] 
+[stderr] thinking
+**Planning vtermemu integration**
+[stderr] exec
+/bin/zsh -lc "sed -n '240,520p' source/tvterm-core/vtermemu.cc" in /Users/james/Repos/tvterm[stderr]  succeeded in 52ms:
+TerminalEmulator &VTermEmulatorFactory::create(TPoint size, Writer &clientDataWriter) noexcept
+{
+    return *new VTermEmulator(size, clientDataWriter);
+}
+
+TSpan<const EnvironmentVar> VTermEmulatorFactory::getCustomEnvironment() noexcept
+{
+    static constexpr EnvironmentVar customEnvironment[] =
+    {
+        {"TERM", "xterm-256color"},
+        {"COLORTERM", "truecolor"},
+    };
+
+    return customEnvironment;
+}
+
+VTermEmulator::VTermEmulator(TPoint size, Writer &aClientDataWriter) noexcept :
+    clientDataWriter(aClientDataWriter)
+{
+    // VTerm requires size to be at least 1.
+[stderr] 
+[stderr] thinking
+**Inspecting terminal emulator header**
+[stderr] exec
+/bin/zsh -lc "sed -n '1,220p' include/tvterm/consts.h" in /Users/james/Repos/tvterm[stderr] exec
+/bin/zsh -lc "sed -n '1,260p' include/tvterm/vtermemu.h" in /Users/james/Repos/tvterm[stderr] exec
+/bin/zsh -lc "sed -n '1,260p' source/tvterm/wnd.cc" in /Users/james/Repos/tvtermexec
+/bin/zsh -lc "sed -n '1,220p' source/tvterm/cmds.h" in /Users/james/Repos/tvterm[stderr] exec
+/bin/zsh -lc "sed -n '1,320p' source/tvterm/app.cc" in /Users/james/Repos/tvterm[stderr]  succeeded in 52ms:
+#ifndef TVTERM_CONSTS_H
+#define TVTERM_CONSTS_H
+
+namespace tvterm
+{
+
+struct TVTermConstants
+{
+    ushort cmCheckTerminalUpdates;
+    ushort cmTerminalUpdated;
+    // Focused commands
+    ushort cmGrabInput;
+    ushort cmReleaseInput;
+    // Help contexts
+    ushort hcInputGrabbed;
+
+    TSpan<const ushort> focusedCmds() const
+    {
+        return {&cmGrabInput, size_t(&cmReleaseInput + 1 - &cmGrabInput)};
+    }
+[stderr]  succeeded in 51ms:
+#ifndef TVTERM_CMDS_H
+#define TVTERM_CMDS_H
+
+#include <tvision/tv.h>
+
+enum : ushort
+{
+    cmGrabInput = 100,
+    cmReleaseInput,
+    cmTileCols,
+    cmTileRows,
+    // Commands that cannot be deactivated.
+    cmNewTerm = 1000,
+    cmCheckTerminalUpdates,
+    cmTerminalUpdated,
+    cmGetOpenTerms,
+};
+
+enum : ushort
+{[stderr] 
+[stderr]  succeeded in 51ms:
+#ifndef TVTERM_VTERMEMU_H
+#define TVTERM_VTERMEMU_H
+
+#include <tvterm/termemu.h>
+#include <utility>
+#include <memory>
+
+#include <vterm.h>
+
+namespace tvterm
+{
+
+class VTermEmulatorFactory final : public TerminalEmulatorFactory
+{
+public:
+
+    TerminalEmulator &create(TPoint size, Writer &clientDataWriter) noexcept override;
+    TSpan<const EnvironmentVar> getCustomEnvironment() noexcept override;
+
+};
+ succeeded in 51ms:
+#include "wnd.h"
+#include "cmds.h"
+
+#define Uses_TEvent
+#include <tvision/tv.h>
+
+const tvterm::TVTermConstants TerminalWindow::appConsts =
+{
+    cmCheckTerminalUpdates,
+    cmTerminalUpdated,
+    cmGrabInput,
+    cmReleaseInput,
+    hcInputGrabbed,
+};
+
+void TerminalWindow::handleEvent(TEvent &ev)
+{
+    if ( ev.what == evBroadcast &&
+         ev.message.command == cmGetOpenTerms && !isDisconnected() )
+        *(size_t *) ev.message.infoPtr += 1;
+[stderr]  succeeded in 51ms:
+#define Uses_TMenuBar
+#define Uses_TSubMenu
+#define Uses_TMenu
+#define Uses_TMenuItem
+#define Uses_TStatusLine
+#define Uses_TStatusItem
+#define Uses_TStatusDef
+#define Uses_TKeys
+#define Uses_TEvent
+#define Uses_TChDirDialog
+#define Uses_TDeskTop
+#define Uses_MsgBox
+#include <tvision/tv.h>
+
+#include "app.h"
+#include "cmds.h"
+#include "desk.h"
+#include "wnd.h"
+#include "apputil.h"
+#include <tvterm/termctrl.h>
+[stderr] 
+[stderr] thinking
+**Investigating bracket paste API**
+[stderr] exec
+/bin/zsh -lc "rg -n \"BRACKET|PASTE|2004|VTERM_PROP|MODE_BRACKET|bracket\" deps include source -g'*vterm*'" in /Users/james/Repos/tvterm[stderr]  succeeded in 52ms:
+source/tvterm-core/vtermemu.cc:280:    vterm_state_set_termprop(vtState, VTERM_PROP_CURSORBLINK, &val);
+source/tvterm-core/vtermemu.cc:432:        case VTERM_PROP_TITLE:
+source/tvterm-core/vtermemu.cc:436:        case VTERM_PROP_CURSORVISIBLE:
+source/tvterm-core/vtermemu.cc:440:        case VTERM_PROP_CURSORBLINK:
+source/tvterm-core/vtermemu.cc:444:        case VTERM_PROP_MOUSE:
+source/tvterm-core/vtermemu.cc:447:        case VTERM_PROP_ALTSCREEN:
+deps/vterm/libvterm/include/vterm.h:253:  /* VTERM_PROP_NONE = 0 */
+deps/vterm/libvterm/include/vterm.h:254:  VTERM_PROP_CURSORVISIBLE = 1, // bool
+deps/vterm/libvterm/include/vterm.h:255:  VTERM_PROP_CURSORBLINK,       // bool
+deps/vterm/libvterm/include/vterm.h:256:  VTERM_PROP_ALTSCREEN,         // bool
+deps/vterm/libvterm/include/vterm.h:257:  VTERM_PROP_TITLE,             // string
+deps/vterm/libvterm/include/vterm.h:258:  VTERM_PROP_ICONNAME,          // string
+deps/vterm/libvterm/include/vterm.h:259:  VTERM_PROP_REVERSE,           // bool
+deps/vterm/libvterm/include/vterm.h:260:  VTERM_PROP_CURSORSHAPE,       // number
+deps/vterm/libvterm/include/vterm.h:261:  VTERM_PROP_MOUSE,             // number
+deps/vterm/libvterm/include/vterm.h:262:  VTERM_PROP_FOCUSREPORT,       // bool
+deps/vterm/libvterm/include/vterm.h:268:  VTERM_PROP_CURSORSHAPE_BLOCK = 1,
+deps/vterm/libvterm/include/vterm.h:269:  VTERM_PROP_CURSORSHAPE_UNDERLINE,
+deps/vterm/libvterm/include/vterm.h:270:  VTERM_PROP_CURSORSHAPE_BAR_LEFT,
+deps/vterm/libvterm/include/vterm.h:276:  VTERM_PROP_MOUSE_NONE = 0,
+[stderr] 
+[stderr] thinking
+**Investigating vterm mode query**
+[stderr] codex
+I found bracketed paste state in vendored libvterm internals (`state->mode.bracketpaste`) and `vterm-ctrl` uses DEC mode `2004`. I’m now checking the public API for querying DEC modes so we can avoid relying on private headers.
+[stderr] exec
+/bin/zsh -lc "sed -n '220,340p' deps/vterm/libvterm/include/vterm.h" in /Users/james/Repos/tvterm[stderr] exec
+/bin/zsh -lc "sed -n '300,380p' deps/vterm/libvterm/bin/vterm-ctrl.c" in /Users/james/Repos/tvterm[stderr] exec
+/bin/zsh -lc 'rg -n "decmode|get.*mode|set.*mode|bracketpaste|2004" deps/vterm/libvterm/include/vterm.h deps/vterm/libvterm/src/state.c deps/vterm/libvterm/src/*.c deps/vterm/libvterm/bin/vterm-ctrl.c' in /Users/james/Repos/tvterm[stderr]  succeeded in 50ms:
+typedef struct {
+  const char *str;
+  size_t      len : 30;
+  bool        initial : 1;
+  bool        final : 1;
+} VTermStringFragment;
+
+typedef union {
+  int boolean;
+  int number;
+  VTermStringFragment string;
+  VTermColor color;
+} VTermValue;
+
+typedef enum {
+  /* VTERM_ATTR_NONE = 0 */
+  VTERM_ATTR_BOLD = 1,   // bool:   1, 22
+  VTERM_ATTR_UNDERLINE,  // number: 4, 21, 24
+  VTERM_ATTR_ITALIC,     // bool:   3, 23
+  VTERM_ATTR_BLINK,      // bool:   5, 25
+[stderr]  succeeded in 52ms:
+              break;
+            case 3: case 4:
+              printf("curshape under\n");
+              break;
+            case 5: case 6:
+              printf("curshape bar\n");
+              break;
+          }
+          break;
+
+        case 0:
+        case 1:
+        case 2:
+          printf("\x1b[%d q", 1 + (shape * 2));
+          break;
+      }
+    }
+    else if(streq(arg, "mouse")) {
+      switch(getchoice(&argi, argc, argv, (const char *[]){"off", "click", "clickdrag", "motion", NULL})) {
+      case 0:
+[stderr]  succeeded in 51ms:
+deps/vterm/libvterm/bin/vterm-ctrl.c:56:  "bracketpaste [off|on|query]",
+deps/vterm/libvterm/bin/vterm-ctrl.c:335:    else if(streq(arg, "bracketpaste")) {
+deps/vterm/libvterm/bin/vterm-ctrl.c:336:      do_dec_mode(2004, getboolq(&argi, argc, argv), "bracketpaste");
+deps/vterm/libvterm/src/keyboard.c:221:  if(vt->state->mode.bracketpaste)
+deps/vterm/libvterm/src/keyboard.c:227:  if(vt->state->mode.bracketpaste)
+deps/vterm/libvterm/src/state.c:609:    settermprop_bool(state, VTERM_PROP_CURSORVISIBLE, state->saved.mode.cursor_visible);
+deps/vterm/libvterm/src/state.c:610:    settermprop_bool(state, VTERM_PROP_CURSORBLINK,   state->saved.mode.cursor_blink);
+deps/vterm/libvterm/src/state.c:611:    settermprop_int (state, VTERM_PROP_CURSORSHAPE,   state->saved.mode.cursor_shape);
+deps/vterm/libvterm/src/state.c:760:static void set_mode(VTermState *state, int num, int val)
+deps/vterm/libvterm/src/state.c:777:static void set_dec_mode(VTermState *state, int num, int val)
+deps/vterm/libvterm/src/state.c:861:  case 2004:
+deps/vterm/libvterm/src/state.c:862:    state->mode.bracketpaste = val;
+deps/vterm/libvterm/src/state.c:936:    case 2004:
+deps/vterm/libvterm/src/state.c:937:      reply = state->mode.bracketpaste;
+deps/vterm/libvterm/src/state.c:1340:      set_mode(state, CSI_ARG(args[0]), 1);
+deps/vterm/libvterm/src/state.c:1346:        set_dec_mode(state, CSI_ARG(args[i]), 1);
+deps/vterm/libvterm/src/state.c:1364:      set_mode(state, CSI_ARG(args[0]), 0);
+deps/vterm/libvterm/src/state.c:1370:        set_dec_mode(state, CSI_ARG(args[i]), 0);
+deps/vterm/libvterm/src/state.c:2115:  state->mode.bracketpaste    = 0;
+deps/vterm/libvterm/src/state.c:609:    settermprop_bool(state, VTERM_PROP_CURSORVISIBLE, state->saved.mode.cursor_visible);
+[stderr] 
+[stderr] thinking
+**Searching for public mode query API**
+[stderr] exec
+/bin/zsh -lc 'rg -n "vterm_state_get|state_get|get_termprop|set_termprop|keyboard_start_paste|keyboard_end_paste|paste" deps/vterm/libvterm/include/vterm.h deps/vterm/libvterm/src/*.c' in /Users/james/Repos/tvterm[stderr]  succeeded in 52ms:
+deps/vterm/libvterm/include/vterm.h:371:void vterm_keyboard_start_paste(VTerm *vt);
+deps/vterm/libvterm/include/vterm.h:372:void vterm_keyboard_end_paste(VTerm *vt);
+deps/vterm/libvterm/include/vterm.h:462:void *vterm_state_get_cbdata(VTermState *state);
+deps/vterm/libvterm/include/vterm.h:467:void *vterm_state_get_unrecognised_fbdata(VTermState *state);
+deps/vterm/libvterm/include/vterm.h:470:void vterm_state_get_cursorpos(const VTermState *state, VTermPos *cursorpos);
+deps/vterm/libvterm/include/vterm.h:471:void vterm_state_get_default_colors(const VTermState *state, VTermColor *default_fg, VTermColor *default_bg);
+deps/vterm/libvterm/include/vterm.h:472:void vterm_state_get_palette_color(const VTermState *state, int index, VTermColor *col);
+deps/vterm/libvterm/include/vterm.h:476:int  vterm_state_get_penattr(const VTermState *state, VTermAttr attr, VTermValue *val);
+deps/vterm/libvterm/include/vterm.h:477:int  vterm_state_set_termprop(VTermState *state, VTermProp prop, VTermValue *val);
+deps/vterm/libvterm/include/vterm.h:480:const VTermLineInfo *vterm_state_get_lineinfo(const VTermState *state, int row);
+deps/vterm/libvterm/src/keyboard.c:219:void vterm_keyboard_start_paste(VTerm *vt)
+deps/vterm/libvterm/src/keyboard.c:221:  if(vt->state->mode.bracketpaste)
+deps/vterm/libvterm/src/keyboard.c:225:void vterm_keyboard_end_paste(VTerm *vt)
+deps/vterm/libvterm/src/keyboard.c:227:  if(vt->state->mode.bracketpaste)
+deps/vterm/libvterm/src/pen.c:231:void vterm_state_get_default_colors(const VTermState *state, VTermColor *default_fg, VTermColor *default_bg)
+deps/vterm/libvterm/src/pen.c:237:void vterm_state_get_palette_color(const VTermState *state, int index, VTermColor *col)
+deps/vterm/libvterm/src/pen.c:471:static int vterm_state_getpen_color(const VTermColor *col, int argi, long args[], int fg)
+deps/vterm/libvterm/src/pen.c:504:INTERNAL int vterm_state_getpen(VTermState *state, long args[], int argcount)
+deps/vterm/libvterm/src/pen.c:537:  argi = vterm_state_getpen_color(&state->pen.fg, argi, args, true);
+deps/vterm/libvterm/src/pen.c:539:  argi = vterm_state_getpen_color(&state->pen.bg, argi, args, false);
+[stderr] 
+[stderr] thinking
+**Assessing paste handling approach**
+[stderr] exec
+/bin/zsh -lc "sed -n '180,260p' deps/vterm/libvterm/src/keyboard.c" in /Users/james/Repos/tvterm[stderr]  succeeded in 52ms:
+    break;
+
+  case KEYCODE_SS3: case_SS3:
+    if(mod == 0)
+      vterm_push_output_sprintf_ctrl(vt, C1_SS3, "%c", k.literal);
+    else
+      goto case_CSI;
+    break;
+
+  case KEYCODE_CSI: case_CSI:
+    if(mod == 0)
+      vterm_push_output_sprintf_ctrl(vt, C1_CSI, "%c", k.literal);
+    else
+      vterm_push_output_sprintf_ctrl(vt, C1_CSI, "1;%d%c", mod + 1, k.literal);
+    break;
+
+  case KEYCODE_CSINUM:
+    if(mod == 0)
+      vterm_push_output_sprintf_ctrl(vt, C1_CSI, "%d%c", k.csinum, k.literal);
+    else
+[stderr] 
+[stderr] thinking
+**Checking terminal header declarations**
+[stderr] exec
+/bin/zsh -lc "sed -n '340,390p' deps/vterm/libvterm/include/vterm.h" in /Users/james/Repos/tvterm[stderr]  succeeded in 52ms:
+/* A convenient shortcut for default cases */
+VTerm *vterm_new(int rows, int cols);
+/* This shortcuts are generally discouraged in favour of just using vterm_build() */
+VTerm *vterm_new_with_allocator(int rows, int cols, VTermAllocatorFunctions *funcs, void *allocdata);
+
+void   vterm_free(VTerm* vt);
+
+void vterm_get_size(const VTerm *vt, int *rowsp, int *colsp);
+void vterm_set_size(VTerm *vt, int rows, int cols);
+
+int  vterm_get_utf8(const VTerm *vt);
+void vterm_set_utf8(VTerm *vt, int is_utf8);
+
+size_t vterm_input_write(VTerm *vt, const char *bytes, size_t len);
+
+/* Setting output callback will override the buffer logic */
+typedef void VTermOutputCallback(const char *s, size_t len, void *user);
+void vterm_output_set_callback(VTerm *vt, VTermOutputCallback *func, void *user);
+
+/* These buffer functions only work if output callback is NOT set
+[stderr] 
+[stderr] thinking
+**Investigating paste feature implementation**
+[stderr] exec
+/bin/zsh -lc 'rg -n -C2 "paste|selection|command|thread|sendEvent|cmCopySelection|TODO" AGENTS.md' in /Users/james/Repos/tvterm[stderr]  succeeded in 52ms:
+16-- `tvterm-core` contains terminal orchestration, PTY abstraction, emulator glue, and Turbo Vision-backed terminal rendering primitives.
+17-- `tvterm` is the app/UI shell that wires menus, desktop/window management, and creates terminal windows using `tvterm-core`.
+18:- Most behavior changes should be made in `tvterm-core`; `tvterm` is typically where commands, window/menu plumbing, and app-level UX hooks are added.
+19-
+20-### Key Abstractions
+--
+28-
+29-### Threading Model
+30:`TerminalController` starts two detached threads (both owned indirectly via `selfOwningPtr`):
+31-
+32-- `WriterLoop`:
+33-  - Waits on condition variable/timeouts.
+34:  - Processes queued events from the main thread.
+35-  - Calls `updateState` on timeout boundaries.
+36-  - Writes pending emulator output to PTY.
+--
+42-Concurrency details:
+43-- Emulator + event-loop shared state are guarded by a single mutex (`TerminalEventLoop::mutex`).
+44:- Main thread event submission uses `eventQueue` (`Mutex<std::queue<TerminalEvent>>`) with separate locking from emulator mutex; this is effectively lock-light from UI perspective (not truly lock-free).
+45:- Main/UI thread interacts by `sendEvent(...)`, receives wakeups via `TEventQueue::wakeUp()`, and redraws when `cmCheckTerminalUpdates` is broadcast.
+[stderr] 
+[stderr] thinking
+**Inspecting document section structure**
+[stderr] exec
+/bin/zsh -lc 'rg -n "''^## |''^### |''^#### " PLAN-text-selection.md' in /Users/james/Repos/tvterm[stderr]  succeeded in 52ms:
+3:## Overview
+6:## Review Feedback Incorporated
+16:## Design Decisions
+18:### D1: Selection state lives in TerminalView (main thread only)
+21:### D2: mouseEnabled must be exposed to the view
+26:### D3: Selection vs emulator mouse — behavior model
+32:### D4: Selection rendering — deterministic writeLine from surface
+44:### D5: Copy mechanism and lock discipline
+50:### D6: Selection coordinate model
+55:### D7: Wide character handling
+62:## Files to Modify
+64:### 1. `include/tvterm/termemu.h` — Add mouseEnabled to TerminalState
+82:### 2. `source/tvterm-core/vtermemu.cc` — Expose mouseEnabled
+88:### 3. `include/tvterm/termview.h` — Add selection state and methods
+149:### 4. `source/tvterm-core/termview.cc` — Main implementation
+151:#### 4a. handleEvent — route mouse for selection (left button only, !mouseEnabled)
+238:#### 4b. handleSelectionMouse
+278:#### 4c. normalizeSelection
+297:#### 4d. clearSelection
+306:#### 4e. draw — cache mouseEnabled
+[stderr] 
+[stderr] thinking
+**Inspecting command forwarding and focus handling**
+[stderr] exec
+/bin/zsh -lc "sed -n '1,260p' include/tvterm/termwnd.h" in /Users/james/Repos/tvterm[stderr]  succeeded in 52ms:
+#ifndef TVTERM_TERMWND_H
+#define TVTERM_TERMWND_H
+
+#include <tvterm/array.h>
+
+#define Uses_TWindow
+#define Uses_TCommandSet
+#include <tvision/tv.h>
+
+namespace tvterm
+{
+
+class TerminalView;
+class TerminalController;
+struct TerminalState;
+struct TVTermConstants;
+struct TerminalUpdatedMsg;
+
+class BasicTerminalWindow : public TWindow
+{
+[stderr] 
+[stderr] thinking
+**Scanning terminal command forwarding**
+[stderr] exec
+/bin/zsh -lc "sed -n '1,320p' source/tvterm-core/termwnd.cc" in /Users/james/Repos/tvterm[stderr]  succeeded in 52ms:
+#define Uses_TFrame
+#define Uses_TEvent
+#define Uses_TStaticText
+#include <tvision/tv.h>
+
+#include <tvterm/termwnd.h>
+#include <tvterm/termview.h>
+#include <tvterm/termframe.h>
+#include <tvterm/termctrl.h>
+#include <tvterm/consts.h>
+
+namespace tvterm
+{
+
+TFrame *BasicTerminalWindow::initFrame(TRect bounds)
+{
+    return new BasicTerminalFrame(bounds);
+}
+
+BasicTerminalWindow::BasicTerminalWindow( const TRect &bounds,
+[stderr] 
+[stderr] thinking
+**Designing paste event handling**
+[stderr] exec
+/bin/zsh -lc 'rg -n "__APPLE__|__linux__|_WIN32|popen|CreateProcess|OpenClipboard|xclip|pbpaste|pbcopy" source include' in /Users/james/Repos/tvterm[stderr]  succeeded in 52ms:
+include/tvterm/pty.h:6:#if !defined(_WIN32)
+include/tvterm/pty.h:23:#if !defined(_WIN32)
+source/tvterm-core/pty.cc:6:#if !defined(_WIN32)
+source/tvterm-core/pty.cc:385:        if ( !CreateProcessA( nullptr,
+source/tvterm-core/pty.cc:396:            failedAction = "CreateProcessA";
+source/tvterm-core/pty.cc:513:#endif // _WIN32
+[stderr] 
+[stderr] thinking
+**Reviewing preprocessor directives in style**
+[stderr] exec
+/bin/zsh -lc "sed -n '1,120p' source/tvterm-core/pty.cc" in /Users/james/Repos/tvterm[stderr]  succeeded in 52ms:
+#include <tvterm/pty.h>
+
+#define Uses_TPoint
+#include <tvision/tv.h>
+
+#if !defined(_WIN32)
+#include <stdio.h>
+#include <unistd.h>
+#include <signal.h>
+#include <fcntl.h>
+#include <sys/ioctl.h>
+#include <sys/wait.h>
+#include <termios.h>
+#include <errno.h>
+
+#if __has_include(<pty.h>)
+#   include <pty.h>
+#elif __has_include(<libutil.h>)
+#   include <libutil.h>
+#elif __has_include(<util.h>)
+[stderr] 
+[stderr] thinking
+**Checking keybinding for paste**
+[stderr] codex
+I’ve identified a key architectural constraint for paste payloads: `TerminalEvent` is a POD union copied into an async queue, so pointers to clipboard buffers from UI thread are unsafe. I’m now checking Turbo Vision key constants and command-routing patterns to specify a safe event design and Shift+Insert binding.
+[stderr] exec
+/bin/zsh -lc "rg -n \"kbShiftIns|kbShiftInsert|kbIns|Shift-Insert|cm.*Paste|focusedCmds\\(|cmGrabInput|cmReleaseInput\" include source deps" in /Users/james/Repos/tvterm[stderr]  succeeded in 51ms:
+source/tvterm-core/vtermemu.cc:41:        { kbIns,            VTERM_KEY_INS               },
+include/tvterm/consts.h:12:    ushort cmGrabInput;
+include/tvterm/consts.h:13:    ushort cmReleaseInput;
+include/tvterm/consts.h:17:    TSpan<const ushort> focusedCmds() const
+include/tvterm/consts.h:19:        return {&cmGrabInput, size_t(&cmReleaseInput + 1 - &cmGrabInput)};
+source/tvterm-core/termwnd.cc:100:            if ( ev.message.command == consts.cmGrabInput &&
+source/tvterm-core/termwnd.cc:107:                       ev.message.command == consts.cmReleaseInput) &&
+source/tvterm-core/termwnd.cc:139:        for (ushort cmd : consts.focusedCmds())
+source/tvterm/wnd.cc:11:    cmGrabInput,
+source/tvterm/wnd.cc:12:    cmReleaseInput,
+source/tvterm/cmds.h:8:    cmGrabInput = 100,
+source/tvterm/cmds.h:9:    cmReleaseInput,
+source/tvterm/app.cc:50:    for (ushort cmd : TerminalWindow::appConsts.focusedCmds())
+source/tvterm/app.cc:66:            *new TStatusItem("~Alt-End~ Release Input", kbAltEnd, cmReleaseInput) +
+source/tvterm/app.cc:167:            *new TMenuItem("~G~rab Input", cmGrabInput, kbNoKey)
+deps/tvision/source/platform/unixclip.cpp:74:constexpr const char *wslPasteArgv[] = {"/mnt/c/Windows/System32/cmd.exe", "/D", "/Q", "/C", wslPasteCmd, 0};
+deps/tvision/source/platform/ncursinp.cpp:99:    { KEY_IC,           {{kbIns},       0}          },
+deps/tvision/source/platform/ncursinp.cpp:110:    { KEY_SIC,          {{kbShiftIns},  kbShift}    },
+deps/tvision/source/platform/hardware.cpp:87:            if (event.keyDown.keyCode == kbIns)
+deps/tvision/source/platform/hardware.cpp:90:                event.keyDown.controlKeyState |= kbInsState;
+[stderr] 
+[stderr] thinking
+**Planning paste command integration**
+[stderr] exec
+/bin/zsh -lc "sed -n '1,240p' include/tvterm/array.h" in /Users/james/Repos/tvterm[stderr]  succeeded in 51ms:
+#ifndef TVTERM_ARRAY_H
+#define TVTERM_ARRAY_H
+
+#include <stdlib.h>
+#include <string.h>
+
+#include <tvision/tv.h>
+
+namespace tvterm
+{
+
+class GrowArray
+{
+    struct
+    {
+        char *data;
+        size_t size;
+        size_t capacity;
+    } p {};
+
+[stderr] 
+[stderr] thinking
+**Assessing event ownership and locking**
+[stderr] exec
+/bin/zsh -lc "sed -n '1,220p' include/tvterm/mutex.h" in /Users/james/Repos/tvterm[stderr]  succeeded in 52ms:
+#ifndef TVTERM_MUTEX_H
+#define TVTERM_MUTEX_H
+
+#include <mutex>
+
+namespace tvterm
+{
+
+template <class T>
+class Mutex
+{
+    std::mutex m;
+    T item;
+
+public:
+
+    template <class... Args>
+    Mutex(Args&&... args) :
+        item(static_cast<Args &&>(args)...)
+    {
+[stderr] 
+[stderr] thinking
+**Planning root cause analysis document**
+[stderr] exec
+/bin/zsh -lc "sed -n '1,220p' source/tvterm/wnd.h" in /Users/james/Repos/tvterm[stderr]  succeeded in 52ms:
+#ifndef TVTERM_WND_H
+#define TVTERM_WND_H
+
+#include <tvterm/termwnd.h>
+#include <tvterm/consts.h>
+
+class TerminalWindow : public tvterm::BasicTerminalWindow
+{
+public:
+
+    static const tvterm::TVTermConstants appConsts;
+
+    TerminalWindow(const TRect &bounds, tvterm::TerminalController &aTerm) noexcept;
+
+    void handleEvent(TEvent &ev) override;
+    void sizeLimits(TPoint &min, TPoint &max) override;
+
+private:
+
+    using Super = tvterm::BasicTerminalWindow;
+[stderr] 
+[stderr] thinking
+**Drafting detailed paste handling spec**
+[stderr] codex
+I have enough context to draft the implementation spec. I’m going to add `PLAN-paste.md` with concrete event-flow design, bracketed-paste handling via libvterm APIs, file-by-file edits, and a focused risk/test matrix.
+[stderr] file update
+A /Users/james/Repos/tvterm/PLAN-paste.md
+# Paste Implementation Plan (v1 — upstream-master based)
+
+## Overview
+Add paste support to `tvterm` in two phases:
+
+1. Basic paste-in: read system clipboard on the UI thread and send bytes to PTY through the existing `TerminalController` event/write pipeline.
+2. Bracketed paste: when terminal DEC mode 2004 is enabled, wrap pasted data with `ESC [ 200 ~` and `ESC [ 201 ~`.
+
+This plan is intentionally independent from `feature/text-selection` and targets upstream `magiblot/tvterm` master architecture.
+
+## Current-State Diagnosis
+
+[stderr] ### Root Cause
+Paste is currently missing because all required pieces are absent:
+
+1. No user command exists for paste (`cmPaste` is not present in [`source/tvterm/cmds.h`](/Users/james/Repos/tvterm/source/tvterm/cmds.h), [`include/tvterm/consts.h`](/Users/james/Repos/tvterm/include/tvterm/consts.h), or [`source/tvterm/wnd.cc`](/Users/james/Repos/tvterm/source/tvterm/wnd.cc)).
+2. `TerminalView` forwards keyboard/mouse events to emulator but has no clipboard read path or paste command handling ([`source/tvterm-core/termview.cc`](/Users/james/Repos/tvterm/source/tvterm-core/termview.cc)).
+3. `TerminalEvent` has no paste event type, and its async queue model makes pointer-based payloads from UI thread unsafe without owned storage ([`include/tvterm/termemu.h`](/Users/james/Repos/tvterm/include/tvterm/termemu.h), [`source/tvterm-core/termctrl.cc`](/Users/james/Repos/tvterm/source/tvterm-core/termctrl.cc)).
+4. `VTermEmulator` handles key/mouse/PTY-read/focus/resize only; no paste action path exists ([`source/tvterm-core/vtermemu.cc`](/Users/james/Repos/tvterm/source/tvterm-core/vtermemu.cc)).
+
+### Exact Existing Input Path (keyboard -> PTY)
+
+1. `TerminalView::handleEvent(evKeyDown)` builds `TerminalEvent{type=KeyDown}` and calls `termCtrl.sendEvent(...)` ([`source/tvterm-core/termview.cc:69`](/Users/james/Repos/tvterm/source/tvterm-core/termview.cc:69)).
+2. `TerminalController::sendEvent` pushes event into `eventQueue` and wakes writer loop ([`source/tvterm-core/termctrl.cc:139`](/Users/james/Repos/tvterm/source/tvterm-core/termctrl.cc:139)).
+3. Writer loop `processEvents()` forwards event to `terminalEmulator.handleEvent(...)` under event-loop mutex ([`source/tvterm-core/termctrl.cc:225`](/Users/james/Repos/tvterm/source/tvterm-core/termctrl.cc:225)).
+4. `VTermEmulator::handleEvent(KeyDown)` converts key and calls libvterm keyboard APIs ([`source/tvterm-core/vtermemu.cc:293`](/Users/james/Repos/tvterm/source/tvterm-core/vtermemu.cc:293)).
+5. libvterm emits encoded bytes through output callback; `VTermEmulator::writeOutput` appends into `clientDataWriter.buffer` ([`source/tvterm-core/vtermemu.cc:389`](/Users/james/Repos/tvterm/source/tvterm-core/vtermemu.cc:389)).
+6. Writer loop flushes that buffer to PTY in `writePendingData` ([`source/tvterm-core/termctrl.cc:290`](/Users/james/Repos/tvterm/source/tvterm-core/termctrl.cc:290)).
+
+Paste must reuse this architecture and not write PTY directly from UI thread.
+
+## Research Findings Required By Task
+
+### 1. Sending text to PTY today
+The only intentional path is:
+`TerminalView` -> `TerminalController::sendEvent` -> writer loop -> `TerminalEmulator::handleEvent` -> `Writer` buffer -> `PtyMaster::writeToClient`.
+
+### 2. How to detect bracketed paste mode 2004
+In vendored libvterm:
+
+- Mode 2004 is internal state (`state->mode.bracketpaste`) in `state.c`.
+- It is **not** exposed via `VTERM_PROP_*` (`VTERM_PROP_BRACKETPASTE` does not exist in public API).
+- Public keyboard helpers `vterm_keyboard_start_paste` / `vterm_keyboard_end_paste` conditionally emit markers based on that internal flag (`keyboard.c`).
+
+Therefore, best integration is to call these helpers around pasted bytes; this is the supported API path and avoids private-header coupling.
+
+### 3. New TerminalEvent type vs reusing KeyDown
+Recommended: add a new paste event type.
+
+Why not `KeyDown`:
+
+- KeyDown path is key-semantic conversion, not bulk byte injection.
+- Replaying paste as per-char key events is slower and can alter data semantics.
+- Bracketed paste is conceptually one paste action, not N keypresses.
+
+### 4. Clipboard read implementation (reverse of text-selection write plan)
+Use platform tools from UI thread:
+
+- macOS: `pbpaste`
+- Linux fallback chain: `xclip -selection clipboard -o` then `xsel --clipboard --output`
+
+Read process stdout into `GrowArray`, then submit that data through controller event pipeline.
+
+### 5. UTF-8 and wide-char considerations
+Paste should treat clipboard data as raw UTF-8 bytes and forward unchanged.
+No TScreenCell conversion is involved (unlike copy-selection extraction). Multi-byte codepoints and combining characters remain intact by byte-preserving transfer.
+
+### 6. Security considerations
+
+- Paste bombing risk (very large payloads): add maximum paste size guard (e.g. 1 MiB MVP cap) and drop/trim with user-visible warning.
+- Control bytes/newlines are expected terminal input; do not sanitize by default or behavior diverges from standard terminals.
+- Bracketed paste reduces accidental command execution for apps that enable mode 2004.
+
+## Design Decisions
+
+### D1: Keep paste initiation in `TerminalView` command handling
+`TerminalView` already owns focused input behavior and has access to `TerminalController`.
+
+### D2: Add dedicated `TerminalEventType::PasteData`
+Represent paste as first-class event for clean separation and future extensions.
+
+### D3: Preserve async safety with owned paste queue in `TerminalController`
+Because `TerminalEvent` is copied into async queue, clipboard pointers from UI thread cannot be queued directly.
+Use an internal `std::queue<GrowArray>` for ownership. `PasteData` event acts as trigger; writer loop pops owned buffer and passes temporary pointer to emulator synchronously.
+
+### D4: Implement bracketed paste in emulator using libvterm APIs
+In `VTermEmulator::handleEvent(PasteData)`:
+
+1. `vterm_keyboard_start_paste(vt);`
+2. `clientDataWriter.write(pasteBytes);`
+3. `vterm_keyboard_end_paste(vt);`
+
+libvterm decides whether wrappers are emitted based on current mode 2004.
+
+### D5: Command routing mirrors focused-command pattern
+Add `cmPaste` to `TVTermConstants` and include it in `focusedCmds()`, so command enable/disable tracks active terminal window like existing grab/release commands.
+
+## Fix Options And Tradeoffs
+
+### Option A (Recommended): New PasteData event + controller-owned paste queue
+Pros:
+- Correct threading and ownership.
+- Keeps PTY writes on existing writer-loop path.
+- Clean abstraction for future paste sources.
+
+Cons:
+- Slightly more code (new queue + event struct + dispatch case).
+
+### Option B: Reuse KeyDown path by synthesizing many key events
+Pros:
+- Minimal structural changes.
+
+Cons:
+- Data fidelity and performance issues for large/complex paste.
+- Poor bracketed-paste semantics.
+- Harder to preserve exact clipboard bytes.
+
+### Option C: Controller direct-write API from main thread (under lock)
+Pros:
+- Fewer event-type changes.
+
+Cons:
+- Violates current event-centric design.
+- Moves PTY-write concerns outside emulator.
+- Bracketed mode handling becomes awkward or duplicated.
+
+## Files To Modify
+
+### 1. `include/tvterm/termemu.h`
+
+Add new event type and payload:
+
+```cpp
+enum class TerminalEventType
+{
+    KeyDown,
+    Mouse,
+[stderr]     ClientDataRead,
+    PasteData,      // NEW
+    ViewportResize,
+    FocusChange,
+};
+
+struct PasteDataEvent
+{
+    const char *data;
+    size_t size;
+};
+
+struct TerminalEvent
+{
+    TerminalEventType type;
+    union
+    {
+        ::KeyDownEvent keyDown;
+        MouseEvent mouse;
+        ClientDataReadEvent clientDataRead;
+        PasteDataEvent pasteData; // NEW
+        ViewportResizeEvent viewportResize;
+        FocusChangeEvent focusChange;
+    };
+};
+```
+
+### 2. `include/tvterm/termctrl.h`
+
+Expose paste submission API:
+
+```cpp
+void sendPasteData(GrowArray data) noexcept;
+```
+
+Reason: explicit API communicates ownership transfer and prevents unsafe pointer lifetime at call sites.
+
+### 3. `source/tvterm-core/termctrl.cc`
+
+Add `pasteQueue` to `TerminalEventLoop`:
+
+```cpp
+Mutex<std::queue<GrowArray>> pasteQueue;
+```
+
+Implement `TerminalController::sendPasteData`:
+
+1. Early-return on empty data.
+2. Move `GrowArray` into `pasteQueue`.
+3. Enqueue lightweight `TerminalEvent{type=PasteData}` via `sendEvent`.
+
+In `TerminalEventLoop::processEvents`, special-case `PasteData`:
+
+1. Pop one `GrowArray` from `pasteQueue` into local variable.
+2. Build local event with `pasteData = {buf.data(), buf.size()}`.
+3. Call `terminalEmulator.handleEvent(localEvent)` synchronously while local buffer is alive.
+
+All this runs under event-loop mutex, matching existing emulator access rules.
+
+### 4. `source/tvterm-core/vtermemu.cc`
+
+Handle paste event:
+
+```cpp
+case TerminalEventType::PasteData:
+    vterm_keyboard_start_paste(vt);
+    clientDataWriter.write({event.pasteData.data, event.pasteData.size});
+    vterm_keyboard_end_paste(vt);
+    break;
+```
+
+This provides Part 1 and Part 2 simultaneously:
+- Mode 2004 OFF: markers not emitted.
+- Mode 2004 ON: markers emitted around payload.
+
+### 5. `include/tvterm/termview.h`
+
+Declare paste helpers:
+
+```cpp
+void pasteFromClipboard() noexcept;
+static bool readClipboard(GrowArray &out) noexcept;
+```
+
+### 6. `source/tvterm-core/termview.cc`
+
+Command handling:
+
+- Add `evCommand` case for `consts.cmPaste` -> `pasteFromClipboard()` -> `clearEvent(ev)`.
+
+Shift+Insert binding:
+
+- In `evKeyDown`, detect `ev.keyDown.keyCode == kbShiftIns`.
+- Trigger `pasteFromClipboard()` and consume event.
+- Otherwise keep existing key forwarding to emulator.
+
+Clipboard reader (`readClipboard`):
+
+- Unix only MVP:
+  - command: `pbpaste 2>/dev/null || xclip -selection clipboard -o 2>/dev/null || xsel --clipboard --output 2>/dev/null`
+  - `popen(..., "r")`, read in chunks, append to `GrowArray`.
+- Return false if tool unavailable/failure.
+
+Paste sender (`pasteFromClipboard`):
+
+1. Read clipboard into `GrowArray`.
+2. Enforce size guard (e.g. `maxPasteBytes = 1 << 20` for MVP).
+3. `termCtrl.sendPasteData(std::move(data));`
+
+### 7. `include/tvterm/consts.h`
+
+Add command constant:
+
+```cpp
+ushort cmPaste; // NEW
+```
+
+Update `focusedCmds()` range to include `cmPaste` (and keep contiguous command block).
+
+### 8. `source/tvterm/cmds.h`
+
+Add command ID:
+
+```cpp
+cmPaste,
+```
+
+Place near other focused terminal commands (`cmGrabInput`, `cmReleaseInput`) to preserve grouping.
+
+### 9. `source/tvterm/wnd.cc`
+[stderr] 
+Wire new constant in `TerminalWindow::appConsts` initializer in correct field order.
+
+### 10. `source/tvterm/app.cc`
+
+Menu wiring:
+
+- Add `"Paste"` menu item with `cmPaste`, key `kbShiftIns`.
+- Place next to `"Copy Selection"` once that feature exists; on upstream master, place near terminal input actions in the `More...` submenu.
+
+## Implementation Order
+
+1. Add `cmPaste` in command/constants plumbing (`cmds.h`, `consts.h`, `wnd.cc`, `app.cc`).
+2. Add paste APIs to `termview.h` and controller/emulator headers.
+3. Implement clipboard read + command/key trigger in `termview.cc`.
+4. Implement controller-owned paste queue and `PasteData` event dispatch in `termctrl.cc`.
+5. Implement `PasteData` handling with bracketed wrappers in `vtermemu.cc`.
+6. Build and run manual validation scenarios below.
+
+## Risks
+
+1. Clipboard tool availability on Linux varies (`xclip`/`xsel` may be missing).
+2. Large paste payloads can spike memory or flood PTY.
+3. Event/paste queue desynchronization if marker events and data queue ever diverge.
+[stderr] 4. Shift+Insert handling in `TerminalView` could conflict with global command dispatch if both are active.
+5. Bracketed wrappers rely on libvterm internal mode tracking; regressions in vendored libvterm would affect behavior.
+
+## Tests To Add
+
+### Manual Functional Tests
+
+1. Basic paste:
+   - Copy `echo test` in host clipboard.
+   - Trigger menu Paste.
+   - Verify text appears in terminal input and executes when pressing Enter.
+2. Shift+Insert:
+[stderr]    - Same clipboard content.
+   - Press Shift+Insert in focused terminal.
+   - Verify identical behavior to menu Paste.
+3. Bracketed paste ON:
+   - In shell: `printf '\e[?2004h'`.
+   - Run `cat -v`, paste multiline text.
+   - Verify wrappers (`^[[200~` ... `^[[201~`) are observed around payload.
+4. Bracketed paste OFF:
+   - `printf '\e[?2004l'`.
+   - Paste same payload.
+[stderr]    - Verify wrappers are absent.
+5. UTF-8 payload:
+   - Clipboard contains `你好 café 🚀`.
+   - Paste and verify bytes round-trip correctly in terminal app.
+6. Large paste guard:
+   - Paste payload larger than cap.
+   - Verify predictable behavior (drop or truncate per implementation) and app remains responsive.
+7. Missing clipboard backend (Linux):
+   - Temporarily run without `xclip`/`xsel`.
+   - Verify paste command fails gracefully (no crash).
+[stderr] 
+### Concurrency/Regression Tests
+
+1. While process emits rapid output (`yes | head -n 200000`), trigger paste repeatedly; verify no deadlock/crash.
+2. Resize window during repeated paste; verify rendering and input still function.
+3. Disconnect child process, then trigger paste; verify no crash (event may be ignored due disconnected PTY).
+
+### Build Tests
+
+1. Clean Debug build with submodules.
+2. Optional second build with `-DTVTERM_USE_SYSTEM_LIBVTERM=ON -DTVTERM_USE_SYSTEM_TVISION=ON`.
+
+## Acceptance Criteria
+
+1. `cmPaste` exists and is wired in constants + menu.
+2. Shift+Insert triggers paste in focused terminal.
+3. Paste data travels through `TerminalController` event pipeline (no direct PTY write from UI thread).
+4. Bracketed wrappers are emitted only when mode 2004 is enabled by child app.
+5. No regressions in existing key/mouse input or terminal update flow.
+[stderr] apply_patch(auto_approved=true) exited 0 in 65ms:
+Success. Updated the following files:
+A PLAN-paste.md
+file update:
+diff --git a/PLAN-paste.md b/PLAN-paste.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..c216e4a14284e2278fec1e87ec6f756c600342da
+--- /dev/null
++++ b/PLAN-paste.md
+@@ -0,0 +1,342 @@
++# Paste Implementation Plan (v1 — upstream-master based)
++
++## Overview
++Add paste support to `tvterm` in two phases:
++
++1. Basic paste-in: read system clipboard on the UI thread and send bytes to PTY through the existing `TerminalController` event/write pipeline.
++2. Bracketed paste: when terminal DEC mode 2004 is enabled, wrap pasted data with `ESC [ 200 ~` and `ESC [ 201 ~`.
++
++This plan is intentionally independent from `feature/text-selection` and targets upstream `magiblot/tvterm` master architecture.
++
++## Current-State Diagnosis
++
++### Root Cause
++Paste is currently missing because all required pieces are absent:
++
++1. No user command exists for paste (`cmPaste` is not present in [`source/tvterm/cmds.h`](/Users/james/Repos/tvterm/source/tvterm/cmds.h), [`include/tvterm/consts.h`](/Users/james/Repos/tvterm/include/tvterm/consts.h), or [`source/tvterm/wnd.cc`](/Users/james/Repos/tvterm/source/tvterm/wnd.cc)).
++2. `TerminalView` forwards keyboard/mouse events to emulator but has no clipboard read path or paste command handling ([`source/tvterm-core/termview.cc`](/Users/james/Repos/tvterm/source/tvterm-core/termview.cc)).
++3. `TerminalEvent` has no paste event type, and its async queue model makes pointer-based payloads from UI thread unsafe without owned storage ([`include/tvterm/termemu.h`](/Users/james/Repos/tvterm/include/tvterm/termemu.h), [`source/tvterm-core/termctrl.cc`](/Users/james/Repos/tvterm/source/tvterm-core/termctrl.cc)).
++4. `VTermEmulator` handles key/mouse/PTY-read/focus/resize only; no paste action path exists ([`source/tvterm-core/vtermemu.cc`](/Users/james/Repos/tvterm/source/tvterm-core/vtermemu.cc)).
++
++### Exact Existing Input Path (keyboard -> PTY)
++
++1. `TerminalView::handleEvent(evKeyDown)` builds `TerminalEvent{type=KeyDown}` and calls `termCtrl.sendEvent(...)` ([`source/tvterm-core/termview.cc:69`](/Users/james/Repos/tvterm/source/tvterm-core/termview.cc:69)).
++2. `TerminalController::sendEvent` pushes event into `eventQueue` and wakes writer loop ([`source/tvterm-core/termctrl.cc:139`](/Users/james/Repos/tvterm/source/tvterm-core/termctrl.cc:139)).
++3. Writer loop `processEvents()` forwards event to `terminalEmulator.handleEvent(...)` under event-loop mutex ([`source/tvterm-core/termctrl.cc:225`](/Users/james/Repos/tvterm/source/tvterm-core/termctrl.cc:225)).
++4. `VTermEmulator::handleEvent(KeyDown)` converts key and calls libvterm keyboard APIs ([`source/tvterm-core/vtermemu.cc:293`](/Users/james/Repos/tvterm/source/tvterm-core/vtermemu.cc:293)).
++5. libvterm emits encoded bytes through output callback; `VTermEmulator::writeOutput` appends into `clientDataWriter.buffer` ([`source/tvterm-core/vtermemu.cc:389`](/Users/james/Repos/tvterm/source/tvterm-core/vtermemu.cc:389)).
++6. Writer loop flushes that buffer to PTY in `writePendingData` ([`source/tvterm-core/termctrl.cc:290`](/Users/james/Repos/tvterm/source/tvterm-core/termctrl.cc:290)).
++
++Paste must reuse this architecture and not write PTY directly from UI thread.
++
++## Research Findings Required By Task
++
++### 1. Sending text to PTY today
++The only intentional path is:
++`TerminalView` -> `TerminalController::sendEvent` -> writer loop -> `TerminalEmulator::handleEvent` -> `Writer` buffer -> `PtyMaster::writeToClient`.
++
++### 2. How to detect bracketed paste mode 2004
++In vendored libvterm:
++
++- Mode 2004 is internal state (`state->mode.bracketpaste`) in `state.c`.
++- It is **not** exposed via `VTERM_PROP_*` (`VTERM_PROP_BRACKETPASTE` does not exist in public API).
++- Public keyboard helpers `vterm_keyboard_start_paste` / `vterm_keyboard_end_paste` conditionally emit markers based on that internal flag (`keyboard.c`).
++
++Therefore, best integration is to call these helpers around pasted bytes; this is the supported API path and avoids private-header coupling.
++
++### 3. New TerminalEvent type vs reusing KeyDown
++Recommended: add a new paste event type.
++
++Why not `KeyDown`:
++
++- KeyDown path is key-semantic conversion, not bulk byte injection.
++- Replaying paste as per-char key events is slower and can alter data semantics.
++- Bracketed paste is conceptually one paste action, not N keypresses.
++
++### 4. Clipboard read implementation (reverse of text-selection write plan)
++Use platform tools from UI thread:
++
++- macOS: `pbpaste`
++- Linux fallback chain: `xclip -selection clipboard -o` then `xsel --clipboard --output`
++
++Read process stdout into `GrowArray`, then submit that data through controller event pipeline.
++
++### 5. UTF-8 and wide-char considerations
++Paste should treat clipboard data as raw UTF-8 bytes and forward unchanged.
++No TScreenCell conversion is involved (unlike copy-selection extraction). Multi-byte codepoints and combining characters remain intact by byte-preserving transfer.
++
++### 6. Security considerations
++
++- Paste bombing risk (very large payloads): add maximum paste size guard (e.g. 1 MiB MVP cap) and drop/trim with user-visible warning.
++- Control bytes/newlines are expected terminal input; do not sanitize by default or behavior diverges from standard terminals.
++- Bracketed paste reduces accidental command execution for apps that enable mode 2004.
++
++## Design Decisions
++
++### D1: Keep paste initiation in `TerminalView` command handling
++`TerminalView` already owns focused input behavior and has access to `TerminalController`.
++
++### D2: Add dedicated `TerminalEventType::PasteData`
++Represent paste as first-class event for clean separation and future extensions.
++
++### D3: Preserve async safety with owned paste queue in `TerminalController`
++Because `TerminalEvent` is copied into async queue, clipboard pointers from UI thread cannot be queued directly.
++Use an internal `std::queue<GrowArray>` for ownership. `PasteData` event acts as trigger; writer loop pops owned buffer and passes temporary pointer to emulator synchronously.
++
++### D4: Implement bracketed paste in emulator using libvterm APIs
++In `VTermEmulator::handleEvent(PasteData)`:
++
++1. `vterm_keyboard_start_paste(vt);`
++2. `clientDataWriter.write(pasteBytes);`
++3. `vterm_keyboard_end_paste(vt);`
++
++libvterm decides whether wrappers are emitted based on current mode 2004.
++
++### D5: Command routing mirrors focused-command pattern
++Add `cmPaste` to `TVTermConstants` and include it in `focusedCmds()`, so command enable/disable tracks active terminal window like existing grab/release commands.
++
++## Fix Options And Tradeoffs
++
++### Option A (Recommended): New PasteData event + controller-owned paste queue
++Pros:
++- Correct threading and ownership.
++- Keeps PTY writes on existing writer-loop path.
++- Clean abstraction for future paste sources.
++
++Cons:
++- Slightly more code (new queue + event struct + dispatch case).
++
++### Option B: Reuse KeyDown path by synthesizing many key events
++Pros:
++- Minimal structural changes.
++
++Cons:
++- Data fidelity and performance issues for large/complex paste.
++- Poor bracketed-paste semantics.
++- Harder to preserve exact clipboard bytes.
++
++### Option C: Controller direct-write API from main thread (under lock)
++Pros:
++- Fewer event-type changes.
++
++Cons:
++- Violates current event-centric design.
++- Moves PTY-write concerns outside emulator.
++- Bracketed mode handling becomes awkward or duplicated.
++
++## Files To Modify
++
++### 1. `include/tvterm/termemu.h`
++
++Add new event type and payload:
++
++```cpp
++enum class TerminalEventType
++{
++    KeyDown,
++    Mouse,
++    ClientDataRead,
++    PasteData,      // NEW
++    ViewportResize,
++    FocusChange,
++};
++
++struct PasteDataEvent
++{
++    const char *data;
++    size_t size;
++};
++
++struct TerminalEvent
++{
++    TerminalEventType type;
++    union
++    {
++        ::KeyDownEvent keyDown;
++        MouseEvent mouse;
++        ClientDataReadEvent clientDataRead;
++        PasteDataEvent pasteData; // NEW
++        ViewportResizeEvent viewportResize;
++        FocusChangeEvent focusChange;
++    };
++};
++```
++
++### 2. `include/tvterm/termctrl.h`
++
++Expose paste submission API:
++
++```cpp
++void sendPasteData(GrowArray data) noexcept;
++```
++
++Reason: explicit API communicates ownership transfer and prevents unsafe pointer lifetime at call sites.
++
++### 3. `source/tvterm-core/termctrl.cc`
++
++Add `pasteQueue` to `TerminalEventLoop`:
++
++```cpp
++Mutex<std::queue<GrowArray>> pasteQueue;
++```
++
++Implement `TerminalController::sendPasteData`:
++
++1. Early-return on empty data.
++2. Move `GrowArray` into `pasteQueue`.
++3. Enqueue lightweight `TerminalEvent{type=PasteData}` via `sendEvent`.
++
++In `TerminalEventLoop::processEvents`, special-case `PasteData`:
++
++1. Pop one `GrowArray` from `pasteQueue` into local variable.
++2. Build local event with `pasteData = {buf.data(), buf.size()}`.
++3. Call `terminalEmulator.handleEvent(localEvent)` synchronously while local buffer is alive.
++
++All this runs under event-loop mutex, matching existing emulator access rules.
++
++### 4. `source/tvterm-core/vtermemu.cc`
++
++Handle paste event:
++
++```cpp
++case TerminalEventType::PasteData:
++    vterm_keyboard_start_paste(vt);
++    clientDataWriter.write({event.pasteData.data, event.pasteData.size});
++    vterm_keyboard_end_paste(vt);
++    break;
++```
++
++This provides Part 1 and Part 2 simultaneously:
++- Mode 2004 OFF: markers not emitted.
++- Mode 2004 ON: markers emitted around payload.
++
++### 5. `include/tvterm/termview.h`
++
++Declare paste helpers:
++
++```cpp
++void pasteFromClipboard() noexcept;
++static bool readClipboard(GrowArray &out) noexcept;
++```
++
++### 6. `source/tvterm-core/termview.cc`
++
++Command handling:
++
++- Add `evCommand` case for `consts.cmPaste` -> `pasteFromClipboard()` -> `clearEvent(ev)`.
++
++Shift+Insert binding:
++
++- In `evKeyDown`, detect `ev.keyDown.keyCode == kbShiftIns`.
++- Trigger `pasteFromClipboard()` and consume event.
++- Otherwise keep existing key forwarding to emulator.
++
++Clipboard reader (`readClipboard`):
++
++- Unix only MVP:
++  - command: `pbpaste 2>/dev/null || xclip -selection clipboard -o 2>/dev/null || xsel --clipboard --output 2>/dev/null`
++  - `popen(..., "r")`, read in chunks, append to `GrowArray`.
++- Return false if tool unavailable/failure.
++
++Paste sender (`pasteFromClipboard`):
++
++1. Read clipboard into `GrowArray`.
++2. Enforce size guard (e.g. `maxPasteBytes = 1 << 20` for MVP).
++3. `termCtrl.sendPasteData(std::move(data));`
++
++### 7. `include/tvterm/consts.h`
++
++Add command constant:
++
++```cpp
++ushort cmPaste; // NEW
++```
++
++Update `focusedCmds()` range to include `cmPaste` (and keep contiguous command block).
++
++### 8. `source/tvterm/cmds.h`
++
++Add command ID:
++
++```cpp
++cmPaste,
++```
++
++Place near other focused terminal commands (`cmGrabInput`, `cmReleaseInput`) to preserve grouping.
++
++### 9. `source/tvterm/wnd.cc`
++
++Wire new constant in `TerminalWindow::appConsts` initializer in correct field order.
++
++### 10. `source/tvterm/app.cc`
++
++Menu wiring:
++
++- Add `"Paste"` menu item with `cmPaste`, key `kbShiftIns`.
++- Place next to `"Copy Selection"` once that feature exists; on upstream master, place near terminal input actions in the `More...` submenu.
++
++## Implementation Order
++
++1. Add `cmPaste` in command/constants plumbing (`cmds.h`, `consts.h`, `wnd.cc`, `app.cc`).
++2. Add paste APIs to `termview.h` and controller/emulator headers.
++3. Implement clipboard read + command/key trigger in `termview.cc`.
++4. Implement controller-owned paste queue and `PasteData` event dispatch in `termctrl.cc`.
++5. Implement `PasteData` handling with bracketed wrappers in `vtermemu.cc`.
++6. Build and run manual validation scenarios below.
++
++## Risks
++
++1. Clipboard tool availability on Linux varies (`xclip`/`xsel` may be missing).
++2. Large paste payloads can spike memory or flood PTY.
++3. Event/paste queue desynchronization if marker events and data queue ever diverge.
++4. Shift+Insert handling in `TerminalView` could conflict with global command dispatch if both are active.
++5. Bracketed wrappers rely on libvterm internal mode tracking; regressions in vendored libvterm would affect behavior.
++
++## Tests To Add
++
++### Manual Functional Tests
++
++1. Basic paste:
++   - Copy `echo test` in host clipboard.
++   - Trigger menu Paste.
++   - Verify text appears in terminal input and executes when pressing Enter.
++2. Shift+Insert:
++   - Same clipboard content.
++   - Press Shift+Insert in focused terminal.
++   - Verify identical behavior to menu Paste.
++3. Bracketed paste ON:
++   - In shell: `printf '\e[?2004h'`.
++   - Run `cat -v`, paste multiline text.
++   - Verify wrappers (`^[[200~` ... `^[[201~`) are observed around payload.
++4. Bracketed paste OFF:
++   - `printf '\e[?2004l'`.
++   - Paste same payload.
++   - Verify wrappers are absent.
++5. UTF-8 payload:
++   - Clipboard contains `你好 café 🚀`.
++   - Paste and verify bytes round-trip correctly in terminal app.
++6. Large paste guard:
++   - Paste payload larger than cap.
++   - Verify predictable behavior (drop or truncate per implementation) and app remains responsive.
++7. Missing clipboard backend (Linux):
++   - Temporarily run without `xclip`/`xsel`.
++   - Verify paste command fails gracefully (no crash).
++
++### Concurrency/Regression Tests
++
++1. While process emits rapid output (`yes | head -n 200000`), trigger paste repeatedly; verify no deadlock/crash.
++2. Resize window during repeated paste; verify rendering and input still function.
++3. Disconnect child process, then trigger paste; verify no crash (event may be ignored due disconnected PTY).
++
++### Build Tests
++
++1. Clean Debug build with submodules.
++2. Optional second build with `-DTVTERM_USE_SYSTEM_LIBVTERM=ON -DTVTERM_USE_SYSTEM_TVISION=ON`.
++
++## Acceptance Criteria
++
++1. `cmPaste` exists and is wired in constants + menu.
++2. Shift+Insert triggers paste in focused terminal.
++3. Paste data travels through `TerminalController` event pipeline (no direct PTY write from UI thread).
++4. Bracketed wrappers are emitted only when mode 2004 is enabled by child app.
++5. No regressions in existing key/mouse input or terminal update flow.
+[stderr] 
+[stderr] file update:
+diff --git a/PLAN-paste.md b/PLAN-paste.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..c216e4a14284e2278fec1e87ec6f756c600342da
+--- /dev/null
++++ b/PLAN-paste.md
+@@ -0,0 +1,342 @@
++# Paste Implementation Plan (v1 — upstream-master based)
++
++## Overview
++Add paste support to `tvterm` in two phases:
++
++1. Basic paste-in: read system clipboard on the UI thread and send bytes to PTY through the existing `TerminalController` event/write pipeline.
++2. Bracketed paste: when terminal DEC mode 2004 is enabled, wrap pasted data with `ESC [ 200 ~` and `ESC [ 201 ~`.
++
++This plan is intentionally independent from `feature/text-selection` and targets upstream `magiblot/tvterm` master architecture.
++
++## Current-State Diagnosis
++
++### Root Cause
++Paste is currently missing because all required pieces are absent:
++
++1. No user command exists for paste (`cmPaste` is not present in [`source/tvterm/cmds.h`](/Users/james/Repos/tvterm/source/tvterm/cmds.h), [`include/tvterm/consts.h`](/Users/james/Repos/tvterm/include/tvterm/consts.h), or [`source/tvterm/wnd.cc`](/Users/james/Repos/tvterm/source/tvterm/wnd.cc)).
++2. `TerminalView` forwards keyboard/mouse events to emulator but has no clipboard read path or paste command handling ([`source/tvterm-core/termview.cc`](/Users/james/Repos/tvterm/source/tvterm-core/termview.cc)).
++3. `TerminalEvent` has no paste event type, and its async queue model makes pointer-based payloads from UI thread unsafe without owned storage ([`include/tvterm/termemu.h`](/Users/james/Repos/tvterm/include/tvterm/termemu.h), [`source/tvterm-core/termctrl.cc`](/Users/james/Repos/tvterm/source/tvterm-core/termctrl.cc)).
++4. `VTermEmulator` handles key/mouse/PTY-read/focus/resize only; no paste action path exists ([`source/tvterm-core/vtermemu.cc`](/Users/james/Repos/tvterm/source/tvterm-core/vtermemu.cc)).
++
++### Exact Existing Input Path (keyboard -> PTY)
++
++1. `TerminalView::handleEvent(evKeyDown)` builds `TerminalEvent{type=KeyDown}` and calls `termCtrl.sendEvent(...)` ([`source/tvterm-core/termview.cc:69`](/Users/james/Repos/tvterm/source/tvterm-core/termview.cc:69)).
++2. `TerminalController::sendEvent` pushes event into `eventQueue` and wakes writer loop ([`source/tvterm-core/termctrl.cc:139`](/Users/james/Repos/tvterm/source/tvterm-core/termctrl.cc:139)).
++3. Writer loop `processEvents()` forwards event to `terminalEmulator.handleEvent(...)` under event-loop mutex ([`source/tvterm-core/termctrl.cc:225`](/Users/james/Repos/tvterm/source/tvterm-core/termctrl.cc:225)).
++4. `VTermEmulator::handleEvent(KeyDown)` converts key and calls libvterm keyboard APIs ([`source/tvterm-core/vtermemu.cc:293`](/Users/james/Repos/tvterm/source/tvterm-core/vtermemu.cc:293)).
++5. libvterm emits encoded bytes through output callback; `VTermEmulator::writeOutput` appends into `clientDataWriter.buffer` ([`source/tvterm-core/vtermemu.cc:389`](/Users/james/Repos/tvterm/source/tvterm-core/vtermemu.cc:389)).
++6. Writer loop flushes that buffer to PTY in `writePendingData` ([`source/tvterm-core/termctrl.cc:290`](/Users/james/Repos/tvterm/source/tvterm-core/termctrl.cc:290)).
++
++Paste must reuse this architecture and not write PTY directly from UI thread.
++
++## Research Findings Required By Task
++
++### 1. Sending text to PTY today
++The only intentional path is:
++`TerminalView` -> `TerminalController::sendEvent` -> writer loop -> `TerminalEmulator::handleEvent` -> `Writer` buffer -> `PtyMaster::writeToClient`.
++
++### 2. How to detect bracketed paste mode 2004
++In vendored libvterm:
++
++- Mode 2004 is internal state (`state->mode.bracketpaste`) in `state.c`.
++- It is **not** exposed via `VTERM_PROP_*` (`VTERM_PROP_BRACKETPASTE` does not exist in public API).
++- Public keyboard helpers `vterm_keyboard_start_paste` / `vterm_keyboard_end_paste` conditionally emit markers based on that internal flag (`keyboard.c`).
++
++Therefore, best integration is to call these helpers around pasted bytes; this is the supported API path and avoids private-header coupling.
++
++### 3. New TerminalEvent type vs reusing KeyDown
++Recommended: add a new paste event type.
++
++Why not `KeyDown`:
++
++- KeyDown path is key-semantic conversion, not bulk byte injection.
++- Replaying paste as per-char key events is slower and can alter data semantics.
++- Bracketed paste is conceptually one paste action, not N keypresses.
++
++### 4. Clipboard read implementation (reverse of text-selection write plan)
++Use platform tools from UI thread:
++
++- macOS: `pbpaste`
++- Linux fallback chain: `xclip -selection clipboard -o` then `xsel --clipboard --output`
++
++Read process stdout into `GrowArray`, then submit that data through controller event pipeline.
++
++### 5. UTF-8 and wide-char considerations
++Paste should treat clipboard data as raw UTF-8 bytes and forward unchanged.
++No TScreenCell conversion is involved (unlike copy-selection extraction). Multi-byte codepoints and combining characters remain intact by byte-preserving transfer.
++
++### 6. Security considerations
++
++- Paste bombing risk (very large payloads): add maximum paste size guard (e.g. 1 MiB MVP cap) and drop/trim with user-visible warning.
++- Control bytes/newlines are expected terminal input; do not sanitize by default or behavior diverges from standard terminals.
++- Bracketed paste reduces accidental command execution for apps that enable mode 2004.
++
++## Design Decisions
++
++### D1: Keep paste initiation in `TerminalView` command handling
++`TerminalView` already owns focused input behavior and has access to `TerminalController`.
++
++### D2: Add dedicated `TerminalEventType::PasteData`
++Represent paste as first-class event for clean separation and future extensions.
++
++### D3: Preserve async safety with owned paste queue in `TerminalController`
++Because `TerminalEvent` is copied into async queue, clipboard pointers from UI thread cannot be queued directly.
++Use an internal `std::queue<GrowArray>` for ownership. `PasteData` event acts as trigger; writer loop pops owned buffer and passes temporary pointer to emulator synchronously.
++
++### D4: Implement bracketed paste in emulator using libvterm APIs
++In `VTermEmulator::handleEvent(PasteData)`:
++
++1. `vterm_keyboard_start_paste(vt);`
++2. `clientDataWriter.write(pasteBytes);`
++3. `vterm_keyboard_end_paste(vt);`
++
++libvterm decides whether wrappers are emitted based on current mode 2004.
++
++### D5: Command routing mirrors focused-command pattern
++Add `cmPaste` to `TVTermConstants` and include it in `focusedCmds()`, so command enable/disable tracks active terminal window like existing grab/release commands.
++
++## Fix Options And Tradeoffs
++
++### Option A (Recommended): New PasteData event + controller-owned paste queue
++Pros:
++- Correct threading and ownership.
++- Keeps PTY writes on existing writer-loop path.
++- Clean abstraction for future paste sources.
++
++Cons:
++- Slightly more code (new queue + event struct + dispatch case).
++
++### Option B: Reuse KeyDown path by synthesizing many key events
++Pros:
++- Minimal structural changes.
++
++Cons:
++- Data fidelity and performance issues for large/complex paste.
++- Poor bracketed-paste semantics.
++- Harder to preserve exact clipboard bytes.
++
++### Option C: Controller direct-write API from main thread (under lock)
++Pros:
++- Fewer event-type changes.
++
++Cons:
++- Violates current event-centric design.
++- Moves PTY-write concerns outside emulator.
++- Bracketed mode handling becomes awkward or duplicated.
++
++## Files To Modify
++
++### 1. `include/tvterm/termemu.h`
++
++Add new event type and payload:
++
++```cpp
++enum class TerminalEventType
++{
++    KeyDown,
++    Mouse,
++    ClientDataRead,
++    PasteData,      // NEW
++    ViewportResize,
++    FocusChange,
++};
++
++struct PasteDataEvent
++{
++    const char *data;
++    size_t size;
++};
++
++struct TerminalEvent
++{
++    TerminalEventType type;
++    union
++    {
++        ::KeyDownEvent keyDown;
++        MouseEvent mouse;
++        ClientDataReadEvent clientDataRead;
++        PasteDataEvent pasteData; // NEW
++        ViewportResizeEvent viewportResize;
++        FocusChangeEvent focusChange;
++    };
++};
++```
++
++### 2. `include/tvterm/termctrl.h`
++
++Expose paste submission API:
++
++```cpp
++void sendPasteData(GrowArray data) noexcept;
++```
++
++Reason: explicit API communicates ownership transfer and prevents unsafe pointer lifetime at call sites.
++
++### 3. `source/tvterm-core/termctrl.cc`
++
++Add `pasteQueue` to `TerminalEventLoop`:
++
++```cpp
++Mutex<std::queue<GrowArray>> pasteQueue;
++```
++
++Implement `TerminalController::sendPasteData`:
++
++1. Early-return on empty data.
++2. Move `GrowArray` into `pasteQueue`.
++3. Enqueue lightweight `TerminalEvent{type=PasteData}` via `sendEvent`.
++
++In `TerminalEventLoop::processEvents`, special-case `PasteData`:
++
++1. Pop one `GrowArray` from `pasteQueue` into local variable.
++2. Build local event with `pasteData = {buf.data(), buf.size()}`.
++3. Call `terminalEmulator.handleEvent(localEvent)` synchronously while local buffer is alive.
++
++All this runs under event-loop mutex, matching existing emulator access rules.
++
++### 4. `source/tvterm-core/vtermemu.cc`
++
++Handle paste event:
++
++```cpp
++case TerminalEventType::PasteData:
++    vterm_keyboard_start_paste(vt);
++    clientDataWriter.write({event.pasteData.data, event.pasteData.size});
++    vterm_keyboard_end_paste(vt);
++    break;
++```
++
++This provides Part 1 and Part 2 simultaneously:
++- Mode 2004 OFF: markers not emitted.
++- Mode 2004 ON: markers emitted around payload.
++
++### 5. `include/tvterm/termview.h`
++
++Declare paste helpers:
++
++```cpp
++void pasteFromClipboard() noexcept;
++static bool readClipboard(GrowArray &out) noexcept;
++```
++
++### 6. `source/tvterm-core/termview.cc`
++
++Command handling:
++
++- Add `evCommand` case for `consts.cmPaste` -> `pasteFromClipboard()` -> `clearEvent(ev)`.
++
++Shift+Insert binding:
++
++- In `evKeyDown`, detect `ev.keyDown.keyCode == kbShiftIns`.
++- Trigger `pasteFromClipboard()` and consume event.
++- Otherwise keep existing key forwarding to emulator.
++
++Clipboard reader (`readClipboard`):
++
++- Unix only MVP:
++  - command: `pbpaste 2>/dev/null || xclip -selection clipboard -o 2>/dev/null || xsel --clipboard --output 2>/dev/null`
++  - `popen(..., "r")`, read in chunks, append to `GrowArray`.
++- Return false if tool unavailable/failure.
++
++Paste sender (`pasteFromClipboard`):
++
++1. Read clipboard into `GrowArray`.
++2. Enforce size guard (e.g. `maxPasteBytes = 1 << 20` for MVP).
++3. `termCtrl.sendPasteData(std::move(data));`
++
++### 7. `include/tvterm/consts.h`
++
++Add command constant:
++
++```cpp
++ushort cmPaste; // NEW
++```
++
++Update `focusedCmds()` range to include `cmPaste` (and keep contiguous command block).
++
++### 8. `source/tvterm/cmds.h`
++
++Add command ID:
++
++```cpp
++cmPaste,
++```
++
++Place near other focused terminal commands (`cmGrabInput`, `cmReleaseInput`) to preserve grouping.
++
++### 9. `source/tvterm/wnd.cc`
++
++Wire new constant in `TerminalWindow::appConsts` initializer in correct field order.
++
++### 10. `source/tvterm/app.cc`
++
++Menu wiring:
++
++- Add `"Paste"` menu item with `cmPaste`, key `kbShiftIns`.
++- Place next to `"Copy Selection"` once that feature exists; on upstream master, place near terminal input actions in the `More...` submenu.
++
++## Implementation Order
++
++1. Add `cmPaste` in command/constants plumbing (`cmds.h`, `consts.h`, `wnd.cc`, `app.cc`).
++2. Add paste APIs to `termview.h` and controller/emulator headers.
++3. Implement clipboard read + command/key trigger in `termview.cc`.
++4. Implement controller-owned paste queue and `PasteData` event dispatch in `termctrl.cc`.
++5. Implement `PasteData` handling with bracketed wrappers in `vtermemu.cc`.
++6. Build and run manual validation scenarios below.
++
++## Risks
++
++1. Clipboard tool availability on Linux varies (`xclip`/`xsel` may be missing).
++2. Large paste payloads can spike memory or flood PTY.
++3. Event/paste queue desynchronization if marker events and data queue ever diverge.
++4. Shift+Insert handling in `TerminalView` could conflict with global command dispatch if both are active.
++5. Bracketed wrappers rely on libvterm internal mode tracking; regressions in vendored libvterm would affect behavior.
++
++## Tests To Add
++
++### Manual Functional Tests
++
++1. Basic paste:
++   - Copy `echo test` in host clipboard.
++   - Trigger menu Paste.
++   - Verify text appears in terminal input and executes when pressing Enter.
++2. Shift+Insert:
++   - Same clipboard content.
++   - Press Shift+Insert in focused terminal.
++   - Verify identical behavior to menu Paste.
++3. Bracketed paste ON:
++   - In shell: `printf '\e[?2004h'`.
++   - Run `cat -v`, paste multiline text.
++   - Verify wrappers (`^[[200~` ... `^[[201~`) are observed around payload.
++4. Bracketed paste OFF:
++   - `printf '\e[?2004l'`.
++   - Paste same payload.
++   - Verify wrappers are absent.
++5. UTF-8 payload:
++   - Clipboard contains `你好 café 🚀`.
++   - Paste and verify bytes round-trip correctly in terminal app.
++6. Large paste guard:
++   - Paste payload larger than cap.
++   - Verify predictable behavior (drop or truncate per implementation) and app remains responsive.
++7. Missing clipboard backend (Linux):
++   - Temporarily run without `xclip`/`xsel`.
++   - Verify paste command fails gracefully (no crash).
++
++### Concurrency/Regression Tests
++
++1. While process emits rapid output (`yes | head -n 200000`), trigger paste repeatedly; verify no deadlock/crash.
++2. Resize window during repeated paste; verify rendering and input still function.
++3. Disconnect child process, then trigger paste; verify no crash (event may be ignored due disconnected PTY).
++
++### Build Tests
++
++1. Clean Debug build with submodules.
++2. Optional second build with `-DTVTERM_USE_SYSTEM_LIBVTERM=ON -DTVTERM_USE_SYSTEM_TVISION=ON`.
++
++## Acceptance Criteria
++
++1. `cmPaste` exists and is wired in constants + menu.
++2. Shift+Insert triggers paste in focused terminal.
++3. Paste data travels through `TerminalController` event pipeline (no direct PTY write from UI thread).
++4. Bracketed wrappers are emitted only when mode 2004 is enabled by child app.
++5. No regressions in existing key/mouse input or terminal update flow.
+
+[stderr] 
+[stderr] thinking
+**Confirming output file and summary**
+[stderr] exec
+/bin/zsh -lc "sed -n '1,80p' PLAN-paste.md" in /Users/james/Repos/tvterm[stderr]  succeeded in 51ms:
+# Paste Implementation Plan (v1 — upstream-master based)
+
+## Overview
+Add paste support to `tvterm` in two phases:
+
+1. Basic paste-in: read system clipboard on the UI thread and send bytes to PTY through the existing `TerminalController` event/write pipeline.
+2. Bracketed paste: when terminal DEC mode 2004 is enabled, wrap pasted data with `ESC [ 200 ~` and `ESC [ 201 ~`.
+
+This plan is intentionally independent from `feature/text-selection` and targets upstream `magiblot/tvterm` master architecture.
+
+## Current-State Diagnosis
+
+### Root Cause
+Paste is currently missing because all required pieces are absent:
+
+1. No user command exists for paste (`cmPaste` is not present in [`source/tvterm/cmds.h`](/Users/james/Repos/tvterm/source/tvterm/cmds.h), [`include/tvterm/consts.h`](/Users/james/Repos/tvterm/include/tvterm/consts.h), or [`source/tvterm/wnd.cc`](/Users/james/Repos/tvterm/source/tvterm/wnd.cc)).
+2. `TerminalView` forwards keyboard/mouse events to emulator but has no clipboard read path or paste command handling ([`source/tvterm-core/termview.cc`](/Users/james/Repos/tvterm/source/tvterm-core/termview.cc)).
+3. `TerminalEvent` has no paste event type, and its async queue model makes pointer-based payloads from UI thread unsafe without owned storage ([`include/tvterm/termemu.h`](/Users/james/Repos/tvterm/include/tvterm/termemu.h), [`source/tvterm-core/termctrl.cc`](/Users/james/Repos/tvterm/source/tvterm-core/termctrl.cc)).
+4. `VTermEmulator` handles key/mouse/PTY-read/focus/resize only; no paste action path exists ([`source/tvterm-core/vtermemu.cc`](/Users/james/Repos/tvterm/source/tvterm-core/vtermemu.cc)).
+
+[stderr] file update:
+diff --git a/PLAN-paste.md b/PLAN-paste.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..c216e4a14284e2278fec1e87ec6f756c600342da
+--- /dev/null
++++ b/PLAN-paste.md
+@@ -0,0 +1,342 @@
++# Paste Implementation Plan (v1 — upstream-master based)
++
++## Overview
++Add paste support to `tvterm` in two phases:
++
++1. Basic paste-in: read system clipboard on the UI thread and send bytes to PTY through the existing `TerminalController` event/write pipeline.
++2. Bracketed paste: when terminal DEC mode 2004 is enabled, wrap pasted data with `ESC [ 200 ~` and `ESC [ 201 ~`.
++
++This plan is intentionally independent from `feature/text-selection` and targets upstream `magiblot/tvterm` master architecture.
++
++## Current-State Diagnosis
++
++### Root Cause
++Paste is currently missing because all required pieces are absent:
++
++1. No user command exists for paste (`cmPaste` is not present in [`source/tvterm/cmds.h`](/Users/james/Repos/tvterm/source/tvterm/cmds.h), [`include/tvterm/consts.h`](/Users/james/Repos/tvterm/include/tvterm/consts.h), or [`source/tvterm/wnd.cc`](/Users/james/Repos/tvterm/source/tvterm/wnd.cc)).
++2. `TerminalView` forwards keyboard/mouse events to emulator but has no clipboard read path or paste command handling ([`source/tvterm-core/termview.cc`](/Users/james/Repos/tvterm/source/tvterm-core/termview.cc)).
++3. `TerminalEvent` has no paste event type, and its async queue model makes pointer-based payloads from UI thread unsafe without owned storage ([`include/tvterm/termemu.h`](/Users/james/Repos/tvterm/include/tvterm/termemu.h), [`source/tvterm-core/termctrl.cc`](/Users/james/Repos/tvterm/source/tvterm-core/termctrl.cc)).
++4. `VTermEmulator` handles key/mouse/PTY-read/focus/resize only; no paste action path exists ([`source/tvterm-core/vtermemu.cc`](/Users/james/Repos/tvterm/source/tvterm-core/vtermemu.cc)).
++
++### Exact Existing Input Path (keyboard -> PTY)
++
++1. `TerminalView::handleEvent(evKeyDown)` builds `TerminalEvent{type=KeyDown}` and calls `termCtrl.sendEvent(...)` ([`source/tvterm-core/termview.cc:69`](/Users/james/Repos/tvterm/source/tvterm-core/termview.cc:69)).
++2. `TerminalController::sendEvent` pushes event into `eventQueue` and wakes writer loop ([`source/tvterm-core/termctrl.cc:139`](/Users/james/Repos/tvterm/source/tvterm-core/termctrl.cc:139)).
++3. Writer loop `processEvents()` forwards event to `terminalEmulator.handleEvent(...)` under event-loop mutex ([`source/tvterm-core/termctrl.cc:225`](/Users/james/Repos/tvterm/source/tvterm-core/termctrl.cc:225)).
++4. `VTermEmulator::handleEvent(KeyDown)` converts key and calls libvterm keyboard APIs ([`source/tvterm-core/vtermemu.cc:293`](/Users/james/Repos/tvterm/source/tvterm-core/vtermemu.cc:293)).
++5. libvterm emits encoded bytes through output callback; `VTermEmulator::writeOutput` appends into `clientDataWriter.buffer` ([`source/tvterm-core/vtermemu.cc:389`](/Users/james/Repos/tvterm/source/tvterm-core/vtermemu.cc:389)).
++6. Writer loop flushes that buffer to PTY in `writePendingData` ([`source/tvterm-core/termctrl.cc:290`](/Users/james/Repos/tvterm/source/tvterm-core/termctrl.cc:290)).
++
++Paste must reuse this architecture and not write PTY directly from UI thread.
++
++## Research Findings Required By Task
++
++### 1. Sending text to PTY today
++The only intentional path is:
++`TerminalView` -> `TerminalController::sendEvent` -> writer loop -> `TerminalEmulator::handleEvent` -> `Writer` buffer -> `PtyMaster::writeToClient`.
++
++### 2. How to detect bracketed paste mode 2004
++In vendored libvterm:
++
++- Mode 2004 is internal state (`state->mode.bracketpaste`) in `state.c`.
++- It is **not** exposed via `VTERM_PROP_*` (`VTERM_PROP_BRACKETPASTE` does not exist in public API).
++- Public keyboard helpers `vterm_keyboard_start_paste` / `vterm_keyboard_end_paste` conditionally emit markers based on that internal flag (`keyboard.c`).
++
++Therefore, best integration is to call these helpers around pasted bytes; this is the supported API path and avoids private-header coupling.
++
++### 3. New TerminalEvent type vs reusing KeyDown
++Recommended: add a new paste event type.
++
++Why not `KeyDown`:
++
++- KeyDown path is key-semantic conversion, not bulk byte injection.
++- Replaying paste as per-char key events is slower and can alter data semantics.
++- Bracketed paste is conceptually one paste action, not N keypresses.
++
++### 4. Clipboard read implementation (reverse of text-selection write plan)
++Use platform tools from UI thread:
++
++- macOS: `pbpaste`
++- Linux fallback chain: `xclip -selection clipboard -o` then `xsel --clipboard --output`
++
++Read process stdout into `GrowArray`, then submit that data through controller event pipeline.
++
++### 5. UTF-8 and wide-char considerations
++Paste should treat clipboard data as raw UTF-8 bytes and forward unchanged.
++No TScreenCell conversion is involved (unlike copy-selection extraction). Multi-byte codepoints and combining characters remain intact by byte-preserving transfer.
++
++### 6. Security considerations
++
++- Paste bombing risk (very large payloads): add maximum paste size guard (e.g. 1 MiB MVP cap) and drop/trim with user-visible warning.
++- Control bytes/newlines are expected terminal input; do not sanitize by default or behavior diverges from standard terminals.
++- Bracketed paste reduces accidental command execution for apps that enable mode 2004.
++
++## Design Decisions
++
++### D1: Keep paste initiation in `TerminalView` command handling
++`TerminalView` already owns focused input behavior and has access to `TerminalController`.
++
++### D2: Add dedicated `TerminalEventType::PasteData`
++Represent paste as first-class event for clean separation and future extensions.
++
++### D3: Preserve async safety with owned paste queue in `TerminalController`
++Because `TerminalEvent` is copied into async queue, clipboard pointers from UI thread cannot be queued directly.
++Use an internal `std::queue<GrowArray>` for ownership. `PasteData` event acts as trigger; writer loop pops owned buffer and passes temporary pointer to emulator synchronously.
++
++### D4: Implement bracketed paste in emulator using libvterm APIs
++In `VTermEmulator::handleEvent(PasteData)`:
++
++1. `vterm_keyboard_start_paste(vt);`
++2. `clientDataWriter.write(pasteBytes);`
++3. `vterm_keyboard_end_paste(vt);`
++
++libvterm decides whether wrappers are emitted based on current mode 2004.
++
++### D5: Command routing mirrors focused-command pattern
++Add `cmPaste` to `TVTermConstants` and include it in `focusedCmds()`, so command enable/disable tracks active terminal window like existing grab/release commands.
++
++## Fix Options And Tradeoffs
++
++### Option A (Recommended): New PasteData event + controller-owned paste queue
++Pros:
++- Correct threading and ownership.
++- Keeps PTY writes on existing writer-loop path.
++- Clean abstraction for future paste sources.
++
++Cons:
++- Slightly more code (new queue + event struct + dispatch case).
++
++### Option B: Reuse KeyDown path by synthesizing many key events
++Pros:
++- Minimal structural changes.
++
++Cons:
++- Data fidelity and performance issues for large/complex paste.
++- Poor bracketed-paste semantics.
++- Harder to preserve exact clipboard bytes.
++
++### Option C: Controller direct-write API from main thread (under lock)
++Pros:
++- Fewer event-type changes.
++
++Cons:
++- Violates current event-centric design.
++- Moves PTY-write concerns outside emulator.
++- Bracketed mode handling becomes awkward or duplicated.
++
++## Files To Modify
++
++### 1. `include/tvterm/termemu.h`
++
++Add new event type and payload:
++
++```cpp
++enum class TerminalEventType
++{
++    KeyDown,
++    Mouse,
++    ClientDataRead,
++    PasteData,      // NEW
++    ViewportResize,
++    FocusChange,
++};
++
++struct PasteDataEvent
++{
++    const char *data;
++    size_t size;
++};
++
++struct TerminalEvent
++{
++    TerminalEventType type;
++    union
++    {
++        ::KeyDownEvent keyDown;
++        MouseEvent mouse;
++        ClientDataReadEvent clientDataRead;
++        PasteDataEvent pasteData; // NEW
++        ViewportResizeEvent viewportResize;
++        FocusChangeEvent focusChange;
++    };
++};
++```
++
++### 2. `include/tvterm/termctrl.h`
++
++Expose paste submission API:
++
++```cpp
++void sendPasteData(GrowArray data) noexcept;
++```
++
++Reason: explicit API communicates ownership transfer and prevents unsafe pointer lifetime at call sites.
++
++### 3. `source/tvterm-core/termctrl.cc`
++
++Add `pasteQueue` to `TerminalEventLoop`:
++
++```cpp
++Mutex<std::queue<GrowArray>> pasteQueue;
++```
++
++Implement `TerminalController::sendPasteData`:
++
++1. Early-return on empty data.
++2. Move `GrowArray` into `pasteQueue`.
++3. Enqueue lightweight `TerminalEvent{type=PasteData}` via `sendEvent`.
++
++In `TerminalEventLoop::processEvents`, special-case `PasteData`:
++
++1. Pop one `GrowArray` from `pasteQueue` into local variable.
++2. Build local event with `pasteData = {buf.data(), buf.size()}`.
++3. Call `terminalEmulator.handleEvent(localEvent)` synchronously while local buffer is alive.
++
++All this runs under event-loop mutex, matching existing emulator access rules.
++
++### 4. `source/tvterm-core/vtermemu.cc`
++
++Handle paste event:
++
++```cpp
++case TerminalEventType::PasteData:
++    vterm_keyboard_start_paste(vt);
++    clientDataWriter.write({event.pasteData.data, event.pasteData.size});
++    vterm_keyboard_end_paste(vt);
++    break;
++```
++
++This provides Part 1 and Part 2 simultaneously:
++- Mode 2004 OFF: markers not emitted.
++- Mode 2004 ON: markers emitted around payload.
++
++### 5. `include/tvterm/termview.h`
++
++Declare paste helpers:
++
++```cpp
++void pasteFromClipboard() noexcept;
++static bool readClipboard(GrowArray &out) noexcept;
++```
++
++### 6. `source/tvterm-core/termview.cc`
++
++Command handling:
++
++- Add `evCommand` case for `consts.cmPaste` -> `pasteFromClipboard()` -> `clearEvent(ev)`.
++
++Shift+Insert binding:
++
++- In `evKeyDown`, detect `ev.keyDown.keyCode == kbShiftIns`.
++- Trigger `pasteFromClipboard()` and consume event.
++- Otherwise keep existing key forwarding to emulator.
++
++Clipboard reader (`readClipboard`):
++
++- Unix only MVP:
++  - command: `pbpaste 2>/dev/null || xclip -selection clipboard -o 2>/dev/null || xsel --clipboard --output 2>/dev/null`
++  - `popen(..., "r")`, read in chunks, append to `GrowArray`.
++- Return false if tool unavailable/failure.
++
++Paste sender (`pasteFromClipboard`):
++
++1. Read clipboard into `GrowArray`.
++2. Enforce size guard (e.g. `maxPasteBytes = 1 << 20` for MVP).
++3. `termCtrl.sendPasteData(std::move(data));`
++
++### 7. `include/tvterm/consts.h`
++
++Add command constant:
++
++```cpp
++ushort cmPaste; // NEW
++```
++
++Update `focusedCmds()` range to include `cmPaste` (and keep contiguous command block).
++
++### 8. `source/tvterm/cmds.h`
++
++Add command ID:
++
++```cpp
++cmPaste,
++```
++
++Place near other focused terminal commands (`cmGrabInput`, `cmReleaseInput`) to preserve grouping.
++
++### 9. `source/tvterm/wnd.cc`
++
++Wire new constant in `TerminalWindow::appConsts` initializer in correct field order.
++
++### 10. `source/tvterm/app.cc`
++
++Menu wiring:
++
++- Add `"Paste"` menu item with `cmPaste`, key `kbShiftIns`.
++- Place next to `"Copy Selection"` once that feature exists; on upstream master, place near terminal input actions in the `More...` submenu.
++
++## Implementation Order
++
++1. Add `cmPaste` in command/constants plumbing (`cmds.h`, `consts.h`, `wnd.cc`, `app.cc`).
++2. Add paste APIs to `termview.h` and controller/emulator headers.
++3. Implement clipboard read + command/key trigger in `termview.cc`.
++4. Implement controller-owned paste queue and `PasteData` event dispatch in `termctrl.cc`.
++5. Implement `PasteData` handling with bracketed wrappers in `vtermemu.cc`.
++6. Build and run manual validation scenarios below.
++
++## Risks
++
++1. Clipboard tool availability on Linux varies (`xclip`/`xsel` may be missing).
++2. Large paste payloads can spike memory or flood PTY.
++3. Event/paste queue desynchronization if marker events and data queue ever diverge.
++4. Shift+Insert handling in `TerminalView` could conflict with global command dispatch if both are active.
++5. Bracketed wrappers rely on libvterm internal mode tracking; regressions in vendored libvterm would affect behavior.
++
++## Tests To Add
++
++### Manual Functional Tests
++
++1. Basic paste:
++   - Copy `echo test` in host clipboard.
++   - Trigger menu Paste.
++   - Verify text appears in terminal input and executes when pressing Enter.
++2. Shift+Insert:
++   - Same clipboard content.
++   - Press Shift+Insert in focused terminal.
++   - Verify identical behavior to menu Paste.
++3. Bracketed paste ON:
++   - In shell: `printf '\e[?2004h'`.
++   - Run `cat -v`, paste multiline text.
++   - Verify wrappers (`^[[200~` ... `^[[201~`) are observed around payload.
++4. Bracketed paste OFF:
++   - `printf '\e[?2004l'`.
++   - Paste same payload.
++   - Verify wrappers are absent.
++5. UTF-8 payload:
++   - Clipboard contains `你好 café 🚀`.
++   - Paste and verify bytes round-trip correctly in terminal app.
++6. Large paste guard:
++   - Paste payload larger than cap.
++   - Verify predictable behavior (drop or truncate per implementation) and app remains responsive.
++7. Missing clipboard backend (Linux):
++   - Temporarily run without `xclip`/`xsel`.
++   - Verify paste command fails gracefully (no crash).
++
++### Concurrency/Regression Tests
++
++1. While process emits rapid output (`yes | head -n 200000`), trigger paste repeatedly; verify no deadlock/crash.
++2. Resize window during repeated paste; verify rendering and input still function.
++3. Disconnect child process, then trigger paste; verify no crash (event may be ignored due disconnected PTY).
++
++### Build Tests
++
++1. Clean Debug build with submodules.
++2. Optional second build with `-DTVTERM_USE_SYSTEM_LIBVTERM=ON -DTVTERM_USE_SYSTEM_TVISION=ON`.
++
++## Acceptance Criteria
++
++1. `cmPaste` exists and is wired in constants + menu.
++2. Shift+Insert triggers paste in focused terminal.
++3. Paste data travels through `TerminalController` event pipeline (no direct PTY write from UI thread).
++4. Bracketed wrappers are emitted only when mode 2004 is enabled by child app.
++5. No regressions in existing key/mouse input or terminal update flow.
+
+[stderr] 
+[stderr] thinking
+**Preparing final response details**
+[stderr] codex
+Created the requested implementation spec in [PLAN-paste.md](/Users/james/Repos/tvterm/PLAN-paste.md).
+
+It includes:
+1. Root cause analysis from the current code paths.
+2. Fix options with tradeoffs (recommended approach + alternatives).
+3. Risks and tests to add.
+4. File-by-file implementation steps across the exact focus files.
+5. Research findings for input flow, libvterm mode 2004 handling, event design, clipboard IO, UTF-8 handling, and security concerns.
+[stderr] file update:
+diff --git a/PLAN-paste.md b/PLAN-paste.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..c216e4a14284e2278fec1e87ec6f756c600342da
+--- /dev/null
++++ b/PLAN-paste.md
+@@ -0,0 +1,342 @@
++# Paste Implementation Plan (v1 — upstream-master based)
++
++## Overview
++Add paste support to `tvterm` in two phases:
++
++1. Basic paste-in: read system clipboard on the UI thread and send bytes to PTY through the existing `TerminalController` event/write pipeline.
++2. Bracketed paste: when terminal DEC mode 2004 is enabled, wrap pasted data with `ESC [ 200 ~` and `ESC [ 201 ~`.
++
++This plan is intentionally independent from `feature/text-selection` and targets upstream `magiblot/tvterm` master architecture.
++
++## Current-State Diagnosis
++
++### Root Cause
++Paste is currently missing because all required pieces are absent:
++
++1. No user command exists for paste (`cmPaste` is not present in [`source/tvterm/cmds.h`](/Users/james/Repos/tvterm/source/tvterm/cmds.h), [`include/tvterm/consts.h`](/Users/james/Repos/tvterm/include/tvterm/consts.h), or [`source/tvterm/wnd.cc`](/Users/james/Repos/tvterm/source/tvterm/wnd.cc)).
++2. `TerminalView` forwards keyboard/mouse events to emulator but has no clipboard read path or paste command handling ([`source/tvterm-core/termview.cc`](/Users/james/Repos/tvterm/source/tvterm-core/termview.cc)).
++3. `TerminalEvent` has no paste event type, and its async queue model makes pointer-based payloads from UI thread unsafe without owned storage ([`include/tvterm/termemu.h`](/Users/james/Repos/tvterm/include/tvterm/termemu.h), [`source/tvterm-core/termctrl.cc`](/Users/james/Repos/tvterm/source/tvterm-core/termctrl.cc)).
++4. `VTermEmulator` handles key/mouse/PTY-read/focus/resize only; no paste action path exists ([`source/tvterm-core/vtermemu.cc`](/Users/james/Repos/tvterm/source/tvterm-core/vtermemu.cc)).
++
++### Exact Existing Input Path (keyboard -> PTY)
++
++1. `TerminalView::handleEvent(evKeyDown)` builds `TerminalEvent{type=KeyDown}` and calls `termCtrl.sendEvent(...)` ([`source/tvterm-core/termview.cc:69`](/Users/james/Repos/tvterm/source/tvterm-core/termview.cc:69)).
++2. `TerminalController::sendEvent` pushes event into `eventQueue` and wakes writer loop ([`source/tvterm-core/termctrl.cc:139`](/Users/james/Repos/tvterm/source/tvterm-core/termctrl.cc:139)).
++3. Writer loop `processEvents()` forwards event to `terminalEmulator.handleEvent(...)` under event-loop mutex ([`source/tvterm-core/termctrl.cc:225`](/Users/james/Repos/tvterm/source/tvterm-core/termctrl.cc:225)).
++4. `VTermEmulator::handleEvent(KeyDown)` converts key and calls libvterm keyboard APIs ([`source/tvterm-core/vtermemu.cc:293`](/Users/james/Repos/tvterm/source/tvterm-core/vtermemu.cc:293)).
++5. libvterm emits encoded bytes through output callback; `VTermEmulator::writeOutput` appends into `clientDataWriter.buffer` ([`source/tvterm-core/vtermemu.cc:389`](/Users/james/Repos/tvterm/source/tvterm-core/vtermemu.cc:389)).
++6. Writer loop flushes that buffer to PTY in `writePendingData` ([`source/tvterm-core/termctrl.cc:290`](/Users/james/Repos/tvterm/source/tvterm-core/termctrl.cc:290)).
++
++Paste must reuse this architecture and not write PTY directly from UI thread.
++
++## Research Findings Required By Task
++
++### 1. Sending text to PTY today
++The only intentional path is:
++`TerminalView` -> `TerminalController::sendEvent` -> writer loop -> `TerminalEmulator::handleEvent` -> `Writer` buffer -> `PtyMaster::writeToClient`.
++
++### 2. How to detect bracketed paste mode 2004
++In vendored libvterm:
++
++- Mode 2004 is internal state (`state->mode.bracketpaste`) in `state.c`.
++- It is **not** exposed via `VTERM_PROP_*` (`VTERM_PROP_BRACKETPASTE` does not exist in public API).
++- Public keyboard helpers `vterm_keyboard_start_paste` / `vterm_keyboard_end_paste` conditionally emit markers based on that internal flag (`keyboard.c`).
++
++Therefore, best integration is to call these helpers around pasted bytes; this is the supported API path and avoids private-header coupling.
++
++### 3. New TerminalEvent type vs reusing KeyDown
++Recommended: add a new paste event type.
++
++Why not `KeyDown`:
++
++- KeyDown path is key-semantic conversion, not bulk byte injection.
++- Replaying paste as per-char key events is slower and can alter data semantics.
++- Bracketed paste is conceptually one paste action, not N keypresses.
++
++### 4. Clipboard read implementation (reverse of text-selection write plan)
++Use platform tools from UI thread:
++
++- macOS: `pbpaste`
++- Linux fallback chain: `xclip -selection clipboard -o` then `xsel --clipboard --output`
++
++Read process stdout into `GrowArray`, then submit that data through controller event pipeline.
++
++### 5. UTF-8 and wide-char considerations
++Paste should treat clipboard data as raw UTF-8 bytes and forward unchanged.
++No TScreenCell conversion is involved (unlike copy-selection extraction). Multi-byte codepoints and combining characters remain intact by byte-preserving transfer.
++
++### 6. Security considerations
++
++- Paste bombing risk (very large payloads): add maximum paste size guard (e.g. 1 MiB MVP cap) and drop/trim with user-visible warning.
++- Control bytes/newlines are expected terminal input; do not sanitize by default or behavior diverges from standard terminals.
++- Bracketed paste reduces accidental command execution for apps that enable mode 2004.
++
++## Design Decisions
++
++### D1: Keep paste initiation in `TerminalView` command handling
++`TerminalView` already owns focused input behavior and has access to `TerminalController`.
++
++### D2: Add dedicated `TerminalEventType::PasteData`
++Represent paste as first-class event for clean separation and future extensions.
++
++### D3: Preserve async safety with owned paste queue in `TerminalController`
++Because `TerminalEvent` is copied into async queue, clipboard pointers from UI thread cannot be queued directly.
++Use an internal `std::queue<GrowArray>` for ownership. `PasteData` event acts as trigger; writer loop pops owned buffer and passes temporary pointer to emulator synchronously.
++
++### D4: Implement bracketed paste in emulator using libvterm APIs
++In `VTermEmulator::handleEvent(PasteData)`:
++
++1. `vterm_keyboard_start_paste(vt);`
++2. `clientDataWriter.write(pasteBytes);`
++3. `vterm_keyboard_end_paste(vt);`
++
++libvterm decides whether wrappers are emitted based on current mode 2004.
++
++### D5: Command routing mirrors focused-command pattern
++Add `cmPaste` to `TVTermConstants` and include it in `focusedCmds()`, so command enable/disable tracks active terminal window like existing grab/release commands.
++
++## Fix Options And Tradeoffs
++
++### Option A (Recommended): New PasteData event + controller-owned paste queue
++Pros:
++- Correct threading and ownership.
++- Keeps PTY writes on existing writer-loop path.
++- Clean abstraction for future paste sources.
++
++Cons:
++- Slightly more code (new queue + event struct + dispatch case).
++
++### Option B: Reuse KeyDown path by synthesizing many key events
++Pros:
++- Minimal structural changes.
++
++Cons:
++- Data fidelity and performance issues for large/complex paste.
++- Poor bracketed-paste semantics.
++- Harder to preserve exact clipboard bytes.
++
++### Option C: Controller direct-write API from main thread (under lock)
++Pros:
++- Fewer event-type changes.
++
++Cons:
++- Violates current event-centric design.
++- Moves PTY-write concerns outside emulator.
++- Bracketed mode handling becomes awkward or duplicated.
++
++## Files To Modify
++
++### 1. `include/tvterm/termemu.h`
++
++Add new event type and payload:
++
++```cpp
++enum class TerminalEventType
++{
++    KeyDown,
++    Mouse,
++    ClientDataRead,
++    PasteData,      // NEW
++    ViewportResize,
++    FocusChange,
++};
++
++struct PasteDataEvent
++{
++    const char *data;
++    size_t size;
++};
++
++struct TerminalEvent
++{
++    TerminalEventType type;
++    union
++    {
++        ::KeyDownEvent keyDown;
++        MouseEvent mouse;
++        ClientDataReadEvent clientDataRead;
++        PasteDataEvent pasteData; // NEW
++        ViewportResizeEvent viewportResize;
++        FocusChangeEvent focusChange;
++    };
++};
++```
++
++### 2. `include/tvterm/termctrl.h`
++
++Expose paste submission API:
++
++```cpp
++void sendPasteData(GrowArray data) noexcept;
++```
++
++Reason: explicit API communicates ownership transfer and prevents unsafe pointer lifetime at call sites.
++
++### 3. `source/tvterm-core/termctrl.cc`
++
++Add `pasteQueue` to `TerminalEventLoop`:
++
++```cpp
++Mutex<std::queue<GrowArray>> pasteQueue;
++```
++
++Implement `TerminalController::sendPasteData`:
++
++1. Early-return on empty data.
++2. Move `GrowArray` into `pasteQueue`.
++3. Enqueue lightweight `TerminalEvent{type=PasteData}` via `sendEvent`.
++
++In `TerminalEventLoop::processEvents`, special-case `PasteData`:
++
++1. Pop one `GrowArray` from `pasteQueue` into local variable.
++2. Build local event with `pasteData = {buf.data(), buf.size()}`.
++3. Call `terminalEmulator.handleEvent(localEvent)` synchronously while local buffer is alive.
++
++All this runs under event-loop mutex, matching existing emulator access rules.
++
++### 4. `source/tvterm-core/vtermemu.cc`
++
++Handle paste event:
++
++```cpp
++case TerminalEventType::PasteData:
++    vterm_keyboard_start_paste(vt);
++    clientDataWriter.write({event.pasteData.data, event.pasteData.size});
++    vterm_keyboard_end_paste(vt);
++    break;
++```
++
++This provides Part 1 and Part 2 simultaneously:
++- Mode 2004 OFF: markers not emitted.
++- Mode 2004 ON: markers emitted around payload.
++
++### 5. `include/tvterm/termview.h`
++
++Declare paste helpers:
++
++```cpp
++void pasteFromClipboard() noexcept;
++static bool readClipboard(GrowArray &out) noexcept;
++```
++
++### 6. `source/tvterm-core/termview.cc`
++
++Command handling:
++
++- Add `evCommand` case for `consts.cmPaste` -> `pasteFromClipboard()` -> `clearEvent(ev)`.
++
++Shift+Insert binding:
++
++- In `evKeyDown`, detect `ev.keyDown.keyCode == kbShiftIns`.
++- Trigger `pasteFromClipboard()` and consume event.
++- Otherwise keep existing key forwarding to emulator.
++
++Clipboard reader (`readClipboard`):
++
++- Unix only MVP:
++  - command: `pbpaste 2>/dev/null || xclip -selection clipboard -o 2>/dev/null || xsel --clipboard --output 2>/dev/null`
++  - `popen(..., "r")`, read in chunks, append to `GrowArray`.
++- Return false if tool unavailable/failure.
++
++Paste sender (`pasteFromClipboard`):
++
++1. Read clipboard into `GrowArray`.
++2. Enforce size guard (e.g. `maxPasteBytes = 1 << 20` for MVP).
++3. `termCtrl.sendPasteData(std::move(data));`
++
++### 7. `include/tvterm/consts.h`
++
++Add command constant:
++
++```cpp
++ushort cmPaste; // NEW
++```
++
++Update `focusedCmds()` range to include `cmPaste` (and keep contiguous command block).
++
++### 8. `source/tvterm/cmds.h`
++
++Add command ID:
++
++```cpp
++cmPaste,
++```
++
++Place near other focused terminal commands (`cmGrabInput`, `cmReleaseInput`) to preserve grouping.
++
++### 9. `source/tvterm/wnd.cc`
++
++Wire new constant in `TerminalWindow::appConsts` initializer in correct field order.
++
++### 10. `source/tvterm/app.cc`
++
++Menu wiring:
++
++- Add `"Paste"` menu item with `cmPaste`, key `kbShiftIns`.
++- Place next to `"Copy Selection"` once that feature exists; on upstream master, place near terminal input actions in the `More...` submenu.
++
++## Implementation Order
++
++1. Add `cmPaste` in command/constants plumbing (`cmds.h`, `consts.h`, `wnd.cc`, `app.cc`).
++2. Add paste APIs to `termview.h` and controller/emulator headers.
++3. Implement clipboard read + command/key trigger in `termview.cc`.
++4. Implement controller-owned paste queue and `PasteData` event dispatch in `termctrl.cc`.
++5. Implement `PasteData` handling with bracketed wrappers in `vtermemu.cc`.
++6. Build and run manual validation scenarios below.
++
++## Risks
++
++1. Clipboard tool availability on Linux varies (`xclip`/`xsel` may be missing).
++2. Large paste payloads can spike memory or flood PTY.
++3. Event/paste queue desynchronization if marker events and data queue ever diverge.
++4. Shift+Insert handling in `TerminalView` could conflict with global command dispatch if both are active.
++5. Bracketed wrappers rely on libvterm internal mode tracking; regressions in vendored libvterm would affect behavior.
++
++## Tests To Add
++
++### Manual Functional Tests
++
++1. Basic paste:
++   - Copy `echo test` in host clipboard.
++   - Trigger menu Paste.
++   - Verify text appears in terminal input and executes when pressing Enter.
++2. Shift+Insert:
++   - Same clipboard content.
++   - Press Shift+Insert in focused terminal.
++   - Verify identical behavior to menu Paste.
++3. Bracketed paste ON:
++   - In shell: `printf '\e[?2004h'`.
++   - Run `cat -v`, paste multiline text.
++   - Verify wrappers (`^[[200~` ... `^[[201~`) are observed around payload.
++4. Bracketed paste OFF:
++   - `printf '\e[?2004l'`.
++   - Paste same payload.
++   - Verify wrappers are absent.
++5. UTF-8 payload:
++   - Clipboard contains `你好 café 🚀`.
++   - Paste and verify bytes round-trip correctly in terminal app.
++6. Large paste guard:
++   - Paste payload larger than cap.
++   - Verify predictable behavior (drop or truncate per implementation) and app remains responsive.
++7. Missing clipboard backend (Linux):
++   - Temporarily run without `xclip`/`xsel`.
++   - Verify paste command fails gracefully (no crash).
++
++### Concurrency/Regression Tests
++
++1. While process emits rapid output (`yes | head -n 200000`), trigger paste repeatedly; verify no deadlock/crash.
++2. Resize window during repeated paste; verify rendering and input still function.
++3. Disconnect child process, then trigger paste; verify no crash (event may be ignored due disconnected PTY).
++
++### Build Tests
++
++1. Clean Debug build with submodules.
++2. Optional second build with `-DTVTERM_USE_SYSTEM_LIBVTERM=ON -DTVTERM_USE_SYSTEM_TVISION=ON`.
++
++## Acceptance Criteria
++
++1. `cmPaste` exists and is wired in constants + menu.
++2. Shift+Insert triggers paste in focused terminal.
++3. Paste data travels through `TerminalController` event pipeline (no direct PTY write from UI thread).
++4. Bracketed wrappers are emitted only when mode 2004 is enabled by child app.
++5. No regressions in existing key/mouse input or terminal update flow.
+
+[stderr] tokens used
+53,415
+Created the requested implementation spec in [PLAN-paste.md](/Users/james/Repos/tvterm/PLAN-paste.md).
+
+It includes:
+1. Root cause analysis from the current code paths.
+2. Fix options with tradeoffs (recommended approach + alternatives).
+3. Risks and tests to add.
+4. File-by-file implementation steps across the exact focus files.
+5. Research findings for input flow, libvterm mode 2004 handling, event design, clipboard IO, UTF-8 handling, and security concerns.
