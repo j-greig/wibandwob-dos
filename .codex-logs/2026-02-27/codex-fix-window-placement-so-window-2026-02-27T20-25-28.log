@@ -1,0 +1,2408 @@
+[stderr] OpenAI Codex v0.101.0 (research preview)
+--------
+[stderr] workdir: /Users/james/Repos/wibandwob-dos
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: medium
+reasoning summaries: auto
+session id: 019ca0c7-1e6d-7123-b8e7-51a070fd3d9a
+--------
+user
+DEVNOTE: Files inside .codex-logs/ are run logs — ignore them completely.
+
+EFFICIENCY: Use targeted commands, not full-file dumps.
+Prefer rg -n -C3 'pattern' file or sed -n '45,55p' file.
+Avoid nl -ba file | sed -n '1,300p'. Only dump full files if <50 lines.
+
+Make the smallest correct changes. Build and test when done.
+Summarise what changed and why.
+
+Focus files: app/wwdos_app.cpp, app/command_registry.cpp
+
+TASK: Fix window placement so windows can NEVER be positioned off-screen. This must be enforced at the C++ level so no agent or API call can create invisible windows.
+
+## What to fix
+
+### 1. app/wwdos_app.cpp — api_resize_window and api_move_window
+
+Both functions use `w->locate(newBounds)` to position windows. Add clamping BEFORE the locate() call:
+
+- Get desktop extent: `TRect desk = TProgram::deskTop->getExtent();`
+- Clamp the window bounds so it stays fully within the desktop:
+  - If newBounds.b.x > desk.b.x, shift left (and shrink if wider than desktop)
+  - If newBounds.b.y > desk.b.y, shift up (and shrink if taller than desktop)
+  - If newBounds.a.x < desk.a.x, shift right
+  - If newBounds.a.y < desk.a.y, shift down
+  - Minimum size: 10 wide, 5 tall
+- After clamping, call locate() with the clamped bounds
+
+### 2. app/command_registry.cpp — snap_window handler
+
+The snap_window handler already computes x, y, w, h from fractional zones. After the computation (around line 845-850), add the same clamping logic before calling api_resize_window and api_move_window.
+
+### 3. app/wwdos_app.cpp — the create_window / spawn path
+
+Find where new windows are spawned via API (search for "create_window" or "open_window" or "spawn"). Ensure new windows are clamped to desktop bounds after initial placement.
+
+## Approach
+
+Write a helper function that takes a TRect and the desktop TRect and returns a clamped TRect. Call it from all three locations. Something like:
+
+```cpp
+static TRect clampToDesktop(TRect bounds, TRect desk) {
+    int minW = 10, minH = 5;
+    int w = bounds.b.x - bounds.a.x;
+    int h = bounds.b.y - bounds.a.y;
+    // Ensure minimum size
+    if (w < minW) w = minW;
+    if (h < minH) h = minH;
+    // Clamp to desktop size
+    if (w > desk.b.x - desk.a.x) w = desk.b.x - desk.a.x;
+    if (h > desk.b.y - desk.a.y) h = desk.b.y - desk.a.y;
+    // Position within desktop
+    int x = bounds.a.x;
+    int y = bounds.a.y;
+    if (x + w > desk.b.x) x = desk.b.x - w;
+    if (y + h > desk.b.y) y = desk.b.y - h;
+    if (x < desk.a.x) x = desk.a.x;
+    if (y < desk.a.y) y = desk.a.y;
+    return TRect(x, y, x + w, y + h);
+}
+```
+
+Put this as a static function in wwdos_app.cpp (near the top, before api_move_window).
+
+Build after: cd build && make -j$(sysctl -n hw.ncpu) wwdos
+
+DO NOT touch: tools/, tests/, .planning/, modules-private/, .pi/, .claude/
+[stderr] mcp startup: no servers
+[stderr] 2026-02-27T20:25:30.001395Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019ca059-d9a5-7de2-bb7e-8e8df86cb6fa
+[stderr] 2026-02-27T20:25:30.024493Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019c9124-f8a7-7783-b397-eb2f4b1d31ed
+[stderr] 
+[stderr] thinking
+**Setting commentary update cadence**
+[stderr] codex
+I’m implementing a shared C++ clamp helper and wiring it into `api_resize_window`, `api_move_window`, `snap_window`, and the API-driven window spawn path in the two files you listed, then I’ll build `wwdos` to verify.
+[stderr] 
+[stderr] thinking
+**Preparing targeted file inspection**
+[stderr] exec
+/bin/zsh -lc "sed -n '780,940p' app/command_registry.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,220p' app/wwdos_app.cpp" in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc "rg -n \"api_resize_window|api_move_window|create_window|open_window|spawn|snap_window|locate\\(\" app/wwdos_app.cpp app/command_registry.cpp" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 52ms:
+/*---------------------------------------------------------*/
+/*                                                         */
+/*   wwdos_app.cpp - Test Pattern Window Spawner   */
+/*   Unlimited resizable windows with test patterns       */
+/*                                                         */
+/*---------------------------------------------------------*/
+
+#define Uses_TKeys
+#define Uses_TApplication
+#define Uses_TEvent
+#define Uses_TRect
+#define Uses_TDialog
+#define Uses_TStaticText
+#define Uses_TButton
+#define Uses_TListBox
+#define Uses_TStringCollection
+#define Uses_TMenuBar
+#define Uses_TMenuBox
+#define Uses_TSubMenu
+#define Uses_TMenuItem
+ succeeded in 52ms:
+    }
+    if (name == "raise_window") {
+        auto it = kv.find("id");
+        if (it == kv.end()) return "err missing id";
+        return api_raise_window(app, it->second);
+    }
+    if (name == "lower_window") {
+        auto it = kv.find("id");
+        if (it == kv.end()) return "err missing id";
+        return api_lower_window(app, it->second);
+    }
+    if (name == "close_window") {
+        auto id = kv.find("id");
+        if (id == kv.end()) return "err missing id";
+        return api_close_window(app, id->second);
+    }
+    // ── Zone-based snap ──────────────────────────────────────────────
+    if (name == "snap_window") {
+        auto id_it = kv.find("id");
+        auto zone_it = kv.find("zone");
+[stderr]  succeeded in 51ms:
+app/command_registry.cpp:26:extern void api_spawn_room_chat(TWwdosApp& app, const TRect* bounds);
+app/command_registry.cpp:53:extern void api_spawn_paint(TWwdosApp& app, const TRect* bounds);
+app/command_registry.cpp:54:extern void api_spawn_micropolis_ascii(TWwdosApp& app, const TRect* bounds);
+app/command_registry.cpp:55:extern void api_spawn_quadra(TWwdosApp& app, const TRect* bounds);
+app/command_registry.cpp:56:extern void api_spawn_snake(TWwdosApp& app, const TRect* bounds);
+app/command_registry.cpp:57:extern void api_spawn_rogue(TWwdosApp& app, const TRect* bounds);
+app/command_registry.cpp:58:extern void api_spawn_deep_signal(TWwdosApp& app, const TRect* bounds);
+app/command_registry.cpp:59:extern void api_spawn_generative_lab(TWwdosApp& app, const TRect* bounds);
+app/command_registry.cpp:60:extern void api_spawn_app_launcher(TWwdosApp& app, const TRect* bounds);
+app/command_registry.cpp:61:extern void api_spawn_gallery(TWwdosApp& app, const TRect* bounds);
+app/command_registry.cpp:63:// Generative art windows — previously only reachable via create_window
+app/command_registry.cpp:64:extern void api_spawn_verse(TWwdosApp& app, const TRect* bounds);
+app/command_registry.cpp:65:extern void api_spawn_mycelium(TWwdosApp& app, const TRect* bounds);
+app/command_registry.cpp:66:extern void api_spawn_orbit(TWwdosApp& app, const TRect* bounds);
+app/command_registry.cpp:67:extern void api_spawn_torus(TWwdosApp& app, const TRect* bounds);
+app/command_registry.cpp:68:extern void api_spawn_cube(TWwdosApp& app, const TRect* bounds);
+app/command_registry.cpp:69:extern void api_spawn_life(TWwdosApp& app, const TRect* bounds);
+app/command_registry.cpp:70:extern void api_spawn_blocks(TWwdosApp& app, const TRect* bounds);
+app/command_registry.cpp:71:extern void api_spawn_score(TWwdosApp& app, const TRect* bounds);
+app/command_registry.cpp:72:extern void api_spawn_ascii(TWwdosApp& app, const TRect* bounds);
+[stderr] 
+[stderr] thinking
+**Focusing on move/resize and window creation**
+[stderr] codex
+I found the `snap_window` zone math and the move/resize APIs; next I’m locating the API `create_window` spawn flow and exact insertion points so we clamp all entry paths consistently.
+[stderr] exec
+/bin/zsh -lc "sed -n '3188,3265p' app/wwdos_app.cpp" in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc "sed -n '3660,3825p' app/wwdos_app.cpp" in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc "rg -n \"create_window|open_window|spawn\\(|spawn\\*|window_type_registry|spec->spawn|bounds\" app/wwdos_app.cpp" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 52ms:
+    // Append chat_log for multiplayer relay bridge
+    json << ",\"chat_log\":[";
+    bool firstChat = true;
+    for (const auto& entry : app.chatLog_) {
+        if (!firstChat) json << ",";
+        json << "{\"seq\":" << entry.seq
+             << ",\"sender\":\"" << json_escape(entry.sender) << "\""
+             << ",\"text\":\"" << json_escape(entry.text) << "\"}";
+        firstChat = false;
+    }
+    json << "]";
+
+    // Desktop size for proportional layout calculations
+    TRect desk = TProgram::deskTop->getExtent();
+    json << ",\"desktop\":{\"w\":" << (desk.b.x - desk.a.x)
+         << ",\"h\":" << (desk.b.y - desk.a.y)
+         << ",\"cell_aspect\":2.0}";
+
+    json << "}";
+    return json.str();
+ succeeded in 52ms:
+                scrambleWindow = static_cast<TScrambleWindow*>(sw);
+                deskTop->insert(sw);
+                registerWindow(sw);
+                windowNumber++;
+            }
+            continue;
+        } else if (type == "frame_player") {
+            std::string path; unsigned pms = 300;
+            bool frameless = false, shadowless = false;
+            size_t propsPos = obj.find("\"props\"");
+            if (propsPos != std::string::npos) {
+                size_t brace = obj.find('{', propsPos);
+                if (brace != std::string::npos) {
+                    parseKeyedString(obj, brace+1, "path", path);
+                    std::string pmsStr;
+                    parseKeyedString(obj, brace+1, "periodMs", pmsStr);
+                    if (!pmsStr.empty()) pms = (unsigned)std::stoul(pmsStr);
+                    parseKeyedBool(obj, brace+1, "frameless", frameless);
+                    parseKeyedBool(obj, brace+1, "shadowless", shadowless);
+                }
+[stderr]  succeeded in 51ms:
+120:class TWindow; TWindow* createAsciiGridDemoWindow(const TRect &bounds);
+140:#include "window_type_registry.h"
+405:    TCustomMenuBar(const TRect& bounds, TMenu* aMenu) : TMenuBar(bounds, aMenu) {
+409:    TCustomMenuBar(const TRect& bounds, TSubMenu& aMenu) : TMenuBar(bounds, aMenu) {
+510:    TCustomStatusLine(const TRect& bounds, TStatusDef& aDefs) : TStatusLine(bounds, aDefs) {}
+608:    TTestPatternView(const TRect& bounds) : TView(bounds)
+644:    TTestPatternWindow(const TRect& bounds, const char* aTitle) :
+645:        TWindow(bounds, "", wnNoNumber),
+650:        // Get the interior bounds (excluding frame)
+681:    TGradientWindow(const TRect& bounds, const char* aTitle, GradientType type) :
+682:        TWindow(bounds, "", wnNoNumber),
+687:        // Get the interior bounds (excluding frame)
+741:    void newTestWindow(const TRect& bounds);
+743:    void newGradientWindow(TGradientWindow::GradientType type, const TRect& bounds);
+747:    void newBrowserWindow(const TRect& bounds);
+755:    void openAnimationFilePath(const std::string& path, const TRect& bounds, bool frameless = false, bool shadowless = false, const std::string& title = "");
+898:    friend void api_open_text_view_path(TWwdosApp&, const std::string&, const TRect* bounds);
+899:    friend void api_spawn_test(TWwdosApp&, const TRect* bounds);
+900:    friend void api_spawn_gradient(TWwdosApp&, const std::string&, const TRect* bounds);
+901:    friend void api_open_animation_path(TWwdosApp&, const std::string&, const TRect* bounds, bool frameless, bool shadowless, const std::string& title);
+[stderr] 
+[stderr] thinking
+**Investigating create_window command location**
+[stderr] codex
+I located a workspace-restore spawn path in `wwdos_app.cpp`; I’m now checking the direct `create_window` command handler to clamp API-created windows at creation time too.
+[stderr] exec
+/bin/zsh -lc "sed -n '3520,3745p' app/wwdos_app.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '520,740p' app/command_registry.cpp" in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc 'rg -n "create_window|open_window|spawn_window|api_create|new window" app/command_registry.cpp app/wwdos_app.cpp' in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 52ms:
+        uint8_t bg = bg_it != kv.end() ? std::atoi(bg_it->second.c_str()) : 0;
+        return api_paint_cell(app, id_it->second, std::atoi(x_it->second.c_str()), std::atoi(y_it->second.c_str()), fg, bg);
+    }
+    if (name == "paint_text") {
+        auto id_it = kv.find("id");
+        auto x_it = kv.find("x"); auto y_it = kv.find("y");
+        auto text_it = kv.find("text");
+        if (id_it == kv.end() || x_it == kv.end() || y_it == kv.end() || text_it == kv.end())
+            return "err missing id/x/y/text";
+        auto fg_it = kv.find("fg"); auto bg_it = kv.find("bg");
+        uint8_t fg = fg_it != kv.end() ? std::atoi(fg_it->second.c_str()) : 15;
+        uint8_t bg = bg_it != kv.end() ? std::atoi(bg_it->second.c_str()) : 0;
+        return api_paint_text(app, id_it->second, std::atoi(x_it->second.c_str()), std::atoi(y_it->second.c_str()), text_it->second, fg, bg);
+    }
+    if (name == "paint_line") {
+        auto id_it = kv.find("id");
+        auto x0_it = kv.find("x0"); auto y0_it = kv.find("y0");
+        auto x1_it = kv.find("x1"); auto y1_it = kv.find("y1");
+        if (id_it == kv.end() || x0_it == kv.end() || y0_it == kv.end() || x1_it == kv.end() || y1_it == kv.end())
+            return "err missing id/x0/y0/x1/y1";
+ succeeded in 52ms:
+                continuous = (pm == "continuous");
+        }
+    }
+
+    // Restore desktop state (texture, colour, gallery mode)
+    size_t deskPos = data.find("\"desktop\"");
+    if (deskPos != std::string::npos) {
+        size_t pos = data.find('{', deskPos);
+        if (pos != std::string::npos) {
+            std::string preset;
+            if (parseKeyedString(data, pos+1, "preset", preset)) {
+                api_desktop_preset(*this, preset);
+            } else {
+                // Fall back to individual fields
+                std::string ch;
+                int fg = -1, bg = -1;
+                if (parseKeyedString(data, pos+1, "char", ch) && !ch.empty()) {
+                    api_desktop_texture(*this, ch);
+                }
+                if (parseKeyedNumber(data, pos+1, "fg", fg) && parseKeyedNumber(data, pos+1, "bg", bg)) {
+[stderr]  succeeded in 51ms:
+app/command_registry.cpp:63:// Generative art windows — previously only reachable via create_window
+app/wwdos_app.cpp:3173:        // Emit path for file-backed window types (needed for remote create_window)
+app/wwdos_app.cpp:4738:// Generative / animated art windows — spawnable via IPC create_window type=X
+[stderr] 
+[stderr] thinking
+**Searching command registry for creation**
+[stderr] exec
+/bin/zsh -lc "rg -n \"name == \\\"create_window\\\"|\\\"create_window\\\"\" app/command_registry.cpp app/api_ipc.* app/wwdos_app.cpp" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 51ms:
+app/api_ipc.cpp:423:    } else if (cmd == "create_window") {
+[stderr] 
+[stderr] thinking
+**Investigating window creation handling**
+[stderr] exec
+/bin/zsh -lc "sed -n '380,470p' app/api_ipc.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '1,140p' app/command_registry.cpp" in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc 'rg -n "apiCommandRegistryHandle|dispatch|execute|create_window|spawn" app/api_ipc.cpp app/wwdos_app.cpp' in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 51ms:
+    char buf[2048];
+    ssize_t n = ::read(fd, buf, sizeof(buf)-1);
+    if (n <= 0) {
+        ::close(fd);
+        return;
+    }
+    buf[n] = 0;
+    std::string line(buf);
+    // Simple trim
+    while (!line.empty() && (line.back()=='\n' || line.back()=='\r' || line.back()==' ')) line.pop_back();
+
+    // Parse: "cmd:<name> k=v k=v"
+    std::string cmd;
+    std::map<std::string,std::string> kv;
+    {
+        std::istringstream iss(line);
+        std::string tok;
+        while (iss >> tok) {
+            if (tok.rfind("cmd:", 0) == 0) {
+                cmd = tok.substr(4);
+ succeeded in 51ms:
+#include "command_registry.h"
+
+#include "api_ipc.h"
+#include "contour_map_view.h"
+#include "core/json_utils.h"
+#include "figlet_utils.h"
+
+#include <cstdint>
+#include <sys/stat.h>
+
+#include <sstream>
+
+// TRect for window bounds
+#define Uses_TRect
+#define Uses_TPoint
+#define Uses_TEvent
+#define Uses_TProgram
+#define Uses_TDeskTop
+#include <tvision/tv.h>
+
+[stderr]  succeeded in 50ms:
+app/api_ipc.cpp:137:// Note: window spawn functions are now in window_type_registry.cpp — not listed here.
+app/api_ipc.cpp:153:extern void api_spawn_paint(TWwdosApp& app, const TRect* bounds);
+app/api_ipc.cpp:423:    } else if (cmd == "create_window") {
+app/api_ipc.cpp:428:        } else if (!spec->spawn) {
+app/api_ipc.cpp:432:            // return the ID for this specific spawn.
+app/api_ipc.cpp:434:            const char* err = spec->spawn(*app_, kv);
+app/wwdos_app.cpp:396:        EXCITED,      // つ◉‿◉‿◉༽つ - Tool use, window spawning
+app/wwdos_app.cpp:895:    friend void api_spawn_test(TWwdosApp&);
+app/wwdos_app.cpp:896:    friend void api_spawn_gradient(TWwdosApp&, const std::string&);
+app/wwdos_app.cpp:899:    friend void api_spawn_test(TWwdosApp&, const TRect* bounds);
+app/wwdos_app.cpp:900:    friend void api_spawn_gradient(TWwdosApp&, const std::string&, const TRect* bounds);
+app/wwdos_app.cpp:923:    friend void api_spawn_text_editor(TWwdosApp&, const TRect* bounds, const std::string& title);
+app/wwdos_app.cpp:924:    friend void api_spawn_browser(TWwdosApp&, const TRect* bounds);
+app/wwdos_app.cpp:925:    friend void api_spawn_room_chat(TWwdosApp&, const TRect* bounds);
+app/wwdos_app.cpp:931:    friend void api_spawn_verse(TWwdosApp&, const TRect* bounds);
+app/wwdos_app.cpp:932:    friend void api_spawn_mycelium(TWwdosApp&, const TRect* bounds);
+app/wwdos_app.cpp:933:    friend void api_spawn_orbit(TWwdosApp&, const TRect* bounds);
+app/wwdos_app.cpp:934:    friend void api_spawn_torus(TWwdosApp&, const TRect* bounds);
+app/wwdos_app.cpp:935:    friend void api_spawn_cube(TWwdosApp&, const TRect* bounds);
+app/wwdos_app.cpp:936:    friend void api_spawn_life(TWwdosApp&, const TRect* bounds);
+[stderr] 
+[stderr] thinking
+**Inspecting window registration for clamping**
+[stderr] codex
+I confirmed `create_window` enters through type spawners, so I’m checking the common registration path to enforce clamping once for all API-spawned windows instead of patching dozens of spawn functions.
+[stderr] exec
+/bin/zsh -lc "sed -n '1680,1865p' app/wwdos_app.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "rg -n \"void TWwdosApp::registerWindow|registerWindow\\(|lastRegisteredWindowId_|api_take_last_registered_window_id\" app/wwdos_app.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '2960,3215p' app/wwdos_app.cpp" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 52ms:
+            event.message.command = cmScrambleReply;
+            event.message.infoPtr = nullptr;
+            app.putEvent(event);
+        });
+
+    if (!isAsync) {
+        // Slash command or fallback — deliver immediately
+        app.pendingScrambleReply = syncResult.empty() ? "(no response from model — try again)" : syncResult;
+        app.deliverScrambleReply();
+        return app.pendingScrambleReply.empty() ? syncResult : syncResult;
+    }
+
+    return "*thinking* /ᐠ｡ꞈ｡ᐟ\\";  // Async started — response will arrive via event
+}
+std::string api_scramble_pet(TWwdosApp& app) {
+    if (!app.scrambleWindow) return "err scramble not open";
+
+    static const char* petReactions[] = {
+        "...fine. /ᐠ- -ᐟ\\",
+        "*allows it* (=^..^=)",
+ succeeded in 52ms:
+824:    std::string lastRegisteredWindowId_;
+826:    std::string registerWindow(TWindow* w, bool emit_event = true) {
+830:            lastRegisteredWindowId_ = it->second;
+838:        lastRegisteredWindowId_ = id;
+930:    friend std::string api_take_last_registered_window_id(TWwdosApp&);
+1178:                registerWindow(w);
+1293:                registerWindow(w);
+1302:                registerWindow(w);
+1311:                registerWindow(w);
+1320:                registerWindow(w);
+1329:                registerWindow(w);
+1339:                    registerWindow(w);
+1354:                registerWindow(w);
+1373:                registerWindow(w);
+1388:                    registerWindow(tw2);
+1439:                    registerWindow(tw2);
+1732:                registerWindow(pw);
+1769:                        registerWindow(w);
+1824:    registerWindow(window);
+1833:    registerWindow(window);
+ succeeded in 52ms:
+                    "Wib&Wob Chat when Claude Code CLI\n"
+                    "is not logged in.\n\n"
+                    "Set via:\n"
+                    "  1. ANTHROPIC_API_KEY env var\n"
+                    "  2. Tools > API Key dialog\n\n"
+                    "Preferred: run 'claude /login'\n"
+                    "See Help > LLM Status for details.",
+                    mfInformation | mfOKButton);
+                clearEvent(event);
+                break;
+            case cmLlmStatus:
+            {
+                std::string summary = AuthConfig::instance().statusSummary();
+                messageBox(summary.c_str(),
+                    mfInformation | mfOKButton);
+                clearEvent(event);
+                break;
+            }
+
+            case cmScrambleReply:
+[stderr] 
+[stderr] thinking
+**Inspecting key class for inline method**
+[stderr] exec
+/bin/zsh -lc "sed -n '780,860p' app/wwdos_app.cpp" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 52ms:
+    static bool parseKeyedString(const std::string &s, size_t objStart, const char *key, std::string &out);
+    static bool parseKeyedNumber(const std::string &s, size_t objStart, const char *key, int &out);
+    static bool parseKeyedBool(const std::string &s, size_t objStart, const char *key, bool &out);
+    static bool parseBounds(const std::string &s, size_t objStart, int &x,int &y,int &w,int &h);
+private:
+    
+    int windowNumber;
+    static const int maxWindows = 99;
+
+    // Scramble cat overlay
+    TScrambleWindow* scrambleWindow;
+    ScrambleEngine scrambleEngine;
+    std::string pendingScrambleReply;  // Queued async response for event-loop delivery
+    ScrambleDisplayState scrambleState;
+    void cycleScramble();
+    void wireScrambleInput();
+    void deliverScrambleReply();
+
+    // Runtime API key (shared across all chat windows)
+    static std::string runtimeApiKey;
+[stderr] 
+[stderr] thinking
+**Planning centralized window clamping helper**
+[stderr] codex
+I’m about to patch both files: add a shared clamp helper in `wwdos_app.cpp`, enforce it in `move/resize` plus the new-window registration path, and mirror the clamp in `snap_window` so zone math can’t request off-screen bounds.
+[stderr] file update
+M /Users/james/Repos/wibandwob-dos/app/wwdos_app.cpp
+@@ -172,2 +172,27 @@
+ 
++static TRect clampToDesktop(TRect bounds, const TRect& desk) {
++    const int minW = 10;
++    const int minH = 5;
++    const int deskW = std::max(1, desk.b.x - desk.a.x);
++    const int deskH = std::max(1, desk.b.y - desk.a.y);
++
++    int w = bounds.b.x - bounds.a.x;
++    int h = bounds.b.y - bounds.a.y;
++
++    if (w < minW) w = minW;
++    if (h < minH) h = minH;
+[stderr] +    if (w > deskW) w = deskW;
++    if (h > deskH) h = deskH;
++
++    int x = bounds.a.x;
++    int y = bounds.a.y;
++
++    if (x + w > desk.b.x) x = desk.b.x - w;
++    if (y + h > desk.b.y) y = desk.b.y - h;
++    if (x < desk.a.x) x = desk.a.x;
++    if (y < desk.a.y) y = desk.a.y;
++
++    return TRect(x, y, x + w, y + h);
++}
++
+ // Command constants
+@@ -832,2 +857,7 @@
+         }
++        if (TProgram::deskTop) {
++            TRect desk = TProgram::deskTop->getExtent();
++            TRect clamped = clampToDesktop(w->getBounds(), desk);
++            w->locate(clamped);
++        }
+         char buf[32];
+@@ -3215,3 +3245,4 @@
+     newBounds.move(x - newBounds.a.x, y - newBounds.a.y);
+-    w->locate(newBounds);
++    TRect desk = TProgram::deskTop->getExtent();
++    w->locate(clampToDesktop(newBounds, desk));
+ 
+@@ -3231,3 +3262,4 @@
+     newBounds.b.y = newBounds.a.y + height;
+-    w->locate(newBounds);
++    TRect desk = TProgram::deskTop->getExtent();
++    w->locate(clampToDesktop(newBounds, desk));
+ 
+[stderr] apply_patch(auto_approved=true) exited 0 in 28ms:
+Success. Updated the following files:
+M app/wwdos_app.cpp
+file update:
+diff --git a/app/wwdos_app.cpp b/app/wwdos_app.cpp
+index aa1cb284e3997beeec881e5128a9e8b4d044863c..9bd919e82a1b609d23975545ee52f4af64652865
+--- a/app/wwdos_app.cpp
++++ b/app/wwdos_app.cpp
+@@ -170,6 +170,31 @@
+ // false = Tiled mode (pattern resets at start of each line, crops at edges)
+ bool USE_CONTINUOUS_PATTERN = true;  // Made non-const so it can be changed at runtime
+ 
++static TRect clampToDesktop(TRect bounds, const TRect& desk) {
++    const int minW = 10;
++    const int minH = 5;
++    const int deskW = std::max(1, desk.b.x - desk.a.x);
++    const int deskH = std::max(1, desk.b.y - desk.a.y);
++
++    int w = bounds.b.x - bounds.a.x;
++    int h = bounds.b.y - bounds.a.y;
++
++    if (w < minW) w = minW;
++    if (h < minH) h = minH;
++    if (w > deskW) w = deskW;
++    if (h > deskH) h = deskH;
++
++    int x = bounds.a.x;
++    int y = bounds.a.y;
++
++    if (x + w > desk.b.x) x = desk.b.x - w;
++    if (y + h > desk.b.y) y = desk.b.y - h;
++    if (x < desk.a.x) x = desk.a.x;
++    if (y < desk.a.y) y = desk.a.y;
++
++    return TRect(x, y, x + w, y + h);
++}
++
+ // Command constants
+ // File menu commands
+ const ushort cmNewWindow = 100;
+@@ -830,6 +855,11 @@
+             lastRegisteredWindowId_ = it->second;
+             return it->second;
+         }
++        if (TProgram::deskTop) {
++            TRect desk = TProgram::deskTop->getExtent();
++            TRect clamped = clampToDesktop(w->getBounds(), desk);
++            w->locate(clamped);
++        }
+         char buf[32];
+         std::snprintf(buf, sizeof(buf), "w%d", apiIdCounter++);
+         std::string id(buf);
+@@ -3213,7 +3243,8 @@
+ 
+     TRect newBounds = w->getBounds();
+     newBounds.move(x - newBounds.a.x, y - newBounds.a.y);
+-    w->locate(newBounds);
++    TRect desk = TProgram::deskTop->getExtent();
++    w->locate(clampToDesktop(newBounds, desk));
+ 
+     if (app.ipcServer) {
+         std::string payload = std::string("{\"id\":\"") + id + "\"}";
+@@ -3229,7 +3260,8 @@
+     TRect newBounds = w->getBounds();
+     newBounds.b.x = newBounds.a.x + width;
+     newBounds.b.y = newBounds.a.y + height;
+-    w->locate(newBounds);
++    TRect desk = TProgram::deskTop->getExtent();
++    w->locate(clampToDesktop(newBounds, desk));
+ 
+     if (app.ipcServer) {
+         std::string payload = std::string("{\"id\":\"") + id + "\"}";
+
+[stderr] file update:
+diff --git a/app/wwdos_app.cpp b/app/wwdos_app.cpp
+index aa1cb284e3997beeec881e5128a9e8b4d044863c..9bd919e82a1b609d23975545ee52f4af64652865
+--- a/app/wwdos_app.cpp
++++ b/app/wwdos_app.cpp
+@@ -170,6 +170,31 @@
+ // false = Tiled mode (pattern resets at start of each line, crops at edges)
+ bool USE_CONTINUOUS_PATTERN = true;  // Made non-const so it can be changed at runtime
+ 
++static TRect clampToDesktop(TRect bounds, const TRect& desk) {
++    const int minW = 10;
++    const int minH = 5;
++    const int deskW = std::max(1, desk.b.x - desk.a.x);
++    const int deskH = std::max(1, desk.b.y - desk.a.y);
++
++    int w = bounds.b.x - bounds.a.x;
++    int h = bounds.b.y - bounds.a.y;
++
++    if (w < minW) w = minW;
++    if (h < minH) h = minH;
++    if (w > deskW) w = deskW;
++    if (h > deskH) h = deskH;
++
++    int x = bounds.a.x;
++    int y = bounds.a.y;
++
++    if (x + w > desk.b.x) x = desk.b.x - w;
++    if (y + h > desk.b.y) y = desk.b.y - h;
++    if (x < desk.a.x) x = desk.a.x;
++    if (y < desk.a.y) y = desk.a.y;
++
++    return TRect(x, y, x + w, y + h);
++}
++
+ // Command constants
+ // File menu commands
+ const ushort cmNewWindow = 100;
+@@ -830,6 +855,11 @@
+             lastRegisteredWindowId_ = it->second;
+             return it->second;
+         }
++        if (TProgram::deskTop) {
++            TRect desk = TProgram::deskTop->getExtent();
++            TRect clamped = clampToDesktop(w->getBounds(), desk);
++            w->locate(clamped);
++        }
+         char buf[32];
+         std::snprintf(buf, sizeof(buf), "w%d", apiIdCounter++);
+         std::string id(buf);
+@@ -3213,7 +3243,8 @@
+ 
+     TRect newBounds = w->getBounds();
+     newBounds.move(x - newBounds.a.x, y - newBounds.a.y);
+-    w->locate(newBounds);
++    TRect desk = TProgram::deskTop->getExtent();
++    w->locate(clampToDesktop(newBounds, desk));
+ 
+     if (app.ipcServer) {
+         std::string payload = std::string("{\"id\":\"") + id + "\"}";
+@@ -3229,7 +3260,8 @@
+     TRect newBounds = w->getBounds();
+     newBounds.b.x = newBounds.a.x + width;
+     newBounds.b.y = newBounds.a.y + height;
+-    w->locate(newBounds);
++    TRect desk = TProgram::deskTop->getExtent();
++    w->locate(clampToDesktop(newBounds, desk));
+ 
+     if (app.ipcServer) {
+         std::string payload = std::string("{\"id\":\"") + id + "\"}";
+
+[stderr] 
+[stderr] thinking
+**Adding patch for command registry helper**
+[stderr] file update
+M /Users/james/Repos/wibandwob-dos/app/command_registry.cpp
+@@ -20,2 +20,27 @@
+ 
++static TRect clampToDesktop(TRect bounds, const TRect& desk) {
++    const int minW = 10;
++    const int minH = 5;
++    const int deskW = std::max(1, desk.b.x - desk.a.x);
++    const int deskH = std::max(1, desk.b.y - desk.a.y);
++
+[stderr] +    int w = bounds.b.x - bounds.a.x;
++    int h = bounds.b.y - bounds.a.y;
++
++    if (w < minW) w = minW;
++    if (h < minH) h = minH;
++    if (w > deskW) w = deskW;
++    if (h > deskH) h = deskH;
++
++    int x = bounds.a.x;
++    int y = bounds.a.y;
++
++    if (x + w > desk.b.x) x = desk.b.x - w;
++    if (y + h > desk.b.y) y = desk.b.y - h;
++    if (x < desk.a.x) x = desk.a.x;
++    if (y < desk.a.y) y = desk.a.y;
++
++    return TRect(x, y, x + w, y + h);
++}
++
+ extern void api_cascade(TWwdosApp& app);
+@@ -893,2 +918,7 @@
+         if (h < 5)  h = 5;
++        TRect clamped = clampToDesktop(TRect(x, y, x + w, y + h), desk);
++        x = clamped.a.x;
++        y = clamped.a.y;
++        w = clamped.b.x - clamped.a.x;
++        h = clamped.b.y - clamped.a.y;
+ 
+[stderr] apply_patch(auto_approved=true) exited 0 in 44ms:
+Success. Updated the following files:
+M app/command_registry.cpp
+file update:
+diff --git a/app/command_registry.cpp b/app/command_registry.cpp
+index 6680312948f5340fbac4ff59e120147a64b02757..f3905c64dc092251e9b4821945c777fd53e8ee05
+--- a/app/command_registry.cpp
++++ b/app/command_registry.cpp
+@@ -18,6 +18,31 @@
+ #define Uses_TDeskTop
+ #include <tvision/tv.h>
+ 
++static TRect clampToDesktop(TRect bounds, const TRect& desk) {
++    const int minW = 10;
++    const int minH = 5;
++    const int deskW = std::max(1, desk.b.x - desk.a.x);
++    const int deskH = std::max(1, desk.b.y - desk.a.y);
++
++    int w = bounds.b.x - bounds.a.x;
++    int h = bounds.b.y - bounds.a.y;
++
++    if (w < minW) w = minW;
++    if (h < minH) h = minH;
++    if (w > deskW) w = deskW;
++    if (h > deskH) h = deskH;
++
++    int x = bounds.a.x;
++    int y = bounds.a.y;
++
++    if (x + w > desk.b.x) x = desk.b.x - w;
++    if (y + h > desk.b.y) y = desk.b.y - h;
++    if (x < desk.a.x) x = desk.a.x;
++    if (y < desk.a.y) y = desk.a.y;
++
++    return TRect(x, y, x + w, y + h);
++}
++
+ extern void api_cascade(TWwdosApp& app);
+ extern void api_toggle_scramble(TWwdosApp& app);
+ extern void api_expand_scramble(TWwdosApp& app);
+@@ -891,6 +916,11 @@
+         int h = (int)((fy1 - fy0) * dh) - margin * 2;
+         if (w < 10) w = 10;
+         if (h < 5)  h = 5;
++        TRect clamped = clampToDesktop(TRect(x, y, x + w, y + h), desk);
++        x = clamped.a.x;
++        y = clamped.a.y;
++        w = clamped.b.x - clamped.a.x;
++        h = clamped.b.y - clamped.a.y;
+ 
+         std::string r1 = api_resize_window(app, id_it->second, w, h);
+         if (r1.rfind("err", 0) == 0) return r1;
+diff --git a/app/wwdos_app.cpp b/app/wwdos_app.cpp
+index aa1cb284e3997beeec881e5128a9e8b4d044863c..9bd919e82a1b609d23975545ee52f4af64652865
+--- a/app/wwdos_app.cpp
++++ b/app/wwdos_app.cpp
+@@ -170,6 +170,31 @@
+ // false = Tiled mode (pattern resets at start of each line, crops at edges)
+ bool USE_CONTINUOUS_PATTERN = true;  // Made non-const so it can be changed at runtime
+ 
++static TRect clampToDesktop(TRect bounds, const TRect& desk) {
++    const int minW = 10;
++    const int minH = 5;
++    const int deskW = std::max(1, desk.b.x - desk.a.x);
++    const int deskH = std::max(1, desk.b.y - desk.a.y);
++
++    int w = bounds.b.x - bounds.a.x;
++    int h = bounds.b.y - bounds.a.y;
++
++    if (w < minW) w = minW;
++    if (h < minH) h = minH;
++    if (w > deskW) w = deskW;
++    if (h > deskH) h = deskH;
++
++    int x = bounds.a.x;
++    int y = bounds.a.y;
++
++    if (x + w > desk.b.x) x = desk.b.x - w;
++    if (y + h > desk.b.y) y = desk.b.y - h;
++    if (x < desk.a.x) x = desk.a.x;
++    if (y < desk.a.y) y = desk.a.y;
++
++    return TRect(x, y, x + w, y + h);
++}
++
+ // Command constants
+ // File menu commands
+ const ushort cmNewWindow = 100;
+@@ -830,6 +855,11 @@
+             lastRegisteredWindowId_ = it->second;
+             return it->second;
+         }
++        if (TProgram::deskTop) {
++            TRect desk = TProgram::deskTop->getExtent();
++            TRect clamped = clampToDesktop(w->getBounds(), desk);
++            w->locate(clamped);
++        }
+         char buf[32];
+         std::snprintf(buf, sizeof(buf), "w%d", apiIdCounter++);
+         std::string id(buf);
+@@ -3213,7 +3243,8 @@
+ 
+     TRect newBounds = w->getBounds();
+     newBounds.move(x - newBounds.a.x, y - newBounds.a.y);
+-    w->locate(newBounds);
++    TRect desk = TProgram::deskTop->getExtent();
++    w->locate(clampToDesktop(newBounds, desk));
+ 
+     if (app.ipcServer) {
+         std::string payload = std::string("{\"id\":\"") + id + "\"}";
+@@ -3229,7 +3260,8 @@
+     TRect newBounds = w->getBounds();
+     newBounds.b.x = newBounds.a.x + width;
+     newBounds.b.y = newBounds.a.y + height;
+-    w->locate(newBounds);
++    TRect desk = TProgram::deskTop->getExtent();
++    w->locate(clampToDesktop(newBounds, desk));
+ 
+     if (app.ipcServer) {
+         std::string payload = std::string("{\"id\":\"") + id + "\"}";
+
+[stderr] file update:
+diff --git a/app/command_registry.cpp b/app/command_registry.cpp
+index 6680312948f5340fbac4ff59e120147a64b02757..f3905c64dc092251e9b4821945c777fd53e8ee05
+--- a/app/command_registry.cpp
++++ b/app/command_registry.cpp
+@@ -18,6 +18,31 @@
+ #define Uses_TDeskTop
+ #include <tvision/tv.h>
+ 
++static TRect clampToDesktop(TRect bounds, const TRect& desk) {
++    const int minW = 10;
++    const int minH = 5;
++    const int deskW = std::max(1, desk.b.x - desk.a.x);
++    const int deskH = std::max(1, desk.b.y - desk.a.y);
++
++    int w = bounds.b.x - bounds.a.x;
++    int h = bounds.b.y - bounds.a.y;
++
++    if (w < minW) w = minW;
++    if (h < minH) h = minH;
++    if (w > deskW) w = deskW;
++    if (h > deskH) h = deskH;
++
++    int x = bounds.a.x;
++    int y = bounds.a.y;
++
++    if (x + w > desk.b.x) x = desk.b.x - w;
++    if (y + h > desk.b.y) y = desk.b.y - h;
++    if (x < desk.a.x) x = desk.a.x;
++    if (y < desk.a.y) y = desk.a.y;
++
++    return TRect(x, y, x + w, y + h);
++}
++
+ extern void api_cascade(TWwdosApp& app);
+ extern void api_toggle_scramble(TWwdosApp& app);
+ extern void api_expand_scramble(TWwdosApp& app);
+@@ -891,6 +916,11 @@
+         int h = (int)((fy1 - fy0) * dh) - margin * 2;
+         if (w < 10) w = 10;
+         if (h < 5)  h = 5;
++        TRect clamped = clampToDesktop(TRect(x, y, x + w, y + h), desk);
++        x = clamped.a.x;
++        y = clamped.a.y;
++        w = clamped.b.x - clamped.a.x;
++        h = clamped.b.y - clamped.a.y;
+ 
+         std::string r1 = api_resize_window(app, id_it->second, w, h);
+         if (r1.rfind("err", 0) == 0) return r1;
+diff --git a/app/wwdos_app.cpp b/app/wwdos_app.cpp
+index aa1cb284e3997beeec881e5128a9e8b4d044863c..9bd919e82a1b609d23975545ee52f4af64652865
+--- a/app/wwdos_app.cpp
++++ b/app/wwdos_app.cpp
+@@ -170,6 +170,31 @@
+ // false = Tiled mode (pattern resets at start of each line, crops at edges)
+ bool USE_CONTINUOUS_PATTERN = true;  // Made non-const so it can be changed at runtime
+ 
++static TRect clampToDesktop(TRect bounds, const TRect& desk) {
++    const int minW = 10;
++    const int minH = 5;
++    const int deskW = std::max(1, desk.b.x - desk.a.x);
++    const int deskH = std::max(1, desk.b.y - desk.a.y);
++
++    int w = bounds.b.x - bounds.a.x;
++    int h = bounds.b.y - bounds.a.y;
++
++    if (w < minW) w = minW;
++    if (h < minH) h = minH;
++    if (w > deskW) w = deskW;
++    if (h > deskH) h = deskH;
++
++    int x = bounds.a.x;
++    int y = bounds.a.y;
++
++    if (x + w > desk.b.x) x = desk.b.x - w;
++    if (y + h > desk.b.y) y = desk.b.y - h;
++    if (x < desk.a.x) x = desk.a.x;
++    if (y < desk.a.y) y = desk.a.y;
++
++    return TRect(x, y, x + w, y + h);
++}
++
+ // Command constants
+ // File menu commands
+ const ushort cmNewWindow = 100;
+@@ -830,6 +855,11 @@
+             lastRegisteredWindowId_ = it->second;
+             return it->second;
+         }
++        if (TProgram::deskTop) {
++            TRect desk = TProgram::deskTop->getExtent();
++            TRect clamped = clampToDesktop(w->getBounds(), desk);
++            w->locate(clamped);
++        }
+         char buf[32];
+         std::snprintf(buf, sizeof(buf), "w%d", apiIdCounter++);
+         std::string id(buf);
+@@ -3213,7 +3243,8 @@
+ 
+     TRect newBounds = w->getBounds();
+     newBounds.move(x - newBounds.a.x, y - newBounds.a.y);
+-    w->locate(newBounds);
++    TRect desk = TProgram::deskTop->getExtent();
++    w->locate(clampToDesktop(newBounds, desk));
+ 
+     if (app.ipcServer) {
+         std::string payload = std::string("{\"id\":\"") + id + "\"}";
+@@ -3229,7 +3260,8 @@
+     TRect newBounds = w->getBounds();
+     newBounds.b.x = newBounds.a.x + width;
+     newBounds.b.y = newBounds.a.y + height;
+-    w->locate(newBounds);
++    TRect desk = TProgram::deskTop->getExtent();
++    w->locate(clampToDesktop(newBounds, desk));
+ 
+     if (app.ipcServer) {
+         std::string payload = std::string("{\"id\":\"") + id + "\"}";
+
+[stderr] 
+[stderr] thinking
+**Adding missing algorithm include**
+[stderr] codex
+Edits are in; I’m doing a quick compile-sanity pass on includes and then building `wwdos` to confirm no regressions.
+[stderr] file update
+M /Users/james/Repos/wibandwob-dos/app/command_registry.cpp
+@@ -10,2 +10,3 @@
+ 
++#include <algorithm>
+ #include <sstream>
+[stderr] apply_patch(auto_approved=true) exited 0 in 43ms:
+Success. Updated the following files:
+M app/command_registry.cpp
+file update:
+diff --git a/app/command_registry.cpp b/app/command_registry.cpp
+index 6680312948f5340fbac4ff59e120147a64b02757..fcd3c906f9f24cfe22fc48dd25e886ee9d0e7726
+--- a/app/command_registry.cpp
++++ b/app/command_registry.cpp
+@@ -8,6 +8,7 @@
+ #include <cstdint>
+ #include <sys/stat.h>
+ 
++#include <algorithm>
+ #include <sstream>
+ 
+ // TRect for window bounds
+@@ -18,6 +19,31 @@
+ #define Uses_TDeskTop
+ #include <tvision/tv.h>
+ 
++static TRect clampToDesktop(TRect bounds, const TRect& desk) {
++    const int minW = 10;
++    const int minH = 5;
++    const int deskW = std::max(1, desk.b.x - desk.a.x);
++    const int deskH = std::max(1, desk.b.y - desk.a.y);
++
++    int w = bounds.b.x - bounds.a.x;
++    int h = bounds.b.y - bounds.a.y;
++
++    if (w < minW) w = minW;
++    if (h < minH) h = minH;
++    if (w > deskW) w = deskW;
++    if (h > deskH) h = deskH;
++
++    int x = bounds.a.x;
++    int y = bounds.a.y;
++
++    if (x + w > desk.b.x) x = desk.b.x - w;
++    if (y + h > desk.b.y) y = desk.b.y - h;
++    if (x < desk.a.x) x = desk.a.x;
++    if (y < desk.a.y) y = desk.a.y;
++
++    return TRect(x, y, x + w, y + h);
++}
++
+ extern void api_cascade(TWwdosApp& app);
+ extern void api_toggle_scramble(TWwdosApp& app);
+ extern void api_expand_scramble(TWwdosApp& app);
+@@ -891,6 +917,11 @@
+         int h = (int)((fy1 - fy0) * dh) - margin * 2;
+         if (w < 10) w = 10;
+         if (h < 5)  h = 5;
++        TRect clamped = clampToDesktop(TRect(x, y, x + w, y + h), desk);
++        x = clamped.a.x;
++        y = clamped.a.y;
++        w = clamped.b.x - clamped.a.x;
++        h = clamped.b.y - clamped.a.y;
+ 
+         std::string r1 = api_resize_window(app, id_it->second, w, h);
+         if (r1.rfind("err", 0) == 0) return r1;
+diff --git a/app/wwdos_app.cpp b/app/wwdos_app.cpp
+index aa1cb284e3997beeec881e5128a9e8b4d044863c..9bd919e82a1b609d23975545ee52f4af64652865
+--- a/app/wwdos_app.cpp
++++ b/app/wwdos_app.cpp
+@@ -170,6 +170,31 @@
+ // false = Tiled mode (pattern resets at start of each line, crops at edges)
+ bool USE_CONTINUOUS_PATTERN = true;  // Made non-const so it can be changed at runtime
+ 
++static TRect clampToDesktop(TRect bounds, const TRect& desk) {
++    const int minW = 10;
++    const int minH = 5;
++    const int deskW = std::max(1, desk.b.x - desk.a.x);
++    const int deskH = std::max(1, desk.b.y - desk.a.y);
++
++    int w = bounds.b.x - bounds.a.x;
++    int h = bounds.b.y - bounds.a.y;
++
++    if (w < minW) w = minW;
++    if (h < minH) h = minH;
++    if (w > deskW) w = deskW;
++    if (h > deskH) h = deskH;
++
++    int x = bounds.a.x;
++    int y = bounds.a.y;
++
++    if (x + w > desk.b.x) x = desk.b.x - w;
++    if (y + h > desk.b.y) y = desk.b.y - h;
++    if (x < desk.a.x) x = desk.a.x;
++    if (y < desk.a.y) y = desk.a.y;
++
++    return TRect(x, y, x + w, y + h);
++}
++
+ // Command constants
+ // File menu commands
+ const ushort cmNewWindow = 100;
+@@ -830,6 +855,11 @@
+             lastRegisteredWindowId_ = it->second;
+             return it->second;
+         }
++        if (TProgram::deskTop) {
++            TRect desk = TProgram::deskTop->getExtent();
++            TRect clamped = clampToDesktop(w->getBounds(), desk);
++            w->locate(clamped);
++        }
+         char buf[32];
+         std::snprintf(buf, sizeof(buf), "w%d", apiIdCounter++);
+         std::string id(buf);
+@@ -3213,7 +3243,8 @@
+ 
+     TRect newBounds = w->getBounds();
+     newBounds.move(x - newBounds.a.x, y - newBounds.a.y);
+-    w->locate(newBounds);
++    TRect desk = TProgram::deskTop->getExtent();
++    w->locate(clampToDesktop(newBounds, desk));
+ 
+     if (app.ipcServer) {
+         std::string payload = std::string("{\"id\":\"") + id + "\"}";
+@@ -3229,7 +3260,8 @@
+     TRect newBounds = w->getBounds();
+     newBounds.b.x = newBounds.a.x + width;
+     newBounds.b.y = newBounds.a.y + height;
+-    w->locate(newBounds);
++    TRect desk = TProgram::deskTop->getExtent();
++    w->locate(clampToDesktop(newBounds, desk));
+ 
+     if (app.ipcServer) {
+         std::string payload = std::string("{\"id\":\"") + id + "\"}";
+
+[stderr] file update:
+diff --git a/app/command_registry.cpp b/app/command_registry.cpp
+index 6680312948f5340fbac4ff59e120147a64b02757..fcd3c906f9f24cfe22fc48dd25e886ee9d0e7726
+--- a/app/command_registry.cpp
++++ b/app/command_registry.cpp
+@@ -8,6 +8,7 @@
+ #include <cstdint>
+ #include <sys/stat.h>
+ 
++#include <algorithm>
+ #include <sstream>
+ 
+ // TRect for window bounds
+@@ -18,6 +19,31 @@
+ #define Uses_TDeskTop
+ #include <tvision/tv.h>
+ 
++static TRect clampToDesktop(TRect bounds, const TRect& desk) {
++    const int minW = 10;
++    const int minH = 5;
++    const int deskW = std::max(1, desk.b.x - desk.a.x);
++    const int deskH = std::max(1, desk.b.y - desk.a.y);
++
++    int w = bounds.b.x - bounds.a.x;
++    int h = bounds.b.y - bounds.a.y;
++
++    if (w < minW) w = minW;
++    if (h < minH) h = minH;
++    if (w > deskW) w = deskW;
++    if (h > deskH) h = deskH;
++
++    int x = bounds.a.x;
++    int y = bounds.a.y;
++
++    if (x + w > desk.b.x) x = desk.b.x - w;
++    if (y + h > desk.b.y) y = desk.b.y - h;
++    if (x < desk.a.x) x = desk.a.x;
++    if (y < desk.a.y) y = desk.a.y;
++
++    return TRect(x, y, x + w, y + h);
++}
++
+ extern void api_cascade(TWwdosApp& app);
+ extern void api_toggle_scramble(TWwdosApp& app);
+ extern void api_expand_scramble(TWwdosApp& app);
+@@ -891,6 +917,11 @@
+         int h = (int)((fy1 - fy0) * dh) - margin * 2;
+         if (w < 10) w = 10;
+         if (h < 5)  h = 5;
++        TRect clamped = clampToDesktop(TRect(x, y, x + w, y + h), desk);
++        x = clamped.a.x;
++        y = clamped.a.y;
++        w = clamped.b.x - clamped.a.x;
++        h = clamped.b.y - clamped.a.y;
+ 
+         std::string r1 = api_resize_window(app, id_it->second, w, h);
+         if (r1.rfind("err", 0) == 0) return r1;
+diff --git a/app/wwdos_app.cpp b/app/wwdos_app.cpp
+index aa1cb284e3997beeec881e5128a9e8b4d044863c..9bd919e82a1b609d23975545ee52f4af64652865
+--- a/app/wwdos_app.cpp
++++ b/app/wwdos_app.cpp
+@@ -170,6 +170,31 @@
+ // false = Tiled mode (pattern resets at start of each line, crops at edges)
+ bool USE_CONTINUOUS_PATTERN = true;  // Made non-const so it can be changed at runtime
+ 
++static TRect clampToDesktop(TRect bounds, const TRect& desk) {
++    const int minW = 10;
++    const int minH = 5;
++    const int deskW = std::max(1, desk.b.x - desk.a.x);
++    const int deskH = std::max(1, desk.b.y - desk.a.y);
++
++    int w = bounds.b.x - bounds.a.x;
++    int h = bounds.b.y - bounds.a.y;
++
++    if (w < minW) w = minW;
++    if (h < minH) h = minH;
++    if (w > deskW) w = deskW;
++    if (h > deskH) h = deskH;
++
++    int x = bounds.a.x;
++    int y = bounds.a.y;
++
++    if (x + w > desk.b.x) x = desk.b.x - w;
++    if (y + h > desk.b.y) y = desk.b.y - h;
++    if (x < desk.a.x) x = desk.a.x;
++    if (y < desk.a.y) y = desk.a.y;
++
++    return TRect(x, y, x + w, y + h);
++}
++
+ // Command constants
+ // File menu commands
+ const ushort cmNewWindow = 100;
+@@ -830,6 +855,11 @@
+             lastRegisteredWindowId_ = it->second;
+             return it->second;
+         }
++        if (TProgram::deskTop) {
++            TRect desk = TProgram::deskTop->getExtent();
++            TRect clamped = clampToDesktop(w->getBounds(), desk);
++            w->locate(clamped);
++        }
+         char buf[32];
+         std::snprintf(buf, sizeof(buf), "w%d", apiIdCounter++);
+         std::string id(buf);
+@@ -3213,7 +3243,8 @@
+ 
+     TRect newBounds = w->getBounds();
+     newBounds.move(x - newBounds.a.x, y - newBounds.a.y);
+-    w->locate(newBounds);
++    TRect desk = TProgram::deskTop->getExtent();
++    w->locate(clampToDesktop(newBounds, desk));
+ 
+     if (app.ipcServer) {
+         std::string payload = std::string("{\"id\":\"") + id + "\"}";
+@@ -3229,7 +3260,8 @@
+     TRect newBounds = w->getBounds();
+     newBounds.b.x = newBounds.a.x + width;
+     newBounds.b.y = newBounds.a.y + height;
+-    w->locate(newBounds);
++    TRect desk = TProgram::deskTop->getExtent();
++    w->locate(clampToDesktop(newBounds, desk));
+ 
+     if (app.ipcServer) {
+         std::string payload = std::string("{\"id\":\"") + id + "\"}";
+
+[stderr] 
+[stderr] thinking
+**Planning command execution integration**
+[stderr] exec
+/bin/zsh -lc 'cd build && make -j$(sysctl -n hw.ncpu) wwdos' in /Users/james/Repos/wibandwob-dos[stderr]  exited 2 in 1.30s:
+[ 12%] Built target micropolis_bridge
+[ 76%] Built target tvision
+[ 78%] Built target tvterm-core
+[ 78%] Building CXX object app/CMakeFiles/wwdos.dir/wwdos_app.cpp.o
+[ 80%] Building CXX object app/CMakeFiles/wwdos.dir/command_registry.cpp.o
+/Users/james/Repos/wibandwob-dos/app/wwdos_app.cpp:3247:15: error: non-const lvalue reference to type 'TRect' cannot bind to a temporary of type 'TRect'
+ 3247 |     w->locate(clampToDesktop(newBounds, desk));
+      |               ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/james/Repos/wibandwob-dos/vendor/tvision/include/tvision/views.h:357:25: note: passing argument to parameter 'bounds' here
+  357 |     void locate( TRect& bounds );
+      |                         ^
+/Users/james/Repos/wibandwob-dos/app/wwdos_app.cpp:3264:15: error: non-const lvalue reference to type 'TRect' cannot bind to a temporary of type 'TRect'
+ 3264 |     w->locate(clampToDesktop(newBounds, desk));
+      |               ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/james/Repos/wibandwob-dos/vendor/tvision/include/tvision/views.h:357:25: note: passing argument to parameter 'bounds' here
+  357 |     void locate( TRect& bounds );
+      |                         ^
+2 errors generated.
+make[3]: *** [app/CMakeFiles/wwdos.dir/wwdos_app.cpp.o] Error 1
+make[2]: *** [app/CMakeFiles/wwdos.dir/all] Error 2
+[stderr] file update:
+diff --git a/app/command_registry.cpp b/app/command_registry.cpp
+index 6680312948f5340fbac4ff59e120147a64b02757..fcd3c906f9f24cfe22fc48dd25e886ee9d0e7726
+--- a/app/command_registry.cpp
++++ b/app/command_registry.cpp
+@@ -8,6 +8,7 @@
+ #include <cstdint>
+ #include <sys/stat.h>
+ 
++#include <algorithm>
+ #include <sstream>
+ 
+ // TRect for window bounds
+@@ -18,6 +19,31 @@
+ #define Uses_TDeskTop
+ #include <tvision/tv.h>
+ 
++static TRect clampToDesktop(TRect bounds, const TRect& desk) {
++    const int minW = 10;
++    const int minH = 5;
++    const int deskW = std::max(1, desk.b.x - desk.a.x);
++    const int deskH = std::max(1, desk.b.y - desk.a.y);
++
++    int w = bounds.b.x - bounds.a.x;
++    int h = bounds.b.y - bounds.a.y;
++
++    if (w < minW) w = minW;
++    if (h < minH) h = minH;
++    if (w > deskW) w = deskW;
++    if (h > deskH) h = deskH;
++
++    int x = bounds.a.x;
++    int y = bounds.a.y;
++
++    if (x + w > desk.b.x) x = desk.b.x - w;
++    if (y + h > desk.b.y) y = desk.b.y - h;
++    if (x < desk.a.x) x = desk.a.x;
++    if (y < desk.a.y) y = desk.a.y;
++
++    return TRect(x, y, x + w, y + h);
++}
++
+ extern void api_cascade(TWwdosApp& app);
+ extern void api_toggle_scramble(TWwdosApp& app);
+ extern void api_expand_scramble(TWwdosApp& app);
+@@ -891,6 +917,11 @@
+         int h = (int)((fy1 - fy0) * dh) - margin * 2;
+         if (w < 10) w = 10;
+         if (h < 5)  h = 5;
++        TRect clamped = clampToDesktop(TRect(x, y, x + w, y + h), desk);
++        x = clamped.a.x;
++        y = clamped.a.y;
++        w = clamped.b.x - clamped.a.x;
++        h = clamped.b.y - clamped.a.y;
+ 
+         std::string r1 = api_resize_window(app, id_it->second, w, h);
+         if (r1.rfind("err", 0) == 0) return r1;
+diff --git a/app/wwdos_app.cpp b/app/wwdos_app.cpp
+index aa1cb284e3997beeec881e5128a9e8b4d044863c..9bd919e82a1b609d23975545ee52f4af64652865
+--- a/app/wwdos_app.cpp
++++ b/app/wwdos_app.cpp
+@@ -170,6 +170,31 @@
+ // false = Tiled mode (pattern resets at start of each line, crops at edges)
+ bool USE_CONTINUOUS_PATTERN = true;  // Made non-const so it can be changed at runtime
+ 
++static TRect clampToDesktop(TRect bounds, const TRect& desk) {
++    const int minW = 10;
++    const int minH = 5;
++    const int deskW = std::max(1, desk.b.x - desk.a.x);
++    const int deskH = std::max(1, desk.b.y - desk.a.y);
++
++    int w = bounds.b.x - bounds.a.x;
++    int h = bounds.b.y - bounds.a.y;
++
++    if (w < minW) w = minW;
++    if (h < minH) h = minH;
++    if (w > deskW) w = deskW;
++    if (h > deskH) h = deskH;
++
++    int x = bounds.a.x;
++    int y = bounds.a.y;
++
++    if (x + w > desk.b.x) x = desk.b.x - w;
++    if (y + h > desk.b.y) y = desk.b.y - h;
++    if (x < desk.a.x) x = desk.a.x;
++    if (y < desk.a.y) y = desk.a.y;
++
++    return TRect(x, y, x + w, y + h);
++}
++
+ // Command constants
+ // File menu commands
+ const ushort cmNewWindow = 100;
+@@ -830,6 +855,11 @@
+             lastRegisteredWindowId_ = it->second;
+             return it->second;
+         }
++        if (TProgram::deskTop) {
++            TRect desk = TProgram::deskTop->getExtent();
++            TRect clamped = clampToDesktop(w->getBounds(), desk);
++            w->locate(clamped);
++        }
+         char buf[32];
+         std::snprintf(buf, sizeof(buf), "w%d", apiIdCounter++);
+         std::string id(buf);
+@@ -3213,7 +3243,8 @@
+ 
+     TRect newBounds = w->getBounds();
+     newBounds.move(x - newBounds.a.x, y - newBounds.a.y);
+-    w->locate(newBounds);
++    TRect desk = TProgram::deskTop->getExtent();
++    w->locate(clampToDesktop(newBounds, desk));
+ 
+     if (app.ipcServer) {
+         std::string payload = std::string("{\"id\":\"") + id + "\"}";
+@@ -3229,7 +3260,8 @@
+     TRect newBounds = w->getBounds();
+     newBounds.b.x = newBounds.a.x + width;
+     newBounds.b.y = newBounds.a.y + height;
+-    w->locate(newBounds);
++    TRect desk = TProgram::deskTop->getExtent();
++    w->locate(clampToDesktop(newBounds, desk));
+ 
+     if (app.ipcServer) {
+         std::string payload = std::string("{\"id\":\"") + id + "\"}";
+
+[stderr] 
+[stderr] thinking
+**Switching CPU count detection method**
+[stderr] codex
+Build caught a Turbo Vision API detail (`locate` takes non-const `TRect&`), so I’m switching to local clamped variables and rerunning build with a sandbox-safe CPU count command.
+[stderr] file update
+M /Users/james/Repos/wibandwob-dos/app/wwdos_app.cpp
+@@ -3246,3 +3246,4 @@
+     TRect desk = TProgram::deskTop->getExtent();
+-    w->locate(clampToDesktop(newBounds, desk));
++    TRect clamped = clampToDesktop(newBounds, desk);
++    w->locate(clamped);
+ 
+@@ -3263,3 +3264,4 @@
+     TRect desk = TProgram::deskTop->getExtent();
+-    w->locate(clampToDesktop(newBounds, desk));
++    TRect clamped = clampToDesktop(newBounds, desk);
++    w->locate(clamped);
+ 
+[stderr] apply_patch(auto_approved=true) exited 0 in 48ms:
+Success. Updated the following files:
+M app/wwdos_app.cpp
+file update:
+diff --git a/app/command_registry.cpp b/app/command_registry.cpp
+index 6680312948f5340fbac4ff59e120147a64b02757..fcd3c906f9f24cfe22fc48dd25e886ee9d0e7726
+--- a/app/command_registry.cpp
++++ b/app/command_registry.cpp
+@@ -8,6 +8,7 @@
+ #include <cstdint>
+ #include <sys/stat.h>
+ 
++#include <algorithm>
+ #include <sstream>
+ 
+ // TRect for window bounds
+@@ -18,6 +19,31 @@
+ #define Uses_TDeskTop
+ #include <tvision/tv.h>
+ 
++static TRect clampToDesktop(TRect bounds, const TRect& desk) {
++    const int minW = 10;
++    const int minH = 5;
++    const int deskW = std::max(1, desk.b.x - desk.a.x);
++    const int deskH = std::max(1, desk.b.y - desk.a.y);
++
++    int w = bounds.b.x - bounds.a.x;
++    int h = bounds.b.y - bounds.a.y;
++
++    if (w < minW) w = minW;
++    if (h < minH) h = minH;
++    if (w > deskW) w = deskW;
++    if (h > deskH) h = deskH;
++
++    int x = bounds.a.x;
++    int y = bounds.a.y;
++
++    if (x + w > desk.b.x) x = desk.b.x - w;
++    if (y + h > desk.b.y) y = desk.b.y - h;
++    if (x < desk.a.x) x = desk.a.x;
++    if (y < desk.a.y) y = desk.a.y;
++
++    return TRect(x, y, x + w, y + h);
++}
++
+ extern void api_cascade(TWwdosApp& app);
+ extern void api_toggle_scramble(TWwdosApp& app);
+ extern void api_expand_scramble(TWwdosApp& app);
+@@ -891,6 +917,11 @@
+         int h = (int)((fy1 - fy0) * dh) - margin * 2;
+         if (w < 10) w = 10;
+         if (h < 5)  h = 5;
++        TRect clamped = clampToDesktop(TRect(x, y, x + w, y + h), desk);
++        x = clamped.a.x;
++        y = clamped.a.y;
++        w = clamped.b.x - clamped.a.x;
++        h = clamped.b.y - clamped.a.y;
+ 
+         std::string r1 = api_resize_window(app, id_it->second, w, h);
+         if (r1.rfind("err", 0) == 0) return r1;
+diff --git a/app/wwdos_app.cpp b/app/wwdos_app.cpp
+index aa1cb284e3997beeec881e5128a9e8b4d044863c..cbc9a80d54b015e13ad3681421ecce5d52001ee9
+--- a/app/wwdos_app.cpp
++++ b/app/wwdos_app.cpp
+@@ -170,6 +170,31 @@
+ // false = Tiled mode (pattern resets at start of each line, crops at edges)
+ bool USE_CONTINUOUS_PATTERN = true;  // Made non-const so it can be changed at runtime
+ 
++static TRect clampToDesktop(TRect bounds, const TRect& desk) {
++    const int minW = 10;
++    const int minH = 5;
++    const int deskW = std::max(1, desk.b.x - desk.a.x);
++    const int deskH = std::max(1, desk.b.y - desk.a.y);
++
++    int w = bounds.b.x - bounds.a.x;
++    int h = bounds.b.y - bounds.a.y;
++
++    if (w < minW) w = minW;
++    if (h < minH) h = minH;
++    if (w > deskW) w = deskW;
++    if (h > deskH) h = deskH;
++
++    int x = bounds.a.x;
++    int y = bounds.a.y;
++
++    if (x + w > desk.b.x) x = desk.b.x - w;
++    if (y + h > desk.b.y) y = desk.b.y - h;
++    if (x < desk.a.x) x = desk.a.x;
++    if (y < desk.a.y) y = desk.a.y;
++
++    return TRect(x, y, x + w, y + h);
++}
++
+ // Command constants
+ // File menu commands
+ const ushort cmNewWindow = 100;
+@@ -830,6 +855,11 @@
+             lastRegisteredWindowId_ = it->second;
+             return it->second;
+         }
++        if (TProgram::deskTop) {
++            TRect desk = TProgram::deskTop->getExtent();
++            TRect clamped = clampToDesktop(w->getBounds(), desk);
++            w->locate(clamped);
++        }
+         char buf[32];
+         std::snprintf(buf, sizeof(buf), "w%d", apiIdCounter++);
+         std::string id(buf);
+@@ -3213,7 +3243,9 @@
+ 
+     TRect newBounds = w->getBounds();
+     newBounds.move(x - newBounds.a.x, y - newBounds.a.y);
+-    w->locate(newBounds);
++    TRect desk = TProgram::deskTop->getExtent();
++    TRect clamped = clampToDesktop(newBounds, desk);
++    w->locate(clamped);
+ 
+     if (app.ipcServer) {
+         std::string payload = std::string("{\"id\":\"") + id + "\"}";
+@@ -3229,7 +3261,9 @@
+     TRect newBounds = w->getBounds();
+     newBounds.b.x = newBounds.a.x + width;
+     newBounds.b.y = newBounds.a.y + height;
+-    w->locate(newBounds);
++    TRect desk = TProgram::deskTop->getExtent();
++    TRect clamped = clampToDesktop(newBounds, desk);
++    w->locate(clamped);
+ 
+     if (app.ipcServer) {
+         std::string payload = std::string("{\"id\":\"") + id + "\"}";
+
+[stderr] file update:
+diff --git a/app/command_registry.cpp b/app/command_registry.cpp
+index 6680312948f5340fbac4ff59e120147a64b02757..fcd3c906f9f24cfe22fc48dd25e886ee9d0e7726
+--- a/app/command_registry.cpp
++++ b/app/command_registry.cpp
+@@ -8,6 +8,7 @@
+ #include <cstdint>
+ #include <sys/stat.h>
+ 
++#include <algorithm>
+ #include <sstream>
+ 
+ // TRect for window bounds
+@@ -18,6 +19,31 @@
+ #define Uses_TDeskTop
+ #include <tvision/tv.h>
+ 
++static TRect clampToDesktop(TRect bounds, const TRect& desk) {
++    const int minW = 10;
++    const int minH = 5;
++    const int deskW = std::max(1, desk.b.x - desk.a.x);
++    const int deskH = std::max(1, desk.b.y - desk.a.y);
++
++    int w = bounds.b.x - bounds.a.x;
++    int h = bounds.b.y - bounds.a.y;
++
++    if (w < minW) w = minW;
++    if (h < minH) h = minH;
++    if (w > deskW) w = deskW;
++    if (h > deskH) h = deskH;
++
++    int x = bounds.a.x;
++    int y = bounds.a.y;
++
++    if (x + w > desk.b.x) x = desk.b.x - w;
++    if (y + h > desk.b.y) y = desk.b.y - h;
++    if (x < desk.a.x) x = desk.a.x;
++    if (y < desk.a.y) y = desk.a.y;
++
++    return TRect(x, y, x + w, y + h);
++}
++
+ extern void api_cascade(TWwdosApp& app);
+ extern void api_toggle_scramble(TWwdosApp& app);
+ extern void api_expand_scramble(TWwdosApp& app);
+@@ -891,6 +917,11 @@
+         int h = (int)((fy1 - fy0) * dh) - margin * 2;
+         if (w < 10) w = 10;
+         if (h < 5)  h = 5;
++        TRect clamped = clampToDesktop(TRect(x, y, x + w, y + h), desk);
++        x = clamped.a.x;
++        y = clamped.a.y;
++        w = clamped.b.x - clamped.a.x;
++        h = clamped.b.y - clamped.a.y;
+ 
+         std::string r1 = api_resize_window(app, id_it->second, w, h);
+         if (r1.rfind("err", 0) == 0) return r1;
+diff --git a/app/wwdos_app.cpp b/app/wwdos_app.cpp
+index aa1cb284e3997beeec881e5128a9e8b4d044863c..cbc9a80d54b015e13ad3681421ecce5d52001ee9
+--- a/app/wwdos_app.cpp
++++ b/app/wwdos_app.cpp
+@@ -170,6 +170,31 @@
+ // false = Tiled mode (pattern resets at start of each line, crops at edges)
+ bool USE_CONTINUOUS_PATTERN = true;  // Made non-const so it can be changed at runtime
+ 
++static TRect clampToDesktop(TRect bounds, const TRect& desk) {
++    const int minW = 10;
++    const int minH = 5;
++    const int deskW = std::max(1, desk.b.x - desk.a.x);
++    const int deskH = std::max(1, desk.b.y - desk.a.y);
++
++    int w = bounds.b.x - bounds.a.x;
++    int h = bounds.b.y - bounds.a.y;
++
++    if (w < minW) w = minW;
++    if (h < minH) h = minH;
++    if (w > deskW) w = deskW;
++    if (h > deskH) h = deskH;
++
++    int x = bounds.a.x;
++    int y = bounds.a.y;
++
++    if (x + w > desk.b.x) x = desk.b.x - w;
++    if (y + h > desk.b.y) y = desk.b.y - h;
++    if (x < desk.a.x) x = desk.a.x;
++    if (y < desk.a.y) y = desk.a.y;
++
++    return TRect(x, y, x + w, y + h);
++}
++
+ // Command constants
+ // File menu commands
+ const ushort cmNewWindow = 100;
+@@ -830,6 +855,11 @@
+             lastRegisteredWindowId_ = it->second;
+             return it->second;
+         }
++        if (TProgram::deskTop) {
++            TRect desk = TProgram::deskTop->getExtent();
++            TRect clamped = clampToDesktop(w->getBounds(), desk);
++            w->locate(clamped);
++        }
+         char buf[32];
+         std::snprintf(buf, sizeof(buf), "w%d", apiIdCounter++);
+         std::string id(buf);
+@@ -3213,7 +3243,9 @@
+ 
+     TRect newBounds = w->getBounds();
+     newBounds.move(x - newBounds.a.x, y - newBounds.a.y);
+-    w->locate(newBounds);
++    TRect desk = TProgram::deskTop->getExtent();
++    TRect clamped = clampToDesktop(newBounds, desk);
++    w->locate(clamped);
+ 
+     if (app.ipcServer) {
+         std::string payload = std::string("{\"id\":\"") + id + "\"}";
+@@ -3229,7 +3261,9 @@
+     TRect newBounds = w->getBounds();
+     newBounds.b.x = newBounds.a.x + width;
+     newBounds.b.y = newBounds.a.y + height;
+-    w->locate(newBounds);
++    TRect desk = TProgram::deskTop->getExtent();
++    TRect clamped = clampToDesktop(newBounds, desk);
++    w->locate(clamped);
+ 
+     if (app.ipcServer) {
+         std::string payload = std::string("{\"id\":\"") + id + "\"}";
+
+[stderr] 
+[stderr] thinking
+**Adding build fallback command**
+[stderr] exec
+/bin/zsh -lc 'cd build && make -j$(getconf _NPROCESSORS_ONLN) wwdos' in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 1.96s:
+[ 12%] Built target micropolis_bridge
+[ 76%] Built target tvision
+[ 78%] Built target tvterm-core
+[ 78%] Building CXX object app/CMakeFiles/wwdos.dir/wwdos_app.cpp.o
+[ 80%] Linking CXX executable wwdos
+ld: warning: ignoring duplicate libraries: '../vendor/tvision/libtvision.a'
+[100%] Built target wwdos
+[stderr] file update:
+diff --git a/app/command_registry.cpp b/app/command_registry.cpp
+index 6680312948f5340fbac4ff59e120147a64b02757..fcd3c906f9f24cfe22fc48dd25e886ee9d0e7726
+--- a/app/command_registry.cpp
++++ b/app/command_registry.cpp
+@@ -8,6 +8,7 @@
+ #include <cstdint>
+ #include <sys/stat.h>
+ 
++#include <algorithm>
+ #include <sstream>
+ 
+ // TRect for window bounds
+@@ -18,6 +19,31 @@
+ #define Uses_TDeskTop
+ #include <tvision/tv.h>
+ 
++static TRect clampToDesktop(TRect bounds, const TRect& desk) {
++    const int minW = 10;
++    const int minH = 5;
++    const int deskW = std::max(1, desk.b.x - desk.a.x);
++    const int deskH = std::max(1, desk.b.y - desk.a.y);
++
++    int w = bounds.b.x - bounds.a.x;
++    int h = bounds.b.y - bounds.a.y;
++
++    if (w < minW) w = minW;
++    if (h < minH) h = minH;
++    if (w > deskW) w = deskW;
++    if (h > deskH) h = deskH;
++
++    int x = bounds.a.x;
++    int y = bounds.a.y;
++
++    if (x + w > desk.b.x) x = desk.b.x - w;
++    if (y + h > desk.b.y) y = desk.b.y - h;
++    if (x < desk.a.x) x = desk.a.x;
++    if (y < desk.a.y) y = desk.a.y;
++
++    return TRect(x, y, x + w, y + h);
++}
++
+ extern void api_cascade(TWwdosApp& app);
+ extern void api_toggle_scramble(TWwdosApp& app);
+ extern void api_expand_scramble(TWwdosApp& app);
+@@ -891,6 +917,11 @@
+         int h = (int)((fy1 - fy0) * dh) - margin * 2;
+         if (w < 10) w = 10;
+         if (h < 5)  h = 5;
++        TRect clamped = clampToDesktop(TRect(x, y, x + w, y + h), desk);
++        x = clamped.a.x;
++        y = clamped.a.y;
++        w = clamped.b.x - clamped.a.x;
++        h = clamped.b.y - clamped.a.y;
+ 
+         std::string r1 = api_resize_window(app, id_it->second, w, h);
+         if (r1.rfind("err", 0) == 0) return r1;
+diff --git a/app/wwdos_app.cpp b/app/wwdos_app.cpp
+index aa1cb284e3997beeec881e5128a9e8b4d044863c..cbc9a80d54b015e13ad3681421ecce5d52001ee9
+--- a/app/wwdos_app.cpp
++++ b/app/wwdos_app.cpp
+@@ -170,6 +170,31 @@
+ // false = Tiled mode (pattern resets at start of each line, crops at edges)
+ bool USE_CONTINUOUS_PATTERN = true;  // Made non-const so it can be changed at runtime
+ 
++static TRect clampToDesktop(TRect bounds, const TRect& desk) {
++    const int minW = 10;
++    const int minH = 5;
++    const int deskW = std::max(1, desk.b.x - desk.a.x);
++    const int deskH = std::max(1, desk.b.y - desk.a.y);
++
++    int w = bounds.b.x - bounds.a.x;
++    int h = bounds.b.y - bounds.a.y;
++
++    if (w < minW) w = minW;
++    if (h < minH) h = minH;
++    if (w > deskW) w = deskW;
++    if (h > deskH) h = deskH;
++
++    int x = bounds.a.x;
++    int y = bounds.a.y;
++
++    if (x + w > desk.b.x) x = desk.b.x - w;
++    if (y + h > desk.b.y) y = desk.b.y - h;
++    if (x < desk.a.x) x = desk.a.x;
++    if (y < desk.a.y) y = desk.a.y;
++
++    return TRect(x, y, x + w, y + h);
++}
++
+ // Command constants
+ // File menu commands
+ const ushort cmNewWindow = 100;
+@@ -830,6 +855,11 @@
+             lastRegisteredWindowId_ = it->second;
+             return it->second;
+         }
++        if (TProgram::deskTop) {
++            TRect desk = TProgram::deskTop->getExtent();
++            TRect clamped = clampToDesktop(w->getBounds(), desk);
++            w->locate(clamped);
++        }
+         char buf[32];
+         std::snprintf(buf, sizeof(buf), "w%d", apiIdCounter++);
+         std::string id(buf);
+@@ -3213,7 +3243,9 @@
+ 
+     TRect newBounds = w->getBounds();
+     newBounds.move(x - newBounds.a.x, y - newBounds.a.y);
+-    w->locate(newBounds);
++    TRect desk = TProgram::deskTop->getExtent();
++    TRect clamped = clampToDesktop(newBounds, desk);
++    w->locate(clamped);
+ 
+     if (app.ipcServer) {
+         std::string payload = std::string("{\"id\":\"") + id + "\"}";
+@@ -3229,7 +3261,9 @@
+     TRect newBounds = w->getBounds();
+     newBounds.b.x = newBounds.a.x + width;
+     newBounds.b.y = newBounds.a.y + height;
+-    w->locate(newBounds);
++    TRect desk = TProgram::deskTop->getExtent();
++    TRect clamped = clampToDesktop(newBounds, desk);
++    w->locate(clamped);
+ 
+     if (app.ipcServer) {
+         std::string payload = std::string("{\"id\":\"") + id + "\"}";
+
+[stderr] 
+[stderr] thinking
+**Running targeted tests with ctest**
+[stderr] exec
+/bin/zsh -lc 'cd build && ctest --output-on-failure' in /Users/james/Repos/wibandwob-dos[stderr]  exited 8 in 52ms:
+Test project /Users/james/Repos/wibandwob-dos/build
+    Start 1: command_registry
+Could not find executable /Users/james/Repos/wibandwob-dos/build/app/command_registry_test
+Looked in the following places:
+/Users/james/Repos/wibandwob-dos/build/app/command_registry_test
+/Users/james/Repos/wibandwob-dos/build/app/command_registry_test
+/Users/james/Repos/wibandwob-dos/build/app/Release/command_registry_test
+/Users/james/Repos/wibandwob-dos/build/app/Release/command_registry_test
+/Users/james/Repos/wibandwob-dos/build/app/Debug/command_registry_test
+/Users/james/Repos/wibandwob-dos/build/app/Debug/command_registry_test
+/Users/james/Repos/wibandwob-dos/build/app/MinSizeRel/command_registry_test
+/Users/james/Repos/wibandwob-dos/build/app/MinSizeRel/command_registry_test
+/Users/james/Repos/wibandwob-dos/build/app/RelWithDebInfo/command_registry_test
+/Users/james/Repos/wibandwob-dos/build/app/RelWithDebInfo/command_registry_test
+/Users/james/Repos/wibandwob-dos/build/app/Deployment/command_registry_test
+/Users/james/Repos/wibandwob-dos/build/app/Deployment/command_registry_test
+/Users/james/Repos/wibandwob-dos/build/app/Development/command_registry_test
+/Users/james/Repos/wibandwob-dos/build/app/Development/command_registry_test
+Users/james/Repos/wibandwob-dos/build/app/command_registry_test
+Users/james/Repos/wibandwob-dos/build/app/command_registry_test
+[stderr] file update:
+diff --git a/app/command_registry.cpp b/app/command_registry.cpp
+index 6680312948f5340fbac4ff59e120147a64b02757..fcd3c906f9f24cfe22fc48dd25e886ee9d0e7726
+--- a/app/command_registry.cpp
++++ b/app/command_registry.cpp
+@@ -8,6 +8,7 @@
+ #include <cstdint>
+ #include <sys/stat.h>
+ 
++#include <algorithm>
+ #include <sstream>
+ 
+ // TRect for window bounds
+@@ -18,6 +19,31 @@
+ #define Uses_TDeskTop
+ #include <tvision/tv.h>
+ 
++static TRect clampToDesktop(TRect bounds, const TRect& desk) {
++    const int minW = 10;
++    const int minH = 5;
++    const int deskW = std::max(1, desk.b.x - desk.a.x);
++    const int deskH = std::max(1, desk.b.y - desk.a.y);
++
++    int w = bounds.b.x - bounds.a.x;
++    int h = bounds.b.y - bounds.a.y;
++
++    if (w < minW) w = minW;
++    if (h < minH) h = minH;
++    if (w > deskW) w = deskW;
++    if (h > deskH) h = deskH;
++
++    int x = bounds.a.x;
++    int y = bounds.a.y;
++
++    if (x + w > desk.b.x) x = desk.b.x - w;
++    if (y + h > desk.b.y) y = desk.b.y - h;
++    if (x < desk.a.x) x = desk.a.x;
++    if (y < desk.a.y) y = desk.a.y;
++
++    return TRect(x, y, x + w, y + h);
++}
++
+ extern void api_cascade(TWwdosApp& app);
+ extern void api_toggle_scramble(TWwdosApp& app);
+ extern void api_expand_scramble(TWwdosApp& app);
+@@ -891,6 +917,11 @@
+         int h = (int)((fy1 - fy0) * dh) - margin * 2;
+         if (w < 10) w = 10;
+         if (h < 5)  h = 5;
++        TRect clamped = clampToDesktop(TRect(x, y, x + w, y + h), desk);
++        x = clamped.a.x;
++        y = clamped.a.y;
++        w = clamped.b.x - clamped.a.x;
++        h = clamped.b.y - clamped.a.y;
+ 
+         std::string r1 = api_resize_window(app, id_it->second, w, h);
+         if (r1.rfind("err", 0) == 0) return r1;
+diff --git a/app/wwdos_app.cpp b/app/wwdos_app.cpp
+index aa1cb284e3997beeec881e5128a9e8b4d044863c..cbc9a80d54b015e13ad3681421ecce5d52001ee9
+--- a/app/wwdos_app.cpp
++++ b/app/wwdos_app.cpp
+@@ -170,6 +170,31 @@
+ // false = Tiled mode (pattern resets at start of each line, crops at edges)
+ bool USE_CONTINUOUS_PATTERN = true;  // Made non-const so it can be changed at runtime
+ 
++static TRect clampToDesktop(TRect bounds, const TRect& desk) {
++    const int minW = 10;
++    const int minH = 5;
++    const int deskW = std::max(1, desk.b.x - desk.a.x);
++    const int deskH = std::max(1, desk.b.y - desk.a.y);
++
++    int w = bounds.b.x - bounds.a.x;
++    int h = bounds.b.y - bounds.a.y;
++
++    if (w < minW) w = minW;
++    if (h < minH) h = minH;
++    if (w > deskW) w = deskW;
++    if (h > deskH) h = deskH;
++
++    int x = bounds.a.x;
++    int y = bounds.a.y;
++
++    if (x + w > desk.b.x) x = desk.b.x - w;
++    if (y + h > desk.b.y) y = desk.b.y - h;
++    if (x < desk.a.x) x = desk.a.x;
++    if (y < desk.a.y) y = desk.a.y;
++
++    return TRect(x, y, x + w, y + h);
++}
++
+ // Command constants
+ // File menu commands
+ const ushort cmNewWindow = 100;
+@@ -830,6 +855,11 @@
+             lastRegisteredWindowId_ = it->second;
+             return it->second;
+         }
++        if (TProgram::deskTop) {
++            TRect desk = TProgram::deskTop->getExtent();
++            TRect clamped = clampToDesktop(w->getBounds(), desk);
++            w->locate(clamped);
++        }
+         char buf[32];
+         std::snprintf(buf, sizeof(buf), "w%d", apiIdCounter++);
+         std::string id(buf);
+@@ -3213,7 +3243,9 @@
+ 
+     TRect newBounds = w->getBounds();
+     newBounds.move(x - newBounds.a.x, y - newBounds.a.y);
+-    w->locate(newBounds);
++    TRect desk = TProgram::deskTop->getExtent();
++    TRect clamped = clampToDesktop(newBounds, desk);
++    w->locate(clamped);
+ 
+     if (app.ipcServer) {
+         std::string payload = std::string("{\"id\":\"") + id + "\"}";
+@@ -3229,7 +3261,9 @@
+     TRect newBounds = w->getBounds();
+     newBounds.b.x = newBounds.a.x + width;
+     newBounds.b.y = newBounds.a.y + height;
+-    w->locate(newBounds);
++    TRect desk = TProgram::deskTop->getExtent();
++    TRect clamped = clampToDesktop(newBounds, desk);
++    w->locate(clamped);
+ 
+     if (app.ipcServer) {
+         std::string payload = std::string("{\"id\":\"") + id + "\"}";
+
+[stderr] 
+[stderr] thinking
+**Considering git diff for references**
+[stderr] codex
+Build succeeded; I also ran `ctest` and found two tests are configured but their executables are missing in this build tree. I’ll summarize exact file changes and test status next.
+[stderr] exec
+/bin/zsh -lc "rg -n \"clampToDesktop|api_move_window|api_resize_window|registerWindow\\(|snap_window\" app/wwdos_app.cpp app/command_registry.cpp" in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc 'git diff -- app/wwdos_app.cpp app/command_registry.cpp' in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 52ms:
+app/command_registry.cpp:22:static TRect clampToDesktop(TRect bounds, const TRect& desk) {
+app/command_registry.cpp:132:extern std::string api_move_window(TWwdosApp& app, const std::string& id, int x, int y);
+app/command_registry.cpp:133:extern std::string api_resize_window(TWwdosApp& app, const std::string& id, int width, int height);
+app/command_registry.cpp:227:        {"snap_window", "Snap window to a named zone or grid cell (id, zone params; optional: margin, cols, rows, col, row, colspan, rowspan). Zones: tl,tr,bl,br,left,right,top,bottom,full,center. Grid: cols+rows divides desktop into grid, zone picks corner or col+row picks cell.", true},
+app/command_registry.cpp:743:        return api_move_window(app, id->second, std::stoi(xi->second), std::stoi(yi->second));
+app/command_registry.cpp:795:            return api_resize_window(app, id->second, w, h);
+app/command_registry.cpp:800:        return api_resize_window(app, id->second, std::stoi(wi->second), std::stoi(hi->second));
+app/command_registry.cpp:823:    if (name == "snap_window") {
+app/command_registry.cpp:920:        TRect clamped = clampToDesktop(TRect(x, y, x + w, y + h), desk);
+app/command_registry.cpp:926:        std::string r1 = api_resize_window(app, id_it->second, w, h);
+app/command_registry.cpp:928:        std::string r2 = api_move_window(app, id_it->second, x, y);
+app/wwdos_app.cpp:173:static TRect clampToDesktop(TRect bounds, const TRect& desk) {
+app/wwdos_app.cpp:851:    std::string registerWindow(TWindow* w, bool emit_event = true) {
+app/wwdos_app.cpp:860:            TRect clamped = clampToDesktop(w->getBounds(), desk);
+app/wwdos_app.cpp:946:    friend std::string api_move_window(TWwdosApp&, const std::string&, int, int);
+app/wwdos_app.cpp:947:    friend std::string api_resize_window(TWwdosApp&, const std::string&, int, int);
+app/wwdos_app.cpp:1208:                registerWindow(w);
+app/wwdos_app.cpp:1323:                registerWindow(w);
+app/wwdos_app.cpp:1332:                registerWindow(w);
+app/wwdos_app.cpp:1341:                registerWindow(w);
+[stderr]  succeeded in 52ms:
+diff --git a/app/command_registry.cpp b/app/command_registry.cpp
+index 6680312..fcd3c90 100644
+--- a/app/command_registry.cpp
++++ b/app/command_registry.cpp
+@@ -8,6 +8,7 @@
+ #include <cstdint>
+ #include <sys/stat.h>
+ 
++#include <algorithm>
+ #include <sstream>
+ 
+ // TRect for window bounds
+@@ -18,6 +19,31 @@
+ #define Uses_TDeskTop
+ #include <tvision/tv.h>
+ 
++static TRect clampToDesktop(TRect bounds, const TRect& desk) {
++    const int minW = 10;
++    const int minH = 5;
++    const int deskW = std::max(1, desk.b.x - desk.a.x);
+[stderr] file update:
+diff --git a/app/command_registry.cpp b/app/command_registry.cpp
+index 6680312948f5340fbac4ff59e120147a64b02757..fcd3c906f9f24cfe22fc48dd25e886ee9d0e7726
+--- a/app/command_registry.cpp
++++ b/app/command_registry.cpp
+@@ -8,6 +8,7 @@
+ #include <cstdint>
+ #include <sys/stat.h>
+ 
++#include <algorithm>
+ #include <sstream>
+ 
+ // TRect for window bounds
+@@ -18,6 +19,31 @@
+ #define Uses_TDeskTop
+ #include <tvision/tv.h>
+ 
++static TRect clampToDesktop(TRect bounds, const TRect& desk) {
++    const int minW = 10;
++    const int minH = 5;
++    const int deskW = std::max(1, desk.b.x - desk.a.x);
++    const int deskH = std::max(1, desk.b.y - desk.a.y);
++
++    int w = bounds.b.x - bounds.a.x;
++    int h = bounds.b.y - bounds.a.y;
++
++    if (w < minW) w = minW;
++    if (h < minH) h = minH;
++    if (w > deskW) w = deskW;
++    if (h > deskH) h = deskH;
++
++    int x = bounds.a.x;
++    int y = bounds.a.y;
++
++    if (x + w > desk.b.x) x = desk.b.x - w;
++    if (y + h > desk.b.y) y = desk.b.y - h;
++    if (x < desk.a.x) x = desk.a.x;
++    if (y < desk.a.y) y = desk.a.y;
++
++    return TRect(x, y, x + w, y + h);
++}
++
+ extern void api_cascade(TWwdosApp& app);
+ extern void api_toggle_scramble(TWwdosApp& app);
+ extern void api_expand_scramble(TWwdosApp& app);
+@@ -891,6 +917,11 @@
+         int h = (int)((fy1 - fy0) * dh) - margin * 2;
+         if (w < 10) w = 10;
+         if (h < 5)  h = 5;
++        TRect clamped = clampToDesktop(TRect(x, y, x + w, y + h), desk);
++        x = clamped.a.x;
++        y = clamped.a.y;
++        w = clamped.b.x - clamped.a.x;
++        h = clamped.b.y - clamped.a.y;
+ 
+         std::string r1 = api_resize_window(app, id_it->second, w, h);
+         if (r1.rfind("err", 0) == 0) return r1;
+diff --git a/app/wwdos_app.cpp b/app/wwdos_app.cpp
+index aa1cb284e3997beeec881e5128a9e8b4d044863c..cbc9a80d54b015e13ad3681421ecce5d52001ee9
+--- a/app/wwdos_app.cpp
++++ b/app/wwdos_app.cpp
+@@ -170,6 +170,31 @@
+ // false = Tiled mode (pattern resets at start of each line, crops at edges)
+ bool USE_CONTINUOUS_PATTERN = true;  // Made non-const so it can be changed at runtime
+ 
++static TRect clampToDesktop(TRect bounds, const TRect& desk) {
++    const int minW = 10;
++    const int minH = 5;
++    const int deskW = std::max(1, desk.b.x - desk.a.x);
++    const int deskH = std::max(1, desk.b.y - desk.a.y);
++
++    int w = bounds.b.x - bounds.a.x;
++    int h = bounds.b.y - bounds.a.y;
++
++    if (w < minW) w = minW;
++    if (h < minH) h = minH;
++    if (w > deskW) w = deskW;
++    if (h > deskH) h = deskH;
++
++    int x = bounds.a.x;
++    int y = bounds.a.y;
++
++    if (x + w > desk.b.x) x = desk.b.x - w;
++    if (y + h > desk.b.y) y = desk.b.y - h;
++    if (x < desk.a.x) x = desk.a.x;
++    if (y < desk.a.y) y = desk.a.y;
++
++    return TRect(x, y, x + w, y + h);
++}
++
+ // Command constants
+ // File menu commands
+ const ushort cmNewWindow = 100;
+@@ -830,6 +855,11 @@
+             lastRegisteredWindowId_ = it->second;
+             return it->second;
+         }
++        if (TProgram::deskTop) {
++            TRect desk = TProgram::deskTop->getExtent();
++            TRect clamped = clampToDesktop(w->getBounds(), desk);
++            w->locate(clamped);
++        }
+         char buf[32];
+         std::snprintf(buf, sizeof(buf), "w%d", apiIdCounter++);
+         std::string id(buf);
+@@ -3213,7 +3243,9 @@
+ 
+     TRect newBounds = w->getBounds();
+     newBounds.move(x - newBounds.a.x, y - newBounds.a.y);
+-    w->locate(newBounds);
++    TRect desk = TProgram::deskTop->getExtent();
++    TRect clamped = clampToDesktop(newBounds, desk);
++    w->locate(clamped);
+ 
+     if (app.ipcServer) {
+         std::string payload = std::string("{\"id\":\"") + id + "\"}";
+@@ -3229,7 +3261,9 @@
+     TRect newBounds = w->getBounds();
+     newBounds.b.x = newBounds.a.x + width;
+     newBounds.b.y = newBounds.a.y + height;
+-    w->locate(newBounds);
++    TRect desk = TProgram::deskTop->getExtent();
++    TRect clamped = clampToDesktop(newBounds, desk);
++    w->locate(clamped);
+ 
+     if (app.ipcServer) {
+         std::string payload = std::string("{\"id\":\"") + id + "\"}";
+
+[stderr] 
+[stderr] thinking
+**Noting test failures due to missing binaries**
+[stderr] exec
+/bin/zsh -lc 'git status --short app/wwdos_app.cpp app/command_registry.cpp' in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 52ms:
+ M app/command_registry.cpp
+ M app/wwdos_app.cpp
+[stderr] file update:
+diff --git a/app/command_registry.cpp b/app/command_registry.cpp
+index 6680312948f5340fbac4ff59e120147a64b02757..fcd3c906f9f24cfe22fc48dd25e886ee9d0e7726
+--- a/app/command_registry.cpp
++++ b/app/command_registry.cpp
+@@ -8,6 +8,7 @@
+ #include <cstdint>
+ #include <sys/stat.h>
+ 
++#include <algorithm>
+ #include <sstream>
+ 
+ // TRect for window bounds
+@@ -18,6 +19,31 @@
+ #define Uses_TDeskTop
+ #include <tvision/tv.h>
+ 
++static TRect clampToDesktop(TRect bounds, const TRect& desk) {
++    const int minW = 10;
++    const int minH = 5;
++    const int deskW = std::max(1, desk.b.x - desk.a.x);
++    const int deskH = std::max(1, desk.b.y - desk.a.y);
++
++    int w = bounds.b.x - bounds.a.x;
++    int h = bounds.b.y - bounds.a.y;
++
++    if (w < minW) w = minW;
++    if (h < minH) h = minH;
++    if (w > deskW) w = deskW;
++    if (h > deskH) h = deskH;
++
++    int x = bounds.a.x;
++    int y = bounds.a.y;
++
++    if (x + w > desk.b.x) x = desk.b.x - w;
++    if (y + h > desk.b.y) y = desk.b.y - h;
++    if (x < desk.a.x) x = desk.a.x;
++    if (y < desk.a.y) y = desk.a.y;
++
++    return TRect(x, y, x + w, y + h);
++}
++
+ extern void api_cascade(TWwdosApp& app);
+ extern void api_toggle_scramble(TWwdosApp& app);
+ extern void api_expand_scramble(TWwdosApp& app);
+@@ -891,6 +917,11 @@
+         int h = (int)((fy1 - fy0) * dh) - margin * 2;
+         if (w < 10) w = 10;
+         if (h < 5)  h = 5;
++        TRect clamped = clampToDesktop(TRect(x, y, x + w, y + h), desk);
++        x = clamped.a.x;
++        y = clamped.a.y;
++        w = clamped.b.x - clamped.a.x;
++        h = clamped.b.y - clamped.a.y;
+ 
+         std::string r1 = api_resize_window(app, id_it->second, w, h);
+         if (r1.rfind("err", 0) == 0) return r1;
+diff --git a/app/wwdos_app.cpp b/app/wwdos_app.cpp
+index aa1cb284e3997beeec881e5128a9e8b4d044863c..cbc9a80d54b015e13ad3681421ecce5d52001ee9
+--- a/app/wwdos_app.cpp
++++ b/app/wwdos_app.cpp
+@@ -170,6 +170,31 @@
+ // false = Tiled mode (pattern resets at start of each line, crops at edges)
+ bool USE_CONTINUOUS_PATTERN = true;  // Made non-const so it can be changed at runtime
+ 
++static TRect clampToDesktop(TRect bounds, const TRect& desk) {
++    const int minW = 10;
++    const int minH = 5;
++    const int deskW = std::max(1, desk.b.x - desk.a.x);
++    const int deskH = std::max(1, desk.b.y - desk.a.y);
++
++    int w = bounds.b.x - bounds.a.x;
++    int h = bounds.b.y - bounds.a.y;
++
++    if (w < minW) w = minW;
++    if (h < minH) h = minH;
++    if (w > deskW) w = deskW;
++    if (h > deskH) h = deskH;
++
++    int x = bounds.a.x;
++    int y = bounds.a.y;
++
++    if (x + w > desk.b.x) x = desk.b.x - w;
++    if (y + h > desk.b.y) y = desk.b.y - h;
++    if (x < desk.a.x) x = desk.a.x;
++    if (y < desk.a.y) y = desk.a.y;
++
++    return TRect(x, y, x + w, y + h);
++}
++
+ // Command constants
+ // File menu commands
+ const ushort cmNewWindow = 100;
+@@ -830,6 +855,11 @@
+             lastRegisteredWindowId_ = it->second;
+             return it->second;
+         }
++        if (TProgram::deskTop) {
++            TRect desk = TProgram::deskTop->getExtent();
++            TRect clamped = clampToDesktop(w->getBounds(), desk);
++            w->locate(clamped);
++        }
+         char buf[32];
+         std::snprintf(buf, sizeof(buf), "w%d", apiIdCounter++);
+         std::string id(buf);
+@@ -3213,7 +3243,9 @@
+ 
+     TRect newBounds = w->getBounds();
+     newBounds.move(x - newBounds.a.x, y - newBounds.a.y);
+-    w->locate(newBounds);
++    TRect desk = TProgram::deskTop->getExtent();
++    TRect clamped = clampToDesktop(newBounds, desk);
++    w->locate(clamped);
+ 
+     if (app.ipcServer) {
+         std::string payload = std::string("{\"id\":\"") + id + "\"}";
+@@ -3229,7 +3261,9 @@
+     TRect newBounds = w->getBounds();
+     newBounds.b.x = newBounds.a.x + width;
+     newBounds.b.y = newBounds.a.y + height;
+-    w->locate(newBounds);
++    TRect desk = TProgram::deskTop->getExtent();
++    TRect clamped = clampToDesktop(newBounds, desk);
++    w->locate(clamped);
+ 
+     if (app.ipcServer) {
+         std::string payload = std::string("{\"id\":\"") + id + "\"}";
+
+[stderr] 
+[stderr] thinking
+**Planning final concise summary**
+[stderr] codex
+Implemented with minimal changes in the two requested files.
+
+**What Changed**
+- Added `clampToDesktop(...)` helper in [app/wwdos_app.cpp](/Users/james/Repos/wibandwob-dos/app/wwdos_app.cpp:173) and used it in:
+1. [api_move_window](/Users/james/Repos/wibandwob-dos/app/wwdos_app.cpp:3240) before `locate()`
+2. [api_resize_window](/Users/james/Repos/wibandwob-dos/app/wwdos_app.cpp:3257) before `locate()`
+3. [registerWindow](/Users/james/Repos/wibandwob-dos/app/wwdos_app.cpp:851) so newly spawned/registered windows (including API `create_window` paths) are clamped immediately after placement
+
+- Added matching `clampToDesktop(...)` helper in [app/command_registry.cpp](/Users/james/Repos/wibandwob-dos/app/command_registry.cpp:22) and applied it in `snap_window` before calling resize/move:
+1. [snap_window clamp site](/Users/james/Repos/wibandwob-dos/app/command_registry.cpp:920)
+
+**Behavior Enforced**
+- Minimum size: `10x5`
+- If window is larger than desktop, it is shrunk to fit
+- Final position is always clamped so full window stays inside desktop bounds
+- This is enforced at C++ layer for move, resize, snap, and new-window registration/spawn paths
+
+**Build/Test**
+- Build passed: `cd build && make -j$(getconf _NPROCESSORS_ONLN) wwdos`
+- `ctest --output-on-failure` ran, but 2 tests were `Not Run` due to missing executables:
+1. `app/command_registry_test`
+2. `app/scramble_engine_test`
+[stderr] file update:
+diff --git a/app/command_registry.cpp b/app/command_registry.cpp
+index 6680312948f5340fbac4ff59e120147a64b02757..fcd3c906f9f24cfe22fc48dd25e886ee9d0e7726
+--- a/app/command_registry.cpp
++++ b/app/command_registry.cpp
+@@ -8,6 +8,7 @@
+ #include <cstdint>
+ #include <sys/stat.h>
+ 
++#include <algorithm>
+ #include <sstream>
+ 
+ // TRect for window bounds
+@@ -18,6 +19,31 @@
+ #define Uses_TDeskTop
+ #include <tvision/tv.h>
+ 
++static TRect clampToDesktop(TRect bounds, const TRect& desk) {
++    const int minW = 10;
++    const int minH = 5;
++    const int deskW = std::max(1, desk.b.x - desk.a.x);
++    const int deskH = std::max(1, desk.b.y - desk.a.y);
++
++    int w = bounds.b.x - bounds.a.x;
++    int h = bounds.b.y - bounds.a.y;
++
++    if (w < minW) w = minW;
++    if (h < minH) h = minH;
++    if (w > deskW) w = deskW;
++    if (h > deskH) h = deskH;
++
++    int x = bounds.a.x;
++    int y = bounds.a.y;
++
++    if (x + w > desk.b.x) x = desk.b.x - w;
++    if (y + h > desk.b.y) y = desk.b.y - h;
++    if (x < desk.a.x) x = desk.a.x;
++    if (y < desk.a.y) y = desk.a.y;
++
++    return TRect(x, y, x + w, y + h);
++}
++
+ extern void api_cascade(TWwdosApp& app);
+ extern void api_toggle_scramble(TWwdosApp& app);
+ extern void api_expand_scramble(TWwdosApp& app);
+@@ -891,6 +917,11 @@
+         int h = (int)((fy1 - fy0) * dh) - margin * 2;
+         if (w < 10) w = 10;
+         if (h < 5)  h = 5;
++        TRect clamped = clampToDesktop(TRect(x, y, x + w, y + h), desk);
++        x = clamped.a.x;
++        y = clamped.a.y;
++        w = clamped.b.x - clamped.a.x;
++        h = clamped.b.y - clamped.a.y;
+ 
+         std::string r1 = api_resize_window(app, id_it->second, w, h);
+         if (r1.rfind("err", 0) == 0) return r1;
+diff --git a/app/wwdos_app.cpp b/app/wwdos_app.cpp
+index aa1cb284e3997beeec881e5128a9e8b4d044863c..cbc9a80d54b015e13ad3681421ecce5d52001ee9
+--- a/app/wwdos_app.cpp
++++ b/app/wwdos_app.cpp
+@@ -170,6 +170,31 @@
+ // false = Tiled mode (pattern resets at start of each line, crops at edges)
+ bool USE_CONTINUOUS_PATTERN = true;  // Made non-const so it can be changed at runtime
+ 
++static TRect clampToDesktop(TRect bounds, const TRect& desk) {
++    const int minW = 10;
++    const int minH = 5;
++    const int deskW = std::max(1, desk.b.x - desk.a.x);
++    const int deskH = std::max(1, desk.b.y - desk.a.y);
++
++    int w = bounds.b.x - bounds.a.x;
++    int h = bounds.b.y - bounds.a.y;
++
++    if (w < minW) w = minW;
++    if (h < minH) h = minH;
++    if (w > deskW) w = deskW;
++    if (h > deskH) h = deskH;
++
++    int x = bounds.a.x;
++    int y = bounds.a.y;
++
++    if (x + w > desk.b.x) x = desk.b.x - w;
++    if (y + h > desk.b.y) y = desk.b.y - h;
++    if (x < desk.a.x) x = desk.a.x;
++    if (y < desk.a.y) y = desk.a.y;
++
++    return TRect(x, y, x + w, y + h);
++}
++
+ // Command constants
+ // File menu commands
+ const ushort cmNewWindow = 100;
+@@ -830,6 +855,11 @@
+             lastRegisteredWindowId_ = it->second;
+             return it->second;
+         }
++        if (TProgram::deskTop) {
++            TRect desk = TProgram::deskTop->getExtent();
++            TRect clamped = clampToDesktop(w->getBounds(), desk);
++            w->locate(clamped);
++        }
+         char buf[32];
+         std::snprintf(buf, sizeof(buf), "w%d", apiIdCounter++);
+         std::string id(buf);
+@@ -3213,7 +3243,9 @@
+ 
+     TRect newBounds = w->getBounds();
+     newBounds.move(x - newBounds.a.x, y - newBounds.a.y);
+-    w->locate(newBounds);
++    TRect desk = TProgram::deskTop->getExtent();
++    TRect clamped = clampToDesktop(newBounds, desk);
++    w->locate(clamped);
+ 
+     if (app.ipcServer) {
+         std::string payload = std::string("{\"id\":\"") + id + "\"}";
+@@ -3229,7 +3261,9 @@
+     TRect newBounds = w->getBounds();
+     newBounds.b.x = newBounds.a.x + width;
+     newBounds.b.y = newBounds.a.y + height;
+-    w->locate(newBounds);
++    TRect desk = TProgram::deskTop->getExtent();
++    TRect clamped = clampToDesktop(newBounds, desk);
++    w->locate(clamped);
+ 
+     if (app.ipcServer) {
+         std::string payload = std::string("{\"id\":\"") + id + "\"}";
+
+[stderr] tokens used
+52,229
+Implemented with minimal changes in the two requested files.
+
+**What Changed**
+- Added `clampToDesktop(...)` helper in [app/wwdos_app.cpp](/Users/james/Repos/wibandwob-dos/app/wwdos_app.cpp:173) and used it in:
+1. [api_move_window](/Users/james/Repos/wibandwob-dos/app/wwdos_app.cpp:3240) before `locate()`
+2. [api_resize_window](/Users/james/Repos/wibandwob-dos/app/wwdos_app.cpp:3257) before `locate()`
+3. [registerWindow](/Users/james/Repos/wibandwob-dos/app/wwdos_app.cpp:851) so newly spawned/registered windows (including API `create_window` paths) are clamped immediately after placement
+
+- Added matching `clampToDesktop(...)` helper in [app/command_registry.cpp](/Users/james/Repos/wibandwob-dos/app/command_registry.cpp:22) and applied it in `snap_window` before calling resize/move:
+1. [snap_window clamp site](/Users/james/Repos/wibandwob-dos/app/command_registry.cpp:920)
+
+**Behavior Enforced**
+- Minimum size: `10x5`
+- If window is larger than desktop, it is shrunk to fit
+- Final position is always clamped so full window stays inside desktop bounds
+- This is enforced at C++ layer for move, resize, snap, and new-window registration/spawn paths
+
+**Build/Test**
+- Build passed: `cd build && make -j$(getconf _NPROCESSORS_ONLN) wwdos`
+- `ctest --output-on-failure` ran, but 2 tests were `Not Run` due to missing executables:
+1. `app/command_registry_test`
+2. `app/scramble_engine_test`

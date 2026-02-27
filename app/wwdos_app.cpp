@@ -170,6 +170,31 @@ std::string findPrimerDir() {
 // false = Tiled mode (pattern resets at start of each line, crops at edges)
 bool USE_CONTINUOUS_PATTERN = true;  // Made non-const so it can be changed at runtime
 
+static TRect clampToDesktop(TRect bounds, const TRect& desk) {
+    const int minW = 10;
+    const int minH = 5;
+    const int deskW = std::max(1, desk.b.x - desk.a.x);
+    const int deskH = std::max(1, desk.b.y - desk.a.y);
+
+    int w = bounds.b.x - bounds.a.x;
+    int h = bounds.b.y - bounds.a.y;
+
+    if (w < minW) w = minW;
+    if (h < minH) h = minH;
+    if (w > deskW) w = deskW;
+    if (h > deskH) h = deskH;
+
+    int x = bounds.a.x;
+    int y = bounds.a.y;
+
+    if (x + w > desk.b.x) x = desk.b.x - w;
+    if (y + h > desk.b.y) y = desk.b.y - h;
+    if (x < desk.a.x) x = desk.a.x;
+    if (y < desk.a.y) y = desk.a.y;
+
+    return TRect(x, y, x + w, y + h);
+}
+
 // Command constants
 // File menu commands
 const ushort cmNewWindow = 100;
@@ -829,6 +854,11 @@ private:
         if (it != winToId.end()) {
             lastRegisteredWindowId_ = it->second;
             return it->second;
+        }
+        if (TProgram::deskTop) {
+            TRect desk = TProgram::deskTop->getExtent();
+            TRect clamped = clampToDesktop(w->getBounds(), desk);
+            w->locate(clamped);
         }
         char buf[32];
         std::snprintf(buf, sizeof(buf), "w%d", apiIdCounter++);
@@ -3213,7 +3243,9 @@ std::string api_move_window(TWwdosApp& app, const std::string& id, int x, int y)
 
     TRect newBounds = w->getBounds();
     newBounds.move(x - newBounds.a.x, y - newBounds.a.y);
-    w->locate(newBounds);
+    TRect desk = TProgram::deskTop->getExtent();
+    TRect clamped = clampToDesktop(newBounds, desk);
+    w->locate(clamped);
 
     if (app.ipcServer) {
         std::string payload = std::string("{\"id\":\"") + id + "\"}";
@@ -3229,7 +3261,9 @@ std::string api_resize_window(TWwdosApp& app, const std::string& id, int width, 
     TRect newBounds = w->getBounds();
     newBounds.b.x = newBounds.a.x + width;
     newBounds.b.y = newBounds.a.y + height;
-    w->locate(newBounds);
+    TRect desk = TProgram::deskTop->getExtent();
+    TRect clamped = clampToDesktop(newBounds, desk);
+    w->locate(clamped);
 
     if (app.ipcServer) {
         std::string payload = std::string("{\"id\":\"") + id + "\"}";

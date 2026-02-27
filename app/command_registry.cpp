@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <sys/stat.h>
 
+#include <algorithm>
 #include <sstream>
 
 // TRect for window bounds
@@ -17,6 +18,31 @@
 #define Uses_TProgram
 #define Uses_TDeskTop
 #include <tvision/tv.h>
+
+static TRect clampToDesktop(TRect bounds, const TRect& desk) {
+    const int minW = 10;
+    const int minH = 5;
+    const int deskW = std::max(1, desk.b.x - desk.a.x);
+    const int deskH = std::max(1, desk.b.y - desk.a.y);
+
+    int w = bounds.b.x - bounds.a.x;
+    int h = bounds.b.y - bounds.a.y;
+
+    if (w < minW) w = minW;
+    if (h < minH) h = minH;
+    if (w > deskW) w = deskW;
+    if (h > deskH) h = deskH;
+
+    int x = bounds.a.x;
+    int y = bounds.a.y;
+
+    if (x + w > desk.b.x) x = desk.b.x - w;
+    if (y + h > desk.b.y) y = desk.b.y - h;
+    if (x < desk.a.x) x = desk.a.x;
+    if (y < desk.a.y) y = desk.a.y;
+
+    return TRect(x, y, x + w, y + h);
+}
 
 extern void api_cascade(TWwdosApp& app);
 extern void api_toggle_scramble(TWwdosApp& app);
@@ -891,6 +917,11 @@ std::string exec_registry_command(
         int h = (int)((fy1 - fy0) * dh) - margin * 2;
         if (w < 10) w = 10;
         if (h < 5)  h = 5;
+        TRect clamped = clampToDesktop(TRect(x, y, x + w, y + h), desk);
+        x = clamped.a.x;
+        y = clamped.a.y;
+        w = clamped.b.x - clamped.a.x;
+        h = clamped.b.y - clamped.a.y;
 
         std::string r1 = api_resize_window(app, id_it->second, w, h);
         if (r1.rfind("err", 0) == 0) return r1;
