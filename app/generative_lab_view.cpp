@@ -351,7 +351,7 @@ public:
     virtual void draw() override {
         TDrawBuffer b;
         static const TColorAttr kPrev =
-            TColorAttr(TColorRGB(0xCC, 0xCC, 0xCC), TColorRGB(0x11, 0x11, 0x11));
+            TColorAttr(TColorRGB(0x00, 0x00, 0x00), TColorRGB(0xFF, 0xFF, 0xFF));
         for (int row = 0; row < size.y; ++row) {
             b.moveChar(0, ' ', kPrev, size.x);
             int idx = delta.y + row;
@@ -364,12 +364,22 @@ private:
     std::vector<std::string> lines_;
 };
 
-// Listbox that broadcasts focus changes for live preview
+// Listbox that broadcasts focus changes for live preview + mouse wheel scroll
 class TStampListBox : public TListBox {
 public:
     TStampListBox(const TRect& bounds, ushort cols, TScrollBar* sb)
-        : TListBox(bounds, cols, sb) {}
+        : TListBox(bounds, cols, sb) {
+        eventMask |= evMouseWheel;
+    }
     virtual void handleEvent(TEvent& ev) override {
+        // Mouse wheel scroll
+        if (ev.what == evMouseWheel) {
+            int delta = (ev.mouse.wheel == mwUp) ? -3 : 3;
+            focusItem(std::max(0, std::min((int)range - 1, focused + delta)));
+            message(owner, evBroadcast, cmStampFocus, this);
+            clearEvent(ev);
+            return;
+        }
         int prev = focused;
         TListBox::handleEvent(ev);
         if (focused != prev)
@@ -444,27 +454,33 @@ public:
         // Position + mode row
         int optY = btnY + 3;
         insert(new TLabel(TRect(3, optY, 12, optY + 1), "Position:", nullptr));
-        posRadio = new TRadioButtons(TRect(12, optY, 50, optY + 1),
+        posRadio = new TRadioButtons(TRect(12, optY, W - 14, optY + 3),
             new TSItem("~C~entre",
+            new TSItem("Rando~m~",
             new TSItem("~T~op-left",
-            new TSItem("Custom", nullptr))));
+            new TSItem("Top-ri~g~ht",
+            new TSItem("~B~ottom-right",
+            new TSItem("Bottom-le~f~t",
+            new TSItem("C~u~stom X,Y", nullptr))))))));
         ushort posVal = 0;
         posRadio->setData(&posVal);
         insert(posRadio);
 
-        insert(new TLabel(TRect(51, optY, 53, optY + 1), "X:", nullptr));
-        xInput = new TInputLine(TRect(53, optY, 59, optY + 1), 6);
+        // Custom X,Y inputs (to the right of the radio)
+        int xyX = W - 13;
+        insert(new TLabel(TRect(xyX, optY, xyX + 2, optY + 1), "X:", nullptr));
+        xInput = new TInputLine(TRect(xyX + 2, optY, xyX + 8, optY + 1), 6);
         char xd[] = "0";
         xInput->setData(xd);
         insert(xInput);
-        insert(new TLabel(TRect(60, optY, 62, optY + 1), "Y:", nullptr));
-        yInput = new TInputLine(TRect(62, optY, 68, optY + 1), 6);
+        insert(new TLabel(TRect(xyX, optY + 1, xyX + 2, optY + 2), "Y:", nullptr));
+        yInput = new TInputLine(TRect(xyX + 2, optY + 1, xyX + 8, optY + 2), 6);
         char yd[] = "0";
         yInput->setData(yd);
         insert(yInput);
 
         // Mode row
-        int optY2 = optY + 2;
+        int optY2 = optY + 4;
         modeRadio = new TRadioButtons(TRect(3, optY2, 50, optY2 + 1),
             new TSItem("~L~ocked (immune to rules)",
             new TSItem("Se~e~ded (rules can modify)", nullptr)));
@@ -491,7 +507,14 @@ public:
 
     void rebuildLists() {
         availList->newList(makeStrCol(availNames));
-        selectedList->newList(makeStrCol(selNames));
+        // Selected list shows name + position mode
+        ushort posMode = 0;
+        posRadio->getData(&posMode);
+        std::vector<std::string> selDisplay;
+        for (auto& n : selNames) {
+            selDisplay.push_back(n + " " + posModeName(posMode));
+        }
+        selectedList->newList(makeStrCol(selDisplay));
     }
 
     void addSelected() {
@@ -549,6 +572,20 @@ public:
         }
     }
 
+    // Position mode names for display in selected list
+    static const char* posModeName(ushort mode) {
+        switch (mode) {
+            case 0: return "@C";   // centre
+            case 1: return "@?";   // random
+            case 2: return "@TL";  // top-left
+            case 3: return "@TR";  // top-right
+            case 4: return "@BR";  // bottom-right
+            case 5: return "@BL";  // bottom-left
+            case 6: return "@XY";  // custom
+        }
+        return "@C";
+    }
+
     std::vector<GenStamp> getStamps(int canvasW, int canvasH) const {
         std::vector<GenStamp> stamps;
         ushort posMode = 0;
@@ -576,11 +613,27 @@ public:
                     st.x = std::max(0, (canvasW - pw) / 2);
                     st.y = std::max(0, (canvasH - ph) / 2);
                     break;
-                case 1: // Top-left
+                case 1: // Random
+                    st.x = std::rand() % std::max(1, canvasW - pw);
+                    st.y = std::rand() % std::max(1, canvasH - ph);
+                    break;
+                case 2: // Top-left
                     st.x = 0;
                     st.y = 0;
                     break;
-                case 2: // Custom
+                case 3: // Top-right
+                    st.x = std::max(0, canvasW - pw);
+                    st.y = 0;
+                    break;
+                case 4: // Bottom-right
+                    st.x = std::max(0, canvasW - pw);
+                    st.y = std::max(0, canvasH - ph);
+                    break;
+                case 5: // Bottom-left
+                    st.x = 0;
+                    st.y = std::max(0, canvasH - ph);
+                    break;
+                case 6: // Custom
                     st.x = customX;
                     st.y = customY;
                     break;
