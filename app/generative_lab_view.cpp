@@ -11,6 +11,7 @@
 #include <sys/stat.h>
 #include <dirent.h>
 #include <algorithm>
+#include <set>
 
 #define Uses_TDialog
 #define Uses_TButton
@@ -245,144 +246,388 @@ void TGenerativeLabView::saveToFile() {
 
 // ── Stamp picker dialog ──────────────────────────────────
 
-// Unsorted string collection for TListBox
-class TPrimerCollection : public TCollection {
+static const ushort cmStampAdd    = 1100;
+static const ushort cmStampRemove = 1101;
+static const ushort cmStampGo     = 1102;
+static const ushort cmStampRnd3   = 1103;
+static const ushort cmStampClear  = 1104;
+static const ushort cmStampFocus  = 1105;
+
+// Scan primer dirs, return (stem, full-path) pairs, sorted, deduped
+static void scanGenPrimers(std::vector<std::string>& names,
+                           std::vector<std::string>& fullPaths) {
+    names.clear();
+    fullPaths.clear();
+    std::set<std::string> seen;
+
+    auto scanDir = [&](const std::string& dir) {
+        DIR* d = opendir(dir.c_str());
+        if (!d) return;
+        struct dirent* entry;
+        while ((entry = readdir(d)) != nullptr) {
+            std::string fname(entry->d_name);
+            if (fname.size() > 4 && fname.substr(fname.size() - 4) == ".txt") {
+                std::string stem = fname.substr(0, fname.size() - 4);
+                if (seen.insert(stem).second) {
+                    names.push_back(stem);
+                    fullPaths.push_back(dir + "/" + fname);
+                }
+            }
+        }
+        closedir(d);
+    };
+
+    scanDir("modules-private/wibwob-primers/primers");
+    scanDir("modules/example-primers/primers");
+    std::string pd = findPrimerDir();
+    if (!pd.empty()) scanDir(pd);
+
+    // Sort both arrays together
+    std::vector<size_t> idx(names.size());
+    for (size_t i = 0; i < idx.size(); ++i) idx[i] = i;
+    std::sort(idx.begin(), idx.end(), [&](size_t a, size_t b) {
+        return names[a] < names[b];
+    });
+    std::vector<std::string> sn, sp;
+    for (auto i : idx) { sn.push_back(names[i]); sp.push_back(fullPaths[i]); }
+    names = sn;
+    fullPaths = sp;
+}
+
+static TStringCollection* makeStrCol(const std::vector<std::string>& items) {
+    auto* col = new TStringCollection(std::max((int)items.size(), 1), 10);
+    for (auto& s : items)
+        col->insert(newStr(s.c_str()));
+    return col;
+}
+
+// Read primer file, skip # comment lines, return dimensions
+static void primerDimensions(const std::string& path, int& outW, int& outH) {
+    outW = 0; outH = 0;
+    FILE* f = fopen(path.c_str(), "r");
+    if (!f) return;
+    char line[1024];
+    while (fgets(line, sizeof(line), f)) {
+        const char* p = line;
+        while (*p == ' ' || *p == '\t') ++p;
+        if (*p == '#') continue;
+        int len = (int)strlen(line);
+        if (len > 0 && line[len-1] == '\n') len--;
+        if (len > outW) outW = len;
+        outH++;
+    }
+    fclose(f);
+}
+
+// Preview: TScroller that displays primer file content (skipping # lines)
+class TStampPreview : public TScroller {
 public:
-    TPrimerCollection(short aLimit, short aDelta)
-        : TCollection(aLimit, aDelta) {}
-    virtual void freeItem(void* item) override { delete[] (char*)item; }
+    TStampPreview(const TRect& bounds, TScrollBar* vsb)
+        : TScroller(bounds, nullptr, vsb) {
+        growMode = gfGrowHiX | gfGrowHiY;
+    }
+
+    void loadFile(const std::string& path) {
+        lines_.clear();
+        FILE* f = fopen(path.c_str(), "r");
+        if (!f) return;
+        char buf[1024];
+        while (fgets(buf, sizeof(buf), f)) {
+            const char* p = buf;
+            while (*p == ' ' || *p == '\t') ++p;
+            if (*p == '#') continue;
+            int len = (int)strlen(buf);
+            if (len > 0 && buf[len-1] == '\n') buf[len-1] = '\0';
+            lines_.push_back(buf);
+        }
+        fclose(f);
+        setLimit(0, std::max(0, (int)lines_.size() - size.y));
+        scrollTo(0, 0);
+        drawView();
+    }
+
+    void clear() { lines_.clear(); drawView(); }
+
+    virtual void draw() override {
+        TDrawBuffer b;
+        static const TColorAttr kPrev =
+            TColorAttr(TColorRGB(0xCC, 0xCC, 0xCC), TColorRGB(0x11, 0x11, 0x11));
+        for (int row = 0; row < size.y; ++row) {
+            b.moveChar(0, ' ', kPrev, size.x);
+            int idx = delta.y + row;
+            if (idx >= 0 && idx < (int)lines_.size())
+                b.moveStr(0, TStringView(lines_[idx]), kPrev);
+            writeLine(0, row, size.x, 1, b);
+        }
+    }
 private:
-    virtual void* readItem(ipstream&) override { return nullptr; }
-    virtual void writeItem(void*, opstream&) override {}
+    std::vector<std::string> lines_;
+};
+
+// Listbox that broadcasts focus changes for live preview
+class TStampListBox : public TListBox {
+public:
+    TStampListBox(const TRect& bounds, ushort cols, TScrollBar* sb)
+        : TListBox(bounds, cols, sb) {}
+    virtual void handleEvent(TEvent& ev) override {
+        int prev = focused;
+        TListBox::handleEvent(ev);
+        if (focused != prev)
+            message(owner, evBroadcast, cmStampFocus, this);
+    }
+};
+
+class TStampDialog : public TDialog {
+public:
+    TStampListBox*   availList;
+    TListBox*        selectedList;
+    TStampPreview*   preview;
+    TScrollBar*      availSB;
+    TScrollBar*      selectedSB;
+    TScrollBar*      previewSB;
+    TRadioButtons*   modeRadio;
+    TRadioButtons*   posRadio;
+    TInputLine*      xInput;
+    TInputLine*      yInput;
+
+    std::vector<std::string> availNames;
+    std::vector<std::string> availPaths;
+    std::vector<std::string> selNames;
+    std::vector<std::string> selPaths;
+
+    TStampDialog(const TRect& bounds,
+                 const std::vector<std::string>& names,
+                 const std::vector<std::string>& paths)
+        : TDialog(bounds, "Stamp Primers")
+        , TWindowInit(&TStampDialog::initFrame)
+        , availNames(names)
+        , availPaths(paths)
+    {
+        const int W = bounds.b.x - bounds.a.x;
+        const int H = bounds.b.y - bounds.a.y;
+
+        // 3-column layout: Available | Preview | Selected
+        const int listTop = 2;
+        const int listH   = std::max(8, H - 11);
+        const int colW    = std::max(15, (W - 6) / 4);
+        const int prevX1  = 3 + colW + 1;
+        const int prevX2  = W - 3 - colW - 1;
+
+        // Available (left)
+        insert(new TLabel(TRect(3, listTop - 1, 3 + colW, listTop), "~A~vailable", nullptr));
+        availSB = new TScrollBar(TRect(2 + colW, listTop, 3 + colW, listTop + listH));
+        insert(availSB);
+        availList = new TStampListBox(TRect(3, listTop, 2 + colW, listTop + listH), 1, availSB);
+        insert(availList);
+
+        // Preview (centre)
+        insert(new TLabel(TRect(prevX1, listTop - 1, prevX2, listTop), "Preview", nullptr));
+        previewSB = new TScrollBar(TRect(prevX2 - 1, listTop, prevX2, listTop + listH));
+        insert(previewSB);
+        preview = new TStampPreview(TRect(prevX1, listTop, prevX2 - 1, listTop + listH), previewSB);
+        insert(preview);
+
+        // Selected (right)
+        insert(new TLabel(TRect(prevX2 + 1, listTop - 1, W - 3, listTop), "~S~elected", nullptr));
+        selectedSB = new TScrollBar(TRect(W - 4, listTop, W - 3, listTop + listH));
+        insert(selectedSB);
+        selectedList = new TListBox(TRect(prevX2 + 1, listTop, W - 4, listTop + listH), 1, selectedSB);
+        insert(selectedList);
+
+        // Buttons below lists
+        int btnY = listTop + listH + 1;
+        insert(new TButton(TRect(3,  btnY, 14, btnY + 2), "~A~dd ->",    cmStampAdd,    bfNormal));
+        insert(new TButton(TRect(15, btnY, 28, btnY + 2), "<- ~R~emove", cmStampRemove, bfNormal));
+        insert(new TButton(TRect(29, btnY, 42, btnY + 2), "+~3~ random", cmStampRnd3,   bfNormal));
+        insert(new TButton(TRect(43, btnY, 54, btnY + 2), "C~l~ear",     cmStampClear,  bfNormal));
+
+        // Position + mode row
+        int optY = btnY + 3;
+        insert(new TLabel(TRect(3, optY, 12, optY + 1), "Position:", nullptr));
+        posRadio = new TRadioButtons(TRect(12, optY, 50, optY + 1),
+            new TSItem("~C~entre",
+            new TSItem("~T~op-left",
+            new TSItem("Custom", nullptr))));
+        ushort posVal = 0;
+        posRadio->setData(&posVal);
+        insert(posRadio);
+
+        insert(new TLabel(TRect(51, optY, 53, optY + 1), "X:", nullptr));
+        xInput = new TInputLine(TRect(53, optY, 59, optY + 1), 6);
+        char xd[] = "0";
+        xInput->setData(xd);
+        insert(xInput);
+        insert(new TLabel(TRect(60, optY, 62, optY + 1), "Y:", nullptr));
+        yInput = new TInputLine(TRect(62, optY, 68, optY + 1), 6);
+        char yd[] = "0";
+        yInput->setData(yd);
+        insert(yInput);
+
+        // Mode row
+        int optY2 = optY + 2;
+        modeRadio = new TRadioButtons(TRect(3, optY2, 50, optY2 + 1),
+            new TSItem("~L~ocked (immune to rules)",
+            new TSItem("Se~e~ded (rules can modify)", nullptr)));
+        ushort modeVal = 0;
+        modeRadio->setData(&modeVal);
+        insert(modeRadio);
+
+        // Stamp! / Cancel
+        int goY = optY2 + 2;
+        insert(new TButton(TRect(W/2 - 12, goY, W/2 - 2, goY + 2),
+                           " Stamp! ", cmStampGo, bfDefault));
+        insert(new TButton(TRect(W/2 + 2, goY, W/2 + 12, goY + 2),
+                           "Cancel", cmCancel, bfNormal));
+
+        rebuildLists();
+        if (!availNames.empty()) updatePreview();
+    }
+
+    void updatePreview() {
+        int idx = availList->focused;
+        if (idx < 0 || idx >= (int)availPaths.size()) { preview->clear(); return; }
+        preview->loadFile(availPaths[idx]);
+    }
+
+    void rebuildLists() {
+        availList->newList(makeStrCol(availNames));
+        selectedList->newList(makeStrCol(selNames));
+    }
+
+    void addSelected() {
+        int idx = availList->focused;
+        if (idx < 0 || idx >= (int)availNames.size()) return;
+        selNames.push_back(availNames[idx]);
+        selPaths.push_back(availPaths[idx]);
+        rebuildLists();
+    }
+
+    void removeSelected() {
+        int idx = selectedList->focused;
+        if (idx < 0 || idx >= (int)selNames.size()) return;
+        selNames.erase(selNames.begin() + idx);
+        selPaths.erase(selPaths.begin() + idx);
+        rebuildLists();
+    }
+
+    void randomAdd(int n) {
+        int pool = (int)availNames.size();
+        if (pool == 0) return;
+        for (int i = 0; i < n; ++i) {
+            int r = std::rand() % pool;
+            selNames.push_back(availNames[r]);
+            selPaths.push_back(availPaths[r]);
+        }
+        rebuildLists();
+    }
+
+    void clearSelected() {
+        selNames.clear();
+        selPaths.clear();
+        rebuildLists();
+    }
+
+    virtual void handleEvent(TEvent& ev) override {
+        TDialog::handleEvent(ev);
+        if (ev.what == evCommand) {
+            switch (ev.message.command) {
+                case cmStampAdd:    addSelected();    clearEvent(ev); break;
+                case cmStampRemove: removeSelected(); clearEvent(ev); break;
+                case cmStampRnd3:   randomAdd(3);     clearEvent(ev); break;
+                case cmStampClear:  clearSelected();  clearEvent(ev); break;
+                case cmStampGo:
+                    endModal(cmStampGo);
+                    clearEvent(ev);
+                    break;
+            }
+        }
+        if (ev.what == evBroadcast &&
+            ev.message.command == cmStampFocus &&
+            ev.message.infoPtr == availList) {
+            updatePreview();
+            clearEvent(ev);
+        }
+    }
+
+    std::vector<GenStamp> getStamps(int canvasW, int canvasH) const {
+        std::vector<GenStamp> stamps;
+        ushort posMode = 0;
+        posRadio->getData(&posMode);
+        ushort lockMode = 0;
+        modeRadio->getData(&lockMode);
+        bool locked = (lockMode == 0);
+
+        char xbuf[8] = {}, ybuf[8] = {};
+        xInput->getData(xbuf);
+        yInput->getData(ybuf);
+        int customX = std::atoi(xbuf);
+        int customY = std::atoi(ybuf);
+
+        for (size_t i = 0; i < selPaths.size(); ++i) {
+            GenStamp st;
+            st.path = selPaths[i];
+            st.locked = locked;
+
+            int pw = 0, ph = 0;
+            primerDimensions(st.path, pw, ph);
+
+            switch (posMode) {
+                case 0: // Centre
+                    st.x = std::max(0, (canvasW - pw) / 2);
+                    st.y = std::max(0, (canvasH - ph) / 2);
+                    break;
+                case 1: // Top-left
+                    st.x = 0;
+                    st.y = 0;
+                    break;
+                case 2: // Custom
+                    st.x = customX;
+                    st.y = customY;
+                    break;
+            }
+
+            stamps.push_back(st);
+        }
+        return stamps;
+    }
 };
 
 void TGenerativeLabView::openStampPicker() {
-    // Gather primer files from all primer dirs
-    std::vector<std::string> files;
-    std::vector<std::string> paths;
+    std::vector<std::string> names, paths;
+    scanGenPrimers(names, paths);
 
-    const char* dirs[] = {
-        "modules-private/wibwob-primers/primers",
-        "modules/example-primers/primers",
-        nullptr
-    };
-
-    // Also try findPrimerDir()
-    std::string primerDir = findPrimerDir();
-
-    for (int i = 0; dirs[i] || i == 0; ++i) {
-        std::string d = (i < 2 && dirs[i]) ? dirs[i] : primerDir;
-        if (d.empty()) continue;
-        DIR* dp = opendir(d.c_str());
-        if (!dp) continue;
-        struct dirent* entry;
-        while ((entry = readdir(dp)) != nullptr) {
-            std::string name(entry->d_name);
-            if (name.size() < 5) continue;
-            if (name.substr(name.size() - 4) != ".txt") continue;
-            // Avoid dupes
-            bool dup = false;
-            for (const auto& f : files) if (f == name) { dup = true; break; }
-            if (!dup) {
-                files.push_back(name);
-                paths.push_back(d + "/" + name);
-            }
-        }
-        closedir(dp);
-        if (i >= 2) break;  // primerDir was the fallback
-    }
-
-    if (files.empty()) {
+    if (names.empty()) {
         flashMsg_ = "No primer files found";
         flashTime_ = time(nullptr);
         drawView();
         return;
     }
 
-    // Sort alphabetically
-    std::vector<size_t> idx(files.size());
-    for (size_t i = 0; i < idx.size(); ++i) idx[i] = i;
-    std::sort(idx.begin(), idx.end(), [&](size_t a, size_t b) {
-        return files[a] < files[b];
-    });
-
-    // Build collection
-    auto* col = new TPrimerCollection(files.size(), 1);
-    for (size_t i = 0; i < idx.size(); ++i) {
-        col->atInsert(i, newStr(files[idx[i]].c_str()));
-    }
-
-    // Build dialog
-    int dlgW = 50;
-    int dlgH = std::min(20, (int)files.size() + 7);
+    // Dialog at 90% of view size
+    int dlgW = std::max(70, size.x * 9 / 10);
+    int dlgH = std::max(20, size.y * 9 / 10);
     TRect dr(0, 0, dlgW, dlgH);
     dr.move((size.x - dlgW) / 2, (size.y - dlgH) / 2);
 
-    auto* dlg = new TDialog(dr, "Stamp Primer");
-
-    // Scrollbar for list
-    TRect sbr(dlgW - 4, 2, dlgW - 3, dlgH - 5);
-    auto* sb = new TScrollBar(sbr);
-    dlg->insert(sb);
-
-    // List box
-    TRect lr(2, 2, dlgW - 4, dlgH - 5);
-    auto* lb = new TListBox(lr, 1, sb);
-    lb->newList(col);
-    dlg->insert(lb);
-    dlg->insert(new TLabel(TRect(2, 1, 20, 2), "~P~rimers:", lb));
-
-    // Locked radio buttons
-    TRect cbr(2, dlgH - 5, dlgW - 15, dlgH - 3);
-    auto* rb = new TRadioButtons(cbr,
-        new TSItem("~L~ocked (immune to rules)",
-        new TSItem("~S~eeded (rules can modify)", nullptr)));
-    ushort rbVal = 0;  // default: locked (item 0)
-    rb->setData(&rbVal);
-    dlg->insert(rb);
-
-    // OK / Cancel
-    dlg->insert(new TButton(TRect(dlgW - 14, dlgH - 4, dlgW - 4, dlgH - 2),
-                             "~S~tamp", cmOK, bfDefault));
+    auto* dlg = new TStampDialog(dr, names, paths);
     dlg->selectNext(False);
 
-    // Execute
     ushort result = owner->execView(dlg);
-    if (result == cmOK) {
-        short sel = lb->focused;
-        if (sel >= 0 && sel < (short)idx.size()) {
-            size_t fileIdx = idx[sel];
-            GenStamp st;
-            st.path = paths[fileIdx];
-            ushort rbResult = 0;
-            rb->getData(&rbResult);
-            st.locked = (rbResult == 0);  // 0 = locked, 1 = seeded
-            // Centre the stamp
-            // Read file to get dimensions
-            FILE* f = fopen(st.path.c_str(), "r");
-            int maxW = 0, lineCount = 0;
-            if (f) {
-                char line[1024];
-                while (fgets(line, sizeof(line), f)) {
-                    int len = (int)strlen(line);
-                    if (len > 0 && line[len-1] == '\n') len--;
-                    if (len > maxW) maxW = len;
-                    lineCount++;
-                }
-                fclose(f);
-            }
-            // Centre in grid coords
-            int contentW = size.x - 2;
-            int contentH = size.y - 3;
-            // For binary substrate, grid is half screen size
-            int gw = contentW / 2;
-            int gh = contentH / 2;
-            st.x = std::max(0, (gw - maxW) / 2);
-            st.y = std::max(0, (gh - lineCount) / 2);
+    if (result == cmStampGo) {
+        // Compute canvas size for positioning
+        int canvasW = size.x - 2;
+        int canvasH = size.y - 3;
+        // Binary substrate uses half-size grid
+        int gw = canvasW / 2;
+        int gh = canvasH / 2;
 
-            stamps_.push_back(st);
-            flashMsg_ = "Stamped: " + files[fileIdx]
-                + (st.locked ? " [locked]" : " [seeded]");
+        auto newStamps = dlg->getStamps(gw, gh);
+        if (!newStamps.empty()) {
+            // Append to existing stamps (additive)
+            for (auto& s : newStamps)
+                stamps_.push_back(s);
+            flashMsg_ = "Stamped " + std::to_string(newStamps.size())
+                + " primer" + (newStamps.size() > 1 ? "s" : "");
             flashTime_ = time(nullptr);
             relaunch();
         }

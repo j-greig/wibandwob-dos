@@ -101,9 +101,14 @@ class Grid:
 
     def stamp_text(self, text: str, ox: int, oy: int, locked: bool = True):
         """Stamp ASCII art text onto grid. Non-space chars become alive cells.
-        If locked=True, these cells are immune to all rules."""
+        If locked=True, these cells are immune to all rules.
+        Lines starting with # are skipped (internal-facing descriptions)."""
         lines = text.split('\n')
-        for dy, line in enumerate(lines):
+        dy = 0
+        for line in lines:
+            stripped = line.lstrip()
+            if stripped.startswith('#'):
+                continue  # skip comment lines
             for dx, ch in enumerate(line):
                 if ch == ' ':
                     continue
@@ -114,6 +119,7 @@ class Grid:
                     self.cells[y][x].age = 0
                     if locked:
                         self.locked.add((x, y))
+            dy += 1
 
     def stamp_file(self, path: str, ox: int, oy: int, locked: bool = True):
         """Load ASCII art from file and stamp onto grid."""
