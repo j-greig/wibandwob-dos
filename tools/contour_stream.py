@@ -51,9 +51,9 @@ def stream_static(width, height, seed, terrain_idx, levels, triptych,
     """Generate and dump a single frame."""
     tname = TERRAINS[terrain_idx][0].upper()
 
-    if mode == 'order':
+    if mode in ('order', 'order-spread'):
         lines = generate_ordered(width, height, seed, terrain_idx)
-        label = f"ORDER:{tname}"
+        label = f"ORDER:{tname}" if mode == 'order' else f"ORDER+:{tname}"
     elif mode == 'hybrid':
         lines = generate_hybrid(width, height, levels, seed, terrain_idx, order_ratio)
         label = f"HYBRID:{tname} {int(order_ratio*100)}%"
@@ -116,7 +116,7 @@ def main():
     parser.add_argument('--levels', type=int, default=5)
     parser.add_argument('--grow', action='store_true')
     parser.add_argument('--triptych', action='store_true')
-    parser.add_argument('--mode', choices=['chaos', 'order', 'hybrid'], default='chaos')
+    parser.add_argument('--mode', choices=['chaos', 'order', 'order-spread', 'hybrid'], default='chaos')
     parser.add_argument('--order-ratio', type=float, default=0.5,
                         help='Hybrid mode: 0.0=all contours, 1.0=all grids')
     parser.add_argument('--list-terrains', action='store_true')

@@ -34,8 +34,8 @@ public:
                int levels, bool grow, bool triptych,
                int mode = 0, float orderRatio = 0.5);
     void stop();
-    void pause();    // SIGSTOP
-    void resume();   // SIGCONT
+    void pause();    // SIGSTOP (process group)
+    void resume();   // SIGCONT (process group)
     bool isRunning() const { return pid_ > 0; }
     bool isPaused() const { return paused_; }
     int pipeFd() const { return pipeFd_; }
@@ -88,7 +88,7 @@ private:
     int levels_ = 5;
     bool grow_ = false;
     bool triptych_ = false;
-    int mode_ = 0;           // 0=chaos, 1=order, 2=hybrid
+    int mode_ = 0;           // 0=chaos, 1=order:pop, 2=order:spread, 3=hybrid
     float orderRatio_ = 0.5; // hybrid blend: 0.0=all contours, 1.0=all grids
 
     // Display state

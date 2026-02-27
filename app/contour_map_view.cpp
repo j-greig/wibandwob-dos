@@ -56,7 +56,8 @@ bool ContourBridge::start(int width, int height, int seed, int terrainIdx,
     if (grow) cmd += " --grow";
     if (triptych) cmd += " --triptych";
     if (mode == 1) cmd += " --mode order";
-    else if (mode == 2) cmd += " --mode hybrid --order-ratio " + std::to_string(orderRatio);
+    else if (mode == 2) cmd += " --mode order-spread";
+    else if (mode == 3) cmd += " --mode hybrid --order-ratio " + std::to_string(orderRatio);
     cmd += " 2>/tmp/contour_bridge_err.log";
 
     // Debug log
@@ -72,12 +73,18 @@ bool ContourBridge::start(int width, int height, int seed, int terrainIdx,
     }
 
     if (pid_ == 0) {
+        // Make the child the process-group leader so control signals can target
+        // both the shell and the python subprocess via -pid.
+        setpgid(0, 0);
         close(pipefd[0]);
         dup2(pipefd[1], STDOUT_FILENO);
         close(pipefd[1]);
         execl("/bin/sh", "sh", "-c", cmd.c_str(), nullptr);
         _exit(127);
     }
+
+    // Parent-side setpgid narrows a race where child execs before grouping.
+    setpgid(pid_, pid_);
 
     close(pipefd[1]);
     pipeFd_ = pipefd[0];
@@ -87,25 +94,25 @@ bool ContourBridge::start(int width, int height, int seed, int terrainIdx,
 
 void ContourBridge::pause() {
     if (pid_ > 0 && !paused_) {
-        kill(pid_, SIGSTOP);
+        kill(-pid_, SIGSTOP);
         paused_ = true;
     }
 }
 
 void ContourBridge::resume() {
     if (pid_ > 0 && paused_) {
-        kill(pid_, SIGCONT);
+        kill(-pid_, SIGCONT);
         paused_ = false;
     }
 }
 
 void ContourBridge::stop() {
     if (pid_ > 0) {
-        kill(pid_, SIGTERM);
+        kill(-pid_, SIGTERM);
         usleep(50000);
         int status;
         if (waitpid(pid_, &status, WNOHANG) == 0) {
-            kill(pid_, SIGKILL);
+            kill(-pid_, SIGKILL);
             waitpid(pid_, &status, 0);
         }
         pid_ = -1;
@@ -379,12 +386,14 @@ void TContourMapView::draw() {
 
         // Mode button
         int modeStart = (int)bar.size();
-        static const char* kModeLabels[] = {"[O:Chaos]", "[O:Order]", "[O:Hybrid]"};
-        bar += kModeLabels[mode_ % 3];
+        static const char* kModeLabels[] = {
+            "[O:Chaos]", "[O:Order:Pop]", "[O:Order:Spread]", "[O:Hybrid]"
+        };
+        bar += kModeLabels[mode_ % 4];
         int modeEnd = (int)bar.size();
         bar += " ";
 
-        if (mode_ == 2) {
+        if (mode_ == 3) {
             bar += "[C:" + std::to_string((int)(orderRatio_ * 100)) + "%]";
             bar += " ";
         }
@@ -538,9 +547,9 @@ void TContourMapView::handleEvent(TEvent& ev) {
             clearEvent(ev); return;
         }
 
-        // o — cycle mode: chaos → order → hybrid → chaos
+        // o — cycle mode: chaos → order:pop → order:spread → hybrid → chaos
         if (ch == 'o' || ch == 'O') {
-            mode_ = (mode_ + 1) % 3;
+            mode_ = (mode_ + 1) % 4;
             relaunch();
             clearEvent(ev); return;
         }
@@ -549,7 +558,7 @@ void TContourMapView::handleEvent(TEvent& ev) {
         if (ch == 'c' || ch == 'C') {
             orderRatio_ += 0.25f;
             if (orderRatio_ > 1.01f) orderRatio_ = 0.0f;
-            if (mode_ != 2) mode_ = 2;  // auto-switch to hybrid
+            if (mode_ != 3) mode_ = 3;  // auto-switch to hybrid
             relaunch();
             clearEvent(ev); return;
         }
