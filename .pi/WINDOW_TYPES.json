@@ -1,0 +1,583 @@
+{
+  "metadata": {
+    "source": "app/window_type_registry.cpp",
+    "total_registered": 36,
+    "agent_spawnable_count": 35,
+    "menu_only_count": 1,
+    "unregistered_in_code": 6,
+    "last_updated": "2026-02-27"
+  },
+  "registered_types": [
+    {
+      "slug": "test_pattern",
+      "agent_spawnable": true,
+      "window_class": "TTestPatternWindow",
+      "view_class": "TTestPatternView",
+      "spawn_function": "spawn_test",
+      "match_function": "match_test_pattern",
+      "include": null,
+      "properties": [
+        { "name": "x", "type": "int", "required": false, "default": "auto" },
+        { "name": "y", "type": "int", "required": false, "default": "auto" },
+        { "name": "w", "type": "int", "required": false, "default": "auto" },
+        { "name": "h", "type": "int", "required": false, "default": "auto" }
+      ],
+      "notes": "Fallback type when no matcher hits. App only spawns if no registered type matches."
+    },
+    {
+      "slug": "gradient",
+      "agent_spawnable": true,
+      "window_class": "TGradientWindow",
+      "view_class": "TGradientView",
+      "spawn_function": "spawn_gradient",
+      "match_function": "match_gradient",
+      "include": "gradient.h",
+      "properties": [
+        { "name": "gradient", "type": "string", "required": false, "default": "horizontal" },
+        { "name": "x", "type": "int", "required": false, "default": "auto" },
+        { "name": "y", "type": "int", "required": false, "default": "auto" },
+        { "name": "w", "type": "int", "required": false, "default": "auto" },
+        { "name": "h", "type": "int", "required": false, "default": "auto" }
+      ],
+      "notes": "Displays procedural gradient. Gradient param controls direction."
+    },
+    {
+      "slug": "frame_player",
+      "agent_spawnable": true,
+      "window_class": "TFrameAnimationWindow",
+      "view_class": "FrameFilePlayerView",
+      "spawn_function": "spawn_frame_player",
+      "match_function": "match_frame_player",
+      "include": "frame_file_player_view.h",
+      "properties": [
+        { "name": "path", "type": "string", "required": true, "default": null },
+        { "name": "frameless", "type": "bool", "required": false, "default": "false" },
+        { "name": "shadowless", "type": "bool", "required": false, "default": "false" },
+        { "name": "title", "type": "string", "required": false, "default": "" },
+        { "name": "x", "type": "int", "required": false, "default": "auto" },
+        { "name": "y", "type": "int", "required": false, "default": "auto" },
+        { "name": "w", "type": "int", "required": false, "default": "auto" },
+        { "name": "h", "type": "int", "required": false, "default": "auto" }
+      ],
+      "notes": "Path required. Frameless/shadowless are '1' or 'true' strings."
+    },
+    {
+      "slug": "text_view",
+      "agent_spawnable": true,
+      "window_class": "TTransparentTextWindow",
+      "view_class": "TTextFileView",
+      "spawn_function": "spawn_text_view",
+      "match_function": "match_text_view",
+      "include": "transparent_text_view.h",
+      "properties": [
+        { "name": "path", "type": "string", "required": true, "default": null },
+        { "name": "x", "type": "int", "required": false, "default": "auto" },
+        { "name": "y", "type": "int", "required": false, "default": "auto" },
+        { "name": "w", "type": "int", "required": false, "default": "auto" },
+        { "name": "h", "type": "int", "required": false, "default": "auto" }
+      ],
+      "notes": "Path required."
+    },
+    {
+      "slug": "text_editor",
+      "agent_spawnable": true,
+      "window_class": "TTextEditorWindow",
+      "view_class": "TTextEditorView",
+      "spawn_function": "spawn_text_editor",
+      "match_function": "match_text_editor",
+      "include": "text_editor_view.h",
+      "properties": [
+        { "name": "title", "type": "string", "required": false, "default": "Text Editor" },
+        { "name": "x", "type": "int", "required": false, "default": "auto" },
+        { "name": "y", "type": "int", "required": false, "default": "auto" },
+        { "name": "w", "type": "int", "required": false, "default": "auto" },
+        { "name": "h", "type": "int", "required": false, "default": "auto" }
+      ]
+    },
+    {
+      "slug": "browser",
+      "agent_spawnable": true,
+      "window_class": "TBrowserWindow",
+      "view_class": "TBrowserView",
+      "spawn_function": "spawn_browser",
+      "match_function": "match_browser",
+      "include": "browser_view.h",
+      "properties": [
+        { "name": "x", "type": "int", "required": false, "default": "auto" },
+        { "name": "y", "type": "int", "required": false, "default": "auto" },
+        { "name": "w", "type": "int", "required": false, "default": "auto" },
+        { "name": "h", "type": "int", "required": false, "default": "auto" }
+      ]
+    },
+    {
+      "slug": "verse",
+      "agent_spawnable": true,
+      "window_class": "TGenerativeVerseWindow",
+      "view_class": "TGenerativeVerseView",
+      "spawn_function": "spawn_verse",
+      "match_function": "match_verse",
+      "include": "generative_verse_view.h",
+      "properties": [
+        { "name": "x", "type": "int", "required": false, "default": "auto" },
+        { "name": "y", "type": "int", "required": false, "default": "auto" },
+        { "name": "w", "type": "int", "required": false, "default": "auto" },
+        { "name": "h", "type": "int", "required": false, "default": "auto" }
+      ]
+    },
+    {
+      "slug": "mycelium",
+      "agent_spawnable": true,
+      "window_class": "TGenerativeMyceliumWindow",
+      "view_class": "TGenerativeMyceliumView",
+      "spawn_function": "spawn_mycelium",
+      "match_function": "match_mycelium",
+      "include": "generative_mycelium_view.h",
+      "properties": [
+        { "name": "x", "type": "int", "required": false, "default": "auto" },
+        { "name": "y", "type": "int", "required": false, "default": "auto" },
+        { "name": "w", "type": "int", "required": false, "default": "auto" },
+        { "name": "h", "type": "int", "required": false, "default": "auto" }
+      ]
+    },
+    {
+      "slug": "orbit",
+      "agent_spawnable": true,
+      "window_class": "TGenerativeOrbitWindow",
+      "view_class": "TGenerativeOrbitView",
+      "spawn_function": "spawn_orbit",
+      "match_function": "match_orbit",
+      "include": "generative_orbit_view.h",
+      "properties": [
+        { "name": "x", "type": "int", "required": false, "default": "auto" },
+        { "name": "y", "type": "int", "required": false, "default": "auto" },
+        { "name": "w", "type": "int", "required": false, "default": "auto" },
+        { "name": "h", "type": "int", "required": false, "default": "auto" }
+      ]
+    },
+    {
+      "slug": "torus",
+      "agent_spawnable": true,
+      "window_class": "TGenerativeTorusWindow",
+      "view_class": "TGenerativeTorusView",
+      "spawn_function": "spawn_torus",
+      "match_function": "match_torus",
+      "include": "generative_torus_view.h",
+      "properties": [
+        { "name": "x", "type": "int", "required": false, "default": "auto" },
+        { "name": "y", "type": "int", "required": false, "default": "auto" },
+        { "name": "w", "type": "int", "required": false, "default": "auto" },
+        { "name": "h", "type": "int", "required": false, "default": "auto" }
+      ]
+    },
+    {
+      "slug": "cube",
+      "agent_spawnable": true,
+      "window_class": "TGenerativeCubeWindow",
+      "view_class": "TGenerativeCubeView",
+      "spawn_function": "spawn_cube",
+      "match_function": "match_cube",
+      "include": "generative_cube_view.h",
+      "properties": [
+        { "name": "x", "type": "int", "required": false, "default": "auto" },
+        { "name": "y", "type": "int", "required": false, "default": "auto" },
+        { "name": "w", "type": "int", "required": false, "default": "auto" },
+        { "name": "h", "type": "int", "required": false, "default": "auto" }
+      ]
+    },
+    {
+      "slug": "life",
+      "agent_spawnable": true,
+      "window_class": "TGameOfLifeWindow",
+      "view_class": "TGameOfLifeView",
+      "spawn_function": "spawn_life",
+      "match_function": "match_life",
+      "include": "game_of_life_view.h",
+      "properties": [
+        { "name": "x", "type": "int", "required": false, "default": "auto" },
+        { "name": "y", "type": "int", "required": false, "default": "auto" },
+        { "name": "w", "type": "int", "required": false, "default": "auto" },
+        { "name": "h", "type": "int", "required": false, "default": "auto" }
+      ]
+    },
+    {
+      "slug": "blocks",
+      "agent_spawnable": true,
+      "window_class": "TAnimatedBlocksWindow",
+      "view_class": "TAnimatedBlocksView",
+      "spawn_function": "spawn_blocks",
+      "match_function": "match_blocks",
+      "include": "animated_blocks_view.h",
+      "properties": [
+        { "name": "x", "type": "int", "required": false, "default": "auto" },
+        { "name": "y", "type": "int", "required": false, "default": "auto" },
+        { "name": "w", "type": "int", "required": false, "default": "auto" },
+        { "name": "h", "type": "int", "required": false, "default": "auto" }
+      ]
+    },
+    {
+      "slug": "score",
+      "agent_spawnable": true,
+      "window_class": "TAnimatedScoreWindow",
+      "view_class": "TAnimatedScoreView",
+      "spawn_function": "spawn_score",
+      "match_function": "match_score",
+      "include": "animated_score_view.h",
+      "properties": [
+        { "name": "x", "type": "int", "required": false, "default": "auto" },
+        { "name": "y", "type": "int", "required": false, "default": "auto" },
+        { "name": "w", "type": "int", "required": false, "default": "auto" },
+        { "name": "h", "type": "int", "required": false, "default": "auto" }
+      ]
+    },
+    {
+      "slug": "ascii",
+      "agent_spawnable": true,
+      "window_class": "TAnimatedAsciiWindow",
+      "view_class": "TAnimatedAsciiView",
+      "spawn_function": "spawn_ascii",
+      "match_function": "match_ascii",
+      "include": "animated_ascii_view.h",
+      "properties": [
+        { "name": "x", "type": "int", "required": false, "default": "auto" },
+        { "name": "y", "type": "int", "required": false, "default": "auto" },
+        { "name": "w", "type": "int", "required": false, "default": "auto" },
+        { "name": "h", "type": "int", "required": false, "default": "auto" }
+      ]
+    },
+    {
+      "slug": "animated_gradient",
+      "agent_spawnable": true,
+      "window_class": "TAnimatedGradientWindow",
+      "view_class": "TAnimatedHGradientView",
+      "spawn_function": "spawn_animated_gradient",
+      "match_function": "match_animated_gradient",
+      "include": "animated_gradient_view.h",
+      "properties": [
+        { "name": "x", "type": "int", "required": false, "default": "auto" },
+        { "name": "y", "type": "int", "required": false, "default": "auto" },
+        { "name": "w", "type": "int", "required": false, "default": "auto" },
+        { "name": "h", "type": "int", "required": false, "default": "auto" }
+      ]
+    },
+    {
+      "slug": "monster_cam",
+      "agent_spawnable": true,
+      "window_class": "TGenerativeMonsterCamWindow",
+      "view_class": "TGenerativeMonsterCamView",
+      "spawn_function": "spawn_monster_cam",
+      "match_function": "match_monster_cam",
+      "include": "generative_monster_cam_view.h",
+      "properties": [
+        { "name": "x", "type": "int", "required": false, "default": "auto" },
+        { "name": "y", "type": "int", "required": false, "default": "auto" },
+        { "name": "w", "type": "int", "required": false, "default": "auto" },
+        { "name": "h", "type": "int", "required": false, "default": "auto" }
+      ]
+    },
+    {
+      "slug": "monster_verse",
+      "agent_spawnable": true,
+      "window_class": "TGenerativeMonsterVerseWindow",
+      "view_class": "TGenerativeMonsterVerseView",
+      "spawn_function": "spawn_monster_verse",
+      "match_function": "match_monster_verse",
+      "include": "generative_monster_verse_view.h",
+      "properties": [
+        { "name": "x", "type": "int", "required": false, "default": "auto" },
+        { "name": "y", "type": "int", "required": false, "default": "auto" },
+        { "name": "w", "type": "int", "required": false, "default": "auto" },
+        { "name": "h", "type": "int", "required": false, "default": "auto" }
+      ]
+    },
+    {
+      "slug": "contour_map",
+      "agent_spawnable": true,
+      "window_class": "TContourMapWindow",
+      "view_class": "TContourMapView",
+      "spawn_function": "spawn_contour_map",
+      "match_function": "match_contour_map",
+      "include": "contour_map_view.h",
+      "properties": [
+        { "name": "x", "type": "int", "required": false, "default": "auto" },
+        { "name": "y", "type": "int", "required": false, "default": "auto" },
+        { "name": "w", "type": "int", "required": false, "default": "auto" },
+        { "name": "h", "type": "int", "required": false, "default": "auto" }
+      ]
+    },
+    {
+      "slug": "generative_lab",
+      "agent_spawnable": true,
+      "window_class": "TGenerativeLabWindow",
+      "view_class": "TGenerativeLabView",
+      "spawn_function": "spawn_generative_lab",
+      "match_function": "match_generative_lab",
+      "include": "generative_lab_view.h",
+      "properties": [
+        { "name": "x", "type": "int", "required": false, "default": "auto" },
+        { "name": "y", "type": "int", "required": false, "default": "auto" },
+        { "name": "w", "type": "int", "required": false, "default": "auto" },
+        { "name": "h", "type": "int", "required": false, "default": "auto" }
+      ]
+    },
+    {
+      "slug": "monster_portal",
+      "agent_spawnable": true,
+      "window_class": "TGenerativeMonsterPortalWindow",
+      "view_class": "TGenerativeMonsterPortalView",
+      "spawn_function": "spawn_monster_portal",
+      "match_function": "match_monster_portal",
+      "include": "generative_monster_portal_view.h",
+      "properties": [
+        { "name": "x", "type": "int", "required": false, "default": "auto" },
+        { "name": "y", "type": "int", "required": false, "default": "auto" },
+        { "name": "w", "type": "int", "required": false, "default": "auto" },
+        { "name": "h", "type": "int", "required": false, "default": "auto" }
+      ]
+    },
+    {
+      "slug": "paint",
+      "agent_spawnable": true,
+      "window_class": "TPaintWindow",
+      "view_class": "TPaintCanvasView",
+      "spawn_function": "spawn_paint",
+      "match_function": "match_paint",
+      "include": "paint/paint_window.h",
+      "properties": [
+        { "name": "x", "type": "int", "required": false, "default": "auto" },
+        { "name": "y", "type": "int", "required": false, "default": "auto" },
+        { "name": "w", "type": "int", "required": false, "default": "auto" },
+        { "name": "h", "type": "int", "required": false, "default": "auto" }
+      ]
+    },
+    {
+      "slug": "micropolis_ascii",
+      "agent_spawnable": true,
+      "window_class": "TMicropolisAsciiWindow",
+      "view_class": "TMicropolisAsciiView",
+      "spawn_function": "spawn_micropolis_ascii",
+      "match_function": "match_micropolis_ascii",
+      "include": "micropolis_ascii_view.h",
+      "properties": [
+        { "name": "x", "type": "int", "required": false, "default": "auto" },
+        { "name": "y", "type": "int", "required": false, "default": "auto" },
+        { "name": "w", "type": "int", "required": false, "default": "auto" },
+        { "name": "h", "type": "int", "required": false, "default": "auto" }
+      ]
+    },
+    {
+      "slug": "terminal",
+      "agent_spawnable": true,
+      "window_class": "TWibWobTerminalWindow",
+      "view_class": "TerminalView",
+      "spawn_function": "spawn_terminal",
+      "match_function": "match_terminal",
+      "include": "tvterm_view.h",
+      "properties": [
+        { "name": "x", "type": "int", "required": false, "default": "auto" },
+        { "name": "y", "type": "int", "required": false, "default": "auto" },
+        { "name": "w", "type": "int", "required": false, "default": "auto" },
+        { "name": "h", "type": "int", "required": false, "default": "auto" }
+      ]
+    },
+    {
+      "slug": "room_chat",
+      "agent_spawnable": true,
+      "window_class": "TRoomChatWindow",
+      "view_class": "TRoomChatView",
+      "spawn_function": "spawn_room_chat",
+      "match_function": "match_room_chat",
+      "include": "room_chat_view.h",
+      "properties": [
+        { "name": "x", "type": "int", "required": false, "default": "auto" },
+        { "name": "y", "type": "int", "required": false, "default": "auto" },
+        { "name": "w", "type": "int", "required": false, "default": "auto" },
+        { "name": "h", "type": "int", "required": false, "default": "auto" }
+      ]
+    },
+    {
+      "slug": "wibwob",
+      "agent_spawnable": true,
+      "window_class": "TWibWobWindow",
+      "view_class": "ChatView",
+      "spawn_function": "inline_lambda",
+      "match_function": "match_wibwob",
+      "include": "wibwob_view.h",
+      "properties": [
+        { "name": "x", "type": "int", "required": false, "default": "auto" },
+        { "name": "y", "type": "int", "required": false, "default": "auto" },
+        { "name": "w", "type": "int", "required": false, "default": "auto" },
+        { "name": "h", "type": "int", "required": false, "default": "auto" }
+      ],
+      "notes": "Marked as internal-only but has spawn function (inline lambda)."
+    },
+    {
+      "slug": "scramble",
+      "agent_spawnable": false,
+      "window_class": "TScrambleWindow",
+      "view_class": "TScrambleView",
+      "spawn_function": null,
+      "match_function": "match_scramble",
+      "include": "scramble_view.h",
+      "properties": [],
+      "notes": "Menu-only. Recognized but NOT spawnable via IPC."
+    },
+    {
+      "slug": "quadra",
+      "agent_spawnable": true,
+      "window_class": "TQuadraWindow",
+      "view_class": "TQuadraView",
+      "spawn_function": "spawn_quadra",
+      "match_function": "match_quadra",
+      "include": "quadra_view.h",
+      "properties": [
+        { "name": "x", "type": "int", "required": false, "default": "auto" },
+        { "name": "y", "type": "int", "required": false, "default": "auto" },
+        { "name": "w", "type": "int", "required": false, "default": "auto" },
+        { "name": "h", "type": "int", "required": false, "default": "auto" }
+      ]
+    },
+    {
+      "slug": "snake",
+      "agent_spawnable": true,
+      "window_class": "TSnakeWindow",
+      "view_class": "TSnakeView",
+      "spawn_function": "spawn_snake",
+      "match_function": "match_snake",
+      "include": "snake_view.h",
+      "properties": [
+        { "name": "x", "type": "int", "required": false, "default": "auto" },
+        { "name": "y", "type": "int", "required": false, "default": "auto" },
+        { "name": "w", "type": "int", "required": false, "default": "auto" },
+        { "name": "h", "type": "int", "required": false, "default": "auto" }
+      ]
+    },
+    {
+      "slug": "rogue",
+      "agent_spawnable": true,
+      "window_class": "TRogueWindow",
+      "view_class": "TRogueView",
+      "spawn_function": "spawn_rogue",
+      "match_function": "match_rogue",
+      "include": "rogue_view.h",
+      "properties": [
+        { "name": "x", "type": "int", "required": false, "default": "auto" },
+        { "name": "y", "type": "int", "required": false, "default": "auto" },
+        { "name": "w", "type": "int", "required": false, "default": "auto" },
+        { "name": "h", "type": "int", "required": false, "default": "auto" }
+      ]
+    },
+    {
+      "slug": "deep_signal",
+      "agent_spawnable": true,
+      "window_class": "TDeepSignalWindow",
+      "view_class": "TDeepSignalView",
+      "spawn_function": "spawn_deep_signal",
+      "match_function": "match_deep_signal",
+      "include": "deep_signal_view.h",
+      "properties": [
+        { "name": "x", "type": "int", "required": false, "default": "auto" },
+        { "name": "y", "type": "int", "required": false, "default": "auto" },
+        { "name": "w", "type": "int", "required": false, "default": "auto" },
+        { "name": "h", "type": "int", "required": false, "default": "auto" }
+      ]
+    },
+    {
+      "slug": "app_launcher",
+      "agent_spawnable": true,
+      "window_class": "TAppLauncherWindow",
+      "view_class": "TAppLauncherView",
+      "spawn_function": "spawn_app_launcher",
+      "match_function": "match_app_launcher",
+      "include": "app_launcher_view.h",
+      "properties": [
+        { "name": "x", "type": "int", "required": false, "default": "auto" },
+        { "name": "y", "type": "int", "required": false, "default": "auto" },
+        { "name": "w", "type": "int", "required": false, "default": "auto" },
+        { "name": "h", "type": "int", "required": false, "default": "auto" }
+      ]
+    },
+    {
+      "slug": "gallery",
+      "agent_spawnable": true,
+      "window_class": "TGalleryWindow",
+      "view_class": "TAsciiGalleryView",
+      "spawn_function": "spawn_gallery",
+      "match_function": "match_gallery",
+      "include": "ascii_gallery_view.h",
+      "properties": [
+        { "name": "x", "type": "int", "required": false, "default": "auto" },
+        { "name": "y", "type": "int", "required": false, "default": "auto" },
+        { "name": "w", "type": "int", "required": false, "default": "auto" },
+        { "name": "h", "type": "int", "required": false, "default": "auto" }
+      ]
+    },
+    {
+      "slug": "figlet_text",
+      "agent_spawnable": true,
+      "window_class": "TFigletTextWindow",
+      "view_class": "TFigletTextView",
+      "spawn_function": "spawn_figlet_text",
+      "match_function": "match_figlet_text",
+      "include": "figlet_text_view.h",
+      "properties": [
+        { "name": "text", "type": "string", "required": true, "default": null },
+        { "name": "font", "type": "string", "required": false, "default": "standard" },
+        { "name": "frameless", "type": "bool", "required": false, "default": "false" },
+        { "name": "shadowless", "type": "bool", "required": false, "default": "false" },
+        { "name": "x", "type": "int", "required": false, "default": "auto" },
+        { "name": "y", "type": "int", "required": false, "default": "auto" },
+        { "name": "w", "type": "int", "required": false, "default": "auto" },
+        { "name": "h", "type": "int", "required": false, "default": "auto" }
+      ],
+      "notes": "Text required. Font defaults to 'standard'. Frameless/shadowless are '1' or 'true' strings."
+    }
+  ],
+  "unregistered_types": [
+    {
+      "slug": "ansi_mini",
+      "window_class": "TAnsiMiniWindow",
+      "file": "app/ansi_view.h",
+      "agent_spawnable": false,
+      "notes": "Not registered; not spawnable via IPC."
+    },
+    {
+      "slug": "ascii_image",
+      "window_class": "TAsciiImageWindow",
+      "file": "app/ascii_image_view.cpp",
+      "creation_function": "createAsciiImageWindowFromFile",
+      "agent_spawnable": false,
+      "notes": "Created only through file menu when opening image files."
+    },
+    {
+      "slug": "mech",
+      "window_class": "TMechWindow",
+      "file": "app/mech_window.h",
+      "agent_spawnable": false,
+      "notes": "Purpose unclear; may be experimental or deprecated."
+    },
+    {
+      "slug": "token_tracker",
+      "window_class": "TTokenTrackerWindow",
+      "file": "app/token_tracker_view.cpp",
+      "creation_function": "createTokenTrackerWindow",
+      "agent_spawnable": false,
+      "notes": "Likely used internally for tracking LLM token usage."
+    },
+    {
+      "slug": "wibwob_test_a",
+      "window_class": "TWibWobTestWindowA",
+      "file": "app/wibwob_scroll_test.h",
+      "creation_function": "createWibWobTestWindowA",
+      "agent_spawnable": false,
+      "notes": "Test/debug window for WibWob scroll behavior."
+    },
+    {
+      "slug": "wibwob_test_b",
+      "window_class": "TWibWobTestWindowB",
+      "file": "app/wibwob_scroll_test.h",
+      "creation_function": "createWibWobTestWindowB",
+      "agent_spawnable": false,
+      "notes": "Alternative test/debug window for WibWob scroll behavior."
+    }
+  ]
+}
