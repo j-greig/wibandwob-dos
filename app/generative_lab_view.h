@@ -27,13 +27,13 @@ struct GenStamp {
 
 // ── Preset names (must match Python PRESET_LIST order) ───
 static const char* kGenPresetNames[] = {
-    "game-of-life", "brians-brain", "eno-bloom", "coral-reef",
+    "game-of-life", "corners-bleed", "eno-bloom", "coral-reef",
     "mycelium", "crystal", "tidal", "erosion", "aurora", "spiral-life"
 };
 static const int kGenPresetCount = 10;
 
 static const char* kGenPresetLabels[] = {
-    "Life", "Brain", "Bloom", "Coral",
+    "Life", "Corners", "Bloom", "Coral",
     "Mycelium", "Crystal", "Tidal", "Erosion", "Aurora", "Spiral"
 };
 

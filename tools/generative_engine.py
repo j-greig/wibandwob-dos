@@ -1057,13 +1057,16 @@ PRESETS = {
         rules=[('grow_life', {'born': [3], 'survive': [2, 3]})],
         tick_ms=100,
     ),
-    'brians-brain': Preset(
-        name="Brian's Brain",
-        substrate='binary',
-        seeder='seed_random',
-        seeder_params={'density': 0.15},
-        rules=[('grow_brian', {})],
-        tick_ms=80,
+    'corners-bleed': Preset(
+        name='Corners Bleed',
+        substrate='block',
+        seeder='seed_clusters',
+        seeder_params={'count': 4, 'radius': 3},
+        rules=[
+            ('grow_diffuse', {'p': 0.4}),
+            ('symmetry', {'axis': 'rotate4'}),
+        ],
+        tick_ms=90,
     ),
     'eno-bloom': Preset(
         name='Eno Bloom',
