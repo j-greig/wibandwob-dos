@@ -57,14 +57,69 @@ def get_desktop_size() -> Tuple[int, int]:
     return (max_r, max_b)
 
 
-def snap_window(window_id: str, zone: str, margin: int = 0) -> str:
-    """Snap a window to a named zone. Returns 'ok' or error string."""
-    zone = zone.lower().strip()
-    if zone not in ZONES:
-        return f"err unknown zone '{zone}' — valid: {', '.join(sorted(ZONES))}"
+def snap_window(window_id: str, zone: str, margin: int = 0,
+                cols: int = 0, rows: int = 0,
+                col: int = -1, row: int = -1,
+                colspan: int = 1, rowspan: int = 1) -> str:
+    """Snap a window to a named zone or grid cell.
 
+    Named zones:  tl, tr, bl, br, left, right, top, bottom, full, center
+    Grid mode:    cols=N rows=M with zone=tl/tr/bl/br (corner of grid)
+                  or col=C row=R for explicit cell (0-indexed)
+                  colspan/rowspan for multi-cell spans
+
+    Examples:
+        snap_window("w1", "tr")                    — top-right quarter
+        snap_window("w1", "bl", cols=3, rows=2)    — bottom-left of 3x2 grid (1/6)
+        snap_window("w1", "full", col=1, row=0, cols=3, rows=2, colspan=2)
+                                                    — top-middle two cells of 3x2
+    """
+    zone = zone.lower().strip()
     dw, dh = get_desktop_size()
-    fx0, fy0, fx1, fy1 = ZONES[zone]
+
+    if cols > 0 and rows > 0:
+        # Grid mode
+        cell_w = dw / cols
+        cell_h = dh / rows
+
+        if col >= 0 and row >= 0:
+            # Explicit cell position
+            gc, gr = col, row
+        elif zone in ("tl", "top", "left", "full"):
+            gc, gr = 0, 0
+        elif zone == "tr":
+            gc, gr = cols - colspan, 0
+        elif zone == "bl":
+            gc, gr = 0, rows - rowspan
+        elif zone == "br":
+            gc, gr = cols - colspan, rows - rowspan
+        elif zone == "center":
+            gc = (cols - colspan) // 2
+            gr = (rows - rowspan) // 2
+        elif zone == "right":
+            gc, gr = cols - colspan, 0
+            rowspan = rows
+        elif zone == "bottom":
+            gc, gr = 0, rows - rowspan
+            colspan = cols
+        else:
+            return f"err unknown zone '{zone}' for grid mode"
+
+        # Clamp to grid bounds
+        gc = max(0, min(gc, cols - 1))
+        gr = max(0, min(gr, rows - 1))
+        colspan = min(colspan, cols - gc)
+        rowspan = min(rowspan, rows - gr)
+
+        fx0 = gc * cell_w / dw
+        fy0 = gr * cell_h / dh
+        fx1 = (gc + colspan) * cell_w / dw
+        fy1 = (gr + rowspan) * cell_h / dh
+    else:
+        # Named zone mode
+        if zone not in ZONES:
+            return f"err unknown zone '{zone}' — valid: {', '.join(sorted(ZONES))}"
+        fx0, fy0, fx1, fy1 = ZONES[zone]
 
     x = int(fx0 * dw) + margin
     y = int(fy0 * dh) + margin
@@ -87,12 +142,32 @@ def snap_window(window_id: str, zone: str, margin: int = 0) -> str:
 
 def main():
     import argparse
-    parser = argparse.ArgumentParser(description="Snap a window to a zone")
+    parser = argparse.ArgumentParser(
+        description="Snap a window to a zone or grid cell",
+        epilog="""Examples:
+  snap_window w13 tr                        # top-right quarter
+  snap_window w13 bl --cols 3 --rows 2      # bottom-left 1/6
+  snap_window w13 full --col 1 --row 0 --cols 3 --rows 2 --colspan 2
+                                            # top-middle 2/6
+""",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     parser.add_argument("window_id", help="Window ID (e.g. w13)")
-    parser.add_argument("zone", help="Zone name: tl, tr, bl, br, left, right, top, bottom, full, center")
-    parser.add_argument("--margin", "-m", type=int, default=0, help="Margin/padding in cells (default 0)")
+    parser.add_argument("zone", help="Zone: tl, tr, bl, br, left, right, top, bottom, full, center")
+    parser.add_argument("--margin", "-m", type=int, default=0, help="Margin in cells (default 0)")
+    parser.add_argument("--cols", type=int, default=0, help="Grid columns (enables grid mode)")
+    parser.add_argument("--rows", type=int, default=0, help="Grid rows (enables grid mode)")
+    parser.add_argument("--col", type=int, default=-1, help="Explicit grid column (0-indexed)")
+    parser.add_argument("--row", type=int, default=-1, help="Explicit grid row (0-indexed)")
+    parser.add_argument("--colspan", type=int, default=1, help="Cells to span horizontally")
+    parser.add_argument("--rowspan", type=int, default=1, help="Cells to span vertically")
     args = parser.parse_args()
-    result = snap_window(args.window_id, args.zone, args.margin)
+    result = snap_window(
+        args.window_id, args.zone, args.margin,
+        cols=args.cols, rows=args.rows,
+        col=args.col, row=args.row,
+        colspan=args.colspan, rowspan=args.rowspan,
+    )
     print(result)
 
 

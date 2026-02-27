@@ -91,4 +91,38 @@ Phase 2 C++ version would do it in one.
 NOTE: discovered the IPC param inconsistency between api_ipc.cpp (width/height)
 and command_registry.cpp (w/h) for resize_window. Should be harmonised eventually.
 
-NEXT: commit phase 1, then build C++ native version.
+### 2026-02-27 15:50 — Arbitrary fractional placement
+
+User asked for a window at 1/6 canvas in BL. The fixed zone vocab couldn't
+express this directly. Had to compute manually: 1/3 wide x 1/2 tall = 1/6 area,
+placed at (0, 35) size 94x35.
+
+This reveals the need for a grid-based snap syntax beyond fixed zones. Proposal:
+
+  snap_window id=w15 zone=bl cols=3 rows=2
+
+Meaning: divide desktop into a 3x2 grid, place window in the bottom-left cell.
+This covers all fixed zones too (cols=2 rows=2 gives quarters, cols=2 rows=1
+gives halves). Much more expressive.
+
+Could also support multi-cell spans:
+  snap_window id=w15 col=0 row=1 colspan=2 rowspan=1 cols=3 rows=2
+  (bottom-left two-thirds of a 3x2 grid)
+
+### 2026-02-27 15:55 — C++ native + grid mode
+
+Added snap_window to command_registry.cpp with full grid support:
+- Named zones (tl, tr, bl, br, left, right, top, bottom, full, center)
+- Grid mode: cols=N rows=M with zone corner or explicit col/row
+- colspan/rowspan for multi-cell spans
+- margin parameter
+- Reads desktop extent directly from TProgram::deskTop->getExtent()
+- Returns JSON with final bounds
+
+Also updated Python snap_window.py with matching grid mode and CLI args.
+
+Still needs:
+- [ ] Register snap_window in capabilities list (command_registry.cpp)
+- [ ] Rebuild and test C++ version
+- [ ] Wire MCP tool (tui_snap_window)
+- [ ] Harmonise resize_window param names (w/h vs width/height)

@@ -197,6 +197,7 @@ const std::vector<CommandCapability>& get_command_capabilities() {
         {"raise_window", "Bring window to front of z-order and focus it (id param)", true},
         {"lower_window", "Send window to back of z-order (id param)", true},
         {"close_window", "Close a window by ID (id param)", true},
+        {"snap_window", "Snap window to a named zone or grid cell (id, zone params; optional: margin, cols, rows, col, row, colspan, rowspan). Zones: tl,tr,bl,br,left,right,top,bottom,full,center. Grid: cols+rows divides desktop into grid, zone picks corner or col+row picks cell.", true},
     };
     return capabilities;
 }
@@ -741,6 +742,117 @@ std::string exec_registry_command(
         auto id = kv.find("id");
         if (id == kv.end()) return "err missing id";
         return api_close_window(app, id->second);
+    }
+    // ── Zone-based snap ──────────────────────────────────────────────
+    if (name == "snap_window") {
+        auto id_it = kv.find("id");
+        auto zone_it = kv.find("zone");
+        if (id_it == kv.end()) return "err missing id";
+        if (zone_it == kv.end()) return "err missing zone";
+
+        std::string zone = zone_it->second;
+        int margin = kv.count("margin") ? std::atoi(kv.at("margin").c_str()) : 0;
+        int cols   = kv.count("cols")   ? std::atoi(kv.at("cols").c_str())   : 0;
+        int rows   = kv.count("rows")   ? std::atoi(kv.at("rows").c_str())   : 0;
+        int col    = kv.count("col")    ? std::atoi(kv.at("col").c_str())    : -1;
+        int row    = kv.count("row")    ? std::atoi(kv.at("row").c_str())    : -1;
+        int cspan  = kv.count("colspan") ? std::atoi(kv.at("colspan").c_str()) : 1;
+        int rspan  = kv.count("rowspan") ? std::atoi(kv.at("rowspan").c_str()) : 1;
+
+        // Get desktop extent
+        TRect desk = TProgram::deskTop->getExtent();
+        int dw = desk.b.x - desk.a.x;
+        int dh = desk.b.y - desk.a.y;
+        if (dw <= 0 || dh <= 0) return "err no desktop";
+
+        // Compute fractional rect
+        double fx0 = 0, fy0 = 0, fx1 = 1, fy1 = 1;
+
+        if (cols > 0 && rows > 0) {
+            // Grid mode
+            double cw = 1.0 / cols;
+            double ch = 1.0 / rows;
+            int gc = 0, gr = 0;
+
+            if (col >= 0 && row >= 0) {
+                gc = col; gr = row;
+            } else if (zone == "tl" || zone == "top" || zone == "left" || zone == "full") {
+                gc = 0; gr = 0;
+            } else if (zone == "tr") {
+                gc = cols - cspan; gr = 0;
+            } else if (zone == "bl") {
+                gc = 0; gr = rows - rspan;
+            } else if (zone == "br") {
+                gc = cols - cspan; gr = rows - rspan;
+            } else if (zone == "center") {
+                gc = (cols - cspan) / 2; gr = (rows - rspan) / 2;
+            } else if (zone == "right") {
+                gc = cols - cspan; gr = 0; rspan = rows;
+            } else if (zone == "bottom") {
+                gc = 0; gr = rows - rspan; cspan = cols;
+            } else {
+                return "err unknown zone '" + zone + "'";
+            }
+
+            // Clamp
+            if (gc < 0) gc = 0;
+            if (gr < 0) gr = 0;
+            if (gc + cspan > cols) cspan = cols - gc;
+            if (gr + rspan > rows) rspan = rows - gr;
+
+            fx0 = gc * cw;
+            fy0 = gr * ch;
+            fx1 = (gc + cspan) * cw;
+            fy1 = (gr + rspan) * ch;
+        } else {
+            // Named zone mode
+            struct ZoneDef { const char* name; double x0, y0, x1, y1; };
+            static const ZoneDef zones[] = {
+                {"tl",     0.0,  0.0,  0.5,  0.5},
+                {"tr",     0.5,  0.0,  1.0,  0.5},
+                {"bl",     0.0,  0.5,  0.5,  1.0},
+                {"br",     0.5,  0.5,  1.0,  1.0},
+                {"left",   0.0,  0.0,  0.5,  1.0},
+                {"right",  0.5,  0.0,  1.0,  1.0},
+                {"top",    0.0,  0.0,  1.0,  0.5},
+                {"bottom", 0.0,  0.5,  1.0,  1.0},
+                {"full",   0.0,  0.0,  1.0,  1.0},
+                {"center", 0.25, 0.25, 0.75, 0.75},
+                {nullptr, 0,0,0,0}
+            };
+            bool found = false;
+            for (int i = 0; zones[i].name; ++i) {
+                if (zone == zones[i].name) {
+                    fx0 = zones[i].x0; fy0 = zones[i].y0;
+                    fx1 = zones[i].x1; fy1 = zones[i].y1;
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                return "err unknown zone '" + zone
+                    + "' — valid: tl,tr,bl,br,left,right,top,bottom,full,center";
+            }
+        }
+
+        int x = (int)(fx0 * dw) + desk.a.x + margin;
+        int y = (int)(fy0 * dh) + desk.a.y + margin;
+        int w = (int)((fx1 - fx0) * dw) - margin * 2;
+        int h = (int)((fy1 - fy0) * dh) - margin * 2;
+        if (w < 10) w = 10;
+        if (h < 5)  h = 5;
+
+        std::string r1 = api_resize_window(app, id_it->second, w, h);
+        if (r1.rfind("err", 0) == 0) return r1;
+        std::string r2 = api_move_window(app, id_it->second, x, y);
+        if (r2.rfind("err", 0) == 0) return r2;
+
+        std::ostringstream os;
+        os << "{\"ok\":true,\"id\":\"" << json_escape(id_it->second) << "\""
+           << ",\"zone\":\"" << json_escape(zone) << "\""
+           << ",\"x\":" << x << ",\"y\":" << y
+           << ",\"w\":" << w << ",\"h\":" << h << "}";
+        return os.str();
     }
     return "err unknown command";
 }
