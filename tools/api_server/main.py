@@ -427,6 +427,37 @@ def make_app() -> FastAPI:
             raise HTTPException(status_code=422, detail=resp)
         return dict(resp)
 
+    # ── Generative Lab ──────────────────────────────────
+    @app.post("/gen_lab/{win_id}")
+    async def gen_lab_action(win_id: str, payload: Dict[str, Any] = {}) -> Dict[str, Any]:
+        """Control a Generative Lab window.
+
+        Actions:
+          get_info         — return current state (preset, seed, speed, stamps, status)
+          set_preset       — {name: "coral-reef"} or {index: 3}
+          set_seed         — {seed: 42}
+          new_seed         — random new seed, same preset
+          mutate           — new seed (M key)
+          pause            — pause generation
+          resume           — resume generation
+          toggle_pause     — toggle pause/resume (Space key)
+          step             — advance one tick when paused (. key)
+          save             — save current frame to exports/ (S key)
+          set_speed        — {ms: 100} (10-500)
+          set_max_ticks    — {ticks: 5000}
+          stamp            — {path: "...", mode: "locked|seeded|canvas", position: "centre|random|custom", x: 0, y: 0}
+          clear_stamps     — remove all stamps (X key)
+          cycle_preset     — next preset (TAB key)
+          list_primers     — return available primer files
+        """
+        action = payload.pop("action", None)
+        if not action:
+            raise HTTPException(status_code=400, detail="missing 'action' field")
+        resp = await ctl.gen_lab_action(win_id, action, payload)
+        if isinstance(resp, dict) and not resp.get("ok", True):
+            raise HTTPException(status_code=422, detail=resp.get("error", "gen_lab action failed"))
+        return resp
+
     @app.post("/browser/open")
     async def browser_open(payload: BrowserOpenReq) -> Dict[str, Any]:
         res = await ctl.browser_open(payload.url, payload.window_id, payload.mode)

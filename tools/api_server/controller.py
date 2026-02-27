@@ -453,6 +453,21 @@ class Controller:
     async def paint_clear(self, win_id: str) -> str:
         return send_cmd("paint_clear", {"id": win_id})
 
+    # ----- Generative Lab IPC -----
+    async def gen_lab_action(self, win_id: str, action: str, params: Dict[str, Any] = None) -> Any:
+        """Send an action to a Generative Lab window. Returns parsed JSON response."""
+        kv = {"id": win_id, "action": action}
+        if params:
+            for k, v in params.items():
+                kv[k] = str(v)
+        resp = send_cmd("gen_lab", kv)
+        if isinstance(resp, str) and resp.lower().startswith("err"):
+            return {"ok": False, "error": resp}
+        try:
+            return json.loads(resp)
+        except Exception:
+            return {"ok": True, "raw": resp}
+
     async def paint_export(self, win_id: str) -> Any:
         resp = send_cmd("paint_export", {"id": win_id})
         if isinstance(resp, str) and resp.lower().startswith("err"):

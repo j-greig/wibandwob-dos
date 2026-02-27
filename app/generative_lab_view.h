@@ -13,6 +13,7 @@
 
 #include <string>
 #include <vector>
+#include <map>
 
 // ── Stamp: ASCII art placed on canvas before generation ──
 
@@ -81,6 +82,10 @@ public:
     int seed() const { return seed_; }
     int presetIdx() const { return presetIdx_; }
     std::string presetName() const;
+
+    // API/IPC control surface — returns JSON response string
+    std::string handleApiAction(const std::string& action,
+                                const std::map<std::string, std::string>& params);
 
 private:
     void startTimer();

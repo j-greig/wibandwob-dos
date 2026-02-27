@@ -1151,6 +1151,258 @@ void TGenerativeLabView::changeBounds(const TRect& bounds) {
     }
 }
 
+// ── API / IPC action handler ─────────────────────────────
+
+std::string TGenerativeLabView::handleApiAction(
+    const std::string& action,
+    const std::map<std::string, std::string>& params) {
+
+    auto getStr = [&](const char* key, const std::string& def = "") -> std::string {
+        auto it = params.find(key);
+        return (it != params.end()) ? it->second : def;
+    };
+    auto getInt = [&](const char* key, int def = 0) -> int {
+        auto it = params.find(key);
+        return (it != params.end()) ? std::atoi(it->second.c_str()) : def;
+    };
+
+    // ── get_info: return current state as JSON ──
+    if (action == "get_info") {
+        std::string json = "{";
+        json += "\"preset\":\"" + presetName() + "\"";
+        json += ",\"preset_index\":" + std::to_string(presetIdx_);
+        json += ",\"seed\":" + std::to_string(seed_);
+        json += ",\"speed_ms\":" + std::to_string(periodMs_);
+        json += ",\"running\":" + std::string(bridge_.isRunning() ? "true" : "false");
+        json += ",\"paused\":" + std::string(bridge_.isPaused() ? "true" : "false");
+        json += ",\"canvas_mode\":" + std::string(canvasMode_ ? "true" : "false");
+        json += ",\"stamp_count\":" + std::to_string(stamps_.size());
+        json += ",\"max_ticks\":" + std::to_string(maxTicks_);
+        json += ",\"line_count\":" + std::to_string(lines_.size());
+        json += ",\"status\":\"" + statusLine_ + "\"";
+
+        // List stamps
+        json += ",\"stamps\":[";
+        for (size_t i = 0; i < stamps_.size(); ++i) {
+            if (i > 0) json += ",";
+            json += "{\"path\":\"" + stamps_[i].path + "\"";
+            json += ",\"x\":" + std::to_string(stamps_[i].x);
+            json += ",\"y\":" + std::to_string(stamps_[i].y);
+            json += ",\"locked\":" + std::string(stamps_[i].locked ? "true" : "false");
+            json += "}";
+        }
+        json += "]";
+
+        // List available presets
+        json += ",\"presets\":[";
+        for (int i = 0; i < kGenPresetCount; ++i) {
+            if (i > 0) json += ",";
+            json += "\"";
+            json += kGenPresetNames[i];
+            json += "\"";
+        }
+        json += ",\"random\"]";
+
+        json += "}";
+        return json;
+    }
+
+    // ── set_preset: by name or index ──
+    if (action == "set_preset") {
+        std::string name = getStr("name");
+        int idx = getInt("index", -1);
+        if (!name.empty()) {
+            if (name == "random") {
+                presetIdx_ = kGenPresetCount;
+            } else {
+                for (int i = 0; i < kGenPresetCount; ++i) {
+                    if (name == kGenPresetNames[i]) {
+                        presetIdx_ = i;
+                        break;
+                    }
+                }
+            }
+        } else if (idx >= 0 && idx <= kGenPresetCount) {
+            presetIdx_ = idx;
+        } else {
+            return "{\"ok\":false,\"error\":\"need name or index\"}";
+        }
+        seed_ = rand() % 100000;
+        relaunch();
+        return "{\"ok\":true,\"preset\":\"" + presetName() + "\",\"seed\":" + std::to_string(seed_) + "}";
+    }
+
+    // ── set_seed ──
+    if (action == "set_seed") {
+        seed_ = getInt("seed", rand() % 100000);
+        relaunch();
+        return "{\"ok\":true,\"seed\":" + std::to_string(seed_) + "}";
+    }
+
+    // ── new_seed (R key equivalent) ──
+    if (action == "new_seed") {
+        seed_ = rand() % 100000;
+        relaunch();
+        return "{\"ok\":true,\"seed\":" + std::to_string(seed_) + "}";
+    }
+
+    // ── mutate (M key equivalent) ──
+    if (action == "mutate") {
+        seed_ = rand() % 100000;
+        flashMsg_ = "MUTATED seed:" + std::to_string(seed_);
+        flashTime_ = time(nullptr);
+        relaunch();
+        return "{\"ok\":true,\"seed\":" + std::to_string(seed_) + "}";
+    }
+
+    // ── pause ──
+    if (action == "pause") {
+        if (bridge_.isRunning() && !bridge_.isPaused()) {
+            bridge_.pause();
+            flashMsg_ = "PAUSED"; flashTime_ = time(nullptr);
+            drawView();
+        }
+        return "{\"ok\":true,\"paused\":true}";
+    }
+
+    // ── resume ──
+    if (action == "resume") {
+        if (bridge_.isRunning() && bridge_.isPaused()) {
+            bridge_.resume();
+            flashMsg_ = "RESUMED"; flashTime_ = time(nullptr);
+            drawView();
+        }
+        return "{\"ok\":true,\"paused\":false}";
+    }
+
+    // ── toggle_pause (Space equivalent) ──
+    if (action == "toggle_pause") {
+        bool paused = false;
+        if (bridge_.isRunning()) {
+            if (bridge_.isPaused()) {
+                bridge_.resume();
+                flashMsg_ = "RESUMED"; flashTime_ = time(nullptr);
+            } else {
+                bridge_.pause();
+                flashMsg_ = "PAUSED"; flashTime_ = time(nullptr);
+                paused = true;
+            }
+            drawView();
+        }
+        return "{\"ok\":true,\"paused\":" + std::string(paused ? "true" : "false") + "}";
+    }
+
+    // ── step (. key equivalent — single tick when paused) ──
+    if (action == "step") {
+        if (bridge_.isRunning() && bridge_.isPaused()) {
+            bridge_.resume();
+            usleep(50000);
+            bridge_.pause();
+            pollPipe();
+            drawView();
+        }
+        return "{\"ok\":true}";
+    }
+
+    // ── save (S key equivalent) ──
+    if (action == "save") {
+        saveToFile();
+        return "{\"ok\":true}";
+    }
+
+    // ── set_speed ──
+    if (action == "set_speed") {
+        int ms = getInt("ms", (int)periodMs_);
+        periodMs_ = std::max(10, std::min(500, ms));
+        stopTimer(); startTimer();
+        return "{\"ok\":true,\"speed_ms\":" + std::to_string(periodMs_) + "}";
+    }
+
+    // ── set_max_ticks ──
+    if (action == "set_max_ticks") {
+        maxTicks_ = getInt("ticks", maxTicks_);
+        return "{\"ok\":true,\"max_ticks\":" + std::to_string(maxTicks_) + "}";
+    }
+
+    // ── stamp: add a primer stamp ──
+    if (action == "stamp") {
+        std::string path = getStr("path");
+        if (path.empty())
+            return "{\"ok\":false,\"error\":\"need path\"}";
+        std::string mode = getStr("mode", "locked");  // locked|seeded|canvas
+
+        GenStamp st;
+        st.path = path;
+        st.locked = (mode != "seeded" && mode != "canvas");
+        st.x = getInt("x", 0);
+        st.y = getInt("y", 0);
+
+        // Position shortcuts
+        std::string pos = getStr("position", "custom");
+        if (pos == "centre" || pos == "center") {
+            int contentW = size.x - 2;
+            int contentH = size.y - 3;
+            int gw = contentW / 2;
+            int gh = contentH / 2;
+            int pw = 0, ph = 0;
+            primerDimensions(path, pw, ph);
+            st.x = std::max(0, (gw - pw) / 2);
+            st.y = std::max(0, (gh - ph) / 2);
+        } else if (pos == "random") {
+            int gw = (size.x - 2) / 2;
+            int gh = (size.y - 3) / 2;
+            int pw = 0, ph = 0;
+            primerDimensions(path, pw, ph);
+            st.x = rand() % std::max(1, gw - pw);
+            st.y = rand() % std::max(1, gh - ph);
+        }
+
+        if (mode == "canvas") {
+            stamps_.clear();
+            stamps_.push_back(st);
+            canvasMode_ = true;
+        } else {
+            canvasMode_ = false;
+            stamps_.push_back(st);
+        }
+
+        flashMsg_ = "Stamped: " + path;
+        flashTime_ = time(nullptr);
+        relaunch();
+        return "{\"ok\":true,\"stamp_count\":" + std::to_string(stamps_.size())
+            + ",\"canvas_mode\":" + std::string(canvasMode_ ? "true" : "false") + "}";
+    }
+
+    // ── clear_stamps (X key equivalent) ──
+    if (action == "clear_stamps") {
+        clearStamps();
+        return "{\"ok\":true,\"stamp_count\":0}";
+    }
+
+    // ── cycle_preset (TAB equivalent) ──
+    if (action == "cycle_preset") {
+        presetIdx_ = (presetIdx_ + 1) % (kGenPresetCount + 1);
+        seed_ = rand() % 100000;
+        relaunch();
+        return "{\"ok\":true,\"preset\":\"" + presetName() + "\",\"seed\":" + std::to_string(seed_) + "}";
+    }
+
+    // ── list_primers: return available primer files ──
+    if (action == "list_primers") {
+        std::vector<std::string> names, paths;
+        scanGenPrimers(names, paths);
+        std::string json = "{\"ok\":true,\"primers\":[";
+        for (size_t i = 0; i < names.size(); ++i) {
+            if (i > 0) json += ",";
+            json += "{\"name\":\"" + names[i] + "\",\"path\":\"" + paths[i] + "\"}";
+        }
+        json += "]}";
+        return json;
+    }
+
+    return "{\"ok\":false,\"error\":\"unknown action: " + action + "\"}";
+}
+
 // ── Window ───────────────────────────────────────────────
 
 TGenerativeLabWindow::TGenerativeLabWindow(const TRect& bounds)

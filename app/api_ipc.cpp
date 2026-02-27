@@ -1,6 +1,7 @@
 #include "api_ipc.h"
 #include "command_registry.h"
 #include "core/json_utils.h"
+#include "generative_lab_view.h"
 #include "room_chat_view.h"
 #include "window_type_registry.h"
 
@@ -151,6 +152,7 @@ extern std::string api_close_window(TWwdosApp& app, const std::string& id);
 extern std::string api_get_canvas_size(TWwdosApp& app);
 extern void api_spawn_paint(TWwdosApp& app, const TRect* bounds);
 extern TPaintCanvasView* api_find_paint_canvas(TWwdosApp& app, const std::string& id);
+extern TGenerativeLabView* api_find_gen_lab_view(TWwdosApp& app, const std::string& id);
 extern std::string api_room_chat_receive(TWwdosApp& app, const std::string& sender, const std::string& text, const std::string& ts);
 extern std::string api_room_presence(TWwdosApp& app, const std::string& participants_json);
 extern std::string api_get_room_chat_pending(TWwdosApp& app);
@@ -751,6 +753,19 @@ void ApiIpcServer::poll() {
                     // Return inline as JSON
                     resp = "{\"text\":\"" + json_escape(text) + "\"}\n";
                 }
+            }
+        }
+    } else if (cmd == "gen_lab") {
+        auto id_it = kv.find("id");
+        auto action_it = kv.find("action");
+        if (id_it == kv.end() || action_it == kv.end()) {
+            resp = "err missing id or action\n";
+        } else {
+            auto* view = api_find_gen_lab_view(*app_, id_it->second);
+            if (!view) {
+                resp = "err gen_lab window not found\n";
+            } else {
+                resp = view->handleApiAction(action_it->second, kv) + "\n";
             }
         }
     } else {

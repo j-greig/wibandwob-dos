@@ -966,6 +966,7 @@ private:
     friend std::string api_terminal_read(TWwdosApp&, const std::string& window_id);
     friend void api_spawn_paint(TWwdosApp&, const TRect* bounds);
     friend TPaintCanvasView* api_find_paint_canvas(TWwdosApp&, const std::string&);
+    friend TGenerativeLabView* api_find_gen_lab_view(TWwdosApp&, const std::string&);
     friend std::string api_browser_fetch(TWwdosApp&, const std::string& url);
     friend std::string api_send_text(TWwdosApp&, const std::string&, const std::string&, 
                                      const std::string&, const std::string&);
@@ -5319,6 +5320,23 @@ TPaintCanvasView* api_find_paint_canvas(TWwdosApp& app, const std::string& id) {
     auto *pw = dynamic_cast<TPaintWindow*>(w);
     if (!pw) return nullptr;
     return pw->getCanvas();
+}
+
+TGenerativeLabView* api_find_gen_lab_view(TWwdosApp& app, const std::string& id) {
+    TWindow* w = app.findWindowById(id);
+    if (!w) return nullptr;
+    auto *gw = dynamic_cast<TGenerativeLabWindow*>(w);
+    if (!gw) return nullptr;
+    // Walk children to find the TGenerativeLabView
+    TView* v = gw->last;
+    if (!v) return nullptr;
+    TView* first = v;
+    do {
+        auto* glv = dynamic_cast<TGenerativeLabView*>(v);
+        if (glv) return glv;
+        v = v->next;
+    } while (v != first);
+    return nullptr;
 }
 
 // Paint wrappers for command_registry (avoids tvision include dependency)
