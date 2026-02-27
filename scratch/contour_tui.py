@@ -541,14 +541,17 @@ class GrowState:
     __slots__ = ('all_hills', 'active', 'tick', 'paused',
                  'done', 'w', 'h', 'n_levels', 'next_hill_tick',
                  'hill_idx', 'swell_queue', 'cached_lines',
-                 'seed', 'terrain_idx')
+                 'seed', 'terrain_idx', 'mode', 'order_ratio')
 
-    def __init__(self, w, h, n_levels, seed, terrain_idx):
+    def __init__(self, w, h, n_levels, seed, terrain_idx,
+                 mode='chaos', order_ratio=0.5):
         self.w = w
         self.h = h
         self.n_levels = n_levels
         self.seed = seed
         self.terrain_idx = terrain_idx
+        self.mode = mode
+        self.order_ratio = order_ratio
         self.paused = False
         self.done = False
         self.tick = 0
@@ -623,7 +626,12 @@ class GrowState:
         # render if changed
         if changed:
             hills_for_render = [e[0] for e in self.active]
-            self.cached_lines = render_from_hills(self.w, self.h, self.n_levels, hills_for_render)
+            if self.mode == 'order':
+                self.cached_lines = self._render_ordered(hills_for_render)
+            elif self.mode == 'hybrid':
+                self.cached_lines = self._render_hybrid(hills_for_render)
+            else:
+                self.cached_lines = render_from_hills(self.w, self.h, self.n_levels, hills_for_render)
 
             # check coverage
             cov = canvas_coverage(self.cached_lines)
@@ -646,6 +654,66 @@ class GrowState:
         state = 'DONE' if self.done else ('PAUSED' if self.paused else 'GROWING')
         return (f"{state}  hills:{len(self.active)}/{len(self.all_hills)}"
                 f"  coverage:{cov:.0%}  tick:{self.tick}/{MAX_GROW_TICKS}")
+
+    def _render_ordered(self, hills):
+        """Render active hills as grid clusters."""
+        canvas = [[' '] * max(1, self.w - 1) for _ in range(max(1, self.h - 1))]
+        grid_rng = random.Random(self.seed + 7777)
+        patterns = [GRID_CHECKER, GRID_RANDOM, GRID_SEQ, GRID_HEX]
+        for hill in hills:
+            cx, cy, r, pk = hill[0], hill[1], hill[2], hill[3]
+            pattern = grid_rng.choice(patterns)
+            cell_size = grid_rng.choice([1, 1, 1, 2])
+            density = 0.3 + pk * 0.6
+            render_grid_cluster(canvas, int(cx), int(cy), r, density,
+                               cell_size, pattern, grid_rng)
+        return [''.join(row) for row in canvas]
+
+    def _render_hybrid(self, hills):
+        """Render active hills as both contours and grids, composited."""
+        w, h = self.w, self.h
+        if not hills:
+            return [' ' * max(0, w - 1) for _ in range(max(0, h - 1))]
+
+        g = heightmap(w, h, hills)
+        thresholds = [(i+1)/(self.n_levels+1) for i in range(self.n_levels)]
+        layers = [march(g, h, w, t) for t in thresholds]
+        contour_canvas = composite(layers)
+
+        grid_canvas = [[' '] * max(1, w - 1) for _ in range(max(1, h - 1))]
+        grid_rng = random.Random(self.seed + 7777)
+        patterns = [GRID_CHECKER, GRID_RANDOM, GRID_SEQ, GRID_HEX]
+        for hill in hills:
+            cx, cy, r, pk = hill[0], hill[1], hill[2], hill[3]
+            pattern = grid_rng.choice(patterns)
+            density = 0.3 + pk * 0.6
+            render_grid_cluster(grid_canvas, int(cx), int(cy), r * 0.7,
+                               density, 1, pattern, grid_rng)
+
+        flat = sorted(v for row in g for v in row)
+        cutoff_idx = int(len(flat) * self.order_ratio)
+        cutoff = flat[min(cutoff_idx, len(flat) - 1)]
+
+        rh = min(len(contour_canvas), len(grid_canvas))
+        rw = min(len(contour_canvas[0]) if contour_canvas else 0,
+                 len(grid_canvas[0]) if grid_canvas else 0)
+        result = [[' '] * rw for _ in range(rh)]
+        for y in range(rh):
+            for x in range(rw):
+                hy = min(y, len(g) - 1)
+                hx = min(x, len(g[0]) - 1) if g else 0
+                h_val = g[hy][hx]
+                if h_val <= cutoff:
+                    if grid_canvas[y][x] != ' ':
+                        result[y][x] = grid_canvas[y][x]
+                    elif contour_canvas[y][x] != ' ':
+                        result[y][x] = contour_canvas[y][x]
+                else:
+                    if contour_canvas[y][x] != ' ':
+                        result[y][x] = contour_canvas[y][x]
+                    elif grid_canvas[y][x] != ' ':
+                        result[y][x] = grid_canvas[y][x]
+        return [''.join(row) for row in result]
 
 
 # ── file export ───────────────────────────────────────────

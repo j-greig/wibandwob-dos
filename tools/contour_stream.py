@@ -71,10 +71,13 @@ def stream_static(width, height, seed, terrain_idx, levels, triptych,
     sys.stdout.flush()
 
 
-def stream_grow(width, height, seed, terrain_idx, levels):
+def stream_grow(width, height, seed, terrain_idx, levels,
+                mode='chaos', order_ratio=0.5):
     """Stream grow animation frames separated by RS."""
-    gs = GrowState(width, height, levels, seed, terrain_idx)
+    gs = GrowState(width, height, levels, seed, terrain_idx,
+                   mode=mode, order_ratio=order_ratio)
     tname = TERRAINS[terrain_idx][0].upper()
+    mode_label = {'chaos': '', 'order': 'ORDER:', 'hybrid': f'HYBRID:{int(order_ratio*100)}% '}
 
     frame_count = 0
     while not gs.done:
@@ -84,7 +87,8 @@ def stream_grow(width, height, seed, terrain_idx, levels):
             lines = gs.get_lines()
             # Status line
             status = gs.status_text()
-            print(f"STATUS:{tname}|seed:{seed}|levels:{levels}|{status}")
+            prefix = mode_label.get(mode, '')
+            print(f"STATUS:{prefix}{tname}|seed:{seed}|levels:{levels}|{status}")
             for ln in lines:
                 print(ln)
             sys.stdout.flush()
@@ -96,7 +100,8 @@ def stream_grow(width, height, seed, terrain_idx, levels):
     # Final frame (no trailing RS — signals done)
     lines = gs.get_lines()
     status = gs.status_text()
-    print(f"STATUS:{tname}|seed:{seed}|levels:{levels}|{status}")
+    prefix = mode_label.get(mode, '')
+    print(f"STATUS:{prefix}{tname}|seed:{seed}|levels:{levels}|{status}")
     for ln in lines:
         print(ln)
     sys.stdout.flush()
@@ -126,7 +131,8 @@ def main():
     terrain_idx = find_terrain_idx(args.terrain)
 
     if args.grow:
-        stream_grow(args.width, args.height, seed, terrain_idx, args.levels)
+        stream_grow(args.width, args.height, seed, terrain_idx, args.levels,
+                    args.mode, args.order_ratio)
     else:
         stream_static(args.width, args.height, seed, terrain_idx, args.levels,
                        args.triptych, args.mode, args.order_ratio)
