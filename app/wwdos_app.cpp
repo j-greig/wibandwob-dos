@@ -4794,8 +4794,20 @@ void api_spawn_monster_cam(TWwdosApp& app, const TRect* bounds) {
 }
 
 void api_spawn_contour_map(TWwdosApp& app, const TRect* bounds) {
-    TRect r = bounds ? *bounds : api_centered_bounds(app, 90, 35);
+    TRect r;
+    if (bounds) {
+        r = *bounds;
+    } else {
+        // 90% of desktop
+        TRect desk = app.deskTop->getExtent();
+        int w90 = desk.b.x * 90 / 100;
+        int h90 = desk.b.y * 90 / 100;
+        int x = (desk.b.x - w90) / 2;
+        int y = (desk.b.y - h90) / 2;
+        r = TRect(x, y, x + w90, y + h90);
+    }
     int seed = rand() % 100000;
+    // Pass deferLaunch=true so generation waits until window is sized
     TWindow* w = createContourMapWindow(r, seed, 5, 5, false, false);
     app.deskTop->insert(w);
     app.registerWindow(w);

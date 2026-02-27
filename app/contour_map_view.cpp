@@ -41,7 +41,8 @@ std::string ContourBridge::resolveScriptPath() {
 }
 
 bool ContourBridge::start(int width, int height, int seed, int terrainIdx,
-                          int levels, bool grow, bool triptych) {
+                          int levels, bool grow, bool triptych,
+                          int mode, float orderRatio) {
     stop();
     paused_ = false;
 
@@ -54,7 +55,12 @@ bool ContourBridge::start(int width, int height, int seed, int terrainIdx,
     cmd += " --levels " + std::to_string(levels);
     if (grow) cmd += " --grow";
     if (triptych) cmd += " --triptych";
-    cmd += " 2>/dev/null";
+    if (mode == 1) cmd += " --mode order";
+    else if (mode == 2) cmd += " --mode hybrid --order-ratio " + std::to_string(orderRatio);
+    cmd += " 2>/tmp/contour_bridge_err.log";
+
+    // Debug log
+    fprintf(stderr, "[contour] cmd: %s\n", cmd.c_str());
 
     int pipefd[2];
     if (pipe(pipefd) < 0) return false;
@@ -158,9 +164,19 @@ void TContourMapView::launch(int seed, int terrainIdx, int levels, bool grow, bo
     if (contentW < 5) contentW = 5;
     if (contentH < 5) contentH = 5;
 
-    bridge_.start(contentW, contentH, seed_, terrainIdx_, levels_, grow_, triptych_);
+    bridge_.start(contentW, contentH, seed_, terrainIdx_, levels_, grow_, triptych_,
+                  mode_, orderRatio_);
     startTimer();
     drawView();
+}
+
+void TContourMapView::deferLaunch(int seed, int terrainIdx, int levels, bool grow, bool triptych) {
+    seed_ = seed;
+    terrainIdx_ = terrainIdx;
+    levels_ = levels;
+    grow_ = grow;
+    triptych_ = triptych;
+    pendingLaunch_ = true;
 }
 
 void TContourMapView::relaunch() {
@@ -283,6 +299,12 @@ void TContourMapView::draw() {
     const int H = size.y;
     if (W <= 0 || H <= 0) return;
 
+    // Deferred launch — now we know the actual window size
+    if (pendingLaunch_ && size.x > 5 && size.y > 5) {
+        pendingLaunch_ = false;
+        launch(seed_, terrainIdx_, levels_, grow_, triptych_);
+    }
+
     TDrawBuffer buf;
 
     static const TColorAttr kBg =
@@ -355,6 +377,18 @@ void TContourMapView::draw() {
             bar += " ";
         }
 
+        // Mode button
+        int modeStart = (int)bar.size();
+        static const char* kModeLabels[] = {"[O:Chaos]", "[O:Order]", "[O:Hybrid]"};
+        bar += kModeLabels[mode_ % 3];
+        int modeEnd = (int)bar.size();
+        bar += " ";
+
+        if (mode_ == 2) {
+            bar += "[C:" + std::to_string((int)(orderRatio_ * 100)) + "%]";
+            bar += " ";
+        }
+
         bar += "[R:New] [S:Save] [H:Help]";
 
         // Write base text in default button colour
@@ -374,6 +408,11 @@ void TContourMapView::draw() {
         if (triptych_) {
             std::string seg = bar.substr(triStart, triEnd - triStart);
             buf.moveStr(triStart, TStringView(seg), kBtnActive);
+        }
+        // Highlight mode if not chaos
+        if (mode_ > 0) {
+            std::string seg = bar.substr(modeStart, modeEnd - modeStart);
+            buf.moveStr(modeStart, TStringView(seg), kBtnActive);
         }
         // Highlight pause if paused
         if (pauseStart >= 0 && bridge_.isPaused()) {
@@ -499,6 +538,22 @@ void TContourMapView::handleEvent(TEvent& ev) {
             clearEvent(ev); return;
         }
 
+        // o — cycle mode: chaos → order → hybrid → chaos
+        if (ch == 'o' || ch == 'O') {
+            mode_ = (mode_ + 1) % 3;
+            relaunch();
+            clearEvent(ev); return;
+        }
+
+        // c — adjust order ratio (hybrid blend): 0% → 25% → 50% → 75% → 100%
+        if (ch == 'c' || ch == 'C') {
+            orderRatio_ += 0.25f;
+            if (orderRatio_ > 1.01f) orderRatio_ = 0.0f;
+            if (mode_ != 2) mode_ = 2;  // auto-switch to hybrid
+            relaunch();
+            clearEvent(ev); return;
+        }
+
         // h — help (placeholder)
         if (ch == 'h' || ch == 'H') {
             flashMsg_ = "Help: r=new 1-7=terrain g=grow t=tri s=save +/-=lvl";
@@ -607,7 +662,9 @@ public:
         viewRect.b.x -= 1;
         auto* view = new TContourMapView(viewRect, vsb);
         insert(view);
-        view->launch(seed, terrainIdx, levels, grow, triptych);
+        // Defer launch — store params, view launches on first draw
+        // so it uses the final window size
+        view->deferLaunch(seed, terrainIdx, levels, grow, triptych);
     }
 
     virtual void changeBounds(const TRect& b) override {

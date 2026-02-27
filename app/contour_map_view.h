@@ -31,7 +31,8 @@ public:
     ~ContourBridge();
 
     bool start(int width, int height, int seed, int terrainIdx,
-               int levels, bool grow, bool triptych);
+               int levels, bool grow, bool triptych,
+               int mode = 0, float orderRatio = 0.5);
     void stop();
     void pause();    // SIGSTOP
     void resume();   // SIGCONT
@@ -60,6 +61,7 @@ public:
     virtual void changeBounds(const TRect& bounds) override;
 
     void launch(int seed, int terrainIdx, int levels, bool grow, bool triptych);
+    void deferLaunch(int seed, int terrainIdx, int levels, bool grow, bool triptych);
 
     int seed() const { return seed_; }
     int terrainIdx() const { return terrainIdx_; }
@@ -86,6 +88,8 @@ private:
     int levels_ = 5;
     bool grow_ = false;
     bool triptych_ = false;
+    int mode_ = 0;           // 0=chaos, 1=order, 2=hybrid
+    float orderRatio_ = 0.5; // hybrid blend: 0.0=all contours, 1.0=all grids
 
     // Display state
     std::vector<std::string> lines_;     // current displayed frame
@@ -94,6 +98,7 @@ private:
     std::string partial_;                // incomplete line accumulator
     bool autoScroll_ = true;
 
+    bool pendingLaunch_ = false;         // deferred first launch
     std::string flashMsg_;               // temporary status flash
     time_t flashTime_ = 0;               // when flash was set
 

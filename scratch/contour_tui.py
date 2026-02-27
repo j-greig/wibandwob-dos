@@ -293,6 +293,189 @@ TERRAINS = [
 ]
 
 
+# ── ordered grid engine ──────────────────────────────────
+# Binary 0/1 grids placed using same hill algorithms as contours.
+# Hill radius → cluster size, peak → cell density.
+# Box-drawing chars: ┌─┬─┐ │0│1│ ├─┼─┤ └─┴─┘
+
+# Grid content patterns
+GRID_CHECKER = 0    # alternating 0/1
+GRID_RANDOM  = 1    # random bits
+GRID_SEQ     = 2    # sequential 0-9 then A-F
+GRID_HEX     = 3    # random hex values
+
+def _grid_cell(row, col, pattern, rng):
+    """Return a single char for grid cell at (row, col)."""
+    if pattern == GRID_CHECKER:
+        return '1' if (row + col) % 2 else '0'
+    elif pattern == GRID_RANDOM:
+        return str(rng.randint(0, 1))
+    elif pattern == GRID_SEQ:
+        return "0123456789ABCDEF"[(row * 16 + col) % 16]
+    elif pattern == GRID_HEX:
+        return "0123456789ABCDEF"[rng.randint(0, 15)]
+    return '0'
+
+def render_grid_cluster(canvas, cx, cy, radius, density, cell_size,
+                        pattern, rng):
+    """Stamp a box-drawing grid cluster onto canvas.
+    
+    radius: approximate half-width/height of grid area
+    density: 0.0-1.0, fraction of cells filled (vs empty)
+    cell_size: 1, 2, or 3 chars per cell content
+    """
+    ch = len(canvas)
+    cw = len(canvas[0]) if ch > 0 else 0
+    
+    # Grid cell metrics: each cell = cell_size content + 1 border
+    step = cell_size + 1  # e.g. cell_size=1 → step=2 (│x│)
+    
+    # How many grid cells fit in the radius
+    gcols = max(2, int(2 * radius / step))
+    grows = max(2, int(2 * radius / (step * 0.5)))  # rows are half-height
+    
+    # Top-left corner of grid
+    gx0 = int(cx - (gcols * step + 1) / 2)
+    gy0 = int(cy - grows)
+    
+    # Render the grid
+    for gr in range(grows + 1):
+        y = gy0 + gr * 2  # each grid row = 2 screen rows (border + content)
+        if y < 0 or y >= ch:
+            continue
+            
+        # Border row: ┌─┬─┐ or ├─┼─┤ or └─┴─┘
+        for gc in range(gcols + 1):
+            x = gx0 + gc * step
+            if x < 0 or x >= cw:
+                continue
+            
+            # Corner/junction char
+            if gr == 0 and gc == 0:       c = '┌'
+            elif gr == 0 and gc == gcols: c = '┐'
+            elif gr == grows and gc == 0:  c = '└'
+            elif gr == grows and gc == gcols: c = '┘'
+            elif gr == 0:                  c = '┬'
+            elif gr == grows:              c = '┴'
+            elif gc == 0:                  c = '├'
+            elif gc == gcols:              c = '┤'
+            else:                          c = '┼'
+            canvas[y][x] = c
+            
+            # Horizontal border between corners
+            if gc < gcols:
+                for dx in range(1, step):
+                    bx = x + dx
+                    if 0 <= bx < cw:
+                        canvas[y][bx] = '─'
+        
+        # Content row (between border rows)
+        if gr < grows:
+            cy_row = y + 1
+            if cy_row < 0 or cy_row >= ch:
+                continue
+            for gc in range(gcols + 1):
+                x = gx0 + gc * step
+                if 0 <= x < cw:
+                    canvas[cy_row][x] = '│'
+            
+            # Fill cell content
+            for gc in range(gcols):
+                if rng.random() > density:
+                    continue  # skip cell (sparse)
+                for dx in range(1, step):
+                    cx_pos = gx0 + gc * step + dx
+                    if 0 <= cx_pos < cw and 0 <= cy_row < ch:
+                        canvas[cy_row][cx_pos] = _grid_cell(gr, gc * cell_size + dx - 1, pattern, rng)
+
+
+def generate_ordered(w, h, seed, terrain_idx):
+    """Generate ordered grid map using same hill placement as terrain.
+    Returns list of strings."""
+    rng = random.Random(seed)
+    _, gen = TERRAINS[terrain_idx % len(TERRAINS)]
+    hills = gen(w, h, rng)
+    
+    canvas = [[' '] * max(1, w - 1) for _ in range(max(1, h - 1))]
+    
+    # Use hill positions/sizes to place grid clusters
+    grid_rng = random.Random(seed + 7777)
+    patterns = [GRID_CHECKER, GRID_RANDOM, GRID_SEQ, GRID_HEX]
+    
+    for hill in hills:
+        cx, cy, r, pk = hill[0], hill[1], hill[2], hill[3]
+        pattern = grid_rng.choice(patterns)
+        cell_size = grid_rng.choice([1, 1, 1, 2])  # mostly 1-char cells
+        density = 0.3 + pk * 0.6  # higher peak = denser grid
+        render_grid_cluster(canvas, int(cx), int(cy), r, density,
+                           cell_size, pattern, grid_rng)
+    
+    return [''.join(row) for row in canvas]
+
+
+def generate_hybrid(w, h, n_levels, seed, terrain_idx, order_ratio=0.5):
+    """Hybrid chaos+order: contours where height varies, grids where flat.
+    order_ratio: 0.0 = all contours, 1.0 = all grids.
+    Returns list of strings."""
+    rng = random.Random(seed)
+    _, gen = TERRAINS[terrain_idx % len(TERRAINS)]
+    hills = gen(w, h, rng)
+    
+    # Generate heightmap
+    g = heightmap(w, h, hills)
+    
+    # Contour layer
+    thresholds = [(i+1)/(n_levels+1) for i in range(n_levels)]
+    layers = [march(g, h, w, t) for t in thresholds]
+    contour_canvas = composite(layers)
+    
+    # Grid layer
+    grid_canvas = [[' '] * max(1, w - 1) for _ in range(max(1, h - 1))]
+    grid_rng = random.Random(seed + 7777)
+    patterns = [GRID_CHECKER, GRID_RANDOM, GRID_SEQ, GRID_HEX]
+    
+    for hill in hills:
+        cx, cy, r, pk = hill[0], hill[1], hill[2], hill[3]
+        pattern = grid_rng.choice(patterns)
+        density = 0.3 + pk * 0.6
+        render_grid_cluster(grid_canvas, int(cx), int(cy), r * 0.7,
+                           density, 1, pattern, grid_rng)
+    
+    # Composite: use quantile threshold to split zones
+    # Flatten heights, find the cutoff
+    flat = sorted(v for row in g for v in row)
+    cutoff_idx = int(len(flat) * order_ratio)
+    cutoff = flat[min(cutoff_idx, len(flat) - 1)]
+    
+    # Merge: below cutoff = grid (ordered), above = contour (chaos)
+    rh = min(len(contour_canvas), len(grid_canvas))
+    rw = min(len(contour_canvas[0]) if contour_canvas else 0,
+             len(grid_canvas[0]) if grid_canvas else 0)
+    result = [[' '] * rw for _ in range(rh)]
+    
+    for y in range(rh):
+        for x in range(rw):
+            # Sample height at this point (careful with grid bounds)
+            hy = min(y, len(g) - 1)
+            hx = min(x, len(g[0]) - 1) if g else 0
+            h_val = g[hy][hx]
+            
+            if h_val <= cutoff:
+                # Ordered zone
+                if grid_canvas[y][x] != ' ':
+                    result[y][x] = grid_canvas[y][x]
+                elif contour_canvas[y][x] != ' ':
+                    result[y][x] = contour_canvas[y][x]
+            else:
+                # Chaotic zone
+                if contour_canvas[y][x] != ' ':
+                    result[y][x] = contour_canvas[y][x]
+                elif grid_canvas[y][x] != ' ':
+                    result[y][x] = grid_canvas[y][x]
+    
+    return [''.join(row) for row in result]
+
+
 # ── rendering ─────────────────────────────────────────────
 
 def render_from_hills(w, h, n_levels, hills):

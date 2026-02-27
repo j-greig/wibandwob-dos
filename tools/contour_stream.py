@@ -27,7 +27,8 @@ import argparse
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'scratch'))
 from contour_tui import (
     TERRAINS, generate, generate_triptych, GrowState,
-    TICK_INTERVAL, render_from_hills
+    TICK_INTERVAL, render_from_hills,
+    generate_ordered, generate_hybrid
 )
 
 RS = '\x1E'  # ASCII record separator — frame delimiter
@@ -45,16 +46,26 @@ def find_terrain_idx(name: str) -> int:
     return 5  # meadow fallback
 
 
-def stream_static(width, height, seed, terrain_idx, levels, triptych):
+def stream_static(width, height, seed, terrain_idx, levels, triptych,
+                   mode='chaos', order_ratio=0.5):
     """Generate and dump a single frame."""
-    if triptych:
+    tname = TERRAINS[terrain_idx][0].upper()
+
+    if mode == 'order':
+        lines = generate_ordered(width, height, seed, terrain_idx)
+        label = f"ORDER:{tname}"
+    elif mode == 'hybrid':
+        lines = generate_hybrid(width, height, levels, seed, terrain_idx, order_ratio)
+        label = f"HYBRID:{tname} {int(order_ratio*100)}%"
+    elif triptych:
         lines = generate_triptych(width, height, levels, seed, terrain_idx)
+        label = tname
     else:
         lines = generate(width, height, levels, seed, terrain_idx)
+        label = tname
 
-    tname = TERRAINS[terrain_idx][0].upper()
     # Header line for status bar parsing
-    print(f"STATUS:{tname}|seed:{seed}|levels:{levels}|STATIC")
+    print(f"STATUS:{label}|seed:{seed}|levels:{levels}|STATIC")
     for ln in lines:
         print(ln)
     sys.stdout.flush()
@@ -100,6 +111,9 @@ def main():
     parser.add_argument('--levels', type=int, default=5)
     parser.add_argument('--grow', action='store_true')
     parser.add_argument('--triptych', action='store_true')
+    parser.add_argument('--mode', choices=['chaos', 'order', 'hybrid'], default='chaos')
+    parser.add_argument('--order-ratio', type=float, default=0.5,
+                        help='Hybrid mode: 0.0=all contours, 1.0=all grids')
     parser.add_argument('--list-terrains', action='store_true')
     args = parser.parse_args()
 
@@ -114,7 +128,8 @@ def main():
     if args.grow:
         stream_grow(args.width, args.height, seed, terrain_idx, args.levels)
     else:
-        stream_static(args.width, args.height, seed, terrain_idx, args.levels, args.triptych)
+        stream_static(args.width, args.height, seed, terrain_idx, args.levels,
+                       args.triptych, args.mode, args.order_ratio)
 
 
 if __name__ == '__main__':

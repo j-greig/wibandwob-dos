@@ -1,0 +1,447 @@
+[stderr] OpenAI Codex v0.104.0 (research preview)
+--------
+workdir: /Users/james/Repos/wibandwob-dos
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: medium
+reasoning summaries: auto
+session id: 019c9ae8-fcff-7810-b563-f4c4e4e5cf65
+--------
+user
+You are a code analyst. Investigate the codebase, diagnose issues, and report findings.
+
+EFFICIENCY: Use targeted commands, not full-file dumps.
+Prefer rg -n -C3 'pattern' file or sed -n '45,55p' file.
+Avoid nl -ba file | sed -n '1,300p'. Only dump full files if <50 lines.
+
+Deliver:
+1. Root cause
+2. Fix options with tradeoffs
+3. Risks and tests to add
+
+TASK: Research isometric ASCII/Unicode art rendering for terrain heightmaps. I need to find:
+
+1. Any Python libraries that do isometric ASCII/text rendering (pip-installable or standalone)
+2. Any TypeScript/JavaScript terminal libraries that render isometric views (like for TUI games)
+3. Any game engines or frameworks that do isometric text-mode rendering
+4. How SimCity 2000's isometric terrain rendering worked technically (the projection math)
+5. What Unicode characters are best suited for isometric projection in monospace terminals (block elements, diagonal lines, box drawing, braille, etc.)
+6. Any notable examples of isometric ASCII art generators or games that render 3D terrain in text
+
+Focus on practical, usable approaches. I want to render a heightmap (2D grid of floats) as an isometric 3D terrain view in a terminal using Unicode characters.
+
+Search broadly: GitHub repos, npm packages, PyPI packages, blog posts about ASCII isometric rendering.
+[stderr] mcp: chrome-devtools starting
+mcp: fastmcp starting
+[stderr] mcp: fastmcp ready
+[stderr] mcp: chrome-devtools ready
+mcp startup: ready: fastmcp, chrome-devtools
+[stderr] 
+[stderr] thinking
+**Preparing targeted web research**
+🌐 Searching the web...
+[stderr] 🌐 Searched: Python isometric ASCII terminal rendering library GitHub PyPI
+[stderr] 
+[stderr] thinking
+**Searching for isometric ASCII examples**
+🌐 Searching the web...
+[stderr] 🌐 Searched: GitHub isometric ASCII art generator terrain terminal
+
+[stderr] thinking
+**Refining search approach**
+[stderr] 🌐 Searching the web...
+[stderr] 🌐 Searched: npm isometric terminal renderer ascii
+
+[stderr] thinking
+**Planning direct source research**
+[stderr] 🌐 Searching the web...
+[stderr] 🌐 Searched: OpenCity2k isometric projection tile to screen formula simcity 2000
+[stderr] 
+[stderr] thinking
+**Searching for tile dimension sources**
+[stderr] 🌐 Searching the web...
+[stderr] 🌐 Searched: SC2k docs tile size pixels isometric 32 16 simcity 2000 github
+[stderr] 
+[stderr] thinking
+**Investigating isometric projection sources**
+🌐 Searching the web...
+[stderr] 🌐 Searched: https://github.com/nicholas-ochoa/OpenSC2K
+[stderr] 
+[stderr] thinking
+**Planning code retrieval approach**
+🌐 Searching the web...
+[stderr] 🌐 Searched: https://github.com/nicholas-ochoa/OpenSC2K/tree/master/src
+[stderr] 
+[stderr] thinking
+**Assessing isometric rendering options**
+[stderr] 🌐 Searching the web...
+[stderr] 🌐 Searched: GitHub python isometric ascii terminal renderer
+[stderr] 
+[stderr] thinking
+**Surveying JS terminal isometric libs**
+🌐 Searching the web...
+[stderr] 🌐 Searched: GitHub node terminal 3d ascii renderer javascript
+[stderr] 
+[stderr] thinking[stderr] 
+**Assessing terminal isometric rendering options**
+🌐 Searching the web...
+[stderr] 🌐 Searched: isometric ascii art generator github terrain
+[stderr] 
+[stderr] thinking
+**Surveying isometric text-mode tools**
+[stderr] 🌐 Searching the web...
+[stderr] 🌐 Searched: chafa terminal image to unicode blocks braille official
+[stderr] 
+[stderr] thinking
+**Planning chafa docs search**
+🌐 Searching the web...
+[stderr] 🌐 Searched: hpjansson chafa symbols braille block elements man page
+
+[stderr] thinking
+**Searching official Unicode charts**
+🌐 Searching the web...
+[stderr] 🌐 Searched: Unicode block elements chart official pdf
+[stderr] 
+[stderr] thinking
+**Checking unicode.org PDFs**
+[stderr] 🌐 Searching the web...
+[stderr] 🌐 Searched: site:unicode.org U2580.pdf unicode chart
+[stderr] 
+[stderr] thinking
+**Checking for UAX11 width usage**
+[stderr] 🌐 Searching the web...
+[stderr] 🌐 Searched: Unicode East Asian Width UAX #11 official
+[stderr] 
+[stderr] thinking
+**Planning terminal width and isometric math sources**
+🌐 Searching the web...
+[stderr] 🌐 Searched: sc2kparser terrain slope array simcity 2000 github
+[stderr] 
+[stderr] thinking
+**Searching for projection formula**
+🌐 Searching the web...
+[stderr] 🌐 Searched: raw.githubusercontent.com nicholas-ochoa OpenSC2K isometric tile width height screen x y src
+[stderr] 
+[stderr] thinking
+**Assessing JS terminal rendering options**
+🌐 Searching the web...
+[stderr] 🌐 Searched: npm ascii-raytracer package
+[stderr] 
+[stderr] thinking
+**Surveying ASCII terrain tools**
+🌐 Searching the web...
+[stderr] 🌐 Searched: terminal-kit npm terminal graphics node.js unicode terminal-kit README
+
+[stderr] thinking
+**Searching for terminal libraries**
+[stderr] 🌐 Searching the web...
+[stderr] 🌐 Searched: rot.js display terminal roguelike library official docs
+[stderr] 
+[stderr] thinking
+**Compiling isometric ASCII rendering resources**
+🌐 Searching the web...
+[stderr] 🌐 Searched: https://pypi.org/project/rendascii/
+[stderr] 
+[stderr] thinking
+**Selecting pages for line snippets**
+🌐 Searching the web...
+[stderr] 🌐 Searched: 'Unicode quarter-character block' in https://pypi.org/project/terminedia/
+[stderr] 
+[stderr] thinking
+**Searching official repos**
+🌐 Searching the web...
+[stderr] 🌐 Searched: GitHub cronvel terminal-kit screenbuffer image loading README
+[stderr] 
+[stderr] thinking
+**Searching for source repository**
+[stderr] 🌐 Searching the web...
+[stderr] 🌐 Searched: GitHub mapbox mapscii README braille block mode
+[stderr] 
+[stderr] thinking
+**Planning final web queries**
+[stderr] 🌐 Searching the web...
+[stderr] 🌐 Searched: 'Rotating the Map Literally Alters Your City.' in https://gamefaqs.gamespot.com/pc/198648-simcity-2000/faqs/81608
+[stderr] 
+[stderr] thinking
+**Summarizing terminal rendering tradeoffs**
+[stderr] codex
+**Root Cause**
+
+There is no widely adopted, off-the-shelf library that directly does `heightmap -> isometric Unicode terminal terrain` rendering.
+
+Why:
+- Terminal cells are not square (font ratio matters).
+- Unicode glyph appearance varies by font/terminal.
+- Width handling is inconsistent for some symbols (Unicode itself warns East Asian Width is not a complete terminal solution).
+- Isometric terrain needs projection + z-order + slope glyphing, which most terminal libs leave to the app.
+
+**Findings (practical)**
+
+### 1. Python libraries (usable for building it)
+- `rendascii` (PyPI): real-time ASCII 3D renderer with z-buffering, OBJ loading. Good if you convert heightmap to mesh.
+- `termgl` (PyPI): terminal 2D/3D graphics lib (shaders, RGB, mouse/input).
+- `terminedia` (PyPI): Unicode sub-cell rendering (quarter blocks, braille-friendly); very useful for custom terrain rasterization.
+- `chafa.py` (PyPI): Python bindings for Chafa (image -> terminal Unicode). Great hybrid path: render iso offscreen, convert to text.
+- `bearlibterminal` (via `pip install bearlibterminal`): terminal-style game rendering framework (not iso-specific, but good engine surface).
+
+### 2. TypeScript/JavaScript terminal libraries / renderers
+- `rot-js`: has Node terminal backend (`layout: "term"`). Good for game loop/input/display, but no built-in isometric terrain.
+- `terminal-kit`: strong `ScreenBuffer`/image/composition support; good for custom Unicode framebuffer.
+- `blessed`: supports ANSI/GIF/PNG-to-terminal image elements and density ASCII options.
+- `mapscii` (Node app): concrete example of high-performance JS terminal rendering using braille/ASCII/block chars.
+- `ascii-raytracer` (npm package ecosystem): terminal 3D approach, useful reference for shading/raster ideas (not iso-specific).
+
+### 3. Engines/frameworks for text-mode rendering (iso-capable with custom code)
+- `libtcod` (console engine): classic text-mode game console; you implement iso projection yourself.
+- `BearLibTerminal`: fast tile/text rendering, input, layering; good for Unicode/tile hybrid isometric views.
+- `rot.js`: text-mode game toolkit with terminal backend.
+- `terminal-kit`: more framework than engine, but practical for Node TUI rendering.
+- `iceoh` (JS isometric tilemap lib): not terminal-focused, but useful isometric math/stacking layer to pair with a terminal framebuffer.
+
+### 4. SimCity 2000 terrain rendering (technical projection)
+Inferred from SC2K behavior + reimplementations/docs:
+- SC2K uses a near-isometric **dimetric 2:1 diamond** projection.
+- Standard tile projection math:
+  - `sx = ox + (x - y) * (tile_w / 2)`
+  - `sy = oy + (x + y) * (tile_h / 2) - z * z_scale`
+- Typical pixel-art iso ratios are `tile_w = 2 * tile_h` (e.g. `32x16`, `64x32` style).
+- SC2K terrain is not only flat-height tiles: it uses altitude + slope variants (corner/edge slope state) and terrain edge tiles/cliffs.
+- Draw order is effectively back-to-front by diagonals (`x+y`) plus sprite/height special cases.
+- SC2K also remaps coordinates on rotate (the visible “north” edge changes in internal coordinates).
+
+### 5. Best Unicode characters for isometric terminal terrain
+Best practical sets (in order):
+- `Braille` (`U+2800` block): highest density (2x4 subpixels/cell), great for smooth slopes/contours.
+- `Block Elements` (`U+2580` block): half/quarter blocks; excellent for filled terrain and cliffs.
+- `Quadrant blocks` (within Block Elements): good for chunky iso faces.
+- `Box Drawing` (`U+2500` block), especially diagonals `╱ ╲ ╳`: good for ridgelines/edges/wireframe overlays.
+- `Shade` chars `░▒▓`: cheap shading/height bands.
+- `Sextants` (`U+1FB00` block, Symbols for Legacy Computing): promising density, but font support is weaker than braille/blocks.
+
+Practical recommendation:
+- Use **braille for geometry silhouette/contours**, **block/quadrant for filled faces**, **box-diagonals for ridge highlights**.
+- Always calibrate to terminal font ratio (like Chafa’s `--font-ratio` concept).
+
+### 6. Notable examples / references
+- `MapSCII`: braille/ASCII/block rendering in terminal (JS, xterm-compatible).
+- `img2braille`: clear braille rasterization technique (2x4 pixel blocks -> Unicode braille).
+- `rendascii` / `ASCII-renderer` / `ascii-raytracer`: text-mode 3D pipelines to borrow z-buffer, shading, projection ideas.
+- `gh-firehose` / `globe`: projection + terminal rasterization examples (not terrain, but useful projection/render loop patterns).
+- `OpenSC2K` / `OpenCity2k`: practical SC2K terrain/reference ecosystem (not terminal, but relevant for SC2K math/terrain semantics).
+
+---
+
+**Fix Options (with tradeoffs)**
+
+1. **Diamond tile painter (glyph-per-tile)**
+- Render each heightmap cell as an iso diamond and cliff faces using a small Unicode tile atlas.
+- Pros: deterministic, fast, easy z-order, good “SimCity-like” look.
+- Cons: coarse slopes unless you add many glyph variants.
+
+2. **Unicode subcell framebuffer (braille/quadrants) + software rasterizer**
+- Rasterize projected terrain into a subpixel buffer, then pack to braille/block chars.
+- Pros: smooth slopes, better contours/shading, scalable quality.
+- Cons: more math, z-buffer needed, font calibration required.
+
+3. **Hybrid: offscreen image render -> Chafa/`chafa.py`**
+- Render isometric terrain to image (Python/JS canvas), convert to terminal Unicode.
+- Pros: fastest prototype, excellent quality quickly, lots of symbol modes.
+- Cons: less direct control over exact glyph placement; harder to preserve crisp tile semantics.
+
+4. **Engine-backed terminal app (BearLibTerminal/libtcod/rot.js/terminal-kit) + custom iso renderer**
+- Use framework for input/framebuffer; own projection/glyphing.
+- Pros: maintainable for TUI game integration.
+- Cons: still must write renderer core yourself.
+
+---
+
+**Risks and Tests to Add**
+
+### Risks
+- Font/terminal differences break alignment (especially braille/sextants).
+- Unicode width ambiguity causes drift.
+- Z-order artifacts on steep slopes/cliffs.
+- Flicker/perf issues at larger maps without dirty-rect updates.
+- Color fallback degradation (16-color terminals).
+
+### Tests to add
+- Projection round-trip tests (`grid -> screen -> picked tile`) for multiple camera offsets.
+- Golden snapshot tests for canonical heightmaps:
+  - flat plane
+  - single hill
+  - cliff edge
+  - checkerboard highs/lows
+  - ridge + saddle
+- Z-order regression tests (overlap cases with equal `x+y` but different heights).
+- Font-ratio calibration tests (expected output under `1:2`, `0.5`, custom ratios).
+- Width safety tests for glyph sets (detect wide chars / broken rendering).
+- Terminal capability matrix tests (braille, block, colors, truecolor fallback).
+
+---
+
+**Bottom Line**
+The practical path is: **custom isometric renderer + Unicode subcell framebuffer**, built on `terminedia`/`terminal-kit`/`rot.js`/`BearLibTerminal`, or **offscreen iso render + `chafa.py`** for fastest results.
+
+**Sources**
+- `rendascii` PyPI: https://pypi.org/project/rendascii/
+- `terminedia` PyPI: https://pypi.org/project/terminedia/
+- `termgl` PyPI: https://pypi.org/project/termgl/
+- `chafa.py` PyPI: https://pypi.org/project/chafa.py/
+- Chafa man page (symbol classes, font ratio concepts): https://hpjansson.org/chafa/man/
+- `rot.js` (terminal backend / `layout:"term"`): https://github.com/ondras/rot.js and https://www.npmjs.com/package/rot-js
+- `terminal-kit`: https://github.com/cronvel/terminal-kit
+- `blessed` ANSI image rendering: https://github.com/chjj/blessed
+- `MapSCII`: https://github.com/rastapasta/mapscii and https://www.npmjs.com/package/mapscii
+- `iceoh` isometric tilemap lib: https://iceoh.netlify.app/
+- `libtcod` console docs: https://libtcod.github.io/docs/html2/console
+- BearLibTerminal (Python install info shown in mirror README): https://github.com/tommyettinger/BearLibTerminal
+- OpenCity2k (SC2K docs reference): https://github.com/OpenCity2k/OpenCity2k
+- OpenSC2K (SC2K reimplementation reference): https://github.com/nicholas-ochoa/OpenSC2K
+- SimCity 2000 coordinate/rotation behavior (strategy guide research): https://gamefaqs.gamespot.com/pc/198648-simcity-2000/faqs/81608
+- Unicode charts index (Box Drawing / Block Elem[stderr] ents / Braille charts): https://www.unicode.org/charts/PDF/
+- Unicode UAX #11 (width caveats): https://www.unicode.org/reports/tr11/
+- `img2braille` reference implementation: https://github.com/TheFel0x/img2braille
+
+If you want, I can next produce a concrete renderer design for your `heightmap[rows][cols] -> terminal frame` pipeline (projection, z-buffer, glyph atlas, and shading rules).
+[stderr] tokens used
+121,827
+**Root Cause**
+
+There is no widely adopted, off-the-shelf library that directly does `heightmap -> isometric Unicode terminal terrain` rendering.
+
+Why:
+- Terminal cells are not square (font ratio matters).
+- Unicode glyph appearance varies by font/terminal.
+- Width handling is inconsistent for some symbols (Unicode itself warns East Asian Width is not a complete terminal solution).
+- Isometric terrain needs projection + z-order + slope glyphing, which most terminal libs leave to the app.
+
+**Findings (practical)**
+
+### 1. Python libraries (usable for building it)
+- `rendascii` (PyPI): real-time ASCII 3D renderer with z-buffering, OBJ loading. Good if you convert heightmap to mesh.
+- `termgl` (PyPI): terminal 2D/3D graphics lib (shaders, RGB, mouse/input).
+- `terminedia` (PyPI): Unicode sub-cell rendering (quarter blocks, braille-friendly); very useful for custom terrain rasterization.
+- `chafa.py` (PyPI): Python bindings for Chafa (image -> terminal Unicode). Great hybrid path: render iso offscreen, convert to text.
+- `bearlibterminal` (via `pip install bearlibterminal`): terminal-style game rendering framework (not iso-specific, but good engine surface).
+
+### 2. TypeScript/JavaScript terminal libraries / renderers
+- `rot-js`: has Node terminal backend (`layout: "term"`). Good for game loop/input/display, but no built-in isometric terrain.
+- `terminal-kit`: strong `ScreenBuffer`/image/composition support; good for custom Unicode framebuffer.
+- `blessed`: supports ANSI/GIF/PNG-to-terminal image elements and density ASCII options.
+- `mapscii` (Node app): concrete example of high-performance JS terminal rendering using braille/ASCII/block chars.
+- `ascii-raytracer` (npm package ecosystem): terminal 3D approach, useful reference for shading/raster ideas (not iso-specific).
+
+### 3. Engines/frameworks for text-mode rendering (iso-capable with custom code)
+- `libtcod` (console engine): classic text-mode game console; you implement iso projection yourself.
+- `BearLibTerminal`: fast tile/text rendering, input, layering; good for Unicode/tile hybrid isometric views.
+- `rot.js`: text-mode game toolkit with terminal backend.
+- `terminal-kit`: more framework than engine, but practical for Node TUI rendering.
+- `iceoh` (JS isometric tilemap lib): not terminal-focused, but useful isometric math/stacking layer to pair with a terminal framebuffer.
+
+### 4. SimCity 2000 terrain rendering (technical projection)
+Inferred from SC2K behavior + reimplementations/docs:
+- SC2K uses a near-isometric **dimetric 2:1 diamond** projection.
+- Standard tile projection math:
+  - `sx = ox + (x - y) * (tile_w / 2)`
+  - `sy = oy + (x + y) * (tile_h / 2) - z * z_scale`
+- Typical pixel-art iso ratios are `tile_w = 2 * tile_h` (e.g. `32x16`, `64x32` style).
+- SC2K terrain is not only flat-height tiles: it uses altitude + slope variants (corner/edge slope state) and terrain edge tiles/cliffs.
+- Draw order is effectively back-to-front by diagonals (`x+y`) plus sprite/height special cases.
+- SC2K also remaps coordinates on rotate (the visible “north” edge changes in internal coordinates).
+
+### 5. Best Unicode characters for isometric terminal terrain
+Best practical sets (in order):
+- `Braille` (`U+2800` block): highest density (2x4 subpixels/cell), great for smooth slopes/contours.
+- `Block Elements` (`U+2580` block): half/quarter blocks; excellent for filled terrain and cliffs.
+- `Quadrant blocks` (within Block Elements): good for chunky iso faces.
+- `Box Drawing` (`U+2500` block), especially diagonals `╱ ╲ ╳`: good for ridgelines/edges/wireframe overlays.
+- `Shade` chars `░▒▓`: cheap shading/height bands.
+- `Sextants` (`U+1FB00` block, Symbols for Legacy Computing): promising density, but font support is weaker than braille/blocks.
+
+Practical recommendation:
+- Use **braille for geometry silhouette/contours**, **block/quadrant for filled faces**, **box-diagonals for ridge highlights**.
+- Always calibrate to terminal font ratio (like Chafa’s `--font-ratio` concept).
+
+### 6. Notable examples / references
+- `MapSCII`: braille/ASCII/block rendering in terminal (JS, xterm-compatible).
+- `img2braille`: clear braille rasterization technique (2x4 pixel blocks -> Unicode braille).
+- `rendascii` / `ASCII-renderer` / `ascii-raytracer`: text-mode 3D pipelines to borrow z-buffer, shading, projection ideas.
+- `gh-firehose` / `globe`: projection + terminal rasterization examples (not terrain, but useful projection/render loop patterns).
+- `OpenSC2K` / `OpenCity2k`: practical SC2K terrain/reference ecosystem (not terminal, but relevant for SC2K math/terrain semantics).
+
+---
+
+**Fix Options (with tradeoffs)**
+
+1. **Diamond tile painter (glyph-per-tile)**
+- Render each heightmap cell as an iso diamond and cliff faces using a small Unicode tile atlas.
+- Pros: deterministic, fast, easy z-order, good “SimCity-like” look.
+- Cons: coarse slopes unless you add many glyph variants.
+
+2. **Unicode subcell framebuffer (braille/quadrants) + software rasterizer**
+- Rasterize projected terrain into a subpixel buffer, then pack to braille/block chars.
+- Pros: smooth slopes, better contours/shading, scalable quality.
+- Cons: more math, z-buffer needed, font calibration required.
+
+3. **Hybrid: offscreen image render -> Chafa/`chafa.py`**
+- Render isometric terrain to image (Python/JS canvas), convert to terminal Unicode.
+- Pros: fastest prototype, excellent quality quickly, lots of symbol modes.
+- Cons: less direct control over exact glyph placement; harder to preserve crisp tile semantics.
+
+4. **Engine-backed terminal app (BearLibTerminal/libtcod/rot.js/terminal-kit) + custom iso renderer**
+- Use framework for input/framebuffer; own projection/glyphing.
+- Pros: maintainable for TUI game integration.
+- Cons: still must write renderer core yourself.
+
+---
+
+**Risks and Tests to Add**
+
+### Risks
+- Font/terminal differences break alignment (especially braille/sextants).
+- Unicode width ambiguity causes drift.
+- Z-order artifacts on steep slopes/cliffs.
+- Flicker/perf issues at larger maps without dirty-rect updates.
+- Color fallback degradation (16-color terminals).
+
+### Tests to add
+- Projection round-trip tests (`grid -> screen -> picked tile`) for multiple camera offsets.
+- Golden snapshot tests for canonical heightmaps:
+  - flat plane
+  - single hill
+  - cliff edge
+  - checkerboard highs/lows
+  - ridge + saddle
+- Z-order regression tests (overlap cases with equal `x+y` but different heights).
+- Font-ratio calibration tests (expected output under `1:2`, `0.5`, custom ratios).
+- Width safety tests for glyph sets (detect wide chars / broken rendering).
+- Terminal capability matrix tests (braille, block, colors, truecolor fallback).
+
+---
+
+**Bottom Line**
+The practical path is: **custom isometric renderer + Unicode subcell framebuffer**, built on `terminedia`/`terminal-kit`/`rot.js`/`BearLibTerminal`, or **offscreen iso render + `chafa.py`** for fastest results.
+
+**Sources**
+- `rendascii` PyPI: https://pypi.org/project/rendascii/
+- `terminedia` PyPI: https://pypi.org/project/terminedia/
+- `termgl` PyPI: https://pypi.org/project/termgl/
+- `chafa.py` PyPI: https://pypi.org/project/chafa.py/
+- Chafa man page (symbol classes, font ratio concepts): https://hpjansson.org/chafa/man/
+- `rot.js` (terminal backend / `layout:"term"`): https://github.com/ondras/rot.js and https://www.npmjs.com/package/rot-js
+- `terminal-kit`: https://github.com/cronvel/terminal-kit
+- `blessed` ANSI image rendering: https://github.com/chjj/blessed
+- `MapSCII`: https://github.com/rastapasta/mapscii and https://www.npmjs.com/package/mapscii
+- `iceoh` isometric tilemap lib: https://iceoh.netlify.app/
+- `libtcod` console docs: https://libtcod.github.io/docs/html2/console
+- BearLibTerminal (Python install info shown in mirror README): https://github.com/tommyettinger/BearLibTerminal
+- OpenCity2k (SC2K docs reference): https://github.com/OpenCity2k/OpenCity2k
+- OpenSC2K (SC2K reimplementation reference): https://github.com/nicholas-ochoa/OpenSC2K
+- SimCity 2000 coordinate/rotation behavior (strategy guide research): https://gamefaqs.gamespot.com/pc/198648-simcity-2000/faqs/81608
+- Unicode charts index (Box Drawing / Block Elements / Braille charts): https://www.unicode.org/charts/PDF/
+- Unicode UAX #11 (width caveats): https://www.unicode.org/reports/tr11/
+- `img2braille` reference implementation: https://github.com/TheFel0x/img2braille
+
+If you want, I can next produce a concrete renderer design for your `heightmap[rows][cols] -> terminal frame` pipeline (projection, z-buffer, glyph atlas, and shading rules).
