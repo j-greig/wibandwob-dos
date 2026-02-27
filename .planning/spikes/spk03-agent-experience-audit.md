@@ -4,7 +4,7 @@ Status: in-progress
 GitHub issue: —
 PR: — (changes uncommitted on spike/contour-map-view branch)
 Started: 2026-02-27
-Last updated: 2026-02-27 19:15
+Last updated: 2026-02-27 19:20
 
 ## Goal
 
@@ -882,7 +882,7 @@ KEY OUTCOMES:
   - close_all: no longer kills agent's own chat/terminal
   - 2 crasher bugs found and documented (micropolis, room_chat)
 
-COMMITS (spike/contour-map-view branch):
+COMMITS (spike/contour-map-view branch, 20 total):
   d8c1781  fix(api): 9 missing window types, kill test_pattern fallback
   f4832b6  docs(planning): SPK-03 audit doc + catalogues
   50cf15d  ci(contracts): parity test CI gate + pre-commit hook
@@ -896,7 +896,11 @@ COMMITS (spike/contour-map-view branch):
   d608daf  docs(planning): spark — Scramble agent commands
   db4a565  docs(planning): spark — micropolis SIGBUS
   9c74676  refactor(skills): 27 → 13 skills
-  3da44e5  test(contracts): timer cleanup parity test
+  3da44e5  test(contracts): timer cleanup parity + skill references tests
+  e558f88  docs(planning): session 2 TLDR
+  573a9d4  docs(engine): CLAUDE.md updates
+  d0c47e0  fix(engine): Codex review actions — closeAll split, bail-out, CI
+  8808488  fix(api): skip terminal in smoke parade (socket theft)
 
 REMAINING:
   P2 — kill Python enum (biggest permanent fix, medium effort)
