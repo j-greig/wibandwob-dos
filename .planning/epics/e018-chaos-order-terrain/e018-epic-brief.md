@@ -46,6 +46,17 @@ Contour curves = chaos (organic, flowing). Binary grids = order (rigid, structur
 - [ ] API params: `mode=chaos|order|hybrid`, `order_ratio=0.5`
 - [ ] Triptych: chaos | hybrid | order side-by-side
 
+### F04 — FIGlet Placename Labels (Python-side)
+- [ ] Place FIGlet-rendered text labels at terrain features (peaks, valleys, grid clusters)
+- [ ] Python shells out to `figlet` binary (same as C++ `figlet_utils` does — no duplication, consistent)
+- [ ] Label placement algorithm: find largest flat areas near peaks/clusters, stamp FIGlet text
+- [ ] Auto-generate placenames from terrain type + seed (deterministic)
+- [ ] Font selection: small fonts (mini, small, banner3) to fit within map features
+- [ ] Labels rendered as overlay layer in Python — composited on top of contours/grids before piping
+- [ ] `--labels` flag enables labels, `--no-labels` disables (default: off)
+- [ ] Key `l` in C++ view — toggles labels, relaunches subprocess with/without `--labels`
+- [ ] Graceful fallback: if `figlet` binary not found, skip labels silently
+
 ## Architecture
 
 All in Python (same subprocess pattern). The ordered grid is a second rendering pass:

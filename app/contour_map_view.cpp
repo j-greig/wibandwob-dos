@@ -2,6 +2,7 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <mach-o/dyld.h>
 #include <ctime>
 #include <unistd.h>
 #include <fcntl.h>
@@ -14,9 +15,27 @@
 ContourBridge::~ContourBridge() { stop(); }
 
 std::string ContourBridge::resolveScriptPath() {
-    // Look for tools/contour_stream.py relative to WIBWOB_REPO_ROOT or cwd
+    // 1. Explicit env var
     const char* root = std::getenv("WIBWOB_REPO_ROOT");
     if (root) return std::string(root) + "/tools/contour_stream.py";
+
+    // 2. Relative to executable (build/app/wwdos → ../../tools/)
+    char exePath[4096];
+    uint32_t sz = sizeof(exePath);
+    if (_NSGetExecutablePath(exePath, &sz) == 0) {
+        std::string dir(exePath);
+        // Strip binary name, then go up two dirs (build/app/ → repo root)
+        auto pos = dir.rfind('/');
+        if (pos != std::string::npos) dir = dir.substr(0, pos);
+        pos = dir.rfind('/');
+        if (pos != std::string::npos) dir = dir.substr(0, pos);
+        pos = dir.rfind('/');
+        if (pos != std::string::npos) dir = dir.substr(0, pos);
+        std::string candidate = dir + "/tools/contour_stream.py";
+        if (access(candidate.c_str(), F_OK) == 0) return candidate;
+    }
+
+    // 3. Fallback: cwd-relative
     return "tools/contour_stream.py";
 }
 
@@ -29,7 +48,7 @@ bool ContourBridge::start(int width, int height, int seed, int terrainIdx,
     cmd += " --width " + std::to_string(width);
     cmd += " --height " + std::to_string(height);
     cmd += " --seed " + std::to_string(seed);
-    cmd += " --terrain " + std::string(kTerrainNames[terrainIdx]);
+    cmd += " --terrain \"" + std::string(kTerrainNames[terrainIdx]) + "\"";
     cmd += " --levels " + std::to_string(levels);
     if (grow) cmd += " --grow";
     if (triptych) cmd += " --triptych";
