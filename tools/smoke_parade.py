@@ -53,7 +53,7 @@ SPAWNABLE_TYPES = [
     "paint",
     "text_editor",
     "browser",
-    # "terminal",  # SKIP: spawns child wwdos process, can steal/delete IPC socket
+    "terminal",
     "gallery",
     "app_launcher",
     # Games
