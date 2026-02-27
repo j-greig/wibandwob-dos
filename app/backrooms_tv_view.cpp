@@ -25,6 +25,7 @@
 #include <map>
 #include <set>
 #include <string>
+#include <sstream>
 
 // Module primer path registry — name (no .txt) → absolute path.
 // Populated by scanPrimerNames() (dialog section, called at dialog open).
@@ -75,6 +76,33 @@ std::string BackroomsBridge::resolveBackroomsPath() const {
 // backrooms primers dir so the CLI subprocess can resolve them by name.
 // ---------------------------------------------------------------------------
 
+// Split text on lines that are purely dashes (---) optionally with spaces.
+// Returns one or more non-empty chunks. Returns {text} if no separators found.
+static std::vector<std::string> splitCustomText(const std::string &text) {
+    std::vector<std::string> chunks;
+    std::string current;
+    std::istringstream ss(text);
+    std::string line;
+    while (std::getline(ss, line)) {
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        // Is separator? 3+ dashes, rest spaces
+        size_t dashes = 0;
+        bool sep = true;
+        for (char c : line) {
+            if (c == '-') dashes++;
+            else if (c != ' ') { sep = false; break; }
+        }
+        if (sep && dashes >= 3) {
+            if (!current.empty()) { chunks.push_back(current); current.clear(); }
+        } else {
+            current += line + "\n";
+        }
+    }
+    if (!current.empty()) chunks.push_back(current);
+    if (chunks.empty() && !text.empty()) chunks.push_back(text);
+    return chunks;
+}
+
 bool BackroomsBridge::start(const BackroomsChannel &channel) {
     stop();  // kill any existing child
 
@@ -112,12 +140,38 @@ bool BackroomsBridge::start(const BackroomsChannel &channel) {
         }
     }
 
+    // Custom text primer: split on --- and write each chunk as _custom_N.txt
+    std::string customPrimerNames;
+    if (!channel.customText.empty()) {
+        auto chunks = splitCustomText(channel.customText);
+        for (int ci = 0; ci < (int)chunks.size(); ++ci) {
+            if (chunks[ci].find_first_not_of(" \t\r\n") == std::string::npos) continue;
+            std::string name = "_custom_" + std::to_string(ci);
+            std::string cpPath = backroomsPath + "/primers/" + name + ".txt";
+            int fd = ::open(cpPath.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
+            if (fd >= 0) {
+                ::write(fd, chunks[ci].data(), chunks[ci].size());
+                ::close(fd);
+                if (!customPrimerNames.empty()) customPrimerNames += ",";
+                customPrimerNames += name;
+            }
+        }
+    }
+
+    // Combine custom primer chunks + named primers
+    std::string allPrimers;
+    if (!customPrimerNames.empty()) allPrimers = customPrimerNames;
+    if (!channel.primers.empty()) {
+        if (!allPrimers.empty()) allPrimers += ",";
+        allPrimers += channel.primers;
+    }
+
     // Build command
     std::string cmd = "cd " + backroomsPath + " && npx tsx src/ui/cli-v3.ts";
     cmd += " \"" + channel.theme + "\"";
     cmd += " --turns " + std::to_string(channel.turns);
-    if (!channel.primers.empty()) {
-        cmd += " --primers \"" + channel.primers + "\"";
+    if (!allPrimers.empty()) {
+        cmd += " --primers \"" + allPrimers + "\"";
     }
     cmd += " --model " + channel.model;
     cmd += " --raw";       // stream only LLM deltas to stdout, no formatting
@@ -585,20 +639,23 @@ TWindow* createBackroomsTvWindow(const TRect &bounds, const BackroomsChannel &ch
 #define Uses_TStringCollection
 #define Uses_TProgram
 #define Uses_TDeskTop
+#define Uses_TEditor
 #include <tvision/tv.h>
 
 #include <algorithm>
 #include "ascii_gallery_view.h"
 
 // Custom command IDs for dialog buttons
-static const ushort cmBktvAdd       = 900;
-static const ushort cmBktvRemove    = 901;
-static const ushort cmBktvRandom3   = 902;
-static const ushort cmBktvPlay      = 903;
-static const ushort cmBktvListFocus = 904;  // available list cursor moved
-static const ushort cmBktvRandom6   = 905;
-static const ushort cmBktvRandom9   = 906;
-static const ushort cmBktvClear     = 907;
+static const ushort cmBktvAdd          = 900;
+static const ushort cmBktvRemove       = 901;
+static const ushort cmBktvRandom3      = 902;
+static const ushort cmBktvPlay         = 903;
+static const ushort cmBktvListFocus    = 904;  // available list cursor moved
+static const ushort cmBktvRandom6      = 905;
+static const ushort cmBktvRandom9      = 906;
+static const ushort cmBktvClear        = 907;
+static const ushort cmBktvSelListFocus = 908;  // selected list cursor moved
+static const ushort cmBktvAddCustom    = 909;  // add custom primer text to selected list
 
 // Resolve the wibandwob-dos repo root for module scanning.
 static std::string resolveRepoRoot(const std::string &backroomsPath) {
@@ -693,17 +750,47 @@ static TStringCollection* makeStringCol(const std::vector<std::string> &items) {
     return col;
 }
 
-// TListBox subclass that broadcasts cmBktvListFocus when cursor moves.
+// TListBox subclass with shift-select range tracking and configurable broadcast.
+// Used for both Available list (cmBktvListFocus) and Selected list (cmBktvSelListFocus).
 class TBktvListBox : public TListBox {
+    int    anchorIdx_   = 0;
+    int    rangeEnd_    = -1;  // -1 = no active range (single item)
+    ushort broadcastCmd_;
 public:
-    TBktvListBox(const TRect &bounds, ushort numCols, TScrollBar *aScrollBar)
-        : TListBox(bounds, numCols, aScrollBar) {}
+    TBktvListBox(const TRect &bounds, ushort numCols, TScrollBar *aScrollBar,
+                 ushort cmd = cmBktvListFocus)
+        : TListBox(bounds, numCols, aScrollBar), broadcastCmd_(cmd) {}
+
+    // Range of currently selected indices (inclusive).
+    // When no shift-range is active, min==max==focused.
+    int rangeMin() const {
+        if (rangeEnd_ < 0) return focused;
+        return std::min(anchorIdx_, rangeEnd_);
+    }
+    int rangeMax() const {
+        if (rangeEnd_ < 0) return focused;
+        return std::max(anchorIdx_, rangeEnd_);
+    }
 
     virtual void handleEvent(TEvent &event) override {
         int prevFocused = focused;
+        bool shiftHeld = false;
+        if (event.what == evKeyDown)
+            shiftHeld = (event.keyDown.controlKeyState & kbShift) != 0;
+        else if (event.what == evMouseDown)
+            shiftHeld = (event.mouse.controlKeyState & kbShift) != 0;
+
         TListBox::handleEvent(event);
-        if (focused != prevFocused)
-            message(owner, evBroadcast, cmBktvListFocus, this);
+
+        if (focused != prevFocused) {
+            if (shiftHeld) {
+                rangeEnd_ = focused;            // extend range from anchor
+            } else {
+                anchorIdx_ = focused;           // new anchor, clear range
+                rangeEnd_  = -1;
+            }
+            message(owner, evBroadcast, broadcastCmd_, this);
+        }
     }
 };
 
@@ -713,11 +800,13 @@ public:
     TInputLine      *turnsInput;
     TRadioButtons   *modelRadio;
     TBktvListBox    *availList;
-    TListBox        *selectedList;
+    TBktvListBox    *selectedList;
     TScrollBar      *availSB;
     TScrollBar      *selectedSB;
     TGalleryPreview *preview;
     TScrollBar      *previewSB;
+    TEditor         *customEditor_ = nullptr;
+    int              customCounter_ = 0;   // suffix for _custom_N file names
 
     std::vector<std::string> availPrimers;
     std::vector<std::string> selectedPrimers;
@@ -755,7 +844,7 @@ public:
 
         // 3-column layout: Available | Preview | Selected
         const int listTop = 10;
-        const int listH   = std::max(8, H - 18);
+        const int listH   = std::max(8, H - 30); // leave room for custom primer area below
         const int listW   = std::max(15, W / 5);   // side column width
         const int prevX1  = 3 + listW + 2;          // preview left edge
         const int prevX2  = W - 3 - listW - 2;      // preview right edge (excl. scrollbar)
@@ -778,7 +867,7 @@ public:
         insert(new TLabel(TRect(prevX2 + 1, listTop - 1, W - 3, listTop), "~S~elected", nullptr));
         selectedSB = new TScrollBar(TRect(W - 4, listTop, W - 3, listTop + listH));
         insert(selectedSB);
-        selectedList = new TListBox(TRect(prevX2 + 1, listTop, W - 4, listTop + listH), 1, selectedSB);
+        selectedList = new TBktvListBox(TRect(prevX2 + 1, listTop, W - 4, listTop + listH), 1, selectedSB, cmBktvSelListFocus);
         insert(selectedList);
 
         // Buttons below lists
@@ -794,6 +883,22 @@ public:
         int playY = btnY + 3;
         insert(new TButton(TRect(W/2 - 14, playY, W/2 - 2,  playY + 2), " \x10 ~P~lay", cmBktvPlay, bfDefault));
         insert(new TButton(TRect(W/2 + 2,  playY, W/2 + 14, playY + 2), "Cancel",       cmCancel,   bfNormal));
+
+        // Custom primer text area — paste raw text, use --- to split into multiple primers
+        int customLabelY = playY + 3;
+        // Label (left) + "Add custom →" button (right, 2 rows tall)
+        insert(new TLabel(TRect(3, customLabelY, W - 22, customLabelY + 1),
+                          "Custom primer text (--- splits into multiple):", nullptr));
+        insert(new TButton(TRect(W - 21, customLabelY, W - 4, customLabelY + 2),
+                           "Add custom \x10", cmBktvAddCustom, bfNormal));
+        // Editor below button
+        int editorTop = customLabelY + 2;
+        int customH   = std::max(4, H - editorTop - 2);
+        auto *customSB = new TScrollBar(TRect(W - 4, editorTop, W - 3, editorTop + customH));
+        insert(customSB);
+        customEditor_ = new TEditor(TRect(3, editorTop, W - 4, editorTop + customH),
+                                    nullptr, customSB, nullptr, 0x20000 /* 128KB buffer */);
+        insert(customEditor_);
 
         // Set defaults
         char defaultTheme[] = "liminal spaces";
@@ -819,23 +924,39 @@ public:
         preview->loadFile(path);
     }
 
+    void updatePreviewFromSelected() {
+        if (selectedPrimers.empty()) { preview->clear(); return; }
+        int idx = selectedList->focused;
+        if (idx < 0 || idx >= (int)selectedPrimers.size()) { preview->clear(); return; }
+        const std::string &name = selectedPrimers[idx];
+        auto it = g_modulePrimerPaths.find(name);
+        std::string path = (it != g_modulePrimerPaths.end())
+            ? it->second
+            : backroomsPath_ + "/primers/" + name + ".txt";
+        preview->loadFile(path);
+    }
+
     void rebuildLists() {
         availList->newList(makeStringCol(availPrimers));
         selectedList->newList(makeStringCol(selectedPrimers));
     }
 
     void addSelected() {
-        int idx = availList->focused;
-        int top = availList->topItem;
-        if (idx < 0 || idx >= (int)availPrimers.size()) return;
-        std::string name = availPrimers[idx];
-        for (auto &s : selectedPrimers)
-            if (s == name) return;
-        selectedPrimers.push_back(name);
+        int top    = availList->topItem;
+        int minIdx = availList->rangeMin();
+        int maxIdx = availList->rangeMax();
+        int lastAdded = minIdx;
+        for (int idx = minIdx; idx <= maxIdx; ++idx) {
+            if (idx < 0 || idx >= (int)availPrimers.size()) continue;
+            const std::string &name = availPrimers[idx];
+            bool already = false;
+            for (auto &s : selectedPrimers)
+                if (s == name) { already = true; break; }
+            if (!already) { selectedPrimers.push_back(name); lastAdded = idx; }
+        }
         rebuildLists();
-        // Restore scroll position after list rebuild
         int maxAvail = (int)availPrimers.size() - 1;
-        availList->focused = (idx <= maxAvail) ? idx : (maxAvail > 0 ? maxAvail : 0);
+        availList->focused = (lastAdded <= maxAvail) ? lastAdded : (maxAvail > 0 ? maxAvail : 0);
         availList->topItem = (top <= availList->focused) ? top : availList->focused;
         availList->drawView();
     }
@@ -878,6 +999,55 @@ public:
         rebuildLists();
     }
 
+    // Read raw text from TEditor gap buffer.
+    std::string readEditorText() const {
+        if (!customEditor_ || customEditor_->bufLen == 0) return {};
+        uint before = customEditor_->curPtr;
+        uint after  = customEditor_->bufLen - before;
+        std::string s;
+        s.reserve(customEditor_->bufLen);
+        s.append(customEditor_->buffer, before);
+        s.append(customEditor_->buffer + before + customEditor_->gapLen, after);
+        return s;
+    }
+
+    // Clear TEditor by resetting the gap buffer to empty.
+    void clearEditor() {
+        if (!customEditor_) return;
+        customEditor_->gapLen += customEditor_->bufLen;
+        customEditor_->bufLen  = 0;
+        customEditor_->curPtr  = 0;
+        customEditor_->selStart = 0;
+        customEditor_->selEnd   = 0;
+        customEditor_->drawView();
+    }
+
+    // Split editor text on --- lines, write each chunk as _custom_N.txt, add to selected list.
+    void addCustomPrimers() {
+        std::string text = readEditorText();
+        // Strip trailing whitespace
+        while (!text.empty() && (text.back() == '\n' || text.back() == '\r' || text.back() == ' '))
+            text.pop_back();
+        if (text.empty()) return;
+
+        auto chunks = splitCustomText(text);
+        std::string primersDir = backroomsPath_ + "/primers/";
+
+        for (auto &chunk : chunks) {
+            if (chunk.find_first_not_of(" \t\r\n") == std::string::npos) continue;
+            std::string name = "_custom_" + std::to_string(customCounter_++);
+            std::string path = primersDir + name + ".txt";
+            int fd = ::open(path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
+            if (fd >= 0) {
+                ::write(fd, chunk.data(), chunk.size());
+                ::close(fd);
+                selectedPrimers.push_back(name);
+            }
+        }
+        clearEditor();
+        rebuildLists();
+    }
+
     virtual void handleEvent(TEvent &event) override {
         TDialog::handleEvent(event);
         if (event.what == evCommand) {
@@ -906,17 +1076,25 @@ public:
                     clearSelected();
                     clearEvent(event);
                     break;
+                case cmBktvAddCustom:
+                    addCustomPrimers();
+                    clearEvent(event);
+                    break;
                 case cmBktvPlay:
                     endModal(cmBktvPlay);
                     clearEvent(event);
                     break;
             }
         }
-        // Live preview: update when cursor moves in available list
-        if (event.what == evBroadcast &&
-            event.message.command == cmBktvListFocus &&
+        // Live preview: update when cursor moves in available or selected list
+        if (event.what == evBroadcast && event.message.command == cmBktvListFocus &&
             event.message.infoPtr == availList) {
             updatePreview();
+            clearEvent(event);
+        }
+        if (event.what == evBroadcast && event.message.command == cmBktvSelListFocus &&
+            event.message.infoPtr == selectedList) {
+            updatePreviewFromSelected();
             clearEvent(event);
         }
     }
@@ -951,6 +1129,13 @@ public:
         }
         ch.primers = primers;
 
+        // Custom primer text — anything still in the editor (not yet Add'd)
+        ch.customText = readEditorText();
+        while (!ch.customText.empty() &&
+               (ch.customText.back() == '\n' || ch.customText.back() == '\r' ||
+                ch.customText.back() == ' '))
+            ch.customText.pop_back();
+
         return ch;
     }
 };
@@ -965,7 +1150,7 @@ bool showBackroomsTvDialog(BackroomsChannel &outChannel) {
     int deskW = TProgram::deskTop->size.x;
     int deskH = TProgram::deskTop->size.y;
     int dlgW = std::max(70, deskW * 7 / 10);
-    int dlgH = std::max(28, deskH * 7 / 10);
+    int dlgH = std::max(42, deskH * 8 / 10); // taller to accommodate custom primer editor
     TRect r(0, 0, dlgW, dlgH);
     r.move((TProgram::deskTop->size.x - dlgW) / 2,
            (TProgram::deskTop->size.y - dlgH) / 2);

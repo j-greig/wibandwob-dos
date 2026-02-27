@@ -30,6 +30,7 @@ struct BackroomsChannel {
     std::string primers;    // comma-separated primer names (empty = none)
     int         turns       = 3;
     std::string model       = "sonnet";
+    std::string customText; // pasted-in raw text, written to _custom.txt and used as extra primer
 };
 
 class BackroomsBridge {
