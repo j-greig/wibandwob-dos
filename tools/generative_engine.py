@@ -121,11 +121,62 @@ class Grid:
                         self.locked.add((x, y))
             dy += 1
 
-    def stamp_file(self, path: str, ox: int, oy: int, locked: bool = True):
-        """Load ASCII art from file and stamp onto grid."""
+    def stamp_text_fit(self, text: str, ox: int, oy: int, locked: bool = True):
+        """Stamp ASCII art, auto-shrinking to fit the grid if too large.
+        Samples every Nth character/line to preserve structure."""
+        lines = []
+        for line in text.split('\n'):
+            stripped = line.lstrip()
+            if stripped.startswith('#'):
+                continue
+            lines.append(line)
+
+        if not lines:
+            return
+
+        art_w = max(len(l) for l in lines)
+        art_h = len(lines)
+        avail_w = self.w - max(ox, 0)
+        avail_h = self.h - max(oy, 0)
+
+        if art_w <= avail_w and art_h <= avail_h:
+            # Fits already — stamp normally
+            self.stamp_text(text, ox, oy, locked)
+            return
+
+        # Scale factor: sample every Nth col/row
+        sx = max(1, (art_w + avail_w - 1) // avail_w)
+        sy = max(1, (art_h + avail_h - 1) // avail_h)
+
+        dy = 0
+        for row_i in range(0, art_h, sy):
+            line = lines[row_i]
+            dx = 0
+            for col_i in range(0, len(line), sx):
+                ch = line[col_i]
+                if ch == ' ':
+                    dx += 1
+                    continue
+                x, y = ox + dx, oy + dy
+                if 0 <= x < self.w and 0 <= y < self.h:
+                    self.cells[y][x].state = 1
+                    self.cells[y][x].value = ch
+                    self.cells[y][x].age = 0
+                    if locked:
+                        self.locked.add((x, y))
+                dx += 1
+            dy += 1
+
+    def stamp_file(self, path: str, ox: int, oy: int, locked: bool = True,
+                   auto_fit: bool = False):
+        """Load ASCII art from file and stamp onto grid.
+        If auto_fit=True, large art is sampled down to fit."""
         with open(path, 'r') as f:
             text = f.read()
-        self.stamp_text(text, ox, oy, locked)
+        if auto_fit:
+            self.stamp_text_fit(text, ox, oy, locked)
+        else:
+            self.stamp_text(text, ox, oy, locked)
 
     def deep_copy(self) -> 'Grid':
         g = Grid(self.w, self.h)
@@ -861,9 +912,9 @@ class Engine:
             path = st.get('path', '')
             text = st.get('text', '')
             if path:
-                self.grid.stamp_file(path, 0, 0, locked=False)
+                self.grid.stamp_file(path, 0, 0, locked=False, auto_fit=True)
             elif text:
-                self.grid.stamp_text(text, 0, 0, locked=False)
+                self.grid.stamp_text_fit(text, 0, 0, locked=False)
             # Build a palette of characters from the stamp for new births
             self._char_palette = []
             for row in self.grid.cells:
@@ -882,9 +933,10 @@ class Engine:
                 locked = st.get('locked', True)
                 ox, oy = st.get('x', 0), st.get('y', 0)
                 if 'path' in st:
-                    self.grid.stamp_file(st['path'], ox, oy, locked)
+                    self.grid.stamp_file(st['path'], ox, oy, locked,
+                                         auto_fit=True)
                 elif 'text' in st:
-                    self.grid.stamp_text(st['text'], ox, oy, locked)
+                    self.grid.stamp_text_fit(st['text'], ox, oy, locked)
 
     def step(self) -> bool:
         """Advance one tick. Returns True if changed."""

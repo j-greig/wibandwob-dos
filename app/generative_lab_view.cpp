@@ -385,6 +385,19 @@ public:
             clearEvent(ev);
             return;
         }
+        // Enter key = add to selected
+        if (ev.what == evKeyDown && ev.keyDown.keyCode == kbEnter) {
+            message(owner, evCommand, cmStampAdd, this);
+            clearEvent(ev);
+            return;
+        }
+        // Double-click = add to selected
+        if (ev.what == evMouseDown && (ev.mouse.eventFlags & meDoubleClick)) {
+            TListBox::handleEvent(ev);  // let it focus the clicked item
+            message(owner, evCommand, cmStampAdd, this);
+            clearEvent(ev);
+            return;
+        }
         int prev = focused;
         TListBox::handleEvent(ev);
         if (focused != prev)
