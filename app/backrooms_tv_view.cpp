@@ -207,7 +207,17 @@ void TBackroomsTvView::stopTimer() {
 void TBackroomsTvView::updateScrollLimit() {
     int contentH = size.y - kPadding * 2 - 2;  // must match draw(): -2 for 2-row status bar
     int maxScroll = std::max(0, (int)lines_.size() - contentH);
-    setLimit(0, maxScroll);
+    // Set limit directly — do NOT use TScroller::setLimit() here.
+    // setLimit() passes (limit.y - size.y) as the scrollbar max, which is negative
+    // when limit.y < size.y (our typical case). TScrollBar::setParams() then clamps
+    // max to 0, making every setValue() snap to 0 and killing auto-scroll.
+    // Instead: set limit.y ourselves and give the scrollbar the correct range directly.
+    limit.x = 0;
+    limit.y = maxScroll;
+    if (vScrollBar) {
+        int pg = (contentH > 1) ? contentH - 1 : 1;
+        vScrollBar->setParams(vScrollBar->value, 0, maxScroll, pg, 3);
+    }
 }
 
 void TBackroomsTvView::scrollToBottom() {
@@ -228,8 +238,9 @@ void TBackroomsTvView::play(const BackroomsChannel &channel) {
 
     bridge_.start(channel_);
     startTimer();
-    scrollTo(0, 0);
-    setLimit(0, 0);
+    delta.x = delta.y = 0;
+    limit.x = limit.y = 0;
+    if (vScrollBar) vScrollBar->setParams(0, 0, 0, 1, 3);
     drawView();
 }
 
@@ -531,12 +542,17 @@ TWindow* createBackroomsTvWindow(const TRect &bounds, const BackroomsChannel &ch
 #include <dirent.h>
 #include <sys/stat.h>
 #include <algorithm>
+#include "ascii_gallery_view.h"
 
 // Custom command IDs for dialog buttons
-static const ushort cmBktvAdd     = 900;
-static const ushort cmBktvRemove  = 901;
-static const ushort cmBktvRandom  = 902;
-static const ushort cmBktvPlay    = 903;
+static const ushort cmBktvAdd       = 900;
+static const ushort cmBktvRemove    = 901;
+static const ushort cmBktvRandom3   = 902;
+static const ushort cmBktvPlay      = 903;
+static const ushort cmBktvListFocus = 904;  // available list cursor moved
+static const ushort cmBktvRandom6   = 905;
+static const ushort cmBktvRandom9   = 906;
+static const ushort cmBktvClear     = 907;
 
 // Helper: scan backrooms primers/ directory for .txt files
 static std::vector<std::string> scanPrimerNames(const std::string &backroomsPath) {
@@ -564,25 +580,46 @@ static TStringCollection* makeStringCol(const std::vector<std::string> &items) {
     return col;
 }
 
+// TListBox subclass that broadcasts cmBktvListFocus when cursor moves.
+class TBktvListBox : public TListBox {
+public:
+    TBktvListBox(const TRect &bounds, ushort numCols, TScrollBar *aScrollBar)
+        : TListBox(bounds, numCols, aScrollBar) {}
+
+    virtual void handleEvent(TEvent &event) override {
+        int prevFocused = focused;
+        TListBox::handleEvent(event);
+        if (focused != prevFocused)
+            message(owner, evBroadcast, cmBktvListFocus, this);
+    }
+};
+
 class TBackroomsTvDialog : public TDialog {
 public:
     TInputLine      *themeInput;
     TInputLine      *turnsInput;
     TRadioButtons   *modelRadio;
-    TListBox        *availList;
+    TBktvListBox    *availList;
     TListBox        *selectedList;
     TScrollBar      *availSB;
     TScrollBar      *selectedSB;
+    TGalleryPreview *preview;
+    TScrollBar      *previewSB;
 
     std::vector<std::string> availPrimers;
     std::vector<std::string> selectedPrimers;
+    std::string backroomsPath_;
 
-    TBackroomsTvDialog(const TRect &bounds, const std::vector<std::string> &primers)
+    TBackroomsTvDialog(const TRect &bounds,
+                       const std::vector<std::string> &primers,
+                       const std::string &backroomsPath)
         : TDialog(bounds, "Backrooms TV")
         , TWindowInit(&TBackroomsTvDialog::initFrame)
         , availPrimers(primers)
+        , backroomsPath_(backroomsPath)
     {
         const int W = bounds.b.x - bounds.a.x;
+        const int H = bounds.b.y - bounds.a.y;
 
         // Theme
         insert(new TLabel(TRect(3, 2, 10, 3), "~T~heme", nullptr));
@@ -603,32 +640,46 @@ public:
             nullptr))));
         insert(modelRadio);
 
-        // Primer lists
+        // 3-column layout: Available | Preview | Selected
         const int listTop = 10;
-        const int listH = 10;
-        const int listMid = W / 2;
+        const int listH   = std::max(8, H - 18);
+        const int listW   = std::max(15, W / 5);   // side column width
+        const int prevX1  = 3 + listW + 2;          // preview left edge
+        const int prevX2  = W - 3 - listW - 2;      // preview right edge (excl. scrollbar)
 
-        insert(new TLabel(TRect(3, listTop - 1, listMid - 2, listTop), "A~v~ailable", nullptr));
-        availSB = new TScrollBar(TRect(listMid - 3, listTop, listMid - 2, listTop + listH));
+        // Available list (left)
+        insert(new TLabel(TRect(3, listTop - 1, 3 + listW, listTop), "A~v~ailable", nullptr));
+        availSB = new TScrollBar(TRect(2 + listW, listTop, 3 + listW, listTop + listH));
         insert(availSB);
-        availList = new TListBox(TRect(3, listTop, listMid - 3, listTop + listH), 1, availSB);
+        availList = new TBktvListBox(TRect(3, listTop, 2 + listW, listTop + listH), 1, availSB);
         insert(availList);
 
-        insert(new TLabel(TRect(listMid + 1, listTop - 1, W - 3, listTop), "~S~elected", nullptr));
+        // Preview (centre)
+        insert(new TLabel(TRect(prevX1, listTop - 1, prevX2 - 1, listTop), "Preview", nullptr));
+        previewSB = new TScrollBar(TRect(prevX2 - 1, listTop, prevX2, listTop + listH));
+        insert(previewSB);
+        preview = new TGalleryPreview(TRect(prevX1, listTop, prevX2 - 1, listTop + listH), previewSB);
+        insert(preview);
+
+        // Selected list (right)
+        insert(new TLabel(TRect(prevX2 + 1, listTop - 1, W - 3, listTop), "~S~elected", nullptr));
         selectedSB = new TScrollBar(TRect(W - 4, listTop, W - 3, listTop + listH));
         insert(selectedSB);
-        selectedList = new TListBox(TRect(listMid + 1, listTop, W - 4, listTop + listH), 1, selectedSB);
+        selectedList = new TListBox(TRect(prevX2 + 1, listTop, W - 4, listTop + listH), 1, selectedSB);
         insert(selectedList);
 
-        // Buttons between lists
+        // Buttons below lists
         int btnY = listTop + listH + 1;
-        insert(new TButton(TRect(3,           btnY, 14,          btnY + 2), "~A~dd →",   cmBktvAdd,    bfNormal));
-        insert(new TButton(TRect(15,          btnY, 28,          btnY + 2), "← ~R~emove",cmBktvRemove, bfNormal));
-        insert(new TButton(TRect(29,          btnY, 44,          btnY + 2), "Ran~d~om 3", cmBktvRandom, bfNormal));
+        insert(new TButton(TRect(3,  btnY, 12, btnY + 2), "~A~dd →",    cmBktvAdd,    bfNormal));
+        insert(new TButton(TRect(13, btnY, 24, btnY + 2), "← ~R~emove", cmBktvRemove, bfNormal));
+        insert(new TButton(TRect(25, btnY, 36, btnY + 2), "+~3~ rnd",    cmBktvRandom3, bfNormal));
+        insert(new TButton(TRect(37, btnY, 48, btnY + 2), "+~6~ rnd",    cmBktvRandom6, bfNormal));
+        insert(new TButton(TRect(49, btnY, 60, btnY + 2), "+~9~ rnd",    cmBktvRandom9, bfNormal));
+        insert(new TButton(TRect(61, btnY, 72, btnY + 2), "C~l~ear",     cmBktvClear,   bfNormal));
 
         // Play / Cancel
         int playY = btnY + 3;
-        insert(new TButton(TRect(W/2 - 14, playY, W/2 - 2, playY + 2), " \x10 ~P~lay", cmBktvPlay, bfDefault));
+        insert(new TButton(TRect(W/2 - 14, playY, W/2 - 2,  playY + 2), " \x10 ~P~lay", cmBktvPlay, bfDefault));
         insert(new TButton(TRect(W/2 + 2,  playY, W/2 + 14, playY + 2), "Cancel",       cmCancel,   bfNormal));
 
         // Set defaults
@@ -639,6 +690,18 @@ public:
         modelRadio->press(1); // Sonnet
 
         rebuildLists();
+        updatePreview();  // load first item immediately
+    }
+
+    void updatePreview() {
+        if (availPrimers.empty()) { preview->clear(); return; }
+        int idx = availList->focused;
+        if (idx >= 0 && idx < (int)availPrimers.size()) {
+            std::string path = backroomsPath_ + "/primers/" + availPrimers[idx] + ".txt";
+            preview->loadFile(path);
+        } else {
+            preview->clear();
+        }
     }
 
     void rebuildLists() {
@@ -648,36 +711,55 @@ public:
 
     void addSelected() {
         int idx = availList->focused;
+        int top = availList->topItem;
         if (idx < 0 || idx >= (int)availPrimers.size()) return;
         std::string name = availPrimers[idx];
-        // Don't add duplicates
         for (auto &s : selectedPrimers)
             if (s == name) return;
         selectedPrimers.push_back(name);
         rebuildLists();
+        // Restore scroll position after list rebuild
+        int maxAvail = (int)availPrimers.size() - 1;
+        availList->focused = (idx <= maxAvail) ? idx : (maxAvail > 0 ? maxAvail : 0);
+        availList->topItem = (top <= availList->focused) ? top : availList->focused;
+        availList->drawView();
     }
 
     void removeSelected() {
         int idx = selectedList->focused;
+        int top = selectedList->topItem;
         if (idx < 0 || idx >= (int)selectedPrimers.size()) return;
         selectedPrimers.erase(selectedPrimers.begin() + idx);
         rebuildLists();
+        // Restore scroll position after list rebuild
+        int maxSel = (int)selectedPrimers.size() - 1;
+        selectedList->focused = (idx <= maxSel) ? idx : (maxSel > 0 ? maxSel : 0);
+        selectedList->topItem = (top <= selectedList->focused) ? top : selectedList->focused;
+        selectedList->drawView();
     }
 
-    void randomThree() {
-        selectedPrimers.clear();
-        if (availPrimers.size() <= 3) {
-            selectedPrimers = availPrimers;
-        } else {
-            // Fisher-Yates partial shuffle for 3 picks
-            std::vector<int> indices(availPrimers.size());
-            for (int i = 0; i < (int)indices.size(); ++i) indices[i] = i;
-            for (int i = 0; i < 3; ++i) {
-                int j = i + (std::rand() % (indices.size() - i));
-                std::swap(indices[i], indices[j]);
-                selectedPrimers.push_back(availPrimers[indices[i]]);
-            }
+    // Additively pick n random primers not already in selectedPrimers.
+    void randomAdd(int n) {
+        // Build pool of primers not already selected
+        std::vector<int> pool;
+        for (int i = 0; i < (int)availPrimers.size(); ++i) {
+            bool already = false;
+            for (auto &s : selectedPrimers)
+                if (s == availPrimers[i]) { already = true; break; }
+            if (!already) pool.push_back(i);
         }
+        // Fisher-Yates partial shuffle up to min(n, pool.size()) picks
+        int picks = (n < (int)pool.size()) ? n : (int)pool.size();
+        for (int i = 0; i < picks; ++i) {
+            int j = i + (std::rand() % (pool.size() - i));
+            std::swap(pool[i], pool[j]);
+            selectedPrimers.push_back(availPrimers[pool[i]]);
+        }
+        rebuildLists();
+    }
+
+    void clearSelected() {
+        selectedPrimers.clear();
         rebuildLists();
     }
 
@@ -693,8 +775,20 @@ public:
                     removeSelected();
                     clearEvent(event);
                     break;
-                case cmBktvRandom:
-                    randomThree();
+                case cmBktvRandom3:
+                    randomAdd(3);
+                    clearEvent(event);
+                    break;
+                case cmBktvRandom6:
+                    randomAdd(6);
+                    clearEvent(event);
+                    break;
+                case cmBktvRandom9:
+                    randomAdd(9);
+                    clearEvent(event);
+                    break;
+                case cmBktvClear:
+                    clearSelected();
                     clearEvent(event);
                     break;
                 case cmBktvPlay:
@@ -702,6 +796,13 @@ public:
                     clearEvent(event);
                     break;
             }
+        }
+        // Live preview: update when cursor moves in available list
+        if (event.what == evBroadcast &&
+            event.message.command == cmBktvListFocus &&
+            event.message.infoPtr == availList) {
+            updatePreview();
+            clearEvent(event);
         }
     }
 
@@ -745,16 +846,16 @@ bool showBackroomsTvDialog(BackroomsChannel &outChannel) {
     std::string backroomsPath = bridge.resolveBackroomsPath();
     std::vector<std::string> primers = scanPrimerNames(backroomsPath);
 
-    // Size dialog to 70% of desktop, min 60x28
+    // Size dialog to 70% of desktop, min 70x28 (wider for 3-column layout)
     int deskW = TProgram::deskTop->size.x;
     int deskH = TProgram::deskTop->size.y;
-    int dlgW = std::max(60, deskW * 7 / 10);
+    int dlgW = std::max(70, deskW * 7 / 10);
     int dlgH = std::max(28, deskH * 7 / 10);
     TRect r(0, 0, dlgW, dlgH);
     r.move((TProgram::deskTop->size.x - dlgW) / 2,
            (TProgram::deskTop->size.y - dlgH) / 2);
 
-    auto *dlg = new TBackroomsTvDialog(r, primers);
+    auto *dlg = new TBackroomsTvDialog(r, primers, backroomsPath);
     ushort result = TProgram::deskTop->execView(dlg);
 
     if (result == cmBktvPlay) {
