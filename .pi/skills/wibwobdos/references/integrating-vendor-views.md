@@ -20,10 +20,11 @@ Adding a vendor TView subclass (e.g. tvterm's `BasicTerminalWindow`) touches exa
 | 10 | Window type registry | `app/window_type_registry.cpp` | spawn/match + k_specs table entry |
 | 11 | Test stubs | `command_registry_test.cpp`, `scramble_engine_test.cpp` | Stub for each new extern |
 | 12 | Python model | `tools/api_server/models.py` | Add to `WindowType` enum |
-| 13 | Python controller | `tools/api_server/controller.py` | Dispatch in `create_window()` |
-| 14 | MCP docstring | `tools/api_server/mcp_tools.py` | Update `tui_create_window` docstring |
+| 13 | Python schema | `tools/api_server/schemas.py` | Add to `WindowCreate.type` Literal list |
+| 14 | Parity test | `tests/contract/test_window_type_parity.py` | Run: all 5 must pass |
 
-All 14 surfaces must be touched or the drift tests / link will fail.
+All 14 surfaces must be touched or the parity contract tests will fail.
+Note: mcp_tools.py no longer needs updating — MCP uses 2 generic tools via Node bridge.
 
 ## Gotchas discovered
 
