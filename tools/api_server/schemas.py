@@ -34,12 +34,21 @@ class WindowCreate(BaseModel):
         "animated_gradient",
         "monster_cam",
         "monster_verse",
+        "contour_map",
+        "generative_lab",
         "monster_portal",
         "paint",
         "micropolis_ascii",
         "terminal",
-        "wibwob",
         "room_chat",
+        "wibwob",
+        "quadra",
+        "snake",
+        "rogue",
+        "deep_signal",
+        "app_launcher",
+        "gallery",
+        "figlet_text",
     ]
     title: Optional[str] = None
     rect: Optional[RectModel] = None

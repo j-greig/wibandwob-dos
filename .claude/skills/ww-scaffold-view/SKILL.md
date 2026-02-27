@@ -16,7 +16,7 @@ Ask for any not provided:
 | `view_name` | yes | `particle_field` | snake_case, becomes `TParticleFieldView` |
 | `window_title` | yes | `"Particle Field"` | Human-readable for TWindow |
 | `type` | yes | `view-only` | `view-only`, `window+view`, `browser-like`, `animation-like` |
-| `parity_scope` | no | `ui+registry` | `ui-only`, `ui+registry`, `full-parity`. Default: `ui+registry` |
+| `parity_scope` | no | `full-parity` | `ui-only`, `ui+registry`, `full-parity`. Default: `full-parity` |
 | `issue_id` | no | `#42` | Required for non-trivial work per repo canon |
 | `description` | no | `Animated particle system` | One-line for comments and registry |
 
@@ -51,10 +51,20 @@ In `app/command_registry.cpp`:
 - Add capability: `{"open_{name}", "Open {title} window", false}`
 - Add dispatch case in `exec_registry_command()`
 
-### 6. Patch Python surfaces (only `full-parity`)
-- `tools/api_server/models.py` — `WindowType` enum value
-- `tools/api_server/controller.py` — `create_window()` case
-- `tools/api_server/mcp_tools.py` — update valid types in docstring
+### 6. Patch Python surfaces (always — required for agent parity)
+- `tools/api_server/models.py` — add `WindowType` enum value
+- `tools/api_server/schemas.py` — add to `WindowCreate.type` Literal list
+- `app/window_type_registry.cpp` — add match function + k_specs[] entry
+  (already done in step 5 for registry scope, but verify match fn exists)
+
+NOTE: mcp_tools.py no longer needs updating — it uses 2 generic tools
+(tui_list_commands + tui_menu_command) that auto-discover from the registry.
+
+### 6b. Run parity test (always)
+```bash
+tools/api_server/venv/bin/pytest tests/contract/test_window_type_parity.py -v
+```
+ALL 5 tests must pass. If any fail, fix before proceeding.
 
 ### 7. Build
 ```bash

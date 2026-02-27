@@ -171,18 +171,14 @@ class Controller:
                         try:
                             wtype = WindowType(raw_type)
                         except ValueError:
-                            # Preserve unknown types from C++ rather than
-                            # silently coercing to test_pattern.  Log for
-                            # visibility so missing enum values get added.
+                            # Unknown C++ type not yet in Python enum.
+                            # Preserve raw string so agents see the real type
+                            # instead of misleading "test_pattern".
                             import logging
                             logging.getLogger(__name__).warning(
                                 "Unknown window type from C++: %r — add to WindowType enum", raw_type
                             )
-                            # Fall back to test_pattern enum but this should
-                            # now be unreachable since the enum covers all
-                            # k_specs[] slugs. If it fires, a new C++ type
-                            # was added without updating models.py.
-                            wtype = WindowType.test_pattern
+                            wtype = raw_type  # type: ignore[assignment]
                         # Carry through any props the C++ side emits (e.g. path for
                         # frame_player / text_view windows) while preserving any
                         # Python-side props already attached to the same window id.
@@ -1088,7 +1084,7 @@ class Controller:
             try:
                 wtype = WindowType(wtype_raw)
             except ValueError:
-                wtype = WindowType.test_pattern
+                wtype = wtype_raw  # type: ignore[assignment]
             win = Window(
                 id=item.get("id", new_id("win")),
                 type=wtype,

@@ -23,16 +23,42 @@ def _cpp_registry_slugs() -> list[dict[str, object]]:
     Spawnable = spawn function is not 'nullptr'.
     """
     src = (REPO_ROOT / "app" / "window_type_registry.cpp").read_text(encoding="utf-8")
-    # Match lines like:  { "gradient",  spawn_gradient,  match_gradient  },
-    # or:                { "wibwob",   nullptr,          match_wibwob    },
-    pattern = re.compile(
-        r'\{\s*"([a-z_]+)"\s*,\s*(\w+)\s*,\s*\w+\s*\}',
-    )
+    # Match k_specs[] entries.  Most are simple:
+    #   { "gradient",  spawn_gradient,  match_gradient  },
+    # but some use inline lambdas:
+    #   { "wibwob",  [](TWwdosApp& ...) { ... },  match_wibwob  },
+    # Strategy: find every opening { "slug" in the k_specs region,
+    # then determine spawnability from whether the second field is nullptr.
+    #
+    # First isolate the k_specs[] block.
+    specs_start = src.find("k_specs[]")
+    if specs_start == -1:
+        return []
+    specs_block = src[specs_start:]
+    # Find closing brace of the array
+    brace_depth = 0
+    specs_end = 0
+    for i, ch in enumerate(specs_block):
+        if ch == '{' and brace_depth == 0:
+            brace_depth = 1
+        elif ch == '{':
+            brace_depth += 1
+        elif ch == '}':
+            brace_depth -= 1
+            if brace_depth == 0:
+                specs_end = i
+                break
+    specs_block = specs_block[:specs_end + 1]
+
+    # Match each entry: { "slug", <spawn>, <match> }
+    # The slug is always the first quoted string after {
+    pattern = re.compile(r'\{\s*"([a-z_]+)"\s*,\s*(.*?)\s*,\s*\w+\s*\}', re.DOTALL)
     results = []
-    for m in pattern.finditer(src):
+    for m in pattern.finditer(specs_block):
         slug = m.group(1)
-        spawn_fn = m.group(2)
-        results.append({"slug": slug, "spawnable": spawn_fn != "nullptr"})
+        spawn_field = m.group(2).strip()
+        spawnable = spawn_field != "nullptr"
+        results.append({"slug": slug, "spawnable": spawnable})
     return results
 
 

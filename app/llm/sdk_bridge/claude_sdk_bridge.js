@@ -169,11 +169,14 @@ class ClaudeSDKBridge {
     async _injectCapabilities() {
         try {
             const axios = require('axios');
-            // Retry up to 3 times — API server may still be starting
-            let resp;
+            // Fetch both endpoints — capabilities for window types, commands for rich descriptions
+            let capsResp, cmdsResp;
             for (let attempt = 1; attempt <= 3; attempt++) {
                 try {
-                    resp = await axios.get('http://127.0.0.1:8089/capabilities', { timeout: 5000 });
+                    [capsResp, cmdsResp] = await Promise.all([
+                        axios.get('http://127.0.0.1:8089/capabilities', { timeout: 5000 }),
+                        axios.get('http://127.0.0.1:8089/commands', { timeout: 5000 }),
+                    ]);
                     break;
                 } catch (retryErr) {
                     if (attempt < 3) {
@@ -184,30 +187,42 @@ class ClaudeSDKBridge {
                     }
                 }
             }
-            const caps = resp.data;
+            const caps = capsResp.data;
+            const cmds = cmdsResp.data;
 
             const windowTypes = (caps.window_types || []).map(t => t.name || t).join(', ');
-            const commands = (caps.commands || []).map(c => c.name || c).join(', ');
+            const commandList = (cmds.commands || []);
 
-            if (!windowTypes && !commands) {
+            if (!windowTypes && !commandList.length) {
                 console.error('[BRIDGE] Capabilities empty, skipping injection');
                 return;
             }
+
+            // Format commands with descriptions for agent comprehension.
+            // Group by category to keep it scannable.
+            const cmdLines = commandList.map(c => {
+                const name = c.name || c;
+                const desc = c.description || '';
+                // Trim long descriptions to keep token budget reasonable
+                const short = desc.length > 100 ? desc.slice(0, 97) + '...' : desc;
+                return `  ${name} — ${short}`;
+            });
 
             const block = [
                 '',
                 '## Available TUI Capabilities (auto-derived from C++ registry)',
                 '',
-                '### Window Types (use with tui_create_window tool)',
+                '### Window Types',
                 windowTypes || '(none)',
                 '',
-                '### Commands (available as tui_* tools)',
-                commands || '(none)',
+                `### Commands (${commandList.length} available, use with tui_menu_command)`,
+                ...cmdLines,
                 ''
             ].join('\n');
 
             this.systemPrompt = (this.systemPrompt || '') + '\n' + block;
-            console.error(`[BRIDGE] Injected capabilities: ${(caps.window_types || []).length} types, ${(caps.commands || []).length} commands`);
+            const tokenEst = Math.ceil(block.length / 4);
+            console.error(`[BRIDGE] Injected capabilities: ${(caps.window_types || []).length} types, ${commandList.length} commands (~${tokenEst} tokens)`);
         } catch (err) {
             console.error(`[BRIDGE] Capabilities fetch failed (API may not be running): ${err.message}`);
         }

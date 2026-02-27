@@ -328,7 +328,9 @@ case cmRogueHackTerminal: {
 | 5 | `app/CMakeLists.txt` | Add `game_view.cpp` to wwdos sources list |
 | 6 | `app/command_registry_test.cpp` | Stub `void api_spawn_*(TWwdosApp&, const TRect*) {}` AND test token `"\"name\":\"open_*\""` |
 | 7 | `app/scramble_engine_test.cpp` | Same stub (both test executables link command_registry.cpp) |
-| 8 | (Optional) `tools/api_server/models.py` | `WindowType` enum for REST/MCP parity |
+| 8 | `tools/api_server/models.py` | `WindowType` enum value (REQUIRED — without this, /state reports type as test_pattern) |
+| 9 | `tools/api_server/schemas.py` | Add to `WindowCreate.type` Literal list (REQUIRED for POST /windows) |
+| 10 | Run parity test | `tools/api_server/venv/bin/pytest tests/contract/test_window_type_parity.py -v` — all 5 must pass |
 
 ### Finding the Next Command ID
 
