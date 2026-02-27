@@ -809,12 +809,14 @@ public:
     void updatePreview() {
         if (availPrimers.empty()) { preview->clear(); return; }
         int idx = availList->focused;
-        if (idx >= 0 && idx < (int)availPrimers.size()) {
-            std::string path = backroomsPath_ + "/primers/" + availPrimers[idx] + ".txt";
-            preview->loadFile(path);
-        } else {
-            preview->clear();
-        }
+        if (idx < 0 || idx >= (int)availPrimers.size()) { preview->clear(); return; }
+        const std::string &name = availPrimers[idx];
+        // Module primers: use the direct source path (no symlink needed)
+        auto it = g_modulePrimerPaths.find(name);
+        std::string path = (it != g_modulePrimerPaths.end())
+            ? it->second
+            : backroomsPath_ + "/primers/" + name + ".txt";
+        preview->loadFile(path);
     }
 
     void rebuildLists() {
