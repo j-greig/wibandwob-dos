@@ -31,9 +31,21 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## ⚡ Quick start — copy-paste to get a working stack
 
+### First time / fresh clone (run once)
+
+```bash
+# Pull all submodules (tvision, MicropolisCore, tvterm, etc.)
+git submodule update --init --recursive
+
+# Configure CMake build dir (only needed once, or after CMakeLists changes)
+cmake . -B ./build -DCMAKE_BUILD_TYPE=Release
+```
+
+### Every session
+
 ```bash
 # 1. Build
-cmake --build ./build --target wwdos -j$(nproc)
+cmake --build ./build --target wwdos
 
 # 2. Start TUI (socket: /tmp/wwdos.sock)
 ./build/app/wwdos 2>/tmp/wibwob_debug.log &
