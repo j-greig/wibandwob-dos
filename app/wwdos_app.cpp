@@ -3260,10 +3260,15 @@ std::string api_close_window(TWwdosApp& app, const std::string& id) {
         return false;
     };
 
-    // TWindow::close() can no-op when valid(cmClose) fails.
-    // For API semantics, ensure the target is actually removed.
+    // Two-phase close:
+    // 1) Ask the window to close itself gracefully. This lets destructors
+    //    run in the correct order (sub-views kill timers, threads, etc.).
+    // 2) Only force-remove+destroy if close() was a no-op (e.g. the window
+    //    returned false from valid(cmClose)). The force path is a last
+    //    resort — it can bypass deferred teardown contracts.
     w->close();
     if (isWindowAlive(w)) {
+        // Graceful close was rejected. Force removal.
         if (w->owner)
             w->owner->remove(w);
         TObject::destroy(w);

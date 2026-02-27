@@ -271,6 +271,13 @@ public:
         writeLine(0, 0, size.x, 1, b);
     }
 
+    virtual ~TRoomInputView() {
+        if (blinkTimer) {
+            killTimer(blinkTimer);
+            blinkTimer = nullptr;
+        }
+    }
+
 private:
     bool cursorVisible = true;
     void* blinkTimer = nullptr;

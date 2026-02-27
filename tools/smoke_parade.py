@@ -100,6 +100,7 @@ COMMAND_SEQUENCE: list[tuple[str, dict, str]] = [
 class API:
     def __init__(self, base: str):
         self.base = base.rstrip("/")
+        self._consecutive_failures = 0
 
     def _req(self, method: str, path: str, body: Optional[dict] = None) -> Any:
         url = f"{self.base}{path}"
@@ -108,8 +109,16 @@ class API:
         req = Request(url, data=data, headers=headers, method=method)
         try:
             with urlopen(req, timeout=10) as resp:
+                self._consecutive_failures = 0
                 return json.loads(resp.read())
         except URLError as e:
+            self._consecutive_failures += 1
+            if self._consecutive_failures >= 3:
+                print(f"\n  ‼️  3 consecutive API failures — IPC likely dead.")
+                print(f"     Last error: {e}")
+                print(f"     Bailing out. Check if the TUI process is still running.")
+                print(f"     Partial results saved.\n")
+                return "BAIL"
             print(f"  !! API error: {e}")
             return None
 
@@ -224,7 +233,9 @@ def run_parade(api: API, delay: float):
         step(step_num, total_steps, f"spawn: {wtype}")
 
         win = api.create_window(wtype)
-        if win and win.get("id"):
+        if win == "BAIL":
+            break
+        if win and isinstance(win, dict) and win.get("id"):
             wid = win["id"]
             reported_type = win.get("type", "???")
             ok = reported_type == wtype
@@ -236,9 +247,10 @@ def run_parade(api: API, delay: float):
             if shot:
                 results["screenshots"].append(shot)
 
-            # Close it to keep desktop clean for next window
+            # Close it to keep desktop clean for next window.
+            # Small delay after close lets timers drain before next spawn.
             api.close_window(wid)
-            time.sleep(0.3)
+            time.sleep(0.5)
 
             if ok:
                 results["passed"].append(wtype)
@@ -272,6 +284,8 @@ def run_parade(api: API, delay: float):
         step(step_num, total_steps, cmd_desc)
 
         result = api.run_command(cmd_name, cmd_args)
+        if result == "BAIL":
+            break
         if result:
             detail = str(result)[:80] if isinstance(result, dict) else str(result)[:80]
             print(f"        → {detail}")
