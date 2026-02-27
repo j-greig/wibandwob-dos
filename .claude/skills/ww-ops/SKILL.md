@@ -29,8 +29,8 @@ Binary: ./build/app/wwdos
 
 # Manual:
 ./build/app/wwdos 2>/tmp/wibwob_debug.log    # in a terminal/tmux pane
-tools/api_server/venv/bin/uvicorn tools.api_server.main:build_app \
-  --factory --host 127.0.0.1 --port 8089      # in another pane
+tools/api_server/venv/bin/uvicorn tools.api_server.main:app \
+  --host 127.0.0.1 --port 8089                 # in another pane
 ```
 
 ### 4-pane tmux monitor
