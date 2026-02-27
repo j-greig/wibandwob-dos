@@ -776,17 +776,19 @@ CONTRACT TEST STATUS (2026-02-27):
   [x] Document menu restructure proposal
   [x] Create this planning doc (750+ lines)
 
-### TODO P0 -- Commit and verify
+### DONE P0 -- Commit and verify
 
-  [ ] Restart API server to pick up models.py changes
-  [ ] Verify figlet/contour/game windows report correct types
-  [ ] Commit: fix(api): add 9 missing window types, fix
+  [x] Restart API server to pick up models.py changes
+  [x] Verify figlet/contour/game windows report correct types
+  [x] Commit: fix(api): add 9 missing window types, fix
       test_pattern fallback, enrich embedded agent prompt
+      (d8c1781, verified 2026-02-27 17:53)
 
-### TODO P1 -- CI gate for parity tests
+### DONE P1 -- CI gate for parity tests
 
-  [ ] Add parity tests to GitHub Actions or pre-commit hook
-  [ ] Fix 4 broken contract test imports (mcp_tools moved)
+  [x] Add parity tests to GitHub Actions (contract-tests.yml, every PR + main)
+  [x] Add Claude Code PreToolUse hook (parity-check.sh, fires on git commit)
+  [x] Fix 4 broken contract test imports (graceful skip with reason)
   [ ] Make ww-build-test "strict" mode the default
 
 ### TODO P2 -- Remove Python enum (centralise)
