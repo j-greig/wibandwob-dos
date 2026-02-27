@@ -63,7 +63,7 @@ SPAWNABLE_TYPES = [
     # Sim
     "micropolis_ascii",
     # Social
-    "room_chat",
+    # "room_chat",  # SKIP: blink timer UAF crashes TUI on close (SPK-03 P4)
     # Animation
     "frame_player",
 ]
@@ -177,7 +177,7 @@ def screenshot(api: API, out_dir: Path, label: str) -> Optional[str]:
         print(f"        📸 screenshot failed: {result}")
         return None
 
-def run_parade(api: API, delay: float):
+def run_parade(api: API, delay: float, start_at: int = 1):
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     out_dir = Path("logs/smoke_parade") / ts
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -197,6 +197,8 @@ def run_parade(api: API, delay: float):
     print(f"  Steps:  {total_steps}")
     print(f"  Types:  {len(SPAWNABLE_TYPES)} window types")
     print(f"  Cmds:   {len(COMMAND_SEQUENCE)} commands")
+    if start_at > 1:
+        print(f"  Skip:   jumping to step {start_at}")
     print()
 
     step_num = 0
@@ -216,20 +218,26 @@ def run_parade(api: API, delay: float):
         }
         log_entries.append(entry)
 
+    def should_run() -> bool:
+        return step_num >= start_at
+
     # ── Phase 1: Clean slate ────────────────────────────────────────────
     step_num += 1
-    step(step_num, total_steps, "CLEAN SLATE — close all windows")
-    api.close_all()
-    time.sleep(0.5)
-    shot = screenshot(api, out_dir, "00_clean_slate")
-    if shot:
-        results["screenshots"].append(shot)
+    if should_run():
+        step(step_num, total_steps, "CLEAN SLATE — close all windows")
+        api.close_all()
+        time.sleep(0.5)
+        shot = screenshot(api, out_dir, "00_clean_slate")
+        if shot:
+            results["screenshots"].append(shot)
 
     # ── Phase 2: Spawn every window type one by one ─────────────────────
     banner("PHASE 1 — Window Types")
 
     for wtype in SPAWNABLE_TYPES:
         step_num += 1
+        if not should_run():
+            continue
         step(step_num, total_steps, f"spawn: {wtype}")
 
         win = api.create_window(wtype)
@@ -266,15 +274,16 @@ def run_parade(api: API, delay: float):
 
     # ── Phase 3: Spawn a few windows then tile/cascade ──────────────────
     step_num += 1
-    step(step_num, total_steps, "MULTI-WINDOW — spawn 6 windows for layout test")
-    layout_types = ["contour_map", "life", "figlet_text", "orbit", "verse", "blocks"]
     layout_ids = []
-    for lt in layout_types:
-        w = api.create_window(lt)
-        if w and w.get("id"):
-            layout_ids.append(w["id"])
-    time.sleep(0.5)
-    screenshot(api, out_dir, "multi_spawned")
+    if should_run():
+        step(step_num, total_steps, "MULTI-WINDOW — spawn 6 windows for layout test")
+        layout_types = ["contour_map", "life", "figlet_text", "orbit", "verse", "blocks"]
+        for lt in layout_types:
+            w = api.create_window(lt)
+            if w and isinstance(w, dict) and w.get("id"):
+                layout_ids.append(w["id"])
+        time.sleep(0.5)
+        screenshot(api, out_dir, "multi_spawned")
 
     # ── Phase 4: Command sequence ───────────────────────────────────────
     banner("PHASE 2 — Commands")
@@ -387,10 +396,11 @@ def main():
     parser = argparse.ArgumentParser(description="Smoke Parade — visual integration test")
     parser.add_argument("--api", default="http://127.0.0.1:8089", help="API base URL")
     parser.add_argument("--delay", type=float, default=2.0, help="Seconds per step (default 2.0)")
+    parser.add_argument("--start", type=int, default=1, help="Skip to step N (default 1)")
     args = parser.parse_args()
 
     api = API(args.api)
-    sys.exit(run_parade(api, args.delay))
+    sys.exit(run_parade(api, args.delay, args.start))
 
 
 if __name__ == "__main__":
