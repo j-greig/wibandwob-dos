@@ -660,85 +660,151 @@ class GrowState:
         return (f"{state}  hills:{len(self.active)}/{len(self.all_hills)}"
                 f"  coverage:{cov:.0%}  tick:{self.tick}/{MAX_GROW_TICKS}")
 
-    def _ensure_grid_canvas(self):
-        """Lazy-init persistent grid canvas."""
-        if self.grid_canvas is None:
-            self.grid_canvas = [[' '] * max(1, self.w - 1)
-                                for _ in range(max(1, self.h - 1))]
-
     def _render_ordered(self, hills):
-        """Order Pop: stamp each new cluster at full size, additive."""
-        self._ensure_grid_canvas()
-        # Only stamp clusters we haven't stamped yet
-        n_stamped = len(self.grid_cluster_meta)
-        if len(hills) > n_stamped:
-            for i in range(n_stamped, len(hills)):
-                hill = hills[i]
-                # Deterministic RNG per cluster index (not per frame)
-                grid_rng = random.Random(self.seed + 7777 + i * 31)
-                patterns = [GRID_CHECKER, GRID_RANDOM, GRID_SEQ, GRID_HEX]
-                cx, cy, r, pk = hill[0], hill[1], hill[2], hill[3]
-                # Use target radius from the active entry, not current swell
-                target_r = self.active[i][1] if i < len(self.active) else r
-                pattern = grid_rng.choice(patterns)
-                cell_size = grid_rng.choice([1, 1, 1, 2])
-                density = 0.3 + pk * 0.6
-                render_grid_cluster(self.grid_canvas, int(cx), int(cy),
-                                   target_r, density, cell_size, pattern,
-                                   grid_rng)
-                self.grid_cluster_meta.append({'stamped': True})
-        return [''.join(row) for row in self.grid_canvas]
+        """Order mode: re-render all active grids from scratch each frame.
+        Grids change shape as hills swell — the original behavior."""
+        canvas = [[' '] * max(1, self.w - 1) for _ in range(max(1, self.h - 1))]
+        grid_rng = random.Random(self.seed + 7777)
+        patterns = [GRID_CHECKER, GRID_RANDOM, GRID_SEQ, GRID_HEX]
+        for hill in hills:
+            cx, cy, r, pk = hill[0], hill[1], hill[2], hill[3]
+            pattern = grid_rng.choice(patterns)
+            cell_size = grid_rng.choice([1, 1, 1, 2])
+            density = 0.3 + pk * 0.6
+            render_grid_cluster(canvas, int(cx), int(cy), r, density,
+                               cell_size, pattern, grid_rng)
+        return [''.join(row) for row in canvas]
 
     def _render_ordered_spread(self, hills):
-        """Order Spread: clusters grow outward, inner cells locked."""
-        self._ensure_grid_canvas()
+        """Order Spread: global grid floods outward from hill centres.
+        One big aligned grid. Cells turn on via flood fill with jagged
+        organic edges. Values locked once placed. Like the primer."""
+        w, h = self.w, self.h
+        cw = max(1, w - 1)
+        ch = max(1, h - 1)
 
-        # Ensure we have meta for each cluster
-        while len(self.grid_cluster_meta) < len(hills):
-            idx = len(self.grid_cluster_meta)
-            hill = hills[idx]
-            grid_rng = random.Random(self.seed + 7777 + idx * 31)
-            patterns = [GRID_CHECKER, GRID_RANDOM, GRID_SEQ, GRID_HEX]
-            target_r = self.active[idx][1] if idx < len(self.active) else hill[2]
-            self.grid_cluster_meta.append({
-                'cx': int(hill[0]),
-                'cy': int(hill[1]),
-                'target_r': target_r,
-                'current_r': 0.0,
-                'pk': hill[3],
-                'pattern': grid_rng.choice(patterns),
-                'cell_size': grid_rng.choice([1, 1, 1, 2]),
-                'density': 0.3 + hill[3] * 0.6,
-                'rng_seed': self.seed + 7777 + idx * 31,
-                'prev_r': 0.0,
-            })
+        # Global grid cell coordinates: each cell = 2 screen cols, 2 screen rows
+        # (│X│ = col 0=border, col 1=value, then next cell)
+        gcols = cw // 2
+        grows = ch // 2
 
-        # Grow each cluster's radius and stamp NEW cells only
-        for meta in self.grid_cluster_meta:
-            # Grow by a fraction each tick
-            grow_step = meta['target_r'] / max(HILL_SWELL_TICKS, 1)
-            new_r = min(meta['current_r'] + grow_step, meta['target_r'])
+        if self.grid_canvas is None:
+            # cell_on[gy][gx] = True if cell is active
+            self.grid_cluster_meta = {
+                'cell_on': [[False] * gcols for _ in range(grows)],
+                'cell_val': [[' '] * gcols for _ in range(grows)],
+                'frontier': [],   # cells to expand from next
+                'val_rng': random.Random(self.seed + 7777),
+                'spread_rng': random.Random(self.seed + 3333),
+                'gcols': gcols,
+                'grows': grows,
+            }
+            self.grid_canvas = [[' '] * cw for _ in range(ch)]
 
-            if new_r > meta['prev_r']:
-                # Re-render at new size onto a TEMP canvas, then stamp
-                # only cells that are new (not already on grid_canvas)
-                tmp = [[' '] * max(1, self.w - 1)
-                       for _ in range(max(1, self.h - 1))]
-                grid_rng = random.Random(meta['rng_seed'])
-                render_grid_cluster(tmp, meta['cx'], meta['cy'],
-                                   new_r, meta['density'],
-                                   meta['cell_size'], meta['pattern'],
-                                   grid_rng)
-                # Stamp new cells only
-                for y in range(len(self.grid_canvas)):
-                    for x in range(len(self.grid_canvas[y])):
-                        if tmp[y][x] != ' ' and self.grid_canvas[y][x] == ' ':
-                            self.grid_canvas[y][x] = tmp[y][x]
-                meta['prev_r'] = new_r
+            # Pre-assign all cell values deterministically
+            val_rng = self.grid_cluster_meta['val_rng']
+            for gy in range(grows):
+                for gx in range(gcols):
+                    self.grid_cluster_meta['cell_val'][gy][gx] = \
+                        str((gx + gy) % 2) if val_rng.random() > 0.3 \
+                        else str(val_rng.randint(0, 1))
 
-            meta['current_r'] = new_r
+        meta = self.grid_cluster_meta
+        cell_on = meta['cell_on']
+        cell_val = meta['cell_val']
+        spread_rng = meta['spread_rng']
 
-        return [''.join(row) for row in self.grid_canvas]
+        # Seed new frontier points from newly active hills
+        n_seeded = len(meta.get('seeded_hills', []))
+        if not meta.get('seeded_hills'):
+            meta['seeded_hills'] = []
+
+        for i in range(n_seeded, len(hills)):
+            hill = hills[i]
+            # Convert hill centre to grid coords
+            gx = max(0, min(gcols - 1, int(hill[0]) // 2))
+            gy = max(0, min(grows - 1, int(hill[1]) // 2))
+            if not cell_on[gy][gx]:
+                cell_on[gy][gx] = True
+                meta['frontier'].append((gx, gy))
+            meta['seeded_hills'].append(i)
+
+        # Spread: expand frontier by 1-3 cells per tick (organic/jagged)
+        new_frontier = []
+        cells_to_add = spread_rng.randint(3, 8)
+        attempts = 0
+        while meta['frontier'] and cells_to_add > 0 and attempts < 200:
+            attempts += 1
+            idx = spread_rng.randint(0, len(meta['frontier']) - 1)
+            fx, fy = meta['frontier'][idx]
+
+            # Pick a random neighbour
+            dx, dy = spread_rng.choice([(0, -1), (0, 1), (-1, 0), (1, 0)])
+            nx, ny = fx + dx, fy + dy
+            if 0 <= nx < gcols and 0 <= ny < grows and not cell_on[ny][nx]:
+                cell_on[ny][nx] = True
+                new_frontier.append((nx, ny))
+                cells_to_add -= 1
+
+            # Remove exhausted frontier cells (all neighbours filled)
+            if all(
+                not (0 <= fx+ddx < gcols and 0 <= fy+ddy < grows)
+                or cell_on[fy+ddy][fx+ddx]
+                for ddx, ddy in [(0, -1), (0, 1), (-1, 0), (1, 0)]
+            ):
+                meta['frontier'].pop(idx)
+
+        meta['frontier'].extend(new_frontier)
+
+        # Render: stamp active cells onto canvas with box-drawing borders
+        canvas = self.grid_canvas
+        # Clear canvas (re-render borders based on current active cells)
+        for y in range(ch):
+            for x in range(cw):
+                canvas[y][x] = ' '
+
+        for gy in range(grows):
+            for gx in range(gcols):
+                if not cell_on[gy][gx]:
+                    continue
+                sx = gx * 2  # screen x
+                sy = gy * 2  # screen y
+
+                # Value cell
+                vx, vy = sx + 1, sy + 1
+                if 0 <= vx < cw and 0 <= vy < ch:
+                    canvas[vy][vx] = cell_val[gy][gx]
+
+                # Left border │
+                if 0 <= sx < cw and 0 <= vy < ch:
+                    canvas[vy][sx] = '│'
+                # Right border │
+                rx = sx + 2
+                if 0 <= rx < cw and 0 <= vy < ch:
+                    canvas[vy][rx] = '│'
+
+                # Top border ─
+                if 0 <= vx < cw and 0 <= sy < ch:
+                    canvas[sy][vx] = '─'
+                # Bottom border ─
+                by = sy + 2
+                if 0 <= vx < cw and 0 <= by < ch:
+                    canvas[by][vx] = '─'
+
+                # Corners/junctions
+                for cy_, cx_ in [(sy, sx), (sy, sx+2), (sy+2, sx), (sy+2, sx+2)]:
+                    if 0 <= cx_ < cw and 0 <= cy_ < ch:
+                        # Determine junction type from neighbours
+                        up = cy_ > 0 and canvas[cy_-1][cx_] in '│┼┤├'
+                        dn = cy_+1 < ch and (
+                            (cy_+1 < ch and canvas[cy_+1][cx_] in '│┼┤├') or
+                            any(cell_on[g][cx_//2] for g in range(grows)
+                                if g * 2 == cy_ and 0 <= cx_//2 < gcols)
+                        )
+                        # Simple: use ┼ for internal, corners for edges
+                        canvas[cy_][cx_] = '┼'
+
+        return [''.join(row) for row in canvas]
 
     def _render_hybrid(self, hills):
         """Render active hills as both contours and grids, composited."""
