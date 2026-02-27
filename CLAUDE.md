@@ -338,6 +338,7 @@ Launch multiple instances: `./tools/scripts/launch_tmux.sh [N]` (tmux + monitor 
 
 ### Build
 - **Turbo Vision**: Git submodule at `vendor/tvision` (fork of magiblot/tvision, C++14 TUI framework)
+- **tvterm**: Git submodule at `vendor/tvterm` (fork of magiblot/tvterm at `j-greig/tvterm`, branch `feature/text-selection`). Adds mouse-driven text selection + copy-to-clipboard (pbcopy/xclip/xsel) and openpty/vfork multithread safety + forced black terminal bg. Upstream PR: magiblot/tvterm#9 (pending merge). Built as `tvterm-core` static lib (see root CMakeLists.txt) to avoid duplicate tvision target.
 - **ncurses/ncursesw**: Terminal backend
 - **CMake 3.10+**: Build system
 
