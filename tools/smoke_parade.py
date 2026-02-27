@@ -53,7 +53,7 @@ SPAWNABLE_TYPES = [
     "paint",
     "text_editor",
     "browser",
-    "terminal",
+    # "terminal",  # SKIP: spawns child wwdos process, can steal/delete IPC socket
     "gallery",
     "app_launcher",
     # Games
@@ -169,7 +169,9 @@ def screenshot(api: API, out_dir: Path, label: str) -> Optional[str]:
     fname = f"{ts}_{safe}.txt"
     fpath = out_dir / fname
     result = api.screenshot(str(fpath))
-    if result and result.get("ok"):
+    if result == "BAIL":
+        return None
+    if result and isinstance(result, dict) and result.get("ok"):
         size = result.get("bytes", 0)
         print(f"        📸 {fname} ({size} bytes)")
         return str(fpath)
