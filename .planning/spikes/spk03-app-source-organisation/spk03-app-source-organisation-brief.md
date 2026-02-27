@@ -89,3 +89,41 @@ E011 (Desktop Shell) will add `app_launcher_view`, desktop icon layer, folder vi
 - No logic refactoring, no new features, no API changes
 - Not a full modularisation to separate installable packages
 - Not switching build system
+
+## Codex Review
+
+- What the plan gets right:
+- The problem statement is real: `app/` root is overloaded, discovery cost is high, and CMake ownership is unclear.
+- Doing this as a no-logic move/refactor pass is the right safety boundary.
+- Splitting before more feature files land can reduce churn if scope is tightly controlled.
+
+- Where the proposed grouping misses current reality:
+- The tree is already partially organized (`paint/`, `llm/`, `micropolis/`, `windows/`, `ui/`, `core/`), so proposing a mostly new taxonomy without centering these existing domains risks a second re-org later.
+- `app/views/` as proposed is not coherent. `text_editor_view`, `browser_view`, and `token_tracker_view` are feature windows, not reusable widgets.
+- `app/generators/` mixes visual effect engines with full windows (`*_view`) and includes `game_of_life_view`, which is interactive/simulation, not just a passive generator.
+- `app/system/` is too broad. Entrypoints (`wwdos_app.cpp`) and infra (`command_registry`, `api_ipc`, `window_type_registry`) should not be forced into one bucket if dependency direction matters.
+- Proposed file examples do not match names exactly (`wibwob` vs `wibwob_view`, `token_tracker` vs `token_tracker_view`), which is a warning that classification was not validated against the real list.
+
+- CMake static-lib approach (for this repo state):
+- Full per-folder static libs are probably premature for a single monolithic TUI binary with heavy cross-includes and frequent feature iteration.
+- You pay extra CMake and link maintenance immediately, while build-speed gains may be marginal unless boundaries are genuinely clean.
+- Better first step: keep one `wwdos` target, but split source lists with `target_sources()` by domain CMake files (`app/chat/CMakeLists.txt`, etc.) without creating many libs yet.
+- Promote only stable seams to libs now: `micropolis_bridge` already exists; `llm` and maybe `paint` are plausible next candidates.
+
+- "Do it before E011" call:
+- Doing a full taxonomy + static-lib conversion before E011 is higher risk than the brief suggests.
+- Recommended sequencing: before E011, do a minimal structure pass (move files, include path updates, no new libs). After E011 settles, evaluate whether additional lib boundaries are justified by pain points.
+- If E011 is active now, avoid broad moves; rebase pain and merge noise will erase most benefit.
+
+- Turbo Vision / `Uses_*` + static lib gotchas:
+- `Uses_*` macros must remain in the translation unit that needs the symbol declarations; moving code across headers/libs can surface missing `Uses_...` includes only at link time.
+- Static library link order still matters on some toolchains. If `wwdos_apps` depends on `wwdos_system`, link order and explicit dependencies must be modeled correctly.
+- Object files in static libs are only pulled when needed; registration side effects in global constructors can be dropped unexpectedly if nothing references those objects directly.
+- Keep an eye on ODR/multiple-definition regressions if shared utility `.cpp` files are accidentally compiled into multiple libs.
+
+- Open questions (recommendations):
+- `apps` vs `windows`: choose `apps`. It communicates product intent better; every file being a Turbo Vision window is implementation detail.
+- `micropolis_*`: yes, keep it as its own domain (`app/micropolis/` already exists). Expand that instead of inventing `app/city/`.
+- `mech*`: keep in `apps/` unless you extract a reusable rendering/widget layer; current names (`mech_window`, `mech_config`, `mech_grid`) look feature-local.
+- `*_test.cpp`: keep alongside the feature for now and register in root CMake; only add `app/tests/` if shared test infra grows.
+- `*_main.cpp`/standalone executables: keep entrypoints near root (or `app/bin/`) and keep feature implementation files in domain folders.
