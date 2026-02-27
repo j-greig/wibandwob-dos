@@ -37,6 +37,20 @@ static const char* kGenPresetLabels[] = {
     "Mycelium", "Crystal", "Tidal", "Erosion", "Aurora", "Spiral"
 };
 
+// true = binary substrate (grid is half screen size), false = full size
+static const bool kGenPresetIsBinary[] = {
+    true,   // game-of-life
+    false,  // corners-bleed (block)
+    true,   // eno-bloom
+    false,  // coral-reef (contour)
+    true,   // mycelium
+    true,   // crystal
+    false,  // tidal (block)
+    false,  // erosion (contour)
+    false,  // aurora (glyph)
+    false,  // spiral-life (contour)
+};
+
 // ── Bridge: fork/pipe to generative_stream.py ────────────
 
 class GenerativeBridge {

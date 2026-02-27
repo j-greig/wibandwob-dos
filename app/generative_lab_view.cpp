@@ -716,9 +716,11 @@ void TGenerativeLabView::openStampPicker() {
         // Compute canvas size for positioning
         int canvasW = size.x - 2;
         int canvasH = size.y - 3;
-        // Binary substrate uses half-size grid
-        int gw = canvasW / 2;
-        int gh = canvasH / 2;
+
+        // Grid size depends on substrate: binary = half screen, others = full
+        bool isBinary = (presetIdx_ < kGenPresetCount) ? kGenPresetIsBinary[presetIdx_] : false;
+        int gw = isBinary ? canvasW / 2 : canvasW;
+        int gh = isBinary ? canvasH / 2 : canvasH;
 
         bool isCanvas = dlg->isCanvasMode();
         auto newStamps = dlg->getStamps(isCanvas ? canvasW : gw,
@@ -1339,18 +1341,19 @@ std::string TGenerativeLabView::handleApiAction(
 
         // Position shortcuts
         std::string pos = getStr("position", "custom");
+        bool isBin = (presetIdx_ < kGenPresetCount) ? kGenPresetIsBinary[presetIdx_] : false;
         if (pos == "centre" || pos == "center") {
             int contentW = size.x - 2;
             int contentH = size.y - 3;
-            int gw = contentW / 2;
-            int gh = contentH / 2;
+            int gw = isBin ? contentW / 2 : contentW;
+            int gh = isBin ? contentH / 2 : contentH;
             int pw = 0, ph = 0;
             primerDimensions(path, pw, ph);
             st.x = std::max(0, (gw - pw) / 2);
             st.y = std::max(0, (gh - ph) / 2);
         } else if (pos == "random") {
-            int gw = (size.x - 2) / 2;
-            int gh = (size.y - 3) / 2;
+            int gw = isBin ? (size.x - 2) / 2 : size.x - 2;
+            int gh = isBin ? (size.y - 3) / 2 : size.y - 3;
             int pw = 0, ph = 0;
             primerDimensions(path, pw, ph);
             st.x = rand() % std::max(1, gw - pw);
