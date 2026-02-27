@@ -192,6 +192,20 @@ def run_parade(api: API, delay: float):
 
     step_num = 0
     results = {"passed": [], "failed": [], "screenshots": []}
+    log_entries: list[dict] = []
+
+    def log(phase: str, action: str, target: str, ok: bool, detail: str = "", shot: str = ""):
+        entry = {
+            "t": datetime.now().isoformat(),
+            "step": step_num,
+            "phase": phase,
+            "action": action,
+            "target": target,
+            "ok": ok,
+            "detail": detail,
+            "screenshot": shot,
+        }
+        log_entries.append(entry)
 
     # ── Phase 1: Clean slate ────────────────────────────────────────────
     step_num += 1
@@ -228,11 +242,14 @@ def run_parade(api: API, delay: float):
 
             if ok:
                 results["passed"].append(wtype)
+                log("windows", "spawn", wtype, True, f"id={wid}", shot or "")
             else:
                 results["failed"].append(f"{wtype} (reported as {reported_type})")
+                log("windows", "spawn", wtype, False, f"reported as {reported_type}", shot or "")
         else:
             print(f"        ❌  failed to create: {win}")
             results["failed"].append(f"{wtype} (create failed)")
+            log("windows", "spawn", wtype, False, f"create returned {win}")
             time.sleep(0.5)
 
     # ── Phase 3: Spawn a few windows then tile/cascade ──────────────────
@@ -259,12 +276,15 @@ def run_parade(api: API, delay: float):
             detail = str(result)[:80] if isinstance(result, dict) else str(result)[:80]
             print(f"        → {detail}")
         else:
-            print(f"        → (no response)")
+            detail = "(no response)"
+            print(f"        → {detail}")
 
+        cmd_ok = bool(result and (not isinstance(result, dict) or result.get("ok", True)))
         time.sleep(delay)
         shot = screenshot(api, out_dir, f"cmd_{cmd_name}")
         if shot:
             results["screenshots"].append(shot)
+        log("commands", "run", f"{cmd_name}({cmd_args})", cmd_ok, detail, shot or "")
 
     # ── Phase 5: Figlet window tricks (need a figlet window) ────────────
     # Find figlet window from layout batch
@@ -324,7 +344,22 @@ def run_parade(api: API, delay: float):
         for p in results["passed"]:
             f.write(f"  - {p}\n")
 
-    print(f"  Summary written to {summary_path}")
+    # Write structured JSON log
+    log_path = out_dir / "parade.json"
+    with open(log_path, "w") as f:
+        json.dump({
+            "timestamp": ts,
+            "api": api.base,
+            "delay": delay,
+            "passed": len(results["passed"]),
+            "failed": len(results["failed"]),
+            "screenshots": len(results["screenshots"]),
+            "failures": results["failed"],
+            "steps": log_entries,
+        }, f, indent=2)
+
+    print(f"  Summary:  {summary_path}")
+    print(f"  Full log: {log_path}")
 
     if results["failed"]:
         print("\n  ⚠️  Some steps failed. Check output above.")
