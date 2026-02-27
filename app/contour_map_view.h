@@ -33,12 +33,16 @@ public:
     bool start(int width, int height, int seed, int terrainIdx,
                int levels, bool grow, bool triptych);
     void stop();
+    void pause();    // SIGSTOP
+    void resume();   // SIGCONT
     bool isRunning() const { return pid_ > 0; }
+    bool isPaused() const { return paused_; }
     int pipeFd() const { return pipeFd_; }
 
 private:
     pid_t pid_ = -1;
     int pipeFd_ = -1;
+    bool paused_ = false;
 
     std::string resolveScriptPath();
 };
@@ -71,6 +75,8 @@ private:
     void scrollToBottom();
     void relaunch();
     void debounceRelaunch();
+    void saveToFile();
+    void drawButtonBar(int y);
 
     ContourBridge bridge_;
 
@@ -87,6 +93,9 @@ private:
     std::string statusLine_;             // parsed from STATUS: header
     std::string partial_;                // incomplete line accumulator
     bool autoScroll_ = true;
+
+    std::string flashMsg_;               // temporary status flash
+    time_t flashTime_ = 0;               // when flash was set
 
     unsigned periodMs_ = 50;
     TTimerId timerId_ = 0;
