@@ -62,6 +62,7 @@ add_executable(wwdos
     ansi_view.cpp
     wibwob_scroll_test.cpp
     contour_map_view.cpp
+    generative_lab_view.cpp
     scramble_view.cpp
     scramble_engine.cpp
     paint/paint_canvas.cpp

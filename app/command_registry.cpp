@@ -55,6 +55,7 @@ extern void api_spawn_quadra(TWwdosApp& app, const TRect* bounds);
 extern void api_spawn_snake(TWwdosApp& app, const TRect* bounds);
 extern void api_spawn_rogue(TWwdosApp& app, const TRect* bounds);
 extern void api_spawn_deep_signal(TWwdosApp& app, const TRect* bounds);
+extern void api_spawn_generative_lab(TWwdosApp& app, const TRect* bounds);
 extern void api_spawn_app_launcher(TWwdosApp& app, const TRect* bounds);
 extern void api_spawn_gallery(TWwdosApp& app, const TRect* bounds);
 extern void api_open_animation_path(TWwdosApp& app, const std::string& path);
@@ -143,6 +144,7 @@ const std::vector<CommandCapability>& get_command_capabilities() {
         {"open_monster_cam", "Open Monster Camera window", false},
         {"open_monster_verse", "Open Monster Verse eldritch poetry", false},
         {"open_contour_map", "Open Contour Studio — topographic map generator (optional: seed, terrain, levels, grow, triptych)", false},
+        {"open_generative_lab", "Open Generative Lab — cellular automata and generative systems playground (presets: game-of-life, brians-brain, eno-bloom, coral-reef, mycelium, crystal, tidal, erosion, aurora, spiral-life, random)", false},
         {"open_monster_portal", "Open Monster Portal dimensional rift", false},
         {"open_browser", "Open the in-terminal web browser", false},
         {"open_figlet_text", "Open a FIGlet text window (optional text, font params; defaults to 'Hello' in 'standard')", false},
@@ -382,6 +384,10 @@ std::string exec_registry_command(
     }
     if (name == "open_contour_map") {
         api_spawn_contour_map(app, nullptr);
+        return "ok";
+    }
+    if (name == "open_generative_lab") {
+        api_spawn_generative_lab(app, nullptr);
         return "ok";
     }
     if (name == "open_monster_verse") {
