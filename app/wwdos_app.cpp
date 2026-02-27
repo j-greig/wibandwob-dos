@@ -2492,11 +2492,16 @@ void TWwdosApp::takeScreenshot(bool showDialog)
     txtOpts.includeMetadata = true;
     bool txtOk = getFrameCapture().saveFrame(frame, txtPath, txtOpts);
 
-    CaptureOptions ansiOpts;
-    ansiOpts.format = CaptureFormat::AnsiEscapes;
-    ansiOpts.addTimestamp = true;
-    ansiOpts.includeMetadata = true;
-    bool ansiOk = getFrameCapture().saveFrame(frame, ansiPath, ansiOpts);
+    // ANSI export disabled by default — nobody uses it and it doubles
+    // screenshot I/O.  Flip this to true or add a command param to re-enable.
+    bool ansiOk = false;
+    if (false) {
+        CaptureOptions ansiOpts;
+        ansiOpts.format = CaptureFormat::AnsiEscapes;
+        ansiOpts.addTimestamp = true;
+        ansiOpts.includeMetadata = true;
+        ansiOk = getFrameCapture().saveFrame(frame, ansiPath, ansiOpts);
+    }
 
     if (showDialog) {
         if (txtOk || ansiOk) {

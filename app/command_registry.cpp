@@ -15,6 +15,7 @@
 #define Uses_TPoint
 #define Uses_TEvent
 #define Uses_TProgram
+#define Uses_TDeskTop
 #include <tvision/tv.h>
 
 extern void api_cascade(TWwdosApp& app);
