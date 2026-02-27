@@ -2024,15 +2024,24 @@ void TWwdosApp::tile()
 
 void TWwdosApp::closeAll()
 {
-    // Close all regular windows on the desktop (iterating safely over circular list)
+    // Close all regular windows on the desktop, but preserve windows that
+    // are essential to the agent/human session: Wib&Wob chat, terminals,
+    // and Scramble. Without these, the agent loses its communication
+    // channel and the human loses any shell they are working in.
     std::vector<TWindow*> toClose;
     TView *start = deskTop->first();
     if (start) {
         TView *v = start;
         do {
-            TView *nextV = v->next; // cache next to avoid invalidation issues
+            TView *nextV = v->next;
             if (TWindow *w = dynamic_cast<TWindow*>(v)) {
-                // Skip non-user windows if any (none expected here)
+                // Preserve session-critical window types
+                if (dynamic_cast<TWibWobWindow*>(w) ||
+                    dynamic_cast<TWibWobTerminalWindow*>(w) ||
+                    dynamic_cast<TScrambleWindow*>(w)) {
+                    v = nextV;
+                    continue;
+                }
                 toClose.push_back(w);
             }
             v = nextV;

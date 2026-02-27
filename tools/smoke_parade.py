@@ -71,8 +71,8 @@ SPAWNABLE_TYPES = [
 # Commands to exercise (in order). Each is (command_name, args_dict, description).
 COMMAND_SEQUENCE: list[tuple[str, dict, str]] = [
     # Theme
-    ("set_theme_mode",    {"path": "dark"},           "Theme: dark mode"),
-    ("set_theme_variant", {"path": "dark_pastel"},    "Theme: dark pastel"),
+    ("set_theme_mode",    {"mode": "dark"},            "Theme: dark mode"),
+    ("set_theme_variant", {"variant": "dark_pastel"}, "Theme: dark pastel"),
     # Desktop
     ("desktop_texture",   {"char": "░"},              "Desktop: textured fill"),
     ("desktop_color",     {"fg": "11", "bg": "1"},    "Desktop: cyan on blue"),
@@ -272,18 +272,40 @@ def run_parade(api: API, delay: float, start_at: int = 1):
             log("windows", "spawn", wtype, False, f"create returned {win}")
             time.sleep(0.5)
 
-    # ── Phase 3: Spawn a few windows then tile/cascade ──────────────────
+    # ── Phase 3: Compose a proper desktop ─────────────────────────────────
+    #
+    # This is what agents SHOULD do: spawn windows, then snap them into a
+    # grid so every window is visible and the human can see what happened.
+    # 8 windows in a 4x2 grid. No overlap. No chaos.
     step_num += 1
     layout_ids = []
     if should_run():
-        step(step_num, total_steps, "MULTI-WINDOW — spawn 6 windows for layout test")
-        layout_types = ["contour_map", "life", "figlet_text", "orbit", "verse", "blocks"]
+        step(step_num, total_steps, "COMPOSE DESKTOP — 8 windows, 4x2 grid, no overlap")
+        api.close_all()
+        time.sleep(0.3)
+        layout_types = [
+            "contour_map", "life", "figlet_text", "orbit",
+            "verse", "blocks", "ascii", "generative_lab",
+        ]
         for lt in layout_types:
             w = api.create_window(lt)
             if w and isinstance(w, dict) and w.get("id"):
-                layout_ids.append(w["id"])
+                layout_ids.append((w["id"], lt))
+        time.sleep(0.3)
+        # Snap each into a 4x2 grid
+        for i, (wid, wtype) in enumerate(layout_ids):
+            col = i % 4
+            row = i // 4
+            api.run_command("snap_window", {
+                "id": wid, "zone": "tl",
+                "cols": "4", "rows": "2",
+                "col": str(col), "row": str(row),
+            })
         time.sleep(0.5)
-        screenshot(api, out_dir, "multi_spawned")
+        shot = screenshot(api, out_dir, "composed_desktop")
+        if shot:
+            results["screenshots"].append(shot)
+        print(f"        📐 {len(layout_ids)} windows snapped to 4x2 grid")
 
     # ── Phase 4: Command sequence ───────────────────────────────────────
     banner("PHASE 2 — Commands")
@@ -309,33 +331,34 @@ def run_parade(api: API, delay: float, start_at: int = 1):
             results["screenshots"].append(shot)
         log("commands", "run", f"{cmd_name}({cmd_args})", cmd_ok, detail, shot or "")
 
-    # ── Phase 5: Figlet window tricks (need a figlet window) ────────────
-    # Find figlet window from layout batch
-    state = api.state()
-    figlet_id = None
-    for w in state.get("windows", []):
-        if w.get("type") == "figlet_text":
-            figlet_id = w["id"]
-            break
-
-    if figlet_id:
-        step_num += 1
-        step(step_num, total_steps, "FIGlet tricks on existing window")
-
-        api.run_command("figlet_set_text", {"id": figlet_id, "text": "SMOKE PARADE"})
-        time.sleep(0.5)
-        api.run_command("figlet_set_font", {"id": figlet_id, "font": "slant"})
-        time.sleep(0.5)
-        screenshot(api, out_dir, "figlet_tricks")
+    # ── Phase 5: Figlet window tricks ─────────────────────────────────────
+    # figlet_set_text/font match by title or "auto" (first figlet window found)
+    step_num += 1
+    if should_run():
+        state = api.state()
+        has_figlet = any(w.get("type") == "figlet_text" for w in state.get("windows", []))
+        if has_figlet:
+            step(step_num, total_steps, "FIGlet tricks — change text and font")
+            api.run_command("figlet_set_text", {"id": "auto", "text": "SMOKE PARADE"})
+            time.sleep(0.5)
+            api.run_command("figlet_set_font", {"id": "auto", "font": "slant"})
+            time.sleep(0.5)
+            shot = screenshot(api, out_dir, "figlet_tricks")
+            if shot:
+                results["screenshots"].append(shot)
+        else:
+            step(step_num, total_steps, "FIGlet tricks — skipped (no figlet window)")
+            print("        (no figlet window on desktop)")
 
     # ── Phase 6: Clean up ───────────────────────────────────────────────
     step_num += 1
-    step(step_num, total_steps, "CLEAN UP — close all, reset theme")
-    api.close_all()
-    api.run_command("reset_theme", {})
-    api.run_command("desktop_preset", {"preset": "default"})
-    time.sleep(0.5)
-    screenshot(api, out_dir, "99_clean_end")
+    if should_run():
+        step(step_num, total_steps, "CLEAN UP — close all, reset theme")
+        api.close_all()
+        api.run_command("reset_theme", {})
+        api.run_command("desktop_preset", {"preset": "default"})
+        time.sleep(0.5)
+        screenshot(api, out_dir, "99_clean_end")
 
     # ── Summary ─────────────────────────────────────────────────────────
     banner("RESULTS")
