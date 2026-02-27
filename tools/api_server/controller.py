@@ -204,6 +204,13 @@ class Controller:
 
                     self._state.windows = new_windows
                     
+            # Parse desktop size from C++ state if available
+            desktop_data = state_data.get("desktop")
+            if desktop_data:
+                self._state.desktop_w = desktop_data.get("w", 80)
+                self._state.desktop_h = desktop_data.get("h", 25)
+                self._state.cell_aspect = desktop_data.get("cell_aspect", 2.0)
+
             # Get canvas size separately
             canvas_resp = send_cmd("get_canvas_size")
             if canvas_resp and canvas_resp.strip():

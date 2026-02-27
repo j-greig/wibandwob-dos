@@ -216,12 +216,19 @@ class CanvasInfo(BaseModel):
     rows: int
 
 
+class DesktopInfo(BaseModel):
+    w: int
+    h: int
+    cell_aspect: float = 2.0
+
+
 class AppStateModel(BaseModel):
     pattern_mode: str
     theme_mode: str
     theme_variant: str
     windows: List[WindowState]
     canvas: CanvasInfo
+    desktop: DesktopInfo
     last_workspace: Optional[str] = None
     last_screenshot: Optional[str] = None
     uptime_sec: float

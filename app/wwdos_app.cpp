@@ -3195,7 +3195,15 @@ std::string api_get_state(TWwdosApp& app) {
              << ",\"text\":\"" << json_escape(entry.text) << "\"}";
         firstChat = false;
     }
-    json << "]}";
+    json << "]";
+
+    // Desktop size for proportional layout calculations
+    TRect desk = TProgram::deskTop->getExtent();
+    json << ",\"desktop\":{\"w\":" << (desk.b.x - desk.a.x)
+         << ",\"h\":" << (desk.b.y - desk.a.y)
+         << ",\"cell_aspect\":2.0}";
+
+    json << "}";
     return json.str();
 }
 

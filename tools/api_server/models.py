@@ -78,6 +78,9 @@ class AppState:
     started_at: float = field(default_factory=lambda: time.time())
     canvas_width: int = 80
     canvas_height: int = 25
+    desktop_w: int = 80
+    desktop_h: int = 25
+    cell_aspect: float = 2.0
 
 
 def new_id(prefix: str) -> str:

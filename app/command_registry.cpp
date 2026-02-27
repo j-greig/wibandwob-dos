@@ -193,7 +193,7 @@ const std::vector<CommandCapability>& get_command_capabilities() {
         {"figlet_list_fonts", "List available figlet font names", false},
         // ── Window management ────────────────────────────────────────────
         {"move_window", "Move a window (id, x, y params)", true},
-        {"resize_window", "Resize a window (id, w, h params)", true},
+        {"resize_window", "Resize a window (id + w,h for exact size, OR id + aspect + w or h to constrain proportions). aspect: 16:9, 4:3, 1:1/square, 3:2, 21:9, portrait/9:16, golden, A4, or any W:H. Cell aspect ~2:1 is handled automatically.", true},
         {"focus_window", "Bring window to front and focus (id param)", true},
         {"raise_window", "Bring window to front of z-order and focus it (id param)", true},
         {"lower_window", "Send window to back of z-order (id param)", true},
@@ -718,10 +718,59 @@ std::string exec_registry_command(
     }
     if (name == "resize_window") {
         auto id = kv.find("id");
+        if (id == kv.end()) return "err missing id";
+
         auto wi = kv.find("w");
         auto hi = kv.find("h");
-        if (id == kv.end()) return "err missing id";
-        if (wi == kv.end() || hi == kv.end()) return "err missing w or h";
+        auto asp = kv.find("aspect");
+
+        if (asp != kv.end()) {
+            // Aspect-ratio mode: compute missing dimension from the other.
+            // Terminal cells are ~2:1 (twice as tall as wide in pixels),
+            // so cell_aspect ≈ 2.0. A "16:9 visual" window needs:
+            //   w_cells = h_cells * (aspect_w / aspect_h) * cell_aspect
+            constexpr double CELL_ASPECT = 2.0;
+
+            // Parse aspect string: "16:9", "4:3", "1:1", "3:2", or named
+            double aw = 1, ah = 1;
+            std::string a = asp->second;
+            if (a == "square" || a == "1:1") { aw = 1; ah = 1; }
+            else if (a == "4:3")    { aw = 4;    ah = 3; }
+            else if (a == "3:2")    { aw = 3;    ah = 2; }
+            else if (a == "16:9")   { aw = 16;   ah = 9; }
+            else if (a == "21:9")   { aw = 21;   ah = 9; }
+            else if (a == "A4" || a == "a4") { aw = 1; ah = 1.414; }  // portrait
+            else if (a == "portrait" || a == "9:16") { aw = 9; ah = 16; }
+            else if (a == "golden") { aw = 1.618; ah = 1; }
+            else {
+                // Try parsing "W:H"
+                auto colon = a.find(':');
+                if (colon != std::string::npos) {
+                    aw = std::stod(a.substr(0, colon));
+                    ah = std::stod(a.substr(colon + 1));
+                } else {
+                    return "err invalid aspect '" + a
+                        + "' — use W:H ratio, or: square, 4:3, 16:9, 21:9, portrait, golden, A4";
+                }
+            }
+
+            int w = 0, h = 0;
+            if (wi != kv.end()) {
+                w = std::stoi(wi->second);
+                // h = w / (aw/ah * CELL_ASPECT)
+                h = std::max(5, (int)(w / (aw / ah * CELL_ASPECT)));
+            } else if (hi != kv.end()) {
+                h = std::stoi(hi->second);
+                // w = h * (aw/ah * CELL_ASPECT)
+                w = std::max(10, (int)(h * (aw / ah * CELL_ASPECT)));
+            } else {
+                return "err aspect requires at least w or h";
+            }
+            return api_resize_window(app, id->second, w, h);
+        }
+
+        // Plain w,h mode
+        if (wi == kv.end() || hi == kv.end()) return "err missing w or h (or use aspect param)";
         return api_resize_window(app, id->second, std::stoi(wi->second), std::stoi(hi->second));
     }
     if (name == "focus_window") {

@@ -36,6 +36,7 @@ from .schemas import (
     BrowserWindowReq,
     BrowserFetchRequest,
     CanvasInfo,
+    DesktopInfo,
     Capabilities,
     GalleryArrangeRequest,
     GalleryArrangeResponse,
@@ -181,6 +182,11 @@ def make_app() -> FastAPI:
                 height=st.canvas_height,
                 cols=st.canvas_width,
                 rows=st.canvas_height
+            ),
+            desktop=DesktopInfo(
+                w=st.desktop_w,
+                h=st.desktop_h,
+                cell_aspect=st.cell_aspect,
             ),
             last_workspace=st.last_workspace,
             last_screenshot=st.last_screenshot,
