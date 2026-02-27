@@ -21,6 +21,16 @@
 #include <fcntl.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
+#include <dirent.h>
+#include <map>
+#include <set>
+#include <string>
+
+// Module primer path registry — name (no .txt) → absolute path.
+// Populated by scanPrimerNames() (dialog section, called at dialog open).
+// Consumed by BackroomsBridge::start() to symlink module primers into the
+// backrooms primers/ dir so the CLI subprocess can resolve them by name.
+static std::map<std::string, std::string> g_modulePrimerPaths;
 
 // Jet black background (#000), white foreground (#FFF)
 static const TColorAttr kTextAttr =
@@ -59,10 +69,48 @@ std::string BackroomsBridge::resolveBackroomsPath() const {
     return "../wibandwob-backrooms";
 }
 
+// ---------------------------------------------------------------------------
+// Module primer path registry — populated by scanPrimerNames(), consumed by
+// BackroomsBridge::start() to ensure module primers are symlinked into the
+// backrooms primers dir so the CLI subprocess can resolve them by name.
+// ---------------------------------------------------------------------------
+
 bool BackroomsBridge::start(const BackroomsChannel &channel) {
     stop();  // kill any existing child
 
     std::string backroomsPath = resolveBackroomsPath();
+
+    // Ensure any module primers are accessible to the CLI.
+    // The CLI resolves primers by name within backroomsPath/primers/.
+    // For primers sourced from modules-private/*/primers/, create symlinks
+    // on demand so the CLI can find them.
+    if (!channel.primers.empty() && !g_modulePrimerPaths.empty()) {
+        std::string primersDir = backroomsPath + "/primers/";
+        std::string csv = channel.primers;
+        std::string name;
+        for (size_t i = 0; i <= csv.size(); ++i) {
+            if (i == csv.size() || csv[i] == ',') {
+                // trim spaces
+                size_t a = 0, b = name.size();
+                while (a < b && name[a] == ' ') ++a;
+                while (b > a && name[b-1] == ' ') --b;
+                name = name.substr(a, b - a);
+                if (!name.empty()) {
+                    auto it = g_modulePrimerPaths.find(name);
+                    if (it != g_modulePrimerPaths.end()) {
+                        std::string linkPath = primersDir + name + ".txt";
+                        struct stat lst;
+                        // Only create symlink if path doesn't already exist
+                        if (lstat(linkPath.c_str(), &lst) != 0)
+                            symlink(it->second.c_str(), linkPath.c_str());
+                    }
+                }
+                name.clear();
+            } else {
+                name += csv[i];
+            }
+        }
+    }
 
     // Build command
     std::string cmd = "cd " + backroomsPath + " && npx tsx src/ui/cli-v3.ts";
@@ -539,8 +587,6 @@ TWindow* createBackroomsTvWindow(const TRect &bounds, const BackroomsChannel &ch
 #define Uses_TDeskTop
 #include <tvision/tv.h>
 
-#include <dirent.h>
-#include <sys/stat.h>
 #include <algorithm>
 #include "ascii_gallery_view.h"
 
@@ -554,20 +600,87 @@ static const ushort cmBktvRandom6   = 905;
 static const ushort cmBktvRandom9   = 906;
 static const ushort cmBktvClear     = 907;
 
-// Helper: scan backrooms primers/ directory for .txt files
-static std::vector<std::string> scanPrimerNames(const std::string &backroomsPath) {
-    std::vector<std::string> names;
-    std::string dir = backroomsPath + "/primers";
-    DIR *d = opendir(dir.c_str());
-    if (!d) return names;
-    struct dirent *entry;
-    while ((entry = readdir(d)) != nullptr) {
-        std::string name(entry->d_name);
-        if (name.size() > 4 && name.substr(name.size() - 4) == ".txt") {
-            names.push_back(name.substr(0, name.size() - 4)); // strip .txt
+// Resolve the wibandwob-dos repo root for module scanning.
+static std::string resolveRepoRoot(const std::string &backroomsPath) {
+    // 1. Explicit env var (set by start_api_server.sh)
+    const char *env = std::getenv("WIBWOB_REPO_ROOT");
+    if (env && env[0]) return std::string(env);
+    // 2. If modules-private/ exists in the current working directory
+    struct stat st;
+    if (stat("modules-private", &st) == 0 && S_ISDIR(st.st_mode)) {
+        char buf[4096];
+        if (getcwd(buf, sizeof(buf))) return std::string(buf);
+    }
+    // 3. Look for a sibling of backroomsPath that has modules-private/
+    auto slash = backroomsPath.rfind('/');
+    if (slash != std::string::npos) {
+        std::string parent = backroomsPath.substr(0, slash);
+        DIR *pd = opendir(parent.c_str());
+        if (pd) {
+            struct dirent *pe;
+            while ((pe = readdir(pd)) != nullptr) {
+                std::string pn(pe->d_name);
+                if (pn == "." || pn == "..") continue;
+                std::string candidate = parent + "/" + pn + "/modules-private";
+                if (stat(candidate.c_str(), &st) == 0 && S_ISDIR(st.st_mode)) {
+                    closedir(pd);
+                    return parent + "/" + pn;
+                }
+            }
+            closedir(pd);
         }
     }
-    closedir(d);
+    return "";
+}
+
+// Scan backrooms primers/ + all modules-private/*/primers/ directories.
+// Populates g_modulePrimerPaths with name→fullpath for module-sourced primers.
+// Backrooms primers take dedup priority (scanned first).
+static std::vector<std::string> scanPrimerNames(const std::string &backroomsPath) {
+    std::vector<std::string> names;
+    std::set<std::string> seen;
+    g_modulePrimerPaths.clear();
+
+    auto scanDir = [&](const std::string &dir, bool isModule) {
+        DIR *d = opendir(dir.c_str());
+        if (!d) return;
+        struct dirent *entry;
+        while ((entry = readdir(d)) != nullptr) {
+            std::string fname(entry->d_name);
+            if (fname.size() > 4 && fname.substr(fname.size() - 4) == ".txt") {
+                std::string stem = fname.substr(0, fname.size() - 4);
+                if (seen.insert(stem).second) {
+                    names.push_back(stem);
+                    if (isModule)
+                        g_modulePrimerPaths[stem] = dir + "/" + fname;
+                }
+            }
+        }
+        closedir(d);
+    };
+
+    // Primary: wibandwob-backrooms/primers/ (dedup base)
+    scanDir(backroomsPath + "/primers", false);
+
+    // Secondary: modules-private/*/primers/ (additive, deduped)
+    std::string repoRoot = resolveRepoRoot(backroomsPath);
+    if (!repoRoot.empty()) {
+        std::string modulesDir = repoRoot + "/modules-private";
+        DIR *md = opendir(modulesDir.c_str());
+        if (md) {
+            struct dirent *me;
+            while ((me = readdir(md)) != nullptr) {
+                std::string mn(me->d_name);
+                if (mn == "." || mn == "..") continue;
+                struct stat mst;
+                std::string mpath = modulesDir + "/" + mn;
+                if (stat(mpath.c_str(), &mst) != 0 || !S_ISDIR(mst.st_mode)) continue;
+                scanDir(mpath + "/primers", true);
+            }
+            closedir(md);
+        }
+    }
+
     std::sort(names.begin(), names.end());
     return names;
 }
