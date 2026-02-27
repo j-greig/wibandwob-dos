@@ -585,7 +585,19 @@ public:
                 case cmStampRnd3:   randomAdd(3);     clearEvent(ev); break;
                 case cmStampClear:  clearSelected();  clearEvent(ev); break;
                 case cmStampGo:
-                    endModal(cmStampGo);
+                    // Auto-add focused available item if selected list is empty
+                    if (selPaths.empty() && !availPaths.empty()) {
+                        int idx = availList->focused;
+                        if (idx >= 0 && idx < (int)availNames.size()) {
+                            selNames.push_back(availNames[idx]);
+                            selPaths.push_back(availPaths[idx]);
+                        }
+                    }
+                    if (!selPaths.empty()) {
+                        endModal(cmStampGo);
+                    } else {
+                        // Nothing selected — flash or beep
+                    }
                     clearEvent(ev);
                     break;
             }
