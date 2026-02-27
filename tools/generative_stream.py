@@ -20,6 +20,7 @@ import sys
 import os
 import time
 import random
+import json
 import argparse
 
 sys.path.insert(0, os.path.dirname(__file__))
@@ -30,7 +31,22 @@ from generative_engine import (
 RS = '\x1E'
 
 
-def stream(width, height, seed, preset_name, max_ticks, snapshot_file):
+def parse_stamp_arg(s: str) -> dict:
+    """Parse stamp arg: PATH:X:Y[:locked|seeded] or @TEXTFILE:X:Y[:locked|seeded]"""
+    parts = s.split(':')
+    if len(parts) < 3:
+        print(f"Bad stamp format: {s} (need PATH:X:Y[:locked|seeded])", file=sys.stderr)
+        sys.exit(1)
+    path = parts[0]
+    x, y = int(parts[1]), int(parts[2])
+    locked = True
+    if len(parts) >= 4 and parts[3] == 'seeded':
+        locked = False
+    return {'path': path, 'x': x, 'y': y, 'locked': locked}
+
+
+def stream(width, height, seed, preset_name, max_ticks, snapshot_file,
+           stamps=None, stamp_stdin=False):
     if preset_name == 'random':
         preset = random_preset(random.Random(seed))
     else:
@@ -40,7 +56,18 @@ def stream(width, height, seed, preset_name, max_ticks, snapshot_file):
             print(f"Available: {', '.join(PRESET_LIST)}", file=sys.stderr)
             sys.exit(1)
 
-    engine = Engine(width, height, seed, preset)
+    stamp_list = stamps or []
+
+    # Read stamps from stdin if requested (JSON array)
+    if stamp_stdin and not sys.stdin.isatty():
+        try:
+            data = sys.stdin.read()
+            if data.strip():
+                stamp_list.extend(json.loads(data))
+        except json.JSONDecodeError as e:
+            print(f"Bad stamp JSON on stdin: {e}", file=sys.stderr)
+
+    engine = Engine(width, height, seed, preset, stamps=stamp_list)
     tick_s = preset.tick_ms / 1000.0
 
     frame_count = 0
@@ -88,6 +115,10 @@ def main():
     parser.add_argument('--preset', type=str, default='game-of-life')
     parser.add_argument('--max-ticks', type=int, default=2000)
     parser.add_argument('--snapshot', type=str, default=None)
+    parser.add_argument('--stamp', type=str, action='append', default=[],
+                        help='Stamp: PATH:X:Y[:locked|seeded] (repeatable)')
+    parser.add_argument('--stamp-stdin', action='store_true',
+                        help='Read stamps as JSON array from stdin')
     parser.add_argument('--list-presets', action='store_true')
     args = parser.parse_args()
 
@@ -99,7 +130,9 @@ def main():
         return
 
     seed = args.seed if args.seed is not None else random.randint(0, 99999)
-    stream(args.width, args.height, seed, args.preset, args.max_ticks, args.snapshot)
+    stamps = [parse_stamp_arg(s) for s in args.stamp]
+    stream(args.width, args.height, seed, args.preset, args.max_ticks,
+           args.snapshot, stamps=stamps, stamp_stdin=args.stamp_stdin)
 
 
 if __name__ == '__main__':

@@ -9,7 +9,26 @@
 #include <signal.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
+#include <dirent.h>
 #include <algorithm>
+
+#define Uses_TDialog
+#define Uses_TButton
+#define Uses_TStaticText
+#define Uses_TLabel
+#define Uses_TListBox
+#define Uses_TStringList
+#define Uses_TCollection
+#define Uses_TStringCollection
+#define Uses_TListViewer
+#define Uses_TInputLine
+#define Uses_TCheckBoxes
+#define Uses_TSItem
+#define Uses_TRadioButtons
+#include <tvision/tv.h>
+
+// Primer directory finder (defined in wwdos_app.cpp)
+extern std::string findPrimerDir();
 
 // ── GenerativeBridge ─────────────────────────────────────
 
@@ -38,7 +57,8 @@ std::string GenerativeBridge::resolveScriptPath() {
 
 bool GenerativeBridge::start(int width, int height, int seed,
                               const std::string& preset, int maxTicks,
-                              const std::string& snapshotPath) {
+                              const std::string& snapshotPath,
+                              const std::vector<GenStamp>& stamps) {
     stop();
     paused_ = false;
 
@@ -51,6 +71,16 @@ bool GenerativeBridge::start(int width, int height, int seed,
     cmd += " --max-ticks " + std::to_string(maxTicks);
     if (!snapshotPath.empty())
         cmd += " --snapshot \"" + snapshotPath + "\"";
+
+    // Add stamp args
+    for (const auto& st : stamps) {
+        if (!st.path.empty()) {
+            cmd += " --stamp \"" + st.path + ":"
+                + std::to_string(st.x) + ":" + std::to_string(st.y) + ":"
+                + (st.locked ? "locked" : "seeded") + "\"";
+        }
+    }
+
     cmd += " 2>/tmp/generative_bridge_err.log";
 
     fprintf(stderr, "[gen-lab] cmd: %s\n", cmd.c_str());
@@ -169,7 +199,7 @@ void TGenerativeLabView::launch() {
     std::string snapPath = snapDir + "/" + std::string(ts)
         + "_" + presetName() + "_s" + std::to_string(seed_) + ".yml";
 
-    bridge_.start(contentW, contentH, seed_, presetName(), maxTicks_, snapPath);
+    bridge_.start(contentW, contentH, seed_, presetName(), maxTicks_, snapPath, stamps_);
     startTimer();
     drawView();
 }
@@ -211,6 +241,161 @@ void TGenerativeLabView::saveToFile() {
     flashMsg_ = "SAVED: " + fname;
     flashTime_ = time(nullptr);
     drawView();
+}
+
+// ── Stamp picker dialog ──────────────────────────────────
+
+// Unsorted string collection for TListBox
+class TPrimerCollection : public TCollection {
+public:
+    TPrimerCollection(short aLimit, short aDelta)
+        : TCollection(aLimit, aDelta) {}
+    virtual void freeItem(void* item) override { delete[] (char*)item; }
+private:
+    virtual void* readItem(ipstream&) override { return nullptr; }
+    virtual void writeItem(void*, opstream&) override {}
+};
+
+void TGenerativeLabView::openStampPicker() {
+    // Gather primer files from all primer dirs
+    std::vector<std::string> files;
+    std::vector<std::string> paths;
+
+    const char* dirs[] = {
+        "modules-private/wibwob-primers/primers",
+        "modules/example-primers/primers",
+        nullptr
+    };
+
+    // Also try findPrimerDir()
+    std::string primerDir = findPrimerDir();
+
+    for (int i = 0; dirs[i] || i == 0; ++i) {
+        std::string d = (i < 2 && dirs[i]) ? dirs[i] : primerDir;
+        if (d.empty()) continue;
+        DIR* dp = opendir(d.c_str());
+        if (!dp) continue;
+        struct dirent* entry;
+        while ((entry = readdir(dp)) != nullptr) {
+            std::string name(entry->d_name);
+            if (name.size() < 5) continue;
+            if (name.substr(name.size() - 4) != ".txt") continue;
+            // Avoid dupes
+            bool dup = false;
+            for (const auto& f : files) if (f == name) { dup = true; break; }
+            if (!dup) {
+                files.push_back(name);
+                paths.push_back(d + "/" + name);
+            }
+        }
+        closedir(dp);
+        if (i >= 2) break;  // primerDir was the fallback
+    }
+
+    if (files.empty()) {
+        flashMsg_ = "No primer files found";
+        flashTime_ = time(nullptr);
+        drawView();
+        return;
+    }
+
+    // Sort alphabetically
+    std::vector<size_t> idx(files.size());
+    for (size_t i = 0; i < idx.size(); ++i) idx[i] = i;
+    std::sort(idx.begin(), idx.end(), [&](size_t a, size_t b) {
+        return files[a] < files[b];
+    });
+
+    // Build collection
+    auto* col = new TPrimerCollection(files.size(), 1);
+    for (size_t i = 0; i < idx.size(); ++i) {
+        col->atInsert(i, newStr(files[idx[i]].c_str()));
+    }
+
+    // Build dialog
+    int dlgW = 50;
+    int dlgH = std::min(20, (int)files.size() + 7);
+    TRect dr(0, 0, dlgW, dlgH);
+    dr.move((size.x - dlgW) / 2, (size.y - dlgH) / 2);
+
+    auto* dlg = new TDialog(dr, "Stamp Primer");
+
+    // Scrollbar for list
+    TRect sbr(dlgW - 4, 2, dlgW - 3, dlgH - 5);
+    auto* sb = new TScrollBar(sbr);
+    dlg->insert(sb);
+
+    // List box
+    TRect lr(2, 2, dlgW - 4, dlgH - 5);
+    auto* lb = new TListBox(lr, 1, sb);
+    lb->newList(col);
+    dlg->insert(lb);
+    dlg->insert(new TLabel(TRect(2, 1, 20, 2), "~P~rimers:", lb));
+
+    // Locked radio buttons
+    TRect cbr(2, dlgH - 5, dlgW - 15, dlgH - 3);
+    auto* rb = new TRadioButtons(cbr,
+        new TSItem("~L~ocked (immune to rules)",
+        new TSItem("~S~eeded (rules can modify)", nullptr)));
+    ushort rbVal = 0;  // default: locked (item 0)
+    rb->setData(&rbVal);
+    dlg->insert(rb);
+
+    // OK / Cancel
+    dlg->insert(new TButton(TRect(dlgW - 14, dlgH - 4, dlgW - 4, dlgH - 2),
+                             "~S~tamp", cmOK, bfDefault));
+    dlg->selectNext(False);
+
+    // Execute
+    ushort result = owner->execView(dlg);
+    if (result == cmOK) {
+        short sel = lb->focused;
+        if (sel >= 0 && sel < (short)idx.size()) {
+            size_t fileIdx = idx[sel];
+            GenStamp st;
+            st.path = paths[fileIdx];
+            ushort rbResult = 0;
+            rb->getData(&rbResult);
+            st.locked = (rbResult == 0);  // 0 = locked, 1 = seeded
+            // Centre the stamp
+            // Read file to get dimensions
+            FILE* f = fopen(st.path.c_str(), "r");
+            int maxW = 0, lineCount = 0;
+            if (f) {
+                char line[1024];
+                while (fgets(line, sizeof(line), f)) {
+                    int len = (int)strlen(line);
+                    if (len > 0 && line[len-1] == '\n') len--;
+                    if (len > maxW) maxW = len;
+                    lineCount++;
+                }
+                fclose(f);
+            }
+            // Centre in grid coords
+            int contentW = size.x - 2;
+            int contentH = size.y - 3;
+            // For binary substrate, grid is half screen size
+            int gw = contentW / 2;
+            int gh = contentH / 2;
+            st.x = std::max(0, (gw - maxW) / 2);
+            st.y = std::max(0, (gh - lineCount) / 2);
+
+            stamps_.push_back(st);
+            flashMsg_ = "Stamped: " + files[fileIdx]
+                + (st.locked ? " [locked]" : " [seeded]");
+            flashTime_ = time(nullptr);
+            relaunch();
+        }
+    }
+
+    TObject::destroy(dlg);
+}
+
+void TGenerativeLabView::clearStamps() {
+    stamps_.clear();
+    flashMsg_ = "Stamps cleared";
+    flashTime_ = time(nullptr);
+    relaunch();
 }
 
 void TGenerativeLabView::debounceRelaunch() {
@@ -362,6 +547,19 @@ void TGenerativeLabView::draw() {
         int mutEnd = (int)bar.size();
         bar += " ";
 
+        // Stamp button
+        int stampStart = (int)bar.size();
+        std::string stampLabel = stamps_.empty()
+            ? "[P:Stamp]"
+            : "[P:Stamp(" + std::to_string(stamps_.size()) + ")]";
+        bar += stampLabel;
+        int stampEnd = (int)bar.size();
+        bar += " ";
+
+        if (!stamps_.empty()) {
+            bar += "[X:Clear] ";
+        }
+
         bar += "[R:New] [S:Save] [I:Info]";
 
         // Truncate if wider than window
@@ -388,6 +586,13 @@ void TGenerativeLabView::draw() {
             int end = std::min(pauseEnd, W);
             std::string seg = bar.substr(pauseStart, end - pauseStart);
             buf.moveStr(pauseStart, TStringView(seg), kBtnActive);
+        }
+
+        // Highlight stamp if stamps active
+        if (!stamps_.empty() && stampStart < W) {
+            int end = std::min(stampEnd, W);
+            std::string seg = bar.substr(stampStart, end - stampStart);
+            buf.moveStr(stampStart, TStringView(seg), kBtnActive);
         }
 
         writeLine(0, H - 2, W, 1, buf);
@@ -517,9 +722,21 @@ void TGenerativeLabView::handleEvent(TEvent& ev) {
             clearEvent(ev); return;
         }
 
+        // p — stamp primer picker
+        if (ch == 'p' || ch == 'P') {
+            openStampPicker();
+            clearEvent(ev); return;
+        }
+
+        // x — clear all stamps
+        if (ch == 'x' || ch == 'X') {
+            clearStamps();
+            clearEvent(ev); return;
+        }
+
         // i — info flash
         if (ch == 'i' || ch == 'I') {
-            flashMsg_ = "1-9=preset 0=random r=new m=mutate s=save .=step";
+            flashMsg_ = "1-9=preset 0=random r=new m=mutate p=stamp x=clear s=save";
             flashTime_ = time(nullptr);
             drawView();
             clearEvent(ev); return;

@@ -14,6 +14,16 @@
 #include <string>
 #include <vector>
 
+// ── Stamp: ASCII art placed on canvas before generation ──
+
+struct GenStamp {
+    std::string path;    // file path (empty if inline text)
+    std::string text;    // inline text (empty if file)
+    int x = 0;
+    int y = 0;
+    bool locked = true;  // true = immune to rules
+};
+
 // ── Preset names (must match Python PRESET_LIST order) ───
 static const char* kGenPresetNames[] = {
     "game-of-life", "brians-brain", "eno-bloom", "coral-reef",
@@ -35,7 +45,8 @@ public:
 
     bool start(int width, int height, int seed,
                const std::string& preset, int maxTicks,
-               const std::string& snapshotPath = "");
+               const std::string& snapshotPath = "",
+               const std::vector<GenStamp>& stamps = {});
     void stop();
     void pause();
     void resume();
@@ -81,6 +92,8 @@ private:
     void debounceRelaunch();
     void saveToFile();
     void drawButtonBar(int y);
+    void openStampPicker();
+    void clearStamps();
 
     GenerativeBridge bridge_;
 
@@ -88,6 +101,7 @@ private:
     int seed_ = 0;
     int presetIdx_ = 0;   // 0-9 = named presets, 10 = random
     int maxTicks_ = 2000;
+    std::vector<GenStamp> stamps_;  // primers stamped before generation
 
     // Display state
     std::vector<std::string> lines_;

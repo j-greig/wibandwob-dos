@@ -45,6 +45,7 @@ class Grid:
         self.w = w
         self.h = h
         self.cells: List[List[Cell]] = [[Cell() for _ in range(w)] for _ in range(h)]
+        self.locked: set = set()  # (x, y) coords that rules cannot modify
 
     def get(self, x: int, y: int) -> Cell:
         return self.cells[y % self.h][x % self.w]
@@ -98,8 +99,31 @@ class Grid:
                 if c.state > 0:
                     c.age += 1
 
+    def stamp_text(self, text: str, ox: int, oy: int, locked: bool = True):
+        """Stamp ASCII art text onto grid. Non-space chars become alive cells.
+        If locked=True, these cells are immune to all rules."""
+        lines = text.split('\n')
+        for dy, line in enumerate(lines):
+            for dx, ch in enumerate(line):
+                if ch == ' ':
+                    continue
+                x, y = ox + dx, oy + dy
+                if 0 <= x < self.w and 0 <= y < self.h:
+                    self.cells[y][x].state = 1
+                    self.cells[y][x].value = ch
+                    self.cells[y][x].age = 0
+                    if locked:
+                        self.locked.add((x, y))
+
+    def stamp_file(self, path: str, ox: int, oy: int, locked: bool = True):
+        """Load ASCII art from file and stamp onto grid."""
+        with open(path, 'r') as f:
+            text = f.read()
+        self.stamp_text(text, ox, oy, locked)
+
     def deep_copy(self) -> 'Grid':
         g = Grid(self.w, self.h)
+        g.locked = set(self.locked)
         for y in range(self.h):
             for x in range(self.w):
                 src = self.cells[y][x]
@@ -110,7 +134,9 @@ class Grid:
 # ── Substrates (renderers) ────────────────────────────────
 
 def substrate_binary(grid: Grid, rng: random.Random) -> List[str]:
-    """Render as 0/1 grid with box-drawing borders. Like the primer."""
+    """Render as 0/1 grid with box-drawing borders. Like the primer.
+    Locked (stamped) cells render their original character directly
+    onto the canvas without grid borders — the art sits 'on top'."""
     w, h = grid.w, grid.h
     # Each cell = 2 screen cols (│X), 2 screen rows (─ + content)
     sw = w * 2 + 1
@@ -121,6 +147,10 @@ def substrate_binary(grid: Grid, rng: random.Random) -> List[str]:
         for gx in range(w):
             if not grid.cells[gy][gx].alive():
                 continue
+            # Skip grid rendering for locked cells — they render raw below
+            if (gx, gy) in grid.locked:
+                continue
+
             sx = gx * 2
             sy = gy * 2
 
@@ -148,6 +178,15 @@ def substrate_binary(grid: Grid, rng: random.Random) -> List[str]:
                 if sx + 2 < sw:
                     canvas[sy + 2][sx + 2] = '┼'
 
+    # Overlay locked (stamped) cells directly — raw character, no grid
+    for (lx, ly) in grid.locked:
+        if 0 <= lx < w and 0 <= ly < h and grid.cells[ly][lx].alive():
+            # Map grid coord to screen coord (centre of cell)
+            sx = lx * 2 + 1
+            sy = ly * 2 + 1
+            if 0 <= sx < sw and 0 <= sy < sh:
+                canvas[sy][sx] = grid.cells[ly][lx].value
+
     return [''.join(row) for row in canvas]
 
 
@@ -161,6 +200,8 @@ def substrate_block(grid: Grid, rng: random.Random) -> List[str]:
             c = grid.cells[y][x]
             if not c.alive():
                 row.append(' ')
+            elif (x, y) in grid.locked:
+                row.append(c.value)  # stamped art renders raw
             else:
                 n = grid.neighbours(x, y)
                 idx = min(len(blocks) - 1, max(1, n // 2 + 1))
@@ -170,12 +211,17 @@ def substrate_block(grid: Grid, rng: random.Random) -> List[str]:
 
 
 def substrate_contour(grid: Grid, rng: random.Random) -> List[str]:
-    """Render alive cells as contour curves via marching squares."""
+    """Render alive cells as contour curves via marching squares.
+    Locked (stamped) cells render their original character."""
     MS = ' ╮╭─╰╮│╯╯│╭╰─╭╮ '
     lines = []
     for y in range(grid.h - 1):
         row = []
         for x in range(grid.w - 1):
+            # If this cell is locked, show its raw value
+            if (x, y) in grid.locked and grid.cells[y][x].alive():
+                row.append(grid.cells[y][x].value)
+                continue
             idx = 0
             if grid.cells[y][x].alive():     idx |= 8
             if grid.cells[y][x+1].alive():   idx |= 4
@@ -197,6 +243,8 @@ def substrate_glyph(grid: Grid, rng: random.Random) -> List[str]:
             c = grid.cells[y][x]
             if not c.alive():
                 row.append(' ')
+            elif (x, y) in grid.locked:
+                row.append(c.value)  # stamped art renders raw
             elif c.age < 6:
                 row.append(glyphs_young[c.age % len(glyphs_young)])
             else:
@@ -724,11 +772,19 @@ class Preset:
 class Engine:
     """Runs a generative system from a preset + seed. Fully reproducible."""
 
-    def __init__(self, w: int, h: int, seed: int, preset: Preset):
+    def __init__(self, w: int, h: int, seed: int, preset: Preset,
+                 stamps: Optional[List[Dict]] = None):
+        """
+        stamps: list of dicts with keys:
+            path: str (file path) OR text: str (raw ASCII)
+            x: int, y: int (grid coordinates)
+            locked: bool (default True — immune to rules)
+        """
         self.w = w
         self.h = h
         self.seed = seed
         self.preset = preset
+        self.stamps = stamps or []
         self.tick = 0
         self.rng = random.Random(seed)
         self.done = False
@@ -751,6 +807,15 @@ class Engine:
         seeder_fn = SEEDERS.get(preset.seeder, seed_random)
         seeder_fn(self.grid, preset.seeder_params, self.rng)
 
+        # Apply stamps after seeding
+        for st in self.stamps:
+            locked = st.get('locked', True)
+            ox, oy = st.get('x', 0), st.get('y', 0)
+            if 'path' in st:
+                self.grid.stamp_file(st['path'], ox, oy, locked)
+            elif 'text' in st:
+                self.grid.stamp_text(st['text'], ox, oy, locked)
+
     def step(self) -> bool:
         """Advance one tick. Returns True if changed."""
         if self.done or self.paused:
@@ -758,12 +823,28 @@ class Engine:
 
         self.tick += 1
 
+        # Snapshot locked cells before rules
+        locked_snapshot = {}
+        if self.grid.locked:
+            for (lx, ly) in self.grid.locked:
+                c = self.grid.cells[ly][lx]
+                locked_snapshot[(lx, ly)] = (c.state, c.age, c.value)
+
         # Apply rules in order
         grid = self.grid
         for rule_name, params in self.rule_params:
             fn = RULES.get(rule_name)
             if fn:
                 grid = fn(grid, params, self.rng, self.tick)
+
+        # Restore locked cells (immune to rules)
+        if locked_snapshot:
+            grid.locked = self.grid.locked
+            for (lx, ly), (st, age, val) in locked_snapshot.items():
+                if 0 <= lx < grid.w and 0 <= ly < grid.h:
+                    grid.cells[ly][lx].state = st
+                    grid.cells[ly][lx].age = age
+                    grid.cells[ly][lx].value = val
 
         # Handle mutation meta-rule
         for rule_name, params in self.rule_params:
@@ -809,18 +890,26 @@ class Engine:
 
     def snapshot(self) -> Dict:
         """Full reproducible state as a dict (for YAML export)."""
-        return {
+        snap = {
             'seed': self.seed,
             'width': self.w,
             'height': self.h,
             'tick': self.tick,
             'coverage': round(self.grid.coverage(), 3),
+            'locked_cells': len(self.grid.locked),
             'preset': self.preset.to_dict(),
             'rule_params_current': [
                 {name: {k: v for k, v in params.items() if not k.startswith('_')}}
                 for name, params in self.rule_params
             ],
         }
+        if self.stamps:
+            snap['stamps'] = [
+                {k: v for k, v in st.items() if k != 'text'}  # skip inline text (too large)
+                if 'path' in st else st
+                for st in self.stamps
+            ]
+        return snap
 
     def snapshot_yaml(self) -> str:
         """Snapshot as YAML string."""
