@@ -394,6 +394,12 @@ public:
 
 class TStampDialog : public TDialog {
 public:
+    // Force gray dialog palette for dark/neutral look
+    virtual TPalette& getPalette() const override {
+        static TPalette pal(cpGrayDialog, sizeof(cpGrayDialog) - 1);
+        return pal;
+    }
+
     TStampListBox*   availList;
     TListBox*        selectedList;
     TStampPreview*   preview;
@@ -423,7 +429,8 @@ public:
 
         // 3-column layout: Available | Preview | Selected
         const int listTop = 2;
-        const int listH   = std::max(8, H - 11);
+        // Reserve: buttons(2) + gap(1) + position(3) + gap(1) + mode(1) + gap(1) + go(2) + pad(1) = 12
+        const int listH   = std::max(6, H - 15);
         const int colW    = std::max(15, (W - 6) / 4);
         const int prevX1  = 3 + colW + 1;
         const int prevX2  = W - 3 - colW - 1;
@@ -672,7 +679,7 @@ void TGenerativeLabView::openStampPicker() {
 
     // Dialog at 90% of view size
     int dlgW = std::max(70, size.x * 9 / 10);
-    int dlgH = std::max(20, size.y * 9 / 10);
+    int dlgH = std::max(28, size.y * 9 / 10);
     TRect dr(0, 0, dlgW, dlgH);
     dr.move((size.x - dlgW) / 2, (size.y - dlgH) / 2);
 
