@@ -61,7 +61,7 @@ SPAWNABLE_TYPES = [
     "snake",
     "rogue",
     # Sim
-    "micropolis_ascii",
+    # "micropolis_ascii",  # SKIP: SIGBUS in Micropolis::clearMap() during init (SPK-03)
     # Social
     # "room_chat",  # SKIP: blink timer UAF crashes TUI on close (SPK-03 P4)
     # Animation
