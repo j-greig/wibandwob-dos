@@ -11,7 +11,8 @@
   },
   "dependencies": {
     "@skitee3000/bun-pty": "^0.3.3",
-    "blessed": "^0.1.81"
+    "blessed": "^0.1.81",
+    "string-width": "^8.2.0"
   },
   "devDependencies": {
     "@types/blessed": "^0.1.25",

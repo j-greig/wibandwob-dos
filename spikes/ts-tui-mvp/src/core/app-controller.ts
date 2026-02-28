@@ -6,6 +6,7 @@ import path from "node:path";
 import { spawn as spawnPty, type IPty as BunPtyTerminal, type IExitEvent as BunPtyExitEvent } from "@skitee3000/bun-pty/dist/index.js";
 
 import { CONTROL_API_PORT, MASTER_PHILOSOPHY_PATH, README_PATH, REPO_ROOT, SPIKE_NOTES_PATH, SPIKE_ROOT, STATE_PATH, WORKSPACES_DIR } from "./config.js";
+import { DesktopGeometryService } from "./desktop-geometry.js";
 import { OverlayManager } from "./overlay-manager.js";
 import type {
   BackroomsChannel,
@@ -21,9 +22,11 @@ import type {
   WindowRecord,
   WindowSnapshot
 } from "./types.js";
+import { contentToWindowSize, getChromeModeForWindow } from "./window-chrome.js";
 import { WindowManager } from "./window-manager.js";
 import { BackroomsService } from "../services/backrooms-service.js";
 import { makeWibReply, makeWobReply } from "../services/chat-service.js";
+import { measurePlainTextContent, measurePrimerContent } from "../services/content-measurement.js";
 import { ControlApiService } from "../services/control-api.js";
 import { ContentService } from "../services/content-service.js";
 import { getDefaultFigletFont, getFigletCatalogue, getFigletFontChoices, measureFiglet, renderFiglet } from "../services/figlet-service.js";
@@ -44,6 +47,7 @@ export class TsTuiMvpApp {
   private readonly backrooms = new BackroomsService();
   private readonly content = new ContentService();
   private readonly workspace = new WorkspaceService(WORKSPACES_DIR);
+  private readonly geometry: DesktopGeometryService;
   private readonly state: StateService;
   private readonly controlApi: ControlApiService;
 
@@ -90,9 +94,11 @@ export class TsTuiMvpApp {
       () => this.syncState(),
       (window, x, y) => this.openWindowContextMenu(window, x, y)
     );
+    this.geometry = new DesktopGeometryService(this.screen);
     this.overlays = new OverlayManager(this.screen, () => this.windowManager.restoreWindowFocus());
     this.controlApi = new ControlApiService(CONTROL_API_PORT, {
       getState: () => this.getDesktopState(),
+      getPrimerInfo: (pathOrName) => this.getPrimerInfo(pathOrName),
       focusWindowById: (id) => this.focusWindowById(id),
       moveWindowById: (id, left, top) => this.moveWindowById(id, left, top),
       resizeWindowById: (id, width, height) => this.resizeWindowById(id, width, height),
@@ -110,10 +116,7 @@ export class TsTuiMvpApp {
         getControlApiStatus: () => this.controlApi.getStatus()
       },
       {
-        getScreenSize: () => ({
-          width: Number(this.screen.width),
-          height: Number(this.screen.height)
-        }),
+        getScreenSize: () => this.geometry.getGeometry(),
         getWindows: () => this.windowManager.getWindows(),
         getFocusedWindow: () => this.windowManager.getFocusedWindow(),
         getOpenMenuLabel: () => this.openMenuLabel
@@ -216,7 +219,7 @@ export class TsTuiMvpApp {
       ? ` Focus ${focus.id}:${focus.kind} ${focus.width}x${focus.height}@${focus.left},${focus.top}`
       : " Focus none";
     this.statusLine.setContent(
-      ` Alt-F File  Alt-E Edit  Alt-V View  Alt-W Window  Alt-T Tools  Tab Next  Shift-Tab Prev  Alt-Shift-Arrows Resize  Ctrl-S Save  Ctrl-Q Quit  |  Term ${current.screen.width}x${current.screen.height}  Windows ${current.screen.openWindowCount}${focusSummary} `
+      ` Alt-F File  Alt-E Edit  Alt-V View  Alt-W Window  Alt-T Tools  Tab Next  Shift-Tab Prev  Alt-Shift-Arrows Resize  Ctrl-S Save  Ctrl-Q Quit  |  Term ${current.screen.width}x${current.screen.height}  Aspect ${current.screen.cellAspect.toFixed(2)}  Windows ${current.screen.openWindowCount}${focusSummary} `
     );
   }
 
@@ -1421,6 +1424,7 @@ export class TsTuiMvpApp {
 
     let currentText = text;
     let currentFont = initialFont;
+    let lastMeasurement = measureFiglet(currentText, currentFont, 0);
 
     const syncTitle = () => {
       frame.title = `Banner: ${currentText.slice(0, 18) || "Banner"}`;
@@ -1430,6 +1434,7 @@ export class TsTuiMvpApp {
     const rerenderFiglet = () => {
       const availableWidth = Math.max(20, Number(viewer.width));
       const measured = measureFiglet(currentText, currentFont, availableWidth);
+      lastMeasurement = measured;
       viewer.setContent(measured.rendered);
       const catalogue = getFigletCatalogue();
       const meta = catalogue.fontMetadata[currentFont];
@@ -1461,7 +1466,9 @@ export class TsTuiMvpApp {
       summary: "Rendered figlet banner window using the shared WibWob font catalogue.",
       inputText: currentText,
       font: currentFont,
-      lineCount: viewer.getContent().split("\n").length,
+      lineCount: lastMeasurement.height,
+      contentWidth: lastMeasurement.width,
+      contentHeight: lastMeasurement.height,
       contentPreview: viewer.getContent().split("\n").slice(0, 8).join("\n")
     });
     frame.focus = () => {
@@ -1480,12 +1487,12 @@ export class TsTuiMvpApp {
     rerenderFiglet();
 
     const measured = measureFiglet(currentText, currentFont, 0);
+    lastMeasurement = measured;
     const oneRowHeight = measured.fontHeight > 0 && measured.height > measured.fontHeight ? measured.fontHeight : measured.height;
-    this.windowManager.resizeWindow(
-      frame.id,
-      Math.min(Math.max(measured.width + 4, 36), Math.max(36, Number(this.screen.width) - Number(frame.frame.left))),
-      Math.min(Math.max(oneRowHeight + 5, 10), Math.max(10, Number(this.screen.height) - 1 - Number(frame.frame.top)))
-    );
+    this.applyMeasuredWindowSize(frame, "figlet", {
+      width: Math.max(measured.width, 32),
+      height: Math.max(oneRowHeight, 5)
+    });
   }
 
   private openPatternWindow(): void {
@@ -1777,7 +1784,19 @@ export class TsTuiMvpApp {
 
   private openPrimerWindow(filePath: string): void {
     try {
-      this.openTextViewerWindow(path.basename(filePath), fs.readFileSync(filePath, "utf8"), "primer", filePath);
+      const rawContent = fs.readFileSync(filePath, "utf8");
+      const measured = measurePrimerContent(rawContent);
+      this.openTextViewerWindow(path.basename(filePath), measured.primaryFrameText, "primer", filePath, {
+        contentMeasurement: {
+          contentWidth: measured.measurement.columnWidth,
+          contentHeight: measured.measurement.lineCount,
+          recommendedWidth: measured.measurement.recommendedWidth,
+          recommendedHeight: measured.measurement.recommendedHeight,
+          animated: measured.measurement.animated,
+          frameCount: measured.measurement.frameCount,
+          skippedCommentLines: measured.measurement.skippedCommentLines
+        }
+      });
     } catch (error) {
       this.overlays.flash(`Cannot open primer: ${error instanceof Error ? error.message : String(error)}`);
     }
@@ -2020,7 +2039,33 @@ export class TsTuiMvpApp {
     return { ch: " ", style: { bg: "white" } };
   }
 
-  private openTextViewerWindow(title: string, content: string, kind: WindowKind, filePath?: string): void {
+  private applyMeasuredWindowSize(frame: WindowRecord, kind: WindowKind, content: { width: number; height: number }): void {
+    const target = contentToWindowSize(content, getChromeModeForWindow(kind));
+    const geometry = this.geometry.getGeometry();
+    this.windowManager.resizeWindow(
+      frame.id,
+      Math.min(Math.max(target.width, 24), Math.max(24, geometry.width - Number(frame.frame.left))),
+      Math.min(Math.max(target.height, 8), Math.max(8, geometry.height - 1 - Number(frame.frame.top)))
+    );
+  }
+
+  private openTextViewerWindow(
+    title: string,
+    content: string,
+    kind: WindowKind,
+    filePath?: string,
+    options?: {
+      contentMeasurement?: {
+        contentWidth: number;
+        contentHeight: number;
+        recommendedWidth: number;
+        recommendedHeight: number;
+        animated?: boolean;
+        frameCount?: number;
+        skippedCommentLines?: number;
+      };
+    }
+  ): void {
     const frame = this.windowManager.createFrame(title, kind);
     const viewer = blessed.box({
       parent: frame.body,
@@ -2039,11 +2084,21 @@ export class TsTuiMvpApp {
     });
     frame.kind = kind;
     frame.filePath = filePath;
+    const fallbackMeasurement = options?.contentMeasurement ? undefined : measurePlainTextContent(content).measurement;
+    const measuredWidth = options?.contentMeasurement?.contentWidth ?? fallbackMeasurement?.columnWidth ?? 0;
+    const measuredHeight = options?.contentMeasurement?.contentHeight ?? fallbackMeasurement?.lineCount ?? 0;
     frame.describeState = () => ({
       appType: `${kind}-viewer`,
       summary: filePath ? `Viewing ${filePath}` : `Viewing ${kind} content.`,
       filePath,
-      lineCount: content.split("\n").length,
+      lineCount: measuredHeight,
+      contentWidth: measuredWidth,
+      contentHeight: measuredHeight,
+      recommendedWidth: options?.contentMeasurement?.recommendedWidth,
+      recommendedHeight: options?.contentMeasurement?.recommendedHeight,
+      animated: options?.contentMeasurement?.animated,
+      frameCount: options?.contentMeasurement?.frameCount,
+      skippedCommentLines: options?.contentMeasurement?.skippedCommentLines,
       contentPreview: content.split("\n").slice(0, 8).join("\n")
     });
     frame.focus = () => {
@@ -2051,6 +2106,12 @@ export class TsTuiMvpApp {
       viewer.focus();
     };
     this.windowManager.registerWindow(frame);
+    if (options?.contentMeasurement) {
+      this.applyMeasuredWindowSize(frame, kind, {
+        width: options.contentMeasurement.contentWidth,
+        height: options.contentMeasurement.contentHeight
+      });
+    }
     frame.focus();
   }
 
@@ -2403,6 +2464,24 @@ export class TsTuiMvpApp {
 
   getDesktopState(): DesktopState {
     return this.state.getState();
+  }
+
+  getPrimerInfo(pathOrName: string): Record<string, unknown> {
+    const entry = this.content.getPrimerInfo(pathOrName);
+    if (!entry) {
+      return { ok: false, path: pathOrName, error: "Primer not found" };
+    }
+    return {
+      ok: true,
+      path: entry.filePath,
+      name: entry.label,
+      content_width: entry.metadata?.contentWidth ?? 0,
+      content_lines: entry.metadata?.contentHeight ?? 0,
+      recommended_w: entry.metadata?.recommendedWidth ?? 0,
+      recommended_h: entry.metadata?.recommendedHeight ?? 0,
+      animated: entry.metadata?.animated ?? false,
+      frame_count: entry.metadata?.frameCount ?? 1
+    };
   }
 
   focusWindowById(id: number): boolean {

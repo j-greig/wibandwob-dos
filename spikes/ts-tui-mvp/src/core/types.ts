@@ -33,6 +33,14 @@ export interface EditorState {
 export interface BrowserEntry {
   label: string;
   filePath: string;
+  metadata?: {
+    contentWidth?: number;
+    contentHeight?: number;
+    recommendedWidth?: number;
+    recommendedHeight?: number;
+    animated?: boolean;
+    frameCount?: number;
+  };
 }
 
 export interface BackroomsChannel {
@@ -111,6 +119,7 @@ export interface DesktopState {
   screen: {
     width: number;
     height: number;
+    cellAspect: number;
     openWindowCount: number;
   };
   focus: {

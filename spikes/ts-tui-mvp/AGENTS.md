@@ -36,16 +36,26 @@ Non-goals:
   - should coordinate, not become a utility dump
 - `src/core/window-manager.ts`
   - z-order, focus, drag, resize, tile, cascade, close
+- `src/core/desktop-geometry.ts`
+  - canonical terminal geometry snapshot
+  - exposes `{width, height, cellAspect}`
+- `src/core/window-chrome.ts`
+  - maps content size to window size
+  - chrome offsets live here, not inline in window code
 - `src/core/overlay-manager.ts`
   - transient UI primitives: flash, prompts, shared browser/openers
 - `src/services/state-service.ts`
   - canonical live desktop/app/window state snapshot
+  - every window should report semantic content metadata through `describeState()`
 - `src/services/control-api.ts`
   - local HTTP control surface over state + window actions
 - `src/services/workspace-service.ts`
   - named workspace persistence only
 - `src/services/content-service.ts`
   - repo content discovery and text-file utility behavior
+- `src/services/content-measurement.ts`
+  - shared content measurement for primers, text, and future content types
+  - returns content metrics, never chrome-adjusted widget math baked into callers
 - `src/services/backrooms-service.ts`
   - Backrooms-specific corpus, run-root prep, playback helpers
 - `src/services/figlet-service.ts`
@@ -63,8 +73,14 @@ Non-goals:
   - Do not add new ad hoc one-line prompts for file/workspace/font selection when a browser/list picker fits.
 - One source of truth per concern.
   - Workspace paths live in `WorkspaceService`.
+  - Desktop geometry lives in `DesktopGeometryService`.
+  - Window chrome math lives in `window-chrome.ts`.
+  - Content measurement lives in `content-measurement.ts`.
   - Desktop state shape lives in `StateService` + `types.ts`.
   - Backrooms primer resolution lives in `BackroomsService`.
+- Content metrics are content metrics.
+  - `contentWidth` / `contentHeight` should describe the renderable payload.
+  - Border, titlebar, toolbar, and padding belong to chrome sizing, not measurement.
 - Prefer composable helpers over inheritance theater.
   - No framework-within-a-framework.
   - Small functions, direct wiring, obvious ownership.
@@ -131,6 +147,9 @@ If you add a new window type:
 - wire it through menus or a clear key path
 - ensure it can focus cleanly
 - ensure cleanup runs on close if timers or external resources are involved
+- add meaningful `describeState()` metadata
+- if it renders sized content, route its measurement through `content-measurement.ts`
+- if it needs non-standard chrome, declare that in `window-chrome.ts`
 
 If you change terminal behavior:
 - test PTY launch directly

@@ -12,7 +12,7 @@ interface StateServiceOptions {
 }
 
 interface StateDependencies {
-  getScreenSize: () => { width: number; height: number };
+  getScreenSize: () => { width: number; height: number; cellAspect: number };
   getWindows: () => WindowRecord[];
   getFocusedWindow: () => WindowRecord | undefined;
   getOpenMenuLabel: () => string | undefined;
@@ -77,6 +77,7 @@ export class StateService {
       screen: {
         width: screen.width,
         height: screen.height,
+        cellAspect: screen.cellAspect,
         openWindowCount: windows.length
       },
       focus: {

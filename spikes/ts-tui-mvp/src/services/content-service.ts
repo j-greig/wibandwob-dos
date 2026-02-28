@@ -4,6 +4,7 @@ import path from "node:path";
 
 import { PRIMER_ROOTS, REPO_ROOT } from "../core/config.js";
 import type { BrowserEntry, GalleryTab, PrimerGroup } from "../core/types.js";
+import { measurePrimerContent } from "./content-measurement.js";
 
 export class ContentService {
   collectPrimerEntries(): BrowserEntry[] {
@@ -36,10 +37,7 @@ export class ContentService {
         const entries = fs
           .readdirSync(primersPath, { withFileTypes: true })
           .filter((entry) => entry.isFile() && this.isTextLikeFile(entry.name))
-          .map((entry) => ({
-            label: entry.name,
-            filePath: path.join(primersPath, entry.name)
-          }))
+          .map((entry) => this.createBrowserEntry(entry.name, path.join(primersPath, entry.name)))
           .sort((left, right) => left.label.localeCompare(right.label));
         if (entries.length > 0) {
           groups.push({
@@ -70,10 +68,7 @@ export class ContentService {
         const moduleEntries = fs
           .readdirSync(primersPath, { withFileTypes: true })
           .filter((entry) => entry.isFile() && this.isTextLikeFile(entry.name))
-          .map((entry) => ({
-            label: `${moduleEntry.name} :: ${entry.name}`,
-            filePath: path.join(primersPath, entry.name)
-          }));
+          .map((entry) => this.createBrowserEntry(`${moduleEntry.name} :: ${entry.name}`, path.join(primersPath, entry.name)));
         entries.push(...moduleEntries);
       }
     }
@@ -131,6 +126,22 @@ export class ContentService {
     return extension === "" || [".md", ".txt", ".json", ".prompt", ".log", ".yaml", ".yml"].includes(extension);
   }
 
+  getPrimerInfo(pathOrName: string): BrowserEntry | undefined {
+    const normalized = pathOrName.trim();
+    if (!normalized) {
+      return undefined;
+    }
+    if (fs.existsSync(normalized) && fs.statSync(normalized).isFile()) {
+      return this.createBrowserEntry(path.basename(normalized), normalized);
+    }
+    const lower = normalized.toLowerCase();
+    return this.collectPrimerEntries().find((entry) => {
+      const fileName = path.basename(entry.filePath).toLowerCase();
+      const bare = fileName.endsWith(".txt") ? fileName.slice(0, -4) : fileName;
+      return fileName === lower || bare === lower;
+    });
+  }
+
   private walkPrimerEntries(
     directory: string,
     rootLabel: string,
@@ -153,10 +164,32 @@ export class ContentService {
       if (!this.isTextLikeFile(child.name)) {
         continue;
       }
-      entries.push({
-        label: `${rootLabel} :: ${path.relative(path.join(REPO_ROOT, rootLabel), childPath)}`,
-        filePath: childPath
-      });
+      entries.push(this.createBrowserEntry(`${rootLabel} :: ${path.relative(path.join(REPO_ROOT, rootLabel), childPath)}`, childPath));
+    }
+  }
+
+  private createBrowserEntry(label: string, filePath: string): BrowserEntry {
+    const metadata = this.readPrimerMetadata(filePath);
+    return {
+      label,
+      filePath,
+      metadata
+    };
+  }
+
+  private readPrimerMetadata(filePath: string): BrowserEntry["metadata"] | undefined {
+    try {
+      const measured = measurePrimerContent(fs.readFileSync(filePath, "utf8")).measurement;
+      return {
+        contentWidth: measured.columnWidth,
+        contentHeight: measured.lineCount,
+        recommendedWidth: measured.recommendedWidth,
+        recommendedHeight: measured.recommendedHeight,
+        animated: measured.animated,
+        frameCount: measured.frameCount
+      };
+    } catch {
+      return undefined;
     }
   }
 }

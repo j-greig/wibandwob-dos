@@ -2,6 +2,7 @@ import type { BackroomsChannel, DesktopState } from "../core/types.js";
 
 interface ControlApiHandlers {
   getState: () => DesktopState;
+  getPrimerInfo: (pathOrName: string) => unknown;
   focusWindowById: (id: number) => boolean;
   moveWindowById: (id: number, left: number, top: number) => boolean;
   resizeWindowById: (id: number, width: number, height: number) => boolean;
@@ -70,6 +71,11 @@ export class ControlApiService {
 
     if (request.method === "GET" && url.pathname === "/state") {
       return Response.json(this.handlers.getState());
+    }
+
+    if (request.method === "GET" && url.pathname === "/content/primer-info") {
+      const pathOrName = url.searchParams.get("path") ?? url.searchParams.get("name") ?? "";
+      return Response.json(this.handlers.getPrimerInfo(pathOrName));
     }
 
     const body = request.method === "POST" ? await request.json().catch(() => ({})) : {};
