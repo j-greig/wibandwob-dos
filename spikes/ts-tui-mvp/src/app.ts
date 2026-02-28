@@ -48,6 +48,16 @@ interface DragState {
   offsetY: number;
 }
 
+interface ResizeState {
+  windowId: number;
+  originLeft: number;
+  originTop: number;
+  originWidth: number;
+  originHeight: number;
+  startX: number;
+  startY: number;
+}
+
 interface MenuConfig {
   label: string;
   key: string;
@@ -72,6 +82,7 @@ class TsTuiMvpApp {
   private focusedWindow?: WindowRecord;
   private nextWindowId = 1;
   private dragState?: DragState;
+  private resizeState?: ResizeState;
 
   constructor() {
     this.screen = blessed.screen({
@@ -192,7 +203,7 @@ class TsTuiMvpApp {
   private renderChrome(): void {
     this.menuBar.setContent("");
     this.statusLine.setContent(
-      " Alt-F File  Alt-E Edit  Alt-W Window  Tab Next  Shift-Tab Prev  Ctrl-S Save  Ctrl-Q Quit "
+      " Alt-F File  Alt-E Edit  Alt-W Window  Tab Next  Shift-Tab Prev  Ctrl-S Save  Ctrl-Q Quit  Drag title  Resize corner "
     );
     this.repaintDesktop();
     this.screen.on("resize", () => {
@@ -363,6 +374,11 @@ class TsTuiMvpApp {
       pty.resize(cols, rows);
     };
     const handleScreenResize = () => syncPtySize();
+    const armTerminalInput = () => {
+      inputLine.focus();
+      inputLine.readInput();
+      this.screen.render();
+    };
 
     pty.onData((chunk: string) => {
       const clean = chunk
@@ -388,7 +404,7 @@ class TsTuiMvpApp {
       pty.write(`${command}\r`);
       inputLine.clearValue();
       this.screen.render();
-      inputLine.focus();
+      armTerminalInput();
     });
 
     const record = frame;
@@ -406,8 +422,15 @@ class TsTuiMvpApp {
     };
     record.focus = () => {
       this.focusWindow(record);
-      inputLine.focus();
+      armTerminalInput();
     };
+
+    frame.body.on("click", armTerminalInput);
+    frame.body.on("mousedown", armTerminalInput);
+    transcript.on("click", armTerminalInput);
+    transcript.on("mousedown", armTerminalInput);
+    inputLine.on("click", armTerminalInput);
+    inputLine.on("focus", () => this.focusWindow(record));
 
     this.registerWindow(record);
     record.focus();
@@ -499,8 +522,16 @@ class TsTuiMvpApp {
   private promptForEditorPath(): void {
     const initial = path.join(process.cwd(), "scratch", "mvp-notes.txt");
     this.openPathPrompt("Open Text File Path", initial, (value) => {
-      const content = fs.existsSync(value) ? fs.readFileSync(value, "utf8") : "";
-      this.openEditorWindow(value, path.basename(value), content);
+      try {
+        const exists = fs.existsSync(value);
+        const content = exists ? fs.readFileSync(value, "utf8") : "";
+        this.openEditorWindow(value, path.basename(value), content);
+        if (!exists) {
+          this.flash(`Opened new buffer for ${value}`);
+        }
+      } catch (error) {
+        this.flash(`Cannot open text file: ${error instanceof Error ? error.message : String(error)}`);
+      }
     });
   }
 
@@ -703,6 +734,20 @@ class TsTuiMvpApp {
         bg: "red"
       }
     });
+    const resizeGrip = blessed.box({
+      parent: frame,
+      bottom: 0,
+      right: 1,
+      width: 2,
+      height: 1,
+      mouse: true,
+      clickable: true,
+      content: "+>",
+      style: {
+        fg: "yellow",
+        bg: "black"
+      }
+    });
 
     const record: WindowRecord = {
       id: this.nextWindowId++,
@@ -738,13 +783,25 @@ class TsTuiMvpApp {
       this.focusWindow(record);
       this.startDrag(record, data);
     });
+    resizeGrip.on("mousedown", (data) => {
+      this.focusWindow(record);
+      this.startResize(record, data);
+    });
     return record;
   }
 
   private handleMouse(data: blessed.Widgets.Events.IMouseEventArg): void {
-    if (!this.dragState) {
+    if (this.dragState) {
+      this.handleDragMouse(data);
       return;
     }
+    if (this.resizeState) {
+      this.handleResizeMouse(data);
+      return;
+    }
+  }
+
+  private handleDragMouse(data: blessed.Widgets.Events.IMouseEventArg): void {
     if (data.action === "mouseup") {
       this.dragState = undefined;
       return;
@@ -774,6 +831,35 @@ class TsTuiMvpApp {
     this.screen.render();
   }
 
+  private handleResizeMouse(data: blessed.Widgets.Events.IMouseEventArg): void {
+    if (!this.resizeState) {
+      return;
+    }
+    if (data.action === "mouseup") {
+      this.resizeState = undefined;
+      return;
+    }
+    if (data.action !== "mousemove" && data.action !== "mousedown") {
+      return;
+    }
+    const record = this.windows.find((window) => window.id === this.resizeState?.windowId);
+    if (!record) {
+      this.resizeState = undefined;
+      return;
+    }
+
+    const desktopWidth = Number(this.screen.width);
+    const desktopHeight = Number(this.screen.height) - 2;
+    const deltaX = data.x - this.resizeState.startX;
+    const deltaY = data.y - this.resizeState.startY;
+    const maxWidth = Math.max(24, desktopWidth - this.resizeState.originLeft);
+    const maxHeight = Math.max(8, desktopHeight - this.resizeState.originTop);
+
+    record.frame.width = this.clamp(this.resizeState.originWidth + deltaX, 24, maxWidth);
+    record.frame.height = this.clamp(this.resizeState.originHeight + deltaY, 8, maxHeight);
+    this.screen.render();
+  }
+
   private startDrag(record: WindowRecord, data: blessed.Widgets.Events.IMouseEventArg): void {
     const coords = record.frame.lpos;
     if (!coords) {
@@ -783,6 +869,18 @@ class TsTuiMvpApp {
       windowId: record.id,
       offsetX: data.x - coords.xi,
       offsetY: data.y - coords.yi
+    };
+  }
+
+  private startResize(record: WindowRecord, data: blessed.Widgets.Events.IMouseEventArg): void {
+    this.resizeState = {
+      windowId: record.id,
+      originLeft: Number(record.frame.left),
+      originTop: Number(record.frame.top),
+      originWidth: Number(record.frame.width),
+      originHeight: Number(record.frame.height),
+      startX: data.x,
+      startY: data.y
     };
   }
 
@@ -1061,7 +1159,7 @@ class TsTuiMvpApp {
         }
       }
     });
-    const input = blessed.textbox({
+    const input: Textbox = blessed.textbox({
       parent: modal,
       top: 1,
       left: 1,
@@ -1098,6 +1196,14 @@ class TsTuiMvpApp {
     };
 
     input.setValue(initialValue);
+    input.key(["tab"], () => {
+      const currentValue = input.getValue();
+      const completedValue = this.completePath(currentValue);
+      if (completedValue !== currentValue) {
+        input.setValue(completedValue);
+        this.screen.render();
+      }
+    });
     input.on("submit", (value) => {
       const nextValue = (value ?? "").trim();
       closePrompt();
@@ -1117,6 +1223,33 @@ class TsTuiMvpApp {
     this.screen.render();
     input.focus();
     input.readInput();
+  }
+
+  private completePath(value: string): string {
+    const expandedValue = value.startsWith("~")
+      ? path.join(os.homedir(), value.slice(1))
+      : value;
+    const directory = expandedValue.endsWith(path.sep)
+      ? expandedValue
+      : path.dirname(expandedValue);
+    const base = expandedValue.endsWith(path.sep) ? "" : path.basename(expandedValue);
+
+    if (!fs.existsSync(directory)) {
+      return value;
+    }
+
+    const matches = fs
+      .readdirSync(directory)
+      .filter((entry) => entry.startsWith(base))
+      .sort((left, right) => left.localeCompare(right));
+    if (matches.length === 0) {
+      return value;
+    }
+
+    const nextPath = path.join(directory, matches[0]);
+    return nextPath.startsWith(os.homedir())
+      ? `~${nextPath.slice(os.homedir().length)}`
+      : nextPath;
   }
 
   private tileWindows(): void {
