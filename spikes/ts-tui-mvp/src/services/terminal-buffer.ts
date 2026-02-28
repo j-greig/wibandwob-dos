@@ -303,6 +303,17 @@ export class TerminalBuffer {
       case "D":
         this.cursor.x = Math.max(0, this.cursor.x - this.paramOrDefault(params, 0, 1));
         return;
+      case "E":
+        this.cursor.y = Math.min(this.lines.length - 1, this.cursor.y + this.paramOrDefault(params, 0, 1));
+        this.cursor.x = 0;
+        return;
+      case "F":
+        this.cursor.y = Math.max(0, this.cursor.y - this.paramOrDefault(params, 0, 1));
+        this.cursor.x = 0;
+        return;
+      case "G":
+        this.cursor.x = Math.min(this.cols - 1, Math.max(0, this.paramOrDefault(params, 0, 1) - 1));
+        return;
       case "H":
       case "f": {
         const row = Math.max(1, this.paramOrDefault(params, 0, 1));
@@ -311,6 +322,9 @@ export class TerminalBuffer {
         this.cursor.x = Math.min(this.cols - 1, col - 1);
         return;
       }
+      case "d":
+        this.cursor.y = Math.min(this.lines.length - 1, Math.max(0, this.paramOrDefault(params, 0, 1) - 1));
+        return;
       case "J":
         this.clearScreen(this.paramOrDefault(params, 0, 0));
         return;

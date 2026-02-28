@@ -213,6 +213,65 @@ The spike currently includes:
 - Backrooms TV with real/fake-live modes and per-run primer roots
 - FIGlet window backed by the shared font catalogue and real `figlet` CLI
 
+## Control Loop
+
+The spike has a local HTTP control surface intended for autonomous debug loops and agent-driven validation.
+
+Primary use:
+- open windows
+- inspect live desktop/window state
+- send input to terminal windows
+- export text captures to `scratch`
+- compare captures while iterating on code
+
+State/control owner:
+- `src/services/control-api.ts`
+
+Current control endpoints:
+- `GET /`
+- `GET /health`
+- `GET /state`
+- `GET /content/primer-info?path=...`
+- `POST /view/xterm/open`
+- `POST /view/xterm/close`
+- `POST /view/xterm/restart`
+- `POST /view/backrooms/open`
+- `POST /windows/focus`
+- `POST /windows/move`
+- `POST /windows/resize`
+- `POST /windows/close`
+- `POST /windows/input`
+- `GET /windows/text?id=...`
+- `POST /windows/text/export`
+- `POST /workspace/save`
+- `POST /workspace/load`
+
+Current loop for terminal debugging:
+1. launch the spike
+2. read `/state` to discover the control API port and current windows
+3. `POST /view/xterm/open`
+4. read `/state` again to find the `xterm-shell` window id
+5. `POST /windows/input` with shell input
+6. `POST /windows/text/export` to persist a text capture
+7. inspect `scratch/xterm/*.log` and `scratch/captures/*.txt`
+8. patch code and repeat
+
+Convenience:
+- use `POST /view/xterm/restart` to close all current `xterm-shell` windows and reopen a fresh one
+- use `POST /view/xterm/close` to close all current `xterm-shell` windows without reopening
+
+Scratch artifacts:
+- xterm PTY logs:
+  - `/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/scratch/xterm`
+- exported text captures:
+  - `/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/scratch/captures`
+- desktop state JSON:
+  - `/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/scratch/app-state.json`
+
+Important rule:
+- when debugging terminal rendering, trust captured PTY logs and exported text snapshots over screenshots alone
+- the point of the loop is to make parser/render bugs reproducible and regressions easy to compare
+
 ## Important Constraints
 
 1. Keep this spike pragmatic.
@@ -258,6 +317,8 @@ If you add a new window type:
 If you change terminal behavior:
 - test PTY launch directly
 - test the in-app terminal window
+- use the control loop above to open `XTerm Shell`, send input, and export a text snapshot
+- inspect `scratch/xterm` for raw PTY traffic before guessing at redraw bugs
 - separate “shell commands work” from “real TUI apps work”
 
 ## Verification

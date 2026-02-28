@@ -107,10 +107,15 @@ export class TsTuiMvpApp {
     this.controlApi = new ControlApiService(CONTROL_API_PORT, {
       getState: () => this.getDesktopState(),
       getPrimerInfo: (pathOrName) => this.getPrimerInfo(pathOrName),
+      openXTermShell: () => void this.openXTermShellWindow(),
+      closeXTermShells: () => this.closeWindowsByAppType("xterm-shell"),
+      restartXTermShell: () => void this.restartXTermShell(),
       focusWindowById: (id) => this.focusWindowById(id),
       moveWindowById: (id, left, top) => this.moveWindowById(id, left, top),
       resizeWindowById: (id, width, height) => this.resizeWindowById(id, width, height),
       closeWindowById: (id) => this.closeWindowById(id),
+      sendWindowInput: (id, input) => this.sendWindowInputById(id, input),
+      captureWindowText: (id, name) => this.captureWindowTextById(id, name),
       openBackroomsTv: (channel) => this.openBackroomsTv(channel),
       saveWorkspaceNamed: (name) => this.saveWorkspaceNamed(name),
       loadWorkspaceNamed: (name) => this.loadWorkspaceNamed(name)
@@ -491,6 +496,12 @@ export class TsTuiMvpApp {
     summary: string;
   }): Promise<void> {
     const frame = this.windowManager.createFrame(options.title, "terminal");
+    const xtermLogDir = path.join(SPIKE_ROOT, "scratch", "xterm");
+    fs.mkdirSync(xtermLogDir, { recursive: true });
+    const logPath = path.join(
+      xtermLogDir,
+      `${new Date().toISOString().replaceAll(":", "-")}_${options.appType}.log`
+    );
     const viewport = blessed.box({
       parent: frame.body,
       top: 0,
@@ -543,7 +554,21 @@ export class TsTuiMvpApp {
 
     const handleScreenResize = () => syncSize();
 
+    const logEvent = (event: string, payload: string | Record<string, unknown>) => {
+      const body = typeof payload === "string" ? payload : JSON.stringify(payload);
+      fs.appendFileSync(logPath, `[${new Date().toISOString()}] ${event} ${body}\n`, "utf8");
+    };
+
+    logEvent("spawn", {
+      command: options.command,
+      args: options.args,
+      cwd: options.cwd,
+      cols: buffer.getCols(),
+      rows: buffer.getRows()
+    });
+
     session.onData((chunk) => {
+      logEvent("data", JSON.stringify(chunk));
       buffer.write(chunk);
       render();
     });
@@ -551,6 +576,10 @@ export class TsTuiMvpApp {
       running = false;
       exitCode = event.exitCode;
       exitSignal = event.signal;
+      logEvent("exit", {
+        exitCode: event.exitCode,
+        signal: event.signal
+      });
       buffer.write(`\r\n[process exited ${event.exitCode} signal ${event.signal ?? "none"}]\r\n`);
       render();
     });
@@ -569,9 +598,11 @@ export class TsTuiMvpApp {
       session.kill();
     };
     frame.writeInput = (input) => {
+      logEvent("input", JSON.stringify(input));
       session.write(input);
     };
     frame.refresh = render;
+    frame.captureText = () => renderTerminalBuffer(buffer, false);
     frame.describeState = () => {
       const cursor = buffer.getCursor();
       return {
@@ -590,6 +621,7 @@ export class TsTuiMvpApp {
         exitCode,
         exitSignal,
         pid: session.pid,
+        debugLogPath: logPath,
         contentPreview: buffer.getPreviewText()
       };
     };
@@ -715,6 +747,7 @@ export class TsTuiMvpApp {
       pty.kill();
     };
     frame.writeInput = (input) => pty.write(input);
+    frame.captureText = () => transcript.getContent();
     frame.describeState = () => ({
       appType: options.appType,
       summary: options.intro,
@@ -2785,6 +2818,43 @@ export class TsTuiMvpApp {
 
   moveWindowById(id: number, left: number, top: number): boolean {
     return this.windowManager.moveWindow(id, left, top);
+  }
+
+  sendWindowInputById(id: number, input: string): boolean {
+    const window = this.windowManager.getWindowById(id);
+    if (!window?.writeInput) {
+      return false;
+    }
+    window.writeInput(input);
+    return true;
+  }
+
+  captureWindowTextById(id: number, name?: string): string | undefined {
+    const window = this.windowManager.getWindowById(id);
+    const content = window?.captureText?.();
+    if (!window || typeof content !== "string") {
+      return undefined;
+    }
+    const capturesDir = path.join(SPIKE_ROOT, "scratch", "captures");
+    fs.mkdirSync(capturesDir, { recursive: true });
+    const safeName = (name && name.trim()) || `${window.kind}-${window.id}`;
+    const fileName = `${new Date().toISOString().replaceAll(":", "-")}_${safeName.replace(/[^a-z0-9._-]+/gi, "-")}.txt`;
+    const filePath = path.join(capturesDir, fileName);
+    fs.writeFileSync(filePath, `${content}\n`, "utf8");
+    return filePath;
+  }
+
+  closeWindowsByAppType(appType: string): number {
+    const targets = this.windowManager.getWindows().filter((window) => window.describeState?.().appType === appType);
+    for (const window of targets) {
+      window.close();
+    }
+    return targets.length;
+  }
+
+  restartXTermShell(): void {
+    this.closeWindowsByAppType("xterm-shell");
+    void this.openXTermShellWindow();
   }
 
   resizeWindowById(id: number, width: number, height: number): boolean {
