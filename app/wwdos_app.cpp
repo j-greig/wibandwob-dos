@@ -5175,9 +5175,12 @@ std::string api_gallery_list(TWwdosApp& app, const std::string& tab) {
                 if (line.find("---") == 0 || line.find("===") == 0) hasFrames = true;
             }
         }
+        // recommended_w/h includes window chrome (+2 each axis for borders)
         os << "{\"name\":\"" << json_escape(files[i]) << "\""
            << ",\"lines\":" << lines
            << ",\"width\":" << maxW
+           << ",\"recommended_w\":" << (maxW + 2)
+           << ",\"recommended_h\":" << (lines + 2)
            << ",\"animated\":" << (hasFrames ? "true" : "false")
            << "}";
     }
