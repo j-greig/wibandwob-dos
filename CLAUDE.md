@@ -156,6 +156,21 @@ cat "$(ls -t logs/screenshots/tui_*.txt | head -1)"
 
 > Full API reference and curl recipes: see `.pi/skills/wibwobdos/SKILL.md` (authoritative ops manual) and `tools/api_server/README.md`.
 
+### CRITICAL: Never kill the TUI process
+
+**NEVER use `pkill`, `kill -9`, or `tmux kill-session` on a running wwdos process.**
+
+wwdos enables terminal mouse tracking. If you kill it without letting it clean up,
+raw mouse escape codes flood the terminal and make it unusable. The human then has
+to quit their terminal entirely and restart.
+
+Rules:
+- To test a new binary, ASK the human to quit the app (Ctrl-Q or Alt-X) and relaunch.
+- Only restart the API server (uvicorn) — that is stateless and safe to kill/restart.
+- If you absolutely must stop wwdos programmatically, send `kill -TERM` (not `-9`) and
+  wait for it to exit cleanly. But prefer asking the human.
+- If the terminal gets mouse garbage, the human can type `reset` to fix it.
+
 ### Gotchas
 
 - **SDK bridge npm install**: if the Wib&Wob chat window silently times out, run `cd app/llm/sdk_bridge && npm install`. The `node_modules/` dir is gitignored and must be installed on each fresh clone.
