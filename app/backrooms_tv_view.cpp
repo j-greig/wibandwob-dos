@@ -394,11 +394,14 @@ void TBackroomsTvView::appendText(const std::string &text) {
     for (size_t i = 0; i < text.size(); ++i) {
         char c = text[i];
         if (c == '\n') {
-            // Skip triple-backtick lines from display (kept in raw log)
+            // Skip noise lines from display (kept in raw log)
             std::string trimmed = partial_;
             size_t start = trimmed.find_first_not_of(" \t");
             if (start != std::string::npos) trimmed = trimmed.substr(start);
-            if (trimmed.substr(0, 3) != "```") {
+            bool skip = (trimmed.substr(0, 3) == "```")
+                     || (trimmed.substr(0, 8) == "[dotenv@")
+                     || (trimmed.substr(0, 2) == "**");  // markdown bold lines
+            if (!skip) {
                 lines_.push_back(partial_);
             }
             partial_.clear();

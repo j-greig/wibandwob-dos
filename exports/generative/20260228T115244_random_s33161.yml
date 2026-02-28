@@ -1,0 +1,110 @@
+seed: 33161
+width: 207
+height: 58
+tick: 11
+canvas_mode: true
+coverage: 0.0
+locked_cells: 0
+preset:
+  name: 'Random #9230'
+  substrate: raw
+  seeder:
+    seed_points:
+      method: centre
+      count: 5
+  rules:
+  - die_overcrowd:
+      max_neighbours: 5
+  - grow_life:
+      born: &id001
+      - 5
+      - 6
+      survive: &id002
+      - 3
+  - erode:
+      p: 0.03219805012979265
+  - smooth:
+      rounds: 2
+  - mutate_rules:
+      rate: 0.05
+  tick_ms: 52
+  continuous: true
+rule_params_current:
+- die_overcrowd:
+    max_neighbours: 5
+- grow_life:
+    born: *id001
+    survive: *id002
+- erode:
+    p: 0.03219805012979265
+- smooth:
+    rounds: 2
+- mutate_rules:
+    rate: 0.05
+stamps:
+- path: modules-private/wibwob-primers/primers/conscious-matrix-1.txt
+  x: 0
+  y: 41
+  locked: false
+output_lines: 58
+
+# ── rendered output ──
+output: |
+                                                                                                                                                                                                                 
+                                                                                                                                                                                                                 
+                                                                                                                                                                                                                 
+                                                                                                                                                                                                                 
+                                                                                                                                                                                                                 
+                                                                                                                                                                                                                 
+                                                                                                                                                                                                                 
+                                                                                                                                                                                                                 
+                                                                                                                                                                                                                 
+                                                                                                                                                                                                                 
+                                                                                                                                                                                                                 
+                                                                                                                                                                                                                 
+                                                                                                                                                                                                                 
+                                                                                                                                                                                                                 
+                                                                                                                                                                                                                 
+                                                                                                                                                                                                                 
+                                                                                                                                                                                                                 
+                                                                                                                                                                                                                 
+                                                                                                                                                                                                                 
+                                                                                                                                                                                                                 
+                                                                                                                                                                                                                 
+                                                                                                                                                                                                                 
+                                                                                                                                                                                                                 
+                                                                                                                                                                                                                 
+                                                                                                                                                                                                                 
+                                                                                                                                                                                                                 
+                                                                                                                                                                                                                 
+                                                                                                                                                                                                                 
+                                                                                                                                                                                                                 
+                                                                                                                                                                                                                 
+                                                                                                                                                                                                                 
+                                                                                                                                                                                                                 
+                                                                                                                                                                                                                 
+                                                                                                                                                                                                                 
+                                                                                                                                                                                                                 
+                                                                                                                                                                                                                 
+                                                                                                                                                                                                                 
+                                                                                                                                                                                                                 
+                                                                                                                                                                                                                 
+                                                                                                                                                                                                                 
+                                                                                                                                                                                                                 
+                                                                                                                                                                                                                 
+                                                                                                                                                                                                                 
+                                                                                                                                                                                                                 
+                                                                                                                                                                                                                 
+                                                                                                                                                                                                                 
+                                                                                                                                                                                                                 
+                                                                                                                                                                                                                 
+                                                                                                                                                                                                                 
+                                                                                                                                                                                                                 
+                                                                                                                                                                                                                 
+                                                                                                                                                                                                                 
+                                                                                                                                                                                                                 
+                                                                                                                                                                                                                 
+                                                                                                                                                                                                                 
+                                                                                                                                                                                                                 
+                                                                                                                                                                                                                 
+                                                                                                                                                                                                                 
