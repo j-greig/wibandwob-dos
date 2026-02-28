@@ -187,7 +187,7 @@ const std::vector<CommandCapability>& get_command_capabilities() {
         {"open_deep_signal", "Open Deep Signal space scanner game", false},
         {"open_apps", "Open the Applications folder browser", false},
         {"open_gallery", "Open the ASCII Art Gallery browser with tabbed primer explorer", false},
-        {"gallery_list", "List available primer filenames (optional tab param: 1/#-C, 2/D-L, 3/M, 4/N-S, 5/T-Z, 6/Find with search param)", false},
+        {"gallery_list", "List primers with dimensions: {name, lines, width, recommended_w, recommended_h, animated}. Use recommended_w/h to open at full size. Optional tab param: 1/#-C, 2/D-L, 3/M, 4/N-S, 5/T-Z, 6/Find with search param", false},
         {"open_primer", "Open a primer file by name (path param). Optional: x,y,w,h for placement. Tip: call primer_info first to get content dimensions, then open at the right size.", true},
         {"primer_info", "Get content dimensions of a primer file WITHOUT opening it (path param). Returns content_lines, content_width, has_frames. Use to size windows before opening.", true},
         {"open_terminal", "Open a terminal emulator window", false},

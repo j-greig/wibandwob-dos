@@ -6,10 +6,15 @@ import path from "node:path";
 type Box = blessed.Widgets.BoxElement;
 type List = blessed.Widgets.ListElement;
 type Prompt = blessed.Widgets.PromptElement;
-type Textarea = blessed.Widgets.TextareaElement;
 type NodePtyModule = typeof import("node-pty");
 
 type WindowKind = "primer" | "editor" | "terminal";
+
+interface EditorState {
+  widget: Box;
+  value: string;
+  cursor: number;
+}
 
 interface WindowRecord {
   id: number;
@@ -19,9 +24,16 @@ interface WindowRecord {
   body: Box;
   close: () => void;
   focus: () => void;
-  editor?: Textarea;
+  titleBar?: Box;
+  editor?: EditorState;
   filePath?: string;
   writeInput?: (input: string) => void;
+}
+
+interface DragState {
+  windowId: number;
+  offsetX: number;
+  offsetY: number;
 }
 
 interface MenuConfig {
@@ -49,6 +61,7 @@ class TsTuiMvpApp {
   private focusedWindow?: WindowRecord;
   private nextWindowId = 1;
   private terminalPty?: NodePtyModule;
+  private dragState?: DragState;
 
   constructor() {
     this.screen = blessed.screen({
@@ -199,9 +212,17 @@ class TsTuiMvpApp {
     this.screen.key(["M-f"], () => this.openMenu("File"));
     this.screen.key(["M-e"], () => this.openMenu("Edit"));
     this.screen.key(["escape"], () => this.closeMenu());
-    this.screen.key(["tab"], () => this.focusNextWindow(1));
+    this.screen.key(["tab"], () => {
+      if (this.focusedWindow?.kind === "editor") {
+        this.insertEditorText(this.focusedWindow, "  ");
+        return;
+      }
+      this.focusNextWindow(1);
+    });
     this.screen.key(["S-tab"], () => this.focusNextWindow(-1));
     this.screen.key(["C-s"], () => this.saveFocusedEditor());
+    this.screen.on("keypress", (ch, key) => this.handleFocusedEditorKeypress(ch, key));
+    this.screen.on("mouse", (data) => this.handleMouse(data));
   }
 
   private bindMenuClicks(): void {
@@ -295,7 +316,6 @@ class TsTuiMvpApp {
       }
     }
 
-    const shell = process.env.SHELL || "zsh";
     const frame = this.createFrame("Terminal", "terminal");
     const transcript = blessed.log({
       parent: frame.body,
@@ -333,13 +353,22 @@ class TsTuiMvpApp {
       }
     });
 
-    const pty = this.terminalPty.spawn(shell, [], {
-      name: "xterm-color",
-      cols: Math.max(20, frame.body.width as number),
-      rows: Math.max(8, (frame.body.height as number) - 1),
-      cwd: process.cwd(),
-      env: process.env as Record<string, string>
-    });
+    let pty;
+    try {
+      pty = this.terminalPty.spawn(this.resolveShellPath(), [], {
+        name: "xterm-color",
+        cols: Math.max(20, Number(frame.body.width)),
+        rows: Math.max(8, Number(frame.body.height) - 1),
+        cwd: process.cwd(),
+        env: this.getPtyEnv()
+      });
+    } catch (error) {
+      frame.close();
+      this.flash(
+        `Terminal launch failed: ${error instanceof Error ? error.message : String(error)}`
+      );
+      return;
+    }
 
     pty.onData((chunk) => {
       const clean = chunk
@@ -463,16 +492,17 @@ class TsTuiMvpApp {
 
   private openEditorWindow(filePath?: string, title = "Untitled.txt", initial = ""): void {
     const frame = this.createFrame(title, "editor");
-    const editor = blessed.textarea({
+    const editorWidget = blessed.box({
       parent: frame.body,
       top: 0,
       left: 0,
       right: 0,
       bottom: 0,
       keys: true,
-      vi: true,
       mouse: true,
-      inputOnFocus: true,
+      tags: true,
+      scrollable: true,
+      alwaysScroll: true,
       scrollbar: {
         ch: " ",
         style: {
@@ -484,7 +514,12 @@ class TsTuiMvpApp {
         bg: "black"
       }
     });
-    editor.setValue(initial);
+
+    const editor: EditorState = {
+      widget: editorWidget,
+      value: initial,
+      cursor: initial.length
+    };
 
     const record = frame;
     record.kind = "editor";
@@ -492,10 +527,10 @@ class TsTuiMvpApp {
     record.filePath = filePath;
     record.focus = () => {
       this.focusWindow(record);
-      editor.focus();
+      editorWidget.focus();
     };
 
-    editor.key(["C-s"], () => this.saveEditor(record));
+    this.renderEditor(record);
     this.registerWindow(record);
     record.focus();
   }
@@ -512,7 +547,6 @@ class TsTuiMvpApp {
       height: Math.min(screenHeight - 6, 20),
       border: "line",
       tags: true,
-      draggable: true,
       mouse: true,
       shadow: true,
       style: {
@@ -568,6 +602,7 @@ class TsTuiMvpApp {
       title,
       frame,
       body,
+      titleBar,
       close: () => {
         frame.destroy();
         const index = this.windows.findIndex((window) => window.id === record.id);
@@ -590,7 +625,60 @@ class TsTuiMvpApp {
     frame.on("click", () => this.focusWindow(record));
     frame.on("mousedown", () => this.focusWindow(record));
     titleBar.on("click", () => this.focusWindow(record));
+    titleBar.on("mousedown", (data) => {
+      this.focusWindow(record);
+      this.startDrag(record, data);
+    });
     return record;
+  }
+
+  private handleMouse(data: blessed.Widgets.Events.IMouseEventArg): void {
+    if (!this.dragState) {
+      return;
+    }
+    if (data.action === "mouseup") {
+      this.dragState = undefined;
+      return;
+    }
+    if (data.action !== "mousemove" && data.action !== "mousedown") {
+      return;
+    }
+    const record = this.windows.find((window) => window.id === this.dragState?.windowId);
+    if (!record) {
+      this.dragState = undefined;
+      return;
+    }
+
+    const screenWidth = Number(this.screen.width);
+    const screenHeight = Number(this.screen.height);
+    const frameWidth = Number(record.frame.width);
+    const frameHeight = Number(record.frame.height);
+    const nextLeft = this.clamp(data.x - this.dragState.offsetX, 0, Math.max(0, screenWidth - frameWidth));
+    const nextTop = this.clamp(
+      data.y - this.dragState.offsetY,
+      1,
+      Math.max(1, screenHeight - 2 - frameHeight)
+    );
+
+    record.frame.left = nextLeft;
+    record.frame.top = nextTop;
+    this.screen.render();
+  }
+
+  private startDrag(record: WindowRecord, data: blessed.Widgets.Events.IMouseEventArg): void {
+    const coords = record.frame.lpos;
+    if (!coords) {
+      return;
+    }
+    this.dragState = {
+      windowId: record.id,
+      offsetX: data.x - coords.xi,
+      offsetY: data.y - coords.yi
+    };
+  }
+
+  private clamp(value: number, min: number, max: number): number {
+    return Math.max(min, Math.min(max, value));
   }
 
   private registerWindow(record: WindowRecord): void {
@@ -660,8 +748,133 @@ class TsTuiMvpApp {
     }
     const targetPath = window.filePath!;
     fs.mkdirSync(path.dirname(targetPath), { recursive: true });
-    fs.writeFileSync(targetPath, window.editor.getValue(), "utf8");
+    fs.writeFileSync(targetPath, window.editor.value, "utf8");
+    window.title = path.basename(targetPath);
+    window.titleBar?.setContent(` ${window.title} `);
     this.flash(`Saved ${targetPath}`);
+  }
+
+  private handleFocusedEditorKeypress(
+    ch: string,
+    key: blessed.Widgets.Events.IKeyEventArg
+  ): void {
+    const window = this.focusedWindow;
+    if (!window || window.kind !== "editor" || !window.editor) {
+      return;
+    }
+    if (this.menuList || this.screen.focused !== window.editor.widget) {
+      return;
+    }
+
+    const editor = window.editor;
+    if (key.ctrl && key.name === "s") {
+      this.saveEditor(window);
+      return;
+    }
+    if (key.ctrl && key.name === "q") {
+      return;
+    }
+    if (key.full === "S-tab") {
+      this.focusNextWindow(-1);
+      return;
+    }
+    if (key.name === "backspace") {
+      this.deleteEditorBackward(window);
+      return;
+    }
+    if (key.name === "delete") {
+      this.deleteEditorForward(window);
+      return;
+    }
+    if (key.name === "left") {
+      editor.cursor = Math.max(0, editor.cursor - 1);
+      this.renderEditor(window);
+      return;
+    }
+    if (key.name === "right") {
+      editor.cursor = Math.min(editor.value.length, editor.cursor + 1);
+      this.renderEditor(window);
+      return;
+    }
+    if (key.name === "up" || key.name === "down") {
+      return;
+    }
+    if (key.name === "enter") {
+      this.insertEditorText(window, "\n");
+      return;
+    }
+    if (ch && !key.ctrl && !key.meta) {
+      this.insertEditorText(window, ch);
+    }
+  }
+
+  private insertEditorText(window: WindowRecord, text: string): void {
+    if (!window.editor) {
+      return;
+    }
+    const { value, cursor } = window.editor;
+    window.editor.value = `${value.slice(0, cursor)}${text}${value.slice(cursor)}`;
+    window.editor.cursor += text.length;
+    this.renderEditor(window);
+  }
+
+  private deleteEditorBackward(window: WindowRecord): void {
+    if (!window.editor || window.editor.cursor === 0) {
+      return;
+    }
+    const { value, cursor } = window.editor;
+    window.editor.value = `${value.slice(0, cursor - 1)}${value.slice(cursor)}`;
+    window.editor.cursor -= 1;
+    this.renderEditor(window);
+  }
+
+  private deleteEditorForward(window: WindowRecord): void {
+    if (!window.editor || window.editor.cursor >= window.editor.value.length) {
+      return;
+    }
+    const { value, cursor } = window.editor;
+    window.editor.value = `${value.slice(0, cursor)}${value.slice(cursor + 1)}`;
+    this.renderEditor(window);
+  }
+
+  private renderEditor(window: WindowRecord): void {
+    if (!window.editor) {
+      return;
+    }
+    const { widget, value, cursor } = window.editor;
+    const before = this.escapeTags(value.slice(0, cursor));
+    const atCursor = value[cursor] ?? " ";
+    const after = this.escapeTags(value.slice(cursor + 1));
+    const cursorCell = `{inverse}${this.escapeTags(atCursor)}{/inverse}`;
+    widget.setContent(`${before}${cursorCell}${after}`);
+    widget.setScrollPerc(100);
+    this.screen.render();
+  }
+
+  private escapeTags(value: string): string {
+    return value.replace(/[{}]/g, "\\$&");
+  }
+
+  private resolveShellPath(): string {
+    const candidates = [process.env.SHELL, "/bin/zsh", "/bin/bash", "/bin/sh"];
+    for (const candidate of candidates) {
+      if (candidate && fs.existsSync(candidate)) {
+        return candidate;
+      }
+    }
+    return "/bin/sh";
+  }
+
+  private getPtyEnv(): Record<string, string> {
+    const env: Record<string, string> = {};
+    for (const [key, value] of Object.entries(process.env)) {
+      if (typeof value === "string") {
+        env[key] = value;
+      }
+    }
+    env.TERM = env.TERM || "xterm-256color";
+    env.COLORTERM = env.COLORTERM || "truecolor";
+    return env;
   }
 
   private flash(message: string): void {
