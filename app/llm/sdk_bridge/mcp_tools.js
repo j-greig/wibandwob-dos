@@ -64,7 +64,7 @@ function createTuiMcpServer() {
                 "Execute any TUI command by name. Use tui_list_commands first to discover available commands. Covers everything: window management (cascade, tile, close_all), apps (open_gallery, open_terminal, open_scramble), text (send_text, send_figlet), paint canvas, screenshots, themes, and more. For resize_window: pass aspect param (16:9, 4:3, square, portrait, golden, A4, or W:H) with w or h to auto-compute proportions.",
                 {
                     command: z.string().describe("Command name from tui_list_commands"),
-                    args: z.record(z.string()).optional().describe("Command arguments as key-value pairs")
+                    args: z.record(z.union([z.string(), z.number()]).transform(v => String(v))).optional().describe("Command arguments as key-value pairs (values are coerced to strings)")
                 },
                 async (params) => {
                     try {
