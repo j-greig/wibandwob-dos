@@ -15,8 +15,14 @@ TypeScript spike for a minimal WibWob-DOS-style desktop shell.
 
 ```bash
 cd /Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp
-npm install
-npm run dev
+bun install
+bun run dev
+```
+
+Direct run:
+
+```bash
+bun run src/app.ts
 ```
 
 ## Controls
