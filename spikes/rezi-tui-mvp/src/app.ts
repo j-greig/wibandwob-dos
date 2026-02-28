@@ -10,6 +10,7 @@ import {
   type EditorSelection,
   type LogEntry
 } from "@rezi-ui/core";
+import type { IExitEvent } from "@skitee3000/bun-pty";
 
 type PanelId = "primer" | "editor" | "terminal";
 
@@ -90,6 +91,7 @@ const app = createNodeApp<AppState>({
 });
 
 let logCounter = 0;
+let currentState: AppState = initialState;
 
 const pty = spawn(resolveShellPath(), ["-i"], {
   name: "xterm-256color",
@@ -99,12 +101,12 @@ const pty = spawn(resolveShellPath(), ["-i"], {
   env: process.env as Record<string, string>
 });
 
-pty.onData((chunk) => {
+pty.onData((chunk: string) => {
   const lines = sanitizeTerminalChunk(chunk);
   if (lines.length === 0) {
     return;
   }
-  app.update((state) => ({
+  updateApp((state) => ({
     ...state,
     terminalEntries: limitLogs([
       ...state.terminalEntries,
@@ -115,8 +117,8 @@ pty.onData((chunk) => {
   }));
 });
 
-pty.onExit(({ exitCode, signal }) => {
-  app.update((state) => ({
+pty.onExit(({ exitCode, signal }: IExitEvent) => {
+  updateApp((state) => ({
     ...state,
     terminalEntries: limitLogs([
       ...state.terminalEntries,
@@ -162,32 +164,7 @@ app.view((state) =>
         ])
       ]
     ),
-    body: ui.layers([
-      ui.layer({
-        id: "desktop",
-        zIndex: 0,
-        content: ui.box({
-          width: "100%",
-          height: "100%",
-          style: { bg: rgb(132, 163, 192), fg: rgb(18, 24, 32) }
-        })
-      }),
-      ui.layer({
-        id: "primer-layer",
-        zIndex: state.windows.primer.zIndex,
-        content: renderEditorWindow(state.windows.primer, state.primer, true)
-      }),
-      ui.layer({
-        id: "editor-layer",
-        zIndex: state.windows.editor.zIndex,
-        content: renderEditorWindow(state.windows.editor, state.editor, false)
-      }),
-      ui.layer({
-        id: "terminal-layer",
-        zIndex: state.windows.terminal.zIndex,
-        content: renderTerminalWindow(state)
-      })
-    ]),
+    body: renderDesktop(state),
     footer: ui.box(
       {
         border: "none",
@@ -212,6 +189,23 @@ app.view((state) =>
 
 await app.run();
 
+function renderDesktop(state: AppState) {
+  const windowNodes = [
+    renderEditorWindow(state.windows.primer, state.primer, true),
+    renderEditorWindow(state.windows.editor, state.editor, false),
+    renderTerminalWindow(state)
+  ];
+
+  return ui.box(
+    {
+      width: "100%",
+      height: "100%",
+      style: { bg: rgb(132, 163, 192), fg: rgb(18, 24, 32) }
+    },
+    windowNodes
+  );
+}
+
 function renderEditorWindow(window: WindowState, model: EditorModel, readOnly: boolean) {
   return ui.box(
     {
@@ -230,58 +224,59 @@ function renderEditorWindow(window: WindowState, model: EditorModel, readOnly: b
         ui.text(window.title, { variant: "heading" }),
         ui.text(model.filePath ?? "untitled", { style: { dim: true } })
       ]),
-      ui.codeEditor({
-        id: `${window.id}-editor`,
-        lines: model.lines,
-        cursor: model.cursor,
-        selection: model.selection,
-        scrollTop: model.scrollTop,
-        scrollLeft: model.scrollLeft,
-        readOnly,
-        lineNumbers: true,
-        syntaxLanguage: "markdown",
-        height: window.height - 4,
-        onChange: (lines, cursor) => {
-          if (readOnly) {
-            return;
-          }
-          app.update((state) => ({
-            ...state,
-            editor: {
-              ...state.editor,
-              lines: [...lines],
-              cursor
-            },
-            status: "Editor changed."
-          }));
-        },
-        onSelectionChange: (selection) => {
-          if (readOnly) {
-            app.update((state) => ({
+      ui.box({ flex: 1 }, [
+        ui.codeEditor({
+          id: `${window.id}-editor`,
+          lines: model.lines,
+          cursor: model.cursor,
+          selection: model.selection,
+          scrollTop: model.scrollTop,
+          scrollLeft: model.scrollLeft,
+          readOnly,
+          lineNumbers: true,
+          syntaxLanguage: "plain",
+          onChange: (lines, cursor) => {
+            if (readOnly) {
+              return;
+            }
+            updateApp((state) => ({
               ...state,
-              primer: { ...state.primer, selection }
+              editor: {
+                ...state.editor,
+                lines: [...lines],
+                cursor
+              },
+              status: "Editor changed."
             }));
-            return;
-          }
-          app.update((state) => ({
-            ...state,
-            editor: { ...state.editor, selection }
-          }));
-        },
-        onScroll: (scrollTop, scrollLeft) => {
-          if (readOnly) {
-            app.update((state) => ({
+          },
+          onSelectionChange: (selection) => {
+            if (readOnly) {
+              updateApp((state) => ({
+                ...state,
+                primer: { ...state.primer, selection }
+              }));
+              return;
+            }
+            updateApp((state) => ({
               ...state,
-              primer: { ...state.primer, scrollTop, scrollLeft }
+              editor: { ...state.editor, selection }
             }));
-            return;
+          },
+          onScroll: (scrollTop, scrollLeft) => {
+            if (readOnly) {
+              updateApp((state) => ({
+                ...state,
+                primer: { ...state.primer, scrollTop, scrollLeft }
+              }));
+              return;
+            }
+            updateApp((state) => ({
+              ...state,
+              editor: { ...state.editor, scrollTop, scrollLeft }
+            }));
           }
-          app.update((state) => ({
-            ...state,
-            editor: { ...state.editor, scrollTop, scrollLeft }
-          }));
-        }
-      })
+        })
+      ])
     ]
   );
 }
@@ -307,7 +302,7 @@ function renderTerminalWindow(state: AppState) {
         ui.spacer({ flex: 1 }),
         ui.button("clear-terminal", "Clear", {
           onPress: () =>
-            app.update((current) => ({
+            updateApp((current) => ({
               ...current,
               terminalEntries: [],
               terminalScrollTop: 0,
@@ -316,32 +311,34 @@ function renderTerminalWindow(state: AppState) {
           intent: "secondary"
         })
       ]),
-      ui.logsConsole({
-        id: "terminal-logs",
-        entries: state.terminalEntries,
-        scrollTop: state.terminalScrollTop,
-        autoScroll: true,
-        showTimestamps: false,
-        showSource: true,
-        height: terminalWindow.height - 7,
-        onScroll: (scrollTop) =>
-          app.update((current) => ({
-            ...current,
-            terminalScrollTop: scrollTop
-          }))
-      }),
-      ui.row({ items: "center", gap: 1 }, [
-        ui.input({
-          id: "terminal-input",
-          value: state.terminalInput,
-          placeholder: "Type a shell command here",
-          flex: 1,
-          onInput: (value) =>
-            app.update((current) => ({
+      ui.box({ flex: 1 }, [
+        ui.logsConsole({
+          id: "terminal-logs",
+          entries: state.terminalEntries,
+          scrollTop: state.terminalScrollTop,
+          autoScroll: true,
+          showTimestamps: false,
+          showSource: true,
+          onScroll: (scrollTop) =>
+            updateApp((current) => ({
               ...current,
-              terminalInput: value
+              terminalScrollTop: scrollTop
             }))
-        }),
+        })
+      ]),
+      ui.row({ items: "center", gap: 1 }, [
+        ui.box({ flex: 1 }, [
+          ui.input({
+            id: "terminal-input",
+            value: state.terminalInput,
+            placeholder: "Type a shell command here",
+            onInput: (value) =>
+              updateApp((current) => ({
+                ...current,
+                terminalInput: value
+              }))
+          })
+        ]),
         ui.button("send-terminal", "Run", {
           onPress: () => sendTerminalCommand(state.terminalInput),
           intent: "primary"
@@ -381,7 +378,7 @@ function saveEditor(): void {
   const target = state.editor.filePath ?? scratchPath;
   fs.mkdirSync(path.dirname(target), { recursive: true });
   fs.writeFileSync(target, state.editor.lines.join("\n"), "utf8");
-  app.update((current) => ({
+  updateApp((current) => ({
     ...current,
     editor: {
       ...current.editor,
@@ -393,7 +390,7 @@ function saveEditor(): void {
 
 function loadPrimer(filePath: string): void {
   const content = readTextFile(filePath, `Could not read ${filePath}`);
-  app.update((state) => ({
+  updateApp((state) => ({
     ...state,
     primer: {
       ...state.primer,
@@ -409,7 +406,7 @@ function sendTerminalCommand(command: string): void {
   if (!trimmed) {
     return;
   }
-  app.update((state) => ({
+  updateApp((state) => ({
     ...state,
     terminalInput: "",
     terminalEntries: limitLogs([
@@ -456,12 +453,15 @@ function resolveShellPath(): string {
 }
 
 function getCurrentState(): AppState {
-  let snapshot = initialState;
+  return currentState;
+}
+
+function updateApp(updater: (state: Readonly<AppState>) => AppState): void {
   app.update((state) => {
-    snapshot = state as AppState;
-    return state as AppState;
+    const next = updater(state);
+    currentState = next;
+    return next;
   });
-  return snapshot;
 }
 
 process.on("SIGINT", async () => {

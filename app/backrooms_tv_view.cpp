@@ -167,7 +167,8 @@ bool BackroomsBridge::start(const BackroomsChannel &channel) {
     }
 
     // Build command
-    std::string cmd = "cd " + backroomsPath + " && npx tsx src/ui/cli.ts";
+    // Ensure claude CLI is findable and auth method is explicit
+    std::string cmd = "export PATH=\"$HOME/.local/bin:$PATH\" && cd " + backroomsPath + " && WIBWOB_AUTH_METHOD=claude-cli npx tsx src/ui/cli.ts";
     cmd += " \"" + channel.theme + "\"";
     cmd += " --turns " + std::to_string(channel.turns);
     if (!allPrimers.empty()) {
