@@ -1,0 +1,22 @@
+{
+  "name": "ts-tui-mvp",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Spike MVP for a TypeScript WibWob-DOS shell",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/app.ts",
+    "start": "tsx src/app.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "blessed": "^0.1.81",
+    "node-pty": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/blessed": "^0.1.25",
+    "@types/node": "^24.0.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0"
+  }
+}
