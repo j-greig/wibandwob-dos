@@ -62,6 +62,8 @@ export interface WindowSnapshot {
   width: number;
   height: number;
   filePath?: string;
+  focused?: boolean;
+  payload?: Record<string, unknown>;
 }
 
 export interface WindowStateDetails {

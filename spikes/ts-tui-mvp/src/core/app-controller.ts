@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { spawn, type IPty as BunPtyTerminal, type IExitEvent as BunPtyExitEvent } from "@skitee3000/bun-pty/dist/index.js";
 
-import { MASTER_PHILOSOPHY_PATH, README_PATH, REPO_ROOT, SPIKE_NOTES_PATH, SPIKE_ROOT, STATE_PATH, WORKSPACE_PATH } from "./config.js";
+import { MASTER_PHILOSOPHY_PATH, README_PATH, REPO_ROOT, SPIKE_NOTES_PATH, SPIKE_ROOT, STATE_PATH, WORKSPACES_DIR } from "./config.js";
 import { OverlayManager } from "./overlay-manager.js";
 import type {
   Box,
@@ -37,7 +37,7 @@ export class TsTuiMvpApp {
   private readonly windowManager: WindowManager;
   private readonly overlays: OverlayManager;
   private readonly content = new ContentService();
-  private readonly workspace = new WorkspaceService(WORKSPACE_PATH);
+  private readonly workspace = new WorkspaceService(WORKSPACES_DIR);
   private readonly state: StateService;
 
   constructor() {
@@ -107,6 +107,8 @@ export class TsTuiMvpApp {
           { label: "Open Primer...", action: () => this.promptForPrimer() },
           { label: "Open Text File...", action: () => this.promptForEditorPath() },
           { label: "New Text Buffer", action: () => this.openEditorWindow() },
+          { label: "Save Workspace...", action: () => this.promptForWorkspaceSave() },
+          { label: "Load Workspace...", action: () => this.promptForWorkspaceLoad() },
           { label: "Open Art Window", action: () => this.openArtWindow() },
           { label: "Open Terminal", action: () => void this.openTerminalWindow() },
           { label: "Quit", action: () => this.destroy() }
@@ -161,7 +163,6 @@ export class TsTuiMvpApp {
     this.bindMenuClicks();
     this.openPrimerWindow(README_PATH);
     this.openEditorWindow(undefined, "notes.txt", "Type here. Ctrl-S saves when the buffer has a path.\n");
-    this.openArtWindow();
     this.openCompanionWindow();
     this.syncState();
     this.screen.render();
@@ -391,7 +392,7 @@ export class TsTuiMvpApp {
     this.syncState();
   }
 
-  private openPrimerBrowserWindow(): void {
+  private openPrimerBrowserWindow(restore?: { selectedIndex?: number }): void {
     const entries = this.content.collectPrimerEntries();
     if (entries.length === 0) {
       this.overlays.flash("No primer files found in modules, modules-private, or docs.");
@@ -422,6 +423,7 @@ export class TsTuiMvpApp {
       items: entries.map((entry) => entry.label),
       style: { fg: "white", bg: "black", selected: { fg: "black", bg: "white" } }
     });
+    const initialSelectedIndex = Math.max(0, Math.min(restore?.selectedIndex ?? 0, entries.length - 1));
     const openSelected = (index?: number) => {
       const itemIndex = typeof index === "number" ? index : (list as List & { selected: number }).selected ?? 0;
       const entry = entries[itemIndex];
@@ -439,6 +441,7 @@ export class TsTuiMvpApp {
     frame.describeState = () => ({
       appType: "primer-browser",
       summary: `Primer browser listing ${entries.length} entries.`,
+      selectedIndex: (list as List & { selected: number }).selected ?? 0,
       selectedLabel: entries[(list as List & { selected: number }).selected ?? 0]?.label,
       entryCount: entries.length
     });
@@ -447,10 +450,11 @@ export class TsTuiMvpApp {
       list.focus();
     };
     this.windowManager.registerWindow(frame);
+    list.select(initialSelectedIndex);
     frame.focus();
   }
 
-  private openPrimerGalleryWindow(): void {
+  private openPrimerGalleryWindow(restore?: { activeTabIndex?: number; searchValue?: string; selectedIndex?: number }): void {
     const allEntries = this.content.collectGalleryEntries();
     if (allEntries.length === 0) {
       this.overlays.flash("No gallery entries available.");
@@ -504,9 +508,9 @@ export class TsTuiMvpApp {
       style: { fg: "white", bg: "black" }
     });
 
-    let activeTabIndex = 0;
-    let activeEntries = tabs[0].entries;
-    let searchValue = "";
+    let activeTabIndex = Math.max(0, Math.min(restore?.activeTabIndex ?? 0, tabs.length - 1));
+    let activeEntries = tabs[activeTabIndex].entries;
+    let searchValue = restore?.searchValue ?? "";
 
     const updatePreview = (index: number) => {
       const entry = activeEntries[index];
@@ -586,7 +590,6 @@ export class TsTuiMvpApp {
       }
     });
     list.on("select", (_, index) => openSelected(index));
-    filterBox.setValue(` ${tabs[0].label} `);
     filterBox.on("submit", (value) => {
       searchValue = (value ?? "").trim();
       applySearch();
@@ -601,8 +604,10 @@ export class TsTuiMvpApp {
     frame.describeState = () => ({
       appType: "primer-gallery",
       summary: `Primer gallery with ${allEntries.length} total entries.`,
+      activeTabIndex,
       activeTab: tabs[activeTabIndex]?.label,
       searchValue,
+      selectedIndex: (list as List & { selected: number }).selected ?? 0,
       visibleEntryCount: activeEntries.length,
       selectedLabel: activeEntries[(list as List & { selected: number }).selected ?? 0]?.label,
       contentPreview: preview.getContent().split("\n").slice(0, 8).join("\n")
@@ -617,6 +622,16 @@ export class TsTuiMvpApp {
       }
     };
     this.windowManager.registerWindow(frame);
+    if (activeTabIndex === 5) {
+      filterBox.setValue(searchValue);
+      applySearch();
+      list.select(Math.max(0, Math.min(restore?.selectedIndex ?? 0, Math.max(0, activeEntries.length - 1))));
+      updatePreview((list as List & { selected: number }).selected ?? 0);
+    } else {
+      switchTab(activeTabIndex);
+      list.select(Math.max(0, Math.min(restore?.selectedIndex ?? 0, Math.max(0, activeEntries.length - 1))));
+      updatePreview((list as List & { selected: number }).selected ?? 0);
+    }
     frame.focus();
   }
 
@@ -634,7 +649,18 @@ export class TsTuiMvpApp {
   }
 
   private openFigletWindow(text: string): void {
-    this.openTextViewerWindow(`Banner: ${text.slice(0, 18) || "Banner"}`, renderFiglet(text), "figlet");
+    const title = `Banner: ${text.slice(0, 18) || "Banner"}`;
+    this.openTextViewerWindow(title, renderFiglet(text), "figlet");
+    const frame = this.windowManager.getWindows().at(-1);
+    if (frame) {
+      frame.describeState = () => ({
+        appType: "figlet-banner",
+        summary: "Rendered figlet banner window.",
+        inputText: text,
+        lineCount: renderFiglet(text).split("\n").length,
+        contentPreview: renderFiglet(text).split("\n").slice(0, 8).join("\n")
+      });
+    }
   }
 
   private openPatternWindow(): void {
@@ -693,7 +719,7 @@ export class TsTuiMvpApp {
     );
   }
 
-  private openChatWindow(): void {
+  private openChatWindow(restore?: { transcriptLines?: string[]; draft?: string }): void {
     const frame = this.windowManager.createFrame("Wib & Wob Chat", "chat");
     const transcript = blessed.log({
       parent: frame.body,
@@ -722,8 +748,16 @@ export class TsTuiMvpApp {
       input.readInput();
       this.screen.render();
     };
-    transcript.log("Wib: A new desktop blooms.");
-    transcript.log("Wob: Systems nominal. Awaiting prompt.");
+    const initialLines = restore?.transcriptLines ?? [
+      "Wib: A new desktop blooms.",
+      "Wob: Systems nominal. Awaiting prompt."
+    ];
+    for (const line of initialLines) {
+      transcript.log(line);
+    }
+    if (restore?.draft) {
+      input.setValue(restore.draft);
+    }
     input.on("submit", (value) => {
       const message = (value ?? "").trim();
       input.clearValue();
@@ -757,7 +791,7 @@ export class TsTuiMvpApp {
     frame.focus();
   }
 
-  private openCompanionWindow(): void {
+  private openCompanionWindow(restore?: { tick?: number }): void {
     const frame = this.windowManager.createFrame("Scramble", "companion");
     frame.frame.width = 30;
     frame.frame.height = 10;
@@ -775,7 +809,7 @@ export class TsTuiMvpApp {
       " /\\\\_/\\\\\n( 0.0 )\n > ^ <\n\nScramble: cat online",
       " /\\\\_/\\\\\n( ^.^ )\n > ^ <\n\nScramble: purring in ANSI"
     ];
-    let tick = 0;
+    let tick = restore?.tick ?? 0;
     const renderCompanion = () => {
       bubble.setContent(moods[tick % moods.length]);
       this.screen.render();
@@ -786,7 +820,8 @@ export class TsTuiMvpApp {
     frame.describeState = () => ({
       appType: "companion-widget",
       summary: "Animated scramble companion.",
-      contentPreview: bubble.getContent()
+      contentPreview: bubble.getContent(),
+      tick
     });
     frame.cleanup = () => clearInterval(timer);
     frame.focus = () => {
@@ -800,41 +835,57 @@ export class TsTuiMvpApp {
 
   private openWorkspaceManagerWindow(): void {
     const frame = this.windowManager.createFrame("Workspace Manager", "workspace");
+    const footer = blessed.box({
+      parent: frame.body,
+      bottom: 0,
+      left: 0,
+      right: 0,
+      height: 3,
+      style: { fg: "black", bg: "cyan" }
+    });
     const list = blessed.list({
       parent: frame.body,
       top: 0,
       left: 0,
       right: 0,
-      bottom: 2,
+      bottom: 3,
       keys: true,
       vi: true,
       mouse: true,
-      items: ["Save Current Workspace", "Load Workspace", "Cascade Windows", "Tile Windows", "Open Command Palette"],
+      items: [
+        "Save Current Workspace",
+        "Save As Workspace...",
+        "Load Workspace...",
+        "Cascade Windows",
+        "Tile Windows",
+        "Open Command Palette"
+      ],
       style: { fg: "white", bg: "black", selected: { fg: "black", bg: "white" } }
     });
-    blessed.box({
-      parent: frame.body,
-      bottom: 0,
-      left: 0,
-      right: 0,
-      height: 2,
-      content: ` Workspace file:\n ${this.workspace.path}`,
-      style: { fg: "black", bg: "cyan" }
-    });
+    const refreshFooter = () => {
+      const names = this.workspace.list();
+      footer.setContent(
+        ` Current: ${this.workspace.currentName}\n File: ${this.workspace.path}\n Known: ${names.length > 0 ? names.join(", ") : "none"}`
+      );
+    };
     const actions = [
       () => this.saveWorkspace(),
-      () => this.loadWorkspace(),
+      () => this.promptForWorkspaceSave(),
+      () => this.promptForWorkspaceLoad(),
       () => this.windowManager.cascadeWindows(),
       () => this.windowManager.tileWindows(),
       () => this.openCommandPaletteWindow()
     ];
     list.on("select", (_, index) => actions[index]?.());
+    refreshFooter();
     frame.kind = "workspace";
     frame.describeState = () => ({
       appType: "workspace-manager",
       summary: "Workspace save/load command window.",
       selectedAction: list.getItem((list as List & { selected: number }).selected ?? 0)?.getText().trim(),
-      workspacePath: this.workspace.path
+      workspaceName: this.workspace.currentName,
+      workspacePath: this.workspace.path,
+      knownWorkspaces: this.workspace.list()
     });
     frame.focus = () => {
       this.windowManager.focusWindow(frame);
@@ -908,7 +959,7 @@ export class TsTuiMvpApp {
     }
   }
 
-  private openEditorWindow(filePath?: string, title = "Untitled.txt", initial = ""): void {
+  private openEditorWindow(filePath?: string, title = "Untitled.txt", initial = "", restore?: { cursor?: number }): void {
     const frame = this.windowManager.createFrame(title, "editor");
     const editorWidget = blessed.box({
       parent: frame.body,
@@ -926,7 +977,7 @@ export class TsTuiMvpApp {
     });
     frame.kind = "editor";
     frame.filePath = filePath;
-    frame.editor = { widget: editorWidget, value: initial, cursor: initial.length };
+    frame.editor = { widget: editorWidget, value: initial, cursor: Math.max(0, Math.min(restore?.cursor ?? initial.length, initial.length)) };
     frame.describeState = () => ({
       appType: "text-editor",
       summary: filePath ? `Editing ${filePath}` : "Unsaved text buffer.",
@@ -981,7 +1032,8 @@ export class TsTuiMvpApp {
     frame.describeState = () => ({
       appType: "generative-art",
       summary: "Animated procedural art field.",
-      contentPreview: canvas.getContent().split("\n").slice(0, 8).join("\n")
+      contentPreview: canvas.getContent().split("\n").slice(0, 8).join("\n"),
+      tick
     });
     frame.cleanup = () => clearInterval(timer);
     frame.focus = () => {
@@ -1253,20 +1305,30 @@ export class TsTuiMvpApp {
   }
 
   private saveWorkspace(): void {
+    const focusedId = this.windowManager.getFocusedWindow()?.id;
     const snapshots: WindowSnapshot[] = this.windowManager
       .getWindows()
       .filter((window) => window.kind !== "workspace" && window.kind !== "palette")
-      .map((window) => ({
-        kind: window.kind,
-        title: window.title,
-        left: Number(window.frame.left),
-        top: Number(window.frame.top),
-        width: Number(window.frame.width),
-        height: Number(window.frame.height),
-        filePath: window.filePath
-      }));
+      .map((window) => this.serializeWindowSnapshot(window, focusedId));
     this.workspace.save(snapshots);
     this.overlays.flash(`Saved workspace to ${this.workspace.path}`);
+  }
+
+  private promptForWorkspaceSave(): void {
+    this.overlays.openValuePrompt("Save Workspace As", this.workspace.currentName, (value) => {
+      this.workspace.setCurrentWorkspaceName(value);
+      this.saveWorkspace();
+      this.syncState();
+    });
+  }
+
+  private promptForWorkspaceLoad(): void {
+    const names = this.workspace.list();
+    const initial = names[0] ?? this.workspace.currentName;
+    this.overlays.openValuePrompt("Load Workspace", initial, (value) => {
+      this.workspace.setCurrentWorkspaceName(value);
+      this.loadWorkspace();
+    });
   }
 
   private loadWorkspace(): void {
@@ -1286,25 +1348,43 @@ export class TsTuiMvpApp {
         window.close();
       }
     }
-    for (const snapshot of snapshots) {
+    let focusIndex = -1;
+    for (const [index, snapshot] of snapshots.entries()) {
       this.restoreWindowSnapshot(snapshot);
+      if (snapshot.focused) {
+        focusIndex = index;
+      }
     }
+    if (focusIndex >= 0) {
+      this.windowManager.getWindows()[focusIndex]?.focus();
+    }
+    this.syncState();
     this.overlays.flash(`Loaded workspace from ${this.workspace.path}`);
   }
 
   private restoreWindowSnapshot(snapshot: WindowSnapshot): void {
+    const payload = snapshot.payload ?? {};
     switch (snapshot.kind) {
       case "primer":
         if (snapshot.filePath) this.openPrimerWindow(snapshot.filePath);
         break;
       case "editor":
-        this.openEditorWindow(snapshot.filePath, snapshot.title, snapshot.filePath && fs.existsSync(snapshot.filePath) ? fs.readFileSync(snapshot.filePath, "utf8") : "");
+        this.openEditorWindow(
+          snapshot.filePath,
+          snapshot.title,
+          typeof payload.content === "string"
+            ? payload.content
+            : snapshot.filePath && fs.existsSync(snapshot.filePath)
+              ? fs.readFileSync(snapshot.filePath, "utf8")
+              : "",
+          { cursor: typeof payload.cursor === "number" ? payload.cursor : undefined }
+        );
         break;
       case "reader":
         this.openBrowserReaderWindow(snapshot.filePath);
         break;
       case "figlet":
-        this.openFigletWindow(snapshot.title.replace(/^Banner:\s*/, ""));
+        this.openFigletWindow(typeof payload.inputText === "string" ? payload.inputText : snapshot.title.replace(/^Banner:\s*/, ""));
         break;
       case "pattern":
         this.openPatternWindow();
@@ -1316,16 +1396,36 @@ export class TsTuiMvpApp {
         this.openGlitchWindow();
         break;
       case "chat":
-        this.openChatWindow();
+        this.openChatWindow({
+          transcriptLines: Array.isArray(payload.transcriptLines) ? payload.transcriptLines.filter((line): line is string => typeof line === "string") : undefined,
+          draft: typeof payload.draft === "string" ? payload.draft : undefined
+        });
         break;
       case "gallery":
-        this.openPrimerGalleryWindow();
+        this.openPrimerGalleryWindow({
+          activeTabIndex: typeof payload.activeTabIndex === "number" ? payload.activeTabIndex : undefined,
+          searchValue: typeof payload.searchValue === "string" ? payload.searchValue : undefined,
+          selectedIndex: typeof payload.selectedIndex === "number" ? payload.selectedIndex : undefined
+        });
         break;
       case "browser":
-        this.openPrimerBrowserWindow();
+        this.openPrimerBrowserWindow({
+          selectedIndex: typeof payload.selectedIndex === "number" ? payload.selectedIndex : undefined
+        });
         break;
       case "terminal":
         void this.openTerminalWindow();
+        break;
+      case "companion":
+        this.openCompanionWindow({
+          tick: typeof payload.tick === "number" ? payload.tick : undefined
+        });
+        break;
+      case "art":
+        this.openArtWindow();
+        break;
+      case "inspector":
+        this.openStateInspectorWindow();
         break;
       default:
         break;
@@ -1336,6 +1436,67 @@ export class TsTuiMvpApp {
       restored.frame.top = snapshot.top;
       restored.frame.width = snapshot.width;
       restored.frame.height = snapshot.height;
+    }
+  }
+
+  private serializeWindowSnapshot(window: WindowRecord, focusedId?: number): WindowSnapshot {
+    return {
+      kind: window.kind,
+      title: window.title,
+      left: Number(window.frame.left),
+      top: Number(window.frame.top),
+      width: Number(window.frame.width),
+      height: Number(window.frame.height),
+      filePath: window.filePath,
+      focused: window.id === focusedId,
+      payload: this.buildWindowSnapshotPayload(window)
+    };
+  }
+
+  private buildWindowSnapshotPayload(window: WindowRecord): Record<string, unknown> | undefined {
+    switch (window.kind) {
+      case "editor":
+        return window.editor
+          ? {
+              content: window.editor.value,
+              cursor: window.editor.cursor
+            }
+          : undefined;
+      case "browser": {
+        const details = window.describeState?.();
+        return {
+          selectedIndex: typeof details?.selectedIndex === "number" ? details.selectedIndex : 0
+        };
+      }
+      case "gallery": {
+        const details = window.describeState?.();
+        return {
+          activeTabIndex: typeof details?.activeTabIndex === "number" ? details.activeTabIndex : 0,
+          searchValue: typeof details?.searchValue === "string" ? details.searchValue : "",
+          selectedIndex: typeof details?.selectedIndex === "number" ? details.selectedIndex : 0
+        };
+      }
+      case "figlet": {
+        const details = window.describeState?.();
+        return {
+          inputText: typeof details?.inputText === "string" ? details.inputText : window.title.replace(/^Banner:\s*/, "")
+        };
+      }
+      case "chat":
+        return window.chat
+          ? {
+              transcriptLines: window.chat.transcript.getContent().split("\n").filter(Boolean),
+              draft: window.chat.input.getValue()
+            }
+          : undefined;
+      case "companion": {
+        const details = window.describeState?.();
+        return {
+          tick: typeof details?.tick === "number" ? details.tick : 0
+        };
+      }
+      default:
+        return undefined;
     }
   }
 
@@ -1350,6 +1511,8 @@ export class TsTuiMvpApp {
       { label: "Open Chat Transcript", action: () => this.openChatWindow() },
       { label: "Open Companion Window", action: () => this.openCompanionWindow() },
       { label: "Open Workspace Manager", action: () => this.openWorkspaceManagerWindow() },
+      { label: "Save Workspace As...", action: () => this.promptForWorkspaceSave() },
+      { label: "Load Workspace...", action: () => this.promptForWorkspaceLoad() },
       { label: "Open State Inspector", action: () => this.openStateInspectorWindow() },
       { label: "Save Workspace", action: () => this.saveWorkspace() },
       { label: "Load Workspace", action: () => this.loadWorkspace() },
