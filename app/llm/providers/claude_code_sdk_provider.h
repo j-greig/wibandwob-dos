@@ -9,6 +9,7 @@
 #define CLAUDE_CODE_SDK_PROVIDER_H
 
 #include "../base/illm_provider.h"
+#include "../base/llm_config.h"
 #include <string>
 #include <memory>
 #include <functional>
@@ -43,6 +44,7 @@ public:
     
     // Configuration
     bool configure(const std::string& config) override;
+    bool configure(const ProviderConfig& config);
     std::string getLastError() const override { return lastError; }
     
     // Session management

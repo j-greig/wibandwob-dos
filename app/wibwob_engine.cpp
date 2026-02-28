@@ -8,6 +8,7 @@
 #include "llm/base/llm_provider_factory.h"
 #include "llm/base/auth_config.h"
 #include "llm/base/path_search.h"
+#include "llm/providers/claude_code_sdk_provider.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -238,13 +239,15 @@ void WibWobEngine::loadConfiguration() {
         loadResult = config->loadFromFile(usedPath);
     }
 
-    fprintf(stderr, "DEBUG: Config file load result: %s%s\n",
-            loadResult ? "SUCCESS " : "FAILED",
-            loadResult ? ("(" + usedPath + ")").c_str() : "");
-
     if (!loadResult) {
-        std::string defaultJson = LLMConfig::getDefaultConfigJson();
-        config->loadFromString(defaultJson);
+        const std::string defaultJson = LLMConfig::getDefaultConfigJson();
+        if (!config->loadFromString(defaultJson)) {
+            fprintf(stderr, "[wibwob] ERROR: Failed to load built-in LLM defaults\n");
+            return;
+        }
+        fprintf(stderr, "[wibwob] Loaded built-in LLM config defaults\n");
+    } else {
+        fprintf(stderr, "[wibwob] Loaded LLM config from %s\n", usedPath.c_str());
     }
 
     // Use AuthConfig singleton to pick the single correct provider.
@@ -267,6 +270,13 @@ void WibWobEngine::loadConfiguration() {
     config->setActiveProvider(desiredProvider);
     fprintf(stderr, "[wibwob] Auth mode %s → provider %s\n",
             auth.modeName(), desiredProvider.c_str());
+    const ProviderConfig resolvedConfig = config->getProviderConfig(desiredProvider);
+    fprintf(stderr,
+            "[wibwob] Resolved LLM config provider=%s model=%s maxTurns=%d sessionTimeout=%d\n",
+            desiredProvider.c_str(),
+            resolvedConfig.model.empty() ? "(default)" : resolvedConfig.model.c_str(),
+            resolvedConfig.getParameterInt("maxTurns", 0),
+            resolvedConfig.getParameterInt("sessionTimeout", 0));
 
     if (initializeProvider(desiredProvider)) {
         fprintf(stderr, "[wibwob] Provider %s initialized OK\n", desiredProvider.c_str());
@@ -289,10 +299,15 @@ bool WibWobEngine::initializeProvider(const std::string& providerName) {
     if (config) {
         ProviderConfig providerConfig = config->getProviderConfig(providerName);
         if (providerConfig.enabled) {
-            // Convert ProviderConfig to JSON string for provider configuration
-            std::string configJson = generateProviderConfigJson(providerConfig);
-            if (!provider->configure(configJson)) {
-                return false;
+            if (auto* sdkProvider = dynamic_cast<ClaudeCodeSDKProvider*>(provider.get())) {
+                if (!sdkProvider->configure(providerConfig)) {
+                    return false;
+                }
+            } else {
+                std::string configJson = generateProviderConfigJson(providerConfig);
+                if (!provider->configure(configJson)) {
+                    return false;
+                }
             }
         }
     }

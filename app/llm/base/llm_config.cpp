@@ -10,6 +10,208 @@
 #include <cstdlib>
 #include <algorithm>
 
+namespace {
+
+size_t skipWhitespace(const std::string& text, size_t pos) {
+    while (pos < text.size() && (text[pos] == ' ' || text[pos] == '\n' ||
+                                 text[pos] == '\r' || text[pos] == '\t')) {
+        ++pos;
+    }
+    return pos;
+}
+
+size_t findMatchingBracket(const std::string& text, size_t openPos, char openCh, char closeCh) {
+    bool inString = false;
+    bool escaped = false;
+    int depth = 0;
+
+    for (size_t pos = openPos; pos < text.size(); ++pos) {
+        const char ch = text[pos];
+
+        if (inString) {
+            if (escaped) {
+                escaped = false;
+            } else if (ch == '\\') {
+                escaped = true;
+            } else if (ch == '"') {
+                inString = false;
+            }
+            continue;
+        }
+
+        if (ch == '"') {
+            inString = true;
+            continue;
+        }
+
+        if (ch == openCh) {
+            ++depth;
+        } else if (ch == closeCh) {
+            --depth;
+            if (depth == 0) {
+                return pos;
+            }
+        }
+    }
+
+    return std::string::npos;
+}
+
+std::string extractQuotedString(const std::string& text, size_t quotePos) {
+    if (quotePos == std::string::npos || quotePos >= text.size() || text[quotePos] != '"') {
+        return "";
+    }
+
+    std::string value;
+    bool escaped = false;
+    for (size_t pos = quotePos + 1; pos < text.size(); ++pos) {
+        const char ch = text[pos];
+        if (escaped) {
+            switch (ch) {
+                case '"': value.push_back('"'); break;
+                case '\\': value.push_back('\\'); break;
+                case 'n': value.push_back('\n'); break;
+                case 'r': value.push_back('\r'); break;
+                case 't': value.push_back('\t'); break;
+                default: value.push_back(ch); break;
+            }
+            escaped = false;
+            continue;
+        }
+        if (ch == '\\') {
+            escaped = true;
+            continue;
+        }
+        if (ch == '"') {
+            return value;
+        }
+        value.push_back(ch);
+    }
+
+    return "";
+}
+
+bool findKeyValueStart(const std::string& objectJson, const std::string& key, size_t& valueStart) {
+    const std::string pattern = "\"" + key + "\"";
+    size_t pos = objectJson.find(pattern);
+    while (pos != std::string::npos) {
+        const size_t colonPos = objectJson.find(':', pos + pattern.size());
+        if (colonPos != std::string::npos) {
+            valueStart = skipWhitespace(objectJson, colonPos + 1);
+            return true;
+        }
+        pos = objectJson.find(pattern, pos + pattern.size());
+    }
+    return false;
+}
+
+std::string parseStringField(const std::string& objectJson, const std::string& key,
+                             const std::string& defaultValue = "") {
+    size_t valueStart = 0;
+    if (!findKeyValueStart(objectJson, key, valueStart)) {
+        return defaultValue;
+    }
+    if (valueStart >= objectJson.size() || objectJson[valueStart] != '"') {
+        return defaultValue;
+    }
+    return extractQuotedString(objectJson, valueStart);
+}
+
+std::string parseScalarField(const std::string& objectJson, const std::string& key,
+                             const std::string& defaultValue = "") {
+    size_t valueStart = 0;
+    if (!findKeyValueStart(objectJson, key, valueStart)) {
+        return defaultValue;
+    }
+    if (valueStart < objectJson.size() && objectJson[valueStart] == '"') {
+        return extractQuotedString(objectJson, valueStart);
+    }
+
+    size_t valueEnd = valueStart;
+    while (valueEnd < objectJson.size() && objectJson[valueEnd] != ',' && objectJson[valueEnd] != '}') {
+        ++valueEnd;
+    }
+    const size_t trimmedEnd = objectJson.find_last_not_of(" \n\r\t", valueEnd == 0 ? 0 : valueEnd - 1);
+    if (trimmedEnd == std::string::npos || trimmedEnd < valueStart) {
+        return defaultValue;
+    }
+    return objectJson.substr(valueStart, trimmedEnd - valueStart + 1);
+}
+
+bool parseBoolField(const std::string& objectJson, const std::string& key, bool defaultValue) {
+    const std::string value = parseScalarField(objectJson, key, defaultValue ? "true" : "false");
+    return value == "true" || value == "1";
+}
+
+std::vector<std::string> parseStringArrayField(const std::string& objectJson, const std::string& key) {
+    std::vector<std::string> values;
+    size_t valueStart = 0;
+    if (!findKeyValueStart(objectJson, key, valueStart) ||
+        valueStart >= objectJson.size() || objectJson[valueStart] != '[') {
+        return values;
+    }
+
+    const size_t arrayEnd = findMatchingBracket(objectJson, valueStart, '[', ']');
+    if (arrayEnd == std::string::npos) {
+        return values;
+    }
+
+    size_t pos = valueStart + 1;
+    while (pos < arrayEnd) {
+        pos = skipWhitespace(objectJson, pos);
+        if (pos >= arrayEnd) {
+            break;
+        }
+        if (objectJson[pos] == '"') {
+            values.push_back(extractQuotedString(objectJson, pos));
+            pos = objectJson.find('"', pos + 1);
+            if (pos == std::string::npos) {
+                break;
+            }
+            ++pos;
+            while (pos < arrayEnd && objectJson[pos] != ',') {
+                ++pos;
+            }
+        }
+        if (pos < arrayEnd && objectJson[pos] == ',') {
+            ++pos;
+        }
+    }
+
+    return values;
+}
+
+std::string extractObjectForKey(const std::string& objectJson, const std::string& key) {
+    size_t valueStart = 0;
+    if (!findKeyValueStart(objectJson, key, valueStart) ||
+        valueStart >= objectJson.size() || objectJson[valueStart] != '{') {
+        return "";
+    }
+
+    const size_t objectEnd = findMatchingBracket(objectJson, valueStart, '{', '}');
+    if (objectEnd == std::string::npos) {
+        return "";
+    }
+    return objectJson.substr(valueStart, objectEnd - valueStart + 1);
+}
+
+std::string escapeJsonString(const std::string& value) {
+    std::ostringstream out;
+    for (const char ch : value) {
+        switch (ch) {
+            case '\\': out << "\\\\"; break;
+            case '"': out << "\\\""; break;
+            case '\n': out << "\\n"; break;
+            case '\r': out << "\\r"; break;
+            case '\t': out << "\\t"; break;
+            default: out << ch; break;
+        }
+    }
+    return out.str();
+}
+
+} // namespace
+
 std::string ProviderConfig::getParameter(const std::string& key, const std::string& defaultValue) const {
     auto it = parameters.find(key);
     return it != parameters.end() ? it->second : defaultValue;
@@ -42,20 +244,7 @@ bool ProviderConfig::getParameterBool(const std::string& key, bool defaultValue)
     return value == "true" || value == "1" || value == "yes";
 }
 
-LLMConfig::LLMConfig() {
-    // Load .env files to set environment variables; try multiple relative paths.
-    const char* envPaths[] = {
-        ".env",        // repo root if run from root
-        "../.env",     // common when run from build/app
-        "../../.env"   // fallback if deeper
-    };
-    for (const auto& p : envPaths) {
-        loadDotEnv(p);
-    }
-
-    // Set up default configuration
-    loadFromString(getDefaultConfigJson());
-}
+LLMConfig::LLMConfig() = default;
 
 bool LLMConfig::loadFromFile(const std::string& configPath) {
     std::ifstream file(configPath);
@@ -72,12 +261,7 @@ bool LLMConfig::loadFromFile(const std::string& configPath) {
 
 bool LLMConfig::loadFromString(const std::string& jsonConfig) {
     validationErrors.clear();
-    bool result = parseJson(jsonConfig);
-
-    // Config loading complete - activeProvider set from JSON or default config
-    fprintf(stderr, "DEBUG: Config loaded, activeProvider: %s\n", activeProvider.c_str());
-
-    return result;
+    return parseJson(jsonConfig);
 }
 
 bool LLMConfig::saveToFile(const std::string& configPath) const {
@@ -130,158 +314,109 @@ std::vector<std::string> LLMConfig::getValidationErrors() const {
     return validationErrors;
 }
 
-// Simple JSON parsing for basic configuration (production would use proper JSON library)
-bool LLMConfig::parseJson(const std::string& json) {
-    // Parse activeProvider
-    size_t pos = json.find("\"activeProvider\"");
-    if (pos != std::string::npos) {
-        size_t start = json.find("\"", pos + 16);
-        if (start != std::string::npos) {
-            start++;
-            size_t end = json.find("\"", start);
-            if (end != std::string::npos) {
-                activeProvider = json.substr(start, end - start);
-            }
-        }
-    }
-    
-    providers.clear(); // Clear any existing providers
-    
-    // Parse providers section - find the "providers" object
-    size_t providersPos = json.find("\"providers\"");
-    if (providersPos == std::string::npos) {
+bool LLMConfig::parseJson(const std::string& jsonConfig) {
+    providers.clear();
+    activeProvider = parseStringField(jsonConfig, "activeProvider", "claude_code_sdk");
+
+    const std::string providersJson = extractObjectForKey(jsonConfig, "providers");
+    if (providersJson.empty()) {
         validationErrors.push_back("No providers section found in config");
         return false;
     }
-    
-    // Find opening brace of providers object
-    size_t providersStart = json.find("{", providersPos);
-    if (providersStart == std::string::npos) return false;
-    
-    // Parse each provider
-    parseProvider(json, "claude_code_sdk");
-    parseProvider(json, "anthropic_api");
-    
+
+    const std::vector<std::string> knownProviders = {"claude_code_sdk", "anthropic_api"};
+    for (const std::string& providerName : knownProviders) {
+        const std::string providerJson = extractObjectForKey(providersJson, providerName);
+        if (providerJson.empty()) {
+            continue;
+        }
+
+        ProviderConfig config;
+        config.enabled = parseBoolField(providerJson, "enabled", true);
+        config.model = parseStringField(providerJson, "model");
+        config.endpoint = parseStringField(providerJson, "endpoint");
+        config.apiKeyEnv = parseStringField(providerJson, "apiKeyEnv");
+        config.command = parseStringField(providerJson, "command");
+        config.args = parseStringArrayField(providerJson, "args");
+        config.allowedTools = parseStringArrayField(providerJson, "allowedTools");
+
+        const std::vector<std::string> parameterKeys = {
+            "maxTokens", "temperature", "maxTurns", "nodeScriptPath", "sessionTimeout"
+        };
+        for (const std::string& key : parameterKeys) {
+            const std::string value = parseScalarField(providerJson, key);
+            if (!value.empty()) {
+                config.parameters[key] = value;
+            }
+        }
+
+        providers[providerName] = config;
+    }
+
     validateConfiguration();
     return validationErrors.empty();
-}
-
-// Helper method to parse individual provider configurations
-void LLMConfig::parseProvider(const std::string& json, const std::string& providerName) {
-    std::string pattern = "\"" + providerName + "\"";
-    size_t pos = json.find(pattern);
-    if (pos == std::string::npos) return;
-    
-    size_t objStart = json.find("{", pos);
-    if (objStart == std::string::npos) return;
-    
-    // Find the end of this provider object
-    int braceCount = 1;
-    size_t objEnd = objStart + 1;
-    while (objEnd < json.length() && braceCount > 0) {
-        if (json[objEnd] == '{') braceCount++;
-        else if (json[objEnd] == '}') braceCount--;
-        objEnd++;
-    }
-    
-    std::string providerJson = json.substr(objStart, objEnd - objStart);
-    
-    ProviderConfig config;
-    config.enabled = parseJsonBool(providerJson, "enabled", true);
-    config.model = parseJsonString(providerJson, "model");
-    config.endpoint = parseJsonString(providerJson, "endpoint");
-    config.apiKeyEnv = parseJsonString(providerJson, "apiKeyEnv");
-    config.command = parseJsonString(providerJson, "command");
-    
-    // Parse common parameters
-    std::string maxTokens = parseJsonString(providerJson, "maxTokens");
-    std::string temperature = parseJsonString(providerJson, "temperature");
-    if (!maxTokens.empty()) config.parameters["maxTokens"] = maxTokens;
-    if (!temperature.empty()) config.parameters["temperature"] = temperature;
-    
-    // Parse claude_code_sdk specific parameters
-    if (providerName == "claude_code_sdk") {
-        std::string maxTurns = parseJsonString(providerJson, "maxTurns");
-        std::string nodeScriptPath = parseJsonString(providerJson, "nodeScriptPath");
-        std::string sessionTimeout = parseJsonString(providerJson, "sessionTimeout");
-        std::string allowedTools = parseJsonString(providerJson, "allowedTools");
-        
-        if (!maxTurns.empty()) config.parameters["maxTurns"] = maxTurns;
-        if (!nodeScriptPath.empty()) config.parameters["nodeScriptPath"] = nodeScriptPath;
-        if (!sessionTimeout.empty()) config.parameters["sessionTimeout"] = sessionTimeout;
-        if (!allowedTools.empty()) config.parameters["allowedTools"] = allowedTools;
-    }
-    
-    providers[providerName] = config;
 }
 
 std::string LLMConfig::generateJson() const {
     std::ostringstream json;
     json << "{\n";
-    json << "  \"activeProvider\": \"" << activeProvider << "\",\n";
+    json << "  \"activeProvider\": \"" << escapeJsonString(activeProvider) << "\",\n";
     json << "  \"providers\": {\n";
-    
-    bool first = true;
+
+    bool firstProvider = true;
     for (const auto& pair : providers) {
-        if (!first) json << ",\n";
-        first = false;
-        
+        if (!firstProvider) {
+            json << ",\n";
+        }
+        firstProvider = false;
+
         const std::string& name = pair.first;
         const ProviderConfig& config = pair.second;
-        
-        json << "    \"" << name << "\": {\n";
-        json << "      \"enabled\": " << (config.enabled ? "true" : "false") << ",\n";
-        
-        if (!config.model.empty()) {
-            json << "      \"model\": \"" << config.model << "\",\n";
-        }
-        if (!config.endpoint.empty()) {
-            json << "      \"endpoint\": \"" << config.endpoint << "\",\n";
-        }
-        if (!config.apiKeyEnv.empty()) {
-            json << "      \"apiKeyEnv\": \"" << config.apiKeyEnv << "\",\n";
-        }
-        if (!config.command.empty()) {
-            json << "      \"command\": \"" << config.command << "\",\n";
-            if (!config.args.empty()) {
-                json << "      \"args\": [";
-                for (size_t i = 0; i < config.args.size(); ++i) {
-                    if (i > 0) json << ", ";
-                    json << "\"" << config.args[i] << "\"";
-                }
-                json << "],\n";
+        json << "    \"" << escapeJsonString(name) << "\": {\n";
+        json << "      \"enabled\": " << (config.enabled ? "true" : "false");
+
+        auto appendStringField = [&json](const std::string& key, const std::string& value) {
+            if (!value.empty()) {
+                json << ",\n"
+                     << "      \"" << escapeJsonString(key) << "\": \"" << escapeJsonString(value) << "\"";
             }
-        }
-        
-        // Add parameters
+        };
+        auto appendArrayField = [&json](const std::string& key, const std::vector<std::string>& values) {
+            if (!values.empty()) {
+                json << ",\n"
+                     << "      \"" << escapeJsonString(key) << "\": [";
+                for (size_t i = 0; i < values.size(); ++i) {
+                    if (i > 0) {
+                        json << ", ";
+                    }
+                    json << "\"" << escapeJsonString(values[i]) << "\"";
+                }
+                json << "]";
+            }
+        };
+
+        appendStringField("model", config.model);
+        appendStringField("endpoint", config.endpoint);
+        appendStringField("apiKeyEnv", config.apiKeyEnv);
+        appendStringField("command", config.command);
+        appendArrayField("args", config.args);
+        appendArrayField("allowedTools", config.allowedTools);
+
         for (const auto& param : config.parameters) {
-            json << "      \"" << param.first << "\": \"" << param.second << "\",\n";
+            appendStringField(param.first, param.second);
         }
-        
-        // Remove trailing comma
-        std::string line = json.str();
-        if (line.back() == '\n' && line[line.size()-2] == ',') {
-            json.seekp(-2, std::ios_base::cur);
-            json << "\n";
-        }
-        
-        json << "    }";
+
+        json << "\n    }";
     }
-    
+
     json << "\n  }\n";
     json << "}\n";
-    
     return json.str();
 }
 
 void LLMConfig::validateConfiguration() {
     if (activeProvider.empty()) {
         validationErrors.push_back("No active provider specified");
-        return;
-    }
-    
-    if (!hasProvider(activeProvider)) {
-        validationErrors.push_back("Active provider '" + activeProvider + "' is not available or disabled");
     }
     
     // Validate provider configurations
@@ -296,48 +431,10 @@ void LLMConfig::validateConfiguration() {
             if (config.endpoint.empty()) {
                 validationErrors.push_back("Provider '" + name + "' missing endpoint");
             }
-            if (!config.apiKeyEnv.empty()) {
-                std::string apiKey = resolveApiKey(config.apiKeyEnv);
-                if (apiKey.empty()) {
-                    validationErrors.push_back("Provider '" + name + "' API key not found in environment variable '" + config.apiKeyEnv + "'");
-                }
-            }
         }
         
         // (No command-based provider validation needed — claude_code removed)
     }
-}
-
-std::string LLMConfig::parseJsonString(const std::string& json, const std::string& key) const {
-    std::string pattern = "\"" + key + "\"";
-    size_t pos = json.find(pattern);
-    if (pos == std::string::npos) return "";
-    
-    size_t start = json.find("\"", pos + pattern.length());
-    if (start == std::string::npos) return "";
-    start++; // Skip opening quote
-    
-    size_t end = json.find("\"", start);
-    if (end == std::string::npos) return "";
-    
-    return json.substr(start, end - start);
-}
-
-bool LLMConfig::parseJsonBool(const std::string& json, const std::string& key, bool defaultValue) const {
-    std::string pattern = "\"" + key + "\"";
-    size_t pos = json.find(pattern);
-    if (pos == std::string::npos) return defaultValue;
-    
-    size_t valuePos = json.find(":", pos);
-    if (valuePos == std::string::npos) return defaultValue;
-    valuePos++;
-    
-    // Skip whitespace
-    while (valuePos < json.length() && (json[valuePos] == ' ' || json[valuePos] == '\t')) {
-        valuePos++;
-    }
-    
-    return (valuePos + 4 <= json.length() && json.substr(valuePos, 4) == "true");
 }
 
 std::string LLMConfig::getDefaultConfigJson() {
@@ -346,6 +443,7 @@ std::string LLMConfig::getDefaultConfigJson() {
   "providers": {
     "claude_code_sdk": {
       "enabled": true,
+      "model": "claude-sonnet-4-6",
       "maxTurns": 50,
       "allowedTools": ["Read", "Write", "Grep", "Bash", "LS", "WebSearch", "WebFetch"],
       "nodeScriptPath": "app/llm/sdk_bridge/claude_sdk_bridge.js",
@@ -361,49 +459,4 @@ std::string LLMConfig::getDefaultConfigJson() {
     }
   }
 })";
-}
-
-void LLMConfig::loadDotEnv(const std::string& envPath) {
-    fprintf(stderr, "DEBUG: Loading .env from: %s\n", envPath.c_str());
-    std::ifstream file(envPath);
-    if (!file.is_open()) {
-        fprintf(stderr, "DEBUG: .env file not found at: %s\n", envPath.c_str());
-        return;
-    }
-    fprintf(stderr, "DEBUG: .env file loaded successfully\n");
-    
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        if (line.empty() || line[0] == '#') {
-            continue;
-        }
-        
-        // Find the = separator
-        size_t equalPos = line.find('=');
-        if (equalPos == std::string::npos) {
-            continue;
-        }
-        
-        std::string key = line.substr(0, equalPos);
-        std::string value = line.substr(equalPos + 1);
-        
-        // Trim whitespace
-        key.erase(key.find_last_not_of(" \t\r\n") + 1);
-        key.erase(0, key.find_first_not_of(" \t\r\n"));
-        value.erase(value.find_last_not_of(" \t\r\n") + 1);
-        value.erase(0, value.find_first_not_of(" \t\r\n"));
-        
-        // Remove quotes if present
-        if (value.length() >= 2 && 
-            ((value[0] == '"' && value[value.length()-1] == '"') ||
-             (value[0] == '\'' && value[value.length()-1] == '\''))) {
-            value = value.substr(1, value.length() - 2);
-        }
-        
-        // Set environment variable using setenv (POSIX)
-        if (!key.empty()) {
-            setenv(key.c_str(), value.c_str(), 1); // 1 = overwrite existing
-        }
-    }
 }

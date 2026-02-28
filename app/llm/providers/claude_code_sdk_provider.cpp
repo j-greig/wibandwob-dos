@@ -604,9 +604,6 @@ std::vector<std::string> ClaudeCodeSDKProvider::getSupportedModels() const {
 }
 
 bool ClaudeCodeSDKProvider::configure(const std::string& config) {
-    // Parse configuration (tolerant JSON-ish parsing without throwing)
-    fprintf(stderr, "DEBUG: SDK Provider configure() called with: %s\n", config.c_str());
-
     auto parseIntField = [&config](const std::string& key, int defaultValue) -> int {
         size_t keyPos = config.find(key);
         if (keyPos == std::string::npos) return defaultValue;
@@ -691,6 +688,40 @@ bool ClaudeCodeSDKProvider::configure(const std::string& config) {
     // allowedTools: if present, keep defaults for now
     allowedTools.clear();
     if (config.find("allowedTools") != std::string::npos) {
+        allowedTools = {"Read", "Write", "Grep", "Bash", "LS", "WebSearch", "WebFetch"};
+    }
+
+    return true;
+}
+
+bool ClaudeCodeSDKProvider::configure(const ProviderConfig& config) {
+    maxTurns = config.getParameterInt("maxTurns", maxTurns);
+
+    if (!config.model.empty()) {
+        if (config.model.find("opus") != std::string::npos) {
+            configuredModel = "claude-opus-4-6";
+        } else if (config.model.find("sonnet") != std::string::npos) {
+            configuredModel = "claude-sonnet-4-6";
+        } else {
+            configuredModel = "claude-sonnet-4-6";
+        }
+    }
+    fprintf(stderr, "[SDK] Configured model: %s (from %s)\n",
+            configuredModel.c_str(),
+            config.model.empty() ? "claude-sonnet-4-6" : config.model.c_str());
+
+    const std::string configuredPath = config.getParameter("nodeScriptPath", nodeScriptPath);
+    nodeScriptPath = configuredPath;
+    const std::string resolved = ww_find_first_existing_upwards({nodeScriptPath}, 6);
+    if (!resolved.empty()) {
+        nodeScriptPath = resolved;
+    }
+
+    sessionTimeout = config.getParameterInt("sessionTimeout", sessionTimeout);
+
+    if (!config.allowedTools.empty()) {
+        allowedTools = config.allowedTools;
+    } else {
         allowedTools = {"Read", "Write", "Grep", "Bash", "LS", "WebSearch", "WebFetch"};
     }
 

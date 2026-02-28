@@ -1,0 +1,756 @@
+[stderr] OpenAI Codex v0.101.0 (research preview)
+--------
+[stderr] workdir: /Users/james/Repos/wibandwob-dos
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: medium
+reasoning summaries: auto
+session id: 019ca39e-c62d-7f92-be61-a6e2de759582
+--------
+user
+You are a code analyst. Investigate the codebase, diagnose issues, and report findings.
+
+EFFICIENCY: Use targeted commands, not full-file dumps.
+Prefer rg -n -C3 'pattern' file or sed -n '45,55p' file.
+Avoid nl -ba file | sed -n '1,300p'. Only dump full files if <50 lines.
+
+Deliver:
+1. Root cause
+2. Fix options with tradeoffs
+3. Risks and tests to add
+
+Focus files: app/llm/base/llm_config.cpp, app/llm/base/llm_config.h, app/llm/base/auth_config.cpp, app/llm/base/auth_config.h, app/llm/providers/claude_code_sdk_provider.cpp, app/llm/providers/claude_code_sdk_provider.h, app/wibwob_engine.cpp, app/llm/config/llm_config.json
+
+TASK: Analyze the LLM auth and config system in this project. It's a mess. Here's what the startup log looks like:
+
+```
+DEBUG: Loading .env from: .env
+DEBUG: .env file loaded successfully
+DEBUG: Loading .env from: ../.env
+DEBUG: .env file not found at: ../.env
+DEBUG: Loading .env from: ../../.env
+DEBUG: .env file not found at: ../../.env
+DEBUG: Config loaded, activeProvider: claude_code_sdk
+DEBUG: Config loaded, activeProvider: claude_code_sdk
+DEBUG: Config file load result: FAILED
+DEBUG: Config loaded, activeProvider: claude_code_sdk
+[wibwob] Auth mode LLM AUTH → provider claude_code_sdk
+DEBUG: Attempting to initialize provider: claude_code_sdk
+DEBUG: SDK Provider configure() called with: {"model":"claude-haiku-4-5","endpoint":"https://api.anthropic.com/v1/messages","apiKeyEnv":"ANTHROPIC_API_KEY","allowedTools":"Read","maxTokens":"4096","maxTurns":"allowedTools","nodeScriptPath":"app/llm/sdk_bridge/claude_sdk_bridge.js","sessionTimeout":"anthropic_api","temperature":"0.7"}
+```
+
+Problems visible:
+1. "Config loaded" printed THREE TIMES before "Config file load result: FAILED" — why?
+2. Config file load fails but startup continues silently with wrong defaults
+3. The SDK provider receives fields from the WRONG provider config: "endpoint", "apiKeyEnv", "temperature" are anthropic_api fields leaking into claude_code_sdk
+4. "maxTurns":"allowedTools" — a string where a number should be (looks like JSON parsing shifted columns)
+5. "allowedTools":"Read" — a string where an array should be
+6. .env loading tries 3 paths sequentially
+
+Trace the full flow from startup to provider initialization:
+1. How does LLMConfig load? (app/llm/base/llm_config.cpp)
+2. How does WibWobEngine use it? (app/wibwob_engine.cpp)
+3. How does the provider selection work? (app/llm/base/auth_config.cpp/h)
+4. How does configure() get called on claude_code_sdk_provider? What string does it receive and why is it wrong?
+5. How does the JSON parsing in llm_config.cpp work? Is it a proper JSON parser or hand-rolled?
+
+Produce a diagnosis explaining:
+- Root cause of each bug
+- Why config fields are cross-contaminated between providers
+- A concrete proposal to simplify this to: detect auth mode, pick model, configure provider. Three steps, no .env hunting, no provider cross-contamination, no triple-loading.
+
+Keep it practical — this is a C++14 Turbo Vision app, not a web service. The only auth mode that matters day-to-day is Claude Code SDK.[stderr] 
+[stderr] mcp startup: no servers
+[stderr] 2026-02-28T09:40:17.617838Z ERROR codex_core::rollout::list: state db missing rollout path for thread 019ca059-d9a5-7de2-bb7e-8e8df86cb6fa
+[stderr] codex
+I’m tracing the startup path through the config and provider code first, then I’ll map each bad log line back to the exact load/parse path that produced it.
+[stderr] exec
+/bin/zsh -lc "sed -n '1,260p' app/llm/base/llm_config.cpp" in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc "sed -n '1,220p' app/llm/base/auth_config.h" in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc "sed -n '1,220p' app/llm/base/llm_config.h" in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc "sed -n '1,260p' app/llm/base/auth_config.cpp" in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc "sed -n '1,260p' app/llm/providers/claude_code_sdk_provider.h" in [stderr] /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc "sed -n '1,320p' app/llm/providers/claude_code_sdk_provider.cpp" in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc "sed -n '1,260p' app/wibwob_engine.cpp" in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc "rg -n -C3 \"Config loaded|Config file load result|Loading \\.env|Auth mode LLM AUTH|initialize provider|configure\\(|activeProvider|claude_code_sdk|anthropic_api|maxTurns|allowedTools\" app/llm/base/llm_config.cpp app/llm/base/llm_config.h app/llm/base/auth_config.cpp app/llm/base/auth_config.h app/llm/providers/claude_code_sdk_provider.cpp app/llm/providers/claude_code_sdk_provider.h app/wibwob_engine.cpp app/llm/config/llm_config.json" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 50ms:
+/*---------------------------------------------------------*/
+/*                                                         */
+/*   llm_config.cpp - LLM Configuration Management        */
+/*                                                         */
+/*---------------------------------------------------------*/
+
+#include "llm_config.h"
+#include <fstream>
+#include <sstream>
+#include <cstdlib>
+#include <algorithm>
+
+std::string ProviderConfig::getParameter(const std::string& key, const std::string& defaultValue) const {
+    auto it = parameters.find(key);
+    return it != parameters.end() ? it->second : defaultValue;
+}
+
+int ProviderConfig::getParameterInt(const std::string& key, int defaultValue) const {
+    std::string value = getParameter(key);
+    if (value.empty()) return defaultValue;
+[stderr]  succeeded in 51ms:
+/*---------------------------------------------------------*/
+/*                                                         */
+/*   auth_config.h - Unified Auth Configuration            */
+/*                                                         */
+/*   Single auth mode for all LLM consumers.               */
+/*   Detect once at startup, read everywhere.              */
+/*                                                         */
+/*---------------------------------------------------------*/
+
+#ifndef AUTH_CONFIG_H
+#define AUTH_CONFIG_H
+
+#include <string>
+
+enum class AuthMode {
+    ClaudeCode,   // claude CLI logged in → SDK + CLI subprocess
+    ApiKey,       // ANTHROPIC_API_KEY set → direct curl fallback
+    NoAuth        // Nothing available → disabled
+};
+
+[stderr]  succeeded in 51ms:
+/*---------------------------------------------------------*/
+/*                                                         */
+/*   llm_config.h - LLM Configuration Management          */
+/*                                                         */
+/*---------------------------------------------------------*/
+
+#ifndef LLM_CONFIG_H
+#define LLM_CONFIG_H
+
+#include <string>
+#include <map>
+#include <vector>
+
+struct ProviderConfig {
+    bool enabled = true;
+    std::string model;
+    std::string endpoint;
+    std::string apiKeyEnv;
+    std::string command;
+    std::vector<std::string> args;
+[stderr]  succeeded in 51ms:
+/*---------------------------------------------------------*/
+/*                                                         */
+/*   auth_config.cpp - Unified Auth Configuration          */
+/*                                                         */
+/*---------------------------------------------------------*/
+
+#include "auth_config.h"
+#include <cstdlib>
+#include <cstdio>
+#include <unistd.h>
+#include <string>
+#include <sstream>
+
+AuthConfig& AuthConfig::instance() {
+    static AuthConfig singleton;
+    return singleton;
+}
+
+void AuthConfig::detect() {
+    // Priority 1: Claude CLI present AND logged in → Claude Code Auth
+[stderr]  succeeded in 52ms:
+/*---------------------------------------------------------*/
+/*                                                         */
+/*   claude_code_sdk_provider.h - Claude Code SDK Provider*/
+/*   Streaming mode with customSystemPrompt support       */
+/*                                                         */
+/*---------------------------------------------------------*/
+
+#ifndef CLAUDE_CODE_SDK_PROVIDER_H
+#define CLAUDE_CODE_SDK_PROVIDER_H
+
+#include "../base/illm_provider.h"
+#include <string>
+#include <memory>
+#include <functional>
+#include <thread>
+#include <atomic>
+#include <queue>
+#include <mutex>
+#include <condition_variable>
+
+[stderr]  succeeded in 52ms:
+/*---------------------------------------------------------*/
+/*                                                         */
+/*   claude_code_sdk_provider.cpp - Claude Code SDK Provider*/
+/*   Streaming mode with customSystemPrompt support       */
+/*                                                         */
+/*---------------------------------------------------------*/
+
+#include "claude_code_sdk_provider.h"
+#include "../base/llm_provider_factory.h"
+#include "../base/path_search.h"
+
+#include <cstdio>
+#include <cstdlib>
+#include <memory>
+#include <sstream>
+#include <algorithm>
+#include <chrono>
+#include <iomanip>
+#include <unistd.h>
+#include <sys/wait.h>
+[stderr]  succeeded in 51ms:
+/*---------------------------------------------------------*/
+/*                                                         */
+/*   wibwob_engine.cpp - LLM Provider Integration Engine  */
+/*                                                         */
+/*---------------------------------------------------------*/
+
+#include "wibwob_engine.h"
+#include "llm/base/llm_provider_factory.h"
+#include "llm/base/auth_config.h"
+#include "llm/base/path_search.h"
+
+#include <cstdio>
+#include <cstdlib>
+#include <memory>
+#include <sstream>
+#include <algorithm>
+#include <chrono>
+
+WibWobEngine::WibWobEngine() {
+    // Default system prompt for wib&wob
+[stderr]  succeeded in 51ms:
+app/llm/providers/claude_code_sdk_provider.h-1-/*---------------------------------------------------------*/
+app/llm/providers/claude_code_sdk_provider.h-2-/*                                                         */
+app/llm/providers/claude_code_sdk_provider.h:3:/*   claude_code_sdk_provider.h - Claude Code SDK Provider*/
+app/llm/providers/claude_code_sdk_provider.h-4-/*   Streaming mode with customSystemPrompt support       */
+app/llm/providers/claude_code_sdk_provider.h-5-/*                                                         */
+app/llm/providers/claude_code_sdk_provider.h-6-/*---------------------------------------------------------*/
+--
+app/llm/providers/claude_code_sdk_provider.h-37-    void poll() override;
+app/llm/providers/claude_code_sdk_provider.h-38-    
+app/llm/providers/claude_code_sdk_provider.h-39-    // Provider info
+app/llm/providers/claude_code_sdk_provider.h:40:    std::string getProviderName() const override { return "claude_code_sdk"; }
+app/llm/providers/claude_code_sdk_provider.h-41-    std::string getVersion() const override;
+app/llm/providers/claude_code_sdk_provider.h-42-    std::vector<std::string> getSupportedModels() const override;
+app/llm/providers/claude_code_sdk_provider.h-43-    
+app/llm/providers/claude_code_sdk_provider.h-44-    // Configuration
+app/llm/providers/claude_code_sdk_provider.h:45:    bool configure(const std::string& config) override;
+app/llm/providers/claude_code_sdk_provider.h-46-    std::string getLastError() const override { return lastError; }
+app/llm/providers/claude_code_sdk_provider.h-47-    
+app/llm/providers/claude_code_sdk_provider.h-48-    // Session management
+--
+[stderr] 
+[stderr] thinking
+**Re-running missing output components**
+[stderr] codex
+I have enough context to see this is not one bug, it’s a layered design failure: config defaults load in the constructor, file load can fail after state is already populated, and both the loader and provider do their own string-based JSON scraping. I’m pulling the remaining call path and exact parser behavior now so I can pin each symptom to a specific line.
+[stderr] exec
+/bin/zsh -lc "sed -n '1,120p' app/llm/config/llm_config.json" in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc "sed -n '220,340p' app/wibwob_engine.cpp" in /Users/james/Repos/wibandwob-dosexec
+/bin/zsh -lc "sed -n '260,420p' app/llm/base/llm_config.cpp" in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc "rg -n -C2 \"AuthConfig::instance\\(|\\.detect\\(|loadConfiguration\\(|generateProviderConfigJson\\(|parseJsonString\\(|parseJsonBool\\(\" app/wibwob_engine.cpp app/llm/base/llm_config.cpp app/llm/base/auth_config.cpp app app/llm/providers -g '"'!build'"'" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 51ms:
+{
+  "activeProvider": "claude_code_sdk",
+  "providers": {
+    "claude_code_sdk": {
+      "enabled": true,
+      "model": "claude-sonnet-4-6",
+      "maxTurns": 50,
+      "allowedTools": [
+        "Read",
+        "Write",
+        "Grep",
+        "Bash",
+        "LS",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "nodeScriptPath": "app/llm/sdk_bridge/claude_sdk_bridge.js",
+      "sessionTimeout": 3600
+    },
+    "anthropic_api": {
+ succeeded in 51ms:
+        const_cast<WibWobEngine*>(this)->loadConfiguration();
+    }
+    if (!currentProvider) return true;
+    return currentProvider->needsApiKey();
+}
+
+void WibWobEngine::loadConfiguration() {
+    config = std::make_unique<LLMConfig>();
+    
+    // Config file path - app is commonly launched from either repo root OR build/app.
+    const std::vector<std::string> cfgCandidates = {
+        "app/llm/config/llm_config.json",
+        "llm/config/llm_config.json"
+    };
+    bool loadResult = false;
+    std::string usedPath;
+    usedPath = ww_find_first_existing_upwards(cfgCandidates, 6);
+    if (!usedPath.empty()) {
+        loadResult = config->loadFromFile(usedPath);
+    }
+ succeeded in 51ms:
+        
+        // Remove trailing comma
+        std::string line = json.str();
+        if (line.back() == '\n' && line[line.size()-2] == ',') {
+            json.seekp(-2, std::ios_base::cur);
+            json << "\n";
+        }
+        
+        json << "    }";
+    }
+    
+    json << "\n  }\n";
+    json << "}\n";
+    
+    return json.str();
+}
+
+void LLMConfig::validateConfiguration() {
+    if (activeProvider.empty()) {
+        validationErrors.push_back("No active provider specified");
+[stderr]  succeeded in 52ms:
+app/llm/base/auth_config.cpp-12-#include <sstream>
+app/llm/base/auth_config.cpp-13-
+app/llm/base/auth_config.cpp:14:AuthConfig& AuthConfig::instance() {
+app/llm/base/auth_config.cpp-15-    static AuthConfig singleton;
+app/llm/base/auth_config.cpp-16-    return singleton;
+--
+app/wibwob_engine.cpp-35-    // Load configuration on first use
+app/wibwob_engine.cpp-36-    if (!currentProvider) {
+app/wibwob_engine.cpp:37:        loadConfiguration();
+app/wibwob_engine.cpp-38-    }
+app/wibwob_engine.cpp-39-    
+--
+app/wibwob_engine.cpp-119-    // Load configuration on first check
+app/wibwob_engine.cpp-120-    if (!currentProvider) {
+app/wibwob_engine.cpp:121:        const_cast<WibWobEngine*>(this)->loadConfiguration();
+app/wibwob_engine.cpp-122-    }
+app/wibwob_engine.cpp-123-    return currentProvider && currentProvider->isAvailable();
+--
+app/wibwob_engine.cpp-135-    // Load configuration on first check
+app/wibwob_engine.cpp-136-    if (!currentProvider) {
+[stderr] 
+[stderr] thinking
+**Inspecting provider parser section**
+[stderr] codex
+The remaining piece is the provider-side parser. I’m reading the `configure()` implementation directly because the bad values in the log strongly suggest a second round of brittle string scanning after the first broken parse.
+[stderr] exec
+/bin/zsh -lc "sed -n '606,710p' app/llm/providers/claude_code_sdk_provider.cpp" in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc "rg -n -C2 \"generateProviderConfigJson|ProviderConfig|parameters\\[|parseIntField|parseStringField|allowedTools.clear|setActiveProvider\\(\" app/wibwob_engine.cpp app/llm/base/llm_config.cpp app/llm/providers/claude_code_sdk_provider.cpp" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 52ms:
+bool ClaudeCodeSDKProvider::configure(const std::string& config) {
+    // Parse configuration (tolerant JSON-ish parsing without throwing)
+    fprintf(stderr, "DEBUG: SDK Provider configure() called with: %s\n", config.c_str());
+
+    auto parseIntField = [&config](const std::string& key, int defaultValue) -> int {
+        size_t keyPos = config.find(key);
+        if (keyPos == std::string::npos) return defaultValue;
+        size_t colonPos = config.find(":", keyPos);
+        if (colonPos == std::string::npos) return defaultValue;
+
+        // Skip spaces
+        size_t valPos = colonPos + 1;
+        while (valPos < config.size() && (config[valPos] == ' ' || config[valPos] == '\t')) {
+            ++valPos;
+        }
+
+        // Extract numeric text, supporting optional quotes
+        std::string numStr;
+        if (valPos < config.size() && config[valPos] == '"') {
+            // Quoted number: "123"
+[stderr]  succeeded in 52ms:
+app/llm/providers/claude_code_sdk_provider.cpp-608-    fprintf(stderr, "DEBUG: SDK Provider configure() called with: %s\n", config.c_str());
+app/llm/providers/claude_code_sdk_provider.cpp-609-
+app/llm/providers/claude_code_sdk_provider.cpp:610:    auto parseIntField = [&config](const std::string& key, int defaultValue) -> int {
+app/llm/providers/claude_code_sdk_provider.cpp-611-        size_t keyPos = config.find(key);
+app/llm/providers/claude_code_sdk_provider.cpp-612-        if (keyPos == std::string::npos) return defaultValue;
+--
+app/llm/providers/claude_code_sdk_provider.cpp-650-    };
+app/llm/providers/claude_code_sdk_provider.cpp-651-
+app/llm/providers/claude_code_sdk_provider.cpp:652:    auto parseStringField = [&config](const std::string& key, std::string defaultValue) -> std::string {
+app/llm/providers/claude_code_sdk_provider.cpp-653-        size_t keyPos = config.find(key);
+app/llm/providers/claude_code_sdk_provider.cpp-654-        if (keyPos == std::string::npos) return defaultValue;
+--
+app/llm/providers/claude_code_sdk_provider.cpp-664-
+app/llm/providers/claude_code_sdk_provider.cpp-665-    // maxTurns (quoted or numeric)
+app/llm/providers/claude_code_sdk_provider.cpp:666:    maxTurns = parseIntField("maxTurns", maxTurns);
+app/llm/providers/claude_code_sdk_provider.cpp-667-
+app/llm/providers/claude_code_sdk_provider.cpp-668-    // nodeScriptPath (resolve relative path by searching upward from CWD).
+app/llm/providers/claude_code_sdk_provider.cpp:669:    nodeScriptPath = parseStringField("nodeScriptPath", nodeScriptPath);
+app/llm/providers/claude_code_sdk_provider.cpp-670-    {
+app/llm/providers/claude_code_sdk_provider.cpp-671-        const std::string resolved = ww_find_first_existing_upwards({nodeScriptPath}, 6);
+[stderr] 
+[stderr] thinking
+**Searching JSON generation code**
+[stderr] exec
+/bin/zsh -lc "sed -n '319,380p' app/wibwob_engine.cpp" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 51ms:
+std::string WibWobEngine::generateProviderConfigJson(const ProviderConfig& config) const {
+    std::ostringstream json;
+    json << "{";
+    
+    if (!config.model.empty()) {
+        json << "\"model\":\"" << config.model << "\",";
+    }
+    if (!config.endpoint.empty()) {
+        json << "\"endpoint\":\"" << config.endpoint << "\",";
+    }
+    if (!config.apiKeyEnv.empty()) {
+        json << "\"apiKeyEnv\":\"" << config.apiKeyEnv << "\",";
+    }
+    if (!config.command.empty()) {
+        json << "\"command\":\"" << config.command << "\",";
+    }
+    
+    // Add generic parameters
+    for (const auto& param : config.parameters) {
+        json << "\"" << param.first << "\":\"" << param.second << "\",";
+[stderr] 
+[stderr] 
+[stderr] 
+[stderr] 
+[stderr] thinking
+**Analyzing triple config load failure**
+thinking
+**Identifying JSON parsing bugs**
+thinking
+**Identifying provider JSON extraction bug**
+thinking
+**Diagnosing config load failure**
+[stderr] codex
+I found the main contamination bug: `parseProvider(json, "claude_code_sdk")` matches the `activeProvider` value before it matches the provider object, so it parses the entire `providers` block as the Claude SDK config. I’m checking why that still returns `FAILED`, because that’s a second issue on top of the contamination.
+[stderr] exec
+/bin/zsh -lc "rg -n -C3 \"validationErrors\\.push_back|return validationErrors\\.empty\\(|hasProvider\\(|enabled\": false|activeProvider\"\"|No providers section found\" app/llm/base/llm_config.cpp app/llm/config/llm_config.json" in /Users/james/Repos/wibandwob-dos[stderr]  exited 1 in 52ms:
+zsh:1: unmatched "
+[stderr] exec
+/bin/zsh -lc "find . -path '*llm_config.json' -print" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 377ms:
+./app/llm/config/llm_config.json
+[stderr] 
+[stderr] thinking
+**Correcting search command quoting**
+[stderr] exec
+/bin/zsh -lc "rg -n -C3 'validationErrors\\.push_back|return validationErrors\\.empty\\(|hasProvider\\(|No providers section found' app/llm/base/llm_config.cpp" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 52ms:
+60-bool LLMConfig::loadFromFile(const std::string& configPath) {
+61-    std::ifstream file(configPath);
+62-    if (!file.is_open()) {
+63:        validationErrors.push_back("Could not open config file: " + configPath);
+64-        return false;
+65-    }
+66-    
+--
+109-    return result;
+110-}
+111-
+112:bool LLMConfig::hasProvider(const std::string& provider) const {
+113-    auto it = providers.find(provider);
+114-    return it != providers.end() && it->second.enabled;
+115-}
+--
+123-bool LLMConfig::isValid() const {
+124-    validationErrors.clear();
+125-    const_cast<LLMConfig*>(this)->validateConfiguration();
+126:    return validationErrors.empty();
+[stderr] 
+[stderr] 
+[stderr] thinking
+**Analyzing config load failures**
+thinking
+**Analyzing config load failures**
+[stderr] exec
+/bin/zsh -lc "rg -n 'loadFromString\\(|LLMConfig\\s*\\(' app -g '"'!build'"'" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 51ms:
+app/wibwob_engine.cpp:247:        config->loadFromString(defaultJson);
+app/llm/base/llm_config.cpp:45:LLMConfig::LLMConfig() {
+app/llm/base/llm_config.cpp:57:    loadFromString(getDefaultConfigJson());
+app/llm/base/llm_config.cpp:70:    return loadFromString(buffer.str());
+app/llm/base/llm_config.cpp:73:bool LLMConfig::loadFromString(const std::string& jsonConfig) {
+app/llm/base/llm_config.h:34:    LLMConfig();
+app/llm/base/llm_config.h:38:    bool loadFromString(const std::string& jsonConfig);
+[stderr] 
+[stderr] thinking
+**Analyzing provider parsing logic**
+[stderr] exec
+/bin/zsh -lc "rg -n -C2 'claude-haiku-4-5|haiku-4-5|setProviderConfig\\(|setActiveProvider\\(|model\"\\s*:' app -g '"'!build'"'" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 52ms:
+app/wibwob_engine.cpp-265-    }
+app/wibwob_engine.cpp-266-
+app/wibwob_engine.cpp:267:    config->setActiveProvider(desiredProvider);
+app/wibwob_engine.cpp-268-    fprintf(stderr, "[wibwob] Auth mode %s → provider %s\n",
+app/wibwob_engine.cpp-269-            auth.modeName(), desiredProvider.c_str());
+--
+app/wibwob_engine.cpp-310-    // Update active provider in config (but don't save - respect user's file)
+app/wibwob_engine.cpp-311-    if (config) {
+app/wibwob_engine.cpp:312:        config->setActiveProvider(providerName);
+app/wibwob_engine.cpp-313-        // Don't auto-save to avoid overwriting user's manual edits
+app/wibwob_engine.cpp-314-    }
+--
+app/scramble_engine.cpp-23-ScrambleHaikuClient::ScrambleHaikuClient()
+app/scramble_engine.cpp-24-    : endpoint("https://api.anthropic.com/v1/messages"),
+app/scramble_engine.cpp:25:      model("claude-haiku-4-5-20251001"),
+app/scramble_engine.cpp-26-      maxTokens(200),
+app/scramble_engine.cpp-27-      lastCallTime(0)
+--
+app/llm/base/llm_config.cpp-96-}
+app/llm/base/llm_config.cpp-97-
+[stderr] 
+[stderr] 
+[stderr] thinking
+**Explaining runtime config load failure**
+thinking
+**Mapping core config bugs and redesign**
+[stderr] codex
+I’ve traced the full path now. One more pass: I’m checking whether the repo already has a JSON library available, because the clean fix is to stop reparsing flattened JSON strings entirely rather than trying to harden these ad hoc scanners.
+[stderr] exec
+/bin/zsh -lc "sed -n '2890,2910p' app/wwdos_app.cpp" in /Users/james/Repos/wibandwob-dos[stderr] exec
+/bin/zsh -lc "rg -n 'nlohmann|rapidjson|jsoncpp|picojson|cJSON|simdjson' app CMakeLists.txt cmake -g '"'!build'"'" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 52ms:
+    //     }
+    // }
+
+    // Broadcast terminal update check so tvterm windows refresh
+    message(this, evBroadcast, TWibWobTerminalWindow::termConsts.cmCheckTerminalUpdates, nullptr);
+}
+
+int main()
+{
+    // Detect auth mode once before any LLM consumer initialises.
+    AuthConfig::instance().detect();
+
+    TWwdosApp app;
+    app.run();
+    return 0;
+}
+
+// ---- IPC API helper functions (friend) ----
+// Backward compatibility overloads
+void api_spawn_test(TWwdosApp& app) { app.newTestWindow(); }
+[stderr]  exited 2 in 51ms:
+rg: cmake: No such file or directory (os error 2)
+[stderr] 
+[stderr] thinking
+**Planning simpler search rerun**
+[stderr] exec
+/bin/zsh -lc "rg -n 'nlohmann|rapidjson|jsoncpp|picojson|cJSON|simdjson' . -g '"'!build'"'" in /Users/james/Repos/wibandwob-dos[stderr]  succeeded in 87ms:
+./workings/chatgpt-refactor-vision-planning-2026-01-15/deep-research-report-turbo-vision-turbo-pascal.md:139:    nlohmann::json inputSchema;   // JSON Schema
+./workings/chatgpt-refactor-vision-planning-2026-01-15/deep-research-report-turbo-vision-turbo-pascal.md:140:    nlohmann::json outputSchema;  // JSON Schema
+./workings/chatgpt-refactor-vision-planning-2026-01-15/deep-research-report-turbo-vision-turbo-pascal.md:154:    virtual nlohmann::json execute(const CommandContext&, const nlohmann::json& args) = 0;
+./workings/chatgpt-refactor-vision-planning-2026-01-15/deep-research-report-turbo-vision-turbo-pascal.md:161:    nlohmann::json call(const CommandContext&, const std::string& id, const nlohmann::json& args);
+./workings/chatgpt-refactor-vision-planning-2026-01-15/deep-research-report-turbo-vision-turbo-pascal.md:191:    nlohmann::json payload;
+./workings/chatgpt-refactor-vision-planning-2026-01-15/deep-research-report-turbo-vision-turbo-pascal.md:204:    nlohmann::json snapshot() const;
+./workings/chatgpt-refactor-vision-planning-2026-01-15/deep-research-report-turbo-vision-turbo-pascal.md:205:    void restore(const nlohmann::json& snap);
+[stderr] 
+[stderr] 
+[stderr] thinking
+**Planning precise config diagnosis**
+thinking
+**Refactoring provider config for safety**
+[stderr] codex
+**Root Cause**
+
+The config path is doing three different jobs at once, and each layer reparses loosely-structured text.
+
+1. Startup/auth flow:
+   `main()` calls `AuthConfig::instance().detect()` once in [app/wwdos_app.cpp:2900](/Users/james/Repos/wibandwob-dos/app/wwdos_app.cpp#L2900).  
+   Later `WibWobEngine::loadConfiguration()` in [app/wibwob_engine.cpp:226](/Users/james/Repos/wibandwob-dos/app/wibwob_engine.cpp#L226) constructs `LLMConfig`, tries to load `llm_config.json`, then ignores the file’s `activeProvider` and overwrites it from `AuthConfig` before calling `initializeProvider()`.
+
+2. `LLMConfig` is not using a JSON parser:
+   `LLMConfig::parseJson`, `parseProvider`, `parseJsonString`, and `parseJsonBool` in [app/llm/base/llm_config.cpp:134](/Users/james/Repos/wibandwob-dos/app/llm/base/llm_config.cpp#L134), [app/llm/base/llm_config.cpp:170](/Users/james/Repos/wibandwob-dos/app/llm/base/llm_config.cpp#L170), [app/llm/base/llm_config.cpp:311](/Users/james/Repos/wibandwob-dos/app/llm/base/llm_config.cpp#L311), and [app/llm/base/llm_config.cpp:326](/Users/james/Repos/wibandwob-dos/app/llm/base/llm_config.cpp#L326) are hand-rolled `find()` scanners.
+
+3. The cross-contamination bug:
+   `parseProvider(json, "claude_code_sdk")` searches the whole file for `"claude_code_sdk"` in [app/llm/base/llm_config.cpp:171](/Users/james/Repos/wibandwob-dos/app/llm/base/llm_config.cpp#L171). The first match is the `activeProvider` value, not the provider object key.  
+   From there it takes the next `{`, which is the `providers` object, so the Claude SDK config is parsed from the entire providers block, not its own object. That is why `endpoint`, `apiKeyEnv`, `maxTokens`, and `temperature` leak from `anthropic_api` into `claude_code_sdk`.
+
+4. The shifted-values bug:
+   `parseJsonString()` always grabs the first quoted token after a key, regardless of type, in [app/llm/base/llm_config.cpp:311](/Users/james/Repos/wibandwob-dos/app/llm/base/llm_config.cpp#L311).  
+   So:
+   - `maxTurns: 50` becomes `"allowedTools"` because the next quoted token is the next key name.
+   - `allowedTools: [ "Read", ... ]` becomes `"Read"` because it returns the first array element, not the array.
+   - Numeric fields only work if they were quoted strings.
+
+5. Wrong string passed into `configure()`:
+   `WibWobEngine::initializeProvider()` serializes the already-polluted `ProviderConfig` back into a flat JSON-ish string via `generateProviderConfigJson()` in [app/wibwob_engine.cpp:319](/Users/james/Repos/wibandwob-dos/app/wibwob_engine.cpp#L319), then passes that to `provider->configure()` in [app/wibwob_engine.cpp:293](/Users/james/Repos/wibandwob-dos/app/wibwob_engine.cpp#L293).  
+   `ClaudeCodeSDKProvider::configure()` then reparses that string with another hand-rolled parser in [app/llm/providers/claude_code_sdk_provider.cpp:606](/Users/james/Repos/wibandwob-dos/app/llm/providers/claude_code_sdk_provider.cpp#L606). So the bad data gets a second chance to go wrong.
+
+6. Why “Config loaded” appears three times:
+   - `LLMConfig` constructor loads `.env` and immediately calls `loadFromString(getDefaultConfigJson())` in [app/llm/base/llm_config.cpp:45](/Users/james/Repos/wibandwob-dos/app/llm/base/llm_config.cpp#L45) and [app/llm/base/llm_config.cpp:57](/Users/james/Repos/wibandwob-dos/app/llm/base/llm_config.cpp#L57).
+   - `loadFromFile()` calls `loadFromString()` again in [app/llm/base/llm_config.cpp:60](/Users/james/Repos/wibandwob-dos/app/llm/base/llm_config.cpp#L60).
+   - On failure, `WibWobEngine::loadConfiguration()` calls `loadFromString(defaultJson)` again in [app/wibwob_engine.cpp:246](/Users/james/Repos/wibandwob-dos/app/wibwob_engine.cpp#L246).
+   
+   Also, `loadFromString()` logs `DEBUG: Config loaded...` unconditionally in [app/llm/base/llm_config.cpp:73](/Users/james/Repos/wibandwob-dos/app/llm/base/llm_config.cpp#L73), even when parse/validation returned `false`. The log message is lying.
+
+7. Why config failure is silent:
+   `WibWobEngine::loadConfiguration()` logs failure, then immediately falls back to defaults and keeps going in [app/wibwob_engine.cpp:241](/Users/james/Repos/wibandwob-dos/app/wibwob_engine.cpp#L241) and [app/wibwob_engine.cpp:246](/Users/james/Repos/wibandwob-dos/app/wibwob_engine.cpp#L246). No hard stop, no surfaced error, no degraded-state marker.
+
+8. `.env` hunting:
+   `LLMConfig` constructor probes `.env`, `../.env`, and `../../.env` every time a config object is created in [app/llm/base/llm_config.cpp:47](/Users/james/Repos/wibandwob-dos/app/llm/base/llm_config.cpp#L47). That is runtime policy buried in a config class, and it runs even if Claude Code auth is already detected and no API key is needed.
+
+One detail to call out explicitly: with the checked-in [app/llm/config/llm_config.json](/Users/james/Repos/wibandwob-dos/app/llm/config/llm_config.json), `anthropic_api` is disabled, so the exact reason your observed `loadFromFile()` returned `FAILED` is likely either different runtime file contents or path/runtime mismatch. But the failure handling is still clearly wrong: partial state is mutated, a misleading “loaded” log is printed, then defaults are silently reapplied.
+
+**Fix Options**
+
+1. Minimal patch:
+   - Fix `parseProvider()` to search only inside the `"providers"` object, not the whole file.
+   - Add real number/array parsing for `maxTurns`, `sessionTimeout`, and `allowedTools`.
+   - Stop logging “Config loaded” before checking success.
+   - Only fall back to defaults when the file is missing, not when it is malformed.
+   
+   Tradeoff: smallest code churn, but you still keep two fragile string parsers.
+
+2. Recommended practical fix:
+   - Keep `AuthConfig` as the single source of auth mode.
+   - Replace `ProviderConfig.parameters` + JSON-string roundtrip with typed structs:
+     `ClaudeCodeSdkConfig { model, maxTurns, allowedTools, nodeScriptPath, sessionTimeout }`
+     `AnthropicApiConfig { model, endpoint, apiKeyEnv, maxTokens, temperature }`
+   - Load `llm_config.json` once into those structs.
+   - Pass typed config directly into provider code; do not serialize back to a string for `configure()`.
+   
+   Tradeoff: moderate refactor, but it removes the whole class of contamination bugs.
+
+3. Simplest day-to-day design, which matches your stated use:
+   - Step 1: detect auth mode once.
+   - Step 2: if `ClaudeCode`, load only Claude SDK model/settings; if `ApiKey`, load only Anthropic fallback settings.
+   - Step 3: configure exactly one provider instance from a typed struct.
+   - Remove `.env` search from `LLMConfig`; rely on inherited env only. If you insist on `.env`, load one explicit path once in `main()`.
+   
+   Tradeoff: least flexible, but this app does not need a generic provider framework for daily use.
+
+If I were changing this repo, I would take option 3 with option 2’s typing discipline. For this app, `activeProvider` in JSON is effectively dead weight because [app/wibwob_engine.cpp:267](/Users/james/Repos/wibandwob-dos/app/wibwob_engine.cpp#L267) overrides it from auth mode anyway.
+
+**Concrete Simplification**
+
+Make it exactly this:
+
+1. `AuthConfig::detect()` decides `ClaudeCode`, `ApiKey`, or `NoAuth`.
+2. `LLMConfig` loads only the config block relevant to that mode.
+3. `WibWobEngine` instantiates that provider and passes a typed config object.
+
+For Claude Code SDK, that means:
+- no `.env` probing in `LLMConfig`
+- no `activeProvider` field needed
+- no provider map
+- no generic `parameters` map
+- no `generateProviderConfigJson()`
+- no `ClaudeCodeSDKProvider::configure(const std::string&)` string scraping
+
+**Risks And Tests To Add**
+
+- Test that loading a config with `activeProvider: "claude_code_sdk"` does not cause `parseProvider("claude_code_sdk")` to match the `activeProvider` value.
+- Test that `claude_code_sdk.allowedTools` remains an array and `maxTurns` remains an integer when loaded from JSON.
+- Test that Claude SDK config never contains `endpoint`, `apiKeyEnv`, `maxTokens`, or `temperature`.
+- Test malformed config handling: missing file may fall back if desired; malformed file should fail loudly and not continue with hidden defaults.
+- Test startup in `ClaudeCode` mode with no `ANTHROPIC_API_KEY`: provider should still initialize cleanly and should not validate Anthropic settings.
+- Test that `.env` loading happens once at process start, or not at all if removed.
+- Test that `loadConfiguration()` is idempotent and does not reinitialize config/provider repeatedly when `currentProvider` is absent due to prior failure.
+
+Residual risk: if you keep any of the current string parsers, this class of bug will recur the next time someone adds a numeric field, array field, or a provider name that also appears elsewhere in the file.
+
+Natural next steps:
+1. I can turn this into a concrete refactor plan with the exact types and function signatures to replace.
+2. I can implement the minimal surgical fix.
+3. I can implement the recommended simplification around Claude Code SDK only.
+[stderr] tokens used
+59,908
+**Root Cause**
+
+The config path is doing three different jobs at once, and each layer reparses loosely-structured text.
+
+1. Startup/auth flow:
+   `main()` calls `AuthConfig::instance().detect()` once in [app/wwdos_app.cpp:2900](/Users/james/Repos/wibandwob-dos/app/wwdos_app.cpp#L2900).  
+   Later `WibWobEngine::loadConfiguration()` in [app/wibwob_engine.cpp:226](/Users/james/Repos/wibandwob-dos/app/wibwob_engine.cpp#L226) constructs `LLMConfig`, tries to load `llm_config.json`, then ignores the file’s `activeProvider` and overwrites it from `AuthConfig` before calling `initializeProvider()`.
+
+2. `LLMConfig` is not using a JSON parser:
+   `LLMConfig::parseJson`, `parseProvider`, `parseJsonString`, and `parseJsonBool` in [app/llm/base/llm_config.cpp:134](/Users/james/Repos/wibandwob-dos/app/llm/base/llm_config.cpp#L134), [app/llm/base/llm_config.cpp:170](/Users/james/Repos/wibandwob-dos/app/llm/base/llm_config.cpp#L170), [app/llm/base/llm_config.cpp:311](/Users/james/Repos/wibandwob-dos/app/llm/base/llm_config.cpp#L311), and [app/llm/base/llm_config.cpp:326](/Users/james/Repos/wibandwob-dos/app/llm/base/llm_config.cpp#L326) are hand-rolled `find()` scanners.
+
+3. The cross-contamination bug:
+   `parseProvider(json, "claude_code_sdk")` searches the whole file for `"claude_code_sdk"` in [app/llm/base/llm_config.cpp:171](/Users/james/Repos/wibandwob-dos/app/llm/base/llm_config.cpp#L171). The first match is the `activeProvider` value, not the provider object key.  
+   From there it takes the next `{`, which is the `providers` object, so the Claude SDK config is parsed from the entire providers block, not its own object. That is why `endpoint`, `apiKeyEnv`, `maxTokens`, and `temperature` leak from `anthropic_api` into `claude_code_sdk`.
+
+4. The shifted-values bug:
+   `parseJsonString()` always grabs the first quoted token after a key, regardless of type, in [app/llm/base/llm_config.cpp:311](/Users/james/Repos/wibandwob-dos/app/llm/base/llm_config.cpp#L311).  
+   So:
+   - `maxTurns: 50` becomes `"allowedTools"` because the next quoted token is the next key name.
+   - `allowedTools: [ "Read", ... ]` becomes `"Read"` because it returns the first array element, not the array.
+   - Numeric fields only work if they were quoted strings.
+
+5. Wrong string passed into `configure()`:
+   `WibWobEngine::initializeProvider()` serializes the already-polluted `ProviderConfig` back into a flat JSON-ish string via `generateProviderConfigJson()` in [app/wibwob_engine.cpp:319](/Users/james/Repos/wibandwob-dos/app/wibwob_engine.cpp#L319), then passes that to `provider->configure()` in [app/wibwob_engine.cpp:293](/Users/james/Repos/wibandwob-dos/app/wibwob_engine.cpp#L293).  
+   `ClaudeCodeSDKProvider::configure()` then reparses that string with another hand-rolled parser in [app/llm/providers/claude_code_sdk_provider.cpp:606](/Users/james/Repos/wibandwob-dos/app/llm/providers/claude_code_sdk_provider.cpp#L606). So the bad data gets a second chance to go wrong.
+
+6. Why “Config loaded” appears three times:
+   - `LLMConfig` constructor loads `.env` and immediately calls `loadFromString(getDefaultConfigJson())` in [app/llm/base/llm_config.cpp:45](/Users/james/Repos/wibandwob-dos/app/llm/base/llm_config.cpp#L45) and [app/llm/base/llm_config.cpp:57](/Users/james/Repos/wibandwob-dos/app/llm/base/llm_config.cpp#L57).
+   - `loadFromFile()` calls `loadFromString()` again in [app/llm/base/llm_config.cpp:60](/Users/james/Repos/wibandwob-dos/app/llm/base/llm_config.cpp#L60).
+   - On failure, `WibWobEngine::loadConfiguration()` calls `loadFromString(defaultJson)` again in [app/wibwob_engine.cpp:246](/Users/james/Repos/wibandwob-dos/app/wibwob_engine.cpp#L246).
+   
+   Also, `loadFromString()` logs `DEBUG: Config loaded...` unconditionally in [app/llm/base/llm_config.cpp:73](/Users/james/Repos/wibandwob-dos/app/llm/base/llm_config.cpp#L73), even when parse/validation returned `false`. The log message is lying.
+
+7. Why config failure is silent:
+   `WibWobEngine::loadConfiguration()` logs failure, then immediately falls back to defaults and keeps going in [app/wibwob_engine.cpp:241](/Users/james/Repos/wibandwob-dos/app/wibwob_engine.cpp#L241) and [app/wibwob_engine.cpp:246](/Users/james/Repos/wibandwob-dos/app/wibwob_engine.cpp#L246). No hard stop, no surfaced error, no degraded-state marker.
+
+8. `.env` hunting:
+   `LLMConfig` constructor probes `.env`, `../.env`, and `../../.env` every time a config object is created in [app/llm/base/llm_config.cpp:47](/Users/james/Repos/wibandwob-dos/app/llm/base/llm_config.cpp#L47). That is runtime policy buried in a config class, and it runs even if Claude Code auth is already detected and no API key is needed.
+
+One detail to call out explicitly: with the checked-in [app/llm/config/llm_config.json](/Users/james/Repos/wibandwob-dos/app/llm/config/llm_config.json), `anthropic_api` is disabled, so the exact reason your observed `loadFromFile()` returned `FAILED` is likely either different runtime file contents or path/runtime mismatch. But the failure handling is still clearly wrong: partial state is mutated, a misleading “loaded” log is printed, then defaults are silently reapplied.
+
+**Fix Options**
+
+1. Minimal patch:
+   - Fix `parseProvider()` to search only inside the `"providers"` object, not the whole file.
+   - Add real number/array parsing for `maxTurns`, `sessionTimeout`, and `allowedTools`.
+   - Stop logging “Config loaded” before checking success.
+   - Only fall back to defaults when the file is missing, not when it is malformed.
+   
+   Tradeoff: smallest code churn, but you still keep two fragile string parsers.
+
+2. Recommended practical fix:
+   - Keep `AuthConfig` as the single source of auth mode.
+   - Replace `ProviderConfig.parameters` + JSON-string roundtrip with typed structs:
+     `ClaudeCodeSdkConfig { model, maxTurns, allowedTools, nodeScriptPath, sessionTimeout }`
+     `AnthropicApiConfig { model, endpoint, apiKeyEnv, maxTokens, temperature }`
+   - Load `llm_config.json` once into those structs.
+   - Pass typed config directly into provider code; do not serialize back to a string for `configure()`.
+   
+   Tradeoff: moderate refactor, but it removes the whole class of contamination bugs.
+
+3. Simplest day-to-day design, which matches your stated use:
+   - Step 1: detect auth mode once.
+   - Step 2: if `ClaudeCode`, load only Claude SDK model/settings; if `ApiKey`, load only Anthropic fallback settings.
+   - Step 3: configure exactly one provider instance from a typed struct.
+   - Remove `.env` search from `LLMConfig`; rely on inherited env only. If you insist on `.env`, load one explicit path once in `main()`.
+   
+   Tradeoff: least flexible, but this app does not need a generic provider framework for daily use.
+
+If I were changing this repo, I would take option 3 with option 2’s typing discipline. For this app, `activeProvider` in JSON is effectively dead weight because [app/wibwob_engine.cpp:267](/Users/james/Repos/wibandwob-dos/app/wibwob_engine.cpp#L267) overrides it from auth mode anyway.
+
+**Concrete Simplification**
+
+Make it exactly this:
+
+1. `AuthConfig::detect()` decides `ClaudeCode`, `ApiKey`, or `NoAuth`.
+2. `LLMConfig` loads only the config block relevant to that mode.
+3. `WibWobEngine` instantiates that provider and passes a typed config object.
+
+For Claude Code SDK, that means:
+- no `.env` probing in `LLMConfig`
+- no `activeProvider` field needed
+- no provider map
+- no generic `parameters` map
+- no `generateProviderConfigJson()`
+- no `ClaudeCodeSDKProvider::configure(const std::string&)` string scraping
+
+**Risks And Tests To Add**
+
+- Test that loading a config with `activeProvider: "claude_code_sdk"` does not cause `parseProvider("claude_code_sdk")` to match the `activeProvider` value.
+- Test that `claude_code_sdk.allowedTools` remains an array and `maxTurns` remains an integer when loaded from JSON.
+- Test that Claude SDK config never contains `endpoint`, `apiKeyEnv`, `maxTokens`, or `temperature`.
+- Test malformed config handling: missing file may fall back if desired; malformed file should fail loudly and not continue with hidden defaults.
+- Test startup in `ClaudeCode` mode with no `ANTHROPIC_API_KEY`: provider should still initialize cleanly and should not validate Anthropic settings.
+- Test that `.env` loading happens once at process start, or not at all if removed.
+- Test that `loadConfiguration()` is idempotent and does not reinitialize config/provider repeatedly when `currentProvider` is absent due to prior failure.
+
+Residual risk: if you keep any of the current string parsers, this class of bug will recur the next time someone adds a numeric field, array field, or a provider name that also appears elsewhere in the file.
+
+Natural next steps:
+1. I can turn this into a concrete refactor plan with the exact types and function signatures to replace.
+2. I can implement the minimal surgical fix.
+3. I can implement the recommended simplification around Claude Code SDK only.
