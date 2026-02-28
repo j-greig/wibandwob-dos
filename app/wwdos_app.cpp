@@ -5162,7 +5162,24 @@ std::string api_gallery_list(TWwdosApp& app, const std::string& tab) {
     os << "{\"count\":" << files.size() << ",\"files\":[";
     for (size_t i = 0; i < files.size(); i++) {
         if (i > 0) os << ",";
-        os << "\"" << json_escape(files[i]) << "\"";
+        // Include content dimensions so agents can size windows in one shot
+        std::string fullPath = primerDir + "/" + files[i];
+        std::ifstream f(fullPath);
+        size_t lines = 0, maxW = 0;
+        bool hasFrames = false;
+        if (f.is_open()) {
+            std::string line;
+            while (std::getline(f, line)) {
+                ++lines;
+                if (line.size() > maxW) maxW = line.size();
+                if (line.find("---") == 0 || line.find("===") == 0) hasFrames = true;
+            }
+        }
+        os << "{\"name\":\"" << json_escape(files[i]) << "\""
+           << ",\"lines\":" << lines
+           << ",\"width\":" << maxW
+           << ",\"animated\":" << (hasFrames ? "true" : "false")
+           << "}";
     }
     os << "]}";
     return os.str();

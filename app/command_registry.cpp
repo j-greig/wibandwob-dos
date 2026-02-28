@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <sstream>
+#include <fstream>
 
 // TRect for window bounds
 #define Uses_TRect
@@ -186,7 +187,8 @@ const std::vector<CommandCapability>& get_command_capabilities() {
         {"open_apps", "Open the Applications folder browser", false},
         {"open_gallery", "Open the ASCII Art Gallery browser with tabbed primer explorer", false},
         {"gallery_list", "List available primer filenames (optional tab param: 1/#-C, 2/D-L, 3/M, 4/N-S, 5/T-Z, 6/Find with search param)", false},
-        {"open_primer", "Open a primer file by name in a viewer window (requires path param, e.g. 'wibwob-faces.txt')", true},
+        {"open_primer", "Open a primer file by name (path param). Optional: x,y,w,h for placement. Tip: call primer_info first to get content dimensions, then open at the right size.", true},
+        {"primer_info", "Get content dimensions of a primer file WITHOUT opening it (path param). Returns content_lines, content_width, has_frames. Use to size windows before opening.", true},
         {"open_terminal", "Open a terminal emulator window", false},
         {"terminal_write", "Send text input to the terminal emulator (requires text param; optional window_id)", true},
         {"terminal_read", "Read the visible text content of a terminal window (optional window_id param)", false},
@@ -501,6 +503,35 @@ std::string exec_registry_command(
             api_open_animation_path(app, path, nullptr, frameless, shadowless, title);
         }
         return "ok";
+    }
+    if (name == "primer_info") {
+        auto it = kv.find("path");
+        if (it == kv.end() || it->second.empty())
+            return "err missing path";
+        std::string path = it->second;
+        if (path.find('/') == std::string::npos && path.find('\\') == std::string::npos) {
+            extern std::string findPrimerDir();
+            path = findPrimerDir() + "/" + path;
+        }
+        struct stat st;
+        if (stat(path.c_str(), &st) != 0)
+            return "err file not found: " + path;
+        // Read file and compute dimensions
+        std::ifstream f(path);
+        if (!f.is_open()) return "err cannot read: " + path;
+        size_t lines = 0, maxWidth = 0;
+        bool hasFrames = false;
+        std::string line;
+        while (std::getline(f, line)) {
+            ++lines;
+            if (line.size() > maxWidth) maxWidth = line.size();
+            if (line.find("---") == 0 || line.find("===") == 0) hasFrames = true;
+        }
+        return "{\"content_lines\": " + std::to_string(lines)
+             + ", \"content_width\": " + std::to_string(maxWidth)
+             + ", \"has_frames\": " + (hasFrames ? "true" : "false")
+             + ", \"file_size\": " + std::to_string(st.st_size)
+             + ", \"path\": \"" + json_escape(path) + "\"}";
     }
     if (name == "open_terminal") {
         api_spawn_terminal(app, nullptr);
