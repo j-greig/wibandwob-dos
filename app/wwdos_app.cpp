@@ -986,6 +986,7 @@ private:
     friend void api_spawn_figlet_text_at(TWwdosApp&,
         const std::string& text, const std::string& font, int x, int y,
         bool frameless, bool shadowless);
+    friend TFigletTextWindow* findFigletWindow(TWwdosApp&, const std::string& id);
     friend std::string api_figlet_set_text(TWwdosApp&, const std::string& id, const std::string& text);
     friend std::string api_figlet_set_font(TWwdosApp&, const std::string& id, const std::string& font);
     friend std::string api_figlet_set_color(TWwdosApp&, const std::string& id, const std::string& fg, const std::string& bg);
@@ -5026,14 +5027,19 @@ void api_spawn_figlet_text_at(TWwdosApp& app,
     app.registerWindow(win);
 }
 
-static TFigletTextWindow* findFigletWindow(TWwdosApp& app, const std::string& id) {
+TFigletTextWindow* findFigletWindow(TWwdosApp& app, const std::string& id) {
+    // Scan desktop — match by registry ID (w1, w2, ...), title, or "auto" (first match)
     TView* v = app.deskTop->first();
     for (; v; v = v->nextView()) {
         TFigletTextWindow* fw = dynamic_cast<TFigletTextWindow*>(v);
         if (fw) {
             if (id == "auto" || id.empty()) return fw;
+            // Check title
             const char* t = fw->getTitle(256);
             if (t && id == t) return fw;
+            // Check registry ID via winToId map
+            auto it = app.winToId.find(fw);
+            if (it != app.winToId.end() && it->second == id) return fw;
         }
     }
     return nullptr;
