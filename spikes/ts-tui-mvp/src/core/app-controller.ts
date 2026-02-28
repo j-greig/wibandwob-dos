@@ -7,7 +7,9 @@ import { spawn as spawnPty, type IPty as BunPtyTerminal, type IExitEvent as BunP
 
 import { CONTROL_API_PORT, MASTER_PHILOSOPHY_PATH, README_PATH, REPO_ROOT, SPIKE_NOTES_PATH, SPIKE_ROOT, STATE_PATH, WORKSPACES_DIR } from "./config.js";
 import { DesktopGeometryService } from "./desktop-geometry.js";
+import { createMenuConfigs, createPaletteCommands, type AppMenuActions } from "./menu-config.js";
 import { OverlayManager } from "./overlay-manager.js";
+import { createScrollbar } from "./ui-primitives.js";
 import type {
   BackroomsChannel,
   Box,
@@ -25,7 +27,6 @@ import type {
 import { contentToWindowSize, getChromeModeForWindow } from "./window-chrome.js";
 import { WindowManager } from "./window-manager.js";
 import { BackroomsService } from "../services/backrooms-service.js";
-import { makeWibReply, makeWobReply } from "../services/chat-service.js";
 import { measurePlainTextContent, measurePrimerContent } from "../services/content-measurement.js";
 import { ControlApiService } from "../services/control-api.js";
 import { ContentService } from "../services/content-service.js";
@@ -36,6 +37,16 @@ import { StateService } from "../services/state-service.js";
 import { TerminalBuffer } from "../services/terminal-buffer.js";
 import { renderTerminalBuffer } from "../services/terminal-renderer.js";
 import { WorkspaceService } from "../services/workspace-service.js";
+import {
+  openChatWindow as openChatTranscriptWindow,
+  openCommandPaletteWindow as openPaletteWindow,
+  openCompanionWindow as openScrambleWindow,
+  openGlitchWindow as openGlitchAnimationWindow,
+  openOrbitWindow as openOrbitAnimationWindow,
+  openPatternWindow as openPatternAnimationWindow,
+  openStateInspectorWindow as openInspectorWindow,
+  openWorkspaceManagerWindow as openWorkspaceCommandWindow
+} from "../windows/misc-windows.js";
 
 export class TsTuiMvpApp {
   private readonly screen: blessed.Widgets.Screen;
@@ -136,75 +147,7 @@ export class TsTuiMvpApp {
       }
     );
 
-    this.menus = [
-      {
-        label: "File",
-        key: "f",
-        left: 1,
-        items: [
-          { label: "Browse Primers", action: () => this.openPrimerBrowserWindow() },
-          { label: "Open Primer...", action: () => this.promptForPrimer() },
-          { label: "Open Text File...", action: () => this.promptForEditorPath() },
-          { label: "New Text Buffer", action: () => this.openEditorWindow() },
-          { label: "Save Workspace...", action: () => this.promptForWorkspaceSave() },
-          { label: "Load Workspace...", action: () => this.promptForWorkspaceLoad() },
-          { label: "Open Art Window", action: () => this.openArtWindow() },
-          { label: "Open Terminal", action: () => void this.openTerminalWindow() },
-          { label: "Open XTerm Shell", action: () => void this.openXTermShellWindow() },
-          { label: "Open Pi Chat", action: () => void this.openPiChatWindow() },
-          { label: "Quit", action: () => this.destroy() }
-        ]
-      },
-      {
-        label: "Edit",
-        key: "e",
-        left: 8,
-        items: [
-          { label: "Focus Next Window", action: () => this.windowManager.focusNextWindow(1) },
-          { label: "Focus Previous Window", action: () => this.windowManager.focusNextWindow(-1) },
-          { label: "Close Focused Window", action: () => this.windowManager.closeFocusedWindow() }
-        ]
-      },
-      {
-        label: "View",
-        key: "v",
-        left: 15,
-        items: [{ label: "Backrooms TV...", action: () => this.promptForBackroomsTv() }]
-      },
-      {
-        label: "Window",
-        key: "w",
-        left: 22,
-        items: [
-          { label: "Tile Windows", action: () => this.windowManager.tileWindows() },
-          { label: "Cascade Windows", action: () => this.windowManager.cascadeWindows() },
-          { label: "Open Gallery", action: () => this.openPrimerGalleryWindow() },
-          { label: "Open Browser", action: () => this.openBrowserReaderWindow() },
-          { label: "Open Art", action: () => this.openArtWindow() }
-        ]
-      },
-      {
-        label: "Tools",
-        key: "t",
-        left: 31,
-        items: [
-          { label: "Backrooms TV", action: () => this.promptForBackroomsTv() },
-          { label: "Primer Gallery", action: () => this.openPrimerGalleryWindow() },
-          { label: "Browser Reader", action: () => this.openBrowserReaderWindow() },
-          { label: "Figlet Banner", action: () => this.promptForFigletText() },
-          { label: "Pattern Window", action: () => this.openPatternWindow() },
-          { label: "Orbit Window", action: () => this.openOrbitWindow() },
-          { label: "Glitch FX", action: () => this.openGlitchWindow() },
-          { label: "Chat Transcript", action: () => this.openChatWindow() },
-          { label: "Companion", action: () => this.openCompanionWindow() },
-          { label: "Workspace Manager", action: () => this.openWorkspaceManagerWindow() },
-          { label: "XTerm Shell", action: () => void this.openXTermShellWindow() },
-          { label: "Pi Chat", action: () => void this.openPiChatWindow() },
-          { label: "Command Palette", action: () => this.openCommandPaletteWindow() },
-          { label: "State Inspector", action: () => this.openStateInspectorWindow() }
-        ]
-      }
-    ];
+    this.menus = createMenuConfigs(this.getAppMenuActions());
   }
 
   run(): void {
@@ -672,7 +615,7 @@ export class TsTuiMvpApp {
       mouse: true,
       scrollable: true,
       alwaysScroll: true,
-      scrollbar: this.createScrollbar(),
+      scrollbar: createScrollbar(),
       style: { fg: "white", bg: "black" }
     }) as LogBox;
     const inputLine = blessed.textbox({
@@ -829,7 +772,7 @@ export class TsTuiMvpApp {
       mouse: true,
       scrollable: true,
       alwaysScroll: true,
-      scrollbar: this.createScrollbar(),
+      scrollbar: createScrollbar(),
       style: { fg: "white", bg: "black", selected: { fg: "black", bg: "white" } }
     });
     const preview = blessed.box({
@@ -841,7 +784,7 @@ export class TsTuiMvpApp {
       mouse: true,
       scrollable: true,
       alwaysScroll: true,
-      scrollbar: this.createScrollbar(),
+      scrollbar: createScrollbar(),
       style: { fg: "white", bg: "black" }
     });
 
@@ -1051,7 +994,7 @@ export class TsTuiMvpApp {
       mouse: true,
       scrollable: true,
       alwaysScroll: true,
-      scrollbar: this.createScrollbar(),
+      scrollbar: createScrollbar(),
       style: { fg: "white", bg: "black" }
     }) as LogBox;
     const footer = blessed.box({
@@ -1408,7 +1351,7 @@ export class TsTuiMvpApp {
       mouse: true,
       scrollable: true,
       alwaysScroll: true,
-      scrollbar: this.createScrollbar(),
+      scrollbar: createScrollbar(),
       items: entries.map((entry) => entry.label),
       style: { fg: "white", bg: "black", selected: { fg: "black", bg: "white" } }
     });
@@ -1480,7 +1423,7 @@ export class TsTuiMvpApp {
       mouse: true,
       scrollable: true,
       alwaysScroll: true,
-      scrollbar: this.createScrollbar(),
+      scrollbar: createScrollbar(),
       items: tabs[0].entries.map((entry) => entry.label),
       style: { fg: "white", bg: "black", selected: { fg: "black", bg: "white" } }
     });
@@ -1493,7 +1436,7 @@ export class TsTuiMvpApp {
       mouse: true,
       scrollable: true,
       alwaysScroll: true,
-      scrollbar: this.createScrollbar(),
+      scrollbar: createScrollbar(),
       style: { fg: "white", bg: "black" }
     });
 
@@ -1671,7 +1614,7 @@ export class TsTuiMvpApp {
       vi: true,
       scrollable: true,
       alwaysScroll: true,
-      scrollbar: this.createScrollbar(),
+      scrollbar: createScrollbar(),
       style: { fg: "white", bg: "black" }
     });
 
@@ -1749,38 +1692,16 @@ export class TsTuiMvpApp {
   }
 
   private openPatternWindow(): void {
-    this.openAnimatedWindow("Pattern Field", "pattern", (tick, width, height) => {
-      const glyphs = ["░", "▒", "▓", "█"];
-      const rows: string[] = [];
-      for (let y = 0; y < height; y += 1) {
-        let row = "";
-        for (let x = 0; x < width; x += 1) {
-          row += glyphs[Math.abs((x + y + tick) % glyphs.length)];
-        }
-        rows.push(row);
-      }
-      return rows.join("\n");
+    openPatternAnimationWindow({
+      screen: this.screen,
+      windowManager: this.windowManager
     });
   }
 
   private openOrbitWindow(): void {
-    this.openAnimatedWindow("Orbit Engine", "orbit", (tick, width, height) => {
-      const cx = width / 2;
-      const cy = height / 2;
-      const rows: string[] = [];
-      for (let y = 0; y < height; y += 1) {
-        let row = "";
-        for (let x = 0; x < width; x += 1) {
-          const dx = x - cx;
-          const dy = y - cy;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          const angle = Math.atan2(dy, dx) + tick / 10;
-          const wave = Math.sin(dist / 2 - tick / 4) + Math.cos(angle * 3);
-          row += wave > 1 ? "@" : wave > 0.5 ? "*" : wave > 0 ? "+" : wave > -0.5 ? "." : " ";
-        }
-        rows.push(row);
-      }
-      return rows.join("\n");
+    openOrbitAnimationWindow({
+      screen: this.screen,
+      windowManager: this.windowManager
     });
   }
 
@@ -1791,227 +1712,52 @@ export class TsTuiMvpApp {
     } catch {
       source = "WibWob-DOS glitch engine source unavailable.";
     }
-    const lines = source.split("\n").slice(0, 24);
-    this.openAnimatedWindow("Glitch FX", "glitch", (tick) =>
-      lines
-        .map((line, index) =>
-          line.split("").map((char, column) => {
-            const value = (tick + index + column) % 17;
-            return value === 0 ? "#" : value === 3 ? "@" : value === 7 ? "%" : char;
-          }).join("")
-        )
-        .join("\n")
+    openGlitchAnimationWindow(
+      {
+        screen: this.screen,
+        windowManager: this.windowManager
+      },
+      source
     );
   }
 
   private openChatWindow(restore?: { transcriptLines?: string[]; draft?: string }): void {
-    const frame = this.windowManager.createFrame("Wib & Wob Chat", "chat");
-    const transcript = blessed.log({
-      parent: frame.body,
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 1,
-      mouse: true,
-      scrollable: true,
-      alwaysScroll: true,
-      scrollbar: this.createScrollbar(),
-      style: { fg: "white", bg: "black" }
-    }) as LogBox;
-    const input = blessed.textbox({
-      parent: frame.body,
-      bottom: 0,
-      left: 0,
-      right: 0,
-      height: 1,
-      inputOnFocus: true,
-      mouse: true,
-      style: { fg: "white", bg: "blue" }
-    });
-    const armChatInput = () => {
-      input.focus();
-      input.readInput();
-      this.screen.render();
-    };
-    const initialLines = restore?.transcriptLines ?? [
-      "Wib: A new desktop blooms.",
-      "Wob: Systems nominal. Awaiting prompt."
-    ];
-    for (const line of initialLines) {
-      transcript.log(line);
-    }
-    if (restore?.draft) {
-      input.setValue(restore.draft);
-    }
-    input.on("submit", (value) => {
-      const message = (value ?? "").trim();
-      input.clearValue();
-      if (!message) {
-        armChatInput();
-        return;
-      }
-      transcript.log(`You: ${message}`);
-      transcript.log(`Wib: ${makeWibReply(message)}`);
-      transcript.log(`Wob: ${makeWobReply(message)}`);
-      this.screen.render();
-      armChatInput();
-    });
-    frame.kind = "chat";
-    frame.chat = { transcript, input };
-    frame.describeState = () => ({
-      appType: "chat-transcript",
-      summary: "Synthetic Wib and Wob chat transcript.",
-      contentPreview: transcript.getContent().split("\n").slice(-8).join("\n"),
-      transcriptLineCount: transcript.getContent().split("\n").filter(Boolean).length,
-      inputValue: input.getValue()
-    });
-    frame.focus = () => {
-      this.windowManager.focusWindow(frame);
-      armChatInput();
-    };
-    frame.body.on("click", armChatInput);
-    transcript.on("click", armChatInput);
-    input.on("focus", () => this.windowManager.focusWindow(frame));
-    this.windowManager.registerWindow(frame);
-    frame.focus();
+    openChatTranscriptWindow(
+      {
+        screen: this.screen,
+        windowManager: this.windowManager
+      },
+      restore
+    );
   }
 
   private openCompanionWindow(restore?: { tick?: number }): void {
-    const frame = this.windowManager.createFrame("Scramble", "companion");
-    frame.frame.width = 30;
-    frame.frame.height = 10;
-    const bubble = blessed.box({
-      parent: frame.body,
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      style: { fg: "white", bg: "black" }
-    });
-    const moods = [
-      " /\\\\_/\\\\\n( o.o )\n > ^ <\n\nScramble: lurking",
-      " /\\\\_/\\\\\n( -.- )\n > ^ <\n\nScramble: judging layout",
-      " /\\\\_/\\\\\n( 0.0 )\n > ^ <\n\nScramble: cat online",
-      " /\\\\_/\\\\\n( ^.^ )\n > ^ <\n\nScramble: purring in ANSI"
-    ];
-    let tick = restore?.tick ?? 0;
-    const renderCompanion = () => {
-      bubble.setContent(moods[tick % moods.length]);
-      this.screen.render();
-      tick += 1;
-    };
-    renderCompanion();
-    frame.kind = "companion";
-    frame.describeState = () => ({
-      appType: "companion-widget",
-      summary: "Animated scramble companion.",
-      contentPreview: bubble.getContent(),
-      tick
-    });
-    frame.cleanup = () => clearInterval(timer);
-    frame.focus = () => {
-      this.windowManager.focusWindow(frame);
-      bubble.focus();
-    };
-    const timer = setInterval(renderCompanion, 2400);
-    this.windowManager.registerWindow(frame);
-    frame.focus();
+    openScrambleWindow(
+      {
+        screen: this.screen,
+        windowManager: this.windowManager
+      },
+      restore
+    );
   }
 
   private openWorkspaceManagerWindow(): void {
-    const frame = this.windowManager.createFrame("Workspace Manager", "workspace");
-    const footer = blessed.box({
-      parent: frame.body,
-      bottom: 0,
-      left: 0,
-      right: 0,
-      height: 3,
-      style: { fg: "black", bg: "cyan" }
+    openWorkspaceCommandWindow({
+      screen: this.screen,
+      windowManager: this.windowManager,
+      workspace: this.workspace,
+      saveWorkspace: () => this.saveWorkspace(),
+      promptForWorkspaceSave: () => this.promptForWorkspaceSave(),
+      promptForWorkspaceLoad: () => this.promptForWorkspaceLoad(),
+      openCommandPaletteWindow: () => this.openCommandPaletteWindow()
     });
-    const list = blessed.list({
-      parent: frame.body,
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 3,
-      keys: true,
-      vi: true,
-      mouse: true,
-      items: [
-        "Save Current Workspace",
-        "Save As Workspace...",
-        "Load Workspace...",
-        "Cascade Windows",
-        "Tile Windows",
-        "Open Command Palette"
-      ],
-      style: { fg: "white", bg: "black", selected: { fg: "black", bg: "white" } }
-    });
-    const refreshFooter = () => {
-      const names = this.workspace.list();
-      footer.setContent(
-        ` Current: ${this.workspace.currentName}\n File: ${this.workspace.path}\n Known: ${names.length > 0 ? names.join(", ") : "none"}`
-      );
-    };
-    const actions = [
-      () => this.saveWorkspace(),
-      () => this.promptForWorkspaceSave(),
-      () => this.promptForWorkspaceLoad(),
-      () => this.windowManager.cascadeWindows(),
-      () => this.windowManager.tileWindows(),
-      () => this.openCommandPaletteWindow()
-    ];
-    list.on("select", (_, index) => actions[index]?.());
-    refreshFooter();
-    frame.kind = "workspace";
-    frame.describeState = () => ({
-      appType: "workspace-manager",
-      summary: "Workspace save/load command window.",
-      selectedAction: list.getItem((list as List & { selected: number }).selected ?? 0)?.getText().trim(),
-      workspaceName: this.workspace.currentName,
-      workspacePath: this.workspace.path,
-      knownWorkspaces: this.workspace.list()
-    });
-    frame.focus = () => {
-      this.windowManager.focusWindow(frame);
-      list.focus();
-    };
-    this.windowManager.registerWindow(frame);
-    frame.focus();
   }
 
   private openCommandPaletteWindow(): void {
-    const commands = this.getPaletteCommands();
-    const frame = this.windowManager.createFrame("Command Palette", "palette");
-    const list = blessed.list({
-      parent: frame.body,
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      keys: true,
-      vi: true,
-      mouse: true,
-      scrollable: true,
-      alwaysScroll: true,
-      scrollbar: this.createScrollbar(),
-      items: commands.map((command) => command.label),
-      style: { fg: "white", bg: "black", selected: { fg: "black", bg: "white" } }
+    openPaletteWindow({
+      windowManager: this.windowManager,
+      commands: createPaletteCommands(this.getAppMenuActions())
     });
-    list.on("select", (_, index) => commands[index]?.action());
-    frame.kind = "palette";
-    frame.describeState = () => ({
-      appType: "command-palette",
-      summary: `Command palette with ${commands.length} actions.`,
-      selectedCommand: commands[(list as List & { selected: number }).selected ?? 0]?.label,
-      commandCount: commands.length
-    });
-    frame.focus = () => {
-      this.windowManager.focusWindow(frame);
-      list.focus();
-    };
-    this.windowManager.registerWindow(frame);
-    frame.focus();
   }
 
   private promptForPrimer(): void {
@@ -2068,7 +1814,7 @@ export class TsTuiMvpApp {
       tags: true,
       scrollable: true,
       alwaysScroll: true,
-      scrollbar: this.createScrollbar(),
+      scrollbar: createScrollbar(),
       style: { fg: "white", bg: "black" }
     });
     frame.kind = "editor";
@@ -2349,10 +2095,6 @@ export class TsTuiMvpApp {
     return env;
   }
 
-  private createScrollbar(): { ch: string; style: { bg: string } } {
-    return { ch: " ", style: { bg: "white" } };
-  }
-
   private applyMeasuredWindowSize(frame: WindowRecord, kind: WindowKind, content: { width: number; height: number }): void {
     const target = contentToWindowSize(content, getChromeModeForWindow(kind));
     const geometry = this.geometry.getGeometry();
@@ -2392,7 +2134,7 @@ export class TsTuiMvpApp {
       vi: true,
       scrollable: true,
       alwaysScroll: true,
-      scrollbar: this.createScrollbar(),
+      scrollbar: createScrollbar(),
       content,
       style: { fg: "white", bg: "black" }
     });
@@ -2429,78 +2171,13 @@ export class TsTuiMvpApp {
     frame.focus();
   }
 
-  private openAnimatedWindow(
-    title: string,
-    kind: WindowKind,
-    renderFrame: (tick: number, width: number, height: number) => string
-  ): void {
-    const frame = this.windowManager.createFrame(title, kind);
-    const canvas = blessed.box({
-      parent: frame.body,
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      style: { fg: "white", bg: "black" }
-    });
-    let tick = 0;
-    const render = () => {
-      canvas.setContent(renderFrame(tick, Math.max(12, Number(canvas.width)), Math.max(6, Number(canvas.height))));
-      this.screen.render();
-      tick += 1;
-    };
-    render();
-    const timer = setInterval(render, 120);
-    frame.kind = kind;
-    frame.describeState = () => ({
-      appType: `${kind}-animation`,
-      summary: `Animated ${kind} window.`,
-      contentPreview: canvas.getContent().split("\n").slice(0, 8).join("\n")
-    });
-    frame.cleanup = () => clearInterval(timer);
-    frame.focus = () => {
-      this.windowManager.focusWindow(frame);
-      canvas.focus();
-    };
-    this.windowManager.registerWindow(frame);
-    frame.focus();
-  }
-
   private openStateInspectorWindow(): void {
-    const frame = this.windowManager.createFrame("State Inspector", "inspector");
-    const viewer = blessed.box({
-      parent: frame.body,
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      mouse: true,
-      keys: true,
-      vi: true,
-      scrollable: true,
-      alwaysScroll: true,
-      scrollbar: this.createScrollbar(),
-      style: { fg: "white", bg: "black" }
-    });
-    const renderState = (state: DesktopState) => {
-      viewer.setContent(JSON.stringify(state, null, 2));
-      this.screen.render();
-    };
-    const unsubscribe = this.state.subscribe(renderState);
-    frame.kind = "inspector";
-    frame.describeState = () => ({
-      appType: "state-inspector",
-      summary: "Live JSON desktop state inspector.",
-      contentPreview: viewer.getContent().split("\n").slice(0, 12).join("\n"),
+    openInspectorWindow({
+      screen: this.screen,
+      windowManager: this.windowManager,
+      state: this.state,
       statePath: STATE_PATH
     });
-    frame.cleanup = () => unsubscribe();
-    frame.focus = () => {
-      this.windowManager.focusWindow(frame);
-      viewer.focus();
-    };
-    this.windowManager.registerWindow(frame);
-    frame.focus();
   }
 
   private saveWorkspace(): void {
@@ -2765,29 +2442,39 @@ export class TsTuiMvpApp {
     }
   }
 
-  private getPaletteCommands(): Array<{ label: string; action: () => void }> {
-    return [
-      { label: "Open Backrooms TV", action: () => this.promptForBackroomsTv() },
-      { label: "Open Primer Gallery", action: () => this.openPrimerGalleryWindow() },
-      { label: "Open Browser Reader", action: () => this.openBrowserReaderWindow() },
-      { label: "Open Figlet Banner", action: () => this.promptForFigletText() },
-      { label: "Open Pattern Window", action: () => this.openPatternWindow() },
-      { label: "Open Orbit Window", action: () => this.openOrbitWindow() },
-      { label: "Open Glitch FX Window", action: () => this.openGlitchWindow() },
-      { label: "Open Chat Transcript", action: () => this.openChatWindow() },
-      { label: "Open Companion Window", action: () => this.openCompanionWindow() },
-      { label: "Open Workspace Manager", action: () => this.openWorkspaceManagerWindow() },
-      { label: "Save Workspace As...", action: () => this.promptForWorkspaceSave() },
-      { label: "Load Workspace...", action: () => this.promptForWorkspaceLoad() },
-      { label: "Open State Inspector", action: () => this.openStateInspectorWindow() },
-      { label: "Save Workspace", action: () => this.saveWorkspace() },
-      { label: "Load Workspace", action: () => this.loadWorkspace() },
-      { label: "Tile Windows", action: () => this.windowManager.tileWindows() },
-      { label: "Cascade Windows", action: () => this.windowManager.cascadeWindows() },
-      { label: "Open Terminal", action: () => void this.openTerminalWindow() },
-      { label: "Open XTerm Shell", action: () => void this.openXTermShellWindow() },
-      { label: "Open Pi Chat", action: () => void this.openPiChatWindow() }
-    ];
+  private getAppMenuActions(): AppMenuActions {
+    return {
+      browsePrimers: () => this.openPrimerBrowserWindow(),
+      openPrimerPrompt: () => this.promptForPrimer(),
+      openTextFilePrompt: () => this.promptForEditorPath(),
+      openEditor: () => this.openEditorWindow(),
+      saveWorkspaceAs: () => this.promptForWorkspaceSave(),
+      loadWorkspacePrompt: () => this.promptForWorkspaceLoad(),
+      openArtWindow: () => this.openArtWindow(),
+      openTerminal: () => void this.openTerminalWindow(),
+      openXTermShell: () => void this.openXTermShellWindow(),
+      openPiChat: () => void this.openPiChatWindow(),
+      quit: () => this.destroy(),
+      focusNextWindow: () => this.windowManager.focusNextWindow(1),
+      focusPreviousWindow: () => this.windowManager.focusNextWindow(-1),
+      closeFocusedWindow: () => this.windowManager.closeFocusedWindow(),
+      openBackroomsPrompt: () => this.promptForBackroomsTv(),
+      tileWindows: () => this.windowManager.tileWindows(),
+      cascadeWindows: () => this.windowManager.cascadeWindows(),
+      openGallery: () => this.openPrimerGalleryWindow(),
+      openBrowserReader: () => this.openBrowserReaderWindow(),
+      openFigletBanner: () => this.promptForFigletText(),
+      openPatternWindow: () => this.openPatternWindow(),
+      openOrbitWindow: () => this.openOrbitWindow(),
+      openGlitchWindow: () => this.openGlitchWindow(),
+      openChatWindow: () => this.openChatWindow(),
+      openCompanionWindow: () => this.openCompanionWindow(),
+      openWorkspaceManager: () => this.openWorkspaceManagerWindow(),
+      openCommandPalette: () => this.openCommandPaletteWindow(),
+      openStateInspector: () => this.openStateInspectorWindow(),
+      saveWorkspace: () => this.saveWorkspace(),
+      loadWorkspace: () => this.loadWorkspace()
+    };
   }
 
   getDesktopState(): DesktopState {

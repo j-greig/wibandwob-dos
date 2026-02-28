@@ -1,0 +1,373 @@
+import blessed from "blessed";
+
+import { makeWibReply, makeWobReply } from "../services/chat-service.js";
+import type { StateService } from "../services/state-service.js";
+import type { WorkspaceService } from "../services/workspace-service.js";
+import { createScrollbar } from "../core/ui-primitives.js";
+import type { DesktopState, List, LogBox, MenuItem, WindowKind, WindowRecord } from "../core/types.js";
+import type { WindowManager } from "../core/window-manager.js";
+
+interface BaseWindowDeps {
+  screen: blessed.Widgets.Screen;
+  windowManager: WindowManager;
+}
+
+export function openAnimatedWindow(
+  deps: BaseWindowDeps,
+  title: string,
+  kind: WindowKind,
+  renderFrame: (tick: number, width: number, height: number) => string
+): void {
+  const frame = deps.windowManager.createFrame(title, kind);
+  const canvas = blessed.box({
+    parent: frame.body,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    style: { fg: "white", bg: "black" }
+  });
+  let tick = 0;
+  const render = () => {
+    canvas.setContent(renderFrame(tick, Math.max(12, Number(canvas.width)), Math.max(6, Number(canvas.height))));
+    deps.screen.render();
+    tick += 1;
+  };
+  render();
+  const timer = setInterval(render, 120);
+  frame.kind = kind;
+  frame.describeState = () => ({
+    appType: `${kind}-animation`,
+    summary: `Animated ${kind} window.`,
+    contentPreview: canvas.getContent().split("\n").slice(0, 8).join("\n")
+  });
+  frame.cleanup = () => clearInterval(timer);
+  frame.focus = () => {
+    deps.windowManager.focusWindow(frame);
+    canvas.focus();
+  };
+  deps.windowManager.registerWindow(frame);
+  frame.focus();
+}
+
+export function openPatternWindow(deps: BaseWindowDeps): void {
+  openAnimatedWindow(deps, "Pattern Field", "pattern", (tick, width, height) => {
+    const glyphs = ["░", "▒", "▓", "█"];
+    const rows: string[] = [];
+    for (let y = 0; y < height; y += 1) {
+      let row = "";
+      for (let x = 0; x < width; x += 1) {
+        row += glyphs[Math.abs((x + y + tick) % glyphs.length)];
+      }
+      rows.push(row);
+    }
+    return rows.join("\n");
+  });
+}
+
+export function openOrbitWindow(deps: BaseWindowDeps): void {
+  openAnimatedWindow(deps, "Orbit Engine", "orbit", (tick, width, height) => {
+    const cx = width / 2;
+    const cy = height / 2;
+    const rows: string[] = [];
+    for (let y = 0; y < height; y += 1) {
+      let row = "";
+      for (let x = 0; x < width; x += 1) {
+        const dx = x - cx;
+        const dy = y - cy;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const angle = Math.atan2(dy, dx) + tick / 10;
+        const wave = Math.sin(dist / 2 - tick / 4) + Math.cos(angle * 3);
+        row += wave > 1 ? "@" : wave > 0.5 ? "*" : wave > 0 ? "+" : wave > -0.5 ? "." : " ";
+      }
+      rows.push(row);
+    }
+    return rows.join("\n");
+  });
+}
+
+export function openGlitchWindow(deps: BaseWindowDeps, sourceText: string): void {
+  const lines = sourceText.split("\n").slice(0, 24);
+  openAnimatedWindow(deps, "Glitch FX", "glitch", (tick) =>
+    lines
+      .map((line, index) =>
+        line
+          .split("")
+          .map((char, column) => {
+            const value = (tick + index + column) % 17;
+            return value === 0 ? "#" : value === 3 ? "@" : value === 7 ? "%" : char;
+          })
+          .join("")
+      )
+      .join("\n")
+  );
+}
+
+export function openChatWindow(
+  deps: BaseWindowDeps,
+  restore?: { transcriptLines?: string[]; draft?: string }
+): void {
+  const frame = deps.windowManager.createFrame("Wib & Wob Chat", "chat");
+  const transcript = blessed.log({
+    parent: frame.body,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 1,
+    mouse: true,
+    scrollable: true,
+    alwaysScroll: true,
+    scrollbar: createScrollbar(),
+    style: { fg: "white", bg: "black" }
+  }) as LogBox;
+  const input = blessed.textbox({
+    parent: frame.body,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 1,
+    inputOnFocus: true,
+    mouse: true,
+    style: { fg: "white", bg: "blue" }
+  });
+  const armChatInput = () => {
+    input.focus();
+    input.readInput();
+    deps.screen.render();
+  };
+  const initialLines = restore?.transcriptLines ?? [
+    "Wib: A new desktop blooms.",
+    "Wob: Systems nominal. Awaiting prompt."
+  ];
+  for (const line of initialLines) {
+    transcript.log(line);
+  }
+  if (restore?.draft) {
+    input.setValue(restore.draft);
+  }
+  input.on("submit", (value) => {
+    const message = (value ?? "").trim();
+    input.clearValue();
+    if (!message) {
+      armChatInput();
+      return;
+    }
+    transcript.log(`You: ${message}`);
+    transcript.log(`Wib: ${makeWibReply(message)}`);
+    transcript.log(`Wob: ${makeWobReply(message)}`);
+    deps.screen.render();
+    armChatInput();
+  });
+  frame.kind = "chat";
+  frame.chat = { transcript, input };
+  frame.describeState = () => ({
+    appType: "chat-transcript",
+    summary: "Synthetic Wib and Wob chat transcript.",
+    contentPreview: transcript.getContent().split("\n").slice(-8).join("\n"),
+    transcriptLineCount: transcript.getContent().split("\n").filter(Boolean).length,
+    inputValue: input.getValue()
+  });
+  frame.focus = () => {
+    deps.windowManager.focusWindow(frame);
+    armChatInput();
+  };
+  frame.body.on("click", armChatInput);
+  transcript.on("click", armChatInput);
+  input.on("focus", () => deps.windowManager.focusWindow(frame));
+  deps.windowManager.registerWindow(frame);
+  frame.focus();
+}
+
+export function openCompanionWindow(
+  deps: BaseWindowDeps,
+  restore?: { tick?: number }
+): void {
+  const frame = deps.windowManager.createFrame("Scramble", "companion");
+  frame.frame.width = 30;
+  frame.frame.height = 10;
+  const bubble = blessed.box({
+    parent: frame.body,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    style: { fg: "white", bg: "black" }
+  });
+  const moods = [
+    " /\\\\_/\\\\\n( o.o )\n > ^ <\n\nScramble: lurking",
+    " /\\\\_/\\\\\n( -.- )\n > ^ <\n\nScramble: judging layout",
+    " /\\\\_/\\\\\n( 0.0 )\n > ^ <\n\nScramble: cat online",
+    " /\\\\_/\\\\\n( ^.^ )\n > ^ <\n\nScramble: purring in ANSI"
+  ];
+  let tick = restore?.tick ?? 0;
+  const renderCompanion = () => {
+    bubble.setContent(moods[tick % moods.length]);
+    deps.screen.render();
+    tick += 1;
+  };
+  renderCompanion();
+  const timer = setInterval(renderCompanion, 2400);
+  frame.kind = "companion";
+  frame.describeState = () => ({
+    appType: "companion-widget",
+    summary: "Animated scramble companion.",
+    contentPreview: bubble.getContent(),
+    tick
+  });
+  frame.cleanup = () => clearInterval(timer);
+  frame.focus = () => {
+    deps.windowManager.focusWindow(frame);
+    bubble.focus();
+  };
+  deps.windowManager.registerWindow(frame);
+  frame.focus();
+}
+
+export function openWorkspaceManagerWindow(params: {
+  screen: blessed.Widgets.Screen;
+  windowManager: WindowManager;
+  workspace: WorkspaceService;
+  saveWorkspace: () => void;
+  promptForWorkspaceSave: () => void;
+  promptForWorkspaceLoad: () => void;
+  openCommandPaletteWindow: () => void;
+}): void {
+  const frame = params.windowManager.createFrame("Workspace Manager", "workspace");
+  const footer = blessed.box({
+    parent: frame.body,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 3,
+    style: { fg: "black", bg: "cyan" }
+  });
+  const list = blessed.list({
+    parent: frame.body,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 3,
+    keys: true,
+    vi: true,
+    mouse: true,
+    items: [
+      "Save Current Workspace",
+      "Save As Workspace...",
+      "Load Workspace...",
+      "Cascade Windows",
+      "Tile Windows",
+      "Open Command Palette"
+    ],
+    style: { fg: "white", bg: "black", selected: { fg: "black", bg: "white" } }
+  });
+  const refreshFooter = () => {
+    const names = params.workspace.list();
+    footer.setContent(
+      ` Current: ${params.workspace.currentName}\n File: ${params.workspace.path}\n Known: ${names.length > 0 ? names.join(", ") : "none"}`
+    );
+  };
+  const actions = [
+    params.saveWorkspace,
+    params.promptForWorkspaceSave,
+    params.promptForWorkspaceLoad,
+    () => params.windowManager.cascadeWindows(),
+    () => params.windowManager.tileWindows(),
+    params.openCommandPaletteWindow
+  ];
+  list.on("select", (_, index) => actions[index]?.());
+  refreshFooter();
+  frame.kind = "workspace";
+  frame.describeState = () => ({
+    appType: "workspace-manager",
+    summary: "Workspace save/load command window.",
+    selectedAction: list.getItem((list as List & { selected: number }).selected ?? 0)?.getText().trim(),
+    workspaceName: params.workspace.currentName,
+    workspacePath: params.workspace.path,
+    knownWorkspaces: params.workspace.list()
+  });
+  frame.focus = () => {
+    params.windowManager.focusWindow(frame);
+    list.focus();
+  };
+  params.windowManager.registerWindow(frame);
+  frame.focus();
+}
+
+export function openCommandPaletteWindow(params: {
+  windowManager: WindowManager;
+  commands: MenuItem[];
+}): void {
+  const frame = params.windowManager.createFrame("Command Palette", "palette");
+  const list = blessed.list({
+    parent: frame.body,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    keys: true,
+    vi: true,
+    mouse: true,
+    scrollable: true,
+    alwaysScroll: true,
+    scrollbar: createScrollbar(),
+    items: params.commands.map((command) => command.label),
+    style: { fg: "white", bg: "black", selected: { fg: "black", bg: "white" } }
+  });
+  list.on("select", (_, index) => params.commands[index]?.action());
+  frame.kind = "palette";
+  frame.describeState = () => ({
+    appType: "command-palette",
+    summary: `Command palette with ${params.commands.length} actions.`,
+    selectedCommand: params.commands[(list as List & { selected: number }).selected ?? 0]?.label,
+    commandCount: params.commands.length
+  });
+  frame.focus = () => {
+    params.windowManager.focusWindow(frame);
+    list.focus();
+  };
+  params.windowManager.registerWindow(frame);
+  frame.focus();
+}
+
+export function openStateInspectorWindow(params: {
+  screen: blessed.Widgets.Screen;
+  windowManager: WindowManager;
+  state: StateService;
+  statePath: string;
+}): void {
+  const frame = params.windowManager.createFrame("State Inspector", "inspector");
+  const viewer = blessed.box({
+    parent: frame.body,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    mouse: true,
+    keys: true,
+    vi: true,
+    scrollable: true,
+    alwaysScroll: true,
+    scrollbar: createScrollbar(),
+    style: { fg: "white", bg: "black" }
+  });
+  const renderState = (state: DesktopState) => {
+    viewer.setContent(JSON.stringify(state, null, 2));
+    params.screen.render();
+  };
+  const unsubscribe = params.state.subscribe(renderState);
+  frame.kind = "inspector";
+  frame.describeState = () => ({
+    appType: "state-inspector",
+    summary: "Live JSON desktop state inspector.",
+    contentPreview: viewer.getContent().split("\n").slice(0, 12).join("\n"),
+    statePath: params.statePath
+  });
+  frame.cleanup = () => unsubscribe();
+  frame.focus = () => {
+    params.windowManager.focusWindow(frame);
+    viewer.focus();
+  };
+  params.windowManager.registerWindow(frame);
+  frame.focus();
+}
+

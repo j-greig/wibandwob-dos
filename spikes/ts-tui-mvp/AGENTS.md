@@ -30,6 +30,7 @@ The bar is:
 - one state path
 - one layout path
 - one agent/runtime integration path per feature
+- one control/API path for every user-visible window/app surface
 
 The code should be:
 
@@ -126,6 +127,15 @@ These rules are strict. Treat violations as bugs, not style nits.
 10. Experimental integrations must stay behind one seam.
    - If we try a foreign runtime or agent stack, wrap it in a single service boundary first.
    - Do not leak vendor-specific assumptions across the app.
+
+11. User-visible surfaces must be API-visible.
+   - If a window, app, button, command, mode, or state matters to a user, it must have a typed representation in desktop state and a control path in `control-api.ts`.
+   - Do not add UI-only commands that agents cannot discover or invoke later.
+   - `describeState()` and the control API should evolve together.
+
+12. Reorg passes do not add product surface area.
+   - When the active goal is architecture cleanup, do not add new window types or scattered UI entry points unless the user explicitly asks for them in that same pass.
+   - Prefer extracting, consolidating, and normalizing existing behavior first.
 
 ## Code Style
 
@@ -245,6 +255,12 @@ Current control endpoints:
 - `POST /windows/text/export`
 - `POST /workspace/save`
 - `POST /workspace/load`
+
+Control parity rule:
+- whenever a new window family, app mode, or user-triggerable command is added, update both:
+  - desktop/window state reporting
+  - control API discovery and execution routes
+- do not leave future agents scraping visible text to reach a feature that the app already understands semantically
 
 Current loop for terminal debugging:
 1. launch the spike

@@ -1,7 +1,7 @@
 // -------------------------------------------------------------------
 // Control API — currently raw Bun.serve() with hand-rolled routing.
 //
-// TODO: migrate to Hono + @modelcontextprotocol/hono
+// TODO: migrate to Hono + @modelcontextprotocol/hono (?)
 //
 // Hono (https://hono.dev) is the Bun-native equivalent of FastAPI.
 // The official MCP TS SDK ships @modelcontextprotocol/hono as a
@@ -53,22 +53,37 @@ export class ControlApiService {
 
   constructor(
     private readonly port: number,
-    private readonly handlers: ControlApiHandlers
+    private readonly handlers: ControlApiHandlers,
   ) {}
 
   start(): void {
-    const bunRuntime = (globalThis as { Bun?: { serve: (options: { port: number; fetch: (request: Request) => Promise<Response> | Response }) => { stop: (closeActiveConnections?: boolean) => void } } }).Bun;
+    const bunRuntime = (
+      globalThis as {
+        Bun?: {
+          serve: (options: {
+            port: number;
+            fetch: (request: Request) => Promise<Response> | Response;
+          }) => { stop: (closeActiveConnections?: boolean) => void };
+        };
+      }
+    ).Bun;
     if (!bunRuntime) {
       this.enabled = false;
       this.actualPort = undefined;
       return;
     }
-    const ports = [this.port, this.port + 1, this.port + 2, this.port + 3, this.port + 4];
+    const ports = [
+      this.port,
+      this.port + 1,
+      this.port + 2,
+      this.port + 3,
+      this.port + 4,
+    ];
     for (const port of ports) {
       try {
         this.server = bunRuntime.serve({
           port,
-          fetch: async (request) => this.handleRequest(request)
+          fetch: async (request) => this.handleRequest(request),
         });
         this.actualPort = port;
         this.enabled = true;
@@ -92,7 +107,7 @@ export class ControlApiService {
   getStatus(): { enabled: boolean; port?: number } {
     return {
       enabled: this.enabled,
-      port: this.actualPort
+      port: this.actualPort,
     };
   }
 
@@ -120,8 +135,8 @@ export class ControlApiService {
           "POST /windows/input",
           "POST /windows/text/export",
           "POST /workspace/save",
-          "POST /workspace/load"
-        ]
+          "POST /workspace/load",
+        ],
       });
     }
 
@@ -134,7 +149,8 @@ export class ControlApiService {
     }
 
     if (request.method === "GET" && url.pathname === "/content/primer-info") {
-      const pathOrName = url.searchParams.get("path") ?? url.searchParams.get("name") ?? "";
+      const pathOrName =
+        url.searchParams.get("path") ?? url.searchParams.get("name") ?? "";
       return Response.json(this.handlers.getPrimerInfo(pathOrName));
     }
     if (request.method === "GET" && url.pathname === "/windows/text") {
@@ -143,29 +159,35 @@ export class ControlApiService {
       return Response.json({ ok: Boolean(exported), path: exported });
     }
 
-    const body = request.method === "POST" ? await request.json().catch(() => ({})) : {};
+    const body =
+      request.method === "POST" ? await request.json().catch(() => ({})) : {};
 
     if (request.method === "POST" && url.pathname === "/view/xterm/open") {
       this.handlers.openXTermShell();
       return Response.json({ ok: true });
     }
     if (request.method === "POST" && url.pathname === "/view/xterm/close") {
-      return Response.json({ ok: true, closed: this.handlers.closeXTermShells() });
+      return Response.json({
+        ok: true,
+        closed: this.handlers.closeXTermShells(),
+      });
     }
     if (request.method === "POST" && url.pathname === "/view/xterm/restart") {
       this.handlers.restartXTermShell();
       return Response.json({ ok: true });
     }
     if (request.method === "POST" && url.pathname === "/windows/focus") {
-      return Response.json({ ok: this.handlers.focusWindowById(Number((body as any).id)) });
+      return Response.json({
+        ok: this.handlers.focusWindowById(Number((body as any).id)),
+      });
     }
     if (request.method === "POST" && url.pathname === "/windows/move") {
       return Response.json({
         ok: this.handlers.moveWindowById(
           Number((body as any).id),
           Number((body as any).left),
-          Number((body as any).top)
-        )
+          Number((body as any).top),
+        ),
       });
     }
     if (request.method === "POST" && url.pathname === "/windows/resize") {
@@ -173,20 +195,28 @@ export class ControlApiService {
         ok: this.handlers.resizeWindowById(
           Number((body as any).id),
           Number((body as any).width),
-          Number((body as any).height)
-        )
+          Number((body as any).height),
+        ),
       });
     }
     if (request.method === "POST" && url.pathname === "/windows/close") {
-      return Response.json({ ok: this.handlers.closeWindowById(Number((body as any).id)) });
+      return Response.json({
+        ok: this.handlers.closeWindowById(Number((body as any).id)),
+      });
     }
     if (request.method === "POST" && url.pathname === "/windows/input") {
       return Response.json({
-        ok: this.handlers.sendWindowInput(Number((body as any).id), String((body as any).input ?? ""))
+        ok: this.handlers.sendWindowInput(
+          Number((body as any).id),
+          String((body as any).input ?? ""),
+        ),
       });
     }
     if (request.method === "POST" && url.pathname === "/windows/text/export") {
-      const exported = this.handlers.captureWindowText(Number((body as any).id), typeof (body as any).name === "string" ? (body as any).name : undefined);
+      const exported = this.handlers.captureWindowText(
+        Number((body as any).id),
+        typeof (body as any).name === "string" ? (body as any).name : undefined,
+      );
       return Response.json({ ok: Boolean(exported), path: exported });
     }
     if (request.method === "POST" && url.pathname === "/view/backrooms/open") {
@@ -211,17 +241,24 @@ export class ControlApiService {
 
 function normalizeBackroomsChannel(raw: unknown): BackroomsChannel {
   const body = (raw ?? {}) as Record<string, unknown>;
-  const model = typeof body.model === "string" && ["haiku", "sonnet", "opus"].includes(body.model)
-    ? (body.model as BackroomsChannel["model"])
-    : "sonnet";
-  const mode = typeof body.mode === "string" && ["auto", "live", "fake-live"].includes(body.mode)
-    ? (body.mode as BackroomsChannel["mode"])
-    : "auto";
+  const model =
+    typeof body.model === "string" &&
+    ["haiku", "sonnet", "opus"].includes(body.model)
+      ? (body.model as BackroomsChannel["model"])
+      : "sonnet";
+  const mode =
+    typeof body.mode === "string" &&
+    ["auto", "live", "fake-live"].includes(body.mode)
+      ? (body.mode as BackroomsChannel["mode"])
+      : "auto";
   return {
-    theme: typeof body.theme === "string" && body.theme.trim() ? body.theme.trim() : "liminal fluorescent maze",
+    theme:
+      typeof body.theme === "string" && body.theme.trim()
+        ? body.theme.trim()
+        : "liminal fluorescent maze",
     primers: typeof body.primers === "string" ? body.primers.trim() : "",
     turns: Math.max(1, Math.min(20, Number(body.turns) || 3)),
     model,
-    mode
+    mode,
   };
 }
