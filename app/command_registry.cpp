@@ -3,6 +3,7 @@
 #include "api_ipc.h"
 #include "contour_map_view.h"
 #include "core/json_utils.h"
+#include "core/primer_utils.h"
 #include "figlet_utils.h"
 
 #include <cstdint>
@@ -516,20 +517,11 @@ std::string exec_registry_command(
         struct stat st;
         if (stat(path.c_str(), &st) != 0)
             return "err file not found: " + path;
-        // Read file and compute dimensions
-        std::ifstream f(path);
-        if (!f.is_open()) return "err cannot read: " + path;
-        size_t lines = 0, maxWidth = 0;
-        bool hasFrames = false;
-        std::string line;
-        while (std::getline(f, line)) {
-            ++lines;
-            if (line.size() > maxWidth) maxWidth = line.size();
-            if (line.find("---") == 0 || line.find("===") == 0) hasFrames = true;
-        }
-        return "{\"content_lines\": " + std::to_string(lines)
-             + ", \"content_width\": " + std::to_string(maxWidth)
-             + ", \"has_frames\": " + (hasFrames ? "true" : "false")
+        PrimerInfo pi = measurePrimer(path);
+        if (!pi.ok) return "err cannot read: " + path;
+        return "{\"content_lines\": " + std::to_string(pi.lines)
+             + ", \"content_width\": " + std::to_string(pi.width)
+             + ", \"has_frames\": " + (pi.hasFrames ? "true" : "false")
              + ", \"file_size\": " + std::to_string(st.st_size)
              + ", \"path\": \"" + json_escape(path) + "\"}";
     }

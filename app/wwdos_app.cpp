@@ -41,6 +41,7 @@
 
 #include "test_pattern.h"
 #include "core/json_utils.h"
+#include "core/primer_utils.h"
 #include "gradient.h"
 #include "ui/ui_helpers.h"
 #include "glitch_engine.h"
@@ -5164,24 +5165,13 @@ std::string api_gallery_list(TWwdosApp& app, const std::string& tab) {
         if (i > 0) os << ",";
         // Include content dimensions so agents can size windows in one shot
         std::string fullPath = primerDir + "/" + files[i];
-        std::ifstream f(fullPath);
-        size_t lines = 0, maxW = 0;
-        bool hasFrames = false;
-        if (f.is_open()) {
-            std::string line;
-            while (std::getline(f, line)) {
-                ++lines;
-                if (line.size() > maxW) maxW = line.size();
-                if (line.find("---") == 0 || line.find("===") == 0) hasFrames = true;
-            }
-        }
-        // recommended_w/h includes window chrome (+2 each axis for borders)
+        PrimerInfo pi = measurePrimer(fullPath);
         os << "{\"name\":\"" << json_escape(files[i]) << "\""
-           << ",\"lines\":" << lines
-           << ",\"width\":" << maxW
-           << ",\"recommended_w\":" << (maxW + 2)
-           << ",\"recommended_h\":" << (lines + 2)
-           << ",\"animated\":" << (hasFrames ? "true" : "false")
+           << ",\"lines\":" << pi.lines
+           << ",\"width\":" << pi.width
+           << ",\"recommended_w\":" << (pi.width + 2)
+           << ",\"recommended_h\":" << (pi.lines + 2)
+           << ",\"animated\":" << (pi.hasFrames ? "true" : "false")
            << "}";
     }
     os << "]}";
