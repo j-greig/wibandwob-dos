@@ -175,7 +175,7 @@ class TsTuiMvpApp {
   }
 
   private renderChrome(): void {
-    this.menuBar.setContent(" File  Edit ");
+    this.menuBar.setContent("");
     this.statusLine.setContent(
       " Alt-F File  Alt-E Edit  Tab Next  Shift-Tab Prev  Ctrl-S Save  Ctrl-Q Quit "
     );
@@ -481,12 +481,7 @@ class TsTuiMvpApp {
       },
       style: {
         fg: "white",
-        bg: "black",
-        focus: {
-          border: {
-            fg: "cyan"
-          }
-        }
+        bg: "black"
       }
     });
     editor.setValue(initial);

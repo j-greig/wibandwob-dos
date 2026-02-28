@@ -26,6 +26,7 @@ variant = d.get('theme_variant', '?')
 
 w, h = desk.get('w', '?'), desk.get('h', '?')
 print(f'[WibWob-DOS Desktop {w}x{h} | {theme}/{variant} | {len(wins)} windows]')
+print(f'  format: z-order: type \"name\" (x,y) WxH')
 
 for i, win in enumerate(wins):
     r = win.get('rect', {})
