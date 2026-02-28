@@ -71,6 +71,9 @@ public:
     bool openBackgroundDialog();
     const std::string &getFilePath() const { return filePath_; }
     unsigned getPeriodMs() const { return periodMs; }
+    size_t getFrameCount() const { return frames.size(); }
+    size_t getContentLines() const;  // lines in current frame
+    size_t getContentWidth() const;  // max cols in current frame
 
 private:
     // Data
@@ -115,6 +118,8 @@ public:
     const TBackgroundConfig& getBackgroundConfig() const { return bgConfig; }
     bool openBackgroundDialog();
     const std::string &getFilePath() const { return filePath_; }
+    size_t getContentLines() const { return lines.size(); }
+    size_t getContentWidth() const;
 
 private:
     std::string filePath_;  // stored for workspace serialisation

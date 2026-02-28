@@ -346,10 +346,16 @@ class ClaudeSDKBridge {
                     options: queryOptions
                 })) {
                     messageCount++;
-                    console.error('=== SDK MESSAGE DEBUG #' + messageCount + ' ===');
-                    console.error('Message type:', message.type);
-                    console.error('Message data:', JSON.stringify(message, null, 2));
-                    console.error('=== END SDK MESSAGE DEBUG ===');
+
+                    // Only log complete messages (assistant text, tool calls, results, errors)
+                    // Skip noisy stream deltas (content_block_delta, message_delta, start/stop)
+                    const logWorthy = ['assistant', 'result', 'tool_result', 'error'].includes(message.type)
+                        || (message.type === 'stream_event' && message.event?.type === 'message_stop');
+                    if (logWorthy) {
+                        console.error('=== SDK MSG #' + messageCount + ' [' + message.type + '] ===');
+                        console.error(JSON.stringify(message, null, 2));
+                        console.error('=== END ===');
+                    }
 
                     // Legacy partials (Agent SDK still emits these when includePartialMessages is true)
                     if (message.type === 'partial_assistant') {

@@ -787,3 +787,35 @@ bool TTextFileView::openBackgroundDialog()
     setBackgroundConfig(config);
     return true;
 }
+
+size_t TTextFileView::getContentWidth() const {
+    size_t maxW = 0;
+    for (auto& l : lines)
+        if (l.size() > maxW) maxW = l.size();
+    return maxW;
+}
+
+size_t FrameFilePlayerView::getContentLines() const {
+    if (frames.empty() || fileData.empty()) return 0;
+    const Span& f = frames[frameIndex < frames.size() ? frameIndex : 0];
+    size_t count = 0;
+    for (size_t i = f.start; i < f.end; ++i)
+        if (fileData[i] == '\n') ++count;
+    return count + 1;  // last line may not end with \n
+}
+
+size_t FrameFilePlayerView::getContentWidth() const {
+    if (frames.empty() || fileData.empty()) return 0;
+    const Span& f = frames[frameIndex < frames.size() ? frameIndex : 0];
+    size_t maxW = 0, lineW = 0;
+    for (size_t i = f.start; i < f.end; ++i) {
+        if (fileData[i] == '\n') {
+            if (lineW > maxW) maxW = lineW;
+            lineW = 0;
+        } else {
+            ++lineW;
+        }
+    }
+    if (lineW > maxW) maxW = lineW;
+    return maxW;
+}

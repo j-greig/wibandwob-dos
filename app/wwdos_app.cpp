@@ -3958,11 +3958,29 @@ std::string TWwdosApp::buildWorkspaceJson()
         if (type == "test_pattern") {
             props = "{}"; // Pattern mode is global in MVP
         } else if (type == "frame_player") {
-            // TFrameAnimationWindow stores the path directly — use its getter
+            // TFrameAnimationWindow stores the path — also expose content dimensions
             if (auto *faw = dynamic_cast<TFrameAnimationWindow*>(w)) {
                 const std::string& fp = faw->getFilePath();
-                if (!fp.empty())
-                    props = "{\"path\": \"" + json_escape(fp) + "\"}";
+                props = "{\"path\": \"" + json_escape(fp) + "\"";
+                // Find the child view to get content dimensions
+                TView *child = faw->first();
+                if (child) {
+                    TView *v = child;
+                    do {
+                        if (auto *tfv = dynamic_cast<TTextFileView*>(v)) {
+                            props += ", \"content_lines\": " + std::to_string(tfv->getContentLines());
+                            props += ", \"content_width\": " + std::to_string(tfv->getContentWidth());
+                            break;
+                        } else if (auto *ffpv = dynamic_cast<FrameFilePlayerView*>(v)) {
+                            props += ", \"content_lines\": " + std::to_string(ffpv->getContentLines());
+                            props += ", \"content_width\": " + std::to_string(ffpv->getContentWidth());
+                            props += ", \"frame_count\": " + std::to_string(ffpv->getFrameCount());
+                            break;
+                        }
+                        v = v->nextView();
+                    } while (v && v != child);
+                }
+                props += "}";
             }
         } else if (type == "gradient") {
             // Keep concrete gradient subtype in props for backward compatibility.
