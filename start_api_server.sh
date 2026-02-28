@@ -1,6 +1,9 @@
 #!/bin/bash
 # Start the TUI Control API server for programmatic window management
 # This enables MCP integration for Claude Code and other AI tools
+#
+# The API auto-discovers any running wwdos IPC socket.
+# Just start wwdos first, then run this. No env vars needed.
 
 set -e
 
@@ -8,12 +11,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
 PORT="${WIBWOB_API_PORT:-8089}"
-
-# Socket: /tmp/wwdos.sock by default, or /tmp/wibwob_N.sock if WIBWOB_INSTANCE=N.
-# Only set WIBWOB_INSTANCE if running multiple TUI instances.
-if [ -n "${WIBWOB_INSTANCE:-}" ]; then
-    export WIBWOB_INSTANCE
-fi
 
 # Kill any stale server on this port
 STALE_PID=$(lsof -ti :"$PORT" 2>/dev/null || true)
