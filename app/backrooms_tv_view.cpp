@@ -167,14 +167,13 @@ bool BackroomsBridge::start(const BackroomsChannel &channel) {
     }
 
     // Build command
-    std::string cmd = "cd " + backroomsPath + " && npx tsx src/ui/cli-v3.ts";
+    std::string cmd = "cd " + backroomsPath + " && npx tsx src/ui/cli.ts";
     cmd += " \"" + channel.theme + "\"";
     cmd += " --turns " + std::to_string(channel.turns);
     if (!allPrimers.empty()) {
         cmd += " --primers \"" + allPrimers + "\"";
     }
     cmd += " --model " + channel.model;
-    cmd += " --raw";       // stream only LLM deltas to stdout, no formatting
     cmd += " 2>/dev/null"; // suppress stderr
 
     // Create pipe
