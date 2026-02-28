@@ -31,7 +31,10 @@ import { ControlApiService } from "../services/control-api.js";
 import { ContentService } from "../services/content-service.js";
 import { getDefaultFigletFont, getFigletCatalogue, getFigletFontChoices, measureFiglet, renderFiglet } from "../services/figlet-service.js";
 import { PiService } from "../services/pi-service.js";
+import { createPtySession, type PtySession } from "../services/pty-session.js";
 import { StateService } from "../services/state-service.js";
+import { TerminalBuffer } from "../services/terminal-buffer.js";
+import { renderTerminalBuffer } from "../services/terminal-renderer.js";
 import { WorkspaceService } from "../services/workspace-service.js";
 
 export class TsTuiMvpApp {
@@ -93,7 +96,10 @@ export class TsTuiMvpApp {
     this.windowManager = new WindowManager(
       this.screen,
       this.desktop,
-      () => this.syncState(),
+      () => {
+        this.syncState();
+        this.refreshTerminalWindows();
+      },
       (window, x, y) => this.openWindowContextMenu(window, x, y)
     );
     this.geometry = new DesktopGeometryService(this.screen);
@@ -139,6 +145,7 @@ export class TsTuiMvpApp {
           { label: "Load Workspace...", action: () => this.promptForWorkspaceLoad() },
           { label: "Open Art Window", action: () => this.openArtWindow() },
           { label: "Open Terminal", action: () => void this.openTerminalWindow() },
+          { label: "Open XTerm Shell", action: () => void this.openXTermShellWindow() },
           { label: "Open Pi Chat", action: () => void this.openPiChatWindow() },
           { label: "Quit", action: () => this.destroy() }
         ]
@@ -186,6 +193,7 @@ export class TsTuiMvpApp {
           { label: "Chat Transcript", action: () => this.openChatWindow() },
           { label: "Companion", action: () => this.openCompanionWindow() },
           { label: "Workspace Manager", action: () => this.openWorkspaceManagerWindow() },
+          { label: "XTerm Shell", action: () => void this.openXTermShellWindow() },
           { label: "Pi Chat", action: () => void this.openPiChatWindow() },
           { label: "Command Palette", action: () => this.openCommandPaletteWindow() },
           { label: "State Inspector", action: () => this.openStateInspectorWindow() }
@@ -198,8 +206,6 @@ export class TsTuiMvpApp {
     this.renderChrome();
     this.bindGlobalKeys();
     this.bindMenuClicks();
-    this.openPrimerWindow(README_PATH);
-    this.openEditorWindow(undefined, "notes.txt", "Type here. Ctrl-S saves when the buffer has a path.\n");
     this.openCompanionWindow();
     this.controlApi.start();
     this.syncState();
@@ -214,6 +220,14 @@ export class TsTuiMvpApp {
       this.syncState();
       this.screen.render();
     });
+  }
+
+  private refreshTerminalWindows(): void {
+    for (const window of this.windowManager.getWindows()) {
+      if (window.kind === "terminal" && window.terminal?.mode === "xterm-bridge") {
+        window.refresh?.();
+      }
+    }
   }
 
   private updateStatusLine(): void {
@@ -249,11 +263,18 @@ export class TsTuiMvpApp {
         this.insertEditorText(focused, "  ");
         return;
       }
+      if (focused?.kind === "terminal" && focused.terminal?.mode === "xterm-bridge") {
+        focused.writeInput?.("\t");
+        return;
+      }
       this.windowManager.focusNextWindow(1);
     });
     this.screen.key(["S-tab"], () => this.windowManager.focusNextWindow(-1));
     this.screen.key(["C-s"], () => this.saveFocusedEditor());
-    this.screen.on("keypress", (ch, key) => this.handleFocusedEditorKeypress(ch, key));
+    this.screen.on("keypress", (ch, key) => {
+      this.handleFocusedEditorKeypress(ch, key);
+      this.handleFocusedTerminalKeypress(ch, key);
+    });
     this.screen.on("mouse", (data) => this.windowManager.handleMouse(data));
     this.desktop.on("mousedown", (data) => {
       if (this.isRightClick(data) && !this.windowManager.getWindowAtPosition(data.x, data.y)) {
@@ -400,6 +421,7 @@ export class TsTuiMvpApp {
       { label: "Open Primer Browser", action: () => this.openPrimerBrowserWindow() },
       { label: "Open Text File", action: () => this.promptForEditorPath() },
       { label: "Open Backrooms TV", action: () => this.promptForBackroomsTv() },
+      { label: "Open XTerm Shell", action: () => void this.openXTermShellWindow() },
       { label: "Open Pi Chat", action: () => void this.openPiChatWindow() },
       { label: "Open Workspace Manager", action: () => this.openWorkspaceManagerWindow() },
       { label: "Tile Windows", action: () => this.windowManager.tileWindows() },
@@ -428,6 +450,18 @@ export class TsTuiMvpApp {
     });
   }
 
+  private async openXTermShellWindow(): Promise<void> {
+    await this.openBufferedTerminalWindow({
+      title: "XTerm Shell",
+      appType: "xterm-shell",
+      command: this.resolveShellPath(),
+      args: ["-i"],
+      cwd: REPO_ROOT,
+      env: this.getPtyEnv(),
+      summary: "Buffered PTY shell window with a local blessed terminal bridge."
+    });
+  }
+
   private async openPiChatWindow(): Promise<void> {
     if (!this.pi.isAvailable()) {
       this.overlays.flash("Pi is not installed in the spike. Run bun install first.");
@@ -445,6 +479,143 @@ export class TsTuiMvpApp {
       intro: "Pi coding agent running inside a terminal window. This is the first reusable chat slice, not yet a fully integrated typed agent surface.",
       shellPath: launch.command
     });
+  }
+
+  private async openBufferedTerminalWindow(options: {
+    title: string;
+    appType: string;
+    command: string;
+    args: string[];
+    cwd: string;
+    env: Record<string, string>;
+    summary: string;
+  }): Promise<void> {
+    const frame = this.windowManager.createFrame(options.title, "terminal");
+    const viewport = blessed.box({
+      parent: frame.body,
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      tags: true,
+      mouse: true,
+      style: { fg: "white", bg: "black" }
+    });
+
+    const getTerminalSize = () => ({
+      cols: Math.max(20, Number(frame.body.width)),
+      rows: Math.max(8, Number(frame.body.height))
+    });
+
+    const buffer = new TerminalBuffer(getTerminalSize().cols, getTerminalSize().rows);
+    let session: PtySession;
+    try {
+      session = createPtySession({
+        command: options.command,
+        args: options.args,
+        cwd: options.cwd,
+        env: options.env,
+        ...getTerminalSize()
+      });
+    } catch (error) {
+      frame.close();
+      this.overlays.flash(`${options.title} launch failed: ${error instanceof Error ? error.message : String(error)}`);
+      return;
+    }
+
+    let running = true;
+    let exitCode: number | undefined;
+    let exitSignal: number | undefined;
+
+    const render = () => {
+      const showCursor = this.windowManager.getFocusedWindow()?.id === frame.id && !this.menuList && !this.popupMenu;
+      viewport.setContent(renderTerminalBuffer(buffer, showCursor));
+      this.syncState();
+      this.screen.render();
+    };
+
+    const syncSize = () => {
+      const size = getTerminalSize();
+      buffer.resize(size.cols, size.rows);
+      session.resize(size.cols, size.rows);
+      render();
+    };
+
+    const handleScreenResize = () => syncSize();
+
+    session.onData((chunk) => {
+      buffer.write(chunk);
+      render();
+    });
+    session.onExit((event) => {
+      running = false;
+      exitCode = event.exitCode;
+      exitSignal = event.signal;
+      buffer.write(`\r\n[process exited ${event.exitCode} signal ${event.signal ?? "none"}]\r\n`);
+      render();
+    });
+
+    frame.kind = "terminal";
+    frame.terminal = {
+      mode: "xterm-bridge",
+      viewport,
+      scrollViewport: (delta) => {
+        buffer.scrollViewport(delta);
+        render();
+      }
+    };
+    frame.cleanup = () => {
+      this.screen.off("resize", handleScreenResize);
+      session.kill();
+    };
+    frame.writeInput = (input) => {
+      session.write(input);
+    };
+    frame.refresh = render;
+    frame.describeState = () => {
+      const cursor = buffer.getCursor();
+      return {
+        appType: options.appType,
+        summary: options.summary,
+        command: options.command,
+        args: options.args,
+        cwd: options.cwd,
+        cols: buffer.getCols(),
+        rows: buffer.getRows(),
+        cursorX: cursor.x,
+        cursorY: cursor.y,
+        viewportTop: buffer.getViewportTop(),
+        scrollbackLines: buffer.getScrollbackLineCount(),
+        running,
+        exitCode,
+        exitSignal,
+        pid: session.pid,
+        contentPreview: buffer.getPreviewText()
+      };
+    };
+    frame.focus = () => {
+      this.windowManager.focusWindow(frame);
+      render();
+    };
+
+    viewport.on("click", () => {
+      this.windowManager.focusWindow(frame);
+      render();
+    });
+    viewport.on("wheelup", () => {
+      buffer.scrollViewport(-3);
+      render();
+    });
+    viewport.on("wheeldown", () => {
+      buffer.scrollViewport(3);
+      render();
+    });
+
+    this.windowManager.registerWindow(frame);
+    frame.frame.on("resize", syncSize);
+    this.screen.on("resize", handleScreenResize);
+    frame.focus();
+    render();
   }
 
   private async openPtyWindow(options: {
@@ -538,7 +709,7 @@ export class TsTuiMvpApp {
     });
 
     frame.kind = "terminal";
-    frame.terminal = { transcript, input: inputLine };
+    frame.terminal = { mode: "legacy", transcript, input: inputLine };
     frame.cleanup = () => {
       this.screen.off("resize", handleScreenResize);
       pty.kill();
@@ -2016,6 +2187,67 @@ export class TsTuiMvpApp {
     }
   }
 
+  private handleFocusedTerminalKeypress(ch: string, key: blessed.Widgets.Events.IKeyEventArg): void {
+    const window = this.windowManager.getFocusedWindow();
+    if (!window || window.kind !== "terminal" || window.terminal?.mode !== "xterm-bridge" || !window.writeInput) {
+      return;
+    }
+    if (this.menuList || this.popupMenu) {
+      return;
+    }
+    if (key.ctrl && key.name === "q") {
+      return;
+    }
+    if (key.full === "S-tab") {
+      return;
+    }
+    if (key.meta) {
+      return;
+    }
+    if (key.name === "pageup") {
+      window.terminal.scrollViewport?.(-8);
+      return;
+    }
+    if (key.name === "pagedown") {
+      window.terminal.scrollViewport?.(8);
+      return;
+    }
+    const escapeSequences: Record<string, string> = {
+      up: "\u001b[A",
+      down: "\u001b[B",
+      right: "\u001b[C",
+      left: "\u001b[D",
+      home: "\u001b[H",
+      end: "\u001b[F",
+      delete: "\u001b[3~",
+      pageup: "\u001b[5~",
+      pagedown: "\u001b[6~"
+    };
+    if (key.name === "enter") {
+      window.writeInput("\r");
+      return;
+    }
+    if (key.name === "backspace") {
+      window.writeInput("\u007f");
+      return;
+    }
+    if (key.name === "tab") {
+      window.writeInput("\t");
+      return;
+    }
+    if (key.name && escapeSequences[key.name]) {
+      window.writeInput(escapeSequences[key.name]);
+      return;
+    }
+    if (typeof key.sequence === "string" && key.sequence.length > 0) {
+      window.writeInput(key.sequence);
+      return;
+    }
+    if (ch && !key.meta) {
+      window.writeInput(ch);
+    }
+  }
+
   private insertEditorText(window: WindowRecord, text: string): void {
     if (!window.editor) {
       return;
@@ -2369,7 +2601,13 @@ export class TsTuiMvpApp {
         });
         break;
       case "terminal":
-        void this.openTerminalWindow();
+        if (payload.appType === "xterm-shell") {
+          void this.openXTermShellWindow();
+        } else if (payload.appType === "pi-chat") {
+          void this.openPiChatWindow();
+        } else {
+          void this.openTerminalWindow();
+        }
         break;
       case "backrooms":
         this.openBackroomsTv({
@@ -2477,6 +2715,12 @@ export class TsTuiMvpApp {
               : "auto"
         };
       }
+      case "terminal": {
+        const details = window.describeState?.();
+        return {
+          appType: typeof details?.appType === "string" ? details.appType : "terminal-shell"
+        };
+      }
       case "companion": {
         const details = window.describeState?.();
         return {
@@ -2508,6 +2752,7 @@ export class TsTuiMvpApp {
       { label: "Tile Windows", action: () => this.windowManager.tileWindows() },
       { label: "Cascade Windows", action: () => this.windowManager.cascadeWindows() },
       { label: "Open Terminal", action: () => void this.openTerminalWindow() },
+      { label: "Open XTerm Shell", action: () => void this.openXTermShellWindow() },
       { label: "Open Pi Chat", action: () => void this.openPiChatWindow() }
     ];
   }

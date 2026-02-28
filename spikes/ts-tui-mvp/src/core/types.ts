@@ -62,8 +62,11 @@ export interface GalleryTab {
 }
 
 export interface TerminalState {
-  transcript: LogBox;
-  input: Textbox;
+  mode: "legacy" | "xterm-bridge";
+  viewport?: Box;
+  transcript?: LogBox;
+  input?: Textbox;
+  scrollViewport?: (delta: number) => void;
 }
 
 export interface ChatState {
@@ -149,6 +152,7 @@ export interface WindowRecord {
   chat?: ChatState;
   writeInput?: (input: string) => void;
   cleanup?: () => void;
+  refresh?: () => void;
   describeState?: () => WindowStateDetails;
   openContextMenu?: (x?: number, y?: number) => void;
 }
