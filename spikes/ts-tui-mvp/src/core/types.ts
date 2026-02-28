@@ -9,6 +9,7 @@ export type WindowKind =
   | "primer"
   | "editor"
   | "terminal"
+  | "backrooms"
   | "browser"
   | "art"
   | "gallery"
@@ -32,6 +33,14 @@ export interface EditorState {
 export interface BrowserEntry {
   label: string;
   filePath: string;
+}
+
+export interface BackroomsChannel {
+  theme: string;
+  primers: string;
+  turns: number;
+  model: "haiku" | "sonnet" | "opus";
+  mode?: "auto" | "live" | "fake-live";
 }
 
 export interface PrimerGroup {
@@ -96,6 +105,8 @@ export interface DesktopState {
     mode: string;
     cwd: string;
     statePath: string;
+    controlApiEnabled?: boolean;
+    controlApiPort?: number;
   };
   screen: {
     width: number;
@@ -130,6 +141,7 @@ export interface WindowRecord {
   writeInput?: (input: string) => void;
   cleanup?: () => void;
   describeState?: () => WindowStateDetails;
+  openContextMenu?: (x?: number, y?: number) => void;
 }
 
 export interface DragState {

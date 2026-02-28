@@ -1,12 +1,14 @@
 import blessed from "blessed";
+import { spawn as spawnProcess, type ChildProcessWithoutNullStreams } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { spawn, type IPty as BunPtyTerminal, type IExitEvent as BunPtyExitEvent } from "@skitee3000/bun-pty/dist/index.js";
+import { spawn as spawnPty, type IPty as BunPtyTerminal, type IExitEvent as BunPtyExitEvent } from "@skitee3000/bun-pty/dist/index.js";
 
-import { MASTER_PHILOSOPHY_PATH, README_PATH, REPO_ROOT, SPIKE_NOTES_PATH, SPIKE_ROOT, STATE_PATH, WORKSPACES_DIR } from "./config.js";
+import { CONTROL_API_PORT, MASTER_PHILOSOPHY_PATH, README_PATH, REPO_ROOT, SPIKE_NOTES_PATH, SPIKE_ROOT, STATE_PATH, WORKSPACES_DIR } from "./config.js";
 import { OverlayManager } from "./overlay-manager.js";
 import type {
+  BackroomsChannel,
   Box,
   BrowserEntry,
   DesktopState,
@@ -20,9 +22,11 @@ import type {
   WindowSnapshot
 } from "./types.js";
 import { WindowManager } from "./window-manager.js";
+import { BackroomsService } from "../services/backrooms-service.js";
 import { makeWibReply, makeWobReply } from "../services/chat-service.js";
+import { ControlApiService } from "../services/control-api.js";
 import { ContentService } from "../services/content-service.js";
-import { renderFiglet } from "../services/figlet-service.js";
+import { getDefaultFigletFont, getFigletCatalogue, getFigletFontChoices, measureFiglet, renderFiglet } from "../services/figlet-service.js";
 import { StateService } from "../services/state-service.js";
 import { WorkspaceService } from "../services/workspace-service.js";
 
@@ -32,13 +36,16 @@ export class TsTuiMvpApp {
   private readonly desktop: Box;
   private readonly statusLine: Box;
   private menuList?: List;
+  private popupMenu?: List;
   private openMenuLabel?: string;
   private readonly menus: MenuConfig[];
   private readonly windowManager: WindowManager;
   private readonly overlays: OverlayManager;
+  private readonly backrooms = new BackroomsService();
   private readonly content = new ContentService();
   private readonly workspace = new WorkspaceService(WORKSPACES_DIR);
   private readonly state: StateService;
+  private readonly controlApi: ControlApiService;
 
   constructor() {
     this.screen = blessed.screen({
@@ -77,14 +84,30 @@ export class TsTuiMvpApp {
       style: { fg: "black", bg: "white" }
     });
 
-    this.windowManager = new WindowManager(this.screen, this.desktop, () => this.syncState());
+    this.windowManager = new WindowManager(
+      this.screen,
+      this.desktop,
+      () => this.syncState(),
+      (window, x, y) => this.openWindowContextMenu(window, x, y)
+    );
     this.overlays = new OverlayManager(this.screen, () => this.windowManager.restoreWindowFocus());
+    this.controlApi = new ControlApiService(CONTROL_API_PORT, {
+      getState: () => this.getDesktopState(),
+      focusWindowById: (id) => this.focusWindowById(id),
+      moveWindowById: (id, left, top) => this.moveWindowById(id, left, top),
+      resizeWindowById: (id, width, height) => this.resizeWindowById(id, width, height),
+      closeWindowById: (id) => this.closeWindowById(id),
+      openBackroomsTv: (channel) => this.openBackroomsTv(channel),
+      saveWorkspaceNamed: (name) => this.saveWorkspaceNamed(name),
+      loadWorkspaceNamed: (name) => this.loadWorkspaceNamed(name)
+    });
     this.state = new StateService(
       {
         appName: "WibWob-DOS TS MVP",
         appMode: "terminal-native",
         cwd: REPO_ROOT,
-        statePath: STATE_PATH
+        statePath: STATE_PATH,
+        getControlApiStatus: () => this.controlApi.getStatus()
       },
       {
         getScreenSize: () => ({
@@ -125,9 +148,15 @@ export class TsTuiMvpApp {
         ]
       },
       {
+        label: "View",
+        key: "v",
+        left: 15,
+        items: [{ label: "Backrooms TV...", action: () => this.promptForBackroomsTv() }]
+      },
+      {
         label: "Window",
         key: "w",
-        left: 15,
+        left: 22,
         items: [
           { label: "Tile Windows", action: () => this.windowManager.tileWindows() },
           { label: "Cascade Windows", action: () => this.windowManager.cascadeWindows() },
@@ -139,8 +168,9 @@ export class TsTuiMvpApp {
       {
         label: "Tools",
         key: "t",
-        left: 24,
+        left: 31,
         items: [
+          { label: "Backrooms TV", action: () => this.promptForBackroomsTv() },
           { label: "Primer Gallery", action: () => this.openPrimerGalleryWindow() },
           { label: "Browser Reader", action: () => this.openBrowserReaderWindow() },
           { label: "Figlet Banner", action: () => this.promptForFigletText() },
@@ -164,6 +194,7 @@ export class TsTuiMvpApp {
     this.openPrimerWindow(README_PATH);
     this.openEditorWindow(undefined, "notes.txt", "Type here. Ctrl-S saves when the buffer has a path.\n");
     this.openCompanionWindow();
+    this.controlApi.start();
     this.syncState();
     this.screen.render();
   }
@@ -185,22 +216,25 @@ export class TsTuiMvpApp {
       ? ` Focus ${focus.id}:${focus.kind} ${focus.width}x${focus.height}@${focus.left},${focus.top}`
       : " Focus none";
     this.statusLine.setContent(
-      ` Alt-F File  Alt-E Edit  Alt-W Window  Alt-T Tools  Tab Next  Shift-Tab Prev  Ctrl-S Save  Ctrl-Q Quit  |  Term ${current.screen.width}x${current.screen.height}  Windows ${current.screen.openWindowCount}${focusSummary} `
+      ` Alt-F File  Alt-E Edit  Alt-V View  Alt-W Window  Alt-T Tools  Tab Next  Shift-Tab Prev  Alt-Shift-Arrows Resize  Ctrl-S Save  Ctrl-Q Quit  |  Term ${current.screen.width}x${current.screen.height}  Windows ${current.screen.openWindowCount}${focusSummary} `
     );
   }
 
   private repaintDesktop(): void {
-    const width = Number(this.screen.width);
-    const height = Math.max(0, Number(this.screen.height) - 2);
-    this.desktop.setContent(Array.from({ length: height }, () => "▒".repeat(width)).join("\n"));
+    this.desktop.setContent("");
   }
 
   private bindGlobalKeys(): void {
     this.screen.key(["C-q"], () => this.destroy());
     this.screen.key(["M-f"], () => this.openMenu("File"));
     this.screen.key(["M-e"], () => this.openMenu("Edit"));
+    this.screen.key(["M-v"], () => this.openMenu("View"));
     this.screen.key(["M-w"], () => this.openMenu("Window"));
     this.screen.key(["M-t"], () => this.openMenu("Tools"));
+    this.screen.key(["M-S-left"], () => this.windowManager.resizeFocusedWindow(-2, 0));
+    this.screen.key(["M-S-right"], () => this.windowManager.resizeFocusedWindow(2, 0));
+    this.screen.key(["M-S-up"], () => this.windowManager.resizeFocusedWindow(0, -1));
+    this.screen.key(["M-S-down"], () => this.windowManager.resizeFocusedWindow(0, 1));
     this.screen.key(["escape"], () => this.closeMenu());
     this.screen.key(["tab"], () => {
       const focused = this.windowManager.getFocusedWindow();
@@ -214,6 +248,11 @@ export class TsTuiMvpApp {
     this.screen.key(["C-s"], () => this.saveFocusedEditor());
     this.screen.on("keypress", (ch, key) => this.handleFocusedEditorKeypress(ch, key));
     this.screen.on("mouse", (data) => this.windowManager.handleMouse(data));
+    this.desktop.on("mousedown", (data) => {
+      if (this.isRightClick(data) && !this.windowManager.getWindowAtPosition(data.x, data.y)) {
+        this.openSystemContextMenu(data.x, data.y);
+      }
+    });
   }
 
   private bindMenuClicks(): void {
@@ -238,7 +277,7 @@ export class TsTuiMvpApp {
   }
 
   private openMenu(label: string): void {
-    this.closeMenu();
+    this.closeMenus();
     const menu = this.menus.find((entry) => entry.label === label);
     if (!menu) {
       return;
@@ -284,6 +323,90 @@ export class TsTuiMvpApp {
     this.screen.render();
   }
 
+  private closePopupMenu(): void {
+    if (!this.popupMenu) {
+      return;
+    }
+    this.popupMenu.destroy();
+    this.popupMenu = undefined;
+    this.windowManager.restoreWindowFocus();
+    this.screen.render();
+  }
+
+  private closeMenus(): void {
+    this.closeMenu();
+    this.closePopupMenu();
+  }
+
+  private openPopupMenu(items: Array<{ label: string; action: () => void }>, x?: number, y?: number): void {
+    this.closeMenus();
+    if (items.length === 0) {
+      return;
+    }
+    const width = Math.max(...items.map((item) => item.label.length)) + 4;
+    const left = Math.max(0, Math.min((x ?? 2) - 1, Math.max(0, Number(this.screen.width) - width - 1)));
+    const top = Math.max(1, Math.min(y ?? 2, Math.max(1, Number(this.screen.height) - items.length - 3)));
+    this.popupMenu = blessed.list({
+      parent: this.screen,
+      top,
+      left,
+      width,
+      height: items.length + 2,
+      border: "line",
+      keys: true,
+      vi: true,
+      mouse: true,
+      style: {
+        fg: "white",
+        bg: "black",
+        border: { fg: "white" },
+        selected: { fg: "black", bg: "cyan" }
+      },
+      items: items.map((item) => item.label)
+    });
+    this.popupMenu.focus();
+    this.popupMenu.select(0);
+    this.popupMenu.on("select", (_, index) => {
+      const item = items[index];
+      this.closePopupMenu();
+      item?.action();
+    });
+    this.popupMenu.on("keypress", (_, key) => {
+      if (key.name === "escape") {
+        this.closePopupMenu();
+      }
+    });
+    this.screen.render();
+  }
+
+  private openWindowContextMenu(window: WindowRecord, x?: number, y?: number): void {
+    this.openPopupMenu([
+      { label: `Focus ${window.title}`, action: () => window.focus() },
+      { label: "Tile Windows", action: () => this.windowManager.tileWindows() },
+      { label: "Cascade Windows", action: () => this.windowManager.cascadeWindows() },
+      { label: "Close Window", action: () => window.close() }
+    ], x, y);
+  }
+
+  private openSystemContextMenu(x?: number, y?: number): void {
+    this.openPopupMenu([
+      { label: "Open Primer Browser", action: () => this.openPrimerBrowserWindow() },
+      { label: "Open Text File", action: () => this.promptForEditorPath() },
+      { label: "Open Backrooms TV", action: () => this.promptForBackroomsTv() },
+      { label: "Open Workspace Manager", action: () => this.openWorkspaceManagerWindow() },
+      { label: "Tile Windows", action: () => this.windowManager.tileWindows() },
+      { label: "Cascade Windows", action: () => this.windowManager.cascadeWindows() }
+    ], x, y);
+  }
+
+  private isRightClick(data?: blessed.Widgets.Events.IMouseEventArg): boolean {
+    if (!data) {
+      return false;
+    }
+    const mouseData = data as blessed.Widgets.Events.IMouseEventArg & { button?: string | number; buttons?: string | number };
+    return mouseData.button === "right" || mouseData.button === 2 || mouseData.buttons === "right" || mouseData.buttons === 2;
+  }
+
   private async openTerminalWindow(): Promise<void> {
     const frame = this.windowManager.createFrame("Terminal", "terminal");
     const transcript = blessed.log({
@@ -313,7 +436,7 @@ export class TsTuiMvpApp {
 
     let pty: BunPtyTerminal;
     try {
-      pty = spawn(this.resolveShellPath(), ["-i"], {
+      pty = spawnPty(this.resolveShellPath(), ["-i"], {
         name: "xterm-256color",
         cols: Math.max(20, Number(frame.body.width)),
         rows: Math.max(8, Number(frame.body.height) - 1),
@@ -334,17 +457,23 @@ export class TsTuiMvpApp {
       this.screen.render();
     };
 
+    let terminalPartialLine = "";
     pty.onData((chunk: string) => {
       const clean = chunk.replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, "").replace(/\r/g, "").replace(/\x07/g, "");
-      for (const line of clean.split("\n")) {
-        if (line.length > 0) {
-          transcript.log(line);
-        }
+      const combined = terminalPartialLine + clean;
+      const lines = combined.split("\n");
+      terminalPartialLine = lines.pop() ?? "";
+      for (const line of lines) {
+        transcript.log(line);
       }
       this.syncState();
       this.screen.render();
     });
     pty.onExit(({ exitCode, signal }: BunPtyExitEvent) => {
+      if (terminalPartialLine.length > 0) {
+        transcript.log(terminalPartialLine);
+        terminalPartialLine = "";
+      }
       transcript.log(`[process exited ${exitCode} signal ${signal ?? "none"}]`);
       this.syncState();
       this.screen.render();
@@ -390,6 +519,610 @@ export class TsTuiMvpApp {
     syncPtySize();
     transcript.log("Experimental shell window. Good for shell commands; full-screen TUIs are not expected to render cleanly yet.");
     this.syncState();
+  }
+
+  private promptForBackroomsTv(): void {
+    const defaults: BackroomsChannel = {
+      theme: "liminal fluorescent maze",
+      primers: "",
+      turns: 3,
+      model: "sonnet"
+    };
+    this.overlays.openValuePrompt("Backrooms Theme", defaults.theme, (theme) => {
+      this.openBackroomsPrimerPicker(theme.trim() || defaults.theme, defaults);
+    });
+  }
+
+  private openBackroomsPrimerPicker(theme: string, defaults: BackroomsChannel): void {
+    const allEntries = this.backrooms.collectPrimers();
+    if (allEntries.length === 0) {
+      this.overlays.flash("No Backrooms primers found.");
+      return;
+    }
+
+    const frame = this.windowManager.createFrame("Backrooms Primer Picker", "browser");
+    frame.frame.width = 96;
+    frame.frame.height = 28;
+
+    const header = blessed.box({
+      parent: frame.body,
+      top: 0,
+      left: 0,
+      right: 0,
+      height: 2,
+      style: { fg: "black", bg: "cyan" }
+    });
+    const searchBox = blessed.textbox({
+      parent: frame.body,
+      top: 2,
+      left: 0,
+      width: "36%",
+      height: 1,
+      inputOnFocus: true,
+      mouse: true,
+      style: { fg: "white", bg: "blue" }
+    });
+    const list = blessed.list({
+      parent: frame.body,
+      top: 3,
+      left: 0,
+      width: "36%",
+      bottom: 0,
+      keys: true,
+      vi: true,
+      mouse: true,
+      scrollable: true,
+      alwaysScroll: true,
+      scrollbar: this.createScrollbar(),
+      style: { fg: "white", bg: "black", selected: { fg: "black", bg: "white" } }
+    });
+    const preview = blessed.box({
+      parent: frame.body,
+      top: 2,
+      left: "36%",
+      right: 0,
+      bottom: 0,
+      mouse: true,
+      scrollable: true,
+      alwaysScroll: true,
+      scrollbar: this.createScrollbar(),
+      style: { fg: "white", bg: "black" }
+    });
+
+    let searchValue = "";
+    let filteredEntries = [...allEntries];
+    const selectedLabels = new Set<string>();
+
+    const syncHeader = () => {
+      header.setContent(
+        ` Theme: ${theme}\n Enter run  Space toggle  / search  Esc cancel  Letters jump  Selected: ${selectedLabels.size || 0} `
+      );
+    };
+
+    const renderList = (selectedIndex = 0) => {
+      list.setItems(
+        filteredEntries.map((entry) => `${selectedLabels.has(entry.label) ? "[x]" : "[ ]"} ${entry.label}`)
+      );
+      if (filteredEntries.length > 0) {
+        list.select(Math.max(0, Math.min(selectedIndex, filteredEntries.length - 1)));
+      } else {
+        list.select(0);
+      }
+      syncHeader();
+      this.screen.render();
+    };
+
+    const updatePreview = (index: number) => {
+      const entry = filteredEntries[index];
+      if (!entry) {
+        preview.setContent(searchValue ? `No primers match "${searchValue}".` : "No primer selected.");
+        this.screen.render();
+        return;
+      }
+      try {
+        const content = fs.readFileSync(entry.filePath, "utf8");
+        preview.setContent(`${entry.label}\n${entry.filePath}\n\n${content}`);
+      } catch (error) {
+        preview.setContent(`Cannot preview primer.\n\n${error instanceof Error ? error.message : String(error)}`);
+      }
+      this.screen.render();
+    };
+
+    const applyFilter = (preserveLabel?: string) => {
+      const lowered = searchValue.toLowerCase();
+      filteredEntries = allEntries.filter((entry) => entry.label.toLowerCase().includes(lowered));
+      const nextIndex = preserveLabel
+        ? Math.max(0, filteredEntries.findIndex((entry) => entry.label === preserveLabel))
+        : 0;
+      renderList(nextIndex < 0 ? 0 : nextIndex);
+      updatePreview((list as List & { selected: number }).selected ?? 0);
+    };
+
+    const toggleSelected = () => {
+      const index = (list as List & { selected: number }).selected ?? 0;
+      const entry = filteredEntries[index];
+      if (!entry) {
+        return;
+      }
+      if (selectedLabels.has(entry.label)) {
+        selectedLabels.delete(entry.label);
+      } else {
+        selectedLabels.add(entry.label);
+      }
+      renderList(index);
+      updatePreview(index);
+    };
+
+    const jumpToLetter = (letter: string) => {
+      const upper = letter.toUpperCase();
+      const index = filteredEntries.findIndex((entry) => entry.label.charAt(0).toUpperCase() === upper);
+      if (index >= 0) {
+        list.select(index);
+        updatePreview(index);
+        this.screen.render();
+      }
+    };
+
+    const closePicker = () => {
+      frame.close();
+    };
+
+    const confirmSelection = () => {
+      const focusedIndex = (list as List & { selected: number }).selected ?? 0;
+      const fallback = filteredEntries[focusedIndex]?.label;
+      const selected = selectedLabels.size > 0 ? [...selectedLabels] : fallback ? [fallback] : [];
+      closePicker();
+      this.promptForBackroomsRunOptions(theme, selected.join(","), defaults);
+    };
+
+    const focusSearch = () => {
+      searchBox.focus();
+      searchBox.readInput();
+      this.screen.render();
+    };
+
+    searchBox.setValue(searchValue);
+    searchBox.on("keypress", (_, key) => {
+      if (key.name === "escape") {
+        list.focus();
+        this.screen.render();
+        return;
+      }
+      if (key.name === "enter") {
+        searchValue = searchBox.getValue().trim();
+        applyFilter(filteredEntries[(list as List & { selected: number }).selected ?? 0]?.label);
+        list.focus();
+        this.screen.render();
+        return;
+      }
+      setTimeout(() => {
+        searchValue = searchBox.getValue().trim();
+        applyFilter(filteredEntries[(list as List & { selected: number }).selected ?? 0]?.label);
+      }, 0);
+    });
+    searchBox.on("submit", (value) => {
+      searchValue = (value ?? "").trim();
+      applyFilter(filteredEntries[(list as List & { selected: number }).selected ?? 0]?.label);
+      list.focus();
+      this.screen.render();
+    });
+
+    list.on("select item", (_, index) => updatePreview(index));
+    list.on("keypress", (ch, key) => {
+      if (key.name === "enter") {
+        confirmSelection();
+        return;
+      }
+      if (key.name === "space") {
+        toggleSelected();
+        return;
+      }
+      if (key.name === "escape") {
+        closePicker();
+        return;
+      }
+      if (key.name === "slash") {
+        focusSearch();
+        return;
+      }
+      if (["up", "down", "j", "k", "pageup", "pagedown", "home", "end"].includes(key.name ?? "")) {
+        setTimeout(() => updatePreview((list as List & { selected: number }).selected ?? 0), 0);
+        return;
+      }
+      if (ch && /^[a-z]$/i.test(ch)) {
+        jumpToLetter(ch);
+      }
+    });
+
+    frame.kind = "browser";
+    frame.describeState = () => ({
+      appType: "backrooms-primer-picker",
+      summary: `Backrooms primer picker with ${allEntries.length} primers.`,
+      theme,
+      searchValue,
+      selectedPrimers: [...selectedLabels],
+      visibleEntryCount: filteredEntries.length,
+      selectedLabel: filteredEntries[(list as List & { selected: number }).selected ?? 0]?.label,
+      contentPreview: preview.getContent().split("\n").slice(0, 8).join("\n")
+    });
+    frame.focus = () => {
+      this.windowManager.focusWindow(frame);
+      list.focus();
+    };
+
+    this.windowManager.registerWindow(frame);
+    renderList(0);
+    updatePreview(0);
+    frame.focus();
+  }
+
+  private promptForBackroomsRunOptions(theme: string, primers: string, defaults: BackroomsChannel): void {
+    this.overlays.openValuePrompt("Backrooms Turns", String(defaults.turns), (turnsValue) => {
+      this.overlays.openValuePrompt("Backrooms Model", defaults.model, (modelValue) => {
+        const turns = Math.max(1, Math.min(20, Number.parseInt(turnsValue, 10) || defaults.turns));
+        const model = ["haiku", "sonnet", "opus"].includes(modelValue.trim()) ? (modelValue.trim() as BackroomsChannel["model"]) : defaults.model;
+        this.openBackroomsTv({
+          theme,
+          primers,
+          turns,
+          model
+        });
+      });
+    });
+  }
+
+  openBackroomsTv(channel: BackroomsChannel): void {
+    const frame = this.windowManager.createFrame("Backrooms TV", "backrooms");
+    frame.frame.width = 86;
+    frame.frame.height = 24;
+
+    const header = blessed.box({
+      parent: frame.body,
+      top: 0,
+      left: 0,
+      right: 0,
+      height: 2,
+      tags: true,
+      style: { fg: "black", bg: "cyan" }
+    });
+    const transcript = blessed.log({
+      parent: frame.body,
+      top: 2,
+      left: 0,
+      right: 0,
+      bottom: 1,
+      tags: false,
+      mouse: true,
+      scrollable: true,
+      alwaysScroll: true,
+      scrollbar: this.createScrollbar(),
+      style: { fg: "white", bg: "black" }
+    }) as LogBox;
+    const footer = blessed.box({
+      parent: frame.body,
+      bottom: 0,
+      left: 0,
+      right: 0,
+      height: 1,
+      style: { fg: "black", bg: "white" }
+    });
+
+    let status = "IDLE";
+    let phase: "idle" | "starting" | "waiting" | "streaming" | "playback" | "complete" | "error" = "idle";
+    let processRef: ChildProcessWithoutNullStreams | undefined;
+    let backroomsPartialLine = "";
+    let logPath = this.backrooms.createLogPath(channel.theme);
+    let fallbackTimer: ReturnType<typeof setInterval> | undefined;
+    let fallbackPlaybackTimer: ReturnType<typeof setInterval> | undefined;
+    let lastError = "";
+    let sourceMode: "live" | "playback" | "simulated-live" = "live";
+    let playbackSourceLabels: string[] = [];
+    let liveStdoutBytes = 0;
+    let liveStderrBytes = 0;
+    let lastActivityAt = 0;
+    let sawLiveStdout = false;
+    let startTime = 0;
+    let startedAt = "";
+    let endedAt = "";
+    let exitCode: number | null = null;
+    let exitSignal: NodeJS.Signals | null = null;
+    let fallbackReason = "";
+    const requestedMode = channel.mode ?? "auto";
+    let launchMode = this.backrooms.resolveLaunchMode(requestedMode);
+    const command = this.backrooms.resolveCliCommand();
+    const cliArgs = this.backrooms.buildCliArgs(channel);
+    const backroomsCwd = this.backrooms.resolveBackroomsPath();
+    let runRoot = "";
+
+    const updateChrome = () => {
+      header.setContent(
+        ` Theme: ${channel.theme}\n Model: ${channel.model}  Turns: ${channel.turns}  Primers: ${channel.primers || "(none)"}  Mode: ${launchMode}${
+          (sourceMode === "playback" || sourceMode === "simulated-live") && playbackSourceLabels.length > 0 ? `  Playback: ${playbackSourceLabels.join(" | ")}` : ""
+        } `
+      );
+      footer.setContent(` ${status} [${sourceMode}]  log: ${logPath}  Space restart  N restart  Alt-Shift-Arrows resize  +> mouse resize `);
+    };
+
+    const appendChunk = (chunk: string) => {
+      const clean = this.backrooms.sanitizeOutputChunk(chunk);
+      if (!clean) {
+        return;
+      }
+      lastActivityAt = Date.now();
+      liveStdoutBytes += Buffer.byteLength(clean);
+      sawLiveStdout = sawLiveStdout || clean.length > 0;
+      if (sourceMode === "live") {
+        phase = "streaming";
+        status = "STREAMING";
+        updateChrome();
+      }
+      fs.appendFileSync(logPath, clean, "utf8");
+      const combined = backroomsPartialLine + clean;
+      const lines = combined.split("\n");
+      backroomsPartialLine = lines.pop() ?? "";
+      for (const line of lines) {
+        transcript.log(line);
+      }
+      this.syncState();
+      this.screen.render();
+    };
+
+    const stopBackrooms = () => {
+      if (fallbackTimer) {
+        clearInterval(fallbackTimer);
+        fallbackTimer = undefined;
+      }
+      if (fallbackPlaybackTimer) {
+        clearInterval(fallbackPlaybackTimer);
+        fallbackPlaybackTimer = undefined;
+      }
+      if (!processRef || processRef.killed) {
+        return;
+      }
+      processRef.kill("SIGTERM");
+      processRef = undefined;
+      phase = "idle";
+      status = "IDLE";
+      updateChrome();
+      this.syncState();
+      this.screen.render();
+    };
+
+    const startSimulatedLive = () => {
+      const playback = this.backrooms.buildPlaybackStream(channel, 3);
+      playbackSourceLabels = playback.labels;
+      sourceMode = "simulated-live";
+      phase = "streaming";
+      status = "SIMULATED LIVE";
+      fallbackReason = "forced-fake-live";
+      updateChrome();
+      if (playback.lines.length === 0) {
+        transcript.log("[backrooms fake-live unavailable: no local sample files found]");
+        phase = "error";
+        status = "SIMULATED LIVE UNAVAILABLE";
+        updateChrome();
+        this.syncState();
+        this.screen.render();
+        return;
+      }
+      transcript.log(`[backrooms fake-live] ${playbackSourceLabels.join(", ")}`);
+      let index = 0;
+      fallbackPlaybackTimer = setInterval(() => {
+        if (index >= playback.lines.length) {
+          if (fallbackPlaybackTimer) {
+            clearInterval(fallbackPlaybackTimer);
+            fallbackPlaybackTimer = undefined;
+          }
+          phase = "complete";
+          status = "SIMULATED COMPLETE";
+          updateChrome();
+          this.syncState();
+          this.screen.render();
+          return;
+        }
+        transcript.log(playback.lines[index]);
+        index += 1;
+        this.syncState();
+        this.screen.render();
+      }, 30);
+    };
+
+    const startPlaybackFallback = (reason: string) => {
+      if (fallbackPlaybackTimer) {
+        return;
+      }
+      if (processRef && !processRef.killed) {
+        processRef.kill("SIGTERM");
+        processRef = undefined;
+      }
+      fallbackReason = reason;
+      sourceMode = "playback";
+      phase = "playback";
+      status = `PLAYBACK ${reason}`;
+      const playback = this.backrooms.buildPlaybackStream(channel, 3);
+      playbackSourceLabels = playback.labels;
+      if (playback.lines.length === 0) {
+        transcript.log("[backrooms playback unavailable: no local sample files found]");
+        phase = "error";
+        status = "PLAYBACK UNAVAILABLE";
+        updateChrome();
+        this.syncState();
+        this.screen.render();
+        return;
+      }
+      let index = 0;
+      transcript.log(`[backrooms playback fallback] ${playbackSourceLabels.join(", ")}`);
+      updateChrome();
+      fallbackPlaybackTimer = setInterval(() => {
+        if (index >= playback.lines.length) {
+          if (fallbackPlaybackTimer) {
+            clearInterval(fallbackPlaybackTimer);
+            fallbackPlaybackTimer = undefined;
+          }
+          phase = "complete";
+          status = "PLAYBACK COMPLETE";
+          updateChrome();
+          this.syncState();
+          this.screen.render();
+          return;
+        }
+        transcript.log(playback.lines[index]);
+        index += 1;
+        this.syncState();
+        this.screen.render();
+      }, 35);
+    };
+
+    const startBackrooms = () => {
+      stopBackrooms();
+      transcript.setContent("");
+      backroomsPartialLine = "";
+      logPath = this.backrooms.createLogPath(channel.theme);
+      launchMode = this.backrooms.resolveLaunchMode(requestedMode);
+      phase = "starting";
+      status = "STARTING";
+      sourceMode = "live";
+      playbackSourceLabels = [];
+      lastError = "";
+      liveStdoutBytes = 0;
+      liveStderrBytes = 0;
+      lastActivityAt = Date.now();
+      sawLiveStdout = false;
+      startTime = Date.now();
+      startedAt = new Date(startTime).toISOString();
+      endedAt = "";
+      exitCode = null;
+      exitSignal = null;
+      fallbackReason = "";
+      runRoot = this.backrooms.prepareRunRoot(channel);
+      updateChrome();
+
+      if (launchMode === "fake-live") {
+        startSimulatedLive();
+        this.syncState();
+        this.screen.render();
+        return;
+      }
+
+      processRef = spawnProcess(command.command, cliArgs, {
+        cwd: backroomsCwd,
+        env: {
+          ...process.env,
+          TERM: "dumb",
+          NO_COLOR: "1",
+          DOTENV_CONFIG_QUIET: "true",
+          WIBWOB_ROOT: runRoot,
+          WIBWOB_AUTH_METHOD: process.env.WIBWOB_AUTH_METHOD || "claude-cli"
+        }
+      });
+
+      processRef.stdout.on("data", (chunk: Buffer) => appendChunk(chunk.toString("utf8")));
+      processRef.stderr.on("data", (chunk: Buffer) => {
+        const text = this.backrooms.sanitizeOutputChunk(chunk.toString("utf8")).trim();
+        liveStderrBytes += Buffer.byteLength(text);
+        lastActivityAt = Date.now();
+        if (!text) {
+          return;
+        }
+        if (!sawLiveStdout) {
+          phase = "waiting";
+          status = "WAITING FOR FIRST TOKENS";
+        }
+        lastError = text;
+        fs.appendFileSync(logPath, `[stderr] ${text}\n`, "utf8");
+        transcript.log(`[stderr] ${text}`);
+        this.syncState();
+        this.screen.render();
+      });
+      processRef.on("close", (code, signal) => {
+        if (fallbackTimer) {
+          clearInterval(fallbackTimer);
+          fallbackTimer = undefined;
+        }
+        processRef = undefined;
+        endedAt = new Date().toISOString();
+        exitCode = code ?? null;
+        exitSignal = signal ?? null;
+        if (backroomsPartialLine.length > 0) {
+          transcript.log(backroomsPartialLine);
+          backroomsPartialLine = "";
+        }
+        phase = code === 0 ? "complete" : "error";
+        status = `EXIT ${code ?? "?"}/${signal ?? "none"}`;
+        updateChrome();
+        transcript.log(`[backrooms exited code=${code ?? "?"} signal=${signal ?? "none"}]`);
+        if (!sawLiveStdout) {
+          startPlaybackFallback(code === 0 && liveStderrBytes === 0 ? "silent" : "error");
+        }
+        this.syncState();
+        this.screen.render();
+      });
+
+      fallbackTimer = setInterval(() => {
+        const silentForMs = Date.now() - lastActivityAt;
+        const uptimeMs = Date.now() - startTime;
+        if (!processRef || processRef.killed || sourceMode !== "live" || sawLiveStdout) {
+          return;
+        }
+        if (uptimeMs >= 1000 && phase === "starting") {
+          phase = "waiting";
+          status = "WAITING FOR FIRST TOKENS";
+          updateChrome();
+          this.syncState();
+          this.screen.render();
+        }
+        if (uptimeMs >= 8000 && silentForMs >= 8000) {
+          transcript.log("[backrooms live mode is still silent after 8s]");
+          if (lastError) {
+            transcript.log(`[backrooms last stderr] ${lastError}`);
+          }
+          startPlaybackFallback("timeout");
+        }
+      }, 1000);
+    };
+
+    updateChrome();
+    frame.cleanup = () => stopBackrooms();
+    frame.describeState = () => ({
+      appType: "backrooms-tv",
+      summary: "Streams existing backrooms cli-v3.ts output into a scrolling window.",
+      theme: channel.theme,
+      primers: channel.primers,
+      turns: channel.turns,
+      model: channel.model,
+      requestedMode,
+      launchMode,
+      phase,
+      status,
+      sourceMode,
+      playbackSources: playbackSourceLabels,
+      lastError,
+      fallbackReason,
+      logPath,
+      command: command.command,
+      args: cliArgs,
+      cwd: backroomsCwd,
+      runRoot,
+      pid: processRef?.pid,
+      startedAt,
+      endedAt,
+      exitCode,
+      exitSignal,
+      liveStdoutBytes,
+      liveStderrBytes,
+      lastActivityMsAgo: Math.max(0, Date.now() - lastActivityAt),
+      uptimeMs: Math.max(0, Date.now() - startTime),
+      contentPreview: transcript.getContent().split("\n").slice(-12).join("\n"),
+      transcriptLineCount: transcript.getContent().split("\n").filter(Boolean).length
+    });
+    frame.focus = () => {
+      this.windowManager.focusWindow(frame);
+      transcript.focus();
+    };
+    frame.frame.key(["space", "n"], () => startBackrooms());
+    this.windowManager.registerWindow(frame);
+    frame.focus();
+    startBackrooms();
   }
 
   private openPrimerBrowserWindow(restore?: { selectedIndex?: number }): void {
@@ -645,22 +1378,114 @@ export class TsTuiMvpApp {
   }
 
   private promptForFigletText(): void {
-    this.overlays.openValuePrompt("Figlet Text", "WIB WOB", (value) => this.openFigletWindow(value));
+    this.overlays.openValuePrompt("Figlet Text", "WIB WOB", (value) => this.openFigletFontPicker(value, getDefaultFigletFont()));
   }
 
-  private openFigletWindow(text: string): void {
+  private openFigletFontPicker(text: string, currentFont: string, onSelect?: (font: string) => void): void {
+    const choices = getFigletFontChoices();
+    const initialIndex = Math.max(0, choices.findIndex((choice) => choice.value === currentFont));
+    this.overlays.openListPrompt("FIGlet Font Picker", choices, initialIndex, (item) => {
+      if (onSelect) {
+        onSelect(item.value);
+        return;
+      }
+      this.openFigletWindow(text, item.value);
+    });
+  }
+
+  private openFigletWindow(text: string, initialFont = getDefaultFigletFont()): void {
     const title = `Banner: ${text.slice(0, 18) || "Banner"}`;
-    this.openTextViewerWindow(title, renderFiglet(text), "figlet");
-    const frame = this.windowManager.getWindows().at(-1);
-    if (frame) {
-      frame.describeState = () => ({
-        appType: "figlet-banner",
-        summary: "Rendered figlet banner window.",
-        inputText: text,
-        lineCount: renderFiglet(text).split("\n").length,
-        contentPreview: renderFiglet(text).split("\n").slice(0, 8).join("\n")
+    const frame = this.windowManager.createFrame(title, "figlet");
+    const toolbar = blessed.box({
+      parent: frame.body,
+      top: 0,
+      left: 0,
+      right: 0,
+      height: 2,
+      style: { fg: "black", bg: "cyan" }
+    });
+    const viewer = blessed.box({
+      parent: frame.body,
+      top: 2,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      mouse: true,
+      keys: true,
+      vi: true,
+      scrollable: true,
+      alwaysScroll: true,
+      scrollbar: this.createScrollbar(),
+      style: { fg: "white", bg: "black" }
+    });
+
+    let currentText = text;
+    let currentFont = initialFont;
+
+    const syncTitle = () => {
+      frame.title = `Banner: ${currentText.slice(0, 18) || "Banner"}`;
+      frame.titleBar?.setContent(` ${frame.title} `);
+    };
+
+    const rerenderFiglet = () => {
+      const availableWidth = Math.max(20, Number(viewer.width));
+      const measured = measureFiglet(currentText, currentFont, availableWidth);
+      viewer.setContent(measured.rendered);
+      const catalogue = getFigletCatalogue();
+      const meta = catalogue.fontMetadata[currentFont];
+      toolbar.setContent(
+        ` Text: ${currentText}\n Font: ${currentFont}${meta ? ` (${meta.height}h x ${meta.width}w)` : ""}  e edit text  f pick font `
+      );
+      syncTitle();
+      this.syncState();
+      this.screen.render();
+    };
+
+    const editText = () => {
+      this.overlays.openValuePrompt("Edit FIGlet Text", currentText, (value) => {
+        currentText = value;
+        rerenderFiglet();
       });
-    }
+    };
+
+    const pickFont = () => {
+      this.openFigletFontPicker(currentText, currentFont, (font) => {
+        currentFont = font;
+        rerenderFiglet();
+      });
+    };
+
+    frame.kind = "figlet";
+    frame.describeState = () => ({
+      appType: "figlet-banner",
+      summary: "Rendered figlet banner window using the shared WibWob font catalogue.",
+      inputText: currentText,
+      font: currentFont,
+      lineCount: viewer.getContent().split("\n").length,
+      contentPreview: viewer.getContent().split("\n").slice(0, 8).join("\n")
+    });
+    frame.focus = () => {
+      this.windowManager.focusWindow(frame);
+      viewer.focus();
+    };
+
+    frame.frame.key(["e"], editText);
+    frame.frame.key(["f"], pickFont);
+    viewer.key(["e"], editText);
+    viewer.key(["f"], pickFont);
+    frame.frame.on("resize", rerenderFiglet);
+
+    this.windowManager.registerWindow(frame);
+    frame.focus();
+    rerenderFiglet();
+
+    const measured = measureFiglet(currentText, currentFont, 0);
+    const oneRowHeight = measured.fontHeight > 0 && measured.height > measured.fontHeight ? measured.fontHeight : measured.height;
+    this.windowManager.resizeWindow(
+      frame.id,
+      Math.min(Math.max(measured.width + 4, 36), Math.max(36, Number(this.screen.width) - Number(frame.frame.left))),
+      Math.min(Math.max(oneRowHeight + 5, 10), Math.max(10, Number(this.screen.height) - 1 - Number(frame.frame.top)))
+    );
   }
 
   private openPatternWindow(): void {
@@ -930,24 +1755,23 @@ export class TsTuiMvpApp {
   }
 
   private promptForPrimer(): void {
-    this.overlays.openPathPrompt("Open Primer Path", README_PATH, (value) => this.content.completePath(value), (value) =>
-      this.openPrimerWindow(value.startsWith("~") ? path.join(os.homedir(), value.slice(1)) : value)
-    );
+    this.overlays.openFileBrowserPrompt("Open Primer", REPO_ROOT, (filePath) => this.openPrimerWindow(filePath), {
+      fileFilter: (filePath, isDirectory) => isDirectory || this.content.isTextLikeFile(path.basename(filePath)),
+      previewLimit: 5000
+    });
   }
 
   private promptForEditorPath(): void {
-    this.overlays.openPathPrompt("Open Text File Path", SPIKE_NOTES_PATH, (value) => this.content.completePath(value), (value) => {
-      const resolved = value.startsWith("~") ? path.join(os.homedir(), value.slice(1)) : value;
+    this.overlays.openFileBrowserPrompt("Open Text File", path.dirname(SPIKE_NOTES_PATH), (filePath) => {
       try {
-        const exists = fs.existsSync(resolved);
-        const content = exists ? fs.readFileSync(resolved, "utf8") : "";
-        this.openEditorWindow(resolved, path.basename(resolved), content);
-        if (!exists) {
-          this.overlays.flash(`Opened new buffer for ${resolved}`);
-        }
+        const content = fs.readFileSync(filePath, "utf8");
+        this.openEditorWindow(filePath, path.basename(filePath), content);
       } catch (error) {
         this.overlays.flash(`Cannot open text file: ${error instanceof Error ? error.message : String(error)}`);
       }
+    }, {
+      fileFilter: (filePath, isDirectory) => isDirectory || this.content.isTextLikeFile(path.basename(filePath)),
+      previewLimit: 5000
     });
   }
 
@@ -1314,6 +2138,11 @@ export class TsTuiMvpApp {
     this.overlays.flash(`Saved workspace to ${this.workspace.path}`);
   }
 
+  saveWorkspaceNamed(name: string): void {
+    this.workspace.setCurrentWorkspaceName(name);
+    this.saveWorkspace();
+  }
+
   private promptForWorkspaceSave(): void {
     this.overlays.openValuePrompt("Save Workspace As", this.workspace.currentName, (value) => {
       this.workspace.setCurrentWorkspaceName(value);
@@ -1324,11 +2153,26 @@ export class TsTuiMvpApp {
 
   private promptForWorkspaceLoad(): void {
     const names = this.workspace.list();
-    const initial = names[0] ?? this.workspace.currentName;
-    this.overlays.openValuePrompt("Load Workspace", initial, (value) => {
-      this.workspace.setCurrentWorkspaceName(value);
+    if (names.length === 0) {
+      this.overlays.flash(`No saved workspaces found in ${WORKSPACES_DIR}`);
+      return;
+    }
+    const items = names.map((name) => ({
+      label: `${name}${name === this.workspace.currentName ? " (current)" : ""}`,
+      value: name,
+      preview: `${path.join(WORKSPACES_DIR, `${name}.json`)}\n\n${fs.readFileSync(path.join(WORKSPACES_DIR, `${name}.json`), "utf8")}`,
+      searchText: name
+    }));
+    const initialIndex = Math.max(0, names.findIndex((name) => name === this.workspace.currentName));
+    this.overlays.openBrowserPrompt("Load Workspace", items, initialIndex, (item) => {
+      this.workspace.setCurrentWorkspaceName(item.value);
       this.loadWorkspace();
     });
+  }
+
+  loadWorkspaceNamed(name: string): void {
+    this.workspace.setCurrentWorkspaceName(name);
+    this.loadWorkspace();
   }
 
   private loadWorkspace(): void {
@@ -1344,25 +2188,23 @@ export class TsTuiMvpApp {
       return;
     }
     for (const window of this.windowManager.getWindows()) {
-      if (window.kind !== "workspace" && window.kind !== "companion") {
+      if (window.kind !== "workspace") {
         window.close();
       }
     }
-    let focusIndex = -1;
-    for (const [index, snapshot] of snapshots.entries()) {
-      this.restoreWindowSnapshot(snapshot);
+    let focusedWindow: WindowRecord | undefined;
+    for (const snapshot of snapshots) {
+      const restored = this.restoreWindowSnapshot(snapshot);
       if (snapshot.focused) {
-        focusIndex = index;
+        focusedWindow = restored;
       }
     }
-    if (focusIndex >= 0) {
-      this.windowManager.getWindows()[focusIndex]?.focus();
-    }
+    focusedWindow?.focus();
     this.syncState();
     this.overlays.flash(`Loaded workspace from ${this.workspace.path}`);
   }
 
-  private restoreWindowSnapshot(snapshot: WindowSnapshot): void {
+  private restoreWindowSnapshot(snapshot: WindowSnapshot): WindowRecord | undefined {
     const payload = snapshot.payload ?? {};
     switch (snapshot.kind) {
       case "primer":
@@ -1384,7 +2226,10 @@ export class TsTuiMvpApp {
         this.openBrowserReaderWindow(snapshot.filePath);
         break;
       case "figlet":
-        this.openFigletWindow(typeof payload.inputText === "string" ? payload.inputText : snapshot.title.replace(/^Banner:\s*/, ""));
+        this.openFigletWindow(
+          typeof payload.inputText === "string" ? payload.inputText : snapshot.title.replace(/^Banner:\s*/, ""),
+          typeof payload.font === "string" ? payload.font : getDefaultFigletFont()
+        );
         break;
       case "pattern":
         this.openPatternWindow();
@@ -1416,6 +2261,21 @@ export class TsTuiMvpApp {
       case "terminal":
         void this.openTerminalWindow();
         break;
+      case "backrooms":
+        this.openBackroomsTv({
+          theme: typeof payload.theme === "string" ? payload.theme : "liminal fluorescent maze",
+          primers: typeof payload.primers === "string" ? payload.primers : "",
+          turns: typeof payload.turns === "number" ? payload.turns : 3,
+          model:
+            payload.model === "haiku" || payload.model === "opus" || payload.model === "sonnet"
+              ? payload.model
+              : "sonnet",
+          mode:
+            payload.mode === "live" || payload.mode === "fake-live" || payload.mode === "auto"
+              ? payload.mode
+              : "auto"
+        });
+        break;
       case "companion":
         this.openCompanionWindow({
           tick: typeof payload.tick === "number" ? payload.tick : undefined
@@ -1437,6 +2297,7 @@ export class TsTuiMvpApp {
       restored.frame.width = snapshot.width;
       restored.frame.height = snapshot.height;
     }
+    return restored;
   }
 
   private serializeWindowSnapshot(window: WindowRecord, focusedId?: number): WindowSnapshot {
@@ -1479,7 +2340,8 @@ export class TsTuiMvpApp {
       case "figlet": {
         const details = window.describeState?.();
         return {
-          inputText: typeof details?.inputText === "string" ? details.inputText : window.title.replace(/^Banner:\s*/, "")
+          inputText: typeof details?.inputText === "string" ? details.inputText : window.title.replace(/^Banner:\s*/, ""),
+          font: typeof details?.font === "string" ? details.font : getDefaultFigletFont()
         };
       }
       case "chat":
@@ -1489,6 +2351,22 @@ export class TsTuiMvpApp {
               draft: window.chat.input.getValue()
             }
           : undefined;
+      case "backrooms": {
+        const details = window.describeState?.();
+        return {
+          theme: typeof details?.theme === "string" ? details.theme : "liminal fluorescent maze",
+          primers: typeof details?.primers === "string" ? details.primers : "",
+          turns: typeof details?.turns === "number" ? details.turns : 3,
+          model:
+            details?.model === "haiku" || details?.model === "opus" || details?.model === "sonnet"
+              ? details.model
+              : "sonnet",
+          mode:
+            details?.requestedMode === "live" || details?.requestedMode === "fake-live" || details?.requestedMode === "auto"
+              ? details.requestedMode
+              : "auto"
+        };
+      }
       case "companion": {
         const details = window.describeState?.();
         return {
@@ -1502,6 +2380,7 @@ export class TsTuiMvpApp {
 
   private getPaletteCommands(): Array<{ label: string; action: () => void }> {
     return [
+      { label: "Open Backrooms TV", action: () => this.promptForBackroomsTv() },
       { label: "Open Primer Gallery", action: () => this.openPrimerGalleryWindow() },
       { label: "Open Browser Reader", action: () => this.openBrowserReaderWindow() },
       { label: "Open Figlet Banner", action: () => this.promptForFigletText() },
@@ -1548,6 +2427,7 @@ export class TsTuiMvpApp {
   }
 
   private destroy(): void {
+    this.controlApi.stop();
     this.screen.destroy();
     process.exit(0);
   }

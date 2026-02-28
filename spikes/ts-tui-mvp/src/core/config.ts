@@ -10,6 +10,7 @@ export const SPIKE_ROOT = path.resolve(SRC_ROOT, "..");
 export const REPO_ROOT = path.resolve(SPIKE_ROOT, "..", "..");
 export const WORKSPACES_DIR = path.join(SPIKE_ROOT, "scratch", "workspaces");
 export const STATE_PATH = path.join(SPIKE_ROOT, "scratch", "app-state.json");
+export const CONTROL_API_PORT = Number.parseInt(process.env.CONTROL_API_PORT ?? "8099", 10) || 8099;
 export const SPIKE_NOTES_PATH = path.join(SPIKE_ROOT, "scratch", "mvp-notes.txt");
 export const README_PATH = path.join(REPO_ROOT, "README.md");
 export const MASTER_PHILOSOPHY_PATH = path.join(REPO_ROOT, "docs", "master-philosophy.md");

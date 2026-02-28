@@ -12,7 +12,8 @@ export class WindowManager {
   constructor(
     private readonly screen: blessed.Widgets.Screen,
     private readonly desktop: Box,
-    private readonly onChange?: () => void
+    private readonly onChange?: () => void,
+    private readonly onWindowContextMenu?: (window: WindowRecord, x?: number, y?: number) => void
   ) {}
 
   getFocusedWindow(): WindowRecord | undefined {
@@ -29,6 +30,21 @@ export class WindowManager {
 
   getWindowById(id: number): WindowRecord | undefined {
     return this.windows.find((window) => window.id === id);
+  }
+
+  getWindowAtPosition(x?: number, y?: number): WindowRecord | undefined {
+    if (typeof x !== "number" || typeof y !== "number") {
+      return undefined;
+    }
+    return [...this.windows]
+      .reverse()
+      .find((window) => {
+        const left = Number(window.frame.left);
+        const top = Number(window.frame.top);
+        const width = Number(window.frame.width);
+        const height = Number(window.frame.height);
+        return x >= left && x < left + width && y >= top && y < top + height;
+      });
   }
 
   createFrame(title: string, kind: WindowKind): WindowRecord {
@@ -128,19 +144,39 @@ export class WindowManager {
       focus: () => {
         this.focusWindow(record);
         body.focus();
-      }
+      },
+      openContextMenu: (x, y) => this.onWindowContextMenu?.(record, x, y)
     };
 
     closeHint.on("click", () => record.close());
     frame.on("click", () => this.focusWindow(record));
-    frame.on("mousedown", () => this.focusWindow(record));
+    frame.on("mousedown", (data) => {
+      this.focusWindow(record);
+      if (this.isRightClick(data)) {
+        record.openContextMenu?.(data.x, data.y);
+      }
+    });
     titleBar.on("click", () => this.focusWindow(record));
     titleBar.on("mousedown", (data) => {
       this.focusWindow(record);
+      if (this.isRightClick(data)) {
+        record.openContextMenu?.(data.x, data.y);
+        return;
+      }
       this.startDrag(record, data);
+    });
+    body.on("mousedown", (data) => {
+      this.focusWindow(record);
+      if (this.isRightClick(data)) {
+        record.openContextMenu?.(data.x, data.y);
+      }
     });
     resizeGrip.on("mousedown", (data) => {
       this.focusWindow(record);
+      if (this.isRightClick(data)) {
+        record.openContextMenu?.(data.x, data.y);
+        return;
+      }
       this.startResize(record, data);
     });
 
@@ -185,6 +221,18 @@ export class WindowManager {
 
   closeFocusedWindow(): void {
     this.focusedWindow?.close();
+  }
+
+  resizeFocusedWindow(deltaWidth: number, deltaHeight: number): boolean {
+    const record = this.focusedWindow;
+    if (!record) {
+      return false;
+    }
+    return this.resizeWindow(
+      record.id,
+      Number(record.frame.width) + deltaWidth,
+      Number(record.frame.height) + deltaHeight
+    );
   }
 
   moveWindow(id: number, left: number, top: number): boolean {
@@ -383,5 +431,13 @@ export class WindowManager {
 
   private clamp(value: number, min: number, max: number): number {
     return Math.max(min, Math.min(max, value));
+  }
+
+  private isRightClick(data?: blessed.Widgets.Events.IMouseEventArg): boolean {
+    if (!data) {
+      return false;
+    }
+    const mouseData = data as blessed.Widgets.Events.IMouseEventArg & { button?: string | number; buttons?: string | number };
+    return mouseData.button === "right" || mouseData.button === 2 || mouseData.buttons === "right" || mouseData.buttons === 2;
   }
 }

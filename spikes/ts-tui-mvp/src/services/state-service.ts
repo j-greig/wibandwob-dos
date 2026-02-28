@@ -8,6 +8,7 @@ interface StateServiceOptions {
   appMode: string;
   cwd: string;
   statePath: string;
+  getControlApiStatus?: () => { enabled: boolean; port?: number };
 }
 
 interface StateDependencies {
@@ -69,7 +70,9 @@ export class StateService {
         name: this.options.appName,
         mode: this.options.appMode,
         cwd: this.options.cwd,
-        statePath: this.options.statePath
+        statePath: this.options.statePath,
+        controlApiEnabled: this.options.getControlApiStatus?.().enabled,
+        controlApiPort: this.options.getControlApiStatus?.().port
       },
       screen: {
         width: screen.width,

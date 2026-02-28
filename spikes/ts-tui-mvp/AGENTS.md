@@ -25,6 +25,50 @@ Non-goals:
 - PTY backend: `@skitee3000/bun-pty`
 - Main app entry: `/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/src/app.ts`
 
+## Architecture
+
+- `src/app.ts`
+  - runtime bootstrap only
+  - normalize env before importing the app controller
+- `src/core/app-controller.ts`
+  - app composition root
+  - owns menus, startup, window creation, workspace restore, and high-level command flow
+  - should coordinate, not become a utility dump
+- `src/core/window-manager.ts`
+  - z-order, focus, drag, resize, tile, cascade, close
+- `src/core/overlay-manager.ts`
+  - transient UI primitives: flash, prompts, shared browser/openers
+- `src/services/state-service.ts`
+  - canonical live desktop/app/window state snapshot
+- `src/services/control-api.ts`
+  - local HTTP control surface over state + window actions
+- `src/services/workspace-service.ts`
+  - named workspace persistence only
+- `src/services/content-service.ts`
+  - repo content discovery and text-file utility behavior
+- `src/services/backrooms-service.ts`
+  - Backrooms-specific corpus, run-root prep, playback helpers
+- `src/services/figlet-service.ts`
+  - shared FIGlet catalogue + real CLI render bridge
+
+## Code Style
+
+- Keep state explicit.
+  - Prefer plain values and small records over hidden widget state.
+- Keep services pure where possible.
+  - File discovery, render helpers, workspace I/O, and catalogue logic belong in services.
+- Keep window behavior local to the window factory.
+  - A window type should own its content widget wiring, focus behavior, cleanup, and `describeState()`.
+- Reuse shared browser/picker primitives.
+  - Do not add new ad hoc one-line prompts for file/workspace/font selection when a browser/list picker fits.
+- One source of truth per concern.
+  - Workspace paths live in `WorkspaceService`.
+  - Desktop state shape lives in `StateService` + `types.ts`.
+  - Backrooms primer resolution lives in `BackroomsService`.
+- Prefer composable helpers over inheritance theater.
+  - No framework-within-a-framework.
+  - Small functions, direct wiring, obvious ownership.
+
 Run commands:
 
 ```bash
@@ -44,8 +88,11 @@ The spike currently includes:
 - primer viewer window
 - text editor window
 - primer browser window
+- shared browser/openers for workspace and file selection
 - animated generative art window
 - experimental shell window backed by Bun PTY
+- Backrooms TV with real/fake-live modes and per-run primer roots
+- FIGlet window backed by the shared font catalogue and real `figlet` CLI
 
 ## Important Constraints
 
@@ -72,11 +119,12 @@ The spike currently includes:
 
 ## Editing Guidance
 
-When changing `/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/src/app.ts`:
-- keep new helpers small and local
-- reduce repeated config where it is obvious
-- do not turn the spike into a large framework
+When changing the spike:
+- extract repeated picker/browser behavior into `OverlayManager` or a focused service
+- extract new window types out of `app-controller.ts` once they stop being tiny
+- keep `app-controller.ts` as orchestration, not as the place all parsing/render helpers go
 - prefer explicit state for drag/focus/window management
+- update `describeState()` whenever a window gains meaningful new internal state
 
 If you add a new window type:
 - extend `WindowKind`
@@ -114,9 +162,10 @@ Manual smoke targets:
 
 ## Known Rough Edges
 
-- The terminal pane still strips control sequences and is not a real VT renderer.
-- Window resizing is not fully implemented yet.
-- The spike is still mostly single-file and intentionally rough.
+- The terminal pane still is not a real VT renderer.
+- `app-controller.ts` is still too large and should continue being decomposed into window-family helpers.
+- Workspace startup semantics are not yet unified with default workspace auto-load.
+- Shared open/save UX is improving, but save-as still uses the older textbox path.
 
 ## Preferred Next Steps
 
