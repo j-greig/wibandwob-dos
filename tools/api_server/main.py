@@ -73,6 +73,11 @@ from .browser import BrowserSession, fetch_and_convert
 from pydantic import BaseModel
 
 
+def _wtype_str(wtype) -> str:
+    """Safely get window type as string, whether enum or raw string."""
+    return wtype.value if hasattr(wtype, 'value') else str(wtype)
+
+
 # ─── Gallery layout engine ─────────────────────────────────────────────────
 from .gallery import (
     SHADOW_W, SHADOW_H, CANVAS_BOTTOM_EXTRA, DEFAULT_MARGIN,
@@ -109,7 +114,7 @@ def make_app() -> FastAPI:
             windows=[
                 WindowState(
                     id=w.id,
-                    type=w.type.value,
+                    type=_wtype_str(w.type),
                     title=w.title,
                     rect=RectModel(x=w.rect.x, y=w.rect.y, w=w.rect.w, h=w.rect.h),
                     z=w.z,
@@ -167,7 +172,7 @@ def make_app() -> FastAPI:
             windows=[
                 WindowState(
                     id=w.id,
-                    type=w.type.value,
+                    type=_wtype_str(w.type),
                     title=w.title,
                     rect=RectModel(x=w.rect.x, y=w.rect.y, w=w.rect.w, h=w.rect.h),
                     z=w.z,

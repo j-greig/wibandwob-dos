@@ -44,6 +44,7 @@ class WindowType(str, enum.Enum):
     app_launcher = "app_launcher"
     gallery = "gallery"
     figlet_text = "figlet_text"
+    backrooms_tv = "backrooms_tv"
 
 
 @dataclass
