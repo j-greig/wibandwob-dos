@@ -21,11 +21,25 @@
 #include <fcntl.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
+#include <sys/ioctl.h>
 #include <dirent.h>
+#include <util.h>       // forkpty() on macOS
 #include <map>
 #include <set>
 #include <string>
 #include <sstream>
+#include <cstdio>
+
+static void bktv_log(const char* fmt, ...) {
+    FILE* f = fopen("/tmp/bktv_debug.log", "a");
+    if (!f) return;
+    va_list ap;
+    va_start(ap, fmt);
+    vfprintf(f, fmt, ap);
+    va_end(ap);
+    fputc('\n', f);
+    fclose(f);
+}
 
 // Module primer path registry — name (no .txt) → absolute path.
 // Populated by scanPrimerNames() (dialog section, called at dialog open).
@@ -166,10 +180,12 @@ bool BackroomsBridge::start(const BackroomsChannel &channel) {
         allPrimers += channel.primers;
     }
 
-    // Build command
-    // Ensure claude CLI is findable, auth method explicit, and stdout unbuffered
-    // script -q /dev/null forces PTY allocation so Node thinks stdout is a terminal → no buffering
-    std::string cmd = "export PATH=\"$HOME/.local/bin:$PATH\" && cd " + backroomsPath + " && WIBWOB_AUTH_METHOD=claude-cli script -q /dev/null npx tsx src/ui/cli-v3.ts";
+    // Build command — NO script(1) wrapper.
+    // script(1) shares the parent's controlling terminal and can mutate termios state,
+    // which freezes the Turbo Vision event loop. The Node CLI already uses
+    // process.stdout.write() which flushes to a pipe without buffering issues.
+    std::string cmd = "export PATH=\"$HOME/.local/bin:$PATH\" && cd " + backroomsPath
+        + " && TERM=dumb NO_COLOR=1 WIBWOB_AUTH_METHOD=claude-cli npx tsx src/ui/cli-v3.ts";
     cmd += " \"" + channel.theme + "\"";
     cmd += " --turns " + std::to_string(channel.turns);
     if (!allPrimers.empty()) {
@@ -179,29 +195,29 @@ bool BackroomsBridge::start(const BackroomsChannel &channel) {
     cmd += " --raw";       // stream only LLM deltas to stdout, no formatting
     cmd += " 2>/dev/null"; // suppress stderr
 
-    // Create pipe
-    int pipefd[2];
-    if (pipe(pipefd) < 0) return false;
+    bktv_log("CMD: %s", cmd.c_str());
 
-    pid_ = fork();
-    if (pid_ < 0) {
-        close(pipefd[0]);
-        close(pipefd[1]);
-        return false;
-    }
+    // Use forkpty() to give the child its OWN private PTY.
+    // Node.js sees a TTY on stdout → streams unbuffered.
+    // The PTY is separate from tvision's terminal → no freeze.
+    int masterFd = -1;
+    struct winsize ws = { 25, 80, 0, 0 };  // dummy size
+    pid_ = forkpty(&masterFd, nullptr, nullptr, &ws);
+    if (pid_ < 0) return false;
 
     if (pid_ == 0) {
-        // Child: redirect stdout to pipe write-end
-        close(pipefd[0]);
-        dup2(pipefd[1], STDOUT_FILENO);
-        close(pipefd[1]);
+        // Child: forkpty already gave us a new session + controlling PTY.
+        // Redirect stdin from /dev/null (we don't send input)
+        int devnull = open("/dev/null", O_RDONLY);
+        if (devnull >= 0) { dup2(devnull, STDIN_FILENO); close(devnull); }
+        // forkpty() already called setsid(), child is session+pgid leader — no setpgid needed
         execl("/bin/sh", "sh", "-c", cmd.c_str(), nullptr);
         _exit(127);
     }
 
-    // Parent: read from pipe read-end
-    close(pipefd[1]);
-    fd_ = pipefd[0];
+    bktv_log("FORK: child pid=%d (forkpty master=%d)", pid_, masterFd);
+
+    fd_ = masterFd;
 
     // Set non-blocking
     int flags = fcntl(fd_, F_GETFL, 0);
@@ -212,13 +228,17 @@ bool BackroomsBridge::start(const BackroomsChannel &channel) {
 
 void BackroomsBridge::stop() {
     if (pid_ > 0) {
-        kill(pid_, SIGTERM);
-        // Give it a moment, then force
-        int status;
-        usleep(50000);  // 50ms
-        if (waitpid(pid_, &status, WNOHANG) == 0) {
-            kill(pid_, SIGKILL);
-            waitpid(pid_, &status, 0);
+        // Check if already dead before sending signals
+        int status = 0;
+        pid_t wp = waitpid(pid_, &status, WNOHANG);
+        if (wp == 0) {
+            // Still running — kill the entire process group (sh -> npx -> node tree)
+            kill(-pid_, SIGTERM);
+            usleep(100000);  // 100ms
+            if (waitpid(pid_, &status, WNOHANG) == 0) {
+                kill(-pid_, SIGKILL);
+                waitpid(pid_, &status, 0);
+            }
         }
         pid_ = -1;
     }
@@ -231,19 +251,34 @@ void BackroomsBridge::stop() {
 int BackroomsBridge::readAvailable(std::string &out) {
     if (fd_ < 0) return -1;
 
+    int totalRead = 0;
     char buf[4096];
-    ssize_t n = read(fd_, buf, sizeof(buf));
-    if (n > 0) {
-        out.append(buf, n);
-        return (int)n;
+    // Drain all available data in a loop (PTY can burst)
+    for (;;) {
+        ssize_t n = read(fd_, buf, sizeof(buf));
+        if (n > 0) {
+            out.append(buf, n);
+            totalRead += (int)n;
+            continue;
+        }
+        if (n == 0) {
+            // EOF — pipe-style
+            bktv_log("readAvailable: EOF (n=0), total=%d", totalRead);
+            return totalRead > 0 ? totalRead : -1;
+        }
+        // n < 0
+        if (errno == EAGAIN || errno == EWOULDBLOCK) break;
+        if (errno == EINTR) continue;
+        if (errno == EIO || errno == ENXIO) {
+            // PTY slave closed — PTY equivalent of EOF
+            bktv_log("readAvailable: PTY EOF (errno=%d), total=%d", errno, totalRead);
+            return totalRead > 0 ? totalRead : -1;
+        }
+        bktv_log("readAvailable: error errno=%d (%s)", errno, strerror(errno));
+        return totalRead > 0 ? totalRead : -1;
     }
-    if (n == 0) {
-        // EOF — child closed stdout
-        return -1;
-    }
-    // EAGAIN/EWOULDBLOCK = nothing available yet
-    if (errno == EAGAIN || errno == EWOULDBLOCK) return 0;
-    return -1;
+    if (totalRead > 0) bktv_log("readAvailable: got %d bytes", totalRead);
+    return totalRead;
 }
 
 // ===== TBackroomsTvView =====
@@ -390,11 +425,36 @@ void TBackroomsTvView::pollPipe() {
     }
 }
 
+// Strip ANSI escape sequences (CSI and OSC) from a string
+static std::string stripAnsi(const std::string &s) {
+    std::string out;
+    out.reserve(s.size());
+    for (size_t i = 0; i < s.size(); ++i) {
+        if (s[i] == '\x1b' && i + 1 < s.size()) {
+            if (s[i+1] == '[') {
+                // CSI: skip until letter
+                i += 2;
+                while (i < s.size() && !((s[i] >= 'A' && s[i] <= 'Z') || (s[i] >= 'a' && s[i] <= 'z'))) ++i;
+                continue;
+            } else if (s[i+1] == ']') {
+                // OSC: skip until BEL or ST
+                i += 2;
+                while (i < s.size() && s[i] != '\x07' && s[i] != '\x1b') ++i;
+                continue;
+            }
+        }
+        out += s[i];
+    }
+    return out;
+}
+
 void TBackroomsTvView::appendText(const std::string &text) {
     // Split incoming bytes into lines, handling partial lines
     for (size_t i = 0; i < text.size(); ++i) {
         char c = text[i];
         if (c == '\n') {
+            // Strip ANSI escapes (script PTY wrapper may inject them)
+            partial_ = stripAnsi(partial_);
             // Skip noise lines from display (kept in raw log)
             std::string trimmed = partial_;
             size_t start = trimmed.find_first_not_of(" \t");

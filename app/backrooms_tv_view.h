@@ -26,7 +26,7 @@
 // ---------------------------------------------------------------------------
 
 struct BackroomsChannel {
-    std::string theme       = "liminal spaces";
+    std::string theme       = "make art";
     std::string primers;    // comma-separated primer names (empty = none)
     int         turns       = 3;
     std::string model       = "sonnet";
