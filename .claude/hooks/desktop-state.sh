@@ -2,6 +2,13 @@
 # desktop-state.sh — UserPromptSubmit hook
 # Injects compact desktop state if the WibWob-DOS API is reachable.
 # Gives the agent instant awareness of desktop size, open windows, z-order.
+# Example:
+#   [WibWob-DOS Desktop 193x63 | light/monochrome | 3 windows]
+#     format: z-order: type "name" (x,y) WxH
+#     z0: frame_player "folk-punk-ai.txt" (1,1) 72x24
+#     z1: wibwob_chat "Wib&Wob Chat" (100,5) 60x30
+#     z2: scramble "Scramble" (0,40) 20x8
+# Silently skips if API not running. 3s timeout.
 
 # Try default port, then test port
 STATE=""
