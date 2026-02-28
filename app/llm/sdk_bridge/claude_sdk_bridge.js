@@ -146,7 +146,7 @@ class ClaudeSDKBridge {
                 systemPrompt: this.systemPrompt,
                 maxTurns: data.maxTurns || this.maxTurns,
                 allowedTools: data.allowedTools || this.allowedTools,
-                model: data.model || 'claude-haiku-4-5'  // Default to haiku 4.5 if not specified
+                model: data.model || 'claude-sonnet-4-6'  // Default to sonnet 4.6 if not specified
             };
 
             this.sendResponse('SESSION_STARTED', {
@@ -517,8 +517,8 @@ class ClaudeSDKBridge {
         // Map common aliases to current 4.6 IDs (avoid 3.5)
         if (m.includes('opus')) return 'claude-opus-4-6';
         if (m.includes('sonnet')) return 'claude-sonnet-4-6';
-        if (m.includes('haiku')) return 'claude-haiku-4-5';
-        return model || 'claude-haiku-4-5';
+        if (m.includes('haiku')) return 'claude-haiku-4-5';  // Keep haiku resolution if explicitly requested
+        return model || 'claude-sonnet-4-6';
     }
     
     

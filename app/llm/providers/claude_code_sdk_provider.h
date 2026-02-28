@@ -75,7 +75,7 @@ private:
     bool sessionStarting = false;  // Async startup in progress
     std::string currentSessionId;
     std::string currentSystemPrompt;
-    std::string configuredModel = "haiku";  // Default to haiku
+    std::string configuredModel = "claude-sonnet-4-6";  // Default to haiku
     std::string lastError;
     
     // Pending query (queued during async session startup)

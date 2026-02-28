@@ -48,7 +48,7 @@ public:
 private:
     bool busy = false;
     std::string endpoint = "https://api.anthropic.com/v1/messages";
-    std::string model = "claude-3-5-haiku-latest";
+    std::string model = "claude-sonnet-4-6";
     std::string apiKey;
     std::string lastError;
     

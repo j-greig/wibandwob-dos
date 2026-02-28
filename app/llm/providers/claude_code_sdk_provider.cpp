@@ -600,7 +600,7 @@ std::string ClaudeCodeSDKProvider::getVersion() const {
 }
 
 std::vector<std::string> ClaudeCodeSDKProvider::getSupportedModels() const {
-    return {"claude-haiku-4-5", "claude-sonnet-4-6", "claude-opus-4-6"};
+    return {"claude-sonnet-4-6", "claude-opus-4-6"};
 }
 
 bool ClaudeCodeSDKProvider::configure(const std::string& config) {
@@ -678,13 +678,13 @@ bool ClaudeCodeSDKProvider::configure(const std::string& config) {
     sessionTimeout = parseIntField("sessionTimeout", sessionTimeout);
 
     // model - map to full 4.6 IDs
-    std::string modelStr = parseStringField("model", "claude-haiku-4-5");
+    std::string modelStr = parseStringField("model", "claude-sonnet-4-6");
     if (modelStr.find("opus") != std::string::npos) {
         configuredModel = "claude-opus-4-6";
     } else if (modelStr.find("sonnet") != std::string::npos) {
         configuredModel = "claude-sonnet-4-6";
     } else {
-        configuredModel = "claude-haiku-4-5";  // Default
+        configuredModel = "claude-sonnet-4-6";  // Default
     }
     fprintf(stderr, "[SDK] Configured model: %s (from %s)\n", configuredModel.c_str(), modelStr.c_str());
 

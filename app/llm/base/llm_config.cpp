@@ -353,7 +353,7 @@ std::string LLMConfig::getDefaultConfigJson() {
     },
     "anthropic_api": {
       "enabled": true,
-      "model": "claude-haiku-4-5",
+      "model": "claude-sonnet-4-6",
       "endpoint": "https://api.anthropic.com/v1/messages",
       "apiKeyEnv": "ANTHROPIC_API_KEY",
       "maxTokens": "4096",

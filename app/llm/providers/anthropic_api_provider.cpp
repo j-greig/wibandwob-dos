@@ -22,7 +22,7 @@ REGISTER_LLM_PROVIDER("anthropic_api", AnthropicAPIProvider);
 
 AnthropicAPIProvider::AnthropicAPIProvider() {
     endpoint = "https://api.anthropic.com/v1/messages";
-    model = "claude-haiku-4-5";
+    model = "claude-sonnet-4-6";
     maxTokens = 4096;
     temperature = 1.0;
 }
@@ -237,7 +237,7 @@ void AnthropicAPIProvider::poll() {
 
 std::vector<std::string> AnthropicAPIProvider::getSupportedModels() const {
     return {
-        "claude-haiku-4-5",
+        "claude-sonnet-4-6",
         "claude-sonnet-4-6"
     };
 }
