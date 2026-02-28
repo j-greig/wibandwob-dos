@@ -2,11 +2,15 @@ import blessed from "blessed";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import {
+  spawn,
+  type IPty as BunPtyTerminal,
+  type IExitEvent as BunPtyExitEvent
+} from "@skitee3000/bun-pty/dist/index.js";
 
 type Box = blessed.Widgets.BoxElement;
 type List = blessed.Widgets.ListElement;
-type Prompt = blessed.Widgets.PromptElement;
-type NodePtyModule = typeof import("node-pty");
+type Textbox = blessed.Widgets.TextboxElement;
 
 type WindowKind = "primer" | "editor" | "terminal" | "browser" | "art";
 
@@ -61,14 +65,12 @@ class TsTuiMvpApp {
   private readonly menuBar: Box;
   private readonly desktop: Box;
   private readonly statusLine: Box;
-  private readonly prompt: Prompt;
   private readonly notification: Box;
   private menuList?: List;
   private readonly menus: MenuConfig[];
   private readonly windows: WindowRecord[] = [];
   private focusedWindow?: WindowRecord;
   private nextWindowId = 1;
-  private terminalPty?: NodePtyModule;
   private dragState?: DragState;
 
   constructor() {
@@ -134,28 +136,6 @@ class TsTuiMvpApp {
         bg: "black",
         border: {
           fg: "yellow"
-        }
-      }
-    });
-
-    this.prompt = blessed.prompt({
-      parent: this.screen,
-      top: "center",
-      left: "center",
-      width: "70%",
-      height: 9,
-      border: "line",
-      tags: true,
-      label: " input ",
-      keys: true,
-      vi: true,
-      mouse: true,
-      hidden: true,
-      style: {
-        fg: "white",
-        bg: "black",
-        border: {
-          fg: "cyan"
         }
       }
     });
@@ -328,17 +308,6 @@ class TsTuiMvpApp {
   }
 
   private async openTerminalWindow(): Promise<void> {
-    if (!this.terminalPty) {
-      try {
-        this.terminalPty = await import("node-pty");
-      } catch (error) {
-        this.flash(
-          `node-pty failed to load: ${error instanceof Error ? error.message : String(error)}`
-        );
-        return;
-      }
-    }
-
     const frame = this.createFrame("Terminal", "terminal");
     const transcript = blessed.log({
       parent: frame.body,
@@ -371,10 +340,10 @@ class TsTuiMvpApp {
       }
     });
 
-    let pty;
+    let pty: BunPtyTerminal;
     try {
-      pty = this.terminalPty.spawn(this.resolveShellPath(), [], {
-        name: "xterm-color",
+      pty = spawn(this.resolveShellPath(), ["-i"], {
+        name: "xterm-256color",
         cols: Math.max(20, Number(frame.body.width)),
         rows: Math.max(8, Number(frame.body.height) - 1),
         cwd: process.cwd(),
@@ -388,7 +357,14 @@ class TsTuiMvpApp {
       return;
     }
 
-    pty.onData((chunk) => {
+    const syncPtySize = () => {
+      const cols = Math.max(20, Number(frame.body.width));
+      const rows = Math.max(8, Number(frame.body.height) - 1);
+      pty.resize(cols, rows);
+    };
+    const handleScreenResize = () => syncPtySize();
+
+    pty.onData((chunk: string) => {
       const clean = chunk
         .replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, "")
         .replace(/\r/g, "")
@@ -401,8 +377,8 @@ class TsTuiMvpApp {
       this.screen.render();
     });
 
-    pty.onExit(({ exitCode }) => {
-      transcript.log(`[process exited ${exitCode}]`);
+    pty.onExit(({ exitCode, signal }: BunPtyExitEvent) => {
+      transcript.log(`[process exited ${exitCode} signal ${signal ?? "none"}]`);
       this.screen.render();
     });
 
@@ -418,11 +394,14 @@ class TsTuiMvpApp {
     const record = frame;
     const baseClose = frame.close;
     record.kind = "terminal";
+    record.cleanup = () => {
+      this.screen.off("resize", handleScreenResize);
+      pty.kill();
+    };
     record.writeInput = (input) => {
       pty.write(input);
     };
     record.close = () => {
-      pty.kill();
       baseClose();
     };
     record.focus = () => {
@@ -432,6 +411,9 @@ class TsTuiMvpApp {
 
     this.registerWindow(record);
     record.focus();
+    frame.frame.on("resize", syncPtySize);
+    this.screen.on("resize", handleScreenResize);
+    syncPtySize();
     transcript.log(
       "Experimental shell window. Good for shell commands; full-screen TUIs are not expected to render cleanly yet."
     );
@@ -511,24 +493,12 @@ class TsTuiMvpApp {
 
   private promptForPrimer(): void {
     const initial = path.join(process.cwd(), "README.md");
-    this.prompt.input("Open Primer Path", initial, (error, value) => {
-      if (error || !value) {
-        this.restoreWindowFocus();
-        this.screen.render();
-        return;
-      }
-      this.openPrimerWindow(value);
-    });
+    this.openPathPrompt("Open Primer Path", initial, (value) => this.openPrimerWindow(value));
   }
 
   private promptForEditorPath(): void {
     const initial = path.join(process.cwd(), "scratch", "mvp-notes.txt");
-    this.prompt.input("Open Text File Path", initial, (error, value) => {
-      if (error || !value) {
-        this.restoreWindowFocus();
-        this.screen.render();
-        return;
-      }
+    this.openPathPrompt("Open Text File Path", initial, (value) => {
       const content = fs.existsSync(value) ? fs.readFileSync(value, "utf8") : "";
       this.openEditorWindow(value, path.basename(value), content);
     });
@@ -871,12 +841,7 @@ class TsTuiMvpApp {
       return;
     }
     if (!window.filePath) {
-      this.prompt.input("Save Text File Path", path.join(process.cwd(), window.title), (error, value) => {
-        if (error || !value) {
-          this.restoreWindowFocus();
-          this.screen.render();
-          return;
-        }
+      this.openPathPrompt("Save Text File Path", path.join(process.cwd(), window.title), (value) => {
         window.filePath = value;
         window.title = path.basename(value);
         this.writeEditor(window);
@@ -1074,6 +1039,84 @@ class TsTuiMvpApp {
         bg: "white"
       }
     };
+  }
+
+  private openPathPrompt(label: string, initialValue: string, onSubmit: (value: string) => void): void {
+    const modal = blessed.box({
+      parent: this.screen,
+      top: "center",
+      left: "center",
+      width: "80%",
+      height: 7,
+      border: "line",
+      label: ` ${label} `,
+      tags: true,
+      mouse: true,
+      keys: true,
+      style: {
+        fg: "white",
+        bg: "black",
+        border: {
+          fg: "cyan"
+        }
+      }
+    });
+    const input = blessed.textbox({
+      parent: modal,
+      top: 1,
+      left: 1,
+      right: 1,
+      height: 1,
+      inputOnFocus: true,
+      keys: true,
+      mouse: true,
+      style: {
+        fg: "white",
+        bg: "blue"
+      }
+    });
+    const help = blessed.box({
+      parent: modal,
+      bottom: 1,
+      left: 1,
+      right: 1,
+      height: 1,
+      content: " Enter open/save  Esc cancel ",
+      style: {
+        fg: "black",
+        bg: "white"
+      }
+    });
+
+    const closePrompt = () => {
+      input.removeAllListeners("submit");
+      input.removeAllListeners("cancel");
+      input.removeAllListeners("keypress");
+      modal.destroy();
+      this.restoreWindowFocus();
+      this.screen.render();
+    };
+
+    input.setValue(initialValue);
+    input.on("submit", (value) => {
+      const nextValue = (value ?? "").trim();
+      closePrompt();
+      if (!nextValue) {
+        return;
+      }
+      onSubmit(nextValue);
+    });
+    input.on("cancel", closePrompt);
+    input.on("keypress", (_, key) => {
+      if (key.name === "escape") {
+        closePrompt();
+      }
+    });
+
+    void help;
+    this.screen.render();
+    input.focus();
+    input.readInput();
   }
 
   private tileWindows(): void {

@@ -5,8 +5,8 @@
     "": {
       "name": "ts-tui-mvp",
       "dependencies": {
+        "@skitee3000/bun-pty": "^0.3.3",
         "blessed": "^0.1.81",
-        "node-pty": "^1.0.0",
       },
       "devDependencies": {
         "@types/blessed": "^0.1.25",
@@ -16,15 +16,13 @@
     },
   },
   "packages": {
+    "@skitee3000/bun-pty": ["@skitee3000/bun-pty@0.3.3", "", {}, "sha512-y+kA3435zkFjh11KdQMy0ho/UkKN/iae0t9tTE7iZ762Oi2h31dGOvbRIJWeJZ2qYYTJvAd6NEIzJlZUhI6ukw=="],
+
     "@types/blessed": ["@types/blessed@0.1.27", "", { "dependencies": { "@types/node": "*" } }, "sha512-ZOQGjLvWDclAXp0rW5iuUBXeD6Gr1PkitN7tj7/G8FCoSzTsij6OhXusOzMKhwrZ9YlL2Pmu0d6xJ9zVvk+Hsg=="],
 
     "@types/node": ["@types/node@24.11.0", "", { "dependencies": { "undici-types": "~7.16.0" } }, "sha512-fPxQqz4VTgPI/IQ+lj9r0h+fDR66bzoeMGHp8ASee+32OSGIkeASsoZuJixsQoVef1QJbeubcPBxKk22QVoWdw=="],
 
     "blessed": ["blessed@0.1.81", "", { "bin": { "blessed": "./bin/tput.js" } }, "sha512-LoF5gae+hlmfORcG1M5+5XZi4LBmvlXTzwJWzUlPryN/SJdSflZvROM2TwkT0GMpq7oqT48NRd4GS7BiVBc5OQ=="],
-
-    "node-addon-api": ["node-addon-api@7.1.1", "", {}, "sha512-5m3bsyrjFWE1xf7nz7YXdN4udnVtXK6/Yfgn5qnahL6bCkf2yKt4k3nuTKAtT4r3IG8JNR2ncsIMdZuAzJjHQQ=="],
-
-    "node-pty": ["node-pty@1.1.0", "", { "dependencies": { "node-addon-api": "^7.1.0" } }, "sha512-20JqtutY6JPXTUnL0ij1uad7Qe1baT46lyolh2sSENDd4sTzKZ4nmAFkeAARDKwmlLjPx6XKRlwRUxwjOy+lUg=="],
 
     "typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
 
