@@ -9,20 +9,50 @@ from typing import Dict, Optional
 def resolve_sock_path() -> str:
     """Resolve IPC socket path.
 
-    Default: /tmp/wwdos.sock (matches TUI default).
-    Multi-instance: set WIBWOB_INSTANCE=N on both TUI and API → /tmp/wibwob_N.sock.
+    Priority:
+    1. WIBWOB_INSTANCE env var → /tmp/wibwob_{instance}.sock
+    2. Auto-discover: find any live /tmp/wibwob_*.sock
+    3. Fallback: /tmp/wwdos.sock
     """
     instance = os.environ.get("WIBWOB_INSTANCE")
     if instance:
         return f"/tmp/wibwob_{instance}.sock"
+
+    # Auto-discover: find any live wibwob socket
+    import glob
+    candidates = glob.glob("/tmp/wibwob_*.sock")
+    for sock in candidates:
+        try:
+            s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            s.settimeout(0.5)
+            s.connect(sock)
+            s.close()
+            return sock
+        except (ConnectionRefusedError, OSError):
+            continue
+
     return "/tmp/wwdos.sock"
 
 
-SOCK_PATH = resolve_sock_path()
+_SOCK_PATH_CACHE: Optional[str] = None
+
+
+def get_sock_path() -> str:
+    """Lazy-resolve and cache the socket path."""
+    global _SOCK_PATH_CACHE
+    if _SOCK_PATH_CACHE is None:
+        _SOCK_PATH_CACHE = resolve_sock_path()
+    return _SOCK_PATH_CACHE
+
+
+def reset_sock_path():
+    """Force re-discovery (e.g. after connection failure)."""
+    global _SOCK_PATH_CACHE
+    _SOCK_PATH_CACHE = None
 
 
 def send_cmd(cmd: str, kv: Optional[Dict[str, str]] = None) -> str:
-    path = SOCK_PATH
+    path = get_sock_path()
 
     # Build human-readable summary for logging
     params_summary = []
@@ -54,6 +84,8 @@ def send_cmd(cmd: str, kv: Optional[Dict[str, str]] = None) -> str:
         s.connect(path)
     except (FileNotFoundError, ConnectionRefusedError) as e:
         s.close()
+        # Force re-discovery next call (socket may have moved or come up)
+        reset_sock_path()
         print(f"[IPC] ✗ socket unavailable: {e}")
         return None
     try:
