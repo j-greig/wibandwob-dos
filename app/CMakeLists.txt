@@ -78,6 +78,7 @@ add_executable(wwdos
     tvterm_view.cpp
     figlet_utils.cpp
     figlet_text_view.cpp
+    backrooms_tv_view.cpp
 )
 target_include_directories(wwdos PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(wwdos PRIVATE tvision tvterm-core)

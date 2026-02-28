@@ -50,6 +50,7 @@
 #include "ascii_image_view.h"
 // Animated blocks view/window
 #include "animated_blocks_view.h"
+#include "backrooms_tv_view.h"
 // Animated gradient view/window
 #include "animated_gradient_view.h"
 // Animated score (ASCII score) view/window
@@ -285,6 +286,7 @@ const ushort cmOpenTerminal = 214;
 const ushort cmAppLauncher = 232;    // Applications folder browser
 const ushort cmScrambleReply = 233;  // Async Scramble LLM response ready
 const ushort cmAsciiGallery = 234;   // ASCII Art Gallery browser
+const ushort cmBackroomsTv = 284;    // Backrooms TV live art window
 
 // Glitch menu commands
 const ushort cmToggleGlitchMode = 140;
@@ -970,6 +972,8 @@ private:
     friend void api_spawn_ascii(TWwdosApp&, const TRect* bounds);
     friend void api_spawn_animated_gradient(TWwdosApp&, const TRect* bounds);
     friend void api_spawn_monster_cam(TWwdosApp&, const TRect* bounds);
+    friend void api_spawn_backrooms_tv(TWwdosApp&, const TRect* bounds);
+    friend void api_spawn_backrooms_tv(TWwdosApp&, const TRect* bounds, const BackroomsChannel* ch);
     friend void api_spawn_monster_verse(TWwdosApp&, const TRect* bounds);
     friend void api_spawn_contour_map(TWwdosApp&, const TRect* bounds);
     friend void api_spawn_generative_lab(TWwdosApp&, const TRect* bounds);
@@ -1033,6 +1037,10 @@ TWwdosApp::TWwdosApp() :
     scrambleState(sdsHidden)
 {
     recentWorkspaces_ = scanRecentWorkspacePaths("workspaces", kMaxRecentWorkspaces);
+
+    // Sync module primers (modules-private/*/primers/) into backrooms primers/
+    // so they appear in the TV dialog and the CLI can resolve them immediately.
+    syncModulePrimers();
 
     // Start IPC server for local API control (best-effort; ignore failures)
     ipcServer = new ApiIpcServer(this);
@@ -1314,6 +1322,18 @@ void TWwdosApp::handleEvent(TEvent& event)
                 TRect r = deskTop->getExtent();
                 r.grow(-2, -1);
                 deskTop->insert(createGenerativeMonsterCamWindow(r));
+                clearEvent(event);
+                break;
+            }
+            case cmBackroomsTv: {
+                BackroomsChannel channel;
+                if (showBackroomsTvDialog(channel)) {
+                    TRect r = deskTop->getExtent();
+                    r.grow(-2, -1);
+                    TWindow *w = createBackroomsTvWindow(r, channel);
+                    deskTop->insert(w);
+                    registerWindow(w);
+                }
                 clearEvent(event);
                 break;
             }
@@ -2675,6 +2695,7 @@ TMenuBar* TWwdosApp::initMenuBar(TRect r)
             *new TMenuItem("Monster Cam (Emo~j~i)", cmMonsterCam, kbNoKey) +
             *new TMenuItem("~C~ontour Studio", cmContourMap, kbNoKey) +
             *new TMenuItem("~G~enerative Lab", cmGenerativeLab, kbNoKey) +
+            *new TMenuItem("~B~ackrooms TV", cmBackroomsTv, kbNoKey) +
             newLine() +
             *new TMenuItem("~A~pplications", cmAppLauncher, kbNoKey) +
             *new TMenuItem("ASCII ~G~allery", cmAsciiGallery, kbNoKey) +
@@ -4883,7 +4904,6 @@ void api_spawn_contour_map(TWwdosApp& app, const TRect* bounds) {
     if (bounds) {
         r = *bounds;
     } else {
-        // 90% of desktop
         TRect desk = app.deskTop->getExtent();
         int w90 = desk.b.x * 90 / 100;
         int h90 = desk.b.y * 90 / 100;
@@ -4892,7 +4912,6 @@ void api_spawn_contour_map(TWwdosApp& app, const TRect* bounds) {
         r = TRect(x, y, x + w90, y + h90);
     }
     int seed = rand() % 100000;
-    // Pass deferLaunch=true so generation waits until window is sized
     TWindow* w = createContourMapWindow(r, seed, 5, 5, false, false);
     app.deskTop->insert(w);
     app.registerWindow(w);
@@ -4913,6 +4932,23 @@ void api_spawn_generative_lab(TWwdosApp& app, const TRect* bounds) {
     TWindow* w = createGenerativeLabWindow(r);
     app.deskTop->insert(w);
     app.registerWindow(w);
+}
+
+void api_spawn_backrooms_tv(TWwdosApp& app, const TRect* bounds, const BackroomsChannel* ch) {
+    BackroomsChannel channel;
+    if (ch) {
+        channel = *ch;
+    } else {
+        if (!showBackroomsTvDialog(channel)) return;
+    }
+    TRect r = bounds ? *bounds : api_centered_bounds(app, 100, 35);
+    TWindow* w = createBackroomsTvWindow(r, channel);
+    app.deskTop->insert(w);
+    app.registerWindow(w);
+}
+
+void api_spawn_backrooms_tv(TWwdosApp& app, const TRect* bounds) {
+    api_spawn_backrooms_tv(app, bounds, nullptr);
 }
 
 void api_spawn_monster_verse(TWwdosApp& app, const TRect* bounds) {
