@@ -20,3 +20,6 @@
 [submodule "spikes/ts-tui-mvp/vendor/pi-mono"]
 	path = spikes/ts-tui-mvp/vendor/pi-mono
 	url = https://github.com/badlogic/pi-mono.git
+[submodule "spikes/ts-tui-mvp/vendor/piclaw"]
+	path = spikes/ts-tui-mvp/vendor/piclaw
+	url = https://github.com/rcarmo/piclaw.git

@@ -30,6 +30,7 @@ import { measurePlainTextContent, measurePrimerContent } from "../services/conte
 import { ControlApiService } from "../services/control-api.js";
 import { ContentService } from "../services/content-service.js";
 import { getDefaultFigletFont, getFigletCatalogue, getFigletFontChoices, measureFiglet, renderFiglet } from "../services/figlet-service.js";
+import { PiService } from "../services/pi-service.js";
 import { StateService } from "../services/state-service.js";
 import { WorkspaceService } from "../services/workspace-service.js";
 
@@ -46,6 +47,7 @@ export class TsTuiMvpApp {
   private readonly overlays: OverlayManager;
   private readonly backrooms = new BackroomsService();
   private readonly content = new ContentService();
+  private readonly pi = new PiService();
   private readonly workspace = new WorkspaceService(WORKSPACES_DIR);
   private readonly geometry: DesktopGeometryService;
   private readonly state: StateService;
@@ -137,6 +139,7 @@ export class TsTuiMvpApp {
           { label: "Load Workspace...", action: () => this.promptForWorkspaceLoad() },
           { label: "Open Art Window", action: () => this.openArtWindow() },
           { label: "Open Terminal", action: () => void this.openTerminalWindow() },
+          { label: "Open Pi Chat", action: () => void this.openPiChatWindow() },
           { label: "Quit", action: () => this.destroy() }
         ]
       },
@@ -183,6 +186,7 @@ export class TsTuiMvpApp {
           { label: "Chat Transcript", action: () => this.openChatWindow() },
           { label: "Companion", action: () => this.openCompanionWindow() },
           { label: "Workspace Manager", action: () => this.openWorkspaceManagerWindow() },
+          { label: "Pi Chat", action: () => void this.openPiChatWindow() },
           { label: "Command Palette", action: () => this.openCommandPaletteWindow() },
           { label: "State Inspector", action: () => this.openStateInspectorWindow() }
         ]
@@ -396,6 +400,7 @@ export class TsTuiMvpApp {
       { label: "Open Primer Browser", action: () => this.openPrimerBrowserWindow() },
       { label: "Open Text File", action: () => this.promptForEditorPath() },
       { label: "Open Backrooms TV", action: () => this.promptForBackroomsTv() },
+      { label: "Open Pi Chat", action: () => void this.openPiChatWindow() },
       { label: "Open Workspace Manager", action: () => this.openWorkspaceManagerWindow() },
       { label: "Tile Windows", action: () => this.windowManager.tileWindows() },
       { label: "Cascade Windows", action: () => this.windowManager.cascadeWindows() }
@@ -411,7 +416,48 @@ export class TsTuiMvpApp {
   }
 
   private async openTerminalWindow(): Promise<void> {
-    const frame = this.windowManager.createFrame("Terminal", "terminal");
+    await this.openPtyWindow({
+      title: "Terminal",
+      appType: "terminal-shell",
+      command: this.resolveShellPath(),
+      args: ["-i"],
+      cwd: REPO_ROOT,
+      env: this.getPtyEnv(),
+      intro: "Interactive shell window. Good for shell commands; full-screen TUIs are not expected to render cleanly yet.",
+      shellPath: this.resolveShellPath()
+    });
+  }
+
+  private async openPiChatWindow(): Promise<void> {
+    if (!this.pi.isAvailable()) {
+      this.overlays.flash("Pi is not installed in the spike. Run bun install first.");
+      return;
+    }
+
+    const launch = this.pi.createLaunchConfig(REPO_ROOT, this.getPtyEnv());
+    await this.openPtyWindow({
+      title: "Pi Chat",
+      appType: "pi-chat",
+      command: launch.command,
+      args: launch.args,
+      cwd: launch.cwd,
+      env: launch.env,
+      intro: "Pi coding agent running inside a terminal window. This is the first reusable chat slice, not yet a fully integrated typed agent surface.",
+      shellPath: launch.command
+    });
+  }
+
+  private async openPtyWindow(options: {
+    title: string;
+    appType: string;
+    command: string;
+    args: string[];
+    cwd: string;
+    env: Record<string, string>;
+    intro: string;
+    shellPath: string;
+  }): Promise<void> {
+    const frame = this.windowManager.createFrame(options.title, "terminal");
     const transcript = blessed.log({
       parent: frame.body,
       top: 0,
@@ -439,16 +485,16 @@ export class TsTuiMvpApp {
 
     let pty: BunPtyTerminal;
     try {
-      pty = spawnPty(this.resolveShellPath(), ["-i"], {
+      pty = spawnPty(options.command, options.args, {
         name: "xterm-256color",
         cols: Math.max(20, Number(frame.body.width)),
         rows: Math.max(8, Number(frame.body.height) - 1),
-        cwd: REPO_ROOT,
-        env: this.getPtyEnv()
+        cwd: options.cwd,
+        env: options.env
       });
     } catch (error) {
       frame.close();
-      this.overlays.flash(`Terminal launch failed: ${error instanceof Error ? error.message : String(error)}`);
+      this.overlays.flash(`${options.title} launch failed: ${error instanceof Error ? error.message : String(error)}`);
       return;
     }
 
@@ -499,10 +545,13 @@ export class TsTuiMvpApp {
     };
     frame.writeInput = (input) => pty.write(input);
     frame.describeState = () => ({
-      appType: "terminal-shell",
-      summary: "Interactive shell pane backed by Bun PTY.",
+      appType: options.appType,
+      summary: options.intro,
       contentPreview: transcript.getContent().split("\n").slice(-8).join("\n"),
-      shellPath: this.resolveShellPath(),
+      shellPath: options.shellPath,
+      command: options.command,
+      args: options.args,
+      cwd: options.cwd,
       transcriptLineCount: transcript.getContent().split("\n").filter(Boolean).length,
       inputValue: inputLine.getValue()
     });
@@ -520,7 +569,7 @@ export class TsTuiMvpApp {
     frame.frame.on("resize", syncPtySize);
     this.screen.on("resize", handleScreenResize);
     syncPtySize();
-    transcript.log("Experimental shell window. Good for shell commands; full-screen TUIs are not expected to render cleanly yet.");
+    transcript.log(options.intro);
     this.syncState();
   }
 
@@ -2458,7 +2507,8 @@ export class TsTuiMvpApp {
       { label: "Load Workspace", action: () => this.loadWorkspace() },
       { label: "Tile Windows", action: () => this.windowManager.tileWindows() },
       { label: "Cascade Windows", action: () => this.windowManager.cascadeWindows() },
-      { label: "Open Terminal", action: () => void this.openTerminalWindow() }
+      { label: "Open Terminal", action: () => void this.openTerminalWindow() },
+      { label: "Open Pi Chat", action: () => void this.openPiChatWindow() }
     ];
   }
 

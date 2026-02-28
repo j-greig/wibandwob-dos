@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@mariozechner/pi-coding-agent": "^0.55.3",
     "@skitee3000/bun-pty": "^0.3.3",
     "blessed": "^0.1.81",
     "string-width": "^8.2.0"

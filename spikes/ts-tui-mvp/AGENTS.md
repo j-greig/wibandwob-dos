@@ -18,6 +18,29 @@ Non-goals:
 - do not pretend this is already a full VT terminal emulator
 - do not pivot this spike toward Electrobun or webview rendering unless explicitly requested
 
+## Design Canon
+
+This spike exists partly to undo the duplication and verbosity that accumulated in the C++ app.
+
+The bar is:
+
+- one concept, one owner
+- one measurement path
+- one sizing path
+- one state path
+- one layout path
+- one agent/runtime integration path per feature
+
+The code should be:
+
+- DRY without becoming abstract theater
+- small in surface area
+- explicit in data flow
+- semantically precise
+- easy for multiple agents to extend without creating parallel systems
+
+Prefer the most elegant correct implementation, not the fastest pile of special cases.
+
 ## Stack
 
 - Runtime: Bun
@@ -61,6 +84,49 @@ Non-goals:
 - `src/services/figlet-service.ts`
   - shared FIGlet catalogue + real CLI render bridge
 
+## Architecture Invariants
+
+These rules are strict. Treat violations as bugs, not style nits.
+
+1. Single source of truth per concern.
+   - If a concept already has a home, extend that home.
+   - Do not create a second helper/service/path for the same concern because it is locally convenient.
+
+2. Measurement is content-only.
+   - Content measurement returns content dimensions and content semantics.
+   - Border, titlebar, padding, toolbar, and shadow are chrome, not content.
+
+3. Chrome is declarative.
+   - Window size math belongs in `window-chrome.ts`.
+   - No inline `+2`, `+3`, `+6`, or copied size formulas in window code.
+
+4. Desktop geometry is canonical.
+   - Screen width/height/cellAspect come from `DesktopGeometryService`.
+   - Do not invent local geometry math unless the result is immediately derived from canonical geometry.
+
+5. Window state is self-describing.
+   - Every window type must expose semantic metadata through `describeState()`.
+   - If an agent needs a property, add it to the window metadata contract rather than teaching the agent to scrape UI text.
+
+6. One reusable interaction component before many prompts.
+   - Repeated picker/open/select flows belong in `OverlayManager` or a dedicated shared component.
+   - Do not add one-off textbox prompts for file/font/workspace/content selection when a shared browser can do it.
+
+7. Layout is an engine, not scattered commands.
+   - New placement logic should move toward shared layout primitives, not bespoke coordinate code per feature.
+
+8. Services own logic, windows own wiring.
+   - Services discover, measure, persist, resolve, and transform data.
+   - Window factories render widgets, bind keys/mouse, manage focus/cleanup, and expose state.
+
+9. No duplicate fallbacks unless centrally owned.
+   - If a fallback mode exists, it must be declared in the owning service.
+   - Do not embed secondary fallback logic inside window code and service code at the same time.
+
+10. Experimental integrations must stay behind one seam.
+   - If we try a foreign runtime or agent stack, wrap it in a single service boundary first.
+   - Do not leak vendor-specific assumptions across the app.
+
 ## Code Style
 
 - Keep state explicit.
@@ -81,9 +147,46 @@ Non-goals:
 - Content metrics are content metrics.
   - `contentWidth` / `contentHeight` should describe the renderable payload.
   - Border, titlebar, toolbar, and padding belong to chrome sizing, not measurement.
+- Keep names precise.
+  - Prefer domain names that describe intent: `measurePrimerContent`, `contentToWindowSize`, `getPrimerInfo`.
+  - Avoid vague helpers like `utils`, `misc`, `helpers2`, or duplicate verbs for the same operation.
 - Prefer composable helpers over inheritance theater.
   - No framework-within-a-framework.
   - Small functions, direct wiring, obvious ownership.
+
+## Anti-Patterns
+
+Do not introduce these:
+
+- parallel measurement functions for different callers
+- per-window copies of generic sizing logic
+- state fields that duplicate the same fact under different names
+- direct widget scraping when semantic state can be exposed
+- vendor code referenced directly from many app files
+- giant controller growth when a window family or service can be extracted cleanly
+- “just this once” prompt flows that should be shared components
+- hardcoded geometry magic numbers without named ownership
+
+## Pi Integration Rule
+
+`pi-mono` is vendored for evaluation and potential runtime reuse.
+
+Current direction:
+
+- yes to using `pi-coding-agent` as an engine inside the TS spike
+- no to letting vendor UI own the desktop/window-manager architecture
+
+The safe rule is:
+
+- if we embed pi, wrap it behind one service such as `wibwob-agent-service.ts`
+- our app still owns:
+  - window chrome
+  - workspace restore
+  - desktop state
+  - z-order / resize / drag
+  - typed metadata for agent-visible state
+
+If we experiment with a PTY-hosted interactive pi session inside a terminal window, treat it as an experiment, not the architectural foundation. The foundation should still be service-backed and state-aware.
 
 Run commands:
 
@@ -150,6 +253,7 @@ If you add a new window type:
 - add meaningful `describeState()` metadata
 - if it renders sized content, route its measurement through `content-measurement.ts`
 - if it needs non-standard chrome, declare that in `window-chrome.ts`
+- if it repeats a pattern already used elsewhere, extract the pattern first
 
 If you change terminal behavior:
 - test PTY launch directly
