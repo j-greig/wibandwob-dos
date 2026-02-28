@@ -362,6 +362,7 @@ def _fetch_image_bytes(source_url: str) -> Dict[str, Any]:
             resp = requests.get(source_url, timeout=15)
         resp.raise_for_status()
         content = resp.content
+        content_type = str(getattr(resp, "headers", {}).get("content-type", "")).lower()
     except requests.exceptions.SSLError:
         try:
             with warnings.catch_warnings():
@@ -372,11 +373,14 @@ def _fetch_image_bytes(source_url: str) -> Dict[str, Any]:
                     resp = requests.get(source_url, timeout=15)
                 resp.raise_for_status()
                 content = resp.content
+                content_type = str(getattr(resp, "headers", {}).get("content-type", "")).lower()
         except Exception as exc:
             return {"ok": False, "error": str(exc)}
     except Exception as exc:
         return {"ok": False, "error": str(exc)}
 
+    if content_type and not content_type.startswith("image/"):
+        return {"ok": False, "error": "invalid_content_type", "content_type": content_type}
     if len(content) > MAX_IMAGE_SOURCE_BYTES:
         return {"ok": False, "error": "source_too_large", "source_bytes": len(content)}
     return {"ok": True, "content": content, "source_bytes": len(content)}

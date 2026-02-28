@@ -13,6 +13,8 @@ import tools.api_server.browser_pipeline as pipeline
 class _Resp:
     def __init__(self, text: str) -> None:
         self.text = text
+        self.content = text.encode("utf-8")
+        self.headers = {"content-type": "text/html; charset=utf-8"}
 
     def raise_for_status(self) -> None:
         return None

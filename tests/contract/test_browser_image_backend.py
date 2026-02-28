@@ -89,3 +89,86 @@ def test_image_backend_cache_reuses_previous_render(monkeypatch, tmp_path: Path)
     pipeline.fetch_render_bundle("https://example.com/cache-images", image_mode="all-inline", cache_root=str(tmp_path))
     assert calls["count"] >= 1
     assert calls["count"] <= 2
+
+
+def test_image_backend_rejects_non_image_asset_response(monkeypatch, tmp_path: Path) -> None:
+    def _bad_get(url: str, timeout: int = 30, headers: dict | None = None, verify: bool = True):  # pylint: disable=unused-argument
+        if url.startswith("https://img.example.com/"):
+            return _Resp(content=b"<html>nope</html>", headers={"content-type": "text/html"})
+        html = "<html><title>T</title><img src='https://img.example.com/not-image'/></html>"
+        return _Resp(
+            text=html,
+            content=html.encode("utf-8"),
+            headers={"content-type": "text/html; charset=utf-8"},
+        )
+
+    monkeypatch.setattr(pipeline, "requests", SimpleNamespace(get=_bad_get))
+    monkeypatch.setattr(pipeline.shutil, "which", lambda _: "/usr/bin/chafa")
+
+    bundle = pipeline.fetch_render_bundle(
+        "https://example.com/not-image",
+        image_mode="all-inline",
+        cache_root=str(tmp_path),
+    )
+    assert bundle["assets"]
+    assert bundle["assets"][0]["status"] == "failed"
+    assert bundle["assets"][0]["render_error"] == "invalid_content_type"
+
+
+def test_image_backend_marks_large_source_failed(monkeypatch, tmp_path: Path) -> None:
+    def _large_get(url: str, timeout: int = 30, headers: dict | None = None, verify: bool = True):  # pylint: disable=unused-argument
+        if url.startswith("https://img.example.com/"):
+            return _Resp(
+                content=b"x" * (pipeline.MAX_IMAGE_SOURCE_BYTES + 1),
+                headers={"content-type": "image/png"},
+            )
+        html = "<html><title>T</title><img src='https://img.example.com/large.png'/></html>"
+        return _Resp(
+            text=html,
+            content=html.encode("utf-8"),
+            headers={"content-type": "text/html; charset=utf-8"},
+        )
+
+    monkeypatch.setattr(pipeline, "requests", SimpleNamespace(get=_large_get))
+    monkeypatch.setattr(pipeline.shutil, "which", lambda _: "/usr/bin/chafa")
+
+    bundle = pipeline.fetch_render_bundle(
+        "https://example.com/large-image",
+        image_mode="all-inline",
+        cache_root=str(tmp_path),
+    )
+    assert bundle["assets"][0]["status"] == "failed"
+    assert bundle["assets"][0]["render_error"] == "source_too_large"
+
+
+def test_image_backend_marks_oversized_dimensions_failed(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(pipeline, "requests", SimpleNamespace(get=_mock_get))
+    monkeypatch.setattr(pipeline.shutil, "which", lambda _: "/usr/bin/chafa")
+    monkeypatch.setattr(
+        pipeline,
+        "_probe_dimensions",
+        lambda image_bytes: {"w": pipeline.MAX_IMAGE_DIMENSION + 1, "h": 100},
+    )
+
+    bundle = pipeline.fetch_render_bundle(
+        "https://example.com/oversized-dims",
+        image_mode="all-inline",
+        cache_root=str(tmp_path),
+    )
+    assert bundle["assets"][0]["status"] == "failed"
+    assert bundle["assets"][0]["render_error"] == "dimensions_too_large"
+
+
+def test_image_backend_handles_missing_chafa(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(pipeline, "requests", SimpleNamespace(get=_mock_get))
+    monkeypatch.setattr(pipeline.shutil, "which", lambda _: None)
+
+    bundle = pipeline.fetch_render_bundle(
+        "https://example.com/no-chafa",
+        image_mode="all-inline",
+        cache_root=str(tmp_path),
+    )
+    statuses = {a["status"] for a in bundle["assets"]}
+    errors = {a.get("render_error") for a in bundle["assets"]}
+    assert "failed" in statuses
+    assert "chafa_not_found" in errors
