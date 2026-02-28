@@ -2566,105 +2566,115 @@ TMenuBar* TWwdosApp::initMenuBar(TRect r)
     r.b.y = r.a.y + 1;
     TMenuItem* recentSubmenu = buildRecentWorkspacesSubmenuItem();
     
+    // Menu bar: organized around the creative-agent workflow.
+    //
+    // Create  — tools for making things (paint, type, edit, open files)
+    // Generate — generative art engines and animations
+    // Canvas  — workspace layout, arrangement, persistence, capture
+    // Talk    — AI chat, room chat, Scramble, LLM config
+    //
+    // Every menu item dispatches via the same command constants used by
+    // the command registry, IPC, REST API, and MCP tools.
+
     return new TCustomMenuBar(r,
-        *new TSubMenu("~F~ile", kbAltF) +
-            *new TMenuItem("New ~T~est Pattern", cmNewWindow, kbCtrlN) +
-            *new TMenuItem("New ~H~-Gradient", cmNewGradientH, kbNoKey) +
-            *new TMenuItem("New ~V~-Gradient", cmNewGradientV, kbNoKey) +
-            *new TMenuItem("New ~R~adial Gradient", cmNewGradientR, kbNoKey) +
-            *new TMenuItem("New ~D~iagonal Gradient", cmNewGradientD, kbNoKey) +
-            // REMOVED E009: New Mechs Grid (dead end, handler commented out)
-            *new TMenuItem("New ~A~nimation", cmNewDonut, kbCtrlD) +
+        // ── Create: making tools ──────────────────────────────────
+        *new TSubMenu("~C~reate", kbAltC) +
+            *new TMenuItem("Pa~i~nt Canvas", cmNewPaintCanvas, kbNoKey) +
+            *new TMenuItem("~F~IGlet Text", cmNewFigletText, kbNoKey) +
+            *new TMenuItem("~T~ext Editor", cmTextEditor, kbNoKey) +
             newLine() +
             *new TMenuItem("~O~pen Text/Animation...", cmOpenAnimation, kbCtrlO) +
             *new TMenuItem("Open I~m~age...", cmOpenImageFile, kbNoKey) +
             *new TMenuItem("Open Mo~n~odraw...", cmOpenMonodraw, kbNoKey) +
+            *new TMenuItem("Open Text ~F~ile (Transparent)...", cmOpenTransparentText, kbNoKey) +
             newLine() +
-            *new TMenuItem("~S~ave Workspace", cmSaveWorkspace, kbCtrlS) +
-            *new TMenuItem("Save Workspace ~A~s...", cmSaveWorkspaceAs, kbNoKey) +
-            *new TMenuItem("Open ~W~orkspace...", cmOpenWorkspace, kbNoKey) +
-            *new TMenuItem("~M~anage Workspaces...", cmManageWorkspaces, kbNoKey) +
-            *recentSubmenu +
-            newLine() +
-            *new TMenuItem("E~x~it", cmQuit, cmQuit, hcNoContext, "Alt-X") +
-        *new TSubMenu("~E~dit", kbAltE) +
-            *new TMenuItem("~C~opy Page", cmCopy, kbCtrlIns) +
-            newLine() +
-            *new TMenuItem("Sc~r~eenshot", cmScreenshot, kbCtrlP) +
-            newLine() +
-            (TMenuItem&) (
-                *new TSubMenu("Pattern ~M~ode", kbNoKey) +
-                    *new TMenuItem(USE_CONTINUOUS_PATTERN ? "\x04 ~C~ontinuous (Diagonal)" : "  ~C~ontinuous (Diagonal)", 
-                                  cmPatternContinuous, kbNoKey) +
-                    *new TMenuItem(!USE_CONTINUOUS_PATTERN ? "\x04 ~T~iled (Cropped)" : "  ~T~iled (Cropped)", 
-                                  cmPatternTiled, kbNoKey)
-            ) +
-            newLine() +
-            *new TMenuItem("FIGlet Edit ~T~ext...", cmFigletEditText, kbNoKey) +
+            *new TMenuItem("FIGlet Edit Te~x~t...", cmFigletEditText, kbNoKey) +
             (TMenuItem&) buildFigletFontSubMenu() +
-        *new TSubMenu("~V~iew", kbAltV) +
-            *new TMenuItem("ASCII ~G~rid Demo", cmAsciiGridDemo, kbNoKey) +
-            *new TMenuItem("~A~nimated Blocks", cmAnimatedBlocks, kbNoKey) +
-            *new TMenuItem("Animated Gradie~n~t", cmAnimatedGradient, kbNoKey) +
-            *new TMenuItem("Animated S~c~ore", cmAnimatedScore, kbNoKey) +
-            *new TMenuItem("Score ~B~G Color...", cmScoreBgColor, kbNoKey) +
-            *new TMenuItem("~V~erse Field (Generative)", cmVerseField, kbNoKey) +
-            *new TMenuItem("~O~rbit Field (Generative)", cmOrbitField, kbNoKey) +
-            *new TMenuItem("M~y~celium Field (Generative)", cmMyceliumField, kbNoKey) +
-            *new TMenuItem("~T~orus Field (Generative)", cmTorusField, kbNoKey) +
-            *new TMenuItem("C~u~be Spinner (Generative)", cmCubeField, kbNoKey) +
-            *new TMenuItem("Monster ~P~ortal (Generative)", cmMonsterPortal, kbNoKey) +
-            *new TMenuItem("Monster Ve~r~se (Generative)", cmMonsterVerse, kbNoKey) +
-            *new TMenuItem("Monster Cam (Emo~j~i)", cmMonsterCam, kbNoKey) +
-            *new TMenuItem("~C~ontour Studio", cmContourMap, kbNoKey) +
-            newLine() +
-            *new TMenuItem("~A~pplications", cmAppLauncher, kbNoKey) +
-            *new TMenuItem("ASCII ~G~allery", cmAsciiGallery, kbNoKey) +
             newLine() +
             (TMenuItem&)(
-                *new TSubMenu("~G~ames", kbNoKey) +
+                *new TSubMenu("Pattern ~M~ode", kbNoKey) +
+                    *new TMenuItem(USE_CONTINUOUS_PATTERN ? "\x04 ~C~ontinuous (Diagonal)" : "  ~C~ontinuous (Diagonal)",
+                                  cmPatternContinuous, kbNoKey) +
+                    *new TMenuItem(!USE_CONTINUOUS_PATTERN ? "\x04 ~T~iled (Cropped)" : "  ~T~iled (Cropped)",
+                                  cmPatternTiled, kbNoKey)
+            ) +
+
+        // ── Generate: generative art & engines ────────────────────
+        *new TSubMenu("~G~enerate", kbAltG) +
+            (TMenuItem&)(
+                *new TSubMenu("~O~rganic", kbNoKey) +
+                    *new TMenuItem("~V~erse Field", cmVerseField, kbNoKey) +
+                    *new TMenuItem("~M~ycelium", cmMyceliumField, kbNoKey) +
+                    *new TMenuItem("~C~ontour Studio", cmContourMap, kbNoKey) +
+                    *new TMenuItem("Game of ~L~ife", cmNewWindow, kbNoKey) // uses life via API
+            ) +
+            (TMenuItem&)(
+                *new TSubMenu("~G~eometric", kbNoKey) +
+                    *new TMenuItem("~O~rbit", cmOrbitField, kbNoKey) +
+                    *new TMenuItem("~T~orus", cmTorusField, kbNoKey) +
+                    *new TMenuItem("~C~ube Spinner", cmCubeField, kbNoKey) +
+                    *new TMenuItem("~A~nimated Gradient", cmAnimatedGradient, kbNoKey)
+            ) +
+            (TMenuItem&)(
+                *new TSubMenu("~M~onsters", kbNoKey) +
+                    *new TMenuItem("~P~ortal", cmMonsterPortal, kbNoKey) +
+                    *new TMenuItem("~V~erse", cmMonsterVerse, kbNoKey) +
+                    *new TMenuItem("~C~am (Emoji)", cmMonsterCam, kbNoKey)
+            ) +
+            newLine() +
+            *new TMenuItem("Animated ~B~locks", cmAnimatedBlocks, kbNoKey) +
+            *new TMenuItem("Animated ~S~core", cmAnimatedScore, kbNoKey) +
+            *new TMenuItem("~N~ew Animation", cmNewDonut, kbCtrlD) +
+            *new TMenuItem("ASCII ~G~rid Demo", cmAsciiGridDemo, kbNoKey) +
+            newLine() +
+            (TMenuItem&)(
+                *new TSubMenu("G~a~mes", kbNoKey) +
                     *new TMenuItem("~M~icropolis City Builder", cmMicropolisAscii, kbNoKey) +
                     *new TMenuItem("~Q~uadra (Falling Blocks)", cmQuadra, kbNoKey) +
                     *new TMenuItem("~S~nake", cmSnake, kbNoKey) +
                     *new TMenuItem("Wib~W~ob Rogue", cmRogue, kbNoKey) +
                     *new TMenuItem("~D~eep Signal", cmDeepSignal, kbNoKey)
             ) +
-            newLine() +
-            *new TMenuItem("Pa~i~nt Canvas", cmNewPaintCanvas, kbNoKey) +
-            *new TMenuItem("~F~IGlet Text", cmNewFigletText, kbNoKey) +
-            newLine() +
-            *new TMenuItem("Scra~m~ble Cat", cmScrambleCat, kbF8) +
-        *new TSubMenu("~W~indow", kbAltW) +
-            *new TMenuItem("~T~ext Editor", cmTextEditor, kbNoKey) +
+
+        // ── Canvas: arrange, browse, save, capture ────────────────
+        *new TSubMenu("C~a~nvas", kbAltA) +
+            *new TMenuItem("~G~allery", cmAsciiGallery, kbNoKey) +
+            *new TMenuItem("~A~pplications", cmAppLauncher, kbNoKey) +
             *new TMenuItem("~B~rowser", cmBrowser, kbCtrlB) +
             *new TMenuItem("Te~r~minal", cmOpenTerminal, kbNoKey) +
-            *new TMenuItem("~O~pen Text File (Transparent)...", cmOpenTransparentText, kbNoKey) +
             newLine() +
             *new TMenuItem("~C~ascade", cmCascade, kbNoKey) +
             *new TMenuItem("Ti~l~e", cmTile, kbNoKey) +
             *new TMenuItem("Send to Bac~k~", cmSendToBack, kbNoKey) +
-            newLine() +
             *new TMenuItem("~N~ext", cmNext, kbF6) +
             *new TMenuItem("~P~revious", cmPrev, kbShiftF6) +
             newLine() +
-            *new TMenuItem("Clos~e~", cmClose, kbAltF3) +
-            *new TMenuItem("Close ~A~ll", cmCloseAll, kbNoKey) +
-            // REMOVED E009: Background Color... (retired for now)
-        *new TSubMenu("~T~ools", kbAltT) +
-            *new TMenuItem("~W~ib&Wob Chat", cmWibWobChat, kbF12) +
+            *new TMenuItem("Sc~r~eenshot", cmScreenshot, kbCtrlP) +
+            *new TMenuItem("Co~p~y Page", cmCopy, kbCtrlIns) +
+            newLine() +
+            *new TMenuItem("~S~ave Workspace", cmSaveWorkspace, kbCtrlS) +
+            *new TMenuItem("Save Workspace As...", cmSaveWorkspaceAs, kbNoKey) +
+            *new TMenuItem("~O~pen Workspace...", cmOpenWorkspace, kbNoKey) +
+            *new TMenuItem("~M~anage Workspaces...", cmManageWorkspaces, kbNoKey) +
+            *recentSubmenu +
+            newLine() +
+            *new TMenuItem("Clos~e~ Window", cmClose, kbAltF3) +
+            *new TMenuItem("Close A~l~l", cmCloseAll, kbNoKey) +
+            newLine() +
+            *new TMenuItem("E~x~it", cmQuit, cmQuit, hcNoContext, "Alt-X") +
+
+        // ── Talk: AI chat, collaboration, config ──────────────────
+        *new TSubMenu("~T~alk", kbAltT) +
+            *new TMenuItem("~W~ib&&Wob Chat", cmWibWobChat, kbF12) +
+            *new TMenuItem("~S~cramble Cat", cmScrambleCat, kbF8) +
             *new TMenuItem("~R~oom Chat", cmRoomChat, kbNoKey) +
-            // REMOVED E009: Test A/B/C (dev-only, type fallback to test_pattern)
-            // REMOVED E009: Glitch Effects submenu (entire submenu disabled)
-            // REMOVED E009: ANSI Editor, Animation Studio (placeholders)
             newLine() +
             *new TMenuItem("~Q~uantum Printer", cmQuantumPrinter, kbF11) +
             newLine() +
-            *new TMenuItem("API ~K~ey...", cmApiKey, kbNoKey) +
-        *new TSubMenu("~H~elp", kbAltH) +
             *new TMenuItem("~A~bout WIBWOBWORLD", cmAbout, kbNoKey) +
             *new TMenuItem("~K~eyboard Shortcuts", cmKeyboardShortcuts, kbNoKey) +
-            *new TMenuItem("A~P~I Key Help", cmApiKeyHelp, kbNoKey) +
-            *new TMenuItem("~L~LM Status", cmLlmStatus, kbNoKey)
+            *new TMenuItem("~L~LM Status", cmLlmStatus, kbNoKey) +
+            *new TMenuItem("API Ke~y~...", cmApiKey, kbNoKey)
     );
 }
 
