@@ -168,13 +168,14 @@ bool BackroomsBridge::start(const BackroomsChannel &channel) {
 
     // Build command
     // Ensure claude CLI is findable and auth method is explicit
-    std::string cmd = "export PATH=\"$HOME/.local/bin:$PATH\" && cd " + backroomsPath + " && WIBWOB_AUTH_METHOD=claude-cli npx tsx src/ui/cli.ts";
+    std::string cmd = "export PATH=\"$HOME/.local/bin:$PATH\" && cd " + backroomsPath + " && WIBWOB_AUTH_METHOD=claude-cli npx tsx src/ui/cli-v3.ts";
     cmd += " \"" + channel.theme + "\"";
     cmd += " --turns " + std::to_string(channel.turns);
     if (!allPrimers.empty()) {
         cmd += " --primers \"" + allPrimers + "\"";
     }
     cmd += " --model " + channel.model;
+    cmd += " --raw";       // stream only LLM deltas to stdout, no formatting
     cmd += " 2>/dev/null"; // suppress stderr
 
     // Create pipe

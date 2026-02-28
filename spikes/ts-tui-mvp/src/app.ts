@@ -8,12 +8,19 @@ type List = blessed.Widgets.ListElement;
 type Prompt = blessed.Widgets.PromptElement;
 type NodePtyModule = typeof import("node-pty");
 
-type WindowKind = "primer" | "editor" | "terminal";
+type WindowKind = "primer" | "editor" | "terminal" | "browser" | "art";
+
+const PRIMER_ROOTS = ["modules", "modules-private", "docs"] as const;
 
 interface EditorState {
   widget: Box;
   value: string;
   cursor: number;
+}
+
+interface BrowserEntry {
+  label: string;
+  filePath: string;
 }
 
 interface WindowRecord {
@@ -28,6 +35,7 @@ interface WindowRecord {
   editor?: EditorState;
   filePath?: string;
   writeInput?: (input: string) => void;
+  cleanup?: () => void;
 }
 
 interface DragState {
@@ -158,9 +166,11 @@ class TsTuiMvpApp {
         key: "f",
         left: 1,
         items: [
+          { label: "Browse Primers", action: () => this.openPrimerBrowserWindow() },
           { label: "Open Primer...", action: () => this.promptForPrimer() },
           { label: "Open Text File...", action: () => this.promptForEditorPath() },
           { label: "New Text Buffer", action: () => this.openEditorWindow() },
+          { label: "Open Art Window", action: () => this.openArtWindow() },
           { label: "Open Terminal", action: () => void this.openTerminalWindow() },
           { label: "Quit", action: () => this.destroy() }
         ]
@@ -174,6 +184,17 @@ class TsTuiMvpApp {
           { label: "Focus Previous Window", action: () => this.focusNextWindow(-1) },
           { label: "Close Focused Window", action: () => this.closeFocusedWindow() }
         ]
+      },
+      {
+        label: "Window",
+        key: "w",
+        left: 15,
+        items: [
+          { label: "Tile Windows", action: () => this.tileWindows() },
+          { label: "Cascade Windows", action: () => this.cascadeWindows() },
+          { label: "Open Browser", action: () => this.openPrimerBrowserWindow() },
+          { label: "Open Art", action: () => this.openArtWindow() }
+        ]
       }
     ];
   }
@@ -184,13 +205,14 @@ class TsTuiMvpApp {
     this.bindMenuClicks();
     this.openPrimerWindow(path.join(process.cwd(), "README.md"));
     this.openEditorWindow(undefined, "notes.txt", "Type here. Ctrl-S saves when the buffer has a path.\n");
+    this.openArtWindow();
     this.screen.render();
   }
 
   private renderChrome(): void {
     this.menuBar.setContent("");
     this.statusLine.setContent(
-      " Alt-F File  Alt-E Edit  Tab Next  Shift-Tab Prev  Ctrl-S Save  Ctrl-Q Quit "
+      " Alt-F File  Alt-E Edit  Alt-W Window  Tab Next  Shift-Tab Prev  Ctrl-S Save  Ctrl-Q Quit "
     );
     this.repaintDesktop();
     this.screen.on("resize", () => {
@@ -211,6 +233,7 @@ class TsTuiMvpApp {
     this.screen.key(["C-q"], () => this.destroy());
     this.screen.key(["M-f"], () => this.openMenu("File"));
     this.screen.key(["M-e"], () => this.openMenu("Edit"));
+    this.screen.key(["M-w"], () => this.openMenu("Window"));
     this.screen.key(["escape"], () => this.closeMenu());
     this.screen.key(["tab"], () => {
       if (this.focusedWindow?.kind === "editor") {
@@ -328,12 +351,7 @@ class TsTuiMvpApp {
       mouse: true,
       scrollable: true,
       alwaysScroll: true,
-      scrollbar: {
-        ch: " ",
-        style: {
-          bg: "white"
-        }
-      },
+      scrollbar: this.createScrollbar(),
       style: {
         fg: "white",
         bg: "black"
@@ -419,6 +437,78 @@ class TsTuiMvpApp {
     );
   }
 
+  private openPrimerBrowserWindow(): void {
+    const entries = this.collectPrimerEntries();
+    if (entries.length === 0) {
+      this.flash("No primer files found in modules, modules-private, or docs.");
+      return;
+    }
+
+    const frame = this.createFrame("Primer Browser", "browser");
+    const help = blessed.box({
+      parent: frame.body,
+      top: 0,
+      left: 0,
+      right: 0,
+      height: 1,
+      content: " Enter opens file  j/k scroll  Esc closes menu ",
+      style: {
+        fg: "black",
+        bg: "cyan"
+      }
+    });
+    const list = blessed.list({
+      parent: frame.body,
+      top: 1,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      keys: true,
+      vi: true,
+      mouse: true,
+      scrollable: true,
+      alwaysScroll: true,
+      scrollbar: this.createScrollbar(),
+      items: entries.map((entry) => entry.label),
+      style: {
+        fg: "white",
+        bg: "black",
+        selected: {
+          fg: "black",
+          bg: "white"
+        }
+      }
+    });
+
+    const openSelected = (index?: number) => {
+      const itemIndex =
+        typeof index === "number" ? index : (list as List & { selected: number }).selected ?? 0;
+      const entry = entries[itemIndex];
+      if (!entry) {
+        return;
+      }
+      this.openPrimerWindow(entry.filePath);
+    };
+
+    list.on("select", (_, index) => openSelected(index));
+    list.on("keypress", (_, key) => {
+      if (key.name === "enter") {
+        openSelected();
+      }
+    });
+
+    const record = frame;
+    record.kind = "browser";
+    record.focus = () => {
+      this.focusWindow(record);
+      list.focus();
+    };
+
+    void help;
+    this.registerWindow(record);
+    record.focus();
+  }
+
   private promptForPrimer(): void {
     const initial = path.join(process.cwd(), "README.md");
     this.prompt.input("Open Primer Path", initial, (error, value) => {
@@ -466,12 +556,7 @@ class TsTuiMvpApp {
       mouse: true,
       scrollable: true,
       alwaysScroll: true,
-      scrollbar: {
-        ch: " ",
-        style: {
-          bg: "white"
-        }
-      },
+      scrollbar: this.createScrollbar(),
       content,
       style: {
         fg: "white",
@@ -503,12 +588,7 @@ class TsTuiMvpApp {
       tags: true,
       scrollable: true,
       alwaysScroll: true,
-      scrollbar: {
-        ch: " ",
-        style: {
-          bg: "white"
-        }
-      },
+      scrollbar: this.createScrollbar(),
       style: {
         fg: "white",
         bg: "black"
@@ -531,6 +611,64 @@ class TsTuiMvpApp {
     };
 
     this.renderEditor(record);
+    this.registerWindow(record);
+    record.focus();
+  }
+
+  private openArtWindow(): void {
+    const frame = this.createFrame("Generative Art", "art");
+    const canvas = blessed.box({
+      parent: frame.body,
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      tags: false,
+      style: {
+        fg: "white",
+        bg: "black"
+      }
+    });
+
+    let tick = 0;
+    const renderArt = () => {
+      const width = Math.max(12, Number(canvas.width));
+      const height = Math.max(6, Number(canvas.height));
+      const palette = " .:-=+*#%@";
+      const rows: string[] = [];
+
+      for (let y = 0; y < height; y += 1) {
+        let row = "";
+        for (let x = 0; x < width; x += 1) {
+          const waveA = Math.sin((x + tick) / 5);
+          const waveB = Math.cos((y - tick) / 4);
+          const orbit = Math.sin((x + y + tick) / 7);
+          const value = (waveA + waveB + orbit + 3) / 6;
+          const index = Math.min(
+            palette.length - 1,
+            Math.max(0, Math.floor(value * palette.length))
+          );
+          row += palette[index];
+        }
+        rows.push(row);
+      }
+
+      canvas.setContent(rows.join("\n"));
+      this.screen.render();
+      tick += 1;
+    };
+
+    renderArt();
+    const timer = setInterval(renderArt, 100);
+
+    const record = frame;
+    record.kind = "art";
+    record.cleanup = () => clearInterval(timer);
+    record.focus = () => {
+      this.focusWindow(record);
+      canvas.focus();
+    };
+
     this.registerWindow(record);
     record.focus();
   }
@@ -604,6 +742,7 @@ class TsTuiMvpApp {
       body,
       titleBar,
       close: () => {
+        record.cleanup?.();
         frame.destroy();
         const index = this.windows.findIndex((window) => window.id === record.id);
         if (index >= 0) {
@@ -687,6 +826,11 @@ class TsTuiMvpApp {
   }
 
   private focusWindow(record: WindowRecord): void {
+    const index = this.windows.findIndex((window) => window.id === record.id);
+    if (index >= 0) {
+      const [active] = this.windows.splice(index, 1);
+      this.windows.push(active);
+    }
     this.focusedWindow = record;
     record.frame.setFront();
     for (const window of this.windows) {
@@ -875,6 +1019,103 @@ class TsTuiMvpApp {
     env.TERM = env.TERM || "xterm-256color";
     env.COLORTERM = env.COLORTERM || "truecolor";
     return env;
+  }
+
+  private collectPrimerEntries(): BrowserEntry[] {
+    const entries: BrowserEntry[] = [];
+    for (const root of PRIMER_ROOTS) {
+      const rootPath = path.join(process.cwd(), root);
+      if (!fs.existsSync(rootPath)) {
+        continue;
+      }
+      this.walkPrimerEntries(rootPath, root, entries, 0);
+    }
+    return entries.sort((left, right) => left.label.localeCompare(right.label));
+  }
+
+  private walkPrimerEntries(
+    directory: string,
+    rootLabel: string,
+    entries: BrowserEntry[],
+    depth: number
+  ): void {
+    if (depth > 3) {
+      return;
+    }
+    const children = fs.readdirSync(directory, { withFileTypes: true });
+    for (const child of children) {
+      if (child.name.startsWith(".") || child.name.endsWith(".log")) {
+        continue;
+      }
+      const childPath = path.join(directory, child.name);
+      if (child.isDirectory()) {
+        this.walkPrimerEntries(childPath, rootLabel, entries, depth + 1);
+        continue;
+      }
+      if (!this.isTextLikeFile(child.name)) {
+        continue;
+      }
+      entries.push({
+        label: `${rootLabel} :: ${path.relative(path.join(process.cwd(), rootLabel), childPath)}`,
+        filePath: childPath
+      });
+    }
+  }
+
+  private isTextLikeFile(fileName: string): boolean {
+    const extension = path.extname(fileName).toLowerCase();
+    return extension === "" || [".md", ".txt", ".json", ".prompt", ".log", ".yaml", ".yml"].includes(extension);
+  }
+
+  private createScrollbar(): { ch: string; style: { bg: string } } {
+    return {
+      ch: " ",
+      style: {
+        bg: "white"
+      }
+    };
+  }
+
+  private tileWindows(): void {
+    if (this.windows.length === 0) {
+      return;
+    }
+    const desktopWidth = Math.max(40, Number(this.screen.width));
+    const desktopHeight = Math.max(12, Number(this.screen.height) - 2);
+    const columns = Math.max(1, Math.ceil(Math.sqrt(this.windows.length)));
+    const rows = Math.max(1, Math.ceil(this.windows.length / columns));
+    const cellWidth = Math.max(24, Math.floor(desktopWidth / columns));
+    const cellHeight = Math.max(8, Math.floor(desktopHeight / rows));
+
+    for (const [index, window] of this.windows.entries()) {
+      const column = index % columns;
+      const row = Math.floor(index / columns);
+      const left = column * cellWidth;
+      const top = 1 + row * cellHeight;
+      const width = column === columns - 1 ? desktopWidth - left : cellWidth;
+      const height = row === rows - 1 ? desktopHeight - row * cellHeight : cellHeight;
+      window.frame.left = Math.max(0, left);
+      window.frame.top = Math.max(1, top);
+      window.frame.width = Math.max(24, width);
+      window.frame.height = Math.max(8, height);
+    }
+
+    this.screen.render();
+  }
+
+  private cascadeWindows(): void {
+    const desktopWidth = Math.max(40, Number(this.screen.width));
+    const desktopHeight = Math.max(12, Number(this.screen.height) - 2);
+    const width = Math.min(desktopWidth - 4, 72);
+    const height = Math.min(desktopHeight - 2, 20);
+    for (const [index, window] of this.windows.entries()) {
+      const offset = index * 2;
+      window.frame.left = this.clamp(offset, 0, Math.max(0, desktopWidth - width));
+      window.frame.top = this.clamp(1 + offset, 1, Math.max(1, desktopHeight - height));
+      window.frame.width = width;
+      window.frame.height = height;
+    }
+    this.screen.render();
   }
 
   private flash(message: string): void {
