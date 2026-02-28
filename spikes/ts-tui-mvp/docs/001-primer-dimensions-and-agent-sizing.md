@@ -102,3 +102,43 @@ Both `.pi/APPEND_SYSTEM.md` and `modules-private/wibwob-prompts/wibandwob.prompt
 - Desktop state injection for Wib&Wob in-app chat (needs C++ SDK bridge change, spec at `.planning/sparks/agent-state-injection.md`)
 - Pi agent must query state manually — no hook equivalent yet
 - Some emoji sequences still measure differently between strwidth and tvision's renderer (edge case)
+
+---
+
+## Appendix: Related features across the codebase
+
+Cross-referenced by Codex. These all touch the same measurement/sizing/placement surface.
+
+### Duplicate measurement — Python side
+`tools/api_server/gallery.py:_measure_primer()` — parallel Python implementation using `wcwidth.wcswidth()` instead of tvision's `strwidth()`. Adds +2 chrome independently. Used by the gallery layout engine. Should share a single source of truth with the C++ measurer.
+
+### Figlet content measurement
+`app/wwdos_app.cpp:5028-5052` — `api_spawn_figlet_text()` renders at unlimited width, counts max line width and line count, then adds +6w/+3h for chrome. Same measure→size pattern as primers, but inline and unshared.
+
+### Gallery layout engine (8 algorithms)
+`tools/api_server/gallery.py` — masonry, fit-rows, packery, poetry, stamp, cluster, horizontal masonry, cells-by-row. ALL consume measured primer dimensions from `_measure_primer()`. This is the primary consumer of content measurement.
+
+### Arrange presets (7 layouts)
+`tools/arrange.py` — golden, magazine, cinema, triptych, diagonal, spotlight, asymmetric. Desktop-proportional only — does NOT use content dimensions. A separate system from gallery.py.
+
+### Batch layout
+`tools/api_server/controller.py:batch_layout()` — programmatic grid macros with idempotent create/move/close. Uses explicit sizes, not content-measured.
+
+### Snap window
+`app/command_registry.cpp:868-982`, `tools/api_server/snap_window.py` — zone-based placement with grid mode. Desktop-aware but not content-aware.
+
+### Aspect ratio resize
+`app/command_registry.cpp:790-845` — `resize_window` with named ratios (16:9, golden, A4...) and cell_aspect=2.0 correction. Infrastructure exists but not connected to content measurement.
+
+### Window types that DON'T report content dimensions
+Only `frame_player` and `figlet_text` report content_lines/content_width in state props. The other 33 window types (browser, terminal, paint, all games, all generative views) report nothing about their content size. Agents are blind to these.
+
+### Desktop state hook
+`.claude/hooks/desktop-state.sh` — only fires for Claude Code sessions. Pi agent and Wib&Wob chat have no equivalent. State injection should be a core service.
+
+### Chrome offset duplication
+The +2 formula (content + 2 for TWindow borders) appears independently in:
+- `app/core/primer_utils.h` (via recommended_w/h in gallery_list)
+- `tools/api_server/gallery.py:42-43`
+- `app/command_registry.cpp` (gallery_list enrichment)
+- `app/wwdos_app.cpp` (figlet uses +6/+3, different formula)
