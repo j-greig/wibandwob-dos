@@ -139,37 +139,74 @@ OpenTUI's overlapping window support is unclear.
 
 ### Why @farjs/blessed specifically
 
-| Fork | Last release | Status |
-|------|-------------|--------|
-| blessed (chjj) | 8+ years ago | Dead |
-| neo-blessed | 5 years ago | Dead |
-| @farjs/blessed | Within 12 months | Active, sustainable |
-| @unblessed/core | Alpha | Too early |
+| Fork | Version | Last release | Status |
+|------|---------|-------------|--------|
+| blessed (chjj) | 0.1.81 | 10+ years ago | Dead |
+| neo-blessed | — | 5 years ago | Dead |
+| @farjs/blessed | 0.4.0 | Feb 2025 | Active, 13 releases |
+| @unblessed/blessed | alpha | Active | Full TS rewrite, too early |
+| bbblessed | — | Active | Bun.js fork, niche |
 
-[@farjs/blessed](https://snyk.io/advisor/npm-package/@farjs/blessed) is used
-by [FAR.js](https://github.com/nickel-org/nickel.rs) — a production file
-manager — proving it works for complex TUI applications with panels, dialogs,
-and keyboard navigation.
+[@farjs/blessed](https://www.npmjs.com/package/@farjs/blessed) is used by
+[FAR.js](https://github.com/nickel-org/nickel.rs) — a production file manager
+— proving it works for complex TUI applications with panels, dialogs, and
+keyboard navigation. Zero runtime dependencies. Ships its own `index.d.ts`
+(delegates to `@types/blessed` for core types, adds `unicode` utility).
+
+The fork's 13 releases focus on: Unicode/wide-character handling fixes (wcwidth,
+surrogate pairs), Windows compatibility (Ctrl+Fx keys), TypeScript 5.7
+maintenance, and bug fixes. The core blessed API surface is unchanged from the
+original — all documentation and community knowledge applies.
 
 **Key blessed APIs and their TV equivalents:**
 
 | Turbo Vision | blessed | Notes |
 |---|---|---|
-| `TApplication` | `blessed.screen()` | Top-level container, event loop |
+| `TApplication` | `blessed.screen({smartCSR: true})` | Top-level container, event loop |
 | `TDeskTop` | `blessed.box({parent: screen})` | Desktop background |
-| `TWindow` | `blessed.box({border: 'line', draggable: true, shadow: true})` | Framed, movable window |
-| `TView.draw()` | `element.render()` or custom `_render()` | Per-cell rendering |
+| `TWindow` | `blessed.box({border: 'line', draggable: true, shadow: true, label: 'Title'})` | Framed, movable window |
+| `TView.draw()` | `element.render()` writes into `screen.lines` | Per-cell rendering (painter's algorithm) |
 | `TView.handleEvent()` | `element.on('keypress')`, `element.on('click')` | Event handlers |
 | `TView.setState(sfShadow)` | `element.shadow = true/false` | Runtime toggle |
+| `TView.setState(sfVisible)` | `element.show()` / `element.hide()` | Visibility toggle |
+| `TView.options.ofSelectable` | `{input: true, keys: true}` | Focusable element |
 | `deskTop->insert(w)` | `screen.append(element)` | Add to z-order |
 | `w->select()` | `element.setFront(); element.focus()` | Raise + focus |
 | `w->putInFrontOf(bg)` | `element.setBack()` | Send to back |
-| `writeLine(x,y,w,1,cells)` | Custom `_render()` with `this.screen.lines[y][x]` | Per-cell write |
-| `TDrawBuffer` | `this.screen.lines` (cell array) | Raw screen buffer |
-| `TTimerId` | `setInterval(fn, 50)` | Animation timer |
+| `w->makeFirst()` | `element.setFront()` | Z-order: children array reorder |
+| `TView::setIndex(z)` | `element.setIndex(z)` | Explicit z position |
+| `writeLine(x,y,w,1,cells)` | `screen.lines[y][x] = [attr, ch]` | Per-cell write |
+| `TDrawBuffer` / `TScreenCell` | `screen.lines` — each cell is `[attr, ch]` | Raw screen buffer |
+| `TDrawBuffer::moveChar()` | `screen.fillRegion(attr, ch, x1, x2, y1, y2)` | Fill region |
+| `TTimerId` / `setTimer()` | `setInterval(fn, 50)` | Animation timer |
 | `TFrame` | `border: {type: 'line'}` | Standard frame |
 | `TGhostFrame` | `border: false` (no border) | Frameless window |
+| `TGroup::forEach()` | `parent.children.forEach()` | Iterate child views |
 | `cmCommand` dispatch | `screen.emit('command', {name, args})` | Custom events |
+
+**Cell format (critical detail):** Each cell in `screen.lines[y][x]` is a
+two-element array `[attr, ch]` where `attr` is a 27-bit packed integer:
+
+```
+Bits  0-8:  background color (0-255, or 0x1ff = default)
+Bits  9-17: foreground color (0-255, or 0x1ff = default)
+Bits 18-26: flags (bold=1, underline=2, blink=4, inverse=8, invisible=16)
+```
+
+Built with `Element.prototype.sattr(style, fg, bg)`. This is the equivalent
+of Turbo Vision's `TColorAttr` packed encoding. Each row has a `.dirty`
+boolean — the draw pass only diffs dirty rows against `screen.olines`.
+
+**Rendering cycle:** `screen.render()` → iterate `children` in order (index 0 =
+back, last index = front), each child writes into `screen.lines` → `screen.draw()`
+diffs `lines` vs `olines` cell-by-cell → only changed cells written to terminal
+via smart cursor movement (`cuf`/`cup`). This is the painter's algorithm with
+damage tracking — the exact same model as Turbo Vision.
+
+**Color support:** 16 named colors + 256-color indices + hex `'#rrggbb'`
+(mapped to nearest 256-color via weighted Euclidean distance, cached). No true
+24-bit SGR output. Hex colors are approximated. `style.transparent = true`
+blends at 50% opacity via `colors.blend()`.
 
 ### Architectural reference: turbo-vision-4-rust
 
@@ -310,6 +347,42 @@ export abstract class WwView {
 }
 ```
 
+### Screen cell helpers
+
+```typescript
+// engine/screen-cell.ts
+
+/** Pack fg, bg, and style flags into blessed's 27-bit attr integer. */
+export function sattr(
+  fg: number,                // 0-255 color index (0x1ff = default)
+  bg: number,                // 0-255 color index (0x1ff = default)
+  flags: { bold?: boolean; underline?: boolean; blink?: boolean;
+           inverse?: boolean; invisible?: boolean } = {}
+): number {
+  return ((flags.invisible ? 16 : 0) << 18)
+    | ((flags.inverse ? 8 : 0) << 18)
+    | ((flags.blink ? 4 : 0) << 18)
+    | ((flags.underline ? 2 : 0) << 18)
+    | ((flags.bold ? 1 : 0) << 18)
+    | ((fg & 0x1ff) << 9)
+    | (bg & 0x1ff);
+}
+
+/** Write a single cell to the screen buffer. */
+export function writeCell(
+  screen: blessed.Widgets.Screen,
+  x: number, y: number,
+  ch: string, attr: number
+): void {
+  const line = (screen as any).lines[y];
+  if (line && line[x]) {
+    line[x][0] = attr;
+    line[x][1] = ch;
+    line.dirty = true;
+  }
+}
+```
+
 ### WwWindow (framed, movable window wrapping a view)
 
 ```typescript
@@ -371,6 +444,42 @@ export type WwEvent =
   | { kind: 'resize'; width: number; height: number };
 ```
 
+### Mouse and keyboard event handling
+
+Blessed provides full mouse event support with automatic element hit-testing:
+
+```typescript
+// Screen-level key binding (global shortcuts)
+screen.key(['escape', 'C-s', 'M-x', 'f12'], (ch, key) => { /* ... */ });
+
+// Element-level events
+element.on('click', (mouse) => {
+  // mouse: { x, y, button: 'left'|'middle'|'right', action: 'click' }
+});
+element.on('mousedown', handler);
+element.on('mouseup', handler);
+element.on('mousemove', handler);
+element.on('mouseover', handler);  // hover enter
+element.on('mouseout', handler);   // hover leave
+element.on('wheelup', handler);    // scroll
+element.on('wheeldown', handler);
+
+// Dragging is built-in
+element.draggable = true;
+
+// Focus management
+screen.focused;           // Current focus
+screen.focusNext();       // Tab cycling
+screen.focusPrevious();   // Shift-tab
+```
+
+Events bubble up the element tree. Parent elements can intercept child events:
+```typescript
+parent.on('element click', (el, mouse) => {
+  return false;  // Stops propagation
+});
+```
+
 ### Generative view pattern (example: Verse Field)
 
 ```typescript
@@ -406,10 +515,12 @@ export class VerseView extends WwView {
         const ch = shadeFor(f);
 
         // Direct cell write — blessed screen buffer
+        // Cell format: [attr, ch] where attr is 27-bit packed integer
         const line = lines[baseY + y];
         if (line && line[baseX + x]) {
-          line[baseX + x][0] = ch;     // character
-          line[baseX + x][1] = encodeFgBg(rgb, {r:0, g:0, b:0});  // attr
+          line[baseX + x][0] = sattr(rgb, {r:0, g:0, b:0});  // packed attr (fg|bg|flags)
+          line[baseX + x][1] = ch;                            // character
+          line[baseY + y].dirty = true;                       // mark row dirty
         }
       }
     }
@@ -516,6 +627,21 @@ export function createMcpServer(app: WwDesktop) {
 
 Generative art views compute O(W*H) sine+noise per cell per frame at 20Hz.
 JavaScript is 3-10x slower than C++ for tight math loops.
+
+### Blessed's built-in optimizations
+
+Blessed already handles rendering efficiently:
+
+1. **Dual-buffer diffing** — `screen.lines` vs `screen.olines`, only changed cells output
+2. **Per-row dirty flags** — `screen.lines[y].dirty`, unchanged rows skipped entirely
+3. **Smart cursor movement** — `cuf` for same-row jumps, `cup` for cross-row, minimizes escape sequences
+4. **CSR** — `smartCSR`/`fastCSR` for efficient scrolling without redrawing
+5. **Color cache** — hex-to-256-color conversions memoized by RGB hash
+
+The render cycle scales as O(children * area) for the paint phase, then O(rows * cols)
+for the diff pass. For a 200x50 terminal (10,000 cells), the diff pass is fast — the
+bottleneck is terminal I/O bandwidth, not internal rendering. The library was used to
+build the `slap` text editor and `blessed-contrib` dashboards with smooth rendering.
 
 ### Mitigation tiers
 
@@ -667,7 +793,7 @@ diff tui_cpp.txt tui_ts.txt
 
 | Package | Purpose | Size |
 |---|---|---|
-| `@farjs/blessed` | TUI framework (blessed fork) | ~500 KB |
+| `@farjs/blessed` | TUI framework (blessed fork, 0 deps) | ~500 KB |
 | `fastify` | HTTP server (API) | ~200 KB |
 | `@anthropic-ai/claude-agent-sdk` | MCP + Claude SDK | ~100 KB |
 | `node-pty` | Terminal emulation (pty) | Native addon |
@@ -699,6 +825,7 @@ diff tui_cpp.txt tui_ts.txt
 | node-pty breaks on some platforms | Medium | Low | node-pty is used by VS Code's terminal — battle-tested. |
 | Two-version maintenance burden | Medium | High | Commit to cutover. Don't maintain both. C++ version becomes read-only reference. |
 | Missing blessed features (ghost frame etc) | Low | Medium | blessed supports no-border mode natively. Shadow is a built-in option. Custom frame rendering via _render() override. |
+| No true-color (24-bit) in blessed | Low | Certain | blessed maps hex to nearest 256-color index. WibWob-DOS generative art already uses shade characters (`.:;*#%`) more than color gradients — impact is minimal. Patch `draw()` to emit 24-bit SGR if needed (small diff). |
 
 ## 13. Decision log
 
@@ -743,10 +870,14 @@ The port is complete when:
 
 ### Framework and libraries
 
-- @farjs/blessed: https://snyk.io/advisor/npm-package/@farjs/blessed
-- blessed API docs: https://github.com/chjj/blessed (original, API still applies)
-- blessed overview: https://best-of-web.builder.io/library/chjj/blessed
-- @unblessed/core (fallback): https://www.npmjs.com/package/@unblessed/core
+- @farjs/blessed npm: https://www.npmjs.com/package/@farjs/blessed
+- @farjs/blessed GitHub: https://github.com/farjs/blessed
+- @farjs/blessed releases: https://github.com/farjs/blessed/releases
+- @farjs/blessed security analysis: https://snyk.io/advisor/npm-package/@farjs/blessed
+- blessed API docs (original, still applies): https://github.com/chjj/blessed
+- blessed events docs: https://lightyears1998.github.io/blessed-docs/mechanics/events/
+- @types/blessed: https://www.npmjs.com/package/@types/blessed
+- @unblessed/blessed (fallback): https://www.npmjs.com/package/@unblessed/blessed
 - Fastify: https://fastify.dev/
 - node-pty: https://github.com/microsoft/node-pty
 - Claude Agent SDK: https://www.npmjs.com/package/@anthropic-ai/claude-agent-sdk
