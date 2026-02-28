@@ -132,6 +132,7 @@ These rules are strict. Treat violations as bugs, not style nits.
    - If a window, app, button, command, mode, or state matters to a user, it must have a typed representation in desktop state and a control path in `control-api.ts`.
    - Do not add UI-only commands that agents cannot discover or invoke later.
    - `describeState()` and the control API should evolve together.
+   - Window-local actions count too. If a window has a primary action like send, restart, run, save, or open, expose a control path for it instead of requiring UI scraping.
 
 12. Reorg passes do not add product surface area.
    - When the active goal is architecture cleanup, do not add new window types or scattered UI entry points unless the user explicitly asks for them in that same pass.
@@ -220,6 +221,7 @@ The spike currently includes:
 - shared browser/openers for workspace and file selection
 - animated generative art window
 - experimental shell window backed by Bun PTY
+- native `Wib&Wob Chat` backed by the Pi SDK and a local task-loop panel
 - Backrooms TV with real/fake-live modes and per-run primer roots
 - FIGlet window backed by the shared font catalogue and real `figlet` CLI
 
@@ -245,6 +247,18 @@ Current control endpoints:
 - `POST /view/xterm/open`
 - `POST /view/xterm/close`
 - `POST /view/xterm/restart`
+- `POST /view/primer-browser/open`
+- `POST /view/primer-gallery/open`
+- `POST /view/browser-reader/open`
+- `POST /view/figlet/open`
+- `POST /view/art/open`
+- `POST /view/chat/open`
+- `POST /view/wibwob-chat/open`
+- `POST /view/companion/open`
+- `POST /view/workspace/open`
+- `POST /view/palette/open`
+- `POST /view/inspector/open`
+- `POST /view/editor/open`
 - `POST /view/backrooms/open`
 - `POST /windows/focus`
 - `POST /windows/move`
@@ -274,7 +288,19 @@ Current loop for terminal debugging:
 
 Convenience:
 - use `POST /view/xterm/restart` to close all current `xterm-shell` windows and reopen a fresh one
+- use `scripts/window-state-parity-loop.sh` to open a representative set of existing window families through the control API and verify their `appType` state surface
+- use `scripts/wibwob-chat-v2-smoke.sh` to open the native Pi SDK chat surface, send one prompt, and export both pane and text captures
 - use `POST /view/xterm/close` to close all current `xterm-shell` windows without reopening
+
+Current loop for native chat debugging:
+1. launch the spike
+2. `POST /view/wibwob-chat/open`
+3. read `/state` again to find the `wibwob-chat-v2` window id
+4. `POST /windows/input` with the prompt text and a trailing carriage return
+5. wait for streaming to settle
+6. `POST /windows/text/export` to persist a text capture
+7. inspect `/state` for `taskLoop`, `messageCount`, `streaming`, and `status`
+8. patch code and repeat
 
 Scratch artifacts:
 - xterm PTY logs:

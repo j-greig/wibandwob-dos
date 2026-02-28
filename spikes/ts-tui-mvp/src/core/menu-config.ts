@@ -10,6 +10,7 @@ export interface AppMenuActions {
   openArtWindow: () => void;
   openTerminal: () => void;
   openXTermShell: () => void;
+  openWibWobChat: () => void;
   openPiChat: () => void;
   quit: () => void;
   focusNextWindow: () => void;
@@ -49,7 +50,8 @@ export function createMenuConfigs(actions: AppMenuActions): MenuConfig[] {
         { label: "Open Art Window", action: actions.openArtWindow },
         { label: "Open Terminal", action: actions.openTerminal },
         { label: "Open XTerm Shell", action: actions.openXTermShell },
-        { label: "Open Pi Chat", action: actions.openPiChat },
+        { label: "Open Wib&Wob Chat", action: actions.openWibWobChat },
+        { label: "Open Pi Terminal (Legacy)", action: actions.openPiChat },
         { label: "Quit", action: actions.quit }
       ]
     },
@@ -94,10 +96,11 @@ export function createMenuConfigs(actions: AppMenuActions): MenuConfig[] {
         { label: "Orbit Window", action: actions.openOrbitWindow },
         { label: "Glitch FX", action: actions.openGlitchWindow },
         { label: "Chat Transcript", action: actions.openChatWindow },
+        { label: "Wib&Wob Chat", action: actions.openWibWobChat },
         { label: "Companion", action: actions.openCompanionWindow },
         { label: "Workspace Manager", action: actions.openWorkspaceManager },
         { label: "XTerm Shell", action: actions.openXTermShell },
-        { label: "Pi Chat", action: actions.openPiChat },
+        { label: "Pi Terminal (Legacy)", action: actions.openPiChat },
         { label: "Command Palette", action: actions.openCommandPalette },
         { label: "State Inspector", action: actions.openStateInspector }
       ]
@@ -115,6 +118,7 @@ export function createPaletteCommands(actions: AppMenuActions): MenuItem[] {
     { label: "Open Orbit Window", action: actions.openOrbitWindow },
     { label: "Open Glitch FX Window", action: actions.openGlitchWindow },
     { label: "Open Chat Transcript", action: actions.openChatWindow },
+    { label: "Open Wib&Wob Chat", action: actions.openWibWobChat },
     { label: "Open Companion Window", action: actions.openCompanionWindow },
     { label: "Open Workspace Manager", action: actions.openWorkspaceManager },
     { label: "Save Workspace As...", action: actions.saveWorkspaceAs },
@@ -126,6 +130,6 @@ export function createPaletteCommands(actions: AppMenuActions): MenuItem[] {
     { label: "Cascade Windows", action: actions.cascadeWindows },
     { label: "Open Terminal", action: actions.openTerminal },
     { label: "Open XTerm Shell", action: actions.openXTermShell },
-    { label: "Open Pi Chat", action: actions.openPiChat }
+    { label: "Open Pi Terminal (Legacy)", action: actions.openPiChat }
   ];
 }

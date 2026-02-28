@@ -32,6 +32,18 @@ import type { BackroomsChannel, DesktopState } from "../core/types.js";
 interface ControlApiHandlers {
   getState: () => DesktopState;
   getPrimerInfo: (pathOrName: string) => unknown;
+  openPrimerBrowser: () => void;
+  openPrimerGallery: () => void;
+  openBrowserReader: (filePath?: string) => void;
+  openFigletBanner: (text?: string, font?: string) => void;
+  openArtWindow: () => void;
+  openChatWindow: () => void;
+  openWibWobChat: () => void;
+  openCompanionWindow: () => void;
+  openWorkspaceManager: () => void;
+  openCommandPalette: () => void;
+  openStateInspector: () => void;
+  openEditorWindow: (filePath?: string, title?: string, initial?: string) => void;
   openXTermShell: () => void;
   closeXTermShells: () => number;
   restartXTermShell: () => void;
@@ -124,6 +136,18 @@ export class ControlApiService {
           "GET /state",
           "GET /content/primer-info?path=...",
           "GET /windows/text?id=...",
+          "POST /view/primer-browser/open",
+          "POST /view/primer-gallery/open",
+          "POST /view/browser-reader/open",
+          "POST /view/figlet/open",
+          "POST /view/art/open",
+          "POST /view/chat/open",
+          "POST /view/wibwob-chat/open",
+          "POST /view/companion/open",
+          "POST /view/workspace/open",
+          "POST /view/palette/open",
+          "POST /view/inspector/open",
+          "POST /view/editor/open",
           "POST /view/xterm/open",
           "POST /view/xterm/close",
           "POST /view/xterm/restart",
@@ -164,6 +188,63 @@ export class ControlApiService {
 
     if (request.method === "POST" && url.pathname === "/view/xterm/open") {
       this.handlers.openXTermShell();
+      return Response.json({ ok: true });
+    }
+    if (request.method === "POST" && url.pathname === "/view/primer-browser/open") {
+      this.handlers.openPrimerBrowser();
+      return Response.json({ ok: true });
+    }
+    if (request.method === "POST" && url.pathname === "/view/primer-gallery/open") {
+      this.handlers.openPrimerGallery();
+      return Response.json({ ok: true });
+    }
+    if (request.method === "POST" && url.pathname === "/view/browser-reader/open") {
+      this.handlers.openBrowserReader(
+        typeof (body as any).filePath === "string" ? (body as any).filePath : undefined,
+      );
+      return Response.json({ ok: true });
+    }
+    if (request.method === "POST" && url.pathname === "/view/figlet/open") {
+      this.handlers.openFigletBanner(
+        typeof (body as any).text === "string" ? (body as any).text : undefined,
+        typeof (body as any).font === "string" ? (body as any).font : undefined,
+      );
+      return Response.json({ ok: true });
+    }
+    if (request.method === "POST" && url.pathname === "/view/art/open") {
+      this.handlers.openArtWindow();
+      return Response.json({ ok: true });
+    }
+    if (request.method === "POST" && url.pathname === "/view/chat/open") {
+      this.handlers.openChatWindow();
+      return Response.json({ ok: true });
+    }
+    if (request.method === "POST" && url.pathname === "/view/wibwob-chat/open") {
+      this.handlers.openWibWobChat();
+      return Response.json({ ok: true });
+    }
+    if (request.method === "POST" && url.pathname === "/view/companion/open") {
+      this.handlers.openCompanionWindow();
+      return Response.json({ ok: true });
+    }
+    if (request.method === "POST" && url.pathname === "/view/workspace/open") {
+      this.handlers.openWorkspaceManager();
+      return Response.json({ ok: true });
+    }
+    if (request.method === "POST" && url.pathname === "/view/palette/open") {
+      this.handlers.openCommandPalette();
+      return Response.json({ ok: true });
+    }
+    if (request.method === "POST" && url.pathname === "/view/inspector/open") {
+      this.handlers.openStateInspector();
+      return Response.json({ ok: true });
+    }
+    if (request.method === "POST" && url.pathname === "/view/editor/open") {
+      this.handlers.openEditorWindow(
+        typeof (body as any).filePath === "string" ? (body as any).filePath : undefined,
+        typeof (body as any).title === "string" ? (body as any).title : undefined,
+        typeof (body as any).initial === "string" ? (body as any).initial : undefined,
+      );
       return Response.json({ ok: true });
     }
     if (request.method === "POST" && url.pathname === "/view/xterm/close") {

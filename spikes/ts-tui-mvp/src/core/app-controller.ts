@@ -6,14 +6,21 @@ import path from "node:path";
 import { spawn as spawnPty, type IPty as BunPtyTerminal, type IExitEvent as BunPtyExitEvent } from "@skitee3000/bun-pty/dist/index.js";
 
 import { CONTROL_API_PORT, MASTER_PHILOSOPHY_PATH, README_PATH, REPO_ROOT, SPIKE_NOTES_PATH, SPIKE_ROOT, STATE_PATH, WORKSPACES_DIR } from "./config.js";
+import { createSystemContextMenuItems, createWindowContextMenuItems } from "./context-menu-items.js";
 import { DesktopGeometryService } from "./desktop-geometry.js";
 import { createMenuConfigs, createPaletteCommands, type AppMenuActions } from "./menu-config.js";
+import { MenuOverlayManager } from "./menu-overlay-manager.js";
 import { OverlayManager } from "./overlay-manager.js";
-import { createScrollbar } from "./ui-primitives.js";
+import { createScrollbar, isRightClick } from "./ui-primitives.js";
+import { restoreWindowSnapshot, serializeWindowSnapshot } from "./workspace-snapshots.js";
 import type {
   BackroomsChannel,
   Box,
   BrowserEntry,
+  ChatMessageEntry,
+  ChatTaskItem,
+  ChatTaskLoop,
+  ChatTaskStory,
   DesktopState,
   GalleryTab,
   List,
@@ -31,37 +38,54 @@ import { measurePlainTextContent, measurePrimerContent } from "../services/conte
 import { ControlApiService } from "../services/control-api.js";
 import { ContentService } from "../services/content-service.js";
 import { getDefaultFigletFont, getFigletCatalogue, getFigletFontChoices, measureFiglet, renderFiglet } from "../services/figlet-service.js";
+import { openPrimerFile, promptForEditorFile, promptForPrimerFile, saveEditorWindow } from "../services/file-actions.js";
 import { PiService } from "../services/pi-service.js";
 import { createPtySession, type PtySession } from "../services/pty-session.js";
+import { deleteBackward as deleteEditorBackwardState, deleteForward as deleteEditorForwardState, insertText as insertEditorTextState, moveCursor as moveEditorCursorState, render as renderEditorState } from "../services/editor-service.js";
 import { StateService } from "../services/state-service.js";
 import { TerminalBuffer } from "../services/terminal-buffer.js";
 import { renderTerminalBuffer } from "../services/terminal-renderer.js";
+import { WibWobChatService } from "../services/wibwob-chat-service.js";
+import { promptForWorkspaceLoad, promptForWorkspaceSave } from "../services/workspace-ui.js";
 import { WorkspaceService } from "../services/workspace-service.js";
+import {
+  openPrimerBrowserWindow as openPrimerBrowserListWindow,
+  openPrimerGalleryWindow as openPrimerGalleryListWindow,
+  openTextViewerWindow as openContentViewerWindow
+} from "../windows/content-windows.js";
+import {
+  openBrowserReaderWindow as openBrowserReaderContentWindow,
+  openFigletFontPicker as openFigletFontPickerWindow,
+  openFigletWindow as openFigletBannerWindow,
+  promptForFigletText as promptForFigletBannerText
+} from "../windows/figlet-windows.js";
 import {
   openChatWindow as openChatTranscriptWindow,
   openCommandPaletteWindow as openPaletteWindow,
   openCompanionWindow as openScrambleWindow,
+  openArtWindow as openGenerativeArtWindow,
   openGlitchWindow as openGlitchAnimationWindow,
   openOrbitWindow as openOrbitAnimationWindow,
   openPatternWindow as openPatternAnimationWindow,
   openStateInspectorWindow as openInspectorWindow,
   openWorkspaceManagerWindow as openWorkspaceCommandWindow
 } from "../windows/misc-windows.js";
+import { openEditorWindow as openTextEditorWindow } from "../windows/text-windows.js";
+import { openWibWobChatWindow as openNativeWibWobChatWindow } from "../windows/wibwob-chat-window.js";
 
 export class TsTuiMvpApp {
   private readonly screen: blessed.Widgets.Screen;
   private readonly menuBar: Box;
   private readonly desktop: Box;
   private readonly statusLine: Box;
-  private menuList?: List;
-  private popupMenu?: List;
-  private openMenuLabel?: string;
   private readonly menus: MenuConfig[];
+  private readonly menuUi: MenuOverlayManager;
   private readonly windowManager: WindowManager;
   private readonly overlays: OverlayManager;
   private readonly backrooms = new BackroomsService();
   private readonly content = new ContentService();
   private readonly pi = new PiService();
+  private readonly wibwobChat = new WibWobChatService();
   private readonly workspace = new WorkspaceService(WORKSPACES_DIR);
   private readonly geometry: DesktopGeometryService;
   private readonly state: StateService;
@@ -115,9 +139,29 @@ export class TsTuiMvpApp {
     );
     this.geometry = new DesktopGeometryService(this.screen);
     this.overlays = new OverlayManager(this.screen, () => this.windowManager.restoreWindowFocus());
+    this.menus = createMenuConfigs(this.getAppMenuActions());
+    this.menuUi = new MenuOverlayManager(
+      this.screen,
+      this.menuBar,
+      this.menus,
+      () => this.windowManager.restoreWindowFocus(),
+      () => this.syncState()
+    );
     this.controlApi = new ControlApiService(CONTROL_API_PORT, {
       getState: () => this.getDesktopState(),
       getPrimerInfo: (pathOrName) => this.getPrimerInfo(pathOrName),
+      openPrimerBrowser: () => this.openPrimerBrowserWindow(),
+      openPrimerGallery: () => this.openPrimerGalleryWindow(),
+      openBrowserReader: (filePath) => this.openBrowserReaderWindow(filePath),
+      openFigletBanner: (text, font) => this.openFigletWindow(text ?? "WIB WOB", font ?? getDefaultFigletFont()),
+      openArtWindow: () => this.openArtWindow(),
+      openChatWindow: () => this.openChatWindow(),
+      openWibWobChat: () => this.openWibWobChatWindow(),
+      openCompanionWindow: () => this.openCompanionWindow(),
+      openWorkspaceManager: () => this.openWorkspaceManagerWindow(),
+      openCommandPalette: () => this.openCommandPaletteWindow(),
+      openStateInspector: () => this.openStateInspectorWindow(),
+      openEditorWindow: (filePath, title, initial) => this.openEditorWindow(filePath, title ?? "Untitled.txt", initial ?? ""),
       openXTermShell: () => void this.openXTermShellWindow(),
       closeXTermShells: () => this.closeWindowsByAppType("xterm-shell"),
       restartXTermShell: () => void this.restartXTermShell(),
@@ -143,17 +187,15 @@ export class TsTuiMvpApp {
         getScreenSize: () => this.geometry.getGeometry(),
         getWindows: () => this.windowManager.getWindows(),
         getFocusedWindow: () => this.windowManager.getFocusedWindow(),
-        getOpenMenuLabel: () => this.openMenuLabel
+        getOpenMenuLabel: () => this.menuUi.getOpenMenuLabel()
       }
     );
-
-    this.menus = createMenuConfigs(this.getAppMenuActions());
   }
 
   run(): void {
     this.renderChrome();
     this.bindGlobalKeys();
-    this.bindMenuClicks();
+    this.menuUi.bindMenuClicks((label) => this.openMenu(label));
     this.openCompanionWindow();
     this.controlApi.start();
     this.syncState();
@@ -225,164 +267,59 @@ export class TsTuiMvpApp {
     });
     this.screen.on("mouse", (data) => this.windowManager.handleMouse(data));
     this.desktop.on("mousedown", (data) => {
-      if (this.isRightClick(data) && !this.windowManager.getWindowAtPosition(data.x, data.y)) {
+      if (isRightClick(data) && !this.windowManager.getWindowAtPosition(data.x, data.y)) {
         this.openSystemContextMenu(data.x, data.y);
       }
     });
   }
 
-  private bindMenuClicks(): void {
-    for (const menu of this.menus) {
-      const target = blessed.box({
-        parent: this.menuBar,
-        top: 0,
-        left: menu.left,
-        width: menu.label.length,
-        height: 1,
-        mouse: true,
-        clickable: true,
-        content: menu.label,
-        style: {
-          fg: "black",
-          bg: "white",
-          hover: { fg: "white", bg: "blue" }
-        }
-      });
-      target.on("click", () => this.openMenu(menu.label));
-    }
-  }
-
   private openMenu(label: string): void {
-    this.closeMenus();
-    const menu = this.menus.find((entry) => entry.label === label);
-    if (!menu) {
-      return;
-    }
-    this.menuList = blessed.list({
-      parent: this.screen,
-      top: 1,
-      left: menu.left,
-      width: Math.max(...menu.items.map((item) => item.label.length)) + 4,
-      height: menu.items.length + 2,
-      border: "line",
-      keys: true,
-      vi: true,
-      mouse: true,
-      style: {
-        fg: "white",
-        bg: "black",
-        border: { fg: "white" },
-        selected: { fg: "black", bg: "cyan" }
-      },
-      items: menu.items.map((item) => item.label)
-    });
-    this.openMenuLabel = label;
-    this.menuList.focus();
-    this.menuList.select(0);
-    this.menuList.on("select", (_, index) => {
-      this.closeMenu();
-      menu.items[index].action();
-    });
-    this.syncState();
-    this.screen.render();
+    this.menuUi.openMenu(label);
   }
 
   private closeMenu(): void {
-    if (!this.menuList) {
-      return;
-    }
-    this.menuList.destroy();
-    this.menuList = undefined;
-    this.openMenuLabel = undefined;
-    this.windowManager.restoreWindowFocus();
-    this.syncState();
-    this.screen.render();
+    this.menuUi.closeMenu();
   }
 
   private closePopupMenu(): void {
-    if (!this.popupMenu) {
-      return;
-    }
-    this.popupMenu.destroy();
-    this.popupMenu = undefined;
-    this.windowManager.restoreWindowFocus();
-    this.screen.render();
+    this.menuUi.closePopupMenu();
   }
 
   private closeMenus(): void {
-    this.closeMenu();
-    this.closePopupMenu();
+    this.menuUi.closeMenus();
   }
 
   private openPopupMenu(items: Array<{ label: string; action: () => void }>, x?: number, y?: number): void {
-    this.closeMenus();
-    if (items.length === 0) {
-      return;
-    }
-    const width = Math.max(...items.map((item) => item.label.length)) + 4;
-    const left = Math.max(0, Math.min((x ?? 2) - 1, Math.max(0, Number(this.screen.width) - width - 1)));
-    const top = Math.max(1, Math.min(y ?? 2, Math.max(1, Number(this.screen.height) - items.length - 3)));
-    this.popupMenu = blessed.list({
-      parent: this.screen,
-      top,
-      left,
-      width,
-      height: items.length + 2,
-      border: "line",
-      keys: true,
-      vi: true,
-      mouse: true,
-      style: {
-        fg: "white",
-        bg: "black",
-        border: { fg: "white" },
-        selected: { fg: "black", bg: "cyan" }
-      },
-      items: items.map((item) => item.label)
-    });
-    this.popupMenu.focus();
-    this.popupMenu.select(0);
-    this.popupMenu.on("select", (_, index) => {
-      const item = items[index];
-      this.closePopupMenu();
-      item?.action();
-    });
-    this.popupMenu.on("keypress", (_, key) => {
-      if (key.name === "escape") {
-        this.closePopupMenu();
-      }
-    });
-    this.screen.render();
+    this.menuUi.openPopupMenu(items, x, y);
   }
 
   private openWindowContextMenu(window: WindowRecord, x?: number, y?: number): void {
-    this.openPopupMenu([
-      { label: `Focus ${window.title}`, action: () => window.focus() },
-      { label: "Tile Windows", action: () => this.windowManager.tileWindows() },
-      { label: "Cascade Windows", action: () => this.windowManager.cascadeWindows() },
-      { label: "Close Window", action: () => window.close() }
-    ], x, y);
+    this.openPopupMenu(
+      createWindowContextMenuItems(window, {
+        tileWindows: () => this.windowManager.tileWindows(),
+        cascadeWindows: () => this.windowManager.cascadeWindows()
+      }),
+      x,
+      y
+    );
   }
 
   private openSystemContextMenu(x?: number, y?: number): void {
-    this.openPopupMenu([
-      { label: "Open Primer Browser", action: () => this.openPrimerBrowserWindow() },
-      { label: "Open Text File", action: () => this.promptForEditorPath() },
-      { label: "Open Backrooms TV", action: () => this.promptForBackroomsTv() },
-      { label: "Open XTerm Shell", action: () => void this.openXTermShellWindow() },
-      { label: "Open Pi Chat", action: () => void this.openPiChatWindow() },
-      { label: "Open Workspace Manager", action: () => this.openWorkspaceManagerWindow() },
-      { label: "Tile Windows", action: () => this.windowManager.tileWindows() },
-      { label: "Cascade Windows", action: () => this.windowManager.cascadeWindows() }
-    ], x, y);
-  }
-
-  private isRightClick(data?: blessed.Widgets.Events.IMouseEventArg): boolean {
-    if (!data) {
-      return false;
-    }
-    const mouseData = data as blessed.Widgets.Events.IMouseEventArg & { button?: string | number; buttons?: string | number };
-    return mouseData.button === "right" || mouseData.button === 2 || mouseData.buttons === "right" || mouseData.buttons === 2;
+    this.openPopupMenu(
+      createSystemContextMenuItems({
+        openPrimerBrowser: () => this.openPrimerBrowserWindow(),
+        openTextFile: () => this.promptForEditorPath(),
+        openBackrooms: () => this.promptForBackroomsTv(),
+        openXTermShell: () => void this.openXTermShellWindow(),
+        openWibWobChat: () => this.openWibWobChatWindow(),
+        openPiChat: () => void this.openPiChatWindow(),
+        openWorkspaceManager: () => this.openWorkspaceManagerWindow(),
+        tileWindows: () => this.windowManager.tileWindows(),
+        cascadeWindows: () => this.windowManager.cascadeWindows()
+      }),
+      x,
+      y
+    );
   }
 
   private async openTerminalWindow(): Promise<void> {
@@ -418,14 +355,35 @@ export class TsTuiMvpApp {
 
     const launch = this.pi.createLaunchConfig(REPO_ROOT, this.getPtyEnv());
     await this.openPtyWindow({
-      title: "Pi Chat",
+      title: "Pi Terminal (Legacy)",
       appType: "pi-chat",
       command: launch.command,
       args: launch.args,
       cwd: launch.cwd,
       env: launch.env,
-      intro: "Pi coding agent running inside a terminal window. This is the first reusable chat slice, not yet a fully integrated typed agent surface.",
+      intro: "Legacy Pi terminal surface. The native Wib&Wob Chat window uses the Pi SDK directly instead of this PTY path.",
       shellPath: launch.command
+    });
+  }
+
+  private openWibWobChatWindow(restore?: {
+    transcriptLines?: string[];
+    draft?: string;
+    messages?: unknown;
+    taskLoop?: unknown;
+  }): void {
+    const session = this.wibwobChat.createSession(REPO_ROOT);
+    openNativeWibWobChatWindow({
+      screen: this.screen,
+      windowManager: this.windowManager,
+      chat: session,
+      restore: {
+        draft: restore?.draft,
+        messages: Array.isArray(restore?.messages)
+          ? restore.messages.filter((message): message is ChatMessageEntry => this.isChatMessageEntry(message))
+          : undefined,
+        taskLoop: this.normalizeTaskLoop(restore?.taskLoop)
+      }
     });
   }
 
@@ -482,7 +440,7 @@ export class TsTuiMvpApp {
     let exitSignal: number | undefined;
 
     const render = () => {
-      const showCursor = this.windowManager.getFocusedWindow()?.id === frame.id && !this.menuList && !this.popupMenu;
+      const showCursor = this.windowManager.getFocusedWindow()?.id === frame.id && !this.menuUi.isAnyMenuOpen();
       viewport.setContent(renderTerminalBuffer(buffer, showCursor));
       this.syncState();
       this.screen.render();
@@ -1325,369 +1283,60 @@ export class TsTuiMvpApp {
   }
 
   private openPrimerBrowserWindow(restore?: { selectedIndex?: number }): void {
-    const entries = this.content.collectPrimerEntries();
-    if (entries.length === 0) {
-      this.overlays.flash("No primer files found in modules, modules-private, or docs.");
-      return;
-    }
-    const frame = this.windowManager.createFrame("Primer Browser", "browser");
-    blessed.box({
-      parent: frame.body,
-      top: 0,
-      left: 0,
-      right: 0,
-      height: 1,
-      content: " Enter opens file  j/k scroll  Esc closes menu ",
-      style: { fg: "black", bg: "cyan" }
+    openPrimerBrowserListWindow({
+      windowManager: this.windowManager,
+      overlays: this.overlays,
+      entries: this.content.collectPrimerEntries(),
+      onOpenPrimer: (filePath) => this.openPrimerWindow(filePath),
+      restore
     });
-    const list = blessed.list({
-      parent: frame.body,
-      top: 1,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      keys: true,
-      vi: true,
-      mouse: true,
-      scrollable: true,
-      alwaysScroll: true,
-      scrollbar: createScrollbar(),
-      items: entries.map((entry) => entry.label),
-      style: { fg: "white", bg: "black", selected: { fg: "black", bg: "white" } }
-    });
-    const initialSelectedIndex = Math.max(0, Math.min(restore?.selectedIndex ?? 0, entries.length - 1));
-    const openSelected = (index?: number) => {
-      const itemIndex = typeof index === "number" ? index : (list as List & { selected: number }).selected ?? 0;
-      const entry = entries[itemIndex];
-      if (entry) {
-        this.openPrimerWindow(entry.filePath);
-      }
-    };
-    list.on("select", (_, index) => openSelected(index));
-    list.on("keypress", (_, key) => {
-      if (key.name === "enter") {
-        openSelected();
-      }
-    });
-    frame.kind = "browser";
-    frame.describeState = () => ({
-      appType: "primer-browser",
-      summary: `Primer browser listing ${entries.length} entries.`,
-      selectedIndex: (list as List & { selected: number }).selected ?? 0,
-      selectedLabel: entries[(list as List & { selected: number }).selected ?? 0]?.label,
-      entryCount: entries.length
-    });
-    frame.focus = () => {
-      this.windowManager.focusWindow(frame);
-      list.focus();
-    };
-    this.windowManager.registerWindow(frame);
-    list.select(initialSelectedIndex);
-    frame.focus();
   }
 
   private openPrimerGalleryWindow(restore?: { activeTabIndex?: number; searchValue?: string; selectedIndex?: number }): void {
     const allEntries = this.content.collectGalleryEntries();
-    if (allEntries.length === 0) {
-      this.overlays.flash("No gallery entries available.");
-      return;
-    }
-    const tabs = this.content.buildGalleryTabs(allEntries);
-    const frame = this.windowManager.createFrame("Primer Gallery", "gallery");
-    const tabBar = blessed.box({
-      parent: frame.body,
-      top: 0,
-      left: 0,
-      right: 0,
-      height: 1,
-      style: { fg: "black", bg: "white" }
+    openPrimerGalleryListWindow({
+      screen: this.screen,
+      windowManager: this.windowManager,
+      overlays: this.overlays,
+      allEntries,
+      tabs: this.content.buildGalleryTabs(allEntries),
+      onOpenPrimer: (filePath) => this.openPrimerWindow(filePath),
+      restore
     });
-    const filterBox = blessed.textbox({
-      parent: frame.body,
-      top: 1,
-      left: 0,
-      width: "34%",
-      height: 1,
-      inputOnFocus: true,
-      mouse: true,
-      style: { fg: "black", bg: "cyan" }
-    });
-    const list = blessed.list({
-      parent: frame.body,
-      top: 2,
-      left: 0,
-      width: "34%",
-      bottom: 0,
-      keys: true,
-      vi: true,
-      mouse: true,
-      scrollable: true,
-      alwaysScroll: true,
-      scrollbar: createScrollbar(),
-      items: tabs[0].entries.map((entry) => entry.label),
-      style: { fg: "white", bg: "black", selected: { fg: "black", bg: "white" } }
-    });
-    const preview = blessed.box({
-      parent: frame.body,
-      top: 1,
-      left: "34%",
-      right: 0,
-      bottom: 0,
-      mouse: true,
-      scrollable: true,
-      alwaysScroll: true,
-      scrollbar: createScrollbar(),
-      style: { fg: "white", bg: "black" }
-    });
-
-    let activeTabIndex = Math.max(0, Math.min(restore?.activeTabIndex ?? 0, tabs.length - 1));
-    let activeEntries = tabs[activeTabIndex].entries;
-    let searchValue = restore?.searchValue ?? "";
-
-    const updatePreview = (index: number) => {
-      const entry = activeEntries[index];
-      if (!entry) {
-        preview.setContent("No primer selected.");
-        this.screen.render();
-        return;
-      }
-      try {
-        const content = fs.readFileSync(entry.filePath, "utf8");
-        preview.setContent(`${tabs[activeTabIndex].label} :: ${entry.label}\n${entry.filePath}\n\n${content}`);
-      } catch (error) {
-        preview.setContent(`Cannot preview file.\n\n${error instanceof Error ? error.message : String(error)}`);
-      }
-      this.screen.render();
-    };
-    const openSelected = (index?: number) => {
-      const currentIndex = typeof index === "number" ? index : (list as List & { selected: number }).selected ?? 0;
-      const entry = activeEntries[currentIndex];
-      if (entry) {
-        this.openPrimerWindow(entry.filePath);
-      }
-    };
-    const renderTabs = () => {
-      tabBar.children.forEach((child) => child.destroy());
-      let left = 0;
-      tabs.forEach((tabConfig, index) => {
-        const tabNode = blessed.box({
-          parent: tabBar,
-          top: 0,
-          left,
-          height: 1,
-          width: tabConfig.label.length + 2,
-          mouse: true,
-          clickable: true,
-          content: ` ${tabConfig.label} `,
-          style: { fg: index === activeTabIndex ? "white" : "black", bg: index === activeTabIndex ? "blue" : "white" }
-        });
-        tabNode.on("click", () => switchTab(index));
-        left += tabConfig.label.length + 2;
-      });
-    };
-    const applySearch = () => {
-      activeEntries = allEntries.filter((entry) => entry.label.toLowerCase().includes(searchValue.toLowerCase()));
-      list.setItems(activeEntries.map((entry) => entry.label));
-      list.select(0);
-      updatePreview(0);
-      this.screen.render();
-    };
-    const switchTab = (index: number) => {
-      activeTabIndex = index;
-      activeEntries = tabs[index].entries;
-      list.setItems(activeEntries.map((entry) => entry.label));
-      list.select(0);
-      filterBox.setValue(index === 5 ? searchValue : ` ${tabs[index].label} `);
-      renderTabs();
-      updatePreview(0);
-      if (index === 5) {
-        filterBox.focus();
-        filterBox.readInput();
-      } else {
-        list.focus();
-      }
-      this.screen.render();
-    };
-
-    list.on("select item", (_, index) => updatePreview(index));
-    list.on("keypress", (_, key) => {
-      if (key.name === "enter") {
-        openSelected();
-      } else if (["up", "down", "j", "k"].includes(key.name ?? "")) {
-        setTimeout(() => updatePreview((list as List & { selected: number }).selected ?? 0), 0);
-      } else if (key.name === "left") {
-        switchTab((activeTabIndex - 1 + tabs.length) % tabs.length);
-      } else if (key.name === "right") {
-        switchTab((activeTabIndex + 1) % tabs.length);
-      }
-    });
-    list.on("select", (_, index) => openSelected(index));
-    filterBox.on("submit", (value) => {
-      searchValue = (value ?? "").trim();
-      applySearch();
-      filterBox.focus();
-      filterBox.readInput();
-    });
-
-    renderTabs();
-    list.select(0);
-    updatePreview(0);
-    frame.kind = "gallery";
-    frame.describeState = () => ({
-      appType: "primer-gallery",
-      summary: `Primer gallery with ${allEntries.length} total entries.`,
-      activeTabIndex,
-      activeTab: tabs[activeTabIndex]?.label,
-      searchValue,
-      selectedIndex: (list as List & { selected: number }).selected ?? 0,
-      visibleEntryCount: activeEntries.length,
-      selectedLabel: activeEntries[(list as List & { selected: number }).selected ?? 0]?.label,
-      contentPreview: preview.getContent().split("\n").slice(0, 8).join("\n")
-    });
-    frame.focus = () => {
-      this.windowManager.focusWindow(frame);
-      if (activeTabIndex === 5) {
-        filterBox.focus();
-        filterBox.readInput();
-      } else {
-        list.focus();
-      }
-    };
-    this.windowManager.registerWindow(frame);
-    if (activeTabIndex === 5) {
-      filterBox.setValue(searchValue);
-      applySearch();
-      list.select(Math.max(0, Math.min(restore?.selectedIndex ?? 0, Math.max(0, activeEntries.length - 1))));
-      updatePreview((list as List & { selected: number }).selected ?? 0);
-    } else {
-      switchTab(activeTabIndex);
-      list.select(Math.max(0, Math.min(restore?.selectedIndex ?? 0, Math.max(0, activeEntries.length - 1))));
-      updatePreview((list as List & { selected: number }).selected ?? 0);
-    }
-    frame.focus();
   }
 
   private openBrowserReaderWindow(filePath = MASTER_PHILOSOPHY_PATH): void {
-    try {
-      const content = fs.readFileSync(filePath, "utf8");
-      this.openTextViewerWindow(`Browser: ${path.basename(filePath)}`, `Location: ${filePath}\n\n${content}`, "reader", filePath);
-    } catch (error) {
-      this.overlays.flash(`Cannot open browser reader: ${error instanceof Error ? error.message : String(error)}`);
-    }
+    openBrowserReaderContentWindow({
+      filePath,
+      onOpenTextViewer: (title, content, kind, nextFilePath) => this.openTextViewerWindow(title, content, kind, nextFilePath),
+      onError: (message) => this.overlays.flash(message)
+    });
   }
 
   private promptForFigletText(): void {
-    this.overlays.openValuePrompt("Figlet Text", "WIB WOB", (value) => this.openFigletFontPicker(value, getDefaultFigletFont()));
+    promptForFigletBannerText(this.overlays, (text, font) => this.openFigletFontPicker(text, font));
   }
 
   private openFigletFontPicker(text: string, currentFont: string, onSelect?: (font: string) => void): void {
-    const choices = getFigletFontChoices();
-    const initialIndex = Math.max(0, choices.findIndex((choice) => choice.value === currentFont));
-    this.overlays.openListPrompt("FIGlet Font Picker", choices, initialIndex, (item) => {
-      if (onSelect) {
-        onSelect(item.value);
-        return;
-      }
-      this.openFigletWindow(text, item.value);
+    openFigletFontPickerWindow({
+      overlays: this.overlays,
+      text,
+      currentFont,
+      onSelect,
+      onOpenWindow: (nextText, font) => this.openFigletWindow(nextText, font)
     });
   }
 
   private openFigletWindow(text: string, initialFont = getDefaultFigletFont()): void {
-    const title = `Banner: ${text.slice(0, 18) || "Banner"}`;
-    const frame = this.windowManager.createFrame(title, "figlet");
-    const toolbar = blessed.box({
-      parent: frame.body,
-      top: 0,
-      left: 0,
-      right: 0,
-      height: 2,
-      style: { fg: "black", bg: "cyan" }
-    });
-    const viewer = blessed.box({
-      parent: frame.body,
-      top: 2,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      mouse: true,
-      keys: true,
-      vi: true,
-      scrollable: true,
-      alwaysScroll: true,
-      scrollbar: createScrollbar(),
-      style: { fg: "white", bg: "black" }
-    });
-
-    let currentText = text;
-    let currentFont = initialFont;
-    let lastMeasurement = measureFiglet(currentText, currentFont, 0);
-
-    const syncTitle = () => {
-      frame.title = `Banner: ${currentText.slice(0, 18) || "Banner"}`;
-      frame.titleBar?.setContent(` ${frame.title} `);
-    };
-
-    const rerenderFiglet = () => {
-      const availableWidth = Math.max(20, Number(viewer.width));
-      const measured = measureFiglet(currentText, currentFont, availableWidth);
-      lastMeasurement = measured;
-      viewer.setContent(measured.rendered);
-      const catalogue = getFigletCatalogue();
-      const meta = catalogue.fontMetadata[currentFont];
-      toolbar.setContent(
-        ` Text: ${currentText}\n Font: ${currentFont}${meta ? ` (${meta.height}h x ${meta.width}w)` : ""}  e edit text  f pick font `
-      );
-      syncTitle();
-      this.syncState();
-      this.screen.render();
-    };
-
-    const editText = () => {
-      this.overlays.openValuePrompt("Edit FIGlet Text", currentText, (value) => {
-        currentText = value;
-        rerenderFiglet();
-      });
-    };
-
-    const pickFont = () => {
-      this.openFigletFontPicker(currentText, currentFont, (font) => {
-        currentFont = font;
-        rerenderFiglet();
-      });
-    };
-
-    frame.kind = "figlet";
-    frame.describeState = () => ({
-      appType: "figlet-banner",
-      summary: "Rendered figlet banner window using the shared WibWob font catalogue.",
-      inputText: currentText,
-      font: currentFont,
-      lineCount: lastMeasurement.height,
-      contentWidth: lastMeasurement.width,
-      contentHeight: lastMeasurement.height,
-      contentPreview: viewer.getContent().split("\n").slice(0, 8).join("\n")
-    });
-    frame.focus = () => {
-      this.windowManager.focusWindow(frame);
-      viewer.focus();
-    };
-
-    frame.frame.key(["e"], editText);
-    frame.frame.key(["f"], pickFont);
-    viewer.key(["e"], editText);
-    viewer.key(["f"], pickFont);
-    frame.frame.on("resize", rerenderFiglet);
-
-    this.windowManager.registerWindow(frame);
-    frame.focus();
-    rerenderFiglet();
-
-    const measured = measureFiglet(currentText, currentFont, 0);
-    lastMeasurement = measured;
-    const oneRowHeight = measured.fontHeight > 0 && measured.height > measured.fontHeight ? measured.fontHeight : measured.height;
-    this.applyMeasuredWindowSize(frame, "figlet", {
-      width: Math.max(measured.width, 32),
-      height: Math.max(oneRowHeight, 5)
+    openFigletBannerWindow({
+      screen: this.screen,
+      windowManager: this.windowManager,
+      overlays: this.overlays,
+      applyMeasuredWindowSize: (frame, kind, content) => this.applyMeasuredWindowSize(frame, kind, content),
+      text,
+      initialFont,
+      onOpenFontPicker: (nextText, currentFont, onSelect) => this.openFigletFontPicker(nextText, currentFont, onSelect),
+      onSyncState: () => this.syncState()
     });
   }
 
@@ -1761,129 +1410,53 @@ export class TsTuiMvpApp {
   }
 
   private promptForPrimer(): void {
-    this.overlays.openFileBrowserPrompt("Open Primer", REPO_ROOT, (filePath) => this.openPrimerWindow(filePath), {
-      fileFilter: (filePath, isDirectory) => isDirectory || this.content.isTextLikeFile(path.basename(filePath)),
-      previewLimit: 5000
+    promptForPrimerFile({
+      overlays: this.overlays,
+      content: this.content,
+      repoRoot: REPO_ROOT,
+      onOpenPrimer: (filePath) => this.openPrimerWindow(filePath)
     });
   }
 
   private promptForEditorPath(): void {
-    this.overlays.openFileBrowserPrompt("Open Text File", path.dirname(SPIKE_NOTES_PATH), (filePath) => {
-      try {
-        const content = fs.readFileSync(filePath, "utf8");
-        this.openEditorWindow(filePath, path.basename(filePath), content);
-      } catch (error) {
-        this.overlays.flash(`Cannot open text file: ${error instanceof Error ? error.message : String(error)}`);
-      }
-    }, {
-      fileFilter: (filePath, isDirectory) => isDirectory || this.content.isTextLikeFile(path.basename(filePath)),
-      previewLimit: 5000
+    promptForEditorFile({
+      overlays: this.overlays,
+      content: this.content,
+      startDir: path.dirname(SPIKE_NOTES_PATH),
+      onOpenEditor: (filePath, title, content) => this.openEditorWindow(filePath, title, content)
     });
   }
 
   private openPrimerWindow(filePath: string): void {
-    try {
-      const rawContent = fs.readFileSync(filePath, "utf8");
-      const measured = measurePrimerContent(rawContent);
-      this.openTextViewerWindow(path.basename(filePath), measured.primaryFrameText, "primer", filePath, {
-        contentMeasurement: {
-          contentWidth: measured.measurement.columnWidth,
-          contentHeight: measured.measurement.lineCount,
-          recommendedWidth: measured.measurement.recommendedWidth,
-          recommendedHeight: measured.measurement.recommendedHeight,
-          animated: measured.measurement.animated,
-          frameCount: measured.measurement.frameCount,
-          skippedCommentLines: measured.measurement.skippedCommentLines
-        }
-      });
-    } catch (error) {
-      this.overlays.flash(`Cannot open primer: ${error instanceof Error ? error.message : String(error)}`);
-    }
+    openPrimerFile({
+      overlays: this.overlays,
+      filePath,
+      onOpenTextViewer: (title, content, kind, nextFilePath, options) =>
+        this.openTextViewerWindow(title, content, kind, nextFilePath, options)
+    });
   }
 
   private openEditorWindow(filePath?: string, title = "Untitled.txt", initial = "", restore?: { cursor?: number }): void {
-    const frame = this.windowManager.createFrame(title, "editor");
-    const editorWidget = blessed.box({
-      parent: frame.body,
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      keys: true,
-      mouse: true,
-      tags: true,
-      scrollable: true,
-      alwaysScroll: true,
-      scrollbar: createScrollbar(),
-      style: { fg: "white", bg: "black" }
+    openTextEditorWindow({
+      windowManager: this.windowManager,
+      title,
+      filePath,
+      initial,
+      cursor: restore?.cursor,
+      renderEditor: (windowId) => {
+        const window = this.windowManager.getWindowById(windowId);
+        if (window) {
+          this.renderEditor(window);
+        }
+      }
     });
-    frame.kind = "editor";
-    frame.filePath = filePath;
-    frame.editor = { widget: editorWidget, value: initial, cursor: Math.max(0, Math.min(restore?.cursor ?? initial.length, initial.length)) };
-    frame.describeState = () => ({
-      appType: "text-editor",
-      summary: filePath ? `Editing ${filePath}` : "Unsaved text buffer.",
-      filePath: frame.filePath,
-      lineCount: frame.editor?.value.split("\n").length ?? 0,
-      cursor: frame.editor?.cursor ?? 0,
-      contentPreview: (frame.editor?.value ?? "").split("\n").slice(0, 8).join("\n")
-    });
-    frame.focus = () => {
-      this.windowManager.focusWindow(frame);
-      editorWidget.focus();
-    };
-    this.renderEditor(frame);
-    this.windowManager.registerWindow(frame);
-    frame.focus();
   }
 
   private openArtWindow(): void {
-    const frame = this.windowManager.createFrame("Generative Art", "art");
-    const canvas = blessed.box({
-      parent: frame.body,
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      style: { fg: "white", bg: "black" }
+    openGenerativeArtWindow({
+      screen: this.screen,
+      windowManager: this.windowManager
     });
-    let tick = 0;
-    const renderArt = () => {
-      const width = Math.max(12, Number(canvas.width));
-      const height = Math.max(6, Number(canvas.height));
-      const palette = " .:-=+*#%@";
-      const rows: string[] = [];
-      for (let y = 0; y < height; y += 1) {
-        let row = "";
-        for (let x = 0; x < width; x += 1) {
-          const waveA = Math.sin((x + tick) / 5);
-          const waveB = Math.cos((y - tick) / 4);
-          const orbit = Math.sin((x + y + tick) / 7);
-          const value = (waveA + waveB + orbit + 3) / 6;
-          row += palette[Math.min(palette.length - 1, Math.max(0, Math.floor(value * palette.length)))];
-        }
-        rows.push(row);
-      }
-      canvas.setContent(rows.join("\n"));
-      this.screen.render();
-      tick += 1;
-    };
-    renderArt();
-    const timer = setInterval(renderArt, 100);
-    frame.kind = "art";
-    frame.describeState = () => ({
-      appType: "generative-art",
-      summary: "Animated procedural art field.",
-      contentPreview: canvas.getContent().split("\n").slice(0, 8).join("\n"),
-      tick
-    });
-    frame.cleanup = () => clearInterval(timer);
-    frame.focus = () => {
-      this.windowManager.focusWindow(frame);
-      canvas.focus();
-    };
-    this.windowManager.registerWindow(frame);
-    frame.focus();
   }
 
   private saveFocusedEditor(): void {
@@ -1896,19 +1469,18 @@ export class TsTuiMvpApp {
   }
 
   private saveEditor(window: WindowRecord): void {
-    if (!window.editor) {
-      return;
-    }
-    if (!window.filePath) {
-      this.overlays.openPathPrompt("Save Text File Path", path.join(SPIKE_ROOT, window.title), (value) => this.content.completePath(value), (value) => {
-        const resolved = value.startsWith("~") ? path.join(os.homedir(), value.slice(1)) : value;
-        window.filePath = resolved;
-        window.title = path.basename(resolved);
-        this.writeEditor(window);
-      });
-      return;
-    }
-    this.writeEditor(window);
+    saveEditorWindow({
+      window,
+      overlays: this.overlays,
+      content: this.content,
+      defaultDir: SPIKE_ROOT,
+      onWritten: () => {
+        this.syncState();
+        if (window.filePath) {
+          this.overlays.flash(`Saved ${window.filePath}`);
+        }
+      }
+    });
   }
 
   private writeEditor(window: WindowRecord): void {
@@ -1928,7 +1500,7 @@ export class TsTuiMvpApp {
     if (!window || window.kind !== "editor" || !window.editor) {
       return;
     }
-    if (this.menuList || this.screen.focused !== window.editor.widget) {
+    if (this.menuUi.isAnyMenuOpen() || this.screen.focused !== window.editor.widget) {
       return;
     }
     if (key.ctrl && key.name === "s") {
@@ -1948,12 +1520,12 @@ export class TsTuiMvpApp {
       return;
     }
     if (key.name === "left") {
-      window.editor.cursor = Math.max(0, window.editor.cursor - 1);
+      moveEditorCursorState(window.editor, -1);
       this.renderEditor(window);
       return;
     }
     if (key.name === "right") {
-      window.editor.cursor = Math.min(window.editor.value.length, window.editor.cursor + 1);
+      moveEditorCursorState(window.editor, 1);
       this.renderEditor(window);
       return;
     }
@@ -1971,7 +1543,7 @@ export class TsTuiMvpApp {
     if (!window || window.kind !== "terminal" || window.terminal?.mode !== "xterm-bridge" || !window.writeInput) {
       return;
     }
-    if (this.menuList || this.popupMenu) {
+    if (this.menuUi.isAnyMenuOpen()) {
       return;
     }
     if (key.ctrl && key.name === "q") {
@@ -2031,9 +1603,7 @@ export class TsTuiMvpApp {
     if (!window.editor) {
       return;
     }
-    const { value, cursor } = window.editor;
-    window.editor.value = `${value.slice(0, cursor)}${text}${value.slice(cursor)}`;
-    window.editor.cursor += text.length;
+    insertEditorTextState(window.editor, text);
     this.renderEditor(window);
   }
 
@@ -2041,9 +1611,7 @@ export class TsTuiMvpApp {
     if (!window.editor || window.editor.cursor === 0) {
       return;
     }
-    const { value, cursor } = window.editor;
-    window.editor.value = `${value.slice(0, cursor - 1)}${value.slice(cursor)}`;
-    window.editor.cursor -= 1;
+    deleteEditorBackwardState(window.editor);
     this.renderEditor(window);
   }
 
@@ -2051,8 +1619,7 @@ export class TsTuiMvpApp {
     if (!window.editor || window.editor.cursor >= window.editor.value.length) {
       return;
     }
-    const { value, cursor } = window.editor;
-    window.editor.value = `${value.slice(0, cursor)}${value.slice(cursor + 1)}`;
+    deleteEditorForwardState(window.editor);
     this.renderEditor(window);
   }
 
@@ -2060,18 +1627,9 @@ export class TsTuiMvpApp {
     if (!window.editor) {
       return;
     }
-    const { widget, value, cursor } = window.editor;
-    const before = this.escapeTags(value.slice(0, cursor));
-    const atCursor = value[cursor] ?? " ";
-    const after = this.escapeTags(value.slice(cursor + 1));
-    widget.setContent(`${before}{inverse}${this.escapeTags(atCursor)}{/inverse}${after}`);
-    widget.setScrollPerc(100);
+    renderEditorState(window.editor);
     this.syncState();
     this.screen.render();
-  }
-
-  private escapeTags(value: string): string {
-    return value.replace(/[{}]/g, "\\$&");
   }
 
   private resolveShellPath(): string {
@@ -2122,53 +1680,17 @@ export class TsTuiMvpApp {
       };
     }
   ): void {
-    const frame = this.windowManager.createFrame(title, kind);
-    const viewer = blessed.box({
-      parent: frame.body,
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      mouse: true,
-      keys: true,
-      vi: true,
-      scrollable: true,
-      alwaysScroll: true,
-      scrollbar: createScrollbar(),
-      content,
-      style: { fg: "white", bg: "black" }
-    });
-    frame.kind = kind;
-    frame.filePath = filePath;
     const fallbackMeasurement = options?.contentMeasurement ? undefined : measurePlainTextContent(content).measurement;
-    const measuredWidth = options?.contentMeasurement?.contentWidth ?? fallbackMeasurement?.columnWidth ?? 0;
-    const measuredHeight = options?.contentMeasurement?.contentHeight ?? fallbackMeasurement?.lineCount ?? 0;
-    frame.describeState = () => ({
-      appType: `${kind}-viewer`,
-      summary: filePath ? `Viewing ${filePath}` : `Viewing ${kind} content.`,
+    openContentViewerWindow({
+      windowManager: this.windowManager,
+      applyMeasuredWindowSize: (frame, nextKind, measured) => this.applyMeasuredWindowSize(frame, nextKind, measured),
+      title,
+      content,
+      kind,
       filePath,
-      lineCount: measuredHeight,
-      contentWidth: measuredWidth,
-      contentHeight: measuredHeight,
-      recommendedWidth: options?.contentMeasurement?.recommendedWidth,
-      recommendedHeight: options?.contentMeasurement?.recommendedHeight,
-      animated: options?.contentMeasurement?.animated,
-      frameCount: options?.contentMeasurement?.frameCount,
-      skippedCommentLines: options?.contentMeasurement?.skippedCommentLines,
-      contentPreview: content.split("\n").slice(0, 8).join("\n")
+      contentMeasurement: options?.contentMeasurement,
+      fallbackMeasurement
     });
-    frame.focus = () => {
-      this.windowManager.focusWindow(frame);
-      viewer.focus();
-    };
-    this.windowManager.registerWindow(frame);
-    if (options?.contentMeasurement) {
-      this.applyMeasuredWindowSize(frame, kind, {
-        width: options.contentMeasurement.contentWidth,
-        height: options.contentMeasurement.contentHeight
-      });
-    }
-    frame.focus();
   }
 
   private openStateInspectorWindow(): void {
@@ -2185,7 +1707,7 @@ export class TsTuiMvpApp {
     const snapshots: WindowSnapshot[] = this.windowManager
       .getWindows()
       .filter((window) => window.kind !== "workspace" && window.kind !== "palette")
-      .map((window) => this.serializeWindowSnapshot(window, focusedId));
+      .map((window) => serializeWindowSnapshot(window, focusedId));
     this.workspace.save(snapshots);
     this.overlays.flash(`Saved workspace to ${this.workspace.path}`);
   }
@@ -2196,29 +1718,20 @@ export class TsTuiMvpApp {
   }
 
   private promptForWorkspaceSave(): void {
-    this.overlays.openValuePrompt("Save Workspace As", this.workspace.currentName, (value) => {
-      this.workspace.setCurrentWorkspaceName(value);
-      this.saveWorkspace();
-      this.syncState();
+    promptForWorkspaceSave({
+      overlays: this.overlays,
+      workspace: this.workspace,
+      onSave: () => this.saveWorkspace(),
+      onAfterChange: () => this.syncState()
     });
   }
 
   private promptForWorkspaceLoad(): void {
-    const names = this.workspace.list();
-    if (names.length === 0) {
-      this.overlays.flash(`No saved workspaces found in ${WORKSPACES_DIR}`);
-      return;
-    }
-    const items = names.map((name) => ({
-      label: `${name}${name === this.workspace.currentName ? " (current)" : ""}`,
-      value: name,
-      preview: `${path.join(WORKSPACES_DIR, `${name}.json`)}\n\n${fs.readFileSync(path.join(WORKSPACES_DIR, `${name}.json`), "utf8")}`,
-      searchText: name
-    }));
-    const initialIndex = Math.max(0, names.findIndex((name) => name === this.workspace.currentName));
-    this.overlays.openBrowserPrompt("Load Workspace", items, initialIndex, (item) => {
-      this.workspace.setCurrentWorkspaceName(item.value);
-      this.loadWorkspace();
+    promptForWorkspaceLoad({
+      overlays: this.overlays,
+      workspace: this.workspace,
+      workspaceDir: WORKSPACES_DIR,
+      onLoad: () => this.loadWorkspace()
     });
   }
 
@@ -2246,7 +1759,27 @@ export class TsTuiMvpApp {
     }
     let focusedWindow: WindowRecord | undefined;
     for (const snapshot of snapshots) {
-      const restored = this.restoreWindowSnapshot(snapshot);
+      const restored = restoreWindowSnapshot(snapshot, {
+        openPrimerWindow: (filePath) => this.openPrimerWindow(filePath),
+        openEditorWindow: (filePath, title, initial, restore) => this.openEditorWindow(filePath, title, initial, restore),
+        openBrowserReaderWindow: (filePath) => this.openBrowserReaderWindow(filePath),
+        openFigletWindow: (text, font) => this.openFigletWindow(text, font),
+        openPatternWindow: () => this.openPatternWindow(),
+        openOrbitWindow: () => this.openOrbitWindow(),
+        openGlitchWindow: () => this.openGlitchWindow(),
+        openChatWindow: (restore) => this.openChatWindow(restore),
+        openWibWobChatWindow: (restore) => this.openWibWobChatWindow(restore),
+        openPrimerGalleryWindow: (restore) => this.openPrimerGalleryWindow(restore),
+        openPrimerBrowserWindow: (restore) => this.openPrimerBrowserWindow(restore),
+        openTerminalWindow: () => this.openTerminalWindow(),
+        openXTermShellWindow: () => this.openXTermShellWindow(),
+        openPiChatWindow: () => this.openPiChatWindow(),
+        openBackroomsTv: (channel) => this.openBackroomsTv(channel),
+        openCompanionWindow: (restore) => this.openCompanionWindow(restore),
+        openArtWindow: () => this.openArtWindow(),
+        openStateInspectorWindow: () => this.openStateInspectorWindow(),
+        getLastWindow: () => this.windowManager.getWindows().at(-1)
+      });
       if (snapshot.focused) {
         focusedWindow = restored;
       }
@@ -2254,192 +1787,6 @@ export class TsTuiMvpApp {
     focusedWindow?.focus();
     this.syncState();
     this.overlays.flash(`Loaded workspace from ${this.workspace.path}`);
-  }
-
-  private restoreWindowSnapshot(snapshot: WindowSnapshot): WindowRecord | undefined {
-    const payload = snapshot.payload ?? {};
-    switch (snapshot.kind) {
-      case "primer":
-        if (snapshot.filePath) this.openPrimerWindow(snapshot.filePath);
-        break;
-      case "editor":
-        this.openEditorWindow(
-          snapshot.filePath,
-          snapshot.title,
-          typeof payload.content === "string"
-            ? payload.content
-            : snapshot.filePath && fs.existsSync(snapshot.filePath)
-              ? fs.readFileSync(snapshot.filePath, "utf8")
-              : "",
-          { cursor: typeof payload.cursor === "number" ? payload.cursor : undefined }
-        );
-        break;
-      case "reader":
-        this.openBrowserReaderWindow(snapshot.filePath);
-        break;
-      case "figlet":
-        this.openFigletWindow(
-          typeof payload.inputText === "string" ? payload.inputText : snapshot.title.replace(/^Banner:\s*/, ""),
-          typeof payload.font === "string" ? payload.font : getDefaultFigletFont()
-        );
-        break;
-      case "pattern":
-        this.openPatternWindow();
-        break;
-      case "orbit":
-        this.openOrbitWindow();
-        break;
-      case "glitch":
-        this.openGlitchWindow();
-        break;
-      case "chat":
-        this.openChatWindow({
-          transcriptLines: Array.isArray(payload.transcriptLines) ? payload.transcriptLines.filter((line): line is string => typeof line === "string") : undefined,
-          draft: typeof payload.draft === "string" ? payload.draft : undefined
-        });
-        break;
-      case "gallery":
-        this.openPrimerGalleryWindow({
-          activeTabIndex: typeof payload.activeTabIndex === "number" ? payload.activeTabIndex : undefined,
-          searchValue: typeof payload.searchValue === "string" ? payload.searchValue : undefined,
-          selectedIndex: typeof payload.selectedIndex === "number" ? payload.selectedIndex : undefined
-        });
-        break;
-      case "browser":
-        this.openPrimerBrowserWindow({
-          selectedIndex: typeof payload.selectedIndex === "number" ? payload.selectedIndex : undefined
-        });
-        break;
-      case "terminal":
-        if (payload.appType === "xterm-shell") {
-          void this.openXTermShellWindow();
-        } else if (payload.appType === "pi-chat") {
-          void this.openPiChatWindow();
-        } else {
-          void this.openTerminalWindow();
-        }
-        break;
-      case "backrooms":
-        this.openBackroomsTv({
-          theme: typeof payload.theme === "string" ? payload.theme : "liminal fluorescent maze",
-          primers: typeof payload.primers === "string" ? payload.primers : "",
-          turns: typeof payload.turns === "number" ? payload.turns : 3,
-          model:
-            payload.model === "haiku" || payload.model === "opus" || payload.model === "sonnet"
-              ? payload.model
-              : "sonnet",
-          mode:
-            payload.mode === "live" || payload.mode === "fake-live" || payload.mode === "auto"
-              ? payload.mode
-              : "auto"
-        });
-        break;
-      case "companion":
-        this.openCompanionWindow({
-          tick: typeof payload.tick === "number" ? payload.tick : undefined
-        });
-        break;
-      case "art":
-        this.openArtWindow();
-        break;
-      case "inspector":
-        this.openStateInspectorWindow();
-        break;
-      default:
-        break;
-    }
-    const restored = this.windowManager.getWindows().at(-1);
-    if (restored) {
-      restored.frame.left = snapshot.left;
-      restored.frame.top = snapshot.top;
-      restored.frame.width = snapshot.width;
-      restored.frame.height = snapshot.height;
-    }
-    return restored;
-  }
-
-  private serializeWindowSnapshot(window: WindowRecord, focusedId?: number): WindowSnapshot {
-    return {
-      kind: window.kind,
-      title: window.title,
-      left: Number(window.frame.left),
-      top: Number(window.frame.top),
-      width: Number(window.frame.width),
-      height: Number(window.frame.height),
-      filePath: window.filePath,
-      focused: window.id === focusedId,
-      payload: this.buildWindowSnapshotPayload(window)
-    };
-  }
-
-  private buildWindowSnapshotPayload(window: WindowRecord): Record<string, unknown> | undefined {
-    switch (window.kind) {
-      case "editor":
-        return window.editor
-          ? {
-              content: window.editor.value,
-              cursor: window.editor.cursor
-            }
-          : undefined;
-      case "browser": {
-        const details = window.describeState?.();
-        return {
-          selectedIndex: typeof details?.selectedIndex === "number" ? details.selectedIndex : 0
-        };
-      }
-      case "gallery": {
-        const details = window.describeState?.();
-        return {
-          activeTabIndex: typeof details?.activeTabIndex === "number" ? details.activeTabIndex : 0,
-          searchValue: typeof details?.searchValue === "string" ? details.searchValue : "",
-          selectedIndex: typeof details?.selectedIndex === "number" ? details.selectedIndex : 0
-        };
-      }
-      case "figlet": {
-        const details = window.describeState?.();
-        return {
-          inputText: typeof details?.inputText === "string" ? details.inputText : window.title.replace(/^Banner:\s*/, ""),
-          font: typeof details?.font === "string" ? details.font : getDefaultFigletFont()
-        };
-      }
-      case "chat":
-        return window.chat
-          ? {
-              transcriptLines: window.chat.transcript.getContent().split("\n").filter(Boolean),
-              draft: window.chat.input.getValue()
-            }
-          : undefined;
-      case "backrooms": {
-        const details = window.describeState?.();
-        return {
-          theme: typeof details?.theme === "string" ? details.theme : "liminal fluorescent maze",
-          primers: typeof details?.primers === "string" ? details.primers : "",
-          turns: typeof details?.turns === "number" ? details.turns : 3,
-          model:
-            details?.model === "haiku" || details?.model === "opus" || details?.model === "sonnet"
-              ? details.model
-              : "sonnet",
-          mode:
-            details?.requestedMode === "live" || details?.requestedMode === "fake-live" || details?.requestedMode === "auto"
-              ? details.requestedMode
-              : "auto"
-        };
-      }
-      case "terminal": {
-        const details = window.describeState?.();
-        return {
-          appType: typeof details?.appType === "string" ? details.appType : "terminal-shell"
-        };
-      }
-      case "companion": {
-        const details = window.describeState?.();
-        return {
-          tick: typeof details?.tick === "number" ? details.tick : 0
-        };
-      }
-      default:
-        return undefined;
-    }
   }
 
   private getAppMenuActions(): AppMenuActions {
@@ -2453,6 +1800,7 @@ export class TsTuiMvpApp {
       openArtWindow: () => this.openArtWindow(),
       openTerminal: () => void this.openTerminalWindow(),
       openXTermShell: () => void this.openXTermShellWindow(),
+      openWibWobChat: () => this.openWibWobChatWindow(),
       openPiChat: () => void this.openPiChatWindow(),
       quit: () => this.destroy(),
       focusNextWindow: () => this.windowManager.focusNextWindow(1),
@@ -2497,6 +1845,74 @@ export class TsTuiMvpApp {
       animated: entry.metadata?.animated ?? false,
       frame_count: entry.metadata?.frameCount ?? 1
     };
+  }
+
+  private isChatMessageEntry(value: unknown): value is ChatMessageEntry {
+    if (!value || typeof value !== "object") {
+      return false;
+    }
+    const entry = value as Record<string, unknown>;
+    return (
+      typeof entry.id === "string" &&
+      (entry.role === "system" || entry.role === "user" || entry.role === "assistant" || entry.role === "status") &&
+      typeof entry.text === "string"
+    );
+  }
+
+  private normalizeTaskLoop(value: unknown): ChatTaskLoop | undefined {
+    if (!value || typeof value !== "object") {
+      return undefined;
+    }
+    const loop = value as Record<string, unknown>;
+    if (!Array.isArray(loop.stories)) {
+      return undefined;
+    }
+    const stories = loop.stories
+      .map((story) => this.normalizeTaskStory(story))
+      .filter((story): story is ChatTaskStory => Boolean(story));
+    return stories.length > 0 ? { stories } : undefined;
+  }
+
+  private normalizeTaskStory(value: unknown): ChatTaskStory | undefined {
+    if (!value || typeof value !== "object") {
+      return undefined;
+    }
+    const story = value as Record<string, unknown>;
+    if (
+      typeof story.title !== "string" ||
+      typeof story.description !== "string" ||
+      (story.status !== "pending" && story.status !== "passed") ||
+      !Array.isArray(story.items)
+    ) {
+      return undefined;
+    }
+    const items = story.items
+      .map((item) => this.normalizeTaskItem(item))
+      .filter((item): item is ChatTaskItem => Boolean(item));
+    return items.length > 0
+      ? {
+          title: story.title,
+          description: story.description,
+          status: story.status,
+          items
+        }
+      : undefined;
+  }
+
+  private normalizeTaskItem(value: unknown): ChatTaskItem | undefined {
+    if (!value || typeof value !== "object") {
+      return undefined;
+    }
+    const item = value as Record<string, unknown>;
+    return typeof item.title === "string" &&
+      typeof item.description === "string" &&
+      (item.status === "pending" || item.status === "passed")
+      ? {
+          title: item.title,
+          description: item.description,
+          status: item.status
+        }
+      : undefined;
   }
 
   focusWindowById(id: number): boolean {

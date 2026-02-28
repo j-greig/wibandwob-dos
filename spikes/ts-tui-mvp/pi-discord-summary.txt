@@ -1,0 +1,26 @@
+Variant 1
+
+I'm building a terminal-native TypeScript remake/spike of WibWob-DOS: a fullscreen desktop-style TUI with windows, menus, workspaces, viewers, and agent surfaces. The stack is Bun + blessed, with a local control API, a typed app state model, and `@skitee3000/bun-pty` for PTY-backed terminal windows. We tried embedding Pi inside one of those terminal windows because we want a `Wib&Wob Chat` inside the app without reinventing everything. The main problem is that Pi's interactive UI streams by constantly repainting the current assistant message in place, and our nested terminal bridge inside blessed does not yet implement enough cursor/erase/redraw semantics, so the stream duplicates and smears instead of updating cleanly. So the big question is whether to keep pushing the PTY-in-a-window path, or move Pi to a more headless/session-driven integration and render the chat natively in our own TUI.
+
+Variant 2
+
+I'm working on a Bun + blessed TUI app — basically a tiny desktop inside your terminal: movable windows, workspace save/load, primers, art views, terminal panes, that kind of thing. We dropped Pi into one window using a PTY because the dream is to have a chat agent live inside that same terminal-native shell. It half works, but the ugly part is that Pi streams by repainting one live message over and over, and we're rendering that inside our own terminal bridge inside blessed inside the user's terminal — so incomplete VT redraw support causes repeated text and prompt artifacts. Pi itself is fine, but our "terminal inside a terminal inside a TUI" stack is the fragile bit.
+
+The PTY side uses @skitee3000/bun-pty which gives us a real pty_open/forkpty, and we have a hand-rolled VT parser that handles basic SGR, cursor movement, and line erases — but not the full CSI repertoire that Pi's ink-based renderer expects (scrolling regions, alternate screen, partial-line rewrites). So it works for shell sessions and Claude Code but falls apart for anything that does aggressive in-place redraw.
+
+I'm trying to figure out whether the right path is: (a) better redraw emulation in our terminal bridge (maybe port xterm.js headless as the parser), (b) using Pi as an engine/backend via its SDK and drawing the chat natively in blessed, or (c) something else entirely. Anyone dealt with nested PTY rendering in a blessed/TUI context?
+
+Variant 2b — shorter, more question-focused
+
+I'm building a Bun + blessed TUI app with PTY-backed terminal windows (@skitee3000/bun-pty). It works great for shell and Claude Code, but when we embed Pi inside a terminal pane the streaming repaints smear — our hand-rolled VT parser handles basic SGR/cursor/erase but not the full CSI set that Pi's ink renderer uses (scroll regions, partial-line rewrites, alternate screen).
+
+Three options I'm weighing:
+(a) Improve our VT parser — maybe use xterm.js headless as the cell state machine instead of hand-rolling
+(b) Use Pi's SDK/session API as a backend and render chat natively in blessed — skip the PTY nesting entirely
+(c) Something else — has anyone solved nested PTY rendering in blessed or a similar TUI framework?
+
+The "terminal inside a terminal inside a TUI" stack is the fragile bit. Pi itself streams fine, our PTY layer works for simpler programs, it's the intersection that breaks. Curious if anyone's been down this road.
+
+Variant 3
+
+I'm prototyping a terminal-native TS version of WibWob-DOS, so think Bun + blessed + a local app/control API + PTY windows instead of a webview or Electron shell. The goal is a real fullscreen TUI desktop with windows, content views, workspaces, and eventually a proper chat window powered by Pi. Right now Pi is being run inside a PTY-backed terminal pane in the app, and the hard part is that its streaming UI updates in place while our nested terminal renderer still misses some cursor movement / erase / repaint behavior. That means Claude looks kind of okay, but Pi gets messy faster because it stresses the redraw path much harder. So I'm at the point where I'm deciding between "improve the embedded terminal emulation" and "stop nesting the interactive Pi UI and instead hook into Pi more structurally."

@@ -1,5 +1,13 @@
 # TS TUI Refactor Epoch Plan
 
+Canonical plan file for this refactor pass.
+
+Notes:
+- this is the single source of truth
+- update checkboxes here as work lands
+- do not maintain a second duplicated tracker in parallel
+- if machine-readable state is needed later, generate it from this file instead of hand-maintaining two plans
+
 Goal: refine the existing spike into a cleaner substrate before adding more product surface.
 
 Rules for this pass:
@@ -36,10 +44,40 @@ Rules for this pass:
 
 ## Epoch 2
 
-- [ ] Extract browser/gallery/workspace restore helpers into dedicated modules
-- [ ] Reduce direct blessed widget construction inside `app-controller.ts`
-- [ ] Normalize window-family state/restore hooks
-- [ ] Add API/state parity checks for existing windows
+- [x] Extract browser/gallery/workspace restore helpers into dedicated modules
+- [x] Reduce direct blessed widget construction inside `app-controller.ts`
+- [x] Normalize window-family state/restore hooks
+- [x] Add API/state parity checks for existing windows
+
+### Epoch 2 progress
+
+- browser and gallery windows now live in `src/windows/content-windows.ts`
+- editor factory now lives in `src/windows/text-windows.ts`
+- workspace snapshot serialize/restore now lives in `src/core/workspace-snapshots.ts`
+- editor mutation/render logic now lives in `src/services/editor-service.ts`
+- figlet/browser/art window helpers now live outside the controller
+- menu overlay ownership now lives in `src/core/menu-overlay-manager.ts`
+- context-menu items now live in `src/core/context-menu-items.ts`
+- file-open/save prompt helpers now live in `src/services/file-actions.ts`
+- workspace prompt helpers now live in `src/services/workspace-ui.ts`
+- `src/core/app-controller.ts` is now down to 1881 lines
+
+### Remaining Epoch 2 work
+
+- decide whether to extract workspace save/load UI prompts from the controller or keep them as orchestration
+- tighten remaining control/API parity around extracted window families
+
+### Evidence
+
+- control/API parity loop passes via `scripts/window-state-parity-loop.sh`
+- latest text capture: `scratch/captures/window-state-parity-loop.txt`
+- latest state snapshot: `scratch/app-state.json`
+- `bun run typecheck` passes after the latest extraction pass
+
+### Plan hygiene
+
+- `refactor-epoch-plan.md` is now the only canonical tracker
+- the duplicate JSON tracker was removed because it was creating drift risk for no real benefit
 
 ## Epoch 3
 
@@ -49,7 +87,7 @@ Rules for this pass:
 
 ---
 
-## Parking lot
+## Parking lot - comments from Claude Code to maybe action or ignore if rubbish
 
 - **Tests**: zero test files exist — add bun test + content-measurement + workspace round-trip before epoch 2 refactors blind.
 - **Theme tokens**: 28 hardcoded blessed style literals in controller will get copy-pasted into every extracted module — tokenise before bulk extraction.

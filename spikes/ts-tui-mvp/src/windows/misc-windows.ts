@@ -159,7 +159,15 @@ export function openChatWindow(
     armChatInput();
   });
   frame.kind = "chat";
-  frame.chat = { transcript, input };
+  frame.chat = {
+    mode: "synthetic",
+    transcript,
+    input,
+    getTranscriptLines: () => transcript.getContent().split("\n").filter(Boolean),
+    getDraft: () => input.getValue(),
+    setDraft: (value) => input.setValue(value),
+    submit: (value) => input.emit("submit", value ?? input.getValue())
+  };
   frame.describeState = () => ({
     appType: "chat-transcript",
     summary: "Synthetic Wib and Wob chat transcript.",
@@ -218,6 +226,55 @@ export function openCompanionWindow(
   frame.focus = () => {
     deps.windowManager.focusWindow(frame);
     bubble.focus();
+  };
+  deps.windowManager.registerWindow(frame);
+  frame.focus();
+}
+
+export function openArtWindow(deps: BaseWindowDeps): void {
+  const frame = deps.windowManager.createFrame("Generative Art", "art");
+  const canvas = blessed.box({
+    parent: frame.body,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    style: { fg: "white", bg: "black" }
+  });
+  let tick = 0;
+  const renderArt = () => {
+    const width = Math.max(12, Number(canvas.width));
+    const height = Math.max(6, Number(canvas.height));
+    const palette = " .:-=+*#%@";
+    const rows: string[] = [];
+    for (let y = 0; y < height; y += 1) {
+      let row = "";
+      for (let x = 0; x < width; x += 1) {
+        const waveA = Math.sin((x + tick) / 5);
+        const waveB = Math.cos((y - tick) / 4);
+        const orbit = Math.sin((x + y + tick) / 7);
+        const value = (waveA + waveB + orbit + 3) / 6;
+        row += palette[Math.min(palette.length - 1, Math.max(0, Math.floor(value * palette.length)))];
+      }
+      rows.push(row);
+    }
+    canvas.setContent(rows.join("\n"));
+    deps.screen.render();
+    tick += 1;
+  };
+  renderArt();
+  const timer = setInterval(renderArt, 100);
+  frame.kind = "art";
+  frame.describeState = () => ({
+    appType: "generative-art",
+    summary: "Animated procedural art field.",
+    contentPreview: canvas.getContent().split("\n").slice(0, 8).join("\n"),
+    tick
+  });
+  frame.cleanup = () => clearInterval(timer);
+  frame.focus = () => {
+    deps.windowManager.focusWindow(frame);
+    canvas.focus();
   };
   deps.windowManager.registerWindow(frame);
   frame.focus();
@@ -370,4 +427,3 @@ export function openStateInspectorWindow(params: {
   params.windowManager.registerWindow(frame);
   frame.focus();
 }
-

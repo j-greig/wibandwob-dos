@@ -69,9 +69,42 @@ export interface TerminalState {
   scrollViewport?: (delta: number) => void;
 }
 
+export type TaskLoopStatus = "pending" | "passed";
+
+export interface ChatTaskItem {
+  title: string;
+  description: string;
+  status: TaskLoopStatus;
+}
+
+export interface ChatTaskStory {
+  title: string;
+  description: string;
+  status: TaskLoopStatus;
+  items: ChatTaskItem[];
+}
+
+export interface ChatTaskLoop {
+  stories: ChatTaskStory[];
+}
+
+export interface ChatMessageEntry {
+  id: string;
+  role: "system" | "user" | "assistant" | "status";
+  text: string;
+  streaming?: boolean;
+}
+
 export interface ChatState {
-  transcript: LogBox;
+  mode: "synthetic" | "pi-sdk";
+  transcript: Box;
   input: Textbox;
+  getTranscriptLines: () => string[];
+  getDraft: () => string;
+  setDraft: (value: string) => void;
+  submit: (value?: string) => void;
+  taskLoop?: ChatTaskLoop;
+  messages?: ChatMessageEntry[];
 }
 
 export interface WindowSnapshot {
