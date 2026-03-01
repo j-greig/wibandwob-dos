@@ -16,6 +16,115 @@ Status vocabulary:
 - `review` — audit/findings doc
 - `stale` — useful history, but no longer canonical
 
+## Execution Buckets
+
+This is the agent-friendly triage layer. Not every doc should become an epic.
+
+### Tier 1 — Core execution now
+
+These define the substrate. Work here first.
+
+- `BUILD-ORDER-FINAL.md`
+  - sequencing canon for the rebuild
+- `overview.md`
+  - high-level parcel map P1-P7
+- `002-architecture-plan-content-sizing-layout.md`
+  - measurement, chrome, state, layout architecture
+- `015-window-manager-reference-and-repair-plan.md`
+  - current window-manager stabilization work
+- `017-framework-direction-and-today-plan.md`
+  - current framework direction and work ordering
+- `018-command-registry-and-tool-adapter-prd.md`
+  - command registry and adapter substrate
+- `spk-agent-window-enhancement.md`
+  - native agent window direction
+- `refactor-epoch-plan.md`
+  - canonical refactor tracker
+
+### Tier 2 — Core follow-on after substrate is boring
+
+Important, but should build on a stable shell.
+
+- `001-primer-dimensions-and-agent-sizing.md`
+- `004-window-type-registry-and-factories.md`
+- `006-command-registry-and-ipc-protocol.md`
+- `007-terminal-emulator.md`
+- `008-theme-system-and-desktop-rendering.md`
+- `010-browser-and-text-rendering.md`
+- `013-events-persistence-and-multi-instance.md`
+- `019-context-sensitive-menu-bar-prd.md`
+
+### Tier 3 — Secondary / optional spikes
+
+Potentially valuable, but not on the critical path today.
+
+- `003-pi-mono-chat-window-evaluation.md`
+- `004-piclaw-sandbox-evaluation.md`
+- `005-llm-integration-and-claude-sdk-bridge.md`
+- `014-gaps-from-skill-crosscheck.md`
+- `terminal-native-research.md`
+
+### Tier 4 — Parking lot / defer
+
+Do not treat these as active epics unless priorities change.
+
+- `009-paint-canvas-system.md`
+- `011-games-and-generative-art.md`
+- `012-micropolis-integration.md`
+- `016-terminal-kit-screenbuffer-animation-spike.md`
+
+### Tier 5 — Historical / review docs
+
+Use for validation and audit, not as the main execution plan.
+
+- `chat-collapse-review.md`
+- `content-measurement-review.md`
+- `editor-save-review.md`
+- `window-facade-review.md`
+- `window-facade-phase1-review.md`
+- `window-facade-full-review.md`
+- `003-document-plan.md`
+- `BUILD-ORDER.md`
+- `INDEX.md` (deleted — superseded by this file)
+
+## How To Turn This Into Work
+
+Agent-friendly rule:
+
+- only Tier 1 docs become active epics by default
+- Tier 2 docs become epics/features only after their dependency Tier 1 seams are stable
+- Tier 3 docs should usually become spikes or short investigations, not epics
+- Tier 4 docs stay parked unless the user explicitly reprioritizes them
+- review docs should produce concrete fix tickets, not stand alone as epics
+
+Recommended current epic buckets:
+
+1. `Core Shell`
+   - window manager
+   - chrome/layout/geometry
+   - theming
+2. `Command Surface`
+   - command registry
+   - control API
+   - context-sensitive menus
+   - future MCP projection
+3. `Agent Surface`
+   - Wib&Wob Chat / Agent
+   - tool adapters
+   - state-aware desktop control
+4. `Content Surfaces`
+   - measurement
+   - browser/text/file manager
+   - window factories and restore semantics
+
+If a doc does not clearly strengthen one of those four buckets, it is probably not a current epic.
+
+## Current Execution Notes
+
+- The TS TUI spike has moved well beyond a tiny MVP.
+- Before much more feature or architecture work lands, split ongoing TS TUI work onto its own fresh spike branch.
+- Treat that branch cut as the start of the next phase, not as a new feature.
+
 | File | About | Status |
 |---|---|---|
 | `001-primer-dimensions-and-agent-sizing.md` | Primer measurement, recommended sizing, and agent-visible content dimensions from the older C++ path. | `reference` |
@@ -41,7 +150,7 @@ Status vocabulary:
 | `019-context-sensitive-menu-bar-prd.md` | Draft plan for macOS-style focus-sensitive menus and per-window menu contributions. | `draft` |
 | `BUILD-ORDER-FINAL.md` | Preferred sequencing for the broader TS rebuild. | `active` |
 | `BUILD-ORDER.md` | Older build order document superseded by the final version. | `stale` |
-| `INDEX.md` | Older doc index with now-stale status notes and priorities. | `stale` |
+| `INDEX.md` | Deleted. Superseded by this file (`000-docs-overview.md`). | `deleted` |
 | `chat-collapse-review.md` | Review of the chat collapse refactor and its contract gaps. | `review` |
 | `content-measurement-review.md` | Review of the content measurement refactor and remaining mismatches. | `review` |
 | `editor-save-review.md` | Review of editor save behavior against the spike save plan. | `review` |
