@@ -1,12 +1,40 @@
 import blessed from "blessed";
 import fs from "node:fs";
 import path from "node:path";
+import stringWidth from "string-width";
 
 import { createScrollbar } from "../core/ui-primitives.js";
 import type { ContentMeasurement } from "../services/content-measurement.js";
-import type { BrowserEntry, List, WindowKind, WindowRecord } from "../core/types.js";
+import type { Box, BrowserEntry, List, WindowKind, WindowRecord } from "../core/types.js";
 import type { OverlayManager } from "../core/overlay-manager.js";
 import type { WindowManager } from "../core/window-manager.js";
+
+function fitLineToWidth(line: string, width: number): string {
+  if (width <= 0) {
+    return "";
+  }
+  let visible = "";
+  let currentWidth = 0;
+  for (const char of line) {
+    const charWidth = stringWidth(char);
+    if (currentWidth + charWidth > width) {
+      break;
+    }
+    visible += char;
+    currentWidth += charWidth;
+  }
+  return visible + " ".repeat(Math.max(0, width - currentWidth));
+}
+
+function setViewportContent(viewport: Box, raw: string): void {
+  const width = Math.max(1, Number(viewport.width) || 1);
+  const minRows = Math.max(1, Number(viewport.height) || 1);
+  const rows = raw.replace(/\r\n/g, "\n").split("\n").map((line) => fitLineToWidth(line, width));
+  while (rows.length < minRows) {
+    rows.push(" ".repeat(width));
+  }
+  viewport.setContent(rows.join("\n"));
+}
 
 export function openPrimerBrowserWindow(params: {
   windowManager: WindowManager;
@@ -140,20 +168,23 @@ export function openPrimerGalleryWindow(params: {
   let activeTabIndex = Math.max(0, Math.min(params.restore?.activeTabIndex ?? 0, tabs.length - 1));
   let activeEntries = tabs[activeTabIndex].entries;
   let searchValue = params.restore?.searchValue ?? "";
+  let previewRawContent = "";
 
   const updatePreview = (index: number) => {
     const entry = activeEntries[index];
     if (!entry) {
-      preview.setContent("No primer selected.");
+      previewRawContent = "No primer selected.";
+      setViewportContent(preview, previewRawContent);
       params.screen.render();
       return;
     }
     try {
       const content = fs.readFileSync(entry.filePath, "utf8");
-      preview.setContent(`${tabs[activeTabIndex].label} :: ${entry.label}\n${entry.filePath}\n\n${content}`);
+      previewRawContent = `${tabs[activeTabIndex].label} :: ${entry.label}\n${entry.filePath}\n\n${content}`;
     } catch (error) {
-      preview.setContent(`Cannot preview file.\n\n${error instanceof Error ? error.message : String(error)}`);
+      previewRawContent = `Cannot preview file.\n\n${error instanceof Error ? error.message : String(error)}`;
     }
+    setViewportContent(preview, previewRawContent);
     params.screen.render();
   };
   const openSelected = (index?: number) => {
@@ -251,6 +282,10 @@ export function openPrimerGalleryWindow(params: {
     }
   };
   params.windowManager.registerWindow(frame);
+  frame.frame.on("resize", () => {
+    setViewportContent(preview, previewRawContent);
+    params.screen.render();
+  });
   if (activeTabIndex === 5) {
     filterBox.setValue(searchValue);
     applySearch();
@@ -274,6 +309,7 @@ export function openTextViewerWindow(params: {
   measurement?: ContentMeasurement;
 }): void {
   const frame = params.windowManager.createFrame(params.title, params.kind);
+  let currentContent = params.content;
   const viewer = blessed.box({
     parent: frame.body,
     top: 0,
@@ -286,7 +322,7 @@ export function openTextViewerWindow(params: {
     scrollable: true,
     alwaysScroll: true,
     scrollbar: createScrollbar(),
-    content: params.content,
+    content: "",
     style: { fg: "white", bg: "black" }
   });
   frame.kind = params.kind;
@@ -310,6 +346,7 @@ export function openTextViewerWindow(params: {
     params.windowManager.focusWindow(frame);
     viewer.focus();
   };
+  frame.refresh = () => setViewportContent(viewer, currentContent);
   params.windowManager.registerWindow(frame);
   if (m) {
     params.applyMeasuredWindowSize(frame, params.kind, {
@@ -317,6 +354,10 @@ export function openTextViewerWindow(params: {
       height: m.lineCount
     });
   }
+  setViewportContent(viewer, currentContent);
+  frame.frame.on("resize", () => {
+    setViewportContent(viewer, currentContent);
+  });
   frame.focus();
 }
 
@@ -392,6 +433,7 @@ export function openFileManagerWindow(params: {
   let allEntries: Array<{ label: string; fullPath: string; isDirectory: boolean }> = [];
   let entries: Array<{ label: string; fullPath: string; isDirectory: boolean }> = [];
   let filterValue = params.restore?.filterValue ?? "";
+  let previewRawContent = "";
 
   const renderFilter = () => {
     const prefix = inputFocused() ? "/" : "/";
@@ -435,21 +477,24 @@ export function openFileManagerWindow(params: {
   const updatePreview = (index: number) => {
     const entry = entries[index];
     if (!entry) {
-      preview.setContent("No file selected.");
+      previewRawContent = "No file selected.";
+      setViewportContent(preview, previewRawContent);
       params.screen.render();
       return;
     }
     if (entry.isDirectory) {
-      preview.setContent(`${entry.fullPath}\n\n[directory]`);
+      previewRawContent = `${entry.fullPath}\n\n[directory]`;
+      setViewportContent(preview, previewRawContent);
       params.screen.render();
       return;
     }
     try {
       const content = fs.readFileSync(entry.fullPath, "utf8");
-      preview.setContent(`${entry.fullPath}\n\n${content.slice(0, 8000)}`);
+      previewRawContent = `${entry.fullPath}\n\n${content.slice(0, 8000)}`;
     } catch (error) {
-      preview.setContent(`Cannot preview file.\n\n${error instanceof Error ? error.message : String(error)}`);
+      previewRawContent = `Cannot preview file.\n\n${error instanceof Error ? error.message : String(error)}`;
     }
+    setViewportContent(preview, previewRawContent);
     params.screen.render();
   };
 
@@ -579,6 +624,11 @@ export function openFileManagerWindow(params: {
   };
 
   params.windowManager.registerWindow(frame);
+  frame.frame.on("resize", () => {
+    renderFilter();
+    setViewportContent(preview, previewRawContent);
+    params.screen.render();
+  });
   navigateTo(initialPath, params.restore?.selectedIndex ?? 0);
   frame.focus();
 }

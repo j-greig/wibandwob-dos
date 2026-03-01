@@ -157,8 +157,8 @@ These live outside the spike dir but directly drive spike work:
 | `015-window-manager-reference-and-repair-plan.md` | External references and repair plan for the blessed window manager. | `active` |
 | `016-terminal-kit-screenbuffer-animation-spike.md` | Plan for a contained terminal-kit ScreenBuffer animation/compositing experiment. | `draft` |
 | `017-framework-direction-and-today-plan.md` | Current framework direction: blessed shell, terminal-kit subsystem spike, Terminal.Gui as design teacher. | `active` |
-| `018-command-registry-and-tool-adapter-prd.md` | PRD for define-once commands projected into menu, palette, API, agent, and later MCP. Phase 1 landed: catalog, registry, menu/palette/API/agent all wired. | `landed` |
-| `019-context-sensitive-menu-bar-prd.md` | PRD for macOS-style context-sensitive menus. CommandVisibility + enabled(ctx) predicates on catalog entries, selection model via getSelection() on WindowRecord. Phase 1: static menus with filtered items. Phase 2: dynamic top-level categories. Depends on 018 (landed). | `draft` |
+| `018-command-registry-and-tool-adapter-prd.md` | PRD for define-once commands projected into menu, palette, API, agent, and later MCP. Core registry path is proven; MCP/cleanup remain. | `partial` |
+| `019-context-sensitive-menu-bar-prd.md` | PRD for macOS-style context-sensitive menus. Context model, enabled predicates, and context-menu alignment are refined; implementation remains partial. | `partial` |
 | `BUILD-ORDER-FINAL.md` | Preferred sequencing for the broader TS rebuild. | `active` |
 | `BUILD-ORDER.md` | Older build order document superseded by the final version. | `stale` |
 | `INDEX.md` | Deleted. Superseded by this file (`000-docs-overview.md`). | `deleted` |
@@ -167,7 +167,7 @@ These live outside the spike dir but directly drive spike work:
 | `editor-save-review.md` | Review of editor save. 4 bugs found, all fixed: dirty title leak, agent write bypass, non-atomic Save As, unresilient writes. | `review` |
 | `overview.md` | High-level parcel map P1-P7 for the full TS rebuild. | `reference` |
 | `refactor-epoch-plan.md` | Canonical tracker for the spike refactor/reorganization epochs. Epoch 1 done (2878->2050 lines). Epoch 2: WindowFacade landed, chat collapsed, command registry landed, content measurement unified. | `active` |
-| `spk-agent-window-enhancement.md` | Plan and rationale for turning chat into a real agent window with TUI tools. Implemented: 15 tools, dual mode (agent/chat), chat collapse done. | `landed` |
+| `spk-agent-window-enhancement.md` | Plan and rationale for turning chat into a real agent window with TUI tools. Useful and partly landed, but still mixed with review corrections. | `partial` |
 | `terminal-native-research.md` | Research note on terminal-native TypeScript TUI options and tradeoffs. | `reference` |
 | `wibwob-chat-v2-plan.md` | Canonical plan for the native Wib&Wob Chat v2 slice. Superseded by agent window with mode="chat". | `landed` |
 | `window-facade-full-review.md` | Full review of Phases 1-5. Capture route fix applied. Remaining: async restore race, old method aliases. | `review` |

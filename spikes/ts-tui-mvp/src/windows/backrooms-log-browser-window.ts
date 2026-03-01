@@ -35,15 +35,22 @@ function scanLogs(logsDir: string): LogEntry[] {
     .sort((a, b) => b.mtime - a.mtime);
 }
 
+/** Strip ISO timestamp prefix from log filenames for display. */
+function displayName(name: string): string {
+  // Filenames like "2026-02-28T14-36-18-164Z_liminal-fluorescent-maze"
+  return name.replace(/^\d{4}-\d{2}-\d{2}T[\d-]+Z?_/, "");
+}
+
 function formatEntry(entry: LogEntry, width: number): string {
   const time = new Date(entry.mtime).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
   const status = entry.live ? " ●" : "";
-  const fixedWidth = 7 + status.length + 1; // time + status + padding
+  const fixedWidth = 7 + status.length + 1;
+  const slug = displayName(entry.name);
   const slugWidth = Math.max(8, width - fixedWidth);
-  const slug = entry.name.length > slugWidth
-    ? entry.name.slice(0, slugWidth - 1) + "…"
-    : entry.name.padEnd(slugWidth, " ");
-  return `${time} ${slug}${status}`;
+  const display = slug.length > slugWidth
+    ? slug.slice(0, slugWidth - 1) + "…"
+    : slug.padEnd(slugWidth, " ");
+  return `${time} ${display}${status}`;
 }
 
 export function openBackroomsLogBrowserWindow(params: {
@@ -119,22 +126,14 @@ export function openBackroomsLogBrowserWindow(params: {
     content: ""
   });
 
-  // Click on path bar → file path actions
+  // Click path bar → copy path to clipboard. Simple, no overlay.
   let currentPath = "";
   pathBar.on("click", () => {
     if (currentPath) {
       const items = createFilePathMenuItems(currentPath);
-      if (items.length > 0) {
-        params.overlays.openListPrompt(
-          "File Actions",
-          items.map(item => ({ label: item.label })),
-          0,
-          (selected) => {
-            const match = items.find(i => i.label === selected.label);
-            match?.action();
-          }
-        );
-      }
+      // Execute the first action (Copy Path) directly
+      items[0]?.action();
+      params.overlays.flash("Path copied to clipboard");
     }
   });
 
@@ -175,7 +174,7 @@ export function openBackroomsLogBrowserWindow(params: {
       params.screen.render();
       return;
     }
-    titleBar.setContent(` ${entry.name}`);
+    titleBar.setContent(` ${displayName(entry.name)}`);
     pathBar.setContent(` ${entry.path}`);
     currentPath = entry.path;
     try {

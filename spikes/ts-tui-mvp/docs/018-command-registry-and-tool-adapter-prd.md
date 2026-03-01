@@ -1,6 +1,6 @@
 # PRD: Command Registry And Tool Adapter
 
-Status: draft
+Status: partial
 Scope: terminal-native TS spike
 
 ## TL;DR
@@ -176,9 +176,18 @@ Current source files:
 - [/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/src/core/menu-config.ts](/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/src/core/menu-config.ts)
 - [/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/src/services/control-api.ts](/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/src/services/control-api.ts)
 
-This is still not the full end-state registry. Agent tools and MCP are not yet
-derived from the same source. But the spike now has a real execution-capable
-registry seam instead of only a nicer menu list.
+This is still not the full end-state registry. MCP is not yet derived from the
+same source, and some special-case UI surfaces still sit outside the generic
+path. But the spike now has a real execution-capable registry seam projected
+into:
+
+- menus
+- command palette
+- control API
+- agent tools
+
+The remaining work is cleanup, deeper migration, and MCP projection, not
+proving the basic registry direction.
 
 ## Core design
 
@@ -485,7 +494,11 @@ Mitigation:
 
 ## Recommendation for today
 
-Do not fully implement this before the window-manager Tier 1 work is stable.
+Treat this PRD as active substrate guidance, not a future-only proposal.
 
-But do treat this PRD as the intended direction and use the file manager as the
-first reference feature when we start the registry migration.
+The basic registry direction is already proven in the spike. Remaining work is:
+
+- continue migrating duplicated command surfaces onto the registry
+- enrich command context for selection-aware/context-menu commands
+- project the same registry into future MCP tools
+- remove residual bespoke action definitions once replacements are stable

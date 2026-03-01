@@ -1,6 +1,6 @@
 # PRD 019: Context-Sensitive Menu Bar (macOS-Style)
 
-Status: draft
+Status: partial
 GitHub issue: —
 PR: —
 
