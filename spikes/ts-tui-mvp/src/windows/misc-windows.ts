@@ -64,27 +64,6 @@ export function openPatternWindow(deps: BaseWindowDeps): void {
   });
 }
 
-export function openOrbitWindow(deps: BaseWindowDeps): void {
-  openAnimatedWindow(deps, "Orbit Engine", "orbit", (tick, width, height) => {
-    const cx = width / 2;
-    const cy = height / 2;
-    const rows: string[] = [];
-    for (let y = 0; y < height; y += 1) {
-      let row = "";
-      for (let x = 0; x < width; x += 1) {
-        const dx = x - cx;
-        const dy = y - cy;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        const angle = Math.atan2(dy, dx) + tick / 10;
-        const wave = Math.sin(dist / 2 - tick / 4) + Math.cos(angle * 3);
-        row += wave > 1 ? "@" : wave > 0.5 ? "*" : wave > 0 ? "+" : wave > -0.5 ? "." : " ";
-      }
-      rows.push(row);
-    }
-    return rows.join("\n");
-  });
-}
-
 export function openGlitchWindow(deps: BaseWindowDeps, sourceText: string): void {
   const lines = sourceText.split("\n").slice(0, 24);
   openAnimatedWindow(deps, "Glitch FX", "glitch", (tick) =>

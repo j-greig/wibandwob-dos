@@ -61,7 +61,6 @@ import {
   openCompanionWindow as openScrambleWindow,
   openArtWindow as openGenerativeArtWindow,
   openGlitchWindow as openGlitchAnimationWindow,
-  openOrbitWindow as openOrbitAnimationWindow,
   openPatternWindow as openPatternAnimationWindow,
   openStateInspectorWindow as openInspectorWindow,
   openWorkspaceManagerWindow as openWorkspaceCommandWindow
@@ -378,7 +377,6 @@ export class TsTuiMvpApp {
           gallery: () => this.openPrimerGalleryWindow(),
           browser: () => this.openBrowserReaderWindow(),
           pattern: () => this.openPatternWindow(),
-          orbit: () => this.openOrbitWindow(),
           glitch: () => this.openGlitchWindow(),
           chat: () => this.openWibWobChatWindow(),
           companion: () => this.openCompanionWindow(),
@@ -1309,13 +1307,6 @@ export class TsTuiMvpApp {
     });
   }
 
-  private openOrbitWindow(): void {
-    openOrbitAnimationWindow({
-      screen: this.screen,
-      windowManager: this.windowManager
-    });
-  }
-
   private openGlitchWindow(): void {
     let source = "No source loaded.";
     try {
@@ -1724,7 +1715,6 @@ export class TsTuiMvpApp {
       openBrowserReaderWindow: (filePath) => this.openBrowserReaderWindow(filePath),
       openFigletWindow: (text, font) => this.openFigletWindow(text, font),
       openPatternWindow: () => this.openPatternWindow(),
-      openOrbitWindow: () => this.openOrbitWindow(),
       openGlitchWindow: () => this.openGlitchWindow(),
       openWibWobChatWindow: (restore) => this.openWibWobChatWindow(restore),
       openPrimerGalleryWindow: (restore) => this.openPrimerGalleryWindow(restore),
@@ -1831,7 +1821,6 @@ export class TsTuiMvpApp {
       openChromeBrowser: () => this.openChromeBrowserWindow(),
       openFigletBanner: () => this.promptForFigletText(),
       openPatternWindow: () => this.openPatternWindow(),
-      openOrbitWindow: () => this.openOrbitWindow(),
       openGlitchWindow: () => this.openGlitchWindow(),
       openCompanionWindow: () => this.openCompanionWindow(),
       openWorkspaceManager: () => this.openWorkspaceManagerWindow(),
@@ -1851,16 +1840,18 @@ export class TsTuiMvpApp {
     if (!entry) {
       return { ok: false, path: pathOrName, error: "Primer not found" };
     }
+    // Measure on demand — not at gallery scan time
+    const m = this.content.measureEntry(entry);
     return {
       ok: true,
       path: entry.filePath,
       name: entry.label,
-      content_width: entry.metadata?.columnWidth ?? 0,
-      content_lines: entry.metadata?.lineCount ?? 0,
-      recommended_w: entry.metadata?.recommendedWidth ?? 0,
-      recommended_h: entry.metadata?.recommendedHeight ?? 0,
-      animated: entry.metadata?.animated ?? false,
-      frame_count: entry.metadata?.frameCount ?? 1
+      content_width: m?.columnWidth ?? 0,
+      content_lines: m?.lineCount ?? 0,
+      recommended_w: m?.recommendedWidth ?? 0,
+      recommended_h: m?.recommendedHeight ?? 0,
+      animated: m?.animated ?? false,
+      frame_count: m?.frameCount ?? 1
     };
   }
 

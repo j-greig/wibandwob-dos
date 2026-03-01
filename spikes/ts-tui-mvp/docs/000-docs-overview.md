@@ -126,6 +126,9 @@ If a doc does not clearly strengthen one of those four buckets, it is probably n
 - The TS TUI spike has moved well beyond a tiny MVP.
 - Before much more feature or architecture work lands, split ongoing TS TUI work onto its own fresh spike branch.
 - Treat that branch cut as the start of the next phase, not as a new feature.
+- The next workspace-system cleanup should make app boot restore `default.json`
+  (and later optionally a last-used-workspace pointer) before falling back to
+  opening Scramble.
 
 ## Key Repo-Root Architecture Docs
 
@@ -161,7 +164,7 @@ These live outside the spike dir but directly drive spike work:
 | `017-framework-direction-and-today-plan.md` | Current framework direction: blessed shell, terminal-kit subsystem spike, Terminal.Gui as design teacher. | `active` |
 | `018-command-registry-and-tool-adapter-prd.md` | PRD for define-once commands projected into menu, palette, API, agent, and later MCP. Core registry path is proven; MCP/cleanup remain. | `partial` |
 | `019-context-sensitive-menu-bar-prd.md` | PRD for macOS-style context-sensitive menus. Context model, enabled predicates, and context-menu alignment are refined; implementation remains partial. | `partial` |
-| `020-target-architecture.md` | Canonical end-state architecture for the TS TUI app: source tree, subsystem boundaries, and file responsibilities. | `active` |
+| `020-target-architecture.md` | Canonical end-state architecture for the TS TUI app: source tree, subsystem boundaries, file responsibilities, startup workspace semantics, native appearance/theme rules, and ASCII animation support. | `active` |
 | `BUILD-ORDER-FINAL.md` | Preferred sequencing for the broader TS rebuild. | `active` |
 | `BUILD-ORDER.md` | Older build order document superseded by the final version. | `stale` |
 | `INDEX.md` | Deleted. Superseded by this file (`000-docs-overview.md`). | `deleted` |

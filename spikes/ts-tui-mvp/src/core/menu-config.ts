@@ -32,7 +32,6 @@ export interface AppMenuActions {
   openChromeBrowser: () => void;
   openFigletBanner: () => void;
   openPatternWindow: () => void;
-  openOrbitWindow: () => void;
   openGlitchWindow: () => void;
   openCompanionWindow: () => void;
   openWorkspaceManager: () => void;

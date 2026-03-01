@@ -410,6 +410,8 @@ If you add a new window type:
 - if it renders sized content, route its measurement through `content-measurement.ts`
 - if it needs non-standard chrome, declare that in `window-chrome.ts`
 - if it repeats a pattern already used elsewhere, extract the pattern first
+- if it introduces colors, backgrounds, borders, or emphasis styles, route them
+  through semantic theme tokens rather than inline blessed style literals
 
 If you change terminal behavior:
 - test PTY launch directly
@@ -445,7 +447,13 @@ Manual smoke targets:
 
 - The terminal pane still is not a real VT renderer.
 - `app-controller.ts` is ~2050 lines — down from ~2800 after WindowFacade and chat collapse, but should continue decomposing.
-- Workspace startup semantics are not yet unified with default workspace auto-load.
+- Workspace startup semantics are not yet unified with default workspace auto-load;
+  the intended direction is: restore `scratch/workspaces/default.json` (and later
+  optionally a last-used-workspace pointer) before falling back to opening
+  Scramble.
+- Theme/appearance is not yet a first-class subsystem. The target direction is a
+  native appearance service with `system` / `light` / `dark` plus semantic theme
+  tokens compiled into blessed styles.
 - Async workspace restore race: getLastWindow() after promise-returning openers can miss the window.
 - wibwob-chat-v2 restore does not yet hydrate transcript/draft into the new agent-backed session.
 - Chrome browser service has pre-existing type errors (missing @types/jsdom, @types/turndown-plugin-gfm).
@@ -464,11 +472,13 @@ Manual smoke targets:
 
 Good next slices:
 1. async workspace restore race fix (getLastWindow after promise openers)
-2. wibwob-chat-v2 restore hydration (transcript/draft into agent session)
-3. WindowRecord discriminated union (replace bag of optionals)
-4. resize handles and stronger window management
-5. screenshot/export support for comparing layouts to WibWob-DOS captures
-6. project more window-local actions onto the command registry path where they are truly shared
+2. workspace startup unification (`default.json` restore first, Scramble fallback second)
+3. appearance/theme subsystem (`appearance-service`, semantic tokens, blessed resolver)
+4. wibwob-chat-v2 restore hydration (transcript/draft into agent session)
+5. WindowRecord discriminated union (replace bag of optionals)
+6. resize handles and stronger window management
+7. screenshot/export support for comparing layouts to WibWob-DOS captures
+8. project more window-local actions onto the command registry path where they are truly shared
 
 Avoid:
 1. full Turbo Vision porting work

@@ -17,7 +17,6 @@ export type WindowKind =
   | "reader"
   | "figlet"
   | "pattern"
-  | "orbit"
   | "glitch"
   | "chat"
   | "companion"

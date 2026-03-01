@@ -169,12 +169,22 @@ export class ContentService {
   }
 
   private createBrowserEntry(label: string, filePath: string): BrowserEntry {
-    const metadata = this.readPrimerMetadata(filePath);
     return {
       label,
       filePath,
-      metadata
+      metadata: undefined  // Lazy — measured on demand via measureEntry()
     };
+  }
+
+  /** Measure a single entry on demand. Caches the result. */
+  measureEntry(entry: BrowserEntry): BrowserEntry["metadata"] {
+    if (entry.metadata) return entry.metadata;
+    try {
+      entry.metadata = measurePrimerContent(fs.readFileSync(entry.filePath, "utf8")).measurement;
+    } catch {
+      // leave undefined
+    }
+    return entry.metadata;
   }
 
   private readPrimerMetadata(filePath: string): BrowserEntry["metadata"] | undefined {

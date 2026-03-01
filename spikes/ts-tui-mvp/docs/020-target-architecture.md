@@ -29,6 +29,8 @@ epics and stories should move toward.
 6. Agents consume the same command/state substrate as menus and APIs.
 7. The app stays terminal-native; browser/webview-only solutions are reference,
    not runtime dependencies.
+8. Appearance is native to the app: semantic theme tokens first, renderer and
+   external-theme adapters second.
 
 ## Reality Check
 
@@ -43,6 +45,9 @@ Current known deltas:
   the target architecture wants.
 - startup still hardcodes a minimal fallback window instead of restoring the
   default workspace on boot.
+- the next workspace-system slice should restore `scratch/workspaces/default.json`
+  on boot, optionally via a last-used-workspace pointer, and only fall back to
+  Scramble when no workspace can be restored.
 - legacy Pi terminal and synthetic transcript chat flows have now been removed
   from the live spike, so the remaining deltas are structural rather than
   compatibility-driven.
@@ -100,6 +105,9 @@ src/
 │   ├── config.ts
 │   ├── types.ts
 │   ├── desktop-geometry.ts
+│   ├── appearance-service.ts
+│   ├── theme-types.ts
+│   ├── theme-resolver.ts
 │   ├── window-chrome.ts
 │   ├── window-manager.ts
 │   ├── window-facade.ts
@@ -118,6 +126,7 @@ src/
 │   ├── content-measurement.ts
 │   ├── editor-service.ts
 │   ├── figlet-service.ts
+│   ├── animation-service.ts
 │   ├── workspace-service.ts
 │   ├── workspace-ui.ts
 │   ├── file-actions.ts
@@ -130,11 +139,13 @@ src/
 │   ├── backrooms-service.ts
 │   ├── chrome-browser-service.ts
 │   ├── brave-search-service.ts
-│   └── youtube-transcript-service.ts
+│   ├── youtube-transcript-service.ts
+│   └── pi-theme-adapter.ts
 ├── windows/
 │   ├── text-windows.ts
 │   ├── content-windows.ts
 │   ├── figlet-windows.ts
+│   ├── animation-windows.ts
 │   ├── terminal-windows.ts
 │   ├── backrooms-windows.ts
 │   ├── wibwob-agent-window.ts
@@ -188,10 +199,14 @@ window-specific behavior.
 
 Startup contract:
 
-- on boot, try to restore the default workspace first
-- optionally later support a last-used-workspace pointer
+- on boot, try to restore `scratch/workspaces/default.json` first
+- optionally support a last-used-workspace pointer once the workspace layer has
+  a stable place to persist it
 - only fall back to opening a bare minimum desktop surface such as Scramble if
-  no default workspace exists or the workspace cannot be loaded
+  no workspace exists or the workspace cannot be loaded
+- workspace save/quit flows may later auto-save into `default.json`, but that
+  behavior should live in the workspace system rather than inside ad hoc boot
+  code
 
 ### `src/core/config.ts`
 
@@ -214,6 +229,36 @@ Target note:
 
 Desktop-relative width, height, and cell-aspect service. All layout math should
 flow through here.
+
+### `src/core/appearance-service.ts`
+
+Owns global appearance mode and theme variant selection.
+
+Target contract:
+
+- supports `system`, `light`, and `dark` appearance modes
+- supports app-level theme variants such as `wibwob-tv`, `monochrome`, or future
+  presets
+- resolves the active semantic token set for the current session
+- broadcasts appearance changes so all open windows can restyle without
+  bespoke per-window toggles
+
+### `src/core/theme-types.ts`
+
+Canonical semantic token vocabulary for the app.
+
+Target rule:
+
+- no window or service should treat raw blessed colors as the source of truth
+- text, background, border, selection, emphasis, warning, success, and desktop
+  colors should be defined as semantic roles first
+- external theme formats are adapters into this vocabulary, not the canonical
+  source
+
+### `src/core/theme-resolver.ts`
+
+Compiles semantic theme tokens into concrete renderer-ready styles for blessed
+and other in-process consumers.
 
 ### `src/core/window-chrome.ts`
 
@@ -301,9 +346,30 @@ Owns text-buffer mutation and rendering helpers for the native editor surface.
 
 Owns figlet font catalog, rendering, and measurement.
 
+### `src/services/animation-service.ts`
+
+Owns ASCII animation parsing, timing, playback state, and frame composition.
+
+Target contract:
+
+- supports pre-rendered frame files with explicit frame separators and playback
+  rate metadata
+- supports live-rendered animation sources for math/generative views
+- exposes frame dimensions, frame count, fps, loop mode, and current playback
+  state as semantic metadata
+- composes overlays such as figlet banners or subtitle/karaoke text without
+  every animated window reimplementing timing and repaint rules
+
 ### `src/services/workspace-service.ts`
 
 Named workspace save/load persistence and file-system bookkeeping.
+
+Target note:
+
+- this service should own the default-workspace convention and any future
+  last-used-workspace pointer
+- boot restore should ask this service for the startup workspace decision
+  instead of probing files ad hoc from the controller
 
 ### `src/services/workspace-ui.ts`
 
@@ -362,10 +428,10 @@ Search integration service used by browser/agent flows.
 
 Transcript extraction service used by browser/agent flows.
 
-### `src/services/chat-service.ts`
+### `src/services/pi-theme-adapter.ts`
 
-Legacy synthetic Wib/Wob chat helpers for the older non-agent chat surface.
-Compatibility-only until explicitly retired.
+Imports and exports Pi-style theme JSON as an adapter over the app's native
+semantic token model. This is an integration surface, not the source of truth.
 
 ### `src/windows/text-windows.ts`
 
@@ -379,6 +445,18 @@ content-heavy panes.
 ### `src/windows/figlet-windows.ts`
 
 Factories for figlet/banner-related windows and pickers.
+
+### `src/windows/animation-windows.ts`
+
+Factories for frame-based and live-rendered ASCII animation windows.
+
+Target note:
+
+- this family should cover both pre-baked frame movies such as donut-style
+  `----`-delimited frame files and live animation generators
+- animation playback should be a first-class window type, not hidden inside
+  miscellaneous art/demo windows
+- minimalist chrome variants are acceptable here when the content is the focus
 
 ### `src/windows/terminal-windows.ts`
 
@@ -438,7 +516,7 @@ The finished app should be understandable as five subsystems.
 
 ### 1. Shell
 
-Menu bar, desktop, overlays, window manager, geometry, and theme.
+Menu bar, desktop, overlays, window manager, geometry, appearance, and theme.
 
 ### 2. Command Surface
 
@@ -454,6 +532,13 @@ control.
 
 Viewer/editor/file-manager/browser/figlet/primer systems plus measurement and
 rendering.
+
+Animation belongs here too:
+
+- frame-file ASCII movies
+- live-generated ASCII animation
+- figlet/subtitle overlays on animated content
+- future concrete-poetry / karaoke-style timed text layers
 
 ### 5. Persistence Surface
 
@@ -487,6 +572,16 @@ These are the checks that turn architectural intent into something enforceable.
 - state details should become more structured where windows are first-class
   long-lived surfaces
 
+### Theme/appearance contract
+
+- appearance mode is global and should support `system`, `light`, and `dark`
+- windows consume semantic tokens, not ad hoc color literals
+- renderer-facing blessed styles should be compiled from the theme resolver
+- external theme formats such as Pi theme JSON should be adapters, not the
+  canonical app theme model
+- no new inline blessed style literals should be introduced when a semantic
+  token already exists
+
 ### Test contract
 
 Before a seam is treated as stable, it should have spike-local coverage:
@@ -495,6 +590,8 @@ Before a seam is treated as stable, it should have spike-local coverage:
 - state service: schema and key fields
 - workspace snapshots: round-trip restore
 - window manager: focus/drag/resize/layout behavior
+- animation service: frame parsing, fps playback timing, and overlay
+  composition behavior
 
 ## What This Architecture Rejects
 

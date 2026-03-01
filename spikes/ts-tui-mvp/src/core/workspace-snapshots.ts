@@ -99,7 +99,6 @@ export interface WorkspaceRestoreActions {
   openBrowserReaderWindow: (filePath?: string) => void;
   openFigletWindow: (text: string, font: string) => void;
   openPatternWindow: () => void;
-  openOrbitWindow: () => void;
   openGlitchWindow: () => void;
   openWibWobChatWindow: (restore?: {
     transcriptLines?: string[];
@@ -148,9 +147,6 @@ export function restoreWindowSnapshot(snapshot: WindowSnapshot, actions: Workspa
       break;
     case "pattern":
       actions.openPatternWindow();
-      break;
-    case "orbit":
-      actions.openOrbitWindow();
       break;
     case "glitch":
       actions.openGlitchWindow();

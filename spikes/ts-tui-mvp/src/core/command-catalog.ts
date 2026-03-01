@@ -330,20 +330,12 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     palettePlacement: { order: 60 }
   },
   {
-    id: "orbit.open",
-    label: "Orbit Window",
-    group: "surface",
-    actionKey: "openOrbitWindow",
-    menuPlacements: [{ category: "applications", order: 90 }],
-    palettePlacement: { order: 70 }
-  },
-  {
     id: "glitch.open",
     label: "Glitch FX",
     group: "surface",
     actionKey: "openGlitchWindow",
-    menuPlacements: [{ category: "applications", order: 100 }],
-    palettePlacement: { order: 80, label: "Open Glitch FX Window" }
+    menuPlacements: [{ category: "applications", order: 90 }],
+    palettePlacement: { order: 70, label: "Open Glitch FX Window" }
   },
   {
     id: "companion.open",
@@ -358,8 +350,8 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     label: "Workspace Manager",
     group: "surface",
     actionKey: "openWorkspaceManager",
-    menuPlacements: [{ category: "applications", order: 150 }],
-    palettePlacement: { order: 130 },
+    menuPlacements: [{ category: "applications", order: 140 }],
+    palettePlacement: { order: 120 },
     contextMenu: { desktop: true, order: 40 }
   },
   {
@@ -375,21 +367,21 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     group: "inspect",
     actionKey: "openStateInspector",
     menuPlacements: [{ category: "view", order: 20 }],
-    palettePlacement: { order: 170 }
+    palettePlacement: { order: 160 }
   },
   {
     id: "workspace.save",
     label: "Save Workspace",
     group: "save",
     actionKey: "saveWorkspace",
-    palettePlacement: { order: 180 }
+    palettePlacement: { order: 170 }
   },
   {
     id: "workspace.load",
     label: "Load Workspace",
     group: "save",
     actionKey: "loadWorkspace",
-    palettePlacement: { order: 190 }
+    palettePlacement: { order: 180 }
   }
 ];
 

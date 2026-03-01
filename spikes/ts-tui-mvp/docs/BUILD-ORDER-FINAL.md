@@ -87,7 +87,7 @@ The keystone. Nothing else should land on the god class.
 **Must build:**
 - `WindowTypeModule<TState>` interface: create, serialize, restore, describe
 - `WindowTypeRegistry` map: slug → module
-- Extract 3 pilot types: primer viewer, orbit/pattern, buffered terminal
+- Extract 3 pilot types: primer viewer, pattern, buffered terminal
 - Registry-backed spawn replacing controller switch
 - Registry-backed workspace restore replacing controller switch
 - Menu/palette entries generated from registry metadata
@@ -246,7 +246,7 @@ a command name or state shape becomes a backward-compat obligation.
 - `AnimatedView` base: timer → compute → render cycle
 - `CellBuffer`: 2D character grid with colour per cell
 - Palette system: shared colour definitions across views
-- 3-4 pilot ports: Game of Life (simplest), orbit, snake, verse
+- 3-4 pilot ports: Game of Life (simplest), snake, verse, frame-file animation
 
 **Defer:** Monster ecosystem, contour map, generative lab, Micropolis.
 
