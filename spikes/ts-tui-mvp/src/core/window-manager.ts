@@ -4,6 +4,7 @@ import type { WindowFacade } from "./window-facade.js";
 import type { Box, DragState, ResizeState, WindowKind, WindowRecord } from "./types.js";
 
 export type EditorWriteHook = (id: number, text: string) => boolean;
+export type EditorSaveHook = (id: number, filePath: string) => string;
 
 export class WindowManager implements WindowFacade {
   private readonly windows: WindowRecord[] = [];

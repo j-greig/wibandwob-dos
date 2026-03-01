@@ -32,6 +32,7 @@ import type {
 import { contentToWindowSize, getChromeModeForWindow } from "./window-chrome.js";
 import { WindowManager } from "./window-manager.js";
 import { BackroomsService } from "../services/backrooms-service.js";
+import { openBackroomsLogBrowserWindow } from "../windows/backrooms-log-browser-window.js";
 import { measurePlainTextContent, measurePrimerContent, type ContentMeasurement } from "../services/content-measurement.js";
 import { ControlApiService } from "../services/control-api.js";
 import { ContentService } from "../services/content-service.js";
@@ -761,6 +762,21 @@ export class TsTuiMvpApp {
     this.syncState();
   }
 
+  private openBackroomsLogBrowserWindow(): void {
+    const logsDir = path.join(REPO_ROOT, "logs", "backrooms-tv");
+    openBackroomsLogBrowserWindow({
+      screen: this.screen,
+      windowManager: this.windowManager,
+      logsDir,
+      onOpenReplay: (logPath, theme) => {
+        this.openBackroomsTv({ theme, model: "sonnet", turns: 0, mode: "fake-live", primers: logPath });
+      },
+      onSaveSnippet: (title, content) => {
+        this.openEditorWindow(undefined, title, content);
+      }
+    });
+  }
+
   private promptForBackroomsTv(): void {
     const defaults: BackroomsChannel = {
       theme: "liminal fluorescent maze",
@@ -1352,9 +1368,10 @@ export class TsTuiMvpApp {
       liveStderrBytes,
       lastActivityMsAgo: Math.max(0, Date.now() - lastActivityAt),
       uptimeMs: Math.max(0, Date.now() - startTime),
-      contentPreview: transcript.getContent().split("\n").slice(-12).join("\n"),
+      contentPreview: transcript.getContent().split("\n").slice(-40).join("\n"),
       transcriptLineCount: transcript.getContent().split("\n").filter(Boolean).length
     });
+    frame.captureText = () => transcript.getContent();
     frame.focus = () => {
       this.windowManager.focusWindow(frame);
       transcript.focus();
@@ -1971,6 +1988,7 @@ export class TsTuiMvpApp {
         const mode = typeof args?.mode === "string" && ["auto", "live", "fake-live"].includes(args.mode) ? args.mode as "auto" | "live" | "fake-live" : "auto";
         this.openBackroomsTv({ theme, model, turns, mode, primers: "" });
       },
+      openBackroomsLogBrowser: () => this.openBackroomsLogBrowserWindow(),
       tileWindows: () => this.windowManager.tileWindows(),
       cascadeWindows: () => this.windowManager.cascadeWindows(),
       openGallery: () => this.openPrimerGalleryWindow(),

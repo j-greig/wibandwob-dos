@@ -270,6 +270,20 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     api: true,
     agent: true
   },
+  {
+    id: "backrooms.log_browser",
+    label: "Backrooms Log Browser",
+    group: "surface",
+    actionKey: "openBackroomsLogBrowser",
+    description: "Browse and preview backrooms TV log files. Two-pane view with list and live preview.",
+    menuPlacements: [
+      { category: "view", order: 20 },
+      { category: "tools", order: 5, label: "Backrooms Logs" }
+    ],
+    palettePlacement: { order: 5 },
+    api: true,
+    agent: true
+  },
 
   {
     id: "window.tile",
