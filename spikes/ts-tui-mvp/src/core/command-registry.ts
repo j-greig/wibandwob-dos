@@ -4,10 +4,12 @@ import {
   listAppCommands,
   type AppCommandCategory,
   type AppCommandDescriptor,
+  type MenuContext,
 } from "./command-catalog.js";
 import type { AppMenuActions } from "./menu-config.js";
 import type { MenuConfig, MenuItem } from "./types.js";
 
+export type { MenuContext };
 export type CommandSurface = "menu" | "palette" | "api" | "agent";
 
 export interface CommandListItem {
@@ -55,6 +57,34 @@ export class CommandRegistry {
     const action = this.actions[command.actionKey] as (args?: Record<string, unknown>) => void;
     action(args);
     return { ok: true };
+  }
+
+  /** Return context-menu items for the given context, sorted by order. */
+  contextMenuItems(ctx: MenuContext): MenuItem[] {
+    return this.commands
+      .filter((cmd) => {
+        const cm = cmd.contextMenu;
+        if (!cm) return false;
+        const hasWindow = !!ctx.focusedWindow;
+        // Desktop-level commands show when no window focused,
+        // or when focused but no windowKinds restriction (global commands like tile/cascade)
+        if (cm.desktop && !hasWindow) return true;
+        if (cm.desktop && hasWindow && !cm.windowKinds) return true;
+        // Window-kind-specific commands
+        if (cm.windowKinds && hasWindow && cm.windowKinds.includes(ctx.focusedWindow!.kind)) {
+          return true;
+        }
+        return false;
+      })
+      .filter((cmd) => {
+        const cm = cmd.contextMenu!;
+        return cm.enabled ? cm.enabled(ctx) : true;
+      })
+      .sort((a, b) => (a.contextMenu!.order ?? 0) - (b.contextMenu!.order ?? 0))
+      .map((cmd) => ({
+        label: cmd.contextMenu!.label ?? cmd.label,
+        action: () => { this.run(cmd.id); }
+      }));
   }
 
   createMenuItems(ids: string[]): MenuItem[] {

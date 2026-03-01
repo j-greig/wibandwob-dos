@@ -7,7 +7,7 @@ import { spawn as spawnPty, type IPty as BunPtyTerminal, type IExitEvent as BunP
 
 import { CONTROL_API_PORT, MASTER_PHILOSOPHY_PATH, README_PATH, REPO_ROOT, SPIKE_NOTES_PATH, SPIKE_ROOT, STATE_PATH, WORKSPACES_DIR } from "./config.js";
 import { CommandRegistry } from "./command-registry.js";
-import { createSystemContextMenuItems, createWindowContextMenuItems } from "./context-menu-items.js";
+import { buildDesktopContextMenu, buildWindowContextMenu } from "./context-menu-items.js";
 import { DesktopGeometryService } from "./desktop-geometry.js";
 import { type AppMenuActions } from "./menu-config.js";
 import { MenuOverlayManager } from "./menu-overlay-manager.js";
@@ -304,18 +304,7 @@ export class TsTuiMvpApp {
 
   private openWindowContextMenu(window: WindowRecord, x?: number, y?: number): void {
     this.openPopupMenu(
-      createWindowContextMenuItems(window, {
-        commandItems: this.commands.createMenuItems([
-          "window.tile",
-          "window.cascade"
-        ]),
-        saveEditor: window.kind === "editor" ? () => this.saveEditor(window) : undefined,
-        saveAsEditor: window.kind === "editor" ? () => {
-          // Focus the window first, then use the shared Save As logic
-          window.focus();
-          this.saveAsFocusedEditor();
-        } : undefined,
-      }),
+      buildWindowContextMenu(window, this.commands),
       x,
       y
     );
@@ -323,21 +312,7 @@ export class TsTuiMvpApp {
 
   private openSystemContextMenu(x?: number, y?: number): void {
     this.openPopupMenu(
-      createSystemContextMenuItems({
-        openPrimerBrowser: () => this.openPrimerBrowserWindow(),
-        openTextFile: () => this.promptForEditorPath(),
-        openBackrooms: () => this.promptForBackroomsTv(),
-        commandItems: this.commands.createMenuItems([
-          "terminal.open_xterm",
-          "browser.open_chrome",
-          "chat.open_wibwob",
-          "agent.open_wibwob",
-          "window.tile",
-          "window.cascade"
-        ]),
-        openPiChat: () => void this.openPiChatWindow(),
-        openWorkspaceManager: () => this.openWorkspaceManagerWindow(),
-      }),
+      buildDesktopContextMenu(this.commands),
       x,
       y
     );

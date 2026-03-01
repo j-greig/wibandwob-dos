@@ -1,10 +1,22 @@
+/**
+ * Context menu adapter — thin layer over the command registry.
+ *
+ * Does NOT own command definitions, labels, or visibility logic.
+ * The catalog owns that. This file only:
+ *   1. Builds a MenuContext from the current state
+ *   2. Asks the registry for applicable commands
+ *   3. Prepends/appends truly local items (file-path actions, close)
+ */
+
 import { execSync } from "node:child_process";
+import type { CommandRegistry, MenuContext } from "./command-registry.js";
 import type { MenuItem, WindowRecord } from "./types.js";
+
+// ── File-path actions (local, not commands) ─────────────────────
 
 /**
  * Reusable file-path context menu items.
- * Use on any widget that displays a file path — log browser header,
- * editor title bar, primer viewer, etc.
+ * These are per-instance actions (specific file), not app commands.
  */
 export function createFilePathMenuItems(filePath: string): MenuItem[] {
   const items: MenuItem[] = [
@@ -17,7 +29,7 @@ export function createFilePathMenuItems(filePath: string): MenuItem[] {
           } else {
             execSync(`printf '%s' ${JSON.stringify(filePath)} | xclip -selection clipboard 2>/dev/null || printf '%s' ${JSON.stringify(filePath)} | xsel --clipboard 2>/dev/null`);
           }
-        } catch { /* clipboard not available — silent fail */ }
+        } catch { /* clipboard not available */ }
       }
     }
   ];
@@ -32,46 +44,44 @@ export function createFilePathMenuItems(filePath: string): MenuItem[] {
   return items;
 }
 
-export interface SystemContextActions {
-  openPrimerBrowser: () => void;
-  openTextFile: () => void;
-  openBackrooms: () => void;
-  openPiChat: () => void;
-  openWorkspaceManager: () => void;
-  commandItems: MenuItem[];
-}
+// ── Context menu builders ───────────────────────────────────────
 
-export function createWindowContextMenuItems(
+/** Build context menu for a right-click on a window frame. */
+export function buildWindowContextMenu(
   window: WindowRecord,
-  actions: {
-    commandItems: MenuItem[];
-    saveEditor?: () => void;
-    saveAsEditor?: () => void;
-  }
+  registry: CommandRegistry
 ): MenuItem[] {
+  const ctx: MenuContext = {
+    focusedWindow: {
+      kind: window.kind ?? "unknown",
+      filePath: window.filePath,
+      title: window.title
+    },
+    selection: window.filePath ? "file" : "none"
+  };
+
   const items: MenuItem[] = [
     { label: `Focus ${window.title}`, action: () => window.focus() },
   ];
-  if (window.kind === "editor" && actions.saveEditor) {
-    items.push({ label: "Save", action: actions.saveEditor });
-  }
-  if (window.kind === "editor" && actions.saveAsEditor) {
-    items.push({ label: "Save As...", action: actions.saveAsEditor });
-  }
+
+  // Registry-derived commands for this window kind
+  items.push(...registry.contextMenuItems(ctx));
+
+  // File-path actions (per-instance, not in registry)
   if (window.filePath) {
     items.push(...createFilePathMenuItems(window.filePath));
   }
-  items.push(...actions.commandItems, { label: "Close Window", action: () => window.close() });
+
+  // Close is always last — direct window action, not a command
+  items.push({ label: "Close Window", action: () => window.close() });
+
   return items;
 }
 
-export function createSystemContextMenuItems(actions: SystemContextActions): MenuItem[] {
-  return [
-    { label: "Open Primer Browser", action: actions.openPrimerBrowser },
-    { label: "Open Text File", action: actions.openTextFile },
-    { label: "Open Backrooms TV", action: actions.openBackrooms },
-    { label: "Open Workspace Manager", action: actions.openWorkspaceManager },
-    ...actions.commandItems,
-    { label: "Open Pi Terminal (Legacy)", action: actions.openPiChat }
-  ];
+/** Build context menu for a right-click on the desktop background. */
+export function buildDesktopContextMenu(
+  registry: CommandRegistry
+): MenuItem[] {
+  const ctx: MenuContext = { selection: "none" };
+  return registry.contextMenuItems(ctx);
 }

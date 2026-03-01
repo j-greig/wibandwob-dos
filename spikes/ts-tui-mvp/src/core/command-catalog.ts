@@ -23,6 +23,26 @@ export interface PalettePlacement {
   label?: string;
 }
 
+/** Context passed to context-menu visibility checks. */
+export interface MenuContext {
+  focusedWindow?: { kind: string; filePath?: string; title?: string };
+  selection?: "file" | "url" | "none";
+}
+
+/** Coarse context-menu visibility. */
+export interface ContextMenuPlacement {
+  /** Show when these window kinds are focused. Empty/undefined = desktop only. */
+  windowKinds?: string[];
+  /** Show on desktop right-click (no window focused). */
+  desktop?: boolean;
+  /** Fine-grained check. Return false to hide even when coarse match passes. */
+  enabled?: (ctx: MenuContext) => boolean;
+  /** Override label in context menu. */
+  label?: string;
+  /** Sort order within context menu. */
+  order?: number;
+}
+
 export interface AppCommandDefinition {
   id: string;
   label: string;
@@ -31,6 +51,7 @@ export interface AppCommandDefinition {
   description?: string;
   menuPlacements?: MenuPlacement[];
   palettePlacement?: PalettePlacement;
+  contextMenu?: ContextMenuPlacement;
   api?: boolean;
   agent?: boolean;
 }
@@ -50,6 +71,7 @@ export interface AppCommandDescriptor {
   description?: string;
   menuPlacements: MenuPlacement[];
   palettePlacement?: PalettePlacement;
+  contextMenu?: ContextMenuPlacement;
   api: boolean;
   agent: boolean;
 }
@@ -89,14 +111,16 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     label: "Open Primer...",
     group: "open",
     actionKey: "openPrimerPrompt",
-    menuPlacements: [{ category: "file", order: 20 }]
+    menuPlacements: [{ category: "file", order: 20 }],
+    contextMenu: { desktop: true, order: 10 }
   },
   {
     id: "file.open_text_file_prompt",
     label: "Open Text File...",
     group: "open",
     actionKey: "openTextFilePrompt",
-    menuPlacements: [{ category: "file", order: 30 }]
+    menuPlacements: [{ category: "file", order: 30 }],
+    contextMenu: { desktop: true, order: 20 }
   },
   {
     id: "file.new_text_buffer",
@@ -111,7 +135,8 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     group: "save",
     actionKey: "saveFocusedEditor",
     menuPlacements: [{ category: "file", order: 50 }],
-    palettePlacement: { order: 50 }
+    palettePlacement: { order: 50 },
+    contextMenu: { windowKinds: ["editor"], order: 10 }
   },
   {
     id: "file.save_as",
@@ -119,7 +144,8 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     group: "save",
     actionKey: "saveAsFocusedEditor",
     menuPlacements: [{ category: "file", order: 60 }],
-    palettePlacement: { order: 60 }
+    palettePlacement: { order: 60 },
+    contextMenu: { windowKinds: ["editor"], order: 20 }
   },
   {
     id: "workspace.save_as",
@@ -162,6 +188,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
       { category: "tools", order: 140, label: "XTerm Shell" }
     ],
     palettePlacement: { order: 110 },
+    contextMenu: { desktop: true, order: 50 },
     api: true,
     agent: true
   },
@@ -176,6 +203,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
       { category: "tools", order: 40, label: "Chrome Browser" }
     ],
     palettePlacement: { order: 120 },
+    contextMenu: { desktop: true, order: 60 },
     api: true,
     agent: true
   },
@@ -189,6 +217,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
       { category: "tools", order: 100, label: "Wib&Wob Chat" }
     ],
     palettePlacement: { order: 130 },
+    contextMenu: { desktop: true, order: 70 },
     api: true,
     agent: true
   },
@@ -202,6 +231,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
       { category: "tools", order: 110, label: "Wib&Wob Agent" }
     ],
     palettePlacement: { order: 140 },
+    contextMenu: { desktop: true, order: 80 },
     api: true,
     agent: true
   },
@@ -214,7 +244,8 @@ const APP_COMMANDS: AppCommandDefinition[] = [
       { category: "file", order: 150 },
       { category: "tools", order: 150, label: "Pi Terminal (Legacy)" }
     ],
-    palettePlacement: { order: 150 }
+    palettePlacement: { order: 150 },
+    contextMenu: { desktop: true, order: 90 }
   },
   {
     id: "app.quit",
@@ -256,6 +287,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
       { category: "tools", order: 0, label: "Backrooms TV" }
     ],
     palettePlacement: { order: 0 },
+    contextMenu: { desktop: true, order: 30 },
     api: true,
     agent: true
   },
@@ -292,6 +324,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     actionKey: "tileWindows",
     menuPlacements: [{ category: "window", order: 10 }],
     palettePlacement: { order: 10 },
+    contextMenu: { desktop: true, order: 100 },
     api: true,
     agent: true
   },
@@ -302,6 +335,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     actionKey: "cascadeWindows",
     menuPlacements: [{ category: "window", order: 20 }],
     palettePlacement: { order: 20 },
+    contextMenu: { desktop: true, order: 110 },
     api: true,
     agent: true
   },
@@ -389,7 +423,8 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     group: "surface",
     actionKey: "openWorkspaceManager",
     menuPlacements: [{ category: "tools", order: 130 }],
-    palettePlacement: { order: 130 }
+    palettePlacement: { order: 130 },
+    contextMenu: { desktop: true, order: 40 }
   },
   {
     id: "palette.open",
@@ -438,6 +473,7 @@ export function listAppCommands(): AppCommandDescriptor[] {
     description: command.description,
     menuPlacements: [...(command.menuPlacements ?? [])],
     palettePlacement: command.palettePlacement,
+    contextMenu: command.contextMenu,
     api: command.api ?? false,
     agent: command.agent ?? false
   }));
