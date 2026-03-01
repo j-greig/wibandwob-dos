@@ -42,7 +42,7 @@ import { deleteBackward as deleteEditorBackwardState, deleteForward as deleteEdi
 import { StateService } from "../services/state-service.js";
 import { TerminalBuffer } from "../services/terminal-buffer.js";
 import { renderTerminalBuffer } from "../services/terminal-renderer.js";
-import { WibWobChatService } from "../services/wibwob-chat-service.js";
+// WibWobChatService removed — plain chat now uses WibWobAgentSession with tools="none"
 import { promptForWorkspaceLoad, promptForWorkspaceSave } from "../services/workspace-ui.js";
 import { WorkspaceService } from "../services/workspace-service.js";
 import {
@@ -69,7 +69,7 @@ import {
   openWorkspaceManagerWindow as openWorkspaceCommandWindow
 } from "../windows/misc-windows.js";
 import { openEditorWindow as openTextEditorWindow } from "../windows/text-windows.js";
-import { openWibWobChatWindow as openNativeWibWobChatWindow } from "../windows/wibwob-chat-window.js";
+// wibwob-chat-window.ts removed — both chat types use wibwob-agent-window.ts
 import { type TuiToolContext } from "../services/agent-tools.js";
 import { WibWobAgentSession } from "../services/wibwob-agent-session.js";
 import { openChromeBrowserWindow } from "../windows/chrome-browser-window.js";
@@ -87,7 +87,7 @@ export class TsTuiMvpApp {
   private readonly backrooms = new BackroomsService();
   private readonly content = new ContentService();
   private readonly pi = new PiService();
-  private readonly wibwobChat = new WibWobChatService();
+  // wibwobChat field removed — plain chat uses WibWobAgentSession with tools="none"
   private readonly workspace = new WorkspaceService(WORKSPACES_DIR);
   private readonly geometry: DesktopGeometryService;
   private readonly state: StateService;
@@ -379,22 +379,18 @@ export class TsTuiMvpApp {
     });
   }
 
-  private openWibWobChatWindow(restore?: {
+  private openWibWobChatWindow(_restore?: {
     transcriptLines?: string[];
     draft?: string;
     messages?: unknown;
   }): void {
-    const session = this.wibwobChat.createSession(REPO_ROOT);
-    openNativeWibWobChatWindow({
+    // Plain chat = agent session with no tools
+    const session = new WibWobAgentSession(null, REPO_ROOT, "none");
+    openNativeWibWobAgentWindow({
       screen: this.screen,
       windowManager: this.windowManager,
-      chat: session,
-      restore: {
-        draft: restore?.draft,
-        messages: Array.isArray(restore?.messages)
-          ? restore.messages.filter((message): message is ChatMessageEntry => this.isChatMessageEntry(message))
-          : undefined
-      }
+      agent: session,
+      title: "Wib&Wob Chat",
     });
   }
 
@@ -1989,18 +1985,6 @@ export class TsTuiMvpApp {
       animated: entry.metadata?.animated ?? false,
       frame_count: entry.metadata?.frameCount ?? 1
     };
-  }
-
-  private isChatMessageEntry(value: unknown): value is ChatMessageEntry {
-    if (!value || typeof value !== "object") {
-      return false;
-    }
-    const entry = value as Record<string, unknown>;
-    return (
-      typeof entry.id === "string" &&
-      (entry.role === "system" || entry.role === "user" || entry.role === "assistant" || entry.role === "status") &&
-      typeof entry.text === "string"
-    );
   }
 
   private writeEditorTextById(id: number, text: string): boolean {

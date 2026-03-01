@@ -180,20 +180,20 @@ interface AgentSnapshot {
 
 type Listener = (snapshot: AgentSnapshot) => void;
 
-function loadAgentSystemPrompt(): string {
-  const base = (() => {
-    try {
-      return fs.readFileSync(SPIKE_PI_APPEND_SYSTEM_PATH, "utf8").trim();
-    } catch {
-      return [
-        "You are Wib & Wob, a two-voice assistant inside WibWob-DOS.",
-        "Keep replies concise, helpful, and written as Wib: / Wob: dialog when natural."
-      ].join("\n\n");
-    }
-  })();
+function loadBasePrompt(): string {
+  try {
+    return fs.readFileSync(SPIKE_PI_APPEND_SYSTEM_PATH, "utf8").trim();
+  } catch {
+    return [
+      "You are Wib & Wob, a two-voice assistant inside WibWob-DOS.",
+      "Keep replies concise, helpful, and written as Wib: / Wob: dialog when natural."
+    ].join("\n\n");
+  }
+}
 
+function loadAgentSystemPrompt(): string {
   return [
-    base,
+    loadBasePrompt(),
     "",
     "You have TUI tools that let you see and control the desktop.",
     "You also have standard coding tools: read, write, edit, bash, grep, find, ls.",
@@ -203,6 +203,10 @@ function loadAgentSystemPrompt(): string {
     "Use read, write, edit, bash for file operations — no need to use the terminal for these.",
     "You can open terminals, run commands, open primers, arrange windows.",
   ].join("\n");
+}
+
+function loadChatSystemPrompt(): string {
+  return loadBasePrompt();
 }
 
 function resolveModel(params: {
@@ -235,15 +239,19 @@ export class WibWobAgentSession {
   private lastToolName?: string;
   private readonly sessionId = createMessageId("wibwob-agent");
 
+  /** tools: "full" = TUI + coding tools, "none" = plain LLM chat */
   constructor(
-    private readonly tuiContext: TuiToolContext,
-    private readonly cwd: string = REPO_ROOT
+    private readonly tuiContext: TuiToolContext | null,
+    private readonly cwd: string = REPO_ROOT,
+    private readonly toolMode: "full" | "none" = "full"
   ) {}
 
   async initialize(): Promise<void> {
     if (this.agent) return;
 
-    this.status = "Starting agent with TUI tools...";
+    this.status = this.toolMode === "full"
+      ? "Starting agent with TUI tools..."
+      : "Starting chat...";
     this.emit();
 
     try {
@@ -256,36 +264,45 @@ export class WibWobAgentSession {
         throw new Error("No model available. Check provider auth.");
       }
 
-      const tuiTools = createTuiTools(this.tuiContext);
-      const codingTools = createJailedCodingTools(REPO_ROOT);
-      const tools = [...tuiTools, ...codingTools];
+      const tools = this.toolMode === "full" && this.tuiContext
+        ? [...createTuiTools(this.tuiContext), ...createJailedCodingTools(REPO_ROOT)]
+        : [];
+
+      const systemPrompt = this.toolMode === "full"
+        ? loadAgentSystemPrompt()
+        : loadChatSystemPrompt();
+
+      const transformContext = this.toolMode === "full" && this.tuiContext
+        ? async (messages: import("@mariozechner/pi-agent-core").AgentMessage[]) => {
+            const state = this.tuiContext!.getState();
+            const summary = formatDesktopSummary(state);
+            const stateMessage = {
+              role: "user" as const,
+              content: `[Current desktop state]\n${summary}`,
+              timestamp: Date.now(),
+            };
+            return [stateMessage, ...messages];
+          }
+        : undefined;
 
       this.agent = new Agent({
         initialState: {
-          systemPrompt: loadAgentSystemPrompt(),
+          systemPrompt,
           model: initial.model,
           thinkingLevel: initial.thinkingLevel,
           tools,
           messages: [],
         },
-        transformContext: async (messages) => {
-          // Inject desktop state as a user message at the start of context
-          const state = this.tuiContext.getState();
-          const summary = formatDesktopSummary(state);
-          const stateMessage = {
-            role: "user" as const,
-            content: `[Current desktop state]\n${summary}`,
-            timestamp: Date.now(),
-          };
-          return [stateMessage, ...messages];
-        },
+        transformContext,
         sessionId: this.sessionId,
         getApiKey: (provider) => authStorage.getApiKey(provider),
       });
 
       this.agent.subscribe((event) => this.handleEvent(event));
       this.ready = true;
-      this.status = `Ready. Tools: ${tools.length}. Model: ${initial.model.provider}/${initial.model.id}`;
+      this.status = tools.length > 0
+        ? `Ready. Tools: ${tools.length}. Model: ${initial.model.provider}/${initial.model.id}`
+        : `Ready. Model: ${initial.model.provider}/${initial.model.id}`;
       this.lastError = undefined;
       this.emit();
     } catch (error) {

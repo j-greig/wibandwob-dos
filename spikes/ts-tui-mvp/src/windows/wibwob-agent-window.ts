@@ -80,9 +80,10 @@ export function openWibWobAgentWindow(params: {
   screen: blessed.Widgets.Screen;
   windowManager: WindowManager;
   agent: WibWobAgentSession;
+  title?: string;
   initialPos?: { top: number; left: number; width: number; height: number };
 }): void {
-  const frame = params.windowManager.createFrame("Wib&Wob Agent", "chat");
+  const frame = params.windowManager.createFrame(params.title ?? "Wib&Wob Agent", "chat");
 
   // Restore position/size if reloading
   if (params.initialPos) {
