@@ -36,6 +36,8 @@ These define the substrate. Work here first.
   - current framework direction and work ordering
 - `018-command-registry-and-tool-adapter-prd.md`
   - command registry and adapter substrate
+- `020-target-architecture.md`
+  - canonical end-state TS app structure and module ownership
 - `spk-agent-window-enhancement.md`
   - native agent window direction
 - `refactor-epoch-plan.md`
@@ -159,6 +161,7 @@ These live outside the spike dir but directly drive spike work:
 | `017-framework-direction-and-today-plan.md` | Current framework direction: blessed shell, terminal-kit subsystem spike, Terminal.Gui as design teacher. | `active` |
 | `018-command-registry-and-tool-adapter-prd.md` | PRD for define-once commands projected into menu, palette, API, agent, and later MCP. Core registry path is proven; MCP/cleanup remain. | `partial` |
 | `019-context-sensitive-menu-bar-prd.md` | PRD for macOS-style context-sensitive menus. Context model, enabled predicates, and context-menu alignment are refined; implementation remains partial. | `partial` |
+| `020-target-architecture.md` | Canonical end-state architecture for the TS TUI app: source tree, subsystem boundaries, and file responsibilities. | `active` |
 | `BUILD-ORDER-FINAL.md` | Preferred sequencing for the broader TS rebuild. | `active` |
 | `BUILD-ORDER.md` | Older build order document superseded by the final version. | `stale` |
 | `INDEX.md` | Deleted. Superseded by this file (`000-docs-overview.md`). | `deleted` |
