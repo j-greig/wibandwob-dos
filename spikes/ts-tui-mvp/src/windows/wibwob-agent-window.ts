@@ -80,8 +80,18 @@ export function openWibWobAgentWindow(params: {
   screen: blessed.Widgets.Screen;
   windowManager: WindowManager;
   agent: WibWobAgentSession;
+  initialPos?: { top: number; left: number; width: number; height: number };
 }): void {
   const frame = params.windowManager.createFrame("Wib&Wob Agent", "chat");
+
+  // Restore position/size if reloading
+  if (params.initialPos) {
+    const { top, left, width, height } = params.initialPos;
+    frame.frame.top = top;
+    frame.frame.left = left;
+    frame.frame.width = width;
+    frame.frame.height = height;
+  }
 
   // Top info bar — model + session ID on the right, Claude Code log link on the left
   const infoBar = blessed.box({
@@ -214,6 +224,24 @@ export function openWibWobAgentWindow(params: {
 
     if (key.name === "return" || key.name === "enter") {
       const text = draft.trim();
+      if (text === "/reload") {
+        draft = "";
+        renderInput();
+        params.screen.render();
+        // Close this window WITHOUT disposing the agent, then reopen with same session
+        unsubscribe();
+        frame.cleanup = undefined; // prevent dispose on close
+        const pos = {
+          top: Number(frame.frame.top),
+          left: Number(frame.frame.left),
+          width: Number(frame.frame.width),
+          height: Number(frame.frame.height),
+        };
+        frame.close();
+        const newFrame = openWibWobAgentWindow({ ...params, initialPos: pos });
+        void newFrame;
+        return;
+      }
       if (text) {
         draft = "";
         renderInput();
@@ -287,6 +315,8 @@ export function openWibWobAgentWindow(params: {
     unsubscribe();
     params.agent.dispose();
   };
+  // NOTE: on /reload we set frame.cleanup = undefined before calling frame.close()
+  // so the agent session is preserved across the reload.
 
   frame.writeInput = (text: string) => {
     void params.agent.send(text);

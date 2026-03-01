@@ -667,6 +667,15 @@ Extracted abstraction
     API visibility
     agent visibility
 
+  Full PRD already exists:
+  spikes/ts-tui-mvp/docs/018-command-registry-and-tool-adapter-prd.md
+
+  That doc defines CommandDefinition, CommandContext,
+  adapters for menu/palette/API/agent/MCP, a 5-phase
+  migration plan, and uses the file manager as the
+  reference implementation. Treat it as the canonical
+  plan for this problem.
+
 Future feature impact
   Directly blocks BUILD-ORDER step 4.
   Makes external agent integration unstable because
@@ -751,11 +760,30 @@ Shotgun surgery count
   likely a third when Pi/PTy chat parity is revisited.
 
 Extracted abstraction
-  ChatWindowView / TranscriptComposer with pluggable:
-    session adapter
-    message renderer
-    status renderer
-    input policy
+  Do not extract a separate ChatWindowView. Instead,
+  collapse wibwob-chat-window into wibwob-agent-window.
+
+  The "plain chat" window is just an agent window with
+  zero tools registered. WibWobAgentSession already
+  accepts tools via createTuiTools — pass an empty
+  array and you get a vanilla LLM chat. The session
+  class, event handling, transcript rendering, and
+  input plumbing are identical.
+
+  Concrete plan:
+    Remove wibwob-chat-window.ts entirely.
+    Remove WibWobChatSession (wibwob-chat-service.ts).
+    WibWobAgentSession gains a constructor option:
+      tools?: "full" | "none" (default "full")
+    "none" skips createTuiTools and createJailedCodingTools.
+    openWibWobChatWindow delegates to openWibWobAgentWindow
+    with tools: "none".
+    Menu entries, API routes, and restore paths collapse
+    from two branches to one with a tools flag.
+
+  This eliminates the duplication at source rather than
+  papering over it with a shared component. One session
+  class, one window factory, one restore path.
 
 Future feature impact
   Directly complicates
@@ -765,7 +793,8 @@ Future feature impact
   windows unless unified.
 
 Effort
-  1-2 days.
+  1 day (less than the shared-component approach
+  because it deletes code rather than extracting it).
 
 
 8. Content measurement and metadata mapping are still
