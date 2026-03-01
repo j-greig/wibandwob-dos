@@ -145,7 +145,51 @@ The top-level menu categories stay fixed: File, Edit, View, Window, Tools.
 Menu accelerators stay fixed: M-f, M-e, M-v, M-w, M-t. What changes is which
 items appear in each menu based on the focused window kind.
 
-#### CommandContext + enabled predicate
+#### MenuQueryContext: focus + selection + state
+
+The menu system evaluates commands against a context object that captures
+three dimensions: what window is focused, what is selected within it, and
+the overall desktop state.
+
+```typescript
+interface MenuQueryContext {
+  focusedKind?: WindowKind;
+  focusedWindow?: WindowRecord;
+  selection?: MenuSelection;
+  state?: DesktopState;
+}
+
+interface MenuSelection {
+  kind: "file" | "url" | "primer" | "window" | "text" | "none";
+  path?: string;        // file selections: absolute path
+  url?: string;         // url selections: full URL
+  windowId?: number;    // window selections: target window id
+  text?: string;        // text selections: selected content
+}
+```
+
+Selection is provided by the focused window. Each window kind knows what is
+"selected" within it:
+
+- File manager: the highlighted file entry (kind: "file", path)
+- Primer browser / gallery: the highlighted primer (kind: "primer", path)
+- Chrome browser: a link under cursor or the current URL (kind: "url", url)
+- Editor: selected text range if any (kind: "text", text)
+- Terminal: nothing typically (kind: "none")
+- Desktop / no focus: nothing (selection absent)
+
+Windows expose selection via an optional method on WindowRecord:
+
+```typescript
+// Added to WindowRecord interface
+getSelection?: () => MenuSelection | undefined;
+```
+
+This is NOT a second registry — it is per-window state, like `describeState()`
+or `captureText()`. The catalog still owns all command definitions. The window
+just reports what it has selected so that predicates can evaluate against it.
+
+#### CommandVisibility + enabled predicate
 
 Every command gains two new optional fields on `AppCommandDefinition`:
 
@@ -154,9 +198,9 @@ Every command gains two new optional fields on `AppCommandDefinition`:
 menuContexts?: CommandVisibility[];
 
 // Fine-grained predicate: is this command ENABLED right now?
-// Called on menu rebuild. Receives the focused window (if any).
+// Called on menu rebuild. Receives the full context.
 // If absent, command is enabled whenever visible.
-enabled?: (focused?: WindowRecord) => boolean;
+enabled?: (ctx: MenuQueryContext) => boolean;
 ```
 
 Where:
@@ -172,15 +216,90 @@ type CommandVisibility =
 Commands with no `menuContexts` default to `["always"]` for backward
 compatibility.
 
-The `enabled` predicate covers cases that `CommandVisibility` cannot:
+The `enabled` predicate receives the full `MenuQueryContext` including
+selection. This covers three classes of conditions:
 
-- Save is visible for all editors but enabled only when the editor is dirty
-- Browser Back is visible for all browsers but enabled only when history exists
-- Terminal Clear is visible for all terminals but enabled only when session is
-  live
+**Window state conditions:**
+- Save enabled only when editor is dirty
+- Browser Back enabled only when history exists
+- Terminal Clear enabled only when session is live
 
-This is the `validateMenuItem:` equivalent from macOS. It prevents the need for
-a second ad hoc validation layer.
+**Selection-dependent conditions:**
+- "Open" enabled when a file is selected in the file manager
+- "Open Link" enabled when a URL is selected in the browser
+- "Reveal in Finder" enabled when a file path is available
+- "Open in Editor" enabled when selection.kind is "file"
+- "Play Primer" enabled when selection.kind is "primer"
+
+**Desktop state conditions:**
+- "Tile Windows" enabled when more than one window is open
+
+This is the `validateMenuItem:` equivalent from macOS. The predicate receives
+everything it needs to make a decision. No second ad hoc validation layer.
+
+#### Command execution with context
+
+Commands that operate on the selection need access to it at execution time,
+not just validation time. The action signature widens:
+
+```typescript
+// AppMenuActions entries that need selection context
+openSelectedFile: (ctx: MenuQueryContext) => void;
+revealInFinder: (ctx: MenuQueryContext) => void;
+openSelectedLink: (ctx: MenuQueryContext) => void;
+```
+
+The registry passes context through when running:
+
+```typescript
+run(id: string, args?: Record<string, unknown>, ctx?: MenuQueryContext):
+  { ok: true } | { ok: false; error: string }
+```
+
+For backward compatibility, existing actions that take no arguments continue
+to work. Only new selection-aware actions receive the context.
+
+#### Example: selection-aware commands
+
+```typescript
+{
+  id: "selection.open_file",
+  label: "Open",
+  menuContexts: ["browser", "gallery"],  // file manager and gallery contexts
+  enabled: (ctx) => ctx.selection?.kind === "file" && !!ctx.selection.path,
+  actionKey: "openSelectedFile",
+  menuPlacements: [{ category: "file", order: 5 }],
+}
+
+{
+  id: "selection.reveal_in_finder",
+  label: "Reveal in Finder",
+  menuContexts: ["editor", "browser", "gallery"],
+  enabled: (ctx) =>
+    ctx.selection?.kind === "file" ||
+    ctx.focusedWindow?.filePath !== undefined,
+  actionKey: "revealInFinder",
+  menuPlacements: [{ category: "file", order: 6 }],
+}
+
+{
+  id: "selection.open_link",
+  label: "Open Link",
+  menuContexts: ["browser"],
+  enabled: (ctx) => ctx.selection?.kind === "url" && !!ctx.selection.url,
+  actionKey: "openSelectedLink",
+  menuPlacements: [{ category: "file", order: 7 }],
+}
+
+{
+  id: "selection.open_in_editor",
+  label: "Open in Editor",
+  menuContexts: ["browser", "gallery"],
+  enabled: (ctx) => ctx.selection?.kind === "file" && !!ctx.selection.path,
+  actionKey: "openSelectedFileInEditor",
+  menuPlacements: [{ category: "file", order: 8 }],
+}
+```
 
 #### Catalog changes
 
@@ -218,10 +337,7 @@ Every existing command gets tagged. Examples:
 ```typescript
 // command-registry.ts
 
-interface MenuQueryContext {
-  focusedKind?: WindowKind;
-  focusedWindow?: WindowRecord;
-}
+// MenuQueryContext is defined above in the design section
 
 buildMenusForContext(ctx: MenuQueryContext = {}): MenuConfig[] {
   return createMenuConfigsFromCatalog(this.actions, ctx);
@@ -233,9 +349,10 @@ buildMenus(): MenuConfig[] {
 }
 ```
 
-The catalog projection function filters commands:
+The catalog projection function filters commands in two passes:
 
 ```typescript
+// Pass 1: coarse visibility by focus kind
 function isVisibleInContext(
   command: AppCommandDescriptor,
   focusedKind?: WindowKind,
@@ -245,9 +362,22 @@ function isVisibleInContext(
     if (ctx === "always") return true;
     if (ctx === "desktop") return focusedKind === undefined;
     if (ctx === "focused-any") return focusedKind !== undefined;
-    return ctx === focusedKind;  // matches specific WindowKind
+    return ctx === focusedKind;
   });
 }
+
+// Pass 2: fine-grained enabled check (for greying out)
+function isEnabledInContext(
+  command: AppCommandDescriptor,
+  ctx: MenuQueryContext,
+): boolean {
+  if (!command.enabled) return true;
+  return command.enabled(ctx);
+}
+```
+
+Visibility controls whether the item appears at all. Enabled controls whether
+it is greyed out. Both are evaluated on the same `MenuQueryContext`.
 ```
 
 #### Menu rebuild trigger
@@ -257,20 +387,35 @@ function isVisibleInContext(
 
 private lastMenuContextKind?: WindowKind | "__none__";
 
+private buildCurrentMenuContext(): MenuQueryContext {
+  const focused = this.windowManager.getFocusedWindow();
+  return {
+    focusedKind: focused?.kind,
+    focusedWindow: focused,
+    selection: focused?.getSelection?.(),
+    state: this.state.getState(),
+  };
+}
+
 private refreshMenusForFocus(): void {
   const focused = this.windowManager.getFocusedWindow();
-  const kind = focused?.kind;
-  const key = kind ?? "__none__";
+  const key = focused?.kind ?? "__none__";
   if (key === this.lastMenuContextKind) return;
   this.lastMenuContextKind = key;
   this.menuUi.setMenus(
-    this.commands.buildMenusForContext({ focusedKind: kind, focusedWindow: focused })
+    this.commands.buildMenusForContext(this.buildCurrentMenuContext())
   );
 }
 ```
 
 Called from the window manager's focus-change callback. NOT called on every
 drag/resize/z-order change — only when the focused window's kind changes.
+
+Note: selection-dependent enabled states may change without a focus change
+(e.g. user highlights a different file in the file manager). For Phase 1 this
+is acceptable — enabled predicates re-evaluate on the next menu open. Phase 2
+could add a `selectionChanged` signal from windows to trigger re-evaluation,
+but that is not needed initially.
 
 #### MenuOverlayManager changes
 
@@ -379,6 +524,14 @@ input, window-specific menu commands map naturally to the same action handlers.
   C-s still saves regardless of whether Save is visible in the menu.
 - **Agent/API discoverability:** `tui_list_commands` returns global list by
   default. Context is opt-in filter parameter.
+- **Selection changes within a window:** Enabled predicates re-evaluate when
+  the menu is opened, not continuously. If a user selects a different file in
+  the file manager, the menu updates next time it is opened. No live polling.
+- **Windows without selection:** `getSelection()` returns undefined. Commands
+  with selection-dependent enabled predicates simply disable. No crash path.
+- **Selection across window types:** A command like "Reveal in Finder" checks
+  both `selection?.path` and `focusedWindow?.filePath` so it works for file
+  managers (selection) and editors (window-level file path).
 
 ## Testing
 
@@ -402,6 +555,18 @@ input, window-specific menu commands map naturally to the same action handlers.
   Test: open editor with no changes, verify Save visible but disabled
 - AC-10: Browser Navigate menu appears only when browser focused (Phase 2)
   Test: focus browser, verify Navigate in menu bar; focus editor, verify gone
+- AC-11: "Open" enabled only when file selected in file manager
+  Test: focus file manager with file highlighted, verify Open enabled;
+  focus file manager with directory highlighted, verify Open disabled
+- AC-12: "Open Link" enabled only when URL selected in browser
+  Test: focus browser with page loaded, verify Open Link reflects selection
+- AC-13: "Reveal in Finder" works for both file manager selection and editor filePath
+  Test: focus editor with saved file, verify Reveal enabled;
+  focus file manager with file selected, verify Reveal enabled;
+  focus art window, verify Reveal disabled
+- AC-14: Selection-aware commands receive context when executed
+  Test: select file in file manager, invoke "Open in Editor" via menu,
+  verify correct file opens in editor
 
 ## Risks
 
