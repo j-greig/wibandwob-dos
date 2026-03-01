@@ -1,8 +1,11 @@
 import blessed from "blessed";
 
+import type { WindowFacade } from "./window-facade.js";
 import type { Box, DragState, ResizeState, WindowKind, WindowRecord } from "./types.js";
 
-export class WindowManager {
+export type EditorWriteHook = (id: number, text: string) => boolean;
+
+export class WindowManager implements WindowFacade {
   private readonly windows: WindowRecord[] = [];
   private focusedWindow?: WindowRecord;
   private nextWindowId = 1;
@@ -10,6 +13,7 @@ export class WindowManager {
   private resizeState?: ResizeState;
   private suppressClickWindowId?: number;
   private suppressClickUntil = 0;
+  private editorWriteHook?: EditorWriteHook;
 
   constructor(
     private readonly screen: blessed.Widgets.Screen,
@@ -17,6 +21,11 @@ export class WindowManager {
     private readonly onChange?: () => void,
     private readonly onWindowContextMenu?: (window: WindowRecord, x?: number, y?: number) => void
   ) {}
+
+  /** Set the editor write hook. Called by AppController after construction. */
+  setEditorWriteHook(hook: EditorWriteHook): void {
+    this.editorWriteHook = hook;
+  }
 
   getFocusedWindow(): WindowRecord | undefined {
     return this.focusedWindow;
@@ -32,6 +41,10 @@ export class WindowManager {
 
   getWindowById(id: number): WindowRecord | undefined {
     return this.windows.find((window) => window.id === id);
+  }
+
+  getLastWindow(): WindowRecord | undefined {
+    return this.windows.at(-1);
   }
 
   getWindowAtPosition(x?: number, y?: number): WindowRecord | undefined {
@@ -144,7 +157,7 @@ export class WindowManager {
         this.screen.render();
       },
       focus: () => {
-        this.focusWindow(record);
+        this.focusWindowInternal(record);
         body.focus();
       },
       openContextMenu: (x, y) => this.onWindowContextMenu?.(record, x, y)
@@ -160,10 +173,10 @@ export class WindowManager {
       if (this.shouldSuppressClick(record)) {
         return;
       }
-      this.focusWindow(record);
+      this.focusWindowInternal(record);
     });
     frame.on("mousedown", (data) => {
-      this.focusWindow(record);
+      this.focusWindowInternal(record);
       if (this.isRightClick(data)) {
         record.openContextMenu?.(data.x, data.y);
       }
@@ -172,10 +185,10 @@ export class WindowManager {
       if (this.shouldSuppressClick(record)) {
         return;
       }
-      this.focusWindow(record);
+      this.focusWindowInternal(record);
     });
     titleBar.on("mousedown", (data) => {
-      this.focusWindow(record);
+      this.focusWindowInternal(record);
       if (this.isRightClick(data)) {
         record.openContextMenu?.(data.x, data.y);
         return;
@@ -183,13 +196,13 @@ export class WindowManager {
       this.startDrag(record, data);
     });
     body.on("mousedown", (data) => {
-      this.focusWindow(record);
+      this.focusWindowInternal(record);
       if (this.isRightClick(data)) {
         record.openContextMenu?.(data.x, data.y);
       }
     });
     resizeGrip.on("mousedown", (data) => {
-      this.focusWindow(record);
+      this.focusWindowInternal(record);
       if (this.isRightClick(data)) {
         record.openContextMenu?.(data.x, data.y);
         return;
@@ -203,10 +216,11 @@ export class WindowManager {
   registerWindow(record: WindowRecord): void {
     this.windows.push(record);
     this.onChange?.();
-    this.focusWindow(record);
+    this.focusWindowInternal(record);
   }
 
-  focusWindow(record: WindowRecord): void {
+  /** Internal: focus a window by record reference. Used by click/register/drag handlers. */
+  focusWindowInternal(record: WindowRecord): void {
     const index = this.windows.findIndex((window) => window.id === record.id);
     if (index >= 0) {
       const [active] = this.windows.splice(index, 1);
@@ -300,6 +314,48 @@ export class WindowManager {
     }
     record.close();
     return true;
+  }
+
+  // -- WindowFacade aliases --
+
+  /** Focus a window by id (WindowFacade contract) or by record (internal use). */
+  focusWindow(idOrRecord: number | WindowRecord): boolean {
+    if (typeof idOrRecord === "number") {
+      return this.focusWindowById(idOrRecord);
+    }
+    this.focusWindowInternal(idOrRecord);
+    return true;
+  }
+
+  /** WindowFacade: closeWindow by id */
+  closeWindow(id: number): boolean {
+    return this.closeWindowById(id);
+  }
+
+  /** WindowFacade: send input to a window */
+  sendInput(id: number, input: string): boolean {
+    const record = this.getWindowById(id);
+    if (!record?.writeInput) return false;
+    record.writeInput(input);
+    return true;
+  }
+
+  /** WindowFacade: write text to an editor window (with dirty marking) */
+  writeEditorText(id: number, text: string): boolean {
+    if (this.editorWriteHook) {
+      return this.editorWriteHook(id, text);
+    }
+    // Fallback: direct write without dirty marking
+    const record = this.getWindowById(id);
+    if (!record?.editor) return false;
+    record.editor.value += text;
+    return true;
+  }
+
+  /** WindowFacade: capture raw text from a window */
+  captureText(id: number): string | undefined {
+    const record = this.getWindowById(id);
+    return record?.captureText?.();
   }
 
   handleMouse(data: blessed.Widgets.Events.IMouseEventArg): void {

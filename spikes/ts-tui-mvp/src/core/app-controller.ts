@@ -139,6 +139,7 @@ export class TsTuiMvpApp {
       },
       (window, x, y) => this.openWindowContextMenu(window, x, y)
     );
+    this.windowManager.setEditorWriteHook((id, text) => this.writeEditorTextById(id, text));
     this.geometry = new DesktopGeometryService(this.screen);
     this.overlays = new OverlayManager(this.screen, () => this.windowManager.restoreWindowFocus());
     this.menus = createMenuConfigs(this.getAppMenuActions());
