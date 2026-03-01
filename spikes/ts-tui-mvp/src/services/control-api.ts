@@ -182,7 +182,7 @@ export class ControlApiService {
     if (request.method === "GET" && url.pathname === "/windows/text") {
       const id = Number(url.searchParams.get("id"));
       const text = this.handlers.windows.captureText(id);
-      return Response.json({ ok: Boolean(text), text: text ?? null });
+      return Response.json({ ok: text !== undefined, text: text ?? null });
     }
 
     const body =

@@ -5,6 +5,7 @@ export interface SystemContextActions {
   openTextFile: () => void;
   openBackrooms: () => void;
   openXTermShell: () => void;
+  openChromeBrowser: () => void;
   openWibWobChat: () => void;
   openWibWobAgent: () => void;
   openPiChat: () => void;
@@ -45,6 +46,7 @@ export function createSystemContextMenuItems(actions: SystemContextActions): Men
     { label: "Open Text File", action: actions.openTextFile },
     { label: "Open Backrooms TV", action: actions.openBackrooms },
     { label: "Open XTerm Shell", action: actions.openXTermShell },
+    { label: "Open Chrome Browser", action: actions.openChromeBrowser },
     { label: "Open Wib&Wob Chat", action: actions.openWibWobChat },
     { label: "Open Pi Terminal (Legacy)", action: actions.openPiChat },
     { label: "Open Workspace Manager", action: actions.openWorkspaceManager },

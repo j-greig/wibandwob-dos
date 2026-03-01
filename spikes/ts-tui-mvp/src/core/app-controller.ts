@@ -72,6 +72,7 @@ import { openEditorWindow as openTextEditorWindow } from "../windows/text-window
 import { openWibWobChatWindow as openNativeWibWobChatWindow } from "../windows/wibwob-chat-window.js";
 import { type TuiToolContext } from "../services/agent-tools.js";
 import { WibWobAgentSession } from "../services/wibwob-agent-session.js";
+import { openChromeBrowserWindow } from "../windows/chrome-browser-window.js";
 import { openWibWobAgentWindow as openNativeWibWobAgentWindow } from "../windows/wibwob-agent-window.js";
 
 export class TsTuiMvpApp {
@@ -321,6 +322,7 @@ export class TsTuiMvpApp {
         openTextFile: () => this.promptForEditorPath(),
         openBackrooms: () => this.promptForBackroomsTv(),
         openXTermShell: () => void this.openXTermShellWindow(),
+        openChromeBrowser: () => this.openChromeBrowserWindow(),
         openWibWobChat: () => this.openWibWobChatWindow(),
         openWibWobAgent: () => this.openWibWobAgentWindow(),
         openPiChat: () => void this.openPiChatWindow(),
@@ -1380,6 +1382,15 @@ export class TsTuiMvpApp {
     });
   }
 
+  private openChromeBrowserWindow(initialUrl?: string): void {
+    openChromeBrowserWindow({
+      screen: this.screen,
+      windowManager: this.windowManager,
+      overlays: this.overlays,
+      initialUrl,
+    });
+  }
+
   private openBrowserReaderWindow(filePath = MASTER_PHILOSOPHY_PATH): void {
     openBrowserReaderContentWindow({
       filePath,
@@ -1943,6 +1954,7 @@ export class TsTuiMvpApp {
       cascadeWindows: () => this.windowManager.cascadeWindows(),
       openGallery: () => this.openPrimerGalleryWindow(),
       openBrowserReader: () => this.openBrowserReaderWindow(),
+      openChromeBrowser: () => this.openChromeBrowserWindow(),
       openFigletBanner: () => this.promptForFigletText(),
       openPatternWindow: () => this.openPatternWindow(),
       openOrbitWindow: () => this.openOrbitWindow(),

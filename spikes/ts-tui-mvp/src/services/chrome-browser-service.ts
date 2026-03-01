@@ -12,6 +12,7 @@ import puppeteer, { type Browser, type Page } from "puppeteer-core";
 import { Readability } from "@mozilla/readability";
 import { JSDOM } from "jsdom";
 import TurndownService from "turndown";
+// @ts-ignore — no types available for turndown-plugin-gfm
 import { gfm } from "turndown-plugin-gfm";
 
 export interface BrowseResult {
@@ -114,7 +115,7 @@ export class ChromeBrowserService {
           .querySelectorAll(
             "script, style, noscript, nav, header, footer, aside"
           )
-          .forEach((el) => el.remove());
+          .forEach((el: Element) => el.remove());
         const main =
           fallbackBody.querySelector(
             "main, article, [role='main'], .content, #content"
@@ -336,7 +337,7 @@ export class ChromeBrowserService {
           .querySelectorAll(
             "script, style, noscript, nav, header, footer, aside"
           )
-          .forEach((el) => el.remove());
+          .forEach((el: Element) => el.remove());
         const main =
           fallbackBody.querySelector(
             "main, article, [role='main'], .content, #content"

@@ -25,6 +25,7 @@ export interface AppMenuActions {
   cascadeWindows: () => void;
   openGallery: () => void;
   openBrowserReader: () => void;
+  openChromeBrowser: () => void;
   openFigletBanner: () => void;
   openPatternWindow: () => void;
   openOrbitWindow: () => void;
@@ -57,6 +58,7 @@ export function createMenuConfigs(actions: AppMenuActions): MenuConfig[] {
         { label: "Open Art Window", action: actions.openArtWindow },
         { label: "Open Terminal", action: actions.openTerminal },
         { label: "Open XTerm Shell", action: actions.openXTermShell },
+        { label: "Open Chrome Browser", action: actions.openChromeBrowser },
         { label: "Open Wib&Wob Chat", action: actions.openWibWobChat },
         { label: "Open Wib&Wob Agent", action: actions.openWibWobAgent },
         { label: "Open Pi Terminal (Legacy)", action: actions.openPiChat },
@@ -89,6 +91,7 @@ export function createMenuConfigs(actions: AppMenuActions): MenuConfig[] {
         { label: "Open Gallery", action: actions.openGallery },
         { label: "Open File Manager", action: actions.openFileManager },
         { label: "Open Browser", action: actions.openBrowserReader },
+        { label: "Open Chrome Browser", action: actions.openChromeBrowser },
         { label: "Open Art", action: actions.openArtWindow }
       ]
     },
@@ -101,6 +104,7 @@ export function createMenuConfigs(actions: AppMenuActions): MenuConfig[] {
         { label: "Primer Gallery", action: actions.openGallery },
         { label: "File Manager", action: actions.openFileManager },
         { label: "Browser Reader", action: actions.openBrowserReader },
+        { label: "Chrome Browser", action: actions.openChromeBrowser },
         { label: "Figlet Banner", action: actions.openFigletBanner },
         { label: "Pattern Window", action: actions.openPatternWindow },
         { label: "Orbit Window", action: actions.openOrbitWindow },
@@ -125,6 +129,7 @@ export function createPaletteCommands(actions: AppMenuActions): MenuItem[] {
     { label: "Open Primer Gallery", action: actions.openGallery },
     { label: "Open File Manager", action: actions.openFileManager },
     { label: "Open Browser Reader", action: actions.openBrowserReader },
+    { label: "Open Chrome Browser", action: actions.openChromeBrowser },
     { label: "Open Figlet Banner", action: actions.openFigletBanner },
     { label: "Open Pattern Window", action: actions.openPatternWindow },
     { label: "Open Orbit Window", action: actions.openOrbitWindow },
