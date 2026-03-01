@@ -38,6 +38,7 @@ export interface TuiToolContext {
   focusWindow: (id: number) => boolean;
   sendWindowInput: (id: number, input: string) => boolean;
   captureWindowText: (id: number) => string | undefined;
+  writeEditorText: (id: number, text: string) => boolean;
 }
 
 // -- Helper to build an AgentTool from our simpler shape --
@@ -115,6 +116,20 @@ const openFigletWindow = tuiTool({
   execute: (params, ctx) => {
     const result = ctx.openFigletWindow(params.text, params.font);
     return JSON.stringify(result);
+  },
+});
+
+const writeEditorText = tuiTool({
+  name: "tui_editor_write",
+  label: "Write to Editor Window",
+  description: "Inserts text at the cursor position in an editor window.",
+  parameters: Type.Object({
+    id: Type.Number({ description: "Editor window ID" }),
+    text: Type.String({ description: "Text to insert at cursor" }),
+  }),
+  execute: (params, ctx) => {
+    const ok = ctx.writeEditorText(params.id, params.text);
+    return ok ? "written" : "editor not found";
   },
 });
 
@@ -207,6 +222,7 @@ export function createTuiTools(ctx: TuiToolContext): AgentTool<any>[] {
     getState(ctx),
     openWindow(ctx),
     openFigletWindow(ctx),
+    writeEditorText(ctx),
     closeWindow(ctx),
     moveWindow(ctx),
     focusWindow(ctx),

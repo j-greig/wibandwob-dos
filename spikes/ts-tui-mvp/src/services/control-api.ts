@@ -53,6 +53,7 @@ interface ControlApiHandlers {
   resizeWindowById: (id: number, width: number, height: number) => boolean;
   closeWindowById: (id: number) => boolean;
   sendWindowInput: (id: number, input: string) => boolean;
+  writeEditorText: (id: number, text: string) => boolean;
   captureWindowText: (id: number, name?: string) => string | undefined;
   openBackroomsTv: (channel: BackroomsChannel) => void;
   saveWorkspaceNamed: (name: string) => void;
@@ -299,6 +300,15 @@ export class ControlApiService {
         ),
       });
     }
+    if (request.method === "POST" && url.pathname === "/windows/editor/write") {
+      return Response.json({
+        ok: this.handlers.writeEditorText(
+          Number((body as any).id),
+          String((body as any).text ?? ""),
+        ),
+      });
+    }
+
     if (request.method === "POST" && url.pathname === "/windows/text/export") {
       const exported = this.handlers.captureWindowText(
         Number((body as any).id),

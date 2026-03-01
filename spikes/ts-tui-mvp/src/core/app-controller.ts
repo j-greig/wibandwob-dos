@@ -172,6 +172,7 @@ export class TsTuiMvpApp {
       resizeWindowById: (id, width, height) => this.resizeWindowById(id, width, height),
       closeWindowById: (id) => this.closeWindowById(id),
       sendWindowInput: (id, input) => this.sendWindowInputById(id, input),
+      writeEditorText: (id, text) => this.writeEditorTextById(id, text),
       captureWindowText: (id, name) => this.captureWindowTextById(id, name),
       openBackroomsTv: (channel) => this.openBackroomsTv(channel),
       saveWorkspaceNamed: (name) => this.saveWorkspaceNamed(name),
@@ -443,6 +444,13 @@ export class TsTuiMvpApp {
           return { id: wins[wins.length - 1].id };
         }
         return { error: "figlet window failed to open" };
+      },
+      writeEditorText: (id: number, text: string) => {
+        const win = this.windowManager.getWindowById(id);
+        if (!win || !win.editor) return false;
+        insertEditorTextState(win.editor, text);
+        this.renderEditor(win);
+        return true;
       },
       captureWindowText: (id) => {
         const win = this.windowManager.getWindowById(id);
@@ -1945,6 +1953,14 @@ export class TsTuiMvpApp {
       return false;
     }
     window.writeInput(input);
+    return true;
+  }
+
+  writeEditorTextById(id: number, text: string): boolean {
+    const window = this.windowManager.getWindowById(id);
+    if (!window || !window.editor) return false;
+    insertEditorTextState(window.editor, text);
+    this.renderEditor(window);
     return true;
   }
 

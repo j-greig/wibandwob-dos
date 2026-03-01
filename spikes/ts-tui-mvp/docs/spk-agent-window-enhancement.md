@@ -20,6 +20,19 @@ We have two agent integration paths right now:
 Option 1 is the right foundation. Option 2 is a dead end for embedding
 (fine as a standalone terminal, bad as an integrated agent surface).
 
+## Practical evidence
+
+Commit `f7fb247dd8efebea6cfb9666821a4691f4d76c38` is an important proof point:
+
+- a Pi agent with commands to inspect and manipulate the TUI was effective in practice
+- it successfully used the terminal app already built inside the spike
+- it modified the app's code through that surface
+- it added the figlet window functionality through the in-app tool/terminal path
+
+This matters because it moves the agent-window idea from "interesting design
+direction" to "already demonstrated useful workflow." The embedded agent is not
+just a chat novelty; it can act as a real operator inside the WibWob desktop.
+
 ## Reference: Gondolin extension pattern
 
 [gondolin/host/examples/pi-gondolin.ts](https://github.com/earendil-works/gondolin/blob/main/host/examples/pi-gondolin.ts)

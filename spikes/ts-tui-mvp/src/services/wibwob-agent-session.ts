@@ -16,7 +16,74 @@ import {
 import { REPO_ROOT, SPIKE_PI_APPEND_SYSTEM_PATH, SPIKE_PI_DIR } from "../core/config.js";
 import type { ChatMessageEntry, DesktopState } from "../core/types.js";
 import { createTuiTools, formatDesktopSummary, type TuiToolContext } from "./agent-tools.js";
+import {
+  createBashTool,
+  createReadTool,
+  createWriteTool,
+  createEditTool,
+  createGrepTool,
+  createFindTool,
+  createLsTool,
+} from "@mariozechner/pi-coding-agent";
 import fs from "node:fs";
+import nodePath from "node:path";
+import { access, readFile, writeFile, mkdir } from "node:fs/promises";
+import { constants } from "node:fs";
+import { execFile } from "node:child_process";
+
+// -- Path jailing: agent cannot escape REPO_ROOT --
+
+function jailPath(requestedPath: string, jail: string): string {
+  const expanded = requestedPath.startsWith("~/")
+    ? nodePath.join(process.env.HOME || "/", requestedPath.slice(2))
+    : requestedPath;
+  const resolved = nodePath.isAbsolute(expanded)
+    ? nodePath.resolve(expanded)
+    : nodePath.resolve(jail, expanded);
+  if (!resolved.startsWith(jail + nodePath.sep) && resolved !== jail) {
+    throw new Error(`Path escapes workspace: ${requestedPath} → ${resolved}`);
+  }
+  return resolved;
+}
+
+function createJailedCodingTools(jail: string) {
+  const jailedRead = createReadTool(jail, {
+    operations: {
+      readFile: async (p) => { jailPath(p, jail); return readFile(p); },
+      access: async (p) => { jailPath(p, jail); await access(p, constants.R_OK); },
+    },
+  });
+
+  const jailedWrite = createWriteTool(jail, {
+    operations: {
+      writeFile: async (p, content) => { jailPath(p, jail); await writeFile(p, content, "utf8"); },
+      mkdir: async (dir) => { jailPath(dir, jail); await mkdir(dir, { recursive: true }); },
+    },
+  });
+
+  const jailedEdit = createEditTool(jail, {
+    operations: {
+      readFile: async (p) => { jailPath(p, jail); return readFile(p); },
+      writeFile: async (p, content) => { jailPath(p, jail); await writeFile(p, content, "utf8"); },
+      access: async (p) => { jailPath(p, jail); await access(p, constants.R_OK | constants.W_OK); },
+    },
+  });
+
+  const jailedBash = createBashTool(jail, {
+    spawnHook: (ctx) => {
+      // Force cwd inside jail
+      const cwd = ctx.cwd ?? jail;
+      const jailedCwd = cwd.startsWith(jail) ? cwd : jail;
+      return { ...ctx, cwd: jailedCwd };
+    },
+  });
+
+  const jailedGrep = createGrepTool(jail);
+  const jailedFind = createFindTool(jail);
+  const jailedLs = createLsTool(jail);
+
+  return [jailedRead, jailedWrite, jailedEdit, jailedBash, jailedGrep, jailedFind, jailedLs];
+}
 
 // Re-use helpers from wibwob-chat-service without importing the class
 function createMessageId(prefix: string): string {
@@ -79,8 +146,11 @@ function loadAgentSystemPrompt(): string {
     base,
     "",
     "You have TUI tools that let you see and control the desktop.",
+    "You also have standard coding tools: read, write, edit, bash, grep, find, ls.",
+    `All file operations are scoped to ${REPO_ROOT} — you cannot access files outside this directory.`,
     "The desktop state is injected at the start of each turn automatically.",
     "Use tui_open_window, tui_send_input, tui_read_window etc to help the user.",
+    "Use read, write, edit, bash for file operations — no need to use the terminal for these.",
     "You can open terminals, run commands, open primers, arrange windows.",
   ].join("\n");
 }
@@ -136,7 +206,9 @@ export class WibWobAgentSession {
         throw new Error("No model available. Check provider auth.");
       }
 
-      const tools = createTuiTools(this.tuiContext);
+      const tuiTools = createTuiTools(this.tuiContext);
+      const codingTools = createJailedCodingTools(REPO_ROOT);
+      const tools = [...tuiTools, ...codingTools];
 
       this.agent = new Agent({
         initialState: {
