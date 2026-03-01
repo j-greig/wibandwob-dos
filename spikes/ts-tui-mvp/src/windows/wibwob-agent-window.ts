@@ -31,8 +31,8 @@ const C = {
 
 // Kaomoji voice markers — replaces "Wib:" and "Wob:" in rendered text.
 // Only used for non-haiku models (haiku struggles with kaomoji in output).
-const WIB_FACE = "(◕‿◕)";
-const WOB_FACE = "(¬_¬)";
+const WIB_FACE = "༼つ◕‿◕‿⚆༽つ";
+const WOB_FACE = "༼つ⚆‿◕‿◕༽つ";
 
 function applyVoiceMarkers(text: string, useKaomoji: boolean): string {
   if (!useKaomoji) return text;

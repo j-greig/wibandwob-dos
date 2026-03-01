@@ -9,7 +9,6 @@ export type LogBox = Box & { log: (text: string) => void };
 export type WindowKind =
   | "primer"
   | "editor"
-  | "terminal"
   | "backrooms"
   | "browser"
   | "art"
@@ -17,7 +16,6 @@ export type WindowKind =
   | "reader"
   | "figlet"
   | "pattern"
-  | "glitch"
   | "chat"
   | "companion"
   | "workspace"
