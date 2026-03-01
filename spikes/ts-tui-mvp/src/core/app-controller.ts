@@ -767,6 +767,7 @@ export class TsTuiMvpApp {
     openBackroomsLogBrowserWindow({
       screen: this.screen,
       windowManager: this.windowManager,
+      overlays: this.overlays,
       logsDir,
       onOpenReplay: (logPath, theme) => {
         this.openBackroomsTv({ theme, model: "sonnet", turns: 0, mode: "fake-live", primers: logPath });

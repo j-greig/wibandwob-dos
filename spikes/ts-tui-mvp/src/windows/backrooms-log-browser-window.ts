@@ -3,6 +3,8 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { createScrollbar } from "../core/ui-primitives.js";
+import { createFilePathMenuItems } from "../core/context-menu-items.js";
+import type { OverlayManager } from "../core/overlay-manager.js";
 import type { WindowManager } from "../core/window-manager.js";
 import type { WindowRecord } from "../core/types.js";
 
@@ -35,19 +37,19 @@ function scanLogs(logsDir: string): LogEntry[] {
 
 function formatEntry(entry: LogEntry, width: number): string {
   const time = new Date(entry.mtime).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
-  const kb = (entry.size / 1024).toFixed(1).padStart(6) + "kb";
-  const status = entry.live ? " LIVE" : " DONE";
-  const fixedWidth = 7 + 1 + kb.length + status.length + 2; // time + space + size + status + padding
+  const status = entry.live ? " ●" : "";
+  const fixedWidth = 7 + status.length + 1; // time + status + padding
   const slugWidth = Math.max(8, width - fixedWidth);
   const slug = entry.name.length > slugWidth
     ? entry.name.slice(0, slugWidth - 1) + "…"
     : entry.name.padEnd(slugWidth, " ");
-  return `${time}  ${slug}  ${kb}${status}`;
+  return `${time} ${slug}${status}`;
 }
 
 export function openBackroomsLogBrowserWindow(params: {
   screen: blessed.Widgets.Screen;
   windowManager: WindowManager;
+  overlays: OverlayManager;
   logsDir: string;
   onOpenReplay: (logPath: string, theme: string) => void;
   onSaveSnippet: (title: string, content: string) => void;
@@ -59,12 +61,16 @@ export function openBackroomsLogBrowserWindow(params: {
   let previewContent = "";
   let previewScrollPositions = new Map<string, number>();
 
+  const LIST_WIDTH = "25%";
+  const DIVIDER_LEFT = "25%";
+  const CONTENT_LEFT = "25%+1";
+
   // Left pane — log list
   const list = blessed.list({
     parent: frame.body,
     top: 0,
     left: 0,
-    width: "40%",
+    width: LIST_WIDTH,
     bottom: 0,
     mouse: true,
     keys: true,
@@ -83,29 +89,60 @@ export function openBackroomsLogBrowserWindow(params: {
   blessed.box({
     parent: frame.body,
     top: 0,
-    left: "40%",
+    left: DIVIDER_LEFT,
     width: 1,
     bottom: 0,
     content: "",
     style: { fg: "#444444", bg: "#222222" }
   });
 
-  // Header above preview
-  const header = blessed.box({
+  // Header row 1 — title/theme
+  const titleBar = blessed.box({
     parent: frame.body,
     top: 0,
-    left: "40%+1",
+    left: CONTENT_LEFT,
     right: 0,
     height: 1,
-    style: { fg: "cyan", bg: "#111111" },
+    style: { fg: "white", bg: "#111111", bold: true },
     content: ""
+  });
+
+  // Header row 2 — file path (right-clickable)
+  const pathBar = blessed.box({
+    parent: frame.body,
+    top: 1,
+    left: CONTENT_LEFT,
+    right: 0,
+    height: 1,
+    mouse: true,
+    style: { fg: "#888888", bg: "#111111" },
+    content: ""
+  });
+
+  // Click on path bar → file path actions
+  let currentPath = "";
+  pathBar.on("click", () => {
+    if (currentPath) {
+      const items = createFilePathMenuItems(currentPath);
+      if (items.length > 0) {
+        params.overlays.openListPrompt(
+          "File Actions",
+          items.map(item => ({ label: item.label })),
+          0,
+          (selected) => {
+            const match = items.find(i => i.label === selected.label);
+            match?.action();
+          }
+        );
+      }
+    }
   });
 
   // Right pane — preview
   const preview = blessed.box({
     parent: frame.body,
-    top: 1,
-    left: "40%+1",
+    top: 2,
+    left: CONTENT_LEFT,
     right: 0,
     bottom: 0,
     mouse: true,
@@ -119,7 +156,7 @@ export function openBackroomsLogBrowserWindow(params: {
 
   function refreshList() {
     entries = scanLogs(params.logsDir);
-    const listWidth = Math.max(20, Math.floor(Number(frame.body.width) * 0.4));
+    const listWidth = Math.max(20, Math.floor(Number(frame.body.width) * 0.25));
     (list as any).setItems(entries.map(e => formatEntry(e, listWidth)));
     if (entries.length > 0) {
       list.select(Math.min(selectedIndex, entries.length - 1));
@@ -130,13 +167,17 @@ export function openBackroomsLogBrowserWindow(params: {
   function loadPreview() {
     const entry = entries[selectedIndex];
     if (!entry) {
-      header.setContent("");
+      titleBar.setContent("");
+      pathBar.setContent("");
       preview.setContent("(no logs)");
       previewContent = "";
+      currentPath = "";
       params.screen.render();
       return;
     }
-    header.setContent(` ${entry.name}  ${entry.path}`);
+    titleBar.setContent(` ${entry.name}`);
+    pathBar.setContent(` ${entry.path}`);
+    currentPath = entry.path;
     try {
       previewContent = fs.readFileSync(entry.path, "utf8");
     } catch {

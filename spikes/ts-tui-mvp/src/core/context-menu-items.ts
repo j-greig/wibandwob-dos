@@ -1,4 +1,36 @@
+import { execSync } from "node:child_process";
 import type { MenuItem, WindowRecord } from "./types.js";
+
+/**
+ * Reusable file-path context menu items.
+ * Use on any widget that displays a file path — log browser header,
+ * editor title bar, primer viewer, etc.
+ */
+export function createFilePathMenuItems(filePath: string): MenuItem[] {
+  const items: MenuItem[] = [
+    {
+      label: "Copy Path to Clipboard",
+      action: () => {
+        try {
+          if (process.platform === "darwin") {
+            execSync(`printf '%s' ${JSON.stringify(filePath)} | pbcopy`);
+          } else {
+            execSync(`printf '%s' ${JSON.stringify(filePath)} | xclip -selection clipboard 2>/dev/null || printf '%s' ${JSON.stringify(filePath)} | xsel --clipboard 2>/dev/null`);
+          }
+        } catch { /* clipboard not available — silent fail */ }
+      }
+    }
+  ];
+  if (process.platform === "darwin") {
+    items.push({
+      label: "Reveal in Finder",
+      action: () => {
+        try { execSync(`open -R ${JSON.stringify(filePath)}`); } catch { /* noop */ }
+      }
+    });
+  }
+  return items;
+}
 
 export interface SystemContextActions {
   openPrimerBrowser: () => void;
@@ -25,6 +57,9 @@ export function createWindowContextMenuItems(
   }
   if (window.kind === "editor" && actions.saveAsEditor) {
     items.push({ label: "Save As...", action: actions.saveAsEditor });
+  }
+  if (window.filePath) {
+    items.push(...createFilePathMenuItems(window.filePath));
   }
   items.push(...actions.commandItems, { label: "Close Window", action: () => window.close() });
   return items;
