@@ -99,13 +99,28 @@ export function openWibWobAgentWindow(params: {
   });
 
   let draft = "";
+  const MAX_INPUT_ROWS = 6;
 
   const renderInput = () => {
     const width = Math.max(1, Number(input.width) || 1);
-    const visibleWidth = Math.max(1, width - 1);
-    const visible = draft.slice(-visibleWidth);
     const cursor = input === params.screen.focused ? "_" : " ";
-    input.setContent((visible + cursor).padEnd(width, " "));
+    const full = draft + cursor;
+
+    // Word-wrap the draft into rows of (width) chars
+    const rows: string[] = [];
+    for (let i = 0; i < full.length || rows.length === 0; i += width) {
+      rows.push(full.slice(i, i + width).padEnd(width, " "));
+    }
+
+    const inputRows = Math.min(MAX_INPUT_ROWS, Math.max(1, rows.length));
+
+    // Resize input and push transcript bottom up to match
+    input.height = inputRows;
+    input.bottom = 0;
+    statusLine.bottom = inputRows;
+    transcript.bottom = inputRows + 1;
+
+    input.setContent(rows.join("\n"));
   };
 
   const armInput = () => {
@@ -123,7 +138,7 @@ export function openWibWobAgentWindow(params: {
   });
 
   // Key handling
-  input.on("keypress", (_ch: string, key: blessed.Widgets.Events.IKeyEventArg) => {
+  input.on("keypress", (ch: string, key: blessed.Widgets.Events.IKeyEventArg) => {
     if (!key) return;
 
     if (key.name === "return" || key.name === "enter") {
@@ -155,8 +170,14 @@ export function openWibWobAgentWindow(params: {
       return;
     }
 
-    if (key.sequence && !key.ctrl && !key.meta) {
-      draft += key.sequence;
+    // Use key.sequence if available, fall back to ch for punctuation and
+    // symbols that blessed may not populate sequence for.
+    const char = (key.sequence && key.sequence.length === 1)
+      ? key.sequence
+      : (ch && ch.length === 1 && ch >= " " ? ch : null);
+
+    if (char && !key.ctrl && !key.meta) {
+      draft += char;
       renderInput();
       params.screen.render();
     }
