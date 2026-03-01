@@ -3,7 +3,6 @@ import { spawn as spawnProcess, type ChildProcessWithoutNullStreams } from "node
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { spawn as spawnPty, type IPty as BunPtyTerminal, type IExitEvent as BunPtyExitEvent } from "@skitee3000/bun-pty/dist/index.js";
 
 import { CONTROL_API_PORT, MASTER_PHILOSOPHY_PATH, README_PATH, REPO_ROOT, SPIKE_NOTES_PATH, SPIKE_ROOT, STATE_PATH, WORKSPACES_DIR } from "./config.js";
 import { CommandRegistry } from "./command-registry.js";
@@ -13,7 +12,7 @@ import { type AppMenuActions } from "./menu-config.js";
 import { MenuOverlayManager } from "./menu-overlay-manager.js";
 import { OverlayManager } from "./overlay-manager.js";
 import { createScrollbar, isRightClick } from "./ui-primitives.js";
-import { restoreWindowSnapshot, serializeWindowSnapshot } from "./workspace-snapshots.js";
+import { restoreWindowSnapshot, serializeWindowSnapshot, type WorkspaceRestoreActions } from "./workspace-snapshots.js";
 import type {
   BackroomsChannel,
   Box,
@@ -38,7 +37,6 @@ import { ControlApiService } from "../services/control-api.js";
 import { ContentService } from "../services/content-service.js";
 import { getDefaultFigletFont, getFigletCatalogue, getFigletFontChoices, measureFiglet, renderFiglet } from "../services/figlet-service.js";
 import { openPrimerFile, promptForEditorFile, promptForPrimerFile, saveEditorWindow } from "../services/file-actions.js";
-import { PiService } from "../services/pi-service.js";
 import { createPtySession, type PtySession } from "../services/pty-session.js";
 import { deleteBackward as deleteEditorBackwardState, deleteForward as deleteEditorForwardState, insertText as insertEditorTextState, moveCursor as moveEditorCursorState, render as renderEditorState } from "../services/editor-service.js";
 import { StateService } from "../services/state-service.js";
@@ -59,7 +57,6 @@ import {
   promptForFigletText as promptForFigletBannerText
 } from "../windows/figlet-windows.js";
 import {
-  openChatWindow as openChatTranscriptWindow,
   openCommandPaletteWindow as openPaletteWindow,
   openCompanionWindow as openScrambleWindow,
   openArtWindow as openGenerativeArtWindow,
@@ -88,7 +85,6 @@ export class TsTuiMvpApp {
   private readonly overlays: OverlayManager;
   private readonly backrooms = new BackroomsService();
   private readonly content = new ContentService();
-  private readonly pi = new PiService();
   private readonly workspace = new WorkspaceService(WORKSPACES_DIR);
   private readonly geometry: DesktopGeometryService;
   private readonly state: StateService;
@@ -165,7 +161,6 @@ export class TsTuiMvpApp {
       openBrowserReader: (filePath) => this.openBrowserReaderWindow(filePath),
       openFigletBanner: (text, font) => this.openFigletWindow(text ?? "WIB WOB", font ?? getDefaultFigletFont()),
       openArtWindow: () => this.openArtWindow(),
-      openChatWindow: () => this.openChatWindow(),
       openWibWobChat: () => this.openWibWobChatWindow(),
       openWibWobAgent: () => this.openWibWobAgentWindow(),
       openCompanionWindow: () => this.openCompanionWindow(),
@@ -202,10 +197,34 @@ export class TsTuiMvpApp {
     this.renderChrome();
     this.bindGlobalKeys();
     this.menuUi.bindMenuClicks((label) => this.openMenu(label));
-    this.openCompanionWindow();
+    this.restoreDefaultWorkspace();
     this.controlApi.start();
     this.syncState();
     this.screen.render();
+  }
+
+  /** Restore last workspace on boot, or open Scramble as bare minimum. */
+  private restoreDefaultWorkspace(): void {
+    if (!this.workspace.exists()) {
+      this.openCompanionWindow();
+      return;
+    }
+    try {
+      const snapshots = this.workspace.load();
+      if (snapshots.length === 0) {
+        this.openCompanionWindow();
+        return;
+      }
+      let focusedWindow: WindowRecord | undefined;
+      for (const snapshot of snapshots) {
+        const restored = restoreWindowSnapshot(snapshot, this.getRestoreActions());
+        if (snapshot.focused) focusedWindow = restored;
+      }
+      focusedWindow?.focus();
+    } catch {
+      // Corrupt workspace — start clean
+      this.openCompanionWindow();
+    }
   }
 
   private renderChrome(): void {
@@ -233,7 +252,7 @@ export class TsTuiMvpApp {
       ? ` Focus ${focus.id}:${focus.kind} ${focus.width}x${focus.height}@${focus.left},${focus.top}`
       : " Focus none";
     this.statusLine.setContent(
-      ` Alt-F File  Alt-E Edit  Alt-V View  Alt-W Window  Alt-T Tools  Tab Next  Shift-Tab Prev  Alt-Shift-Arrows Resize  Ctrl-S Save  Ctrl-Q Quit  |  Term ${current.screen.width}x${current.screen.height}  Aspect ${current.screen.cellAspect.toFixed(2)}  Windows ${current.screen.openWindowCount}${focusSummary} `
+      ` Alt-F File  Alt-E Edit  Alt-V View  Alt-W Window  Alt-A Applications  Tab Next  Shift-Tab Prev  Alt-Shift-Arrows Resize  Ctrl-S Save  Ctrl-Q Quit  |  Term ${current.screen.width}x${current.screen.height}  Aspect ${current.screen.cellAspect.toFixed(2)}  Windows ${current.screen.openWindowCount}${focusSummary} `
     );
   }
 
@@ -250,7 +269,7 @@ export class TsTuiMvpApp {
     this.screen.key(["M-e"], () => this.openMenu("Edit"));
     this.screen.key(["M-v"], () => this.openMenu("View"));
     this.screen.key(["M-w"], () => this.openMenu("Window"));
-    this.screen.key(["M-t"], () => this.openMenu("Tools"));
+    this.screen.key(["M-a"], () => this.openMenu("Applications"));
     this.screen.key(["M-S-left"], () => this.windowManager.resizeFocusedWindow(-2, 0));
     this.screen.key(["M-S-right"], () => this.windowManager.resizeFocusedWindow(2, 0));
     this.screen.key(["M-S-up"], () => this.windowManager.resizeFocusedWindow(0, -1));
@@ -318,19 +337,6 @@ export class TsTuiMvpApp {
     );
   }
 
-  private async openTerminalWindow(): Promise<void> {
-    await this.openPtyWindow({
-      title: "Terminal",
-      appType: "terminal-shell",
-      command: this.resolveShellPath(),
-      args: ["-i"],
-      cwd: REPO_ROOT,
-      env: this.getPtyEnv(),
-      intro: "Interactive shell window. Good for shell commands; full-screen TUIs are not expected to render cleanly yet.",
-      shellPath: this.resolveShellPath()
-    });
-  }
-
   private async openXTermShellWindow(): Promise<void> {
     await this.openBufferedTerminalWindow({
       title: "XTerm Shell",
@@ -340,25 +346,6 @@ export class TsTuiMvpApp {
       cwd: REPO_ROOT,
       env: this.getPtyEnv(),
       summary: "Buffered PTY shell window with a local blessed terminal bridge."
-    });
-  }
-
-  private async openPiChatWindow(): Promise<void> {
-    if (!this.pi.isAvailable()) {
-      this.overlays.flash("Pi is not installed in the spike. Run bun install first.");
-      return;
-    }
-
-    const launch = this.pi.createLaunchConfig(REPO_ROOT, this.getPtyEnv());
-    await this.openPtyWindow({
-      title: "Pi Terminal (Legacy)",
-      appType: "pi-chat",
-      command: launch.command,
-      args: launch.args,
-      cwd: launch.cwd,
-      env: launch.env,
-      intro: "Legacy Pi terminal surface. The native Wib&Wob Chat window uses the Pi SDK directly instead of this PTY path.",
-      shellPath: launch.command
     });
   }
 
@@ -393,7 +380,7 @@ export class TsTuiMvpApp {
           pattern: () => this.openPatternWindow(),
           orbit: () => this.openOrbitWindow(),
           glitch: () => this.openGlitchWindow(),
-          chat: () => this.openChatWindow(),
+          chat: () => this.openWibWobChatWindow(),
           companion: () => this.openCompanionWindow(),
           inspector: () => this.openStateInspectorWindow(),
           primer: () => this.openPrimerBrowserWindow(),
@@ -608,133 +595,6 @@ export class TsTuiMvpApp {
     this.screen.on("resize", handleScreenResize);
     frame.focus();
     render();
-  }
-
-  private async openPtyWindow(options: {
-    title: string;
-    appType: string;
-    command: string;
-    args: string[];
-    cwd: string;
-    env: Record<string, string>;
-    intro: string;
-    shellPath: string;
-  }): Promise<void> {
-    const frame = this.windowManager.createFrame(options.title, "terminal");
-    const transcript = blessed.log({
-      parent: frame.body,
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 1,
-      tags: false,
-      keys: false,
-      mouse: true,
-      scrollable: true,
-      alwaysScroll: true,
-      scrollbar: createScrollbar(),
-      style: { fg: "white", bg: "black" }
-    }) as LogBox;
-    const inputLine = blessed.textbox({
-      parent: frame.body,
-      bottom: 0,
-      left: 0,
-      right: 0,
-      height: 1,
-      inputOnFocus: true,
-      mouse: true,
-      style: { fg: "white", bg: "blue" }
-    });
-
-    let pty: BunPtyTerminal;
-    try {
-      pty = spawnPty(options.command, options.args, {
-        name: "xterm-256color",
-        cols: Math.max(20, Number(frame.body.width)),
-        rows: Math.max(8, Number(frame.body.height) - 1),
-        cwd: options.cwd,
-        env: options.env
-      });
-    } catch (error) {
-      frame.close();
-      this.overlays.flash(`${options.title} launch failed: ${error instanceof Error ? error.message : String(error)}`);
-      return;
-    }
-
-    const syncPtySize = () => pty.resize(Math.max(20, Number(frame.body.width)), Math.max(8, Number(frame.body.height) - 1));
-    const handleScreenResize = () => syncPtySize();
-    const armTerminalInput = () => {
-      inputLine.focus();
-      inputLine.readInput();
-      this.screen.render();
-    };
-
-    let terminalPartialLine = "";
-    pty.onData((chunk: string) => {
-      const clean = chunk.replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, "").replace(/\r/g, "").replace(/\x07/g, "");
-      const combined = terminalPartialLine + clean;
-      const lines = combined.split("\n");
-      terminalPartialLine = lines.pop() ?? "";
-      for (const line of lines) {
-        transcript.log(line);
-      }
-      this.syncState();
-      this.screen.render();
-    });
-    pty.onExit(({ exitCode, signal }: BunPtyExitEvent) => {
-      if (terminalPartialLine.length > 0) {
-        transcript.log(terminalPartialLine);
-        terminalPartialLine = "";
-      }
-      transcript.log(`[process exited ${exitCode} signal ${signal ?? "none"}]`);
-      this.syncState();
-      this.screen.render();
-    });
-    inputLine.on("submit", (value) => {
-      const command = value ?? "";
-      transcript.log(`$ ${command}`);
-      pty.write(`${command}\r`);
-      inputLine.clearValue();
-      this.syncState();
-      this.screen.render();
-      armTerminalInput();
-    });
-
-    frame.kind = "terminal";
-    frame.terminal = { mode: "legacy", transcript, input: inputLine };
-    frame.cleanup = () => {
-      this.screen.off("resize", handleScreenResize);
-      pty.kill();
-    };
-    frame.writeInput = (input) => pty.write(input);
-    frame.captureText = () => transcript.getContent();
-    frame.describeState = () => ({
-      appType: options.appType,
-      summary: options.intro,
-      contentPreview: transcript.getContent().split("\n").slice(-8).join("\n"),
-      shellPath: options.shellPath,
-      command: options.command,
-      args: options.args,
-      cwd: options.cwd,
-      transcriptLineCount: transcript.getContent().split("\n").filter(Boolean).length,
-      inputValue: inputLine.getValue()
-    });
-    frame.focus = () => {
-      this.windowManager.focusWindow(frame);
-      armTerminalInput();
-    };
-
-    frame.body.on("click", armTerminalInput);
-    transcript.on("click", armTerminalInput);
-    inputLine.on("focus", () => this.windowManager.focusWindow(frame));
-
-    this.windowManager.registerWindow(frame);
-    frame.focus();
-    frame.frame.on("resize", syncPtySize);
-    this.screen.on("resize", handleScreenResize);
-    syncPtySize();
-    transcript.log(options.intro);
-    this.syncState();
   }
 
   private openBackroomsLogBrowserWindow(): void {
@@ -1472,16 +1332,6 @@ export class TsTuiMvpApp {
     );
   }
 
-  private openChatWindow(restore?: { transcriptLines?: string[]; draft?: string }): void {
-    openChatTranscriptWindow(
-      {
-        screen: this.screen,
-        windowManager: this.windowManager
-      },
-      restore
-    );
-  }
-
   private openCompanionWindow(restore?: { tick?: number }): void {
     openScrambleWindow(
       {
@@ -1847,14 +1697,46 @@ export class TsTuiMvpApp {
     });
   }
 
-  private saveWorkspace(): void {
+  private snapshotWindows(): WindowSnapshot[] {
     const focusedId = this.windowManager.getFocusedWindow()?.id;
-    const snapshots: WindowSnapshot[] = this.windowManager
+    return this.windowManager
       .getWindows()
       .filter((window) => window.kind !== "workspace" && window.kind !== "palette")
       .map((window) => serializeWindowSnapshot(window, focusedId));
-    this.workspace.save(snapshots);
+  }
+
+  private saveWorkspace(): void {
+    this.workspace.save(this.snapshotWindows());
     this.overlays.flash(`Saved workspace to ${this.workspace.path}`);
+  }
+
+  /** Auto-save current layout to the active workspace (silent, no flash). */
+  private autoSaveWorkspace(): void {
+    try {
+      this.workspace.save(this.snapshotWindows());
+    } catch { /* best-effort — don't block quit */ }
+  }
+
+  private getRestoreActions(): WorkspaceRestoreActions {
+    return {
+      openPrimerWindow: (filePath) => this.openPrimerWindow(filePath),
+      openEditorWindow: (filePath, title, initial, restore) => this.openEditorWindow(filePath, title, initial, restore),
+      openBrowserReaderWindow: (filePath) => this.openBrowserReaderWindow(filePath),
+      openFigletWindow: (text, font) => this.openFigletWindow(text, font),
+      openPatternWindow: () => this.openPatternWindow(),
+      openOrbitWindow: () => this.openOrbitWindow(),
+      openGlitchWindow: () => this.openGlitchWindow(),
+      openWibWobChatWindow: (restore) => this.openWibWobChatWindow(restore),
+      openPrimerGalleryWindow: (restore) => this.openPrimerGalleryWindow(restore),
+      openPrimerBrowserWindow: (restore) => this.openPrimerBrowserWindow(restore),
+      openFileManagerWindow: (restore) => this.openFileManagerWindow(restore),
+      openXTermShellWindow: () => this.openXTermShellWindow(),
+      openBackroomsTv: (channel) => this.openBackroomsTv(channel),
+      openCompanionWindow: (restore) => this.openCompanionWindow(restore),
+      openArtWindow: () => this.openArtWindow(),
+      openStateInspectorWindow: () => this.openStateInspectorWindow(),
+      windows: this.windowManager
+    };
   }
 
   saveWorkspaceNamed(name: string): void {
@@ -1904,28 +1786,7 @@ export class TsTuiMvpApp {
     }
     let focusedWindow: WindowRecord | undefined;
     for (const snapshot of snapshots) {
-      const restored = restoreWindowSnapshot(snapshot, {
-        openPrimerWindow: (filePath) => this.openPrimerWindow(filePath),
-        openEditorWindow: (filePath, title, initial, restore) => this.openEditorWindow(filePath, title, initial, restore),
-        openBrowserReaderWindow: (filePath) => this.openBrowserReaderWindow(filePath),
-        openFigletWindow: (text, font) => this.openFigletWindow(text, font),
-        openPatternWindow: () => this.openPatternWindow(),
-        openOrbitWindow: () => this.openOrbitWindow(),
-        openGlitchWindow: () => this.openGlitchWindow(),
-        openChatWindow: (restore) => this.openChatWindow(restore),
-        openWibWobChatWindow: (restore) => this.openWibWobChatWindow(restore),
-        openPrimerGalleryWindow: (restore) => this.openPrimerGalleryWindow(restore),
-        openPrimerBrowserWindow: (restore) => this.openPrimerBrowserWindow(restore),
-        openFileManagerWindow: (restore) => this.openFileManagerWindow(restore),
-        openTerminalWindow: () => this.openTerminalWindow(),
-        openXTermShellWindow: () => this.openXTermShellWindow(),
-        openPiChatWindow: () => this.openPiChatWindow(),
-        openBackroomsTv: (channel) => this.openBackroomsTv(channel),
-        openCompanionWindow: (restore) => this.openCompanionWindow(restore),
-        openArtWindow: () => this.openArtWindow(),
-        openStateInspectorWindow: () => this.openStateInspectorWindow(),
-        windows: this.windowManager
-      });
+      const restored = restoreWindowSnapshot(snapshot, this.getRestoreActions());
       if (snapshot.focused) {
         focusedWindow = restored;
       }
@@ -1947,11 +1808,9 @@ export class TsTuiMvpApp {
       saveWorkspaceAs: () => this.promptForWorkspaceSave(),
       loadWorkspacePrompt: () => this.promptForWorkspaceLoad(),
       openArtWindow: () => this.openArtWindow(),
-      openTerminal: () => void this.openTerminalWindow(),
       openXTermShell: () => void this.openXTermShellWindow(),
       openWibWobChat: () => this.openWibWobChatWindow(),
       openWibWobAgent: () => this.openWibWobAgentWindow(),
-      openPiChat: () => void this.openPiChatWindow(),
       quit: () => this.destroy(),
       focusNextWindow: () => this.windowManager.focusNextWindow(1),
       focusPreviousWindow: () => this.windowManager.focusNextWindow(-1),
@@ -1974,7 +1833,6 @@ export class TsTuiMvpApp {
       openPatternWindow: () => this.openPatternWindow(),
       openOrbitWindow: () => this.openOrbitWindow(),
       openGlitchWindow: () => this.openGlitchWindow(),
-      openChatWindow: () => this.openChatWindow(),
       openCompanionWindow: () => this.openCompanionWindow(),
       openWorkspaceManager: () => this.openWorkspaceManagerWindow(),
       openCommandPalette: () => this.openCommandPaletteWindow(),
@@ -2034,6 +1892,7 @@ export class TsTuiMvpApp {
   }
 
   private destroy(): void {
+    this.autoSaveWorkspace();
     this.controlApi.stop();
     this.screen.destroy();
     process.exit(0);

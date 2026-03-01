@@ -207,7 +207,7 @@ These rules are strict. Treat violations as bugs, not style nits.
 - `src/core/command-registry.ts` is the execution and projection layer over that catalog.
 - If you add a new user-visible command, add it to the command catalog first instead of hand-wiring menu and palette entries in multiple places.
 - Use explicit spaced `order` values (`0, 10, 20...`) so later insertions do not force renumbering.
-- Use `menuPlacements` for commands that appear in more than one menu. Do not duplicate those as separate command ids just to hit File/Window/Tools.
+- Use `menuPlacements` for commands that appear in more than one menu. Do not duplicate those as separate command ids just to hit File/View/Window/Applications.
 - `group` is for logical clustering and future separators/adapters.
 - `actionKey` must point at an `AppMenuActions` entry implemented by `app-controller.ts`.
 - Current registry phase covers menu/palette projection plus generic control API command discovery/execution.

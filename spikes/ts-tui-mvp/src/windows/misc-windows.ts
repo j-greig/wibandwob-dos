@@ -1,6 +1,5 @@
 import blessed from "blessed";
 
-import { makeWibReply, makeWobReply } from "../services/chat-service.js";
 import type { StateService } from "../services/state-service.js";
 import type { WorkspaceService } from "../services/workspace-service.js";
 import { createScrollbar } from "../core/ui-primitives.js";
@@ -101,89 +100,6 @@ export function openGlitchWindow(deps: BaseWindowDeps, sourceText: string): void
       )
       .join("\n")
   );
-}
-
-export function openChatWindow(
-  deps: BaseWindowDeps,
-  restore?: { transcriptLines?: string[]; draft?: string }
-): void {
-  const frame = deps.windowManager.createFrame("Wib & Wob Chat", "chat");
-  const transcript = blessed.log({
-    parent: frame.body,
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 1,
-    mouse: true,
-    scrollable: true,
-    alwaysScroll: true,
-    scrollbar: createScrollbar(),
-    style: { fg: "white", bg: "black" }
-  }) as LogBox;
-  const input = blessed.textbox({
-    parent: frame.body,
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 1,
-    inputOnFocus: true,
-    mouse: true,
-    style: { fg: "white", bg: "blue" }
-  });
-  const armChatInput = () => {
-    input.focus();
-    input.readInput();
-    deps.screen.render();
-  };
-  const initialLines = restore?.transcriptLines ?? [
-    "Wib: A new desktop blooms.",
-    "Wob: Systems nominal. Awaiting prompt."
-  ];
-  for (const line of initialLines) {
-    transcript.log(line);
-  }
-  if (restore?.draft) {
-    input.setValue(restore.draft);
-  }
-  input.on("submit", (value) => {
-    const message = (value ?? "").trim();
-    input.clearValue();
-    if (!message) {
-      armChatInput();
-      return;
-    }
-    transcript.log(`You: ${message}`);
-    transcript.log(`Wib: ${makeWibReply(message)}`);
-    transcript.log(`Wob: ${makeWobReply(message)}`);
-    deps.screen.render();
-    armChatInput();
-  });
-  frame.kind = "chat";
-  frame.chat = {
-    mode: "synthetic",
-    transcript,
-    input,
-    getTranscriptLines: () => transcript.getContent().split("\n").filter(Boolean),
-    getDraft: () => input.getValue(),
-    setDraft: (value) => input.setValue(value),
-    submit: (value) => input.emit("submit", value ?? input.getValue())
-  };
-  frame.describeState = () => ({
-    appType: "chat-transcript",
-    summary: "Synthetic Wib and Wob chat transcript.",
-    contentPreview: transcript.getContent().split("\n").slice(-8).join("\n"),
-    transcriptLineCount: transcript.getContent().split("\n").filter(Boolean).length,
-    inputValue: input.getValue()
-  });
-  frame.focus = () => {
-    deps.windowManager.focusWindow(frame);
-    armChatInput();
-  };
-  frame.body.on("click", armChatInput);
-  transcript.on("click", armChatInput);
-  input.on("focus", () => deps.windowManager.focusWindow(frame));
-  deps.windowManager.registerWindow(frame);
-  frame.focus();
 }
 
 export function openCompanionWindow(

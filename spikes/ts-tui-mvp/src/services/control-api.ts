@@ -44,7 +44,6 @@ interface ControlApiHandlers {
   openBrowserReader: (filePath?: string) => void;
   openFigletBanner: (text?: string, font?: string) => void;
   openArtWindow: () => void;
-  openChatWindow: () => void;
   openWibWobChat: () => void;
   openWibWobAgent: () => void;
   openCompanionWindow: () => void;
@@ -146,7 +145,6 @@ export class ControlApiService {
           "POST /view/browser-reader/open",
           "POST /view/figlet/open",
           "POST /view/art/open",
-          "POST /view/chat/open",
           "POST /view/wibwob-chat/open",
           "POST /view/wibwob-agent/open",
           "POST /view/companion/open",
@@ -249,10 +247,6 @@ export class ControlApiService {
     }
     if (request.method === "POST" && url.pathname === "/view/art/open") {
       this.handlers.openArtWindow();
-      return Response.json({ ok: true });
-    }
-    if (request.method === "POST" && url.pathname === "/view/chat/open") {
-      this.handlers.openChatWindow();
       return Response.json({ ok: true });
     }
     if (request.method === "POST" && url.pathname === "/view/wibwob-chat/open") {

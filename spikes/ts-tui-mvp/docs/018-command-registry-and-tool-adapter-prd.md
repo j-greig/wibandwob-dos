@@ -199,7 +199,7 @@ Each command should define:
 interface CommandDefinition<TArgs = unknown, TResult = unknown> {
   id: string;
   label: string;
-  category: "file" | "edit" | "view" | "window" | "tools" | "agent";
+  category: "file" | "edit" | "view" | "window" | "applications" | "agent";
   description: string;
   argsSchema?: unknown;
   visibility: {
@@ -276,7 +276,7 @@ Then derive:
 
 - `File -> Open File Manager`
 - `Window -> Open File Manager`
-- `Tools -> File Manager`
+- `Applications -> File Manager`
 - palette command
 - `POST /commands/file_manager.open`
 - agent tool `command_run("file_manager.open")`

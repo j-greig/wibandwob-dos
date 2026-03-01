@@ -17,8 +17,8 @@ User prompt:
 
 ## Problem
 
-The menu bar is static. Every command is dumped into File/Edit/View/Window/Tools
-regardless of what is focused. An editor window shows "Backrooms TV" in Tools.
+The menu bar is static. Every command is dumped into File/Edit/View/Window/Applications
+regardless of what is focused. An editor window shows "Backrooms TV" in Applications.
 A terminal window shows "Save" in File. The Chrome browser has no Navigate menu.
 The desktop shows editor commands when no editor is open.
 
@@ -29,6 +29,10 @@ app menu, Window) but their contents change.
 
 The current spike has a good command catalog and registry, but no concept of
 command context. Every command is globally visible at all times.
+
+There is also launcher sprawl. Desktop/application launchers are spread across
+File, Window, and Applications. The target experience should consolidate those into
+one Finder/Desktop-style launcher area instead of scattering them.
 
 ## Guiding Constraint
 
@@ -141,9 +145,16 @@ registry binds actions. Context filtering extends the same two-phase split.
 
 ### Phase 1: Static top-level menus, context-filtered items
 
-The top-level menu categories stay fixed: File, Edit, View, Window, Tools.
-Menu accelerators stay fixed: M-f, M-e, M-v, M-w, M-t. What changes is which
+The top-level menu categories stay fixed: File, Edit, View, Window, Applications.
+Menu accelerators stay fixed: M-f, M-e, M-v, M-w, M-a. What changes is which
 items appear in each menu based on the focused window kind.
+
+Desktop-mode rule for Phase 1:
+
+- keep the top-level buckets static
+- collapse application launchers into one desktop/Finder-style launcher section
+- derive that launcher section from the command registry, not from bespoke menu
+  code
 
 #### MenuQueryContext: focus + selection + state
 
@@ -517,13 +528,29 @@ And commands placed in these categories:
 }
 ```
 
-The menu bar builder merges the base categories (File/Edit/View/Window/Tools)
+The menu bar builder merges the base categories (File/Edit/View/Window/Applications)
 with any contextual categories active for the focused kind. Dynamic `left`
 positions are computed at render time.
 
 This requires `MenuOverlayManager` to support variable-length menu bars and
 rebinding accelerator keys. That is materially more complex than Phase 1 and
 should be scoped separately.
+
+Phase 2 is also the right place to decide whether the launcher section should
+graduate into a true top-level Finder/Desktop/Applications menu.
+
+## Declarative menu config
+
+The menu system can support a config layer, but only for presentation.
+
+Recommended split:
+
+- command ids, handlers, predicates, argument schemas: code
+- menu layout, grouping, labels, ordering, launcher sections: TOML
+- explanatory docs/help: Markdown
+
+That keeps the command registry as the only executable command-definition path
+while still allowing the menu bar to be tuned declaratively.
 
 ## Related Work (not in scope, but synergistic)
 

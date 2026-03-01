@@ -30,6 +30,23 @@ epics and stories should move toward.
 7. The app stays terminal-native; browser/webview-only solutions are reference,
    not runtime dependencies.
 
+## Reality Check
+
+This doc is the target shape, not a claim that the spike already matches it.
+
+Current known deltas:
+
+- `app-controller.ts` is still too large and still owns terminal and Backrooms
+  window construction directly.
+- some core modules still depend on service-layer types and helpers.
+- workspace snapshot and window state payloads are still more open-ended than
+  the target architecture wants.
+- startup still hardcodes a minimal fallback window instead of restoring the
+  default workspace on boot.
+- legacy Pi terminal and synthetic transcript chat flows have now been removed
+  from the live spike, so the remaining deltas are structural rather than
+  compatibility-driven.
+
 ## Top-Level Runtime Model
 
 ```text
@@ -47,20 +64,28 @@ ts-tui-mvp
 │   ├── agent-domain
 │   ├── terminal-domain
 │   ├── browser-domain
-│   └── persistence/integration
+│   ├── persistence/integration
+│   └── projection-adapters
 ├── windows/
 │   ├── content-windows
 │   ├── agent-windows
 │   ├── terminal-windows
-│   ├── utility-windows
-│   └── app-specific windows
-├── adapters/
-│   ├── control-api
-│   ├── agent-tools
-│   ├── future MCP
-│   └── future automation surfaces
+│   ├── backrooms-windows
+│   └── utility-windows
+├── tests/
+│   ├── command-contracts
+│   ├── state-contracts
+│   ├── workspace-roundtrip
+│   └── window-manager
 └── docs/
 ```
+
+Note:
+
+- `control-api.ts` and `agent-tools.ts` are projections of the core substrate.
+- They currently live under `src/services/` and that is acceptable for now.
+- If more projection surfaces arrive (`mcp`, `automation`, `ipc`), they should
+  migrate into a dedicated `src/adapters/` or `src/projections/` area together.
 
 ## Desired Source Tree
 
@@ -81,6 +106,7 @@ src/
 │   ├── command-types.ts
 │   ├── command-catalog.ts
 │   ├── command-registry.ts
+│   ├── menu-config.ts
 │   ├── menu-overlay-manager.ts
 │   ├── context-menu-items.ts
 │   ├── overlay-manager.ts
@@ -109,14 +135,43 @@ src/
 │   ├── text-windows.ts
 │   ├── content-windows.ts
 │   ├── figlet-windows.ts
+│   ├── terminal-windows.ts
+│   ├── backrooms-windows.ts
 │   ├── wibwob-agent-window.ts
 │   ├── chrome-browser-window.ts
 │   ├── backrooms-log-browser-window.ts
 │   └── misc-windows.ts
-└── adapters/
-    ├── mcp-adapter.ts
-    └── automation-adapter.ts
+└── tests/
+    ├── command-registry.test.ts
+    ├── state-service.test.ts
+    ├── workspace-snapshots.test.ts
+    └── window-manager.test.ts
 ```
+
+## Transitional Shims And Compatibility Flows
+
+These are live modules or flows today. They are allowed in the target tree only
+as transitional shims until their replacement is proven.
+
+### `src/core/menu-config.ts`
+
+Transitional shim around command wiring and menu actions. Keep until registry
+execution plus context-sensitive menu projection fully subsume the remaining
+manual action surface.
+
+### Removal list
+
+These should be struck off rather than carried forward into the target tree:
+
+- `src/services/pi-service.ts`
+- `src/services/chat-service.ts`
+- `terminal.open_pi_legacy`
+- `chat.open_transcript`
+
+The target architecture favors `wibwob-agent-window.ts` plus
+`wibwob-agent-session.ts` for native chat/agent behavior and `terminal-windows`
+for real shell panes. The nested Pi terminal path and synthetic transcript chat
+path should be deleted, not preserved as first-class compatibility surfaces.
 
 ## File Responsibilities
 
@@ -131,6 +186,13 @@ Owns runtime composition of the app. Wires together shell, services, windows,
 registry, state, menus, and adapters. It should orchestrate, not implement
 window-specific behavior.
 
+Startup contract:
+
+- on boot, try to restore the default workspace first
+- optionally later support a last-used-workspace pointer
+- only fall back to opening a bare minimum desktop surface such as Scramble if
+  no default workspace exists or the workspace cannot be loaded
+
 ### `src/core/config.ts`
 
 Central runtime paths, ports, and environment-derived defaults. No feature
@@ -140,6 +202,13 @@ logic.
 
 Cross-cutting domain types for windows, state, chat records, geometry, and
 shared UI contracts.
+
+Target note:
+
+- shared contracts that are consumed by both core and services should live here
+  or in a dedicated `core/contracts` area.
+- current reverse imports from core into services are tolerated only as a
+  transitional state.
 
 ### `src/core/desktop-geometry.ts`
 
@@ -166,10 +235,18 @@ agent tooling.
 Canonical command metadata types, command context, menu context, and adapter
 projection types.
 
+This file should eventually own:
+
+- typed command args/results
+- per-command argument schemas
+- API/agent validation contracts
+- context-menu selection payload types
+
 ### `src/core/command-catalog.ts`
 
 Single source of truth for user-visible commands. Defines ids, labels, category,
-ordering, placement, visibility, and enablement predicates.
+ordering, placement, visibility, enablement predicates, and argument-schema
+links.
 
 ### `src/core/command-registry.ts`
 
@@ -197,8 +274,9 @@ Small presentational primitives reused across windows and overlays.
 
 ### `src/core/workspace-snapshots.ts`
 
-Serializes and restores window snapshots using stable, typed payloads. No
-window-specific UI logic outside factory hooks.
+Serializes and restores window snapshots using typed payload contracts as the
+target state. The current spike still has open-ended payload maps and should
+move toward discriminated unions or runtime schemas.
 
 ### `src/services/state-service.ts`
 
@@ -241,9 +319,13 @@ Shared open/save/reveal actions across file-backed windows.
 Local HTTP control plane for state, command execution, test automation, and
 external driving of the TUI.
 
+Architecturally this is a projection adapter implemented in `services/` today.
+
 ### `src/services/agent-tools.ts`
 
 Registry-backed and low-level tools exposed to the native agent surface.
+
+Architecturally this is a projection adapter implemented in `services/` today.
 
 ### `src/services/wibwob-agent-session.ts`
 
@@ -280,6 +362,11 @@ Search integration service used by browser/agent flows.
 
 Transcript extraction service used by browser/agent flows.
 
+### `src/services/chat-service.ts`
+
+Legacy synthetic Wib/Wob chat helpers for the older non-agent chat surface.
+Compatibility-only until explicitly retired.
+
 ### `src/windows/text-windows.ts`
 
 Factories for editor-like text windows and closely related text-entry surfaces.
@@ -292,6 +379,16 @@ content-heavy panes.
 ### `src/windows/figlet-windows.ts`
 
 Factories for figlet/banner-related windows and pickers.
+
+### `src/windows/terminal-windows.ts`
+
+Factories for terminal, XTerm-shell, and future shell-like panes. Their logic
+should move here out of `app-controller.ts`.
+
+### `src/windows/backrooms-windows.ts`
+
+Factories for Backrooms TV, Backrooms primer picker, and related Backrooms
+panes. Their logic should move here out of `app-controller.ts`.
 
 ### `src/windows/wibwob-agent-window.ts`
 
@@ -310,13 +407,30 @@ Log browser window for Backrooms artifacts and previews.
 
 Lightweight utility windows that do not yet justify their own module group.
 
-### `src/adapters/mcp-adapter.ts`
+Extraction rule:
 
-Future projection of the command/state substrate into MCP resources and tools.
+- no new complex domain should land here
+- once a domain has 2+ related windows or >~200 lines of dedicated behavior,
+  it should move to its own module family
+- terminal and Backrooms are already past that threshold and should be
+  extracted first
 
-### `src/adapters/automation-adapter.ts`
+### `src/tests/command-registry.test.ts`
 
-Future projection of commands/state into recurring automation-safe tasks.
+Contract tests for command discovery, ordering, context filtering, and generic
+execution.
+
+### `src/tests/state-service.test.ts`
+
+Contract tests for semantic desktop state shape and key per-window fields.
+
+### `src/tests/workspace-snapshots.test.ts`
+
+Round-trip tests for snapshot serialization and restore semantics.
+
+### `src/tests/window-manager.test.ts`
+
+Behavioral tests for focus, z-order, drag, resize, tile, and cascade.
 
 ## Canonical Subsystems
 
@@ -346,13 +460,105 @@ rendering.
 Workspace save/load, run logs, app state, content metadata caches, and future
 multi-instance/event state.
 
+## Guardrails And Exit Criteria
+
+These are the checks that turn architectural intent into something enforceable.
+
+### `app-controller.ts` shrink target
+
+- target: controller stays orchestration-only
+- exit criterion: terminal and Backrooms window construction no longer live in
+  `app-controller.ts`
+- target threshold: controller should trend downward toward composition rather
+  than continue as the default landing zone
+
+### Command surface contract
+
+- registry owns user-visible command metadata
+- menus, palette, control API, agent tools, and context menus should all derive
+  shared actions from that registry
+- target-specific actions require typed selection payloads, not bespoke
+  side-channel callbacks
+
+### Snapshot/state contract
+
+- window snapshot payloads should move from `Record<string, unknown>` toward
+  discriminated unions or runtime-validated schemas
+- state details should become more structured where windows are first-class
+  long-lived surfaces
+
+### Test contract
+
+Before a seam is treated as stable, it should have spike-local coverage:
+
+- command registry: list/run/context behavior
+- state service: schema and key fields
+- workspace snapshots: round-trip restore
+- window manager: focus/drag/resize/layout behavior
+
 ## What This Architecture Rejects
 
 1. No second command-definition path in menus or context menus.
 2. No feature-specific state scraping when semantic state can be described once.
-3. No god-object growth in `app-controller.ts` for window-specific behavior.
+3. No indefinite god-object growth in `app-controller.ts` for window-specific behavior.
 4. No nested PTY TUI as the primary chat/agent architecture.
 5. No broad renderer pivot until the shell and command surface are boring.
+
+Today:
+
+- rules 1 and 4 are materially directionally enforced
+- rules 2, 3, and 5 are still active migration targets, not finished facts
+
+## Menu Direction
+
+The target menu system should have one consolidated desktop launcher area rather
+than scattering app/window launchers across multiple top-level menus.
+
+Target rule:
+
+- desktop mode gets a single Finder/Desktop-style launcher surface
+- application/window launchers live there first
+- app-specific commands still appear contextually in File/Edit/View/Window/Applications
+
+This does not require throwing away the command registry. It means the registry
+should support:
+
+- desktop launcher grouping
+- per-context top-level placement
+- contextual filtering without duplicating command definitions
+
+## Menu Configuration Strategy
+
+Use code for semantics and TOML for declarative presentation.
+
+Recommended split:
+
+- command ids, handlers, predicates, schemas: **code**
+- top-level menu grouping, ordering, labels, desktop/app launcher sections:
+  **TOML**
+- long-form help and human documentation: **Markdown**
+
+Why:
+
+- TOML is good for stable declarative menu structure
+- Markdown is good for docs and help, not machine-trustworthy menu config
+- predicates like `enabled(ctx)` and selection-aware behavior belong in code,
+  not in free-form config
+
+Target shape:
+
+- `menus/main.toml`
+  - top-level menu layout
+  - launcher sections
+  - ordering/group names
+- `menus/apps/*.toml`
+  - optional per-app presentation overrides
+  - labels, grouping, inclusion/exclusion of existing command ids
+
+Hard rule:
+
+- config may rearrange, rename, group, or hide command ids
+- config must not become a second executable command-definition path
 
 ## How Existing Docs Should Relate To This One
 
@@ -376,75 +582,3 @@ This doc should drive the next planning layer:
 
 Those should translate the target architecture into delivery slices without
 being trapped by the order or wording of older spike docs.
-
----
-
-## Review Findings (Codex, 2026-03-01)
-
-Automated architecture review by Codex subagent against landed code.
-Address these before promoting this doc to epic/story planning input.
-
-```json
-[
-  {
-    "type": "gap",
-    "section": "Desired Source Tree",
-    "summary": "The tree omits live modules that the current app still depends on.",
-    "detail": "The canonical tree leaves out src/core/menu-config.ts, src/services/pi-service.ts, and src/services/chat-service.ts. Those are not dead files: command-catalog.ts, command-registry.ts, app-controller.ts, and misc-windows.ts import them today. The doc should either include them in the steady-state tree or explicitly mark them as transitional shims with removal criteria."
-  },
-  {
-    "type": "contradiction",
-    "section": "Top-Level Runtime Model",
-    "summary": "Control API and agent tools are classified as adapters in one section and services in another.",
-    "detail": "The runtime model places control-api and agent-tools under adapters/, which implies they are projections of the core substrate. The desired tree and file responsibilities then place both under src/services/, which makes them look like domain services instead. That split weakens the architectural boundary the doc is trying to establish, especially once MCP and automation adapters arrive."
-  },
-  {
-    "type": "contradiction",
-    "section": "Principles",
-    "summary": "The document says window factories own window-specific behavior, but major window implementations still have no module home outside app-controller.ts.",
-    "detail": "Terminal, Backrooms primer picker, and Backrooms TV windows are still built directly inside app-controller.ts, and the desired tree does not reserve a terminal-windows.ts or backrooms-windows.ts destination for them. The top-level model talks about terminal and app-specific window groups, but the concrete tree does not. That leaves the controller as the default landing zone for some of the most complex window logic, which is the opposite of Principle 4."
-  },
-  {
-    "type": "concern",
-    "section": "File Responsibilities",
-    "summary": "The doc describes a layered core/services split, but the current core already depends on services.",
-    "detail": "src/core/types.ts imports ContentMeasurement from src/services/content-measurement.ts, and src/core/workspace-snapshots.ts imports getDefaultFigletFont from src/services/figlet-service.ts. That creates a reverse dependency from core into services and makes the layering less stable than the document implies. The doc should either formalize that dependency direction or move those shared contracts into core so the boundary is real."
-  },
-  {
-    "type": "gap",
-    "section": "src/core/command-types.ts",
-    "summary": "The command architecture still lacks a typed argument contract for API and agent execution.",
-    "detail": "The live command path still uses inline types in command-catalog.ts and an unvalidated Record<string, unknown> in CommandRegistry.run(). Parameterized commands such as Backrooms parsing are handled ad hoc in app-controller.ts, which means API and agent callers do not get a machine-checkable contract. For a registry that is supposed to be the single source of truth, argument schemas and validation rules are a missing seam."
-  },
-  {
-    "type": "concern",
-    "section": "What This Architecture Rejects",
-    "summary": "The rejection list mixes enforced rules with aspirational ones, but the doc does not say which are actually guarded.",
-    "detail": "The no-second-command-path rule is materially enforced by context-menu-items.ts delegating to the registry, and the chat/agent direction is mostly enforced by wibwob-agent-window.ts plus WibWobAgentSession. By contrast, the no-god-object rule is not enforced at all: app-controller.ts is still about 2050 lines and owns terminal, Backrooms, workspace restore, editor key handling, and control API composition. The doc needs explicit guardrails or exit criteria, otherwise that section reads more like intent than architecture."
-  },
-  {
-    "type": "contradiction",
-    "section": "src/core/workspace-snapshots.ts",
-    "summary": "The document overstates how typed the snapshot and state contracts currently are.",
-    "detail": "WindowSnapshot.payload is still Record<string, unknown>, and WindowStateDetails is an open-ended map with an index signature. Restore logic branches on free-form appType strings and manual property checks instead of discriminated unions or runtime schemas. That is workable for a spike, but it is weaker than the doc's claim of stable, typed payloads and semantic state."
-  },
-  {
-    "type": "gap",
-    "section": "Canonical Subsystems",
-    "summary": "The architecture doc does not say enough about testing or contract enforcement for the seams it treats as stable.",
-    "detail": "There are no spike-local test directories, and the doc does not define what must be covered before these interfaces are trusted. The command surface, WindowFacade, workspace snapshot round-trips, and StateService schema all need contract tests if they are meant to anchor future adapters and agents. Without that, the document names the seams but does not explain how regressions will be caught."
-  },
-  {
-    "type": "concern",
-    "section": "Canonical Subsystems",
-    "summary": "misc-windows.ts is too vague as a long-term bucket for a 15-20 window app.",
-    "detail": "For a tiny MVP, misc-windows.ts is fine, but the current app already has enough window types that the file risks becoming a junk drawer. The doc should define extraction thresholds or first-class groups for terminal, Backrooms, and utility windows instead of leaving only misc-windows.ts as the catch-all. Otherwise subsystem decomposition will drift back toward file-size-based organization instead of architectural boundaries."
-  },
-  {
-    "type": "question",
-    "section": "Agent Surface",
-    "summary": "The steady-state status of legacy chat and Pi terminal flows is unclear.",
-    "detail": "The doc says chat has collapsed into the native agent surface and rejects a nested PTY TUI as the primary chat architecture, but the app still exposes terminal.open_pi_legacy, PiService, and the older synthetic openChatWindow path. The desired tree omits those modules, which suggests they are not part of the target architecture, but the document never says that explicitly. It should state whether those flows are compatibility-only, deprecated, or intentionally preserved."
-  }
-]
-```

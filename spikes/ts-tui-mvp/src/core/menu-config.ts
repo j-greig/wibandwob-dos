@@ -15,11 +15,9 @@ export interface AppMenuActions {
   saveWorkspaceAs: () => void;
   loadWorkspacePrompt: () => void;
   openArtWindow: () => void;
-  openTerminal: () => void;
   openXTermShell: () => void;
   openWibWobChat: () => void;
   openWibWobAgent: () => void;
-  openPiChat: () => void;
   quit: () => void;
   focusNextWindow: () => void;
   focusPreviousWindow: () => void;
@@ -36,7 +34,6 @@ export interface AppMenuActions {
   openPatternWindow: () => void;
   openOrbitWindow: () => void;
   openGlitchWindow: () => void;
-  openChatWindow: () => void;
   openCompanionWindow: () => void;
   openWorkspaceManager: () => void;
   openCommandPalette: () => void;

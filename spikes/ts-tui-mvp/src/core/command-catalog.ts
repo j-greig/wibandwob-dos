@@ -1,7 +1,7 @@
 import type { MenuConfig, MenuItem } from "./types.js";
 import type { AppMenuActions } from "./menu-config.js";
 
-export type AppCommandCategory = "file" | "edit" | "view" | "window" | "tools";
+export type AppCommandCategory = "file" | "edit" | "view" | "window" | "applications";
 export type AppCommandGroup =
   | "browse"
   | "open"
@@ -81,7 +81,7 @@ const MENU_DEFINITIONS: MenuDefinition[] = [
   { category: "edit", label: "Edit", key: "e", left: 8 },
   { category: "view", label: "View", key: "v", left: 15 },
   { category: "window", label: "Window", key: "w", left: 22 },
-  { category: "tools", label: "Tools", key: "t", left: 31 }
+  { category: "applications", label: "Applications", key: "a", left: 31 }
 ];
 
 const APP_COMMANDS: AppCommandDefinition[] = [
@@ -97,11 +97,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     label: "Open File Manager",
     group: "browse",
     actionKey: "openFileManager",
-    menuPlacements: [
-      { category: "file", order: 10 },
-      { category: "window", order: 40 },
-      { category: "tools", order: 20, label: "File Manager" }
-    ],
+    menuPlacements: [{ category: "applications", order: 0 }],
     palettePlacement: { order: 10 },
     api: true,
     agent: true
@@ -164,29 +160,11 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     palettePlacement: { order: 80 }
   },
   {
-    id: "file.open_art_window",
-    label: "Open Art Window",
-    group: "open",
-    actionKey: "openArtWindow",
-    menuPlacements: [{ category: "file", order: 90 }]
-  },
-  {
-    id: "terminal.open_legacy",
-    label: "Open Terminal",
-    group: "open",
-    actionKey: "openTerminal",
-    menuPlacements: [{ category: "file", order: 100 }],
-    palettePlacement: { order: 100 }
-  },
-  {
     id: "terminal.open_xterm",
     label: "Open XTerm Shell",
     group: "open",
     actionKey: "openXTermShell",
-    menuPlacements: [
-      { category: "file", order: 110 },
-      { category: "tools", order: 140, label: "XTerm Shell" }
-    ],
+    menuPlacements: [{ category: "applications", order: 130, label: "XTerm Shell" }],
     palettePlacement: { order: 110 },
     contextMenu: { desktop: true, order: 50 },
     api: true,
@@ -197,11 +175,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     label: "Open Chrome Browser",
     group: "open",
     actionKey: "openChromeBrowser",
-    menuPlacements: [
-      { category: "file", order: 120 },
-      { category: "window", order: 60 },
-      { category: "tools", order: 40, label: "Chrome Browser" }
-    ],
+    menuPlacements: [{ category: "applications", order: 40 }],
     palettePlacement: { order: 120 },
     contextMenu: { desktop: true, order: 60 },
     api: true,
@@ -212,10 +186,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     label: "Open Wib&Wob Chat",
     group: "open",
     actionKey: "openWibWobChat",
-    menuPlacements: [
-      { category: "file", order: 130 },
-      { category: "tools", order: 100, label: "Wib&Wob Chat" }
-    ],
+    menuPlacements: [{ category: "applications", order: 110, label: "Wib&Wob Chat" }],
     palettePlacement: { order: 130 },
     contextMenu: { desktop: true, order: 70 },
     api: true,
@@ -226,26 +197,11 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     label: "Open Wib&Wob Agent",
     group: "open",
     actionKey: "openWibWobAgent",
-    menuPlacements: [
-      { category: "file", order: 140 },
-      { category: "tools", order: 110, label: "Wib&Wob Agent" }
-    ],
+    menuPlacements: [{ category: "applications", order: 120, label: "Wib&Wob Agent" }],
     palettePlacement: { order: 140 },
     contextMenu: { desktop: true, order: 80 },
     api: true,
     agent: true
-  },
-  {
-    id: "terminal.open_pi_legacy",
-    label: "Open Pi Terminal (Legacy)",
-    group: "open",
-    actionKey: "openPiChat",
-    menuPlacements: [
-      { category: "file", order: 150 },
-      { category: "tools", order: 150, label: "Pi Terminal (Legacy)" }
-    ],
-    palettePlacement: { order: 150 },
-    contextMenu: { desktop: true, order: 90 }
   },
   {
     id: "app.quit",
@@ -260,21 +216,21 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     label: "Focus Next Window",
     group: "focus",
     actionKey: "focusNextWindow",
-    menuPlacements: [{ category: "edit", order: 10 }]
+    menuPlacements: [{ category: "window", order: 10 }]
   },
   {
     id: "window.focus_previous",
     label: "Focus Previous Window",
     group: "focus",
     actionKey: "focusPreviousWindow",
-    menuPlacements: [{ category: "edit", order: 20 }]
+    menuPlacements: [{ category: "window", order: 20 }]
   },
   {
     id: "window.close_focused",
     label: "Close Focused Window",
     group: "focus",
     actionKey: "closeFocusedWindow",
-    menuPlacements: [{ category: "edit", order: 30 }]
+    menuPlacements: [{ category: "window", order: 30 }]
   },
 
   {
@@ -282,10 +238,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     label: "Backrooms TV...",
     group: "surface",
     actionKey: "openBackroomsPrompt",
-    menuPlacements: [
-      { category: "view", order: 10 },
-      { category: "tools", order: 0, label: "Backrooms TV" }
-    ],
+    menuPlacements: [{ category: "applications", order: 10 }],
     palettePlacement: { order: 0 },
     contextMenu: { desktop: true, order: 30 },
     api: true,
@@ -308,10 +261,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     group: "surface",
     actionKey: "openBackroomsLogBrowser",
     description: "Browse and preview backrooms TV log files. Two-pane view with list and live preview.",
-    menuPlacements: [
-      { category: "view", order: 20 },
-      { category: "tools", order: 5, label: "Backrooms Logs" }
-    ],
+    menuPlacements: [{ category: "applications", order: 20 }],
     palettePlacement: { order: 5 },
     api: true,
     agent: true
@@ -322,7 +272,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     label: "Tile Windows",
     group: "layout",
     actionKey: "tileWindows",
-    menuPlacements: [{ category: "window", order: 10 }],
+    menuPlacements: [{ category: "window", order: 40 }],
     palettePlacement: { order: 10 },
     contextMenu: { desktop: true, order: 100 },
     api: true,
@@ -333,7 +283,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     label: "Cascade Windows",
     group: "layout",
     actionKey: "cascadeWindows",
-    menuPlacements: [{ category: "window", order: 20 }],
+    menuPlacements: [{ category: "window", order: 50 }],
     palettePlacement: { order: 20 },
     contextMenu: { desktop: true, order: 110 },
     api: true,
@@ -344,10 +294,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     label: "Open Gallery",
     group: "surface",
     actionKey: "openGallery",
-    menuPlacements: [
-      { category: "window", order: 30 },
-      { category: "tools", order: 10, label: "Primer Gallery" }
-    ],
+    menuPlacements: [{ category: "applications", order: 30 }],
     palettePlacement: { order: 20 }
   },
   {
@@ -355,10 +302,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     label: "Open Browser",
     group: "surface",
     actionKey: "openBrowserReader",
-    menuPlacements: [
-      { category: "window", order: 50 },
-      { category: "tools", order: 30, label: "Browser Reader" }
-    ],
+    menuPlacements: [{ category: "applications", order: 50 }],
     palettePlacement: { order: 30 }
   },
   {
@@ -366,7 +310,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     label: "Open Art",
     group: "surface",
     actionKey: "openArtWindow",
-    menuPlacements: [{ category: "window", order: 70 }]
+    menuPlacements: [{ category: "applications", order: 60 }]
   },
 
   {
@@ -374,7 +318,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     label: "Open Figlet Banner",
     group: "surface",
     actionKey: "openFigletBanner",
-    menuPlacements: [{ category: "tools", order: 50, label: "Figlet Banner" }],
+    menuPlacements: [{ category: "applications", order: 70, label: "Figlet Banner" }],
     palettePlacement: { order: 50, label: "Open Figlet Banner" }
   },
   {
@@ -382,7 +326,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     label: "Pattern Window",
     group: "surface",
     actionKey: "openPatternWindow",
-    menuPlacements: [{ category: "tools", order: 60 }],
+    menuPlacements: [{ category: "applications", order: 80 }],
     palettePlacement: { order: 60 }
   },
   {
@@ -390,7 +334,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     label: "Orbit Window",
     group: "surface",
     actionKey: "openOrbitWindow",
-    menuPlacements: [{ category: "tools", order: 70 }],
+    menuPlacements: [{ category: "applications", order: 90 }],
     palettePlacement: { order: 70 }
   },
   {
@@ -398,23 +342,15 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     label: "Glitch FX",
     group: "surface",
     actionKey: "openGlitchWindow",
-    menuPlacements: [{ category: "tools", order: 80 }],
+    menuPlacements: [{ category: "applications", order: 100 }],
     palettePlacement: { order: 80, label: "Open Glitch FX Window" }
-  },
-  {
-    id: "chat.open_transcript",
-    label: "Chat Transcript",
-    group: "surface",
-    actionKey: "openChatWindow",
-    menuPlacements: [{ category: "tools", order: 90 }],
-    palettePlacement: { order: 90 }
   },
   {
     id: "companion.open",
     label: "Companion",
     group: "surface",
     actionKey: "openCompanionWindow",
-    menuPlacements: [{ category: "tools", order: 120 }],
+    menuPlacements: [{ category: "applications", order: 140 }],
     palettePlacement: { order: 120 }
   },
   {
@@ -422,7 +358,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     label: "Workspace Manager",
     group: "surface",
     actionKey: "openWorkspaceManager",
-    menuPlacements: [{ category: "tools", order: 130 }],
+    menuPlacements: [{ category: "applications", order: 150 }],
     palettePlacement: { order: 130 },
     contextMenu: { desktop: true, order: 40 }
   },
@@ -431,14 +367,14 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     label: "Command Palette",
     group: "inspect",
     actionKey: "openCommandPalette",
-    menuPlacements: [{ category: "tools", order: 160 }]
+    menuPlacements: [{ category: "view", order: 10 }]
   },
   {
     id: "inspector.open",
     label: "Open State Inspector",
     group: "inspect",
     actionKey: "openStateInspector",
-    menuPlacements: [{ category: "tools", order: 170 }],
+    menuPlacements: [{ category: "view", order: 20 }],
     palettePlacement: { order: 170 }
   },
   {

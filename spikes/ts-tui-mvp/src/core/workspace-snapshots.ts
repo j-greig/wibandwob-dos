@@ -79,7 +79,7 @@ export function buildWindowSnapshotPayload(window: WindowRecord): Record<string,
     case "terminal": {
       const details = window.describeState?.();
       return {
-        appType: typeof details?.appType === "string" ? details.appType : "terminal-shell"
+        appType: typeof details?.appType === "string" ? details.appType : "xterm-shell"
       };
     }
     case "companion": {
@@ -101,7 +101,6 @@ export interface WorkspaceRestoreActions {
   openPatternWindow: () => void;
   openOrbitWindow: () => void;
   openGlitchWindow: () => void;
-  openChatWindow: (restore?: { transcriptLines?: string[]; draft?: string }) => void;
   openWibWobChatWindow: (restore?: {
     transcriptLines?: string[];
     draft?: string;
@@ -110,9 +109,7 @@ export interface WorkspaceRestoreActions {
   openPrimerGalleryWindow: (restore?: { activeTabIndex?: number; searchValue?: string; selectedIndex?: number }) => void;
   openPrimerBrowserWindow: (restore?: { selectedIndex?: number }) => void;
   openFileManagerWindow: (restore?: { currentPath?: string; selectedIndex?: number; filterValue?: string }) => void;
-  openTerminalWindow: () => void | Promise<void>;
   openXTermShellWindow: () => void | Promise<void>;
-  openPiChatWindow: () => void | Promise<void>;
   openBackroomsTv: (channel: BackroomsChannel) => void;
   openCompanionWindow: (restore?: { tick?: number }) => void;
   openArtWindow: () => void;
@@ -159,22 +156,13 @@ export function restoreWindowSnapshot(snapshot: WindowSnapshot, actions: Workspa
       actions.openGlitchWindow();
       break;
     case "chat":
-      if (payload.appType === "wibwob-chat-v2") {
-        actions.openWibWobChatWindow({
-          transcriptLines: Array.isArray(payload.transcriptLines)
-            ? payload.transcriptLines.filter((line): line is string => typeof line === "string")
-            : undefined,
-          draft: typeof payload.draft === "string" ? payload.draft : undefined,
-          messages: payload.messages
-        });
-      } else {
-        actions.openChatWindow({
-          transcriptLines: Array.isArray(payload.transcriptLines)
-            ? payload.transcriptLines.filter((line): line is string => typeof line === "string")
-            : undefined,
-          draft: typeof payload.draft === "string" ? payload.draft : undefined
-        });
-      }
+      actions.openWibWobChatWindow({
+        transcriptLines: Array.isArray(payload.transcriptLines)
+          ? payload.transcriptLines.filter((line): line is string => typeof line === "string")
+          : undefined,
+        draft: typeof payload.draft === "string" ? payload.draft : undefined,
+        messages: payload.messages
+      });
       break;
     case "gallery":
       actions.openPrimerGalleryWindow({
@@ -197,13 +185,7 @@ export function restoreWindowSnapshot(snapshot: WindowSnapshot, actions: Workspa
       }
       break;
     case "terminal":
-      if (payload.appType === "xterm-shell") {
-        void actions.openXTermShellWindow();
-      } else if (payload.appType === "pi-chat") {
-        void actions.openPiChatWindow();
-      } else {
-        void actions.openTerminalWindow();
-      }
+      void actions.openXTermShellWindow();
       break;
     case "backrooms":
       actions.openBackroomsTv({
