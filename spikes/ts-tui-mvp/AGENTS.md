@@ -289,7 +289,7 @@ Current loop for terminal debugging:
 Convenience:
 - use `POST /view/xterm/restart` to close all current `xterm-shell` windows and reopen a fresh one
 - use `scripts/window-state-parity-loop.sh` to open a representative set of existing window families through the control API and verify their `appType` state surface
-- use `scripts/wibwob-chat-v2-smoke.sh` to open the native Pi SDK chat surface, send one prompt, and export both pane and text captures
+- use `scripts/wibwob-chat-v2-smoke.sh` to open the native `pi-agent-core` chat surface, send one prompt, and export both pane and text captures
 - use `POST /view/xterm/close` to close all current `xterm-shell` windows without reopening
 
 Current loop for native chat debugging:
@@ -299,7 +299,7 @@ Current loop for native chat debugging:
 4. `POST /windows/input` with the prompt text and a trailing carriage return
 5. wait for streaming to settle
 6. `POST /windows/text/export` to persist a text capture
-7. inspect `/state` for `taskLoop`, `messageCount`, `streaming`, and `status`
+7. inspect `/state` for `messageCount`, `streaming`, `status`, and `model`
 8. patch code and repeat
 
 Scratch artifacts:

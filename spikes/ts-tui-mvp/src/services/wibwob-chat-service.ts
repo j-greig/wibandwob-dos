@@ -1,22 +1,18 @@
+import fs from "node:fs";
+
+import { Agent, type AgentEvent, type ThinkingLevel } from "@mariozechner/pi-agent-core";
 import {
   AuthStorage,
-  createAgentSession,
-  createCodingTools,
-  DefaultResourceLoader,
   ModelRegistry,
-  SessionManager,
-  SettingsManager,
-  type AgentSession,
-  type AgentSessionEvent
+  SettingsManager
 } from "@mariozechner/pi-coding-agent";
 
-import { REPO_ROOT, SPIKE_PI_APPEND_SYSTEM_PATH, SPIKE_PI_DIR } from "../core/config.js";
-import type {
-  ChatMessageEntry,
-  ChatTaskItem,
-  ChatTaskLoop,
-  ChatTaskStory
-} from "../core/types.js";
+import {
+  REPO_ROOT,
+  SPIKE_PI_APPEND_SYSTEM_PATH,
+  SPIKE_PI_DIR
+} from "../core/config.js";
+import type { ChatMessageEntry } from "../core/types.js";
 
 interface WibWobChatSnapshot {
   ready: boolean;
@@ -26,126 +22,19 @@ interface WibWobChatSnapshot {
   model?: string;
   sessionId?: string;
   messageCount: number;
-  taskLoop?: ChatTaskLoop;
   messages: ChatMessageEntry[];
 }
 
 type Listener = (snapshot: WibWobChatSnapshot) => void;
 
-const TASK_LOOP_INSTRUCTIONS = `Before your visible reply, emit exactly one task loop block in this format:
-<task_loop>
-{"stories":[{"title":"...","description":"...","status":"pending","items":[{"title":"...","description":"...","status":"pending"}]}]}
-</task_loop>
-
-Rules:
-- use valid JSON only inside the tags
-- statuses are only "pending" or "passed"
-- keep the loop compact and update it every turn
-- if the request is conversational, still emit one minimal story called "Conversation"
-- after the closing tag, write the user-facing reply in plain text with Wib: and Wob: speaker markers
-- do not mention the task loop unless the user asks for it`;
-
-function buildPromptMessage(userMessage: string): string {
-  return `${TASK_LOOP_INSTRUCTIONS}
-
-User request:
-${userMessage}`;
-}
-
-function buildFallbackTaskLoop(userMessage: string): ChatTaskLoop {
-  const summary = userMessage.replace(/\s+/g, " ").trim() || "Conversation";
-  const short = summary.length > 56 ? `${summary.slice(0, 53)}...` : summary;
-  return {
-    stories: [
-      {
-        title: "Conversation",
-        description: short,
-        status: "pending",
-        items: [
-          {
-            title: "Respond to user",
-            description: short,
-            status: "pending"
-          }
-        ]
-      }
-    ]
-  };
-}
-
 function createMessageId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function normalizeTaskItem(value: unknown): ChatTaskItem | undefined {
-  if (!value || typeof value !== "object") {
-    return undefined;
-  }
-  const item = value as Record<string, unknown>;
-  const status = item.status === "passed" ? "passed" : item.status === "pending" ? "pending" : undefined;
-  if (typeof item.title !== "string" || typeof item.description !== "string" || !status) {
-    return undefined;
-  }
-  return {
-    title: item.title,
-    description: item.description,
-    status
-  };
-}
-
-function normalizeTaskStory(value: unknown): ChatTaskStory | undefined {
-  if (!value || typeof value !== "object") {
-    return undefined;
-  }
-  const story = value as Record<string, unknown>;
-  const status = story.status === "passed" ? "passed" : story.status === "pending" ? "pending" : undefined;
-  if (typeof story.title !== "string" || typeof story.description !== "string" || !status || !Array.isArray(story.items)) {
-    return undefined;
-  }
-  const items = story.items.map((item) => normalizeTaskItem(item)).filter((item): item is ChatTaskItem => Boolean(item));
-  if (items.length === 0) {
-    return undefined;
-  }
-  return {
-    title: story.title,
-    description: story.description,
-    status,
-    items
-  };
-}
-
-function extractTaskLoop(text: string): { visibleText: string; taskLoop?: ChatTaskLoop } {
-  const match = text.match(/<task_loop>\s*([\s\S]*?)\s*<\/task_loop>/i);
-  if (!match) {
-    return { visibleText: text.trim() };
-  }
-
-  let taskLoop: ChatTaskLoop | undefined;
-  try {
-    const parsed = JSON.parse(match[1]) as { stories?: unknown[] };
-    const stories = Array.isArray(parsed.stories)
-      ? parsed.stories
-          .map((story) => normalizeTaskStory(story))
-          .filter((story): story is ChatTaskStory => Boolean(story))
-      : [];
-    if (stories.length > 0) {
-      taskLoop = { stories };
-    }
-  } catch {
-    taskLoop = undefined;
-  }
-
-  const visibleText = text.replace(match[0], "").trim();
-  return {
-    visibleText,
-    taskLoop
-  };
 }
 
 function normalizeVisibleReply(text: string): string {
   const trimmed = text.trim();
   if (!trimmed) {
-    return "Wib: …\nWob: The line went missing.";
+    return "Wob: …";
   }
   if (/(^|\n)\s*(Wib|Wob):/i.test(trimmed)) {
     return trimmed;
@@ -153,68 +42,146 @@ function normalizeVisibleReply(text: string): string {
   return `Wob: ${trimmed}`;
 }
 
+function loadSystemPrompt(): string {
+  try {
+    return fs.readFileSync(SPIKE_PI_APPEND_SYSTEM_PATH, "utf8").trim();
+  } catch {
+    return [
+      "You are Wib & Wob, a two-voice assistant inside WibWob-DOS.",
+      "Keep replies concise, helpful, and written as Wib: / Wob: dialog when natural."
+    ].join("\n\n");
+  }
+}
+
+function resolveInitialModel(params: {
+  modelRegistry: ModelRegistry;
+  settingsManager: SettingsManager;
+}): {
+  model?: ReturnType<ModelRegistry["getAll"]>[number];
+  thinkingLevel: ThinkingLevel;
+} {
+  const availableModels = params.modelRegistry.getAvailable();
+  const defaultProvider = params.settingsManager.getDefaultProvider();
+  const defaultModelId = params.settingsManager.getDefaultModel();
+  const defaultThinkingLevel = params.settingsManager.getDefaultThinkingLevel();
+  const preferredModels: Array<[string, string]> = [
+    ["anthropic", "claude-sonnet-4-6"],
+    ["anthropic", "claude-opus-4-6"],
+    ["openai", "gpt-5.1-codex"],
+    ["google", "gemini-2.5-pro"],
+    ["openrouter", "openai/gpt-5.1-codex"],
+    ["vercel-ai-gateway", "anthropic/claude-opus-4-6"]
+  ];
+
+  for (const [provider, modelId] of preferredModels) {
+    const preferred = availableModels.find((model) => model.provider === provider && model.id === modelId);
+    if (preferred) {
+      return {
+        model: preferred,
+        thinkingLevel: defaultThinkingLevel ?? "off"
+      };
+    }
+  }
+
+  if (defaultProvider && defaultModelId) {
+    const found = params.modelRegistry.find(defaultProvider, defaultModelId);
+    if (found && availableModels.some((model) => model.provider === found.provider && model.id === found.id)) {
+      return {
+        model: found,
+        thinkingLevel: defaultThinkingLevel ?? "off"
+      };
+    }
+  }
+
+  return {
+    model: availableModels[0],
+    thinkingLevel: defaultThinkingLevel ?? "off"
+  };
+}
+
+function getUserContentText(message: unknown): string | undefined {
+  if (!message || typeof message !== "object") {
+    return undefined;
+  }
+  const role = Reflect.get(message, "role");
+  if (role !== "user" && role !== "assistant" && role !== "toolResult") {
+    return undefined;
+  }
+  const content = Reflect.get(message, "content");
+  if (typeof content === "string") {
+    return content;
+  }
+  if (!Array.isArray(content)) {
+    return undefined;
+  }
+  const textParts = content
+    .filter((part): part is { type?: unknown; text?: unknown } => Boolean(part) && typeof part === "object")
+    .filter((part) => part.type === "text" && typeof part.text === "string")
+    .map((part) => part.text as string);
+  return textParts.length > 0 ? textParts.join("") : undefined;
+}
+
+function getMessageRole(message: unknown): string | undefined {
+  if (!message || typeof message !== "object") {
+    return undefined;
+  }
+  const role = Reflect.get(message, "role");
+  return typeof role === "string" ? role : undefined;
+}
+
 export class WibWobChatSession {
   private readonly listeners = new Set<Listener>();
   private readonly messages: ChatMessageEntry[] = [];
-  private session?: AgentSession;
+  private agent?: Agent;
   private ready = false;
-  private status = "Starting Pi SDK session...";
+  private status = "Starting Pi agent...";
   private lastError?: string;
-  private taskLoop?: ChatTaskLoop;
   private currentAssistantId?: string;
-  private unsubscribe?: () => void;
   private lastToolName?: string;
+  private readonly sessionId = createMessageId("wibwob-chat");
 
   constructor(private readonly cwd: string = REPO_ROOT) {}
 
-  hydrate(state: { messages?: ChatMessageEntry[]; taskLoop?: ChatTaskLoop }): void {
+  hydrate(state: { messages?: ChatMessageEntry[] }): void {
     if (Array.isArray(state.messages) && state.messages.length > 0) {
       this.messages.length = 0;
       this.messages.push(...state.messages.map((message) => ({ ...message, streaming: false })));
-    }
-    if (state.taskLoop) {
-      this.taskLoop = state.taskLoop;
     }
     this.emit();
   }
 
   async initialize(): Promise<void> {
-    if (this.session) {
+    if (this.agent) {
       return;
     }
 
-    this.status = "Starting Pi SDK session...";
+    this.status = "Starting Pi agent...";
     this.emit();
 
     try {
       const authStorage = AuthStorage.create();
       const modelRegistry = new ModelRegistry(authStorage);
       const settingsManager = SettingsManager.create(this.cwd, SPIKE_PI_DIR);
-      const resourceLoader = new DefaultResourceLoader({
-        cwd: this.cwd,
-        agentDir: SPIKE_PI_DIR,
-        settingsManager,
-        appendSystemPrompt: SPIKE_PI_APPEND_SYSTEM_PATH,
-        appendSystemPromptOverride: (base) => [...base, TASK_LOOP_INSTRUCTIONS],
-        noThemes: true
-      });
+      const initialModel = resolveInitialModel({ modelRegistry, settingsManager });
 
-      const { session, modelFallbackMessage } = await createAgentSession({
-        cwd: this.cwd,
-        agentDir: SPIKE_PI_DIR,
-        authStorage,
-        modelRegistry,
-        settingsManager,
-        resourceLoader,
-        tools: createCodingTools(this.cwd),
-        sessionManager: SessionManager.inMemory(this.cwd)
-      });
+      if (!initialModel.model) {
+        throw new Error("No Pi model is available. Check provider auth/config.");
+      }
 
-      this.session = session;
+      this.agent = new Agent({
+        initialState: {
+          systemPrompt: loadSystemPrompt(),
+          model: initialModel.model,
+          thinkingLevel: initialModel.thinkingLevel,
+          messages: []
+        },
+        sessionId: this.sessionId,
+        getApiKey: (provider) => authStorage.getApiKey(provider)
+      });
+      this.agent.subscribe((event) => this.handleEvent(event));
       this.ready = true;
-      this.status = modelFallbackMessage ?? "Ready.";
+      this.status = "Ready.";
       this.lastError = undefined;
-      this.unsubscribe = session.subscribe((event) => this.handleEvent(event));
       this.emit();
     } catch (error) {
       this.ready = false;
@@ -230,10 +197,8 @@ export class WibWobChatSession {
   }
 
   dispose(): void {
-    this.unsubscribe?.();
-    this.unsubscribe = undefined;
-    this.session?.dispose();
-    this.session = undefined;
+    this.agent?.abort();
+    this.agent = undefined;
     this.ready = false;
     this.status = "Closed.";
     this.emit();
@@ -248,13 +213,12 @@ export class WibWobChatSession {
   getSnapshot(): WibWobChatSnapshot {
     return {
       ready: this.ready,
-      streaming: this.session?.isStreaming ?? false,
+      streaming: this.agent?.state.isStreaming ?? false,
       status: this.buildStatus(),
       lastError: this.lastError,
-      model: this.session?.model ? `${this.session.model.provider}/${this.session.model.id}` : undefined,
-      sessionId: this.session?.sessionId,
+      model: this.agent?.state.model ? `${this.agent.state.model.provider}/${this.agent.state.model.id}` : undefined,
+      sessionId: this.sessionId,
       messageCount: this.messages.length,
-      taskLoop: this.taskLoop,
       messages: this.messages.map((message) => ({ ...message }))
     };
   }
@@ -265,11 +229,11 @@ export class WibWobChatSession {
       return;
     }
 
-    if (!this.session) {
+    if (!this.agent) {
       await this.initialize();
     }
-    if (!this.session) {
-      throw new Error("Pi SDK session was not created");
+    if (!this.agent) {
+      throw new Error("Pi agent was not created");
     }
 
     this.messages.push({
@@ -277,7 +241,6 @@ export class WibWobChatSession {
       role: "user",
       text: message
     });
-    this.taskLoop = buildFallbackTaskLoop(message);
     this.currentAssistantId = createMessageId("assistant");
     this.messages.push({
       id: this.currentAssistantId,
@@ -290,10 +253,15 @@ export class WibWobChatSession {
     this.emit();
 
     try {
-      if (this.session.isStreaming) {
-        await this.session.prompt(buildPromptMessage(message), { streamingBehavior: "followUp" });
+      if (this.agent.state.isStreaming) {
+        this.agent.followUp({
+          role: "user",
+          content: [{ type: "text", text: message }],
+          timestamp: Date.now()
+        });
+        await this.agent.waitForIdle();
       } else {
-        await this.session.prompt(buildPromptMessage(message));
+        await this.agent.prompt(message);
       }
     } catch (error) {
       const assistant = this.findCurrentAssistant();
@@ -310,24 +278,11 @@ export class WibWobChatSession {
 
   captureText(): string {
     const parts: string[] = [];
-    parts.push("WIB&WOB CHAT V2");
+    parts.push("WIB&WOB CHAT");
     parts.push(`Status: ${this.buildStatus()}`);
-    const model = this.session?.model ? `${this.session.model.provider}/${this.session.model.id}` : "unselected";
+    const model = this.agent?.state.model ? `${this.agent.state.model.provider}/${this.agent.state.model.id}` : "unselected";
     parts.push(`Model: ${model}`);
     parts.push("");
-    parts.push("TASK LOOP");
-    if (this.taskLoop?.stories.length) {
-      for (const story of this.taskLoop.stories) {
-        parts.push(`[${story.status}] ${story.title} — ${story.description}`);
-        for (const item of story.items) {
-          parts.push(`  - [${item.status}] ${item.title} — ${item.description}`);
-        }
-      }
-    } else {
-      parts.push("(no task loop yet)");
-    }
-    parts.push("");
-    parts.push("TRANSCRIPT");
     for (const message of this.messages) {
       const prefix =
         message.role === "user"
@@ -360,21 +315,19 @@ export class WibWobChatSession {
     return this.currentAssistantId ? this.messages.find((message) => message.id === this.currentAssistantId) : undefined;
   }
 
-  private handleEvent(event: AgentSessionEvent): void {
+  private handleEvent(event: AgentEvent): void {
     switch (event.type) {
       case "message_start": {
-        if (event.message.role !== "assistant") {
+        if (getMessageRole(event.message) !== "assistant" || this.findCurrentAssistant()) {
           return;
         }
-        if (!this.findCurrentAssistant()) {
-          this.currentAssistantId = createMessageId("assistant");
-          this.messages.push({
-            id: this.currentAssistantId,
-            role: "assistant",
-            text: "",
-            streaming: true
-          });
-        }
+        this.currentAssistantId = createMessageId("assistant");
+        this.messages.push({
+          id: this.currentAssistantId,
+          role: "assistant",
+          text: "",
+          streaming: true
+        });
         this.status = "Streaming...";
         this.emit();
         return;
@@ -408,15 +361,24 @@ export class WibWobChatSession {
         this.status = event.isError ? `Tool ${event.toolName} failed.` : `Tool ${event.toolName} finished.`;
         this.emit();
         return;
+      case "message_end": {
+        if (getMessageRole(event.message) !== "assistant") {
+          return;
+        }
+        const assistant = this.findCurrentAssistant();
+        if (assistant) {
+          assistant.text = normalizeVisibleReply(getUserContentText(event.message) || assistant.text);
+          assistant.streaming = false;
+          this.status = "Ready.";
+          this.emit();
+        }
+        return;
+      }
       case "agent_end": {
         const assistant = this.findCurrentAssistant();
         if (assistant) {
-          const extracted = extractTaskLoop(assistant.text);
-          assistant.text = normalizeVisibleReply(extracted.visibleText);
+          assistant.text = normalizeVisibleReply(assistant.text);
           assistant.streaming = false;
-          if (extracted.taskLoop) {
-            this.taskLoop = extracted.taskLoop;
-          }
         }
         this.currentAssistantId = undefined;
         this.lastToolName = undefined;

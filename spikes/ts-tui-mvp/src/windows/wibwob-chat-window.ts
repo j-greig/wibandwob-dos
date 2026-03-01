@@ -4,29 +4,9 @@ import { createScrollbar } from "../core/ui-primitives.js";
 import type {
   Box,
   ChatMessageEntry,
-  ChatTaskLoop,
-  ChatTaskStory,
-  Textbox,
-  WindowRecord
 } from "../core/types.js";
 import type { WindowManager } from "../core/window-manager.js";
 import type { WibWobChatSession } from "../services/wibwob-chat-service.js";
-
-function renderTaskLoop(taskLoop?: ChatTaskLoop): string {
-  if (!taskLoop?.stories.length) {
-    return "TASK LOOP\nNo task loop yet.";
-  }
-
-  const lines = ["TASK LOOP"];
-  for (const story of taskLoop.stories.slice(0, 3)) {
-    lines.push(`[${story.status}] ${story.title}`);
-    lines.push(`  ${story.description}`);
-    for (const item of story.items.slice(0, 4)) {
-      lines.push(`  - [${item.status}] ${item.title}`);
-    }
-  }
-  return lines.join("\n");
-}
 
 function renderMessage(message: ChatMessageEntry): string {
   if (message.role === "user") {
@@ -45,26 +25,6 @@ function renderTranscript(messages: ChatMessageEntry[]): string {
   return messages.map((message) => renderMessage(message)).join("\n\n");
 }
 
-function summarizeTaskLoop(taskLoop?: ChatTaskLoop): { pending: number; passed: number } {
-  let pending = 0;
-  let passed = 0;
-  for (const story of taskLoop?.stories ?? []) {
-    if (story.status === "passed") {
-      passed += 1;
-    } else {
-      pending += 1;
-    }
-    for (const item of story.items) {
-      if (item.status === "passed") {
-        passed += 1;
-      } else {
-        pending += 1;
-      }
-    }
-  }
-  return { pending, passed };
-}
-
 export function openWibWobChatWindow(params: {
   screen: blessed.Widgets.Screen;
   windowManager: WindowManager;
@@ -72,22 +32,12 @@ export function openWibWobChatWindow(params: {
   restore?: {
     messages?: ChatMessageEntry[];
     draft?: string;
-    taskLoop?: ChatTaskLoop;
   };
 }): void {
   const frame = params.windowManager.createFrame("Wib&Wob Chat", "chat");
-  const taskPanel = blessed.box({
-    parent: frame.body,
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 7,
-    tags: false,
-    style: { fg: "yellow", bg: "black" }
-  });
   const transcript = blessed.box({
     parent: frame.body,
-    top: 7,
+    top: 0,
     left: 0,
     right: 0,
     bottom: 1,
@@ -98,63 +48,59 @@ export function openWibWobChatWindow(params: {
     scrollbar: createScrollbar(),
     style: { fg: "white", bg: "black" }
   });
-  const input = blessed.textbox({
+  const input = blessed.box({
     parent: frame.body,
     bottom: 0,
     left: 0,
     right: 0,
     height: 1,
-    inputOnFocus: true,
+    keys: true,
     mouse: true,
     style: { fg: "white", bg: "blue" }
   });
+  let draft = "";
 
   if (params.restore) {
     params.chat.hydrate({
-      messages: params.restore.messages,
-      taskLoop: params.restore.taskLoop
+      messages: params.restore.messages
     });
     if (params.restore.draft) {
-      input.setValue(params.restore.draft);
+      draft = params.restore.draft;
     }
   }
 
-  let inputArmed = false;
+  const renderInput = () => {
+    const width = Math.max(1, Number(input.width) || 1);
+    const visibleWidth = Math.max(1, width - 1);
+    const visible = draft.slice(-visibleWidth);
+    const cursor = input === params.screen.focused ? "_" : " ";
+    input.setContent((visible + cursor).padEnd(width, " "));
+  };
 
   const armInput = () => {
     params.windowManager.focusWindow(frame);
     input.focus();
-    if (inputArmed) {
-      params.screen.render();
-      return;
-    }
-    inputArmed = true;
-    input.readInput();
+    renderInput();
     params.screen.render();
   };
 
   const submit = (override?: string) => {
-    inputArmed = false;
-    const value = (override ?? input.getValue() ?? "").trim();
-    input.clearValue();
+    const value = (override ?? draft).trim();
+    draft = "";
+    renderInput();
     params.screen.render();
     if (!value) {
       armInput();
       return;
     }
-    void params.chat.send(value).finally(() => {
-      armInput();
-    });
+    void params.chat.send(value).finally(() => params.screen.render());
   };
 
   const render = () => {
     const snapshot = params.chat.getSnapshot();
-    const loopSummary = summarizeTaskLoop(snapshot.taskLoop);
-    taskPanel.setContent(
-      `${renderTaskLoop(snapshot.taskLoop)}\n\nStatus: ${snapshot.status}\nMessages: ${snapshot.messageCount}  Pending: ${loopSummary.pending}  Passed: ${loopSummary.passed}`
-    );
     transcript.setContent(renderTranscript(snapshot.messages));
     transcript.setScrollPerc(100);
+    renderInput();
     params.screen.render();
   };
 
@@ -162,18 +108,44 @@ export function openWibWobChatWindow(params: {
   render();
   void params.chat.initialize();
 
-  input.on("submit", (value) => submit(value ?? ""));
-  input.on("cancel", () => {
-    inputArmed = false;
+  frame.frame.on("resize", () => render());
+  frame.body.on("click", () => armInput());
+  transcript.on("click", () => armInput());
+  input.on("focus", () => {
+    params.windowManager.focusWindow(frame);
+    renderInput();
     params.screen.render();
   });
   input.on("blur", () => {
-    inputArmed = false;
+    renderInput();
+    params.screen.render();
   });
-  frame.body.on("click", () => armInput());
-  transcript.on("click", () => armInput());
-  taskPanel.on("click", () => armInput());
-  input.on("focus", () => params.windowManager.focusWindow(frame));
+  input.on("keypress", (ch, key) => {
+    if (key.name === "enter") {
+      submit();
+      return;
+    }
+    if (key.name === "backspace") {
+      draft = draft.slice(0, -1);
+      renderInput();
+      params.screen.render();
+      return;
+    }
+    if (key.name === "escape") {
+      return;
+    }
+    if (key.ctrl && key.name === "u") {
+      draft = "";
+      renderInput();
+      params.screen.render();
+      return;
+    }
+    if (typeof ch === "string" && ch.length > 0 && !key.ctrl && !key.meta) {
+      draft += ch;
+      renderInput();
+      params.screen.render();
+    }
+  });
 
   frame.kind = "chat";
   frame.chat = {
@@ -181,18 +153,19 @@ export function openWibWobChatWindow(params: {
     transcript,
     input,
     getTranscriptLines: () => renderTranscript(params.chat.getSnapshot().messages).split("\n"),
-    getDraft: () => input.getValue(),
-    setDraft: (value) => input.setValue(value),
+    getDraft: () => draft,
+    setDraft: (value) => {
+      draft = value;
+      renderInput();
+    },
     submit,
-    messages: params.chat.getSnapshot().messages,
-    taskLoop: params.chat.getSnapshot().taskLoop
+    messages: params.chat.getSnapshot().messages
   };
   frame.describeState = () => {
     const snapshot = params.chat.getSnapshot();
-    const loopSummary = summarizeTaskLoop(snapshot.taskLoop);
     return {
       appType: "wibwob-chat-v2",
-      summary: "Native Pi SDK chat window with task-loop rendering.",
+      summary: "Native Pi SDK chat window.",
       contentPreview: renderTranscript(snapshot.messages).split("\n").slice(-8).join("\n"),
       transcriptLines: snapshot.messages.map((message) => renderMessage(message)),
       messageCount: snapshot.messageCount,
@@ -201,11 +174,8 @@ export function openWibWobChatWindow(params: {
       ready: snapshot.ready,
       streaming: snapshot.streaming,
       lastError: snapshot.lastError,
-      pendingTaskCount: loopSummary.pending,
-      passedTaskCount: loopSummary.passed,
-      draft: input.getValue(),
-      messages: snapshot.messages,
-      taskLoop: snapshot.taskLoop
+      draft,
+      messages: snapshot.messages
     };
   };
   frame.captureText = () => params.chat.captureText();
@@ -223,12 +193,13 @@ export function openWibWobChatWindow(params: {
     }
     const normalized = text.replace(/\r\n/g, "\n");
     const segments = normalized.split(/\n/);
-    const initial = input.getValue();
-    input.setValue(initial + segments[0]);
+    draft += segments[0];
+    renderInput();
     for (const segment of segments.slice(1)) {
       submit();
       if (segment) {
-        input.setValue(segment);
+        draft = segment;
+        renderInput();
       }
     }
     if (normalized.includes("\r") || normalized.endsWith("\n")) {

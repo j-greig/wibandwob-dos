@@ -53,8 +53,7 @@ export function buildWindowSnapshotPayload(window: WindowRecord): Record<string,
             appType: window.describeState?.().appType ?? "chat-transcript",
             transcriptLines: window.chat.getTranscriptLines(),
             draft: window.chat.getDraft(),
-            messages: window.describeState?.().messages,
-            taskLoop: window.describeState?.().taskLoop
+            messages: window.describeState?.().messages
           }
         : undefined;
     case "backrooms": {
@@ -103,7 +102,6 @@ export interface WorkspaceRestoreActions {
     transcriptLines?: string[];
     draft?: string;
     messages?: unknown;
-    taskLoop?: unknown;
   }) => void;
   openPrimerGalleryWindow: (restore?: { activeTabIndex?: number; searchValue?: string; selectedIndex?: number }) => void;
   openPrimerBrowserWindow: (restore?: { selectedIndex?: number }) => void;
@@ -162,8 +160,7 @@ export function restoreWindowSnapshot(snapshot: WindowSnapshot, actions: Workspa
             ? payload.transcriptLines.filter((line): line is string => typeof line === "string")
             : undefined,
           draft: typeof payload.draft === "string" ? payload.draft : undefined,
-          messages: payload.messages,
-          taskLoop: payload.taskLoop
+          messages: payload.messages
         });
       } else {
         actions.openChatWindow({

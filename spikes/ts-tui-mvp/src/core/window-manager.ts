@@ -8,6 +8,8 @@ export class WindowManager {
   private nextWindowId = 1;
   private dragState?: DragState;
   private resizeState?: ResizeState;
+  private suppressClickWindowId?: number;
+  private suppressClickUntil = 0;
 
   constructor(
     private readonly screen: blessed.Widgets.Screen,
@@ -53,7 +55,7 @@ export class WindowManager {
     const screenHeight = Number(this.screen.height);
     const frame = blessed.box({
       parent: this.desktop,
-      top: 1 + offset,
+      top: offset,
       left: 2 + offset,
       width: Math.min(screenWidth - 6, 72),
       height: Math.min(screenHeight - 6, 20),
@@ -148,15 +150,30 @@ export class WindowManager {
       openContextMenu: (x, y) => this.onWindowContextMenu?.(record, x, y)
     };
 
-    closeHint.on("click", () => record.close());
-    frame.on("click", () => this.focusWindow(record));
+    closeHint.on("click", () => {
+      if (this.shouldSuppressClick(record)) {
+        return;
+      }
+      record.close();
+    });
+    frame.on("click", () => {
+      if (this.shouldSuppressClick(record)) {
+        return;
+      }
+      this.focusWindow(record);
+    });
     frame.on("mousedown", (data) => {
       this.focusWindow(record);
       if (this.isRightClick(data)) {
         record.openContextMenu?.(data.x, data.y);
       }
     });
-    titleBar.on("click", () => this.focusWindow(record));
+    titleBar.on("click", () => {
+      if (this.shouldSuppressClick(record)) {
+        return;
+      }
+      this.focusWindow(record);
+    });
     titleBar.on("mousedown", (data) => {
       this.focusWindow(record);
       if (this.isRightClick(data)) {
@@ -196,7 +213,7 @@ export class WindowManager {
       this.windows.push(active);
     }
     this.focusedWindow = record;
-    record.frame.setFront();
+    this.syncZOrder();
     for (const window of this.windows) {
       const active = window.id === record.id;
       window.frame.style.border = { fg: active ? "cyan" : "white" };
@@ -245,7 +262,7 @@ export class WindowManager {
     const frameWidth = Number(record.frame.width);
     const frameHeight = Number(record.frame.height);
     record.frame.left = this.clamp(left, 0, Math.max(0, screenWidth - frameWidth));
-    record.frame.top = this.clamp(top, 1, Math.max(1, screenHeight - 2 - frameHeight));
+    record.frame.top = this.clamp(top, 0, Math.max(0, screenHeight - 2 - frameHeight));
     this.onChange?.();
     this.screen.render();
     return true;
@@ -310,11 +327,11 @@ export class WindowManager {
       const column = index % columns;
       const row = Math.floor(index / columns);
       const left = column * cellWidth;
-      const top = 1 + row * cellHeight;
+      const top = row * cellHeight;
       const width = column === columns - 1 ? desktopWidth - left : cellWidth;
       const height = row === rows - 1 ? desktopHeight - row * cellHeight : cellHeight;
       window.frame.left = Math.max(0, left);
-      window.frame.top = Math.max(1, top);
+      window.frame.top = Math.max(0, top);
       window.frame.width = Math.max(24, width);
       window.frame.height = Math.max(8, height);
     }
@@ -330,8 +347,8 @@ export class WindowManager {
     const height = Math.min(desktopHeight - 2, 20);
     for (const [index, window] of this.windows.entries()) {
       const offset = index * 2;
-      window.frame.left = this.clamp(offset, 0, Math.max(0, desktopWidth - width));
-      window.frame.top = this.clamp(1 + offset, 1, Math.max(1, desktopHeight - height));
+      window.frame.left = this.clamp(1 + offset, 1, Math.max(1, desktopWidth - width));
+      window.frame.top = this.clamp(offset, 0, Math.max(0, desktopHeight - height));
       window.frame.width = width;
       window.frame.height = height;
     }
@@ -345,6 +362,10 @@ export class WindowManager {
       return;
     }
     if (data.action === "mouseup") {
+      if (dragState.moved) {
+        this.suppressClickWindowId = dragState.windowId;
+        this.suppressClickUntil = Date.now() + 150;
+      }
       this.dragState = undefined;
       return;
     }
@@ -361,15 +382,22 @@ export class WindowManager {
     const screenHeight = Number(this.screen.height);
     const frameWidth = Number(record.frame.width);
     const frameHeight = Number(record.frame.height);
-    const nextLeft = this.clamp(data.x - dragState.offsetX, 0, Math.max(0, screenWidth - frameWidth));
+    const nextLeft = this.clamp(
+      dragState.originLeft + (data.x - dragState.startX),
+      0,
+      Math.max(0, screenWidth - frameWidth)
+    );
     const nextTop = this.clamp(
-      data.y - dragState.offsetY,
-      1,
-      Math.max(1, screenHeight - 2 - frameHeight)
+      dragState.originTop + (data.y - dragState.startY),
+      0,
+      Math.max(0, screenHeight - 2 - frameHeight)
     );
 
     record.frame.left = nextLeft;
     record.frame.top = nextTop;
+    if (nextLeft !== dragState.originLeft || nextTop !== dragState.originTop) {
+      dragState.moved = true;
+    }
     this.onChange?.();
     this.screen.render();
   }
@@ -406,15 +434,20 @@ export class WindowManager {
   }
 
   private startDrag(record: WindowRecord, data: blessed.Widgets.Events.IMouseEventArg): void {
-    const coords = record.frame.lpos;
-    if (!coords) {
-      return;
-    }
     this.dragState = {
       windowId: record.id,
-      offsetX: data.x - coords.xi,
-      offsetY: data.y - coords.yi
+      originLeft: Number(record.frame.left),
+      originTop: Number(record.frame.top),
+      startX: data.x,
+      startY: data.y,
+      moved: false
     };
+  }
+
+  private syncZOrder(): void {
+    for (const window of this.windows) {
+      window.frame.setFront();
+    }
   }
 
   private startResize(record: WindowRecord, data: blessed.Widgets.Events.IMouseEventArg): void {
@@ -439,5 +472,17 @@ export class WindowManager {
     }
     const mouseData = data as blessed.Widgets.Events.IMouseEventArg & { button?: string | number; buttons?: string | number };
     return mouseData.button === "right" || mouseData.button === 2 || mouseData.buttons === "right" || mouseData.buttons === 2;
+  }
+
+  private shouldSuppressClick(record: WindowRecord): boolean {
+    if (this.suppressClickWindowId !== record.id) {
+      return false;
+    }
+    if (Date.now() <= this.suppressClickUntil) {
+      return true;
+    }
+    this.suppressClickWindowId = undefined;
+    this.suppressClickUntil = 0;
+    return false;
   }
 }

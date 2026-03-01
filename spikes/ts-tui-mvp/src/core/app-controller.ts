@@ -18,9 +18,6 @@ import type {
   Box,
   BrowserEntry,
   ChatMessageEntry,
-  ChatTaskItem,
-  ChatTaskLoop,
-  ChatTaskStory,
   DesktopState,
   GalleryTab,
   List,
@@ -132,6 +129,7 @@ export class TsTuiMvpApp {
       this.screen,
       this.desktop,
       () => {
+        this.repaintDesktop();
         this.syncState();
         this.refreshTerminalWindows();
       },
@@ -232,7 +230,10 @@ export class TsTuiMvpApp {
   }
 
   private repaintDesktop(): void {
-    this.desktop.setContent("");
+    const width = Math.max(1, Number(this.screen.width));
+    const height = Math.max(1, Number(this.screen.height) - 2);
+    const line = " ".repeat(width);
+    this.desktop.setContent(Array.from({ length: height }, () => line).join("\n"));
   }
 
   private bindGlobalKeys(): void {
@@ -370,7 +371,6 @@ export class TsTuiMvpApp {
     transcriptLines?: string[];
     draft?: string;
     messages?: unknown;
-    taskLoop?: unknown;
   }): void {
     const session = this.wibwobChat.createSession(REPO_ROOT);
     openNativeWibWobChatWindow({
@@ -381,8 +381,7 @@ export class TsTuiMvpApp {
         draft: restore?.draft,
         messages: Array.isArray(restore?.messages)
           ? restore.messages.filter((message): message is ChatMessageEntry => this.isChatMessageEntry(message))
-          : undefined,
-        taskLoop: this.normalizeTaskLoop(restore?.taskLoop)
+          : undefined
       }
     });
   }
@@ -1857,62 +1856,6 @@ export class TsTuiMvpApp {
       (entry.role === "system" || entry.role === "user" || entry.role === "assistant" || entry.role === "status") &&
       typeof entry.text === "string"
     );
-  }
-
-  private normalizeTaskLoop(value: unknown): ChatTaskLoop | undefined {
-    if (!value || typeof value !== "object") {
-      return undefined;
-    }
-    const loop = value as Record<string, unknown>;
-    if (!Array.isArray(loop.stories)) {
-      return undefined;
-    }
-    const stories = loop.stories
-      .map((story) => this.normalizeTaskStory(story))
-      .filter((story): story is ChatTaskStory => Boolean(story));
-    return stories.length > 0 ? { stories } : undefined;
-  }
-
-  private normalizeTaskStory(value: unknown): ChatTaskStory | undefined {
-    if (!value || typeof value !== "object") {
-      return undefined;
-    }
-    const story = value as Record<string, unknown>;
-    if (
-      typeof story.title !== "string" ||
-      typeof story.description !== "string" ||
-      (story.status !== "pending" && story.status !== "passed") ||
-      !Array.isArray(story.items)
-    ) {
-      return undefined;
-    }
-    const items = story.items
-      .map((item) => this.normalizeTaskItem(item))
-      .filter((item): item is ChatTaskItem => Boolean(item));
-    return items.length > 0
-      ? {
-          title: story.title,
-          description: story.description,
-          status: story.status,
-          items
-        }
-      : undefined;
-  }
-
-  private normalizeTaskItem(value: unknown): ChatTaskItem | undefined {
-    if (!value || typeof value !== "object") {
-      return undefined;
-    }
-    const item = value as Record<string, unknown>;
-    return typeof item.title === "string" &&
-      typeof item.description === "string" &&
-      (item.status === "pending" || item.status === "passed")
-      ? {
-          title: item.title,
-          description: item.description,
-          status: item.status
-        }
-      : undefined;
   }
 
   focusWindowById(id: number): boolean {

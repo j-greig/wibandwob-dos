@@ -98,7 +98,7 @@ export interface ChatMessageEntry {
 export interface ChatState {
   mode: "synthetic" | "pi-sdk";
   transcript: Box;
-  input: Textbox;
+  input: Box | Textbox;
   getTranscriptLines: () => string[];
   getDraft: () => string;
   setDraft: (value: string) => void;
@@ -193,8 +193,11 @@ export interface WindowRecord {
 
 export interface DragState {
   windowId: number;
-  offsetX: number;
-  offsetY: number;
+  originLeft: number;
+  originTop: number;
+  startX: number;
+  startY: number;
+  moved: boolean;
 }
 
 export interface ResizeState {
