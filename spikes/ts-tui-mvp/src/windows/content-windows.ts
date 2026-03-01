@@ -338,7 +338,8 @@ export function openFileManagerWindow(params: {
   overlays: OverlayManager;
   startPath: string;
   onOpenFile: (filePath: string) => void;
-  restore?: { currentPath?: string; selectedIndex?: number };
+  onViewFile: (filePath: string) => void;
+  restore?: { currentPath?: string; selectedIndex?: number; filterValue?: string };
 }): void {
   const initialPath = params.restore?.currentPath ?? params.startPath;
   if (!fs.existsSync(initialPath) || !fs.statSync(initialPath).isDirectory()) {
@@ -355,9 +356,17 @@ export function openFileManagerWindow(params: {
     height: 1,
     style: { fg: "black", bg: "cyan" }
   });
-  const list = blessed.list({
+  const filterBox = blessed.box({
     parent: frame.body,
     top: 1,
+    left: 0,
+    width: "36%",
+    height: 1,
+    style: { fg: "black", bg: "white" }
+  });
+  const list = blessed.list({
+    parent: frame.body,
+    top: 2,
     left: 0,
     width: "36%",
     bottom: 0,
@@ -369,9 +378,18 @@ export function openFileManagerWindow(params: {
     scrollbar: createScrollbar(),
     style: { fg: "white", bg: "black", selected: { fg: "black", bg: "white" } }
   });
-  const preview = blessed.box({
+  const previewHeader = blessed.box({
     parent: frame.body,
     top: 1,
+    left: "36%",
+    right: 0,
+    height: 4,
+    content: " ____  ____  _____ _   _ _____ _____ _    _\n|  _ \\|  _ \\| ____| | | | ____|_   _| |  | |\n| |_) | |_) |  _| | | | |  _|   | | | |  | |\n|  __/|  _ <| |___| |_| | |___  | | | |__| |\n|_|   |_| \\_\\_____|\\___/|_____| |_|  \\____/\n",
+    style: { fg: "yellow", bg: "black" }
+  });
+  const preview = blessed.box({
+    parent: frame.body,
+    top: 5,
     left: "36%",
     right: 0,
     bottom: 0,
@@ -383,7 +401,18 @@ export function openFileManagerWindow(params: {
   });
 
   let currentPath = initialPath;
+  let allEntries: Array<{ label: string; fullPath: string; isDirectory: boolean }> = [];
   let entries: Array<{ label: string; fullPath: string; isDirectory: boolean }> = [];
+  let filterValue = params.restore?.filterValue ?? "";
+
+  const renderFilter = () => {
+    const prefix = inputFocused() ? "/" : "/";
+    const width = Math.max(1, Number(filterBox.width) || 1);
+    const visible = filterValue.slice(-(width - 2));
+    filterBox.setContent(`${prefix}${visible}`.padEnd(width, " "));
+  };
+
+  const inputFocused = () => filterBox === params.screen.focused;
 
   const buildEntries = (directoryPath: string) => {
     const names = fs.readdirSync(directoryPath, { withFileTypes: true })
@@ -436,20 +465,33 @@ export function openFileManagerWindow(params: {
     params.screen.render();
   };
 
-  const navigateTo = (directoryPath: string, selectedIndex = 0) => {
-    currentPath = directoryPath;
-    entries = buildEntries(directoryPath);
-    header.setContent(` Enter open  Backspace parent  Path: ${currentPath} `);
+  const applyFilter = (selectedIndex = 0) => {
+    const normalized = filterValue.trim().toLowerCase();
+    entries = normalized.length === 0
+      ? [...allEntries]
+      : allEntries.filter((entry) => entry.label.toLowerCase().includes(normalized));
     list.setItems(entries.map((entry) => entry.label));
     const safeIndex = Math.max(0, Math.min(selectedIndex, Math.max(0, entries.length - 1)));
     list.select(safeIndex);
     updatePreview(safeIndex);
+    renderFilter();
     params.screen.render();
   };
 
-  const openSelected = (index?: number) => {
+  const navigateTo = (directoryPath: string, selectedIndex = 0) => {
+    currentPath = directoryPath;
+    allEntries = buildEntries(directoryPath);
+    header.setContent(` Enter edit  v view  / filter  Backspace parent  Path: ${currentPath} `);
+    applyFilter(selectedIndex);
+  };
+
+  const getSelectedEntry = (index?: number) => {
     const currentIndex = typeof index === "number" ? index : (list as List & { selected: number }).selected ?? 0;
-    const entry = entries[currentIndex];
+    return entries[currentIndex];
+  };
+
+  const openSelected = (index?: number) => {
+    const entry = getSelectedEntry(index);
     if (!entry) {
       return;
     }
@@ -459,11 +501,28 @@ export function openFileManagerWindow(params: {
     }
     params.onOpenFile(entry.fullPath);
   };
+  const viewSelected = (index?: number) => {
+    const entry = getSelectedEntry(index);
+    if (!entry || entry.isDirectory) {
+      return;
+    }
+    params.onViewFile(entry.fullPath);
+  };
 
   list.on("select", (_, index) => updatePreview(index));
   list.on("keypress", (ch, key) => {
     if (key.name === "enter") {
       openSelected();
+      return;
+    }
+    if (key.name === "v") {
+      viewSelected();
+      return;
+    }
+    if (key.name === "slash") {
+      filterBox.focus();
+      renderFilter();
+      params.screen.render();
       return;
     }
     if (key.name === "backspace") {
@@ -489,12 +548,38 @@ export function openFileManagerWindow(params: {
       }
     }
   });
+  filterBox.on("focus", () => {
+    params.windowManager.focusWindow(frame);
+    renderFilter();
+    params.screen.render();
+  });
+  filterBox.on("blur", () => {
+    renderFilter();
+    params.screen.render();
+  });
+  filterBox.on("keypress", (ch, key) => {
+    if (key.name === "enter" || key.name === "escape") {
+      list.focus();
+      params.screen.render();
+      return;
+    }
+    if (key.name === "backspace") {
+      filterValue = filterValue.slice(0, -1);
+      applyFilter();
+      return;
+    }
+    if (typeof ch === "string" && /^[ -~]$/.test(ch) && !key.ctrl && !key.meta) {
+      filterValue += ch;
+      applyFilter();
+    }
+  });
 
   frame.kind = "browser";
   frame.describeState = () => ({
     appType: "farjs-file-manager",
     summary: `File manager at ${currentPath}`,
     currentPath,
+    filterValue,
     selectedIndex: (list as List & { selected: number }).selected ?? 0,
     selectedLabel: entries[(list as List & { selected: number }).selected ?? 0]?.label,
     entryCount: entries.length,

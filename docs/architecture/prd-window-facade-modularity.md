@@ -353,3 +353,614 @@ FILE REFERENCE
   core/types.ts                 WindowRecord lines 175-192
   services/control-api.ts       ControlApiHandlers lines 32-58
   services/agent-tools.ts       TuiToolContext lines 26-42
+
+
+ADDENDUM: ARCHITECTURE-WIDE DRY AND MODULARITY AUDIT
+
+Date: 2026-03-01
+
+
+PRD REVIEW
+
+The WindowFacade PRD is sound.
+
+It correctly identifies the most immediate duplicated
+window-operations contract and the restore race caused
+by async openers plus getLastWindow().
+
+Two things are missing:
+
+1. The same problem exists for window OPENING, not just
+   window OPERATIONS. open-* callbacks are duplicated
+   across menus, context menus, control API handlers,
+   workspace restore, and agent tool maps.
+
+2. The larger root cause is not only "missing facade".
+   It is "no canonical window type/module contract".
+   Without a WindowTypeRegistry / WindowTypeModule seam,
+   facade work will reduce one hotspot but not the
+   switchboards and bag-of-optionals elsewhere.
+
+Recommended PRD follow-on:
+
+  After WindowFacade, the next extraction should be:
+
+    WindowTypeModule<TState>
+      create()
+      describeState()
+      serializeSnapshot()
+      restoreSnapshot()
+      getMenuEntries?()
+      getCommands?()
+
+  and a WindowTypeRegistry keyed by app/window slug.
+
+
+ROOT CAUSE
+
+The spike has no single module boundary for a window
+type or a user command.
+
+Because of that, each new feature is mirrored by hand
+across:
+
+  - shared type bags
+  - app-controller wrapper methods
+  - control-api interfaces and routes
+  - agent tool interfaces and maps
+  - menu and palette action interfaces
+  - workspace snapshot switches
+  - per-window describeState closures
+
+The repeated declarations are not accidental. They are
+the result of missing first-class abstractions for:
+
+  - window capabilities
+  - window type registration
+  - snapshot/state ownership
+  - command dispatch
+  - editor session ownership
+  - overlay prompt composition
+  - theme tokens
+
+
+FINDINGS
+
+1. Repeated window OPENING contracts and spawn maps
+
+Problem
+  The same open-* surface is declared in multiple
+  interfaces and maps:
+
+  menu-config.ts:3-37
+    AppMenuActions lists ~30 open/save/window actions.
+
+  context-menu-items.ts:3-12
+    SystemContextActions repeats a subset.
+
+  control-api.ts:32-60
+    ControlApiHandlers repeats another subset.
+
+  workspace-snapshots.ts:94-121
+    WorkspaceRestoreActions repeats restore openers.
+
+  app-controller.ts:153-181, 322-333, 403-454,
+  1915-1935, 1947-1983
+    The same window types are manually re-exposed via
+    constructor wiring, system menu wiring, agent tool
+    maps, restore actions, and menu action builders.
+
+Shotgun surgery count
+  Adding one new window type usually touches 5-7 places:
+  menu-config, control-api handlers, app-controller
+  constructor wiring, agent open map, restore actions,
+  snapshot restore switch, and often context menu.
+
+Extracted abstraction
+  WindowTypeRegistry plus OpenWindowService.
+
+  Registry owns:
+    slug
+    label
+    create/open
+    restore
+    menu/palette metadata
+    control-api exposure metadata
+    agent exposure metadata
+
+Future feature impact
+  Blocks BUILD-ORDER step 2 directly.
+  Complicates every new window type, especially paint,
+  browser, games, and agent surfaces.
+
+Effort
+  1.5-2.5 days for a 3-window pilot.
+
+
+2. Snapshot serialize/restore switchboards are still
+   centralized and drift-prone
+
+Problem
+  workspace-snapshots.ts:6-91
+    buildWindowSnapshotPayload() is a switch on
+    window.kind with per-kind payload conventions.
+
+  workspace-snapshots.ts:123-232
+    restoreWindowSnapshot() is another switch on
+    snapshot.kind with more per-kind branching on
+    payload.appType.
+
+  windows/*.ts and app-controller.ts define ad-hoc
+  describeState() payloads independently:
+    text-windows.ts:36-42
+    content-windows.ts:62-67, 232-238, 307-318,
+      578-584
+    misc-windows.ts:39-43, 171-176, 219-223,
+      268-272, 337-343, 375-379, 416-420
+    wibwob-chat-window.ts:164-178
+    wibwob-agent-window.ts:203-211
+    app-controller.ts:590-605, 735-741, 978-983,
+      1326-1334
+
+  State shape, snapshot shape, and restore shape are
+  owned by different files. They can drift silently.
+
+Shotgun surgery count
+  Changing one window's persisted state commonly
+  touches 3-5 places:
+  window file describeState, workspace serialize,
+  workspace restore, app-controller open signature,
+  and sometimes control/state consumers.
+
+Extracted abstraction
+  WindowTypeModule<TState> with:
+    describeState(record): WindowStateDetails
+    serialize(record): SnapshotPayload
+    restore(snapshot, deps): Promise<WindowRecord>
+
+Future feature impact
+  Directly blocks BUILD-ORDER step 2 and step 3.
+  Makes workspace save/load, screenshot regression,
+  and state/control parity brittle as more windows land.
+
+Effort
+  2-3 days once registry extraction starts.
+
+
+3. WindowRecord is a growing bag of optionals instead
+   of a capability model
+
+Problem
+  types.ts:171-193
+    WindowRecord mixes every window family's private
+    state and hooks:
+      editor?
+      isDirty?
+      lastSavedContent?
+      terminal?
+      chat?
+      writeInput?
+      cleanup?
+      refresh?
+      captureText?
+      describeState?
+      openContextMenu?
+
+  Consumers probe these ad hoc:
+    app-controller.ts:441-445, 459-461, 2025-2044
+    workspace-snapshots.ts:22-88
+    state-service.ts:96-112
+    context-menu-items.ts:28-32
+
+  This is feature envy plus SRP breakage. Shared code
+  knows too much about each window family's internals.
+
+Shotgun surgery count
+  Adding a new capability usually touches 4+ places:
+  types.ts, window factory, controller/service call
+  sites, and snapshot/state code.
+
+Extracted abstraction
+  Keep WindowRecord minimal:
+    id, kind, title, frame, focus, close
+
+  Move per-family data into module-owned state and add
+  small capability interfaces:
+    TextCapturable
+    InputWritable
+    StateDescribable
+    SnapshotSerializable
+    ResizableContent
+
+Future feature impact
+  Directly called out by BUILD-ORDER-FINAL and
+  refactor-epoch-plan.
+  Will get worse with paint, games, browser state,
+  richer terminal state, and per-window commands.
+
+Effort
+  2-4 days depending on how many windows migrate.
+
+
+4. Editor behavior is split across three layers with no
+   canonical editor service boundary
+
+Problem
+  text-windows.ts:7-50
+    openEditorWindow() creates the frame and editor
+    state but does not own mutation lifecycle.
+
+  app-controller.ts:1565-1620, 1651-1778, 2034-2044
+    Controller owns save orchestration, save-as write,
+    dirty tracking, title rendering, keyboard edits,
+    tool/API edits, and render calls.
+
+  file-actions.ts:81-123
+    saveEditorWindow()/writeEditorWindow() own file IO
+    and some title/filePath updates.
+
+  editor-service.ts:3-35
+    Owns low-level text mutation and render.
+
+  A behavior change like "editor write should update
+  dirty state and title consistently" spans four files.
+
+Shotgun surgery count
+  4 files for editor mutation/save behavior:
+  app-controller, text-windows, file-actions,
+  editor-service.
+
+Extracted abstraction
+  EditorSession / EditorFacade:
+    insertText
+    deleteBackward
+    deleteForward
+    moveCursor
+    render
+    save
+    saveAs
+    markDirty/markClean
+    describeState
+
+  Window factory should host the session, not the
+  controller.
+
+Future feature impact
+  Complicates docs/development/spike-editor-save.md.
+  Will block richer editor model work from BUILD-ORDER
+  step 6 and any command/API parity for editor actions.
+
+Effort
+  1-1.5 days.
+
+
+5. Command surfaces are duplicated across menu,
+   palette, control API, and agent tools
+
+Problem
+  menu-config.ts:41-144
+    Menu items and palette commands are hand-listed.
+
+  control-api.ts:185-321
+    REST routes are hand-dispatched per behavior.
+
+  agent-tools.ts:24-227
+    Agent tools are hand-declared per behavior.
+
+  app-controller.ts:152-181, 1947-1983
+    AppController wires each callback separately.
+
+  Same intent, four representations, no typed registry.
+
+Shotgun surgery count
+  A new command-like behavior can touch 4-6 places:
+  controller method, control-api route, handler
+  interface, menu/palette entry, agent tool, and docs.
+
+Extracted abstraction
+  CommandRegistry:
+    name
+    label
+    schema
+    execute
+    menu visibility
+    API visibility
+    agent visibility
+
+Future feature impact
+  Directly blocks BUILD-ORDER step 4.
+  Makes external agent integration unstable because
+  prompts freeze around ad-hoc routes/tools.
+
+Effort
+  2 days for core commands and adapters.
+
+
+6. OverlayManager duplicates prompt/list-browser logic
+   and remains a UI god object
+
+Problem
+  overlay-manager.ts:51-105
+    openValuePrompt()
+
+  overlay-manager.ts:108-191
+    openPathPrompt()
+
+  overlay-manager.ts:214-399
+    openBrowserPrompt()
+
+  overlay-manager.ts:403-648
+    openFileBrowserPrompt()
+
+  openBrowserPrompt() and openFileBrowserPrompt()
+  duplicate modal creation, search box wiring, list
+  wiring, close cleanup, preview plumbing, and jump
+  behavior. The file browser is mostly "browser prompt
+  plus directory source".
+
+Shotgun surgery count
+  Search/list UX changes require 2-4 edits inside the
+  same class, and any new picker is likely to copy one
+  of these again.
+
+Extracted abstraction
+  PromptOverlay primitives:
+    ModalPrompt
+    FilterableListPrompt
+    PreviewPanePrompt
+    FileSystemDataSource
+
+Future feature impact
+  Complicates future font pickers, browser pickers,
+  save/load prompts, command palette evolution, and
+  themed overlay work.
+
+Effort
+  1-1.5 days.
+
+
+7. WibWob chat windows are parallel implementations of
+   the same transcript/input shell
+
+Problem
+  wibwob-chat-window.ts:24-190
+    Native chat window.
+
+  wibwob-agent-window.ts:54-230
+    Agent chat window.
+
+  Both create:
+    transcript pane
+    input pane
+    local draft state
+    renderInput()
+    focus/blur/click wiring
+    keypress handling
+    subscribe/unsubscribe lifecycle
+    writeInput()
+    describeState()
+
+  They already diverge:
+    different wrap behavior
+    different status line behavior
+    different transcript formatting
+    different restore/hydrate paths
+
+Shotgun surgery count
+  Chat-shell behavior changes touch 2 files now, and
+  likely a third when Pi/PTy chat parity is revisited.
+
+Extracted abstraction
+  ChatWindowView / TranscriptComposer with pluggable:
+    session adapter
+    message renderer
+    status renderer
+    input policy
+
+Future feature impact
+  Directly complicates
+  spk-agent-window-enhancement.md.
+  Tool event rendering, model switching, history clear,
+  and workspace persistence will drift between chat
+  windows unless unified.
+
+Effort
+  1-2 days.
+
+
+8. Content measurement and metadata mapping are still
+   duplicated instead of becoming one content contract
+
+Problem
+  content-service.ts:171-190
+    readPrimerMetadata() measures primer files.
+
+  file-actions.ts:39-77
+    openPrimerFile() re-reads and re-measures primer
+    content instead of consuming canonical metadata.
+
+  content-windows.ts:268-330
+    openTextViewerWindow() defines another inline
+    contentMeasurement shape.
+
+  app-controller.ts:1987-2001
+    getPrimerInfo() remaps the same metadata again.
+
+  figlet-service.ts:138-157
+    Figlet has a separate measure path and result shape.
+
+Shotgun surgery count
+  Adding one new metadata field like contentAspect or
+  recommendedChrome touches 4-5 places.
+
+Extracted abstraction
+  MeasuredContent / ContentDescriptor:
+    sourceType
+    contentWidth
+    contentHeight
+    recommendedWidth
+    recommendedHeight
+    animated
+    frameCount
+    previewText
+
+  All open/info/state APIs consume this shared type.
+
+Future feature impact
+  Directly blocks BUILD-ORDER step 1, step 5 parcel
+  work, and universal typeInfo sizing workflows.
+
+Effort
+  1 day.
+
+
+9. Theme and chrome styling are duplicated as literals
+   across core and window factories
+
+Problem
+  window-manager.ts:66-121
+    frame/title/body/close/grip styles are inline.
+
+  overlay-manager.ts:31-35, 62-65, 77-79, 125-128,
+  140-154, 230-289, 423-483
+    prompt styles repeat the same fg/bg/border triples.
+
+  windows/*.ts repeat white/black/blue/cyan styling:
+    text-windows.ts:27
+    content-windows.ts:30,45,99,109,124,136,178,
+      301,357,365,379,388,400
+    misc-windows.ts:28,121,131,202,242,299,318,
+      371,408
+    wibwob-chat-window.ts:49,59
+    wibwob-agent-window.ts:78,87,98
+    figlet-windows.ts:55,69
+
+Shotgun surgery count
+  A theme pass already means multi-file edits.
+  Adding desktop presets would multiply this.
+
+Extracted abstraction
+  Theme tokens:
+    frameBorderActive
+    frameBorderInactive
+    titleBar
+    textBody
+    inputField
+    menuAccent
+    footerHint
+    notification
+
+  WindowManager and overlays consume roles, not colors.
+
+Future feature impact
+  Directly blocks BUILD-ORDER step 5.
+  Also makes extracted modules copy visual literals.
+
+Effort
+  0.5-1 day.
+
+
+10. State contract is structurally weak: describeState()
+    is untyped and doubles as live UI summary plus
+    persistence source
+
+Problem
+  types.ts:102-107
+    WindowStateDetails has only appType plus an index
+    signature `[key: string]: unknown`.
+
+  state-service.ts:96-112
+    StateService trusts describeState() blindly.
+
+  workspace-snapshots.ts:29-88
+    Snapshot payload extraction reaches back into that
+    loose shape via typeof checks.
+
+  This is a DRY violation at the schema level. The same
+  meaning is re-encoded by convention, not by type.
+
+Shotgun surgery count
+  Any field rename or shape change touches producer,
+  state consumer, snapshot serializer, restore logic,
+  and sometimes API consumers.
+
+Extracted abstraction
+  Per-window typed state DTO owned by the module.
+  State service should consume a typed module contract,
+  not a free-form bag.
+
+Future feature impact
+  Blocks reliable state/control parity and regression
+  fixtures from BUILD-ORDER step 3.
+
+Effort
+  Fold into WindowTypeModule work above.
+
+
+PRIORITY ORDER
+
+If fixing in dependency order:
+
+  1. WindowFacade
+  2. WindowTypeRegistry / module contract
+  3. WindowRecord capability cleanup
+  4. CommandRegistry
+  5. EditorSession extraction
+  6. Overlay prompt primitives
+  7. Chat shell unification
+  8. ContentDescriptor unification
+  9. Theme tokens
+
+
+RISKS IF LEFT AS-IS
+
+  New window types will continue to require edits in
+  5+ files.
+
+  Workspace save/load will drift from live state.
+
+  Agent tools and control API will keep exposing subtly
+  different semantics for the same action.
+
+  Theme work will become a mass search/replace across
+  factories instead of a token swap.
+
+  The next large feature (paint, browser, game, or
+  richer editor) will expand app-controller again
+  instead of shrinking it.
+
+
+TESTS TO ADD WITH THE REFACTOR
+
+  WindowFacade contract tests:
+    get/focus/move/resize/close/sendInput/writeEditor/
+    captureText semantics.
+
+  WindowTypeModule round-trip tests:
+    create -> describeState -> serialize -> restore.
+
+  Workspace restore async tests:
+    buffered terminal/xterm/pi openers restore geometry
+    onto the correct record.
+
+  CommandRegistry adapter tests:
+    same command callable from menu, API, and agent
+    adapter with one implementation.
+
+  EditorSession tests:
+    insert/delete/cursor/save/save-as/dirty/title sync.
+
+  Overlay prompt tests:
+    filter, selection, preview, close cleanup, path
+    completion, and directory navigation.
+
+  Chat shell tests:
+    input handling, transcript rendering, tool event
+    rendering, and hydrate/restore parity.
+
+  ContentDescriptor tests:
+    primer and figlet measurement map to one schema.
+
+  Theme token smoke tests:
+    a token change updates frame, overlays, and at
+    least one extracted window family.

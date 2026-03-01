@@ -1375,7 +1375,7 @@ export class TsTuiMvpApp {
     });
   }
 
-  private openFileManagerWindow(restore?: { currentPath?: string; selectedIndex?: number }): void {
+  private openFileManagerWindow(restore?: { currentPath?: string; selectedIndex?: number; filterValue?: string }): void {
     openFarjsFileManagerWindow({
       screen: this.screen,
       windowManager: this.windowManager,
@@ -1384,6 +1384,10 @@ export class TsTuiMvpApp {
       restore,
       onOpenFile: (filePath) => {
         this.openEditorWindow(filePath, path.basename(filePath), fs.readFileSync(filePath, "utf8"));
+      },
+      onViewFile: (filePath) => {
+        const content = fs.readFileSync(filePath, "utf8");
+        this.openTextViewerWindow(path.basename(filePath), content, "reader", filePath);
       }
     });
   }

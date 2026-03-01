@@ -7,6 +7,9 @@
  */
 
 import blessed from "blessed";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { createScrollbar } from "../core/ui-primitives.js";
 import type { Box, ChatMessageEntry } from "../core/types.js";
 import type { WindowManager } from "../core/window-manager.js";
@@ -56,6 +59,23 @@ function renderTranscript(messages: ChatMessageEntry[]): string {
   return messages.map(renderMessage).join("\n\n");
 }
 
+/** Find the most recent Claude Code JSONL for the current project cwd. */
+function findClaudeCodeJsonl(cwd: string): string | null {
+  try {
+    const safePath = cwd.replace(/\//g, "-");
+    const projectDir = path.join(os.homedir(), ".claude", "projects", safePath);
+    if (!fs.existsSync(projectDir)) return null;
+    const files = fs.readdirSync(projectDir)
+      .filter((f) => f.endsWith(".jsonl"))
+      .map((f) => ({ f, mtime: fs.statSync(path.join(projectDir, f)).mtimeMs }))
+      .sort((a, b) => b.mtime - a.mtime);
+    if (!files.length) return null;
+    return path.join(projectDir, files[0].f);
+  } catch {
+    return null;
+  }
+}
+
 export function openWibWobAgentWindow(params: {
   screen: blessed.Widgets.Screen;
   windowManager: WindowManager;
@@ -63,9 +83,21 @@ export function openWibWobAgentWindow(params: {
 }): void {
   const frame = params.windowManager.createFrame("Wib&Wob Agent", "chat");
 
-  const transcript = blessed.box({
+  // Top info bar — model + session ID on the right, Claude Code log link on the left
+  const infoBar = blessed.box({
     parent: frame.body,
     top: 0,
+    left: 0,
+    right: 0,
+    height: 1,
+    tags: true,
+    mouse: true,
+    style: { fg: C.muted, bg: "black" },
+  });
+
+  const transcript = blessed.box({
+    parent: frame.body,
+    top: 1,
     left: 0,
     right: 0,
     bottom: 2,
@@ -129,11 +161,50 @@ export function openWibWobAgentWindow(params: {
     params.screen.render();
   };
 
+  // Info bar — rendered once and updated when model info changes
+  const cwd = process.cwd();
+  const claudeJsonl = findClaudeCodeJsonl(cwd);
+
+  const renderInfoBar = (model: string, sessionId: string) => {
+    const barWidth = Math.max(1, Number(infoBar.width) || 80);
+    // Right side: model + session short ID
+    const shortSession = sessionId.replace(/^wibwob-agent-/, "").slice(0, 8);
+    const right = `${model}  #${shortSession}`;
+    // Left side: claude code log link if available
+    const left = claudeJsonl
+      ? `{${C.blue}-fg}cc:${path.basename(claudeJsonl, ".jsonl").slice(0, 8)}{/${C.blue}-fg}`
+      : "";
+    // Pad to right-align the right portion
+    const leftLen = claudeJsonl ? 12 : 0;
+    const gap = Math.max(1, barWidth - leftLen - right.length - 1);
+    infoBar.setContent(` ${left}${" ".repeat(gap)}{${C.muted}-fg}${right}{/${C.muted}-fg}`);
+  };
+
+  // Click the left side (cc: label) to open the JSONL in an editor
+  if (claudeJsonl) {
+    infoBar.on("click", (mouse) => {
+      const clickX = (mouse as unknown as { x: number }).x;
+      if (clickX < 14) {
+        // Open the Claude Code log in a text editor window
+        const edWin = params.windowManager.createFrame(path.basename(claudeJsonl), "editor");
+        try {
+          const content = fs.readFileSync(claudeJsonl, "utf-8");
+          edWin.body.setContent(content);
+        } catch {
+          edWin.body.setContent("(could not read file)");
+        }
+        params.windowManager.registerWindow(edWin);
+        params.screen.render();
+      }
+    });
+  }
+
   // Subscribe to agent state
   const unsubscribe = params.agent.subscribe((snapshot) => {
     transcript.setContent(renderTranscript(snapshot.messages));
     transcript.setScrollPerc(100);
     statusLine.setContent(` ${snapshot.status}`);
+    renderInfoBar(snapshot.model ?? "—", snapshot.sessionId ?? "");
     params.screen.render();
   });
 
