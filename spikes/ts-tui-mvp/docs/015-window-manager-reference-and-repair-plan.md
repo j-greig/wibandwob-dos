@@ -14,6 +14,8 @@ Recent bugs make that clear:
 - focus/z-order is not always visually coherent during move/drag
 - tile/cascade origins were off by one row/column
 - resize/repaint can leave stale text if the content view does not rerender
+- shadows and wide-glyph content can leave ghost cells behind until another
+  window happens to repaint over them
 
 This is not surprising. `blessed` gives good terminal UI primitives, but it
 does **not** ship a complete desktop/window-manager model. The app must own:
@@ -25,6 +27,7 @@ does **not** ship a complete desktop/window-manager model. The app must own:
 - click suppression after drag
 - layout presets
 - repaint invalidation
+- deterministic shadow/ghost-cell cleanup
 
 So the right question is not "which library solves Turbo Vision desktop
 windowing for us?" The right question is "which maintained codebases have the
@@ -49,7 +52,7 @@ terminal" cleanly.
 
 - absolute positioning
 - boxed widgets
-- borders, shadows, lists, forms
+- borders, lists, forms
 - full-screen terminal ownership
 - key and mouse event routing
 - screen redraw
@@ -70,6 +73,7 @@ Useful source references:
 - click suppression after drag
 - layout presets like tile/cascade/magazine/cinema
 - universal content resize contracts
+- reliable stale-cell cleanup for shadows, wide glyphs, and overlapping repaint
 
 That logic belongs in our code.
 
@@ -125,6 +129,7 @@ What to borrow conceptually:
 - top-level desktop coordinates vs child coordinates
 - view-local bounds, not ad hoc screen-relative math
 - clear separation between content bounds and chrome bounds
+- deterministic repaint ownership instead of trusting incidental terminal diffing
 
 Useful places to read:
 

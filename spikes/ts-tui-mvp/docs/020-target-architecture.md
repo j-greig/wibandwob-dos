@@ -48,6 +48,8 @@ Current known deltas:
 - the next workspace-system slice should restore `scratch/workspaces/default.json`
   on boot, optionally via a last-used-workspace pointer, and only fall back to
   Scramble when no workspace can be restored.
+- repaint and shadow invalidation are still too weak; stale cells and ghost
+  characters can remain on screen until another window repaints over them.
 - legacy Pi terminal and synthetic transcript chat flows have now been removed
   from the live spike, so the remaining deltas are structural rather than
   compatibility-driven.
@@ -159,6 +161,20 @@ src/
     └── window-manager.test.ts
 ```
 
+## Retained Local Extension Seam
+
+The TS app should continue to treat `modules-private/` as a first-class
+extension seam alongside repo-owned content in `modules/`.
+
+Target rule:
+
+- primers, prompts, and other app material may live in either `modules/` or
+  `modules-private/`
+- discovery, measurement, and agent/browser access should flow through one
+  shared content pipeline
+- once discovered, UI surfaces should not care whether content came from the
+  public repo or the private extension seam
+
 ## Transitional Shims And Compatibility Flows
 
 These are live modules or flows today. They are allowed in the target tree only
@@ -265,6 +281,12 @@ and other in-process consumers.
 Converts content bounds into framed window bounds. Owns titlebar/border/shadow
 math so no `+2` or `+3` offsets leak across the app.
 
+Target note:
+
+- shadow rendering should be app-owned and deterministic
+- if renderer-native shadows leave stale cells, they should be replaced by
+  explicit shadow painting or removed until the paint model is trustworthy
+
 ### `src/core/window-manager.ts`
 
 Owns z-order, focus, drag, resize, tile, cascade, hit testing, and window
@@ -332,6 +354,12 @@ and agents.
 
 Discovers primers, docs, file lists, and content groupings used by viewers and
 file managers.
+
+Target note:
+
+- discovery must include both `modules/` and `modules-private/`
+- callers should get one unified content model rather than branching on source
+  root
 
 ### `src/services/content-measurement.ts`
 
@@ -582,6 +610,14 @@ These are the checks that turn architectural intent into something enforceable.
 - no new inline blessed style literals should be introduced when a semantic
   token already exists
 
+### Paint/chrome contract
+
+- move, resize, close, and desktop repaint must fully clear obsolete cells
+- shadow and border rendering should be deterministic and testable, not left to
+  incidental renderer cleanup
+- wide glyphs, emoji, and box-drawing content must not leave stale trail cells
+  behind after content changes
+
 ### Test contract
 
 Before a seam is treated as stable, it should have spike-local coverage:
@@ -590,6 +626,7 @@ Before a seam is treated as stable, it should have spike-local coverage:
 - state service: schema and key fields
 - workspace snapshots: round-trip restore
 - window manager: focus/drag/resize/layout behavior
+- paint/chrome: no stale shadow or content cells after move/resize/close
 - animation service: frame parsing, fps playback timing, and overlay
   composition behavior
 
@@ -679,3 +716,23 @@ This doc should drive the next planning layer:
 
 Those should translate the target architecture into delivery slices without
 being trapped by the order or wording of older spike docs.
+
+## Stretch Ideas And Future Optimisations
+
+Items that are not blockers but would improve the architecture if picked up.
+Add here rather than cluttering the main sections.
+
+### Primer dims header
+
+Primer `.txt` files already skip `#` comment lines for display. A single
+header line like `# dims: 68x22` at the top of each file would let the
+content pipeline read dimensions in microseconds instead of running
+`stringWidth()` over every line. The measurement pass currently takes ~14s
+across 197 primers (worst file 5s at 4572 lines). With a dims header:
+
+- `collectGalleryEntries()` reads one line per file, no full scan
+- `measureEntry()` becomes a fallback for files without the header
+- A one-off migration script measures everything and prepends the header
+- New primers include it by convention
+- The comment-skip display logic already handles `#` lines, so no viewer
+  changes needed
