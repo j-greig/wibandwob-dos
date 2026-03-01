@@ -271,8 +271,7 @@ export function openTextViewerWindow(params: {
   content: string;
   kind: WindowKind;
   filePath?: string;
-  contentMeasurement?: ContentMeasurement;
-  fallbackMeasurement?: ContentMeasurement;
+  measurement?: ContentMeasurement;
 }): void {
   const frame = params.windowManager.createFrame(params.title, params.kind);
   const viewer = blessed.box({
@@ -292,7 +291,7 @@ export function openTextViewerWindow(params: {
   });
   frame.kind = params.kind;
   frame.filePath = params.filePath;
-  const m = params.contentMeasurement ?? params.fallbackMeasurement;
+  const m = params.measurement;
   frame.describeState = () => ({
     appType: `${params.kind}-viewer`,
     summary: params.filePath ? `Viewing ${params.filePath}` : `Viewing ${params.kind} content.`,
@@ -312,10 +311,10 @@ export function openTextViewerWindow(params: {
     viewer.focus();
   };
   params.windowManager.registerWindow(frame);
-  if (params.contentMeasurement) {
+  if (m) {
     params.applyMeasuredWindowSize(frame, params.kind, {
-      width: params.contentMeasurement.columnWidth,
-      height: params.contentMeasurement.lineCount
+      width: m.columnWidth,
+      height: m.lineCount
     });
   }
   frame.focus();

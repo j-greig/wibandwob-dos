@@ -34,7 +34,7 @@ export interface EditorState {
 export interface BrowserEntry {
   label: string;
   filePath: string;
-  metadata?: Partial<ContentMeasurement>;
+  metadata?: ContentMeasurement;
 }
 
 export interface BackroomsChannel {

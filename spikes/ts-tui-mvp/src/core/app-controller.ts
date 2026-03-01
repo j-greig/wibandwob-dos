@@ -1833,7 +1833,7 @@ export class TsTuiMvpApp {
       contentMeasurement?: ContentMeasurement;
     }
   ): void {
-    const fallbackMeasurement = options?.contentMeasurement ? undefined : measurePlainTextContent(content).measurement;
+    const measurement = options?.contentMeasurement ?? measurePlainTextContent(content).measurement;
     openContentViewerWindow({
       windowManager: this.windowManager,
       applyMeasuredWindowSize: (frame, nextKind, measured) => this.applyMeasuredWindowSize(frame, nextKind, measured),
@@ -1841,8 +1841,7 @@ export class TsTuiMvpApp {
       content,
       kind,
       filePath,
-      contentMeasurement: options?.contentMeasurement,
-      fallbackMeasurement
+      measurement
     });
   }
 
