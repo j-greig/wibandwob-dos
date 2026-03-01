@@ -42,7 +42,6 @@ import { deleteBackward as deleteEditorBackwardState, deleteForward as deleteEdi
 import { StateService } from "../services/state-service.js";
 import { TerminalBuffer } from "../services/terminal-buffer.js";
 import { renderTerminalBuffer } from "../services/terminal-renderer.js";
-// WibWobChatService removed — plain chat now uses WibWobAgentSession with tools="none"
 import { promptForWorkspaceLoad, promptForWorkspaceSave } from "../services/workspace-ui.js";
 import { WorkspaceService } from "../services/workspace-service.js";
 import {
@@ -69,7 +68,6 @@ import {
   openWorkspaceManagerWindow as openWorkspaceCommandWindow
 } from "../windows/misc-windows.js";
 import { openEditorWindow as openTextEditorWindow } from "../windows/text-windows.js";
-// wibwob-chat-window.ts removed — both chat types use wibwob-agent-window.ts
 import { type TuiToolContext } from "../services/agent-tools.js";
 import { WibWobAgentSession } from "../services/wibwob-agent-session.js";
 import { openChromeBrowserWindow } from "../windows/chrome-browser-window.js";
@@ -87,7 +85,6 @@ export class TsTuiMvpApp {
   private readonly backrooms = new BackroomsService();
   private readonly content = new ContentService();
   private readonly pi = new PiService();
-  // wibwobChat field removed — plain chat uses WibWobAgentSession with tools="none"
   private readonly workspace = new WorkspaceService(WORKSPACES_DIR);
   private readonly geometry: DesktopGeometryService;
   private readonly state: StateService;

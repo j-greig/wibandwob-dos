@@ -137,7 +137,6 @@ function formatToolResult(result: { content?: Array<{ type?: string; text?: stri
   return "";
 }
 
-// Re-use helpers from wibwob-chat-service without importing the class
 function createMessageId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
