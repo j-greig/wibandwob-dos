@@ -385,7 +385,7 @@ export class TsTuiMvpApp {
     messages?: unknown;
   }): void {
     // Plain chat = agent session with no tools
-    const session = new WibWobAgentSession(null, REPO_ROOT, "none");
+    const session = new WibWobAgentSession(null, REPO_ROOT, "chat");
     openNativeWibWobAgentWindow({
       screen: this.screen,
       windowManager: this.windowManager,
@@ -431,6 +431,15 @@ export class TsTuiMvpApp {
           return { id: wins[wins.length - 1].id };
         }
         return { error: "figlet window failed to open" };
+      },
+      openChromeBrowser: (url) => {
+        const before = this.windowManager.getWindows().length;
+        this.openChromeBrowserWindow(url);
+        const wins = this.windowManager.getWindows();
+        if (wins.length > before) {
+          return { id: wins[wins.length - 1].id };
+        }
+        return { error: "chrome browser window failed to open" };
       },
       windows: this.windowManager,
     };

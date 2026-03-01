@@ -27,6 +27,7 @@ export interface TuiToolContext {
   getState: () => DesktopState;
   openWindow: (type: string) => { id: number } | { error: string };
   openFigletWindow: (text: string, font?: string) => { id: number } | { error: string };
+  openChromeBrowser: (url?: string) => { id: number } | { error: string };
   windows: import("../core/window-facade.js").WindowFacade;
 }
 
@@ -202,6 +203,37 @@ const readWindow = tuiTool({
   },
 });
 
+const openChromeBrowser = tuiTool({
+  name: "tui_open_chrome_browser",
+  label: "Open Chrome Browser",
+  description:
+    "Opens a Chrome browser window, optionally navigating to a URL. " +
+    "Returns the new window's ID.",
+  parameters: Type.Object({
+    url: Type.Optional(Type.String({ description: "URL to navigate to on open" })),
+  }),
+  execute: (params, ctx) => {
+    const result = ctx.openChromeBrowser(params.url);
+    return JSON.stringify(result);
+  },
+});
+
+const browserNavigate = tuiTool({
+  name: "tui_browser_navigate",
+  label: "Navigate Chrome Browser",
+  description:
+    "Navigates an existing Chrome browser window to a URL. " +
+    "Pass the window ID and the full URL (including https://).",
+  parameters: Type.Object({
+    id: Type.Number({ description: "Chrome browser window ID" }),
+    url: Type.String({ description: "URL to navigate to" }),
+  }),
+  execute: (params, ctx) => {
+    const ok = ctx.windows.sendInput(params.id, params.url);
+    return ok ? `navigating to ${params.url}` : "window not found or not a browser";
+  },
+});
+
 // -- Public API --
 
 export function createTuiTools(ctx: TuiToolContext): AgentTool<any>[] {
@@ -209,6 +241,8 @@ export function createTuiTools(ctx: TuiToolContext): AgentTool<any>[] {
     getState(ctx),
     openWindow(ctx),
     openFigletWindow(ctx),
+    openChromeBrowser(ctx),
+    browserNavigate(ctx),
     writeEditorText(ctx),
     closeWindow(ctx),
     moveWindow(ctx),

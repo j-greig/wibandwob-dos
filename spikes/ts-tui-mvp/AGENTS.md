@@ -58,6 +58,9 @@ Prefer the most elegant correct implementation, not the fastest pile of special 
   - app composition root
   - owns menus, startup, window creation, workspace restore, and high-level command flow
   - should coordinate, not become a utility dump
+- `src/core/command-catalog.ts`
+  - current source of truth for menu/palette-visible app commands
+  - owns command ids, categories, groups, ordering, and surface visibility
 - `src/core/window-manager.ts`
   - z-order, focus, drag, resize, tile, cascade, close
 - `src/core/desktop-geometry.ts`
@@ -116,25 +119,30 @@ These rules are strict. Treat violations as bugs, not style nits.
 7. Layout is an engine, not scattered commands.
    - New placement logic should move toward shared layout primitives, not bespoke coordinate code per feature.
 
-8. Services own logic, windows own wiring.
+8. User-visible commands should be defined once.
+   - Menu and palette entries should derive from `command-catalog.ts`.
+   - Use explicit `order` values with gaps (`0, 10, 20...`) so commands can be inserted later without renumbering everything.
+   - `category` decides the menu bucket, not ad hoc hand placement in multiple files.
+
+9. Services own logic, windows own wiring.
    - Services discover, measure, persist, resolve, and transform data.
    - Window factories render widgets, bind keys/mouse, manage focus/cleanup, and expose state.
 
-9. No duplicate fallbacks unless centrally owned.
+10. No duplicate fallbacks unless centrally owned.
    - If a fallback mode exists, it must be declared in the owning service.
    - Do not embed secondary fallback logic inside window code and service code at the same time.
 
-10. Experimental integrations must stay behind one seam.
+11. Experimental integrations must stay behind one seam.
    - If we try a foreign runtime or agent stack, wrap it in a single service boundary first.
    - Do not leak vendor-specific assumptions across the app.
 
-11. User-visible surfaces must be API-visible.
+12. User-visible surfaces must be API-visible.
    - If a window, app, button, command, mode, or state matters to a user, it must have a typed representation in desktop state and a control path in `control-api.ts`.
    - Do not add UI-only commands that agents cannot discover or invoke later.
    - `describeState()` and the control API should evolve together.
    - Window-local actions count too. If a window has a primary action like send, restart, run, save, or open, expose a control path for it instead of requiring UI scraping.
 
-12. Reorg passes do not add product surface area.
+13. Reorg passes do not add product surface area.
    - When the active goal is architecture cleanup, do not add new window types or scattered UI entry points unless the user explicitly asks for them in that same pass.
    - Prefer extracting, consolidating, and normalizing existing behavior first.
 

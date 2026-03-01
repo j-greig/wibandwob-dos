@@ -55,7 +55,7 @@ function renderMessage(msg: ChatMessageEntry): string {
 }
 
 function renderTranscript(messages: ChatMessageEntry[]): string {
-  if (messages.length === 0) return "[status] Starting Wib&Wob Agent…";
+  if (messages.length === 0) return "[status] Starting…";
   return messages.map(renderMessage).join("\n\n");
 }
 
@@ -303,7 +303,7 @@ export function openWibWobAgentWindow(params: {
   frame.describeState = () => {
     const snapshot = params.agent.getSnapshot();
     return {
-      appType: "wibwob-agent",
+      appType: params.agent.mode === "chat" ? "wibwob-chat-v2" : "wibwob-agent",
       summary: snapshot.status,
       messageCount: snapshot.messageCount,
       streaming: snapshot.streaming,

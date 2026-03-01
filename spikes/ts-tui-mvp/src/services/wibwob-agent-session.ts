@@ -112,8 +112,10 @@ function formatToolCall(name: string, args: Record<string, unknown>): string {
     case "tui_close_window": return `close #${args.id}`;
     case "tui_move_window": return `move #${args.id} → ${args.left},${args.top}${args.width ? ` ${args.width}x${args.height}` : ""}`;
     case "tui_focus_window": return `focus #${args.id}`;
-    case "tui_send_input": return `input #${args.id} "${String(args.text || "").slice(0, 40)}"`;
+    case "tui_send_input": return `input #${args.id} "${String(args.text || args.input || "").slice(0, 40)}"`;
     case "tui_read_window": return `read_window #${args.id}`;
+    case "tui_open_chrome_browser": return `open_chrome${args.url ? ` ${String(args.url).slice(0, 50)}` : ""}`;
+    case "tui_browser_navigate": return `navigate #${args.id} → ${String(args.url || "").slice(0, 50)}`;
     default: {
       const j = JSON.stringify(args);
       return `${name}(${j.length > 50 ? j.slice(0, 47) + "..." : j})`;
@@ -206,7 +208,16 @@ function loadAgentSystemPrompt(): string {
 }
 
 function loadChatSystemPrompt(): string {
-  return loadBasePrompt();
+  const base = loadBasePrompt();
+  // Strip any tool/desktop instructions that leaked in from APPEND_SYSTEM.md
+  const lines = base.split("\n").filter(line => {
+    const lower = line.toLowerCase();
+    return !lower.includes("tui tool") &&
+           !lower.includes("desktop state") &&
+           !lower.includes("tui_") &&
+           !lower.includes("coding tool");
+  });
+  return lines.join("\n").trim() || "You are Wib & Wob, a two-voice assistant. Keep replies concise and helpful.";
 }
 
 function resolveModel(params: {
@@ -239,17 +250,20 @@ export class WibWobAgentSession {
   private lastToolName?: string;
   private readonly sessionId = createMessageId("wibwob-agent");
 
-  /** tools: "full" = TUI + coding tools, "none" = plain LLM chat */
+  readonly mode: "agent" | "chat";
+
   constructor(
     private readonly tuiContext: TuiToolContext | null,
     private readonly cwd: string = REPO_ROOT,
-    private readonly toolMode: "full" | "none" = "full"
-  ) {}
+    mode: "agent" | "chat" = "agent"
+  ) {
+    this.mode = mode;
+  }
 
   async initialize(): Promise<void> {
     if (this.agent) return;
 
-    this.status = this.toolMode === "full"
+    this.status = this.mode === "agent"
       ? "Starting agent with TUI tools..."
       : "Starting chat...";
     this.emit();
@@ -264,15 +278,15 @@ export class WibWobAgentSession {
         throw new Error("No model available. Check provider auth.");
       }
 
-      const tools = this.toolMode === "full" && this.tuiContext
+      const tools = this.mode === "agent" && this.tuiContext
         ? [...createTuiTools(this.tuiContext), ...createJailedCodingTools(REPO_ROOT)]
         : [];
 
-      const systemPrompt = this.toolMode === "full"
+      const systemPrompt = this.mode === "agent"
         ? loadAgentSystemPrompt()
         : loadChatSystemPrompt();
 
-      const transformContext = this.toolMode === "full" && this.tuiContext
+      const transformContext = this.mode === "agent" && this.tuiContext
         ? async (messages: import("@mariozechner/pi-agent-core").AgentMessage[]) => {
             const state = this.tuiContext!.getState();
             const summary = formatDesktopSummary(state);
@@ -391,7 +405,8 @@ export class WibWobAgentSession {
   }
 
   captureText(): string {
-    const parts = ["WIB&WOB AGENT", `Status: ${this.buildStatus()}`, ""];
+    const header = this.mode === "agent" ? "WIB&WOB AGENT" : "WIB&WOB CHAT";
+    const parts = [header, `Status: ${this.buildStatus()}`, ""];
     for (const m of this.messages) {
       const prefix =
         m.role === "user" ? "You: " : m.role === "status" ? "[status] " : "";

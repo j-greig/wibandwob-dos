@@ -156,6 +156,28 @@ Choose **Option 1: CommandRegistry + adapters**.
 
 This keeps the app desktop-first while still making it agent-friendly.
 
+## Current implementation status
+
+Phase 1 has started in the spike:
+
+- menus and command palette now derive from a shared command catalog
+- the catalog carries:
+  - `id`
+  - `category`
+  - `group`
+  - `order`
+  - `visibility`
+  - `actionKey`
+
+Current source files:
+
+- [/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/src/core/command-catalog.ts](/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/src/core/command-catalog.ts)
+- [/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/src/core/menu-config.ts](/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/src/core/menu-config.ts)
+
+This is not the full end-state registry yet. It is the first real step:
+one command catalog drives menu/palette ordering instead of duplicated static
+lists.
+
 ## Core design
 
 ### CommandDefinition

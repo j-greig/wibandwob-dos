@@ -316,6 +316,11 @@ export function openChromeBrowserWindow(params: {
     windowManager.focusWindow(frame);
     content.focus();
   };
+  // Allow agent tools to navigate by sending a URL string
+  frame.writeInput = (input: string) => {
+    const trimmed = input.trim();
+    if (trimmed) void navigateTo(trimmed);
+  };
 
   windowManager.registerWindow(frame);
   frame.focus();
