@@ -1857,7 +1857,9 @@ export class TsTuiMvpApp {
         openCompanionWindow: (restore) => this.openCompanionWindow(restore),
         openArtWindow: () => this.openArtWindow(),
         openStateInspectorWindow: () => this.openStateInspectorWindow(),
-        getLastWindow: () => this.windowManager.getWindows().at(-1)
+        getLastWindow: () => this.windowManager.getWindows().at(-1),
+        moveWindow: (id, left, top) => this.windowManager.moveWindow(id, left, top),
+        resizeWindow: (id, width, height) => this.windowManager.resizeWindow(id, width, height)
       });
       if (snapshot.focused) {
         focusedWindow = restored;

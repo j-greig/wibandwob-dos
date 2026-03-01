@@ -113,6 +113,8 @@ export interface WorkspaceRestoreActions {
   openArtWindow: () => void;
   openStateInspectorWindow: () => void;
   getLastWindow: () => WindowRecord | undefined;
+  moveWindow: (id: number, left: number, top: number) => void;
+  resizeWindow: (id: number, width: number, height: number) => void;
 }
 
 export function restoreWindowSnapshot(snapshot: WindowSnapshot, actions: WorkspaceRestoreActions): WindowRecord | undefined {
@@ -223,10 +225,8 @@ export function restoreWindowSnapshot(snapshot: WindowSnapshot, actions: Workspa
   }
   const restored = actions.getLastWindow();
   if (restored) {
-    restored.frame.left = snapshot.left;
-    restored.frame.top = snapshot.top;
-    restored.frame.width = snapshot.width;
-    restored.frame.height = snapshot.height;
+    actions.moveWindow(restored.id, snapshot.left, snapshot.top);
+    actions.resizeWindow(restored.id, snapshot.width, snapshot.height);
   }
   return restored;
 }

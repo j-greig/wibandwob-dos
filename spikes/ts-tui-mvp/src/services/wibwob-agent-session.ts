@@ -85,6 +85,56 @@ function createJailedCodingTools(jail: string) {
   return [jailedRead, jailedWrite, jailedEdit, jailedBash, jailedGrep, jailedFind, jailedLs];
 }
 
+// -- Compact tool call formatting --
+
+function shortenPath(p: string): string {
+  const home = process.env.HOME || "";
+  if (home && p.startsWith(home)) return "~" + p.slice(home.length);
+  if (p.startsWith(REPO_ROOT + "/")) return p.slice(REPO_ROOT.length + 1);
+  return p;
+}
+
+function formatToolCall(name: string, args: Record<string, unknown>): string {
+  switch (name) {
+    case "read": return `read ${shortenPath(String(args.path || ""))}${args.offset ? `:${args.offset}` : ""}`;
+    case "write": return `write ${shortenPath(String(args.path || ""))}`;
+    case "edit": return `edit ${shortenPath(String(args.path || ""))}`;
+    case "bash": {
+      const cmd = String(args.command || "");
+      return `$ ${cmd.length > 60 ? cmd.slice(0, 57) + "..." : cmd}`;
+    }
+    case "grep": return `grep /${args.pattern}/ in ${shortenPath(String(args.path || "."))}`;
+    case "find": return `find ${args.pattern} in ${shortenPath(String(args.path || "."))}`;
+    case "ls": return `ls ${shortenPath(String(args.path || "."))}`;
+    case "tui_get_state": return "get_state";
+    case "tui_open_window": return `open ${args.type}`;
+    case "tui_open_figlet": return `figlet "${args.text}"${args.font ? ` [${args.font}]` : ""}`;
+    case "tui_close_window": return `close #${args.id}`;
+    case "tui_move_window": return `move #${args.id} → ${args.left},${args.top}${args.width ? ` ${args.width}x${args.height}` : ""}`;
+    case "tui_focus_window": return `focus #${args.id}`;
+    case "tui_send_input": return `input #${args.id} "${String(args.text || "").slice(0, 40)}"`;
+    case "tui_read_window": return `read_window #${args.id}`;
+    default: {
+      const j = JSON.stringify(args);
+      return `${name}(${j.length > 50 ? j.slice(0, 47) + "..." : j})`;
+    }
+  }
+}
+
+function formatToolResult(result: { content?: Array<{ type?: string; text?: string }> }): string {
+  if (!result?.content) return "";
+  const text = result.content
+    .filter((c) => c.type === "text" && c.text)
+    .map((c) => c.text!)
+    .join("");
+  if (!text) return "";
+  // Show first line, truncated
+  const firstLine = text.split("\n")[0].trim();
+  if (firstLine.length > 60) return ` → ${firstLine.slice(0, 57)}...`;
+  if (firstLine) return ` → ${firstLine}`;
+  return "";
+}
+
 // Re-use helpers from wibwob-chat-service without importing the class
 function createMessageId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -385,20 +435,28 @@ export class WibWobAgentSession {
       case "tool_execution_start":
         this.lastToolName = event.toolName;
         this.status = `Running ${event.toolName}...`;
-        // Add tool call to transcript
         this.messages.push({
           id: createMessageId("tool"),
           role: "status",
-          text: `[tool] ${event.toolName}(${JSON.stringify(event.args).slice(0, 80)})`,
+          text: `[tool] ${formatToolCall(event.toolName, event.args)}`,
         });
         this.emit();
         return;
-      case "tool_execution_end":
+      case "tool_execution_end": {
+        const summary = event.isError
+          ? `[fail] ${event.toolName}`
+          : `[done] ${event.toolName}${formatToolResult(event.result)}`;
+        this.messages.push({
+          id: createMessageId("tool-result"),
+          role: "status",
+          text: summary,
+        });
         this.status = event.isError
           ? `Tool ${event.toolName} failed.`
           : `Tool ${event.toolName} done.`;
         this.emit();
         return;
+      }
       case "message_end": {
         if (getMessageRole(event.message) !== "assistant") return;
         const a = this.findCurrentAssistant();

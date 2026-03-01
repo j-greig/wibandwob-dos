@@ -12,10 +12,43 @@ import type { Box, ChatMessageEntry } from "../core/types.js";
 import type { WindowManager } from "../core/window-manager.js";
 import type { WibWobAgentSession } from "../services/wibwob-agent-session.js";
 
+function escapeTagBraces(text: string): string {
+  // Escape { and } that aren't blessed tags so they don't break rendering
+  return text.replace(/\{(?!\/?(?:bold|underline|blink|inverse|invisible|[a-z]+-(?:fg|bg))(?:\}|-))/g, "\\{");
+}
+
+// wibwob-tv theme palette
+const C = {
+  pink:  "#f07f8f",  // accent, user
+  blue:  "#57c7ff",  // tool title, borders
+  lime:  "#b7ff3c",  // success, status
+  muted: "#666666",  // dim text, tool args
+  gray:  "#d0d0d0",  // main text
+} as const;
+
 function renderMessage(msg: ChatMessageEntry): string {
-  if (msg.role === "user") return `You: ${msg.text}`;
-  if (msg.role === "status") return `  ${msg.text}`;
-  return msg.text || (msg.streaming ? "Wib: …\nWob: …" : "");
+  if (msg.role === "user") {
+    return `{${C.pink}-fg}You:{/${C.pink}-fg} {${C.gray}-fg}${escapeTagBraces(msg.text)}{/${C.gray}-fg}`;
+  }
+  if (msg.role === "status") {
+    const escaped = escapeTagBraces(msg.text);
+    if (escaped.includes("[tool]")) {
+      const trimmed = escaped.replace(/^\s*\[tool\]\s*/, "");
+      return `  {${C.blue}-fg}▸{/${C.blue}-fg} {${C.muted}-fg}${trimmed}{/${C.muted}-fg}`;
+    }
+    if (escaped.includes("[done]")) {
+      const trimmed = escaped.replace(/^\s*\[done\]\s*/, "");
+      return `  {${C.lime}-fg}✓{/${C.lime}-fg} {${C.muted}-fg}${trimmed}{/${C.muted}-fg}`;
+    }
+    if (escaped.includes("[fail]")) {
+      const trimmed = escaped.replace(/^\s*\[fail\]\s*/, "");
+      return `  {${C.pink}-fg}✗ ${trimmed}{/${C.pink}-fg}`;
+    }
+    return `  {${C.lime}-fg}${escaped}{/${C.lime}-fg}`;
+  }
+  // Assistant text — Wib/Wob voices in main gray
+  const text = msg.text || (msg.streaming ? "Wib: …\nWob: …" : "");
+  return escapeTagBraces(text);
 }
 
 function renderTranscript(messages: ChatMessageEntry[]): string {
@@ -36,12 +69,13 @@ export function openWibWobAgentWindow(params: {
     left: 0,
     right: 0,
     bottom: 2,
+    tags: true,
     mouse: true,
     keys: true,
     scrollable: true,
     alwaysScroll: true,
     scrollbar: createScrollbar(),
-    style: { fg: "white", bg: "black" },
+    style: { fg: C.gray, bg: "black" },
   });
 
   const statusLine = blessed.box({
