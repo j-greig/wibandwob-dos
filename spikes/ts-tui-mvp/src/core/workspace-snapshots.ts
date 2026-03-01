@@ -29,6 +29,8 @@ export function buildWindowSnapshotPayload(window: WindowRecord): Record<string,
     case "browser": {
       const details = window.describeState?.();
       return {
+        appType: typeof details?.appType === "string" ? details.appType : "primer-browser",
+        currentPath: typeof details?.currentPath === "string" ? details.currentPath : undefined,
         selectedIndex: typeof details?.selectedIndex === "number" ? details.selectedIndex : 0
       };
     }
@@ -105,6 +107,7 @@ export interface WorkspaceRestoreActions {
   }) => void;
   openPrimerGalleryWindow: (restore?: { activeTabIndex?: number; searchValue?: string; selectedIndex?: number }) => void;
   openPrimerBrowserWindow: (restore?: { selectedIndex?: number }) => void;
+  openFileManagerWindow: (restore?: { currentPath?: string; selectedIndex?: number }) => void;
   openTerminalWindow: () => void | Promise<void>;
   openXTermShellWindow: () => void | Promise<void>;
   openPiChatWindow: () => void | Promise<void>;
@@ -181,9 +184,16 @@ export function restoreWindowSnapshot(snapshot: WindowSnapshot, actions: Workspa
       });
       break;
     case "browser":
-      actions.openPrimerBrowserWindow({
-        selectedIndex: typeof payload.selectedIndex === "number" ? payload.selectedIndex : undefined
-      });
+      if (payload.appType === "farjs-file-manager") {
+        actions.openFileManagerWindow({
+          currentPath: typeof payload.currentPath === "string" ? payload.currentPath : undefined,
+          selectedIndex: typeof payload.selectedIndex === "number" ? payload.selectedIndex : undefined
+        });
+      } else {
+        actions.openPrimerBrowserWindow({
+          selectedIndex: typeof payload.selectedIndex === "number" ? payload.selectedIndex : undefined
+        });
+      }
       break;
     case "terminal":
       if (payload.appType === "xterm-shell") {

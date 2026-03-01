@@ -2,9 +2,12 @@ import type { MenuConfig, MenuItem } from "./types.js";
 
 export interface AppMenuActions {
   browsePrimers: () => void;
+  openFileManager: () => void;
   openPrimerPrompt: () => void;
   openTextFilePrompt: () => void;
   openEditor: () => void;
+  saveFocusedEditor: () => void;
+  saveAsFocusedEditor: () => void;
   saveWorkspaceAs: () => void;
   loadWorkspacePrompt: () => void;
   openArtWindow: () => void;
@@ -43,9 +46,12 @@ export function createMenuConfigs(actions: AppMenuActions): MenuConfig[] {
       left: 1,
       items: [
         { label: "Browse Primers", action: actions.browsePrimers },
+        { label: "Open File Manager", action: actions.openFileManager },
         { label: "Open Primer...", action: actions.openPrimerPrompt },
         { label: "Open Text File...", action: actions.openTextFilePrompt },
         { label: "New Text Buffer", action: actions.openEditor },
+        { label: "Save", action: actions.saveFocusedEditor },
+        { label: "Save As...", action: actions.saveAsFocusedEditor },
         { label: "Save Workspace...", action: actions.saveWorkspaceAs },
         { label: "Load Workspace...", action: actions.loadWorkspacePrompt },
         { label: "Open Art Window", action: actions.openArtWindow },
@@ -81,6 +87,7 @@ export function createMenuConfigs(actions: AppMenuActions): MenuConfig[] {
         { label: "Tile Windows", action: actions.tileWindows },
         { label: "Cascade Windows", action: actions.cascadeWindows },
         { label: "Open Gallery", action: actions.openGallery },
+        { label: "Open File Manager", action: actions.openFileManager },
         { label: "Open Browser", action: actions.openBrowserReader },
         { label: "Open Art", action: actions.openArtWindow }
       ]
@@ -92,6 +99,7 @@ export function createMenuConfigs(actions: AppMenuActions): MenuConfig[] {
       items: [
         { label: "Backrooms TV", action: actions.openBackroomsPrompt },
         { label: "Primer Gallery", action: actions.openGallery },
+        { label: "File Manager", action: actions.openFileManager },
         { label: "Browser Reader", action: actions.openBrowserReader },
         { label: "Figlet Banner", action: actions.openFigletBanner },
         { label: "Pattern Window", action: actions.openPatternWindow },
@@ -115,6 +123,7 @@ export function createPaletteCommands(actions: AppMenuActions): MenuItem[] {
   return [
     { label: "Open Backrooms TV", action: actions.openBackroomsPrompt },
     { label: "Open Primer Gallery", action: actions.openGallery },
+    { label: "Open File Manager", action: actions.openFileManager },
     { label: "Open Browser Reader", action: actions.openBrowserReader },
     { label: "Open Figlet Banner", action: actions.openFigletBanner },
     { label: "Open Pattern Window", action: actions.openPatternWindow },
@@ -125,6 +134,8 @@ export function createPaletteCommands(actions: AppMenuActions): MenuItem[] {
     { label: "Open Wib&Wob Agent", action: actions.openWibWobAgent },
     { label: "Open Companion Window", action: actions.openCompanionWindow },
     { label: "Open Workspace Manager", action: actions.openWorkspaceManager },
+    { label: "Save File", action: actions.saveFocusedEditor },
+    { label: "Save File As...", action: actions.saveAsFocusedEditor },
     { label: "Save Workspace As...", action: actions.saveWorkspaceAs },
     { label: "Load Workspace...", action: actions.loadWorkspacePrompt },
     { label: "Open State Inspector", action: actions.openStateInspector },

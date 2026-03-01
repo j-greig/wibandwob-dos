@@ -181,6 +181,8 @@ export interface WindowRecord {
   titleBar?: Box;
   editor?: EditorState;
   filePath?: string;
+  isDirty?: boolean;
+  lastSavedContent?: string;
   terminal?: TerminalState;
   chat?: ChatState;
   writeInput?: (input: string) => void;

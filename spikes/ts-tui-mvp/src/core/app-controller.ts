@@ -46,6 +46,7 @@ import { WibWobChatService } from "../services/wibwob-chat-service.js";
 import { promptForWorkspaceLoad, promptForWorkspaceSave } from "../services/workspace-ui.js";
 import { WorkspaceService } from "../services/workspace-service.js";
 import {
+  openFileManagerWindow as openFarjsFileManagerWindow,
   openPrimerBrowserWindow as openPrimerBrowserListWindow,
   openPrimerGalleryWindow as openPrimerGalleryListWindow,
   openTextViewerWindow as openContentViewerWindow
@@ -152,6 +153,7 @@ export class TsTuiMvpApp {
       getState: () => this.getDesktopState(),
       getPrimerInfo: (pathOrName) => this.getPrimerInfo(pathOrName),
       openPrimerBrowser: () => this.openPrimerBrowserWindow(),
+      openFileManager: () => this.openFileManagerWindow(),
       openPrimerGallery: () => this.openPrimerGalleryWindow(),
       openBrowserReader: (filePath) => this.openBrowserReaderWindow(filePath),
       openFigletBanner: (text, font) => this.openFigletWindow(text ?? "WIB WOB", font ?? getDefaultFigletFont()),
@@ -303,7 +305,13 @@ export class TsTuiMvpApp {
     this.openPopupMenu(
       createWindowContextMenuItems(window, {
         tileWindows: () => this.windowManager.tileWindows(),
-        cascadeWindows: () => this.windowManager.cascadeWindows()
+        cascadeWindows: () => this.windowManager.cascadeWindows(),
+        saveEditor: window.kind === "editor" ? () => this.saveEditor(window) : undefined,
+        saveAsEditor: window.kind === "editor" ? () => {
+          // Focus the window first, then use the shared Save As logic
+          window.focus();
+          this.saveAsFocusedEditor();
+        } : undefined,
       }),
       x,
       y
@@ -1371,6 +1379,19 @@ export class TsTuiMvpApp {
     });
   }
 
+  private openFileManagerWindow(restore?: { currentPath?: string; selectedIndex?: number }): void {
+    openFarjsFileManagerWindow({
+      screen: this.screen,
+      windowManager: this.windowManager,
+      overlays: this.overlays,
+      startPath: restore?.currentPath ?? REPO_ROOT,
+      restore,
+      onOpenFile: (filePath) => {
+        this.openEditorWindow(filePath, path.basename(filePath), fs.readFileSync(filePath, "utf8"));
+      }
+    });
+  }
+
   private openPrimerGalleryWindow(restore?: { activeTabIndex?: number; searchValue?: string; selectedIndex?: number }): void {
     const allEntries = this.content.collectGalleryEntries();
     openPrimerGalleryListWindow({
@@ -1529,6 +1550,13 @@ export class TsTuiMvpApp {
         }
       }
     });
+    // Set initial saved content for dirty tracking
+    const wins = this.windowManager.getWindows();
+    const latest = wins[wins.length - 1];
+    if (latest?.kind === "editor") {
+      latest.lastSavedContent = initial;
+      latest.isDirty = false;
+    }
   }
 
   private openArtWindow(): void {
@@ -1547,6 +1575,34 @@ export class TsTuiMvpApp {
     this.saveEditor(focused);
   }
 
+  private saveAsFocusedEditor(): void {
+    const focused = this.windowManager.getFocusedWindow();
+    if (!focused || focused.kind !== "editor" || !focused.editor) {
+      this.overlays.flash("Focused window is not an editor.");
+      return;
+    }
+    // Always prompt for a new path, regardless of current filePath
+    const defaultPath = focused.filePath
+      ? focused.filePath
+      : path.join(SPIKE_ROOT, focused.title.replace(/^\*/, ""));
+    this.overlays.openPathPrompt(
+      "Save As",
+      defaultPath,
+      (value) => this.content.completePath(value),
+      (value) => {
+        const resolved = value.startsWith("~") ? path.join(os.homedir(), value.slice(1)) : value;
+        focused.filePath = resolved;
+        focused.title = path.basename(resolved);
+        fs.mkdirSync(path.dirname(resolved), { recursive: true });
+        fs.writeFileSync(resolved, focused.editor!.value, "utf8");
+        focused.titleBar?.setContent(` ${focused.title} `);
+        this.markEditorClean(focused);
+        this.syncState();
+        this.overlays.flash(`Saved as ${resolved}`);
+      }
+    );
+  }
+
   private saveEditor(window: WindowRecord): void {
     saveEditorWindow({
       window,
@@ -1554,24 +1610,13 @@ export class TsTuiMvpApp {
       content: this.content,
       defaultDir: SPIKE_ROOT,
       onWritten: () => {
+        this.markEditorClean(window);
         this.syncState();
         if (window.filePath) {
           this.overlays.flash(`Saved ${window.filePath}`);
         }
       }
     });
-  }
-
-  private writeEditor(window: WindowRecord): void {
-    if (!window.editor || !window.filePath) {
-      return;
-    }
-    fs.mkdirSync(path.dirname(window.filePath), { recursive: true });
-    fs.writeFileSync(window.filePath, window.editor.value, "utf8");
-    window.title = path.basename(window.filePath);
-    window.titleBar?.setContent(` ${window.title} `);
-    this.syncState();
-    this.overlays.flash(`Saved ${window.filePath}`);
   }
 
   private handleFocusedEditorKeypress(ch: string, key: blessed.Widgets.Events.IKeyEventArg): void {
@@ -1683,6 +1728,7 @@ export class TsTuiMvpApp {
       return;
     }
     insertEditorTextState(window.editor, text);
+    this.markEditorDirty(window);
     this.renderEditor(window);
   }
 
@@ -1691,6 +1737,7 @@ export class TsTuiMvpApp {
       return;
     }
     deleteEditorBackwardState(window.editor);
+    this.markEditorDirty(window);
     this.renderEditor(window);
   }
 
@@ -1699,7 +1746,32 @@ export class TsTuiMvpApp {
       return;
     }
     deleteEditorForwardState(window.editor);
+    this.markEditorDirty(window);
     this.renderEditor(window);
+  }
+
+  private markEditorDirty(window: WindowRecord): void {
+    if (window.isDirty) return;
+    window.isDirty = true;
+    this.updateEditorTitleDirty(window);
+  }
+
+  private markEditorClean(window: WindowRecord): void {
+    window.isDirty = false;
+    window.lastSavedContent = window.editor?.value;
+    this.updateEditorTitleDirty(window);
+  }
+
+  private updateEditorTitleDirty(window: WindowRecord): void {
+    if (!window.titleBar) return;
+    const base = window.title.replace(/^\*/, "");
+    if (window.isDirty) {
+      window.title = `*${base}`;
+    } else {
+      window.title = base;
+    }
+    window.titleBar.setContent(` ${window.title} `);
+    this.screen.render();
   }
 
   private renderEditor(window: WindowRecord): void {
@@ -1850,6 +1922,7 @@ export class TsTuiMvpApp {
         openWibWobChatWindow: (restore) => this.openWibWobChatWindow(restore),
         openPrimerGalleryWindow: (restore) => this.openPrimerGalleryWindow(restore),
         openPrimerBrowserWindow: (restore) => this.openPrimerBrowserWindow(restore),
+        openFileManagerWindow: (restore) => this.openFileManagerWindow(restore),
         openTerminalWindow: () => this.openTerminalWindow(),
         openXTermShellWindow: () => this.openXTermShellWindow(),
         openPiChatWindow: () => this.openPiChatWindow(),
@@ -1873,9 +1946,12 @@ export class TsTuiMvpApp {
   private getAppMenuActions(): AppMenuActions {
     return {
       browsePrimers: () => this.openPrimerBrowserWindow(),
+      openFileManager: () => this.openFileManagerWindow(),
       openPrimerPrompt: () => this.promptForPrimer(),
       openTextFilePrompt: () => this.promptForEditorPath(),
       openEditor: () => this.openEditorWindow(),
+      saveFocusedEditor: () => this.saveFocusedEditor(),
+      saveAsFocusedEditor: () => this.saveAsFocusedEditor(),
       saveWorkspaceAs: () => this.promptForWorkspaceSave(),
       loadWorkspacePrompt: () => this.promptForWorkspaceLoad(),
       openArtWindow: () => this.openArtWindow(),
@@ -1962,6 +2038,7 @@ export class TsTuiMvpApp {
     const window = this.windowManager.getWindowById(id);
     if (!window || !window.editor) return false;
     insertEditorTextState(window.editor, text);
+    this.markEditorDirty(window);
     this.renderEditor(window);
     return true;
   }

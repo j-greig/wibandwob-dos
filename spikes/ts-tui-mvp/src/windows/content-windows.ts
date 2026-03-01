@@ -1,5 +1,6 @@
 import blessed from "blessed";
 import fs from "node:fs";
+import path from "node:path";
 
 import { createScrollbar } from "../core/ui-primitives.js";
 import type { BrowserEntry, List, WindowKind, WindowRecord } from "../core/types.js";
@@ -331,3 +332,180 @@ export function openTextViewerWindow(params: {
   frame.focus();
 }
 
+export function openFileManagerWindow(params: {
+  screen: blessed.Widgets.Screen;
+  windowManager: WindowManager;
+  overlays: OverlayManager;
+  startPath: string;
+  onOpenFile: (filePath: string) => void;
+  restore?: { currentPath?: string; selectedIndex?: number };
+}): void {
+  const initialPath = params.restore?.currentPath ?? params.startPath;
+  if (!fs.existsSync(initialPath) || !fs.statSync(initialPath).isDirectory()) {
+    params.overlays.flash(`File manager path is not a directory: ${initialPath}`);
+    return;
+  }
+
+  const frame = params.windowManager.createFrame("File Manager", "browser");
+  const header = blessed.box({
+    parent: frame.body,
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 1,
+    style: { fg: "black", bg: "cyan" }
+  });
+  const list = blessed.list({
+    parent: frame.body,
+    top: 1,
+    left: 0,
+    width: "36%",
+    bottom: 0,
+    keys: true,
+    vi: true,
+    mouse: true,
+    scrollable: true,
+    alwaysScroll: true,
+    scrollbar: createScrollbar(),
+    style: { fg: "white", bg: "black", selected: { fg: "black", bg: "white" } }
+  });
+  const preview = blessed.box({
+    parent: frame.body,
+    top: 1,
+    left: "36%",
+    right: 0,
+    bottom: 0,
+    mouse: true,
+    scrollable: true,
+    alwaysScroll: true,
+    scrollbar: createScrollbar(),
+    style: { fg: "white", bg: "black" }
+  });
+
+  let currentPath = initialPath;
+  let entries: Array<{ label: string; fullPath: string; isDirectory: boolean }> = [];
+
+  const buildEntries = (directoryPath: string) => {
+    const names = fs.readdirSync(directoryPath, { withFileTypes: true })
+      .map((entry) => ({
+        name: entry.name,
+        isDirectory: entry.isDirectory()
+      }))
+      .sort((a, b) => {
+        if (a.isDirectory !== b.isDirectory) {
+          return a.isDirectory ? -1 : 1;
+        }
+        return a.name.localeCompare(b.name);
+      });
+    const nextEntries: Array<{ label: string; fullPath: string; isDirectory: boolean }> = [];
+    if (path.dirname(directoryPath) !== directoryPath) {
+      nextEntries.push({
+        label: "../",
+        fullPath: path.dirname(directoryPath),
+        isDirectory: true
+      });
+    }
+    for (const entry of names) {
+      nextEntries.push({
+        label: entry.isDirectory ? `${entry.name}/` : entry.name,
+        fullPath: path.join(directoryPath, entry.name),
+        isDirectory: entry.isDirectory
+      });
+    }
+    return nextEntries;
+  };
+
+  const updatePreview = (index: number) => {
+    const entry = entries[index];
+    if (!entry) {
+      preview.setContent("No file selected.");
+      params.screen.render();
+      return;
+    }
+    if (entry.isDirectory) {
+      preview.setContent(`${entry.fullPath}\n\n[directory]`);
+      params.screen.render();
+      return;
+    }
+    try {
+      const content = fs.readFileSync(entry.fullPath, "utf8");
+      preview.setContent(`${entry.fullPath}\n\n${content.slice(0, 8000)}`);
+    } catch (error) {
+      preview.setContent(`Cannot preview file.\n\n${error instanceof Error ? error.message : String(error)}`);
+    }
+    params.screen.render();
+  };
+
+  const navigateTo = (directoryPath: string, selectedIndex = 0) => {
+    currentPath = directoryPath;
+    entries = buildEntries(directoryPath);
+    header.setContent(` Enter open  Backspace parent  Path: ${currentPath} `);
+    list.setItems(entries.map((entry) => entry.label));
+    const safeIndex = Math.max(0, Math.min(selectedIndex, Math.max(0, entries.length - 1)));
+    list.select(safeIndex);
+    updatePreview(safeIndex);
+    params.screen.render();
+  };
+
+  const openSelected = (index?: number) => {
+    const currentIndex = typeof index === "number" ? index : (list as List & { selected: number }).selected ?? 0;
+    const entry = entries[currentIndex];
+    if (!entry) {
+      return;
+    }
+    if (entry.isDirectory) {
+      navigateTo(entry.fullPath);
+      return;
+    }
+    params.onOpenFile(entry.fullPath);
+  };
+
+  list.on("select", (_, index) => updatePreview(index));
+  list.on("keypress", (ch, key) => {
+    if (key.name === "enter") {
+      openSelected();
+      return;
+    }
+    if (key.name === "backspace") {
+      const parentPath = path.dirname(currentPath);
+      if (parentPath !== currentPath) {
+        navigateTo(parentPath);
+      }
+      return;
+    }
+    if (["up", "down", "j", "k"].includes(key.name ?? "")) {
+      setTimeout(() => updatePreview((list as List & { selected: number }).selected ?? 0), 0);
+      return;
+    }
+    if (typeof ch === "string" && /^[ -~]$/.test(ch)) {
+      const startIndex = ((list as List & { selected: number }).selected ?? 0) + 1;
+      const normalized = ch.toLowerCase();
+      const ordered = entries.slice(startIndex).concat(entries.slice(0, startIndex));
+      const match = ordered.find((entry) => entry.label.toLowerCase().startsWith(normalized));
+      if (match) {
+        const nextIndex = entries.indexOf(match);
+        list.select(nextIndex);
+        updatePreview(nextIndex);
+      }
+    }
+  });
+
+  frame.kind = "browser";
+  frame.describeState = () => ({
+    appType: "farjs-file-manager",
+    summary: `File manager at ${currentPath}`,
+    currentPath,
+    selectedIndex: (list as List & { selected: number }).selected ?? 0,
+    selectedLabel: entries[(list as List & { selected: number }).selected ?? 0]?.label,
+    entryCount: entries.length,
+    contentPreview: preview.getContent().split("\n").slice(0, 10).join("\n")
+  });
+  frame.focus = () => {
+    params.windowManager.focusWindow(frame);
+    list.focus();
+  };
+
+  params.windowManager.registerWindow(frame);
+  navigateTo(initialPath, params.restore?.selectedIndex ?? 0);
+  frame.focus();
+}

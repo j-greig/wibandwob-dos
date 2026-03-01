@@ -33,6 +33,7 @@ interface ControlApiHandlers {
   getState: () => DesktopState;
   getPrimerInfo: (pathOrName: string) => unknown;
   openPrimerBrowser: () => void;
+  openFileManager: () => void;
   openPrimerGallery: () => void;
   openBrowserReader: (filePath?: string) => void;
   openFigletBanner: (text?: string, font?: string) => void;
@@ -139,6 +140,7 @@ export class ControlApiService {
           "GET /content/primer-info?path=...",
           "GET /windows/text?id=...",
           "POST /view/primer-browser/open",
+          "POST /view/file-manager/open",
           "POST /view/primer-gallery/open",
           "POST /view/browser-reader/open",
           "POST /view/figlet/open",
@@ -195,6 +197,10 @@ export class ControlApiService {
     }
     if (request.method === "POST" && url.pathname === "/view/primer-browser/open") {
       this.handlers.openPrimerBrowser();
+      return Response.json({ ok: true });
+    }
+    if (request.method === "POST" && url.pathname === "/view/file-manager/open") {
+      this.handlers.openFileManager();
       return Response.json({ ok: true });
     }
     if (request.method === "POST" && url.pathname === "/view/primer-gallery/open") {
