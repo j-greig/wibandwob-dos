@@ -24,9 +24,10 @@ These three drive all remaining work. Read in order.
    CommandRegistry replacing 5-file shotgun surgery.
    Define a command once, project to menu/palette/API/
    agent/MCP.
-   STATUS: command-catalog.ts exists with full command
-   list + menu/palette generators. Not yet wired in.
-   Codex working on wiring.
+   STATUS: DONE (Phase 1). command-catalog.ts is source
+   of truth. command-registry.ts provides execution.
+   Menu, palette, control API, and agent tools all
+   derive from the catalog. Context menu adapter next.
 
 
 DONE (findings absorbed, no action needed)

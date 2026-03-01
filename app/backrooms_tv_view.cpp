@@ -30,16 +30,6 @@
 #include <sstream>
 #include <cstdio>
 
-static void bktv_log(const char* fmt, ...) {
-    FILE* f = fopen("/tmp/bktv_debug.log", "a");
-    if (!f) return;
-    va_list ap;
-    va_start(ap, fmt);
-    vfprintf(f, fmt, ap);
-    va_end(ap);
-    fputc('\n', f);
-    fclose(f);
-}
 
 // Module primer path registry — name (no .txt) → absolute path.
 // Populated by scanPrimerNames() (dialog section, called at dialog open).
@@ -195,7 +185,7 @@ bool BackroomsBridge::start(const BackroomsChannel &channel) {
     cmd += " --raw";       // stream only LLM deltas to stdout, no formatting
     cmd += " 2>/dev/null"; // suppress stderr
 
-    bktv_log("CMD: %s", cmd.c_str());
+
 
     // Use forkpty() to give the child its OWN private PTY.
     // Node.js sees a TTY on stdout → streams unbuffered.
@@ -215,7 +205,7 @@ bool BackroomsBridge::start(const BackroomsChannel &channel) {
         _exit(127);
     }
 
-    bktv_log("FORK: child pid=%d (forkpty master=%d)", pid_, masterFd);
+
 
     fd_ = masterFd;
 
@@ -263,7 +253,7 @@ int BackroomsBridge::readAvailable(std::string &out) {
         }
         if (n == 0) {
             // EOF — pipe-style
-            bktv_log("readAvailable: EOF (n=0), total=%d", totalRead);
+        
             return totalRead > 0 ? totalRead : -1;
         }
         // n < 0
@@ -271,13 +261,13 @@ int BackroomsBridge::readAvailable(std::string &out) {
         if (errno == EINTR) continue;
         if (errno == EIO || errno == ENXIO) {
             // PTY slave closed — PTY equivalent of EOF
-            bktv_log("readAvailable: PTY EOF (errno=%d), total=%d", errno, totalRead);
+        
             return totalRead > 0 ? totalRead : -1;
         }
-        bktv_log("readAvailable: error errno=%d (%s)", errno, strerror(errno));
+    
         return totalRead > 0 ? totalRead : -1;
     }
-    if (totalRead > 0) bktv_log("readAvailable: got %d bytes", totalRead);
+
     return totalRead;
 }
 

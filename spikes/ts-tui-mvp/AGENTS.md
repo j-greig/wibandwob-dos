@@ -290,34 +290,37 @@ Current control endpoints:
 - `GET /`
 - `GET /health`
 - `GET /state`
+- `GET /commands/list`
 - `GET /content/primer-info?path=...`
-- `POST /view/xterm/open`
-- `POST /view/xterm/close`
-- `POST /view/xterm/restart`
+- `GET /windows/text?id=...`
+- `POST /commands/run`
 - `POST /view/primer-browser/open`
+- `POST /view/file-manager/open`
 - `POST /view/primer-gallery/open`
+- `POST /view/primer/open`
 - `POST /view/browser-reader/open`
 - `POST /view/figlet/open`
 - `POST /view/art/open`
 - `POST /view/chat/open`
 - `POST /view/wibwob-chat/open`
+- `POST /view/wibwob-agent/open`
 - `POST /view/companion/open`
 - `POST /view/workspace/open`
 - `POST /view/palette/open`
 - `POST /view/inspector/open`
 - `POST /view/editor/open`
+- `POST /view/xterm/open`
+- `POST /view/xterm/close`
+- `POST /view/xterm/restart`
 - `POST /view/backrooms/open`
 - `POST /windows/focus`
 - `POST /windows/move`
 - `POST /windows/resize`
 - `POST /windows/close`
 - `POST /windows/input`
-- `GET /windows/text?id=...`
 - `POST /windows/text/export`
 - `POST /workspace/save`
 - `POST /workspace/load`
-- `GET /commands/list`
-- `POST /commands/run`
 
 Control parity rule:
 - whenever a new window family, app mode, or user-triggerable command is added, update both:
@@ -450,18 +453,19 @@ Manual smoke targets:
 - Chat collapse: wibwob-chat-window.ts and wibwob-chat-service.ts deleted (613 lines). Both chat types share one session class and one window factory.
 - Command catalog: single source of truth for all menu/palette commands. menuPlacements[] eliminates triple-entry duplication.
 - Command registry: execution layer with list/run, consumed by control API and agent tools.
+- Context menus: shared desktop/window commands now come from the command registry instead of a second hard-coded command list.
 - Editor save: Save, Save As, dirty indicator, context menu. Display-only asterisk (title stays clean).
-- Agent tools: 15 tools total (8 TUI + 7 jailed coding). Registry-backed tui_list_commands/tui_run_command.
+- Agent tools: registry-backed `tui_list_commands` / `tui_run_command` plus low-level TUI controls and jailed coding tools.
 
 ## Preferred Next Steps
 
 Good next slices:
-1. context menu actions onto command registry path
-2. async workspace restore race fix (getLastWindow after promise openers)
-3. wibwob-chat-v2 restore hydration (transcript/draft into agent session)
-4. WindowRecord discriminated union (replace bag of optionals)
-5. resize handles and stronger window management
-6. screenshot/export support for comparing layouts to WibWob-DOS captures
+1. async workspace restore race fix (getLastWindow after promise openers)
+2. wibwob-chat-v2 restore hydration (transcript/draft into agent session)
+3. WindowRecord discriminated union (replace bag of optionals)
+4. resize handles and stronger window management
+5. screenshot/export support for comparing layouts to WibWob-DOS captures
+6. project more window-local actions onto the command registry path where they are truly shared
 
 Avoid:
 1. full Turbo Vision porting work

@@ -923,3 +923,121 @@ Next high-leverage items:
   1. P2: kill the Python enum entirely (prevents this class of bug forever)
   2. P4: IPC resilience (the smoke parade exposed how fragile the socket is)
   3. Micropolis SIGBUS: needs AddressSanitizer run to find exact bad write
+
+---
+
+## Session 3 — TS TUI MVP Architecture Hardening (2026-03-01)
+
+Shifted focus from C++ parity fixes to the TS TUI MVP spike
+architecture. The spike had accumulated ~2800 lines in
+app-controller.ts and parallel systems for chat/agent/menus/API.
+
+### WindowFacade (Phases 1-5, all done)
+
+Extracted 11-method interface for all window operations:
+  query: getWindowById, getWindows, getLastWindow, getWindowsByKind
+  geometry: moveWindow, resizeWindow, focusWindow, closeWindowById
+  content: sendInput, captureText, writeEditorText
+
+Collapsed 4 consumers:
+  Phase 2: WorkspaceRestoreActions (3 fields -> 1 windows: WindowFacade)
+  Phase 3: TuiToolContext (6 fields -> 1 windows: WindowFacade)
+  Phase 4: ControlApiHandlers (7 fields -> 1 windows: WindowFacade)
+  Phase 5: Deleted 6 public bridge methods from AppController
+
+Codex reviewed each batch. Fixes applied:
+  - capture route: empty text is success, undefined is not-found
+  - writeEditorText fallback returns false not undefined
+
+### Chat Shell Collapse (done)
+
+Deleted 613 lines:
+  src/windows/wibwob-chat-window.ts (214 lines)
+  src/services/wibwob-chat-service.ts (399 lines)
+
+Both Wib&Wob Chat and Wib&Wob Agent now use WibWobAgentSession:
+  mode="agent": 15 tools, desktop state injection, full prompt
+  mode="chat": no tools, no state injection, stripped prompt
+
+describeState reports correct appType per mode:
+  "wibwob-agent" or "wibwob-chat-v2"
+
+Codex reviewed. Fixes applied:
+  - appType identity preserved for workspace restore
+  - system prompt stripped of tool/desktop instructions in chat mode
+  - UI labels use mode-appropriate text
+
+### Command Catalog + Registry (done, Codex-led)
+
+command-catalog.ts: single source of truth for all commands.
+  Each command defined once with menuPlacements[] array.
+  One id, one actionKey, multiple menu appearances.
+  api/agent boolean flags for surface visibility.
+
+command-registry.ts: execution adapter.
+  buildMenus(), buildPalette(), list(), run()
+  Consumed by control API (GET /commands/list, POST /commands/run)
+  and agent tools (tui_list_commands, tui_run_command).
+
+menu-config.ts: thin pass-through to catalog generators.
+  Old hand-maintained menu/palette lists deleted.
+
+### Editor Save (done)
+
+Full implementation across 7 steps:
+  Save + Save As in File menu, command palette, context menu.
+  Dirty indicator (display-only asterisk, title stays clean).
+  isDirty + lastSavedContent on WindowRecord.
+  writeEditorWindow returns boolean for error handling.
+  Dead writeEditor method removed.
+
+Codex found 4 bugs, all fixed:
+  - asterisk leaking into filenames (display-only now)
+  - agent writes bypassing dirty flag (routed through hook)
+  - non-atomic Save As (try/catch before state mutation)
+  - unresilient file writes (boolean return)
+
+### Agent Window Tools (done)
+
+15 tools total in agent window:
+  8 TUI: get_state, open_window, open_figlet, open_chrome_browser,
+         browser_navigate, close_window, move_window, focus_window,
+         send_input, read_window
+  2 registry: tui_list_commands, tui_run_command
+  7 jailed coding: read, write, edit, bash, grep, find, ls
+
+Jailed to REPO_ROOT via jailPath() helper.
+Themed tool display using wibwob-tv palette.
+
+### Architecture Audit
+
+Full DRY audit found 9 problem areas. Addendum written into
+prd-window-facade-modularity.md. Chat collapse and command
+registry address items 2 and 5. Remaining:
+  - Window opening shotgun surgery (needs WindowTypeRegistry)
+  - WindowRecord bag of optionals (needs discriminated union)
+  - Editor lifecycle coupling
+  - Overlay prompt duplication
+  - Content measurement duplication
+  - Theme token scattering
+
+### Other
+
+  - Backrooms TV debug logging removed (bktv_log calls)
+  - AGENTS.md fully updated with current architecture
+  - INDEX.md updated with completion status
+  - Stray chrome-browser-agent-tools.md deleted from repo root
+  - app-controller.ts: ~2800 -> ~2050 lines
+
+### Commits (spike/contour-map-view, session 3)
+
+  82f2309  docs: document index
+  e00c848  feat: WindowFacade Phase 1
+  892eb70  feat: WindowFacade Phase 2
+  3869105  feat: WindowFacade Phases 3-5
+  3d42783  fix: capture route empty text
+  04847de  feat: chat collapse (-613 lines)
+  bd6405d  fix: chat collapse review fixes
+  3f49fcb  chore: stale comment cleanup
+  b26aef6  docs: INDEX.md status update
+  730ebcf  docs: AGENTS.md full update
