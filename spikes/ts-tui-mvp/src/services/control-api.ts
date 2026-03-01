@@ -27,6 +27,8 @@
 // Packages: hono, @modelcontextprotocol/server, @modelcontextprotocol/hono, zod
 // -------------------------------------------------------------------
 
+import fs from "node:fs";
+import path from "node:path";
 import type { BackroomsChannel, DesktopState } from "../core/types.js";
 
 interface ControlApiHandlers {
@@ -50,13 +52,7 @@ interface ControlApiHandlers {
   openXTermShell: () => void;
   closeXTermShells: () => number;
   restartXTermShell: () => void;
-  focusWindowById: (id: number) => boolean;
-  moveWindowById: (id: number, left: number, top: number) => boolean;
-  resizeWindowById: (id: number, width: number, height: number) => boolean;
-  closeWindowById: (id: number) => boolean;
-  sendWindowInput: (id: number, input: string) => boolean;
-  writeEditorText: (id: number, text: string) => boolean;
-  captureWindowText: (id: number, name?: string) => string | undefined;
+  windows: import("../core/window-facade.js").WindowFacade;
   openBackroomsTv: (channel: BackroomsChannel) => void;
   saveWorkspaceNamed: (name: string) => void;
   loadWorkspaceNamed: (name: string) => void;
@@ -185,8 +181,8 @@ export class ControlApiService {
     }
     if (request.method === "GET" && url.pathname === "/windows/text") {
       const id = Number(url.searchParams.get("id"));
-      const exported = this.handlers.captureWindowText(id);
-      return Response.json({ ok: Boolean(exported), path: exported });
+      const text = this.handlers.windows.captureText(id);
+      return Response.json({ ok: Boolean(text), text: text ?? null });
     }
 
     const body =
@@ -279,12 +275,12 @@ export class ControlApiService {
     }
     if (request.method === "POST" && url.pathname === "/windows/focus") {
       return Response.json({
-        ok: this.handlers.focusWindowById(Number((body as any).id)),
+        ok: this.handlers.windows.focusWindow(Number((body as any).id)),
       });
     }
     if (request.method === "POST" && url.pathname === "/windows/move") {
       return Response.json({
-        ok: this.handlers.moveWindowById(
+        ok: this.handlers.windows.moveWindow(
           Number((body as any).id),
           Number((body as any).left),
           Number((body as any).top),
@@ -293,7 +289,7 @@ export class ControlApiService {
     }
     if (request.method === "POST" && url.pathname === "/windows/resize") {
       return Response.json({
-        ok: this.handlers.resizeWindowById(
+        ok: this.handlers.windows.resizeWindow(
           Number((body as any).id),
           Number((body as any).width),
           Number((body as any).height),
@@ -302,12 +298,12 @@ export class ControlApiService {
     }
     if (request.method === "POST" && url.pathname === "/windows/close") {
       return Response.json({
-        ok: this.handlers.closeWindowById(Number((body as any).id)),
+        ok: this.handlers.windows.closeWindow(Number((body as any).id)),
       });
     }
     if (request.method === "POST" && url.pathname === "/windows/input") {
       return Response.json({
-        ok: this.handlers.sendWindowInput(
+        ok: this.handlers.windows.sendInput(
           Number((body as any).id),
           String((body as any).input ?? ""),
         ),
@@ -315,7 +311,7 @@ export class ControlApiService {
     }
     if (request.method === "POST" && url.pathname === "/windows/editor/write") {
       return Response.json({
-        ok: this.handlers.writeEditorText(
+        ok: this.handlers.windows.writeEditorText(
           Number((body as any).id),
           String((body as any).text ?? ""),
         ),
@@ -323,11 +319,18 @@ export class ControlApiService {
     }
 
     if (request.method === "POST" && url.pathname === "/windows/text/export") {
-      const exported = this.handlers.captureWindowText(
-        Number((body as any).id),
-        typeof (body as any).name === "string" ? (body as any).name : undefined,
-      );
-      return Response.json({ ok: Boolean(exported), path: exported });
+      const id = Number((body as any).id);
+      const text = this.handlers.windows.captureText(id);
+      if (!text) return Response.json({ ok: false, path: null });
+      // File export is a control-API concern, not a facade concern
+      const capturesDir = path.join(process.cwd(), "scratch", "captures");
+      fs.mkdirSync(capturesDir, { recursive: true });
+      const name = typeof (body as any).name === "string" ? (body as any).name : `window-${id}`;
+      const safeName = name.replace(/[^a-z0-9._-]+/gi, "-");
+      const fileName = `${new Date().toISOString().replaceAll(":", "-")}_${safeName}.txt`;
+      const filePath = path.join(capturesDir, fileName);
+      fs.writeFileSync(filePath, `${text}\n`, "utf8");
+      return Response.json({ ok: true, path: filePath });
     }
     if (request.method === "POST" && url.pathname === "/view/backrooms/open") {
       const channel = normalizeBackroomsChannel(body);

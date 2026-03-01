@@ -171,13 +171,7 @@ export class TsTuiMvpApp {
       openXTermShell: () => void this.openXTermShellWindow(),
       closeXTermShells: () => this.closeWindowsByAppType("xterm-shell"),
       restartXTermShell: () => void this.restartXTermShell(),
-      focusWindowById: (id) => this.focusWindowById(id),
-      moveWindowById: (id, left, top) => this.moveWindowById(id, left, top),
-      resizeWindowById: (id, width, height) => this.resizeWindowById(id, width, height),
-      closeWindowById: (id) => this.closeWindowById(id),
-      sendWindowInput: (id, input) => this.sendWindowInputById(id, input),
-      writeEditorText: (id, text) => this.writeEditorTextById(id, text),
-      captureWindowText: (id, name) => this.captureWindowTextById(id, name),
+      windows: this.windowManager,
       openBackroomsTv: (channel) => this.openBackroomsTv(channel),
       saveWorkspaceNamed: (name) => this.saveWorkspaceNamed(name),
       loadWorkspaceNamed: (name) => this.loadWorkspaceNamed(name)
@@ -431,21 +425,6 @@ export class TsTuiMvpApp {
         }
         return { id: 0 };
       },
-      closeWindow: (id) => this.windowManager.closeWindowById(id),
-      moveWindow: (id, left, top, width, height) => {
-        const moved = this.windowManager.moveWindow(id, left, top);
-        if (moved && width !== undefined && height !== undefined) {
-          this.windowManager.resizeWindow(id, width, height);
-        }
-        return moved;
-      },
-      focusWindow: (id) => this.windowManager.focusWindowById(id),
-      sendWindowInput: (id, input) => {
-        const win = this.windowManager.getWindowById(id);
-        if (!win?.writeInput) return false;
-        win.writeInput(input);
-        return true;
-      },
       openFigletWindow: (text, font) => {
         const before = this.windowManager.getWindows().length;
         this.openFigletWindow(text, font ?? getDefaultFigletFont());
@@ -455,13 +434,7 @@ export class TsTuiMvpApp {
         }
         return { error: "figlet window failed to open" };
       },
-      writeEditorText: (id: number, text: string) => {
-        return this.writeEditorTextById(id, text);
-      },
-      captureWindowText: (id) => {
-        const win = this.windowManager.getWindowById(id);
-        return win?.captureText?.();
-      },
+      windows: this.windowManager,
     };
 
     const session = new WibWobAgentSession(tuiContext, REPO_ROOT);
@@ -2018,45 +1991,13 @@ export class TsTuiMvpApp {
     );
   }
 
-  focusWindowById(id: number): boolean {
-    return this.windowManager.focusWindowById(id);
-  }
-
-  moveWindowById(id: number, left: number, top: number): boolean {
-    return this.windowManager.moveWindow(id, left, top);
-  }
-
-  sendWindowInputById(id: number, input: string): boolean {
-    const window = this.windowManager.getWindowById(id);
-    if (!window?.writeInput) {
-      return false;
-    }
-    window.writeInput(input);
-    return true;
-  }
-
-  writeEditorTextById(id: number, text: string): boolean {
+  private writeEditorTextById(id: number, text: string): boolean {
     const window = this.windowManager.getWindowById(id);
     if (!window || !window.editor) return false;
     insertEditorTextState(window.editor, text);
     this.markEditorDirty(window);
     this.renderEditor(window);
     return true;
-  }
-
-  captureWindowTextById(id: number, name?: string): string | undefined {
-    const window = this.windowManager.getWindowById(id);
-    const content = window?.captureText?.();
-    if (!window || typeof content !== "string") {
-      return undefined;
-    }
-    const capturesDir = path.join(SPIKE_ROOT, "scratch", "captures");
-    fs.mkdirSync(capturesDir, { recursive: true });
-    const safeName = (name && name.trim()) || `${window.kind}-${window.id}`;
-    const fileName = `${new Date().toISOString().replaceAll(":", "-")}_${safeName.replace(/[^a-z0-9._-]+/gi, "-")}.txt`;
-    const filePath = path.join(capturesDir, fileName);
-    fs.writeFileSync(filePath, `${content}\n`, "utf8");
-    return filePath;
   }
 
   closeWindowsByAppType(appType: string): number {
@@ -2070,14 +2011,6 @@ export class TsTuiMvpApp {
   restartXTermShell(): void {
     this.closeWindowsByAppType("xterm-shell");
     void this.openXTermShellWindow();
-  }
-
-  resizeWindowById(id: number, width: number, height: number): boolean {
-    return this.windowManager.resizeWindow(id, width, height);
-  }
-
-  closeWindowById(id: number): boolean {
-    return this.windowManager.closeWindowById(id);
   }
 
   private syncState(): void {

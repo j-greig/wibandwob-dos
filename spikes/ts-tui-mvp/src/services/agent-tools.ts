@@ -27,18 +27,7 @@ export interface TuiToolContext {
   getState: () => DesktopState;
   openWindow: (type: string) => { id: number } | { error: string };
   openFigletWindow: (text: string, font?: string) => { id: number } | { error: string };
-  closeWindow: (id: number) => boolean;
-  moveWindow: (
-    id: number,
-    left: number,
-    top: number,
-    width?: number,
-    height?: number
-  ) => boolean;
-  focusWindow: (id: number) => boolean;
-  sendWindowInput: (id: number, input: string) => boolean;
-  captureWindowText: (id: number) => string | undefined;
-  writeEditorText: (id: number, text: string) => boolean;
+  windows: import("../core/window-facade.js").WindowFacade;
 }
 
 // -- Helper to build an AgentTool from our simpler shape --
@@ -128,7 +117,7 @@ const writeEditorText = tuiTool({
     text: Type.String({ description: "Text to insert at cursor" }),
   }),
   execute: (params, ctx) => {
-    const ok = ctx.writeEditorText(params.id, params.text);
+    const ok = ctx.windows.writeEditorText(params.id, params.text);
     return ok ? "written" : "editor not found";
   },
 });
@@ -141,7 +130,7 @@ const closeWindow = tuiTool({
     id: Type.Number({ description: "Window ID to close" }),
   }),
   execute: (params, ctx) => {
-    const ok = ctx.closeWindow(params.id);
+    const ok = ctx.windows.closeWindow(params.id);
     return ok ? "closed" : "window not found";
   },
 });
@@ -160,14 +149,12 @@ const moveWindow = tuiTool({
     height: Type.Optional(Type.Number({ description: "New height" })),
   }),
   execute: (params, ctx) => {
-    const ok = ctx.moveWindow(
-      params.id,
-      params.left,
-      params.top,
-      params.width,
-      params.height
-    );
-    return ok ? "moved" : "window not found";
+    const moved = ctx.windows.moveWindow(params.id, params.left, params.top);
+    if (!moved) return "window not found";
+    if (params.width !== undefined && params.height !== undefined) {
+      ctx.windows.resizeWindow(params.id, params.width, params.height);
+    }
+    return "moved";
   },
 });
 
@@ -179,7 +166,7 @@ const focusWindow = tuiTool({
     id: Type.Number({ description: "Window ID to focus" }),
   }),
   execute: (params, ctx) => {
-    const ok = ctx.focusWindow(params.id);
+    const ok = ctx.windows.focusWindow(params.id);
     return ok ? "focused" : "window not found";
   },
 });
@@ -195,7 +182,7 @@ const sendInput = tuiTool({
     input: Type.String({ description: "Text to send" }),
   }),
   execute: (params, ctx) => {
-    const ok = ctx.sendWindowInput(params.id, params.input);
+    const ok = ctx.windows.sendInput(params.id, params.input);
     return ok ? "sent" : "window not found or not interactive";
   },
 });
@@ -210,7 +197,7 @@ const readWindow = tuiTool({
     id: Type.Number({ description: "Window ID to read" }),
   }),
   execute: (params, ctx) => {
-    const text = ctx.captureWindowText(params.id);
+    const text = ctx.windows.captureText(params.id);
     return text ?? "window not found or not readable";
   },
 });
