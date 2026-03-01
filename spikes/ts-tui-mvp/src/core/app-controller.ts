@@ -409,6 +409,7 @@ export class TsTuiMvpApp {
           companion: () => this.openCompanionWindow(),
           inspector: () => this.openStateInspectorWindow(),
           primer: () => this.openPrimerBrowserWindow(),
+          figlet: () => this.openFigletWindow("WibWob"),
         };
         const fn = map[type];
         if (!fn) return { error: `unknown window type: ${type}` };
@@ -433,6 +434,15 @@ export class TsTuiMvpApp {
         if (!win?.writeInput) return false;
         win.writeInput(input);
         return true;
+      },
+      openFigletWindow: (text, font) => {
+        const before = this.windowManager.getWindows().length;
+        this.openFigletWindow(text, font ?? getDefaultFigletFont());
+        const wins = this.windowManager.getWindows();
+        if (wins.length > before) {
+          return { id: wins[wins.length - 1].id };
+        }
+        return { error: "figlet window failed to open" };
       },
       captureWindowText: (id) => {
         const win = this.windowManager.getWindowById(id);

@@ -26,6 +26,7 @@ import type { DesktopState } from "../core/types.js";
 export interface TuiToolContext {
   getState: () => DesktopState;
   openWindow: (type: string) => { id: number } | { error: string };
+  openFigletWindow: (text: string, font?: string) => { id: number } | { error: string };
   closeWindow: (id: number) => boolean;
   moveWindow: (
     id: number,
@@ -97,6 +98,22 @@ const openWindow = tuiTool({
   }),
   execute: (params, ctx) => {
     const result = ctx.openWindow(params.type);
+    return JSON.stringify(result);
+  },
+});
+
+const openFigletWindow = tuiTool({
+  name: "tui_open_figlet",
+  label: "Open Figlet Banner",
+  description:
+    "Opens a FIGlet ASCII-art banner window with the given text. " +
+    "Optionally specify a font name. Returns the new window ID.",
+  parameters: Type.Object({
+    text: Type.String({ description: "Text to render as FIGlet ASCII art" }),
+    font: Type.Optional(Type.String({ description: "FIGlet font name (e.g. 'standard', 'banner', 'big', 'slant'). Defaults to app default." })),
+  }),
+  execute: (params, ctx) => {
+    const result = ctx.openFigletWindow(params.text, params.font);
     return JSON.stringify(result);
   },
 });
@@ -189,6 +206,7 @@ export function createTuiTools(ctx: TuiToolContext): AgentTool<any>[] {
   return [
     getState(ctx),
     openWindow(ctx),
+    openFigletWindow(ctx),
     closeWindow(ctx),
     moveWindow(ctx),
     focusWindow(ctx),
