@@ -107,12 +107,17 @@ export function saveEditorWindow(params: {
   params.onWritten();
 }
 
-function writeEditorWindow(window: WindowRecord): void {
+function writeEditorWindow(window: WindowRecord): boolean {
   if (!window.editor || !window.filePath) {
-    return;
+    return false;
   }
-  fs.mkdirSync(path.dirname(window.filePath), { recursive: true });
-  fs.writeFileSync(window.filePath, window.editor.value, "utf8");
+  try {
+    fs.mkdirSync(path.dirname(window.filePath), { recursive: true });
+    fs.writeFileSync(window.filePath, window.editor.value, "utf8");
+  } catch {
+    return false;
+  }
   window.title = path.basename(window.filePath);
   window.titleBar?.setContent(` ${window.title} `);
+  return true;
 }

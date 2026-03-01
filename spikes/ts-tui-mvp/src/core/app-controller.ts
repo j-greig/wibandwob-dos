@@ -454,11 +454,7 @@ export class TsTuiMvpApp {
         return { error: "figlet window failed to open" };
       },
       writeEditorText: (id: number, text: string) => {
-        const win = this.windowManager.getWindowById(id);
-        if (!win || !win.editor) return false;
-        insertEditorTextState(win.editor, text);
-        this.renderEditor(win);
-        return true;
+        return this.writeEditorTextById(id, text);
       },
       captureWindowText: (id) => {
         const win = this.windowManager.getWindowById(id);
@@ -1591,11 +1587,16 @@ export class TsTuiMvpApp {
       (value) => this.content.completePath(value),
       (value) => {
         const resolved = value.startsWith("~") ? path.join(os.homedir(), value.slice(1)) : value;
+        try {
+          fs.mkdirSync(path.dirname(resolved), { recursive: true });
+          fs.writeFileSync(resolved, focused.editor!.value, "utf8");
+        } catch (err) {
+          this.overlays.flash(`Save failed: ${err instanceof Error ? err.message : String(err)}`);
+          return;
+        }
         focused.filePath = resolved;
         focused.title = path.basename(resolved);
-        fs.mkdirSync(path.dirname(resolved), { recursive: true });
-        fs.writeFileSync(resolved, focused.editor!.value, "utf8");
-        focused.titleBar?.setContent(` ${focused.title} `);
+        this.updateEditorTitleBar(focused);
         this.markEditorClean(focused);
         this.syncState();
         this.overlays.flash(`Saved as ${resolved}`);
@@ -1753,24 +1754,20 @@ export class TsTuiMvpApp {
   private markEditorDirty(window: WindowRecord): void {
     if (window.isDirty) return;
     window.isDirty = true;
-    this.updateEditorTitleDirty(window);
+    this.updateEditorTitleBar(window);
   }
 
   private markEditorClean(window: WindowRecord): void {
     window.isDirty = false;
     window.lastSavedContent = window.editor?.value;
-    this.updateEditorTitleDirty(window);
+    this.updateEditorTitleBar(window);
   }
 
-  private updateEditorTitleDirty(window: WindowRecord): void {
+  /** Update title bar display. window.title stays clean (no asterisk). */
+  private updateEditorTitleBar(window: WindowRecord): void {
     if (!window.titleBar) return;
-    const base = window.title.replace(/^\*/, "");
-    if (window.isDirty) {
-      window.title = `*${base}`;
-    } else {
-      window.title = base;
-    }
-    window.titleBar.setContent(` ${window.title} `);
+    const display = window.isDirty ? `*${window.title}` : window.title;
+    window.titleBar.setContent(` ${display} `);
     this.screen.render();
   }
 
