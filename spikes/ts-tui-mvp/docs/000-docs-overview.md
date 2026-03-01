@@ -158,7 +158,7 @@ These live outside the spike dir but directly drive spike work:
 | `016-terminal-kit-screenbuffer-animation-spike.md` | Plan for a contained terminal-kit ScreenBuffer animation/compositing experiment. | `draft` |
 | `017-framework-direction-and-today-plan.md` | Current framework direction: blessed shell, terminal-kit subsystem spike, Terminal.Gui as design teacher. | `active` |
 | `018-command-registry-and-tool-adapter-prd.md` | PRD for define-once commands projected into menu, palette, API, agent, and later MCP. Phase 1 landed: catalog, registry, menu/palette/API/agent all wired. | `landed` |
-| `019-context-sensitive-menu-bar-prd.md` | PRD for macOS-style focus-sensitive menus, per-window menu contributions, Applications menu, and menu deduplication. Codex reviewed + enhanced. | `draft` |
+| `019-context-sensitive-menu-bar-prd.md` | PRD for macOS-style context-sensitive menus. CommandVisibility + enabled(ctx) predicates on catalog entries, selection model via getSelection() on WindowRecord. Phase 1: static menus with filtered items. Phase 2: dynamic top-level categories. Depends on 018 (landed). | `draft` |
 | `BUILD-ORDER-FINAL.md` | Preferred sequencing for the broader TS rebuild. | `active` |
 | `BUILD-ORDER.md` | Older build order document superseded by the final version. | `stale` |
 | `INDEX.md` | Deleted. Superseded by this file (`000-docs-overview.md`). | `deleted` |
