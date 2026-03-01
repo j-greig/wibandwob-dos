@@ -15,6 +15,7 @@
         "string-width": "^8.2.0",
         "turndown": "^7.2.2",
         "turndown-plugin-gfm": "^1.0.2",
+        "youtube-transcript-plus": "^1.2.0",
       },
       "devDependencies": {
         "@types/blessed": "^0.1.25",
@@ -687,6 +688,8 @@
     "yauzl": ["yauzl@2.10.0", "", { "dependencies": { "buffer-crc32": "~0.2.3", "fd-slicer": "~1.1.0" } }, "sha512-p4a9I6X6nu6IhoGmBqAcbJy1mlC4j27vEPZX9F4L4/vZT3Lyq1VkFHw/V/PUcB9Buo+DG3iHkT0x3Qya58zc3g=="],
 
     "yoctocolors": ["yoctocolors@2.1.2", "", {}, "sha512-CzhO+pFNo8ajLM2d2IW/R93ipy99LWjtwblvC1RsoSUMZgyLbYFr221TnSNT7GjGdYui6P459mw9JH/g/zW2ug=="],
+
+    "youtube-transcript-plus": ["youtube-transcript-plus@1.2.0", "", {}, "sha512-SRjVft8V+vUulMKgakgfzC+pnFLSy4tolX7xGnSvp9juUNocikMFmUx5GlhzLDILzxYrijcYtmNqz0qyklnPmA=="],
 
     "zod": ["zod@3.25.76", "", {}, "sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ=="],
 

@@ -6,9 +6,10 @@ import path from "node:path";
 import { spawn as spawnPty, type IPty as BunPtyTerminal, type IExitEvent as BunPtyExitEvent } from "@skitee3000/bun-pty/dist/index.js";
 
 import { CONTROL_API_PORT, MASTER_PHILOSOPHY_PATH, README_PATH, REPO_ROOT, SPIKE_NOTES_PATH, SPIKE_ROOT, STATE_PATH, WORKSPACES_DIR } from "./config.js";
+import { CommandRegistry } from "./command-registry.js";
 import { createSystemContextMenuItems, createWindowContextMenuItems } from "./context-menu-items.js";
 import { DesktopGeometryService } from "./desktop-geometry.js";
-import { createMenuConfigs, createPaletteCommands, type AppMenuActions } from "./menu-config.js";
+import { type AppMenuActions } from "./menu-config.js";
 import { MenuOverlayManager } from "./menu-overlay-manager.js";
 import { OverlayManager } from "./overlay-manager.js";
 import { createScrollbar, isRightClick } from "./ui-primitives.js";
@@ -70,6 +71,7 @@ import {
 import { openEditorWindow as openTextEditorWindow } from "../windows/text-windows.js";
 import { type TuiToolContext } from "../services/agent-tools.js";
 import { WibWobAgentSession } from "../services/wibwob-agent-session.js";
+import { ChromeBrowserService } from "../services/chrome-browser-service.js";
 import { openChromeBrowserWindow } from "../windows/chrome-browser-window.js";
 import { openWibWobAgentWindow as openNativeWibWobAgentWindow } from "../windows/wibwob-agent-window.js";
 
@@ -79,6 +81,7 @@ export class TsTuiMvpApp {
   private readonly desktop: Box;
   private readonly statusLine: Box;
   private readonly menus: MenuConfig[];
+  private readonly commands: CommandRegistry;
   private readonly menuUi: MenuOverlayManager;
   private readonly windowManager: WindowManager;
   private readonly overlays: OverlayManager;
@@ -140,7 +143,8 @@ export class TsTuiMvpApp {
     this.windowManager.setEditorWriteHook((id, text) => this.writeEditorTextById(id, text));
     this.geometry = new DesktopGeometryService(this.screen);
     this.overlays = new OverlayManager(this.screen, () => this.windowManager.restoreWindowFocus());
-    this.menus = createMenuConfigs(this.getAppMenuActions());
+    this.commands = new CommandRegistry(this.getAppMenuActions());
+    this.menus = this.commands.buildMenus();
     this.menuUi = new MenuOverlayManager(
       this.screen,
       this.menuBar,
@@ -151,6 +155,8 @@ export class TsTuiMvpApp {
     this.controlApi = new ControlApiService(CONTROL_API_PORT, {
       getState: () => this.getDesktopState(),
       getPrimerInfo: (pathOrName) => this.getPrimerInfo(pathOrName),
+      listCommands: (surface) => this.commands.list(surface),
+      runCommand: (id) => this.commands.run(id),
       openPrimerBrowser: () => this.openPrimerBrowserWindow(),
       openFileManager: () => this.openFileManagerWindow(),
       openPrimerGallery: () => this.openPrimerGalleryWindow(),
@@ -394,6 +400,8 @@ export class TsTuiMvpApp {
   private openWibWobAgentWindow(): void {
     const tuiContext: TuiToolContext = {
       getState: () => this.state.sync(),
+      listCommands: () => this.commands.list("agent"),
+      runCommand: (id) => this.commands.run(id),
       openWindow: (type) => {
         const before = this.windowManager.getWindows().length;
         const map: Record<string, () => void> = {
@@ -437,6 +445,15 @@ export class TsTuiMvpApp {
           return { id: wins[wins.length - 1].id };
         }
         return { error: "chrome browser window failed to open" };
+      },
+      browserSearch: async (query, numResults) => {
+        const svc = new ChromeBrowserService();
+        try {
+          const results = await svc.search(query, numResults);
+          return results;
+        } finally {
+          svc.disconnect();
+        }
       },
       windows: this.windowManager,
     };
@@ -1493,7 +1510,7 @@ export class TsTuiMvpApp {
   private openCommandPaletteWindow(): void {
     openPaletteWindow({
       windowManager: this.windowManager,
-      commands: createPaletteCommands(this.getAppMenuActions())
+      commands: this.commands.buildPalette()
     });
   }
 

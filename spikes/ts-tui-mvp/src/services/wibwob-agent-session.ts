@@ -107,6 +107,8 @@ function formatToolCall(name: string, args: Record<string, unknown>): string {
     case "find": return `find ${args.pattern} in ${shortenPath(String(args.path || "."))}`;
     case "ls": return `ls ${shortenPath(String(args.path || "."))}`;
     case "tui_get_state": return "get_state";
+    case "tui_list_commands": return "list_commands";
+    case "tui_run_command": return `run_command ${String(args.id || "")}`;
     case "tui_open_window": return `open ${args.type}`;
     case "tui_open_figlet": return `figlet "${args.text}"${args.font ? ` [${args.font}]` : ""}`;
     case "tui_close_window": return `close #${args.id}`;
@@ -116,6 +118,12 @@ function formatToolCall(name: string, args: Record<string, unknown>): string {
     case "tui_read_window": return `read_window #${args.id}`;
     case "tui_open_chrome_browser": return `open_chrome${args.url ? ` ${String(args.url).slice(0, 50)}` : ""}`;
     case "tui_browser_navigate": return `navigate #${args.id} → ${String(args.url || "").slice(0, 50)}`;
+    case "tui_browser_list_links": return `list_links #${args.id}`;
+    case "tui_browser_follow_link": return `follow_link #${args.id} link ${args.link_index}`;
+    case "tui_browser_search": return `chrome_search "${String(args.query || "").slice(0, 50)}"${args.num_results ? ` (${args.num_results})` : ""}`;
+    case "tui_web_search": return `search "${String(args.query || "").slice(0, 50)}"${args.num_results ? ` (${args.num_results})` : ""}${args.freshness ? ` [${args.freshness}]` : ""}`;
+    case "tui_web_content": return `fetch ${String(args.url || "").slice(0, 60)}`;
+    case "tui_youtube_transcript": return `yt_transcript ${String(args.video || "").slice(0, 50)}`;
     default: {
       const j = JSON.stringify(args);
       return `${name}(${j.length > 50 ? j.slice(0, 47) + "..." : j})`;

@@ -158,25 +158,27 @@ This keeps the app desktop-first while still making it agent-friendly.
 
 ## Current implementation status
 
-Phase 1 has started in the spike:
+Phase 1 has landed in the spike:
 
 - menus and command palette now derive from a shared command catalog
-- the catalog carries:
-  - `id`
-  - `category`
-  - `group`
-  - `order`
-  - `visibility`
-  - `actionKey`
+- the catalog now carries canonical command ids, groups, multi-menu placements,
+  palette placement, surface visibility, and action keys
+- a real registry now projects that catalog into:
+  - menus
+  - command palette
+  - generic command discovery
+  - generic command execution over the control API
 
 Current source files:
 
 - [/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/src/core/command-catalog.ts](/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/src/core/command-catalog.ts)
+- [/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/src/core/command-registry.ts](/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/src/core/command-registry.ts)
 - [/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/src/core/menu-config.ts](/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/src/core/menu-config.ts)
+- [/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/src/services/control-api.ts](/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/src/services/control-api.ts)
 
-This is not the full end-state registry yet. It is the first real step:
-one command catalog drives menu/palette ordering instead of duplicated static
-lists.
+This is still not the full end-state registry. Agent tools and MCP are not yet
+derived from the same source. But the spike now has a real execution-capable
+registry seam instead of only a nicer menu list.
 
 ## Core design
 
@@ -385,9 +387,9 @@ Owns:
 
 ### Phase 1 — foundation
 
-- [ ] add registry types
-- [ ] add registry implementation
-- [ ] register only 5-10 commands
+- [x] add registry types
+- [x] add registry implementation
+- [x] register only 5-10 pilot commands plus compatibility coverage for the rest
 
 Initial commands:
 
@@ -401,21 +403,37 @@ Initial commands:
 
 ### Phase 2 — menu/palette projection
 
-- [ ] derive menu items from registry for the migrated commands
-- [ ] derive palette items from registry
-- [ ] keep old ad hoc paths for untouched commands temporarily
+- [x] derive menu items from registry for the migrated commands
+- [x] derive palette items from registry
+- [x] keep old ad hoc paths for untouched commands temporarily
+- [x] support one canonical command appearing in multiple menus via `menuPlacements`
+
+Pilot commands now using the cleaner multi-placement model:
+
+- `browser.open_chrome`
+- `file.open_file_manager`
+- `chat.open_wibwob`
+- `agent.open_wibwob`
+- `window.tile`
+- `window.cascade`
 
 ### Phase 3 — API projection
 
-- [ ] add `/commands/list`
-- [ ] add `/commands/run`
-- [ ] keep old bespoke routes temporarily
+- [x] add `/commands/list`
+- [x] add `/commands/run`
+- [x] keep old bespoke routes temporarily
 
 ### Phase 4 — agent projection
 
-- [ ] add `tui_list_commands`
-- [ ] add `tui_run_command`
-- [ ] let `Wib&Wob Agent` use those instead of bespoke per-command tools where sensible
+- [x] add `tui_list_commands`
+- [x] add `tui_run_command`
+- [~] let `Wib&Wob Agent` use those instead of bespoke per-command tools where sensible
+
+Current spike status:
+
+- `Wib&Wob Agent` can now discover registry-backed commands via `tui_list_commands`
+- `Wib&Wob Agent` can run registry-backed commands via `tui_run_command`
+- lower-level window tools remain available alongside the registry path for now
 
 ### Phase 5 — cleanup
 

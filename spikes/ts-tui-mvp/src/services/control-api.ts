@@ -30,10 +30,13 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { BackroomsChannel, DesktopState } from "../core/types.js";
+import type { CommandSurface, CommandListItem } from "../core/command-registry.js";
 
 interface ControlApiHandlers {
   getState: () => DesktopState;
   getPrimerInfo: (pathOrName: string) => unknown;
+  listCommands: (surface?: CommandSurface) => CommandListItem[];
+  runCommand: (id: string) => { ok: true } | { ok: false; error: string };
   openPrimerBrowser: () => void;
   openFileManager: () => void;
   openPrimerGallery: () => void;
@@ -134,6 +137,7 @@ export class ControlApiService {
         endpoints: [
           "GET /health",
           "GET /state",
+          "GET /commands/list",
           "GET /content/primer-info?path=...",
           "GET /windows/text?id=...",
           "POST /view/primer-browser/open",
@@ -154,6 +158,7 @@ export class ControlApiService {
           "POST /view/xterm/close",
           "POST /view/xterm/restart",
           "POST /view/backrooms/open",
+          "POST /commands/run",
           "POST /windows/focus",
           "POST /windows/move",
           "POST /windows/resize",
@@ -173,6 +178,13 @@ export class ControlApiService {
     if (request.method === "GET" && url.pathname === "/state") {
       return Response.json(this.handlers.getState());
     }
+    if (request.method === "GET" && url.pathname === "/commands/list") {
+      const surface = url.searchParams.get("surface") as CommandSurface | null;
+      return Response.json({
+        ok: true,
+        commands: this.handlers.listCommands(surface ?? undefined)
+      });
+    }
 
     if (request.method === "GET" && url.pathname === "/content/primer-info") {
       const pathOrName =
@@ -187,6 +199,15 @@ export class ControlApiService {
 
     const body =
       request.method === "POST" ? await request.json().catch(() => ({})) : {};
+
+    if (request.method === "POST" && url.pathname === "/commands/run") {
+      const id = typeof (body as any).id === "string" ? (body as any).id : "";
+      if (!id) {
+        return Response.json({ ok: false, error: "id required" }, { status: 400 });
+      }
+      const result = this.handlers.runCommand(id);
+      return Response.json(result, { status: result.ok ? 200 : 404 });
+    }
 
     if (request.method === "POST" && url.pathname === "/view/xterm/open") {
       this.handlers.openXTermShell();

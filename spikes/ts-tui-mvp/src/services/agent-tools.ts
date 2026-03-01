@@ -20,14 +20,21 @@ import type {
   AgentToolUpdateCallback,
 } from "@mariozechner/pi-agent-core";
 import type { DesktopState } from "../core/types.js";
+import type { CommandListItem } from "../core/command-registry.js";
+import type { SearchResult } from "./chrome-browser-service.js";
+import { BraveSearchService } from "./brave-search-service.js";
+import { fetchYoutubeTranscript } from "./youtube-transcript-service.js";
 
 // -- Context interface: what the TUI exposes to tools --
 
 export interface TuiToolContext {
   getState: () => DesktopState;
+  listCommands: () => CommandListItem[];
+  runCommand: (id: string) => { ok: true } | { ok: false; error: string };
   openWindow: (type: string) => { id: number } | { error: string };
   openFigletWindow: (text: string, font?: string) => { id: number } | { error: string };
   openChromeBrowser: (url?: string) => { id: number } | { error: string };
+  browserSearch: (query: string, numResults?: number) => Promise<SearchResult[]>;
   windows: import("../core/window-facade.js").WindowFacade;
 }
 
@@ -73,6 +80,26 @@ const getState = tuiTool({
     "their positions/sizes/types, and which window is focused.",
   parameters: Type.Object({}),
   execute: (_params, ctx) => JSON.stringify(ctx.getState(), null, 2),
+});
+
+const listCommands = tuiTool({
+  name: "tui_list_commands",
+  label: "List TUI Commands",
+  description:
+    "Lists the high-level app commands exposed by the shared command registry.",
+  parameters: Type.Object({}),
+  execute: (_params, ctx) => JSON.stringify(ctx.listCommands(), null, 2),
+});
+
+const runCommand = tuiTool({
+  name: "tui_run_command",
+  label: "Run TUI Command",
+  description:
+    "Runs a high-level app command by id using the shared command registry.",
+  parameters: Type.Object({
+    id: Type.String({ description: "Command id, e.g. browser.open_chrome or window.tile" }),
+  }),
+  execute: (params, ctx) => JSON.stringify(ctx.runCommand(params.id)),
 });
 
 const openWindow = tuiTool({
@@ -234,15 +261,190 @@ const browserNavigate = tuiTool({
   },
 });
 
+/**
+ * Parse markdown links [text](url) from raw text.
+ * Returns de-duplicated list preserving first-seen order.
+ */
+function parseMarkdownLinks(markdown: string): Array<{ index: number; text: string; url: string }> {
+  const seen = new Set<string>();
+  const links: Array<{ index: number; text: string; url: string }> = [];
+  const re = /\[([^\]]*)\]\(([^)]+)\)/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(markdown)) !== null) {
+    const url = m[2].trim();
+    // Skip fragment-only links (#section) — they're internal page jumps
+    if (url.startsWith("#")) continue;
+    if (seen.has(url)) continue;
+    seen.add(url);
+    links.push({ index: links.length + 1, text: m[1].trim() || "(no text)", url });
+  }
+  return links;
+}
+
+const browserListLinks = tuiTool({
+  name: "tui_browser_list_links",
+  label: "List Links in Browser Page",
+  description:
+    "Extracts and returns a numbered list of all links found on the current " +
+    "page in a Chrome browser window. Each link has an index number, display " +
+    "text, and URL. Use the index with tui_browser_follow_link to navigate.",
+  parameters: Type.Object({
+    id: Type.Number({ description: "Chrome browser window ID" }),
+  }),
+  execute: (params, ctx) => {
+    const text = ctx.windows.captureText(params.id);
+    if (text === undefined) return "window not found or not readable";
+    const links = parseMarkdownLinks(text);
+    if (links.length === 0) return "No links found on this page.";
+    const lines = links.map((l) => `${l.index}. [${l.text}] ${l.url}`);
+    return `${links.length} links found:\n${lines.join("\n")}`;
+  },
+});
+
+const browserFollowLink = tuiTool({
+  name: "tui_browser_follow_link",
+  label: "Follow Link in Browser Page",
+  description:
+    "Follows a link by its index number (from tui_browser_list_links) in a " +
+    "Chrome browser window. Navigates to that URL and loads the page.",
+  parameters: Type.Object({
+    id: Type.Number({ description: "Chrome browser window ID" }),
+    link_index: Type.Number({ description: "Link number from tui_browser_list_links output" }),
+  }),
+  execute: (params, ctx) => {
+    const text = ctx.windows.captureText(params.id);
+    if (text === undefined) return "window not found or not readable";
+    const links = parseMarkdownLinks(text);
+    const link = links.find((l) => l.index === params.link_index);
+    if (!link) return `link #${params.link_index} not found. Use tui_browser_list_links to see available links.`;
+    const ok = ctx.windows.sendInput(params.id, link.url);
+    return ok ? `following link #${params.link_index}: [${link.text}] → ${link.url}` : "could not navigate";
+  },
+});
+
+const browserSearch = tuiTool({
+  name: "tui_browser_search",
+  label: "Search the Web (Chrome)",
+  description:
+    "Searches Google via Chrome and returns structured results with title, " +
+    "URL, and snippet for each result. Use tui_browser_navigate or " +
+    "tui_browser_follow_link to visit a result. Requires Chrome on :9222. " +
+    "Prefer tui_web_search (Brave) when available — it needs no browser.",
+  parameters: Type.Object({
+    query: Type.String({ description: "Search query" }),
+    num_results: Type.Optional(
+      Type.Number({ description: "Number of results to return (default 5, max 20)" })
+    ),
+  }),
+  execute: async (params, ctx) => {
+    const n = Math.max(1, Math.min(params.num_results ?? 5, 20));
+    const results = await ctx.browserSearch(params.query, n);
+    if (results.length === 0) return "No results found. Is Chrome running on :9222?";
+    const lines = results.map(
+      (r, i) => `${i + 1}. ${r.title}\n   ${r.link}\n   ${r.snippet}`
+    );
+    return `${results.length} results for "${params.query}":\n\n${lines.join("\n\n")}`;
+  },
+});
+
+// -- Brave Search (no browser needed) --
+
+const braveService = new BraveSearchService();
+
+const webSearch = tuiTool({
+  name: "tui_web_search",
+  label: "Search the Web (Brave)",
+  description:
+    "Searches the web via Brave Search API. No browser required. " +
+    "Returns titles, URLs, snippets, and age for each result. " +
+    "Use tui_web_content to fetch full page content for a URL. " +
+    "Falls back with a helpful error if BRAVE_API_KEY is not set.",
+  parameters: Type.Object({
+    query: Type.String({ description: "Search query" }),
+    num_results: Type.Optional(
+      Type.Number({ description: "Number of results (default 5, max 20)" })
+    ),
+    freshness: Type.Optional(
+      Type.String({
+        description:
+          "Time filter: pd (past day), pw (past week), pm (past month), " +
+          "py (past year), or YYYY-MM-DDtoYYYY-MM-DD date range",
+      })
+    ),
+  }),
+  execute: async (params) => {
+    const { results, error } = await braveService.search(params.query, {
+      numResults: params.num_results,
+      freshness: params.freshness,
+    });
+    if (error && results.length === 0) return error;
+    if (results.length === 0) return "No results found.";
+    const lines = results.map(
+      (r, i) =>
+        `${i + 1}. ${r.title}\n   ${r.link}${r.age ? `  (${r.age})` : ""}\n   ${r.snippet}`
+    );
+    return `${results.length} results for "${params.query}":\n\n${lines.join("\n\n")}`;
+  },
+});
+
+const webContent = tuiTool({
+  name: "tui_web_content",
+  label: "Fetch Web Page Content",
+  description:
+    "Fetches a URL and extracts readable content as markdown. " +
+    "No browser required — uses HTTP fetch + Readability. " +
+    "Works for most pages. For JS-heavy SPAs, use Chrome browser instead.",
+  parameters: Type.Object({
+    url: Type.String({ description: "Full URL to fetch (including https://)" }),
+  }),
+  execute: async (params) => {
+    const result = await braveService.fetchContent(params.url);
+    if (!result.ok) return result.error ?? "Could not fetch content";
+    const header = result.title ? `# ${result.title}\nURL: ${result.url}\n\n` : `URL: ${result.url}\n\n`;
+    return header + result.markdown;
+  },
+});
+
+// -- YouTube Transcript --
+
+const youtubeTranscript = tuiTool({
+  name: "tui_youtube_transcript",
+  label: "Fetch YouTube Transcript",
+  description:
+    "Fetches the transcript/captions from a YouTube video. " +
+    "Accepts a video URL or 11-character video ID. " +
+    "Returns timestamped text. No API key or browser required.",
+  parameters: Type.Object({
+    video: Type.String({
+      description:
+        "YouTube video URL or ID (e.g. 'dQw4w9WgXcQ' or 'https://www.youtube.com/watch?v=dQw4w9WgXcQ')",
+    }),
+  }),
+  execute: async (params) => {
+    const result = await fetchYoutubeTranscript(params.video);
+    if (!result.ok) return result.error ?? "Could not fetch transcript";
+    const header = `YouTube transcript for ${result.videoId} (${result.entries.length} entries):\n\n`;
+    return header + result.fullText;
+  },
+});
+
 // -- Public API --
 
 export function createTuiTools(ctx: TuiToolContext): AgentTool<any>[] {
   return [
     getState(ctx),
+    listCommands(ctx),
+    runCommand(ctx),
     openWindow(ctx),
     openFigletWindow(ctx),
     openChromeBrowser(ctx),
     browserNavigate(ctx),
+    browserListLinks(ctx),
+    browserFollowLink(ctx),
+    browserSearch(ctx),
+    webSearch(ctx),
+    webContent(ctx),
+    youtubeTranscript(ctx),
     writeEditorText(ctx),
     closeWindow(ctx),
     moveWindow(ctx),

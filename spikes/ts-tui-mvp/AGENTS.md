@@ -59,8 +59,11 @@ Prefer the most elegant correct implementation, not the fastest pile of special 
   - owns menus, startup, window creation, workspace restore, and high-level command flow
   - should coordinate, not become a utility dump
 - `src/core/command-catalog.ts`
-  - current source of truth for menu/palette-visible app commands
-  - owns command ids, categories, groups, ordering, and surface visibility
+  - source of truth for user-visible command metadata
+  - owns command ids, groups, menu placements, palette placement, and surface visibility
+- `src/core/command-registry.ts`
+  - execution-capable adapter over the catalog
+  - builds menus, builds palette entries, lists commands for API/agent use, and runs commands by id
 - `src/core/window-manager.ts`
   - z-order, focus, drag, resize, tile, cascade, close
 - `src/core/desktop-geometry.ts`
@@ -172,6 +175,19 @@ These rules are strict. Treat violations as bugs, not style nits.
 - Prefer composable helpers over inheritance theater.
   - No framework-within-a-framework.
   - Small functions, direct wiring, obvious ownership.
+
+## Command Catalog Usage
+
+- `src/core/command-catalog.ts` is the source of truth for user-visible command definitions.
+- `src/core/command-registry.ts` is the execution and projection layer over that catalog.
+- If you add a new user-visible command, add it to the command catalog first instead of hand-wiring menu and palette entries in multiple places.
+- Use explicit spaced `order` values (`0, 10, 20...`) so later insertions do not force renumbering.
+- Use `menuPlacements` for commands that appear in more than one menu. Do not duplicate those as separate command ids just to hit File/Window/Tools.
+- `group` is for logical clustering and future separators/adapters.
+- `actionKey` must point at an `AppMenuActions` entry implemented by `app-controller.ts`.
+- Current registry phase covers menu/palette projection plus generic control API command discovery/execution.
+- `Wib&Wob Agent` also has registry-backed `tui_list_commands` and `tui_run_command` tools now.
+- Context menus, agent tools, and MCP may still be bespoke until later adapter phases land.
 
 ## Anti-Patterns
 
