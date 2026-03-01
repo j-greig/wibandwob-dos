@@ -15,7 +15,6 @@ export interface AppMenuActions {
   saveWorkspaceAs: () => void;
   loadWorkspacePrompt: () => void;
   openArtWindow: () => void;
-  openXTermShell: () => void;
   openWibWobChat: () => void;
   openWibWobAgent: () => void;
   quit: () => void;
@@ -32,7 +31,6 @@ export interface AppMenuActions {
   openChromeBrowser: () => void;
   openFigletBanner: () => void;
   openPatternWindow: () => void;
-  openGlitchWindow: () => void;
   openCompanionWindow: () => void;
   openWorkspaceManager: () => void;
   openCommandPalette: () => void;

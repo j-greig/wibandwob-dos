@@ -29,7 +29,19 @@ const C = {
   gray:  "#d0d0d0",  // main text
 } as const;
 
-function renderMessage(msg: ChatMessageEntry): string {
+// Kaomoji voice markers — replaces "Wib:" and "Wob:" in rendered text.
+// Only used for non-haiku models (haiku struggles with kaomoji in output).
+const WIB_FACE = "(◕‿◕)";
+const WOB_FACE = "(¬_¬)";
+
+function applyVoiceMarkers(text: string, useKaomoji: boolean): string {
+  if (!useKaomoji) return text;
+  return text
+    .replace(/^Wib:/gm, WIB_FACE)
+    .replace(/^Wob:/gm, WOB_FACE);
+}
+
+function renderMessage(msg: ChatMessageEntry, useKaomoji: boolean): string {
   if (msg.role === "user") {
     return `{${C.pink}-fg}You:{/${C.pink}-fg} {${C.gray}-fg}${escapeTagBraces(msg.text)}{/${C.gray}-fg}`;
   }
@@ -49,14 +61,14 @@ function renderMessage(msg: ChatMessageEntry): string {
     }
     return `  {${C.lime}-fg}${escaped}{/${C.lime}-fg}`;
   }
-  // Assistant text — Wib/Wob voices in main gray
+  // Assistant text — Wib/Wob voices with kaomoji faces
   const text = msg.text || (msg.streaming ? "Wib: …\nWob: …" : "");
-  return escapeTagBraces(text);
+  return escapeTagBraces(applyVoiceMarkers(text, useKaomoji));
 }
 
-function renderTranscript(messages: ChatMessageEntry[]): string {
+function renderTranscript(messages: ChatMessageEntry[], useKaomoji: boolean): string {
   if (messages.length === 0) return "[status] Starting…";
-  return messages.map(renderMessage).join("\n\n");
+  return messages.map((m) => renderMessage(m, useKaomoji)).join("\n\n");
 }
 
 /** Find the most recent Claude Code JSONL for the current project cwd. */
@@ -212,7 +224,8 @@ export function openWibWobAgentWindow(params: {
 
   // Subscribe to agent state
   const unsubscribe = params.agent.subscribe((snapshot) => {
-    transcript.setContent(renderTranscript(snapshot.messages));
+    const useKaomoji = !snapshot.model?.toLowerCase().includes("haiku");
+    transcript.setContent(renderTranscript(snapshot.messages, useKaomoji));
     transcript.setScrollPerc(100);
     statusLine.setContent(` ${snapshot.status}`);
     renderInfoBar(snapshot.model ?? "—", snapshot.sessionId ?? "");
