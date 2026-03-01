@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { createScrollbar } from "../core/ui-primitives.js";
+import type { ContentMeasurement } from "../services/content-measurement.js";
 import type { BrowserEntry, List, WindowKind, WindowRecord } from "../core/types.js";
 import type { OverlayManager } from "../core/overlay-manager.js";
 import type { WindowManager } from "../core/window-manager.js";
@@ -270,19 +271,8 @@ export function openTextViewerWindow(params: {
   content: string;
   kind: WindowKind;
   filePath?: string;
-  contentMeasurement?: {
-    contentWidth: number;
-    contentHeight: number;
-    recommendedWidth: number;
-    recommendedHeight: number;
-    animated?: boolean;
-    frameCount?: number;
-    skippedCommentLines?: number;
-  };
-  fallbackMeasurement?: {
-    columnWidth: number;
-    lineCount: number;
-  };
+  contentMeasurement?: ContentMeasurement;
+  fallbackMeasurement?: ContentMeasurement;
 }): void {
   const frame = params.windowManager.createFrame(params.title, params.kind);
   const viewer = blessed.box({
@@ -302,20 +292,19 @@ export function openTextViewerWindow(params: {
   });
   frame.kind = params.kind;
   frame.filePath = params.filePath;
-  const measuredWidth = params.contentMeasurement?.contentWidth ?? params.fallbackMeasurement?.columnWidth ?? 0;
-  const measuredHeight = params.contentMeasurement?.contentHeight ?? params.fallbackMeasurement?.lineCount ?? 0;
+  const m = params.contentMeasurement ?? params.fallbackMeasurement;
   frame.describeState = () => ({
     appType: `${params.kind}-viewer`,
     summary: params.filePath ? `Viewing ${params.filePath}` : `Viewing ${params.kind} content.`,
     filePath: params.filePath,
-    lineCount: measuredHeight,
-    contentWidth: measuredWidth,
-    contentHeight: measuredHeight,
-    recommendedWidth: params.contentMeasurement?.recommendedWidth,
-    recommendedHeight: params.contentMeasurement?.recommendedHeight,
-    animated: params.contentMeasurement?.animated,
-    frameCount: params.contentMeasurement?.frameCount,
-    skippedCommentLines: params.contentMeasurement?.skippedCommentLines,
+    lineCount: m?.lineCount ?? 0,
+    contentWidth: m?.columnWidth ?? 0,
+    contentHeight: m?.lineCount ?? 0,
+    recommendedWidth: m?.recommendedWidth,
+    recommendedHeight: m?.recommendedHeight,
+    animated: m?.animated,
+    frameCount: m?.frameCount,
+    skippedCommentLines: m?.skippedCommentLines,
     contentPreview: params.content.split("\n").slice(0, 8).join("\n")
   });
   frame.focus = () => {
@@ -325,8 +314,8 @@ export function openTextViewerWindow(params: {
   params.windowManager.registerWindow(frame);
   if (params.contentMeasurement) {
     params.applyMeasuredWindowSize(frame, params.kind, {
-      width: params.contentMeasurement.contentWidth,
-      height: params.contentMeasurement.contentHeight
+      width: params.contentMeasurement.columnWidth,
+      height: params.contentMeasurement.lineCount
     });
   }
   frame.focus();

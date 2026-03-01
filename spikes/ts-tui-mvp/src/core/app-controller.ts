@@ -32,7 +32,7 @@ import type {
 import { contentToWindowSize, getChromeModeForWindow } from "./window-chrome.js";
 import { WindowManager } from "./window-manager.js";
 import { BackroomsService } from "../services/backrooms-service.js";
-import { measurePlainTextContent, measurePrimerContent } from "../services/content-measurement.js";
+import { measurePlainTextContent, measurePrimerContent, type ContentMeasurement } from "../services/content-measurement.js";
 import { ControlApiService } from "../services/control-api.js";
 import { ContentService } from "../services/content-service.js";
 import { getDefaultFigletFont, getFigletCatalogue, getFigletFontChoices, measureFiglet, renderFiglet } from "../services/figlet-service.js";
@@ -1830,15 +1830,7 @@ export class TsTuiMvpApp {
     kind: WindowKind,
     filePath?: string,
     options?: {
-      contentMeasurement?: {
-        contentWidth: number;
-        contentHeight: number;
-        recommendedWidth: number;
-        recommendedHeight: number;
-        animated?: boolean;
-        frameCount?: number;
-        skippedCommentLines?: number;
-      };
+      contentMeasurement?: ContentMeasurement;
     }
   ): void {
     const fallbackMeasurement = options?.contentMeasurement ? undefined : measurePlainTextContent(content).measurement;
@@ -2012,8 +2004,8 @@ export class TsTuiMvpApp {
       ok: true,
       path: entry.filePath,
       name: entry.label,
-      content_width: entry.metadata?.contentWidth ?? 0,
-      content_lines: entry.metadata?.contentHeight ?? 0,
+      content_width: entry.metadata?.columnWidth ?? 0,
+      content_lines: entry.metadata?.lineCount ?? 0,
       recommended_w: entry.metadata?.recommendedWidth ?? 0,
       recommended_h: entry.metadata?.recommendedHeight ?? 0,
       animated: entry.metadata?.animated ?? false,

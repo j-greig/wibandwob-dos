@@ -179,15 +179,7 @@ export class ContentService {
 
   private readPrimerMetadata(filePath: string): BrowserEntry["metadata"] | undefined {
     try {
-      const measured = measurePrimerContent(fs.readFileSync(filePath, "utf8")).measurement;
-      return {
-        contentWidth: measured.columnWidth,
-        contentHeight: measured.lineCount,
-        recommendedWidth: measured.recommendedWidth,
-        recommendedHeight: measured.recommendedHeight,
-        animated: measured.animated,
-        frameCount: measured.frameCount
-      };
+      return measurePrimerContent(fs.readFileSync(filePath, "utf8")).measurement;
     } catch {
       return undefined;
     }

@@ -1,4 +1,5 @@
 import blessed from "blessed";
+import type { ContentMeasurement } from "../services/content-measurement.js";
 
 export type Box = blessed.Widgets.BoxElement;
 export type List = blessed.Widgets.ListElement;
@@ -33,14 +34,7 @@ export interface EditorState {
 export interface BrowserEntry {
   label: string;
   filePath: string;
-  metadata?: {
-    contentWidth?: number;
-    contentHeight?: number;
-    recommendedWidth?: number;
-    recommendedHeight?: number;
-    animated?: boolean;
-    frameCount?: number;
-  };
+  metadata?: Partial<ContentMeasurement>;
 }
 
 export interface BackroomsChannel {

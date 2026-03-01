@@ -113,9 +113,9 @@ export function openFigletWindow(params: {
     summary: "Rendered figlet banner window using the shared WibWob font catalogue.",
     inputText: currentText,
     font: currentFont,
-    lineCount: lastMeasurement.height,
-    contentWidth: lastMeasurement.width,
-    contentHeight: lastMeasurement.height,
+    lineCount: lastMeasurement.measurement.lineCount,
+    contentWidth: lastMeasurement.measurement.columnWidth,
+    contentHeight: lastMeasurement.measurement.lineCount,
     contentPreview: viewer.getContent().split("\n").slice(0, 8).join("\n")
   });
   frame.focus = () => {
@@ -135,9 +135,11 @@ export function openFigletWindow(params: {
 
   const measured = measureFiglet(currentText, currentFont, 0);
   lastMeasurement = measured;
-  const oneRowHeight = measured.fontHeight > 0 && measured.height > measured.fontHeight ? measured.fontHeight : measured.height;
+  const mh = measured.measurement.lineCount;
+  const mw = measured.measurement.columnWidth;
+  const oneRowHeight = measured.fontHeight > 0 && mh > measured.fontHeight ? measured.fontHeight : mh;
   params.applyMeasuredWindowSize(frame, "figlet", {
-    width: Math.max(measured.width, 32),
+    width: Math.max(mw, 32),
     height: Math.max(oneRowHeight, 5)
   });
 }

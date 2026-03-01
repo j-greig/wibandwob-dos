@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { measurePrimerContent } from "./content-measurement.js";
+import { measurePrimerContent, type ContentMeasurement } from "./content-measurement.js";
 import type { ContentService } from "./content-service.js";
 import type { OverlayManager } from "../core/overlay-manager.js";
 import type { WindowRecord } from "../core/types.js";
@@ -46,32 +46,14 @@ export function openPrimerFile(params: {
     content: string,
     kind: "primer",
     filePath: string,
-    options: {
-      contentMeasurement: {
-        contentWidth: number;
-        contentHeight: number;
-        recommendedWidth: number;
-        recommendedHeight: number;
-        animated?: boolean;
-        frameCount?: number;
-        skippedCommentLines?: number;
-      };
-    }
+    options: { contentMeasurement: ContentMeasurement }
   ) => void;
 }): void {
   try {
     const rawContent = fs.readFileSync(params.filePath, "utf8");
     const measured = measurePrimerContent(rawContent);
     params.onOpenTextViewer(path.basename(params.filePath), measured.primaryFrameText, "primer", params.filePath, {
-      contentMeasurement: {
-        contentWidth: measured.measurement.columnWidth,
-        contentHeight: measured.measurement.lineCount,
-        recommendedWidth: measured.measurement.recommendedWidth,
-        recommendedHeight: measured.measurement.recommendedHeight,
-        animated: measured.measurement.animated,
-        frameCount: measured.measurement.frameCount,
-        skippedCommentLines: measured.measurement.skippedCommentLines
-      }
+      contentMeasurement: measured.measurement
     });
   } catch (error) {
     params.overlays.flash(`Cannot open primer: ${error instanceof Error ? error.message : String(error)}`);

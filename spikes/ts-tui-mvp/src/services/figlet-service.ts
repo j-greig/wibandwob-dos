@@ -3,7 +3,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 
 import { REPO_ROOT } from "../core/config.js";
-import { measurePlainTextContent } from "./content-measurement.js";
+import { measurePlainTextContent, type ContentMeasurement } from "./content-measurement.js";
 
 export interface FigletFontMeta {
   height: number;
@@ -150,21 +150,21 @@ export function renderFigletLines(text: string, font = FALLBACK_FONT, width = 0)
   return rendered ? rendered.split("\n") : [];
 }
 
-export function measureFiglet(text: string, font = FALLBACK_FONT, width = 0): {
+export interface FigletMeasurement {
   rendered: string;
   lines: string[];
-  width: number;
-  height: number;
+  measurement: ContentMeasurement;
   fontHeight: number;
-} {
+}
+
+export function measureFiglet(text: string, font = FALLBACK_FONT, width = 0): FigletMeasurement {
   const rendered = renderFiglet(text, font, width);
   const lines = rendered ? rendered.split("\n") : [];
-  const measured = measurePlainTextContent(rendered).measurement;
+  const measurement = measurePlainTextContent(rendered).measurement;
   return {
     rendered,
     lines,
-    width: measured.columnWidth,
-    height: measured.lineCount,
+    measurement,
     fontHeight: getFigletFontHeight(font)
   };
 }
