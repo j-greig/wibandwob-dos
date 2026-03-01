@@ -6,6 +6,10 @@ This file is local guidance for agents working in `/Users/james/Repos/wibandwob-
 
 This spike is a terminal-native TypeScript MVP of a WibWob-DOS-style desktop shell.
 
+Canonical doc inventory:
+- `docs/000-docs-overview.md`
+  - update this whenever a spike doc is added or its status materially changes
+
 Current goals:
 - stay terminal-native
 - use Bun as the runtime and package manager
@@ -98,12 +102,11 @@ Prefer the most elegant correct implementation, not the fastest pile of special 
 - `src/services/figlet-service.ts`
   - shared FIGlet catalogue + real CLI render bridge
 - `src/services/agent-tools.ts`
-  - 8 TUI tools for agent window (get_state, open_window, open_figlet, open_chrome_browser, browser_navigate, close_window, move_window, focus_window, send_input, read_window)
-  - plus registry-backed tui_list_commands and tui_run_command
+  - agent-facing TUI tools, including registry-backed `tui_list_commands` and `tui_run_command`
   - all tools use TuiToolContext which wraps WindowFacade
 - `src/services/wibwob-agent-session.ts`
   - unified session for both chat (mode="chat") and agent (mode="agent")
-  - agent mode: 15 tools (TUI + jailed coding), desktop state injection via transformContext
+  - agent mode: TUI tools + jailed coding tools, desktop state injection via transformContext
   - chat mode: no tools, no state injection, stripped system prompt
   - 7 jailed coding tools (read, write, edit, bash, grep, find, ls) scoped to REPO_ROOT
 - `src/windows/wibwob-agent-window.ts`
@@ -210,7 +213,7 @@ These rules are strict. Treat violations as bugs, not style nits.
 - Current registry phase covers menu/palette projection plus generic control API command discovery/execution.
 - `Wib&Wob Agent` also has registry-backed `tui_list_commands` and `tui_run_command` tools now.
 - Agent guidance should prefer registry commands first for high-level actions and use low-level window tools only for precise manipulation.
-- Context menus, agent tools, and MCP may still be bespoke until later adapter phases land.
+- Some window-local actions and MCP exposure still lag behind the registry. Shared context-menu actions are already on the registry path.
 
 ## Anti-Patterns
 
