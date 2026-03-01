@@ -156,7 +156,7 @@ interface MenuQueryContext {
   focusedKind?: WindowKind;
   focusedWindow?: WindowRecord;
   selection?: MenuSelection;
-  state?: DesktopState;
+  windowCount?: number;        // lightweight — avoids snapshotting full DesktopState
 }
 
 interface MenuSelection {
@@ -232,10 +232,15 @@ selection. This covers three classes of conditions:
 - "Play Primer" enabled when selection.kind is "primer"
 
 **Desktop state conditions:**
-- "Tile Windows" enabled when more than one window is open
+- "Tile Windows" enabled when `ctx.windowCount > 1`
 
 This is the `validateMenuItem:` equivalent from macOS. The predicate receives
 everything it needs to make a decision. No second ad hoc validation layer.
+
+Note: `enabled` predicates are functions, so the catalog is no longer pure
+serializable data. The agent tool `tui_list_commands` should evaluate predicates
+server-side and return a boolean `enabled` field per command, not expose the
+predicate itself.
 
 #### Command execution with context
 
@@ -309,7 +314,7 @@ Every existing command gets tagged. Examples:
 {
   id: "file.save",
   menuContexts: ["editor"],
-  enabled: (focused) => focused?.isDirty === true,
+  enabled: (ctx) => ctx.focusedWindow?.isDirty === true,
   // ...existing fields
 }
 
@@ -378,7 +383,6 @@ function isEnabledInContext(
 
 Visibility controls whether the item appears at all. Enabled controls whether
 it is greyed out. Both are evaluated on the same `MenuQueryContext`.
-```
 
 #### Menu rebuild trigger
 
@@ -393,7 +397,7 @@ private buildCurrentMenuContext(): MenuQueryContext {
     focusedKind: focused?.kind,
     focusedWindow: focused,
     selection: focused?.getSelection?.(),
-    state: this.state.getState(),
+    windowCount: this.windowManager.getWindows().length,
   };
 }
 
@@ -433,7 +437,18 @@ minimal change needed.
   menu visibility
 - `context-menu-items.ts` stays for now (unified in Phase 1 Slice B)
 
-### Phase 1 Slice B: Unify context menus
+### Phase 1 Slice B: Implement getSelection on key window types
+
+Add `getSelection?()` to WindowRecord and implement for:
+- File manager: returns highlighted file/directory entry
+- Primer browser / gallery: returns highlighted primer
+- Chrome browser: returns current page URL
+- Editor: returns filePath if saved (text selection is future work)
+
+Other window types return undefined. This is prerequisite for selection-aware
+commands in Slice C.
+
+### Phase 1 Slice C: Unify context menus
 
 After filtered menus work, replace `context-menu-items.ts` with registry
 queries:
@@ -450,6 +465,18 @@ const items = this.commands.buildContextMenu({});
 ```
 
 Same filter logic, same catalog, same predicates. No second definition path.
+
+### Phase 1 Slice D: Selection-aware commands
+
+Add new commands that operate on the current selection:
+- `selection.open_file` — Open highlighted file
+- `selection.open_in_editor` — Open file in editor
+- `selection.reveal_in_finder` — Reveal file in macOS Finder
+- `selection.open_link` — Follow URL in Chrome browser
+
+These are NEW product surface, not refactoring. Each needs an AppMenuActions
+entry and execution path in app-controller. Scope to file manager and browser
+initially.
 
 ### Phase 2: Dynamic top-level menu categories
 
@@ -498,18 +525,27 @@ This requires `MenuOverlayManager` to support variable-length menu bars and
 rebinding accelerator keys. That is materially more complex than Phase 1 and
 should be scoped separately.
 
-### Phase 2 Slice B: Push input handling to windows
+## Related Work (not in scope, but synergistic)
+
+### Push input handling to windows
 
 Move editor and terminal keypress logic from app-controller into window
 factories. Add optional `handleInput?(ch, key): boolean` to `WindowRecord`.
 App-controller dispatches to focused window first; handles unhandled keys
 globally.
 
-This is independent of menu work but synergistic — once windows own their
-input, window-specific menu commands map naturally to the same action handlers.
+This is a separate refactor, not a menu concern. But it is synergistic — once
+windows own their input, window-specific menu commands map naturally to the
+same action handlers. Should be its own PRD or spike task.
 
 ## Edge Cases
 
+- **Empty menus after filtering:** If a top-level category has zero visible
+  items after context filtering (e.g. View when an editor is focused), hide
+  the category label from the menu bar entirely. Do not show an empty dropdown.
+  The menu bar width and accelerator positions adjust accordingly. If this is
+  too complex for Phase 1, show the category with a single greyed "(empty)"
+  placeholder instead.
 - **No focused window with windows open:** Not a normal steady state today.
   Desktop context triggers when `focusedKind === undefined`. No need to add
   explicit desktop-focus mode in Phase 1.
