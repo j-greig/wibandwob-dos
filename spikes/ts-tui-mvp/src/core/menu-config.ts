@@ -11,6 +11,7 @@ export interface AppMenuActions {
   openTerminal: () => void;
   openXTermShell: () => void;
   openWibWobChat: () => void;
+  openWibWobAgent: () => void;
   openPiChat: () => void;
   quit: () => void;
   focusNextWindow: () => void;
@@ -51,6 +52,7 @@ export function createMenuConfigs(actions: AppMenuActions): MenuConfig[] {
         { label: "Open Terminal", action: actions.openTerminal },
         { label: "Open XTerm Shell", action: actions.openXTermShell },
         { label: "Open Wib&Wob Chat", action: actions.openWibWobChat },
+        { label: "Open Wib&Wob Agent", action: actions.openWibWobAgent },
         { label: "Open Pi Terminal (Legacy)", action: actions.openPiChat },
         { label: "Quit", action: actions.quit }
       ]
@@ -97,6 +99,7 @@ export function createMenuConfigs(actions: AppMenuActions): MenuConfig[] {
         { label: "Glitch FX", action: actions.openGlitchWindow },
         { label: "Chat Transcript", action: actions.openChatWindow },
         { label: "Wib&Wob Chat", action: actions.openWibWobChat },
+        { label: "Wib&Wob Agent", action: actions.openWibWobAgent },
         { label: "Companion", action: actions.openCompanionWindow },
         { label: "Workspace Manager", action: actions.openWorkspaceManager },
         { label: "XTerm Shell", action: actions.openXTermShell },
@@ -119,6 +122,7 @@ export function createPaletteCommands(actions: AppMenuActions): MenuItem[] {
     { label: "Open Glitch FX Window", action: actions.openGlitchWindow },
     { label: "Open Chat Transcript", action: actions.openChatWindow },
     { label: "Open Wib&Wob Chat", action: actions.openWibWobChat },
+    { label: "Open Wib&Wob Agent", action: actions.openWibWobAgent },
     { label: "Open Companion Window", action: actions.openCompanionWindow },
     { label: "Open Workspace Manager", action: actions.openWorkspaceManager },
     { label: "Save Workspace As...", action: actions.saveWorkspaceAs },

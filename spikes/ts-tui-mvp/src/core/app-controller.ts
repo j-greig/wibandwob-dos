@@ -69,6 +69,9 @@ import {
 } from "../windows/misc-windows.js";
 import { openEditorWindow as openTextEditorWindow } from "../windows/text-windows.js";
 import { openWibWobChatWindow as openNativeWibWobChatWindow } from "../windows/wibwob-chat-window.js";
+import { type TuiToolContext } from "../services/agent-tools.js";
+import { WibWobAgentSession } from "../services/wibwob-agent-session.js";
+import { openWibWobAgentWindow as openNativeWibWobAgentWindow } from "../windows/wibwob-agent-window.js";
 
 export class TsTuiMvpApp {
   private readonly screen: blessed.Widgets.Screen;
@@ -155,6 +158,7 @@ export class TsTuiMvpApp {
       openArtWindow: () => this.openArtWindow(),
       openChatWindow: () => this.openChatWindow(),
       openWibWobChat: () => this.openWibWobChatWindow(),
+      openWibWobAgent: () => this.openWibWobAgentWindow(),
       openCompanionWindow: () => this.openCompanionWindow(),
       openWorkspaceManager: () => this.openWorkspaceManagerWindow(),
       openCommandPalette: () => this.openCommandPaletteWindow(),
@@ -313,6 +317,7 @@ export class TsTuiMvpApp {
         openBackrooms: () => this.promptForBackroomsTv(),
         openXTermShell: () => void this.openXTermShellWindow(),
         openWibWobChat: () => this.openWibWobChatWindow(),
+        openWibWobAgent: () => this.openWibWobAgentWindow(),
         openPiChat: () => void this.openPiChatWindow(),
         openWorkspaceManager: () => this.openWorkspaceManagerWindow(),
         tileWindows: () => this.windowManager.tileWindows(),
@@ -383,6 +388,63 @@ export class TsTuiMvpApp {
           ? restore.messages.filter((message): message is ChatMessageEntry => this.isChatMessageEntry(message))
           : undefined
       }
+    });
+  }
+
+  private openWibWobAgentWindow(): void {
+    const tuiContext: TuiToolContext = {
+      getState: () => this.state.sync(),
+      openWindow: (type) => {
+        const before = this.windowManager.getWindows().length;
+        const map: Record<string, () => void> = {
+          terminal: () => void this.openXTermShellWindow(),
+          editor: () => this.openEditorWindow(),
+          art: () => this.openArtWindow(),
+          gallery: () => this.openPrimerGalleryWindow(),
+          browser: () => this.openBrowserReaderWindow(),
+          pattern: () => this.openPatternWindow(),
+          orbit: () => this.openOrbitWindow(),
+          glitch: () => this.openGlitchWindow(),
+          chat: () => this.openChatWindow(),
+          companion: () => this.openCompanionWindow(),
+          inspector: () => this.openStateInspectorWindow(),
+          primer: () => this.openPrimerBrowserWindow(),
+        };
+        const fn = map[type];
+        if (!fn) return { error: `unknown window type: ${type}` };
+        fn();
+        const wins = this.windowManager.getWindows();
+        if (wins.length > before) {
+          return { id: wins[wins.length - 1].id };
+        }
+        return { id: 0 };
+      },
+      closeWindow: (id) => this.windowManager.closeWindowById(id),
+      moveWindow: (id, left, top, width, height) => {
+        const moved = this.windowManager.moveWindow(id, left, top);
+        if (moved && width !== undefined && height !== undefined) {
+          this.windowManager.resizeWindow(id, width, height);
+        }
+        return moved;
+      },
+      focusWindow: (id) => this.windowManager.focusWindowById(id),
+      sendWindowInput: (id, input) => {
+        const win = this.windowManager.getWindowById(id);
+        if (!win?.writeInput) return false;
+        win.writeInput(input);
+        return true;
+      },
+      captureWindowText: (id) => {
+        const win = this.windowManager.getWindowById(id);
+        return win?.captureText?.();
+      },
+    };
+
+    const session = new WibWobAgentSession(tuiContext, REPO_ROOT);
+    openNativeWibWobAgentWindow({
+      screen: this.screen,
+      windowManager: this.windowManager,
+      agent: session,
     });
   }
 
@@ -1800,6 +1862,7 @@ export class TsTuiMvpApp {
       openTerminal: () => void this.openTerminalWindow(),
       openXTermShell: () => void this.openXTermShellWindow(),
       openWibWobChat: () => this.openWibWobChatWindow(),
+      openWibWobAgent: () => this.openWibWobAgentWindow(),
       openPiChat: () => void this.openPiChatWindow(),
       quit: () => this.destroy(),
       focusNextWindow: () => this.windowManager.focusNextWindow(1),

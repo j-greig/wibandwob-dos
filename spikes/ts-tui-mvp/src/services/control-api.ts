@@ -39,6 +39,7 @@ interface ControlApiHandlers {
   openArtWindow: () => void;
   openChatWindow: () => void;
   openWibWobChat: () => void;
+  openWibWobAgent: () => void;
   openCompanionWindow: () => void;
   openWorkspaceManager: () => void;
   openCommandPalette: () => void;
@@ -143,6 +144,7 @@ export class ControlApiService {
           "POST /view/art/open",
           "POST /view/chat/open",
           "POST /view/wibwob-chat/open",
+          "POST /view/wibwob-agent/open",
           "POST /view/companion/open",
           "POST /view/workspace/open",
           "POST /view/palette/open",
@@ -221,6 +223,10 @@ export class ControlApiService {
     }
     if (request.method === "POST" && url.pathname === "/view/wibwob-chat/open") {
       this.handlers.openWibWobChat();
+      return Response.json({ ok: true });
+    }
+    if (request.method === "POST" && url.pathname === "/view/wibwob-agent/open") {
+      this.handlers.openWibWobAgent();
       return Response.json({ ok: true });
     }
     if (request.method === "POST" && url.pathname === "/view/companion/open") {

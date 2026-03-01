@@ -6,6 +6,7 @@ export interface SystemContextActions {
   openBackrooms: () => void;
   openXTermShell: () => void;
   openWibWobChat: () => void;
+  openWibWobAgent: () => void;
   openPiChat: () => void;
   openWorkspaceManager: () => void;
   tileWindows: () => void;
