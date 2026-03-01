@@ -4,21 +4,15 @@ export interface SystemContextActions {
   openPrimerBrowser: () => void;
   openTextFile: () => void;
   openBackrooms: () => void;
-  openXTermShell: () => void;
-  openChromeBrowser: () => void;
-  openWibWobChat: () => void;
-  openWibWobAgent: () => void;
   openPiChat: () => void;
   openWorkspaceManager: () => void;
-  tileWindows: () => void;
-  cascadeWindows: () => void;
+  commandItems: MenuItem[];
 }
 
 export function createWindowContextMenuItems(
   window: WindowRecord,
   actions: {
-    tileWindows: () => void;
-    cascadeWindows: () => void;
+    commandItems: MenuItem[];
     saveEditor?: () => void;
     saveAsEditor?: () => void;
   }
@@ -32,11 +26,7 @@ export function createWindowContextMenuItems(
   if (window.kind === "editor" && actions.saveAsEditor) {
     items.push({ label: "Save As...", action: actions.saveAsEditor });
   }
-  items.push(
-    { label: "Tile Windows", action: actions.tileWindows },
-    { label: "Cascade Windows", action: actions.cascadeWindows },
-    { label: "Close Window", action: () => window.close() }
-  );
+  items.push(...actions.commandItems, { label: "Close Window", action: () => window.close() });
   return items;
 }
 
@@ -45,12 +35,8 @@ export function createSystemContextMenuItems(actions: SystemContextActions): Men
     { label: "Open Primer Browser", action: actions.openPrimerBrowser },
     { label: "Open Text File", action: actions.openTextFile },
     { label: "Open Backrooms TV", action: actions.openBackrooms },
-    { label: "Open XTerm Shell", action: actions.openXTermShell },
-    { label: "Open Chrome Browser", action: actions.openChromeBrowser },
-    { label: "Open Wib&Wob Chat", action: actions.openWibWobChat },
-    { label: "Open Pi Terminal (Legacy)", action: actions.openPiChat },
     { label: "Open Workspace Manager", action: actions.openWorkspaceManager },
-    { label: "Tile Windows", action: actions.tileWindows },
-    { label: "Cascade Windows", action: actions.cascadeWindows }
+    ...actions.commandItems,
+    { label: "Open Pi Terminal (Legacy)", action: actions.openPiChat }
   ];
 }

@@ -208,7 +208,10 @@ function loadAgentSystemPrompt(): string {
     "You also have standard coding tools: read, write, edit, bash, grep, find, ls.",
     `All file operations are scoped to ${REPO_ROOT} — you cannot access files outside this directory.`,
     "The desktop state is injected at the start of each turn automatically.",
-    "Use tui_open_window, tui_send_input, tui_read_window etc to help the user.",
+    "For high-level app actions, prefer the shared command registry path first.",
+    "Use tui_list_commands to discover available commands and tui_run_command to execute them.",
+    "Examples: opening windows, tiling/cascading, opening Chrome, opening the file manager, opening Wib&Wob Chat or Wib&Wob Agent.",
+    "Use low-level TUI tools like tui_open_window, tui_move_window, tui_send_input, tui_read_window, or tui_editor_write only when you need precise control that the registry does not expose.",
     "Use read, write, edit, bash for file operations — no need to use the terminal for these.",
     "You can open terminals, run commands, open primers, arrange windows.",
   ].join("\n");

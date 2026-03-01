@@ -25,6 +25,7 @@ export interface AppMenuActions {
   focusPreviousWindow: () => void;
   closeFocusedWindow: () => void;
   openBackroomsPrompt: () => void;
+  openBackroomsTv: (args?: Record<string, unknown>) => void;
   tileWindows: () => void;
   cascadeWindows: () => void;
   openGallery: () => void;

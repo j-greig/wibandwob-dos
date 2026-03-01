@@ -156,7 +156,7 @@ export class TsTuiMvpApp {
       getState: () => this.getDesktopState(),
       getPrimerInfo: (pathOrName) => this.getPrimerInfo(pathOrName),
       listCommands: (surface) => this.commands.list(surface),
-      runCommand: (id) => this.commands.run(id),
+      runCommand: (id, args) => this.commands.run(id, args),
       openPrimerBrowser: () => this.openPrimerBrowserWindow(),
       openFileManager: () => this.openFileManagerWindow(),
       openPrimerGallery: () => this.openPrimerGalleryWindow(),
@@ -304,8 +304,10 @@ export class TsTuiMvpApp {
   private openWindowContextMenu(window: WindowRecord, x?: number, y?: number): void {
     this.openPopupMenu(
       createWindowContextMenuItems(window, {
-        tileWindows: () => this.windowManager.tileWindows(),
-        cascadeWindows: () => this.windowManager.cascadeWindows(),
+        commandItems: this.commands.createMenuItems([
+          "window.tile",
+          "window.cascade"
+        ]),
         saveEditor: window.kind === "editor" ? () => this.saveEditor(window) : undefined,
         saveAsEditor: window.kind === "editor" ? () => {
           // Focus the window first, then use the shared Save As logic
@@ -324,14 +326,16 @@ export class TsTuiMvpApp {
         openPrimerBrowser: () => this.openPrimerBrowserWindow(),
         openTextFile: () => this.promptForEditorPath(),
         openBackrooms: () => this.promptForBackroomsTv(),
-        openXTermShell: () => void this.openXTermShellWindow(),
-        openChromeBrowser: () => this.openChromeBrowserWindow(),
-        openWibWobChat: () => this.openWibWobChatWindow(),
-        openWibWobAgent: () => this.openWibWobAgentWindow(),
+        commandItems: this.commands.createMenuItems([
+          "terminal.open_xterm",
+          "browser.open_chrome",
+          "chat.open_wibwob",
+          "agent.open_wibwob",
+          "window.tile",
+          "window.cascade"
+        ]),
         openPiChat: () => void this.openPiChatWindow(),
         openWorkspaceManager: () => this.openWorkspaceManagerWindow(),
-        tileWindows: () => this.windowManager.tileWindows(),
-        cascadeWindows: () => this.windowManager.cascadeWindows()
       }),
       x,
       y
@@ -401,7 +405,7 @@ export class TsTuiMvpApp {
     const tuiContext: TuiToolContext = {
       getState: () => this.state.sync(),
       listCommands: () => this.commands.list("agent"),
-      runCommand: (id) => this.commands.run(id),
+      runCommand: (id, args) => this.commands.run(id, args),
       openWindow: (type) => {
         const before = this.windowManager.getWindows().length;
         const map: Record<string, () => void> = {
@@ -1969,6 +1973,13 @@ export class TsTuiMvpApp {
       focusPreviousWindow: () => this.windowManager.focusNextWindow(-1),
       closeFocusedWindow: () => this.windowManager.closeFocusedWindow(),
       openBackroomsPrompt: () => this.promptForBackroomsTv(),
+      openBackroomsTv: (args?: Record<string, unknown>) => {
+        const theme = typeof args?.theme === "string" && args.theme.trim() ? args.theme.trim() : "liminal fluorescent maze";
+        const model = typeof args?.model === "string" && ["haiku", "sonnet", "opus"].includes(args.model) ? args.model as "haiku" | "sonnet" | "opus" : "sonnet";
+        const turns = typeof args?.turns === "number" ? Math.max(1, Math.min(20, args.turns)) : 6;
+        const mode = typeof args?.mode === "string" && ["auto", "live", "fake-live"].includes(args.mode) ? args.mode as "auto" | "live" | "fake-live" : "auto";
+        this.openBackroomsTv({ theme, model, turns, mode, primers: "" });
+      },
       tileWindows: () => this.windowManager.tileWindows(),
       cascadeWindows: () => this.windowManager.cascadeWindows(),
       openGallery: () => this.openPrimerGalleryWindow(),

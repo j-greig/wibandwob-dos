@@ -14,14 +14,44 @@ from typing import Any, Dict, List, Optional
 from urllib.parse import urljoin
 
 import requests
+from bs4 import BeautifulSoup
 from markdownify import markdownify as md
 from readability import Document
+
+
+def _extract_pre_blocks(html: str) -> tuple[str, dict[str, str]]:
+    """Replace <pre> blocks with unique placeholder tokens.
+
+    Returns (modified_html, {token: pre_text}) so callers can restore
+    the verbatim whitespace-preserved content after readability/markdownify
+    have run.  readability-lxml collapses whitespace inside <pre> tags;
+    this protects them by removing them before readability sees them.
+    """
+    soup = BeautifulSoup(html, "html.parser")
+    stash: dict[str, str] = {}
+    for idx, pre in enumerate(soup.find_all("pre")):
+        token = f"\x00PRE{idx}\x00"
+        # Get the raw text content, preserving internal newlines and spaces
+        text = pre.get_text()
+        stash[token] = text
+        pre.replace_with(token)
+    return str(soup), stash
+
+
+def _restore_pre_blocks(markdown: str, stash: dict[str, str]) -> str:
+    """Substitute placeholder tokens back with verbatim pre-block text."""
+    for token, text in stash.items():
+        # Ensure the block is surrounded by blank lines so it reads cleanly
+        block = "\n" + text.rstrip("\n") + "\n"
+        markdown = markdown.replace(token, block)
+    return markdown
 
 
 def fetch_and_convert(url: str) -> Dict[str, Any]:
     """Fetch a URL and return a RenderBundle dict.
 
-    Pipeline: requests.get → readability extract → markdownify → bundle.
+    Pipeline: requests.get → pre-block extraction → readability extract
+              → markdownify → pre-block restoration → bundle.
     """
     headers = {"User-Agent": "WibWob-DOS/0.1"}
     try:
@@ -40,11 +70,27 @@ def fetch_and_convert(url: str) -> Dict[str, Any]:
     # Force UTF-8 decoding — requests sometimes guesses Latin-1 for
     # responses without an explicit charset, causing double-encoding.
     resp.encoding = resp.apparent_encoding or "utf-8"
-    doc = Document(resp.text)
+
+    # Protect <pre> blocks before readability collapses their whitespace.
+    protected_html, pre_stash = _extract_pre_blocks(resp.text)
+
+    doc = Document(protected_html)
     title = doc.title()
     article_html = doc.summary()
 
+    # readability returns an empty body when it cannot find article-like
+    # prose (e.g. pages that are primarily ASCII art or navigation).
+    # Fall back to running markdownify on the full protected source.
+    soup_check = BeautifulSoup(article_html, "html.parser")
+    body_text = soup_check.get_text(strip=True)
+    if not body_text:
+        article_html = protected_html
+
     markdown = md(article_html, heading_style="ATX", strip=["img", "script", "style"])
+
+    # Restore verbatim pre-block content
+    markdown = _restore_pre_blocks(markdown, pre_stash)
+
     links = _extract_links(article_html, url)
 
     return {

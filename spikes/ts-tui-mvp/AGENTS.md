@@ -58,14 +58,21 @@ Prefer the most elegant correct implementation, not the fastest pile of special 
   - app composition root
   - owns menus, startup, window creation, workspace restore, and high-level command flow
   - should coordinate, not become a utility dump
+- `src/core/window-facade.ts`
+  - 11-method interface for all window operations (query, geometry, content)
+  - implemented by WindowManager
+  - single seam consumed by workspace restore, agent tools, control API, and controller
 - `src/core/command-catalog.ts`
   - source of truth for user-visible command metadata
   - owns command ids, groups, menu placements, palette placement, and surface visibility
+  - each command defined ONCE with menuPlacements[] for cross-menu appearance
 - `src/core/command-registry.ts`
   - execution-capable adapter over the catalog
   - builds menus, builds palette entries, lists commands for API/agent use, and runs commands by id
+  - consumed by control API (GET /commands/list, POST /commands/run) and agent tools (tui_list_commands, tui_run_command)
 - `src/core/window-manager.ts`
   - z-order, focus, drag, resize, tile, cascade, close
+  - implements WindowFacade interface
 - `src/core/desktop-geometry.ts`
   - canonical terminal geometry snapshot
   - exposes `{width, height, cellAspect}`
@@ -90,6 +97,21 @@ Prefer the most elegant correct implementation, not the fastest pile of special 
   - Backrooms-specific corpus, run-root prep, playback helpers
 - `src/services/figlet-service.ts`
   - shared FIGlet catalogue + real CLI render bridge
+- `src/services/agent-tools.ts`
+  - 8 TUI tools for agent window (get_state, open_window, open_figlet, open_chrome_browser, browser_navigate, close_window, move_window, focus_window, send_input, read_window)
+  - plus registry-backed tui_list_commands and tui_run_command
+  - all tools use TuiToolContext which wraps WindowFacade
+- `src/services/wibwob-agent-session.ts`
+  - unified session for both chat (mode="chat") and agent (mode="agent")
+  - agent mode: 15 tools (TUI + jailed coding), desktop state injection via transformContext
+  - chat mode: no tools, no state injection, stripped system prompt
+  - 7 jailed coding tools (read, write, edit, bash, grep, find, ls) scoped to REPO_ROOT
+- `src/windows/wibwob-agent-window.ts`
+  - shared window factory for both Wib&Wob Chat and Wib&Wob Agent
+  - themed tool display using wibwob-tv colour palette
+  - reports appType "wibwob-agent" or "wibwob-chat-v2" based on session mode
+- `src/services/file-actions.ts`
+  - file I/O: save, save-as, writeEditorWindow (returns boolean)
 
 ## Architecture Invariants
 
@@ -187,6 +209,7 @@ These rules are strict. Treat violations as bugs, not style nits.
 - `actionKey` must point at an `AppMenuActions` entry implemented by `app-controller.ts`.
 - Current registry phase covers menu/palette projection plus generic control API command discovery/execution.
 - `Wib&Wob Agent` also has registry-backed `tui_list_commands` and `tui_run_command` tools now.
+- Agent guidance should prefer registry commands first for high-level actions and use low-level window tools only for precise manipulation.
 - Context menus, agent tools, and MCP may still be bespoke until later adapter phases land.
 
 ## Anti-Patterns
@@ -245,7 +268,7 @@ The spike currently includes:
 - shared browser/openers for workspace and file selection
 - animated generative art window
 - experimental shell window backed by Bun PTY
-- native `Wib&Wob Chat` backed by the Pi SDK and a local task-loop panel
+- native `Wib&Wob Chat` and `Wib&Wob Agent` — both backed by WibWobAgentSession (mode: "chat" or "agent"). Agent mode has 15 tools (8 TUI + 7 jailed coding). Chat mode has no tools. One session class, one window factory.
 - Backrooms TV with real/fake-live modes and per-run primer roots
 - FIGlet window backed by the shared font catalogue and real `figlet` CLI
 
@@ -293,6 +316,8 @@ Current control endpoints:
 - `POST /windows/text/export`
 - `POST /workspace/save`
 - `POST /workspace/load`
+- `GET /commands/list`
+- `POST /commands/run`
 
 Control parity rule:
 - whenever a new window family, app mode, or user-triggerable command is added, update both:
@@ -413,17 +438,30 @@ Manual smoke targets:
 ## Known Rough Edges
 
 - The terminal pane still is not a real VT renderer.
-- `app-controller.ts` is still too large and should continue being decomposed into window-family helpers.
+- `app-controller.ts` is ~2050 lines — down from ~2800 after WindowFacade and chat collapse, but should continue decomposing.
 - Workspace startup semantics are not yet unified with default workspace auto-load.
-- Shared open/save UX is improving, but save-as still uses the older textbox path.
+- Async workspace restore race: getLastWindow() after promise-returning openers can miss the window.
+- wibwob-chat-v2 restore does not yet hydrate transcript/draft into the new agent-backed session.
+- Chrome browser service has pre-existing type errors (missing @types/jsdom, @types/turndown-plugin-gfm).
+
+## Completed Architecture Work
+
+- WindowFacade: 11-method interface, all 4 consumers collapsed (workspace restore, agent tools, control API, controller). ~80 lines deleted from controller.
+- Chat collapse: wibwob-chat-window.ts and wibwob-chat-service.ts deleted (613 lines). Both chat types share one session class and one window factory.
+- Command catalog: single source of truth for all menu/palette commands. menuPlacements[] eliminates triple-entry duplication.
+- Command registry: execution layer with list/run, consumed by control API and agent tools.
+- Editor save: Save, Save As, dirty indicator, context menu. Display-only asterisk (title stays clean).
+- Agent tools: 15 tools total (8 TUI + 7 jailed coding). Registry-backed tui_list_commands/tui_run_command.
 
 ## Preferred Next Steps
 
 Good next slices:
-1. resize handles and stronger window management
-2. better file open/save UX
-3. cleaner shell-pane behavior
-4. screenshot/export support for comparing layouts to WibWob-DOS captures
+1. context menu actions onto command registry path
+2. async workspace restore race fix (getLastWindow after promise openers)
+3. wibwob-chat-v2 restore hydration (transcript/draft into agent session)
+4. WindowRecord discriminated union (replace bag of optionals)
+5. resize handles and stronger window management
+6. screenshot/export support for comparing layouts to WibWob-DOS captures
 
 Avoid:
 1. full Turbo Vision porting work

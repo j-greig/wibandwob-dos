@@ -14,6 +14,7 @@ export interface CommandListItem {
   id: string;
   label: string;
   group: string;
+  description?: string;
   surfaces: CommandSurface[];
   menuCategories: AppCommandCategory[];
 }
@@ -39,19 +40,36 @@ export class CommandRegistry {
         id: command.id,
         label: command.label,
         group: command.group,
+        description: command.description,
         surfaces: this.getSurfaces(command),
         menuCategories: [...new Set(command.menuPlacements.map((placement) => placement.category))]
       }))
       .filter((command) => (surface ? command.surfaces.includes(surface) : true));
   }
 
-  run(id: string): { ok: true } | { ok: false; error: string } {
+  run(id: string, args?: Record<string, unknown>): { ok: true } | { ok: false; error: string } {
     const command = this.commands.find((candidate) => candidate.id === id);
     if (!command) {
       return { ok: false, error: `Unknown command: ${id}` };
     }
-    this.actions[command.actionKey]();
+    const action = this.actions[command.actionKey] as (args?: Record<string, unknown>) => void;
+    action(args);
     return { ok: true };
+  }
+
+  createMenuItems(ids: string[]): MenuItem[] {
+    return ids.flatMap((id) => {
+      const command = this.commands.find((candidate) => candidate.id === id);
+      if (!command) {
+        return [];
+      }
+      return [{
+        label: command.label,
+        action: () => {
+          this.run(command.id);
+        }
+      }];
+    });
   }
 
   private getSurfaces(command: AppCommandDescriptor): CommandSurface[] {

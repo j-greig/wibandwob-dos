@@ -36,7 +36,7 @@ interface ControlApiHandlers {
   getState: () => DesktopState;
   getPrimerInfo: (pathOrName: string) => unknown;
   listCommands: (surface?: CommandSurface) => CommandListItem[];
-  runCommand: (id: string) => { ok: true } | { ok: false; error: string };
+  runCommand: (id: string, args?: Record<string, unknown>) => { ok: true } | { ok: false; error: string };
   openPrimerBrowser: () => void;
   openFileManager: () => void;
   openPrimerGallery: () => void;
@@ -205,7 +205,10 @@ export class ControlApiService {
       if (!id) {
         return Response.json({ ok: false, error: "id required" }, { status: 400 });
       }
-      const result = this.handlers.runCommand(id);
+      const args = typeof (body as any).args === "object" && (body as any).args !== null
+        ? (body as any).args as Record<string, unknown>
+        : undefined;
+      const result = this.handlers.runCommand(id, args);
       return Response.json(result, { status: result.ok ? 200 : 404 });
     }
 

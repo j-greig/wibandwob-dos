@@ -30,7 +30,7 @@ import { fetchYoutubeTranscript } from "./youtube-transcript-service.js";
 export interface TuiToolContext {
   getState: () => DesktopState;
   listCommands: () => CommandListItem[];
-  runCommand: (id: string) => { ok: true } | { ok: false; error: string };
+  runCommand: (id: string, args?: Record<string, unknown>) => { ok: true } | { ok: false; error: string };
   openWindow: (type: string) => { id: number } | { error: string };
   openFigletWindow: (text: string, font?: string) => { id: number } | { error: string };
   openChromeBrowser: (url?: string) => { id: number } | { error: string };
@@ -98,8 +98,11 @@ const runCommand = tuiTool({
     "Runs a high-level app command by id using the shared command registry.",
   parameters: Type.Object({
     id: Type.String({ description: "Command id, e.g. browser.open_chrome or window.tile" }),
+    args: Type.Optional(Type.Record(Type.String(), Type.Unknown(), {
+      description: "Optional arguments for parameterised commands, e.g. {\"theme\": \"forest\", \"model\": \"sonnet\", \"turns\": 8} for backrooms.open"
+    }))
   }),
-  execute: (params, ctx) => JSON.stringify(ctx.runCommand(params.id)),
+  execute: (params, ctx) => JSON.stringify(ctx.runCommand(params.id, params.args)),
 });
 
 const openWindow = tuiTool({

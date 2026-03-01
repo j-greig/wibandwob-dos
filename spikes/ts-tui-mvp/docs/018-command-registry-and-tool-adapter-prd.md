@@ -434,6 +434,7 @@ Current spike status:
 - `Wib&Wob Agent` can now discover registry-backed commands via `tui_list_commands`
 - `Wib&Wob Agent` can run registry-backed commands via `tui_run_command`
 - lower-level window tools remain available alongside the registry path for now
+- agent guidance now explicitly prefers registry commands first for high-level app actions
 
 ### Phase 5 — cleanup
 

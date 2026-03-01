@@ -28,6 +28,7 @@ export interface AppCommandDefinition {
   label: string;
   group: AppCommandGroup;
   actionKey: keyof AppMenuActions;
+  description?: string;
   menuPlacements?: MenuPlacement[];
   palettePlacement?: PalettePlacement;
   api?: boolean;
@@ -46,6 +47,7 @@ export interface AppCommandDescriptor {
   label: string;
   group: AppCommandGroup;
   actionKey: keyof AppMenuActions;
+  description?: string;
   menuPlacements: MenuPlacement[];
   palettePlacement?: PalettePlacement;
   api: boolean;
@@ -259,6 +261,17 @@ const APP_COMMANDS: AppCommandDefinition[] = [
   },
 
   {
+    id: "backrooms.open",
+    label: "Open Backrooms TV (with args)",
+    group: "surface",
+    actionKey: "openBackroomsTv",
+    description: "Open a Backrooms TV channel directly. Args: theme (string), model (haiku|sonnet|opus), turns (number), mode (auto|live|fake-live).",
+    menuPlacements: [],
+    api: true,
+    agent: true
+  },
+
+  {
     id: "window.tile",
     label: "Tile Windows",
     group: "layout",
@@ -408,6 +421,7 @@ export function listAppCommands(): AppCommandDescriptor[] {
     label: command.label,
     group: command.group,
     actionKey: command.actionKey,
+    description: command.description,
     menuPlacements: [...(command.menuPlacements ?? [])],
     palettePlacement: command.palettePlacement,
     api: command.api ?? false,
