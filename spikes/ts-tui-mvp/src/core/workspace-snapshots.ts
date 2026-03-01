@@ -1,6 +1,7 @@
 import fs from "node:fs";
 
 import { getDefaultFigletFont } from "../services/figlet-service.js";
+import type { WindowFacade } from "./window-facade.js";
 import type { BackroomsChannel, WindowRecord, WindowSnapshot } from "./types.js";
 
 export function serializeWindowSnapshot(window: WindowRecord, focusedId?: number): WindowSnapshot {
@@ -116,9 +117,7 @@ export interface WorkspaceRestoreActions {
   openCompanionWindow: (restore?: { tick?: number }) => void;
   openArtWindow: () => void;
   openStateInspectorWindow: () => void;
-  getLastWindow: () => WindowRecord | undefined;
-  moveWindow: (id: number, left: number, top: number) => void;
-  resizeWindow: (id: number, width: number, height: number) => void;
+  windows: WindowFacade;
 }
 
 export function restoreWindowSnapshot(snapshot: WindowSnapshot, actions: WorkspaceRestoreActions): WindowRecord | undefined {
@@ -235,10 +234,10 @@ export function restoreWindowSnapshot(snapshot: WindowSnapshot, actions: Workspa
     default:
       break;
   }
-  const restored = actions.getLastWindow();
+  const restored = actions.windows.getLastWindow();
   if (restored) {
-    actions.moveWindow(restored.id, snapshot.left, snapshot.top);
-    actions.resizeWindow(restored.id, snapshot.width, snapshot.height);
+    actions.windows.moveWindow(restored.id, snapshot.left, snapshot.top);
+    actions.windows.resizeWindow(restored.id, snapshot.width, snapshot.height);
   }
   return restored;
 }

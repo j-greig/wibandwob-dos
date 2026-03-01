@@ -345,11 +345,8 @@ export class WindowManager implements WindowFacade {
     if (this.editorWriteHook) {
       return this.editorWriteHook(id, text);
     }
-    // Fallback: direct write without dirty marking
-    const record = this.getWindowById(id);
-    if (!record?.editor) return false;
-    record.editor.value += text;
-    return true;
+    // No hook set — refuse rather than silently bypass dirty marking
+    return false;
   }
 
   /** WindowFacade: capture raw text from a window */

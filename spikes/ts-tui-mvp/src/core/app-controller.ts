@@ -156,6 +156,7 @@ export class TsTuiMvpApp {
       openPrimerBrowser: () => this.openPrimerBrowserWindow(),
       openFileManager: () => this.openFileManagerWindow(),
       openPrimerGallery: () => this.openPrimerGalleryWindow(),
+      openPrimerFile: (filePath) => this.openPrimerWindow(filePath),
       openBrowserReader: (filePath) => this.openBrowserReaderWindow(filePath),
       openFigletBanner: (text, font) => this.openFigletWindow(text ?? "WIB WOB", font ?? getDefaultFigletFont()),
       openArtWindow: () => this.openArtWindow(),
@@ -1932,9 +1933,7 @@ export class TsTuiMvpApp {
         openCompanionWindow: (restore) => this.openCompanionWindow(restore),
         openArtWindow: () => this.openArtWindow(),
         openStateInspectorWindow: () => this.openStateInspectorWindow(),
-        getLastWindow: () => this.windowManager.getWindows().at(-1),
-        moveWindow: (id, left, top) => this.windowManager.moveWindow(id, left, top),
-        resizeWindow: (id, width, height) => this.windowManager.resizeWindow(id, width, height)
+        windows: this.windowManager
       });
       if (snapshot.focused) {
         focusedWindow = restored;

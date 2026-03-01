@@ -35,6 +35,7 @@ interface ControlApiHandlers {
   openPrimerBrowser: () => void;
   openFileManager: () => void;
   openPrimerGallery: () => void;
+  openPrimerFile: (filePath: string) => void;
   openBrowserReader: (filePath?: string) => void;
   openFigletBanner: (text?: string, font?: string) => void;
   openArtWindow: () => void;
@@ -205,6 +206,12 @@ export class ControlApiService {
     }
     if (request.method === "POST" && url.pathname === "/view/primer-gallery/open") {
       this.handlers.openPrimerGallery();
+      return Response.json({ ok: true });
+    }
+    if (request.method === "POST" && url.pathname === "/view/primer/open") {
+      const filePath = typeof (body as any).filePath === "string" ? (body as any).filePath : undefined;
+      if (!filePath) return Response.json({ ok: false, error: "filePath required" }, { status: 400 });
+      this.handlers.openPrimerFile(filePath);
       return Response.json({ ok: true });
     }
     if (request.method === "POST" && url.pathname === "/view/browser-reader/open") {
