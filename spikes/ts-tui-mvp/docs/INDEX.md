@@ -15,12 +15,18 @@ These three drive all remaining work. Read in order.
    (repo root, not spike dir)
    WindowFacade extraction + full architecture audit.
    11-method interface, 6-phase migration, plus addendum
-   covering 9 codebase-wide DRY violations. Do first.
+   covering 9 codebase-wide DRY violations.
+   STATUS: Phases 1-5 DONE. Chat collapse DONE.
+   Remaining: async restore race (Phase 2 stretch),
+   agent session restore (Phase 6).
 
 3. 018-command-registry-and-tool-adapter-prd.md
    CommandRegistry replacing 5-file shotgun surgery.
    Define a command once, project to menu/palette/API/
-   agent/MCP. Do second (after WindowFacade).
+   agent/MCP.
+   STATUS: command-catalog.ts exists with full command
+   list + menu/palette generators. Not yet wired in.
+   Codex working on wiring.
 
 
 DONE (findings absorbed, no action needed)
@@ -32,6 +38,16 @@ DONE (findings absorbed, no action needed)
   editor-save-review.md
     Codex code review of editor save. 4 bugs found,
     all fixed in commit e91e188. Reference only.
+
+  window-facade-phase1-review.md
+    Codex Phase 1 review. Fallback fix applied.
+
+  window-facade-full-review.md
+    Codex Phases 1-5 review. Capture route fix applied.
+    Remaining: async restore race, old method aliases.
+
+  chat-collapse-review.md
+    Codex review. Identity + prompt fixes applied.
 
   BUILD-ORDER.md
     Superseded by BUILD-ORDER-FINAL.md. Kept for the
