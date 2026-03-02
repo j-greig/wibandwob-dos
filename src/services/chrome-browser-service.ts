@@ -1,11 +1,11 @@
 /**
  * Chrome Browser Service
  *
- * Connects to Chrome via CDP (Chrome DevTools Protocol) on localhost:9222,
- * navigates to URLs, and extracts readable content as markdown using
+ * Auto-launches headless Chrome via puppeteer and connects via CDP.
+ * Navigates to URLs and extracts readable content as markdown using
  * Mozilla Readability + Turndown. Based on badlogic/browser-tools.
  *
- * Requires Chrome running with --remote-debugging-port=9222
+ * Falls back to connecting to an existing Chrome on :9222 if launch fails.
  */
 
 import puppeteer, { type Browser, type Page } from "puppeteer-core";
@@ -14,6 +14,7 @@ import { JSDOM } from "jsdom";
 import TurndownService from "turndown";
 // @ts-ignore — no types available for turndown-plugin-gfm
 import { gfm } from "turndown-plugin-gfm";
+import fs from "node:fs";
 
 export interface BrowseResult {
   ok: boolean;
@@ -29,14 +30,58 @@ export interface SearchResult {
   snippet: string;
 }
 
+/** Well-known Chrome/Chromium paths by platform. */
+const CHROME_PATHS = [
+  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",  // macOS
+  "/usr/bin/google-chrome-stable",                                  // Linux (apt/rpm)
+  "/usr/bin/chromium-browser",                                      // Linux (snap/apt)
+  "/usr/bin/chromium",                                              // Linux (arch)
+];
+
+function findChrome(): string | null {
+  for (const p of CHROME_PATHS) {
+    if (fs.existsSync(p)) return p;
+  }
+  return null;
+}
+
 export class ChromeBrowserService {
   private browser: Browser | null = null;
   private page: Page | null = null;
+  private launched = false;
 
   /**
-   * Attempt to connect to Chrome on :9222. Returns true if connected.
+   * Launch or connect to Chrome. Tries launching headless first,
+   * falls back to connecting to an existing instance on :9222.
    */
   async connect(): Promise<boolean> {
+    // Try launching our own headless Chrome
+    if (!this.launched) {
+      const chromePath = findChrome();
+      if (chromePath) {
+        try {
+          this.browser = await puppeteer.launch({
+            executablePath: chromePath,
+            headless: true,
+            args: [
+              "--no-first-run",
+              "--no-default-browser-check",
+              "--disable-background-networking",
+              "--disable-sync",
+              "--disable-gpu",
+            ],
+          });
+          const pages = await this.browser.pages();
+          this.page = pages.at(-1) ?? (await this.browser.newPage());
+          this.launched = true;
+          return true;
+        } catch {
+          // launch failed, fall through to connect
+        }
+      }
+    }
+
+    // Fall back: connect to existing Chrome on :9222
     try {
       this.browser = await Promise.race([
         puppeteer.connect({
@@ -73,7 +118,7 @@ export class ChromeBrowserService {
           url,
           title: "",
           markdown: "",
-          error: "Cannot connect to Chrome on :9222. Run browser-start.js first.",
+          error: "Cannot launch or connect to Chrome. Install Chrome and try again.",
         };
       }
     }
@@ -367,9 +412,15 @@ export class ChromeBrowserService {
 
   disconnect(): void {
     if (this.browser) {
-      this.browser.disconnect();
+      if (this.launched) {
+        // We spawned it, so kill it properly
+        this.browser.close().catch(() => {});
+      } else {
+        this.browser.disconnect();
+      }
       this.browser = null;
       this.page = null;
+      this.launched = false;
     }
   }
 

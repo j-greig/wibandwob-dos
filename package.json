@@ -12,6 +12,7 @@
   "dependencies": {
     "@mariozechner/pi-agent-core": "^0.55.3",
     "@mariozechner/pi-coding-agent": "^0.55.3",
+    "@mediapipe/tasks-vision": "^0.10.32",
     "@mozilla/readability": "^0.6.0",
     "@skitee3000/bun-pty": "^0.3.3",
     "blessed": "^0.1.81",

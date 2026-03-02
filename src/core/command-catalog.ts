@@ -41,13 +41,14 @@ export interface AppMenuActions {
   finderSearch: (args?: Record<string, unknown>) => void;
   finderNavigate: (args?: Record<string, unknown>) => void;
   finderToggleView: () => void;
-
   finderAdvancedSearch: (args?: Record<string, unknown>) => void;
   finderBookmarkPath: () => void;
   finderGoToBookmark: (args?: Record<string, unknown>) => void;
   finderNewFolder: () => void;
   finderRefresh: () => void;
   finderSortBy: (args?: Record<string, unknown>) => void;
+  // ── Monster Cam ───────────────────────────────────────
+  openMonsterCam: () => void;
 }
 
 export type AppCommandCategory = "file" | "edit" | "view" | "window" | "applications";
@@ -333,6 +334,17 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     menuPlacements: [{ category: "applications", order: 120, label: "Wib&Wob Agent" }],
     palettePlacement: { order: 130 },
     contextMenu: { desktop: true, order: 70 },
+    api: true,
+    agent: true
+  },
+  {
+    id: "cam.open_monster_cam",
+    label: "Monster Cam",
+    group: "open",
+    actionKey: "openMonsterCam",
+    menuPlacements: [{ category: "applications", order: 150, label: "Monster Cam" }],
+    palettePlacement: { order: 145 },
+    contextMenu: { desktop: true, order: 80 },
     api: true,
     agent: true
   },

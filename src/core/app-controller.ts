@@ -74,6 +74,7 @@ import { ChromeBrowserService } from "../services/chrome-browser-service.js";
 import { openChromeBrowserWindow } from "../windows/chrome-browser-window.js";
 import { openWibWobAgentWindow as openNativeWibWobAgentWindow } from "../windows/wibwob-agent-window.js";
 import { CustomCursor } from "./custom-cursor.js";
+import { openMonsterCamWindow } from "../windows/monster-cam-window.js";
 
 export class TsTuiMvpApp {
   private readonly screen: blessed.Widgets.Screen;
@@ -164,6 +165,7 @@ export class TsTuiMvpApp {
       openBrowserReader: (filePath) => this.openBrowserReaderWindow(filePath),
       openFigletBanner: (text, font) => this.openFigletWindow(text ?? "WIB WOB", font ?? getDefaultFigletFont()),
       openArtWindow: () => this.openArtWindow(),
+      openMonsterCam: () => this.openMonsterCam(),
       openWibWobAgent: () => this.openWibWobAgentWindow(),
       openCompanionWindow: () => this.openCompanionWindow(),
       openWorkspaceManager: () => this.openWorkspaceManagerWindow(),
@@ -664,6 +666,13 @@ export class TsTuiMvpApp {
     });
   }
 
+  private openMonsterCam(): void {
+    openMonsterCamWindow({
+      screen: this.screen,
+      windowManager: this.windowManager
+    });
+  }
+
   private saveFocusedEditor(): void {
     const focused = this.windowManager.getFocusedWindow();
     if (!focused || focused.kind !== "editor" || !focused.editor) {
@@ -1111,7 +1120,9 @@ export class TsTuiMvpApp {
           ? args.field as "name" | "size" | "modified" | "type"
           : "name";
         finder.sortBy(field);
-      }
+      },
+      // ── Monster Cam ─────────────────────────────────────
+      openMonsterCam: () => this.openMonsterCam()
     };
   }
 
