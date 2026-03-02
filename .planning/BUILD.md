@@ -18,9 +18,9 @@ Rules:
   Restore `scratch/workspaces/default.json` on launch, optional last-used pointer, if no workspace exists then workspace is empty.
   Status: landed
 
-- [ ] **Window manager hardening**
+- [x] **Window manager hardening**
   Fix repaint/shadow invalidation, drag/release bugs, z-order correctness, stale cell cleanup, resize sanity.
-  Status: partial — shadow disabled (stale cell fix), resize now signals content via refresh(), coordinate inconsistency fixed (screenHeight-1 → screenHeight-2). Needs visual smoke test for drag-disappear bug and full verification.
+  Status: landed — app-owned shadows (offset 2E 1S, themed, synced on drag/resize/move/close), blessed shadow:true permanently replaced. Resize signals content, coordinate fix, drag click suppression, titlebar/close overlap fix. Remaining edge case: drag-disappear on fast moves (low priority).
   Spec: `.planning/refactor-docs/015-window-manager-reference-and-repair-plan.md`
 
 - [x] **Controller extraction — backrooms + agent + terminal**
@@ -100,9 +100,9 @@ Rules:
 
 ## Tier 7 — Testing
 
-- [ ] **Contract tests**
+- [x] **Contract tests**
   Add `src/tests/` with: `command-registry.test.ts`, `state-service.test.ts`, `workspace-snapshots.test.ts`, `window-manager.test.ts`.
-  Status: not-started
+  Status: partial — 11 tests passing (command registry, state service, theme cycle, screenshot text). Fleet test script. Text screenshot API. Remaining: workspace round-trip, parity audit automation, golden file baselines.
 
 ## Parking lot
 
@@ -116,6 +116,10 @@ here with a note. Promote back when conditions change.
 - **Dual measurement**: `openPrimerWindow` re-measures instead of consuming content-service — fix when primers extracted
 - **WindowRecord shape**: optional fields still grow per type — refactor to discriminated union
 - ~~**28 hardcoded blessed style literals**~~: done — all surfaces now use theme tokens
+- **Parity audit**: 8 window kinds untested (figlet, pattern, inspector, workspace, chrome-browser, wibwob-agent, backrooms-tv, reader). Need automated test that catches missing appType/summary.
+- **Double-line fix audit**: setViewportContent scrollbar fix landed for primers. Audit gallery preview, editor, file manager for same bug.
+- **Proportional layout**: derive viewport width from window evidence, never absolute cols. Dual-monitor blessed reports combined width.
+- **Theme in /state**: expose active theme name in desktop state endpoint
 
 ## History
 
