@@ -64,10 +64,10 @@ Must preserve:
 - `scratch/`
 - `screenshots/`
 - `vendor/`
-- `partykit/`
+- `partykit/` (can move to .trash if you want)
 - retained repo-wide test/tools areas only if they still have a clear role
 
-Must review carefully before moving/deleting:
+Must review carefully before moving/deleting anything from:
 
 - `tools/`
 - `tests/`

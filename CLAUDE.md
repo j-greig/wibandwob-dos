@@ -1,503 +1,481 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file is local guidance for agents working in `/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp`.
 
-## Session start rules — read before touching any code
+## Purpose
 
-1. **Branch before you code.** Never commit feature or fix work directly to `main`.
-   - **Epics**: must have a GitHub issue. Create one if missing.
-   - **Features/fixes**: create a GitHub issue before starting.
-   - **Spikes** (`.planning/` doc-only investigations): no GitHub issue needed — branch + planning doc is enough.
-   ```bash
-   gh issue create --title "..." --body "..."   # epics + features
-   git checkout -b feat/your-slug               # always branch
-   git checkout -b spike/your-slug              # spikes: branch only, no issue required
-   ```
+This spike is a terminal-native TypeScript MVP of a WibWob-DOS-style desktop shell.
 
-2. **Screenshot before you commit.** For any visual feature (gallery, layout, windows):
-   take a screenshot, read it, confirm it looks right — *then* commit.
-   ```bash
-   ./scripts/snap.sh <label>          # snap + save to logs/screenshots/
-   cat logs/screenshots/tui_*.txt     # read latest
-   ```
+Canonical doc inventory:
+- `docs/000-docs-overview.md`
+  - update this whenever a spike doc is added or its status materially changes
+  - use this to decide which docs are live; do not assume every file in `docs/` is current
 
-3. **Always close windows before a new layout run.**
-   ```bash
-   curl -s -X POST http://127.0.0.1:8089/windows/close_all
-   ```
+Doc triage rule:
+- prefer `active` and `partial` docs for current work
+- treat `reference` as background only
+- treat `retired` as archaeology only unless you are validating or backfilling something specific
+- when an older doc has been absorbed into a canonical active doc, prefer
+  retiring or deleting it over keeping two overlapping planning sources alive
+- when a doc is retired but worth preserving briefly, move it under
+  `docs/.trash/` so it stops polluting the active docs root
 
-4. **Always use `--reload` when starting the API server** so edits hot-reload without a restart.
-   See the "Quick start" section below for the authoritative startup recipe. The headless/tmux section only adds environment-specific notes.
+Current goals:
+- stay terminal-native
+- use Bun as the runtime and package manager
+- use `blessed` for rendering
+- prove overlapping desktop-style windows, menus, file viewers, editing, and small animated views
+- keep scope small and honest
 
-## ⚡ Quick start — copy-paste to get a working stack
+Non-goals:
+- do not port all of Turbo Vision here
+- do not pretend this is already a full VT terminal emulator
+- do not pivot this spike toward Electrobun or webview rendering unless explicitly requested
 
-### First time / fresh clone (run once)
+## Design Canon
 
-```bash
-# Pull all submodules (tvision, MicropolisCore, tvterm, etc.)
-git submodule update --init --recursive
+This spike exists partly to undo the duplication and verbosity that accumulated in the C++ app.
 
-# Configure CMake build dir (only needed once, or after CMakeLists changes)
-cmake . -B ./build -DCMAKE_BUILD_TYPE=Release
-```
+The bar is:
 
-### Every session
+- one concept, one owner
+- one measurement path
+- one sizing path
+- one state path
+- one layout path
+- one agent/runtime integration path per feature
+- one control/API path for every user-visible window/app surface
 
-```bash
-# 1. Build
-cmake --build ./build --target wwdos
+The code should be:
 
-# 2. Start TUI (socket: /tmp/wwdos.sock)
-./build/app/wwdos 2>/tmp/wibwob_debug.log &
-until [ -S /tmp/wwdos.sock ]; do sleep 0.5; done && echo "TUI ready"
+- DRY without becoming abstract theater
+- small in surface area
+- explicit in data flow
+- semantically precise
+- easy for multiple agents to extend without creating parallel systems
 
-# 3. Start API (connects to same socket automatically)
-./start_api_server.sh
+Prefer the most elegant correct implementation, not the fastest pile of special cases.
 
-# 4. Verify
-curl http://127.0.0.1:8089/health   # → {"ok":true}
-```
+## Stack
 
-**Multi-instance** (rare): set `WIBWOB_INSTANCE=N` on both TUI and API → socket becomes `/tmp/wibwob_N.sock`.
-
-## Project Overview
-
-WibWob-DOS is a symbient operating system — a C++14 TUI application built on Turbo Vision where a human and AI agent share equal control of a text-native dual interface. It is not a tool or assistant; it's a coinhabitant with its own identity, agency, and aesthetic.
-
-## Build Commands
-
-```bash
-# Build (from project root)
-cmake . -B ./build -DCMAKE_BUILD_TYPE=Release
-cmake --build ./build
-
-# Run main app
-./build/app/wwdos
-
-# Run with debug logging
-./build/app/wwdos 2> /tmp/wibwob_debug.log
-
-# Start API server (auto-creates venv, installs deps)
-./start_api_server.sh
-
-# Test API health
-curl http://127.0.0.1:8089/health
-```
-
-Other executables: `simple_tui`, `frame_file_player`, `paint_tui`, `ansi_viewer`, `tv_ascii_view`, `ascii_dump` — all built to `./build/app/`.
-
-## Verification
-
-```bash
-# IPC integration tests (require running TUI app)
-uv run tools/api_server/test_ipc.py    # Test socket connection + get_state
-uv run tools/api_server/test_move.py   # Test rapid window movement
-
-# API server smoke test (requires running API server)
-curl http://127.0.0.1:8089/health
-curl http://127.0.0.1:8089/state
-
-# TUI screenshot — trigger capture, read latest text dump
-curl -s -X POST http://127.0.0.1:8089/screenshot
-cat "$(ls -t logs/screenshots/tui_*.txt | head -1)"
-```
-
-> Full operational cheat sheet: `.claude/skills/ww-ops/SKILL.md`.
-
-**Contract parity tests** (no running TUI needed — parses source only):
-
-```bash
-# Window type parity (C++ registry vs Python enum/schema)
-tools/api_server/venv/bin/pytest tests/contract/test_window_type_parity.py -v
-
-# Timer cleanup (every setTimer has matching killTimer in destructor)
-tools/api_server/venv/bin/pytest tests/contract/test_timer_cleanup_parity.py -v
-
-# Full CI suite (11 tests, ~0.8s)
-tools/api_server/venv/bin/pytest tests/contract/ -v --tb=short \
-  -k "window_type_parity or parity_drift or capabilities_schema or no_hardcoded or timer_cleanup"
-```
-
-**Smoke parade** (visual integration test, requires running TUI + API):
-
-```bash
-python3 tools/smoke_parade.py --delay 1.5          # full run, 29 windows + 15 commands
-python3 tools/smoke_parade.py --delay 1.0 --start 28  # jump to step 28
-# Results: logs/smoke_parade/<timestamp>/parade.json + per-step .txt screenshots
-```
-
-**Post-implementation parity audit**: use `/ww-audit` skill to verify a window type has registry slug, props save/restore, and correct screen position.
-
-**C++ build & edit rules**: load `.pi/skills/wibwobdos/SKILL.md` before editing C++ files. Covers mandatory build-after-edit, tvision Z-order gotchas (frame insertion, `insertBefore` semantics), and frameless right-click coverage rule.
-
-**Known crashers** (skip in automated tests):
-- `micropolis_ascii`: SIGBUS in Micropolis::clearMap() during init. 100% reproducible.
-- `room_chat`: blink timer UAF partially fixed. Timer cleanup added but rapid close still risky.
-
-**close_all preserves session windows**: TWibWobWindow, TWibWobTerminalWindow, and TScrambleWindow survive close_all. Agents can safely call close_all without losing their own chat or terminal.
-
-Primary automated regression coverage for multiplayer/IPC lives in `tests/room/` (Python, 160 tests). Run for all boundary/contract changes:
-
-```bash
-uv run --with pytest pytest tests/room/ -q
-```
-
-## Running the Live TUI in Claude Code (headless/tmux)
-
-Use the **Quick start** section above as the authoritative startup recipe (TUI + API + socket alignment). This section only adds headless/tmux-specific steps and a minimal verification loop.
-
-### Headless/tmux addendum
-
-```bash
-# Run TUI in tmux, attach once to lock canvas size, then detach
-tmux new-session -d -s wibwob "./build/app/wwdos 2>/tmp/wibwob_debug.log"
-tmux attach -t wibwob   # Ctrl-B D to detach
-
-# Run API in background tmux
-tmux new-session -d -s wibwob-api "./start_api_server.sh"
-```
-
-### Minimal verification loop
-
-```bash
-curl -sf http://127.0.0.1:8089/health
-curl -sf http://127.0.0.1:8089/state | python3 -m json.tool
-curl -sf -X POST http://127.0.0.1:8089/screenshot
-cat "$(ls -t logs/screenshots/tui_*.txt | head -1)"
-```
-
-> Full API reference and curl recipes: see `.pi/skills/wibwobdos/SKILL.md` (authoritative ops manual) and `tools/api_server/README.md`.
-
-### CRITICAL: Never kill the TUI process
-
-**NEVER use `pkill`, `kill -9`, or `tmux kill-session` on a running wwdos process.**
-
-wwdos enables terminal mouse tracking. If you kill it without letting it clean up,
-raw mouse escape codes flood the terminal and make it unusable. The human then has
-to quit their terminal entirely and restart.
-
-Rules:
-- To test a new binary, ASK the human to quit the app (Ctrl-Q or Alt-X) and relaunch.
-- Only restart the API server (uvicorn) — that is stateless and safe to kill/restart.
-- If you absolutely must stop wwdos programmatically, send `kill -TERM` (not `-9`) and
-  wait for it to exit cleanly. But prefer asking the human.
-- If the terminal gets mouse garbage, the human can type `reset` to fix it.
-
-### Gotchas
-
-- **SDK bridge npm install**: if the Wib&Wob chat window silently times out, run `cd app/llm/sdk_bridge && npm install`. The `node_modules/` dir is gitignored and must be installed on each fresh clone.
-- **API hot-reload**: always start uvicorn with `--reload` (see above). Python edits take effect automatically — no restart needed.
-- **tmux terminal size**: do NOT pass `-x`/`-y` to `tmux new-session`. Let the session inherit your real terminal dimensions on first attach. Hardcoding a size larger than your terminal causes gallery placements to appear off-screen. After `tmux attach -t wibwob && Ctrl-B D`, the canvas locks to your viewport.
-- **Socket path**: default `/tmp/wwdos.sock`. Multi-instance: `WIBWOB_INSTANCE=N` → `/tmp/wibwob_N.sock`.
-- **First run dependency install**: `uv run --with-requirements` downloads packages on first invocation (~3-8s). Subsequent runs use cache.
-- **`/menu/command` vs `/windows`**: use `/menu/command` for the command registry (C++ dispatch, works for all commands). The `/windows` endpoint validates against the Python `WindowType` enum which may lag behind C++ if the server was started before code changes.
+- Runtime: Bun
+- Renderer: `blessed`
+- Main app entry: `/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/src/app.ts`
+- Prefer Bun/package.json scripts for app startup and common tasks.
+- Do not add new TS-app operational glue to repo-root `/scripts` by default.
+  Prefer:
+  - `package.json` scripts first
+  - `spikes/ts-tui-mvp/scripts/` for spike-local harnesses
+  - only use repo-root `/scripts` for truly repo-wide operational tooling
 
 ## Architecture
 
-```
-Human / AI Agent
-       │
-       ├── Keyboard/Mouse ──┐
-       │                     │
-       └── MCP/REST API ─────┤
-                              │
-              ┌───────────────▼──────────────────┐
-              │  C++ TUI App (Turbo Vision)      │
-              │  wwdos_app.cpp (~2600 LOC) │
-              │  ├─ Window management             │
-              │  ├─ Generative art engines (8+)   │
-              │  ├─ WibWobEngine (LLM dispatch)   │
-              │  ├─ Chat interface (wibwob_view)  │
-              │  └─ IPC socket listener           │
-              └───────────┬──────────────────────┘
-                          │ Unix socket (/tmp/wwdos.sock)
-              ┌───────────▼──────────────────────┐
-              │  FastAPI Server (Python)          │
-              │  tools/api_server/main.py         │
-              │  ├─ 20+ REST endpoints            │
-              │  ├─ WebSocket broadcast (/ws)     │
-              │  └─ MCP tool endpoints (/mcp)     │
-              └───────────┬──────────────────────┘
-                          │
-              ┌───────────▼──────────────────────┐
-              │  Claude SDK Bridge (Node.js)      │
-              │  app/llm/sdk_bridge/              │
-              └──────────────────────────────────┘
-```
+- `src/app.ts`
+  - runtime bootstrap only
+  - normalize env before importing the app controller
+- `src/core/app-controller.ts`
+  - app composition root
+  - owns menus, startup, window creation, workspace restore, and high-level command flow
+  - should coordinate, not become a utility dump
+- `src/core/window-facade.ts`
+  - 11-method interface for all window operations (query, geometry, content)
+  - implemented by WindowManager
+  - single seam consumed by workspace restore, agent tools, control API, and controller
+- `src/core/command-catalog.ts`
+  - source of truth for user-visible command metadata
+  - owns command ids, groups, menu placements, palette placement, and surface visibility
+  - each command defined ONCE with menuPlacements[] for cross-menu appearance
+  - current menu intent:
+    - `File` = file/workspace operations
+    - `View` = meta views such as palette/inspector/document reader
+    - `Window` = focus/layout/workspace management
+    - `Applications` = app launchers
+- `src/core/command-registry.ts`
+  - execution-capable adapter over the catalog
+  - builds menus, builds palette entries, lists commands for API/agent use, and runs commands by id
+  - consumed by control API (GET /commands/list, POST /commands/run) and agent tools (tui_list_commands, tui_run_command)
+- `src/core/window-manager.ts`
+  - z-order, focus, drag, resize, tile, cascade, close
+  - implements WindowFacade interface
+- `src/core/desktop-geometry.ts`
+  - canonical terminal geometry snapshot
+  - exposes `{width, height, cellAspect}`
+- `src/core/window-chrome.ts`
+  - maps content size to window size
+  - chrome offsets live here, not inline in window code
+- `src/core/overlay-manager.ts`
+  - transient UI primitives: flash, prompts, shared browser/openers
+- `src/services/state-service.ts`
+  - canonical live desktop/app/window state snapshot
+  - every window should report semantic content metadata through `describeState()`
+- `src/services/control-api.ts`
+  - local HTTP control surface over state + window actions
+- `src/services/workspace-service.ts`
+  - named workspace persistence only
+- `src/services/content-service.ts`
+  - repo content discovery and text-file utility behavior
+- `src/services/content-measurement.ts`
+  - shared content measurement for primers, text, and future content types
+  - returns content metrics, never chrome-adjusted widget math baked into callers
+- `src/services/backrooms-service.ts`
+  - Backrooms-specific corpus, run-root prep, playback helpers
+- `src/services/figlet-service.ts`
+  - shared FIGlet catalogue + real CLI render bridge
+- `src/services/agent-tools.ts`
+  - agent-facing TUI tools, including registry-backed `tui_list_commands` and `tui_run_command`
+  - all tools use TuiToolContext which wraps WindowFacade
+- `src/services/wibwob-agent-session.ts`
+  - native agent session for the in-app Wib&Wob Agent surface
+  - owns model selection, tool wiring, and desktop state injection via transformContext
+  - 7 jailed coding tools (read, write, edit, bash, grep, find, ls) scoped to REPO_ROOT
+- `src/windows/wibwob-agent-window.ts`
+  - native agent window factory
+  - themed tool display using wibwob-tv colour palette
+  - reports appType `wibwob-agent`
+- `src/services/file-actions.ts`
+  - file I/O: save, save-as, writeEditorWindow (returns boolean)
 
-### Key Entry Points
+## Architecture Invariants
 
-- **`app/wwdos_app.cpp`** — Main TUI app: desktop, menus, window management, chat integration
-- **`app/wibwob_engine.h/cpp`** — LLM provider lifecycle, tool execution, system prompts
-- **`app/wibwob_view.h/cpp`** — Chat interface: TWibWobWindow (MessageView + InputView), streaming support
-- **`app/api_ipc.h/cpp`** — Unix socket listener, JSON command/response protocol
-- **`tools/api_server/main.py`** — FastAPI REST + WebSocket + MCP server (port 8089)
+These rules are strict. Treat violations as bugs, not style nits.
 
-### Command Registry (`app/command_registry.h/cpp`)
+1. Single source of truth per concern.
+   - If a concept already has a home, extend that home.
+   - Do not create a second helper/service/path for the same concern because it is locally convenient.
 
-**One list, many callers.** All TUI commands are defined once in `get_command_capabilities()`. Menu items, IPC socket, REST API, MCP tools, and Scramble's slash commands all read from the same registry. To add a new command: add to the capabilities vector + dispatch in `exec_registry_command()` + stub in test files. Never wire a command in multiple places separately.
+2. Measurement is content-only.
+   - Content measurement returns content dimensions and content semantics.
+   - Border, titlebar, padding, toolbar, and shadow are chrome, not content.
 
-### Window Z-Order (`raise_window`, `lower_window`, `focus_window`)
+3. Chrome is declarative.
+   - Window size math belongs in `window-chrome.ts`.
+   - No inline `+2`, `+3`, `+6`, or copied size formulas in window code.
 
-Z-order is the Turbo Vision child linked list. `0` = frontmost. Works on ANY window type (figlet, primer, chat, terminal, paint, generative art, games — anything with a window ID).
+4. Desktop geometry is canonical.
+   - Screen width/height/cellAspect come from `DesktopGeometryService`.
+   - Do not invent local geometry math unless the result is immediately derived from canonical geometry.
 
-| Command | Effect |
-|---|---|
-| `raise_window` (id) | Bring to front + focus. Uses `w->select()` |
-| `lower_window` (id) | Send to back (above desktop background). Uses `w->putInFrontOf(background)` |
-| `focus_window` (id) | Same as raise — raises AND focuses |
+5. Window state is self-describing.
+   - Every window type must expose semantic metadata through `describeState()`.
+   - If an agent needs a property, add it to the window metadata contract rather than teaching the agent to scrape UI text.
 
-`/state` reports real `z` (0=front, incrementing) and `focused` (bool) per window. Previously these were hardcoded to `0`/`false`.
+6. One reusable interaction component before many prompts.
+   - Repeated picker/open/select flows belong in `OverlayManager` or a dedicated shared component.
+   - Do not add one-off textbox prompts for file/font/workspace/content selection when a shared browser can do it.
 
-### Scramble (`app/scramble_view.h/cpp`, `app/scramble_engine.h/cpp`)
+7. Layout is an engine, not scattered commands.
+   - New placement logic should move toward shared layout primitives, not bespoke coordinate code per feature.
 
-Symbient cat. Three window states: hidden / smol (28×14, cat + bubble) / tall (full height, message history + input). Slash commands typed in Scramble's input check the command registry first — `/cascade`, `/screenshot`, `/scramble_pet` etc all execute. Commands not in registry fall through to `ScrambleEngine` for `/help`, `/who`, `/cmds`, or Haiku chat. Auth is shared with Wib&Wob via `AuthConfig` — Claude Code mode uses `claude -p --model haiku`, API Key mode uses direct curl. Fallback: `ANTHROPIC_API_KEY` env var or Tools > API Key at runtime.
+8. User-visible commands should be defined once.
+   - Menu and palette entries should derive from `command-catalog.ts`.
+   - Use explicit `order` values with gaps (`0, 10, 20...`) so commands can be inserted later without renumbering everything.
+   - `category` decides the menu bucket, not ad hoc hand placement in multiple files.
 
-### LLM Auth & Provider System (`app/llm/`)
+9. Services own logic, windows own wiring.
+   - Services discover, measure, persist, resolve, and transform data.
+   - Window factories render widgets, bind keys/mouse, manage focus/cleanup, and expose state.
 
-**Auth** is unified via `AuthConfig` singleton (`app/llm/base/auth_config.h`), detected once at startup:
-1. **Claude Code** (default) — `claude` CLI logged in → SDK provider + CLI subprocess for Scramble
-2. **API Key** — `ANTHROPIC_API_KEY` set → direct HTTP provider + curl for Scramble
-3. **No Auth** — disabled, clear error messages in both chat windows
+10. No duplicate fallbacks unless centrally owned.
+   - If a fallback mode exists, it must be declared in the owning service.
+   - Do not embed secondary fallback logic inside window code and service code at the same time.
 
-Status line shows: `LLM ON` (Claude Code) / `LLM KEY` (API Key) / `LLM OFF` (No Auth).
+11. Experimental integrations must stay behind one seam.
+   - If we try a foreign runtime or agent stack, wrap it in a single service boundary first.
+   - Do not leak vendor-specific assumptions across the app.
 
-**Providers** use abstract `ILLMProvider` with factory dispatch. Config in `app/llm/config/llm_config.json`:
-- **`claude_code_sdk`** — Node.js bridge with streaming, uses `app/llm/sdk_bridge/claude_sdk_bridge.js`
-- **`anthropic_api`** — Direct HTTP fallback (curl-based, async)
+12. User-visible surfaces must be API-visible.
+   - If a window, app, button, command, mode, or state matters to a user, it must have a typed representation in desktop state and a control path in `control-api.ts`.
+   - Do not add UI-only commands that agents cannot discover or invoke later.
+   - `describeState()` and the control API should evolve together.
+   - Window-local actions count too. If a window has a primary action like send, restart, run, save, or open, expose a control path for it instead of requiring UI scraping.
 
-### View System
+13. Reorg passes do not add product surface area.
+   - When the active goal is architecture cleanup, do not add new window types or scattered UI entry points unless the user explicitly asks for them in that same pass.
+   - Prefer extracting, consolidating, and normalizing existing behavior first.
 
-All views are TView subclasses — resizable, movable, stackable:
-- **Generative art engines** (8+): Verse, Mycelium, Monster Portal/Verse/Cam, Orbit, Torus, Cube, Game of Life
-- **Animated views**: Blocks, Gradient, ASCII, Score, Frame Player
-- **Utility**: Text editor, ANSI viewer, ASCII image, grid, transparent text, token tracker
-- **Paint**: Full pixel-level drawing system (`app/paint/`)
+## Code Style
 
-### Primer Window Chrome
+- Keep state explicit.
+  - Prefer plain values and small records over hidden widget state.
+- Keep services pure where possible.
+  - File discovery, render helpers, workspace I/O, and catalogue logic belong in services.
+- Keep window behavior local to the window factory.
+  - A window type should own its content widget wiring, focus behavior, cleanup, and `describeState()`.
+- Reuse shared browser/picker primitives.
+  - Do not add new ad hoc one-line prompts for file/workspace/font selection when a browser/list picker fits.
+- One source of truth per concern.
+  - Workspace paths live in `WorkspaceService`.
+  - Desktop geometry lives in `DesktopGeometryService`.
+  - Window chrome math lives in `window-chrome.ts`.
+  - Content measurement lives in `content-measurement.ts`.
+  - Desktop state shape lives in `StateService` + `types.ts`.
+  - Backrooms primer resolution lives in `BackroomsService`.
+- Content metrics are content metrics.
+  - `contentWidth` / `contentHeight` should describe the renderable payload.
+  - Border, titlebar, toolbar, and padding belong to chrome sizing, not measurement.
+- Keep names precise.
+  - Prefer domain names that describe intent: `measurePrimerContent`, `contentToWindowSize`, `getPrimerInfo`.
+  - Avoid vague helpers like `utils`, `misc`, `helpers2`, or duplicate verbs for the same operation.
+- Prefer composable helpers over inheritance theater.
+  - No framework-within-a-framework.
+  - Small functions, direct wiring, obvious ownership.
 
-Primer windows (`TFrameAnimationWindow`) have three **independent** display flags — mix freely:
+## Command Catalog Usage
 
-| `frameless` | `shadowless` | result |
-|---|---|---|
-| false | false | normal framed window with drop shadow (default) |
-| true  | false | ghost frame (invisible border) + shadow still visible |
-| false | true  | normal frame, no drop shadow |
-| true  | true  | fully chromeless — no border, no shadow (pure art/gallery mode) |
+- `src/core/command-catalog.ts` is the source of truth for user-visible command definitions.
+- `src/core/command-registry.ts` is the execution and projection layer over that catalog.
+- If you add a new user-visible command, add it to the command catalog first instead of hand-wiring menu and palette entries in multiple places.
+- Use explicit spaced `order` values (`0, 10, 20...`) so later insertions do not force renumbering.
+- Use `menuPlacements` for commands that appear in more than one menu. Do not duplicate those as separate command ids just to hit File/View/Window/Applications.
+- Default to one top-level menu placement per command. Duplicate placements
+  should be rare exceptions, not normal practice.
+- `group` is for logical clustering and future separators/adapters.
+- `actionKey` must point at an `AppMenuActions` entry implemented by `app-controller.ts`.
+- Preserve the naming split:
+  - `Document Reader` = local file/markdown reader
+  - `Chrome Browser` = real web browser/extraction surface
+- Current registry phase covers menu/palette projection plus generic control API command discovery/execution.
+- `Wib&Wob Agent` also has registry-backed `tui_list_commands` and `tui_run_command` tools now.
+- Agent guidance should prefer registry commands first for high-level actions and use low-level window tools only for precise manipulation.
+- Some window-local actions and MCP exposure still lag behind the registry. Shared context-menu actions are already on the registry path.
 
-`show_title=true` — shows primer filename (without `.txt`) in the top border.
-No-op on frameless windows: `TGhostFrame` has no title bar to render into.
+## Anti-Patterns
 
-**API usage** (`/gallery/arrange` or direct `/menu/command open_primer`):
+Do not introduce these:
+
+- parallel measurement functions for different callers
+- per-window copies of generic sizing logic
+- state fields that duplicate the same fact under different names
+- direct widget scraping when semantic state can be exposed
+- vendor code referenced directly from many app files
+- giant controller growth when a window family or service can be extracted cleanly
+- “just this once” prompt flows that should be shared components
+- hardcoded geometry magic numbers without named ownership
+
+## Pi Integration Rule
+
+`pi-mono` is vendored for evaluation and potential runtime reuse.
+
+Current direction:
+
+- yes to using `pi-coding-agent` as an engine inside the TS spike
+- no to letting vendor UI own the desktop/window-manager architecture
+
+The safe rule is:
+
+- if we embed pi, wrap it behind one service such as `wibwob-agent-service.ts`
+- our app still owns:
+  - window chrome
+  - workspace restore
+  - desktop state
+  - z-order / resize / drag
+  - typed metadata for agent-visible state
+
+If terminal-hosted pi work ever returns, treat it as an experiment, not the architectural foundation. The foundation should still be service-backed and state-aware.
+
+Run commands:
+
 ```bash
-# ghost frame only
-curl -X POST .../gallery/arrange -d '{"frameless":true,"shadowless":false,...}'
-
-# fully chromeless
-curl -X POST .../gallery/arrange -d '{"frameless":true,"shadowless":true,...}'
-
-# titled framed window
-curl -X POST .../gallery/arrange -d '{"show_title":true,...}'
+bun install
+bun run typecheck
+bun run dev
 ```
 
-**C++ location**: `TFrameAnimationWindow` constructor in `app/wwdos_app.cpp`.
-`frameless` → chooses `TGhostFrame` vs `TFrame` via `TWindowInit`.
-`shadowless` → clears `sfShadow` state flag post-construction.
-`title` kv arg → passed as `aTitle` to `TWindow`; visible only when framed.
+## Current Behavior
 
-### FIGlet Typography System
+The spike currently includes:
+- fullscreen terminal app shell
+- top menu bar
+- bottom status line
+- desktop background fill
+- draggable floating windows
+- primer viewer window
+- text editor window
+- primer browser window
+- shared browser/openers for workspace and file selection
+- animated generative art window
+- native `Wib&Wob Agent` backed by `WibWobAgentSession`
+- Backrooms TV with real/fake-live modes and per-run primer roots
+- FIGlet window backed by the shared font catalogue and real `figlet` CLI
 
-**Core files**: `app/figlet_utils.h/.cpp`, `app/figlet_text_view.h/.cpp`
-**Font catalogue**: `modules/wibwob-figlet-fonts/fonts.json` — 148 fonts with metadata
-**Skill**: `.pi/skills/figlet-videographer/SKILL.md`
+## Control Loop
 
-**Font height index** — every font has a fixed character height (lines per row of rendered text). The catalogue stores this in `font_metadata`:
+The spike has a local HTTP control surface intended for autonomous debug loops and agent-driven validation.
 
-```cpp
-int h = figlet::fontHeight("banner");   // → 7
-int h = figlet::fontHeight("isometric1"); // → 11
-```
+Primary use:
+- open windows
+- inspect live desktop/window state
+- send input to agent/editor windows
+- export text captures to `scratch`
+- compare captures while iterating on code
 
-Common font heights: mini=4, small=5, standard=6, big=8, banner=7, banner3-D=8, block=8, doom=8, gothic=9, larry3d=9, isometric1=11, 3-d=8.
+State/control owner:
+- `src/services/control-api.ts`
 
-**Wrap detection** — if figlet output has more lines than `fontHeight()`, the text wrapped into multiple rows. The auto-sizer uses this: `if (total_lines > font_height) lines = font_height` to cap window height to one row.
+Current control endpoints:
+- `GET /`
+- `GET /health`
+- `GET /state`
+- `GET /commands/list`
+- `GET /content/primer-info?path=...`
+- `GET /windows/text?id=...`
+- `POST /commands/run`
+- `POST /view/primer-browser/open`
+- `POST /view/file-manager/open`
+- `POST /view/primer-gallery/open`
+- `POST /view/primer/open`
+- `POST /view/browser-reader/open`
+- `POST /view/figlet/open`
+- `POST /view/art/open`
+- `POST /view/wibwob-agent/open`
+- `POST /view/companion/open`
+- `POST /view/workspace/open`
+- `POST /view/palette/open`
+- `POST /view/inspector/open`
+- `POST /view/editor/open`
+- `POST /view/backrooms/open`
+- `POST /windows/focus`
+- `POST /windows/move`
+- `POST /windows/resize`
+- `POST /windows/close`
+- `POST /windows/input`
+- `POST /windows/text/export`
+- `POST /workspace/save`
+- `POST /workspace/load`
 
-**Auto-sizing** — `api_spawn_figlet_text()` renders at unlimited width, measures max line width and line count, then sizes the window to fit: `width = maxW + 6` (borders + padding), `height = lines + 3`.
+Control parity rule:
+- whenever a new window family, app mode, or user-triggerable command is added, update both:
+  - desktop/window state reporting
+  - control API discovery and execution routes
+- do not leave future agents scraping visible text to reach a feature that the app already understands semantically
 
-**Window management via API**:
-- `open_figlet_text` — open auto-sized window (text, font args)
-- `move_window` / `resize_window` — position by ID (id, x, y / id, w, h)
-- `figlet_set_text` / `figlet_set_font` / `figlet_set_color` — mutate in-place
-- `window_shadow` — toggle shadow (id, on=true/false)
-- `preview_figlet` — render without opening a window (returns text)
-- `list_figlet_fonts` — returns all 148 font names
+Convenience:
+- use `scripts/window-state-parity-loop.sh` to open a representative set of existing window families through the control API and verify their `appType` state surface
+- use the control API plus exported captures to smoke the native agent surface and window-state parity after substantial UI changes
 
-**Concrete poetry** — the figlet-videographer skill composes spatial word arrangements on the desktop canvas. See `.pi/skills/figlet-videographer/examples/` for timeline JSON format and playback script.
+Current loop for native agent debugging:
+1. launch the spike
+2. `POST /view/wibwob-agent/open`
+3. read `/state` again to find the `wibwob-agent` window id
+4. `POST /windows/input` with the prompt text and a trailing carriage return
+5. wait for streaming to settle
+6. `POST /windows/text/export` to persist a text capture
+7. inspect `/state` for `messageCount`, `streaming`, `status`, and `model`
+8. patch code and repeat
 
-### Turbo Vision ANSI Rendering Rule
+Scratch artifacts:
+- exported text captures:
+  - `/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/scratch/captures`
+- desktop state JSON:
+  - `/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/scratch/app-state.json`
 
-When implementing image/terminal-rich rendering in Turbo Vision views:
+Important rule:
+- when debugging repaint/rendering issues, trust exported text snapshots and state captures over screenshots alone
+- the point of the loop is to make rendering bugs reproducible and regressions easy to compare
 
-1. Do **not** write raw ANSI escape streams (`\x1b[...`) directly to `TDrawBuffer` text.
-2. Parse ANSI into a cell model first: `cell = glyph + fg + bg`.
-3. Render cells with Turbo Vision-native draw operations (attributes/colors per cell).
-4. Treat visible ESC/CSI sequences in UI as a correctness bug.
+## Important Constraints
 
-Use this kickoff prompt for any ANSI/image rendering task:
+1. Keep this spike pragmatic.
+   - Prefer the smallest vertical slice that makes the terminal-native direction clearer.
+   - Avoid speculative abstractions.
 
-`Before coding, design the render path from first principles for Turbo Vision: source bytes -> ANSI stream -> parsed cell grid (glyph, fg, bg) -> native TV draw calls. Do not render raw ANSI text. Show parser/renderer boundaries, cache keys, failure modes, and a test that fails if ESC sequences appear in UI output.`
+2. Preserve the desktop-window-manager feel.
+   - Overlapping windows, focus, z-order, drag, tile, and cascade matter more than fancy widgets.
+   - If a library shortcut breaks the WibWob desktop feel, it is probably the wrong shortcut.
 
-### Module System
+3. Be honest about the terminal.
+   - The live app currently has no in-app shell pane.
+   - Future terminal work is architectural/reference work, not a shipped surface in this spike.
+   - Do not claim embedded VT support unless it is reintroduced and actually works.
 
-Content packs in `modules/` (public, shipped) and `modules-private/` (user content, gitignored). Each module has a `module.json` manifest. Types: content, prompt, view, tool. See `modules/README.md`.
+4. Prefer custom simple behavior over broken widget magic.
+   - The editor and drag logic are intentionally custom because some stock blessed behaviors were flaky.
+   - If a built-in blessed widget regresses interaction, replace or wrap it rather than fighting it blindly.
 
-### WibWobCity (Micropolis ASCII city-builder)
+5. Keep Bun-first assumptions.
+   - Do not reintroduce Node-only runtime assumptions unless explicitly necessary.
+   - If terminal work returns later, treat PTY/runtime choice as a fresh integration decision rather than reviving removed spike code.
 
-An in-engine city-builder built on the open-source Micropolis (SimCity) engine.
-**Full gameplay reference — controls, glyphs, code map, tests:** `docs/wibwobcity-gameplay.md`
+## Editing Guidance
 
-Key files:
-- `app/micropolis_ascii_view.h/.cpp` — `TMicropolisAsciiView`: cursor, camera, tool select, HUD, draw
-- `app/micropolis/micropolis_bridge.h/.cpp` — thin C++ wrapper over Micropolis engine: tick, apply_tool, snapshot, glyphs
-- `app/micropolis/compat/emscripten.h` — shim allowing native build of MicropolisCore
-- `vendor/MicropolisCore/` — upstream engine (git submodule)
-- `.pi/skills/micropolis-engine/SKILL.md` — engine archaeology: tile ranges, zone tier formulae, tool API
+When changing the spike:
+- extract repeated picker/browser behavior into `OverlayManager` or a focused service
+- extract new window types out of `app-controller.ts` once they stop being tiny
+- keep `app-controller.ts` as orchestration, not as the place all parsing/render helpers go
+- prefer explicit state for drag/focus/window management
+- update `describeState()` whenever a window gains meaningful new internal state
 
-Opened via `open_micropolis_ascii` command. Guardrail: no raw ANSI bytes in any `TDrawBuffer` write — `micropolis_no_ansi` test must stay green.
+If you add a new window type:
+- extend `WindowKind`
+- wire it through menus or a clear key path
+- ensure it can focus cleanly
+- ensure cleanup runs on close if timers or external resources are involved
+- add meaningful `describeState()` metadata
+- if it renders sized content, route its measurement through `content-measurement.ts`
+- if it needs non-standard chrome, declare that in `window-chrome.ts`
+- if it repeats a pattern already used elsewhere, extract the pattern first
+- if it introduces colors, backgrounds, borders, or emphasis styles, route them
+  through semantic theme tokens rather than inline blessed style literals
 
-## Key Configuration Files
+## Verification
 
-| File | Purpose |
-|------|---------|
-| `CMakeLists.txt` + `app/CMakeLists.txt` | CMake build (C++14, 7 executables) |
-| `app/llm/config/llm_config.json` | Active LLM provider and settings |
-| `app/README-CLAUDE-CONFIG.md` | Dual Claude instance setup, MCP config |
-| `tools/api_server/requirements.txt` | Python deps (FastAPI, uvicorn, pydantic, fastapi-mcp) |
-| `.gitmodules` | tvision submodule at `vendor/tvision` |
+At minimum, run:
 
-### Multi-Instance Environment Variables
-
-| Variable | Effect |
-|----------|--------|
-| `WIBWOB_INSTANCE` | Multi-instance only. Set to `N` on both TUI and API → socket `/tmp/wibwob_N.sock`. Unset = `/tmp/wwdos.sock` |
-| `WIBWOB_REPO_ROOT` | Repo root for API server (set automatically by `start_api_server.sh`). Prevents cross-checkout path mismatch when API server and TUI run from different repo copies |
-
-Launch multiple instances: `./tools/scripts/launch_tmux.sh [N]` (tmux + monitor sidebar).
-
-## Dependencies
-
-### Build
-- **Turbo Vision**: Git submodule at `vendor/tvision` (fork of magiblot/tvision, C++14 TUI framework)
-- **tvterm**: Git submodule at `vendor/tvterm` (fork of magiblot/tvterm at `j-greig/tvterm`, branch `feature/text-selection`). Adds mouse-driven text selection + copy-to-clipboard (pbcopy/xclip/xsel) and openpty/vfork multithread safety + forced black terminal bg. Upstream PR: magiblot/tvterm#9 (pending merge). Built as `tvterm-core` static lib (see root CMakeLists.txt) to avoid duplicate tvision target.
-- **ncurses/ncursesw**: Terminal backend
-- **CMake 3.10+**: Build system
-
-### Runtime
-- **Python 3.x + FastAPI stack**: API server (`tools/api_server/`), auto-creates venv via `start_api_server.sh`
-- **Node.js**: Claude SDK bridge (`app/llm/sdk_bridge/`) — **must `npm install` before first use**:
-  ```bash
-  cd app/llm/sdk_bridge && npm install
-  ```
-  Without this, the Wib&Wob chat window silently times out. Verify with:
-  ```bash
-  node app/llm/sdk_bridge/smoke_test.js
-  ```
-
-### System tools (macOS: `brew install`)
-- **chafa**: ANSI image rendering for browser view (`brew install chafa`) — required for `images:all-inline`/`key-inline`/`gallery` modes
-- **curl**: Used by TUI browser to call API server (pre-installed on macOS/Linux)
-
-## Dual Claude Instance Architecture
-
-Two separate Claude instances interact with the system (see `app/README-CLAUDE-CONFIG.md`):
-1. **External CLI** (Claude Code) — develops the codebase, builds, runs the app
-2. **Embedded Chat** (inside TUI) — controls windows via MCP tools, accessed via Tools → Wib&Wob Chat (F12)
-
-The API server on port 8089 bridges between the Python/MCP layer and the C++ app via IPC socket.
-
-## Parity Enforcement
-
-> Canon terms: **Registry**, **Parity**, **Capability** — see `.planning/README.md` for formal definitions.
-
-The C++ command registry (`app/command_registry.cpp`) and window type registry (`app/window_type_registry.cpp`) are the single sources of truth. Python enums, schemas, and MCP tool builders must stay in sync.
-
-**Automated enforcement** (run these tests before merging):
 ```bash
-uv run --with pytest pytest tests/contract/test_window_type_parity.py tests/contract/test_surface_parity_matrix.py tests/contract/test_node_mcp_parity.py -v
+bun run typecheck
 ```
 
-These tests auto-derive from C++ source — no hardcoded mapping tables. They will fail immediately if a new C++ type or command is added without updating the Python side.
+When touching interactive behavior, also do a manual smoke run:
 
-### Adding a new window type
-1. Add entry to `k_specs[]` in `app/window_type_registry.cpp` (type slug, spawn fn, match fn)
-2. Add value to `WindowType` enum in `tools/api_server/models.py`
-3. If spawnable: add to `WindowCreate` Literal in `tools/api_server/schemas.py`
-4. Run: `pytest tests/contract/test_window_type_parity.py`
+```bash
+bun run start
+```
 
-### Adding a new command
-1. Add to `get_command_capabilities()` in `app/command_registry.cpp`
-2. Add dispatch in `exec_registry_command()` in same file
-3. Add MCP tool builder in `_command_tool_builders()` in `tools/api_server/mcp_tools.py`
-4. Add matching tool in `app/llm/sdk_bridge/mcp_tools.js` (Node MCP for embedded agent)
-5. Run: `pytest tests/contract/test_surface_parity_matrix.py tests/contract/test_node_mcp_parity.py`
+Manual smoke targets:
+- open menu items
+- open a primer
+- open a text file
+- type in the editor
+- drag a window
+- close a window
+- open Wib&Wob Agent and verify input still works
 
-### Node MCP bridge (embedded Wib&Wob agent)
-The embedded agent uses `app/llm/sdk_bridge/mcp_tools.js` for TUI control tools.
-- Window types use `z.string()` (not `z.enum`) — validated by C++ registry, not JS
-- Tool whitelist in `claude_sdk_bridge.js` is auto-derived from `mcpServer.tools` (no hardcoding)
-- System prompt is augmented at session start with live capabilities from `GET /capabilities`
-- Parity test: `pytest tests/contract/test_node_mcp_parity.py`
+## Known Rough Edges
 
-### Capabilities endpoint
-`GET /capabilities` now queries C++ via IPC (`get_window_types` and `get_capabilities` commands) so window types and commands are auto-derived from the running binary — Python never maintains its own authoritative list.
+- `app-controller.ts` is ~2050 lines — down from ~2800 after WindowFacade and chat collapse, but should continue decomposing.
+- Workspace startup semantics are not yet unified with default workspace auto-load;
+  the intended direction is: restore `scratch/workspaces/default.json` (and later
+  optionally a last-used-workspace pointer) before falling back to opening
+  Scramble.
+- Theme/appearance is not yet a first-class subsystem. The target direction is a
+  native appearance service with `system` / `light` / `dark` plus semantic theme
+  tokens compiled into blessed styles.
+- Async workspace restore race: getLastWindow() after promise-returning openers can miss the window.
+- Chrome browser service has pre-existing type errors (missing @types/jsdom, @types/turndown-plugin-gfm).
 
-## Agent Workflow
+## Completed Architecture Work
 
-- **Planning canon first**: follow `.planning/README.md` for terms, acceptance-criteria format, and issue-first workflow.
-- **Epic status**: `.planning/epics/EPIC_STATUS.md` is the quick-read register. Run `.claude/scripts/planning.sh status` for live table from frontmatter. Each epic brief has YAML frontmatter (`id`, `title`, `status`, `issue`, `pr`, `depends_on`). A PostToolUse hook auto-syncs EPIC_STATUS.md whenever a brief is edited.
-- **Issue-first**: epics and features require a GitHub issue before starting. Spikes (`.planning/` investigations, no code changes) only need a branch — no issue required.
-- **Manual issue/PR sync required**: issue state is not auto-updated by hooks or PR creation. Claude/Codex must explicitly:
-  - move issue status in planning and GitHub as work starts/completes,
-  - update frontmatter `status:` and `pr:` fields in epic briefs (hook syncs EPIC_STATUS.md automatically),
-  - post progress evidence (commit SHAs + tests),
-  - close linked story/feature/epic issues once acceptance checks pass.
-- **GitHub formatting reliability**: do not post long markdown in inline quoted CLI args. Use `gh ... --body-file` (file or heredoc stdin) for all issue/PR comments and `gh pr edit --body-file` for PR description updates, then verify line breaks by reading back body text.
-- **Branch-per-issue**: branch from `main`, name as `<type>/<short-description>` (e.g. `feat/command-registry`, `fix/ipc-timeout`).
-- **Use templates**: open issues from `.github/ISSUE_TEMPLATE/` and use `.github/pull_request_template.md`.
-- **PR body must use the template**: always populate the PR body from `.github/pull_request_template.md`. Tick all Acceptance Criteria checkboxes before declaring the PR ready. Verify by reading back the PR body with `gh pr view`.
-- **PR checklist**: see `workings/chatgpt-refactor-vision-planning-2026-01-15/pr-acceptance-and-quality-gates.md` for the full acceptance gate list. Key gates: command defined once in C++ registry, menu/MCP parity preserved, `get_state()` validates against schema, Python tests pass.
-- **No force-push to main**.
-- **No emoji in commit messages** — not in title, not in description. Plain text only.
+- WindowFacade: 11-method interface, all 4 consumers collapsed (workspace restore, agent tools, control API, controller). ~80 lines deleted from controller.
+- Chat collapse: the standalone chat surface was removed and agent work is now centered on the native Wib&Wob Agent path.
+- Command catalog: single source of truth for all menu/palette commands. menuPlacements[] eliminates triple-entry duplication.
+- Command registry: execution layer with list/run, consumed by control API and agent tools.
+- Context menus: shared desktop/window commands now come from the command registry instead of a second hard-coded command list.
+- Editor save: Save, Save As, dirty indicator, context menu. Display-only asterisk (title stays clean).
+- Agent tools: registry-backed `tui_list_commands` / `tui_run_command` plus low-level TUI controls and jailed coding tools.
 
-### Codex review loop (hardening tasks)
+## Preferred Next Steps
 
-When implementing a multi-round hardening task (bug fixing, IPC robustness, etc.):
+Good next slices:
+1. async workspace restore race fix (getLastWindow after promise openers)
+2. workspace startup unification (`default.json` restore first, Scramble fallback second)
+3. appearance/theme subsystem (`appearance-service`, semantic tokens, blessed resolver)
+4. agent window restore hydration and deeper session/state parity
+5. WindowRecord discriminated union (replace bag of optionals)
+6. resize handles and stronger window management
+7. screenshot/export support for comparing layouts to WibWob-DOS captures
+8. project more window-local actions onto the command registry path where they are truly shared
 
-1. **After committing a batch of fixes**, immediately launch Codex round-N review in background:
-   ```bash
-   codex exec -C /Users/james/Repos/wibandwob-dos "<detailed prompt>" \
-     2>&1 | tee /Users/james/Repos/wibandwob-dos/codex-review-roundN-$(date +%Y%m%d-%H%M%S).log &
-   ```
-
-2. **Always include a devnote preamble** in every Codex prompt that lists the last 5-10 CODEX-ANALYSIS-ROUNDn-REVIEW.md files. Codex has no persistent memory across calls, so it must be told what happened in previous rounds. Example:
-   ```
-   Read CODEX-ANALYSIS-ROUND7-REVIEW.md, CODEX-ANALYSIS-ROUND6-REVIEW.md,
-   CODEX-ANALYSIS-ROUND5-REVIEW.md to understand all previous findings and
-   fixes. Then do a fresh verification pass...
-   ```
-   The analysis markdowns are compact (~30-50 lines) and give Codex the full context it needs without requiring it to re-read raw logs.
-
-3. **Context limit protocol** — when context remaining drops below ~13%:
-   a. Launch Codex round-N with a detailed prompt referencing the last 2 log files AND recent CODEX-ANALYSIS markdowns for context
-   b. Run `/compact` to preserve session state to `logs/memory/compact-<date>.md`
-   c. The next session reads the Codex log and continues the loop
-
-4. **Per-round cycle**: read log → write `CODEX-ANALYSIS-ROUNDn-REVIEW.md` → implement findings → add/run tests → commit → launch next round
-
-5. **Stop when**: Codex reports no new Critical/High findings. Document "confirmed safe" list in final review.
-
-## Scope Guardrails
-
-- The memory/state substrate is **local-first only** — no retrieval pipelines, no RAG, no cloud sync.
-- Planning docs in `workings/` are local working files, not shipped artifacts.
-- The local-first research scope was explicitly closed as local-only (see `workings/chatgpt-refactor-vision-planning-2026-01-15/overview.md` notes).
+Avoid:
+1. full Turbo Vision porting work
+2. heavy framework layering
+3. pretending terminal emulation is solved when only PTY spawning works
