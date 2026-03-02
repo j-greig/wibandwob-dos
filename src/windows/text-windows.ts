@@ -1,5 +1,6 @@
 import blessed from "blessed";
 
+import { theme } from "../core/theme-resolver.js";
 import { createScrollbar } from "../core/ui-primitives.js";
 import type { WindowManager } from "../core/window-manager.js";
 
@@ -24,7 +25,7 @@ export function openEditorWindow(params: {
     scrollable: true,
     alwaysScroll: true,
     scrollbar: createScrollbar(),
-    style: { fg: "white", bg: "black" }
+    style: theme().body
   });
   frame.kind = "editor";
   frame.filePath = params.filePath;
@@ -49,4 +50,3 @@ export function openEditorWindow(params: {
   params.renderEditor(frame.id);
   frame.focus();
 }
-

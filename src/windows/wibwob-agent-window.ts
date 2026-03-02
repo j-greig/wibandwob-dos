@@ -10,6 +10,7 @@ import blessed from "blessed";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { theme } from "../core/theme-resolver.js";
 import { createScrollbar } from "../core/ui-primitives.js";
 import type { Box, ChatMessageEntry } from "../core/types.js";
 import type { WindowManager } from "../core/window-manager.js";
@@ -115,7 +116,7 @@ export function openWibWobAgentWindow(params: {
     height: 1,
     tags: true,
     mouse: true,
-    style: { fg: C.muted, bg: "black" },
+    style: theme().muted,
   });
 
   const transcript = blessed.box({
@@ -130,7 +131,7 @@ export function openWibWobAgentWindow(params: {
     scrollable: true,
     alwaysScroll: true,
     scrollbar: createScrollbar(),
-    style: { fg: C.gray, bg: "black" },
+    style: theme().body,
   });
 
   const statusLine = blessed.box({
@@ -139,7 +140,7 @@ export function openWibWobAgentWindow(params: {
     left: 0,
     right: 0,
     height: 1,
-    style: { fg: "yellow", bg: "black" },
+    style: theme().warning,
   });
 
   const input = blessed.box({
@@ -150,7 +151,7 @@ export function openWibWobAgentWindow(params: {
     height: 1,
     keys: true,
     mouse: true,
-    style: { fg: "white", bg: "blue" },
+    style: theme().input,
   });
 
   let draft = "";

@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import stringWidth from "string-width";
 
+import { theme } from "../core/theme-resolver.js";
 import { createScrollbar } from "../core/ui-primitives.js";
 import type { ContentMeasurement } from "../services/content-measurement.js";
 import type { Box, BrowserEntry, List, WindowKind, WindowRecord } from "../core/types.js";
@@ -56,7 +57,7 @@ export function openPrimerBrowserWindow(params: {
     right: 0,
     height: 1,
     content: " Enter opens file  j/k scroll  Esc closes menu ",
-    style: { fg: "black", bg: "cyan" }
+    style: theme().header
   });
   const list = blessed.list({
     parent: frame.body,
@@ -71,7 +72,7 @@ export function openPrimerBrowserWindow(params: {
     alwaysScroll: true,
     scrollbar: createScrollbar(),
     items: entries.map((entry) => entry.label),
-    style: { fg: "white", bg: "black", selected: { fg: "black", bg: "white" } }
+    style: { ...theme().body, selected: theme().selected }
   });
   const initialSelectedIndex = Math.max(0, Math.min(params.restore?.selectedIndex ?? 0, entries.length - 1));
   const openSelected = (index?: number) => {
@@ -125,7 +126,7 @@ export function openPrimerGalleryWindow(params: {
     left: 0,
     right: 0,
     height: 1,
-    style: { fg: "black", bg: "white" }
+    style: theme().footer
   });
   const filterBox = blessed.textbox({
     parent: frame.body,
@@ -135,7 +136,7 @@ export function openPrimerGalleryWindow(params: {
     height: 1,
     inputOnFocus: true,
     mouse: true,
-    style: { fg: "black", bg: "cyan" }
+    style: theme().input
   });
   const list = blessed.list({
     parent: frame.body,
@@ -150,7 +151,7 @@ export function openPrimerGalleryWindow(params: {
     alwaysScroll: true,
     scrollbar: createScrollbar(),
     items: tabs[0].entries.map((entry) => entry.label),
-    style: { fg: "white", bg: "black", selected: { fg: "black", bg: "white" } }
+    style: { ...theme().body, selected: theme().selected }
   });
   const preview = blessed.box({
     parent: frame.body,
@@ -162,7 +163,7 @@ export function openPrimerGalleryWindow(params: {
     scrollable: true,
     alwaysScroll: true,
     scrollbar: createScrollbar(),
-    style: { fg: "white", bg: "black" }
+    style: theme().body
   });
 
   let activeTabIndex = Math.max(0, Math.min(params.restore?.activeTabIndex ?? 0, tabs.length - 1));
@@ -207,7 +208,7 @@ export function openPrimerGalleryWindow(params: {
         mouse: true,
         clickable: true,
         content: ` ${tabConfig.label} `,
-        style: { fg: index === activeTabIndex ? "white" : "black", bg: index === activeTabIndex ? "blue" : "white" }
+        style: index === activeTabIndex ? theme().input : theme().footer
       });
       tabNode.on("click", () => switchTab(index));
       left += tabConfig.label.length + 2;
@@ -323,7 +324,7 @@ export function openTextViewerWindow(params: {
     alwaysScroll: true,
     scrollbar: createScrollbar(),
     content: "",
-    style: { fg: "white", bg: "black" }
+    style: theme().body
   });
   frame.kind = params.kind;
   frame.filePath = params.filePath;
@@ -383,7 +384,7 @@ export function openFileManagerWindow(params: {
     left: 0,
     right: 0,
     height: 1,
-    style: { fg: "black", bg: "cyan" }
+    style: theme().header
   });
   const filterBox = blessed.box({
     parent: frame.body,
@@ -391,7 +392,7 @@ export function openFileManagerWindow(params: {
     left: 0,
     width: "36%",
     height: 1,
-    style: { fg: "black", bg: "white" }
+    style: theme().footer
   });
   const list = blessed.list({
     parent: frame.body,
@@ -405,7 +406,7 @@ export function openFileManagerWindow(params: {
     scrollable: true,
     alwaysScroll: true,
     scrollbar: createScrollbar(),
-    style: { fg: "white", bg: "black", selected: { fg: "black", bg: "white" } }
+    style: { ...theme().body, selected: theme().selected }
   });
   const previewHeader = blessed.box({
     parent: frame.body,
@@ -414,7 +415,7 @@ export function openFileManagerWindow(params: {
     right: 0,
     height: 4,
     content: " ____  ____  _____ _   _ _____ _____ _    _\n|  _ \\|  _ \\| ____| | | | ____|_   _| |  | |\n| |_) | |_) |  _| | | | |  _|   | | | |  | |\n|  __/|  _ <| |___| |_| | |___  | | | |__| |\n|_|   |_| \\_\\_____|\\___/|_____| |_|  \\____/\n",
-    style: { fg: "yellow", bg: "black" }
+    style: theme().warning
   });
   const preview = blessed.box({
     parent: frame.body,
@@ -426,7 +427,7 @@ export function openFileManagerWindow(params: {
     scrollable: true,
     alwaysScroll: true,
     scrollbar: createScrollbar(),
-    style: { fg: "white", bg: "black" }
+    style: theme().body
   });
 
   let currentPath = initialPath;

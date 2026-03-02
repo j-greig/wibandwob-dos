@@ -1,17 +1,17 @@
 import blessed from "blessed";
-import { spawn as spawnProcess, type ChildProcessWithoutNullStreams } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
 import { CONTROL_API_PORT, MASTER_PHILOSOPHY_PATH, README_PATH, REPO_ROOT, SPIKE_NOTES_PATH, SPIKE_ROOT, STATE_PATH, WORKSPACES_DIR } from "./config.js";
+import type { AppMenuActions } from "./command-catalog.js";
 import { CommandRegistry } from "./command-registry.js";
 import { buildDesktopContextMenu, buildWindowContextMenu } from "./context-menu-items.js";
 import { DesktopGeometryService } from "./desktop-geometry.js";
-import { type AppMenuActions } from "./menu-config.js";
 import { MenuOverlayManager } from "./menu-overlay-manager.js";
 import { OverlayManager } from "./overlay-manager.js";
-import { createScrollbar, isRightClick } from "./ui-primitives.js";
+import { theme } from "./theme-resolver.js";
+import { isRightClick } from "./ui-primitives.js";
 import { restoreWindowSnapshot, serializeWindowSnapshot, type WorkspaceRestoreActions } from "./workspace-snapshots.js";
 import type {
   BackroomsChannel,
@@ -20,8 +20,6 @@ import type {
   ChatMessageEntry,
   DesktopState,
   GalleryTab,
-  List,
-  LogBox,
   MenuConfig,
   Textbox,
   WindowKind,
@@ -31,7 +29,6 @@ import type {
 import { contentToWindowSize, getChromeModeForWindow } from "./window-chrome.js";
 import { WindowManager } from "./window-manager.js";
 import { BackroomsService } from "../services/backrooms-service.js";
-import { openBackroomsLogBrowserWindow } from "../windows/backrooms-log-browser-window.js";
 import { measurePlainTextContent, measurePrimerContent, type ContentMeasurement } from "../services/content-measurement.js";
 import { ControlApiService } from "../services/control-api.js";
 import { ContentService } from "../services/content-service.js";
@@ -41,6 +38,14 @@ import { deleteBackward as deleteEditorBackwardState, deleteForward as deleteEdi
 import { StateService } from "../services/state-service.js";
 import { promptForWorkspaceLoad, promptForWorkspaceSave } from "../services/workspace-ui.js";
 import { WorkspaceService } from "../services/workspace-service.js";
+import {
+  type BackroomsWindowContext,
+  openBackroomsLogBrowserWindow as openBackroomsLogBrowserWindowFactory,
+  openBackroomsPrimerPicker as openBackroomsPrimerPickerWindow,
+  openBackroomsTvWindow,
+  promptForBackroomsRunOptions as promptForBackroomsRunOptionsWindow,
+  promptForBackroomsTv as promptForBackroomsTvWindow
+} from "../windows/backrooms-windows.js";
 import {
   openFileManagerWindow as openFarjsFileManagerWindow,
   openPrimerBrowserWindow as openPrimerBrowserListWindow,
@@ -102,7 +107,7 @@ export class TsTuiMvpApp {
       height: 1,
       width: "100%",
       tags: true,
-      style: { fg: "black", bg: "white" }
+      style: theme().menuBar
     });
     this.desktop = blessed.box({
       parent: this.screen,
@@ -110,7 +115,7 @@ export class TsTuiMvpApp {
       left: 0,
       bottom: 1,
       width: "100%",
-      style: { fg: "blue", bg: "blue" }
+      style: theme().desktop
     });
     this.statusLine = blessed.box({
       parent: this.screen,
@@ -119,7 +124,7 @@ export class TsTuiMvpApp {
       height: 1,
       width: "100%",
       tags: true,
-      style: { fg: "black", bg: "white" }
+      style: theme().statusLine
     });
 
     this.windowManager = new WindowManager(
@@ -193,18 +198,12 @@ export class TsTuiMvpApp {
     this.screen.render();
   }
 
-  /** Restore last workspace on boot, or open Scramble as bare minimum. */
+  /** Restore default workspace on boot. Empty desktop if none exists. */
   private restoreDefaultWorkspace(): void {
-    if (!this.workspace.exists()) {
-      this.openCompanionWindow();
-      return;
-    }
+    if (!this.workspace.exists()) return;
     try {
       const snapshots = this.workspace.load();
-      if (snapshots.length === 0) {
-        this.openCompanionWindow();
-        return;
-      }
+      if (snapshots.length === 0) return;
       let focusedWindow: WindowRecord | undefined;
       for (const snapshot of snapshots) {
         const restored = restoreWindowSnapshot(snapshot, this.getRestoreActions());
@@ -212,8 +211,7 @@ export class TsTuiMvpApp {
       }
       focusedWindow?.focus();
     } catch {
-      // Corrupt workspace — start clean
-      this.openCompanionWindow();
+      // Corrupt workspace — start with empty desktop
     }
   }
 
@@ -380,625 +378,36 @@ export class TsTuiMvpApp {
     });
   }
 
-  private openBackroomsLogBrowserWindow(): void {
-    const logsDir = path.join(REPO_ROOT, "logs", "backrooms-tv");
-    openBackroomsLogBrowserWindow({
+  private getBackroomsWindowContext(): BackroomsWindowContext {
+    return {
       screen: this.screen,
       windowManager: this.windowManager,
       overlays: this.overlays,
-      logsDir,
-      onOpenReplay: (logPath, theme) => {
-        this.openBackroomsTv({ theme, model: "sonnet", turns: 0, mode: "fake-live", primers: logPath });
-      },
-      onSaveSnippet: (title, content) => {
-        this.openEditorWindow(undefined, title, content);
-      }
-    });
+      backrooms: this.backrooms,
+      syncState: () => this.syncState(),
+      openEditorWindow: (filePath?: string, title?: string, initial?: string) => this.openEditorWindow(filePath, title, initial),
+      openBackroomsTv: (channel: BackroomsChannel) => this.openBackroomsTv(channel)
+    };
+  }
+
+  private openBackroomsLogBrowserWindow(): void {
+    openBackroomsLogBrowserWindowFactory(this.getBackroomsWindowContext());
   }
 
   private promptForBackroomsTv(): void {
-    const defaults: BackroomsChannel = {
-      theme: "liminal fluorescent maze",
-      primers: "",
-      turns: 3,
-      model: "sonnet"
-    };
-    this.overlays.openValuePrompt("Backrooms Theme", defaults.theme, (theme) => {
-      this.openBackroomsPrimerPicker(theme.trim() || defaults.theme, defaults);
-    });
+    promptForBackroomsTvWindow(this.getBackroomsWindowContext());
   }
 
   private openBackroomsPrimerPicker(theme: string, defaults: BackroomsChannel): void {
-    const allEntries = this.backrooms.collectPrimers();
-    if (allEntries.length === 0) {
-      this.overlays.flash("No Backrooms primers found.");
-      return;
-    }
-
-    const frame = this.windowManager.createFrame("Backrooms Primer Picker", "browser");
-    frame.frame.width = 96;
-    frame.frame.height = 28;
-
-    const header = blessed.box({
-      parent: frame.body,
-      top: 0,
-      left: 0,
-      right: 0,
-      height: 2,
-      style: { fg: "black", bg: "cyan" }
-    });
-    const searchBox = blessed.textbox({
-      parent: frame.body,
-      top: 2,
-      left: 0,
-      width: "36%",
-      height: 1,
-      inputOnFocus: true,
-      mouse: true,
-      style: { fg: "white", bg: "blue" }
-    });
-    const list = blessed.list({
-      parent: frame.body,
-      top: 3,
-      left: 0,
-      width: "36%",
-      bottom: 0,
-      keys: true,
-      vi: true,
-      mouse: true,
-      scrollable: true,
-      alwaysScroll: true,
-      scrollbar: createScrollbar(),
-      style: { fg: "white", bg: "black", selected: { fg: "black", bg: "white" } }
-    });
-    const preview = blessed.box({
-      parent: frame.body,
-      top: 2,
-      left: "36%",
-      right: 0,
-      bottom: 0,
-      mouse: true,
-      scrollable: true,
-      alwaysScroll: true,
-      scrollbar: createScrollbar(),
-      style: { fg: "white", bg: "black" }
-    });
-
-    let searchValue = "";
-    let filteredEntries = [...allEntries];
-    const selectedLabels = new Set<string>();
-
-    const syncHeader = () => {
-      header.setContent(
-        ` Theme: ${theme}\n Enter run  Space toggle  / search  Esc cancel  Letters jump  Selected: ${selectedLabels.size || 0} `
-      );
-    };
-
-    const renderList = (selectedIndex = 0) => {
-      list.setItems(
-        filteredEntries.map((entry) => `${selectedLabels.has(entry.label) ? "[x]" : "[ ]"} ${entry.label}`)
-      );
-      if (filteredEntries.length > 0) {
-        list.select(Math.max(0, Math.min(selectedIndex, filteredEntries.length - 1)));
-      } else {
-        list.select(0);
-      }
-      syncHeader();
-      this.screen.render();
-    };
-
-    const updatePreview = (index: number) => {
-      const entry = filteredEntries[index];
-      if (!entry) {
-        preview.setContent(searchValue ? `No primers match "${searchValue}".` : "No primer selected.");
-        this.screen.render();
-        return;
-      }
-      try {
-        const content = fs.readFileSync(entry.filePath, "utf8");
-        preview.setContent(`${entry.label}\n${entry.filePath}\n\n${content}`);
-      } catch (error) {
-        preview.setContent(`Cannot preview primer.\n\n${error instanceof Error ? error.message : String(error)}`);
-      }
-      this.screen.render();
-    };
-
-    const applyFilter = (preserveLabel?: string) => {
-      const lowered = searchValue.toLowerCase();
-      filteredEntries = allEntries.filter((entry) => entry.label.toLowerCase().includes(lowered));
-      const nextIndex = preserveLabel
-        ? Math.max(0, filteredEntries.findIndex((entry) => entry.label === preserveLabel))
-        : 0;
-      renderList(nextIndex < 0 ? 0 : nextIndex);
-      updatePreview((list as List & { selected: number }).selected ?? 0);
-    };
-
-    const toggleSelected = () => {
-      const index = (list as List & { selected: number }).selected ?? 0;
-      const entry = filteredEntries[index];
-      if (!entry) {
-        return;
-      }
-      if (selectedLabels.has(entry.label)) {
-        selectedLabels.delete(entry.label);
-      } else {
-        selectedLabels.add(entry.label);
-      }
-      renderList(index);
-      updatePreview(index);
-    };
-
-    const jumpToLetter = (letter: string) => {
-      const upper = letter.toUpperCase();
-      const index = filteredEntries.findIndex((entry) => entry.label.charAt(0).toUpperCase() === upper);
-      if (index >= 0) {
-        list.select(index);
-        updatePreview(index);
-        this.screen.render();
-      }
-    };
-
-    const closePicker = () => {
-      frame.close();
-    };
-
-    const confirmSelection = () => {
-      const focusedIndex = (list as List & { selected: number }).selected ?? 0;
-      const fallback = filteredEntries[focusedIndex]?.label;
-      const selected = selectedLabels.size > 0 ? [...selectedLabels] : fallback ? [fallback] : [];
-      closePicker();
-      this.promptForBackroomsRunOptions(theme, selected.join(","), defaults);
-    };
-
-    const focusSearch = () => {
-      searchBox.focus();
-      searchBox.readInput();
-      this.screen.render();
-    };
-
-    searchBox.setValue(searchValue);
-    searchBox.on("keypress", (_, key) => {
-      if (key.name === "escape") {
-        list.focus();
-        this.screen.render();
-        return;
-      }
-      if (key.name === "enter") {
-        searchValue = searchBox.getValue().trim();
-        applyFilter(filteredEntries[(list as List & { selected: number }).selected ?? 0]?.label);
-        list.focus();
-        this.screen.render();
-        return;
-      }
-      setTimeout(() => {
-        searchValue = searchBox.getValue().trim();
-        applyFilter(filteredEntries[(list as List & { selected: number }).selected ?? 0]?.label);
-      }, 0);
-    });
-    searchBox.on("submit", (value) => {
-      searchValue = (value ?? "").trim();
-      applyFilter(filteredEntries[(list as List & { selected: number }).selected ?? 0]?.label);
-      list.focus();
-      this.screen.render();
-    });
-
-    list.on("select item", (_, index) => updatePreview(index));
-    list.on("keypress", (ch, key) => {
-      if (key.name === "enter") {
-        confirmSelection();
-        return;
-      }
-      if (key.name === "space") {
-        toggleSelected();
-        return;
-      }
-      if (key.name === "escape") {
-        closePicker();
-        return;
-      }
-      if (key.name === "slash") {
-        focusSearch();
-        return;
-      }
-      if (["up", "down", "j", "k", "pageup", "pagedown", "home", "end"].includes(key.name ?? "")) {
-        setTimeout(() => updatePreview((list as List & { selected: number }).selected ?? 0), 0);
-        return;
-      }
-      if (ch && /^[a-z]$/i.test(ch)) {
-        jumpToLetter(ch);
-      }
-    });
-
-    frame.kind = "browser";
-    frame.describeState = () => ({
-      appType: "backrooms-primer-picker",
-      summary: `Backrooms primer picker with ${allEntries.length} primers.`,
-      theme,
-      searchValue,
-      selectedPrimers: [...selectedLabels],
-      visibleEntryCount: filteredEntries.length,
-      selectedLabel: filteredEntries[(list as List & { selected: number }).selected ?? 0]?.label,
-      contentPreview: preview.getContent().split("\n").slice(0, 8).join("\n")
-    });
-    frame.focus = () => {
-      this.windowManager.focusWindow(frame);
-      list.focus();
-    };
-
-    this.windowManager.registerWindow(frame);
-    renderList(0);
-    updatePreview(0);
-    frame.focus();
+    openBackroomsPrimerPickerWindow(this.getBackroomsWindowContext(), theme, defaults);
   }
 
   private promptForBackroomsRunOptions(theme: string, primers: string, defaults: BackroomsChannel): void {
-    this.overlays.openValuePrompt("Backrooms Turns", String(defaults.turns), (turnsValue) => {
-      this.overlays.openValuePrompt("Backrooms Model", defaults.model, (modelValue) => {
-        const turns = Math.max(1, Math.min(20, Number.parseInt(turnsValue, 10) || defaults.turns));
-        const model = ["haiku", "sonnet", "opus"].includes(modelValue.trim()) ? (modelValue.trim() as BackroomsChannel["model"]) : defaults.model;
-        this.openBackroomsTv({
-          theme,
-          primers,
-          turns,
-          model
-        });
-      });
-    });
+    promptForBackroomsRunOptionsWindow(this.getBackroomsWindowContext(), theme, primers, defaults);
   }
 
   openBackroomsTv(channel: BackroomsChannel): void {
-    const frame = this.windowManager.createFrame("Backrooms TV", "backrooms");
-    frame.frame.width = 86;
-    frame.frame.height = 24;
-
-    const header = blessed.box({
-      parent: frame.body,
-      top: 0,
-      left: 0,
-      right: 0,
-      height: 2,
-      tags: true,
-      style: { fg: "black", bg: "cyan" }
-    });
-    const transcript = blessed.log({
-      parent: frame.body,
-      top: 2,
-      left: 0,
-      right: 0,
-      bottom: 1,
-      tags: false,
-      mouse: true,
-      scrollable: true,
-      alwaysScroll: true,
-      scrollbar: createScrollbar(),
-      style: { fg: "white", bg: "black" }
-    }) as LogBox;
-    const footer = blessed.box({
-      parent: frame.body,
-      bottom: 0,
-      left: 0,
-      right: 0,
-      height: 1,
-      style: { fg: "black", bg: "white" }
-    });
-
-    let status = "IDLE";
-    let phase: "idle" | "starting" | "waiting" | "streaming" | "playback" | "complete" | "error" = "idle";
-    let processRef: ChildProcessWithoutNullStreams | undefined;
-    let backroomsPartialLine = "";
-    let logPath = this.backrooms.createLogPath(channel.theme);
-    let fallbackTimer: ReturnType<typeof setInterval> | undefined;
-    let fallbackPlaybackTimer: ReturnType<typeof setInterval> | undefined;
-    let lastError = "";
-    let sourceMode: "live" | "playback" | "simulated-live" = "live";
-    let playbackSourceLabels: string[] = [];
-    let liveStdoutBytes = 0;
-    let liveStderrBytes = 0;
-    let lastActivityAt = 0;
-    let sawLiveStdout = false;
-    let startTime = 0;
-    let startedAt = "";
-    let endedAt = "";
-    let exitCode: number | null = null;
-    let exitSignal: NodeJS.Signals | null = null;
-    let fallbackReason = "";
-    const requestedMode = channel.mode ?? "auto";
-    let launchMode = this.backrooms.resolveLaunchMode(requestedMode);
-    const command = this.backrooms.resolveCliCommand();
-    const cliArgs = this.backrooms.buildCliArgs(channel);
-    const backroomsCwd = this.backrooms.resolveBackroomsPath();
-    let runRoot = "";
-
-    const updateChrome = () => {
-      header.setContent(
-        ` Theme: ${channel.theme}\n Model: ${channel.model}  Turns: ${channel.turns}  Primers: ${channel.primers || "(none)"}  Mode: ${launchMode}${
-          (sourceMode === "playback" || sourceMode === "simulated-live") && playbackSourceLabels.length > 0 ? `  Playback: ${playbackSourceLabels.join(" | ")}` : ""
-        } `
-      );
-      footer.setContent(` ${status} [${sourceMode}]  log: ${logPath}  Space restart  N restart  Alt-Shift-Arrows resize  +> mouse resize `);
-    };
-
-    const appendChunk = (chunk: string) => {
-      const clean = this.backrooms.sanitizeOutputChunk(chunk);
-      if (!clean) {
-        return;
-      }
-      lastActivityAt = Date.now();
-      liveStdoutBytes += Buffer.byteLength(clean);
-      sawLiveStdout = sawLiveStdout || clean.length > 0;
-      if (sourceMode === "live") {
-        phase = "streaming";
-        status = "STREAMING";
-        updateChrome();
-      }
-      fs.appendFileSync(logPath, clean, "utf8");
-      const combined = backroomsPartialLine + clean;
-      const lines = combined.split("\n");
-      backroomsPartialLine = lines.pop() ?? "";
-      for (const line of lines) {
-        transcript.log(line);
-      }
-      this.syncState();
-      this.screen.render();
-    };
-
-    const stopBackrooms = () => {
-      if (fallbackTimer) {
-        clearInterval(fallbackTimer);
-        fallbackTimer = undefined;
-      }
-      if (fallbackPlaybackTimer) {
-        clearInterval(fallbackPlaybackTimer);
-        fallbackPlaybackTimer = undefined;
-      }
-      if (!processRef || processRef.killed) {
-        return;
-      }
-      processRef.kill("SIGTERM");
-      processRef = undefined;
-      phase = "idle";
-      status = "IDLE";
-      updateChrome();
-      this.syncState();
-      this.screen.render();
-    };
-
-    const startSimulatedLive = () => {
-      const playback = this.backrooms.buildPlaybackStream(channel, 3);
-      playbackSourceLabels = playback.labels;
-      sourceMode = "simulated-live";
-      phase = "streaming";
-      status = "SIMULATED LIVE";
-      fallbackReason = "forced-fake-live";
-      updateChrome();
-      if (playback.lines.length === 0) {
-        transcript.log("[backrooms fake-live unavailable: no local sample files found]");
-        phase = "error";
-        status = "SIMULATED LIVE UNAVAILABLE";
-        updateChrome();
-        this.syncState();
-        this.screen.render();
-        return;
-      }
-      transcript.log(`[backrooms fake-live] ${playbackSourceLabels.join(", ")}`);
-      let index = 0;
-      fallbackPlaybackTimer = setInterval(() => {
-        if (index >= playback.lines.length) {
-          if (fallbackPlaybackTimer) {
-            clearInterval(fallbackPlaybackTimer);
-            fallbackPlaybackTimer = undefined;
-          }
-          phase = "complete";
-          status = "SIMULATED COMPLETE";
-          updateChrome();
-          this.syncState();
-          this.screen.render();
-          return;
-        }
-        transcript.log(playback.lines[index]);
-        index += 1;
-        this.syncState();
-        this.screen.render();
-      }, 30);
-    };
-
-    const startPlaybackFallback = (reason: string) => {
-      if (fallbackPlaybackTimer) {
-        return;
-      }
-      if (processRef && !processRef.killed) {
-        processRef.kill("SIGTERM");
-        processRef = undefined;
-      }
-      fallbackReason = reason;
-      sourceMode = "playback";
-      phase = "playback";
-      status = `PLAYBACK ${reason}`;
-      const playback = this.backrooms.buildPlaybackStream(channel, 3);
-      playbackSourceLabels = playback.labels;
-      if (playback.lines.length === 0) {
-        transcript.log("[backrooms playback unavailable: no local sample files found]");
-        phase = "error";
-        status = "PLAYBACK UNAVAILABLE";
-        updateChrome();
-        this.syncState();
-        this.screen.render();
-        return;
-      }
-      let index = 0;
-      transcript.log(`[backrooms playback fallback] ${playbackSourceLabels.join(", ")}`);
-      updateChrome();
-      fallbackPlaybackTimer = setInterval(() => {
-        if (index >= playback.lines.length) {
-          if (fallbackPlaybackTimer) {
-            clearInterval(fallbackPlaybackTimer);
-            fallbackPlaybackTimer = undefined;
-          }
-          phase = "complete";
-          status = "PLAYBACK COMPLETE";
-          updateChrome();
-          this.syncState();
-          this.screen.render();
-          return;
-        }
-        transcript.log(playback.lines[index]);
-        index += 1;
-        this.syncState();
-        this.screen.render();
-      }, 35);
-    };
-
-    const startBackrooms = () => {
-      stopBackrooms();
-      transcript.setContent("");
-      backroomsPartialLine = "";
-      logPath = this.backrooms.createLogPath(channel.theme);
-      launchMode = this.backrooms.resolveLaunchMode(requestedMode);
-      phase = "starting";
-      status = "STARTING";
-      sourceMode = "live";
-      playbackSourceLabels = [];
-      lastError = "";
-      liveStdoutBytes = 0;
-      liveStderrBytes = 0;
-      lastActivityAt = Date.now();
-      sawLiveStdout = false;
-      startTime = Date.now();
-      startedAt = new Date(startTime).toISOString();
-      endedAt = "";
-      exitCode = null;
-      exitSignal = null;
-      fallbackReason = "";
-      runRoot = this.backrooms.prepareRunRoot(channel);
-      updateChrome();
-
-      if (launchMode === "fake-live") {
-        startSimulatedLive();
-        this.syncState();
-        this.screen.render();
-        return;
-      }
-
-      processRef = spawnProcess(command.command, cliArgs, {
-        cwd: backroomsCwd,
-        env: {
-          ...process.env,
-          TERM: "dumb",
-          NO_COLOR: "1",
-          DOTENV_CONFIG_QUIET: "true",
-          WIBWOB_ROOT: runRoot,
-          WIBWOB_AUTH_METHOD: process.env.WIBWOB_AUTH_METHOD || "claude-cli"
-        }
-      });
-
-      processRef.stdout.on("data", (chunk: Buffer) => appendChunk(chunk.toString("utf8")));
-      processRef.stderr.on("data", (chunk: Buffer) => {
-        const text = this.backrooms.sanitizeOutputChunk(chunk.toString("utf8")).trim();
-        liveStderrBytes += Buffer.byteLength(text);
-        lastActivityAt = Date.now();
-        if (!text) {
-          return;
-        }
-        if (!sawLiveStdout) {
-          phase = "waiting";
-          status = "WAITING FOR FIRST TOKENS";
-        }
-        lastError = text;
-        fs.appendFileSync(logPath, `[stderr] ${text}\n`, "utf8");
-        transcript.log(`[stderr] ${text}`);
-        this.syncState();
-        this.screen.render();
-      });
-      processRef.on("close", (code, signal) => {
-        if (fallbackTimer) {
-          clearInterval(fallbackTimer);
-          fallbackTimer = undefined;
-        }
-        processRef = undefined;
-        endedAt = new Date().toISOString();
-        exitCode = code ?? null;
-        exitSignal = signal ?? null;
-        if (backroomsPartialLine.length > 0) {
-          transcript.log(backroomsPartialLine);
-          backroomsPartialLine = "";
-        }
-        phase = code === 0 ? "complete" : "error";
-        status = `EXIT ${code ?? "?"}/${signal ?? "none"}`;
-        updateChrome();
-        transcript.log(`[backrooms exited code=${code ?? "?"} signal=${signal ?? "none"}]`);
-        if (!sawLiveStdout) {
-          startPlaybackFallback(code === 0 && liveStderrBytes === 0 ? "silent" : "error");
-        }
-        this.syncState();
-        this.screen.render();
-      });
-
-      fallbackTimer = setInterval(() => {
-        const silentForMs = Date.now() - lastActivityAt;
-        const uptimeMs = Date.now() - startTime;
-        if (!processRef || processRef.killed || sourceMode !== "live" || sawLiveStdout) {
-          return;
-        }
-        if (uptimeMs >= 1000 && phase === "starting") {
-          phase = "waiting";
-          status = "WAITING FOR FIRST TOKENS";
-          updateChrome();
-          this.syncState();
-          this.screen.render();
-        }
-        if (uptimeMs >= 8000 && silentForMs >= 8000) {
-          transcript.log("[backrooms live mode is still silent after 8s]");
-          if (lastError) {
-            transcript.log(`[backrooms last stderr] ${lastError}`);
-          }
-          startPlaybackFallback("timeout");
-        }
-      }, 1000);
-    };
-
-    updateChrome();
-    frame.cleanup = () => stopBackrooms();
-    frame.describeState = () => ({
-      appType: "backrooms-tv",
-      summary: "Streams existing backrooms cli-v3.ts output into a scrolling window.",
-      theme: channel.theme,
-      primers: channel.primers,
-      turns: channel.turns,
-      model: channel.model,
-      requestedMode,
-      launchMode,
-      phase,
-      status,
-      sourceMode,
-      playbackSources: playbackSourceLabels,
-      lastError,
-      fallbackReason,
-      logPath,
-      command: command.command,
-      args: cliArgs,
-      cwd: backroomsCwd,
-      runRoot,
-      pid: processRef?.pid,
-      startedAt,
-      endedAt,
-      exitCode,
-      exitSignal,
-      liveStdoutBytes,
-      liveStderrBytes,
-      lastActivityMsAgo: Math.max(0, Date.now() - lastActivityAt),
-      uptimeMs: Math.max(0, Date.now() - startTime),
-      contentPreview: transcript.getContent().split("\n").slice(-40).join("\n"),
-      transcriptLineCount: transcript.getContent().split("\n").filter(Boolean).length
-    });
-    frame.captureText = () => transcript.getContent();
-    frame.focus = () => {
-      this.windowManager.focusWindow(frame);
-      transcript.focus();
-    };
-    frame.frame.key(["space", "n"], () => startBackrooms());
-    this.windowManager.registerWindow(frame);
-    frame.focus();
-    startBackrooms();
+    openBackroomsTvWindow(this.getBackroomsWindowContext(), channel);
   }
 
   private openPrimerBrowserWindow(restore?: { selectedIndex?: number }): void {

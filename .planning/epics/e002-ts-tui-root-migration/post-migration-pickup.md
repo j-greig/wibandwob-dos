@@ -1,3 +1,8 @@
+<retired reason="superseded" replacement=".planning/BUILD.md">
+Post-migration resumption guide. Migration landed; outstanding work now tracked in master checklist.
+Master checklist: .planning/BUILD.md
+Architecture reference: .planning/refactor-docs/020-target-architecture.md
+
 # E002 Post-Migration Pickup
 
 Use this file when resuming work after the TS TUI root migration.
@@ -95,3 +100,4 @@ migration already happened. It should start directly from:
 - root app canonical
 - root docs canonical
 - post-migration stabilization work only
+</retired>

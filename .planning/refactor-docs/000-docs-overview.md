@@ -1,3 +1,8 @@
+<retired reason="superseded" replacement=".planning/BUILD.md">
+Doc inventory and triage. Superseded by the master build checklist.
+Master checklist: .planning/BUILD.md
+Architecture reference: .planning/refactor-docs/020-target-architecture.md
+
 # TS TUI Spike Docs Overview
 
 Canonical inventory of `/docs` (formerly `/spikes/ts-tui-mvp/docs`).
@@ -218,3 +223,4 @@ These live outside the spike dir but directly drive spike work:
 | `window-facade-full-review.md` | Full review of Phases 1-5. Capture route fix applied. Remaining: async restore race, old method aliases. | `review` |
 | `window-facade-phase1-review.md` | Review of the early WindowFacade phase and contract drift. | `review` |
 | `window-facade-review.md` | Initial WindowFacade problem framing before the fuller migration work. | `review` |
+</retired>

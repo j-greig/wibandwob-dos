@@ -4,6 +4,7 @@ import path from "node:path";
 import blessed from "blessed";
 
 import type { OverlayManager } from "../core/overlay-manager.js";
+import { theme } from "../core/theme-resolver.js";
 import type { WindowRecord } from "../core/types.js";
 import type { WindowManager } from "../core/window-manager.js";
 import { createScrollbar } from "../core/ui-primitives.js";
@@ -52,7 +53,7 @@ export function openFigletWindow(params: {
     left: 0,
     right: 0,
     height: 2,
-    style: { fg: "black", bg: "cyan" }
+    style: theme().header
   });
   const viewer = blessed.box({
     parent: frame.body,
@@ -66,7 +67,7 @@ export function openFigletWindow(params: {
     scrollable: true,
     alwaysScroll: true,
     scrollbar: createScrollbar(),
-    style: { fg: "white", bg: "black" }
+    style: theme().body
   });
 
   let currentText = params.text;

@@ -5,6 +5,7 @@ import path from "node:path";
 import { createScrollbar } from "../core/ui-primitives.js";
 import { createFilePathMenuItems } from "../core/context-menu-items.js";
 import type { OverlayManager } from "../core/overlay-manager.js";
+import { theme } from "../core/theme-resolver.js";
 import type { WindowManager } from "../core/window-manager.js";
 import type { WindowRecord } from "../core/types.js";
 
@@ -84,10 +85,9 @@ export function openBackroomsLogBrowserWindow(params: {
     vi: true,
     scrollbar: createScrollbar(),
     style: {
-      fg: "white",
-      bg: "black",
-      selected: { fg: "black", bg: "cyan" },
-      item: { fg: "white", bg: "black" }
+      ...theme().body,
+      selected: theme().selected,
+      item: theme().body
     },
     items: []
   }) as blessed.Widgets.ListElement;
@@ -100,7 +100,7 @@ export function openBackroomsLogBrowserWindow(params: {
     width: 1,
     bottom: 0,
     content: "",
-    style: { fg: "#444444", bg: "#222222" }
+    style: theme().muted
   });
 
   // Header row 1 — title/theme
@@ -110,7 +110,7 @@ export function openBackroomsLogBrowserWindow(params: {
     left: CONTENT_LEFT,
     right: 0,
     height: 1,
-    style: { fg: "white", bg: "#111111", bold: true },
+    style: { ...theme().body, bold: true },
     content: ""
   });
 
@@ -122,7 +122,7 @@ export function openBackroomsLogBrowserWindow(params: {
     right: 0,
     height: 1,
     mouse: true,
-    style: { fg: "#888888", bg: "#111111" },
+    style: theme().muted,
     content: ""
   });
 
@@ -150,7 +150,7 @@ export function openBackroomsLogBrowserWindow(params: {
     alwaysScroll: true,
     scrollbar: createScrollbar(),
     content: "",
-    style: { fg: "#d0d0d0", bg: "black" }
+    style: theme().body
   });
 
   function refreshList() {

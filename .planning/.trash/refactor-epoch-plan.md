@@ -1,3 +1,7 @@
+<retired reason="superseded" replacement=".planning/BUILD.md">
+Epoch tracker. Epochs 1-2 landed. Epoch 3 and parking lot items absorbed into master checklist.
+Master checklist: .planning/BUILD.md
+
 # TS TUI Refactor Epoch Plan
 
 Canonical plan file for this refactor pass.
@@ -81,9 +85,9 @@ Rules for this pass:
 
 ## Epoch 3
 
-- [ ] Continue shrinking `app-controller.ts` by extracting remaining Backrooms and agent orchestration seams
-- [ ] Harden repaint/invalidation rules so stale shadow/content cells stop surviving resize/move/close
-- [ ] Keep using the control API loop to regression-check window-state and repaint behavior after each refactor
+- [x] Continue shrinking `app-controller.ts` by extracting remaining Backrooms and agent orchestration seams — absorbed into `.planning/BUILD.md` Tier 1
+- [x] Harden repaint/invalidation rules so stale shadow/content cells stop surviving resize/move/close — absorbed into `.planning/BUILD.md` Tier 1
+- [x] Keep using the control API loop to regression-check window-state and repaint behavior after each refactor — implicit in BUILD.md hardening work
 
 ---
 
@@ -96,3 +100,4 @@ Rules for this pass:
 - **Overlay-manager coupling**: file browser prompt (lines 403-648) is coupled to gallery/browser content discovery — may need touching when epoch 2 extracts those windows.
 - **API routes**: no epoch adds /commands discovery or new endpoints — extracted windows need control API parity as they land.
 - **Dual measurement**: openPrimerWindow re-measures via measurePrimerContent instead of consuming content-service's readPrimerMetadata — single measurement path when primers get extracted.
+</retired>

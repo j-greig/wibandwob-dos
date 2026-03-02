@@ -1,5 +1,6 @@
 import blessed from "blessed";
 
+import { theme } from "../core/theme-resolver.js";
 import type { StateService } from "../services/state-service.js";
 import type { WorkspaceService } from "../services/workspace-service.js";
 import { createScrollbar } from "../core/ui-primitives.js";
@@ -24,7 +25,7 @@ export function openAnimatedWindow(
     left: 0,
     right: 0,
     bottom: 0,
-    style: { fg: "white", bg: "black" }
+    style: theme().body
   });
   let tick = 0;
   const render = () => {
@@ -77,7 +78,7 @@ export function openCompanionWindow(
     left: 0,
     right: 0,
     bottom: 0,
-    style: { fg: "white", bg: "black" }
+    style: theme().body
   });
   const moods = [
     " /\\\\_/\\\\\n( o.o )\n > ^ <\n\nScramble: lurking",
@@ -117,7 +118,7 @@ export function openArtWindow(deps: BaseWindowDeps): void {
     left: 0,
     right: 0,
     bottom: 0,
-    style: { fg: "white", bg: "black" }
+    style: theme().body
   });
   let tick = 0;
   const renderArt = () => {
@@ -174,7 +175,7 @@ export function openWorkspaceManagerWindow(params: {
     left: 0,
     right: 0,
     height: 3,
-    style: { fg: "black", bg: "cyan" }
+    style: theme().header
   });
   const list = blessed.list({
     parent: frame.body,
@@ -193,7 +194,7 @@ export function openWorkspaceManagerWindow(params: {
       "Tile Windows",
       "Open Command Palette"
     ],
-    style: { fg: "white", bg: "black", selected: { fg: "black", bg: "white" } }
+    style: { ...theme().body, selected: theme().selected }
   });
   const refreshFooter = () => {
     const names = params.workspace.list();
@@ -246,7 +247,7 @@ export function openCommandPaletteWindow(params: {
     alwaysScroll: true,
     scrollbar: createScrollbar(),
     items: params.commands.map((command) => command.label),
-    style: { fg: "white", bg: "black", selected: { fg: "black", bg: "white" } }
+    style: { ...theme().body, selected: theme().selected }
   });
   list.on("select", (_, index) => params.commands[index]?.action());
   frame.kind = "palette";
@@ -283,7 +284,7 @@ export function openStateInspectorWindow(params: {
     scrollable: true,
     alwaysScroll: true,
     scrollbar: createScrollbar(),
-    style: { fg: "white", bg: "black" }
+    style: theme().body
   });
   const renderState = (state: DesktopState) => {
     viewer.setContent(JSON.stringify(state, null, 2));

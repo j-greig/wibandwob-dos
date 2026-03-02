@@ -1,5 +1,7 @@
+import { theme } from "./theme-resolver.js";
+
 export function createScrollbar(): { ch: string; style: { bg: string } } {
-  return { ch: " ", style: { bg: "white" } };
+  return { ch: " ", style: { bg: theme().scrollbar.bg } };
 }
 
 export function isRightClick(data?: { button?: string | number; buttons?: string | number } | null): boolean {

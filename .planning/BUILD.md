@@ -1,0 +1,124 @@
+# BUILD — Master Checklist
+
+Single source of truth for outstanding TS TUI build work.
+Update checkboxes here as work lands. Do not maintain parallel trackers.
+
+Architecture reference: `.planning/refactor-docs/020-target-architecture.md`
+Legacy C++ handover: `.planning/epics/e002-ts-tui-root-migration/legacy-docs/`
+
+Rules:
+- Work top-down through tiers. Items near the top unblock items further down.
+- When an item becomes blocked or deprioritised, move it to the Parking Lot
+  with a note explaining why.
+- Parking lot items can be promoted back when conditions change.
+
+## Tier 1 — Substrate (do first)
+
+- [x] **Default workspace boot**
+  Restore `scratch/workspaces/default.json` on launch, optional last-used pointer, if no workspace exists then workspace is empty.
+  Status: landed
+
+- [ ] **Window manager hardening**
+  Fix repaint/shadow invalidation, drag/release bugs, z-order correctness, stale cell cleanup, resize sanity.
+  Status: partial — shadow disabled (stale cell fix), resize now signals content via refresh(), coordinate inconsistency fixed (screenHeight-1 → screenHeight-2). Needs visual smoke test for drag-disappear bug and full verification.
+  Spec: `.planning/refactor-docs/015-window-manager-reference-and-repair-plan.md`
+
+- [x] **Controller extraction — backrooms + agent + terminal**
+  Extract remaining Backrooms, agent, and terminal window construction out of `app-controller.ts`.
+  Status: landed — backrooms extracted to backrooms-windows.ts (649 lines). Controller now 1013 lines, only shell chrome construction remains. No window createFrame calls left in controller.
+  Spec: `.planning/epics/e002-ts-tui-root-migration/legacy-docs/004-window-type-registry-and-factories.md`
+
+## Tier 2 — Command and state surface
+
+- [x] **Command registry completion**
+  Collapse remaining bespoke command paths into one registry with typed execution contracts.
+  Status: landed — menu-config.ts collapsed into command-catalog.ts, AppMenuActions now single-sourced. All commands defined once in catalog, projected to menus/palette/API/agent. ~15 bespoke /view/*/open API routes remain as convenience aliases (functional but redundant with /commands/run).
+  Spec: `.planning/refactor-docs/018-command-registry-and-tool-adapter-prd.md`
+  Also: `.planning/epics/e002-ts-tui-root-migration/legacy-docs/006-command-registry-and-ipc-protocol.md`
+
+- [x] **Context-sensitive menus**
+  Finish static contextual menu filtering. Dynamic top-level categories only later.
+  Status: landed — context menus are registry-driven with windowKind filtering and enabled predicates. Top-level menus remain static (File/Edit/View/Window/Applications). Phase 2 (dynamic top-level categories) is deliberately deferred.
+  Spec: `.planning/refactor-docs/019-context-sensitive-menu-bar-prd.md`
+
+- [ ] **Typed window/state/snapshot contracts**
+  Move payloads from `Record<string, unknown>` toward discriminated unions or runtime-validated schemas. Modules own their own serialize/restore. 14 window kinds to type. Medium refactor, no runtime behaviour change.
+  Status: partial — deferred to parking lot for now, promotes back when snapshot round-trip bugs surface.
+  Spec: `.planning/epics/e002-ts-tui-root-migration/legacy-docs/window-facade-full-review.md`
+
+## Tier 3 — Appearance and rendering
+
+- [x] **Appearance and theme system**
+  Implement `appearance-service.ts`, `theme-types.ts`, `theme-resolver.ts`. Semantic tokens, `system/light/dark`, remove inline colour literals.
+  Status: landed — three new files created, all inline colour literals replaced across window-manager, controller, and 8 window files. Dark theme active. Light variant and system detection deferred.
+  Spec: `.planning/epics/e002-ts-tui-root-migration/legacy-docs/008-theme-system-and-desktop-rendering.md`
+
+- [ ] **Unicode/cell-aware text rendering**
+  Replace fragile string repaint for complex Unicode with a shared text-to-cells path.
+  Status: not-started
+  Spec: `.planning/refactor-docs/021-unicode-cell-rendering-follow-on.md`
+
+## Tier 4 — Content and browser surfaces
+
+- [ ] **Content measurement consistency**
+  Use shared measurement consistently on open for primers/text/figlet/other content-aware surfaces.
+  Status: partial
+  Spec: `.planning/epics/e002-ts-tui-root-migration/legacy-docs/001-primer-dimensions-and-agent-sizing.md`
+
+- [ ] **Browser/document/text rendering**
+  Finish cleaning document reader/browser/file-manager/text rendering on shared measurement and repaint.
+  Status: partial
+  Spec: `.planning/epics/e002-ts-tui-root-migration/legacy-docs/010-browser-and-text-rendering.md`
+
+## Tier 5 — Agent surface
+
+- [ ] **Agent surface convergence**
+  Continue converging on native agent window + shared command/state tools. Remove stale assumptions.
+  Status: partial
+  Spec: `.planning/epics/e002-ts-tui-root-migration/legacy-docs/spk-agent-window-enhancement.md`
+  Also: `.planning/epics/e002-ts-tui-root-migration/legacy-docs/005-llm-integration-and-claude-sdk-bridge.md`
+
+## Tier 6 — New subsystems (defer until shell is boring)
+
+- [ ] **Animation subsystem**
+  Build `animation-service.ts` + `animation-windows.ts`. Frame source, playback, live generators, overlay composition.
+  Status: not-started
+  Spec: `.planning/epics/e002-ts-tui-root-migration/legacy-docs/011-games-and-generative-art.md`
+  Also: `.planning/epics/e002-ts-tui-root-migration/legacy-docs/016-terminal-kit-screenbuffer-animation-spike.md`
+
+- [ ] **Terminal subsystem**
+  Build `pty-session.ts`, `terminal-buffer.ts`, `terminal-renderer.ts`, `terminal-windows.ts`. Only after shell/paint/contracts are boring.
+  Status: not-started
+  Spec: `.planning/epics/e002-ts-tui-root-migration/legacy-docs/007-terminal-emulator.md`
+  Also: `.planning/epics/e002-ts-tui-root-migration/legacy-docs/terminal-native-research.md`
+
+- [ ] **Event/persistence/multi-instance model**
+  Re-spec and implement modern TS-native event/persistence/multi-instance behaviour.
+  Status: not-started
+  Spec: `.planning/epics/e002-ts-tui-root-migration/legacy-docs/013-events-persistence-and-multi-instance.md`
+
+## Tier 7 — Testing
+
+- [ ] **Contract tests**
+  Add `src/tests/` with: `command-registry.test.ts`, `state-service.test.ts`, `workspace-snapshots.test.ts`, `window-manager.test.ts`.
+  Status: not-started
+
+## Parking lot
+
+Items not on the critical path. Move blocked or deprioritised checklist items
+here with a note. Promote back when conditions change.
+
+- **`pi-theme-adapter.ts`**: was in Tier 3 theme system. Pi theme import/export is an integration adapter, not needed until the native theme system exists and an external format needs bridging. Promote back after appearance-service lands.
+- **Primer dims header**: add `# dims: 68x22` to primer files to skip full measurement scan (~14s across 197 files)
+- **tmux-launch rewrite**: replace C++/API era launcher with TS-native tmux harness
+- **CI and contract tests**: rebuild C++ era contract test patterns in TS against the new API surface
+- **Dual measurement**: `openPrimerWindow` re-measures instead of consuming content-service — fix when primers extracted
+- **WindowRecord shape**: optional fields still grow per type — refactor to discriminated union
+- **28 hardcoded blessed style literals**: tokenise before bulk extraction spreads them further
+
+## History
+
+This file absorbs and supersedes:
+- Outstanding Build Work table from `.planning/refactor-docs/020-target-architecture.md`
+- Epoch 3 items from `.planning/.trash/refactor-epoch-plan.md`
+- Parking lot items from `.planning/.trash/refactor-epoch-plan.md`

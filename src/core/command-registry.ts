@@ -1,12 +1,12 @@
 import {
-  createMenuConfigsFromCatalog,
-  createPaletteCommandsFromCatalog,
+  createMenuConfigs,
+  createPaletteCommands,
   listAppCommands,
   type AppCommandCategory,
   type AppCommandDescriptor,
+  type AppMenuActions,
   type MenuContext,
 } from "./command-catalog.js";
-import type { AppMenuActions } from "./menu-config.js";
 import type { MenuConfig, MenuItem } from "./types.js";
 
 export type { MenuContext };
@@ -29,11 +29,11 @@ export class CommandRegistry {
   }
 
   buildMenus(): MenuConfig[] {
-    return createMenuConfigsFromCatalog(this.actions);
+    return createMenuConfigs(this.actions);
   }
 
   buildPalette(): MenuItem[] {
-    return createPaletteCommandsFromCatalog(this.actions);
+    return createPaletteCommands(this.actions);
   }
 
   list(surface?: CommandSurface): CommandListItem[] {

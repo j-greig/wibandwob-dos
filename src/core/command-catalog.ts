@@ -1,5 +1,40 @@
 import type { MenuConfig, MenuItem } from "./types.js";
-import type { AppMenuActions } from "./menu-config.js";
+
+export interface AppMenuActions {
+  browsePrimers: () => void;
+  openFileManager: () => void;
+  openPrimerPrompt: () => void;
+  openTextFilePrompt: () => void;
+  openEditor: () => void;
+  saveFocusedEditor: () => void;
+  saveAsFocusedEditor: () => void;
+  saveWorkspaceAs: () => void;
+  loadWorkspacePrompt: () => void;
+  copyFocusedWindowText: () => void;
+  exportFocusedWindowText: () => void;
+  openArtWindow: () => void;
+  openWibWobAgent: () => void;
+  quit: () => void;
+  focusNextWindow: () => void;
+  focusPreviousWindow: () => void;
+  closeFocusedWindow: () => void;
+  openBackroomsPrompt: () => void;
+  openBackroomsTv: (args?: Record<string, unknown>) => void;
+  openBackroomsLogBrowser: () => void;
+  tileWindows: () => void;
+  cascadeWindows: () => void;
+  openGallery: () => void;
+  openBrowserReader: () => void;
+  openChromeBrowser: () => void;
+  openFigletBanner: () => void;
+  openPatternWindow: () => void;
+  openCompanionWindow: () => void;
+  openWorkspaceManager: () => void;
+  openCommandPalette: () => void;
+  openStateInspector: () => void;
+  saveWorkspace: () => void;
+  loadWorkspace: () => void;
+}
 
 export type AppCommandCategory = "file" | "edit" | "view" | "window" | "applications";
 export type AppCommandGroup =
@@ -397,7 +432,7 @@ export function listAppCommands(): AppCommandDescriptor[] {
   }));
 }
 
-export function createMenuConfigsFromCatalog(actions: AppMenuActions): MenuConfig[] {
+export function createMenuConfigs(actions: AppMenuActions): MenuConfig[] {
   return MENU_DEFINITIONS.map((menu) => ({
     label: menu.label,
     key: menu.key,
@@ -417,7 +452,7 @@ export function createMenuConfigsFromCatalog(actions: AppMenuActions): MenuConfi
   }));
 }
 
-export function createPaletteCommandsFromCatalog(actions: AppMenuActions): MenuItem[] {
+export function createPaletteCommands(actions: AppMenuActions): MenuItem[] {
   return listAppCommands()
     .flatMap((command) =>
       command.palettePlacement

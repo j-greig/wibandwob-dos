@@ -7,6 +7,7 @@
  */
 
 import blessed from "blessed";
+import { theme } from "../core/theme-resolver.js";
 import { createScrollbar } from "../core/ui-primitives.js";
 import type { WindowRecord } from "../core/types.js";
 import type { WindowManager } from "../core/window-manager.js";
@@ -35,7 +36,7 @@ export function openChromeBrowserWindow(params: {
     left: 0,
     right: 0,
     height: 1,
-    style: { fg: "black", bg: "white" },
+    style: theme().footer,
   });
 
   const backBtn = blessed.box({
@@ -46,7 +47,7 @@ export function openChromeBrowserWindow(params: {
     height: 1,
     content: " <- ",
     mouse: true,
-    style: { fg: "black", bg: "white", hover: { bg: "cyan" } },
+    style: { ...theme().footer, hover: theme().header },
   });
 
   const fwdBtn = blessed.box({
@@ -57,7 +58,7 @@ export function openChromeBrowserWindow(params: {
     height: 1,
     content: " -> ",
     mouse: true,
-    style: { fg: "black", bg: "white", hover: { bg: "cyan" } },
+    style: { ...theme().footer, hover: theme().header },
   });
 
   const reloadBtn = blessed.box({
@@ -68,7 +69,7 @@ export function openChromeBrowserWindow(params: {
     height: 1,
     content: " @  ",
     mouse: true,
-    style: { fg: "black", bg: "white", hover: { bg: "cyan" } },
+    style: { ...theme().footer, hover: theme().header },
   });
 
   const goBtn = blessed.box({
@@ -79,7 +80,7 @@ export function openChromeBrowserWindow(params: {
     height: 1,
     content: "  Go  ",
     mouse: true,
-    style: { fg: "white", bg: "blue", hover: { bg: "cyan" } },
+    style: { ...theme().input, hover: theme().header },
   });
 
   const urlBox = blessed.textbox({
@@ -90,7 +91,7 @@ export function openChromeBrowserWindow(params: {
     height: 1,
     inputOnFocus: true,
     mouse: true,
-    style: { fg: "white", bg: "blue" },
+    style: theme().input,
   });
 
   // -- Status bar --
@@ -100,7 +101,7 @@ export function openChromeBrowserWindow(params: {
     left: 0,
     right: 0,
     height: 1,
-    style: { fg: "black", bg: "cyan" },
+    style: theme().header,
   });
 
   // -- Content viewport --
@@ -116,7 +117,7 @@ export function openChromeBrowserWindow(params: {
     scrollable: true,
     alwaysScroll: true,
     scrollbar: createScrollbar(),
-    style: { fg: "white", bg: "black" },
+    style: theme().body,
   });
 
   // -- State --

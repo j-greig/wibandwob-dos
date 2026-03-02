@@ -1,3 +1,7 @@
+<retired reason="superseded" replacement=".planning/BUILD.md">
+Doc pruning plan. Pruning is done; outstanding work now tracked in master checklist.
+Master checklist: .planning/BUILD.md
+
 # 022 — Doc Prune Backlog
 
 Status: active
@@ -116,3 +120,4 @@ When moving a doc to `.trash`:
 - opening `docs/` shows mostly live planning docs
 - active architecture is obvious without historical scanning
 - agents are not nudged toward dead paths by filename proximity
+</retired>

@@ -1,6 +1,7 @@
 import blessed from "blessed";
 
 import type { WindowFacade } from "./window-facade.js";
+import { theme } from "./theme-resolver.js";
 import type { Box, DragState, ResizeState, WindowKind, WindowRecord } from "./types.js";
 
 export type EditorWriteHook = (id: number, text: string) => boolean;
@@ -76,25 +77,22 @@ export class WindowManager implements WindowFacade {
       border: "line",
       tags: true,
       mouse: true,
-      shadow: true,
+      // shadow: true — disabled; blessed shadow leaves stale cells on move/resize/close.
+      // TODO: reintroduce as explicit app-owned shadow painting once invalidation is solid.
       style: {
-        fg: "white",
-        bg: "black",
-        border: { fg: "white" }
+        ...theme().windowFrame,
+        border: theme().windowBorderUnfocused
       }
     });
     const titleBar = blessed.box({
       parent: frame,
       top: 0,
       left: 2,
-      right: 2,
+      right: 4,
       height: 1,
       tags: true,
       content: ` ${title} `,
-      style: {
-        fg: "black",
-        bg: "white"
-      }
+      style: theme().titleBarUnfocused
     });
     const body = blessed.box({
       parent: frame,
@@ -102,10 +100,7 @@ export class WindowManager implements WindowFacade {
       left: 1,
       right: 1,
       bottom: 1,
-      style: {
-        fg: "white",
-        bg: "black"
-      }
+      style: theme().body
     });
     const closeHint = blessed.box({
       parent: frame,
@@ -116,10 +111,7 @@ export class WindowManager implements WindowFacade {
       mouse: true,
       clickable: true,
       content: " x ",
-      style: {
-        fg: "white",
-        bg: "red"
-      }
+      style: theme().closeButton
     });
     const resizeGrip = blessed.box({
       parent: frame,
@@ -130,10 +122,7 @@ export class WindowManager implements WindowFacade {
       mouse: true,
       clickable: true,
       content: "+>",
-      style: {
-        fg: "yellow",
-        bg: "black"
-      }
+      style: theme().resizeGrip
     });
 
     const record: WindowRecord = {
@@ -231,7 +220,10 @@ export class WindowManager implements WindowFacade {
     this.syncZOrder();
     for (const window of this.windows) {
       const active = window.id === record.id;
-      window.frame.style.border = { fg: active ? "cyan" : "white" };
+      window.frame.style.border = active ? theme().windowBorderFocused : theme().windowBorderUnfocused;
+      if (window.titleBar) {
+        window.titleBar.style = active ? theme().titleBarFocused : theme().titleBarUnfocused;
+      }
     }
     this.onChange?.();
     this.screen.render();
@@ -291,9 +283,10 @@ export class WindowManager implements WindowFacade {
     const screenWidth = Number(this.screen.width);
     const screenHeight = Number(this.screen.height);
     const maxWidth = Math.max(24, screenWidth - Number(record.frame.left));
-    const maxHeight = Math.max(8, screenHeight - 1 - Number(record.frame.top));
+    const maxHeight = Math.max(8, screenHeight - 2 - Number(record.frame.top));
     record.frame.width = this.clamp(width, 24, maxWidth);
     record.frame.height = this.clamp(height, 8, maxHeight);
+    record.refresh?.();
     this.onChange?.();
     this.screen.render();
     return true;
@@ -483,6 +476,7 @@ export class WindowManager implements WindowFacade {
 
     record.frame.width = this.clamp(resizeState.originWidth + deltaX, 24, maxWidth);
     record.frame.height = this.clamp(resizeState.originHeight + deltaY, 8, maxHeight);
+    record.refresh?.();
     this.onChange?.();
     this.screen.render();
   }
@@ -529,14 +523,16 @@ export class WindowManager implements WindowFacade {
   }
 
   private shouldSuppressClick(record: WindowRecord): boolean {
-    if (this.suppressClickWindowId !== record.id) {
-      return false;
-    }
-    if (Date.now() <= this.suppressClickUntil) {
+    // Suppress clicks while actively dragging (blessed fires click before our mouseup handler)
+    if (this.dragState?.windowId === record.id && this.dragState.moved) {
       return true;
     }
-    this.suppressClickWindowId = undefined;
-    this.suppressClickUntil = 0;
+    // Post-drag one-shot suppression: consume and clear on first check
+    if (this.suppressClickWindowId === record.id) {
+      this.suppressClickWindowId = undefined;
+      this.suppressClickUntil = 0;
+      return true;
+    }
     return false;
   }
 }
