@@ -9,6 +9,7 @@ export type AppCommandGroup =
   | "focus"
   | "layout"
   | "surface"
+  | "edit"
   | "inspect"
   | "system";
 
@@ -120,7 +121,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
   },
   {
     id: "file.new_text_buffer",
-    label: "New Text Buffer",
+    label: "New Editor",
     group: "open",
     actionKey: "openEditor",
     menuPlacements: [{ category: "file", order: 40 }]
@@ -159,6 +160,25 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     menuPlacements: [{ category: "file", order: 80 }],
     palettePlacement: { order: 80 }
   },
+  // ── Edit ──────────────────────────────────────────────
+  {
+    id: "edit.copy_window_text",
+    label: "Copy Window Text",
+    group: "edit",
+    actionKey: "copyFocusedWindowText",
+    menuPlacements: [{ category: "edit", order: 10 }],
+    palettePlacement: { order: 200 },
+    contextMenu: { windowKinds: ["editor", "primer", "chat", "browser", "reader", "gallery", "inspector", "companion", "backrooms"], order: 30 }
+  },
+  {
+    id: "edit.export_window_text",
+    label: "Export Window Text...",
+    group: "edit",
+    actionKey: "exportFocusedWindowText",
+    menuPlacements: [{ category: "edit", order: 20 }],
+    palettePlacement: { order: 210 }
+  },
+  // ── Applications ─────────────────────────────────────
   {
     id: "browser.open_chrome",
     label: "Open Chrome Browser",

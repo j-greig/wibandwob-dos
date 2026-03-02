@@ -31,6 +31,8 @@ epics and stories should move toward.
    not runtime dependencies.
 8. Appearance is native to the app: semantic theme tokens first, renderer and
    external-theme adapters second.
+9. Menu layout stays semantically clean: `File` for file/workspace operations,
+   `Window` for focus/layout/workspace management, `Applications` for launchers.
 
 ## Reality Check
 
@@ -199,6 +201,31 @@ The target architecture favors `wibwob-agent-window.ts` plus
 `wibwob-agent-session.ts` for native chat/agent behavior and `terminal-windows`
 for real shell panes. The nested Pi terminal path and synthetic transcript chat
 path should be deleted, not preserved as first-class compatibility surfaces.
+
+## Menu Direction
+
+The current direction is intentionally closer to a Finder-style desktop shell:
+
+- `File` holds file creation/open/save and workspace load/save
+- `Edit` remains as a placeholder bucket for future edit operations such as
+  undo/find/clipboard
+- `View` holds meta views such as palette, inspector, and document reading
+- `Window` holds focus/layout and workspace-manager behavior
+- `Applications` is the primary launcher surface for app windows
+
+Default rule:
+
+- one command appears in one top-level menu
+- do not duplicate launchers across `File`, `Window`, and `Applications`
+- if a command needs to appear elsewhere, treat that as an exception that must
+  be justified in the command metadata, not the default
+
+Naming rule:
+
+- `Document Reader` means local file/markdown reading
+- `Chrome Browser` means real web browsing/extraction
+
+Avoid generic `Browser` labels that collapse those two surfaces together.
 
 ## File Responsibilities
 

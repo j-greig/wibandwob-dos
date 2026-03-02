@@ -1220,6 +1220,50 @@ export class TsTuiMvpApp {
     );
   }
 
+  private copyFocusedWindowText(): void {
+    const focused = this.windowManager.getFocusedWindow();
+    if (!focused) {
+      this.overlays.flash("No focused window.");
+      return;
+    }
+    const text = this.windowManager.captureText(focused.id);
+    if (!text) {
+      this.overlays.flash("No text to copy from this window.");
+      return;
+    }
+    try {
+      const { execSync } = require("node:child_process");
+      if (process.platform === "darwin") {
+        execSync("pbcopy", { input: text });
+      } else {
+        execSync("xclip -selection clipboard", { input: text });
+      }
+      this.overlays.flash(`Copied ${text.split("\n").length} lines to clipboard.`);
+    } catch {
+      this.overlays.flash("Clipboard not available.");
+    }
+  }
+
+  private exportFocusedWindowText(): void {
+    const focused = this.windowManager.getFocusedWindow();
+    if (!focused) {
+      this.overlays.flash("No focused window.");
+      return;
+    }
+    const text = this.windowManager.captureText(focused.id);
+    if (!text) {
+      this.overlays.flash("No text to export from this window.");
+      return;
+    }
+    const capturesDir = path.join(SPIKE_ROOT, "scratch", "captures");
+    fs.mkdirSync(capturesDir, { recursive: true });
+    const slug = focused.title.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 40);
+    const fileName = `${slug}_${Date.now()}.txt`;
+    const filePath = path.join(capturesDir, fileName);
+    fs.writeFileSync(filePath, text, "utf8");
+    this.overlays.flash(`Exported to ${fileName}`);
+  }
+
   private saveEditor(window: WindowRecord): void {
     saveEditorWindow({
       window,
@@ -1481,6 +1525,8 @@ export class TsTuiMvpApp {
       saveAsFocusedEditor: () => this.saveAsFocusedEditor(),
       saveWorkspaceAs: () => this.promptForWorkspaceSave(),
       loadWorkspacePrompt: () => this.promptForWorkspaceLoad(),
+      copyFocusedWindowText: () => this.copyFocusedWindowText(),
+      exportFocusedWindowText: () => this.exportFocusedWindowText(),
       openArtWindow: () => this.openArtWindow(),
       openWibWobAgent: () => this.openWibWobAgentWindow(),
       quit: () => this.destroy(),

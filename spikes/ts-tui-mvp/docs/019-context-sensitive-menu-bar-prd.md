@@ -30,9 +30,11 @@ app menu, Window) but their contents change.
 The current spike has a good command catalog and registry, but no concept of
 command context. Every command is globally visible at all times.
 
-There is also launcher sprawl. Desktop/application launchers are spread across
-File, Window, and Applications. The target experience should consolidate those into
-one Finder/Desktop-style launcher area instead of scattering them.
+There was also launcher sprawl. Desktop/application launchers were spread across
+File, Window, and Applications. The current spike has started to clean this up:
+`Applications` is now the primary launcher area, `File` is mostly file/workspace
+operations, and `Window` is mostly focus/layout/workspace management. That is the
+right direction and should be preserved.
 
 ## Guiding Constraint
 
@@ -155,6 +157,16 @@ Desktop-mode rule for Phase 1:
 - collapse application launchers into one desktop/Finder-style launcher section
 - derive that launcher section from the command registry, not from bespoke menu
   code
+- keep one-command-one-menu as the default rule; avoid duplicate top-level
+  placements unless there is a very strong UI reason
+
+Current live naming cleanup worth preserving:
+
+- `Document Reader` = local text/markdown reader
+- `Chrome Browser` = real web browser / extraction surface
+
+Those names should stay distinct to avoid drifting back into generic `Browser`
+labels that confuse file reading with web navigation.
 
 #### MenuQueryContext: focus + selection + state
 

@@ -14,6 +14,8 @@ export interface AppMenuActions {
   saveAsFocusedEditor: () => void;
   saveWorkspaceAs: () => void;
   loadWorkspacePrompt: () => void;
+  copyFocusedWindowText: () => void;
+  exportFocusedWindowText: () => void;
   openArtWindow: () => void;
   openWibWobAgent: () => void;
   quit: () => void;

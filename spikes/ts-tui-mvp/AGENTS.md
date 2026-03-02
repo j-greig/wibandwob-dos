@@ -75,6 +75,11 @@ Prefer the most elegant correct implementation, not the fastest pile of special 
   - source of truth for user-visible command metadata
   - owns command ids, groups, menu placements, palette placement, and surface visibility
   - each command defined ONCE with menuPlacements[] for cross-menu appearance
+  - current menu intent:
+    - `File` = file/workspace operations
+    - `View` = meta views such as palette/inspector/document reader
+    - `Window` = focus/layout/workspace management
+    - `Applications` = app launchers
 - `src/core/command-registry.ts`
   - execution-capable adapter over the catalog
   - builds menus, builds palette entries, lists commands for API/agent use, and runs commands by id
@@ -212,8 +217,13 @@ These rules are strict. Treat violations as bugs, not style nits.
 - If you add a new user-visible command, add it to the command catalog first instead of hand-wiring menu and palette entries in multiple places.
 - Use explicit spaced `order` values (`0, 10, 20...`) so later insertions do not force renumbering.
 - Use `menuPlacements` for commands that appear in more than one menu. Do not duplicate those as separate command ids just to hit File/View/Window/Applications.
+- Default to one top-level menu placement per command. Duplicate placements
+  should be rare exceptions, not normal practice.
 - `group` is for logical clustering and future separators/adapters.
 - `actionKey` must point at an `AppMenuActions` entry implemented by `app-controller.ts`.
+- Preserve the naming split:
+  - `Document Reader` = local file/markdown reader
+  - `Chrome Browser` = real web browser/extraction surface
 - Current registry phase covers menu/palette projection plus generic control API command discovery/execution.
 - `Wib&Wob Agent` also has registry-backed `tui_list_commands` and `tui_run_command` tools now.
 - Agent guidance should prefer registry commands first for high-level actions and use low-level window tools only for precise manipulation.

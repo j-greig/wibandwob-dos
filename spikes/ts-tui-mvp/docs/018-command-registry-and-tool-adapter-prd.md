@@ -163,6 +163,13 @@ Phase 1 has landed in the spike:
 - menus and command palette now derive from a shared command catalog
 - the catalog now carries canonical command ids, groups, multi-menu placements,
   palette placement, surface visibility, and action keys
+- top-level menu intent is cleaner now:
+  - `File` = open/save/workspace operations
+  - `View` = meta views such as palette/inspector/reader
+  - `Window` = focus/layout/workspace management
+  - `Applications` = app launchers
+- duplicate menu placements were intentionally removed in the latest menu pass;
+  each live command now appears in exactly one top-level menu
 - a real registry now projects that catalog into:
   - menus
   - command palette
@@ -188,6 +195,13 @@ into:
 
 The remaining work is cleanup, deeper migration, and MCP projection, not
 proving the basic registry direction.
+
+Recent concrete examples from the live catalog:
+
+- `Browse Primers` now lives under `Applications`, not `File`
+- `Workspace Manager` now lives under `Window`, not `Applications`
+- `Document Reader` is the renamed local file/markdown reader, distinct from
+  the real `Chrome Browser`
 
 ## Core design
 

@@ -147,6 +147,11 @@ If a doc does not clearly strengthen one of those four buckets, it is probably n
 - The TS TUI spike has moved well beyond a tiny MVP.
 - Before much more feature or architecture work lands, split ongoing TS TUI work onto its own fresh spike branch.
 - Treat that branch cut as the start of the next phase, not as a new feature.
+- The latest menu regrouping is the intended direction:
+  - `Applications` is the launcher area
+  - `File` is file/workspace oriented
+  - `Window` is focus/layout/workspace management
+  - `Document Reader` and `Chrome Browser` are intentionally distinct
 - The next workspace-system cleanup should make app boot restore `default.json`
   (and later optionally a last-used-workspace pointer) before falling back to
   opening Scramble.
