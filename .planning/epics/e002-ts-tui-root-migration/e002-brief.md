@@ -1,11 +1,11 @@
 ---
-Status: in-progress
+Status: done
 Type: epic
-GitHub issue: —
-PR: —
+GitHub issue: -
+PR: -
 ---
 
-# E002 — TS TUI Root Migration
+# E002 - TS TUI Root Migration
 
 ## TL;DR
 
@@ -31,27 +31,27 @@ Make the TS TUI app the primary repo runtime layout:
 
 ## Acceptance Criteria
 
-- [ ] AC-1: Repo root matches the target TS TUI layout closely enough that
+- [x] AC-1: Repo root matches the target TS TUI layout closely enough that
   `spikes/ts-tui-mvp` is no longer the app root-in-practice.
   Test: `bun run typecheck` succeeds from repo root; `src/`, `package.json`,
   `bun.lock`, and TS config are rooted at `/Users/james/Repos/wibandwob-dos/`.
 
-- [ ] AC-2: Root canon docs and instructions point to the TS TUI architecture,
+- [x] AC-2: Root canon docs and instructions point to the TS TUI architecture,
   not the old mixed repo shape.
   Test: root `README.md` and `AGENTS.md` describe the TS TUI as primary app;
   removed/stale instructions are absent.
 
-- [ ] AC-3: Legacy root clutter is either retained intentionally, rewritten,
+- [x] AC-3: Legacy root clutter is either retained intentionally, rewritten,
   or pruned per the disposition rules in `020`.
   Test: migration summary lists every top-level retained, moved, rewritten, or
   deleted item; no ambiguous leftovers remain in the working set.
 
-- [ ] AC-4: Active planning for this move lives under `.planning/epics/e002-*`
+- [x] AC-4: Active planning for this move lives under `.planning/epics/e002-*`
   rather than in ad hoc spike notes.
   Test: this epic plus the first story brief are sufficient to execute the
-  first migration slice without consulting a separate “prompt chat”.
+  first migration slice without consulting a separate "prompt chat".
 
 ## Planned First Story
 
-- [ ] S01 — Lift TS TUI to root without changing behavior
+- [x] S01 — Lift TS TUI to root without changing behavior
 

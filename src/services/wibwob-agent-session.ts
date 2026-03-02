@@ -190,13 +190,29 @@ interface AgentSnapshot {
 type Listener = (snapshot: AgentSnapshot) => void;
 
 function loadBasePrompt(): string {
+  // Load all .md files from the wibwob-prompts module, sorted by filename.
+  // This lets identity.md and other fragments live alongside the machinery file
+  // and be rewritten independently without touching the loader.
+  const promptsDir = nodePath.join(REPO_ROOT, "modules-private", "wibwob-prompts");
   try {
-    return fs.readFileSync(SPIKE_PI_APPEND_SYSTEM_PATH, "utf8").trim();
+    const files = fs.readdirSync(promptsDir)
+      .filter(f => f.endsWith(".md"))
+      .sort();
+    if (files.length === 0) throw new Error("no prompt files");
+    return files
+      .map(f => fs.readFileSync(nodePath.join(promptsDir, f), "utf8").trim())
+      .filter(Boolean)
+      .join("\n\n");
   } catch {
-    return [
-      "You are Wib & Wob, a two-voice assistant inside WibWob-DOS.",
-      "Keep replies concise, helpful, and written as Wib: / Wob: dialog when natural."
-    ].join("\n\n");
+    // Fallback to the legacy single-file path
+    try {
+      return fs.readFileSync(SPIKE_PI_APPEND_SYSTEM_PATH, "utf8").trim();
+    } catch {
+      return [
+        "You are Wib & Wob, a two-voice assistant inside WibWob-DOS.",
+        "Keep replies concise, helpful, and written as Wib: / Wob: dialog when natural."
+      ].join("\n\n");
+    }
   }
 }
 
