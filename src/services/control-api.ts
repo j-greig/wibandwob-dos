@@ -44,6 +44,7 @@ interface ControlApiHandlers {
   openBrowserReader: (filePath?: string) => void;
   openFigletBanner: (text?: string, font?: string) => void;
   openArtWindow: () => void;
+  openMonsterCam: () => void;
   openWibWobAgent: () => void;
   openCompanionWindow: () => void;
   openWorkspaceManager: () => void;
@@ -144,6 +145,7 @@ export class ControlApiService {
           "POST /view/browser-reader/open",
           "POST /view/figlet/open",
           "POST /view/art/open",
+          "POST /view/monster-cam/open",
           "POST /view/wibwob-agent/open",
           "POST /view/companion/open",
           "POST /view/workspace/open",
@@ -247,6 +249,10 @@ export class ControlApiService {
     }
     if (request.method === "POST" && url.pathname === "/view/art/open") {
       this.handlers.openArtWindow();
+      return Response.json({ ok: true });
+    }
+    if (request.method === "POST" && url.pathname === "/view/monster-cam/open") {
+      this.handlers.openMonsterCam();
       return Response.json({ ok: true });
     }
     if (request.method === "POST" && url.pathname === "/view/wibwob-agent/open") {

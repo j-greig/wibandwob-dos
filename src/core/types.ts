@@ -20,7 +20,8 @@ export type WindowKind =
   | "companion"
   | "workspace"
   | "palette"
-  | "inspector";
+  | "inspector"
+  | "monster-cam";
 
 export interface EditorState {
   widget: Box;
