@@ -1,0 +1,106 @@
+seed: 9537
+width: 276
+height: 74
+tick: 2000
+canvas_mode: false
+coverage: 0.014
+locked_cells: 0
+preset:
+  name: Erosion
+  substrate: contour
+  seeder:
+    seed_random:
+      density: 0.6
+  rules:
+  - die_isolate:
+      min_neighbours: 2
+  - erode:
+      p: 0.05
+  - smooth:
+      rounds: 1
+  tick_ms: 150
+  continuous: true
+rule_params_current:
+- die_isolate:
+    min_neighbours: 2
+- erode:
+    p: 0.05
+- smooth:
+    rounds: 1
+output_lines: 73
+
+# ── rendered output ──
+output: |
+                                                                                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                                                                     
+                                                                                                                                                                                                                           ╭────╮                                                    
+                                                  ╭───╮                                                                                                                                                                 ╭──╯    ╰╮                                                   
+                                                 ╭╯   ╰╮                                                                                                                                                             ╭──╯        │                                                   
+                                                ╭╯     ╰─╮                                                                                                                                                       ╭───╯          ╭╯                                                   
+                                                │        ╰╮                                                                                                                                                   ╭──╯              │                                                    
+                                                │         │                                                                                                                                                  ╭╯                ╭╯                                                    
+                                               ╭╯         │                                                                                                                                                 ╭╯                ╭╯                                                     
+                                               │          │                                                                                                                                                ╭╯                ╭╯                                                      
+                                               │         ╭╯                                                                                                                                                │               ╭─╯                                                       
+                                               │       ╭─╯                                                                                                                                                 │             ╭─╯                                                         
+                                               ╰╮     ╭╯                                                                                                                                                   │           ╭─╯                                                           
+                                                ╰─────╯                                                                                                                                                    │          ╭╯                                                             
+                                                                                                                                                                                                           │         ╭╯                                                              
+                                                                                                                                                                                                           ╰╮        │                                                               
+                                                                                                                                                                                                            │       ╭╯                                                               
+                                                                                                                                                                                                            ╰╮     ╭╯                                                                
+                                                                                                                                                                                                             ╰╮   ╭╯                                                                 
+                                                                                                                                                                                                              ╰╮ ╭╯                                                                  
+                                                                                                                                                                                                               ╰─╯                                                                   
+                                                                                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                                                                     
