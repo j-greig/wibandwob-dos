@@ -127,12 +127,12 @@ export class WindowManager implements WindowFacade {
     const resizeGrip = blessed.box({
       parent: frame,
       bottom: 0,
-      right: 2,
+      right: 0,
       width: 2,
       height: 1,
       mouse: true,
       clickable: true,
-      content: "+>",
+      content: "─>",
       style: theme().resizeGrip
     });
 
