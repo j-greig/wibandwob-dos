@@ -56,7 +56,6 @@ Prefer the most elegant correct implementation, not the fastest pile of special 
 
 - Runtime: Bun
 - Renderer: `blessed`
-- PTY backend: `@skitee3000/bun-pty`
 - Main app entry: `/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/src/app.ts`
 
 ## Architecture
@@ -111,14 +110,13 @@ Prefer the most elegant correct implementation, not the fastest pile of special 
   - agent-facing TUI tools, including registry-backed `tui_list_commands` and `tui_run_command`
   - all tools use TuiToolContext which wraps WindowFacade
 - `src/services/wibwob-agent-session.ts`
-  - unified session for both chat (mode="chat") and agent (mode="agent")
-  - agent mode: TUI tools + jailed coding tools, desktop state injection via transformContext
-  - chat mode: no tools, no state injection, stripped system prompt
+  - native agent session for the in-app Wib&Wob Agent surface
+  - owns model selection, tool wiring, and desktop state injection via transformContext
   - 7 jailed coding tools (read, write, edit, bash, grep, find, ls) scoped to REPO_ROOT
 - `src/windows/wibwob-agent-window.ts`
-  - shared window factory for both Wib&Wob Chat and Wib&Wob Agent
+  - native agent window factory
   - themed tool display using wibwob-tv colour palette
-  - reports appType "wibwob-agent" or "wibwob-chat-v2" based on session mode
+  - reports appType `wibwob-agent`
 - `src/services/file-actions.ts`
   - file I/O: save, save-as, writeEditorWindow (returns boolean)
 
@@ -253,7 +251,7 @@ The safe rule is:
   - z-order / resize / drag
   - typed metadata for agent-visible state
 
-If we experiment with a PTY-hosted interactive pi session inside a terminal window, treat it as an experiment, not the architectural foundation. The foundation should still be service-backed and state-aware.
+If terminal-hosted pi work ever returns, treat it as an experiment, not the architectural foundation. The foundation should still be service-backed and state-aware.
 
 Run commands:
 
@@ -276,8 +274,7 @@ The spike currently includes:
 - primer browser window
 - shared browser/openers for workspace and file selection
 - animated generative art window
-- experimental shell window backed by Bun PTY
-- native `Wib&Wob Chat` and `Wib&Wob Agent` — both backed by WibWobAgentSession (mode: "chat" or "agent"). Agent mode has 15 tools (8 TUI + 7 jailed coding). Chat mode has no tools. One session class, one window factory.
+- native `Wib&Wob Agent` backed by `WibWobAgentSession`
 - Backrooms TV with real/fake-live modes and per-run primer roots
 - FIGlet window backed by the shared font catalogue and real `figlet` CLI
 
@@ -288,7 +285,7 @@ The spike has a local HTTP control surface intended for autonomous debug loops a
 Primary use:
 - open windows
 - inspect live desktop/window state
-- send input to terminal windows
+- send input to agent/editor windows
 - export text captures to `scratch`
 - compare captures while iterating on code
 
@@ -310,8 +307,6 @@ Current control endpoints:
 - `POST /view/browser-reader/open`
 - `POST /view/figlet/open`
 - `POST /view/art/open`
-- `POST /view/chat/open`
-- `POST /view/wibwob-chat/open`
 - `POST /view/wibwob-agent/open`
 - `POST /view/companion/open`
 - `POST /view/workspace/open`
@@ -336,12 +331,12 @@ Control parity rule:
 
 Convenience:
 - use `scripts/window-state-parity-loop.sh` to open a representative set of existing window families through the control API and verify their `appType` state surface
-- use `scripts/wibwob-chat-v2-smoke.sh` to open the native `pi-agent-core` chat surface, send one prompt, and export both pane and text captures
+- use the control API plus exported captures to smoke the native agent surface and window-state parity after substantial UI changes
 
-Current loop for native chat debugging:
+Current loop for native agent debugging:
 1. launch the spike
-2. `POST /view/wibwob-chat/open`
-3. read `/state` again to find the `wibwob-chat-v2` window id
+2. `POST /view/wibwob-agent/open`
+3. read `/state` again to find the `wibwob-agent` window id
 4. `POST /windows/input` with the prompt text and a trailing carriage return
 5. wait for streaming to settle
 6. `POST /windows/text/export` to persist a text capture
@@ -379,7 +374,7 @@ Important rule:
 
 5. Keep Bun-first assumptions.
    - Do not reintroduce Node-only runtime assumptions unless explicitly necessary.
-   - `node-pty` previously failed under Bun with `posix_spawnp failed`; the spike uses `@skitee3000/bun-pty` now.
+   - If terminal work returns later, treat PTY/runtime choice as a fresh integration decision rather than reviving removed spike code.
 
 ## Editing Guidance
 
@@ -423,7 +418,7 @@ Manual smoke targets:
 - type in the editor
 - drag a window
 - close a window
-- open Wib&Wob Chat or Wib&Wob Agent and verify input still works
+- open Wib&Wob Agent and verify input still works
 
 ## Known Rough Edges
 
@@ -436,13 +431,12 @@ Manual smoke targets:
   native appearance service with `system` / `light` / `dark` plus semantic theme
   tokens compiled into blessed styles.
 - Async workspace restore race: getLastWindow() after promise-returning openers can miss the window.
-- wibwob-chat-v2 restore does not yet hydrate transcript/draft into the new agent-backed session.
 - Chrome browser service has pre-existing type errors (missing @types/jsdom, @types/turndown-plugin-gfm).
 
 ## Completed Architecture Work
 
 - WindowFacade: 11-method interface, all 4 consumers collapsed (workspace restore, agent tools, control API, controller). ~80 lines deleted from controller.
-- Chat collapse: wibwob-chat-window.ts and wibwob-chat-service.ts deleted (613 lines). Both chat types share one session class and one window factory.
+- Chat collapse: the standalone chat surface was removed and agent work is now centered on the native Wib&Wob Agent path.
 - Command catalog: single source of truth for all menu/palette commands. menuPlacements[] eliminates triple-entry duplication.
 - Command registry: execution layer with list/run, consumed by control API and agent tools.
 - Context menus: shared desktop/window commands now come from the command registry instead of a second hard-coded command list.
@@ -455,7 +449,7 @@ Good next slices:
 1. async workspace restore race fix (getLastWindow after promise openers)
 2. workspace startup unification (`default.json` restore first, Scramble fallback second)
 3. appearance/theme subsystem (`appearance-service`, semantic tokens, blessed resolver)
-4. wibwob-chat-v2 restore hydration (transcript/draft into agent session)
+4. agent window restore hydration and deeper session/state parity
 5. WindowRecord discriminated union (replace bag of optionals)
 6. resize handles and stronger window management
 7. screenshot/export support for comparing layouts to WibWob-DOS captures

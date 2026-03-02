@@ -90,7 +90,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     label: "Browse Primers",
     group: "browse",
     actionKey: "browsePrimers",
-    menuPlacements: [{ category: "file", order: 0 }]
+    menuPlacements: [{ category: "applications", order: 25 }]
   },
   {
     id: "file.open_file_manager",
@@ -277,7 +277,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
   },
   {
     id: "reader.open",
-    label: "Open Browser",
+    label: "Document Reader",
     group: "surface",
     actionKey: "openBrowserReader",
     menuPlacements: [{ category: "applications", order: 50 }],
@@ -320,7 +320,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     label: "Workspace Manager",
     group: "surface",
     actionKey: "openWorkspaceManager",
-    menuPlacements: [{ category: "applications", order: 140 }],
+    menuPlacements: [{ category: "window", order: 60 }],
     palettePlacement: { order: 120 },
     contextMenu: { desktop: true, order: 40 }
   },

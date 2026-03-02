@@ -25,20 +25,14 @@ This is the agent-friendly triage layer. Not every doc should become an epic.
 
 These define the substrate. Work here first.
 
-- `BUILD-ORDER-FINAL.md`
-  - sequencing canon for the rebuild
 - `overview.md`
   - high-level parcel map P1-P7
-- `002-architecture-plan-content-sizing-layout.md`
-  - measurement, chrome, state, layout architecture
 - `015-window-manager-reference-and-repair-plan.md`
   - current window-manager stabilization work
 - `018-command-registry-and-tool-adapter-prd.md`
   - command registry and adapter substrate
 - `020-target-architecture.md`
   - canonical end-state TS app structure and module ownership
-- `spk-agent-window-enhancement.md`
-  - native agent window direction
 - `refactor-epoch-plan.md`
   - canonical refactor tracker
 
@@ -47,6 +41,7 @@ These define the substrate. Work here first.
 Important, but should build on a stable shell.
 
 - `001-primer-dimensions-and-agent-sizing.md`
+- `002-architecture-plan-content-sizing-layout.md`
 - `004-window-type-registry-and-factories.md`
 - `006-command-registry-and-ipc-protocol.md`
 - `007-terminal-emulator.md`
@@ -84,8 +79,10 @@ Use for validation and audit, not as the main execution plan.
 - `window-facade-review.md`
 - `window-facade-phase1-review.md`
 - `window-facade-full-review.md`
+- `spk-agent-window-enhancement.md`
 - `003-document-plan.md`
 - `BUILD-ORDER.md`
+- `BUILD-ORDER-FINAL.md`
 - `INDEX.md` (deleted — superseded by this file)
 
 ## Retire From Active Working Set
@@ -101,13 +98,15 @@ shaping day-to-day planning.
   - superseded by the native agent/chat path
 - `017-framework-direction-and-today-plan.md`
   - useful historical rationale, but `020-target-architecture.md` is now the canonical direction
+- `BUILD-ORDER-FINAL.md`
+  - useful sequencing history, but no longer canonical after the recent surface removals and target-architecture reset
 
 Likely next retirement candidates after one more pass:
 
-- `002-architecture-plan-content-sizing-layout.md`
-  - much of its architectural intent is now absorbed into `020`
 - `terminal-native-research.md`
   - still good background, but no longer execution-driving
+- `spk-agent-window-enhancement.md`
+  - still valuable rationale, but now drifting because the standalone chat app has been removed
 - review docs for already-fixed slices
   - keep as evidence, not as current planning inputs
 
@@ -133,7 +132,7 @@ Recommended current epic buckets:
    - context-sensitive menus
    - future MCP projection
 3. `Agent Surface`
-   - Wib&Wob Chat / Agent
+   - Wib&Wob Agent
    - tool adapters
    - state-aware desktop control
 4. `Content Surfaces`
@@ -187,7 +186,7 @@ These live outside the spike dir but directly drive spike work:
 | `018-command-registry-and-tool-adapter-prd.md` | PRD for define-once commands projected into menu, palette, API, agent, and later MCP. Core registry path is proven; MCP/cleanup remain. | `partial` |
 | `019-context-sensitive-menu-bar-prd.md` | PRD for macOS-style context-sensitive menus. Context model, enabled predicates, and context-menu alignment are refined; implementation remains partial. | `partial` |
 | `020-target-architecture.md` | Canonical end-state architecture for the TS TUI app: source tree, subsystem boundaries, file responsibilities, startup workspace semantics, native appearance/theme rules, and ASCII animation support. | `active` |
-| `BUILD-ORDER-FINAL.md` | Preferred sequencing for the broader TS rebuild. | `active` |
+| `BUILD-ORDER-FINAL.md` | Preferred sequencing for the broader TS rebuild. Still useful, but no longer canonical after recent removals and the target-architecture reset. | `retired` |
 | `BUILD-ORDER.md` | Older build order document superseded by the final version. | `retired` |
 | `INDEX.md` | Deleted. Superseded by this file (`000-docs-overview.md`). | `deleted` |
 | `chat-collapse-review.md` | Review of chat collapse. Found identity + prompt regressions — both fixed (appType, stripped prompts). | `review` |
@@ -195,7 +194,7 @@ These live outside the spike dir but directly drive spike work:
 | `editor-save-review.md` | Review of editor save. 4 bugs found, all fixed: dirty title leak, agent write bypass, non-atomic Save As, unresilient writes. | `review` |
 | `overview.md` | High-level parcel map P1-P7 for the full TS rebuild. | `reference` |
 | `refactor-epoch-plan.md` | Canonical tracker for the spike refactor/reorganization epochs. Epoch 1 done (2878->2050 lines). Epoch 2: WindowFacade landed, chat collapsed, command registry landed, content measurement unified. | `active` |
-| `spk-agent-window-enhancement.md` | Plan and rationale for turning chat into a real agent window with TUI tools. Useful and partly landed, but still mixed with review corrections. | `partial` |
+| `spk-agent-window-enhancement.md` | Plan and rationale for the native agent window/tool path. Still useful, but parts of the old chat framing are now stale. | `stale` |
 | `terminal-native-research.md` | Research note on terminal-native TypeScript TUI options and tradeoffs. | `reference` |
 | `wibwob-chat-v2-plan.md` | Native Wib&Wob Chat v2 plan. Kept only as historical slice notes; superseded by the native agent/chat path. | `retired` |
 | `window-facade-full-review.md` | Full review of Phases 1-5. Capture route fix applied. Remaining: async restore race, old method aliases. | `review` |
