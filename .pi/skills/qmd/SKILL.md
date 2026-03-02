@@ -120,30 +120,8 @@ curl -X POST http://localhost:8181/query \
 
 ## Bootstrap
 
-```bash
-# install
-npm install -g @tobilu/qmd
+If `qmd status` fails or collections are missing, run `bash scripts/bootstrap.sh`.
 
-# check state (run first — may already be configured)
-qmd status
-
-# project collections (recreate if missing)
-qmd collection add /Users/james/Repos/wibandwob-dos/.planning --name wwdos-planning --mask "**/*.md"
-qmd collection add /Users/james/Repos/wibandwob-heartbeat/memories --name ww-memories --mask "**/*.md"
-
-# re-index after file changes
-qmd update
-
-# embeddings (vec/hyde/query modes only — skip on CPU-only/old hardware)
-qmd embed
-
-# nuke and rebuild
-qmd cleanup  # removes cache + orphans, vacuums DB
-```
-
-Paths: config `~/.config/qmd/index.yml`, index `~/.cache/qmd/index.sqlite`, models `~/.cache/qmd/models/`.
-
-`qmd search` (BM25) works immediately after indexing — no embeddings required.
-`qmd query` / `vec` / `hyde` require `qmd embed` to have run.
-
-Cross-collection search: omit `-c` to search all, or pass multiple `-c` flags (`-c wwdos-planning -c ww-memories`).
+`qmd search` (BM25) works immediately — no embeddings needed.
+`qmd query`/`vec`/`hyde` require `qmd embed` (needs GPU or patience on CPU).
+Omit `-c` to search all collections, or pass multiple `-c` flags.
