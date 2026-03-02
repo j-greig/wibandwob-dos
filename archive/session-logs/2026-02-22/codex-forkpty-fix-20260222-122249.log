@@ -1,7 +1,0 @@
-error: unexpected argument '--writable-root' found
-
-  tip: to pass '--writable-root' as a value, use '-- --writable-root'
-
-Usage: codex exec --cd <DIR> --output-last-message <FILE> [PROMPT]
-
-For more information, try '--help'.

@@ -1,7 +1,0 @@
-error: unexpected argument '--approval' found
-
-  tip: to pass '--approval' as a value, use '-- --approval'
-
-Usage: codex exec --cd <DIR> --output-last-message <FILE> [PROMPT]
-
-For more information, try '--help'.

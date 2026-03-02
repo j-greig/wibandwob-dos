@@ -202,6 +202,252 @@ The target architecture favors `wibwob-agent-window.ts` plus
 for real shell panes. The nested Pi terminal path and synthetic transcript chat
 path should be deleted, not preserved as first-class compatibility surfaces.
 
+## Legacy Repo-Root Scripts Disposition
+
+The repo-root `scripts/` folder is mostly legacy C++/Python operational glue.
+The future TS app should not inherit that folder wholesale.
+
+Target rule:
+
+- TS app startup/dev/test flows should live in:
+  - `package.json` Bun scripts for common entry points
+  - `spikes/ts-tui-mvp/scripts/` for spike-local harnesses and smoke loops
+  - future `tools/` or `scripts/` inside the new TS repo only when a task is
+    clearly app-owned and cannot live as a Bun script
+- do not carry forward repo-root shell/python helpers just because they exist
+
+Disposition of current repo-root scripts:
+
+- `scripts/dev-start.sh`
+  - legacy C++ TUI + Python API launcher
+  - do not carry into the new TS repo
+  - replace with Bun scripts such as `bun run dev`, `bun run start`, and
+    optional TS-native smoke wrappers
+- `scripts/dev-stop.sh`
+  - legacy C++ stop helper
+  - do not carry into the new TS repo
+- `scripts/tmux-launch.sh`
+  - legacy C++/API tmux launcher
+  - do not carry into the new TS repo
+  - if multi-pane harnessing is still needed, rebuild it as a TS-spike-local
+    script near the app, not as inherited repo-root canon
+- `scripts/workspace_snapshot.py`
+  - legacy API/SVG snapshot helper
+  - do not carry as-is
+  - reimplement only if the TS app still needs structured exports, ideally in
+    TypeScript/Bun
+- `scripts/snap.sh`
+  - legacy wrapper around `workspace_snapshot.py` and old API screenshot route
+  - do not carry as-is
+- `scripts/parity-check.py`
+  - C++ workspace parity checker
+  - does not belong in the TS repo
+- `scripts/init-submodules.sh`
+  - only keep if the new TS repo still depends on git submodules
+  - otherwise delete
+- `scripts/sprite-setup.sh`
+  - deployment/provisioning helper for the legacy hosted app
+  - keep only if the deployment target survives and the new TS app still uses
+    Sprites in that exact form
+- `scripts/sprite-user-session.sh`
+  - legacy ttyd/session entrypoint for Sprites-hosted C++ app
+  - do not carry unless the new runtime keeps the same hosting model
+- `scripts/stamp.sh`
+  - legacy gallery/arrangement exploration helper
+  - do not carry into the new TS repo
+
+Short version:
+
+- for the TS app itself, the answer is almost always "kill or rewrite"
+- prefer Bun `package.json` scripts first
+- prefer spike-local TS harnesses second
+- only keep repo-root shell/python scripts when they are genuinely repo-wide
+  operational tooling and still used by the active product
+
+## Repo-Root Migration Disposition
+
+If `spikes/ts-tui-mvp` graduates into the repo root, the migration should be
+aggressively pruning, not conservatively hoarding. Missing something is cheaper
+than carrying legacy clutter forever because git history and tags can recover
+deleted files.
+
+Default bias:
+
+- keep only what has a clear active role in the TS app or repo governance
+- rewrite rather than inherit when a folder is tightly coupled to the C++/Python
+  runtime
+- treat old operational glue as disposable unless proven otherwise
+- fold still-useful planning/review material into the canonical target docs, then
+  retire or delete the source documents instead of keeping permanent duplicates
+
+### Keep at repo root
+
+- dot-directories and dot-config already treated as persistent repo context:
+  - `.agents/`
+  - `.claude/`
+  - `.codex/`
+  - `.github/`
+  - `.pi/`
+  - `.planning/` (until explicitly replaced)
+  - `.zed/`
+  - `.zilla/`
+- `modules/`
+- `modules-private/`
+- `partykit/`
+- `vendor/` (initially; later audit per dependency)
+- `logs/` (but respec it)
+- `scratch/` (but respec it)
+- `screenshots/` (but classify it)
+- `exports/` (but classify it)
+
+### Move to become the new root canon
+
+When the TS spike becomes the effective app root, these should be replaced by
+their TS equivalents:
+
+- `README.md`
+- `AGENTS.md`
+- Bun/TS root config:
+  - `package.json`
+  - lockfile
+  - `tsconfig*.json`
+  - any Bun-native app config needed by the new root
+
+### Delete after replacement
+
+- `CLAUDE.md`
+  - delete once the new root `AGENTS.md` / docs cover the TS app canon
+- old top-level docs that only describe the C++ runtime once replacement docs
+  exist at root
+- repo-root startup docs that only point at the old C++/Python stack
+
+### Rewrite or re-spec before carrying forward
+
+These folders are too entangled with the old runtime to inherit blindly:
+
+#### `tools/`
+
+Split into:
+
+- keep as reference only:
+  - `tools/api_server/`
+  - `tools/room/`
+  - `tools/monitor/`
+  - `tools/agent_mailbox/`
+  - `tools/smoke_parade.py`
+  - `tools/generative_*.py`
+  - `tools/arrange.py`
+- rewrite if still needed by the TS app:
+  - browser/content extraction helpers
+  - room/teleport orchestration
+  - screenshot/export tooling
+  - deployment hooks
+- delete if no clear TS owner emerges
+
+#### `tests/`
+
+Do not carry the current root `tests/` folder as-is.
+
+Target split:
+
+- TS-app tests live under the new root test strategy from this document
+- legacy C++/Python/API contract tests become:
+  - reference-only during migration, or
+  - deleted once their TS equivalent exists
+
+Aggressive default:
+
+- keep only tests that still validate an active cross-cutting contract
+- delete app-specific C++ contract tests once the TS app no longer depends on
+  that surface
+
+#### `logs/`
+
+Respec into explicit buckets:
+
+- runtime logs
+- smoke/verification artifacts
+- retained historical captures
+
+Do not let it remain an unstructured dumping ground.
+
+#### `scratch/`
+
+Keep as ephemeral local state only:
+
+- workspace defaults
+- state exports
+- text captures
+- transient debug artifacts
+
+No canonical source files should live here.
+
+#### `exports/`
+
+Needs one of two fates:
+
+- formalize as user-facing export output
+- or delete if it is just historical residue
+
+#### `screenshots/`
+
+Classify explicitly:
+
+- product/media assets
+- verification artifacts
+- historical captures
+
+If mixed, split it.
+
+#### `scripts/`
+
+Do not carry forward wholesale. See the dedicated script disposition section
+above. The TS app should prefer Bun scripts and local TS harnesses.
+
+#### `vendor/`
+
+Needs a second-pass dependency audit:
+
+- keep if still required by active runtime or near-term migration
+- keep as reference if useful but no longer runtime-critical
+- delete if tied only to the retired C++/Python stack
+
+### Likely delete early
+
+Unless a concrete owner re-claims them during migration:
+
+- repo-root shell helpers tied to the C++ app lifecycle
+- Python snapshot/export helpers tied to the old API server
+- gallery/arrangement exploration scripts tied to the retired runtime
+- old smoke wrappers that only exercise the legacy stack
+
+### First-class migration tasks
+
+Before promoting the TS app to root, explicitly plan:
+
+1. Root doc replacement
+   - replace root `README.md`
+   - replace root `AGENTS.md`
+   - delete root `CLAUDE.md`
+2. Root config replacement
+   - move Bun/TS config to root
+   - rewrite `.gitignore`
+   - rewrite `.gitmodules`
+3. Folder disposition audit
+   - `tools/`
+   - `tests/`
+   - `vendor/`
+   - `logs/`
+   - `scratch/`
+   - `screenshots/`
+   - `exports/`
+4. Reference-vs-runtime line
+   - explicitly mark what remains only for archaeology or migration reference
+5. Doc consolidation
+   - absorb useful material from older spike docs into the canonical target docs
+   - then retire or delete the source docs once their remaining value is purely
+     historical
+
 ## Menu Direction
 
 The current direction is intentionally closer to a Finder-style desktop shell:

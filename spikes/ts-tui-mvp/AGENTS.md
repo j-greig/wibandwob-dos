@@ -15,6 +15,8 @@ Doc triage rule:
 - prefer `active` and `partial` docs for current work
 - treat `reference` as background only
 - treat `retired` as archaeology only unless you are validating or backfilling something specific
+- when an older doc has been absorbed into a canonical active doc, prefer
+  retiring or deleting it over keeping two overlapping planning sources alive
 
 Current goals:
 - stay terminal-native
@@ -57,6 +59,12 @@ Prefer the most elegant correct implementation, not the fastest pile of special 
 - Runtime: Bun
 - Renderer: `blessed`
 - Main app entry: `/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/src/app.ts`
+- Prefer Bun/package.json scripts for app startup and common tasks.
+- Do not add new TS-app operational glue to repo-root `/scripts` by default.
+  Prefer:
+  - `package.json` scripts first
+  - `spikes/ts-tui-mvp/scripts/` for spike-local harnesses
+  - only use repo-root `/scripts` for truly repo-wide operational tooling
 
 ## Architecture
 

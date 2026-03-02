@@ -6,6 +6,8 @@ Keep this file updated when:
 - a new doc is added
 - a doc becomes stale, superseded, landed, or reference-only
 - a planning doc changes phase/status materially
+- useful content is consolidated into a canonical doc and the source doc becomes
+  eligible for retirement or deletion
 
 Status vocabulary:
 - `active` — still driving current work
@@ -119,6 +121,9 @@ Agent-friendly rule:
 - Tier 3 docs should usually become spikes or short investigations, not epics
 - Tier 4 docs stay parked unless the user explicitly reprioritizes them
 - review docs should produce concrete fix tickets, not stand alone as epics
+- when an older doc has been mined for its still-useful content, move that
+  content into the canonical active docs and retire the original instead of
+  keeping two live planning sources
 
 Recommended current epic buckets:
 
