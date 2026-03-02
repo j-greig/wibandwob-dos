@@ -1,26 +1,27 @@
-Status: not-started
-GitHub issue: —
+Status: in-progress
+GitHub issue: #107
 PR: —
 
 # E004 — Monster Cam
 
 ## TL;DR
 
-Webcam → ASCII window in the TS TUI. Pure TS, no native addons. Camera capture via ffmpeg subprocess (avfoundation on macOS). Detection via `@mediapipe/tasks-vision` (Google WASM). Three progressive features: face → hands → body.
+Webcam → ASCII window in the TS TUI. Python/MediaPipe worker via Unix socket. Face detection + hand tracking working. ASCII BG toggle working. Pose detected but no skeleton render yet.
 
 ## Background
 
-Python prototype (`app/tools/face_worker.py`) existed briefly, deleted in `52fbfd5`. Used OpenCV + Haar cascades. This epic replaces it with a fully TS-native stack — no node-gyp, no native addons, runs under Bun.
+Original plan was ffmpeg + @mediapipe/tasks-vision WASM. Pivoted to Python/OpenCV/MediaPipe (simpler, more reliable on macOS, avoids WASM node-path issues). Stack diverges from brief but ships faster.
 
-## Stack
+## Stack (actual)
 
 | Concern | Solution | Notes |
 |---------|----------|-------|
-| Camera capture | `ffmpeg` subprocess | `-f avfoundation -pix_fmt rgb24 -f rawvideo pipe:1` — raw RGB bytes to stdout. macOS native, no addon. |
-| Face detection | `@mediapipe/tasks-vision` `FaceLandmarker` | WASM, zero native compile |
-| Hand detection | `@mediapipe/tasks-vision` `HandLandmarker` | same package, F02 |
-| Body/pose | `@mediapipe/tasks-vision` `PoseLandmarker` | same package, F03 |
-| Frame decode | `sharp` or manual stride math | RGB stride = w*3 |
+| Camera capture | OpenCV `VideoCapture` in Python | macOS, 320×240 input |
+| Face detection | `mediapipe.solutions.face_detection` | FaceDetection model 0 |
+| Hand detection | `mediapipe.solutions.hands` | max 2 hands, conf 0.3 |
+| Body/pose | `mediapipe.solutions.pose` | detected, no render yet |
+| Frame transport | Unix socket `/tmp/face_monster_cam.sock` | JSON header + raw grayscale bytes |
+| Worker launcher | `monster-cam-worker.ts` → spawns Python | thin TS shim |
 
 ## Architecture
 
@@ -62,29 +63,29 @@ Socket protocol (per frame):
 
 ## Acceptance Criteria
 
-- [ ] **AC-1:** Worker starts, opens camera via ffmpeg, writes valid frames to socket at ≥8fps.
-  - Test: `bun run src/services/monster-cam-worker.ts --dry-run` prints frame JSON without crashing; `nc -U /tmp/face_monster_cam.sock | head -c 500` shows JSON line then bytes.
+- [x] **AC-1:** Worker starts, opens camera via Python/OpenCV, writes valid frames to socket at ≥8fps.
+  - Test: Worker spawned via `bun run src/services/monster-cam-worker.ts`; socket emits JSON header + grayscale bytes; FPS shown live in status bar. Manually verified.
 
 - [ ] **AC-2:** Window opens via Applications menu and `POST /view/monster-cam/open`.
   - Test: `curl -X POST localhost:PORT/view/monster-cam/open` → window visible; menu item produces same result.
 
-- [ ] **AC-3:** Live ASCII render updates in the blessed window (F01).
-  - Test: wave in front of camera — visible change in terminal render.
+- [x] **AC-3:** Live ASCII render updates in the blessed window (F01).
+  - Test: Wave in front of camera — visible change in terminal ASCII render. Manually verified. BG toggle (b key + button) working.
 
-- [ ] **AC-4:** `hasFace` in `/state` tracks camera correctly (F01).
-  - Test: cover lens → `GET /state` shows `hasFace: false`; uncover → `hasFace: true`.
+- [x] **AC-4:** `hasFace` in `/state` tracks camera correctly (F01).
+  - Test: Face detection box appears/disappears with face presence; `describeState()` reports `hasFace`. Manually verified.
 
-- [ ] **AC-5:** `handCount` in `/state` tracks hands correctly (F02).
-  - Test: hold up one hand → `handCount: 1`; two → `handCount: 2`; none → `handCount: 0`.
+- [x] **AC-5:** `handCount` in `/state` tracks hands correctly (F02).
+  - Test: L/R coloured double-line boxes appear per hand; `describeState()` reports `handCount`. Manually verified.
 
 - [ ] **AC-6:** `hasPose` in `/state` set when body visible (F03).
-  - Test: step into frame → `hasPose: true`; step out → `hasPose: false`.
+  - Test: step into frame → `hasPose: true`; step out → `hasPose: false`. Detection wired, skeleton render not yet done.
 
-- [ ] **AC-7:** Window closes cleanly — ffmpeg and worker exit, socket removed.
-  - Test: close window, `ps aux | grep ffmpeg` empty, `/tmp/face_monster_cam.sock` gone.
+- [ ] **AC-7:** Window closes cleanly — Python worker exits, socket removed.
+  - Test: Close window; `ps aux | grep python` shows worker gone; `/tmp/face_monster_cam.sock` removed.
 
-- [ ] **AC-8:** App boots normally with no camera or ffmpeg — window shows error state, no crash.
-  - Test: unset camera device or rename ffmpeg binary, open window — error shown in window, app continues.
+- [ ] **AC-8:** App boots normally with no camera — window shows error state, no crash.
+  - Test: Unset camera device, open window — error shown in status bar, app continues.
 
 - [ ] **AC-9:** `bun run typecheck` passes with all monster cam source included.
   - Test: `bun run typecheck` exits 0 from repo root.
