@@ -1,52 +1,38 @@
-# TS TUI MVP
+# WibWob-DOS
 
-TypeScript spike for a minimal WibWob-DOS-style desktop shell.
-
-## Scope
-
-- fullscreen terminal app
-- top menu bar with `File` and `Edit`
-- bottom status line
-- read-only primer viewer window
-- editable text window
-- experimental shell window backed by a pseudo-terminal
+Terminal-native TypeScript TUI desktop shell.
 
 ## Run
 
 ```bash
-cd /Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp
 bun install
-bun run dev
-```
-
-Direct run:
-
-```bash
-bun run src/app.ts
+bun run dev      # watch mode
+bun run start    # single run
 ```
 
 ## Controls
 
 - `Alt-F`: open File menu
 - `Alt-E`: open Edit menu
-- `Tab`: focus next window
-- `Shift-Tab`: focus previous window
+- `Tab` / `Shift-Tab`: cycle window focus
 - `Esc`: close menus or prompts
-- `Ctrl-Q`: quit app
+- `Ctrl-Q`: quit
 
-File menu:
+## Menu layout
 
-- `Open Primer...`: open a read-only text file in a viewer window
-- `Open Text File...`: open an editable text file
-- `New Text Buffer`: open a blank editor window
-- `Open Terminal`: open experimental shell window
+- `File`: file/workspace operations
+- `Edit`: future edit operations
+- `View`: palette, inspector, document reader
+- `Window`: focus, layout, workspace management
+- `Applications`: app launchers
 
-Text editor:
+## Typecheck
 
-- `Ctrl-S`: save to disk if the editor has a file path
+```bash
+bun run typecheck
+```
 
-Terminal window:
+## Architecture
 
-- experimental only
-- suitable for shell commands and line-oriented tools
-- full-screen terminal apps are not expected to render correctly yet
+See `docs/020-target-architecture.md` for the canonical end-state layout.
+See `docs/000-docs-overview.md` for the full doc inventory.

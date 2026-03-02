@@ -1,14 +1,14 @@
 # AGENTS.md
 
-This file is local guidance for agents working in `/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp`.
+This file is local guidance for agents working in `/Users/james/Repos/wibandwob-dos`.
 
 ## Purpose
 
-This spike is a terminal-native TypeScript MVP of a WibWob-DOS-style desktop shell.
+WibWob-DOS is a terminal-native TypeScript desktop shell.
 
 Canonical doc inventory:
 - `docs/000-docs-overview.md`
-  - update this whenever a spike doc is added or its status materially changes
+  - update this whenever a doc is added or its status materially changes
   - use this to decide which docs are live; do not assume every file in `docs/` is current
 
 Doc triage rule:
@@ -30,11 +30,11 @@ Current goals:
 Non-goals:
 - do not port all of Turbo Vision here
 - do not pretend this is already a full VT terminal emulator
-- do not pivot this spike toward Electrobun or webview rendering unless explicitly requested
+- do not pivot toward Electrobun or webview rendering unless explicitly requested
 
 ## Design Canon
 
-This spike exists partly to undo the duplication and verbosity that accumulated in the C++ app.
+This codebase exists partly to undo the duplication and verbosity that accumulated in the C++ app.
 
 The bar is:
 
@@ -60,13 +60,9 @@ Prefer the most elegant correct implementation, not the fastest pile of special 
 
 - Runtime: Bun
 - Renderer: `blessed`
-- Main app entry: `/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/src/app.ts`
+- Main app entry: `/Users/james/Repos/wibandwob-dos/src/app.ts`
 - Prefer Bun/package.json scripts for app startup and common tasks.
-- Do not add new TS-app operational glue to repo-root `/scripts` by default.
-  Prefer:
-  - `package.json` scripts first
-  - `spikes/ts-tui-mvp/scripts/` for spike-local harnesses
-  - only use repo-root `/scripts` for truly repo-wide operational tooling
+- Prefer `package.json` scripts first, `scripts/` for harnesses and operational tooling.
 
 ## Architecture
 
@@ -258,7 +254,7 @@ Do not introduce these:
 
 Current direction:
 
-- yes to using `pi-coding-agent` as an engine inside the TS spike
+- yes to using `pi-coding-agent` as an engine inside the app
 - no to letting vendor UI own the desktop/window-manager architecture
 
 The safe rule is:
@@ -283,7 +279,7 @@ bun run dev
 
 ## Current Behavior
 
-The spike currently includes:
+The app currently includes:
 - fullscreen terminal app shell
 - top menu bar
 - bottom status line
@@ -300,7 +296,7 @@ The spike currently includes:
 
 ## Control Loop
 
-The spike has a local HTTP control surface intended for autonomous debug loops and agent-driven validation.
+The app has a local HTTP control surface intended for autonomous debug loops and agent-driven validation.
 
 Primary use:
 - open windows
@@ -354,7 +350,7 @@ Convenience:
 - use the control API plus exported captures to smoke the native agent surface and window-state parity after substantial UI changes
 
 Current loop for native agent debugging:
-1. launch the spike
+1. launch the app
 2. `POST /view/wibwob-agent/open`
 3. read `/state` again to find the `wibwob-agent` window id
 4. `POST /windows/input` with the prompt text and a trailing carriage return
@@ -365,9 +361,9 @@ Current loop for native agent debugging:
 
 Scratch artifacts:
 - exported text captures:
-  - `/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/scratch/captures`
+  - `/Users/james/Repos/wibandwob-dos/scratch/captures`
 - desktop state JSON:
-  - `/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/scratch/app-state.json`
+  - `/Users/james/Repos/wibandwob-dos/scratch/app-state.json`
 
 Important rule:
 - when debugging repaint/rendering issues, trust exported text snapshots and state captures over screenshots alone
@@ -375,7 +371,7 @@ Important rule:
 
 ## Important Constraints
 
-1. Keep this spike pragmatic.
+1. Keep it pragmatic.
    - Prefer the smallest vertical slice that makes the terminal-native direction clearer.
    - Avoid speculative abstractions.
 
@@ -385,7 +381,7 @@ Important rule:
 
 3. Be honest about the terminal.
    - The live app currently has no in-app shell pane.
-   - Future terminal work is architectural/reference work, not a shipped surface in this spike.
+   - Future terminal work is architectural/reference work, not a shipped surface yet.
    - Do not claim embedded VT support unless it is reintroduced and actually works.
 
 4. Prefer custom simple behavior over broken widget magic.
@@ -394,11 +390,11 @@ Important rule:
 
 5. Keep Bun-first assumptions.
    - Do not reintroduce Node-only runtime assumptions unless explicitly necessary.
-   - If terminal work returns later, treat PTY/runtime choice as a fresh integration decision rather than reviving removed spike code.
+   - If terminal work returns later, treat PTY/runtime choice as a fresh integration decision.
 
 ## Editing Guidance
 
-When changing the spike:
+When changing the app:
 - extract repeated picker/browser behavior into `OverlayManager` or a focused service
 - extract new window types out of `app-controller.ts` once they stop being tiny
 - keep `app-controller.ts` as orchestration, not as the place all parsing/render helpers go
