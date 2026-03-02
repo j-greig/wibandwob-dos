@@ -4,6 +4,7 @@ export const light: ThemeVariant = {
   name: "wibwob-light",
   tokens: {
     desktop:              { fg: "grey",   bg: "#e0e0e0" },  // light grey desktop
+    desktopFillChar:      " ",
     menuBar:              { fg: "black",  bg: "white"   },  // white bar on grey desktop = visible
     statusLine:           { fg: "black",  bg: "white"   },
 

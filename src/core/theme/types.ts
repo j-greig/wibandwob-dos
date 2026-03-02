@@ -17,6 +17,8 @@ export interface StylePair {
 export interface ThemeTokens {
   // Desktop shell
   desktop: StylePair;
+  /** Character used to tile the desktop background. Space = flat colour. */
+  desktopFillChar: string;
   menuBar: StylePair;
   statusLine: StylePair;
 

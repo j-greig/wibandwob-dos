@@ -5,6 +5,7 @@ export const darkNord: ThemeVariant = {
   name: "wibwob-dark-nord",
   tokens: {
     desktop:              { fg: "#4c566a",  bg: "#2e3440"  },  // nord1 on nord0
+    desktopFillChar:      " ",
     menuBar:              { fg: "#d8dee9",  bg: "#3b4252"  },  // nord4 on nord1
     statusLine:           { fg: "#d8dee9",  bg: "#3b4252"  },
 

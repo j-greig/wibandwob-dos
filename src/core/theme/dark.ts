@@ -4,6 +4,7 @@ export const dark: ThemeVariant = {
   name: "wibwob-dark",
   tokens: {
     desktop:              { fg: "#444444", bg: "black"  },
+    desktopFillChar:      "░",
     menuBar:              { fg: "white",  bg: "#333333" },
     statusLine:           { fg: "white",  bg: "#333333" },
 
@@ -11,7 +12,7 @@ export const dark: ThemeVariant = {
     windowBorderFocused:  { fg: "cyan",   bg: "black"   },
     windowBorderUnfocused:{ fg: "white",  bg: "black"   },
     titleBarFocused:      { fg: "black",  bg: "white"   },
-    titleBarUnfocused:    { fg: "white",  bg: "black"   },
+    titleBarUnfocused:    { fg: "white",  bg: "#1a1a1a" },
     closeButton:          { fg: "white",  bg: "red"     },
     resizeGrip:           { fg: "yellow", bg: "black"   },
 

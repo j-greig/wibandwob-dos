@@ -265,7 +265,8 @@ export class TsTuiMvpApp {
   private repaintDesktop(): void {
     const width = Math.max(1, Number(this.screen.width));
     const height = Math.max(1, Number(this.screen.height) - 2);
-    const line = " ".repeat(width);
+    const fill = theme().desktopFillChar || " ";
+    const line = fill.repeat(width);
     this.desktop.setContent(Array.from({ length: height }, () => line).join("\n"));
   }
 

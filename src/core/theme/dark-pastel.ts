@@ -5,6 +5,7 @@ export const darkPastel: ThemeVariant = {
   name: "wibwob-dark-pastel",
   tokens: {
     desktop:              { fg: "#6c7086",  bg: "#1e1e2e"  },  // surface0 on base
+    desktopFillChar:      " ",
     menuBar:              { fg: "#cdd6f4",  bg: "#313244"  },  // text on surface0
     statusLine:           { fg: "#a6adc8",  bg: "#313244"  },  // subtext0 on surface0
 
