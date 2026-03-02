@@ -381,64 +381,149 @@ style: { fg: "white", bg: "black",
 ### 9.1 CSS-like theme tokens (recommended)
 
 Replace the TV palette chain with a **flat token map** — essentially CSS
-custom properties for the terminal:
+custom properties for the terminal.
+
+Use **TypeBox** (`@sinclair/typebox`) to define the token schema so that
+theme JSON is validated at load time, not just described by a TS interface.
+TypeBox gives you a JSON Schema and a compiled runtime validator from the
+same definition — missing tokens, wrong types, and malformed colour values
+are caught before they become blank cells on screen.
+
+Reference implementation: pi's theme system
+(`node_modules/@mariozechner/pi-coding-agent/dist/modes/interactive/theme/theme.js`)
+defines all 51 colour tokens as a TypeBox schema, compiles the validator once
+at import time, and runs it on every theme file load. This is the pattern to
+follow.
 
 ```typescript
-interface ThemeTokens {
+import { Type } from "@sinclair/typebox";
+import { TypeCompiler } from "@sinclair/typebox/compiler";
+
+const ColorValue = Type.Union([
+  Type.String(),                              // "#RRGGBB", var ref, or ""
+  Type.Integer({ minimum: 0, maximum: 255 }), // 256-colour index
+]);
+
+const ThemeTokensSchema = Type.Object({
   // Desktop
-  desktopFg: Color;
-  desktopBg: Color;
-  desktopFillChar: string;
+  desktopFg: ColorValue,
+  desktopBg: ColorValue,
+  desktopFillChar: Type.String(),
 
   // Chrome
-  menuBarFg: Color;
-  menuBarBg: Color;
-  statusLineFg: Color;
-  statusLineBg: Color;
+  menuBarFg: ColorValue,
+  menuBarBg: ColorValue,
+  statusLineFg: ColorValue,
+  statusLineBg: ColorValue,
 
   // Semantic roles (map 1:1 from ThemeRole)
-  background: Color;
-  foreground: Color;
-  foregroundSecondary: Color;
-  accentPrimary: Color;
-  accentSecondary: Color;
-  accentTertiary: Color;
-  frame: Color;
-  selection: Color;
-  selectionText: Color;
-  warning: Color;
+  background: ColorValue,
+  foreground: ColorValue,
+  foregroundSecondary: ColorValue,
+  accentPrimary: ColorValue,
+  accentSecondary: ColorValue,
+  accentTertiary: ColorValue,
+  frame: ColorValue,
+  selection: ColorValue,
+  selectionText: ColorValue,
+  warning: ColorValue,
 
   // Window chrome
-  windowFrameActive: Color;
-  windowFrameInactive: Color;
-  windowTitleFg: Color;
-  windowTitleBg: Color;
-}
+  windowFrameActive: ColorValue,
+  windowFrameInactive: ColorValue,
+  windowTitleFg: ColorValue,
+  windowTitleBg: ColorValue,
+});
 
-type Color = string; // "#RRGGBB" | "ansi:N" | named
+const ThemeJsonSchema = Type.Object({
+  name: Type.String(),
+  vars: Type.Optional(Type.Record(Type.String(), ColorValue)),
+  tokens: ThemeTokensSchema,
+});
+
+const validateTheme = TypeCompiler.Compile(ThemeJsonSchema);
+```
+
+The `vars` field follows pi's pattern: define reusable named colours in
+`vars`, then reference them by name in the token values. A two-pass resolve
+step substitutes variable references before handing concrete values to the
+renderer. This keeps theme files DRY without inventing a custom templating
+language.
+
+```json
+{
+  "name": "dark_pastel",
+  "vars": {
+    "blue": "#57c7ff",
+    "pink": "#f07f8f",
+    "green": "#b7ff3c",
+    "grey": "#d0d0d0"
+  },
+  "tokens": {
+    "accentPrimary": "blue",
+    "accentSecondary": "pink",
+    "accentTertiary": "green",
+    "foreground": "grey",
+    "background": "#000000"
+  }
+}
 ```
 
 ### 9.2 Theme resolver
 
+Use **chalk** for colour output instead of hand-rolling ANSI escape
+sequences. chalk detects terminal capability automatically (truecolor vs
+256 vs basic) and provides `chalk.rgb(r,g,b)` and `chalk.ansi256(n)` for
+foreground, `chalk.bgRgb(r,g,b)` and `chalk.bgAnsi256(n)` for background.
+
+For cases where raw ANSI strings are needed (writing directly to a cell
+buffer rather than through chalk's tagged-template API), pi's theme.js
+demonstrates the full fallback path:
+
+1. Detect `COLORTERM` env var for truecolor support
+2. If truecolor, emit `\x1b[38;2;R;G;Bm` directly
+3. If 256-colour, convert hex to nearest xterm index using weighted
+   euclidean distance across the 6x6x6 colour cube and 24-step greyscale
+   ramp, with a saturation check to avoid mapping tinted colours to grey
+4. Empty string means "use terminal default" (`\x1b[39m` / `\x1b[49m`)
+
+The resolver should be a two-step pipeline:
+
+1. **Variable resolution:** substitute var refs from the `vars` map
+2. **Colour compilation:** convert resolved values into renderer-ready
+   fg/bg ANSI strings (or chalk calls), cached per theme load
+
 ```typescript
-interface Theme {
+import chalk from "chalk";
+
+interface ResolvedTheme {
   name: string;
   mode: "light" | "dark";
   variant: string;
-  tokens: ThemeTokens;
+  fg: Record<string, string>;   // token -> fg ANSI string
+  bg: Record<string, string>;   // token -> bg ANSI string
+  sourcePath?: string;
 }
 
-const THEMES: Record<string, Theme> = {
-  monochrome: { ... },
-  dark_pastel: { ... },
-};
-
-function resolveColor(color: Color): string {
-  if (color.startsWith("#")) return `\x1b[38;2;${r};${g};${b}m`;
-  if (color.startsWith("ansi:")) return `\x1b[38;5;${n}m`;
-  return blessedNameToAnsi(color);
+function resolveVars(
+  tokens: Record<string, string | number>,
+  vars: Record<string, string | number> = {}
+): Record<string, string | number> {
+  const resolved: Record<string, string | number> = {};
+  for (const [key, value] of Object.entries(tokens)) {
+    if (typeof value === "string" && value in vars) {
+      resolved[key] = vars[value];
+    } else {
+      resolved[key] = value;
+    }
+  }
+  return resolved;
 }
 ```
+
+For hot-reload during development, watch the active theme file with
+`fs.watch` and debounce reloads (pi uses 100ms). Broadcast changes via
+a callback so all open windows restyle without restart.
 
 ### 9.3 Desktop presets — port directly
 
@@ -541,9 +626,15 @@ bar layout that poll or subscribe to service health state.
    strings; map CGA indices to their canonical RGB equivalents at load time.
 
 4. **Terminal colour capability detection.** Not all terminals support
-   true-colour. The theme system should detect `COLORTERM=truecolor` and
-   fall back to 256-colour or 16-colour approximation. Libraries like
-   `chalk` or `ansi-styles` handle this.
+   true-colour. Pi's theme.js demonstrates the full pattern: detect
+   `COLORTERM` for truecolor/24bit, check `WT_SESSION` for Windows
+   Terminal, treat `TERM=dumb` and Apple Terminal as 256-colour only,
+   and default to truecolor for everything else. For 256-colour fallback,
+   it converts hex to the nearest xterm index using weighted euclidean
+   distance (green-biased: 0.299R + 0.587G + 0.114B) across the 6x6x6
+   colour cube, with a saturation guard that only considers greyscale
+   when the RGB channel spread is under 10. Use chalk for the common
+   path and this fallback logic for direct cell-buffer writes.
 
 5. **Desktop fill performance.** Filling the entire desktop with a repeated
    character on every redraw is fine in TV's direct buffer model. In a

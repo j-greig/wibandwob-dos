@@ -10,6 +10,12 @@ PR: —
 > the canonical epic shell (status, links, summary); this doc owns the
 > detailed design and updated acceptance criteria.
 
+> **Zilla note:** The "Minimum viable first slice" approach from the Codex
+> review is the preferred direction. One subsystem spec (workspace), one
+> index entry, one retrieval command, one evaluation against historical
+> prompts. Prove it works before building the platform.
+> See: https://github.com/j-greig/wibandwob-dos/issues/106#issuecomment-3982637443
+
 ## Summary
 
 WibWob-DOS needs a project-memory system that is cheap to query, easy to update, and hard to let drift silently. The aim is not to copy the 'Codified Context' paper literally. The aim is to adapt its hot / specialist / cold memory pattern to this repo using the primitives we already have: `CLAUDE.md`, `.pi/skills/`, `.planning/`, scripts, and QMD.
