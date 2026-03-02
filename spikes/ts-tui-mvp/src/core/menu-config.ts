@@ -15,7 +15,6 @@ export interface AppMenuActions {
   saveWorkspaceAs: () => void;
   loadWorkspacePrompt: () => void;
   openArtWindow: () => void;
-  openWibWobChat: () => void;
   openWibWobAgent: () => void;
   quit: () => void;
   focusNextWindow: () => void;

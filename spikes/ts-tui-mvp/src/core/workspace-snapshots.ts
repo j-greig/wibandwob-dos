@@ -76,12 +76,6 @@ export function buildWindowSnapshotPayload(window: WindowRecord): Record<string,
             : "auto"
       };
     }
-    case "terminal": {
-      const details = window.describeState?.();
-      return {
-        appType: typeof details?.appType === "string" ? details.appType : "xterm-shell"
-      };
-    }
     case "companion": {
       const details = window.describeState?.();
       return {
@@ -99,16 +93,9 @@ export interface WorkspaceRestoreActions {
   openBrowserReaderWindow: (filePath?: string) => void;
   openFigletWindow: (text: string, font: string) => void;
   openPatternWindow: () => void;
-  openGlitchWindow: () => void;
-  openWibWobChatWindow: (restore?: {
-    transcriptLines?: string[];
-    draft?: string;
-    messages?: unknown;
-  }) => void;
   openPrimerGalleryWindow: (restore?: { activeTabIndex?: number; searchValue?: string; selectedIndex?: number }) => void;
   openPrimerBrowserWindow: (restore?: { selectedIndex?: number }) => void;
   openFileManagerWindow: (restore?: { currentPath?: string; selectedIndex?: number; filterValue?: string }) => void;
-  openXTermShellWindow: () => void | Promise<void>;
   openBackroomsTv: (channel: BackroomsChannel) => void;
   openCompanionWindow: (restore?: { tick?: number }) => void;
   openArtWindow: () => void;
@@ -148,18 +135,6 @@ export function restoreWindowSnapshot(snapshot: WindowSnapshot, actions: Workspa
     case "pattern":
       actions.openPatternWindow();
       break;
-    case "glitch":
-      actions.openGlitchWindow();
-      break;
-    case "chat":
-      actions.openWibWobChatWindow({
-        transcriptLines: Array.isArray(payload.transcriptLines)
-          ? payload.transcriptLines.filter((line): line is string => typeof line === "string")
-          : undefined,
-        draft: typeof payload.draft === "string" ? payload.draft : undefined,
-        messages: payload.messages
-      });
-      break;
     case "gallery":
       actions.openPrimerGalleryWindow({
         activeTabIndex: typeof payload.activeTabIndex === "number" ? payload.activeTabIndex : undefined,
@@ -179,9 +154,6 @@ export function restoreWindowSnapshot(snapshot: WindowSnapshot, actions: Workspa
           selectedIndex: typeof payload.selectedIndex === "number" ? payload.selectedIndex : undefined
         });
       }
-      break;
-    case "terminal":
-      void actions.openXTermShellWindow();
       break;
     case "backrooms":
       actions.openBackroomsTv({

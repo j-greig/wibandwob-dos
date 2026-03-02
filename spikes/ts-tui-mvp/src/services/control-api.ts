@@ -44,16 +44,12 @@ interface ControlApiHandlers {
   openBrowserReader: (filePath?: string) => void;
   openFigletBanner: (text?: string, font?: string) => void;
   openArtWindow: () => void;
-  openWibWobChat: () => void;
   openWibWobAgent: () => void;
   openCompanionWindow: () => void;
   openWorkspaceManager: () => void;
   openCommandPalette: () => void;
   openStateInspector: () => void;
   openEditorWindow: (filePath?: string, title?: string, initial?: string) => void;
-  openXTermShell: () => void;
-  closeXTermShells: () => number;
-  restartXTermShell: () => void;
   windows: import("../core/window-facade.js").WindowFacade;
   openBackroomsTv: (channel: BackroomsChannel) => void;
   saveWorkspaceNamed: (name: string) => void;
@@ -145,16 +141,12 @@ export class ControlApiService {
           "POST /view/browser-reader/open",
           "POST /view/figlet/open",
           "POST /view/art/open",
-          "POST /view/wibwob-chat/open",
           "POST /view/wibwob-agent/open",
           "POST /view/companion/open",
           "POST /view/workspace/open",
           "POST /view/palette/open",
           "POST /view/inspector/open",
           "POST /view/editor/open",
-          "POST /view/xterm/open",
-          "POST /view/xterm/close",
-          "POST /view/xterm/restart",
           "POST /view/backrooms/open",
           "POST /commands/run",
           "POST /windows/focus",
@@ -210,10 +202,6 @@ export class ControlApiService {
       return Response.json(result, { status: result.ok ? 200 : 404 });
     }
 
-    if (request.method === "POST" && url.pathname === "/view/xterm/open") {
-      this.handlers.openXTermShell();
-      return Response.json({ ok: true });
-    }
     if (request.method === "POST" && url.pathname === "/view/primer-browser/open") {
       this.handlers.openPrimerBrowser();
       return Response.json({ ok: true });
@@ -249,10 +237,6 @@ export class ControlApiService {
       this.handlers.openArtWindow();
       return Response.json({ ok: true });
     }
-    if (request.method === "POST" && url.pathname === "/view/wibwob-chat/open") {
-      this.handlers.openWibWobChat();
-      return Response.json({ ok: true });
-    }
     if (request.method === "POST" && url.pathname === "/view/wibwob-agent/open") {
       this.handlers.openWibWobAgent();
       return Response.json({ ok: true });
@@ -279,16 +263,6 @@ export class ControlApiService {
         typeof (body as any).title === "string" ? (body as any).title : undefined,
         typeof (body as any).initial === "string" ? (body as any).initial : undefined,
       );
-      return Response.json({ ok: true });
-    }
-    if (request.method === "POST" && url.pathname === "/view/xterm/close") {
-      return Response.json({
-        ok: true,
-        closed: this.handlers.closeXTermShells(),
-      });
-    }
-    if (request.method === "POST" && url.pathname === "/view/xterm/restart") {
-      this.handlers.restartXTermShell();
       return Response.json({ ok: true });
     }
     if (request.method === "POST" && url.pathname === "/windows/focus") {

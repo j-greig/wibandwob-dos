@@ -81,9 +81,9 @@ Rules for this pass:
 
 ## Epoch 3
 
-- [ ] Collapse the dual terminal paths toward one owned subsystem
-- [ ] Improve xterm-shell redraw correctness using scratch logs and captures
-- [ ] Use the control API loop to regression-check terminal behavior after each parser change
+- [ ] Continue shrinking `app-controller.ts` by extracting remaining Backrooms and agent orchestration seams
+- [ ] Harden repaint/invalidation rules so stale shadow/content cells stop surviving resize/move/close
+- [ ] Keep using the control API loop to regression-check window-state and repaint behavior after each refactor
 
 ---
 
@@ -91,9 +91,8 @@ Rules for this pass:
 
 - **Tests**: zero test files exist — add bun test + content-measurement + workspace round-trip before epoch 2 refactors blind.
 - **Theme tokens**: 28 hardcoded blessed style literals in controller will get copy-pasted into every extracted module — tokenise before bulk extraction.
-- **WindowRecord shape**: ~10 optional fields (editor?, terminal?, chat?, writeInput?, refresh?) grow per window type — refactor to discriminated union or module-owned state before epoch 2.
+- **WindowRecord shape**: optional fields (`editor?`, `chat?`, `writeInput?`, `refresh?`) still grow per window type — refactor to discriminated union or module-owned state before epoch 2.
 - **Snapshot switches**: serializeWindowSnapshot/restoreWindowSnapshot are big switch statements that grow per type — modules must own their own serialize/restore, not just shuffle cases.
 - **Overlay-manager coupling**: file browser prompt (lines 403-648) is coupled to gallery/browser content discovery — may need touching when epoch 2 extracts those windows.
 - **API routes**: no epoch adds /commands discovery or new endpoints — extracted windows need control API parity as they land.
-- **Pi Chat on legacy PTY**: epoch 3 kills the legacy terminal path but Pi Chat also rides openPtyWindow — must migrate Pi Chat too or it breaks.
 - **Dual measurement**: openPrimerWindow re-measures via measurePrimerContent instead of consuming content-service's readPrimerMetadata — single measurement path when primers get extracted.

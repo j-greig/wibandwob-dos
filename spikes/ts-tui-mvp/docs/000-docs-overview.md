@@ -15,6 +15,7 @@ Status vocabulary:
 - `reference` — background or handover material
 - `review` — audit/findings doc
 - `stale` — useful history, but no longer canonical
+- `retired` — keep on disk for archaeology only; do not use for current planning
 
 ## Execution Buckets
 
@@ -32,8 +33,6 @@ These define the substrate. Work here first.
   - measurement, chrome, state, layout architecture
 - `015-window-manager-reference-and-repair-plan.md`
   - current window-manager stabilization work
-- `017-framework-direction-and-today-plan.md`
-  - current framework direction and work ordering
 - `018-command-registry-and-tool-adapter-prd.md`
   - command registry and adapter substrate
 - `020-target-architecture.md`
@@ -88,6 +87,29 @@ Use for validation and audit, not as the main execution plan.
 - `003-document-plan.md`
 - `BUILD-ORDER.md`
 - `INDEX.md` (deleted — superseded by this file)
+
+## Retire From Active Working Set
+
+These should remain on disk for context and archaeology, but they should stop
+shaping day-to-day planning.
+
+- `003-document-plan.md`
+  - obsolete now that the real doc corpus exists
+- `BUILD-ORDER.md`
+  - replaced by `BUILD-ORDER-FINAL.md`
+- `wibwob-chat-v2-plan.md`
+  - superseded by the native agent/chat path
+- `017-framework-direction-and-today-plan.md`
+  - useful historical rationale, but `020-target-architecture.md` is now the canonical direction
+
+Likely next retirement candidates after one more pass:
+
+- `002-architecture-plan-content-sizing-layout.md`
+  - much of its architectural intent is now absorbed into `020`
+- `terminal-native-research.md`
+  - still good background, but no longer execution-driving
+- review docs for already-fixed slices
+  - keep as evidence, not as current planning inputs
 
 ## How To Turn This Into Work
 
@@ -145,7 +167,7 @@ These live outside the spike dir but directly drive spike work:
 |---|---|---|
 | `001-primer-dimensions-and-agent-sizing.md` | Primer measurement, recommended sizing, and agent-visible content dimensions from the older C++ path. | `reference` |
 | `002-architecture-plan-content-sizing-layout.md` | TS architecture plan for parcels P1-P7: measurement, chrome, state, layout, and pre-open sizing. | `reference` |
-| `003-document-plan.md` | Early estimate of the handover docs needed for the TS rebuild. | `stale` |
+| `003-document-plan.md` | Early estimate of the handover docs needed for the TS rebuild. | `retired` |
 | `003-pi-mono-chat-window-evaluation.md` | Evaluates pi-mono as a native chat engine versus nested TUI-in-TUI rendering. | `reference` |
 | `004-piclaw-sandbox-evaluation.md` | Notes on piclaw as sandbox/runtime architecture inspiration for Pi sessions. | `reference` |
 | `004-window-type-registry-and-factories.md` | Full C++ window inventory and factory decomposition strategy for the TS rebuild. | `reference` |
@@ -161,12 +183,12 @@ These live outside the spike dir but directly drive spike work:
 | `014-gaps-from-skill-crosscheck.md` | Gap analysis from skill cross-checking against the spike and rebuild plan. | `reference` |
 | `015-window-manager-reference-and-repair-plan.md` | External references and repair plan for the blessed window manager. | `active` |
 | `016-terminal-kit-screenbuffer-animation-spike.md` | Plan for a contained terminal-kit ScreenBuffer animation/compositing experiment. | `draft` |
-| `017-framework-direction-and-today-plan.md` | Current framework direction: blessed shell, terminal-kit subsystem spike, Terminal.Gui as design teacher. | `active` |
+| `017-framework-direction-and-today-plan.md` | Historical framework-direction snapshot before the target architecture became canonical. | `retired` |
 | `018-command-registry-and-tool-adapter-prd.md` | PRD for define-once commands projected into menu, palette, API, agent, and later MCP. Core registry path is proven; MCP/cleanup remain. | `partial` |
 | `019-context-sensitive-menu-bar-prd.md` | PRD for macOS-style context-sensitive menus. Context model, enabled predicates, and context-menu alignment are refined; implementation remains partial. | `partial` |
 | `020-target-architecture.md` | Canonical end-state architecture for the TS TUI app: source tree, subsystem boundaries, file responsibilities, startup workspace semantics, native appearance/theme rules, and ASCII animation support. | `active` |
 | `BUILD-ORDER-FINAL.md` | Preferred sequencing for the broader TS rebuild. | `active` |
-| `BUILD-ORDER.md` | Older build order document superseded by the final version. | `stale` |
+| `BUILD-ORDER.md` | Older build order document superseded by the final version. | `retired` |
 | `INDEX.md` | Deleted. Superseded by this file (`000-docs-overview.md`). | `deleted` |
 | `chat-collapse-review.md` | Review of chat collapse. Found identity + prompt regressions — both fixed (appType, stripped prompts). | `review` |
 | `content-measurement-review.md` | Review of the content measurement unification. Found sizing regression — fixed (collapsed to single measurement field). | `review` |
@@ -175,7 +197,7 @@ These live outside the spike dir but directly drive spike work:
 | `refactor-epoch-plan.md` | Canonical tracker for the spike refactor/reorganization epochs. Epoch 1 done (2878->2050 lines). Epoch 2: WindowFacade landed, chat collapsed, command registry landed, content measurement unified. | `active` |
 | `spk-agent-window-enhancement.md` | Plan and rationale for turning chat into a real agent window with TUI tools. Useful and partly landed, but still mixed with review corrections. | `partial` |
 | `terminal-native-research.md` | Research note on terminal-native TypeScript TUI options and tradeoffs. | `reference` |
-| `wibwob-chat-v2-plan.md` | Canonical plan for the native Wib&Wob Chat v2 slice. Superseded by agent window with mode="chat". | `landed` |
+| `wibwob-chat-v2-plan.md` | Native Wib&Wob Chat v2 plan. Kept only as historical slice notes; superseded by the native agent/chat path. | `retired` |
 | `window-facade-full-review.md` | Full review of Phases 1-5. Capture route fix applied. Remaining: async restore race, old method aliases. | `review` |
 | `window-facade-phase1-review.md` | Review of the early WindowFacade phase and contract drift. | `review` |
 | `window-facade-review.md` | Initial WindowFacade problem framing before the fuller migration work. | `review` |

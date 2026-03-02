@@ -52,13 +52,7 @@ export interface GalleryTab {
   entries: BrowserEntry[];
 }
 
-export interface TerminalState {
-  mode: "legacy" | "xterm-bridge";
-  viewport?: Box;
-  transcript?: LogBox;
-  input?: Textbox;
-  scrollViewport?: (delta: number) => void;
-}
+
 
 export type TaskLoopStatus = "pending" | "passed";
 
@@ -174,7 +168,6 @@ export interface WindowRecord {
   filePath?: string;
   isDirty?: boolean;
   lastSavedContent?: string;
-  terminal?: TerminalState;
   chat?: ChatState;
   writeInput?: (input: string) => void;
   cleanup?: () => void;

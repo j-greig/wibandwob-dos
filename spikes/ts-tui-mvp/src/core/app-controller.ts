@@ -37,11 +37,8 @@ import { ControlApiService } from "../services/control-api.js";
 import { ContentService } from "../services/content-service.js";
 import { getDefaultFigletFont, getFigletCatalogue, getFigletFontChoices, measureFiglet, renderFiglet } from "../services/figlet-service.js";
 import { openPrimerFile, promptForEditorFile, promptForPrimerFile, saveEditorWindow } from "../services/file-actions.js";
-import { createPtySession, type PtySession } from "../services/pty-session.js";
 import { deleteBackward as deleteEditorBackwardState, deleteForward as deleteEditorForwardState, insertText as insertEditorTextState, moveCursor as moveEditorCursorState, render as renderEditorState } from "../services/editor-service.js";
 import { StateService } from "../services/state-service.js";
-import { TerminalBuffer } from "../services/terminal-buffer.js";
-import { renderTerminalBuffer } from "../services/terminal-renderer.js";
 import { promptForWorkspaceLoad, promptForWorkspaceSave } from "../services/workspace-ui.js";
 import { WorkspaceService } from "../services/workspace-service.js";
 import {
@@ -60,7 +57,6 @@ import {
   openCommandPaletteWindow as openPaletteWindow,
   openCompanionWindow as openScrambleWindow,
   openArtWindow as openGenerativeArtWindow,
-  openGlitchWindow as openGlitchAnimationWindow,
   openPatternWindow as openPatternAnimationWindow,
   openStateInspectorWindow as openInspectorWindow,
   openWorkspaceManagerWindow as openWorkspaceCommandWindow
@@ -132,7 +128,6 @@ export class TsTuiMvpApp {
       () => {
         this.repaintDesktop();
         this.syncState();
-        this.refreshTerminalWindows();
       },
       (window, x, y) => this.openWindowContextMenu(window, x, y)
     );
@@ -160,16 +155,12 @@ export class TsTuiMvpApp {
       openBrowserReader: (filePath) => this.openBrowserReaderWindow(filePath),
       openFigletBanner: (text, font) => this.openFigletWindow(text ?? "WIB WOB", font ?? getDefaultFigletFont()),
       openArtWindow: () => this.openArtWindow(),
-      openWibWobChat: () => this.openWibWobChatWindow(),
       openWibWobAgent: () => this.openWibWobAgentWindow(),
       openCompanionWindow: () => this.openCompanionWindow(),
       openWorkspaceManager: () => this.openWorkspaceManagerWindow(),
       openCommandPalette: () => this.openCommandPaletteWindow(),
       openStateInspector: () => this.openStateInspectorWindow(),
       openEditorWindow: (filePath, title, initial) => this.openEditorWindow(filePath, title ?? "Untitled.txt", initial ?? ""),
-      openXTermShell: () => void this.openXTermShellWindow(),
-      closeXTermShells: () => this.closeWindowsByAppType("xterm-shell"),
-      restartXTermShell: () => void this.restartXTermShell(),
       windows: this.windowManager,
       openBackroomsTv: (channel) => this.openBackroomsTv(channel),
       saveWorkspaceNamed: (name) => this.saveWorkspaceNamed(name),
@@ -236,13 +227,6 @@ export class TsTuiMvpApp {
     });
   }
 
-  private refreshTerminalWindows(): void {
-    for (const window of this.windowManager.getWindows()) {
-      if (window.kind === "terminal" && window.terminal?.mode === "xterm-bridge") {
-        window.refresh?.();
-      }
-    }
-  }
 
   private updateStatusLine(): void {
     const current = this.state.sync();
@@ -280,17 +264,12 @@ export class TsTuiMvpApp {
         this.insertEditorText(focused, "  ");
         return;
       }
-      if (focused?.kind === "terminal" && focused.terminal?.mode === "xterm-bridge") {
-        focused.writeInput?.("\t");
-        return;
-      }
       this.windowManager.focusNextWindow(1);
     });
     this.screen.key(["S-tab"], () => this.windowManager.focusNextWindow(-1));
     this.screen.key(["C-s"], () => this.saveFocusedEditor());
     this.screen.on("keypress", (ch, key) => {
       this.handleFocusedEditorKeypress(ch, key);
-      this.handleFocusedTerminalKeypress(ch, key);
     });
     this.screen.on("mouse", (data) => this.windowManager.handleMouse(data));
     this.desktop.on("mousedown", (data) => {
@@ -336,33 +315,6 @@ export class TsTuiMvpApp {
     );
   }
 
-  private async openXTermShellWindow(): Promise<void> {
-    await this.openBufferedTerminalWindow({
-      title: "XTerm Shell",
-      appType: "xterm-shell",
-      command: this.resolveShellPath(),
-      args: ["-i"],
-      cwd: REPO_ROOT,
-      env: this.getPtyEnv(),
-      summary: "Buffered PTY shell window with a local blessed terminal bridge."
-    });
-  }
-
-  private openWibWobChatWindow(_restore?: {
-    transcriptLines?: string[];
-    draft?: string;
-    messages?: unknown;
-  }): void {
-    // Plain chat = agent session with no tools
-    const session = new WibWobAgentSession(null, REPO_ROOT, "chat");
-    openNativeWibWobAgentWindow({
-      screen: this.screen,
-      windowManager: this.windowManager,
-      agent: session,
-      title: "Wib&Wob Chat",
-    });
-  }
-
   private openWibWobAgentWindow(): void {
     const tuiContext: TuiToolContext = {
       getState: () => this.state.sync(),
@@ -371,14 +323,11 @@ export class TsTuiMvpApp {
       openWindow: (type) => {
         const before = this.windowManager.getWindows().length;
         const map: Record<string, () => void> = {
-          terminal: () => void this.openXTermShellWindow(),
           editor: () => this.openEditorWindow(),
           art: () => this.openArtWindow(),
           gallery: () => this.openPrimerGalleryWindow(),
           browser: () => this.openBrowserReaderWindow(),
           pattern: () => this.openPatternWindow(),
-          glitch: () => this.openGlitchWindow(),
-          chat: () => this.openWibWobChatWindow(),
           companion: () => this.openCompanionWindow(),
           inspector: () => this.openStateInspectorWindow(),
           primer: () => this.openPrimerBrowserWindow(),
@@ -429,170 +378,6 @@ export class TsTuiMvpApp {
       windowManager: this.windowManager,
       agent: session,
     });
-  }
-
-  private async openBufferedTerminalWindow(options: {
-    title: string;
-    appType: string;
-    command: string;
-    args: string[];
-    cwd: string;
-    env: Record<string, string>;
-    summary: string;
-  }): Promise<void> {
-    const frame = this.windowManager.createFrame(options.title, "terminal");
-    const xtermLogDir = path.join(SPIKE_ROOT, "scratch", "xterm");
-    fs.mkdirSync(xtermLogDir, { recursive: true });
-    const logPath = path.join(
-      xtermLogDir,
-      `${new Date().toISOString().replaceAll(":", "-")}_${options.appType}.log`
-    );
-    const viewport = blessed.box({
-      parent: frame.body,
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      tags: true,
-      mouse: true,
-      style: { fg: "white", bg: "black" }
-    });
-
-    const getTerminalSize = () => ({
-      cols: Math.max(20, Number(frame.body.width)),
-      rows: Math.max(8, Number(frame.body.height))
-    });
-
-    const buffer = new TerminalBuffer(getTerminalSize().cols, getTerminalSize().rows);
-    let session: PtySession;
-    try {
-      session = createPtySession({
-        command: options.command,
-        args: options.args,
-        cwd: options.cwd,
-        env: options.env,
-        ...getTerminalSize()
-      });
-    } catch (error) {
-      frame.close();
-      this.overlays.flash(`${options.title} launch failed: ${error instanceof Error ? error.message : String(error)}`);
-      return;
-    }
-
-    let running = true;
-    let exitCode: number | undefined;
-    let exitSignal: number | undefined;
-
-    const render = () => {
-      const showCursor = this.windowManager.getFocusedWindow()?.id === frame.id && !this.menuUi.isAnyMenuOpen();
-      viewport.setContent(renderTerminalBuffer(buffer, showCursor));
-      this.syncState();
-      this.screen.render();
-    };
-
-    const syncSize = () => {
-      const size = getTerminalSize();
-      buffer.resize(size.cols, size.rows);
-      session.resize(size.cols, size.rows);
-      render();
-    };
-
-    const handleScreenResize = () => syncSize();
-
-    const logEvent = (event: string, payload: string | Record<string, unknown>) => {
-      const body = typeof payload === "string" ? payload : JSON.stringify(payload);
-      fs.appendFileSync(logPath, `[${new Date().toISOString()}] ${event} ${body}\n`, "utf8");
-    };
-
-    logEvent("spawn", {
-      command: options.command,
-      args: options.args,
-      cwd: options.cwd,
-      cols: buffer.getCols(),
-      rows: buffer.getRows()
-    });
-
-    session.onData((chunk) => {
-      logEvent("data", JSON.stringify(chunk));
-      buffer.write(chunk);
-      render();
-    });
-    session.onExit((event) => {
-      running = false;
-      exitCode = event.exitCode;
-      exitSignal = event.signal;
-      logEvent("exit", {
-        exitCode: event.exitCode,
-        signal: event.signal
-      });
-      buffer.write(`\r\n[process exited ${event.exitCode} signal ${event.signal ?? "none"}]\r\n`);
-      render();
-    });
-
-    frame.kind = "terminal";
-    frame.terminal = {
-      mode: "xterm-bridge",
-      viewport,
-      scrollViewport: (delta) => {
-        buffer.scrollViewport(delta);
-        render();
-      }
-    };
-    frame.cleanup = () => {
-      this.screen.off("resize", handleScreenResize);
-      session.kill();
-    };
-    frame.writeInput = (input) => {
-      logEvent("input", JSON.stringify(input));
-      session.write(input);
-    };
-    frame.refresh = render;
-    frame.captureText = () => renderTerminalBuffer(buffer, false);
-    frame.describeState = () => {
-      const cursor = buffer.getCursor();
-      return {
-        appType: options.appType,
-        summary: options.summary,
-        command: options.command,
-        args: options.args,
-        cwd: options.cwd,
-        cols: buffer.getCols(),
-        rows: buffer.getRows(),
-        cursorX: cursor.x,
-        cursorY: cursor.y,
-        viewportTop: buffer.getViewportTop(),
-        scrollbackLines: buffer.getScrollbackLineCount(),
-        running,
-        exitCode,
-        exitSignal,
-        pid: session.pid,
-        debugLogPath: logPath,
-        contentPreview: buffer.getPreviewText()
-      };
-    };
-    frame.focus = () => {
-      this.windowManager.focusWindow(frame);
-      render();
-    };
-
-    viewport.on("click", () => {
-      this.windowManager.focusWindow(frame);
-      render();
-    });
-    viewport.on("wheelup", () => {
-      buffer.scrollViewport(-3);
-      render();
-    });
-    viewport.on("wheeldown", () => {
-      buffer.scrollViewport(3);
-      render();
-    });
-
-    this.windowManager.registerWindow(frame);
-    frame.frame.on("resize", syncSize);
-    this.screen.on("resize", handleScreenResize);
-    frame.focus();
-    render();
   }
 
   private openBackroomsLogBrowserWindow(): void {
@@ -1307,22 +1092,6 @@ export class TsTuiMvpApp {
     });
   }
 
-  private openGlitchWindow(): void {
-    let source = "No source loaded.";
-    try {
-      source = fs.readFileSync(README_PATH, "utf8");
-    } catch {
-      source = "WibWob-DOS glitch engine source unavailable.";
-    }
-    openGlitchAnimationWindow(
-      {
-        screen: this.screen,
-        windowManager: this.windowManager
-      },
-      source
-    );
-  }
-
   private openCompanionWindow(restore?: { tick?: number }): void {
     openScrambleWindow(
       {
@@ -1510,67 +1279,6 @@ export class TsTuiMvpApp {
     }
   }
 
-  private handleFocusedTerminalKeypress(ch: string, key: blessed.Widgets.Events.IKeyEventArg): void {
-    const window = this.windowManager.getFocusedWindow();
-    if (!window || window.kind !== "terminal" || window.terminal?.mode !== "xterm-bridge" || !window.writeInput) {
-      return;
-    }
-    if (this.menuUi.isAnyMenuOpen()) {
-      return;
-    }
-    if (key.ctrl && key.name === "q") {
-      return;
-    }
-    if (key.full === "S-tab") {
-      return;
-    }
-    if (key.meta) {
-      return;
-    }
-    if (key.name === "pageup") {
-      window.terminal.scrollViewport?.(-8);
-      return;
-    }
-    if (key.name === "pagedown") {
-      window.terminal.scrollViewport?.(8);
-      return;
-    }
-    const escapeSequences: Record<string, string> = {
-      up: "\u001b[A",
-      down: "\u001b[B",
-      right: "\u001b[C",
-      left: "\u001b[D",
-      home: "\u001b[H",
-      end: "\u001b[F",
-      delete: "\u001b[3~",
-      pageup: "\u001b[5~",
-      pagedown: "\u001b[6~"
-    };
-    if (key.name === "enter") {
-      window.writeInput("\r");
-      return;
-    }
-    if (key.name === "backspace") {
-      window.writeInput("\u007f");
-      return;
-    }
-    if (key.name === "tab") {
-      window.writeInput("\t");
-      return;
-    }
-    if (key.name && escapeSequences[key.name]) {
-      window.writeInput(escapeSequences[key.name]);
-      return;
-    }
-    if (typeof key.sequence === "string" && key.sequence.length > 0) {
-      window.writeInput(key.sequence);
-      return;
-    }
-    if (ch && !key.meta) {
-      window.writeInput(ch);
-    }
-  }
-
   private insertEditorText(window: WindowRecord, text: string): void {
     if (!window.editor) {
       return;
@@ -1625,27 +1333,6 @@ export class TsTuiMvpApp {
     renderEditorState(window.editor);
     this.syncState();
     this.screen.render();
-  }
-
-  private resolveShellPath(): string {
-    for (const candidate of [process.env.SHELL, "/bin/zsh", "/bin/bash", "/bin/sh"]) {
-      if (candidate && fs.existsSync(candidate)) {
-        return candidate;
-      }
-    }
-    return "/bin/sh";
-  }
-
-  private getPtyEnv(): Record<string, string> {
-    const env: Record<string, string> = {};
-    for (const [key, value] of Object.entries(process.env)) {
-      if (typeof value === "string") {
-        env[key] = value;
-      }
-    }
-    env.TERM = env.TERM || "xterm-256color";
-    env.COLORTERM = env.COLORTERM || "truecolor";
-    return env;
   }
 
   private applyMeasuredWindowSize(frame: WindowRecord, kind: WindowKind, content: { width: number; height: number }): void {
@@ -1715,12 +1402,9 @@ export class TsTuiMvpApp {
       openBrowserReaderWindow: (filePath) => this.openBrowserReaderWindow(filePath),
       openFigletWindow: (text, font) => this.openFigletWindow(text, font),
       openPatternWindow: () => this.openPatternWindow(),
-      openGlitchWindow: () => this.openGlitchWindow(),
-      openWibWobChatWindow: (restore) => this.openWibWobChatWindow(restore),
       openPrimerGalleryWindow: (restore) => this.openPrimerGalleryWindow(restore),
       openPrimerBrowserWindow: (restore) => this.openPrimerBrowserWindow(restore),
       openFileManagerWindow: (restore) => this.openFileManagerWindow(restore),
-      openXTermShellWindow: () => this.openXTermShellWindow(),
       openBackroomsTv: (channel) => this.openBackroomsTv(channel),
       openCompanionWindow: (restore) => this.openCompanionWindow(restore),
       openArtWindow: () => this.openArtWindow(),
@@ -1798,8 +1482,6 @@ export class TsTuiMvpApp {
       saveWorkspaceAs: () => this.promptForWorkspaceSave(),
       loadWorkspacePrompt: () => this.promptForWorkspaceLoad(),
       openArtWindow: () => this.openArtWindow(),
-      openXTermShell: () => void this.openXTermShellWindow(),
-      openWibWobChat: () => this.openWibWobChatWindow(),
       openWibWobAgent: () => this.openWibWobAgentWindow(),
       quit: () => this.destroy(),
       focusNextWindow: () => this.windowManager.focusNextWindow(1),
@@ -1821,7 +1503,6 @@ export class TsTuiMvpApp {
       openChromeBrowser: () => this.openChromeBrowserWindow(),
       openFigletBanner: () => this.promptForFigletText(),
       openPatternWindow: () => this.openPatternWindow(),
-      openGlitchWindow: () => this.openGlitchWindow(),
       openCompanionWindow: () => this.openCompanionWindow(),
       openWorkspaceManager: () => this.openWorkspaceManagerWindow(),
       openCommandPalette: () => this.openCommandPaletteWindow(),
@@ -1862,19 +1543,6 @@ export class TsTuiMvpApp {
     this.markEditorDirty(window);
     this.renderEditor(window);
     return true;
-  }
-
-  closeWindowsByAppType(appType: string): number {
-    const targets = this.windowManager.getWindows().filter((window) => window.describeState?.().appType === appType);
-    for (const window of targets) {
-      window.close();
-    }
-    return targets.length;
-  }
-
-  restartXTermShell(): void {
-    this.closeWindowsByAppType("xterm-shell");
-    void this.openXTermShellWindow();
   }
 
   private syncState(): void {

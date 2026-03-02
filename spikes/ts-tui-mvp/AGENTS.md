@@ -9,6 +9,12 @@ This spike is a terminal-native TypeScript MVP of a WibWob-DOS-style desktop she
 Canonical doc inventory:
 - `docs/000-docs-overview.md`
   - update this whenever a spike doc is added or its status materially changes
+  - use this to decide which docs are live; do not assume every file in `docs/` is current
+
+Doc triage rule:
+- prefer `active` and `partial` docs for current work
+- treat `reference` as background only
+- treat `retired` as archaeology only unless you are validating or backfilling something specific
 
 Current goals:
 - stay terminal-native
@@ -312,9 +318,6 @@ Current control endpoints:
 - `POST /view/palette/open`
 - `POST /view/inspector/open`
 - `POST /view/editor/open`
-- `POST /view/xterm/open`
-- `POST /view/xterm/close`
-- `POST /view/xterm/restart`
 - `POST /view/backrooms/open`
 - `POST /windows/focus`
 - `POST /windows/move`
@@ -331,21 +334,9 @@ Control parity rule:
   - control API discovery and execution routes
 - do not leave future agents scraping visible text to reach a feature that the app already understands semantically
 
-Current loop for terminal debugging:
-1. launch the spike
-2. read `/state` to discover the control API port and current windows
-3. `POST /view/xterm/open`
-4. read `/state` again to find the `xterm-shell` window id
-5. `POST /windows/input` with shell input
-6. `POST /windows/text/export` to persist a text capture
-7. inspect `scratch/xterm/*.log` and `scratch/captures/*.txt`
-8. patch code and repeat
-
 Convenience:
-- use `POST /view/xterm/restart` to close all current `xterm-shell` windows and reopen a fresh one
 - use `scripts/window-state-parity-loop.sh` to open a representative set of existing window families through the control API and verify their `appType` state surface
 - use `scripts/wibwob-chat-v2-smoke.sh` to open the native `pi-agent-core` chat surface, send one prompt, and export both pane and text captures
-- use `POST /view/xterm/close` to close all current `xterm-shell` windows without reopening
 
 Current loop for native chat debugging:
 1. launch the spike
@@ -358,16 +349,14 @@ Current loop for native chat debugging:
 8. patch code and repeat
 
 Scratch artifacts:
-- xterm PTY logs:
-  - `/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/scratch/xterm`
 - exported text captures:
   - `/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/scratch/captures`
 - desktop state JSON:
   - `/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/scratch/app-state.json`
 
 Important rule:
-- when debugging terminal rendering, trust captured PTY logs and exported text snapshots over screenshots alone
-- the point of the loop is to make parser/render bugs reproducible and regressions easy to compare
+- when debugging repaint/rendering issues, trust exported text snapshots and state captures over screenshots alone
+- the point of the loop is to make rendering bugs reproducible and regressions easy to compare
 
 ## Important Constraints
 
@@ -380,9 +369,9 @@ Important rule:
    - If a library shortcut breaks the WibWob desktop feel, it is probably the wrong shortcut.
 
 3. Be honest about the terminal.
-   - The current shell window is a shell pane, not a full embedded VT emulator.
-   - PTY launch should work.
-   - Fullscreen TUIs inside the pane should not be claimed as supported unless they actually work.
+   - The live app currently has no in-app shell pane.
+   - Future terminal work is architectural/reference work, not a shipped surface in this spike.
+   - Do not claim embedded VT support unless it is reintroduced and actually works.
 
 4. Prefer custom simple behavior over broken widget magic.
    - The editor and drag logic are intentionally custom because some stock blessed behaviors were flaky.
@@ -413,13 +402,6 @@ If you add a new window type:
 - if it introduces colors, backgrounds, borders, or emphasis styles, route them
   through semantic theme tokens rather than inline blessed style literals
 
-If you change terminal behavior:
-- test PTY launch directly
-- test the in-app terminal window
-- use the control loop above to open `XTerm Shell`, send input, and export a text snapshot
-- inspect `scratch/xterm` for raw PTY traffic before guessing at redraw bugs
-- separate “shell commands work” from “real TUI apps work”
-
 ## Verification
 
 At minimum, run:
@@ -441,11 +423,10 @@ Manual smoke targets:
 - type in the editor
 - drag a window
 - close a window
-- open the terminal pane and run a simple command like `pwd` or `echo ok`
+- open Wib&Wob Chat or Wib&Wob Agent and verify input still works
 
 ## Known Rough Edges
 
-- The terminal pane still is not a real VT renderer.
 - `app-controller.ts` is ~2050 lines — down from ~2800 after WindowFacade and chat collapse, but should continue decomposing.
 - Workspace startup semantics are not yet unified with default workspace auto-load;
   the intended direction is: restore `scratch/workspaces/default.json` (and later

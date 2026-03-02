@@ -113,8 +113,8 @@ const openWindow = tuiTool({
   parameters: Type.Object({
     type: Type.String({
       description:
-        'Window type to open: "terminal", "editor", "primer", "art", ' +
-        '"gallery", "browser", "figlet", "pattern", "glitch", etc.',
+        'Window type to open: "editor", "primer", "art", ' +
+        '"gallery", "browser", "figlet", "pattern", "chat", "agent", etc.',
     }),
   }),
   execute: (params, ctx) => {

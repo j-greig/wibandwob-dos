@@ -160,35 +160,13 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     palettePlacement: { order: 80 }
   },
   {
-    id: "terminal.open_xterm",
-    label: "Open XTerm Shell",
-    group: "open",
-    actionKey: "openXTermShell",
-    menuPlacements: [{ category: "applications", order: 130, label: "XTerm Shell" }],
-    palettePlacement: { order: 110 },
-    contextMenu: { desktop: true, order: 50 },
-    api: true,
-    agent: true
-  },
-  {
     id: "browser.open_chrome",
     label: "Open Chrome Browser",
     group: "open",
     actionKey: "openChromeBrowser",
     menuPlacements: [{ category: "applications", order: 40 }],
-    palettePlacement: { order: 120 },
-    contextMenu: { desktop: true, order: 60 },
-    api: true,
-    agent: true
-  },
-  {
-    id: "chat.open_wibwob",
-    label: "Open Wib&Wob Chat",
-    group: "open",
-    actionKey: "openWibWobChat",
-    menuPlacements: [{ category: "applications", order: 110, label: "Wib&Wob Chat" }],
-    palettePlacement: { order: 130 },
-    contextMenu: { desktop: true, order: 70 },
+    palettePlacement: { order: 110 },
+    contextMenu: { desktop: true, order: 50 },
     api: true,
     agent: true
   },
@@ -198,8 +176,8 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     group: "open",
     actionKey: "openWibWobAgent",
     menuPlacements: [{ category: "applications", order: 120, label: "Wib&Wob Agent" }],
-    palettePlacement: { order: 140 },
-    contextMenu: { desktop: true, order: 80 },
+    palettePlacement: { order: 130 },
+    contextMenu: { desktop: true, order: 70 },
     api: true,
     agent: true
   },
@@ -330,19 +308,11 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     palettePlacement: { order: 60 }
   },
   {
-    id: "glitch.open",
-    label: "Glitch FX",
-    group: "surface",
-    actionKey: "openGlitchWindow",
-    menuPlacements: [{ category: "applications", order: 90 }],
-    palettePlacement: { order: 70, label: "Open Glitch FX Window" }
-  },
-  {
     id: "companion.open",
     label: "Companion",
     group: "surface",
     actionKey: "openCompanionWindow",
-    menuPlacements: [{ category: "applications", order: 140 }],
+    menuPlacements: [{ category: "applications", order: 130 }],
     palettePlacement: { order: 120 }
   },
   {

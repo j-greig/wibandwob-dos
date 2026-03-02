@@ -64,23 +64,6 @@ export function openPatternWindow(deps: BaseWindowDeps): void {
   });
 }
 
-export function openGlitchWindow(deps: BaseWindowDeps, sourceText: string): void {
-  const lines = sourceText.split("\n").slice(0, 24);
-  openAnimatedWindow(deps, "Glitch FX", "glitch", (tick) =>
-    lines
-      .map((line, index) =>
-        line
-          .split("")
-          .map((char, column) => {
-            const value = (tick + index + column) % 17;
-            return value === 0 ? "#" : value === 3 ? "@" : value === 7 ? "%" : char;
-          })
-          .join("")
-      )
-      .join("\n")
-  );
-}
-
 export function openCompanionWindow(
   deps: BaseWindowDeps,
   restore?: { tick?: number }
