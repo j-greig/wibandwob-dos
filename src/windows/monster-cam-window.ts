@@ -9,7 +9,7 @@ import { MonsterCamService } from "../services/monster-cam-service.js";
 import type { WindowManager } from "../core/window-manager.js";
 
 // Grayscale ASCII density ramp (dark → light)
-const RAMP = "$@B%8&WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/\\|()1{}[]?-_+~<>i!lI;:,\"^` ";
+const RAMP = " .:-=+*#%@";
 const RAMP_LEN = RAMP.length;
 
 function grayToChar(g: number): string {
@@ -85,22 +85,34 @@ export function openMonsterCamWindow(deps: Deps): void {
       rows.push(row);
     }
 
-    // Face bbox overlay — mark corners with '+'
+    // Face bbox overlay — box-drawing outline
     if (hasFace) {
       const [bx, by, bw, bh] = f.bbox;
-      const cx0 = Math.round((bx / srcW) * w);
-      const cy0 = Math.round((by / srcH) * h);
+      const cx0 = Math.max(0, Math.round((bx / srcW) * w));
+      const cy0 = Math.max(0, Math.round((by / srcH) * h));
       const cx1 = Math.min(w - 1, Math.round(((bx + bw) / srcW) * w));
       const cy1 = Math.min(h - 1, Math.round(((by + bh) / srcH) * h));
-      const markRow = (ry: number, rx: number) => {
-        if (ry >= 0 && ry < rows.length) {
-          const r = rows[ry].split("");
-          if (rx >= 0 && rx < r.length) r[rx] = "+";
+
+      const setChar = (ry: number, rx: number, ch: string) => {
+        if (ry >= 0 && ry < rows.length && rx >= 0) {
+          const r = [...rows[ry]];
+          if (rx < r.length) r[rx] = ch;
           rows[ry] = r.join("");
         }
       };
-      for (const [ry, rx] of [[cy0, cx0], [cy0, cx1], [cy1, cx0], [cy1, cx1]] as [number,number][]) {
-        markRow(ry, rx);
+
+      // Corners
+      setChar(cy0, cx0, "┌"); setChar(cy0, cx1, "┐");
+      setChar(cy1, cx0, "└"); setChar(cy1, cx1, "┘");
+      // Top + bottom edges
+      for (let x = cx0 + 1; x < cx1; x++) {
+        setChar(cy0, x, "─");
+        setChar(cy1, x, "─");
+      }
+      // Left + right edges
+      for (let y = cy0 + 1; y < cy1; y++) {
+        setChar(y, cx0, "│");
+        setChar(y, cx1, "│");
       }
     }
 
