@@ -1,4 +1,4 @@
-Status: not-started
+Status: in-progress
 GitHub issue: —
 PR: —
 
@@ -108,14 +108,14 @@ Rollback note:
 
 ## Tasks
 
-- [ ] Audit repo-root items against `020` disposition rules
-- [ ] Move live TS TUI app root files into repo root
-- [ ] Replace root `README.md` and `AGENTS.md`
-- [ ] Remove root `CLAUDE.md` and symlink AGENTS.md -> CLAUDE.md
-- [ ] Rework root ignore/submodule config
-- [ ] Record retained vs deleted items in a migration summary
-- [ ] Run root-level typecheck and smoke verification
-- [ ] Update this story status and task checkboxes
+- [x] Audit repo-root items against `020` disposition rules
+- [x] Move live TS TUI app root files into repo root
+- [x] Replace root `README.md` and `AGENTS.md`
+- [x] Remove root `CLAUDE.md` and symlink AGENTS.md -> CLAUDE.md
+- [x] Rework root ignore/submodule config
+- [x] Record retained vs deleted items in a migration summary
+- [x] Run root-level typecheck and smoke verification
+- [x] Update this story status and task checkboxes
 
 ## Disposition Decisions (confirmed by user)
 
