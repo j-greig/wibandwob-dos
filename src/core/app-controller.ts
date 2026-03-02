@@ -250,6 +250,46 @@ export class TsTuiMvpApp {
     this.applyTheme();
   }
 
+  private chooseTheme(): void {
+    const variants = allVariants();
+    const current = themeName();
+    const items = variants.map(v => v.name === current ? `● ${v.name}` : `  ${v.name}`);
+    const list = blessed.list({
+      parent: this.screen,
+      top: "center",
+      left: "center",
+      width: 30,
+      height: variants.length + 2,
+      border: "line",
+      tags: true,
+      keys: true,
+      vi: true,
+      mouse: true,
+      items,
+      selected: variants.findIndex(v => v.name === current),
+      style: {
+        ...theme().body,
+        border: theme().windowBorderFocused,
+        selected: theme().selected
+      }
+    });
+    list.focus();
+    list.on("select", (_item, index) => {
+      const variant = variants[index];
+      if (variant) {
+        setThemeVariant(variant);
+        this.applyTheme();
+      }
+      list.destroy();
+      this.screen.render();
+    });
+    list.key(["escape", "q"], () => {
+      list.destroy();
+      this.screen.render();
+    });
+    this.screen.render();
+  }
+
   /** Apply current theme tokens to all shell chrome and open windows. */
   private applyTheme(): void {
     this.menuBar.style = theme().menuBar;
@@ -1013,7 +1053,8 @@ export class TsTuiMvpApp {
       openStateInspector: () => this.openStateInspectorWindow(),
       saveWorkspace: () => this.saveWorkspace(),
       loadWorkspace: () => this.loadWorkspace(),
-      toggleTheme: () => this.toggleTheme()
+      toggleTheme: () => this.toggleTheme(),
+      chooseTheme: () => this.chooseTheme()
     };
   }
 

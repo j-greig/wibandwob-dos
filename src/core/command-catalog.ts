@@ -35,6 +35,7 @@ export interface AppMenuActions {
   saveWorkspace: () => void;
   loadWorkspace: () => void;
   toggleTheme: () => void;
+  chooseTheme: () => void;
 }
 
 export type AppCommandCategory = "file" | "edit" | "view" | "window" | "applications";
@@ -239,11 +240,21 @@ const APP_COMMANDS: AppCommandDefinition[] = [
   },
   {
     id: "app.toggle_theme",
-    label: "Toggle Light/Dark",
+    label: "Cycle Theme",
     group: "system",
     actionKey: "toggleTheme",
     menuPlacements: [{ category: "view", order: 30 }],
     palettePlacement: { order: 190 },
+    api: true,
+    agent: true
+  },
+  {
+    id: "app.choose_theme",
+    label: "Choose Theme...",
+    group: "system",
+    actionKey: "chooseTheme",
+    menuPlacements: [{ category: "view", order: 31 }],
+    palettePlacement: { order: 191 },
     api: true,
     agent: true
   },
