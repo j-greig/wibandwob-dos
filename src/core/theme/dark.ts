@@ -3,7 +3,7 @@ import type { ThemeVariant } from "./types.js";
 export const dark: ThemeVariant = {
   name: "wibwob-dark",
   tokens: {
-    desktop:              { fg: "#444444", bg: "black"  },
+    desktop:              { fg: "#222222", bg: "#0a0a0a" },  // xterm 235 on 232 — subtle ░ texture
     desktopFillChar:      "░",
     menuBar:              { fg: "white",  bg: "#333333" },
     statusLine:           { fg: "white",  bg: "#333333" },
