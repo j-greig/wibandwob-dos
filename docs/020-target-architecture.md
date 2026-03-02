@@ -195,6 +195,45 @@ Current known deltas:
   `.trash/002-architecture-plan-content-sizing-layout.md` remain only as
   archaeology; their active architectural guidance is now consolidated here.
 
+## Outstanding Build Work
+
+This is the blunt list of what still needs to be built after the root migration
+and planning cleanup. Treat this as the high-level execution map until these
+items land or are deliberately dropped.
+
+Status vocabulary here:
+
+- `landed` — materially done enough to build on
+- `partial` — meaningful slice landed, but not trustworthy/complete yet
+- `not-started` — architecture intent exists, implementation does not
+
+| Area | Status | What still needs doing | Primary spec/reference |
+|---|---|---|---|
+| Root migration | `landed` | Treat repo root as canon; do not re-do structural move work | `/Users/james/Repos/wibandwob-dos/.planning/epics/e002-ts-tui-root-migration/migration-summary.md` |
+| Default workspace boot | `not-started` | Boot should restore `scratch/workspaces/default.json`, later optional last-used pointer, only then fall back to `Scramble` | This doc (`Reality Check`) |
+| Window manager hardening | `partial` | Fix repaint/shadow invalidation, drag/release bugs, z-order correctness, stale cell cleanup, resize sanity | `/Users/james/Repos/wibandwob-dos/docs/015-window-manager-reference-and-repair-plan.md` |
+| Unicode/cell-aware text rendering | `not-started` | Replace fragile string repaint for complex Unicode with a shared text-to-cells path | `/Users/james/Repos/wibandwob-dos/docs/021-unicode-cell-rendering-follow-on.md` |
+| Command registry core | `partial` | Keep collapsing remaining bespoke command paths into one registry with typed execution contracts | `/Users/james/Repos/wibandwob-dos/docs/018-command-registry-and-tool-adapter-prd.md` and `/Users/james/Repos/wibandwob-dos/.planning/epics/e002-ts-tui-root-migration/legacy-docs/006-command-registry-and-ipc-protocol.md` |
+| Context-sensitive menus | `partial` | Finish static contextual menu filtering first; only later consider dynamic top-level categories | `/Users/james/Repos/wibandwob-dos/docs/019-context-sensitive-menu-bar-prd.md` |
+| Window/app extraction from controller | `partial` | Keep shrinking `app-controller.ts`; move terminal/backrooms/remaining window logic into dedicated modules | `/Users/james/Repos/wibandwob-dos/docs/refactor-epoch-plan.md` and `/Users/james/Repos/wibandwob-dos/.planning/epics/e002-ts-tui-root-migration/legacy-docs/004-window-type-registry-and-factories.md` |
+| Typed window/state/snapshot contracts | `partial` | Move payloads toward discriminated unions or runtime-validated schemas; tighten restore/state invariants | This doc (`Core Contracts To Lock`) and `/Users/james/Repos/wibandwob-dos/.planning/epics/e002-ts-tui-root-migration/legacy-docs/window-facade-full-review.md` |
+| Appearance and theme system | `not-started` | Implement semantic theme tokens, `system/light/dark`, resolver, and adapter model; remove inline color literals over time | `/Users/james/Repos/wibandwob-dos/.planning/epics/e002-ts-tui-root-migration/legacy-docs/008-theme-system-and-desktop-rendering.md` and this doc (`Principles`, desired tree) |
+| Content measurement and pre-open sizing | `partial` | Finish shared measurement for primers/text/figlet/other content-aware surfaces and use it consistently on open | `/Users/james/Repos/wibandwob-dos/.planning/epics/e002-ts-tui-root-migration/legacy-docs/001-primer-dimensions-and-agent-sizing.md` |
+| Browser/document/text rendering surfaces | `partial` | Finish cleaning document reader/browser/file-manager/text rendering on top of shared measurement and repaint rules | `/Users/james/Repos/wibandwob-dos/.planning/epics/e002-ts-tui-root-migration/legacy-docs/010-browser-and-text-rendering.md` |
+| Agent surface | `partial` | Continue converging on native agent window + shared command/state tools; remove remaining stale assumptions | `/Users/james/Repos/wibandwob-dos/.planning/epics/e002-ts-tui-root-migration/legacy-docs/spk-agent-window-enhancement.md` and `/Users/james/Repos/wibandwob-dos/.planning/epics/e002-ts-tui-root-migration/legacy-docs/005-llm-integration-and-claude-sdk-bridge.md` |
+| Event/persistence/multi-instance model | `not-started` | Re-spec and implement modern TS-native event/persistence/multi-instance behavior instead of inheriting old patterns | `/Users/james/Repos/wibandwob-dos/.planning/epics/e002-ts-tui-root-migration/legacy-docs/013-events-persistence-and-multi-instance.md` |
+| Animation subsystem | `not-started` | Build reusable frame source + playback + live generator architecture for ASCII motion and overlays | `/Users/james/Repos/wibandwob-dos/.planning/epics/e002-ts-tui-root-migration/legacy-docs/011-games-and-generative-art.md` and `/Users/james/Repos/wibandwob-dos/.planning/epics/e002-ts-tui-root-migration/legacy-docs/016-terminal-kit-screenbuffer-animation-spike.md` |
+| Terminal subsystem | `not-started` | Revisit only after shell/paint/contracts are boring; do not let nested terminal work dominate current roadmap | `/Users/james/Repos/wibandwob-dos/.planning/epics/e002-ts-tui-root-migration/legacy-docs/007-terminal-emulator.md` and `/Users/james/Repos/wibandwob-dos/.planning/epics/e002-ts-tui-root-migration/legacy-docs/terminal-native-research.md` |
+| Testing and seam enforcement | `not-started` | Add contract tests for command surface, workspace round-trips, state shape, and WM invariants | This doc (`Top-Level Runtime Model`) |
+
+Execution rule:
+
+- if work is not represented above, it is probably either legacy archaeology,
+  parking-lot material, or should be folded into one of these areas before
+  implementation starts
+- commit messages for future work should say whether they land one of these
+  items or only do migration/planning cleanup
+
 ## Top-Level Runtime Model
 
 ```text
