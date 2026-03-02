@@ -250,71 +250,32 @@ export class TsTuiMvpApp {
     this.applyTheme();
   }
 
+  private setThemeByName(args?: Record<string, unknown>): void {
+    const name = String(args?.name ?? "");
+    const variant = allVariants().find(v => v.name === name);
+    if (!variant) {
+      this.overlays.flash(`Unknown theme: ${name}. Available: ${allVariants().map(v => v.name).join(", ")}`);
+      return;
+    }
+    setThemeVariant(variant);
+    this.applyTheme();
+  }
+
   private chooseTheme(): void {
     const variants = allVariants();
     const current = themeName();
-    const items = variants.map(v => v.name === current ? `● ${v.name}` : `  ${v.name}`);
-    const list = blessed.list({
-      parent: this.screen,
-      top: "center",
-      left: "center",
-      width: 30,
-      height: variants.length + 2,
-      border: "line",
-      tags: true,
-      keys: true,
-      vi: true,
-      mouse: true,
-      items,
-      selected: variants.findIndex(v => v.name === current),
-      style: {
-        ...theme().body,
-        border: theme().windowBorderFocused,
-        selected: theme().selected
-      }
-    });
-    let closed = false;
-    const closePicker = () => {
-      if (closed) return;
-      closed = true;
-      list.detach();
-      list.destroy();
-      this.repaintDesktop();
-      this.screen.render();
-    };
-    const applySelection = () => {
-      const index = (list as any).selected as number;
-      const variant = variants[index];
-      closePicker();
-      if (variant) {
-        setThemeVariant(variant);
+    this.overlays.openCenteredListPrompt(
+      "Choose Theme",
+      variants.map((variant) => ({
+        label: variant.name === current ? `● ${variant.name}` : `  ${variant.name}`,
+        variant
+      })),
+      variants.findIndex((variant) => variant.name === current),
+      (item) => {
+        setThemeVariant(item.variant);
         this.applyTheme();
       }
-    };
-    // Grab all keys at screen level to avoid focus issues
-    const keyHandler = (_ch: string, key: any) => {
-      if (!key) return;
-      if (key.name === "escape" || key.name === "q") {
-        this.screen.removeListener("keypress", keyHandler);
-        closePicker();
-      } else if (key.name === "return" || key.name === "enter") {
-        this.screen.removeListener("keypress", keyHandler);
-        applySelection();
-      } else if (key.name === "j" || key.name === "down") {
-        list.down(1);
-        this.screen.render();
-      } else if (key.name === "k" || key.name === "up") {
-        list.up(1);
-        this.screen.render();
-      }
-    };
-    this.screen.on("keypress", keyHandler);
-    list.on("select", () => {
-      this.screen.removeListener("keypress", keyHandler);
-      applySelection();
-    });
-    list.focus();
-    this.screen.render();
+    );
   }
 
   /** Apply current theme tokens to all shell chrome and open windows. */
@@ -1081,7 +1042,8 @@ export class TsTuiMvpApp {
       saveWorkspace: () => this.saveWorkspace(),
       loadWorkspace: () => this.loadWorkspace(),
       toggleTheme: () => this.toggleTheme(),
-      chooseTheme: () => this.chooseTheme()
+      chooseTheme: () => this.chooseTheme(),
+      setTheme: (args) => this.setThemeByName(args)
     };
   }
 

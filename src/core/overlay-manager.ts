@@ -2,6 +2,7 @@ import blessed from "blessed";
 import fs from "node:fs";
 import path from "node:path";
 
+import { theme } from "./theme/resolver.js";
 import type { Box, List, Textbox } from "./types.js";
 
 interface BrowserPromptItem {
@@ -209,6 +210,95 @@ export class OverlayManager {
       initialIndex,
       (item, index) => onSubmit(items[index], index)
     );
+  }
+
+  openCenteredListPrompt<T extends { label: string }>(
+    label: string,
+    items: T[],
+    initialIndex: number,
+    onSubmit: (item: T, index: number) => void,
+    onCancel?: () => void
+  ): void {
+    const screen = this.screen as blessed.Widgets.Screen & { grabKeys: boolean };
+    const previousGrabKeys = screen.grabKeys;
+    const width = Math.max(24, Math.max(...items.map((item) => item.label.length), 0) + 4);
+    const modal = blessed.box({
+      parent: this.screen,
+      top: "center",
+      left: "center",
+      width,
+      height: Math.max(3, items.length + 2),
+      border: "line",
+      label: ` ${label} `,
+      mouse: true,
+      keys: true,
+      style: {
+        ...theme().body,
+        border: theme().windowBorderFocused
+      }
+    });
+    const list = blessed.list({
+      parent: modal,
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      mouse: true,
+      keys: true,
+      vi: true,
+      items: items.map((item) => item.label),
+      style: {
+        ...theme().body,
+        selected: theme().selected
+      }
+    }) as List & { selected?: number };
+
+    screen.grabKeys = true;
+
+    let closed = false;
+
+    const closePrompt = (cancelled: boolean) => {
+      if (closed) {
+        return;
+      }
+      closed = true;
+      list.removeAllListeners("select");
+      list.removeAllListeners("keypress");
+      modal.destroy();
+      screen.grabKeys = previousGrabKeys;
+      this.restoreWindowFocus();
+      this.screen.render();
+      if (cancelled) {
+        onCancel?.();
+      }
+    };
+
+    const applySelection = () => {
+      if (closed) {
+        return;
+      }
+      const index = list.selected ?? 0;
+      const item = items[index];
+      closePrompt(false);
+      if (item) {
+        onSubmit(item, index);
+      }
+    };
+
+    list.select(Math.max(0, Math.min(initialIndex, Math.max(0, items.length - 1))));
+    list.on("select", () => applySelection());
+    list.on("keypress", (_, key) => {
+      if (key.name === "escape" || key.name === "q") {
+        closePrompt(true);
+        return;
+      }
+      if (key.name === "enter" || key.name === "return") {
+        applySelection();
+      }
+    });
+
+    list.focus();
+    this.screen.render();
   }
 
   openBrowserPrompt(

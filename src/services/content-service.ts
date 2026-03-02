@@ -28,7 +28,7 @@ export class ContentService {
       }
       const modules = fs
         .readdirSync(rootPath, { withFileTypes: true })
-        .filter((entry) => entry.isDirectory() && !entry.name.startsWith("."));
+        .filter((entry) => !entry.name.startsWith(".") && this.isDirectoryEntry(rootPath, entry));
       for (const moduleEntry of modules) {
         const primersPath = path.join(rootPath, moduleEntry.name, "primers");
         if (!fs.existsSync(primersPath)) {
@@ -36,7 +36,7 @@ export class ContentService {
         }
         const entries = fs
           .readdirSync(primersPath, { withFileTypes: true })
-          .filter((entry) => entry.isFile() && this.isTextLikeFile(entry.name))
+          .filter((entry) => this.isTextFileEntry(primersPath, entry))
           .map((entry) => this.createBrowserEntry(entry.name, path.join(primersPath, entry.name)))
           .sort((left, right) => left.label.localeCompare(right.label));
         if (entries.length > 0) {
@@ -59,7 +59,7 @@ export class ContentService {
       }
       const modules = fs
         .readdirSync(rootPath, { withFileTypes: true })
-        .filter((entry) => entry.isDirectory() && !entry.name.startsWith("."));
+        .filter((entry) => !entry.name.startsWith(".") && this.isDirectoryEntry(rootPath, entry));
       for (const moduleEntry of modules) {
         const primersPath = path.join(rootPath, moduleEntry.name, "primers");
         if (!fs.existsSync(primersPath)) {
@@ -67,7 +67,7 @@ export class ContentService {
         }
         const moduleEntries = fs
           .readdirSync(primersPath, { withFileTypes: true })
-          .filter((entry) => entry.isFile() && this.isTextLikeFile(entry.name))
+          .filter((entry) => this.isTextFileEntry(primersPath, entry))
           .map((entry) => this.createBrowserEntry(`${moduleEntry.name} :: ${entry.name}`, path.join(primersPath, entry.name)));
         entries.push(...moduleEntries);
       }
@@ -157,14 +157,45 @@ export class ContentService {
         continue;
       }
       const childPath = path.join(directory, child.name);
-      if (child.isDirectory()) {
+      if (this.isDirectoryEntry(directory, child)) {
         this.walkPrimerEntries(childPath, rootLabel, entries, depth + 1);
         continue;
       }
-      if (!this.isTextLikeFile(child.name)) {
+      if (!this.isTextFileEntry(directory, child)) {
         continue;
       }
       entries.push(this.createBrowserEntry(`${rootLabel} :: ${path.relative(path.join(REPO_ROOT, rootLabel), childPath)}`, childPath));
+    }
+  }
+
+  private isDirectoryEntry(directory: string, entry: fs.Dirent): boolean {
+    if (entry.isDirectory()) {
+      return true;
+    }
+    if (!entry.isSymbolicLink()) {
+      return false;
+    }
+    return this.safeStat(path.join(directory, entry.name))?.isDirectory() === true;
+  }
+
+  private isTextFileEntry(directory: string, entry: fs.Dirent): boolean {
+    if (!this.isTextLikeFile(entry.name)) {
+      return false;
+    }
+    if (entry.isFile()) {
+      return true;
+    }
+    if (!entry.isSymbolicLink()) {
+      return false;
+    }
+    return this.safeStat(path.join(directory, entry.name))?.isFile() === true;
+  }
+
+  private safeStat(filePath: string): fs.Stats | undefined {
+    try {
+      return fs.statSync(filePath);
+    } catch {
+      return undefined;
     }
   }
 

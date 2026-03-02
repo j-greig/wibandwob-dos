@@ -36,6 +36,7 @@ export interface AppMenuActions {
   loadWorkspace: () => void;
   toggleTheme: () => void;
   chooseTheme: () => void;
+  setTheme: (args?: Record<string, unknown>) => void;
 }
 
 export type AppCommandCategory = "file" | "edit" | "view" | "window" | "applications";
@@ -255,6 +256,15 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     actionKey: "chooseTheme",
     menuPlacements: [{ category: "view", order: 31 }],
     palettePlacement: { order: 191 },
+    api: true,
+    agent: true
+  },
+  {
+    id: "app.set_theme",
+    label: "Set Theme",
+    description: "Set theme by name. Args: name (wibwob-dark, wibwob-dark-nord, wibwob-dark-pastel, wibwob-phosphor, wibwob-light).",
+    group: "system",
+    actionKey: "setTheme",
     api: true,
     agent: true
   },
