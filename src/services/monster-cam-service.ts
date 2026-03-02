@@ -15,6 +15,8 @@ export interface MonsterCamFrame {
   bbox: [number, number, number, number];
   hasHands: boolean;
   handCount: number;
+  handBoxes: [number, number, number, number][];
+  handLabels: string[];
   hasPose: boolean;
   fps: number;
   gray: Uint8Array; // w*h grayscale bytes
@@ -114,6 +116,8 @@ export class MonsterCamService extends EventEmitter {
             bbox:      h.bbox       ?? [0,0,0,0],
             hasHands:  h.has_hands  ?? false,
             handCount: h.hand_count ?? 0,
+            handBoxes:  h.hand_boxes   ?? [],
+            handLabels: h.hand_labels  ?? [],
             hasPose:   h.has_pose   ?? false,
             fps:       h.fps        ?? 0,
           };

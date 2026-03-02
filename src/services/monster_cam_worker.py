@@ -38,7 +38,7 @@ face_det  = mp.solutions.face_detection.FaceDetection(
     model_selection=0, min_detection_confidence=0.5)
 hands_det = mp.solutions.hands.Hands(
     static_image_mode=False, max_num_hands=2,
-    min_detection_confidence=0.5, min_tracking_confidence=0.5)
+    min_detection_confidence=0.3, min_tracking_confidence=0.3)
 pose_det  = mp.solutions.pose.Pose(
     static_image_mode=False,
     min_detection_confidence=0.5, min_tracking_confidence=0.5)
@@ -121,9 +121,23 @@ while True:
                     int(d.width * W), int(d.height * H)]
 
         hands_res = hands_det.process(frame_rgb)
+        hand_boxes  = []
+        hand_labels = []
         if hands_res.multi_hand_landmarks:
             has_hands  = True
             hand_count = len(hands_res.multi_hand_landmarks)
+            handedness = hands_res.multi_handedness or []
+            for i, lm in enumerate(hands_res.multi_hand_landmarks):
+                label = handedness[i].classification[0].label[0] if i < len(handedness) else "?"
+                xs = [p.x for p in lm.landmark]
+                ys = [p.y for p in lm.landmark]
+                pad_x, pad_y = (max(xs)-min(xs)) * 0.2, (max(ys)-min(ys)) * 0.2
+                x0 = max(0, int((min(xs) - pad_x) * W))
+                y0 = max(0, int((min(ys) - pad_y) * H))
+                x1 = min(W, int((max(xs) + pad_x) * W))
+                y1 = min(H, int((max(ys) + pad_y) * H))
+                hand_boxes.append([x0, y0, x1 - x0, y1 - y0])
+                hand_labels.append(label)
 
         pose_res = pose_det.process(frame_rgb)
         if pose_res.pose_landmarks:
@@ -134,6 +148,7 @@ while True:
         "w": W, "h": H, "ts": int(now * 1000),
         "has_face": has_face, "bbox": bbox,
         "has_hands": has_hands, "hand_count": hand_count,
+        "hand_boxes": hand_boxes, "hand_labels": hand_labels,
         "has_pose": has_pose, "fps": fps_val
     }) + "\n"
     payload = header.encode() + bytes(gray)
