@@ -15,7 +15,7 @@ export const dark: ThemeVariant = {
     titleBarUnfocused:    { fg: "white",  bg: "#1a1a1a" },
     closeButton:          { fg: "white",  bg: "red"     },
     resizeGrip:           { fg: "yellow", bg: "black"   },
-    windowShadow:         { fg: "black", bg: "black", char: "▒" },
+    windowShadow:         { fg: "black", bg: "#333", char: "▒" },
 
     body:                 { fg: "white",  bg: "black"   },
     bodyAlt:              { fg: "white",  bg: "blue"    },

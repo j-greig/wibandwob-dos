@@ -50,20 +50,21 @@ export class OverlayManager {
   }
 
   openValuePrompt(label: string, initialValue: string, onSubmit: (value: string) => void): void {
+    const t = theme();
+    const promptWidth = Math.min(60, Math.floor(Number(this.screen.width) * 0.5));
     const modal = blessed.box({
       parent: this.screen,
       top: "center",
       left: "center",
-      width: "70%",
-      height: 7,
+      width: promptWidth,
+      height: 5,
       border: "line",
       label: ` ${label} `,
       mouse: true,
       keys: true,
       style: {
-        fg: "white",
-        bg: "black",
-        border: { fg: "cyan" }
+        ...t.body,
+        border: t.windowBorderFocused
       }
     });
     const input: Textbox = blessed.textbox({
@@ -75,10 +76,7 @@ export class OverlayManager {
       inputOnFocus: true,
       mouse: true,
       keys: true,
-      style: {
-        fg: "white",
-        bg: "blue"
-      }
+      style: t.selected
     });
 
     const closePrompt = () => {
@@ -112,11 +110,13 @@ export class OverlayManager {
     completePath: (value: string) => string,
     onSubmit: (value: string) => void
   ): void {
+    const t = theme();
+    const pathWidth = Math.min(80, Math.floor(Number(this.screen.width) * 0.5));
     const modal = blessed.box({
       parent: this.screen,
       top: "center",
       left: "center",
-      width: "80%",
+      width: pathWidth,
       height: 7,
       border: "line",
       label: ` ${label} `,
@@ -124,9 +124,8 @@ export class OverlayManager {
       mouse: true,
       keys: true,
       style: {
-        fg: "white",
-        bg: "black",
-        border: { fg: "cyan" }
+        ...t.body,
+        border: t.windowBorderFocused
       }
     });
     const input: Textbox = blessed.textbox({
@@ -138,10 +137,7 @@ export class OverlayManager {
       inputOnFocus: true,
       keys: true,
       mouse: true,
-      style: {
-        fg: "white",
-        bg: "blue"
-      }
+      style: t.selected
     });
     blessed.box({
       parent: modal,
