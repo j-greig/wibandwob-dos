@@ -97,6 +97,7 @@ export interface WorkspaceRestoreActions {
   openPrimerBrowserWindow: (restore?: { selectedIndex?: number }) => void;
   openFileManagerWindow: (restore?: { currentPath?: string; selectedIndex?: number; filterValue?: string; searchQuery?: string; searchMode?: "simple" | "advanced"; viewMode?: "list" | "icon"; showHidden?: boolean; sortField?: "name" | "size" | "modified" | "type" }) => void;
   openBackroomsTv: (channel: BackroomsChannel) => void;
+  openBackroomsLogBrowserWindow: () => void;
   openCompanionWindow: (restore?: { tick?: number }) => void;
   openArtWindow: () => void;
   openStateInspectorWindow: () => void;
@@ -154,6 +155,8 @@ export function restoreWindowSnapshot(snapshot: WindowSnapshot, actions: Workspa
           showHidden: typeof payload.showHidden === "boolean" ? payload.showHidden : undefined,
           sortField: ["name", "size", "modified", "type"].includes(payload.sortField as string) ? payload.sortField as "name" | "size" | "modified" | "type" : undefined
         });
+      } else if (payload.appType === "backrooms-log-browser") {
+        actions.openBackroomsLogBrowserWindow();
       } else {
         actions.openPrimerBrowserWindow({
           selectedIndex: typeof payload.selectedIndex === "number" ? payload.selectedIndex : undefined

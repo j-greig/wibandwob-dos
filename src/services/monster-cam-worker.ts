@@ -18,7 +18,12 @@ function log(msg: string) {
   process.stderr.write(`[monster-cam-worker] ${msg}\n`);
 }
 
-const py = spawn(VENV_PY, [PY_WORKER, ...process.argv.slice(2)], {
+// Try venv first, fall back to system python3
+const fs = await import("fs");
+const pythonPath = fs.existsSync(VENV_PY) ? VENV_PY : "python3";
+log(`Using Python: ${pythonPath}`);
+
+const py = spawn(pythonPath, [PY_WORKER, ...process.argv.slice(2)], {
   stdio: ["ignore", "ignore", "inherit"],
   env: process.env,
 });

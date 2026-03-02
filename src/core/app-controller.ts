@@ -945,6 +945,7 @@ export class TsTuiMvpApp {
       openPrimerBrowserWindow: (restore) => this.openPrimerBrowserWindow(restore),
       openFileManagerWindow: (restore) => this.openFileManagerWindow(restore),
       openBackroomsTv: (channel) => this.openBackroomsTv(channel),
+      openBackroomsLogBrowserWindow: () => this.openBackroomsLogBrowserWindow(),
       openCompanionWindow: (restore) => this.openCompanionWindow(restore),
       openArtWindow: () => this.openArtWindow(),
       openStateInspectorWindow: () => this.openStateInspectorWindow(),
