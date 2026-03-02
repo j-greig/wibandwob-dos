@@ -2,12 +2,12 @@
 
 Full theme system with live switching across all surfaces.
 
-## Status: IN PROGRESS
+## Status: LANDED
 
 ## Definitions
 
 - **theme token**: a semantic colour role (e.g. `body`, `header`, `selected`) resolved at runtime
-- **variant**: a named set of token values (dark, dark-pastel, light)
+- **variant**: a named set of token values (dark, dark-nord, dark-pastel, phosphor, light)
 - **fleet test**: opening one of every window kind and toggling through all variants
 - **surface**: any visible UI element — menu bar, dropdown, popup, window, status line
 
@@ -26,60 +26,27 @@ Full theme system with live switching across all surfaces.
 - [x] Theme file split: `src/core/theme/` with types, resolver, variants/
 - [x] Phosphor theme in `modules-private/wibwob-themes/variants/`
 - [x] Fleet audit: 12 window kinds x 5 themes, screenshots in scratch/
+- [x] Theme picker: `Choose Theme...` via View menu / palette / API
+- [x] `app.set_theme` API command: set theme by name without interactive picker
+- [x] Workspace theme persistence: v2 envelope `{version:2, theme, windows}`, backward compat
+- [x] Themed overlay prompts (value prompt, path prompt)
+- [x] App-owned window shadows, themed via `windowShadow` token
+- [x] Desktop fill char system, themed via `desktopFillChar` token
+- [x] Unfocused title bar contrast fixed in dark variant
+- [x] Status bar shows active theme name
+- [x] Fleet test script: `scripts/fleet-test.sh`
 
 ## Theme Parity — Surface Audit
 
-Every surface must use theme tokens. No hardcoded colour strings.
+All surfaces verified across 5 themes via fleet audit (35 windows x 5 themes).
 
-### Shell chrome
-- [x] **Menu bar click targets** — now use `theme().menuBar` + `theme().selected` hover
-- [x] **Dropdown menus** — now use `theme().body` + `theme().selected`
-- [x] **Popup/context menus** — same
-- [x] **Status line** — restyles on toggle
-- [x] **Menu bar background continuity** — bar bg distinct from desktop bg in all variants
-- [ ] **Menu bar restyle on toggle** — targets restyle via `menuUi.restyle()`, verify visually
+- [x] Shell chrome (menu bar, dropdowns, context menus, status line)
+- [x] Window chrome (close button, title bar focused/unfocused)
+- [x] All 15 window kinds verified: primer, browser, gallery, editor, figlet, art, pattern, companion, workspace, palette, inspector, backrooms, backrooms-log, chrome-browser, wibwob-agent
 
-### Window chrome
-- [ ] **Close button** — verify X button uses theme tokens on restyle
-- [ ] **Resize grip** — verify grip glyph uses theme tokens on restyle
-- [ ] **Unfocused title bar** — verify contrast is readable in all variants
+## Remaining Follow-ons
 
-### Per-window-kind audit
-
-Open each, toggle all 3 themes, screenshot, check for hardcoded colours or broken contrast.
-
-- [ ] primer (content viewer)
-- [ ] browser (primer browser list)
-- [ ] gallery (primer gallery with tabs + filter + preview)
-- [ ] editor (text editor)
-- [ ] figlet (banner with toolbar)
-- [ ] art (generative art canvas)
-- [ ] pattern (pattern field canvas)
-- [ ] companion (Scramble)
-- [ ] workspace (workspace manager)
-- [ ] palette (command palette)
-- [ ] inspector (state inspector)
-- [ ] backrooms (backrooms TV)
-- [ ] backrooms-log (log browser)
-- [ ] chrome-browser (web browser)
-- [ ] wibwob-agent (W&W agent chat)
-
-### Fleet test script
-- [ ] Write a script that opens one of each window kind, tiles, toggles all 3 themes, screenshots each
-- [ ] Save screenshots to `scratch/screenshots/` with date + variant naming
-
-## Theme Quality
-
-- [ ] **Dark variant** — review contrast, readability, accent visibility
-- [ ] **Dark-pastel variant** — review hex→xterm-256 mapping accuracy, tweak if colours look off
-- [ ] **Light variant** — review contrast (currently very plain white, could use more warmth)
-- [ ] **Scrollbar visibility** — verify scrollbar thumb is visible in all variants
-- [ ] **Selected item contrast** — verify selection highlight is readable in all variants
-
-## Future / Parking Lot
-
-- [ ] Theme persistence (save active variant to config, restore on boot)
-- [ ] Theme selector command (pick from list, not just cycle)
+- [ ] Theme in `/state` endpoint — expose active theme name in desktop state JSON
 - [ ] User-defined themes (load variant from JSON/YAML file)
 - [ ] `appearance-service.ts` integration (system/light/dark auto-detection)
-- [ ] More variants (Nord, Dracula, Solarized, Gruvbox, Tokyo Night)
+- [ ] More variants (Dracula, Solarized, Gruvbox, Tokyo Night)

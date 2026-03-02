@@ -281,15 +281,24 @@ bun run dev
 
 The app currently includes:
 - fullscreen terminal app shell
-- top menu bar
-- bottom status line
-- desktop background fill
-- draggable floating windows
+- top menu bar, bottom status line (shows theme name, window count, focus info)
+- desktop background fill with themed fill characters
+- draggable floating windows with app-owned shadows
+- theme system: 5 variants (dark, nord, pastel, phosphor, light), live switching via Alt+T / menu / palette / API, theme picker, `app.set_theme` API command, workspace theme persistence
 - primer viewer window
 - text editor window
-- primer browser window
+- primer browser window (discovers symlinked private primers)
+- primer gallery with tabbed categories and preview
+- file manager browser
+- document reader
+- chrome browser (web extraction)
 - shared browser/openers for workspace and file selection
 - animated generative art window
+- pattern field window
+- companion (Scramble the cat)
+- command palette
+- state inspector
+- workspace manager with save/load
 - native `Wib&Wob Agent` backed by `WibWobAgentSession`
 - Backrooms TV with real/fake-live modes and per-run primer roots
 - FIGlet window backed by the shared font catalogue and real `figlet` CLI
@@ -338,6 +347,7 @@ Current control endpoints:
 - `POST /windows/text/export`
 - `POST /workspace/save`
 - `POST /workspace/load`
+- `GET /screenshot/text`
 
 Control parity rule:
 - whenever a new window family, app mode, or user-triggerable command is added, update both:

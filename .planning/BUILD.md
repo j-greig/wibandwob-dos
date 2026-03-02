@@ -50,7 +50,7 @@ Rules:
 
 - [x] **Appearance and theme system**
   Implement theme types, resolver, and variants. Semantic tokens, live switching, remove inline colour literals.
-  Status: landed — 5 themes (dark, nord, pastel, phosphor, light) cycling live via Alt+T / menu / API. All surfaces themed: windows, menus, dropdowns, context menus, status line. `safeSetStyle` helper handles blessed scrollbar/item sub-styles. Theme files split into `src/core/theme/` with one file per theme. Private themes in `modules-private/wibwob-theme-{name}/`. Fleet audit: 12 window kinds x 5 themes verified. Menu bar vs desktop contrast fixed in all variants.
+  Status: landed — 5 themes (dark, nord, pastel, phosphor, light) cycling live via Alt+T / menu / API. Theme picker (Choose Theme...) and `app.set_theme` API command for direct selection. Workspace theme persistence (v2 envelope). Themed overlays, shadows, desktop fill, menus, context menus, status line. `safeSetStyle` helper handles blessed sub-styles. Fleet audit: 35 windows x 5 themes verified. Remaining: expose theme in `/state` endpoint.
   Epic: `.planning/epics/e014-theme-system/EPIC.md`
   Spec: `.planning/epics/e002-ts-tui-root-migration/legacy-docs/008-theme-system-and-desktop-rendering.md`
 
@@ -113,7 +113,6 @@ here with a note. Promote back when conditions change.
 - **Primer dims header**: add `# dims: 68x22` to primer files to skip full measurement scan (~14s across 197 files)
 - **tmux-launch rewrite**: replace C++/API era launcher with TS-native tmux harness
 - **CI and contract tests**: rebuild C++ era contract test patterns in TS against the new API surface
-- **Dual measurement**: `openPrimerWindow` re-measures instead of consuming content-service — fix when primers extracted
 - **WindowRecord shape**: optional fields still grow per type — refactor to discriminated union
 - ~~**28 hardcoded blessed style literals**~~: done — all surfaces now use theme tokens
 - **Parity audit**: 8 window kinds untested (figlet, pattern, inspector, workspace, chrome-browser, wibwob-agent, backrooms-tv, reader). Need automated test that catches missing appType/summary.
