@@ -1,0 +1,339 @@
+# E001: Codified Context Infrastructure
+
+Status: not-started
+GitHub issue: —
+PR: —
+
+## Summary (300 words)
+
+This epic is informed by the paper "Codified Context: Infrastructure for AI
+Agents in a Complex Codebase" (Vasilopoulos, 2026; arXiv:2602.20478v1).
+
+The paper presents a three-tier architecture for giving AI coding agents
+persistent project memory. The problem: LLM agents lose coherence across
+sessions, forget conventions, and repeat mistakes. Single-file manifests
+(CLAUDE.md, AGENTS.md) don't scale past modest codebases.
+
+The solution is tiered knowledge infrastructure:
+
+Tier 1 (Hot Memory): A single constitution file (~660 lines) loaded every
+session. Defines conventions, naming rules, build commands, architectural
+summaries, and trigger tables that route tasks to specialist agents.
+
+Tier 2 (Domain Experts): 19 specialist agent specs (~9,300 lines total)
+encoding deep domain knowledge. Over half of each spec is project-specific
+facts, not behavioral instructions. Created reactively when a domain
+repeatedly caused debugging failures. The practical heuristic: if debugging
+stalls an unguided session, create a specialist and restart.
+
+Tier 3 (Cold Memory): 34 knowledge base documents (~16,250 lines) served
+via MCP, each covering one subsystem. Written for AI consumption with file
+paths, function names, and explicit do/don't instructions. Retrieved on
+demand by keyword search.
+
+Evaluated across 283 sessions, 70 days, 108K lines of C#. The
+knowledge-to-code ratio reached 24.2%. Key findings: specifications as
+coordination documents prevented bugs across 74 sessions; captured
+experience eliminated trial-and-error; documentation gaps detected by null
+search results; embedded domain knowledge enabled collaborative debugging
+of subtle cross-cutting bugs.
+
+Practitioner guidelines: start the constitution early; if you explained it
+twice, write it down; route automatically or forget constantly; when in
+doubt, create an agent and restart; stale specs mislead — treat them as
+load-bearing infrastructure.
+
+WibWob-DOS already has elements of this pattern (CLAUDE.md, AGENTS.md,
+.pi/skills, .planning). This epic formalises and extends it.
+
+## Relevance to WibWob-DOS
+
+We already have:
+- CLAUDE.md (~660 lines) — functions as Tier 1 constitution
+- AGENTS.md — project-level agent instructions
+- .pi/skills/ — 13 skills acting as partial Tier 2 specialists
+- .planning/ — spikes, epics, sparks (partial Tier 3)
+- qmd collection — 62 indexed md files for search
+
+We lack:
+- Trigger tables routing file changes to specific skills/agents
+- Subsystem specs written for AI consumption (our docs are mixed human/AI)
+- Drift detection (stale specs vs changed code)
+- Knowledge base served via MCP for on-demand retrieval
+- Formal hot/cold separation — everything loads or nothing does
+
+## Acceptance Criteria
+
+- [ ] AC-1: Constitution file includes trigger table mapping file patterns to skills
+  Test: grep for trigger table in CLAUDE.md, verify at least 10 file-pattern→skill mappings
+
+- [ ] AC-2: At least 5 subsystem specs written for AI consumption in .planning/specs/
+  Test: each spec has file paths, function names, known failure modes, do/don't instructions
+
+- [ ] AC-3: Context drift detector warns when source changes without spec updates
+  Test: modify a file covered by a spec, run detector, verify warning output
+
+- [ ] AC-4: qmd or MCP retrieval serves specs on demand from agent sessions
+  Test: agent can search and retrieve spec content during a session
+
+- [ ] AC-5: Knowledge-to-code ratio tracked and reported
+  Test: script counts lines in specs vs source, outputs ratio
+
+## Reference
+
+Full paper text preserved below for agent consumption.
+
+---
+
+## Full Paper Text
+
+Source: https://arxiv.org/html/2602.20478v1
+Title: Codified Context: Infrastructure for AI Agents in a Complex Codebase
+Authors: Aristidis Vasilopoulos
+Date: 24 Feb 2026
+
+### Abstract
+
+LLM-based agentic coding assistants lack persistent memory: they lose
+coherence across sessions, forget project conventions, and repeat known
+mistakes. Recent studies characterize how developers configure agents
+through manifest files, but an open challenge remains how to scale such
+configurations for large, multi-agent projects. This paper presents a
+three-component codified context infrastructure developed during
+construction of a 108,000-line C# distributed system: (1) a hot-memory
+constitution encoding conventions, retrieval hooks, and orchestration
+protocols; (2) 19 specialized domain-expert agents; and (3) a cold-memory
+knowledge base of 34 on-demand specification documents. Quantitative
+metrics on infrastructure growth and interaction patterns across 283
+development sessions are reported alongside four observational case studies
+illustrating how codified context propagates across sessions to prevent
+failures and maintain consistency. The framework is published as an
+open-source companion repository.
+
+### 1. Introduction
+
+AI coding agents such as GitHub Copilot, Cursor, and Claude Code have
+reached millions of developers, and recent work documents fully agentic
+systems capable of planning, executing, and iterating on complex
+development tasks. These tools possess broad programming knowledge, but
+they lack project memory: each session begins without awareness of prior
+sessions, established conventions, or past mistakes. Consistent output for
+a specific project requires knowledge that persists across sessions, yet
+single-file manifests (.cursorrules, CLAUDE.md, AGENTS.md) do not scale
+beyond modest codebases: a 1,000-line prototype can be fully described in a
+single prompt, but a 100,000-line system cannot. The AI must be told —
+repeatedly, reliably, and in a format it can act on — how the project
+works, what patterns to follow, and what mistakes to avoid. Structured
+knowledge transfer to agents remains a largely open interaction design
+problem.
+
+This paper addresses the gap with a codified context infrastructure that
+treats documentation as infrastructure — load-bearing artifacts that AI
+agents depend on to produce correct output. Machine-readable specification
+documents, available on demand, allow agents to simulate persistent memory
+even in a complex codebase.
+
+The architecture was developed iteratively during construction of a
+108,000-line C# distributed system (a real-time multiplayer simulation
+built on the MonoGame framework and the Arch Entity Component System
+library). Both application code and context infrastructure were generated
+using Claude Code as the sole code-generation tool, directed by human
+prompting and agent orchestration. The author's primary background is in
+chemistry rather than software engineering, making this project a test case
+for a specific emerging use pattern: domain experts building software
+beyond their primary expertise with AI agents.
+
+#### 1.1. Contributions
+
+(1) A tiered architecture for organizing project knowledge to support
+multi-agent AI-assisted development. This architecture extends the
+single-file manifest pattern with domain-expert agents embedding
+project-specific knowledge, trigger tables for automatic task routing, and
+a hot/cold memory separation that distinguishes always-loaded conventions
+from on-demand specifications.
+
+(2) Quantitative evaluation across 283 development sessions, including
+infrastructure growth metrics, interaction patterns (2,801 human prompts,
+1,197 agent invocations, 16,522 agent turns), and four observational case
+studies.
+
+(3) An open-source framework with representative agent specifications, an
+MCP retrieval server, example documents, factory agents for bootstrapping,
+and all analysis scripts.
+
+### 2. Related Work
+
+#### 2.1. Agentic Coding Manifests
+
+Developers have begun creating configuration files — variously called
+CLAUDE.md, .cursorrules, or AGENTS.md — to provide AI coding agents with
+project-specific instructions at the start of each session. Among Claude
+Code projects, 72.6% specify application architecture, and the pattern
+generalizes across 2,303 files spanning Claude Code, Codex, and GitHub
+Copilot. Adoption across the broader open-source ecosystem remains early —
+only ~5% of 466 surveyed repositories had adopted any context file format —
+but among projects that do use manifests, the presence of AGENTS.md files
+was associated with a 29% reduction in median runtime and 17% reduction in
+output token consumption.
+
+The present work addresses a different question: what happens when a
+project's knowledge needs outgrow a single file? The project described here
+began with a manifest similar to those analyzed in prior studies but
+evolved into a tiered architecture totaling approximately 26,000 lines —
+more than an order of magnitude beyond the typical manifests.
+
+#### 2.2. Context Engineering and Multi-Agent Frameworks
+
+Context engineering has been formalized as a discipline. Agentic Context
+Engineering (ACE) treats contexts as "evolving playbooks" refined through a
+generate-reflect-curate cycle. That work also identifies a brevity bias — a
+tendency for iterative optimization to collapse toward short, generic
+prompts — which is consistent with the finding here that specialized agents
+require substantial embedded domain knowledge to perform reliably.
+
+Multi-agent coordination frameworks such as AutoGen, ChatDev, and MetaGPT
+address how agents coordinate, how tasks are divided into stages, and how
+standard procedures are embedded into workflows, respectively. The
+contribution here is complementary: while those frameworks define how
+agents coordinate, the focus here is on structuring the knowledge that
+agents depend on.
+
+### 3. Architecture
+
+The architecture consists of three tiers:
+
+#### 3.1. Tier 1: Project Constitution (Hot Memory)
+
+A single Markdown file (~660 lines) loaded automatically into every AI
+session. It defines code quality standards, naming conventions, build
+commands, architectural pattern summaries with references to detailed
+specifications in Tier 3, checklists for common operations, known failure
+modes, and orchestration protocols that route tasks to specialized agents.
+
+The constitution embeds trigger tables that route tasks to the appropriate
+specialized agent based on observable signals — primarily which files are
+being modified.
+
+Representative triggers:
+- Network/sync files -> network-protocol-designer agent
+- Coordinates/camera files -> coordinate-wizard agent
+- Abilities files -> ability-designer agent
+- Post architecture/design changes -> systems-designer agent
+- Post ECS/network changes -> code-reviewer-game-dev agent
+
+#### 3.2. Tier 2: Specialized Agents
+
+19 agent specification files (115-1,233 lines each, ~9,300 lines total)
+define domain-expert personas. Split into: 8 higher-capability agents
+(~5,700 lines, ~711 lines/agent) for complex domains, and 11 standard
+agents (~3,600 lines, ~327 lines/agent) for focused tasks.
+
+Over half of each specification's content is project-domain knowledge
+rather than behavioral instructions. This creates intentional overlap with
+Tier 3, driven by: complex domains requiring complete mental models; agents
+accumulating symptom-cause-fix tables from debugging; and some domains
+requiring pre-synthesized views spanning multiple Tier 3 documents.
+
+Agent creation was typically driven by observed failure patterns rather than
+upfront design. The practical heuristic: if debugging a particular domain
+consumed an extended session without resolution, it was faster to create a
+specialized agent and restart the task.
+
+#### 3.3. Tier 3: Knowledge Base (Cold Memory)
+
+34 Markdown files (~16,250 lines including ~1,600-line retrieval service),
+each documenting one subsystem. Three design decisions: documents written
+for AI consumption (explicit code patterns with file paths, parameter
+names, expected behavior); specifications are living documents generated
+and updated by AI at developer's direction; each document scoped to a
+single subsystem for targeted retrieval.
+
+Served through an MCP server with five tools: list_subsystems(),
+get_files_for_subsystem(key), find_relevant_context(task),
+search_context_documents(query), suggest_agent(task).
+
+### 4. Evaluation
+
+283 sessions spanning 70 days of part-time development. 108,256 lines C#.
+2,801 human prompts, 1,197 agent invocations, 16,522 agent turns. Context
+infrastructure: 54 files, ~26,200 lines, 24.2% of codebase.
+
+Three development phases:
+- Phase 1 (days 1-10): ~100-line constitution only
+- Phase 2 (days 11-30): Emergence of specifications and initial agents
+- Phase 3 (days 31-57): MCP retrieval service, expanded agent pool
+
+Of 757 classifiable agent invocations, 57% were project-specific
+specialists, 43% built-in tool agents. Most invoked: code reviewer (154),
+network-protocol-designer (85). Over 80% of human prompts were 100 words
+or fewer. Meta-infrastructure prompts (building the knowledge architecture)
+accounted for 4.3% of substantive prompts.
+
+#### Case Studies
+
+1. Save System: save-system.md (283 lines) referenced in 74 sessions and
+12 agent conversations. Five subsequent features touching persistence were
+implemented correctly. Zero save-related bugs across 74 sessions over four
+weeks.
+
+2. UI Sync Routing: Lessons from shop sync bugs captured in
+ui-sync-patterns.md (126 lines). Next networked UI feature correctly
+applied the dual delivery pattern on first attempt.
+
+3. Drop System: Search returned zero results — the null result revealed an
+entire undocumented subsystem. Documentation created before refactor;
+subsequently referenced in dozens of sessions.
+
+4. Deterministic RNG: network-protocol-designer agent (~915 lines)
+identified three issues in a debugging session spanning five context window
+exhaustions and 84 code edits. Agent recommended replacing time-bucket
+parameter with synchronized shot counter — a recommendation requiring
+pre-loaded understanding of hash sensitivity.
+
+### 5. Discussion
+
+#### 5.1. Practitioner Guidelines
+
+G1: A basic constitution does heavy lifting — stating project objectives,
+tech stack, and core conventions is sufficient to dramatically improve
+agent output from day one.
+
+G2: Let the planner gather context — running a planning agent before
+implementation automatically surfaces which specifications and specialists
+a task requires.
+
+G3: Route automatically or forget constantly — human memory doesn't scale.
+Trigger tables encode which expertise each file area requires.
+
+G4: If you explained it twice, write it down — repeated explanation across
+sessions signals the need to codify.
+
+G5: When in doubt, create an agent and restart — building a specialist with
+embedded domain knowledge can resolve problems that stall unguided
+sessions.
+
+G6: Stale specs mislead efforts — agents trust documentation absolutely,
+out-of-date specs cause silent failures.
+
+#### 5.2. Maintenance Cost
+
+Specification updates performed same session as code changes, ~5 minutes
+per session. Biweekly review pass ~30-45 minutes. Total ~1-2 hours/week.
+Primary failure mode: specification staleness.
+
+#### 5.3. Limitations
+
+Single-developer, single-project evaluation. Observational methodology.
+Tool-specific implementation (Claude Code with MCP). Real-time distributed
+simulation demands more documentation than simpler projects.
+
+### 6. Conclusion
+
+Structured access to project-specific knowledge substantially improves
+consistency of AI-generated code. The tiered architecture treats project
+documentation as infrastructure rather than artifact. This supported a
+single developer in constructing a 108,000-line distributed system in under
+70 days of part-time development.
+
+Companion repository:
+https://github.com/arisvas4/codified-context-infrastructure
