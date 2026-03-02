@@ -4,7 +4,7 @@ import path from "node:path";
 import stringWidth from "string-width";
 
 import { theme } from "../core/theme-resolver.js";
-import { createScrollbar } from "../core/ui-primitives.js";
+import { createScrollbar, safeSetStyle } from "../core/ui-primitives.js";
 import type { ContentMeasurement } from "../services/content-measurement.js";
 import type { Box, BrowserEntry, List, WindowKind, WindowRecord } from "../core/types.js";
 import type { OverlayManager } from "../core/overlay-manager.js";
@@ -50,7 +50,7 @@ export function openPrimerBrowserWindow(params: {
     return;
   }
   const frame = params.windowManager.createFrame("Primer Browser", "browser");
-  blessed.box({
+  const header = blessed.box({
     parent: frame.body,
     top: 0,
     left: 0,
@@ -99,6 +99,10 @@ export function openPrimerBrowserWindow(params: {
   frame.focus = () => {
     params.windowManager.focusWindow(frame);
     list.focus();
+  };
+  frame.onRestyle = () => {
+    header.style = theme().header;
+    safeSetStyle(list, { ...theme().body, selected: theme().selected });
   };
   params.windowManager.registerWindow(frame);
   list.select(initialSelectedIndex);
@@ -282,6 +286,15 @@ export function openPrimerGalleryWindow(params: {
       list.focus();
     }
   };
+  frame.onRestyle = () => {
+    tabBar.style = theme().footer;
+    filterBox.style = theme().input;
+    safeSetStyle(list, { ...theme().body, selected: theme().selected });
+    safeSetStyle(preview, theme().body);
+    tabBar.children.forEach((child, index) => {
+      (child as blessed.Widgets.BoxElement).style = index === activeTabIndex ? theme().input : theme().footer;
+    });
+  };
   params.windowManager.registerWindow(frame);
   frame.frame.on("resize", () => {
     setViewportContent(preview, previewRawContent);
@@ -348,6 +361,9 @@ export function openTextViewerWindow(params: {
     viewer.focus();
   };
   frame.refresh = () => setViewportContent(viewer, currentContent);
+  frame.onRestyle = () => {
+    safeSetStyle(viewer, theme().body);
+  };
   params.windowManager.registerWindow(frame);
   if (m) {
     params.applyMeasuredWindowSize(frame, params.kind, {
@@ -622,6 +638,13 @@ export function openFileManagerWindow(params: {
   frame.focus = () => {
     params.windowManager.focusWindow(frame);
     list.focus();
+  };
+  frame.onRestyle = () => {
+    header.style = theme().header;
+    filterBox.style = theme().footer;
+    safeSetStyle(list, { ...theme().body, selected: theme().selected });
+    previewHeader.style = theme().warning;
+    safeSetStyle(preview, theme().body);
   };
 
   params.windowManager.registerWindow(frame);

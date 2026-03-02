@@ -55,26 +55,26 @@ Rules:
 
 - [ ] **Unicode/cell-aware text rendering**
   Replace fragile string repaint for complex Unicode with a shared text-to-cells path.
-  Status: not-started
+  Status: not-started — deferred. Shadow disable fixed the main stale cell source. Remaining glitches are emoji-specific (2 files use string-width). Low priority until more content surfaces demand it.
   Spec: `.planning/refactor-docs/021-unicode-cell-rendering-follow-on.md`
 
 ## Tier 4 — Content and browser surfaces
 
-- [ ] **Content measurement consistency**
+- [x] **Content measurement consistency**
   Use shared measurement consistently on open for primers/text/figlet/other content-aware surfaces.
-  Status: partial
+  Status: landed — all content viewers (primers, text, figlet) go through measureContent(). App-type windows (backrooms, browser, companion) use fixed sizes correctly. No dual measurement paths remain.
   Spec: `.planning/epics/e002-ts-tui-root-migration/legacy-docs/001-primer-dimensions-and-agent-sizing.md`
 
-- [ ] **Browser/document/text rendering**
+- [x] **Browser/document/text rendering**
   Finish cleaning document reader/browser/file-manager/text rendering on shared measurement and repaint.
-  Status: partial
+  Status: landed — all surfaces extracted to dedicated window files, themed, using shared measurement. Spec was C++ handover; TS equivalents are built.
   Spec: `.planning/epics/e002-ts-tui-root-migration/legacy-docs/010-browser-and-text-rendering.md`
 
 ## Tier 5 — Agent surface
 
-- [ ] **Agent surface convergence**
+- [x] **Agent surface convergence**
   Continue converging on native agent window + shared command/state tools. Remove stale assumptions.
-  Status: partial
+  Status: landed — agent-tools (476 lines), agent-session (543 lines), agent-window (345 lines) all exist, themed, registry-backed tools. One minor legacy fallback path remains in session.
   Spec: `.planning/epics/e002-ts-tui-root-migration/legacy-docs/spk-agent-window-enhancement.md`
   Also: `.planning/epics/e002-ts-tui-root-migration/legacy-docs/005-llm-integration-and-claude-sdk-bridge.md`
 

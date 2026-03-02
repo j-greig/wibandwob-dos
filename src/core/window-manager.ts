@@ -2,6 +2,7 @@ import blessed from "blessed";
 
 import type { WindowFacade } from "./window-facade.js";
 import { theme } from "./theme-resolver.js";
+import { safeSetStyle } from "./ui-primitives.js";
 import type { Box, DragState, ResizeState, WindowKind, WindowRecord } from "./types.js";
 
 export type EditorWriteHook = (id: number, text: string) => boolean;
@@ -347,6 +348,20 @@ export class WindowManager implements WindowFacade {
   captureText(id: number): string | undefined {
     const record = this.getWindowById(id);
     return record?.captureText?.();
+  }
+
+  /** Restyle all open windows to match the current theme tokens. */
+  restyleAll(): void {
+    for (const window of this.windows) {
+      const active = this.focusedWindow?.id === window.id;
+      window.frame.style = { ...theme().windowFrame, border: active ? theme().windowBorderFocused : theme().windowBorderUnfocused };
+      if (window.titleBar) {
+        window.titleBar.style = active ? theme().titleBarFocused : theme().titleBarUnfocused;
+      }
+      safeSetStyle(window.body, theme().body);
+      window.onRestyle?.();
+    }
+    this.screen.render();
   }
 
   handleMouse(data: blessed.Widgets.Events.IMouseEventArg): void {

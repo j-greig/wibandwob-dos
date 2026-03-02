@@ -10,7 +10,7 @@ import { buildDesktopContextMenu, buildWindowContextMenu } from "./context-menu-
 import { DesktopGeometryService } from "./desktop-geometry.js";
 import { MenuOverlayManager } from "./menu-overlay-manager.js";
 import { OverlayManager } from "./overlay-manager.js";
-import { theme } from "./theme-resolver.js";
+import { theme, toggleTheme as toggleThemeVariant } from "./theme-resolver.js";
 import { isRightClick } from "./ui-primitives.js";
 import { restoreWindowSnapshot, serializeWindowSnapshot, type WorkspaceRestoreActions } from "./workspace-snapshots.js";
 import type {
@@ -237,6 +237,19 @@ export class TsTuiMvpApp {
     );
   }
 
+  private toggleTheme(): void {
+    toggleThemeVariant();
+    // Restyle shell chrome
+    this.menuBar.style = theme().menuBar;
+    this.desktop.style = theme().desktop;
+    this.statusLine.style = theme().statusLine;
+    // Restyle all open windows
+    this.windowManager.restyleAll();
+    this.repaintDesktop();
+    this.syncState();
+    this.screen.render();
+  }
+
   private repaintDesktop(): void {
     const width = Math.max(1, Number(this.screen.width));
     const height = Math.max(1, Number(this.screen.height) - 2);
@@ -251,6 +264,7 @@ export class TsTuiMvpApp {
     this.screen.key(["M-v"], () => this.openMenu("View"));
     this.screen.key(["M-w"], () => this.openMenu("Window"));
     this.screen.key(["M-a"], () => this.openMenu("Applications"));
+    this.screen.key(["M-t"], () => this.toggleTheme());
     this.screen.key(["M-S-left"], () => this.windowManager.resizeFocusedWindow(-2, 0));
     this.screen.key(["M-S-right"], () => this.windowManager.resizeFocusedWindow(2, 0));
     this.screen.key(["M-S-up"], () => this.windowManager.resizeFocusedWindow(0, -1));
@@ -963,7 +977,8 @@ export class TsTuiMvpApp {
       openCommandPalette: () => this.openCommandPaletteWindow(),
       openStateInspector: () => this.openStateInspectorWindow(),
       saveWorkspace: () => this.saveWorkspace(),
-      loadWorkspace: () => this.loadWorkspace()
+      loadWorkspace: () => this.loadWorkspace(),
+      toggleTheme: () => this.toggleTheme()
     };
   }
 

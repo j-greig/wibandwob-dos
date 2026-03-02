@@ -2,7 +2,7 @@ import blessed from "blessed";
 import fs from "node:fs";
 import path from "node:path";
 
-import { createScrollbar } from "../core/ui-primitives.js";
+import { createScrollbar, safeSetStyle } from "../core/ui-primitives.js";
 import { createFilePathMenuItems } from "../core/context-menu-items.js";
 import type { OverlayManager } from "../core/overlay-manager.js";
 import { theme } from "../core/theme-resolver.js";
@@ -93,7 +93,7 @@ export function openBackroomsLogBrowserWindow(params: {
   }) as blessed.Widgets.ListElement;
 
   // Divider
-  blessed.box({
+  const divider = blessed.box({
     parent: frame.body,
     top: 0,
     left: DIVIDER_LEFT,
@@ -268,6 +268,18 @@ export function openBackroomsLogBrowserWindow(params: {
   frame.focus = () => {
     params.windowManager.focusWindow(frame);
     list.focus();
+  };
+
+  frame.onRestyle = () => {
+    safeSetStyle(list, {
+      ...theme().body,
+      selected: theme().selected,
+      item: theme().body
+    });
+    divider.style = theme().muted;
+    titleBar.style = { ...theme().body, bold: true };
+    pathBar.style = theme().muted;
+    safeSetStyle(preview, theme().body);
   };
 
   params.windowManager.registerWindow(frame);

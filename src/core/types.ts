@@ -172,6 +172,7 @@ export interface WindowRecord {
   writeInput?: (input: string) => void;
   cleanup?: () => void;
   refresh?: () => void;
+  onRestyle?: () => void;
   captureText?: () => string;
   describeState?: () => WindowStateDetails;
   openContextMenu?: (x?: number, y?: number) => void;

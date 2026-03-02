@@ -11,7 +11,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { theme } from "../core/theme-resolver.js";
-import { createScrollbar } from "../core/ui-primitives.js";
+import { createScrollbar, safeSetStyle } from "../core/ui-primitives.js";
 import type { Box, ChatMessageEntry } from "../core/types.js";
 import type { WindowManager } from "../core/window-manager.js";
 import type { WibWobAgentSession } from "../services/wibwob-agent-session.js";
@@ -335,6 +335,12 @@ export function openWibWobAgentWindow(params: {
 
   frame.writeInput = (text: string) => {
     void params.agent.send(text);
+  };
+  frame.onRestyle = () => {
+    infoBar.style = theme().muted;
+    safeSetStyle(transcript, theme().body);
+    statusLine.style = theme().warning;
+    input.style = theme().input;
   };
 
   params.windowManager.registerWindow(frame);

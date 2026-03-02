@@ -34,6 +34,7 @@ export interface AppMenuActions {
   openStateInspector: () => void;
   saveWorkspace: () => void;
   loadWorkspace: () => void;
+  toggleTheme: () => void;
 }
 
 export type AppCommandCategory = "file" | "edit" | "view" | "window" | "applications";
@@ -233,6 +234,16 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     menuPlacements: [{ category: "applications", order: 120, label: "Wib&Wob Agent" }],
     palettePlacement: { order: 130 },
     contextMenu: { desktop: true, order: 70 },
+    api: true,
+    agent: true
+  },
+  {
+    id: "app.toggle_theme",
+    label: "Toggle Light/Dark",
+    group: "system",
+    actionKey: "toggleTheme",
+    menuPlacements: [{ category: "view", order: 30 }],
+    palettePlacement: { order: 190 },
     api: true,
     agent: true
   },

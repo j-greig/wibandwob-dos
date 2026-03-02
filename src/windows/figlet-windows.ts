@@ -7,7 +7,7 @@ import type { OverlayManager } from "../core/overlay-manager.js";
 import { theme } from "../core/theme-resolver.js";
 import type { WindowRecord } from "../core/types.js";
 import type { WindowManager } from "../core/window-manager.js";
-import { createScrollbar } from "../core/ui-primitives.js";
+import { createScrollbar, safeSetStyle } from "../core/ui-primitives.js";
 import { getDefaultFigletFont, getFigletCatalogue, getFigletFontChoices, measureFiglet } from "../services/figlet-service.js";
 
 export function promptForFigletText(
@@ -122,6 +122,10 @@ export function openFigletWindow(params: {
   frame.focus = () => {
     params.windowManager.focusWindow(frame);
     viewer.focus();
+  };
+  frame.onRestyle = () => {
+    toolbar.style = theme().header;
+    safeSetStyle(viewer, theme().body);
   };
 
   frame.frame.key(["e"], editText);

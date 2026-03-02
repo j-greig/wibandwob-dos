@@ -6,7 +6,7 @@ import path from "node:path";
 import { REPO_ROOT } from "../core/config.js";
 import type { OverlayManager } from "../core/overlay-manager.js";
 import { theme as appTheme } from "../core/theme-resolver.js";
-import { createScrollbar } from "../core/ui-primitives.js";
+import { createScrollbar, safeSetStyle } from "../core/ui-primitives.js";
 import type { BackroomsChannel, List, LogBox } from "../core/types.js";
 import type { WindowManager } from "../core/window-manager.js";
 import type { BackroomsService } from "../services/backrooms-service.js";
@@ -265,6 +265,12 @@ export function openBackroomsPrimerPicker(context: BackroomsWindowContext, theme
   frame.focus = () => {
     context.windowManager.focusWindow(frame);
     list.focus();
+  };
+  frame.onRestyle = () => {
+    header.style = appTheme().header;
+    searchBox.style = appTheme().input;
+    safeSetStyle(list, { ...appTheme().body, selected: appTheme().selected });
+    safeSetStyle(preview, appTheme().body);
   };
 
   context.windowManager.registerWindow(frame);
@@ -644,6 +650,11 @@ export function openBackroomsTvWindow(context: BackroomsWindowContext, channel: 
     transcript.focus();
   };
   frame.frame.key(["space", "n"], () => startBackrooms());
+  frame.onRestyle = () => {
+    header.style = appTheme().header;
+    safeSetStyle(transcript, appTheme().body);
+    footer.style = appTheme().footer;
+  };
   context.windowManager.registerWindow(frame);
   frame.focus();
   startBackrooms();

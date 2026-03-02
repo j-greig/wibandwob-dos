@@ -3,7 +3,7 @@ import blessed from "blessed";
 import { theme } from "../core/theme-resolver.js";
 import type { StateService } from "../services/state-service.js";
 import type { WorkspaceService } from "../services/workspace-service.js";
-import { createScrollbar } from "../core/ui-primitives.js";
+import { createScrollbar, safeSetStyle } from "../core/ui-primitives.js";
 import type { DesktopState, List, LogBox, MenuItem, WindowKind, WindowRecord } from "../core/types.js";
 import type { WindowManager } from "../core/window-manager.js";
 
@@ -45,6 +45,9 @@ export function openAnimatedWindow(
   frame.focus = () => {
     deps.windowManager.focusWindow(frame);
     canvas.focus();
+  };
+  frame.onRestyle = () => {
+    safeSetStyle(canvas, theme().body);
   };
   deps.windowManager.registerWindow(frame);
   frame.focus();
@@ -106,6 +109,9 @@ export function openCompanionWindow(
     deps.windowManager.focusWindow(frame);
     bubble.focus();
   };
+  frame.onRestyle = () => {
+    safeSetStyle(bubble, theme().body);
+  };
   deps.windowManager.registerWindow(frame);
   frame.focus();
 }
@@ -154,6 +160,9 @@ export function openArtWindow(deps: BaseWindowDeps): void {
   frame.focus = () => {
     deps.windowManager.focusWindow(frame);
     canvas.focus();
+  };
+  frame.onRestyle = () => {
+    safeSetStyle(canvas, theme().body);
   };
   deps.windowManager.registerWindow(frame);
   frame.focus();
@@ -225,6 +234,10 @@ export function openWorkspaceManagerWindow(params: {
     params.windowManager.focusWindow(frame);
     list.focus();
   };
+  frame.onRestyle = () => {
+    footer.style = theme().header;
+    safeSetStyle(list, { ...theme().body, selected: theme().selected });
+  };
   params.windowManager.registerWindow(frame);
   frame.focus();
 }
@@ -260,6 +273,9 @@ export function openCommandPaletteWindow(params: {
   frame.focus = () => {
     params.windowManager.focusWindow(frame);
     list.focus();
+  };
+  frame.onRestyle = () => {
+    safeSetStyle(list, { ...theme().body, selected: theme().selected });
   };
   params.windowManager.registerWindow(frame);
   frame.focus();
@@ -302,6 +318,9 @@ export function openStateInspectorWindow(params: {
   frame.focus = () => {
     params.windowManager.focusWindow(frame);
     viewer.focus();
+  };
+  frame.onRestyle = () => {
+    safeSetStyle(viewer, theme().body);
   };
   params.windowManager.registerWindow(frame);
   frame.focus();

@@ -1,7 +1,7 @@
 import blessed from "blessed";
 
 import { theme } from "../core/theme-resolver.js";
-import { createScrollbar } from "../core/ui-primitives.js";
+import { createScrollbar, safeSetStyle } from "../core/ui-primitives.js";
 import type { WindowManager } from "../core/window-manager.js";
 
 export function openEditorWindow(params: {
@@ -45,6 +45,9 @@ export function openEditorWindow(params: {
   frame.focus = () => {
     params.windowManager.focusWindow(frame);
     editorWidget.focus();
+  };
+  frame.onRestyle = () => {
+    safeSetStyle(editorWidget, theme().body);
   };
   params.windowManager.registerWindow(frame);
   params.renderEditor(frame.id);
