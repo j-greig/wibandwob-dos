@@ -54,6 +54,119 @@ Rule:
 9. Menu layout stays semantically clean: `File` for file/workspace operations,
    `Window` for focus/layout/workspace management, `Applications` for launchers.
 
+## Canonical Architecture Parcels
+
+These are the durable rebuild parcels absorbed from the older `overview.md`
+and `002-architecture-plan-content-sizing-layout.md`. They remain useful, but
+their active planning home is now this document.
+
+### P1 — Content measurement
+
+Single source of truth for content dimensions before a window opens.
+
+Target contract:
+
+- one measurement path for primers, text, figlet output, and later animations
+- display-width aware, not byte-count based
+- content-only metrics, no chrome offsets
+
+### P2 — Chrome and window geometry
+
+Translate content size into window size through declarative chrome presets.
+
+Target contract:
+
+- no inline `+2`, `+3`, `+6`
+- chrome math lives in one place
+- borders, padding, shadows, toolbars are chrome concerns
+
+### P3 — Desktop geometry and cell aspect
+
+Treat terminal geometry as a canonical service, not ad hoc math.
+
+Target contract:
+
+- one source of truth for width, height, and `cellAspect`
+- layout and resize logic consume canonical desktop geometry
+
+### P4 — Agent-visible semantic state
+
+Every important surface must expose semantic state, not screen-scraped text.
+
+Target contract:
+
+- window metadata includes geometry, type, content semantics, selection, dirty
+  state, and runtime/session status where relevant
+- menus, APIs, agent tools, and future MCP consume the same substrate
+
+### P5 — Layout and composition
+
+Layout is a shared engine, not scattered coordinate code.
+
+Target contract:
+
+- tile, cascade, snapping, gallery/exhibition, and future arrangements all sit
+  on shared geometry/layout primitives
+
+### P6 — Resize contracts and aspect control
+
+Windows must react to resize with explicit contracts, not luck.
+
+Target contract:
+
+- windows own resize behavior
+- content surfaces declare whether they wrap, crop, relayout, or preserve
+  aspect ratio
+
+### P7 — Pre-open sizing workflow
+
+Window size should be chosen from content metadata before opening whenever the
+content type makes that possible.
+
+Target contract:
+
+- primers, text, figlet, animations, and later other content-aware apps should
+  open from measured/recommended size instead of generic defaults
+
+## Core Contracts To Lock
+
+These are the first contracts to keep stable while the codebase is still being
+reorganized.
+
+### Content measurement
+
+- content dimensions are Unicode/display-width aware
+- measurement returns content metrics only
+- comments/metadata lines may be excluded by content-type rules
+
+### Window chrome
+
+- chrome presets convert content size to window size
+- shadow ownership belongs to chrome/paint rules, not to arbitrary window code
+
+### Desktop geometry
+
+- all layout math derives from canonical screen geometry
+- `cellAspect` is configurable/measurable, not copy-pasted
+
+### State and snapshots
+
+- state is semantic
+- snapshots restore intent, not just rectangles
+- payloads should move toward discriminated unions or runtime-validated shapes
+
+### Command surface
+
+- user-visible commands are defined once
+- menus, palette, API, agent tools, and later MCP project from one command
+  source
+
+### Text rendering
+
+- simple ASCII may use fast string rendering
+- complex Unicode needs a cell-aware rendering path
+- repaint correctness is part of the contract, not a polish extra
+
 ## Reality Check
 
 This doc is the target shape, not a claim that the spike already matches it.
@@ -78,6 +191,9 @@ Current known deltas:
 - legacy Pi terminal and synthetic transcript chat flows have now been removed
   from the live spike, so the remaining deltas are structural rather than
   compatibility-driven.
+- older architecture docs such as `.trash/overview.md` and
+  `.trash/002-architecture-plan-content-sizing-layout.md` remain only as
+  archaeology; their active architectural guidance is now consolidated here.
 
 ## Top-Level Runtime Model
 

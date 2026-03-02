@@ -10,11 +10,35 @@ PR: —
 > the canonical epic shell (status, links, summary); this doc owns the
 > detailed design and updated acceptance criteria.
 
-> **Zilla note:** The "Minimum viable first slice" approach from the Codex
-> review is the preferred direction. One subsystem spec (workspace), one
-> index entry, one retrieval command, one evaluation against historical
-> prompts. Prove it works before building the platform.
-> See: https://github.com/j-greig/wibandwob-dos/issues/106#issuecomment-3982637443
+> **Zilla note:** The "Minimum viable first slice" from the
+> [Codex review](https://github.com/j-greig/wibandwob-dos/issues/106#issuecomment-3982637443)
+> is the preferred direction:
+>
+> **One subsystem spec (workspace)**
+> Pick the narrowest, most-corrected subsystem and write one canonical
+> machine-facing spec for it.
+> Workspace has the highest correction-to-confusion ratio in the audit.
+> Starting here means the first spec covers real, repeated pain instead
+> of speculative architecture.
+>
+> **One index entry**
+> Create a single entry in `subsystem-index.yaml` mapping workspace to
+> its files, spec, skills, and tests.
+> The index file is the core data structure everything else reads from.
+> Getting its shape right on one entry is worth more than filling it
+> with five guesses.
+>
+> **One retrieval command**
+> Implement one deterministic lookup that takes task text and returns
+> the spec plus linked files.
+> If one command cannot surface the right spec for a workspace task,
+> five commands will not fix the problem. This is the falsifiable claim.
+>
+> **One evaluation against historical prompts**
+> Replay 5-10 real prompts from the confusion audit with and without
+> the spec and score correctness.
+> Without a before/after comparison the epic has no way to prove it
+> changed anything. This is what separates infrastructure from prose.
 
 ## Summary
 

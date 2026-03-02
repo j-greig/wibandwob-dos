@@ -17,6 +17,8 @@ Doc triage rule:
 - treat `retired` as archaeology only unless you are validating or backfilling something specific
 - when an older doc has been absorbed into a canonical active doc, prefer
   retiring or deleting it over keeping two overlapping planning sources alive
+- when a doc is retired but worth preserving briefly, move it under
+  `docs/.trash/` so it stops polluting the active docs root
 
 Current goals:
 - stay terminal-native
