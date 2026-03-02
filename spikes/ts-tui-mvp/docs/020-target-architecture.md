@@ -19,6 +19,26 @@ Use this doc to answer:
 This doc is **not** a direct migration plan. It is the target shape that later
 epics and stories should move toward.
 
+## Post-Refactor Stretch Goal
+
+After the TS TUI refactor, root migration, and current active architecture
+work are complete, use the cleaned-up TypeScript app structure to improve:
+
+- [E001 — Codified Context Infrastructure](../../../.planning/epics/e001-codified-context-infrastructure/e001-brief.md)
+
+Why this is delayed:
+
+- session archaeology and codified-context work currently reflect too much of
+  the old mixed C++/Python/API architecture
+- the TS refactor should flatten major failure paths first
+- context infrastructure should be upgraded against the cleaner post-refactor
+  app, not the transitional spike mess
+
+Rule:
+
+- do not treat E001 as current critical-path work for the TS TUI refactor
+- treat it as a deliberate follow-on once the new root architecture is stable
+
 ## Principles
 
 1. One source of truth per concern.
@@ -1012,3 +1032,23 @@ across 197 primers (worst file 5s at 4572 lines). With a dims header:
 - New primers include it by convention
 - The comment-skip display logic already handles `#` lines, so no viewer
   changes needed
+
+### Post-migration: tmux-launch rewrite
+
+`scripts/tmux-launch.sh` is a C++/API era launcher. After E002 root
+migration, rewrite as a TS-native tmux harness:
+
+- `bun run dev` in one pane (TS TUI app)
+- optional second pane for logs or API
+- integrate with E001 session-start hooks (drift detection, desktop state
+  injection) so tmux launch also triggers the codified context pipeline
+
+Related: E001 trigger table / session-start hook work.
+
+### Post-migration: CI and contract tests
+
+`tests/contract/` and `tools/smoke_parade.py` tested the C++ app via the
+Python API server. Both deleted in E002. Post-migration, rebuild contract
+tests in TypeScript targeting the TS app's own API surface. The test
+patterns (window type parity, timer cleanup, surface matrix) are still
+valid — only the transport layer changed.

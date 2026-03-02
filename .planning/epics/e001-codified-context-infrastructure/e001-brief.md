@@ -1,7 +1,7 @@
 # E001: Codified Context Infrastructure
 
 Status: not-started
-GitHub issue: —
+GitHub issue: #106
 PR: —
 
 ## Summary (300 words)

@@ -117,7 +117,49 @@ Rollback note:
 - [ ] Run root-level typecheck and smoke verification
 - [ ] Update this story status and task checkboxes
 
+## Disposition Decisions (confirmed by user)
+
+1. `tools/api_server/` — DELETE. TS app will serve its own API.
+2. `tools/smoke_parade.py` and `tests/contract/` — DELETE. They test
+   the C++ app via the Python API server, both now dead.
+3. `scripts/tmux-launch.sh` — ADD to 020-target-architecture.md as a
+   post-migration task (rewrite for TS launch). Related to E001 trigger
+   table / session-start work already noted there.
+4. `partykit/` — MOVE to `.trash/`. Multiplayer parked for now.
+5. `spikes/ts-tui-mvp/docs/` (21 architecture docs) — MOVE to
+   `.planning/epics/e002-ts-tui-root-migration/legacy-docs/`. They are
+   spike-era reference, not canon for the promoted app.
+6. `spikes/ts-tui-mvp/vendor/` and root `vendor/` — MERGE into root
+   `vendor/`. Deduplicate if overlapping.
+7. CLAUDE.md is the real file (Claude Code convention). Symlink
+   AGENTS.md -> CLAUDE.md for Codex/GitHub compatibility.
+8. `spikes/ts-tui-mvp/scratch/` and root `scratch/` — MERGE into root
+   `scratch/`.
+
+Other `tools/` items to disposition during migration:
+- `tools/arrange.py` — layout prototyping script, probably dead (TS has its own)
+- `tools/agent_mailbox/` — review if still used
+- `tools/contour_stream.py`, `tools/generative_*.py` — C++ era, likely dead
+- `tools/github/`, `tools/monitor/`, `tools/room/` — review per 020 rules
+- `tools/scripts/` — nested scripts dir, review for live items
+
+Other `tests/` items:
+- `tests/room/` — multiplayer tests, dead with partykit parked
+- `tests/test_browser*.py`, `tests/test_paint_ipc.py` — C++ IPC tests, dead
+- `tests/run_ipc_chain.py`, `tests/test_ipc_chain.sh` — C++ IPC, dead
+
+Other `scripts/` items:
+- `scripts/dev-start.sh`, `scripts/dev-stop.sh` — review if TS-relevant
+- `scripts/parity-check.py` — C++ parity, dead
+- `scripts/snap.sh`, `scripts/stamp.sh` — review
+- `scripts/sprite-*.sh` — C++ era, likely dead
+- `scripts/workspace_snapshot.py` — review if superseded by TS workspace service
+- `scripts/init-submodules.sh` — keep if submodules still used
+
 ## Notes
 
 - There is no `.planning/epochs/` convention in this repo canon, we use epics instead.
 - This work is tracked under `.planning/epics/e002-ts-tui-root-migration/`.
+- Do the move as ONE commit (git mv, not copy-delete) to preserve blame/history.
+  Then fix paths in a SECOND commit.
+- CLAUDE.md is real file, AGENTS.md is symlink (decision #7).
