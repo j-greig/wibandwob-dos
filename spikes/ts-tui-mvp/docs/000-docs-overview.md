@@ -51,6 +51,7 @@ Important, but should build on a stable shell.
 - `010-browser-and-text-rendering.md`
 - `013-events-persistence-and-multi-instance.md`
 - `019-context-sensitive-menu-bar-prd.md`
+- `021-unicode-cell-rendering-follow-on.md`
 
 ### Tier 3 — Secondary / optional spikes
 
@@ -196,6 +197,7 @@ These live outside the spike dir but directly drive spike work:
 | `018-command-registry-and-tool-adapter-prd.md` | PRD for define-once commands projected into menu, palette, API, agent, and later MCP. Core registry path is proven; MCP/cleanup remain. | `partial` |
 | `019-context-sensitive-menu-bar-prd.md` | PRD for macOS-style context-sensitive menus. Context model, enabled predicates, and context-menu alignment are refined; implementation remains partial. | `partial` |
 | `020-target-architecture.md` | Canonical end-state architecture for the TS TUI app: source tree, subsystem boundaries, file responsibilities, startup workspace semantics, native appearance/theme rules, and ASCII animation support. | `active` |
+| `021-unicode-cell-rendering-follow-on.md` | Post-refactor follow-on for Unicode/cell-aware text rendering. Tracks glitch investigation, tvision clues, and shared text-to-cells plan. | `draft` |
 | `BUILD-ORDER-FINAL.md` | Preferred sequencing for the broader TS rebuild. Still useful, but no longer canonical after recent removals and the target-architecture reset. | `retired` |
 | `BUILD-ORDER.md` | Older build order document superseded by the final version. | `retired` |
 | `INDEX.md` | Deleted. Superseded by this file (`000-docs-overview.md`). | `deleted` |

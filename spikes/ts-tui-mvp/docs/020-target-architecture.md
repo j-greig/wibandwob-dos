@@ -52,6 +52,9 @@ Current known deltas:
   Scramble when no workspace can be restored.
 - repaint and shadow invalidation are still too weak; stale cells and ghost
   characters can remain on screen until another window repaints over them.
+- Unicode-heavy content still uses a mostly string-based repaint path. Complex
+  glyphs need a shared text-to-cells renderer; see
+  `021-unicode-cell-rendering-follow-on.md`.
 - legacy Pi terminal and synthetic transcript chat flows have now been removed
   from the live spike, so the remaining deltas are structural rather than
   compatibility-driven.

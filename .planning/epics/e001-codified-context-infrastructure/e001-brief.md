@@ -6,45 +6,48 @@ PR: —
 
 ## Summary (300 words)
 
-This epic is informed by the paper "Codified Context: Infrastructure for AI
-Agents in a Complex Codebase" (Vasilopoulos, 2026; arXiv:2602.20478v1).
+Informed by "Codified Context: Infrastructure for AI Agents in a Complex
+Codebase" (Vasilopoulos, 2026; arXiv:2602.20478v1).
+> https://arxiv.org/html/2602.20478v1
 
-The paper presents a three-tier architecture for giving AI coding agents
-persistent project memory. The problem: LLM agents lose coherence across
-sessions, forget conventions, and repeat mistakes. Single-file manifests
-(CLAUDE.md, AGENTS.md) don't scale past modest codebases.
+The paper's core insight: documentation is INFRASTRUCTURE, not artifact.
+Specs are load-bearing — agents depend on them to produce correct output.
+When a spec is stale, agents silently produce wrong code that looks right.
 
-The solution is tiered knowledge infrastructure:
+Three tiers, distinguished by loading strategy and update frequency:
 
-Tier 1 (Hot Memory): A single constitution file (~660 lines) loaded every
-session. Defines conventions, naming rules, build commands, architectural
-summaries, and trigger tables that route tasks to specialist agents.
+Tier 1 (Hot Memory): Constitution (~660 lines), always loaded. Conventions,
+build commands, architectural summaries, and TRIGGER TABLES with redundant
+routing: pre-change triggers (consult specialist BEFORE touching files) and
+post-change triggers (review after), PLUS a fallback to suggest_agent(task)
+when exploring unfamiliar code. Both paths enforced.
 
-Tier 2 (Domain Experts): 19 specialist agent specs (~9,300 lines total)
-encoding deep domain knowledge. Over half of each spec is project-specific
-facts, not behavioral instructions. Created reactively when a domain
-repeatedly caused debugging failures. The practical heuristic: if debugging
+Tier 2 (Domain Experts): 19 specialist agents (115-1,233 lines each).
+Each declares: scope, tools, permissions (some READ-ONLY for safety),
+relevant Tier 3 docs, output format, and common domain mistakes. Over half
+of each spec is domain knowledge, not behavioral instructions — intentional
+overlap with Tier 3, because complex domains need a complete pre-loaded
+mental model, not piecemeal retrieval. Created REACTIVELY: when debugging
 stalls an unguided session, create a specialist and restart.
 
-Tier 3 (Cold Memory): 34 knowledge base documents (~16,250 lines) served
-via MCP, each covering one subsystem. Written for AI consumption with file
-paths, function names, and explicit do/don't instructions. Retrieved on
-demand by keyword search.
+Tier 3 (Cold Memory): 34 single-subsystem docs written for MACHINE
+consumption — file paths, parameter names, expected behaviour, invariants,
+symptom/cause/fix tables. Served via MCP with 5 tools: list_subsystems,
+get_files_for_subsystem, find_relevant_context, search_context_documents,
+suggest_agent. Keyword substring matching (embeddings are future work).
 
-Evaluated across 283 sessions, 70 days, 108K lines of C#. The
-knowledge-to-code ratio reached 24.2%. Key findings: specifications as
-coordination documents prevented bugs across 74 sessions; captured
-experience eliminated trial-and-error; documentation gaps detected by null
-search results; embedded domain knowledge enabled collaborative debugging
-of subtle cross-cutting bugs.
+Rollout was PHASED AND REACTIVE, not designed upfront: Phase 1 (days 1-10)
+~100-line constitution only; Phase 2 (days 11-30) specs + agents for
+high-failure domains; Phase 3 (days 31-57) MCP retrieval + agent pool
+expansion. The 24.2% knowledge-to-code ratio is TELEMETRY not a target —
+the useful signal is agent behaviour: inconsistency means a spec is missing
+or stale.
 
-Practitioner guidelines: start the constitution early; if you explained it
-twice, write it down; route automatically or forget constantly; when in
-doubt, create an agent and restart; stale specs mislead — treat them as
-load-bearing infrastructure.
+Key guideline: let the planner gather context BEFORE implementation. Run a
+planning pass that surfaces which specs and specialists a task needs.
 
-WibWob-DOS already has elements of this pattern (CLAUDE.md, AGENTS.md,
-.pi/skills, .planning). This epic formalises and extends it.
+WibWob-DOS already has elements (CLAUDE.md, AGENTS.md, .pi/skills,
+.planning, qmd). This epic formalises and extends them.
 
 ## Relevance to WibWob-DOS
 
@@ -56,28 +59,126 @@ We already have:
 - qmd collection — 62 indexed md files for search
 
 We lack:
-- Trigger tables routing file changes to specific skills/agents
-- Subsystem specs written for AI consumption (our docs are mixed human/AI)
-- Drift detection (stale specs vs changed code)
-- Knowledge base served via MCP for on-demand retrieval
-- Formal hot/cold separation — everything loads or nothing does
+- Trigger tables with pre-change AND post-change routing + suggest_agent fallback
+- Agent permission classes (read-only reviewers vs write-capable builders)
+- Subsystem specs in machine-consumption format (ours are mixed human/AI)
+- Intentional Tier 2/3 overlap for complex domains needing full mental models
+- Drift detection as SESSION-START HOOK (not just CI) — parsing recent Git
+  commits against subsystem-to-file mapping, injecting warning into context
+- Planner-first workflow: gather context before implementation
+- Factory agents for bootstrapping new specs/agents from templates
+- Phased rollout plan starting with high-failure domains
 
 ## Acceptance Criteria
 
-- [ ] AC-1: Constitution file includes trigger table mapping file patterns to skills
-  Test: grep for trigger table in CLAUDE.md, verify at least 10 file-pattern→skill mappings
+- [ ] AC-1: Constitution includes trigger table with BOTH pre-change and
+  post-change triggers, plus fallback to suggest_agent(task) for unfamiliar code
+  Test: grep CLAUDE.md for pre-change and post-change trigger sections;
+  verify at least 10 file-pattern->skill mappings across both categories;
+  verify suggest_agent fallback instruction exists
 
-- [ ] AC-2: At least 5 subsystem specs written for AI consumption in .planning/specs/
-  Test: each spec has file paths, function names, known failure modes, do/don't instructions
+- [ ] AC-2: At least 5 subsystem specs, each scoped to ONE subsystem, using
+  repeatable structure: overview / key files / invariants / failure modes
+  (symptom-cause-fix) / do-don't / commands / change checklist
+  Test: each spec validates against structure checklist; each contains
+  file paths, parameter names, expected behaviour; no spec covers >1 subsystem
 
-- [ ] AC-3: Context drift detector warns when source changes without spec updates
-  Test: modify a file covered by a spec, run detector, verify warning output
+- [ ] AC-3: Context drift detector runs as SESSION-START HOOK, parses recent
+  Git commits against spec-to-file mapping, injects warning when code changed
+  without corresponding spec update
+  Test: modify a file covered by a spec without updating spec; start new
+  session; verify warning injected into context mentioning the stale spec
 
-- [ ] AC-4: qmd or MCP retrieval serves specs on demand from agent sessions
-  Test: agent can search and retrieve spec content during a session
+- [ ] AC-4: Retrieval exposes 4 search paths: list all specs, lookup by
+  subsystem key, free-text search, and agent suggestion (suggest_agent)
+  Test: exercise all 4 paths from agent session; verify each returns results
 
-- [ ] AC-5: Knowledge-to-code ratio tracked and reported
-  Test: script counts lines in specs vs source, outputs ratio
+- [ ] AC-5: Telemetry tracks spec-hit rate (how often specs are retrieved),
+  stale-spec warnings fired, and tasks requiring repeated human re-explanation
+  (the paper's useful signal: agent confusion = missing/stale spec)
+  Test: run telemetry script; verify it reports hit rate, warning count,
+  and flags repeated explanation patterns from session logs
+
+## Design Questions (open — block implementation until answered)
+
+These questions must be answered before features/stories are cut.
+
+### Stack and storage
+1. Is QMD the preferred cold-memory format, or plain Markdown + frontmatter
+   as the canonical layer with QMD as search index only?
+2. Should the hot-memory constitution stay in CLAUDE.md, or split into
+   CLAUDE.md + smaller generated includes?
+3. Should specs be stored in .planning/specs/, a new docs/specs/, or
+   alongside the code they describe?
+
+### Routing
+4. Should trigger routing use file globs only, or also command IDs, window
+   types, and changed subsystem tags?
+5. Should the command registry serve as the primary routing graph for docs
+   too, not just for UI actions?
+
+### Specialists
+6. What are the first high-failure domains deserving specialists? Candidates:
+   window manager, workspace restore, command registry, blessed rendering,
+   agent control API, content measurement, theming
+7. Which specialists should be read-only reviewers vs write-capable builders?
+8. Should .pi/skills/ stay as the Tier 2 layer, or introduce a new agents/
+   layer with skills as one subtype?
+
+### Orchestration
+9. Is the orchestrator a human habit, a Claude/Codex convention, or an actual
+   runtime service inside the repo?
+10. Should planner-first behaviour be enforced by tooling or just documented
+    as a guideline?
+
+### Spec format and lifecycle
+11. Rigid schema (summary / key files / invariants / commands / failure modes
+    / tests / related agents / related specs) or something looser?
+12. Should specs be self-compacting (summarising older detail upward) or
+    append-only with generated digests?
+13. Spec lifecycle: draft -> active -> compressed -> archived, or just
+    active/obsolete?
+14. For self-updating docs, which source of truth wins when they disagree:
+    code, tests, workspace snapshots, or constitution?
+15. Should agents be allowed to update specs directly, or only propose
+    patches for human review?
+
+### Scope of cold memory
+16. Should cold memory document only code structure, or also design intent,
+    UX rules, terminal behaviour, and agent etiquette?
+17. Should subsystem docs be keyed by folder, concept ("workspace
+    persistence"), or runtime object ("WindowManager")?
+18. Should workspace JSON snapshots become part of Tier 3 knowledge, or stay
+    runtime state only?
+19. Which current repo artifacts are already close to good Tier 3 docs and
+    should be promoted first?
+
+### Retrieval
+20. Should retrieval return only docs, or also exact commands, tests, files,
+    and recent commits?
+21. Should the WibWob-DOS agent be able to query the TUI for live context, so
+    cold memory includes runtime state, not just repo docs?
+22. Should QMD retrieval be the canonical interface with MCP as thin adapter,
+    or MCP canonical and QMD just storage?
+23. Should every spec maintain an explicit file coverage map, or infer
+    coverage from backlinks and embeddings?
+
+### Drift and staleness
+24. What counts as "stale": changed file hash, changed exported API, changed
+    test snapshot, changed command signature, changed workspace schema?
+25. Should drift detection run at session start, pre-commit, CI, or all three?
+26. Should "missing knowledge" detection use agent confusion text, null
+    retrievals, repeated retries, or all of them?
+
+### Maintenance
+27. How much do you care about token thrift vs richer always-loaded memory?
+28. Which parts of .planning/ remain human-facing prose and which become
+    machine-facing specs?
+29. Does "self-compacting" mean deduping repeated facts, rolling up old
+    decisions into constitutions, or summarising old chat/planning material
+    into stable subsystem docs?
+30. Is this system mainly for Claude Code / Codex agents, or should it also
+    feed in-world Wib/Wob/Scramble agents?
 
 ## Reference
 
