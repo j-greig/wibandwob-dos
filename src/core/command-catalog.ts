@@ -26,7 +26,7 @@ export interface AppMenuActions {
   openGallery: () => void;
   openBrowserReader: () => void;
   openChromeBrowser: () => void;
-  openFigletBanner: () => void;
+  openFigletBanner: (args?: Record<string, unknown>) => void;
   openPatternWindow: () => void;
   openCompanionWindow: () => void;
   openWorkspaceManager: () => void;
@@ -381,10 +381,13 @@ const APP_COMMANDS: AppCommandDefinition[] = [
   {
     id: "figlet.open",
     label: "Open Figlet Banner",
+    description: "Open a FIGlet banner. Args: text (string), font (string, optional). Without args opens interactive prompt.",
     group: "surface",
     actionKey: "openFigletBanner",
     menuPlacements: [{ category: "applications", order: 70, label: "Figlet Banner" }],
-    palettePlacement: { order: 50, label: "Open Figlet Banner" }
+    palettePlacement: { order: 50, label: "Open Figlet Banner" },
+    api: true,
+    agent: true
   },
   {
     id: "pattern.open",

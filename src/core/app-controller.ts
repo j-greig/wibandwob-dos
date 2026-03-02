@@ -238,7 +238,7 @@ export class TsTuiMvpApp {
     const current = this.state.sync();
     const focus = current.windows.find((window) => window.focused);
     const focusSummary = focus
-      ? ` Focus ${focus.id}:${focus.kind} ${focus.width}x${focus.height}@${focus.left},${focus.top}`
+      ? ` Focus ${focus.id}:${focus.kind} ${focus.width ?? "?"}x${focus.height ?? "?"}@${focus.left ?? 0},${focus.top ?? 0}`
       : " Focus none";
     this.statusLine.setContent(
       ` Alt-F File  Alt-E Edit  Alt-V View  Alt-W Window  Alt-A Applications  Tab Next  Shift-Tab Prev  Alt-Shift-Arrows Resize  Ctrl-S Save  Ctrl-Q Quit  |  Term ${current.screen.width}x${current.screen.height}  Theme ${themeName()}  Windows ${current.screen.openWindowCount}${focusSummary} `
@@ -1033,7 +1033,15 @@ export class TsTuiMvpApp {
       openGallery: () => this.openPrimerGalleryWindow(),
       openBrowserReader: () => this.openBrowserReaderWindow(),
       openChromeBrowser: () => this.openChromeBrowserWindow(),
-      openFigletBanner: () => this.promptForFigletText(),
+      openFigletBanner: (args) => {
+        const text = args?.text as string | undefined;
+        if (text) {
+          const font = (args?.font as string) || getDefaultFigletFont();
+          this.openFigletWindow(text, font);
+        } else {
+          this.promptForFigletText();
+        }
+      },
       openPatternWindow: () => this.openPatternWindow(),
       openCompanionWindow: () => this.openCompanionWindow(),
       openWorkspaceManager: () => this.openWorkspaceManagerWindow(),

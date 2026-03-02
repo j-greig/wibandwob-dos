@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import type { DesktopState, DesktopWindowState, WindowRecord } from "../core/types.js";
+import { themeName } from "../core/theme/resolver.js";
 
 interface StateServiceOptions {
   appName: string;
@@ -72,7 +73,8 @@ export class StateService {
         cwd: this.options.cwd,
         statePath: this.options.statePath,
         controlApiEnabled: this.options.getControlApiStatus?.().enabled,
-        controlApiPort: this.options.getControlApiStatus?.().port
+        controlApiPort: this.options.getControlApiStatus?.().port,
+        theme: themeName()
       },
       screen: {
         width: screen.width,
@@ -104,10 +106,10 @@ export class StateService {
       kind: window.kind,
       appType: details.appType,
       title: window.title,
-      left: Number(window.frame.left),
-      top: Number(window.frame.top),
-      width: Number(window.frame.width),
-      height: Number(window.frame.height),
+      left: Number(window.frame.left) || 0,
+      top: Number(window.frame.top) || 0,
+      width: Number(window.frame.width) || null,
+      height: Number(window.frame.height) || null,
       zIndex: index,
       focused: window.id === focusedId,
       filePath: window.filePath,

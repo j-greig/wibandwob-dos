@@ -119,8 +119,8 @@ export interface DesktopWindowState {
   title: string;
   left: number;
   top: number;
-  width: number;
-  height: number;
+  width: number | null;
+  height: number | null;
   zIndex: number;
   focused: boolean;
   filePath?: string;
@@ -136,6 +136,7 @@ export interface DesktopState {
     statePath: string;
     controlApiEnabled?: boolean;
     controlApiPort?: number;
+    theme?: string;
   };
   screen: {
     width: number;
