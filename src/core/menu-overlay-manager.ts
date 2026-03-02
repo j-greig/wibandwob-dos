@@ -1,11 +1,13 @@
 import blessed from "blessed";
 
+import { theme } from "./theme-resolver.js";
 import type { Box, List, MenuConfig, MenuItem } from "./types.js";
 
 export class MenuOverlayManager {
   private menuList?: List;
   private popupMenu?: List;
   private openMenuLabel?: string;
+  private menuTargets: Box[] = [];
 
   constructor(
     private readonly screen: blessed.Widgets.Screen,
@@ -35,12 +37,19 @@ export class MenuOverlayManager {
         clickable: true,
         content: menu.label,
         style: {
-          fg: "black",
-          bg: "white",
-          hover: { fg: "white", bg: "blue" }
+          ...theme().menuBar,
+          hover: theme().selected
         }
       });
       target.on("click", () => openMenu(menu.label));
+      this.menuTargets.push(target);
+    }
+  }
+
+  /** Restyle menu bar targets and any open menus to match current theme. */
+  restyle(): void {
+    for (const target of this.menuTargets) {
+      target.style = { ...theme().menuBar, hover: theme().selected };
     }
   }
 
@@ -61,10 +70,9 @@ export class MenuOverlayManager {
       vi: true,
       mouse: true,
       style: {
-        fg: "white",
-        bg: "black",
-        border: { fg: "white" },
-        selected: { fg: "black", bg: "cyan" }
+        ...theme().body,
+        border: theme().windowBorderFocused,
+        selected: theme().selected
       },
       items: menu.items.map((item) => item.label)
     });
@@ -125,10 +133,9 @@ export class MenuOverlayManager {
       vi: true,
       mouse: true,
       style: {
-        fg: "white",
-        bg: "black",
-        border: { fg: "white" },
-        selected: { fg: "black", bg: "cyan" }
+        ...theme().body,
+        border: theme().windowBorderFocused,
+        selected: theme().selected
       },
       items: items.map((item) => item.label)
     });

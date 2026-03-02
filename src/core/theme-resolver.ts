@@ -11,8 +11,8 @@ import type { ThemeTokens, ThemeVariant } from "./theme-types.js";
 const WIBWOB_LIGHT: ThemeVariant = {
   name: "wibwob-light",
   tokens: {
-    desktop:              { fg: "grey",   bg: "white"   },
-    menuBar:              { fg: "black",  bg: "white"   },
+    desktop:              { fg: "grey",   bg: "#e0e0e0" },  // light grey desktop
+    menuBar:              { fg: "black",  bg: "white"   },  // white bar on grey desktop = visible
     statusLine:           { fg: "black",  bg: "white"   },
 
     windowFrame:          { fg: "black",  bg: "white"   },
@@ -43,9 +43,9 @@ const WIBWOB_LIGHT: ThemeVariant = {
 const WIBWOB_DARK: ThemeVariant = {
   name: "wibwob-dark",
   tokens: {
-    desktop:              { fg: "black",  bg: "white"   },
-    menuBar:              { fg: "black",  bg: "white"   },
-    statusLine:           { fg: "black",  bg: "white"   },
+    desktop:              { fg: "#444444", bg: "black"  },  // pure black desktop
+    menuBar:              { fg: "white",  bg: "#333333" },  // dark grey bar on black desktop = visible
+    statusLine:           { fg: "white",  bg: "#333333" },
 
     windowFrame:          { fg: "white",  bg: "black"   },
     windowBorderFocused:  { fg: "cyan",   bg: "black"   },

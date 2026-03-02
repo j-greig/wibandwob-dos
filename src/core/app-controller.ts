@@ -243,6 +243,7 @@ export class TsTuiMvpApp {
     this.menuBar.style = theme().menuBar;
     this.desktop.style = theme().desktop;
     this.statusLine.style = theme().statusLine;
+    this.menuUi.restyle();
     // Restyle all open windows
     this.windowManager.restyleAll();
     this.repaintDesktop();
