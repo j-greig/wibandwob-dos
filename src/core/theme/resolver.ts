@@ -17,14 +17,19 @@ import { darkPastel } from "./dark-pastel.js";
 import { light } from "./light.js";
 
 // ── Private themes (modules-private/wibwob-theme-*) ──
-import { phosphor } from "../../../modules-private/wibwob-theme-phosphor/theme.js";
+// TODO: import real phosphor from modules-private once submodule is cloned.
+// Stub reuses dark tokens so the theme cycle works without the private repo.
+const phosphor: ThemeVariant = {
+  name: "phosphor",
+  tokens: { ...dark.tokens },
+};
 
 /** All built-in variants in cycle order. */
 const VARIANT_CYCLE: ThemeVariant[] = [
   dark,
   darkNord,
   darkPastel,
-  phosphor,
+  ...(phosphor ? [phosphor] : []),
   light,
 ];
 
