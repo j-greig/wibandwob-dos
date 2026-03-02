@@ -18,21 +18,26 @@ Full theme system with live switching across all surfaces.
 - [x] `onRestyle` hook on all window types
 - [x] `safeSetStyle` helper (preserves blessed scrollbar/item sub-styles)
 - [x] Live toggle via Alt+T / View menu / command palette / API
-- [x] Three variants: dark, dark-pastel (Catppuccin Mocha), light
-- [x] Cycle order: dark → dark-pastel → light → dark
+- [x] Five variants: dark, dark-nord, dark-pastel, phosphor, light
+- [x] Cycle order: dark → nord → pastel → phosphor → light → dark
 - [x] Error handling in control API commands/run endpoint
+- [x] Menu bar/dropdown/context menus themed (no more hardcoded colours)
+- [x] Menu bar vs desktop contrast in all variants
+- [x] Theme file split: `src/core/theme/` with types, resolver, variants/
+- [x] Phosphor theme in `modules-private/wibwob-themes/variants/`
+- [x] Fleet audit: 12 window kinds x 5 themes, screenshots in scratch/
 
 ## Theme Parity — Surface Audit
 
 Every surface must use theme tokens. No hardcoded colour strings.
 
 ### Shell chrome
-- [ ] **Menu bar click targets** — `menu-overlay-manager.ts:40` hardcodes `fg:"black", bg:"white"`
-- [ ] **Menu bar hover** — hardcodes `hover: { fg:"white", bg:"blue" }`
-- [ ] **Dropdown menus** — `menu-overlay-manager.ts:64` hardcodes white-on-black + cyan selected
-- [ ] **Popup/context menus** — `menu-overlay-manager.ts:119` same hardcoded colours
-- [ ] **Status line** — verify it restyles on toggle (currently set in toggleTheme)
-- [ ] **Menu bar background continuity** — the bar bg and the word bg must match exactly
+- [x] **Menu bar click targets** — now use `theme().menuBar` + `theme().selected` hover
+- [x] **Dropdown menus** — now use `theme().body` + `theme().selected`
+- [x] **Popup/context menus** — same
+- [x] **Status line** — restyles on toggle
+- [x] **Menu bar background continuity** — bar bg distinct from desktop bg in all variants
+- [ ] **Menu bar restyle on toggle** — targets restyle via `menuUi.restyle()`, verify visually
 
 ### Window chrome
 - [ ] **Close button** — verify X button uses theme tokens on restyle
