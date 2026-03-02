@@ -169,7 +169,8 @@ export class TsTuiMvpApp {
       windows: this.windowManager,
       openBackroomsTv: (channel) => this.openBackroomsTv(channel),
       saveWorkspaceNamed: (name) => this.saveWorkspaceNamed(name),
-      loadWorkspaceNamed: (name) => this.loadWorkspaceNamed(name)
+      loadWorkspaceNamed: (name) => this.loadWorkspaceNamed(name),
+      screenshotText: () => (this.screen as any).screenshot() as string
     });
     this.state = new StateService(
       {

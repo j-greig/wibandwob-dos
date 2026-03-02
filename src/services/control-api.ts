@@ -54,6 +54,8 @@ interface ControlApiHandlers {
   openBackroomsTv: (channel: BackroomsChannel) => void;
   saveWorkspaceNamed: (name: string) => void;
   loadWorkspaceNamed: (name: string) => void;
+  /** Blessed screen.screenshot() — returns full TUI as ANSI text. */
+  screenshotText: () => string;
 }
 
 export class ControlApiService {
@@ -135,6 +137,7 @@ export class ControlApiService {
           "GET /commands/list",
           "GET /content/primer-info?path=...",
           "GET /windows/text?id=...",
+          "GET /screenshot/text",
           "POST /view/primer-browser/open",
           "POST /view/file-manager/open",
           "POST /view/primer-gallery/open",
@@ -181,6 +184,11 @@ export class ControlApiService {
         url.searchParams.get("path") ?? url.searchParams.get("name") ?? "";
       return Response.json(this.handlers.getPrimerInfo(pathOrName));
     }
+    if (request.method === "GET" && url.pathname === "/screenshot/text") {
+      const text = this.handlers.screenshotText();
+      return new Response(text, { headers: { "Content-Type": "text/plain; charset=utf-8" } });
+    }
+
     if (request.method === "GET" && url.pathname === "/windows/text") {
       const id = Number(url.searchParams.get("id"));
       const text = this.handlers.windows.captureText(id);
