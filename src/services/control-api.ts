@@ -283,20 +283,22 @@ export class ControlApiService {
       });
     }
     if (request.method === "POST" && url.pathname === "/windows/move") {
+      const b = body as any;
       return Response.json({
         ok: this.handlers.windows.moveWindow(
-          Number((body as any).id),
-          Number((body as any).left),
-          Number((body as any).top),
+          Number(b.id),
+          Number(b.left ?? b.x),
+          Number(b.top ?? b.y),
         ),
       });
     }
     if (request.method === "POST" && url.pathname === "/windows/resize") {
+      const b = body as any;
       return Response.json({
         ok: this.handlers.windows.resizeWindow(
-          Number((body as any).id),
-          Number((body as any).width),
-          Number((body as any).height),
+          Number(b.id),
+          Number(b.width ?? b.w),
+          Number(b.height ?? b.h),
         ),
       });
     }
