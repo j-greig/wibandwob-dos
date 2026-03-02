@@ -1,5 +1,5 @@
 ---
-Status: not-started
+Status: in-progress
 Type: epic
 GitHub issue: #104
 PR: —
@@ -139,11 +139,33 @@ QMD-powered search over indexed markdown collections:
 
 ## Planned Features / Stories
 
-- [ ] F01 — Core Finder window (directory listing, navigation, file preview)
-- [ ] F02 — Simple search (grep/rg integration, incremental results)
+- [x] F01 — Core Finder window (directory listing, navigation, file preview)
+  - Directory listing with sort (name/size/modified/type)
+  - File preview with line numbers and search context
+  - List view (36/64 split with preview) and icon view (full-width grid)
+  - Icon view: Unicode type glyphs, keyboard nav (arrows, vim, enter, backspace, letter-jump)
+  - Selection sync between list and icon views
+  - Clickable toolbar buttons (Filter, Search, List/Icon toggle)
+  - Clickable status bar buttons (Sort, Refresh)
+  - Dotfiles always shown
+- [x] F02 — Simple search (grep/rg integration, incremental results)
+  - rg subprocess with streaming results (max 200 hits)
+  - Search box in toolbar (s to focus, Enter to run)
+  - Search result preview with context window (5 before, 20 after, arrow marker)
 - [ ] F03 — Advanced search (QMD integration, query modes, graceful fallback)
-- [ ] F04 — Command registry and agent surface integration
-- [ ] F05 — Workspace persistence for Finder state
+  - Not started. Needs QMD client, query dispatch, collection discovery.
+  - Advanced mode stub removed from UI; command catalog entry retained.
+- [x] F04 — Command registry and agent surface integration
+  - 9 commands: search, navigate, toggle_view, advanced_search (stub),
+    bookmark_path (stub), go_to_bookmark (stub), new_folder (stub), refresh, sort_by
+  - FinderController interface on WindowRecord.finder
+  - All live commands tested via API
+- [x] F05 — Workspace persistence for Finder state
+  - Persists: currentPath, selectedIndex, filterValue, searchQuery, viewMode, sortField
+- [x] F06 — Design system: modal buttons
+  - createButtonBar primitive in src/core/modal.ts
+  - OK/Cancel buttons on openValuePrompt and openPathPrompt
+  - Covers: Save Workspace As, Figlet Text, Backrooms prompts, Save As file path
 
 ## Dependencies
 

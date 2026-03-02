@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { theme } from "./theme/resolver.js";
+import { createModal, createButtonBar, showToast, type ModalPosition } from "./modal.js";
 import type { Box, List, Textbox } from "./types.js";
 
 interface BrowserPromptItem {
@@ -14,61 +15,44 @@ interface BrowserPromptItem {
 }
 
 export class OverlayManager {
-  private readonly notification: Box;
+  /** Default toast position for flash notifications. */
+  private toastPosition: ModalPosition = "s";
 
   constructor(
     private readonly screen: blessed.Widgets.Screen,
     private readonly restoreWindowFocus: () => void
-  ) {
-    this.notification = blessed.box({
-      parent: this.screen,
-      top: "center",
-      left: "center",
-      width: "shrink",
-      height: "shrink",
-      border: "line",
-      padding: { left: 1, right: 1 },
-      hidden: true,
-      style: {
-        fg: "white",
-        bg: "black",
-        border: {
-          fg: "yellow"
-        }
-      }
-    });
+  ) {}
+
+  /** Set the default compass position for flash/toast notifications. */
+  setToastPosition(position: ModalPosition): void {
+    this.toastPosition = position;
   }
 
-  flash(message: string): void {
-    this.notification.setContent(` ${message} `);
-    this.notification.show();
-    this.screen.render();
-    setTimeout(() => {
-      this.notification.hide();
-      this.screen.render();
-    }, 2200);
+  flash(message: string, position?: ModalPosition): void {
+    showToast({
+      screen: this.screen,
+      message,
+      position: position ?? this.toastPosition,
+      duration: 2200
+    });
   }
 
   openValuePrompt(label: string, initialValue: string, onSubmit: (value: string) => void): void {
     const t = theme();
     const promptWidth = Math.min(60, Math.floor(Number(this.screen.width) * 0.5));
-    const modal = blessed.box({
-      parent: this.screen,
-      top: "center",
-      left: "center",
+    const modal = createModal({
+      screen: this.screen,
       width: promptWidth,
-      height: 5,
-      border: "line",
-      label: ` ${label} `,
-      mouse: true,
-      keys: true,
+      height: 7,
+      position: "c",
+      label,
       style: {
         ...t.body,
         border: t.windowBorderFocused
       }
     });
     const input: Textbox = blessed.textbox({
-      parent: modal,
+      parent: modal.box,
       top: 1,
       left: 1,
       right: 1,
@@ -80,22 +64,39 @@ export class OverlayManager {
     });
 
     const closePrompt = () => {
+      buttonBar.destroy();
       modal.destroy();
       this.restoreWindowFocus();
       this.screen.render();
     };
 
-    input.setValue(initialValue);
-    input.on("submit", (value) => {
+    const submitValue = () => {
+      const nextValue = (input.getValue() ?? "").trim();
       closePrompt();
-      const nextValue = (value ?? "").trim();
       if (nextValue) {
         onSubmit(nextValue);
       }
+    };
+
+    const buttonBar = createButtonBar({
+      parent: modal.box,
+      bottom: 1,
+      screen: this.screen,
+      align: "right",
+      buttons: [
+        { label: "OK", variant: "primary", action: submitValue },
+        { label: "Cancel", action: closePrompt }
+      ]
     });
+
+    input.setValue(initialValue);
+    input.on("submit", () => submitValue());
     input.on("keypress", (_, key) => {
       if (key.name === "escape") {
         closePrompt();
+      }
+      if (key.name === "tab") {
+        buttonBar.focus(0);
       }
     });
 
@@ -112,24 +113,20 @@ export class OverlayManager {
   ): void {
     const t = theme();
     const pathWidth = Math.min(80, Math.floor(Number(this.screen.width) * 0.5));
-    const modal = blessed.box({
-      parent: this.screen,
-      top: "center",
-      left: "center",
+    const modal = createModal({
+      screen: this.screen,
       width: pathWidth,
-      height: 7,
-      border: "line",
-      label: ` ${label} `,
+      height: 8,
+      position: "c",
+      label,
       tags: true,
-      mouse: true,
-      keys: true,
       style: {
         ...t.body,
         border: t.windowBorderFocused
       }
     });
     const input: Textbox = blessed.textbox({
-      parent: modal,
+      parent: modal.box,
       top: 1,
       left: 1,
       right: 1,
@@ -140,12 +137,12 @@ export class OverlayManager {
       style: t.selected
     });
     blessed.box({
-      parent: modal,
-      bottom: 1,
+      parent: modal.box,
+      top: 3,
       left: 1,
       right: 1,
       height: 1,
-      content: " Enter open/save  Tab complete  Esc cancel ",
+      content: " Tab complete path ",
       style: {
         fg: "black",
         bg: "white"
@@ -156,10 +153,30 @@ export class OverlayManager {
       input.removeAllListeners("submit");
       input.removeAllListeners("cancel");
       input.removeAllListeners("keypress");
+      buttonBar.destroy();
       modal.destroy();
       this.restoreWindowFocus();
       this.screen.render();
     };
+
+    const submitValue = () => {
+      const nextValue = (input.getValue() ?? "").trim();
+      closePrompt();
+      if (nextValue) {
+        onSubmit(nextValue);
+      }
+    };
+
+    const buttonBar = createButtonBar({
+      parent: modal.box,
+      bottom: 1,
+      screen: this.screen,
+      align: "right",
+      buttons: [
+        { label: "OK", variant: "primary", action: submitValue },
+        { label: "Cancel", action: closePrompt }
+      ]
+    });
 
     input.setValue(initialValue);
     input.key(["tab"], () => {
@@ -170,13 +187,7 @@ export class OverlayManager {
         this.screen.render();
       }
     });
-    input.on("submit", (value) => {
-      const nextValue = (value ?? "").trim();
-      closePrompt();
-      if (nextValue) {
-        onSubmit(nextValue);
-      }
-    });
+    input.on("submit", () => submitValue());
     input.on("cancel", closePrompt);
     input.on("keypress", (_, key) => {
       if (key.name === "escape") {
@@ -193,7 +204,8 @@ export class OverlayManager {
     label: string,
     items: T[],
     initialIndex: number,
-    onSubmit: (item: T, index: number) => void
+    onSubmit: (item: T, index: number) => void,
+    options?: { onPreview?: (item: T, index: number) => string | undefined }
   ): void {
     this.openBrowserPrompt(
       label,
@@ -204,7 +216,15 @@ export class OverlayManager {
         searchText: item.searchText ?? item.label
       })),
       initialIndex,
-      (item, index) => onSubmit(items[index], index)
+      (item, index) => onSubmit(items[index], index),
+      options?.onPreview
+        ? { onPreview: (browserItem, _index) => {
+            const originalIndex = items.findIndex(
+              (it) => ("value" in it && typeof it.value === "string" ? it.value : "") === browserItem.value
+            );
+            return originalIndex >= 0 ? options.onPreview!(items[originalIndex], originalIndex) : undefined;
+          }}
+        : undefined
     );
   }
 
@@ -215,26 +235,21 @@ export class OverlayManager {
     onSubmit: (item: T, index: number) => void,
     onCancel?: () => void
   ): void {
-    const screen = this.screen as blessed.Widgets.Screen & { grabKeys: boolean };
-    const previousGrabKeys = screen.grabKeys;
     const width = Math.max(24, Math.max(...items.map((item) => item.label.length), 0) + 4);
-    const modal = blessed.box({
-      parent: this.screen,
-      top: "center",
-      left: "center",
+    const modal = createModal({
+      screen: this.screen,
       width,
       height: Math.max(3, items.length + 2),
-      border: "line",
-      label: ` ${label} `,
-      mouse: true,
-      keys: true,
+      position: "c",
+      label,
+      grabKeys: true,
       style: {
         ...theme().body,
         border: theme().windowBorderFocused
       }
     });
     const list = blessed.list({
-      parent: modal,
+      parent: modal.box,
       top: 0,
       left: 0,
       right: 0,
@@ -249,8 +264,6 @@ export class OverlayManager {
       }
     }) as List & { selected?: number };
 
-    screen.grabKeys = true;
-
     let closed = false;
 
     const closePrompt = (cancelled: boolean) => {
@@ -261,7 +274,6 @@ export class OverlayManager {
       list.removeAllListeners("select");
       list.removeAllListeners("keypress");
       modal.destroy();
-      screen.grabKeys = previousGrabKeys;
       this.restoreWindowFocus();
       this.screen.render();
       if (cancelled) {
@@ -301,18 +313,15 @@ export class OverlayManager {
     label: string,
     items: BrowserPromptItem[],
     initialIndex: number,
-    onSubmit: (item: BrowserPromptItem, index: number) => void
+    onSubmit: (item: BrowserPromptItem, index: number) => void,
+    options?: { onPreview?: (item: BrowserPromptItem, index: number) => string | undefined }
   ): void {
-    const modal = blessed.box({
-      parent: this.screen,
-      top: "center",
-      left: "center",
+    const modal = createModal({
+      screen: this.screen,
       width: "82%",
       height: "70%",
-      border: "line",
-      label: ` ${label} `,
-      mouse: true,
-      keys: true,
+      position: "c",
+      label,
       style: {
         fg: "white",
         bg: "black",
@@ -321,7 +330,7 @@ export class OverlayManager {
     });
 
     const searchBox: Textbox = blessed.textbox({
-      parent: modal,
+      parent: modal.box,
       top: 0,
       left: 0,
       width: "38%",
@@ -331,7 +340,7 @@ export class OverlayManager {
       style: { fg: "white", bg: "blue" }
     });
     const list = blessed.list({
-      parent: modal,
+      parent: modal.box,
       top: 1,
       left: 0,
       width: "38%",
@@ -349,7 +358,7 @@ export class OverlayManager {
       }
     }) as List;
     const preview = blessed.box({
-      parent: modal,
+      parent: modal.box,
       top: 0,
       left: "38%",
       right: 0,
@@ -366,7 +375,7 @@ export class OverlayManager {
     });
 
     blessed.box({
-      parent: modal,
+      parent: modal.box,
       bottom: 0,
       left: 0,
       right: 0,
@@ -399,10 +408,25 @@ export class OverlayManager {
       this.screen.render();
     };
 
+    let previewTimer: ReturnType<typeof setTimeout> | undefined;
+
     const updatePreview = (index: number) => {
       const item = filteredItems[index];
       if (!item) {
         preview.setContent(searchValue ? `No matches for "${searchValue}".` : "No item selected.");
+        return;
+      }
+      // If a lazy onPreview callback is provided, debounce it (80ms)
+      if (options?.onPreview) {
+        if (previewTimer) clearTimeout(previewTimer);
+        preview.setContent(item.preview ?? item.label);
+        previewTimer = setTimeout(() => {
+          const content = options.onPreview!(item, index);
+          if (content !== undefined) {
+            preview.setContent(content);
+            this.screen.render();
+          }
+        }, 80);
         return;
       }
       preview.setContent(item.preview ?? item.label);
@@ -461,6 +485,12 @@ export class OverlayManager {
         onSubmit(item, index);
       }
     });
+    list.on("click", () => {
+      setTimeout(() => {
+        updatePreview((list as List & { selected: number }).selected ?? 0);
+        this.screen.render();
+      }, 0);
+    });
     list.on("keypress", (ch, key) => {
       if (key.name === "escape") {
         closePrompt();
@@ -496,16 +526,12 @@ export class OverlayManager {
       previewLimit?: number;
     }
   ): void {
-    const modal = blessed.box({
-      parent: this.screen,
-      top: "center",
-      left: "center",
+    const modal = createModal({
+      screen: this.screen,
       width: "88%",
       height: "76%",
-      border: "line",
-      label: ` ${label} `,
-      mouse: true,
-      keys: true,
+      position: "c",
+      label,
       style: {
         fg: "white",
         bg: "black",
@@ -513,7 +539,7 @@ export class OverlayManager {
       }
     });
     const pathBar = blessed.box({
-      parent: modal,
+      parent: modal.box,
       top: 0,
       left: 0,
       right: 0,
@@ -521,7 +547,7 @@ export class OverlayManager {
       style: { fg: "black", bg: "cyan" }
     });
     const searchBox: Textbox = blessed.textbox({
-      parent: modal,
+      parent: modal.box,
       top: 1,
       left: 0,
       width: "38%",
@@ -531,7 +557,7 @@ export class OverlayManager {
       style: { fg: "white", bg: "blue" }
     });
     const list = blessed.list({
-      parent: modal,
+      parent: modal.box,
       top: 2,
       left: 0,
       width: "38%",
@@ -549,7 +575,7 @@ export class OverlayManager {
       }
     }) as List;
     const preview = blessed.box({
-      parent: modal,
+      parent: modal.box,
       top: 1,
       left: "38%",
       right: 0,
@@ -560,7 +586,7 @@ export class OverlayManager {
       style: { fg: "white", bg: "black" }
     });
     blessed.box({
-      parent: modal,
+      parent: modal.box,
       bottom: 0,
       left: 0,
       right: 0,

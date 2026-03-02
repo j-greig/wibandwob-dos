@@ -37,6 +37,17 @@ export interface AppMenuActions {
   toggleTheme: () => void;
   chooseTheme: () => void;
   setTheme: (args?: Record<string, unknown>) => void;
+  // ── Finder ────────────────────────────────────────────
+  finderSearch: (args?: Record<string, unknown>) => void;
+  finderNavigate: (args?: Record<string, unknown>) => void;
+  finderToggleView: () => void;
+
+  finderAdvancedSearch: (args?: Record<string, unknown>) => void;
+  finderBookmarkPath: () => void;
+  finderGoToBookmark: (args?: Record<string, unknown>) => void;
+  finderNewFolder: () => void;
+  finderRefresh: () => void;
+  finderSortBy: (args?: Record<string, unknown>) => void;
 }
 
 export type AppCommandCategory = "file" | "edit" | "view" | "window" | "applications";
@@ -138,6 +149,92 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     actionKey: "openFileManager",
     menuPlacements: [{ category: "applications", order: 0 }],
     palettePlacement: { order: 10 },
+    api: true,
+    agent: true
+  },
+  // ── Finder commands ──────────────────────────────────
+  {
+    id: "finder.search",
+    label: "Finder: Search Files",
+    description: "Search file contents in the focused Finder window. Args: query (string), glob (string, optional e.g. '*.ts').",
+    group: "browse",
+    actionKey: "finderSearch",
+    palettePlacement: { order: 11 },
+    api: true,
+    agent: true
+  },
+  {
+    id: "finder.navigate",
+    label: "Finder: Go to Path",
+    description: "Navigate the focused Finder to a directory. Args: path (string).",
+    group: "browse",
+    actionKey: "finderNavigate",
+    palettePlacement: { order: 12 },
+    api: true,
+    agent: true
+  },
+  {
+    id: "finder.toggle_view",
+    label: "Finder: Toggle List/Icon View",
+    group: "browse",
+    actionKey: "finderToggleView",
+    palettePlacement: { order: 13 },
+    api: true,
+    agent: true
+  },
+  // finder.toggle_hidden removed — dotfiles always shown
+  {
+    id: "finder.advanced_search",
+    label: "Finder: Advanced Search (QMD)",
+    description: "Semantic/keyword search via QMD in the focused Finder. Args: query (string), mode (lex|vec|hyde, optional). Requires QMD.",
+    group: "browse",
+    actionKey: "finderAdvancedSearch",
+    palettePlacement: { order: 15 },
+    api: true,
+    agent: true
+  },
+  {
+    id: "finder.bookmark_path",
+    label: "Finder: Bookmark Current Path",
+    description: "Bookmark the current directory in the focused Finder for quick access.",
+    group: "browse",
+    actionKey: "finderBookmarkPath",
+    palettePlacement: { order: 16 }
+  },
+  {
+    id: "finder.go_to_bookmark",
+    label: "Finder: Go to Bookmark",
+    description: "Navigate to a bookmarked path. Args: name (string).",
+    group: "browse",
+    actionKey: "finderGoToBookmark",
+    api: true,
+    agent: true
+  },
+  {
+    id: "finder.new_folder",
+    label: "Finder: New Folder",
+    description: "Create a new folder in the current Finder directory.",
+    group: "browse",
+    actionKey: "finderNewFolder",
+    palettePlacement: { order: 17 }
+  },
+  {
+    id: "finder.refresh",
+    label: "Finder: Refresh",
+    description: "Reload the directory listing in the focused Finder.",
+    group: "browse",
+    actionKey: "finderRefresh",
+    palettePlacement: { order: 18 },
+    api: true,
+    agent: true
+  },
+  {
+    id: "finder.sort_by",
+    label: "Finder: Sort By",
+    description: "Change sort order. Args: field (name|size|modified|type).",
+    group: "browse",
+    actionKey: "finderSortBy",
+    palettePlacement: { order: 19 },
     api: true,
     agent: true
   },

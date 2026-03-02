@@ -8,7 +8,7 @@ import { theme } from "../core/theme/resolver.js";
 import type { WindowRecord } from "../core/types.js";
 import type { WindowManager } from "../core/window-manager.js";
 import { createScrollbar, safeSetStyle } from "../core/ui-primitives.js";
-import { getDefaultFigletFont, getFigletCatalogue, getFigletFontChoices, measureFiglet } from "../services/figlet-service.js";
+import { getDefaultFigletFont, getFigletCatalogue, getFigletFontChoices, measureFiglet, renderFiglet } from "../services/figlet-service.js";
 
 export function promptForFigletText(
   overlays: OverlayManager,
@@ -32,6 +32,8 @@ export function openFigletFontPicker(params: {
       return;
     }
     params.onOpenWindow(params.text, item.value);
+  }, {
+    onPreview: (item) => renderFiglet(params.text || "WIB WOB", item.value)
   });
 }
 

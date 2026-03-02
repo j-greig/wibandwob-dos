@@ -95,7 +95,7 @@ export interface WorkspaceRestoreActions {
   openPatternWindow: () => void;
   openPrimerGalleryWindow: (restore?: { activeTabIndex?: number; searchValue?: string; selectedIndex?: number }) => void;
   openPrimerBrowserWindow: (restore?: { selectedIndex?: number }) => void;
-  openFileManagerWindow: (restore?: { currentPath?: string; selectedIndex?: number; filterValue?: string }) => void;
+  openFileManagerWindow: (restore?: { currentPath?: string; selectedIndex?: number; filterValue?: string; searchQuery?: string; searchMode?: "simple" | "advanced"; viewMode?: "list" | "icon"; showHidden?: boolean; sortField?: "name" | "size" | "modified" | "type" }) => void;
   openBackroomsTv: (channel: BackroomsChannel) => void;
   openCompanionWindow: (restore?: { tick?: number }) => void;
   openArtWindow: () => void;
@@ -147,7 +147,12 @@ export function restoreWindowSnapshot(snapshot: WindowSnapshot, actions: Workspa
         actions.openFileManagerWindow({
           currentPath: typeof payload.currentPath === "string" ? payload.currentPath : undefined,
           filterValue: typeof payload.filterValue === "string" ? payload.filterValue : undefined,
-          selectedIndex: typeof payload.selectedIndex === "number" ? payload.selectedIndex : undefined
+          selectedIndex: typeof payload.selectedIndex === "number" ? payload.selectedIndex : undefined,
+          searchQuery: typeof payload.searchQuery === "string" ? payload.searchQuery : undefined,
+          searchMode: payload.searchMode === "simple" || payload.searchMode === "advanced" ? payload.searchMode : undefined,
+          viewMode: payload.viewMode === "list" || payload.viewMode === "icon" ? payload.viewMode : undefined,
+          showHidden: typeof payload.showHidden === "boolean" ? payload.showHidden : undefined,
+          sortField: ["name", "size", "modified", "type"].includes(payload.sortField as string) ? payload.sortField as "name" | "size" | "modified" | "type" : undefined
         });
       } else {
         actions.openPrimerBrowserWindow({

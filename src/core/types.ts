@@ -171,6 +171,7 @@ export interface WindowRecord {
   isDirty?: boolean;
   lastSavedContent?: string;
   chat?: ChatState;
+  finder?: FinderController;
   writeInput?: (input: string) => void;
   cleanup?: () => void;
   refresh?: () => void;
@@ -178,6 +179,16 @@ export interface WindowRecord {
   captureText?: () => string;
   describeState?: () => WindowStateDetails;
   openContextMenu?: (x?: number, y?: number) => void;
+}
+
+/** Controller interface exposed by Finder windows for command dispatch. */
+export interface FinderController {
+  search: (query: string, glob?: string) => void;
+  navigateTo: (directoryPath: string) => void;
+  toggleView: () => void;
+
+  refresh: () => void;
+  sortBy: (field: "name" | "size" | "modified" | "type") => void;
 }
 
 export interface DragState {

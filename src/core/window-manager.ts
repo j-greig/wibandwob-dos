@@ -218,6 +218,7 @@ export class WindowManager implements WindowFacade {
 
   registerWindow(record: WindowRecord): void {
     this.windows.push(record);
+    this.syncShadow(record);
     this.onChange?.();
     this.focusWindowInternal(record);
   }
@@ -548,10 +549,15 @@ export class WindowManager implements WindowFacade {
 
   private syncShadow(record: WindowRecord): void {
     if (!record.shadow) return;
+    const w = Number(record.frame.width);
+    const h = Number(record.frame.height);
     record.shadow.left = Number(record.frame.left) + 2;
     record.shadow.top = Number(record.frame.top) + 1;
-    record.shadow.width = Number(record.frame.width);
-    record.shadow.height = Number(record.frame.height);
+    record.shadow.width = w;
+    record.shadow.height = h;
+    // Rebuild shadow content to match current dimensions
+    const sh = theme().windowShadow;
+    record.shadow.setContent(Array.from({ length: h }, () => sh.char.repeat(w)).join("\n"));
   }
 
   private clamp(value: number, min: number, max: number): number {

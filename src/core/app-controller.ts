@@ -48,6 +48,7 @@ import {
 } from "../windows/backrooms-windows.js";
 import {
   openFileManagerWindow as openFarjsFileManagerWindow,
+  type FileManagerRestore,
   openPrimerBrowserWindow as openPrimerBrowserListWindow,
   openPrimerGalleryWindow as openPrimerGalleryListWindow,
   openTextViewerWindow as openContentViewerWindow
@@ -72,6 +73,7 @@ import { WibWobAgentSession } from "../services/wibwob-agent-session.js";
 import { ChromeBrowserService } from "../services/chrome-browser-service.js";
 import { openChromeBrowserWindow } from "../windows/chrome-browser-window.js";
 import { openWibWobAgentWindow as openNativeWibWobAgentWindow } from "../windows/wibwob-agent-window.js";
+import { CustomCursor } from "./custom-cursor.js";
 
 export class TsTuiMvpApp {
   private readonly screen: blessed.Widgets.Screen;
@@ -87,6 +89,7 @@ export class TsTuiMvpApp {
   private readonly content = new ContentService();
   private readonly workspace = new WorkspaceService(WORKSPACES_DIR);
   private readonly geometry: DesktopGeometryService;
+  private readonly customCursor: CustomCursor;
   private readonly state: StateService;
   private readonly controlApi: ControlApiService;
 
@@ -138,6 +141,7 @@ export class TsTuiMvpApp {
     );
     this.windowManager.setEditorWriteHook((id, text) => this.writeEditorTextById(id, text));
     this.geometry = new DesktopGeometryService(this.screen);
+    this.customCursor = new CustomCursor(this.screen);
     this.overlays = new OverlayManager(this.screen, () => this.windowManager.restoreWindowFocus());
     this.commands = new CommandRegistry(this.getAppMenuActions());
     this.menus = this.commands.buildMenus();
@@ -284,6 +288,7 @@ export class TsTuiMvpApp {
     this.desktop.style = theme().desktop;
     this.statusLine.style = theme().statusLine;
     this.menuUi.restyle();
+    this.customCursor.restyle();
     this.windowManager.restyleAll();
     this.repaintDesktop();
     this.syncState();
@@ -487,7 +492,12 @@ export class TsTuiMvpApp {
     });
   }
 
-  private openFileManagerWindow(restore?: { currentPath?: string; selectedIndex?: number; filterValue?: string }): void {
+  private getFocusedFinder() {
+    const win = this.windowManager.getFocusedWindow();
+    return win?.finder ?? null;
+  }
+
+  private openFileManagerWindow(restore?: FileManagerRestore): void {
     openFarjsFileManagerWindow({
       screen: this.screen,
       windowManager: this.windowManager,
@@ -1051,7 +1061,57 @@ export class TsTuiMvpApp {
       loadWorkspace: () => this.loadWorkspace(),
       toggleTheme: () => this.toggleTheme(),
       chooseTheme: () => this.chooseTheme(),
-      setTheme: (args) => this.setThemeByName(args)
+      setTheme: (args) => this.setThemeByName(args),
+      // ── Finder ──────────────────────────────────────────
+      finderSearch: (args) => {
+        const finder = this.getFocusedFinder();
+        if (!finder) { this.overlays.flash("No Finder window focused"); return; }
+        const query = typeof args?.query === "string" ? args.query : "";
+        const glob = typeof args?.glob === "string" ? args.glob : undefined;
+        finder.search(query, glob);
+      },
+      finderNavigate: (args) => {
+        const finder = this.getFocusedFinder();
+        if (!finder) { this.overlays.flash("No Finder window focused"); return; }
+        const dirPath = typeof args?.path === "string" ? args.path : "";
+        finder.navigateTo(dirPath);
+      },
+      finderToggleView: () => {
+        const finder = this.getFocusedFinder();
+        if (!finder) { this.overlays.flash("No Finder window focused"); return; }
+        finder.toggleView();
+      },
+
+      finderAdvancedSearch: (args) => {
+        const finder = this.getFocusedFinder();
+        if (!finder) { this.overlays.flash("No Finder window focused"); return; }
+        const query = typeof args?.query === "string" ? args.query : "";
+        // Stub — will dispatch to QMD when implemented
+        this.overlays.flash("Advanced search (QMD) coming soon");
+        void query;
+      },
+      finderBookmarkPath: () => {
+        this.overlays.flash("Bookmarks coming soon");
+      },
+      finderGoToBookmark: (_args) => {
+        this.overlays.flash("Bookmarks coming soon");
+      },
+      finderNewFolder: () => {
+        this.overlays.flash("New folder coming soon");
+      },
+      finderRefresh: () => {
+        const finder = this.getFocusedFinder();
+        if (!finder) { this.overlays.flash("No Finder window focused"); return; }
+        finder.refresh();
+      },
+      finderSortBy: (args) => {
+        const finder = this.getFocusedFinder();
+        if (!finder) { this.overlays.flash("No Finder window focused"); return; }
+        const field = typeof args?.field === "string" && ["name", "size", "modified", "type"].includes(args.field)
+          ? args.field as "name" | "size" | "modified" | "type"
+          : "name";
+        finder.sortBy(field);
+      }
     };
   }
 
