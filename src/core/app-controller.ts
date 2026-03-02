@@ -10,7 +10,7 @@ import { buildDesktopContextMenu, buildWindowContextMenu } from "./context-menu-
 import { DesktopGeometryService } from "./desktop-geometry.js";
 import { MenuOverlayManager } from "./menu-overlay-manager.js";
 import { OverlayManager } from "./overlay-manager.js";
-import { theme, toggleTheme as toggleThemeVariant } from "./theme/resolver.js";
+import { theme, themeName, toggleTheme as toggleThemeVariant, allVariants, setThemeVariant } from "./theme/resolver.js";
 import { isRightClick } from "./ui-primitives.js";
 import { restoreWindowSnapshot, serializeWindowSnapshot, type WorkspaceRestoreActions } from "./workspace-snapshots.js";
 import type {
@@ -203,7 +203,14 @@ export class TsTuiMvpApp {
   private restoreDefaultWorkspace(): void {
     if (!this.workspace.exists()) return;
     try {
-      const snapshots = this.workspace.load();
+      const { windows: snapshots, theme: savedTheme } = this.workspace.load();
+      if (savedTheme) {
+        const variant = allVariants().find(v => v.name === savedTheme);
+        if (variant) {
+          setThemeVariant(variant);
+          this.applyTheme();
+        }
+      }
       if (snapshots.length === 0) return;
       let focusedWindow: WindowRecord | undefined;
       for (const snapshot of snapshots) {
@@ -234,18 +241,21 @@ export class TsTuiMvpApp {
       ? ` Focus ${focus.id}:${focus.kind} ${focus.width}x${focus.height}@${focus.left},${focus.top}`
       : " Focus none";
     this.statusLine.setContent(
-      ` Alt-F File  Alt-E Edit  Alt-V View  Alt-W Window  Alt-A Applications  Tab Next  Shift-Tab Prev  Alt-Shift-Arrows Resize  Ctrl-S Save  Ctrl-Q Quit  |  Term ${current.screen.width}x${current.screen.height}  Aspect ${current.screen.cellAspect.toFixed(2)}  Windows ${current.screen.openWindowCount}${focusSummary} `
+      ` Alt-F File  Alt-E Edit  Alt-V View  Alt-W Window  Alt-A Applications  Tab Next  Shift-Tab Prev  Alt-Shift-Arrows Resize  Ctrl-S Save  Ctrl-Q Quit  |  Term ${current.screen.width}x${current.screen.height}  Theme ${themeName()}  Windows ${current.screen.openWindowCount}${focusSummary} `
     );
   }
 
   private toggleTheme(): void {
     toggleThemeVariant();
-    // Restyle shell chrome
+    this.applyTheme();
+  }
+
+  /** Apply current theme tokens to all shell chrome and open windows. */
+  private applyTheme(): void {
     this.menuBar.style = theme().menuBar;
     this.desktop.style = theme().desktop;
     this.statusLine.style = theme().statusLine;
     this.menuUi.restyle();
-    // Restyle all open windows
     this.windowManager.restyleAll();
     this.repaintDesktop();
     this.syncState();
@@ -853,14 +863,14 @@ export class TsTuiMvpApp {
   }
 
   private saveWorkspace(): void {
-    this.workspace.save(this.snapshotWindows());
+    this.workspace.save(this.snapshotWindows(), themeName());
     this.overlays.flash(`Saved workspace to ${this.workspace.path}`);
   }
 
   /** Auto-save current layout to the active workspace (silent, no flash). */
   private autoSaveWorkspace(): void {
     try {
-      this.workspace.save(this.snapshotWindows());
+      this.workspace.save(this.snapshotWindows(), themeName());
     } catch { /* best-effort — don't block quit */ }
   }
 
@@ -916,11 +926,21 @@ export class TsTuiMvpApp {
       return;
     }
     let snapshots: WindowSnapshot[] = [];
+    let savedTheme: string | undefined;
     try {
-      snapshots = this.workspace.load();
+      const loaded = this.workspace.load();
+      snapshots = loaded.windows;
+      savedTheme = loaded.theme;
     } catch (error) {
       this.overlays.flash(`Cannot parse workspace: ${error instanceof Error ? error.message : String(error)}`);
       return;
+    }
+    if (savedTheme) {
+      const variant = allVariants().find(v => v.name === savedTheme);
+      if (variant) {
+        setThemeVariant(variant);
+        this.applyTheme();
+      }
     }
     for (const window of this.windowManager.getWindows()) {
       if (window.kind !== "workspace") {

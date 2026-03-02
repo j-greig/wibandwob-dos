@@ -253,6 +253,7 @@ export function openBackroomsLogBrowserWindow(params: {
     const entry = entries[selectedIndex];
     return {
       appType: "backrooms-log-browser",
+      summary: `Backrooms log browser with ${entries.length} entries.`,
       selectedIndex,
       selectedTheme: entry?.name ?? "",
       selectedPath: entry?.path ?? "",

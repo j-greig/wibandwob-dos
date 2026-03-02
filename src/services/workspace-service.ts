@@ -3,6 +3,13 @@ import path from "node:path";
 
 import type { WindowSnapshot } from "../core/types.js";
 
+/** Workspace file envelope. Backward-compatible: old files are bare arrays. */
+export interface WorkspaceFile {
+  version: 2;
+  theme?: string;
+  windows: WindowSnapshot[];
+}
+
 export class WorkspaceService {
   private currentWorkspaceName = "default";
 
@@ -20,13 +27,17 @@ export class WorkspaceService {
     this.currentWorkspaceName = this.sanitizeName(name);
   }
 
-  save(snapshots: WindowSnapshot[]): void {
+  save(snapshots: WindowSnapshot[], theme?: string): void {
+    const file: WorkspaceFile = { version: 2, theme, windows: snapshots };
     fs.mkdirSync(this.workspaceDir, { recursive: true });
-    fs.writeFileSync(this.path, JSON.stringify(snapshots, null, 2), "utf8");
+    fs.writeFileSync(this.path, JSON.stringify(file, null, 2), "utf8");
   }
 
-  load(): WindowSnapshot[] {
-    return JSON.parse(fs.readFileSync(this.path, "utf8")) as WindowSnapshot[];
+  load(): { windows: WindowSnapshot[]; theme?: string } {
+    const raw = JSON.parse(fs.readFileSync(this.path, "utf8"));
+    // Backward compat: old files are bare WindowSnapshot[]
+    if (Array.isArray(raw)) return { windows: raw };
+    return { windows: raw.windows ?? [], theme: raw.theme };
   }
 
   exists(): boolean {
