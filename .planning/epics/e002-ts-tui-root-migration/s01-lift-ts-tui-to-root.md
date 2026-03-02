@@ -15,8 +15,8 @@ You are executing the first root-migration slice for the WibWob-DOS TS TUI.
 
 Read first:
 
-- [/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/docs/000-docs-overview.md](/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/docs/000-docs-overview.md)
-- [/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/docs/020-target-architecture.md](/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/docs/020-target-architecture.md)
+- [/Users/james/Repos/wibandwob-dos/docs/000-docs-overview.md](/Users/james/Repos/wibandwob-dos/docs/000-docs-overview.md)
+- [/Users/james/Repos/wibandwob-dos/docs/020-target-architecture.md](/Users/james/Repos/wibandwob-dos/docs/020-target-architecture.md)
 
 Objective:
 

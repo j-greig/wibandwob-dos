@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT="/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp"
+ROOT="/Users/james/Repos/wibandwob-dos"
 OUT_DIR="$ROOT/scratch/feedback-loop"
 SESSION="${SESSION_NAME:-ts-tui-backrooms-loop}"
 API_BASE="${API_BASE:-}"

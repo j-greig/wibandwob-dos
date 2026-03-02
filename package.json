@@ -1,8 +1,8 @@
 {
-  "name": "ts-tui-mvp",
+  "name": "wibandwob-dos",
   "private": true,
-  "version": "0.1.0",
-  "description": "Spike MVP for a TypeScript WibWob-DOS shell",
+  "version": "0.2.0",
+  "description": "WibWob-DOS — terminal-native TypeScript TUI shell",
   "type": "module",
   "scripts": {
     "dev": "bun --watch src/app.ts",

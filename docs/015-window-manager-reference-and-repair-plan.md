@@ -220,10 +220,10 @@ terminal-native spike.
 
 The current ownership is already mostly right:
 
-- window manager: [/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/src/core/window-manager.ts](/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/src/core/window-manager.ts)
-- controller orchestration: [/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/src/core/app-controller.ts](/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/src/core/app-controller.ts)
-- state surface: [/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/src/services/state-service.ts](/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/src/services/state-service.ts)
-- type contracts: [/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/src/core/types.ts](/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/src/core/types.ts)
+- window manager: [/Users/james/Repos/wibandwob-dos/src/core/window-manager.ts](/Users/james/Repos/wibandwob-dos/src/core/window-manager.ts)
+- controller orchestration: [/Users/james/Repos/wibandwob-dos/src/core/app-controller.ts](/Users/james/Repos/wibandwob-dos/src/core/app-controller.ts)
+- state surface: [/Users/james/Repos/wibandwob-dos/src/services/state-service.ts](/Users/james/Repos/wibandwob-dos/src/services/state-service.ts)
+- type contracts: [/Users/james/Repos/wibandwob-dos/src/core/types.ts](/Users/james/Repos/wibandwob-dos/src/core/types.ts)
 
 The next step is not more extraction for its own sake. The next step is to make
 `WindowManager` behavior correct and boring.
@@ -296,16 +296,16 @@ This is critical for automated verification loops.
 
 Local spike code:
 
-- [/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/src/core/window-manager.ts](/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/src/core/window-manager.ts)
-- [/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/src/core/app-controller.ts](/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/src/core/app-controller.ts)
-- [/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/src/services/state-service.ts](/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/src/services/state-service.ts)
-- [/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/src/windows/wibwob-chat-window.ts](/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/src/windows/wibwob-chat-window.ts)
+- [/Users/james/Repos/wibandwob-dos/src/core/window-manager.ts](/Users/james/Repos/wibandwob-dos/src/core/window-manager.ts)
+- [/Users/james/Repos/wibandwob-dos/src/core/app-controller.ts](/Users/james/Repos/wibandwob-dos/src/core/app-controller.ts)
+- [/Users/james/Repos/wibandwob-dos/src/services/state-service.ts](/Users/james/Repos/wibandwob-dos/src/services/state-service.ts)
+- [/Users/james/Repos/wibandwob-dos/src/windows/wibwob-chat-window.ts](/Users/james/Repos/wibandwob-dos/src/windows/wibwob-chat-window.ts)
 
 Local blessed source:
 
-- [/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/node_modules/blessed/lib/widgets/textbox.js](/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/node_modules/blessed/lib/widgets/textbox.js)
-- [/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/node_modules/blessed/lib/widgets/textarea.js](/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/node_modules/blessed/lib/widgets/textarea.js)
-- [/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/node_modules/blessed/example/simple-form.js](/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/node_modules/blessed/example/simple-form.js)
+- [/Users/james/Repos/wibandwob-dos/node_modules/blessed/lib/widgets/textbox.js](/Users/james/Repos/wibandwob-dos/node_modules/blessed/lib/widgets/textbox.js)
+- [/Users/james/Repos/wibandwob-dos/node_modules/blessed/lib/widgets/textarea.js](/Users/james/Repos/wibandwob-dos/node_modules/blessed/lib/widgets/textarea.js)
+- [/Users/james/Repos/wibandwob-dos/node_modules/blessed/example/simple-form.js](/Users/james/Repos/wibandwob-dos/node_modules/blessed/example/simple-form.js)
 
 ## Concrete repair plan
 
@@ -354,9 +354,9 @@ Use the existing spike API/state loop, not just eyeballing.
 
 Current artifacts:
 
-- state: [/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/scratch/app-state.json](/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/scratch/app-state.json)
-- captures: [/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/scratch/captures](/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/scratch/captures)
-- xterm logs: [/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/scratch/xterm](/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/scratch/xterm)
+- state: [/Users/james/Repos/wibandwob-dos/scratch/app-state.json](/Users/james/Repos/wibandwob-dos/scratch/app-state.json)
+- captures: [/Users/james/Repos/wibandwob-dos/scratch/captures](/Users/james/Repos/wibandwob-dos/scratch/captures)
+- xterm logs: [/Users/james/Repos/wibandwob-dos/scratch/xterm](/Users/james/Repos/wibandwob-dos/scratch/xterm)
 
 Recommended loop:
 

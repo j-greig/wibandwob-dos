@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT="/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp"
+ROOT="/Users/james/Repos/wibandwob-dos"
 SESSION="ts-tui-parity-loop"
 PORT="${CONTROL_API_PORT:-8114}"
 STATE_FILE="$ROOT/scratch/app-state.json"

@@ -1,6 +1,6 @@
 # TS TUI Spike Docs Overview
 
-Canonical inventory of `/spikes/ts-tui-mvp/docs`.
+Canonical inventory of `/docs` (formerly `/spikes/ts-tui-mvp/docs`).
 
 Keep this file updated when:
 - a new doc is added

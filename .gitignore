@@ -1,5 +1,3 @@
-# Private modules (primers, prompts, art packs)
-
 # Build
 build/
 
@@ -17,6 +15,7 @@ venv/
 # Secrets / local config
 .mcp.json
 *.env
+.env
 
 # OS
 .DS_Store
@@ -36,33 +35,26 @@ Thumbs.db
 node_modules/
 
 # Logs
-app/logs/
 logs/*
 !logs/agent-mailbox/
 !logs/agent-mailbox/**
+logs/backrooms-tv/
 
 # Runtime cache
 cache/
 
-# Local workspace snapshots/artifacts
-workspaces/*
-!workspaces/.gitkeep
+# Local workspace snapshots/artifacts (ephemeral)
+scratch/
 
-# CoPilot
-_codeql_build_dir/
-_codeql_*
+# Codex logs (local ephemeral)
+.codex-logs/
+codex-*.log
+
+# Legacy C++ build artifacts (retained in gitignore for safety)
 build-linux/
 build-release/
 build-sprites/
-260219-*.txt
 build-asan/
 wibwob_crash.log
 *.crash.log
 saves/
-tools/api_server/venv/
-workspaces/
-tools/room/__pycache__/
-.env
-scratch/
-logs/backrooms-tv/
-codex-*.log

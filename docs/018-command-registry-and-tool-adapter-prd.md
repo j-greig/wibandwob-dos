@@ -178,10 +178,10 @@ Phase 1 has landed in the spike:
 
 Current source files:
 
-- [/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/src/core/command-catalog.ts](/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/src/core/command-catalog.ts)
-- [/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/src/core/command-registry.ts](/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/src/core/command-registry.ts)
-- [/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/src/core/menu-config.ts](/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/src/core/menu-config.ts)
-- [/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/src/services/control-api.ts](/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/src/services/control-api.ts)
+- [/Users/james/Repos/wibandwob-dos/src/core/command-catalog.ts](/Users/james/Repos/wibandwob-dos/src/core/command-catalog.ts)
+- [/Users/james/Repos/wibandwob-dos/src/core/command-registry.ts](/Users/james/Repos/wibandwob-dos/src/core/command-registry.ts)
+- [/Users/james/Repos/wibandwob-dos/src/core/menu-config.ts](/Users/james/Repos/wibandwob-dos/src/core/menu-config.ts)
+- [/Users/james/Repos/wibandwob-dos/src/services/control-api.ts](/Users/james/Repos/wibandwob-dos/src/services/control-api.ts)
 
 This is still not the full end-state registry. MCP is not yet derived from the
 same source, and some special-case UI surfaces still sit outside the generic
@@ -255,11 +255,11 @@ The new file manager feature is the model case.
 
 `Open File Manager` required changes in:
 
-- [/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/src/windows/content-windows.ts](/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/src/windows/content-windows.ts)
-- [/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/src/core/app-controller.ts](/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/src/core/app-controller.ts)
-- [/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/src/core/menu-config.ts](/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/src/core/menu-config.ts)
-- [/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/src/services/control-api.ts](/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/src/services/control-api.ts)
-- [/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/src/core/workspace-snapshots.ts](/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/src/core/workspace-snapshots.ts)
+- [/Users/james/Repos/wibandwob-dos/src/windows/content-windows.ts](/Users/james/Repos/wibandwob-dos/src/windows/content-windows.ts)
+- [/Users/james/Repos/wibandwob-dos/src/core/app-controller.ts](/Users/james/Repos/wibandwob-dos/src/core/app-controller.ts)
+- [/Users/james/Repos/wibandwob-dos/src/core/menu-config.ts](/Users/james/Repos/wibandwob-dos/src/core/menu-config.ts)
+- [/Users/james/Repos/wibandwob-dos/src/services/control-api.ts](/Users/james/Repos/wibandwob-dos/src/services/control-api.ts)
+- [/Users/james/Repos/wibandwob-dos/src/core/workspace-snapshots.ts](/Users/james/Repos/wibandwob-dos/src/core/workspace-snapshots.ts)
 
 That is already too much wiring for one feature.
 
