@@ -116,7 +116,7 @@ export class WindowManager implements WindowFacade {
     const closeHint = blessed.box({
       parent: frame,
       top: 0,
-      right: 1,
+      right: 2,
       width: 3,
       height: 1,
       mouse: true,
@@ -127,7 +127,7 @@ export class WindowManager implements WindowFacade {
     const resizeGrip = blessed.box({
       parent: frame,
       bottom: 0,
-      right: 1,
+      right: 2,
       width: 2,
       height: 1,
       mouse: true,
