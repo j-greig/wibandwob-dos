@@ -105,6 +105,72 @@ const WIBWOB_DARK_PASTEL: ThemeVariant = {
   }
 };
 
+// ── Nord-inspired: muted steel blues, calm and professional ──
+const WIBWOB_DARK_NORD: ThemeVariant = {
+  name: "wibwob-dark-nord",
+  tokens: {
+    desktop:              { fg: "#4c566a",  bg: "#2e3440"  },  // nord1 on nord0
+    menuBar:              { fg: "#d8dee9",  bg: "#3b4252"  },  // nord4 on nord1
+    statusLine:           { fg: "#d8dee9",  bg: "#3b4252"  },
+
+    windowFrame:          { fg: "#d8dee9",  bg: "#2e3440"  },
+    windowBorderFocused:  { fg: "#88c0d0",  bg: "#2e3440"  },  // nord8 frost
+    windowBorderUnfocused:{ fg: "#4c566a",  bg: "#2e3440"  },  // nord3
+    titleBarFocused:      { fg: "#2e3440",  bg: "#88c0d0"  },  // nord0 on frost
+    titleBarUnfocused:    { fg: "#d8dee9",  bg: "#3b4252"  },
+    closeButton:          { fg: "#2e3440",  bg: "#bf616a"  },  // nord11 red
+    resizeGrip:           { fg: "#ebcb8b",  bg: "#2e3440"  },  // nord13 yellow
+
+    body:                 { fg: "#d8dee9",  bg: "#2e3440"  },
+    bodyAlt:              { fg: "#d8dee9",  bg: "#3b4252"  },
+    header:               { fg: "#2e3440",  bg: "#5e81ac"  },  // nord0 on nord10
+    footer:               { fg: "#2e3440",  bg: "#4c566a"  },  // nord0 on nord3
+
+    selected:             { fg: "#2e3440",  bg: "#88c0d0"  },  // nord0 on frost
+    input:                { fg: "#eceff4",  bg: "#434c5e"  },  // nord6 on nord2
+    scrollbar:            { fg: "#88c0d0",  bg: "#3b4252",  track: "#434c5e" },
+
+    accent:               { fg: "#88c0d0",  bg: "#2e3440"  },  // nord8
+    warning:              { fg: "#ebcb8b",  bg: "#2e3440"  },  // nord13
+    error:                { fg: "#bf616a",  bg: "#2e3440"  },  // nord11
+    success:              { fg: "#a3be8c",  bg: "#2e3440"  },  // nord14
+    muted:                { fg: "#4c566a",  bg: "#2e3440"  },  // nord3
+  }
+};
+
+// ── CRT Phosphor: retro amber/green terminal, maximum nostalgia ──
+const WIBWOB_PHOSPHOR: ThemeVariant = {
+  name: "wibwob-phosphor",
+  tokens: {
+    desktop:              { fg: "#1a1100",  bg: "#0a0800"  },  // near-black warm
+    menuBar:              { fg: "#ffb000",  bg: "#1a1100"  },  // amber on dark
+    statusLine:           { fg: "#ffb000",  bg: "#1a1100"  },
+
+    windowFrame:          { fg: "#ffb000",  bg: "#0a0800"  },
+    windowBorderFocused:  { fg: "#ffdd00",  bg: "#0a0800"  },  // bright amber
+    windowBorderUnfocused:{ fg: "#664400",  bg: "#0a0800"  },  // dim amber
+    titleBarFocused:      { fg: "#0a0800",  bg: "#ffb000"  },  // black on amber
+    titleBarUnfocused:    { fg: "#ffb000",  bg: "#1a1100"  },
+    closeButton:          { fg: "#0a0800",  bg: "#ff4400"  },  // black on hot orange
+    resizeGrip:           { fg: "#ffdd00",  bg: "#0a0800"  },
+
+    body:                 { fg: "#ffb000",  bg: "#0a0800"  },  // amber on black
+    bodyAlt:              { fg: "#ffb000",  bg: "#1a1100"  },
+    header:               { fg: "#0a0800",  bg: "#ff8800"  },  // black on orange
+    footer:               { fg: "#0a0800",  bg: "#996600"  },  // black on brown
+
+    selected:             { fg: "#0a0800",  bg: "#ffdd00"  },  // black on bright
+    input:                { fg: "#ffdd00",  bg: "#1a1100"  },  // bright on dark
+    scrollbar:            { fg: "#ffb000",  bg: "#1a1100",  track: "#332200" },
+
+    accent:               { fg: "#ffdd00",  bg: "#0a0800"  },
+    warning:              { fg: "#ff8800",  bg: "#0a0800"  },
+    error:                { fg: "#ff4400",  bg: "#0a0800"  },
+    success:              { fg: "#44ff00",  bg: "#0a0800"  },  // phosphor green!
+    muted:                { fg: "#664400",  bg: "#0a0800"  },
+  }
+};
+
 let activeVariant: ThemeVariant = WIBWOB_DARK;
 
 /** The current active theme tokens. */
@@ -133,7 +199,13 @@ export function builtinLightVariant(): ThemeVariant {
 }
 
 /** All built-in variants in cycle order. */
-const VARIANT_CYCLE: ThemeVariant[] = [WIBWOB_DARK, WIBWOB_DARK_PASTEL, WIBWOB_LIGHT];
+const VARIANT_CYCLE: ThemeVariant[] = [
+  WIBWOB_DARK,
+  WIBWOB_DARK_NORD,
+  WIBWOB_DARK_PASTEL,
+  WIBWOB_PHOSPHOR,
+  WIBWOB_LIGHT,
+];
 
 /** Cycle to the next theme variant. Returns the new variant name. */
 export function toggleTheme(): string {
