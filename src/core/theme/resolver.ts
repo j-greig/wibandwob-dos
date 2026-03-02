@@ -10,14 +10,14 @@
 
 import type { ThemeTokens, ThemeVariant } from "./types.js";
 
-// ── Public variants ──
-import { dark } from "./variants/dark.js";
-import { darkNord } from "./variants/dark-nord.js";
-import { darkPastel } from "./variants/dark-pastel.js";
-import { light } from "./variants/light.js";
+// ── Public themes ──
+import { dark } from "./dark.js";
+import { darkNord } from "./dark-nord.js";
+import { darkPastel } from "./dark-pastel.js";
+import { light } from "./light.js";
 
-// ── Private variants (modules-private) ──
-import { phosphor } from "../../../modules-private/wibwob-themes/variants/phosphor.js";
+// ── Private themes (modules-private/wibwob-theme-*) ──
+import { phosphor } from "../../../modules-private/wibwob-theme-phosphor/theme.js";
 
 /** All built-in variants in cycle order. */
 const VARIANT_CYCLE: ThemeVariant[] = [

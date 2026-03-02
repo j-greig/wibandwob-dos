@@ -8,7 +8,7 @@
 
 import type { AppearanceMode } from "./theme/types.js";
 import { setThemeVariant } from "./theme/resolver.js";
-import { dark } from "./theme/variants/dark.js";
+import { dark } from "./theme/dark.js";
 
 let currentMode: AppearanceMode = "dark";
 

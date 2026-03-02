@@ -1,4 +1,4 @@
-import type { ThemeVariant } from "../types.js";
+import type { ThemeVariant } from "./types.js";
 
 export const dark: ThemeVariant = {
   name: "wibwob-dark",

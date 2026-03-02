@@ -1,4 +1,4 @@
-import type { ThemeVariant } from "../types.js";
+import type { ThemeVariant } from "./types.js";
 
 /** Catppuccin Mocha-inspired: purple accents on dark grey. */
 export const darkPastel: ThemeVariant = {

@@ -1,4 +1,4 @@
-import type { ThemeVariant } from "../types.js";
+import type { ThemeVariant } from "./types.js";
 
 /** Nord-inspired: muted steel blues, calm and professional. */
 export const darkNord: ThemeVariant = {
