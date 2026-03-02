@@ -47,17 +47,61 @@ export function openFigletWindow(params: {
 }): void {
   const title = `Banner: ${params.text.slice(0, 18) || "Banner"}`;
   const frame = params.windowManager.createFrame(title, "figlet");
+  // --- Toolbar: input box + buttons ---
   const toolbar = blessed.box({
     parent: frame.body,
     top: 0,
     left: 0,
     right: 0,
-    height: 2,
+    height: 1,
     style: theme().header
+  });
+  const toolbarLabel = blessed.box({
+    parent: toolbar,
+    top: 0,
+    left: 0,
+    width: 6,
+    height: 1,
+    content: " Text:",
+    style: theme().header
+  });
+  const textInput = blessed.textbox({
+    parent: toolbar,
+    top: 0,
+    left: 6,
+    right: 24,
+    height: 1,
+    mouse: true,
+    keys: true,
+    inputOnFocus: true,
+    style: theme().input,
+    value: params.text
+  });
+  const fontBtn = blessed.box({
+    parent: toolbar,
+    top: 0,
+    right: 12,
+    width: 12,
+    height: 1,
+    mouse: true,
+    clickable: true,
+    content: " [F] Font ",
+    style: { ...theme().footer, hover: theme().selected }
+  });
+  const editBtn = blessed.box({
+    parent: toolbar,
+    top: 0,
+    right: 0,
+    width: 12,
+    height: 1,
+    mouse: true,
+    clickable: true,
+    content: " [E] Edit ",
+    style: { ...theme().footer, hover: theme().selected }
   });
   const viewer = blessed.box({
     parent: frame.body,
-    top: 2,
+    top: 1,
     left: 0,
     right: 0,
     bottom: 0,
@@ -86,19 +130,23 @@ export function openFigletWindow(params: {
     viewer.setContent(measured.rendered);
     const catalogue = getFigletCatalogue();
     const meta = catalogue.fontMetadata[currentFont];
-    toolbar.setContent(
-      ` Text: ${currentText}\n Font: ${currentFont}${meta ? ` (${meta.height}h x ${meta.width}w)` : ""}  e edit text  f pick font `
-    );
+    fontBtn.setContent(` [F] ${currentFont.slice(0, 8)} `);
     syncTitle();
     params.onSyncState();
     params.screen.render();
   };
 
-  const editText = () => {
-    params.overlays.openValuePrompt("Edit FIGlet Text", currentText, (value) => {
-      currentText = value;
+  const submitText = () => {
+    const val = textInput.getValue().trim();
+    if (val && val !== currentText) {
+      currentText = val;
       rerenderFiglet();
-    });
+    }
+  };
+
+  const editText = () => {
+    textInput.focus();
+    textInput.readInput();
   };
 
   const pickFont = () => {
@@ -107,6 +155,21 @@ export function openFigletWindow(params: {
       rerenderFiglet();
     });
   };
+
+  // Submit on Enter in textbox
+  textInput.on("submit", () => {
+    submitText();
+    viewer.focus();
+  });
+  // Cancel on Escape in textbox
+  textInput.on("cancel", () => {
+    textInput.setValue(currentText);
+    viewer.focus();
+    params.screen.render();
+  });
+  // Button clicks
+  editBtn.on("click", editText);
+  fontBtn.on("click", pickFont);
 
   frame.kind = "figlet";
   frame.describeState = () => ({
@@ -125,6 +188,10 @@ export function openFigletWindow(params: {
   };
   frame.onRestyle = () => {
     toolbar.style = theme().header;
+    toolbarLabel.style = theme().header;
+    textInput.style = theme().input;
+    fontBtn.style = { ...theme().footer, hover: theme().selected };
+    editBtn.style = { ...theme().footer, hover: theme().selected };
     safeSetStyle(viewer, theme().body);
   };
 
