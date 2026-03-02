@@ -274,19 +274,22 @@ export class TsTuiMvpApp {
       }
     });
     list.focus();
+    const closePicker = () => {
+      list.destroy();
+      this.repaintDesktop();
+      this.screen.render();
+    };
     list.on("select", (_item, index) => {
       const variant = variants[index];
       if (variant) {
         setThemeVariant(variant);
+        closePicker();
         this.applyTheme();
+      } else {
+        closePicker();
       }
-      list.destroy();
-      this.screen.render();
     });
-    list.key(["escape", "q"], () => {
-      list.destroy();
-      this.screen.render();
-    });
+    list.key(["escape", "q"], closePicker);
     this.screen.render();
   }
 
