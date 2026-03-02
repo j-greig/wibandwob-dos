@@ -1,7 +1,7 @@
 import blessed from "blessed";
 
 import type { WindowFacade } from "./window-facade.js";
-import { theme } from "./theme-resolver.js";
+import { theme } from "./theme/resolver.js";
 import { safeSetStyle } from "./ui-primitives.js";
 import type { Box, DragState, ResizeState, WindowKind, WindowRecord } from "./types.js";
 

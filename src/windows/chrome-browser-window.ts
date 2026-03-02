@@ -7,7 +7,7 @@
  */
 
 import blessed from "blessed";
-import { theme } from "../core/theme-resolver.js";
+import { theme } from "../core/theme/resolver.js";
 import { createScrollbar, safeSetStyle } from "../core/ui-primitives.js";
 import type { WindowRecord } from "../core/types.js";
 import type { WindowManager } from "../core/window-manager.js";

@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import stringWidth from "string-width";
 
-import { theme } from "../core/theme-resolver.js";
+import { theme } from "../core/theme/resolver.js";
 import { createScrollbar, safeSetStyle } from "../core/ui-primitives.js";
 import type { ContentMeasurement } from "../services/content-measurement.js";
 import type { Box, BrowserEntry, List, WindowKind, WindowRecord } from "../core/types.js";

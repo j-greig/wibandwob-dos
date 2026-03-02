@@ -5,7 +5,7 @@ import path from "node:path";
 
 import { REPO_ROOT } from "../core/config.js";
 import type { OverlayManager } from "../core/overlay-manager.js";
-import { theme as appTheme } from "../core/theme-resolver.js";
+import { theme as appTheme } from "../core/theme/resolver.js";
 import { createScrollbar, safeSetStyle } from "../core/ui-primitives.js";
 import type { BackroomsChannel, List, LogBox } from "../core/types.js";
 import type { WindowManager } from "../core/window-manager.js";

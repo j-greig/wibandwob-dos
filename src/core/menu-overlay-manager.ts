@@ -1,6 +1,6 @@
 import blessed from "blessed";
 
-import { theme } from "./theme-resolver.js";
+import { theme } from "./theme/resolver.js";
 import type { Box, List, MenuConfig, MenuItem } from "./types.js";
 
 export class MenuOverlayManager {

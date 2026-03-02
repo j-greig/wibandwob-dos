@@ -6,8 +6,9 @@
  * broadcast changes so open windows can restyle.
  */
 
-import type { AppearanceMode } from "./theme-types.js";
-import { builtinDarkVariant, setThemeVariant } from "./theme-resolver.js";
+import type { AppearanceMode } from "./theme/types.js";
+import { setThemeVariant } from "./theme/resolver.js";
+import { dark } from "./theme/variants/dark.js";
 
 let currentMode: AppearanceMode = "dark";
 
@@ -19,5 +20,5 @@ export function setAppearanceMode(mode: AppearanceMode): void {
   currentMode = mode;
   // Future: resolve system preference, select light/dark variant, broadcast
   // For now, always use dark
-  setThemeVariant(builtinDarkVariant());
+  setThemeVariant(dark);
 }

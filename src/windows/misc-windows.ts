@@ -1,6 +1,6 @@
 import blessed from "blessed";
 
-import { theme } from "../core/theme-resolver.js";
+import { theme } from "../core/theme/resolver.js";
 import type { StateService } from "../services/state-service.js";
 import type { WorkspaceService } from "../services/workspace-service.js";
 import { createScrollbar, safeSetStyle } from "../core/ui-primitives.js";

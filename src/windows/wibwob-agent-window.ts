@@ -10,7 +10,7 @@ import blessed from "blessed";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { theme } from "../core/theme-resolver.js";
+import { theme } from "../core/theme/resolver.js";
 import { createScrollbar, safeSetStyle } from "../core/ui-primitives.js";
 import type { Box, ChatMessageEntry } from "../core/types.js";
 import type { WindowManager } from "../core/window-manager.js";

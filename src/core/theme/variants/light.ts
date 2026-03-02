@@ -1,0 +1,33 @@
+import type { ThemeVariant } from "../types.js";
+
+export const light: ThemeVariant = {
+  name: "wibwob-light",
+  tokens: {
+    desktop:              { fg: "grey",   bg: "#e0e0e0" },  // light grey desktop
+    menuBar:              { fg: "black",  bg: "white"   },  // white bar on grey desktop = visible
+    statusLine:           { fg: "black",  bg: "white"   },
+
+    windowFrame:          { fg: "black",  bg: "white"   },
+    windowBorderFocused:  { fg: "blue",   bg: "white"   },
+    windowBorderUnfocused:{ fg: "grey",   bg: "white"   },
+    titleBarFocused:      { fg: "white",  bg: "blue"    },
+    titleBarUnfocused:    { fg: "black",  bg: "white"   },
+    closeButton:          { fg: "white",  bg: "red"     },
+    resizeGrip:           { fg: "blue",   bg: "white"   },
+
+    body:                 { fg: "black",  bg: "white"   },
+    bodyAlt:              { fg: "black",  bg: "white"   },
+    header:               { fg: "white",  bg: "blue"    },
+    footer:               { fg: "white",  bg: "blue"    },
+
+    selected:             { fg: "white",  bg: "blue"    },
+    input:                { fg: "white",  bg: "blue"    },
+    scrollbar:            { fg: "blue",   bg: "white",  track: "grey" },
+
+    accent:               { fg: "blue",   bg: "white"   },
+    warning:              { fg: "red",    bg: "white"   },
+    error:                { fg: "red",    bg: "white"   },
+    success:              { fg: "green",  bg: "white"   },
+    muted:                { fg: "grey",   bg: "white"   },
+  }
+};

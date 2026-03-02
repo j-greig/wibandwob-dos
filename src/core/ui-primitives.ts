@@ -1,4 +1,4 @@
-import { theme } from "./theme-resolver.js";
+import { theme } from "./theme/resolver.js";
 
 export function createScrollbar(): { ch: string; style: { bg: string } } {
   return { ch: " ", style: { bg: theme().scrollbar.bg } };

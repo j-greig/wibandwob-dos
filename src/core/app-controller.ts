@@ -10,7 +10,7 @@ import { buildDesktopContextMenu, buildWindowContextMenu } from "./context-menu-
 import { DesktopGeometryService } from "./desktop-geometry.js";
 import { MenuOverlayManager } from "./menu-overlay-manager.js";
 import { OverlayManager } from "./overlay-manager.js";
-import { theme, toggleTheme as toggleThemeVariant } from "./theme-resolver.js";
+import { theme, toggleTheme as toggleThemeVariant } from "./theme/resolver.js";
 import { isRightClick } from "./ui-primitives.js";
 import { restoreWindowSnapshot, serializeWindowSnapshot, type WorkspaceRestoreActions } from "./workspace-snapshots.js";
 import type {
