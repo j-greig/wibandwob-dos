@@ -68,7 +68,7 @@ export class ContentService {
         const moduleEntries = fs
           .readdirSync(primersPath, { withFileTypes: true })
           .filter((entry) => this.isTextFileEntry(primersPath, entry))
-          .map((entry) => this.createBrowserEntry(`${moduleEntry.name} :: ${entry.name}`, path.join(primersPath, entry.name)));
+          .map((entry) => this.createBrowserEntry(entry.name, path.join(primersPath, entry.name)));
         entries.push(...moduleEntries);
       }
     }
@@ -164,7 +164,7 @@ export class ContentService {
       if (!this.isTextFileEntry(directory, child)) {
         continue;
       }
-      entries.push(this.createBrowserEntry(`${rootLabel} :: ${path.relative(path.join(REPO_ROOT, rootLabel), childPath)}`, childPath));
+      entries.push(this.createBrowserEntry(child.name, childPath));
     }
   }
 
