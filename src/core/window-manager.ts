@@ -69,17 +69,27 @@ export class WindowManager implements WindowFacade {
     const offset = this.windows.length * 2;
     const screenWidth = Number(this.screen.width);
     const screenHeight = Number(this.screen.height);
+    const frameWidth = Math.min(screenWidth - 6, 72);
+    const frameHeight = Math.min(screenHeight - 6, 20);
+    const sh = theme().windowShadow;
+    const shadow = blessed.box({
+      parent: this.desktop,
+      top: offset + 1,
+      left: 2 + offset + 2,
+      width: frameWidth,
+      height: frameHeight,
+      content: Array.from({ length: frameHeight }, () => sh.char.repeat(frameWidth)).join("\n"),
+      style: { fg: sh.fg, bg: sh.bg },
+    });
     const frame = blessed.box({
       parent: this.desktop,
       top: offset,
       left: 2 + offset,
-      width: Math.min(screenWidth - 6, 72),
-      height: Math.min(screenHeight - 6, 20),
+      width: frameWidth,
+      height: frameHeight,
       border: "line",
       tags: true,
       mouse: true,
-      // shadow: true — disabled; blessed shadow leaves stale cells on move/resize/close.
-      // TODO: reintroduce as explicit app-owned shadow painting once invalidation is solid.
       style: {
         ...theme().windowFrame,
         border: theme().windowBorderUnfocused
@@ -133,8 +143,10 @@ export class WindowManager implements WindowFacade {
       frame,
       body,
       titleBar,
+      shadow,
       close: () => {
         record.cleanup?.();
+        shadow.destroy();
         frame.destroy();
         const index = this.windows.findIndex((window) => window.id === record.id);
         if (index >= 0) {
@@ -271,6 +283,7 @@ export class WindowManager implements WindowFacade {
     const frameHeight = Number(record.frame.height);
     record.frame.left = this.clamp(left, 0, Math.max(0, screenWidth - frameWidth));
     record.frame.top = this.clamp(top, 0, Math.max(0, screenHeight - 2 - frameHeight));
+    this.syncShadow(record);
     this.onChange?.();
     this.screen.render();
     return true;
@@ -287,6 +300,7 @@ export class WindowManager implements WindowFacade {
     const maxHeight = Math.max(8, screenHeight - 2 - Number(record.frame.top));
     record.frame.width = this.clamp(width, 24, maxWidth);
     record.frame.height = this.clamp(height, 8, maxHeight);
+    this.syncShadow(record);
     record.refresh?.();
     this.onChange?.();
     this.screen.render();
@@ -359,6 +373,10 @@ export class WindowManager implements WindowFacade {
         window.titleBar.style = active ? theme().titleBarFocused : theme().titleBarUnfocused;
       }
       safeSetStyle(window.body, theme().body);
+      if (window.shadow) {
+        const sh = theme().windowShadow;
+        window.shadow.style = { fg: sh.fg, bg: sh.bg };
+      }
       window.onRestyle?.();
     }
     this.screen.render();
@@ -457,6 +475,7 @@ export class WindowManager implements WindowFacade {
 
     record.frame.left = nextLeft;
     record.frame.top = nextTop;
+    this.syncShadow(record);
     if (nextLeft !== dragState.originLeft || nextTop !== dragState.originTop) {
       dragState.moved = true;
     }
@@ -491,6 +510,7 @@ export class WindowManager implements WindowFacade {
 
     record.frame.width = this.clamp(resizeState.originWidth + deltaX, 24, maxWidth);
     record.frame.height = this.clamp(resizeState.originHeight + deltaY, 8, maxHeight);
+    this.syncShadow(record);
     record.refresh?.();
     this.onChange?.();
     this.screen.render();
@@ -509,6 +529,7 @@ export class WindowManager implements WindowFacade {
 
   private syncZOrder(): void {
     for (const window of this.windows) {
+      window.shadow?.setFront();
       window.frame.setFront();
     }
   }
@@ -523,6 +544,14 @@ export class WindowManager implements WindowFacade {
       startX: data.x,
       startY: data.y
     };
+  }
+
+  private syncShadow(record: WindowRecord): void {
+    if (!record.shadow) return;
+    record.shadow.left = Number(record.frame.left) + 2;
+    record.shadow.top = Number(record.frame.top) + 1;
+    record.shadow.width = Number(record.frame.width);
+    record.shadow.height = Number(record.frame.height);
   }
 
   private clamp(value: number, min: number, max: number): number {

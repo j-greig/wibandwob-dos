@@ -265,9 +265,21 @@ export class TsTuiMvpApp {
   private repaintDesktop(): void {
     const width = Math.max(1, Number(this.screen.width));
     const height = Math.max(1, Number(this.screen.height) - 2);
-    const fill = theme().desktopFillChar || " ";
-    const line = fill.repeat(width);
-    this.desktop.setContent(Array.from({ length: height }, () => line).join("\n"));
+    const pattern = theme().desktopPattern;
+    if (pattern && pattern.length > 0) {
+      const rows: string[] = [];
+      for (let y = 0; y < height; y++) {
+        const patRow = pattern[y % pattern.length];
+        let line = "";
+        while (line.length < width) line += patRow;
+        rows.push(line.slice(0, width));
+      }
+      this.desktop.setContent(rows.join("\n"));
+    } else {
+      const fill = theme().desktopFillChar || " ";
+      const line = fill.repeat(width);
+      this.desktop.setContent(Array.from({ length: height }, () => line).join("\n"));
+    }
   }
 
   private bindGlobalKeys(): void {

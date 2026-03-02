@@ -164,6 +164,7 @@ export interface WindowRecord {
   close: () => void;
   focus: () => void;
   titleBar?: Box;
+  shadow?: Box;
   editor?: EditorState;
   filePath?: string;
   isDirty?: boolean;

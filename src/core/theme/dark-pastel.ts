@@ -15,7 +15,8 @@ export const darkPastel: ThemeVariant = {
     titleBarFocused:      { fg: "#1e1e2e",  bg: "#cba6f7"  },  // base on mauve
     titleBarUnfocused:    { fg: "#a6adc8",  bg: "#313244"  },  // subtext0 on surface0
     closeButton:          { fg: "#1e1e2e",  bg: "#f38ba8"  },  // base on red
-    resizeGrip:           { fg: "#f9e2af",  bg: "#1e1e2e"  },  // yellow on base
+    resizeGrip:           { fg: "#f9e2af",  bg: "#1e1e2e"  },
+    windowShadow:         { fg: "#181825", bg: "#181825", char: "▒" },
 
     body:                 { fg: "#cdd6f4",  bg: "#1e1e2e"  },  // text on base
     bodyAlt:              { fg: "#cdd6f4",  bg: "#313244"  },  // text on surface0

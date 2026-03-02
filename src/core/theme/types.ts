@@ -19,6 +19,8 @@ export interface ThemeTokens {
   desktop: StylePair;
   /** Character used to tile the desktop background. Space = flat colour. */
   desktopFillChar: string;
+  /** Multi-line tiling pattern for desktop. Overrides desktopFillChar if set. */
+  desktopPattern?: string[];
   menuBar: StylePair;
   statusLine: StylePair;
 
@@ -30,6 +32,7 @@ export interface ThemeTokens {
   titleBarUnfocused: StylePair;
   closeButton: StylePair;
   resizeGrip: StylePair;
+  windowShadow: { fg: string; bg: string; char: string };
 
   // Content areas
   body: StylePair;

@@ -15,6 +15,7 @@ export const light: ThemeVariant = {
     titleBarUnfocused:    { fg: "black",  bg: "white"   },
     closeButton:          { fg: "white",  bg: "red"     },
     resizeGrip:           { fg: "blue",   bg: "white"   },
+    windowShadow:         { fg: "#c0c0c0", bg: "#c0c0c0", char: "▒" },
 
     body:                 { fg: "black",  bg: "white"   },
     bodyAlt:              { fg: "black",  bg: "white"   },
