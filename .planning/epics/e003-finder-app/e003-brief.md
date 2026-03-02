@@ -17,9 +17,9 @@ collections).
 
 ## Read First
 
-- [/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/docs/020-target-architecture.md](/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/docs/020-target-architecture.md)
-- [/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/docs/000-docs-overview.md](/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/docs/000-docs-overview.md)
-- [/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/docs/004-window-type-registry-and-factories.md](/Users/james/Repos/wibandwob-dos/spikes/ts-tui-mvp/docs/004-window-type-registry-and-factories.md)
+- [/Users/james/Repos/wibandwob-dos/docs/020-target-architecture.md](/Users/james/Repos/wibandwob-dos/docs/020-target-architecture.md)
+- [/Users/james/Repos/wibandwob-dos/docs/000-docs-overview.md](/Users/james/Repos/wibandwob-dos/docs/000-docs-overview.md)
+- [/Users/james/Repos/wibandwob-dos/.planning/epics/e002-ts-tui-root-migration/legacy-docs/004-window-type-registry-and-factories.md](/Users/james/Repos/wibandwob-dos/.planning/epics/e002-ts-tui-root-migration/legacy-docs/004-window-type-registry-and-factories.md)
 
 ## Architecture Bucket
 
@@ -150,8 +150,8 @@ QMD-powered search over indexed markdown collections:
 - Window factory and command registry (018-command-registry-and-tool-adapter-prd.md)
   should be stable before F04.
 - QMD must be installed and collections indexed for F03 to be testable.
-- No hard dependency on E002 (root migration) — can be built inside
-  spikes/ts-tui-mvp and migrated later.
+- No hard dependency on E002 (root migration) — E002 is now complete,
+  app lives at repo root.
 
 ## Open Questions
 

@@ -350,7 +350,7 @@ Target rule:
 
 - TS app startup/dev/test flows should live in:
   - `package.json` Bun scripts for common entry points
-  - `spikes/ts-tui-mvp/scripts/` for spike-local harnesses and smoke loops
+  - `scripts/` for harnesses and smoke loops
   - future `tools/` or `scripts/` inside the new TS repo only when a task is
     clearly app-owned and cannot live as a Bun script
 - do not carry forward repo-root shell/python helpers just because they exist
@@ -405,7 +405,7 @@ Short version:
 
 ## Repo-Root Migration Disposition
 
-If `spikes/ts-tui-mvp` graduates into the repo root, the migration should be
+Now that the TS TUI has graduated to the repo root (E002), the disposition is
 aggressively pruning, not conservatively hoarding. Missing something is cheaper
 than carrying legacy clutter forever because git history and tags can recover
 deleted files.
