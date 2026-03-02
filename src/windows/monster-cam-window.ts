@@ -34,11 +34,34 @@ export function openMonsterCamWindow(deps: Deps): void {
     tags: true,   // enables {color-fg} tags
   });
 
-  const status = blessed.box({
+  // Bottom bar
+  const statusBar = blessed.box({
     parent: frame.body,
     bottom: 0, left: 0, right: 0, height: 1,
     style: theme().header,
-    content: " Starting...  b=bg q=close",
+  });
+
+  const mkBtn = (label: string, right: number, width: number, onClick: () => void) => {
+    const btn = blessed.box({
+      parent: statusBar,
+      top: 0, right, width, height: 1,
+      mouse: true, clickable: true,
+      content: label,
+      style: { ...theme().header, hover: theme().selected },
+      tags: false,
+    });
+    btn.on("click", onClick);
+    return btn;
+  };
+
+  mkBtn(" [Q] Close ", 0,  11, () => windowManager.closeWindow(frame.id));
+  const bgBtn = mkBtn(" [B] BG off", 11, 11, () => toggleBg());
+
+  const status = blessed.box({
+    parent: statusBar,
+    top: 0, left: 0, right: 22, height: 1,
+    style: theme().header,
+    content: " Starting...",
     tags: false,
   });
 
@@ -48,7 +71,13 @@ export function openMonsterCamWindow(deps: Deps): void {
   let hasPose   = false;
   let fps       = 0;
   let lastBbox: [number,number,number,number] = [0,0,0,0];
-  let showBg    = false;   // ASCII background off by default
+  let showBg = false;
+
+  const toggleBg = () => {
+    showBg = !showBg;
+    bgBtn.setContent(showBg ? " [B] BG on " : " [B] BG off");
+    screen.render();
+  };
 
   const svc = new MonsterCamService();
 
@@ -163,12 +192,10 @@ export function openMonsterCamWindow(deps: Deps): void {
     safeSetStyle(status, theme().header);
   };
 
-  canvas.key(["b"], () => {
-    showBg = !showBg;
-    status.setContent(` b=${showBg ? "bg ON" : "bg off"} — next frame...`);
-    screen.render();
-  });
-  canvas.key(["q", "escape"], () => windowManager.closeWindow(frame.id));
+  for (const el of [canvas, frame.body]) {
+    el.key(["b"], () => toggleBg());
+    el.key(["q", "escape"], () => windowManager.closeWindow(frame.id));
+  }
   canvas.focus();
 
   frame.focus = () => { windowManager.focusWindow(frame); canvas.focus(); };
