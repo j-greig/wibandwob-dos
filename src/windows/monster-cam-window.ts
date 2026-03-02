@@ -163,7 +163,11 @@ export function openMonsterCamWindow(deps: Deps): void {
     safeSetStyle(status, theme().header);
   };
 
-  canvas.key(["b"], () => { showBg = !showBg; });
+  canvas.key(["b"], () => {
+    showBg = !showBg;
+    status.setContent(` b=${showBg ? "bg ON" : "bg off"} — next frame...`);
+    screen.render();
+  });
   canvas.key(["q", "escape"], () => windowManager.closeWindow(frame.id));
   canvas.focus();
 

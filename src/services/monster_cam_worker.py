@@ -128,7 +128,9 @@ while True:
             hand_count = len(hands_res.multi_hand_landmarks)
             handedness = hands_res.multi_handedness or []
             for i, lm in enumerate(hands_res.multi_hand_landmarks):
-                label = handedness[i].classification[0].label[0] if i < len(handedness) else "?"
+                # macOS webcam is mirrored — flip L/R to match what user sees
+                raw = handedness[i].classification[0].label[0] if i < len(handedness) else "?"
+                label = "R" if raw == "L" else ("L" if raw == "R" else raw)
                 xs = [p.x for p in lm.landmark]
                 ys = [p.y for p in lm.landmark]
                 pad_x, pad_y = (max(xs)-min(xs)) * 0.2, (max(ys)-min(ys)) * 0.2
