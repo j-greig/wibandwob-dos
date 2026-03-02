@@ -273,23 +273,47 @@ export class TsTuiMvpApp {
         selected: theme().selected
       }
     });
-    list.focus();
+    let closed = false;
     const closePicker = () => {
+      if (closed) return;
+      closed = true;
+      list.detach();
       list.destroy();
       this.repaintDesktop();
       this.screen.render();
     };
-    list.on("select", (_item, index) => {
+    const applySelection = () => {
+      const index = (list as any).selected as number;
       const variant = variants[index];
+      closePicker();
       if (variant) {
         setThemeVariant(variant);
-        closePicker();
         this.applyTheme();
-      } else {
-        closePicker();
       }
+    };
+    // Grab all keys at screen level to avoid focus issues
+    const keyHandler = (_ch: string, key: any) => {
+      if (!key) return;
+      if (key.name === "escape" || key.name === "q") {
+        this.screen.removeListener("keypress", keyHandler);
+        closePicker();
+      } else if (key.name === "return" || key.name === "enter") {
+        this.screen.removeListener("keypress", keyHandler);
+        applySelection();
+      } else if (key.name === "j" || key.name === "down") {
+        list.down(1);
+        this.screen.render();
+      } else if (key.name === "k" || key.name === "up") {
+        list.up(1);
+        this.screen.render();
+      }
+    };
+    this.screen.on("keypress", keyHandler);
+    list.on("select", () => {
+      this.screen.removeListener("keypress", keyHandler);
+      applySelection();
     });
-    list.key(["escape", "q"], closePicker);
+    list.focus();
     this.screen.render();
   }
 
