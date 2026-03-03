@@ -12,6 +12,7 @@ import type { WindowManager } from "../core/window-manager.js";
 export interface BaseWindowDeps {
   screen: blessed.Widgets.Screen;
   windowManager: WindowManager;
+  onStateChanged?: () => void;
 }
 
 /** AnimationKind — the subset of WindowKind valid for the animated window factory. */

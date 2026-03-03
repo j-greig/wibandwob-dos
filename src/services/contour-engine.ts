@@ -652,6 +652,13 @@ export interface ContourPlayer extends FramePlayer {
   readonly levels: number;
 }
 
+function sanitizeViewportDimension(value: number, fallback: number, min: number): number {
+  if (!Number.isFinite(value)) {
+    return fallback;
+  }
+  return Math.max(min, Math.floor(value));
+}
+
 export function createContourPlayer(opts: ContourPlayerOptions): ContourPlayer {
   let mode: ContourMode = opts.mode ?? "chaos";
   let seed = opts.seed ?? Math.floor(Math.random() * 100000);
@@ -695,9 +702,17 @@ export function createContourPlayer(opts: ContourPlayerOptions): ContourPlayer {
     opts.onStatus?.({ mode, terrain: terrainNames[terrainIdx] ?? "unknown", seed, levels: nLevels });
   };
 
+  const getViewport = () => {
+    const viewport = opts.getViewport();
+    return {
+      width: sanitizeViewportDimension(viewport.width, 40, 8),
+      height: sanitizeViewportDimension(viewport.height, 15, 4),
+    };
+  };
+
   const advance = () => {
     if (paused) return;
-    const { width, height } = opts.getViewport();
+    const { width, height } = getViewport();
     opts.onFrame(buildFrame(width, height));
     emitStatus();
     tick += 1;
@@ -709,16 +724,16 @@ export function createContourPlayer(opts: ContourPlayerOptions): ContourPlayer {
     advance();
   };
 
-  const play = () => { paused = false; if (!timer) timer = setInterval(advance, 1000 / fps); };
+  const play = () => {
+    paused = false;
+    if (!timer) {
+      advance();
+      timer = setInterval(advance, 1000 / fps);
+    }
+  };
   const pause = () => { paused = true; };
   const stop = () => { paused = false; tick = 0; if (timer) { clearInterval(timer); timer = null; } };
   const destroy = () => { if (timer) { clearInterval(timer); timer = null; } };
-
-  // Emit initial frame
-  const { width, height } = opts.getViewport();
-  opts.onFrame(buildFrame(width, height));
-  emitStatus();
-  tick += 1;
 
   return {
     play, pause, stop, destroy,

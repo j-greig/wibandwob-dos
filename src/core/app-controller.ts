@@ -672,6 +672,7 @@ export class TsTuiMvpApp {
       openTerrainLabStudioWindow({
         screen: this.screen,
         windowManager: this.windowManager,
+        onStateChanged: () => this.syncState(),
       });
     });
   }

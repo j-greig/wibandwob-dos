@@ -55,8 +55,8 @@ export function openTerrainLabWindow(deps: BaseWindowDeps): void {
     terrainIdx: Math.max(0, terrainNames.indexOf("meadow")),
     fps: 12,
     getViewport: () => ({
-      width: Math.max(8, Number(contourBox.width)),
-      height: Math.max(4, Number(contourBox.height)),
+      width: Math.max(8, Number(contourBox.width) || 40),
+      height: Math.max(4, Number(contourBox.height) || 15),
     }),
     onFrame: (content) => {
       contourBox.setContent(content);
@@ -78,6 +78,7 @@ export function openTerrainLabWindow(deps: BaseWindowDeps): void {
       ].join("\n");
       infoBlock.update({ text: infoText });
       statusBar.update({ left: "m:mode t:terrain r:reseed +/-:levels" });
+      deps.onStateChanged?.();
     },
   });
 
