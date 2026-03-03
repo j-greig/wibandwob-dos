@@ -19,6 +19,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { spawnSync } from "node:child_process";
+import { createPreRenderedPlayer } from "../../src/services/animation-service.js";
+import type { FramePlayer } from "../../src/services/animation-service.js";
 import type { MicroappHost } from "../../src/services/module-loader.js";
 
 // ---------------------------------------------------------------------------
@@ -63,6 +65,42 @@ function renderFigletTime(time: string): string {
   if (result.status !== 0 || !result.stdout.trim()) return `  ${time}`;
   return result.stdout.replace(/\s+$/u, "");
 }
+
+// ---------------------------------------------------------------------------
+// Scramble — animated cat frames (string[][] = array of frames, each frame = lines)
+// ---------------------------------------------------------------------------
+
+const SCRAMBLE_FRAMES: string[][] = [
+  [
+    " /\\_/\\   ",
+    "( o.o )  ",
+    " > ^ <   ",
+    "/|   |\\  ",
+    "(_|   |_)",
+  ],
+  [
+    " /\\_/\\   ",
+    "( -.- )  ",
+    " > ^ <   ",
+    "/|   |\\  ",
+    "(_|   |_)",
+  ],
+  [
+    " /\\_/\\   ",
+    "( o.o )  ",
+    " > ~ <   ",
+    " |   |   ",
+    "/|   |\\  ",
+    "(_|   |_)",
+  ],
+  [
+    " /\\_/\\   ",
+    "( ^.^ )  ",
+    " > ^ <   ",
+    "/|   |\\  ",
+    "(_|   |_)",
+  ],
+];
 
 // ---------------------------------------------------------------------------
 // Anthropic API — direct fetch using pi's OAuth token
@@ -166,11 +204,13 @@ export default function setup(host: MicroappHost) {
     let lastTime = "";
     let lastDate = "";
     let generating = false;
+    let catPlayer: FramePlayer | null = null;
 
+    // Window is wider to accommodate scramble cat panel
     const win = host.createWindow({
       title: "Poetry Clock",
-      width: 54,
-      height: 15,
+      width: 64,
+      height: 17,
     });
 
     // ── Date line ──
@@ -203,6 +243,29 @@ export default function setup(host: MicroappHost) {
       style: host.theme().muted,
     });
 
+    // ── Cat panel (scramble mode only, left side) ──
+    const catBox = blessed.box({
+      parent: win.body,
+      top: 7,
+      left: 0,
+      width: 15,
+      bottom: 2,
+      style: host.theme().body,
+      hidden: true,
+    });
+
+    // ── Vertical divider between cat and poem (scramble mode) ──
+    const catDivider = blessed.box({
+      parent: win.body,
+      top: 7,
+      left: 15,
+      width: 1,
+      bottom: 2,
+      content: "│\n│\n│\n│\n│\n│",
+      style: host.theme().muted,
+      hidden: true,
+    });
+
     // ── Poem area ──
     const poemBox = blessed.box({
       parent: win.body,
@@ -227,7 +290,7 @@ export default function setup(host: MicroappHost) {
       parent: modeBar,
       left: 1,
       top: 0,
-      width: 36,
+      width: 46,
       height: 1,
       style: host.theme().header,
     });
@@ -244,6 +307,32 @@ export default function setup(host: MicroappHost) {
       style: { ...host.theme().header, hover: host.theme().selected },
     });
 
+    // ── Cat animation ──
+    function startCat() {
+      if (catPlayer) return;
+      catBox.show();
+      catDivider.show();
+      poemBox.left = 16;
+      catPlayer = createPreRenderedPlayer({
+        frames: SCRAMBLE_FRAMES,
+        fps: 2,
+        onFrame: (content) => {
+          catBox.setContent(content);
+          host.screen.render();
+        },
+      });
+      catPlayer.play();
+    }
+
+    function stopCat() {
+      if (!catPlayer) return;
+      catPlayer.destroy();
+      catPlayer = null;
+      catBox.hide();
+      catDivider.hide();
+      poemBox.left = 2;
+    }
+
     // ── Poem generation ──
     async function requestPoem() {
       if (generating) return;
@@ -258,7 +347,6 @@ export default function setup(host: MicroappHost) {
         lastPoem = poem;
         lastGeneratedMinute = now.getHours() * 60 + now.getMinutes();
       } else if (mode === "sentient" && !lastPoem) {
-        // Auth failed on first attempt — fall back to clock
         mode = "clock";
       }
       render();
@@ -270,18 +358,24 @@ export default function setup(host: MicroappHost) {
         mode = "sentient";
         voice = "plain";
         lastPoem = "";
+        stopCat();
         requestPoem();
         return;
       }
-      // Cycle voice, or back to clock after scramble
       const idx = VOICE_CYCLE.indexOf(voice);
       if (idx >= VOICE_CYCLE.length - 1) {
         mode = "clock";
         voice = "plain";
         lastPoem = "";
+        stopCat();
       } else {
         voice = VOICE_CYCLE[idx + 1];
         lastPoem = "";
+        if (voice === "scramble") {
+          startCat();
+        } else {
+          stopCat();
+        }
         requestPoem();
         return;
       }
@@ -306,7 +400,7 @@ export default function setup(host: MicroappHost) {
         poemBox.setContent("");
         statusLabel.setContent("");
       } else {
-        divider.setContent("─".repeat(48));
+        divider.setContent("─".repeat(58));
         if (generating) {
           poemBox.setContent("\n ...");
           statusLabel.setContent(` ${VOICE_LABELS[voice]} ...`);
@@ -328,29 +422,32 @@ export default function setup(host: MicroappHost) {
     function tick() {
       const now = new Date();
       const currentMinute = now.getHours() * 60 + now.getMinutes();
-
       render();
-
-      // Generate new poem if minute changed in sentient mode
       if (mode === "sentient" && currentMinute !== lastGeneratedMinute && !generating) {
         requestPoem();
       }
     }
 
-    // Initial render + kick off sentient mode if restoring
+    // Initial render
     render();
     if (mode === "sentient") {
+      if (voice === "scramble") startCat();
       requestPoem();
     }
 
     const timer = setInterval(tick, 15_000);
 
-    win.onCleanup(() => clearInterval(timer));
+    win.onCleanup(() => {
+      clearInterval(timer);
+      stopCat();
+    });
 
     win.onRestyle(() => {
       dateBox.style = host.theme().muted;
       figletBox.style = host.theme().body;
       divider.style = host.theme().muted;
+      catBox.style = host.theme().body;
+      catDivider.style = host.theme().muted;
       poemBox.style = host.theme().body;
       modeBar.style = host.theme().header;
       statusLabel.style = host.theme().header;

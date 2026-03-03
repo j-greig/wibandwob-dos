@@ -16,7 +16,13 @@ interface MicroappHost {
     captureText(fn: () => string): void;
     focus(): void;
   };
-  registerCommand(def: { id: string; label: string; action: () => void }): void;
+  registerCommand(def: {
+    id: string;
+    label: string;
+    action: () => void;
+    menu?: { category: string; order: number; label?: string }[];
+    palette?: { order: number; label?: string };
+  }): void;
   readonly theme: () => { body: Record<string, unknown> };
 }
 
@@ -35,7 +41,9 @@ export default function setup(host: MicroappHost) {
 
   host.registerCommand({
     id: "open",
-    label: "Open Hello World",
+    label: "Hello World Example",
+    menu: [{ category: "help", order: 10, label: "Hello World Example" }],
+    palette: { order: 210, label: "Hello World" },
     action: () => {
       const blessed = require("blessed");
       const win = host.createWindow({ title: "Hello World", width, height });
