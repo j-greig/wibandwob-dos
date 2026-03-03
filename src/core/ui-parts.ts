@@ -143,10 +143,12 @@ function createLinearLayout(
   }
 
   let lastRect: Rect = { top: 0, left: 0, width: 0, height: 0 };
+  let laying = false;
 
-  const relayout = () => layoutChildren(lastRect);
+  const relayout = () => { if (!laying) layoutChildren(lastRect); };
 
   const layoutChildren = (rect: Rect) => {
+    laying = true;
     lastRect = {
       top: rect.top,
       left: rect.left,
@@ -202,6 +204,7 @@ function createLinearLayout(
       child.part.layout(childRect);
       cursor += cappedExtent;
     }
+    laying = false;
   };
 
   (node as blessed.Widgets.Node).on?.("resize", relayout);

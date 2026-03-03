@@ -443,6 +443,20 @@ Manual smoke targets:
 - open a text file
 - type in the editor
 - drag a window
+
+### Visual smoke testing
+
+When reviewing or smoke-testing a specific window, use the screenshot script
+instead of dumping the full TUI — full dumps are 50KB+ and kill agent context:
+
+```bash
+./scripts/screenshot-window.sh "Window Title"   # by title substring
+./scripts/screenshot-window.sh <id>             # by window id from /state
+```
+
+Returns a plain-text ANSI-stripped crop of just that window's rect.
+Use this in reviews, smoke tests, layout checks, and any time you need to
+verify what a window actually looks like without asking the human.
 - close a window
 - open Wib&Wob Agent and verify input still works
 
