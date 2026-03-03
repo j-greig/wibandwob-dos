@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# minimap.sh — ASCII art spatial map of the live WibWob-DOS desktop
+# Usage: scripts/minimap.sh
+# Fetches /state from port 8099 and renders scaled window rectangles.
+
+set -euo pipefail
+
+STATE=$(curl -sf http://127.0.0.1:8099/state 2>/dev/null) || {
+  echo "WibWob-DOS not running (port 8099 unreachable)" >&2
+  exit 1
+}
+
+python3 -c "
+import sys, json
+
+state = json.loads(sys.argv[1])
+windows = state.get('windows', [])
+screen  = state.get('screen', {})
+sw, sh  = screen.get('width', 280), screen.get('height', 80)
+focus_id = state.get('focus', {}).get('windowId')
+theme    = state.get('app', {}).get('theme', '?')
+
+MW, MH = 62, 18
+sx = MW / sw
+sy = MH / (sh * 0.5)  # cell aspect 2:1
+
+grid = [[' '] * MW for _ in range(MH)]
+
+def clamp(v, lo, hi): return max(lo, min(hi, v))
+
+def stamp(wx, wy, ww, wh, label, focused):
+    x = clamp(round(wx * sx), 0, MW - 4)
+    y = clamp(round(wy * sy), 0, MH - 3)
+    w = clamp(round(ww * sx), 4, MW - x)
+    h = clamp(round(wh * sy), 2, MH - y)
+    for i in range(w):
+        if x+i < MW:
+            grid[y][x+i]     = '-'
+            grid[y+h-1][x+i] = '-'
+    for j in range(h):
+        grid[y+j][x]       = '|'
+        if x+w-1 < MW: grid[y+j][x+w-1] = '|'
+    tl = '#' if focused else '+'
+    grid[y][x]         = tl
+    grid[y][x+w-1]     = tl
+    grid[y+h-1][x]     = tl
+    grid[y+h-1][x+w-1] = tl
+    lbl = label[:w-2]
+    for i, c in enumerate(lbl):
+        grid[y+1][x+1+i] = c
+
+for w in sorted(windows, key=lambda w: w.get('zIndex', 0)):
+    lbl = f\"{w['id']}:{w['title'][:14]}\"
+    stamp(w.get('left',0), w.get('top',0),
+          w.get('width',10), w.get('height',5),
+          lbl, w['id'] == focus_id)
+
+f = state.get('focus', {})
+focus_label = f\"{f.get('windowId','?')}:{f.get('title','?')}\" if f else 'none'
+print(f'WibWob-DOS  {theme}  {sw}x{sh}  focus:{focus_label}')
+print('  +' + '-'*MW + '+')
+for row in grid:
+    print('  |' + ''.join(row) + '|')
+print('  +' + '-'*MW + '+')
+print(f'  # = focused   + = other   {len(windows)} windows')
+" "$STATE"

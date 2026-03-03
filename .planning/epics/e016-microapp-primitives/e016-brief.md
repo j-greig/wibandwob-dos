@@ -1,7 +1,7 @@
 ---
 id: E016
 title: Microapp Primitives Library
-status: smoke-test-pending
+status: done
 issue: ~
 pr: ~
 depends_on: [E015]
