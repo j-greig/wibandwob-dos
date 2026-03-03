@@ -41,9 +41,9 @@ Rules:
   Status: landed — context menus are registry-driven with windowKind filtering and enabled predicates. Top-level menus remain static (File/Edit/View/Window/Applications). Phase 2 (dynamic top-level categories) is deliberately deferred.
   Spec: `.planning/refactor-docs/019-context-sensitive-menu-bar-prd.md`
 
-- [ ] **Typed window/state/snapshot contracts**
+- [x] **Typed window/state/snapshot contracts**
   Move payloads from `Record<string, unknown>` toward discriminated unions or runtime-validated schemas. Modules own their own serialize/restore. 14 window kinds to type. Medium refactor, no runtime behaviour change.
-  Status: partial — deferred to parking lot for now, promotes back when snapshot round-trip bugs surface.
+  Status: landed (phase 1) — dead code removed (ChatState, ChatTaskItem, ChatTaskStory, ChatTaskLoop, TaskLoopStatus), dead `chat` field removed from WindowRecord, dead `chat` serialization in snapshot-registry replaced with `describeState()` path, type guards added (`isEditorWindow`, `isFinderWindow` with narrowed types `EditorWindowRecord`, `FinderWindowRecord`). WindowRecord fields now grouped and documented by owner. Full discriminated union blocked by two-phase construction pattern in WindowManager.createFrame; type guards provide equivalent narrowing safety for consumers.
   Spec: `.planning/epics/e002-ts-tui-root-migration/legacy-docs/window-facade-full-review.md`
 
 ## Tier 3 — Appearance and rendering
@@ -113,9 +113,9 @@ here with a note. Promote back when conditions change.
 - **Primer dims header**: add `# dims: 68x22` to primer files to skip full measurement scan (~14s across 197 files)
 - **tmux-launch rewrite**: replace C++/API era launcher with TS-native tmux harness
 - **CI and contract tests**: rebuild C++ era contract test patterns in TS against the new API surface
-- **WindowRecord shape**: optional fields still grow per type — refactor to discriminated union
+- ~~**WindowRecord shape**~~: done (phase 1) — dead fields removed, type guards added, fields grouped by owner. Full union blocked by two-phase construction.
 - ~~**28 hardcoded blessed style literals**~~: done — all surfaces now use theme tokens
-- **Parity audit**: 8 window kinds untested (figlet, pattern, inspector, workspace, chrome-browser, wibwob-agent, backrooms-tv, reader). Need automated test that catches missing appType/summary.
+- ~~**Parity audit**: 8 window kinds untested~~ — done. `src/tests/window-parity.test.ts` covers all 8 plus the already-tested types. Every window has describeState with appType and summary.
 - **Double-line fix audit**: setViewportContent scrollbar fix landed for primers. Audit gallery preview, editor, file manager for same bug.
 - **Proportional layout**: derive viewport width from window evidence, never absolute cols. Dual-monitor blessed reports combined width.
 - **Theme in /state**: expose active theme name in desktop state endpoint

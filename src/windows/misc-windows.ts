@@ -4,6 +4,7 @@ import { theme } from "../core/theme/resolver.js";
 import type { StateService } from "../services/state-service.js";
 import type { WorkspaceService } from "../services/workspace-service.js";
 import { createScrollbar, safeSetStyle } from "../core/ui-primitives.js";
+import { animationAppType } from "../core/types.js";
 import type { DesktopState, List, LogBox, MenuItem, WindowKind, WindowRecord } from "../core/types.js";
 import type { WindowManager } from "../core/window-manager.js";
 
@@ -12,10 +13,13 @@ interface BaseWindowDeps {
   windowManager: WindowManager;
 }
 
+/** AnimationKind — the subset of WindowKind valid for the animated window factory. */
+export type AnimationKind = "pattern";
+
 export function openAnimatedWindow(
   deps: BaseWindowDeps,
   title: string,
-  kind: WindowKind,
+  kind: AnimationKind,
   renderFrame: (tick: number, width: number, height: number) => string
 ): void {
   const frame = deps.windowManager.createFrame(title, kind);
@@ -37,7 +41,7 @@ export function openAnimatedWindow(
   const timer = setInterval(render, 120);
   frame.kind = kind;
   frame.describeState = () => ({
-    appType: `${kind}-animation`,
+    appType: animationAppType[kind],
     summary: `Animated ${kind} window.`,
     contentPreview: canvas.getContent().split("\n").slice(0, 8).join("\n")
   });

@@ -6,6 +6,7 @@ import stringWidth from "string-width";
 import { theme } from "../core/theme/resolver.js";
 import { createScrollbar, safeSetStyle } from "../core/ui-primitives.js";
 import type { ContentMeasurement } from "../services/content-measurement.js";
+import { viewerAppType } from "../core/types.js";
 import type { Box, BrowserEntry, List, WindowKind, WindowRecord } from "../core/types.js";
 import type { OverlayManager } from "../core/overlay-manager.js";
 import type { WindowManager } from "../core/window-manager.js";
@@ -316,12 +317,15 @@ export function openPrimerGalleryWindow(params: {
   frame.focus();
 }
 
+/** ViewerKind — the subset of WindowKind valid for the content viewer factory. */
+export type ViewerKind = "primer" | "reader";
+
 export function openTextViewerWindow(params: {
   windowManager: WindowManager;
-  applyMeasuredWindowSize: (frame: WindowRecord, kind: WindowKind, content: { width: number; height: number }) => void;
+  applyMeasuredWindowSize: (frame: WindowRecord, kind: ViewerKind, content: { width: number; height: number }) => void;
   title: string;
   content: string;
-  kind: WindowKind;
+  kind: ViewerKind;
   filePath?: string;
   measurement?: ContentMeasurement;
 }): void {
@@ -346,7 +350,7 @@ export function openTextViewerWindow(params: {
   frame.filePath = params.filePath;
   const m = params.measurement;
   frame.describeState = () => ({
-    appType: `${params.kind}-viewer`,
+    appType: viewerAppType[params.kind],
     summary: params.filePath ? `Viewing ${params.filePath}` : `Viewing ${params.kind} content.`,
     filePath: params.filePath,
     lineCount: m?.lineCount ?? 0,

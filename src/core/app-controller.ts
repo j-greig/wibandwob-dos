@@ -13,11 +13,11 @@ import { OverlayManager } from "./overlay-manager.js";
 import { theme, themeName, toggleTheme as toggleThemeVariant, allVariants, setThemeVariant } from "./theme/resolver.js";
 import { isRightClick } from "./ui-primitives.js";
 import { restoreWindowSnapshot, serializeWindowSnapshot, type WorkspaceRestoreActions } from "./workspace-snapshots.js";
+import { isPersistable } from "./snapshot-registry.js";
 import type {
   BackroomsChannel,
   Box,
   BrowserEntry,
-  ChatMessageEntry,
   DesktopState,
   GalleryTab,
   MenuConfig,
@@ -887,7 +887,7 @@ export class TsTuiMvpApp {
   private openTextViewerWindow(
     title: string,
     content: string,
-    kind: WindowKind,
+    kind: "primer" | "reader",
     filePath?: string,
     options?: {
       contentMeasurement?: ContentMeasurement;
@@ -918,7 +918,7 @@ export class TsTuiMvpApp {
     const focusedId = this.windowManager.getFocusedWindow()?.id;
     return this.windowManager
       .getWindows()
-      .filter((window) => window.kind !== "workspace" && window.kind !== "palette")
+      .filter(isPersistable)
       .map((window) => serializeWindowSnapshot(window, focusedId));
   }
 
@@ -946,9 +946,12 @@ export class TsTuiMvpApp {
       openFileManagerWindow: (restore) => this.openFileManagerWindow(restore),
       openBackroomsTv: (channel) => this.openBackroomsTv(channel),
       openBackroomsLogBrowserWindow: () => this.openBackroomsLogBrowserWindow(),
+      openBackroomsPrimerPickerWindow: () => this.openBackroomsPrimerPicker("liminal fluorescent maze", { theme: "liminal fluorescent maze", primers: "", turns: 3, model: "sonnet" }),
+      openChromeBrowserWindow: (restore) => this.openChromeBrowserWindow(restore?.url),
       openCompanionWindow: (restore) => this.openCompanionWindow(restore),
       openArtWindow: () => this.openArtWindow(),
-      openStateInspectorWindow: () => this.openStateInspectorWindow(),
+      openMonsterCamWindow: () => this.openMonsterCam(),
+      openWibWobAgentWindow: () => this.openWibWobAgentWindow(),
       windows: this.windowManager
     };
   }

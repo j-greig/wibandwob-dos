@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import type { DesktopState, DesktopWindowState, WindowRecord } from "../core/types.js";
+import type { AppType, DesktopState, DesktopWindowState, WindowRecord, WindowStateDetails } from "../core/types.js";
 import { themeName } from "../core/theme/resolver.js";
 
 interface StateServiceOptions {
@@ -96,8 +96,12 @@ export class StateService {
   }
 
   private describeWindow(window: WindowRecord, index: number, focusedId?: number): DesktopWindowState {
-    const details = window.describeState?.() ?? {
-      appType: window.kind,
+    const described = window.describeState?.();
+    if (!described) {
+      console.warn(`[state-service] Window "${window.title}" (kind=${window.kind}) has no describeState — appType will fall back to kind`);
+    }
+    const details: WindowStateDetails = described ?? {
+      appType: window.kind as AppType,
       summary: window.filePath ? `File-backed ${window.kind} window.` : `${window.kind} window.`
     };
 

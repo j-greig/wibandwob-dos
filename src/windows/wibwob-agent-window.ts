@@ -317,7 +317,7 @@ export function openWibWobAgentWindow(params: {
   frame.describeState = () => {
     const snapshot = params.agent.getSnapshot();
     return {
-      appType: params.agent.mode === "chat" ? "wibwob-chat-v2" : "wibwob-agent",
+      appType: "wibwob-agent",
       summary: snapshot.status,
       messageCount: snapshot.messageCount,
       streaming: snapshot.streaming,
