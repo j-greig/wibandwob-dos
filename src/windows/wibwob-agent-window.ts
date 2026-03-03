@@ -47,7 +47,7 @@ function applyVoiceMarkers(text: string, useKaomoji: boolean): string {
 
 function renderMessage(msg: ChatMessageEntry, useKaomoji: boolean): string {
   if (msg.role === "user") {
-    const label = msg.sender ?? "You";
+    const label = msg.sender ?? "Human";
     return `{${C.pink}-fg}${label}:{/${C.pink}-fg} {${C.gray}-fg}${escapeTagBraces(msg.text)}{/${C.gray}-fg}`;
   }
   if (msg.role === "status") {
