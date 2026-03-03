@@ -49,9 +49,11 @@ export interface AppMenuActions {
   finderSortBy: (args?: Record<string, unknown>) => void;
   // ── Monster Cam ───────────────────────────────────────
   openMonsterCam: () => void;
+  // ── Help ──────────────────────────────────────────────
+  viewReadme: () => void;
 }
 
-export type AppCommandCategory = "file" | "edit" | "view" | "window" | "applications";
+export type AppCommandCategory = "file" | "edit" | "view" | "window" | "applications" | "help";
 export type AppCommandGroup =
   | "browse"
   | "open"
@@ -132,7 +134,8 @@ const MENU_DEFINITIONS: MenuDefinition[] = [
   { category: "edit", label: "Edit", key: "e", left: 8 },
   { category: "view", label: "View", key: "v", left: 15 },
   { category: "window", label: "Window", key: "w", left: 22 },
-  { category: "applications", label: "Applications", key: "a", left: 31 }
+  { category: "applications", label: "Applications", key: "a", left: 31 },
+  { category: "help", label: "Help", key: "h", left: 47 }
 ];
 
 const APP_COMMANDS: AppCommandDefinition[] = [
@@ -551,6 +554,16 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     group: "save",
     actionKey: "loadWorkspace",
     palettePlacement: { order: 180 }
+  },
+  // ── Help ──────────────────────────────────────────────
+  {
+    id: "help.view_readme",
+    label: "View README",
+    group: "surface",
+    actionKey: "viewReadme",
+    description: "Open the project README in a document reader window.",
+    menuPlacements: [{ category: "help", order: 0 }],
+    palettePlacement: { order: 200 },
   }
 ];
 

@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 
 import { CONTROL_API_PORT, MASTER_PHILOSOPHY_PATH, README_PATH, REPO_ROOT, SPIKE_NOTES_PATH, SPIKE_ROOT, STATE_PATH, WORKSPACES_DIR } from "./config.js";
+import { appFlags } from "./cli.js";
 import { loadModules } from "../services/module-loader.js";
 import type { AppMenuActions } from "./command-catalog.js";
 import { CommandRegistry } from "./command-registry.js";
@@ -77,6 +78,9 @@ import { openWibWobAgentWindow as openNativeWibWobAgentWindow } from "../windows
 import { CustomCursor } from "./custom-cursor.js";
 import { openMonsterCamWindow } from "../windows/monster-cam-window.js";
 
+/** Exit code used by dev-mode reload. The launcher script watches for this. */
+export const DEV_RELOAD_EXIT_CODE = 75;
+
 export class TsTuiMvpApp {
   private readonly screen: blessed.Widgets.Screen;
   private readonly menuBar: Box;
@@ -91,7 +95,7 @@ export class TsTuiMvpApp {
   private readonly content = new ContentService();
   private readonly workspace = new WorkspaceService(WORKSPACES_DIR);
   private readonly geometry: DesktopGeometryService;
-  private readonly customCursor: CustomCursor;
+  private readonly customCursor: CustomCursor | null;
   private readonly state: StateService;
   private readonly controlApi: ControlApiService;
 
@@ -143,7 +147,7 @@ export class TsTuiMvpApp {
     );
     this.windowManager.setEditorWriteHook((id, text) => this.writeEditorTextById(id, text));
     this.geometry = new DesktopGeometryService(this.screen);
-    this.customCursor = new CustomCursor(this.screen);
+    this.customCursor = appFlags().customCursor ? new CustomCursor(this.screen) : null;
     this.overlays = new OverlayManager(this.screen, () => this.windowManager.restoreWindowFocus());
     this.commands = new CommandRegistry(this.getAppMenuActions());
     this.menus = this.commands.buildMenus();
@@ -237,11 +241,40 @@ export class TsTuiMvpApp {
   private renderChrome(): void {
     this.updateStatusLine();
     this.repaintDesktop();
+    if (appFlags().dev) this.renderDevControls();
     this.screen.on("resize", () => {
       this.repaintDesktop();
       this.syncState();
       this.screen.render();
     });
+  }
+
+  /** Dev-mode controls: reload button top-right, Ctrl+R to reload. */
+  private renderDevControls(): void {
+    const reloadBtn = blessed.box({
+      parent: this.screen,
+      top: 0,
+      right: 0,
+      height: 1,
+      width: 12,
+      tags: true,
+      content: " ↻ Reload ",
+      style: { fg: "black", bg: "yellow", bold: true, hover: { fg: "black", bg: "white" } },
+      mouse: true,
+      clickable: true,
+    });
+    reloadBtn.on("click", () => this.devReload());
+    this.screen.key(["C-r"], () => this.devReload());
+  }
+
+  /** Save workspace and exit with reload code so the launcher restarts us. */
+  private devReload(): void {
+    // Auto-save current workspace before reloading
+    try {
+      this.workspace.save(this.snapshotWindows(), themeName());
+    } catch { /* best effort */ }
+    this.screen.destroy();
+    process.exit(DEV_RELOAD_EXIT_CODE);
   }
 
 
@@ -295,7 +328,7 @@ export class TsTuiMvpApp {
     this.desktop.style = theme().desktop;
     this.statusLine.style = theme().statusLine;
     this.menuUi.restyle();
-    this.customCursor.restyle();
+    this.customCursor?.restyle();
     this.windowManager.restyleAll();
     this.repaintDesktop();
     this.syncState();
@@ -1133,7 +1166,9 @@ export class TsTuiMvpApp {
         finder.sortBy(field);
       },
       // ── Monster Cam ─────────────────────────────────────
-      openMonsterCam: () => this.openMonsterCam()
+      openMonsterCam: () => this.openMonsterCam(),
+      // ── Help ────────────────────────────────────────────
+      viewReadme: () => this.openBrowserReaderWindow(README_PATH)
     };
   }
 

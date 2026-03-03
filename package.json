@@ -5,7 +5,7 @@
   "description": "WibWob-DOS — terminal-native TypeScript TUI shell",
   "type": "module",
   "scripts": {
-    "dev": "bun --watch src/app.ts",
+    "dev": "bun run src/app.ts --dev",
     "start": "bun run src/app.ts",
     "typecheck": "tsc --noEmit"
   },
