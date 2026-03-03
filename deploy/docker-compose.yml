@@ -32,12 +32,12 @@ services:
       - run
       - /app/deploy/token-proxy.ts
     restart: unless-stopped
+    env_file:
+      - /etc/wibwob.env
     environment:
-      - ADMIN_SECRET=${ADMIN_SECRET}
       - TTYD_URL=http://ttyd:7681
       - TOKEN_TTL_MS=1800000
       - PORT=8080
-      - PUBLIC_URL=https://dos.wibandwob.com
     expose:
       - "8080"
     depends_on:
