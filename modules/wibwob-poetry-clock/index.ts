@@ -14,21 +14,89 @@
  * Falls back to clock mode if auth is unavailable.
  */
 
-import blessed from "blessed";
 import { readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 import { homedir } from "node:os";
-import { spawnSync } from "node:child_process";
-import { createPreRenderedPlayer } from "../../src/services/animation-service.js";
-import type { FramePlayer } from "../../src/services/animation-service.js";
-import type { MicroappHost } from "../../src/services/module-loader.js";
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
 
 type ClockMode = "clock" | "sentient";
 type Voice = "plain" | "liminal" | "scramble";
+
+type Rect = { top: number; left: number; width: number; height: number };
+type UiNode = {
+  on?(event: string, handler: () => void): void;
+  hide(): void;
+  show(): void;
+  setContent(content: string): void;
+};
+type UiPart<Props = void> = {
+  node: UiNode;
+  layout(rect: Rect): void;
+  update(props: Props): void;
+  restyle(): void;
+  destroy(): void;
+};
+type StackChild = {
+  key: string;
+  basis: number | string;
+  part: UiPart<unknown>;
+  visible?: () => boolean;
+};
+type SnapshotWindow = {
+  describeState?: () => Record<string, unknown>;
+};
+type MicroappWindowHandle = {
+  readonly id: number;
+  readonly body: {
+    width?: number | string;
+    height?: number | string;
+    key(keys: string[], fn: () => void): void;
+  };
+  onCleanup(fn: () => void): void;
+  onRestyle(fn: () => void): void;
+  describeState(fn: () => Record<string, unknown>): void;
+  captureText(fn: () => string): void;
+  close(): void;
+};
+type AnimatedPanelPlayer = {
+  destroy(): void;
+  attachTarget?(target: UiNode): void;
+};
+type MicroappHost = {
+  createWindow(init: { title: string; width?: number; height?: number }): MicroappWindowHandle;
+  registerCommand(def: {
+    id: string;
+    label: string;
+    description?: string;
+    action: (args?: Record<string, unknown>) => void;
+    menu?: { category: string; order: number; label?: string }[];
+    palette?: { order: number; label?: string };
+  }): void;
+  registerSnapshot(handlers: {
+    serialize: (window: SnapshotWindow) => Record<string, unknown> | undefined;
+    restore: (_snapshot: unknown, payload: Record<string, unknown>) => void;
+  }): void;
+  runCommand(localId: string, args?: Record<string, unknown>): void;
+  screen: { render(): void };
+  ui: {
+    createStack(parent: unknown, children: StackChild[]): UiPart<void>;
+    createColumns(parent: unknown, children: StackChild[]): UiPart<void>;
+    createHeaderBar(parent: unknown, opts?: { leftInset?: number }): UiPart<{ left: string; right?: string }>;
+    createStatusBar(parent: unknown): UiPart<{ left?: string; right?: string }>;
+    createTextBlock(
+      parent: unknown,
+      opts?: { paddingLeft?: number; paddingTop?: number }
+    ): UiPart<{ text: string }>;
+    createRule(
+      parent: unknown,
+      opts: { axis: "horizontal" | "vertical"; inset?: number }
+    ): UiPart<{ visible: boolean }>;
+    createFigletDisplay(parent: unknown, opts: {
+      renderText: (value: string) => string;
+    }): UiPart<{ value: string }>;
+    createAnimatedPanel(parent: unknown, opts: { player: AnimatedPanelPlayer }): UiPart<void>;
+  };
+};
 
 const VOICE_CYCLE: Voice[] = ["plain", "liminal", "scramble"];
 const VOICE_LABELS: Record<Voice, string> = {
@@ -36,10 +104,6 @@ const VOICE_LABELS: Record<Voice, string> = {
   liminal: "backrooms",
   scramble: "scramble",
 };
-
-// ---------------------------------------------------------------------------
-// Time formatting
-// ---------------------------------------------------------------------------
 
 function formatTime(date: Date): string {
   const h = date.getHours().toString().padStart(2, "0");
@@ -49,30 +113,23 @@ function formatTime(date: Date): string {
 
 function formatDate(date: Date): string {
   const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-  const months = ["January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December"];
+  const months = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
+  ];
   return `${days[date.getDay()]}, ${date.getDate()} ${months[date.getMonth()]}`;
 }
-
-// ---------------------------------------------------------------------------
-// FIGlet rendering
-// ---------------------------------------------------------------------------
 
 const FIGLET_FONT = "chunky";
 
 function renderFigletTime(time: string): string {
   const result = spawnSync("figlet", ["-f", FIGLET_FONT, time], { encoding: "utf8" });
-  if (result.status !== 0 || !result.stdout.trim()) return `  ${time}`;
+  if (result.status !== 0 || !result.stdout.trim()) {
+    return `  ${time}`;
+  }
   return result.stdout.replace(/\s+$/u, "");
 }
 
-// ---------------------------------------------------------------------------
-// Scramble — animated cat frames (string[][] = array of frames, each frame = lines)
-// ---------------------------------------------------------------------------
-
-// Note: blessed interprets tags in content by default — use {/} to be safe,
-// but simpler: just keep frames as plain ASCII with no special chars.
-// Backslash at line end can confuse some renderers; pad all lines to equal width.
 const SCRAMBLE_FRAMES: string[][] = [
   [
     "  /\\_/\\   ",
@@ -105,9 +162,63 @@ const SCRAMBLE_FRAMES: string[][] = [
   ],
 ];
 
-// ---------------------------------------------------------------------------
-// Anthropic API — direct fetch using pi's OAuth token
-// ---------------------------------------------------------------------------
+function createScramblePlayer(host: MicroappHost): AnimatedPanelPlayer & { setRunning(running: boolean): void } {
+  let target: UiNode | null = null;
+  let timer: ReturnType<typeof setInterval> | null = null;
+  let frameIndex = 0;
+  let running = false;
+
+  const renderFrame = () => {
+    if (!target) {
+      return;
+    }
+    target.setContent(SCRAMBLE_FRAMES[frameIndex].join("\n"));
+    host.screen.render();
+  };
+
+  const stop = () => {
+    if (timer) {
+      clearInterval(timer);
+      timer = null;
+    }
+  };
+
+  const start = () => {
+    if (timer || !target) {
+      return;
+    }
+    timer = setInterval(() => {
+      frameIndex = (frameIndex + 1) % SCRAMBLE_FRAMES.length;
+      renderFrame();
+    }, 2_000);
+  };
+
+  return {
+    attachTarget(nextTarget) {
+      target = nextTarget;
+      frameIndex = 0;
+      renderFrame();
+      if (running) {
+        start();
+      }
+    },
+    setRunning(nextRunning) {
+      running = nextRunning;
+      if (!running) {
+        stop();
+        frameIndex = 0;
+        renderFrame();
+        return;
+      }
+      renderFrame();
+      start();
+    },
+    destroy() {
+      stop();
+      target = null;
+    },
+  };
+}
 
 const MODEL = "claude-haiku-4-5-20251001";
 const API_URL = "https://api.anthropic.com/v1/messages";
@@ -132,10 +243,13 @@ function readOAuthToken(): string | null {
   try {
     const auth = JSON.parse(readFileSync(AUTH_FILE, "utf-8"));
     const token = auth?.anthropic?.access;
-    if (!token || typeof token !== "string") return null;
-    // Check expiry if present
+    if (!token || typeof token !== "string") {
+      return null;
+    }
     const expires = auth?.anthropic?.expires;
-    if (expires && Date.now() > expires) return null;
+    if (expires && Date.now() > expires) {
+      return null;
+    }
     return token;
   } catch {
     return null;
@@ -144,7 +258,9 @@ function readOAuthToken(): string | null {
 
 async function generatePoem(time: string, voice: Voice): Promise<string | null> {
   const token = readOAuthToken();
-  if (!token) return null;
+  if (!token) {
+    return null;
+  }
 
   const prompt = VOICE_PROMPTS[voice].replace(/\{time\}/g, time);
 
@@ -172,17 +288,20 @@ async function generatePoem(time: string, voice: Voice): Promise<string | null> 
 
     clearTimeout(timeout);
 
-    if (!response.ok) return null;
+    if (!response.ok) {
+      return null;
+    }
 
     const data = await response.json() as {
       content?: Array<{ type: string; text?: string }>;
     };
 
-    const text = data.content?.find(c => c.type === "text")?.text?.trim();
-    if (!text) return null;
+    const text = data.content?.find((item) => item.type === "text")?.text?.trim();
+    if (!text) {
+      return null;
+    }
 
-    // Strip surrounding quotes if present
-    if (text.startsWith('"') && text.endsWith('"')) {
+    if (text.startsWith("\"") && text.endsWith("\"")) {
       return text.slice(1, -1);
     }
     return text;
@@ -191,12 +310,7 @@ async function generatePoem(time: string, voice: Voice): Promise<string | null> 
   }
 }
 
-// ---------------------------------------------------------------------------
-// Setup
-// ---------------------------------------------------------------------------
-
 export default function setup(host: MicroappHost) {
-
   function openClock(args?: Record<string, unknown>) {
     const restoreMode = args?.mode as ClockMode | undefined;
     const restoreVoice = args?.voice as Voice | undefined;
@@ -207,138 +321,84 @@ export default function setup(host: MicroappHost) {
     let lastTime = "";
     let lastDate = "";
     let generating = false;
-    let catPlayer: FramePlayer | null = null;
+    let lastGeneratedMinute = -1;
 
-    // Window is wider to accommodate scramble cat panel
     const win = host.createWindow({
       title: "Poetry Clock",
       width: 64,
       height: 17,
     });
 
-    // ── Date line ──
-    const dateBox = blessed.box({
-      parent: win.body,
-      top: 0,
-      left: 2,
-      right: 2,
-      height: 1,
-      style: host.theme().muted,
-    });
+    const dateHeader = host.ui.createHeaderBar(win.body, { leftInset: 1 });
+    const figletTime = host.ui.createFigletDisplay(win.body, { renderText: renderFigletTime });
+    const divider = host.ui.createRule(win.body, { axis: "horizontal", inset: 2 });
+    const catPlayer = createScramblePlayer(host);
+    const catPanel = host.ui.createAnimatedPanel(win.body, { player: catPlayer });
+    const catRule = host.ui.createRule(win.body, { axis: "vertical" });
+    const poemBlock = host.ui.createTextBlock(win.body, { paddingLeft: 1, paddingTop: 1 });
+    const statusBar = host.ui.createStatusBar(win.body);
 
-    // ── FIGlet time ──
-    const figletBox = blessed.box({
-      parent: win.body,
-      top: 1,
-      left: 1,
-      right: 1,
-      height: 5,
-      style: host.theme().body,
-    });
+    const body = host.ui.createColumns(win.body, [
+      {
+        key: "cat",
+        basis: 15,
+        part: catPanel,
+        visible: () => mode === "sentient" && voice === "scramble",
+      },
+      {
+        key: "cat-rule",
+        basis: 1,
+        part: catRule,
+        visible: () => mode === "sentient" && voice === "scramble",
+      },
+      {
+        key: "poem",
+        basis: "1fr",
+        part: poemBlock,
+      },
+    ]);
 
-    // ── Divider ──
-    const divider = blessed.box({
-      parent: win.body,
-      top: 6,
-      left: 2,
-      right: 2,
-      height: 1,
-      style: host.theme().muted,
-    });
+    const root = host.ui.createStack(win.body, [
+      { key: "date", basis: 1, part: dateHeader },
+      { key: "figlet", basis: 5, part: figletTime },
+      {
+        key: "divider",
+        basis: 1,
+        part: divider,
+        visible: () => mode !== "clock",
+      },
+      { key: "body", basis: "1fr", part: body },
+      { key: "status", basis: 1, part: statusBar },
+    ]);
 
-    // ── Cat panel (scramble mode only, left side) ──
-    const catBox = blessed.box({
-      parent: win.body,
-      top: 7,
-      left: 0,
-      width: 15,
-      bottom: 2,
-      style: host.theme().body,
-      hidden: true,
-    });
+    const cycleMode = () => {
+      if (mode === "clock") {
+        mode = "sentient";
+        voice = "plain";
+        lastPoem = "";
+        requestPoem();
+        return;
+      }
 
-    // ── Vertical divider between cat and poem (scramble mode) ──
-    const catDivider = blessed.box({
-      parent: win.body,
-      top: 7,
-      left: 15,
-      width: 1,
-      bottom: 2,
-      content: "│\n│\n│\n│\n│\n│",
-      style: host.theme().muted,
-      hidden: true,
-    });
+      const voiceIndex = VOICE_CYCLE.indexOf(voice);
+      if (voiceIndex >= VOICE_CYCLE.length - 1) {
+        mode = "clock";
+        voice = "plain";
+        lastPoem = "";
+        render();
+        return;
+      }
 
-    // ── Poem area ──
-    const poemBox = blessed.box({
-      parent: win.body,
-      top: 7,
-      left: 2,
-      right: 2,
-      bottom: 2,
-      style: host.theme().body,
-    });
+      voice = VOICE_CYCLE[voiceIndex + 1];
+      lastPoem = "";
+      requestPoem();
+    };
 
-    // ── Bottom bar ──
-    const modeBar = blessed.box({
-      parent: win.body,
-      bottom: 0,
-      left: 0,
-      right: 0,
-      height: 1,
-      style: host.theme().header,
-    });
-
-    const statusLabel = blessed.box({
-      parent: modeBar,
-      left: 1,
-      top: 0,
-      width: 46,
-      height: 1,
-      style: host.theme().header,
-    });
-
-    const modeBtn = blessed.box({
-      parent: modeBar,
-      right: 1,
-      top: 0,
-      width: 11,
-      height: 1,
-      content: " [m]ode  ",
-      mouse: true,
-      clickable: true,
-      style: { ...host.theme().header, hover: host.theme().selected },
-    });
-
-    // ── Cat animation ──
-    function startCat() {
-      if (catPlayer) return;
-      catBox.show();
-      catDivider.show();
-      poemBox.left = 16;
-      catPlayer = createPreRenderedPlayer({
-        frames: SCRAMBLE_FRAMES,
-        fps: 0.5,
-        onFrame: (content) => {
-          catBox.setContent(content);
-          host.screen.render();
-        },
-      });
-      catPlayer.play();
-    }
-
-    function stopCat() {
-      if (!catPlayer) return;
-      catPlayer.destroy();
-      catPlayer = null;
-      catBox.hide();
-      catDivider.hide();
-      poemBox.left = 2;
-    }
-
-    // ── Poem generation ──
     async function requestPoem() {
-      if (generating) return;
+      if (generating) {
+        return;
+      }
+
       generating = true;
       render();
 
@@ -351,94 +411,42 @@ export default function setup(host: MicroappHost) {
         lastGeneratedMinute = now.getHours() * 60 + now.getMinutes();
       } else if (mode === "sentient" && !lastPoem) {
         mode = "clock";
+        voice = "plain";
       }
+
       render();
     }
 
-    // ── Mode cycling ──
-    function cycleMode() {
-      if (mode === "clock") {
-        mode = "sentient";
-        voice = "plain";
-        lastPoem = "";
-        stopCat();
-        requestPoem();
-        return;
-      }
-      const idx = VOICE_CYCLE.indexOf(voice);
-      if (idx >= VOICE_CYCLE.length - 1) {
-        mode = "clock";
-        voice = "plain";
-        lastPoem = "";
-        stopCat();
-      } else {
-        voice = VOICE_CYCLE[idx + 1];
-        lastPoem = "";
-        if (voice === "scramble") {
-          startCat();
-        } else {
-          stopCat();
-        }
-        requestPoem();
-        return;
-      }
-      render();
-    }
-
-    modeBtn.on("click", cycleMode);
-    win.body.key(["m"], cycleMode);
-    win.body.key(["q", "escape"], () => win.close());
-
-    // ── Rendering ──
     function render() {
       const now = new Date();
       lastTime = formatTime(now);
       lastDate = formatDate(now);
 
-      dateBox.setContent(lastDate);
-      figletBox.setContent(renderFigletTime(lastTime));
+      const innerW = Number(win.body.width) || 0;
+      const innerH = Number(win.body.height) || 0;
+      const scrambleVisible = mode === "sentient" && voice === "scramble";
+
+      root.layout({ top: 0, left: 0, width: innerW, height: innerH });
+
+      dateHeader.update({ left: lastDate });
+      figletTime.update({ value: lastTime });
+      divider.update({ visible: mode !== "clock" });
+      catRule.update({ visible: scrambleVisible });
+      catPlayer.setRunning(scrambleVisible);
 
       if (mode === "clock") {
-        divider.setContent("");
-        poemBox.setContent("");
-        statusLabel.setContent("");
+        poemBlock.update({ text: "" });
+        statusBar.update({ left: "", right: "[m]ode" });
+      } else if (generating) {
+        poemBlock.update({ text: "..." });
+        statusBar.update({ left: VOICE_LABELS[voice], right: "[m]ode" });
       } else {
-        divider.setContent("─".repeat(58));
-        if (generating) {
-          poemBox.setContent("\n ...");
-          statusLabel.setContent(` ${VOICE_LABELS[voice]} ...`);
-        } else if (lastPoem) {
-          // Pre-wrap to box width so all lines (including wrapped) get indent.
-          // poemBox.width is the inner width at render time; fall back to 44.
-          const boxW = Math.max(20, (Number(poemBox.width) || 46) - 2);
-          const lines: string[] = [];
-          for (const raw of lastPoem.split("\n")) {
-            const words = raw.split(" ");
-            let line = "";
-            for (const word of words) {
-              if (!line) { line = word; continue; }
-              if (line.length + 1 + word.length <= boxW) {
-                line += " " + word;
-              } else {
-                lines.push(" " + line);
-                line = word;
-              }
-            }
-            lines.push(" " + line);
-          }
-          poemBox.setContent("\n" + lines.join("\n"));
-          statusLabel.setContent(` ${VOICE_LABELS[voice]}`);
-        } else {
-          poemBox.setContent("");
-          statusLabel.setContent(` ${VOICE_LABELS[voice]}`);
-        }
+        poemBlock.update({ text: lastPoem });
+        statusBar.update({ left: VOICE_LABELS[voice], right: "[m]ode" });
       }
 
       host.screen.render();
     }
-
-    // ── Timer tick ──
-    let lastGeneratedMinute = -1;
 
     function tick() {
       const now = new Date();
@@ -449,10 +457,12 @@ export default function setup(host: MicroappHost) {
       }
     }
 
-    // Initial render
+    statusBar.node.on?.("click", cycleMode);
+    win.body.key(["m"], cycleMode);
+    win.body.key(["q", "escape"], () => win.close());
+
     render();
     if (mode === "sentient") {
-      if (voice === "scramble") startCat();
       requestPoem();
     }
 
@@ -460,20 +470,12 @@ export default function setup(host: MicroappHost) {
 
     win.onCleanup(() => {
       clearInterval(timer);
-      stopCat();
+      root.destroy();
     });
 
     win.onRestyle(() => {
-      dateBox.style = host.theme().muted;
-      figletBox.style = host.theme().body;
-      divider.style = host.theme().muted;
-      catBox.style = host.theme().body;
-      catDivider.style = host.theme().muted;
-      poemBox.style = host.theme().body;
-      modeBar.style = host.theme().header;
-      statusLabel.style = host.theme().header;
-      modeBtn.style = { ...host.theme().header, hover: host.theme().selected };
-      render();
+      root.restyle();
+      host.screen.render();
     });
 
     win.describeState(() => ({
@@ -496,7 +498,6 @@ export default function setup(host: MicroappHost) {
     });
   }
 
-  // ── Register command ──
   host.registerCommand({
     id: "open",
     label: "Open Poetry Clock",
@@ -506,13 +507,12 @@ export default function setup(host: MicroappHost) {
     palette: { order: 50, label: "Poetry Clock" },
   });
 
-  // ── Register snapshot ──
   host.registerSnapshot({
     serialize: (window) => {
-      const d = window.describeState?.() ?? {};
+      const state = window.describeState?.() ?? {};
       return {
-        mode: d.mode ?? "clock",
-        voice: d.voice ?? "plain",
+        mode: state.mode ?? "clock",
+        voice: state.voice ?? "plain",
       };
     },
     restore: (_snapshot, payload) => {
