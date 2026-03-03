@@ -418,6 +418,15 @@ export class ControlApiService {
         ),
       });
     }
+    // Dedicated endpoint for session-to-agent messages — always requires sender
+    if (request.method === "POST" && url.pathname === "/windows/agent-message") {
+      const sender = (body as any).sender ? String((body as any).sender) : undefined;
+      const text = String((body as any).text ?? (body as any).input ?? "");
+      const id = Number((body as any).id);
+      return Response.json({
+        ok: this.handlers.windows.sendInput(id, text, sender),
+      });
+    }
     if (request.method === "POST" && url.pathname === "/windows/editor/write") {
       return Response.json({
         ok: this.handlers.windows.writeEditorText(

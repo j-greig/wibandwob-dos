@@ -227,20 +227,21 @@ const AUTH_FILE = join(homedir(), ".pi", "agent", "auth.json");
 const VOICE_PROMPTS: Record<Voice, string> = {
   plain:
     "Write a two-line poem for the time {time}. " +
-    "The poem should resonate with the specific quality of that moment in the day — " +
-    "early morning has a different weight to late afternoon, midnight to noon. " +
-    "Let the hour's mood shape the imagery and tone. " +
+    "First: look at the digits and the hour. Find what's hiding in {time} — " +
+    "a pattern, a cultural echo, a feeling, the shape of the digits, bingo calls, " +
+    "something numerical, anything. Let that secret be the spine of the poem. " +
     "Observational, quiet. No title, no explanation. Maximum 120 characters.",
   liminal:
     "Write a two-line poem for the time {time}. " +
-    "Surreal, backrooms-flavoured. Let the specific hour haunt the imagery — " +
-    "3am is not the same as 3pm, both are wrong in different ways. " +
-    "Fluorescent corridors, temporal drift, the wrongness of this particular moment. " +
-    "No title, no explanation. Maximum 120 characters.",
+    "First: look at the digits and the hour. Find what's hiding in {time} — " +
+    "a pattern, an echo, a wrongness specific to this exact time. " +
+    "3am is not the same as 3pm. Let that particular strangeness haunt the poem. " +
+    "Surreal, backrooms-flavoured. No title, no explanation. Maximum 120 characters.",
   scramble:
     "Write a two-line poem for the time {time}. " +
-    "From Scramble the cat's perspective. The hour matters — is it feeding time, nap time, " +
-    "the witching hour, the slow afternoon? Let the time shape what Scramble is doing or thinking. " +
+    "First: look at the digits and the hour. Find what's hiding in {time} — " +
+    "is it feeding time, nap time, the witching hour, a suspicious number? " +
+    "Scramble the cat has noticed something about this particular time. " +
     "Simple, funny, catlike. No title, no explanation. Maximum 120 characters.",
 };
 

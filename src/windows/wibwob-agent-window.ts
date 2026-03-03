@@ -49,15 +49,18 @@ function renderMessage(msg: ChatMessageEntry, useKaomoji: boolean): string {
   }
   if (msg.role === "status") {
     const escaped = escapeTagBraces(msg.text);
-    if (escaped.includes("[tool]")) {
+    if (escaped.startsWith("[status]")) {
+      return "";
+    }
+    if (escaped.startsWith("[tool]")) {
       const trimmed = escaped.replace(/^\s*\[tool\]\s*/, "");
       return `  {${C.blue}-fg}▸{/${C.blue}-fg} {${C.muted}-fg}${trimmed}{/${C.muted}-fg}`;
     }
-    if (escaped.includes("[done]")) {
+    if (escaped.startsWith("[done]")) {
       const trimmed = escaped.replace(/^\s*\[done\]\s*/, "");
       return `  {${C.lime}-fg}✓{/${C.lime}-fg} {${C.muted}-fg}${trimmed}{/${C.muted}-fg}`;
     }
-    if (escaped.includes("[fail]")) {
+    if (escaped.startsWith("[fail]")) {
       const trimmed = escaped.replace(/^\s*\[fail\]\s*/, "");
       return `  {${C.pink}-fg}✗ ${trimmed}{/${C.pink}-fg}`;
     }
@@ -69,13 +72,14 @@ function renderMessage(msg: ChatMessageEntry, useKaomoji: boolean): string {
 }
 
 function renderTranscript(messages: ChatMessageEntry[], useKaomoji: boolean): string {
-  if (messages.length === 0) return "[status] Starting…";
+  const visibleMessages = messages.filter((m) => !(m.role === "status" && m.text.startsWith("[status]")));
+  if (visibleMessages.length === 0) return "";
 
   // Collapse [tool] + [done/fail] pairs into one line: ▸ toolname → result
   const collapsed: ChatMessageEntry[] = [];
-  for (let i = 0; i < messages.length; i++) {
-    const m = messages[i];
-    const next = messages[i + 1];
+  for (let i = 0; i < visibleMessages.length; i++) {
+    const m = visibleMessages[i];
+    const next = visibleMessages[i + 1];
     if (
       m.role === "status" &&
       m.text.startsWith("[tool]") &&
@@ -102,6 +106,7 @@ function renderTranscript(messages: ChatMessageEntry[], useKaomoji: boolean): st
     const m = collapsed[i];
     const prev = collapsed[i - 1];
     const rendered = renderMessage(m, useKaomoji);
+    if (!rendered) continue;
     // Add blank line before user/assistant turns (not between consecutive tool calls)
     if (i > 0 && (m.role !== "status" || prev?.role !== "status")) {
       lines.push("");
