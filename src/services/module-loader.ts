@@ -27,6 +27,12 @@ import type { WindowManager } from "../core/window-manager.js";
 import type { WindowFacade } from "../core/window-facade.js";
 import type { CommandRegistry, DynamicCommandDefinition } from "../core/command-registry.js";
 import type { MenuPlacement, PalettePlacement } from "../core/command-catalog.js";
+import {
+  createStack, createColumns,
+  createHeaderBar, createStatusBar, createTextBlock,
+  createRule, createFigletDisplay, createAnimatedPanel,
+} from "../core/ui-parts.js";
+import type { Rect, UiPart, StackChild } from "../core/ui-parts.js";
 
 // ---------------------------------------------------------------------------
 // Manifest types
@@ -91,7 +97,22 @@ export interface MicroappHost {
   readonly geometry: { width: number; height: number; cellAspect: number };
   readonly theme: () => ThemeTokens;
   readonly windows: WindowFacade;
+
+  /** Layout + content primitives. Import these instead of reaching into src/. */
+  readonly ui: {
+    createStack: typeof createStack;
+    createColumns: typeof createColumns;
+    createHeaderBar: typeof createHeaderBar;
+    createStatusBar: typeof createStatusBar;
+    createTextBlock: typeof createTextBlock;
+    createRule: typeof createRule;
+    createFigletDisplay: typeof createFigletDisplay;
+    createAnimatedPanel: typeof createAnimatedPanel;
+  };
 }
+
+/** Re-exported types for microapp authors who need them in annotations. */
+export type { Rect, UiPart, StackChild };
 
 export interface MicroappWindowHandle {
   readonly id: number;
@@ -231,6 +252,17 @@ function createMicroappHost(
     geometry,
     theme,
     windows: windowManager,
+
+    ui: {
+      createStack,
+      createColumns,
+      createHeaderBar,
+      createStatusBar,
+      createTextBlock,
+      createRule,
+      createFigletDisplay,
+      createAnimatedPanel,
+    },
   };
 
   return host;

@@ -4,8 +4,10 @@ import type { FramePlayer } from "../services/animation-service.js";
 import { theme } from "./theme/resolver.js";
 import { createScrollbar, safeSetStyle, scrollableStyle } from "./ui-primitives.js";
 
+/** @primitive */
 export type Rect = { top: number; left: number; width: number; height: number };
 
+/** @primitive */
 export type UiPart<Props = void> = {
   node: blessed.Widgets.BoxElement;
   layout(rect: Rect): void;
@@ -14,6 +16,7 @@ export type UiPart<Props = void> = {
   destroy(): void;
 };
 
+/** @primitive */
 export type StackChild = {
   key: string;
   basis: number | string;
@@ -225,14 +228,17 @@ function createLinearLayout(
   };
 }
 
+/** @primitive */
 export function createStack(parent: blessed.Widgets.Node, children: StackChild[]): UiPart<void> {
   return createLinearLayout(parent, children, "vertical");
 }
 
+/** @primitive */
 export function createColumns(parent: blessed.Widgets.Node, children: StackChild[]): UiPart<void> {
   return createLinearLayout(parent, children, "horizontal");
 }
 
+/** @primitive */
 export function createHeaderBar(
   parent: blessed.Widgets.Node,
   opts: { leftInset?: number } = {}
@@ -274,6 +280,7 @@ export function createHeaderBar(
   };
 }
 
+/** @primitive */
 export function createStatusBar(
   parent: blessed.Widgets.Node,
   _opts: Record<string, never> = {}
@@ -315,6 +322,7 @@ export function createStatusBar(
   };
 }
 
+/** @primitive */
 export function createTextBlock(
   parent: blessed.Widgets.Node,
   opts: { paddingLeft?: number; paddingTop?: number } = {}
@@ -362,6 +370,7 @@ export function createTextBlock(
   };
 }
 
+/** @primitive */
 export function createRule(
   parent: blessed.Widgets.Node,
   opts: { axis: "horizontal" | "vertical"; inset?: number }
@@ -418,6 +427,7 @@ export function createRule(
   };
 }
 
+/** @primitive */
 export function createFigletDisplay(
   parent: blessed.Widgets.Node,
   opts: { renderText: (value: string) => string }
@@ -462,6 +472,7 @@ export function createFigletDisplay(
   };
 }
 
+/** @primitive */
 export function createAnimatedPanel(
   parent: blessed.Widgets.Node,
   opts: { player: FramePlayer }
