@@ -151,7 +151,7 @@ function createMicroappHost(
 
       // Default describeState — microapp should override via handle
       frame.describeState = () => ({
-        appType: moduleId as AppType,
+        appType: moduleId,
         summary: manifest.title,
       });
 
@@ -170,7 +170,7 @@ function createMicroappHost(
         describeState(fn) {
           frame.describeState = (): WindowStateDetails => {
             const details = fn();
-            return { ...details, appType: moduleId as AppType };
+            return { ...details, appType: moduleId };
           };
         },
 

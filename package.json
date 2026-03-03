@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@anthropic-ai/claude-code": "^2.1.63",
     "@mariozechner/pi-agent-core": "^0.55.3",
     "@mariozechner/pi-coding-agent": "^0.55.3",
     "@mediapipe/tasks-vision": "^0.10.32",

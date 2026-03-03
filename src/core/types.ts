@@ -108,9 +108,12 @@ export type TransientAppType =
 
 /**
  * Union of all known appType strings.
- * Use this to type describeState() return values in window factories.
+ * Built-in types are literal unions for compile-time safety.
+ * Dynamic types (microapp modules) are plain strings registered at runtime.
+ * The (string & {}) arm widens the union without losing literal narrowing
+ * for built-in consumers.
  */
-export type AppType = PersistableAppType | TransientAppType;
+export type AppType = PersistableAppType | TransientAppType | (string & {});
 
 /**
  * Checked mappings from WindowKind to AppType for generic factories.
