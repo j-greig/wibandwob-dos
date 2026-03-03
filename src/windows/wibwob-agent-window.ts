@@ -69,7 +69,46 @@ function renderMessage(msg: ChatMessageEntry, useKaomoji: boolean): string {
 
 function renderTranscript(messages: ChatMessageEntry[], useKaomoji: boolean): string {
   if (messages.length === 0) return "[status] Starting…";
-  return messages.map((m) => renderMessage(m, useKaomoji)).join("\n\n");
+
+  // Collapse [tool] + [done/fail] pairs into one line: ▸ toolname → result
+  const collapsed: ChatMessageEntry[] = [];
+  for (let i = 0; i < messages.length; i++) {
+    const m = messages[i];
+    const next = messages[i + 1];
+    if (
+      m.role === "status" &&
+      m.text.startsWith("[tool]") &&
+      next?.role === "status" &&
+      (next.text.startsWith("[done]") || next.text.startsWith("[fail]"))
+    ) {
+      // Merge: strip [tool] prefix, append result from next
+      const toolPart = m.text.replace(/^\[tool\]\s*/, "");
+      const resultPart = next.text.replace(/^\[done\]\s*/, "").replace(/^\[fail\]\s*/, "");
+      const isError = next.text.startsWith("[fail]");
+      collapsed.push({
+        ...m,
+        text: isError ? `[fail] ${toolPart}` : `[done] ${toolPart}${resultPart ? ` → ${resultPart}` : ""}`,
+      });
+      i++; // skip [done]/[fail] entry
+    } else {
+      collapsed.push(m);
+    }
+  }
+
+  // Single blank line between user/assistant turns, no gap between tool lines
+  const lines: string[] = [];
+  for (let i = 0; i < collapsed.length; i++) {
+    const m = collapsed[i];
+    const prev = collapsed[i - 1];
+    const rendered = renderMessage(m, useKaomoji);
+    // Add blank line before user/assistant turns (not between consecutive tool calls)
+    if (i > 0 && (m.role !== "status" || prev?.role !== "status")) {
+      lines.push("");
+    }
+    lines.push(rendered);
+  }
+
+  return lines.join("\n");
 }
 
 /** Find the most recent Claude Code JSONL for the current project cwd. */
