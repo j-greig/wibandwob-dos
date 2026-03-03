@@ -449,6 +449,15 @@ export class WibWobAgentSession {
     return msgs.length > 0 ? msgs[msgs.length - 1].text : null;
   }
 
+  reloadPrompt(): boolean {
+    if (!this.agent) return false;
+    const newPrompt = this.mode === "agent"
+      ? loadAgentSystemPrompt()
+      : loadChatSystemPrompt();
+    this.agent.setSystemPrompt(newPrompt);
+    return true;
+  }
+
   dispose(): void {
     this.sessionServer?.close();
     this.sessionServer = undefined;

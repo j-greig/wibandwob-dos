@@ -100,6 +100,7 @@ export class TsTuiMvpApp {
   private readonly customCursor: CustomCursor | null;
   private readonly state: StateService;
   private readonly controlApi: ControlApiService;
+  private activeAgentSession?: WibWobAgentSession;
 
   constructor() {
     this.screen = blessed.screen({
@@ -507,6 +508,7 @@ export class TsTuiMvpApp {
     };
 
     const session = new WibWobAgentSession(tuiContext, REPO_ROOT);
+    this.activeAgentSession = session;
     this.focusOrCreate("wibwob-agent", () => {
       openNativeWibWobAgentWindow({
         screen: this.screen,
@@ -1177,6 +1179,13 @@ export class TsTuiMvpApp {
       exportFocusedWindowText: () => this.exportFocusedWindowText(),
       openArtWindow: () => this.openArtWindow(),
       openWibWobAgent: () => this.openWibWobAgentWindow(),
+      reloadAgentPrompt: () => {
+        if (this.activeAgentSession?.reloadPrompt()) {
+          this.overlays.flash("Agent prompt reloaded from disk");
+        } else {
+          this.overlays.flash("No active agent session to reload");
+        }
+      },
       quit: () => this.destroy(),
       focusNextWindow: () => this.windowManager.focusNextWindow(1),
       focusPreviousWindow: () => this.windowManager.focusNextWindow(-1),

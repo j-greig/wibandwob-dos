@@ -15,6 +15,7 @@ export interface AppMenuActions {
   exportFocusedWindowText: () => void;
   openArtWindow: () => void;
   openWibWobAgent: () => void;
+  reloadAgentPrompt: () => void;
   quit: () => void;
   focusNextWindow: () => void;
   focusPreviousWindow: () => void;
@@ -356,6 +357,15 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     menuPlacements: [{ category: "applications", order: 120, label: "Wib&Wob Agent" }],
     palettePlacement: { order: 130 },
     contextMenu: { desktop: true, order: 70 },
+    api: true,
+    agent: true
+  },
+  {
+    id: "agent.reload_prompt",
+    label: "Reload Agent Prompt",
+    description: "Re-read system prompt files from disk and hot-swap into the running agent session. No restart needed.",
+    group: "system",
+    actionKey: "reloadAgentPrompt",
     api: true,
     agent: true
   },
