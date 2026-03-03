@@ -317,37 +317,37 @@ Primary use:
 State/control owner:
 - `src/services/control-api.ts`
 
-Current control endpoints:
-- `GET /`
-- `GET /health`
+Current control endpoints (POST bodies shown where non-obvious):
+
 - `GET /state`
+- `GET /health`
 - `GET /commands/list`
 - `GET /content/primer-info?path=...`
 - `GET /windows/text?id=...`
-- `POST /commands/run`
-- `POST /view/primer-browser/open`
-- `POST /view/file-manager/open`
-- `POST /view/primer-gallery/open`
-- `POST /view/primer/open`
-- `POST /view/browser-reader/open`
-- `POST /view/figlet/open`
-- `POST /view/art/open`
-- `POST /view/wibwob-agent/open`
-- `POST /view/companion/open`
-- `POST /view/workspace/open`
-- `POST /view/palette/open`
-- `POST /view/inspector/open`
-- `POST /view/editor/open`
-- `POST /view/backrooms/open`
-- `POST /windows/focus`
-- `POST /windows/move`
-- `POST /windows/resize`
-- `POST /windows/close`
-- `POST /windows/input`
-- `POST /windows/text/export`
-- `POST /workspace/save`
-- `POST /workspace/load`
-- `GET /screenshot/text`
+- `GET /screenshot/text?id=...`
+- `POST /commands/run`              `{"command":"id","args":{}}`
+- `POST /view/primer/open`          `{"filePath":"/abs/path.txt"}`
+- `POST /view/figlet/open`          `{"text":"HELLO","font":"optional"}`
+- `POST /view/backrooms/open`       `{"theme":"...","mode":"auto|live|fake-live","model":"haiku|sonnet","turns":3,"primers":"optional"}`
+- `POST /view/editor/open`          `{"filePath":"/abs/path.txt"}`
+- `POST /view/browser-reader/open`  `{"filePath":"/abs/path.txt"}` or `{"url":"https://..."}`
+- `POST /view/art/open`             `{}` (no args)
+- `POST /view/wibwob-agent/open`    `{}` (focuses existing if open)
+- `POST /view/companion/open`       `{}`
+- `POST /view/primer-browser/open`  `{}`
+- `POST /view/file-manager/open`    `{}`
+- `POST /view/primer-gallery/open`  `{}`
+- `POST /view/workspace/open`       `{}`
+- `POST /view/palette/open`         `{}`
+- `POST /view/inspector/open`       `{}`
+- `POST /windows/focus`             `{"id":N}`
+- `POST /windows/move`              `{"id":N,"left":X,"top":Y}`
+- `POST /windows/resize`            `{"id":N,"width":W,"height":H}`
+- `POST /windows/close`             `{"id":N}`
+- `POST /windows/input`             `{"id":N,"input":"text\r"}` — trailing `\r` submits
+- `POST /windows/text/export`       `{"id":N,"label":"optional-name"}`
+- `POST /workspace/save`            `{"name":"workspace-name"}`
+- `POST /workspace/load`            `{"name":"workspace-name"}`
 
 Control parity rule:
 - whenever a new window family, app mode, or user-triggerable command is added, update both:

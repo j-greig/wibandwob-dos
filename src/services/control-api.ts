@@ -59,6 +59,79 @@ interface ControlApiHandlers {
   screenshotText: () => string;
 }
 
+// ---------------------------------------------------------------------------
+// Endpoint catalogue — single source of truth for GET / and /openapi.json
+// ---------------------------------------------------------------------------
+
+const ENDPOINT_CATALOGUE = [
+  { method: "GET",  path: "/",                              description: "Service info + endpoint list (this response)" },
+  { method: "GET",  path: "/help",                          description: "Alias for /" },
+  { method: "GET",  path: "/health",                        description: "Health check" },
+  { method: "GET",  path: "/openapi.json",                  description: "OpenAPI 3.0 spec" },
+  { method: "GET",  path: "/state",                         description: "Full live desktop + window state" },
+  { method: "GET",  path: "/commands/list",                 description: "All registered commands (optional ?surface=menu|palette|api|agent)" },
+  { method: "GET",  path: "/content/primer-info",           description: "Primer content metadata. ?path=/abs/path.txt" },
+  { method: "GET",  path: "/windows/text",                  description: "Raw text content of a window. ?id=N" },
+  { method: "GET",  path: "/screenshot/text",               description: "ANSI-stripped text screenshot of a window. ?id=N" },
+  { method: "POST", path: "/commands/run",                  body: { command: "string (command id)", args: "object (optional)" } },
+  { method: "POST", path: "/view/primer/open",              body: { filePath: "string (absolute path to .txt primer)" } },
+  { method: "POST", path: "/view/figlet/open",              body: { text: "string", font: "string (optional)" } },
+  { method: "POST", path: "/view/editor/open",              body: { filePath: "string (optional)", title: "string (optional)", initial: "string (optional)" } },
+  { method: "POST", path: "/view/backrooms/open",           body: { theme: "string", mode: "auto|live|fake-live", model: "haiku|sonnet|opus", turns: "number", primers: "string (optional csv)" } },
+  { method: "POST", path: "/view/browser-reader/open",      body: { filePath: "string (optional)", url: "string (optional)" } },
+  { method: "POST", path: "/view/art/open",                 body: {} },
+  { method: "POST", path: "/view/monster-cam/open",         body: {} },
+  { method: "POST", path: "/view/wibwob-agent/open",        body: {} },
+  { method: "POST", path: "/view/companion/open",           body: {} },
+  { method: "POST", path: "/view/primer-browser/open",      body: {} },
+  { method: "POST", path: "/view/file-manager/open",        body: {} },
+  { method: "POST", path: "/view/primer-gallery/open",      body: {} },
+  { method: "POST", path: "/view/workspace/open",           body: {} },
+  { method: "POST", path: "/view/palette/open",             body: {} },
+  { method: "POST", path: "/view/inspector/open",           body: {} },
+  { method: "POST", path: "/windows/focus",                 body: { id: "number" } },
+  { method: "POST", path: "/windows/move",                  body: { id: "number", left: "number", top: "number" } },
+  { method: "POST", path: "/windows/resize",                body: { id: "number", width: "number", height: "number" } },
+  { method: "POST", path: "/windows/close",                 body: { id: "number" } },
+  { method: "POST", path: "/windows/batch",                 body: { ops: "[{id, x?, y?, w?, h?, close?}]" } },
+  { method: "POST", path: "/windows/input",                 body: { id: "number", input: "string (trailing \\r submits)" } },
+  { method: "POST", path: "/windows/text/export",           body: { id: "number", label: "string (optional)" } },
+  { method: "POST", path: "/workspace/save",                body: { name: "string" } },
+  { method: "POST", path: "/workspace/load",                body: { name: "string" } },
+];
+
+function buildOpenApiSpec(port: number) {
+  const paths: Record<string, unknown> = {};
+  for (const ep of ENDPOINT_CATALOGUE) {
+    const key = ep.path;
+    const method = ep.method.toLowerCase();
+    if (!paths[key]) paths[key] = {};
+    const op: Record<string, unknown> = {
+      summary: ep.description,
+      responses: { "200": { description: "OK" } },
+    };
+    if (method === "post" && "body" in ep && Object.keys(ep.body as object).length > 0) {
+      const props: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(ep.body as Record<string, string>)) {
+        props[k] = { type: "string", description: v };
+      }
+      op.requestBody = {
+        required: true,
+        content: { "application/json": { schema: { type: "object", properties: props } } },
+      };
+    }
+    (paths[key] as Record<string, unknown>)[method] = op;
+  }
+  return {
+    openapi: "3.0.0",
+    info: { title: "WibWob-DOS Control API", version: "1.0.0", description: "Local HTTP control surface for the WibWob-DOS TUI" },
+    servers: [{ url: `http://127.0.0.1:${port}` }],
+    paths,
+  };
+}
+
+// ---------------------------------------------------------------------------
+
 export class ControlApiService {
   private server?: { stop: (closeActiveConnections?: boolean) => void };
   private actualPort?: number;
@@ -127,43 +200,18 @@ export class ControlApiService {
   private async handleRequest(request: Request): Promise<Response> {
     const url = new URL(request.url);
 
-    if (request.method === "GET" && url.pathname === "/") {
+    if (request.method === "GET" && (url.pathname === "/" || url.pathname === "/help")) {
       return Response.json({
         ok: true,
         service: "wibwob-ts-tui-control-api",
         port: this.actualPort,
-        endpoints: [
-          "GET /health",
-          "GET /state",
-          "GET /commands/list",
-          "GET /content/primer-info?path=...",
-          "GET /windows/text?id=...",
-          "GET /screenshot/text",
-          "POST /view/primer-browser/open",
-          "POST /view/file-manager/open",
-          "POST /view/primer-gallery/open",
-          "POST /view/browser-reader/open",
-          "POST /view/figlet/open",
-          "POST /view/art/open",
-          "POST /view/monster-cam/open",
-          "POST /view/wibwob-agent/open",
-          "POST /view/companion/open",
-          "POST /view/workspace/open",
-          "POST /view/palette/open",
-          "POST /view/inspector/open",
-          "POST /view/editor/open",
-          "POST /view/backrooms/open",
-          "POST /commands/run",
-          "POST /windows/focus",
-          "POST /windows/move",
-          "POST /windows/resize",
-          "POST /windows/close",
-          "POST /windows/input",
-          "POST /windows/text/export",
-          "POST /workspace/save",
-          "POST /workspace/load",
-        ],
+        docs: "GET /openapi.json for full OpenAPI 3.0 spec",
+        endpoints: ENDPOINT_CATALOGUE,
       });
+    }
+
+    if (request.method === "GET" && url.pathname === "/openapi.json") {
+      return Response.json(buildOpenApiSpec(this.actualPort ?? this.port));
     }
 
     if (request.method === "GET" && url.pathname === "/health") {
@@ -330,6 +378,35 @@ export class ControlApiService {
       return Response.json({
         ok: this.handlers.windows.closeWindow(Number((body as any).id)),
       });
+    }
+
+    if (request.method === "POST" && url.pathname === "/windows/batch") {
+      // Body: { ops: Array<{ id, x?, y?, w?, h?, close? }> }
+      // Each op can move, resize, or close a window. All applied in order.
+      const ops = (body as any).ops as Array<{
+        id: number;
+        x?: number; y?: number;
+        w?: number; h?: number;
+        close?: boolean;
+      }>;
+      if (!Array.isArray(ops)) {
+        return Response.json({ ok: false, error: "ops must be an array" }, { status: 400 });
+      }
+      const results: boolean[] = [];
+      for (const op of ops) {
+        const id = Number(op.id);
+        if (op.close) {
+          results.push(this.handlers.windows.closeWindow(id));
+          continue;
+        }
+        if (op.x !== undefined && op.y !== undefined) {
+          results.push(this.handlers.windows.moveWindow(id, Number(op.x), Number(op.y)));
+        }
+        if (op.w !== undefined && op.h !== undefined) {
+          results.push(this.handlers.windows.resizeWindow(id, Number(op.w), Number(op.h)));
+        }
+      }
+      return Response.json({ ok: results.every(Boolean), results });
     }
     if (request.method === "POST" && url.pathname === "/windows/input") {
       return Response.json({
