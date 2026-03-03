@@ -23,6 +23,10 @@ export interface CommandListItem {
   menuCategories: AppCommandCategory[];
 }
 
+export type CommandRunResult =
+  | { ok: true; result?: unknown }
+  | { ok: false; error: string };
+
 /** Definition accepted by addDynamic(). Self-contained — no AppMenuActions key needed. */
 export interface DynamicCommandDefinition {
   id: string;
@@ -128,20 +132,20 @@ export class CommandRegistry {
     return surface ? all.filter((cmd) => cmd.surfaces.includes(surface)) : all;
   }
 
-  run(id: string, args?: Record<string, unknown>): { ok: true } | { ok: false; error: string } {
+  run(id: string, args?: Record<string, unknown>): CommandRunResult {
     const canonicalId = LEGACY_COMMAND_ALIASES[id] ?? id;
     // Check built-in commands first
     const command = this.commands.find((candidate) => candidate.id === canonicalId);
     if (command) {
-      const action = this.actions[command.actionKey] as (args?: Record<string, unknown>) => void;
-      action(args);
-      return { ok: true };
+      const action = this.actions[command.actionKey] as (args?: Record<string, unknown>) => unknown;
+      const result = action(args);
+      return result === undefined ? { ok: true } : { ok: true, result };
     }
     // Check dynamic commands
     const dyn = this.dynamicCommands.find((candidate) => candidate.id === canonicalId);
     if (dyn) {
-      dyn.action(args);
-      return { ok: true };
+      const result = dyn.action(args);
+      return result === undefined ? { ok: true } : { ok: true, result };
     }
     return { ok: false, error: `Unknown command: ${id}` };
   }

@@ -30,13 +30,13 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { BackroomsChannel, DesktopState } from "../core/types.js";
-import type { CommandSurface, CommandListItem } from "../core/command-registry.js";
+import type { CommandSurface, CommandListItem, CommandRunResult } from "../core/command-registry.js";
 
 interface ControlApiHandlers {
   getState: () => DesktopState;
   getPrimerInfo: (pathOrName: string) => unknown;
   listCommands: (surface?: CommandSurface) => CommandListItem[];
-  runCommand: (id: string, args?: Record<string, unknown>) => { ok: true } | { ok: false; error: string };
+  runCommand: (id: string, args?: Record<string, unknown>) => CommandRunResult;
   openPrimerBrowser: () => void;
   openFileManager: () => void;
   openPrimerGallery: () => void;

@@ -1134,7 +1134,39 @@ export class TsTuiMvpApp {
     return {
       browsePrimers: () => this.openPrimerBrowserWindow(),
       openFileManager: () => this.openFileManagerWindow(),
-      openPrimerPrompt: () => this.promptForPrimer(),
+      openPrimerPrompt: (args) => {
+        const filePath = typeof args?.filePath === "string" ? args.filePath : undefined;
+        if (!filePath) {
+          this.promptForPrimer();
+          return;
+        }
+        const window = this.openPrimerWindow(filePath);
+        if (!window) {
+          return;
+        }
+        const x = typeof args?.x === "number" ? args.x : Number(window.frame.left);
+        const y = typeof args?.y === "number" ? args.y : Number(window.frame.top);
+        const w = typeof args?.w === "number" ? args.w : Number(window.frame.width);
+        const h = typeof args?.h === "number" ? args.h : Number(window.frame.height);
+        if (typeof args?.x === "number" || typeof args?.y === "number") {
+          this.windowManager.moveWindow(window.id, x, y);
+        }
+        if (typeof args?.w === "number" || typeof args?.h === "number") {
+          this.windowManager.resizeWindow(window.id, w, h);
+        }
+      },
+      listPrimers: () => this.content.collectPrimerEntries().map((entry) => {
+        const measurement = this.content.measureEntry(entry);
+        return {
+          name: entry.label,
+          path: entry.filePath,
+          lines: measurement?.lineCount ?? 0,
+          width: measurement?.columnWidth ?? 0,
+          recommended_w: measurement?.recommendedWidth ?? 0,
+          recommended_h: measurement?.recommendedHeight ?? 0,
+          animated: measurement?.animated ?? false
+        };
+      }),
       openTextFilePrompt: () => this.promptForEditorPath(),
       openEditor: () => this.openEditorWindow(),
       saveFocusedEditor: () => this.saveFocusedEditor(),

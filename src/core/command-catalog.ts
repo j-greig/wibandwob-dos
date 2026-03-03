@@ -3,7 +3,8 @@ import type { MenuConfig, MenuItem } from "./types.js";
 export interface AppMenuActions {
   browsePrimers: () => void;
   openFileManager: () => void;
-  openPrimerPrompt: () => void;
+  openPrimerPrompt: (args?: Record<string, unknown>) => void;
+  listPrimers: () => unknown;
   openTextFilePrompt: () => void;
   openEditor: () => void;
   saveFocusedEditor: () => void;
@@ -247,11 +248,23 @@ const APP_COMMANDS: AppCommandDefinition[] = [
   {
     id: "primer.open",
     label: "Open Primer...",
+    description: "Open a primer viewer. Args: filePath (string, absolute path). Optional: x, y, w, h (numbers for position/size — w,h default to recommended dimensions). Without args opens interactive file picker.",
     group: "open",
     actionKey: "openPrimerPrompt",
     multiInstance: true,
     menuPlacements: [{ category: "file", order: 20 }],
-    contextMenu: { desktop: true, order: 10 }
+    contextMenu: { desktop: true, order: 10 },
+    api: true,
+    agent: true
+  },
+  {
+    id: "primer.list",
+    label: "List Primers",
+    description: "List all available primers with content dimensions. Returns array of {name, lines, width, recommended_w, recommended_h, animated}.",
+    group: "open",
+    actionKey: "listPrimers",
+    api: true,
+    agent: true
   },
   {
     id: "editor.open",
