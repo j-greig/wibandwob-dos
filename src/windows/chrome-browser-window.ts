@@ -21,6 +21,7 @@ export function openChromeBrowserWindow(params: {
   windowManager: WindowManager;
   overlays: OverlayManager;
   initialUrl?: string;
+  onStateChanged?: () => void;
 }): void {
   const { screen, windowManager, overlays } = params;
   const service = new ChromeBrowserService();
@@ -161,6 +162,7 @@ export function openChromeBrowserWindow(params: {
     content.setContent(display);
     content.scrollTo(0);
     setUrl(result.url);
+    params.onStateChanged?.();
     setStatus(`${result.title || result.url}`);
     screen.render();
   };

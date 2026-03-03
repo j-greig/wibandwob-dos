@@ -19,6 +19,24 @@ interface StateDependencies {
   getOpenMenuLabel: () => string | undefined;
 }
 
+/**
+ * Canonical live desktop state snapshot.
+ *
+ * Caching model: StateService maintains a cached `latestState` built from
+ * window manager and screen dependencies. The cache is NOT automatically
+ * invalidated — callers must trigger `sync()` after state-visible mutations.
+ *
+ * Two sync modes:
+ * - `sync()` — rebuilds state in memory only. Cheap. Use after window
+ *   mutations that should be visible via GET /state immediately.
+ * - `persistAndNotify()` — rebuilds, writes to disk, and fires listeners.
+ *   Heavier. Use for workspace-level events (save, load, theme change).
+ *
+ * Window factories that mutate state-visible fields (Finder: toggleView,
+ * sortBy, search, navigateTo; Chrome browser: navigate) should accept an
+ * `onStateChanged` callback and call it after mutations. The controller
+ * wires this to `syncState()` which calls `sync()`.
+ */
 export class StateService {
   private latestState: DesktopState;
   private readonly listeners = new Set<(state: DesktopState) => void>();

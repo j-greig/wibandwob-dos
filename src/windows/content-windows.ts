@@ -447,6 +447,7 @@ export function openFileManagerWindow(params: {
   onOpenFile: (filePath: string) => void;
   onViewFile: (filePath: string) => void;
   restore?: FileManagerRestore;
+  onStateChanged?: () => void;
 }): void {
   const initialPath = params.restore?.currentPath ?? params.startPath;
   if (!fs.existsSync(initialPath) || !fs.statSync(initialPath).isDirectory()) {
@@ -1382,20 +1383,29 @@ export function openFileManagerWindow(params: {
       } else {
         runAdvancedSearch(query);
       }
+      params.onStateChanged?.();
     },
     navigateTo: (dirPath: string) => {
       if (fs.existsSync(dirPath) && fs.statSync(dirPath).isDirectory()) {
         navigateTo(dirPath);
+        params.onStateChanged?.();
       } else {
         params.overlays.flash(`Not a directory: ${dirPath}`);
       }
     },
-    toggleView: () => toggleViewMode(),
+    toggleView: () => {
+      toggleViewMode();
+      params.onStateChanged?.();
+    },
 
-    refresh: () => navigateTo(currentPath),
+    refresh: () => {
+      navigateTo(currentPath);
+      params.onStateChanged?.();
+    },
     sortBy: (field: "name" | "size" | "modified" | "type") => {
       sortField = field;
       navigateTo(currentPath);
+      params.onStateChanged?.();
     }
   };
 

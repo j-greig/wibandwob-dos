@@ -577,7 +577,8 @@ export class TsTuiMvpApp {
       onViewFile: (filePath) => {
         const content = fs.readFileSync(filePath, "utf8");
         this.openTextViewerWindow(path.basename(filePath), content, "reader", filePath);
-      }
+      },
+      onStateChanged: () => this.syncState(),
     });
     });
   }
@@ -604,6 +605,7 @@ export class TsTuiMvpApp {
       windowManager: this.windowManager,
       overlays: this.overlays,
       initialUrl,
+      onStateChanged: () => this.syncState(),
     });
     }, true);
   }
