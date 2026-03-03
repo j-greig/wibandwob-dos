@@ -89,7 +89,7 @@ export function openTerrainLabWindow(deps: BaseWindowDeps): void {
     const headerH = 1;
     const statusH = 1;
     const bodyH = Math.max(1, h - headerH - statusH);
-    const infoW = Math.min(20, Math.floor(w * 0.25));
+    const infoW = Math.max(1, Math.min(20, Math.floor(w * 0.25)));
     const divW = 1;
     const mapW = Math.max(8, w - infoW - divW);
 
@@ -110,9 +110,6 @@ export function openTerrainLabWindow(deps: BaseWindowDeps): void {
 
     statusBar.layout({ top: headerH + bodyH, left: 0, width: w, height: statusH });
   };
-
-  doLayout();
-  player.play();
 
   const cycleMode = () => {
     const next = MODE_ORDER[(MODE_ORDER.indexOf(player.mode) + 1) % MODE_ORDER.length] ?? "chaos";
@@ -157,6 +154,12 @@ export function openTerrainLabWindow(deps: BaseWindowDeps): void {
     statusBar.restyle();
   };
 
+  frame.refresh = doLayout;
   deps.windowManager.registerWindow(frame);
   frame.focus();
+
+  // Layout and play AFTER registration — frame.body dimensions are not
+  // reliable until blessed has rendered the frame at least once.
+  doLayout();
+  player.play();
 }
