@@ -10,6 +10,7 @@ import {
   type PalettePlacement,
 } from "./command-catalog.js";
 import type { MenuConfig, MenuItem } from "./types.js";
+import { log } from "../services/app-logger.js";
 
 export type { MenuContext };
 export type CommandSurface = "menu" | "palette" | "api" | "agent";
@@ -134,19 +135,25 @@ export class CommandRegistry {
 
   run(id: string, args?: Record<string, unknown>): CommandRunResult {
     const canonicalId = LEGACY_COMMAND_ALIASES[id] ?? id;
+    const argsStr = args && Object.keys(args).length > 0
+      ? " " + Object.entries(args).map(([k, v]) => `${k}=${typeof v === "string" ? v : JSON.stringify(v)}`).join(" ")
+      : "";
     // Check built-in commands first
     const command = this.commands.find((candidate) => candidate.id === canonicalId);
     if (command) {
       const action = this.actions[command.actionKey] as (args?: Record<string, unknown>) => unknown;
       const result = action(args);
+      log.info("cmd", `${canonicalId}${argsStr} → ok`);
       return result === undefined ? { ok: true } : { ok: true, result };
     }
     // Check dynamic commands
     const dyn = this.dynamicCommands.find((candidate) => candidate.id === canonicalId);
     if (dyn) {
       const result = dyn.action(args);
+      log.info("cmd", `${canonicalId}${argsStr} → ok`);
       return result === undefined ? { ok: true } : { ok: true, result };
     }
+    log.warn("cmd", `${canonicalId}${argsStr} → unknown command`);
     return { ok: false, error: `Unknown command: ${id}` };
   }
 

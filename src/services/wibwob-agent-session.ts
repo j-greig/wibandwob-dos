@@ -28,6 +28,7 @@ import {
   createFindTool,
   createLsTool,
 } from "@mariozechner/pi-coding-agent";
+import { log } from "./app-logger.js";
 import fs from "node:fs";
 import nodePath from "node:path";
 import { access, readFile, writeFile, mkdir } from "node:fs/promises";
@@ -450,11 +451,15 @@ export class WibWobAgentSession {
   }
 
   reloadPrompt(): boolean {
-    if (!this.agent) return false;
+    if (!this.agent) {
+      log.warn("agent", "reload requested but no active session");
+      return false;
+    }
     const newPrompt = this.mode === "agent"
       ? loadAgentSystemPrompt()
       : loadChatSystemPrompt();
     this.agent.setSystemPrompt(newPrompt);
+    log.info("agent", `prompt reloaded (${newPrompt.length} chars)`);
     return true;
   }
 
@@ -536,6 +541,10 @@ export class WibWobAgentSession {
 
     if (!this.agent) await this.initialize();
     if (!this.agent) throw new Error("Agent was not created");
+
+    const from = sender ? `[${sender}]` : "user";
+    const preview = msg.length > 80 ? msg.slice(0, 77) + "..." : msg;
+    log.info("agent", `${from} → ${preview}`);
 
     this.messages.push({ id: createMessageId("user"), role: "user", text: msg, sender });
     this.currentAssistantId = createMessageId("assistant");

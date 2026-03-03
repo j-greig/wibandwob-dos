@@ -31,6 +31,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type { BackroomsChannel, DesktopState } from "../core/types.js";
 import type { CommandSurface, CommandListItem, CommandRunResult } from "../core/command-registry.js";
+import { log } from "./app-logger.js";
 
 interface ControlApiHandlers {
   getState: () => DesktopState;
@@ -174,6 +175,7 @@ export class ControlApiService {
         });
         this.actualPort = port;
         this.enabled = true;
+        log.info("app", `control API listening on port ${port}`);
         return;
       } catch {
         continue;
@@ -266,6 +268,10 @@ export class ControlApiService {
 
     const body =
       request.method === "POST" ? await request.json().catch(() => ({})) : {};
+
+    if (request.method === "POST") {
+      log.info("api", `POST ${url.pathname}`);
+    }
 
     if (request.method === "POST" && url.pathname === "/commands/run") {
       const id = typeof (body as any).id === "string" ? (body as any).id : "";

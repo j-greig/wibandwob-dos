@@ -2,6 +2,7 @@ import blessed from "blessed";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { log } from "../services/app-logger.js";
 
 import { CONTROL_API_PORT, MASTER_PHILOSOPHY_PATH, README_PATH, REPO_ROOT, SPIKE_NOTES_PATH, SPIKE_ROOT, STATE_PATH, WORKSPACES_DIR } from "./config.js";
 import { appFlags } from "./cli.js";
@@ -228,6 +229,7 @@ export class TsTuiMvpApp {
     this.controlApi.start();
     this.syncState();
     this.screen.render();
+    log.info("app", `started ${this.screen.width}x${this.screen.height} theme:${themeName()}`);
   }
 
   /** Restore default workspace on boot. Empty desktop if none exists. */
@@ -345,6 +347,7 @@ export class TsTuiMvpApp {
 
   /** Apply current theme tokens to all shell chrome and open windows. */
   private applyTheme(): void {
+    log.info("app", `theme → ${themeName()}`);
     this.menuBar.style = theme().menuBar;
     this.desktop.style = theme().desktop;
     this.statusLine.style = theme().statusLine;
