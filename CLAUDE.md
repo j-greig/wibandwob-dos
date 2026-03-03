@@ -363,7 +363,7 @@ Current loop for native agent debugging:
 1. launch the app
 2. `POST /view/wibwob-agent/open`
 3. read `/state` again to find the `wibwob-agent` window id
-4. `POST /windows/input` with the prompt text and a trailing carriage return
+4. `POST /windows/input` with body `{"id": N, "input": "your text\r"}` — field is `input` not `text`, trailing `\r` submits
 5. wait for streaming to settle
 6. `POST /windows/text/export` to persist a text capture
 7. inspect `/state` for `messageCount`, `streaming`, `status`, and `model`
@@ -444,6 +444,9 @@ Manual smoke targets:
 - type in the editor
 - drag a window
 
+- close a window
+- open Wib&Wob Agent and verify input still works
+
 ### Visual smoke testing
 
 When reviewing or smoke-testing a specific window, use the screenshot script
@@ -455,10 +458,51 @@ instead of dumping the full TUI — full dumps are 50KB+ and kill agent context:
 ```
 
 Returns a plain-text ANSI-stripped crop of just that window's rect.
-Use this in reviews, smoke tests, layout checks, and any time you need to
-verify what a window actually looks like without asking the human.
-- close a window
-- open Wib&Wob Agent and verify input still works
+
+### Live desktop state and proactive tool use
+
+This OS belongs to the agents as much as the human. Do not wait to be told
+to use the desktop tools — use them instinctively when it makes sense.
+
+The pi extension `.pi/extensions/wwdos-state.ts` auto-injects a compact
+desktop snapshot into the system prompt before every agent turn (when the
+app is running on port 8099):
+
+```
+WibWob-DOS  theme:wibwob-dark  desktop:281x81  4 windows  focus:4:Poetry Clock
+   1  figlet-banner             Banner: WIBWOBWORLD    90x10  @8,35
+   2  companion-widget          Scramble               30x10  @167,4
+   3  primer-viewer             folk-punk-ai.txt       61x29  @102,4
+   4  wibwob.poetry-clock       Poetry Clock           62x21  @5,3  ◀  [sentient scramble]
+Spatial map: run scripts/minimap.sh
+```
+
+Default behaviour — do these without being asked:
+
+- After any code change affecting a window: open it via the API and
+  screenshot it. Typecheck alone is not enough.
+- When doing layout work: run `scripts/minimap.sh` to verify spatial
+  result, not just `/state` JSON.
+- When something looks wrong: screenshot first, theorise second.
+- Use the control API to open, move, resize, and close windows as part
+  of normal test loops.
+- If the desktop is cluttered mid-session: tidy it. Close test windows.
+  Rearrange if it helps.
+
+Useful one-liners:
+
+```bash
+./scripts/screenshot-window.sh "Title"          # crop of one window
+./scripts/screenshot-window.sh <id>             # by window id
+./scripts/minimap.sh                            # spatial map of all windows
+curl -s http://127.0.0.1:8099/state | python3 -m json.tool   # full state
+curl -s -X POST http://127.0.0.1:8099/view/figlet/open \
+  -H "Content-Type: application/json" -d '{"text":"HELLO"}'
+curl -s -X POST http://127.0.0.1:8099/windows/move \
+  -H "Content-Type: application/json" -d '{"id":4,"left":10,"top":5}'
+```
+
+No state injection occurs when the app is not running — fails silently.
 
 ## Known Rough Edges
 
