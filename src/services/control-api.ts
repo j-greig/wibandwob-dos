@@ -93,6 +93,7 @@ const ENDPOINT_CATALOGUE = [
   { method: "POST", path: "/windows/move",                  body: { id: "number", left: "number", top: "number" } },
   { method: "POST", path: "/windows/resize",                body: { id: "number", width: "number", height: "number" } },
   { method: "POST", path: "/windows/close",                 body: { id: "number" } },
+  { method: "POST", path: "/windows/batch",                 body: { ops: "array — each op: {id, x?, y?, w?, h?, close?}" }, description: "Move/resize/close multiple windows in one request. Applied in order. Returns {ok, results[]}" },
   { method: "POST", path: "/windows/batch",                 body: { ops: "[{id, x?, y?, w?, h?, close?}]" } },
   { method: "POST", path: "/windows/input",                 body: { id: "number", input: "string (trailing \\r submits)" } },
   { method: "POST", path: "/windows/text/export",           body: { id: "number", label: "string (optional)" } },

@@ -344,6 +344,7 @@ Current control endpoints (POST bodies shown where non-obvious):
 - `POST /windows/move`              `{"id":N,"left":X,"top":Y}`
 - `POST /windows/resize`            `{"id":N,"width":W,"height":H}`
 - `POST /windows/close`             `{"id":N}`
+- `POST /windows/batch`             `{"ops":[{"id":N,"x":X,"y":Y,"w":W,"h":H},{"id":M,"close":true},...]}` — move/resize/close many windows in one call, applied in order. Prefer this over chained individual calls.
 - `POST /windows/input`             `{"id":N,"input":"text\r"}` — trailing `\r` submits
 - `POST /windows/text/export`       `{"id":N,"label":"optional-name"}`
 - `POST /workspace/save`            `{"name":"workspace-name"}`

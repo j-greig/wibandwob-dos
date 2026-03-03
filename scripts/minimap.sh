@@ -66,5 +66,6 @@ print(f'  # = focused   + = other   {len(windows)} windows')
 print()
 for w in sorted(windows, key=lambda w: w['id']):
     focus_marker = ' ◀' if w['id'] == focus_id else ''
-    print(f\"  {w['id']:3}  {w['title']:<28}  {w['width']}x{w['height']}  @{w['left']},{w['top']}{focus_marker}\")
+    z = w.get('zIndex', 0)
+    print(f\"  {w['id']:3}  z{z:<2}  {w['title']:<28}  {w['width']}x{w['height']}  @{w['left']},{w['top']}{focus_marker}\")
 " "$STATE"

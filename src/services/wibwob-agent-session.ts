@@ -15,7 +15,9 @@ import {
 
 import { REPO_ROOT, SPIKE_PI_APPEND_SYSTEM_PATH, SPIKE_PI_DIR } from "../core/config.js";
 import type { ChatMessageEntry, DesktopState } from "../core/types.js";
+import { Type } from "@sinclair/typebox";
 import { createTuiTools, formatDesktopSummary, type TuiToolContext } from "./agent-tools.js";
+import { listSessions, sendToSession, getLastMessage } from "./pi-session-bridge.js";
 import {
   createBashTool,
   createReadTool,
@@ -216,6 +218,55 @@ function loadBasePrompt(): string {
   }
 }
 
+function createPiSessionTools() {
+  return [
+    {
+      name: "list_sessions",
+      label: "List Pi Sessions",
+      description: "List running pi sessions (wibwob1, wibwob2, etc.) that have a control socket.",
+      parameters: Type.Object({}),
+      async execute(_toolCallId: string, _params: Record<string, never>) {
+        const sessions = await listSessions();
+        if (sessions.length === 0) return { content: [{ type: "text" as const, text: "No live pi sessions found." }], details: undefined };
+        const lines = sessions.map(s => `- ${s.name ?? s.sessionId}${s.name ? ` (${s.sessionId})` : ""}`);
+        return { content: [{ type: "text" as const, text: `Live sessions:\n${lines.join("\n")}` }], details: sessions };
+      },
+    },
+    {
+      name: "send_to_session",
+      label: "Send To Pi Session",
+      description: "Send a message to a running pi session (wibwob1 or wibwob2). Use sessionName for named sessions.",
+      parameters: Type.Object({
+        sessionName: Type.Optional(Type.String({ description: "Session name e.g. wibwob1 or wibwob2" })),
+        sessionId: Type.Optional(Type.String({ description: "Session UUID" })),
+        message: Type.String({ description: "Message to send" }),
+        mode: Type.Optional(Type.Union([Type.Literal("steer"), Type.Literal("follow_up")], { description: "Delivery mode (default: steer)" })),
+      }),
+      async execute(_toolCallId: string, params: { sessionName?: string; sessionId?: string; message: string; mode?: "steer" | "follow_up" }) {
+        const target = params.sessionName ?? params.sessionId;
+        if (!target) return { content: [{ type: "text" as const, text: "Provide sessionName or sessionId" }], isError: true, details: undefined };
+        const result = await sendToSession(target, params.message, params.mode ?? "steer");
+        return { content: [{ type: "text" as const, text: result.ok ? `Message delivered to ${target}` : `Failed: ${result.error}` }], details: result };
+      },
+    },
+    {
+      name: "get_session_message",
+      label: "Get Pi Session Message",
+      description: "Get the last assistant message from a running pi session.",
+      parameters: Type.Object({
+        sessionName: Type.Optional(Type.String()),
+        sessionId: Type.Optional(Type.String()),
+      }),
+      async execute(_toolCallId: string, params: { sessionName?: string; sessionId?: string }) {
+        const target = params.sessionName ?? params.sessionId;
+        if (!target) return { content: [{ type: "text" as const, text: "Provide sessionName or sessionId" }], isError: true, details: undefined };
+        const msg = await getLastMessage(target);
+        return { content: [{ type: "text" as const, text: msg ?? "No message found" }], details: { message: msg } };
+      },
+    },
+  ];
+}
+
 function loadAgentSystemPrompt(): string {
   return [
     loadBasePrompt(),
@@ -305,7 +356,7 @@ export class WibWobAgentSession {
       }
 
       const tools = this.mode === "agent" && this.tuiContext
-        ? [...createTuiTools(this.tuiContext), ...createJailedCodingTools(REPO_ROOT)]
+        ? [...createTuiTools(this.tuiContext), ...createJailedCodingTools(REPO_ROOT), ...createPiSessionTools()]
         : [];
 
       const systemPrompt = this.mode === "agent"

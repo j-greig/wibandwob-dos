@@ -21,6 +21,7 @@ interface WindowState {
   title: string;
   appType?: string;
   focused?: boolean;
+  zIndex?: number;
   left?: number;
   top?: number;
   width?: number;
