@@ -356,12 +356,12 @@ Use `GET /help` or `GET /openapi.json` first for the live authoritative endpoint
 - `GET /content/primer-info?path=...`
 - `GET /windows/text?id=...`
 - `GET /screenshot/text?id=...`
-- `POST /commands/run`              `{"id":"command-id","args":{}}` — note field is `id` not `command`
+- `POST /commands/run`              `{"id":"command-id","args":{}}` — canonical field is `id`; `command` accepted as deprecated alias
 - `POST /view/primer/open`          `{"filePath":"/abs/path.txt"}`
 - `POST /view/figlet/open`          `{"text":"HELLO","font":"optional"}`
 - `POST /view/backrooms/open`       `{"theme":"...","mode":"auto|live|fake-live","model":"haiku|sonnet","turns":3,"primers":"optional"}`
 - `POST /view/editor/open`          `{"filePath":"/abs/path.txt"}`
-- `POST /view/browser-reader/open`  `{"filePath":"/abs/path.txt"}` or `{"url":"https://..."}`
+- `POST /view/browser-reader/open`  `{"filePath":"/abs/path.txt"}`
 - `POST /view/art/open`             `{}` (no args)
 - `POST /view/wibwob-agent/open`    `{}` (focuses existing if open)
 - `POST /view/companion/open`       `{}`
@@ -378,7 +378,7 @@ Use `GET /help` or `GET /openapi.json` first for the live authoritative endpoint
 - `POST /windows/batch`             `{"ops":[{"id":N,"x":X,"y":Y,"w":W,"h":H},{"id":M,"close":true},...]}` — move/resize/close many windows in one call, applied in order. Prefer this over chained individual calls.
 - `POST /windows/input`             `{"id":N,"input":"text\r"}` — trailing `\r` submits
 - `POST /windows/agent-message`     `{"id":N,"text":"message","sender":"wibwob2"}` — send to agent window with named sender label. Outbound messages from the in-app agent include `replyVia: {url:"http://127.0.0.1:8099/windows/agent-message", windowId:N}` as return address.
-- `POST /windows/text/export`       `{"id":N,"label":"optional-name"}`
+- `POST /windows/text/export`       `{"id":N,"name":"optional-name"}` — `name` is canonical; `label` accepted as alias
 - `POST /workspace/load`            `{"name":"workspace-name"}`
 - `POST /workspace/load`            `{"name":"workspace-name"}`
 - `POST /workspace/save`            `{"name":"workspace-name"}`

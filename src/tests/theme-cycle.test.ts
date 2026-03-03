@@ -8,10 +8,11 @@
  */
 
 import { describe, test, expect } from "bun:test";
+import { allVariants } from "../core/theme/resolver.js";
 
 const API = process.env.API_URL ?? "http://localhost:8099";
 
-const THEME_COUNT = 5; // dark, nord, pastel, phosphor, light
+const THEME_COUNT = allVariants().length;
 
 async function runCommand(id: string) {
   const res = await fetch(`${API}/commands/run`, {

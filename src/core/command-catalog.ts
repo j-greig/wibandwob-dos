@@ -157,6 +157,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
   {
     id: "finder.open",
     label: "Open File Manager",
+    description: "Open the file manager browser.",
     group: "browse",
     actionKey: "openFileManager",
     menuPlacements: [{ category: "applications", order: 0 }],
@@ -188,6 +189,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
   {
     id: "finder.toggle_view",
     label: "Finder: Toggle List/Icon View",
+    description: "Toggle between list and icon view in the focused Finder window.",
     group: "browse",
     actionKey: "finderToggleView",
     palettePlacement: { order: 13 },
@@ -347,6 +349,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
   {
     id: "chrome.open",
     label: "Open Chrome Browser",
+    description: "Open a Chrome browser window for web content extraction.",
     group: "open",
     actionKey: "openChromeBrowser",
     multiInstance: true,
@@ -359,6 +362,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
   {
     id: "agent.open",
     label: "Open Wib&Wob Agent",
+    description: "Open (or focus) the native Wib&Wob Agent chat window.",
     group: "open",
     actionKey: "openWibWobAgent",
     menuPlacements: [{ category: "applications", order: 120, label: "Wib&Wob Agent" }],
@@ -379,6 +383,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
   {
     id: "monster_cam.open",
     label: "Monster Cam",
+    description: "Open the Monster Cam window.",
     group: "open",
     actionKey: "openMonsterCam",
     menuPlacements: [{ category: "applications", order: 150, label: "Monster Cam" }],
@@ -390,6 +395,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
   {
     id: "theme.cycle",
     label: "Cycle Theme",
+    description: "Cycle to the next theme variant.",
     group: "system",
     actionKey: "toggleTheme",
     menuPlacements: [{ category: "view", order: 30 }],
@@ -400,6 +406,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
   {
     id: "theme.choose",
     label: "Choose Theme...",
+    description: "Open an interactive theme picker.",
     group: "system",
     actionKey: "chooseTheme",
     menuPlacements: [{ category: "view", order: 31 }],
@@ -449,6 +456,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
   {
     id: "backrooms.open",
     label: "Backrooms TV...",
+    description: "Open Backrooms TV with an interactive channel picker.",
     group: "surface",
     actionKey: "openBackroomsPrompt",
     menuPlacements: [{ category: "applications", order: 10 }],
@@ -484,6 +492,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
   {
     id: "window.tile",
     label: "Tile Windows",
+    description: "Arrange all windows in a tiled grid layout.",
     group: "layout",
     actionKey: "tileWindows",
     menuPlacements: [{ category: "window", order: 40 }],
@@ -495,6 +504,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
   {
     id: "window.cascade",
     label: "Cascade Windows",
+    description: "Arrange all windows in a cascading stack layout.",
     group: "layout",
     actionKey: "cascadeWindows",
     menuPlacements: [{ category: "window", order: 50 }],

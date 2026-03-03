@@ -74,12 +74,12 @@ const ENDPOINT_CATALOGUE = [
   { method: "GET",  path: "/content/primer-info",           description: "Primer content metadata. ?path=/abs/path.txt" },
   { method: "GET",  path: "/windows/text",                  description: "Raw text content of a window. ?id=N" },
   { method: "GET",  path: "/screenshot/text",               description: "ANSI-stripped text screenshot of a window. ?id=N" },
-  { method: "POST", path: "/commands/run",                  body: { command: "string (command id)", args: "object (optional)" } },
+  { method: "POST", path: "/commands/run",                  body: { id: "string (command id, canonical)", command: "string (deprecated alias for id)", args: "object (optional)" } },
   { method: "POST", path: "/view/primer/open",              body: { filePath: "string (absolute path to .txt primer)" } },
   { method: "POST", path: "/view/figlet/open",              body: { text: "string", font: "string (optional)" } },
   { method: "POST", path: "/view/editor/open",              body: { filePath: "string (optional)", title: "string (optional)", initial: "string (optional)" } },
   { method: "POST", path: "/view/backrooms/open",           body: { theme: "string", mode: "auto|live|fake-live", model: "haiku|sonnet|opus", turns: "number", primers: "string (optional csv)" } },
-  { method: "POST", path: "/view/browser-reader/open",      body: { filePath: "string (optional)", url: "string (optional)" } },
+  { method: "POST", path: "/view/browser-reader/open",      body: { filePath: "string (optional)" } },
   { method: "POST", path: "/view/art/open",                 body: {} },
   { method: "POST", path: "/view/monster-cam/open",         body: {} },
   { method: "POST", path: "/view/wibwob-agent/open",        body: {} },
@@ -97,7 +97,7 @@ const ENDPOINT_CATALOGUE = [
   { method: "POST", path: "/windows/batch",                 body: { ops: "[{id, x?, y?, w?, h?, close?}]" }, description: "Move/resize/close multiple windows in one request. Applied in order. Returns {ok, results[]}" },
   { method: "POST", path: "/windows/input",                 body: { id: "number", input: "string (trailing \\r submits)" } },
   { method: "POST", path: "/windows/agent-message",         body: { id: "number", text: "string", sender: "string (optional — shows as sender label in agent window)" } },
-  { method: "POST", path: "/windows/text/export",           body: { id: "number", label: "string (optional)" } },
+  { method: "POST", path: "/windows/text/export",           body: { id: "number", name: "string (optional, canonical)", label: "string (optional, alias for name)" } },
   { method: "POST", path: "/workspace/save",                body: { name: "string" } },
   { method: "POST", path: "/workspace/load",                body: { name: "string" } },
 ];
@@ -274,9 +274,11 @@ export class ControlApiService {
     }
 
     if (request.method === "POST" && url.pathname === "/commands/run") {
-      const id = typeof (body as any).id === "string" ? (body as any).id : "";
+      const id = typeof (body as any).id === "string" ? (body as any).id
+        : typeof (body as any).command === "string" ? (body as any).command
+        : "";
       if (!id) {
-        return Response.json({ ok: false, error: "id required" }, { status: 400 });
+        return Response.json({ ok: false, error: "id required (also accepts 'command' as deprecated alias)" }, { status: 400 });
       }
       const args = typeof (body as any).args === "object" && (body as any).args !== null
         ? (body as any).args as Record<string, unknown>
@@ -449,7 +451,9 @@ export class ControlApiService {
       // File export is a control-API concern, not a facade concern
       const capturesDir = path.join(process.cwd(), "scratch", "captures");
       fs.mkdirSync(capturesDir, { recursive: true });
-      const name = typeof (body as any).name === "string" ? (body as any).name : `window-${id}`;
+      const name = typeof (body as any).name === "string" ? (body as any).name
+        : typeof (body as any).label === "string" ? (body as any).label
+        : `window-${id}`;
       const safeName = name.replace(/[^a-z0-9._-]+/gi, "-");
       const fileName = `${new Date().toISOString().replaceAll(":", "-")}_${safeName}.txt`;
       const filePath = path.join(capturesDir, fileName);

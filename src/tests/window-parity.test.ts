@@ -2,9 +2,12 @@
  * Window parity audit — verifies every openable window type reports
  * correct appType and summary through the state API.
  *
- * Covers the 8 previously untested types: figlet, pattern, inspector,
- * workspace, chrome-browser, wibwob-agent, backrooms-tv, reader.
- * Also covers already-tested types for completeness.
+ * Covers: figlet, pattern, inspector, workspace, chrome-browser,
+ * wibwob-agent, reader, and already-tested types for completeness.
+ *
+ * NOTE: backrooms-tv is not yet covered here (requires external
+ * runtime behaviour). Add when a deterministic fake-live test mode
+ * is available.
  *
  * Requires the app to be running on port 8099.
  */
