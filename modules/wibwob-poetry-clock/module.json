@@ -1,0 +1,19 @@
+{
+  "name": "wibwob-poetry-clock",
+  "version": "0.1.0",
+  "description": "A clock that tells the time as a tiny poem every minute",
+  "type": "microapp",
+  "entry": "index.ts",
+  "microapp": {
+    "id": "wibwob.poetry-clock",
+    "title": "Poetry Clock",
+    "description": "Time told as tiny poems. Inspired by Poem/1.",
+    "persist": true,
+    "menu": [
+      { "category": "applications", "order": 30, "label": "Poetry Clock" }
+    ],
+    "palette": { "order": 50, "label": "Open Poetry Clock" },
+    "agent": true,
+    "api": true
+  }
+}

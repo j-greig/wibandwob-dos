@@ -6,6 +6,7 @@ import path from "node:path";
 import { CONTROL_API_PORT, MASTER_PHILOSOPHY_PATH, README_PATH, REPO_ROOT, SPIKE_NOTES_PATH, SPIKE_ROOT, STATE_PATH, WORKSPACES_DIR } from "./config.js";
 import { appFlags } from "./cli.js";
 import { loadModules } from "../services/module-loader.js";
+import type { MicroappHostDeps } from "../services/module-loader.js";
 import type { AppMenuActions } from "./command-catalog.js";
 import { CommandRegistry } from "./command-registry.js";
 import { buildDesktopContextMenu, buildWindowContextMenu } from "./context-menu-items.js";
@@ -201,9 +202,19 @@ export class TsTuiMvpApp {
   }
 
   async run(): Promise<void> {
-    // Load external modules (themes, future microapps) before workspace restore
-    // so that external themes are available for theme restoration.
-    await loadModules();
+    // Load external modules (themes + microapps) before workspace restore
+    // so that external themes and commands are available for restoration.
+    const microappDeps: MicroappHostDeps = {
+      screen: this.screen,
+      windowManager: this.windowManager,
+      commands: this.commands,
+      geometry: this.geometry.getGeometry(),
+    };
+    await loadModules(microappDeps);
+
+    // Rebuild menus after microapps may have registered dynamic commands
+    this.menus.length = 0;
+    this.menus.push(...this.commands.buildMenus());
 
     this.renderChrome();
     this.bindGlobalKeys();
@@ -249,10 +260,10 @@ export class TsTuiMvpApp {
     });
   }
 
-  /** Dev-mode controls: reload button top-right, Ctrl+R to reload. */
+  /** Dev-mode controls: restart button top-right, Ctrl+R to restart. */
   private renderDevControls(): void {
     const t = theme();
-    const reloadBtn = blessed.box({
+    const restartBtn = blessed.box({
       parent: this.screen,
       top: 0,
       right: 0,
@@ -264,26 +275,22 @@ export class TsTuiMvpApp {
       mouse: true,
       clickable: true,
     });
-    reloadBtn.on("click", () => this.devReload());
-    this.screen.key(["C-r"], () => this.devReload());
+    restartBtn.on("click", () => this.devRestart());
+    this.screen.key(["C-r"], () => this.devRestart());
   }
 
-  /** Save workspace, destroy screen, re-exec the process. */
-  private devReload(): void {
+  /** Save workspace, quit, then send Up arrow to terminal so last command is ready to re-run. */
+  private devRestart(): void {
     try {
       this.workspace.save(this.snapshotWindows(), themeName());
     } catch { /* best effort */ }
     this.screen.destroy();
-    // Re-exec ourselves with the same argv
-    const { spawn } = require("node:child_process") as typeof import("node:child_process");
-    const args = process.argv.slice(1);
-    const child = spawn(process.execPath, args, {
-      stdio: "inherit",
-      env: process.env,
-      detached: true,
-    });
-    child.unref();
-    process.exit(0);
+    // After blessed releases the terminal, send Up arrow keystroke
+    // so the shell shows the last command (e.g. bun run dev) ready to press Enter
+    setTimeout(() => {
+      process.stdout.write("\x1b[A"); // Up arrow escape sequence
+      process.exit(0);
+    }, 300);
   }
 
 

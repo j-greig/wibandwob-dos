@@ -93,7 +93,7 @@ Test: `bun run typecheck` — no errors (pre-existing bun:test errors excluded).
 
 ### F02 — Microapp Host API + Registration
 
-Status: not-started
+Status: in-progress
 
 The core microapp infrastructure: MicroappHost interface, MicroappWindowHandle,
 dynamic command registration, dynamic snapshot registration, and the type
@@ -107,45 +107,45 @@ Split across two contributors:
 
 Stories:
 
-#### S01 — Type system changes (owner: wibwob1)
-- [ ] Add `"microapp"` to `WindowKind` union in `src/core/types.ts`
-- [ ] Add `microappId?: string` to `WindowRecord`
-- [ ] Add `MicroappWindowRecord` interface extending `WindowRecord`
-- [ ] Add `isMicroappWindow()` type guard
-- [ ] Typecheck passes
+#### S01 — Type system changes (owner: wibwob1) — DONE (aeb76d2)
+- [x] Add `"microapp"` to `WindowKind` union in `src/core/types.ts`
+- [x] Add `microappId?: string` to `WindowRecord`
+- [x] Add `MicroappWindowRecord` interface extending `WindowRecord`
+- [x] Add `isMicroappWindow()` type guard
+- [x] Typecheck passes
 
 AC-S01: `"microapp"` is a valid WindowKind and `isMicroappWindow()` narrows correctly.
 Test: `bun run typecheck` passes. Type guard returns true for a record with
 `kind: "microapp"` and `microappId` set.
 
-#### S02 — Dynamic command registration (owner: wibwob1)
-- [ ] Add `addDynamic(def: AppCommandDefinition)` to `CommandRegistry`
-- [ ] Dynamic commands appear in `list()`, `buildMenus()`, `buildPalette()`
-- [ ] Dynamic commands executable via `run()`
+#### S02 — Dynamic command registration (owner: wibwob1) — DONE (aeb76d2)
+- [x] Add `addDynamic(def: DynamicCommandDefinition)` to `CommandRegistry`
+- [x] Dynamic commands appear in `list()`, `buildMenus()`, `buildPalette()`
+- [x] Dynamic commands executable via `run()`
 
 AC-S02: A dynamically registered command appears in all projection surfaces.
 Test: Register a test command via `addDynamic()`. Verify it appears in
 `list("agent")`, `list("api")`, and is runnable via `run()`.
 
-#### S03 — Dynamic snapshot registration (owner: wibwob1)
-- [ ] Add `registerDynamicSnapshot()` to `src/core/snapshot-registry.ts`
-- [ ] `registryRestore()` checks dynamic handlers before warn-and-skip
-- [ ] `registrySerialize()` checks dynamic handlers for unknown appTypes
+#### S03 — Dynamic snapshot registration (owner: wibwob1) — DONE (aeb76d2)
+- [x] Add `registerDynamicSnapshot()` to `src/core/snapshot-registry.ts`
+- [x] `registryRestore()` checks dynamic handlers before warn-and-skip
+- [x] `registrySerialize()` checks dynamic handlers for unknown appTypes
 
 AC-S03: A dynamically registered snapshot handler saves and restores.
 Test: Register a test handler. Create a window with matching appType.
 Verify `registrySerialize()` calls the handler. Verify `registryRestore()`
 calls the handler on a snapshot with that appType.
 
-#### S04 — MicroappHost implementation (owner: wibwob2)
-- [ ] `MicroappHost` interface in `src/services/module-loader.ts`
-- [ ] `MicroappWindowHandle` wrapper over `WindowRecord`
-- [ ] `createWindow()` sets `kind: "microapp"` and `microappId`
-- [ ] `describeState()` host-enforced, injects `appType` from manifest
-- [ ] `registerCommand()` wraps `CommandRegistry.addDynamic()`
-- [ ] `registerSnapshot()` wraps `registerDynamicSnapshot()`
-- [ ] `runCommand()` wraps `CommandRegistry.run()` scoped to module namespace
-- [ ] Module loader calls `setup()` for `type: "microapp"` manifests
+#### S04 — MicroappHost implementation (owner: wibwob2) — DONE
+- [x] `MicroappHost` interface in `src/services/module-loader.ts`
+- [x] `MicroappWindowHandle` wrapper over `WindowRecord`
+- [x] `createWindow()` sets `kind: "microapp"` and `microappId`
+- [x] `describeState()` host-enforced, injects `appType` from manifest
+- [x] `registerCommand()` wraps `CommandRegistry.addDynamic()`
+- [x] `registerSnapshot()` wraps `registerDynamicSnapshot()`
+- [x] `runCommand()` wraps `CommandRegistry.run()` scoped to module namespace
+- [x] Module loader calls `setup()` for `type: "microapp"` manifests
 
 AC-S04: A microapp module in `modules/` is discovered, loaded, and its
 window appears in menus, palette, and agent tools.
@@ -155,23 +155,24 @@ opens with correct `appType` in `GET /state`.
 
 ### F03 — Poetry Clock Microapp
 
-Status: not-started
+Status: in-progress
 
 A microapp module that displays a new AI-generated poem containing the
 current time every minute. Inspired by Poem/1 (Matt Webb / Acts Not Facts).
 
 Lives in: `modules/wibwob-poetry-clock/`
 
-#### S05 — Static poetry clock (no LLM)
-- [ ] `module.json` manifest with `type: "microapp"`
-- [ ] `index.ts` entry point with `setup(host)` default export
-- [ ] Window displays current time as formatted text
-- [ ] Timer ticks every 60 seconds, updates display
-- [ ] `cleanup()` clears interval on close
-- [ ] `onRestyle()` respects theme changes
-- [ ] `describeState()` reports time, mode
-- [ ] Pre-baked poem bank keyed to minute-of-hour as placeholder content
-- [ ] Mode selector: plain / liminal / scramble (bottom bar or key)
+#### S05 — Static poetry clock (no LLM) — DONE
+- [x] `module.json` manifest with `type: "microapp"`
+- [x] `index.ts` entry point with `setup(host)` default export
+- [x] Window displays current time as formatted text
+- [x] Timer ticks every 30 seconds, updates display
+- [x] `cleanup()` clears interval on close
+- [x] `onRestyle()` respects theme changes
+- [x] `describeState()` reports time, mode, currentPoem
+- [x] Pre-baked poem bank: 60 plain, 20 liminal, 20 scramble poems
+- [x] Mode selector: [m] key or click to cycle plain/liminal/scramble
+- [x] Workspace snapshot: saves and restores mode
 
 AC-S05: Poetry clock opens, ticks, themes, cleans up, and reports state.
 Test: Open via command. Verify `GET /state` shows appType
