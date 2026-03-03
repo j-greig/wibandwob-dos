@@ -1,13 +1,11 @@
 dos.wibandwob.com {
-    basicauth {
-        # htpasswd hash — default: wibwob / wibwob123 (change this)
-        # generate new hash: caddy hash-password --plaintext yourpassword
-        wibwob $2a$14$Zkx19XLiW6VYouLHR5NmfOFU0z2GTNmpkT61B9jlhgC9OXPJoM5C6
+    tls internal
+
+    basic_auth {
+        wibwob $2a$14$PWxcZWyTT2za30FLJn1DquQHPFQeW8j6VbKbSHgcngsI3HPWU5GoK
     }
 
-    reverse_proxy ttyd:7681 {
-        header_up X-Real-IP {http.request.header.CF-Connecting-IP}
-    }
+    reverse_proxy ttyd:7681
 
     log {
         output file /data/logs/access.log
