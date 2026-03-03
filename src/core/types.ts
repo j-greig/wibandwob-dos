@@ -16,6 +16,7 @@ export type WindowKind =
   | "reader"
   | "figlet"
   | "pattern"
+  | "contour"
   | "chat"
   | "companion"
   | "workspace"
@@ -106,7 +107,8 @@ export type PersistableAppType =
 export type TransientAppType =
   | "command-palette"
   | "workspace-manager"
-  | "state-inspector";
+  | "state-inspector"
+  | "contour-studio";
 
 /**
  * Union of all known appType strings.

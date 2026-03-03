@@ -14,6 +14,7 @@ export interface AppMenuActions {
   copyFocusedWindowText: () => void;
   exportFocusedWindowText: () => void;
   openArtWindow: () => void;
+  openContourWindow: () => void;
   openWibWobAgent: () => void;
   reloadAgentPrompt: () => void;
   quit: () => void;
@@ -146,9 +147,12 @@ const APP_COMMANDS: AppCommandDefinition[] = [
   {
     id: "primer.browse",
     label: "Browse Primers",
+    description: "Open the primer browser to discover and preview primer files.",
     group: "browse",
     actionKey: "browsePrimers",
-    menuPlacements: [{ category: "applications", order: 25 }]
+    menuPlacements: [{ category: "applications", order: 25 }],
+    api: true,
+    agent: true
   },
   {
     id: "finder.open",
@@ -279,10 +283,13 @@ const APP_COMMANDS: AppCommandDefinition[] = [
   {
     id: "editor.new",
     label: "New Editor",
+    description: "Open a new empty text editor window.",
     group: "open",
     actionKey: "openEditor",
     multiInstance: true,
-    menuPlacements: [{ category: "file", order: 40 }]
+    menuPlacements: [{ category: "file", order: 40 }],
+    api: true,
+    agent: true
   },
   {
     id: "editor.save",
@@ -499,10 +506,13 @@ const APP_COMMANDS: AppCommandDefinition[] = [
   {
     id: "primer_gallery.open",
     label: "Open Gallery",
+    description: "Open the primer gallery with tabbed categories and preview.",
     group: "surface",
     actionKey: "openGallery",
     menuPlacements: [{ category: "applications", order: 30 }],
-    palettePlacement: { order: 20 }
+    palettePlacement: { order: 20 },
+    api: true,
+    agent: true
   },
   {
     id: "document.open",
@@ -516,9 +526,12 @@ const APP_COMMANDS: AppCommandDefinition[] = [
   {
     id: "art.open",
     label: "Open Art",
+    description: "Open an animated generative art window.",
     group: "surface",
     actionKey: "openArtWindow",
-    menuPlacements: [{ category: "applications", order: 60 }]
+    menuPlacements: [{ category: "applications", order: 60 }],
+    api: true,
+    agent: true
   },
 
   {
@@ -536,42 +549,68 @@ const APP_COMMANDS: AppCommandDefinition[] = [
   {
     id: "pattern.open",
     label: "Pattern Window",
+    description: "Open a pattern field window.",
     group: "surface",
     actionKey: "openPatternWindow",
     menuPlacements: [{ category: "applications", order: 80 }],
-    palettePlacement: { order: 60 }
+    palettePlacement: { order: 60 },
+    api: true,
+    agent: true
+  },
+  {
+    id: "contour.open",
+    label: "Contour Studio",
+    description: "Open animated contour map studio. Three modes: chaos (organic contours), order (binary grids), hybrid (mixed).",
+    group: "surface",
+    actionKey: "openContourWindow",
+    menuPlacements: [{ category: "applications", order: 85 }],
+    palettePlacement: { order: 55 },
+    api: true,
+    agent: true
   },
   {
     id: "companion.open",
     label: "Companion",
+    description: "Open Scramble the cat companion window.",
     group: "surface",
     actionKey: "openCompanionWindow",
     menuPlacements: [{ category: "applications", order: 130 }],
-    palettePlacement: { order: 120 }
+    palettePlacement: { order: 120 },
+    api: true,
+    agent: true
   },
   {
     id: "workspace.manage",
     label: "Workspace Manager",
+    description: "Open the workspace manager for saving and loading desktop layouts.",
     group: "surface",
     actionKey: "openWorkspaceManager",
     menuPlacements: [{ category: "window", order: 60 }],
     palettePlacement: { order: 120 },
-    contextMenu: { desktop: true, order: 40 }
+    contextMenu: { desktop: true, order: 40 },
+    api: true,
+    agent: true
   },
   {
     id: "palette.open",
     label: "Command Palette",
+    description: "Open the command palette for quick command access.",
     group: "inspect",
     actionKey: "openCommandPalette",
-    menuPlacements: [{ category: "view", order: 10 }]
+    menuPlacements: [{ category: "view", order: 10 }],
+    api: true,
+    agent: true
   },
   {
     id: "inspector.open",
     label: "Open State Inspector",
+    description: "Open the live desktop state inspector.",
     group: "inspect",
     actionKey: "openStateInspector",
     menuPlacements: [{ category: "view", order: 20 }],
-    palettePlacement: { order: 160 }
+    palettePlacement: { order: 160 },
+    api: true,
+    agent: true
   },
   {
     id: "workspace.save",
@@ -597,6 +636,8 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     multiInstance: true,
     menuPlacements: [{ category: "help", order: 0 }],
     palettePlacement: { order: 200 },
+    api: true,
+    agent: true
   }
 ];
 

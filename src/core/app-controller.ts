@@ -72,6 +72,7 @@ import {
   openStateInspectorWindow as openInspectorWindow,
   openWorkspaceManagerWindow as openWorkspaceCommandWindow
 } from "../windows/misc-windows.js";
+import { openContourWindow as openContourStudioWindow } from "../windows/contour-window.js";
 import { openEditorWindow as openTextEditorWindow } from "../windows/text-windows.js";
 import { type TuiToolContext } from "../services/agent-tools.js";
 import { WibWobAgentSession } from "../services/wibwob-agent-session.js";
@@ -671,6 +672,15 @@ export class TsTuiMvpApp {
     });
   }
 
+  private openContourWindow(): WindowRecord | undefined {
+    return this.focusOrCreate("contour-studio", () => {
+      openContourStudioWindow({
+        screen: this.screen,
+        windowManager: this.windowManager
+      });
+    });
+  }
+
   private openCompanionWindow(restore?: { tick?: number }): WindowRecord | undefined {
     return this.focusOrCreate("companion-widget", () => {
       openScrambleWindow(
@@ -1181,6 +1191,7 @@ export class TsTuiMvpApp {
       copyFocusedWindowText: () => this.copyFocusedWindowText(),
       exportFocusedWindowText: () => this.exportFocusedWindowText(),
       openArtWindow: () => this.openArtWindow(),
+      openContourWindow: () => this.openContourWindow(),
       openWibWobAgent: () => this.openWibWobAgentWindow(),
       reloadAgentPrompt: () => {
         if (this.activeAgentSession?.reloadPrompt()) {

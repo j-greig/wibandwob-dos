@@ -9,7 +9,7 @@ import { animationAppType } from "../core/types.js";
 import type { DesktopState, List, LogBox, MenuItem, WindowKind, WindowRecord } from "../core/types.js";
 import type { WindowManager } from "../core/window-manager.js";
 
-interface BaseWindowDeps {
+export interface BaseWindowDeps {
   screen: blessed.Widgets.Screen;
   windowManager: WindowManager;
 }
