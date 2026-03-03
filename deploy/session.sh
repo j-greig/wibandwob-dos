@@ -3,12 +3,12 @@
 # Hard 30-min timeout regardless of activity
 
 export TERM=xterm-256color
-export HOME=/app
+export HOME=/root
 export COLORTERM=truecolor
 
-echo "WibWob-DOS — session starting..."
-echo "This session will expire in 30 minutes."
-echo ""
+# Wait for ttyd to receive the browser's terminal dimensions via WebSocket
+# before blessed initialises — otherwise it renders at default 80x24 and
+# the resize signal arrives too late to reflow correctly on first paint.
+sleep 0.5
 
-# timeout kills the process after 1800s (30 min)
 exec timeout 1800 bun run /app/src/app.ts
