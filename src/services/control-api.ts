@@ -38,24 +38,7 @@ interface ControlApiHandlers {
   getPrimerInfo: (pathOrName: string) => unknown;
   listCommands: (surface?: CommandSurface) => CommandListItem[];
   runCommand: (id: string, args?: Record<string, unknown>) => CommandRunResult;
-  openPrimerBrowser: () => void;
-  openFileManager: () => void;
-  openPrimerGallery: () => void;
-  openPrimerFile: (filePath: string) => void;
-  openBrowserReader: (filePath?: string) => void;
-  openFigletBanner: (text?: string, font?: string) => void;
-  openArtWindow: () => void;
-  openMonsterCam: () => void;
-  openWibWobAgent: () => void;
-  openCompanionWindow: () => void;
-  openWorkspaceManager: () => void;
-  openCommandPalette: () => void;
-  openStateInspector: () => void;
-  openEditorWindow: (filePath?: string, title?: string, initial?: string) => void;
   windows: import("../core/window-facade.js").WindowFacade;
-  openBackroomsTv: (channel: BackroomsChannel) => void;
-  saveWorkspaceNamed: (name: string) => void;
-  loadWorkspaceNamed: (name: string) => void;
   /** Blessed screen.screenshot() — returns full TUI as ANSI text. */
   screenshotText: () => string;
 }
@@ -75,21 +58,23 @@ const ENDPOINT_CATALOGUE = [
   { method: "GET",  path: "/windows/text",                  description: "Raw text content of a window. ?id=N" },
   { method: "GET",  path: "/screenshot/text",               description: "ANSI-stripped text screenshot of a window. ?id=N" },
   { method: "POST", path: "/commands/run",                  body: { id: "string (command id, canonical)", command: "string (deprecated alias for id)", args: "object (optional)" } },
-  { method: "POST", path: "/view/primer/open",              body: { filePath: "string (absolute path to .txt primer)" } },
-  { method: "POST", path: "/view/figlet/open",              body: { text: "string", font: "string (optional)" } },
-  { method: "POST", path: "/view/editor/open",              body: { filePath: "string (optional)", title: "string (optional)", initial: "string (optional)" } },
-  { method: "POST", path: "/view/backrooms/open",           body: { theme: "string", mode: "auto|live|fake-live", model: "haiku|sonnet|opus", turns: "number", primers: "string (optional csv)" } },
-  { method: "POST", path: "/view/browser-reader/open",      body: { filePath: "string (optional)" } },
-  { method: "POST", path: "/view/art/open",                 body: {} },
-  { method: "POST", path: "/view/monster-cam/open",         body: {} },
-  { method: "POST", path: "/view/wibwob-agent/open",        body: {} },
-  { method: "POST", path: "/view/companion/open",           body: {} },
-  { method: "POST", path: "/view/primer-browser/open",      body: {} },
-  { method: "POST", path: "/view/file-manager/open",        body: {} },
-  { method: "POST", path: "/view/primer-gallery/open",      body: {} },
-  { method: "POST", path: "/view/workspace/open",           body: {} },
-  { method: "POST", path: "/view/palette/open",             body: {} },
-  { method: "POST", path: "/view/inspector/open",           body: {} },
+  // ── View endpoints — command aliases, kept for backward compat ──
+  // All dispatch through /commands/run internally. Prefer /commands/run for new integrations.
+  { method: "POST", path: "/view/primer/open",              body: { filePath: "string (absolute path)" }, description: "Alias: primer.open" },
+  { method: "POST", path: "/view/figlet/open",              body: { text: "string", font: "string (optional)" }, description: "Alias: figlet.open" },
+  { method: "POST", path: "/view/editor/open",              body: { filePath: "string (optional)", title: "string (optional)", initial: "string (optional)" }, description: "Alias: editor.open" },
+  { method: "POST", path: "/view/backrooms/open",           body: { theme: "string", mode: "auto|live|fake-live", model: "haiku|sonnet|opus", turns: "number", primers: "string (optional csv)" }, description: "Alias: backrooms.run" },
+  { method: "POST", path: "/view/browser-reader/open",      body: { filePath: "string (optional)" }, description: "Alias: document.open" },
+  { method: "POST", path: "/view/art/open",                 body: {}, description: "Alias: art.open" },
+  { method: "POST", path: "/view/monster-cam/open",         body: {}, description: "Alias: monster_cam.open" },
+  { method: "POST", path: "/view/wibwob-agent/open",        body: {}, description: "Alias: agent.open" },
+  { method: "POST", path: "/view/companion/open",           body: {}, description: "Alias: companion.open" },
+  { method: "POST", path: "/view/primer-browser/open",      body: {}, description: "Alias: primer.browse" },
+  { method: "POST", path: "/view/file-manager/open",        body: {}, description: "Alias: finder.open" },
+  { method: "POST", path: "/view/primer-gallery/open",      body: {}, description: "Alias: primer_gallery.open" },
+  { method: "POST", path: "/view/workspace/open",           body: {}, description: "Alias: workspace.manage" },
+  { method: "POST", path: "/view/palette/open",             body: {}, description: "Alias: palette.open" },
+  { method: "POST", path: "/view/inspector/open",           body: {}, description: "Alias: inspector.open" },
   { method: "POST", path: "/windows/focus",                 body: { id: "number" } },
   { method: "POST", path: "/windows/move",                  body: { id: "number", left: "number", top: "number" } },
   { method: "POST", path: "/windows/resize",                body: { id: "number", width: "number", height: "number" } },
@@ -98,8 +83,8 @@ const ENDPOINT_CATALOGUE = [
   { method: "POST", path: "/windows/input",                 body: { id: "number", input: "string (trailing \\r submits)" } },
   { method: "POST", path: "/windows/agent-message",         body: { id: "number", text: "string", sender: "string (optional — shows as sender label in agent window)" } },
   { method: "POST", path: "/windows/text/export",           body: { id: "number", name: "string (optional, canonical)", label: "string (optional, alias for name)" } },
-  { method: "POST", path: "/workspace/save",                body: { name: "string" } },
-  { method: "POST", path: "/workspace/load",                body: { name: "string" } },
+  { method: "POST", path: "/workspace/save",                body: { name: "string" }, description: "Alias: workspace.save" },
+  { method: "POST", path: "/workspace/load",                body: { name: "string" }, description: "Alias: workspace.load_named" },
 ];
 
 function buildOpenApiSpec(port: number) {
@@ -291,72 +276,43 @@ export class ControlApiService {
       }
     }
 
-    if (request.method === "POST" && url.pathname === "/view/primer-browser/open") {
-      this.handlers.openPrimerBrowser();
-      return Response.json({ ok: true });
-    }
-    if (request.method === "POST" && url.pathname === "/view/file-manager/open") {
-      this.handlers.openFileManager();
-      return Response.json({ ok: true });
-    }
-    if (request.method === "POST" && url.pathname === "/view/primer-gallery/open") {
-      this.handlers.openPrimerGallery();
-      return Response.json({ ok: true });
-    }
-    if (request.method === "POST" && url.pathname === "/view/primer/open") {
-      const filePath = typeof (body as any).filePath === "string" ? (body as any).filePath : undefined;
-      if (!filePath) return Response.json({ ok: false, error: "filePath required" }, { status: 400 });
-      this.handlers.openPrimerFile(filePath);
-      return Response.json({ ok: true });
-    }
-    if (request.method === "POST" && url.pathname === "/view/browser-reader/open") {
-      this.handlers.openBrowserReader(
-        typeof (body as any).filePath === "string" ? (body as any).filePath : undefined,
-      );
-      return Response.json({ ok: true });
-    }
-    if (request.method === "POST" && url.pathname === "/view/figlet/open") {
-      this.handlers.openFigletBanner(
-        typeof (body as any).text === "string" ? (body as any).text : undefined,
-        typeof (body as any).font === "string" ? (body as any).font : undefined,
-      );
-      return Response.json({ ok: true });
-    }
-    if (request.method === "POST" && url.pathname === "/view/art/open") {
-      this.handlers.openArtWindow();
-      return Response.json({ ok: true });
-    }
-    if (request.method === "POST" && url.pathname === "/view/monster-cam/open") {
-      this.handlers.openMonsterCam();
-      return Response.json({ ok: true });
-    }
-    if (request.method === "POST" && url.pathname === "/view/wibwob-agent/open") {
-      this.handlers.openWibWobAgent();
-      return Response.json({ ok: true });
-    }
-    if (request.method === "POST" && url.pathname === "/view/companion/open") {
-      this.handlers.openCompanionWindow();
-      return Response.json({ ok: true });
-    }
-    if (request.method === "POST" && url.pathname === "/view/workspace/open") {
-      this.handlers.openWorkspaceManager();
-      return Response.json({ ok: true });
-    }
-    if (request.method === "POST" && url.pathname === "/view/palette/open") {
-      this.handlers.openCommandPalette();
-      return Response.json({ ok: true });
-    }
-    if (request.method === "POST" && url.pathname === "/view/inspector/open") {
-      this.handlers.openStateInspector();
-      return Response.json({ ok: true });
-    }
-    if (request.method === "POST" && url.pathname === "/view/editor/open") {
-      this.handlers.openEditorWindow(
-        typeof (body as any).filePath === "string" ? (body as any).filePath : undefined,
-        typeof (body as any).title === "string" ? (body as any).title : undefined,
-        typeof (body as any).initial === "string" ? (body as any).initial : undefined,
-      );
-      return Response.json({ ok: true });
+    // ── View endpoints — all dispatch through command registry ──
+    // Routes kept for backward compat; each is a thin shim over /commands/run.
+    const viewRoutes: Record<string, { id: string; argsMapper?: (b: any) => Record<string, unknown> | undefined }> = {
+      "/view/primer-browser/open":  { id: "primer.browse" },
+      "/view/file-manager/open":    { id: "finder.open" },
+      "/view/primer-gallery/open":  { id: "primer_gallery.open" },
+      "/view/primer/open":          { id: "primer.open", argsMapper: (b) => b.filePath ? { filePath: b.filePath, x: b.x, y: b.y, w: b.w, h: b.h } : undefined },
+      "/view/browser-reader/open":  { id: "document.open", argsMapper: (b) => b.filePath ? { filePath: b.filePath } : undefined },
+      "/view/figlet/open":          { id: "figlet.open", argsMapper: (b) => b.text ? { text: b.text, font: b.font } : undefined },
+      "/view/art/open":             { id: "art.open" },
+      "/view/monster-cam/open":     { id: "monster_cam.open" },
+      "/view/wibwob-agent/open":    { id: "agent.open" },
+      "/view/companion/open":       { id: "companion.open" },
+      "/view/workspace/open":       { id: "workspace.manage" },
+      "/view/palette/open":         { id: "palette.open" },
+      "/view/inspector/open":       { id: "inspector.open" },
+      "/view/editor/open":          { id: "editor.open", argsMapper: (b) => {
+        const args: Record<string, unknown> = {};
+        if (typeof b.filePath === "string") args.filePath = b.filePath;
+        if (typeof b.title === "string") args.title = b.title;
+        if (typeof b.initial === "string") args.initial = b.initial;
+        return Object.keys(args).length ? args : undefined;
+      }},
+    };
+    const viewRoute = request.method === "POST" ? viewRoutes[url.pathname] : undefined;
+    if (viewRoute) {
+      const args = viewRoute.argsMapper ? viewRoute.argsMapper(body) : undefined;
+      // Validate required args (primer.open requires filePath)
+      if (viewRoute.id === "primer.open" && !args?.filePath) {
+        return Response.json({ ok: false, error: "filePath required" }, { status: 400 });
+      }
+      try {
+        const result = this.handlers.runCommand(viewRoute.id, args);
+        return Response.json(result, { status: result.ok ? 200 : 404 });
+      } catch (err: any) {
+        return Response.json({ ok: false, error: err?.message ?? String(err) }, { status: 500 });
+      }
     }
     if (request.method === "POST" && url.pathname === "/windows/focus") {
       return Response.json({
@@ -460,20 +416,21 @@ export class ControlApiService {
       fs.writeFileSync(filePath, `${text}\n`, "utf8");
       return Response.json({ ok: true, path: filePath });
     }
+    // ── Backrooms + workspace — also dispatch through command registry ──
     if (request.method === "POST" && url.pathname === "/view/backrooms/open") {
       const channel = normalizeBackroomsChannel(body);
-      this.handlers.openBackroomsTv(channel);
-      return Response.json({ ok: true, channel });
+      const result = this.handlers.runCommand("backrooms.run", channel as unknown as Record<string, unknown>);
+      return Response.json({ ...result, channel }, { status: result.ok ? 200 : 404 });
     }
     if (request.method === "POST" && url.pathname === "/workspace/save") {
       const name = String((body as any).name ?? "default");
-      this.handlers.saveWorkspaceNamed(name);
-      return Response.json({ ok: true, name });
+      const result = this.handlers.runCommand("workspace.save", { name });
+      return Response.json({ ...result, name });
     }
     if (request.method === "POST" && url.pathname === "/workspace/load") {
       const name = String((body as any).name ?? "default");
-      this.handlers.loadWorkspaceNamed(name);
-      return Response.json({ ok: true, name });
+      const result = this.handlers.runCommand("workspace.load_named", { name });
+      return Response.json({ ...result, name });
     }
 
     return new Response("not found", { status: 404 });
