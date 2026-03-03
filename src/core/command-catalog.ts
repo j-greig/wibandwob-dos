@@ -15,6 +15,7 @@ export interface AppMenuActions {
   exportFocusedWindowText: (args?: Record<string, unknown>) => void;
   openArtWindow: () => void;
   openContourWindow: () => void;
+  openTerrainLab: () => void;
   openWibWobAgent: () => void;
   reloadAgentPrompt: () => void;
   quit: () => void;
@@ -584,6 +585,17 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     actionKey: "openContourWindow",
     menuPlacements: [{ category: "applications", order: 85 }],
     palettePlacement: { order: 55 },
+    api: true,
+    agent: true
+  },
+  {
+    id: "terrain_lab.open",
+    label: "Terrain Lab",
+    description: "Contour map with info panel — demonstrates composable ContourPlayer embedding.",
+    group: "surface",
+    actionKey: "openTerrainLab",
+    menuPlacements: [{ category: "applications", order: 86 }],
+    palettePlacement: { order: 56 },
     api: true,
     agent: true
   },

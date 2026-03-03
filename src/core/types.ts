@@ -17,6 +17,7 @@ export type WindowKind =
   | "figlet"
   | "pattern"
   | "contour"
+  | "terrain-lab"
   | "chat"
   | "companion"
   | "workspace"
@@ -108,7 +109,8 @@ export type TransientAppType =
   | "command-palette"
   | "workspace-manager"
   | "state-inspector"
-  | "contour-studio";
+  | "contour-studio"
+  | "terrain-lab";
 
 /**
  * Union of all known appType strings.
