@@ -10,3 +10,4 @@ e002-ts-tui-root-migration — done
 e003-finder-app — in-progress
 e004-monster-cam — in-progress @ origin/worktree-e004-monster-cam
 e014-theme-system — done
+e015-microapp-modules — in-progress

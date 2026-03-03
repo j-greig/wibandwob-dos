@@ -251,15 +251,16 @@ export class TsTuiMvpApp {
 
   /** Dev-mode controls: reload button top-right, Ctrl+R to reload. */
   private renderDevControls(): void {
+    const t = theme();
     const reloadBtn = blessed.box({
       parent: this.screen,
       top: 0,
       right: 0,
       height: 1,
-      width: 12,
+      width: 5,
       tags: true,
-      content: " ↻ Reload ",
-      style: { fg: "black", bg: "yellow", bold: true, hover: { fg: "black", bg: "white" } },
+      content: " ↻  ",
+      style: { ...t.menuBar, hover: t.selected },
       mouse: true,
       clickable: true,
     });
@@ -267,14 +268,22 @@ export class TsTuiMvpApp {
     this.screen.key(["C-r"], () => this.devReload());
   }
 
-  /** Save workspace and exit with reload code so the launcher restarts us. */
+  /** Save workspace, destroy screen, re-exec the process. */
   private devReload(): void {
-    // Auto-save current workspace before reloading
     try {
       this.workspace.save(this.snapshotWindows(), themeName());
     } catch { /* best effort */ }
     this.screen.destroy();
-    process.exit(DEV_RELOAD_EXIT_CODE);
+    // Re-exec ourselves with the same argv
+    const { spawn } = require("node:child_process") as typeof import("node:child_process");
+    const args = process.argv.slice(1);
+    const child = spawn(process.execPath, args, {
+      stdio: "inherit",
+      env: process.env,
+      detached: true,
+    });
+    child.unref();
+    process.exit(0);
   }
 
 

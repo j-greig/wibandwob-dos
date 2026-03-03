@@ -21,7 +21,8 @@ export type WindowKind =
   | "workspace"
   | "palette"
   | "inspector"
-  | "monster-cam";
+  | "monster-cam"
+  | "microapp";
 
 export interface EditorState {
   widget: Box;
