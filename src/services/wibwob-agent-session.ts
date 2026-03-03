@@ -220,7 +220,7 @@ function loadBasePrompt(): string {
 
 /** Sender info appended to outbound messages so recipients can reply via the control API */
 const TUI_AGENT_SENDER_INFO = JSON.stringify({
-  sessionName: "wibwob-tui-agent",
+  sessionName: "wibwob-tui",
   replyVia: "POST http://127.0.0.1:8099/windows/agent-message",
   windowId: 3,
 });

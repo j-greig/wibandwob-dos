@@ -19,6 +19,7 @@ export const light: ThemeVariant = {
 
     body:                 { fg: "black",  bg: "white"   },
     bodyAlt:              { fg: "black",  bg: "white"   },
+    agentBg:              { fg: "#1a1a2e", bg: "#eeeef8" },
     header:               { fg: "white",  bg: "blue"    },
     footer:               { fg: "white",  bg: "blue"    },
 

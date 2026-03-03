@@ -39,6 +39,8 @@ export interface ThemeTokens {
   // Content areas
   body: StylePair;
   bodyAlt: StylePair;
+  /** Background for the Wib&Wob Agent window — distinct from plain body */
+  agentBg: StylePair;
   header: StylePair;
   footer: StylePair;
 

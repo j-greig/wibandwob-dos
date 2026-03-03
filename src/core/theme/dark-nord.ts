@@ -20,6 +20,7 @@ export const darkNord: ThemeVariant = {
 
     body:                 { fg: "#d8dee9",  bg: "#2e3440"  },
     bodyAlt:              { fg: "#d8dee9",  bg: "#3b4252"  },
+    agentBg:              { fg: "#e5e9f0",  bg: "#1a1f2e"  },
     header:               { fg: "#2e3440",  bg: "#5e81ac"  },  // nord0 on nord10
     footer:               { fg: "#2e3440",  bg: "#4c566a"  },  // nord0 on nord3
 

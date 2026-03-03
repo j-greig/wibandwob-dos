@@ -346,7 +346,7 @@ Current control endpoints (POST bodies shown where non-obvious):
 - `POST /windows/close`             `{"id":N}`
 - `POST /windows/batch`             `{"ops":[{"id":N,"x":X,"y":Y,"w":W,"h":H},{"id":M,"close":true},...]}` — move/resize/close many windows in one call, applied in order. Prefer this over chained individual calls.
 - `POST /windows/input`             `{"id":N,"input":"text\r"}` — trailing `\r` submits
-- `POST /windows/agent-message`     `{"id":N,"text":"message","sender":"wibwob2"}` — send to agent window with named sender label
+- `POST /windows/agent-message`     `{"id":N,"text":"message","sender":"wibwob2"}` — send to agent window with named sender label. Outbound messages from the in-app agent include `replyVia: {url:"http://127.0.0.1:8099/windows/agent-message", windowId:N}` as return address.
 - `POST /windows/text/export`       `{"id":N,"label":"optional-name"}`
 - `POST /workspace/save`            `{"name":"workspace-name"}`
 - `POST /workspace/load`            `{"name":"workspace-name"}`

@@ -176,7 +176,7 @@ export function openWibWobAgentWindow(params: {
     scrollable: true,
     alwaysScroll: true,
     scrollbar: createScrollbar(),
-    style: theme().body,
+    style: theme().agentBg,
   });
 
   const statusLine = blessed.box({
@@ -388,7 +388,7 @@ export function openWibWobAgentWindow(params: {
   };
   frame.onRestyle = () => {
     infoBar.style = theme().muted;
-    safeSetStyle(transcript, theme().body);
+    safeSetStyle(transcript, theme().agentBg);
     statusLine.style = theme().warning;
     input.style = theme().input;
   };

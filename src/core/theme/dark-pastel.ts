@@ -20,6 +20,7 @@ export const darkPastel: ThemeVariant = {
 
     body: { fg: "#cdd6f4", bg: "#1e1e2e" }, // text on base
     bodyAlt: { fg: "#cdd6f4", bg: "#313244" }, // text on surface0
+    agentBg: { fg: "#cdd6f4", bg: "#11111b" }, // deep crust — distinct from body
     header: { fg: "#1e1e2e", bg: "#89b4fa" }, // base on blue
     footer: { fg: "#1e1e2e", bg: "#a6adc8" }, // base on subtext0
 
