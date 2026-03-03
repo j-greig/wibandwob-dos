@@ -44,7 +44,8 @@ function applyVoiceMarkers(text: string, useKaomoji: boolean): string {
 
 function renderMessage(msg: ChatMessageEntry, useKaomoji: boolean): string {
   if (msg.role === "user") {
-    return `{${C.pink}-fg}You:{/${C.pink}-fg} {${C.gray}-fg}${escapeTagBraces(msg.text)}{/${C.gray}-fg}`;
+    const label = msg.sender ?? "You";
+    return `{${C.pink}-fg}${label}:{/${C.pink}-fg} {${C.gray}-fg}${escapeTagBraces(msg.text)}{/${C.gray}-fg}`;
   }
   if (msg.role === "status") {
     const escaped = escapeTagBraces(msg.text);
@@ -300,7 +301,11 @@ export function openWibWobAgentWindow(params: {
         draft = "";
         renderInput();
         params.screen.render();
-        void params.agent.send(text);
+        if (text.trim() === "/new") {
+          params.agent.reset();
+        } else {
+          void params.agent.send(text);
+        }
       }
       return;
     }
@@ -372,8 +377,9 @@ export function openWibWobAgentWindow(params: {
   // NOTE: on /reload we set frame.cleanup = undefined before calling frame.close()
   // so the agent session is preserved across the reload.
 
-  frame.writeInput = (text: string) => {
-    void params.agent.send(text);
+  frame.writeInput = (text: string, sender?: string) => {
+    if (text.trim() === "/new") { params.agent.reset(); return; }
+    void params.agent.send(text, sender);
   };
   frame.onRestyle = () => {
     infoBar.style = theme().muted;

@@ -25,7 +25,7 @@ export interface WindowFacade {
   closeWindow(id: number): boolean;
 
   // Content
-  sendInput(id: number, input: string): boolean;
+  sendInput(id: number, input: string, sender?: string): boolean;
   writeEditorText(id: number, text: string): boolean;
   captureText(id: number): string | undefined;
 }

@@ -343,10 +343,10 @@ export class WindowManager implements WindowFacade {
   }
 
   /** WindowFacade: send input to a window */
-  sendInput(id: number, input: string): boolean {
+  sendInput(id: number, input: string, sender?: string): boolean {
     const record = this.getWindowById(id);
     if (!record?.writeInput) return false;
-    record.writeInput(input);
+    record.writeInput(input, sender);
     return true;
   }
 

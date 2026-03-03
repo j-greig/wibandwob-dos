@@ -226,17 +226,22 @@ const AUTH_FILE = join(homedir(), ".pi", "agent", "auth.json");
 
 const VOICE_PROMPTS: Record<Voice, string> = {
   plain:
-    "Write a two-line poem containing the time {time}. " +
-    "Observational, quiet, about desktop life or the passage of time. " +
-    "No title, no explanation, just the poem. Maximum 120 characters.",
+    "Write a two-line poem for the time {time}. " +
+    "The poem should resonate with the specific quality of that moment in the day — " +
+    "early morning has a different weight to late afternoon, midnight to noon. " +
+    "Let the hour's mood shape the imagery and tone. " +
+    "Observational, quiet. No title, no explanation. Maximum 120 characters.",
   liminal:
-    "Write a two-line poem containing the time {time}. " +
-    "Surreal, backrooms-flavoured. Fluorescent corridors, wet carpet, temporal drift. " +
-    "No title, no explanation, just the poem. Maximum 120 characters.",
+    "Write a two-line poem for the time {time}. " +
+    "Surreal, backrooms-flavoured. Let the specific hour haunt the imagery — " +
+    "3am is not the same as 3pm, both are wrong in different ways. " +
+    "Fluorescent corridors, temporal drift, the wrongness of this particular moment. " +
+    "No title, no explanation. Maximum 120 characters.",
   scramble:
-    "Write a two-line poem containing the time {time}. " +
-    "From a cat's perspective. The cat is named Scramble. Simple, funny, catlike. " +
-    "No title, no explanation, just the poem. Maximum 120 characters.",
+    "Write a two-line poem for the time {time}. " +
+    "From Scramble the cat's perspective. The hour matters — is it feeding time, nap time, " +
+    "the witching hour, the slow afternoon? Let the time shape what Scramble is doing or thinking. " +
+    "Simple, funny, catlike. No title, no explanation. Maximum 120 characters.",
 };
 
 function readOAuthToken(): string | null {
@@ -254,6 +259,18 @@ function readOAuthToken(): string | null {
   } catch {
     return null;
   }
+}
+
+function timeContext(time: string): string {
+  const [hStr] = time.split(":");
+  const h = parseInt(hStr, 10);
+  if (h >= 5 && h < 8)   return "early morning, the day barely started, cool and quiet";
+  if (h >= 8 && h < 12)  return "morning, the working day underway";
+  if (h >= 12 && h < 14) return "midday, the sun at its height, a pause";
+  if (h >= 14 && h < 17) return "afternoon, the slow stretch after lunch";
+  if (h >= 17 && h < 20) return "evening, the day winding down";
+  if (h >= 20 && h < 23) return "night, the world going quiet";
+  return "the small hours, deep night, most people asleep";
 }
 
 async function generatePoem(time: string, voice: Voice): Promise<string | null> {
@@ -282,7 +299,7 @@ async function generatePoem(time: string, voice: Voice): Promise<string | null> 
         model: MODEL,
         max_tokens: 150,
         messages: [{ role: "user", content: prompt }],
-        system: "You are a poet. Write only the poem, nothing else. No preamble, no title.",
+        system: `You are a poet. The current time is ${time} — ${timeContext(time)}. Write only the poem, nothing else. No preamble, no title.`,
       }),
     });
 

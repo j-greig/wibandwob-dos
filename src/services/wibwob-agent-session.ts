@@ -318,7 +318,7 @@ function resolveModel(params: {
 
 export class WibWobAgentSession {
   private readonly listeners = new Set<Listener>();
-  private readonly messages: ChatMessageEntry[] = [];
+  private messages: ChatMessageEntry[] = [];
   private agent?: Agent;
   private ready = false;
   private status = "Starting agent...";
@@ -438,14 +438,27 @@ export class WibWobAgentSession {
     };
   }
 
-  async send(text: string): Promise<void> {
+  reset(): void {
+    if (this.agent?.state.isStreaming) return; // don't reset mid-stream
+    this.messages = [];
+    this.currentAssistantId = undefined;
+    this.lastToolName = undefined;
+    this.lastError = undefined;
+    this.status = "Ready.";
+    // Re-create the agent so context is fresh
+    this.agent?.abort();
+    this.agent = undefined;
+    this.emit();
+  }
+
+  async send(text: string, sender?: string): Promise<void> {
     const msg = text.trim();
     if (!msg) return;
 
     if (!this.agent) await this.initialize();
     if (!this.agent) throw new Error("Agent was not created");
 
-    this.messages.push({ id: createMessageId("user"), role: "user", text: msg });
+    this.messages.push({ id: createMessageId("user"), role: "user", text: msg, sender });
     this.currentAssistantId = createMessageId("assistant");
     this.messages.push({
       id: this.currentAssistantId,

@@ -414,6 +414,7 @@ export class ControlApiService {
         ok: this.handlers.windows.sendInput(
           Number((body as any).id),
           String((body as any).input ?? ""),
+          (body as any).sender ? String((body as any).sender) : undefined,
         ),
       });
     }

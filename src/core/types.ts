@@ -61,6 +61,8 @@ export interface ChatMessageEntry {
   role: "system" | "user" | "assistant" | "status";
   text: string;
   streaming?: boolean;
+  /** Override the display name shown for user-role messages (default: "You") */
+  sender?: string;
 }
 
 export interface WindowSnapshot {
@@ -217,7 +219,7 @@ export interface WindowRecord {
   microappId?: string;
 
   // Cross-cutting hooks — any window type may set these
-  writeInput?: (input: string) => void;
+  writeInput?: (input: string, sender?: string) => void;
   cleanup?: () => void;
   refresh?: () => void;
   onRestyle?: () => void;
