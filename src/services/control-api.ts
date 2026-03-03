@@ -96,6 +96,7 @@ const ENDPOINT_CATALOGUE = [
   { method: "POST", path: "/windows/batch",                 body: { ops: "array — each op: {id, x?, y?, w?, h?, close?}" }, description: "Move/resize/close multiple windows in one request. Applied in order. Returns {ok, results[]}" },
   { method: "POST", path: "/windows/batch",                 body: { ops: "[{id, x?, y?, w?, h?, close?}]" } },
   { method: "POST", path: "/windows/input",                 body: { id: "number", input: "string (trailing \\r submits)" } },
+  { method: "POST", path: "/windows/agent-message",         body: { id: "number", text: "string", sender: "string (optional — shows as sender label in agent window)" } },
   { method: "POST", path: "/windows/text/export",           body: { id: "number", label: "string (optional)" } },
   { method: "POST", path: "/workspace/save",                body: { name: "string" } },
   { method: "POST", path: "/workspace/load",                body: { name: "string" } },

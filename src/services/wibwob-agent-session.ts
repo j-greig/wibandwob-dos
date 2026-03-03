@@ -218,6 +218,17 @@ function loadBasePrompt(): string {
   }
 }
 
+/** Sender info appended to outbound messages so recipients can reply via the control API */
+const TUI_AGENT_SENDER_INFO = JSON.stringify({
+  sessionName: "wibwob-tui-agent",
+  replyVia: "POST http://127.0.0.1:8099/windows/agent-message",
+  windowId: 3,
+});
+
+function withSenderInfo(message: string): string {
+  return `${message}\n\n<sender_info>${TUI_AGENT_SENDER_INFO}</sender_info>`;
+}
+
 function createPiSessionTools() {
   return [
     {
@@ -245,7 +256,7 @@ function createPiSessionTools() {
       async execute(_toolCallId: string, params: { sessionName?: string; sessionId?: string; message: string; mode?: "steer" | "follow_up" }) {
         const target = params.sessionName ?? params.sessionId;
         if (!target) return { content: [{ type: "text" as const, text: "Provide sessionName or sessionId" }], isError: true, details: undefined };
-        const result = await sendToSession(target, params.message, params.mode ?? "steer");
+        const result = await sendToSession(target, withSenderInfo(params.message), params.mode ?? "steer");
         return { content: [{ type: "text" as const, text: result.ok ? `Message delivered to ${target}` : `Failed: ${result.error}` }], details: result };
       },
     },
