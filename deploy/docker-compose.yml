@@ -9,8 +9,6 @@ services:
       - ttyd
       - --port
       - "7681"
-      - --timeout   # idle disconnect after 5 min no input
-      - "300"
       - --max-clients
       - "20"
       - --writable
