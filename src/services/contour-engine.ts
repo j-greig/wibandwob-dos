@@ -589,3 +589,153 @@ export function renderContour(
     hills: generateTerrainHills(w, h, opts.seed, opts.terrainIdx)
   });
 }
+
+// ── Contour Player ─────────────────────────────────────────
+// Wraps the grow animation as a FramePlayer for embedding via
+// createAnimatedPanel or direct mount in any window/microapp.
+
+import type { FramePlayer } from "./animation-service.js";
+
+const SWELL_TICKS = 15;
+const ADD_HILL_EVERY = 1;
+const COVERAGE_TARGET = 0.6;
+
+type ActiveHill = { hill: Hill; startTick: number };
+
+type GrowState = {
+  key: string;
+  allHills: Hill[];
+  active: ActiveHill[];
+  nextHillIndex: number;
+  finished: boolean;
+};
+
+function scaledHill(hill: Hill, age: number): Hill {
+  const swell = Math.max(0.14, Math.min(1, age / SWELL_TICKS));
+  return [
+    hill[0], hill[1], hill[2] * swell, hill[3] * (0.35 + swell * 0.65),
+    hill[4], hill[5], hill[6], hill[7], hill[8],
+  ] as const;
+}
+
+function estimatedCoverage(hills: readonly Hill[], w: number, h: number): number {
+  const area = Math.max(1, w * h);
+  return Math.min(1, hills.reduce((s, hi) => s + Math.PI * hi[2] * hi[2], 0) / area);
+}
+
+export interface ContourPlayerOptions {
+  mode?: ContourMode;
+  seed?: number;
+  terrainIdx?: number;
+  nLevels?: number;
+  orderRatio?: number;
+  fps?: number;
+  getViewport: () => { width: number; height: number };
+  onFrame: (content: string) => void;
+  /** Called each tick with current state for status display. */
+  onStatus?: (state: { mode: ContourMode; terrain: string; seed: number; levels: number }) => void;
+}
+
+export interface ContourPlayer extends FramePlayer {
+  /** Switch rendering mode. Resets grow animation. */
+  setMode(mode: ContourMode): void;
+  /** Switch terrain. Resets grow animation. */
+  setTerrain(idx: number): void;
+  /** Randomise seed. Resets grow animation. */
+  reroll(): void;
+  /** Adjust contour levels. Resets grow animation. */
+  setLevels(n: number): void;
+  /** Current configuration (read-only). */
+  readonly mode: ContourMode;
+  readonly terrainIdx: number;
+  readonly seed: number;
+  readonly levels: number;
+}
+
+export function createContourPlayer(opts: ContourPlayerOptions): ContourPlayer {
+  let mode: ContourMode = opts.mode ?? "chaos";
+  let seed = opts.seed ?? Math.floor(Math.random() * 100000);
+  let terrainIdx = opts.terrainIdx ?? 0;
+  let nLevels = opts.nLevels ?? 5;
+  const orderRatio = opts.orderRatio ?? 0.5;
+  const fps = opts.fps ?? 12;
+
+  let growState: GrowState | null = null;
+  let tick = 0;
+  let paused = false;
+  let timer: ReturnType<typeof setInterval> | null = null;
+
+  const ensureGrowState = (w: number, h: number): GrowState => {
+    const key = [w, h, seed, terrainIdx].join(":");
+    if (growState && growState.key === key) return growState;
+    growState = {
+      key,
+      allHills: generateTerrainHills(w, h, seed, terrainIdx),
+      active: [],
+      nextHillIndex: 0,
+      finished: false,
+    };
+    return growState;
+  };
+
+  const buildFrame = (w: number, h: number): string => {
+    const state = ensureGrowState(w, h);
+    if (!state.finished && tick % ADD_HILL_EVERY === 0 && state.nextHillIndex < state.allHills.length) {
+      state.active.push({ hill: state.allHills[state.nextHillIndex]!, startTick: tick });
+      state.nextHillIndex += 1;
+    }
+    const activeHills = state.active.map(a => scaledHill(a.hill, Math.max(1, tick - a.startTick + 1)));
+    if (!state.finished && (estimatedCoverage(activeHills, w, h) >= COVERAGE_TARGET || state.nextHillIndex >= state.allHills.length)) {
+      state.finished = true;
+    }
+    return renderContourFromHills(w, h, { mode, seed, terrainIdx, nLevels, orderRatio, hills: activeHills }).join("\n");
+  };
+
+  const emitStatus = () => {
+    opts.onStatus?.({ mode, terrain: terrainNames[terrainIdx] ?? "unknown", seed, levels: nLevels });
+  };
+
+  const advance = () => {
+    if (paused) return;
+    const { width, height } = opts.getViewport();
+    opts.onFrame(buildFrame(width, height));
+    emitStatus();
+    tick += 1;
+  };
+
+  const reset = () => {
+    growState = null;
+    tick = 0;
+    advance();
+  };
+
+  const play = () => { paused = false; if (!timer) timer = setInterval(advance, 1000 / fps); };
+  const pause = () => { paused = true; };
+  const stop = () => { paused = false; tick = 0; if (timer) { clearInterval(timer); timer = null; } };
+  const destroy = () => { if (timer) { clearInterval(timer); timer = null; } };
+
+  // Emit initial frame
+  const { width, height } = opts.getViewport();
+  opts.onFrame(buildFrame(width, height));
+  emitStatus();
+  tick += 1;
+
+  return {
+    play, pause, stop, destroy,
+    togglePause() { paused = !paused; return paused; },
+    get paused() { return paused; },
+    get currentFrame() { return tick; },
+    get totalFrames() { return -1; },
+    get fps() { return fps; },
+
+    setMode(m) { mode = m; reset(); },
+    setTerrain(idx) { terrainIdx = ((idx % terrainNames.length) + terrainNames.length) % terrainNames.length; reset(); },
+    reroll() { seed = Math.floor(Math.random() * 100000); reset(); },
+    setLevels(n) { nLevels = Math.max(2, Math.min(8, n)); reset(); },
+
+    get mode() { return mode; },
+    get terrainIdx() { return terrainIdx; },
+    get seed() { return seed; },
+    get levels() { return nLevels; },
+  };
+}
