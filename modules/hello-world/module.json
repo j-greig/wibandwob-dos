@@ -10,7 +10,7 @@
     "description": "The simplest possible microapp. Opens a window with a figlet greeting.",
     "persist": false,
     "menu": [
-      { "category": "help", "order": 10, "label": "Hello World Example" }
+      { "category": "applications", "order": 40, "label": "Hello World" }
     ],
     "palette": { "order": 210, "label": "Hello World" },
     "agent": true,

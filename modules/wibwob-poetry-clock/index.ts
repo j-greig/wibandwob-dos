@@ -72,33 +72,33 @@ function renderFigletTime(time: string): string {
 
 const SCRAMBLE_FRAMES: string[][] = [
   [
-    " /\\_/\\   ",
-    "( o.o )  ",
-    " > ^ <   ",
-    "/|   |\\  ",
-    "(_|   |_)",
+    "  /\\_/\\  ",
+    " ( o.o ) ",
+    "  > ^ <  ",
+    " /|   |\\ ",
+    " (_|   |_)",
   ],
   [
-    " /\\_/\\   ",
-    "( -.- )  ",
-    " > ^ <   ",
-    "/|   |\\  ",
-    "(_|   |_)",
+    "  /\\_/\\  ",
+    " ( -.- ) ",
+    "  > ^ <  ",
+    " /|   |\\ ",
+    " (_|   |_)",
   ],
   [
-    " /\\_/\\   ",
-    "( o.o )  ",
-    " > ~ <   ",
-    " |   |   ",
-    "/|   |\\  ",
-    "(_|   |_)",
+    "  /\\_/\\  ",
+    " ( o.o ) ",
+    "  > ~ <  ",
+    "  |   |  ",
+    " /|   |\\ ",
+    " (_|   |_)",
   ],
   [
-    " /\\_/\\   ",
-    "( ^.^ )  ",
-    " > ^ <   ",
-    "/|   |\\  ",
-    "(_|   |_)",
+    "  /\\_/\\  ",
+    " ( ^.^ ) ",
+    "  > ^ <  ",
+    " /|   |\\ ",
+    " (_|   |_)",
   ],
 ];
 
@@ -315,7 +315,7 @@ export default function setup(host: MicroappHost) {
       poemBox.left = 16;
       catPlayer = createPreRenderedPlayer({
         frames: SCRAMBLE_FRAMES,
-        fps: 2,
+        fps: 0.5,
         onFrame: (content) => {
           catBox.setContent(content);
           host.screen.render();
