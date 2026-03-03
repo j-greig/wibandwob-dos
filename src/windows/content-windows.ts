@@ -87,11 +87,6 @@ export function openPrimerBrowserWindow(params: {
     }
   };
   list.on("select", (_, index) => openSelected(index));
-  list.on("keypress", (_, key) => {
-    if (key.name === "enter") {
-      openSelected();
-    }
-  });
   frame.kind = "browser";
   frame.describeState = () => ({
     appType: "primer-browser",
@@ -248,9 +243,7 @@ export function openPrimerGalleryWindow(params: {
 
   list.on("select item", (_, index) => updatePreview(index));
   list.on("keypress", (_, key) => {
-    if (key.name === "enter") {
-      openSelected();
-    } else if (["up", "down", "j", "k"].includes(key.name ?? "")) {
+    if (["up", "down", "j", "k"].includes(key.name ?? "")) {
       setTimeout(() => updatePreview((list as List & { selected: number }).selected ?? 0), 0);
     } else if (key.name === "left") {
       switchTab((activeTabIndex - 1 + tabs.length) % tabs.length);
