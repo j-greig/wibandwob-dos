@@ -120,6 +120,7 @@ export interface MicroappWindowHandle {
 
   onCleanup(fn: () => void): void;
   onRestyle(fn: () => void): void;
+  onResize(fn: () => void): void;
   onInput(fn: (input: string) => void): void;
   describeState(fn: () => MicroappStateDetails): void;
   captureText(fn: () => string): void;
@@ -188,6 +189,7 @@ function createMicroappHost(
 
         onCleanup(fn) { frame.cleanup = fn; },
         onRestyle(fn) { frame.onRestyle = fn; },
+        onResize(fn) { frame.refresh = fn; },
         onInput(fn) { frame.writeInput = fn; },
         captureText(fn) { frame.captureText = fn; },
 

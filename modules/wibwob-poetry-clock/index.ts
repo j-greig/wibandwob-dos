@@ -457,6 +457,7 @@ export default function setup(host: MicroappHost) {
       }
     }
 
+    win.onResize(render);
     statusBar.node.on?.("click", cycleMode);
     win.body.key(["m"], cycleMode);
     win.body.key(["q", "escape"], () => win.close());
