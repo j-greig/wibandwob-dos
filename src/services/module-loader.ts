@@ -47,6 +47,7 @@ interface MicroappManifestConfig {
   id: string;
   title: string;
   description?: string;
+  multiInstance?: boolean;
   persist?: boolean;
   menu?: { category: string; order: number; label?: string }[];
   palette?: { order: number; label?: string };
@@ -72,6 +73,7 @@ export interface MicroappHost {
     label: string;
     description?: string;
     action: (args?: Record<string, unknown>) => void;
+    multiInstance?: boolean;
     menu?: { category: string; order: number; label?: string }[];
     palette?: { order: number; label?: string };
   }): void;
@@ -120,6 +122,7 @@ export interface MicroappHostDeps {
   windowManager: WindowManager;
   commands: CommandRegistry;
   geometry: { width: number; height: number; cellAspect: number };
+  focusOrCreate: (appType: string, createFn: () => void, multiInstance?: boolean) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -130,7 +133,7 @@ function createMicroappHost(
   manifest: MicroappManifestConfig,
   deps: MicroappHostDeps
 ): MicroappHost {
-  const { screen, windowManager, commands, geometry } = deps;
+  const { screen, windowManager, commands, geometry, focusOrCreate } = deps;
   const moduleId = manifest.id;
 
   const host: MicroappHost = {
@@ -183,11 +186,13 @@ function createMicroappHost(
 
     registerCommand(def) {
       const fullId = `microapp.${moduleId}.${def.id}`;
+      const multiInstance = def.multiInstance ?? manifest.multiInstance ?? false;
       const dynDef: DynamicCommandDefinition = {
         id: fullId,
         label: def.label,
         description: def.description,
-        action: def.action,
+        action: (args) => focusOrCreate(moduleId, () => def.action(args), multiInstance),
+        multiInstance,
         menuPlacements: def.menu?.map(m => ({
           category: m.category as MenuPlacement["category"],
           order: m.order,

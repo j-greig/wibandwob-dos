@@ -18,6 +18,7 @@ import { isRightClick } from "./ui-primitives.js";
 import { restoreWindowSnapshot, serializeWindowSnapshot, type WorkspaceRestoreActions } from "./workspace-snapshots.js";
 import { isPersistable } from "./snapshot-registry.js";
 import type {
+  AppType,
   BackroomsChannel,
   Box,
   BrowserEntry,
@@ -209,6 +210,9 @@ export class TsTuiMvpApp {
       windowManager: this.windowManager,
       commands: this.commands,
       geometry: this.geometry.getGeometry(),
+      focusOrCreate: (appType, createFn, multiInstance) => {
+        this.focusOrCreate(appType, createFn, multiInstance);
+      }
     };
     await loadModules(microappDeps);
 
@@ -441,14 +445,32 @@ export class TsTuiMvpApp {
     );
   }
 
+  private findWindowByAppType(appType: AppType): WindowRecord | undefined {
+    return [...this.windowManager.getWindows()]
+      .reverse()
+      .find((window) => window.describeState?.().appType === appType);
+  }
+
+  private focusOrCreate(appType: AppType, createFn: () => void, multiInstance = false): WindowRecord | undefined {
+    if (!multiInstance) {
+      const existing = this.findWindowByAppType(appType);
+      if (existing) {
+        existing.focus();
+        return existing;
+      }
+    }
+
+    createFn();
+    return this.windowManager.getLastWindow();
+  }
+
   private openWibWobAgentWindow(): void {
     const tuiContext: TuiToolContext = {
       getState: () => this.state.sync(),
       listCommands: () => this.commands.list("agent"),
       runCommand: (id, args) => this.commands.run(id, args),
       openWindow: (type) => {
-        const before = this.windowManager.getWindows().length;
-        const map: Record<string, () => void> = {
+        const map: Record<string, () => WindowRecord | undefined> = {
           editor: () => this.openEditorWindow(),
           art: () => this.openArtWindow(),
           gallery: () => this.openPrimerGalleryWindow(),
@@ -461,30 +483,16 @@ export class TsTuiMvpApp {
         };
         const fn = map[type];
         if (!fn) return { error: `unknown window type: ${type}` };
-        fn();
-        const wins = this.windowManager.getWindows();
-        if (wins.length > before) {
-          return { id: wins[wins.length - 1].id };
-        }
-        return { id: 0 };
+        const window = fn();
+        return window ? { id: window.id } : { error: `${type} window failed to open` };
       },
       openFigletWindow: (text, font) => {
-        const before = this.windowManager.getWindows().length;
-        this.openFigletWindow(text, font ?? getDefaultFigletFont());
-        const wins = this.windowManager.getWindows();
-        if (wins.length > before) {
-          return { id: wins[wins.length - 1].id };
-        }
-        return { error: "figlet window failed to open" };
+        const window = this.openFigletWindow(text, font ?? getDefaultFigletFont());
+        return window ? { id: window.id } : { error: "figlet window failed to open" };
       },
       openChromeBrowser: (url) => {
-        const before = this.windowManager.getWindows().length;
-        this.openChromeBrowserWindow(url);
-        const wins = this.windowManager.getWindows();
-        if (wins.length > before) {
-          return { id: wins[wins.length - 1].id };
-        }
-        return { error: "chrome browser window failed to open" };
+        const window = this.openChromeBrowserWindow(url);
+        return window ? { id: window.id } : { error: "chrome browser window failed to open" };
       },
       browserSearch: async (query, numResults) => {
         const svc = new ChromeBrowserService();
@@ -499,10 +507,12 @@ export class TsTuiMvpApp {
     };
 
     const session = new WibWobAgentSession(tuiContext, REPO_ROOT);
-    openNativeWibWobAgentWindow({
-      screen: this.screen,
-      windowManager: this.windowManager,
-      agent: session,
+    this.focusOrCreate("wibwob-agent", () => {
+      openNativeWibWobAgentWindow({
+        screen: this.screen,
+        windowManager: this.windowManager,
+        agent: session,
+      });
     });
   }
 
@@ -518,33 +528,43 @@ export class TsTuiMvpApp {
     };
   }
 
-  private openBackroomsLogBrowserWindow(): void {
-    openBackroomsLogBrowserWindowFactory(this.getBackroomsWindowContext());
+  private openBackroomsLogBrowserWindow(): WindowRecord | undefined {
+    return this.focusOrCreate("backrooms-log-browser", () => {
+      openBackroomsLogBrowserWindowFactory(this.getBackroomsWindowContext());
+    });
   }
 
-  private promptForBackroomsTv(): void {
-    promptForBackroomsTvWindow(this.getBackroomsWindowContext());
+  private promptForBackroomsTv(): WindowRecord | undefined {
+    return this.focusOrCreate("backrooms-primer-picker", () => {
+      promptForBackroomsTvWindow(this.getBackroomsWindowContext());
+    });
   }
 
-  private openBackroomsPrimerPicker(theme: string, defaults: BackroomsChannel): void {
-    openBackroomsPrimerPickerWindow(this.getBackroomsWindowContext(), theme, defaults);
+  private openBackroomsPrimerPicker(theme: string, defaults: BackroomsChannel): WindowRecord | undefined {
+    return this.focusOrCreate("backrooms-primer-picker", () => {
+      openBackroomsPrimerPickerWindow(this.getBackroomsWindowContext(), theme, defaults);
+    });
   }
 
   private promptForBackroomsRunOptions(theme: string, primers: string, defaults: BackroomsChannel): void {
     promptForBackroomsRunOptionsWindow(this.getBackroomsWindowContext(), theme, primers, defaults);
   }
 
-  openBackroomsTv(channel: BackroomsChannel): void {
-    openBackroomsTvWindow(this.getBackroomsWindowContext(), channel);
+  openBackroomsTv(channel: BackroomsChannel): WindowRecord | undefined {
+    return this.focusOrCreate("backrooms-tv", () => {
+      openBackroomsTvWindow(this.getBackroomsWindowContext(), channel);
+    }, true);
   }
 
-  private openPrimerBrowserWindow(restore?: { selectedIndex?: number }): void {
-    openPrimerBrowserListWindow({
+  private openPrimerBrowserWindow(restore?: { selectedIndex?: number }): WindowRecord | undefined {
+    return this.focusOrCreate("primer-browser", () => {
+      openPrimerBrowserListWindow({
       windowManager: this.windowManager,
       overlays: this.overlays,
       entries: this.content.collectPrimerEntries(),
       onOpenPrimer: (filePath) => this.openPrimerWindow(filePath),
       restore
+    });
     });
   }
 
@@ -553,8 +573,9 @@ export class TsTuiMvpApp {
     return win?.finder ?? null;
   }
 
-  private openFileManagerWindow(restore?: FileManagerRestore): void {
-    openFarjsFileManagerWindow({
+  private openFileManagerWindow(restore?: FileManagerRestore): WindowRecord | undefined {
+    return this.focusOrCreate("farjs-file-manager", () => {
+      openFarjsFileManagerWindow({
       screen: this.screen,
       windowManager: this.windowManager,
       overlays: this.overlays,
@@ -568,11 +589,13 @@ export class TsTuiMvpApp {
         this.openTextViewerWindow(path.basename(filePath), content, "reader", filePath);
       }
     });
+    });
   }
 
-  private openPrimerGalleryWindow(restore?: { activeTabIndex?: number; searchValue?: string; selectedIndex?: number }): void {
+  private openPrimerGalleryWindow(restore?: { activeTabIndex?: number; searchValue?: string; selectedIndex?: number }): WindowRecord | undefined {
     const allEntries = this.content.collectGalleryEntries();
-    openPrimerGalleryListWindow({
+    return this.focusOrCreate("primer-gallery", () => {
+      openPrimerGalleryListWindow({
       screen: this.screen,
       windowManager: this.windowManager,
       overlays: this.overlays,
@@ -581,23 +604,28 @@ export class TsTuiMvpApp {
       onOpenPrimer: (filePath) => this.openPrimerWindow(filePath),
       restore
     });
+    });
   }
 
-  private openChromeBrowserWindow(initialUrl?: string): void {
-    openChromeBrowserWindow({
+  private openChromeBrowserWindow(initialUrl?: string): WindowRecord | undefined {
+    return this.focusOrCreate("chrome-browser", () => {
+      openChromeBrowserWindow({
       screen: this.screen,
       windowManager: this.windowManager,
       overlays: this.overlays,
       initialUrl,
     });
+    }, true);
   }
 
-  private openBrowserReaderWindow(filePath = MASTER_PHILOSOPHY_PATH): void {
-    openBrowserReaderContentWindow({
+  private openBrowserReaderWindow(filePath = MASTER_PHILOSOPHY_PATH): WindowRecord | undefined {
+    return this.focusOrCreate("reader-viewer", () => {
+      openBrowserReaderContentWindow({
       filePath,
       onOpenTextViewer: (title, content, kind, nextFilePath) => this.openTextViewerWindow(title, content, kind, nextFilePath),
       onError: (message) => this.overlays.flash(message)
     });
+    }, true);
   }
 
   private promptForFigletText(): void {
@@ -614,8 +642,9 @@ export class TsTuiMvpApp {
     });
   }
 
-  private openFigletWindow(text: string, initialFont = getDefaultFigletFont()): void {
-    openFigletBannerWindow({
+  private openFigletWindow(text: string, initialFont = getDefaultFigletFont()): WindowRecord | undefined {
+    return this.focusOrCreate("figlet-banner", () => {
+      openFigletBannerWindow({
       screen: this.screen,
       windowManager: this.windowManager,
       overlays: this.overlays,
@@ -625,27 +654,33 @@ export class TsTuiMvpApp {
       onOpenFontPicker: (nextText, currentFont, onSelect) => this.openFigletFontPicker(nextText, currentFont, onSelect),
       onSyncState: () => this.syncState()
     });
+    }, true);
   }
 
-  private openPatternWindow(): void {
-    openPatternAnimationWindow({
+  private openPatternWindow(): WindowRecord | undefined {
+    return this.focusOrCreate("pattern-animation", () => {
+      openPatternAnimationWindow({
       screen: this.screen,
       windowManager: this.windowManager
     });
+    });
   }
 
-  private openCompanionWindow(restore?: { tick?: number }): void {
-    openScrambleWindow(
+  private openCompanionWindow(restore?: { tick?: number }): WindowRecord | undefined {
+    return this.focusOrCreate("companion-widget", () => {
+      openScrambleWindow(
       {
         screen: this.screen,
         windowManager: this.windowManager
       },
       restore
     );
+    });
   }
 
-  private openWorkspaceManagerWindow(): void {
-    openWorkspaceCommandWindow({
+  private openWorkspaceManagerWindow(): WindowRecord | undefined {
+    return this.focusOrCreate("workspace-manager", () => {
+      openWorkspaceCommandWindow({
       screen: this.screen,
       windowManager: this.windowManager,
       workspace: this.workspace,
@@ -654,12 +689,15 @@ export class TsTuiMvpApp {
       promptForWorkspaceLoad: () => this.promptForWorkspaceLoad(),
       openCommandPaletteWindow: () => this.openCommandPaletteWindow()
     });
+    });
   }
 
-  private openCommandPaletteWindow(): void {
-    openPaletteWindow({
+  private openCommandPaletteWindow(): WindowRecord | undefined {
+    return this.focusOrCreate("command-palette", () => {
+      openPaletteWindow({
       windowManager: this.windowManager,
       commands: this.commands.buildPalette()
+    });
     });
   }
 
@@ -681,17 +719,20 @@ export class TsTuiMvpApp {
     });
   }
 
-  private openPrimerWindow(filePath: string): void {
-    openPrimerFile({
+  private openPrimerWindow(filePath: string): WindowRecord | undefined {
+    return this.focusOrCreate("primer-viewer", () => {
+      openPrimerFile({
       overlays: this.overlays,
       filePath,
       onOpenTextViewer: (title, content, kind, nextFilePath, options) =>
         this.openTextViewerWindow(title, content, kind, nextFilePath, options)
     });
+    }, true);
   }
 
-  private openEditorWindow(filePath?: string, title = "Untitled.txt", initial = "", restore?: { cursor?: number }): void {
-    openTextEditorWindow({
+  private openEditorWindow(filePath?: string, title = "Untitled.txt", initial = "", restore?: { cursor?: number }): WindowRecord | undefined {
+    const window = this.focusOrCreate("text-editor", () => {
+      openTextEditorWindow({
       windowManager: this.windowManager,
       title,
       filePath,
@@ -704,6 +745,7 @@ export class TsTuiMvpApp {
         }
       }
     });
+    }, true);
     // Set initial saved content for dirty tracking
     const wins = this.windowManager.getWindows();
     const latest = wins[wins.length - 1];
@@ -711,19 +753,24 @@ export class TsTuiMvpApp {
       latest.lastSavedContent = initial;
       latest.isDirty = false;
     }
+    return window;
   }
 
-  private openArtWindow(): void {
-    openGenerativeArtWindow({
+  private openArtWindow(): WindowRecord | undefined {
+    return this.focusOrCreate("generative-art", () => {
+      openGenerativeArtWindow({
       screen: this.screen,
       windowManager: this.windowManager
     });
+    });
   }
 
-  private openMonsterCam(): void {
-    openMonsterCamWindow({
+  private openMonsterCam(): WindowRecord | undefined {
+    return this.focusOrCreate("monster-cam", () => {
+      openMonsterCamWindow({
       screen: this.screen,
       windowManager: this.windowManager
+    });
     });
   }
 
@@ -947,9 +994,10 @@ export class TsTuiMvpApp {
       contentMeasurement?: ContentMeasurement;
       frames?: string[][];
     }
-  ): void {
+  ): WindowRecord | undefined {
     const measurement = options?.contentMeasurement ?? measurePlainTextContent(content).measurement;
-    openContentViewerWindow({
+    return this.focusOrCreate(kind === "primer" ? "primer-viewer" : "reader-viewer", () => {
+      openContentViewerWindow({
       windowManager: this.windowManager,
       applyMeasuredWindowSize: (frame, nextKind, measured) => this.applyMeasuredWindowSize(frame, nextKind, measured),
       title,
@@ -959,14 +1007,17 @@ export class TsTuiMvpApp {
       measurement,
       frames: options?.frames
     });
+    }, true);
   }
 
-  private openStateInspectorWindow(): void {
-    openInspectorWindow({
+  private openStateInspectorWindow(): WindowRecord | undefined {
+    return this.focusOrCreate("state-inspector", () => {
+      openInspectorWindow({
       screen: this.screen,
       windowManager: this.windowManager,
       state: this.state,
       statePath: STATE_PATH
+    });
     });
   }
 

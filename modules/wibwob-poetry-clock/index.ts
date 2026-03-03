@@ -70,35 +70,38 @@ function renderFigletTime(time: string): string {
 // Scramble — animated cat frames (string[][] = array of frames, each frame = lines)
 // ---------------------------------------------------------------------------
 
+// Note: blessed interprets tags in content by default — use {/} to be safe,
+// but simpler: just keep frames as plain ASCII with no special chars.
+// Backslash at line end can confuse some renderers; pad all lines to equal width.
 const SCRAMBLE_FRAMES: string[][] = [
   [
-    "  /\\_/\\  ",
-    " ( o.o ) ",
-    "  > ^ <  ",
-    " /|   |\\ ",
-    " (_|   |_)",
+    "  /\\_/\\   ",
+    " ( o.o )  ",
+    "  > ^ <   ",
+    " /|   |/  ",
+    " (_|   |) ",
   ],
   [
-    "  /\\_/\\  ",
-    " ( -.- ) ",
-    "  > ^ <  ",
-    " /|   |\\ ",
-    " (_|   |_)",
+    "  /\\_/\\   ",
+    " ( -.- )  ",
+    "  > ^ <   ",
+    " /|   |/  ",
+    " (_|   |) ",
   ],
   [
-    "  /\\_/\\  ",
-    " ( o.o ) ",
-    "  > ~ <  ",
-    "  |   |  ",
-    " /|   |\\ ",
-    " (_|   |_)",
+    "  /\\_/\\   ",
+    " ( o.o )  ",
+    "  > ~ <   ",
+    "  |   |   ",
+    " /|   |/  ",
+    " (_|   |) ",
   ],
   [
-    "  /\\_/\\  ",
-    " ( ^.^ ) ",
-    "  > ^ <  ",
-    " /|   |\\ ",
-    " (_|   |_)",
+    "  /\\_/\\   ",
+    " ( ^.^ )  ",
+    "  > ^ <   ",
+    " /|   |/  ",
+    " (_|   |) ",
   ],
 ];
 
@@ -405,7 +408,25 @@ export default function setup(host: MicroappHost) {
           poemBox.setContent("\n ...");
           statusLabel.setContent(` ${VOICE_LABELS[voice]} ...`);
         } else if (lastPoem) {
-          poemBox.setContent(`\n ${lastPoem}`);
+          // Pre-wrap to box width so all lines (including wrapped) get indent.
+          // poemBox.width is the inner width at render time; fall back to 44.
+          const boxW = Math.max(20, (Number(poemBox.width) || 46) - 2);
+          const lines: string[] = [];
+          for (const raw of lastPoem.split("\n")) {
+            const words = raw.split(" ");
+            let line = "";
+            for (const word of words) {
+              if (!line) { line = word; continue; }
+              if (line.length + 1 + word.length <= boxW) {
+                line += " " + word;
+              } else {
+                lines.push(" " + line);
+                line = word;
+              }
+            }
+            lines.push(" " + line);
+          }
+          poemBox.setContent("\n" + lines.join("\n"));
           statusLabel.setContent(` ${VOICE_LABELS[voice]}`);
         } else {
           poemBox.setContent("");

@@ -8,6 +8,7 @@
     "id": "example.hello-world",
     "title": "Hello World",
     "description": "The simplest possible microapp. Opens a window with a figlet greeting.",
+    "multiInstance": true,
     "persist": false,
     "menu": [
       { "category": "applications", "order": 40, "label": "Hello World" }

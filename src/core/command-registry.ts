@@ -30,6 +30,7 @@ export interface DynamicCommandDefinition {
   group?: string;
   description?: string;
   action: (args?: Record<string, unknown>) => void;
+  multiInstance?: boolean;
   menuPlacements?: MenuPlacement[];
   palettePlacement?: PalettePlacement;
   api?: boolean;

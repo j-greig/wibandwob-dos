@@ -187,7 +187,25 @@ export class ControlApiService {
       return Response.json(this.handlers.getPrimerInfo(pathOrName));
     }
     if (request.method === "GET" && url.pathname === "/screenshot/text") {
-      const text = this.handlers.screenshotText();
+      const rawId = url.searchParams.get("id");
+      let text = this.handlers.screenshotText();
+      if (rawId !== null) {
+        const id = Number(rawId);
+        const win = this.handlers.windows.getWindowById(id);
+        if (win) {
+          const x = Number(win.frame.left);
+          const y = Number(win.frame.top);
+          const w = Number(win.frame.width);
+          const h = Number(win.frame.height);
+          // Strip ANSI, crop to window rect
+          const lines = text.split("\n");
+          const cropped = lines.slice(y, y + h).map(line => {
+            const stripped = line.replace(/\x1b\[[0-9;]*m/g, "");
+            return stripped.slice(x, x + w);
+          });
+          text = cropped.join("\n");
+        }
+      }
       return new Response(text, { headers: { "Content-Type": "text/plain; charset=utf-8" } });
     }
 

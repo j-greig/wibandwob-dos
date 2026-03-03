@@ -102,6 +102,7 @@ export interface AppCommandDefinition {
   group: AppCommandGroup;
   actionKey: keyof AppMenuActions;
   description?: string;
+  multiInstance?: boolean;
   menuPlacements?: MenuPlacement[];
   palettePlacement?: PalettePlacement;
   contextMenu?: ContextMenuPlacement;
@@ -122,6 +123,7 @@ export interface AppCommandDescriptor {
   group: AppCommandGroup;
   actionKey: keyof AppMenuActions;
   description?: string;
+  multiInstance?: boolean;
   menuPlacements: MenuPlacement[];
   palettePlacement?: PalettePlacement;
   contextMenu?: ContextMenuPlacement;
@@ -247,6 +249,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     label: "Open Primer...",
     group: "open",
     actionKey: "openPrimerPrompt",
+    multiInstance: true,
     menuPlacements: [{ category: "file", order: 20 }],
     contextMenu: { desktop: true, order: 10 }
   },
@@ -255,6 +258,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     label: "Open Text File...",
     group: "open",
     actionKey: "openTextFilePrompt",
+    multiInstance: true,
     menuPlacements: [{ category: "file", order: 30 }],
     contextMenu: { desktop: true, order: 20 }
   },
@@ -263,6 +267,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     label: "New Editor",
     group: "open",
     actionKey: "openEditor",
+    multiInstance: true,
     menuPlacements: [{ category: "file", order: 40 }]
   },
   {
@@ -323,6 +328,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     label: "Open Chrome Browser",
     group: "open",
     actionKey: "openChromeBrowser",
+    multiInstance: true,
     menuPlacements: [{ category: "applications", order: 40 }],
     palettePlacement: { order: 110 },
     contextMenu: { desktop: true, order: 50 },
@@ -428,6 +434,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     group: "surface",
     actionKey: "openBackroomsTv",
     description: "Open a Backrooms TV channel directly. Args: theme (string), model (haiku|sonnet|opus), turns (number), mode (auto|live|fake-live).",
+    multiInstance: true,
     menuPlacements: [],
     api: true,
     agent: true
@@ -479,6 +486,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     label: "Document Reader",
     group: "surface",
     actionKey: "openBrowserReader",
+    multiInstance: true,
     menuPlacements: [{ category: "applications", order: 50 }],
     palettePlacement: { order: 30 }
   },
@@ -496,6 +504,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     description: "Open a FIGlet banner. Args: text (string), font (string, optional). Without args opens interactive prompt.",
     group: "surface",
     actionKey: "openFigletBanner",
+    multiInstance: true,
     menuPlacements: [{ category: "applications", order: 70, label: "Figlet Banner" }],
     palettePlacement: { order: 50, label: "Open Figlet Banner" },
     api: true,
@@ -562,6 +571,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     group: "surface",
     actionKey: "viewReadme",
     description: "Open the project README in a document reader window.",
+    multiInstance: true,
     menuPlacements: [{ category: "help", order: 0 }],
     palettePlacement: { order: 200 },
   }
@@ -581,6 +591,7 @@ export function listAppCommands(): AppCommandDescriptor[] {
     group: command.group,
     actionKey: command.actionKey,
     description: command.description,
+    multiInstance: command.multiInstance,
     menuPlacements: [...(command.menuPlacements ?? [])],
     palettePlacement: command.palettePlacement,
     contextMenu: command.contextMenu,
