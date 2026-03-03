@@ -45,6 +45,13 @@ describe("command registry", () => {
     }
   });
 
+  test("list emits canonical ids only", async () => {
+    const { data } = await api("/commands/list");
+    const ids = new Set<string>(data.commands.map((cmd: { id: string }) => cmd.id));
+    expect(ids.has("theme.cycle")).toBe(true);
+    expect(ids.has("app.toggle_theme")).toBe(false);
+  });
+
   test("unknown command returns 404", async () => {
     const { status, data } = await api("/commands/run", "POST", { id: "nonexistent.command" });
     expect(status).toBe(404);
@@ -53,6 +60,16 @@ describe("command registry", () => {
 
   test("toggle_theme executes without error", async () => {
     // Toggle twice to end up back where we started
+    const r1 = await api("/commands/run", "POST", { id: "theme.cycle" });
+    expect(r1.status).toBe(200);
+    expect(r1.data.ok).toBe(true);
+
+    const r2 = await api("/commands/run", "POST", { id: "theme.cycle" });
+    expect(r2.status).toBe(200);
+    expect(r2.data.ok).toBe(true);
+  });
+
+  test("legacy alias executes without error", async () => {
     const r1 = await api("/commands/run", "POST", { id: "app.toggle_theme" });
     expect(r1.status).toBe(200);
     expect(r1.data.ok).toBe(true);

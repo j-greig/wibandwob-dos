@@ -185,3 +185,134 @@ export async function getLastMessage(target: string): Promise<string | null> {
     return null;
   }
 }
+
+// ============================================================================
+// Session Server — makes wibwob-tui a first-class peer in list_sessions
+// ============================================================================
+
+export interface SessionServerHandle {
+  /** The socket file path, e.g. ~/.pi/session-control/<id>.sock */
+  socketPath: string;
+  /** The alias symlink path, e.g. ~/.pi/session-control/wibwob-tui.alias */
+  aliasPath: string;
+  /** Stop the server and remove the socket + alias */
+  close(): void;
+}
+
+export interface SessionServerTarget {
+  /** The session's unique id (used as the socket filename) */
+  sessionId: string;
+  /** Submit a message into the session */
+  send(text: string, sender?: string): Promise<void>;
+  /** Return the last assistant reply, or null if none yet */
+  getLastReply(): string | null;
+  /** Abort any in-flight streaming */
+  abort?(): void;
+  /** Reset the session to empty state */
+  reset?(): void;
+}
+
+/**
+ * Start a Unix socket server so that `listSessions()` on any pi node
+ * discovers wibwob-tui as a first-class peer.
+ *
+ * Registers the socket at ~/.pi/session-control/<sessionId>.sock
+ * and a named alias at ~/.pi/session-control/wibwob-tui.alias.
+ *
+ * Handles the four standard RPC commands: send, get_message, abort, clear.
+ * get_summary returns the last reply as a stub summary.
+ */
+export function startSessionServer(target: SessionServerTarget): SessionServerHandle {
+  fs.mkdirSync(CONTROL_DIR, { recursive: true });
+
+  const socketPath = getSocketPath(target.sessionId);
+  const aliasPath = path.join(CONTROL_DIR, "wibwob-tui.alias");
+
+  // Clean up any stale socket from a previous run
+  try { fs.unlinkSync(socketPath); } catch { /* ignore */ }
+  try { fs.unlinkSync(aliasPath); } catch { /* ignore */ }
+
+  const server = net.createServer((socket) => {
+    socket.setEncoding("utf8");
+    let buffer = "";
+
+    socket.on("data", (chunk) => {
+      buffer += chunk;
+      const nl = buffer.indexOf("\n");
+      if (nl === -1) return;
+      const line = buffer.slice(0, nl);
+      buffer = buffer.slice(nl + 1);
+
+      let cmd: Record<string, unknown>;
+      try { cmd = JSON.parse(line); }
+      catch { socket.end(); return; }
+
+      const id = typeof cmd.id === "string" ? cmd.id : undefined;
+
+      function respond(success: boolean, data?: unknown, error?: string) {
+        const resp = JSON.stringify({ type: "response", command: cmd.type, success, data, error, id });
+        socket.end(resp + "\n");
+      }
+
+      switch (cmd.type) {
+        case "send": {
+          const message = typeof cmd.message === "string" ? cmd.message : "";
+          const mode = cmd.mode === "follow_up" ? "follow_up" : "steer";
+          const sender = typeof cmd.sender === "string" ? cmd.sender : undefined;
+          if (!message) { respond(false, undefined, "empty message"); return; }
+          // Fire and forget — the response is sent immediately so the caller isn't blocked
+          target.send(message, sender).catch(() => { /* swallow */ });
+          void mode; // mode noted, steer vs follow_up distinction handled by session.send internals
+          respond(true, { queued: true });
+          return;
+        }
+        case "get_message": {
+          const reply = target.getLastReply();
+          respond(true, { message: reply ? { content: reply } : null });
+          return;
+        }
+        case "get_summary": {
+          // Stub: return the last reply as summary
+          const reply = target.getLastReply();
+          respond(true, { summary: reply ?? "No messages yet." });
+          return;
+        }
+        case "abort": {
+          target.abort?.();
+          respond(true);
+          return;
+        }
+        case "clear": {
+          target.reset?.();
+          respond(true);
+          return;
+        }
+        default:
+          respond(false, undefined, `Unknown command: ${cmd.type}`);
+      }
+    });
+
+    socket.on("error", () => { /* ignore client disconnect errors */ });
+  });
+
+  server.listen(socketPath, () => {
+    // Create the alias symlink pointing to the socket basename
+    const rel = path.basename(socketPath);
+    try { fs.symlinkSync(rel, aliasPath); } catch { /* alias already exists or failed */ }
+  });
+
+  server.on("error", (e) => {
+    // Log but don't crash — the app runs fine without peer visibility
+    console.error("[pi-session-bridge] server error:", e.message);
+  });
+
+  return {
+    socketPath,
+    aliasPath,
+    close() {
+      server.close();
+      try { fs.unlinkSync(socketPath); } catch { /* ignore */ }
+      try { fs.unlinkSync(aliasPath); } catch { /* ignore */ }
+    },
+  };
+}

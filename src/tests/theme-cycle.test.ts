@@ -37,7 +37,7 @@ describe("theme cycle", () => {
       screenshots.push(text);
 
       // Toggle to next
-      const result = await runCommand("app.toggle_theme");
+      const result = await runCommand("theme.cycle");
       expect(result.ok).toBe(true);
     }
 
@@ -52,7 +52,7 @@ describe("theme cycle", () => {
 
     for (let i = 0; i < THEME_COUNT; i++) {
       screenshots.push(await getScreenText());
-      await runCommand("app.toggle_theme");
+      await runCommand("theme.cycle");
     }
 
     // Each pair of adjacent themes should differ

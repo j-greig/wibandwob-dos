@@ -248,6 +248,25 @@ Do not introduce these:
 - “just this once” prompt flows that should be shared components
 - hardcoded geometry magic numbers without named ownership
 
+## Pi Session Bridge
+
+The in-app Wib&Wob Agent can communicate with external pi sessions (wibwob1, wibwob2) running on the same machine.
+
+Three agent tools:
+- `list_sessions` — discover all live sessions by name and socket id
+- `send_to_session` — deliver a message to a named session
+- `get_session_message` — read the last response from a session
+
+Routing note: `sessionName` (e.g. "wibwob1") is sufficient to route a message. The `--session-control` flag is only required on the SENDING side. The receiver does not need it. No extra flag is needed when calling `send_to_session` from the in-app agent.
+
+Current topology: pi sessions (wibwob1, wibwob2) create Unix sockets at `~/.pi/session-control/<id>.sock` and speak JSON-RPC. The in-app agent bridge (`pi-session-bridge.ts`) is currently a CLIENT only — it can send to pi sessions but does not appear in `list_sessions` itself.
+
+To make wibwob-dos a first-class peer visible to other nodes:
+- spin up a socket SERVER in `pi-session-bridge.ts`
+- register the socket under `~/.pi/session-control/<id>.sock`
+- implement four RPC methods: `send`, `get_message`, `get_summary`, `clear`
+- then `list_sessions` from any node will discover wibwob-dos automatically
+
 ## Pi Integration Rule
 
 `pi-mono` is vendored for evaluation and potential runtime reuse.
@@ -284,7 +303,7 @@ The app currently includes:
 - top menu bar, bottom status line (shows theme name, window count, focus info)
 - desktop background fill with themed fill characters
 - draggable floating windows with app-owned shadows
-- theme system: 5 variants (dark, nord, pastel, phosphor, light), live switching via Alt+T / menu / palette / API, theme picker, `app.set_theme` API command, workspace theme persistence
+- theme system: 5 variants (dark, nord, pastel, phosphor, light), live switching via Alt+T / menu / palette / API, theme picker, `theme.set` API command, workspace theme persistence
 - primer viewer window
 - text editor window
 - primer browser window (discovers symlinked private primers)
@@ -307,6 +326,8 @@ The app currently includes:
 
 The app has a local HTTP control surface intended for autonomous debug loops and agent-driven validation.
 
+`AGENTS.md` and `CLAUDE.md` should stay identical in this section.
+
 Primary use:
 - open windows
 - inspect live desktop/window state
@@ -319,13 +340,23 @@ State/control owner:
 
 Current control endpoints (POST bodies shown where non-obvious):
 
+Use `GET /help` or `GET /openapi.json` first for the live authoritative endpoint catalogue. `GET /help` returns structured endpoint objects including body field shapes. The static list below is quick reference only.
+
 - `GET /state`
 - `GET /health`
+- `GET /help`                        — structured endpoint catalogue with method, path, description, body field shapes
+- `GET /openapi.json`               — OpenAPI 3.0 spec derived from ENDPOINT_CATALOGUE (paste into editor.swagger.io)
+
+`AGENTS.md` and `CLAUDE.md` should stay identical in this section.
+Use `GET /help` or `GET /openapi.json` first for the live authoritative endpoint catalogue. `GET /help` returns structured endpoint objects with body field shapes. The static list below is quick reference only.
+
+`AGENTS.md` and `CLAUDE.md` should stay identical in this section.
+Use `GET /help` or `GET /openapi.json` first for the live authoritative endpoint catalogue. `GET /help` returns structured endpoint objects with body field shapes. The static list below is quick reference only.
 - `GET /commands/list`
 - `GET /content/primer-info?path=...`
 - `GET /windows/text?id=...`
 - `GET /screenshot/text?id=...`
-- `POST /commands/run`              `{"command":"id","args":{}}`
+- `POST /commands/run`              `{"id":"command-id","args":{}}` — note field is `id` not `command`
 - `POST /view/primer/open`          `{"filePath":"/abs/path.txt"}`
 - `POST /view/figlet/open`          `{"text":"HELLO","font":"optional"}`
 - `POST /view/backrooms/open`       `{"theme":"...","mode":"auto|live|fake-live","model":"haiku|sonnet","turns":3,"primers":"optional"}`
@@ -348,8 +379,13 @@ Current control endpoints (POST bodies shown where non-obvious):
 - `POST /windows/input`             `{"id":N,"input":"text\r"}` — trailing `\r` submits
 - `POST /windows/agent-message`     `{"id":N,"text":"message","sender":"wibwob2"}` — send to agent window with named sender label. Outbound messages from the in-app agent include `replyVia: {url:"http://127.0.0.1:8099/windows/agent-message", windowId:N}` as return address.
 - `POST /windows/text/export`       `{"id":N,"label":"optional-name"}`
+- `POST /workspace/load`            `{"name":"workspace-name"}`
+- `POST /workspace/load`            `{"name":"workspace-name"}`
 - `POST /workspace/save`            `{"name":"workspace-name"}`
 - `POST /workspace/load`            `{"name":"workspace-name"}`
+
+Quick reference — common commands via POST /commands/run:
+- poetry clock mode:  `{"id":"microapp.wibwob.poetry-clock.set-mode","args":{"mode":"clock"|"sentient","voice":"plain"|"liminal"|"scramble"}}`
 
 Control parity rule:
 - whenever a new window family, app mode, or user-triggerable command is added, update both:

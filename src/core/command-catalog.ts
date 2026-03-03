@@ -142,14 +142,14 @@ const MENU_DEFINITIONS: MenuDefinition[] = [
 
 const APP_COMMANDS: AppCommandDefinition[] = [
   {
-    id: "file.browse_primers",
+    id: "primer.browse",
     label: "Browse Primers",
     group: "browse",
     actionKey: "browsePrimers",
     menuPlacements: [{ category: "applications", order: 25 }]
   },
   {
-    id: "file.open_file_manager",
+    id: "finder.open",
     label: "Open File Manager",
     group: "browse",
     actionKey: "openFileManager",
@@ -245,7 +245,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     agent: true
   },
   {
-    id: "file.open_primer_prompt",
+    id: "primer.open",
     label: "Open Primer...",
     group: "open",
     actionKey: "openPrimerPrompt",
@@ -254,7 +254,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     contextMenu: { desktop: true, order: 10 }
   },
   {
-    id: "file.open_text_file_prompt",
+    id: "editor.open",
     label: "Open Text File...",
     group: "open",
     actionKey: "openTextFilePrompt",
@@ -263,7 +263,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     contextMenu: { desktop: true, order: 20 }
   },
   {
-    id: "file.new_text_buffer",
+    id: "editor.new",
     label: "New Editor",
     group: "open",
     actionKey: "openEditor",
@@ -271,7 +271,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     menuPlacements: [{ category: "file", order: 40 }]
   },
   {
-    id: "file.save",
+    id: "editor.save",
     label: "Save",
     group: "save",
     actionKey: "saveFocusedEditor",
@@ -280,7 +280,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     contextMenu: { windowKinds: ["editor"], order: 10 }
   },
   {
-    id: "file.save_as",
+    id: "editor.save_as",
     label: "Save As...",
     group: "save",
     actionKey: "saveAsFocusedEditor",
@@ -297,7 +297,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     palettePlacement: { order: 70 }
   },
   {
-    id: "workspace.load_prompt",
+    id: "workspace.load",
     label: "Load Workspace...",
     group: "save",
     actionKey: "loadWorkspacePrompt",
@@ -306,7 +306,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
   },
   // ── Edit ──────────────────────────────────────────────
   {
-    id: "edit.copy_window_text",
+    id: "window.copy_text",
     label: "Copy Window Text",
     group: "edit",
     actionKey: "copyFocusedWindowText",
@@ -315,7 +315,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     contextMenu: { windowKinds: ["editor", "primer", "chat", "browser", "reader", "gallery", "inspector", "companion", "backrooms"], order: 30 }
   },
   {
-    id: "edit.export_window_text",
+    id: "window.export_text",
     label: "Export Window Text...",
     group: "edit",
     actionKey: "exportFocusedWindowText",
@@ -324,7 +324,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
   },
   // ── Applications ─────────────────────────────────────
   {
-    id: "browser.open_chrome",
+    id: "chrome.open",
     label: "Open Chrome Browser",
     group: "open",
     actionKey: "openChromeBrowser",
@@ -336,7 +336,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     agent: true
   },
   {
-    id: "agent.open_wibwob",
+    id: "agent.open",
     label: "Open Wib&Wob Agent",
     group: "open",
     actionKey: "openWibWobAgent",
@@ -347,7 +347,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     agent: true
   },
   {
-    id: "cam.open_monster_cam",
+    id: "monster_cam.open",
     label: "Monster Cam",
     group: "open",
     actionKey: "openMonsterCam",
@@ -358,7 +358,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     agent: true
   },
   {
-    id: "app.toggle_theme",
+    id: "theme.cycle",
     label: "Cycle Theme",
     group: "system",
     actionKey: "toggleTheme",
@@ -368,7 +368,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     agent: true
   },
   {
-    id: "app.choose_theme",
+    id: "theme.choose",
     label: "Choose Theme...",
     group: "system",
     actionKey: "chooseTheme",
@@ -378,7 +378,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     agent: true
   },
   {
-    id: "app.set_theme",
+    id: "theme.set",
     label: "Set Theme",
     description: "Set theme by name. Args: name (wibwob-dark, wibwob-dark-nord, wibwob-dark-pastel, wibwob-phosphor, wibwob-light).",
     group: "system",
@@ -417,7 +417,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
   },
 
   {
-    id: "backrooms.open_prompt",
+    id: "backrooms.open",
     label: "Backrooms TV...",
     group: "surface",
     actionKey: "openBackroomsPrompt",
@@ -429,7 +429,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
   },
 
   {
-    id: "backrooms.open",
+    id: "backrooms.run",
     label: "Open Backrooms TV (with args)",
     group: "surface",
     actionKey: "openBackroomsTv",
@@ -440,7 +440,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     agent: true
   },
   {
-    id: "backrooms.log_browser",
+    id: "backrooms_logs.open",
     label: "Backrooms Log Browser",
     group: "surface",
     actionKey: "openBackroomsLogBrowser",
@@ -474,7 +474,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     agent: true
   },
   {
-    id: "gallery.open",
+    id: "primer_gallery.open",
     label: "Open Gallery",
     group: "surface",
     actionKey: "openGallery",
@@ -482,7 +482,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     palettePlacement: { order: 20 }
   },
   {
-    id: "reader.open",
+    id: "document.open",
     label: "Document Reader",
     group: "surface",
     actionKey: "openBrowserReader",
@@ -491,7 +491,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     palettePlacement: { order: 30 }
   },
   {
-    id: "art.open_window",
+    id: "art.open",
     label: "Open Art",
     group: "surface",
     actionKey: "openArtWindow",
@@ -527,7 +527,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     palettePlacement: { order: 120 }
   },
   {
-    id: "workspace.open_manager",
+    id: "workspace.manage",
     label: "Workspace Manager",
     group: "surface",
     actionKey: "openWorkspaceManager",
@@ -558,7 +558,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     palettePlacement: { order: 170 }
   },
   {
-    id: "workspace.load",
+    id: "workspace.load_named",
     label: "Load Workspace",
     group: "save",
     actionKey: "loadWorkspace",
@@ -566,7 +566,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
   },
   // ── Help ──────────────────────────────────────────────
   {
-    id: "help.view_readme",
+    id: "readme.open",
     label: "View README",
     group: "surface",
     actionKey: "viewReadme",

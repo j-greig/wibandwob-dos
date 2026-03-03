@@ -30,8 +30,8 @@ fi
 
 curl -fsS "http://127.0.0.1:$PORT/commands/list?surface=agent" > "$CAPTURE_DIR/command-registry-agent-list.json"
 
-if ! grep -q '"id":"browser.open_chrome"' "$CAPTURE_DIR/command-registry-agent-list.json"; then
-  echo "browser.open_chrome not exposed to agent surface" >&2
+if ! grep -q '"id":"chrome.open"' "$CAPTURE_DIR/command-registry-agent-list.json"; then
+  echo "chrome.open not exposed to agent surface" >&2
   exit 1
 fi
 
@@ -42,7 +42,7 @@ fi
 
 curl -fsS -X POST "http://127.0.0.1:$PORT/commands/run" \
   -H 'content-type: application/json' \
-  -d '{"id":"browser.open_chrome"}' >/dev/null
+  -d '{"id":"chrome.open"}' >/dev/null
 
 curl -fsS -X POST "http://127.0.0.1:$PORT/commands/run" \
   -H 'content-type: application/json' \

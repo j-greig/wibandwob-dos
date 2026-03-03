@@ -36,7 +36,7 @@ describe("workspace round-trip", () => {
 
   test("save → close all → load → windows match", async () => {
     // 1. Open a known set of windows
-    await post("/commands/run", { id: "file.new_text_buffer" });
+    await post("/commands/run", { id: "editor.new" });
     await post("/commands/run", { id: "companion.open" });
     await post("/commands/run", { id: "figlet.open", args: { text: "TEST" } });
     await post("/view/primer/open", { filePath: "modules/example-primers/primers/hello-world.txt" });
@@ -75,14 +75,14 @@ describe("workspace round-trip", () => {
 
   test("theme persists across save/load", async () => {
     // Set a known theme
-    await post("/commands/run", { id: "app.set_theme", args: { name: "wibwob-dark-nord" } });
+    await post("/commands/run", { id: "theme.set", args: { name: "wibwob-dark-nord" } });
     await new Promise((r) => setTimeout(r, 300));
 
     // Save
     await post("/workspace/save", { name: testName + "-theme" });
 
     // Switch theme
-    await post("/commands/run", { id: "app.set_theme", args: { name: "wibwob-light" } });
+    await post("/commands/run", { id: "theme.set", args: { name: "wibwob-light" } });
     await new Promise((r) => setTimeout(r, 300));
     const mid = await get("/state");
     expect(mid.app.theme).toBe("wibwob-light");
@@ -94,7 +94,7 @@ describe("workspace round-trip", () => {
     expect(after.app.theme).toBe("wibwob-dark-nord");
 
     // Restore dark
-    await post("/commands/run", { id: "app.set_theme", args: { name: "wibwob-dark" } });
+    await post("/commands/run", { id: "theme.set", args: { name: "wibwob-dark" } });
   });
 
   test("move API accepts x/y aliases", async () => {

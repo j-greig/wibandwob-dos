@@ -89,7 +89,7 @@ describe("window parity audit", () => {
   });
 
   test("workspace-manager: reports appType and summary", async () => {
-    const win = await openAndFind("workspace.open_manager", "workspace-manager");
+    const win = await openAndFind("workspace.manage", "workspace-manager");
     expect(win).toBeDefined();
     openedIds.push(win.id);
     expect(win.details.appType).toBe("workspace-manager");
@@ -97,7 +97,7 @@ describe("window parity audit", () => {
   });
 
   test("chrome-browser: reports appType and summary", async () => {
-    const win = await openAndFind("browser.open_chrome", "chrome-browser", undefined, 1000);
+    const win = await openAndFind("chrome.open", "chrome-browser", undefined, 1000);
     expect(win).toBeDefined();
     openedIds.push(win.id);
     expect(win.details.appType).toBe("chrome-browser");
@@ -105,7 +105,7 @@ describe("window parity audit", () => {
   });
 
   test("wibwob-agent: reports appType, summary, model, streaming", async () => {
-    const win = await openAndFind("agent.open_wibwob", "wibwob-agent", undefined, 1000);
+    const win = await openAndFind("agent.open", "wibwob-agent", undefined, 1000);
     expect(win).toBeDefined();
     openedIds.push(win.id);
     expect(win.details.appType).toBe("wibwob-agent");
@@ -115,7 +115,7 @@ describe("window parity audit", () => {
   });
 
   test("reader-viewer: reports appType and summary", async () => {
-    const win = await openAndFind("reader.open", "reader-viewer", { filePath: "README.md" });
+    const win = await openAndFind("document.open", "reader-viewer", { filePath: "README.md" });
     expect(win).toBeDefined();
     openedIds.push(win.id);
     expect(win.details.appType).toBe("reader-viewer");
@@ -125,7 +125,7 @@ describe("window parity audit", () => {
   // --- Already tested types, included for completeness ---
 
   test("text-editor: reports appType and summary", async () => {
-    const win = await openAndFind("file.new_text_buffer", "text-editor");
+    const win = await openAndFind("editor.new", "text-editor");
     expect(win).toBeDefined();
     openedIds.push(win.id);
     expect(win.details.appType).toBe("text-editor");
@@ -141,7 +141,7 @@ describe("window parity audit", () => {
   });
 
   test("generative-art: reports appType and summary", async () => {
-    const win = await openAndFind("art.open_window", "generative-art");
+    const win = await openAndFind("art.open", "generative-art");
     expect(win).toBeDefined();
     openedIds.push(win.id);
     expect(win.details.appType).toBe("generative-art");
@@ -157,7 +157,7 @@ describe("window parity audit", () => {
   });
 
   test("primer-gallery: reports appType and summary", async () => {
-    const win = await openAndFind("gallery.open", "primer-gallery");
+    const win = await openAndFind("primer_gallery.open", "primer-gallery");
     expect(win).toBeDefined();
     openedIds.push(win.id);
     expect(win.details.appType).toBe("primer-gallery");

@@ -33,14 +33,14 @@ echo "Output: $OUTDIR"
 CMDS=(
   "file.new_text_buffer"
   "figlet.open"
-  "art.open_window"
+  "art.open"
   "pattern.open"
   "companion.open"
-  "gallery.open"
-  "workspace.open_manager"
+  "primer_gallery.open"
+  "workspace.manage"
   "inspector.open"
   "palette.open"
-  "backrooms.log_browser"
+  "backrooms_logs.open"
 )
 
 echo ""
@@ -84,7 +84,7 @@ for t in "${THEMES[@]}"; do
   echo "  ✓ $t"
   
   # Toggle to next theme
-  curl -sf -X POST "$API/commands/run" -H 'Content-Type: application/json' -d '{"id":"app.toggle_theme"}' > /dev/null
+  curl -sf -X POST "$API/commands/run" -H 'Content-Type: application/json' -d '{"id":"theme.cycle"}' > /dev/null
   sleep 0.3
 done
 

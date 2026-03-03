@@ -37,6 +37,33 @@ export interface DynamicCommandDefinition {
   agent?: boolean;
 }
 
+const LEGACY_COMMAND_ALIASES: Record<string, string> = {
+  "file.browse_primers": "primer.browse",
+  "file.open_file_manager": "finder.open",
+  "file.open_primer_prompt": "primer.open",
+  "file.open_text_file_prompt": "editor.open",
+  "file.save": "editor.save",
+  "file.save_as": "editor.save_as",
+  "workspace.load_prompt": "workspace.load",
+  "workspace.load": "workspace.load_named",
+  "edit.copy_window_text": "window.copy_text",
+  "edit.export_window_text": "window.export_text",
+  "browser.open_chrome": "chrome.open",
+  "agent.open_wibwob": "agent.open",
+  "cam.open_monster_cam": "monster_cam.open",
+  "app.toggle_theme": "theme.cycle",
+  "app.choose_theme": "theme.choose",
+  "app.set_theme": "theme.set",
+  "backrooms.open_prompt": "backrooms.open",
+  "backrooms.open": "backrooms.run",
+  "backrooms.log_browser": "backrooms_logs.open",
+  "gallery.open": "primer_gallery.open",
+  "reader.open": "document.open",
+  "art.open_window": "art.open",
+  "workspace.open_manager": "workspace.manage",
+  "help.view_readme": "readme.open",
+};
+
 export class CommandRegistry {
   private readonly commands: AppCommandDescriptor[];
   /** Dynamic commands registered by microapp modules at runtime. */
@@ -102,15 +129,16 @@ export class CommandRegistry {
   }
 
   run(id: string, args?: Record<string, unknown>): { ok: true } | { ok: false; error: string } {
+    const canonicalId = LEGACY_COMMAND_ALIASES[id] ?? id;
     // Check built-in commands first
-    const command = this.commands.find((candidate) => candidate.id === id);
+    const command = this.commands.find((candidate) => candidate.id === canonicalId);
     if (command) {
       const action = this.actions[command.actionKey] as (args?: Record<string, unknown>) => void;
       action(args);
       return { ok: true };
     }
     // Check dynamic commands
-    const dyn = this.dynamicCommands.find((candidate) => candidate.id === id);
+    const dyn = this.dynamicCommands.find((candidate) => candidate.id === canonicalId);
     if (dyn) {
       dyn.action(args);
       return { ok: true };

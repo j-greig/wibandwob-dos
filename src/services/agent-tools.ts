@@ -97,9 +97,9 @@ const runCommand = tuiTool({
   description:
     "Runs a high-level app command by id using the shared command registry.",
   parameters: Type.Object({
-    id: Type.String({ description: "Command id, e.g. browser.open_chrome or window.tile" }),
+    id: Type.String({ description: "Command id, e.g. chrome.open or window.tile" }),
     args: Type.Optional(Type.Record(Type.String(), Type.Unknown(), {
-      description: "Optional arguments for parameterised commands, e.g. {\"theme\": \"forest\", \"model\": \"sonnet\", \"turns\": 8} for backrooms.open"
+      description: "Optional arguments for parameterised commands, e.g. {\"theme\": \"forest\", \"model\": \"sonnet\", \"turns\": 8} for backrooms.run"
     }))
   }),
   execute: (params, ctx) => JSON.stringify(ctx.runCommand(params.id, params.args)),

@@ -18,7 +18,7 @@ import { REPO_ROOT, SPIKE_PI_APPEND_SYSTEM_PATH, SPIKE_PI_DIR } from "../core/co
 import type { ChatMessageEntry, DesktopState } from "../core/types.js";
 import { Type } from "@sinclair/typebox";
 import { createTuiTools, formatDesktopSummary, type TuiToolContext } from "./agent-tools.js";
-import { getLastMessage, listSessions, loadSessionMessages, sendToSession } from "./pi-session-bridge.js";
+import { getLastMessage, listSessions, loadSessionMessages, sendToSession, startSessionServer, type SessionServerHandle } from "./pi-session-bridge.js";
 import {
   createBashTool,
   createReadTool,
@@ -339,6 +339,7 @@ export class WibWobAgentSession {
   private lastToolName?: string;
   private readonly sessionId = createMessageId("wibwob-agent");
   private resumeMessages?: AgentMessage[];
+  private sessionServer?: SessionServerHandle;
 
   readonly mode: "agent" | "chat";
 
@@ -411,6 +412,24 @@ export class WibWobAgentSession {
         ? `Ready. Tools: ${tools.length}. Model: ${initial.model.provider}/${initial.model.id}`
         : `Ready. Model: ${initial.model.provider}/${initial.model.id}`;
       this.lastError = undefined;
+
+      // Start the session control server so wibwob-tui appears in list_sessions
+      if (!this.sessionServer) {
+        const self = this;
+        try {
+          this.sessionServer = startSessionServer({
+            sessionId: this.sessionId,
+            send: (text, sender) => self.send(text, sender),
+            getLastReply: () => self.getLastReply(),
+            abort: () => self.agent?.abort(),
+            reset: () => self.reset(),
+          });
+        } catch (e) {
+          // Non-fatal — agent runs fine without peer socket
+          console.error("[wibwob-agent-session] could not start session server:", e);
+        }
+      }
+
       this.emit();
     } catch (error) {
       this.ready = false;
@@ -425,7 +444,14 @@ export class WibWobAgentSession {
     }
   }
 
+  getLastReply(): string | null {
+    const msgs = this.messages.filter(m => m.role === "assistant" && !m.streaming && m.text);
+    return msgs.length > 0 ? msgs[msgs.length - 1].text : null;
+  }
+
   dispose(): void {
+    this.sessionServer?.close();
+    this.sessionServer = undefined;
     this.agent?.abort();
     this.agent = undefined;
     this.ready = false;
