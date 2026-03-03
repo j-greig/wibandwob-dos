@@ -4,6 +4,7 @@ import { theme } from "../core/theme/resolver.js";
 import type { StateService } from "../services/state-service.js";
 import type { WorkspaceService } from "../services/workspace-service.js";
 import { createScrollbar, safeSetStyle } from "../core/ui-primitives.js";
+import { createLivePlayer, type LiveFrameGenerator } from "../services/animation-service.js";
 import { animationAppType } from "../core/types.js";
 import type { DesktopState, List, LogBox, MenuItem, WindowKind, WindowRecord } from "../core/types.js";
 import type { WindowManager } from "../core/window-manager.js";
@@ -20,7 +21,8 @@ export function openAnimatedWindow(
   deps: BaseWindowDeps,
   title: string,
   kind: AnimationKind,
-  renderFrame: (tick: number, width: number, height: number) => string
+  generator: LiveFrameGenerator,
+  fps = 8
 ): void {
   const frame = deps.windowManager.createFrame(title, kind);
   const canvas = blessed.box({
@@ -31,21 +33,26 @@ export function openAnimatedWindow(
     bottom: 0,
     style: theme().body
   });
-  let tick = 0;
-  const render = () => {
-    canvas.setContent(renderFrame(tick, Math.max(12, Number(canvas.width)), Math.max(6, Number(canvas.height))));
-    deps.screen.render();
-    tick += 1;
-  };
-  render();
-  const timer = setInterval(render, 120);
+  const player = createLivePlayer({
+    generator,
+    fps,
+    getViewport: () => ({
+      width: Math.max(12, Number(canvas.width)),
+      height: Math.max(6, Number(canvas.height)),
+    }),
+    onFrame: (content) => {
+      canvas.setContent(content);
+      deps.screen.render();
+    },
+  });
+  player.play();
   frame.kind = kind;
   frame.describeState = () => ({
     appType: animationAppType[kind],
     summary: `Animated ${kind} window.`,
     contentPreview: canvas.getContent().split("\n").slice(0, 8).join("\n")
   });
-  frame.cleanup = () => clearInterval(timer);
+  frame.cleanup = () => player.destroy();
   frame.focus = () => {
     deps.windowManager.focusWindow(frame);
     canvas.focus();
@@ -69,7 +76,7 @@ export function openPatternWindow(deps: BaseWindowDeps): void {
       rows.push(row);
     }
     return rows.join("\n");
-  });
+  }, 8);
 }
 
 export function openCompanionWindow(
@@ -130,37 +137,42 @@ export function openArtWindow(deps: BaseWindowDeps): void {
     bottom: 0,
     style: theme().body
   });
-  let tick = 0;
-  const renderArt = () => {
-    const width = Math.max(12, Number(canvas.width));
-    const height = Math.max(6, Number(canvas.height));
-    const palette = " .:-=+*#%@";
-    const rows: string[] = [];
-    for (let y = 0; y < height; y += 1) {
-      let row = "";
-      for (let x = 0; x < width; x += 1) {
-        const waveA = Math.sin((x + tick) / 5);
-        const waveB = Math.cos((y - tick) / 4);
-        const orbit = Math.sin((x + y + tick) / 7);
-        const value = (waveA + waveB + orbit + 3) / 6;
-        row += palette[Math.min(palette.length - 1, Math.max(0, Math.floor(value * palette.length)))];
+  const player = createLivePlayer({
+    generator: (tick, width, height) => {
+      const palette = " .:-=+*#%@";
+      const rows: string[] = [];
+      for (let y = 0; y < height; y += 1) {
+        let row = "";
+        for (let x = 0; x < width; x += 1) {
+          const waveA = Math.sin((x + tick) / 5);
+          const waveB = Math.cos((y - tick) / 4);
+          const orbit = Math.sin((x + y + tick) / 7);
+          const value = (waveA + waveB + orbit + 3) / 6;
+          row += palette[Math.min(palette.length - 1, Math.max(0, Math.floor(value * palette.length)))];
+        }
+        rows.push(row);
       }
-      rows.push(row);
-    }
-    canvas.setContent(rows.join("\n"));
-    deps.screen.render();
-    tick += 1;
-  };
-  renderArt();
-  const timer = setInterval(renderArt, 100);
+      return rows.join("\n");
+    },
+    fps: 10,
+    getViewport: () => ({
+      width: Math.max(12, Number(canvas.width)),
+      height: Math.max(6, Number(canvas.height)),
+    }),
+    onFrame: (content) => {
+      canvas.setContent(content);
+      deps.screen.render();
+    },
+  });
+  player.play();
   frame.kind = "art";
   frame.describeState = () => ({
     appType: "generative-art",
     summary: "Animated procedural art field.",
     contentPreview: canvas.getContent().split("\n").slice(0, 8).join("\n"),
-    tick
+    tick: player.currentFrame
   });
-  frame.cleanup = () => clearInterval(timer);
+  frame.cleanup = () => player.destroy();
   frame.focus = () => {
     deps.windowManager.focusWindow(frame);
     canvas.focus();

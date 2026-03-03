@@ -81,9 +81,9 @@ Rules:
 
 ## Tier 6 — New subsystems (defer until shell is boring)
 
-- [ ] **Animation subsystem**
+- [x] **Animation subsystem**
   Build `animation-service.ts` + `animation-windows.ts`. Frame source, playback, live generators, overlay composition.
-  Status: not-started
+  Status: landed (core) — animation-service.ts with createPreRenderedPlayer and createLivePlayer. Primer viewer, pattern window, and generative art all refactored to use the service. Overlay composition deferred until needed.
   Spec: `.planning/epics/e002-ts-tui-root-migration/legacy-docs/011-games-and-generative-art.md`
   Also: `.planning/epics/e002-ts-tui-root-migration/legacy-docs/016-terminal-kit-screenbuffer-animation-spike.md`
 

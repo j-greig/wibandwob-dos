@@ -6,6 +6,7 @@ import stringWidth from "string-width";
 import { theme } from "../core/theme/resolver.js";
 import { createScrollbar, safeSetStyle } from "../core/ui-primitives.js";
 import type { ContentMeasurement } from "../services/content-measurement.js";
+import { createPreRenderedPlayer, type FramePlayer } from "../services/animation-service.js";
 import { viewerAppType } from "../core/types.js";
 import type { Box, BrowserEntry, List, WindowKind, WindowRecord } from "../core/types.js";
 import type { OverlayManager } from "../core/overlay-manager.js";
@@ -345,31 +346,31 @@ export function openTextViewerWindow(params: {
   frame.filePath = params.filePath;
   const m = params.measurement;
 
-  // --- Animation setup ---
+  // --- Animation setup (uses animation-service) ---
   const animFrames = params.frames && params.frames.length > 1 ? params.frames : null;
-  const fps = m?.fps ?? 4;
-  let animIndex = 0;
-  let animTimer: ReturnType<typeof setInterval> | null = null;
-  let animPaused = false;
   const baseTitle = params.title;
+  let player: FramePlayer | null = null;
 
   const updateTitle = () => {
-    if (!animFrames || !frame.titleBar) return;
-    const counter = `${animIndex + 1}/${animFrames.length}`;
-    const pauseTag = animPaused ? " ⏸" : "";
+    if (!player || !frame.titleBar) return;
+    const counter = `${player.currentFrame + 1}/${player.totalFrames}`;
+    const pauseTag = player.paused ? " ⏸" : "";
     frame.titleBar.setContent(` ${counter} ${baseTitle}${pauseTag} `);
   };
 
   if (animFrames) {
+    player = createPreRenderedPlayer({
+      frames: animFrames,
+      fps: m?.fps ?? 4,
+      onFrame: (content, _index, _total) => {
+        currentContent = content;
+        setViewportContent(viewer, currentContent);
+        updateTitle();
+        viewer.screen.render();
+      },
+    });
     updateTitle();
-    animTimer = setInterval(() => {
-      if (animPaused) return;
-      animIndex = (animIndex + 1) % animFrames.length;
-      currentContent = animFrames[animIndex].join("\n");
-      setViewportContent(viewer, currentContent);
-      updateTitle();
-      viewer.screen.render();
-    }, 1000 / fps);
+    player.play();
   }
 
   frame.describeState = () => ({
@@ -382,10 +383,10 @@ export function openTextViewerWindow(params: {
     recommendedWidth: m?.recommendedWidth,
     recommendedHeight: m?.recommendedHeight,
     animated: m?.animated,
-    fps: animFrames ? fps : undefined,
+    fps: player?.fps,
     frameCount: m?.frameCount,
-    currentFrame: animFrames ? animIndex : undefined,
-    paused: animFrames ? animPaused : undefined,
+    currentFrame: player?.currentFrame,
+    paused: player?.paused,
     skippedCommentLines: m?.skippedCommentLines,
     contentPreview: params.content.split("\n").slice(0, 8).join("\n")
   });
@@ -399,10 +400,10 @@ export function openTextViewerWindow(params: {
   };
 
   // Space to pause/resume animation
-  if (animFrames) {
+  if (player) {
     viewer.on("keypress", (_ch: string, key: { name?: string }) => {
       if (key.name === "space") {
-        animPaused = !animPaused;
+        player!.togglePause();
         updateTitle();
         viewer.screen.render();
       }
@@ -410,10 +411,7 @@ export function openTextViewerWindow(params: {
   }
 
   frame.cleanup = () => {
-    if (animTimer) {
-      clearInterval(animTimer);
-      animTimer = null;
-    }
+    player?.destroy();
   };
 
   params.windowManager.registerWindow(frame);
