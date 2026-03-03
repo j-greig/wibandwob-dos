@@ -1,16 +1,12 @@
 dos.wibandwob.com {
-    # WebSocket support (ttyd uses WS for terminal IO)
-    @websocket {
-        header Connection *Upgrade*
-        header Upgrade    websocket
+    basicauth {
+        # htpasswd hash — default: wibwob / wibwob123 (change this)
+        # generate new hash: caddy hash-password --plaintext yourpassword
+        wibwob $2a$14$Zkx19XLiW6VYouLHR5NmfOFU0z2GTNmpkT61B9jlhgC9OXPJoM5C6
     }
 
-    handle @websocket {
-        reverse_proxy token-proxy:8080
-    }
-
-    handle {
-        reverse_proxy token-proxy:8080
+    reverse_proxy ttyd:7681 {
+        header_up X-Real-IP {http.request.header.CF-Connecting-IP}
     }
 
     log {
