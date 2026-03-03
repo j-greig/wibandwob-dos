@@ -1,10 +1,22 @@
 FROM oven/bun:1-debian
 
+# Install figlet + curl via apt, ttyd via GitHub release (not in Debian trixie)
 RUN apt-get update && apt-get install -y \
-    ttyd \
     figlet \
     curl \
     && rm -rf /var/lib/apt/lists/*
+
+# Install ttyd binary for aarch64 (arm64) from GitHub releases
+RUN ARCH=$(dpkg --print-architecture) && \
+    case "$ARCH" in \
+      amd64) TTYD_ARCH=x86_64 ;; \
+      arm64) TTYD_ARCH=aarch64 ;; \
+      *) echo "Unsupported arch: $ARCH" && exit 1 ;; \
+    esac && \
+    curl -fsSL "https://github.com/tsl0922/ttyd/releases/latest/download/ttyd.${TTYD_ARCH}" \
+      -o /usr/local/bin/ttyd && \
+    chmod +x /usr/local/bin/ttyd && \
+    ttyd --version
 
 WORKDIR /app
 
