@@ -11,6 +11,7 @@
  */
 
 /** A live generator produces a frame string given tick count and viewport size. */
+/** @primitive */
 export type LiveFrameGenerator = (tick: number, width: number, height: number) => string;
 
 export interface FramePlayerOptions {
@@ -28,6 +29,7 @@ export interface LivePlayerOptions extends FramePlayerOptions {
   getViewport: () => { width: number; height: number };
 }
 
+/** @primitive */
 export interface FramePlayer {
   /** Start or resume playback. */
   play(): void;
@@ -50,6 +52,7 @@ export interface FramePlayer {
  * Create a player for pre-rendered frames (e.g. animated primers).
  * Frames are cycled at the given FPS. onFrame is called with the
  * joined frame text, current index, and total count.
+ * @primitive
  */
 export function createPreRenderedPlayer(options: PreRenderedPlayerOptions): FramePlayer {
   const { frames, fps, onFrame } = options;
@@ -100,6 +103,7 @@ export function createPreRenderedPlayer(options: PreRenderedPlayerOptions): Fram
 /**
  * Create a player for live-generated frames (e.g. pattern field, generative art).
  * The generator is called every tick with the current tick count and viewport size.
+ * @primitive
  */
 export function createLivePlayer(options: LivePlayerOptions): FramePlayer {
   const { generator, getViewport, fps, onFrame } = options;

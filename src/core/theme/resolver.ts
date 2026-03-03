@@ -35,16 +35,19 @@ let activeVariant: ThemeVariant = dark;
 // ---------------------------------------------------------------------------
 
 /** The current active theme tokens. */
+/** @primitive */
 export function theme(): ThemeTokens {
   return activeVariant.tokens;
 }
 
 /** The current variant name. */
+/** @primitive */
 export function themeName(): string {
   return activeVariant.name;
 }
 
 /** Switch to a specific variant. */
+/** @primitive */
 export function setThemeVariant(variant: ThemeVariant): void {
   activeVariant = variant;
 }
@@ -59,6 +62,7 @@ export function toggleTheme(): string {
 }
 
 /** All registered variants (built-in + external). */
+/** @primitive */
 export function allVariants(): readonly ThemeVariant[] {
   return [...BUILTIN_VARIANTS, ...externalVariants];
 }
@@ -66,6 +70,7 @@ export function allVariants(): readonly ThemeVariant[] {
 /**
  * Register an external theme variant from a module.
  * Called by module-loader.ts during startup, before workspace restore.
+ * @primitive
  */
 export function registerExternalTheme(variant: ThemeVariant): void {
   // Prevent duplicates — a module reloading should not double-register

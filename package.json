@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "bun run src/app.ts --dev",
     "start": "bun run src/app.ts",
+    "gen-primitives": "bun scripts/gen-primitives.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

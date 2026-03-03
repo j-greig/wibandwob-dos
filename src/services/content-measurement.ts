@@ -116,6 +116,7 @@ export function measureContent(rawContent: string, options: MeasureOptions = {})
   };
 }
 
+/** @primitive */
 export function measurePrimerContent(rawContent: string): MeasuredContent {
   return measureContent(rawContent, {
     skipHashComments: true,

@@ -1,12 +1,15 @@
 import type { WindowKind } from "./types.js";
 
+/** @primitive */
 export type ChromeMode = "standard" | "toolbar" | "frameless";
 
+/** @primitive */
 export interface ContentSize {
   width: number;
   height: number;
 }
 
+/** @primitive */
 export interface WindowSize {
   width: number;
   height: number;
@@ -22,10 +25,12 @@ const CHROME_PADDING: Record<ChromeMode, WindowSize> = {
   frameless: { width: 0, height: 0 }
 };
 
+/** @primitive */
 export function getChromeModeForWindow(kind: WindowKind): ChromeMode {
   return CHROME_BY_KIND[kind] ?? "standard";
 }
 
+/** @primitive */
 export function contentToWindowSize(content: ContentSize, chromeMode: ChromeMode): WindowSize {
   const chrome = CHROME_PADDING[chromeMode];
   return {

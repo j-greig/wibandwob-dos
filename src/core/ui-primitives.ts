@@ -1,5 +1,6 @@
 import { theme } from "./theme/resolver.js";
 
+/** @primitive */
 export function createScrollbar(): { ch: string; style: { bg: string } } {
   return { ch: " ", style: { bg: theme().scrollbar.bg } };
 }
@@ -8,6 +9,7 @@ export function createScrollbar(): { ch: string; style: { bg: string } } {
  * Returns a style object that includes scrollbar sub-styles.
  * Use this for any widget that has `scrollable: true` / `scrollbar: createScrollbar()`.
  * Without this, blessed crashes on render when style.scrollbar is missing.
+ * @primitive
  */
 export function scrollableStyle(base: Record<string, any>): Record<string, any> {
   return {
@@ -22,6 +24,7 @@ export function scrollableStyle(base: Record<string, any>): Record<string, any> 
  * Blessed crashes if style.scrollbar is missing on scrollable elements,
  * or if style.item is missing on list elements.
  * Use this instead of `el.style = {...}` when restyling widgets.
+ * @primitive
  */
 export function safeSetStyle(el: any, newStyle: Record<string, any>): void {
   const patched = { ...newStyle };
@@ -40,6 +43,7 @@ export function safeSetStyle(el: any, newStyle: Record<string, any>): void {
   el.style = patched;
 }
 
+/** @primitive */
 export function isRightClick(data?: { button?: string | number; buttons?: string | number } | null): boolean {
   if (!data) {
     return false;

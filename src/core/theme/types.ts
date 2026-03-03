@@ -8,12 +8,14 @@
 export type AppearanceMode = "system" | "light" | "dark";
 
 /** A blessed-compatible style pair. */
+/** @primitive */
 export interface StylePair {
   fg: string;
   bg: string;
 }
 
 /** Full semantic token set for one theme variant. */
+/** @primitive */
 export interface ThemeTokens {
   // Desktop shell
   desktop: StylePair;
@@ -54,6 +56,7 @@ export interface ThemeTokens {
 }
 
 /** A named theme variant. */
+/** @primitive */
 export interface ThemeVariant {
   name: string;
   tokens: ThemeTokens;
