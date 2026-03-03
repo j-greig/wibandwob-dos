@@ -143,17 +143,17 @@ export class CommandRegistry {
     if (command) {
       const action = this.actions[command.actionKey] as (args?: Record<string, unknown>) => unknown;
       const result = action(args);
-      log.info("cmd", `${canonicalId}${argsStr} → ok`);
+      log.cmd(`${canonicalId}${argsStr} → ok`);
       return result === undefined ? { ok: true } : { ok: true, result };
     }
     // Check dynamic commands
     const dyn = this.dynamicCommands.find((candidate) => candidate.id === canonicalId);
     if (dyn) {
       const result = dyn.action(args);
-      log.info("cmd", `${canonicalId}${argsStr} → ok`);
+      log.cmd(`${canonicalId}${argsStr} → ok`);
       return result === undefined ? { ok: true } : { ok: true, result };
     }
-    log.warn("cmd", `${canonicalId}${argsStr} → unknown command`);
+    log.cmd(`${canonicalId}${argsStr} → unknown command`);
     return { ok: false, error: `Unknown command: ${id}` };
   }
 

@@ -229,7 +229,7 @@ export class TsTuiMvpApp {
     this.controlApi.start();
     this.syncState();
     this.screen.render();
-    log.info("app", `started ${this.screen.width}x${this.screen.height} theme:${themeName()}`);
+    log.app(`started ${this.screen.width}x${this.screen.height} theme:${themeName()}`);
   }
 
   /** Restore default workspace on boot. Empty desktop if none exists. */
@@ -347,7 +347,7 @@ export class TsTuiMvpApp {
 
   /** Apply current theme tokens to all shell chrome and open windows. */
   private applyTheme(): void {
-    log.info("app", `theme → ${themeName()}`);
+    log.app(`theme → ${themeName()}`);
     this.menuBar.style = theme().menuBar;
     this.desktop.style = theme().desktop;
     this.statusLine.style = theme().statusLine;

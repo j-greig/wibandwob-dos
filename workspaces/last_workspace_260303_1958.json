@@ -1,0 +1,67 @@
+{
+  "version": 1,
+  "app": "test_pattern",
+  "timestamp": "2026-03-03T19:58:32",
+  "screen": { "width": 320, "height": 77 },
+  "globals": { "patternMode": "continuous" },
+  "desktop": { "char": "Â", "fg": 8, "bg": 0, "gallery": false, "preset": "custom" },
+  "windows": [
+    {
+      "id": "w1",
+      "type": "text_view",
+      "title": "claude-taste-cube.txt (Transparent)",
+      "bounds": { "x": 138, "y": 8, "w": 75, "h": 31 },
+      "zoomed": false,
+      "props": {"path": "/Users/james/Repos/wibandwob-dos/modules-private/wibwob-primers/primers/claude-taste-cube.txt"}
+    },
+    {
+      "id": "w2",
+      "type": "text_view",
+      "title": "devil-terminal.txt (Transparent)",
+      "bounds": { "x": 47, "y": 22, "w": 116, "h": 52 },
+      "zoomed": false,
+      "props": {"path": "/Users/james/Repos/wibandwob-dos/modules-private/wibwob-primers/primers/devil-terminal.txt"}
+    },
+    {
+      "id": "w3",
+      "type": "figlet_text",
+      "title": "dissolve into signal",
+      "bounds": { "x": 62, "y": 12, "w": 82, "h": 9 },
+      "zoomed": false,
+      "props": {"text": "dissolve into signal", "font": "smslant", "fg": "#FFFFFF", "bg": "#000000", "frameless": false, "shadowless": false}
+    },
+    {
+      "id": "w4",
+      "type": "figlet_text",
+      "title": "exit / start",
+      "bounds": { "x": 235, "y": 32, "w": 55, "h": 12 },
+      "zoomed": false,
+      "props": {"text": "exit / start", "font": "doom", "fg": "#FFFFFF", "bg": "#000000", "frameless": false, "shadowless": false}
+    },
+    {
+      "id": "w5",
+      "type": "figlet_text",
+      "title": "the devil reads your screen",
+      "bounds": { "x": 200, "y": 3, "w": 82, "h": 9 },
+      "zoomed": false,
+      "props": {"text": "the devil reads your screen", "font": "small", "fg": "#FFFFFF", "bg": "#000000", "frameless": false, "shadowless": false}
+    },
+    {
+      "id": "w6",
+      "type": "wibwob",
+      "title": "Wib&Wob Chat",
+      "bounds": { "x": 169, "y": 40, "w": 148, "h": 34 },
+      "zoomed": false,
+      "props": {}
+    },
+    {
+      "id": "w7",
+      "type": "text_view",
+      "title": "consiousness-fragmentation.txt (Transparent)",
+      "bounds": { "x": 8, "y": 3, "w": 80, "h": 25 },
+      "zoomed": false,
+      "props": {"path": "/Users/james/Repos/wibandwob-dos/modules-private/wibwob-primers/primers/consiousness-fragmentation.txt"}
+    }
+  ],
+  "focusedIndex": 0
+}

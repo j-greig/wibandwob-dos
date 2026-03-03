@@ -452,14 +452,14 @@ export class WibWobAgentSession {
 
   reloadPrompt(): boolean {
     if (!this.agent) {
-      log.warn("agent", "reload requested but no active session");
+      log.err("reload requested but no active session");
       return false;
     }
     const newPrompt = this.mode === "agent"
       ? loadAgentSystemPrompt()
       : loadChatSystemPrompt();
     this.agent.setSystemPrompt(newPrompt);
-    log.info("agent", `prompt reloaded (${newPrompt.length} chars)`);
+    log.sys(`prompt reloaded (${newPrompt.length} chars)`);
     return true;
   }
 
@@ -544,7 +544,7 @@ export class WibWobAgentSession {
 
     const from = sender ? `[${sender}]` : "user";
     const preview = msg.length > 80 ? msg.slice(0, 77) + "..." : msg;
-    log.info("agent", `${from} → ${preview}`);
+    log.msg(`${from} → ${preview}`);
 
     this.messages.push({ id: createMessageId("user"), role: "user", text: msg, sender });
     this.currentAssistantId = createMessageId("assistant");

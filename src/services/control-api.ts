@@ -175,7 +175,7 @@ export class ControlApiService {
         });
         this.actualPort = port;
         this.enabled = true;
-        log.info("app", `control API listening on port ${port}`);
+        log.app(`control API listening on port ${port}`);
         return;
       } catch {
         continue;
@@ -270,7 +270,7 @@ export class ControlApiService {
       request.method === "POST" ? await request.json().catch(() => ({})) : {};
 
     if (request.method === "POST") {
-      log.info("api", `POST ${url.pathname}`);
+      log.api(`POST ${url.pathname}`);
     }
 
     if (request.method === "POST" && url.pathname === "/commands/run") {

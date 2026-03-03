@@ -1,10 +1,15 @@
 /**
  * app-logger.ts — terse, human-readable daily log file.
  *
- * Format: HH:MM:SS level source message
- * Example: 22:14:03 INFO cmd agent.reload_prompt → ok
- *          22:14:05 WARN session no active agent to reload
- *          22:14:07 ERR  api /view/primer/open failed: file not found
+ * Format: HH:MM:SS TAG message
+ *
+ * Tags:
+ *   APP  — lifecycle: startup, shutdown, theme change
+ *   CMD  — command registry: run, unknown
+ *   MSG  — agent messages: inbound user/sender text
+ *   SYS  — system ops: prompt reload, session init
+ *   API  — control API: POST requests
+ *   ERR  — failures
  *
  * One file per day: logs/tui-app/YYYY-MM-DD.log
  * Gitignored via existing logs/* rule.
@@ -15,13 +20,13 @@ import { join } from "node:path";
 
 const LOG_DIR = join(new URL(".", import.meta.url).pathname, "../../logs/tui-app");
 
-type Level = "INFO" | "WARN" | "ERR ";
+type Tag = "APP " | "CMD " | "MSG " | "SYS " | "API " | "ERR ";
 
 let currentDate = "";
 let logPath = "";
 
 function ensureLogFile(): string {
-  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  const today = new Date().toISOString().slice(0, 10);
   if (today !== currentDate) {
     currentDate = today;
     mkdirSync(LOG_DIR, { recursive: true });
@@ -30,21 +35,23 @@ function ensureLogFile(): string {
   return logPath;
 }
 
-function timestamp(): string {
-  return new Date().toISOString().slice(11, 19); // HH:MM:SS
+function ts(): string {
+  return new Date().toISOString().slice(11, 19);
 }
 
-function write(level: Level, source: string, message: string): void {
-  const line = `${timestamp()} ${level} ${source} ${message}\n`;
+function write(tag: Tag, message: string): void {
   try {
-    appendFileSync(ensureLogFile(), line);
+    appendFileSync(ensureLogFile(), `${ts()} ${tag} ${message}\n`);
   } catch {
     // Silent — logging must never crash the app
   }
 }
 
 export const log = {
-  info: (source: string, message: string) => write("INFO", source, message),
-  warn: (source: string, message: string) => write("WARN", source, message),
-  err:  (source: string, message: string) => write("ERR ", source, message),
+  app: (message: string) => write("APP ", message),
+  cmd: (message: string) => write("CMD ", message),
+  msg: (message: string) => write("MSG ", message),
+  sys: (message: string) => write("SYS ", message),
+  api: (message: string) => write("API ", message),
+  err: (message: string) => write("ERR ", message),
 };
