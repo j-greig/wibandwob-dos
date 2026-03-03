@@ -210,6 +210,9 @@ export interface WindowRecord {
   // Finder-specific (set by content-windows.ts)
   finder?: FinderController;
 
+  // Microapp-specific (set by module-loader.ts via MicroappHost)
+  microappId?: string;
+
   // Cross-cutting hooks — any window type may set these
   writeInput?: (input: string) => void;
   cleanup?: () => void;
@@ -244,6 +247,17 @@ export function isEditorWindow(w: WindowRecord): w is EditorWindowRecord {
 /** Narrow to a finder window with guaranteed finder controller. */
 export function isFinderWindow(w: WindowRecord): w is FinderWindowRecord {
   return w.kind === "browser" && w.finder !== undefined;
+}
+
+/** Window created by a microapp module. */
+export interface MicroappWindowRecord extends WindowRecord {
+  kind: "microapp";
+  microappId: string;
+}
+
+/** Narrow to a microapp window with guaranteed microappId. */
+export function isMicroappWindow(w: WindowRecord): w is MicroappWindowRecord {
+  return w.kind === "microapp" && typeof w.microappId === "string";
 }
 
 /** Controller interface exposed by Finder windows for command dispatch. */

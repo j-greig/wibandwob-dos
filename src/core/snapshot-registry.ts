@@ -299,6 +299,23 @@ export const snapshotRegistry = {
 } satisfies Record<PersistableAppType, SnapshotHandler>;
 
 // ---------------------------------------------------------------------------
+// Dynamic snapshot handlers — registered by microapp modules at runtime.
+// ---------------------------------------------------------------------------
+
+const dynamicHandlers = new Map<string, SnapshotHandler>();
+
+/**
+ * Register a snapshot handler for a dynamic appType (microapp module).
+ * Called by MicroappHost.registerSnapshot() during module setup.
+ */
+export function registerDynamicSnapshot(appType: string, handler: SnapshotHandler): void {
+  if (dynamicHandlers.has(appType)) {
+    console.warn(`[snapshot-registry] Duplicate dynamic handler for "${appType}" — overwriting`);
+  }
+  dynamicHandlers.set(appType, handler);
+}
+
+// ---------------------------------------------------------------------------
 // Public API — used by workspace-snapshots.ts
 // ---------------------------------------------------------------------------
 
@@ -306,14 +323,15 @@ export const snapshotRegistry = {
 export function isPersistable(window: WindowRecord): boolean {
   const appType = window.describeState?.()?.appType;
   if (!appType) return false;
-  return appType in snapshotRegistry;
+  return (appType in snapshotRegistry) || dynamicHandlers.has(appType);
 }
 
 /** Serialize a window's payload using the registry. Returns undefined for unknown/transient types. */
 export function registrySerialize(window: WindowRecord): Record<string, unknown> | undefined {
-  const appType = window.describeState?.()?.appType as PersistableAppType | undefined;
+  const appType = window.describeState?.()?.appType as string | undefined;
   if (!appType) return undefined;
-  const handler = snapshotRegistry[appType];
+  // Check built-in registry first, then dynamic handlers
+  const handler = (snapshotRegistry as Record<string, SnapshotHandler>)[appType] ?? dynamicHandlers.get(appType);
   if (!handler) return undefined;
   const payload = handler.serialize(window);
   // Always include appType in the payload so restore can dispatch on it
@@ -355,12 +373,13 @@ export function registryRestore(
   // Prefer explicit appType from payload, remap legacy values, fall back to kind-based default
   const raw = typeof payload.appType === "string" ? payload.appType : undefined;
   const remapped = raw ? (legacyAppTypeRemap[raw] ?? raw) : undefined;
-  const appType = (remapped ?? kindFallbackMap[snapshot.kind]) as PersistableAppType | undefined;
+  const appType = (remapped ?? kindFallbackMap[snapshot.kind]) as string | undefined;
   if (!appType) {
     console.warn(`[snapshot-registry] No restore handler for kind "${snapshot.kind}" — skipping window "${snapshot.title}"`);
     return false;
   }
-  const handler = snapshotRegistry[appType];
+  // Check built-in registry first, then dynamic handlers
+  const handler = (snapshotRegistry as Record<string, SnapshotHandler>)[appType] ?? dynamicHandlers.get(appType);
   if (!handler) {
     console.warn(`[snapshot-registry] No restore handler for appType "${appType}" — skipping window "${snapshot.title}"`);
     return false;

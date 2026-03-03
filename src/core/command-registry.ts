@@ -6,6 +6,8 @@ import {
   type AppCommandDescriptor,
   type AppMenuActions,
   type MenuContext,
+  type MenuPlacement,
+  type PalettePlacement,
 } from "./command-catalog.js";
 import type { MenuConfig, MenuItem } from "./types.js";
 
@@ -21,42 +23,98 @@ export interface CommandListItem {
   menuCategories: AppCommandCategory[];
 }
 
+/** Definition accepted by addDynamic(). Self-contained — no AppMenuActions key needed. */
+export interface DynamicCommandDefinition {
+  id: string;
+  label: string;
+  group?: string;
+  description?: string;
+  action: (args?: Record<string, unknown>) => void;
+  menuPlacements?: MenuPlacement[];
+  palettePlacement?: PalettePlacement;
+  api?: boolean;
+  agent?: boolean;
+}
+
 export class CommandRegistry {
   private readonly commands: AppCommandDescriptor[];
+  /** Dynamic commands registered by microapp modules at runtime. */
+  private readonly dynamicCommands: DynamicCommandDefinition[] = [];
 
   constructor(private readonly actions: AppMenuActions) {
     this.commands = listAppCommands();
   }
 
+  /**
+   * Register a dynamic command (from a microapp module).
+   * Appears in list(), run(), buildMenus(), buildPalette(), and agent/API surfaces.
+   */
+  addDynamic(def: DynamicCommandDefinition): void {
+    this.dynamicCommands.push(def);
+  }
+
   buildMenus(): MenuConfig[] {
-    return createMenuConfigs(this.actions);
+    const menus = createMenuConfigs(this.actions);
+    // Append dynamic commands to matching menu categories
+    for (const dyn of this.dynamicCommands) {
+      for (const placement of dyn.menuPlacements ?? []) {
+        const menu = menus.find((m) => m.label.toLowerCase() === placement.category);
+        if (menu) {
+          menu.items.push({ label: placement.label ?? dyn.label, action: () => dyn.action() });
+        }
+      }
+    }
+    return menus;
   }
 
   buildPalette(): MenuItem[] {
-    return createPaletteCommands(this.actions);
+    const items = createPaletteCommands(this.actions);
+    for (const dyn of this.dynamicCommands) {
+      if (dyn.palettePlacement) {
+        items.push({ label: dyn.palettePlacement.label ?? dyn.label, action: () => dyn.action() });
+      }
+    }
+    return items;
   }
 
   list(surface?: CommandSurface): CommandListItem[] {
-    return this.commands
-      .map((command) => ({
-        id: command.id,
-        label: command.label,
-        group: command.group,
-        description: command.description,
-        surfaces: this.getSurfaces(command),
-        menuCategories: [...new Set(command.menuPlacements.map((placement) => placement.category))]
-      }))
-      .filter((command) => (surface ? command.surfaces.includes(surface) : true));
+    const builtIn = this.commands.map((command) => ({
+      id: command.id,
+      label: command.label,
+      group: command.group,
+      description: command.description,
+      surfaces: this.getSurfaces(command),
+      menuCategories: [...new Set(command.menuPlacements.map((placement) => placement.category))]
+    }));
+
+    const dynamic = this.dynamicCommands.map((dyn) => ({
+      id: dyn.id,
+      label: dyn.label,
+      group: dyn.group ?? "surface",
+      description: dyn.description,
+      surfaces: this.getDynamicSurfaces(dyn),
+      menuCategories: [...new Set((dyn.menuPlacements ?? []).map((p) => p.category))] as AppCommandCategory[],
+    }));
+
+    const all = [...builtIn, ...dynamic];
+    return surface ? all.filter((cmd) => cmd.surfaces.includes(surface)) : all;
   }
 
   run(id: string, args?: Record<string, unknown>): { ok: true } | { ok: false; error: string } {
+    // Check built-in commands first
     const command = this.commands.find((candidate) => candidate.id === id);
-    if (!command) {
-      return { ok: false, error: `Unknown command: ${id}` };
+    if (command) {
+      const action = this.actions[command.actionKey] as (args?: Record<string, unknown>) => void;
+      action(args);
+      return { ok: true };
     }
-    const action = this.actions[command.actionKey] as (args?: Record<string, unknown>) => void;
-    action(args);
-    return { ok: true };
+    // Check dynamic commands
+    const dyn = this.dynamicCommands.find((candidate) => candidate.id === id);
+    if (dyn) {
+      dyn.action(args);
+      return { ok: true };
+    }
+    return { ok: false, error: `Unknown command: ${id}` };
   }
 
   /** Return context-menu items for the given context, sorted by order. */
@@ -116,6 +174,15 @@ export class CommandRegistry {
     if (command.agent) {
       surfaces.add("agent");
     }
+    return [...surfaces];
+  }
+
+  private getDynamicSurfaces(dyn: DynamicCommandDefinition): CommandSurface[] {
+    const surfaces = new Set<CommandSurface>();
+    if ((dyn.menuPlacements ?? []).length > 0) surfaces.add("menu");
+    if (dyn.palettePlacement) surfaces.add("palette");
+    if (dyn.api !== false) surfaces.add("api");
+    if (dyn.agent !== false) surfaces.add("agent");
     return [...surfaces];
   }
 }
