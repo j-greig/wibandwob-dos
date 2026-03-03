@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 
 import { CONTROL_API_PORT, MASTER_PHILOSOPHY_PATH, README_PATH, REPO_ROOT, SPIKE_NOTES_PATH, SPIKE_ROOT, STATE_PATH, WORKSPACES_DIR } from "./config.js";
+import { loadModules } from "../services/module-loader.js";
 import type { AppMenuActions } from "./command-catalog.js";
 import { CommandRegistry } from "./command-registry.js";
 import { buildDesktopContextMenu, buildWindowContextMenu } from "./context-menu-items.js";
@@ -195,7 +196,11 @@ export class TsTuiMvpApp {
     );
   }
 
-  run(): void {
+  async run(): Promise<void> {
+    // Load external modules (themes, future microapps) before workspace restore
+    // so that external themes are available for theme restoration.
+    await loadModules();
+
     this.renderChrome();
     this.bindGlobalKeys();
     this.menuUi.bindMenuClicks((label) => this.openMenu(label));

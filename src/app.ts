@@ -7,4 +7,4 @@ process.env.HOME = process.env.HOME || os.homedir();
 
 const { TsTuiMvpApp } = await import("./core/app-controller.js");
 
-new TsTuiMvpApp().run();
+await new TsTuiMvpApp().run();

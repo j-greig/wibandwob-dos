@@ -86,7 +86,12 @@ export function measureContent(rawContent: string, options: MeasureOptions = {})
     frames.push([...currentFrame]);
   }
 
-  const measuredLines = sawFrameDelimiter ? primaryFrameLines : visibleLines;
+  // If delimiter came before any content (leading-delimiter format like "FPS=3\n---\n..."),
+  // primaryFrameLines is empty. Fall back to the first parsed frame for sizing.
+  const effectivePrimary = primaryFrameLines.length > 0
+    ? primaryFrameLines
+    : (frames.length > 0 ? frames[0] : visibleLines);
+  const measuredLines = sawFrameDelimiter ? effectivePrimary : visibleLines;
   const columnWidth = measuredLines.reduce((max, line) => Math.max(max, stringWidth(line)), 0);
 
   return {
