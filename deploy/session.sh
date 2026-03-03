@@ -11,4 +11,6 @@ export COLORTERM=truecolor
 # the resize signal arrives too late to reflow correctly on first paint.
 sleep 0.5
 
-exec timeout 1800 bun run /app/src/app.ts
+# unshare creates a new mount/pid/uts namespace — limits filesystem damage
+# TODO: replace with proper non-root user + read-only mounts (see deploy/README.md)
+exec unshare --mount --pid --fork timeout 1800 bun run /app/src/app.ts
