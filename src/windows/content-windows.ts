@@ -351,13 +351,23 @@ export function openTextViewerWindow(params: {
   let animIndex = 0;
   let animTimer: ReturnType<typeof setInterval> | null = null;
   let animPaused = false;
+  const baseTitle = params.title;
+
+  const updateTitle = () => {
+    if (!animFrames || !frame.titleBar) return;
+    const counter = `${animIndex + 1}/${animFrames.length}`;
+    const pauseTag = animPaused ? " ⏸" : "";
+    frame.titleBar.setContent(` ${counter} ${baseTitle}${pauseTag} `);
+  };
 
   if (animFrames) {
+    updateTitle();
     animTimer = setInterval(() => {
       if (animPaused) return;
       animIndex = (animIndex + 1) % animFrames.length;
       currentContent = animFrames[animIndex].join("\n");
       setViewportContent(viewer, currentContent);
+      updateTitle();
       viewer.screen.render();
     }, 1000 / fps);
   }
@@ -393,6 +403,8 @@ export function openTextViewerWindow(params: {
     viewer.on("keypress", (_ch: string, key: { name?: string }) => {
       if (key.name === "space") {
         animPaused = !animPaused;
+        updateTitle();
+        viewer.screen.render();
       }
     });
   }
