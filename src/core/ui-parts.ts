@@ -286,7 +286,7 @@ export function createHeaderBar(
 /** @primitive */
 export function createStatusBar(
   parent: blessed.Widgets.Node,
-  _opts: Record<string, never> = {}
+  opts: { leftInset?: number } = {}
 ): UiPart<{ left?: string; right?: string }> {
   const node = blessed.box({
     parent,
@@ -301,7 +301,7 @@ export function createStatusBar(
   let lastProps: { left?: string; right?: string } = {};
 
   const render = () => {
-    node.setContent(renderAlignedBar(lastProps.left ?? "", lastProps.right, lastRect.width));
+    node.setContent(renderAlignedBar(lastProps.left ?? "", lastProps.right, lastRect.width, opts.leftInset ?? 0));
   };
 
   return {
@@ -433,7 +433,7 @@ export function createRule(
 /** @primitive */
 export function createFigletDisplay(
   parent: blessed.Widgets.Node,
-  opts: { renderText: (value: string) => string }
+  opts: { renderText: (value: string) => string; leftInset?: number }
 ): UiPart<{ value: string }> {
   const node = blessed.box({
     parent,
@@ -451,7 +451,8 @@ export function createFigletDisplay(
   let lastProps = { value: "" };
 
   const render = () => {
-    node.setContent(opts.renderText(lastProps.value));
+    const inset = " ".repeat(Math.max(0, opts.leftInset ?? 0));
+    node.setContent(opts.renderText(lastProps.value).split("\n").map(l => `${inset}${l}`).join("\n"));
   };
 
   return {

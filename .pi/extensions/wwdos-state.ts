@@ -25,12 +25,14 @@ interface WindowState {
   top?: number;
   width?: number;
   height?: number;
+  details?: Record<string, unknown>;
 }
 
 interface AppState {
   windows?: WindowState[];
-  theme?: string;
-  desktop?: { width: number; height: number };
+  app?: { theme?: string };
+  screen?: { width: number; height: number };
+  focus?: { windowId: number; kind: string; title: string };
 }
 
 async function fetchState(): Promise<AppState | null> {
@@ -50,21 +52,30 @@ function formatState(state: AppState): string {
   const windows = state.windows ?? [];
   if (windows.length === 0) return "";
 
-  const focused = windows.find((w) => w.focused);
-  const focusLabel = focused ? `focus: ${focused.id}:${focused.kind}` : "none focused";
-  const desktop = state.desktop ? `${state.desktop.width}x${state.desktop.height}` : "?";
-  const theme = state.theme ?? "?";
+  const f = state.focus;
+  const focusLabel = f ? `${f.windowId}:${f.kind}` : "none focused";
+  const screen = state.screen;
+  const desktop = screen ? `${screen.width}x${screen.height}` : "?";
+  const theme = state.app?.theme ?? "?";
 
   const lines: string[] = [
-    `## WibWob-DOS desktop — ${windows.length} window${windows.length === 1 ? "" : "s"} | ${focusLabel} | theme: ${theme} | desktop: ${desktop}`,
+    `## WibWob-DOS desktop — ${windows.length} window${windows.length === 1 ? "" : "s"} | focus: ${focusLabel} | theme: ${theme} | desktop: ${desktop}`,
   ];
 
   for (const w of windows) {
     const pos = w.left != null ? ` @${w.left},${w.top}` : "";
     const size = w.width != null ? ` ${w.width}x${w.height}` : "";
-    const focus = w.focused ? " [focused]" : "";
+    const foc = w.focused ? " [focused]" : "";
     const type = w.appType ? `${w.kind}(${w.appType})` : w.kind;
-    lines.push(`  ${String(w.id).padStart(2)}  ${type.padEnd(22)} ${w.title}${size}${pos}${focus}`);
+    // surface useful detail fields for focused/microapp windows
+    const d = w.details ?? {};
+    const extras: string[] = [];
+    if (d.mode) extras.push(`mode:${d.mode}`);
+    if (d.voice) extras.push(`voice:${d.voice}`);
+    if (d.currentTime) extras.push(`time:${d.currentTime}`);
+    if (d.streaming !== undefined) extras.push(`streaming:${d.streaming}`);
+    const detail = extras.length ? `  {${extras.join(", ")}}` : "";
+    lines.push(`  ${String(w.id).padStart(2)}  ${type.padEnd(30)} ${w.title}${size}${pos}${foc}${detail}`);
   }
 
   lines.push(`Use ./scripts/screenshot-window.sh "<title>" to inspect any window visually.`);
@@ -73,7 +84,7 @@ function formatState(state: AppState): string {
 }
 
 export default function (pi: ExtensionAPI) {
-  pi.on("before_agent_start", async (_event, _ctx) => {
+  pi.on("before_agent_start", async (event, _ctx) => {
     const state = await fetchState();
     if (!state) return; // app not running — skip silently
 
@@ -81,7 +92,7 @@ export default function (pi: ExtensionAPI) {
     if (!snippet) return;
 
     return {
-      systemPrompt: _event.systemPrompt + "\n\n" + snippet,
+      systemPrompt: event.systemPrompt + "\n\n" + snippet,
     };
   });
 }

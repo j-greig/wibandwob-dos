@@ -329,14 +329,14 @@ export default function setup(host: MicroappHost) {
       height: 17,
     });
 
-    const dateHeader = host.ui.createHeaderBar(win.body, { leftInset: 1 });
-    const figletTime = host.ui.createFigletDisplay(win.body, { renderText: renderFigletTime });
+    const dateHeader = host.ui.createHeaderBar(win.body, { leftInset: 2 });
+    const figletTime = host.ui.createFigletDisplay(win.body, { renderText: renderFigletTime, leftInset: 2 });
     const divider = host.ui.createRule(win.body, { axis: "horizontal", inset: 2 });
     const catPlayer = createScramblePlayer(host);
     const catPanel = host.ui.createAnimatedPanel(win.body, { player: catPlayer });
     const catRule = host.ui.createRule(win.body, { axis: "vertical" });
-    const poemBlock = host.ui.createTextBlock(win.body, { paddingLeft: 1, paddingTop: 1 });
-    const statusBar = host.ui.createStatusBar(win.body);
+    const poemBlock = host.ui.createTextBlock(win.body, { paddingLeft: 2, paddingTop: 1 });
+    const statusBar = host.ui.createStatusBar(win.body, { leftInset: 2 });
 
     const body = host.ui.createColumns(win.body, [
       {
