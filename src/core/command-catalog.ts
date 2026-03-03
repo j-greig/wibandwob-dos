@@ -5,14 +5,14 @@ export interface AppMenuActions {
   openFileManager: () => void;
   openPrimerPrompt: (args?: Record<string, unknown>) => void;
   listPrimers: () => unknown;
-  openTextFilePrompt: () => void;
+  openTextFilePrompt: (args?: Record<string, unknown>) => void;
   openEditor: () => void;
   saveFocusedEditor: () => void;
   saveAsFocusedEditor: () => void;
   saveWorkspaceAs: () => void;
   loadWorkspacePrompt: () => void;
   copyFocusedWindowText: () => void;
-  exportFocusedWindowText: () => void;
+  exportFocusedWindowText: (args?: Record<string, unknown>) => void;
   openArtWindow: () => void;
   openContourWindow: () => void;
   openWibWobAgent: () => void;
@@ -27,16 +27,16 @@ export interface AppMenuActions {
   tileWindows: () => void;
   cascadeWindows: () => void;
   openGallery: () => void;
-  openBrowserReader: () => void;
-  openChromeBrowser: () => void;
+  openBrowserReader: (args?: Record<string, unknown>) => void;
+  openChromeBrowser: (args?: Record<string, unknown>) => void;
   openFigletBanner: (args?: Record<string, unknown>) => void;
   openPatternWindow: () => void;
   openCompanionWindow: () => void;
   openWorkspaceManager: () => void;
   openCommandPalette: () => void;
   openStateInspector: () => void;
-  saveWorkspace: () => void;
-  loadWorkspace: () => void;
+  saveWorkspace: (args?: Record<string, unknown>) => void;
+  loadWorkspace: (args?: Record<string, unknown>) => void;
   toggleTheme: () => void;
   chooseTheme: () => void;
   setTheme: (args?: Record<string, unknown>) => void;
@@ -276,11 +276,14 @@ const APP_COMMANDS: AppCommandDefinition[] = [
   {
     id: "editor.open",
     label: "Open Text File...",
+    description: "Open a text file in the editor. Args: filePath (string), title (string, optional), initial (string, optional). Without args opens interactive file picker.",
     group: "open",
     actionKey: "openTextFilePrompt",
     multiInstance: true,
     menuPlacements: [{ category: "file", order: 30 }],
-    contextMenu: { desktop: true, order: 20 }
+    contextMenu: { desktop: true, order: 20 },
+    api: true,
+    agent: true
   },
   {
     id: "editor.new",
@@ -340,16 +343,19 @@ const APP_COMMANDS: AppCommandDefinition[] = [
   {
     id: "window.export_text",
     label: "Export Window Text...",
+    description: "Export a window's text content to scratch/captures/. Args: id (number, window id), name (string, optional label). Without args exports the focused window.",
     group: "edit",
     actionKey: "exportFocusedWindowText",
     menuPlacements: [{ category: "edit", order: 20 }],
-    palettePlacement: { order: 210 }
+    palettePlacement: { order: 210 },
+    api: true,
+    agent: true
   },
   // ── Applications ─────────────────────────────────────
   {
     id: "chrome.open",
     label: "Open Chrome Browser",
-    description: "Open a Chrome browser window for web content extraction.",
+    description: "Open a Chrome browser window for web content extraction. Args: url (string, optional). Without args opens to default page.",
     group: "open",
     actionKey: "openChromeBrowser",
     multiInstance: true,
@@ -527,11 +533,14 @@ const APP_COMMANDS: AppCommandDefinition[] = [
   {
     id: "document.open",
     label: "Document Reader",
+    description: "Open a local file in the document reader. Args: filePath (string). Without args opens the default document.",
     group: "surface",
     actionKey: "openBrowserReader",
     multiInstance: true,
     menuPlacements: [{ category: "applications", order: 50 }],
-    palettePlacement: { order: 30 }
+    palettePlacement: { order: 30 },
+    api: true,
+    agent: true
   },
   {
     id: "art.open",
@@ -625,16 +634,22 @@ const APP_COMMANDS: AppCommandDefinition[] = [
   {
     id: "workspace.save",
     label: "Save Workspace",
+    description: "Save the current workspace. Args: name (string). Without args saves to 'default'.",
     group: "save",
     actionKey: "saveWorkspace",
-    palettePlacement: { order: 170 }
+    palettePlacement: { order: 170 },
+    api: true,
+    agent: true
   },
   {
     id: "workspace.load_named",
     label: "Load Workspace",
+    description: "Load a named workspace. Args: name (string). Without args loads 'default'.",
     group: "save",
     actionKey: "loadWorkspace",
-    palettePlacement: { order: 180 }
+    palettePlacement: { order: 180 },
+    api: true,
+    agent: true
   },
   // ── Help ──────────────────────────────────────────────
   {

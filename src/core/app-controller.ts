@@ -855,20 +855,34 @@ export class TsTuiMvpApp {
     }
   }
 
-  private exportFocusedWindowText(): void {
-    const focused = this.windowManager.getFocusedWindow();
-    if (!focused) {
-      this.overlays.flash("No focused window.");
-      return;
+  private exportFocusedWindowText(targetId?: number, label?: string): void {
+    let windowId: number;
+    let windowTitle: string;
+    if (targetId !== undefined) {
+      const win = this.windowManager.getWindowById(targetId);
+      if (!win) {
+        this.overlays.flash(`Window ${targetId} not found.`);
+        return;
+      }
+      windowId = targetId;
+      windowTitle = win.title;
+    } else {
+      const focused = this.windowManager.getFocusedWindow();
+      if (!focused) {
+        this.overlays.flash("No focused window.");
+        return;
+      }
+      windowId = focused.id;
+      windowTitle = focused.title;
     }
-    const text = this.windowManager.captureText(focused.id);
+    const text = this.windowManager.captureText(windowId);
     if (!text) {
       this.overlays.flash("No text to export from this window.");
       return;
     }
     const capturesDir = path.join(SPIKE_ROOT, "scratch", "captures");
     fs.mkdirSync(capturesDir, { recursive: true });
-    const slug = focused.title.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 40);
+    const slug = (label ?? windowTitle).replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 40);
     const fileName = `${slug}_${Date.now()}.txt`;
     const filePath = path.join(capturesDir, fileName);
     fs.writeFileSync(filePath, text, "utf8");
@@ -1182,14 +1196,35 @@ export class TsTuiMvpApp {
           animated: measurement?.animated ?? false
         };
       }),
-      openTextFilePrompt: () => this.promptForEditorPath(),
+      openTextFilePrompt: (args) => {
+        const filePath = typeof args?.filePath === "string" && args.filePath.trim() ? args.filePath.trim() : undefined;
+        if (filePath) {
+          const title = typeof args?.title === "string" ? args.title : path.basename(filePath);
+          let initial = typeof args?.initial === "string" ? args.initial : undefined;
+          // If no initial content provided, read from disk
+          if (initial === undefined) {
+            try {
+              initial = fs.existsSync(filePath) ? fs.readFileSync(filePath, "utf8") : "";
+            } catch {
+              initial = "";
+            }
+          }
+          this.openEditorWindow(filePath, title, initial);
+        } else {
+          this.promptForEditorPath();
+        }
+      },
       openEditor: () => this.openEditorWindow(),
       saveFocusedEditor: () => this.saveFocusedEditor(),
       saveAsFocusedEditor: () => this.saveAsFocusedEditor(),
       saveWorkspaceAs: () => this.promptForWorkspaceSave(),
       loadWorkspacePrompt: () => this.promptForWorkspaceLoad(),
       copyFocusedWindowText: () => this.copyFocusedWindowText(),
-      exportFocusedWindowText: () => this.exportFocusedWindowText(),
+      exportFocusedWindowText: (args) => {
+        const id = typeof args?.id === "number" ? args.id : undefined;
+        const name = typeof args?.name === "string" && args.name.trim() ? args.name.trim() : undefined;
+        this.exportFocusedWindowText(id, name);
+      },
       openArtWindow: () => this.openArtWindow(),
       openContourWindow: () => this.openContourWindow(),
       openWibWobAgent: () => this.openWibWobAgentWindow(),
@@ -1216,8 +1251,14 @@ export class TsTuiMvpApp {
       tileWindows: () => this.windowManager.tileWindows(),
       cascadeWindows: () => this.windowManager.cascadeWindows(),
       openGallery: () => this.openPrimerGalleryWindow(),
-      openBrowserReader: () => this.openBrowserReaderWindow(),
-      openChromeBrowser: () => this.openChromeBrowserWindow(),
+      openBrowserReader: (args) => {
+        const filePath = typeof args?.filePath === "string" && args.filePath.trim() ? args.filePath.trim() : undefined;
+        this.openBrowserReaderWindow(filePath);
+      },
+      openChromeBrowser: (args) => {
+        const url = typeof args?.url === "string" && args.url.trim() ? args.url.trim() : undefined;
+        this.openChromeBrowserWindow(url);
+      },
       openFigletBanner: (args) => {
         const text = args?.text as string | undefined;
         if (text) {
@@ -1232,8 +1273,22 @@ export class TsTuiMvpApp {
       openWorkspaceManager: () => this.openWorkspaceManagerWindow(),
       openCommandPalette: () => this.openCommandPaletteWindow(),
       openStateInspector: () => this.openStateInspectorWindow(),
-      saveWorkspace: () => this.saveWorkspace(),
-      loadWorkspace: () => this.loadWorkspace(),
+      saveWorkspace: (args) => {
+        const name = typeof args?.name === "string" && args.name.trim() ? args.name.trim() : undefined;
+        if (name) {
+          this.saveWorkspaceNamed(name);
+        } else {
+          this.saveWorkspace();
+        }
+      },
+      loadWorkspace: (args) => {
+        const name = typeof args?.name === "string" && args.name.trim() ? args.name.trim() : undefined;
+        if (name) {
+          this.loadWorkspaceNamed(name);
+        } else {
+          this.loadWorkspace();
+        }
+      },
       toggleTheme: () => this.toggleTheme(),
       chooseTheme: () => this.chooseTheme(),
       setTheme: (args) => this.setThemeByName(args),
