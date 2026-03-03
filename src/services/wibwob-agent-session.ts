@@ -7,6 +7,7 @@
  */
 
 import { Agent } from "@mariozechner/pi-agent-core";
+import type { AgentMessage } from "@mariozechner/pi-agent-core";
 import {
   AuthStorage,
   ModelRegistry,
@@ -17,7 +18,7 @@ import { REPO_ROOT, SPIKE_PI_APPEND_SYSTEM_PATH, SPIKE_PI_DIR } from "../core/co
 import type { ChatMessageEntry, DesktopState } from "../core/types.js";
 import { Type } from "@sinclair/typebox";
 import { createTuiTools, formatDesktopSummary, type TuiToolContext } from "./agent-tools.js";
-import { listSessions, sendToSession, getLastMessage } from "./pi-session-bridge.js";
+import { getLastMessage, listSessions, loadSessionMessages, sendToSession } from "./pi-session-bridge.js";
 import {
   createBashTool,
   createReadTool,
@@ -337,6 +338,7 @@ export class WibWobAgentSession {
   private currentAssistantId?: string;
   private lastToolName?: string;
   private readonly sessionId = createMessageId("wibwob-agent");
+  private resumeMessages?: AgentMessage[];
 
   readonly mode: "agent" | "chat";
 
@@ -387,13 +389,16 @@ export class WibWobAgentSession {
           }
         : undefined;
 
+      const initialMessages = this.resumeMessages ?? [];
+      this.resumeMessages = undefined;
+
       this.agent = new Agent({
         initialState: {
           systemPrompt,
           model: initial.model,
           thinkingLevel: initial.thinkingLevel,
           tools,
-          messages: [],
+          messages: initialMessages,
         },
         transformContext,
         sessionId: this.sessionId,
@@ -455,10 +460,38 @@ export class WibWobAgentSession {
     this.currentAssistantId = undefined;
     this.lastToolName = undefined;
     this.lastError = undefined;
+    this.resumeMessages = undefined;
     this.status = "Ready.";
     // Re-create the agent so context is fresh
     this.agent?.abort();
     this.agent = undefined;
+    this.emit();
+  }
+
+  pushStatus(text: string): void {
+    this.messages.push({
+      id: createMessageId("status"),
+      role: "status",
+      text,
+    });
+    this.emit();
+  }
+
+  async resume(sessionPath: string): Promise<void> {
+    if (this.agent?.state.isStreaming) {
+      throw new Error("Cannot resume while the agent is streaming.");
+    }
+
+    this.reset();
+
+    const loadedMessages = await loadSessionMessages(sessionPath);
+    this.messages.push({
+      id: createMessageId("system"),
+      role: "status",
+      text: `[resumed] Session loaded — ${loadedMessages.length} messages`,
+    });
+    this.resumeMessages = loadedMessages;
+    await this.initialize();
     this.emit();
   }
 

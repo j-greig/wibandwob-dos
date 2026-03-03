@@ -10,10 +10,13 @@ import blessed from "blessed";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { SessionManager } from "@mariozechner/pi-coding-agent";
+import { REPO_ROOT } from "../core/config.js";
 import { theme } from "../core/theme/resolver.js";
 import { createScrollbar, safeSetStyle } from "../core/ui-primitives.js";
 import type { Box, ChatMessageEntry } from "../core/types.js";
 import type { WindowManager } from "../core/window-manager.js";
+import { listLocalSessions, type LocalSessionInfo } from "../services/pi-session-bridge.js";
 import type { WibWobAgentSession } from "../services/wibwob-agent-session.js";
 
 function escapeTagBraces(text: string): string {
@@ -117,6 +120,27 @@ function renderTranscript(messages: ChatMessageEntry[], useKaomoji: boolean): st
   return lines.join("\n");
 }
 
+function truncatePreview(text: string, max = 50): string {
+  const compact = text.replace(/\s+/g, " ").trim();
+  if (compact.length <= max) return compact;
+  return `${compact.slice(0, max - 3)}...`;
+}
+
+function formatRelativeSessionTime(date: Date): string {
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfTarget = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const dayDiff = Math.round((startOfToday.getTime() - startOfTarget.getTime()) / 86400000);
+
+  if (dayDiff === 0) {
+    return `today ${date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false })}`;
+  }
+  if (dayDiff === 1) {
+    return "yesterday";
+  }
+  return date.toLocaleDateString([], { month: "short", day: "numeric" });
+}
+
 /** Find the most recent Claude Code JSONL for the current project cwd. */
 function findClaudeCodeJsonl(cwd: string): string | null {
   try {
@@ -142,6 +166,7 @@ export function openWibWobAgentWindow(params: {
   initialPos?: { top: number; left: number; width: number; height: number };
 }): void {
   const frame = params.windowManager.createFrame(params.title ?? "Wib&Wob Agent", "chat");
+  let lastSessionList: LocalSessionInfo[] | undefined;
 
   // Restore position/size if reloading
   if (params.initialPos) {
@@ -249,6 +274,56 @@ export function openWibWobAgentWindow(params: {
     infoBar.setContent(` ${left}${" ".repeat(gap)}{${C.muted}-fg}${right}{/${C.muted}-fg}`);
   };
 
+  const runResumeCommand = (rawArg: string) => {
+    const arg = rawArg.trim();
+
+    if (!arg) {
+      void (async () => {
+        const sessions = await listLocalSessions(REPO_ROOT);
+        lastSessionList = sessions;
+        if (sessions.length === 0) {
+          params.agent.pushStatus("[resume] No local pi sessions found.");
+          return;
+        }
+        params.agent.pushStatus(
+          [
+            "Recent sessions (type /resume <number> to load):",
+            ...sessions.map((session, index) =>
+              `  ${index + 1}  ${truncatePreview(session.firstMessage || "(no message)")}  —  ${session.messageCount} msgs  —  ${formatRelativeSessionTime(session.modified)}`
+            ),
+          ].join("\n")
+        );
+      })().catch((error) => {
+        params.agent.pushStatus(`[resume] Failed to list sessions: ${error instanceof Error ? error.message : String(error)}`);
+      });
+      return;
+    }
+
+    if (/^\d+$/.test(arg) && lastSessionList) {
+      const session = lastSessionList[Number(arg) - 1];
+      if (!session) {
+        params.agent.pushStatus(`[resume] No session ${arg} in the last shown list.`);
+        return;
+      }
+      void params.agent.resume(session.path).catch((error) => {
+        params.agent.pushStatus(`[resume] Failed to load session: ${error instanceof Error ? error.message : String(error)}`);
+      });
+      return;
+    }
+
+    void (async () => {
+      const sessions = await SessionManager.list(REPO_ROOT);
+      const match = sessions.find((session) => session.id === arg);
+      if (!match) {
+        params.agent.pushStatus(`[resume] No local session found for id ${arg}.`);
+        return;
+      }
+      await params.agent.resume(match.path);
+    })().catch((error) => {
+      params.agent.pushStatus(`[resume] Failed to load session: ${error instanceof Error ? error.message : String(error)}`);
+    });
+  };
+
   // Click the left side (cc: label) to open the JSONL in an editor
   if (claudeJsonl) {
     infoBar.on("click", (mouse) => {
@@ -308,6 +383,8 @@ export function openWibWobAgentWindow(params: {
         params.screen.render();
         if (text.trim() === "/new") {
           params.agent.reset();
+        } else if (text.trim().startsWith("/resume")) {
+          runResumeCommand(text.trim().slice("/resume".length));
         } else {
           void params.agent.send(text);
         }
@@ -384,6 +461,10 @@ export function openWibWobAgentWindow(params: {
 
   frame.writeInput = (text: string, sender?: string) => {
     if (text.trim() === "/new") { params.agent.reset(); return; }
+    if (text.trim().startsWith("/resume")) {
+      runResumeCommand(text.trim().slice("/resume".length));
+      return;
+    }
     void params.agent.send(text, sender);
   };
   frame.onRestyle = () => {

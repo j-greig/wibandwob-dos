@@ -7,13 +7,15 @@
  * Protocol: newline-delimited JSON over ~/.pi/session-control/<sessionId>.sock
  * Alias sockets: ~/.pi/session-control/<name>.alias (symlinks)
  *
- * This module is a pure Node client — no pi SDK dependencies.
+ * This module bridges both live socket control and local persisted pi sessions.
  */
 
 import * as net from "node:net";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
+import { SessionManager } from "@mariozechner/pi-coding-agent";
+import type { AgentMessage } from "@mariozechner/pi-agent-core";
 
 const CONTROL_DIR = path.join(os.homedir(), ".pi", "session-control");
 const SOCKET_SUFFIX = ".sock";
@@ -77,6 +79,35 @@ export interface LiveSession {
   sessionId: string;
   name?: string;
   socketPath: string;
+}
+
+export interface LocalSessionInfo {
+  id: string;
+  path: string;
+  firstMessage: string;
+  messageCount: number;
+  modified: Date;
+}
+
+export async function listLocalSessions(repoRoot: string): Promise<LocalSessionInfo[]> {
+  const sessions = await SessionManager.list(repoRoot);
+  return sessions
+    .sort((a, b) => b.modified.getTime() - a.modified.getTime())
+    .slice(0, 15)
+    .map((session) => ({
+      id: session.id,
+      path: session.path,
+      firstMessage: session.firstMessage,
+      messageCount: session.messageCount,
+      modified: session.modified,
+    }));
+}
+
+export async function loadSessionMessages(path: string): Promise<AgentMessage[]> {
+  return SessionManager.open(path)
+    .getBranch()
+    .filter((entry): entry is typeof entry & { type: "message"; message: AgentMessage } => entry.type === "message")
+    .map((entry) => entry.message);
 }
 
 export async function listSessions(): Promise<LiveSession[]> {
