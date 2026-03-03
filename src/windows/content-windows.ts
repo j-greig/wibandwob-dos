@@ -321,6 +321,8 @@ export function openTextViewerWindow(params: {
   kind: ViewerKind;
   filePath?: string;
   measurement?: ContentMeasurement;
+  /** All animation frames as line arrays. If present and length > 1, viewer animates. */
+  frames?: string[][];
 }): void {
   const frame = params.windowManager.createFrame(params.title, params.kind);
   let currentContent = params.content;
@@ -342,6 +344,24 @@ export function openTextViewerWindow(params: {
   frame.kind = params.kind;
   frame.filePath = params.filePath;
   const m = params.measurement;
+
+  // --- Animation setup ---
+  const animFrames = params.frames && params.frames.length > 1 ? params.frames : null;
+  const fps = m?.fps ?? 4;
+  let animIndex = 0;
+  let animTimer: ReturnType<typeof setInterval> | null = null;
+  let animPaused = false;
+
+  if (animFrames) {
+    animTimer = setInterval(() => {
+      if (animPaused) return;
+      animIndex = (animIndex + 1) % animFrames.length;
+      currentContent = animFrames[animIndex].join("\n");
+      setViewportContent(viewer, currentContent);
+      viewer.screen.render();
+    }, 1000 / fps);
+  }
+
   frame.describeState = () => ({
     appType: viewerAppType[params.kind],
     summary: params.filePath ? `Viewing ${params.filePath}` : `Viewing ${params.kind} content.`,
@@ -352,7 +372,10 @@ export function openTextViewerWindow(params: {
     recommendedWidth: m?.recommendedWidth,
     recommendedHeight: m?.recommendedHeight,
     animated: m?.animated,
+    fps: animFrames ? fps : undefined,
     frameCount: m?.frameCount,
+    currentFrame: animFrames ? animIndex : undefined,
+    paused: animFrames ? animPaused : undefined,
     skippedCommentLines: m?.skippedCommentLines,
     contentPreview: params.content.split("\n").slice(0, 8).join("\n")
   });
@@ -364,6 +387,23 @@ export function openTextViewerWindow(params: {
   frame.onRestyle = () => {
     safeSetStyle(viewer, theme().body);
   };
+
+  // Space to pause/resume animation
+  if (animFrames) {
+    viewer.on("keypress", (_ch: string, key: { name?: string }) => {
+      if (key.name === "space") {
+        animPaused = !animPaused;
+      }
+    });
+  }
+
+  frame.cleanup = () => {
+    if (animTimer) {
+      clearInterval(animTimer);
+      animTimer = null;
+    }
+  };
+
   params.windowManager.registerWindow(frame);
   if (m) {
     params.applyMeasuredWindowSize(frame, params.kind, {

@@ -46,14 +46,15 @@ export function openPrimerFile(params: {
     content: string,
     kind: "primer",
     filePath: string,
-    options: { contentMeasurement: ContentMeasurement }
+    options: { contentMeasurement: ContentMeasurement; frames?: string[][] }
   ) => void;
 }): void {
   try {
     const rawContent = fs.readFileSync(params.filePath, "utf8");
     const measured = measurePrimerContent(rawContent);
     params.onOpenTextViewer(path.basename(params.filePath), measured.primaryFrameText, "primer", params.filePath, {
-      contentMeasurement: measured.measurement
+      contentMeasurement: measured.measurement,
+      frames: measured.measurement.animated ? measured.frames : undefined
     });
   } catch (error) {
     params.overlays.flash(`Cannot open primer: ${error instanceof Error ? error.message : String(error)}`);

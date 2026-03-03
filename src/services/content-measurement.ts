@@ -6,6 +6,7 @@ export interface ContentMeasurement {
   frameCount: number;
   hasFrames: boolean;
   animated: boolean;
+  fps: number;
   skippedCommentLines: number;
   recommendedWidth: number;
   recommendedHeight: number;
@@ -18,6 +19,8 @@ export interface MeasuredContent {
   lines: string[];
   visibleLines: string[];
   primaryFrameLines: string[];
+  /** All frames as separate line arrays. Empty if not animated. */
+  frames: string[][];
   measurement: ContentMeasurement;
 }
 
@@ -41,25 +44,46 @@ export function measureContent(rawContent: string, options: MeasureOptions = {})
   const lines = normalized.split("\n");
   const visibleLines: string[] = [];
   const primaryFrameLines: string[] = [];
+  const frames: string[][] = [];
+  let currentFrame: string[] = [];
   let skippedCommentLines = 0;
   let frameCount = 1;
   let sawFrameDelimiter = false;
+  let fps = 4; // default playback rate
 
   for (const line of lines) {
     if (config.skipHashComments && line.startsWith("#")) {
       skippedCommentLines += 1;
       continue;
     }
+    // Parse FPS=N directive (appears before first frame delimiter)
+    if (config.detectFrames && !sawFrameDelimiter && /^\s*FPS\s*=\s*\d+/i.test(line)) {
+      const match = line.match(/FPS\s*=\s*(\d+)/i);
+      if (match) fps = Math.max(1, Math.min(60, parseInt(match[1], 10)));
+      continue;
+    }
     const isFrameDelimiter = config.detectFrames && /^\s*(---|===)\s*$/.test(line);
     if (isFrameDelimiter) {
+      if (!sawFrameDelimiter && currentFrame.length > 0) {
+        // First delimiter — commit the first frame
+        frames.push([...currentFrame]);
+      } else if (sawFrameDelimiter && currentFrame.length > 0) {
+        frames.push([...currentFrame]);
+      }
+      currentFrame = [];
       sawFrameDelimiter = true;
       frameCount += 1;
       continue;
     }
     visibleLines.push(line);
+    currentFrame.push(line);
     if (!sawFrameDelimiter) {
       primaryFrameLines.push(line);
     }
+  }
+  // Commit trailing frame (content after last delimiter)
+  if (sawFrameDelimiter && currentFrame.length > 0) {
+    frames.push([...currentFrame]);
   }
 
   const measuredLines = sawFrameDelimiter ? primaryFrameLines : visibleLines;
@@ -72,12 +96,14 @@ export function measureContent(rawContent: string, options: MeasureOptions = {})
     lines,
     visibleLines,
     primaryFrameLines: measuredLines,
+    frames,
     measurement: {
       lineCount: measuredLines.length,
       columnWidth,
-      frameCount,
+      frameCount: sawFrameDelimiter ? frames.length : 1,
       hasFrames: sawFrameDelimiter,
-      animated: sawFrameDelimiter && frameCount > 1,
+      animated: sawFrameDelimiter && frames.length > 1,
+      fps,
       skippedCommentLines,
       recommendedWidth: columnWidth + config.chromeWidth,
       recommendedHeight: measuredLines.length + config.chromeHeight

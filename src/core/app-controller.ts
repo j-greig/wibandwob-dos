@@ -891,6 +891,7 @@ export class TsTuiMvpApp {
     filePath?: string,
     options?: {
       contentMeasurement?: ContentMeasurement;
+      frames?: string[][];
     }
   ): void {
     const measurement = options?.contentMeasurement ?? measurePlainTextContent(content).measurement;
@@ -901,7 +902,8 @@ export class TsTuiMvpApp {
       content,
       kind,
       filePath,
-      measurement
+      measurement,
+      frames: options?.frames
     });
   }
 
