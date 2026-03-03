@@ -2,144 +2,47 @@
  * Poetry Clock — a microapp that tells the time as a tiny poem every minute.
  * Inspired by Poem/1 by Matt Webb / Acts Not Facts.
  *
- * Modes:
- *   plain    — clean, observational couplets
- *   liminal  — backrooms-flavoured temporal drift
+ * Two modes:
+ *   clock    — plain time display, no inference
+ *   sentient — AI-generated poem each minute via Anthropic Haiku (pi OAuth)
+ *
+ * Sentient mode has three voices:
+ *   plain    — observational, quiet
+ *   liminal  — backrooms temporal drift
  *   scramble — from Scramble the cat's perspective
+ *
+ * Falls back to clock mode if auth is unavailable.
  */
 
 import blessed from "blessed";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { homedir } from "node:os";
+import { spawnSync } from "node:child_process";
 import type { MicroappHost } from "../../src/services/module-loader.js";
 
 // ---------------------------------------------------------------------------
-// Poem bank — pre-baked poems keyed by minute-of-hour, per mode.
-// Each poem contains {time} placeholder replaced with the formatted time.
+// Types
 // ---------------------------------------------------------------------------
 
-type PoemMode = "plain" | "liminal" | "scramble";
+type ClockMode = "clock" | "sentient";
+type Voice = "plain" | "liminal" | "scramble";
 
-const POEMS: Record<PoemMode, string[]> = {
-  plain: [
-    "{time} — the cursor blinks.\nAnother minute, another thought unthought.",
-    "It is {time}.\nThe screen hums its patient hum.",
-    "{time} exactly.\nSomewhere a kettle clicks off.",
-    "The clock says {time}.\nThe code says otherwise.",
-    "{time} — halfway to something.\nHalfway from something else.",
-    "At {time} the light shifts.\nThe monitor does not notice.",
-    "{time}. A bird outside.\nYou forgot about birds.",
-    "Now it is {time}.\nNow it is slightly later.",
-    "{time} — the desktop holds still.\nWindows arranged like paintings.",
-    "Quarter past or half to —\n{time}, if you must know.",
-    "{time}. Tea goes cold.\nThe best ideas arrive too late.",
-    "It is precisely {time}.\nPrecision is a kind of hope.",
-    "{time} ticks by.\nThe terminal remembers everything.",
-    "At {time} the shadows\nmove one pixel to the right.",
-    "{time} and counting.\nCounting what? Just counting.",
-    "The time is {time}.\nThe time is always now.",
-    "{time}. Someone typed something.\nSomeone deleted it.",
-    "It is {time} and the code\ncompiles on the first try. Miracle.",
-    "{time} — a commit is made.\nHistory gains one more line.",
-    "At {time} the fan spins up.\nAt {time} it spins back down.",
-    "{time}. The wifi drops.\n{time}. The wifi returns.",
-    "In the quiet of {time}\na semicolon is misplaced.",
-    "{time}. The amber glow\nof phosphor on a dark desk.",
-    "One minute past {time}.\nNo — wait — it is {time} again.",
-    "{time} arrived without fanfare.\nMost minutes do.",
-    "It is {time}. Breathe.\nThe deadline is imaginary.",
-    "{time}. Rain on the window.\nReflections on the screen.",
-    "At {time} the world outside\ncontinues without you. Good.",
-    "{time} — the cat stretches.\nTime means nothing to cats.",
-    "Half a day, or half a night.\n{time}, and all is well.",
-    "{time}. The old code works.\nNobody knows why. Nobody asks.",
-    "{time} — between meetings.\nThe best minutes are between things.",
-    "At {time} a thought arrives:\nwhat if the bug is a feature?",
-    "It is {time}. Somewhere\na server restarts. Somewhere else, peace.",
-    "{time}. The cursor waits.\nIt has nowhere else to be.",
-    "{time} and the light through the blinds\nmakes stripes on the keyboard.",
-    "The clock reads {time}.\nThe clock reads nothing. Clocks cannot read.",
-    "{time}. Compile. Wait. Refresh.\nThe holy trinity of {time}.",
-    "It is {time} o'clock.\nO'clock. What a strange word. O'clock.",
-    "{time}. A function returns true.\nA function returns undefined.",
-    "{time} — the desk lamp flickers.\nPhosphor ghosts in the glass.",
-    "Now is {time}. Then was then.\nLater is a problem for later.",
-    "{time}. The cat is asleep.\nThe cat has been asleep since dawn.",
-    "At precisely {time}\nnothing of consequence occurs.",
-    "{time} rolls around again.\nMinutes are very circular.",
-    "It is {time}. The inbox\ncontains exactly one more email.",
-    "{time} and the trees outside\ndo not care about your sprint.",
-    "The time is {time}.\nYou already knew that, probably.",
-    "{time}. Save your work.\nCtrl-S, muscle memory, amen.",
-    "{time}. Close the tab.\nOpen it again. Close it. Open.",
-    "At {time} the autumn sun\nhits the screen at that angle.",
-    "{time} in the backrooms.\nWait — no. {time} at the desk.",
-    "It was {time} a moment ago.\nNow it is {time}. Still.",
-    "{time}. Stack overflow says\nthis answer is from 2014. Trust it.",
-    "The time, announced: {time}.\nThe audience: one human, one cat.",
-    "{time} — git stash. git stash pop.\nThe dance of the uncommitted.",
-    "{time} and the coffee is cold.\nWarm it up? No. Drink it cold.",
-    "It is {time}. The prompt blinks.\nWaiting is its only skill.",
-    "{time}. Sixty seconds of silence.\nThen sixty more. Then sixty more.",
-    "{time}. A new minute begins.\nThe old one leaves no forwarding address.",
-  ],
-
-  liminal: [
-    "{time} — the corridor stretches.\nThe fluorescent tube cannot decide.",
-    "It is {time} here.\nIt is a different {time} there.",
-    "{time}. The carpet is wet.\nIt has always been wet.",
-    "The clock on the wall says {time}.\nThe clock on the floor says nothing.",
-    "{time} — you have been here\nfor zero days. Or all of them.",
-    "At {time} the door appears.\nAt {time} the door is gone.",
-    "{time}. The hum is louder.\nOr quieter. Hard to tell at {time}.",
-    "It was {time} when you entered.\nIt is still {time}. Check again.",
-    "{time} — minor temporal displacement.\nApproximately stable. Approximately.",
-    "The exit was at {time}.\nYou are now past {time}. Keep walking.",
-    "{time}. Do not trust this clock.\nDo not trust any clock here.",
-    "Between {time} and {time}\nthere is a room with no number.",
-    "{time} — the lights flicker.\nYellow-green. The colour of waiting.",
-    "This is level {time}.\nAll levels are level {time}.",
-    "{time}. Someone left a note:\n'the stairs go up and also up.'",
-    "{time} and the wallpaper\nrepeats. The wallpaper always repeats.",
-    "It is {time}. You remember {time}.\nBut {time} has not happened yet.",
-    "{time}. Turn left. Turn left.\nTurn left. You are facing right.",
-    "The time is {time}.\nThe time was {time}. The time will be {time}.",
-    "{time}. A phone rings\nin a room you have already passed.",
-  ],
-
-  scramble: [
-    "{time}. The warm spot moved.\nI will follow it.",
-    "It is {time}. The human types.\nI sit on the keyboard. Better.",
-    "{time}. Nap. Nap. Nap.\nNap. Nap. {time}. Nap.",
-    "The clock says {time}.\nI say: where is my dinner.",
-    "{time} — a moth. A moth!\nAt {time} — still a moth!",
-    "It is {time}.\nI have forgotten what I was doing.\nI was sitting.",
-    "{time}. The red dot appears.\nThe red dot vanishes. Betrayal.",
-    "At {time} the human leaves.\nAt {time} the human returns.\nWhy.",
-    "{time}. I knocked something\noff the desk. Gravity works.",
-    "{time} means nothing.\nThe patch of sun means everything.",
-    "Is it {time}? Is it food?\nIs it food? Is it {time}?\nFood.",
-    "{time} and the box is warm.\nThe box is always warm. Box.",
-    "It is {time}. I stare\nat the wall. The wall stares back. Good.",
-    "{time}. The other one\n(the screen one) is talking again.",
-    "At {time} I choose violence.\nAt {time} plus one I choose sleep.",
-    "{time}. Paw. Paw. Stretch.\nThe full extent of my ambition.",
-    "It is {time}. The bird\nis on the window. The bird is IN the window.",
-    "{time}. I have been awake\nfor eleven seconds. Exhausting.",
-    "The time is {time}.\nTime is a human problem. I have fur.",
-    "{time}. Tuna? No?\nThen what are we even doing here.",
-  ],
+const VOICE_CYCLE: Voice[] = ["plain", "liminal", "scramble"];
+const VOICE_LABELS: Record<Voice, string> = {
+  plain: "poet",
+  liminal: "backrooms",
+  scramble: "scramble",
 };
 
-function getPoem(mode: PoemMode, minute: number): string {
-  const bank = POEMS[mode];
-  return bank[minute % bank.length];
-}
+// ---------------------------------------------------------------------------
+// Time formatting
+// ---------------------------------------------------------------------------
 
 function formatTime(date: Date): string {
-  const h = date.getHours();
+  const h = date.getHours().toString().padStart(2, "0");
   const m = date.getMinutes().toString().padStart(2, "0");
-  const hour12 = h % 12 || 12;
-  const ampm = h < 12 ? "am" : "pm";
-  return `${hour12}:${m}${ampm}`;
+  return `${h}:${m}`;
 }
 
 function formatDate(date: Date): string {
@@ -149,12 +52,103 @@ function formatDate(date: Date): string {
   return `${days[date.getDay()]}, ${date.getDate()} ${months[date.getMonth()]}`;
 }
 
-const MODE_CYCLE: PoemMode[] = ["plain", "liminal", "scramble"];
-const MODE_LABELS: Record<PoemMode, string> = {
-  plain: "PLAIN",
-  liminal: "LIMINAL",
-  scramble: "SCRAMBLE",
+// ---------------------------------------------------------------------------
+// FIGlet rendering
+// ---------------------------------------------------------------------------
+
+const FIGLET_FONT = "chunky";
+
+function renderFigletTime(time: string): string {
+  const result = spawnSync("figlet", ["-f", FIGLET_FONT, time], { encoding: "utf8" });
+  if (result.status !== 0 || !result.stdout.trim()) return `  ${time}`;
+  return result.stdout.replace(/\s+$/u, "");
+}
+
+// ---------------------------------------------------------------------------
+// Anthropic API — direct fetch using pi's OAuth token
+// ---------------------------------------------------------------------------
+
+const MODEL = "claude-haiku-4-5-20251001";
+const API_URL = "https://api.anthropic.com/v1/messages";
+const AUTH_FILE = join(homedir(), ".pi", "agent", "auth.json");
+
+const VOICE_PROMPTS: Record<Voice, string> = {
+  plain:
+    "Write a two-line poem containing the time {time}. " +
+    "Observational, quiet, about desktop life or the passage of time. " +
+    "No title, no explanation, just the poem. Maximum 120 characters.",
+  liminal:
+    "Write a two-line poem containing the time {time}. " +
+    "Surreal, backrooms-flavoured. Fluorescent corridors, wet carpet, temporal drift. " +
+    "No title, no explanation, just the poem. Maximum 120 characters.",
+  scramble:
+    "Write a two-line poem containing the time {time}. " +
+    "From a cat's perspective. The cat is named Scramble. Simple, funny, catlike. " +
+    "No title, no explanation, just the poem. Maximum 120 characters.",
 };
+
+function readOAuthToken(): string | null {
+  try {
+    const auth = JSON.parse(readFileSync(AUTH_FILE, "utf-8"));
+    const token = auth?.anthropic?.access;
+    if (!token || typeof token !== "string") return null;
+    // Check expiry if present
+    const expires = auth?.anthropic?.expires;
+    if (expires && Date.now() > expires) return null;
+    return token;
+  } catch {
+    return null;
+  }
+}
+
+async function generatePoem(time: string, voice: Voice): Promise<string | null> {
+  const token = readOAuthToken();
+  if (!token) return null;
+
+  const prompt = VOICE_PROMPTS[voice].replace(/\{time\}/g, time);
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10_000);
+
+    const response = await fetch(API_URL, {
+      method: "POST",
+      signal: controller.signal,
+      headers: {
+        "content-type": "application/json",
+        "authorization": `Bearer ${token}`,
+        "anthropic-version": "2023-06-01",
+        "anthropic-beta": "claude-code-20250219,oauth-2025-04-20",
+        "anthropic-dangerous-direct-browser-access": "true",
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        max_tokens: 150,
+        messages: [{ role: "user", content: prompt }],
+        system: "You are a poet. Write only the poem, nothing else. No preamble, no title.",
+      }),
+    });
+
+    clearTimeout(timeout);
+
+    if (!response.ok) return null;
+
+    const data = await response.json() as {
+      content?: Array<{ type: string; text?: string }>;
+    };
+
+    const text = data.content?.find(c => c.type === "text")?.text?.trim();
+    if (!text) return null;
+
+    // Strip surrounding quotes if present
+    if (text.startsWith('"') && text.endsWith('"')) {
+      return text.slice(1, -1);
+    }
+    return text;
+  } catch {
+    return null;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Setup
@@ -162,38 +156,25 @@ const MODE_LABELS: Record<PoemMode, string> = {
 
 export default function setup(host: MicroappHost) {
 
-  // State shared across open/restore
-  let currentMode: PoemMode = "plain";
-
   function openClock(args?: Record<string, unknown>) {
-    const restoreMode = args?.mode as PoemMode | undefined;
-    if (restoreMode && MODE_CYCLE.includes(restoreMode)) {
-      currentMode = restoreMode;
-    }
+    const restoreMode = args?.mode as ClockMode | undefined;
+    const restoreVoice = args?.voice as Voice | undefined;
 
-    const win = host.createWindow({
-      title: "Poetry Clock",
-      width: 48,
-      height: 12,
-    });
-
-    let mode: PoemMode = currentMode;
+    let mode: ClockMode = restoreMode ?? "clock";
+    let voice: Voice = restoreVoice ?? "plain";
     let lastPoem = "";
     let lastTime = "";
     let lastDate = "";
+    let generating = false;
 
-    // ── Content area ──
-    const poemBox = blessed.box({
-      parent: win.body,
-      top: 1,
-      left: 2,
-      right: 2,
-      bottom: 3,
-      style: host.theme().body,
+    const win = host.createWindow({
+      title: "Poetry Clock",
+      width: 54,
+      height: 15,
     });
 
-    // ── Time display ──
-    const timeBox = blessed.box({
+    // ── Date line ──
+    const dateBox = blessed.box({
       parent: win.body,
       top: 0,
       left: 2,
@@ -202,7 +183,37 @@ export default function setup(host: MicroappHost) {
       style: host.theme().muted,
     });
 
-    // ── Mode bar ──
+    // ── FIGlet time ──
+    const figletBox = blessed.box({
+      parent: win.body,
+      top: 1,
+      left: 1,
+      right: 1,
+      height: 5,
+      style: host.theme().body,
+    });
+
+    // ── Divider ──
+    const divider = blessed.box({
+      parent: win.body,
+      top: 6,
+      left: 2,
+      right: 2,
+      height: 1,
+      style: host.theme().muted,
+    });
+
+    // ── Poem area ──
+    const poemBox = blessed.box({
+      parent: win.body,
+      top: 7,
+      left: 2,
+      right: 2,
+      bottom: 2,
+      style: host.theme().body,
+    });
+
+    // ── Bottom bar ──
     const modeBar = blessed.box({
       parent: win.body,
       bottom: 0,
@@ -212,79 +223,158 @@ export default function setup(host: MicroappHost) {
       style: host.theme().header,
     });
 
-    // ── Mode buttons ──
-    const modeLabel = blessed.box({
+    const statusLabel = blessed.box({
       parent: modeBar,
       left: 1,
       top: 0,
-      width: 30,
+      width: 36,
       height: 1,
       style: host.theme().header,
     });
 
-    const nextBtn = blessed.box({
+    const modeBtn = blessed.box({
       parent: modeBar,
       right: 1,
       top: 0,
-      width: 9,
+      width: 11,
       height: 1,
-      content: " [m]ode ",
+      content: " [m]ode  ",
       mouse: true,
       clickable: true,
       style: { ...host.theme().header, hover: host.theme().selected },
     });
 
-    function cycleMode() {
-      const idx = MODE_CYCLE.indexOf(mode);
-      mode = MODE_CYCLE[(idx + 1) % MODE_CYCLE.length];
-      currentMode = mode;
+    // ── Poem generation ──
+    async function requestPoem() {
+      if (generating) return;
+      generating = true;
+      render();
+
+      const now = new Date();
+      const poem = await generatePoem(formatTime(now), voice);
+      generating = false;
+
+      if (poem) {
+        lastPoem = poem;
+        lastGeneratedMinute = now.getHours() * 60 + now.getMinutes();
+      } else if (mode === "sentient" && !lastPoem) {
+        // Auth failed on first attempt — fall back to clock
+        mode = "clock";
+      }
       render();
     }
 
-    nextBtn.on("click", cycleMode);
+    // ── Mode cycling ──
+    function cycleMode() {
+      if (mode === "clock") {
+        mode = "sentient";
+        voice = "plain";
+        lastPoem = "";
+        requestPoem();
+        return;
+      }
+      // Cycle voice, or back to clock after scramble
+      const idx = VOICE_CYCLE.indexOf(voice);
+      if (idx >= VOICE_CYCLE.length - 1) {
+        mode = "clock";
+        voice = "plain";
+        lastPoem = "";
+      } else {
+        voice = VOICE_CYCLE[idx + 1];
+        lastPoem = "";
+        requestPoem();
+        return;
+      }
+      render();
+    }
 
-    // Key bindings on the body so they work when focused
+    modeBtn.on("click", cycleMode);
     win.body.key(["m"], cycleMode);
     win.body.key(["q", "escape"], () => win.close());
 
+    // ── Rendering ──
     function render() {
       const now = new Date();
       lastTime = formatTime(now);
       lastDate = formatDate(now);
-      lastPoem = getPoem(mode, now.getMinutes()).replace(/\{time\}/g, lastTime);
 
-      timeBox.setContent(`${lastDate}  ${lastTime}`);
-      poemBox.setContent(`\n${lastPoem}`);
-      modeLabel.setContent(` ${MODE_LABELS[mode]}`);
+      dateBox.setContent(lastDate);
+      figletBox.setContent(renderFigletTime(lastTime));
+
+      if (mode === "clock") {
+        divider.setContent("");
+        poemBox.setContent("");
+        statusLabel.setContent("");
+      } else {
+        divider.setContent("─".repeat(48));
+        if (generating) {
+          poemBox.setContent("\n ...");
+          statusLabel.setContent(` ${VOICE_LABELS[voice]} ...`);
+        } else if (lastPoem) {
+          poemBox.setContent(`\n ${lastPoem}`);
+          statusLabel.setContent(` ${VOICE_LABELS[voice]}`);
+        } else {
+          poemBox.setContent("");
+          statusLabel.setContent(` ${VOICE_LABELS[voice]}`);
+        }
+      }
+
       host.screen.render();
     }
 
-    render();
+    // ── Timer tick ──
+    let lastGeneratedMinute = -1;
 
-    // Tick every 30 seconds — catches minute boundaries without being wasteful
-    const timer = setInterval(render, 30_000);
+    function tick() {
+      const now = new Date();
+      const currentMinute = now.getHours() * 60 + now.getMinutes();
+
+      render();
+
+      // Generate new poem if minute changed in sentient mode
+      if (mode === "sentient" && currentMinute !== lastGeneratedMinute && !generating) {
+        requestPoem();
+      }
+    }
+
+    // Initial render + kick off sentient mode if restoring
+    render();
+    if (mode === "sentient") {
+      requestPoem();
+    }
+
+    const timer = setInterval(tick, 15_000);
 
     win.onCleanup(() => clearInterval(timer));
 
     win.onRestyle(() => {
+      dateBox.style = host.theme().muted;
+      figletBox.style = host.theme().body;
+      divider.style = host.theme().muted;
       poemBox.style = host.theme().body;
-      timeBox.style = host.theme().muted;
       modeBar.style = host.theme().header;
-      modeLabel.style = host.theme().header;
-      nextBtn.style = { ...host.theme().header, hover: host.theme().selected };
+      statusLabel.style = host.theme().header;
+      modeBtn.style = { ...host.theme().header, hover: host.theme().selected };
       render();
     });
 
     win.describeState(() => ({
-      summary: `Poetry clock in ${mode} mode`,
+      summary: mode === "clock"
+        ? "Poetry clock — clock mode"
+        : `Poetry clock — ${voice} voice`,
       mode,
+      voice,
       currentTime: lastTime,
       currentDate: lastDate,
-      currentPoem: lastPoem,
+      currentPoem: lastPoem || undefined,
+      generating,
     }));
 
     win.captureText(() => {
-      return `${lastDate}  ${lastTime}\n\n${lastPoem}\n\n[${MODE_LABELS[mode]}]`;
+      if (mode === "clock") {
+        return `${lastDate}  ${lastTime}\n\n[CLOCK]`;
+      }
+      return `${lastDate}  ${lastTime}\n\n${lastPoem || "(generating...)"}\n\n[${VOICE_LABELS[voice]}]`;
     });
   }
 
@@ -292,7 +382,7 @@ export default function setup(host: MicroappHost) {
   host.registerCommand({
     id: "open",
     label: "Open Poetry Clock",
-    description: "A clock that tells the time as a tiny poem",
+    description: "A clock that tells the time — plain or as AI-generated poems",
     action: openClock,
     menu: [{ category: "applications", order: 30, label: "Poetry Clock" }],
     palette: { order: 50, label: "Poetry Clock" },
@@ -302,10 +392,16 @@ export default function setup(host: MicroappHost) {
   host.registerSnapshot({
     serialize: (window) => {
       const d = window.describeState?.() ?? {};
-      return { mode: d.mode ?? "plain" };
+      return {
+        mode: d.mode ?? "clock",
+        voice: d.voice ?? "plain",
+      };
     },
     restore: (_snapshot, payload) => {
-      host.runCommand("open", { mode: payload.mode });
+      host.runCommand("open", {
+        mode: payload.mode,
+        voice: payload.voice,
+      });
     },
   });
 }
