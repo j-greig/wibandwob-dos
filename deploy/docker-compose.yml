@@ -1,0 +1,62 @@
+services:
+
+  # The actual TUI — one process per browser connection via ttyd
+  ttyd:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    command:
+      - ttyd
+      - --port
+      - "7681"
+      - --timeout   # idle disconnect after 5 min no input
+      - "300"
+      - --max-clients
+      - "20"
+      - --writable
+      - /usr/local/bin/wibwob-session
+    restart: unless-stopped
+    environment:
+      - TERM=xterm-256color
+    # ttyd is internal only — token proxy is the only way in
+    expose:
+      - "7681"
+
+  # Token proxy — generates share links, gates access to ttyd
+  token-proxy:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    command:
+      - bun
+      - run
+      - /app/deploy/token-proxy.ts
+    restart: unless-stopped
+    environment:
+      - ADMIN_SECRET=${ADMIN_SECRET}
+      - TTYD_URL=http://ttyd:7681
+      - TOKEN_TTL_MS=1800000
+      - PORT=8080
+      - PUBLIC_URL=https://dos.wibandwob.com
+    expose:
+      - "8080"
+    depends_on:
+      - ttyd
+
+  # Caddy reverse proxy — handles HTTPS termination (Cloudflare in front)
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - token-proxy
+
+volumes:
+  caddy_data:
+  caddy_config:

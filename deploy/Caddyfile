@@ -1,0 +1,28 @@
+dos.wibandwob.com {
+    # Cloudflare is in front — trust CF-Connecting-IP for real IPs
+    trusted_proxies cloudflare
+
+    # WebSocket support (ttyd uses WS for terminal IO)
+    @websocket {
+        header Connection *Upgrade*
+        header Upgrade    websocket
+    }
+
+    # All traffic routes through token-proxy
+    handle {
+        reverse_proxy token-proxy:8080 {
+            header_up X-Real-IP {http.request.header.CF-Connecting-IP}
+        }
+    }
+
+    # WebSocket upgrade passthrough
+    handle @websocket {
+        reverse_proxy token-proxy:8080
+    }
+
+    # Logging
+    log {
+        output file /data/logs/access.log
+        format json
+    }
+}
