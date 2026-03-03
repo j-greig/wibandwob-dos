@@ -329,6 +329,9 @@ async function generatePoem(time: string, voice: Voice): Promise<string | null> 
 }
 
 export default function setup(host: MicroappHost) {
+  // Active clock controller — set when a clock window is open, cleared on close
+  let clockControl: { setMode: (mode: ClockMode, voice?: Voice) => void } | undefined;
+
   function openClock(args?: Record<string, unknown>) {
     const restoreMode = args?.mode as ClockMode | undefined;
     const restoreVoice = args?.voice as Voice | undefined;
@@ -340,6 +343,20 @@ export default function setup(host: MicroappHost) {
     let lastDate = "";
     let generating = false;
     let lastGeneratedMinute = -1;
+
+    clockControl = {
+      setMode(targetMode: ClockMode, targetVoice?: Voice) {
+        mode = targetMode;
+        if (targetVoice) voice = targetVoice;
+        lastPoem = "";
+        if (mode === "sentient") {
+          requestPoem();
+        } else {
+          voice = "plain";
+          render();
+        }
+      },
+    };
 
     const win = host.createWindow({
       title: "Poetry Clock",
@@ -490,6 +507,7 @@ export default function setup(host: MicroappHost) {
     win.onCleanup(() => {
       clearInterval(timer);
       root.destroy();
+      clockControl = undefined;
     });
 
     win.onRestyle(() => {
@@ -524,6 +542,22 @@ export default function setup(host: MicroappHost) {
     action: openClock,
     menu: [{ category: "applications", order: 30, label: "Poetry Clock" }],
     palette: { order: 50, label: "Poetry Clock" },
+  });
+
+  host.registerCommand({
+    id: "set-mode",
+    label: "Set Poetry Clock Mode",
+    description: 'Set clock mode. args: { mode: "clock"|"sentient", voice?: "plain"|"liminal"|"scramble" }. Opens clock if not already open.',
+    direct: true,
+    action: (args) => {
+      const targetMode = (args?.mode as ClockMode | undefined) ?? "sentient";
+      const targetVoice = args?.voice as Voice | undefined;
+      if (clockControl) {
+        clockControl.setMode(targetMode, targetVoice);
+      } else {
+        openClock({ mode: targetMode, voice: targetVoice ?? "plain" });
+      }
+    },
   });
 
   host.registerSnapshot({

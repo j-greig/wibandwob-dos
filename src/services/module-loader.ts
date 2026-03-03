@@ -80,6 +80,8 @@ export interface MicroappHost {
     description?: string;
     action: (args?: Record<string, unknown>) => void;
     multiInstance?: boolean;
+    /** If true, action is called directly — no focusOrCreate wrapper. Use for control commands on existing windows. */
+    direct?: boolean;
     menu?: { category: string; order: number; label?: string }[];
     palette?: { order: number; label?: string };
   }): void;
@@ -214,7 +216,7 @@ function createMicroappHost(
         id: fullId,
         label: def.label,
         description: def.description,
-        action: (args) => focusOrCreate(moduleId, () => def.action(args), multiInstance),
+        action: def.direct ? def.action : (args) => focusOrCreate(moduleId, () => def.action(args), multiInstance),
         multiInstance,
         menuPlacements: def.menu?.map(m => ({
           category: m.category as MenuPlacement["category"],
