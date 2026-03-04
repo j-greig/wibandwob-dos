@@ -8,161 +8,19 @@
 
 import blessed from "blessed";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { SessionManager } from "@mariozechner/pi-coding-agent";
 import { REPO_ROOT } from "../core/config.js";
 import { theme } from "../core/theme/resolver.js";
 import { createScrollbar, safeSetStyle } from "../core/ui-primitives.js";
-import type { Box, ChatMessageEntry } from "../core/types.js";
+import type { Box } from "../core/types.js";
 import type { WindowManager } from "../core/window-manager.js";
 import { listLocalSessions, type LocalSessionInfo } from "../services/pi-session-bridge.js";
 import type { WibWobAgentSession } from "../services/wibwob-agent-session.js";
 import { sharedPlayer, fmtTime } from "../services/audio-player-controller.js";
-
-function escapeTagBraces(text: string): string {
-  // Escape { and } that aren't blessed tags so they don't break rendering
-  return text.replace(/\{(?!\/?(?:bold|underline|blink|inverse|invisible|[a-z]+-(?:fg|bg))(?:\}|-))/g, "\\{");
-}
-
-// Resolve agent palette from the active theme tokens at call time.
-// Never cache these — theme() is cheap and we want live theme switching.
-function C() {
-  const t = theme();
-  return {
-    pink:  t.highlight.fg,  // user labels, warm accent
-    blue:  t.accent.fg,     // tool titles, borders
-    lime:  t.success.fg,    // checkmarks, status lines
-    muted: t.muted.fg,      // dim tool arg text
-    gray:  t.body.fg,       // main assistant text
-  };
-}
-
-// Kaomoji voice markers — replaces "Wib:" and "Wob:" in rendered text.
-// Only used for non-haiku models (haiku struggles with kaomoji in output).
-const WIB_FACE = "༼つ◕‿◕‿⚆༽つ";
-const WOB_FACE = "༼つ⚆‿◕‿◕༽つ";
-
-function applyVoiceMarkers(text: string, useKaomoji: boolean): string {
-  if (!useKaomoji) return text;
-  return text
-    .replace(/^Wib:/gm, WIB_FACE)
-    .replace(/^Wob:/gm, WOB_FACE);
-}
-
-function renderMessage(msg: ChatMessageEntry, useKaomoji: boolean): string {
-  const c = C();
-  if (msg.role === "user") {
-    const label = msg.sender ?? "Human";
-    return `{${c.pink}-fg}${label}:{/${c.pink}-fg} {${c.gray}-fg}${escapeTagBraces(msg.text)}{/${c.gray}-fg}`;
-  }
-  if (msg.role === "status") {
-    const escaped = escapeTagBraces(msg.text);
-    if (escaped.startsWith("[status]")) {
-      return "";
-    }
-    if (escaped.startsWith("[tool]")) {
-      const trimmed = escaped.replace(/^\s*\[tool\]\s*/, "");
-      return `  {${c.blue}-fg}▸{/${c.blue}-fg} {${c.muted}-fg}${trimmed}{/${c.muted}-fg}`;
-    }
-    if (escaped.startsWith("[done]")) {
-      const trimmed = escaped.replace(/^\s*\[done\]\s*/, "");
-      return `  {${c.lime}-fg}✓{/${c.lime}-fg} {${c.muted}-fg}${trimmed}{/${c.muted}-fg}`;
-    }
-    if (escaped.startsWith("[fail]")) {
-      const trimmed = escaped.replace(/^\s*\[fail\]\s*/, "");
-      return `  {${c.pink}-fg}✗ ${trimmed}{/${c.pink}-fg}`;
-    }
-    return `  {${c.lime}-fg}${escaped}{/${c.lime}-fg}`;
-  }
-  // Assistant text — Wib/Wob voices with kaomoji faces
-  const text = msg.text || (msg.streaming ? "Wib: …\nWob: …" : "");
-  return escapeTagBraces(applyVoiceMarkers(text, useKaomoji));
-}
-
-function renderTranscript(messages: ChatMessageEntry[], useKaomoji: boolean): string {
-  const visibleMessages = messages.filter((m) => !(m.role === "status" && m.text.startsWith("[status]")));
-  if (visibleMessages.length === 0) return "";
-
-  // Collapse [tool] + [done/fail] pairs into one line: ▸ toolname → result
-  const collapsed: ChatMessageEntry[] = [];
-  for (let i = 0; i < visibleMessages.length; i++) {
-    const m = visibleMessages[i];
-    const next = visibleMessages[i + 1];
-    if (
-      m.role === "status" &&
-      m.text.startsWith("[tool]") &&
-      next?.role === "status" &&
-      (next.text.startsWith("[done]") || next.text.startsWith("[fail]"))
-    ) {
-      // Merge: strip [tool] prefix, append result from next
-      const toolPart = m.text.replace(/^\[tool\]\s*/, "");
-      const resultPart = next.text.replace(/^\[done\]\s*/, "").replace(/^\[fail\]\s*/, "");
-      const isError = next.text.startsWith("[fail]");
-      collapsed.push({
-        ...m,
-        text: isError ? `[fail] ${toolPart}` : `[done] ${toolPart}${resultPart ? ` → ${resultPart}` : ""}`,
-      });
-      i++; // skip [done]/[fail] entry
-    } else {
-      collapsed.push(m);
-    }
-  }
-
-  // Single blank line between user/assistant turns, no gap between tool lines
-  const lines: string[] = [];
-  for (let i = 0; i < collapsed.length; i++) {
-    const m = collapsed[i];
-    const prev = collapsed[i - 1];
-    const rendered = renderMessage(m, useKaomoji);
-    if (!rendered) continue;
-    // Add blank line before user/assistant turns (not between consecutive tool calls)
-    if (i > 0 && (m.role !== "status" || prev?.role !== "status")) {
-      lines.push("");
-    }
-    lines.push(rendered);
-  }
-
-  return lines.join("\n");
-}
-
-function truncatePreview(text: string, max = 50): string {
-  const compact = text.replace(/\s+/g, " ").trim();
-  if (compact.length <= max) return compact;
-  return `${compact.slice(0, max - 3)}...`;
-}
-
-function formatRelativeSessionTime(date: Date): string {
-  const now = new Date();
-  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const startOfTarget = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  const dayDiff = Math.round((startOfToday.getTime() - startOfTarget.getTime()) / 86400000);
-
-  if (dayDiff === 0) {
-    return `today ${date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false })}`;
-  }
-  if (dayDiff === 1) {
-    return "yesterday";
-  }
-  return date.toLocaleDateString([], { month: "short", day: "numeric" });
-}
-
-/** Find the most recent Claude Code JSONL for the current project cwd. */
-function findClaudeCodeJsonl(cwd: string): string | null {
-  try {
-    const safePath = cwd.replace(/\//g, "-");
-    const projectDir = path.join(os.homedir(), ".claude", "projects", safePath);
-    if (!fs.existsSync(projectDir)) return null;
-    const files = fs.readdirSync(projectDir)
-      .filter((f) => f.endsWith(".jsonl"))
-      .map((f) => ({ f, mtime: fs.statSync(path.join(projectDir, f)).mtimeMs }))
-      .sort((a, b) => b.mtime - a.mtime);
-    if (!files.length) return null;
-    return path.join(projectDir, files[0].f);
-  } catch {
-    return null;
-  }
-}
+import { findClaudeCodeJsonl, formatRelativeSessionTime, truncatePreview } from "../services/agent-session-helpers.js";
+import { dispatchSlashCommand } from "./agent-slash-commands.js";
+import { C, renderTranscript } from "./wibwob-agent-render.js";
 
 export function openWibWobAgentWindow(params: {
   screen: blessed.Widgets.Screen;
@@ -492,26 +350,7 @@ export function openWibWobAgentWindow(params: {
         draft = "";
         renderInput();
         params.screen.render();
-        if (text.trim() === "/help") {
-          params.agent.pushStatus(
-            "[commands]\n" +
-            "  /help       — show this list\n" +
-            "  /session    — session id, model, message count, log path\n" +
-            "  /new        — start a fresh session\n" +
-            "  /resume [n] — list or load previous sessions\n" +
-            "  /reload     — hot-swap system prompt from disk"
-          );
-        } else if (text.trim() === "/new") {
-          params.agent.reset();
-        } else if (text.trim() === "/session") {
-          const snap = params.agent.getSnapshot();
-          const msgs = snap.messageCount;
-          const model = snap.model ?? "—";
-          const file = snap.sessionFile ?? "(no log)";
-          params.agent.pushStatus(`[session] ${snap.sessionId}\n  model: ${model}\n  messages: ${msgs}\n  log: ${file}`);
-        } else if (text.trim().startsWith("/resume")) {
-          runResumeCommand(text.trim().slice("/resume".length));
-        } else {
+        if (!dispatchSlashCommand(text.trim(), params.agent, runResumeCommand)) {
           void params.agent.send(text);
         }
       }
@@ -588,25 +427,21 @@ export function openWibWobAgentWindow(params: {
 
   frame.writeInput = (text: string, sender?: string) => {
     const trimmed = text.trim();
-    if (trimmed === "/help") {
-      params.agent.pushStatus(
-        "[commands]\n" +
-        "  /help       — show this list\n" +
-        "  /session    — session id, model, message count, log path\n" +
-        "  /new        — start a fresh session\n" +
-        "  /resume [n] — list or load previous sessions\n" +
-        "  /reload     — hot-swap system prompt from disk"
-      );
+    if (dispatchSlashCommand(trimmed, params.agent, runResumeCommand)) {
       return;
     }
-    if (trimmed === "/new") { params.agent.reset(); return; }
-    if (trimmed === "/session") {
-      const snap = params.agent.getSnapshot();
-      params.agent.pushStatus(`[session] ${snap.sessionId}\n  model: ${snap.model ?? "—"}\n  messages: ${snap.messageCount}\n  log: ${snap.sessionFile ?? "(no log)"}`);
-      return;
-    }
-    if (trimmed.startsWith("/resume")) {
-      runResumeCommand(trimmed.slice("/resume".length));
+    if (trimmed === "/reload") {
+      unsubscribe();
+      unsubscribePlayer();
+      const pos = {
+        top: Number(frame.frame.top),
+        left: Number(frame.frame.left),
+        width: Number(frame.frame.width),
+        height: Number(frame.frame.height),
+      };
+      frame.cleanup = undefined;
+      frame.close();
+      openWibWobAgentWindow({ ...params, initialPos: pos });
       return;
     }
     void params.agent.send(text, sender);

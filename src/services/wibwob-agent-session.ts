@@ -633,6 +633,30 @@ export class WibWobAgentSession {
     };
   }
 
+  /** Abort in-flight streaming. Returns true if something was aborted. */
+  abort(): boolean {
+    if (!this.agent?.state.isStreaming) return false;
+    this.agent.abort();
+    this.status = "Aborted.";
+    this.emit();
+    return true;
+  }
+
+  /** Clear the transcript without resetting the session or model. */
+  clearTranscript(): void {
+    this.messages = [];
+    this.currentAssistantId = undefined;
+    this.lastToolName = undefined;
+    this.lastError = undefined;
+    this.status = "Ready.";
+    this.emit();
+  }
+
+  /** List names of all registered tools. */
+  getToolNames(): string[] {
+    return this.agent?.state.tools?.map((t) => t.name) ?? [];
+  }
+
   reset(): void {
     if (this.agent?.state.isStreaming) return; // don't reset mid-stream
     this.messages = [];

@@ -258,7 +258,12 @@ export function startSessionServer(target: SessionServerTarget): SessionServerHa
         case "send": {
           const message = typeof cmd.message === "string" ? cmd.message : "";
           const mode = cmd.mode === "follow_up" ? "follow_up" : "steer";
-          const sender = typeof cmd.sender === "string" ? cmd.sender : undefined;
+          // Sender from explicit field, or extracted from <sender_info> in message text
+          let sender = typeof cmd.sender === "string" ? cmd.sender : undefined;
+          if (!sender) {
+            const m = message.match(/<sender_info>\s*\{[^}]*"sessionName"\s*:\s*"([^"]+)"[^}]*\}\s*<\/sender_info>/);
+            if (m) sender = m[1];
+          }
           if (!message) { respond(false, undefined, "empty message"); return; }
           // Fire and forget — the response is sent immediately so the caller isn't blocked
           target.send(message, sender).catch(() => { /* swallow */ });
