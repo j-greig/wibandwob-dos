@@ -104,7 +104,7 @@ export class WindowManager implements WindowFacade {
     const titleBar = blessed.box({
       parent: frame,
       top: 0,
-      left: 1,
+      left: 2,
       right: 4,
       height: 1,
       tags: true,
@@ -114,8 +114,8 @@ export class WindowManager implements WindowFacade {
     const body = blessed.box({
       parent: frame,
       top: 1,
-      left: 1,
-      right: 1,
+      left: 2,
+      right: 2,
       bottom: 1,
       style: theme().body
     });
