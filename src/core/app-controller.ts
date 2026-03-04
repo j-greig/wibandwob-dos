@@ -6,6 +6,7 @@
  */
 
 import blessed from "blessed";
+import stringWidth from "string-width";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -80,6 +81,8 @@ import {
   openWorkspaceManagerWindow as openWorkspaceCommandWindow
 } from "../windows/misc-windows.js";
 import { openContourWindow as openContourStudioWindow } from "../windows/contour-window.js";
+import { openPlasmaWindow as openPlasmaStudioWindow } from "../windows/plasma-window.js";
+import { extractMoodFromText, type PlasmaModifiers } from "../services/plasma-engine.js";
 import { openContourTriptychWindow } from "../windows/contour-triptych-window.js";
 import { openMusicPlayerWindow } from "../windows/music-player-window.js";
 import { openTerrainLabWindow as openTerrainLabStudioWindow } from "../windows/terrain-lab-window.js";
@@ -101,6 +104,7 @@ export class TsTuiMvpApp {
   private readonly menuBar: Box;
   private readonly desktop: Box;
   private readonly statusLine: Box;
+  private statusKaomoji?: Box;
   private readonly menus: MenuConfig[];
   private readonly commands: CommandRegistry;
   private readonly menuUi: MenuOverlayManager;
@@ -268,9 +272,11 @@ export class TsTuiMvpApp {
     this.updateStatusLine();
     this.repaintDesktop();
     if (appFlags().dev) this.renderDevControls();
+    this.renderTopKaomoji();
     this.screen.on("resize", () => {
       this.repaintDesktop();
       this.syncLiveState();
+      this.renderTopKaomoji();
       this.screen.render();
     });
   }
@@ -308,6 +314,33 @@ export class TsTuiMvpApp {
     }, 300);
   }
 
+  private getStatusKaomoji(): string {
+    return "༼つ◕‿◕‿◕༽つ";
+  }
+
+  private renderTopKaomoji(): void {
+    const text = this.getStatusKaomoji();
+    const baseOffset = appFlags().dev ? 6 : 1;
+    const rightOffset = Math.max(0, baseOffset - 2);
+    const width = Math.max(1, stringWidth(text) + 1);
+    if (!this.statusKaomoji) {
+      this.statusKaomoji = blessed.box({
+        parent: this.menuBar,
+        top: 0,
+        right: rightOffset,
+        height: 1,
+        width,
+        tags: true,
+        content: text,
+        style: theme().menuBar
+      });
+      return;
+    }
+    this.statusKaomoji.right = rightOffset;
+    this.statusKaomoji.width = width;
+    this.statusKaomoji.setContent(text);
+    this.statusKaomoji.style = theme().menuBar;
+  }
 
   private updateStatusLine(): void {
     const current = this.state.sync();
@@ -315,9 +348,10 @@ export class TsTuiMvpApp {
     const focusSummary = focus
       ? ` Focus ${focus.id}:${focus.kind} ${focus.width ?? "?"}x${focus.height ?? "?"}@${focus.left ?? 0},${focus.top ?? 0}`
       : " Focus none";
-    this.statusLine.setContent(
-      ` Alt-F File  Alt-E Edit  Alt-V View  Alt-W Window  Alt-A Applications  Tab Next  Shift-Tab Prev  Alt-Shift-Arrows Resize  Ctrl-S Save  Ctrl-Q Quit  |  Term ${current.screen.width}x${current.screen.height}  Theme ${themeName()}  Windows ${current.screen.openWindowCount}${focusSummary} `
-    );
+    const left = `༼ Alt-F File  Alt-E Edit  Alt-V View  Alt-W Window  Alt-A Applications  Tab Next  Shift-Tab Prev  Alt-Shift-Arrows Resize  Ctrl-S Save  Ctrl-Q Quit  |  Term ${current.screen.width}x${current.screen.height}  Theme ${themeName()}  Windows ${current.screen.openWindowCount}${focusSummary}`;
+    const width = Math.max(1, Number(this.screen.width));
+    const content = left.slice(0, width);
+    this.statusLine.setContent(content);
   }
 
   private toggleTheme(): void {
@@ -362,6 +396,7 @@ export class TsTuiMvpApp {
     this.menuUi.restyle();
     this.customCursor?.restyle();
     this.windowManager.restyleAll();
+    this.renderTopKaomoji();
     this.repaintDesktop();
     this.persistState();
     this.screen.render();
@@ -498,6 +533,7 @@ export class TsTuiMvpApp {
           gallery: () => this.openPrimerGalleryWindow(),
           browser: () => this.openBrowserReaderWindow(),
           pattern: () => this.openPatternWindow(),
+          plasma: () => { this.openPlasmaWindow(); return undefined; },
           companion: () => this.openCompanionWindow(),
           inspector: () => this.openStateInspectorWindow(),
           "music-player": () => this.openMusicPlayerWindow(),
@@ -723,6 +759,62 @@ export class TsTuiMvpApp {
         onStateChanged: () => this.syncLiveState(),
       });
     });
+  }
+
+  private openPlasmaWindow(
+    mood?: string,
+    renderMode?: string,
+    options?: { primerName?: string; primerText?: string; reason?: string; modifiers?: PlasmaModifiers },
+  ): void {
+    openPlasmaStudioWindow(
+      {
+        screen: this.screen,
+        windowManager: this.windowManager,
+        onStateChanged: () => this.syncLiveState(),
+      },
+      {
+        mood,
+        renderMode: renderMode as any,
+        primerName: options?.primerName,
+        primerText: options?.primerText,
+        reason: options?.reason,
+        modifiers: options?.modifiers,
+      },
+    );
+  }
+
+  private openPlasmaFromPrimer(filePath?: string): void {
+    if (filePath) {
+      this.spawnPlasmaForFile(filePath);
+      return;
+    }
+    // No path — open a file picker so the menu item actually works
+    promptForPrimerFile({
+      overlays: this.overlays,
+      content: this.content,
+      repoRoot: REPO_ROOT,
+      onOpenPrimer: (picked) => this.spawnPlasmaForFile(picked),
+    });
+  }
+
+  private spawnPlasmaForFile(filePath: string): void {
+    try {
+      const text = fs.readFileSync(filePath, "utf8");
+      const analysis = extractMoodFromText(text);
+      this.openPlasmaWindow(analysis.mood.name, undefined, {
+        primerName: path.basename(filePath),
+        primerText: text,
+        reason: analysis.reason,
+        modifiers: {
+          density: analysis.density,
+          entropy: analysis.entropy,
+          dominantRatio: analysis.dominantRatio,
+        },
+      });
+      this.overlays.flash(`Plasma: ${analysis.mood.name} — ${analysis.reason}`);
+    } catch {
+      this.openPlasmaWindow();
+    }
   }
 
   private openContourTriptychStudioWindow(): WindowRecord | undefined {
@@ -1103,6 +1195,15 @@ export class TsTuiMvpApp {
       openContourWindow: () => this.openContourWindow(),
       openTerrainLab: () => this.openTerrainLabWindow(),
       openContourTriptych: () => this.openContourTriptychStudioWindow(),
+      openPlasmaWindow: (args) => {
+        const mood = typeof args?.mood === "string" ? args.mood : undefined;
+        const renderMode = typeof args?.renderMode === "string" ? args.renderMode : undefined;
+        this.openPlasmaWindow(mood, renderMode);
+      },
+      openPlasmaFromPrimer: (args) => {
+        const filePath = typeof args?.filePath === "string" ? args.filePath : undefined;
+        this.openPlasmaFromPrimer(filePath);
+      },
       openWibWobAgent: () => this.openWibWobAgentWindow(),
       reloadAgentPrompt: () => {
         if (this.activeAgentSession?.reloadPrompt()) {
