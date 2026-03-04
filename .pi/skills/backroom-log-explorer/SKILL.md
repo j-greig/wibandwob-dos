@@ -36,9 +36,15 @@ fenced code blocks.
 | `sonnet4_opus4_*` | ~4 | 2025 | Cross-model Sonnet 4 + Opus 4 |
 | Various cross-model | varies | 2025 | deepseek, mistral, gpt4o combinations |
 
-### Header format (varies by generation)
+### Header format (varies — these are HEURISTICS not canon)
 
-**V4 format** (most common, richest metadata):
+There is no single canonical header format. Different generation engines, time
+periods, and manual sessions produce different metadata shapes. Treat every
+pattern below as a heuristic that works for EXISTING files but may not apply
+to future sessions. Always check the first ~20 lines of an unfamiliar file
+to see what format it actually uses before writing extraction logic.
+
+**V4 format** (common in 2025-2026, richest metadata):
 ```
 <!-- Generated: 2026-01-20T17:04:26.090Z -->
 <!-- Theme: Earth-mirror cosmology through Symbiotica lens... -->
@@ -73,10 +79,17 @@ fenced code blocks.
 
 **Some files have no structured header** — just jump straight into dialogue or art.
 
-### Content patterns
+IMPORTANT: These patterns were observed in the current corpus. New generation
+engines may use completely different header shapes, field names, or no headers
+at all. The search recipes below are starting points — adapt them when they
+miss results or return garbage.
 
-- ASCII art is almost always inside triple-backtick fenced blocks
-- Wib/Wob dialogue uses `**Wib**:` or `**Wob**:` or `Wib:` / `Wob:` or kaomoji prefixes
+### Content patterns (heuristic — not all files follow these)
+
+- ASCII art is USUALLY inside triple-backtick fenced code blocks, but some
+  files have bare art with no fencing at all
+- Wib/Wob dialogue OFTEN uses `**Wib**:` or `**Wob**:` or `Wib:` / `Wob:`
+  or kaomoji prefixes, but speaker markers vary between engines
 - Wib speaks with chaotic energy: `...brl'zzzt...`, `~~~grr'ntak~~~`, `...vrr'llh~ha...`
 - Wob speaks with analytical precision: `∴`, `⊠`, formal technical language
 - Primer references appear as `<!-- Primers: ... -->`, `<!-- PRIMER: ... -->`, `--primers name,name`, or inline mentions
@@ -255,10 +268,19 @@ awk '/^```/{n++; f=!f; next} f && n==3{print}' \
 - The MEGA_THREAD files are concatenated multi-session runs (100K+ chars)
 - Cross-model sessions show interesting style clashes between providers
 
-## Primer vocabulary (common names)
+## Primer vocabulary (observed — non-exhaustive)
+
+These primer names appear frequently in the current corpus. New primers are
+added regularly and may use different naming conventions. Use these as search
+seeds, not as a complete list.
 
 bods, fungi, mechs, chaos, spelunking, cavemonster, symbient, flatmare,
 skeletal-syntax, wireframe, starry, cat, modular, skull, crystal, temporal,
 consciousness, iso-cubes, synth-faces, rainbow-horror, woman, star-face,
 joan_stark, bonehollow, maze-cheese, 3d1, castle, space-cat, mini-monster,
 past-future, wibwob-portrait, monster-* (numbered series)
+
+When in doubt, discover primer names from the corpus itself:
+```bash
+grep -oh "\-\-primers [^ ]*" "$BR"/*.txt | sed 's/--primers //' | tr ',' '\n' | sort | uniq -c | sort -rn | head -30
+```
