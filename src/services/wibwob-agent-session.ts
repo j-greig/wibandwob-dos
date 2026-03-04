@@ -854,6 +854,20 @@ export class WibWobAgentSession {
         return;
       }
       case "turn_end": {
+        // Surface API errors (e.g. context too long, rate limit, auth failure)
+        const turnMsg = event.message as unknown as Record<string, unknown>;
+        if (turnMsg?.errorMessage) {
+          const errText = String(turnMsg.errorMessage);
+          const a = this.findCurrentAssistant();
+          if (a && !a.text.trim()) {
+            a.text = `Wob: API error.\nWib: ${errText}`;
+            a.streaming = false;
+          }
+          this.status = "Error.";
+          this.lastError = errText;
+          this.currentAssistantId = undefined;
+          this.emit();
+        }
         // Persist tool results from this turn
         if (event.toolResults) {
           for (const tr of event.toolResults) {
