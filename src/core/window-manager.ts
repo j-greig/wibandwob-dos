@@ -5,9 +5,12 @@ import { theme } from "./theme/resolver.js";
 import { safeSetStyle } from "./ui-primitives.js";
 import type { Box, DragState, ResizeState, WindowKind, WindowRecord } from "./types.js";
 
+/** Called when an editor window receives input text. Return true if handled. */
 export type EditorWriteHook = (id: number, text: string) => boolean;
+/** Called when an editor window saves. Returns the resolved file path after save. */
 export type EditorSaveHook = (id: number, filePath: string) => string;
 
+/** Manages live window records, z-order stack, focus, drag/resize, and layout. Implements WindowFacade. */
 export class WindowManager implements WindowFacade {
   private readonly windows: WindowRecord[] = [];
   private focusedWindow?: WindowRecord;
@@ -67,6 +70,7 @@ export class WindowManager implements WindowFacade {
       });
   }
 
+  /** Create canonical window chrome (frame, shadow, titlebar, body) and base WindowRecord with event wiring. */
   createFrame(title: string, kind: WindowKind): WindowRecord {
     const offset = this.windows.length * 2;
     const screenWidth = Number(this.screen.width);
@@ -100,7 +104,7 @@ export class WindowManager implements WindowFacade {
     const titleBar = blessed.box({
       parent: frame,
       top: 0,
-      left: 2,
+      left: 1,
       right: 4,
       height: 1,
       tags: true,
@@ -228,6 +232,7 @@ export class WindowManager implements WindowFacade {
     return record;
   }
 
+  /** Insert a fully wired record into the managed stack, sync shadow/z-order, and focus it. */
   registerWindow(record: WindowRecord): void {
     this.windows.push(record);
     this.syncShadow(record);
@@ -285,6 +290,7 @@ export class WindowManager implements WindowFacade {
     );
   }
 
+  /** Move a window to absolute coordinates. Clears maximize state, clamps to desktop bounds. */
   moveWindow(id: number, left: number, top: number): boolean {
     const record = this.getWindowById(id);
     if (!record) {
@@ -303,6 +309,7 @@ export class WindowManager implements WindowFacade {
     return true;
   }
 
+  /** Resize a window. Clears maximize state, enforces minimum size. */
   resizeWindow(id: number, width: number, height: number): boolean {
     const record = this.getWindowById(id);
     if (!record) {
@@ -407,6 +414,7 @@ export class WindowManager implements WindowFacade {
     }
   }
 
+  /** Arrange all windows in a grid tile layout. Columns = ceil(sqrt(count)). */
   tileWindows(): void {
     if (this.windows.length === 0) {
       return;
@@ -437,6 +445,7 @@ export class WindowManager implements WindowFacade {
     this.screen.render();
   }
 
+  /** Arrange all windows in a diagonal cascade with uniform size and 2-cell offset. */
   cascadeWindows(): void {
     const desktopWidth = Math.max(40, Number(this.screen.width));
     const desktopHeight = Math.max(12, Number(this.screen.height) - 2);
@@ -600,6 +609,7 @@ export class WindowManager implements WindowFacade {
     return true;
   }
 
+  /** Toggle maximize: save bounds before maximizing, restore and clamp on un-maximize. Hides shadow when maximized. */
   private toggleMaximizeInternal(record: WindowRecord): void {
     if (record.savedBounds) {
       // Restore — clamp to current desktop bounds
