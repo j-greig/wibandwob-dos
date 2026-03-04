@@ -109,6 +109,7 @@ class AudioPlayerController {
 	private baseOffset = 0;
 	private proc: ChildProcessWithoutNullStreams | null = null;
 	private ticker: ReturnType<typeof setInterval> | null = null;
+	private lastTickerSecond = -1;
 	private listeners = new Set<() => void>();
 	private opChain: Promise<void> = Promise.resolve();
 	private generationCounter = 0;
@@ -148,14 +149,16 @@ class AudioPlayerController {
 	selectNext(): void {
 		this.refreshFiles();
 		if (this.files.length === 0) return;
-		this.selectedIndex = (this.selectedIndex + 1) % this.files.length;
+		if (this.selectedIndex >= this.files.length - 1) return;
+		this.selectedIndex += 1;
 		this.emitChange();
 	}
 
 	selectPrevious(): void {
 		this.refreshFiles();
 		if (this.files.length === 0) return;
-		this.selectedIndex = (this.selectedIndex - 1 + this.files.length) % this.files.length;
+		if (this.selectedIndex <= 0) return;
+		this.selectedIndex -= 1;
 		this.emitChange();
 	}
 
@@ -484,9 +487,13 @@ class AudioPlayerController {
 
 	private startTicker(): void {
 		this.stopTicker();
+		this.lastTickerSecond = Math.floor(this.getCurrentElapsed());
 		this.ticker = setInterval(() => {
 			if (this.state !== "playing") return;
 			this.elapsed = this.getCurrentElapsed();
+			const currentSecond = Math.floor(this.elapsed);
+			if (currentSecond === this.lastTickerSecond) return;
+			this.lastTickerSecond = currentSecond;
 			this.emitChange();
 		}, 250);
 	}
@@ -495,6 +502,7 @@ class AudioPlayerController {
 		if (!this.ticker) return;
 		clearInterval(this.ticker);
 		this.ticker = null;
+		this.lastTickerSecond = -1;
 	}
 }
 
@@ -505,9 +513,12 @@ class MusicPlayerOverlay {
 	private cachedLines: string[] = [];
 	private scrollTop = 0;
 	private unsubscribe: (() => void) | null = null;
+	private pendingEscape = "";
+	private escapeTimer: ReturnType<typeof setTimeout> | null = null;
 
 	constructor(
 		private tui: { requestRender(): void },
+		private onClose: () => void,
 		startFile?: string,
 	) {
 		this.unsubscribe = playerController.subscribe(() => {
@@ -518,8 +529,22 @@ class MusicPlayerOverlay {
 	}
 
 	handleInput(data: string): boolean {
+		if (this.pendingEscape || data.startsWith("\x1b")) {
+			const resolved = this.resolveEscapeInput(data);
+			if (!resolved) return true;
+			data = resolved;
+		}
+
+		for (const chunk of splitInputChunks(data)) {
+			if (!this.handleChunk(chunk)) return false;
+		}
+		return true;
+	}
+
+	private handleChunk(data: string): boolean {
 		if (matchesKey(data, "escape") || data === "q" || data === "Q") {
 			this.destroy();
+			this.onClose();
 			return false;
 		}
 		if (data === " ") {
@@ -542,6 +567,40 @@ class MusicPlayerOverlay {
 			void playerController.playSelected();
 		}
 		return true;
+	}
+
+	private resolveEscapeInput(data: string): string | null {
+		const combined = `${this.pendingEscape}${data}`;
+		this.pendingEscape = "";
+		if (this.escapeTimer) {
+			clearTimeout(this.escapeTimer);
+			this.escapeTimer = null;
+		}
+
+		if (combined === "\x1b" || combined === "\x1b[") {
+			this.pendingEscape = combined;
+			this.escapeTimer = setTimeout(() => {
+				if (this.pendingEscape !== "\x1b") return;
+				this.pendingEscape = "";
+				this.escapeTimer = null;
+				this.destroy();
+				this.onClose();
+			}, 40);
+			return null;
+		}
+
+		if (
+			combined.startsWith("\x1b[") &&
+			!combined.startsWith("\x1b[A") &&
+			!combined.startsWith("\x1b[B") &&
+			!combined.startsWith("\x1b[C") &&
+			!combined.startsWith("\x1b[D")
+		) {
+			this.pendingEscape = combined;
+			return null;
+		}
+
+		return combined;
 	}
 
 	invalidate(): void {
@@ -624,9 +683,31 @@ class MusicPlayerOverlay {
 	}
 
 	destroy(): void {
+		if (this.escapeTimer) {
+			clearTimeout(this.escapeTimer);
+			this.escapeTimer = null;
+		}
+		this.pendingEscape = "";
 		this.unsubscribe?.();
 		this.unsubscribe = null;
 	}
+}
+
+function splitInputChunks(data: string): string[] {
+	const chunks: string[] = [];
+	for (let index = 0; index < data.length; ) {
+		if (data[index] === "\x1b" && data[index + 1] === "[" && index + 2 < data.length) {
+			const chunk = data.slice(index, index + 3);
+			if (chunk === "\x1b[A" || chunk === "\x1b[B" || chunk === "\x1b[C" || chunk === "\x1b[D") {
+				chunks.push(chunk);
+				index += 3;
+				continue;
+			}
+		}
+		chunks.push(data[index] ?? "");
+		index += 1;
+	}
+	return chunks;
 }
 
 function renderInlineState(
@@ -780,12 +861,12 @@ export default function (pi: ExtensionAPI) {
 
 			const startFile = args?.trim() || undefined;
 			await ctx.ui.custom<void>((tui, _theme, _kb, done) => {
-				const overlay = new MusicPlayerOverlay(tui, startFile);
+				const overlay = new MusicPlayerOverlay(tui, () => done(undefined), startFile);
 				return {
 					render: (width) => overlay.render(width),
 					invalidate: () => overlay.invalidate(),
 					handleInput: (data) => {
-						if (!overlay.handleInput(data)) done(undefined);
+						overlay.handleInput(data);
 					},
 				};
 			});
