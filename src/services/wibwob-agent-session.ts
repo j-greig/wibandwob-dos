@@ -531,11 +531,12 @@ export class WibWobAgentSession {
         acc[tool.name] = tool;
         return acc;
       }, {});
+      // Music tools are registered by .pi/extensions/music-player.ts — do NOT
+      // include them here or AgentSession will see duplicate tool names.
       const customTools = this.mode === "agent" && this.tuiContext
         ? [
             ...createTuiToolDefinitions(this.tuiContext),
             ...toToolDefinitionList(piSessionTools),
-            ...toToolDefinitionList(musicTools),
           ]
         : [];
       // Activate all tools: jailed coding tools (via baseToolsOverride) + custom tools
