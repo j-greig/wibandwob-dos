@@ -503,6 +503,7 @@ const playerController = new AudioPlayerController();
 class MusicPlayerOverlay {
 	private cachedWidth = -1;
 	private cachedLines: string[] = [];
+	private scrollTop = 0;
 	private unsubscribe: (() => void) | null = null;
 
 	constructor(
@@ -585,11 +586,16 @@ class MusicPlayerOverlay {
 		const termHeight = Math.max(12, (process.stdout.rows ?? 40) - 1);
 		const chromeLines = 7;
 		const listHeight = Math.max(3, termHeight - chromeLines);
-		let start = Math.max(0, snapshot.selectedIndex - Math.floor(listHeight / 2));
-		if (start + listHeight > snapshot.files.length) {
-			start = Math.max(0, snapshot.files.length - listHeight);
+		// Scroll only when selection goes outside visible window
+		// Keep scroll position stable otherwise (no re-centering on every frame)
+		if (snapshot.selectedIndex < this.scrollTop) {
+			this.scrollTop = snapshot.selectedIndex;
+		} else if (snapshot.selectedIndex >= this.scrollTop + listHeight) {
+			this.scrollTop = snapshot.selectedIndex - listHeight + 1;
 		}
-		const visibleFiles = snapshot.files.slice(start, start + listHeight);
+		// Clamp scroll bounds
+		this.scrollTop = Math.max(0, Math.min(this.scrollTop, Math.max(0, snapshot.files.length - listHeight)));
+		const visibleFiles = snapshot.files.slice(this.scrollTop, this.scrollTop + listHeight);
 
 		for (let row = 0; row < listHeight; row += 1) {
 			const name = visibleFiles[row];
@@ -597,7 +603,7 @@ class MusicPlayerOverlay {
 				lines.push("");
 				continue;
 			}
-			const absoluteIndex = start + row;
+			const absoluteIndex = this.scrollTop + row;
 			const isSelected = absoluteIndex === snapshot.selectedIndex;
 			const isPlaying = name === snapshot.fileName && snapshot.state !== "stopped";
 			const prefix = isPlaying ? green(" ♫ ") : "   ";
