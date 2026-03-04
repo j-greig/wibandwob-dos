@@ -1,10 +1,3 @@
-/**
- * Window manager: owns live window records, z-order stack, focus,
- * drag/resize state machines, tile/cascade layout, and maximize.
- * Implements the WindowFacade interface consumed by workspace restore,
- * agent tools, control API, and the app controller.
- */
-
 import blessed from "blessed";
 
 import type { WindowFacade } from "./window-facade.js";
@@ -107,8 +100,8 @@ export class WindowManager implements WindowFacade {
     const titleBar = blessed.box({
       parent: frame,
       top: 0,
-      left: 1,
-      right: 3,
+      left: 2,
+      right: 4,
       height: 1,
       tags: true,
       content: ` ${title} `,
