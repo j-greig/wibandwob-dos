@@ -592,10 +592,10 @@ export class WindowManager implements WindowFacade {
 
   toggleMaximize(record: WindowRecord): void {
     if (record.savedBounds) {
-      // Restore — clamp to current screen bounds
+      // Restore — clamp to current desktop bounds
       const b = record.savedBounds;
-      const sw = Number(this.screen.width);
-      const sh = Number(this.screen.height) - 2;
+      const sw = Number(this.desktop.width) || Number(this.screen.width);
+      const sh = Number(this.desktop.height) || (Number(this.screen.height) - 2);
       record.frame.left = this.clamp(b.left, 0, Math.max(0, sw - b.width));
       record.frame.top = this.clamp(b.top, 0, Math.max(0, sh - b.height));
       record.frame.width = Math.min(b.width, sw);
@@ -611,10 +611,12 @@ export class WindowManager implements WindowFacade {
         width: Number(record.frame.width),
         height: Number(record.frame.height),
       };
+      const dw = Number(this.desktop.width) || w;
+      const dh = Number(this.desktop.height) || (h - 2);
       record.frame.left = 0;
-      record.frame.top = 1; // below menu bar
-      record.frame.width = w;
-      record.frame.height = h - 2; // above status bar
+      record.frame.top = 0;
+      record.frame.width = dw;
+      record.frame.height = dh;
     }
     this.syncShadow(record);
     if (record.savedBounds && record.shadow) record.shadow.hide();
