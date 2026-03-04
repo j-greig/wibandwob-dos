@@ -37,6 +37,20 @@ function applyRect(node: blessed.Widgets.BoxElement, rect: Rect): void {
   node.height = clampSize(rect.height);
 }
 
+/** Wrap a raw blessed box as a UiPart so it can participate in createStack/createColumns layout. */
+export function createNodePart(
+  node: blessed.Widgets.BoxElement,
+  opts?: { restyle?: () => void }
+): UiPart<Record<string, never>> {
+  return {
+    node,
+    layout(rect) { applyRect(node, rect); },
+    update() {},
+    restyle() { opts?.restyle?.(); },
+    destroy() { node.destroy(); },
+  };
+}
+
 function parseFractionBasis(basis: number | string): number | null {
   if (typeof basis === "number") {
     return null;

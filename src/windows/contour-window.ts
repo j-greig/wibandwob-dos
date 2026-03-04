@@ -4,6 +4,7 @@ import { theme } from "../core/theme/resolver.js";
 import { safeSetStyle } from "../core/ui-primitives.js";
 import {
   createContourPlayer,
+  readNodeViewport,
   terrainNames,
 } from "../services/contour-engine.js";
 import type { BaseWindowDeps } from "./misc-windows.js";
@@ -34,10 +35,7 @@ export function openContourWindow(deps: BaseWindowDeps): void {
     mode: "chaos",
     terrainIdx: Math.max(0, terrainNames.indexOf("meadow")),
     fps: 12,
-    getViewport: () => ({
-      width: Math.max(12, Number(canvas.width)),
-      height: Math.max(6, Number(canvas.height)),
-    }),
+    getViewport: () => readNodeViewport(canvas, { minWidth: 12, minHeight: 6 }),
     onFrame: (content) => {
       canvas.setContent(content);
       deps.screen.render();
@@ -46,8 +44,6 @@ export function openContourWindow(deps: BaseWindowDeps): void {
       status.setContent(` mode:${s.mode}  terrain:${s.terrain}  seed:${s.seed}  levels:${s.levels}  keys:m t/TAB r +/- `);
     },
   });
-
-  player.play();
 
   frame.describeState = () => ({
     appType: "contour-studio" as const,
@@ -85,4 +81,5 @@ export function openContourWindow(deps: BaseWindowDeps): void {
   frame.frame.on("resize", () => player.reroll());
   deps.windowManager.registerWindow(frame);
   frame.focus();
+  player.play();
 }

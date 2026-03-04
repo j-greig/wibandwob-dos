@@ -20,10 +20,11 @@ import { join } from "node:path";
 import { homedir } from "node:os";
 import {
   createContourPlayer,
+  readNodeViewport,
   terrainNames,
-  type ContourPlayer,
   type ContourMode,
 } from "../../src/services/contour-engine.js";
+import { createLazyMountedPlayer } from "../../src/services/animation-service.js";
 
 type ClockMode = "clock" | "sentient";
 type Voice = "plain" | "liminal" | "scramble" | "terrain";
@@ -344,61 +345,33 @@ async function generatePoem(time: string, voice: Voice): Promise<string | null> 
 const CONTOUR_MODES: ContourMode[] = ["chaos", "order", "hybrid"];
 
 function createTerrainPlayer(host: MicroappHost): AnimatedPanelPlayer & { setRunning(running: boolean): void; shuffle(): void } {
-  let target: UiNode | null = null;
-  let player: ContourPlayer | null = null;
-  let running = false;
+  function randomContourConfig() {
+    return {
+      mode: CONTOUR_MODES[Math.floor(Math.random() * CONTOUR_MODES.length)],
+      seed: Math.floor(Math.random() * 100000),
+      terrainIdx: Math.floor(Math.random() * terrainNames.length),
+      nLevels: 3 + Math.floor(Math.random() * 6),
+      fps: 8,
+    };
+  }
 
-  const randomise = () => {
-    if (!player) return;
-    player.setMode(CONTOUR_MODES[Math.floor(Math.random() * CONTOUR_MODES.length)]);
-    player.setTerrain(Math.floor(Math.random() * terrainNames.length));
-    player.setLevels(3 + Math.floor(Math.random() * 6)); // 3–8
-    player.reroll();
-  };
+  const bridge = createLazyMountedPlayer({
+    create(target) {
+      return createContourPlayer({
+        ...randomContourConfig(),
+        getViewport: () => readNodeViewport(target, { minWidth: 12, minHeight: 6, fallbackWidth: 12, fallbackHeight: 6 }),
+        onFrame: (content) => { target.setContent(content); host.screen.render(); },
+      });
+    },
+    render: () => host.screen.render(),
+    clearOnStop: true,
+  });
 
   return {
-    attachTarget(nextTarget) {
-      target = nextTarget;
-    },
+    ...bridge,
     shuffle() {
-      randomise();
-    },
-    setRunning(nextRunning) {
-      running = nextRunning;
-      if (!running) {
-        player?.destroy();
-        player = null;
-        if (target) {
-          target.setContent("");
-          host.screen.render();
-        }
-        return;
-      }
-      if (!target) return;
-      if (player) { player.destroy(); player = null; }
-
-      const t = target;
-      player = createContourPlayer({
-        mode: CONTOUR_MODES[Math.floor(Math.random() * CONTOUR_MODES.length)],
-        seed: Math.floor(Math.random() * 100000),
-        terrainIdx: Math.floor(Math.random() * terrainNames.length),
-        nLevels: 3 + Math.floor(Math.random() * 6),
-        fps: 8,
-        getViewport: () => ({
-          width: Number((t as any).width) || 12,
-          height: Number((t as any).height) || 6,
-        }),
-        onFrame: (content) => {
-          t.setContent(content);
-          host.screen.render();
-        },
-      });
-      player.play();
-    },
-    destroy() {
-      player?.destroy();
-      player = null;
-      target = null;
+      bridge.setRunning(false);
+      bridge.setRunning(true);
     },
   };
 }

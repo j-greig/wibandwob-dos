@@ -48,6 +48,12 @@ export interface FramePlayer {
   readonly fps: number;
 }
 
+export interface LazyMountedPlayer {
+  attachTarget(target: { setContent(s: string): void; width?: number | string; height?: number | string }): void;
+  setRunning(running: boolean): void;
+  destroy(): void;
+}
+
 /**
  * Create a player for pre-rendered frames (e.g. animated primers).
  * Frames are cycled at the given FPS. onFrame is called with the
@@ -150,5 +156,42 @@ export function createLivePlayer(options: LivePlayerOptions): FramePlayer {
     get currentFrame() { return tick; },
     get totalFrames() { return -1; },
     get fps() { return fps; },
+  };
+}
+
+/**
+ * Bridge any FramePlayer factory into the attachTarget/setRunning interface
+ * expected by createAnimatedPanel in microapps.
+ */
+export function createLazyMountedPlayer(opts: {
+  create(target: { setContent(s: string): void; width?: number | string; height?: number | string }): FramePlayer;
+  render: () => void;
+  clearOnStop?: boolean;
+}): LazyMountedPlayer {
+  let target: { setContent(s: string): void; width?: number | string; height?: number | string } | null = null;
+  let player: FramePlayer | null = null;
+
+  return {
+    attachTarget(t) { target = t; },
+    setRunning(running) {
+      if (!running) {
+        player?.destroy();
+        player = null;
+        if (target && opts.clearOnStop !== false) {
+          target.setContent("");
+          opts.render();
+        }
+        return;
+      }
+      if (!target) return;
+      if (player) { player.destroy(); player = null; }
+      player = opts.create(target);
+      player.play();
+    },
+    destroy() {
+      player?.destroy();
+      player = null;
+      target = null;
+    },
   };
 }

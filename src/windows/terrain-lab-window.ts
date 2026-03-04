@@ -18,6 +18,7 @@ import { theme } from "../core/theme/resolver.js";
 import {
   createStack,
   createColumns,
+  createNodePart,
   createHeaderBar,
   createStatusBar,
   createTextBlock,
@@ -25,6 +26,7 @@ import {
 } from "../core/ui-parts.js";
 import {
   createContourPlayer,
+  readNodeViewport,
   terrainNames,
 } from "../services/contour-engine.js";
 import type { BaseWindowDeps } from "./misc-windows.js";
@@ -54,10 +56,7 @@ export function openTerrainLabWindow(deps: BaseWindowDeps): void {
     mode: "chaos",
     terrainIdx: Math.max(0, terrainNames.indexOf("meadow")),
     fps: 12,
-    getViewport: () => ({
-      width: Math.max(8, Number(contourBox.width) || 40),
-      height: Math.max(4, Number(contourBox.height) || 15),
-    }),
+    getViewport: () => readNodeViewport(contourBox, { minWidth: 8, minHeight: 4 }),
     onFrame: (content) => {
       contourBox.setContent(content);
       deps.screen.render();
@@ -82,34 +81,26 @@ export function openTerrainLabWindow(deps: BaseWindowDeps): void {
     },
   });
 
-  // Manual layout since contourBox is raw blessed, not a UiPart
+  const contourPart = createNodePart(contourBox, {
+    restyle: () => { contourBox.style = theme().body; },
+  });
+
+  const bodyColumns = createColumns(frame.body, [
+    { key: "map", basis: "3fr", part: contourPart },
+    { key: "divider", basis: 1, part: divider },
+    { key: "info", basis: "1fr", part: infoBlock },
+  ]);
+
+  const root = createStack(frame.body, [
+    { key: "header", basis: 1, part: header },
+    { key: "body", basis: "1fr", part: bodyColumns },
+    { key: "status", basis: 1, part: statusBar },
+  ]);
+
   const doLayout = () => {
     const w = Math.max(1, Number(frame.body.width) || 0);
     const h = Math.max(1, Number(frame.body.height) || 0);
-
-    const headerH = 1;
-    const statusH = 1;
-    const bodyH = Math.max(1, h - headerH - statusH);
-    const infoW = Math.max(1, Math.min(20, Math.floor(w * 0.25)));
-    const divW = 1;
-    const mapW = Math.max(8, w - infoW - divW);
-
-    header.layout({ top: 0, left: 0, width: w, height: headerH });
-
-    // Contour map — left
-    contourBox.top = headerH;
-    contourBox.left = 0;
-    contourBox.width = mapW;
-    contourBox.height = bodyH;
-
-    // Divider
-    divider.layout({ top: headerH, left: mapW, width: divW, height: bodyH });
-    divider.update({ visible: true });
-
-    // Info panel — right
-    infoBlock.layout({ top: headerH, left: mapW + divW, width: infoW, height: bodyH });
-
-    statusBar.layout({ top: headerH + bodyH, left: 0, width: w, height: statusH });
+    root.layout({ top: 0, left: 0, width: w, height: h });
   };
 
   const cycleMode = () => {
@@ -138,21 +129,14 @@ export function openTerrainLabWindow(deps: BaseWindowDeps): void {
   frame.captureText = () => `${contourBox.getContent()}\n\n${infoText}`;
   frame.cleanup = () => {
     player.destroy();
-    header.destroy();
-    divider.destroy();
-    infoBlock.destroy();
-    statusBar.destroy();
+    root.destroy();
   };
   frame.focus = () => {
     deps.windowManager.focusWindow(frame);
     contourBox.focus();
   };
   frame.onRestyle = () => {
-    contourBox.style = theme().body;
-    header.restyle();
-    divider.restyle();
-    infoBlock.restyle();
-    statusBar.restyle();
+    root.restyle();
   };
 
   frame.refresh = doLayout;

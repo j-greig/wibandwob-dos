@@ -1,3 +1,10 @@
+/**
+ * Procedural terrain generation and contour rendering engine.
+ * Owns hill generation, heightmap computation, marching-squares contouring,
+ * ordered/hybrid grid rendering, and the animated ContourPlayer.
+ * Pure maths — no blessed, no IO, no framework deps.
+ */
+
 const MS_LOOKUP = " ╮╭─╰╮│╯╯│╭╰─╭╮ ";
 const TAU = Math.PI * 2;
 
@@ -12,6 +19,7 @@ const GRID_RANDOM = 1;
 const GRID_SEQ = 2;
 const GRID_HEX = 3;
 
+/** Parametric hill tuple: [cx, cy, radius, peak, shape, rotation, aspect, sides, power]. */
 export type Hill = readonly [
   cx: number,
   cy: number,
@@ -24,10 +32,12 @@ export type Hill = readonly [
   power: number
 ];
 
+/** Rendering mode: "chaos" = organic contour lines, "order" = geometric grid clusters, "hybrid" = both blended. */
 export type ContourMode = "chaos" | "order" | "hybrid";
 
 type TerrainFactory = (w: number, h: number, rng: SeededRandom) => Hill[];
 
+/** Deterministic PRNG. Same seed reproduces the same terrain and grid patterns. */
 class SeededRandom {
   private state: number;
   private spare: number | null = null;
@@ -132,6 +142,7 @@ function shapedDistance(dx: number, dy: number, hill: Hill): number {
   return lx * lx + ly * ly;
 }
 
+/** Construct one randomised hill profile with shape/rotation/aspect variation from a seed. */
 export function makeHill(cx: number, cy: number, r: number, peak: number, rngSeed: number | SeededRandom): Hill {
   const rng = typeof rngSeed === "number" ? new SeededRandom(rngSeed) : rngSeed;
   const shape = rng.weightedChoice(
@@ -158,6 +169,7 @@ export function makeHill(cx: number, cy: number, r: number, peak: number, rngSee
   return [cx, cy, r, peak, shape, rotation, aspect, sides, power] as const;
 }
 
+/** Compute a 2D heightfield by summing Gaussian contributions from all hills. */
 export function heightmap(w: number, h: number, hills: readonly Hill[]): number[][] {
   const grid = Array.from({ length: h }, () => Array.from({ length: w }, () => 0));
   for (const hill of hills) {
@@ -192,6 +204,7 @@ export function heightmap(w: number, h: number, hills: readonly Hill[]): number[
   return grid.map((row) => row.map((value) => (value - lo) * scale));
 }
 
+/** Run marching squares on a heightfield at a single threshold, producing a character grid. */
 export function march(grid: readonly number[][], h: number, w: number, threshold: number): string[][] {
   const rows: string[][] = [];
   for (let y = 0; y < h - 1; y += 1) {
@@ -209,6 +222,7 @@ export function march(grid: readonly number[][], h: number, w: number, threshold
   return rows;
 }
 
+/** Overlay multiple marching-squares layers, keeping the last non-space character per cell. */
 export function composite(layers: readonly string[][][]): string[][] {
   const height = layers[0]?.length ?? 0;
   const width = layers[0]?.[0]?.length ?? 0;
@@ -384,8 +398,10 @@ const TERRAIN_FACTORIES: readonly [string, TerrainFactory][] = [
   ["twin peaks", tTwinPeaks]
 ] as const;
 
+/** Human-readable names for each terrain factory, indexed by terrainIdx. */
 export const terrainNames = TERRAIN_FACTORIES.map(([name]) => name);
 
+/** Generate hills for a named terrain type at the given seed. */
 export function generateTerrainHills(w: number, h: number, seed: number, terrainIdx: number): Hill[] {
   const rng = new SeededRandom(seed);
   const terrain = TERRAIN_FACTORIES[((terrainIdx % TERRAIN_FACTORIES.length) + TERRAIN_FACTORIES.length) % TERRAIN_FACTORIES.length];
@@ -543,6 +559,7 @@ export function generateHybrid(
   return generateHybridFromHills(w, h, nLevels, seed, generateTerrainHills(w, h, seed, terrainIdx), orderRatio);
 }
 
+/** Render chaos-mode contour lines from precomputed hills. Returns string rows. */
 export function renderFromHills(w: number, h: number, nLevels: number, hills: readonly Hill[]): string[] {
   if (hills.length === 0) {
     return blankGrid(w, h).map((row) => row.join(""));
@@ -552,6 +569,7 @@ export function renderFromHills(w: number, h: number, nLevels: number, hills: re
   return composite(thresholds.map((threshold) => march(heights, h, w, threshold))).map((row) => row.join(""));
 }
 
+/** Render any contour mode from precomputed hills. Dispatches to chaos/order/hybrid renderers. */
 export function renderContourFromHills(
   w: number,
   h: number,
@@ -659,6 +677,22 @@ function sanitizeViewportDimension(value: number, fallback: number, min: number)
   return Math.max(min, Math.floor(value));
 }
 
+/** Read viewport from a blessed-like node with NaN-safe fallbacks. */
+export function readNodeViewport(
+  node: { width?: number | string; height?: number | string },
+  opts?: { minWidth?: number; minHeight?: number; fallbackWidth?: number; fallbackHeight?: number }
+): { width: number; height: number } {
+  const fw = opts?.fallbackWidth ?? 40;
+  const fh = opts?.fallbackHeight ?? 15;
+  const mw = opts?.minWidth ?? 8;
+  const mh = opts?.minHeight ?? 4;
+  return {
+    width: sanitizeViewportDimension(Number(node.width), fw, mw),
+    height: sanitizeViewportDimension(Number(node.height), fh, mh),
+  };
+}
+
+/** Create an animated contour player. Manages viewport polling, grow animation, terrain cycling, and status callbacks. */
 export function createContourPlayer(opts: ContourPlayerOptions): ContourPlayer {
   let mode: ContourMode = opts.mode ?? "chaos";
   let seed = opts.seed ?? Math.floor(Math.random() * 100000);
