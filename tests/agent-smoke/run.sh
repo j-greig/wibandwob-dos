@@ -11,7 +11,8 @@ set -euo pipefail
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$REPO"
 
-API="http://127.0.0.1:8099"
+API_PORT="${SMOKE_PORT:-8098}"
+API="http://127.0.0.1:${API_PORT}"
 TMUX_SESSION="wibwob-test"
 RESULTS_DIR="tests/agent-smoke/results/$(date +%Y-%m-%dT%H-%M-%S)"
 mkdir -p "$RESULTS_DIR"
@@ -143,14 +144,14 @@ log "Cleaning up..."
 tmux kill-session -t "$TMUX_SESSION" 2>/dev/null || true
 sleep 1
 
-# Kill any existing process on port 8099
-lsof -ti:8099 | xargs kill -9 2>/dev/null || true
+# Kill any existing process on the test port (NOT 8099 which may be the user's live instance)
+lsof -ti:${API_PORT} | xargs kill -9 2>/dev/null || true
 sleep 1
 
 log "Launching WibWob-DOS in tmux session '$TMUX_SESSION'..."
 # COLUMNS/LINES env vars ensure blessed gets a real terminal size even in headless tmux
 tmux new-session -d -s "$TMUX_SESSION" -x 200 -y 60 \
-  "cd $REPO && COLUMNS=200 LINES=60 bun run dev 2>&1 | tee $RESULTS_DIR/app.log"
+  "cd $REPO && COLUMNS=200 LINES=60 CONTROL_API_PORT=${API_PORT} bun run dev 2>&1 | tee $RESULTS_DIR/app.log"
 
 log "Waiting for API on $API..."
 for i in $(seq 1 30); do
@@ -270,12 +271,32 @@ COUNT_AFTER=$(agent_msg_count "$STATE" "$AGENT_ID")
 DETAILS=$(agent_details "$STATE" "$AGENT_ID")
 STREAMING=$(echo "$DETAILS" | python3 -c "import sys,json; print(json.load(sys.stdin).get('streaming',False))" 2>/dev/null || echo "True")
 
-# Should have at least user + assistant message = +2
-if [ "$COUNT_AFTER" -ge $((COUNT_BEFORE + 2)) ] && [ "$STREAMING" = "False" ]; then
+# Must have user + assistant (+2), not be streaming, and status should be Ready not Error
+SUMMARY=$(echo "$DETAILS" | python3 -c "import sys,json; print(json.load(sys.stdin).get('summary',''))" 2>/dev/null || echo "")
+if [ "$COUNT_AFTER" -ge $((COUNT_BEFORE + 2)) ] && [ "$STREAMING" = "False" ] && ! echo "$SUMMARY" | grep -qi "error"; then
   pass "Simple prompt got response (count: $COUNT_BEFORE → $COUNT_AFTER)"
 else
-  SUMMARY=$(echo "$DETAILS" | python3 -c "import sys,json; print(json.load(sys.stdin).get('summary',''))" 2>/dev/null || echo "")
-  fail "Simple prompt" "count=$COUNT_BEFORE→$COUNT_AFTER streaming=$STREAMING summary=$SUMMARY"
+  # Check session log for the actual error
+  SESSION_LOG_NOW=$(find_session_log)
+  if [ -n "$SESSION_LOG_NOW" ]; then
+    ERR=$(tail -1 "$SESSION_LOG_NOW" | python3 -c "
+import sys, json
+e = json.loads(sys.stdin.readline())
+if e.get('type') == 'message':
+  m = e['message']
+  if m.get('errorMessage'):
+    print(m['errorMessage'][:200])
+  elif m.get('stopReason') == 'error':
+    print('stopReason=error (no errorMessage)')
+" 2>/dev/null || echo "")
+    if [ -n "$ERR" ]; then
+      fail "Simple prompt" "API error: $ERR"
+    else
+      fail "Simple prompt" "count=$COUNT_BEFORE→$COUNT_AFTER streaming=$STREAMING summary=$SUMMARY"
+    fi
+  else
+    fail "Simple prompt" "count=$COUNT_BEFORE→$COUNT_AFTER streaming=$STREAMING summary=$SUMMARY"
+  fi
 fi
 
 agent_text "$AGENT_ID" > "$RESULTS_DIR/06-prompt.txt" 2>/dev/null || true
