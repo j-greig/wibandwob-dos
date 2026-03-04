@@ -18,6 +18,7 @@ Canonical inventory of documentation for WibWob-DOS. Update this file whenever a
 | `AGENTS.md` | active | Agent guidance, architecture invariants, control API reference, editing rules |
 | `README.md` | active | Project overview, setup, quick start |
 | `docs/000-docs-overview.md` | active | This file — doc inventory |
+| `docs/zen-of-ai-coding.md` | reference | Summary of Zen of AI Coding + repo-specific reflections and gap analysis |
 
 ## Planning
 
