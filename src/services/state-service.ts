@@ -134,6 +134,7 @@ export class StateService {
       height: Number(window.frame.height) || null,
       zIndex: index,
       focused: window.id === focusedId,
+      maximized: !!window.savedBounds,
       filePath: window.filePath,
       details
     };

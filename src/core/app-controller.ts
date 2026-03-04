@@ -1247,6 +1247,10 @@ export class TsTuiMvpApp {
       openBackroomsLogBrowser: () => this.openBackroomsLogBrowserWindow(),
       tileWindows: () => this.windowManager.tileWindows(),
       cascadeWindows: () => this.windowManager.cascadeWindows(),
+      toggleMaximizeFocused: () => {
+        const focused = this.windowManager.getFocusedWindow();
+        if (focused) this.windowManager.toggleMaximize(focused);
+      },
       openGallery: () => this.openPrimerGalleryWindow(),
       openBrowserReader: (args) => {
         const filePath = typeof args?.filePath === "string" && args.filePath.trim() ? args.filePath.trim() : undefined;

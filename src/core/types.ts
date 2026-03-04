@@ -154,6 +154,7 @@ export interface DesktopWindowState {
   height: number | null;
   zIndex: number;
   focused: boolean;
+  maximized: boolean;
   filePath?: string;
   details: WindowStateDetails;
 }
@@ -221,6 +222,9 @@ export interface WindowRecord {
 
   // Microapp-specific (set by module-loader.ts via MicroappHost)
   microappId?: string;
+
+  // Maximize state (set by WindowManager on double-click titlebar)
+  savedBounds?: { left: number; top: number; width: number; height: number };
 
   // Cross-cutting hooks — any window type may set these
   writeInput?: (input: string, sender?: string) => void;

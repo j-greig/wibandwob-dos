@@ -16,6 +16,8 @@ export class WindowManager implements WindowFacade {
   private resizeState?: ResizeState;
   private suppressClickWindowId?: number;
   private suppressClickUntil = 0;
+  private lastTitleClickTime = 0;
+  private lastTitleClickWindowId = -1;
   private editorWriteHook?: EditorWriteHook;
 
   constructor(
@@ -189,6 +191,16 @@ export class WindowManager implements WindowFacade {
         return;
       }
       this.focusWindowInternal(record);
+
+      const now = Date.now();
+      if (this.lastTitleClickWindowId === record.id && now - this.lastTitleClickTime < 400) {
+        this.toggleMaximize(record);
+        this.lastTitleClickTime = 0;
+        this.lastTitleClickWindowId = -1;
+      } else {
+        this.lastTitleClickTime = now;
+        this.lastTitleClickWindowId = record.id;
+      }
     });
     titleBar.on("mousedown", (data) => {
       this.focusWindowInternal(record);
@@ -570,6 +582,44 @@ export class WindowManager implements WindowFacade {
     }
     const mouseData = data as blessed.Widgets.Events.IMouseEventArg & { button?: string | number; buttons?: string | number };
     return mouseData.button === "right" || mouseData.button === 2 || mouseData.buttons === "right" || mouseData.buttons === 2;
+  }
+
+  toggleMaximize(record: WindowRecord): void {
+    if (record.savedBounds) {
+      // Restore
+      const b = record.savedBounds;
+      record.frame.left = b.left;
+      record.frame.top = b.top;
+      record.frame.width = b.width;
+      record.frame.height = b.height;
+      if (record.shadow) {
+        record.shadow.left = b.left + 2;
+        record.shadow.top = b.top + 1;
+        record.shadow.width = b.width;
+        record.shadow.height = b.height;
+        record.shadow.show();
+      }
+      record.savedBounds = undefined;
+    } else {
+      // Maximize
+      const w = Number(this.screen.width);
+      const h = Number(this.screen.height);
+      record.savedBounds = {
+        left: Number(record.frame.left),
+        top: Number(record.frame.top),
+        width: Number(record.frame.width),
+        height: Number(record.frame.height),
+      };
+      record.frame.left = 0;
+      record.frame.top = 1; // below menu bar
+      record.frame.width = w;
+      record.frame.height = h - 2; // above status bar
+      if (record.shadow) {
+        record.shadow.hide();
+      }
+    }
+    record.refresh?.();
+    this.screen.render();
   }
 
   private shouldSuppressClick(record: WindowRecord): boolean {

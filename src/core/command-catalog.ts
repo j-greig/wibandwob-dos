@@ -27,6 +27,7 @@ export interface AppMenuActions {
   openBackroomsLogBrowser: () => void;
   tileWindows: () => void;
   cascadeWindows: () => void;
+  toggleMaximizeFocused: () => void;
   openGallery: () => void;
   openBrowserReader: (args?: Record<string, unknown>) => void;
   openChromeBrowser: (args?: Record<string, unknown>) => void;
@@ -517,6 +518,18 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     menuPlacements: [{ category: "window", order: 50 }],
     palettePlacement: { order: 20 },
     contextMenu: { desktop: true, order: 110 },
+    api: true,
+    agent: true
+  },
+  {
+    id: "window.toggle_maximize",
+    label: "Toggle Maximize",
+    description: "Maximize the focused window or restore it to its previous size.",
+    group: "layout",
+    actionKey: "toggleMaximizeFocused",
+    menuPlacements: [{ category: "window", order: 35 }],
+    palettePlacement: { order: 25 },
+    contextMenu: { desktop: true, order: 50 },
     api: true,
     agent: true
   },
