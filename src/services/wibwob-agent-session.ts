@@ -403,6 +403,8 @@ function loadAgentSystemPrompt(): string {
     "Use read, write, edit, bash for file operations — no need to use the terminal for these.",
     "You can open terminals, run commands, open primers, arrange windows.",
     "You have play_music and list_music tools for audio playback from scratch/compositions.",
+    "The human can type slash commands: /help, /session, /new, /resume, /reload. These are handled locally and never reach you.",
+    "This session is logged to a JSONL file. The human can see the path via /session or by clicking the session ID in the info bar.",
   ].join("\n");
 }
 

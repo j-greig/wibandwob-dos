@@ -484,7 +484,16 @@ export function openWibWobAgentWindow(params: {
         draft = "";
         renderInput();
         params.screen.render();
-        if (text.trim() === "/new") {
+        if (text.trim() === "/help") {
+          params.agent.pushStatus(
+            "[commands]\n" +
+            "  /help       — show this list\n" +
+            "  /session    — session id, model, message count, log path\n" +
+            "  /new        — start a fresh session\n" +
+            "  /resume [n] — list or load previous sessions\n" +
+            "  /reload     — hot-swap system prompt from disk"
+          );
+        } else if (text.trim() === "/new") {
           params.agent.reset();
         } else if (text.trim() === "/session") {
           const snap = params.agent.getSnapshot();
@@ -571,6 +580,17 @@ export function openWibWobAgentWindow(params: {
 
   frame.writeInput = (text: string, sender?: string) => {
     const trimmed = text.trim();
+    if (trimmed === "/help") {
+      params.agent.pushStatus(
+        "[commands]\n" +
+        "  /help       — show this list\n" +
+        "  /session    — session id, model, message count, log path\n" +
+        "  /new        — start a fresh session\n" +
+        "  /resume [n] — list or load previous sessions\n" +
+        "  /reload     — hot-swap system prompt from disk"
+      );
+      return;
+    }
     if (trimmed === "/new") { params.agent.reset(); return; }
     if (trimmed === "/session") {
       const snap = params.agent.getSnapshot();
