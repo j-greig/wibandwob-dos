@@ -2,7 +2,8 @@
  * Pattern A: Direct blessed box in a standalone window.
  *
  * This is the simplest embedding — create a blessed box, wire the player's
- * onFrame to box.setContent(), lay out manually or with anchored sizing.
+ * onFrame to box.setContent(), and use readNodeViewport() for safe blessed
+ * viewport measurement instead of inline Number(...) fallback wrappers.
  *
  * Copied from: src/windows/contour-window.ts (88 lines)
  * The original 218-line window was split into:
@@ -13,7 +14,7 @@
 import blessed from "blessed";
 import { theme } from "../core/theme/resolver.js";
 import { safeSetStyle } from "../core/ui-primitives.js";
-import { createContourPlayer, terrainNames } from "../services/contour-engine.js";
+import { createContourPlayer, readNodeViewport, terrainNames } from "../services/contour-engine.js";
 import type { BaseWindowDeps } from "./misc-windows.js";
 
 const MODE_ORDER = ["chaos", "order", "hybrid"] as const;
@@ -34,16 +35,11 @@ export function openContourWindow(deps: BaseWindowDeps): void {
   });
 
   // 2. Create the player — wire onFrame to the box
-  //    IMPORTANT: use || fallback, not just Math.max, because
-  //    Number("100%-2") = NaN and Math.max(n, NaN) = NaN
   const player = createContourPlayer({
     mode: "chaos",
     terrainIdx: Math.max(0, terrainNames.indexOf("meadow")),
     fps: 12,
-    getViewport: () => ({
-      width: Math.max(12, Number(canvas.width) || 40),
-      height: Math.max(6, Number(canvas.height) || 15),
-    }),
+    getViewport: () => readNodeViewport(canvas, { minWidth: 12, minHeight: 6 }),
     onFrame: (content) => {
       canvas.setContent(content);
       deps.screen.render();
@@ -53,12 +49,7 @@ export function openContourWindow(deps: BaseWindowDeps): void {
     },
   });
 
-  // 3. Register FIRST, play AFTER — blessed dims unreliable before render
-  deps.windowManager.registerWindow(frame);
-  frame.focus();
-  player.play();
-
-  // 4. Standard window contract: describeState, cleanup, captureText
+  // 3. Standard window contract: describeState, cleanup, captureText
   frame.describeState = () => ({
     appType: "contour-studio" as const,
     summary: "Animated contour map studio.",
@@ -85,4 +76,9 @@ export function openContourWindow(deps: BaseWindowDeps): void {
     el.key(["+", "="], () => player.setLevels(player.levels + 1));
     el.key(["-"], () => player.setLevels(player.levels - 1));
   }
+
+  // 4. Register FIRST, play AFTER — blessed dims unreliable before render
+  deps.windowManager.registerWindow(frame);
+  frame.focus();
+  player.play();
 }
