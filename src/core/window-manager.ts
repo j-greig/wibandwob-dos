@@ -138,7 +138,7 @@ export class WindowManager implements WindowFacade {
       height: 1,
       mouse: true,
       clickable: true,
-      content: "─>",
+      content: " +",
       style: theme().resizeGrip
     });
 
