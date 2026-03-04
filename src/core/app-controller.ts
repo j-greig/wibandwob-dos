@@ -105,6 +105,8 @@ export class TsTuiMvpApp {
   private readonly desktop: Box;
   private readonly statusLine: Box;
   private statusKaomoji?: Box;
+  private kaomojiBlink = false;
+  private kaomojiTimer?: NodeJS.Timeout;
   private readonly menus: MenuConfig[];
   private readonly commands: CommandRegistry;
   private readonly menuUi: MenuOverlayManager;
@@ -273,6 +275,7 @@ export class TsTuiMvpApp {
     this.repaintDesktop();
     if (appFlags().dev) this.renderDevControls();
     this.renderTopKaomoji();
+    this.startKaomojiBlink();
     this.screen.on("resize", () => {
       this.repaintDesktop();
       this.syncLiveState();
@@ -315,7 +318,26 @@ export class TsTuiMvpApp {
   }
 
   private getStatusKaomoji(): string {
-    return "༼つ◕‿◕‿◕༽つ";
+    return this.kaomojiBlink ? "༼つ-‿-‿-༽つ" : "༼つ◕‿◕‿◕༽つ";
+  }
+
+  private startKaomojiBlink(): void {
+    if (this.kaomojiTimer) return;
+    const scheduleNext = () => {
+      const delay = 120_000 + Math.random() * 60_000; // 2-3 minutes
+      this.kaomojiTimer = setTimeout(() => {
+        this.kaomojiBlink = true;
+        this.renderTopKaomoji();
+        this.screen.render();
+        setTimeout(() => {
+          this.kaomojiBlink = false;
+          this.renderTopKaomoji();
+          this.screen.render();
+          scheduleNext();
+        }, 250);
+      }, delay);
+    };
+    scheduleNext();
   }
 
   private renderTopKaomoji(): void {
