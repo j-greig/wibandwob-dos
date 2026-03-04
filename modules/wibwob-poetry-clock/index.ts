@@ -18,9 +18,14 @@ import { readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 import { homedir } from "node:os";
+import {
+  createContourPlayer,
+  terrainNames,
+  type ContourPlayer,
+} from "../../src/services/contour-engine.js";
 
 type ClockMode = "clock" | "sentient";
-type Voice = "plain" | "liminal" | "scramble";
+type Voice = "plain" | "liminal" | "scramble" | "terrain";
 
 type Rect = { top: number; left: number; width: number; height: number };
 type UiNode = {
@@ -98,11 +103,12 @@ type MicroappHost = {
   };
 };
 
-const VOICE_CYCLE: Voice[] = ["plain", "liminal", "scramble"];
+const VOICE_CYCLE: Voice[] = ["plain", "liminal", "scramble", "terrain"];
 const VOICE_LABELS: Record<Voice, string> = {
   plain: "poet",
   liminal: "backrooms",
   scramble: "scramble",
+  terrain: "terrain",
 };
 
 function formatTime(date: Date): string {
@@ -243,6 +249,12 @@ const VOICE_PROMPTS: Record<Voice, string> = {
     "is it feeding time, nap time, the witching hour, a suspicious number? " +
     "Scramble the cat has noticed something about this particular time. " +
     "Simple, funny, catlike. No title, no explanation. Maximum 120 characters.",
+  terrain:
+    "Write a two-line poem for the time {time}. " +
+    "First: look at the digits and the hour. Find what's hiding in {time} — " +
+    "a ridge, a valley, an erosion pattern, a geological age, a contour line. " +
+    "The landscape shifts with the hour. What does this time look like as terrain? " +
+    "Geological, atmospheric, vast. No title, no explanation. Maximum 120 characters.",
 };
 
 function readOAuthToken(): string | null {
@@ -328,6 +340,55 @@ async function generatePoem(time: string, voice: Voice): Promise<string | null> 
   }
 }
 
+function createTerrainPlayer(host: MicroappHost): AnimatedPanelPlayer & { setRunning(running: boolean): void } {
+  let target: UiNode | null = null;
+  let player: ContourPlayer | null = null;
+  let running = false;
+
+  return {
+    attachTarget(nextTarget) {
+      target = nextTarget;
+    },
+    setRunning(nextRunning) {
+      running = nextRunning;
+      if (!running) {
+        player?.destroy();
+        player = null;
+        if (target) {
+          target.setContent("");
+          host.screen.render();
+        }
+        return;
+      }
+      if (!target) return;
+      if (player) { player.destroy(); player = null; }
+
+      const t = target;
+      player = createContourPlayer({
+        mode: "chaos",
+        seed: Math.floor(Date.now() / 60000), // new terrain each minute
+        terrainIdx: Math.floor(Math.random() * terrainNames.length),
+        nLevels: 4,
+        fps: 8,
+        getViewport: () => ({
+          width: Number((t as any).width) || 12,
+          height: Number((t as any).height) || 6,
+        }),
+        onFrame: (content) => {
+          t.setContent(content);
+          host.screen.render();
+        },
+      });
+      player.play();
+    },
+    destroy() {
+      player?.destroy();
+      player = null;
+      target = null;
+    },
+  };
+}
+
 export default function setup(host: MicroappHost) {
   // Active clock controller — set when a clock window is open, cleared on close
   let clockControl: { setMode: (mode: ClockMode, voice?: Voice) => void } | undefined;
@@ -370,6 +431,9 @@ export default function setup(host: MicroappHost) {
     const catPlayer = createScramblePlayer(host);
     const catPanel = host.ui.createAnimatedPanel(win.body, { player: catPlayer });
     const catRule = host.ui.createRule(win.body, { axis: "vertical" });
+    const terrainPlayer = createTerrainPlayer(host);
+    const terrainPanel = host.ui.createAnimatedPanel(win.body, { player: terrainPlayer });
+    const terrainRule = host.ui.createRule(win.body, { axis: "vertical" });
     const poemBlock = host.ui.createTextBlock(win.body, { paddingLeft: 2, paddingTop: 1 });
     const statusBar = host.ui.createStatusBar(win.body, { leftInset: 2 });
 
@@ -385,6 +449,18 @@ export default function setup(host: MicroappHost) {
         basis: 1,
         part: catRule,
         visible: () => mode === "sentient" && voice === "scramble",
+      },
+      {
+        key: "terrain",
+        basis: 20,
+        part: terrainPanel,
+        visible: () => mode === "sentient" && voice === "terrain",
+      },
+      {
+        key: "terrain-rule",
+        basis: 1,
+        part: terrainRule,
+        visible: () => mode === "sentient" && voice === "terrain",
       },
       {
         key: "poem",
@@ -460,6 +536,7 @@ export default function setup(host: MicroappHost) {
       const innerW = Number(win.body.width) || 0;
       const innerH = Number(win.body.height) || 0;
       const scrambleVisible = mode === "sentient" && voice === "scramble";
+      const terrainVisible = mode === "sentient" && voice === "terrain";
 
       root.layout({ top: 0, left: 0, width: innerW, height: innerH });
 
@@ -468,6 +545,8 @@ export default function setup(host: MicroappHost) {
       divider.update({ visible: mode !== "clock" });
       catRule.update({ visible: scrambleVisible });
       catPlayer.setRunning(scrambleVisible);
+      terrainRule.update({ visible: terrainVisible });
+      terrainPlayer.setRunning(terrainVisible);
 
       if (mode === "clock") {
         poemBlock.update({ text: "" });
@@ -547,7 +626,7 @@ export default function setup(host: MicroappHost) {
   host.registerCommand({
     id: "set-mode",
     label: "Set Poetry Clock Mode",
-    description: 'Set clock mode. args: { mode: "clock"|"sentient", voice?: "plain"|"liminal"|"scramble" }. Opens clock if not already open.',
+    description: 'Set clock mode. args: { mode: "clock"|"sentient", voice?: "plain"|"liminal"|"scramble"|"terrain" }. Opens clock if not already open.',
     direct: true,
     action: (args) => {
       const targetMode = (args?.mode as ClockMode | undefined) ?? "sentient";
