@@ -1,3 +1,5 @@
+import { exec } from "node:child_process";
+import path from "node:path";
 import type { WibWobAgentSession } from "../services/wibwob-agent-session.js";
 
 const HELP_TEXT =
@@ -10,28 +12,37 @@ const HELP_TEXT =
   "  /stop       — abort current generation\n" +
   "  /model      — show current model info\n" +
   "  /tools      — list active tools\n" +
-  "  /clear      — clear transcript (keeps session)";
+  "  /clear      — clear transcript (keeps session)\n" +
+  "  /minimap    — ASCII spatial map of desktop windows\n" +
+  "  /state      — compact desktop state summary";
 
-export function dispatchSlashCommand(
+export async function dispatchSlashCommand(
   trimmed: string,
   agent: WibWobAgentSession,
   runResumeCommand: (arg: string) => void,
-): boolean {
+): Promise<boolean> {
   if (trimmed === "/help") {
     agent.pushStatus(HELP_TEXT);
     return true;
   }
 
   if (trimmed === "/new") {
-    agent.reset();
+    await agent.reset();
     return true;
   }
 
   if (trimmed === "/session") {
+    const stats = agent.getSessionStats();
     const snap = agent.getSnapshot();
-    agent.pushStatus(
-      `[session] ${snap.sessionId}\n  model: ${snap.model ?? "—"}\n  messages: ${snap.messageCount}\n  log: ${snap.sessionFile ?? "(no log)"}`
-    );
+    if (stats) {
+      agent.pushStatus(
+        `[session] ${stats.sessionId}\n  model: ${snap.model ?? "—"}\n  messages: ${stats.totalMessages} (${stats.userMessages} user / ${stats.assistantMessages} assistant)\n  tokens: in ${stats.tokens.input}  out ${stats.tokens.output}  total ${stats.tokens.total}\n  cost: $${stats.cost.toFixed(4)}\n  log: ${stats.sessionFile ?? "(no log)"}`
+      );
+    } else {
+      agent.pushStatus(
+        `[session] ${snap.sessionId}\n  model: ${snap.model ?? "—"}\n  messages: ${snap.messageCount}\n  log: ${snap.sessionFile ?? "(no log)"}`
+      );
+    }
     return true;
   }
 
@@ -41,8 +52,14 @@ export function dispatchSlashCommand(
   }
 
   if (trimmed === "/stop") {
-    const aborted = agent.abort();
+    const aborted = await agent.abort();
     if (!aborted) agent.pushStatus("[stop] Nothing running.");
+    return true;
+  }
+
+  if (trimmed === "/reload") {
+    const reloaded = await agent.reload();
+    agent.pushStatus(reloaded ? "[reload] Prompt/runtime reloaded." : "[reload] No active session.");
     return true;
   }
 
@@ -64,6 +81,37 @@ export function dispatchSlashCommand(
 
   if (trimmed === "/clear") {
     agent.clearTranscript();
+    return true;
+  }
+
+  if (trimmed === "/minimap") {
+    const script = path.join(process.cwd(), "scripts", "minimap.sh");
+    exec(script, { timeout: 5000 }, (err, stdout) => {
+      agent.pushStatus(err ? "[minimap] app not running or script failed" : stdout.trimEnd());
+    });
+    return true;
+  }
+
+  if (trimmed === "/state") {
+    fetch("http://127.0.0.1:8099/state")
+      .then((r) => r.json())
+      .then((d: any) => {
+        const app = d.app ?? {};
+        const scr = d.screen ?? {};
+        const wins: any[] = d.windows ?? [];
+        const focusId = d.focus?.windowId;
+        const lines = [
+          `[desktop] ${app.theme ?? "?"}  ${scr.width}x${scr.height}  ${wins.length} windows  focus:${focusId ?? "none"}`,
+        ];
+        for (const w of wins.sort((a: any, b: any) => a.id - b.id)) {
+          const marker = w.id === focusId ? " ◀" : "";
+          lines.push(
+            `  ${String(w.id).padStart(3)}  ${(w.appType ?? w.kind).padEnd(20)} ${w.title.slice(0, 24).padEnd(24)}  ${w.width}x${w.height}  @${w.left},${w.top}${marker}`
+          );
+        }
+        agent.pushStatus(lines.join("\n"));
+      })
+      .catch(() => agent.pushStatus("[state] app not running"));
     return true;
   }
 

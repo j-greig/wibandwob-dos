@@ -5,21 +5,24 @@
  * integration. Supports "agent" (tools enabled) and "chat" (tools stripped) modes.
  */
 
-import { Agent } from "@mariozechner/pi-agent-core";
-import type { AgentMessage } from "@mariozechner/pi-agent-core";
-import type { Message } from "@mariozechner/pi-ai";
+import { Agent, type AgentTool } from "@mariozechner/pi-agent-core";
 import {
+  AgentSession,
   AuthStorage,
+  DefaultResourceLoader,
   ModelRegistry,
   SessionManager,
-  SettingsManager
+  SettingsManager,
+  type AgentSessionEvent,
+  type SessionStats,
+  type ToolDefinition,
 } from "@mariozechner/pi-coding-agent";
 
 import { REPO_ROOT, SPIKE_PI_APPEND_SYSTEM_PATH, SPIKE_PI_DIR } from "../core/config.js";
 import type { ChatMessageEntry, DesktopState } from "../core/types.js";
 import { Type } from "@sinclair/typebox";
-import { createTuiTools, formatDesktopSummary, type TuiToolContext } from "./agent-tools.js";
-import { getLastMessage, listSessions, loadSessionMessages, sendToSession, startSessionServer, type SessionServerHandle } from "./pi-session-bridge.js";
+import { agentToolToDefinition, createTuiToolDefinitions, createTuiTools, formatDesktopSummary, type TuiToolContext } from "./agent-tools.js";
+import { getLastMessage, listSessions, sendToSession, startSessionServer, type SessionServerHandle } from "./pi-session-bridge.js";
 import {
   createBashTool,
   createReadTool,
@@ -173,6 +176,10 @@ function createMessageId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function toToolDefinitionList(tools: AgentTool<any>[]): ToolDefinition[] {
+  return tools.map(agentToolToDefinition);
+}
+
 function normalizeVisibleReply(text: string): string {
   const trimmed = text.trim();
   if (!trimmed) return "Wob: …";
@@ -208,6 +215,10 @@ interface AgentSnapshot {
   model?: string;
   sessionId?: string;
   sessionFile?: string;
+  tokenInput?: number;
+  tokenOutput?: number;
+  tokenTotal?: number;
+  cost?: number;
   messageCount: number;
   messages: ChatMessageEntry[];
 }
@@ -252,7 +263,7 @@ function buildSenderInfo(windowId: number): string {
 }
 
 /** Create tools for cross-session communication: list_sessions, send_to_session, get_session_message. */
-function createPiSessionTools(appendSenderInfo: (message: string) => string) {
+function createPiSessionTools(appendSenderInfo: (message: string) => string): AgentTool<any>[] {
   return [
     {
       name: "list_sessions",
@@ -302,7 +313,7 @@ function createPiSessionTools(appendSenderInfo: (message: string) => string) {
 }
 
 /** Create play_music and list_music tools backed by the shared AudioPlayerController singleton. */
-function createMusicTools(runCommand: TuiToolContext["runCommand"]) {
+function createMusicTools(runCommand: TuiToolContext["runCommand"]): AgentTool<any>[] {
   return [
     {
       name: "play_music",
@@ -446,13 +457,13 @@ export class WibWobAgentSession {
   private readonly listeners = new Set<Listener>();
   private messages: ChatMessageEntry[] = [];
   private agent?: Agent;
+  private session?: AgentSession;
   private ready = false;
   private status = "Starting agent...";
   private lastError?: string;
   private currentAssistantId?: string;
   private lastToolName?: string;
   private readonly sessionId = createMessageId("wibwob-agent");
-  private resumeMessages?: AgentMessage[];
   private sessionServer?: SessionServerHandle;
   private senderInfo = buildSenderInfo(0);
   private sessionManager?: SessionManager;
@@ -474,7 +485,7 @@ export class WibWobAgentSession {
 
   /** Path to the JSONL session log file, if persistence is active. */
   getSessionFile(): string | undefined {
-    return this.sessionManager?.getSessionFile() ?? undefined;
+    return this.session?.sessionFile ?? this.sessionManager?.getSessionFile() ?? undefined;
   }
 
   /** Append sender info to an outbound message so recipients can reply via the control API. */
@@ -501,8 +512,32 @@ export class WibWobAgentSession {
         throw new Error("No model available. Check provider auth.");
       }
 
+      const resourceLoader = new DefaultResourceLoader({
+        cwd: this.cwd,
+        agentDir: SPIKE_PI_DIR,
+        settingsManager,
+      });
+      await resourceLoader.reload();
+
+      const tuiTools = this.mode === "agent" && this.tuiContext ? createTuiTools(this.tuiContext) : [];
+      const jailedCodingTools = this.mode === "agent" ? createJailedCodingTools(REPO_ROOT) : [];
+      const piSessionTools = this.mode === "agent" ? createPiSessionTools((msg) => this.withSenderInfo(msg)) : [];
+      const musicTools = this.mode === "agent" && this.tuiContext ? createMusicTools(this.tuiContext.runCommand) : [];
+
       const tools = this.mode === "agent" && this.tuiContext
-        ? [...createTuiTools(this.tuiContext), ...createJailedCodingTools(REPO_ROOT), ...createPiSessionTools((msg) => this.withSenderInfo(msg)), ...createMusicTools(this.tuiContext.runCommand)]
+        ? [...tuiTools, ...jailedCodingTools, ...piSessionTools, ...musicTools]
+        : [];
+      const baseToolsOverride = jailedCodingTools.reduce<Record<string, AgentTool<any>>>((acc, tool) => {
+        acc[tool.name] = tool;
+        return acc;
+      }, {});
+      const initialActiveToolNames = Object.keys(baseToolsOverride);
+      const customTools = this.mode === "agent" && this.tuiContext
+        ? [
+            ...createTuiToolDefinitions(this.tuiContext),
+            ...toToolDefinitionList(piSessionTools),
+            ...toToolDefinitionList(musicTools),
+          ]
         : [];
 
       const systemPrompt = this.mode === "agent"
@@ -522,9 +557,6 @@ export class WibWobAgentSession {
           }
         : undefined;
 
-      const initialMessages = this.resumeMessages ?? [];
-      this.resumeMessages = undefined;
-
       // Create a persistent SessionManager so conversation history is saved
       // to ~/.pi/agent/sessions/ as JSONL — same location as regular pi sessions.
       if (!this.sessionManager) {
@@ -538,14 +570,25 @@ export class WibWobAgentSession {
           model: initial.model,
           thinkingLevel: initial.thinkingLevel,
           tools,
-          messages: initialMessages,
+          messages: [],
         },
         transformContext,
         sessionId: this.sessionId,
         getApiKey: (provider) => authStorage.getApiKey(provider),
       });
 
-      this.agent.subscribe((event) => this.handleEvent(event));
+      this.session = new AgentSession({
+        agent: this.agent,
+        sessionManager: this.sessionManager,
+        settingsManager,
+        resourceLoader,
+        modelRegistry,
+        cwd: this.cwd,
+        customTools,
+        baseToolsOverride: initialActiveToolNames.length > 0 ? baseToolsOverride : undefined,
+        initialActiveToolNames: initialActiveToolNames.length > 0 ? initialActiveToolNames : undefined,
+      });
+      this.session.subscribe((event) => this.handleSessionEvent(event));
       this.ready = true;
       this.status = tools.length > 0
         ? `Ready. Tools: ${tools.length}. Model: ${initial.model.provider}/${initial.model.id}`
@@ -560,8 +603,12 @@ export class WibWobAgentSession {
             sessionId: this.sessionId,
             send: (text, sender) => self.send(text, sender),
             getLastReply: () => self.getLastReply(),
-            abort: () => self.agent?.abort(),
-            reset: () => self.reset(),
+            abort: () => {
+              void self.abort();
+            },
+            reset: () => {
+              void self.reset();
+            },
           });
         } catch (e) {
           // Non-fatal — agent runs fine without peer socket
@@ -588,22 +635,20 @@ export class WibWobAgentSession {
     return msgs.length > 0 ? msgs[msgs.length - 1].text : null;
   }
 
-  reloadPrompt(): boolean {
-    if (!this.agent) {
-      log.err("reload requested but no active session");
-      return false;
-    }
-    const newPrompt = this.mode === "agent"
-      ? loadAgentSystemPrompt()
-      : loadChatSystemPrompt();
-    this.agent.setSystemPrompt(newPrompt);
-    log.sys(`prompt reloaded (${newPrompt.length} chars)`);
+  async reload(): Promise<boolean> {
+    if (!this.session) return false;
+    await this.session.reload();
+    this.status = "Ready.";
+    this.lastError = undefined;
+    this.emit();
     return true;
   }
 
   dispose(): void {
     this.sessionServer?.close();
     this.sessionServer = undefined;
+    this.session?.dispose();
+    this.session = undefined;
     this.agent?.abort();
     this.agent = undefined;
     this.ready = false;
@@ -618,25 +663,29 @@ export class WibWobAgentSession {
   }
 
   getSnapshot(): AgentSnapshot {
+    const model = this.session?.model ?? this.agent?.state.model;
+    const stats = this.session?.getSessionStats();
     return {
       ready: this.ready,
-      streaming: this.agent?.state.isStreaming ?? false,
+      streaming: this.session?.isStreaming ?? this.agent?.state.isStreaming ?? false,
       status: this.buildStatus(),
       lastError: this.lastError,
-      model: this.agent?.state.model
-        ? `${this.agent.state.model.provider}/${this.agent.state.model.id}`
-        : undefined,
-      sessionId: this.sessionId,
-      sessionFile: this.sessionManager?.getSessionFile() ?? undefined,
+      model: model ? `${model.provider}/${model.id}` : undefined,
+      sessionId: this.session?.sessionId ?? this.sessionId,
+      sessionFile: stats?.sessionFile ?? this.session?.sessionFile ?? this.sessionManager?.getSessionFile() ?? undefined,
+      tokenInput: stats?.tokens.input,
+      tokenOutput: stats?.tokens.output,
+      tokenTotal: stats?.tokens.total,
+      cost: stats?.cost,
       messageCount: this.messages.length,
       messages: this.messages.map((m) => ({ ...m })),
     };
   }
 
   /** Abort in-flight streaming. Returns true if something was aborted. */
-  abort(): boolean {
-    if (!this.agent?.state.isStreaming) return false;
-    this.agent.abort();
+  async abort(): Promise<boolean> {
+    if (!this.session?.isStreaming) return false;
+    await this.session.abort();
     this.status = "Aborted.";
     this.emit();
     return true;
@@ -654,20 +703,21 @@ export class WibWobAgentSession {
 
   /** List names of all registered tools. */
   getToolNames(): string[] {
-    return this.agent?.state.tools?.map((t) => t.name) ?? [];
+    return this.session?.getActiveToolNames() ?? this.agent?.state.tools?.map((t) => t.name) ?? [];
   }
 
-  reset(): void {
-    if (this.agent?.state.isStreaming) return; // don't reset mid-stream
+  getSessionStats(): SessionStats | undefined {
+    return this.session?.getSessionStats();
+  }
+
+  async reset(): Promise<void> {
+    if (!this.session || this.session.isStreaming) return; // don't reset mid-stream
+    await this.session.newSession();
     this.messages = [];
     this.currentAssistantId = undefined;
     this.lastToolName = undefined;
     this.lastError = undefined;
-    this.resumeMessages = undefined;
     this.status = "Ready.";
-    // Re-create the agent so context is fresh
-    this.agent?.abort();
-    this.agent = undefined;
     this.emit();
   }
 
@@ -681,20 +731,25 @@ export class WibWobAgentSession {
   }
 
   async resume(sessionPath: string): Promise<void> {
-    if (this.agent?.state.isStreaming) {
+    if (!this.session) await this.initialize();
+    if (!this.session) throw new Error("Agent session was not created");
+    if (this.session.isStreaming) {
       throw new Error("Cannot resume while the agent is streaming.");
     }
 
-    this.reset();
-
-    const loadedMessages = await loadSessionMessages(sessionPath);
+    this.messages = [];
+    this.currentAssistantId = undefined;
+    this.lastToolName = undefined;
+    this.lastError = undefined;
+    const switched = await this.session.switchSession(sessionPath);
+    if (!switched) throw new Error("Session switch was cancelled.");
+    const loadedMessageCount = this.session.state.messages.length;
     this.messages.push({
       id: createMessageId("system"),
       role: "status",
-      text: `[resumed] Session loaded — ${loadedMessages.length} messages`,
+      text: `[resumed] Session loaded — ${loadedMessageCount} messages`,
     });
-    this.resumeMessages = loadedMessages;
-    await this.initialize();
+    this.status = "Ready.";
     this.emit();
   }
 
@@ -703,20 +758,14 @@ export class WibWobAgentSession {
     const msg = text.trim();
     if (!msg) return;
 
-    if (!this.agent) await this.initialize();
-    if (!this.agent) throw new Error("Agent was not created");
+    if (!this.session) await this.initialize();
+    if (!this.session) throw new Error("Agent session was not created");
 
     const from = sender ? `[${sender}]` : "user";
     const preview = msg.length > 80 ? msg.slice(0, 77) + "..." : msg;
     log.msg(`${from} → ${preview}`);
 
     this.messages.push({ id: createMessageId("user"), role: "user", text: msg, sender });
-    // Persist user message to session log
-    this.sessionManager?.appendMessage({
-      role: "user",
-      content: [{ type: "text", text: msg }],
-      timestamp: Date.now(),
-    });
     this.currentAssistantId = createMessageId("assistant");
     this.messages.push({
       id: this.currentAssistantId,
@@ -729,15 +778,10 @@ export class WibWobAgentSession {
     this.emit();
 
     try {
-      if (this.agent.state.isStreaming) {
-        this.agent.followUp({
-          role: "user",
-          content: [{ type: "text", text: msg }],
-          timestamp: Date.now(),
-        });
-        await this.agent.waitForIdle();
+      if (this.session.isStreaming) {
+        await this.session.followUp(msg);
       } else {
-        await this.agent.prompt(msg);
+        await this.session.prompt(msg);
       }
     } catch (error) {
       const assistant = this.findCurrentAssistant();
@@ -780,7 +824,7 @@ export class WibWobAgentSession {
   }
 
   /** Translate low-level agent events into chat transcript entries and visible session status. */
-  private handleEvent(event: import("@mariozechner/pi-agent-core").AgentEvent): void {
+  private handleSessionEvent(event: AgentSessionEvent): void {
     switch (event.type) {
       case "message_start": {
         if (getMessageRole(event.message) !== "assistant" || this.findCurrentAssistant()) return;
@@ -847,10 +891,6 @@ export class WibWobAgentSession {
           this.status = "Ready.";
           this.emit();
         }
-        // Persist the full assistant message (includes tool calls + text)
-        if (event.message && typeof event.message === "object" && "role" in event.message) {
-          this.sessionManager?.appendMessage(event.message as Message);
-        }
         return;
       }
       case "turn_end": {
@@ -868,12 +908,55 @@ export class WibWobAgentSession {
           this.currentAssistantId = undefined;
           this.emit();
         }
-        // Persist tool results from this turn
-        if (event.toolResults) {
-          for (const tr of event.toolResults) {
-            this.sessionManager?.appendMessage(tr as Message);
-          }
-        }
+        return;
+      }
+      case "auto_compaction_start": {
+        this.status = "Compacting...";
+        this.messages.push({
+          id: createMessageId("compact"),
+          role: "status",
+          text: `[compact] start (${event.reason})`,
+        });
+        this.emit();
+        return;
+      }
+      case "auto_compaction_end": {
+        const detail = event.aborted
+          ? "aborted"
+          : event.result?.summary
+            ? "ok"
+            : "no-op";
+        this.messages.push({
+          id: createMessageId("compact"),
+          role: "status",
+          text: `[compact] end (${detail})${event.willRetry ? " — retrying" : ""}${event.errorMessage ? ` — ${event.errorMessage}` : ""}`,
+        });
+        this.status = event.errorMessage ? "Error." : "Ready.";
+        if (event.errorMessage) this.lastError = event.errorMessage;
+        this.emit();
+        return;
+      }
+      case "auto_retry_start": {
+        this.status = "Retrying...";
+        this.messages.push({
+          id: createMessageId("retry"),
+          role: "status",
+          text: `[retry] ${event.attempt}/${event.maxAttempts} in ${event.delayMs}ms — ${event.errorMessage}`,
+        });
+        this.emit();
+        return;
+      }
+      case "auto_retry_end": {
+        this.messages.push({
+          id: createMessageId("retry"),
+          role: "status",
+          text: event.success
+            ? `[retry] success on attempt ${event.attempt}`
+            : `[retry] failed on attempt ${event.attempt}${event.finalError ? ` — ${event.finalError}` : ""}`,
+        });
+        this.status = event.success ? "Ready." : "Error.";
+        if (!event.success && event.finalError) this.lastError = event.finalError;
+        this.emit();
         return;
       }
       case "agent_end": {

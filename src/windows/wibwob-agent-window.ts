@@ -327,32 +327,19 @@ export function openWibWobAgentWindow(params: {
 
     if (key.name === "return" || key.name === "enter") {
       const text = draft.trim();
-      if (text === "/reload") {
-        draft = "";
-        renderInput();
-        params.screen.render();
-        // Close this window WITHOUT disposing the agent, then reopen with same session
-        unsubscribe();
-        unsubscribePlayer();
-        frame.cleanup = undefined; // prevent dispose on close
-        const pos = {
-          top: Number(frame.frame.top),
-          left: Number(frame.frame.left),
-          width: Number(frame.frame.width),
-          height: Number(frame.frame.height),
-        };
-        frame.close();
-        const newFrame = openWibWobAgentWindow({ ...params, initialPos: pos });
-        void newFrame;
-        return;
-      }
       if (text) {
         draft = "";
         renderInput();
         params.screen.render();
-        if (!dispatchSlashCommand(text.trim(), params.agent, runResumeCommand)) {
-          void params.agent.send(text);
-        }
+        void dispatchSlashCommand(text.trim(), params.agent, runResumeCommand)
+          .then((handled) => {
+            if (!handled) {
+              void params.agent.send(text);
+            }
+          })
+          .catch((error) => {
+            params.agent.pushStatus(`[slash] ${error instanceof Error ? error.message : String(error)}`);
+          });
       }
       return;
     }
@@ -422,29 +409,18 @@ export function openWibWobAgentWindow(params: {
     unsubscribePlayer();
     params.agent.dispose();
   };
-  // NOTE: on /reload we set frame.cleanup = undefined before calling frame.close()
-  // so the agent session is preserved across the reload.
 
   frame.writeInput = (text: string, sender?: string) => {
     const trimmed = text.trim();
-    if (dispatchSlashCommand(trimmed, params.agent, runResumeCommand)) {
-      return;
-    }
-    if (trimmed === "/reload") {
-      unsubscribe();
-      unsubscribePlayer();
-      const pos = {
-        top: Number(frame.frame.top),
-        left: Number(frame.frame.left),
-        width: Number(frame.frame.width),
-        height: Number(frame.frame.height),
-      };
-      frame.cleanup = undefined;
-      frame.close();
-      openWibWobAgentWindow({ ...params, initialPos: pos });
-      return;
-    }
-    void params.agent.send(text, sender);
+    void dispatchSlashCommand(trimmed, params.agent, runResumeCommand)
+      .then((handled) => {
+        if (!handled) {
+          void params.agent.send(text, sender);
+        }
+      })
+      .catch((error) => {
+        params.agent.pushStatus(`[slash] ${error instanceof Error ? error.message : String(error)}`);
+      });
   };
   frame.onRestyle = () => {
     infoBar.style = theme().muted;

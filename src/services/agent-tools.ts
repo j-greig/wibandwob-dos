@@ -19,6 +19,7 @@ import type {
   AgentToolResult,
   AgentToolUpdateCallback,
 } from "@mariozechner/pi-agent-core";
+import type { ToolDefinition } from "@mariozechner/pi-coding-agent";
 import type { DesktopState } from "../core/types.js";
 import type { CommandListItem } from "../core/command-registry.js";
 import type { SearchResult } from "./chrome-browser-service.js";
@@ -455,6 +456,20 @@ export function createTuiTools(ctx: TuiToolContext): AgentTool<any>[] {
     sendInput(ctx),
     readWindow(ctx),
   ];
+}
+
+export function agentToolToDefinition<T extends TSchema, TDetails>(
+  tool: AgentTool<T, TDetails>
+): ToolDefinition<T, TDetails> {
+  return {
+    ...tool,
+    execute: (toolCallId, params, signal, onUpdate, _ctx) =>
+      tool.execute(toolCallId, params, signal, onUpdate),
+  };
+}
+
+export function createTuiToolDefinitions(ctx: TuiToolContext): ToolDefinition[] {
+  return createTuiTools(ctx).map(agentToolToDefinition);
 }
 
 /**
