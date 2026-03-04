@@ -45,8 +45,8 @@ import { measurePlainTextContent, measurePrimerContent, type ContentMeasurement 
 import { ControlApiService } from "../services/control-api.js";
 import { ContentService } from "../services/content-service.js";
 import { getDefaultFigletFont, getFigletCatalogue, getFigletFontChoices, measureFiglet, renderFiglet } from "../services/figlet-service.js";
-import { openPrimerFile, promptForEditorFile, promptForPrimerFile, saveEditorWindow } from "../services/file-actions.js";
-import { deleteBackward as deleteEditorBackwardState, deleteForward as deleteEditorForwardState, insertText as insertEditorTextState, moveCursor as moveEditorCursorState, render as renderEditorState } from "../services/editor-service.js";
+import { openPrimerFile, promptForPrimerFile } from "../services/file-actions.js";
+import { EditorCoordinator } from "./editor-coordinator.js";
 import { StateService } from "../services/state-service.js";
 import { promptForWorkspaceLoad, promptForWorkspaceSave } from "../services/workspace-ui.js";
 import { WorkspaceService } from "../services/workspace-service.js";
@@ -83,7 +83,7 @@ import { openContourWindow as openContourStudioWindow } from "../windows/contour
 import { openContourTriptychWindow } from "../windows/contour-triptych-window.js";
 import { openMusicPlayerWindow } from "../windows/music-player-window.js";
 import { openTerrainLabWindow as openTerrainLabStudioWindow } from "../windows/terrain-lab-window.js";
-import { openEditorWindow as openTextEditorWindow } from "../windows/text-windows.js";
+// Editor window factory now used via EditorCoordinator
 import { type TuiToolContext } from "../services/agent-tools.js";
 import { WibWobAgentSession } from "../services/wibwob-agent-session.js";
 import { ChromeBrowserService } from "../services/chrome-browser-service.js";
@@ -113,6 +113,7 @@ export class TsTuiMvpApp {
   private readonly customCursor: CustomCursor | null;
   private readonly state: StateService;
   private readonly controlApi: ControlApiService;
+  private readonly editor: EditorCoordinator;
   private activeAgentSession?: WibWobAgentSession;
 
   constructor() {
@@ -161,7 +162,7 @@ export class TsTuiMvpApp {
       },
       (window, x, y) => this.openWindowContextMenu(window, x, y)
     );
-    this.windowManager.setEditorWriteHook((id, text) => this.writeEditorTextById(id, text));
+    this.windowManager.setEditorWriteHook((id, text) => this.editor.writeTextById(id, text));
     this.geometry = new DesktopGeometryService(this.screen);
     this.customCursor = appFlags().customCursor ? new CustomCursor(this.screen) : null;
     this.overlays = new OverlayManager(this.screen, () => this.windowManager.restoreWindowFocus());
@@ -174,6 +175,17 @@ export class TsTuiMvpApp {
       () => this.windowManager.restoreWindowFocus(),
       () => this.syncLiveState()
     );
+    this.editor = new EditorCoordinator({
+      windowManager: this.windowManager,
+      overlays: this.overlays,
+      content: this.content,
+      screen: this.screen,
+      isMenuOpen: () => this.menuUi.isAnyMenuOpen(),
+      syncLiveState: () => this.syncLiveState(),
+      persistState: () => this.persistState(),
+      defaultDir: SPIKE_ROOT,
+      editorStartDir: path.dirname(SPIKE_NOTES_PATH),
+    });
     this.controlApi = new ControlApiService(CONTROL_API_PORT, {
       getState: () => this.getDesktopState(),
       getPrimerInfo: (pathOrName) => this.getPrimerInfo(pathOrName),
@@ -392,15 +404,15 @@ export class TsTuiMvpApp {
     this.screen.key(["tab"], () => {
       const focused = this.windowManager.getFocusedWindow();
       if (focused?.kind === "editor") {
-        this.insertEditorText(focused, "  ");
+        this.editor.insertText(focused, "  ");
         return;
       }
       this.windowManager.focusNextWindow(1);
     });
     this.screen.key(["S-tab"], () => this.windowManager.focusNextWindow(-1));
-    this.screen.key(["C-s"], () => this.saveFocusedEditor());
+    this.screen.key(["C-s"], () => this.editor.saveFocused());
     this.screen.on("keypress", (ch, key) => {
-      this.handleFocusedEditorKeypress(ch, key);
+      this.editor.handleFocusedKeypress(ch, key);
     });
     this.screen.on("mouse", (data) => this.windowManager.handleMouse(data));
     this.desktop.on("mousedown", (data) => {
@@ -481,7 +493,7 @@ export class TsTuiMvpApp {
       runCommand: (id, args) => this.commands.run(id, args),
       openWindow: (type) => {
         const map: Record<string, () => WindowRecord | undefined> = {
-          editor: () => this.openEditorWindow(),
+          editor: () => this.editor.openWindow(),
           art: () => this.openArtWindow(),
           gallery: () => this.openPrimerGalleryWindow(),
           browser: () => this.openBrowserReaderWindow(),
@@ -547,7 +559,7 @@ export class TsTuiMvpApp {
       overlays: this.overlays,
       backrooms: this.backrooms,
       syncState: () => this.syncLiveState(),
-      openEditorWindow: (filePath?: string, title?: string, initial?: string) => this.openEditorWindow(filePath, title, initial),
+      openEditorWindow: (filePath?: string, title?: string, initial?: string) => this.editor.openWindow(filePath, title, initial),
       openBackroomsTv: (channel: BackroomsChannel) => this.openBackroomsTv(channel)
     };
   }
@@ -607,7 +619,7 @@ export class TsTuiMvpApp {
       startPath: restore?.currentPath ?? REPO_ROOT,
       restore,
       onOpenFile: (filePath) => {
-        this.openEditorWindow(filePath, path.basename(filePath), fs.readFileSync(filePath, "utf8"));
+        this.editor.openWindow(filePath, path.basename(filePath), fs.readFileSync(filePath, "utf8"));
       },
       onViewFile: (filePath) => {
         const content = fs.readFileSync(filePath, "utf8");
@@ -776,14 +788,7 @@ export class TsTuiMvpApp {
     });
   }
 
-  private promptForEditorPath(): void {
-    promptForEditorFile({
-      overlays: this.overlays,
-      content: this.content,
-      startDir: path.dirname(SPIKE_NOTES_PATH),
-      onOpenEditor: (filePath, title, content) => this.openEditorWindow(filePath, title, content)
-    });
-  }
+  // Editor open/save/keypress behavior delegated to EditorCoordinator
 
   private openPrimerWindow(filePath: string): WindowRecord | undefined {
     return this.focusOrCreate("primer-viewer", () => {
@@ -794,32 +799,6 @@ export class TsTuiMvpApp {
         this.openTextViewerWindow(title, content, kind, nextFilePath, options)
     });
     }, true);
-  }
-
-  private openEditorWindow(filePath?: string, title = "Untitled.txt", initial = "", restore?: { cursor?: number }): WindowRecord | undefined {
-    const window = this.focusOrCreate("text-editor", () => {
-      openTextEditorWindow({
-      windowManager: this.windowManager,
-      title,
-      filePath,
-      initial,
-      cursor: restore?.cursor,
-      renderEditor: (windowId) => {
-        const window = this.windowManager.getWindowById(windowId);
-        if (window) {
-          this.renderEditor(window);
-        }
-      }
-    });
-    }, true);
-    // Set initial saved content for dirty tracking
-    const wins = this.windowManager.getWindows();
-    const latest = wins[wins.length - 1];
-    if (latest?.kind === "editor") {
-      latest.lastSavedContent = initial;
-      latest.isDirty = false;
-    }
-    return window;
   }
 
   private openArtWindow(): WindowRecord | undefined {
@@ -839,48 +818,6 @@ export class TsTuiMvpApp {
       onStateChanged: () => this.syncLiveState(),
     });
     });
-  }
-
-  private saveFocusedEditor(): void {
-    const focused = this.windowManager.getFocusedWindow();
-    if (!focused || focused.kind !== "editor" || !focused.editor) {
-      this.overlays.flash("Focused window is not an editor.");
-      return;
-    }
-    this.saveEditor(focused);
-  }
-
-  private saveAsFocusedEditor(): void {
-    const focused = this.windowManager.getFocusedWindow();
-    if (!focused || focused.kind !== "editor" || !focused.editor) {
-      this.overlays.flash("Focused window is not an editor.");
-      return;
-    }
-    // Always prompt for a new path, regardless of current filePath
-    const defaultPath = focused.filePath
-      ? focused.filePath
-      : path.join(SPIKE_ROOT, focused.title.replace(/^\*/, ""));
-    this.overlays.openPathPrompt(
-      "Save As",
-      defaultPath,
-      (value) => this.content.completePath(value),
-      (value) => {
-        const resolved = value.startsWith("~") ? path.join(os.homedir(), value.slice(1)) : value;
-        try {
-          fs.mkdirSync(path.dirname(resolved), { recursive: true });
-          fs.writeFileSync(resolved, focused.editor!.value, "utf8");
-        } catch (err) {
-          this.overlays.flash(`Save failed: ${err instanceof Error ? err.message : String(err)}`);
-          return;
-        }
-        focused.filePath = resolved;
-        focused.title = path.basename(resolved);
-        this.updateEditorTitleBar(focused);
-        this.markEditorClean(focused);
-        this.persistState();
-        this.overlays.flash(`Saved as ${resolved}`);
-      }
-    );
   }
 
   private copyFocusedWindowText(): void {
@@ -939,121 +876,6 @@ export class TsTuiMvpApp {
     const filePath = path.join(capturesDir, fileName);
     fs.writeFileSync(filePath, text, "utf8");
     this.overlays.flash(`Exported to ${fileName}`);
-  }
-
-  private saveEditor(window: WindowRecord): void {
-    saveEditorWindow({
-      window,
-      overlays: this.overlays,
-      content: this.content,
-      defaultDir: SPIKE_ROOT,
-      onWritten: () => {
-        this.markEditorClean(window);
-        this.persistState();
-        if (window.filePath) {
-          this.overlays.flash(`Saved ${window.filePath}`);
-        }
-      }
-    });
-  }
-
-  private handleFocusedEditorKeypress(ch: string, key: blessed.Widgets.Events.IKeyEventArg): void {
-    const window = this.windowManager.getFocusedWindow();
-    if (!window || window.kind !== "editor" || !window.editor) {
-      return;
-    }
-    if (this.menuUi.isAnyMenuOpen() || this.screen.focused !== window.editor.widget) {
-      return;
-    }
-    if (key.ctrl && key.name === "s") {
-      this.saveEditor(window);
-      return;
-    }
-    if (key.full === "S-tab") {
-      this.windowManager.focusNextWindow(-1);
-      return;
-    }
-    if (key.name === "backspace") {
-      this.deleteEditorBackward(window);
-      return;
-    }
-    if (key.name === "delete") {
-      this.deleteEditorForward(window);
-      return;
-    }
-    if (key.name === "left") {
-      moveEditorCursorState(window.editor, -1);
-      this.renderEditor(window);
-      return;
-    }
-    if (key.name === "right") {
-      moveEditorCursorState(window.editor, 1);
-      this.renderEditor(window);
-      return;
-    }
-    if (key.name === "enter") {
-      this.insertEditorText(window, "\n");
-      return;
-    }
-    if (ch && !key.ctrl && !key.meta) {
-      this.insertEditorText(window, ch);
-    }
-  }
-
-  private insertEditorText(window: WindowRecord, text: string): void {
-    if (!window.editor) {
-      return;
-    }
-    insertEditorTextState(window.editor, text);
-    this.markEditorDirty(window);
-    this.renderEditor(window);
-  }
-
-  private deleteEditorBackward(window: WindowRecord): void {
-    if (!window.editor || window.editor.cursor === 0) {
-      return;
-    }
-    deleteEditorBackwardState(window.editor);
-    this.markEditorDirty(window);
-    this.renderEditor(window);
-  }
-
-  private deleteEditorForward(window: WindowRecord): void {
-    if (!window.editor || window.editor.cursor >= window.editor.value.length) {
-      return;
-    }
-    deleteEditorForwardState(window.editor);
-    this.markEditorDirty(window);
-    this.renderEditor(window);
-  }
-
-  private markEditorDirty(window: WindowRecord): void {
-    if (window.isDirty) return;
-    window.isDirty = true;
-    this.updateEditorTitleBar(window);
-  }
-
-  private markEditorClean(window: WindowRecord): void {
-    window.isDirty = false;
-    window.lastSavedContent = window.editor?.value;
-    this.updateEditorTitleBar(window);
-  }
-
-  /** Update title bar display. window.title stays clean (no asterisk). */
-  private updateEditorTitleBar(window: WindowRecord): void {
-    if (!window.titleBar) return;
-    const display = window.isDirty ? `*${window.title}` : window.title;
-    window.titleBar.setContent(` ${display} `);
-    this.screen.render();
-  }
-
-  private renderEditor(window: WindowRecord): void {
-    if (!window.editor) {
-      return;
-    }
-    renderEditorState(window.editor);
-    this.syncLiveState();
-    this.screen.render();
   }
 
   private applyMeasuredWindowSize(frame: WindowRecord, kind: WindowKind, content: { width: number; height: number }): void {
@@ -1126,7 +948,7 @@ export class TsTuiMvpApp {
   private getRestoreActions(): WorkspaceRestoreActions {
     return {
       openPrimerWindow: (filePath) => this.openPrimerWindow(filePath),
-      openEditorWindow: (filePath, title, initial, restore) => this.openEditorWindow(filePath, title, initial, restore),
+      openEditorWindow: (filePath, title, initial, restore) => this.editor.openWindow(filePath, title, initial, restore),
       openBrowserReaderWindow: (filePath) => this.openBrowserReaderWindow(filePath),
       openFigletWindow: (text, font) => this.openFigletWindow(text, font),
       openPatternWindow: () => this.openPatternWindow(),
@@ -1251,36 +1073,24 @@ export class TsTuiMvpApp {
           animated: measurement?.animated ?? false
         };
       }),
-      openTextFilePrompt: (args) => {
+      openTextFile: (args) => {
         const filePath = typeof args?.filePath === "string" && args.filePath.trim() ? args.filePath.trim() : undefined;
         if (filePath) {
-          const title = typeof args?.title === "string" ? args.title : path.basename(filePath);
-          let initial = typeof args?.initial === "string" ? args.initial : undefined;
-          // If no initial content provided, read from disk
-          if (initial === undefined) {
-            const fileExists = fs.existsSync(filePath);
-            try {
-              initial = fileExists ? fs.readFileSync(filePath, "utf8") : "";
-            } catch {
-              if (fileExists) {
-                this.overlays.flash(`Failed to read file: ${filePath}`);
-                return;
-              }
-              initial = "";
-            }
-          }
-          this.openEditorWindow(filePath, title, initial);
+          // Path A: open a specific file
+          this.editor.openFile(filePath, args);
         } else if (typeof args?.title === "string" || typeof args?.initial === "string") {
+          // Path B: open an unsaved buffer with title/initial content
           const title = typeof args?.title === "string" ? args.title : undefined;
           const initial = typeof args?.initial === "string" ? args.initial : undefined;
-          this.openEditorWindow(undefined, title, initial);
+          this.editor.openWindow(undefined, title, initial);
         } else {
-          this.promptForEditorPath();
+          // Path C: interactive file picker
+          this.editor.openPicker();
         }
       },
-      openEditor: () => this.openEditorWindow(),
-      saveFocusedEditor: () => this.saveFocusedEditor(),
-      saveAsFocusedEditor: () => this.saveAsFocusedEditor(),
+      openEditor: () => this.editor.openWindow(),
+      saveFocusedEditor: () => this.editor.saveFocused(),
+      saveAsFocusedEditor: () => this.editor.saveAsFocused(),
       saveWorkspaceAs: () => this.promptForWorkspaceSave(),
       loadWorkspacePrompt: () => this.promptForWorkspaceLoad(),
       copyFocusedWindowText: () => this.copyFocusedWindowText(),
@@ -1449,14 +1259,7 @@ export class TsTuiMvpApp {
     };
   }
 
-  private writeEditorTextById(id: number, text: string): boolean {
-    const window = this.windowManager.getWindowById(id);
-    if (!window || !window.editor) return false;
-    insertEditorTextState(window.editor, text);
-    this.markEditorDirty(window);
-    this.renderEditor(window);
-    return true;
-  }
+  // writeEditorTextById delegated to this.editor.writeTextById via setEditorWriteHook
 
   /** Cheap live state sync: rebuild in-memory state and update status line. No disk write, no listener fanout.
    *  Use for routine mutations: drag, resize, focus, typing, window-internal state changes. */

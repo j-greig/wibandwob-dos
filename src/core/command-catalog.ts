@@ -13,7 +13,7 @@ export interface AppMenuActions {
   openFileManager: () => void;
   openPrimerPrompt: (args?: Record<string, unknown>) => void;
   listPrimers: () => unknown;
-  openTextFilePrompt: (args?: Record<string, unknown>) => void;
+  openTextFile: (args?: Record<string, unknown>) => void;
   openEditor: () => void;
   saveFocusedEditor: () => void;
   saveAsFocusedEditor: () => void;
@@ -296,7 +296,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     label: "Open Text File...",
     description: "Open a text file in the editor. Args: filePath (string), title (string, optional), initial (string, optional). Without args opens interactive file picker.",
     group: "open",
-    actionKey: "openTextFilePrompt",
+    actionKey: "openTextFile",
     multiInstance: true,
     menuPlacements: [{ category: "file", order: 30 }],
     contextMenu: { desktop: true, order: 20 },

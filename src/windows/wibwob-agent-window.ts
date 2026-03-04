@@ -404,6 +404,7 @@ export function openWibWobAgentWindow(params: {
   /** Open a JSONL log file in a read-only viewer window. */
   const openLogViewer = (filePath: string) => {
     const edWin = params.windowManager.createFrame(path.basename(filePath), "editor");
+    edWin.filePath = filePath; // enables "Copy Path" / "Reveal in Finder" in context menu
     edWin.describeState = () => ({
       appType: "text-editor" as const,
       summary: `Viewing ${path.basename(filePath)}`,
@@ -485,6 +486,12 @@ export function openWibWobAgentWindow(params: {
         params.screen.render();
         if (text.trim() === "/new") {
           params.agent.reset();
+        } else if (text.trim() === "/session") {
+          const snap = params.agent.getSnapshot();
+          const msgs = snap.messageCount;
+          const model = snap.model ?? "—";
+          const file = snap.sessionFile ?? "(no log)";
+          params.agent.pushStatus(`[session] ${snap.sessionId}\n  model: ${model}\n  messages: ${msgs}\n  log: ${file}`);
         } else if (text.trim().startsWith("/resume")) {
           runResumeCommand(text.trim().slice("/resume".length));
         } else {
