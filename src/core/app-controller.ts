@@ -1,3 +1,10 @@
+/**
+ * Application composition root. Owns startup, menus, window openers,
+ * workspace restore, theme application, global keybindings, and
+ * control API wiring. Coordinates services and window factories
+ * but should not accumulate utility logic.
+ */
+
 import blessed from "blessed";
 import fs from "node:fs";
 import os from "node:os";
@@ -73,6 +80,8 @@ import {
   openWorkspaceManagerWindow as openWorkspaceCommandWindow
 } from "../windows/misc-windows.js";
 import { openContourWindow as openContourStudioWindow } from "../windows/contour-window.js";
+import { openContourTriptychWindow } from "../windows/contour-triptych-window.js";
+import { openMusicPlayerWindow } from "../windows/music-player-window.js";
 import { openTerrainLabWindow as openTerrainLabStudioWindow } from "../windows/terrain-lab-window.js";
 import { openEditorWindow as openTextEditorWindow } from "../windows/text-windows.js";
 import { type TuiToolContext } from "../services/agent-tools.js";
@@ -86,6 +95,7 @@ import { openMonsterCamWindow } from "../windows/monster-cam-window.js";
 /** Exit code used by dev-mode reload. The launcher script watches for this. */
 export const DEV_RELOAD_EXIT_CODE = 75;
 
+/** Top-level application coordinator. Builds the screen, service graph, menus, and window manager. */
 export class TsTuiMvpApp {
   private readonly screen: blessed.Widgets.Screen;
   private readonly menuBar: Box;
@@ -189,6 +199,7 @@ export class TsTuiMvpApp {
     );
   }
 
+  /** Boot the app: load modules, rebuild menus, render chrome, bind global keys, restore workspace, start control API. */
   async run(): Promise<void> {
     // Load external modules (themes + microapps) before workspace restore
     // so that external themes and commands are available for restoration.
@@ -364,6 +375,7 @@ export class TsTuiMvpApp {
     }
   }
 
+  /** Global input contract: menu triggers, window cycling/resizing, editor save, mouse delegation. */
   private bindGlobalKeys(): void {
     this.screen.key(["C-q"], () => this.destroy());
     this.screen.key(["M-f"], () => this.openMenu("File"));
@@ -440,6 +452,7 @@ export class TsTuiMvpApp {
       .find((window) => window.describeState?.().appType === appType);
   }
 
+  /** Focus an existing window of appType, or create one. Single-instance by default. */
   private focusOrCreate(appType: AppType, createFn: () => void, multiInstance = false): WindowRecord | undefined {
     if (!multiInstance) {
       const existing = this.findWindowByAppType(appType);
@@ -453,6 +466,7 @@ export class TsTuiMvpApp {
     return this.windowManager.getLastWindow();
   }
 
+  /** Build TuiToolContext, create the agent session, and open/focus the native agent window. */
   private openWibWobAgentWindow(): void {
     const tuiContext: TuiToolContext = {
       getState: () => this.state.sync(),
@@ -467,6 +481,7 @@ export class TsTuiMvpApp {
           pattern: () => this.openPatternWindow(),
           companion: () => this.openCompanionWindow(),
           inspector: () => this.openStateInspectorWindow(),
+          "music-player": () => this.openMusicPlayerWindow(),
           primer: () => this.openPrimerBrowserWindow(),
           figlet: () => this.openFigletWindow("WibWob"),
         };
@@ -495,15 +510,26 @@ export class TsTuiMvpApp {
       windows: this.windowManager,
     };
 
+    const existing = this.findWindowByAppType("wibwob-agent");
+    if (existing) {
+      existing.focus();
+      return;
+    }
+
     const session = new WibWobAgentSession(tuiContext, REPO_ROOT);
     this.activeAgentSession = session;
-    this.focusOrCreate("wibwob-agent", () => {
-      openNativeWibWobAgentWindow({
-        screen: this.screen,
-        windowManager: this.windowManager,
-        agent: session,
-      });
+    openNativeWibWobAgentWindow({
+      screen: this.screen,
+      windowManager: this.windowManager,
+      agent: session,
+      onStateChanged: () => this.syncState(),
     });
+
+    // Set the window id on the session so outbound messages route correctly
+    const agentWin = this.windowManager.getLastWindow();
+    if (agentWin) {
+      session.setWindowId(agentWin.id);
+    }
   }
 
   private getBackroomsWindowContext(): BackroomsWindowContext {
@@ -553,7 +579,8 @@ export class TsTuiMvpApp {
       overlays: this.overlays,
       entries: this.content.collectPrimerEntries(),
       onOpenPrimer: (filePath) => this.openPrimerWindow(filePath),
-      restore
+      restore,
+      onStateChanged: () => this.syncState(),
     });
     });
   }
@@ -593,7 +620,8 @@ export class TsTuiMvpApp {
       allEntries,
       tabs: this.content.buildGalleryTabs(allEntries),
       onOpenPrimer: (filePath) => this.openPrimerWindow(filePath),
-      restore
+      restore,
+      onStateChanged: () => this.syncState(),
     });
     });
   }
@@ -674,6 +702,25 @@ export class TsTuiMvpApp {
         windowManager: this.windowManager,
         onStateChanged: () => this.syncState(),
       });
+    });
+  }
+
+  private openContourTriptychStudioWindow(): WindowRecord | undefined {
+    return this.focusOrCreate("contour-triptych", () => {
+      openContourTriptychWindow({
+        screen: this.screen,
+        windowManager: this.windowManager,
+        onStateChanged: () => this.syncState(),
+      });
+    });
+  }
+
+  private openMusicPlayerWindow(restore?: { filePath?: string; volume?: number }): WindowRecord | undefined {
+    return this.focusOrCreate("music-player", () => {
+      openMusicPlayerWindow(
+        { screen: this.screen, windowManager: this.windowManager },
+        restore
+      );
     });
   }
 
@@ -780,7 +827,8 @@ export class TsTuiMvpApp {
     return this.focusOrCreate("monster-cam", () => {
       openMonsterCamWindow({
       screen: this.screen,
-      windowManager: this.windowManager
+      windowManager: this.windowManager,
+      onStateChanged: () => this.syncState(),
     });
     });
   }
@@ -1116,6 +1164,7 @@ export class TsTuiMvpApp {
     this.loadWorkspace();
   }
 
+  /** Restore a workspace: apply theme, tear down existing windows, replay snapshots, restore focus. */
   private loadWorkspace(): void {
     if (!this.workspace.exists()) {
       this.overlays.flash(`Workspace file not found: ${this.workspace.path}`);
@@ -1155,6 +1204,7 @@ export class TsTuiMvpApp {
     this.overlays.flash(`Loaded workspace from ${this.workspace.path}`);
   }
 
+  /** Action bridge between the command catalog/registry and concrete controller behaviour. */
   private getAppMenuActions(): AppMenuActions {
     return {
       browsePrimers: () => this.openPrimerBrowserWindow(),
@@ -1199,13 +1249,22 @@ export class TsTuiMvpApp {
           let initial = typeof args?.initial === "string" ? args.initial : undefined;
           // If no initial content provided, read from disk
           if (initial === undefined) {
+            const fileExists = fs.existsSync(filePath);
             try {
-              initial = fs.existsSync(filePath) ? fs.readFileSync(filePath, "utf8") : "";
+              initial = fileExists ? fs.readFileSync(filePath, "utf8") : "";
             } catch {
+              if (fileExists) {
+                this.overlays.flash(`Failed to read file: ${filePath}`);
+                return;
+              }
               initial = "";
             }
           }
           this.openEditorWindow(filePath, title, initial);
+        } else if (typeof args?.title === "string" || typeof args?.initial === "string") {
+          const title = typeof args?.title === "string" ? args.title : undefined;
+          const initial = typeof args?.initial === "string" ? args.initial : undefined;
+          this.openEditorWindow(undefined, title, initial);
         } else {
           this.promptForEditorPath();
         }
@@ -1224,6 +1283,7 @@ export class TsTuiMvpApp {
       openArtWindow: () => this.openArtWindow(),
       openContourWindow: () => this.openContourWindow(),
       openTerrainLab: () => this.openTerrainLabWindow(),
+      openContourTriptych: () => this.openContourTriptychStudioWindow(),
       openWibWobAgent: () => this.openWibWobAgentWindow(),
       reloadAgentPrompt: () => {
         if (this.activeAgentSession?.reloadPrompt()) {
@@ -1268,6 +1328,10 @@ export class TsTuiMvpApp {
         } else {
           this.promptForFigletText();
         }
+      },
+      openMusicPlayer: (args) => {
+        const filePath = typeof args?.filePath === "string" && args.filePath.trim() ? args.filePath.trim() : undefined;
+        this.openMusicPlayerWindow(filePath ? { filePath } : undefined);
       },
       openPatternWindow: () => this.openPatternWindow(),
       openCompanionWindow: () => this.openCompanionWindow(),
@@ -1350,10 +1414,12 @@ export class TsTuiMvpApp {
     };
   }
 
+  /** Return the current desktop state snapshot. Fed to control API and agent state injection. */
   getDesktopState(): DesktopState {
     return this.state.getState();
   }
 
+  /** Resolve a primer by path or name and return measured content info. Used by control API. */
   getPrimerInfo(pathOrName: string): Record<string, unknown> {
     const entry = this.content.getPrimerInfo(pathOrName);
     if (!entry) {
@@ -1383,7 +1449,15 @@ export class TsTuiMvpApp {
     return true;
   }
 
-  private syncState(): void {
+  /** Cheap live state sync: rebuild in-memory state and update status line. No disk write, no listener fanout.
+   *  Use for routine mutations: drag, resize, focus, typing, window-internal state changes. */
+  private syncLiveState(): void {
+    this.updateStatusLine();
+  }
+
+  /** Expensive state checkpoint: rebuild, write to disk, fire listeners.
+   *  Use for significant events: startup, theme change, workspace load/save, editor save. */
+  private persistState(): void {
     this.updateStatusLine();
     this.state.persistAndNotify();
   }

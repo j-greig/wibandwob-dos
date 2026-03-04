@@ -1,5 +1,13 @@
+/**
+ * Single source of truth for user-visible command metadata.
+ * Defines command ids, groups, menu/palette/context-menu placements,
+ * and agent/API visibility flags. Projected into runtime structures
+ * by command-registry.ts.
+ */
+
 import type { MenuConfig, MenuItem } from "./types.js";
 
+/** Controller action contract consumed by the command registry and catalog projections. */
 export interface AppMenuActions {
   browsePrimers: () => void;
   openFileManager: () => void;
@@ -16,6 +24,7 @@ export interface AppMenuActions {
   openArtWindow: () => void;
   openContourWindow: () => void;
   openTerrainLab: () => void;
+  openContourTriptych: () => void;
   openWibWobAgent: () => void;
   reloadAgentPrompt: () => void;
   quit: () => void;
@@ -32,6 +41,7 @@ export interface AppMenuActions {
   openBrowserReader: (args?: Record<string, unknown>) => void;
   openChromeBrowser: (args?: Record<string, unknown>) => void;
   openFigletBanner: (args?: Record<string, unknown>) => void;
+  openMusicPlayer: (args?: Record<string, unknown>) => void;
   openPatternWindow: () => void;
   openCompanionWindow: () => void;
   openWorkspaceManager: () => void;
@@ -58,7 +68,9 @@ export interface AppMenuActions {
   viewReadme: () => void;
 }
 
+/** Menu bucket — determines which top-level menu a command appears in. */
 export type AppCommandCategory = "file" | "edit" | "view" | "window" | "applications" | "help";
+/** Logical clustering within a category, used for future separators and adapters. */
 export type AppCommandGroup =
   | "browse"
   | "open"
@@ -70,12 +82,14 @@ export type AppCommandGroup =
   | "inspect"
   | "system";
 
+/** Where a command appears in a top-level menu. Not executable on its own. */
 export interface MenuPlacement {
   category: AppCommandCategory;
   order: number;
   label?: string;
 }
 
+/** Where a command appears in the command palette. Not executable on its own. */
 export interface PalettePlacement {
   order: number;
   label?: string;
@@ -101,6 +115,7 @@ export interface ContextMenuPlacement {
   order?: number;
 }
 
+/** Authored command definition — the static catalog shape before projection. */
 export interface AppCommandDefinition {
   id: string;
   label: string;
@@ -122,6 +137,7 @@ interface MenuDefinition {
   left: MenuConfig["left"];
 }
 
+/** Projected command descriptor — normalised shape consumed by registry, palette, and API. */
 export interface AppCommandDescriptor {
   id: string;
   label: string;
@@ -612,6 +628,28 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     agent: true
   },
   {
+    id: "contour_triptych.open",
+    label: "Contour Triptych",
+    description: "Open a three-panel contour triptych with synchronized terrain and mode controls.",
+    group: "surface",
+    actionKey: "openContourTriptych",
+    menuPlacements: [{ category: "applications", order: 87 }],
+    palettePlacement: { order: 57 },
+    api: true,
+    agent: true
+  },
+  {
+    id: "music-player.open",
+    label: "Music Player",
+    description: "Open the music player. Pass filePath to auto-load a track.",
+    group: "surface",
+    actionKey: "openMusicPlayer",
+    menuPlacements: [{ category: "applications", order: 125 }],
+    palettePlacement: { order: 115 },
+    api: true,
+    agent: true
+  },
+  {
     id: "companion.open",
     label: "Companion",
     description: "Open Scramble the cat companion window.",
@@ -697,6 +735,7 @@ function byPlacementOrder(
   return a.order - b.order || a.label.localeCompare(b.label);
 }
 
+/** Project static catalog data into normalised command descriptors. */
 export function listAppCommands(): AppCommandDescriptor[] {
   return APP_COMMANDS.map((command) => ({
     id: command.id,
@@ -713,6 +752,7 @@ export function listAppCommands(): AppCommandDescriptor[] {
   }));
 }
 
+/** Build runtime MenuConfig[] by projecting catalog commands into their menu placements. */
 export function createMenuConfigs(actions: AppMenuActions): MenuConfig[] {
   return MENU_DEFINITIONS.map((menu) => ({
     label: menu.label,
@@ -733,6 +773,7 @@ export function createMenuConfigs(actions: AppMenuActions): MenuConfig[] {
   }));
 }
 
+/** Build runtime palette items by projecting catalog commands with palettePlacement. */
 export function createPaletteCommands(actions: AppMenuActions): MenuItem[] {
   return listAppCommands()
     .flatMap((command) =>
