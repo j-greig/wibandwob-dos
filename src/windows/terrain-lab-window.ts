@@ -14,6 +14,8 @@
  */
 
 import blessed from "blessed";
+import fs from "node:fs";
+import path from "node:path";
 import { theme } from "../core/theme/resolver.js";
 import {
   createStack,
@@ -76,7 +78,7 @@ export function openTerrainLabWindow(deps: BaseWindowDeps): void {
         " +/- levels",
       ].join("\n");
       infoBlock.update({ text: infoText });
-      statusBar.update({ left: "m:mode t:terrain r:reseed +/-:levels" });
+      statusBar.update({ left: "m:mode t:terrain r:reseed +/-:levels s:save" });
       deps.onStateChanged?.();
     },
   });
@@ -108,12 +110,24 @@ export function openTerrainLabWindow(deps: BaseWindowDeps): void {
     player.setMode(next);
   };
 
+  const saveFrame = () => {
+    const text = contourBox.getContent();
+    if (!text) return;
+    const dir = path.join(process.cwd(), "scratch", "captures");
+    fs.mkdirSync(dir, { recursive: true });
+    const name = `terrain_${player.mode}_${terrainNames[player.terrainIdx]}_${player.seed}_${Date.now()}.txt`;
+    fs.writeFileSync(path.join(dir, name), text, "utf8");
+    statusBar.update({ left: `saved: ${name}` });
+    deps.screen.render();
+  };
+
   for (const el of [frame.frame, frame.body, contourBox]) {
     el.key(["m"], cycleMode);
     el.key(["t", "tab"], () => player.setTerrain(player.terrainIdx + 1));
     el.key(["r"], () => player.reroll());
     el.key(["+", "="], () => player.setLevels(player.levels + 1));
     el.key(["-"], () => player.setLevels(player.levels - 1));
+    el.key(["s"], saveFrame);
   }
 
   frame.frame.on("resize", doLayout);
