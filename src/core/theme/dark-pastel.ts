@@ -29,6 +29,7 @@ export const darkPastel: ThemeVariant = {
     scrollbar: { fg: "#cba6f7", bg: "#313244", track: "#45475a" },
 
     accent: { fg: "#89b4fa", bg: "#1e1e2e" }, // blue
+    highlight: { fg: "#f38ba8", bg: "#1e1e2e" }, // catppuccin pink/flamingo
     warning: { fg: "#f9e2af", bg: "#1e1e2e" }, // yellow
     error: { fg: "#f38ba8", bg: "#1e1e2e" }, // red
     success: { fg: "#a6e3a1", bg: "#1e1e2e" }, // green

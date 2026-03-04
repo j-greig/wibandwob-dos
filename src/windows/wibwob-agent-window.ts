@@ -25,14 +25,18 @@ function escapeTagBraces(text: string): string {
   return text.replace(/\{(?!\/?(?:bold|underline|blink|inverse|invisible|[a-z]+-(?:fg|bg))(?:\}|-))/g, "\\{");
 }
 
-// wibwob-tv theme palette
-const C = {
-  pink:  "#f07f8f",  // accent, user
-  blue:  "#57c7ff",  // tool title, borders
-  lime:  "#b7ff3c",  // success, status
-  muted: "#666666",  // dim text, tool args
-  gray:  "#d0d0d0",  // main text
-} as const;
+// Resolve agent palette from the active theme tokens at call time.
+// Never cache these — theme() is cheap and we want live theme switching.
+function C() {
+  const t = theme();
+  return {
+    pink:  t.highlight.fg,  // user labels, warm accent
+    blue:  t.accent.fg,     // tool titles, borders
+    lime:  t.success.fg,    // checkmarks, status lines
+    muted: t.muted.fg,      // dim tool arg text
+    gray:  t.body.fg,       // main assistant text
+  };
+}
 
 // Kaomoji voice markers — replaces "Wib:" and "Wob:" in rendered text.
 // Only used for non-haiku models (haiku struggles with kaomoji in output).
@@ -47,9 +51,10 @@ function applyVoiceMarkers(text: string, useKaomoji: boolean): string {
 }
 
 function renderMessage(msg: ChatMessageEntry, useKaomoji: boolean): string {
+  const c = C();
   if (msg.role === "user") {
     const label = msg.sender ?? "Human";
-    return `{${C.pink}-fg}${label}:{/${C.pink}-fg} {${C.gray}-fg}${escapeTagBraces(msg.text)}{/${C.gray}-fg}`;
+    return `{${c.pink}-fg}${label}:{/${c.pink}-fg} {${c.gray}-fg}${escapeTagBraces(msg.text)}{/${c.gray}-fg}`;
   }
   if (msg.role === "status") {
     const escaped = escapeTagBraces(msg.text);
@@ -58,17 +63,17 @@ function renderMessage(msg: ChatMessageEntry, useKaomoji: boolean): string {
     }
     if (escaped.startsWith("[tool]")) {
       const trimmed = escaped.replace(/^\s*\[tool\]\s*/, "");
-      return `  {${C.blue}-fg}▸{/${C.blue}-fg} {${C.muted}-fg}${trimmed}{/${C.muted}-fg}`;
+      return `  {${c.blue}-fg}▸{/${c.blue}-fg} {${c.muted}-fg}${trimmed}{/${c.muted}-fg}`;
     }
     if (escaped.startsWith("[done]")) {
       const trimmed = escaped.replace(/^\s*\[done\]\s*/, "");
-      return `  {${C.lime}-fg}✓{/${C.lime}-fg} {${C.muted}-fg}${trimmed}{/${C.muted}-fg}`;
+      return `  {${c.lime}-fg}✓{/${c.lime}-fg} {${c.muted}-fg}${trimmed}{/${c.muted}-fg}`;
     }
     if (escaped.startsWith("[fail]")) {
       const trimmed = escaped.replace(/^\s*\[fail\]\s*/, "");
-      return `  {${C.pink}-fg}✗ ${trimmed}{/${C.pink}-fg}`;
+      return `  {${c.pink}-fg}✗ ${trimmed}{/${c.pink}-fg}`;
     }
-    return `  {${C.lime}-fg}${escaped}{/${C.lime}-fg}`;
+    return `  {${c.lime}-fg}${escaped}{/${c.lime}-fg}`;
   }
   // Assistant text — Wib/Wob voices with kaomoji faces
   const text = msg.text || (msg.streaming ? "Wib: …\nWob: …" : "");
@@ -268,7 +273,8 @@ export function openWibWobAgentWindow(params: {
     }
 
     const w = Math.max(20, Number(playerBar.width) || 60);
-    const icon = snap.state === "playing" ? `{${C.lime}-fg}▶{/${C.lime}-fg}` : `{#f5a623-fg}⏸{/#f5a623-fg}`;
+    const c = C();
+    const icon = snap.state === "playing" ? `{${c.lime}-fg}▶{/${c.lime}-fg}` : `{#f5a623-fg}⏸{/#f5a623-fg}`;
     const name = snap.fileName.length > 24 ? snap.fileName.slice(0, 21) + "…" : snap.fileName;
     const timeStr = `${fmtTime(snap.elapsed)}/${fmtTime(snap.duration)}`;
     const volStr = `${snap.volume}%`;
@@ -277,10 +283,10 @@ export function openWibWobAgentWindow(params: {
     const barWidth = Math.max(4, w - fixedLen);
     const ratio = snap.duration > 0 ? Math.min(snap.elapsed / snap.duration, 1) : 0;
     const filled = Math.round(ratio * barWidth);
-    const bar = `{${C.blue}-fg}${"▪".repeat(filled)}{/${C.blue}-fg}{${C.muted}-fg}${"·".repeat(barWidth - filled)}{/${C.muted}-fg}`;
+    const bar = `{${c.blue}-fg}${"▪".repeat(filled)}{/${c.blue}-fg}{${c.muted}-fg}${"·".repeat(barWidth - filled)}{/${c.muted}-fg}`;
 
     playerBar.setContent(
-      ` ${icon} {${C.gray}-fg}${name}{/${C.gray}-fg} ${bar} {${C.muted}-fg}${timeStr}  ${volStr}{/${C.muted}-fg}`
+      ` ${icon} {${c.gray}-fg}${name}{/${c.gray}-fg} ${bar} {${c.muted}-fg}${timeStr}  ${volStr}{/${c.muted}-fg}`
     );
     params.screen.render();
   };
@@ -334,21 +340,23 @@ export function openWibWobAgentWindow(params: {
   const renderInfoBar = (model: string, sessionId: string, sessionFile?: string) => {
     currentSessionFile = sessionFile;
     const barWidth = Math.max(1, Number(infoBar.width) || 80);
-    // Right side: model + clickable session short ID (blue when log exists)
+    // Right side: short model name + clickable session short ID (blue when log exists)
+    const shortModel = model.replace(/^[^/]+\//, "").replace(/^claude-/, "");
+    const c = C();
     const shortSession = sessionId.replace(/^wibwob-agent-/, "").slice(0, 8);
     const sessionLabel = sessionFile
-      ? `{${C.blue}-fg}#${shortSession}{/${C.blue}-fg}`
+      ? `{${c.blue}-fg}#${shortSession}{/${c.blue}-fg}`
       : `#${shortSession}`;
     const sessionLabelLen = 1 + shortSession.length; // plain text length
-    const right = `${model}  ${sessionLabel}`;
-    const rightLen = model.length + 2 + sessionLabelLen;
+    const right = `${shortModel}  ${sessionLabel}`;
+    const rightLen = shortModel.length + 2 + sessionLabelLen;
     // Left side: claude code log link if available
     const left = claudeJsonl
-      ? `{${C.blue}-fg}cc:${path.basename(claudeJsonl, ".jsonl").slice(0, 8)}{/${C.blue}-fg}`
+      ? `{${c.blue}-fg}cc:${path.basename(claudeJsonl, ".jsonl").slice(0, 8)}{/${c.blue}-fg}`
       : "";
     const leftLen = claudeJsonl ? 12 : 0;
     const gap = Math.max(1, barWidth - leftLen - rightLen - 1);
-    infoBar.setContent(` ${left}${" ".repeat(gap)}{${C.muted}-fg}${right}{/${C.muted}-fg}`);
+    infoBar.setContent(` ${left}${" ".repeat(gap)}{${c.muted}-fg}${right}{/${c.muted}-fg}`);
   };
 
   const runResumeCommand = (rawArg: string) => {

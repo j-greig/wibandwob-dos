@@ -28,6 +28,7 @@ export const dark: ThemeVariant = {
     scrollbar:            { fg: "white",  bg: "black",  track: "grey" },
 
     accent:               { fg: "cyan",   bg: "black"   },
+    highlight:            { fg: "#f07f8f", bg: "black"  },  // warm pink — user labels
     warning:              { fg: "yellow", bg: "black"   },
     error:                { fg: "red",    bg: "black"   },
     success:              { fg: "green",  bg: "black"   },

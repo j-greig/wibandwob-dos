@@ -29,6 +29,7 @@ export const darkNord: ThemeVariant = {
     scrollbar:            { fg: "#88c0d0",  bg: "#3b4252",  track: "#434c5e" },
 
     accent:               { fg: "#88c0d0",  bg: "#2e3440"  },  // nord8
+    highlight:            { fg: "#d08770",  bg: "#2e3440"  },  // nord12 — aurora orange
     warning:              { fg: "#ebcb8b",  bg: "#2e3440"  },  // nord13
     error:                { fg: "#bf616a",  bg: "#2e3440"  },  // nord11
     success:              { fg: "#a3be8c",  bg: "#2e3440"  },  // nord14

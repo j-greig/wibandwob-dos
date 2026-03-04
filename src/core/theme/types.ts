@@ -51,6 +51,8 @@ export interface ThemeTokens {
 
   // Semantic
   accent: StylePair;
+  /** Warm highlight — used for user labels, call-to-action text. Distinct from error. */
+  highlight: StylePair;
   warning: StylePair;
   error: StylePair;
   success: StylePair;

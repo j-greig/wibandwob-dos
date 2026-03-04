@@ -28,6 +28,7 @@ export const light: ThemeVariant = {
     scrollbar:            { fg: "blue",   bg: "white",  track: "grey" },
 
     accent:               { fg: "blue",   bg: "white"   },
+    highlight:            { fg: "#c0006a", bg: "white"  },  // deep rose — readable on white
     warning:              { fg: "red",    bg: "white"   },
     error:                { fg: "red",    bg: "white"   },
     success:              { fg: "green",  bg: "white"   },
