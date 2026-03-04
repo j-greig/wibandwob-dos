@@ -23,8 +23,8 @@ import type { WindowFacade } from "./window-facade.js";
 /** Extracts persistable payload from a live window. */
 export type SnapshotSerializer = (window: WindowRecord) => Record<string, unknown> | undefined;
 
-/** Restores a window from a snapshot. Should call exactly one open* action. */
-export type SnapshotRestorer = (snapshot: WindowSnapshot, payload: Record<string, unknown>, actions: SnapshotRestoreActions) => void;
+/** Restores a window from a snapshot. Should call exactly one open* action and return the created window. */
+export type SnapshotRestorer = (snapshot: WindowSnapshot, payload: Record<string, unknown>, actions: SnapshotRestoreActions) => WindowRecord | undefined;
 
 export interface SnapshotHandler {
   serialize: SnapshotSerializer;
@@ -36,23 +36,25 @@ export interface SnapshotHandler {
 // Extend this when adding new persistable window types.
 // ---------------------------------------------------------------------------
 
+type MaybeWindow = WindowRecord | undefined;
+
 export interface SnapshotRestoreActions {
-  openPrimerWindow: (filePath: string) => void;
-  openEditorWindow: (filePath: string | undefined, title: string, initial: string, restore?: { cursor?: number }) => void;
-  openBrowserReaderWindow: (filePath?: string) => void;
-  openFigletWindow: (text: string, font: string) => void;
-  openPatternWindow: () => void;
-  openPrimerGalleryWindow: (restore?: { activeTabIndex?: number; searchValue?: string; selectedIndex?: number }) => void;
-  openPrimerBrowserWindow: (restore?: { selectedIndex?: number }) => void;
-  openFileManagerWindow: (restore?: { currentPath?: string; selectedIndex?: number; filterValue?: string; searchQuery?: string; searchMode?: "simple" | "advanced"; viewMode?: "list" | "icon"; showHidden?: boolean; sortField?: "name" | "size" | "modified" | "type" }) => void;
-  openBackroomsTv: (channel: BackroomsChannel) => void;
-  openBackroomsLogBrowserWindow: () => void;
-  openBackroomsPrimerPickerWindow: () => void;
-  openChromeBrowserWindow: (restore?: { url?: string }) => void;
-  openCompanionWindow: (restore?: { tick?: number }) => void;
-  openArtWindow: () => void;
-  openMonsterCamWindow: () => void;
-  openWibWobAgentWindow: () => void;
+  openPrimerWindow: (filePath: string) => MaybeWindow;
+  openEditorWindow: (filePath: string | undefined, title: string, initial: string, restore?: { cursor?: number }) => MaybeWindow;
+  openBrowserReaderWindow: (filePath?: string) => MaybeWindow;
+  openFigletWindow: (text: string, font: string) => MaybeWindow;
+  openPatternWindow: () => MaybeWindow;
+  openPrimerGalleryWindow: (restore?: { activeTabIndex?: number; searchValue?: string; selectedIndex?: number }) => MaybeWindow;
+  openPrimerBrowserWindow: (restore?: { selectedIndex?: number }) => MaybeWindow;
+  openFileManagerWindow: (restore?: { currentPath?: string; selectedIndex?: number; filterValue?: string; searchQuery?: string; searchMode?: "simple" | "advanced"; viewMode?: "list" | "icon"; showHidden?: boolean; sortField?: "name" | "size" | "modified" | "type" }) => MaybeWindow;
+  openBackroomsTv: (channel: BackroomsChannel) => MaybeWindow;
+  openBackroomsLogBrowserWindow: () => MaybeWindow;
+  openBackroomsPrimerPickerWindow: () => MaybeWindow;
+  openChromeBrowserWindow: (restore?: { url?: string }) => MaybeWindow;
+  openCompanionWindow: (restore?: { tick?: number }) => MaybeWindow;
+  openArtWindow: () => MaybeWindow;
+  openMonsterCamWindow: () => MaybeWindow;
+  openWibWobAgentWindow: () => MaybeWindow;
   windows: WindowFacade;
 }
 
@@ -84,7 +86,7 @@ export const snapshotRegistry = {
   "primer-viewer": {
     serialize: (_window) => undefined,
     restore: (snapshot, _payload, actions) => {
-      if (snapshot.filePath) actions.openPrimerWindow(snapshot.filePath);
+      return snapshot.filePath ? actions.openPrimerWindow(snapshot.filePath) : undefined;
     },
   },
 
@@ -95,7 +97,7 @@ export const snapshotRegistry = {
         ? { content: window.editor.value, cursor: window.editor.cursor }
         : undefined,
     restore: (snapshot, payload, actions) => {
-      actions.openEditorWindow(
+      return actions.openEditorWindow(
         snapshot.filePath,
         snapshot.title,
         typeof payload.content === "string"
@@ -112,7 +114,7 @@ export const snapshotRegistry = {
   "reader-viewer": {
     serialize: (_window) => undefined,
     restore: (snapshot, _payload, actions) => {
-      actions.openBrowserReaderWindow(snapshot.filePath);
+      return actions.openBrowserReaderWindow(snapshot.filePath);
     },
   },
 
@@ -126,7 +128,7 @@ export const snapshotRegistry = {
       };
     },
     restore: (_snapshot, payload, actions) => {
-      actions.openFigletWindow(
+      return actions.openFigletWindow(
         typeof payload.inputText === "string" ? payload.inputText : "WibWob",
         typeof payload.font === "string" ? payload.font : getDefaultFigletFont()
       );
@@ -137,7 +139,7 @@ export const snapshotRegistry = {
   "pattern-animation": {
     serialize: (_window) => undefined,
     restore: (_snapshot, _payload, actions) => {
-      actions.openPatternWindow();
+      return actions.openPatternWindow();
     },
   },
 
@@ -152,7 +154,7 @@ export const snapshotRegistry = {
       };
     },
     restore: (_snapshot, payload, actions) => {
-      actions.openPrimerGalleryWindow({
+      return actions.openPrimerGalleryWindow({
         activeTabIndex: typeof payload.activeTabIndex === "number" ? payload.activeTabIndex : undefined,
         searchValue: typeof payload.searchValue === "string" ? payload.searchValue : undefined,
         selectedIndex: typeof payload.selectedIndex === "number" ? payload.selectedIndex : undefined,
@@ -167,7 +169,7 @@ export const snapshotRegistry = {
       selectedIndex: detailNumber(getDetails(window), "selectedIndex") ?? 0,
     }),
     restore: (_snapshot, payload, actions) => {
-      actions.openPrimerBrowserWindow({
+      return actions.openPrimerBrowserWindow({
         selectedIndex: typeof payload.selectedIndex === "number" ? payload.selectedIndex : undefined,
       });
     },
@@ -188,7 +190,7 @@ export const snapshotRegistry = {
       };
     },
     restore: (_snapshot, payload, actions) => {
-      actions.openFileManagerWindow({
+      return actions.openFileManagerWindow({
         currentPath: typeof payload.currentPath === "string" ? payload.currentPath : undefined,
         filterValue: typeof payload.filterValue === "string" ? payload.filterValue : undefined,
         selectedIndex: typeof payload.selectedIndex === "number" ? payload.selectedIndex : undefined,
@@ -204,7 +206,7 @@ export const snapshotRegistry = {
   "backrooms-log-browser": {
     serialize: (_window) => undefined,
     restore: (_snapshot, _payload, actions) => {
-      actions.openBackroomsLogBrowserWindow();
+      return actions.openBackroomsLogBrowserWindow();
     },
   },
 
@@ -213,7 +215,7 @@ export const snapshotRegistry = {
       currentUrl: detailString(getDetails(window), "currentUrl"),
     }),
     restore: (_snapshot, payload, actions) => {
-      actions.openChromeBrowserWindow({
+      return actions.openChromeBrowserWindow({
         url: typeof payload.currentUrl === "string" ? payload.currentUrl : undefined,
       });
     },
@@ -222,7 +224,7 @@ export const snapshotRegistry = {
   "backrooms-primer-picker": {
     serialize: (_window) => undefined,
     restore: (_snapshot, _payload, actions) => {
-      actions.openBackroomsPrimerPickerWindow();
+      return actions.openBackroomsPrimerPickerWindow();
     },
   },
 
@@ -243,7 +245,7 @@ export const snapshotRegistry = {
       };
     },
     restore: (_snapshot, payload, actions) => {
-      actions.openBackroomsTv({
+      return actions.openBackroomsTv({
         theme: typeof payload.theme === "string" ? payload.theme : "liminal fluorescent maze",
         primers: typeof payload.primers === "string" ? payload.primers : "",
         turns: typeof payload.turns === "number" ? payload.turns : 3,
@@ -263,7 +265,7 @@ export const snapshotRegistry = {
       tick: detailNumber(getDetails(window), "tick") ?? 0,
     }),
     restore: (_snapshot, payload, actions) => {
-      actions.openCompanionWindow({
+      return actions.openCompanionWindow({
         tick: typeof payload.tick === "number" ? payload.tick : undefined,
       });
     },
@@ -273,7 +275,7 @@ export const snapshotRegistry = {
   "generative-art": {
     serialize: (_window) => undefined,
     restore: (_snapshot, _payload, actions) => {
-      actions.openArtWindow();
+      return actions.openArtWindow();
     },
   },
 
@@ -281,7 +283,7 @@ export const snapshotRegistry = {
   "monster-cam": {
     serialize: (_window) => undefined,
     restore: (_snapshot, _payload, actions) => {
-      actions.openMonsterCamWindow();
+      return actions.openMonsterCamWindow();
     },
   },
 
@@ -292,7 +294,7 @@ export const snapshotRegistry = {
       return details?.messages ? { messages: details.messages } : undefined;
     },
     restore: (_snapshot, _payload, actions) => {
-      actions.openWibWobAgentWindow();
+      return actions.openWibWobAgentWindow();
     },
   },
 
@@ -364,11 +366,11 @@ const kindFallbackMap: Partial<Record<string, PersistableAppType>> = {
   workspace: undefined,  // transient, skip
 };
 
-/** Restore a window from a snapshot using the registry. Returns false for unknown types. */
+/** Restore a window from a snapshot using the registry. Returns the restored window, or undefined on failure. */
 export function registryRestore(
   snapshot: WindowSnapshot,
   actions: SnapshotRestoreActions
-): boolean {
+): WindowRecord | undefined {
   const payload = snapshot.payload ?? {};
   // Prefer explicit appType from payload, remap legacy values, fall back to kind-based default
   const raw = typeof payload.appType === "string" ? payload.appType : undefined;
@@ -376,14 +378,13 @@ export function registryRestore(
   const appType = (remapped ?? kindFallbackMap[snapshot.kind]) as string | undefined;
   if (!appType) {
     console.warn(`[snapshot-registry] No restore handler for kind "${snapshot.kind}" — skipping window "${snapshot.title}"`);
-    return false;
+    return undefined;
   }
   // Check built-in registry first, then dynamic handlers
   const handler = (snapshotRegistry as Record<string, SnapshotHandler>)[appType] ?? dynamicHandlers.get(appType);
   if (!handler) {
     console.warn(`[snapshot-registry] No restore handler for appType "${appType}" — skipping window "${snapshot.title}"`);
-    return false;
+    return undefined;
   }
-  handler.restore(snapshot, payload, actions);
-  return true;
+  return handler.restore(snapshot, payload, actions);
 }

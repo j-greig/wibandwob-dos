@@ -54,22 +54,22 @@ async function closeAllWindows() {
 
 function makeRestoreActions(overrides?: Partial<SnapshotRestoreActions>): SnapshotRestoreActions {
   return {
-    openPrimerWindow: () => {},
-    openEditorWindow: () => {},
-    openBrowserReaderWindow: () => {},
-    openFigletWindow: () => {},
-    openPatternWindow: () => {},
-    openPrimerGalleryWindow: () => {},
-    openPrimerBrowserWindow: () => {},
-    openFileManagerWindow: () => {},
-    openBackroomsTv: () => {},
-    openBackroomsLogBrowserWindow: () => {},
-    openBackroomsPrimerPickerWindow: () => {},
-    openChromeBrowserWindow: () => {},
-    openCompanionWindow: () => {},
-    openArtWindow: () => {},
-    openMonsterCamWindow: () => {},
-    openWibWobAgentWindow: () => {},
+    openPrimerWindow: () => undefined,
+    openEditorWindow: () => undefined,
+    openBrowserReaderWindow: () => undefined,
+    openFigletWindow: () => undefined,
+    openPatternWindow: () => undefined,
+    openPrimerGalleryWindow: () => undefined,
+    openPrimerBrowserWindow: () => undefined,
+    openFileManagerWindow: () => undefined,
+    openBackroomsTv: () => undefined,
+    openBackroomsLogBrowserWindow: () => undefined,
+    openBackroomsPrimerPickerWindow: () => undefined,
+    openChromeBrowserWindow: () => undefined,
+    openCompanionWindow: () => undefined,
+    openArtWindow: () => undefined,
+    openMonsterCamWindow: () => undefined,
+    openWibWobAgentWindow: () => undefined,
     windows: {} as any,  // not used by restore handlers directly
     ...overrides,
   };
@@ -158,13 +158,13 @@ describe("snapshot restore edge cases", () => {
       },
       makeRestoreActions(),
     );
-    expect(result).toBe(false);
+    expect(result).toBeUndefined();
   });
 
   test("legacy wibwob-chat-v2 remaps to wibwob-agent", () => {
     let openedAgent = false;
     const actions = makeRestoreActions({
-      openWibWobAgentWindow: () => { openedAgent = true; },
+      openWibWobAgentWindow: () => { openedAgent = true; return undefined; },
     });
 
     const result = registryRestore(
@@ -176,14 +176,14 @@ describe("snapshot restore edge cases", () => {
       },
       actions,
     );
-    expect(result).toBe(true);
+    expect(result).not.toBe(false);
     expect(openedAgent).toBe(true);
   });
 
   test("legacy chat-transcript remaps to wibwob-agent", () => {
     let openedAgent = false;
     const actions = makeRestoreActions({
-      openWibWobAgentWindow: () => { openedAgent = true; },
+      openWibWobAgentWindow: () => { openedAgent = true; return undefined; },
     });
 
     const result = registryRestore(
@@ -195,14 +195,14 @@ describe("snapshot restore edge cases", () => {
       },
       actions,
     );
-    expect(result).toBe(true);
+    expect(result).not.toBe(false);
     expect(openedAgent).toBe(true);
   });
 
   test("kind-only fallback works for old workspace files without appType", () => {
     let openedPrimer = false;
     const actions = makeRestoreActions({
-      openPrimerWindow: () => { openedPrimer = true; },
+      openPrimerWindow: () => { openedPrimer = true; return undefined; },
     });
 
     const result = registryRestore(
@@ -215,7 +215,7 @@ describe("snapshot restore edge cases", () => {
       },
       actions,
     );
-    expect(result).toBe(true);
+    expect(result).not.toBe(false);
     expect(openedPrimer).toBe(true);
   });
 });

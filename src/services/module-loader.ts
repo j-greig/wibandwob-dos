@@ -238,6 +238,7 @@ function createMicroappHost(
         serialize: handlers.serialize,
         restore: (snapshot, payload, _actions) => {
           handlers.restore(snapshot, payload);
+          return undefined; // dynamic modules don't return the window yet
         },
       };
       registerDynamicSnapshot(moduleId, snapshotHandler);

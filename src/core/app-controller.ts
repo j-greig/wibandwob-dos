@@ -452,7 +452,8 @@ export class TsTuiMvpApp {
       .find((window) => window.describeState?.().appType === appType);
   }
 
-  /** Focus an existing window of appType, or create one. Single-instance by default. */
+  /** Focus an existing window of appType, or create one. Single-instance by default.
+   *  Returns undefined if the create function did not actually produce a new window. */
   private focusOrCreate(appType: AppType, createFn: () => void, multiInstance = false): WindowRecord | undefined {
     if (!multiInstance) {
       const existing = this.findWindowByAppType(appType);
@@ -462,12 +463,18 @@ export class TsTuiMvpApp {
       }
     }
 
+    const countBefore = this.windowManager.getWindows().length;
     createFn();
-    return this.windowManager.getLastWindow();
+    const windows = this.windowManager.getWindows();
+    // Only return the new window if one was actually created
+    if (windows.length > countBefore) {
+      return windows[windows.length - 1];
+    }
+    return undefined;
   }
 
   /** Build TuiToolContext, create the agent session, and open/focus the native agent window. */
-  private openWibWobAgentWindow(): void {
+  private openWibWobAgentWindow(): WindowRecord | undefined {
     const tuiContext: TuiToolContext = {
       getState: () => this.state.sync(),
       listCommands: () => this.commands.list("agent"),
@@ -513,7 +520,7 @@ export class TsTuiMvpApp {
     const existing = this.findWindowByAppType("wibwob-agent");
     if (existing) {
       existing.focus();
-      return;
+      return existing;
     }
 
     const session = new WibWobAgentSession(tuiContext, REPO_ROOT);
@@ -530,6 +537,7 @@ export class TsTuiMvpApp {
     if (agentWin) {
       session.setWindowId(agentWin.id);
     }
+    return agentWin;
   }
 
   private getBackroomsWindowContext(): BackroomsWindowContext {

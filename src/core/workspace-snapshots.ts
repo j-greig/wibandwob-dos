@@ -32,12 +32,10 @@ export function restoreWindowSnapshot(
   snapshot: WindowSnapshot,
   actions: SnapshotRestoreActions
 ): WindowRecord | undefined {
-  if (!registryRestore(snapshot, actions)) return undefined;
+  const restored = registryRestore(snapshot, actions);
+  if (!restored) return undefined;
 
-  const restored = actions.windows.getLastWindow();
-  if (restored) {
-    actions.windows.moveWindow(restored.id, snapshot.left, snapshot.top);
-    actions.windows.resizeWindow(restored.id, snapshot.width, snapshot.height);
-  }
+  actions.windows.moveWindow(restored.id, snapshot.left, snapshot.top);
+  actions.windows.resizeWindow(restored.id, snapshot.width, snapshot.height);
   return restored;
 }

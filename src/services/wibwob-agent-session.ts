@@ -7,9 +7,11 @@
 
 import { Agent } from "@mariozechner/pi-agent-core";
 import type { AgentMessage } from "@mariozechner/pi-agent-core";
+import type { Message } from "@mariozechner/pi-ai";
 import {
   AuthStorage,
   ModelRegistry,
+  SessionManager,
   SettingsManager
 } from "@mariozechner/pi-coding-agent";
 
@@ -205,6 +207,7 @@ interface AgentSnapshot {
   lastError?: string;
   model?: string;
   sessionId?: string;
+  sessionFile?: string;
   messageCount: number;
   messages: ChatMessageEntry[];
 }
@@ -450,6 +453,7 @@ export class WibWobAgentSession {
   private resumeMessages?: AgentMessage[];
   private sessionServer?: SessionServerHandle;
   private senderInfo = buildSenderInfo(0);
+  private sessionManager?: SessionManager;
 
   readonly mode: "agent" | "chat";
 
@@ -464,6 +468,11 @@ export class WibWobAgentSession {
   /** Update the window id used in outbound sender info for session routing. */
   setWindowId(id: number): void {
     this.senderInfo = buildSenderInfo(id);
+  }
+
+  /** Path to the JSONL session log file, if persistence is active. */
+  getSessionFile(): string | undefined {
+    return this.sessionManager?.getSessionFile() ?? undefined;
   }
 
   /** Append sender info to an outbound message so recipients can reply via the control API. */
@@ -513,6 +522,13 @@ export class WibWobAgentSession {
 
       const initialMessages = this.resumeMessages ?? [];
       this.resumeMessages = undefined;
+
+      // Create a persistent SessionManager so conversation history is saved
+      // to ~/.pi/agent/sessions/ as JSONL — same location as regular pi sessions.
+      if (!this.sessionManager) {
+        this.sessionManager = SessionManager.create(this.cwd);
+        log.sys(`session log: ${this.sessionManager.getSessionFile()}`);
+      }
 
       this.agent = new Agent({
         initialState: {
@@ -609,6 +625,7 @@ export class WibWobAgentSession {
         ? `${this.agent.state.model.provider}/${this.agent.state.model.id}`
         : undefined,
       sessionId: this.sessionId,
+      sessionFile: this.sessionManager?.getSessionFile() ?? undefined,
       messageCount: this.messages.length,
       messages: this.messages.map((m) => ({ ...m })),
     };
@@ -668,6 +685,12 @@ export class WibWobAgentSession {
     log.msg(`${from} → ${preview}`);
 
     this.messages.push({ id: createMessageId("user"), role: "user", text: msg, sender });
+    // Persist user message to session log
+    this.sessionManager?.appendMessage({
+      role: "user",
+      content: [{ type: "text", text: msg }],
+      timestamp: Date.now(),
+    });
     this.currentAssistantId = createMessageId("assistant");
     this.messages.push({
       id: this.currentAssistantId,
@@ -797,6 +820,19 @@ export class WibWobAgentSession {
           a.streaming = false;
           this.status = "Ready.";
           this.emit();
+        }
+        // Persist the full assistant message (includes tool calls + text)
+        if (event.message && typeof event.message === "object" && "role" in event.message) {
+          this.sessionManager?.appendMessage(event.message as Message);
+        }
+        return;
+      }
+      case "turn_end": {
+        // Persist tool results from this turn
+        if (event.toolResults) {
+          for (const tr of event.toolResults) {
+            this.sessionManager?.appendMessage(tr as Message);
+          }
         }
         return;
       }
