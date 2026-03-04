@@ -451,10 +451,9 @@ export default function setup(host: MicroappHost) {
         visible: () => mode === "sentient" && voice === "scramble",
       },
       {
-        key: "terrain",
-        basis: 20,
-        part: terrainPanel,
-        visible: () => mode === "sentient" && voice === "terrain",
+        key: "poem",
+        basis: "1fr",
+        part: poemBlock,
       },
       {
         key: "terrain-rule",
@@ -463,9 +462,10 @@ export default function setup(host: MicroappHost) {
         visible: () => mode === "sentient" && voice === "terrain",
       },
       {
-        key: "poem",
-        basis: "1fr",
-        part: poemBlock,
+        key: "terrain",
+        basis: "3fr",
+        part: terrainPanel,
+        visible: () => mode === "sentient" && voice === "terrain",
       },
     ]);
 
