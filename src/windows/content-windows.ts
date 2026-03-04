@@ -1,3 +1,9 @@
+/**
+ * Content-oriented window factories: primer browser, primer gallery (tabbed),
+ * text viewer (primer + reader), and file manager. Wires blessed widgets to
+ * WindowManager records with workspace-restorable state metadata.
+ */
+
 import blessed from "blessed";
 import fs from "node:fs";
 import path from "node:path";
@@ -12,6 +18,7 @@ import type { Box, BrowserEntry, List, WindowKind, WindowRecord } from "../core/
 import type { OverlayManager } from "../core/overlay-manager.js";
 import type { WindowManager } from "../core/window-manager.js";
 
+/** Truncate a line by display width (not string length) and pad to fixed width for full-Unicode rendering. */
 function fitLineToWidth(line: string, width: number): string {
   if (width <= 0) {
     return "";
@@ -29,6 +36,7 @@ function fitLineToWidth(line: string, width: number): string {
   return visible + " ".repeat(Math.max(0, width - currentWidth));
 }
 
+/** Convert raw text into viewport-safe lines, accounting for inner width and scrollbar, then setContent. */
 function setViewportContent(viewport: Box, raw: string): void {
   const outer = Math.max(1, Number(viewport.width) || 1);
   const iw = Number((viewport as any).iwidth ?? 0);
@@ -42,12 +50,14 @@ function setViewportContent(viewport: Box, raw: string): void {
   viewport.setContent(rows.join("\n"));
 }
 
+/** Open the simple primer list browser. Restores selection index from workspace state. */
 export function openPrimerBrowserWindow(params: {
   windowManager: WindowManager;
   overlays: OverlayManager;
   entries: BrowserEntry[];
   onOpenPrimer: (filePath: string) => void;
   restore?: { selectedIndex?: number };
+  onStateChanged?: () => void;
 }): void {
   const { entries } = params;
   if (entries.length === 0) {
@@ -87,6 +97,7 @@ export function openPrimerBrowserWindow(params: {
       params.onOpenPrimer(entry.filePath);
     }
   };
+  list.on("select item", () => params.onStateChanged?.());
   list.on("select", (_, index) => openSelected(index));
   frame.kind = "browser";
   frame.describeState = () => ({
@@ -109,6 +120,7 @@ export function openPrimerBrowserWindow(params: {
   frame.focus();
 }
 
+/** Open the tabbed primer gallery with search/filter, preview pane, and restorable tab/selection state. */
 export function openPrimerGalleryWindow(params: {
   screen: blessed.Widgets.Screen;
   windowManager: WindowManager;
@@ -117,6 +129,7 @@ export function openPrimerGalleryWindow(params: {
   tabs: Array<{ label: string; entries: BrowserEntry[] }>;
   onOpenPrimer: (filePath: string) => void;
   restore?: { activeTabIndex?: number; searchValue?: string; selectedIndex?: number };
+  onStateChanged?: () => void;
 }): void {
   const { allEntries, tabs } = params;
   if (allEntries.length === 0) {
@@ -223,6 +236,7 @@ export function openPrimerGalleryWindow(params: {
     list.setItems(activeEntries.map((entry) => entry.label));
     list.select(0);
     updatePreview(0);
+    params.onStateChanged?.();
     params.screen.render();
   };
   const switchTab = (index: number) => {
@@ -239,10 +253,14 @@ export function openPrimerGalleryWindow(params: {
     } else {
       list.focus();
     }
+    params.onStateChanged?.();
     params.screen.render();
   };
 
-  list.on("select item", (_, index) => updatePreview(index));
+  list.on("select item", (_, index) => {
+    updatePreview(index);
+    params.onStateChanged?.();
+  });
   list.on("keypress", (_, key) => {
     if (["up", "down", "j", "k"].includes(key.name ?? "")) {
       setTimeout(() => updatePreview((list as List & { selected: number }).selected ?? 0), 0);
@@ -314,6 +332,7 @@ export function openPrimerGalleryWindow(params: {
 /** ViewerKind — the subset of WindowKind valid for the content viewer factory. */
 export type ViewerKind = "primer" | "reader";
 
+/** Open the shared text viewer for both primer and reader kinds. Optionally wires animation playback when frames are provided. */
 export function openTextViewerWindow(params: {
   windowManager: WindowManager;
   applyMeasuredWindowSize: (frame: WindowRecord, kind: ViewerKind, content: { width: number; height: number }) => void;
@@ -435,10 +454,12 @@ export interface FileManagerRestore {
   searchQuery?: string;
   searchMode?: "simple" | "advanced";
   viewMode?: "list" | "icon";
-  showHidden?: boolean; // deprecated — dotfiles always shown
+  /** @deprecated Dotfiles are always shown now. Kept for workspace restore compat. */
+  showHidden?: boolean;
   sortField?: "name" | "size" | "modified" | "type";
 }
 
+/** Open the Finder-style file manager with browse/search/filter/view-mode, preview, and workspace-restorable state. */
 export function openFileManagerWindow(params: {
   screen: blessed.Widgets.Screen;
   windowManager: WindowManager;

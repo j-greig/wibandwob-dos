@@ -1,5 +1,5 @@
 ---
-name: chiptune-bricks
+name: chiptune-studio
 description: |
   Composable audio synthesis toolkit for building chiptune music from numpy primitives.
   Three layers: oscillators/effects/theory (raw materials), patterns (compositional gestures),
@@ -15,11 +15,12 @@ Composable audio synthesis. Numpy in, sound out.
 
 ## Architecture
 
-Three layers, each building on the last:
+Four layers, each building on the last:
 
 ```
 PRIMITIVES   osc · fx · theory · canvas    raw waveforms, effects, note math, mixing
 PATTERNS     patterns                       compositional gestures that place sounds in time
+SYNTHS       synths                         virtual instruments with presets (pick your gear)
 PIPELINE     pipeline                       pydub bridge, file mixing, voice, export
 ```
 
@@ -43,7 +44,7 @@ Python 3.13+ removed the `audioop` module that pydub depends on. **Always includ
 # NOTE: audioop-lts is REQUIRED — pydub breaks without it on Python 3.13+
 
 import sys
-sys.path.insert(0, "~/Repos/symbient-skills/skills/chiptune-bricks/scripts")
+sys.path.insert(0, "~/Repos/symbient-skills/skills/chiptune-studio/scripts")
 
 from bricks import *
 
@@ -118,6 +119,67 @@ Common structural moves (not rules, just vocabulary):
 
 Transitions between sections: crossfade, silence gap, filter sweep, rhythmic
 break, new element entering early (foreshadowing).
+
+## Synths — Virtual Instruments
+
+The `bricks.synths` module provides classic synthesiser emulations with presets.
+Each synth is a single Python file with an engine function and named presets.
+All share a consistent API: `play(note, dur, preset=)`, `list_presets()`.
+
+### Available Synths
+
+| Module | Instrument | Character | Key methods |
+|--------|-----------|-----------|-------------|
+| `juno` | Roland Juno-106 | Warm detuned chorus polysynth | `play`, `chord`, `bass_chord` |
+| `tb303` | Roland TB-303 | Acid bass with filter sweep | `play`, `slide`, `slide_notes` |
+| `monopoly` | Korg Monopoly | PWM mono lead with portamento | `play`, `phrase` |
+| `prophet5` | Prophet-5 | Dual-osc polysynth with drift | `play`, `chord`, `arp` |
+| `ms20` | Korg MS-20 | Aggressive dual-filter bass monster | `play`, `chord`, `bass_fifth` |
+| `odyssey` | ARP Odyssey | Ring mod, S&H, metallic weirdness | `play`, `duo`, `chord` |
+
+### Available Drum Machines
+
+| Module | Machine | Type | Character |
+|--------|---------|------|-----------|
+| `tr808` | Roland TR-808 | Synthesised | Boomy, the hip-hop/electro kick |
+| `linndrum` | LinnDrum LM-2 | Sample-based | Dry, punchy, 8-bit, 80s pop |
+| `cr78` | Roland CR-78 | Sample-based | Thin, metallic, lo-fi, 1978 |
+
+All drum machines share the `kit(preset=)` API returning a dict of callable functions.
+
+### Usage
+
+```python
+from bricks.synths import juno, tb303, ms20, prophet5, odyssey
+from bricks.synths import tr808, linndrum, cr78
+
+# Synths
+pad = juno.chord(["Eb3", "G3", "Bb3"], 4.0, preset="warm_pad")
+acid = tb303.play("Eb2", 0.5, preset="acid_saw")
+bass = ms20.play("Eb1", 1.0, preset="screaming_bass")
+arp_line = prophet5.arp(["Eb4", "G4", "Bb4"], 4.0, preset="arp_sparkle")
+bells = odyssey.play("Eb4", 1.0, preset="ring_mod_bell")
+
+# Drum kits
+drums = linndrum.kit("classic")   # or tr808.kit("minimal_techno"), cr78.kit()
+kick = drums["kick"]()
+snare = drums["snare"]()
+hat = drums["hh"]()
+```
+
+### Genre Palette Guide
+
+These are starting points, not rules. Mix and match.
+
+| Genre | Synths | Drums | Notes |
+|-------|--------|-------|-------|
+| Techno | tb303 acid_saw, juno stab | tr808 minimal_techno | Four-on-the-floor, acid filter sweeps |
+| Italo disco | juno italo_bass, juno warm_pad | tr808 electro or linndrum | Chorus bass, lush pads |
+| Synth-pop | prophet5 poly_pad, monopoly numan | linndrum classic | Linn kick, Prophet strings, Monopoly lead |
+| Industrial | ms20 industrial, odyssey metallic_stab | tr808 classic | MS-20 drive cranked, ring mod |
+| Ambient | prophet5 dark_strings, ms20 drone | cr78 (sparse) | Long attacks, slow filter sweeps |
+| Hyperpop | odyssey alien_fx, ms20 screaming_bass | tr808 trap | Bitcrushed, pitch-shifted, chaotic |
+| New wave | monopoly thin_80s, juno string_pad | cr78 or linndrum | CR-78 gives the authentic primitive feel |
 
 ## Pattern Reference
 

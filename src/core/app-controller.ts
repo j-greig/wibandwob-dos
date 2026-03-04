@@ -157,7 +157,7 @@ export class TsTuiMvpApp {
       this.desktop,
       () => {
         this.repaintDesktop();
-        this.syncState();
+        this.syncLiveState();
       },
       (window, x, y) => this.openWindowContextMenu(window, x, y)
     );
@@ -172,7 +172,7 @@ export class TsTuiMvpApp {
       this.menuBar,
       this.menus,
       () => this.windowManager.restoreWindowFocus(),
-      () => this.syncState()
+      () => this.syncLiveState()
     );
     this.controlApi = new ControlApiService(CONTROL_API_PORT, {
       getState: () => this.getDesktopState(),
@@ -223,7 +223,7 @@ export class TsTuiMvpApp {
     this.menuUi.bindMenuClicks((label) => this.openMenu(label));
     this.restoreDefaultWorkspace();
     this.controlApi.start();
-    this.syncState();
+    this.persistState();
     this.screen.render();
     log.app(`started ${this.screen.width}x${this.screen.height} theme:${themeName()}`);
   }
@@ -258,7 +258,7 @@ export class TsTuiMvpApp {
     if (appFlags().dev) this.renderDevControls();
     this.screen.on("resize", () => {
       this.repaintDesktop();
-      this.syncState();
+      this.syncLiveState();
       this.screen.render();
     });
   }
@@ -351,7 +351,7 @@ export class TsTuiMvpApp {
     this.customCursor?.restyle();
     this.windowManager.restyleAll();
     this.repaintDesktop();
-    this.syncState();
+    this.persistState();
     this.screen.render();
   }
 
@@ -522,7 +522,7 @@ export class TsTuiMvpApp {
       screen: this.screen,
       windowManager: this.windowManager,
       agent: session,
-      onStateChanged: () => this.syncState(),
+      onStateChanged: () => this.syncLiveState(),
     });
 
     // Set the window id on the session so outbound messages route correctly
@@ -538,7 +538,7 @@ export class TsTuiMvpApp {
       windowManager: this.windowManager,
       overlays: this.overlays,
       backrooms: this.backrooms,
-      syncState: () => this.syncState(),
+      syncState: () => this.syncLiveState(),
       openEditorWindow: (filePath?: string, title?: string, initial?: string) => this.openEditorWindow(filePath, title, initial),
       openBackroomsTv: (channel: BackroomsChannel) => this.openBackroomsTv(channel)
     };
@@ -580,7 +580,7 @@ export class TsTuiMvpApp {
       entries: this.content.collectPrimerEntries(),
       onOpenPrimer: (filePath) => this.openPrimerWindow(filePath),
       restore,
-      onStateChanged: () => this.syncState(),
+      onStateChanged: () => this.syncLiveState(),
     });
     });
   }
@@ -605,7 +605,7 @@ export class TsTuiMvpApp {
         const content = fs.readFileSync(filePath, "utf8");
         this.openTextViewerWindow(path.basename(filePath), content, "reader", filePath);
       },
-      onStateChanged: () => this.syncState(),
+      onStateChanged: () => this.syncLiveState(),
     });
     });
   }
@@ -621,7 +621,7 @@ export class TsTuiMvpApp {
       tabs: this.content.buildGalleryTabs(allEntries),
       onOpenPrimer: (filePath) => this.openPrimerWindow(filePath),
       restore,
-      onStateChanged: () => this.syncState(),
+      onStateChanged: () => this.syncLiveState(),
     });
     });
   }
@@ -633,7 +633,7 @@ export class TsTuiMvpApp {
       windowManager: this.windowManager,
       overlays: this.overlays,
       initialUrl,
-      onStateChanged: () => this.syncState(),
+      onStateChanged: () => this.syncLiveState(),
     });
     }, true);
   }
@@ -672,7 +672,7 @@ export class TsTuiMvpApp {
       text,
       initialFont,
       onOpenFontPicker: (nextText, currentFont, onSelect) => this.openFigletFontPicker(nextText, currentFont, onSelect),
-      onSyncState: () => this.syncState()
+      onSyncState: () => this.syncLiveState()
     });
     }, true);
   }
@@ -700,7 +700,7 @@ export class TsTuiMvpApp {
       openTerrainLabStudioWindow({
         screen: this.screen,
         windowManager: this.windowManager,
-        onStateChanged: () => this.syncState(),
+        onStateChanged: () => this.syncLiveState(),
       });
     });
   }
@@ -710,7 +710,7 @@ export class TsTuiMvpApp {
       openContourTriptychWindow({
         screen: this.screen,
         windowManager: this.windowManager,
-        onStateChanged: () => this.syncState(),
+        onStateChanged: () => this.syncLiveState(),
       });
     });
   }
@@ -718,7 +718,7 @@ export class TsTuiMvpApp {
   private openMusicPlayerWindow(restore?: { filePath?: string; volume?: number }): WindowRecord | undefined {
     return this.focusOrCreate("music-player", () => {
       openMusicPlayerWindow(
-        { screen: this.screen, windowManager: this.windowManager },
+        { screen: this.screen, windowManager: this.windowManager, onStateChanged: () => this.syncLiveState() },
         restore
       );
     });
@@ -828,7 +828,7 @@ export class TsTuiMvpApp {
       openMonsterCamWindow({
       screen: this.screen,
       windowManager: this.windowManager,
-      onStateChanged: () => this.syncState(),
+      onStateChanged: () => this.syncLiveState(),
     });
     });
   }
@@ -869,7 +869,7 @@ export class TsTuiMvpApp {
         focused.title = path.basename(resolved);
         this.updateEditorTitleBar(focused);
         this.markEditorClean(focused);
-        this.syncState();
+        this.persistState();
         this.overlays.flash(`Saved as ${resolved}`);
       }
     );
@@ -941,7 +941,7 @@ export class TsTuiMvpApp {
       defaultDir: SPIKE_ROOT,
       onWritten: () => {
         this.markEditorClean(window);
-        this.syncState();
+        this.persistState();
         if (window.filePath) {
           this.overlays.flash(`Saved ${window.filePath}`);
         }
@@ -1044,7 +1044,7 @@ export class TsTuiMvpApp {
       return;
     }
     renderEditorState(window.editor);
-    this.syncState();
+    this.syncLiveState();
     this.screen.render();
   }
 
@@ -1104,6 +1104,7 @@ export class TsTuiMvpApp {
 
   private saveWorkspace(): void {
     this.workspace.save(this.snapshotWindows(), themeName());
+    this.persistState();
     this.overlays.flash(`Saved workspace to ${this.workspace.path}`);
   }
 
@@ -1146,7 +1147,7 @@ export class TsTuiMvpApp {
       overlays: this.overlays,
       workspace: this.workspace,
       onSave: () => this.saveWorkspace(),
-      onAfterChange: () => this.syncState()
+      onAfterChange: () => this.syncLiveState()
     });
   }
 
@@ -1200,7 +1201,7 @@ export class TsTuiMvpApp {
       }
     }
     focusedWindow?.focus();
-    this.syncState();
+    this.persistState();
     this.overlays.flash(`Loaded workspace from ${this.workspace.path}`);
   }
 

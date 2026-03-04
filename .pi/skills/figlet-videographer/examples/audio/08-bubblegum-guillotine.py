@@ -12,7 +12,7 @@ No word sync — just a mood bed.
 """
 import sys, os
 import numpy as np
-sys.path.insert(0, "/Users/james/.claude/skills/chiptune-bricks/scripts")
+sys.path.insert(0, "/Users/james/.claude/skills/chiptune-studio/scripts")
 from bricks import osc, fx, theory, canvas, patterns, pipeline
 
 SR = 22050

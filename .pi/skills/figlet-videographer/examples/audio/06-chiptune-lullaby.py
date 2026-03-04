@@ -8,7 +8,7 @@ Waltz time (3/4 at 72bpm). The crow at dusk. Light fading through holes.
 The machine powers down. G major — gentle, tired, kind.
 """
 import sys, numpy as np
-sys.path.insert(0, "/Users/james/.claude/skills/chiptune-bricks/scripts")
+sys.path.insert(0, "/Users/james/.claude/skills/chiptune-studio/scripts")
 from bricks import osc, fx, theory, canvas, patterns
 
 SR = 22050

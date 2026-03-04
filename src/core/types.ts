@@ -110,7 +110,8 @@ export type TransientAppType =
   | "workspace-manager"
   | "state-inspector"
   | "contour-studio"
-  | "terrain-lab";
+  | "terrain-lab"
+  | "music-player";
 
 /**
  * Union of all known appType strings.

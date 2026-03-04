@@ -1,6 +1,6 @@
 # Pattern Catalog
 
-Full API reference for all chiptune-bricks modules.
+Full API reference for all chiptune-studio modules.
 
 ## Table of Contents
 

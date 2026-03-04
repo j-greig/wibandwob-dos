@@ -1,3 +1,10 @@
+/**
+ * Shared transient UI primitives: flash toasts, value/path prompts,
+ * list pickers, browser prompts with search and preview, and file
+ * browser dialogs. Prevents window code from creating one-off
+ * interaction flows.
+ */
+
 import blessed from "blessed";
 import fs from "node:fs";
 import path from "node:path";
@@ -14,6 +21,7 @@ interface BrowserPromptItem {
   isDirectory?: boolean;
 }
 
+/** Shared transient-UI manager for prompts, browsers, pickers, and notifications. */
 export class OverlayManager {
   /** Default toast position for flash notifications. */
   private toastPosition: ModalPosition = "s";
@@ -28,6 +36,7 @@ export class OverlayManager {
     this.toastPosition = position;
   }
 
+  /** Show a transient toast notification at the default or overridden compass position. */
   flash(message: string, position?: ModalPosition): void {
     showToast({
       screen: this.screen,
@@ -37,6 +46,7 @@ export class OverlayManager {
     });
   }
 
+  /** Show a modal text input. Submits only if the trimmed value is non-empty. */
   openValuePrompt(label: string, initialValue: string, onSubmit: (value: string) => void): void {
     const t = theme();
     const promptWidth = Math.min(60, Math.floor(Number(this.screen.width) * 0.5));
@@ -105,6 +115,7 @@ export class OverlayManager {
     input.readInput();
   }
 
+  /** Show a modal text input with tab-completion for filesystem paths. */
   openPathPrompt(
     label: string,
     initialValue: string,
@@ -200,6 +211,7 @@ export class OverlayManager {
     input.readInput();
   }
 
+  /** Show a list picker, adapting generic items onto the richer browser prompt API. Supports optional lazy previews. */
   openListPrompt<T extends { label: string; value?: string; preview?: string; searchText?: string }>(
     label: string,
     items: T[],
@@ -228,6 +240,7 @@ export class OverlayManager {
     );
   }
 
+  /** Compact centre-screen picker for short enumerations (theme list, font list, etc.). */
   openCenteredListPrompt<T extends { label: string }>(
     label: string,
     items: T[],
@@ -309,6 +322,7 @@ export class OverlayManager {
     this.screen.render();
   }
 
+  /** Split-pane search/list/preview browser. Reusable primitive for large item sets with optional debounced preview. */
   openBrowserPrompt(
     label: string,
     items: BrowserPromptItem[],
@@ -516,6 +530,7 @@ export class OverlayManager {
     list.focus();
   }
 
+  /** File browser with directory navigation, filtering, preview, and directoriesOnly/fileFilter options. */
   openFileBrowserPrompt(
     label: string,
     initialDirectory: string,

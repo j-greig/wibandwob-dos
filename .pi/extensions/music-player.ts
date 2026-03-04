@@ -710,8 +710,15 @@ function splitInputChunks(data: string): string[] {
 	return chunks;
 }
 
+function fmtDuration(seconds: number): string {
+	if (seconds <= 0) return "";
+	const m = Math.floor(seconds / 60);
+	const s = Math.round(seconds % 60);
+	return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
 function renderInlineState(
-	details: { state: PlayState; fileName: string; filePath?: string; volume: number },
+	details: { state: PlayState; fileName: string; filePath?: string; volume: number; duration?: number },
 	theme: {
 		fg(token: string, text: string): string;
 		bold(text: string): string;
@@ -724,10 +731,12 @@ function renderInlineState(
 				? theme.fg("warning", "⏸")
 				: theme.fg("muted", "■");
 	const name = details.fileName || "(no file)";
+	const durStr = details.duration ? ` ${fmtDuration(details.duration)}` : "";
 	const line =
 		icon +
 		" " +
 		theme.fg("accent", name) +
+		durStr +
 		" " +
 		theme.fg("muted", `[${details.state}, ${details.volume}%]`);
 	const container = new Container();
@@ -782,6 +791,7 @@ export default function (pi: ExtensionAPI) {
 						fileName: snapshot.fileName,
 						filePath: snapshot.filePath,
 						volume: snapshot.volume,
+						duration: snapshot.duration,
 					},
 				};
 			} catch (error) {

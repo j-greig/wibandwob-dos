@@ -1,9 +1,8 @@
 /**
- * WibWobAgentSession — a WibWobChatSession with TUI tools.
- *
- * Extends the base chat session so the agent can see and manipulate
- * the desktop. Desktop state is injected automatically every turn
- * via transformContext, and TUI tools are registered via setTools.
+ * Native Wib & Wob agent/chat session. Owns model selection, prompt loading,
+ * jailed coding tools (scoped to REPO_ROOT), TUI desktop tools, desktop-state
+ * injection via transformContext, session resume, and pi-session bridge
+ * integration. Supports "agent" (tools enabled) and "chat" (tools stripped) modes.
  */
 
 import { Agent } from "@mariozechner/pi-agent-core";
@@ -29,6 +28,7 @@ import {
   createLsTool,
 } from "@mariozechner/pi-coding-agent";
 import { log } from "./app-logger.js";
+import { sharedPlayer, fmtTime, findAudioFiles, COMPOSITIONS_DIR } from "./audio-player-controller.js";
 import fs from "node:fs";
 import nodePath from "node:path";
 import { access, readFile, writeFile, mkdir } from "node:fs/promises";
@@ -50,34 +50,40 @@ function jailPath(requestedPath: string, jail: string): string {
   return resolved;
 }
 
+/** Wrap pi coding tools so all file/process operations stay jailed to the given root directory. */
 function createJailedCodingTools(jail: string) {
   const jailedRead = createReadTool(jail, {
     operations: {
-      readFile: async (p) => { jailPath(p, jail); return readFile(p); },
-      access: async (p) => { jailPath(p, jail); await access(p, constants.R_OK); },
+      readFile: async (p) => { const r = jailPath(p, jail); return readFile(r); },
+      access: async (p) => { const r = jailPath(p, jail); await access(r, constants.R_OK); },
     },
   });
 
   const jailedWrite = createWriteTool(jail, {
     operations: {
-      writeFile: async (p, content) => { jailPath(p, jail); await writeFile(p, content, "utf8"); },
-      mkdir: async (dir) => { jailPath(dir, jail); await mkdir(dir, { recursive: true }); },
+      writeFile: async (p, content) => { const r = jailPath(p, jail); await writeFile(r, content, "utf8"); },
+      mkdir: async (dir) => { const r = jailPath(dir, jail); await mkdir(r, { recursive: true }); },
     },
   });
 
   const jailedEdit = createEditTool(jail, {
     operations: {
-      readFile: async (p) => { jailPath(p, jail); return readFile(p); },
-      writeFile: async (p, content) => { jailPath(p, jail); await writeFile(p, content, "utf8"); },
-      access: async (p) => { jailPath(p, jail); await access(p, constants.R_OK | constants.W_OK); },
+      readFile: async (p) => { const r = jailPath(p, jail); return readFile(r); },
+      writeFile: async (p, content) => { const r = jailPath(p, jail); await writeFile(r, content, "utf8"); },
+      access: async (p) => { const r = jailPath(p, jail); await access(r, constants.R_OK | constants.W_OK); },
     },
   });
 
   const jailedBash = createBashTool(jail, {
     spawnHook: (ctx) => {
-      // Force cwd inside jail
+      // Force cwd inside jail using the same boundary check as jailPath
       const cwd = ctx.cwd ?? jail;
-      const jailedCwd = cwd.startsWith(jail) ? cwd : jail;
+      let jailedCwd: string;
+      try {
+        jailedCwd = jailPath(cwd, jail);
+      } catch {
+        jailedCwd = jail;
+      }
       return { ...ctx, cwd: jailedCwd };
     },
   });
@@ -98,6 +104,7 @@ function shortenPath(p: string): string {
   return p;
 }
 
+/** Format a tool invocation into a compact one-line summary for the visible chat transcript. */
 function formatToolCall(name: string, args: Record<string, unknown>): string {
   switch (name) {
     case "read": return `read ${shortenPath(String(args.path || ""))}${args.offset ? `:${args.offset}` : ""}`;
@@ -128,6 +135,16 @@ function formatToolCall(name: string, args: Record<string, unknown>): string {
     case "tui_web_search": return `search "${String(args.query || "").slice(0, 50)}"${args.num_results ? ` (${args.num_results})` : ""}${args.freshness ? ` [${args.freshness}]` : ""}`;
     case "tui_web_content": return `fetch ${String(args.url || "").slice(0, 60)}`;
     case "tui_youtube_transcript": return `yt_transcript ${String(args.video || "").slice(0, 50)}`;
+    case "play_music": {
+      if (args.action === "stop") return "♫ player stop";
+      if (args.action === "open_window") {
+        const label = typeof args.filePath === "string" ? ` ${nodePath.basename(args.filePath)}` : "";
+        return `♫ open Music Player window${label}`;
+      }
+      const label = typeof args.filePath === "string" ? nodePath.basename(args.filePath) : "(no file)";
+      return `♫ player play ${label}`;
+    }
+    case "list_music": return "♫ list tracks";
     default: {
       const j = JSON.stringify(args);
       return `${name}(${j.length > 50 ? j.slice(0, 47) + "..." : j})`;
@@ -135,6 +152,7 @@ function formatToolCall(name: string, args: Record<string, unknown>): string {
   }
 }
 
+/** Format a tool result into a truncated text summary for the visible chat transcript. */
 function formatToolResult(result: { content?: Array<{ type?: string; text?: string }> }): string {
   if (!result?.content) return "";
   const text = result.content
@@ -193,6 +211,7 @@ interface AgentSnapshot {
 
 type Listener = (snapshot: AgentSnapshot) => void;
 
+/** Load prompt fragments from modules-private/wibwob-prompts/*.md, sorted by filename. Falls back to legacy single-file path. */
 function loadBasePrompt(): string {
   // Load all .md files from the wibwob-prompts module, sorted by filename.
   // This lets identity.md and other fragments live alongside the machinery file
@@ -220,18 +239,17 @@ function loadBasePrompt(): string {
   }
 }
 
-/** Sender info appended to outbound messages so recipients can reply via the control API */
-const TUI_AGENT_SENDER_INFO = JSON.stringify({
-  sessionName: "wibwob-tui",
-  replyVia: "POST http://127.0.0.1:8099/windows/agent-message",
-  windowId: 3,
-});
-
-function withSenderInfo(message: string): string {
-  return `${message}\n\n<sender_info>${TUI_AGENT_SENDER_INFO}</sender_info>`;
+/** Build sender info with the actual agent window id so replies route correctly. */
+function buildSenderInfo(windowId: number): string {
+  return JSON.stringify({
+    sessionName: "wibwob-tui",
+    replyVia: "POST http://127.0.0.1:8099/windows/agent-message",
+    windowId,
+  });
 }
 
-function createPiSessionTools() {
+/** Create tools for cross-session communication: list_sessions, send_to_session, get_session_message. */
+function createPiSessionTools(appendSenderInfo: (message: string) => string) {
   return [
     {
       name: "list_sessions",
@@ -258,7 +276,7 @@ function createPiSessionTools() {
       async execute(_toolCallId: string, params: { sessionName?: string; sessionId?: string; message: string; mode?: "steer" | "follow_up" }) {
         const target = params.sessionName ?? params.sessionId;
         if (!target) return { content: [{ type: "text" as const, text: "Provide sessionName or sessionId" }], isError: true, details: undefined };
-        const result = await sendToSession(target, withSenderInfo(params.message), params.mode ?? "steer");
+        const result = await sendToSession(target, appendSenderInfo(params.message), params.mode ?? "steer");
         return { content: [{ type: "text" as const, text: result.ok ? `Message delivered to ${target}` : `Failed: ${result.error}` }], details: result };
       },
     },
@@ -280,6 +298,93 @@ function createPiSessionTools() {
   ];
 }
 
+/** Create play_music and list_music tools backed by the shared AudioPlayerController singleton. */
+function createMusicTools(runCommand: TuiToolContext["runCommand"]) {
+  return [
+    {
+      name: "play_music",
+      label: "Play Music",
+      description:
+        "Play an audio file from scratch/compositions in the background via ffplay, stop current playback, " +
+        "or open the full TUI Music Player window. " +
+        "Use list_music first to see available tracks. " +
+        "Use action=open_window to open the graphical Music Player instead of inline playback.",
+      parameters: Type.Object({
+        action: Type.Union(
+          [Type.Literal("play"), Type.Literal("stop"), Type.Literal("open_window")],
+          { description: "play inline, stop current playback, or open_window to open the TUI Music Player" }
+        ),
+        filePath: Type.Optional(
+          Type.String({
+            description: "Filename or path relative to scratch/compositions. Used for action=play (inline) or action=open_window (auto-loads the track).",
+          })
+        ),
+      }),
+      async execute(_toolCallId: string, params: { action: "play" | "stop" | "open_window"; filePath?: string }) {
+        if (params.action === "open_window") {
+          const args: Record<string, unknown> = {};
+          if (params.filePath?.trim()) args.filePath = params.filePath.trim();
+          const result = runCommand("music-player.open", args);
+          if (!result.ok) {
+            return { isError: true, content: [{ type: "text" as const, text: `Could not open Music Player: ${result.error}` }], details: { error: result.error } };
+          }
+          const trackNote = params.filePath ? ` Loading: ${nodePath.basename(params.filePath)}` : "";
+          return { content: [{ type: "text" as const, text: `Music Player window opened.${trackNote}` }], details: { action: "open_window", filePath: params.filePath } };
+        }
+
+        if (params.action === "stop") {
+          const snap = await sharedPlayer.stop();
+          const text = snap.fileName && snap.fileName !== "(no file)"
+            ? `Stopped. (was playing: ${snap.fileName})`
+            : "Stopped.";
+          return { content: [{ type: "text" as const, text }], details: { action: "stop", ...snap } };
+        }
+
+        if (!params.filePath?.trim()) {
+          return {
+            isError: true,
+            content: [{ type: "text" as const, text: "filePath is required for action=play." }],
+            details: { error: "filePath required" },
+          };
+        }
+
+        try {
+          const snap = await sharedPlayer.playFile(params.filePath);
+          const duration = snap.duration > 0 ? ` (${fmtTime(snap.duration)})` : "";
+          return {
+            content: [{ type: "text" as const, text: `Playing ${snap.fileName}${duration}` }],
+            details: { action: "play", state: snap.state, fileName: snap.fileName, filePath: snap.filePath, volume: snap.volume },
+          };
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          return { isError: true, content: [{ type: "text" as const, text: message }], details: { error: message } };
+        }
+      },
+    },
+    {
+      name: "list_music",
+      label: "List Music Tracks",
+      description: "List available audio files in scratch/compositions.",
+      parameters: Type.Object({}),
+      async execute(_toolCallId: string, _params: Record<string, never>) {
+        const files = findAudioFiles(COMPOSITIONS_DIR);
+        if (files.length === 0) {
+          return { content: [{ type: "text" as const, text: "No audio files found in scratch/compositions." }], details: [] };
+        }
+        const snap = sharedPlayer.getSnapshot();
+        const lines = files.map((f, i) => {
+          const playing = f === snap.fileName && snap.state !== "stopped" ? ` [${snap.state}]` : "";
+          return `${i + 1}. ${f}${playing}`;
+        });
+        return {
+          content: [{ type: "text" as const, text: `Tracks in scratch/compositions:\n${lines.join("\n")}` }],
+          details: files,
+        };
+      },
+    },
+  ];
+}
+
 function loadAgentSystemPrompt(): string {
   return [
     loadBasePrompt(),
@@ -294,6 +399,7 @@ function loadAgentSystemPrompt(): string {
     "Use low-level TUI tools like tui_open_window, tui_move_window, tui_send_input, tui_read_window, or tui_editor_write only when you need precise control that the registry does not expose.",
     "Use read, write, edit, bash for file operations — no need to use the terminal for these.",
     "You can open terminals, run commands, open primers, arrange windows.",
+    "You have play_music and list_music tools for audio playback from scratch/compositions.",
   ].join("\n");
 }
 
@@ -310,6 +416,7 @@ function loadChatSystemPrompt(): string {
   return lines.join("\n").trim() || "You are Wib & Wob, a two-voice assistant. Keep replies concise and helpful.";
 }
 
+/** Pick the best available model. Prefers Anthropic Sonnet, then Opus, then OpenAI, then Google. */
 function resolveModel(params: {
   modelRegistry: ModelRegistry;
   settingsManager: SettingsManager;
@@ -329,6 +436,7 @@ function resolveModel(params: {
   return { model: available[0], thinkingLevel: defaultThinking ?? ("off" as const) };
 }
 
+/** Native agent/chat session. Supports "agent" (TUI + coding tools) and "chat" (tools stripped) modes. */
 export class WibWobAgentSession {
   private readonly listeners = new Set<Listener>();
   private messages: ChatMessageEntry[] = [];
@@ -341,6 +449,7 @@ export class WibWobAgentSession {
   private readonly sessionId = createMessageId("wibwob-agent");
   private resumeMessages?: AgentMessage[];
   private sessionServer?: SessionServerHandle;
+  private senderInfo = buildSenderInfo(0);
 
   readonly mode: "agent" | "chat";
 
@@ -352,6 +461,17 @@ export class WibWobAgentSession {
     this.mode = mode;
   }
 
+  /** Update the window id used in outbound sender info for session routing. */
+  setWindowId(id: number): void {
+    this.senderInfo = buildSenderInfo(id);
+  }
+
+  /** Append sender info to an outbound message so recipients can reply via the control API. */
+  private withSenderInfo(message: string): string {
+    return `${message}\n\n<sender_info>${this.senderInfo}</sender_info>`;
+  }
+
+  /** Build the underlying Agent, choose model, inject tools/context, and start the session-control server. */
   async initialize(): Promise<void> {
     if (this.agent) return;
 
@@ -371,7 +491,7 @@ export class WibWobAgentSession {
       }
 
       const tools = this.mode === "agent" && this.tuiContext
-        ? [...createTuiTools(this.tuiContext), ...createJailedCodingTools(REPO_ROOT), ...createPiSessionTools()]
+        ? [...createTuiTools(this.tuiContext), ...createJailedCodingTools(REPO_ROOT), ...createPiSessionTools((msg) => this.withSenderInfo(msg)), ...createMusicTools(this.tuiContext.runCommand)]
         : [];
 
       const systemPrompt = this.mode === "agent"
@@ -535,6 +655,7 @@ export class WibWobAgentSession {
     this.emit();
   }
 
+  /** Enqueue a user message, create an optimistic assistant placeholder, and stream the response. */
   async send(text: string, sender?: string): Promise<void> {
     const msg = text.trim();
     if (!msg) return;
@@ -609,6 +730,7 @@ export class WibWobAgentSession {
       : undefined;
   }
 
+  /** Translate low-level agent events into chat transcript entries and visible session status. */
   private handleEvent(event: import("@mariozechner/pi-agent-core").AgentEvent): void {
     switch (event.type) {
       case "message_start": {

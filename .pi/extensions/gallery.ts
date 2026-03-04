@@ -16,7 +16,7 @@ import { matchesKey, truncateToWidth, visibleWidth } from "@mariozechner/pi-tui"
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-const PRIMERS_DIR = path.join(process.cwd(), "modules-private/wibwobworld/primers");
+const PRIMERS_DIR = path.join(process.cwd(), "modules-private/wibwob-primers/primers");
 
 /** Read the first frame of a primer (stops at ---- delimiter). */
 function readPrimer(filePath: string): string[] {

@@ -8,7 +8,7 @@ Low drone bed. Metallic noise hits on word reveals. Silence between.
 Key: atonal / E pedal. The machine hums. The crow interrupts.
 """
 import sys, numpy as np
-sys.path.insert(0, "/Users/james/.claude/skills/chiptune-bricks/scripts")
+sys.path.insert(0, "/Users/james/.claude/skills/chiptune-studio/scripts")
 from bricks import osc, fx, theory, canvas, patterns
 
 SR = 22050

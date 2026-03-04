@@ -18,6 +18,7 @@ import type { Box, ChatMessageEntry } from "../core/types.js";
 import type { WindowManager } from "../core/window-manager.js";
 import { listLocalSessions, type LocalSessionInfo } from "../services/pi-session-bridge.js";
 import type { WibWobAgentSession } from "../services/wibwob-agent-session.js";
+import { sharedPlayer, fmtTime } from "../services/audio-player-controller.js";
 
 function escapeTagBraces(text: string): string {
   // Escape { and } that aren't blessed tags so they don't break rendering
@@ -164,6 +165,7 @@ export function openWibWobAgentWindow(params: {
   agent: WibWobAgentSession;
   title?: string;
   initialPos?: { top: number; left: number; width: number; height: number };
+  onStateChanged?: () => void;
 }): void {
   const frame = params.windowManager.createFrame(params.title ?? "Wib&Wob Agent", "chat");
   let lastSessionList: LocalSessionInfo[] | undefined;
@@ -224,8 +226,83 @@ export function openWibWobAgentWindow(params: {
     style: theme().input,
   });
 
+  // ── Inline player bar ──────────────────────────────────────────────────────
+  // A 1-row strip that appears above the status line whenever audio is playing
+  // or paused. Subscribes directly to sharedPlayer for live second-by-second
+  // updates, independent of the agent turn cycle.
+
+  const playerBar = blessed.box({
+    parent: frame.body,
+    bottom: 2,   // above statusLine; adjusted by renderPlayerBarLayout()
+    left: 0,
+    right: 0,
+    height: 0,   // hidden until something is playing
+    tags: true,
+    mouse: true,
+    clickable: true,
+    style: { fg: "#57c7ff", bg: "#1a1a2e" },
+  });
+
+  // Click anywhere on the player bar to toggle play/pause
+  playerBar.on("click", () => {
+    sharedPlayer.togglePause().then(() => renderPlayerBar());
+  });
+
+  // Track whether bar is currently visible so we avoid redundant layout thrash
+  let playerBarVisible = false;
+
+  const renderPlayerBar = () => {
+    const snap = sharedPlayer.getSnapshot();
+    const active = snap.state !== "stopped";
+
+    if (active !== playerBarVisible) {
+      playerBarVisible = active;
+      // Re-run layout with current input height so stack stays consistent
+      renderLayout(Math.max(1, Number(input.height) || 1));
+    }
+
+    if (!active) {
+      playerBar.setContent("");
+      params.screen.render();
+      return;
+    }
+
+    const w = Math.max(20, Number(playerBar.width) || 60);
+    const icon = snap.state === "playing" ? `{${C.lime}-fg}▶{/${C.lime}-fg}` : `{#f5a623-fg}⏸{/#f5a623-fg}`;
+    const name = snap.fileName.length > 24 ? snap.fileName.slice(0, 21) + "…" : snap.fileName;
+    const timeStr = `${fmtTime(snap.elapsed)}/${fmtTime(snap.duration)}`;
+    const volStr = `${snap.volume}%`;
+    // Reserve space: icon(1) + sp(1) + name(25) + sp(1) + time(11) + sp(1) + vol(4) + sp(1) = ~45
+    const fixedLen = 1 + 1 + 25 + 1 + 11 + 1 + 4 + 2;
+    const barWidth = Math.max(4, w - fixedLen);
+    const ratio = snap.duration > 0 ? Math.min(snap.elapsed / snap.duration, 1) : 0;
+    const filled = Math.round(ratio * barWidth);
+    const bar = `{${C.blue}-fg}${"▪".repeat(filled)}{/${C.blue}-fg}{${C.muted}-fg}${"·".repeat(barWidth - filled)}{/${C.muted}-fg}`;
+
+    playerBar.setContent(
+      ` ${icon} {${C.gray}-fg}${name}{/${C.gray}-fg} ${bar} {${C.muted}-fg}${timeStr}  ${volStr}{/${C.muted}-fg}`
+    );
+    params.screen.render();
+  };
+
+  const unsubscribePlayer = sharedPlayer.subscribe(renderPlayerBar);
+
+  // ── Input rendering ─────────────────────────────────────────────────────────
+
   let draft = "";
   const MAX_INPUT_ROWS = 6;
+
+  // Single source of truth for the vertical layout stack (from bottom up):
+  //   input (inputRows)  →  statusLine (1)  →  playerBar (0 or 1)  →  transcript
+  const renderLayout = (inputRows: number) => {
+    const barRows = playerBarVisible ? 1 : 0;
+    input.height = inputRows;
+    input.bottom = 0;
+    statusLine.bottom = inputRows;
+    playerBar.bottom = inputRows + 1;
+    playerBar.height = barRows;
+    transcript.bottom = inputRows + 1 + barRows;
+  };
 
   const renderInput = () => {
     const width = Math.max(1, Number(input.width) || 1);
@@ -239,13 +316,7 @@ export function openWibWobAgentWindow(params: {
     }
 
     const inputRows = Math.min(MAX_INPUT_ROWS, Math.max(1, rows.length));
-
-    // Resize input and push transcript bottom up to match
-    input.height = inputRows;
-    input.bottom = 0;
-    statusLine.bottom = inputRows;
-    transcript.bottom = inputRows + 1;
-
+    renderLayout(inputRows);
     input.setContent(rows.join("\n"));
   };
 
@@ -329,8 +400,13 @@ export function openWibWobAgentWindow(params: {
     infoBar.on("click", (mouse) => {
       const clickX = (mouse as unknown as { x: number }).x;
       if (clickX < 14) {
-        // Open the Claude Code log in a text editor window
+        // Open the Claude Code log in a read-only viewer
         const edWin = params.windowManager.createFrame(path.basename(claudeJsonl), "editor");
+        edWin.describeState = () => ({
+          appType: "text-editor" as const,
+          summary: `Viewing ${path.basename(claudeJsonl)}`,
+          filePath: claudeJsonl,
+        });
         try {
           const content = fs.readFileSync(claudeJsonl, "utf-8");
           edWin.body.setContent(content);
@@ -350,6 +426,7 @@ export function openWibWobAgentWindow(params: {
     transcript.setScrollPerc(100);
     statusLine.setContent(` ${snapshot.status}`);
     renderInfoBar(snapshot.model ?? "—", snapshot.sessionId ?? "");
+    params.onStateChanged?.();
     params.screen.render();
   });
 
@@ -365,6 +442,7 @@ export function openWibWobAgentWindow(params: {
         params.screen.render();
         // Close this window WITHOUT disposing the agent, then reopen with same session
         unsubscribe();
+        unsubscribePlayer();
         frame.cleanup = undefined; // prevent dispose on close
         const pos = {
           top: Number(frame.frame.top),
@@ -454,6 +532,7 @@ export function openWibWobAgentWindow(params: {
 
   frame.cleanup = () => {
     unsubscribe();
+    unsubscribePlayer();
     params.agent.dispose();
   };
   // NOTE: on /reload we set frame.cleanup = undefined before calling frame.close()
@@ -472,9 +551,11 @@ export function openWibWobAgentWindow(params: {
     safeSetStyle(transcript, theme().agentBg);
     statusLine.style = theme().warning;
     input.style = theme().input;
+    // playerBar keeps its own fixed dark style
   };
 
   params.windowManager.registerWindow(frame);
+  params.agent.setWindowId(frame.id);
   armInput();
 
   // Initialize agent (starts model, registers tools)

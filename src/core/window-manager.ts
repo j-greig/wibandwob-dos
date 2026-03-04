@@ -234,6 +234,11 @@ export class WindowManager implements WindowFacade {
 
   /** Insert a fully wired record into the managed stack, sync shadow/z-order, and focus it. */
   registerWindow(record: WindowRecord): void {
+    if (!record.describeState) {
+      // Contract: every registered user-visible window should expose semantic state.
+      // This warning catches drift early. Target: make describeState mandatory.
+      console.warn(`[window-manager] Window "${record.title}" (kind=${record.kind}) registered without describeState`);
+    }
     this.windows.push(record);
     this.syncShadow(record);
     this.onChange?.();
@@ -621,6 +626,7 @@ export class WindowManager implements WindowFacade {
       record.frame.width = Math.min(b.width, sw);
       record.frame.height = Math.min(b.height, sh);
       record.savedBounds = undefined;
+      if (record.shadow) record.shadow.show();
     } else {
       // Maximize
       const w = Number(this.screen.width);

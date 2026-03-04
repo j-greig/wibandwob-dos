@@ -135,4 +135,4 @@ tail + 3.5s fade-out lets the final resolve ring and die naturally.
 - `noise_breath()`: used `burst_rate` kwarg which doesn't exist. Correct params: `n_breaths`, `dur_range`, `cutoff`
 - `sparkle()`: used `density` kwarg which doesn't exist. Correct params: `start_t`, `dur`, `spacing`
 
-Always check `chiptune-bricks/references/pattern-catalog.md` for exact function signatures.
+Always check `chiptune-studio/references/pattern-catalog.md` for exact function signatures.

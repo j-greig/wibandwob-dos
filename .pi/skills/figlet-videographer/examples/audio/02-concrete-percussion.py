@@ -7,7 +7,7 @@ crow light machine — v2: CONCRETE PERCUSSION
 No melody. Just impacts and textures. Like field recordings from inside the ledge.
 """
 import sys, numpy as np
-sys.path.insert(0, "/Users/james/.claude/skills/chiptune-bricks/scripts")
+sys.path.insert(0, "/Users/james/.claude/skills/chiptune-studio/scripts")
 from bricks import osc, fx, theory, canvas, patterns
 
 SR = 22050

@@ -34,7 +34,8 @@ export function openBackroomsLogBrowserWindow(context: BackroomsWindowContext): 
     },
     onSaveSnippet: (title, content) => {
       context.openEditorWindow(undefined, title, content);
-    }
+    },
+    onStateChanged: () => context.syncState(),
   });
 }
 

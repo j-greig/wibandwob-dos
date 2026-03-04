@@ -2,20 +2,20 @@
 name: chiptune-cover
 description: |
   Convert well-known melodies, themes, and scores into chiptune arrangements using
-  chiptune-bricks. Takes a song reference (title, artist, or melody description),
+  chiptune-studio. Takes a song reference (title, artist, or melody description),
   researches key/tempo/notes, makes creative arrangement decisions per scene or section,
-  and outputs a composed WAV via chiptune-bricks synthesis. Use when: user asks to
+  and outputs a composed WAV via chiptune-studio synthesis. Use when: user asks to
   "make a chiptune version of [song]", "cover [track] in 8-bit", "arrange [theme]
   for chiptune", "do a chiptune [song name]", or references any well-known melody
-  that should be rendered through the chiptune-bricks toolkit. Also triggers on:
+  that should be rendered through the chiptune-studio toolkit. Also triggers on:
   "soundtrack this with [song]", "score this video with a chiptune [reference]".
 ---
 
 # Chiptune Cover
 
-Arrange well-known melodies as chiptune compositions via chiptune-bricks.
+Arrange well-known melodies as chiptune compositions via chiptune-studio.
 
-**Prerequisite skill:** `chiptune-bricks` (synthesis toolkit). This skill handles the
+**Prerequisite skill:** `chiptune-studio` (synthesis toolkit). This skill handles the
 creative arrangement process. Chiptune-bricks handles the sound.
 
 ## Process
@@ -98,7 +98,7 @@ Original: [composer]. Chiptune-covering with love.
 
 import sys
 import numpy as np
-sys.path.insert(0, "~/Repos/symbient-skills/skills/chiptune-bricks/scripts")
+sys.path.insert(0, "~/Repos/symbient-skills/skills/chiptune-studio/scripts")
 
 from bricks import *
 from bricks.osc import sine, square, sawtooth, triangle, noise, silence, pad

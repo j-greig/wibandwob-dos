@@ -8,7 +8,7 @@ Garage-influenced tempo (138bpm). The crow has swagger. Light pulses.
 The machine tries to keep up but stutters. E Phrygian for that dark edge.
 """
 import sys, numpy as np
-sys.path.insert(0, "/Users/james/.claude/skills/chiptune-bricks/scripts")
+sys.path.insert(0, "/Users/james/.claude/skills/chiptune-studio/scripts")
 from bricks import osc, fx, theory, canvas, patterns
 
 SR = 22050

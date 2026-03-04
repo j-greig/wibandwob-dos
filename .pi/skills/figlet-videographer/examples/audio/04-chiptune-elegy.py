@@ -8,7 +8,7 @@ E minor pentatonic melody. Slow, deliberate. The crow's song is mournful.
 Light enters as arpeggiated chords. The machine is a broken music box.
 """
 import sys, numpy as np
-sys.path.insert(0, "/Users/james/.claude/skills/chiptune-bricks/scripts")
+sys.path.insert(0, "/Users/james/.claude/skills/chiptune-studio/scripts")
 from bricks import osc, fx, theory, canvas, patterns
 
 SR = 22050

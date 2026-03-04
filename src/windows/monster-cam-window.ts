@@ -20,6 +20,7 @@ function grayToChar(g: number): string {
 interface Deps {
   screen: blessed.Widgets.Screen;
   windowManager: WindowManager;
+  onStateChanged?: () => void;
 }
 
 export function openMonsterCamWindow(deps: Deps): void {
@@ -76,6 +77,7 @@ export function openMonsterCamWindow(deps: Deps): void {
   const toggleBg = () => {
     showBg = !showBg;
     bgBtn.setContent(showBg ? " [B] BG on " : " [B] BG off");
+    deps.onStateChanged?.();
     screen.render();
   };
 
@@ -91,6 +93,7 @@ export function openMonsterCamWindow(deps: Deps): void {
     hasPose   = f.hasPose;
     fps       = f.fps;
     if (f.hasFace) lastBbox = f.bbox;
+    deps.onStateChanged?.();
 
     const w    = Math.max(1, Number(canvas.width));
     const h    = Math.max(1, Number(canvas.height));

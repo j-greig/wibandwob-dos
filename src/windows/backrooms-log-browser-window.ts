@@ -61,6 +61,7 @@ export function openBackroomsLogBrowserWindow(params: {
   logsDir: string;
   onOpenReplay: (logPath: string, theme: string) => void;
   onSaveSnippet: (title: string, content: string) => void;
+  onStateChanged?: () => void;
 }): void {
   const frame = params.windowManager.createFrame("Backrooms Logs", "browser");
 
@@ -160,6 +161,7 @@ export function openBackroomsLogBrowserWindow(params: {
     if (entries.length > 0) {
       list.select(Math.min(selectedIndex, entries.length - 1));
     }
+    params.onStateChanged?.();
     params.screen.render();
   }
 
@@ -211,6 +213,7 @@ export function openBackroomsLogBrowserWindow(params: {
     saveScrollPos();
     selectedIndex = index;
     loadPreview();
+    params.onStateChanged?.();
   });
 
   // Keybindings

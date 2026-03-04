@@ -78,16 +78,25 @@ export function saveEditorWindow(params: {
       (value) => params.content.completePath(value),
       (value) => {
         const resolved = value.startsWith("~") ? path.join(os.homedir(), value.slice(1)) : value;
+        // Stage the new path/title — only commit after successful write
+        const oldPath = params.window.filePath;
+        const oldTitle = params.window.title;
         params.window.filePath = resolved;
         params.window.title = path.basename(resolved);
-        writeEditorWindow(params.window);
-        params.onWritten();
+        if (writeEditorWindow(params.window)) {
+          params.onWritten();
+        } else {
+          // Roll back on failure
+          params.window.filePath = oldPath;
+          params.window.title = oldTitle;
+        }
       }
     );
     return;
   }
-  writeEditorWindow(params.window);
-  params.onWritten();
+  if (writeEditorWindow(params.window)) {
+    params.onWritten();
+  }
 }
 
 function writeEditorWindow(window: WindowRecord): boolean {
