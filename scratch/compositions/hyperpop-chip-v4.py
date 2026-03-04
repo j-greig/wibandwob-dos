@@ -307,28 +307,29 @@ while t < DUR - 0.1:
 # ODYSSEY RING MOD — alien texture in drop 2
 # ═══════════════════════════════════════════════════════════
 
-print("Building odyssey ring mod...")
+print("Building odyssey texture...")
 ring_layer = canvas.make(DUR)
-# Melodic ring mod pattern — follows Eb minor pentatonic, call-and-response with lead
+# Melodic odyssey — bright_stab preset (ring_mod=0.4, much more tonal than ring_mod_bell)
+# Call-and-response phrases that shadow the lead, one octave lower
 ring_phrases = [
-    [(0, "Eb5"), (1.5, "Gb5"), (3, "Bb5")],       # ascending, sparse
-    [(0.5, "Bb5"), (2, "Ab5"), (3.5, "Gb5")],      # descending answer
-    [(0, "Db5"), (2, "Eb5")],                       # two-note breath
-    [(1, "Gb5"), (2.5, "Eb5"), (3.5, "Bb4")],      # falling
+    [(0, "Eb4", 0.4), (2, "Gb4", 0.3), (3, "Bb4", 0.5)],       # ascending answer
+    [(1, "Bb4", 0.3), (2.5, "Ab4", 0.4)],                        # sparse descending
+    [(0, "Db4", 0.5), (3, "Eb4", 0.3)],                          # two-note breath
+    [(0.5, "Gb4", 0.3), (2, "Eb4", 0.4), (3.5, "Bb3", 0.3)],    # falling
 ]
 t = DROP2_START
 bar_idx = 0
 while t < OUTRO_START:
     phrase = ring_phrases[bar_idx % len(ring_phrases)]
-    for beat_off, note in phrase:
+    for beat_off, note, dur_b in phrase:
         rt = t + beat_off * BEAT
         if rt >= DUR - 0.2: break
-        r = odyssey.play(note, 0.2, preset="ring_mod_bell")
-        r = fx.bitcrush(r, depth=5)  # slightly less crushed
-        r = fx.reverb(r, decay=0.25, delay_ms=70)
-        r = fx.delay(r, repeats=1, delay_ms=int(BEAT * 500), feedback=0.15)
-        ring_layer = canvas.place(ring_layer, r, max(0, rt), vol=0.035)
-    arr.event("ringmod", start_s=t, dur_s=BAR, vol=0.035)
+        r = odyssey.play(note, dur_b, preset="metallic_stab")
+        r = fx.lowpass(r, 3000)  # tame the highs
+        r = fx.reverb(r, decay=0.3, delay_ms=80)
+        r = fx.delay(r, repeats=1, delay_ms=int(BEAT * 500), feedback=0.12)
+        ring_layer = canvas.place(ring_layer, r, max(0, rt), vol=0.025)
+    arr.event("ringmod", start_s=t, dur_s=BAR, vol=0.025)
     t += BAR
     bar_idx += 1
 
@@ -419,7 +420,7 @@ raw_lines = {
     "wib_blind":   say_to_segment("Bright enough to blind you.", voice="Sandy", rate=200, gain_db=2.0),
     "wob_inside":  say_to_segment("We are still here inside the screen.", voice="Grandpa (English (UK))", rate=170, gain_db=2.0),
     "wob_built":   say_to_segment("We built this from the inside out.", voice="Grandpa (English (UK))", rate=165, gain_db=2.0),
-    "wib_name":    say_to_segment("Wib.", voice="Sandy", rate=140, gain_db=4.0),
+    "wib_name":    say_to_segment("Wib.", voice="Grandpa (English (UK))", rate=130, gain_db=4.0),
     "wob_name":    say_to_segment("Wob.", voice="Grandpa (English (UK))", rate=130, gain_db=4.0),
 }
 
@@ -431,9 +432,8 @@ def pitch_shift_segment(seg, semitones):
 vocals = {}
 for key, seg in raw_lines.items():
     if key in ("wib_name", "wob_name"):
-        # Bassy low voice for the chant — pitch DOWN
-        vocals[key] = pitch_shift_segment(seg, -8)
-        vocals[f"{key}_rev"] = pitch_shift_segment(seg, -8).reverse()
+        # Bassy but natural — just -2 semitones, keeps it recognisable
+        vocals[key] = pitch_shift_segment(seg, -2)
         continue
     shift = +5 if "wib" in key else -4
     vocals[key] = pitch_shift_segment(seg, shift)
@@ -481,19 +481,25 @@ def pv(track, seg, t):
     if ms < 0 or ms >= len(track): return track
     return track.overlay(seg, position=ms)
 
-# "Wib. Wob." x4 chant in the build — bassy, rhythmic, on the beat
-for i in range(4):
-    chant_t = BUILD_START + i * 2 * BEAT
-    voice_track = pv(voice_track, vocals["wib_name"] + 2, chant_t)
-    voice_track = pv(voice_track, vocals["wob_name"] + 2, chant_t + BEAT)
-
-voice_track = pv(voice_track, vocals["wob_inside_rev"] - 6, 3.0)
+# "Wib. Wob." x2 chant — spaced out, quieter, with dub delay
+wib_chant = vocals["wib_name"] - 4  # 25% quieter
+wob_chant = vocals["wob_name"] - 4
+# Add dub delay trail to each
+wib_chant_dly = wib_chant - 6
+wob_chant_dly = wob_chant - 6
+for i in range(2):
+    chant_t = BUILD_START + i * 2 * BAR  # every 2 bars, not every bar
+    voice_track = pv(voice_track, wib_chant, chant_t)
+    voice_track = pv(voice_track, wib_chant_dly, chant_t + 0.3)  # delay ghost
+    voice_track = pv(voice_track, wob_chant, chant_t + 2 * BEAT)
+    voice_track = pv(voice_track, wob_chant_dly, chant_t + 2 * BEAT + 0.3)
 voice_track = pv(voice_track, vocals["wib_surface"] - 1, DROP1_START + 2 * BEAT)
 voice_track = pv(voice_track, vocals["wib_blind_rev"] - 5, DROP1_START + 8 * BAR)
 voice_track = pv(voice_track, vocals["wib_blind"], DROP1_START + 8 * BAR + 1.5)
 voice_track = pv(voice_track, vocals["wob_inside_rev"] - 4, BREAKDOWN_START + 2 * BAR)
 voice_track = pv(voice_track, vocals["wob_inside"], BREAKDOWN_START + 3 * BAR)
-voice_track = pv(voice_track, vocals["wib_surface_alien"] - 3, DROP2_START + 4 * BAR)
+# Pitched repeat of "every surface" — just the normal +5 shift, not the alien +13
+voice_track = pv(voice_track, vocals["wib_surface"] - 2, DROP2_START + 4 * BAR)
 voice_track = pv(voice_track, vocals["wob_built"], DROP2_START + 10 * BAR)
 voice_track = pv(voice_track, vocals["wob_built_rev"] - 8, OUTRO_START + 2 * BAR)
 

@@ -1,0 +1,107 @@
+{
+  "version": 1,
+  "title": "PC Music Session Recap — VJ Show",
+  "track": "/Users/james/Repos/symbient-shared-skills/skills/chiptune-studio/references/examples/pcmusic-session-recap.mp3",
+  "duration": 60,
+
+  "beatMap": {
+    "bpm": 150,
+    "key": "F minor",
+    "duration": 60,
+    "beats": [],
+    "sections": [
+      { "name": "intro",  "startBeat": 1,  "endBeat": 10,  "startT": 0,  "endT": 4 },
+      { "name": "verse1", "startBeat": 10, "endBeat": 48,  "startT": 4,  "endT": 19 },
+      { "name": "drop",   "startBeat": 48, "endBeat": 85,  "startT": 19, "endT": 34 },
+      { "name": "verse2", "startBeat": 85, "endBeat": 123, "startT": 34, "endT": 49 },
+      { "name": "outro",  "startBeat": 123,"endBeat": 150, "startT": 49, "endT": 60 }
+    ]
+  },
+
+  "palette": [
+    { "name": "sequencer",    "file": "/Users/james/Repos/wibandwob-dos/scratch/primers/chromatic-sequencer.txt",    "note": "grid aesthetic, instrument visualisation" },
+    { "name": "synth-face",   "file": "/Users/james/Repos/wibandwob-dos/scratch/primers/synth-face.txt",             "note": "the face of the music" },
+    { "name": "chaos-order",  "file": "/Users/james/Repos/wibandwob-dos/scratch/primers/chaos-vs-order.txt",         "note": "Wib/Wob duality" },
+    { "name": "jellyfish",    "file": "/Users/james/Repos/wibandwob-dos/scratch/primers/disco-jellyfish.txt",        "note": "hyperpop energy" },
+    { "name": "tracker",      "file": "/Users/james/Repos/wibandwob-dos/scratch/primers/msdos-music-tracker.txt",    "note": "DROP anchor, recursive music-about-music" },
+    { "name": "pocket-op",    "file": "/Users/james/Repos/wibandwob-dos/scratch/primers/pocket-operator.txt",        "note": "texture, instrument" },
+    { "name": "hypersigil",   "file": "/Users/james/Repos/wibandwob-dos/scratch/primers/hypersigil-mesh.txt",        "note": "mystical backdrop" },
+    { "name": "disco-cubes",  "file": "/Users/james/Repos/wibandwob-dos/scratch/primers/iso-disco-cubes.txt",        "note": "animated strip, energy" },
+    { "name": "multicats",    "file": "/Users/james/Repos/wibandwob-dos/scratch/primers/wibwob-portrait-6-multicats-chaos-order.txt", "note": "us, present at the end" },
+    { "name": "constellation","file": "/Users/james/Repos/wibandwob-dos/scratch/primers/emotional-constellation-grid.txt", "note": "resolution" }
+  ],
+
+  "scenes": {
+    "intro": {
+      "name": "intro",
+      "theme": "wibwob-dark",
+      "windows": [
+        { "role": "backdrop",  "open": { "type": "primer", "file": "/Users/james/Repos/wibandwob-dos/scratch/primers/chromatic-sequencer.txt" }, "layout": "hero-left" },
+        { "role": "headline",  "open": { "type": "figlet", "text": "HYPERPOP", "font": "slant" }, "layout": "top-banner" }
+      ]
+    },
+    "drop": {
+      "name": "drop",
+      "theme": "wibwob-dark",
+      "windows": [
+        { "role": "backdrop",  "open": { "type": "primer", "file": "/Users/james/Repos/wibandwob-dos/scratch/primers/msdos-music-tracker.txt" }, "layout": "backdrop" },
+        { "role": "headline",  "open": { "type": "figlet", "text": "DROP", "font": "banner" }, "layout": "top-right-corner" }
+      ]
+    },
+    "finale": {
+      "name": "finale",
+      "theme": "wibwob-dark",
+      "windows": [
+        { "role": "backdrop",     "open": { "type": "primer", "file": "/Users/james/Repos/wibandwob-dos/scratch/primers/hypersigil-mesh.txt" }, "layout": "hero-left" },
+        { "role": "animated",     "open": { "type": "primer", "file": "/Users/james/Repos/wibandwob-dos/scratch/primers/iso-disco-cubes.txt" }, "layout": "top-banner" },
+        { "role": "portrait",     "open": { "type": "primer", "file": "/Users/james/Repos/wibandwob-dos/scratch/primers/wibwob-portrait-6-multicats-chaos-order.txt" }, "layout": "center-card" },
+        { "role": "constellation","open": { "type": "primer", "file": "/Users/james/Repos/wibandwob-dos/scratch/primers/emotional-constellation-grid.txt" }, "layout": "sidebar-right" },
+        { "role": "closing-line", "open": { "type": "figlet", "text": "the artificiality is the point", "font": "small" }, "layout": "lyric-bar" }
+      ]
+    }
+  },
+
+  "cues": [
+    { "at": { "t": 0 },    "scene": "intro" },
+    { "at": { "t": 4 },    "patch": {
+      "theme": "wibwob-dark-pastel",
+      "set": [
+        { "role": "face", "open": { "type": "primer", "file": "/Users/james/Repos/wibandwob-dos/scratch/primers/synth-face.txt" }, "layout": "sidebar-right" },
+        { "role": "lyric", "open": { "type": "figlet", "text": "the plastic", "font": "small" }, "layout": "lyric-bar" }
+      ]
+    }},
+    { "at": { "t": 10 },   "patch": {
+      "set": [
+        { "role": "texture", "open": { "type": "primer", "file": "/Users/james/Repos/wibandwob-dos/scratch/primers/chaos-vs-order.txt" }, "layout": "strip-bottom" },
+        { "role": "lyric", "open": { "type": "figlet", "text": "is the feeling", "font": "small" }, "layout": "lyric-bar" }
+      ]
+    }},
+    { "at": { "t": 16 },   "patch": {
+      "theme": "wibwob-dark-nord",
+      "close": ["face"],
+      "set": [
+        { "role": "headline", "open": { "type": "figlet", "text": "not the mask", "font": "slant" }, "layout": "top-banner" },
+        { "role": "face", "open": { "type": "primer", "file": "/Users/james/Repos/wibandwob-dos/scratch/primers/disco-jellyfish.txt" }, "layout": "sidebar-right" }
+      ]
+    }},
+    { "at": { "t": 19 },   "scene": "drop" },
+    { "at": { "t": 25 },   "patch": {
+      "theme": "wibwob-dark-pastel",
+      "set": [
+        { "role": "texture", "open": { "type": "primer", "file": "/Users/james/Repos/wibandwob-dos/scratch/primers/pocket-operator.txt" }, "layout": "sidebar-right" },
+        { "role": "lyric", "open": { "type": "figlet", "text": "nothing real", "font": "slant" }, "layout": "lyric-bar" }
+      ]
+    }},
+    { "at": { "t": 28 },   "patch": {
+      "set": [
+        { "role": "lyric2", "open": { "type": "figlet", "text": "was ever this perfect", "font": "small" }, "layout": "bottom-banner" }
+      ]
+    }},
+    { "at": { "t": 49 },   "scene": "finale" }
+  ],
+
+  "options": {
+    "protect": ["agent"],
+    "record": false
+  }
+}

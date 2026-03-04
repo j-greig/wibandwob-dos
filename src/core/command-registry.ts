@@ -69,6 +69,24 @@ const LEGACY_COMMAND_ALIASES: Record<string, string> = {
   "help.view_readme": "readme.open",
 };
 
+/**
+ * Returns the value unchanged if it is safely JSON-serialisable (plain object,
+ * array, primitive), otherwise returns undefined. This prevents cyclic-structure
+ * errors when command actions return live window objects.
+ */
+function safeSerializable(value: unknown): unknown {
+  if (value === null || value === undefined) return value;
+  const t = typeof value;
+  if (t === "string" || t === "number" || t === "boolean") return value;
+  if (t !== "object" && t !== "function") return undefined;
+  try {
+    JSON.stringify(value);
+    return value;
+  } catch {
+    return undefined;
+  }
+}
+
 export class CommandRegistry {
   private readonly commands: AppCommandDescriptor[];
   /** Dynamic commands registered by microapp modules at runtime. */
@@ -144,14 +162,14 @@ export class CommandRegistry {
       const action = this.actions[command.actionKey] as (args?: Record<string, unknown>) => unknown;
       const result = action(args);
       log.cmd(`${canonicalId}${argsStr} → ok`);
-      return result === undefined ? { ok: true } : { ok: true, result };
+      return result === undefined ? { ok: true } : { ok: true, result: safeSerializable(result) };
     }
     // Check dynamic commands
     const dyn = this.dynamicCommands.find((candidate) => candidate.id === canonicalId);
     if (dyn) {
       const result = dyn.action(args);
       log.cmd(`${canonicalId}${argsStr} → ok`);
-      return result === undefined ? { ok: true } : { ok: true, result };
+      return result === undefined ? { ok: true } : { ok: true, result: safeSerializable(result) };
     }
     log.cmd(`${canonicalId}${argsStr} → unknown command`);
     return { ok: false, error: `Unknown command: ${id}` };

@@ -18,6 +18,7 @@ export type WindowKind =
   | "pattern"
   | "contour"
   | "terrain-lab"
+  | "plasma"
   | "chat"
   | "companion"
   | "workspace"

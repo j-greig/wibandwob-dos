@@ -6,9 +6,8 @@
     "commands",
     "P2"
   ],
-  "status": "open",
-  "created_at": "2026-03-04T10:15:30.209Z",
-  "assigned_to_session": "5eca286d-13db-4a0d-9155-8c8bc7bd46ce"
+  "status": "closed",
+  "created_at": "2026-03-04T10:15:30.209Z"
 }
 
 Audit commands marked non-API or non-agent.\n\nVerify they are either:\na) truly blocked from those surfaces, or\nb) explicitly documented as invokable-but-undiscoverable\n\nNo silent gaps where a command is discoverable but not invokable, or invokable but not discoverable.\n\nFiles: src/core/command-registry.ts, src/services/control-api.ts\nAcceptance: every command's api/agent flags match actual enforcement behaviour."

@@ -62,6 +62,9 @@ export interface AppMenuActions {
   finderNewFolder: () => void;
   finderRefresh: () => void;
   finderSortBy: (args?: Record<string, unknown>) => void;
+  // ── Plasma ─────────────────────────────────────────────
+  openPlasmaWindow: (args?: Record<string, unknown>) => void;
+  openPlasmaFromPrimer: (args?: Record<string, unknown>) => void;
   // ── Monster Cam ───────────────────────────────────────
   openMonsterCam: () => void;
   // ── Help ──────────────────────────────────────────────
@@ -602,6 +605,30 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     actionKey: "openPatternWindow",
     menuPlacements: [{ category: "applications", order: 80 }],
     palettePlacement: { order: 60 },
+    api: true,
+    agent: true
+  },
+  {
+    id: "plasma.open",
+    label: "Plasma Screensaver",
+    description: "Open animated plasma colour-field screensaver. Args: mood (circuit|void|chaos|aurora|sunset|acid|deep-space|chrome), renderMode (plain|emoji|ansi).",
+    group: "surface",
+    actionKey: "openPlasmaWindow",
+    multiInstance: true,
+    menuPlacements: [{ category: "applications", order: 82 }],
+    palettePlacement: { order: 52 },
+    api: true,
+    agent: true
+  },
+  {
+    id: "plasma.from-primer",
+    label: "Plasma from Primer",
+    description: "Open a plasma screensaver tuned to a primer file's mood. Args: filePath (string). Analyses the text and picks a matching plasma mood.",
+    group: "surface",
+    actionKey: "openPlasmaFromPrimer",
+    multiInstance: true,
+    menuPlacements: [{ category: "applications", order: 83 }],
+    palettePlacement: { order: 53 },
     api: true,
     agent: true
   },
