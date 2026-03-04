@@ -22,6 +22,7 @@ import {
   createContourPlayer,
   terrainNames,
   type ContourPlayer,
+  type ContourMode,
 } from "../../src/services/contour-engine.js";
 
 type ClockMode = "clock" | "sentient";
@@ -340,14 +341,27 @@ async function generatePoem(time: string, voice: Voice): Promise<string | null> 
   }
 }
 
-function createTerrainPlayer(host: MicroappHost): AnimatedPanelPlayer & { setRunning(running: boolean): void } {
+const CONTOUR_MODES: ContourMode[] = ["chaos", "order", "hybrid"];
+
+function createTerrainPlayer(host: MicroappHost): AnimatedPanelPlayer & { setRunning(running: boolean): void; shuffle(): void } {
   let target: UiNode | null = null;
   let player: ContourPlayer | null = null;
   let running = false;
 
+  const randomise = () => {
+    if (!player) return;
+    player.setMode(CONTOUR_MODES[Math.floor(Math.random() * CONTOUR_MODES.length)]);
+    player.setTerrain(Math.floor(Math.random() * terrainNames.length));
+    player.setLevels(3 + Math.floor(Math.random() * 6)); // 3–8
+    player.reroll();
+  };
+
   return {
     attachTarget(nextTarget) {
       target = nextTarget;
+    },
+    shuffle() {
+      randomise();
     },
     setRunning(nextRunning) {
       running = nextRunning;
@@ -365,10 +379,10 @@ function createTerrainPlayer(host: MicroappHost): AnimatedPanelPlayer & { setRun
 
       const t = target;
       player = createContourPlayer({
-        mode: "chaos",
-        seed: Math.floor(Date.now() / 60000), // new terrain each minute
+        mode: CONTOUR_MODES[Math.floor(Math.random() * CONTOUR_MODES.length)],
+        seed: Math.floor(Math.random() * 100000),
         terrainIdx: Math.floor(Math.random() * terrainNames.length),
-        nLevels: 4,
+        nLevels: 3 + Math.floor(Math.random() * 6),
         fps: 8,
         getViewport: () => ({
           width: Number((t as any).width) || 12,
@@ -508,6 +522,10 @@ export default function setup(host: MicroappHost) {
     async function requestPoem() {
       if (generating) {
         return;
+      }
+
+      if (voice === "terrain") {
+        terrainPlayer.shuffle();
       }
 
       generating = true;
