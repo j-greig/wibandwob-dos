@@ -21,6 +21,7 @@ export interface WindowFacade {
   // Geometry
   moveWindow(id: number, left: number, top: number): boolean;
   resizeWindow(id: number, width: number, height: number): boolean;
+  toggleMaximize(id: number): boolean;
   focusWindow(id: number): boolean;
   closeWindow(id: number): boolean;
 

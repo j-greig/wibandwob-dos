@@ -590,7 +590,17 @@ export class WindowManager implements WindowFacade {
     return mouseData.button === "right" || mouseData.button === 2 || mouseData.buttons === "right" || mouseData.buttons === 2;
   }
 
-  toggleMaximize(record: WindowRecord): void {
+  /** WindowFacade: toggleMaximize by id */
+  toggleMaximize(idOrRecord: number | WindowRecord): boolean {
+    const record = typeof idOrRecord === "number"
+      ? this.getWindowById(idOrRecord)
+      : idOrRecord;
+    if (!record) return false;
+    this.toggleMaximizeInternal(record);
+    return true;
+  }
+
+  private toggleMaximizeInternal(record: WindowRecord): void {
     if (record.savedBounds) {
       // Restore — clamp to current desktop bounds
       const b = record.savedBounds;

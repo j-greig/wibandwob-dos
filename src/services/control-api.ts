@@ -79,6 +79,7 @@ const ENDPOINT_CATALOGUE = [
   { method: "POST", path: "/windows/move",                  body: { id: "number", left: "number", top: "number" } },
   { method: "POST", path: "/windows/resize",                body: { id: "number", width: "number", height: "number" } },
   { method: "POST", path: "/windows/close",                 body: { id: "number" } },
+  { method: "POST", path: "/windows/maximize",              body: { id: "number" } },
   { method: "POST", path: "/windows/batch",                 body: { ops: "[{id, x?, y?, w?, h?, close?}]" }, description: "Move/resize/close multiple windows in one request. Applied in order. Returns {ok, results[]}" },
   { method: "POST", path: "/windows/input",                 body: { id: "number", input: "string (trailing \\r submits)" } },
   { method: "POST", path: "/windows/agent-message",         body: { id: "number", text: "string", sender: "string (optional — shows as sender label in agent window)" } },
@@ -342,6 +343,12 @@ export class ControlApiService {
     if (request.method === "POST" && url.pathname === "/windows/close") {
       return Response.json({
         ok: this.handlers.windows.closeWindow(Number((body as any).id)),
+      });
+    }
+
+    if (request.method === "POST" && url.pathname === "/windows/maximize") {
+      return Response.json({
+        ok: this.handlers.windows.toggleMaximize(Number((body as any).id)),
       });
     }
 
