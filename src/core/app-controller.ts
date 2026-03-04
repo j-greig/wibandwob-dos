@@ -619,7 +619,7 @@ export class TsTuiMvpApp {
       startPath: restore?.currentPath ?? REPO_ROOT,
       restore,
       onOpenFile: (filePath) => {
-        this.editor.openWindow(filePath, path.basename(filePath), fs.readFileSync(filePath, "utf8"));
+        this.editor.openFile(filePath);
       },
       onViewFile: (filePath) => {
         const content = fs.readFileSync(filePath, "utf8");

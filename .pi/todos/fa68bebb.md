@@ -6,7 +6,7 @@
     "editor",
     "P1"
   ],
-  "status": "open",
+  "status": "closed",
   "created_at": "2026-03-04T10:15:30.045Z"
 }
 

@@ -570,9 +570,15 @@ export function openWibWobAgentWindow(params: {
   // so the agent session is preserved across the reload.
 
   frame.writeInput = (text: string, sender?: string) => {
-    if (text.trim() === "/new") { params.agent.reset(); return; }
-    if (text.trim().startsWith("/resume")) {
-      runResumeCommand(text.trim().slice("/resume".length));
+    const trimmed = text.trim();
+    if (trimmed === "/new") { params.agent.reset(); return; }
+    if (trimmed === "/session") {
+      const snap = params.agent.getSnapshot();
+      params.agent.pushStatus(`[session] ${snap.sessionId}\n  model: ${snap.model ?? "—"}\n  messages: ${snap.messageCount}\n  log: ${snap.sessionFile ?? "(no log)"}`);
+      return;
+    }
+    if (trimmed.startsWith("/resume")) {
+      runResumeCommand(trimmed.slice("/resume".length));
       return;
     }
     void params.agent.send(text, sender);
