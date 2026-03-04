@@ -531,12 +531,15 @@ export class WibWobAgentSession {
         acc[tool.name] = tool;
         return acc;
       }, {});
-      // Music tools are registered by .pi/extensions/music-player.ts — do NOT
-      // include them here or AgentSession will see duplicate tool names.
+      // Music tools (play_music, list_music) are registered by .pi/extensions/music-player.ts
+      // Session bridge tools (list_sessions, send_to_session) are registered by .pi/extensions/control.ts
+      // Do NOT include them here or AgentSession will see duplicate tool names.
+      // Only TUI tools (tui_*) and get_session_message are unique to customTools.
       const customTools = this.mode === "agent" && this.tuiContext
         ? [
             ...createTuiToolDefinitions(this.tuiContext),
-            ...toToolDefinitionList(piSessionTools),
+            // get_session_message is not in any extension — keep it as custom
+            ...toToolDefinitionList(piSessionTools.filter(t => !["list_sessions", "send_to_session"].includes(t.name))),
           ]
         : [];
       // Activate all tools: jailed coding tools (via baseToolsOverride) + custom tools
