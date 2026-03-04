@@ -529,7 +529,6 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     actionKey: "toggleMaximizeFocused",
     menuPlacements: [{ category: "window", order: 35 }],
     palettePlacement: { order: 25 },
-    contextMenu: { desktop: true, order: 50 },
     api: true,
     agent: true
   },

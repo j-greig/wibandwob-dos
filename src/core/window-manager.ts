@@ -290,6 +290,7 @@ export class WindowManager implements WindowFacade {
     if (!record) {
       return false;
     }
+    this.clearMaximize(record);
     const screenWidth = Number(this.screen.width);
     const screenHeight = Number(this.screen.height);
     const frameWidth = Number(record.frame.width);
@@ -307,6 +308,7 @@ export class WindowManager implements WindowFacade {
     if (!record) {
       return false;
     }
+    this.clearMaximize(record);
     const screenWidth = Number(this.screen.width);
     const screenHeight = Number(this.screen.height);
     const maxWidth = Math.max(24, screenWidth - Number(record.frame.left));
@@ -417,6 +419,7 @@ export class WindowManager implements WindowFacade {
     const cellHeight = Math.max(8, Math.floor(desktopHeight / rows));
 
     for (const [index, window] of this.windows.entries()) {
+      this.clearMaximize(window);
       const column = index % columns;
       const row = Math.floor(index / columns);
       const left = column * cellWidth;
@@ -427,6 +430,7 @@ export class WindowManager implements WindowFacade {
       window.frame.top = Math.max(0, top);
       window.frame.width = Math.max(24, width);
       window.frame.height = Math.max(8, height);
+      this.syncShadow(window);
     }
 
     this.onChange?.();
@@ -439,11 +443,13 @@ export class WindowManager implements WindowFacade {
     const width = Math.min(desktopWidth - 4, 72);
     const height = Math.min(desktopHeight - 2, 20);
     for (const [index, window] of this.windows.entries()) {
+      this.clearMaximize(window);
       const offset = index * 2;
       window.frame.left = this.clamp(1 + offset, 1, Math.max(1, desktopWidth - width));
       window.frame.top = this.clamp(offset, 0, Math.max(0, desktopHeight - height));
       window.frame.width = width;
       window.frame.height = height;
+      this.syncShadow(window);
     }
     this.onChange?.();
     this.screen.render();
@@ -586,19 +592,14 @@ export class WindowManager implements WindowFacade {
 
   toggleMaximize(record: WindowRecord): void {
     if (record.savedBounds) {
-      // Restore
+      // Restore — clamp to current screen bounds
       const b = record.savedBounds;
-      record.frame.left = b.left;
-      record.frame.top = b.top;
-      record.frame.width = b.width;
-      record.frame.height = b.height;
-      if (record.shadow) {
-        record.shadow.left = b.left + 2;
-        record.shadow.top = b.top + 1;
-        record.shadow.width = b.width;
-        record.shadow.height = b.height;
-        record.shadow.show();
-      }
+      const sw = Number(this.screen.width);
+      const sh = Number(this.screen.height) - 2;
+      record.frame.left = this.clamp(b.left, 0, Math.max(0, sw - b.width));
+      record.frame.top = this.clamp(b.top, 0, Math.max(0, sh - b.height));
+      record.frame.width = Math.min(b.width, sw);
+      record.frame.height = Math.min(b.height, sh);
       record.savedBounds = undefined;
     } else {
       // Maximize
@@ -614,12 +615,20 @@ export class WindowManager implements WindowFacade {
       record.frame.top = 1; // below menu bar
       record.frame.width = w;
       record.frame.height = h - 2; // above status bar
-      if (record.shadow) {
-        record.shadow.hide();
-      }
     }
+    this.syncShadow(record);
+    if (record.savedBounds && record.shadow) record.shadow.hide();
     record.refresh?.();
+    this.onChange?.();
     this.screen.render();
+  }
+
+  /** Clear maximize state — call before any manual geometry mutation. */
+  private clearMaximize(record: WindowRecord): void {
+    if (record.savedBounds) {
+      record.savedBounds = undefined;
+      if (record.shadow) record.shadow.show();
+    }
   }
 
   private shouldSuppressClick(record: WindowRecord): boolean {
