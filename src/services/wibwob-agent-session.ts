@@ -524,14 +524,13 @@ export class WibWobAgentSession {
       const piSessionTools = this.mode === "agent" ? createPiSessionTools((msg) => this.withSenderInfo(msg)) : [];
       const musicTools = this.mode === "agent" && this.tuiContext ? createMusicTools(this.tuiContext.runCommand) : [];
 
-      const tools = this.mode === "agent" && this.tuiContext
-        ? [...tuiTools, ...jailedCodingTools, ...piSessionTools, ...musicTools]
-        : [];
+      // Tools are registered through AgentSession (customTools + baseToolsOverride),
+      // NOT on the raw Agent. Passing tools here would create duplicates.
+      const tools: AgentTool<any>[] = [];
       const baseToolsOverride = jailedCodingTools.reduce<Record<string, AgentTool<any>>>((acc, tool) => {
         acc[tool.name] = tool;
         return acc;
       }, {});
-      const initialActiveToolNames = Object.keys(baseToolsOverride);
       const customTools = this.mode === "agent" && this.tuiContext
         ? [
             ...createTuiToolDefinitions(this.tuiContext),
@@ -539,6 +538,8 @@ export class WibWobAgentSession {
             ...toToolDefinitionList(musicTools),
           ]
         : [];
+      // Activate all tools: jailed coding tools (via baseToolsOverride) + custom tools
+      const initialActiveToolNames = [...Object.keys(baseToolsOverride), ...customTools.map(t => t.name)];
 
       const systemPrompt = this.mode === "agent"
         ? loadAgentSystemPrompt()
@@ -590,8 +591,9 @@ export class WibWobAgentSession {
       });
       this.session.subscribe((event) => this.handleSessionEvent(event));
       this.ready = true;
-      this.status = tools.length > 0
-        ? `Ready. Tools: ${tools.length}. Model: ${initial.model.provider}/${initial.model.id}`
+      const totalTools = initialActiveToolNames.length;
+      this.status = totalTools > 0
+        ? `Ready. Tools: ${totalTools}. Model: ${initial.model.provider}/${initial.model.id}`
         : `Ready. Model: ${initial.model.provider}/${initial.model.id}`;
       this.lastError = undefined;
 
