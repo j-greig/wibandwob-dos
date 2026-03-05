@@ -544,6 +544,78 @@ export class TR808Engine {
     }
   }
 
+  // -- Pattern copy/paste --
+
+  private clipboard: PatternData | null = null;
+
+  copyPattern(): void {
+    this.clipboard = JSON.parse(JSON.stringify(this.pattern));
+  }
+
+  pastePattern(): void {
+    if (!this.clipboard) return;
+    const pat = this.pattern;
+    const src = this.clipboard;
+    for (const id of INSTRUMENT_IDS) {
+      for (let i = 0; i < STEPS; i++) {
+        pat.steps[id][i] = src.steps[id][i];
+      }
+    }
+    for (let i = 0; i < STEPS; i++) {
+      pat.accent[i] = src.accent[i];
+    }
+    pat.lastStep = src.lastStep;
+    this.emit({ type: "pattern-changed" });
+  }
+
+  get hasClipboard(): boolean { return this.clipboard !== null; }
+
+  // -- Random pattern generator --
+
+  randomizePattern(density = 0.3): void {
+    const pat = this.pattern;
+    // Clear first
+    for (const id of INSTRUMENT_IDS) {
+      for (let i = 0; i < STEPS; i++) pat.steps[id][i] = false;
+    }
+    for (let i = 0; i < STEPS; i++) pat.accent[i] = false;
+
+    // BD always on 1 and maybe 9
+    pat.steps.bd[0] = true;
+    if (Math.random() > 0.3) pat.steps.bd[8] = true;
+
+    // SD on 5 and 13
+    pat.steps.sd[4] = true;
+    pat.steps.sd[12] = true;
+
+    // CH on 8ths or 16ths
+    const chPattern = Math.random() > 0.5 ? "8ths" : "16ths";
+    for (let i = 0; i < STEPS; i++) {
+      if (chPattern === "8ths" && i % 2 === 0) pat.steps.ch[i] = true;
+      if (chPattern === "16ths") pat.steps.ch[i] = true;
+    }
+
+    // Random hits for other instruments
+    for (const id of INSTRUMENT_IDS) {
+      if (id === "bd" || id === "sd" || id === "ch") continue;
+      for (let i = 0; i < STEPS; i++) {
+        if (Math.random() < density * 0.5) pat.steps[id][i] = true;
+      }
+    }
+
+    // Extra random BD hits
+    for (let i = 0; i < STEPS; i++) {
+      if (i !== 0 && i !== 8 && Math.random() < density) pat.steps.bd[i] = true;
+    }
+
+    // Random accents
+    for (let i = 0; i < STEPS; i++) {
+      if (Math.random() < density * 0.4) pat.accent[i] = true;
+    }
+
+    this.emit({ type: "pattern-changed" });
+  }
+
   destroy(): void {
     this.stopTimer();
     this.listeners = [];

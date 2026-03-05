@@ -269,6 +269,13 @@ export default function setup(host: MicroappHost) {
       render();
     });
 
+    // Copy/paste pattern
+    win.body.key(["C-c"], () => { engine!.copyPattern(); render(); });
+    win.body.key(["C-v"], () => { engine!.pastePattern(); render(); });
+
+    // Randomize
+    win.body.key(["r"], () => { engine!.randomizePattern(); render(); });
+
     // Audio mute toggle
     win.body.key(["m"], () => {
       if (audio) audio.setEnabled(!audio.isEnabled);
@@ -452,6 +459,12 @@ export default function setup(host: MicroappHost) {
     if (cmd === "mute") { audio?.setEnabled(false); return; }
     if (cmd === "unmute") { audio?.setEnabled(true); return; }
     if (cmd === "audio toggle") { if (audio) audio.setEnabled(!audio.isEnabled); return; }
+
+    // Copy/paste/randomize
+    if (cmd === "copy") { engine.copyPattern(); return; }
+    if (cmd === "paste") { engine.pastePattern(); return; }
+    const randMatch = cmd.match(/^random(?:ize)?(?:\s+([\d.]+))?$/);
+    if (randMatch) { engine.randomizePattern(parseFloat(randMatch[1] ?? "0.3")); return; }
 
     // Bounce
     const bounceMatch = cmd.match(/^bounce(?:\s+(.+))?$/);
