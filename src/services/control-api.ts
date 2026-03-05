@@ -35,6 +35,8 @@ import { log } from "./app-logger.js";
 
 interface ControlApiHandlers {
   getState: () => DesktopState;
+  /** Rebuild state from scratch (bypasses cache). */
+  syncState: () => DesktopState;
   getPrimerInfo: (pathOrName: string) => unknown;
   listCommands: (surface?: CommandSurface) => CommandListItem[];
   runCommand: (id: string, args?: Record<string, unknown>) => CommandRunResult;
@@ -209,7 +211,9 @@ export class ControlApiService {
     }
 
     if (request.method === "GET" && url.pathname === "/state") {
-      return Response.json(this.handlers.getState());
+      // Always rebuild state fresh — internal window state may have changed
+      // without triggering a window-manager onChange (e.g. direct microapp commands).
+      return Response.json(this.handlers.syncState());
     }
     if (request.method === "GET" && url.pathname === "/commands/list") {
       const surface = url.searchParams.get("surface") as CommandSurface | null;

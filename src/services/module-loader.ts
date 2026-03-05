@@ -176,14 +176,23 @@ function createMicroappHost(
         if (init.height) frame.shadow.height = init.height;
       }
 
-      // Default describeState — microapp should override via handle
+      // Default describeState — microapp should override via handle.describeState()
       frame.describeState = () => ({
         appType: moduleId,
         summary: manifest.title,
       });
 
-      windowManager.registerWindow(frame);
-      frame.focus();
+      // Defer registerWindow until next tick so the microapp can wire up
+      // describeState, cleanup, onRestyle, etc. before the first state sync.
+      let registered = false;
+      const ensureRegistered = () => {
+        if (registered) return;
+        registered = true;
+        windowManager.registerWindow(frame);
+        frame.focus();
+      };
+      // Auto-register on next tick if the microapp hasn't triggered it
+      setTimeout(ensureRegistered, 0);
 
       const handle: MicroappWindowHandle = {
         get id() { return frame.id; },
@@ -202,7 +211,10 @@ function createMicroappHost(
           };
         },
 
-        focus() { frame.focus(); },
+        focus() {
+          ensureRegistered();
+          frame.focus();
+        },
         close() { windowManager.closeWindow(frame.id); },
       };
 

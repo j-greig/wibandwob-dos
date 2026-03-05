@@ -244,6 +244,7 @@ export class TsTuiMvpApp {
     });
     this.controlApi = new ControlApiService(CONTROL_API_PORT, {
       getState: () => this.getDesktopState(),
+      syncState: () => this.state.sync(),
       getPrimerInfo: (pathOrName) => this.getPrimerInfo(pathOrName),
       listCommands: (surface) => this.commands.list(surface),
       runCommand: (id, args) => this.commands.run(id, args),
