@@ -1,6 +1,11 @@
 /**
  * TR-808 ASCII Renderer — generates the visual representation.
  *
+ * Faithful to the real Roland TR-808 three-band layout:
+ *   Band 1 (top): Title + global controls (tempo, mode, transport)
+ *   Band 2 (center): Instrument knob grid — columns per voice
+ *   Band 3 (bottom): 16-step sequencer with colour-coded groups
+ *
  * Pure function: takes engine state → returns string content.
  * No blessed dependency — could render to any text surface.
  */
@@ -13,44 +18,33 @@ import {
 } from "./engine.js";
 
 // ---------------------------------------------------------------------------
-// Box-drawing characters
+// Visual constants
 // ---------------------------------------------------------------------------
 
-const BOX = {
-  tl: "╔", tr: "╗", bl: "╚", br: "╝",
-  h: "═", v: "║",
-  t: "╦", b: "╩", l: "╠", r: "╣", x: "╬",
-  // Single-line variants for inner divisions
-  stl: "┌", str: "┐", sbl: "└", sbr: "┘",
-  sh: "─", sv: "│",
-  st: "┬", sb: "┴", sl: "├", sr: "┤", sx: "┼",
-};
+const STEP_ON  = "██";
+const STEP_OFF = "░░";
+const STEP_CURSOR_ON  = "▓▓";
+const STEP_CURSOR_OFF = "▒▒";
+const ACCENT_ON  = "▲▲";
+const ACCENT_OFF = "△△";
+const KNOB_CHARS = ["○", "◔", "◑", "◕", "●"]; // 5-level knob position
 
-const KNOB_CHARS = ["○", "◐", "●"]; // low, mid, high
-const STEP_ON = "█";
-const STEP_OFF = "░";
-const STEP_CURSOR = "▶";
-const ACCENT_ON = "▲";
-const ACCENT_OFF = "△";
+// Step colour groups (in real 808: red 1-4, orange 5-8, yellow 9-12, white 13-16)
+const STEP_GROUP_CHARS = ["R", "O", "Y", "W"];
 
 // ---------------------------------------------------------------------------
-// Rendering
+// Helpers
 // ---------------------------------------------------------------------------
 
 function knobChar(value: number, max: number): string {
   const ratio = value / max;
-  if (ratio < 0.33) return KNOB_CHARS[0];
-  if (ratio < 0.66) return KNOB_CHARS[1];
-  return KNOB_CHARS[2];
-}
-
-function knobBar(value: number, max: number, width: number): string {
-  const filled = Math.round((value / max) * width);
-  return "▮".repeat(filled) + "▯".repeat(width - filled);
+  const idx = Math.min(4, Math.floor(ratio * 5));
+  return KNOB_CHARS[idx];
 }
 
 function padCenter(text: string, width: number): string {
-  const pad = Math.max(0, width - text.length);
+  if (text.length >= width) return text.slice(0, width);
+  const pad = width - text.length;
   const left = Math.floor(pad / 2);
   return " ".repeat(left) + text + " ".repeat(pad - left);
 }
@@ -59,129 +53,148 @@ function padRight(text: string, width: number): string {
   return text.slice(0, width).padEnd(width, " ");
 }
 
+function bar(value: number, max: number, width: number): string {
+  const filled = Math.round((value / max) * width);
+  return "▮".repeat(filled) + "▯".repeat(Math.max(0, width - filled));
+}
+
+// ---------------------------------------------------------------------------
+// Main renderer
+// ---------------------------------------------------------------------------
+
 export function renderTR808(engine: TR808Engine, width: number, height: number, audioEnabled = false): string {
   const lines: string[] = [];
   const safeWidth = Number.isFinite(width) ? Math.floor(width) : 80;
   const safeHeight = Number.isFinite(height) ? Math.floor(height) : 24;
   const w = Math.max(80, safeWidth);
-  const h = Math.max(1, safeHeight);
 
-  // ── Header ──────────────────────────────────────────────
-  const title = "R O L A N D    T R - 8 0 8    R H Y T H M   C O M P O S E R";
-  lines.push(padCenter(title, w));
-  lines.push("═".repeat(w));
-
-  // ── Status bar ──────────────────────────────────────────
   const slot = engine.slot;
-  const transport = engine.state === "playing" ? "▶ PLAY" : "■ STOP";
-  const tempo = `BPM:${engine.tempo}`;
-  const bank = `${slot.bank}${slot.number}`;
-  const variation = `VAR:${slot.variation}`;
-  const scale = `SCALE:${engine.scaleLabel}`;
-  const master = `MASTER:${engine.master}%`;
-  const accentLvl = `ACCENT:${engine.accent}%`;
-  const audioLabel = audioEnabled ? "♪ ON" : "♪ OFF";
-  const statusParts = [transport, tempo, bank, variation, scale, master, accentLvl, audioLabel];
-  const statusLine = ` ${statusParts.join("  │  ")} `;
-  lines.push(padRight(statusLine, w));
-  lines.push("─".repeat(w));
-
-  // ── Instrument grid with step sequencer ─────────────────
-  // Each row: [INST] [PARAMS...] │ [16 steps]
-  const stepAreaWidth = STEPS * 3 + 1; // "XX " * 16 + border
-  const paramAreaWidth = Math.max(20, w - 6 - stepAreaWidth - 3);
-
-  // Header for step numbers
-  const stepNums = Array.from({ length: STEPS }, (_, i) =>
-    (i + 1).toString().padStart(2, " ")
-  ).join(" ");
-  const gridHeader = padRight("", 6) + padRight("", paramAreaWidth) + " │ " + stepNums;
-  lines.push(gridHeader);
-  lines.push("─".repeat(w));
-
   const currentStep = engine.step;
   const selectedInst = engine.selected;
+  const isPlaying = engine.state === "playing";
 
+  // ══════════════════════════════════════════════════════════
+  // BAND 1: Title bar + global controls
+  // ══════════════════════════════════════════════════════════
+
+  // Title with wood panel sides
+  const titleText = " R O L A N D    T R - 8 0 8    R H Y T H M   C O M P O S E R ";
+  const woodL = "▐█";
+  const woodR = "█▌";
+  const innerW = w - woodL.length - woodR.length;
+  lines.push(woodL + padCenter(titleText, innerW) + woodR);
+  lines.push(woodL + "═".repeat(innerW) + woodR);
+
+  // Transport + global status
+  const transport = isPlaying ? " ▶ PLAYING " : " ■ STOPPED ";
+  const tempoStr = ` TEMPO: ${engine.tempo} `;
+  const bankStr = ` ${slot.bank}${slot.number}-${slot.variation} `;
+  const scaleStr = ` ${engine.scaleLabel} `;
+  const audioStr = audioEnabled ? " ♪ON " : " ♪-- ";
+  const masterStr = ` VOL:${bar(engine.master, 100, 6)} `;
+  const accentStr = ` ACC:${bar(engine.accent, 100, 6)} `;
+
+  const statusLine = `${transport}│${tempoStr}│${bankStr}│${scaleStr}│${masterStr}│${accentStr}│${audioStr}`;
+  lines.push(woodL + padRight(statusLine, innerW) + woodR);
+  lines.push(woodL + "─".repeat(innerW) + woodR);
+
+  // ══════════════════════════════════════════════════════════
+  // BAND 2: Instrument grid — each row is one voice
+  // ══════════════════════════════════════════════════════════
+
+  // Column widths
+  const selectorW = 5;  // "►BD "
+  const stepAreaW = STEPS * 3; // "XX " * 16
+  const sepW = 3; // " │ "
+  const paramW = Math.max(20, innerW - selectorW - stepAreaW - sepW);
+
+  // Step number header
+  const stepNums = Array.from({ length: STEPS }, (_, i) => {
+    const n = i + 1;
+    return n < 10 ? ` ${n}` : `${n}`;
+  }).join(" ");
+  const groupBar = "  R  R  R  R  O  O  O  O  Y  Y  Y  Y  W  W  W  W";
+  lines.push(woodL + " ".repeat(selectorW) + padRight("", paramW) + " │ " + stepNums + " ".repeat(Math.max(0, innerW - selectorW - paramW - sepW - stepAreaW)) + woodR);
+
+  // Instrument rows
   for (const inst of INSTRUMENTS) {
     const isSelected = selectedInst === inst.id;
     const marker = isSelected ? "►" : " ";
-    const label = `${marker}${inst.shortLabel}`.padEnd(5);
+    const label = `${marker}${inst.shortLabel} `;
 
-    // Param summary
+    // Parameter knobs with labels
     const paramParts: string[] = [];
     for (const p of inst.params) {
       const val = engine.getParam(inst.id, p.id);
-      paramParts.push(`${p.label}:${knobChar(val, p.max)}`);
+      paramParts.push(`${p.label}${knobChar(val, p.max)}`);
     }
-    const paramStr = padRight(paramParts.join(" "), paramAreaWidth);
+    const paramStr = padRight(paramParts.join(" "), paramW);
 
-    // Steps
+    // Step buttons
     const steps = engine.getSteps(inst.id);
     const stepChars = Array.from({ length: STEPS }, (_, i) => {
       const active = steps[i];
-      const isCursor = engine.state === "playing" && i === currentStep;
-      if (isCursor && active) return "▓▓";
-      if (isCursor) return "▒▒";
-      if (active) return STEP_ON + STEP_ON;
-      return STEP_OFF + STEP_OFF;
+      const isCursor = isPlaying && i === currentStep;
+      if (isCursor && active) return STEP_CURSOR_ON;
+      if (isCursor) return STEP_CURSOR_OFF;
+      if (active) return STEP_ON;
+      return STEP_OFF;
     }).join(" ");
 
-    lines.push(`${label}${paramStr} │ ${stepChars}`);
+    const row = `${label}${paramStr} │ ${stepChars}`;
+    lines.push(woodL + padRight(row, innerW) + woodR);
   }
 
   // Accent row
   {
-    const isAccentSelected = selectedInst === "accent";
-    const marker = isAccentSelected ? "►" : " ";
-    const label = `${marker}AC `.padEnd(5);
-    const paramStr = padRight(`LVL:${knobBar(engine.accent, 100, 10)} ${engine.accent}%`, paramAreaWidth);
+    const isAccSel = selectedInst === "accent";
+    const marker = isAccSel ? "►" : " ";
+    const label = `${marker}AC `;
+    const paramStr = padRight(`LVL${bar(engine.accent, 100, 8)} ${engine.accent}%`, paramW);
     const accentSteps = engine.getSteps("accent");
     const stepChars = Array.from({ length: STEPS }, (_, i) => {
       const active = accentSteps[i];
-      const isCursor = engine.state === "playing" && i === currentStep;
-      if (isCursor && active) return ACCENT_ON + ACCENT_ON;
-      if (isCursor) return "▒▒";
-      if (active) return ACCENT_ON + " ";
-      return ACCENT_OFF + " ";
+      const isCursor = isPlaying && i === currentStep;
+      if (isCursor && active) return "▲▲";
+      if (isCursor) return STEP_CURSOR_OFF;
+      if (active) return "▲ ";
+      return "△ ";
     }).join(" ");
-    lines.push(`${label}${paramStr} │ ${stepChars}`);
+    const row = `${label}${paramStr} │ ${stepChars}`;
+    lines.push(woodL + padRight(row, innerW) + woodR);
   }
 
-  lines.push("─".repeat(w));
+  // ══════════════════════════════════════════════════════════
+  // BAND 3: Sequencer footer
+  // ══════════════════════════════════════════════════════════
 
-  // ── Playhead position indicator ─────────────────────────
-  if (engine.state === "playing" && currentStep >= 0) {
-    const offset = 6 + paramAreaWidth + 3;
-    const pos = offset + currentStep * 3;
-    const cursor = " ".repeat(pos) + "▲▲";
-    lines.push(cursor);
+  lines.push(woodL + "─".repeat(innerW) + woodR);
+
+  // Playhead indicator
+  if (isPlaying && currentStep >= 0) {
+    const offset = selectorW + paramW + sepW + currentStep * 3;
+    const cursorLine = " ".repeat(offset) + "▲▲";
+    lines.push(woodL + padRight(cursorLine, innerW) + woodR);
   } else {
-    lines.push("");
+    lines.push(woodL + " ".repeat(innerW) + woodR);
   }
 
-  // ── Controls footer ─────────────────────────────────────
-  lines.push("─".repeat(w));
-  const controls = [
-    "[SPACE] play/stop",
-    "[1-9,0,−,=] select inst",
-    "[F1-F8] pattern",
-    "[←→] step cursor",
-  ];
-  lines.push(` ${controls.join("  ")}`);
-  const controls2 = [
-    "[a/z] tempo ±5",
-    "[v] variation",
-    "[b] bank",
-    "[p] preset",
-    "[c] clear",
-    "[s] scale",
-    "[m] mute",
-  ];
-  lines.push(` ${controls2.join("  ")}`);
+  // Step group colour indicators
+  const groupLine = " ".repeat(selectorW + paramW + sepW) +
+    " 1  2  3  4  5  6  7  8  9  10 11 12 13 14 15 16";
+  lines.push(woodL + padRight(groupLine, innerW) + woodR);
 
-  // Pad or trim to height
-  while (lines.length < h) lines.push("");
-  return lines.slice(0, h).join("\n");
+  // Controls
+  lines.push(woodL + "═".repeat(innerW) + woodR);
+  const ctrl1 = " [SPACE] play/stop  [ENTER] toggle step  [1-0,-,=] instrument  [BKSP] CH  [`] accent";
+  const ctrl2 = " [a/z] tempo  [v] var  [b] bank  [F1-8] pattern  [p] preset  [c] clear  [s] scale  [m] mute";
+  lines.push(woodL + padRight(ctrl1, innerW) + woodR);
+  lines.push(woodL + padRight(ctrl2, innerW) + woodR);
+  lines.push(woodL + "═".repeat(innerW) + woodR);
+
+  // Pad to height
+  while (lines.length < safeHeight) lines.push("");
+  return lines.slice(0, safeHeight).join("\n");
 }
 
 /**
