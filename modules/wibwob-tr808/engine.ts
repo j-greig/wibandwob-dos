@@ -305,10 +305,7 @@ export class TR808Engine {
   get tempo(): number { return this._tempo; }
   set tempo(bpm: number) {
     this._tempo = Math.max(35, Math.min(300, bpm));
-    if (this.transport === "playing") {
-      this.stopTimer();
-      this.startTimer();
-    }
+    // No need to restart — setTimeout-based scheduling picks up new tempo naturally
     this.emit({ type: "tempo", bpm: this._tempo });
   }
 
@@ -322,6 +319,11 @@ export class TR808Engine {
   set scale(s: PreScale) { this.preScale = s; }
 
   get scaleLabel(): string { return PRESCALE_LABELS[this.preScale]; }
+
+  // -- Swing --
+  private _swing = 50; // 50 = straight, 0-100 range
+  get swing(): number { return this._swing; }
+  set swing(val: number) { this._swing = Math.max(0, Math.min(100, val)); }
 
   // -- Transport --
 
@@ -349,7 +351,7 @@ export class TR808Engine {
     else this.start();
   }
 
-  private stepIntervalMs(): number {
+  private baseStepIntervalMs(): number {
     const beatsPerMin = this._tempo;
     switch (this.preScale) {
       case "16th": return (60000 / beatsPerMin) / 4;
@@ -358,17 +360,43 @@ export class TR808Engine {
     }
   }
 
+  /** Get the delay for the NEXT step, accounting for swing.
+   *  Swing shifts every other step forward in time. */
+  private swingDelayMs(): number {
+    const base = this.baseStepIntervalMs();
+    if (this._swing === 50) return base; // straight
+    // On odd steps (0-indexed), delay by swing amount
+    const nextStep = (this.currentStep + 1) % this.pattern.lastStep;
+    if (nextStep % 2 === 1) {
+      // Swing shifts odd steps: 50=straight, 66=standard swing, 75=heavy
+      const swingRatio = this._swing / 100;
+      return base * (1 + (swingRatio - 0.5));
+    }
+    // Even steps get shortened to compensate
+    const swingRatio = this._swing / 100;
+    return base * (1 - (swingRatio - 0.5));
+  }
+
   private startTimer(): void {
     this.stopTimer();
-    const interval = this.stepIntervalMs();
-    this.timer = setInterval(() => this.advanceStep(), interval);
     // Fire first step immediately
     this.advanceStep();
+    this.scheduleNextStep();
+  }
+
+  private scheduleNextStep(): void {
+    const delay = this.swingDelayMs();
+    this.timer = setTimeout(() => {
+      this.advanceStep();
+      if (this.transport === "playing") {
+        this.scheduleNextStep();
+      }
+    }, delay);
   }
 
   private stopTimer(): void {
     if (this.timer) {
-      clearInterval(this.timer);
+      clearTimeout(this.timer);
       this.timer = null;
     }
   }
@@ -449,6 +477,7 @@ export class TR808Engine {
       accentLevel: this.accentLevel,
       masterLevel: this.masterLevel,
       preScale: this.preScale,
+      swing: this._swing,
       selectedInstrument: this.selectedInstrument,
       patterns: Object.fromEntries(this.patterns),
     };
@@ -459,6 +488,7 @@ export class TR808Engine {
     if (typeof data.accentLevel === "number") this.accentLevel = data.accentLevel;
     if (typeof data.masterLevel === "number") this.masterLevel = data.masterLevel;
     if (typeof data.preScale === "string") this.preScale = data.preScale as PreScale;
+    if (typeof data.swing === "number") this._swing = data.swing;
     if (data.slot && typeof data.slot === "object") {
       const s = data.slot as Record<string, unknown>;
       if (typeof s.bank === "string") this.currentSlot.bank = s.bank as PatternBank;

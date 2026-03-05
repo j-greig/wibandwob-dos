@@ -141,7 +141,7 @@ export default function setup(host: MicroappHost) {
 
       const w = Math.max(80, innerW);
       const h = Math.max(1, innerH - 2);
-      const content = renderTR808(engine, w, h, audio?.isEnabled ?? false);
+      const content = renderTR808(engine, w, h, audio?.isEnabled ?? false, stepCursor);
       headerBar.update({
         left: "TR-808 Rhythm Composer",
         right: `${engine.state === "playing" ? "PLAY" : "STOP"} ${engine.tempo} BPM`,
@@ -247,6 +247,14 @@ export default function setup(host: MicroappHost) {
       render();
     });
 
+    // Swing
+    win.body.key(["w"], () => {
+      const swings = [50, 55, 60, 66, 75];
+      const idx = swings.indexOf(engine!.swing);
+      engine!.swing = swings[(idx + 1) % swings.length];
+      render();
+    });
+
     // Audio mute toggle
     win.body.key(["m"], () => {
       if (audio) audio.setEnabled(!audio.isEnabled);
@@ -277,6 +285,7 @@ export default function setup(host: MicroappHost) {
       selectedInstrument: engine!.selected,
       accentLevel: engine!.accent,
       masterLevel: engine!.master,
+      swing: engine!.swing,
       instruments: INSTRUMENTS.map(inst => ({
         id: inst.id,
         label: inst.shortLabel,
@@ -290,7 +299,7 @@ export default function setup(host: MicroappHost) {
     win.captureText(() => {
       const w = Math.max(80, Number(win.body.width) || 80);
       const h = Math.max(1, (Number(win.body.height) || 24) - 2);
-      return renderTR808(engine!, w, h, audio?.isEnabled ?? false);
+      return renderTR808(engine!, w, h, audio?.isEnabled ?? false, stepCursor);
     });
 
     // ── Cleanup ───────────────────────────────────────────
@@ -406,6 +415,10 @@ export default function setup(host: MicroappHost) {
     // Last step
     const lastMatch = cmd.match(/^laststep\s+(\d+)$/);
     if (lastMatch) { engine.setLastStep(parseInt(lastMatch[1])); return; }
+
+    // Swing
+    const swingMatch = cmd.match(/^swing\s+(\d+)$/);
+    if (swingMatch) { engine.swing = parseInt(swingMatch[1]); return; }
 
     // Audio
     if (cmd === "mute") { audio?.setEnabled(false); return; }

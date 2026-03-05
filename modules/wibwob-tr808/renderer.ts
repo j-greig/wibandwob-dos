@@ -62,7 +62,7 @@ function bar(value: number, max: number, width: number): string {
 // Main renderer
 // ---------------------------------------------------------------------------
 
-export function renderTR808(engine: TR808Engine, width: number, height: number, audioEnabled = false): string {
+export function renderTR808(engine: TR808Engine, width: number, height: number, audioEnabled = false, editCursor = -1): string {
   const lines: string[] = [];
   const safeWidth = Number.isFinite(width) ? Math.floor(width) : 80;
   const safeHeight = Number.isFinite(height) ? Math.floor(height) : 24;
@@ -91,10 +91,11 @@ export function renderTR808(engine: TR808Engine, width: number, height: number, 
   const bankStr = ` ${slot.bank}${slot.number}-${slot.variation} `;
   const scaleStr = ` ${engine.scaleLabel} `;
   const audioStr = audioEnabled ? " ♪ON " : " ♪-- ";
+  const swingStr = engine.swing !== 50 ? ` SWG:${engine.swing}% ` : "";
   const masterStr = ` VOL:${bar(engine.master, 100, 6)} `;
   const accentStr = ` ACC:${bar(engine.accent, 100, 6)} `;
 
-  const statusLine = `${transport}│${tempoStr}│${bankStr}│${scaleStr}│${masterStr}│${accentStr}│${audioStr}`;
+  const statusLine = `${transport}│${tempoStr}│${bankStr}│${scaleStr}${swingStr ? "│" + swingStr : ""}│${masterStr}│${accentStr}│${audioStr}`;
   lines.push(woodL + padRight(statusLine, innerW) + woodR);
   lines.push(woodL + "─".repeat(innerW) + woodR);
 
@@ -134,9 +135,12 @@ export function renderTR808(engine: TR808Engine, width: number, height: number, 
     const steps = engine.getSteps(inst.id);
     const stepChars = Array.from({ length: STEPS }, (_, i) => {
       const active = steps[i];
-      const isCursor = isPlaying && i === currentStep;
-      if (isCursor && active) return STEP_CURSOR_ON;
-      if (isCursor) return STEP_CURSOR_OFF;
+      const isPlayCursor = isPlaying && i === currentStep;
+      const isEditCur = !isPlaying && i === editCursor;
+      if (isPlayCursor && active) return STEP_CURSOR_ON;
+      if (isPlayCursor) return STEP_CURSOR_OFF;
+      if (isEditCur && active) return "▓█";
+      if (isEditCur) return "▒░";
       if (active) return STEP_ON;
       return STEP_OFF;
     }).join(" ");
@@ -154,9 +158,12 @@ export function renderTR808(engine: TR808Engine, width: number, height: number, 
     const accentSteps = engine.getSteps("accent");
     const stepChars = Array.from({ length: STEPS }, (_, i) => {
       const active = accentSteps[i];
-      const isCursor = isPlaying && i === currentStep;
-      if (isCursor && active) return "▲▲";
-      if (isCursor) return STEP_CURSOR_OFF;
+      const isPlayCursor = isPlaying && i === currentStep;
+      const isEditCur = !isPlaying && i === editCursor;
+      if (isPlayCursor && active) return "▲▲";
+      if (isPlayCursor) return STEP_CURSOR_OFF;
+      if (isEditCur && active) return "▲▲";
+      if (isEditCur) return "▒▒";
       if (active) return "▲ ";
       return "△ ";
     }).join(" ");
