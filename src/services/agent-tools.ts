@@ -190,6 +190,47 @@ const moveWindow = tuiTool({
   },
 });
 
+const batchLayout = tuiTool({
+  name: "tui_batch_layout",
+  label: "Batch Layout",
+  description:
+    "Move, resize, and/or close multiple windows in a single call. " +
+    "Pass an array of ops — each op needs an 'id' plus any of: x, y, w, h (move/resize), or close:true. " +
+    "Ops are applied in order. Use this instead of chained tui_move_window calls whenever positioning more than one window.",
+  parameters: Type.Object({
+    ops: Type.Array(
+      Type.Object({
+        id: Type.Number({ description: "Window ID" }),
+        x: Type.Optional(Type.Number({ description: "Left position (columns)" })),
+        y: Type.Optional(Type.Number({ description: "Top position (rows)" })),
+        w: Type.Optional(Type.Number({ description: "Width (columns)" })),
+        h: Type.Optional(Type.Number({ description: "Height (rows)" })),
+        close: Type.Optional(Type.Boolean({ description: "Close this window if true" })),
+      }),
+      { description: "Array of window operations to apply in order" }
+    ),
+  }),
+  execute: (params, ctx) => {
+    const results: string[] = [];
+    for (const op of params.ops) {
+      if (op.close) {
+        const ok = ctx.windows.closeWindow(op.id);
+        results.push(`${op.id}: ${ok ? "closed" : "not found"}`);
+        continue;
+      }
+      if (op.x !== undefined && op.y !== undefined) {
+        const moved = ctx.windows.moveWindow(op.id, op.x, op.y);
+        if (!moved) { results.push(`${op.id}: not found`); continue; }
+      }
+      if (op.w !== undefined && op.h !== undefined) {
+        ctx.windows.resizeWindow(op.id, op.w, op.h);
+      }
+      results.push(`${op.id}: ok`);
+    }
+    return results.join(", ");
+  },
+});
+
 const focusWindow = tuiTool({
   name: "tui_focus_window",
   label: "Focus Window",
@@ -452,6 +493,7 @@ export function createTuiTools(ctx: TuiToolContext): AgentTool<any>[] {
     writeEditorText(ctx),
     closeWindow(ctx),
     moveWindow(ctx),
+    batchLayout(ctx),
     focusWindow(ctx),
     sendInput(ctx),
     readWindow(ctx),
