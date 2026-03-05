@@ -437,5 +437,73 @@ else
   fail "Close window" "Window still found (id=$FOUND)"
 fi
 
+# ── Test 16: Audio state reported ─────────────────────────
+
+log "Test 16: Audio state in details"
+# Re-open the 808
+api_post "/commands/run" '{"id":"microapp.wibwob.tr808.open"}' > /dev/null
+sleep 2
+
+STATE=$(get_state "16-audio")
+TR808_ID=$(find_window_by_apptype "$STATE" "wibwob.tr808")
+AUDIO=$(window_detail "$STATE" "$TR808_ID" "audioEnabled")
+
+if [ "$AUDIO" = "True" ] || [ "$AUDIO" = "False" ]; then
+  pass "Audio state reported: $AUDIO"
+else
+  fail "Audio state" "audioEnabled=$AUDIO"
+fi
+
+# ── Test 17: Multiple presets ─────────────────────────────
+
+log "Test 17: Multiple presets"
+PRESET_OK=true
+for preset in electro trap bossa reggaeton minimal afrobeat; do
+  api_post "/commands/run" "{\"id\":\"microapp.wibwob.tr808.load-preset\",\"args\":{\"preset\":\"$preset\"}}" > /dev/null
+  sleep 0.3
+  STATE=$(get_state "17-preset-$preset")
+  DETAILS=$(window_detail_json "$STATE" "$TR808_ID")
+  TOTAL=$(echo "$DETAILS" | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+total = sum(sum(1 for s in inst['steps'] if s) for inst in d.get('instruments', []))
+print(total)
+" 2>/dev/null || echo "0")
+  if [ "$TOTAL" -lt 2 ]; then
+    PRESET_OK=false
+    fail "Preset $preset" "Only $TOTAL active steps"
+    break
+  fi
+done
+
+if [ "$PRESET_OK" = true ]; then
+  pass "All presets load with active steps"
+fi
+
+# ── Test 18: Input handler ──────────────────────────────
+
+log "Test 18: Input handler (writeInput)"
+# Clear and use text input
+api_post "/commands/run" '{"id":"microapp.wibwob.tr808.clear","args":{"all":true}}' > /dev/null
+sleep 0.3
+
+# Use windows/input to send text commands
+api_post "/windows/input" "{\"id\":${TR808_ID},\"input\":\"tempo 180\r\"}" > /dev/null
+sleep 0.5
+
+STATE=$(get_state "18-input")
+TEMPO=$(window_detail "$STATE" "$TR808_ID" "tempo")
+
+if [ "$TEMPO" = "180" ]; then
+  pass "Input handler: tempo set to 180"
+else
+  fail "Input handler" "Expected tempo=180, got $TEMPO"
+fi
+
+# ── Cleanup: close the window ────────────────────────────
+
+api_post "/windows/close" "{\"id\":${TR808_ID}}" > /dev/null
+sleep 0.5
+
 log ""
 log "Done."

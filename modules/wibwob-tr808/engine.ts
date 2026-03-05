@@ -528,6 +528,28 @@ const PRESETS: Record<string, Record<string, number[]>> = {
     mt: [13],
     accent: [0, 4, 10, 12],
   },
+  "reggaeton": {
+    bd: [0, 3, 4, 7, 8, 11, 12, 15],
+    sd: [4, 12],
+    ch: [0, 2, 4, 6, 8, 10, 12, 14],
+    rs: [2, 6, 10, 14],
+    accent: [0, 4, 8, 12],
+  },
+  "minimal": {
+    bd: [0, 8],
+    ch: [0, 2, 4, 6, 8, 10, 12, 14],
+    rs: [4, 12],
+    accent: [0, 8],
+  },
+  "afrobeat": {
+    bd: [0, 5, 10],
+    sd: [4, 12],
+    ch: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+    cb: [2, 6, 10, 14],
+    cl: [3, 7, 11, 15],
+    ht: [1, 9],
+    accent: [0, 4, 10],
+  },
 };
 
 export const PRESET_NAMES = Object.keys(PRESETS);
