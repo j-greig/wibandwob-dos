@@ -5,7 +5,7 @@ ASCII art Roland TR-808 Rhythm Composer for WibWob-DOS.
 ## Architecture
 
 ```
-engine.ts     Pure state machine — patterns, transport, params
+engine.ts     Pure state machine — patterns, transport, params, mute/solo, swing
 renderer.ts   Pure ASCII renderer — no blessed dependency
 audio.ts      Analog drum synthesis in TypeScript (afplay on macOS)
 index.ts      Microapp wiring — keyboard, commands, snapshot
@@ -39,10 +39,25 @@ generates WAV samples from scratch using pure TypeScript DSP.
 ## Pattern Storage
 
 32 slots: 2 banks (A/B) × 8 patterns (1-8) × 2 variations (A/B).
+Pattern copy/paste between slots via Ctrl+C/V.
 
 ## Preset Patterns
 
 classic-house, electro, trap, bossa, breakbeat, reggaeton, minimal, afrobeat
+
+## Timing
+
+- Tempo: 35-300 BPM
+- Pre-scale: 16th notes, 32nd notes, 8th-note triplets
+- Swing: 0-100% (50=straight, 66=standard, 75=heavy)
+- Last step: configurable pattern length (1-16)
+
+## Mute / Solo
+
+Per-instrument mute and solo:
+- Visual flags: S (solo), M (mute) next to instrument label
+- Solo takes priority: if any instrument is soloed, only solos sound
+- State preserved in workspace snapshots
 
 ## Keyboard Controls
 
@@ -62,8 +77,14 @@ classic-house, electro, trap, bossa, breakbeat, reggaeton, minimal, afrobeat
 | p | Cycle preset patterns |
 | c | Clear selected instrument |
 | C | Clear entire pattern |
-| s | Cycle pre-scale (16th/32nd/8th-triplet) |
+| r | Randomize pattern |
+| s | Cycle pre-scale |
+| w | Cycle swing amount |
+| x | Toggle mute on selected |
+| o | Toggle solo on selected |
 | m | Toggle audio mute |
+| Ctrl+C | Copy pattern |
+| Ctrl+V | Paste pattern |
 | q/ESC | Close |
 
 ## API Commands
@@ -82,6 +103,7 @@ microapp.wibwob.tr808.set-param      {instrument: "bd", param: "tune", value: 75
 microapp.wibwob.tr808.load-preset    {preset: "classic-house"}
 microapp.wibwob.tr808.clear          {all?: true, instrument?: "bd"}
 microapp.wibwob.tr808.set-pattern    {bank?: "A", number?: 1, variation?: "A"}
+microapp.wibwob.tr808.bounce         {path?: string, loops?: number}
 ```
 
 ## Text Input Commands
@@ -92,20 +114,21 @@ Via `POST /windows/input {id: N, input: "command\r"}`:
 play, stop, toggle
 tempo 140
 select bd
-toggle 4        (toggle step on selected instrument)
-toggle bd 4     (toggle step on specific instrument)
-set bd 0 on     (set step explicitly)
+toggle 4 / toggle bd 4
+set bd 0 on
 param bd tune 75
-bank a, bank b
-variation a, variation b
-pattern 3
+bank a / variation a / pattern 3
 preset classic-house
-clear, clear all
+clear / clear all
 scale 16th
-accent 80
-master 100
+accent 80 / master 100
 laststep 12
-mute, unmute
+swing 66
+mute bd / solo sd
+copy / paste
+random / random 0.5
+bounce [path]
+mute / unmute
 ```
 
 ## Sound Synthesis
@@ -121,10 +144,28 @@ Each voice is synthesised from mathematical primitives — no samples:
 Parameters affect synthesis in real-time — changing BD tune re-renders
 the sample at the new pitch.
 
+## Bounce to WAV
+
+Export the current pattern as a WAV file:
+- API: `microapp.wibwob.tr808.bounce {path: "/path/to/file.wav", loops: 2}`
+- Text: `bounce /path/to/file.wav`
+- Renders all instruments at current tempo with accent dynamics
+
+## Smoke Tests
+
+```bash
+./tests/tr808-smoke/run.sh
+```
+
+19 tests covering: command discovery, window lifecycle, transport,
+tempo, instrument selection, step toggling, parameters, pattern
+switching, presets, text capture, audio state, input handler, bounce.
+
 ## Future Directions
 
 - Song mode (pattern chaining)
-- WAV export of pattern loops
 - WebAudio playback (cross-platform)
 - Modular connectivity (clock sync with other microapps)
 - Visual pattern editing with mouse
+- Tap tempo
+- Pattern export/import (JSON)
