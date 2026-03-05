@@ -126,6 +126,8 @@ AgentSession loads tools from THREE sources:
 - `customTools` — TUI tools (tui_*), session bridge tools
 - `.pi/extensions/*.ts` — extension-registered tools (play_music, codex, todo, list_sessions, send_to_session)
 
+Also verify that every tool named in `.pi/APPEND_SYSTEM.md` actually appears in `src/services/agent-tools.ts` — a tool described in the prompt but missing from the implementation causes agents to guess command-registry slugs instead, which fail silently.
+
 If ANY name appears in more than one source, the Anthropic API returns:
 `"tools: Tool names must be unique."`
 
@@ -247,6 +249,7 @@ fi
 
 ## Future test ideas
 
+- Prompt-tool parity: extract tool names from APPEND_SYSTEM.md, diff against /tools output, fail on any gap
 - Tool use verification: send a prompt that triggers a specific tool, verify tool_use in session log
 - Compaction: fill context until auto_compaction fires, verify session continues
 - /resume: create session, /new, /resume back, verify messageCount restored
