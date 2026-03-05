@@ -373,7 +373,7 @@ const SYNTH_MAP: Record<InstrumentId, (params: Record<string, number>) => Float6
 
 export class TR808Audio {
   private sampleDir: string;
-  private procs: ChildProcess[] = [];
+  private procs = new Set<ChildProcess>();
   private enabled = true;
 
   constructor() {
@@ -407,16 +407,18 @@ export class TR808Audio {
     if (!existsSync(wavPath)) return;
 
     const vol = accentBoost ? "1.2" : "0.9";
-    const proc = spawn("afplay", ["-v", vol, wavPath], {
-      stdio: "ignore",
-      detached: true,
-    });
-    proc.unref();
+    setImmediate(() => {
+      const proc = spawn("afplay", ["-v", vol, wavPath], {
+        stdio: "ignore",
+        detached: true,
+      });
+      proc.unref();
 
-    // Track for cleanup
-    this.procs.push(proc);
-    proc.on("exit", () => {
-      this.procs = this.procs.filter(p => p !== proc);
+      // Track for cleanup
+      this.procs.add(proc);
+      proc.on("exit", () => {
+        this.procs.delete(proc);
+      });
     });
   }
 
@@ -443,12 +445,12 @@ export class TR808Audio {
   bouncePattern(
     instruments: { id: InstrumentId; steps: boolean[]; params: Record<string, number> }[],
     accent: boolean[],
-    tempo: number,
+    stepDurationMs: number,
     lastStep: number,
     outPath: string,
     loops = 2,
   ): string {
-    const stepDurSec = 60 / tempo / 4; // 16th note duration
+    const stepDurSec = stepDurationMs / 1000;
     const loopDurSec = lastStep * stepDurSec;
     const totalDurSec = loopDurSec * loops;
     const totalSamples = Math.ceil(totalDurSec * SR);
@@ -483,7 +485,7 @@ export class TR808Audio {
     for (const proc of this.procs) {
       try { proc.kill(); } catch {}
     }
-    this.procs = [];
+    this.procs.clear();
 
     // Clean up sample files
     try {

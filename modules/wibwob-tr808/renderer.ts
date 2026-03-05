@@ -29,9 +29,6 @@ const ACCENT_ON  = "▲▲";
 const ACCENT_OFF = "△△";
 const KNOB_CHARS = ["○", "◔", "◑", "◕", "●"]; // 5-level knob position
 
-// Step colour groups (in real 808: red 1-4, orange 5-8, yellow 9-12, white 13-16)
-const STEP_GROUP_CHARS = ["R", "O", "Y", "W"];
-
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -114,7 +111,6 @@ export function renderTR808(engine: TR808Engine, width: number, height: number, 
     const n = i + 1;
     return n < 10 ? ` ${n}` : `${n}`;
   }).join(" ");
-  const groupBar = "  R  R  R  R  O  O  O  O  Y  Y  Y  Y  W  W  W  W";
   lines.push(woodL + " ".repeat(selectorW) + padRight("", paramW) + " │ " + stepNums + " ".repeat(Math.max(0, innerW - selectorW - paramW - sepW - stepAreaW)) + woodR);
 
   // Instrument rows

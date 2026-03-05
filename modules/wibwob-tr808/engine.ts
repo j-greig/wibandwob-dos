@@ -154,6 +154,10 @@ function patternKey(slot: PatternSlot): string {
   return `${slot.bank}${slot.number}${slot.variation}`;
 }
 
+function isInstrumentIdValue(id: string): id is InstrumentId {
+  return INSTRUMENT_IDS.includes(id as InstrumentId);
+}
+
 // ---------------------------------------------------------------------------
 // Pre-scale
 // ---------------------------------------------------------------------------
@@ -171,6 +175,10 @@ const PRESCALE_LABELS: Record<PreScale, string> = {
 // ---------------------------------------------------------------------------
 
 export type TransportState = "stopped" | "playing";
+
+export function isValidPatternNumber(n: number): boolean {
+  return Number.isInteger(n) && n >= 1 && n <= 8;
+}
 
 // ---------------------------------------------------------------------------
 // Engine events
@@ -202,7 +210,8 @@ export class TR808Engine {
   private currentStep = -1;
   private accentLevel = 80; // 0-100
   private masterLevel = 100; // 0-100
-  private timer: ReturnType<typeof setInterval> | null = null;
+  private timer: ReturnType<typeof setTimeout> | null = null;
+  private nextTickAt = 0;
   private listeners: EngineListener[] = [];
 
   // Per-instrument mute/solo
@@ -244,9 +253,15 @@ export class TR808Engine {
 
   setSlot(slot: Partial<PatternSlot>): void {
     if (slot.bank !== undefined) this.currentSlot.bank = slot.bank;
-    if (slot.number !== undefined) this.currentSlot.number = slot.number;
+    if (slot.number !== undefined && isValidPatternNumber(slot.number)) {
+      this.currentSlot.number = slot.number;
+    }
     if (slot.variation !== undefined) this.currentSlot.variation = slot.variation;
     this.emit({ type: "pattern-changed" });
+  }
+
+  getInstrumentIds(): InstrumentId[] {
+    return [...INSTRUMENT_IDS];
   }
 
   // -- Instrument selection --
@@ -334,7 +349,9 @@ export class TR808Engine {
   get tempo(): number { return this._tempo; }
   set tempo(bpm: number) {
     this._tempo = Math.max(35, Math.min(300, bpm));
-    // No need to restart — setTimeout-based scheduling picks up new tempo naturally
+    if (this.transport === "playing") {
+      this.rescheduleFromNow();
+    }
     this.emit({ type: "tempo", bpm: this._tempo });
   }
 
@@ -348,6 +365,7 @@ export class TR808Engine {
   set scale(s: PreScale) { this.preScale = s; }
 
   get scaleLabel(): string { return PRESCALE_LABELS[this.preScale]; }
+  get stepDurationMs(): number { return this.baseStepIntervalMs(); }
 
   // -- Swing --
   private _swing = 50; // 50 = straight, 0-100 range
@@ -410,17 +428,33 @@ export class TR808Engine {
     this.stopTimer();
     // Fire first step immediately
     this.advanceStep();
-    this.scheduleNextStep();
+    this.scheduleFirstTick();
   }
 
-  private scheduleNextStep(): void {
-    const delay = this.swingDelayMs();
-    this.timer = setTimeout(() => {
-      this.advanceStep();
-      if (this.transport === "playing") {
-        this.scheduleNextStep();
-      }
-    }, delay);
+  private scheduleFirstTick(): void {
+    const intervalMs = this.swingDelayMs();
+    this.nextTickAt = performance.now() + intervalMs;
+    this.timer = setTimeout(() => this.tick(), intervalMs);
+  }
+
+  private tick(): void {
+    if (this.transport !== "playing") return;
+
+    // Schedule next tick immediately against wall clock.
+    const intervalMs = this.swingDelayMs();
+    this.nextTickAt += intervalMs;
+    const delay = Math.max(0, this.nextTickAt - performance.now());
+    this.timer = setTimeout(() => this.tick(), delay);
+
+    this.advanceStep();
+  }
+
+  private rescheduleFromNow(): void {
+    if (this.transport !== "playing") return;
+    const intervalMs = this.swingDelayMs();
+    this.nextTickAt = performance.now() + intervalMs;
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = setTimeout(() => this.tick(), intervalMs);
   }
 
   private stopTimer(): void {
@@ -428,6 +462,7 @@ export class TR808Engine {
       clearTimeout(this.timer);
       this.timer = null;
     }
+    this.nextTickAt = 0;
   }
 
   private advanceStep(): void {
@@ -490,8 +525,8 @@ export class TR808Engine {
     for (const [instId, steps] of Object.entries(preset)) {
       if (instId === "accent") {
         for (const s of steps) pat.accent[s] = true;
-      } else if (instId in pat.steps) {
-        for (const s of steps) (pat.steps as any)[instId][s] = true;
+      } else if (isInstrumentIdValue(instId)) {
+        for (const s of steps) pat.steps[instId][s] = true;
       }
     }
     this.emit({ type: "pattern-changed" });
