@@ -1485,6 +1485,14 @@ export class TsTuiMvpApp {
       focusNextWindow: () => this.windowManager.focusNextWindow(1),
       focusPreviousWindow: () => this.windowManager.focusNextWindow(-1),
       closeFocusedWindow: () => this.windowManager.closeFocusedWindow(),
+      clearDesktop: () => {
+        const windows = this.windowManager.getWindows();
+        for (const w of windows) {
+          if (w.kind !== "chat") {
+            this.windowManager.closeWindow(w.id);
+          }
+        }
+      },
       openBackroomsPrompt: () => this.promptForBackroomsTv(),
       openBackroomsTv: (args?: Record<string, unknown>) => {
         const theme =

@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "title": "8-bar pipeline test",
+  "duration": 16,
+
+  "palette": [
+    { "name": "sequencer",  "file": "chromatic-sequencer.txt",       "note": "grid, lots of structure" },
+    { "name": "synth",      "file": "synth-face.txt",                "note": "face, eerie" },
+    { "name": "disco",      "file": "italic-disco.txt",              "note": "energy" },
+    { "name": "horror",     "file": "cosmic-horror.txt",             "note": "dark texture" },
+    { "name": "tracker",    "file": "msdos-vbdos-forms.txt",         "note": "retro grid" }
+  ],
+
+  "scenes": {
+    "intro": {
+      "name": "intro",
+      "theme": "wibwob-dark",
+      "windows": [
+        { "role": "backdrop", "open": { "type": "primer", "file": "chromatic-sequencer.txt" }, "layout": "backdrop" }
+      ]
+    },
+    "drop": {
+      "name": "drop",
+      "theme": "wibwob-dark-pastel",
+      "windows": [
+        { "role": "backdrop", "open": { "type": "primer", "file": "italic-disco.txt" }, "layout": "hero-left" },
+        { "role": "headline", "open": { "type": "figlet", "text": "DROP", "font": "standard" }, "layout": "top-right-corner" }
+      ]
+    },
+    "breakdown": {
+      "name": "breakdown",
+      "theme": "wibwob-dark-nord",
+      "windows": [
+        { "role": "backdrop", "open": { "type": "primer", "file": "synth-face.txt" }, "layout": "hero-left" },
+        { "role": "sidebar",  "open": { "type": "primer", "file": "cosmic-horror.txt" }, "layout": "sidebar-right" }
+      ]
+    },
+    "finale": {
+      "name": "finale",
+      "theme": "wibwob-dark",
+      "windows": [
+        { "role": "backdrop", "open": { "type": "primer", "file": "chromatic-sequencer.txt" }, "layout": "backdrop" }
+      ]
+    }
+  },
+
+  "cues": [
+    { "at": { "t": 0  }, "scene": "intro" },
+    { "at": { "t": 4  }, "patch": { "theme": "wibwob-dark", "set": [
+      { "role": "headline", "open": { "type": "figlet", "text": "WIBWOB", "font": "standard" }, "layout": "top-banner" }
+    ]}},
+    { "at": { "t": 6  }, "command": { "id": "theme.set", "args": { "name": "wibwob-dark-pastel" } } },
+    { "at": { "t": 8  }, "scene": "drop" },
+    { "at": { "t": 10 }, "patch": { "set": [
+      { "role": "sidebar", "open": { "type": "primer", "file": "msdos-vbdos-forms.txt" }, "layout": "sidebar-right" }
+    ]}},
+    { "at": { "t": 12 }, "scene": "breakdown" },
+    { "at": { "t": 14 }, "scene": "finale" }
+  ]
+}

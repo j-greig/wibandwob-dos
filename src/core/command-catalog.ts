@@ -31,6 +31,7 @@ export interface AppMenuActions {
   focusNextWindow: () => void;
   focusPreviousWindow: () => void;
   closeFocusedWindow: () => void;
+  clearDesktop: () => void;
   openBackroomsPrompt: () => void;
   openBackroomsTv: (args?: Record<string, unknown>) => void;
   openBackroomsLogBrowser: () => void;
@@ -478,6 +479,16 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     group: "focus",
     actionKey: "closeFocusedWindow",
     menuPlacements: [{ category: "window", order: 30 }]
+  },
+  {
+    id: "desktop.clear-all",
+    label: "Clear Desktop",
+    description: "Close all windows except the Wib&Wob Agent. Use for silence cues in timelines.",
+    group: "focus",
+    actionKey: "clearDesktop",
+    menuPlacements: [{ category: "window", order: 35 }],
+    api: true,
+    agent: false
   },
 
   {

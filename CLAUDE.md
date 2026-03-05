@@ -371,6 +371,16 @@ Use `GET /help` or `GET /openapi.json` first for the live authoritative endpoint
 - `POST /view/workspace/open`       `{}`
 - `POST /view/palette/open`         `{}`
 - `POST /view/inspector/open`       `{}`
+- `POST /view/monster-cam/open`     `{}`
+- `POST /view/music-player/open`    `{}`
+
+Windows with no dedicated /view route — open via POST /commands/run instead:
+- `{"id":"pattern.open","args":{}}`
+- `{"id":"plasma.open","args":{"mood":"circuit|void|chaos|aurora|sunset|acid|deep-space|chrome"}}`
+- `{"id":"plasma.from-primer","args":{"filePath":"/abs/path.txt"}}`
+- `{"id":"contour.open","args":{}}`
+- `{"id":"contour_triptych.open","args":{}}`
+- `{"id":"terrain_lab.open","args":{}}`
 - `POST /windows/focus`             `{"id":N}`
 - `POST /windows/move`              `{"id":N,"left":X,"top":Y}`
 - `POST /windows/resize`            `{"id":N,"width":W,"height":H}`
@@ -386,6 +396,7 @@ Use `GET /help` or `GET /openapi.json` first for the live authoritative endpoint
 
 Quick reference — common commands via POST /commands/run:
 - poetry clock mode:  `{"id":"microapp.wibwob.poetry-clock.set-mode","args":{"mode":"clock"|"sentient","voice":"plain"|"liminal"|"scramble"}}`
+- clear desktop (API/timeline only, NOT agent-callable): `{"id":"desktop.clear-all","args":{}}` — closes all windows except the Wib&Wob Agent; used in VJ timeline silence cues; `agent:false` is intentional
 
 Control parity rule:
 - whenever a new window family, app mode, or user-triggerable command is added, update both:
@@ -533,6 +544,7 @@ Useful one-liners:
 ./scripts/screenshot-window.sh "Title"          # crop of one window
 ./scripts/screenshot-window.sh <id>             # by window id
 ./scripts/minimap.sh                            # spatial map of all windows
+bun run scripts/preview-scene.ts <timeline.json> <scene-name>  # clear+open+position+screenshot a scene in one call
 curl -s http://127.0.0.1:8099/state | python3 -m json.tool   # full state
 curl -s -X POST http://127.0.0.1:8099/view/figlet/open \
   -H "Content-Type: application/json" -d '{"text":"HELLO"}'
