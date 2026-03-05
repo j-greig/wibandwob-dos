@@ -388,6 +388,115 @@ export function createTextBlock(
 }
 
 /** @primitive */
+export interface InputLineProps {
+  placeholder?: string;
+}
+
+/** @primitive */
+export function createInputLine(
+  screen: blessed.Widgets.Screen,
+  onSubmit: (value: string) => void
+): UiPart<InputLineProps> {
+  const node = blessed.textbox({
+    parent: screen,
+    top: 0,
+    left: 0,
+    width: 0,
+    height: 1,
+    mouse: true,
+    keys: true,
+    inputOnFocus: true,
+    style: theme().input ?? theme().body,
+  });
+
+  let placeholder = "";
+
+  const renderPlaceholder = () => {
+    if (!node.getValue() && placeholder) {
+      node.setContent(placeholder);
+    } else if (!node.getValue()) {
+      node.setContent("");
+    }
+  };
+
+  node.on("submit", (value) => {
+    onSubmit((value ?? "").trim());
+    node.clearValue();
+    renderPlaceholder();
+    screen.render();
+  });
+
+  return {
+    node,
+    layout(rect) {
+      applyRect(node, { ...rect, height: 1 });
+    },
+    update(props) {
+      placeholder = props.placeholder ?? "";
+      renderPlaceholder();
+      screen.render();
+    },
+    restyle() {
+      safeSetStyle(node, theme().input ?? theme().body);
+    },
+    destroy() {
+      node.destroy();
+    },
+  };
+}
+
+/** @primitive */
+export interface MessageHistoryEntry {
+  role: "user" | "assistant";
+  content: string;
+}
+
+/** @primitive */
+export interface MessageHistoryProps {
+  entries: MessageHistoryEntry[];
+}
+
+/** @primitive */
+export function createMessageHistory(
+  screen: blessed.Widgets.Screen
+): UiPart<MessageHistoryProps> {
+  const node = blessed.list({
+    parent: screen,
+    top: 0,
+    left: 0,
+    width: 0,
+    height: 0,
+    mouse: true,
+    keys: true,
+    scrollable: true,
+    alwaysScroll: true,
+    scrollbar: createScrollbar(),
+    style: scrollableStyle(theme().body),
+  });
+
+  return {
+    node,
+    layout(rect) {
+      applyRect(node, rect);
+    },
+    update(props) {
+      const formatted = props.entries.map((entry) => {
+        return entry.role === "user" ? `> ${entry.content}` : entry.content;
+      });
+      node.setItems(formatted);
+      node.setScrollPerc(100);
+      screen.render();
+    },
+    restyle() {
+      safeSetStyle(node, scrollableStyle(theme().body));
+    },
+    destroy() {
+      node.destroy();
+    },
+  };
+}
+
+/** @primitive */
 export function createRule(
   parent: blessed.Widgets.Node,
   opts: { axis: "horizontal" | "vertical"; inset?: number }

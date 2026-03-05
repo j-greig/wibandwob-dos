@@ -73,9 +73,9 @@ export function parseTimeline(filePath: string): ParseResult {
     errors.push(`Unsupported version: ${file.version}. Expected 1.`);
   }
 
-  // Validate track
-  if (!file.track) {
-    errors.push("Missing required field: track");
+  // Validate track (optional when running with --no-audio)
+  if (!file.track && !file.noAudio) {
+    // Allow missing track — capture/run scripts accept --no-audio flag
   }
 
   // Validate duration
@@ -277,21 +277,23 @@ export function runTimeline(
     elapsedMs: () => running ? Date.now() - startTime : 0,
   };
 
-  // Resolve track path
+  // Resolve track path — skip audio if noAudio flag set or track absent
   const trackPath = timeline.file.track;
-  if (!fs.existsSync(trackPath)) {
-    callbacks.onError?.(`Track not found: ${trackPath}`);
-    running = false;
-    return handle;
-  }
+  if (!timeline.file.noAudio) {
+    if (!trackPath || !fs.existsSync(trackPath)) {
+      callbacks.onError?.(`Track not found: ${trackPath}`);
+      running = false;
+      return handle;
+    }
 
-  // Start audio
-  try {
-    audioProc = spawn("ffplay", ["-nodisp", "-autoexit", "-loglevel", "quiet", trackPath], { stdio: "ignore" });
-  } catch (e) {
-    callbacks.onError?.(`Failed to start audio: ${e}`);
-    running = false;
-    return handle;
+    // Start audio
+    try {
+      audioProc = spawn("ffplay", ["-nodisp", "-autoexit", "-loglevel", "quiet", trackPath], { stdio: "ignore" });
+    } catch (e) {
+      callbacks.onError?.(`Failed to start audio: ${e}`);
+      running = false;
+      return handle;
+    }
   }
 
   startTime = Date.now();
