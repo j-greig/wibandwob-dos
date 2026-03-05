@@ -436,6 +436,48 @@ export class TR808Audio {
     return this.enabled;
   }
 
+  /**
+   * Bounce current pattern to a WAV file.
+   * Renders one full loop of the pattern at the given tempo.
+   */
+  bouncePattern(
+    instruments: { id: InstrumentId; steps: boolean[]; params: Record<string, number> }[],
+    accent: boolean[],
+    tempo: number,
+    lastStep: number,
+    outPath: string,
+    loops = 2,
+  ): string {
+    const stepDurSec = 60 / tempo / 4; // 16th note duration
+    const loopDurSec = lastStep * stepDurSec;
+    const totalDurSec = loopDurSec * loops;
+    const totalSamples = Math.ceil(totalDurSec * SR);
+    const mix = new Float64Array(totalSamples);
+
+    for (let loop = 0; loop < loops; loop++) {
+      for (let step = 0; step < lastStep; step++) {
+        const stepOffset = Math.floor((loop * loopDurSec + step * stepDurSec) * SR);
+        const isAccented = accent[step];
+
+        for (const inst of instruments) {
+          if (!inst.steps[step]) continue;
+          const synthFn = SYNTH_MAP[inst.id];
+          if (!synthFn) continue;
+
+          const samples = synthFn(inst.params);
+          const vol = isAccented ? 1.2 : 0.9;
+          mixInto(mix, samples, stepOffset, vol);
+        }
+      }
+    }
+
+    // Normalize
+    const normalized = normalize(mix);
+    const wav = encodeWav(normalized);
+    writeFileSync(outPath, wav);
+    return outPath;
+  }
+
   /** Kill all playing sounds and clean up */
   destroy(): void {
     for (const proc of this.procs) {

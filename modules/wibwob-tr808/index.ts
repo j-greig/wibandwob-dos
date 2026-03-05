@@ -411,6 +411,19 @@ export default function setup(host: MicroappHost) {
     if (cmd === "mute") { audio?.setEnabled(false); return; }
     if (cmd === "unmute") { audio?.setEnabled(true); return; }
     if (cmd === "audio toggle") { if (audio) audio.setEnabled(!audio.isEnabled); return; }
+
+    // Bounce
+    const bounceMatch = cmd.match(/^bounce(?:\s+(.+))?$/);
+    if (bounceMatch && audio) {
+      const path = bounceMatch[1]?.trim() || `/tmp/tr808-bounce-${Date.now()}.wav`;
+      const instruments = INSTRUMENTS.map(inst => ({
+        id: inst.id,
+        steps: engine.getSteps(inst.id),
+        params: Object.fromEntries(inst.params.map(p => [p.id, engine.getParam(inst.id, p.id)])),
+      }));
+      audio.bouncePattern(instruments, engine.getSteps("accent"), engine.tempo, engine.pattern.lastStep, path);
+      return;
+    }
   }
 
   // ── Register commands ───────────────────────────────────
@@ -542,6 +555,36 @@ export default function setup(host: MicroappHost) {
       if (typeof args.number === "number") slot.number = args.number;
       if (typeof args.variation === "string") slot.variation = args.variation.toUpperCase();
       engine.setSlot(slot as any);
+    },
+  });
+
+  host.registerCommand({
+    id: "bounce",
+    label: "TR-808: Bounce to WAV",
+    description: 'Bounce current pattern to WAV file. Args: { path?: string, loops?: number }. Returns the output path.',
+    direct: true,
+    action: (args) => {
+      if (!engine || !audio) return;
+      const loops = typeof args?.loops === "number" ? args.loops : 2;
+      const defaultPath = `/tmp/tr808-bounce-${Date.now()}.wav`;
+      const outPath = typeof args?.path === "string" ? args.path : defaultPath;
+
+      const instruments = INSTRUMENTS.map(inst => ({
+        id: inst.id,
+        steps: engine!.getSteps(inst.id),
+        params: Object.fromEntries(inst.params.map(p => [p.id, engine!.getParam(inst.id, p.id)])),
+      }));
+
+      audio.bouncePattern(
+        instruments,
+        engine.getSteps("accent"),
+        engine.tempo,
+        engine.pattern.lastStep,
+        outPath,
+        loops,
+      );
+
+      return outPath;
     },
   });
 

@@ -500,6 +500,29 @@ else
   fail "Input handler" "Expected tempo=180, got $TEMPO"
 fi
 
+# ── Test 19: Bounce to WAV ────────────────────────────────
+
+log "Test 19: Bounce pattern to WAV"
+# Load a preset first
+api_post "/commands/run" '{"id":"microapp.wibwob.tr808.load-preset","args":{"preset":"electro"}}' > /dev/null
+sleep 0.5
+
+BOUNCE_PATH="/tmp/tr808-smoke-bounce-$$.wav"
+api_post "/commands/run" "{\"id\":\"microapp.wibwob.tr808.bounce\",\"args\":{\"path\":\"$BOUNCE_PATH\",\"loops\":1}}" > /dev/null
+sleep 1
+
+if [ -f "$BOUNCE_PATH" ]; then
+  SIZE=$(stat -f%z "$BOUNCE_PATH" 2>/dev/null || stat -c%s "$BOUNCE_PATH" 2>/dev/null || echo "0")
+  if [ "$SIZE" -gt 1000 ]; then
+    pass "Bounced pattern to WAV ($SIZE bytes)"
+  else
+    fail "Bounce" "File too small: $SIZE bytes"
+  fi
+  rm -f "$BOUNCE_PATH"
+else
+  fail "Bounce" "WAV file not created at $BOUNCE_PATH"
+fi
+
 # ── Cleanup: close the window ────────────────────────────
 
 api_post "/windows/close" "{\"id\":${TR808_ID}}" > /dev/null
