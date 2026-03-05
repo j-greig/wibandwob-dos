@@ -205,6 +205,10 @@ export class TR808Engine {
   private timer: ReturnType<typeof setInterval> | null = null;
   private listeners: EngineListener[] = [];
 
+  // Per-instrument mute/solo
+  private muted = new Set<InstrumentId>();
+  private soloed = new Set<InstrumentId>();
+
   constructor() {
     // Initialize all pattern slots
     for (const bank of ["A", "B"] as PatternBank[]) {
@@ -299,6 +303,31 @@ export class TR808Engine {
     this.pattern.params[instrument][param] = clamped;
     this.emit({ type: "param-changed", instrument, param, value: clamped });
   }
+
+  // -- Mute/Solo --
+
+  toggleMute(id: InstrumentId): void {
+    if (this.muted.has(id)) this.muted.delete(id);
+    else this.muted.add(id);
+    this.emit({ type: "pattern-changed" });
+  }
+
+  toggleSolo(id: InstrumentId): void {
+    if (this.soloed.has(id)) this.soloed.delete(id);
+    else this.soloed.add(id);
+    this.emit({ type: "pattern-changed" });
+  }
+
+  isMuted(id: InstrumentId): boolean { return this.muted.has(id); }
+  isSoloed(id: InstrumentId): boolean { return this.soloed.has(id); }
+
+  /** Check if an instrument should sound (respects mute + solo) */
+  shouldPlay(id: InstrumentId): boolean {
+    if (this.soloed.size > 0) return this.soloed.has(id);
+    return !this.muted.has(id);
+  }
+
+  get hasSolo(): boolean { return this.soloed.size > 0; }
 
   // -- Global controls --
 
@@ -405,10 +434,10 @@ export class TR808Engine {
     const pat = this.pattern;
     this.currentStep = (this.currentStep + 1) % pat.lastStep;
 
-    // Collect which instruments fire on this step
+    // Collect which instruments fire on this step (respects mute/solo)
     const firing: InstrumentId[] = [];
     for (const inst of INSTRUMENTS) {
-      if (pat.steps[inst.id][this.currentStep]) {
+      if (pat.steps[inst.id][this.currentStep] && this.shouldPlay(inst.id)) {
         firing.push(inst.id);
       }
     }
@@ -478,6 +507,8 @@ export class TR808Engine {
       masterLevel: this.masterLevel,
       preScale: this.preScale,
       swing: this._swing,
+      muted: [...this.muted],
+      soloed: [...this.soloed],
       selectedInstrument: this.selectedInstrument,
       patterns: Object.fromEntries(this.patterns),
     };
@@ -489,6 +520,12 @@ export class TR808Engine {
     if (typeof data.masterLevel === "number") this.masterLevel = data.masterLevel;
     if (typeof data.preScale === "string") this.preScale = data.preScale as PreScale;
     if (typeof data.swing === "number") this._swing = data.swing;
+    if (Array.isArray(data.muted)) {
+      this.muted = new Set(data.muted as InstrumentId[]);
+    }
+    if (Array.isArray(data.soloed)) {
+      this.soloed = new Set(data.soloed as InstrumentId[]);
+    }
     if (data.slot && typeof data.slot === "object") {
       const s = data.slot as Record<string, unknown>;
       if (typeof s.bank === "string") this.currentSlot.bank = s.bank as PatternBank;

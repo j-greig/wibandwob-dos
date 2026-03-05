@@ -247,6 +247,20 @@ export default function setup(host: MicroappHost) {
       render();
     });
 
+    // Mute selected instrument
+    win.body.key(["x"], () => {
+      const sel = engine!.selected;
+      if (sel !== "accent") engine!.toggleMute(sel);
+      render();
+    });
+
+    // Solo selected instrument
+    win.body.key(["o"], () => {
+      const sel = engine!.selected;
+      if (sel !== "accent") engine!.toggleSolo(sel);
+      render();
+    });
+
     // Swing
     win.body.key(["w"], () => {
       const swings = [50, 55, 60, 66, 75];
@@ -291,6 +305,8 @@ export default function setup(host: MicroappHost) {
         label: inst.shortLabel,
         steps: engine!.getSteps(inst.id),
         params: Object.fromEntries(inst.params.map(p => [p.id, engine!.getParam(inst.id, p.id)])),
+        muted: engine!.isMuted(inst.id),
+        soloed: engine!.isSoloed(inst.id),
       })),
       accentSteps: engine!.getSteps("accent"),
       audioEnabled: audio?.isEnabled ?? false,
@@ -419,6 +435,18 @@ export default function setup(host: MicroappHost) {
     // Swing
     const swingMatch = cmd.match(/^swing\s+(\d+)$/);
     if (swingMatch) { engine.swing = parseInt(swingMatch[1]); return; }
+
+    // Mute/solo
+    const muteMatch = cmd.match(/^mute\s+(\w+)$/);
+    if (muteMatch && muteMatch[1] !== "all") {
+      const id = muteMatch[1] as InstrumentId;
+      if (INSTRUMENT_IDS.includes(id)) { engine.toggleMute(id); return; }
+    }
+    const soloMatch = cmd.match(/^solo\s+(\w+)$/);
+    if (soloMatch) {
+      const id = soloMatch[1] as InstrumentId;
+      if (INSTRUMENT_IDS.includes(id)) { engine.toggleSolo(id); return; }
+    }
 
     // Audio
     if (cmd === "mute") { audio?.setEnabled(false); return; }

@@ -104,7 +104,7 @@ export function renderTR808(engine: TR808Engine, width: number, height: number, 
   // ══════════════════════════════════════════════════════════
 
   // Column widths
-  const selectorW = 5;  // "►BD "
+  const selectorW = 7;  // "►BD M  "
   const stepAreaW = STEPS * 3; // "XX " * 16
   const sepW = 3; // " │ "
   const paramW = Math.max(20, innerW - selectorW - stepAreaW - sepW);
@@ -120,8 +120,11 @@ export function renderTR808(engine: TR808Engine, width: number, height: number, 
   // Instrument rows
   for (const inst of INSTRUMENTS) {
     const isSelected = selectedInst === inst.id;
+    const isMuted = engine.isMuted(inst.id);
+    const isSoloed = engine.isSoloed(inst.id);
     const marker = isSelected ? "►" : " ";
-    const label = `${marker}${inst.shortLabel} `;
+    const muteFlag = isSoloed ? "S" : isMuted ? "M" : " ";
+    const label = `${marker}${inst.shortLabel.padEnd(2)}${muteFlag} `;
 
     // Parameter knobs with labels
     const paramParts: string[] = [];
@@ -194,7 +197,7 @@ export function renderTR808(engine: TR808Engine, width: number, height: number, 
   // Controls
   lines.push(woodL + "═".repeat(innerW) + woodR);
   const ctrl1 = " [SPACE] play/stop  [ENTER] toggle step  [1-0,-,=] instrument  [BKSP] CH  [`] accent";
-  const ctrl2 = " [a/z] tempo  [v] var  [b] bank  [F1-8] pattern  [p] preset  [c] clear  [s] scale  [m] mute";
+  const ctrl2 = " [a/z] tempo  [v] var  [b] bank  [F1-8] pat  [p] preset  [c] clear  [s] scale  [w] swing  [x] mute  [o] solo  [m] audio";
   lines.push(woodL + padRight(ctrl1, innerW) + woodR);
   lines.push(woodL + padRight(ctrl2, innerW) + woodR);
   lines.push(woodL + "═".repeat(innerW) + woodR);
