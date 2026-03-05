@@ -59,7 +59,7 @@ function padRight(text: string, width: number): string {
   return text.slice(0, width).padEnd(width, " ");
 }
 
-export function renderTR808(engine: TR808Engine, width: number, height: number): string {
+export function renderTR808(engine: TR808Engine, width: number, height: number, audioEnabled = false): string {
   const lines: string[] = [];
   const safeWidth = Number.isFinite(width) ? Math.floor(width) : 80;
   const safeHeight = Number.isFinite(height) ? Math.floor(height) : 24;
@@ -80,7 +80,8 @@ export function renderTR808(engine: TR808Engine, width: number, height: number):
   const scale = `SCALE:${engine.scaleLabel}`;
   const master = `MASTER:${engine.master}%`;
   const accentLvl = `ACCENT:${engine.accent}%`;
-  const statusParts = [transport, tempo, bank, variation, scale, master, accentLvl];
+  const audioLabel = audioEnabled ? "♪ ON" : "♪ OFF";
+  const statusParts = [transport, tempo, bank, variation, scale, master, accentLvl, audioLabel];
   const statusLine = ` ${statusParts.join("  │  ")} `;
   lines.push(padRight(statusLine, w));
   lines.push("─".repeat(w));
@@ -174,6 +175,7 @@ export function renderTR808(engine: TR808Engine, width: number, height: number):
     "[p] preset",
     "[c] clear",
     "[s] scale",
+    "[m] mute",
   ];
   lines.push(` ${controls2.join("  ")}`);
 

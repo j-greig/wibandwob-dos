@@ -17,6 +17,7 @@ import {
   type PreScale,
 } from "./engine.js";
 import { renderTR808, summarizeState } from "./renderer.js";
+import { TR808Audio } from "./audio.js";
 
 // Key map: keyboard key → instrument selector index
 // 1=BD, 2=SD, 3=LT, 4=MT, 5=HT, 6=RS, 7=CB, 8=CP, 9=MA, 0=CL, -=CY, ==OH
@@ -89,10 +90,21 @@ type MicroappHost = {
 
 export default function setup(host: MicroappHost) {
   let engine: TR808Engine | undefined;
+  let audio: TR808Audio | undefined;
   let stepCursor = 0; // keyboard step cursor for manual step editing
 
   function openDrumMachine(args?: Record<string, unknown>) {
     engine = new TR808Engine();
+
+    // Initialize audio
+    audio = new TR808Audio();
+    const allParams: Record<string, Record<string, number>> = {};
+    for (const inst of INSTRUMENTS) {
+      allParams[inst.id] = Object.fromEntries(
+        inst.params.map(p => [p.id, engine!.getParam(inst.id, p.id)])
+      );
+    }
+    audio.renderSamples(allParams as any);
 
     // Restore from snapshot if provided
     if (args && typeof args === "object") {
@@ -129,7 +141,7 @@ export default function setup(host: MicroappHost) {
 
       const w = Math.max(80, innerW);
       const h = Math.max(1, innerH - 2);
-      const content = renderTR808(engine, w, h);
+      const content = renderTR808(engine, w, h, audio?.isEnabled ?? false);
       headerBar.update({
         left: "TR-808 Rhythm Composer",
         right: `${engine.state === "playing" ? "PLAY" : "STOP"} ${engine.tempo} BPM`,
@@ -142,8 +154,24 @@ export default function setup(host: MicroappHost) {
       host.screen.render();
     }
 
-    // Engine events → re-render
-    const unsub = engine.on(() => render());
+    // Engine events → re-render + audio
+    const unsub = engine.on((event) => {
+      if (event.type === "step" && audio) {
+        audio.playStep(event.instruments, event.accent);
+      }
+      if (event.type === "param-changed" && audio) {
+        // Re-render the changed instrument's sample
+        const params: Record<string, number> = {};
+        const inst = INSTRUMENTS.find(i => i.id === event.instrument);
+        if (inst) {
+          for (const p of inst.params) {
+            params[p.id] = engine!.getParam(inst.id, p.id);
+          }
+          audio.renderSingle(event.instrument, params);
+        }
+      }
+      render();
+    });
 
     // ── Keyboard bindings ──────────────────────────────────
 
@@ -219,6 +247,12 @@ export default function setup(host: MicroappHost) {
       render();
     });
 
+    // Audio mute toggle
+    win.body.key(["m"], () => {
+      if (audio) audio.setEnabled(!audio.isEnabled);
+      render();
+    });
+
     // Close
     win.body.key(["q", "escape"], () => win.close());
 
@@ -250,18 +284,21 @@ export default function setup(host: MicroappHost) {
         params: Object.fromEntries(inst.params.map(p => [p.id, engine!.getParam(inst.id, p.id)])),
       })),
       accentSteps: engine!.getSteps("accent"),
+      audioEnabled: audio?.isEnabled ?? false,
     }));
 
     win.captureText(() => {
       const w = Math.max(80, Number(win.body.width) || 80);
       const h = Math.max(1, (Number(win.body.height) || 24) - 2);
-      return renderTR808(engine!, w, h);
+      return renderTR808(engine!, w, h, audio?.isEnabled ?? false);
     });
 
     // ── Cleanup ───────────────────────────────────────────
     win.onCleanup(() => {
       unsub();
       root.destroy();
+      audio?.destroy();
+      audio = undefined;
       engine!.destroy();
       engine = undefined;
     });
@@ -369,6 +406,11 @@ export default function setup(host: MicroappHost) {
     // Last step
     const lastMatch = cmd.match(/^laststep\s+(\d+)$/);
     if (lastMatch) { engine.setLastStep(parseInt(lastMatch[1])); return; }
+
+    // Audio
+    if (cmd === "mute") { audio?.setEnabled(false); return; }
+    if (cmd === "unmute") { audio?.setEnabled(true); return; }
+    if (cmd === "audio toggle") { if (audio) audio.setEnabled(!audio.isEnabled); return; }
   }
 
   // ── Register commands ───────────────────────────────────
