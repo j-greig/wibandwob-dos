@@ -2,6 +2,7 @@
 
 WibWob-DOS is a terminal-native TypeScript desktop shell.
 Runtime: Bun. Renderer: blessed. Entry: `src/app.ts`.
+Concept: proactive, autonomous AI/agent has equal control of OS with a human.
 
 @.agents/architecture.md
 @.agents/invariants.md
