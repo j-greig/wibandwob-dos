@@ -24,6 +24,7 @@ type Tag = "APP " | "CMD " | "MSG " | "SYS " | "API " | "ERR ";
 
 let currentDate = "";
 let logPath = "";
+let identityPrefix = "";
 
 function ensureLogFile(): string {
   const today = new Date().toISOString().slice(0, 10);
@@ -41,13 +42,16 @@ function ts(): string {
 
 function write(tag: Tag, message: string): void {
   try {
-    appendFileSync(ensureLogFile(), `${ts()} ${tag} ${message}\n`);
+    appendFileSync(ensureLogFile(), `${ts()} ${tag}${identityPrefix}${message}\n`);
   } catch {
     // Silent — logging must never crash the app
   }
 }
 
 export const log = {
+  setIdentity: (identity: string) => {
+    identityPrefix = identity.trim() ? `[${identity.trim()}] ` : "";
+  },
   app: (message: string) => write("APP ", message),
   cmd: (message: string) => write("CMD ", message),
   msg: (message: string) => write("MSG ", message),

@@ -12,3 +12,6 @@ e004-monster-cam — in-progress @ origin/worktree-e004-monster-cam
 e014-theme-system — done
 e015-microapp-modules — done
 e016-microapp-primitives — done
+e017-scramble-brains — not-started
+e018-contour-studio-v2-terrain-foundation — in-progress
+e019-rogue-tui-port — not-started

@@ -7,8 +7,8 @@ export { theme, themeName, setThemeVariant, allVariants, registerExternalTheme }
 export type { StylePair, ThemeTokens, ThemeVariant } from "./theme/types.js";
 
 // src/core/ui-parts.ts
-export { createStack, createColumns, createHeaderBar, createStatusBar, createTextBlock, createRule, createFigletDisplay, createAnimatedPanel } from "./ui-parts.js";
-export type { Rect, UiPart, StackChild } from "./ui-parts.js";
+export { createStack, createColumns, createHeaderBar, createStatusBar, createTextBlock, createInputLine, createMessageHistory, createRule, createFigletDisplay, createAnimatedPanel } from "./ui-parts.js";
+export type { Rect, UiPart, StackChild, InputLineProps, MessageHistoryEntry, MessageHistoryProps } from "./ui-parts.js";
 
 // src/core/ui-primitives.ts
 export { createScrollbar, scrollableStyle, safeSetStyle, isRightClick } from "./ui-primitives.js";

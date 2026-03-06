@@ -32,6 +32,7 @@ import path from "node:path";
 import type { BackroomsChannel, DesktopState } from "../core/types.js";
 import type { CommandSurface, CommandListItem, CommandRunResult } from "../core/command-registry.js";
 import { log } from "./app-logger.js";
+import { worldChatService, formatWorldChannelText } from "./world-chat-service.js";
 
 interface ControlApiHandlers {
   getState: () => DesktopState;
@@ -43,6 +44,11 @@ interface ControlApiHandlers {
   windows: import("../core/window-facade.js").WindowFacade;
   /** Blessed screen.screenshot() — returns full TUI as ANSI text. */
   screenshotText: () => string;
+}
+
+interface ControlApiIdentity {
+  instanceLabel?: string;
+  sessionId: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -57,6 +63,10 @@ const ENDPOINT_CATALOGUE = [
   { method: "GET",  path: "/state",                         description: "Full live desktop + window state" },
   { method: "GET",  path: "/commands/list",                 description: "All registered commands (optional ?surface=menu|palette|api|agent)" },
   { method: "GET",  path: "/content/primer-info",           description: "Primer content metadata. ?path=/abs/path.txt" },
+  { method: "GET",  path: "/world-chat/state",              description: "Structured world chat snapshot outside the TUI" },
+  { method: "GET",  path: "/world-chat/channels",           description: "List world chat channels outside the TUI" },
+  { method: "GET",  path: "/world-chat/channel",            description: "Read one world chat channel. ?id=%23world-ridge-overlook" },
+  { method: "GET",  path: "/world-chat/channel/text",       description: "Plain text export of one world chat channel. ?id=%23world-ridge-overlook" },
   { method: "GET",  path: "/windows/text",                  description: "Raw text content of a window. ?id=N" },
   { method: "GET",  path: "/screenshot/text",               description: "ANSI-stripped text screenshot of a window. ?id=N" },
   { method: "POST", path: "/commands/run",                  body: { id: "string (command id, canonical)", command: "string (deprecated alias for id)", args: "object (optional)" } },
@@ -131,6 +141,7 @@ export class ControlApiService {
   constructor(
     private readonly port: number,
     private readonly handlers: ControlApiHandlers,
+    private readonly identity: ControlApiIdentity,
   ) {}
 
   start(): void {
@@ -197,6 +208,8 @@ export class ControlApiService {
         ok: true,
         service: "wibwob-ts-tui-control-api",
         port: this.actualPort,
+        instanceLabel: this.identity.instanceLabel,
+        sessionId: this.identity.sessionId,
         docs: "GET /openapi.json for full OpenAPI 3.0 spec",
         endpoints: ENDPOINT_CATALOGUE,
       });
@@ -207,7 +220,12 @@ export class ControlApiService {
     }
 
     if (request.method === "GET" && url.pathname === "/health") {
-      return Response.json({ ok: true, port: this.actualPort });
+      return Response.json({
+        ok: true,
+        port: this.actualPort,
+        instanceLabel: this.identity.instanceLabel,
+        sessionId: this.identity.sessionId,
+      });
     }
 
     if (request.method === "GET" && url.pathname === "/state") {
@@ -227,6 +245,41 @@ export class ControlApiService {
       const pathOrName =
         url.searchParams.get("path") ?? url.searchParams.get("name") ?? "";
       return Response.json(this.handlers.getPrimerInfo(pathOrName));
+    }
+    if (request.method === "GET" && url.pathname === "/world-chat/state") {
+      return Response.json({
+        ok: true,
+        ...worldChatService.snapshot(),
+      });
+    }
+    if (request.method === "GET" && url.pathname === "/world-chat/channels") {
+      return Response.json({
+        ok: true,
+        worldKey: worldChatService.getCurrentWorldKey(),
+        transport: worldChatService.getTransportStatus(),
+        channels: worldChatService.listChannels(),
+      });
+    }
+    if (request.method === "GET" && url.pathname === "/world-chat/channel") {
+      const channelId = url.searchParams.get("id") ?? "";
+      const channel = channelId ? worldChatService.readChannel(channelId) : undefined;
+      if (!channel) {
+        return Response.json({ ok: false, error: "channel not found" }, { status: 404 });
+      }
+      return Response.json({ ok: true, channel });
+    }
+    if (request.method === "GET" && url.pathname === "/world-chat/channel/text") {
+      const channelId = url.searchParams.get("id") ?? "";
+      const channel = channelId ? worldChatService.readChannel(channelId) : undefined;
+      if (!channel) {
+        return new Response("channel not found\n", {
+          status: 404,
+          headers: { "Content-Type": "text/plain; charset=utf-8" },
+        });
+      }
+      return new Response(`${formatWorldChannelText(channel)}\n`, {
+        headers: { "Content-Type": "text/plain; charset=utf-8" },
+      });
     }
     if (request.method === "GET" && url.pathname === "/screenshot/text") {
       const rawId = url.searchParams.get("id");

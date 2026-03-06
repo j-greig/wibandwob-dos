@@ -261,7 +261,9 @@ function createMicroappHost(
     },
 
     runCommand(localId, args) {
-      const fullId = `microapp.${moduleId}.${localId}`;
+      const fullId = localId.startsWith("microapp.")
+        ? localId
+        : `microapp.${moduleId}.${localId}`;
       commands.run(fullId, args);
     },
 

@@ -13,6 +13,7 @@ export interface AppMenuActions {
   openFileManager: () => void;
   openPrimerPrompt: (args?: Record<string, unknown>) => void;
   listPrimers: () => unknown;
+  smearTextSurface: (args?: Record<string, unknown>) => unknown;
   openTextFile: (args?: Record<string, unknown>) => void;
   openEditor: () => void;
   saveFocusedEditor: () => void;
@@ -31,6 +32,7 @@ export interface AppMenuActions {
   focusNextWindow: () => void;
   focusPreviousWindow: () => void;
   closeFocusedWindow: () => void;
+  clearDesktop: () => void;
   openBackroomsPrompt: () => void;
   openBackroomsTv: (args?: Record<string, unknown>) => void;
   openBackroomsLogBrowser: () => void;
@@ -295,6 +297,18 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     agent: true
   },
   {
+    id: "text.smear",
+    label: "Smear Text Surface",
+    description: "Run scripts/smear.py on a file-backed text surface. Args: filePath (string, optional; defaults to focused file-backed primer/reader/editor), mode (wipe|shear|glitch|stretch, default wipe), width (number, optional), at/tile/skew/seed/intensity (mode-specific options), openAs (primer|reader, optional). Returns {ok, filePath, windowId, sourcePath, kind, mode}.",
+    group: "edit",
+    actionKey: "smearTextSurface",
+    menuPlacements: [{ category: "edit", order: 35 }],
+    palettePlacement: { order: 35 },
+    contextMenu: { windowKinds: ["primer", "reader", "editor"], order: 35 },
+    api: true,
+    agent: true
+  },
+  {
     id: "editor.open",
     label: "Open Text File...",
     description: "Open a text file in the editor. Args: filePath (string), title (string, optional), initial (string, optional). Without args opens interactive file picker.",
@@ -478,6 +492,16 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     group: "focus",
     actionKey: "closeFocusedWindow",
     menuPlacements: [{ category: "window", order: 30 }]
+  },
+  {
+    id: "desktop.clear-all",
+    label: "Clear Desktop",
+    description: "Close all windows except the Wib&Wob Agent. Use for silence cues in timelines.",
+    group: "focus",
+    actionKey: "clearDesktop",
+    menuPlacements: [{ category: "window", order: 35 }],
+    api: true,
+    agent: false
   },
 
   {

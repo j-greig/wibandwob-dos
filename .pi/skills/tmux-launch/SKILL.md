@@ -5,38 +5,73 @@ description: Launch WibWob-DOS + API server in a tmux session. Kills existing pr
 
 # tmux-launch
 
-Clean launch of wwdos TUI + API server in tmux. One command, handles everything.
+Launch WibWob-DOS (TypeScript/blessed, bun runtime) in a tmux session.
 
-## Usage
+## CRITICAL — screenshots need a visible terminal
+
+if using the studio setup with 2 displays, `screencapture -D 2` grabs display 2 pixel-for-pixel. If the tmux terminal
+window is not VISIBLE and POSITIONED on display 2, every screenshot will be
+identical garbage (whatever else is on that display). at home zilla only has 1 display (most of the time) but ask him if not sure.
+
+**Before running any smoke test or VJ capture:**
+1. Open a terminal window
+2. `tmux attach -t wibwob-screenshot`
+3. Drag that terminal window to the external monitor (display 2)
+4. Make it as large as possible — fullscreen is ideal
+5. Only then run the smoke test
+
+## Start the app (fresh)
 
 ```bash
-./scripts/tmux-launch.sh [session-name]
+cd /Users/james/Repos/wibandwob-dos
+
+# Kill anything on port 8099 first
+lsof -ti:8099 | xargs kill -9 2>/dev/null; true
+
+# Start in tmux
+tmux new-session -d -s wibwob-screenshot -x 281 -y 81
+tmux send-keys -t wibwob-screenshot "CONTROL_API_PORT=8099 bun run dev" Enter
+
+# Wait for API
+sleep 6 && curl -s http://127.0.0.1:8099/health
 ```
 
-Default session name: `wibwob`. Socket becomes `/tmp/wibwob_<session>.sock`, API on port 8090.
+## Attach to running session
 
-Override API port with `WIBWOB_PORT=8091 ./scripts/tmux-launch.sh test2`.
+```bash
+tmux attach -t wibwob-screenshot
+```
 
-## What it does
+Then move the terminal window to the external monitor. Fullscreen it.
 
-1. Kills any existing API on the port
-2. Kills existing tmux session with that name
-3. Removes stale socket
-4. Creates tmux session 200x55
-5. Launches `./build/app/wwdos` with `WIBWOB_INSTANCE=<session>`
-6. Waits for socket (up to 15s)
-7. Starts API server in background
-8. Verifies API responds
+## Check if running
 
-## After launch
+```bash
+curl -s http://127.0.0.1:8099/health   # → {"ok":true,"port":8099}
+tmux ls                                 # → wibwob-screenshot: 1 windows
+```
 
-- Human attaches: `tmux attach -t wibwob`
-- Agent uses API: `curl http://127.0.0.1:8090/state`
-- Debug log: `/tmp/wibwob_debug_<session>.log`
-- API log: `/tmp/api_<session>.log`
+## Session name / port
 
-## CRITICAL
+| Var | Value |
+|-----|-------|
+| tmux session | `wibwob-screenshot` |
+| API port | `8099` |
+| screencapture display | `2` (external monitor) |
+| desktop size | 281×81 |
 
-- NEVER kill the wwdos process directly with kill -9. Use this script to do clean restarts.
-- The script sends tmux kill-session which lets wwdos clean up mouse tracking.
-- If you just need to restart the API (stateless), kill uvicorn and relaunch — don't touch the TUI.
+Override port: `CONTROL_API_PORT=8098 bun run dev`
+Override display: `DISPLAY_NUM=1 ./tests/timeline-smoke/run.sh ...`
+
+## Kill / restart
+
+```bash
+# Kill session (clean)
+tmux kill-session -t wibwob-screenshot
+
+# Kill port
+lsof -ti:8099 | xargs kill -9 2>/dev/null; true
+```
+
+Never `kill -9` the bun process directly — tmux kill-session lets blessed
+clean up mouse tracking and terminal state properly.

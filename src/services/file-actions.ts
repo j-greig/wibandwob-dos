@@ -13,7 +13,10 @@ export function promptForPrimerFile(params: {
   repoRoot: string;
   onOpenPrimer: (filePath: string) => void;
 }): void {
-  params.overlays.openFileBrowserPrompt("Open Primer", params.repoRoot, (filePath) => params.onOpenPrimer(filePath), {
+  // Prefer the private primers collection; fall back to repo root.
+  const privateprimers = path.join(params.repoRoot, "modules-private", "wibwob-primers", "primers");
+  const startDir = fs.existsSync(privateprimers) ? privateprimers : params.repoRoot;
+  params.overlays.openFileBrowserPrompt("Open Primer", startDir, (filePath) => params.onOpenPrimer(filePath), {
     fileFilter: (filePath, isDirectory) => isDirectory || params.content.isTextLikeFile(path.basename(filePath)),
     previewLimit: 5000
   });

@@ -8,9 +8,9 @@
 import {
   TR808Engine,
   INSTRUMENTS,
-  INSTRUMENT_IDS,
   STEPS,
   PRESET_NAMES,
+  isValidPatternNumber,
   type InstrumentId,
   type PatternBank,
   type PatternVariation,
@@ -88,6 +88,14 @@ type MicroappHost = {
   };
 };
 
+function collectInstrumentParams(engine: TR808Engine, inst: (typeof INSTRUMENTS)[number]): Record<string, number> {
+  return Object.fromEntries(inst.params.map(p => [p.id, engine.getParam(inst.id, p.id)]));
+}
+
+function isValidInstrumentId(id: string, engine: TR808Engine): id is InstrumentId {
+  return engine.getInstrumentIds().includes(id as InstrumentId);
+}
+
 export default function setup(host: MicroappHost) {
   let engine: TR808Engine | undefined;
   let audio: TR808Audio | undefined;
@@ -95,16 +103,10 @@ export default function setup(host: MicroappHost) {
 
   function openDrumMachine(args?: Record<string, unknown>) {
     engine = new TR808Engine();
+    const sampleRerenderTimers = new Map<InstrumentId, ReturnType<typeof setTimeout>>();
 
     // Initialize audio
     audio = new TR808Audio();
-    const allParams: Record<string, Record<string, number>> = {};
-    for (const inst of INSTRUMENTS) {
-      allParams[inst.id] = Object.fromEntries(
-        inst.params.map(p => [p.id, engine!.getParam(inst.id, p.id)])
-      );
-    }
-    audio.renderSamples(allParams as any);
 
     // Restore from snapshot if provided
     if (args && typeof args === "object") {
@@ -115,6 +117,13 @@ export default function setup(host: MicroappHost) {
         engine.loadPreset(args.preset);
       }
     }
+
+    // Ensure all samples are rendered before any playback starts.
+    const allParams: Record<InstrumentId, Record<string, number>> = {} as Record<InstrumentId, Record<string, number>>;
+    for (const inst of INSTRUMENTS) {
+      allParams[inst.id] = collectInstrumentParams(engine, inst);
+    }
+    audio.renderSamples(allParams);
 
     const win = host.createWindow({
       title: "TR-808 Rhythm Composer",
@@ -161,13 +170,16 @@ export default function setup(host: MicroappHost) {
       }
       if (event.type === "param-changed" && audio) {
         // Re-render the changed instrument's sample
-        const params: Record<string, number> = {};
         const inst = INSTRUMENTS.find(i => i.id === event.instrument);
         if (inst) {
-          for (const p of inst.params) {
-            params[p.id] = engine!.getParam(inst.id, p.id);
-          }
-          audio.renderSingle(event.instrument, params);
+          const existing = sampleRerenderTimers.get(event.instrument);
+          if (existing) clearTimeout(existing);
+          const timer = setTimeout(() => {
+            sampleRerenderTimers.delete(event.instrument);
+            const params = collectInstrumentParams(engine!, inst);
+            audio?.renderSingle(event.instrument, params);
+          }, 50);
+          sampleRerenderTimers.set(event.instrument, timer);
         }
       }
       render();
@@ -311,7 +323,7 @@ export default function setup(host: MicroappHost) {
         id: inst.id,
         label: inst.shortLabel,
         steps: engine!.getSteps(inst.id),
-        params: Object.fromEntries(inst.params.map(p => [p.id, engine!.getParam(inst.id, p.id)])),
+        params: collectInstrumentParams(engine!, inst),
         muted: engine!.isMuted(inst.id),
         soloed: engine!.isSoloed(inst.id),
       })),
@@ -328,6 +340,10 @@ export default function setup(host: MicroappHost) {
     // ── Cleanup ───────────────────────────────────────────
     win.onCleanup(() => {
       unsub();
+      for (const timer of sampleRerenderTimers.values()) {
+        clearTimeout(timer);
+      }
+      sampleRerenderTimers.clear();
       root.destroy();
       audio?.destroy();
       audio = undefined;
@@ -365,8 +381,10 @@ export default function setup(host: MicroappHost) {
     // Select instrument
     const selMatch = cmd.match(/^select\s+(\w+)$/);
     if (selMatch) {
-      const id = selMatch[1] as InstrumentId | "accent";
-      if (INSTRUMENT_IDS.includes(id as InstrumentId) || id === "accent") {
+      const id = selMatch[1];
+      if (id === "accent") {
+        engine.selectInstrument("accent");
+      } else if (isValidInstrumentId(id, engine)) {
         engine.selectInstrument(id);
       }
       return;
@@ -375,9 +393,12 @@ export default function setup(host: MicroappHost) {
     // Toggle step: "toggle 0" or "toggle bd 4"
     const toggleMatch = cmd.match(/^toggle\s+(?:(\w+)\s+)?(\d+)$/);
     if (toggleMatch) {
-      const inst = toggleMatch[1] as InstrumentId | "accent" | undefined;
+      const instText = toggleMatch[1];
       const step = parseInt(toggleMatch[2]);
       if (step >= 0 && step < STEPS) {
+        const inst = instText === "accent"
+          ? "accent"
+          : (instText && isValidInstrumentId(instText, engine) ? instText : undefined);
         engine.toggleStep(step, inst);
       }
       return;
@@ -386,10 +407,11 @@ export default function setup(host: MicroappHost) {
     // Set step: "set bd 0 on" or "set bd 0 off"
     const setMatch = cmd.match(/^set\s+(\w+)\s+(\d+)\s+(on|off)$/);
     if (setMatch) {
-      const inst = setMatch[1] as InstrumentId | "accent";
+      const instText = setMatch[1];
       const step = parseInt(setMatch[2]);
       const active = setMatch[3] === "on";
-      if (step >= 0 && step < STEPS) {
+      if (step >= 0 && step < STEPS && (instText === "accent" || isValidInstrumentId(instText, engine))) {
+        const inst = instText === "accent" ? "accent" : instText;
         engine.setStep(step, active, inst);
       }
       return;
@@ -398,7 +420,8 @@ export default function setup(host: MicroappHost) {
     // Param: "param bd tune 75"
     const paramMatch = cmd.match(/^param\s+(\w+)\s+(\w+)\s+(\d+)$/);
     if (paramMatch) {
-      const inst = paramMatch[1] as InstrumentId;
+      const inst = paramMatch[1];
+      if (!isValidInstrumentId(inst, engine)) return;
       const param = paramMatch[2];
       const value = parseInt(paramMatch[3]);
       engine.setParam(inst, param, value);
@@ -413,7 +436,13 @@ export default function setup(host: MicroappHost) {
     if (varMatch) { engine.setSlot({ variation: varMatch[1].toUpperCase() as PatternVariation }); return; }
 
     const patMatch = cmd.match(/^pattern\s+(\d)$/);
-    if (patMatch) { engine.setSlot({ number: parseInt(patMatch[1]) }); return; }
+    if (patMatch) {
+      const patternNumber = parseInt(patMatch[1]);
+      if (isValidPatternNumber(patternNumber)) {
+        engine.setSlot({ number: patternNumber });
+      }
+      return;
+    }
 
     // Preset
     const presetMatch = cmd.match(/^preset\s+(.+)$/);
@@ -446,13 +475,13 @@ export default function setup(host: MicroappHost) {
     // Mute/solo
     const muteMatch = cmd.match(/^mute\s+(\w+)$/);
     if (muteMatch && muteMatch[1] !== "all") {
-      const id = muteMatch[1] as InstrumentId;
-      if (INSTRUMENT_IDS.includes(id)) { engine.toggleMute(id); return; }
+      const id = muteMatch[1];
+      if (isValidInstrumentId(id, engine)) { engine.toggleMute(id); return; }
     }
     const soloMatch = cmd.match(/^solo\s+(\w+)$/);
     if (soloMatch) {
-      const id = soloMatch[1] as InstrumentId;
-      if (INSTRUMENT_IDS.includes(id)) { engine.toggleSolo(id); return; }
+      const id = soloMatch[1];
+      if (isValidInstrumentId(id, engine)) { engine.toggleSolo(id); return; }
     }
 
     // Audio
@@ -473,9 +502,9 @@ export default function setup(host: MicroappHost) {
       const instruments = INSTRUMENTS.map(inst => ({
         id: inst.id,
         steps: engine.getSteps(inst.id),
-        params: Object.fromEntries(inst.params.map(p => [p.id, engine.getParam(inst.id, p.id)])),
+        params: collectInstrumentParams(engine, inst),
       }));
-      audio.bouncePattern(instruments, engine.getSteps("accent"), engine.tempo, engine.pattern.lastStep, path);
+      audio.bouncePattern(instruments, engine.getSteps("accent"), engine.stepDurationMs, engine.pattern.lastStep, path);
       return;
     }
   }
@@ -527,7 +556,9 @@ export default function setup(host: MicroappHost) {
     direct: true,
     action: (args) => {
       if (engine && typeof args?.instrument === "string") {
-        engine.selectInstrument(args.instrument as InstrumentId | "accent");
+        if (args.instrument === "accent" || isValidInstrumentId(args.instrument, engine)) {
+          engine.selectInstrument(args.instrument);
+        }
       }
     },
   });
@@ -539,7 +570,10 @@ export default function setup(host: MicroappHost) {
     direct: true,
     action: (args) => {
       if (engine && typeof args?.step === "number") {
-        const inst = typeof args?.instrument === "string" ? args.instrument as InstrumentId | "accent" : undefined;
+        const inst = typeof args?.instrument === "string" &&
+          (args.instrument === "accent" || isValidInstrumentId(args.instrument, engine))
+          ? args.instrument
+          : undefined;
         engine.toggleStep(args.step, inst);
       }
     },
@@ -552,7 +586,10 @@ export default function setup(host: MicroappHost) {
     direct: true,
     action: (args) => {
       if (engine && typeof args?.step === "number" && typeof args?.active === "boolean") {
-        const inst = typeof args?.instrument === "string" ? args.instrument as InstrumentId | "accent" : undefined;
+        const inst = typeof args?.instrument === "string" &&
+          (args.instrument === "accent" || isValidInstrumentId(args.instrument, engine))
+          ? args.instrument
+          : undefined;
         engine.setStep(args.step, args.active, inst);
       }
     },
@@ -565,7 +602,8 @@ export default function setup(host: MicroappHost) {
     direct: true,
     action: (args) => {
       if (engine && typeof args?.instrument === "string" && typeof args?.param === "string" && typeof args?.value === "number") {
-        engine.setParam(args.instrument as InstrumentId, args.param, args.value);
+        if (!isValidInstrumentId(args.instrument, engine)) return;
+        engine.setParam(args.instrument, args.param, args.value);
       }
     },
   });
@@ -592,7 +630,11 @@ export default function setup(host: MicroappHost) {
     action: (args) => {
       if (!engine) return;
       if (args?.all === true) engine.clearPattern();
-      else if (typeof args?.instrument === "string") engine.clearInstrument(args.instrument as InstrumentId | "accent");
+      else if (typeof args?.instrument === "string") {
+        if (args.instrument === "accent" || isValidInstrumentId(args.instrument, engine)) {
+          engine.clearInstrument(args.instrument);
+        }
+      }
       else engine.clearInstrument();
     },
   });
@@ -604,11 +646,11 @@ export default function setup(host: MicroappHost) {
     direct: true,
     action: (args) => {
       if (!engine || !args) return;
-      const slot: Record<string, unknown> = {};
-      if (typeof args.bank === "string") slot.bank = args.bank.toUpperCase();
-      if (typeof args.number === "number") slot.number = args.number;
-      if (typeof args.variation === "string") slot.variation = args.variation.toUpperCase();
-      engine.setSlot(slot as any);
+      const slot: Partial<{ bank: PatternBank; number: number; variation: PatternVariation }> = {};
+      if (args.bank === "A" || args.bank === "B") slot.bank = args.bank;
+      if (typeof args.number === "number" && isValidPatternNumber(args.number)) slot.number = args.number;
+      if (args.variation === "A" || args.variation === "B") slot.variation = args.variation;
+      engine.setSlot(slot);
     },
   });
 
@@ -626,13 +668,13 @@ export default function setup(host: MicroappHost) {
       const instruments = INSTRUMENTS.map(inst => ({
         id: inst.id,
         steps: engine!.getSteps(inst.id),
-        params: Object.fromEntries(inst.params.map(p => [p.id, engine!.getParam(inst.id, p.id)])),
+        params: collectInstrumentParams(engine!, inst),
       }));
 
       audio.bouncePattern(
         instruments,
         engine.getSteps("accent"),
-        engine.tempo,
+        engine.stepDurationMs,
         engine.pattern.lastStep,
         outPath,
         loops,

@@ -13,6 +13,14 @@ if (flags.help) {
   process.exit(0);
 }
 
+function randomSessionId(): string {
+  return Math.random().toString(36).slice(2, 5).padEnd(3, "0");
+}
+
+const instanceLabel = process.env.WIBWOB_INSTANCE_LABEL?.trim() || undefined;
+const sessionId = randomSessionId();
+process.env.WIBWOB_SESSION_ID = sessionId;
+
 const { TsTuiMvpApp } = await import("./core/app-controller.js");
 
-await new TsTuiMvpApp().run();
+await new TsTuiMvpApp({ instanceLabel, sessionId }).run();

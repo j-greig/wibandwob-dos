@@ -10,6 +10,7 @@ import stringWidth from "string-width";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { execFileSync } from "node:child_process";
 import { log } from "../services/app-logger.js";
 
 import {
@@ -149,6 +150,7 @@ export class TsTuiMvpApp {
   private readonly desktop: Box;
   private readonly statusLine: Box;
   private statusKaomoji?: Box;
+  private statusIdentity?: Box;
   private kaomojiBlink = false;
   private kaomojiTimer?: NodeJS.Timeout;
   private readonly menus: MenuConfig[];
@@ -165,8 +167,13 @@ export class TsTuiMvpApp {
   private readonly controlApi: ControlApiService;
   private readonly editor: EditorCoordinator;
   private activeAgentSession?: WibWobAgentSession;
+  private readonly instanceLabel?: string;
+  private readonly sessionId: string;
 
-  constructor() {
+  constructor(opts?: { instanceLabel?: string; sessionId?: string }) {
+    this.instanceLabel = opts?.instanceLabel?.trim() || undefined;
+    this.sessionId = opts?.sessionId?.trim() || "???";
+    log.setIdentity(this.getInstanceDisplayLabel());
     this.screen = blessed.screen({
       smartCSR: true,
       fullUnicode: true,
@@ -242,21 +249,30 @@ export class TsTuiMvpApp {
       defaultDir: SPIKE_ROOT,
       editorStartDir: path.dirname(SPIKE_NOTES_PATH),
     });
-    this.controlApi = new ControlApiService(CONTROL_API_PORT, {
-      getState: () => this.getDesktopState(),
-      syncState: () => this.state.sync(),
-      getPrimerInfo: (pathOrName) => this.getPrimerInfo(pathOrName),
-      listCommands: (surface) => this.commands.list(surface),
-      runCommand: (id, args) => this.commands.run(id, args),
-      windows: this.windowManager,
-      screenshotText: () => (this.screen as any).screenshot() as string,
-    });
+    this.controlApi = new ControlApiService(
+      CONTROL_API_PORT,
+      {
+        getState: () => this.getDesktopState(),
+        syncState: () => this.state.sync(),
+        getPrimerInfo: (pathOrName) => this.getPrimerInfo(pathOrName),
+        listCommands: (surface) => this.commands.list(surface),
+        runCommand: (id, args) => this.commands.run(id, args),
+        windows: this.windowManager,
+        screenshotText: () => (this.screen as any).screenshot() as string,
+      },
+      {
+        instanceLabel: this.instanceLabel,
+        sessionId: this.sessionId,
+      },
+    );
     this.state = new StateService(
       {
         appName: "WibWob-DOS TS MVP",
         appMode: "terminal-native",
         cwd: REPO_ROOT,
         statePath: STATE_PATH,
+        instanceLabel: this.instanceLabel,
+        sessionId: this.sessionId,
         getControlApiStatus: () => this.controlApi.getStatus(),
       },
       {
@@ -295,7 +311,7 @@ export class TsTuiMvpApp {
     this.persistState();
     this.screen.render();
     log.app(
-      `started ${this.screen.width}x${this.screen.height} theme:${themeName()}`,
+      `started ${this.screen.width}x${this.screen.height} theme:${themeName()} instance:${this.getInstanceDisplayLabel()}`,
     );
   }
 
@@ -330,11 +346,13 @@ export class TsTuiMvpApp {
     this.updateStatusLine();
     this.repaintDesktop();
     if (appFlags().dev) this.renderDevControls();
+    this.renderTopIdentity();
     this.renderTopKaomoji();
     this.startKaomojiBlink();
     this.screen.on("resize", () => {
       this.repaintDesktop();
       this.syncLiveState();
+      this.renderTopIdentity();
       this.renderTopKaomoji();
       this.screen.render();
     });
@@ -401,8 +419,9 @@ export class TsTuiMvpApp {
 
   private renderTopKaomoji(): void {
     const text = this.getStatusKaomoji();
+    const identityWidth = stringWidth(` ${this.getInstanceDisplayLabel()} `);
     const baseOffset = appFlags().dev ? 6 : 1;
-    const rightOffset = Math.max(0, baseOffset - 2);
+    const rightOffset = Math.max(0, baseOffset + identityWidth);
     const width = Math.max(1, stringWidth(text));
     if (!this.statusKaomoji) {
       this.statusKaomoji = blessed.box({
@@ -421,6 +440,35 @@ export class TsTuiMvpApp {
     this.statusKaomoji.width = width;
     this.statusKaomoji.setContent(text);
     this.statusKaomoji.style = theme().menuBar;
+  }
+
+  private getInstanceDisplayLabel(): string {
+    return this.instanceLabel
+      ? `${this.instanceLabel} · ${this.sessionId}`
+      : this.sessionId;
+  }
+
+  private renderTopIdentity(): void {
+    const text = ` ${this.getInstanceDisplayLabel()} `;
+    const rightOffset = Math.max(0, appFlags().dev ? 6 : 1);
+    const width = Math.max(1, stringWidth(text));
+    if (!this.statusIdentity) {
+      this.statusIdentity = blessed.box({
+        parent: this.menuBar,
+        top: 0,
+        right: rightOffset,
+        height: 1,
+        width,
+        tags: true,
+        content: text,
+        style: theme().menuBar,
+      });
+      return;
+    }
+    this.statusIdentity.right = rightOffset;
+    this.statusIdentity.width = width;
+    this.statusIdentity.setContent(text);
+    this.statusIdentity.style = theme().menuBar;
   }
 
   private updateStatusLine(): void {
@@ -482,6 +530,7 @@ export class TsTuiMvpApp {
     this.menuUi.restyle();
     this.customCursor?.restyle();
     this.windowManager.restyleAll();
+    this.renderTopIdentity();
     this.renderTopKaomoji();
     this.repaintDesktop();
     this.persistState();
@@ -1323,6 +1372,174 @@ export class TsTuiMvpApp {
     this.loadWorkspace();
   }
 
+  private resolveSmearSource(args?: Record<string, unknown>): {
+    sourcePath: string;
+    outputKind: "primer" | "reader";
+    sourceKind: WindowKind;
+  } | { error: string } {
+    const explicitFilePath =
+      typeof args?.filePath === "string" && args.filePath.trim()
+        ? args.filePath.trim()
+        : undefined;
+    const openAs =
+      args?.openAs === "primer" || args?.openAs === "reader"
+        ? args.openAs
+        : undefined;
+
+    if (explicitFilePath) {
+      return {
+        sourcePath: explicitFilePath,
+        outputKind: openAs ?? "reader",
+        sourceKind: openAs ?? "reader",
+      };
+    }
+
+    const focused = this.windowManager.getFocusedWindow();
+    if (!focused) {
+      return { error: "No focused window and no filePath provided." };
+    }
+    if (!focused.filePath) {
+      return { error: "Focused window is not file-backed. Pass filePath explicitly." };
+    }
+    if (focused.kind !== "primer" && focused.kind !== "reader" && focused.kind !== "editor") {
+      return { error: `Focused window kind "${focused.kind}" is not smearable.` };
+    }
+    return {
+      sourcePath: focused.filePath,
+      outputKind: openAs ?? (focused.kind === "primer" ? "primer" : "reader"),
+      sourceKind: focused.kind,
+    };
+  }
+
+  private smearTextSurface(args?: Record<string, unknown>): {
+    ok: true;
+    filePath: string;
+    windowId?: number;
+    sourcePath: string;
+    kind: "primer" | "reader";
+    mode: string;
+  } | {
+    ok: false;
+    error: string;
+  } {
+    const resolved = this.resolveSmearSource(args);
+    if ("error" in resolved) {
+      this.overlays.flash(resolved.error);
+      return { ok: false, error: resolved.error };
+    }
+
+    const { sourcePath, outputKind } = resolved;
+    if (!fs.existsSync(sourcePath)) {
+      const error = `File not found: ${sourcePath}`;
+      this.overlays.flash(error);
+      return { ok: false, error };
+    }
+
+    const scriptPath = path.join(REPO_ROOT, "scripts", "smear.py");
+    if (!fs.existsSync(scriptPath)) {
+      const error = `Smear script not found: ${scriptPath}`;
+      this.overlays.flash(error);
+      return { ok: false, error };
+    }
+
+    const allowedModes = new Set(["wipe", "shear", "glitch", "stretch", "frames"]);
+    const mode =
+      typeof args?.mode === "string" && allowedModes.has(args.mode)
+        ? args.mode
+        : "wipe";
+
+    const generatedDir = path.join(REPO_ROOT, "scratch", "generated", "smear");
+    fs.mkdirSync(generatedDir, { recursive: true });
+    const slug = path.basename(sourcePath, path.extname(sourcePath)).replace(/[^a-zA-Z0-9_-]/g, "_");
+    const outputPath =
+      typeof args?.outPath === "string" && args.outPath.trim()
+        ? args.outPath.trim()
+        : path.join(generatedDir, `${slug}-${mode}-${Date.now()}.txt`);
+
+    const cmdArgs = [scriptPath, sourcePath, "--mode", mode, "--out", outputPath];
+    const numericArg = (name: string) =>
+      typeof args?.[name] === "number" && Number.isFinite(args[name] as number)
+        ? String(args[name])
+        : undefined;
+
+    const maybeWidth = numericArg("width");
+    const maybeAt = numericArg("at");
+    const maybeTile = numericArg("tile");
+    const maybeSkew = numericArg("skew");
+    const maybeSeed = numericArg("seed");
+    const maybeIntensity = numericArg("intensity");
+    const maybeFrom = numericArg("from");
+    const maybeTo = numericArg("to");
+    const maybeSteps = numericArg("steps");
+    const maybeOutdir =
+      typeof args?.outdir === "string" && args.outdir.trim()
+        ? args.outdir.trim()
+        : undefined;
+
+    if (maybeWidth) cmdArgs.push("--width", maybeWidth);
+    if (maybeAt) cmdArgs.push("--at", maybeAt);
+    if (maybeTile) cmdArgs.push("--tile", maybeTile);
+    if (maybeSkew) cmdArgs.push("--skew", maybeSkew);
+    if (maybeSeed) cmdArgs.push("--seed", maybeSeed);
+    if (maybeIntensity) cmdArgs.push("--intensity", maybeIntensity);
+    if (maybeFrom) cmdArgs.push("--from", maybeFrom);
+    if (maybeTo) cmdArgs.push("--to", maybeTo);
+    if (maybeSteps) cmdArgs.push("--steps", maybeSteps);
+    if (maybeOutdir) cmdArgs.push("--outdir", maybeOutdir);
+
+    try {
+      execFileSync("python3", cmdArgs, {
+        cwd: REPO_ROOT,
+        stdio: ["ignore", "pipe", "pipe"],
+        encoding: "utf8",
+      });
+    } catch (error) {
+      const stderr =
+        error instanceof Error && "stderr" in error && typeof error.stderr === "string"
+          ? error.stderr.trim()
+          : error instanceof Error
+            ? error.message
+            : String(error);
+      const message = `Smear failed: ${stderr || "unknown error"}`;
+      this.overlays.flash(message);
+      return { ok: false, error: message };
+    }
+
+    if (!fs.existsSync(outputPath)) {
+      const error = `Smear output missing: ${outputPath}`;
+      this.overlays.flash(error);
+      return { ok: false, error };
+    }
+
+    const title = path.basename(outputPath);
+    const rawContent = fs.readFileSync(outputPath, "utf8");
+    const opened = outputKind === "primer"
+      ? this.openTextViewerWindow(
+          title,
+          rawContent,
+          "primer",
+          outputPath,
+          { contentMeasurement: measurePrimerContent(rawContent).measurement },
+        )
+      : this.openTextViewerWindow(
+          title,
+          rawContent,
+          "reader",
+          outputPath,
+          { contentMeasurement: measurePlainTextContent(rawContent).measurement },
+        );
+
+    this.overlays.flash(`Smeared ${path.basename(sourcePath)} → ${path.basename(outputPath)}`);
+    return {
+      ok: true,
+      filePath: outputPath,
+      windowId: opened?.id,
+      sourcePath,
+      kind: outputKind,
+      mode,
+    };
+  }
+
   /** Restore a workspace: apply theme, tear down existing windows, replay snapshots, restore focus. */
   private loadWorkspace(): void {
     if (!this.workspace.exists()) {
@@ -1412,6 +1629,7 @@ export class TsTuiMvpApp {
             animated: measurement?.animated ?? false,
           };
         }),
+      smearTextSurface: (args) => this.smearTextSurface(args),
       openTextFile: (args) => {
         const filePath =
           typeof args?.filePath === "string" && args.filePath.trim()
@@ -1485,6 +1703,14 @@ export class TsTuiMvpApp {
       focusNextWindow: () => this.windowManager.focusNextWindow(1),
       focusPreviousWindow: () => this.windowManager.focusNextWindow(-1),
       closeFocusedWindow: () => this.windowManager.closeFocusedWindow(),
+      clearDesktop: () => {
+        const windows = this.windowManager.getWindows();
+        for (const w of windows) {
+          if (w.kind !== "chat") {
+            this.windowManager.closeWindow(w.id);
+          }
+        }
+      },
       openBackroomsPrompt: () => this.promptForBackroomsTv(),
       openBackroomsTv: (args?: Record<string, unknown>) => {
         const theme =

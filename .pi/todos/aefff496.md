@@ -1,11 +1,11 @@
 {
   "id": "aefff496",
-  "title": "Fix figlet window sizing — width should match text not full desktop",
+  "title": "Fix figlet window sizing \u2014 width should match text not full desktop",
   "tags": [
     "vj-timeline",
     "bug"
   ],
-  "status": "open",
+  "status": "closed",
   "created_at": "2026-03-04T13:56:28.152Z"
 }
 

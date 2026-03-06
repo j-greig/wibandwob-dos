@@ -164,8 +164,11 @@ export interface TimelineFile {
   /** Human-readable title. */
   title: string;
 
-  /** Audio file path (absolute or relative to timeline file). */
-  track: string;
+  /** Audio file path (absolute or relative to timeline file). Optional when running with --no-audio. */
+  track?: string;
+
+  /** Set true to run without audio. Suppresses missing-track validation. */
+  noAudio?: boolean;
 
   /** Track duration in seconds. Runner uses this for end-of-show. */
   duration: number;

@@ -651,7 +651,11 @@ export class OverlayManager {
         .filter((entry) => !entry.name.startsWith("."))
         .map((entry) => {
           const fullPath = path.join(currentDirectory, entry.name);
-          const isDirectory = entry.isDirectory();
+          // Use fs.statSync (follows symlinks) so symlinked directories are treated as directories.
+          let isDirectory = entry.isDirectory();
+          if (!isDirectory && entry.isSymbolicLink()) {
+            try { isDirectory = fs.statSync(fullPath).isDirectory(); } catch { /* broken symlink — leave as file */ }
+          }
           return {
             label: isDirectory ? `[DIR] ${entry.name}` : entry.name,
             value: fullPath,
