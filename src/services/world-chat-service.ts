@@ -1,3 +1,7 @@
+import fs from "node:fs";
+import path from "node:path";
+import { createWorldChatTransport, type WorldChatTransport, type WorldChatTransportStatus } from "./world-chat-transport.js";
+
 export interface Chatspot {
   id: string;
   label: string;
@@ -8,6 +12,7 @@ export interface Chatspot {
 }
 
 export interface WorldMessage {
+  kind: "system" | "chat" | "event";
   sender: string;
   text: string;
   at: string;
@@ -25,6 +30,24 @@ export interface WorldChatSnapshot {
   worldKey: string;
   chatspots: Chatspot[];
   channels: WorldChannel[];
+  transport: WorldChatTransportStatus;
+}
+
+export function formatWorldChannelText(channel: WorldChannel): string {
+  const lines = [
+    `${channel.label}  ${channel.id}`,
+    `participants: ${channel.participants.join(", ") || "(none)"}`,
+    "",
+  ];
+  for (const message of channel.messages) {
+    const time = message.at.slice(11, 16);
+    if (message.kind === "chat") {
+      lines.push(`[${time}] <${message.sender}> ${message.text}`);
+      continue;
+    }
+    lines.push(`[${time}] ${message.text}`);
+  }
+  return lines.join("\n");
 }
 
 function nowIso(): string {
@@ -70,12 +93,50 @@ function defaultChatspots(width: number, height: number): Chatspot[] {
   ];
 }
 
+const WORLD_CHAT_LOG_PATH = path.join(process.cwd(), "scratch", "logs", "world-chat.log");
+const WORLD_CHAT_IDENTITY = [
+  process.env.WIBWOB_INSTANCE_LABEL?.trim(),
+  process.env.WIBWOB_SESSION_ID?.trim(),
+].filter(Boolean).join(" ");
+
+function appendWorldChatLog(line: string): void {
+  try {
+    fs.mkdirSync(path.dirname(WORLD_CHAT_LOG_PATH), { recursive: true });
+    fs.appendFileSync(WORLD_CHAT_LOG_PATH, `${line}\n`);
+  } catch {
+    // Logging must never break the live chat path.
+  }
+}
+
+function logWorldChatEvent(channelId: string, kind: WorldMessage["kind"], text: string): void {
+  const identity = WORLD_CHAT_IDENTITY ? `[${WORLD_CHAT_IDENTITY}] ` : "";
+  appendWorldChatLog(`${nowIso()} ${identity}[${channelId}] [${kind}] ${text}`);
+}
+
 class WorldChatService {
   private currentWorldKey = "";
   private chatspots: Chatspot[] = [];
   private channels = new Map<string, WorldChannel>();
+  private readonly transport: WorldChatTransport;
+
+  constructor() {
+    this.transport = createWorldChatTransport(process.env.WIBWOB_SESSION_ID?.trim() || "wwd");
+    this.transport.onEvent((event) => {
+      if (event.type === "system") {
+        if (event.channelId) logWorldChatEvent(event.channelId, "system", event.text);
+        else appendWorldChatLog(`${nowIso()} [transport] ${event.text}`);
+        return;
+      }
+      if (event.type === "join") {
+        this.applyJoin(event.sender, event.channelId, true);
+        return;
+      }
+      this.applyIncomingMessage(event.sender, event.channelId, event.text, true);
+    });
+  }
 
   ensureWorld(worldKey: string, width: number, height: number): Chatspot[] {
+    this.transport.connect();
     if (this.currentWorldKey === worldKey && this.chatspots.length > 0) {
       return this.chatspots;
     }
@@ -91,6 +152,7 @@ class WorldChatService {
           chatspotId: spot.id,
           messages: [
             {
+              kind: "system",
               sender: "system",
               text: `${spot.label} is live.`,
               at: nowIso(),
@@ -100,6 +162,11 @@ class WorldChatService {
         },
       ]),
     );
+    const identity = WORLD_CHAT_IDENTITY ? `[${WORLD_CHAT_IDENTITY}] ` : "";
+    appendWorldChatLog(`${nowIso()} ${identity}[world] init ${worldKey} ${width}x${height}`);
+    for (const spot of this.chatspots) {
+      logWorldChatEvent(spot.channelId, "system", `${spot.label} is live.`);
+    }
     return this.chatspots;
   }
 
@@ -139,30 +206,14 @@ class WorldChatService {
   }
 
   joinChannel(agentId: string, channelId: string): WorldChannel | undefined {
-    const channel = this.channels.get(channelId);
-    if (!channel) return undefined;
-    if (!channel.participants.includes(agentId)) {
-      channel.participants.push(agentId);
-      channel.messages.push({
-        sender: "system",
-        text: `${agentId} joined ${channel.label}.`,
-        at: nowIso(),
-      });
-    }
+    this.applyJoin(agentId, channelId, false);
+    this.transport.join(channelId);
     return this.getChannel(channelId);
   }
 
   sendMessage(agentId: string, channelId: string, text: string): WorldChannel | undefined {
-    const channel = this.channels.get(channelId);
-    if (!channel) return undefined;
-    if (!channel.participants.includes(agentId)) {
-      channel.participants.push(agentId);
-    }
-    channel.messages.push({
-      sender: agentId,
-      text,
-      at: nowIso(),
-    });
+    this.applyOutgoingMessage(agentId, channelId, text);
+    this.transport.send(channelId, agentId, text);
     return this.getChannel(channelId);
   }
 
@@ -175,7 +226,76 @@ class WorldChatService {
       worldKey: this.currentWorldKey,
       chatspots: this.listChatspots(),
       channels: this.listChannels(),
+      transport: this.transport.status(),
     };
+  }
+
+  getTransportStatus(): WorldChatTransportStatus {
+    return this.transport.status();
+  }
+
+  private applyJoin(agentId: string, channelId: string, fromTransport: boolean): void {
+    const channel = this.channels.get(channelId);
+    if (!channel) return;
+    if (!channel.participants.includes(agentId)) {
+      channel.participants.push(agentId);
+      const message = {
+        kind: "system",
+        sender: "system",
+        text: `${agentId} joined ${channel.label}.`,
+        at: nowIso(),
+      } satisfies WorldMessage;
+      channel.messages.push(message);
+      logWorldChatEvent(channelId, message.kind, `${fromTransport ? "[irc] " : ""}${message.text}`);
+    }
+  }
+
+  private applyOutgoingMessage(agentId: string, channelId: string, text: string): void {
+    const channel = this.channels.get(channelId);
+    if (!channel) return;
+    if (!channel.participants.includes(agentId)) {
+      channel.participants.push(agentId);
+    }
+    const chatMessage = {
+      kind: "chat",
+      sender: agentId,
+      text,
+      at: nowIso(),
+    } satisfies WorldMessage;
+    channel.messages.push(chatMessage);
+    logWorldChatEvent(channelId, chatMessage.kind, `<${agentId}> ${text}`);
+    const eventMessage = {
+      kind: "event",
+      sender: "system",
+      text: `${agentId} said: ${text}`,
+      at: nowIso(),
+    } satisfies WorldMessage;
+    channel.messages.push(eventMessage);
+    logWorldChatEvent(channelId, eventMessage.kind, eventMessage.text);
+  }
+
+  private applyIncomingMessage(agentId: string, channelId: string, text: string, fromTransport: boolean): void {
+    const channel = this.channels.get(channelId);
+    if (!channel) return;
+    if (!channel.participants.includes(agentId)) {
+      channel.participants.push(agentId);
+    }
+    const chatMessage = {
+      kind: "chat",
+      sender: agentId,
+      text,
+      at: nowIso(),
+    } satisfies WorldMessage;
+    channel.messages.push(chatMessage);
+    logWorldChatEvent(channelId, chatMessage.kind, `${fromTransport ? "[irc] " : ""}<${agentId}> ${text}`);
+    const eventMessage = {
+      kind: "event",
+      sender: "system",
+      text: `${agentId} said: ${text}`,
+      at: nowIso(),
+    } satisfies WorldMessage;
+    channel.messages.push(eventMessage);
+    logWorldChatEvent(channelId, eventMessage.kind, `${fromTransport ? "[irc] " : ""}${eventMessage.text}`);
   }
 }
 
