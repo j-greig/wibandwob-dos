@@ -9,6 +9,8 @@ interface StateServiceOptions {
   appMode: string;
   cwd: string;
   statePath: string;
+  instanceLabel?: string;
+  sessionId: string;
   getControlApiStatus?: () => { enabled: boolean; port?: number };
 }
 
@@ -69,8 +71,11 @@ export class StateService {
   persistAndNotify(): DesktopState {
     const nextState = this.buildState();
     this.latestState = nextState;
-    fs.mkdirSync(path.dirname(this.options.statePath), { recursive: true });
-    fs.writeFileSync(this.options.statePath, `${JSON.stringify(nextState, null, 2)}\n`, "utf8");
+    // Don't persist corrupt state from headless/piped runs — min sane terminal is 20×6
+    if (nextState.screen.width >= 20 && nextState.screen.height >= 6) {
+      fs.mkdirSync(path.dirname(this.options.statePath), { recursive: true });
+      fs.writeFileSync(this.options.statePath, `${JSON.stringify(nextState, null, 2)}\n`, "utf8");
+    }
     for (const listener of this.listeners) {
       listener(nextState);
     }
@@ -90,6 +95,8 @@ export class StateService {
         mode: this.options.appMode,
         cwd: this.options.cwd,
         statePath: this.options.statePath,
+        instanceLabel: this.options.instanceLabel,
+        sessionId: this.options.sessionId,
         controlApiEnabled: this.options.getControlApiStatus?.().enabled,
         controlApiPort: this.options.getControlApiStatus?.().port,
         theme: themeName()
