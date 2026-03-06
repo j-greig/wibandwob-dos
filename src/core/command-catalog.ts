@@ -13,6 +13,7 @@ export interface AppMenuActions {
   openFileManager: () => void;
   openPrimerPrompt: (args?: Record<string, unknown>) => void;
   listPrimers: () => unknown;
+  smearTextSurface: (args?: Record<string, unknown>) => unknown;
   openTextFile: (args?: Record<string, unknown>) => void;
   openEditor: () => void;
   saveFocusedEditor: () => void;
@@ -292,6 +293,18 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     description: "List all available primers with content dimensions. Returns array of {name, lines, width, recommended_w, recommended_h, animated}.",
     group: "open",
     actionKey: "listPrimers",
+    api: true,
+    agent: true
+  },
+  {
+    id: "text.smear",
+    label: "Smear Text Surface",
+    description: "Run scripts/smear.py on a file-backed text surface. Args: filePath (string, optional; defaults to focused file-backed primer/reader/editor), mode (wipe|shear|glitch|stretch, default wipe), width (number, optional), at/tile/skew/seed/intensity (mode-specific options), openAs (primer|reader, optional). Returns {ok, filePath, windowId, sourcePath, kind, mode}.",
+    group: "edit",
+    actionKey: "smearTextSurface",
+    menuPlacements: [{ category: "edit", order: 35 }],
+    palettePlacement: { order: 35 },
+    contextMenu: { windowKinds: ["primer", "reader", "editor"], order: 35 },
     api: true,
     agent: true
   },
