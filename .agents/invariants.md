@@ -1,5 +1,7 @@
 # Invariants, Anti-Patterns & Integration Rules
 
+WibWob-DOS is designed for equal human/agent control. The invariants below exist to enforce that — if an agent cannot reach a surface, discover a command, or read meaningful state, that is a bug not a limitation.
+
 ## Architecture Invariants
 
 These rules are strict. Treat violations as bugs, not style nits.

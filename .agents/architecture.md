@@ -1,6 +1,7 @@
 # Architecture Reference
 
 Full service and file inventory for WibWob-DOS.
+The app is built for a proactive autonomous agent with equal control of the OS alongside a human — every surface that matters to a human must be equally reachable by an agent.
 
 ## File Inventory
 
