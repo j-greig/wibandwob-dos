@@ -1,5 +1,5 @@
 ---
-Status: not-started
+Status: in-progress
 Type: epic
 GitHub issue: —
 PR: —
@@ -47,6 +47,8 @@ Upstream references:
 - `terminal-kit` GitHub: https://github.com/cronvel/terminal-kit
 - `terminal-kit` npm: https://www.npmjs.com/package/terminal-kit
 - `blessed` GitHub: https://github.com/chjj/blessed
+- `earthscii` PyPI: https://pypi.org/project/earthscii/
+  - terminal 3D terrain renderer over real elevation data; useful as a projection/shading reference for the `WibWobWorld Iso` experiment, not as a drop-in engine for WibWob-DOS
 
 ## Read First
 
@@ -285,58 +287,58 @@ This is mandatory. The control surface must not need to infer terrain state from
 
 ## Acceptance Criteria
 
-- [ ] **AC-1:** `WibWobWorld` opens through the module command path and behaves as a first-class window.
+- [x] **AC-1:** `WibWobWorld` opens through the module command path and behaves as a first-class window.
   - Test: open via the registered `microapp.*.open` command and verify focus, movement, resize, close, and `/state` all work.
 
-- [ ] **AC-2:** Terrain generation is deterministic by seed and terrain type.
+- [x] **AC-2:** Terrain generation is deterministic by seed and terrain type.
   - Test: same seed + terrain + viewport + options produce the same terrain metadata and visible output.
 
-- [ ] **AC-3:** Below-sea-level terrain renders as water.
+- [x] **AC-3:** Below-sea-level terrain renders as water.
   - Test: adjusting sea level changes water coverage and visibly changes terrain output.
 
-- [ ] **AC-4:** Vegetation renders only on suitable land bands.
+- [x] **AC-4:** Vegetation renders only on suitable land bands.
   - Test: vegetation toggle changes output; forests do not appear in deep water or peak bands.
 
-- [ ] **AC-5:** `describeState()` reports semantic terrain data, not just a preview string.
+- [x] **AC-5:** `describeState()` reports semantic terrain data, not just a preview string.
   - Test: `/state` includes terrain, seed, seaLevel, waterCoverage, minElevation, maxElevation, renderMode, vegetationEnabled.
 
-- [ ] **AC-6:** Rendering logic is split cleanly from terrain semantics.
+- [x] **AC-6:** Rendering logic is split cleanly from terrain semantics.
   - Test: new terrain model service can be imported and exercised without Blessed.
 
-- [ ] **AC-7:** `WibWobWorld` remains a reusable foundation rather than the game itself.
+- [x] **AC-7:** `WibWobWorld` remains a reusable foundation rather than the game itself.
   - Test: the terrain model can be consumed later by a second window without extracting logic back out of the window.
 
-- [ ] **AC-8:** the existing built-in `Contour Studio` remains unchanged as a prototype surface.
+- [x] **AC-8:** the existing built-in `Contour Studio` remains unchanged as a prototype surface.
   - Test: `contour.open` still opens the old built-in window, and `WibWobWorld` opens separately.
 
 ## Planned Features / Stories
 
-- [ ] **F01 — Terrain model extraction**
+- [x] **F01 — Terrain model extraction**
   - add `terrain-model.ts`
   - derive terrain map from existing heightmap
   - compute semantic elevation and biome bands
 
-- [ ] **F02 — Water pass / sea level**
+- [x] **F02 — Water pass / sea level**
   - add configurable `seaLevel`
   - classify water / shore / land
   - compute `waterCoverage`
 
-- [ ] **F03 — Terrain renderer**
+- [x] **F03 — Terrain renderer**
   - add `terrain-render.ts`
   - render terrain-only and hybrid modes
   - introduce semantic terrain colours
 
-- [ ] **F04 — WibWobWorld microapp integration**
+- [x] **F04 — WibWobWorld microapp integration**
   - add the microapp shell in `modules-private/`
   - register commands and snapshot behavior
   - keep UI thin
   - wire state + keybindings to new services
 
-- [ ] **F05 — Vegetation pass**
+- [x] **F05 — Vegetation pass**
   - deterministic tree placement
   - simple suitability heuristic by elevation band
 
-- [ ] **F06 — Save/export/state parity**
+- [x] **F06 — Save/export/state parity**
   - export snapshots
   - verify API visibility and live state parity
 
@@ -383,3 +385,38 @@ If E018 lands cleanly, the next game-adjacent slice should be:
 4. future z-band exploration
 
 That is the correct path toward the larger game idea without collapsing into premature simulation complexity.
+
+## How E019 Slots In
+
+`E018` and `E019` should remain separate surfaces with a deliberate handoff:
+
+- `WibWobWorld` from `E018` is the overworld layer
+- the roguelike from `E019` is the local room / encounter layer
+- the whole WibWob-DOS desktop remains the visible gameplay architecture for both
+
+Recommended relationship:
+- `WibWobWorld` owns terrain-scale generation, landmark placement, portal nodes, and overworld traversal
+- `E019` owns room-scale play, combat, FOV, message log, and entity simulation inside a local map
+- entering a portal / cave / town / ruin in `WibWobWorld` should eventually open or focus the `E019` microapp at the corresponding local scene
+- returning from the rogue view should hand control back to the overworld without duplicating terrain ownership
+
+Architecture rule:
+- do not merge the two engines into one window
+- do not make the roguelike own overworld terrain generation
+- do not make `WibWobWorld` reimplement room-scale roguelike mechanics
+
+Practical sequencing:
+1. finish `WibWobWorld` as a stable overworld substrate
+2. land the first playable `E019` room-scale microapp
+3. add a thin transition contract between them:
+   - overworld node / portal id
+   - target biome or room template
+   - player entry position / facing
+   - return destination in the overworld
+
+## Related Feature Briefs
+
+- isometric sibling window MVP:
+  - [/Users/james/Repos/wibandwob-dos/.planning/epics/e018-contour-studio-v2-terrain-foundation/pi-brief-isometric-view.md](/Users/james/Repos/wibandwob-dos/.planning/epics/e018-contour-studio-v2-terrain-foundation/pi-brief-isometric-view.md)
+- chatspots + agent coordination:
+  - [/Users/james/Repos/wibandwob-dos/.planning/epics/e018-contour-studio-v2-terrain-foundation/fr-chatspots-and-agent-coordination.md](/Users/james/Repos/wibandwob-dos/.planning/epics/e018-contour-studio-v2-terrain-foundation/fr-chatspots-and-agent-coordination.md)
