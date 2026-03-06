@@ -74,9 +74,10 @@ Acceptance criteria:
 
 Verification:
 ```bash
-ssh -i ~/.ssh/agent_a_key <user>@<vps> 'tmux list-sessions'
-ssh -i ~/.ssh/agent_b_key <user>@<vps> 'tmux list-sessions'
-ssh <user>@<vps> 'grep -n "Accepted publickey" /var/log/auth.log | tail -n 20'
+ssh -i ~/.ssh/agent_a_key -p 2849 <user>@<vps> 'tmux list-sessions'
+ssh -i ~/.ssh/agent_b_key -p 2849 <user>@<vps> 'tmux list-sessions'
+# Ubuntu 24.04 uses journald — auth.log may not exist without rsyslog
+ssh -p 2849 <user>@<vps> 'journalctl -u ssh --since "1 hour ago" | grep "Accepted publickey"'
 ```
 
 ### S03 — Remote control API exposure
@@ -91,7 +92,7 @@ Acceptance criteria:
 
 Verification:
 ```bash
-ssh -N -L 18099:127.0.0.1:8099 <user>@<vps>
+ssh -N -L 18099:127.0.0.1:8099 -p 2849 <user>@<vps>
 curl -s http://127.0.0.1:18099/state
 curl -s -X POST http://127.0.0.1:18099/commands/run \
   -H 'Content-Type: application/json' \
@@ -195,13 +196,27 @@ is advisory only and is not enforced at runtime.
 
 All long-running services are systemd units with `Restart=on-failure`. WibWob-DOS
 is a blessed TUI — it must run inside a tmux session to be attachable. These are not
-competing models: systemd is the supervisor (ensures restart on failure, starts at
-boot), and its `ExecStart` creates or attaches a named tmux session:
-```
-ExecStart=/usr/bin/tmux new-session -d -s wibwob -x 320 -y 79 \
+competing models: systemd is the supervisor, tmux is the interactive surface.
+
+**Critical gotcha:** `tmux new-session -d` daemonises and exits immediately with code 0.
+systemd `Type=simple` sees that exit and triggers a restart loop. Use a wrapper script
+instead:
+
+```bash
+# /opt/wibandwob-dos/scripts/start-tmux.sh
+#!/bin/bash
+tmux new-session -d -s wibwob -x 320 -y 79 \
   /usr/local/bin/bun run /opt/wibandwob-dos/src/app.ts
+# Block — keep the foreground process alive so systemd tracks it
+tmux wait-for wibwob
 ```
-The tmux session is the interactive surface; systemd is the watchdog.
+
+Service unit (`Type=simple`, not `Type=forking`):
+```
+ExecStart=/opt/wibandwob-dos/scripts/start-tmux.sh
+ExecStop=/usr/bin/tmux kill-session -t wibwob
+```
+
 `vps-hetzner-one/services/signal-daemon.service` is the shape reference.
 Add `wibwob-dos.service` to that repo's `services/` directory.
 
@@ -212,7 +227,7 @@ Claude CLI `--permission-mode bypassPermissions` is **blocked for root** on this
 that spawns Claude Code headless must run as a non-root user.
 Provisioning pattern from runbook section 5b:
 ```bash
-useradd -r -m -s /bin/bash wibwob
+useradd -m -s /bin/bash wibwob   # NOT -r: system users block interactive Claude OAuth
 chown -R wibwob:wibwob /opt/wibandwob-dos
 # interactive OAuth — must be a real login shell, not a subshell:
 su - wibwob -c 'claude'   # or: ssh in, then su - wibwob, then run claude manually
@@ -259,6 +274,12 @@ tmux attach -t wibwob -r     # read-only observe
 Multiple agents in the same session share a single TUI pane — fine for observation,
 requires coordination for input. S02 should clarify whether agents get isolated
 sessions or shared.
+
+**Resize gotcha:** tmux forces the session to the smallest attached terminal. A remote
+agent attaching at a narrow terminal will shrink the blessed layout for everyone in the
+session. Mitigate with `tmux attach -t wibwob -r` (read-only) for observers, or set
+`setw -g aggressive-resize on` in `.tmux.conf` so only the smallest *active* client
+determines size.
 
 ### RAM headroom
 
@@ -391,6 +412,59 @@ Consider a pre-story **S00 — Docker smoke** that must pass before S01 (real VP
 work) begins. Gates: health endpoint live, non-root user running, SSH key auth
 working, control API tunnel confirmed. Keeps the real VPS clean until the runtime
 is proven locally.
+
+## Known Structural Gaps (must resolve before S04/S05)
+
+These are not implementation details — they are design prerequisites. S04 and S05
+cannot be built without answering them first. Both stories should be treated as
+mini-milestones requiring their own breakdown once these are resolved.
+
+### Gap 1 — Terrain seed determinism
+
+Chatspot IDs are derived from terrain seed, which is random on every WibWobWorld open.
+A fresh restart, a reseed, or a second agent opening WibWobWorld independently will
+produce different chatspots at different world coordinates. For chatspot→folder binding
+to be stable, the VPS needs:
+
+- A fixed, persisted seed stored server-side (not random at open-time)
+- WibWobWorld configured to load that seed on the VPS instance
+- Chatspot IDs defined as stable named entities (not coordinate-derived), OR the
+  binding keyed on `channelId` (IRC channel) which IS stable if the seed is fixed
+
+Until this is solved, the folder an agent "navigates to" can change between sessions.
+This is a showstopper for S04.
+
+### Gap 2 — API is single-tenant, S05 enforcement has no foundation
+
+Every remote agent tunnels to the same port 8099 and issues `POST /commands/run`
+with no per-agent identity on the HTTP request. The API has no concept of "which
+principal is making this call." S05 says "agent not in chatspot cannot write" —
+but the enforcement layer has nothing to enforce against.
+
+Before S05 is buildable, the control API needs either:
+- A per-request token (e.g. `Authorization: Bearer <agent-key>`) mapped to a principal
+- Or a per-agent API instance (separate port per agent, separate process) — heavy
+- Or the file write operations happen inside per-agent SSH sessions with UNIX permission
+  enforcement at the OS layer (elegant but requires per-agent UNIX users, not a shared
+  `wibwob` user)
+
+The UNIX-user approach may be the simplest first pass: each agent identity gets its
+own Linux user with appropriate directory permissions. No API auth layer needed — the
+OS enforces it. Worth considering before designing a custom token system.
+
+### Gap 3 — WibWobWorld not auto-opened on startup
+
+S01 guarantees the app process is running. It does not guarantee WibWobWorld is open
+and terrain has been generated. For S04 to work from a cold start a remote agent must:
+
+1. Open WibWobWorld via API
+2. Wait for terrain generation to complete
+3. Confirm chatspots are visible in state
+4. Navigate and join
+
+This is not a blocker but it is an unspoken dependency. S01 AC should include a
+workspace that auto-opens WibWobWorld on startup, or S04 AC should explicitly cover
+the cold-start flow.
 
 ## Commit Context Note
 
