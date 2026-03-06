@@ -74,10 +74,10 @@ Verification:
 - [x] `bun run dev:world` starts, connects, World Chatroom shows IRC● green
 - [x] `python3 scripts/dev-irc-bot-burst.py 127.0.0.1 6667 '#world-ridge-overlook'`
       → messages appear in World Chatroom within 2s
-- [ ] `./scripts/screenshot-window.sh "World Chatroom"` — transcript populated
+- [x] `./scripts/screenshot-window.sh "World Chatroom"` — transcript populated
 - [x] `/world-chat/channel/text?id=...` API matches on-screen transcript
-- [ ] kill + restart dev-irc-server → client reconnects within 10s without manual intervention
-- [ ] `./scripts/world-chat-log-tail.sh` shows no dropped messages
+- [ ] kill + restart dev-irc-server → client reconnects within 10s without manual intervention  ← TODO
+- [x] `./scripts/world-chat-log-tail.sh` shows no dropped messages
 
 ---
 
