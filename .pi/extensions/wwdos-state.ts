@@ -31,7 +31,7 @@ interface WindowState {
 
 interface AppState {
   windows?: WindowState[];
-  app?: { theme?: string };
+  app?: { theme?: string; sessionId?: string; instanceLabel?: string };
   screen?: { width: number; height: number };
   focus?: { windowId: number; kind: string; title: string };
 }
@@ -56,10 +56,13 @@ function formatCompact(state: AppState): string {
   const screen = state.screen;
   const desktop = screen ? `${screen.width}x${screen.height}` : "?";
   const theme = state.app?.theme ?? "?";
+  const sessionId = state.app?.sessionId;
+  const instanceLabel = state.app?.instanceLabel;
+  const identity = instanceLabel ? `${instanceLabel}·${sessionId}` : sessionId;
   const n = windows.length;
 
   const lines: string[] = [
-    `WibWob-DOS  theme:${theme}  desktop:${desktop}  ${n} window${n === 1 ? "" : "s"}  focus:${focusLabel}`,
+    `WibWob-DOS  theme:${theme}  desktop:${desktop}  ${n} window${n === 1 ? "" : "s"}  focus:${focusLabel}${identity ? `  id:${identity}` : ""}`,
   ];
 
   for (const w of windows) {
@@ -81,7 +84,7 @@ function formatCompact(state: AppState): string {
     );
   }
 
-  lines.push(`Spatial map: run scripts/minimap.sh`);
+  lines.push(`Spatial map: scripts/minimap.sh  ·  Overlaps + fix hints: scripts/overlap-check.sh`);
 
   return lines.join("\n");
 }
