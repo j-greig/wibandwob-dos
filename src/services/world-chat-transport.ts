@@ -1,4 +1,4 @@
-import net from "node:net";
+import { Client as IRCClient } from "irc-framework";
 
 export interface WorldChatTransportStatus {
   kind: "local" | "irc";
@@ -34,24 +34,17 @@ class LocalWorldChatTransport implements WorldChatTransport {
     this.handler = handler;
   }
   status(): WorldChatTransportStatus {
-    return {
-      kind: "local",
-      connected: true,
-      joinedChannels: [],
-    };
+    return { kind: "local", connected: true, joinedChannels: [] };
   }
 }
 
 class IrcWorldChatTransport implements WorldChatTransport {
   readonly kind = "irc" as const;
-  private socket?: net.Socket;
-  private buffer = "";
+  private client?: IRCClient;
   private connected = false;
-  private connecting = false;
   private joinedChannels = new Set<string>();
   private handler?: (event: WorldChatTransportEvent) => void;
   private lastError?: string;
-  private reconnectTimer?: ReturnType<typeof setTimeout>;
 
   constructor(
     private readonly host: string,
@@ -62,54 +55,62 @@ class IrcWorldChatTransport implements WorldChatTransport {
   ) {}
 
   connect(): void {
-    if (this.connected || this.connecting) return;
-    this.connecting = true;
-    const socket = net.createConnection({ host: this.host, port: this.port });
-    this.socket = socket;
+    if (this.client) return; // already initialised — irc-framework handles reconnect internally
+    const client = new IRCClient();
+    this.client = client;
 
-    socket.on("connect", () => {
-      this.connecting = false;
+    client.on("registered", () => {
       this.connected = true;
       this.lastError = undefined;
-      this.write(`NICK ${this.nick}`);
-      this.write(`USER ${this.username} 0 * :${this.realname}`);
       this.emit({ type: "system", text: `connected to irc ${this.host}:${this.port} as ${this.nick}` });
-      for (const channelId of this.joinedChannels) this.write(`JOIN ${channelId}`);
+      for (const channelId of this.joinedChannels) client.join(channelId);
     });
 
-    socket.on("data", (chunk) => {
-      this.buffer += chunk.toString("utf8");
-      this.flushLines();
+    client.on("message", (event) => {
+      if (event.nick === this.nick) return; // suppress own echo
+      this.emit({ type: "message", channelId: event.target, sender: event.nick, text: event.message });
     });
 
-    socket.on("error", (error) => {
-      this.lastError = error.message;
-      this.emit({ type: "system", text: `irc error: ${error.message}` });
+    client.on("join", (event) => {
+      if (event.nick === this.nick) return; // suppress own join echo
+      this.emit({ type: "join", channelId: event.channel, sender: event.nick });
     });
 
-    socket.on("close", () => {
+    client.on("close", () => {
       this.connected = false;
-      this.connecting = false;
       this.emit({ type: "system", text: `irc disconnected from ${this.host}:${this.port}` });
-      // Reconnect after 5 seconds so a dev server restart doesn't require a full app restart.
-      if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
-      this.reconnectTimer = setTimeout(() => {
-        this.reconnectTimer = undefined;
-        if (!this.connected && !this.connecting) this.connect();
-      }, 5000);
+    });
+
+    client.on("socket close", () => {
+      this.connected = false;
+    });
+
+    client.on("error", (event) => {
+      this.lastError = event.error?.message ?? event.message ?? "unknown irc error";
+      this.emit({ type: "system", text: `irc error: ${this.lastError}` });
+    });
+
+    client.connect({
+      host: this.host,
+      port: this.port,
+      nick: this.nick,
+      username: this.username,
+      gecos: this.realname,
+      auto_reconnect: true,
+      auto_reconnect_wait: 5000,
     });
   }
 
   join(channelId: string): void {
     this.joinedChannels.add(channelId);
     this.connect();
-    if (this.connected) this.write(`JOIN ${channelId}`);
+    if (this.connected) this.client?.join(channelId);
   }
 
   send(channelId: string, sender: string, text: string): void {
     this.join(channelId);
     const payload = sender === this.nick ? text : `${sender}: ${text}`;
-    if (this.connected) this.write(`PRIVMSG ${channelId} :${payload}`);
+    if (this.connected) this.client?.say(channelId, payload);
   }
 
   onEvent(handler: (event: WorldChatTransportEvent) => void): void {
@@ -130,44 +131,6 @@ class IrcWorldChatTransport implements WorldChatTransport {
   private emit(event: WorldChatTransportEvent): void {
     this.handler?.(event);
   }
-
-  private write(line: string): void {
-    this.socket?.write(`${line}\r\n`);
-  }
-
-  private flushLines(): void {
-    while (true) {
-      const index = this.buffer.indexOf("\r\n");
-      if (index < 0) break;
-      const line = this.buffer.slice(0, index);
-      this.buffer = this.buffer.slice(index + 2);
-      this.handleLine(line);
-    }
-  }
-
-  private handleLine(line: string): void {
-    if (!line) return;
-    if (line.startsWith("PING ")) {
-      this.write(`PONG ${line.slice(5)}`);
-      return;
-    }
-
-    const privmsg = line.match(/^:([^!]+)![^ ]+ PRIVMSG ([^ ]+) :(.*)$/);
-    if (privmsg) {
-      const [, nick, channelId, text] = privmsg;
-      if (nick === this.nick) return;
-      this.emit({ type: "message", channelId, sender: nick, text });
-      return;
-    }
-
-    const join = line.match(/^:([^!]+)![^ ]+ JOIN :?([^ ]+)$/);
-    if (join) {
-      const [, nick, channelId] = join;
-      if (nick === this.nick) return;
-      this.emit({ type: "join", channelId, sender: nick });
-      return;
-    }
-  }
 }
 
 export function createWorldChatTransport(sessionId: string): WorldChatTransport {
@@ -178,8 +141,16 @@ export function createWorldChatTransport(sessionId: string): WorldChatTransport 
   const rawPort = process.env.WIBWOB_CHAT_IRC_PORT?.trim();
   if (!host) return new LocalWorldChatTransport();
   const port = rawPort ? Number(rawPort) : 6667;
-  const nick = process.env.WIBWOB_CHAT_IRC_NICK?.trim() || `ww-${process.env.WIBWOB_INSTANCE_LABEL?.trim() || sessionId}`;
+  const nick =
+    process.env.WIBWOB_CHAT_IRC_NICK?.trim() ||
+    `ww-${process.env.WIBWOB_INSTANCE_LABEL?.trim() || sessionId}`;
   const username = process.env.WIBWOB_CHAT_IRC_USERNAME?.trim() || nick;
   const realname = process.env.WIBWOB_CHAT_IRC_REALNAME?.trim() || "WibWobWorld";
-  return new IrcWorldChatTransport(host, Number.isFinite(port) ? port : 6667, nick, username, realname);
+  return new IrcWorldChatTransport(
+    host,
+    Number.isFinite(port) ? port : 6667,
+    nick,
+    username,
+    realname,
+  );
 }
