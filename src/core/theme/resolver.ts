@@ -9,7 +9,7 @@
  * at startup via registerExternalTheme(), called by module-loader.ts.
  */
 
-import type { ThemeTokens, ThemeVariant } from "./types.js";
+import type { StylePair, ThemeTokens, ThemeVariant } from "./types.js";
 
 // ── Built-in themes ──
 import { dark } from "./dark.js";
@@ -68,12 +68,51 @@ export function allVariants(): readonly ThemeVariant[] {
 }
 
 /**
+ * Fill any missing tokens in a theme variant using the dark baseline,
+ * with ultimate fallback to plain black/white StylePairs.
+ *
+ * This makes external/module themes safe to use even if they are incomplete.
+ * Missing StylePair tokens fall back to the dark theme value; if dark is also
+ * missing for some reason the final fallback is { fg: "white", bg: "black" }.
+ */
+export function fillThemeTokens(variant: ThemeVariant): ThemeVariant {
+  const base = dark.tokens as unknown as Record<string, unknown>;
+  const src  = variant.tokens as unknown as Record<string, unknown>;
+  const last: StylePair = { fg: "white", bg: "black" };
+
+  const filled: Record<string, unknown> = { ...base };
+  for (const [key, val] of Object.entries(src)) {
+    if (val !== undefined && val !== null) {
+      filled[key] = val;
+    }
+  }
+
+  // For any key that is a StylePair in the baseline, ensure fg and bg are present.
+  for (const key of Object.keys(base)) {
+    const baseVal = base[key];
+    if (typeof baseVal !== "object" || baseVal === null) continue;
+    const bv = baseVal as Record<string, unknown>;
+    if (!("fg" in bv && "bg" in bv)) continue;                    // not a StylePair
+    const existing = (filled[key] ?? {}) as Record<string, unknown>;
+    filled[key] = {
+      ...existing,
+      fg: typeof existing.fg === "string" ? existing.fg : (typeof bv.fg === "string" ? bv.fg : last.fg),
+      bg: typeof existing.bg === "string" ? existing.bg : (typeof bv.bg === "string" ? bv.bg : last.bg),
+    };
+  }
+
+  return { ...variant, tokens: filled as unknown as ThemeTokens };
+}
+
+/**
  * Register an external theme variant from a module.
  * Called by module-loader.ts during startup, before workspace restore.
+ * Missing tokens are filled from the dark baseline so incomplete themes
+ * never cause runtime errors.
  * @primitive
  */
 export function registerExternalTheme(variant: ThemeVariant): void {
   // Prevent duplicates — a module reloading should not double-register
   if (externalVariants.some(v => v.name === variant.name)) return;
-  externalVariants.push(variant);
+  externalVariants.push(fillThemeTokens(variant));
 }
