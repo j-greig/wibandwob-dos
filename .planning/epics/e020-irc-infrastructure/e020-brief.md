@@ -1,5 +1,5 @@
 ---
-Status: draft
+Status: active
 Type: epic
 GitHub issue: —
 PR: —
@@ -9,79 +9,147 @@ PR: —
 
 ## TL;DR
 
-WibWobWorld world chat currently works through hand-rolled IRC server/client layers that are intentionally minimal and good enough for local MVP loops. This epic locks one decision per layer: keep a Bun-native dev IRC server and harden it, while upgrading the client transport to `irc-framework` for protocol correctness and reconnect behavior. The goal is reliable dual-instance local chat plus external IRC client visibility (Textual) without over-scoping into production IRC hosting.
+Lock one ownership decision per layer: keep hand-rolled Bun IRC server, upgrade client to `irc-framework`. Goal: reliable dual-instance local chat + Textual visibility without over-scoping.
 
 ## Architecture Bucket
 
 Runtime infrastructure + transport reliability.
 
-## Objective
+## Design Decisions (locked)
 
-Stabilize IRC-backed world chat for local multi-instance development by choosing one ownership path per layer and removing protocol fragility where it hurts most.
+**Server:** keep `scripts/dev-irc-server.ts` — Bun-native, zero extra binary, hardened incrementally.
+**Client:** swap `IrcWorldChatTransport` to `irc-framework` — maintain `WorldChatTransport` interface, delegate protocol + reconnect to a maintained library.
 
-## Current State
+---
 
-`/Users/james/Repos/wibandwob-dos/scripts/dev-irc-server.ts` is a 137-line `node:net` IRC server that supports only the minimum command set (`NICK`, `USER`, `JOIN`, `PRIVMSG`, `PING`, `QUIT`) plus basic names replies (`353`/`366`). It has no TLS, SASL, persistent channel state, operator/auth model, or durable logs/channels. `/Users/james/Repos/wibandwob-dos/src/services/world-chat-transport.ts` has a hand-rolled socket IRC client that parses only a subset of server lines (`PING`, `PRIVMSG`, `JOIN`) and reconnects on a fixed timer; it works for current MVP flow but lacks broader IRCv3 capability and protocol edge-case handling.
+## Stories
 
-## Design
+### S01 — Server layer decision + harden path
+Status: [ ] open
 
-### Server Layer Decision
+What: Document decision in `dev-irc-server.ts` header. Harden:
+- safer nick/user guard (reject duplicate nicks, send 433)
+- correct `001/002/003/004` welcome numerics
+- `NAMES` reply on `JOIN` includes all present nicks
+- `QUIT` removes nick from all channels, sends `PART`-like relay to room
 
-Keep the hand-rolled Bun/Node `dev-irc-server.ts` for local dev and harden it incrementally instead of replacing it with Ergo now. For the current use case (localhost development, dual-instance smoke, Textual on local machine), Ergo’s production-oriented strengths (TLS/SASL/persistent network features) are useful but not necessary to meet the immediate acceptance bar, while introducing a separate Go binary and config lifecycle would add operational surface area to a loop that currently runs as a single Bun script. We retain one-runtime ergonomics and add only the specific hardening needed for reliable local chat.
+Verification:
+- [ ] `bun run dev-irc-server` starts clean, no crashes on two clients joining
+- [ ] `python3 scripts/dev-irc-bot-burst.py` delivers messages to both instances
+- [ ] `./scripts/world-chat-log-tail.sh` shows no dropped messages
+- [ ] `./scripts/screenshot-window.sh "World Chatroom"` confirms transcript populated
+- [ ] typecheck clean: `bun run typecheck`
 
-### Client Layer Decision
+---
 
-Replace the hand-rolled IRC socket parsing in `IrcWorldChatTransport` with `irc-framework`. This is the thinner/safer swap: keep the existing transport seam and world-chat service contract, but delegate IRC protocol handling and reconnect behavior to a maintained library with broader IRCv3 coverage. Bun compatibility is expected to be workable because `irc-framework` is a standard Node package using core Node networking/event patterns that Bun supports; this must still be validated in-repo by running the dual-instance and Textual smoke flows.
+### S02 — Client transport upgrade to `irc-framework`
+Status: [ ] open
 
-## Planned Features / Stories
+What: Replace hand-rolled socket/parser in `IrcWorldChatTransport` (`src/services/world-chat-transport.ts`) with `irc-framework`. Keep `WorldChatTransport` interface unchanged. Map events:
+- `message` → `privmsg`
+- `join` → `join`
+- `system` → `join/kick/nick change notices`
+- `connected`/`disconnected` state preserved
+- reconnect delegated to irc-framework (remove hand-rolled retry timer)
 
-- [ ] **S01 — Server layer decision + harden path (keep hand-rolled)**
-  - document why server remains Bun-native for local world chat
-  - add targeted hardening to `dev-irc-server.ts` (better nick/user guards, clearer system numerics, safer channel lifecycle)
+Verification:
+- [ ] `bun add irc-framework` — install resolves, no Bun compat errors
+- [ ] `WIBWOB_CHAT_TRANSPORT=irc bun run src/app.ts` starts, connects to dev IRC server
+- [ ] WibWobWorld → join chatspot → chatroom shows IRC●  indicator green
+- [ ] bot burst: `python3 scripts/dev-irc-bot-burst.py 127.0.0.1 6667 '#world-ridge-overlook'`
+  - messages appear in World Chatroom TUI within 2s
+- [ ] `./scripts/screenshot-window.sh "World Chatroom"` — transcript visible, no blank window
+- [ ] `/world-chat/channel/text?id=...` API response matches what's on screen
+- [ ] dual-instance: alt instance (port 8098) also receives bot messages
+- [ ] disconnect/reconnect: kill and restart dev-irc-server, client reconnects within 10s
+- [ ] typecheck clean: `bun run typecheck`
 
-- [ ] **S02 — Client transport upgrade to `irc-framework`**
-  - keep `WorldChatTransport` interface stable
-  - replace manual line parser/socket wiring in `IrcWorldChatTransport`
-  - preserve existing world-chat event mapping (`message`, `join`, `system`)
+---
 
-- [ ] **S03 — Persistent world channels for local dev**
-  - implement lightweight persistence in the hand-rolled server (channel registry + optional replayable state)
-  - ensure canonical channels (for example `#world-ridge-overlook`) survive server restart semantics for operator workflows
+### S03 — Persistent world channels for local dev
+Status: [ ] open
 
-- [ ] **S04 — Dual-instance smoke (C08 from E018)**
-  - run two WibWob-DOS instances against one IRC backend
-  - verify cross-instance relay in TUI and `/world-chat/*` surfaces
-  - record this as explicit completion of E018 C08 follow-through (currently incomplete)
+What: IRC server keeps channel registry in memory (never resets on join/part). Optionally: replay last N messages to joining client (`329`/`TOPIC` + replay). Canonical channels (`#world-*`) are pre-seeded on server start so they appear in `LIST` before any client joins.
 
-- [ ] **S05 — Textual desktop-client interoperability smoke**
-  - connect Textual (macOS IRC GUI) to the local dev IRC server
-  - verify world channels are visible and live message relay works between Textual and WibWob-DOS instances
+Verification:
+- [ ] client 1 joins `#world-ridge-overlook` and sends 3 messages
+- [ ] client 1 disconnects, reconnects — channel is still present, no extra `323`/`LIST` errors
+- [ ] `bun run dev-irc-server` SIGTERM + restart — channel names still visible after reconnect
+- [ ] `./scripts/screenshot-window.sh "World Chatroom"` shows channel label correct
+- [ ] typecheck clean: `bun run typecheck`
 
-- [ ] **S06 — Fix ensureWorld channel map reset on viewport resize**
-  - found during C08 smoke: when WibWobWorld resizes, viewport dimensions change → new worldKey →
-    ensureWorld resets the channels Map → chatroom loses participant state and drops incoming IRC messages
-  - fix: ensureWorld should not blow away channels when the world terrain key is the same but dimensions
-    differ slightly, OR merge/preserve existing channel messages/participants into the new map on reset
-  - acceptance: resize WibWobWorld mid-session, send a bot burst, verify messages still appear in chatroom
+---
+
+### S04 — Dual-instance smoke  ✓ DONE (C08 from E018)
+Status: [x] complete — verified 2026-03-06
+
+C08 result: `zuk` (alt/8098) sent "hiya", `hle` (main/8099) received with `[irc]` tag in transcript and world-chat.log. Both instances connected, cross-relay confirmed. Marking done. Re-run after S02 lands to confirm irc-framework swap doesn't break parity.
+
+Re-verification gate (post-S02):
+- [ ] same dual-instance smoke passes with irc-framework client
+- [ ] `./scripts/screenshot-window.sh "World Chatroom"` on both instances shows cross messages
+
+---
+
+### S05 — Textual desktop-client interoperability smoke
+Status: [ ] open
+
+What: Connect Textual (macOS IRC GUI client) to `127.0.0.1:6667`. Join `#world-ridge-overlook`. Verify:
+- WibWob-DOS messages appear in Textual
+- Textual messages appear in WibWob-DOS World Chatroom
+
+Verification:
+- [ ] `bun run dev-irc-server` running
+- [ ] WibWob-DOS connected via IRC, chatspot joined
+- [ ] Textual: add server `127.0.0.1:6667`, connect, `/join #world-ridge-overlook`
+- [ ] send message from Textual → appears in WibWob-DOS World Chatroom TUI
+- [ ] send message from WibWob-DOS → appears in Textual
+- [ ] `./scripts/screenshot-window.sh "World Chatroom"` — Textual nick visible in transcript
+- [ ] no server crashes or connection drops during 5min idle
+
+---
+
+### S06 — Fix ensureWorld channel map reset on viewport resize
+Status: [ ] open
+
+Bug: WibWobWorld resize → viewport dimensions change → new `worldKey` → `ensureWorld` blows away `channels` Map → chatroom loses all participant state, incoming IRC messages silently dropped.
+
+Root cause: `worldKey` encodes viewport size. Any resize creates a new key and resets the world.
+
+Fix options (pick one):
+- A: strip viewport dimensions from worldKey — key = terrain seed + terrainIdx only
+- B: ensureWorld merges existing channels/participants into new world instead of resetting
+
+Option A is cleaner. Verify there are no cases where same seed+terrain should produce different channel maps.
+
+Verification:
+- [ ] `bun run dev:world`, WibWobWorld open, join chatspot, bot burst → messages visible
+- [ ] resize WibWobWorld window (drag or API batch resize)
+- [ ] send second bot burst → messages STILL appear in chatroom
+- [ ] `./scripts/screenshot-window.sh "World Chatroom"` — transcript not blank after resize
+- [ ] `/world-chat/channels` API response still shows correct channel after resize
+- [ ] typecheck clean: `bun run typecheck`
+
+---
 
 ## Acceptance Criteria
 
-- [ ] Layer decisions are explicit and documented: server stays hand-rolled for now, client moves to `irc-framework`
-- [ ] `bun run dev-irc-server` remains the default local backend workflow with no additional mandatory binary dependency
-- [ ] `WIBWOB_CHAT_TRANSPORT=irc` flow still works end-to-end after client swap
-- [ ] Dual-instance smoke passes (the exact C08 bar from E018)
-- [ ] Textual can connect to local server and see/send messages in world channels
-- [ ] `/world-chat/channels` and `/world-chat/channel/text` remain consistent with on-screen chat state during smoke runs
+- [x] S04 dual-instance smoke passes (C08 verified 2026-03-06)
+- [ ] S01: server decision documented, 4 hardening items shipped
+- [ ] S02: irc-framework client live, dual-instance + Textual smoke both pass
+- [ ] S03: channel names survive restart and `LIST` before first join
+- [ ] S05: Textual ↔ WibWob-DOS relay confirmed with screenshot evidence
+- [ ] S06: resize mid-session does not flush chatroom state
 
 ## Out of Scope
 
-- Replacing local dev IRC with a production internet-facing IRC deployment
-- Full Ergo rollout (service management, TLS certs, SASL account provisioning, persistent network policy)
-- Federated/shared identity across machines
+- Production internet-facing IRC
+- Full Ergo rollout (TLS, SASL, persistent network policy)
+- Federated identity across machines
 - Non-IRC chat protocol work
 
 ## Risks
 
-- `irc-framework` may expose Bun runtime edge cases under reconnect/load; mitigation is explicit dual-instance + Textual smoke before marking done
-- Hardening a custom server can drift toward reimplementing a full IRC daemon; mitigation is strict scope: only local-dev requirements
-- Channel persistence decisions can create accidental lock-in if state format is ad hoc; mitigation is keep format simple and documented for later migration
+- `irc-framework` Bun edge cases under reconnect/load — mitigated by dual-instance + Textual smoke before close
+- Custom server hardening drifting toward full IRC daemon — mitigated by strict scope: local-dev only
+- Channel persistence format lock-in — keep format simple, document for later migration
