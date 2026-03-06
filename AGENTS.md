@@ -30,6 +30,7 @@ One control/API path for every user-visible surface.
 - every meaningful window exposes semantic metadata through `describeState()`
 - user-visible features must also be API-visible
 - services own logic; windows own rendering, input wiring, focus, cleanup
+- prefer established modular Blessed patterns over bespoke widget tangles
 
 ## Key Files
 

@@ -65,6 +65,19 @@ Checklist — every item is mandatory:
 - keep names precise — `measurePrimerContent`, `contentToWindowSize`, `getPrimerInfo`; avoid `utils`, `misc`, `helpers2`
 - prefer composable helpers over inheritance theater — small functions, direct wiring, obvious ownership
 
+### Blessed Pattern
+
+When adding new app/game/chat windows, copy the structural pattern of existing modular windows such as:
+- `src/windows/wibwob-agent-window.ts`
+- microapps under `modules-private/`
+
+The preferred shape is:
+- service-owned logic/state
+- window-owned render + focus + cleanup
+- explicit top/transcript/status/input regions where needed
+- explicit boxes and layout over magic widgets
+- no reliance on implicit Blessed textbox magic if a plain input box is clearer
+
 ## Completed Architecture Work
 
 - **WindowFacade** — 11-method interface; all 4 consumers collapsed; ~80 lines deleted from controller

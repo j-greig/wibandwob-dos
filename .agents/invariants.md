@@ -33,6 +33,9 @@ These rules are strict. Treat violations as bugs, not style nits.
 9. **Services own logic, windows own wiring.**
    Services discover, measure, persist, resolve, and transform data. Window factories render widgets, bind keys/mouse, manage focus/cleanup, and expose state.
 
+9a. **Blessed composition should stay modular.**
+   Reuse established window interaction patterns when they fit, instead of inventing a second chat/input model.
+
 10. **No duplicate fallbacks unless centrally owned.**
     If a fallback mode exists, it must be declared in the owning service. Do not embed secondary fallback logic inside window code and service code at the same time.
 
