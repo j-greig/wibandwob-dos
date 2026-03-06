@@ -155,6 +155,126 @@ curl -s -X POST http://127.0.0.1:8099/commands/run -H 'Content-Type: application
 - Keep world identity stable across resize; do not regress E020 S06 (`worldKey` must not include viewport dimensions).
 - Any new mount/authorization action must be command-visible and API-visible.
 
+## Hosting / DevOps Context
+
+### The VPS (wibwob1)
+
+Hetzner CAX11, Ubuntu 24.04 LTS, **aarch64 (ARM64)**, 2 vCPU, 3.7GB RAM, 38GB disk.
+IP: 89.167.18.207. SSH port: **2849** (non-standard — all SSH configs and firewall rules
+must use this port explicitly).
+
+Runbook and service files live in a separate repo:
+`~/Repos/vps-hetzner-one/` → `/opt/vps-hetzner-one/` on the VPS.
+This repo is the resurrection doc. Any wibwob-dos VPS setup steps must land in its
+`RUNBOOK.md` (thin section, link to app README) and a `.service` file in `services/`.
+
+### Current service layout
+
+```
+/opt/
+├── symbiotica/              # sy-discord bot (GitHub Actions auto-deploy)
+├── symbient-shared-skills/  # signal-daemon (systemd, non-root user)
+├── wibandwob-heartbeat/     # daemon context — TOPOFMIND, HUMANS, memories
+└── vps-hetzner-one/         # this runbook repo
+```
+
+`wibwob-dos` will land at `/opt/wibandwob-dos/` following the same pattern.
+
+### Bun
+
+Not yet installed on the VPS. Bun publishes native ARM64 Linux binaries — install with:
+```bash
+curl -fsSL https://bun.sh/install | bash
+cp /root/.local/bin/bun /usr/local/bin/bun   # copy not symlink — same gotcha as uv
+```
+Version pin to whatever is in the app's `package.json` `engines` field.
+
+### systemd service pattern
+
+All long-running services are systemd units with `Restart=on-failure`. Reference:
+`vps-hetzner-one/services/signal-daemon.service`. WibWob-DOS will need a
+`wibwob-dos.service` following the same shape:
+- `User=wibwob` (non-root — see below)
+- `WorkingDirectory=/opt/wibandwob-dos`
+- `ExecStart=/usr/local/bin/bun run src/app.ts`
+- `EnvironmentFile=/opt/wibandwob-dos/.env`
+
+### Non-root user requirement (critical)
+
+Claude CLI `--permission-mode bypassPermissions` is **blocked for root** on this VPS
+(same constraint that forced signal-daemon into its own user). Any wibwob-dos process
+that spawns Claude Code headless must run as a non-root user.
+Provisioning pattern from runbook section 5b:
+```bash
+useradd -r -m -s /bin/bash wibwob
+chown -R wibwob:wibwob /opt/wibandwob-dos
+su - wibwob && claude   # interactive OAuth once per user
+```
+
+### Control API port binding
+
+Port 8099 must bind to `127.0.0.1` only — never `0.0.0.0`.
+The Docker port binding gotcha in the runbook applies here too:
+a bare `-p 8099:8099` or equivalent without host binding is a live exposure.
+Remote agents access the API via SSH tunnel:
+```bash
+ssh -N -L 18099:127.0.0.1:8099 wibwob1 -p 2849
+curl http://127.0.0.1:18099/health
+```
+
+### SSH key model for agent identity
+
+`/root/.ssh/authorized_keys` (or `/home/wibwob/.ssh/authorized_keys`) already holds
+per-machine ed25519 keys (Zilla's MacBook Air, Zilla's iMac). Agent principals follow
+the same pattern — one key per agent identity, named in a comment:
+```
+ssh-ed25519 AAAA... agent-local-james-imac
+ssh-ed25519 AAAA... agent-vps-wibwob
+ssh-ed25519 AAAA... agent-friend-remote
+```
+Key fingerprint is the initial identity token — maps to `WIBWOB_INSTANCE_LABEL` for
+the IRC/world layer. No separate auth service needed for the first pass.
+
+### tmux session convention
+
+All services with interactive TUI surfaces use a persistent tmux session named after
+the service. Existing pattern: `tmux new-session -d -s wibwob -x 320 -y 79`.
+The session persists across SSH disconnects. Remote agents attach with:
+```bash
+tmux attach -t wibwob        # take control
+tmux attach -t wibwob -r     # read-only observe
+```
+Multiple agents in the same session share a single TUI pane — fine for observation,
+requires coordination for input. S02 should clarify whether agents get isolated
+sessions or shared.
+
+### RAM headroom
+
+3.7GB total. Current services (sy-discord Python bot, signal-daemon Python + Claude Code
+headless, signal-api Docker container) consume ~600MB–1.2GB idle. WibWob-DOS
+(Bun + blessed TUI + IRC client) is lightweight — estimate ~150MB RSS at idle.
+Running a local Claude Code headless call from inside the app is the RAM risk:
+each spawn is ~300–500MB. Avoid concurrent Claude Code subprocesses on this host.
+
+### Deploy pattern
+
+sy-discord deploys via GitHub Actions on push to main. WibWob-DOS can follow the same
+pattern (`.github/workflows/deploy-vps.yml` in the app repo): SSH into VPS,
+`git pull`, `bun install`, `systemctl restart wibwob-dos`. No Docker needed —
+Bun runs the app directly.
+
+### Secrets pattern
+
+All secrets in 1Password + per-service `.env` files (chmod 600). For wibwob-dos:
+`/opt/wibandwob-dos/.env` holds IRC env vars, instance label, any API keys.
+Never committed. Reference entry added to runbook section 7 secrets table.
+
+### aarch64 gotcha surface
+
+All native modules must have ARM64 builds. Blessed (pure JS) is fine. Any native
+addon brought in later (e.g. sqlite, canvas) needs explicit ARM64 verification.
+Node.js v22 is already installed — Bun and Node can coexist.
+
 ## Commit Context Note
 
 Recent commits show E020 effectively closed (IRC framework client, reconnect behaviour, dual-instance smoke, dev-server hardening) and E018 terrain/world work stabilized around WibWobWorld chatspots, world-key resize safety, and API identity fields (`instanceLabel`, `sessionId`) in `/health`; this epic starts from that baseline and adds VPS deployment/access hardening plus filesystem authorization semantics on top.
