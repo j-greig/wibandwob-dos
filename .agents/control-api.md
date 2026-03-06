@@ -85,7 +85,7 @@ backrooms.run                           {"theme":"…","mode":"…","model":"…
 ## Native Agent Debug Loop
 
 1. `bun run start` — launch the app
-2. `GET /health` — wait until this responds
+2. `GET /health` — wait until this responds (`{"ok":true,"port":8099,"sessionId":"abc"}`)
 3. `POST /view/wibwob-agent/open`
 4. `GET /state` — find the `wibwob-agent` window id
 5. `POST /windows/input` with `{"id":N,"input":"your text\r"}`
@@ -101,10 +101,12 @@ This OS belongs to the agents as much as the human. Use the desktop tools instin
 The pi extension `.pi/extensions/wwdos-state.ts` auto-injects a compact desktop snapshot into the system prompt before every agent turn when the app is running on port 8099:
 
 ```
-WibWob-DOS  theme:wibwob-dark  desktop:281x81  4 windows  focus:4:Poetry Clock
+WibWob-DOS  theme:wibwob-dark  desktop:281x81  4 windows  focus:4:Poetry Clock  id:dph
    1  figlet-banner   Banner: WIBWOBWORLD   90x10  @8,35
    4  wibwob.poetry-clock  Poetry Clock    62x21  @5,3  ◀
 ```
+
+The `id:` suffix is the 3-char `sessionId` from `/health`/`/state`. Use it to confirm you are talking to the right instance when multiple are running.
 
 Default behaviour — do these without being asked:
 - after any code change affecting a window: open it via the API and screenshot it

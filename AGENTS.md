@@ -32,20 +32,22 @@ One control/API path for every user-visible surface.
 - services own logic; windows own rendering, input wiring, focus, cleanup
 - prefer established modular Blessed patterns over bespoke widget tangles
 
+Full invariants and anti-patterns: `.agents/invariants.md`
+
 ## Key Files
 
-- `src/core/app-controller.ts` — composition root; window opening, command flow, menus, restore
-- `src/core/command-catalog.ts` — single source of truth for all user-visible commands
-- `src/core/command-registry.ts` — execution and projection layer; consumed by menus, palette, API, agent
-- `src/core/window-facade.ts` — 11-method interface; single seam for workspace restore, agent tools, control API
-- `src/core/window-chrome.ts` — all chrome/border/shadow sizing math lives here
-- `src/core/overlay-manager.ts` — shared prompts, flash messages, file browser, picker flows
-- `src/services/control-api.ts` — local HTTP control surface on port 8099
-- `src/services/state-service.ts` — canonical live desktop and window state
-- `src/services/content-measurement.ts` — shared measurement for primers, text, and future content types
-- `src/services/wibwob-agent-session.ts` — embedded pi-based native agent session
+Quick index — full descriptions live in `.agents/architecture.md`.
 
-Full service inventory: `.agents/architecture.md`
+- `src/core/app-controller.ts` — composition root
+- `src/core/command-catalog.ts` — command source of truth
+- `src/core/command-registry.ts` — execution + list/run layer
+- `src/core/window-facade.ts` — 11-method window interface
+- `src/core/window-chrome.ts` — chrome sizing math
+- `src/core/overlay-manager.ts` — shared prompts and pickers
+- `src/services/control-api.ts` — HTTP control surface (port 8099)
+- `src/services/state-service.ts` — live desktop state
+- `src/services/content-measurement.ts` — content measurement
+- `src/services/wibwob-agent-session.ts` — pi agent session
 
 ## Command Rules
 
@@ -96,7 +98,7 @@ bun run typecheck        # minimum bar
 bun run check-themes     # after any theme change
 ```
 
-After any code change affecting a window: open it via the API, read `/state`, screenshot or export. Never stop at typecheck alone.
+Never stop at typecheck alone. Default proactive behaviour after code changes: `.agents/control-api.md § Proactive Tool Use`.
 
 Smoke targets: menus, primer open, text file open, editor typing, window drag/close, Wib&Wob Agent input + slash commands, agent-spawned windows controllable via API, `/state` parity with screen.
 

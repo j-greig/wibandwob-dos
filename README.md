@@ -96,8 +96,10 @@ Then verify the correct instance is responding:
 
 ```bash
 curl http://127.0.0.1:8097/health
-# → {"ok":true,"port":8097}
+# → {"ok":true,"port":8097,"sessionId":"abc"}
 ```
+
+The `sessionId` is a 3-char identifier unique to each running instance. Check it when multiple instances are live to confirm you are talking to the right one.
 
 **Common hiccup:** using `WIBWOB_PORT` (wrong name) — the env var is
 `CONTROL_API_PORT`, defined in `src/core/config.ts`. The app starts fine

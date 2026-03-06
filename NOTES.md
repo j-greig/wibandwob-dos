@@ -25,6 +25,36 @@
 - raw terminal dimensions in character cells, usually width x height, before any app-specific chrome or desktop layout rules
 - value: keeps the difference clear between actual terminal space and the desktop/window space we derive from it
 
+## PROMPTING
+
+The template: name exactly what was just found, make it the seed pattern, sweep for more of the same. No preamble.
+
+```
+We just found [EXACT THING]. grep [CODEBASE SCOPE] for every other instance of the same pattern. Fix them the same way. bun run typecheck clean. commit. report what changed.
+```
+
+Examples from this session — paste verbatim:
+
+**duplicate local types**
+```
+We just found Rect, UiPart, and StackChild redefined locally in modules-private/wibwobworld/index.ts despite being exported from src/core/ui-parts.ts. grep modules-private/*/index.ts for any other locally defined types that already exist as exports in src/core/ui-parts.ts or src/services/module-loader.ts. For each: add the import, delete the local definition. bun run typecheck clean. commit submodule, bump parent. report.
+```
+
+**duplicate utility functions**
+```
+We just found applyRect defined locally in modules-private/wibwobworld/index.ts and modules-private/wibwobworld-iso/index.ts despite being exported from src/core/ui-parts.ts. grep modules-private/ for any function body that duplicates something exported from src/core/ or src/services/. Import and delete. bun run typecheck clean. commit. report lines deleted.
+```
+
+**inline geometry that should use a helper**
+```
+We just found consecutive .top= .left= .width= .height= assignments in modules-private/world-chatroom/index.ts that should be applyRect() calls. grep -n "\.top = \|\.left = \|\.width = \|\.height = " modules-private/*/index.ts. For every 3+ consecutive hits on the same node: replace with applyRect(). bun run typecheck clean. commit. report.
+```
+
+**stale API field references in scripts and docs**
+```
+We just found scripts/smoke-test.sh asserting .status on the /health response — that field doesn't exist, the real field is .ok. curl http://127.0.0.1:8099/health and http://127.0.0.1:8099/state to get the actual live shapes. Then grep scripts/ tests/ .agents/ .pi/skills/ for any field name from those responses being referenced incorrectly. Fix scripts that parse wrong fields. Fix docs that show stale response shapes. commit. report.
+```
+
 ## DEV TERMS
 
 **smoke test**

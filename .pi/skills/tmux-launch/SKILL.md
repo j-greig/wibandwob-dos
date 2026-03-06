@@ -47,7 +47,7 @@ Then move the terminal window to the external monitor. Fullscreen it.
 ## Check if running
 
 ```bash
-curl -s http://127.0.0.1:8099/health   # → {"ok":true,"port":8099}
+curl -s http://127.0.0.1:8099/health   # → {"ok":true,"port":8099,"sessionId":"abc"}
 tmux ls                                 # → wibwob-screenshot: 1 windows
 ```
 

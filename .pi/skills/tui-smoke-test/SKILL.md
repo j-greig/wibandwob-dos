@@ -38,6 +38,14 @@ test script
 The smoke suite defaults to port 8098 (`SMOKE_PORT` env var) so it never kills
 a live dev instance on 8099. Override: `SMOKE_PORT=8097 ./tests/agent-smoke/run.sh`
 
+## Health response shape
+
+`GET /health` returns:
+```json
+{"ok":true,"port":8099,"sessionId":"dph","instanceLabel":null}
+```
+Assert `ok === true` and `typeof sessionId === "string"`. There is no `status` field — any code checking `.status === "ok"` is a bug.
+
 The app reads `CONTROL_API_PORT` from env (see `src/core/config.ts`).
 
 ## Key principles (learned the hard way)

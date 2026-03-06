@@ -291,14 +291,14 @@ if (import.meta.main) {
     return i !== -1 ? args[i + 1] : undefined;
   };
 
-  // Get desktop size from running app
+  // Get desktop size from running app (canonical: state.screen.width/height)
   let desktopW = 362, desktopH = 80;
   try {
     const resp = await fetch(`${API}/state`);
     const state = await resp.json() as Record<string, unknown>;
-    const app = state.app as Record<string, number>;
-    desktopW = app.desktopWidth ?? desktopW;
-    desktopH = app.desktopHeight ?? desktopH;
+    const screen = state.screen as Record<string, number> | undefined;
+    desktopW = screen?.width ?? desktopW;
+    desktopH = screen?.height ?? desktopH;
   } catch { /* use defaults */ }
 
   const density = parseInt(getArg("--density") ?? "2") as Density;

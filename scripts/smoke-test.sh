@@ -92,7 +92,7 @@ else:
 
   # Health check
   local HEALTH
-  HEALTH=$(curl -sf "$API/health" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status',''))")
+  HEALTH=$(curl -sf "$API/health" | python3 -c "import sys,json; print('ok' if json.load(sys.stdin).get('ok') else '')")
   if [ "$HEALTH" != "ok" ]; then
     fail "health degraded after $CMD_ID"
   fi
@@ -111,7 +111,7 @@ smoke_command "inspector.open" "state-inspector"
 
 echo
 echo "Verifying health..."
-HEALTH=$(curl -sf "$API/health" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status',''))")
+HEALTH=$(curl -sf "$API/health" | python3 -c "import sys,json; print('ok' if json.load(sys.stdin).get('ok') else '')")
 if [ "$HEALTH" = "ok" ]; then
   pass "health OK after all opens"
 else
