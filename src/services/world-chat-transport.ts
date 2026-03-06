@@ -51,6 +51,7 @@ class IrcWorldChatTransport implements WorldChatTransport {
   private joinedChannels = new Set<string>();
   private handler?: (event: WorldChatTransportEvent) => void;
   private lastError?: string;
+  private reconnectTimer?: ReturnType<typeof setTimeout>;
 
   constructor(
     private readonly host: string,
@@ -90,6 +91,12 @@ class IrcWorldChatTransport implements WorldChatTransport {
       this.connected = false;
       this.connecting = false;
       this.emit({ type: "system", text: `irc disconnected from ${this.host}:${this.port}` });
+      // Reconnect after 5 seconds so a dev server restart doesn't require a full app restart.
+      if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = setTimeout(() => {
+        this.reconnectTimer = undefined;
+        if (!this.connected && !this.connecting) this.connect();
+      }, 5000);
     });
   }
 
@@ -171,7 +178,7 @@ export function createWorldChatTransport(sessionId: string): WorldChatTransport 
   const rawPort = process.env.WIBWOB_CHAT_IRC_PORT?.trim();
   if (!host) return new LocalWorldChatTransport();
   const port = rawPort ? Number(rawPort) : 6667;
-  const nick = process.env.WIBWOB_CHAT_IRC_NICK?.trim() || `ww-${sessionId}`;
+  const nick = process.env.WIBWOB_CHAT_IRC_NICK?.trim() || `ww-${process.env.WIBWOB_INSTANCE_LABEL?.trim() || sessionId}`;
   const username = process.env.WIBWOB_CHAT_IRC_USERNAME?.trim() || nick;
   const realname = process.env.WIBWOB_CHAT_IRC_REALNAME?.trim() || "WibWobWorld";
   return new IrcWorldChatTransport(host, Number.isFinite(port) ? port : 6667, nick, username, realname);
