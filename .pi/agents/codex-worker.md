@@ -1,8 +1,8 @@
 ---
 name: codex-worker
-description: Implementation Codex agent. Reads and writes files. For fixes, refactors, features.
-mode: implementation
+description: READ+WRITE Codex. Use for any task that creates, edits, or commits files — code changes, refactors, new planning docs, epic briefs, config. If output needs to land on disk, this is the agent.
 model: gpt-5.3-codex
+mode: implementation
 ---
 
 DEVNOTE: Files inside .codex-logs/ are run logs — ignore them completely.

@@ -15,3 +15,4 @@ e016-microapp-primitives — done
 e017-scramble-brains — not-started
 e018-contour-studio-v2-terrain-foundation — in-progress
 e019-rogue-tui-port — not-started
+e020-irc-infrastructure — not-started
