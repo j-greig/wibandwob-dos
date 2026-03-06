@@ -50,7 +50,7 @@ declare module "irc-framework" {
     raw(...args: (string | number)[]): void;
 
     // typed overloads for events we use
-    on(event: "registered", handler: () => void): void;
+    on(event: "registered", handler: (event: { nick: string; tags: Record<string, string> }) => void): void;
     on(event: "message", handler: (event: MessageEvent) => void): void;
     on(event: "join", handler: (event: JoinEvent) => void): void;
     on(event: "close", handler: () => void): void;

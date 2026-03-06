@@ -42,6 +42,7 @@ class IrcWorldChatTransport implements WorldChatTransport {
   readonly kind = "irc" as const;
   private client?: IRCClient;
   private connected = false;
+  private effectiveNick: string; // actual nick after registration (may differ if 433 suffixed)
   private joinedChannels = new Set<string>();
   private handler?: (event: WorldChatTransportEvent) => void;
   private lastError?: string;
@@ -49,30 +50,42 @@ class IrcWorldChatTransport implements WorldChatTransport {
   constructor(
     private readonly host: string,
     private readonly port: number,
-    private readonly nick: string,
+    private readonly nick: string, // desired nick; effectiveNick holds the actual one after registration
     private readonly username: string,
     private readonly realname: string,
-  ) {}
+  ) {
+    this.effectiveNick = nick;
+  }
 
   connect(): void {
     if (this.client) return; // already initialised — irc-framework handles reconnect internally
     const client = new IRCClient();
     this.client = client;
 
-    client.on("registered", () => {
+    // Track the nick irc-framework is actively trying (may differ from this.nick after 433 suffix)
+    let attemptedNick = this.nick;
+
+    client.on("registered", (event) => {
+      this.effectiveNick = event.nick ?? attemptedNick; // use actual nick assigned by server
       this.connected = true;
       this.lastError = undefined;
-      this.emit({ type: "system", text: `connected to irc ${this.host}:${this.port} as ${this.nick}` });
+      this.emit({ type: "system", text: `connected to irc ${this.host}:${this.port} as ${this.effectiveNick}` });
       for (const channelId of this.joinedChannels) client.join(channelId);
     });
 
+    // 433 ERR_NICKNAMEINUSE — append _ and retry (handles stale nicks from hard-killed instances)
+    (client as any).on("nick in use", () => {
+      attemptedNick = attemptedNick + "_";
+      (client as any).changeNick(attemptedNick);
+    });
+
     client.on("message", (event) => {
-      if (event.nick === this.nick) return; // suppress own echo
+      if (event.nick === this.effectiveNick) return; // suppress own echo
       this.emit({ type: "message", channelId: event.target, sender: event.nick, text: event.message });
     });
 
     client.on("join", (event) => {
-      if (event.nick === this.nick) return; // suppress own join echo
+      if (event.nick === this.effectiveNick) return; // suppress own join echo
       this.emit({ type: "join", channelId: event.channel, sender: event.nick });
     });
 
@@ -110,7 +123,7 @@ class IrcWorldChatTransport implements WorldChatTransport {
 
   send(channelId: string, sender: string, text: string): void {
     this.join(channelId);
-    const payload = sender === this.nick ? text : `${sender}: ${text}`;
+    const payload = sender === this.effectiveNick ? text : `${sender}: ${text}`;
     if (this.connected) this.client?.say(channelId, payload);
   }
 
@@ -123,7 +136,7 @@ class IrcWorldChatTransport implements WorldChatTransport {
       kind: "irc",
       connected: this.connected,
       server: `${this.host}:${this.port}`,
-      nick: this.nick,
+      nick: this.effectiveNick,
       joinedChannels: [...this.joinedChannels],
       lastError: this.lastError,
     };
