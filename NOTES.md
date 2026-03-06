@@ -27,31 +27,46 @@
 
 ## PROMPTING
 
-Name the anti-pattern. Agent finds all instances itself. No prior knowledge of which files are affected.
+Vibe-first. Describe the feeling of the problem, not the exact technical issue. Paste one of these when something feels off but you can't name it precisely.
 
-**shadowed exports** — local definitions that duplicate something already exported
 ```
-Find every type or function defined locally in modules-private/ that has an identical or structurally equivalent export somewhere in src/. Read src/core/ui-parts.ts and src/services/module-loader.ts to know what's available. For each local duplicate: import the canonical version, delete the local one, fix call sites. bun run typecheck clean. commit. report.
-```
-
-**copy-paste utilities** — same function body in multiple files
-```
-Find every function defined in 2 or more files with an identical or near-identical body. For each group: pick the best home, export it there, import it everywhere else, delete the copies. bun run typecheck clean. commit. report.
+This codebase feels copy-pasty. Hunt for anything that appears to have been written twice — same logic, same shape, same idea — in more than one place. Every duplicate you find: give it one home, wire it up everywhere else, delete the copies. Typecheck clean. Commit. Tell me what you found.
 ```
 
-**inline what should be a helper** — repeated multi-line patterns with no shared name
 ```
-Find every place 3 or more consecutive statements do the same conceptual thing across multiple files (e.g. setting top/left/width/height, building the same object shape, running the same validation). For each pattern with 2+ sites: extract a named helper, wire it up everywhere. bun run typecheck clean. commit. report.
-```
-
-**stale contracts** — scripts or docs referencing fields that may not exist
-```
-Get the live API shapes: curl http://127.0.0.1:8099/health and /state and /commands/list. Then grep scripts/, tests/, .agents/, and .pi/skills/ for field names and response shapes. For every reference to a field that isn't in the live response: fix it. bun run typecheck clean. commit. report.
+Things feel bolted-on rather than composed. Read the architectural docs first to understand how the pieces are supposed to fit together, then find everywhere the code bypasses that structure — goes around the seams, hardcodes things that should be config, reimplements something that already exists. Fix each one to go through the right path. Typecheck clean. Commit.
 ```
 
-**inlined patterns that should be primitives** — behaviour in consumers that belongs in the shared layer
 ```
-Read AGENTS.md. Then read every file under modules-private/. For any logic that implements something the host should provide — layout, theming, state reading, command registration — check if it belongs in src/core/ or src/services/ instead. If the same logic appears in 2+ microapps: extract it to the right owner, expose via host.ui or host API, delete from consumers. bun run typecheck clean. commit. report.
+The shared layer feels underused. Read whatever files define the shared primitives and utilities in this codebase, then look at the consumers. Find everywhere a consumer is doing work the shared layer could be doing for it. Extract upward, simplify downward. Typecheck clean. Commit.
+```
+
+```
+The docs and the code feel out of sync. Get the ground truth from the live running system, then read the docs, scripts, and tests. Find everywhere they describe or assert something that no longer matches reality. Fix the lies. Commit.
+```
+
+```
+Some things feel invisible to the outside world. Find every meaningful piece of state or behaviour in this app that a caller, agent, or test cannot observe or trigger through the external interface. Add what's missing. Commit.
+```
+
+```
+Some functions feel like they've eaten too much. Find anything that's grown into a wall of code doing several different jobs. Name the jobs, pull them apart into focused pieces, make the original just coordinate them. Typecheck clean. Commit.
+```
+
+```
+There are probably magic values scattered everywhere. Find hardcoded numbers, strings, and thresholds that appear more than once or clearly belong to a named idea. Give them names and a single home. Typecheck clean. Commit.
+```
+
+```
+Some features probably got added without thinking about the rest of the codebase. Find anything that solves a problem in isolation when a more general solution would have served the whole system. Generalise it. Commit.
+```
+
+```
+The tests and scripts probably make assumptions that are no longer true. Find every place a test or script asserts a specific value, field, or behaviour. Verify each assumption still holds against the live system. Fix what doesn't. Commit.
+```
+
+```
+New modules probably reinvented things the older modules already solved. Read the oldest and most stable parts of the codebase to understand what patterns were established. Then read the newest parts. Find the gaps where new code ignored those patterns. Close them. Typecheck clean. Commit.
 ```
 
 ## DEV TERMS
