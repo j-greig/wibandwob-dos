@@ -5,151 +5,215 @@ GitHub issue: —
 PR: —
 ---
 
-# E020 — IRC Infrastructure
+# E020 — NNTP World Chat Infrastructure
 
 ## TL;DR
 
-Lock one ownership decision per layer: keep hand-rolled Bun IRC server, upgrade client to `irc-framework`. Goal: reliable dual-instance local chat + Textual visibility without over-scoping.
+Replace the hand-rolled IRC transport with NNTP (Usenet newsgroups) as the world chat
+protocol. IRC was a wrong turn — NNTP gives us retro authenticity, native threading,
+message persistence, and a simpler client/server model. The `WorldChatTransport`
+interface is already protocol-agnostic so the swap is surgical: write
+`NntpWorldChatTransport`, keep everything above it unchanged.
 
 ## Architecture Bucket
 
-Runtime infrastructure + transport reliability.
+Runtime infrastructure + transport.
 
 ## Design Decisions (locked)
 
-**Server:** keep `scripts/dev-irc-server.ts` — Bun-native, zero extra binary, hardened incrementally.
-**Client:** swap `IrcWorldChatTransport` to `irc-framework` — maintain `WorldChatTransport` interface, delegate protocol + reconnect to a maintained library.
+**Server:** `nntp-server` npm package (v3.1.0, MIT). Minimal Bun wrapper for local dev.
+No extra binary, same ergonomics as the old `dev-irc-server.ts` script.
+
+**Client:** `newsie` npm package (v1.2.3, March 2025). Replaces hand-rolled IRC socket.
+Implement as `NntpWorldChatTransport` behind the existing `WorldChatTransport` interface.
+
+**Polling:** High-water mark per newsgroup, 3s interval. Transport synthesises
+`message` events internally and delivers via existing `onEvent` callback.
+No changes to `WorldChatService` or anything above it.
+
+**Presence:** NNTP has none. Chatspot "join" = subscribe to a newsgroup. "Who's online"
+derived from recent article `From:` headers (last 5 minutes). Accepted UX shift:
+world chat is bulletin-board style, not real-time presence.
+
+**Channel IDs:** renamed from IRC `#world-ridge-overlook` to NNTP dot-notation
+`wibwob.world.ridge-overlook`. Change is in `defaultChatspots` config only —
+the interface accepts any string.
+
+**pirc-extension reference:** `vendor/pirc-extension/src/driver.ts` is reusable
+as-is for subprocess RPC if we later want pi subagent integration. Tool registration
+patterns also port directly.
+
+## Interface Contract (unchanged)
+
+```typescript
+// src/services/world-chat-transport.ts — no edits to this interface
+export interface WorldChatTransport {
+  readonly kind: "local" | "irc" | "nntp";   // add "nntp"
+  connect(): void;
+  join(channelId: string): void;
+  send(channelId: string, sender: string, text: string): void;
+  status(): WorldChatTransportStatus;
+  onEvent(handler: (event: WorldChatTransportEvent) => void): void;
+}
+```
+
+`WorldChatService` = zero changes.
 
 ---
 
 ## Stories
 
-### S01 — Server layer decision + harden path
+### S01 — NNTP dev server
 Status: [ ] open
 
-What: Document decision in `dev-irc-server.ts` header. Harden:
-- safer nick/user guard (reject duplicate nicks, send 433)
-- correct `001/002/003/004` welcome numerics
-- `NAMES` reply on `JOIN` includes all present nicks
-- `QUIT` removes nick from all channels, sends `PART`-like relay to room
+What: thin Bun wrapper around `nntp-server` npm package. Script at
+`scripts/dev-nntp-server.ts`. Pre-seeds canonical groups (`wibwob.world.*`).
+In-memory store; articles survive within a session, not across restarts (S03 adds
+persistence if needed).
+
+```bash
+bun run dev-nntp-server   # add to package.json scripts
+```
 
 Verification:
-- [ ] `bun run dev-irc-server` starts clean, no crashes on two clients joining
-- [ ] `python3 scripts/dev-irc-bot-burst.py` delivers messages to both instances
-- [ ] `./scripts/world-chat-log-tail.sh` shows no dropped messages
-- [ ] `./scripts/screenshot-window.sh "World Chatroom"` confirms transcript populated
-- [ ] typecheck clean: `bun run typecheck`
+- [ ] server starts on port 119 (or configurable `WIBWOB_NNTP_PORT`), logs startup
+- [ ] `telnet 127.0.0.1 <port>` → see `200 WibWob NNTP` greeting
+- [ ] `LIST` returns `wibwob.world.ridge-overlook` (and other pre-seeded groups)
+- [ ] `POST` a test article, `GROUP` + `ARTICLE 1` retrieves it
+- [ ] two clients connect simultaneously, each sees the other's posted articles
+- [ ] `bun run typecheck` clean
 
 ---
 
-### S02 — Client transport upgrade to `irc-framework`
+### S02 — NNTP client transport (`NntpWorldChatTransport`)
 Status: [ ] open
 
-What: Replace hand-rolled socket/parser in `IrcWorldChatTransport` (`src/services/world-chat-transport.ts`) with `irc-framework`. Keep `WorldChatTransport` interface unchanged. Map events:
-- `message` → `privmsg`
-- `join` → `join`
-- `system` → `join/kick/nick change notices`
-- `connected`/`disconnected` state preserved
-- reconnect delegated to irc-framework (remove hand-rolled retry timer)
+What: implement `NntpWorldChatTransport` in `src/services/world-chat-transport.ts`.
+Use `newsie` for the TCP/NNTP layer.
+
+Key behaviours:
+- `connect()` → newsie connect + `CAPABILITIES` check, idempotent
+- `join(groupId)` → add to `watchedGroups`, initialise high-water mark from
+  current `GROUP` last-article number (don't replay old articles on join)
+- poll loop (3s): for each watched group, `GROUP` to get `last`, if `last > hwm`
+  fetch `XOVER hwm+1-last`, emit `message` events, advance hwm
+- `send(groupId, sender, text)` → `POST` with `From: sender`, `Newsgroups: groupId`,
+  `Subject: world-chat`, blank subject line, `text` body
+- `status()` → `{ kind: "nntp", connected, server, identity, joinedChannels, lastError? }`
+- `onEvent(handler)` → single handler, same constraint as IRC transport
+- env vars: `WIBWOB_CHAT_NNTP_HOST`, `WIBWOB_CHAT_NNTP_PORT`
+- factory: `WIBWOB_CHAT_TRANSPORT=nntp` → return `NntpWorldChatTransport`
+
+Presence simulation: emit a `system` event listing nicks seen in articles from the
+last 5 minutes when a new article arrives from a previously-unseen `From:` header.
 
 Verification:
-- [ ] `bun add irc-framework` — install resolves, no Bun compat errors
-- [ ] `WIBWOB_CHAT_TRANSPORT=irc bun run src/app.ts` starts, connects to dev IRC server
-- [ ] WibWobWorld → join chatspot → chatroom shows IRC●  indicator green
-- [ ] bot burst: `python3 scripts/dev-irc-bot-burst.py 127.0.0.1 6667 '#world-ridge-overlook'`
-  - messages appear in World Chatroom TUI within 2s
-- [ ] `./scripts/screenshot-window.sh "World Chatroom"` — transcript visible, no blank window
-- [ ] `/world-chat/channel/text?id=...` API response matches what's on screen
-- [ ] dual-instance: alt instance (port 8098) also receives bot messages
-- [ ] disconnect/reconnect: kill and restart dev-irc-server, client reconnects within 10s
-- [ ] typecheck clean: `bun run typecheck`
+- [ ] `bun add newsie` — resolves, no Bun compat errors
+- [ ] `WIBWOB_CHAT_TRANSPORT=nntp bun run src/app.ts` starts, connects to dev NNTP server
+- [ ] WibWobWorld → join chatspot → World Chatroom shows NNTP● indicator green
+- [ ] post an article via `telnet` or test script → appears in World Chatroom within 5s
+- [ ] `send()` from TUI → article visible via `telnet + ARTICLE` on the server
+- [ ] `./scripts/screenshot-window.sh "World Chatroom"` — transcript populated
+- [ ] `/world-chat/channel/text?id=...` API response matches on-screen transcript
+- [ ] poll does not emit duplicate messages on repeated polls of same hwm
+- [ ] `bun run typecheck` clean
 
 ---
 
-### S03 — Persistent world channels for local dev
-Status: [ ] open
+### S03 — Persistent newsgroups (optional, post-MVP)
+Status: [ ] open — defer until S02 is stable
 
-What: IRC server keeps channel registry in memory (never resets on join/part). Optionally: replay last N messages to joining client (`329`/`TOPIC` + replay). Canonical channels (`#world-*`) are pre-seeded on server start so they appear in `LIST` before any client joins.
+What: articles survive server restart. Options:
+- A: `nntp-server` with a filesystem or SQLite backend
+- B: keep in-memory, accept loss on restart (likely fine for dev)
 
-Verification:
-- [ ] client 1 joins `#world-ridge-overlook` and sends 3 messages
-- [ ] client 1 disconnects, reconnects — channel is still present, no extra `323`/`LIST` errors
-- [ ] `bun run dev-irc-server` SIGTERM + restart — channel names still visible after reconnect
-- [ ] `./scripts/screenshot-window.sh "World Chatroom"` shows channel label correct
-- [ ] typecheck clean: `bun run typecheck`
+Decision gate: if S04 dual-instance smoke requires articles to survive a server
+restart, do S03. Otherwise skip for now.
 
----
-
-### S04 — Dual-instance smoke  ✓ DONE (C08 from E018)
-Status: [x] complete — verified 2026-03-06
-
-C08 result: `zuk` (alt/8098) sent "hiya", `hle` (main/8099) received with `[irc]` tag in transcript and world-chat.log. Both instances connected, cross-relay confirmed. Marking done. Re-run after S02 lands to confirm irc-framework swap doesn't break parity.
-
-Re-verification gate (post-S02):
-- [ ] same dual-instance smoke passes with irc-framework client
-- [ ] `./scripts/screenshot-window.sh "World Chatroom"` on both instances shows cross messages
+Verification (if done):
+- [ ] post 3 articles, SIGTERM server, restart, `ARTICLE 1-3` returns original articles
+- [ ] `bun run typecheck` clean
 
 ---
 
-### S05 — Textual desktop-client interoperability smoke
-Status: [ ] open
+### S04 — Dual-instance smoke
+Status: [ ] open (replaces the IRC C08 verification)
 
-What: Connect Textual (macOS IRC GUI client) to `127.0.0.1:6667`. Join `#world-ridge-overlook`. Verify:
-- WibWob-DOS messages appear in Textual
-- Textual messages appear in WibWob-DOS World Chatroom
+What: two WibWob-DOS instances (`WIBWOB_INSTANCE_LABEL=main` port 8099,
+`WIBWOB_INSTANCE_LABEL=alt` port 8098) both connect to one dev NNTP server.
+Both join `wibwob.world.ridge-overlook`. Alt posts a message. Main's World Chatroom
+shows it within 5s.
 
 Verification:
-- [ ] `bun run dev-irc-server` running
-- [ ] WibWob-DOS connected via IRC, chatspot joined
-- [ ] Textual: add server `127.0.0.1:6667`, connect, `/join #world-ridge-overlook`
-- [ ] send message from Textual → appears in WibWob-DOS World Chatroom TUI
-- [ ] send message from WibWob-DOS → appears in Textual
-- [ ] `./scripts/screenshot-window.sh "World Chatroom"` — Textual nick visible in transcript
-- [ ] no server crashes or connection drops during 5min idle
+- [ ] dev NNTP server running
+- [ ] `bun run dev:world` (main) + `bun run dev:world:alt` (or equivalent) both start
+- [ ] alt instance sends a chat message via TUI or API (`/commands/run microapp.world-chatroom.send`)
+- [ ] main World Chatroom transcript shows alt's message with correct sender label
+- [ ] `./scripts/screenshot-window.sh "World Chatroom"` on main confirms
+- [ ] `/world-chat/channel/text?id=wibwob.world.ridge-overlook` on main API shows message
+- [ ] no duplicate messages in either instance
+- [ ] `./scripts/world-chat-log-tail.sh` shows cross-instance relay
+
+---
+
+### S05 — External NNTP client interoperability smoke
+Status: [ ] open
+
+What: connect a real NNTP client (Unison, Thunderbird, or `tin` CLI) to the local
+dev server. Verify world newsgroups are visible and article exchange works both ways.
+
+`tin` is fastest to verify with:
+```bash
+brew install tin
+tin -g 127.0.0.1 -p <port>
+```
+
+Verification:
+- [ ] dev NNTP server running, WibWob-DOS connected and posting
+- [ ] external client connects, `LIST` shows `wibwob.world.*` groups
+- [ ] WibWob-DOS article visible in external client
+- [ ] external client `POST` → WibWob-DOS World Chatroom shows it within 5s
+- [ ] `./scripts/screenshot-window.sh "World Chatroom"` — external nick visible in transcript
 
 ---
 
 ### S06 — Fix ensureWorld channel map reset on viewport resize
-Status: [ ] open
+Status: [ ] open — protocol-agnostic, same bug as before
 
-Bug: WibWobWorld resize → viewport dimensions change → new `worldKey` → `ensureWorld` blows away `channels` Map → chatroom loses all participant state, incoming IRC messages silently dropped.
+Bug: WibWobWorld resize → new `worldKey` → `ensureWorld` blows away `channels` Map
+→ chatroom loses participant state, incoming NNTP polls silently discarded.
 
-Root cause: `worldKey` encodes viewport size. Any resize creates a new key and resets the world.
-
-Fix options (pick one):
-- A: strip viewport dimensions from worldKey — key = terrain seed + terrainIdx only
-- B: ensureWorld merges existing channels/participants into new world instead of resetting
-
-Option A is cleaner. Verify there are no cases where same seed+terrain should produce different channel maps.
+Fix: strip viewport dimensions from `worldKey`. Key = terrain seed + terrainIdx only.
 
 Verification:
-- [ ] `bun run dev:world`, WibWobWorld open, join chatspot, bot burst → messages visible
-- [ ] resize WibWobWorld window (drag or API batch resize)
-- [ ] send second bot burst → messages STILL appear in chatroom
-- [ ] `./scripts/screenshot-window.sh "World Chatroom"` — transcript not blank after resize
-- [ ] `/world-chat/channels` API response still shows correct channel after resize
-- [ ] typecheck clean: `bun run typecheck`
+- [ ] `bun run dev:world`, WibWobWorld open, join chatspot, article arrives → visible
+- [ ] resize WibWobWorld window (drag or batch API)
+- [ ] post new article via test script → STILL appears in chatroom after resize
+- [ ] `./scripts/screenshot-window.sh "World Chatroom"` — transcript not blank post-resize
+- [ ] `/world-chat/channels` API still shows correct group after resize
+- [ ] `bun run typecheck` clean
 
 ---
 
 ## Acceptance Criteria
 
-- [x] S04 dual-instance smoke passes (C08 verified 2026-03-06)
-- [ ] S01: server decision documented, 4 hardening items shipped
-- [ ] S02: irc-framework client live, dual-instance + Textual smoke both pass
-- [ ] S03: channel names survive restart and `LIST` before first join
-- [ ] S05: Textual ↔ WibWob-DOS relay confirmed with screenshot evidence
-- [ ] S06: resize mid-session does not flush chatroom state
+- [ ] S01: dev NNTP server starts, accepts clients, LIST/GROUP/ARTICLE/POST all work
+- [ ] S02: `NntpWorldChatTransport` live, dual-instance smoke passes, no duplicate msgs
+- [ ] S03: deferred unless S04 requires persistence
+- [ ] S04: cross-instance article relay confirmed in TUI + API + log
+- [ ] S05: `tin` or equivalent external client sees WibWob-DOS articles and vice versa
+- [ ] S06: viewport resize no longer flushes chatroom state
 
 ## Out of Scope
 
-- Production internet-facing IRC
-- Full Ergo rollout (TLS, SASL, persistent network policy)
-- Federated identity across machines
-- Non-IRC chat protocol work
+- IRC (removed — wrong protocol for this project)
+- Production internet NNTP (usenet.example.com, TLS, auth)
+- Full newsreader UI (threading tree, headers view) — that's a separate epic
+- NNTP authentication / AUTHINFO
 
 ## Risks
 
-- `irc-framework` Bun edge cases under reconnect/load — mitigated by dual-instance + Textual smoke before close
-- Custom server hardening drifting toward full IRC daemon — mitigated by strict scope: local-dev only
-- Channel persistence format lock-in — keep format simple, document for later migration
+- `newsie` Bun compat under poll load — mitigated by S02 verification gates
+- NNTP poll latency feels slow vs IRC push — mitigated by 3s interval + hwm strategy;
+  if unacceptable, reduce to 1s or add server-push via NOTIFY extension (rare, skip for now)
+- No presence model — accepted; derive "recent posters" from article From: headers

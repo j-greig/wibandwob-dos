@@ -1,0 +1,35 @@
+{
+  "name": "pirc-extension",
+  "version": "1.0.0",
+  "description": "Pi extension: plan decomposition into IRC-coordinated subagents",
+  "keywords": [],
+  "license": "ISC",
+  "author": "",
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "check": "pnpm run fmt:check && pnpm run lint && pnpm run types",
+    "fmt": "oxfmt",
+    "fmt:check": "oxfmt --check",
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
+    "types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@mariozechner/pi-coding-agent": "^0.55.4",
+    "@sinclair/typebox": "^0.34.48",
+    "irc-framework": "^4.14.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.3",
+    "oxfmt": "^0.36.0",
+    "oxlint": "^1.51.0",
+    "typescript": "^5.9.3"
+  },
+  "packageManager": "pnpm@10.30.0",
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  }
+}
