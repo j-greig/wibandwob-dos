@@ -370,15 +370,32 @@ This is mandatory. The control surface must not need to infer terrain state from
   - make local typing/focus behavior feel trustworthy
   - improve event logging so room activity is easier to grok live
 
-- [ ] **C06 — IRC transport seam**
+- [x] **C06 — IRC transport seam**
   - keep the `World Chatroom` TUI shape
   - add an IRC-backed transport/adapter behind one service seam
   - use `pirc-extension` as a reference, not a drop-in UI
 
-- [ ] **C07 — IRC-backed world chat MVP**
+- [x] **C07 — IRC-backed world chat MVP**
   - join a canonical world channel like `#world-ridge-overlook`
   - mirror incoming/outgoing IRC traffic into local world-chat state
   - keep `describeState()` and the control API as the local source of truth for the desktop
+
+- [ ] **C08 — Dual-instance IRC smoke**
+  - run two WibWob-DOS instances against the same IRC backend
+  - join the same world channel from both
+  - verify cross-instance message relay in both TUI and outside-TUI surfaces
+
+Local dev launch shape for the IRC MVP:
+
+```bash
+bun run dev-irc-server
+
+WIBWOB_CHAT_TRANSPORT=irc \
+WIBWOB_CHAT_IRC_HOST=127.0.0.1 \
+WIBWOB_CHAT_IRC_PORT=6667 \
+WIBWOB_INSTANCE_LABEL=main \
+bun run start
+```
 
 ## Out of Scope
 
