@@ -33,6 +33,11 @@ export interface WorldChatSnapshot {
   transport: WorldChatTransportStatus;
 }
 
+export type WorldChatChangeEvent =
+  | { type: "world-reset"; worldKey: string }
+  | { type: "channel"; channelId: string }
+  | { type: "transport"; status: WorldChatTransportStatus };
+
 export function formatWorldChannelText(channel: WorldChannel): string {
   const lines = [
     `${channel.label}  ${channel.id}`,
@@ -118,6 +123,7 @@ class WorldChatService {
   private chatspots: Chatspot[] = [];
   private channels = new Map<string, WorldChannel>();
   private readonly transport: WorldChatTransport;
+  private readonly listeners = new Set<(event: WorldChatChangeEvent) => void>();
 
   constructor() {
     this.transport = createWorldChatTransport(process.env.WIBWOB_SESSION_ID?.trim() || "wwd");
@@ -125,6 +131,7 @@ class WorldChatService {
       if (event.type === "system") {
         if (event.channelId) logWorldChatEvent(event.channelId, "system", event.text);
         else appendWorldChatLog(`${nowIso()} [transport] ${event.text}`);
+        this.emit({ type: "transport", status: this.transport.status() });
         return;
       }
       if (event.type === "join") {
@@ -167,6 +174,8 @@ class WorldChatService {
     for (const spot of this.chatspots) {
       logWorldChatEvent(spot.channelId, "system", `${spot.label} is live.`);
     }
+    this.emit({ type: "world-reset", worldKey });
+    this.emit({ type: "transport", status: this.transport.status() });
     return this.chatspots;
   }
 
@@ -234,6 +243,17 @@ class WorldChatService {
     return this.transport.status();
   }
 
+  subscribe(listener: (event: WorldChatChangeEvent) => void): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  private emit(event: WorldChatChangeEvent): void {
+    for (const listener of this.listeners) listener(event);
+  }
+
   private applyJoin(agentId: string, channelId: string, fromTransport: boolean): void {
     const channel = this.channels.get(channelId);
     if (!channel) return;
@@ -247,6 +267,7 @@ class WorldChatService {
       } satisfies WorldMessage;
       channel.messages.push(message);
       logWorldChatEvent(channelId, message.kind, `${fromTransport ? "[irc] " : ""}${message.text}`);
+      this.emit({ type: "channel", channelId });
     }
   }
 
@@ -272,6 +293,7 @@ class WorldChatService {
     } satisfies WorldMessage;
     channel.messages.push(eventMessage);
     logWorldChatEvent(channelId, eventMessage.kind, eventMessage.text);
+    this.emit({ type: "channel", channelId });
   }
 
   private applyIncomingMessage(agentId: string, channelId: string, text: string, fromTransport: boolean): void {
@@ -296,6 +318,7 @@ class WorldChatService {
     } satisfies WorldMessage;
     channel.messages.push(eventMessage);
     logWorldChatEvent(channelId, eventMessage.kind, `${fromTransport ? "[irc] " : ""}${eventMessage.text}`);
+    this.emit({ type: "channel", channelId });
   }
 }
 
