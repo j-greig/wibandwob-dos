@@ -98,6 +98,7 @@ class IrcWorldChatTransport implements WorldChatTransport {
       gecos: this.realname,
       auto_reconnect: true,
       auto_reconnect_wait: 5000,
+      auto_reconnect_max_retries: 9999, // keep trying indefinitely
     });
   }
 
