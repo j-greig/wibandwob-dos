@@ -144,10 +144,20 @@ class WorldChatService {
 
   ensureWorld(worldKey: string, width: number, height: number): Chatspot[] {
     this.transport.connect();
-    if (this.currentWorldKey === worldKey && this.chatspots.length > 0) {
+
+    const sameWorld = this.currentWorldKey === worldKey && this.chatspots.length > 0;
+    if (sameWorld) {
+      // Same terrain+seed. If viewport changed, reposition chatspots but keep channel state.
+      const newSpots = defaultChatspots(width, height);
+      const dimsChanged =
+        newSpots.length !== this.chatspots.length ||
+        newSpots[0]?.x !== this.chatspots[0]?.x ||
+        newSpots[0]?.y !== this.chatspots[0]?.y;
+      if (dimsChanged) this.chatspots = newSpots;
       return this.chatspots;
     }
 
+    // New world — full reinit.
     this.currentWorldKey = worldKey;
     this.chatspots = defaultChatspots(width, height);
     this.channels = new Map(
