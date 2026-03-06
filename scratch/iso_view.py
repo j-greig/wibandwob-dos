@@ -81,22 +81,27 @@ if args.cx is not None: cam_wx = args.cx
 if args.cy is not None: cam_wy = args.cy
 
 cam_yaw  = math.atan2(peak_y - cam_wy, peak_x - cam_wx)
-cam_elev = sea + 0.01
+cam_elev = cell_at(cam_wx, cam_wy)["elevation"]  # stand on terrain surface
 
 FOV     = math.pi / 2.0
-FAR     = math.sqrt((peak_x-cam_wx)**2 + (peak_y-cam_wy)**2) * 1.2
-STEPS   = 600
-HORIZON = int(PH * 0.55)     # horizon sits 55% down — more sky room
-ELEV_SC = PH * 0.20          # gentle vertical scale so hills read clearly
+FAR     = math.sqrt((peak_x-cam_wx)**2 + (peak_y-cam_wy)**2) * 1.4
+STEPS   = 800
+# Fixed-horizon y-buffer (far-to-near, relative to cam_elev).
+# proj = HORIZON - (e - cam_elev) * ELEV_SC
+# Works for any cam elevation: same-height terrain → HORIZON,
+# above-cam terrain → above HORIZON, below-cam → below HORIZON.
+# Scale higher for elevated cameras so 0.4-unit peaks stay dramatic.
+HORIZON = int(PH * 0.52)
+ELEV_SC = PH * (0.38 if cam_elev > sea + 0.05 else 0.22)
 
 print(f"Terrain: {m['terrainName']}  seed:{m['seed']}  {W}x{H}  sea:{sea:.2f}", file=sys.stderr)
-print(f"Cam ({int(cam_wx)},{int(cam_wy)}) -> peak ({peak_x},{peak_y}) e={best_e:.2f}  yaw={math.degrees(cam_yaw):.0f}°", file=sys.stderr)
+print(f"Cam ({int(cam_wx)},{int(cam_wy)}) elev={cam_elev:.2f} -> peak ({peak_x},{peak_y}) e={best_e:.2f}  yaw={math.degrees(cam_yaw):.0f}°", file=sys.stderr)
 
-# Pixel canvas: colour index per pixel (None = sky)
+# Pixel canvas
 canvas = [[None]*SW for _ in range(PH)]
-y_buf  = [HORIZON] * SW   # topmost painted pixel row per column
+y_buf  = [HORIZON] * SW   # topmost painted row per column; moves toward 0
 
-for step in range(STEPS, 0, -1):
+for step in range(STEPS, 0, -1):   # far → near
     dist = FAR * step / STEPS
     for col in range(SW):
         if y_buf[col] <= 0:
@@ -106,29 +111,29 @@ for step in range(STEPS, 0, -1):
         wy  = cam_wy + math.sin(ang) * dist
         if wx < 0 or wx >= W or wy < 0 or wy >= H:
             continue
-        c = cell_at(wx, wy)
-        e = c["elevation"]
-        b = c["biome"]
+        c   = cell_at(wx, wy)
+        e   = c["elevation"]
+        b   = c["biome"]
         col_idx = BIOME_COL.get(b, 34)
-        proj = HORIZON - int((e - sea) * ELEV_SC)
+        proj = HORIZON - int((e - cam_elev) * ELEV_SC)
         proj = max(0, min(PH-1, proj))
         if proj < y_buf[col]:
-            canvas[proj][col] = col_idx          # surface pixel
-            for r in range(proj+1, min(y_buf[col], PH)):
+            canvas[proj][col] = col_idx                         # surface pixel
+            for r in range(proj+1, min(y_buf[col], PH)):        # column face
                 if canvas[r][col] is None:
-                    canvas[r][col] = FACE_COL    # column face
+                    canvas[r][col] = FACE_COL
             y_buf[col] = proj
 
-# Water fill below horizon
+# Fill below horizon: water if near sea level, biome-tinted ground otherwise
+fill_col = BIOME_COL["deep-water"] if cam_elev < sea + 0.08 else BIOME_COL["forest"]
 for col in range(SW):
-    base = max(HORIZON, y_buf[col])
-    for r in range(base, PH):
+    for r in range(max(HORIZON, y_buf[col]), PH):
         if canvas[r][col] is None:
-            canvas[r][col] = BIOME_COL["deep-water"]
+            canvas[r][col] = fill_col
 
-# Sky fill: gradient using row fraction
+# Sky fill above terrain
 def sky_col(pixel_row):
-    frac = pixel_row / HORIZON if HORIZON > 0 else 0
+    frac = min(1.0, pixel_row / HORIZON) if HORIZON > 0 else 0
     idx  = min(len(SKY_COLS)-1, int(frac * len(SKY_COLS)))
     return SKY_COLS[idx]
 
