@@ -43,9 +43,8 @@ chafa -f symbols --symbols ascii -c none -s 130x60 source.jpg > primers/myfile.t
 
 ## Invert guidance
 
-- Dark painting on light background (most old masters) → add `--invert`
+- To invert an image → add `--invert` (use sparingly)
 - Already dark image (night scene, dark background) → no flag needed
-- When in doubt: try both, pick the one where shapes read
 
 ## Known good conversions
 
