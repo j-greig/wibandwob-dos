@@ -5,11 +5,48 @@ GitHub issue: —
 PR: —
 ---
 
-# E018 — Contour Studio v2 Terrain Foundation
+# E018 — WibWobWorld Terrain Foundation
 
 ## TL;DR
 
-Turn `Contour Studio` into the first reusable terrain-generation surface for a future SimCity 2000 / Dwarf Fortress-style TUI game. The first shipped slice is not a game yet: it is a deterministic landscape generator with elevation-aware terrain classification, water, vegetation, hills, peaks, and API-visible state. `Contour Studio v2` is the thin UI shell; reusable terrain logic lives in new services.
+Create `WibWobWorld`, the first reusable terrain-generation surface for a future SimCity 2000 / Dwarf Fortress-style TUI game played inside the full WibWob-DOS desktop. The first shipped slice is not a game yet: it is a deterministic landscape generator with elevation-aware terrain classification, water, vegetation, hills, peaks, and API-visible state. `WibWobWorld` ships as a new private microapp in `modules-private/`, while the existing built-in `Contour Studio` stays intact as a prototype.
+
+## Top-Level Product Assumptions
+
+- `WibWobWorld` is not just a terrain toy; it is the first private gameplay microapp in a larger agent-played desktop world
+- the whole WibWob-DOS TUI desktop is the gameplay surface
+- the in-app agent should eventually be able to play through the same desktop surfaces a human sees
+- the agent should be able to open support windows during play
+- support windows may include readers, notes, logs, prompts, and a gameplay diary
+- OBS/Twitch streaming is part of the intended usage context
+- the existing built-in `Contour Studio` remains untouched as the old prototype
+- stretch goal later: quasi-3D / isometric rendering over the same terrain model, not a second terrain system
+
+## External Engine Notes
+
+Useful context from the adjacent MVP repo:
+
+- local MVP repo: [/Users/james/Repos/wibandwob-rogue](/Users/james/Repos/wibandwob-rogue)
+- MVP package manifest: [/Users/james/Repos/wibandwob-rogue/package.json](/Users/james/Repos/wibandwob-rogue/package.json)
+- vendored ROT build: [/Users/james/Repos/wibandwob-rogue/libs/rot/rot.min.js](/Users/james/Repos/wibandwob-rogue/libs/rot/rot.min.js)
+
+Current recommendation:
+- use `rot-js` as the underlying roguelike toolkit for map generation, FOV, pathfinding, RNG, and turn scheduling
+- use WibWob-DOS as the desktop/window/playback architecture
+- keep game-specific state, agents, diaries, and multi-window play flows in custom code rather than searching for a monolithic TS/JS TUI game engine
+
+Why:
+- `rot-js` is mature and directly relevant to roguelike simulation
+- terminal UI libraries like Blessed or Terminal Kit help with rendering/input, but they are not game-management engines
+- there does not appear to be a strong drop-in TS/JS engine for the full "agent-played desktop roguelike/sim" problem
+
+Upstream references:
+- `rot-js` homepage: https://ondras.github.io/rot.js/hp/
+- `rot-js` GitHub: https://github.com/ondras/rot.js
+- `rot-js` npm: https://www.npmjs.com/package/rot-js
+- `terminal-kit` GitHub: https://github.com/cronvel/terminal-kit
+- `terminal-kit` npm: https://www.npmjs.com/package/terminal-kit
+- `blessed` GitHub: https://github.com/chjj/blessed
 
 ## Read First
 
@@ -32,19 +69,36 @@ Build a modular terrain substrate that can later support:
 - future z-band / multi-layer exploration
 - later settlement / simulation systems
 
-The first milestone is `Contour Studio v2`, not the full game.
+The first milestone is `WibWobWorld`, not the full game.
 
-## Why Contour Studio First
+## Product Context
 
-`Contour Studio` is the cleaner first seam than `Terrain Lab`.
+The long-term goal is to use the full WibWob-DOS desktop as the visible gameplay architecture.
 
-- `Contour Studio` is already a dedicated terrain canvas window.
+- an in-app agent should eventually be able to play the game through the same desktop surfaces a human sees
+- OBS can stream the TUI desktop to Twitch while the agent plays
+- the agent should be able to spawn supporting windows during play
+- those supporting windows may include readers, notes, logs, prompts, and a gameplay diary
+
+This means the terrain slice must behave like a first-class desktop app surface:
+- open through the command registry
+- expose semantic `describeState()`
+- remain controllable via the local HTTP API
+- coexist cleanly with the rest of the desktop
+
+## Why WibWobWorld First
+
+`WibWobWorld` is the right first game-facing seam, while the built-in `Contour Studio` remains a prototype.
+
+- `Contour Studio` already proves the contour prototype and should not be destabilized.
 - `Terrain Lab` is a composition demo proving the player can be embedded with side panels.
-- A game-adjacent first step should produce a reusable terrain model and a focused landscape generator surface, not a more complex lab shell.
+- the game-facing work should start as a separate sibling app surface so iteration can be more aggressive
+- putting it in `modules-private/` matches the likely product boundary for game-specific work
 
 Target outcome:
-- `Contour Studio v2` generates a SimCity 2000-ish TUI landscape with water, vegetation, hills, ridges, and peaks
-- the same terrain model can later be consumed by a game window, `Terrain Lab`, or other simulation views
+- `WibWobWorld` generates a SimCity 2000-ish TUI landscape with water, vegetation, hills, ridges, and peaks
+- the existing `Contour Studio` remains available as the old prototype
+- the same terrain model can later be consumed by gameplay windows or other simulation views
 
 ## Current State
 
@@ -67,11 +121,11 @@ Current gaps:
 
 ### Core Rule
 
-Do not turn `Contour Studio` into the terrain model.
+Do not turn the existing built-in `Contour Studio` into the terrain model.
 
 Keep this split:
-- `contour-window.ts`
-  - UI wiring, keys, focus, `describeState()`
+- `modules-private/wibwobworld/`
+  - microapp shell, keys, focus, `describeState()`, command registration
 - `contour-engine.ts`
   - terrain archetypes, raw hills, raw heightmap, contour rendering
 - `terrain-model.ts` (new)
@@ -80,6 +134,18 @@ Keep this split:
   - glyph + colour rendering for terrain views
 
 That keeps the feature modular, testable, and reusable by future game windows.
+
+### Module Placement
+
+Implementation target:
+- new microapp under `modules-private/`
+- loaded by `src/services/module-loader.ts`
+- opened through dynamic `microapp.*` commands
+
+Important note:
+- `modules-private/` is a git submodule
+- planning and integration notes can live in this repo
+- actual private module code should be authored in the private modules repo, then pulled in through the submodule
 
 ### Proposed New Modules
 
@@ -184,7 +250,7 @@ Important rule:
 
 ### Window Behavior
 
-`Contour Studio v2` should support:
+`WibWobWorld` should support:
 - deterministic reroll from seed
 - terrain archetype switching
 - sea level adjustment
@@ -219,8 +285,8 @@ This is mandatory. The control surface must not need to infer terrain state from
 
 ## Acceptance Criteria
 
-- [ ] **AC-1:** `Contour Studio v2` opens through the existing command path and still behaves as a first-class window.
-  - Test: open via `POST /commands/run {"id":"contour.open"}` and verify focus, movement, resize, close, and `/state` all work.
+- [ ] **AC-1:** `WibWobWorld` opens through the module command path and behaves as a first-class window.
+  - Test: open via the registered `microapp.*.open` command and verify focus, movement, resize, close, and `/state` all work.
 
 - [ ] **AC-2:** Terrain generation is deterministic by seed and terrain type.
   - Test: same seed + terrain + viewport + options produce the same terrain metadata and visible output.
@@ -237,8 +303,11 @@ This is mandatory. The control surface must not need to infer terrain state from
 - [ ] **AC-6:** Rendering logic is split cleanly from terrain semantics.
   - Test: new terrain model service can be imported and exercised without Blessed.
 
-- [ ] **AC-7:** `Contour Studio v2` remains a reusable foundation rather than the game itself.
+- [ ] **AC-7:** `WibWobWorld` remains a reusable foundation rather than the game itself.
   - Test: the terrain model can be consumed later by a second window without extracting logic back out of the window.
+
+- [ ] **AC-8:** the existing built-in `Contour Studio` remains unchanged as a prototype surface.
+  - Test: `contour.open` still opens the old built-in window, and `WibWobWorld` opens separately.
 
 ## Planned Features / Stories
 
@@ -257,8 +326,9 @@ This is mandatory. The control surface must not need to infer terrain state from
   - render terrain-only and hybrid modes
   - introduce semantic terrain colours
 
-- [ ] **F04 — Contour Studio v2 integration**
-  - update `contour-window.ts`
+- [ ] **F04 — WibWobWorld microapp integration**
+  - add the microapp shell in `modules-private/`
+  - register commands and snapshot behavior
   - keep UI thin
   - wire state + keybindings to new services
 
@@ -286,6 +356,16 @@ For this epic’s first shipped slice:
 - settlement systems
 
 Those depend on the terrain substrate landing cleanly first.
+
+## Stretch Goal
+
+If the first terrain substrate lands cleanly, a strong follow-on visual experiment is:
+- quasi-3D / isometric rendering of generated terrain in the TUI
+
+Constraints:
+- difficult in a terminal, but not impossible
+- should remain a rendering layer over the same terrain model rather than a separate terrain system
+- should not compromise the simpler top-down terrain slice required for M01
 
 ## Risks
 

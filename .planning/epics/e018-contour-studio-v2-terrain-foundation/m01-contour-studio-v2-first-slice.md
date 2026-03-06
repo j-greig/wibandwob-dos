@@ -4,11 +4,11 @@ Type: milestone
 Epic: e018-contour-studio-v2-terrain-foundation
 ---
 
-# M01 — Contour Studio v2 First Slice
+# M01 — WibWobWorld First Slice
 
 ## Goal
 
-Ship `Contour Studio v2` as a deterministic terrain generator with:
+Ship `WibWobWorld` as a deterministic terrain generator with:
 - sea level
 - water rendering
 - vegetation rendering
@@ -19,12 +19,13 @@ Ship `Contour Studio v2` as a deterministic terrain generator with:
 
 - `src/services/terrain-model.ts`
 - `src/services/terrain-render.ts`
-- updated `src/windows/contour-window.ts`
+- new private microapp under `modules-private/`
 - semantic terrain state in `describeState()`
 
 ## Done Means
 
-- `contour.open` still opens the window normally
+- the existing `contour.open` path still opens the old built-in prototype
+- `WibWobWorld` opens through its microapp command path
 - water appears when sea level rises
 - vegetation appears on appropriate land
 - `/state` exposes terrain semantics

@@ -14,3 +14,4 @@ e015-microapp-modules — done
 e016-microapp-primitives — done
 e017-scramble-brains — not-started
 e018-contour-studio-v2-terrain-foundation — not-started
+e019-rogue-tui-port — not-started
