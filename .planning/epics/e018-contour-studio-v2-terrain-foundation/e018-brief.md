@@ -342,7 +342,14 @@ This is mandatory. The control surface must not need to infer terrain state from
   - export snapshots
   - verify API visibility and live state parity
 
-- [ ] **F07 — Game bootstrap follow-on**
+- [ ] **F07 — WibWobWorld status bar mode switcher**
+  - add clickable mode buttons (TERRAIN / CONTOURS / HYBRID / 3D) in the bottom-right of the status bar
+  - clicking a button switches render mode directly — no need to remember `m` to cycle
+  - highlight the active mode button
+  - keeps keyboard shortcut `m` as well — buttons are additive not replacing
+  - rationale: firstperson mode traps users who forget the key; escape route must be visible
+
+- [ ] **F08 — Game bootstrap follow-on**
   - use `TerrainMap` as the substrate for a future playable terrain/game view
   - likely next: cursor + inspect tile + movement cost by elevation delta
 
@@ -413,7 +420,7 @@ Acceptance bar right now:
   - mirror incoming/outgoing IRC traffic into local world-chat state
   - keep `describeState()` and the control API as the local source of truth for the desktop
 
-- [x] **C08 — Dual-instance IRC smoke**
+- [ ] **C08 — Dual-instance IRC smoke**
   - run two WibWob-DOS instances against the same IRC backend
   - join the same world channel from both
   - verify cross-instance message relay in both TUI and outside-TUI surfaces
