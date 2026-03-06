@@ -342,12 +342,14 @@ This is mandatory. The control surface must not need to infer terrain state from
   - export snapshots
   - verify API visibility and live state parity
 
-- [ ] **F07 — WibWobWorld status bar mode switcher**
+- [x] **F07 — WibWobWorld status bar mode switcher**
   - add clickable mode buttons (TERRAIN / CONTOURS / HYBRID / 3D) in the bottom-right of the status bar
   - clicking a button switches render mode directly — no need to remember `m` to cycle
   - highlight the active mode button
   - keeps keyboard shortcut `m` as well — buttons are additive not replacing
   - rationale: firstperson mode traps users who forget the key; escape route must be visible
+  - verified 2026-03-06: buttons visible in all modes including firstperson, active mode highlighted,
+    API mode switch updates highlight correctly
 
 - [ ] **F08 — Game bootstrap follow-on**
   - use `TerrainMap` as the substrate for a future playable terrain/game view
