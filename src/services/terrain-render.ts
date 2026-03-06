@@ -85,7 +85,7 @@ function renderContourCell(char: string, map: TerrainMap, x: number, y: number, 
 // Ported from scratch/iso_view.py — see that file for algorithm notes.
 // ---------------------------------------------------------------------------
 
-function fpFindPeak(map: TerrainMap): { x: number; y: number; elevation: number } {
+export function findTerrainPeak(map: TerrainMap): { x: number; y: number; elevation: number } {
   let best = { x: Math.floor(map.width / 2), y: Math.floor(map.height / 2), elevation: 0 };
   for (let y = 0; y < map.height; y += 4) {
     for (let x = 0; x < map.width; x += 4) {
@@ -122,7 +122,7 @@ function renderFirstPerson(
   height: number,
   tags: boolean,
 ): string[] {
-  const peak = fpFindPeak(map);
+  const peak = findTerrainPeak(map);
   const cam = camOpt ?? fpAutoCamera(map, peak);
   const camCell = map.cells[Math.round(cam.y)]?.[Math.round(cam.x)];
   const camElev = camCell?.elevation ?? map.seaLevel;
