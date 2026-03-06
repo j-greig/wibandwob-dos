@@ -30,7 +30,7 @@ function clampSize(value: number): number {
   return Math.max(0, Math.floor(value));
 }
 
-function applyRect(node: blessed.Widgets.BoxElement, rect: Rect): void {
+export function applyRect(node: blessed.Widgets.BoxElement, rect: Rect): void {
   node.top = rect.top;
   node.left = rect.left;
   node.width = clampSize(rect.width);
@@ -633,6 +633,93 @@ export function createAnimatedPanel(
     destroy() {
       opts.player.destroy();
       node.destroy();
+    },
+  };
+}
+
+/**
+ * A 1-row bar with a left text area and N right-aligned clickable buttons.
+ * Active button is shown inverse. Suitable for mode switchers in microapps.
+ *
+ * @example
+ * const bar = createButtonBar(win.body, buttons, (id) => { mode = id; render(); });
+ * // in render():
+ * bar.update({ leftText: hintText, activeId: currentMode });
+ */
+export function createButtonBar<Id extends string>(
+  parent: blessed.Widgets.Node,
+  buttons: ReadonlyArray<{ id: Id; label: string }>,
+  onSelect: (id: Id) => void,
+): UiPart<{ leftText: string; activeId: Id }> {
+  // Static button widths: label + 1 space padding each side; 1 gap between buttons.
+  const buttonWidths = buttons.map(b => b.label.length + 2);
+  const buttonsAreaWidth = buttonWidths.reduce((sum, w, i) => sum + w + (i > 0 ? 1 : 0), 0);
+
+  const bar = blessed.box({
+    parent,
+    top: 0, left: 0, width: 0, height: 1,
+    style: theme().footer,
+  });
+
+  const leftLabel = blessed.box({
+    parent: bar,
+    top: 0, left: 0, right: buttonsAreaWidth, height: 1,
+    tags: true,
+    style: theme().footer,
+  });
+
+  const buttonNodes = buttons.map((btn, i) => {
+    const node = blessed.box({
+      parent: bar,
+      top: 0, left: 0,
+      width: buttonWidths[i],
+      height: 1,
+      mouse: true,
+      clickable: true,
+      tags: true,
+      content: ` ${btn.label} `,
+      style: theme().footer,
+    });
+    node.on("click", () => onSelect(btn.id));
+    return node;
+  });
+
+  let lastProps: { leftText: string; activeId: Id } = {
+    leftText: "",
+    activeId: buttons[0]?.id as Id,
+  };
+
+  return {
+    node: bar,
+    layout(rect) {
+      applyRect(bar, rect);
+      const barWidth = clampSize(rect.width);
+      const leftWidth = Math.max(0, barWidth - buttonsAreaWidth);
+      applyRect(leftLabel, { top: 0, left: 0, width: leftWidth, height: 1 });
+      let cursor = barWidth;
+      for (let i = buttonNodes.length - 1; i >= 0; i--) {
+        const node = buttonNodes[i]!;
+        const w = buttonWidths[i]!;
+        cursor -= w;
+        applyRect(node, { top: 0, left: Math.max(0, cursor), width: w, height: 1 });
+        if (i > 0) cursor -= 1;
+      }
+    },
+    update(props) {
+      lastProps = props;
+      leftLabel.setContent(props.leftText);
+      safeSetStyle(bar, theme().footer);
+      safeSetStyle(leftLabel, theme().footer);
+      for (let i = 0; i < buttonNodes.length; i++) {
+        const isActive = buttons[i]!.id === props.activeId;
+        safeSetStyle(buttonNodes[i]!, isActive ? { ...theme().footer, inverse: true } : theme().footer);
+      }
+    },
+    restyle() {
+      this.update(lastProps);
+    },
+    destroy() {
+      bar.destroy();
     },
   };
 }

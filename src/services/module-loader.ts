@@ -31,6 +31,7 @@ import {
   createStack, createColumns,
   createHeaderBar, createStatusBar, createTextBlock,
   createRule, createFigletDisplay, createAnimatedPanel,
+  createButtonBar, applyRect,
 } from "../core/ui-parts.js";
 import type { Rect, UiPart, StackChild } from "../core/ui-parts.js";
 
@@ -110,6 +111,10 @@ export interface MicroappHost {
     createRule: typeof createRule;
     createFigletDisplay: typeof createFigletDisplay;
     createAnimatedPanel: typeof createAnimatedPanel;
+    /** 1-row bar: left hint text + N right-aligned clickable mode buttons. */
+    createButtonBar: typeof createButtonBar;
+    /** Position a blessed box within a Rect. Use instead of re-implementing in each microapp. */
+    applyRect: typeof applyRect;
   };
 }
 
@@ -281,6 +286,8 @@ function createMicroappHost(
       createRule,
       createFigletDisplay,
       createAnimatedPanel,
+      createButtonBar,
+      applyRect,
     },
   };
 
