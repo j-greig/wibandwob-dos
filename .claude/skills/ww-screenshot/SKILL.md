@@ -1,3 +1,12 @@
+---
+name: ww-screenshot
+description: >-
+  Capture a plain-text crop of a single WibWob-DOS window for visual debugging.
+  Use instead of full /screenshot/text dumps — those are 50KB+ and destroy context fast.
+  Triggers on: "screenshot window", "capture window", "what does window look like",
+  "show me window", "crop window".
+---
+
 # Skill: ww-screenshot
 
 Capture a plain-text crop of a single WibWob-DOS window for visual debugging.

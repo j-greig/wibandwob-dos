@@ -1,8 +1,9 @@
 ---
 name: timeline-smoke
-description: Smoke test a VJ timeline end-to-end with real macOS screencapture PNGs
-  at every cue step, plus tmux text dumps and state JSON. Capture-then-review pattern —
-  all evidence collected first, comparison done after. Use when testing a new timeline,
+description: >-
+  Smoke test a VJ timeline end-to-end with real macOS screencapture PNGs at every
+  cue step, plus tmux text dumps and state JSON. Capture-then-review pattern — all
+  evidence collected first, comparison done after. Use when testing a new timeline,
   verifying the pipeline after code changes, or debugging cue behaviour. Triggers on:
   "smoke test timeline", "test the timeline", "capture each step", "screenshot each cue".
 ---
