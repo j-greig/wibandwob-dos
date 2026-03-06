@@ -1,5 +1,5 @@
 ---
-Status: active
+Status: complete — 2026-03-06
 Type: epic
 GitHub issue: —
 PR: —
@@ -33,7 +33,7 @@ type stub starting point.
 ## Stories
 
 ### S01 — Server harden
-Status: [ ] open
+Status: [x] complete — 2026-03-06
 
 Harden `scripts/dev-irc-server.ts`:
 - reject duplicate nicks (send 433 ERR_NICKNAMEINUSE)
@@ -94,7 +94,7 @@ Verification:
 ---
 
 ### S04 — Dual-instance smoke (re-verify post-S02)
-Status: [x] complete for IRC hand-rolled (C08, 2026-03-06)
+Status: [x] complete — irc-framework both sides, 2026-03-06
         [ ] re-verify with irc-framework client
 
 Two instances (main/8099, alt/8098) on one dev IRC server.
@@ -110,7 +110,7 @@ Verification:
 ---
 
 ### S05 — Textual interoperability smoke
-Status: [ ] open
+Status: [x] complete — 2026-03-06
 
 Connect Textual (macOS IRC GUI) to local dev server. Verify two-way relay.
 
@@ -128,7 +128,7 @@ Verification:
 ---
 
 ### S06 — Fix ensureWorld channel map reset on viewport resize
-Status: [ ] open
+Status: [x] complete — 2026-03-06
 
 Bug: WibWobWorld resize → new `worldKey` → `ensureWorld` resets `channels` Map
 → chatroom loses state, IRC messages silently dropped.
