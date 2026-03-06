@@ -185,19 +185,25 @@ This repo is the resurrection doc. Any wibwob-dos VPS setup steps must land in i
 Not yet installed on the VPS. Bun publishes native ARM64 Linux binaries — install with:
 ```bash
 curl -fsSL https://bun.sh/install | bash
-cp /root/.local/bin/bun /usr/local/bin/bun   # copy not symlink — same gotcha as uv
+cp /root/.bun/bin/bun /usr/local/bin/bun   # copy not symlink — same gotcha as uv
+# verify: bun --version
 ```
-Version pin to whatever is in the app's `package.json` `engines` field.
+Pin an explicit Bun version in the runbook (e.g. `1.1.x`) — `package.json` `engines`
+is advisory only and is not enforced at runtime.
 
 ### systemd service pattern
 
-All long-running services are systemd units with `Restart=on-failure`. Reference:
-`vps-hetzner-one/services/signal-daemon.service`. WibWob-DOS will need a
-`wibwob-dos.service` following the same shape:
-- `User=wibwob` (non-root — see below)
-- `WorkingDirectory=/opt/wibandwob-dos`
-- `ExecStart=/usr/local/bin/bun run src/app.ts`
-- `EnvironmentFile=/opt/wibandwob-dos/.env`
+All long-running services are systemd units with `Restart=on-failure`. WibWob-DOS
+is a blessed TUI — it must run inside a tmux session to be attachable. These are not
+competing models: systemd is the supervisor (ensures restart on failure, starts at
+boot), and its `ExecStart` creates or attaches a named tmux session:
+```
+ExecStart=/usr/bin/tmux new-session -d -s wibwob -x 320 -y 79 \
+  /usr/local/bin/bun run /opt/wibandwob-dos/src/app.ts
+```
+The tmux session is the interactive surface; systemd is the watchdog.
+`vps-hetzner-one/services/signal-daemon.service` is the shape reference.
+Add `wibwob-dos.service` to that repo's `services/` directory.
 
 ### Non-root user requirement (critical)
 
@@ -208,7 +214,9 @@ Provisioning pattern from runbook section 5b:
 ```bash
 useradd -r -m -s /bin/bash wibwob
 chown -R wibwob:wibwob /opt/wibandwob-dos
-su - wibwob && claude   # interactive OAuth once per user
+# interactive OAuth — must be a real login shell, not a subshell:
+su - wibwob -c 'claude'   # or: ssh in, then su - wibwob, then run claude manually
+# verify: su - wibwob -c 'ls ~/.claude/'  (token files should exist)
 ```
 
 ### Control API port binding
@@ -232,8 +240,12 @@ ssh-ed25519 AAAA... agent-local-james-imac
 ssh-ed25519 AAAA... agent-vps-wibwob
 ssh-ed25519 AAAA... agent-friend-remote
 ```
-Key fingerprint is the initial identity token — maps to `WIBWOB_INSTANCE_LABEL` for
-the IRC/world layer. No separate auth service needed for the first pass.
+Key fingerprint is the starting identity signal — loosely maps to
+`WIBWOB_INSTANCE_LABEL` for the IRC/world layer for S02 purposes. This is NOT
+a robust authorization model: shared tmux sessions destroy per-agent isolation (an
+agent in the session can set any `instanceLabel`), and SSH key → label mapping is
+convention only, not enforced. The Open Questions section covers what a stronger model
+needs. No separate auth service for S02 — but S05 will require it.
 
 ### tmux session convention
 
@@ -250,11 +262,18 @@ sessions or shared.
 
 ### RAM headroom
 
-3.7GB total. Current services (sy-discord Python bot, signal-daemon Python + Claude Code
-headless, signal-api Docker container) consume ~600MB–1.2GB idle. WibWob-DOS
-(Bun + blessed TUI + IRC client) is lightweight — estimate ~150MB RSS at idle.
-Running a local Claude Code headless call from inside the app is the RAM risk:
-each spawn is ~300–500MB. Avoid concurrent Claude Code subprocesses on this host.
+3.7GB total. Figures below are **unmeasured estimates** — baseline before adding
+wibwob-dos. Measure with `smem -r` or `ps aux --sort=-%mem` under representative
+load before committing to a memory budget.
+
+- Current services idle: ~600MB–1.2GB (sy-discord Python, signal-daemon + Claude Code
+  headless, signal-api Docker container)
+- WibWob-DOS at idle: estimated ~150MB RSS (Bun + blessed TUI + IRC client)
+- Claude Code headless subprocess: estimated ~300–500MB per spawn
+
+Risk: concurrent Claude Code subprocesses (one from signal-daemon, one from wibwob-dos)
+could push 2GB+ and cause swapping. Avoid concurrent spawns; consider a VPS RAM
+upgrade to CAX21 (8GB) before shipping S04/S05 if measured headroom is tight.
 
 ### Deploy pattern
 
@@ -274,6 +293,104 @@ Never committed. Reference entry added to runbook section 7 secrets table.
 All native modules must have ARM64 builds. Blessed (pure JS) is fine. Any native
 addon brought in later (e.g. sqlite, canvas) needs explicit ARM64 verification.
 Node.js v22 is already installed — Bun and Node can coexist.
+
+## Local Docker Smoke Environment
+
+### Rationale
+
+Before touching the real VPS, prove the core hosting stack works in a throwaway
+container. The Hetzner VPS is Ubuntu 24.04 LTS aarch64. This dev machine is also
+ARM64 (Apple Silicon). Docker on ARM64 runs `linux/arm64` containers natively —
+no QEMU emulation. Same ISA and OS image: a useful architecture-compatible smoke,
+not a full VPS replica (kernel, cgroups, systemd, Hetzner networking, and disk
+persistence are all absent or different).
+
+What the container smoke can honestly cover:
+- Bun installs cleanly on Ubuntu 24.04 ARM64 and the binary runs
+- `bun install && bun run src/app.ts` starts without crashing under a non-root user
+- `GET /health` responds correctly when the app is running
+- tmux session starts and is attachable (`tmux attach` works)
+- SSH key auth works: known key admitted, unknown key rejected,
+  password auth refused (validates `authorized_keys` + `PasswordAuthentication no`)
+- Control API SSH tunnel pattern works end-to-end
+
+What it cannot cover:
+- systemd supervision (no init — run app directly in container)
+- Claude CLI non-root restriction (Claude not installed in container — validate
+  this separately on first VPS login)
+- Hetzner firewall / network topology
+- RAM pressure at VPS scale
+- Port-exposure security at the host-network level
+
+### Port binding note (important)
+
+If the app binds to `127.0.0.1:8099` inside the container (prod posture),
+`docker run -p 18099:8099` will NOT forward — Docker's proxy connects via the
+container's bridge interface, not loopback. Two honest testing postures:
+
+**A — Test tunnel path (mirrors prod):** app binds `127.0.0.1:8099`, no `-p 8099`
+published, access only via SSH tunnel through the container's sshd. Proves the
+real access pattern.
+
+**B — Test app startup only:** app binds `0.0.0.0:8099`, publish with
+`-p 127.0.0.1:18099:8099` (host-bound to avoid LAN exposure). Quicker smoke
+for "does the app start and respond" without needing sshd running.
+
+Do not mix: claiming `127.0.0.1` binding AND `-p` direct access are both true is
+wrong. Choose A or B per what you're proving.
+
+### Sketch (incomplete — starting point only)
+
+This needs an entrypoint script, sshd host keys, `authorized_keys`, and
+`PasswordAuthentication no` before it is runnable as a real smoke harness.
+Treat as scratch notes, not a copy-paste solution.
+
+```dockerfile
+FROM ubuntu:24.04
+RUN apt-get update && apt-get install -y curl git tmux openssh-server sudo \
+    && curl -fsSL https://bun.sh/install | bash \
+    && cp /root/.bun/bin/bun /usr/local/bin/bun \
+    && useradd -m -s /bin/bash wibwob \
+    && mkdir -p /run/sshd /home/wibwob/.ssh \
+    && ssh-keygen -A                          # generate sshd host keys
+# TODO: COPY test_agent_key.pub /home/wibwob/.ssh/authorized_keys
+# TODO: RUN chmod 700 /home/wibwob/.ssh && chown -R wibwob:wibwob /home/wibwob/.ssh
+# TODO: RUN sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
+# TODO: ENTRYPOINT: start sshd, then su to wibwob and run app in tmux
+COPY . /opt/wibandwob-dos
+RUN chown -R wibwob:wibwob /opt/wibandwob-dos
+EXPOSE 22
+```
+
+Run (posture A — tunnel only, mirrors prod):
+```bash
+docker build --platform linux/arm64 -t wibwob-vps-smoke .
+docker run -d --rm \
+  -p 127.0.0.1:2849:22 \   # SSH only — no direct API port published
+  --platform linux/arm64 \
+  --name wibwob-smoke \
+  wibwob-vps-smoke
+```
+
+Verify inside container via SSH:
+```bash
+# SSH key auth
+ssh -i ~/.ssh/test_agent_key -p 2849 wibwob@localhost 'whoami'
+# tmux attach
+ssh -i ~/.ssh/test_agent_key -p 2849 wibwob@localhost 'tmux attach -t wibwob -r'
+# control API via tunnel
+ssh -N -L 19099:127.0.0.1:8099 -i ~/.ssh/test_agent_key -p 2849 wibwob@localhost &
+curl -s http://127.0.0.1:19099/health
+# confirm direct host access is blocked (should fail)
+curl -s http://127.0.0.1:8099/health  # expected: connection refused
+```
+
+### Story suggestion
+
+Consider a pre-story **S00 — Docker smoke** that must pass before S01 (real VPS
+work) begins. Gates: health endpoint live, non-root user running, SSH key auth
+working, control API tunnel confirmed. Keeps the real VPS clean until the runtime
+is proven locally.
 
 ## Commit Context Note
 
