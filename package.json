@@ -9,7 +9,8 @@
     "start": "bun run src/app.ts",
     "gen-primitives": "bun scripts/gen-primitives.ts",
     "check-surface-parity": "bun run scripts/check-surface-parity.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "check-themes": "bun run scripts/check-themes.ts"
   },
   "dependencies": {
     "@anthropic-ai/claude-code": "^2.1.63",
