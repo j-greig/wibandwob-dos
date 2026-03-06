@@ -168,6 +168,8 @@ export interface DesktopState {
     mode: string;
     cwd: string;
     statePath: string;
+    instanceLabel?: string;
+    sessionId?: string;
     controlApiEnabled?: boolean;
     controlApiPort?: number;
     theme?: string;

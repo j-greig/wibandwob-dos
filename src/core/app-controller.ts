@@ -150,6 +150,7 @@ export class TsTuiMvpApp {
   private readonly desktop: Box;
   private readonly statusLine: Box;
   private statusKaomoji?: Box;
+  private statusIdentity?: Box;
   private kaomojiBlink = false;
   private kaomojiTimer?: NodeJS.Timeout;
   private readonly menus: MenuConfig[];
@@ -166,8 +167,13 @@ export class TsTuiMvpApp {
   private readonly controlApi: ControlApiService;
   private readonly editor: EditorCoordinator;
   private activeAgentSession?: WibWobAgentSession;
+  private readonly instanceLabel?: string;
+  private readonly sessionId: string;
 
-  constructor() {
+  constructor(opts?: { instanceLabel?: string; sessionId?: string }) {
+    this.instanceLabel = opts?.instanceLabel?.trim() || undefined;
+    this.sessionId = opts?.sessionId?.trim() || "???";
+    log.setIdentity(this.getInstanceDisplayLabel());
     this.screen = blessed.screen({
       smartCSR: true,
       fullUnicode: true,
@@ -243,21 +249,30 @@ export class TsTuiMvpApp {
       defaultDir: SPIKE_ROOT,
       editorStartDir: path.dirname(SPIKE_NOTES_PATH),
     });
-    this.controlApi = new ControlApiService(CONTROL_API_PORT, {
-      getState: () => this.getDesktopState(),
-      syncState: () => this.state.sync(),
-      getPrimerInfo: (pathOrName) => this.getPrimerInfo(pathOrName),
-      listCommands: (surface) => this.commands.list(surface),
-      runCommand: (id, args) => this.commands.run(id, args),
-      windows: this.windowManager,
-      screenshotText: () => (this.screen as any).screenshot() as string,
-    });
+    this.controlApi = new ControlApiService(
+      CONTROL_API_PORT,
+      {
+        getState: () => this.getDesktopState(),
+        syncState: () => this.state.sync(),
+        getPrimerInfo: (pathOrName) => this.getPrimerInfo(pathOrName),
+        listCommands: (surface) => this.commands.list(surface),
+        runCommand: (id, args) => this.commands.run(id, args),
+        windows: this.windowManager,
+        screenshotText: () => (this.screen as any).screenshot() as string,
+      },
+      {
+        instanceLabel: this.instanceLabel,
+        sessionId: this.sessionId,
+      },
+    );
     this.state = new StateService(
       {
         appName: "WibWob-DOS TS MVP",
         appMode: "terminal-native",
         cwd: REPO_ROOT,
         statePath: STATE_PATH,
+        instanceLabel: this.instanceLabel,
+        sessionId: this.sessionId,
         getControlApiStatus: () => this.controlApi.getStatus(),
       },
       {
@@ -296,7 +311,7 @@ export class TsTuiMvpApp {
     this.persistState();
     this.screen.render();
     log.app(
-      `started ${this.screen.width}x${this.screen.height} theme:${themeName()}`,
+      `started ${this.screen.width}x${this.screen.height} theme:${themeName()} instance:${this.getInstanceDisplayLabel()}`,
     );
   }
 
@@ -331,11 +346,13 @@ export class TsTuiMvpApp {
     this.updateStatusLine();
     this.repaintDesktop();
     if (appFlags().dev) this.renderDevControls();
+    this.renderTopIdentity();
     this.renderTopKaomoji();
     this.startKaomojiBlink();
     this.screen.on("resize", () => {
       this.repaintDesktop();
       this.syncLiveState();
+      this.renderTopIdentity();
       this.renderTopKaomoji();
       this.screen.render();
     });
@@ -402,8 +419,9 @@ export class TsTuiMvpApp {
 
   private renderTopKaomoji(): void {
     const text = this.getStatusKaomoji();
+    const identityWidth = stringWidth(` ${this.getInstanceDisplayLabel()} `);
     const baseOffset = appFlags().dev ? 6 : 1;
-    const rightOffset = Math.max(0, baseOffset - 2);
+    const rightOffset = Math.max(0, baseOffset + identityWidth);
     const width = Math.max(1, stringWidth(text));
     if (!this.statusKaomoji) {
       this.statusKaomoji = blessed.box({
@@ -422,6 +440,35 @@ export class TsTuiMvpApp {
     this.statusKaomoji.width = width;
     this.statusKaomoji.setContent(text);
     this.statusKaomoji.style = theme().menuBar;
+  }
+
+  private getInstanceDisplayLabel(): string {
+    return this.instanceLabel
+      ? `${this.instanceLabel} · ${this.sessionId}`
+      : this.sessionId;
+  }
+
+  private renderTopIdentity(): void {
+    const text = ` ${this.getInstanceDisplayLabel()} `;
+    const rightOffset = Math.max(0, appFlags().dev ? 6 : 1);
+    const width = Math.max(1, stringWidth(text));
+    if (!this.statusIdentity) {
+      this.statusIdentity = blessed.box({
+        parent: this.menuBar,
+        top: 0,
+        right: rightOffset,
+        height: 1,
+        width,
+        tags: true,
+        content: text,
+        style: theme().menuBar,
+      });
+      return;
+    }
+    this.statusIdentity.right = rightOffset;
+    this.statusIdentity.width = width;
+    this.statusIdentity.setContent(text);
+    this.statusIdentity.style = theme().menuBar;
   }
 
   private updateStatusLine(): void {
@@ -483,6 +530,7 @@ export class TsTuiMvpApp {
     this.menuUi.restyle();
     this.customCursor?.restyle();
     this.windowManager.restyleAll();
+    this.renderTopIdentity();
     this.renderTopKaomoji();
     this.repaintDesktop();
     this.persistState();
