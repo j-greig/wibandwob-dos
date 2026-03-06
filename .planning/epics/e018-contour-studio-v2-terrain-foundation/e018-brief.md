@@ -351,7 +351,7 @@ This is mandatory. The control surface must not need to infer terrain state from
   - verified 2026-03-06: buttons visible in all modes including firstperson, active mode highlighted,
     API mode switch updates highlight correctly
 
-- [ ] **F08 — Game bootstrap follow-on**
+- [x] **F08 — Game bootstrap follow-on**
   - use `TerrainMap` as the substrate for a future playable terrain/game view
   - likely next: cursor + inspect tile + movement cost by elevation delta
 
