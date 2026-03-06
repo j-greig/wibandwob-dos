@@ -408,9 +408,11 @@ Acceptance bar right now:
   - open/send through `microapp.world-chatroom.*`
   - verify messages can land in the room through the control API
 
-- [ ] **C05 — Chatroom UX polish**
+- [x] **C05 — Chatroom UX polish**
   - make local typing/focus behavior feel trustworthy
   - improve event logging so room activity is easier to grok live
+  - verified 2026-03-06: scroll-to-bottom on incoming messages, / arms input from
+    any focused node, IRC●/○/LOCAL colour indicator prominent in status bar
 
 - [x] **C06 — IRC transport seam**
   - keep the `World Chatroom` TUI shape
