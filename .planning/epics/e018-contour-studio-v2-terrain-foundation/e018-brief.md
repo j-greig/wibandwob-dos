@@ -346,6 +346,40 @@ This is mandatory. The control surface must not need to infer terrain state from
   - use `TerrainMap` as the substrate for a future playable terrain/game view
   - likely next: cursor + inspect tile + movement cost by elevation delta
 
+### Chatspots / Coordination Track
+
+- [x] **C01 — In-memory world chat service MVP**
+  - add a local service for chatspots, channels, participants, and message history
+  - keep state service-owned rather than UI-owned
+
+- [x] **C02 — WibWobWorld chatspot visibility**
+  - surface chatspot markers on the overworld
+  - expose nearest/current chatspot and channel ids through `describeState()`
+
+- [x] **C03 — World Chatroom microapp MVP**
+  - open a sibling chatroom window for a world channel
+  - render transcript + right-side game log
+  - keep it API-visible and state-visible
+
+- [x] **C04 — Command/API send path**
+  - join nearest chatspot from `WibWobWorld`
+  - open/send through `microapp.world-chatroom.*`
+  - verify messages can land in the room through the control API
+
+- [ ] **C05 — Chatroom UX polish**
+  - make local typing/focus behavior feel trustworthy
+  - improve event logging so room activity is easier to grok live
+
+- [ ] **C06 — IRC transport seam**
+  - keep the `World Chatroom` TUI shape
+  - add an IRC-backed transport/adapter behind one service seam
+  - use `pirc-extension` as a reference, not a drop-in UI
+
+- [ ] **C07 — IRC-backed world chat MVP**
+  - join a canonical world channel like `#world-ridge-overlook`
+  - mirror incoming/outgoing IRC traffic into local world-chat state
+  - keep `describeState()` and the control API as the local source of truth for the desktop
+
 ## Out of Scope
 
 For this epic’s first shipped slice:
