@@ -95,3 +95,38 @@ The preferred shape is:
 - Theme/appearance not yet a first-class subsystem — target: `appearance-service` with semantic tokens compiled into blessed styles
 - Async workspace restore race: `getLastWindow()` after promise-returning openers can miss the window
 - Chrome browser service has pre-existing type errors (`@types/jsdom`, `@types/turndown-plugin-gfm`)
+
+## World Chat / IRC Transport
+
+World chat is a service-transport split. Never conflate them.
+
+**Service** — `src/services/world-chat-service.ts`
+Owns channel state, participants, message history, chatspot registry, and the `ensureWorld`
+world-key lifecycle. The service never touches sockets or IRC protocol directly.
+
+**Transport** — `src/services/world-chat-transport.ts`
+Implements `WorldChatTransport` (5 methods: `connect`, `join`, `send`, `status`, `onEvent`).
+Two concrete implementations:
+- `LocalWorldChatTransport` — no-op stub (default when `WIBWOB_CHAT_TRANSPORT` is unset)
+- `IrcWorldChatTransport` — backed by `irc-framework` (kiwiirc); handles protocol,
+  PING/PONG, and auto-reconnect. Activated by `WIBWOB_CHAT_TRANSPORT=irc`.
+
+**Dev IRC server** — `scripts/dev-irc-server.ts`
+Hand-rolled Bun TCP server. Minimal command set: NICK, USER, JOIN, PRIVMSG, PING, QUIT.
+Port 6667. Start with `bun run dev-irc-server`. No TLS, no auth, local dev only.
+
+**Launch with IRC:**
+```
+WIBWOB_CHAT_TRANSPORT=irc WIBWOB_CHAT_IRC_HOST=127.0.0.1 WIBWOB_CHAT_IRC_PORT=6667 WIBWOB_INSTANCE_LABEL=main bun run src/app.ts --dev
+```
+Or: `bun run dev:world` (package.json alias).
+
+**Known bug (e020 S06):** `worldKey` encodes viewport dimensions. Any WibWobWorld resize
+creates a new key → `ensureWorld` resets the `channels` Map → chatroom loses state
+mid-session. Fix: strip viewport size from worldKey (seed + terrainIdx only).
+
+**Type stubs:** `src/types/irc-framework.d.ts` — typed event overloads for `registered`,
+`message`, `join`, `close`, `error`. Extend here if new events are needed.
+
+**Reference impl:** `vendor/pirc-extension/src/` — shows irc-framework + pi extension
+integration patterns. `driver.ts` (subprocess RPC) is protocol-agnostic and reusable.

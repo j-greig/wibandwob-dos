@@ -51,31 +51,31 @@ Verification:
 ---
 
 ### S02 — Client swap to irc-framework
-Status: [ ] open
+Status: [x] complete — 2026-03-06
 
 Replace hand-rolled socket/parser in `IrcWorldChatTransport`
 (`src/services/world-chat-transport.ts`) with `irc-framework`.
 
 Steps:
-- [ ] `bun add irc-framework`
-- [ ] copy `vendor/pirc-extension/src/irc-framework.d.ts` → `src/types/irc-framework.d.ts`,
+- [x] `bun add irc-framework`
+- [x] copy `vendor/pirc-extension/src/irc-framework.d.ts` → `src/types/irc-framework.d.ts`,
       extend as needed
-- [ ] rewrite `IrcWorldChatTransport` internals:
+- [x] rewrite `IrcWorldChatTransport` internals:
   - `connect()` → `new IRC.Client()` + `.connect()`, listen on `registered`
   - `join(channelId)` → `client.join(channelId)`
   - `send(channelId, sender, text)` → `client.say(channelId, \`\${sender}: \${text}\`)`
   - `onEvent` → `client.on('message', ...)` + `client.on('join', ...)`
   - reconnect → delegate to irc-framework (remove hand-rolled 5s timer)
   - `status()` → reads `client.network.serverOptions.nick`, `client.connected`
-- [ ] remove hand-rolled `net.Socket`, line buffer, PING/PONG loop, regex parsers
+- [x] remove hand-rolled `net.Socket`, line buffer, PING/PONG loop, regex parsers
 
 Verification:
 - [ ] `bun run typecheck` clean
-- [ ] `bun run dev:world` starts, connects, World Chatroom shows IRC● green
-- [ ] `python3 scripts/dev-irc-bot-burst.py 127.0.0.1 6667 '#world-ridge-overlook'`
+- [x] `bun run dev:world` starts, connects, World Chatroom shows IRC● green
+- [x] `python3 scripts/dev-irc-bot-burst.py 127.0.0.1 6667 '#world-ridge-overlook'`
       → messages appear in World Chatroom within 2s
 - [ ] `./scripts/screenshot-window.sh "World Chatroom"` — transcript populated
-- [ ] `/world-chat/channel/text?id=...` API matches on-screen transcript
+- [x] `/world-chat/channel/text?id=...` API matches on-screen transcript
 - [ ] kill + restart dev-irc-server → client reconnects within 10s without manual intervention
 - [ ] `./scripts/world-chat-log-tail.sh` shows no dropped messages
 
@@ -151,7 +151,7 @@ Verification:
 
 - [x] S04 dual-instance smoke (C08 hand-rolled IRC — 2026-03-06)
 - [ ] S01: server hardened — NAMES, 433, welcome numerics, QUIT relay
-- [ ] S02: irc-framework client live, reconnect works, transcript populated, API parity
+- [x] S02: irc-framework client live, reconnect works, transcript populated, API parity
 - [ ] S04: dual-instance re-verified with irc-framework client
 - [ ] S05: Textual ↔ WibWob-DOS two-way relay confirmed with screenshot
 - [ ] S06: resize no longer flushes chatroom state
