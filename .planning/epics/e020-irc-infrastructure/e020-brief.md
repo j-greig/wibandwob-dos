@@ -76,7 +76,7 @@ Verification:
       → messages appear in World Chatroom within 2s
 - [x] `./scripts/screenshot-window.sh "World Chatroom"` — transcript populated
 - [x] `/world-chat/channel/text?id=...` API matches on-screen transcript
-- [ ] kill + restart dev-irc-server → client reconnects within 10s without manual intervention  ← TODO
+- [x] kill + restart dev-irc-server → client reconnects within 10s without manual intervention
 - [x] `./scripts/world-chat-log-tail.sh` shows no dropped messages
 
 ---
