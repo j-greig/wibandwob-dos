@@ -1,3 +1,10 @@
+---
+name: ww-screenshot
+description: |
+  Capture a plain-text crop of a single WibWob-DOS window for visual debugging.
+  Use when you need a targeted window snapshot instead of a full TUI dump.
+---
+
 # Skill: ww-screenshot
 
 Capture a plain-text crop of a single WibWob-DOS window for visual debugging.
