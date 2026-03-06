@@ -8,6 +8,7 @@
     "dev": "bun run src/app.ts --dev",
     "start": "bun run src/app.ts",
     "dev-irc-server": "bun run scripts/dev-irc-server.ts",
+    "dev-irc-bot-burst": "python3 scripts/dev-irc-bot-burst.py",
     "gen-primitives": "bun scripts/gen-primitives.ts",
     "check-surface-parity": "bun run scripts/check-surface-parity.ts",
     "typecheck": "tsc --noEmit",

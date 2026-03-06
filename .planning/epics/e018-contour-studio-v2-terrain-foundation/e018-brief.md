@@ -348,6 +348,39 @@ This is mandatory. The control surface must not need to infer terrain state from
 
 ### Chatspots / Coordination Track
 
+Current reality:
+- use this file as the source of truth for what is built and how to run it
+- treat `fr-chatspots-and-agent-coordination.md` as background/reference, not the operator brief
+- current shipped surfaces:
+  - `WibWobWorld`
+  - `World Chatroom`
+  - `/world-chat/*`
+  - `scratch/logs/world-chat.log`
+
+Fast operator loop:
+
+```bash
+bun run dev-irc-server
+
+WIBWOB_CHAT_TRANSPORT=irc \
+WIBWOB_CHAT_IRC_HOST=127.0.0.1 \
+WIBWOB_CHAT_IRC_PORT=6667 \
+WIBWOB_INSTANCE_LABEL=main \
+bun run start
+
+curl -s http://127.0.0.1:8099/world-chat/channels | jq
+curl -s --get --data-urlencode 'id=#world-ridge-overlook' \
+  http://127.0.0.1:8099/world-chat/channel/text
+python3 scripts/dev-irc-bot-burst.py 127.0.0.1 6667 '#world-ridge-overlook'
+```
+
+Acceptance bar right now:
+- `WibWobWorld` can join the nearest chatspot
+- `World Chatroom` opens and sends locally
+- IRC transport can mirror external bot traffic into the room
+- the same channel is visible in TUI, `/world-chat/*`, and `world-chat.log`
+- restore is stable because `WibWobWorld` falls back to `contours` on startup
+
 - [x] **C01 — In-memory world chat service MVP**
   - add a local service for chatspots, channels, participants, and message history
   - keep state service-owned rather than UI-owned
@@ -380,10 +413,19 @@ This is mandatory. The control surface must not need to infer terrain state from
   - mirror incoming/outgoing IRC traffic into local world-chat state
   - keep `describeState()` and the control API as the local source of truth for the desktop
 
-- [ ] **C08 — Dual-instance IRC smoke**
+- [x] **C08 — Dual-instance IRC smoke**
   - run two WibWob-DOS instances against the same IRC backend
   - join the same world channel from both
   - verify cross-instance message relay in both TUI and outside-TUI surfaces
+
+- [x] **C09 — IRC operator tooling**
+  - add small local scripts to launch the dev IRC backend and inject test bots/messages
+  - keep the smoke loop fast for humans and agents
+  - shipped:
+    - `bun run dev-irc-server`
+    - `bun run dev-irc-bot-burst`
+    - `./scripts/world-chat-tail.sh`
+    - `./scripts/world-chat-log-tail.sh`
 
 Local dev launch shape for the IRC MVP:
 
@@ -395,7 +437,13 @@ WIBWOB_CHAT_IRC_HOST=127.0.0.1 \
 WIBWOB_CHAT_IRC_PORT=6667 \
 WIBWOB_INSTANCE_LABEL=main \
 bun run start
+
+python3 scripts/dev-irc-bot-burst.py 127.0.0.1 6667 '#world-ridge-overlook'
 ```
+
+Current known limitation:
+- restoring `WibWobWorld` directly into `renderMode: "firstperson"` still triggers a startup hang / runaway memory path in Blessed
+- pragmatic mitigation is currently in place: restore falls back to `contours`, while manual post-boot switching to `firstperson` still works
 
 ## Out of Scope
 

@@ -1,10 +1,14 @@
 ---
-Status: proposed
+Status: in-progress
 Type: feature-brief
 Epic: e018-contour-studio-v2-terrain-foundation
 ---
 
 # FR — Chatspots, Agent Coordination, and Sugarscape-Style Survival
+
+This file is background/reference.
+For what is actually built, how to run it, and what is checked off now, use:
+- [e018-brief.md](/Users/james/Repos/wibandwob-dos/.planning/epics/e018-contour-studio-v2-terrain-foundation/e018-brief.md)
 
 ## Summary
 
@@ -112,6 +116,13 @@ What is **not** a drop-in fit:
 Conclusion:
 - reuse/adapt concepts, not the whole runtime wholesale
 - likely embed a WibWob-DOS-native coordination layer, with IRC or IRC-like transport behind one service seam if we want it
+
+Current implementation status:
+- `world-chat-service.ts` exists and owns canonical local channel state
+- `world-chatroom` exists as a WibWob-DOS microapp frontend
+- an IRC transport seam exists behind the service
+- dual-instance IRC smoke has been proven against the local dev IRC backend
+- outside-TUI parity exists through `/world-chat/*` and `scratch/logs/world-chat.log`
 
 ## Core Product Idea
 
