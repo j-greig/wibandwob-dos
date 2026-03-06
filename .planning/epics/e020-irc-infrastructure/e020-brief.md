@@ -57,6 +57,13 @@ Replace the hand-rolled IRC socket parsing in `IrcWorldChatTransport` with `irc-
   - connect Textual (macOS IRC GUI) to the local dev IRC server
   - verify world channels are visible and live message relay works between Textual and WibWob-DOS instances
 
+- [ ] **S06 — Fix ensureWorld channel map reset on viewport resize**
+  - found during C08 smoke: when WibWobWorld resizes, viewport dimensions change → new worldKey →
+    ensureWorld resets the channels Map → chatroom loses participant state and drops incoming IRC messages
+  - fix: ensureWorld should not blow away channels when the world terrain key is the same but dimensions
+    differ slightly, OR merge/preserve existing channel messages/participants into the new map on reset
+  - acceptance: resize WibWobWorld mid-session, send a bot burst, verify messages still appear in chatroom
+
 ## Acceptance Criteria
 
 - [ ] Layer decisions are explicit and documented: server stays hand-rolled for now, client moves to `irc-framework`

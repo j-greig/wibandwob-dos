@@ -420,10 +420,14 @@ Acceptance bar right now:
   - mirror incoming/outgoing IRC traffic into local world-chat state
   - keep `describeState()` and the control API as the local source of truth for the desktop
 
-- [ ] **C08 — Dual-instance IRC smoke**
+- [x] **C08 — Dual-instance IRC smoke**
   - run two WibWob-DOS instances against the same IRC backend
   - join the same world channel from both
   - verify cross-instance message relay in both TUI and outside-TUI surfaces
+  - verified 2026-03-06: zuk (alt) sent "hiya", hle (main) received via IRC with [irc] tags in log
+  - known issue: ensureWorld resets channel map when worldKey changes (viewport resize changes dimensions
+    → new worldKey → channels flushed → chatroom loses local participant state mid-session). IRC relay
+    itself works; local state coherence after resize is a separate bug to fix in e020.
 
 - [x] **C09 — IRC operator tooling**
   - add small local scripts to launch the dev IRC backend and inject test bots/messages
