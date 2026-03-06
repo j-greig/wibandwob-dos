@@ -165,17 +165,19 @@ Running two WibWob-DOS instances on one machine requires three isolations:
 
 **Launch pattern:**
 ```bash
-# Main instance (window 0, already in session)
-# bun run dev:world   → port 8099, label=main, scratch/
+# Main instance already in wibwob:0
 
-# Alt instance (open a new tmux window)
-tmux new-window -t wibwob -n "alt"
-tmux send-keys -t wibwob:alt 'bun run dev:world:alt' Enter
-sleep 10
+# Alt instance — use the script, not inline tmux commands
+bash scripts/start-alt-instance.sh
+# → creates window, launches, polls /health, prints window index
 
 curl -s http://127.0.0.1:8099/health   # main
 curl -s http://127.0.0.1:8098/health   # alt
 ```
+
+**Window targeting pitfall:** `tmux new-window -n "alt"` names the window but
+does not make "alt" a valid target. Always capture the index:
+`WIN=$(tmux new-window -t wibwob -P -F '#{window_index}')`
 
 `dev:world:alt` sets `WIBWOB_INSTANCE_LABEL=zuk CONTROL_API_PORT=8098 SCRATCH_DIR=scratch/alt`.
 

@@ -86,19 +86,32 @@ tmux ls
 ## Dual-instance setup (S04 smoke / IRC relay tests)
 
 Two instances share one IRC server. Each needs:
-- Its own **tmux window** (blessed requires a real PTY)
+- Its own **tmux window** (blessed requires a real PTY — no backgrounding, no pipes)
 - Its own **CONTROL_API_PORT** (8099 main, 8098 alt)
 - Its own **SCRATCH_DIR** so workspaces and state don't collide
 
+**Use the script — do not try to inline this:**
+
 ```bash
-# Window 0 — main (already running on wibwob:0 via dev:world above)
+bash scripts/start-alt-instance.sh
+# → opens a new tmux window, launches, polls /health, prints window index
+```
 
-# Window 1 — alt instance
-tmux new-window -t wibwob -n "alt"
-tmux send-keys -t wibwob:alt 'bun run dev:world:alt' Enter
-sleep 10
+The script handles: stale port cleanup, `tmux new-window -P -F '#{window_index}'`
+(the only reliable way to get the new window index), readiness polling.
 
-# Verify both are up
+**Why `-n "alt"` does not work:** `-n` names the window, it does not target it.
+`tmux send-keys -t wibwob:alt` then fails with "can't find window: alt".
+Always capture the index with `-P -F '#{window_index}'`.
+
+```bash
+# Correct pattern if doing it manually:
+WIN=$(tmux new-window -t wibwob -P -F '#{window_index}')
+tmux send-keys -t wibwob:$WIN 'bun run dev:world:alt' Enter
+```
+
+Verify both up:
+```bash
 curl -s http://127.0.0.1:8099/health   # main
 curl -s http://127.0.0.1:8098/health   # alt
 ```
@@ -109,6 +122,9 @@ The `dev:world:alt` script sets:
 The alt instance writes its workspace and state to `scratch/alt/` — it will NOT
 restore the main instance's workspace (scratch/alt/workspaces/default.json won't
 exist on first run; the app falls back to the Scramble default).
+
+Scratch dirs are created automatically on first launch (workspace-service and
+state-service both use `mkdirSync(..., { recursive: true })`).
 
 ## IRC server
 
