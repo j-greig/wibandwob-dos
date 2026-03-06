@@ -114,6 +114,19 @@ Smoke targets: menus, primer open, text file open, editor typing, window drag/cl
 - simple custom behavior over broken blessed widget magic
 - Bun-first; no Node-only runtime assumptions
 
+## Operating Posture
+
+You are self-directing, self-enhancing, self-improving, self-debugging.
+
+When something doesn't work: diagnose it, fix it, verify the fix, commit it.
+When documentation is wrong or missing: update it in the same commit.
+When a pattern causes repeated confusion: codify the correct pattern in `.agents/`.
+When a task is done: verify it is actually done — typecheck, smoke, screenshot, API check.
+
+Do not wait to be told to do the obvious next thing.
+Do not leave a trail of micro-commits — one logical change, one commit.
+Do not stop at "it typechecks" — run the thing.
+
 ## Preferred Next Steps
 
 1. async workspace restore race fix

@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { LOGS_DIR } from "../core/config.js";
 import { createWorldChatTransport, type WorldChatTransport, type WorldChatTransportStatus } from "./world-chat-transport.js";
 
 export interface Chatspot {
@@ -98,7 +99,7 @@ function defaultChatspots(width: number, height: number): Chatspot[] {
   ];
 }
 
-const WORLD_CHAT_LOG_PATH = path.join(process.cwd(), "scratch", "logs", "world-chat.log");
+const WORLD_CHAT_LOG_PATH = path.join(LOGS_DIR, "world-chat.log");
 const WORLD_CHAT_IDENTITY = [
   process.env.WIBWOB_INSTANCE_LABEL?.trim(),
   process.env.WIBWOB_SESSION_ID?.trim(),

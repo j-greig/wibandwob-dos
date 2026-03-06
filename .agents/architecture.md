@@ -121,12 +121,76 @@ WIBWOB_CHAT_TRANSPORT=irc WIBWOB_CHAT_IRC_HOST=127.0.0.1 WIBWOB_CHAT_IRC_PORT=66
 ```
 Or: `bun run dev:world` (package.json alias).
 
-**Known bug (e020 S06):** `worldKey` encodes viewport dimensions. Any WibWobWorld resize
-creates a new key → `ensureWorld` resets the `channels` Map → chatroom loses state
-mid-session. Fix: strip viewport size from worldKey (seed + terrainIdx only).
+**Fixed (e020 S06):** `worldKey` no longer encodes viewport dimensions. Key is now
+`terrainName:seed` only. Resize recalculates chatspot positions only; channel state
+(messages, participants) is preserved. Fix landed in `world-chat-service.ts:ensureWorld`.
 
 **Type stubs:** `src/types/irc-framework.d.ts` — typed event overloads for `registered`,
 `message`, `join`, `close`, `error`. Extend here if new events are needed.
 
 **Reference impl:** `vendor/pirc-extension/src/` — shows irc-framework + pi extension
 integration patterns. `driver.ts` (subprocess RPC) is protocol-agnostic and reusable.
+
+## Tmux session management
+
+The live app runs in tmux session **`wibwob`**. Agents interact via the control API
+(port 8099) and `tmux send-keys` for keyboard input.
+
+**Restart pattern** (preserve session, replace process):
+```bash
+APP_PID=$(ps aux | grep "bun run src/app.ts" | grep -v grep | awk '{print $2}')
+kill $APP_PID          # SIGTERM — blessed cleanup runs
+sleep 3
+tmux send-keys -t wibwob 'bun run dev:world' Enter
+sleep 10 && curl -s http://127.0.0.1:8099/health
+```
+
+Use `kill -9` only as fallback. If terminal is left dirty after a hard kill, run
+`printf '\033[?1000l\033[?1002l\033[?1003l\033[?1006l\033[?25h\033[0m' && reset`
+in the tmux pane.
+
+Full launch/restart reference: `.pi/skills/tmux-launch/SKILL.md`
+
+## Dual-instance setup
+
+Running two WibWob-DOS instances on one machine requires three isolations:
+
+| Resource | Conflict | Fix |
+|----------|----------|-----|
+| HTTP API port | both bind 8099 → EADDRINUSE | `CONTROL_API_PORT=8098` for alt |
+| Workspace + state | both read/write `scratch/workspaces/`, `scratch/app-state.json` | `SCRATCH_DIR=scratch/alt` for alt |
+| World-chat log | both append to same file | same `SCRATCH_DIR` fix covers this |
+| IRC nick | both try same nick → 433 | `WIBWOB_INSTANCE_LABEL=zuk` for alt |
+| TTY | blessed crashes without a real PTY | each instance needs its own tmux window |
+
+**Launch pattern:**
+```bash
+# Main instance (window 0, already in session)
+# bun run dev:world   → port 8099, label=main, scratch/
+
+# Alt instance (open a new tmux window)
+tmux new-window -t wibwob -n "alt"
+tmux send-keys -t wibwob:alt 'bun run dev:world:alt' Enter
+sleep 10
+
+curl -s http://127.0.0.1:8099/health   # main
+curl -s http://127.0.0.1:8098/health   # alt
+```
+
+`dev:world:alt` sets `WIBWOB_INSTANCE_LABEL=zuk CONTROL_API_PORT=8098 SCRATCH_DIR=scratch/alt`.
+
+The alt instance will NOT restore the main workspace on first run (no `scratch/alt/workspaces/default.json`
+exists) — it falls back to Scramble. That is fine for smoke tests.
+
+**Scratch paths** — `SCRATCH_DIR` env var (config.ts) controls:
+- `WORKSPACES_DIR` → `<SCRATCH_BASE>/workspaces`
+- `STATE_PATH`     → `<SCRATCH_BASE>/app-state.json`
+- `CAPTURES_DIR`   → `<SCRATCH_BASE>/captures`
+- `LOGS_DIR`       → `<SCRATCH_BASE>/logs`
+- `PI_AGENT_HOME`  → `<SCRATCH_BASE>/pi-agent-home`
+- `APP_NOTES_PATH` → `<SCRATCH_BASE>/mvp-notes.txt`
+
+Paths NOT yet covered by `SCRATCH_DIR` (hard-coded in individual windows):
+`scratch/captures` in contour/plasma/terrain windows, `scratch/generated/smear` in
+app-controller. These are captures only (not read on startup) — they don't cause
+dual-instance conflicts in practice.

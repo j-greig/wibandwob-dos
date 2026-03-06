@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "bun run src/app.ts --dev",
     "dev:world": "WIBWOB_CHAT_TRANSPORT=irc WIBWOB_CHAT_IRC_HOST=127.0.0.1 WIBWOB_CHAT_IRC_PORT=6667 WIBWOB_INSTANCE_LABEL=main bun run src/app.ts --dev",
+    "dev:world:alt": "WIBWOB_CHAT_TRANSPORT=irc WIBWOB_CHAT_IRC_HOST=127.0.0.1 WIBWOB_CHAT_IRC_PORT=6667 WIBWOB_INSTANCE_LABEL=zuk CONTROL_API_PORT=8098 SCRATCH_DIR=scratch/alt bun run src/app.ts --dev",
     "start": "bun run src/app.ts",
     "dev-irc-server": "bun run scripts/dev-irc-server.ts",
     "dev-irc-bot-burst": "python3 scripts/dev-irc-bot-burst.py",

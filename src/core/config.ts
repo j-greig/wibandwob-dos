@@ -12,11 +12,29 @@ export const REPO_ROOT = APP_ROOT;
 export const PI_DIR = path.join(APP_ROOT, ".pi");
 export const PI_APPEND_SYSTEM_PATH = path.join(PI_DIR, "APPEND_SYSTEM.md");
 export const PI_THEME_PATH = path.join(PI_DIR, "themes", "wibwob-tv.json");
-export const WORKSPACES_DIR = path.join(APP_ROOT, "scratch", "workspaces");
-export const STATE_PATH = path.join(APP_ROOT, "scratch", "app-state.json");
+/**
+ * SCRATCH_BASE — root for all instance-local mutable files.
+ *
+ * Set SCRATCH_DIR env var to run a second instance without clobbering the
+ * first instance's workspace, state, or logs.  Path is resolved relative to
+ * APP_ROOT so both relative ("scratch/alt") and absolute paths work.
+ *
+ * Default: "scratch" (= <repo>/scratch  — legacy behaviour, unchanged).
+ *
+ * Alt-instance example:
+ *   SCRATCH_DIR=scratch/alt CONTROL_API_PORT=8098 bun run dev
+ */
+export const SCRATCH_BASE = process.env.SCRATCH_DIR
+  ? path.resolve(APP_ROOT, process.env.SCRATCH_DIR)
+  : path.join(APP_ROOT, "scratch");
+
+export const WORKSPACES_DIR = path.join(SCRATCH_BASE, "workspaces");
+export const STATE_PATH = path.join(SCRATCH_BASE, "app-state.json");
+export const CAPTURES_DIR = path.join(SCRATCH_BASE, "captures");
+export const LOGS_DIR = path.join(SCRATCH_BASE, "logs");
 export const CONTROL_API_PORT = Number.parseInt(process.env.CONTROL_API_PORT ?? "8099", 10) || 8099;
-export const APP_NOTES_PATH = path.join(APP_ROOT, "scratch", "mvp-notes.txt");
-export const PI_AGENT_HOME = path.join(APP_ROOT, "scratch", "pi-agent-home");
+export const APP_NOTES_PATH = path.join(SCRATCH_BASE, "mvp-notes.txt");
+export const PI_AGENT_HOME = path.join(SCRATCH_BASE, "pi-agent-home");
 export const README_PATH = path.join(REPO_ROOT, "README.md");
 export const MASTER_PHILOSOPHY_PATH = path.join(REPO_ROOT, "docs", "master-philosophy.md");
 

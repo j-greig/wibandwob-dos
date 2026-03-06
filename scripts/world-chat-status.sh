@@ -2,9 +2,11 @@
 # world-chat-status — quick summary of active world chat channels and transport
 PORT=${CONTROL_API_PORT:-8099}
 
-curl -s "http://127.0.0.1:$PORT/world-chat/channels" | python3 - << 'EOF'
+TMPFILE=$(mktemp)
+curl -s "http://127.0.0.1:$PORT/world-chat/channels" > "$TMPFILE"
+python3 - "$TMPFILE" << 'EOF'
 import sys, json
-data = json.load(sys.stdin)
+data = json.load(open(sys.argv[1]))
 t = data.get("transport", {})
 kind = t.get("kind", "?")
 conn = "●" if t.get("connected") else "○"
@@ -24,3 +26,4 @@ for ch in data.get("channels", []):
     print(f"    last: {last_str}")
     print()
 EOF
+rm -f "$TMPFILE"
