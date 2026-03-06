@@ -121,6 +121,9 @@ export interface MicroappHost {
 /** Re-exported types for microapp authors who need them in annotations. */
 export type { Rect, UiPart, StackChild };
 
+/** Window object passed to a microapp's registerSnapshot serialize handler. */
+export type MicroappSnapshotWindow = { describeState?: () => Record<string, unknown> };
+
 export interface MicroappWindowHandle {
   readonly id: number;
   readonly body: blessed.Widgets.BoxElement;
