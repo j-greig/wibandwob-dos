@@ -1,6 +1,6 @@
 ---
 id: E024
-title: Session retroapply — 4 missing fixes onto clean 16e7b6a base
+title: Session retroapply — 5 stories onto clean 16e7b6a base
 status: in-progress
 branch: fix/session-retroapply
 created: 2026-03-07
@@ -75,6 +75,27 @@ Must be applied to `modules-private/wibwobworld/index.ts` instead.
 
 ---
 
+### S05 — Move wibwobworld + world-chatroom to modules/, delete wibwobworld-iso
+**Status: open**
+**Depends on: S02 + S03 (E022 fixes must be in modules-private first)**
+
+Move the two world modules out of the submodule into the main repo's modules/.
+Delete wibwobworld-iso entirely — its renderIso function is imported directly
+by wibwobworld, so move that import inline or copy the needed code across.
+
+- [ ] Copy `modules-private/wibwobworld/` → `modules/wibwobworld/`
+- [ ] Copy `modules-private/world-chatroom/` → `modules/world-chatroom/`
+- [ ] Delete `modules-private/wibwobworld-iso/` from submodule
+- [ ] Delete `modules-private/wibwobworld/` from submodule
+- [ ] Delete `modules-private/world-chatroom/` from submodule
+- [ ] Fix the `import { renderIso } from "../wibwobworld-iso/index.js"` in wibwobworld
+      — either inline renderIso or copy wibwobworld-iso/index.ts into wibwobworld/
+- [ ] Commit inside modules-private (just primers/prompts/phosphor-theme remain)
+- [ ] Commit modules/ additions + submodule ref update in main repo
+- [ ] typecheck passes
+
+---
+
 ### S04 — handover.sh
 **Status: open**
 **Patch: 0014 + 0023**
@@ -96,4 +117,7 @@ Patch 0023 fixes the epic table parse bug. Both are new files, clean apply.
 - [ ] Workspace restore opens WibWobWorld in correct renderMode (not forced to contours)
 - [ ] Hybrid view iso pane not squashed
 - [ ] `bun run handover` generates doc with populated epic table
+- [ ] wibwobworld + world-chatroom in modules/, not modules-private
+- [ ] wibwobworld-iso deleted entirely
+- [ ] modules-private contains only wibwob-primers, wibwob-prompts, wibwob-theme-phosphor
 - [ ] PR fix/session-retroapply → main, squash merge, close E024
