@@ -32,8 +32,10 @@ parse_frontmatter() {
     local file="$1"
     awk '
         /^---$/ { if (in_fm) exit; in_fm=1; next }
-        in_fm && /^[a-z_]+:/ {
+        in_fm && /^[A-Za-z][A-Za-z0-9 _-]*:[[:space:]]*/ {
             key = $0; sub(/:.*/, "", key)
+            gsub(/[[:space:]-]+/, "_", key)
+            key = tolower(key)
             val = $0; sub(/^[^:]+:[[:space:]]*/, "", val)
             print key "=" val
         }
@@ -46,30 +48,87 @@ get_field() {
     parse_frontmatter "$file" | grep "^${field}=" | head -1 | sed "s/^${field}=//"
 }
 
+# Find brief file in an epic directory.
+# Preferred: *brief.md, fallback: EPIC.md
+find_brief_file() {
+    local dir="$1"
+    local brief=""
+    brief=$(find "$dir" -maxdepth 1 -type f -name '*brief.md' | sort | head -1 || true)
+    if [[ -n "$brief" ]]; then
+        echo "$brief"
+        return 0
+    fi
+    if [[ -f "$dir/EPIC.md" ]]; then
+        echo "$dir/EPIC.md"
+        return 0
+    fi
+    return 1
+}
+
+derive_epic_id() {
+    local dirname="$1"
+    local prefix="${dirname%%-*}"
+    echo "${prefix^^}"
+}
+
+extract_heading_title() {
+    local file="$1"
+    local heading
+    heading=$(grep -m1 -E '^# ' "$file" | sed -E 's/^#[[:space:]]+//' || true)
+    if [[ -z "$heading" ]]; then
+        echo ""
+        return 0
+    fi
+    echo "$heading" | sed -E 's/^E[0-9]{3}[[:space:]]*[—-][[:space:]]*//'
+}
+
+extract_status() {
+    local file="$1"
+    local status
+    status=$(get_field "$file" "status")
+    if [[ -z "$status" ]]; then
+        status=$(grep -im1 -E '^#{0,3}[[:space:]]*status:[[:space:]]*' "$file" | sed -E 's/^#{0,3}[[:space:]]*[Ss]tatus:[[:space:]]*//' || true)
+    fi
+    echo "$status"
+}
+
+normalize_status() {
+    local raw="$1"
+    local s
+    s=$(echo "$raw" | tr '[:upper:]' '[:lower:]' | sed -E 's/^\[[^]]+\][[:space:]]*//' | sed -E 's/^[[:space:]]+|[[:space:]]+$//g')
+    case "$s" in
+        not-started*) echo "not-started" ;;
+        in-progress*) echo "in-progress" ;;
+        dropped*) echo "dropped" ;;
+        done*|complete*|completed*|landed*) echo "done" ;;
+        *) echo "$s" ;;
+    esac
+}
+
 # Collect all epic data as tab-separated lines
 collect_epics() {
     for dir in "$EPICS_PATH"/e[0-9]*/; do
         [[ -d "$dir" ]] || continue
         local dirname
         dirname=$(basename "$dir")
-        local brief="$dir/${dirname%%-*}-epic-brief.md"
+        local brief
+        brief=$(find_brief_file "$dir" || true)
 
-        # Extract epic ID prefix for brief filename (e001 -> e001-epic-brief.md)
-        local prefix="${dirname%%-*}"
-        brief="$dir/${prefix}-epic-brief.md"
-
-        if [[ ! -f "$brief" ]]; then
+        if [[ -z "$brief" || ! -f "$brief" ]]; then
             echo "${dirname}	?	?	?	?	?"
             continue
         fi
 
-        local id title status issue pr depends
+        local id title status issue pr
         id=$(get_field "$brief" "id")
+        [[ -z "$id" ]] && id=$(derive_epic_id "$dirname")
         title=$(get_field "$brief" "title")
-        status=$(get_field "$brief" "status")
+        [[ -z "$title" ]] && title=$(extract_heading_title "$brief")
+        status=$(extract_status "$brief")
+        status=$(normalize_status "$status")
         issue=$(get_field "$brief" "issue")
+        [[ -z "$issue" ]] && issue=$(get_field "$brief" "github_issue")
         pr=$(get_field "$brief" "pr")
-        depends=$(get_field "$brief" "depends_on")
 
         echo "${dirname}	${id:-?}	${title:-?}	${status:-?}	${issue:-~}	${pr:-~}"
     done
@@ -80,7 +139,6 @@ status_icon() {
     case "$1" in
         done)         echo "[x]" ;;
         in-progress)  echo "[~]" ;;
-        blocked)      echo "[!]" ;;
         not-started)  echo "[ ]" ;;
         dropped)      echo "[-]" ;;
         *)            echo "[?]" ;;
@@ -129,7 +187,7 @@ cmd_sync() {
     content="# Epic Status Register
 
 > Machine-parseable index. One line per epic: \`<dir> — <status>\`.
-> Valid statuses: \`not-started\`, \`in-progress\`, \`blocked\`, \`done\`, \`dropped\`.
+> Valid statuses: \`not-started\`, \`in-progress\`, \`done\`, \`dropped\`.
 > Canonical detail lives in each epic's frontmatter and GitHub issue.
 
 "
@@ -161,9 +219,10 @@ cmd_detail() {
         local prefix="${dirname%%-*}"
 
         if [[ "$prefix" == "$target" ]]; then
-            local brief="$dir/${prefix}-epic-brief.md"
-            if [[ ! -f "$brief" ]]; then
-                echo "No brief found: $brief" >&2
+            local brief
+            brief=$(find_brief_file "$dir" || true)
+            if [[ -z "$brief" || ! -f "$brief" ]]; then
+                echo "No brief found for: $dirname" >&2
                 exit 1
             fi
             echo "--- $dirname ---"
