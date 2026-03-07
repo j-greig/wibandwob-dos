@@ -177,10 +177,9 @@ Do not stop at "it typechecks" — run the thing.
 
 ## Preferred Next Steps
 
-1. **E022 WibWobWorld restore & layout fidelity** — `.planning/epics/e022-wibwobworld-restore-layout-fidelity/e022-brief.md`
-   Six root causes, implementation order S01→S06. Start with S01 (breadcrumbs) then S02 (renderMode restore — highest daily pain).
-2. workspace startup unification (`default.json` → Scramble fallback)
-3. appearance/theme subsystem with semantic tokens — `.planning/epics/e014-theme-system/`
+1. **E001 S02** — 3 subsystem specs in machine-consumption format (module-loader, command-registry, workspace-snapshots). `.planning/epics/e001-codified-context-infrastructure/`
+2. **T3-D** — audit and move or delete loose .md files at repo root (NOTES.md, PLASMA-IDEAS.md, devnote-bbc, vj-session, wibwob-command-ideas, modules-private-commits)
+3. workspace startup unification (`default.json` → Scramble fallback)
 4. stronger `WindowRecord` discriminated union
 
 ## Parking Lot
