@@ -55,7 +55,7 @@ fi
 echo "Commit message does not match canon format." >&2
 echo "Expected: type(scope): imperative summary" >&2
 echo "  type:  feat | fix | refactor | docs | test | chore | ci | spike" >&2
-echo "  scope: engine | registry | ipc | api | mcp | ui | contracts | vault | events | paint | llm | build | planning" >&2
-echo "  Example: feat(registry): add CommandRegistry skeleton with exec_command dispatch" >&2
+echo "  scope: tui | agent | window | workspace | api | theme | microapp | world | irc | planning | scripts | skills | build" >&2
+echo "  Example: feat(window): add command registry skeleton with exec dispatch" >&2
 echo "Got: $MSG" >&2
 exit 2
