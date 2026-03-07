@@ -1736,9 +1736,12 @@ export class TsTuiMvpApp {
       openBackroomsLogBrowser: () => this.openBackroomsLogBrowserWindow(),
       tileWindows: () => this.windowManager.tileWindows(),
       cascadeWindows: () => this.windowManager.cascadeWindows(),
-      toggleMaximizeFocused: () => {
-        const focused = this.windowManager.getFocusedWindow();
-        if (focused) this.windowManager.toggleMaximize(focused);
+      toggleMaximizeFocused: (args?: Record<string, unknown>) => {
+        const byId = typeof args?.windowId === "number"
+          ? this.windowManager.getWindowById(args.windowId)
+          : undefined;
+        const target = byId ?? this.windowManager.getFocusedWindow();
+        if (target) this.windowManager.toggleMaximize(target);
       },
       openGallery: () => this.openPrimerGalleryWindow(),
       openBrowserReader: (args) => {
