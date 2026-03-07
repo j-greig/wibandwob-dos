@@ -134,6 +134,27 @@ Smoke targets: menus, primer open, text file open, editor typing, window drag/cl
 ./scripts/minimap.sh
 ```
 
+## Planning Updates
+
+After completing any story, feature, or epic — update `.planning` immediately. Do not leave docs stale.
+
+```bash
+bun run planning:status   # see current epic state
+bun run planning:sync     # regenerate EPIC_STATUS.md from frontmatter
+```
+
+Rule: one logical change = one planning update commit. Use the `planning-update` skill for exact patterns.
+
+Checkbox states: `[ ]` not-started · `[~]` in-progress · `[x]` done · `[-]` dropped
+Epic status values: `not-started` · `in-progress` · `blocked` · `done` · `dropped`
+
+Closeout ceremony (run after final PR merges):
+1. Verify all ACs against running app
+2. Tick all checkboxes `[x]`
+3. Set `status: done` in frontmatter
+4. `bun run planning:sync`
+5. Commit: `docs(planning): close E0NN <title>`
+
 ## Constraints
 
 - pragmatic — smallest slice that proves the direction
@@ -161,3 +182,11 @@ Do not stop at "it typechecks" — run the thing.
 2. workspace startup unification (`default.json` → Scramble fallback)
 3. appearance/theme subsystem with semantic tokens — `.planning/epics/e014-theme-system/`
 4. stronger `WindowRecord` discriminated union
+
+## Parking Lot
+
+Deferred work not yet epic-tracked. Promote when conditions change.
+
+- **Unicode/cell-aware text rendering** — replace fragile string repaint for complex Unicode with shared text-to-cells path. Deferred; emoji-specific glitches only. Spec: `.planning/refactor-docs/021-unicode-cell-rendering-follow-on.md`
+- **Terminal subsystem** — `pty-session.ts`, `terminal-buffer.ts`, `terminal-renderer.ts`. Only after shell/paint are stable. Spec: `e002 legacy-docs/007-terminal-emulator.md`
+- **Event/persistence/multi-instance model** — re-spec TS-native event/persistence layer. Spec: `e002 legacy-docs/013-events-persistence-and-multi-instance.md`
