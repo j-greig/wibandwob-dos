@@ -14,7 +14,9 @@
     "gen-primitives": "bun scripts/gen-primitives.ts",
     "check-surface-parity": "bun run scripts/check-surface-parity.ts",
     "typecheck": "tsc --noEmit",
-    "check-themes": "bun run scripts/check-themes.ts"
+    "check-themes": "bun run scripts/check-themes.ts",
+    "planning:status": "bash .claude/scripts/planning.sh status",
+    "planning:sync": "bash .claude/scripts/planning.sh sync"
   },
   "dependencies": {
     "@anthropic-ai/claude-code": "^2.1.63",
