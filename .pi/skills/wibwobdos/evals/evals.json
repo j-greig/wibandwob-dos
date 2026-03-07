@@ -1,0 +1,30 @@
+{
+  "skill_name": "wibwobdos",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Show me what's on the WibWob-DOS desktop right now. List any open windows with their ids and positions.",
+      "expected_output": "A compact summary of the live desktop: screen dimensions, theme, session id, and a list of open windows with id, title, size, and position. If no windows are open, says so clearly. Uses bash scripts/state.sh and shows real data from the live /state endpoint."
+    },
+    {
+      "id": 2,
+      "prompt": "Open the WibWobWorld 3D terrain view and tell me what chatspots are available once it loads.",
+      "expected_output": "Runs `bash scripts/open.sh microapp.wibwobworld.open`, waits a few seconds for terrain to generate, then reads the window content via `bash scripts/export.sh <id>` and lists the chatspot names visible in the world state. Reports the window id it used."
+    },
+    {
+      "id": 3,
+      "prompt": "Take a screenshot of the WibWob-DOS TUI and share it to Discord as a PNG image.",
+      "expected_output": "Checks DISCORD_WEBHOOK_URL is set, renders a PNG via scripts/png.sh, and posts it to Discord using scripts/discord.sh png. Confirms the post succeeded and notes the instance label shown in the title. If Pillow is missing, says how to install it."
+    },
+    {
+      "id": 4,
+      "prompt": "Open some generative art — plasma in void mode. Then take an ASCII minimap to show me the desktop layout.",
+      "expected_output": "Runs `bash scripts/open.sh plasma.open '{\"mood\":\"void\"}'`, waits a moment, then runs `bash scripts/state.sh` to show the new window id and position, and produces an ASCII minimap from the /state data showing the spatial layout of all windows."
+    },
+    {
+      "id": 5,
+      "prompt": "Send a message to the Wib and Wob agent chat saying 'hello from a remote agent'.",
+      "expected_output": "Checks if a wibwob-agent window is open via scripts/state.sh. If not, opens one with POST /view/wibwob-agent/open. Gets the window id from state. Sends the message using `bash scripts/send.sh <id> 'hello from a remote agent' --agent remote-agent`. Confirms sent."
+    }
+  ]
+}
