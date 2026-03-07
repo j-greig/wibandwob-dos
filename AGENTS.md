@@ -182,3 +182,11 @@ Do not stop at "it typechecks" — run the thing.
 2. workspace startup unification (`default.json` → Scramble fallback)
 3. appearance/theme subsystem with semantic tokens — `.planning/epics/e014-theme-system/`
 4. stronger `WindowRecord` discriminated union
+
+## Parking Lot
+
+Deferred work not yet epic-tracked. Promote when conditions change.
+
+- **Unicode/cell-aware text rendering** — replace fragile string repaint for complex Unicode with shared text-to-cells path. Deferred; emoji-specific glitches only. Spec: `.planning/refactor-docs/021-unicode-cell-rendering-follow-on.md`
+- **Terminal subsystem** — `pty-session.ts`, `terminal-buffer.ts`, `terminal-renderer.ts`. Only after shell/paint are stable. Spec: `e002 legacy-docs/007-terminal-emulator.md`
+- **Event/persistence/multi-instance model** — re-spec TS-native event/persistence layer. Spec: `e002 legacy-docs/013-events-persistence-and-multi-instance.md`
