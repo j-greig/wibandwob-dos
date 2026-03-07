@@ -1,0 +1,5 @@
+{
+  "description": "Full local development - all capabilities enabled if probed available",
+  "forceOff": [],
+  "forceOn": []
+}

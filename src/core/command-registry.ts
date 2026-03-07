@@ -11,6 +11,7 @@ import {
 } from "./command-catalog.js";
 import type { MenuConfig, MenuItem } from "./types.js";
 import { log } from "../services/app-logger.js";
+import { capabilityService, type CapabilityKey } from "../services/capability-service.js";
 
 export type { MenuContext };
 export type CommandSurface = "menu" | "palette" | "api" | "agent";
@@ -22,6 +23,8 @@ export interface CommandListItem {
   description?: string;
   surfaces: CommandSurface[];
   menuCategories: AppCommandCategory[];
+  available: boolean;
+  missingCapabilities?: CapabilityKey[];
 }
 
 export type CommandRunResult =
@@ -128,15 +131,20 @@ export class CommandRegistry {
     return items;
   }
 
-  list(surface?: CommandSurface): CommandListItem[] {
-    const builtIn = this.commands.map((command) => ({
-      id: command.id,
-      label: command.label,
-      group: command.group,
-      description: command.description,
-      surfaces: this.getSurfaces(command),
-      menuCategories: [...new Set(command.menuPlacements.map((placement) => placement.category))]
-    }));
+  list(surface?: CommandSurface, opts?: { includeUnavailable?: boolean }): CommandListItem[] {
+    const builtIn = this.commands.map((command) => {
+      const availability = capabilityService.isAvailable(command.requires);
+      return {
+        id: command.id,
+        label: command.label,
+        group: command.group,
+        description: command.description,
+        surfaces: this.getSurfaces(command),
+        menuCategories: [...new Set(command.menuPlacements.map((placement) => placement.category))],
+        available: availability.ok,
+        missingCapabilities: availability.ok ? undefined : availability.missing,
+      };
+    });
 
     const dynamic = this.dynamicCommands.map((dyn) => ({
       id: dyn.id,
@@ -145,10 +153,12 @@ export class CommandRegistry {
       description: dyn.description,
       surfaces: this.getDynamicSurfaces(dyn),
       menuCategories: [...new Set((dyn.menuPlacements ?? []).map((p) => p.category))] as AppCommandCategory[],
+      available: true,
     }));
 
     const all = [...builtIn, ...dynamic];
-    return surface ? all.filter((cmd) => cmd.surfaces.includes(surface)) : all;
+    const forSurface = surface ? all.filter((cmd) => cmd.surfaces.includes(surface)) : all;
+    return opts?.includeUnavailable ? forSurface : forSurface.filter((cmd) => cmd.available);
   }
 
   run(id: string, args?: Record<string, unknown>): CommandRunResult {
@@ -159,6 +169,15 @@ export class CommandRegistry {
     // Check built-in commands first
     const command = this.commands.find((candidate) => candidate.id === canonicalId);
     if (command) {
+      const availability = capabilityService.isAvailable(command.requires);
+      if (!availability.ok) {
+        const missing = availability.missing.join(", ");
+        log.cmd(`${canonicalId}${argsStr} → unavailable (${missing})`);
+        return {
+          ok: false,
+          error: `Command unavailable: ${canonicalId} (missing: ${missing})`,
+        };
+      }
       const action = this.actions[command.actionKey] as (args?: Record<string, unknown>) => unknown;
       const result = action(args);
       log.cmd(`${canonicalId}${argsStr} → ok`);

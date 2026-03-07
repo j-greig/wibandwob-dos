@@ -88,6 +88,7 @@ import {
 } from "../services/file-actions.js";
 import { EditorCoordinator } from "./editor-coordinator.js";
 import { StateService } from "../services/state-service.js";
+import { capabilityService } from "../services/capability-service.js";
 import {
   promptForWorkspaceLoad,
   promptForWorkspaceSave,
@@ -229,6 +230,7 @@ export class TsTuiMvpApp {
     this.overlays = new OverlayManager(this.screen, () =>
       this.windowManager.restoreWindowFocus(),
     );
+    capabilityService.probe();
     this.commands = new CommandRegistry(this.getAppMenuActions());
     this.menus = this.commands.buildMenus();
     this.menuUi = new MenuOverlayManager(
@@ -255,7 +257,7 @@ export class TsTuiMvpApp {
         getState: () => this.getDesktopState(),
         syncState: () => this.state.sync(),
         getPrimerInfo: (pathOrName) => this.getPrimerInfo(pathOrName),
-        listCommands: (surface) => this.commands.list(surface),
+        listCommands: (surface, opts) => this.commands.list(surface, opts),
         runCommand: (id, args) => this.commands.run(id, args),
         windows: this.windowManager,
         screenshotText: () => (this.screen as any).screenshot() as string,

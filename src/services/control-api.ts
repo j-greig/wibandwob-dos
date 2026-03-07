@@ -39,7 +39,10 @@ interface ControlApiHandlers {
   /** Rebuild state from scratch (bypasses cache). */
   syncState: () => DesktopState;
   getPrimerInfo: (pathOrName: string) => unknown;
-  listCommands: (surface?: CommandSurface) => CommandListItem[];
+  listCommands: (
+    surface?: CommandSurface,
+    opts?: { includeUnavailable?: boolean },
+  ) => CommandListItem[];
   runCommand: (id: string, args?: Record<string, unknown>) => CommandRunResult;
   windows: import("../core/window-facade.js").WindowFacade;
   /** Blessed screen.screenshot() — returns full TUI as ANSI text. */
@@ -61,7 +64,7 @@ const ENDPOINT_CATALOGUE = [
   { method: "GET",  path: "/health",                        description: "Health check" },
   { method: "GET",  path: "/openapi.json",                  description: "OpenAPI 3.0 spec" },
   { method: "GET",  path: "/state",                         description: "Full live desktop + window state" },
-  { method: "GET",  path: "/commands/list",                 description: "All registered commands (optional ?surface=menu|palette|api|agent)" },
+  { method: "GET",  path: "/commands/list",                 description: "All registered commands (optional ?surface=menu|palette|api|agent&includeUnavailable=1)" },
   { method: "GET",  path: "/content/primer-info",           description: "Primer content metadata. ?path=/abs/path.txt" },
   { method: "GET",  path: "/world-chat/state",              description: "Structured world chat snapshot outside the TUI" },
   { method: "GET",  path: "/world-chat/channels",           description: "List world chat channels outside the TUI" },
@@ -235,9 +238,16 @@ export class ControlApiService {
     }
     if (request.method === "GET" && url.pathname === "/commands/list") {
       const surface = url.searchParams.get("surface") as CommandSurface | null;
+      const includeUnavailableRaw = url.searchParams.get("includeUnavailable");
+      const includeUnavailable =
+        includeUnavailableRaw === "1" ||
+        includeUnavailableRaw === "true" ||
+        includeUnavailableRaw === "yes";
       return Response.json({
         ok: true,
-        commands: this.handlers.listCommands(surface ?? undefined)
+        commands: this.handlers.listCommands(surface ?? undefined, {
+          includeUnavailable,
+        }),
       });
     }
 
