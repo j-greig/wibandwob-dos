@@ -1,8 +1,10 @@
 ---
-Status: complete — 2026-03-06
-Type: epic
-GitHub issue: —
-PR: —
+id: E020
+title: IRC Infrastructure
+status: done
+issue: ~
+pr: ~
+depends_on: []
 ---
 
 # E020 — IRC Infrastructure (irc-framework client)
