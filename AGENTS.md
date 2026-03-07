@@ -90,8 +90,10 @@ alternate screen or the terminal fills with garbage escape sequences.
 # Clean stop — preferred
 kill $(cat scratch/wibwob.pid)
 
-# Or by process title (readable in ps/htop as "wibwob-dos" or "wibwob-dos-main")
-pkill wibwob-dos
+# By process title — includes session ID shown in TUI top-right
+# e.g. if TUI shows "jp9", process is named "wibwob-dos-main-jp9"
+pkill wibwob-dos-jp9   # kill exact session
+pkill wibwob-dos       # kill any wibwob instance
 
 # Last resort only — will leak escape codes to terminal
 kill -9 $(lsof -ti:8099)

@@ -23,7 +23,13 @@ process.env.WIBWOB_SESSION_ID = sessionId;
 
 // Set process title so `pkill wibwob-dos` works and ps output is readable.
 // Include instance label so dual-instance is distinguishable: wibwob-dos-main, wibwob-dos-zuk
-process.title = instanceLabel ? `wibwob-dos-${instanceLabel}` : "wibwob-dos";
+// Process title includes instance label + session ID so ps/htop and pkill match what you see in the TUI top-right.
+// e.g. "wibwob-dos-main-jp9" — pkill wibwob-dos-jp9 kills exactly that session.
+process.title = [
+  "wibwob-dos",
+  instanceLabel,
+  sessionId,
+].filter(Boolean).join("-");
 
 // Write PID file so agents can kill cleanly: kill $(cat scratch/wibwob.pid)
 // Respects SCRATCH_DIR for dual-instance isolation.
