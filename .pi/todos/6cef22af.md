@@ -5,7 +5,7 @@
     "planning-infra",
     "t2"
   ],
-  "status": "open",
+  "status": "closed",
   "created_at": "2026-03-07T11:12:59.933Z"
 }
 
