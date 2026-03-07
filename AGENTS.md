@@ -81,6 +81,27 @@ curl -s http://127.0.0.1:8099/health
 
 Do not guess window ids or command availability before `/health` responds.
 
+## Stopping the App
+
+**Always use SIGTERM — never `kill -9`.** Blessed must clean up mouse tracking and
+alternate screen or the terminal fills with garbage escape sequences.
+
+```bash
+# Clean stop — preferred
+kill $(cat scratch/wibwob.pid)
+
+# Or by process title (readable in ps/htop as "wibwob-dos" or "wibwob-dos-main")
+pkill wibwob-dos
+
+# Last resort only — will leak escape codes to terminal
+kill -9 $(lsof -ti:8099)
+```
+
+If the terminal does get poisoned after a hard kill, run in the affected pane:
+```
+printf '\033[?1000l\033[?1002l\033[?1003l\033[?1006l\033[?25h\033[0m\033[?1049l' && reset
+```
+
 ## Control Loop
 
 API on `http://127.0.0.1:8099`. Full reference: `.agents/control-api.md`.
