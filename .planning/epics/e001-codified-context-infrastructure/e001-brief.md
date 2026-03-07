@@ -1,8 +1,13 @@
+---
+id: E001
+title: Codified Context Infrastructure
+status: not-started
+issue: 106
+pr: ~
+depends_on: []
+---
 # E001: Codified Context Infrastructure
 
-Status: not-started
-GitHub issue: #106
-PR: —
 
 ## Summary (300 words)
 

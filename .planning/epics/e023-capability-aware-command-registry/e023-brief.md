@@ -1,7 +1,10 @@
 ---
-Status: not-started
-Type: epic
-Epic: e023-capability-aware-command-registry
+id: E023
+title: Capability-Aware Command Registry
+status: not-started
+issue: ~
+pr: ~
+depends_on: []
 ---
 
 <human-prompt>

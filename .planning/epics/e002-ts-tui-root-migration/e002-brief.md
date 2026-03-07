@@ -1,8 +1,10 @@
 ---
-Status: done
-Type: epic
-GitHub issue: -
-PR: -
+id: E002
+title: TS TUI Root Migration
+status: done
+issue: ~
+pr: ~
+depends_on: []
 ---
 
 # E002 - TS TUI Root Migration

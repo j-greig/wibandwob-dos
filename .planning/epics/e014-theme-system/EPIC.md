@@ -1,3 +1,12 @@
+---
+id: E014
+title: Theme System
+status: done
+issue: ~
+pr: ~
+depends_on: []
+---
+
 # E014 — Theme System
 
 Full theme system with live switching across all surfaces.

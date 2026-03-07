@@ -1,6 +1,11 @@
-Status: in-progress
-GitHub issue: #107
-PR: —
+---
+id: E004
+title: Monster Cam
+status: in-progress
+issue: 107
+pr: ~
+depends_on: []
+---
 
 # E004 — Monster Cam
 

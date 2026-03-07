@@ -7,7 +7,7 @@
 ## DOING/PLANNED
 e001-codified-context-infrastructure — not-started
 e004-monster-cam — in-progress
-e017-scramble-brains — in-progress
+e017-scramble-brains — not-started
 e019-rogue-tui-port — not-started
 e021-vps-multi-agent-world — in-progress
 e022-wibwobworld-restore-layout-fidelity — in-progress

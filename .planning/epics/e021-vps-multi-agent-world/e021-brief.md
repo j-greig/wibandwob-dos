@@ -1,7 +1,10 @@
 ---
-Status: in-progress
-Type: epic
-Epic: e021-vps-multi-agent-world
+id: E021
+title: VPS Multi-Agent World
+status: in-progress
+issue: ~
+pr: ~
+depends_on: [E018, E020]
 ---
 
 <human-prompt>

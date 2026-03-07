@@ -4,16 +4,27 @@
 # On epic branches: full context. On main/other: lightweight reminder only.
 
 BRANCH=$(git -C "$CLAUDE_PROJECT_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
+EPIC_STATUS="$CLAUDE_PROJECT_DIR/.planning/epics/EPIC_STATUS.md"
 
 case "$BRANCH" in
   feat/*|fix/*|refactor/*|spike/*)
-    cat <<'CTX'
+    # Build active epics block from EPIC_STATUS.md
+    if [[ -f "$EPIC_STATUS" ]]; then
+      ACTIVE=$(grep '— in-progress$' "$EPIC_STATUS" | sed 's/ — in-progress$//')
+      if [[ -n "$ACTIVE" ]]; then
+        ACTIVE_BLOCK="Active epics:"$'\n'"$(echo "$ACTIVE" | sed 's/^/  /')"
+      else
+        ACTIVE_BLOCK="Active epics: (none currently in-progress)"
+      fi
+    else
+      ACTIVE_BLOCK="Active epics: (EPIC_STATUS.md not found)"
+    fi
+
+    cat <<CTX
 [Planning context — active epic branch]
-Active track: command/capability parity refactor (E001)
-Goals: registry single source of truth, parity enforcement, authoritative engine state
-Non-goals: no RAG, no cloud sync, no broad rewrite
+$ACTIVE_BLOCK
 Commit format: type(scope): summary — see .planning/README.md
-Epic dir: .planning/epics/e001-command-parity-refactor/
+Epic index: .planning/epics/EPIC_STATUS.md
 Ref: .planning/README.md
 CTX
     ;;

@@ -1,3 +1,7 @@
+---
+name: figlet-videographer
+description: Create typographic video sequences using figlet text animations in WibWob-DOS. Use when composing figlet-based title cards, animated text sequences, or typographic VJ elements synced to music.
+---
 # Figlet Typographic Videographer
 
 Create stop-frame typographic animations using figlet word arrangements as keyframes in WibWob-DOS.
@@ -12,7 +16,7 @@ Create stop-frame typographic animations using figlet word arrangements as keyfr
 ## Prerequisites
 
 - WibWob-DOS TUI running with IPC socket at `/tmp/wwdos.sock`
-- API server running on port 8089
+- API server running on port 8099
 - `figlet` installed (`brew install figlet` / `apt install figlet`)
 
 ## Available Commands
@@ -58,7 +62,7 @@ Sketch word positions on a grid. Canvas is typically 156×37 (menu bar takes row
 ### 2. Preview fonts
 
 ```bash
-curl -X POST http://127.0.0.1:8089/menu/command \
+curl -X POST http://127.0.0.1:8099/menu/command \
   -H "Content-Type: application/json" \
   -d '{"command":"preview_figlet","args":{"text":"hello","font":"big"}}'
 ```
@@ -67,12 +71,12 @@ curl -X POST http://127.0.0.1:8089/menu/command \
 
 ```bash
 # Open
-curl -X POST http://127.0.0.1:8089/menu/command \
+curl -X POST http://127.0.0.1:8099/menu/command \
   -d '{"command":"open_figlet_text","args":{"text":"drift","font":"banner"}}'
 
 # Get window ID from /state
 # Move to position
-curl -X POST http://127.0.0.1:8089/menu/command \
+curl -X POST http://127.0.0.1:8099/menu/command \
   -d '{"command":"move_window","args":{"id":"w3","x":"25","y":"4"}}'
 ```
 
@@ -125,7 +129,7 @@ python3 examples/play.py examples/01-drift-poem.json
 Before placing a word, check if the font wraps it onto multiple lines:
 
 ```bash
-curl -X POST http://127.0.0.1:8089/menu/command \
+curl -X POST http://127.0.0.1:8099/menu/command \
   -d '{"command":"preview_figlet","args":{"text":"symbient","font":"isometric1","width":"0","info":"true"}}'
 ```
 
