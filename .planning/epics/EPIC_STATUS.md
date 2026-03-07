@@ -16,3 +16,5 @@ e017-scramble-brains — not-started
 e018-contour-studio-v2-terrain-foundation — in-progress
 e019-rogue-tui-port — not-started
 e020-irc-infrastructure — not-started
+e021-vps-multi-agent-world — not-started
+e022-wibwobworld-restore-layout-fidelity — in-progress

@@ -1,5 +1,5 @@
 ---
-Status: not-started
+Status: in-progress
 Type: epic
 Epic: e021-vps-multi-agent-world
 ---

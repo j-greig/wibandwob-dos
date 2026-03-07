@@ -156,9 +156,8 @@ Do not stop at "it typechecks" — run the thing.
 
 ## Preferred Next Steps
 
-1. hybrid ISO pane — iso right-pane fill parity with standalone ISO mode
-2. strip debug breadcrumbs from `modules-private/wibwobworld/index.ts` (keep env-gated `debugWibWobWorld` calls, remove granular render: labels)
-3. async workspace restore race fix
-4. workspace startup unification (`default.json` → Scramble fallback)
-5. appearance/theme subsystem with semantic tokens
-6. stronger `WindowRecord` discriminated union
+1. **E022 WibWobWorld restore & layout fidelity** — `.planning/epics/e022-wibwobworld-restore-layout-fidelity/e022-brief.md`
+   Six root causes, implementation order S01→S06. Start with S01 (breadcrumbs) then S02 (renderMode restore — highest daily pain).
+2. workspace startup unification (`default.json` → Scramble fallback)
+3. appearance/theme subsystem with semantic tokens — `.planning/epics/e014-theme-system/`
+4. stronger `WindowRecord` discriminated union
