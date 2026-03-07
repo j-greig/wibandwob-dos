@@ -1,0 +1,129 @@
+From dd8ed1b5cc757efd4793b141b19e680092dec07d Mon Sep 17 00:00:00 2001
+From: James Greig <3stripe@gmail.com>
+Date: Sat, 7 Mar 2026 12:40:12 +0000
+Subject: [PATCH 23/32] fix(handover): epic table now populates correctly
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+parse_epics("all") treated "all" as a status filter — no epic has
+status=="all" so every row was skipped. Pass empty string for "show
+all in table format"; non-empty string remains the filter path.
+
+Also: E001 status in-progress (scoped to S01+S02 per T4-A analysis),
+EPIC_STATUS.md synced.
+---
+ .planning/epics/EPIC_STATUS.md                |  4 +-
+ .../e001-brief.md                             |  2 +-
+ scripts/handover.sh                           | 54 ++++++-------------
+ 3 files changed, 19 insertions(+), 41 deletions(-)
+
+diff --git a/.planning/epics/EPIC_STATUS.md b/.planning/epics/EPIC_STATUS.md
+index 097ffa1..47d2733 100644
+--- a/.planning/epics/EPIC_STATUS.md
++++ b/.planning/epics/EPIC_STATUS.md
+@@ -4,7 +4,7 @@
+ > Valid statuses: `not-started`, `in-progress`, `done`, `dropped`.
+ > Canonical detail lives in each epic's frontmatter and GitHub issue.
+ 
+-e001-codified-context-infrastructure — not-started
++e001-codified-context-infrastructure — in-progress
+ e002-ts-tui-root-migration — done
+ e003-finder-app — not-started
+ e004-monster-cam — in-progress
+@@ -16,6 +16,6 @@ e018-contour-studio-v2-terrain-foundation — done
+ e019-rogue-tui-port — not-started
+ e020-irc-infrastructure — done
+ e021-vps-multi-agent-world — in-progress
+-e022-wibwobworld-restore-layout-fidelity — in-progress
++e022-wibwobworld-restore-layout-fidelity — done
+ e023-capability-aware-command-registry — done
+ 
+diff --git a/.planning/epics/e001-codified-context-infrastructure/e001-brief.md b/.planning/epics/e001-codified-context-infrastructure/e001-brief.md
+index d3e73be..7ee23a7 100644
+--- a/.planning/epics/e001-codified-context-infrastructure/e001-brief.md
++++ b/.planning/epics/e001-codified-context-infrastructure/e001-brief.md
+@@ -1,7 +1,7 @@
+ ---
+ id: E001
+ title: Codified Context Infrastructure
+-status: not-started
++status: in-progress
+ issue: 106
+ pr: ~
+ depends_on: []
+diff --git a/scripts/handover.sh b/scripts/handover.sh
+index a74a35d..646121a 100755
+--- a/scripts/handover.sh
++++ b/scripts/handover.sh
+@@ -19,43 +19,21 @@ mkdir -p "$REPO/tmp"
+ # ---------------------------------------------------------------------------
+ 
+ parse_epics() {
+-  python3 - "$REPO/.planning/epics" "$1" <<'PYEOF'
+-import sys, os, pathlib, re
+-
+-epics_dir = pathlib.Path(sys.argv[1])
+-filter_status = sys.argv[2] if len(sys.argv) > 2 else ""
+-
+-def parse_frontmatter(text):
+-    m = re.match(r'^---\s*\n(.*?)\n---', text, re.DOTALL)
+-    if not m:
+-        return {}
+-    result = {}
+-    for line in m.group(1).splitlines():
+-        kv = line.split(':', 1)
+-        if len(kv) == 2:
+-            result[kv[0].strip()] = kv[1].strip()
+-    return result
+-
+-for epic_dir in sorted(epics_dir.iterdir()):
+-    if not epic_dir.is_dir():
+-        continue
+-    briefs = sorted(epic_dir.glob("e*-brief.md"))
+-    if not briefs:
+-        continue
+-    fm = parse_frontmatter(briefs[0].read_text())
+-    if not fm:
+-        continue
+-    eid = fm.get("id", "?")
+-    title = fm.get("title", "(untitled)")
+-    status = fm.get("status", "?")
+-    issue = fm.get("issue", "~")
+-    if filter_status and status != filter_status:
+-        continue
+-    if filter_status:
+-        print(f"- **{eid}** — {title}  (issue: #{issue})")
+-    else:
+-        print(f"| {eid} | {title} | {status} |")
+-PYEOF
++  local filter_status="${1:-}"
++  for brief in "$REPO/.planning/epics"/e*/e*-brief.md; do
++    [ -f "$brief" ] || continue
++    eid="$(grep    '^id:'     "$brief" | head -1 | sed 's/^id: *//')"
++    title="$(grep  '^title:'  "$brief" | head -1 | sed 's/^title: *//')"
++    status="$(grep '^status:' "$brief" | head -1 | sed 's/^status: *//')"
++    issue="$(grep  '^issue:'  "$brief" | head -1 | sed 's/^issue: *//')"
++    [ -z "$eid" ] && continue
++    if [ -n "$filter_status" ]; then
++      [ "$status" = "$filter_status" ] || continue
++      echo "- **${eid}** — ${title}  (issue: #${issue})"
++    else
++      echo "| ${eid} | ${title} | ${status} |"
++    fi
++  done
+ }
+ 
+ parse_todos() {
+@@ -166,7 +144,7 @@ echo "## 3. Epic Status"
+ echo ""
+ echo "| Epic | Title | Status |"
+ echo "|------|-------|--------|"
+-parse_epics "all"
++parse_epics ""
+ echo ""
+ 
+ # --- 4. Open Todos ---
+-- 
+2.39.5 (Apple Git-154)
+

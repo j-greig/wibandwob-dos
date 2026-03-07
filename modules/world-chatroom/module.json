@@ -1,0 +1,19 @@
+{
+  "name": "world-chatroom",
+  "version": "0.1.0",
+  "description": "Private world chatroom microapp for WibWobWorld chatspots",
+  "type": "microapp",
+  "entry": "index.ts",
+  "microapp": {
+    "id": "world-chatroom",
+    "title": "World Chatroom",
+    "description": "Open a location-bound world chat channel inside WibWob-DOS.",
+    "persist": true,
+    "menu": [
+      { "category": "applications", "order": 90, "label": "World Chatroom" }
+    ],
+    "palette": { "order": 60, "label": "Open World Chatroom" },
+    "agent": true,
+    "api": true
+  }
+}

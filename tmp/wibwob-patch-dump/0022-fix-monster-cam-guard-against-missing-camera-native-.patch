@@ -1,0 +1,83 @@
+From ee30faef98f1935495065bb01e24bf0aee8a6726 Mon Sep 17 00:00:00 2001
+From: James Greig <3stripe@gmail.com>
+Date: Sat, 7 Mar 2026 12:31:41 +0000
+Subject: [PATCH 22/32] fix(monster-cam): guard against missing camera/native
+ deps
+
+---
+ .pi/todos/9b57d538.md               |  2 +-
+ src/services/monster-cam-service.ts | 24 +++++++++++++++++++++++-
+ 2 files changed, 24 insertions(+), 2 deletions(-)
+
+diff --git a/.pi/todos/9b57d538.md b/.pi/todos/9b57d538.md
+index d99a799..c6b9771 100644
+--- a/.pi/todos/9b57d538.md
++++ b/.pi/todos/9b57d538.md
+@@ -5,7 +5,7 @@
+     "bug",
+     "monster-cam"
+   ],
+-  "status": "open",
++  "status": "closed",
+   "created_at": "2026-03-07T10:25:16.170Z"
+ }
+ 
+diff --git a/src/services/monster-cam-service.ts b/src/services/monster-cam-service.ts
+index 2d5b8f6..8590c62 100644
+--- a/src/services/monster-cam-service.ts
++++ b/src/services/monster-cam-service.ts
+@@ -3,6 +3,7 @@
+  */
+ import net from "net";
+ import path from "path";
++import fs from "fs";
+ import { fileURLToPath } from "url";
+ import { EventEmitter } from "events";
+ import { spawn, type ChildProcess } from "child_process";
+@@ -33,6 +34,11 @@ const WORKER_PATH = path.resolve(
+   path.dirname(fileURLToPath(import.meta.url)),
+   "monster-cam-worker.ts"
+ );
++// Pre-flight path: if this doesn't exist, the mediapipe venv is not set up.
++const VENV_PY = path.resolve(
++  path.dirname(fileURLToPath(import.meta.url)),
++  "../../assets/mediapipe-venv/bin/python"
++);
+ 
+ export class MonsterCamService extends EventEmitter {
+   private worker: ChildProcess | null = null;
+@@ -43,6 +49,22 @@ export class MonsterCamService extends EventEmitter {
+ 
+   start() {
+     if (this.running) return;
++
++    // Pre-flight: check for the mediapipe Python environment before spawning
++    // anything. Without it the TS worker would crash immediately with ENOENT,
++    // giving the user a cryptic "Worker exited with code 1" message. Fail fast
++    // with a clear message instead.
++    if (!fs.existsSync(VENV_PY)) {
++      this.emit(
++        "error",
++        new Error(
++          "Monster Cam unavailable — no camera detected. " +
++            "Requires assets/mediapipe-venv/ (run scripts/setup-monster-cam.sh)."
++        )
++      );
++      return;
++    }
++
+     this.running = true;
+     this._spawnWorker();
+   }
+@@ -76,7 +98,7 @@ export class MonsterCamService extends EventEmitter {
+     });
+ 
+     this.worker.on("error", (err) => {
+-      this.emit("error", err);
++      if (this.running) this.emit("error", err);
+     });
+   }
+ 
+-- 
+2.39.5 (Apple Git-154)
+

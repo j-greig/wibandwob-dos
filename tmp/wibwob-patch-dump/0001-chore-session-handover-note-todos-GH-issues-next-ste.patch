@@ -1,0 +1,146 @@
+From 7838db1d2bad641ecaf739cdee84d6795fda5000 Mon Sep 17 00:00:00 2001
+From: James Greig <3stripe@gmail.com>
+Date: Sat, 7 Mar 2026 11:47:07 +0000
+Subject: [PATCH 01/32] =?UTF-8?q?chore:=20session=20handover=20note=20?=
+ =?UTF-8?q?=E2=80=94=20todos,=20GH=20issues,=20next=20steps?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+---
+ tmp/session-handover-2026-03-07.md | 124 +++++++++++++++++++++++++++++
+ 1 file changed, 124 insertions(+)
+
+diff --git a/tmp/session-handover-2026-03-07.md b/tmp/session-handover-2026-03-07.md
+new file mode 100644
+index 0000000..fd0616d
+--- /dev/null
++++ b/tmp/session-handover-2026-03-07.md
+@@ -0,0 +1,124 @@
++# Session Handover — 2026-03-07
++
++Captured at end of session. Pick up from here on `codex/e002-root-migration`.
++
++---
++
++## Branch / Worktree State
++
++```
++codex/e002-root-migration          ← main working branch (this repo)
++codex/e023-capability-aware-*      ← worktree at ~/Repos/wibandwob-dos-e023
++                                      READY TO MERGE — see tmp/e023-handover.md
++```
++
++Merge e023 first before starting new work:
++```bash
++cd /Users/james/Repos/wibandwob-dos
++git merge codex/e023-capability-aware-command-registry --no-ff \
++  -m "merge(e023): capability-aware command registry into e002-root-migration"
++bun run typecheck
++```
++
++---
++
++## What Was Done This Session
++
++### E023 — Capability-Aware Command Registry (COMPLETE)
++- `CapabilityService` probes at boot: figlet, chrome, monster_cam venv, backrooms repo, ANTHROPIC_API_KEY
++- `requires?: CapabilityKey[]` on command definitions
++- `CommandRegistry.list()` filters unavailable, `run()` guards execution
++- `GET /state` exposes `app.capabilities`, `GET /commands/list?includeUnavailable=1` available
++- `WIBWOB_DEPLOY_PROFILE=docker-safe` gates 4 broken commands, 69/73 available in Docker
++- All S00–S05 done, typecheck clean, Docker smoke verified
++- See: `.planning/epics/e023-capability-aware-command-registry/e023-brief.md`
++- Merge guide: `tmp/e023-handover.md`
++
++### Bugs Fixed (committed to e002-root-migration)
++- `e0fca87` — figlet on PATH in Docker, README.md in Docker, backrooms picker crash
++- `7ebd80c` — WibWobWorld hybrid+ISO restore crash (Option A fix)
++
++### Planning Docs Added
++- `e021-brief.md` — VPS multi-agent world epic, S00 all gates verified
++- `e021/next-session-plan.md` — 9-step agent-executable VPS deploy plan
++- `e023-brief.md` — capability registry epic, marked done
++
++---
++
++## Open Todos (actionable)
++
++### 🔴 Needs claiming (assigned to dead sessions)
++
++| ID | Title |
++|---|---|
++| TODO-22b43104 | T2-A: Create planning-update skill + update AGENTS.md |
++| TODO-4ce96f5e | Refine ambient-presence v3 chiptune (creative, lower priority) |
++
++### 🟡 Bugs — open, unresolved
++
++| ID | Title | Notes |
++|---|---|---|
++| TODO-9b57d538 | BUG: Monster Cam — unknown crash | needs investigation; Python/mediapipe not in Docker |
++| TODO-011ca571 | BUG: Poetry Clock — no inference in Docker | needs `ANTHROPIC_API_KEY` injected via `docker run -e` |
++
++### 🟡 Planning infra — open
++
++| ID | Title |
++|---|---|
++| TODO-d9502be7 | T3-A: Rewrite .planning/README.md for WibWob-DOS |
++| TODO-888b1f9f | T3-B: Move spk01-figlet-live-preview to .planning/spikes/ |
++| TODO-e94848c7 | T3-C: Audit BUILD.md before deleting |
++| TODO-b1738085 | T3-D: Audit and clean loose planning docs at root |
++| TODO-f9667622 | T3-E: Fix and install pre-commit hook |
++| TODO-8eb8da84 | T4-A: Decide E001 fate |
++
++### 🟢 Creative / features — parked
++
++| ID | Title |
++|---|---|
++| TODO-76d08210 | ASCII music video for grime remix |
++| TODO-01c0f123 | BPM-synced animation speed for primer frame rate |
++
++---
++
++## Open GitHub Issues (actionable)
++
++| # | Title | Action |
++|---|---|---|
++| #116 | WibWobWorld hybrid+ISO restore crash | **Close** — fix shipped in `7ebd80c` |
++| #112 | Agent tool call output leaking into transcript | **Real bug** — nobody's looked at it yet |
++| #115 | E017 Scramble Brains LLM | Epic, parked |
++| #113 | TV→TS parity audit spike | Parked |
++| #107 | E004 Monster Cam | Parked (relates to TODO-9b57d538) |
++| #106 | E001 Codified Context | Parked (TODO-8eb8da84 to decide fate) |
++| #104 | E003 Finder App | Parked |
++| #103 | E017 Backrooms TV | Parked |
++| #78  | E011 Desktop Shell | Parked |
++
++---
++
++## Recommended Next Steps (in order)
++
++1. **Merge e023** — see above, 2 commands, clean merge expected
++2. **Close #116** — `gh issue close 116 --comment "Fixed in 7ebd80c (Option A: skip ISO restore when hybrid mode active)"`
++3. **E021 VPS deploy** — the stated goal; e023 unblocked it
++   - Full 9-step plan at `.planning/epics/e021-vps-multi-agent-world/next-session-plan.md`
++   - Step 1: confirm SSH to `89.167.18.207:2849`
++   - Step 2: Docker-safe app list ✓ (done via e023)
++   - Step 3: update `~/Repos/vps-hetzner-one/RUNBOOK.md`
++   - Steps 4–9: build+transfer image, run, provision key, 8 gates, agent onboarding
++4. **Fix #112** — agent transcript leak, quick win bug
++5. **T2-A** — claim and do planning skill (1 commit job)
++
++---
++
++## Key Paths
++
++```
++VPS:       89.167.18.207, SSH port 2849, Ubuntu 24.04 ARM64
++Runbook:   ~/Repos/vps-hetzner-one/RUNBOOK.md  (needs wibwob-dos section)
++Skill:     .pi/skills/wibwobdos/  (connect.sh, state.sh, open.sh etc)
++Profiles:  config/capability-profiles/docker-safe.json
++E021 plan: .planning/epics/e021-vps-multi-agent-world/next-session-plan.md
++E023 done: .planning/epics/e023-capability-aware-command-registry/e023-brief.md
++```
+-- 
+2.39.5 (Apple Git-154)
+

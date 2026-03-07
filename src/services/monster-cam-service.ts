@@ -3,6 +3,7 @@
  */
 import net from "net";
 import path from "path";
+import fs from "fs";
 import { fileURLToPath } from "url";
 import { EventEmitter } from "events";
 import { spawn, type ChildProcess } from "child_process";
@@ -33,6 +34,11 @@ const WORKER_PATH = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "monster-cam-worker.ts"
 );
+// Pre-flight path: if this doesn't exist, the mediapipe venv is not set up.
+const VENV_PY = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../../assets/mediapipe-venv/bin/python"
+);
 
 export class MonsterCamService extends EventEmitter {
   private worker: ChildProcess | null = null;
@@ -43,6 +49,22 @@ export class MonsterCamService extends EventEmitter {
 
   start() {
     if (this.running) return;
+
+    // Pre-flight: check for the mediapipe Python environment before spawning
+    // anything. Without it the TS worker would crash immediately with ENOENT,
+    // giving the user a cryptic "Worker exited with code 1" message. Fail fast
+    // with a clear message instead.
+    if (!fs.existsSync(VENV_PY)) {
+      this.emit(
+        "error",
+        new Error(
+          "Monster Cam unavailable — no camera detected. " +
+            "Requires assets/mediapipe-venv/ (run scripts/setup-monster-cam.sh)."
+        )
+      );
+      return;
+    }
+
     this.running = true;
     this._spawnWorker();
   }
@@ -76,7 +98,7 @@ export class MonsterCamService extends EventEmitter {
     });
 
     this.worker.on("error", (err) => {
-      this.emit("error", err);
+      if (this.running) this.emit("error", err);
     });
   }
 
