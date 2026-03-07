@@ -3,6 +3,7 @@ import path from "node:path";
 
 import type { AppType, DesktopState, DesktopWindowState, WindowRecord, WindowStateDetails } from "../core/types.js";
 import { themeName } from "../core/theme/resolver.js";
+import { capabilityService } from "./capability-service.js";
 
 interface StateServiceOptions {
   appName: string;
@@ -99,7 +100,8 @@ export class StateService {
         sessionId: this.options.sessionId,
         controlApiEnabled: this.options.getControlApiStatus?.().enabled,
         controlApiPort: this.options.getControlApiStatus?.().port,
-        theme: themeName()
+        theme: themeName(),
+        capabilities: capabilityService.snapshot()
       },
       screen: {
         width: screen.width,

@@ -8,6 +8,7 @@
 import { spawn } from "child_process";
 import path from "path";
 import { fileURLToPath } from "url";
+import { capabilityService } from "./capability-service.js";
 
 const __dirname  = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT  = path.resolve(__dirname, "../..");
@@ -16,6 +17,11 @@ const PY_WORKER  = path.resolve(__dirname, "monster_cam_worker.py");
 
 function log(msg: string) {
   process.stderr.write(`[monster-cam-worker] ${msg}\n`);
+}
+
+const gate = capabilityService.isAvailable(["path.monster_cam.venv"]);
+if (!gate.ok) {
+  throw new Error(`Monster Cam unavailable: mediapipe venv not found (${gate.missing.join(", ")})`);
 }
 
 // Try venv first, fall back to system python3

@@ -6,6 +6,7 @@
  */
 
 import type { MenuConfig, MenuItem } from "./types.js";
+import type { CapabilityKey } from "../services/capability-service.js";
 
 /** Controller action contract consumed by the command registry and catalog projections. */
 export interface AppMenuActions {
@@ -126,6 +127,7 @@ export interface AppCommandDefinition {
   label: string;
   group: AppCommandGroup;
   actionKey: keyof AppMenuActions;
+  requires?: CapabilityKey[];
   description?: string;
   multiInstance?: boolean;
   menuPlacements?: MenuPlacement[];
@@ -148,6 +150,7 @@ export interface AppCommandDescriptor {
   label: string;
   group: AppCommandGroup;
   actionKey: keyof AppMenuActions;
+  requires?: CapabilityKey[];
   description?: string;
   multiInstance?: boolean;
   menuPlacements: MenuPlacement[];
@@ -393,6 +396,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     description: "Open a Chrome browser window for web content extraction. Args: url (string, optional). Without args opens to default page.",
     group: "open",
     actionKey: "openChromeBrowser",
+    requires: ["bin.chrome"],
     multiInstance: true,
     menuPlacements: [{ category: "applications", order: 40 }],
     palettePlacement: { order: 110 },
@@ -427,6 +431,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     description: "Open the Monster Cam window.",
     group: "open",
     actionKey: "openMonsterCam",
+    requires: ["path.monster_cam.venv"],
     menuPlacements: [{ category: "applications", order: 150, label: "Monster Cam" }],
     palettePlacement: { order: 145 },
     contextMenu: { desktop: true, order: 80 },
@@ -510,6 +515,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     description: "Open Backrooms TV with an interactive channel picker.",
     group: "surface",
     actionKey: "openBackroomsPrompt",
+    requires: ["path.backrooms.repo"],
     menuPlacements: [{ category: "applications", order: 10 }],
     palettePlacement: { order: 0 },
     contextMenu: { desktop: true, order: 30 },
@@ -522,6 +528,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     label: "Open Backrooms TV (with args)",
     group: "surface",
     actionKey: "openBackroomsTv",
+    requires: ["path.backrooms.repo"],
     description: "Open a Backrooms TV channel directly. Args: theme (string), model (haiku|sonnet|opus), turns (number), mode (auto|live|fake-live).",
     multiInstance: true,
     menuPlacements: [],
@@ -615,6 +622,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     description: "Open a FIGlet banner. Args: text (string), font (string, optional). Without args opens interactive prompt.",
     group: "surface",
     actionKey: "openFigletBanner",
+    requires: ["bin.figlet"],
     multiInstance: true,
     menuPlacements: [{ category: "applications", order: 70, label: "Figlet Banner" }],
     palettePlacement: { order: 50, label: "Open Figlet Banner" },
@@ -793,6 +801,7 @@ export function listAppCommands(): AppCommandDescriptor[] {
     label: command.label,
     group: command.group,
     actionKey: command.actionKey,
+    requires: command.requires,
     description: command.description,
     multiInstance: command.multiInstance,
     menuPlacements: [...(command.menuPlacements ?? [])],

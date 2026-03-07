@@ -15,6 +15,7 @@ import TurndownService from "turndown";
 // @ts-ignore — no types available for turndown-plugin-gfm
 import { gfm } from "turndown-plugin-gfm";
 import fs from "node:fs";
+import { capabilityService } from "./capability-service.js";
 
 export interface BrowseResult {
   ok: boolean;
@@ -38,7 +39,7 @@ const CHROME_PATHS = [
   "/usr/bin/chromium",                                              // Linux (arch)
 ];
 
-function findChrome(): string | null {
+export function findChromeExecutablePath(): string | null {
   for (const p of CHROME_PATHS) {
     if (fs.existsSync(p)) return p;
   }
@@ -55,9 +56,14 @@ export class ChromeBrowserService {
    * falls back to connecting to an existing instance on :9222.
    */
   async connect(): Promise<boolean> {
+    const gate = capabilityService.isAvailable(["bin.chrome"]);
+    if (!gate.ok) {
+      throw new Error(`Chrome not available: ${gate.missing.join(", ")}`);
+    }
+
     // Try launching our own headless Chrome
     if (!this.launched) {
-      const chromePath = findChrome();
+      const chromePath = findChromeExecutablePath();
       if (chromePath) {
         try {
           this.browser = await puppeteer.launch({

@@ -597,6 +597,16 @@ export function openBackroomsTvWindow(context: BackroomsWindowContext, channel: 
       context.syncState();
       context.screen.render();
     });
+    processRef.on("error", (err: Error) => {
+      processRef = undefined;
+      endedAt = new Date().toISOString();
+      phase = "error";
+      status = `SPAWN ERROR: ${err.message}`;
+      updateChrome();
+      transcript.log(`[backrooms spawn error: ${err.message}]`);
+      context.syncState();
+      context.screen.render();
+    });
 
     fallbackTimer = setInterval(() => {
       const silentForMs = Date.now() - lastActivityAt;

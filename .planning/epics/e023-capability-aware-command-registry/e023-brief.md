@@ -1,7 +1,7 @@
 ---
 id: E023
 title: Capability-Aware Command Registry
-status: not-started
+status: done
 issue: ~
 pr: ~
 depends_on: []
@@ -279,6 +279,27 @@ Files:
 - `src/services/monster-cam-service.ts`
 - `src/services/monster-cam-worker.ts`
 - `src/services/figlet-service.ts`
+
+## Implementation Summary
+
+All 6 stories shipped in commit `da941da` on branch `codex/e023-capability-aware-command-registry`.
+
+| Story | Status | Key files |
+| --- | --- | --- |
+| S00 CapabilityService + probes | ✓ done | `src/services/capability-service.ts` |
+| S01 requires in catalog | ✓ done | `src/core/command-catalog.ts` |
+| S02 Registry gating | ✓ done | `src/core/command-registry.ts` |
+| S03 API/state exposure | ✓ done | `src/services/control-api.ts`, `src/services/state-service.ts` |
+| S04 Profile overlay | ✓ done | `config/capability-profiles/*.json`, `deploy/Dockerfile.smoke` |
+| S05 Crash fixes | ✓ done | `src/windows/backrooms-windows.ts`, `src/services/chrome-browser-service.ts`, `src/services/monster-cam-worker.ts` |
+
+### Verified behaviour
+
+- `bin.figlet` OK, `path.monster_cam.venv` NO → `monster_cam.open` gated on dev machine
+- `WIBWOB_DEPLOY_PROFILE=docker-safe` → 4 commands gated (chrome.open, monster_cam.open, backrooms.open, backrooms.run), 54/58 available
+- `GET /state` → `app.capabilities` map with ok+reason+source per key
+- `GET /commands/list?includeUnavailable=1` → full list with available+missingCapabilities per command
+- `bun run typecheck` → clean
 
 ## Open Questions
 - If dependencies are installed while app is running, should probes be static-at-boot, periodic, or manual refresh (`/capabilities/reprobe`)?

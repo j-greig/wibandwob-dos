@@ -173,6 +173,7 @@ export interface DesktopState {
     controlApiEnabled?: boolean;
     controlApiPort?: number;
     theme?: string;
+    capabilities?: Record<string, { ok: boolean; reason?: string; source?: string; checkedAt?: string }>;
   };
   screen: {
     width: number;

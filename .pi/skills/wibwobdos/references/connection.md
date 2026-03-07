@@ -107,3 +107,27 @@ Protect the private key: `chmod 600 ~/.ssh/wibwob_agent_key`
 - `PasswordAuthentication no` — only key auth is accepted
 - One key per agent identity — revoke per-key without affecting others
 - Webhook URLs have no auth; rotate them if exposed
+
+## Deployment Profiles
+
+Set `WIBWOB_DEPLOY_PROFILE` in the instance `.env` to gate unavailable commands.
+
+| Profile | Description |
+| --- | --- |
+| `docker-safe` | Disables chrome, monster_cam, backrooms (no native deps in smoke image) |
+| `full` | No overrides — all probed capabilities used as-is |
+| _(unset)_ | Same as `full` — probe results only |
+
+Capabilities appear in `/state` under `app.capabilities`:
+```json
+{ "bin.figlet": { "ok": true, "source": "probe" },
+  "bin.chrome":  { "ok": false, "reason": "disabled by profile", "source": "profile-force-off" } }
+```
+
+Check which commands are currently gated:
+```bash
+curl -s "http://127.0.0.1:$TUNNEL_PORT/commands/list?includeUnavailable=1" | \
+  python3 -c "import sys,json; [print(c['id']) for c in json.load(sys.stdin)['commands'] if not c.get('available',True)]"
+```
+
+Add a new profile at `config/capability-profiles/<name>.json` — see `docker-safe.json` as reference.

@@ -1,0 +1,9 @@
+{
+  "description": "Docker/VPS smoke deployment - disables commands requiring native deps not in the smoke image",
+  "forceOff": [
+    "path.monster_cam.venv",
+    "path.backrooms.repo",
+    "bin.chrome"
+  ],
+  "forceOn": []
+}
