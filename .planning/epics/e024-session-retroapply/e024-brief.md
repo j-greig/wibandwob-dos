@@ -1,9 +1,8 @@
 ---
 id: E024
-title: Session Retroapply — cherry-pick real fixes onto clean 16e7b6a base
+title: Session retroapply — 4 missing fixes onto clean 16e7b6a base
 status: in-progress
 branch: fix/session-retroapply
-issue: ~
 created: 2026-03-07
 ---
 
@@ -11,160 +10,90 @@ created: 2026-03-07
 
 ## Context
 
-Main was reset to `16e7b6a` (codex/e002-root-migration, last known-good) after
-a bad merge `4e2500b` gutted ~700 lines from app-controller, deleted AGENTS.md,
-stripped 23 commands, and killed all API routes.
+main was reset to `16e7b6a` (last known-good, codex/e002-root-migration) after
+a bad merge gutted the codebase. modules-private restored to `c4357e6` (E022
+S01+S02 applied — wibwobworld/wibwobworld-iso/world-chatroom intact).
 
-modules-private is at `c4357e6` (E022 S02 — wibwobworld + world-chatroom +
-wibwobworld-iso with E022 S01+S02 debug/renderMode fixes applied).
+Old main preserved as `main-archive-tvision`.
+Working branch: `fix/session-retroapply`.
 
-Patch dump: `tmp/wibwob-patch-dump/0001-0032.patch`
-Full reapply notes: `tmp/wibwob-patch-dump/REAPPLY-PLAN.md`
+Patch dump for reference: `tmp/wibwob-patch-dump/` (patches 0001-0032).
 
 ---
 
-## What 16e7b6a already has (do NOT re-apply)
+## What 16e7b6a already has — confirmed, skip these
 
-- Full app-controller (1933 lines) — kaomoji, session ID, loadModules wired
-- All 60+ commands including legacy aliases, theme.*, finder.*, maximize
-- Full control-api routes (world-chat, batch, openapi, maximize)
-- Full state-service with instanceLabel/sessionId/capabilities/theme
-- AGENTS.md as real file (192 lines)
-- Monster Cam MVP
-- modules-private at c4357e6 with E022 S01+S02 applied
+- Transcript leak fix (#112) — currentAssistantId already in wibwob-agent-session.ts
+- E022 S04 microapp geometry restore — registrySerialize already in workspace-snapshots.ts
+- Poetry clock fallback — already in modules/wibwob-poetry-clock
 
 ---
 
 ## Stories
 
-### S01 — Bug fixes (patches 0008, 0021, 0022)
+### S01 — Monster cam crash guard
 **Status: open**
+**Patch: 0022**
 
-Real bug fixes from the session, clean cherry-picks.
+Adds existsSync preflight before spawning Python worker. No UI change.
 
-- [ ] AC-1: `0008` fix(agent): clear assistant entry between turns, prevent transcript leak (#112)
-  - File: `src/services/wibwob-agent-session.ts`
-  - Apply: `git am tmp/wibwob-patch-dump/0008-*.patch`
-  - Risk: low — self-contained, well-scoped fix
-
-- [ ] AC-2: `0021` fix(poetry-clock): graceful fallback to plain clock when no API key
-  - File: `modules/wibwob-poetry-clock/`
-  - Apply: `git am tmp/wibwob-patch-dump/0021-*.patch`
-  - Risk: low — modules/ path unchanged
-
-- [ ] AC-3: `0022` fix(monster-cam): guard against missing camera/native deps
-  - File: `src/windows/monster-cam-window.ts`
-  - Apply: `git am tmp/wibwob-patch-dump/0022-*.patch`
-  - Risk: low — additive guard, no refactor
+- [ ] Apply or hand-copy the guard from patch 0022 into `src/windows/monster-cam-window.ts`
+- [ ] typecheck passes
+- [ ] commit: `fix(monster-cam): guard against missing camera/native deps`
 
 ---
 
-### S02 — E022 S03+S04+S05 (patches 0011, 0012, 0016) — MANUAL
+### S02 — E022 S03: iso serialises terrain params not file path
 **Status: open**
+**Patch: 0011 — path redirect needed**
 
-These patches were written against `modules/` paths after migration. Since we
-reverted, target is now `modules-private/`. Needs manual path fixup.
+Serialisation only — no UI change. Fixes workspace restore breaking when a tmp
+terrain file path no longer exists. Instead saves seed/seaLevel/levels/terrainIdx.
 
-- [ ] AC-1: `0011` fix(e022-s03): iso serialises terrain params not ephemeral file path
-  - Original target: `modules/wibwobworld-iso/index.ts`
-  - Now target: `modules-private/wibwobworld-iso/index.ts`
-  - Action: read patch diff, apply change manually, commit to modules-private first
-            then update submodule ref in main repo
+Patch targets `modules/wibwobworld-iso/index.ts` (migration path, wrong).
+Must be applied to `modules-private/wibwobworld-iso/index.ts` instead.
 
-- [ ] AC-2: `0012` fix(e022-s04): microapp geometry restored on restart
-  - Files: `src/core/workspace-snapshots.ts`, `src/core/app-controller.ts`
-  - Check if 16e7b6a already has registrySerialize path in workspace-snapshots
-  - `grep -n "registrySerialize\|restoreMicroapp" src/core/workspace-snapshots.ts`
-  - If missing: apply diff manually from patch file
-
-- [ ] AC-3: `0016` fix(e022-s05): hybrid iso pane uses pane-sized world
-  - Original target: `modules/wibwobworld/index.ts`
-  - Now target: `modules-private/wibwobworld/index.ts`
-  - Action: read patch diff, apply manually to modules-private, commit there first
+- [ ] Read patch 0011, apply change manually to `modules-private/wibwobworld-iso/index.ts`
+- [ ] Commit inside modules-private: `fix(e022-s03): iso serialises terrain params not file path`
+- [ ] Update submodule ref in main repo, commit: `fix(e022-s03): update modules-private submodule ref`
 
 ---
 
-### S03 — Tooling (patches 0014, 0023)
+### S03 — E022 S05: hybrid iso pane uses its own sized world
 **Status: open**
+**Patch: 0016 — path redirect needed**
 
-New scripts that didn't exist in 16e7b6a, apply cleanly.
+Adds a separate `hybridIsoCacheKey` + world sized to the iso pane, not the full
+contour world. Prevents stride compression / squashed iso in hybrid view.
 
-- [ ] AC-1: `0014` feat(handover): scripts/handover.sh auto-generate session handover
-  - New file — `git am tmp/wibwob-patch-dump/0014-*.patch`
-  - Also apply `0023` fix(handover): epic table parse_epics bug
+Patch targets `modules/wibwobworld/index.ts` (migration path, wrong).
+Must be applied to `modules-private/wibwobworld/index.ts` instead.
 
-- [ ] AC-2: `0023` fix(handover): epic table populates correctly
-  - Depends on 0014
-  - `git am tmp/wibwob-patch-dump/0023-*.patch`
+- [ ] Read patch 0016, apply change manually to `modules-private/wibwobworld/index.ts`
+- [ ] Commit inside modules-private: `fix(e022-s05): hybrid iso pane uses pane-sized world`
+- [ ] Update submodule ref in main repo
 
 ---
 
-### S04 — AGENTS.md update + CLAUDE.md constitution
+### S04 — handover.sh
 **Status: open**
+**Patch: 0014 + 0023**
 
-16e7b6a has AGENTS.md at 192 lines. The session produced a 477-line v2 and a
-638-line .agents/CLAUDE.md agent constitution.
+New script `scripts/handover.sh` — auto-generates session handover doc.
+Patch 0023 fixes the epic table parse bug. Both are new files, clean apply.
 
-- [ ] AC-1: Update AGENTS.md to 477-line v2
-  - Source: `git show a325fb2:AGENTS.md` — no, source is bc21111 version
-  - Actually just write it fresh — it's docs, not code
-  - `git show` the content from the orphaned commit if needed:
-    `git show a2ad84d~1:AGENTS.md` (the commit before reset had the 477-line ver)
-
-- [ ] AC-2: `0031` docs(e001-s01): .agents/CLAUDE.md agent constitution
-  - New file — `git am tmp/wibwob-patch-dump/0031-*.patch`
-  - 638-line agent constitution with trigger tables, subsystem map, commit rules
-
----
-
-### S05 — Planning docs bulk
-**Status: open**
-
-Docs-only commits from the session. Apply in one pass.
-
-Apply in order:
-- `0001` chore: session handover note
-- `0002` docs: fix epics, update handover
-- `0003` docs: spike auto-generated handover
-- `0010` docs(e022): tick S01+S02 done
-- `0013` docs(e022): tick S03+S04 done
-- `0015` docs: mark spk-session-handover done
-- `0017` docs(planning): rewrite README for WibWob-DOS
-- `0018` chore(planning): remove stale loose docs
-- `0019` docs(e022): tick S05 done
-- `0020` docs(e022): close S06, mark epic done
-- `0032` docs: tick E001 S01 done in brief
-
-Command to try bulk apply (expect some conflicts on planning files):
-```
-git am tmp/wibwob-patch-dump/0001-*.patch \
-       tmp/wibwob-patch-dump/0002-*.patch \
-       ...
-```
-Or apply one at a time with `git am --reject` and fix manually.
-
----
-
-## Execution order
-
-1. S01 — bug fixes (clean, do first, low risk)
-2. S02 — E022 S03+S04+S05 (manual, modules-private first then submodule ref)
-3. S03 — tooling (clean new files)
-4. S04 — AGENTS.md + CLAUDE.md (docs but important)
-5. S05 — planning bulk (docs only, any order)
-
-typecheck after S01 and S02. Push fix/session-retroapply when clean.
-PR into main. Do not force-push main again.
+- [ ] `git am tmp/wibwob-patch-dump/0014-*.patch`
+- [ ] `git am tmp/wibwob-patch-dump/0023-*.patch`
 
 ---
 
 ## Acceptance criteria
 
 - [ ] `bun run typecheck` passes clean
-- [ ] App boots: kaomoji visible, session code visible, all 6 microapps in menu
-- [ ] WibWobWorld opens from Applications menu
-- [ ] World Chatroom opens
-- [ ] #112 fixed (no tool output in transcript)
-- [ ] Poetry clock fallback works without API key
-- [ ] handover.sh generates a full doc with epic table populated
-- [ ] `.agents/CLAUDE.md` exists with trigger tables
+- [ ] App boots — kaomoji, session code, all 6 microapps in Applications menu
+- [ ] WibWobWorld and World Chatroom open without error
+- [ ] Monster Cam opens without crashing when venv missing
+- [ ] Workspace restore opens WibWobWorld in correct renderMode (not forced to contours)
+- [ ] Hybrid view iso pane not squashed
+- [ ] `bun run handover` generates doc with populated epic table
+- [ ] PR fix/session-retroapply → main, squash merge, close E024
