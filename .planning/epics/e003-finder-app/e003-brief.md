@@ -1,8 +1,10 @@
 ---
-Status: in-progress
-Type: epic
-GitHub issue: #104
-PR: —
+id: E003
+title: Finder App
+status: done
+issue: ~
+pr: ~
+depends_on: []
 ---
 
 # E003 — Finder App
