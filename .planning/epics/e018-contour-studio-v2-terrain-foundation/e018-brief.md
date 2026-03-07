@@ -1,8 +1,10 @@
 ---
-Status: in-progress
-Type: epic
-GitHub issue: —
-PR: —
+id: E018
+title: WibWobWorld Terrain Foundation
+status: done
+issue: ~
+pr: ~
+depends_on: []
 ---
 
 # E018 — WibWobWorld Terrain Foundation
