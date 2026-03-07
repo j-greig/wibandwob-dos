@@ -8,7 +8,7 @@ cat <<'CTX'
 [Session orientation — WibWob-DOS]
 Canon rules enforced by hooks:
   - Commit format: type(scope): summary (feat|fix|refactor|docs|test|chore|ci|spike)
-  - File names: snake_case for .cpp/.h/.py, kebab-case for .md
+  - File names: kebab-case.ts for source, kebab-case.md for docs
 Key refs: .planning/README.md, CLAUDE.md
 CTX
 
