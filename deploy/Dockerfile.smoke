@@ -1,0 +1,73 @@
+# WibWob-DOS VPS smoke image
+# Ubuntu 24.04 + Bun — mirrors wibwob1 Hetzner (aarch64, Ubuntu 24.04)
+# Build: docker build --platform linux/arm64 -t wibwob-vps-smoke -f deploy/Dockerfile.smoke .
+# Run:  docker run -d -t -p 127.0.0.1:2849:22 --platform linux/arm64 --name wibwob-smoke wibwob-vps-smoke
+
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# System deps
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      curl unzip git tmux openssh-server ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Bun (ARM64 native binary — same method as production VPS)
+ENV BUN_VERSION=1.2.4
+RUN curl -fsSL "https://github.com/oven-sh/bun/releases/download/bun-v${BUN_VERSION}/bun-linux-aarch64.zip" \
+      -o /tmp/bun.zip \
+    && unzip /tmp/bun.zip -d /tmp/bun-release \
+    && cp /tmp/bun-release/bun-linux-aarch64/bun /usr/local/bin/bun \
+    && chmod +x /usr/local/bin/bun \
+    && rm -rf /tmp/bun.zip /tmp/bun-release \
+    && bun --version
+
+# Generate sshd host keys
+RUN ssh-keygen -A
+
+# SSH hardening — use sshd_config.d (Ubuntu 24.04 canonical approach, avoids fragile sed)
+RUN echo "PasswordAuthentication no" > /etc/ssh/sshd_config.d/99-smoke.conf \
+    && echo "AuthenticationMethods publickey" >> /etc/ssh/sshd_config.d/99-smoke.conf \
+    && echo "X11Forwarding no" >> /etc/ssh/sshd_config.d/99-smoke.conf \
+    && echo "AllowAgentForwarding no" >> /etc/ssh/sshd_config.d/99-smoke.conf
+
+# Create wibwob user (non-root — mirrors VPS requirement)
+RUN useradd -m -s /bin/bash wibwob \
+    && mkdir -p /home/wibwob/.ssh \
+    && chmod 700 /home/wibwob/.ssh
+
+# Install smoke test SSH key (public key only — private key never enters image)
+COPY deploy/test_agent_key.pub /home/wibwob/.ssh/authorized_keys
+RUN chmod 600 /home/wibwob/.ssh/authorized_keys \
+    && chown -R wibwob:wibwob /home/wibwob/.ssh
+
+# App — copy source, install deps as wibwob
+# Layer: package files first for bun install cache
+COPY --chown=wibwob:wibwob package.json bun.lock /opt/wibandwob-dos/
+# --ignore-scripts: skips canvas native build (not imported in source) and
+# puppeteer chromium download (not needed for smoke). bun-pty pre-built .so
+# in its dist/ works without recompile.
+RUN cd /opt/wibandwob-dos && su -c "bun install --ignore-scripts" wibwob
+
+# Layer: full source
+COPY --chown=wibwob:wibwob src /opt/wibandwob-dos/src
+COPY --chown=wibwob:wibwob tsconfig.json /opt/wibandwob-dos/
+COPY --chown=wibwob:wibwob modules /opt/wibandwob-dos/modules
+COPY --chown=wibwob:wibwob modules-private /opt/wibandwob-dos/modules-private
+
+# Minimal smoke .env — local transport (no IRC), named instance
+RUN printf 'WIBWOB_INSTANCE_LABEL=smoke\n' \
+      > /opt/wibandwob-dos/.env \
+    && chown wibwob:wibwob /opt/wibandwob-dos/.env \
+    && chmod 600 /opt/wibandwob-dos/.env
+
+# Entrypoint
+COPY deploy/smoke-entrypoint.sh /usr/local/bin/smoke-entrypoint.sh
+RUN chmod +x /usr/local/bin/smoke-entrypoint.sh
+
+# /run/sshd needed by sshd privilege separation
+RUN mkdir -p /run/sshd
+
+EXPOSE 22
+
+ENTRYPOINT ["/usr/local/bin/smoke-entrypoint.sh"]

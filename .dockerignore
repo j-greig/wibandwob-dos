@@ -1,0 +1,14 @@
+node_modules/
+.git/
+scratch/
+.planning/
+.codex-logs/
+.pi/
+art/
+vendor/
+modules-private/.git/
+deploy/test_agent_key
+*.log
+*.cast
+.env
+.env.*
