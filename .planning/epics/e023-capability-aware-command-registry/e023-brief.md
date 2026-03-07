@@ -5,7 +5,7 @@ Epic: e023-capability-aware-command-registry
 ---
 
 <human-prompt>
-"What do you think would be a great canon best practice way to do the Docker safe list of apps? Think about the config files, the settings files, the workspace, JSON files. Always we're configuring and manipulating the app already. Maybe ask Codex to compile a report and rank its list of suggestions of how to do it. Might be non-docker other instance of the TUI app in future even."
+"What do you think would be a great canon best practice way to do the Docker safe list of apps? Think about the config files, the settings files, the workspace, JSON files. Ways we're configuring and manipulating the app already. Maybe ask Codex to compile a report and rank its list of suggestions of how to do it. Might be non-docker other instance of the TUI app in future even."
 </human-prompt>
 
 # E023 - Capability-Aware Command Registry
