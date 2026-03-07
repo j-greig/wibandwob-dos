@@ -181,7 +181,15 @@ export function openBackroomsPrimerPicker(context: BackroomsWindowContext, theme
     }
   };
 
+  let pickerClosed = false;
   const closePicker = () => {
+    if (pickerClosed) return;
+    pickerClosed = true;
+    // Cancel any active readInput() on searchBox before destroying the frame.
+    // If we skip this, blessed keeps firing keypresses into the orphaned widget
+    // and crashes at textbox.js:40 when the overlay prompt receives its first key.
+    // cancelInput() is a blessed runtime method not in @types/blessed — cast needed.
+    try { (searchBox as unknown as { cancel(): void }).cancel(); } catch { /* already idle or widget destroyed */ }
     frame.close();
   };
 
@@ -201,6 +209,7 @@ export function openBackroomsPrimerPicker(context: BackroomsWindowContext, theme
 
   searchBox.setValue(searchValue);
   searchBox.on("keypress", (_, key) => {
+    if (pickerClosed) return;
     if (key.name === "escape") {
       list.focus();
       context.screen.render();
@@ -219,6 +228,7 @@ export function openBackroomsPrimerPicker(context: BackroomsWindowContext, theme
     }, 0);
   });
   searchBox.on("submit", (value) => {
+    if (pickerClosed) return;
     searchValue = (value ?? "").trim();
     applyFilter(filteredEntries[(list as List & { selected: number }).selected ?? 0]?.label);
     list.focus();

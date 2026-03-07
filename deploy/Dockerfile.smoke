@@ -9,7 +9,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 # System deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      curl unzip git tmux openssh-server ca-certificates \
+      curl unzip git tmux openssh-server ca-certificates figlet \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Bun (ARM64 native binary — same method as production VPS)
@@ -60,6 +60,7 @@ COPY --chown=wibwob:wibwob src /opt/wibandwob-dos/src
 COPY --chown=wibwob:wibwob tsconfig.json /opt/wibandwob-dos/
 COPY --chown=wibwob:wibwob modules /opt/wibandwob-dos/modules
 COPY --chown=wibwob:wibwob modules-private /opt/wibandwob-dos/modules-private
+COPY --chown=wibwob:wibwob README.md /opt/wibandwob-dos/
 
 # Minimal smoke .env — local transport (no IRC), named instance
 RUN printf 'WIBWOB_INSTANCE_LABEL=smoke\n' \
