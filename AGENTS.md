@@ -67,41 +67,45 @@ Tools available to it:
 
 Rule: registry command first → low-level TUI tool if insufficient → expose via state and control API if it matters to users.
 
-## Startup
+## App Lifecycle
 
+**Start** (first time or after `bun install`):
 ```bash
-bun install && bun run typecheck && bun run start
+bun install && bun run typecheck && bun run dev:world
 ```
 
-Wait for the API before acting:
-
+**Restart without human involvement** — preferred for agents:
 ```bash
-curl -s http://127.0.0.1:8099/health
+bash scripts/restart.sh
 ```
+SIGTERM → waits for clean exit → `tmux send-keys` → polls `/health` until ready.
+Returns the new session ID. Requires tmux session `wibwob` with the app in window 0.
 
+**Wait for API before acting:**
+```bash
+curl -s http://127.0.0.1:8099/health   # returns {"ok":true,"sessionId":"abc"}
+```
 Do not guess window ids or command availability before `/health` responds.
 
-## Stopping the App
-
-**Always use SIGTERM — never `kill -9`.** Blessed must clean up mouse tracking and
-alternate screen or the terminal fills with garbage escape sequences.
-
+**Stop — always SIGTERM, never `kill -9`.** Blessed must run cleanup or mouse
+tracking escape codes leak into the terminal.
 ```bash
-# Clean stop — preferred
-kill $(cat scratch/wibwob.pid)
+kill $(cat scratch/wibwob.pid)   # preferred — uses PID file written on startup
+pkill wibwob-dos                 # by process title (includes session ID: wibwob-dos-main-jp9)
+```
 
-# By process title — includes session ID shown in TUI top-right
-# e.g. if TUI shows "jp9", process is named "wibwob-dos-main-jp9"
-pkill wibwob-dos-jp9   # kill exact session
-pkill wibwob-dos       # kill any wibwob instance
-
-# Last resort only — will leak escape codes to terminal
+**Last resort only** (will poison terminal):
+```bash
 kill -9 $(lsof -ti:8099)
 ```
-
-If the terminal does get poisoned after a hard kill, run in the affected pane:
+Terminal reset after a poisoned kill:
 ```
 printf '\033[?1000l\033[?1002l\033[?1003l\033[?1006l\033[?25h\033[0m\033[?1049l' && reset
+```
+
+**Alt instance** (port 8098, label=zuk):
+```bash
+bash scripts/start-alt-instance.sh
 ```
 
 ## Control Loop
@@ -152,9 +156,9 @@ Do not stop at "it typechecks" — run the thing.
 
 ## Preferred Next Steps
 
-1. async workspace restore race fix
-2. workspace startup unification (`default.json` → Scramble fallback)
-3. appearance/theme subsystem with semantic tokens
-4. stronger `WindowRecord` discriminated union
-5. deeper agent/session restore parity
-6. project more window-local actions onto the command registry path
+1. hybrid ISO pane — iso right-pane fill parity with standalone ISO mode
+2. strip debug breadcrumbs from `modules-private/wibwobworld/index.ts` (keep env-gated `debugWibWobWorld` calls, remove granular render: labels)
+3. async workspace restore race fix
+4. workspace startup unification (`default.json` → Scramble fallback)
+5. appearance/theme subsystem with semantic tokens
+6. stronger `WindowRecord` discriminated union
