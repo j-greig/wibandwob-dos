@@ -71,6 +71,8 @@ export function openPlasmaWindow(
 
   let infoText = "";
   let currentSpeed = 0;
+  let fullscreen = false;
+  let savedRect: { top: number; left: number; width: number; height: number } | null = null;
 
   const readViewport = () => {
     const w = Math.max(4, Number(canvas.width) || 40);
@@ -114,7 +116,7 @@ export function openPlasmaWindow(
       ].filter((line): line is string => line !== undefined);
       infoText = infoLines.join("\n");
       infoBlock.update({ text: infoText });
-      statusBar.update({ left: "m:mood r:render p:pause s:save" });
+      statusBar.update({ left: "m:mood r:render p:pause s:save f:fullscreen" });
       deps.onStateChanged?.();
     },
   });
@@ -125,14 +127,14 @@ export function openPlasmaWindow(
 
   const bodyColumns = createColumns(frame.body, [
     { key: "canvas", basis: "3fr", part: canvasPart },
-    { key: "divider", basis: 1, part: divider },
-    { key: "info", basis: "1fr", part: infoBlock },
+    { key: "divider", basis: 1, part: divider, visible: () => !fullscreen },
+    { key: "info", basis: "1fr", part: infoBlock, visible: () => !fullscreen },
   ]);
 
   const root = createStack(frame.body, [
-    { key: "header", basis: 1, part: header },
+    { key: "header", basis: 1, part: header, visible: () => !fullscreen },
     { key: "body", basis: "1fr", part: bodyColumns },
-    { key: "status", basis: 1, part: statusBar },
+    { key: "status", basis: 1, part: statusBar, visible: () => !fullscreen },
   ]);
 
   const doLayout = () => {
@@ -152,11 +154,36 @@ export function openPlasmaWindow(
     deps.screen.render();
   };
 
+  // ── Fullscreen toggle ──────────────────────────────────────────────────────
+  const toggleFullscreen = () => {
+    fullscreen = !fullscreen;
+    if (fullscreen) {
+      savedRect = {
+        top:    Number(frame.frame.top),
+        left:   Number(frame.frame.left),
+        width:  Number(frame.frame.width),
+        height: Number(frame.frame.height),
+      };
+      frame.frame.top    = 0;
+      frame.frame.left   = 0;
+      frame.frame.width  = deps.screen.cols;
+      frame.frame.height = deps.screen.rows;
+    } else if (savedRect) {
+      frame.frame.top    = savedRect.top;
+      frame.frame.left   = savedRect.left;
+      frame.frame.width  = savedRect.width;
+      frame.frame.height = savedRect.height;
+    }
+    doLayout();
+    deps.screen.render();
+  };
+
   for (const el of [frame.frame, frame.body, canvas]) {
     el.key(["m"], () => player.nextMood());
     el.key(["r"], () => player.nextRenderMode());
     el.key(["p"], () => player.togglePause());
     el.key(["s"], saveFrame);
+    el.key(["f"], toggleFullscreen);
   }
 
   frame.frame.on("resize", doLayout);
