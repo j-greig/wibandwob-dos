@@ -45,6 +45,41 @@ Out:
 
 ## Stories
 
+### S00 — Docker smoke (VERIFIED ✓)
+
+Goal: Prove the runtime, SSH posture, and control API work in a clean Linux/ARM64
+container before touching the real VPS. Gate for all subsequent stories.
+
+Files: `deploy/Dockerfile.smoke`, `deploy/smoke-entrypoint.sh`, `deploy/test_agent_key.pub`
+
+Acceptance criteria:
+- [x] GATE1: SSH key auth — `wibwob@localhost:2849` admitted with `test_agent_key`
+- [x] GATE2: Password auth blocked — `ssh -o PasswordAuthentication=yes` rejected
+- [x] GATE3: tmux session live — `tmux has-session -t wibwob` returns 0
+- [x] GATE4: `/health` via SSH tunnel returns `ok:true`, `instanceLabel:"smoke"`
+- [x] GATE5: Direct port 8099 not reachable from host (bound to 127.0.0.1 inside container)
+- [x] GATE6: `/state` and `/commands/list` functional via tunnel (88 commands)
+- [x] GATE7: `microapp.wibwobworld.open` — container survives, window appears in `/state`
+- [x] GATE8: ttyd serves xterm.js at `http://127.0.0.1:7681/` — TUI in browser
+
+```bash
+# Build and run
+docker build --platform linux/arm64 -t wibwob-vps-smoke -f deploy/Dockerfile.smoke .
+docker run -d -t -p 127.0.0.1:2849:22 -p 127.0.0.1:7681:7681 \
+  --platform linux/arm64 --name wibwob-smoke wibwob-vps-smoke
+
+# Establish control API tunnel
+ssh -fN -i deploy/test_agent_key -p 2849 -o StrictHostKeyChecking=no \
+  -L 19099:127.0.0.1:8099 wibwob@localhost
+
+# Verify all gates
+curl http://127.0.0.1:19099/health    # GATE4
+curl http://127.0.0.1:19099/state     # GATE6
+curl http://127.0.0.1:7681/           # GATE8 (check for xterm in response)
+```
+
+Commit: `c550086` — `feat(e021/S00): Docker VPS smoke — verified green`
+
 ### S01 — VPS baseline
 
 Goal: Run WibWob-DOS reliably on a Linux VPS with stable process/session management.
@@ -465,6 +500,77 @@ and terrain has been generated. For S04 to work from a cold start a remote agent
 This is not a blocker but it is an unspoken dependency. S01 AC should include a
 workspace that auto-opens WibWobWorld on startup, or S04 AC should explicitly cover
 the cold-start flow.
+
+## Stretch Goal — Web TUI Access via ttyd + xterm.js
+
+### Concept
+
+Serve the WibWob-DOS TUI over HTTP using **ttyd** — a C binary that streams a
+PTY to a browser via WebSocket, rendered by xterm.js. No browser plugin, no VNC.
+Pure terminal in a tab.
+
+The existing `deploy/Dockerfile` already uses ttyd for the web-session path.
+Pattern is proven. The question is multi-user URL routing.
+
+### Single-session MVP (simplest)
+
+```bash
+ttyd --writable -p 7681 su -c "tmux attach -t wibwob" wibwob
+```
+
+`http://vps:7681/` — everyone gets the same shared tmux session. Fine for a
+demonstration or a trusted single-operator setup. Not suitable for per-agent
+isolation.
+
+### Per-user paths (S02 era question)
+
+ttyd does not natively route `/username/` to per-user sessions. Options:
+
+**Option A — One ttyd per agent, Caddy proxies paths:**
+```
+http://vps/alice/  →  ttyd on :7682  →  tmux attach (alice's session)
+http://vps/bob/    →  ttyd on :7683  →  tmux attach (bob's session)
+```
+Caddy config: `reverse_proxy /alice/* localhost:7682`. Simple, explicit,
+no extra deps. Each agent gets a dedicated port and their own tmux session.
+Requires per-agent UNIX users (aligns with S03.6 UNIX-user identity model).
+
+**Option B — wetty:**
+Wetty (Node.js web terminal) natively supports `/username/` path routing
+and SSH-based auth (`wetty --ssh-host localhost`). Agents authenticate with
+their SSH key via the browser. No separate ttyd-per-user needed.
+More moving parts but cleaner auth story.
+
+**Option C — shared read-only + one writable:**
+`http://vps/view/` → ttyd read-only attach (all observers share one view)
+`http://vps/control/` → ttyd writable (one active controller at a time, basic auth)
+Simplest for a VJ/demo scenario where one agent drives and others watch.
+
+### Recommendation
+
+For smoke testing: single-session ttyd at port 7681, no auth. Proves the
+concept end-to-end in the container.
+
+For VPS: Option A (one ttyd per agent, Caddy routing) aligns with the
+per-agent UNIX user model already recommended in S03.6. No new auth layer.
+
+For the `/username` URL question: yes, you need the path prefix if multiple
+agents share one hostname. Caddy `handle_path /alice/*` strips the prefix
+before proxying — ttyd doesn't see it. Clean.
+
+### Smoke gate (added to S00)
+
+- [ ] `http://127.0.0.1:7681/` serves xterm.js in browser showing live TUI
+- [ ] typing in browser reaches the blessed app (writable session)
+- [ ] container survives ttyd + sshd + app running concurrently
+
+### Notes
+
+- ttyd binary: ARM64 release at `github.com/tsl0922/ttyd/releases` (already
+  in `deploy/Dockerfile` pattern)
+- ttyd port must bind `127.0.0.1` on VPS, exposed via Caddy or SSH tunnel
+  (same rule as control API — never `0.0.0.0` directly)
+- xterm.js theme can be customised — opportunity to match WibWob-DOS aesthetic
 
 ## Commit Context Note
 

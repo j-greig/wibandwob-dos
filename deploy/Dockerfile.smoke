@@ -22,6 +22,12 @@ RUN curl -fsSL "https://github.com/oven-sh/bun/releases/download/bun-v${BUN_VERS
     && rm -rf /tmp/bun.zip /tmp/bun-release \
     && bun --version
 
+# ttyd — web terminal (xterm.js frontend, WebSocket PTY backend)
+RUN curl -fsSL "https://github.com/tsl0922/ttyd/releases/latest/download/ttyd.aarch64" \
+      -o /usr/local/bin/ttyd \
+    && chmod +x /usr/local/bin/ttyd \
+    && ttyd --version
+
 # Generate sshd host keys
 RUN ssh-keygen -A
 
@@ -68,6 +74,6 @@ RUN chmod +x /usr/local/bin/smoke-entrypoint.sh
 # /run/sshd needed by sshd privilege separation
 RUN mkdir -p /run/sshd
 
-EXPOSE 22
+EXPOSE 22 7681
 
 ENTRYPOINT ["/usr/local/bin/smoke-entrypoint.sh"]

@@ -25,12 +25,24 @@ for i in $(seq 1 20); do
   sleep 1
 done
 
-echo "[smoke] container ready. tmux session: wibwob. ssh port: 22"
+echo "[smoke] starting ttyd on port 7681..."
+# ttyd serves the tmux session over WebSocket + xterm.js
+# --writable: browser can type into the TUI (not read-only)
+# Binds 0.0.0.0 in container — host publish controls actual exposure
+ttyd --writable -p 7681 \
+  su -c "tmux attach -t wibwob" wibwob &
+TTYD_PID=$!
+sleep 1 && curl -sf http://127.0.0.1:7681/ > /dev/null \
+  && echo "[smoke] ttyd OK — TUI at http://localhost:7681/" \
+  || echo "[smoke] ttyd WARN: not yet ready"
+
+echo "[smoke] container ready. ssh port: 22, web TUI port: 7681"
 
 # Keep alive — exit when tmux session dies (app crashed) or sshd dies
 while su -c "tmux has-session -t wibwob" wibwob 2>/dev/null && kill -0 "$SSHD_PID" 2>/dev/null; do
   sleep 5
 done
+kill "$TTYD_PID" 2>/dev/null || true
 
 echo "[smoke] session ended. last stderr:"
 tail -20 /opt/wibandwob-dos/scratch/app-stderr.log 2>/dev/null || echo "(no stderr log)"
