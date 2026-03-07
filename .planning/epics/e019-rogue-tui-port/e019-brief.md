@@ -1,8 +1,10 @@
 ---
-Status: not-started
-Type: epic
-GitHub issue: —
-PR: —
+id: E019
+title: Rogue TUI Port
+status: not-started
+issue: ~
+pr: ~
+depends_on: []
 ---
 
 # E019 — Wibwob Roguelike in the TUI
