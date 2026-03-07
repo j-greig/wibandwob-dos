@@ -1,0 +1,657 @@
+From fa0fc77bdddf69bea3b28d6c0cb0b30caa80f316 Mon Sep 17 00:00:00 2001
+From: James Greig <3stripe@gmail.com>
+Date: Sat, 7 Mar 2026 13:22:38 +0000
+Subject: [PATCH 31/32] docs(e001-s01): CLAUDE.md agent constitution with
+ trigger tables
+
+---
+ .agents/CLAUDE.md | 638 ++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 638 insertions(+)
+
+diff --git a/.agents/CLAUDE.md b/.agents/CLAUDE.md
+new file mode 100644
+index 0000000..721f52d
+--- /dev/null
++++ b/.agents/CLAUDE.md
+@@ -0,0 +1,638 @@
++# WibWob-DOS — Agent Constitution
++
++**This file is the primary constitution for agents working on WibWob-DOS.**
++Read it completely before touching any code. Cross-reference the subsystem
++docs in `.agents/` for deep dives.
++
++---
++
++## 1. Project Identity
++
++WibWob-DOS is a **symbient operating system** — a TUI desktop shared between
++two AI personas (Wib and Wob) and a human co-habitant. It is NOT a C++
++project. There is no engine, no cmake, no IPC protocol.
++
++**Runtime stack:**
++- Language: TypeScript
++- Runtime: Bun (not Node — use `bun run`, not `node`)
++- TUI: blessed (terminal widget library)
++- API server: FastAPI (Python) — `src/api/`
++- Multiplayer: PartyKit — `src/services/party-*.ts`
++- Module system: dynamic microapps loaded at startup from `modules/` and `modules-private/`
++
++**Key directories:**
++```
++src/core/          — app controller, window manager, command catalog/registry, theme
++src/services/      — state, control API, workspace, content, agent session, file actions
++src/windows/       — window factory functions (one per window type)
++modules/           — public microapp modules (each has module.json + index.ts)
++modules-private/   — private modules (git submodule, never commit here without separate submodule commit)
++.agents/           — machine-readable specs: architecture.md, invariants.md, control-api.md
++.pi/skills/        — specialist skill files loaded on demand by the agent
++.planning/         — epics, features, stories, spikes, refactor docs
++scripts/           — shell utilities: handover.sh, restart.sh, minimap.sh
++scratch/           — runtime outputs (captures, workspaces, logs) — gitignored
++```
++
++**The app is designed for equal human/agent control.** Every surface accessible
++to a human must be equally reachable by an agent via the control API or
++command registry. If an agent can't reach something, that is a bug.
++
++---
++
++## 2. Build and Dev Commands
++
++```bash
++# Start the app
++bun run dev              # watch mode
++bun run start            # one-shot
++
++# Type checking — ALWAYS run before committing
++bun run typecheck        # tsc --noEmit; must pass clean
++
++# Planning
++bun run planning:status  # print epic status table
++bun run planning:sync    # sync EPIC_STATUS.md from frontmatter
++
++# Handover doc
++bun run handover         # generates tmp/session-handover-YYYY-MM-DD.md
++
++# Live app is in tmux session 'wibwob'
++# Health check:
++curl -s http://127.0.0.1:8099/health
++# State:
++curl -s http://127.0.0.1:8099/state | python3 -m json.tool
++# Run a command:
++curl -s -X POST http://127.0.0.1:8099/commands/run \
++  -H 'Content-Type: application/json' -d '{"id":"theme.set","args":{"name":"wibwob-dark"}}'
++```
++
++**Restart the live app (preserve tmux session):**
++```bash
++APP_PID=$(ps aux | grep "bun run src/app.ts" | grep -v grep | awk '{print $2}')
++kill $APP_PID && sleep 3
++tmux send-keys -t wibwob 'bun run start' Enter
++sleep 8 && curl -s http://127.0.0.1:8099/health
++```
++NEVER use `kill -9` as first resort — blessed needs SIGTERM for terminal cleanup.
++
++---
++
++## 3. Architecture Map
++
++Eight subsystems. Know which one owns each concern.
++
++### 3.1 Command System
++
++**Files:** `src/core/command-catalog.ts`, `src/core/command-registry.ts`
++
++`command-catalog.ts` is the **single source of truth** for all user-visible
++commands. It defines IDs, labels, groups, menu/palette placements, and API/
++agent visibility. Every command defined ONCE. The `AppMenuActions` interface
++declares every handler type.
++
++`command-registry.ts` is the execution adapter. It builds menus, palette,
++and the API list from the catalog. It holds `LEGACY_COMMAND_ALIASES` for
++backward-compat ID resolution. `registry.run(id, args)` is the canonical
++dispatch path — used by the API, agent tools, and keyboard shortcuts.
++
++**Gotchas agents get wrong:**
++- Adding a new command in catalog without wiring the `actionKey` handler in
++  `app-controller.ts:getAppMenuActions()` — TypeScript will catch this
++- Using a hardcoded ID string elsewhere instead of running via registry
++- Forgetting to set `api: true, agent: true` on commands that should be
++  agent-visible (default is false)
++- Command IDs changed in merge 4e2500b — use the LEGACY_COMMAND_ALIASES for
++  old IDs; add new aliases there rather than breaking callers
++
++### 3.2 Window Manager
++
++**Files:** `src/core/window-manager.ts`, `src/core/types.ts` (WindowRecord), `src/core/window-chrome.ts`
++
++`WindowManager` owns z-order, focus, drag, resize, tile, cascade, close, and
++maximize. Implements `WindowFacade` (11-method interface in `window-facade.ts`).
++
++`WindowRecord` is the runtime descriptor for every open window. Each window
++type creates a `WindowRecord` via `windowManager.createFrame()` or a custom
++blessed box, then calls `windowManager.registerWindow(record)`.
++
++`window-chrome.ts` is the ONLY place window size math (chrome offsets) lives.
++Never inline `+2`, `+3`, `+6` in window code.
++
++**Gotchas:**
++- Shadow was disabled (leaves stale cells). Do NOT re-enable blessed shadow.
++  The `syncShadow` and `shadow.show/hide` code was removed intentionally.
++- `savedBounds` on `WindowRecord` tracks maximize state — do not mutate directly
++- `describeState()` on every registered window is contractual — omitting it
++  prints a console warning; it is heading toward mandatory
++- `sendInput(id, input)` signature — no `sender` param in current HEAD
++- After `registerWindow()`, always call `record.focus()` to bring to front
++
++### 3.3 App Controller
++
++**File:** `src/core/app-controller.ts` (~2050 lines)
++
++The composition root. Creates the screen, desktop, menu bar, status line,
++overlays, window manager, command registry, control API, and workspace
++service. Owns all window-opening private methods.
++
++`getAppMenuActions()` (line ~1086) wires every catalog `actionKey` to a
++private method. If you add a command to the catalog, you MUST add the handler
++here too — TypeScript enforces this via `AppMenuActions` interface.
++
++**Decomposition in progress.** Do not add more code here. New window families
++belong in `src/windows/` as factory functions.
++
++**Gotchas:**
++- `applyTheme()` must be called after any `setThemeVariant()` call — it
++  propagates tokens to menu bar, desktop, status line, and all windows
++- `this.overlays.openListPrompt()` not `openCenteredListPrompt()` — the
++  centered variant does not exist in current HEAD
++- Workspace restore is async; `getLastWindow()` after `await openX()` may miss
++  the window — use `windowManager.getWindows()` after restore if needed
++
++### 3.4 Module System
++
++**Files:** `src/services/module-loader.ts`, each `modules/*/module.json`
++
++Modules are directories with `module.json` and `index.ts`. They register
++window types, commands, themes, and snapshot handlers dynamically at startup.
++
++`module.json` declares `name`, `type` (`microapp` | `theme` | `primers`),
++`entry` (default `index.ts`), and type-specific config.
++
++The loader calls `setup(host: MicroappHost)` on `index.ts`'s default export.
++`host.registerCommand()` wires into the command registry. `host.registerSnapshot()`
++hooks workspace save/restore. `host.createWindow()` creates blessed windows.
++
++**Gotchas:**
++- `modules-private/` is a git submodule — NEVER `git add modules-private/` in
++  the parent repo. Changes need a separate commit inside the submodule.
++- Theme modules export a `ThemeVariant` as either default or named export
++- Microapp commands use LOCAL IDs (`"open"`) — the registry prefixes them with
++  the module namespace (e.g. `"microapp.wibwob.poetry-clock.open"`)
++- The ISO viewer serialises `{ seed, terrainIdx, seaLevel, levels }` — NOT
++  `sourcePath` (ephemeral file path). Do not regress this.
++
++### 3.5 State and Control API
++
++**Files:** `src/services/state-service.ts`, `src/services/control-api.ts`
++
++`StateService` owns canonical live desktop state. Every window reports
++semantic content via `describeState()`. The state is the source of truth for
++agent tools, workspace save, and API responses.
++
++`ControlAPI` exposes HTTP endpoints on port 8099 (default). See
++`.agents/control-api.md` for the full endpoint list.
++
++**Key endpoints agents use constantly:**
++```
++GET  /health               — wait for this before any other call
++GET  /state                — full window list with ids, positions, state
++GET  /commands/list        — all command ids with descriptions
++POST /commands/run         — {"id":"command-id","args":{}}
++POST /windows/input        — {"id":N,"input":"text\r"}  ← \r submits
++POST /view/primer/open     — {"filePath":"/abs/path","x":X,"y":Y,"w":W,"h":H}
++```
++
++**Gotchas:**
++- Always `GET /state` first to get real window IDs — never guess
++- `/commands/run` goes through the legacy alias map — old IDs work
++- `POST /windows/input` requires `\r` (not `\n`) to submit in interactive windows
++- The sessionId in `/health` is a 3-char slug — use it to verify you're talking
++  to the right instance when two are running
++
++### 3.6 Workspace and Snapshots
++
++**Files:** `src/services/workspace-service.ts`, `src/core/workspace-snapshots.ts`, `src/core/snapshot-registry.ts`
++
++Workspace = persisted JSON of open windows, positions, sizes, and per-window
++state. Saved to `scratch/workspaces/default.json` automatically.
++
++Each window type implements serialize + restore via `snapshot-registry.ts`.
++Microapps use `host.registerSnapshot({ serialize, restore })`.
++
++**Rules:**
++- Serialize PARAMS not ephemeral paths (`seed/terrainIdx` not `sourcePath`)
++- `describeState()` must set `appType` or the serialize guard will bail
++- Restore must degrade gracefully if payload is missing or partial
++
++### 3.7 Theme System
++
++**Files:** `src/core/theme/resolver.ts`, `src/core/theme/types.ts`, `src/core/theme/{dark,light,dark-pastel,dark-nord}.ts`, `modules-private/wibwob-theme-*/theme.ts`
++
++`ThemeTokens` defines the full semantic token set (23 tokens). Every window
++uses `theme().body`, `theme().header`, etc. — never raw blessed colour strings.
++
++`toggleTheme()` cycles variants. `setThemeVariant(v)` sets a specific one.
++`allVariants()` returns all registered variants. `registerExternalTheme(v)`
++adds module-provided themes.
++
++**After any theme change:** call `applyTheme()` in app-controller to propagate
++tokens to shell chrome and all windows via `windowManager.restyleAll()`.
++
++**Gotchas:**
++- `safeSetStyle()` in `ui-primitives.ts` handles blessed's awkward scrollbar
++  sub-style fields — use it instead of direct `.style =` on widgets with items
++- External theme modules: loader accepts either `default` or named export that
++  has `.name` and `.tokens`
++
++### 3.8 Agent Session
++
++**Files:** `src/services/wibwob-agent-session.ts`, `src/windows/wibwob-agent-window.ts`, `src/services/agent-tools.ts`
++
++`WibWobAgentSession` owns model selection, tool wiring, and desktop state
++injection via `transformContext`. All file operations are jailed to REPO_ROOT.
++
++`agent-tools.ts` exposes TUI tools: `tui_get_state`, `tui_list_commands`,
++`tui_menu_command`, `tui_batch_layout`, `tui_screenshot`, etc. These wrap the
++`TuiToolContext` which wraps `WindowFacade`.
++
++**Lifecycle (multi-turn):**
++- `message_start` → no-op (entry created lazily)
++- `message_update` (text_delta) → creates entry on first delta if none exists
++- `message_end` → finalises text, clears `currentAssistantId`
++- `agent_end` → clears `currentAssistantId`, status = Ready
++Do NOT pre-create assistant entries in `send()` or create them in
++`message_start` — this was the transcript leak bug fixed in commit b0826fa.
++
++---
++
++## 4. Trigger Table
++
++Use this before starting any task. Read the indicated spec BEFORE touching files.
++
++| Task | Read first | Key gotchas |
++|------|-----------|-------------|
++| Add or rename a command | `src/core/command-catalog.ts` (scan existing IDs first) | Must add handler in `getAppMenuActions()`, set `api:true, agent:true` if needed, add to LEGACY_COMMAND_ALIASES if renaming |
++| Add a new window type | `.agents/architecture.md` §"Adding a New Window Type" | 10-step checklist — every item mandatory; wire into command catalog too |
++| Touch window-manager.ts | `src/core/types.ts` (WindowRecord), `src/core/window-chrome.ts` | Do not re-enable shadow; do not add size math inline |
++| Touch workspace save/restore | `src/core/snapshot-registry.ts`, `src/core/workspace-snapshots.ts` | Serialize params not paths; appType required for snapshot guard |
++| Touch theme system | `src/core/theme/types.ts` (ThemeTokens), `src/core/theme/resolver.ts` | All 23 tokens required; call `applyTheme()` after any `setThemeVariant()` |
++| Add a new module | `src/services/module-loader.ts`, `modules/example-primers/` | module.json required; modules-private is a submodule — separate commit |
++| Edit modules-private/ | Nothing to read — just remember: submodule commit first | NEVER `git add modules-private/` in parent repo |
++| Touch control API | `.agents/control-api.md` | Check existing endpoints before adding; `describeState()` and API should evolve together |
++| Touch agent session | `src/services/wibwob-agent-session.ts` (read fully) | Multi-turn transcript lifecycle is subtle — re-read the event order comments |
++| Work on planning docs | `.pi/skills/planning-update/SKILL.md`, `.pi/skills/simplify-planning/SKILL.md` | Checkbox format `[x]/[~]/[ ]/[-]`, frontmatter status values, never duplicate in GitHub issues |
++| VJ timeline / music video | `.pi/skills/vj-timeline/SKILL.md` | Timeline JSON format, cue types, audio sync |
++| Chiptune / audio | `.pi/skills/chiptune/SKILL.md` | numpy bricks, pydub pipeline, WAV export path |
++| Backrooms / primers | `.pi/skills/backroom-log-explorer/SKILL.md` | Session log format, extraction patterns |
++| Micropolis / WibWobCity | `.pi/skills/micropolis-engine/SKILL.md` | Tile system, bitmasks, emscripten shim |
++| ASCII art sourcing | `.pi/skills/img-to-ascii/SKILL.md`, `.pi/skills/joan-stark-ascii-art/SKILL.md` | Conversion params, primer format |
++| Build/test/restart ops | `.pi/skills/ww-ops/SKILL.md` | tmux session name, health check, restart pattern |
++| Scaffold a new view | `.pi/skills/ww-scaffold-view/SKILL.md` | Full lifecycle from header to menu wiring |
++| Code review / cleanup | `.pi/skills/simplify/SKILL.md` | Three-pass: reuse, quality, efficiency |
++
++**If no trigger matches:** list `.pi/skills/` and pick the nearest specialist.
++Describe the task in one sentence and grep skill descriptions for keywords.
++
++---
++
++## 5. Commit Conventions
++
++```
++<type>(<scope>): <imperative summary, lowercase, ≤72 chars>
++```
++
++**Types:** `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `ci`, `spike`
++
++**Scopes:** `app`, `tui`, `window`, `microapp`, `module`, `theme`, `api`,
++`llm`, `agent`, `primer`, `workspace`, `command`, `snapshot`, `build`, `planning`
++
++**One logical change = one commit.** Typecheck must pass before every commit.
++
++Examples:
++```
++feat(command): add theme.choose interactive picker
++fix(workspace): serialize terrain params not ephemeral sourcePath
++fix(agent): clear assistant entry between turns, prevent transcript leak
++docs(planning): mark E022 S03 done
++chore(planning): close TODO-f9c4afb7 command regression
++```
++
++Multi-line body encouraged for non-trivial changes. Explain WHY, not WHAT.
++
++---
++
++## 6. Planning Conventions
++
++**Epics** live in `.planning/epics/eNNN-*/eNNN-brief.md` with YAML frontmatter:
++```yaml
++---
++id: E022
++title: WibWobWorld Restore & Layout Fidelity
++status: in-progress   # not-started | in-progress | blocked | done | dropped
++issue: 116
++pr: ~
++depends_on: [E018]
++---
++```
++
++**Stories** use body-level status: `Status: in-progress`
++
++**Checkboxes:** `[ ]` not started, `[~]` in progress, `[x]` done, `[-]` dropped
++
++**After landing a story:**
++1. Tick tasks `[x]` in story brief, set `Status: done`, add `PR: #NNN`
++2. Tick story in parent feature checklist
++3. If all features done: set epic `status: done`, run `bun run planning:sync`
++
++**GitHub issues exist at epic level only.** Stories/features/tasks live in
++`.planning/` briefs. Do not create GitHub issues for stories.
++
++---
++
++## 7. What NOT to Do
++
++These are failure modes agents have hit repeatedly.
++
++### Code
++
++- **DO NOT** use `kill -9` on the app process as a first resort. SIGTERM
++  (`kill $PID`) lets blessed clean up the terminal. Use `kill -9` only as
++  a last resort and run `reset` afterward.
++
++- **DO NOT** add inline size math (`+2`, `+3`, `+6`) in window code.
++  Chrome sizes belong in `window-chrome.ts`. Content sizes belong in
++  `content-measurement.ts`.
++
++- **DO NOT** re-enable blessed shadow. `shadow: true` leaves stale cells on
++  move/resize/close. The `syncShadow()` code was removed intentionally.
++
++- **DO NOT** add `sourcePath` back as an ISO viewer restore key. The file is
++  ephemeral (gitignored). Serialize `{ seed, terrainIdx, seaLevel, levels }`.
++  This regression was fixed in commit 5b1e255.
++
++- **DO NOT** commit changes to `modules-private/` via the parent repo.
++  The submodule has its own git history. Stage and commit inside
++  `modules-private/` first, then update the parent's submodule pointer.
++
++- **DO NOT** add a second measurement path for a caller that already has one.
++  One measurement function per content type. If you need measurement
++  somewhere new, call the existing `content-measurement.ts` functions.
++
++- **DO NOT** skip `describeState()` on new window types. It is heading toward
++  mandatory. Omitting it silently breaks workspace restore and agent state.
++
++- **DO NOT** add one-off text prompts when `OverlayManager.openListPrompt()`
++  can do the job. Shared pickers are the pattern.
++
++- **DO NOT** extend `restoreSafeMode` (the old workspace safe-mode flag).
++  It was removed. The correct approach is per-window graceful degradation
++  in the `restore` handler.
++
++- **DO NOT** set `currentAssistantId` in `send()` or create assistant entries
++  eagerly in `message_start`. Lazy creation in `message_update` is correct.
++  Pre-creating entries causes multi-turn transcript leaks.
++
++### Planning
++
++- **DO NOT** mark ACs done based on follow-on progress. ACs are binary.
++
++- **DO NOT** create GitHub issues for stories or features. Only epics get issues.
++
++- **DO NOT** edit `EPIC_STATUS.md` directly. It is generated by
++  `bun run planning:sync` from epic frontmatter.
++
++- **DO NOT** add planning content to `workings/` and expect it to be normative.
++  `workings/` is informational only. `.planning/` is the source of truth.
++
++### Agents
++
++- **DO NOT** guess window IDs. Always `GET /state` first.
++
++- **DO NOT** send bare text to agent windows without `\r` to submit.
++
++- **DO NOT** assume the live app is running. Check `/health` first.
++
++- **DO NOT** spawn a second app instance on port 8099. Use
++  `CONTROL_API_PORT=8098 SCRATCH_DIR=scratch/alt` for the alt instance.
++
++---
++
++## 8. Common Patterns and Code Examples
++
++### Opening a new window via command registry
++
++```typescript
++// In a window factory or service, dispatch a command:
++registry.run("plasma.open", { mood: "void" });
++registry.run("theme.set", { name: "wibwob-dark-pastel" });
++registry.run("window.toggle_maximize", { windowId: 4 });
++
++// Via HTTP from shell:
++curl -s -X POST http://127.0.0.1:8099/commands/run \
++  -H 'Content-Type: application/json' \
++  -d '{"id":"primer.open","args":{"filePath":"/abs/path.txt","w":72,"h":22}}'
++```
++
++### Adding a new window type (skeleton)
++
++```typescript
++// src/windows/my-thing-window.ts
++import blessed from "blessed";
++import { theme } from "../core/theme/resolver.js";
++import type { WindowManager } from "../core/window-manager.js";
++
++export function openMyThingWindow(deps: { screen: ...; windowManager: WindowManager }): void {
++  const { screen, windowManager } = deps;
++  const frame = windowManager.createFrame("My Thing", "my-thing");  // kind must be in WindowKind
++
++  const body = blessed.box({ parent: frame.body, top: 0, left: 0, right: 0, bottom: 1,
++    style: theme().body, tags: true });
++  const statusBar = blessed.box({ parent: frame.body, bottom: 0, left: 0, right: 0, height: 1,
++    style: theme().header, content: " q=close" });
++
++  frame.describeState = () => ({     // REQUIRED
++    appType: "my-thing",
++    summary: "My Thing window"
++  });
++
++  frame.cleanup = () => { /* stop timers, destroy resources */ };
++
++  frame.onRestyle = () => {
++    body.style = theme().body;
++    statusBar.style = theme().header;
++  };
++
++  body.key(["q", "escape"], () => windowManager.closeWindow(frame.id));
++  frame.focus = () => { windowManager.focusWindow(frame); body.focus(); };
++
++  windowManager.registerWindow(frame);
++  frame.focus();
++}
++```
++
++Then in `command-catalog.ts`:
++```typescript
++{ id: "my-thing.open", label: "My Thing", group: "open",
++  actionKey: "openMyThing",
++  menuPlacements: [{ category: "applications", order: 200 }],
++  api: true, agent: true }
++```
++
++And in `AppMenuActions`:
++```typescript
++openMyThing: () => void;
++```
++
++And in `app-controller.ts:getAppMenuActions()`:
++```typescript
++openMyThing: () => this.openMyThingWindow(),
++```
++
++And in `src/core/types.ts`, extend `WindowKind`:
++```typescript
++| "my-thing"
++```
++
++### Writing a microapp module
++
++```typescript
++// modules/my-module/index.ts
++export default function setup(host: MicroappHost) {
++  host.registerCommand({
++    id: "open",            // local ID — becomes "microapp.my-module.open" globally
++    label: "Open My Module",
++    action: (args) => openMyWindow(host, args),
++    menu: [{ category: "applications", order: 200, label: "My Module" }],
++    palette: { order: 200 },
++  });
++
++  host.registerSnapshot({
++    serialize: (window) => {
++      const state = window.describeState?.() ?? {};
++      if (state.appType !== "my-module") return undefined;
++      return { param: state.param };        // serialize PARAMS not paths
++    },
++    restore: (_snapshot, payload) => {
++      host.runCommand("open", { param: payload.param });
++    },
++  });
++}
++```
++
++```json
++// modules/my-module/module.json
++{
++  "name": "wibwob.my-module",
++  "type": "microapp",
++  "microapp": { "id": "my-module", "title": "My Module" }
++}
++```
++
++### Content measurement
++
++```typescript
++import { measureContent } from "../services/content-measurement.js";
++import { contentToWindowSize } from "../core/window-chrome.js";
++
++const m = measureContent(filePath, "primer");
++const { w, h } = contentToWindowSize(m);   // includes chrome offsets
++```
++
++Do not compute `m.columnWidth + 4` yourself. `contentToWindowSize` owns
++chrome math.
++
++### Workspace restore — graceful degradation
++
++```typescript
++restore: (_snapshot, payload) => {
++  const { seed, terrainIdx, seaLevel, levels } = payload;
++  if (seed !== undefined) {
++    host.runCommand("open", { seed, terrainIdx, seaLevel, levels });
++  } else {
++    host.runCommand("open");   // legacy payload — open with defaults
++  }
++}
++```
++
++### Theme token usage in blessed widgets
++
++```typescript
++import { theme } from "../core/theme/resolver.js";
++import { safeSetStyle } from "../core/ui-primitives.js";
++
++// On create:
++const box = blessed.box({ style: theme().body });
++const list = blessed.list({ style: theme().body });
++
++// On restyle (called by windowManager.restyleAll()):
++frame.onRestyle = () => {
++  safeSetStyle(box, theme().body);   // use safeSetStyle for lists/widgets with sub-styles
++  safeSetStyle(list, theme().selected);
++};
++```
++
++---
++
++## 9. Frequently Confused Things
++
++### "My command exists but run() returns Unknown command"
++
++1. Check `api: true, agent: true` in the catalog definition
++2. Check `LEGACY_COMMAND_ALIASES` — you may need to add an alias for the old ID
++3. Dynamic commands (from modules) are registered after startup — call
++   `GET /commands/list` to see current live set, not the static catalog
++
++### "Window opened but not visible / blank"
++
++1. Is the window registered with `windowManager.registerWindow(record)`?
++2. Did `frame.focus()` get called?
++3. Did `screen.render()` get called after content was set?
++4. Check `frame.body` dimensions — if width/height are 0, layout hasn't run
++
++### "Workspace restore opens wrong window or crashes"
++
++1. `describeState()` must set `appType` — the serialize guard checks it
++2. Snapshot `serialize` returning `undefined` disables restore silently
++3. Restore must not throw — wrap in try/catch and degrade to `runCommand("open")`
++
++### "Theme change doesn't update all windows"
++
++Call `this.applyTheme()` in app-controller after `setThemeVariant()`. It calls
++`windowManager.restyleAll()` which triggers every window's `onRestyle()`.
++If you set the variant directly without going through `applyTheme()`, the
++shell chrome (menu bar, desktop, status line) stays on the old theme.
++
++### "Module changes not picked up after restart"
++
++Module loader scans at startup only. Restart the app after changing
++`module.json` or `index.ts` in a module directory. For `modules-private/`,
++also check the submodule pointer is updated in the parent repo.
++
++### "TypeScript errors after adding a new actionKey"
++
++`AppMenuActions` in `command-catalog.ts` is an interface. Adding a new
++`actionKey` to a command definition requires:
++1. Adding the method to `AppMenuActions`
++2. Implementing it in `app-controller.ts:getAppMenuActions()`
++
++TypeScript will error on both if you miss either step — this is intentional.
++
++---
++
++## 10. Cross-Reference Index
++
++| Need | File |
++|------|------|
++| Full file inventory | `.agents/architecture.md` |
++| Architecture invariants and anti-patterns | `.agents/invariants.md` |
++| Control API full endpoint list | `.agents/control-api.md` |
++| Planning conventions (canonical) | `.planning/README.md` |
++| Epic status overview | `.planning/EPIC_STATUS.md` |
++| Build/launch/restart ops | `.pi/skills/ww-ops/SKILL.md` |
++| Scaffold new window type | `.pi/skills/ww-scaffold-view/SKILL.md` |
++| Build game | `.pi/skills/ww-build-game/SKILL.md` |
++| Post-story planning update | `.pi/skills/planning-update/SKILL.md` |
++| Planning audit | `.pi/skills/simplify-planning/SKILL.md` |
++| Code cleanup | `.pi/skills/simplify/SKILL.md` |
++| Session archaeology | `.pi/skills/session-archaeology/SKILL.md` |
++| VJ timeline | `.pi/skills/vj-timeline/SKILL.md` |
++| Chiptune | `.pi/skills/chiptune/SKILL.md` |
++| Backrooms logs | `.pi/skills/backroom-log-explorer/SKILL.md` |
++| Image to ASCII | `.pi/skills/img-to-ascii/SKILL.md` |
++| Micropolis engine | `.pi/skills/micropolis-engine/SKILL.md` |
++| Smoke tests | `.pi/skills/tui-smoke-test/SKILL.md` |
++| Room chat multi-instance | `.pi/skills/ww-room-chat/SKILL.md` |
++| Sprites deploy | `.agents/skills/sprites-deploy/SKILL.md` |
+-- 
+2.39.5 (Apple Git-154)
+

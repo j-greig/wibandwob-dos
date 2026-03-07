@@ -1,0 +1,87 @@
+From fe8cfe8fa3643e66279f2527242d51924a70bf22 Mon Sep 17 00:00:00 2001
+From: James Greig <3stripe@gmail.com>
+Date: Sat, 7 Mar 2026 11:53:48 +0000
+Subject: [PATCH 03/32] =?UTF-8?q?docs(planning):=20spike=20=E2=80=94=20aut?=
+ =?UTF-8?q?o-generated=20session=20handover=20script?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+---
+ .../spk-session-handover/spike-brief.md       | 65 +++++++++++++++++++
+ 1 file changed, 65 insertions(+)
+
+diff --git a/.planning/spikes/spk-session-handover/spike-brief.md b/.planning/spikes/spk-session-handover/spike-brief.md
+new file mode 100644
+index 0000000..b7cf104
+--- /dev/null
++++ b/.planning/spikes/spk-session-handover/spike-brief.md
+@@ -0,0 +1,65 @@
++---
++id: spk-session-handover
++title: Session Handover — auto-generated context doc
++status: not-started
++---
++
++# Spike: Session Handover
++
++## Problem
++
++Handover docs are hand-written at end of session, go stale within the same
++session, and require manual cross-referencing of git log / todos / planning
++status / open GitHub issues. Agents starting a new session have to reconstruct
++state from multiple scattered sources.
++
++## Goal
++
++A `scripts/handover.sh` that auto-generates `tmp/session-handover-$(date +%Y-%m-%d).md`
++from live sources, structured for agent pickup with zero manual work.
++
++## Inputs to aggregate
++
++| Source | What to pull |
++|--------|-------------|
++| `git log main --since="24 hours ago"` | what shipped (commit messages) |
++| `bun run planning:status` | epic status table |
++| `.pi/todos/` | open todos grouped by tag |
++| `gh issue list --state open` | open GitHub issues (if gh CLI available) |
++| `git branch -a` | any live worktrees / feature branches |
++| `git status` | uncommitted work |
++
++## Output format
++
++```
++# Session Handover — YYYY-MM-DD
++
++## Branch State          (git status + branches)
++## What Shipped Today    (git log --since 24h, formatted)
++## Epic Status           (planning:status output)
++## Open Todos            (grouped: bugs / planning / creative)
++## Open GitHub Issues    (gh issue list)
++## Recommended Next Steps (derived from in-progress epics + open todos)
++```
++
++## Integration points
++
++- `planning-update` skill closeout ceremony: call `bash scripts/handover.sh` as final step
++- AGENTS.md: document as "end of session" action
++- `bun run handover` alias in package.json
++
++## Success criteria
++
++- `bash scripts/handover.sh` runs in < 5s without the app running
++- Output is parseable by a fresh agent session without reading anything else
++- No manual edits needed for > 80% of handover content
++
++## Out of scope
++
++- Real-time updates during session
++- Pushing handover to GitHub as a PR description
++- Summarising with LLM (keep it deterministic)
++
++## Estimated effort
++
++Half a day. Pure bash + existing CLI tools.
+-- 
+2.39.5 (Apple Git-154)
+

@@ -1,0 +1,59 @@
+From b0826fae3b9e575ef63a2559b37707a85b9b856e Mon Sep 17 00:00:00 2001
+From: James Greig <3stripe@gmail.com>
+Date: Sat, 7 Mar 2026 12:08:08 +0000
+Subject: [PATCH 08/32] fix(agent): clear assistant entry between turns,
+ prevent transcript leak (#112)
+
+---
+ src/services/wibwob-agent-session.ts | 21 ++++-----------------
+ 1 file changed, 4 insertions(+), 17 deletions(-)
+
+diff --git a/src/services/wibwob-agent-session.ts b/src/services/wibwob-agent-session.ts
+index 249ae69..60d4ede 100644
+--- a/src/services/wibwob-agent-session.ts
++++ b/src/services/wibwob-agent-session.ts
+@@ -478,13 +478,6 @@ export class WibWobAgentSession {
+     if (!this.agent) throw new Error("Agent was not created");
+ 
+     this.messages.push({ id: createMessageId("user"), role: "user", text: msg });
+-    this.currentAssistantId = createMessageId("assistant");
+-    this.messages.push({
+-      id: this.currentAssistantId,
+-      role: "assistant",
+-      text: "",
+-      streaming: true,
+-    });
+     this.status = "Thinking...";
+     this.lastError = undefined;
+     this.emit();
+@@ -543,16 +536,8 @@ export class WibWobAgentSession {
+   private handleEvent(event: import("@mariozechner/pi-agent-core").AgentEvent): void {
+     switch (event.type) {
+       case "message_start": {
+-        if (getMessageRole(event.message) !== "assistant" || this.findCurrentAssistant()) return;
+-        this.currentAssistantId = createMessageId("assistant");
+-        this.messages.push({
+-          id: this.currentAssistantId,
+-          role: "assistant",
+-          text: "",
+-          streaming: true,
+-        });
+-        this.status = "Streaming...";
+-        this.emit();
++        // Entry created lazily in message_update on first text_delta.
++        // Eager creation here caused empty "Wob: …" bubbles for tool-only turns.
+         return;
+       }
+       case "message_update": {
+@@ -607,6 +592,8 @@ export class WibWobAgentSession {
+           this.status = "Ready.";
+           this.emit();
+         }
++        // Clear so message_start for the next turn creates a fresh entry.
++        this.currentAssistantId = undefined;
+         return;
+       }
+       case "agent_end": {
+-- 
+2.39.5 (Apple Git-154)
+

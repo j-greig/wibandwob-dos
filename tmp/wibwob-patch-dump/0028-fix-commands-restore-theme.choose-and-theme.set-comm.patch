@@ -1,0 +1,117 @@
+From 76faeda6fc11de9d547a246f89e5b5e8a37d7129 Mon Sep 17 00:00:00 2001
+From: James Greig <3stripe@gmail.com>
+Date: Sat, 7 Mar 2026 13:19:17 +0000
+Subject: [PATCH 28/32] fix(commands): restore theme.choose and theme.set
+ commands
+
+---
+ src/core/app-controller.ts  | 37 ++++++++++++++++++++++++++++++++++++-
+ src/core/command-catalog.ts | 23 +++++++++++++++++++++++
+ 2 files changed, 59 insertions(+), 1 deletion(-)
+
+diff --git a/src/core/app-controller.ts b/src/core/app-controller.ts
+index ca66d21..246b674 100644
+--- a/src/core/app-controller.ts
++++ b/src/core/app-controller.ts
+@@ -12,7 +12,7 @@ import { buildDesktopContextMenu, buildWindowContextMenu } from "./context-menu-
+ import { DesktopGeometryService } from "./desktop-geometry.js";
+ import { MenuOverlayManager } from "./menu-overlay-manager.js";
+ import { OverlayManager } from "./overlay-manager.js";
+-import { theme, toggleTheme as toggleThemeVariant } from "./theme/resolver.js";
++import { theme, toggleTheme as toggleThemeVariant, allVariants, themeName, setThemeVariant } from "./theme/resolver.js";
+ import { isRightClick } from "./ui-primitives.js";
+ import { registryRestore } from "./snapshot-registry.js";
+ import type { SnapshotRestoreActions } from "./snapshot-registry.js";
+@@ -351,6 +351,39 @@ export class TsTuiMvpApp {
+     );
+   }
+ 
++  private chooseTheme(): void {
++    const variants = allVariants();
++    const current = themeName();
++    this.overlays.openListPrompt(
++      "Choose Theme",
++      variants.map((v) => ({ label: v.name === current ? `● ${v.name}` : `  ${v.name}`, variantName: v.name })),
++      variants.findIndex((v) => v.name === current),
++      (item: { label: string; variantName: string }) => {
++        const v = allVariants().find((x) => x.name === item.variantName);
++        if (v) { setThemeVariant(v); this.applyTheme(); }
++      },
++    );
++  }
++
++  private setThemeByName(args?: Record<string, unknown>): void {
++    const name = String(args?.name ?? "");
++    const variant = allVariants().find((v) => v.name === name);
++    if (!variant) {
++      this.overlays.flash(`Unknown theme: ${name}. Available: ${allVariants().map((v) => v.name).join(", ")}`);
++      return;
++    }
++    setThemeVariant(variant);
++    this.applyTheme();
++  }
++
++  private applyTheme(): void {
++    this.menuBar.style = theme().menuBar;
++    this.desktop.style = theme().desktop;
++    this.statusLine.style = theme().statusLine;
++    this.menuUi?.restyle?.();
++    this.windowManager.restyleAll();
++  }
++
+   private toggleTheme(): void {
+     toggleThemeVariant();
+     // Restyle shell chrome
+@@ -1125,6 +1158,8 @@ export class TsTuiMvpApp {
+       saveWorkspace: () => this.saveWorkspace(),
+       loadWorkspace: () => this.loadWorkspace(),
+       toggleTheme: () => this.toggleTheme(),
++      chooseTheme: () => this.chooseTheme(),
++      setTheme: (args) => this.setThemeByName(args),
+       openMonsterCam: () => this.openMonsterCam(),
+       toggleMaximizeFocused: (args?: Record<string, unknown>) => {
+         const byId = typeof args?.windowId === "number"
+diff --git a/src/core/command-catalog.ts b/src/core/command-catalog.ts
+index 1515380..ca891d2 100644
+--- a/src/core/command-catalog.ts
++++ b/src/core/command-catalog.ts
+@@ -35,6 +35,8 @@ export interface AppMenuActions {
+   saveWorkspace: () => void;
+   loadWorkspace: () => void;
+   toggleTheme: () => void;
++  chooseTheme: () => void;
++  setTheme: (args?: Record<string, unknown>) => void;
+   openMonsterCam: () => void;
+   toggleMaximizeFocused: (args?: Record<string, unknown>) => void;
+ }
+@@ -260,6 +262,27 @@ const APP_COMMANDS: AppCommandDefinition[] = [
+     api: true,
+     agent: true
+   },
++  {
++    id: "theme.choose",
++    label: "Choose Theme...",
++    description: "Open an interactive picker to select a theme by name.",
++    group: "system",
++    actionKey: "chooseTheme",
++    menuPlacements: [{ category: "view", order: 31 }],
++    palettePlacement: { order: 191 },
++    api: true,
++    agent: true
++  },
++  {
++    id: "theme.set",
++    label: "Set Theme",
++    description: "Set theme by name. Args: name (string — e.g. wibwob-dark, wibwob-light, wibwob-dark-pastel, wibwob-phosphor, wibwob-dark-nord).",
++    group: "system",
++    actionKey: "setTheme",
++    menuPlacements: [],
++    api: true,
++    agent: true
++  },
+   {
+     id: "app.quit",
+     label: "Quit",
+-- 
+2.39.5 (Apple Git-154)
+
