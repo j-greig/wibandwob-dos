@@ -32,7 +32,7 @@ Patch dump for reference: `tmp/wibwob-patch-dump/` (patches 0001-0032).
 ## Stories
 
 ### S01 — Monster cam crash guard
-**Status: open**
+**Status: done**
 **Patch: 0022**
 
 Adds existsSync preflight before spawning Python worker. No UI change.
@@ -44,7 +44,7 @@ Adds existsSync preflight before spawning Python worker. No UI change.
 ---
 
 ### S02 — E022 S03: iso serialises terrain params not file path
-**Status: open**
+**Status: done**
 **Patch: 0011 — path redirect needed**
 
 Serialisation only — no UI change. Fixes workspace restore breaking when a tmp
@@ -60,7 +60,7 @@ Must be applied to `modules-private/wibwobworld-iso/index.ts` instead.
 ---
 
 ### S03 — E022 S05: hybrid iso pane uses its own sized world
-**Status: open**
+**Status: done**
 **Patch: 0016 — path redirect needed**
 
 Adds a separate `hybridIsoCacheKey` + world sized to the iso pane, not the full
@@ -76,7 +76,7 @@ Must be applied to `modules-private/wibwobworld/index.ts` instead.
 ---
 
 ### S05 — Move wibwobworld + world-chatroom to modules/, delete wibwobworld-iso
-**Status: open**
+**Status: done**
 **Depends on: S02 + S03 (E022 fixes must be in modules-private first)**
 
 Move the two world modules out of the submodule into the main repo's modules/.
