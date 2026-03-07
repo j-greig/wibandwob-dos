@@ -104,12 +104,12 @@ QMD-powered search over indexed markdown collections:
 
 ## Acceptance Criteria
 
-- [ ] AC-1: Finder window opens from Applications menu and displays directory
+- [x] AC-1: Finder window opens from Applications menu and displays directory
   contents for a given path.
   Test: Open Finder via command; verify directory listing renders with correct
   item count; navigate into a subdirectory and back.
 
-- [ ] AC-2: Simple search returns grep-style results for a query string
+- [x] AC-2: Simple search returns grep-style results for a query string
   scoped to the current directory tree.
   Test: Open Finder at repo root; search for "WindowFacade"; verify results
   include file paths, line numbers, and matching lines from known files.
@@ -118,22 +118,23 @@ QMD-powered search over indexed markdown collections:
   Test: With QMD running and a collection indexed, search for a known term;
   verify results include title, score, and snippet; select a result and
   verify preview renders document content.
+  AC-3 deferred — QMD dependency not met; spin off as separate spike when QMD is available.
 
-- [ ] AC-4: Advanced search degrades gracefully when QMD is unavailable.
+- [x] AC-4: Advanced search degrades gracefully when QMD is unavailable.
   Test: With QMD stopped, switch to Advanced mode; verify a clear status
   message appears; verify Simple search still works.
 
-- [ ] AC-5: File preview pane shows content of the selected file or search
+- [x] AC-5: File preview pane shows content of the selected file or search
   result with basic syntax awareness (line numbers at minimum).
   Test: Select a .ts file in the directory listing; verify preview shows
   file content with line numbers.
 
-- [ ] AC-6: Finder is registered in the window factory and command registry
+- [x] AC-6: Finder is registered in the window factory and command registry
   and is agent-accessible.
   Test: Verify "open_finder" appears in command list; verify agent can open
   a Finder and trigger a search via the command surface.
 
-- [ ] AC-7: Finder state persists across workspace save/restore.
+- [x] AC-7: Finder state persists across workspace save/restore.
   Test: Open Finder at a specific path with a search active; save workspace;
   restore workspace; verify Finder reopens with same path and search.
 

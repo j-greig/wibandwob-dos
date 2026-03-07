@@ -89,14 +89,14 @@ Introduce the base `UiPart` lifecycle plus reusable stack and columns layout
 containers. The goal is to move all microapp content geometry into one shared
 layout path.
 
-- [ ] Define `Rect` and `UiPart<Props>` contract
-- [ ] Add `createStack(parent, children)` vertical layout container
-- [ ] Add `createColumns(parent, children)` horizontal layout container
-- [ ] Support child basis values: fixed number, `"1fr"`, `"2fr"`, and similar
-- [ ] Support `visible?: () => boolean` so hidden children collapse cleanly
-- [ ] Wire resize/layout reflow through the root layout container
-- [ ] Make root `destroy()` cascade to all child parts
-- [ ] Make root `restyle()` cascade to all child parts
+- [x] Define `Rect` and `UiPart<Props>` contract
+- [x] Add `createStack(parent, children)` vertical layout container
+- [x] Add `createColumns(parent, children)` horizontal layout container
+- [x] Support child basis values: fixed number, `"1fr"`, `"2fr"`, and similar
+- [x] Support `visible?: () => boolean` so hidden children collapse cleanly
+- [x] Wire resize/layout reflow through the root layout container
+- [x] Make root `destroy()` cascade to all child parts
+- [x] Make root `restyle()` cascade to all child parts
 
 AC-1: All content geometry for converted microapps lives in layout containers.
 Test: Poetry Clock rewrite contains zero coordinate mutation on mode change and
@@ -121,13 +121,13 @@ Status: not-started
 Add thin reusable wrappers for the repeating content patterns already visible
 in the Poetry Clock and likely future microapps.
 
-- [ ] `createHeaderBar(parent, opts?)` → `UiPart<{ left: string; right?: string }>`
-- [ ] `createStatusBar(parent, opts?)` → `UiPart<{ left?: string; right?: string }>`
-- [ ] `createTextBlock(parent, opts?)` → `UiPart<{ text: string }>`
-- [ ] `createRule(parent, opts)` → `UiPart<{ visible: boolean }>`
-- [ ] `createFigletDisplay(parent, opts)` → `UiPart<{ value: string }>`
-- [ ] `createAnimatedPanel(parent, opts)` → `UiPart<void>`
-- [ ] `createTextBlock()` preserves indent across wrapped continuation lines
+- [x] `createHeaderBar(parent, opts?)` → `UiPart<{ left: string; right?: string }>`
+- [x] `createStatusBar(parent, opts?)` → `UiPart<{ left?: string; right?: string }>`
+- [x] `createTextBlock(parent, opts?)` → `UiPart<{ text: string }>`
+- [x] `createRule(parent, opts)` → `UiPart<{ visible: boolean }>`
+- [x] `createFigletDisplay(parent, opts)` → `UiPart<{ value: string }>`
+- [x] `createAnimatedPanel(parent, opts)` → `UiPart<void>`
+- [x] `createTextBlock()` preserves indent across wrapped continuation lines
 
 AC-1: The named parts cover the Poetry Clock surface without extra ad hoc
 widget helpers.
@@ -149,11 +149,11 @@ Status: not-started
 Rewrite the Poetry Clock using the new primitives to prove the system is real,
 small, and sufficient. This story is the validation pass, not an optional demo.
 
-- [ ] Replace manual `blessed.box` tree wiring with `UiPart` composition
-- [ ] Remove hardcoded divider, status, and cat panel geometry from view logic
-- [ ] Remove direct coordinate mutation on mode changes
-- [ ] Route layout changes through visible predicates and container reflow
-- [ ] Keep rendered output visually identical to the current Poetry Clock
+- [x] Replace manual `blessed.box` tree wiring with `UiPart` composition
+- [x] Remove hardcoded divider, status, and cat panel geometry from view logic
+- [x] Remove direct coordinate mutation on mode changes
+- [x] Route layout changes through visible predicates and container reflow
+- [x] Keep rendered output visually identical to the current Poetry Clock
 
 AC-1: The rewritten Poetry Clock passes typecheck.
 Test: `bun run typecheck`.
@@ -173,10 +173,10 @@ Status: not-started
 Expose the primitives from the microapp host so module authors import from the
 host contract instead of reaching into relative core paths.
 
-- [ ] Add primitives exports to `MicroappHost`
-- [ ] Document the host-facing import path for microapps
-- [ ] Update Poetry Clock imports to use the host export path
-- [ ] Keep modules insulated from internal `src/` path knowledge
+- [x] Add primitives exports to `MicroappHost`
+- [x] Document the host-facing import path for microapps
+- [x] Update Poetry Clock imports to use the host export path
+- [x] Keep modules insulated from internal `src/` path knowledge
 
 AC-1: Microapps consume primitives through the host contract.
 Test: Poetry Clock imports primitives from `MicroappHost` rather than relative

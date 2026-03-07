@@ -66,7 +66,7 @@ Socket protocol (per frame):
 - [x] **AC-1:** Worker starts, opens camera via Python/OpenCV, writes valid frames to socket at ≥8fps.
   - Test: Worker spawned via `bun run src/services/monster-cam-worker.ts`; socket emits JSON header + grayscale bytes; FPS shown live in status bar. Manually verified.
 
-- [ ] **AC-2:** Window opens via Applications menu and `POST /view/monster-cam/open`.
+- [x] **AC-2:** Window opens via Applications menu and `POST /view/monster-cam/open`.
   - Test: `curl -X POST localhost:PORT/view/monster-cam/open` → window visible; menu item produces same result.
 
 - [x] **AC-3:** Live ASCII render updates in the blessed window (F01).
@@ -84,11 +84,13 @@ Socket protocol (per frame):
 - [ ] **AC-7:** Window closes cleanly — Python worker exits, socket removed.
   - Test: Close window; `ps aux | grep python` shows worker gone; `/tmp/face_monster_cam.sock` removed.
 
-- [ ] **AC-8:** App boots normally with no camera — window shows error state, no crash.
+- [x] **AC-8:** App boots normally with no camera — window shows error state, no crash.
   - Test: Unset camera device, open window — error shown in status bar, app continues.
 
 - [ ] **AC-9:** `bun run typecheck` passes with all monster cam source included.
   - Test: `bun run typecheck` exits 0 from repo root.
+
+Branch worktree-e004-monster-cam merged to main (b3d9d1d). Remaining: AC-6 pose skeleton, AC-7 socket cleanup verification, AC-9 typecheck.
 
 ## Out of Scope
 

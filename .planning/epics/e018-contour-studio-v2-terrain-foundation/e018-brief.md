@@ -312,6 +312,7 @@ This is mandatory. The control surface must not need to infer terrain state from
   - Test: `contour.open` still opens the old built-in window, and `WibWobWorld` opens separately.
 
 ## Planned Features / Stories
+All stories complete as of 2026-03-07. Firstperson restore bug tracked in E022 S02.
 
 - [x] **F01 — Terrain model extraction**
   - add `terrain-model.ts`

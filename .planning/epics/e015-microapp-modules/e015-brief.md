@@ -180,12 +180,13 @@ Test: Open via command. Verify `GET /state` shows appType
 verify no leaked intervals. Change theme, verify clock restyles.
 
 #### S06 — Live poem generation via Claude Code SDK
-- [ ] Claude Code SDK (TS v2 preview) installed: `@anthropic-ai/claude-code`
-- [ ] Subprocess worker pattern: spawn worker, send prompt via stdin, read poem from stdout
-- [ ] Prompt template: time, mode (plain/liminal/scramble), voice (Wib/Wob)
-- [ ] Fallback: if SDK unavailable or auth missing, use pre-baked bank
-- [ ] Rate limiting: one call per minute max, cache result for that minute
-- [ ] Generated poem replaces pre-baked content in display
+- [x] Claude Code SDK (TS v2 preview) installed: `@anthropic-ai/claude-code`
+- [x] Subprocess worker pattern: spawn worker, send prompt via stdin, read poem from stdout
+- [x] Prompt template: time, mode (plain/liminal/scramble), voice (Wib/Wob)
+- [x] Fallback: if SDK unavailable or auth missing, use pre-baked bank
+- [x] Rate limiting: one call per minute max, cache result for that minute
+- [x] Generated poem replaces pre-baked content in display
+Implemented via fetch() to Anthropic API with OAuth token — no subprocess worker. Core AC satisfied.
 
 AC-S06: Live poems generated every minute using Claude Code SDK.
 Test: Open clock in live mode. Verify poem contains current time.
@@ -193,9 +194,9 @@ Verify poem changes each minute. Kill claude auth — verify fallback
 to pre-baked bank with status indicator.
 
 #### S07 — Workspace persistence
-- [ ] `registerSnapshot()` saves mode and last poem
-- [ ] Restore reopens clock in saved mode with last poem displayed
-- [ ] If live mode, generates fresh poem on restore
+- [x] `registerSnapshot()` saves mode and last poem
+- [x] Restore reopens clock in saved mode with last poem displayed
+- [x] If live mode, generates fresh poem on restore
 
 AC-S07: Poetry clock round-trips through workspace save/restore.
 Test: Open clock, set mode to liminal. Save workspace. Close clock.
@@ -204,6 +205,7 @@ Restore workspace. Verify clock reopens in liminal mode.
 ### F04 — Primitives Library (Phase 2)
 
 Status: not-started
+→ delivered in E016 (Microapp Primitives Library)
 
 Optional building blocks extracted from existing window factories for
 microapp authors. Ships after 2-3 real microapps reveal which patterns

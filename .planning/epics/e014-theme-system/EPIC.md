@@ -46,7 +46,7 @@ All surfaces verified across 5 themes via fleet audit (35 windows x 5 themes).
 
 ## Remaining Follow-ons
 
-- [ ] Theme in `/state` endpoint — expose active theme name in desktop state JSON
+- [x] Theme in `/state` endpoint — expose active theme name in desktop state JSON
 - [ ] User-defined themes (load variant from JSON/YAML file)
 - [ ] `appearance-service.ts` integration (system/light/dark auto-detection)
 - [ ] More variants (Dracula, Solarized, Gruvbox, Tokyo Night)

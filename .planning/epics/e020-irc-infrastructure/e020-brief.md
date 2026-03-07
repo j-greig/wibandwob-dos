@@ -42,11 +42,11 @@ Harden `scripts/dev-irc-server.ts`:
 - QUIT removes nick from all channels, relays PART-like notice to room
 
 Verification:
-- [ ] two clients join same channel, each gets NAMES list of both
-- [ ] duplicate nick gets 433, must choose new nick
-- [ ] client QUIT removes them from channel for other clients
-- [ ] `python3 scripts/dev-irc-bot-burst.py` delivers to both instances
-- [ ] `bun run typecheck` clean
+- [x] two clients join same channel, each gets NAMES list of both
+- [x] duplicate nick gets 433, must choose new nick
+- [x] client QUIT removes them from channel for other clients
+- [x] `python3 scripts/dev-irc-bot-burst.py` delivers to both instances
+- [x] `bun run typecheck` clean
 
 ---
 
@@ -82,7 +82,7 @@ Verification:
 ---
 
 ### S03 — Persistent world channels (server)
-Status: [ ] open — defer unless S04 requires it
+Status: [-] dropped — S04 completed without requiring S03
 
 Pre-seed canonical channels on server start so they appear in LIST before any client
 joins. In-memory only; articles lost on restart is acceptable for dev.
@@ -95,17 +95,17 @@ Verification:
 
 ### S04 — Dual-instance smoke (re-verify post-S02)
 Status: [x] complete — irc-framework both sides, 2026-03-06
-        [ ] re-verify with irc-framework client
+        [x] re-verify with irc-framework client
 
 Two instances (main/8099, alt/8098) on one dev IRC server.
 Alt sends → main's World Chatroom shows it within 2s.
 
 Verification:
-- [ ] both instances start with `WIBWOB_INSTANCE_LABEL=main/alt`
-- [ ] alt sends via API: `microapp.world-chatroom.send`
-- [ ] main World Chatroom transcript shows alt's message with `[irc]` tag
-- [ ] `./scripts/screenshot-window.sh "World Chatroom"` on main confirms
-- [ ] `./scripts/world-chat-log-tail.sh` shows cross-instance relay
+- [x] both instances start with `WIBWOB_INSTANCE_LABEL=main/alt`
+- [x] alt sends via API: `microapp.world-chatroom.send`
+- [x] main World Chatroom transcript shows alt's message with `[irc]` tag
+- [x] `./scripts/screenshot-window.sh "World Chatroom"` on main confirms
+- [x] `./scripts/world-chat-log-tail.sh` shows cross-instance relay
 
 ---
 
@@ -119,11 +119,11 @@ Connect Textual (macOS IRC GUI) to local dev server. Verify two-way relay.
 ```
 
 Verification:
-- [ ] Textual connects to `127.0.0.1:6667`, joins `#world-ridge-overlook`
-- [ ] WibWob-DOS message visible in Textual
-- [ ] Textual message visible in WibWob-DOS World Chatroom within 2s
-- [ ] `./scripts/screenshot-window.sh "World Chatroom"` — Textual nick in transcript
-- [ ] no crashes or disconnects over 5min idle
+- [x] Textual connects to `127.0.0.1:6667`, joins `#world-ridge-overlook`
+- [x] WibWob-DOS message visible in Textual
+- [x] Textual message visible in WibWob-DOS World Chatroom within 2s
+- [x] `./scripts/screenshot-window.sh "World Chatroom"` — Textual nick in transcript
+- [x] no crashes or disconnects over 5min idle
 
 ---
 
