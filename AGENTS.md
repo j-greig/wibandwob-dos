@@ -134,6 +134,27 @@ Smoke targets: menus, primer open, text file open, editor typing, window drag/cl
 ./scripts/minimap.sh
 ```
 
+## Planning Updates
+
+After completing any story, feature, or epic — update `.planning` immediately. Do not leave docs stale.
+
+```bash
+bun run planning:status   # see current epic state
+bun run planning:sync     # regenerate EPIC_STATUS.md from frontmatter
+```
+
+Rule: one logical change = one planning update commit. Use the `planning-update` skill for exact patterns.
+
+Checkbox states: `[ ]` not-started · `[~]` in-progress · `[x]` done · `[-]` dropped
+Epic status values: `not-started` · `in-progress` · `blocked` · `done` · `dropped`
+
+Closeout ceremony (run after final PR merges):
+1. Verify all ACs against running app
+2. Tick all checkboxes `[x]`
+3. Set `status: done` in frontmatter
+4. `bun run planning:sync`
+5. Commit: `docs(planning): close E0NN <title>`
+
 ## Constraints
 
 - pragmatic — smallest slice that proves the direction
