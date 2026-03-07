@@ -175,13 +175,6 @@ Do not wait to be told to do the obvious next thing.
 Do not leave a trail of micro-commits — one logical change, one commit.
 Do not stop at "it typechecks" — run the thing.
 
-## Preferred Next Steps
-
-1. **E001 S02** — 3 subsystem specs in machine-consumption format (module-loader, command-registry, workspace-snapshots). `.planning/epics/e001-codified-context-infrastructure/`
-2. **T3-D** — audit and move or delete loose .md files at repo root (NOTES.md, PLASMA-IDEAS.md, devnote-bbc, vj-session, wibwob-command-ideas, modules-private-commits)
-3. workspace startup unification (`default.json` → Scramble fallback)
-4. stronger `WindowRecord` discriminated union
-
 ## Parking Lot
 
 Deferred work not yet epic-tracked. Promote when conditions change.
