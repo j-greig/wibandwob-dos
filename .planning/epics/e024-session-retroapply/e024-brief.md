@@ -1,7 +1,7 @@
 ---
 id: E024
 title: Session retroapply — 5 stories onto clean 16e7b6a base
-status: in-progress
+status: done
 branch: fix/session-retroapply
 created: 2026-03-07
 ---
@@ -97,7 +97,7 @@ by wibwobworld, so move that import inline or copy the needed code across.
 ---
 
 ### S04 — handover.sh
-**Status: open**
+**Status: done**
 **Patch: 0014 + 0023**
 
 New script `scripts/handover.sh` — auto-generates session handover doc.
