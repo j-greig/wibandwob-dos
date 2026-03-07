@@ -1,0 +1,19 @@
+{
+  "name": "wibwobworld",
+  "version": "0.1.0",
+  "description": "Private terrain-generation microapp for the future WibWobWorld game",
+  "type": "microapp",
+  "entry": "index.ts",
+  "microapp": {
+    "id": "wibwobworld",
+    "title": "WibWobWorld",
+    "description": "Seeded terrain world generator with water, vegetation, and contour overlays.",
+    "persist": true,
+    "menu": [
+      { "category": "applications", "order": 88, "label": "WibWobWorld" }
+    ],
+    "palette": { "order": 58, "label": "Open WibWobWorld" },
+    "agent": true,
+    "api": true
+  }
+}
