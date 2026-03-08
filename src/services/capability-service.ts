@@ -11,10 +11,10 @@ export type CapabilityKey =
   | "path.monster_cam.venv"
   | "path.backrooms.repo"
   | "env.anthropic_api_key"
-  /** MVPv2: inference-required apps (agent, poetry clock). Probes ANTHROPIC_API_KEY. */
-  | "feature.mvpv2"
-  /** MVPv3: resource-heavy apps (plasma, companion). Gate via profile forceOff. */
-  | "feature.mvpv3";
+  /** Inference-required apps (agent, poetry clock). Probes ANTHROPIC_API_KEY. */
+  | "feature.inference"
+  /** Resource-heavy apps (plasma, companion). Always probes true — gate via profile forceOff. */
+  | "feature.resource-heavy";
 
 export interface CapabilityStatus {
   ok: boolean;
@@ -35,8 +35,8 @@ const CAPABILITY_KEYS: CapabilityKey[] = [
   "path.monster_cam.venv",
   "path.backrooms.repo",
   "env.anthropic_api_key",
-  "feature.mvpv2",
-  "feature.mvpv3",
+  "feature.inference",
+  "feature.resource-heavy",
 ];
 
 function buildStatus(ok: boolean, reason?: string): CapabilityStatus {
@@ -89,12 +89,12 @@ export class CapabilityService {
         hasAnthropicApiKey ? undefined : "ANTHROPIC_API_KEY is not set",
       ),
       // Tier gates — probe infers from env; profiles can override via forceOff/forceOn.
-      "feature.mvpv2": buildStatus(
+      "feature.inference": buildStatus(
         hasAnthropicApiKey,
-        hasAnthropicApiKey ? undefined : "MVPv2 features require ANTHROPIC_API_KEY",
+        hasAnthropicApiKey ? undefined : "Inference features require ANTHROPIC_API_KEY",
       ),
-      // MVPv3 (plasma, companion) probes true — gate via profile forceOff in lower tiers.
-      "feature.mvpv3": buildStatus(true),
+      // Resource-heavy (plasma, companion) probes true — gate via profile forceOff in lower tiers.
+      "feature.resource-heavy": buildStatus(true),
     };
     const checkedAt = new Date().toISOString();
     for (const key of policy.forceOn) {

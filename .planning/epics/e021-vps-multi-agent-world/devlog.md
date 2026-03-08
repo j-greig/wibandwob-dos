@@ -253,6 +253,30 @@ Priority: MEDIUM — cosmetic but confusing for hosted users.
 
 ---
 
+### Post-rebase verification (2026-03-08)
+
+Rebased cleanly onto E023 merge (9d6251c). Zero conflicts.
+Commands: 86 (up from 81 — E023 added more).
+All 8 smoke gates green on rebuilt image.
+
+End-to-end hosted command path verified:
+  catalog     chrome.open has requires:["bin.chrome"] ✓
+  menu        chrome.open absent from Applications menu (createMenuConfigs filter) ✓
+  list        chrome.open absent from /commands/list default ✓
+  run         chrome.open → {"ok":false,"error":"Command unavailable..."} ✓
+  unavailable includeUnavailable=1 shows: chrome.open, monster_cam.open, backrooms.open, backrooms.run ✓
+  dynamic     all 32 module commands showing available ✓
+  poetry-clock microapp.wibwob.poetry-clock.open available (no requires.inference wired yet) ✓
+  wibwobworld + world-chatroom available ✓
+
+CALLOUT for Codex (not Pi's lane):
+  patchbay-lab module.json describes "SDK coverage harness" — dev tool
+  currently visible in Applications menu and API on hosted instances
+  has no requires field → can't be gated until dynamic requires threading done
+  Decision needed: feature.local-only? or keep hosted-visible?
+
+RENAME done: feature.mvpv2 → feature.inference, feature.mvpv3 → feature.resource-heavy
+
 ### Close-out checklist (not done)
 - [ ] Thread requires through command-registry + module-loader
 - [ ] Tag module.json files with correct tier requires
