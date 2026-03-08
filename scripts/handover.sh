@@ -11,6 +11,7 @@ REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DATE="$(date +%Y-%m-%d)"
 TIME="$(date +%H:%M:%S)"
 OUT="$REPO/tmp/session-handover-$DATE.md"
+CURRENT_BRANCH="$(git -C "$REPO" branch --show-current 2>/dev/null || echo "(unknown)")"
 
 mkdir -p "$REPO/tmp"
 
@@ -141,6 +142,8 @@ echo ""
 
 # --- 3. Epic Status ---
 echo "## 3. Epic Status"
+echo ""
+echo "**Current branch:** \`$CURRENT_BRANCH\`"
 echo ""
 echo "| Epic | Title | Status |"
 echo "|------|-------|--------|"

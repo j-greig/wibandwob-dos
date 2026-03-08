@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+BRANCH="$(git branch --show-current)"
+if [[ "$BRANCH" == "main" ]]; then
+  echo "✗ Direct commit to main is not allowed. Create a branch first." >&2
+  exit 1
+fi
