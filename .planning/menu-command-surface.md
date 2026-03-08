@@ -23,14 +23,14 @@ forceOn:  [bin.figlet, feature.resource-heavy]
 
 | Status | Label | Command ID |
 |---|---|---|
-| [ON] | Open Primer... | `primer.open` |
-| [ON] | Open Text File... | `editor.open` |
-| [ON] | New Editor | `editor.new` |
-| [ON] | Save | `editor.save` |
-| [ON] | Save As... | `editor.save_as` |
-| [ON] | Save Workspace... | `workspace.save_as` |
-| [ON] | Load Workspace... | `workspace.load` |
-| [ON] | Quit | `app.quit` |
+| [OFF] | Open Primer... | `primer.open` |
+| [OFF] | Open Text File... | `editor.open` |
+| [ON] | New Editor | `editor.new` — saves to /opt/wibandwob-dos/scratch/ |
+| [OFF] | Save | `editor.save` |
+| [OFF] | Save As... | `editor.save_as` |
+| [OFF] | Save Workspace... | `workspace.save_as` |
+| [OFF] | Load Workspace... | `workspace.load` |
+| [OFF] | Quit | `app.quit` |
 
 ---
 
@@ -48,7 +48,7 @@ forceOn:  [bin.figlet, feature.resource-heavy]
 
 | Status | Label | Command ID |
 |---|---|---|
-| [ON] | Command Palette | `palette.open` |
+| [ON] | Command Palette | `palette.open` | NOTE: must only show available / ON options
 | [ON] | Open State Inspector | `inspector.open` |
 | [ON] | Cycle Theme | `theme.cycle` |
 | [ON] | Choose Theme... | `theme.choose` |
@@ -75,21 +75,21 @@ forceOn:  [bin.figlet, feature.resource-heavy]
 | Status | Label | Command ID | Notes |
 |---|---|---|---|
 | [OFF] | Open File Manager | `finder.open` | feature.file-manager — security |
-| [ON] | Backrooms Log Browser | `backrooms_logs.open` | |
+| [OFF] | Backrooms Log Browser | `backrooms_logs.open` | |
 | [OFF] | Backrooms TV... | `backrooms.open` | path.backrooms.repo — not in image |
 | [ON] | Browse Primers | `primer.browse` | |
 | [ON] | Open Gallery | `primer_gallery.open` | |
 | [OFF] | Open Chrome Browser | `chrome.open` | bin.chrome — not in image |
-| [ON] | Document Reader | `document.open` | |
-| [ON] | Open Art | `art.open` | |
+| [OFF] | Document Reader | `document.open` | |
+| [ON] | Open Art | `art.open` | | NOTE: Rename Open Genarative Art Demo
 | [ON] | Figlet Banner | `figlet.open` | forceOn — bin.figlet installed |
 | [ON] | Pattern Window | `pattern.open` | |
 | [ON] | Plasma Screensaver | `plasma.open` | forceOn — feature.resource-heavy |
 | [ON] | Plasma from Primer | `plasma.from-primer` | forceOn — feature.resource-heavy |
 | [ON] | Contour Studio | `contour.open` | |
 | [ON] | Terrain Lab | `terrain_lab.open` | |
-| [ON] | Wib&Wob Agent | `agent.open` | |
-| [ON] | Music Player | `music-player.open` | |
+| [OFF] | Wib&Wob Agent | `agent.open` | |
+| [OFF] | Music Player | `music-player.open` | |
 | [ON] | Companion | `companion.open` | forceOn — feature.resource-heavy |
 | [OFF] | Monster Cam | `monster_cam.open` | path.monster_cam.venv — not in image |
 
@@ -99,7 +99,7 @@ forceOn:  [bin.figlet, feature.resource-heavy]
 
 | Status | Label | Command ID |
 |---|---|---|
-| [ON] | View README | `readme.open` |
+| [ON] | View README | `readme.open` | NOTE: needs friendly intro more like 2-3 para version of /agents.md and its 3 children inc the philsopsgy of msdos as symibnet substrate in fact lets do a new Help -> Readme file based on them it should bev non techy for most part
 
 ---
 
