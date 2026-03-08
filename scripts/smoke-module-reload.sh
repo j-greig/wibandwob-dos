@@ -52,7 +52,27 @@ printf '%s' "$BASE_SCREENSHOT" | rg -q "$ORIGINAL_SCREEN_TEXT" \
 pass "baseline screenshot contains original canary text"
 
 cp "$FILE" "${FILE}.bak-reload-smoke"
-perl -0pi -e "s/\Q$ORIGINAL_SCREEN_TEXT\E/$RELOADED_SCREEN_TEXT/; s/\Qvariant: \"greenfield\"\E/variant: \"reloaded\"/; s/\QcontentPreview: \"runtime reload canary\"\E/contentPreview: \"runtime reload canary reloaded\"/" "$FILE"
+python3 - <<'PY'
+from pathlib import Path
+path = Path("modules/runtime-reload-canary/index.ts")
+text = path.read_text()
+text = text.replace(
+    'const CANARY_BODY_LINE = "greenfield microapp";',
+    'const CANARY_BODY_LINE = "greenfield microapp reloaded";',
+    1,
+)
+text = text.replace(
+    'const CANARY_VARIANT = "greenfield";',
+    'const CANARY_VARIANT = "reloaded";',
+    1,
+)
+text = text.replace(
+    'const CANARY_PREVIEW = "runtime reload canary";',
+    'const CANARY_PREVIEW = "runtime reload canary reloaded";',
+    1,
+)
+path.write_text(text)
+PY
 
 note "reloading module after source edit"
 curl -sf -X POST "$API/modules/reload" \

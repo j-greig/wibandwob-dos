@@ -5,6 +5,7 @@ import {
 } from "../core/ui-parts.js";
 import type { Rect, UiPart, StackChild } from "../core/ui-parts.js";
 import type { BrowserEntry, GalleryTab } from "../core/types.js";
+import type { StylePair } from "../core/theme/types.js";
 import {
   createContourPlayer,
   readNodeViewport,
@@ -36,6 +37,54 @@ import type {
   MicroappSnapshotWindow,
   MicroappWindowHandle,
 } from "./module-loader.js";
+
+export interface MicroappThemeVars {
+  color?: string;
+  background?: string;
+  borderColor?: string;
+  accentColor?: string;
+  accentBackground?: string;
+  mutedColor?: string;
+}
+
+export interface ResolvedMicroappTheme {
+  body: StylePair;
+  panel: StylePair & { borderFg?: string };
+  accent: StylePair;
+  muted: StylePair;
+}
+
+export function createMicroappTheme(
+  host: MicroappHost,
+  vars: MicroappThemeVars = {},
+): ResolvedMicroappTheme {
+  const base = host.theme();
+  const body = {
+    ...(base.body ?? {}),
+    fg: vars.color ?? base.body?.fg,
+    bg: vars.background ?? base.body?.bg,
+  } satisfies StylePair;
+
+  return {
+    body,
+    panel: {
+      ...(base.bodyAlt ?? body),
+      fg: vars.color ?? base.bodyAlt?.fg ?? body.fg,
+      bg: vars.background ?? base.bodyAlt?.bg ?? body.bg,
+      borderFg: vars.borderColor ?? base.selected?.fg ?? base.bodyAlt?.fg,
+    },
+    accent: {
+      ...(base.selected ?? body),
+      fg: vars.accentColor ?? base.selected?.fg ?? base.body?.fg,
+      bg: vars.accentBackground ?? base.selected?.bg ?? base.bodyAlt?.bg,
+    },
+    muted: {
+      ...(base.bodyAlt ?? body),
+      fg: vars.mutedColor ?? base.bodyAlt?.fg ?? base.body?.fg,
+      bg: vars.background ?? base.bodyAlt?.bg ?? base.body?.bg,
+    },
+  };
+}
 
 // Canonical type-only import surface for module authors.
 // Runtime capabilities still flow through the host object itself.
