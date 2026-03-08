@@ -545,3 +545,84 @@ ls ../modules/daw-studio/index.ts
 curl -sf http://127.0.0.1:8099/modules/list | grep -q "daw-studio"
 ```
 
+
+---
+
+### Story 20: Demo — Signal Scanner
+
+Create `../modules/signal-scanner/` — a fake radio/signal scanning surface.
+
+**Features:**
+- Spectrum component showing a scrolling frequency sweep (simulated noise floor + fake signal peaks that drift over time)
+- 8 "channel" rows, each with: frequency label, LevelMeter, Waveform thumbnail, Badge for signal status (NOISE / LOCK / CARRIER)
+- Main large Waveform panel showing the "tuned" channel's waveform (sine, square, sawtooth — cycles on timer)
+- Knob for scan speed, Knob for squelch threshold, Knob for gain
+- StepMatrix repurposed as a signal-event log — each column is a timestep, each row is a channel, filled cell = signal detected
+- All driven by deterministic pseudo-random generators (seeded, reproducible) — no real audio
+- Wib register: glitch artifacts, scan-line corruption on strong signals
+- Wob register: clean readouts, precise dB values
+
+**Done conditions:**
+```bash
+ls ../modules/signal-scanner/index.ts
+grep -q "Spectrum\|LevelMeter\|Waveform" ../modules/signal-scanner/index.ts
+grep -q "Knob\|StepMatrix" ../modules/signal-scanner/index.ts
+curl -sf http://127.0.0.1:8099/modules/list | grep -q "signal-scanner"
+```
+
+---
+
+### Story 21: Demo — Modular Patcher
+
+Create `../modules/modular-patcher/` — a VCV Rack / MaxMSP style modular synth UI. Pure ASCII, pseudo audio, real patching.
+
+**Features:**
+- 6 module nodes rendered as titled boxes with port labels:
+  - OSC (oscillator): outputs sine/square/saw, Knob for frequency (Hz label), Knob for detune
+  - ENV (envelope): ADSR Knobs (attack, decay, sustain, release), triggered by clock
+  - LFO: Knob for rate, Knob for depth, Waveform preview of current shape
+  - FILTER: Knob for cutoff, Knob for resonance, Badge showing filter type (LP/HP/BP)
+  - MIX: 4-channel mixer, LevelMeter per channel, master Knob
+  - OUT: final LevelMeter + Waveform showing combined pseudo output
+- PatchCable components draw ASCII cables between port outputs → inputs
+- Click a port to start patching, click another to complete cable
+- Knobs all interactive (arrow keys when focused)
+- All signal values are simulated math (sin/cos functions, not Web Audio)
+- `p` key toggles play — animates all waveforms and meters
+
+**Done conditions:**
+```bash
+ls ../modules/modular-patcher/index.ts
+grep -q "PatchCable\|Knob" ../modules/modular-patcher/index.ts
+grep -q "OSC\|ENV\|LFO\|FILTER" ../modules/modular-patcher/index.ts
+curl -sf http://127.0.0.1:8099/modules/list | grep -q "modular-patcher"
+```
+
+---
+
+### Story 22: Demo — ASCII Visualizer
+
+Create `../modules/ascii-visualizer/` — a WinAMP-style music visualizer, pseudo audio, maximum aesthetic.
+
+**Features:**
+- Three visualizer modes (Tab to switch, Tabs component):
+  - **Spectrum** — full-width Spectrum bars, 64 bins, animated via sine-sum pseudo signal, colors shift per bar using theme accent palette
+  - **Oscilloscope** — full-width Waveform of a composite waveform (3 overlaid sine waves at different frequencies), Wib register adds glitch/corruption frames
+  - **Waterfall** — scrolling spectrogram: each frame is a row of █▓▒░ chars representing frequency intensity, rows scroll upward
+- LevelMeter strip along bottom (stereo, always visible)
+- "Track info" header: fake artist/title/BPM using Badge + Spinner (loading shimmer)
+- Knob row: Bass, Mid, Treble, Brightness — affect the pseudo signal math
+- Beat detection simulation: every N frames (BPM-synced), flash accent color on peak bars
+- `b` cycles between beat patterns (4/4, swing, breakbeat, waltz)
+- All at 24fps via setInterval(41)
+- Wib mode: glitch frames, scanline corruption, color overflow
+- Wob mode: precise dB scale, clean color ramp, no corruption
+
+**Done conditions:**
+```bash
+ls ../modules/ascii-visualizer/index.ts
+grep -q "Spectrum\|Waveform\|Tabs" ../modules/ascii-visualizer/index.ts
+grep -q "Knob\|LevelMeter" ../modules/ascii-visualizer/index.ts
+grep -q "Waterfall\|waterfall\|spectrogram" ../modules/ascii-visualizer/index.ts
+curl -sf http://127.0.0.1:8099/modules/list | grep -q "ascii-visualizer"
+```
