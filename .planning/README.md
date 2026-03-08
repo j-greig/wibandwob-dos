@@ -37,14 +37,32 @@ files. These docs reflect that reality.
 <type>/<short-kebab-description>
 ```
 
-Types: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `spike`.
+Canon branch types: `epic`, `spike`, `fix`, `feat`, `chore`, `docs`.
 
 Examples:
+- `epic/e024-session-retroapply`
+- `spike/plasma-fullscreen`
+- `fix/session-retroapply`
 - `feat/command-registry-dynamic`
-- `fix/workspace-restore-rendermode`
-- `refactor/module-loader-snapshot`
-- `spike/iso-pane-sizing`
+- `chore/planning-hook-guard`
 - `docs/planning-readme`
+
+## Branch Discipline
+
+All development work must happen on a branch tied to the current `.planning`
+focus: an epic, spike, or canonical development-task branch.
+
+Rules:
+1. Create the branch before the first commit for that work.
+2. Match canon branch names:
+   - `epic/e0NN-slug`
+   - `spike/spk-slug`
+   - `fix/slug`
+   - `feat/slug`
+   - `chore/slug`
+   - `docs/slug`
+3. Never commit directly to `main`; merge to `main` only after passing
+   `bun run typecheck` and smoke.
 
 ### Commits
 

@@ -177,9 +177,17 @@ When a pattern causes repeated confusion or failure in agent work: codify the fi
 After completing any story, feature, or epic — update `.planning` immediately. Do not leave docs stale.
 
 ```bash
+git status               # confirm you are not on main before starting work
 bun run planning:status   # see current epic state
 bun run planning:sync     # regenerate EPIC_STATUS.md from frontmatter
 ```
+
+Always work on a branch tied to the current `.planning` focus. Branch naming:
+`epic/e0NN-slug`, `spike/spk-slug`, `fix/slug`, `feat/slug`, `chore/slug`,
+`docs/slug`.
+Before starting any work: run `git status` to confirm you are not on `main`.
+If you are on `main`, create the correct branch first.
+Never commit directly to `main`. `main` is updated via merge only.
 
 Rule: one logical change = one planning update commit. Use the `planning-update` skill for exact patterns.
 
