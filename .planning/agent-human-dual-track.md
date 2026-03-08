@@ -19,8 +19,27 @@ posts screenshots to Discord          checks Discord for shares
                                       reads logs if something breaks
 ```
 
-Both tracks run simultaneously. The agent drives. The human observes, steers,
-and intervenes if needed.
+Both tracks run simultaneously. By convention the agent drives — but this is a
+workflow default, not a runtime privilege. Both tracks have equal API access.
+The human can take over at any point by typing in the chat window or calling the
+API directly.
+
+---
+
+## Canon rule: scripts vs raw API
+
+The `scripts/*` wrappers are convenience shells around the HTTP control API.
+The real source of truth is the API + command registry at `$WIBWOB_API`.
+
+Rule: **use wrapper scripts for common hosted flows; fall back to raw API only when
+a wrapper does not cover the task.** Do not invent parallel patterns — the scripts
+and the API must stay in sync or agents fragment.
+
+If a script behaves unexpectedly, check the raw API response first:
+```bash
+curl -s -H "Authorization: Bearer $WIBWOB_TOKEN" "$WIBWOB_API/state"
+curl -s -H "Authorization: Bearer $WIBWOB_TOKEN" "$WIBWOB_API/commands/list"
+```
 
 ---
 
@@ -50,8 +69,19 @@ Agent wants to see WibWobWorld terrain.
 
 1. `bash scripts/open.sh microapp.wibwobworld.open`
 2. `bash scripts/state.sh` — finds new window ID, e.g. `win-4`
-3. Waits 2–3s for render.
-4. `bash scripts/export.sh win-4` — reads the window's text content as ASCII.
+3. Poll until ready — do NOT sleep arbitrarily:
+```bash
+for i in $(seq 1 20); do
+  RESP=$(curl -s -H "Authorization: Bearer $WIBWOB_TOKEN" \
+    "$WIBWOB_API/windows/text?id=win-4")
+  OK=$(echo "$RESP" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('ok','false'))")
+  TEXT=$(echo "$RESP" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('text',''))" 2>/dev/null)
+  [[ "$OK" == "True" && -n "$TEXT" ]] && break
+  sleep 0.5
+done
+```
+  Ready signal: `ok === true` AND `text` is non-empty. No ready field exists — this is the only poll target.
+4. `bash scripts/export.sh win-4` — reads text content.
 5. Optionally: `bash scripts/png.sh win-4 world.png` — captures as PNG.
 
 ---
@@ -130,10 +160,11 @@ agent opens, every cursor move, every render update — visible in real time.
 
 Human wants to observe but not accidentally type into the TUI.
 
-Browser ttyd is `--writable` but tmux keybindings are stripped (SEC-C1 fix).
-Normal typing still reaches the blessed TUI input, but `Ctrl-b c` and other
-tmux escape sequences do nothing. Human can type safely in the agent chat window
-to steer, without risk of shell escape.
+Browser ttyd is `--writable` and tmux prefix keybindings are stripped (SEC-C1 fix),
+so `Ctrl-b c` and tmux escape sequences do nothing. However: this is still a live
+interactive input surface. Normal keystrokes reach the blessed TUI. The human can
+perturb the TUI — type in the wrong window, dismiss dialogs, move focus. Reduced
+shell escape risk, not zero-input isolation.
 
 **Future:** read-only browser view mode (separate ttyd endpoint, `--readonly`,
 different URL) — not yet built.
@@ -156,18 +187,29 @@ Agent posts screenshots to Discord via `discord.sh`. Human reads the Discord cha
 Human sees the agent failed silently. Where to look:
 
 ```bash
-# Stderr from the app (app crashes, startup errors, profile warnings)
+# PRIMARY: structured app log — APP/CMD/MSG/SYS/API/ERR categories, one file per day
+# This is where command runs, window events, API calls, and errors land.
+docker exec wibwob-smoke cat /opt/wibandwob-dos/logs/tui-app/$(date +%Y-%m-%d).log
+
+# STARTUP ONLY: stderr captures profile load warnings, token generation, pre-logger errors
 docker exec wibwob-smoke cat /opt/wibandwob-dos/scratch/app-stderr.log
 
-# Container events (entrypoint, sshd, ttyd)
+# CONTAINER: entrypoint, sshd, ttyd events
 docker logs wibwob-smoke --tail 50
 
-# Control API token source (was profile loaded?)
-docker exec wibwob-smoke grep "control-api\]" /opt/wibandwob-dos/scratch/app-stderr.log
-
-# On direct systemd deploy:
+# DIRECT SYSTEMD DEPLOY:
 journalctl -u wibwob-dos -n 100 --no-pager
 ```
+
+Log categories in `logs/tui-app/YYYY-MM-DD.log`:
+| Tag | Content |
+|-----|---------|
+| `APP` | Lifecycle — startup, shutdown, theme change |
+| `CMD` | Command registry — run, unknown command |
+| `MSG` | Agent messages — inbound user/sender text |
+| `SYS` | System ops — prompt reload, session init |
+| `API` | Control API — POST requests |
+| `ERR` | Failures |
 
 ---
 
@@ -182,6 +224,11 @@ Human wants to swap which agent is driving, without restarting the desktop.
 
 The `sessionId` changes only on app restart. Desktop layout, open windows, scratch
 state all survive agent handoffs as long as the container is running.
+
+**Port continuity ≠ session continuity.** The tunnel port (e.g. 19099) stays the same
+across app restarts, but `sessionId` changes. A new agent connecting to the same port
+after a restart will see a fresh desktop, not the previous one. Always check `sessionId`
+in `/health` when resuming a handoff — if it changed, the desktop was reset.
 
 ---
 
@@ -205,9 +252,13 @@ state all survive agent handoffs as long as the container is running.
 - Contents of what was typed into the TUI from browser
 - Agent's reasoning / chain-of-thought (stays in agent's context, not server)
 - Session history between agent turns (agent context window only)
+- Module reload attempts and unload failures (partially visible, not yet structured)
+- Runtime ownership events for microapps (no audit trail yet)
 
-**Gap to close:** structured request log for the control API (who called what when).
-Currently only `log.cmd` on successful runs. No 401 log, no caller IP log.
+**Gaps to close:**
+- Structured request log for the control API (caller IP, timestamp, command ID, result, 401s)
+- Module/runtime event log (load, unload, reload, failure per microapp)
+- `/modules/list` endpoint — no hosted module inspection exists today
 
 ---
 
@@ -234,11 +285,102 @@ the human observes — or types in chat to redirect.
 
 ---
 
+## Minimum safe agent loop
+
+Every agent operating WibWob-DOS should internalize this loop before acting:
+
+```
+1. connect    eval "$(bash scripts/connect.sh)"
+              → sets WIBWOB_API + WIBWOB_TOKEN
+
+2. verify     HEALTH=$(curl -s "$WIBWOB_API/health")
+   profile    deployProfile=$(echo $HEALTH | python3 -c "import json,sys; print(json.load(sys.stdin).get('deployProfile','MISSING'))")
+              [[ "$deployProfile" == "MISSING" || "$deployProfile" == "null" ]] && echo "STOP: profile not loaded" && exit 1
+
+3. verify     curl -s -H "Authorization: Bearer $WIBWOB_TOKEN" "$WIBWOB_API/state" | python3 -c "import json,sys; json.load(sys.stdin)" > /dev/null
+   auth       # if 401 → token wrong, re-run connect.sh
+
+4. read       bash scripts/state.sh
+   state      # get real window IDs, desktop dimensions, focus — never guess
+
+5. list       bash scripts/open.sh --list
+   commands   # confirm expected commands are available under current profile
+
+6. act        bash scripts/open.sh <command-id>
+              bash scripts/send.sh <window-id> <text>
+
+7. verify     poll /windows/text?id=N until ok+text non-empty (max 10s)
+   result     # do not sleep; poll
+```
+
+---
+
 ## Open gaps (not yet built)
 
-- `WIBWOB_CONTROL_TOKEN` not yet threaded into `connect.sh` — skill scripts need updating
-  to pass `Authorization: Bearer $TOKEN` header. Currently auth was just added (E021).
-- Read-only browser URL (separate ttyd `--readonly` endpoint for pure observation).
-- Structured request log for control API (caller IP, timestamp, command ID, result).
-- `deployProfile` verification step in `connect.sh` — agent should assert profile name
-  before proceeding, not just check health ok=true.
+- ~~`WIBWOB_CONTROL_TOKEN` not threaded into connect.sh~~ — **DONE** (merged to main 2026-03-08)
+- Read-only browser URL (separate ttyd `--readonly` endpoint for pure observation)
+- Structured request log for control API (caller IP, timestamp, command ID, result, 401s)
+- `deployProfile` verification step in `connect.sh` — agent should assert profile name,
+  not just check ok=true
+- `/modules/list` endpoint — hosted module inspection does not exist; `GET /state` has
+  no module info; `module-loader.ts` has no `listModules()` method
+- Module/runtime audit log — load, unload, reload, failure events not yet structured
+
+<codex-notes>
+Questions / concerns:
+
+1. The doc still treats `state.sh`, `open.sh`, `send.sh`, `export.sh`, and `png.sh`
+as if they are the canon agent surface, but after the newer module/runtime work we
+should be careful not to let helper scripts become a parallel control plane. The
+real source of truth is still the control API plus command registry. I would make
+that explicit near the top so agents understand the scripts are convenience wrappers,
+not a second architecture.
+
+2. AS-2 currently uses a guessed wait: "Waits 2–3s for render." That is exactly the
+kind of pattern agents cargo-cult forever. Better pattern: poll `/state` or verify
+`/windows/text` / screenshot readiness instead of sleeping unless a given surface is
+known to stream or animate.
+
+3. The examples mix raw API and wrapper scripts somewhat loosely. That is fine for a
+human-facing explainer, but for agent reliability I would add one short canon rule:
+"use wrapper scripts for common hosted flows; fall back to raw API only when the
+wrapper does not cover the task." Otherwise different agents will fragment.
+
+4. The doc says "Both tracks run simultaneously. The agent drives." That is a useful
+operational default, but I would clarify that this is a workflow convention, not a
+runtime privilege model. Otherwise people may read "drives" as implying exclusive
+ownership or precedence in the system itself.
+
+5. HS-2 still sounds a bit safer than it really is. If the browser endpoint is
+`--writable`, then humans can still perturb the TUI even with tmux escapes stripped.
+I would sharpen the wording from "type safely" to something like "reduced shell escape
+risk, but still an interactive input surface." That is more honest.
+
+6. The "What the logs capture" table needs a newer split between:
+   - app log file (`logs/tui-app/...`)
+   - scratch stderr
+   - docker logs / journalctl
+Right now it over-indexes on `scratch/app-stderr.log`, but newer runtime/module
+events may already be landing in the app logger instead. If that drift is real, this
+doc will send humans to the wrong place during incidents.
+
+7. The "What is NOT captured" section should explicitly add: module reload attempts,
+module unload failures, and runtime ownership events may be partially visible today
+but not yet structured enough for good incident forensics. That matters because hosted
+multi-agent work and local module-runtime work are starting to intersect.
+
+8. I would add one short note about session identity instability across restarts.
+There are now multiple places where humans/agents may confuse "the same desktop" with
+"the same port". The doc already mentions `sessionId`, but a stronger sentence like
+"port continuity does not imply session continuity" would prevent sloppy handoffs.
+
+9. The open gap list is missing one thing that feels increasingly important:
+hosted-visible module/runtime inspection. Once microapp runtime reload and agent-
+authored modules matter, hosted operators will need `/modules/list`-style visibility
+and probably a hosted-safe subset of runtime controls.
+
+10. The document is good as an operational overview, but if it is meant to guide
+agents directly I would consider adding one final "minimum safe loop":
+connect -> verify profile -> verify auth -> read state -> list commands -> act -> verify
+state changed. That loop is the thing I would want every agent to internalize.
+</codex-notes>
