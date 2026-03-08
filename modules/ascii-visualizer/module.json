@@ -1,0 +1,16 @@
+{
+  "name": "ascii-visualizer",
+  "version": "1.0.0",
+  "description": "WinAMP-style music visualizer — spectrum, oscilloscope, waterfall modes",
+  "type": "microapp",
+  "entry": "index.ts",
+  "microapp": {
+    "id": "ascii-visualizer",
+    "title": "ASCII Visualizer",
+    "multiInstance": true,
+    "menu": [{ "category": "applications", "order": 75, "label": "ASCII Visualizer" }],
+    "palette": { "order": 190, "label": "ASCII Visualizer" },
+    "agent": true,
+    "api": true
+  }
+}

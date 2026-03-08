@@ -1,0 +1,16 @@
+{
+  "name": "daw-studio",
+  "version": "1.0.0",
+  "description": "Composable music production surface with DAW components",
+  "type": "microapp",
+  "entry": "index.ts",
+  "microapp": {
+    "id": "daw-studio",
+    "title": "DAW Studio",
+    "multiInstance": true,
+    "menu": [{ "category": "applications", "order": 65, "label": "DAW Studio" }],
+    "palette": { "order": 180, "label": "DAW Studio" },
+    "agent": true,
+    "api": true
+  }
+}

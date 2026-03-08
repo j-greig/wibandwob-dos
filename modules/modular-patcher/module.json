@@ -1,0 +1,16 @@
+{
+  "name": "modular-patcher",
+  "version": "1.0.0",
+  "description": "VCV Rack / MaxMSP style modular synth UI with ASCII patch cables",
+  "type": "microapp",
+  "entry": "index.ts",
+  "microapp": {
+    "id": "modular-patcher",
+    "title": "Modular Patcher",
+    "multiInstance": true,
+    "menu": [{ "category": "applications", "order": 72, "label": "Modular Patcher" }],
+    "palette": { "order": 187, "label": "Modular Patcher" },
+    "agent": true,
+    "api": true
+  }
+}

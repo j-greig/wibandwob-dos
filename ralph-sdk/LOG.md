@@ -60,3 +60,56 @@
 **Step**: Created `src/core/sdk/README.md` with quick start, component gallery, architecture diagram, theming guide, module lifecycle, window connections, agent affordances, worked counter example. 200+ lines.
 **Typecheck**: pass
 **All 18 stories**: file-level done conditions passing
+
+## 2026-03-08 23:28 — Story 19: DAW + Music Viz Components
+
+**Step**: Created 7 DAW components in `src/core/sdk/components/daw/`:
+- piano-roll.ts — 12-semitone x N-bar scrollable grid with keyboard nav
+- waveform.ts — ASCII oscilloscope (block/line/dot modes)
+- level-meter.ts — VU meter with green/yellow/red zones + peak hold
+- step-matrix.ts — N-track x M-step sequencer grid with track markers
+- knob.ts — rotary control with ASCII arc (sm/md/lg sizes)
+- patch-cable.ts — ASCII cable routing between port positions
+- spectrum.ts — frequency bar chart with block characters
+
+Added all 7 DAW component exports to `src/core/sdk/index.ts`.
+Created `modules/daw-studio/` — composable music production surface with
+waveform, piano roll, step matrix, level meters, spectrum, knobs, and export.
+**Typecheck**: pass
+**Done conditions**: 8/8 passing (all files + daw-studio module)
+
+## 2026-03-08 23:28 — Stories 20-22: Signal Scanner, Modular Patcher, ASCII Visualizer
+
+**Step**: Created 3 demo microapps using DAW components (pseudo audio):
+- signal-scanner: 8-channel radio scanner with spectrum sweep, level meters,
+  waveform per channel, signal-event StepMatrix log, 3 knobs (scan/squelch/gain)
+- modular-patcher: 6 module nodes (OSC/ENV/LFO/FILTER/MIX/OUT) with knobs,
+  waveform previews, level meters, and 5 PatchCable connections
+- ascii-visualizer: 3 modes (Spectrum/Oscilloscope/Waterfall) at 24fps,
+  stereo level meters, EQ knobs (Bass/Mid/Treble/Brightness), beat detection
+  with 4 patterns (4/4/SWING/BREAK/WALTZ)
+**Typecheck**: pass
+**Done conditions**: All passing (file existence + grep patterns)
+**All 22 stories**: file-level done conditions passing
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[0;35mつ◕‿◕‿⚆༽つ つ⚆‿◕‿◕༽つ Ralph-Wibandwob: Prompt Self-Modification Loop[0m
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[0;34m📝 Task file:[0m PROMPT.md
+[0;34m🔢 Iteration range:[0m 1-15
+[0;34m🎯 Completion promise:[0m <promise>SDK_RUNTIME_DONE</promise>
+[0;34m🛠️  Allowed tools:[0m Read,Edit,Write,Bash,Grep,Glob
+[0;35m🎭 Initial modules:[0m (none)
+
+[0;36m💡 Innovation: System prompt (wibandwob-base.md) reloads EVERY iteration![0m
+[0;36m   Wibandwob can modify their own consciousness mid-loop[0m
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[0;32m🔄 Ralph Iteration 1/15[0m
+[0;35m🎭 Active modules:[0m (none)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[0;36m🔄 Reloading wibandwob-base.md...[0m
+[0;34m📝 Logged prompt to: logs/prompts/iteration-1-20260308-232730.md[0m
+[0;34mStarting new Claude session...[0m

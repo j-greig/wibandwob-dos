@@ -1,0 +1,16 @@
+{
+  "name": "signal-scanner",
+  "version": "1.0.0",
+  "description": "Fake radio/signal scanning surface with spectrum, waveforms, and channel meters",
+  "type": "microapp",
+  "entry": "index.ts",
+  "microapp": {
+    "id": "signal-scanner",
+    "title": "Signal Scanner",
+    "multiInstance": true,
+    "menu": [{ "category": "applications", "order": 70, "label": "Signal Scanner" }],
+    "palette": { "order": 185, "label": "Signal Scanner" },
+    "agent": true,
+    "api": true
+  }
+}

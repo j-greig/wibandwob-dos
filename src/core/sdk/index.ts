@@ -73,3 +73,19 @@ export { createModal } from "./components/modal.js";
 export type { ModalProps, ModalButton } from "./components/modal.js";
 export { createNotification } from "./components/notification.js";
 export type { NotificationProps } from "./components/notification.js";
+
+// --- Elements: DAW + Music Viz ---
+export { createPianoRoll } from "./components/daw/piano-roll.js";
+export type { PianoRollProps } from "./components/daw/piano-roll.js";
+export { createWaveform } from "./components/daw/waveform.js";
+export type { WaveformProps } from "./components/daw/waveform.js";
+export { createLevelMeter } from "./components/daw/level-meter.js";
+export type { LevelMeterProps } from "./components/daw/level-meter.js";
+export { createStepMatrix } from "./components/daw/step-matrix.js";
+export type { StepMatrixProps } from "./components/daw/step-matrix.js";
+export { createKnob } from "./components/daw/knob.js";
+export type { KnobProps } from "./components/daw/knob.js";
+export { createPatchCable } from "./components/daw/patch-cable.js";
+export type { PatchCableProps } from "./components/daw/patch-cable.js";
+export { createSpectrum } from "./components/daw/spectrum.js";
+export type { SpectrumProps } from "./components/daw/spectrum.js";
