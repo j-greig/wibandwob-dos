@@ -26,9 +26,15 @@ export interface CapabilityStatus {
 }
 
 export type CapabilitySnapshot = Record<CapabilityKey, CapabilityStatus>;
+export interface MenuStrip {
+  id: string;
+  reason: string;
+}
+
 interface CapabilityProfilePolicy {
   forceOff: CapabilityKey[];
   forceOn: CapabilityKey[];
+  stripMenuFrom: MenuStrip[];
 }
 
 const CAPABILITY_KEYS: CapabilityKey[] = [
@@ -127,6 +133,10 @@ export class CapabilityService {
     return this._snapshot ?? this.probe();
   }
 
+  strippedMenuCommands(): Set<string> {
+    return new Set(this.loadProfilePolicy().stripMenuFrom.map((s) => s.id));
+  }
+
   isAvailable(requires?: CapabilityKey[]): { ok: boolean; missing: CapabilityKey[] } {
     if (!requires || requires.length === 0) {
       return { ok: true, missing: [] };
@@ -139,7 +149,7 @@ export class CapabilityService {
   private loadProfilePolicy(): CapabilityProfilePolicy {
     const profileName = process.env.WIBWOB_DEPLOY_PROFILE?.trim();
     if (!profileName) {
-      return { forceOff: [], forceOn: [] };
+      return { forceOff: [], forceOn: [], stripMenuFrom: [] };
     }
 
     const here = path.dirname(new URL(import.meta.url).pathname);
@@ -163,9 +173,14 @@ export class CapabilityService {
       const raw = fs.readFileSync(profilePath, "utf8");
       const parsed = JSON.parse(raw) as Partial<CapabilityProfilePolicy>;
       console.log(`[capability-service] profile loaded: ${profileName} (${profilePath})`);
+      const strips = Array.isArray(parsed.stripMenuFrom) ? parsed.stripMenuFrom : [];
+      if (strips.length) {
+        console.log(`[capability-service] stripMenuFrom: ${strips.map((s) => `${s.id} (${s.reason})`).join(", ")}`);
+      }
       return {
         forceOff: this.filterCapabilityKeys(parsed.forceOff),
         forceOn: this.filterCapabilityKeys(parsed.forceOn),
+        stripMenuFrom: strips,
       };
     } catch (error) {
       // Fail-closed: profile found but unreadable/invalid JSON — crash rather than open.

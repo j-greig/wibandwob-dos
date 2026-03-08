@@ -9,5 +9,8 @@
   "forceOn": [
     "bin.figlet",
     "feature.resource-heavy"
+  ],
+  "stripMenuFrom": [
+    { "id": "app.quit", "reason": "public instance — prevent visitors quitting the shared process" }
   ]
 }

@@ -827,12 +827,14 @@ export function listAppCommands(): AppCommandDescriptor[] {
 
 /** Build runtime MenuConfig[] by projecting catalog commands into their menu placements. */
 export function createMenuConfigs(actions: AppMenuActions): MenuConfig[] {
+  const stripped = capabilityService.strippedMenuCommands();
   return MENU_DEFINITIONS.map((menu) => ({
     label: menu.label,
     key: menu.key,
     left: menu.left,
     items: listAppCommands()
       .filter((command) => capabilityService.isAvailable(command.requires).ok)
+      .filter((command) => !stripped.has(command.id))
       .flatMap((command) =>
         command.menuPlacements
           .filter((placement) => placement.category === menu.category)
