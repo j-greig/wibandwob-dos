@@ -1,47 +1,12 @@
 services:
 
-  # The actual TUI — one process per browser connection via ttyd
-  ttyd:
-    build:
-      context: ..
-      dockerfile: deploy/Dockerfile
-    command:
-      - ttyd
-      - --port
-      - "7681"
-      - --max-clients
-      - "20"
-      - --writable
-      - /usr/local/bin/wibwob-session
-    restart: unless-stopped
-    environment:
-      - TERM=xterm-256color
-    # ttyd is internal only — token proxy is the only way in
-    expose:
-      - "7681"
-
-  # Token proxy — generates share links, gates access to ttyd
-  token-proxy:
-    build:
-      context: ..
-      dockerfile: deploy/Dockerfile
-    command:
-      - bun
-      - run
-      - /app/deploy/token-proxy.ts
-    restart: unless-stopped
-    env_file:
-      - /etc/wibwob.env
-    environment:
-      - TTYD_URL=http://ttyd:7681
-      - TOKEN_TTL_MS=1800000
-      - PORT=8080
-    expose:
-      - "8080"
-    depends_on:
-      - ttyd
-
-  # Caddy reverse proxy — handles HTTPS termination (Cloudflare in front)
+  # Caddy reverse proxy — HTTPS termination + routing.
+  # Human path: / -> basic_auth -> wibwob:7681 (ttyd)
+  # Agent path: /api/* -> wibwob:8099 (control API, bearer-token auth inside app)
+  #
+  # NOTE: token-proxy (deploy/token-proxy.ts) is currently bypassed.
+  # The browser goes direct to ttyd behind basic_auth.
+  # Restore token-proxy if time-limited share links are needed.
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
@@ -52,8 +17,25 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
+    environment:
+      # Generate: caddy hash-password --plaintext 'yourpassword'
+      # Set in /etc/wibwob.env on the VPS host, then pass here.
+      - WIBWOB_BASIC_AUTH_HASH=${WIBWOB_BASIC_AUTH_HASH}
     depends_on:
-      - token-proxy
+      - wibwob
+
+  # WibWob-DOS smoke image — runs ttyd (7681) + control API (8099) + sshd (22).
+  # For the full multi-service compose (ttyd + token-proxy separate), see Dockerfile.
+  wibwob:
+    image: wibwob-vps-smoke:arm64
+    restart: unless-stopped
+    expose:
+      - "7681"
+      - "8099"
+    ports:
+      - "127.0.0.1:2222:22"   # SSH access for operators only — not public
+    env_file:
+      - /etc/wibwob.env        # ANTHROPIC_API_KEY, WIBWOB_DEPLOY_PROFILE, etc.
 
 volumes:
   caddy_data:

@@ -1,5 +1,6 @@
 import path from "node:path";
 import os from "node:os";
+import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 
 export const PRIMER_ROOTS = ["modules", "modules-private", "docs"] as const;
@@ -55,20 +56,56 @@ export const SPIKE_NOTES_PATH = APP_NOTES_PATH;
 
 /**
  * Ensure a file path stays within the app root boundary (SEC-M8).
- * Throws if the resolved path escapes APP_ROOT via traversal.
- * Use before any editor save or user-supplied write path.
+ *
+ * Two-phase check to block both path traversal and symlink escapes:
+ * 1. Lexical resolve — blocks ../../../etc via path.resolve()
+ * 2. Canonical resolve — resolves symlinks on the deepest existing ancestor,
+ *    then checks the real path. Blocks APP_ROOT/safe-link -> /etc style escapes.
+ *
+ * Returns the lexically resolved path (not the real path of the final file,
+ * which may not exist yet). Throws if either check fails.
  */
 export function assertWithinAppRoot(filePath: string): string {
-  const resolved = path.resolve(
+  const lexical = path.resolve(
     filePath.startsWith("~")
       ? path.join(os.homedir(), filePath.slice(1))
       : filePath,
   );
-  if (!resolved.startsWith(APP_ROOT + path.sep) && resolved !== APP_ROOT) {
+
+  // Phase 1: lexical prefix check
+  if (!lexical.startsWith(APP_ROOT + path.sep) && lexical !== APP_ROOT) {
     throw new Error(
-      `Write path '${filePath}' resolves to '${resolved}' which is outside APP_ROOT (${APP_ROOT}). ` +
+      `Write path '${filePath}' resolves to '${lexical}' which is outside APP_ROOT (${APP_ROOT}). ` +
       `Editor saves are restricted to the application directory.`,
     );
   }
-  return resolved;
+
+  // Phase 2: canonical check — walk up to find deepest existing ancestor,
+  // resolve its real path (follows symlinks), then reattach the suffix.
+  // This catches symlinks inside APP_ROOT that point outside.
+  let ancestor = lexical;
+  let suffix = "";
+  while (ancestor !== path.dirname(ancestor)) {
+    try {
+      const real = fs.realpathSync(ancestor);
+      const realWithSuffix = suffix ? path.join(real, suffix) : real;
+      if (!realWithSuffix.startsWith(APP_ROOT + path.sep) && realWithSuffix !== APP_ROOT) {
+        throw new Error(
+          `Write path '${filePath}' resolves through a symlink to '${realWithSuffix}' ` +
+          `which is outside APP_ROOT (${APP_ROOT}). Symlink escapes are not permitted.`,
+        );
+      }
+      break; // ancestor exists and is within boundary — done
+    } catch (err: unknown) {
+      if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+        // ancestor doesn't exist yet — go up one level
+        suffix = suffix ? path.join(path.basename(ancestor), suffix) : path.basename(ancestor);
+        ancestor = path.dirname(ancestor);
+        continue;
+      }
+      throw err; // re-throw real errors (permissions etc.)
+    }
+  }
+
+  return lexical;
 }
