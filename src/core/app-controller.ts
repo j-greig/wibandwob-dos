@@ -139,6 +139,7 @@ import { openChromeBrowserWindow } from "../windows/chrome-browser-window.js";
 import { openWibWobAgentWindow as openNativeWibWobAgentWindow } from "../windows/wibwob-agent-window.js";
 import { CustomCursor } from "./custom-cursor.js";
 import { openMonsterCamWindow } from "../windows/monster-cam-window.js";
+import { worldChatService } from "../services/world-chat-service.js";
 
 /** Exit code used by dev-mode reload. The launcher script watches for this. */
 export const DEV_RELOAD_EXIT_CODE = 75;
@@ -298,6 +299,7 @@ export class TsTuiMvpApp {
       focusOrCreate: (appType, createFn, multiInstance) => {
         this.focusOrCreate(appType, createFn, multiInstance);
       },
+      worldChat: worldChatService,
     };
     await loadModules(microappDeps);
 

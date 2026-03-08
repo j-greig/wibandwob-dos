@@ -1,59 +1,16 @@
 import blessed from "blessed";
 
-import { worldChatService } from "../../src/services/world-chat-service.js";
-import { applyRect } from "../../src/core/ui-parts.js";
-import type { Rect, UiPart, StackChild } from "../../src/core/ui-parts.js";
-import type { MicroappSnapshotWindow } from "../../src/services/module-loader.js";
-
-type MicroappWindowHandle = {
-  readonly id: number;
-  readonly body: blessed.Widgets.BoxElement;
-  onCleanup(fn: () => void): void;
-  onRestyle(fn: () => void): void;
-  onResize(fn: () => void): void;
-  onInput(fn: (input: string) => void): void;
-  describeState(fn: () => Record<string, unknown>): void;
-  captureText(fn: () => string): void;
-  focus(): void;
-  close(): void;
-};
-
-
-
-type MicroappHost = {
-  createWindow(init: { title: string; width?: number; height?: number }): MicroappWindowHandle;
-  registerCommand(def: {
-    id: string;
-    label: string;
-    description?: string;
-    action: (args?: Record<string, unknown>) => void;
-    direct?: boolean;
-    menu?: { category: string; order: number; label?: string }[];
-    palette?: { order: number; label?: string };
-  }): void;
-  registerSnapshot(handlers: {
-    serialize: (window: MicroappSnapshotWindow) => Record<string, unknown> | undefined;
-    restore: (_snapshot: unknown, payload: Record<string, unknown>) => void;
-  }): void;
-  runCommand(localId: string, args?: Record<string, unknown>): void;
-  readonly screen: blessed.Widgets.Screen;
-  readonly geometry: { width: number; height: number; cellAspect: number };
-  readonly theme: () => {
-    body: Record<string, unknown>;
-    muted?: Record<string, unknown>;
-    footer?: Record<string, unknown>;
-  };
-  readonly ui: {
-    createHeaderBar(parent: unknown, opts?: { leftInset?: number }): UiPart<{ left: string; right?: string }>;
-  };
-};
+import type {
+  MicroappHost,
+  MicroappSnapshotWindow,
+} from "../../src/services/microapp-sdk.js";
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
-function firstChannelId(): string | undefined {
-  return worldChatService.listChannels()[0]?.id;
+function firstChannelId(host: MicroappHost): string | undefined {
+  return host.worldChat.listChannels()[0]?.id;
 }
 
 export default function setup(host: MicroappHost) {
@@ -65,7 +22,7 @@ export default function setup(host: MicroappHost) {
     | undefined;
 
   function openChatroom(args?: Record<string, unknown>) {
-    let channelId = typeof args?.channelId === "string" ? args.channelId : firstChannelId();
+    let channelId = typeof args?.channelId === "string" ? args.channelId : firstChannelId(host);
     let sender = typeof args?.sender === "string" ? args.sender : "wibwob-player";
     let lastText = "";
     let draft = "";
@@ -178,17 +135,17 @@ export default function setup(host: MicroappHost) {
       const footerTop = bodyTop + bodyHeight;
 
       headerBar.layout({ top: 0, left: 0, width: innerW, height: headerHeight });
-      applyRect(bodyNode,  { top: bodyTop,              left: 0,              width: innerW,         height: bodyHeight   });
-      applyRect(statusBar, { top: footerTop,            left: 0,              width: innerW,         height: statusHeight });
-      applyRect(input,     { top: footerTop + statusHeight, left: 0,          width: innerW,         height: inputRows    });
+      host.ui.applyRect(bodyNode,  { top: bodyTop,              left: 0,              width: innerW,         height: bodyHeight   });
+      host.ui.applyRect(statusBar, { top: footerTop,            left: 0,              width: innerW,         height: statusHeight });
+      host.ui.applyRect(input,     { top: footerTop + statusHeight, left: 0,          width: innerW,         height: inputRows    });
 
       const sidebarWidth = 26;
       const transcriptWidth = Math.max(12, innerW - sidebarWidth);
-      applyRect(transcript, { top: 0, left: 0,              width: transcriptWidth, height: bodyHeight });
-      applyRect(gameLog,    { top: 0, left: transcriptWidth, width: sidebarWidth,   height: bodyHeight });
+      host.ui.applyRect(transcript, { top: 0, left: 0,              width: transcriptWidth, height: bodyHeight });
+      host.ui.applyRect(gameLog,    { top: 0, left: transcriptWidth, width: sidebarWidth,   height: bodyHeight });
 
-      const channel = channelId ? worldChatService.readChannel(channelId) : undefined;
-      const transport = worldChatService.getTransportStatus();
+      const channel = channelId ? host.worldChat.readChannel(channelId) : undefined;
+      const transport = host.worldChat.getTransportStatus();
       if (!channel) {
         lastText = "No world chat channel available yet.";
         headerBar.update({ left: "World Chatroom", right: "no channel" });
@@ -265,13 +222,13 @@ export default function setup(host: MicroappHost) {
     control = {
       setChannel(nextChannelId) {
         channelId = nextChannelId;
-        worldChatService.joinChannel(sender, nextChannelId);
+        host.worldChat.joinChannel(sender, nextChannelId);
         render();
       },
       send(nextSender, text) {
         sender = nextSender;
         if (channelId && text.trim().length > 0) {
-          worldChatService.sendMessage(sender, channelId, text.trim());
+          host.worldChat.sendMessage(sender, channelId, text.trim());
         }
         render();
       },
@@ -338,7 +295,7 @@ export default function setup(host: MicroappHost) {
       if (key.name === "return" || key.name === "enter") {
         const text = draft.trim();
         if (text.length > 0 && channelId) {
-          worldChatService.sendMessage(sender, channelId, text);
+          host.worldChat.sendMessage(sender, channelId, text);
           draft = "";
           render();
         }
@@ -361,9 +318,9 @@ export default function setup(host: MicroappHost) {
     });
 
     if (channelId) {
-      worldChatService.joinChannel(sender, channelId);
+      host.worldChat.joinChannel(sender, channelId);
     }
-    unsubscribe = worldChatService.subscribe((event) => {
+    unsubscribe = host.worldChat.subscribe((event) => {
       if (event.type === "transport") {
         render();
         return;
@@ -421,8 +378,8 @@ export default function setup(host: MicroappHost) {
       }
       const channelId = explicitChannelId ?? firstChannelId();
       if (!channelId) return;
-      worldChatService.joinChannel(sender, channelId);
-      worldChatService.sendMessage(sender, channelId, text);
+      host.worldChat.joinChannel(sender, channelId);
+      host.worldChat.sendMessage(sender, channelId, text);
       if (!control) openChatroom({ channelId, sender });
     },
   });

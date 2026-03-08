@@ -27,6 +27,12 @@ import type { WindowManager } from "../core/window-manager.js";
 import type { WindowFacade } from "../core/window-facade.js";
 import type { CommandRegistry, DynamicCommandDefinition } from "../core/command-registry.js";
 import type { MenuPlacement, PalettePlacement } from "../core/command-catalog.js";
+import type {
+  Chatspot,
+  WorldChannel,
+  WorldChatChangeEvent,
+} from "./world-chat-service.js";
+import type { WorldChatTransportStatus } from "./world-chat-transport.js";
 import {
   createStack, createColumns,
   createHeaderBar, createStatusBar, createTextBlock,
@@ -100,6 +106,7 @@ export interface MicroappHost {
   readonly geometry: { width: number; height: number; cellAspect: number };
   readonly theme: () => ThemeTokens;
   readonly windows: WindowFacade;
+  readonly worldChat: WorldChatHostAccess;
 
   /** Layout + content primitives. Import these instead of reaching into src/. */
   readonly ui: {
@@ -145,6 +152,17 @@ interface MicroappStateDetails {
   [key: string]: unknown;
 }
 
+export interface WorldChatHostAccess {
+  ensureWorld(worldKey: string, width: number, height: number): Chatspot[];
+  nearestChatspot(x: number, y: number): Chatspot | undefined;
+  listChannels(): WorldChannel[];
+  readChannel(channelId: string): WorldChannel | undefined;
+  joinChannel(agentId: string, channelId: string): WorldChannel | undefined;
+  sendMessage(agentId: string, channelId: string, text: string): WorldChannel | undefined;
+  getTransportStatus(): WorldChatTransportStatus;
+  subscribe(listener: (event: WorldChatChangeEvent) => void): () => void;
+}
+
 // ---------------------------------------------------------------------------
 // MicroappHost dependencies — provided by app-controller.ts
 // ---------------------------------------------------------------------------
@@ -155,6 +173,7 @@ export interface MicroappHostDeps {
   commands: CommandRegistry;
   geometry: { width: number; height: number; cellAspect: number };
   focusOrCreate: (appType: string, createFn: () => void, multiInstance?: boolean) => void;
+  worldChat: WorldChatHostAccess;
 }
 
 // ---------------------------------------------------------------------------
@@ -165,7 +184,7 @@ function createMicroappHost(
   manifest: MicroappManifestConfig,
   deps: MicroappHostDeps
 ): MicroappHost {
-  const { screen, windowManager, commands, geometry, focusOrCreate } = deps;
+  const { screen, windowManager, commands, geometry, focusOrCreate, worldChat } = deps;
   const moduleId = manifest.id;
 
   const host: MicroappHost = {
@@ -279,6 +298,7 @@ function createMicroappHost(
     geometry,
     theme,
     windows: windowManager,
+    worldChat,
 
     ui: {
       createStack,
