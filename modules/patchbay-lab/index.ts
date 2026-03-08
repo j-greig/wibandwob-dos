@@ -485,23 +485,26 @@ export default function setup(host: MicroappHost) {
       },
       update() {},
       restyle() {
+        const activeFrame = primerPaneFocus === "list" ? host.theme().selected : host.theme().input ?? host.theme().selected;
+        const inactiveFrame = host.theme().bodyAlt ?? host.theme().body;
         viewSurfaceNode.style = host.theme().body;
         primerFrameBox.style = {
-          ...(host.theme().body ?? {}),
+          ...(inactiveFrame ?? {}),
           border: {
-            ...(host.theme().body?.border ?? {}),
-            fg: primerPaneFocus === "list" ? "yellow" : "cyan",
+            fg: activeFrame.fg,
           },
         } as blessed.Widgets.BoxOptions["style"];
-        primerFrameTitle.style = primerPaneFocus === "list" ? host.theme().header : host.theme().footer ?? host.theme().body;
-        primerFrameStatus.style = host.theme().footer ?? host.theme().body;
+        primerFrameTitle.style = activeFrame;
+        primerFrameStatus.style = activeFrame;
         simplePreviewBox.style = host.theme().body;
         primerSidebarBox.style = primerPaneFocus === "list"
-          ? { ...(host.theme().body ?? {}), inverse: true }
+          ? activeFrame
           : host.theme().body;
-        primerDividerBox.style = host.theme().muted ?? host.theme().body;
+        primerDividerBox.style = primerPaneFocus === "list"
+          ? activeFrame
+          : host.theme().muted ?? host.theme().body;
         primerContentBox.style = primerPaneFocus === "preview"
-          ? { ...(host.theme().body ?? {}), inverse: true }
+          ? activeFrame
           : host.theme().body;
       },
       destroy() {
