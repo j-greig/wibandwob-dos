@@ -784,7 +784,7 @@ export default function setup(host: MicroappHost) {
         "[x] close helpers",
         "",
         "Primer bench:",
-        "[tab] toggle list/preview focus",
+        "[click/f] focus list/preview",
         "[j/k/↑↓] primer up/down",
         "[[] prev tab",
         "[]] next tab",
@@ -821,7 +821,7 @@ export default function setup(host: MicroappHost) {
           : `${summarizeChannel(host, channelId)} · seed ${seed}`;
       lastStatusRight =
         view === "overview"
-          ? `[tab] ${primerPaneFocus} · list:j/k/↑↓,[ ] · preview:j/k/↑↓ scroll · [q] close`
+          ? `[click/f] ${primerPaneFocus} · list:j/k/↑↓,[ ] · preview:j/k/↑↓ scroll · [q] close`
           : "[1-3] views [r] reseed [m/n] helpers [p] ping [q] close";
 
       headerBar.update({
@@ -847,8 +847,8 @@ export default function setup(host: MicroappHost) {
         );
         primerFrameStatus.setContent(
           primerPaneFocus === "list"
-            ? " ▶ LIST ACTIVE  Tab toggle  j/k/↑↓ select primer  [ ] change tab "
-            : " ▶ PREVIEW ACTIVE  Tab toggle  j/k/↑↓ scroll preview ",
+            ? " ▶ LIST ACTIVE  Click preview or press f  j/k/↑↓ select  [ ] tab "
+            : " ▶ PREVIEW ACTIVE  Click list or press f  j/k/↑↓ scroll ",
         );
         primerSidebarBox.setContent(gallery.sidebar);
         primerDividerBox.setContent(Array.from({ length: Math.max(1, Number(primerDividerBox.height) || 1) }, () => "│").join("\n"));
@@ -915,7 +915,7 @@ export default function setup(host: MicroappHost) {
     win.body.key(["m"], () => control?.spawnHelper("signal-monitor"));
     win.body.key(["n"], () => control?.spawnHelper("note-cloud"));
     win.body.key(["x"], () => control?.closeHelpers());
-    win.body.key(["tab"], () => { if (view === "overview") togglePrimerPaneFocus(); });
+    win.body.key(["f"], () => { if (view === "overview") togglePrimerPaneFocus(); });
     win.body.key(["j"], () => {
       if (view !== "overview") return;
       if (primerPaneFocus === "list") {
