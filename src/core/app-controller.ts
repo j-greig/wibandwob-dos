@@ -153,6 +153,7 @@ export class TsTuiMvpApp {
   private statusKaomoji?: Box;
   private statusIdentity?: Box;
   private kaomojiBlink = false;
+  private desktopChromeless = false;
   private kaomojiTimer?: NodeJS.Timeout;
   private readonly menus: MenuConfig[];
   private readonly commands: CommandRegistry;
@@ -641,6 +642,22 @@ export class TsTuiMvpApp {
 
   private openSystemContextMenu(x?: number, y?: number): void {
     this.openPopupMenu(buildDesktopContextMenu(this.commands), x, y);
+  }
+
+  private toggleDesktopChrome(): void {
+    this.desktopChromeless = !this.desktopChromeless;
+    if (this.desktopChromeless) {
+      this.menuBar.hide();
+      this.statusLine.hide();
+      this.desktop.top = 0 as any;
+      this.desktop.bottom = 0 as any;
+    } else {
+      this.menuBar.show();
+      this.statusLine.show();
+      this.desktop.top = 1 as any;
+      this.desktop.bottom = 1 as any;
+    }
+    this.screen.render();
   }
 
   private findWindowByAppType(appType: AppType): WindowRecord | undefined {
@@ -1713,6 +1730,7 @@ export class TsTuiMvpApp {
           }
         }
       },
+      toggleDesktopChrome: () => this.toggleDesktopChrome(),
       openBackroomsPrompt: () => this.promptForBackroomsTv(),
       openBackroomsTv: (args?: Record<string, unknown>) => {
         const theme =
