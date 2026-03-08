@@ -116,6 +116,7 @@ Upcoming example tasks to keep in view:
   [`sdk-proving-app-shortlist.md`](./sdk-proving-app-shortlist.md)
 - [x] Capture TouchLab stretch goal in
   [`touchlab-stretch-goal.md`](./touchlab-stretch-goal.md)
+  [`p3-touchlab-mvp-build.md`](./p3-touchlab-mvp-build.md)
 - [ ] Split this umbrella spike into implementation epics/stories
 
 ## Why This Is A Spike Right Now
@@ -548,8 +549,8 @@ Parsing notes for agents:
   "phases": [
     { "id": "P0", "title": "Split into implementation epics", "status": "not-started" },
     { "id": "P1", "title": "SDK foundation", "status": "not-started" },
-    { "id": "P2", "title": "Runtime foundation", "status": "not-started" },
-    { "id": "P3", "title": "Composition foundation", "status": "not-started" },
+    { "id": "P2", "title": "Runtime foundation", "status": "in-progress" },
+    { "id": "P3", "title": "Composition foundation", "status": "in-progress" },
     { "id": "P4", "title": "Agentic developer experience", "status": "not-started" },
     { "id": "P5", "title": "Product surfaces", "status": "not-started" },
     { "id": "P6", "title": "Multi-instance and swarm runtime", "status": "not-started" },
@@ -558,8 +559,8 @@ Parsing notes for agents:
   ],
   "workstreams": [
     { "id": "W1", "phase": "P1", "title": "SDK foundation", "status": "not-started" },
-    { "id": "W2", "phase": "P2", "title": "Runtime foundation", "status": "not-started" },
-    { "id": "W3", "phase": "P3", "title": "Composition foundation", "status": "not-started" },
+    { "id": "W2", "phase": "P2", "title": "Runtime foundation", "status": "in-progress" },
+    { "id": "W3", "phase": "P3", "title": "Composition foundation", "status": "in-progress" },
     { "id": "W4", "phase": "P4", "title": "Agentic DX and canon hygiene", "status": "not-started" },
     { "id": "W5", "phase": "P5", "title": "Product surfaces", "status": "not-started" },
     { "id": "W6", "phase": "P6", "title": "Multi-instance runtime", "status": "not-started" }
@@ -656,7 +657,7 @@ supported behaviors.
 
 ### P2 — Runtime foundation
 
-Status: not-started
+Status: in-progress
 
 Goal:
 reload one module in a running instance without restarting the whole app.
@@ -689,12 +690,19 @@ Completion signal:
 an agent edits `modules/wibwob-poetry-clock/index.ts` or a fresh test microapp,
 calls reload, and sees the new surface without restarting WibWob-DOS.
 
+Current note:
+runtime reload, hot-reload smoke, and human-facing canary demos are now proven;
+follow-on work in `P2` is now refinement rather than first implementation.
+
 ### P3 — Composition foundation
 
-Status: not-started
+Status: in-progress
 
 Goal:
 make layout and cross-window interaction first-class instead of ad hoc.
+
+Working doc:
+[`p3-touchlab-mvp-build.md`](./p3-touchlab-mvp-build.md)
 
 Action checklist:
 
