@@ -71,6 +71,30 @@ New modules probably reinvented things the older modules already solved. Read th
 
 ## DEV TERMS
 
+**canary**
+- a tiny, obvious test signal used to prove whether a system change actually propagated
+- in this repo: usually a minimal microapp, text string, or state field whose only job is to make reload/smoke behaviour easy to detect
+
+**smoke canary**
+- a deliberately simple text or UI marker used in smoke tests so success/failure is visible in `/state`, screenshots, and `tmux capture-pane`
+- value: avoids relying on subtle visual differences like colour alone
+
+**runtime reload**
+- unload and reload one module inside a running WibWob-DOS instance without restarting the whole app
+- value: proves lifecycle ownership, cleanup, and reopen behaviour even if true source hot-reload is still being hardened
+
+**hot reload**
+- the stronger claim: edit code, reload the module, and see the new behaviour appear live in the running app without a full restart
+- value: the ideal agentic workflow, but stricter than plain runtime reload and needs stronger proof
+
+**brownfield proof**
+- a validation step performed against an existing, non-trivial app surface already living in the codebase
+- in this repo: Poetry Clock or Patchbay Lab are good brownfield reload proofs
+
+**greenfield proof**
+- a validation step performed against a tiny new surface created specifically to prove a seam in isolation
+- in this repo: `runtime.reload-canary` is a greenfield reload proof
+
 **smoke test**
 - quick "does it launch and not crash" pass — open things, poke them, close them
 - not about correctness, just about survival

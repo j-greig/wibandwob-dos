@@ -17,6 +17,7 @@ import blessed from "blessed";
 import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import ts from "typescript";
 import { APP_ROOT } from "../core/config.js";
 import { registerExternalTheme } from "../core/theme/resolver.js";
 import { theme } from "../core/theme/resolver.js";
@@ -388,6 +389,7 @@ interface LoadedMicroappRuntime {
   commandCount: number;
   reloadCount: number;
   revisionToken: string;
+  shadowDir?: string;
   lastLoadedAt?: string;
   lastError?: string;
 }
@@ -473,10 +475,57 @@ async function loadThemeModule(mod: DiscoveredModule): Promise<void> {
 // Microapp loading
 // ---------------------------------------------------------------------------
 
-async function importModuleEntry(entryPath: string, revisionToken?: string) {
-  const fileUrl = pathToFileURL(entryPath).href;
-  const href = revisionToken ? `${fileUrl}?rev=${encodeURIComponent(revisionToken)}` : fileUrl;
-  return import(href);
+function ensureSymlink(targetPath: string, linkPath: string): void {
+  if (fs.existsSync(linkPath)) return;
+  fs.symlinkSync(targetPath, linkPath, "dir");
+}
+
+function transpileShadowTsFiles(rootDir: string): void {
+  const walk = (dirPath: string) => {
+    for (const entry of fs.readdirSync(dirPath, { withFileTypes: true })) {
+      const fullPath = path.join(dirPath, entry.name);
+      if (entry.isDirectory()) {
+        walk(fullPath);
+        continue;
+      }
+      if (!entry.isFile() || !fullPath.endsWith(".ts") || fullPath.endsWith(".d.ts")) {
+        continue;
+      }
+      const source = fs.readFileSync(fullPath, "utf8");
+      const transpiled = ts.transpileModule(source, {
+        compilerOptions: {
+          module: ts.ModuleKind.ESNext,
+          target: ts.ScriptTarget.ES2022,
+          moduleResolution: ts.ModuleResolutionKind.Bundler,
+          esModuleInterop: true,
+        },
+        fileName: fullPath,
+      });
+      fs.writeFileSync(fullPath.replace(/\.ts$/, ".js"), transpiled.outputText, "utf8");
+    }
+  };
+  walk(rootDir);
+}
+
+function createReloadShadow(mod: DiscoveredModule, revisionToken: string): { shadowDir: string; entryPath: string } {
+  const cacheRoot = path.join(
+    APP_ROOT,
+    "scratch",
+    "runtime-module-cache",
+    mod.manifest.microapp?.id ?? mod.manifest.name,
+  );
+  const shadowRoot = path.join(cacheRoot, revisionToken);
+  const relativeModuleDir = path.relative(APP_ROOT, mod.dir);
+  const shadowDir = path.join(shadowRoot, relativeModuleDir);
+  fs.mkdirSync(path.dirname(shadowDir), { recursive: true });
+  fs.cpSync(mod.dir, shadowDir, { recursive: true, force: true });
+  ensureSymlink(path.join(APP_ROOT, "src"), path.join(shadowRoot, "src"));
+  transpileShadowTsFiles(shadowDir);
+  const entry = mod.manifest.entry ?? "index.ts";
+  return {
+    shadowDir: shadowRoot,
+    entryPath: path.join(shadowDir, entry.replace(/\.ts$/, ".js")),
+  };
 }
 
 async function loadMicroappModule(
@@ -500,7 +549,8 @@ async function loadMicroappModule(
 
   try {
     const revisionToken = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    const imported = await importModuleEntry(entryPath, revisionToken);
+    const shadow = createReloadShadow(mod, revisionToken);
+    const imported = await import(pathToFileURL(shadow.entryPath).href);
     const setup = imported.default;
 
     if (typeof setup !== "function") {
@@ -521,6 +571,7 @@ async function loadMicroappModule(
       commandCount: 0,
       reloadCount: runtime?.reloadCount ?? 0,
       revisionToken,
+      shadowDir: shadow.shadowDir,
       lastLoadedAt: new Date().toISOString(),
     };
   } catch (err) {
@@ -535,6 +586,7 @@ async function loadMicroappModule(
       commandCount: 0,
       reloadCount: runtime?.reloadCount ?? 0,
       revisionToken: runtime?.revisionToken ?? "error",
+      shadowDir: runtime?.shadowDir,
       lastError: err instanceof Error ? err.message : String(err),
     };
   }
@@ -617,6 +669,10 @@ export class ModuleRuntimeService {
       cleanup();
     }
     this.moduleCleanupMap.delete(id);
+    if (runtime.shadowDir) {
+      fs.rmSync(runtime.shadowDir, { recursive: true, force: true });
+      runtime.shadowDir = undefined;
+    }
 
     runtime.status = "unloaded";
     runtime.commandCount = 0;

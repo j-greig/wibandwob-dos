@@ -77,6 +77,12 @@ being boring and reliable first.
   still a convention-based runtime model rather than a richer ownership graph
 - the current runtime state is truthful and API-visible, but reload failure
   ergonomics are still state/log oriented rather than event-stream oriented
+- source-edit hot reload is now proven via the `runtime.reload-canary` smoke
+  path, but only after hardening the loader to import from a transpiled shadow
+  copy of the module directory; Bun's direct `.ts` import path was too stale to
+  trust as the reload mechanism
+- runtime code-path changes still require a full app restart before the new
+  reload machinery itself is active; module edits do not
 
 ## Open Questions To Resolve In Code
 
