@@ -3,7 +3,7 @@
 # Hard 30-min timeout regardless of activity
 
 export TERM=xterm-256color
-export HOME=/root
+export HOME=/home/wibwob
 export COLORTERM=truecolor
 
 # Wait for ttyd to receive the browser's terminal dimensions via WebSocket

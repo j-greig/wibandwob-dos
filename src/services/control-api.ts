@@ -370,7 +370,9 @@ export class ControlApiService {
         const result = this.handlers.runCommand(id, args);
         return Response.json(result, { status: result.ok ? 200 : 404 });
       } catch (err: any) {
-        return Response.json({ ok: false, error: err?.message ?? String(err), stack: err?.stack }, { status: 500 });
+        // SEC-L9: never leak stack traces to callers; log server-side only
+        console.error("[control-api] command error:", err);
+        return Response.json({ ok: false, error: err?.message ?? "Internal error" }, { status: 500 });
       }
     }
 
