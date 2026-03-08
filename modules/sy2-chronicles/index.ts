@@ -1379,8 +1379,10 @@ export default function setup(host: MicroappHost) {
         parent: frame,
         top: 1,
         left: 1,
-        right: 1,
-        bottom: 1,
+        // Explicit dims — right/bottom are unreliable when parent is off-screen
+        // during initial layout in a scrollable canvas.
+        width: Math.max(1, def.w - 2),
+        height: Math.max(1, def.h - 2),
         mouse: true,
         clickable: true,
         tags: false,
@@ -1593,6 +1595,9 @@ export default function setup(host: MicroappHost) {
         node.frame.top = node.y;
         node.frame.width = size.w;
         node.frame.height = size.h;
+        // Keep content box dims in sync with frame (explicit, not relative)
+        node.content.width = Math.max(1, size.w - 2);
+        node.content.height = Math.max(1, size.h - 2);
       }
 
       for (const node of panelNodes.values()) {
@@ -1866,6 +1871,9 @@ export default function setup(host: MicroappHost) {
     renderLayoutAndContent();
     root.focus();
     win.focus();
+    // Deferred re-render: blessed needs one tick to compute canvas.lpos and
+    // child sizes. Off-screen panels get empty content on first pass.
+    setTimeout(() => { renderLayoutAndContent(); host.screen.render(); }, 80);
 
     return {
       snapshot: () => ({
