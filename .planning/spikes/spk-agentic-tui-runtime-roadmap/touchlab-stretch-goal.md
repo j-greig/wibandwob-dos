@@ -79,6 +79,25 @@ If TouchLab works, it proves the SDK/runtime stack can handle:
 - [ ] Surface all stage state through `describeState()`
 - [ ] Keep the whole pipeline inspectable and commandable via registry/API
 
+## Next MVP sprint
+
+- [~] Prove real nested mouse dragging end to end
+- [x] Add visible ASCII arrows or link labels between source nodes and the mix node
+- [x] Add one selected-node inspector / parameter strip inside the parent window
+- [x] Allow changing at least one per-node visual parameter live
+      example: title color, body fg/bg, or border color
+- [x] Add one more transformation mode beyond plain overwrite composition
+      example: mask, max-density, xor-ish glyph preference, or tint priority
+- [x] Expose selected node + per-node visual params in `describeState()`
+
+Design note:
+- use a TouchDesigner-style parameter inspector first, not a floating text-input
+  flyout
+- canonical interaction should be:
+  select node -> inspect parameters -> tweak -> see output change live
+- current MVP keeps the inspector permanently visible, with `i` collapsing it to a
+  slim sliver rather than hiding it entirely
+
 ## Architectural implications
 
 TouchLab likely requires seams that Patchbay only hints at:
