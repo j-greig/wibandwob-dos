@@ -685,8 +685,8 @@ Action checklist:
 - [ ] Add dev watch mode for module directories
 - [x] Surface module runtime status in `/state`
 - [ ] Add agent tools for scaffold, reload, and runtime inspection
-- [ ] Use Poetry Clock as the brownfield reload proof
-- [ ] Use one fresh test microapp as the greenfield reload proof
+- [x] Use Poetry Clock as the brownfield reload proof
+- [x] Use one fresh test microapp as the greenfield reload proof
 
 Completion signal:
 

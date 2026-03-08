@@ -1,0 +1,20 @@
+{
+  "name": "runtime-reload-canary",
+  "version": "0.1.0",
+  "description": "Tiny microapp used to prove greenfield module reload.",
+  "type": "microapp",
+  "entry": "index.ts",
+  "microapp": {
+    "id": "runtime.reload-canary",
+    "title": "Runtime Reload Canary",
+    "description": "Minimal reload canary for the module runtime.",
+    "multiInstance": false,
+    "persist": false,
+    "menu": [
+      { "category": "applications", "order": 46, "label": "Runtime Reload Canary" }
+    ],
+    "palette": { "order": 216, "label": "Runtime Reload Canary" },
+    "agent": true,
+    "api": true
+  }
+}

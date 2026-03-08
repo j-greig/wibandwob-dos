@@ -1,7 +1,7 @@
 ---
 id: spk-agentic-tui-runtime-roadmap-module-runtime-reload
 title: Module Runtime Reload Build
-status: in-progress
+status: done
 created: 2026-03-08
 depends_on: [spk-agentic-tui-runtime-roadmap, spk-agentic-tui-runtime-roadmap-patchbay-lab-build]
 ---
