@@ -785,7 +785,7 @@ export default function setup(host: MicroappHost) {
         "",
         "Primer bench:",
         "[tab] toggle list/preview focus",
-        "[j/k] primer up/down",
+        "[j/k/↑↓] primer up/down",
         "[[] prev tab",
         "[]] next tab",
         "",
@@ -821,7 +821,7 @@ export default function setup(host: MicroappHost) {
           : `${summarizeChannel(host, channelId)} · seed ${seed}`;
       lastStatusRight =
         view === "overview"
-          ? `[tab] ${primerPaneFocus} · list:j/k,[ ] · preview:j/k scroll · [q] close`
+          ? `[tab] ${primerPaneFocus} · list:j/k/↑↓,[ ] · preview:j/k/↑↓ scroll · [q] close`
           : "[1-3] views [r] reseed [m/n] helpers [p] ping [q] close";
 
       headerBar.update({
@@ -847,8 +847,8 @@ export default function setup(host: MicroappHost) {
         );
         primerFrameStatus.setContent(
           primerPaneFocus === "list"
-            ? " ▶ LIST ACTIVE  Tab toggle  j/k select primer  [ ] change tab "
-            : " ▶ PREVIEW ACTIVE  Tab toggle  j/k scroll preview ",
+            ? " ▶ LIST ACTIVE  Tab toggle  j/k/↑↓ select primer  [ ] change tab "
+            : " ▶ PREVIEW ACTIVE  Tab toggle  j/k/↑↓ scroll preview ",
         );
         primerSidebarBox.setContent(gallery.sidebar);
         primerDividerBox.setContent(Array.from({ length: Math.max(1, Number(primerDividerBox.height) || 1) }, () => "│").join("\n"));
@@ -926,6 +926,24 @@ export default function setup(host: MicroappHost) {
       }
     });
     win.body.key(["k"], () => {
+      if (view !== "overview") return;
+      if (primerPaneFocus === "list") {
+        movePrimerSelection(-1);
+      } else {
+        primerContentBox.scroll(-1);
+        host.screen.render();
+      }
+    });
+    win.body.key(["down"], () => {
+      if (view !== "overview") return;
+      if (primerPaneFocus === "list") {
+        movePrimerSelection(1);
+      } else {
+        primerContentBox.scroll(1);
+        host.screen.render();
+      }
+    });
+    win.body.key(["up"], () => {
       if (view !== "overview") return;
       if (primerPaneFocus === "list") {
         movePrimerSelection(-1);

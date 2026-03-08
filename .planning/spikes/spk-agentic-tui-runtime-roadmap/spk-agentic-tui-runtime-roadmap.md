@@ -114,6 +114,8 @@ Upcoming example tasks to keep in view:
   [`symbient-feedback.md`](./symbient-feedback.md)
 - [x] Capture proving-app shortlist in
   [`sdk-proving-app-shortlist.md`](./sdk-proving-app-shortlist.md)
+- [x] Capture TouchLab stretch goal in
+  [`touchlab-stretch-goal.md`](./touchlab-stretch-goal.md)
 - [ ] Split this umbrella spike into implementation epics/stories
 
 ## Why This Is A Spike Right Now
