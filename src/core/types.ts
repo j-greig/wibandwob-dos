@@ -170,6 +170,7 @@ export interface DesktopState {
     statePath: string;
     instanceLabel?: string;
     sessionId?: string;
+    deployProfile?: string | null;
     controlApiEnabled?: boolean;
     controlApiPort?: number;
     theme?: string;

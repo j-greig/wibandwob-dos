@@ -79,6 +79,7 @@ COPY --chown=wibwob:wibwob modules /opt/wibandwob-dos/modules
 COPY --chown=wibwob:wibwob modules-private /opt/wibandwob-dos/modules-private
 COPY --chown=wibwob:wibwob README.md /opt/wibandwob-dos/
 COPY --chown=wibwob:wibwob AGENTS.md /opt/wibandwob-dos/
+COPY --chown=wibwob:wibwob WELCOME.md /opt/wibandwob-dos/
 COPY --chown=wibwob:wibwob config /opt/wibandwob-dos/config
 
 # Minimal smoke .env — local transport (no IRC), named instance
