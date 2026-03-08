@@ -3,7 +3,9 @@
 # Build: docker build --platform linux/arm64 -t wibwob-vps-smoke -f deploy/Dockerfile.smoke .
 # Run:  docker run -d -t -p 127.0.0.1:2849:22 --platform linux/arm64 --name wibwob-smoke wibwob-vps-smoke
 
-FROM ubuntu:24.04
+# SEC-H4: pinned digest — update deliberately, not silently on rebuild
+# To update: docker pull --platform linux/arm64 ubuntu:24.04 && docker inspect ubuntu:24.04 | grep RepoDigests
+FROM ubuntu:24.04@sha256:d1e2e92c075e5ca139d51a140fff46f84315c0fdce203eab2807c7e495eff4f9
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -23,14 +25,18 @@ shutil.copytree(Path(pyfiglet.__file__).parent/'fonts', Path('/usr/share/figlet'
 # Install Bun — use install script (robust, handles arch detection)
 # Copy to /usr/local/bin so non-root wibwob user can find it on PATH
 ENV BUN_VERSION=1.2.4
-RUN curl -fsSL https://bun.sh/install | bash \
+# SEC-H4: pinned Bun version — curl|bash with pinned version tag
+# To update: check https://github.com/oven-sh/bun/releases
+RUN curl -fsSL https://bun.sh/install | bash -s -- bun-v1.3.10 \
     && mkdir -p /usr/local/bin \
     && cp /root/.bun/bin/bun /usr/local/bin/bun \
     && rm -rf /root/.bun \
     && bun --version
 
 # ttyd — web terminal (xterm.js frontend, WebSocket PTY backend)
-RUN curl -fsSL "https://github.com/tsl0922/ttyd/releases/latest/download/ttyd.aarch64" \
+# SEC-H4: pinned ttyd version — never pull "latest" silently
+# To update: check https://github.com/tsl0922/ttyd/releases
+RUN curl -fsSL "https://github.com/tsl0922/ttyd/releases/download/1.7.7/ttyd.aarch64" \
       -o /usr/local/bin/ttyd \
     && chmod +x /usr/local/bin/ttyd \
     && ttyd --version
