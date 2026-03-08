@@ -84,6 +84,13 @@ being boring and reliable first.
 - runtime code-path changes still require a full app restart before the new
   reload machinery itself is active; module edits do not
 
+## Canon proof paths
+
+- lightweight human demo:
+  `bash scripts/demo-module-reload.sh`
+- stricter engineering smoke:
+  `bash scripts/smoke-module-reload.sh`
+
 ## Open Questions To Resolve In Code
 
 - [ ] Where the runtime owner should live: `module-loader.ts` extension or
