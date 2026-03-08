@@ -134,7 +134,45 @@ Smoke targets: menus, primer open, text file open, editor typing, window drag/cl
 ./scripts/minimap.sh
 ```
 
-## Planning Updates
+## Agent Tooling
+
+Scripts and skills that exist to help agents work are **agent tooling**. When agent tooling causes friction, degrades, or fails — improve it, don't work around it. Delegate improvement to Codex when the fix is self-contained.
+
+### Canon names for self-testing work
+
+| Name | What it means |
+|------|--------------|
+| **typecheck** | `bun run typecheck` — minimum gate before any commit |
+| **smoke** | Manual or scripted run through key surfaces (menus, windows, API) |
+| **restart** | `bash scripts/restart.sh` — clean SIGTERM → wait → launch → poll `/health` |
+| **API parity** | `/state` response matches what is visually on screen |
+| **screenshot** | `./scripts/screenshot-window.sh "Title"` — capture a window |
+| **minimap** | `./scripts/minimap.sh` — spatial overview of all open windows |
+| **overlap-check** | `./scripts/overlap-check.sh` — detect overlapping windows |
+| **handover** | `bun run handover` — generate session handover doc from live state |
+| **planning-sync** | `bun run planning:sync` — regenerate EPIC_STATUS.md from frontmatter |
+
+### Codex delegation pattern for tooling improvement
+
+When a script or skill is causing repeated friction, has a known failure mode, or needs a new capability — delegate improvement to Codex rather than patching around it:
+
+```
+Use the codex-worker subagent.
+Task: describe what the script does, what the failure mode is, what the fix should be.
+Files: point at the script(s) to improve.
+```
+
+Good candidates for Codex tooling improvement:
+- `scripts/restart.sh` — if it reports ready with the same session ID (old process still alive)
+- `scripts/smoke-test.sh` — if smoke targets grow stale
+- `.pi/skills/*` — if a skill's instructions cause agents to make repeated mistakes
+- `scripts/handover.sh` — if the epic table or todo list goes stale
+
+Example: Codex improved `restart.sh` to capture old sessionId, confirm new sessionId differs, kill more aggressively (SIGKILL fallback), and reset terminal escape codes before launching — after the plain SIGTERM pattern left the terminal poisoned on unclean exits.
+
+### Self-improvement rule
+
+When a pattern causes repeated confusion or failure in agent work: codify the fix in `.agents/` or the relevant skill, not just in the code. The agent constitution should reflect what actually works.
 
 After completing any story, feature, or epic — update `.planning` immediately. Do not leave docs stale.
 

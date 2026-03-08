@@ -1,5 +1,9 @@
 # Agent Smoke Test Suite
 
+**LOCAL TMUX SMOKE TEST — not a Docker test.**
+Runs WibWob-DOS directly on the host (Bun + tmux), hits the control API at port 8098.
+For Docker/VPS smoke testing see `deploy/Dockerfile.smoke` and the `ww-ops` skill (§ DOCKER SMOKE).
+
 Autonomous integration tests for the WibWob TUI agent.
 Launches the app in tmux, exercises the agent via control API, checks session logs.
 
@@ -11,8 +15,8 @@ Launches the app in tmux, exercises the agent via control API, checks session lo
 
 This will:
 1. Kill any existing wibwob-test tmux session
-2. Launch WibWob-DOS in a fresh tmux session (headless)
-3. Wait for the control API on port 8099
+2. Launch WibWob-DOS in a fresh tmux session (headless, port 8098)
+3. Wait for the control API on port 8098
 4. Open the agent window
 5. Run all test cases via the control API
 6. Collect results + session logs

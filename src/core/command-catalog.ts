@@ -34,6 +34,7 @@ export interface AppMenuActions {
   focusPreviousWindow: () => void;
   closeFocusedWindow: () => void;
   clearDesktop: () => void;
+  toggleDesktopChrome: () => void;
   openBackroomsPrompt: () => void;
   openBackroomsTv: (args?: Record<string, unknown>) => void;
   openBackroomsLogBrowser: () => void;
@@ -507,6 +508,17 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     menuPlacements: [{ category: "window", order: 35 }],
     api: true,
     agent: false
+  },
+  {
+    id: "desktop.toggle_chrome",
+    label: "Toggle Chromeless Mode",
+    description: "Hide/show the top menu bar and bottom status bar. Turns the desktop into a clean canvas — useful for screensaver/display mode. Right-click desktop to toggle.",
+    group: "focus",
+    actionKey: "toggleDesktopChrome",
+    contextMenu: { desktop: true, order: 30 },
+    palettePlacement: { order: 36, label: "Toggle Chromeless Mode" },
+    api: true,
+    agent: true,
   },
 
   {
