@@ -167,6 +167,9 @@ export default function setup(host: MicroappHost) {
         left: 0,
         right: 0,
         bottom: 0,
+        keys: true,
+        mouse: true,
+        clickable: true,
         style: host.theme().body,
       });
 
@@ -176,6 +179,9 @@ export default function setup(host: MicroappHost) {
         right: 0,
         width: 26,
         height: "100%",
+        keys: true,
+        mouse: true,
+        clickable: true,
         border: "line",
         style: {
           ...host.theme().bodyAlt,
@@ -189,6 +195,9 @@ export default function setup(host: MicroappHost) {
         left: 0,
         right: 26,
         bottom: 0,
+        keys: true,
+        mouse: true,
+        clickable: true,
         style: host.theme().body,
       });
 
@@ -198,6 +207,7 @@ export default function setup(host: MicroappHost) {
         left: 0,
         right: 0,
         bottom: 0,
+        mouse: true,
         tags: false,
         style: host.theme().muted,
       });
@@ -228,6 +238,8 @@ export default function setup(host: MicroappHost) {
       for (const item of initial) {
         const frame = blessed.box({
           parent: canvas,
+          mouse: true,
+          clickable: true,
           border: "line",
           style: {
             ...host.theme().body,
@@ -240,6 +252,8 @@ export default function setup(host: MicroappHost) {
           left: 1,
           right: 1,
           height: 1,
+          mouse: true,
+          clickable: true,
           style: host.theme().selected,
         });
         const content = blessed.box({
@@ -248,6 +262,8 @@ export default function setup(host: MicroappHost) {
           left: 1,
           right: 1,
           bottom: 1,
+          mouse: true,
+          clickable: true,
           tags: false,
           style: host.theme().body,
         });
@@ -381,6 +397,12 @@ export default function setup(host: MicroappHost) {
         renderNodes();
       };
 
+      const selectNode = (id: NodeId) => {
+        bringToFront(id);
+        root.focus();
+        host.screen.render();
+      };
+
       const pointerToCanvas = (data: blessed.Widgets.Events.IMouseEventArg) => {
         const lpos = canvas.lpos;
         if (!lpos) return undefined;
@@ -391,6 +413,12 @@ export default function setup(host: MicroappHost) {
       };
 
       for (const node of nodes.values()) {
+        node.frame.on("mousedown", () => {
+          selectNode(node.id);
+        });
+        node.content.on("mousedown", () => {
+          selectNode(node.id);
+        });
         if (node.id === "mix") continue;
         node.titleBar.on("mousedown", (data) => {
           const point = pointerToCanvas(data);
@@ -401,7 +429,7 @@ export default function setup(host: MicroappHost) {
             offsetY: point.y - node.y,
           };
           mouseDragAttempts += 1;
-          bringToFront(node.id);
+          selectNode(node.id);
         });
       }
 
@@ -461,7 +489,7 @@ export default function setup(host: MicroappHost) {
         if (input === "b") blendMode = blendMode === "overwrite" ? "mask" : "overwrite";
         if (input === "i") inspectorCollapsed = !inspectorCollapsed;
         if (input === "t") {
-          textInput = TEXT_PHRASES[(phase + 1) % TEXT_PHRASES.length] ?? textInput;
+          phase = (phase + 1) % TEXT_PHRASES.length;
         }
         if (selectedNode === "input" && input === "\b") {
           textInput = textInput.slice(0, -1);
@@ -498,14 +526,42 @@ export default function setup(host: MicroappHost) {
         }
       };
 
+      const handleKeypress = (ch: string, key?: blessed.Widgets.Events.IKeyEventArg) => {
+        if (host.windows.getFocusedWindow()?.id !== win.id) {
+          return;
+        }
+        if (key?.name === "left") {
+          moveSelected(-1, 0);
+          return;
+        }
+        if (key?.name === "right") {
+          moveSelected(1, 0);
+          return;
+        }
+        if (key?.name === "up") {
+          moveSelected(0, -1);
+          return;
+        }
+        if (key?.name === "down") {
+          moveSelected(0, 1);
+          return;
+        }
+        if (key?.name === "backspace") {
+          handleInputSequence("\b");
+          renderNodes();
+          host.screen.render();
+          return;
+        }
+        if (ch) {
+          handleInputSequence(ch);
+          renderNodes();
+          host.screen.render();
+        }
+      };
+
+      host.screen.on("keypress", handleKeypress);
       host.screen.on("mousemove", onMouseMove);
       host.screen.on("mouseup", stopDragging);
-
-      const timer = setInterval(() => {
-        phase = (phase + 1) % 9999;
-        renderNodes();
-        host.screen.render();
-      }, 500);
 
       win.onInput((input) => {
         handleInputSequence(input);
@@ -551,12 +607,13 @@ export default function setup(host: MicroappHost) {
       });
 
       win.onCleanup(() => {
-        clearInterval(timer);
+        host.screen.off("keypress", handleKeypress);
         host.screen.off("mousemove", onMouseMove);
         host.screen.off("mouseup", stopDragging);
       });
 
       renderNodes();
+      root.focus();
       win.focus();
     },
   });
