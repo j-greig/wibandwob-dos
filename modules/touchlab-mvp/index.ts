@@ -97,12 +97,10 @@ function waveSource(width: number, height: number, phase: number): string {
   return gridToText(grid);
 }
 
-function textSource(width: number, height: number, phase: number): string {
+function textSource(width: number, height: number, phrase: string): string {
   const grid = blankGrid(width, height);
-  const word = TEXT_PHRASES[phase % TEXT_PHRASES.length] ?? "signal patch";
   const top = Math.floor(height / 2);
-  paintText(grid, 0, top, word.slice(0, width));
-  paintText(grid, 0, Math.min(height - 1, top + 1), `${phase}`);
+  paintText(grid, 0, top, phrase.slice(0, width));
   return gridToText(grid);
 }
 
@@ -255,7 +253,9 @@ export default function setup(host: MicroappHost) {
       let selectedNode: NodeId = "gen";
       let blendMode: BlendMode = "overwrite";
       let textInput = "human signal";
-      let phase = 0;
+      let phraseIndex = 0;
+      let motionPhase = 0;
+      let animationEnabled = true;
       let inspectorCollapsed = false;
       let dragging:
         | { id: NodeId; offsetX: number; offsetY: number }
@@ -420,6 +420,7 @@ export default function setup(host: MicroappHost) {
             "",
             ` ${node.id}`,
             ` ${blendMode === "overwrite" ? "ow" : "mk"}`,
+            ` ${animationEnabled ? "ani" : "stl"}`,
             "",
             " i",
           ].join("\n"));
@@ -435,6 +436,7 @@ export default function setup(host: MicroappHost) {
           "",
           ` node: ${node.id}`,
           ` blend: ${blendMode}`,
+          ` motion: ${animationEnabled ? "live" : "paused"}`,
           ` fg: ${node.fg}`,
           ` bg: ${node.bg}`,
           ` pos: ${node.x},${node.y}`,
@@ -446,13 +448,14 @@ export default function setup(host: MicroappHost) {
           " -/= bg cycle",
           " ,/. width  n/m height",
           " b blend mode",
+          " space animate",
           " i inspector",
           " t phrase cycle",
           " type in INPUT C",
           " mouse: drag pane or +",
           "",
           " sources:",
-          ` text: ${TEXT_PHRASES[phase % TEXT_PHRASES.length]}`,
+          ` text: ${TEXT_PHRASES[phraseIndex]}`,
           ` input: ${textInput.slice(0, 16)}`,
           "",
           ` mouse drags: ${mouseDragAttempts}`,
@@ -490,8 +493,8 @@ export default function setup(host: MicroappHost) {
         const inspectorWidth = inspectorCollapsed ? 8 : 26;
         inspector.width = inspectorWidth;
         canvas.right = inspectorWidth;
-        const gen = waveSource(24, 6, phase);
-        const text = textSource(22, 5, phase);
+        const gen = waveSource(24, 6, motionPhase);
+        const text = textSource(22, 5, TEXT_PHRASES[phraseIndex] ?? "signal patch");
         const input = inputSource(18, 5, textInput);
         const mix = composite(34, 8, [gen, text, input], blendMode);
 
@@ -655,9 +658,10 @@ export default function setup(host: MicroappHost) {
         if (input === "-") cycleSelectedBg(-1);
         if (input === "=") cycleSelectedBg(1);
         if (input === "b") blendMode = blendMode === "overwrite" ? "mask" : "overwrite";
+        if (input === " ") animationEnabled = !animationEnabled;
         if (input === "i") inspectorCollapsed = !inspectorCollapsed;
         if (input === "t") {
-          phase = (phase + 1) % TEXT_PHRASES.length;
+          phraseIndex = (phraseIndex + 1) % TEXT_PHRASES.length;
         }
         if (input === ",") resizeSelected(-2, 0);
         if (input === ".") resizeSelected(2, 0);
@@ -734,6 +738,12 @@ export default function setup(host: MicroappHost) {
       host.screen.on("keypress", handleKeypress);
       host.screen.on("mousemove", onMouseMove);
       host.screen.on("mouseup", stopDragging);
+      const animationTimer = setInterval(() => {
+        if (!animationEnabled) return;
+        motionPhase = (motionPhase + 1) % 10_000;
+        renderNodes();
+        host.screen.render();
+      }, 180);
 
       win.onInput((input) => {
         handleInputSequence(input);
@@ -746,6 +756,8 @@ export default function setup(host: MicroappHost) {
         contentPreview: "nested drag + composite ascii pipeline",
         selectedNode,
         blendMode,
+        animationEnabled,
+        phraseIndex,
         textInput,
         pipeline: ["gen", "text", "input", "mix"],
         nodes: [...nodes.values()].map((node) => ({
@@ -779,6 +791,7 @@ export default function setup(host: MicroappHost) {
       });
 
       win.onCleanup(() => {
+        clearInterval(animationTimer);
         host.screen.off("keypress", handleKeypress);
         host.screen.off("mousemove", onMouseMove);
         host.screen.off("mouseup", stopDragging);
