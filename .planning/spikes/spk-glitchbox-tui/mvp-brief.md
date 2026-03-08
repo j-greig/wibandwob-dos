@@ -3,6 +3,7 @@ id: SPK-glitchbox-tui
 title: GlitchBox TUI — MVP Brief
 status: not-started
 type: mvp-brief
+issue: 121
 ---
 
 # GlitchBox TUI — MVP Brief
