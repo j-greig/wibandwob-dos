@@ -1316,16 +1316,27 @@ export default function setup(host: MicroappHost) {
       style: host.theme().body,
     });
 
-    // S07: Coordinate translation for drag operations
-    const pointerToCanvas = (data: any) => {
-      const lpos = (canvas as any).lpos;
-      if (!lpos) return undefined;
-      // Account for canvas scroll offset
+    // S07: Convert screen coords → canvas content-space coords (scroll-aware).
+    // Uses canvas.atop/aleft (actual screen position) which are reliable
+    // after first render, unlike lpos which can be stale in scrollable boxes.
+    const pointerToContent = (screenX: number, screenY: number) => {
+      const ct = (canvas as any).atop  ?? (canvas as any).lpos?.yi ?? 1;
+      const cl = (canvas as any).aleft ?? (canvas as any).lpos?.xi ?? 1;
       const scrollY = (canvas as any).getScroll?.() ?? 0;
-      return {
-        x: data.x - lpos.xi,
-        y: data.y - lpos.yi + scrollY,
-      };
+      return { x: screenX - cl, y: screenY - ct + scrollY };
+    };
+
+    // S07: Hit-test a content-space point against all panel nodes.
+    const hitPanel = (cx: number, cy: number): PanelNode | undefined => {
+      for (const node of panelNodes.values()) {
+        const w = Number(node.frame.width)  || node.def.w;
+        const h = Number(node.frame.height) || node.def.h;
+        if (cx >= node.x && cx < node.x + w &&
+            cy >= node.y && cy < node.y + h) {
+          return node;
+        }
+      }
+      return undefined;
     };
 
     // Arrow overlay — full content height, scrolls with canvas
@@ -1430,23 +1441,7 @@ export default function setup(host: MicroappHost) {
         lastClickTime = now;
       });
 
-      // S07: Panel drag-to-move handlers
-      const startDrag = (data: any) => {
-        const pt = pointerToCanvas(data);
-        if (!pt) return;
-        const node = panelNodes.get(def.id);
-        if (!node) return;
-        dragging = {
-          id: def.id,
-          offsetX: pt.x - node.x,
-          offsetY: pt.y - node.y,
-        };
-        activePanelId = def.id;
-        applyStyles();
-      };
-      frame.on("mousedown", startDrag);
-      titleBar.on("mousedown", startDrag);
-      content.on("mousedown", startDrag);
+      // S07: drag initiation handled in screen-level hit-test handler below
 
       panelNodes.set(def.id, {
         def,
@@ -1693,29 +1688,46 @@ export default function setup(host: MicroappHost) {
     host.screen.on('mouse', handleWheel);
     win.onCleanup(() => host.screen.off('mouse', handleWheel));
 
-    // S07: Global drag handler for panel movement
+    // S07: Single screen-level handler — hit-test for drag start, then track.
+    // Avoids relying on child mousedown events which are unreliable inside
+    // a scrollable blessed.box.
     const handleDragMouse = (data: any) => {
+      if (data.action === 'wheeldown' || data.action === 'wheelup') return; // let wheel handler run
+
       if (data.action === 'mouseup') {
-        if (dragging) {
-          dragging = undefined;
+        dragging = undefined;
+        return;
+      }
+
+      if (data.action === 'mousedown') {
+        const pt = pointerToContent(data.x, data.y);
+        const node = hitPanel(pt.x, pt.y);
+        if (node) {
+          dragging = {
+            id: node.def.id,
+            offsetX: pt.x - node.x,
+            offsetY: pt.y - node.y,
+          };
+          activePanelId = node.def.id;
+          applyStyles();
           host.screen.render();
         }
         return;
       }
-      if (!dragging || data.action !== 'mousemove') return;
-      const pt = pointerToCanvas(data);
-      if (!pt) return;
-      const node = panelNodes.get(dragging.id);
-      if (!node) return;
-      // Update position override
-      const newX = Math.max(0, pt.x - dragging.offsetX);
-      const newY = Math.max(0, pt.y - dragging.offsetY);
-      panelPositionOverrides.set(dragging.id, { x: newX, y: newY });
-      node.x = newX;
-      node.y = newY;
-      node.frame.left = newX;
-      node.frame.top = newY;
-      host.screen.render();
+
+      if (data.action === 'mousemove' && dragging) {
+        const pt = pointerToContent(data.x, data.y);
+        const node = panelNodes.get(dragging.id);
+        if (!node) return;
+        const newX = Math.max(0, pt.x - dragging.offsetX);
+        const newY = Math.max(0, pt.y - dragging.offsetY);
+        panelPositionOverrides.set(dragging.id, { x: newX, y: newY });
+        node.x = newX;
+        node.y = newY;
+        node.frame.left = newX;
+        node.frame.top = newY;
+        host.screen.render();
+      }
     };
     host.screen.on('mouse', handleDragMouse);
     win.onCleanup(() => host.screen.off('mouse', handleDragMouse));
