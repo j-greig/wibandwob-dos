@@ -175,7 +175,10 @@ export class ControlApiService {
       try {
         this.server = bunRuntime.serve({
           port,
-          hostname: "127.0.0.1",
+          // Binds 0.0.0.0 inside container — Docker -p 127.0.0.1:8099:8099 is
+          // what restricts external access. Direct/systemd deploy: firewall or
+          // WIBWOB_CONTROL_API_HOST env var should gate this (future work).
+          hostname: process.env.WIBWOB_CONTROL_API_HOST ?? "0.0.0.0",
           fetch: async (request) => this.handleRequest(request),
         });
         this.actualPort = port;
