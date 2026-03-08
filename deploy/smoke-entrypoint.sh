@@ -52,7 +52,7 @@ echo "[smoke] starting ttyd on port 7681..."
 # --writable: browser can type into the TUI (not read-only)
 # Binds 0.0.0.0 in container — host publish controls actual exposure
 ttyd --writable -p 7681 \
-  su -c "tmux -S $TMUX_SOCKET attach -t wibwob" wibwob &
+  su -c "tmux -S $TMUX_SOCKET attach-session -t wibwob" wibwob &
 TTYD_PID=$!
 sleep 1 && curl -sf http://127.0.0.1:7681/ > /dev/null \
   && echo "[smoke] ttyd OK — TUI at http://localhost:7681/" \

@@ -41,8 +41,11 @@ interface StateDependencies {
  * wires this to `syncState()` which calls `sync()`.
  */
 export class StateService {
+  private static readonly AUTO_SAVE_DEBOUNCE_MS = 2000;
+
   private latestState: DesktopState;
   private readonly listeners = new Set<(state: DesktopState) => void>();
+  private autoSaveTimer?: ReturnType<typeof setTimeout>;
 
   constructor(
     private readonly options: StateServiceOptions,
@@ -74,13 +77,29 @@ export class StateService {
     this.latestState = nextState;
     // Don't persist corrupt state from headless/piped runs — min sane terminal is 20×6
     if (nextState.screen.width >= 20 && nextState.screen.height >= 6) {
-      fs.mkdirSync(path.dirname(this.options.statePath), { recursive: true });
-      fs.writeFileSync(this.options.statePath, `${JSON.stringify(nextState, null, 2)}\n`, "utf8");
+      this.writeStateAtomically(nextState);
     }
     for (const listener of this.listeners) {
       listener(nextState);
     }
     return nextState;
+  }
+
+  scheduleAutoSave(): void {
+    if (this.autoSaveTimer) {
+      clearTimeout(this.autoSaveTimer);
+    }
+    this.autoSaveTimer = setTimeout(() => {
+      this.autoSaveTimer = undefined;
+      this.persistAndNotify();
+    }, StateService.AUTO_SAVE_DEBOUNCE_MS);
+  }
+
+  private writeStateAtomically(state: DesktopState): void {
+    fs.mkdirSync(path.dirname(this.options.statePath), { recursive: true });
+    const tempPath = `${this.options.statePath}.tmp`;
+    fs.writeFileSync(tempPath, `${JSON.stringify(state, null, 2)}\n`, "utf8");
+    fs.renameSync(tempPath, this.options.statePath);
   }
 
   private buildState(): DesktopState {

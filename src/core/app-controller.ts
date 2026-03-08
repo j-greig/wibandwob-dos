@@ -342,7 +342,7 @@ export class TsTuiMvpApp {
     this.renderChrome();
     this.bindGlobalKeys();
     this.menuUi.bindMenuClicks((label) => this.openMenu(label));
-    this.restoreDefaultWorkspace();
+    this.restoreStartupWorkspace();
     this.controlApi.start();
     this.persistState();
     this.screen.render();
@@ -351,28 +351,77 @@ export class TsTuiMvpApp {
     );
   }
 
+  private restoreStartupWorkspace(): void {
+    if (this.restoreStateFileWorkspace()) return;
+    this.restoreDefaultWorkspace();
+  }
+
+  private restoreStateFileWorkspace(): boolean {
+    if (!fs.existsSync(STATE_PATH)) {
+      return false;
+    }
+    try {
+      const raw = JSON.parse(fs.readFileSync(STATE_PATH, "utf8")) as DesktopState;
+      const savedTheme = typeof raw.app?.theme === "string" ? raw.app.theme : undefined;
+      const snapshots = this.snapshotsFromDesktopState(raw);
+      this.restoreSnapshots(snapshots, savedTheme);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private snapshotsFromDesktopState(state: DesktopState): WindowSnapshot[] {
+    const transientAppTypes = new Set([
+      "command-palette",
+      "workspace-manager",
+      "state-inspector",
+      "contour-studio",
+      "terrain-lab",
+      "music-player",
+    ]);
+    return [...state.windows]
+      .sort((a, b) => a.zIndex - b.zIndex)
+      .filter((window) => !transientAppTypes.has(window.appType))
+      .map((window) => ({
+        kind: window.kind,
+        title: window.title,
+        left: Number(window.left) || 0,
+        top: Number(window.top) || 0,
+        width: Math.max(20, Number(window.width) || 80),
+        height: Math.max(6, Number(window.height) || 24),
+        filePath: window.filePath,
+        focused: window.focused,
+        payload: { appType: window.appType },
+      }));
+  }
+
+  private restoreSnapshots(snapshots: WindowSnapshot[], savedTheme?: string): void {
+    if (savedTheme) {
+      const variant = allVariants().find((v) => v.name === savedTheme);
+      if (variant) {
+        setThemeVariant(variant);
+        this.applyTheme();
+      }
+    }
+    if (snapshots.length === 0) return;
+    let focusedWindow: WindowRecord | undefined;
+    for (const snapshot of snapshots) {
+      const restored = restoreWindowSnapshot(
+        snapshot,
+        this.getRestoreActions(),
+      );
+      if (snapshot.focused) focusedWindow = restored;
+    }
+    focusedWindow?.focus();
+  }
+
   /** Restore default workspace on boot. Empty desktop if none exists. */
   private restoreDefaultWorkspace(): void {
     if (!this.workspace.exists()) return;
     try {
       const { windows: snapshots, theme: savedTheme } = this.workspace.load();
-      if (savedTheme) {
-        const variant = allVariants().find((v) => v.name === savedTheme);
-        if (variant) {
-          setThemeVariant(variant);
-          this.applyTheme();
-        }
-      }
-      if (snapshots.length === 0) return;
-      let focusedWindow: WindowRecord | undefined;
-      for (const snapshot of snapshots) {
-        const restored = restoreWindowSnapshot(
-          snapshot,
-          this.getRestoreActions(),
-        );
-        if (snapshot.focused) focusedWindow = restored;
-      }
-      focusedWindow?.focus();
+      this.restoreSnapshots(snapshots, savedTheme);
     } catch {
       // Corrupt workspace — start with empty desktop
     }
@@ -1956,6 +2005,7 @@ export class TsTuiMvpApp {
    *  Use for routine mutations: drag, resize, focus, typing, window-internal state changes. */
   private syncLiveState(): void {
     this.updateStatusLine();
+    this.state.scheduleAutoSave();
   }
 
   /** Expensive state checkpoint: rebuild, write to disk, fire listeners.
