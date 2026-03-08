@@ -35,6 +35,7 @@ Patchbay Lab v1 should prove:
 - [x] Add one animation bench using `createAnimatedPanel`
 - [x] Add one chat bench using `host.worldChat`
 - [x] Add one nested primer gallery subview with internal tab bar and picker
+- [x] Add visible nested panel chrome and local focus affordances for the primer bench
 - [x] Add one state/inspector pane driven by semantic state
 - [x] Add helper-window spawn/close controls and ownership tracking
 - [x] Add snapshot save/restore for the main Patchbay Lab window
@@ -68,6 +69,9 @@ Patchbay Lab v1 should prove:
 - nested gallery composition still leans on raw Blessed boxes inside one custom
   surface part; it works, but it shows where higher-order SDK sublayout helpers
   would reduce hand wiring
+- nested panel focus is now explicit inside Patchbay, which is directionally
+  right, but it is still app-local logic rather than a reusable SDK `panel
+  chrome` primitive
 
 ## Patchbay v2 Stretch Goal
 

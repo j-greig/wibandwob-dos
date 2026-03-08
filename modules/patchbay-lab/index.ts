@@ -23,6 +23,7 @@ import {
 
 type ViewMode = "overview" | "terrain" | "chat";
 type HelperKind = "signal-monitor" | "note-cloud";
+type PrimerPaneFocus = "list" | "preview";
 
 const VIEW_BUTTONS = [
   { id: "overview", label: "OVERVIEW" },
@@ -210,6 +211,7 @@ export default function setup(host: MicroappHost) {
       ? clamp(Math.floor(args.primerTabIndex), 0, Math.max(0, primerTabButtons.length - 1))
       : 0;
     let activePrimerIndex = typeof args?.primerIndex === "number" ? Math.max(0, Math.floor(args.primerIndex)) : 0;
+    let primerPaneFocus: PrimerPaneFocus = args?.primerPaneFocus === "preview" ? "preview" : "list";
 
     const helperWindows = new Map<HelperKind, { id: number; render: () => void; close: () => void }>();
     const desktopWidth = Math.max(48, Math.floor(host.geometry.width));
@@ -344,6 +346,34 @@ export default function setup(host: MicroappHost) {
       height: 0,
       style: host.theme().body,
     });
+    const primerFrameBox = blessed.box({
+      parent: viewSurfaceNode,
+      top: 0,
+      left: 0,
+      width: 0,
+      height: 0,
+      tags: true,
+      border: "line",
+      style: host.theme().body,
+    });
+    const primerFrameTitle = blessed.box({
+      parent: primerFrameBox,
+      top: 0,
+      left: 1,
+      right: 1,
+      height: 1,
+      tags: true,
+      style: host.theme().header,
+    });
+    const primerFrameStatus = blessed.box({
+      parent: primerFrameBox,
+      left: 1,
+      right: 1,
+      height: 1,
+      bottom: 0,
+      tags: true,
+      style: host.theme().footer ?? host.theme().body,
+    });
     const simplePreviewBox = blessed.box({
       parent: viewSurfaceNode,
       top: 0,
@@ -358,7 +388,7 @@ export default function setup(host: MicroappHost) {
       style: host.theme().body,
     });
     const primerSidebarBox = blessed.box({
-      parent: viewSurfaceNode,
+      parent: primerFrameBox,
       top: 0,
       left: 0,
       width: 0,
@@ -371,7 +401,7 @@ export default function setup(host: MicroappHost) {
       style: host.theme().body,
     });
     const primerDividerBox = blessed.box({
-      parent: viewSurfaceNode,
+      parent: primerFrameBox,
       top: 0,
       left: 0,
       width: 0,
@@ -380,7 +410,7 @@ export default function setup(host: MicroappHost) {
       style: host.theme().muted ?? host.theme().body,
     });
     const primerContentBox = blessed.box({
-      parent: viewSurfaceNode,
+      parent: primerFrameBox,
       top: 0,
       left: 0,
       width: 0,
@@ -397,31 +427,55 @@ export default function setup(host: MicroappHost) {
       layout(rect: Rect) {
         host.ui.applyRect(viewSurfaceNode, rect);
         if (view === "overview") {
+          const frameInset = 1;
+          const titleHeight = 1;
+          const statusHeight = 1;
           const sidebarWidth = clamp(Math.floor(rect.width * 0.32), 24, 36);
           const dividerWidth = 1;
           simplePreviewBox.hide();
+          primerFrameBox.show();
+          primerFrameTitle.show();
+          primerFrameStatus.show();
           primerSidebarBox.show();
           primerDividerBox.show();
           primerContentBox.show();
-          host.ui.applyRect(primerSidebarBox, {
+          host.ui.applyRect(primerFrameBox, rect);
+          host.ui.applyRect(primerFrameTitle, {
             top: 0,
-            left: 0,
+            left: 1,
+            width: Math.max(0, rect.width - 2),
+            height: titleHeight,
+          });
+          host.ui.applyRect(primerFrameStatus, {
+            top: Math.max(0, rect.height - 1),
+            left: 1,
+            width: Math.max(0, rect.width - 2),
+            height: statusHeight,
+          });
+          const innerTop = frameInset + titleHeight;
+          const innerHeight = Math.max(0, rect.height - frameInset - titleHeight - statusHeight - frameInset);
+          host.ui.applyRect(primerSidebarBox, {
+            top: innerTop,
+            left: frameInset,
             width: sidebarWidth,
-            height: rect.height,
+            height: innerHeight,
           });
           host.ui.applyRect(primerDividerBox, {
-            top: 0,
-            left: sidebarWidth,
+            top: innerTop,
+            left: frameInset + sidebarWidth,
             width: dividerWidth,
-            height: rect.height,
+            height: innerHeight,
           });
           host.ui.applyRect(primerContentBox, {
-            top: 0,
-            left: sidebarWidth + dividerWidth,
-            width: Math.max(0, rect.width - sidebarWidth - dividerWidth),
-            height: rect.height,
+            top: innerTop,
+            left: frameInset + sidebarWidth + dividerWidth,
+            width: Math.max(0, rect.width - (frameInset * 2) - sidebarWidth - dividerWidth),
+            height: innerHeight,
           });
         } else {
+          primerFrameBox.hide();
+          primerFrameTitle.hide();
+          primerFrameStatus.hide();
           primerSidebarBox.hide();
           primerDividerBox.hide();
           primerContentBox.hide();
@@ -432,10 +486,23 @@ export default function setup(host: MicroappHost) {
       update() {},
       restyle() {
         viewSurfaceNode.style = host.theme().body;
+        primerFrameBox.style = {
+          ...(host.theme().body ?? {}),
+          border: {
+            ...(host.theme().body?.border ?? {}),
+            fg: primerPaneFocus === "list" ? "yellow" : "cyan",
+          },
+        } as blessed.Widgets.BoxOptions["style"];
+        primerFrameTitle.style = primerPaneFocus === "list" ? host.theme().header : host.theme().footer ?? host.theme().body;
+        primerFrameStatus.style = host.theme().footer ?? host.theme().body;
         simplePreviewBox.style = host.theme().body;
-        primerSidebarBox.style = host.theme().body;
+        primerSidebarBox.style = primerPaneFocus === "list"
+          ? { ...(host.theme().body ?? {}), inverse: true }
+          : host.theme().body;
         primerDividerBox.style = host.theme().muted ?? host.theme().body;
-        primerContentBox.style = host.theme().body;
+        primerContentBox.style = primerPaneFocus === "preview"
+          ? { ...(host.theme().body ?? {}), inverse: true }
+          : host.theme().body;
       },
       destroy() {
         viewSurfaceNode.destroy();
@@ -648,6 +715,12 @@ export default function setup(host: MicroappHost) {
       };
     }
 
+    function togglePrimerPaneFocus(): void {
+      primerPaneFocus = primerPaneFocus === "list" ? "preview" : "list";
+      pushEvent(`primer focus -> ${primerPaneFocus}`);
+      render();
+    }
+
     function renderInspector(): string {
       const channel = channelId ? host.worldChat.readChannel(channelId) : undefined;
       const transport = host.worldChat.getTransportStatus();
@@ -702,6 +775,7 @@ export default function setup(host: MicroappHost) {
         "[x] close helpers",
         "",
         "Primer bench:",
+        "[tab] toggle list/preview focus",
         "[j/k] primer up/down",
         "[[] prev tab",
         "[]] next tab",
@@ -738,7 +812,7 @@ export default function setup(host: MicroappHost) {
           : `${summarizeChannel(host, channelId)} · seed ${seed}`;
       lastStatusRight =
         view === "overview"
-          ? "[j/k] select [[]/[]] tabs [m/n] helpers [q] close"
+          ? `[tab] ${primerPaneFocus} · [j/k] select [[]/[]] tabs [m/n] helpers [q] close`
           : "[1-3] views [r] reseed [m/n] helpers [p] ping [q] close";
 
       headerBar.update({
@@ -759,6 +833,12 @@ export default function setup(host: MicroappHost) {
         const gallery = renderPrimerGallery();
         previewText = `${gallery.sidebar}\n\n${gallery.content}`;
         simplePreviewBox.setContent("");
+        primerFrameTitle.setContent(
+          `${primerPaneFocus === "list" ? "{black-fg}{yellow-bg} Primer Bench {/yellow-bg}{/black-fg}" : "{black-fg}{cyan-bg} Primer Bench {/cyan-bg}{/black-fg}"}  ${currentPrimerTab().label}`,
+        );
+        primerFrameStatus.setContent(
+          ` ${primerPaneFocus === "list" ? "LIST ACTIVE" : "PREVIEW ACTIVE"}  Tab switch  j/k select  [ ] tabs `,
+        );
         primerSidebarBox.setContent(gallery.sidebar);
         primerDividerBox.setContent(Array.from({ length: Math.max(1, Number(primerDividerBox.height) || 1) }, () => "│").join("\n"));
         primerContentBox.setContent(gallery.content);
@@ -824,6 +904,7 @@ export default function setup(host: MicroappHost) {
     win.body.key(["m"], () => control?.spawnHelper("signal-monitor"));
     win.body.key(["n"], () => control?.spawnHelper("note-cloud"));
     win.body.key(["x"], () => control?.closeHelpers());
+    win.body.key(["tab"], () => { if (view === "overview") togglePrimerPaneFocus(); });
     win.body.key(["j"], () => { if (view === "overview") movePrimerSelection(1); });
     win.body.key(["k"], () => { if (view === "overview") movePrimerSelection(-1); });
     win.body.key(["["], () => { if (view === "overview") switchPrimerTab(activePrimerTabIndex - 1); });
@@ -860,6 +941,7 @@ export default function setup(host: MicroappHost) {
       primerTabLabel: currentPrimerTab().label,
       primerIndex: activePrimerIndex,
       primerLabel: currentPrimerEntry()?.label,
+      primerPaneFocus,
       helperKinds: [...helperWindows.keys()],
       helperWindowIds: [...helperWindows.values()].map((helper) => helper.id),
       eventCount: eventLines.length,
@@ -982,6 +1064,7 @@ export default function setup(host: MicroappHost) {
         channelId: payload.channelId,
         primerTabIndex: payload.primerTabIndex,
         primerIndex: payload.primerIndex,
+        primerPaneFocus: payload.primerPaneFocus,
         helperKinds: payload.helperKinds,
       });
     },
