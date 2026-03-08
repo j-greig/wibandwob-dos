@@ -149,8 +149,12 @@ export const DEV_RELOAD_EXIT_CODE = 75;
 function loadOrGenerateControlToken(): string {
   const fromEnv = process.env.WIBWOB_CONTROL_TOKEN?.trim();
   if (fromEnv) {
-    process.stderr.write("[control-api] token loaded from env\n");
-    return fromEnv;
+    if (fromEnv.length < 32) {
+      process.stderr.write("[control-api] WIBWOB_CONTROL_TOKEN too short (min 32 chars) — ignoring, generating fresh token\n");
+    } else {
+      process.stderr.write("[control-api] token loaded from env\n");
+      return fromEnv;
+    }
   }
 
   try {

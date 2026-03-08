@@ -145,7 +145,7 @@ export class ControlApiService {
     private readonly port: number,
     private readonly handlers: ControlApiHandlers,
     private readonly identity: ControlApiIdentity,
-    private readonly token: string | null = null,
+    private readonly token: string,
   ) {}
 
   start(): void {
@@ -175,6 +175,7 @@ export class ControlApiService {
       try {
         this.server = bunRuntime.serve({
           port,
+          hostname: "127.0.0.1",
           fetch: async (request) => this.handleRequest(request),
         });
         this.actualPort = port;
@@ -213,12 +214,17 @@ export class ControlApiService {
         url.pathname === "/openapi.json" ||
         url.pathname === "/health");
 
-    if (!isPublicEndpoint && this.token !== null) {
+    if (!isPublicEndpoint) {
       const authHeader = request.headers.get("Authorization");
-      const provided = authHeader?.startsWith("Bearer ")
-        ? authHeader.slice(7)
-        : null;
-      if (provided !== this.token) {
+      const provided = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : "";
+      // Constant-time compare — prevents timing oracle even on loopback
+      const tokenBuf = Buffer.from(this.token.padEnd(64));
+      const providedBuf = Buffer.from(provided.padEnd(64));
+      const match =
+        provided.length === this.token.length &&
+        tokenBuf.length === providedBuf.length &&
+        require("node:crypto").timingSafeEqual(tokenBuf, providedBuf);
+      if (!match) {
         return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
       }
     }
