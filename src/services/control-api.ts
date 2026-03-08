@@ -228,6 +228,9 @@ export class ControlApiService {
         port: this.actualPort,
         instanceLabel: this.identity.instanceLabel,
         sessionId: this.identity.sessionId,
+        // deployProfile confirms the capability profile loaded (or absent = no profile).
+        // Critical: if this is absent/null when WIBWOB_DEPLOY_PROFILE is set, profile silently failed.
+        deployProfile: process.env.WIBWOB_DEPLOY_PROFILE?.trim() ?? null,
       });
     }
 

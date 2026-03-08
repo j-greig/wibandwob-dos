@@ -1,0 +1,10 @@
+{
+  "description": "MVP hosted deployment — public-safe surface. Disables native deps not on VPS, resource-heavy apps, and commands that destabilise shared sessions.",
+  "forceOff": [
+    "bin.chrome",
+    "path.monster_cam.venv",
+    "path.backrooms.repo",
+    "feature.resource-heavy"
+  ],
+  "forceOn": []
+}
