@@ -24,13 +24,20 @@ before running connect.sh — it will tunnel and fetch the token via SSH.
 ## Always do this first
 
 ```bash
-# Verify profile loaded (deployProfile must not be null)
+# Health — sessionId + deployProfile live HERE not in /state
 curl -s "$WIBWOB_API/health"
 
-# Read live state — get real window ids, never guess
-curl -s -H "Authorization: Bearer $WIBWOB_TOKEN" "$WIBWOB_API/state"
+# Minimap — window fields are left/top/width/height at top level (no rect key)
+curl -s -H "Authorization: Bearer $WIBWOB_TOKEN" "$WIBWOB_API/state" | python3 -c "
+import json,sys
+d=json.load(sys.stdin); s=d['screen']
+print(f'desktop {s[\"width\"]}x{s[\"height\"]}  {len(d[\"windows\"])} windows')
+for w in d['windows']:
+    f='◀' if w.get('focused') else ' '
+    print(f'  {f}[{w[\"id\"]:>2}] {w.get(\"title\",\"?\"):<28} @{w.get(\"left\",0)},{w.get(\"top\",0)}  {w.get(\"width\",0)}x{w.get(\"height\",0)}')
+"
 
-# See what commands are available under this profile
+# Commands available under current profile
 curl -s -H "Authorization: Bearer $WIBWOB_TOKEN" "$WIBWOB_API/commands/list"
 ```
 
