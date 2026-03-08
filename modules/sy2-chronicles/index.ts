@@ -1253,6 +1253,22 @@ function layoutPanels(panels: PanelDef[], maxWidth: number): LayoutResult {
 
 export default function setup(host: MicroappHost) {
   let snapshotRegistered = false;
+  let commandsRegistered = false;
+
+  // S07: Panel drag-to-move state (module-level for persistence across opens)
+  let dragging: { id: string; offsetX: number; offsetY: number } | undefined;
+  const panelPositionOverrides = new Map<string, { x: number; y: number }>();
+
+  // S08: Double-click edit state
+  const contentOverrides = new Map<string, string>();
+  let editingPanelId: string | undefined;
+
+  // S09: Module-level references for command handlers
+  let activePanelNodes: Map<string, PanelNode> | undefined;
+  let activeApplyStyles: (() => void) | undefined;
+  let activeRenderLayoutAndContent: (() => void) | undefined;
+  let activeCanvas: any;
+  let activeSetPanelId: ((id: string) => void) | undefined;
 
   function openChronicles(args?: Record<string, unknown>) {
     const win = host.createWindow({
@@ -1299,6 +1315,18 @@ export default function setup(host: MicroappHost) {
       },
       style: host.theme().body,
     });
+
+    // S07: Coordinate translation for drag operations
+    const pointerToCanvas = (data: any) => {
+      const lpos = (canvas as any).lpos;
+      if (!lpos) return undefined;
+      // Account for canvas scroll offset
+      const scrollY = (canvas as any).getScroll?.() ?? 0;
+      return {
+        x: data.x - lpos.xi,
+        y: data.y - lpos.yi + scrollY,
+      };
+    };
 
     // Arrow overlay — full content height, scrolls with canvas
     const arrowOverlay = blessed.box({
@@ -1362,6 +1390,61 @@ export default function setup(host: MicroappHost) {
       frame.on("click", () => focusPanel(def.id));
       titleBar.on("click", () => focusPanel(def.id));
       content.on("click", () => focusPanel(def.id));
+
+      // S08: Double-click → inline edit mode (text panels only)
+      let lastClickTime = 0;
+      const DBLCLICK_MS = 350;
+      const enterEditMode = () => {
+        if (editingPanelId) return; // already editing another
+        editingPanelId = def.id;
+        const currentText = contentOverrides.get(def.id) ?? def.content(0, Math.max(1, def.w - 2), Math.max(1, def.h - 2));
+        const editor = blessed.textarea({
+          parent: frame,
+          top: 1, left: 1, right: 1, bottom: 1,
+          keys: true, mouse: true,
+          inputOnFocus: true,
+          style: { ...host.theme().body, border: { fg: host.theme().selected.bg } },
+          content: currentText,
+          scrollable: true,
+        });
+        editor.setValue(currentText);
+        editor.focus();
+        host.screen.render();
+        const exitEdit = () => {
+          const saved = editor.getValue();
+          contentOverrides.set(def.id, saved);
+          editor.destroy();
+          editingPanelId = undefined;
+          renderLayoutAndContent();
+          host.screen.render();
+        };
+        editor.key(['escape'], exitEdit);
+        editor.key(['C-s'], exitEdit);
+        editor.on('blur', exitEdit);
+      };
+      content.on("click", () => {
+        const now = Date.now();
+        if (now - lastClickTime < DBLCLICK_MS) enterEditMode();
+        lastClickTime = now;
+      });
+
+      // S07: Panel drag-to-move handlers
+      const startDrag = (data: any) => {
+        const pt = pointerToCanvas(data);
+        if (!pt) return;
+        const node = panelNodes.get(def.id);
+        if (!node) return;
+        dragging = {
+          id: def.id,
+          offsetX: pt.x - node.x,
+          offsetY: pt.y - node.y,
+        };
+        activePanelId = def.id;
+        applyStyles();
+      };
+      frame.on("mousedown", startDrag);
+      titleBar.on("mousedown", startDrag);
+      content.on("mousedown", startDrag);
 
       panelNodes.set(def.id, {
         def,
@@ -1490,6 +1573,15 @@ export default function setup(host: MicroappHost) {
       panelPlacements = layout.placements;
       totalContentHeight = Math.max(layout.contentHeight, viewportHeight);
 
+      // S07: Apply position overrides from user drags
+      for (const placement of layout.placements) {
+        const override = panelPositionOverrides.get(placement.id);
+        if (override) {
+          placement.x = override.x;
+          placement.y = override.y;
+        }
+      }
+
       // Position frames at natural content positions — canvas.scrollable handles clipping
       for (const placement of layout.placements) {
         const node = panelNodes.get(placement.id);
@@ -1507,7 +1599,10 @@ export default function setup(host: MicroappHost) {
         const size = sizeMap.get(node.def.id) ?? { w: 3, h: 3 };
         const contentWidth = Math.max(1, size.w - 2);
         const contentHeight = Math.max(1, size.h - 2);
-        node.content.setContent(node.def.content(tick, contentWidth, contentHeight));
+        // S08: use override text if panel was edited, skip live animation if editing
+        if (editingPanelId === node.def.id) continue;
+        const override = contentOverrides.get(node.def.id);
+        node.content.setContent(override ?? node.def.content(tick, contentWidth, contentHeight));
       }
 
       // Arrow overlay — full content height so arrows scroll with panels
@@ -1593,6 +1688,33 @@ export default function setup(host: MicroappHost) {
     host.screen.on('mouse', handleWheel);
     win.onCleanup(() => host.screen.off('mouse', handleWheel));
 
+    // S07: Global drag handler for panel movement
+    const handleDragMouse = (data: any) => {
+      if (data.action === 'mouseup') {
+        if (dragging) {
+          dragging = undefined;
+          host.screen.render();
+        }
+        return;
+      }
+      if (!dragging || data.action !== 'mousemove') return;
+      const pt = pointerToCanvas(data);
+      if (!pt) return;
+      const node = panelNodes.get(dragging.id);
+      if (!node) return;
+      // Update position override
+      const newX = Math.max(0, pt.x - dragging.offsetX);
+      const newY = Math.max(0, pt.y - dragging.offsetY);
+      panelPositionOverrides.set(dragging.id, { x: newX, y: newY });
+      node.x = newX;
+      node.y = newY;
+      node.frame.left = newX;
+      node.frame.top = newY;
+      host.screen.render();
+    };
+    host.screen.on('mouse', handleDragMouse);
+    win.onCleanup(() => host.screen.off('mouse', handleDragMouse));
+
     // Add wheel handlers directly on canvas
     canvas.on('wheeldown', () => { (canvas as any).scroll(3); host.screen.render(); });
     canvas.on('wheelup', () => { (canvas as any).scroll(-3); host.screen.render(); });
@@ -1603,6 +1725,15 @@ export default function setup(host: MicroappHost) {
       panelCount: PANEL_DEFS.length,
       activePanelId,
       contentHeight: totalContentHeight,
+      panels: [...panelNodes.entries()].map(([id, node]) => ({
+        id,
+        title: node.def.title,
+        x: node.x,
+        y: node.y,
+        w: node.frame.width,
+        h: node.frame.height,
+        live: node.def.live ?? false,
+      })),
     }));
 
     win.captureText(() => {
@@ -1635,6 +1766,8 @@ export default function setup(host: MicroappHost) {
       const { width: viewportWidth } = measureViewport();
       for (const node of panelNodes.values()) {
         if (!node.def.live) continue;
+        if (editingPanelId === node.def.id) continue; // don't clobber editor
+        if (contentOverrides.has(node.def.id)) continue; // static override wins
         const baseSize = getPanelSize(node.def.id, node.def);
         const size = { w: clamp(baseSize.w, 3, viewportWidth), h: Math.max(3, baseSize.h) };
         const contentWidth = Math.max(1, size.w - 2);
@@ -1658,6 +1791,77 @@ export default function setup(host: MicroappHost) {
       });
       snapshotRegistered = true;
     }
+
+    // S09: Set module-level references for command handlers
+    activePanelNodes = panelNodes;
+    activeApplyStyles = applyStyles;
+    activeRenderLayoutAndContent = renderLayoutAndContent;
+    activeCanvas = canvas;
+    activeSetPanelId = (id: string) => { activePanelId = id; };
+
+    // S09: Register agent panel manipulation commands (once)
+    if (!commandsRegistered) {
+      host.registerCommand({
+        id: 'panel.move',
+        label: 'Move Panel',
+        description: 'Move a §y² Chronicles panel to a new position',
+        action: (args: Record<string, unknown>) => {
+          const id = String(args.id ?? '');
+          const x = Number(args.x ?? 0);
+          const y = Number(args.y ?? 0);
+          if (!activePanelNodes) return { ok: false, error: 'No active window' };
+          const node = activePanelNodes.get(id);
+          if (!node) return { ok: false, error: `Panel not found: ${id}` };
+          panelPositionOverrides.set(id, { x, y });
+          node.x = x; node.y = y;
+          node.frame.left = x; node.frame.top = y;
+          host.screen.render();
+          return { ok: true, id, x, y };
+        },
+      });
+
+      host.registerCommand({
+        id: 'panel.focus',
+        label: 'Focus Panel',
+        description: 'Focus and highlight a §y² Chronicles panel',
+        action: (args: Record<string, unknown>) => {
+          const id = String(args.id ?? '');
+          if (!activePanelNodes) return { ok: false, error: 'No active window' };
+          if (!activePanelNodes.has(id)) return { ok: false, error: `Panel not found: ${id}` };
+          activeSetPanelId?.(id);
+          activeApplyStyles?.();
+          host.screen.render();
+          // Scroll to make it visible
+          const node = activePanelNodes.get(id)!;
+          activeCanvas?.scrollTo?.(Math.max(0, node.y - 5));
+          host.screen.render();
+          return { ok: true, id };
+        },
+      });
+
+      host.registerCommand({
+        id: 'panel.reset',
+        label: 'Reset Panel Layout',
+        description: 'Reset all panels to their computed layout positions',
+        action: () => {
+          panelPositionOverrides.clear();
+          activeRenderLayoutAndContent?.();
+          host.screen.render();
+          return { ok: true };
+        },
+      });
+
+      commandsRegistered = true;
+    }
+
+    // S09: Clear references on cleanup
+    win.onCleanup(() => {
+      activePanelNodes = undefined;
+      activeApplyStyles = undefined;
+      activeRenderLayoutAndContent = undefined;
+      activeCanvas = undefined;
+      activeSetPanelId = undefined;
+    });
 
     renderLayoutAndContent();
     root.focus();
