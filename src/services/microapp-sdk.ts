@@ -37,6 +37,35 @@ import type {
   MicroappWindowHandle,
 } from "./module-loader.js";
 
+export interface AnimationClock {
+  readonly tick: number;
+  subscribe(handler: (tick: number) => void): () => void;  // returns unsubscribe fn
+  play(): void;
+  pause(): void;
+  destroy(): void;
+}
+
+export function createAnimationClock(fps: number): AnimationClock {
+  let tick = 0;
+  let running = true;
+  const handlers = new Set<(tick: number) => void>();
+  const interval = setInterval(() => {
+    if (!running) return;
+    tick++;
+    for (const h of handlers) h(tick);
+  }, Math.round(1000 / fps));
+  return {
+    get tick() { return tick; },
+    subscribe(handler) {
+      handlers.add(handler);
+      return () => handlers.delete(handler);
+    },
+    play() { running = true; },
+    pause() { running = false; },
+    destroy() { clearInterval(interval); handlers.clear(); },
+  };
+}
+
 // Canonical type-only import surface for module authors.
 // Runtime capabilities still flow through the host object itself.
 export type {
