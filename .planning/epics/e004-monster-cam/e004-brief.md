@@ -13,6 +13,16 @@ depends_on: []
 
 Webcam → ASCII window in the TS TUI. Python/MediaPipe worker via Unix socket. Face detection + hand tracking working. ASCII BG toggle working. Pose detected but no skeleton render yet.
 
+## ⚠️ Scope: LOCAL ONLY — no webcam on VPS
+
+Monster Cam requires a physical webcam on the machine running the app.
+It **cannot work on dos.wibandwob.com** or any headless VPS — there is no camera.
+It is correctly `forceOff` in the `docker-safe` profile and will stay that way.
+
+For the VPS/agent embodiment equivalent — where agents "dance" without a webcam —
+see the GlitchBox TUI spike: `.planning/spikes/spk-glitchbox-tui/`
+That is a separate feature with a separate brief. Do not confuse the two.
+
 ## Background
 
 Original plan was ffmpeg + @mediapipe/tasks-vision WASM. Pivoted to Python/OpenCV/MediaPipe (simpler, more reliable on macOS, avoids WASM node-path issues). Stack diverges from brief but ships faster.
@@ -75,7 +85,7 @@ Socket protocol (per frame):
   - Test: `curl -X POST localhost:PORT/view/monster-cam/open` → window visible; menu item produces same result.
 
 - [x] **AC-3:** Live ASCII render updates in the blessed window (F01).
-  - Test: Wave in front of camera — visible change in terminal ASCII render. Manually verified. BG toggle (b key + button) working.
+  - Test: Wave in front of camera — visible change in terminal ASCII render. Manually verified. BG toggle (b key + button) working. Re-verified 2026-03-08 on feat/e004-monster-cam-complete — face confirmed live.
 
 - [x] **AC-4:** `hasFace` in `/state` tracks camera correctly (F01).
   - Test: Face detection box appears/disappears with face presence; `describeState()` reports `hasFace`. Manually verified.
