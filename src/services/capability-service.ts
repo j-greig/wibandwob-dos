@@ -14,7 +14,9 @@ export type CapabilityKey =
   /** Inference-required apps (agent, poetry clock). Probes ANTHROPIC_API_KEY. */
   | "feature.inference"
   /** Resource-heavy apps (plasma, companion). Always probes true — gate via profile forceOff. */
-  | "feature.resource-heavy";
+  | "feature.resource-heavy"
+  /** File manager — disabled in hosted profiles (no filesystem jail). Always probes true; gate via forceOff. */
+  | "feature.file-manager";
 
 export interface CapabilityStatus {
   ok: boolean;
@@ -37,6 +39,7 @@ const CAPABILITY_KEYS: CapabilityKey[] = [
   "env.anthropic_api_key",
   "feature.inference",
   "feature.resource-heavy",
+  "feature.file-manager",
 ];
 
 function buildStatus(ok: boolean, reason?: string): CapabilityStatus {
@@ -95,6 +98,8 @@ export class CapabilityService {
       ),
       // Resource-heavy (plasma, companion) probes true — gate via profile forceOff in lower tiers.
       "feature.resource-heavy": buildStatus(true),
+      // File manager probes true — disabled in hosted profiles via forceOff (no filesystem jail).
+      "feature.file-manager": buildStatus(true),
     };
     const checkedAt = new Date().toISOString();
     for (const key of policy.forceOn) {
