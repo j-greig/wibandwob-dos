@@ -29,6 +29,7 @@ type NestedNode = {
   frame: blessed.Widgets.BoxElement;
   titleBar: blessed.Widgets.BoxElement;
   content: blessed.Widgets.BoxElement;
+  resizeGrip: blessed.Widgets.BoxElement;
 };
 
 type PaletteSlot = {
@@ -259,6 +260,9 @@ export default function setup(host: MicroappHost) {
       let dragging:
         | { id: NodeId; offsetX: number; offsetY: number }
         | undefined;
+      let resizing:
+        | { id: NodeId; startW: number; startH: number; anchorX: number; anchorY: number }
+        | undefined;
       let mouseDragAttempts = 0;
 
       const colorPair = (name: ThemeColorName) => {
@@ -308,7 +312,18 @@ export default function setup(host: MicroappHost) {
           tags: false,
           style: host.theme().body,
         });
-        nodes.set(item.id, { ...item, frame, titleBar, content });
+        const resizeGrip = blessed.box({
+          parent: frame,
+          bottom: 0,
+          right: 0,
+          width: 2,
+          height: 1,
+          mouse: true,
+          clickable: true,
+          content: " +",
+          style: host.theme().selected,
+        });
+        nodes.set(item.id, { ...item, frame, titleBar, content, resizeGrip });
       }
 
       FG_OPTIONS.forEach((key, index) => {
@@ -429,11 +444,12 @@ export default function setup(host: MicroappHost) {
           " h/j/k/l move",
           " [/] fg cycle",
           " -/= bg cycle",
+          " ,/. width  n/m height",
           " b blend mode",
           " i inspector",
           " t phrase cycle",
           " type in INPUT C",
-          " mouse: drag title bars",
+          " mouse: drag pane or +",
           "",
           " sources:",
           ` text: ${TEXT_PHRASES[phase % TEXT_PHRASES.length]}`,
@@ -496,6 +512,7 @@ export default function setup(host: MicroappHost) {
             : { fg: fg.fg, bg: host.theme().bodyAlt.bg };
           node.titleBar.setContent(` ${selectedNode === node.id ? "●" : " "} ${node.title} `);
           node.content.style = { fg: fg.fg, bg: bg.bg };
+          node.resizeGrip.style = selectedNode === node.id ? host.theme().highlight : host.theme().selected;
         }
 
         nodes.get("gen")?.content.setContent(gen);
@@ -535,6 +552,7 @@ export default function setup(host: MicroappHost) {
         const startNodeDrag = (data: blessed.Widgets.Events.IMouseEventArg) => {
           const point = pointerToCanvas(data);
           if (!point) return;
+          resizing = undefined;
           dragging = {
             id: node.id,
             offsetX: point.x - node.x,
@@ -543,24 +561,50 @@ export default function setup(host: MicroappHost) {
           mouseDragAttempts += 1;
           selectNode(node.id);
         };
+        const startNodeResize = (data: blessed.Widgets.Events.IMouseEventArg) => {
+          const point = pointerToCanvas(data);
+          if (!point) return;
+          dragging = undefined;
+          resizing = {
+            id: node.id,
+            startW: node.w,
+            startH: node.h,
+            anchorX: point.x,
+            anchorY: point.y,
+          };
+          selectNode(node.id);
+        };
         node.frame.on("mousedown", (data) => startNodeDrag(data));
         node.content.on("mousedown", (data) => startNodeDrag(data));
         node.titleBar.on("mousedown", (data) => startNodeDrag(data));
+        node.resizeGrip.on("mousedown", (data) => startNodeResize(data));
       }
 
       const onMouseMove = (data: blessed.Widgets.Events.IMouseEventArg) => {
-        if (!dragging) return;
         const point = pointerToCanvas(data);
-        const node = nodes.get(dragging.id);
-        if (!point || !node) return;
-        node.x = point.x - dragging.offsetX;
-        node.y = point.y - dragging.offsetY;
-        renderNodes();
-        host.screen.render();
+        if (!point) return;
+        if (dragging) {
+          const node = nodes.get(dragging.id);
+          if (!node) return;
+          node.x = point.x - dragging.offsetX;
+          node.y = point.y - dragging.offsetY;
+          renderNodes();
+          host.screen.render();
+          return;
+        }
+        if (resizing) {
+          const node = nodes.get(resizing.id);
+          if (!node) return;
+          node.w = clamp(resizing.startW + (point.x - resizing.anchorX), 16, 56);
+          node.h = clamp(resizing.startH + (point.y - resizing.anchorY), 6, 18);
+          renderNodes();
+          host.screen.render();
+        }
       };
 
       const stopDragging = () => {
         dragging = undefined;
+        resizing = undefined;
       };
 
       const moveSelected = (dx: number, dy: number) => {
@@ -588,6 +632,15 @@ export default function setup(host: MicroappHost) {
         host.screen.render();
       };
 
+      const resizeSelected = (dw: number, dh: number) => {
+        const node = currentNode();
+        if (!node) return;
+        node.w = clamp(node.w + dw, 16, 56);
+        node.h = clamp(node.h + dh, 6, 18);
+        renderNodes();
+        host.screen.render();
+      };
+
       const handleInputToken = (input: string) => {
         if (input === "1") selectedNode = "gen";
         if (input === "2") selectedNode = "text";
@@ -606,6 +659,10 @@ export default function setup(host: MicroappHost) {
         if (input === "t") {
           phase = (phase + 1) % TEXT_PHRASES.length;
         }
+        if (input === ",") resizeSelected(-2, 0);
+        if (input === ".") resizeSelected(2, 0);
+        if (input === "n") resizeSelected(0, -1);
+        if (input === "m") resizeSelected(0, 1);
         if (selectedNode === "input" && input === "\b") {
           textInput = textInput.slice(0, -1);
         } else if (selectedNode === "input" && input.length === 1 && input >= " " && input !== "\u007f") {
