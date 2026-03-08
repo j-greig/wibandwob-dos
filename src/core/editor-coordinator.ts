@@ -23,6 +23,7 @@ import {
   moveCursor as moveEditorCursorState,
   render as renderEditorState,
 } from "../services/editor-service.js";
+import { assertWithinAppRoot } from "./config.js";
 
 export interface EditorCoordinatorDeps {
   windowManager: WindowManager;
@@ -122,7 +123,13 @@ export class EditorCoordinator {
       defaultPath,
       (value) => this.deps.content.completePath(value),
       (value) => {
-        const resolved = value.startsWith("~") ? path.join(os.homedir(), value.slice(1)) : value;
+        let resolved: string;
+        try {
+          resolved = assertWithinAppRoot(value); // SEC-M8: block writes outside APP_ROOT
+        } catch (err) {
+          this.deps.overlays.flash(`Save blocked: ${err instanceof Error ? err.message : String(err)}`);
+          return;
+        }
         try {
           fs.mkdirSync(path.dirname(resolved), { recursive: true });
           fs.writeFileSync(resolved, focused.editor!.value, "utf8");

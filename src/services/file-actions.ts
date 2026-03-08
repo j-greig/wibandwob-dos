@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { assertWithinAppRoot } from "../core/config.js";
 
 import { measurePrimerContent, type ContentMeasurement } from "./content-measurement.js";
 import type { ContentService } from "./content-service.js";
@@ -106,9 +107,15 @@ function writeEditorWindow(window: WindowRecord): boolean {
   if (!window.editor || !window.filePath) {
     return false;
   }
+  let safePath: string;
   try {
-    fs.mkdirSync(path.dirname(window.filePath), { recursive: true });
-    fs.writeFileSync(window.filePath, window.editor.value, "utf8");
+    safePath = assertWithinAppRoot(window.filePath); // SEC-M8
+  } catch {
+    return false; // silently block writes outside APP_ROOT
+  }
+  try {
+    fs.mkdirSync(path.dirname(safePath), { recursive: true });
+    fs.writeFileSync(safePath, window.editor.value, "utf8");
   } catch {
     return false;
   }

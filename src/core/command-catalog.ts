@@ -662,7 +662,8 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     menuPlacements: [{ category: "applications", order: 82 }],
     palettePlacement: { order: 52 },
     api: true,
-    agent: true
+    agent: true,
+    requires: ["feature.resource-heavy"],
   },
   {
     id: "plasma.from-primer",
@@ -673,6 +674,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     multiInstance: true,
     menuPlacements: [{ category: "applications", order: 83 }],
     palettePlacement: { order: 53 },
+    requires: ["feature.resource-heavy"],
     api: true,
     agent: true
   },
@@ -718,7 +720,8 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     menuPlacements: [{ category: "applications", order: 130 }],
     palettePlacement: { order: 120 },
     api: true,
-    agent: true
+    agent: true,
+    requires: ["feature.resource-heavy"],
   },
   {
     id: "workspace.manage",

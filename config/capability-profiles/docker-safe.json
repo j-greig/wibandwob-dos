@@ -3,7 +3,8 @@
   "forceOff": [
     "path.monster_cam.venv",
     "path.backrooms.repo",
-    "bin.chrome"
+    "bin.chrome",
+    "feature.resource-heavy"
   ],
   "forceOn": []
 }

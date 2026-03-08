@@ -1,4 +1,5 @@
 import path from "node:path";
+import os from "node:os";
 import { fileURLToPath } from "node:url";
 
 export const PRIMER_ROOTS = ["modules", "modules-private", "docs"] as const;
@@ -51,3 +52,23 @@ export const SPIKE_PI_APPEND_SYSTEM_PATH = PI_APPEND_SYSTEM_PATH;
 export const SPIKE_PI_THEME_PATH = PI_THEME_PATH;
 /** @deprecated Use APP_NOTES_PATH */
 export const SPIKE_NOTES_PATH = APP_NOTES_PATH;
+
+/**
+ * Ensure a file path stays within the app root boundary (SEC-M8).
+ * Throws if the resolved path escapes APP_ROOT via traversal.
+ * Use before any editor save or user-supplied write path.
+ */
+export function assertWithinAppRoot(filePath: string): string {
+  const resolved = path.resolve(
+    filePath.startsWith("~")
+      ? path.join(os.homedir(), filePath.slice(1))
+      : filePath,
+  );
+  if (!resolved.startsWith(APP_ROOT + path.sep) && resolved !== APP_ROOT) {
+    throw new Error(
+      `Write path '${filePath}' resolves to '${resolved}' which is outside APP_ROOT (${APP_ROOT}). ` +
+      `Editor saves are restricted to the application directory.`,
+    );
+  }
+  return resolved;
+}
