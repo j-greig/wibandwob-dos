@@ -31,6 +31,11 @@ type NestedNode = {
   content: blessed.Widgets.BoxElement;
 };
 
+type PaletteSlot = {
+  key: ThemeColorName;
+  box: blessed.Widgets.BoxElement;
+};
+
 const TEXT_PHRASES = [
   "signal patch",
   "terminal garden",
@@ -212,6 +217,39 @@ export default function setup(host: MicroappHost) {
         style: host.theme().muted,
       });
 
+      const paletteTitle = blessed.box({
+        parent: inspector,
+        top: 23,
+        left: 1,
+        width: 22,
+        height: 1,
+        mouse: true,
+        clickable: true,
+        style: host.theme().bodyAlt,
+      });
+      const fgPaletteLabel = blessed.box({
+        parent: inspector,
+        top: 24,
+        left: 1,
+        width: 4,
+        height: 1,
+        mouse: true,
+        clickable: true,
+        style: host.theme().bodyAlt,
+      });
+      const bgPaletteLabel = blessed.box({
+        parent: inspector,
+        top: 26,
+        left: 1,
+        width: 4,
+        height: 1,
+        mouse: true,
+        clickable: true,
+        style: host.theme().bodyAlt,
+      });
+      const fgPaletteSlots: PaletteSlot[] = [];
+      const bgPaletteSlots: PaletteSlot[] = [];
+
       const nodes = new Map<NodeId, NestedNode>();
       let selectedNode: NodeId = "gen";
       let blendMode: BlendMode = "overwrite";
@@ -227,6 +265,9 @@ export default function setup(host: MicroappHost) {
         const tokens = host.theme();
         return tokens[name] ?? tokens.body;
       };
+
+      const compactLabel = (name: ThemeColorName) =>
+        name === "bodyAlt" ? "ba" : name.slice(0, 2);
 
       const initial: Array<Pick<NestedNode, "id" | "title" | "x" | "y" | "w" | "h" | "z" | "fg" | "bg">> = [
         { id: "gen", title: "GEN A", x: 2, y: 1, w: 26, h: 9, z: 0, fg: "highlight", bg: "body" },
@@ -270,6 +311,48 @@ export default function setup(host: MicroappHost) {
         nodes.set(item.id, { ...item, frame, titleBar, content });
       }
 
+      FG_OPTIONS.forEach((key, index) => {
+        const box = blessed.box({
+          parent: inspector,
+          top: 24,
+          left: 5 + index * 2,
+          width: 2,
+          height: 1,
+          mouse: true,
+          clickable: true,
+          tags: false,
+        });
+        fgPaletteSlots.push({ key, box });
+        box.on("click", () => {
+          const node = currentNode();
+          if (!node) return;
+          node.fg = key;
+          renderNodes();
+          host.screen.render();
+        });
+      });
+
+      BG_OPTIONS.forEach((key, index) => {
+        const box = blessed.box({
+          parent: inspector,
+          top: 26,
+          left: 5 + index * 2,
+          width: 2,
+          height: 1,
+          mouse: true,
+          clickable: true,
+          tags: false,
+        });
+        bgPaletteSlots.push({ key, box });
+        box.on("click", () => {
+          const node = currentNode();
+          if (!node) return;
+          node.bg = key;
+          renderNodes();
+          host.screen.render();
+        });
+      });
+
       const currentNode = () => nodes.get(selectedNode);
 
       const cycleColor = (
@@ -312,6 +395,11 @@ export default function setup(host: MicroappHost) {
         const node = currentNode();
         if (!node) return;
         if (inspectorCollapsed) {
+          paletteTitle.hide();
+          fgPaletteLabel.hide();
+          bgPaletteLabel.hide();
+          fgPaletteSlots.forEach(({ box }) => box.hide());
+          bgPaletteSlots.forEach(({ box }) => box.hide());
           inspector.setContent([
             " TL",
             "",
@@ -322,6 +410,11 @@ export default function setup(host: MicroappHost) {
           ].join("\n"));
           return;
         }
+        paletteTitle.show();
+        fgPaletteLabel.show();
+        bgPaletteLabel.show();
+        fgPaletteSlots.forEach(({ box }) => box.show());
+        bgPaletteSlots.forEach(({ box }) => box.show());
         inspector.setContent([
           " TouchLab Inspector",
           "",
@@ -340,6 +433,7 @@ export default function setup(host: MicroappHost) {
           " i inspector",
           " t phrase cycle",
           " type in INPUT C",
+          " mouse: drag title bars",
           "",
           " sources:",
           ` text: ${TEXT_PHRASES[phase % TEXT_PHRASES.length]}`,
@@ -347,6 +441,31 @@ export default function setup(host: MicroappHost) {
           "",
           ` mouse drags: ${mouseDragAttempts}`,
         ].join("\n"));
+        paletteTitle.setContent(" Palette");
+        fgPaletteLabel.setContent(" FG ");
+        bgPaletteLabel.setContent(" BG ");
+        fgPaletteSlots.forEach(({ key, box }) => {
+          const active = node.fg === key;
+          const token = colorPair(key);
+          box.style = {
+            fg: active ? host.theme().body.bg : token.fg,
+            bg: active ? host.theme().highlight.bg : token.bg,
+            bold: active,
+            inverse: false,
+          };
+          box.setContent(active ? "[]" : compactLabel(key));
+        });
+        bgPaletteSlots.forEach(({ key, box }) => {
+          const active = node.bg === key;
+          const token = colorPair(key);
+          box.style = {
+            fg: active ? host.theme().body.bg : token.fg,
+            bg: active ? host.theme().highlight.bg : token.bg,
+            bold: active,
+            inverse: false,
+          };
+          box.setContent(active ? "[]" : compactLabel(key));
+        });
       };
 
       const renderNodes = () => {
@@ -413,14 +532,7 @@ export default function setup(host: MicroappHost) {
       };
 
       for (const node of nodes.values()) {
-        node.frame.on("mousedown", () => {
-          selectNode(node.id);
-        });
-        node.content.on("mousedown", () => {
-          selectNode(node.id);
-        });
-        if (node.id === "mix") continue;
-        node.titleBar.on("mousedown", (data) => {
+        const startNodeDrag = (data: blessed.Widgets.Events.IMouseEventArg) => {
           const point = pointerToCanvas(data);
           if (!point) return;
           dragging = {
@@ -430,7 +542,10 @@ export default function setup(host: MicroappHost) {
           };
           mouseDragAttempts += 1;
           selectNode(node.id);
-        });
+        };
+        node.frame.on("mousedown", (data) => startNodeDrag(data));
+        node.content.on("mousedown", (data) => startNodeDrag(data));
+        node.titleBar.on("mousedown", (data) => startNodeDrag(data));
       }
 
       const onMouseMove = (data: blessed.Widgets.Events.IMouseEventArg) => {
@@ -450,7 +565,7 @@ export default function setup(host: MicroappHost) {
 
       const moveSelected = (dx: number, dy: number) => {
         const node = currentNode();
-        if (!node || node.id === "mix") return;
+        if (!node) return;
         node.x += dx;
         node.y += dy;
         renderNodes();
