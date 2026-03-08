@@ -40,3 +40,31 @@ Story checkboxes: `[ ]` not-started · `[~]` in-progress · `[x]` done · `[-]` 
 Epic status: `not-started` · `in-progress` · `blocked` · `done` · `dropped`
 
 Full canon: `.planning/README.md`
+
+## GitHub kanban board
+
+https://github.com/users/j-greig/projects/2 — epic-level board, one card per epic.
+Switch to Board view in the browser (Views tab → Board) for column layout.
+
+To add a new epic issue to the board:
+```bash
+gh project item-add 2 --owner j-greig --url https://github.com/j-greig/wibandwob-dos/issues/NNN
+```
+
+## gh CLI auth — IMPORTANT for agents
+
+`gh` needs the `project` scope to read/write the kanban board. Repo/issue commands work without it.
+
+**Checking scope:**
+```bash
+gh auth status   # look for 'project' in Token scopes line
+```
+
+**If `project` scope is missing** — DO NOT run `gh auth refresh` in a subagent or script.
+It requires an interactive TTY and will silently fail or update the wrong token.
+Instead: tell the human to run this in their own terminal:
+```bash
+gh auth refresh -s project
+```
+That's it. One command. Browser opens automatically. Done in 30 seconds.
+Do not suggest creating a new PAT. Do not run device flows via subagents. Just ask.
