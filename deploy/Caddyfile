@@ -1,23 +1,18 @@
 dos.wibandwob.com {
-    # Real Let's Encrypt cert via ACME — remove tls internal for production.
-    # Caddy handles auto-renewal. Requires port 80+443 open in UFW and
-    # DNS A record dos.wibandwob.com -> VPS IP before deploy.
-    # (Keep tls internal for local smoke testing only — swap before VPS deploy.)
+    # tls internal is correct here — Cloudflare (orange cloud) terminates
+    # public TLS at the edge. This cert covers the CF -> origin leg only.
+    # CF SSL mode should be set to "Full" (not Flexible, not Full Strict).
+    tls internal
 
     # --- Agent: control API lane ---
     # Bearer token auth enforced inside the app (control-api.ts).
-    # Caddy just routes — no extra auth here, the app owns it.
     handle_path /api/* {
         reverse_proxy wibwob:8099
     }
 
     # --- Human: browser TUI lane ---
-    # Basic auth gate in front of ttyd. Cloudflare Access is the stronger
-    # long-term option; basic_auth is acceptable for a trusted test setup.
     handle {
         basic_auth {
-            # Set WIBWOB_BASIC_AUTH_HASH in caddy service environment (see compose).
-            # Generate: caddy hash-password --plaintext 'yourpassword'
             wibwob {env.WIBWOB_BASIC_AUTH_HASH}
         }
         reverse_proxy wibwob:7681

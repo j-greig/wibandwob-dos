@@ -17,10 +17,12 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
-    environment:
-      # Generate: caddy hash-password --plaintext 'yourpassword'
-      # Set in /etc/wibwob.env on the VPS host, then pass here.
-      - WIBWOB_BASIC_AUTH_HASH=${WIBWOB_BASIC_AUTH_HASH}
+    env_file:
+      # Reads WIBWOB_BASIC_AUTH_HASH directly — avoids compose YAML $-interpolation
+      # which mangles bcrypt hashes (they contain literal $ chars).
+      # Generate hash: caddy hash-password --plaintext 'yourpassword'
+      # Set WIBWOB_BASIC_AUTH_HASH in /etc/wibwob.env on the VPS.
+      - /etc/wibwob.env
     depends_on:
       - wibwob
 
