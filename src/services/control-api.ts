@@ -38,6 +38,9 @@ interface ControlApiHandlers {
   getState: () => DesktopState;
   /** Rebuild state from scratch (bypasses cache). */
   syncState: () => DesktopState;
+  listModules: () => import("../core/types.js").ModuleRuntimeState[];
+  reloadModule: (id: string) => Promise<{ ok: true } | { ok: false; error: string }>;
+  unloadModule: (id: string) => { ok: true } | { ok: false; error: string };
   getPrimerInfo: (pathOrName: string) => unknown;
   listCommands: (
     surface?: CommandSurface,
@@ -64,6 +67,7 @@ const ENDPOINT_CATALOGUE = [
   { method: "GET",  path: "/health",                        description: "Health check" },
   { method: "GET",  path: "/openapi.json",                  description: "OpenAPI 3.0 spec" },
   { method: "GET",  path: "/state",                         description: "Full live desktop + window state" },
+  { method: "GET",  path: "/modules/list",                  description: "Runtime-loaded microapp modules and status" },
   { method: "GET",  path: "/commands/list",                 description: "All registered commands (optional ?surface=menu|palette|api|agent&includeUnavailable=1)" },
   { method: "GET",  path: "/content/primer-info",           description: "Primer content metadata. ?path=/abs/path.txt" },
   { method: "GET",  path: "/world-chat/state",              description: "Structured world chat snapshot outside the TUI" },
@@ -73,6 +77,8 @@ const ENDPOINT_CATALOGUE = [
   { method: "GET",  path: "/windows/text",                  description: "Raw text content of a window. ?id=N" },
   { method: "GET",  path: "/screenshot/text",               description: "ANSI-stripped text screenshot of a window. ?id=N" },
   { method: "POST", path: "/commands/run",                  body: { id: "string (command id, canonical)", command: "string (deprecated alias for id)", args: "object (optional)" } },
+  { method: "POST", path: "/modules/reload",                body: { id: "string (microapp id)" } },
+  { method: "POST", path: "/modules/unload",                body: { id: "string (microapp id)" } },
   // ── View endpoints — command aliases, kept for backward compat ──
   // All dispatch through /commands/run internally. Prefer /commands/run for new integrations.
   { method: "POST", path: "/view/primer/open",              body: { filePath: "string (absolute path)" }, description: "Alias: primer.open" },
@@ -236,6 +242,12 @@ export class ControlApiService {
       // without triggering a window-manager onChange (e.g. direct microapp commands).
       return Response.json(this.handlers.syncState());
     }
+    if (request.method === "GET" && url.pathname === "/modules/list") {
+      return Response.json({
+        ok: true,
+        modules: this.handlers.listModules(),
+      });
+    }
     if (request.method === "GET" && url.pathname === "/commands/list") {
       const surface = url.searchParams.get("surface") as CommandSurface | null;
       const includeUnavailableRaw = url.searchParams.get("includeUnavailable");
@@ -343,6 +355,24 @@ export class ControlApiService {
       } catch (err: any) {
         return Response.json({ ok: false, error: err?.message ?? String(err), stack: err?.stack }, { status: 500 });
       }
+    }
+
+    if (request.method === "POST" && url.pathname === "/modules/reload") {
+      const id = typeof (body as any).id === "string" ? (body as any).id : "";
+      if (!id) {
+        return Response.json({ ok: false, error: "id required" }, { status: 400 });
+      }
+      const result = await this.handlers.reloadModule(id);
+      return Response.json(result, { status: result.ok ? 200 : 404 });
+    }
+
+    if (request.method === "POST" && url.pathname === "/modules/unload") {
+      const id = typeof (body as any).id === "string" ? (body as any).id : "";
+      if (!id) {
+        return Response.json({ ok: false, error: "id required" }, { status: 400 });
+      }
+      const result = this.handlers.unloadModule(id);
+      return Response.json(result, { status: result.ok ? 200 : 404 });
     }
 
     // ── View endpoints — all dispatch through command registry ──

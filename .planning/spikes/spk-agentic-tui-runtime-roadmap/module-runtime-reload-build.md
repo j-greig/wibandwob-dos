@@ -29,27 +29,27 @@ being boring and reliable first.
 
 ## Acceptance Checklist
 
-- [ ] Introduce a runtime owner for loaded module instances
-- [ ] Track module id, source path, version/revision token, load status, and
+- [x] Introduce a runtime owner for loaded module instances
+- [x] Track module id, source path, version/revision token, load status, and
       last error
-- [ ] Track runtime-owned module resources:
+- [x] Track runtime-owned module resources:
       commands, windows, cleanup hooks, subscriptions, timers if applicable
-- [ ] Define unload semantics that clean owned resources without restarting the
+- [x] Define unload semantics that clean owned resources without restarting the
       app
-- [ ] Define reload semantics as teardown + reopen for v1
-- [ ] Preserve enough module metadata to explain reload failures in `/state`
-- [ ] Add `GET /modules/list`
-- [ ] Add `POST /modules/reload`
-- [ ] Add `POST /modules/unload`
-- [ ] Surface module runtime summary through `/state`
-- [ ] Add one command path for module reload in the registry
-- [ ] Prove reload against `modules/patchbay-lab`
-- [ ] Verify no duplicate commands after reloading Patchbay Lab
-- [ ] Verify helper windows owned by Patchbay Lab are cleaned up on unload
-- [ ] Capture reload friction in the spike docs
-- [ ] `bun run typecheck`
-- [ ] restart
-- [ ] smoke
+- [x] Define reload semantics as teardown + reopen for v1
+- [x] Preserve enough module metadata to explain reload failures in `/state`
+- [x] Add `GET /modules/list`
+- [x] Add `POST /modules/reload`
+- [x] Add `POST /modules/unload`
+- [x] Surface module runtime summary through `/state`
+- [x] Add one command path for module reload in the registry
+- [x] Prove reload against `modules/patchbay-lab`
+- [x] Verify no duplicate commands after reloading Patchbay Lab
+- [x] Verify helper windows owned by Patchbay Lab are cleaned up on unload
+- [x] Capture reload friction in the spike docs
+- [x] `bun run typecheck`
+- [x] restart
+- [x] smoke
 
 ## Non-goals
 
@@ -66,6 +66,17 @@ being boring and reliable first.
 - module-visible commands must be runtime-cleaned on unload
 - runtime state must be API-visible
 - failures must be inspectable without reading logs first
+
+## Reload friction captured
+
+- v1 reopen semantics only restore the module's main entry surface when the
+  module had open windows; helper windows are intentionally cleaned and not
+  reconstructed
+- module-owned resources are currently inferred from command id prefix,
+  `microappId`, and registered snapshot id; that is good enough for v1 but
+  still a convention-based runtime model rather than a richer ownership graph
+- the current runtime state is truthful and API-visible, but reload failure
+  ergonomics are still state/log oriented rather than event-stream oriented
 
 ## Open Questions To Resolve In Code
 

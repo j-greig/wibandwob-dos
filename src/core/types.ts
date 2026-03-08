@@ -190,7 +190,24 @@ export interface DesktopState {
     open: boolean;
     label?: string;
   };
+  modules?: {
+    loadedCount: number;
+    runtime: ModuleRuntimeState[];
+  };
   windows: DesktopWindowState[];
+}
+
+export interface ModuleRuntimeState {
+  id: string;
+  title: string;
+  version: string;
+  status: "loaded" | "unloaded" | "error";
+  commandCount: number;
+  openWindowCount: number;
+  reloadCount: number;
+  revisionToken: string;
+  lastLoadedAt?: string;
+  lastError?: string;
 }
 
 /**

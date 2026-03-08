@@ -28,6 +28,7 @@ export interface AppMenuActions {
   openTerrainLab: () => void;
   openWibWobAgent: () => void;
   reloadAgentPrompt: () => void;
+  reloadMicroappModule: (args?: Record<string, unknown>) => void;
   quit: () => void;
   focusNextWindow: () => void;
   focusPreviousWindow: () => void;
@@ -422,6 +423,16 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     description: "Re-read system prompt files from disk and hot-swap into the running agent session. No restart needed.",
     group: "system",
     actionKey: "reloadAgentPrompt",
+    api: true,
+    agent: true
+  },
+  {
+    id: "microapp.reload",
+    label: "Reload Microapp Module",
+    description: "Reload a microapp module at runtime. Args: id (string, optional; defaults to focused microapp window).",
+    group: "system",
+    actionKey: "reloadMicroappModule",
+    palettePlacement: { order: 135 },
     api: true,
     agent: true
   },

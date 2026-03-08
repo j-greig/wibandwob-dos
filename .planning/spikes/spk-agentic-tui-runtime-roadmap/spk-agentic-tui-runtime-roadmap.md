@@ -667,11 +667,11 @@ Working doc:
 
 Action checklist:
 
-- [ ] Introduce `ModuleRuntimeService`
-- [ ] Track loaded modules, errors, versions, owned windows, commands, and
+- [x] Introduce `ModuleRuntimeService`
+- [x] Track loaded modules, errors, versions, owned windows, commands, and
       cleanup hooks
-- [ ] Implement module unload semantics
-- [ ] Implement module reload semantics
+- [x] Implement module unload semantics
+- [x] Implement module reload semantics
 - [ ] Design reactive runtime event subscription for agents and tools
 - [ ] Scaffold a simple project-memory pattern modeled after Claude-style
       project memory files, with room to project it into runtime-backed memory
@@ -681,9 +681,9 @@ Action checklist:
 - [ ] Define persistence semantics for agent-authored modules
 - [ ] Make teardown + reopen the default reload path for v1
 - [ ] Define explicit stretch-path semantics for preserved-state reload in v2/v3
-- [ ] Add `/modules/list`, `/modules/reload`, `/modules/unload` API endpoints
+- [x] Add `/modules/list`, `/modules/reload`, `/modules/unload` API endpoints
 - [ ] Add dev watch mode for module directories
-- [ ] Surface module runtime status in `/state`
+- [x] Surface module runtime status in `/state`
 - [ ] Add agent tools for scaffold, reload, and runtime inspection
 - [ ] Use Poetry Clock as the brownfield reload proof
 - [ ] Use one fresh test microapp as the greenfield reload proof

@@ -24,7 +24,7 @@ import {
   WORKSPACES_DIR,
 } from "./config.js";
 import { appFlags } from "./cli.js";
-import { loadModules } from "../services/module-loader.js";
+import { ModuleRuntimeService } from "../services/module-loader.js";
 import type { MicroappHostDeps } from "../services/module-loader.js";
 import type { AppMenuActions } from "./command-catalog.js";
 import { CommandRegistry } from "./command-registry.js";
@@ -167,6 +167,7 @@ export class TsTuiMvpApp {
   private readonly customCursor: CustomCursor | null;
   private readonly state: StateService;
   private readonly controlApi: ControlApiService;
+  private readonly moduleRuntime: ModuleRuntimeService;
   private readonly editor: EditorCoordinator;
   private activeAgentSession?: WibWobAgentSession;
   private readonly instanceLabel?: string;
@@ -252,11 +253,27 @@ export class TsTuiMvpApp {
       defaultDir: SPIKE_ROOT,
       editorStartDir: path.dirname(SPIKE_NOTES_PATH),
     });
+    const microappDeps: MicroappHostDeps = {
+      screen: this.screen,
+      windowManager: this.windowManager,
+      commands: this.commands,
+      geometry: this.geometry.getGeometry(),
+      focusOrCreate: (appType, createFn, multiInstance) => {
+        this.focusOrCreate(appType, createFn, multiInstance);
+      },
+      worldChat: worldChatService,
+      onModuleCommandsChanged: () => this.rebuildMenus(),
+      onRuntimeStateChanged: () => this.syncLiveState(),
+    };
+    this.moduleRuntime = new ModuleRuntimeService(microappDeps);
     this.controlApi = new ControlApiService(
       CONTROL_API_PORT,
       {
         getState: () => this.getDesktopState(),
         syncState: () => this.state.sync(),
+        listModules: () => this.moduleRuntime.listModules(),
+        reloadModule: (id) => this.moduleRuntime.reloadModule(id),
+        unloadModule: (id) => this.moduleRuntime.unloadModule(id),
         getPrimerInfo: (pathOrName) => this.getPrimerInfo(pathOrName),
         listCommands: (surface, opts) => this.commands.list(surface, opts),
         runCommand: (id, args) => this.commands.run(id, args),
@@ -283,6 +300,7 @@ export class TsTuiMvpApp {
         getWindows: () => this.windowManager.getWindows(),
         getFocusedWindow: () => this.windowManager.getFocusedWindow(),
         getOpenMenuLabel: () => this.menuUi.getOpenMenuLabel(),
+        getModuleRuntime: () => this.moduleRuntime.listModules(),
       },
     );
   }
@@ -291,21 +309,8 @@ export class TsTuiMvpApp {
   async run(): Promise<void> {
     // Load external modules (themes + microapps) before workspace restore
     // so that external themes and commands are available for restoration.
-    const microappDeps: MicroappHostDeps = {
-      screen: this.screen,
-      windowManager: this.windowManager,
-      commands: this.commands,
-      geometry: this.geometry.getGeometry(),
-      focusOrCreate: (appType, createFn, multiInstance) => {
-        this.focusOrCreate(appType, createFn, multiInstance);
-      },
-      worldChat: worldChatService,
-    };
-    await loadModules(microappDeps);
-
-    // Rebuild menus after microapps may have registered dynamic commands
-    this.menus.length = 0;
-    this.menus.push(...this.commands.buildMenus());
+    await this.moduleRuntime.loadAllModules();
+    this.rebuildMenus();
 
     this.renderChrome();
     this.bindGlobalKeys();
@@ -485,6 +490,11 @@ export class TsTuiMvpApp {
     const width = Math.max(1, Number(this.screen.width));
     const content = left.slice(0, width);
     this.statusLine.setContent(content);
+  }
+
+  private rebuildMenus(): void {
+    this.menus.length = 0;
+    this.menus.push(...this.commands.buildMenus());
   }
 
   private toggleTheme(): void {
@@ -1708,6 +1718,21 @@ export class TsTuiMvpApp {
             const message = error instanceof Error ? error.message : String(error);
             this.overlays.flash(`Agent reload failed: ${message}`);
           });
+      },
+      reloadMicroappModule: (args) => {
+        const explicitId =
+          typeof args?.id === "string" && args.id.trim() ? args.id.trim() : undefined;
+        const focusedId = this.windowManager.getFocusedWindow()?.microappId;
+        const id = explicitId ?? focusedId;
+        if (!id) {
+          this.overlays.flash("No microapp id provided and no microapp window focused");
+          return;
+        }
+        void this.moduleRuntime.reloadModule(id).then((result) => {
+          this.overlays.flash(
+            result.ok ? `Reloaded microapp: ${id}` : `Microapp reload failed: ${result.error}`,
+          );
+        });
       },
       quit: () => this.destroy(),
       focusNextWindow: () => this.windowManager.focusNextWindow(1),

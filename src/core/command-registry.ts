@@ -107,6 +107,22 @@ export class CommandRegistry {
     this.dynamicCommands.push(def);
   }
 
+  removeDynamicByPrefix(prefix: string): number {
+    const before = this.dynamicCommands.length;
+    for (let i = this.dynamicCommands.length - 1; i >= 0; i -= 1) {
+      if (this.dynamicCommands[i]?.id.startsWith(prefix)) {
+        this.dynamicCommands.splice(i, 1);
+      }
+    }
+    return before - this.dynamicCommands.length;
+  }
+
+  hasCommand(id: string): boolean {
+    const canonicalId = LEGACY_COMMAND_ALIASES[id] ?? id;
+    return this.commands.some((command) => command.id === canonicalId)
+      || this.dynamicCommands.some((command) => command.id === canonicalId);
+  }
+
   buildMenus(): MenuConfig[] {
     const menus = createMenuConfigs(this.actions);
     // Append dynamic commands to matching menu categories

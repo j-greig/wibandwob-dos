@@ -16,13 +16,23 @@
 import blessed from "blessed";
 import fs from "node:fs";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { APP_ROOT } from "../core/config.js";
 import { registerExternalTheme } from "../core/theme/resolver.js";
 import { theme } from "../core/theme/resolver.js";
-import { registerDynamicSnapshot } from "../core/snapshot-registry.js";
+import {
+  registerDynamicSnapshot,
+  unregisterDynamicSnapshot,
+} from "../core/snapshot-registry.js";
 import type { SnapshotHandler } from "../core/snapshot-registry.js";
 import type { ThemeVariant, ThemeTokens } from "../core/theme/types.js";
-import type { AppType, WindowRecord, WindowSnapshot, WindowStateDetails } from "../core/types.js";
+import type {
+  AppType,
+  ModuleRuntimeState,
+  WindowRecord,
+  WindowSnapshot,
+  WindowStateDetails,
+} from "../core/types.js";
 import type { WindowManager } from "../core/window-manager.js";
 import type { WindowFacade } from "../core/window-facade.js";
 import type { CommandRegistry, DynamicCommandDefinition } from "../core/command-registry.js";
@@ -100,6 +110,8 @@ export interface MicroappHost {
 
   registerTheme(variant: ThemeVariant): void;
 
+  onModuleCleanup(fn: () => void): void;
+
   runCommand(localId: string, args?: Record<string, unknown>): void;
 
   readonly screen: blessed.Widgets.Screen;
@@ -174,6 +186,9 @@ export interface MicroappHostDeps {
   geometry: { width: number; height: number; cellAspect: number };
   focusOrCreate: (appType: string, createFn: () => void, multiInstance?: boolean) => void;
   worldChat: WorldChatHostAccess;
+  onModuleCommandsChanged?: () => void;
+  onRuntimeStateChanged?: () => void;
+  onModuleCleanupRegistered?: (moduleId: string) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -184,7 +199,17 @@ function createMicroappHost(
   manifest: MicroappManifestConfig,
   deps: MicroappHostDeps
 ): MicroappHost {
-  const { screen, windowManager, commands, geometry, focusOrCreate, worldChat } = deps;
+  const {
+    screen,
+    windowManager,
+    commands,
+    geometry,
+    focusOrCreate,
+    worldChat,
+    onModuleCommandsChanged,
+    onRuntimeStateChanged,
+    onModuleCleanupRegistered,
+  } = deps;
   const moduleId = manifest.id;
 
   const host: MicroappHost = {
@@ -242,7 +267,10 @@ function createMicroappHost(
           ensureRegistered();
           frame.focus();
         },
-        close() { windowManager.closeWindow(frame.id); },
+        close() {
+          windowManager.closeWindow(frame.id);
+          onRuntimeStateChanged?.();
+        },
       };
 
       return handle;
@@ -270,6 +298,7 @@ function createMicroappHost(
         agent: manifest.agent !== false,
       };
       commands.addDynamic(dynDef);
+      onModuleCommandsChanged?.();
     },
 
     registerSnapshot(handlers) {
@@ -285,6 +314,27 @@ function createMicroappHost(
 
     registerTheme(variant) {
       registerExternalTheme(variant);
+    },
+
+    onModuleCleanup(fn) {
+      onModuleCleanupRegistered?.(moduleId);
+      const current = windowManager.getWindows().filter((window) => window.microappId === moduleId);
+      if (current.length > 0) {
+        for (const window of current) {
+          const existing = window.cleanup;
+          window.cleanup = () => {
+            existing?.();
+            fn();
+          };
+        }
+        return;
+      }
+      // If called before any window exists, run on unload only.
+      const runtimeCleanup = (deps as MicroappHostDeps & { __moduleCleanupMap?: Map<string, (() => void)[]> }).__moduleCleanupMap;
+      if (!runtimeCleanup) return;
+      const list = runtimeCleanup.get(moduleId) ?? [];
+      list.push(fn);
+      runtimeCleanup.set(moduleId, list);
     },
 
     runCommand(localId, args) {
@@ -326,6 +376,20 @@ const MODULE_DIRS = ["modules", "modules-private"] as const;
 interface DiscoveredModule {
   dir: string;
   manifest: ModuleManifest;
+}
+
+interface LoadedMicroappRuntime {
+  id: string;
+  title: string;
+  version: string;
+  status: "loaded" | "unloaded" | "error";
+  dir: string;
+  entryPath: string;
+  commandCount: number;
+  reloadCount: number;
+  revisionToken: string;
+  lastLoadedAt?: string;
+  lastError?: string;
 }
 
 function discoverModules(): DiscoveredModule[] {
@@ -409,11 +473,21 @@ async function loadThemeModule(mod: DiscoveredModule): Promise<void> {
 // Microapp loading
 // ---------------------------------------------------------------------------
 
-async function loadMicroappModule(mod: DiscoveredModule, deps: MicroappHostDeps): Promise<void> {
+async function importModuleEntry(entryPath: string, revisionToken?: string) {
+  const fileUrl = pathToFileURL(entryPath).href;
+  const href = revisionToken ? `${fileUrl}?rev=${encodeURIComponent(revisionToken)}` : fileUrl;
+  return import(href);
+}
+
+async function loadMicroappModule(
+  mod: DiscoveredModule,
+  deps: MicroappHostDeps,
+  runtime?: LoadedMicroappRuntime,
+): Promise<LoadedMicroappRuntime | undefined> {
   const config = mod.manifest.microapp;
   if (!config?.id || !config?.title) {
     console.warn(`[module-loader] Microapp ${mod.manifest.name} missing id or title in microapp config`);
-    return;
+    return undefined;
   }
 
   const entry = mod.manifest.entry ?? "index.ts";
@@ -421,23 +495,170 @@ async function loadMicroappModule(mod: DiscoveredModule, deps: MicroappHostDeps)
 
   if (!fs.existsSync(entryPath)) {
     console.warn(`[module-loader] Microapp ${mod.manifest.name} missing entry ${entry}`);
-    return;
+    return undefined;
   }
 
   try {
-    const imported = await import(entryPath);
+    const revisionToken = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const imported = await importModuleEntry(entryPath, revisionToken);
     const setup = imported.default;
 
     if (typeof setup !== "function") {
       console.warn(`[module-loader] Microapp ${mod.manifest.name} does not default-export a setup function`);
-      return;
+      return undefined;
     }
 
     const host = createMicroappHost(config, deps);
     setup(host);
     console.log(`[module-loader] Loaded microapp: ${config.id} (from ${mod.manifest.name})`);
+    return {
+      id: config.id,
+      title: config.title,
+      version: mod.manifest.version,
+      status: "loaded",
+      dir: mod.dir,
+      entryPath,
+      commandCount: 0,
+      reloadCount: runtime?.reloadCount ?? 0,
+      revisionToken,
+      lastLoadedAt: new Date().toISOString(),
+    };
   } catch (err) {
     console.warn(`[module-loader] Failed to load microapp ${mod.manifest.name}: ${err}`);
+    return {
+      id: config.id,
+      title: config.title,
+      version: mod.manifest.version,
+      status: "error",
+      dir: mod.dir,
+      entryPath,
+      commandCount: 0,
+      reloadCount: runtime?.reloadCount ?? 0,
+      revisionToken: runtime?.revisionToken ?? "error",
+      lastError: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
+export class ModuleRuntimeService {
+  private readonly runtime = new Map<string, LoadedMicroappRuntime>();
+  private readonly discovered = new Map<string, DiscoveredModule>();
+  private readonly moduleCleanupMap = new Map<string, (() => void)[]>();
+
+  constructor(private readonly deps: MicroappHostDeps) {}
+
+  async loadAllModules(): Promise<void> {
+    await loadThemes();
+    const modules = discoverModules();
+    const seenIds = new Set<string>();
+    this.discovered.clear();
+
+    for (const mod of modules) {
+      if (mod.manifest.type === "microapp" && mod.manifest.microapp?.id) {
+        const id = mod.manifest.microapp.id;
+        if (seenIds.has(id)) {
+          throw new Error(`[module-loader] Duplicate microapp id "${id}" — found in ${mod.dir}`);
+        }
+        seenIds.add(id);
+        this.discovered.set(id, mod);
+      }
+    }
+
+    for (const mod of modules) {
+      if (mod.manifest.type !== "microapp") continue;
+      await this.loadOne(mod.manifest.microapp?.id ?? "");
+    }
+  }
+
+  listModules(): ModuleRuntimeState[] {
+    const windows = this.deps.windowManager.getWindows();
+    return [...this.runtime.values()]
+      .sort((a, b) => a.id.localeCompare(b.id))
+      .map((mod) => ({
+        id: mod.id,
+        title: mod.title,
+        version: mod.version,
+        status: mod.status,
+        commandCount: mod.commandCount,
+        openWindowCount: windows.filter((window) => window.microappId === mod.id).length,
+        reloadCount: mod.reloadCount,
+        revisionToken: mod.revisionToken,
+        lastLoadedAt: mod.lastLoadedAt,
+        lastError: mod.lastError,
+      }));
+  }
+
+  async reloadModule(id: string): Promise<{ ok: true } | { ok: false; error: string }> {
+    const hadWindows = this.deps.windowManager.getWindows().some((window) => window.microappId === id);
+    const unload = this.unloadModule(id);
+    if (!unload.ok) return unload;
+    const load = await this.loadOne(id);
+    if (!load.ok) return load;
+    if (hadWindows && this.deps.commands.hasCommand(`microapp.${id}.open`)) {
+      this.deps.commands.run(`microapp.${id}.open`);
+    }
+    this.deps.onRuntimeStateChanged?.();
+    return { ok: true };
+  }
+
+  unloadModule(id: string): { ok: true } | { ok: false; error: string } {
+    const runtime = this.runtime.get(id);
+    if (!runtime) {
+      return { ok: false, error: `Unknown module: ${id}` };
+    }
+
+    const windows = this.deps.windowManager.getWindows().filter((window) => window.microappId === id);
+    for (const window of windows) {
+      this.deps.windowManager.closeWindow(window.id);
+    }
+    this.deps.commands.removeDynamicByPrefix(`microapp.${id}.`);
+    unregisterDynamicSnapshot(id);
+    for (const cleanup of this.moduleCleanupMap.get(id) ?? []) {
+      cleanup();
+    }
+    this.moduleCleanupMap.delete(id);
+
+    runtime.status = "unloaded";
+    runtime.commandCount = 0;
+    runtime.lastError = undefined;
+    this.deps.onModuleCommandsChanged?.();
+    this.deps.onRuntimeStateChanged?.();
+    return { ok: true };
+  }
+
+  private async loadOne(id: string): Promise<{ ok: true } | { ok: false; error: string }> {
+    const mod = this.discovered.get(id);
+    if (!mod) {
+      return { ok: false, error: `Unknown module: ${id}` };
+    }
+    const current = this.runtime.get(id);
+    const next = await loadMicroappModule(mod, {
+      ...this.deps,
+      __moduleCleanupMap: this.moduleCleanupMap,
+      onModuleCommandsChanged: () => this.refreshModuleCommandCount(id),
+      onRuntimeStateChanged: this.deps.onRuntimeStateChanged,
+      onModuleCleanupRegistered: () => this.deps.onRuntimeStateChanged?.(),
+    } as MicroappHostDeps & { __moduleCleanupMap: Map<string, (() => void)[]> }, current);
+    if (!next) {
+      return { ok: false, error: `Failed to load module: ${id}` };
+    }
+    next.reloadCount = current ? current.reloadCount + 1 : 0;
+    this.runtime.set(id, next);
+    this.refreshModuleCommandCount(id);
+    this.deps.onRuntimeStateChanged?.();
+    return next.status === "error"
+      ? { ok: false, error: next.lastError ?? `Failed to load module: ${id}` }
+      : { ok: true };
+  }
+
+  private refreshModuleCommandCount(id: string): void {
+    const runtime = this.runtime.get(id);
+    if (!runtime) return;
+    runtime.commandCount = this.deps.commands
+      .list(undefined, { includeUnavailable: true })
+      .filter((command) => command.id.startsWith(`microapp.${id}.`)).length;
+    this.deps.onModuleCommandsChanged?.();
+    this.deps.onRuntimeStateChanged?.();
   }
 }
 
@@ -463,25 +684,8 @@ export async function loadThemes(): Promise<void> {
  * CommandRegistry, etc.) but before workspace restore.
  */
 export async function loadMicroapps(deps: MicroappHostDeps): Promise<void> {
-  const modules = discoverModules();
-  const seenIds = new Set<string>();
-
-  // Fail-fast on duplicate ids
-  for (const mod of modules) {
-    if (mod.manifest.type === "microapp" && mod.manifest.microapp?.id) {
-      const id = mod.manifest.microapp.id;
-      if (seenIds.has(id)) {
-        throw new Error(`[module-loader] Duplicate microapp id "${id}" — found in ${mod.dir}`);
-      }
-      seenIds.add(id);
-    }
-  }
-
-  for (const mod of modules) {
-    if (mod.manifest.type === "microapp") {
-      await loadMicroappModule(mod, deps);
-    }
-  }
+  const runtime = new ModuleRuntimeService(deps);
+  await runtime.loadAllModules();
 }
 
 /**
@@ -489,8 +693,10 @@ export async function loadMicroapps(deps: MicroappHostDeps): Promise<void> {
  * If deps not provided, only themes are loaded (backward compat).
  */
 export async function loadModules(deps?: MicroappHostDeps): Promise<void> {
-  await loadThemes();
-  if (deps) {
-    await loadMicroapps(deps);
+  if (!deps) {
+    await loadThemes();
+    return;
   }
+  const runtime = new ModuleRuntimeService(deps);
+  await runtime.loadAllModules();
 }

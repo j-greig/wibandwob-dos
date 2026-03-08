@@ -317,6 +317,10 @@ export function registerDynamicSnapshot(appType: string, handler: SnapshotHandle
   dynamicHandlers.set(appType, handler);
 }
 
+export function unregisterDynamicSnapshot(appType: string): void {
+  dynamicHandlers.delete(appType);
+}
+
 // ---------------------------------------------------------------------------
 // Public API — used by workspace-snapshots.ts
 // ---------------------------------------------------------------------------

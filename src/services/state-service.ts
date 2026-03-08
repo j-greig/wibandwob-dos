@@ -1,7 +1,14 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import type { AppType, DesktopState, DesktopWindowState, WindowRecord, WindowStateDetails } from "../core/types.js";
+import type {
+  AppType,
+  DesktopState,
+  DesktopWindowState,
+  ModuleRuntimeState,
+  WindowRecord,
+  WindowStateDetails,
+} from "../core/types.js";
 import { themeName } from "../core/theme/resolver.js";
 import { capabilityService } from "./capability-service.js";
 
@@ -20,6 +27,7 @@ interface StateDependencies {
   getWindows: () => WindowRecord[];
   getFocusedWindow: () => WindowRecord | undefined;
   getOpenMenuLabel: () => string | undefined;
+  getModuleRuntime?: () => ModuleRuntimeState[];
 }
 
 /**
@@ -118,6 +126,12 @@ export class StateService {
         open: Boolean(openMenuLabel),
         label: openMenuLabel
       },
+      modules: this.dependencies.getModuleRuntime
+        ? {
+            loadedCount: this.dependencies.getModuleRuntime().filter((mod) => mod.status === "loaded").length,
+            runtime: this.dependencies.getModuleRuntime(),
+          }
+        : undefined,
       windows: windows.map((window, index) => this.describeWindow(window, index, focused?.id))
     };
   }

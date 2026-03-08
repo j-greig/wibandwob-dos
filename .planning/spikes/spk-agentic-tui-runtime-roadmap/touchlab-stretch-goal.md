@@ -47,6 +47,16 @@ Build a local multi-stage ASCII pipeline inside one parent TouchLab surface:
 - the smiley should move within the ASCII webcam window to correspond to the
   tracked human face position
 
+Existing code note:
+- there is already a built-in webcam surface via `monster_cam.open`
+- it carries a real capability gate today:
+  `requires: ["path.monster_cam.venv"]`
+- treat that as the first substrate to inspect and adapt before inventing a
+  second webcam path for TouchLab
+- the future SDK/operator story here is probably "align built-in Monster Cam
+  with a microapp-visible operator input" rather than "start webcam capture
+  over from zero"
+
 ### Window D — blended output
 
 - combine generator output, primer influence, and webcam/avatar position
