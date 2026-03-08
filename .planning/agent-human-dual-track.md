@@ -69,18 +69,29 @@ Agent wants to see WibWobWorld terrain.
 
 1. `bash scripts/open.sh microapp.wibwobworld.open`
 2. `bash scripts/state.sh` — finds new window ID, e.g. `win-4`
-3. Poll until ready — do NOT sleep arbitrarily:
-```bash
-for i in $(seq 1 20); do
-  RESP=$(curl -s -H "Authorization: Bearer $WIBWOB_TOKEN" \
-    "$WIBWOB_API/windows/text?id=win-4")
-  OK=$(echo "$RESP" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('ok','false'))")
-  TEXT=$(echo "$RESP" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('text',''))" 2>/dev/null)
-  [[ "$OK" == "True" && -n "$TEXT" ]] && break
-  sleep 0.5
-done
-```
-  Ready signal: `ok === true` AND `text` is non-empty. No ready field exists — this is the only poll target.
+3. Poll in two stages — do NOT sleep arbitrarily:
+
+   **Stage 1 — existence:** poll `/state` until the new window appears by appType/id.
+   ```bash
+   for i in $(seq 1 20); do
+     FOUND=$(curl -s -H "Authorization: Bearer $WIBWOB_TOKEN" "$WIBWOB_API/state" \
+       | python3 -c "import json,sys; ws=json.load(sys.stdin)['windows']; \
+         print('yes' if any(w.get('appType')=='wibwobworld' for w in ws) else 'no')")
+     [[ "$FOUND" == "yes" ]] && break
+     sleep 0.5
+   done
+   ```
+
+   **Stage 2 — content:** poll `/windows/text?id=N` until text is non-empty.
+   ```bash
+   for i in $(seq 1 20); do
+     RESP=$(curl -s -H "Authorization: Bearer $WIBWOB_TOKEN" "$WIBWOB_API/windows/text?id=win-4")
+     TEXT=$(echo "$RESP" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('text',''))" 2>/dev/null)
+     [[ -n "$TEXT" ]] && break
+     sleep 0.5
+   done
+   ```
+   No `/windows/ready` endpoint exists. Sleeps are fallback heuristics for streaming/animated surfaces only.
 4. `bash scripts/export.sh win-4` — reads text content.
 5. Optionally: `bash scripts/png.sh win-4 world.png` — captures as PNG.
 
@@ -204,12 +215,15 @@ journalctl -u wibwob-dos -n 100 --no-pager
 Log categories in `logs/tui-app/YYYY-MM-DD.log`:
 | Tag | Content |
 |-----|---------|
-| `APP` | Lifecycle — startup, shutdown, theme change |
+| `APP` | Lifecycle — startup, shutdown, theme change, module load/unload success |
 | `CMD` | Command registry — run, unknown command |
 | `MSG` | Agent messages — inbound user/sender text |
 | `SYS` | System ops — prompt reload, session init |
 | `API` | Control API — POST requests |
-| `ERR` | Failures |
+| `ERR` | Failures including module loader errors |
+
+`scratch/app-stderr.log` is secondary — crashes, startup spill, pre-logger errors only.
+Do not treat it as the primary log for routine module/runtime lifecycle.
 
 ---
 
@@ -309,8 +323,8 @@ Every agent operating WibWob-DOS should internalize this loop before acting:
 6. act        bash scripts/open.sh <command-id>
               bash scripts/send.sh <window-id> <text>
 
-7. verify     poll /windows/text?id=N until ok+text non-empty (max 10s)
-   result     # do not sleep; poll
+7. verify     poll /state until window appears by appType, THEN poll /windows/text
+   result     until text is non-empty. Two stages. No fixed sleep.
 ```
 
 ---
@@ -322,9 +336,13 @@ Every agent operating WibWob-DOS should internalize this loop before acting:
 - Structured request log for control API (caller IP, timestamp, command ID, result, 401s)
 - `deployProfile` verification step in `connect.sh` — agent should assert profile name,
   not just check ok=true
-- `/modules/list` endpoint — hosted module inspection does not exist; `GET /state` has
-  no module info; `module-loader.ts` has no `listModules()` method
-- Module/runtime audit log — load, unload, reload, failure events not yet structured
+- `/modules/list`, `/modules/reload`, `/modules/unload` — these exist in the local
+  app runtime (from current module-runtime work) and module info is projected into
+  `GET /state` locally. NOT yet guaranteed in the hosted/VPS branch until that work
+  is rebased/merged. Treat as near-term, not speculative — but verify against the
+  running instance's `/health` sessionId before assuming availability.
+- Module/runtime audit log — load, unload, reload, failure events land in
+  `logs/tui-app/` (`log.app`/`log.err`) but not yet structured for incident forensics
 
 <codex-notes>
 Questions / concerns:
