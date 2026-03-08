@@ -190,9 +190,10 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     menuPlacements: [{ category: "applications", order: 0 }],
     palettePlacement: { order: 10 },
     api: true,
-    agent: true
+    agent: true,
+    requires: ["feature.file-manager"],
   },
-  // ── Finder commands ──────────────────────────────────
+  // ── Finder commands — all require feature.file-manager ───────────────────
   {
     id: "finder.search",
     label: "Finder: Search Files",
@@ -201,7 +202,8 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     actionKey: "finderSearch",
     palettePlacement: { order: 11 },
     api: true,
-    agent: true
+    agent: true,
+    requires: ["feature.file-manager"],
   },
   {
     id: "finder.navigate",
@@ -211,7 +213,8 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     actionKey: "finderNavigate",
     palettePlacement: { order: 12 },
     api: true,
-    agent: true
+    agent: true,
+    requires: ["feature.file-manager"],
   },
   {
     id: "finder.toggle_view",
@@ -221,7 +224,8 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     actionKey: "finderToggleView",
     palettePlacement: { order: 13 },
     api: true,
-    agent: true
+    agent: true,
+    requires: ["feature.file-manager"],
   },
   // finder.toggle_hidden removed — dotfiles always shown
   {
@@ -232,7 +236,8 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     actionKey: "finderAdvancedSearch",
     palettePlacement: { order: 15 },
     api: true,
-    agent: true
+    agent: true,
+    requires: ["feature.file-manager"],
   },
   {
     id: "finder.bookmark_path",
@@ -240,7 +245,8 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     description: "Bookmark the current directory in the focused Finder for quick access.",
     group: "browse",
     actionKey: "finderBookmarkPath",
-    palettePlacement: { order: 16 }
+    palettePlacement: { order: 16 },
+    requires: ["feature.file-manager"],
   },
   {
     id: "finder.go_to_bookmark",
@@ -249,7 +255,8 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     group: "browse",
     actionKey: "finderGoToBookmark",
     api: true,
-    agent: true
+    agent: true,
+    requires: ["feature.file-manager"],
   },
   {
     id: "finder.new_folder",
@@ -257,7 +264,8 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     description: "Create a new folder in the current Finder directory.",
     group: "browse",
     actionKey: "finderNewFolder",
-    palettePlacement: { order: 17 }
+    palettePlacement: { order: 17 },
+    requires: ["feature.file-manager"],
   },
   {
     id: "finder.refresh",
@@ -267,7 +275,8 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     actionKey: "finderRefresh",
     palettePlacement: { order: 18 },
     api: true,
-    agent: true
+    agent: true,
+    requires: ["feature.file-manager"],
   },
   {
     id: "finder.sort_by",
