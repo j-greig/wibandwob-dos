@@ -63,3 +63,4 @@ assets/mediapipe-venv/
 # Claude worktrees
 .claude/worktrees/
 .claude/skills/
+tests/tidepool-smoke/results/

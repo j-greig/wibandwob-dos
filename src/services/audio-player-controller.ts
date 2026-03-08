@@ -18,6 +18,7 @@ import * as path from "node:path";
 import { REPO_ROOT } from "../core/config.js";
 
 export const COMPOSITIONS_DIR = path.join(REPO_ROOT, "scratch", "compositions");
+export const BUNDLED_MUSIC_DIR = path.join(REPO_ROOT, "content", "music");
 const AUDIO_FILE_PATTERN = /\.(mp3|wav|m4a|ogg|flac)$/i;
 const SCRUB_SECONDS = 5;
 export const VOLUME_STEP = 10;
@@ -73,6 +74,7 @@ export function resolveAudioPath(rawPath: string): string | null {
     path.isAbsolute(trimmed) ? trimmed : "",
     path.resolve(process.cwd(), trimmed),
     path.resolve(COMPOSITIONS_DIR, trimmed),
+    path.resolve(BUNDLED_MUSIC_DIR, trimmed),
   ].filter(Boolean);
 
   for (const candidate of candidates) {
@@ -252,7 +254,13 @@ export class AudioPlayerController {
   }
 
   private refreshFiles(): void {
-    this.files = findAudioFiles(COMPOSITIONS_DIR);
+    // Merge bundled tracks (content/music/) with scratch compositions.
+    // Bundled tracks come first; scratch tracks with the same filename win (override).
+    const bundled = fs.existsSync(BUNDLED_MUSIC_DIR) ? findAudioFiles(BUNDLED_MUSIC_DIR) : [];
+    const local = fs.existsSync(COMPOSITIONS_DIR) ? findAudioFiles(COMPOSITIONS_DIR) : [];
+    const localSet = new Set(local);
+    const merged = [...bundled.filter((f) => !localSet.has(f)), ...local];
+    this.files = merged;
     if (this.files.length === 0) {
       this.selectedIndex = 0;
       return;
