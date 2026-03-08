@@ -1,7 +1,7 @@
 ---
 name: wibwobdos
 description: Operate WibWob-DOS — a shared terminal desktop with overlapping windows, generative art, a 3D world with chat rooms, and an embedded AI agent. Use to open windows, read desktop state, send messages to the agent chat, capture screenshots, and post to Discord. Triggers on: "open WibWobWorld", "show the desktop", "take a screenshot", "share to Discord", "what's on screen", "open some art", "send a chat message".
-compatibility: Requires bash, curl, python3. SSH key required. Run `pip install Pillow` for PNG screenshots.
+compatibility: Requires bash, curl, python3. Scripts marked [vps-ok] work with bearer token only. Scripts marked [local-only] require SSH key or local deps (Pillow, Discord webhook).
 ---
 
 # WibWob-DOS
@@ -31,15 +31,16 @@ export WIBWOB_TOKEN=$(cat scratch/control-token)
 
 ## Core operations
 
-| Goal | Script |
-|---|---|
-| Desktop layout — windows, sizes, focus | `bash scripts/state.sh` |
-| Open a window | `bash scripts/open.sh <command-id>` |
-| Send text or a message | `bash scripts/send.sh <window-id> <text>` |
-| Read a window's content | `bash scripts/export.sh <window-id>` |
-| Text screenshot of full TUI | `bash scripts/screenshot.sh` |
-| PNG screenshot | `bash scripts/png.sh [window-id] [out.png]` |
-| Share minimap and/or PNG to Discord | `bash scripts/discord.sh [minimap\|png\|both]` |
+| Goal | Script | Where |
+|---|---|---|
+| Desktop layout — windows, sizes, focus | `bash scripts/minimap.sh` | [vps-ok] |
+| Open a window | `bash scripts/open.sh <command-id>` | [vps-ok] |
+| Wait for window content after open | `bash scripts/poll-window.sh <id> [timeout]` | [vps-ok] |
+| Send text or a message | `bash scripts/send.sh <window-id> <text>` | [vps-ok] |
+| Read a window's content | `bash scripts/export.sh <window-id>` | [vps-ok] |
+| Text screenshot of full TUI | `bash scripts/screenshot.sh` | [local-only] requires SSH |
+| PNG screenshot | `bash scripts/png.sh [window-id] [out.png]` | [local-only] requires Pillow |
+| Share minimap and/or PNG to Discord | `bash scripts/discord.sh [minimap\|png\|both]` | [local-only] requires DISCORD_WEBHOOK_URL + Pillow |
 
 ## Discover what's available
 
