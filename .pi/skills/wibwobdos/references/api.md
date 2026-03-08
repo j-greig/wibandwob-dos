@@ -109,7 +109,7 @@ curl -s -X POST $WIBWOB_API/windows/batch \
 
 ```json
 {
-  "app":     { "theme": "wibwob-dark", "sessionId": "ab3", "instanceLabel": "main" },
+  "app":     { "theme": "wibwob-dark", },
   "screen":  { "width": 280, "height": 81, "cellAspect": 2.0 },
   "focus":   { "windowId": 3 },
   "windows": [
@@ -119,13 +119,18 @@ curl -s -X POST $WIBWOB_API/windows/batch \
       "kind": "microapp",
       "appType": "wibwob.world",
       "focused": true,
-      "rect": { "x": 5, "y": 3, "w": 120, "h": 40 }
+      "left": 5,
+      "top": 3,
+      "width": 120,
+      "height": 40
     }
   ]
 }
 ```
 
-Window ids are integers and reset each session. Always read from `/state`.
+Window position/size: `left`, `top`, `width`, `height` at TOP LEVEL — no `rect` key.
+`sessionId` + `deployProfile` are in `/health` only, not `/state`.
+Window ids reset each session. Always read from `/state`.
 
 ## Themes
 
