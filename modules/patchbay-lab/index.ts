@@ -721,6 +721,15 @@ export default function setup(host: MicroappHost) {
       render();
     }
 
+    function setPrimerPaneFocus(nextFocus: PrimerPaneFocus): void {
+      if (primerPaneFocus === nextFocus) {
+        return;
+      }
+      primerPaneFocus = nextFocus;
+      pushEvent(`primer focus -> ${primerPaneFocus}`);
+      render();
+    }
+
     function renderInspector(): string {
       const channel = channelId ? host.worldChat.readChannel(channelId) : undefined;
       const transport = host.worldChat.getTransportStatus();
@@ -812,7 +821,7 @@ export default function setup(host: MicroappHost) {
           : `${summarizeChannel(host, channelId)} · seed ${seed}`;
       lastStatusRight =
         view === "overview"
-          ? `[tab] ${primerPaneFocus} · [j/k] select [[]/[]] tabs [m/n] helpers [q] close`
+          ? `[tab] ${primerPaneFocus} · list:j/k,[ ] · preview:j/k scroll · [q] close`
           : "[1-3] views [r] reseed [m/n] helpers [p] ping [q] close";
 
       headerBar.update({
@@ -834,10 +843,12 @@ export default function setup(host: MicroappHost) {
         previewText = `${gallery.sidebar}\n\n${gallery.content}`;
         simplePreviewBox.setContent("");
         primerFrameTitle.setContent(
-          `${primerPaneFocus === "list" ? "{black-fg}{yellow-bg} Primer Bench {/yellow-bg}{/black-fg}" : "{black-fg}{cyan-bg} Primer Bench {/cyan-bg}{/black-fg}"}  ${currentPrimerTab().label}`,
+          `${primerPaneFocus === "list" ? "{black-fg}{yellow-bg} ▶ LIST {/yellow-bg}{/black-fg}" : "{black-fg}{cyan-bg} ▶ PREVIEW {/cyan-bg}{/black-fg}"}  Primer Bench  ${currentPrimerTab().label}`,
         );
         primerFrameStatus.setContent(
-          ` ${primerPaneFocus === "list" ? "LIST ACTIVE" : "PREVIEW ACTIVE"}  Tab switch  j/k select  [ ] tabs `,
+          primerPaneFocus === "list"
+            ? " ▶ LIST ACTIVE  Tab toggle  j/k select primer  [ ] change tab "
+            : " ▶ PREVIEW ACTIVE  Tab toggle  j/k scroll preview ",
         );
         primerSidebarBox.setContent(gallery.sidebar);
         primerDividerBox.setContent(Array.from({ length: Math.max(1, Number(primerDividerBox.height) || 1) }, () => "│").join("\n"));
@@ -905,11 +916,42 @@ export default function setup(host: MicroappHost) {
     win.body.key(["n"], () => control?.spawnHelper("note-cloud"));
     win.body.key(["x"], () => control?.closeHelpers());
     win.body.key(["tab"], () => { if (view === "overview") togglePrimerPaneFocus(); });
-    win.body.key(["j"], () => { if (view === "overview") movePrimerSelection(1); });
-    win.body.key(["k"], () => { if (view === "overview") movePrimerSelection(-1); });
-    win.body.key(["["], () => { if (view === "overview") switchPrimerTab(activePrimerTabIndex - 1); });
-    win.body.key(["]"], () => { if (view === "overview") switchPrimerTab(activePrimerTabIndex + 1); });
+    win.body.key(["j"], () => {
+      if (view !== "overview") return;
+      if (primerPaneFocus === "list") {
+        movePrimerSelection(1);
+      } else {
+        primerContentBox.scroll(1);
+        host.screen.render();
+      }
+    });
+    win.body.key(["k"], () => {
+      if (view !== "overview") return;
+      if (primerPaneFocus === "list") {
+        movePrimerSelection(-1);
+      } else {
+        primerContentBox.scroll(-1);
+        host.screen.render();
+      }
+    });
+    win.body.key(["["], () => {
+      if (view === "overview" && primerPaneFocus === "list") switchPrimerTab(activePrimerTabIndex - 1);
+    });
+    win.body.key(["]"], () => {
+      if (view === "overview" && primerPaneFocus === "list") switchPrimerTab(activePrimerTabIndex + 1);
+    });
     win.body.key(["q", "escape"], () => win.close());
+
+    primerSidebarBox.on("click", () => {
+      if (view === "overview") {
+        setPrimerPaneFocus("list");
+      }
+    });
+    primerContentBox.on("click", () => {
+      if (view === "overview") {
+        setPrimerPaneFocus("preview");
+      }
+    });
 
     win.onResize(render);
     win.onRestyle(() => {
