@@ -139,6 +139,7 @@ import { openChromeBrowserWindow } from "../windows/chrome-browser-window.js";
 import { openWibWobAgentWindow as openNativeWibWobAgentWindow } from "../windows/wibwob-agent-window.js";
 import { CustomCursor } from "./custom-cursor.js";
 import { openMonsterCamWindow } from "../windows/monster-cam-window.js";
+import { openGlitchBoxWindow, glitchboxSetPose } from "../windows/glitchbox-window.js";
 import { worldChatService } from "../services/world-chat-service.js";
 
 /** Exit code used by dev-mode reload. The launcher script watches for this. */
@@ -1174,6 +1175,28 @@ export class TsTuiMvpApp {
     });
   }
 
+  private openGlitchBox(): WindowRecord | undefined {
+    return this.focusOrCreate("glitchbox", () => {
+      openGlitchBoxWindow({
+        screen: this.screen,
+        windowManager: this.windowManager,
+        onStateChanged: () => this.syncLiveState(),
+      });
+    });
+  }
+
+  private glitchboxPose(preset: string): void {
+    const win = this.windowManager.getWindows()
+      .find((w) => w.describeState?.().appType === "glitchbox");
+    if (!win) {
+      this.overlays.flash("GlitchBox not open.");
+      return;
+    }
+    if (!glitchboxSetPose(win, preset)) {
+      this.overlays.flash(`Unknown pose: ${preset}`);
+    }
+  }
+
   private copyFocusedWindowText(): void {
     const focused = this.windowManager.getFocusedWindow();
     if (!focused) {
@@ -1897,6 +1920,12 @@ export class TsTuiMvpApp {
       },
       // ── Monster Cam ─────────────────────────────────────
       openMonsterCam: () => this.openMonsterCam(),
+      // ── GlitchBox ─────────────────────────────────────
+      openGlitchBox: () => this.openGlitchBox(),
+      glitchboxPose: (args) => {
+        const preset = typeof args?.preset === "string" ? args.preset : "idle";
+        this.glitchboxPose(preset);
+      },
       // ── Help ────────────────────────────────────────────
       viewReadme: () => this.openBrowserReaderWindow(README_PATH),
     };

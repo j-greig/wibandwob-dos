@@ -5,18 +5,18 @@
 GlitchBox TUI is a blessed window where agents control an ASCII skeleton
 in a generative field. No webcam. No Python. Works on VPS. API-driven poses.
 
-Repo root: `../../` from this directory.
-Spec: `../../.planning/spikes/spk-glitchbox-tui/mvp-brief.md`
-Epic: `../../.planning/epics/e004-monster-cam/e004-brief.md` (skeleton render ref)
+Repo root: `../` from this directory.
+Spec: `../.planning/spikes/spk-glitchbox-tui/mvp-brief.md`
+Epic: `../.planning/epics/e004-monster-cam/e004-brief.md` (skeleton render ref)
 
 ## Your task each iteration
 
-1. **Read** the MVP brief at `../../.planning/spikes/spk-glitchbox-tui/mvp-brief.md`
+1. **Read** the MVP brief at `../.planning/spikes/spk-glitchbox-tui/mvp-brief.md`
 
 2. **Assess** current state — check what exists:
-   - `../../src/windows/glitchbox-window.ts` (may not exist yet)
-   - `../../src/core/command-catalog.ts` (look for glitchbox entries)
-   - `../../src/core/app-controller.ts` (look for glitchbox wiring)
+   - `../src/windows/glitchbox-window.ts` (may not exist yet)
+   - `../src/core/command-catalog.ts` (look for glitchbox entries)
+   - `../src/core/app-controller.ts` (look for glitchbox wiring)
 
 3. **Pick** the lowest-numbered unmet AC from this list:
    - AC-1: `glitchbox.open` opens window with animated field + idle skeleton
@@ -28,12 +28,12 @@ Epic: `../../.planning/epics/e004-monster-cam/e004-brief.md` (skeleton render re
    - AC-7: `bun run typecheck` passes clean
 
 4. **Implement** ONE concrete thing toward that AC:
-   - New window: `../../src/windows/glitchbox-window.ts`
-   - New commands: register in `../../src/core/command-catalog.ts`
-   - Wire handler: `../../src/core/app-controller.ts`
-   - State: `../../src/services/state-service.ts` if needed
+   - New window: `../src/windows/glitchbox-window.ts`
+   - New commands: register in `../src/core/command-catalog.ts`
+   - Wire handler: `../src/core/app-controller.ts`
+   - State: `../src/services/state-service.ts` if needed
 
-5. **Typecheck**: `cd ../../ && bun run typecheck`
+5. **Typecheck**: `cd ../ && bun run typecheck`
    Fix ALL errors before continuing. Zero tolerance.
 
 6. **Log** one line to `logs/glitchbox-build.log`:
@@ -49,7 +49,7 @@ Epic: `../../.planning/epics/e004-monster-cam/e004-brief.md` (skeleton render re
 ## Implementation notes
 
 For the generative field (AC-1, AC-4):
-- Look at `../../src/windows/generative-art-window.ts` — plasma engine
+- Look at `../src/windows/generative-art-window.ts` — plasma engine
 - Extract the render loop, adapt for GlitchBox layer 1
 - Field should animate continuously, ~10fps minimum
 

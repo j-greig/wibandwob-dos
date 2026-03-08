@@ -25,6 +25,7 @@ export type WindowKind =
   | "palette"
   | "inspector"
   | "monster-cam"
+  | "glitchbox"
   | "microapp";
 
 export interface EditorState {
@@ -112,7 +113,8 @@ export type TransientAppType =
   | "state-inspector"
   | "contour-studio"
   | "terrain-lab"
-  | "music-player";
+  | "music-player"
+  | "glitchbox";
 
 /**
  * Union of all known appType strings.

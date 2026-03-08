@@ -71,6 +71,9 @@ export interface AppMenuActions {
   openPlasmaFromPrimer: (args?: Record<string, unknown>) => void;
   // ── Monster Cam ───────────────────────────────────────
   openMonsterCam: () => void;
+  // ── GlitchBox ───────────────────────────────────────────
+  openGlitchBox: () => void;
+  glitchboxPose: (args?: Record<string, unknown>) => void;
   // ── Window control (by id — agent/API use) ────────────
   closeWindowById: (args?: Record<string, unknown>) => void;
   focusWindowById: (args?: Record<string, unknown>) => void;
@@ -818,6 +821,28 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     group: "save",
     actionKey: "loadWorkspace",
     palettePlacement: { order: 180 },
+    api: true,
+    agent: true
+  },
+  // ── GlitchBox ───────────────────────────────────────────
+  {
+    id: "glitchbox.open",
+    label: "GlitchBox",
+    description: "Open the GlitchBox window — ASCII skeleton in a generative field. No camera needed.",
+    group: "surface",
+    actionKey: "openGlitchBox",
+    menuPlacements: [{ category: "applications", order: 155 }],
+    palettePlacement: { order: 147 },
+    contextMenu: { desktop: true, order: 85 },
+    api: true,
+    agent: true
+  },
+  {
+    id: "glitchbox.pose",
+    label: "GlitchBox: Set Pose",
+    description: "Set the GlitchBox skeleton to a named preset. Args: preset (idle|arms-raised|step-left|jump|wave).",
+    group: "surface",
+    actionKey: "glitchboxPose",
     api: true,
     agent: true
   },
