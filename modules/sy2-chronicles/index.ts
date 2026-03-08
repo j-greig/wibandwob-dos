@@ -1200,27 +1200,50 @@ const PANEL_DEFS: PanelDef[] = [
 
 function layoutPanels(panels: PanelDef[], maxWidth: number): LayoutResult {
   const placements: Array<{ id: string; x: number; y: number }> = [];
-  let cursorX = 0;
-  let cursorY = 0;
-  let rowHeight = 0;
   let contentWidth = 0;
+  const safeWidth = Math.max(20, Math.floor(maxWidth));
+  const normalizedPanels = panels.map((panel, index) => ({
+    ...panel,
+    w: clamp(panel.w, 3, safeWidth),
+    h: Math.max(3, panel.h),
+    _index: index,
+  }));
+  const rows: Array<typeof normalizedPanels> = [];
+  let row: typeof normalizedPanels = [];
+  let rowWidth = 0;
 
-  const safeWidth = Math.max(20, maxWidth);
-
-  for (const panel of panels) {
-    if (cursorX > 0 && cursorX + panel.w > safeWidth) {
-      cursorY += rowHeight + 1;
-      cursorX = 0;
-      rowHeight = 0;
+  for (const panel of normalizedPanels) {
+    const nextWidth = row.length === 0 ? panel.w : rowWidth + COL_GAP + panel.w;
+    if (row.length > 0 && nextWidth > safeWidth) {
+      rows.push(row);
+      row = [];
+      rowWidth = 0;
     }
-
-    placements.push({ id: panel.id, x: cursorX, y: cursorY });
-    cursorX += panel.w + COL_GAP;
-    rowHeight = Math.max(rowHeight, panel.h);
-    contentWidth = Math.max(contentWidth, cursorX - COL_GAP);
+    row.push(panel);
+    rowWidth = row.length === 1 ? panel.w : rowWidth + COL_GAP + panel.w;
+  }
+  if (row.length > 0) {
+    rows.push(row);
   }
 
-  const contentHeight = cursorY + rowHeight;
+  let cursorY = 0;
+  let contentHeight = 1;
+  for (let rowIndex = 0; rowIndex < rows.length; rowIndex += 1) {
+    const rowPanels = [...(rows[rowIndex] ?? [])].sort((a, b) => a.col - b.col || a._index - b._index);
+    let cursorX = 0;
+    let rowHeight = 0;
+    for (const panel of rowPanels) {
+      placements.push({ id: panel.id, x: cursorX, y: cursorY });
+      cursorX += panel.w + COL_GAP;
+      rowHeight = Math.max(rowHeight, panel.h);
+      contentWidth = Math.max(contentWidth, cursorX - COL_GAP);
+    }
+    contentHeight = Math.max(contentHeight, cursorY + rowHeight);
+    if (rowIndex < rows.length - 1) {
+      cursorY += rowHeight + 1;
+    }
+  }
+
   return {
     placements,
     contentWidth: Math.max(contentWidth, safeWidth),
@@ -1435,8 +1458,14 @@ export default function setup(host: MicroappHost) {
     }
 
     function measureViewport() {
-      const width = Math.max(20, host.geometry.width - 2);
-      const height = Math.max(6, host.geometry.height - 5);
+      const canvasWidth = Number((canvas as any).width);
+      const canvasHeight = Number((canvas as any).height);
+      const computedWidth = Number.isFinite(canvasWidth) && canvasWidth > 0 ? canvasWidth - 1 : NaN;
+      const width = Math.max(20, Number.isFinite(computedWidth) ? computedWidth : host.geometry.width - 4);
+      const height = Math.max(
+        6,
+        Number.isFinite(canvasHeight) && canvasHeight > 0 ? canvasHeight : host.geometry.height - 5,
+      );
       return { width, height };
     }
 
@@ -1447,20 +1476,25 @@ export default function setup(host: MicroappHost) {
     }
 
     function renderLayoutAndContent() {
-      const { width: viewportWidth } = measureViewport();
+      const { width: viewportWidth, height: viewportHeight } = measureViewport();
       const panelsWithOverrides = PANEL_DEFS.map((def) => {
         const size = getPanelSize(def.id, def);
-        return { ...def, w: size.w, h: size.h };
+        return {
+          ...def,
+          w: clamp(size.w, 3, viewportWidth),
+          h: Math.max(3, size.h),
+        };
       });
       const layout = layoutPanels(panelsWithOverrides, viewportWidth);
+      const sizeMap = new Map(panelsWithOverrides.map((panel) => [panel.id, { w: panel.w, h: panel.h }]));
       panelPlacements = layout.placements;
-      totalContentHeight = layout.contentHeight;
+      totalContentHeight = Math.max(layout.contentHeight, viewportHeight);
 
       // Position frames at natural content positions — canvas.scrollable handles clipping
       for (const placement of layout.placements) {
         const node = panelNodes.get(placement.id);
         if (!node) continue;
-        const size = getPanelSize(placement.id, node.def);
+        const size = sizeMap.get(placement.id) ?? { w: 3, h: 3 };
         node.x = placement.x;
         node.y = placement.y;
         node.frame.left = node.x;
@@ -1470,7 +1504,7 @@ export default function setup(host: MicroappHost) {
       }
 
       for (const node of panelNodes.values()) {
-        const size = getPanelSize(node.def.id, node.def);
+        const size = sizeMap.get(node.def.id) ?? { w: 3, h: 3 };
         const contentWidth = Math.max(1, size.w - 2);
         const contentHeight = Math.max(1, size.h - 2);
         node.content.setContent(node.def.content(tick, contentWidth, contentHeight));
@@ -1487,7 +1521,7 @@ export default function setup(host: MicroappHost) {
       ];
 
       const placementMap = new Map(panelPlacements.map((p) => [p.id, p]));
-      const defMap = new Map(PANEL_DEFS.map((d) => [d.id, d]));
+      const defMap = new Map(panelsWithOverrides.map((d) => [d.id, d]));
       const arrowGrid = blankGrid(viewportWidth, totalContentHeight);
 
       for (const [fromId, toId] of arrowRelations) {
@@ -1568,8 +1602,9 @@ export default function setup(host: MicroappHost) {
     win.onRestyle(() => {
       root.style = host.theme().body;
       canvas.style = host.theme().body;
+      (canvas as any).scrollbar.style = { fg: host.theme().muted.fg, bg: host.theme().body.bg };
       arrowOverlay.style = { fg: host.theme().muted.fg, bg: "default", transparent: true };
-      applyStyles();
+      renderLayoutAndContent();
       host.screen.render();
     });
 
@@ -1580,9 +1615,11 @@ export default function setup(host: MicroappHost) {
 
     const timer = setInterval(() => {
       tick += 1;
+      const { width: viewportWidth } = measureViewport();
       for (const node of panelNodes.values()) {
         if (!node.def.live) continue;
-        const size = getPanelSize(node.def.id, node.def);
+        const baseSize = getPanelSize(node.def.id, node.def);
+        const size = { w: clamp(baseSize.w, 3, viewportWidth), h: Math.max(3, baseSize.h) };
         const contentWidth = Math.max(1, size.w - 2);
         const contentHeight = Math.max(1, size.h - 2);
         node.content.setContent(node.def.content(tick, contentWidth, contentHeight));
