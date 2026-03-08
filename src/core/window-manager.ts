@@ -149,6 +149,8 @@ export class WindowManager implements WindowFacade {
       frame,
       body,
       titleBar,
+      closeHint,
+      resizeGrip,
       shadow,
       close: () => {
         record.cleanup?.();
@@ -398,6 +400,12 @@ export class WindowManager implements WindowFacade {
       window.frame.style = { ...theme().windowFrame, border: active ? theme().windowBorderFocused : theme().windowBorderUnfocused };
       if (window.titleBar) {
         window.titleBar.style = active ? theme().titleBarFocused : theme().titleBarUnfocused;
+      }
+      if (window.closeHint) {
+        window.closeHint.style = theme().closeButton;
+      }
+      if (window.resizeGrip) {
+        window.resizeGrip.style = theme().resizeGrip;
       }
       safeSetStyle(window.body, theme().body);
       if (window.shadow) {
