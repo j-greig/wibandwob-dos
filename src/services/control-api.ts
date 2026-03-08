@@ -145,6 +145,7 @@ export class ControlApiService {
     private readonly port: number,
     private readonly handlers: ControlApiHandlers,
     private readonly identity: ControlApiIdentity,
+    private readonly token: string | null = null,
   ) {}
 
   start(): void {
@@ -205,6 +206,22 @@ export class ControlApiService {
 
   private async handleRequest(request: Request): Promise<Response> {
     const url = new URL(request.url);
+    const isPublicEndpoint =
+      request.method === "GET" &&
+      (url.pathname === "/" ||
+        url.pathname === "/help" ||
+        url.pathname === "/openapi.json" ||
+        url.pathname === "/health");
+
+    if (!isPublicEndpoint && this.token !== null) {
+      const authHeader = request.headers.get("Authorization");
+      const provided = authHeader?.startsWith("Bearer ")
+        ? authHeader.slice(7)
+        : null;
+      if (provided !== this.token) {
+        return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+      }
+    }
 
     if (request.method === "GET" && (url.pathname === "/" || url.pathname === "/help")) {
       return Response.json({

@@ -10,10 +10,12 @@ import stringWidth from "string-width";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import crypto from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { log } from "../services/app-logger.js";
 
 import {
+  CONTROL_TOKEN_PATH,
   CONTROL_API_PORT,
   AGENTS_PATH,
   README_PATH,
@@ -144,6 +146,30 @@ import { worldChatService } from "../services/world-chat-service.js";
 /** Exit code used by dev-mode reload. The launcher script watches for this. */
 export const DEV_RELOAD_EXIT_CODE = 75;
 
+function loadOrGenerateControlToken(): string {
+  const fromEnv = process.env.WIBWOB_CONTROL_TOKEN?.trim();
+  if (fromEnv) {
+    process.stderr.write("[control-api] token loaded from env\n");
+    return fromEnv;
+  }
+
+  try {
+    const fromFile = fs.readFileSync(CONTROL_TOKEN_PATH, "utf8").trim();
+    if (fromFile.length >= 32) {
+      process.stderr.write("[control-api] token loaded from file\n");
+      return fromFile;
+    }
+  } catch {
+    // scratch/control-token missing on first boot is expected
+  }
+
+  const token = crypto.randomBytes(32).toString("hex");
+  fs.mkdirSync(path.dirname(CONTROL_TOKEN_PATH), { recursive: true });
+  fs.writeFileSync(CONTROL_TOKEN_PATH, token, { mode: 0o600 });
+  process.stderr.write("[control-api] token loaded from generated\n");
+  return token;
+}
+
 /** Top-level application coordinator. Builds the screen, service graph, menus, and window manager. */
 export class TsTuiMvpApp {
   private readonly screen: blessed.Widgets.Screen;
@@ -252,6 +278,7 @@ export class TsTuiMvpApp {
       defaultDir: SPIKE_ROOT,
       editorStartDir: path.dirname(SPIKE_NOTES_PATH),
     });
+    const controlToken = loadOrGenerateControlToken();
     this.controlApi = new ControlApiService(
       CONTROL_API_PORT,
       {
@@ -267,6 +294,7 @@ export class TsTuiMvpApp {
         instanceLabel: this.instanceLabel,
         sessionId: this.sessionId,
       },
+      controlToken,
     );
     this.state = new StateService(
       {

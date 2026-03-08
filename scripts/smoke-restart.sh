@@ -105,12 +105,23 @@ done
 echo "[smoke] health: $HEALTH"
 
 if echo "$HEALTH" | grep -q '"ok":true'; then
+  # Fetch control token from container scratch dir
+  CONTROL_TOKEN=$(ssh -i "$SMOKE_SSH_KEY" -p "$SMOKE_SSH_PORT" \
+    -o StrictHostKeyChecking=no wibwob@127.0.0.1 \
+    'cat /opt/wibandwob-dos/scratch/control-token 2>/dev/null' 2>/dev/null || echo "")
+
   echo ""
   echo "[smoke] READY"
   echo "  TUI (browser): http://127.0.0.1:${SMOKE_TTYD_PORT}"
   echo "  SSH:           ssh -i $SMOKE_SSH_KEY -p $SMOKE_SSH_PORT wibwob@127.0.0.1"
   echo "  Control API:   http://127.0.0.1:${SMOKE_TUNNEL_PORT}"
   echo "  Attach tmux:   ssh -i $SMOKE_SSH_KEY -p $SMOKE_SSH_PORT wibwob@127.0.0.1 'tmux attach -t wibwob'"
+  if [ -n "$CONTROL_TOKEN" ]; then
+    echo "  Auth header:   Authorization: Bearer $CONTROL_TOKEN"
+    echo "  Quick test:    curl -s -H \"Authorization: Bearer $CONTROL_TOKEN\" http://127.0.0.1:${SMOKE_TUNNEL_PORT}/state"
+  else
+    echo "  Auth token:    (not yet available — run: ssh -i $SMOKE_SSH_KEY -p $SMOKE_SSH_PORT wibwob@127.0.0.1 'cat scratch/control-token')"
+  fi
 else
   echo "[smoke] ERROR: health check failed — check docker logs $SMOKE_NAME"
   exit 1

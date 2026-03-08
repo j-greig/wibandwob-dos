@@ -72,6 +72,8 @@ COPY --chown=wibwob:wibwob AGENTS.md /opt/wibandwob-dos/
 COPY --chown=wibwob:wibwob config /opt/wibandwob-dos/config
 
 # Minimal smoke .env — local transport (no IRC), named instance
+# Optional override (leave unset for per-instance runtime generation):
+# WIBWOB_CONTROL_TOKEN=
 RUN printf 'WIBWOB_INSTANCE_LABEL=smoke\nWIBWOB_DEPLOY_PROFILE=docker-safe\n' \
       > /opt/wibandwob-dos/.env \
     && chown wibwob:wibwob /opt/wibandwob-dos/.env \

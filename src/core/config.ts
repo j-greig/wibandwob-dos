@@ -32,6 +32,7 @@ export const WORKSPACES_DIR = path.join(SCRATCH_BASE, "workspaces");
 export const STATE_PATH = path.join(SCRATCH_BASE, "app-state.json");
 export const CAPTURES_DIR = path.join(SCRATCH_BASE, "captures");
 export const LOGS_DIR = path.join(SCRATCH_BASE, "logs");
+export const CONTROL_TOKEN_PATH = path.join(SCRATCH_BASE, "control-token");
 export const CONTROL_API_PORT = Number.parseInt(process.env.CONTROL_API_PORT ?? "8099", 10) || 8099;
 export const APP_NOTES_PATH = path.join(SCRATCH_BASE, "mvp-notes.txt");
 export const PI_AGENT_HOME = path.join(SCRATCH_BASE, "pi-agent-home");
