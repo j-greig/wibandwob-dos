@@ -38,7 +38,7 @@ export const CONTROL_TOKEN_PATH = path.join(SCRATCH_BASE, "control-token");
 export const CONTROL_API_PORT = Number.parseInt(process.env.CONTROL_API_PORT ?? "8099", 10) || 8099;
 export const APP_NOTES_PATH = path.join(SCRATCH_BASE, "mvp-notes.txt");
 export const PI_AGENT_HOME = path.join(SCRATCH_BASE, "pi-agent-home");
-export const README_PATH = path.join(REPO_ROOT, "README.md");
+export const README_PATH = path.join(REPO_ROOT, "WELCOME.md");
 /** Guaranteed-present doc for Document Reader default — AGENTS.md exists in every checkout and image. */
 export const AGENTS_PATH = path.join(REPO_ROOT, "AGENTS.md");
 
