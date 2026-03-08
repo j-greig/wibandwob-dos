@@ -95,7 +95,6 @@ export interface SceneWindow {
     | { type: "art" }
     | { type: "pattern" }
     | { type: "contour" }
-    | { type: "contour-triptych" }
     | { type: "companion" }
     | { type: "command"; id: string; args?: Record<string, unknown> };
 

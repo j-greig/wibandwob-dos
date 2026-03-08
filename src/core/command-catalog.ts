@@ -26,7 +26,6 @@ export interface AppMenuActions {
   openArtWindow: () => void;
   openContourWindow: () => void;
   openTerrainLab: () => void;
-  openContourTriptych: () => void;
   openWibWobAgent: () => void;
   reloadAgentPrompt: () => void;
   quit: () => void;
@@ -695,17 +694,6 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     actionKey: "openTerrainLab",
     menuPlacements: [{ category: "applications", order: 86 }],
     palettePlacement: { order: 56 },
-    api: true,
-    agent: true
-  },
-  {
-    id: "contour_triptych.open",
-    label: "Contour Triptych",
-    description: "Open a three-panel contour triptych with synchronized terrain and mode controls.",
-    group: "surface",
-    actionKey: "openContourTriptych",
-    menuPlacements: [{ category: "applications", order: 87 }],
-    palettePlacement: { order: 57 },
     api: true,
     agent: true
   },
