@@ -2,7 +2,7 @@
 id: E021
 title: VPS Multi-Agent World
 status: blocked
-issue: ~
+issue: 118
 pr: ~
 depends_on: [E018, E020]
 ---

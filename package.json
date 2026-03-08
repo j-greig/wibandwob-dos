@@ -20,6 +20,7 @@
     "planning:status": "bash .claude/scripts/planning.sh status",
     "planning:sync": "bash .claude/scripts/planning.sh sync",
     "planning:branch": "git branch --show-current && git log --oneline -5",
+    "planning:inbox": "bun run scripts/planning-inbox.ts",
     "prepare": "git config core.hooksPath .githooks"
   },
   "dependencies": {

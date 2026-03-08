@@ -2,7 +2,7 @@
 id: E019
 title: Rogue TUI Port
 status: not-started
-issue: ~
+issue: 119
 pr: ~
 depends_on: []
 ---
