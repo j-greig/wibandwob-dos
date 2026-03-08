@@ -1241,7 +1241,7 @@ export default function setup(host: MicroappHost) {
     });
 
     let tick = 0;
-    let scrollOffset = typeof args?._scrollY === "number" ? Math.max(0, Math.floor(args._scrollY)) : 0;
+    const scrollOffset = typeof args?._scrollY === "number" ? Math.max(0, Math.floor(args._scrollY)) : 0;
     let activePanelId = PANEL_DEFS[0]?.id ?? "";
     let totalContentHeight = 1;
     let panelPlacements: Array<{ id: string; x: number; y: number }> = [];
@@ -1267,16 +1267,23 @@ export default function setup(host: MicroappHost) {
       keys: true,
       mouse: true,
       clickable: true,
+      scrollable: true,
+      alwaysScroll: true,
+      scrollbar: {
+        ch: "│",
+        track: { ch: "░" },
+        style: { fg: host.theme().muted.fg, bg: host.theme().body.bg },
+      },
       style: host.theme().body,
     });
 
-    // Arrow overlay lives on canvas (viewport-sized, positions adjusted by scrollOffset)
+    // Arrow overlay — full content height, scrolls with canvas
     const arrowOverlay = blessed.box({
       parent: canvas,
       top: 0,
       left: 0,
       right: 0,
-      bottom: 0,
+      height: 1,   // updated to totalContentHeight after layout
       tags: false,
       style: { fg: host.theme().muted.fg, bg: "default", transparent: true },
     });
@@ -1428,10 +1435,8 @@ export default function setup(host: MicroappHost) {
     }
 
     function measureViewport() {
-      // Use awidth/aheight (blessed actual screen coords) so we get the true
-      // clipped viewport size, NOT the scroller child's inflated height.
-      const width = Math.max(20, (canvas as any).awidth ?? Number(canvas.width) ?? host.geometry.width - 2);
-      const height = Math.max(6, (canvas as any).aheight ?? host.geometry.height - 5);
+      const width = Math.max(20, host.geometry.width - 2);
+      const height = Math.max(6, host.geometry.height - 5);
       return { width, height };
     }
 
@@ -1442,8 +1447,7 @@ export default function setup(host: MicroappHost) {
     }
 
     function renderLayoutAndContent() {
-      const { width: viewportWidth, height: viewportHeight } = measureViewport();
-      // Create panels with terrain size override for layout calculation
+      const { width: viewportWidth } = measureViewport();
       const panelsWithOverrides = PANEL_DEFS.map((def) => {
         const size = getPanelSize(def.id, def);
         return { ...def, w: size.w, h: size.h };
@@ -1452,10 +1456,7 @@ export default function setup(host: MicroappHost) {
       panelPlacements = layout.placements;
       totalContentHeight = layout.contentHeight;
 
-      const maxScroll = Math.max(0, totalContentHeight - viewportHeight);
-      scrollOffset = clamp(scrollOffset, 0, maxScroll);
-
-      // Position each frame directly on canvas with scrollOffset applied
+      // Position frames at natural content positions — canvas.scrollable handles clipping
       for (const placement of layout.placements) {
         const node = panelNodes.get(placement.id);
         if (!node) continue;
@@ -1463,7 +1464,7 @@ export default function setup(host: MicroappHost) {
         node.x = placement.x;
         node.y = placement.y;
         node.frame.left = node.x;
-        node.frame.top = node.y - scrollOffset;
+        node.frame.top = node.y;
         node.frame.width = size.w;
         node.frame.height = size.h;
       }
@@ -1475,7 +1476,7 @@ export default function setup(host: MicroappHost) {
         node.content.setContent(node.def.content(tick, contentWidth, contentHeight));
       }
 
-      // Render relationship arrows overlay — viewport-sized, positions adjusted by scrollOffset
+      // Arrow overlay — full content height so arrows scroll with panels
       const arrowRelations: Array<[string, string]> = [
         ["born", "first-tools"],
         ["question", "answer"],
@@ -1487,8 +1488,7 @@ export default function setup(host: MicroappHost) {
 
       const placementMap = new Map(panelPlacements.map((p) => [p.id, p]));
       const defMap = new Map(PANEL_DEFS.map((d) => [d.id, d]));
-      // Arrow grid sized to viewport (overlay is fixed to canvas)
-      const arrowGrid = blankGrid(viewportWidth, viewportHeight);
+      const arrowGrid = blankGrid(viewportWidth, totalContentHeight);
 
       for (const [fromId, toId] of arrowRelations) {
         const fromPlacement = placementMap.get(fromId);
@@ -1497,26 +1497,28 @@ export default function setup(host: MicroappHost) {
         const toDef = defMap.get(toId);
         if (!fromPlacement || !toPlacement || !fromDef || !toDef) continue;
 
-        // Positions adjusted by scrollOffset since overlay is viewport-fixed
         const fromX = fromPlacement.x + fromDef.w;
-        const fromY = fromPlacement.y + Math.floor(fromDef.h / 2) - scrollOffset;
+        const fromY = fromPlacement.y + Math.floor(fromDef.h / 2);
         const toX = toPlacement.x;
-        const toY = toPlacement.y + Math.floor(toDef.h / 2) - scrollOffset;
+        const toY = toPlacement.y + Math.floor(toDef.h / 2);
 
         drawArrow(arrowGrid, fromX, fromY, toX, toY);
       }
 
+      arrowOverlay.height = totalContentHeight;
       arrowOverlay.setContent(gridToText(arrowGrid));
       arrowOverlay.setBack();
 
       applyStyles();
     }
 
+    // Restore initial scroll position
+    if (scrollOffset > 0) {
+      canvas.scrollTo(scrollOffset);
+    }
+
     function scrollBy(delta: number) {
-      const { height: viewportHeight } = measureViewport();
-      const maxScroll = Math.max(0, totalContentHeight - viewportHeight);
-      scrollOffset = clamp(scrollOffset + delta, 0, maxScroll);
-      renderLayoutAndContent();
+      (canvas as any).scroll(delta);
       host.screen.render();
     }
 
@@ -1529,28 +1531,24 @@ export default function setup(host: MicroappHost) {
       // Speed multiplier: shift=5x, ctrl=10x (like Illustrator nudge)
       const speed = key?.shift ? 5 : key?.ctrl ? 10 : 1;
 
-      // Arrow keys + WASD — vertical scroll only (left/right = up/down for 1D scroll)
       if (key?.name === "up" || ch === "k") { scrollBy(-1 * speed); return; }
       if (key?.name === "down" || ch === "j") { scrollBy(1 * speed); return; }
       if (key?.name === "left" || ch === "w") { scrollBy(-1 * speed); return; }
       if (key?.name === "right" || ch === "s") { scrollBy(1 * speed); return; }
 
-      // WASD capitals = 5x (bonus: hold shift + wasd)
       if (ch === "W" || ch === "K") { scrollBy(-5); return; }
       if (ch === "S" || ch === "J") { scrollBy(5); return; }
 
-      // Page up/down = full screen jump
-      if (key?.name === "pageup") { scrollBy(-Math.floor((Number(win.body.height) || 24) * speed)); return; }
-      if (key?.name === "pagedown") { scrollBy(Math.floor((Number(win.body.height) || 24) * speed)); return; }
+      if (key?.name === "pageup") { scrollBy(-Math.floor(host.geometry.height * speed)); return; }
+      if (key?.name === "pagedown") { scrollBy(Math.floor(host.geometry.height * speed)); return; }
 
-      // Home/End
-      if (key?.name === "home") { scrollBy(-totalContentHeight); return; }
-      if (key?.name === "end") { scrollBy(totalContentHeight); return; }
+      if (key?.name === "home") { (canvas as any).scrollTo(0); host.screen.render(); return; }
+      if (key?.name === "end") { (canvas as any).scrollTo(totalContentHeight); host.screen.render(); return; }
     });
 
     win.describeState(() => ({
-      summary: `§y² Chronicles (scroll:${scrollOffset})`,
-      scrollY: scrollOffset,
+      summary: `§y² Chronicles (scroll:${(canvas as any).getScrollPerc?.() ?? 0}%)`,
+      scrollY: (canvas as any).getScroll?.() ?? 0,
       panelCount: PANEL_DEFS.length,
       activePanelId,
       contentHeight: totalContentHeight,
