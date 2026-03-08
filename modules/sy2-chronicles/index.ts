@@ -1868,6 +1868,65 @@ export default function setup(host: MicroappHost) {
         },
       });
 
+      // S08/agent: write text into any panel — agents use this to leave notes
+      host.registerCommand({
+        id: 'panel.write',
+        label: 'Write Panel Content',
+        description: 'Set the text content of a §y² Chronicles panel (agents: use this to write notes)',
+        action: (args: Record<string, unknown>) => {
+          const id = String(args.id ?? '');
+          const text = String(args.text ?? '');
+          if (!activePanelNodes?.has(id)) return { ok: false, error: `Panel not found: ${id}` };
+          contentOverrides.set(id, text);
+          activeRenderLayoutAndContent?.();
+          host.screen.render();
+          return { ok: true, id, written: text.length };
+        },
+      });
+
+      host.registerCommand({
+        id: 'panel.append',
+        label: 'Append Panel Content',
+        description: 'Append text to a §y² Chronicles panel',
+        action: (args: Record<string, unknown>) => {
+          const id = String(args.id ?? '');
+          const text = String(args.text ?? '');
+          if (!activePanelNodes?.has(id)) return { ok: false, error: `Panel not found: ${id}` };
+          const node = activePanelNodes!.get(id)!;
+          const current = contentOverrides.get(id)
+            ?? node.def.content(0, Math.max(1, node.def.w - 2), Math.max(1, node.def.h - 2));
+          contentOverrides.set(id, current + '\n' + text);
+          activeRenderLayoutAndContent?.();
+          host.screen.render();
+          return { ok: true, id };
+        },
+      });
+
+      host.registerCommand({
+        id: 'panel.clear',
+        label: 'Clear Panel Override',
+        description: 'Clear edited content of a §y² Chronicles panel, restoring original',
+        action: (args: Record<string, unknown>) => {
+          const id = String(args.id ?? '');
+          contentOverrides.delete(id);
+          activeRenderLayoutAndContent?.();
+          host.screen.render();
+          return { ok: true, id };
+        },
+      });
+
+      host.registerCommand({
+        id: 'panel.list',
+        label: 'List Panels',
+        description: 'List all §y² Chronicles panel IDs and titles',
+        action: () => {
+          const panels = [...(activePanelNodes?.entries() ?? [])].map(([id, n]) => ({
+            id, title: n.def.title, x: n.x, y: n.y,
+          }));
+          return { ok: true, panels };
+        },
+      });
+
       commandsRegistered = true;
     }
 
