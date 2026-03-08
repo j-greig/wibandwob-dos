@@ -614,8 +614,8 @@ Action checklist:
 - [ ] Remove supported direct `../../src/...` imports from current modules
 - [x] Replace duplicated `MicroappHost` / `MicroappWindowHandle` / layout type
       definitions with imported SDK types
-- [ ] Upgrade `modules/hello-world` into the canonical scaffold template
-- [ ] Rewrite `new-window-type` and related skills around the SDK path
+- [x] Upgrade `modules/hello-world` into the canonical scaffold template
+- [~] Rewrite `new-window-type` and related skills around the SDK path
 - [ ] Rebuild `modules/wibwob-poetry-clock` against the SDK as the brownfield
       proof case
 - [ ] Record which required Poetry Clock capabilities still cannot be expressed
@@ -786,9 +786,9 @@ Status: in-progress
 
 - [x] Export canonical module-author types from one path
 - [x] Replace local `MicroappHost` redefinitions in current modules
-- [ ] Project more internals through host capabilities instead of `../../src`
-- [ ] Turn `modules/hello-world` into the canonical scaffold template
-- [ ] Add scaffolding script for new modules/microapps
+- [~] Project more internals through host capabilities instead of `../../src`
+- [x] Turn `modules/hello-world` into the canonical scaffold template
+- [x] Add scaffolding script for new modules/microapps
 - [ ] Rebuild `modules/wibwob-poetry-clock` against the SDK as the brownfield
       proof case
 

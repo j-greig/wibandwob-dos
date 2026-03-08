@@ -33,6 +33,8 @@ Start from:
 
 - `modules/hello-world/` for the minimal scaffold
 - `modules/wibwob-poetry-clock/` for a real microapp using richer behavior
+- `bash scripts/scaffold-microapp.sh modules/<name> <app-id> "<Title>"` for a
+  fresh scaffold generated against the current SDK path
 
 This is still phase-1 SDK work, so some modules still depend on internal
 services directly. The direction is to shrink those direct imports over time by
