@@ -68,6 +68,32 @@ Windows without a `/view` route — open via `POST /commands/run`:
 {"id":"terrain_lab.open","args":{}}
 ```
 
+## Capability Profiles
+
+Commands are gated by capability keys declared in `requires: [...]` on each command definition.
+The active profile is set via `WIBWOB_DEPLOY_PROFILE` env var → `config/capability-profiles/<name>.json`.
+
+Profile JSON shape:
+```json
+{
+  "forceOff": ["feature.editor-open", "feature.agent"],
+  "forceOn":  ["bin.figlet", "feature.resource-heavy"],
+  "stripMenuFrom": [
+    { "id": "app.quit",  "reason": "public instance — prevent visitors quitting the shared process" },
+    { "id": "some.cmd", "reason": "not in MVP surface" }
+  ]
+}
+```
+
+- `forceOff` — marks a capability key unavailable regardless of probe; hides all commands that `require` it from menus AND blocks execution
+- `forceOn` — marks a capability key available even if probe returns false
+- `stripMenuFrom` — hides a specific command from all menus by command ID; command remains runnable via API and `POST /commands/run`. Use for commands that work but shouldn't be in the UI for this deployment (e.g. `app.quit` on a public shared instance). Each entry requires a `reason` string — logged at startup.
+
+`GET /commands/list` reflects profile filtering — only available commands are returned.
+`GET /health` returns `deployProfile` name.
+
+Current profiles: `docker-safe` (VPS MVP), `full` (local dev, no gates).
+
 ## Command Quick-Reference
 
 ```
