@@ -50,6 +50,9 @@ Rules:
   - but there is no agent-facing API to synthesize mouse down/move/up inside a parent window surface
   Consequence:
   - nested drag/resize can be built, but cannot be robustly smoke-tested by an agent
+  Winning approach so far:
+  - route nested drag/resize off the generic `screen.on("mouse")` stream and inspect
+    `data.action`, matching the top-level window manager path
   Wishlist:
   - `POST /windows/mouse` with `id`, `action`, `x`, `y`, maybe `button`
   - or a higher-level `POST /windows/gesture/drag`

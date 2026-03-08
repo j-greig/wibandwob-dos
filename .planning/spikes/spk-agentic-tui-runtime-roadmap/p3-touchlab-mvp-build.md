@@ -21,7 +21,7 @@ Build the smallest believable composition proof:
 - [x] Scaffold `modules/touchlab-mvp`
 - [x] Open one parent `TouchLab MVP` window
 - [x] Render four nested subwindows inside the parent canvas
-- [~] Make at least three nested source subwindows draggable by mouse
+- [x] Make at least three nested source subwindows draggable by mouse
 - [x] Make nested subwindows resizable with keyboard fallback
 - [x] Pipe three ASCII sources into one composite output subwindow
 - [x] Add visible ASCII arrows or link labels between sources and the output
@@ -59,6 +59,7 @@ If true mouse dragging cannot be made reliable within three fix attempts:
 - [x] Animation is back on the generative layer, with `Space` pausing it
 - [x] `/state` reflects node positions, selected node, blend mode, and color labels
 - [x] screenshot proves nested windows, arrows, inspector, and composite output
-- [~] Mouse dragging is implemented on nested title bars, but automated proof is still missing because the control API has no nested mouse-event route
+- [x] Mouse dragging works in the live app after moving TouchLab onto the generic screen mouse stream
+- [~] Automated mouse proof is still missing because the control API has no nested mouse-event route
 - [x] Inspector is persistent and TouchDesigner-like by default, with `i` to collapse it to a slim parameter sliver
 - [x] Inspector includes clickable FG/BG palette swatches tied to theme-token labels

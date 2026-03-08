@@ -81,7 +81,7 @@ If TouchLab works, it proves the SDK/runtime stack can handle:
 
 ## Next MVP sprint
 
-- [~] Prove real nested mouse dragging end to end
+- [x] Prove real nested mouse dragging end to end
 - [x] Add nested resize behavior with keyboard fallback and corner grips
 - [x] Add visible ASCII arrows or link labels between source nodes and the mix node
 - [x] Add one selected-node inspector / parameter strip inside the parent window

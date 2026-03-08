@@ -269,6 +269,11 @@ export default function setup(host: MicroappHost) {
         const tokens = host.theme();
         return tokens[name] ?? tokens.body;
       };
+      const activeTitleStyle = () => ({
+        fg: host.theme().body.fg ?? "white",
+        bg: host.theme().accent.bg ?? host.theme().highlight.bg ?? "magenta",
+        bold: true,
+      });
 
       const compactLabel = (name: ThemeColorName) =>
         name === "bodyAlt" ? "ba" : name.slice(0, 2);
@@ -511,7 +516,7 @@ export default function setup(host: MicroappHost) {
             border: { fg: selectedNode === node.id ? host.theme().highlight.fg : host.theme().muted.fg },
           };
           node.titleBar.style = selectedNode === node.id
-            ? host.theme().highlight
+            ? activeTitleStyle()
             : { fg: fg.fg, bg: host.theme().bodyAlt.bg };
           node.titleBar.setContent(` ${selectedNode === node.id ? "●" : " "} ${node.title} `);
           node.content.style = { fg: fg.fg, bg: bg.bg };
@@ -583,7 +588,15 @@ export default function setup(host: MicroappHost) {
         node.resizeGrip.on("mousedown", (data) => startNodeResize(data));
       }
 
-      const onMouseMove = (data: blessed.Widgets.Events.IMouseEventArg) => {
+      const handleNestedMouse = (data: blessed.Widgets.Events.IMouseEventArg) => {
+        if (data.action === "mouseup") {
+          dragging = undefined;
+          resizing = undefined;
+          return;
+        }
+        if (data.action !== "mousemove" && data.action !== "mousedown") {
+          return;
+        }
         const point = pointerToCanvas(data);
         if (!point) return;
         if (dragging) {
@@ -603,11 +616,6 @@ export default function setup(host: MicroappHost) {
           renderNodes();
           host.screen.render();
         }
-      };
-
-      const stopDragging = () => {
-        dragging = undefined;
-        resizing = undefined;
       };
 
       const moveSelected = (dx: number, dy: number) => {
@@ -736,8 +744,7 @@ export default function setup(host: MicroappHost) {
       };
 
       host.screen.on("keypress", handleKeypress);
-      host.screen.on("mousemove", onMouseMove);
-      host.screen.on("mouseup", stopDragging);
+      host.screen.on("mouse", handleNestedMouse);
       const animationTimer = setInterval(() => {
         if (!animationEnabled) return;
         motionPhase = (motionPhase + 1) % 10_000;
@@ -793,8 +800,7 @@ export default function setup(host: MicroappHost) {
       win.onCleanup(() => {
         clearInterval(animationTimer);
         host.screen.off("keypress", handleKeypress);
-        host.screen.off("mousemove", onMouseMove);
-        host.screen.off("mouseup", stopDragging);
+        host.screen.off("mouse", handleNestedMouse);
       });
 
       renderNodes();
