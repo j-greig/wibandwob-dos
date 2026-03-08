@@ -79,7 +79,7 @@ function matchWindowToRole(
     case "art":
       return win.appType === "generative-art";
     case "pattern":
-      return win.appType === "pattern-field";
+      return win.appType === "pattern-animation";
     case "contour":
       return win.appType === "contour-studio";
     case "companion":
@@ -128,10 +128,13 @@ export function planSceneTransition(
   // Phase 3: close unclaimed windows (except protected)
   for (const win of current.windows) {
     if (claimed.has(win.id)) continue;
-    // Protect agent windows and explicitly protected roles
+    // Protect agent windows and any explicitly listed appType or kind.
+    // protect: ["agent"] matches kind="agent" (chat window).
+    // protect: ["wibwob-agent"] or protect: ["chat"] also work.
     const isProtected =
       win.appType === "wibwob-agent" ||
-      protectedRoles.has(win.appType ?? "");
+      protectedRoles.has(win.appType ?? "") ||
+      protectedRoles.has(win.kind ?? "");
     if (!isProtected) {
       ops.push({ type: "close", windowId: win.id });
     }
