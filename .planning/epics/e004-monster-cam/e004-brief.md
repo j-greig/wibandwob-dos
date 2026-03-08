@@ -97,6 +97,8 @@ Socket protocol (per frame):
 
 Branch worktree-e004-monster-cam merged to main (b3d9d1d). Remaining: AC-6 pose skeleton, AC-7 socket cleanup verification, AC-9 typecheck.
 
+**2026-03-08:** venv created at `assets/mediapipe-venv/` (gitignored). `monster_cam.open` now appears in Applications menu and opens successfully. Worktree: `feat/e004-monster-cam-complete`.
+
 ## Out of Scope
 
 - Monster/emoji face compositing
