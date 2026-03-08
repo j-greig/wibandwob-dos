@@ -116,6 +116,7 @@ Upcoming example tasks to keep in view:
   [`sdk-proving-app-shortlist.md`](./sdk-proving-app-shortlist.md)
 - [x] Capture TouchLab stretch goal in
   [`touchlab-stretch-goal.md`](./touchlab-stretch-goal.md)
+  [`module-runtime-reload-build.md`](./module-runtime-reload-build.md)
 - [ ] Split this umbrella spike into implementation epics/stories
 
 ## Why This Is A Spike Right Now
@@ -548,7 +549,7 @@ Parsing notes for agents:
   "phases": [
     { "id": "P0", "title": "Split into implementation epics", "status": "not-started" },
     { "id": "P1", "title": "SDK foundation", "status": "not-started" },
-    { "id": "P2", "title": "Runtime foundation", "status": "not-started" },
+    { "id": "P2", "title": "Runtime foundation", "status": "in-progress" },
     { "id": "P3", "title": "Composition foundation", "status": "not-started" },
     { "id": "P4", "title": "Agentic developer experience", "status": "not-started" },
     { "id": "P5", "title": "Product surfaces", "status": "not-started" },
@@ -558,7 +559,7 @@ Parsing notes for agents:
   ],
   "workstreams": [
     { "id": "W1", "phase": "P1", "title": "SDK foundation", "status": "not-started" },
-    { "id": "W2", "phase": "P2", "title": "Runtime foundation", "status": "not-started" },
+    { "id": "W2", "phase": "P2", "title": "Runtime foundation", "status": "in-progress" },
     { "id": "W3", "phase": "P3", "title": "Composition foundation", "status": "not-started" },
     { "id": "W4", "phase": "P4", "title": "Agentic DX and canon hygiene", "status": "not-started" },
     { "id": "W5", "phase": "P5", "title": "Product surfaces", "status": "not-started" },
@@ -656,10 +657,13 @@ supported behaviors.
 
 ### P2 — Runtime foundation
 
-Status: not-started
+Status: in-progress
 
 Goal:
 reload one module in a running instance without restarting the whole app.
+
+Working doc:
+[`module-runtime-reload-build.md`](./module-runtime-reload-build.md)
 
 Action checklist:
 

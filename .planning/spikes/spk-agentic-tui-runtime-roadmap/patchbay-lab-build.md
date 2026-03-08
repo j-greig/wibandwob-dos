@@ -1,7 +1,7 @@
 ---
 id: spk-agentic-tui-runtime-roadmap-patchbay-lab-build
 title: Patchbay Lab v1 Build
-status: in-progress
+status: done
 created: 2026-03-08
 depends_on: [spk-agentic-tui-runtime-roadmap, spk-agentic-tui-runtime-roadmap-sdk-proving-app-shortlist]
 ---
