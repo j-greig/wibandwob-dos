@@ -5,3 +5,6 @@
 	path = modules-private
 	url = https://github.com/j-greig/wibandwob-wwdos-modules-private.git
 	ignore = dirty
+[submodule "ralph"]
+	path = ralph
+	url = https://github.com/j-greig/wibandwob-ralph

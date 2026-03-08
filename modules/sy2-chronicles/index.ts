@@ -1082,8 +1082,10 @@ export default function setup(host: MicroappHost) {
     }
 
     function measureViewport() {
-      const width = Math.max(20, Number(canvas.width) || 80);
-      const height = Math.max(6, Number(canvas.height) || 24);
+      // Use awidth/aheight (blessed actual screen coords) so we get the true
+      // clipped viewport size, NOT the scroller child's inflated height.
+      const width = Math.max(20, (canvas as any).awidth ?? Number(canvas.width) ?? host.geometry.width - 2);
+      const height = Math.max(6, (canvas as any).aheight ?? host.geometry.height - 5);
       return { width, height };
     }
 
