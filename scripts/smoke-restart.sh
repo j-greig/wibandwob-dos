@@ -1,5 +1,7 @@
 #!/bin/bash
 # Rebuild + restart local smoke container, re-establish tunnel, verify health.
+# SEC-C2: SSH key is generated ephemerally at image build time, extracted to /tmp after
+# container start, and cleaned up on exit. Never committed to repo.
 # Usage:
 #   bash scripts/smoke-restart.sh           # rebuild + restart
 #   bash scripts/smoke-restart.sh --no-build  # restart from existing image only
@@ -19,18 +21,18 @@ SMOKE_NAME="${SMOKE_NAME:-wibwob-smoke}"
 SMOKE_SSH_PORT="${SMOKE_SSH_PORT:-2849}"
 SMOKE_TTYD_PORT="${SMOKE_TTYD_PORT:-7681}"
 SMOKE_TUNNEL_PORT="${SMOKE_TUNNEL_PORT:-19099}"
-SMOKE_SSH_KEY="${SMOKE_SSH_KEY:-deploy/test_agent_key}"
 SMOKE_LABEL="${SMOKE_LABEL:-smoke}"
 NO_BUILD="${1:-}"
 
+# Clean up ephemeral key on exit
+trap 'rm -f "$KEY" 2>/dev/null' EXIT
+
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-KEY="$REPO_ROOT/$SMOKE_SSH_KEY"
+# Ephemeral key — extracted from container after start, never committed to repo
+KEY="/tmp/wibwob-smoke-key-$$"
 
 echo "[smoke] === WibWob-DOS Smoke Restart ==="
 echo "[smoke] container: $SMOKE_NAME  ssh: $SMOKE_SSH_PORT  ttyd: $SMOKE_TTYD_PORT  tunnel: $SMOKE_TUNNEL_PORT"
-
-# Fix key permissions
-chmod 600 "$KEY" 2>/dev/null || true
 
 # Kill existing tunnel
 pkill -f "${SMOKE_TUNNEL_PORT}:127.0.0.1:8099" 2>/dev/null || true
@@ -71,6 +73,20 @@ fi
 echo "[smoke] starting container..."
 docker run "${DOCKER_ARGS[@]}" wibwob-vps-smoke > /dev/null
 
+# Extract ephemeral private key from container (generated at build time, never in repo)
+echo "[smoke] extracting ephemeral SSH key from container..."
+for i in $(seq 1 10); do
+  sleep 1
+  if docker cp "$SMOKE_NAME:/home/wibwob/.ssh/smoke_key" "$KEY" 2>/dev/null; then
+    chmod 600 "$KEY"
+    # Also copy to stable path for use after script exits
+    cp "$KEY" /tmp/wibwob-smoke-key && chmod 600 /tmp/wibwob-smoke-key
+    echo "[smoke] key extracted → /tmp/wibwob-smoke-key"
+    break
+  fi
+  if [ "$i" -eq 10 ]; then echo "[smoke] ERROR: could not extract SSH key"; exit 1; fi
+done
+
 # Wait for sshd + app
 echo "[smoke] waiting for app..."
 ssh-keygen -R "[127.0.0.1]:${SMOKE_SSH_PORT}" 2>/dev/null | grep -v "^#" || true
@@ -80,7 +96,7 @@ for i in $(seq 1 30); do
   if ssh -i "$KEY" -p "$SMOKE_SSH_PORT" \
       -o StrictHostKeyChecking=no \
       -o ConnectTimeout=2 \
-      wibwob@127.0.0.1 'tmux has-session -t wibwob' 2>/dev/null; then
+      wibwob@127.0.0.1 'tmux -S /opt/wibandwob-dos/scratch/tmux-web.sock has-session -t wibwob' 2>/dev/null; then
     echo " ready (${i}s)"
     break
   fi
@@ -113,9 +129,9 @@ if echo "$HEALTH" | grep -q '"ok":true'; then
   echo ""
   echo "[smoke] READY"
   echo "  TUI (browser): http://127.0.0.1:${SMOKE_TTYD_PORT}"
-  echo "  SSH:           ssh -i $SMOKE_SSH_KEY -p $SMOKE_SSH_PORT wibwob@127.0.0.1"
+  echo "  SSH:           ssh -i /tmp/wibwob-smoke-key -p $SMOKE_SSH_PORT wibwob@127.0.0.1"
   echo "  Control API:   http://127.0.0.1:${SMOKE_TUNNEL_PORT}"
-  echo "  Attach tmux:   ssh -i $SMOKE_SSH_KEY -p $SMOKE_SSH_PORT wibwob@127.0.0.1 'tmux attach -t wibwob'"
+  echo "  Attach tmux:   ssh -i /tmp/wibwob-smoke-key -p $SMOKE_SSH_PORT wibwob@127.0.0.1 'tmux -S /opt/wibandwob-dos/scratch/tmux-web.sock attach -t wibwob'"
   if [ -n "$CONTROL_TOKEN" ]; then
     echo "  Auth header:   Authorization: Bearer $CONTROL_TOKEN"
     echo "  Quick test:    curl -s -H \"Authorization: Bearer $CONTROL_TOKEN\" http://127.0.0.1:${SMOKE_TUNNEL_PORT}/state"

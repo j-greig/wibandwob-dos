@@ -63,3 +63,14 @@ assets/mediapipe-venv/
 # Claude worktrees
 .claude/worktrees/
 .claude/skills/
+
+# Private keys and credentials — never commit
+deploy/test_agent_key
+deploy/test_agent_key.pub
+deploy/*.key
+*_rsa
+*_ed25519
+*.pem
+.env.*
+*.secret
+scratch/control-token

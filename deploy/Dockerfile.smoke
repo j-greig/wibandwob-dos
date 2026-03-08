@@ -49,9 +49,13 @@ RUN useradd -m -s /bin/bash wibwob \
     && mkdir -p /home/wibwob/.ssh \
     && chmod 700 /home/wibwob/.ssh
 
-# Install smoke test SSH key (public key only — private key never enters image)
-COPY deploy/test_agent_key.pub /home/wibwob/.ssh/authorized_keys
-RUN chmod 600 /home/wibwob/.ssh/authorized_keys \
+# Generate ephemeral SSH keypair at build time — private key stays in image only.
+# smoke-restart.sh extracts it via `docker cp` after container starts.
+# The private key is NEVER committed to the repo.
+RUN ssh-keygen -t ed25519 -C "wibwob-smoke-ephemeral" -N "" \
+      -f /home/wibwob/.ssh/smoke_key \
+    && cp /home/wibwob/.ssh/smoke_key.pub /home/wibwob/.ssh/authorized_keys \
+    && chmod 600 /home/wibwob/.ssh/authorized_keys /home/wibwob/.ssh/smoke_key \
     && chown -R wibwob:wibwob /home/wibwob/.ssh
 
 # App — copy source, install deps as wibwob
