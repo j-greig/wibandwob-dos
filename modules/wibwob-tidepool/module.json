@@ -1,0 +1,20 @@
+{
+  "name": "wibwob-tidepool",
+  "version": "0.1.0",
+  "description": "ASCII ecosystem simulator — cellular automata tide pool with five interacting species",
+  "type": "microapp",
+  "entry": "index.ts",
+  "microapp": {
+    "id": "wibwob.tidepool",
+    "title": "Tide Pool",
+    "description": "Living ASCII ecosystem. Five species compete, cooperate, bloom, and collapse in a bounded tide pool. Shannon diversity index tracks biodiversity.",
+    "multiInstance": true,
+    "persist": true,
+    "menu": [
+      { "category": "applications", "order": 38, "label": "Tide Pool" }
+    ],
+    "palette": { "order": 58, "label": "Open Tide Pool" },
+    "agent": true,
+    "api": true
+  }
+}
