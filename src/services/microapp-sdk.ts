@@ -1,3 +1,4 @@
+import type blessed from "blessed";
 import {
   applyRect,
   createNodePart,
@@ -8,6 +9,22 @@ import {
   readNodeViewport,
   terrainNames,
 } from "./contour-engine.js";
+import {
+  createSavedTerrainArtifact,
+  createTerrainMap,
+  getTerrainFocusPoint,
+  type SavedTerrainArtifact,
+  type TerrainBiome,
+  type TerrainMap,
+  type TerrainPoint,
+} from "./terrain-model.js";
+import {
+  BIOME_COLORS,
+  BIOME_GLYPHS,
+  findTerrainPeak,
+  renderTerrainMap,
+  type TerrainRenderMode,
+} from "./terrain-render.js";
 import {
   createLazyMountedPlayer,
   type LazyMountedPlayer,
@@ -28,6 +45,15 @@ export type {
   UiPart,
   StackChild,
   LazyMountedPlayer,
+  SavedTerrainArtifact,
+  TerrainBiome,
+  TerrainMap,
+  TerrainPoint,
+  TerrainRenderMode,
+};
+
+export type AnimatedPanelPlayer = LazyMountedPlayer & {
+  attachTarget?(target: blessed.Widgets.BoxElement): void;
 };
 
 // Shared runtime helpers that module authors should import from the SDK surface
@@ -39,4 +65,11 @@ export {
   createLazyMountedPlayer,
   readNodeViewport,
   terrainNames,
+  createSavedTerrainArtifact,
+  createTerrainMap,
+  getTerrainFocusPoint,
+  BIOME_COLORS,
+  BIOME_GLYPHS,
+  findTerrainPeak,
+  renderTerrainMap,
 };

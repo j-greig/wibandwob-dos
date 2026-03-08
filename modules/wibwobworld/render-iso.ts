@@ -2,8 +2,12 @@
  * ISO terrain renderer — extracted from wibwobworld-iso module.
  * Moved here when wibwobworld-iso was merged into wibwobworld (S05 migration).
  */
-import type { SavedTerrainArtifact, TerrainBiome } from "../../src/services/terrain-model.js";
-import { BIOME_COLORS, BIOME_GLYPHS } from "../../src/services/terrain-render.js";
+import {
+  BIOME_COLORS,
+  BIOME_GLYPHS,
+  type SavedTerrainArtifact,
+  type TerrainBiome,
+} from "../../src/services/microapp-sdk.js";
 
 // Vertical exaggeration — higher = more dramatic height difference between water and peaks
 const ISO_EXAGGERATION = 8;

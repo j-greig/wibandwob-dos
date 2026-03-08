@@ -19,6 +19,7 @@ import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import {
+  type AnimatedPanelPlayer,
   createContourPlayer,
   createLazyMountedPlayer,
   readNodeViewport,
@@ -29,31 +30,6 @@ import {
 
 type ClockMode = "clock" | "sentient";
 type Voice = "plain" | "liminal" | "scramble" | "terrain";
-
-type Rect = { top: number; left: number; width: number; height: number };
-type UiNode = {
-  on?(event: string, handler: () => void): void;
-  hide(): void;
-  show(): void;
-  setContent(content: string): void;
-};
-type UiPart<Props = void> = {
-  node: UiNode;
-  layout(rect: Rect): void;
-  update(props: Props): void;
-  restyle(): void;
-  destroy(): void;
-};
-type StackChild = {
-  key: string;
-  basis: number | string;
-  part: UiPart<unknown>;
-  visible?: () => boolean;
-};
-type AnimatedPanelPlayer = {
-  destroy(): void;
-  attachTarget?(target: UiNode): void;
-};
 
 const VOICE_CYCLE: Voice[] = ["plain", "liminal", "scramble", "terrain"];
 const VOICE_LABELS: Record<Voice, string> = {
@@ -121,7 +97,7 @@ const SCRAMBLE_FRAMES: string[][] = [
 ];
 
 function createScramblePlayer(host: MicroappHost): AnimatedPanelPlayer & { setRunning(running: boolean): void } {
-  let target: UiNode | null = null;
+  let target: Parameters<NonNullable<AnimatedPanelPlayer["attachTarget"]>>[0] | null = null;
   let timer: ReturnType<typeof setInterval> | null = null;
   let frameIndex = 0;
   let running = false;

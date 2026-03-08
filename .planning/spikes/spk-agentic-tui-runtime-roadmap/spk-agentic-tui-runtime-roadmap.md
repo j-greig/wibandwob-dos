@@ -611,7 +611,7 @@ make module authorship sane before touching reload, graphing, or mobile reflow.
 Action checklist:
 
 - [x] Export a single canonical microapp SDK surface for module authors
-- [ ] Remove supported direct `../../src/...` imports from current modules
+- [x] Remove supported direct `../../src/...` imports from current modules
 - [x] Replace duplicated `MicroappHost` / `MicroappWindowHandle` / layout type
       definitions with imported SDK types
 - [x] Upgrade `modules/hello-world` into the canonical scaffold template
@@ -620,6 +620,14 @@ Action checklist:
       proof case
 - [ ] Record which required Poetry Clock capabilities still cannot be expressed
       cleanly through the SDK
+
+Current Poetry Clock SDK gap notes:
+- there was no named `AnimatedPanelPlayer` type in the SDK, so the module had to
+  reconstruct the animated-panel contract locally; this should now be projected
+  by the SDK and treated as a pattern to watch in other microapps
+- Poetry Clock still depends on raw `win.body` / Blessed composition for custom
+  layout, which is acceptable for now but marks the current edge of the
+  primitive set
 
 Completion signal:
 
@@ -786,6 +794,7 @@ Status: in-progress
 
 - [x] Export canonical module-author types from one path
 - [x] Replace local `MicroappHost` redefinitions in current modules
+- [x] Remove current supported direct module imports except the SDK path itself
 - [~] Project more internals through host capabilities instead of `../../src`
 - [x] Turn `modules/hello-world` into the canonical scaffold template
 - [x] Add scaffolding script for new modules/microapps

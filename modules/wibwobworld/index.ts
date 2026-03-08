@@ -6,11 +6,13 @@ import {
   createSavedTerrainArtifact,
   createTerrainMap,
   getTerrainFocusPoint,
+  renderTerrainMap,
+  findTerrainPeak,
   type SavedTerrainArtifact,
   type TerrainMap,
   type TerrainPoint,
-} from "../../src/services/terrain-model.js";
-import { findTerrainPeak, renderTerrainMap, type TerrainRenderMode } from "../../src/services/terrain-render.js";
+  type TerrainRenderMode,
+} from "../../src/services/microapp-sdk.js";
 import { debugWibWobWorld, debugWibWobWorldError } from "./debug.js";
 import type {
   MicroappHost,
