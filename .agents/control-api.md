@@ -23,6 +23,32 @@ GET /screenshot/text?id=…         text screenshot of window
 ```
 POST /commands/run                {"id":"command-id","args":{}}
 POST /windows/batch               {"ops":[{"id":N,"x":X,"y":Y,"w":W,"h":H},{"id":M,"close":true}]}
+```
+
+`/windows/batch` op fields — all optional except `id`:
+
+| field | type | effect |
+|-------|------|--------|
+| `id` | number | window id (required) |
+| `x`, `y` | number | move to absolute position |
+| `w`, `h` | number | resize to exact dimensions |
+| `close` | boolean | close the window (other fields ignored) |
+
+Each op is applied independently in order. A single op can move AND resize in one call.
+
+```json
+// Example: move window 3, resize window 7, close window 12
+{ "ops": [
+  { "id": 3, "x": 10, "y": 2 },
+  { "id": 7, "w": 60, "h": 20 },
+  { "id": 3, "w": 80, "h": 24 },
+  { "id": 12, "close": true }
+] }
+```
+
+Response: `{ "ok": true, "results": [true, true, true, true] }` — one boolean per op.
+
+```
 POST /windows/input               {"id":N,"input":"text\r"}   — trailing \r submits
 POST /windows/agent-message       {"id":N,"text":"message","sender":"wibwob2"}
 POST /windows/focus               {"id":N}
