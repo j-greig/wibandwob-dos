@@ -18,6 +18,13 @@
 
 set -euo pipefail
 
+# Auto-source repo root .env if present (gitignored — safe for tokens)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../../../../.." && pwd)"
+if [[ -f "$REPO_ROOT/.env" ]]; then
+  set -a; source "$REPO_ROOT/.env"; set +a
+fi
+
 LOCAL_PORT="${WIBWOB_LOCAL_PORT:-19099}"
 SSH_PORT="${WIBWOB_PORT:-2849}"
 SSH_USER="wibwob"
