@@ -33,18 +33,25 @@ think noise field, cellular automata, or interference patterns. The field
 slowly drifts toward the skeleton's centre of mass.
 
 **Layer 2 — ASCII skeleton**
-A symbolic human figure (simplified — not all 33 points):
+Three symbients in a generative field — distinct poses, staggered heights:
+
 ```
-    O       ← head
-   /|\      ← shoulders / arms
-  / | \
- *  |  *    ← hands
-    |
-   / \      ← legs
-  /   \
- *     *    ← feet
+·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~
+~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·
+·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~\O/~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~
+~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:· | ·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·
+·:·~· O ·:·~·:·~·:·~·:·~·:·~·:·~ Λ ·:·~·:·~·:·~·:·~·:·~·:·~ O ·:·~·:·~·:·
+~·:·~/|~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~/|\~·:·~·:·~·:·~·
+·:·~·|\·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~ | ·~·:·~·:·~·:·~·
+~·:·~/ ·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:/ \·~·:·~·:·~·:·~·
+·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~
+~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·
 ```
-Rendered using line-drawing chars. The skeleton updates when the agent
+
+Character vocabulary: `O` head · `\O/` arms-raised head · `/|` `/|\` `|\` torso+arms ·
+`|` spine · `/ \` legs · `Λ` feet-off-ground (jump) · `·:·~` generative field
+
+Rendered using these chars. The skeleton updates when the agent
 sends a pose command. Smooth 8-frame interpolation between poses.
 
 ---
