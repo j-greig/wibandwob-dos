@@ -194,6 +194,16 @@ export class CommandRegistry {
     return { ok: false, error: `Unknown command: ${id}` };
   }
 
+  /** Execute only a dynamic command by id, bypassing built-in command ids. */
+  runDynamic(id: string, args?: Record<string, unknown>): CommandRunResult {
+    const dyn = this.dynamicCommands.find((candidate) => candidate.id === id);
+    if (!dyn) {
+      return { ok: false, error: `Unknown dynamic command: ${id}` };
+    }
+    const result = dyn.action(args);
+    return result === undefined ? { ok: true } : { ok: true, result: safeSerializable(result) };
+  }
+
   /** Return context-menu items for the given context, sorted by order. */
   contextMenuItems(ctx: MenuContext): MenuItem[] {
     return this.commands

@@ -1789,6 +1789,12 @@ export class TsTuiMvpApp {
             : undefined;
         this.openMusicPlayerWindow(filePath ? { filePath } : undefined);
       },
+      openSy2Chronicles: (args) => {
+        const result = this.commands.runDynamic("microapp.wibwob.sy2chronicles.open", args);
+        if (!result.ok) {
+          this.overlays.flash(result.error);
+        }
+      },
       openPatternWindow: () => this.openPatternWindow(),
       openCompanionWindow: () => this.openCompanionWindow(),
       openWorkspaceManager: () => this.openWorkspaceManagerWindow(),

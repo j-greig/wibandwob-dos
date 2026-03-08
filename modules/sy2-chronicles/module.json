@@ -1,0 +1,29 @@
+{
+  "id": "wibwob.sy2chronicles",
+  "name": "§y² Chronicles",
+  "version": "0.1.0",
+  "description": "§y²'s first week — a dense panel visualization",
+  "main": "index.ts",
+  "commands": [
+    {
+      "id": "microapp.wibwob.sy2chronicles.open",
+      "label": "Open §y² Chronicles",
+      "category": "Microapps"
+    }
+  ],
+  "type": "microapp",
+  "entry": "index.ts",
+  "microapp": {
+    "id": "wibwob.sy2chronicles",
+    "title": "§y² Chronicles",
+    "description": "§y²'s first week — a dense panel visualization",
+    "persist": true,
+    "multiInstance": true,
+    "menu": [
+      { "category": "applications", "order": 39, "label": "§y² Chronicles" }
+    ],
+    "palette": { "order": 59, "label": "Open §y² Chronicles" },
+    "agent": true,
+    "api": true
+  }
+}

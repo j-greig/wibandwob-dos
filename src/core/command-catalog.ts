@@ -45,6 +45,7 @@ export interface AppMenuActions {
   openChromeBrowser: (args?: Record<string, unknown>) => void;
   openFigletBanner: (args?: Record<string, unknown>) => void;
   openMusicPlayer: (args?: Record<string, unknown>) => void;
+  openSy2Chronicles: (args?: Record<string, unknown>) => void;
   openPatternWindow: () => void;
   openCompanionWindow: () => void;
   openWorkspaceManager: () => void;
@@ -748,6 +749,13 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     palettePlacement: { order: 115 },
     api: true,
     agent: true
+  },
+  {
+    id: "microapp.wibwob.sy2chronicles.open",
+    label: "Open §y² Chronicles",
+    description: "Bridge command for the §y² Chronicles microapp dynamic opener.",
+    group: "surface",
+    actionKey: "openSy2Chronicles",
   },
   {
     id: "companion.open",
