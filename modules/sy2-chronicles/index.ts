@@ -1580,6 +1580,23 @@ export default function setup(host: MicroappHost) {
       if (key?.name === "end") { (canvas as any).scrollTo(totalContentHeight); host.screen.render(); return; }
     });
 
+    // Route mouse wheel from anywhere in the window to canvas scroll
+    const handleWheel = (data: any) => {
+      if (data.action === 'wheeldown') {
+        (canvas as any).scroll(3);
+        host.screen.render();
+      } else if (data.action === 'wheelup') {
+        (canvas as any).scroll(-3);
+        host.screen.render();
+      }
+    };
+    host.screen.on('mouse', handleWheel);
+    win.onCleanup(() => host.screen.off('mouse', handleWheel));
+
+    // Add wheel handlers directly on canvas
+    canvas.on('wheeldown', () => { (canvas as any).scroll(3); host.screen.render(); });
+    canvas.on('wheelup', () => { (canvas as any).scroll(-3); host.screen.render(); });
+
     win.describeState(() => ({
       summary: `§y² Chronicles (scroll:${(canvas as any).getScrollPerc?.() ?? 0}%)`,
       scrollY: (canvas as any).getScroll?.() ?? 0,

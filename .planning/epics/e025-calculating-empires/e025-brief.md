@@ -1,7 +1,7 @@
 ---
 id: E025
 title: Calculating Empires TUI
-status: not-started
+status: in-progress
 issue: 120
 pr: ~
 depends_on: [E015, E016]
@@ -139,6 +139,27 @@ WibWobWorld geology, etc). The panel system is content-agnostic.
 - `z` to toggle zoom (2 zoom levels: normal / compact — more panels visible)
 - AC: all navigation gestures work, search filters visible panels
 
+### S07 — Panel drag-to-move (human + agent)
+- Any panel can be dragged by its title bar or body to a new x/y position
+- Pattern: TouchLab MVP `mousedown` + global `screen.on("mouse")` handler
+- Pointer translation via `canvas.lpos` (same as TouchLab)
+- Agent API: expose panel positions in `describeState()`, add command `sy2.panel.move {id, x, y}`
+- Panels snap to a loose grid (COL_GAP alignment) on drop
+- AC: drag any panel with mouse, agent can move panel via command
+
+### S08 — Double-click edit mode
+- Double-click any text panel → enters edit mode (cursor appears, text editable)
+- `Escape` or click-outside → exits edit mode, saves content
+- Edited content persists in panel state (snapshot-aware)
+- Only applies to `text` and `mixed` panel types
+- AC: double-click a text panel, type to edit, Escape to save, content persists on snapshot restore
+
+### S09 — Agent panel manipulation
+- `tui_list_commands` exposes `sy2.panel.move`, `sy2.panel.resize`, `sy2.panel.focus`
+- `describeState()` returns each panel's current `{id, title, x, y, w, h, type}` in `panels[]`
+- Agent can GET full panel map via `/state` → window describeState
+- AC: agent opens chronicles, reads panel positions, moves 3 panels, verifies via describeState
+
 ---
 
 ## Acceptance Criteria
@@ -153,6 +174,9 @@ WibWobWorld geology, etc). The panel system is content-agnostic.
 - [ ] AC-8: Two zoom levels — normal and compact
 - [ ] AC-9: `describeState()` contract correct (panelCount, viewport, scrollPos)
 - [ ] AC-10: `bun run typecheck` clean
+- [ ] AC-11: Any panel draggable by human via mouse
+- [ ] AC-12: Agent can move panels via registered command
+- [ ] AC-13: Double-click text panel enters edit mode
 
 ---
 

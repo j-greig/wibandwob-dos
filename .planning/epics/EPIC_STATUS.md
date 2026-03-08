@@ -19,5 +19,5 @@ e021-vps-multi-agent-world — blocked
 e022-wibwobworld-restore-layout-fidelity — in-progress
 e023-capability-aware-command-registry — done
 e024-session-retroapply — done
-e025-calculating-empires — not-started
+e025-calculating-empires — in-progress
 
