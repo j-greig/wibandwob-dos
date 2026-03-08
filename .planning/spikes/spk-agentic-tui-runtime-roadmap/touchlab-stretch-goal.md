@@ -1,7 +1,7 @@
 ---
 id: spk-agentic-tui-runtime-roadmap-touchlab-stretch-goal
 title: TouchLab Stretch Goal
-status: not-started
+status: in-progress
 created: 2026-03-08
 depends_on: [spk-agentic-tui-runtime-roadmap, spk-agentic-tui-runtime-roadmap-patchbay-lab-build]
 ---
@@ -82,12 +82,14 @@ If TouchLab works, it proves the SDK/runtime stack can handle:
 ## Next MVP sprint
 
 - [~] Prove real nested mouse dragging end to end
+- [x] Add nested resize behavior with keyboard fallback and corner grips
 - [x] Add visible ASCII arrows or link labels between source nodes and the mix node
 - [x] Add one selected-node inspector / parameter strip inside the parent window
 - [x] Allow changing at least one per-node visual parameter live
       example: title color, body fg/bg, or border color
 - [x] Add one more transformation mode beyond plain overwrite composition
       example: mask, max-density, xor-ish glyph preference, or tint priority
+- [x] Restore controlled motion on the generator layer with an explicit pause toggle
 - [x] Expose selected node + per-node visual params in `describeState()`
 
 Design note:
@@ -97,6 +99,7 @@ Design note:
   select node -> inspect parameters -> tweak -> see output change live
 - current MVP keeps the inspector permanently visible, with `i` collapsing it to a
   slim sliver rather than hiding it entirely
+- current MVP now includes clickable FG/BG palette swatches inside the inspector
 
 ## Architectural implications
 
