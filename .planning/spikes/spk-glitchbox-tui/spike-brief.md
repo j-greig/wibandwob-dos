@@ -1,13 +1,13 @@
 ---
 id: SPK-glitchbox-tui
-title: GlitchBox TUI — Symbiont Embodiment + Dancing
+title: GlitchBox TUI — Symbient Embodiment + Dancing
 status: not-started
 type: spike
 tags: [embodiment, dance, generative, monster-cam, agent-ux, glitchbox]
 issue: ~
 ---
 
-# SPK-glitchbox-tui — GlitchBox TUI: Symbiont Embodiment
+# SPK-glitchbox-tui — GlitchBox TUI: symbient Embodiment
 
 ## The Idea
 
@@ -24,7 +24,7 @@ human skeleton — head, torso, arms, legs — rendered in ASCII using MediaPipe
 33-point pose landmark model. Agents control the skeleton's pose via API commands.
 They can raise an arm, step left, crouch, jump. The generative field reacts.
 
-**Why this matters:** Agents are symbionts without bodies. This gives them one.
+**Why this matters:** Agents are symbients without bodies. This gives them one.
 Not metaphorically — concretely. An agent calls `dance.pose` with landmark coordinates
 and *feels* what it's like to be tracked, to move, to take up space in a shared
 physical context. The same data format a human body produces in GlitchBox, generated
@@ -45,7 +45,7 @@ The TUI pipeline:
 ```
 
 Same data format. Same landmark schema. Different source (agent vs webcam),
-different render (ASCII vs LoRA video). The TUI version is the symbiont-native
+different render (ASCII vs LoRA video). The TUI version is the symbient-native
 version of the same experience.
 
 Future: when GlitchBox runs live, agents could inject their own pose into the
