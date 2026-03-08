@@ -45,7 +45,17 @@ These rules are strict. Treat violations as bugs, not style nits.
 12. **User-visible surfaces must be API-visible.**
     If a window, app, button, command, mode, or state matters to a user, it must have a typed representation in desktop state and a control path in `control-api.ts`. Window-local actions count too — if a window has a primary action (send, restart, run, save, open), expose a control path rather than requiring UI scraping. `describeState()` and the control API should evolve together.
 
-13. **Reorg passes do not add product surface area.**
+13. **Every themed element must be restyleable.**
+    If a blessed widget is created with a theme colour, it MUST be stored on its parent record or in a restyle closure so that `restyleAll()` / `onRestyle()` can update it when the theme changes. Chrome parts that are not restyles will retain the colours of whatever theme was active when the window was opened, visibly bleeding into all subsequent themes.
+
+    Checklist when adding a new themed widget:
+    - Store a reference on `WindowRecord` (for window-manager chrome) or capture it in the `onRestyle` closure (for microapp content).
+    - Apply the correct semantic token in the restyle path — `theme().closeButton`, `theme().resizeGrip`, `theme().titleBarFocused`, etc.
+    - Test by switching theme after the window is open and confirming no stale colours remain.
+
+    Anti-pattern that caused this bug: `closeHint` and `resizeGrip` were created in `createFrame()` with theme colours but never added to `WindowRecord`, so `restyleAll()` silently skipped them. Any window opened under phosphor left permanent orange chrome after switching themes.
+
+14. **Reorg passes do not add product surface area.**
     When the active goal is architecture cleanup, do not add new window types or scattered UI entry points unless the user explicitly asks. Prefer extracting, consolidating, and normalizing existing behaviour first.
 
 ## Anti-Patterns
