@@ -18,6 +18,7 @@
     "feature.resource-heavy"
   ],
   "stripMenuFrom": [
-    { "id": "app.quit", "reason": "public instance — prevent visitors quitting the shared process" }
+    { "id": "app.quit", "reason": "public instance — prevent visitors quitting the shared process" },
+    { "id": "microapp.wibwob.tr808.open", "reason": "TR-808 not in VPS MVP surface" }
   ]
 }
