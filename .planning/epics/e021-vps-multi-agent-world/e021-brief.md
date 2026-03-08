@@ -1,7 +1,7 @@
 ---
 id: E021
 title: VPS Multi-Agent World
-status: in-progress
+status: blocked
 issue: ~
 pr: ~
 depends_on: [E018, E020]

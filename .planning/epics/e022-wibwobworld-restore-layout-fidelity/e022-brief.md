@@ -65,7 +65,7 @@ _Files:_ `modules-private/wibwobworld/index.ts`
 ## Stories
 
 ### S01 — Strip debug breadcrumbs (RC-6)
-Status: [ ] not-started
+Status: [x] done
 
 Remove the granular `render:*` breadcrumb calls added during diagnosis. Keep the
 env-gated `debugWibWobWorld` function and any `setup`, `render:focus`, `render:end`,
@@ -82,7 +82,7 @@ AC:
 ---
 
 ### S02 — Preserve renderMode on restore (RC-3)
-Status: [ ] not-started
+Status: [x] done
 
 Remove the `restoreSafeMode` bandage that forces `"contours"` on every restore.
 Let the serialised `renderMode` be honoured directly.
@@ -121,7 +121,7 @@ AC:
 ---
 
 ### S04 — Microapp geometry restored on restart (RC-4)
-Status: [ ] not-started
+Status: [x] done
 
 `module-loader.ts registerSnapshot` must return the snapshot geometry so
 `restoreWindowSnapshot()` can reapply `left/top/width/height`.
