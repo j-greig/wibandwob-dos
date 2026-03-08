@@ -18,6 +18,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import ts from "typescript";
+import { log } from "./app-logger.js";
 import { APP_ROOT } from "../core/config.js";
 import { registerExternalTheme } from "../core/theme/resolver.js";
 import { theme } from "../core/theme/resolver.js";
@@ -415,13 +416,13 @@ function discoverModules(): DiscoveredModule[] {
         const manifest = JSON.parse(raw) as ModuleManifest;
 
         if (!manifest.name || !manifest.type) {
-          console.warn(`[module-loader] Invalid manifest in ${root}/${name} — missing name or type, skipping`);
+          log.err(`[module-loader] Invalid manifest in ${root}/${name} — missing name or type, skipping`);
           continue;
         }
 
         found.push({ dir: path.join(rootPath, name), manifest });
       } catch (err) {
-        console.warn(`[module-loader] Failed to parse ${manifestPath}: ${err}`);
+        log.err(`[module-loader] Failed to parse ${manifestPath}: ${err}`);
       }
     }
   }
@@ -438,7 +439,7 @@ async function loadThemeModule(mod: DiscoveredModule): Promise<void> {
   const entryPath = path.join(mod.dir, entry);
 
   if (!fs.existsSync(entryPath)) {
-    console.warn(`[module-loader] Theme module ${mod.manifest.name} missing entry ${entry}`);
+    log.err(`[module-loader] Theme module ${mod.manifest.name} missing entry ${entry}`);
     return;
   }
 
@@ -460,14 +461,14 @@ async function loadThemeModule(mod: DiscoveredModule): Promise<void> {
     }
 
     if (!variant) {
-      console.warn(`[module-loader] Theme module ${mod.manifest.name} does not export a ThemeVariant`);
+      log.err(`[module-loader] Theme module ${mod.manifest.name} does not export a ThemeVariant`);
       return;
     }
 
     registerExternalTheme(variant);
-    console.log(`[module-loader] Loaded theme: ${variant.name} (from ${mod.manifest.name})`);
+    log.app(`[module-loader] Loaded theme: ${variant.name} (from ${mod.manifest.name})`);
   } catch (err) {
-    console.warn(`[module-loader] Failed to load theme ${mod.manifest.name}: ${err}`);
+    log.err(`[module-loader] Failed to load theme ${mod.manifest.name}: ${err}`);
   }
 }
 
@@ -535,7 +536,7 @@ async function loadMicroappModule(
 ): Promise<LoadedMicroappRuntime | undefined> {
   const config = mod.manifest.microapp;
   if (!config?.id || !config?.title) {
-    console.warn(`[module-loader] Microapp ${mod.manifest.name} missing id or title in microapp config`);
+    log.err(`[module-loader] Microapp ${mod.manifest.name} missing id or title in microapp config`);
     return undefined;
   }
 
@@ -543,7 +544,7 @@ async function loadMicroappModule(
   const entryPath = path.join(mod.dir, entry);
 
   if (!fs.existsSync(entryPath)) {
-    console.warn(`[module-loader] Microapp ${mod.manifest.name} missing entry ${entry}`);
+    log.err(`[module-loader] Microapp ${mod.manifest.name} missing entry ${entry}`);
     return undefined;
   }
 
@@ -554,13 +555,13 @@ async function loadMicroappModule(
     const setup = imported.default;
 
     if (typeof setup !== "function") {
-      console.warn(`[module-loader] Microapp ${mod.manifest.name} does not default-export a setup function`);
+      log.err(`[module-loader] Microapp ${mod.manifest.name} does not default-export a setup function`);
       return undefined;
     }
 
     const host = createMicroappHost(config, deps);
     setup(host);
-    console.log(`[module-loader] Loaded microapp: ${config.id} (from ${mod.manifest.name})`);
+    log.app(`[module-loader] Loaded microapp: ${config.id} (from ${mod.manifest.name})`);
     return {
       id: config.id,
       title: config.title,
@@ -575,7 +576,7 @@ async function loadMicroappModule(
       lastLoadedAt: new Date().toISOString(),
     };
   } catch (err) {
-    console.warn(`[module-loader] Failed to load microapp ${mod.manifest.name}: ${err}`);
+    log.err(`[module-loader] Failed to load microapp ${mod.manifest.name}: ${err}`);
     return {
       id: config.id,
       title: config.title,
