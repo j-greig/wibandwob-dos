@@ -103,12 +103,25 @@ SLEEP 2: H4 must stay explicitly open. Not permanent fix. Codex emphatic.
 WISHLIST → TASKS: typecheck from worktree, separate mutable data, profile
 verification endpoint are not polish — they affect agent operability. Promote.
 
-### MERGE NOTE
-Two branches will need merging before VPS deploy:
-- `epic/e021-vps-multi-agent-world` (this worktree — deploy/system changes)
-- Wherever capability tier TypeScript work lands (feature.mvpv2/v3, requires threading)
-Tier work is PAUSED. Focus shifted to Docker smoke + VPS deploy system prep only.
-Minor deploy/ and config/ edits OK. No core TypeScript changes.
+### LANE DEFINITION (from Codex, 2026-03-08) — BINDING
+
+PI-OWNED NOW (proceed):
+  deploy/  scripts/smoke-restart.sh  scripts/start-tmux.sh
+  VPS runbook  smoke image hardening
+  hosted verification gates  Caddy/auth/systemd/container docs
+
+PI-OWNED AFTER E023 REBASE (conditional):
+  src/core/command-catalog.ts  src/core/command-registry.ts
+  src/services/capability-service.ts  hosted/local-only command policy
+
+DO NOT TOUCH:
+  src/services/microapp-sdk.ts  src/services/module-loader.ts
+  modules/* microapps  Patchbay planning/docs
+  Any broad SDK/module/runtime work
+
+NEXT ACTION: rebase onto E023 before any more TS capability edits.
+After rebase: verify one full hosted-command availability path end to end
+(catalog → menu → /commands/list → /commands/run rejection → dynamic commands).
 
 ### Docker smoke — all 8 gates GREEN (rebuilt image 2026-03-08)
 - GATE1 ✓ SSH key auth
