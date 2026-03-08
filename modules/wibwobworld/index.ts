@@ -2,75 +2,33 @@ import blessed from "blessed";
 import fs from "node:fs";
 import path from "node:path";
 
-import { terrainNames } from "../../src/services/contour-engine.js";
 import {
   createSavedTerrainArtifact,
   createTerrainMap,
   getTerrainFocusPoint,
+  renderTerrainMap,
+  findTerrainPeak,
   type SavedTerrainArtifact,
   type TerrainMap,
   type TerrainPoint,
-} from "../../src/services/terrain-model.js";
-import { findTerrainPeak, renderTerrainMap, type TerrainRenderMode } from "../../src/services/terrain-render.js";
-import { worldChatService } from "../../src/services/world-chat-service.js";
+  type TerrainRenderMode,
+} from "../../src/services/microapp-sdk.js";
 import { debugWibWobWorld, debugWibWobWorldError } from "./debug.js";
-import { applyRect, createNodePart } from "../../src/core/ui-parts.js";
-import type { Rect, UiPart, StackChild } from "../../src/core/ui-parts.js";
-import type { MicroappSnapshotWindow } from "../../src/services/module-loader.js";
+import type {
+  MicroappHost,
+  MicroappSnapshotWindow,
+  Rect,
+  StackChild,
+  UiPart,
+} from "../../src/services/microapp-sdk.js";
+import {
+  applyRect,
+  createNodePart,
+  terrainNames,
+} from "../../src/services/microapp-sdk.js";
 import { renderIso } from "./render-iso.js";
 
 type WorldRenderMode = TerrainRenderMode | "iso";
-
-type MicroappWindowHandle = {
-  readonly id: number;
-  readonly body: blessed.Widgets.BoxElement;
-  onCleanup(fn: () => void): void;
-  onRestyle(fn: () => void): void;
-  onResize(fn: () => void): void;
-  onInput(fn: (input: string) => void): void;
-  describeState(fn: () => Record<string, unknown>): void;
-  captureText(fn: () => string): void;
-  focus(): void;
-  close(): void;
-};
-
-
-
-type MicroappHost = {
-  createWindow(init: { title: string; width?: number; height?: number }): MicroappWindowHandle;
-  registerCommand(def: {
-    id: string;
-    label: string;
-    description?: string;
-    action: (args?: Record<string, unknown>) => void;
-    direct?: boolean;
-    menu?: { category: string; order: number; label?: string }[];
-    palette?: { order: number; label?: string };
-  }): void;
-  registerSnapshot(handlers: {
-    serialize: (window: MicroappSnapshotWindow) => Record<string, unknown> | undefined;
-    restore: (_snapshot: unknown, payload: Record<string, unknown>) => void;
-  }): void;
-  runCommand(localId: string, args?: Record<string, unknown>): void;
-  readonly screen: blessed.Widgets.Screen;
-  readonly geometry: { width: number; height: number; cellAspect: number };
-  readonly theme: () => {
-    body: Record<string, unknown>;
-    header: Record<string, unknown>;
-    muted: Record<string, unknown>;
-    footer: Record<string, unknown>;
-    selected: Record<string, unknown>;
-  };
-  readonly ui: {
-    createStack(parent: unknown, children: StackChild[]): UiPart<void>;
-    createColumns(parent: unknown, children: StackChild[]): UiPart<void>;
-    createHeaderBar(parent: unknown, opts?: { leftInset?: number }): UiPart<{ left: string; right?: string }>;
-    createStatusBar(parent: unknown, opts?: { leftInset?: number }): UiPart<{ left?: string; right?: string }>;
-    createTextBlock(parent: unknown, opts?: { paddingLeft?: number; paddingTop?: number }): UiPart<{ text: string }>;
-    createButtonBar<Id extends string>(parent: unknown, buttons: ReadonlyArray<{ id: Id; label: string }>, onSelect: (id: Id) => void): UiPart<{ leftText: string; activeId: Id }>;
-    applyRect(node: blessed.Widgets.BoxElement, rect: Rect): void;
-  };
-};
 
 const RENDER_MODES: WorldRenderMode[] = ["terrain", "contours", "iso", "hybrid", "firstperson"];
 const MODE_BUTTONS = [
@@ -445,8 +403,8 @@ export default function setup(host: MicroappHost) {
         // worldKey must NOT include viewport dimensions — resize would flush channels and participants.
         // Terrain identity = terrainName + seed only; chatspot positions are recalculated each call.
         const worldKey = `${terrain.terrainName}:${seed}`;
-        const chatspots = worldChatService.ensureWorld(worldKey, terrain.width, terrain.height);
-        const nearestChatspot = worldChatService.nearestChatspot(focus.x, focus.y);
+        const chatspots = host.worldChat.ensureWorld(worldKey, terrain.width, terrain.height);
+        const nearestChatspot = host.worldChat.nearestChatspot(focus.x, focus.y);
         debugWibWobWorld("render:focus", { mapViewport, worldSize, focus });
         const camX = fpCamX ?? focus.x;
         const camY = fpCamY ?? focus.y;
@@ -743,10 +701,10 @@ export default function setup(host: MicroappHost) {
     };
     const joinNearestChatspot = () => {
       if (!latestFocus) return undefined;
-      const nearest = worldChatService.nearestChatspot(latestFocus.x, latestFocus.y);
+      const nearest = host.worldChat.nearestChatspot(latestFocus.x, latestFocus.y);
       if (!nearest) return undefined;
       const sender = "wibwob-player";
-      worldChatService.joinChannel(sender, nearest.channelId);
+      host.worldChat.joinChannel(sender, nearest.channelId);
       latestJoinedChannelId = nearest.channelId;
       debugWibWobWorld("joinNearestChatspot", { channelId: latestJoinedChannelId, chatspotId: nearest.id });
       host.runCommand("microapp.world-chatroom.set-channel", {

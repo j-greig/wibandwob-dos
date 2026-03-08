@@ -19,91 +19,17 @@ import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import {
+  type AnimatedPanelPlayer,
   createContourPlayer,
+  createLazyMountedPlayer,
   readNodeViewport,
   terrainNames,
   type ContourMode,
-} from "../../src/services/contour-engine.js";
-import { createLazyMountedPlayer } from "../../src/services/animation-service.js";
+  type MicroappHost,
+} from "../../src/services/microapp-sdk.js";
 
 type ClockMode = "clock" | "sentient";
 type Voice = "plain" | "liminal" | "scramble" | "terrain";
-
-type Rect = { top: number; left: number; width: number; height: number };
-type UiNode = {
-  on?(event: string, handler: () => void): void;
-  hide(): void;
-  show(): void;
-  setContent(content: string): void;
-};
-type UiPart<Props = void> = {
-  node: UiNode;
-  layout(rect: Rect): void;
-  update(props: Props): void;
-  restyle(): void;
-  destroy(): void;
-};
-type StackChild = {
-  key: string;
-  basis: number | string;
-  part: UiPart<unknown>;
-  visible?: () => boolean;
-};
-type SnapshotWindow = {
-  describeState?: () => Record<string, unknown>;
-};
-type MicroappWindowHandle = {
-  readonly id: number;
-  readonly body: {
-    width?: number | string;
-    height?: number | string;
-    key(keys: string[], fn: () => void): void;
-  };
-  onCleanup(fn: () => void): void;
-  onRestyle(fn: () => void): void;
-  describeState(fn: () => Record<string, unknown>): void;
-  captureText(fn: () => string): void;
-  close(): void;
-};
-type AnimatedPanelPlayer = {
-  destroy(): void;
-  attachTarget?(target: UiNode): void;
-};
-type MicroappHost = {
-  createWindow(init: { title: string; width?: number; height?: number }): MicroappWindowHandle;
-  registerCommand(def: {
-    id: string;
-    label: string;
-    description?: string;
-    action: (args?: Record<string, unknown>) => void;
-    menu?: { category: string; order: number; label?: string }[];
-    palette?: { order: number; label?: string };
-  }): void;
-  registerSnapshot(handlers: {
-    serialize: (window: SnapshotWindow) => Record<string, unknown> | undefined;
-    restore: (_snapshot: unknown, payload: Record<string, unknown>) => void;
-  }): void;
-  runCommand(localId: string, args?: Record<string, unknown>): void;
-  screen: { render(): void };
-  ui: {
-    createStack(parent: unknown, children: StackChild[]): UiPart<void>;
-    createColumns(parent: unknown, children: StackChild[]): UiPart<void>;
-    createHeaderBar(parent: unknown, opts?: { leftInset?: number }): UiPart<{ left: string; right?: string }>;
-    createStatusBar(parent: unknown): UiPart<{ left?: string; right?: string }>;
-    createTextBlock(
-      parent: unknown,
-      opts?: { paddingLeft?: number; paddingTop?: number }
-    ): UiPart<{ text: string }>;
-    createRule(
-      parent: unknown,
-      opts: { axis: "horizontal" | "vertical"; inset?: number }
-    ): UiPart<{ visible: boolean }>;
-    createFigletDisplay(parent: unknown, opts: {
-      renderText: (value: string) => string;
-    }): UiPart<{ value: string }>;
-    createAnimatedPanel(parent: unknown, opts: { player: AnimatedPanelPlayer }): UiPart<void>;
-  };
-};
 
 const VOICE_CYCLE: Voice[] = ["plain", "liminal", "scramble", "terrain"];
 const VOICE_LABELS: Record<Voice, string> = {
@@ -171,7 +97,7 @@ const SCRAMBLE_FRAMES: string[][] = [
 ];
 
 function createScramblePlayer(host: MicroappHost): AnimatedPanelPlayer & { setRunning(running: boolean): void } {
-  let target: UiNode | null = null;
+  let target: Parameters<NonNullable<AnimatedPanelPlayer["attachTarget"]>>[0] | null = null;
   let timer: ReturnType<typeof setInterval> | null = null;
   let frameIndex = 0;
   let running = false;

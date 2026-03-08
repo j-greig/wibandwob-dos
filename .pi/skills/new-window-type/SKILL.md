@@ -9,6 +9,20 @@ Use this skill when adding a new window type or microapp surface to WibWob-DOS.
 It prevents the most common drift patterns: missing state contracts, orphaned
 openers, duplicate patterns, and parity gaps.
 
+For microapps under `modules/`, start with:
+
+```bash
+bash scripts/scaffold-microapp.sh modules/<name> <app-id> "<Title>"
+```
+
+Then edit the generated files against the canonical SDK surface:
+
+```ts
+import type { MicroappHost } from "../../src/services/microapp-sdk.js";
+```
+
+Do not locally redefine `MicroappHost` or shared layout types in new microapps.
+
 ## Before you build: check what exists
 
 CRITICAL: before writing any new code, search for existing patterns.

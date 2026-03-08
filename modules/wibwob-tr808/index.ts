@@ -18,6 +18,7 @@ import {
 } from "./engine.js";
 import { renderTR808, summarizeState } from "./renderer.js";
 import { TR808Audio } from "./audio.js";
+import type { MicroappHost } from "../../src/services/microapp-sdk.js";
 
 // Key map: keyboard key → instrument selector index
 // 1=BD, 2=SD, 3=LT, 4=MT, 5=HT, 6=RS, 7=CB, 8=CP, 9=MA, 0=CL, -=CY, ==OH
@@ -45,47 +46,6 @@ type StackChild = {
   basis: number | string;
   part: UiPart<unknown>;
   visible?: () => boolean;
-};
-type MicroappWindowHandle = {
-  readonly id: number;
-  readonly body: {
-    width?: number | string;
-    height?: number | string;
-    key(keys: string[], fn: () => void): void;
-  };
-  onCleanup(fn: () => void): void;
-  onRestyle(fn: () => void): void;
-  onResize(fn: () => void): void;
-  onInput(fn: (input: string) => void): void;
-  describeState(fn: () => MicroappStateDetails): void;
-  captureText(fn: () => string): void;
-  close(): void;
-};
-type SnapshotWindow = { describeState?: () => Record<string, unknown> };
-type MicroappHost = {
-  createWindow(init: { title: string; width?: number; height?: number }): MicroappWindowHandle;
-  registerCommand(def: {
-    id: string; label: string; description?: string;
-    action: (args?: Record<string, unknown>) => void;
-    direct?: boolean;
-    menu?: { category: string; order: number; label?: string }[];
-    palette?: { order: number; label?: string };
-  }): void;
-  registerSnapshot(handlers: {
-    serialize: (window: SnapshotWindow) => Record<string, unknown> | undefined;
-    restore: (_snapshot: unknown, payload: Record<string, unknown>) => void;
-  }): void;
-  runCommand(localId: string, args?: Record<string, unknown>): void;
-  screen: { render(): void };
-  ui: {
-    createStack(parent: unknown, children: StackChild[]): UiPart<void>;
-    createHeaderBar(parent: unknown, opts?: { leftInset?: number }): UiPart<{ left: string; right?: string }>;
-    createStatusBar(parent: unknown, opts?: { leftInset?: number }): UiPart<{ left?: string; right?: string }>;
-    createTextBlock(
-      parent: unknown,
-      opts?: { paddingLeft?: number; paddingTop?: number }
-    ): UiPart<{ text: string }>;
-  };
 };
 
 function collectInstrumentParams(engine: TR808Engine, inst: (typeof INSTRUMENTS)[number]): Record<string, number> {

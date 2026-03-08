@@ -5,26 +5,9 @@
  * Use this as a starting template for new microapps.
  */
 
+import blessed from "blessed";
 import { spawnSync } from "node:child_process";
-
-interface MicroappHost {
-  createWindow(init: { title: string; width?: number; height?: number }): {
-    body: any;
-    onCleanup(fn: () => void): void;
-    onRestyle(fn: () => void): void;
-    describeState(fn: () => Record<string, unknown>): void;
-    captureText(fn: () => string): void;
-    focus(): void;
-  };
-  registerCommand(def: {
-    id: string;
-    label: string;
-    action: () => void;
-    menu?: { category: string; order: number; label?: string }[];
-    palette?: { order: number; label?: string };
-  }): void;
-  readonly theme: () => { body: Record<string, unknown> };
-}
+import type { MicroappHost } from "../../src/services/microapp-sdk.js";
 
 function renderFiglet(text: string, font: string): string {
   const result = spawnSync("figlet", ["-f", font, text], { encoding: "utf8" });
@@ -45,7 +28,6 @@ export default function setup(host: MicroappHost) {
     menu: [{ category: "applications", order: 40, label: "Hello World" }],
     palette: { order: 210, label: "Hello World" },
     action: () => {
-      const blessed = require("blessed");
       const win = host.createWindow({ title: "Hello World", width, height });
 
       const content = blessed.box({

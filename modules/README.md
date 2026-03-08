@@ -12,6 +12,34 @@ modules-private/      ← your private modules (git submodule → your own priva
 Add modules directly under `modules/`. They're tracked in the main repo and
 visible to everyone.
 
+## Microapp Authoring
+
+For microapps, the current canonical authoring surface is:
+
+- manifest: `module.json`
+- entry: `index.ts`
+- host/types import:
+  `../../src/services/microapp-sdk.js`
+
+Current rule:
+
+- import shared module-author types and helpers from `microapp-sdk.js`
+- do not locally redefine `MicroappHost`, `MicroappWindowHandle`, or shared
+  layout types
+- prefer host capabilities and SDK helpers over direct imports into `src/`
+  internals when an SDK path exists
+
+Start from:
+
+- `modules/hello-world/` for the minimal scaffold
+- `modules/wibwob-poetry-clock/` for a real microapp using richer behavior
+- `bash scripts/scaffold-microapp.sh modules/<name> <app-id> "<Title>"` for a
+  fresh scaffold generated against the current SDK path
+
+This is still phase-1 SDK work, so some modules still depend on internal
+services directly. The direction is to shrink those direct imports over time by
+projecting stable capabilities through the host.
+
 ## Private modules
 
 `modules-private/` is a **git submodule** — it points to a separate private
