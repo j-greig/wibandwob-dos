@@ -40,7 +40,9 @@ curl -sf -X POST "$API/commands/run" \
   || fail "failed to open runtime reload canary"
 
 echo "Applying v2 demo changes to ${FILE}..."
-if [ ! -f "${FILE}.bak-reload-demo-v2" ]; then
+if [ -f "${FILE}.bak-reload-demo-v2" ]; then
+  cp "${FILE}.bak-reload-demo-v2" "$FILE"
+else
   cp "$FILE" "${FILE}.bak-reload-demo-v2"
 fi
 python3 - <<'PY'

@@ -43,7 +43,9 @@ curl -sf -X POST "$API/commands/run" \
   || fail "failed to open runtime reload canary via $COMMAND_ID"
 
 echo "Changing one visible line in ${FILE}..."
-if [ ! -f "${FILE}.bak-reload-demo" ]; then
+if [ -f "${FILE}.bak-reload-demo" ]; then
+  cp "${FILE}.bak-reload-demo" "$FILE"
+else
   cp "$FILE" "${FILE}.bak-reload-demo"
 fi
 python3 - <<'PY'
