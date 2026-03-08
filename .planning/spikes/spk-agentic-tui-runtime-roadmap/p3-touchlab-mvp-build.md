@@ -28,17 +28,17 @@ This is a quick sprint, not the full TouchLab stretch goal.
 
 ## Acceptance Checklist
 
-- [ ] Scaffold `modules/touchlab-mvp`
-- [ ] Open one parent `TouchLab MVP` window
-- [ ] Render four nested subwindows inside the parent canvas
-- [ ] Make at least three nested source subwindows draggable by mouse
-- [ ] Pipe three ASCII sources into one composite output subwindow
-- [ ] Surface nested-window positions via `describeState()`
-- [ ] Surface composite text summary via `describeState()`
-- [ ] Provide at least one direct command that opens the app
-- [ ] `bun run typecheck`
-- [ ] restart
-- [ ] screenshot
+- [x] Scaffold `modules/touchlab-mvp`
+- [x] Open one parent `TouchLab MVP` window
+- [x] Render four nested subwindows inside the parent canvas
+- [~] Make at least three nested source subwindows draggable by mouse
+- [x] Pipe three ASCII sources into one composite output subwindow
+- [x] Surface nested-window positions via `describeState()`
+- [x] Surface composite text summary via `describeState()`
+- [x] Provide at least one direct command that opens the app
+- [x] `bun run typecheck`
+- [x] restart
+- [x] screenshot
 
 ## Simplifications
 
@@ -55,3 +55,10 @@ If true mouse dragging cannot be made reliable within three fix attempts:
 - keep the four nested windows
 - downgrade movement to keyboard nudging
 - record mouse dragging as blocked rather than stalling the whole `P3` proof
+
+## Current proof note
+
+- nested movement is verified through window input (`h/j/k/l`) and reflected in
+  `/state` plus screenshots
+- mouse-drag wiring is implemented on nested title bars, but this sprint has
+  not yet automated a trustworthy mouse-drag verification path

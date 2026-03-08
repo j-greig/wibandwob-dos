@@ -1,8 +1,5 @@
 import blessed from "blessed";
-import {
-  createMicroappTheme,
-  type MicroappHost,
-} from "../../src/services/microapp-sdk.js";
+import type { MicroappHost } from "../../src/services/microapp-sdk.js";
 
 const CANARY_TITLE = "Runtime Reload Canary";
 const CANARY_VARIANT = "greenfield";
@@ -29,13 +26,6 @@ export default function setup(host: MicroappHost) {
     menu: [{ category: "applications", order: 46, label: "Runtime Reload Canary" }],
     palette: { order: 216, label: "Runtime Reload Canary" },
     action: () => {
-      const appTheme = createMicroappTheme(host, {
-        color: CANARY_COLOR,
-        background: CANARY_BACKGROUND,
-        accentColor: CANARY_ACCENT_COLOR,
-        accentBackground: CANARY_ACCENT_BACKGROUND,
-      });
-
       const win = host.createWindow({
         title: CANARY_TITLE,
         width: 42,
@@ -52,7 +42,11 @@ export default function setup(host: MicroappHost) {
         bottom: 0,
         tags: false,
         content: CANARY_BANNER,
-        style: appTheme.body,
+        style: {
+          ...host.theme().body,
+          fg: CANARY_COLOR,
+          bg: CANARY_BACKGROUND,
+        },
       });
 
       const badge = blessed.box({
@@ -62,7 +56,11 @@ export default function setup(host: MicroappHost) {
         height: 1,
         width: 12,
         content: ` ${CANARY_VARIANT} `,
-        style: appTheme.accent,
+        style: {
+          ...host.theme().selected,
+          fg: CANARY_ACCENT_COLOR,
+          bg: CANARY_ACCENT_BACKGROUND,
+        },
       });
 
       win.describeState(() => ({
@@ -76,14 +74,16 @@ export default function setup(host: MicroappHost) {
       win.captureText(() => CANARY_BANNER);
 
       win.onRestyle(() => {
-        const nextTheme = createMicroappTheme(host, {
-          color: CANARY_COLOR,
-          background: CANARY_BACKGROUND,
-          accentColor: CANARY_ACCENT_COLOR,
-          accentBackground: CANARY_ACCENT_BACKGROUND,
-        });
-        content.style = nextTheme.body;
-        badge.style = nextTheme.accent;
+        content.style = {
+          ...host.theme().body,
+          fg: CANARY_COLOR,
+          bg: CANARY_BACKGROUND,
+        };
+        badge.style = {
+          ...host.theme().selected,
+          fg: CANARY_ACCENT_COLOR,
+          bg: CANARY_ACCENT_BACKGROUND,
+        };
       });
 
       win.focus();
