@@ -1,62 +1,117 @@
 ---
 name: wibwobdos
-description: Operate WibWob-DOS — a shared terminal desktop with overlapping windows, generative art, a 3D world with chat rooms, and an embedded AI agent. Use to open windows, read desktop state, send messages to the agent chat, capture screenshots, and post to Discord. Triggers on: "open WibWobWorld", "show the desktop", "take a screenshot", "share to Discord", "what's on screen", "open some art", "send a chat message".
-compatibility: Requires bash, curl, python3. SSH key required. Run `pip install Pillow` for PNG screenshots.
+description: Operate WibWob-DOS — a shared terminal desktop with overlapping windows, generative art, a 3D world with chat rooms, and an embedded AI agent. Use to open windows, move them, read desktop state, send messages to the agent chat, capture screenshots, and post to Discord. Triggers on: "open WibWobWorld", "show the desktop", "take a screenshot", "share to Discord", "what's on screen", "open some art", "send a chat message".
+compatibility: Requires bash, curl, python3. pip install Pillow for PNG screenshots.
 ---
 
-# WibWob-DOS
+# WibWob-DOS skill
 
-A live shared terminal desktop shell. Everything is controlled through an HTTP API
-on port 8099 — open windows, move them, read their text, send input, check state.
+Control surface for the live shared terminal desktop at `https://dos.wibandwob.com`.
+Everything is HTTP. The API is self-describing — `GET /api/help` lists all endpoints.
 
 ## Connect
 
-```bash
-export WIBWOB_SSH_KEY=~/.ssh/your_agent_key   # path to your provisioned key
-export WIBWOB_HOST=the.host.or.ip             # or 127.0.0.1 if already on server
-export WIBWOB_PORT=2849                        # SSH port (default)
+Credentials are in repo root `.env` (gitignored). Just:
 
-eval "$(bash scripts/connect.sh)"             # tunnel + health check + sets WIBWOB_API + WIBWOB_TOKEN
+```bash
+eval "$(bash .pi/skills/wibwobdos/scripts/connect.sh)"
+# → exports WIBWOB_API + WIBWOB_TOKEN
 ```
 
-All API calls require a bearer token. `connect.sh` fetches it automatically via SSH
-and exports it as `WIBWOB_TOKEN`. If running without `connect.sh`, set
-`WIBWOB_CONTROL_TOKEN` before starting, or read the token from `scratch/control-token`.
+For a private/local instance, set `WIBWOB_SSH_KEY` + `WIBWOB_HOST` + `WIBWOB_PORT`
+before running connect.sh — it will tunnel and fetch the token via SSH.
 
-If you already have API access (local or tunnel established):
+## Always do this first
+
 ```bash
-export WIBWOB_API=http://127.0.0.1:8099
-export WIBWOB_TOKEN=$(cat scratch/control-token)
+# Verify profile loaded (deployProfile must not be null)
+curl -s "$WIBWOB_API/health"
+
+# Read live state — get real window ids, never guess
+curl -s -H "Authorization: Bearer $WIBWOB_TOKEN" "$WIBWOB_API/state"
+
+# See what commands are available under this profile
+curl -s -H "Authorization: Bearer $WIBWOB_TOKEN" "$WIBWOB_API/commands/list"
 ```
 
-## Core operations
+## Core patterns
 
-| Goal | Script |
+```bash
+H="Authorization: Bearer $WIBWOB_TOKEN"
+
+# Open a window
+curl -s -H "$H" -X POST "$WIBWOB_API/commands/run" \
+  -H "Content-Type: application/json" -d '{"id":"microapp.wibwobworld.open"}'
+
+# Batch move/resize (preferred over chained individual calls)
+curl -s -H "$H" -X POST "$WIBWOB_API/windows/batch" \
+  -H "Content-Type: application/json" \
+  -d '{"ops":[{"action":"move","id":3,"x":5,"y":2},{"action":"resize","id":3,"w":60,"h":20}]}'
+
+# Read a window's text content
+curl -s -H "$H" "$WIBWOB_API/windows/text?id=3"
+```
+
+## Window readiness — poll, never sleep
+
+No `/windows/ready` endpoint exists. Two-stage poll:
+
+```bash
+# Stage 1: window exists in /state
+for i in $(seq 1 20); do
+  FOUND=$(curl -s -H "$H" "$WIBWOB_API/state" | python3 -c \
+    "import json,sys; ws=json.load(sys.stdin)['windows']; \
+     print('yes' if any(w.get('appType')=='wibwobworld' for w in ws) else 'no')")
+  [[ "$FOUND" == "yes" ]] && break; sleep 0.5
+done
+
+# Stage 2: window has content
+for i in $(seq 1 20); do
+  TEXT=$(curl -s -H "$H" "$WIBWOB_API/windows/text?id=N" | \
+    python3 -c "import json,sys; print(json.load(sys.stdin).get('text',''))" 2>/dev/null)
+  [[ -n "$TEXT" ]] && break; sleep 0.5
+done
+```
+
+## Convenience scripts
+
+| Goal | Command |
 |---|---|
-| Desktop layout — windows, sizes, focus | `bash scripts/state.sh` |
-| Open a window | `bash scripts/open.sh <command-id>` |
-| Send text or a message | `bash scripts/send.sh <window-id> <text>` |
-| Read a window's content | `bash scripts/export.sh <window-id>` |
-| Text screenshot of full TUI | `bash scripts/screenshot.sh` |
-| PNG screenshot | `bash scripts/png.sh [window-id] [out.png]` |
-| Share minimap and/or PNG to Discord | `bash scripts/discord.sh [minimap\|png\|both]` |
+| Desktop state | `bash scripts/state.sh` |
+| Open window | `bash scripts/open.sh <command-id>` |
+| List commands | `bash scripts/open.sh --list` |
+| Send text | `bash scripts/send.sh <window-id> <text>` |
+| Read window | `bash scripts/export.sh <window-id>` |
+| Full TUI text | `bash scripts/screenshot.sh` |
+| PNG capture | `bash scripts/png.sh [window-id] [out.png]` |
+| Share to Discord | `bash scripts/discord.sh [minimap\|png\|both]` |
 
-## Discover what's available
+Scripts wrap the API. If a script doesn't cover it, call the API directly.
+
+## Key command IDs
+
+Authoritative list: `GET /api/commands/list` — always reflects the active profile.
+
+```
+microapp.wibwobworld.open   3D terrain world with chatspots
+contour.open                contour terrain lab
+pattern.open                animated ASCII patterns
+backrooms.run               AI backrooms session
+primer.open                 open ASCII art file (requires filePath arg)
+theme.set                   change theme (name arg: wibwob-dark, wibwob-phosphor, etc.)
+```
+
+**Disabled in docker-safe profile:** `plasma.open`, `companion.open`, `finder.open`
+
+## Logs (hosted container)
 
 ```bash
-bash scripts/state.sh           # current windows — get real ids from here
-bash scripts/open.sh --list     # every openable command with description
+# Primary log (APP/CMD/MSG/SYS/API/ERR)
+ssh -p 2849 root@89.167.18.207 \
+  "docker exec wibwob-deploy-wibwob-1 \
+   cat /opt/wibandwob-dos/logs/tui-app/$(date +%Y-%m-%d).log"
 ```
 
-## Common windows to open
+## References
 
-```
-microapp.wibwobworld.open    3D terrain world with chatspots
-plasma.open                  generative plasma (moods: void circuit chaos aurora)
-contour.open                 contour terrain lab
-pattern.open                 animated ASCII patterns
-backrooms.run                AI backrooms session
-```
-
-Full API, endpoint shapes, and all command ids: `references/api.md`
-SSH tunnel options, env vars, and auth token: `references/connection.md`
+- `references/api.md` — full endpoint catalogue + /state response shape
