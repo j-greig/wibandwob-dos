@@ -1,0 +1,16 @@
+{
+  "name": "module-observatory",
+  "version": "1.0.0",
+  "description": "Live runtime dashboard showing loaded modules, commands, and windows",
+  "type": "microapp",
+  "entry": "index.ts",
+  "microapp": {
+    "id": "module-observatory",
+    "title": "Module Observatory",
+    "multiInstance": false,
+    "menu": [{ "category": "system", "order": 50, "label": "Module Observatory" }],
+    "palette": { "order": 170, "label": "Module Observatory" },
+    "agent": true,
+    "api": true
+  }
+}

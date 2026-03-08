@@ -47,6 +47,8 @@ interface ControlApiHandlers {
   windows: import("../core/window-facade.js").WindowFacade;
   /** Blessed screen.screenshot() — returns full TUI as ANSI text. */
   screenshotText: () => string;
+  /** Module runtime — lists, unloads, reloads modules. */
+  moduleRuntime?: import("./module-runtime-service.js").ModuleRuntimeService;
 }
 
 interface ControlApiIdentity {
@@ -64,6 +66,9 @@ const ENDPOINT_CATALOGUE = [
   { method: "GET",  path: "/health",                        description: "Health check" },
   { method: "GET",  path: "/openapi.json",                  description: "OpenAPI 3.0 spec" },
   { method: "GET",  path: "/state",                         description: "Full live desktop + window state" },
+  { method: "GET",  path: "/modules/list",                  description: "List all loaded modules with status, commands, windows" },
+  { method: "POST", path: "/modules/unload",                body: { name: "string (module name)" }, description: "Unload a module: close windows, remove commands" },
+  { method: "POST", path: "/modules/reload",                body: { name: "string (module name)" }, description: "Reload a module from disk" },
   { method: "GET",  path: "/commands/list",                 description: "All registered commands (optional ?surface=menu|palette|api|agent&includeUnavailable=1)" },
   { method: "GET",  path: "/content/primer-info",           description: "Primer content metadata. ?path=/abs/path.txt" },
   { method: "GET",  path: "/world-chat/state",              description: "Structured world chat snapshot outside the TUI" },
@@ -236,6 +241,28 @@ export class ControlApiService {
       // without triggering a window-manager onChange (e.g. direct microapp commands).
       return Response.json(this.handlers.syncState());
     }
+    if (request.method === "GET" && url.pathname === "/modules/list") {
+      const rt = this.handlers.moduleRuntime;
+      if (!rt) return Response.json([]);
+      return Response.json(rt.list());
+    }
+
+    if (request.method === "POST" && url.pathname === "/modules/unload") {
+      const body = await request.json() as { name?: string };
+      const rt = this.handlers.moduleRuntime;
+      if (!rt) return Response.json({ ok: false, error: "module runtime not available" });
+      if (!body.name) return Response.json({ ok: false, error: "name required" });
+      return Response.json(rt.unload(body.name));
+    }
+
+    if (request.method === "POST" && url.pathname === "/modules/reload") {
+      const body = await request.json() as { name?: string };
+      const rt = this.handlers.moduleRuntime;
+      if (!rt) return Response.json({ ok: false, error: "module runtime not available" });
+      if (!body.name) return Response.json({ ok: false, error: "name required" });
+      return Response.json(await rt.reload(body.name));
+    }
+
     if (request.method === "GET" && url.pathname === "/commands/list") {
       const surface = url.searchParams.get("surface") as CommandSurface | null;
       const includeUnavailableRaw = url.searchParams.get("includeUnavailable");

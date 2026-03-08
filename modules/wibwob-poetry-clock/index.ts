@@ -26,7 +26,7 @@ import {
   terrainNames,
   type ContourMode,
   type MicroappHost,
-} from "../../src/services/microapp-sdk.js";
+} from "#sdk";
 
 type ClockMode = "clock" | "sentient";
 type Voice = "plain" | "liminal" | "scramble" | "terrain";

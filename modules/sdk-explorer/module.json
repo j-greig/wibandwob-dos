@@ -1,0 +1,16 @@
+{
+  "name": "sdk-explorer",
+  "version": "1.0.0",
+  "description": "Interactive SDK documentation with live component examples",
+  "type": "microapp",
+  "entry": "index.ts",
+  "microapp": {
+    "id": "sdk-explorer",
+    "title": "SDK Explorer",
+    "multiInstance": false,
+    "menu": [{ "category": "applications", "order": 63, "label": "SDK Explorer" }],
+    "palette": { "order": 174, "label": "SDK Explorer" },
+    "agent": true,
+    "api": true
+  }
+}

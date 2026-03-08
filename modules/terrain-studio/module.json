@@ -1,0 +1,16 @@
+{
+  "name": "terrain-studio",
+  "version": "1.0.0",
+  "description": "Contour terrain editor with gauge sliders, presets, and live preview",
+  "type": "microapp",
+  "entry": "index.ts",
+  "microapp": {
+    "id": "terrain-studio",
+    "title": "Terrain Studio",
+    "multiInstance": false,
+    "menu": [{ "category": "applications", "order": 60, "label": "Terrain Studio" }],
+    "palette": { "order": 171, "label": "Terrain Studio" },
+    "agent": true,
+    "api": true
+  }
+}

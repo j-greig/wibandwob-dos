@@ -409,6 +409,10 @@ async function loadThemeModule(mod: DiscoveredModule): Promise<void> {
 // Microapp loading
 // ---------------------------------------------------------------------------
 
+export async function loadMicroappSingle(mod: { dir: string; manifest: { name: string; entry?: string; microapp?: MicroappManifestConfig } }, deps: MicroappHostDeps): Promise<void> {
+  return loadMicroappModule(mod as DiscoveredModule, deps);
+}
+
 async function loadMicroappModule(mod: DiscoveredModule, deps: MicroappHostDeps): Promise<void> {
   const config = mod.manifest.microapp;
   if (!config?.id || !config?.title) {

@@ -1,0 +1,16 @@
+{
+  "name": "symbient-composer",
+  "version": "1.0.0",
+  "description": "Agent conversation composer with streaming output and connection ports",
+  "type": "microapp",
+  "entry": "index.ts",
+  "microapp": {
+    "id": "symbient-composer",
+    "title": "Symbient Composer",
+    "multiInstance": true,
+    "menu": [{ "category": "applications", "order": 62, "label": "Symbient Composer" }],
+    "palette": { "order": 173, "label": "Symbient Composer" },
+    "agent": true,
+    "api": true
+  }
+}

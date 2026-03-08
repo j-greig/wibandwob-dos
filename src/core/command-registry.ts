@@ -107,6 +107,12 @@ export class CommandRegistry {
     this.dynamicCommands.push(def);
   }
 
+  /** Remove a dynamic command by id (for module unload). */
+  removeDynamic(id: string): void {
+    const idx = this.dynamicCommands.findIndex(d => d.id === id);
+    if (idx >= 0) this.dynamicCommands.splice(idx, 1);
+  }
+
   buildMenus(): MenuConfig[] {
     const menus = createMenuConfigs(this.actions);
     // Append dynamic commands to matching menu categories

@@ -1,0 +1,16 @@
+{
+  "name": "primer-gallery",
+  "version": "1.0.0",
+  "description": "Browsable primer gallery with tabs, search, and preview",
+  "type": "microapp",
+  "entry": "index.ts",
+  "microapp": {
+    "id": "primer-gallery",
+    "title": "Primer Gallery",
+    "multiInstance": false,
+    "menu": [{ "category": "applications", "order": 61, "label": "Primer Gallery" }],
+    "palette": { "order": 172, "label": "Primer Gallery" },
+    "agent": true,
+    "api": true
+  }
+}

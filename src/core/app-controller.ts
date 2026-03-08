@@ -26,6 +26,7 @@ import {
 import { appFlags } from "./cli.js";
 import { loadModules } from "../services/module-loader.js";
 import type { MicroappHostDeps } from "../services/module-loader.js";
+import { ModuleRuntimeService } from "../services/module-runtime-service.js";
 import type { AppMenuActions } from "./command-catalog.js";
 import { CommandRegistry } from "./command-registry.js";
 import {
@@ -167,6 +168,7 @@ export class TsTuiMvpApp {
   private readonly customCursor: CustomCursor | null;
   private readonly state: StateService;
   private readonly controlApi: ControlApiService;
+  private readonly moduleRuntime = new ModuleRuntimeService();
   private readonly editor: EditorCoordinator;
   private activeAgentSession?: WibWobAgentSession;
   private readonly instanceLabel?: string;
@@ -262,6 +264,7 @@ export class TsTuiMvpApp {
         runCommand: (id, args) => this.commands.run(id, args),
         windows: this.windowManager,
         screenshotText: () => (this.screen as any).screenshot() as string,
+        moduleRuntime: this.moduleRuntime,
       },
       {
         instanceLabel: this.instanceLabel,
@@ -302,6 +305,7 @@ export class TsTuiMvpApp {
       worldChat: worldChatService,
     };
     await loadModules(microappDeps);
+    this.moduleRuntime.initFromDiscovery(microappDeps);
 
     // Rebuild menus after microapps may have registered dynamic commands
     this.menus.length = 0;
@@ -1899,6 +1903,15 @@ export class TsTuiMvpApp {
       openMonsterCam: () => this.openMonsterCam(),
       // ── Help ────────────────────────────────────────────
       viewReadme: () => this.openBrowserReaderWindow(README_PATH),
+      // ── Modules ──────────────────────────────────────────
+      scaffoldModule: () => {
+        execFileSync("bash", ["scripts/scaffold-microapp.sh"], { stdio: "inherit", cwd: REPO_ROOT });
+      },
+      reloadModule: (args) => {
+        const name = args?.name as string;
+        if (!name) return;
+        this.moduleRuntime.reload(name);
+      },
     };
   }
 
@@ -1945,6 +1958,7 @@ export class TsTuiMvpApp {
 
   private destroy(): void {
     this.autoSaveWorkspace();
+    this.moduleRuntime.stop();
     this.controlApi.stop();
     this.screen.destroy();
     process.exit(0);

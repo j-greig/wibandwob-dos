@@ -41,6 +41,10 @@
     "turndown-plugin-gfm": "^1.0.2",
     "youtube-transcript-plus": "^1.2.0"
   },
+  "imports": {
+    "#sdk": "./src/services/microapp-sdk.ts",
+    "#sdk/*": "./src/services/*.ts"
+  },
   "devDependencies": {
     "@types/blessed": "^0.1.25",
     "@types/jsdom": "^28.0.0",

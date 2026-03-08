@@ -78,6 +78,9 @@ export interface AppMenuActions {
   resizeWindowById: (args?: Record<string, unknown>) => void;
   // ── Help ──────────────────────────────────────────────
   viewReadme: () => void;
+  // ── Modules ─────────────────────────────────────────
+  scaffoldModule: () => void;
+  reloadModule: (args?: Record<string, unknown>) => void;
 }
 
 /** Menu bucket — determines which top-level menu a command appears in. */
@@ -831,6 +834,26 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     multiInstance: true,
     menuPlacements: [{ category: "help", order: 0 }],
     palettePlacement: { order: 200 },
+    api: true,
+    agent: true
+  },
+  {
+    id: "module.scaffold",
+    label: "Scaffold Module",
+    group: "system",
+    actionKey: "scaffoldModule",
+    description: "Create a new microapp module from the hello-world template.",
+    palettePlacement: { order: 180 },
+    api: true,
+    agent: true
+  },
+  {
+    id: "module.reload",
+    label: "Reload Module",
+    group: "system",
+    actionKey: "reloadModule",
+    description: "Hot-reload a module from disk. Args: { name: string }",
+    palettePlacement: { order: 181 },
     api: true,
     agent: true
   }
