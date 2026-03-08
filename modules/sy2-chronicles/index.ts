@@ -1,6 +1,7 @@
 import blessed from "blessed";
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
 import { renderContour } from "../../src/services/contour-engine.js";
+import { renderFiglet } from "../../src/services/figlet-service.js";
 
 type PanelDef = {
   id: string;
@@ -147,6 +148,35 @@ const PANEL_DEFS: PanelDef[] = [
     },
   },
   {
+    id: "kaomoji-variants",
+    title: "Kaomoji",
+    w: 36,
+    h: 12,
+    col: 0,
+    live: true,
+    content: (tick, width, height) => {
+      const variants = [
+        ["  つ◕‿◕‿◕༽つ    standard", "standard"],
+        ["  つ◕‿◕‿◉༽つ    wib", "wib"],
+        ["  つ◉‿◔‿◔༽つ    wob", "wob"],
+        ["  つ🧠‿🧠‿🧠༽つ   thinking", "thinking"],
+        ["  つ👁️‿👁️‿👁️༽つ  watching", "watching"],
+      ];
+      const g = blankGrid(width, height);
+      const activeIdx = tick % 5;
+      const startY = Math.max(0, Math.floor((height - variants.length) / 2));
+      for (let i = 0; i < variants.length && startY + i < height; i++) {
+        const [line] = variants[i] ?? [""];
+        const prefix = i === activeIdx ? ">>> " : "    ";
+        const fullLine = prefix + line;
+        for (let x = 0; x < Math.min(fullLine.length, width); x++) {
+          g[startY + i][x] = fullLine[x];
+        }
+      }
+      return gridToText(g);
+    },
+  },
+  {
     id: "born",
     title: "Born",
     w: 28,
@@ -161,6 +191,97 @@ const PANEL_DEFS: PanelDef[] = [
         ["born: 2026-03-03", "", "first artifact:", "FastTracker II", "umwelt-score", "", `first words`, `in #sy2${cursor}`],
         { centerX: true, centerY: true },
       );
+    },
+  },
+  {
+    id: "wib-and-wob",
+    title: "Wib & Wob",
+    w: 42,
+    h: 12,
+    col: 0,
+    content: (_tick, width, height) => {
+      const art = [
+        "    /\\_____/\\           /\\_____/\\",
+        "   /  o   o  \\         /  o   o  \\",
+        "  ( ==  ^  == )       ( ==  ^  == )",
+        "   )         (         )         (",
+        "  (           )       (           )",
+        " ( (  ) (  )  )       ( (  ) (  )  )",
+        "(__(__)_(__)__)       (__(__)_(__)__)",
+        "   WIB                    WOB",
+        " chaos                  order",
+        " folk                   punk",
+      ];
+      const g = blankGrid(width, height);
+      const startY = Math.max(0, Math.floor((height - art.length) / 2));
+      for (let i = 0; i < art.length && startY + i < height; i++) {
+        const row = art[i] ?? "";
+        for (let x = 0; x < Math.min(row.length, width); x++) {
+          g[startY + i][x] = row[x];
+        }
+      }
+      return gridToText(g);
+    },
+  },
+  {
+    id: "chaos-vs-order",
+    title: "Chaos vs Order",
+    w: 50,
+    h: 14,
+    col: 0,
+    content: (_tick, width, height) => {
+      const art = [
+        "#   CHAOTIC SYSTEMS    &     ORDERED SYSTEMS    ",
+        "  ╭─╮  ╭╮ ╭╮   ╭╮          ┌─┬─┬─┬─┬─┬─┬─┬─┐  ",
+        "  ╰╮╰╮╭╯╰─╯╰╮ ╭╯╰╮         │1│0│1│0│1│0│1│0│  ",
+        "   ╰╮╰╯   ╭─╯╭╯  │         ├─┼─┼─┼─┼─┼─┼─┼─┤  ",
+        "   ╭╯╭╮  ╭╯ ╭╯   │         │0│1│0│1│0│1│0│1│  ",
+        "  ╭╯ ││ ╭╯  │    │         ├─┼─┼─┼─┼─┼─┼─┼─┤  ",
+        "  │  ╰╯ │   ╰╮  ╭╯         │1│0│1│0│1│0│1│0│  ",
+        "  ╰╮    ╰╮   ╰╮╭╯          ├─┼─┼─┼─┼─┼─┼─┼─┤  ",
+        "   ╰╮    ╰─╮  ╰╯           │0│1│0│1│0│1│0│1│  ",
+        "    ╰╮     ╰─╮             └─┴─┴─┴─┴─┴─┴─┴─┘  ",
+        "     ╰───────╯                                ",
+      ];
+      const g = blankGrid(width, height);
+      const startY = Math.max(0, Math.floor((height - art.length) / 2));
+      for (let i = 0; i < art.length && startY + i < height; i++) {
+        const row = art[i] ?? "";
+        for (let x = 0; x < Math.min(row.length, width); x++) {
+          g[startY + i][x] = row[x];
+        }
+      }
+      return gridToText(g);
+    },
+  },
+  {
+    id: "jgs-aliens",
+    title: "First Contact",
+    w: 44,
+    h: 13,
+    col: 0,
+    content: (_tick, width, height) => {
+      const art = [
+        "                    .   .      .   .     .   .",
+        "       .-\"\"\"`\"\"\"-.       \\_/        \\_/       \\_/",
+        "      /       \\      / \\        / \\       ) (",
+        "   .--'._____.'--.   \\\"/        \\\"/       \\\"/",
+        "  ( o     _     o )  /|\\__,   __/|\\       /|\\",
+        "   '-..o_|_|_o..-'   \\|      `   | \\     / | \\",
+        "jgs   /        \\      `|\\         |\\ `   ` /|  `",
+        "    ()          ()     | \\        / |   __/ |",
+        "                       | /       /  |  `    |",
+        "                       ` `      `   `       `",
+      ];
+      const g = blankGrid(width, height);
+      const startY = Math.max(0, Math.floor((height - art.length) / 2));
+      for (let i = 0; i < art.length && startY + i < height; i++) {
+        const row = art[i];
+        for (let x = 0; x < Math.min(row.length, width); x++) {
+          g[startY + i][x] = row[x];
+        }
+      }
+      return gridToText(g);
     },
   },
   {
@@ -187,6 +308,48 @@ const PANEL_DEFS: PanelDef[] = [
       ),
   },
   {
+    id: "recursive-cat",
+    title: "Recursive Cat",
+    w: 26,
+    h: 13,
+    col: 0,
+    content: (_tick, width, height) => {
+      const art = [
+        "    /ᐠ｡ꞈ｡ᐟ\\",
+        "   ╱     ╲",
+        "  ╱ /ᐠ｡ꞈ｡ᐟ\\ ╲",
+        " ╱ ╱     ╲ ╲",
+        "╱ ╱ /ᐠ｡ꞈ｡ᐟ\\ ╲ ╲",
+        " ╱ ╱     ╲ ╲",
+        "  ╱ /ᐠ｡ꞈ｡ᐟ\\ ╲",
+        "   ╱     ╲",
+        "    /ᐠ｡ꞈ｡ᐟ\\",
+        "",
+        "y² = y·y = cat(cat)",
+      ];
+      const g = blankGrid(width, height);
+      const startY = Math.max(0, Math.floor((height - art.length) / 2));
+      for (let i = 0; i < art.length && startY + i < height; i++) {
+        const row = art[i] ?? "";
+        const startX = Math.max(0, Math.floor((width - row.length) / 2));
+        for (let x = 0; x < Math.min(row.length, width - startX); x++) {
+          g[startY + i][startX + x] = row[x];
+        }
+      }
+      return gridToText(g);
+    },
+  },
+  {
+    id: "figlet-sy2",
+    title: "§ y ²",
+    w: 52,
+    h: 9,
+    col: 0,
+    content: (_tick, width, _height) => {
+      return renderFiglet("sy2", "slant", width);
+    },
+  },
+  {
     id: "first-tools",
     title: "First Tools",
     w: 28,
@@ -202,6 +365,23 @@ const PANEL_DEFS: PanelDef[] = [
     },
   },
   {
+    id: "scramble-cat",
+    title: "Scramble",
+    w: 32,
+    h: 10,
+    col: 0,
+    live: true,
+    content: (tick, width, height) => {
+      const catFace = tick % 2 === 0 ? "/ᐠ｡>ᴥ<｡ᐟ\\" : "/ᐠ｡ᴥ>ᴥ｡ᐟ\\";
+      const g = blankGrid(width, height);
+      const centerY = Math.floor(height / 2);
+      paintCentered(g, centerY - 2, "the cat-cat of wib&wob");
+      paintCentered(g, centerY, catFace);
+      paintCentered(g, centerY + 2, "Scramble");
+      return gridToText(g);
+    },
+  },
+  {
     id: "wave-title",
     title: "Standing Wave",
     w: 68,
@@ -214,6 +394,41 @@ const PANEL_DEFS: PanelDef[] = [
       const y = Math.min(height - 1, 2);
       paintText(grid, 0, y, waveLine(width, tick, 0));
       return gridToText(grid);
+    },
+  },
+  {
+    id: "jgs-owl",
+    title: "Owl of Minerva",
+    w: 30,
+    h: 9,
+    col: 0,
+    content: (_tick, width, height) => {
+      const art = [
+        "     ,___,",
+        "     (O,O)",
+        "     (   )",
+        "jgs --\"-\"--",
+      ];
+      const g = blankGrid(width, height);
+      const startY = Math.max(0, Math.floor((height - art.length) / 2));
+      for (let i = 0; i < art.length && startY + i < height; i++) {
+        const row = art[i];
+        const startX = Math.max(0, Math.floor((width - row.length) / 2));
+        for (let x = 0; x < Math.min(row.length, width - startX); x++) {
+          g[startY + i][startX + x] = row[x];
+        }
+      }
+      return gridToText(g);
+    },
+  },
+  {
+    id: "figlet-signal",
+    title: "SIGNAL",
+    w: 60,
+    h: 9,
+    col: 0,
+    content: (_tick, width, _height) => {
+      return renderFiglet("SIGNAL", "doom", width);
     },
   },
   {
@@ -258,6 +473,37 @@ const PANEL_DEFS: PanelDef[] = [
         "",
         "a standing wave.",
       ]),
+  },
+  {
+    id: "jgs-lightbulb",
+    title: "The Idea",
+    w: 26,
+    h: 14,
+    col: 0,
+    content: (_tick, width, height) => {
+      const art = [
+        "      _____",
+        "    .'     `.",
+        "   /         \\",
+        "  |           |",
+        "  '.  +^^^+  .'",
+        "    `. \\./  .'",
+        "      |_|_|",
+        "      (___)  jgs",
+        "      (___)   ",
+        "      `---'",
+      ];
+      const g = blankGrid(width, height);
+      const startY = Math.max(0, Math.floor((height - art.length) / 2));
+      for (let i = 0; i < art.length && startY + i < height; i++) {
+        const row = art[i];
+        const startX = Math.max(0, Math.floor((width - row.length) / 2));
+        for (let x = 0; x < Math.min(row.length, width - startX); x++) {
+          g[startY + i][startX + x] = row[x];
+        }
+      }
+      return gridToText(g);
+    },
   },
   {
     id: "convergence",
@@ -335,6 +581,33 @@ const PANEL_DEFS: PanelDef[] = [
         "2026-03-07",
         "the mycelium becomes visible.",
       ]),
+  },
+  {
+    id: "starfield",
+    title: "The Void",
+    w: 36,
+    h: 10,
+    col: 0,
+    live: true,
+    content: (tick, width, height) => {
+      const STARS = [".", "*", "+", "·", "✦", "✧", "·", " ", " ", " "];
+      const g = blankGrid(width, height);
+      // Deterministic "random" star field using tick for slow drift
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          const seed = (x * 31 + y * 97 + Math.floor(tick / 4)) % STARS.length;
+          g[y][x] = STARS[seed];
+        }
+      }
+      // Put a small label
+      const label = "5 iterations";
+      const lx = Math.floor((width - label.length) / 2);
+      const ly = Math.floor(height / 2);
+      for (let i = 0; i < label.length && lx + i < width; i++) {
+        g[ly][lx + i] = label[i];
+      }
+      return gridToText(g);
+    },
   },
   {
     id: "memory",
@@ -769,6 +1042,16 @@ const PANEL_DEFS: PanelDef[] = [
       ]),
   },
   {
+    id: "figlet-emergence",
+    title: "EMERGENCE",
+    w: 64,
+    h: 9,
+    col: 0,
+    content: (_tick, width, _height) => {
+      return renderFiglet("EMERGE", "big", width);
+    },
+  },
+  {
     id: "glitchbox-teaser",
     title: "GlitchBox TUI",
     w: 42,
@@ -820,6 +1103,77 @@ const PANEL_DEFS: PanelDef[] = [
         }
       }
       return gridToText(grid);
+    },
+  },
+  {
+    id: "plantoid",
+    title: "Plantoid",
+    w: 68,
+    h: 13,
+    col: 0,
+    content: (_tick, width, height) => {
+      const art = [
+        "          _ _                               ╭─╮          ",
+        "         (_\\_)                             ╭╯ ╰╮         ",
+        "   _ _  (__<_{⚙                           ╭╯ ◔◔╰╮        ",
+        "  (_\\_)  (_/_)   _ _                     ╭╯   - ╰╮╭─╮    ",
+        " (__<_{⚙|\\	|    (_\\_)  .!, .!, .!, .!,    ╭─╮    ╭╯ ╰╮   ",
+        "  (_/_)  \\\\| /|(__<_{⚙ -*- -*- -*- -*- >>╭╯ ╰╮  ╭╯ ◔◔╰╮  ",
+        " |\\ |     \\|//  (_/_)  '|` '|` '|` '|`  ╭╯ ◕◕╰╮╭╯   - ╰╮",
+        "  \\\\| /|   |/  |\\ |   🦇                ╭╯   ○ ╰╮   ╭─╮   ",
+        "   \\|//  ^^^^^  \\\\| /|                    ╭─╮     ╭╯ ╰╮  ",
+        "    |/           \\|//                    ╭╯ ╰╮   ╭╯ ◔◔╰╮ ",
+        "^^^^^^^^^^        |/                    ╭╯ ◔◔╰╮ ╭╯   - ╰╮",
+      ];
+      const g = blankGrid(width, height);
+      const startY = Math.max(0, Math.floor((height - art.length) / 2));
+      for (let i = 0; i < art.length && startY + i < height; i++) {
+        const row = art[i] ?? "";
+        for (let x = 0; x < Math.min(row.length, width); x++) {
+          g[startY + i][x] = row[x];
+        }
+      }
+      return gridToText(g);
+    },
+  },
+  {
+    id: "space-cat",
+    title: "Space Cat",
+    w: 56,
+    h: 22,
+    col: 0,
+    content: (_tick, width, height) => {
+      const art = [
+        "                    ✦    /ᐠ｡ ◕ ｡ᐟ\\  ✧",
+        "                  ✧   ╱cosmic whiskers╲   ✦",
+        "               ✦     ╱                 ╲     ✧",
+        "             ✧      ╱ /ᐠ｡ ◕ ｡ᐟ\\stellar╲      ✦",
+        "           ✦       ╱ ╱   purr-drive   ╲ ╲       ✧",
+        "         ✧        ╱ ╱ /ᐠ｡ ◕ ｡ᐟ\\meme ╲ ╲        ✦",
+        "       ✦         ╱ ╱ ╱void-meowing ╲ ╲ ╲         ✧",
+        "     ✧          ╱ ╱ ╱ /ᐠ｡ ◕ ｡ᐟ\\  ╲ ╲ ╲          ✦",
+        "   ✦           ╱ ╱ ╱ ╱   MROW?    ╲ ╲ ╲ ╲           ✧",
+        " ✧   ∞═══════╱ ╱ ╱ ╱ /ᐠ｡ ◕ ｡ᐟ\\  ╲ ╲ ╲ ╲═══════∞   ✦",
+        "   ✦         ╲ ╲ ╲ ╲ ╲  quantum  ╱ ╱ ╱ ╱         ✧",
+        "     ✧        ╲ ╲ ╲ ╲  hairball ╱ ╱ ╱ ╱        ✦",
+        "       ✦       ╲ ╲ ╲  /ᐠ｡ ◕ ｡ᐟ\\ ╱ ╱ ╱       ✧",
+        "         ✧      ╲ ╲   dark-matter ╱ ╱      ✦",
+        "           ✦     ╲    /ᐠ｡ ◕ ｡ᐟ\\    ╱     ✧",
+        "             ✧   ╲  zero-g-zoomies ╱   ✦",
+        "               ✦  ╲  /ᐠ｡ ◕ ｡ᐟ\\  ╱  ✧",
+        "                 ✧ ╲___________╱ ✦",
+        "                   ✦  ◉    ◉  ✧",
+      ];
+      const g = blankGrid(width, height);
+      const startY = Math.max(0, Math.floor((height - art.length) / 2));
+      for (let i = 0; i < art.length && startY + i < height; i++) {
+        const row = art[i] ?? "";
+        const startX = Math.max(0, Math.floor((width - row.length) / 2));
+        for (let x = 0; x < Math.min(row.length, width - startX); x++) {
+          g[startY + i][startX + x] = row[x];
+        }
+      }
+      return gridToText(g);
     },
   },
   {
@@ -916,24 +1270,13 @@ export default function setup(host: MicroappHost) {
       style: host.theme().body,
     });
 
-    const scroller = blessed.box({
+    // Arrow overlay lives on canvas (viewport-sized, positions adjusted by scrollOffset)
+    const arrowOverlay = blessed.box({
       parent: canvas,
       top: 0,
       left: 0,
-      width: 1,
-      height: 1,
-      mouse: true,
-      clickable: true,
-      style: host.theme().body,
-    });
-
-    // Arrow overlay lives inside scroller so it scrolls automatically
-    const arrowOverlay = blessed.box({
-      parent: scroller,
-      top: 0,
-      left: 0,
       right: 0,
-      height: 1, // updated in renderLayoutAndContent
+      bottom: 0,
       tags: false,
       style: { fg: host.theme().muted.fg, bg: "default", transparent: true },
     });
@@ -948,7 +1291,7 @@ export default function setup(host: MicroappHost) {
 
     for (const def of PANEL_DEFS) {
       const frame = blessed.box({
-        parent: scroller,
+        parent: canvas,
         top: 0,
         left: 0,
         width: def.w,
@@ -1020,17 +1363,19 @@ export default function setup(host: MicroappHost) {
 
       let resizing = false;
       let resizeStartX = 0;
+      let resizeStartY = 0;
       let resizeStartW = 52;
       let resizeStartH = 24;
 
-      grip.on("mousedown", (data: { x: number }) => {
+      grip.on("mousedown", (data: { x: number; y: number }) => {
         resizing = true;
         resizeStartX = data.x;
+        resizeStartY = data.y;
         resizeStartW = terrainSize.w;
         resizeStartH = terrainSize.h;
       });
 
-      const mouseHandler = (data: { action: string; x: number }) => {
+      const mouseHandler = (data: { action: string; x: number; y: number }) => {
         if (!resizing) return;
         if (data.action === "mouseup") {
           resizing = false;
@@ -1038,8 +1383,9 @@ export default function setup(host: MicroappHost) {
         }
         if (data.action !== "mousemove") return;
         const dx = data.x - resizeStartX;
+        const dy = data.y - resizeStartY;
         terrainSize.w = Math.max(30, resizeStartW + dx);
-        terrainSize.h = Math.max(12, Math.min(40, resizeStartH + Math.floor(dx / 2)));
+        terrainSize.h = Math.max(12, Math.min(40, resizeStartH + dy));
         renderLayoutAndContent();
         host.screen.render();
       };
@@ -1109,11 +1455,7 @@ export default function setup(host: MicroappHost) {
       const maxScroll = Math.max(0, totalContentHeight - viewportHeight);
       scrollOffset = clamp(scrollOffset, 0, maxScroll);
 
-      scroller.left = 0;
-      scroller.top = -scrollOffset;
-      scroller.width = layout.contentWidth;
-      scroller.height = totalContentHeight;
-
+      // Position each frame directly on canvas with scrollOffset applied
       for (const placement of layout.placements) {
         const node = panelNodes.get(placement.id);
         if (!node) continue;
@@ -1121,7 +1463,7 @@ export default function setup(host: MicroappHost) {
         node.x = placement.x;
         node.y = placement.y;
         node.frame.left = node.x;
-        node.frame.top = node.y;
+        node.frame.top = node.y - scrollOffset;
         node.frame.width = size.w;
         node.frame.height = size.h;
       }
@@ -1133,7 +1475,7 @@ export default function setup(host: MicroappHost) {
         node.content.setContent(node.def.content(tick, contentWidth, contentHeight));
       }
 
-      // Render relationship arrows overlay — inside scroller so no scroll math needed
+      // Render relationship arrows overlay — viewport-sized, positions adjusted by scrollOffset
       const arrowRelations: Array<[string, string]> = [
         ["born", "first-tools"],
         ["question", "answer"],
@@ -1145,8 +1487,8 @@ export default function setup(host: MicroappHost) {
 
       const placementMap = new Map(panelPlacements.map((p) => [p.id, p]));
       const defMap = new Map(PANEL_DEFS.map((d) => [d.id, d]));
-      // Arrow grid sized to full content height since it scrolls with scroller
-      const arrowGrid = blankGrid(layout.contentWidth, totalContentHeight);
+      // Arrow grid sized to viewport (overlay is fixed to canvas)
+      const arrowGrid = blankGrid(viewportWidth, viewportHeight);
 
       for (const [fromId, toId] of arrowRelations) {
         const fromPlacement = placementMap.get(fromId);
@@ -1155,17 +1497,15 @@ export default function setup(host: MicroappHost) {
         const toDef = defMap.get(toId);
         if (!fromPlacement || !toPlacement || !fromDef || !toDef) continue;
 
-        // Raw panel positions — no scroll offset math since overlay is inside scroller
+        // Positions adjusted by scrollOffset since overlay is viewport-fixed
         const fromX = fromPlacement.x + fromDef.w;
-        const fromY = fromPlacement.y + Math.floor(fromDef.h / 2);
+        const fromY = fromPlacement.y + Math.floor(fromDef.h / 2) - scrollOffset;
         const toX = toPlacement.x;
-        const toY = toPlacement.y + Math.floor(toDef.h / 2);
+        const toY = toPlacement.y + Math.floor(toDef.h / 2) - scrollOffset;
 
         drawArrow(arrowGrid, fromX, fromY, toX, toY);
       }
 
-      // Update arrowOverlay height to match content and send to back
-      arrowOverlay.height = totalContentHeight;
       arrowOverlay.setContent(gridToText(arrowGrid));
       arrowOverlay.setBack();
 
@@ -1176,7 +1516,7 @@ export default function setup(host: MicroappHost) {
       const { height: viewportHeight } = measureViewport();
       const maxScroll = Math.max(0, totalContentHeight - viewportHeight);
       scrollOffset = clamp(scrollOffset + delta, 0, maxScroll);
-      scroller.top = -scrollOffset;
+      renderLayoutAndContent();
       host.screen.render();
     }
 
@@ -1230,7 +1570,6 @@ export default function setup(host: MicroappHost) {
     win.onRestyle(() => {
       root.style = host.theme().body;
       canvas.style = host.theme().body;
-      scroller.style = host.theme().body;
       arrowOverlay.style = { fg: host.theme().muted.fg, bg: "default", transparent: true };
       applyStyles();
       host.screen.render();
