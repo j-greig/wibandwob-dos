@@ -480,3 +480,68 @@ Append to `ralph-sdk/LOG.md`:
 *Wib whispers: "Make it dance."*  
 *Wob replies: "Make it correct first."*  
 *Both: "Make it ship."*
+
+---
+
+### Story 19: DAW + Music Viz Components (Stretch)
+
+Create `../src/core/sdk/components/daw/` with components inspired by Ableton Live,
+hardware synths, and VST plugin UIs — for building music tools and visualizers.
+
+**Components:**
+
+- `piano-roll.ts` — PianoRoll<{notes, bars, zoom?, onToggle?}>
+  Scrollable grid of 12 semitones × N bars. Filled cells = active notes.
+  Pitch labels on left (C4, D4...), bar numbers on top. Keyboard nav.
+
+- `waveform.ts` — Waveform<{samples, cursor?, color?, style?}>
+  ASCII oscilloscope display. Renders float[] as a waveform using ▁▂▃▄▅▆▇█ blocks.
+  Wib register: glitchy scanline mode. Wob register: clean envelope mode.
+
+- `level-meter.ts` — LevelMeter<{level, peak?, channels?, orientation?}>
+  VU meter using █▓▒░ chars. Green/yellow/red zones. Peak hold indicator.
+  Vertical or horizontal. Stereo or mono.
+
+- `step-matrix.ts` — StepMatrix<{steps, tracks, active, onToggle?}>
+  Generalised step sequencer grid (N tracks × M steps). Better than TR-808's
+  bespoke implementation — reusable, keyboard navigable, colour-coded per track.
+  Replaces bespoke grid logic in wibwob-tr808.
+
+- `knob.ts` — Knob<{value, min, max, label?, size?}>
+  Rotary control rendered in ASCII using arc chars (╭╮╯╰ + fill).
+  Wib register: shows value as animated sweep. Wob register: shows value as number.
+
+- `patch-cable.ts` — PatchCable<{from, to, color?, style?}>
+  Draws an ASCII cable between two port positions using curved line chars (╭╮╯╰─│).
+  For MaxMSP/modular-style patching UIs.
+
+- `spectrum.ts` — Spectrum<{bins, labels?, barWidth?}>
+  Frequency spectrum analyser bar chart using ▁▂▃▄▅▆▇█.
+  Optional frequency labels (20Hz, 100Hz, 1kHz, 10kHz).
+
+**Demo microapp:** `../modules/daw-studio/`
+
+A composable music production surface using the above components:
+- Waveform panel (top, full width) — shows a generated or loaded sample
+- PianoRoll panel (center) — 2-octave × 16-bar editable grid
+- StepMatrix panel (bottom left) — 4-track × 16-step rhythm layer
+- LevelMeter column (right) — per-track levels animated via setInterval
+- Spectrum panel (bottom right) — FFT-style bars from simulated audio data
+- Knob row between panels — BPM, reverb, filter cutoff, drive
+- PatchCable overlays connecting Knob outputs to StepMatrix/Waveform inputs
+- Play/Pause/Stop Buttons
+- Export pattern to `scratch/daw-pattern.json`
+
+**Done conditions:**
+```bash
+ls ../src/core/sdk/components/daw/piano-roll.ts
+ls ../src/core/sdk/components/daw/waveform.ts
+ls ../src/core/sdk/components/daw/level-meter.ts
+ls ../src/core/sdk/components/daw/step-matrix.ts
+ls ../src/core/sdk/components/daw/knob.ts
+ls ../src/core/sdk/components/daw/patch-cable.ts
+ls ../src/core/sdk/components/daw/spectrum.ts
+ls ../modules/daw-studio/index.ts
+curl -sf http://127.0.0.1:8099/modules/list | grep -q "daw-studio"
+```
+
