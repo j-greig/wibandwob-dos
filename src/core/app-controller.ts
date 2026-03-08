@@ -1794,6 +1794,10 @@ export class TsTuiMvpApp {
       focusNextWindow: () => this.windowManager.focusNextWindow(1),
       focusPreviousWindow: () => this.windowManager.focusNextWindow(-1),
       closeFocusedWindow: () => this.windowManager.closeFocusedWindow(),
+      closeWindowById: (args) => { this.windowManager.closeWindow(Number(args?.id)); },
+      focusWindowById: (args) => { this.windowManager.focusWindowById(Number(args?.id)); },
+      moveWindowById: (args) => { this.windowManager.moveWindow(Number(args?.id), Number(args?.x), Number(args?.y)); },
+      resizeWindowById: (args) => { this.windowManager.resizeWindow(Number(args?.id), Number(args?.w), Number(args?.h)); },
       clearDesktop: () => {
         const windows = this.windowManager.getWindows();
         for (const w of windows) {
