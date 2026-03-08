@@ -4,6 +4,7 @@ import {
   createNodePart,
 } from "../core/ui-parts.js";
 import type { Rect, UiPart, StackChild } from "../core/ui-parts.js";
+import type { BrowserEntry, GalleryTab } from "../core/types.js";
 import {
   createContourPlayer,
   readNodeViewport,
@@ -29,6 +30,7 @@ import {
   createLazyMountedPlayer,
   type LazyMountedPlayer,
 } from "./animation-service.js";
+import { ContentService } from "./content-service.js";
 import type {
   MicroappHost,
   MicroappSnapshotWindow,
@@ -50,6 +52,8 @@ export type {
   TerrainMap,
   TerrainPoint,
   TerrainRenderMode,
+  BrowserEntry,
+  GalleryTab,
 };
 
 export type AnimatedPanelPlayer = LazyMountedPlayer & {
@@ -72,4 +76,5 @@ export {
   BIOME_GLYPHS,
   findTerrainPeak,
   renderTerrainMap,
+  ContentService,
 };

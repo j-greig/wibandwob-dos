@@ -1,9 +1,10 @@
 import blessed from "blessed";
+import fs from "node:fs";
 
 import {
+  ContentService,
   createContourPlayer,
   createLazyMountedPlayer,
-  createNodePart,
   createSavedTerrainArtifact,
   createTerrainMap,
   getTerrainFocusPoint,
@@ -11,9 +12,13 @@ import {
   renderTerrainMap,
   terrainNames,
   type AnimatedPanelPlayer,
+  type BrowserEntry,
+  type GalleryTab,
   type MicroappHost,
   type MicroappSnapshotWindow,
+  type Rect,
   type TerrainMap,
+  type UiPart,
 } from "../../src/services/microapp-sdk.js";
 
 type ViewMode = "overview" | "terrain" | "chat";
@@ -30,8 +35,17 @@ const HELPER_TITLES: Record<HelperKind, string> = {
   "note-cloud": "Patchbay: Note Cloud",
 };
 
+const primerContent = new ContentService();
+
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
+}
+
+function clipText(value: string, width: number): string {
+  if (width <= 0) {
+    return "";
+  }
+  return value.length > width ? `${value.slice(0, Math.max(0, width - 1))}…` : value;
 }
 
 function firstChannelId(host: MicroappHost): string | undefined {
@@ -65,6 +79,7 @@ function buildOverviewText(args: {
     "  - terrain",
     "  - animation",
     "  - world chat",
+    "  - primer gallery subview",
     "  - helper windows",
     "  - semantic state + snapshot",
     "",
@@ -128,6 +143,18 @@ function createPatchAnimationPlayer(host: MicroappHost): AnimatedPanelPlayer & {
   };
 }
 
+function readPrimerPreview(entry: BrowserEntry | undefined): string {
+  if (!entry) {
+    return "No primer selected.";
+  }
+  try {
+    const raw = fs.readFileSync(entry.filePath, "utf8");
+    return `${entry.label}\n${entry.filePath}\n\n${raw}`;
+  } catch (error) {
+    return `Cannot preview primer.\n\n${error instanceof Error ? error.message : String(error)}`;
+  }
+}
+
 export default function setup(host: MicroappHost) {
   let control:
     | {
@@ -173,6 +200,16 @@ export default function setup(host: MicroappHost) {
       vegetationEnabled: true,
     });
     let focus = getTerrainFocusPoint(terrain);
+    const primerEntries = primerContent.collectGalleryEntries();
+    const primerTabs = primerContent.buildGalleryTabs(primerEntries);
+    const primerTabButtons = (primerTabs.length > 0 ? primerTabs : [{ label: "Empty", entries: [] }]).map((tab, index) => ({
+      id: `tab-${index}`,
+      label: tab.label,
+    }));
+    let activePrimerTabIndex = typeof args?.primerTabIndex === "number"
+      ? clamp(Math.floor(args.primerTabIndex), 0, Math.max(0, primerTabButtons.length - 1))
+      : 0;
+    let activePrimerIndex = typeof args?.primerIndex === "number" ? Math.max(0, Math.floor(args.primerIndex)) : 0;
 
     const helperWindows = new Map<HelperKind, { id: number; render: () => void; close: () => void }>();
     const desktopWidth = Math.max(48, Math.floor(host.geometry.width));
@@ -191,6 +228,43 @@ export default function setup(host: MicroappHost) {
       while (eventLines.length > 24) {
         eventLines.shift();
       }
+    }
+
+    function currentPrimerTab(): GalleryTab {
+      return primerTabs[activePrimerTabIndex] ?? { label: "Empty", entries: [] };
+    }
+
+    function currentPrimerEntries(): BrowserEntry[] {
+      return currentPrimerTab().entries;
+    }
+
+    function currentPrimerEntry(): BrowserEntry | undefined {
+      const entries = currentPrimerEntries();
+      if (entries.length === 0) {
+        return undefined;
+      }
+      activePrimerIndex = clamp(activePrimerIndex, 0, entries.length - 1);
+      return entries[activePrimerIndex];
+    }
+
+    function switchPrimerTab(nextIndex: number): void {
+      activePrimerTabIndex = clamp(nextIndex, 0, Math.max(0, primerTabButtons.length - 1));
+      activePrimerIndex = 0;
+      pushEvent(`primer tab -> ${currentPrimerTab().label}`);
+      render();
+    }
+
+    function movePrimerSelection(delta: number): void {
+      const entries = currentPrimerEntries();
+      if (entries.length === 0) {
+        return;
+      }
+      activePrimerIndex = clamp(activePrimerIndex + delta, 0, entries.length - 1);
+      const selected = entries[activePrimerIndex];
+      if (selected) {
+        pushEvent(`primer -> ${selected.label}`);
+      }
+      render();
     }
 
     function ensureWorld(): void {
@@ -252,8 +326,26 @@ export default function setup(host: MicroappHost) {
       },
     );
     const commandDeck = host.ui.createTextBlock(win.body, { paddingLeft: 1, paddingTop: 0 });
-    const previewBox = blessed.box({
+    const galleryTabBar = host.ui.createButtonBar(
+      win.body,
+      primerTabButtons,
+      (tabId) => {
+        const nextIndex = Number(tabId.replace("tab-", ""));
+        if (Number.isFinite(nextIndex)) {
+          switchPrimerTab(nextIndex);
+        }
+      },
+    );
+    const viewSurfaceNode = blessed.box({
       parent: win.body,
+      top: 0,
+      left: 0,
+      width: 0,
+      height: 0,
+      style: host.theme().body,
+    });
+    const simplePreviewBox = blessed.box({
+      parent: viewSurfaceNode,
       top: 0,
       left: 0,
       width: 0,
@@ -265,16 +357,101 @@ export default function setup(host: MicroappHost) {
       alwaysScroll: true,
       style: host.theme().body,
     });
-    const previewPart = createNodePart(previewBox, {
-      restyle: () => {
-        previewBox.style = host.theme().body;
-      },
+    const primerSidebarBox = blessed.box({
+      parent: viewSurfaceNode,
+      top: 0,
+      left: 0,
+      width: 0,
+      height: 0,
+      tags: true,
+      mouse: true,
+      keys: true,
+      scrollable: true,
+      alwaysScroll: true,
+      style: host.theme().body,
     });
+    const primerDividerBox = blessed.box({
+      parent: viewSurfaceNode,
+      top: 0,
+      left: 0,
+      width: 0,
+      height: 0,
+      tags: true,
+      style: host.theme().muted ?? host.theme().body,
+    });
+    const primerContentBox = blessed.box({
+      parent: viewSurfaceNode,
+      top: 0,
+      left: 0,
+      width: 0,
+      height: 0,
+      tags: false,
+      mouse: true,
+      keys: true,
+      scrollable: true,
+      alwaysScroll: true,
+      style: host.theme().body,
+    });
+    const viewSurface: UiPart<void> = {
+      node: viewSurfaceNode,
+      layout(rect: Rect) {
+        host.ui.applyRect(viewSurfaceNode, rect);
+        if (view === "overview") {
+          const sidebarWidth = clamp(Math.floor(rect.width * 0.32), 24, 36);
+          const dividerWidth = 1;
+          simplePreviewBox.hide();
+          primerSidebarBox.show();
+          primerDividerBox.show();
+          primerContentBox.show();
+          host.ui.applyRect(primerSidebarBox, {
+            top: 0,
+            left: 0,
+            width: sidebarWidth,
+            height: rect.height,
+          });
+          host.ui.applyRect(primerDividerBox, {
+            top: 0,
+            left: sidebarWidth,
+            width: dividerWidth,
+            height: rect.height,
+          });
+          host.ui.applyRect(primerContentBox, {
+            top: 0,
+            left: sidebarWidth + dividerWidth,
+            width: Math.max(0, rect.width - sidebarWidth - dividerWidth),
+            height: rect.height,
+          });
+        } else {
+          primerSidebarBox.hide();
+          primerDividerBox.hide();
+          primerContentBox.hide();
+          simplePreviewBox.show();
+          host.ui.applyRect(simplePreviewBox, rect);
+        }
+      },
+      update() {},
+      restyle() {
+        viewSurfaceNode.style = host.theme().body;
+        simplePreviewBox.style = host.theme().body;
+        primerSidebarBox.style = host.theme().body;
+        primerDividerBox.style = host.theme().muted ?? host.theme().body;
+        primerContentBox.style = host.theme().body;
+      },
+      destroy() {
+        viewSurfaceNode.destroy();
+      },
+    };
     const previewDivider = host.ui.createRule(win.body, { axis: "horizontal", inset: 1 });
     const animationPlayer = createPatchAnimationPlayer(host);
     const animationPanel = host.ui.createAnimatedPanel(win.body, { player: animationPlayer });
     const previewStack = host.ui.createStack(win.body, [
-      { key: "preview", basis: "1fr", part: previewPart },
+      {
+        key: "primer-tabs",
+        basis: 1,
+        part: galleryTabBar,
+        visible: () => view === "overview",
+      },
+      { key: "preview", basis: "1fr", part: viewSurface },
       { key: "divider", basis: 1, part: previewDivider },
       { key: "animation", basis: 8, part: animationPanel },
     ]);
@@ -339,6 +516,7 @@ export default function setup(host: MicroappHost) {
                 "- title metadata can carry lightweight ownership",
                 "",
                 `current terrain: ${terrain.terrainName}`,
+                `primer tab: ${currentPrimerTab().label}`,
                 `helpers: ${[...helperWindows.keys()].join(", ") || "(none)"}`,
               ];
         content.setContent(lines.join("\n"));
@@ -386,17 +564,7 @@ export default function setup(host: MicroappHost) {
       render();
     }
 
-    function renderPreview(): string {
-      if (view === "overview") {
-        return buildOverviewText({
-          seed,
-          terrain,
-          helperKinds: [...helperWindows.keys()],
-          eventLines,
-          channelSummary: summarizeChannel(host, channelId),
-        });
-      }
-
+    function renderSimplePreview(): string {
       if (view === "chat") {
         const channel = channelId ? host.worldChat.readChannel(channelId) : undefined;
         if (!channel) {
@@ -420,7 +588,7 @@ export default function setup(host: MicroappHost) {
         ].join("\n");
       }
 
-      const viewport = readNodeViewport(previewBox, {
+      const viewport = readNodeViewport(simplePreviewBox, {
         minWidth: 24,
         minHeight: 8,
         fallbackWidth: 36,
@@ -446,6 +614,40 @@ export default function setup(host: MicroappHost) {
       return lines.join("\n");
     }
 
+    function renderPrimerGallery(): { sidebar: string; content: string } {
+      const entries = currentPrimerEntries();
+      const selected = currentPrimerEntry();
+      const sidebarWidth = Math.max(12, (Number(primerSidebarBox.width) || 26) - 2);
+      const sidebarLines = [
+        `Primer tab: ${currentPrimerTab().label}`,
+        "",
+        ...(
+          entries.length > 0
+            ? entries.slice(0, 24).map((entry, index) => {
+                const marker = index === activePrimerIndex ? ">" : " ";
+                return `${marker} ${clipText(entry.label, sidebarWidth - 2)}`;
+              })
+            : ["(no primers in this tab)"]
+        ),
+      ];
+      const meta = selected ? primerContent.measureEntry(selected) : undefined;
+      const contentLines = [
+        selected ? selected.label : "No primer selected",
+        selected ? selected.filePath : "",
+        meta
+          ? `measured ${meta.lineCount} lines · ${meta.columnWidth} cols · rec ${meta.recommendedWidth}x${meta.recommendedHeight}`
+          : entries.length > 0
+            ? "measurement unavailable"
+            : "switch tab or add primers",
+        "",
+        readPrimerPreview(selected),
+      ];
+      return {
+        sidebar: sidebarLines.join("\n"),
+        content: contentLines.join("\n"),
+      };
+    }
+
     function renderInspector(): string {
       const channel = channelId ? host.worldChat.readChannel(channelId) : undefined;
       const transport = host.worldChat.getTransportStatus();
@@ -458,6 +660,7 @@ export default function setup(host: MicroappHost) {
         playerGlyph: "@",
         playerSprite: [" @ "],
       });
+      const selectedPrimer = currentPrimerEntry();
 
       return [
         "Inspector",
@@ -469,6 +672,9 @@ export default function setup(host: MicroappHost) {
         `artifact mode: ${artifact.renderMode}`,
         `channel: ${channel?.id ?? "(none)"}`,
         `transport: ${transport.kind}${transport.kind === "irc" ? transport.connected ? " connected" : " offline" : ""}`,
+        `primer tab: ${currentPrimerTab().label}`,
+        `primer count: ${currentPrimerEntries().length}`,
+        `primer selected: ${selectedPrimer?.label ?? "(none)"}`,
         `helpers: ${[...helperWindows.keys()].join(", ") || "(none)"}`,
         "",
         "Helper window ids:",
@@ -494,7 +700,10 @@ export default function setup(host: MicroappHost) {
         "[m] open signal monitor",
         "[n] open note cloud",
         "[x] close helpers",
-        "[q] close patchbay",
+        "",
+        "Primer bench:",
+        "[j/k] primer up/down",
+        "[[/]] tab prev/next",
         "",
         "Current benches:",
         "- commands",
@@ -502,6 +711,7 @@ export default function setup(host: MicroappHost) {
         "- terrain",
         "- animation",
         "- world chat",
+        "- primer gallery subview",
         "- helper windows",
         "- snapshot/state",
       ].join("\n");
@@ -512,18 +722,23 @@ export default function setup(host: MicroappHost) {
       const innerH = Math.max(0, Number(win.body.height) || 0);
       root.layout({ top: 0, left: 0, width: innerW, height: innerH });
 
-      previewText = renderPreview();
-      inspectorText = renderInspector();
       deckText = renderDeck();
+      inspectorText = renderInspector();
       lastSummary = `Patchbay ${view} · ${terrain.terrainName} · ${helperWindows.size} helpers`;
       statePreview =
         view === "terrain"
           ? `terrain ${terrain.terrainName} seed ${seed} focus ${focus.x},${focus.y}`
           : view === "chat"
             ? summarizeChannel(host, channelId)
-            : `overview ${terrain.terrainName} helpers ${helperWindows.size}`;
-      lastStatusLeft = `${summarizeChannel(host, channelId)} · seed ${seed}`;
-      lastStatusRight = "[1-3] views [r] reseed [m/n] helpers [p] ping [q] close";
+            : `overview ${currentPrimerTab().label} selected ${currentPrimerEntry()?.label ?? "(none)"}`;
+      lastStatusLeft =
+        view === "overview"
+          ? `${currentPrimerTab().label} · ${activePrimerIndex + 1}/${Math.max(1, currentPrimerEntries().length)} primers`
+          : `${summarizeChannel(host, channelId)} · seed ${seed}`;
+      lastStatusRight =
+        view === "overview"
+          ? "[j/k] select [/] tabs [m/n] helpers [q] close"
+          : "[1-3] views [r] reseed [m/n] helpers [p] ping [q] close";
 
       headerBar.update({
         left: "Patchbay Lab",
@@ -533,8 +748,27 @@ export default function setup(host: MicroappHost) {
         leftText: `mode=${view}  helpers=${helperWindows.size}`,
         activeId: view,
       });
+      galleryTabBar.update({
+        leftText: "Primer bench",
+        activeId: primerTabButtons[Math.min(activePrimerTabIndex, primerTabButtons.length - 1)]?.id ?? "tab-0",
+      });
       commandDeck.update({ text: deckText });
-      previewBox.setContent(previewText);
+
+      if (view === "overview") {
+        const gallery = renderPrimerGallery();
+        previewText = `${gallery.sidebar}\n\n${gallery.content}`;
+        simplePreviewBox.setContent("");
+        primerSidebarBox.setContent(gallery.sidebar);
+        primerDividerBox.setContent(Array.from({ length: Math.max(1, Number(primerDividerBox.height) || 1) }, () => "│").join("\n"));
+        primerContentBox.setContent(gallery.content);
+      } else {
+        previewText = renderSimplePreview();
+        simplePreviewBox.setContent(previewText);
+        primerSidebarBox.setContent("");
+        primerDividerBox.setContent("");
+        primerContentBox.setContent("");
+      }
+
       inspector.update({ text: inspectorText });
       statusBar.update({
         left: lastStatusLeft,
@@ -589,12 +823,16 @@ export default function setup(host: MicroappHost) {
     win.body.key(["m"], () => control?.spawnHelper("signal-monitor"));
     win.body.key(["n"], () => control?.spawnHelper("note-cloud"));
     win.body.key(["x"], () => control?.closeHelpers());
+    win.body.key(["j"], () => { if (view === "overview") movePrimerSelection(1); });
+    win.body.key(["k"], () => { if (view === "overview") movePrimerSelection(-1); });
+    win.body.key(["["], () => { if (view === "overview") switchPrimerTab(activePrimerTabIndex - 1); });
+    win.body.key(["]"], () => { if (view === "overview") switchPrimerTab(activePrimerTabIndex + 1); });
     win.body.key(["q", "escape"], () => win.close());
 
     win.onResize(render);
     win.onRestyle(() => {
-      previewBox.style = host.theme().body;
       root.restyle();
+      viewSurface.restyle();
       render();
     });
     win.onCleanup(() => {
@@ -617,6 +855,10 @@ export default function setup(host: MicroappHost) {
       terrainName: terrain.terrainName,
       terrainIdx,
       channelId,
+      primerTabIndex: activePrimerTabIndex,
+      primerTabLabel: currentPrimerTab().label,
+      primerIndex: activePrimerIndex,
+      primerLabel: currentPrimerEntry()?.label,
       helperKinds: [...helperWindows.keys()],
       helperWindowIds: [...helperWindows.values()].map((helper) => helper.id),
       eventCount: eventLines.length,
@@ -630,7 +872,9 @@ export default function setup(host: MicroappHost) {
       } else if (event.type === "channel") {
         pushEvent(`channel updated -> ${event.channelId}`);
       } else {
-        pushEvent(`transport -> ${event.status.kind}${event.status.kind === "irc" ? event.status.connected ? " connected" : " offline" : ""}`);
+        pushEvent(
+          `transport -> ${event.status.kind}${event.status.kind === "irc" ? event.status.connected ? " connected" : " offline" : ""}`,
+        );
       }
       render();
     });
@@ -724,6 +968,8 @@ export default function setup(host: MicroappHost) {
         seed: state.seed,
         terrainIdx: state.terrainIdx,
         channelId: state.channelId,
+        primerTabIndex: state.primerTabIndex,
+        primerIndex: state.primerIndex,
         helperKinds: state.helperKinds,
       };
     },
@@ -733,6 +979,8 @@ export default function setup(host: MicroappHost) {
         seed: payload.seed,
         terrainIdx: payload.terrainIdx,
         channelId: payload.channelId,
+        primerTabIndex: payload.primerTabIndex,
+        primerIndex: payload.primerIndex,
         helperKinds: payload.helperKinds,
       });
     },

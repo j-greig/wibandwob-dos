@@ -34,6 +34,7 @@ Patchbay Lab v1 should prove:
 - [x] Add one terrain bench using SDK terrain helpers
 - [x] Add one animation bench using `createAnimatedPanel`
 - [x] Add one chat bench using `host.worldChat`
+- [x] Add one nested primer gallery subview with internal tab bar and picker
 - [x] Add one state/inspector pane driven by semantic state
 - [x] Add helper-window spawn/close controls and ownership tracking
 - [x] Add snapshot save/restore for the main Patchbay Lab window
@@ -64,3 +65,6 @@ Patchbay Lab v1 should prove:
   runtime-owned concept
 - richer patchbay-style note editing still falls off the current primitive edge
   because the SDK does not yet expose a comfortable composable input surface
+- nested gallery composition still leans on raw Blessed boxes inside one custom
+  surface part; it works, but it shows where higher-order SDK sublayout helpers
+  would reduce hand wiring
