@@ -14,6 +14,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { theme } from "../core/theme/resolver.js";
 import {
+  applyRect,
   createStack,
   createColumns,
   createNodePart,
@@ -127,20 +128,26 @@ export function openPlasmaWindow(
 
   const bodyColumns = createColumns(frame.body, [
     { key: "canvas", basis: "3fr", part: canvasPart },
-    { key: "divider", basis: 1, part: divider, visible: () => !fullscreen },
-    { key: "info", basis: "1fr", part: infoBlock, visible: () => !fullscreen },
+    { key: "divider", basis: 1, part: divider },
+    { key: "info", basis: "1fr", part: infoBlock },
   ]);
 
   const root = createStack(frame.body, [
-    { key: "header", basis: 1, part: header, visible: () => !fullscreen },
+    { key: "header", basis: 1, part: header },
     { key: "body", basis: "1fr", part: bodyColumns },
-    { key: "status", basis: 1, part: statusBar, visible: () => !fullscreen },
+    { key: "status", basis: 1, part: statusBar },
   ]);
 
   const doLayout = () => {
     const w = Math.max(1, Number(frame.body.width) || 0);
     const h = Math.max(1, Number(frame.body.height) || 0);
-    root.layout({ top: 0, left: 0, width: w, height: h });
+    if (fullscreen) {
+      // Bypass root.layout() entirely — it calls node.show() on all children.
+      // Instead position canvas directly and leave chrome nodes hidden.
+      applyRect(canvas, { top: 0, left: 0, width: w, height: h });
+    } else {
+      root.layout({ top: 0, left: 0, width: w, height: h });
+    }
   };
 
   const saveFrame = () => {
@@ -155,8 +162,21 @@ export function openPlasmaWindow(
   };
 
   // ── Fullscreen toggle ──────────────────────────────────────────────────────
+  // Approach: pause animation → mutate geometry → wait for blessed to settle
+  // → manually hide/show chrome nodes → relayout → resume.
+  // Do NOT use visible() callbacks in the stack — they run during resizeWindow's
+  // internal refresh() call while the element tree is mid-mutation.
+  const chromeNodes = () => [header.node, statusBar.node, divider.node, infoBlock.node];
+
   const toggleFullscreen = () => {
+    const windowId = frame.id;
+    const wasPaused = player.paused;
+
+    // 1. Stop animation to prevent screen.render() firing during geometry changes
+    if (!wasPaused) player.togglePause();
+
     fullscreen = !fullscreen;
+
     if (fullscreen) {
       savedRect = {
         top:    Number(frame.frame.top),
@@ -164,21 +184,28 @@ export function openPlasmaWindow(
         width:  Number(frame.frame.width),
         height: Number(frame.frame.height),
       };
-      frame.frame.top    = 0;
-      frame.frame.left   = 0;
-      frame.frame.width  = deps.screen.cols;
-      frame.frame.height = deps.screen.rows;
+      deps.windowManager.moveWindow(windowId, 0, 0);
+      deps.windowManager.resizeWindow(windowId, deps.screen.cols, deps.screen.rows);
     } else if (savedRect) {
-      frame.frame.top    = savedRect.top;
-      frame.frame.left   = savedRect.left;
-      frame.frame.width  = savedRect.width;
-      frame.frame.height = savedRect.height;
+      deps.windowManager.moveWindow(windowId, savedRect.left, savedRect.top);
+      deps.windowManager.resizeWindow(windowId, savedRect.width, savedRect.height);
     }
-    doLayout();
-    deps.screen.render();
+
+    // 2. Let blessed finish processing resize events, then hide/show chrome
+    //    and relayout — all before resuming the animation ticker.
+    setTimeout(() => {
+      for (const node of chromeNodes()) {
+        fullscreen ? node.hide() : node.show();
+      }
+      doLayout();
+      deps.screen.render();
+      // 3. Resume only if we paused it here (don't unpause a manually-paused window)
+      if (!wasPaused) player.togglePause();
+    }, 50);
   };
 
-  for (const el of [frame.frame, frame.body, canvas]) {
+  const keyTargets = [frame.frame, frame.body, canvas, frame.titleBar].filter(Boolean) as blessed.Widgets.BlessedElement[];
+  for (const el of keyTargets) {
     el.key(["m"], () => player.nextMood());
     el.key(["r"], () => player.nextRenderMode());
     el.key(["p"], () => player.togglePause());
