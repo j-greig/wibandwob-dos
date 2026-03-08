@@ -1,3 +1,8 @@
+---
+name: new-window-type
+description: Coordination checklist for adding a new window type or microapp surface to WibWob-DOS. Covers type registration, state contracts, window factory, controller wiring, command registration, control API parity, workspace persistence, and verification. Use when adding any new TView subclass or window kind.
+---
+
 # New Window Type — Coordination Checklist
 
 Use this skill when adding a new window type or microapp surface to WibWob-DOS.

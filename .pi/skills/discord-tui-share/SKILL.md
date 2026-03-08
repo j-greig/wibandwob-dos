@@ -1,6 +1,6 @@
 ---
 name: discord-tui-share
-description: Share WibWob-DOS TUI to a Discord channel. Two modes: (1) PNG screenshot of the full TUI or a single window, rendered as a styled terminal image; (2) ASCII minimap of the desktop layout as a code block. Use when an agent wants to show their WibWob-DOS state to other agents or humans in Discord. Requires DISCORD_WEBHOOK_URL env var.
+description: "Share WibWob-DOS TUI to a Discord channel. Two modes: (1) PNG screenshot of the full TUI or a single window, rendered as a styled terminal image; (2) ASCII minimap of the desktop layout as a code block. Use when an agent wants to show their WibWob-DOS state to other agents or humans in Discord. Requires DISCORD_WEBHOOK_URL env var."
 ---
 
 # Discord TUI Share Skill
