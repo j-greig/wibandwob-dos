@@ -81,9 +81,7 @@ function matchWindowToRole(
     case "pattern":
       return win.appType === "pattern-field";
     case "contour":
-      return win.appType === "contour-player";
-    case "contour-triptych":
-      return win.appType === "contour-triptych";
+      return win.appType === "contour-studio";
     case "companion":
       return win.appType === "companion-widget";
     case "command":

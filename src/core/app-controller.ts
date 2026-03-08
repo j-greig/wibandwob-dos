@@ -129,7 +129,6 @@ import {
   extractMoodFromText,
   type PlasmaModifiers,
 } from "../services/plasma-engine.js";
-import { openContourTriptychWindow } from "../windows/contour-triptych-window.js";
 import { openMusicPlayerWindow } from "../windows/music-player-window.js";
 import { openTerrainLabWindow as openTerrainLabStudioWindow } from "../windows/terrain-lab-window.js";
 // Editor window factory now used via EditorCoordinator
@@ -993,6 +992,7 @@ export class TsTuiMvpApp {
       openContourStudioWindow({
         screen: this.screen,
         windowManager: this.windowManager,
+        onStateChanged: () => this.syncLiveState(),
       });
     });
   }
@@ -1066,16 +1066,6 @@ export class TsTuiMvpApp {
     } catch {
       this.openPlasmaWindow();
     }
-  }
-
-  private openContourTriptychStudioWindow(): WindowRecord | undefined {
-    return this.focusOrCreate("contour-triptych", () => {
-      openContourTriptychWindow({
-        screen: this.screen,
-        windowManager: this.windowManager,
-        onStateChanged: () => this.syncLiveState(),
-      });
-    });
   }
 
   private openMusicPlayerWindow(restore?: {
@@ -1689,7 +1679,6 @@ export class TsTuiMvpApp {
       openArtWindow: () => this.openArtWindow(),
       openContourWindow: () => this.openContourWindow(),
       openTerrainLab: () => this.openTerrainLabWindow(),
-      openContourTriptych: () => this.openContourTriptychStudioWindow(),
       openPlasmaWindow: (args) => {
         const mood = typeof args?.mood === "string" ? args.mood : undefined;
         const renderMode =
