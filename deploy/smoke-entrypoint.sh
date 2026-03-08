@@ -9,7 +9,8 @@ echo "[smoke] starting wibwob-dos as wibwob user in tmux..."
 su -c "
   cd /opt/wibandwob-dos
   mkdir -p /opt/wibandwob-dos/scratch
-  WIBWOB_INSTANCE_LABEL=smoke \
+  # Source .env so capability profile + instance label are picked up by the app
+  set -a; [ -f /opt/wibandwob-dos/.env ] && . /opt/wibandwob-dos/.env; set +a
   TERM=xterm-256color \
   tmux new-session -d -s wibwob -x 320 -y 79 \
     'exec /usr/local/bin/bun run /opt/wibandwob-dos/src/app.ts 2>/opt/wibandwob-dos/scratch/app-stderr.log'

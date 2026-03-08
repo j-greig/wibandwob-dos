@@ -18,19 +18,27 @@ RUN ARCH=$(dpkg --print-architecture) && \
     chmod +x /usr/local/bin/ttyd && \
     ttyd --version
 
+# Create non-root user — Claude CLI --permission-mode bypassPermissions is
+# blocked for root; all app processes must run as wibwob.
+RUN useradd -m -s /bin/bash wibwob
+
 WORKDIR /app
 
 # Deps layer (cached unless package files change)
 COPY package.json bun.lock ./
-RUN bun install --frozen-lockfile
+RUN bun install --frozen-lockfile && chown -R wibwob:wibwob /app
 
 # Source
-COPY src ./src
-COPY tsconfig.json ./
+COPY --chown=wibwob:wibwob src ./src
+COPY --chown=wibwob:wibwob tsconfig.json ./
+COPY --chown=wibwob:wibwob config ./config
 
 # Session + token proxy
 COPY deploy/session.sh /usr/local/bin/wibwob-session
 COPY deploy/token-proxy.ts /app/deploy/token-proxy.ts
-RUN chmod +x /usr/local/bin/wibwob-session
+RUN chmod +x /usr/local/bin/wibwob-session \
+    && chown wibwob:wibwob /app/deploy/token-proxy.ts
+
+USER wibwob
 
 EXPOSE 7681 8080

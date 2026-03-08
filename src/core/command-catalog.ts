@@ -7,6 +7,7 @@
 
 import type { MenuConfig, MenuItem } from "./types.js";
 import type { CapabilityKey } from "../services/capability-service.js";
+import { capabilityService } from "../services/capability-service.js";
 
 /** Controller action contract consumed by the command registry and catalog projections. */
 export interface AppMenuActions {
@@ -819,6 +820,7 @@ export function createMenuConfigs(actions: AppMenuActions): MenuConfig[] {
     key: menu.key,
     left: menu.left,
     items: listAppCommands()
+      .filter((command) => capabilityService.isAvailable(command.requires).ok)
       .flatMap((command) =>
         command.menuPlacements
           .filter((placement) => placement.category === menu.category)

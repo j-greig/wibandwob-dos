@@ -15,7 +15,7 @@ import { log } from "../services/app-logger.js";
 
 import {
   CONTROL_API_PORT,
-  MASTER_PHILOSOPHY_PATH,
+  AGENTS_PATH,
   README_PATH,
   REPO_ROOT,
   SPIKE_NOTES_PATH,
@@ -920,7 +920,7 @@ export class TsTuiMvpApp {
   }
 
   private openBrowserReaderWindow(
-    filePath = MASTER_PHILOSOPHY_PATH,
+    filePath = AGENTS_PATH,
   ): WindowRecord | undefined {
     return this.focusOrCreate(
       "reader-viewer",

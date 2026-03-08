@@ -2,7 +2,7 @@ dos.wibandwob.com {
     tls internal
 
     basic_auth {
-        wibwob $2a$14$PWxcZWyTT2za30FLJn1DquQHPFQeW8j6VbKbSHgcngsI3HPWU5GoK
+        wibwob {env.WIBWOB_BASIC_AUTH_HASH}
     }
 
     reverse_proxy ttyd:7681

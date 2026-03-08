@@ -9,7 +9,7 @@ export COLORTERM=truecolor
 # Wait for ttyd to receive the browser's terminal dimensions via WebSocket
 # before blessed initialises — otherwise it renders at default 80x24 and
 # the resize signal arrives too late to reflow correctly on first paint.
-sleep 0.5
+sleep 2
 
 # unshare creates a new mount/pid/uts namespace — limits filesystem damage
 # TODO: replace with proper non-root user + read-only mounts (see deploy/README.md)

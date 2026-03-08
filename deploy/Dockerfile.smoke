@@ -9,17 +9,24 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 # System deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      curl unzip git tmux openssh-server ca-certificates figlet \
+      curl unzip git tmux openssh-server ca-certificates figlet python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Bun (ARM64 native binary — same method as production VPS)
+# Figlet fonts — install pyfiglet (148 fonts), copy to system figlet dir, remove pip artefacts
+RUN pip3 install --break-system-packages pyfiglet \
+    && python3 -c "\
+import pyfiglet, shutil; from pathlib import Path; \
+shutil.copytree(Path(pyfiglet.__file__).parent/'fonts', Path('/usr/share/figlet'), dirs_exist_ok=True)" \
+    && pip3 uninstall -y --break-system-packages pyfiglet \
+    && rm -rf /root/.cache/pip
+
+# Install Bun — use install script (robust, handles arch detection)
+# Copy to /usr/local/bin so non-root wibwob user can find it on PATH
 ENV BUN_VERSION=1.2.4
-RUN curl -fsSL "https://github.com/oven-sh/bun/releases/download/bun-v${BUN_VERSION}/bun-linux-aarch64.zip" \
-      -o /tmp/bun.zip \
-    && unzip /tmp/bun.zip -d /tmp/bun-release \
-    && cp /tmp/bun-release/bun-linux-aarch64/bun /usr/local/bin/bun \
-    && chmod +x /usr/local/bin/bun \
-    && rm -rf /tmp/bun.zip /tmp/bun-release \
+RUN curl -fsSL https://bun.sh/install | bash \
+    && mkdir -p /usr/local/bin \
+    && cp /root/.bun/bin/bun /usr/local/bin/bun \
+    && rm -rf /root/.bun \
     && bun --version
 
 # ttyd — web terminal (xterm.js frontend, WebSocket PTY backend)
@@ -61,6 +68,7 @@ COPY --chown=wibwob:wibwob tsconfig.json /opt/wibandwob-dos/
 COPY --chown=wibwob:wibwob modules /opt/wibandwob-dos/modules
 COPY --chown=wibwob:wibwob modules-private /opt/wibandwob-dos/modules-private
 COPY --chown=wibwob:wibwob README.md /opt/wibandwob-dos/
+COPY --chown=wibwob:wibwob AGENTS.md /opt/wibandwob-dos/
 COPY --chown=wibwob:wibwob config /opt/wibandwob-dos/config
 
 # Minimal smoke .env — local transport (no IRC), named instance
