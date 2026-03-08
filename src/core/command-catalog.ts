@@ -618,7 +618,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
   },
   {
     id: "art.open",
-    label: "Open Art",
+    label: "Open Generative Art Demo",
     description: "Open an animated generative art window.",
     group: "surface",
     actionKey: "openArtWindow",

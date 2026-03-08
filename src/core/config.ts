@@ -35,7 +35,7 @@ export const LOGS_DIR = path.join(SCRATCH_BASE, "logs");
 export const CONTROL_API_PORT = Number.parseInt(process.env.CONTROL_API_PORT ?? "8099", 10) || 8099;
 export const APP_NOTES_PATH = path.join(SCRATCH_BASE, "mvp-notes.txt");
 export const PI_AGENT_HOME = path.join(SCRATCH_BASE, "pi-agent-home");
-export const README_PATH = path.join(REPO_ROOT, "README.md");
+export const README_PATH = path.join(REPO_ROOT, "WELCOME.md");
 export const MASTER_PHILOSOPHY_PATH = path.join(REPO_ROOT, "docs", "master-philosophy.md");
 
 // Backward-compat aliases (remove after all consumers updated)
