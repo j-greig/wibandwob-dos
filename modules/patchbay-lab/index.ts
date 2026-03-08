@@ -703,7 +703,8 @@ export default function setup(host: MicroappHost) {
         "",
         "Primer bench:",
         "[j/k] primer up/down",
-        "[[/]] tab prev/next",
+        "[[] prev tab",
+        "[]] next tab",
         "",
         "Current benches:",
         "- commands",
@@ -737,7 +738,7 @@ export default function setup(host: MicroappHost) {
           : `${summarizeChannel(host, channelId)} · seed ${seed}`;
       lastStatusRight =
         view === "overview"
-          ? "[j/k] select [/] tabs [m/n] helpers [q] close"
+          ? "[j/k] select [[]/[]] tabs [m/n] helpers [q] close"
           : "[1-3] views [r] reseed [m/n] helpers [p] ping [q] close";
 
       headerBar.update({

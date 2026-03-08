@@ -68,3 +68,48 @@ Patchbay Lab v1 should prove:
 - nested gallery composition still leans on raw Blessed boxes inside one custom
   surface part; it works, but it shows where higher-order SDK sublayout helpers
   would reduce hand wiring
+
+## Patchbay v2 Stretch Goal
+
+Patchbay v2 should evolve from a coverage harness into a terminal-native
+operator graph more akin to TouchDesigner, Max/MSP, or Pure Data: multiple
+windows acting as chained transformation stages rather than isolated apps.
+
+### Intent
+
+Use one concrete creative pipeline to pressure the still-untouched seams:
+
+- linked multi-window composition
+- explicit arrows or visible connection overlays
+- data passing between windows
+- SDK-compatible reuse of older app primitives
+- richer transform chains for creative and VJ-like workflows
+
+### Candidate pipeline
+
+- `Window A — source generator`
+  example: contour/generative pattern surface
+- `Window B — text or primer source`
+  example: selected primer or text-derived mask/source
+- `Window C — blended output`
+  example: ASCII composite, mask, overwrite, warp, dither, or contour-informed
+  remix
+
+### V2 target behaviors
+
+- [ ] Spawn the three-window pipeline from Patchbay
+- [ ] Make each stage semantically stateful via `describeState()`
+- [ ] Show explicit source/transform/output roles in window metadata
+- [ ] Add visible ASCII arrows or labels linking the stages
+- [ ] Add one simple blend operator that combines generator output and primer
+      content
+- [ ] Keep the whole pipeline commandable through the registry/API
+- [ ] Use the pipeline as an excuse to migrate or align older app primitives
+      toward the SDK path where useful
+
+### Why this matters
+
+- it becomes the first concrete proof of the future connection graph
+- it turns "window as app" into "window as operator"
+- it aligns directly with the art/VJ/screensaver ambition
+- it pressures the SDK toward reusable transforms rather than isolated demos

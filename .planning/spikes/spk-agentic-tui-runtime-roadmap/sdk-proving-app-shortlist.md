@@ -198,6 +198,20 @@ If Patchbay Lab works well, then the SDK is good enough for:
 If it feels awkward to build, the awkwardness will be highly diagnostic rather
 than hidden.
 
+### Patchbay v2 stretch direction
+
+After v1 proves the base SDK surface, Patchbay should evolve toward a
+TouchDesigner / Max/MSP / Pure Data-style operator graph:
+
+- generator window
+- primer/text window
+- blended-output window
+- visible arrows or labels between them
+
+That v2 path would turn Patchbay from a coverage harness into the first real
+creative pipeline proving ground for connection-graph and multi-window operator
+design.
+
 ## Suggested build order inside the app
 
 - [ ] Create the main Patchbay Lab window with command registration
