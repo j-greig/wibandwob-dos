@@ -1,11 +1,13 @@
 {
-  "description": "Docker/VPS smoke deployment - disables commands requiring native deps not in the smoke image",
+  "description": "Docker/VPS smoke deployment — MVP surface. Disables commands requiring native deps not in the smoke image or posing security risk in shared sessions.",
   "forceOff": [
     "path.monster_cam.venv",
     "path.backrooms.repo",
     "bin.chrome",
-    "feature.resource-heavy",
     "feature.file-manager"
   ],
-  "forceOn": []
+  "forceOn": [
+    "bin.figlet",
+    "feature.resource-heavy"
+  ]
 }
