@@ -86,8 +86,7 @@ scr  = d.get('screen', {})
 app  = d.get('app', {})
 print(f\"{scr.get('width','?')}x{scr.get('height','?')}  {app.get('theme','?')}  {len(wins)} windows\")
 for w in wins:
-  r = w.get('rect', {})
-  print(f\"  [{w['id']}] {w.get('title','?'):<30}  {r.get('w','?')}x{r.get('h','?')}  @{r.get('x','?')},{r.get('y','?')}\")
+  print(f\"  [{w['id']}] {w.get('title','?'):<30}  {w.get('width','?')}x{w.get('height','?')}  @{w.get('left','?')},{w.get('top','?')}\")
 " 2>/dev/null || echo "(state unavailable)")
   fi
 

@@ -15,7 +15,7 @@ e017-scramble-brains — not-started
 e018-contour-studio-v2-terrain-foundation — done
 e019-rogue-tui-port — not-started
 e020-irc-infrastructure — done
-e021-vps-multi-agent-world — in-progress
+e021-vps-multi-agent-world — blocked
 e022-wibwobworld-restore-layout-fidelity — in-progress
 e023-capability-aware-command-registry — done
 e024-session-retroapply — done

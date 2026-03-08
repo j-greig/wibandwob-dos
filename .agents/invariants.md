@@ -45,7 +45,10 @@ These rules are strict. Treat violations as bugs, not style nits.
 12. **User-visible surfaces must be API-visible.**
     If a window, app, button, command, mode, or state matters to a user, it must have a typed representation in desktop state and a control path in `control-api.ts`. Window-local actions count too — if a window has a primary action (send, restart, run, save, open), expose a control path rather than requiring UI scraping. `describeState()` and the control API should evolve together.
 
-13. **Reorg passes do not add product surface area.**
+13. **Every themed widget must be restyleable.**
+    Any blessed node created with a theme colour must be reachable from `restyleAll()` or `onRestyle()` — either stored on `WindowRecord` (chrome) or captured in the restyle closure (microapp). Unregistered nodes keep the colour of whatever theme was active on open and bleed into every subsequent theme. Verify by switching theme with the window open.
+
+14. **Reorg passes do not add product surface area.**
     When the active goal is architecture cleanup, do not add new window types or scattered UI entry points unless the user explicitly asks. Prefer extracting, consolidating, and normalizing existing behaviour first.
 
 ## Anti-Patterns

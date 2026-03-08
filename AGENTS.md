@@ -170,6 +170,25 @@ Good candidates for Codex tooling improvement:
 
 Example: Codex improved `restart.sh` to capture old sessionId, confirm new sessionId differs, kill more aggressively (SIGKILL fallback), and reset terminal escape codes before launching — after the plain SIGTERM pattern left the terminal poisoned on unclean exits.
 
+### Three-tier planning model
+
+| Tier | System | Role | Lifetime |
+|------|--------|------|---------|
+| Capture | GitHub issues | Scatterbrain inbox — low-friction quick capture | One session: promote or close |
+| Ephemeral | `.pi/todos` | Session whiteboard — subtasks, mid-session tracking | Two sessions max: promote or close |
+| Truth | `.planning/` briefs | Everything that lasts — committed, versioned, canonical | Permanent until done/dropped |
+
+**GitHub issues as inbox:** any GH issue that is not an epic tracker must graduate within one
+session. Add it to a planning brief, add to `AGENTS.md` Parking Lot, or close it. Never leave a
+non-epic GH issue open across sessions — it becomes invisible drift.
+
+**Pi todos as whiteboard:** session-scoped only. Never use them to track work spanning more than
+one session. If a todo is still open after two sessions, promote or close it.
+
+**`.planning/` is the only source of truth.** When in doubt, write it in a brief.
+
+Full rules: `.planning/README.md` § GitHub Mapping
+
 ### Self-improvement rule
 
 When a pattern causes repeated confusion or failure in agent work: codify the fix in `.agents/` or the relevant skill, not just in the code. The agent constitution should reflect what actually works.

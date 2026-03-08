@@ -270,8 +270,7 @@ export default function setup(host: MicroappHost) {
         return tokens[name] ?? tokens.body;
       };
       const activeTitleStyle = () => ({
-        fg: host.theme().body.fg ?? "white",
-        bg: host.theme().accent.bg ?? host.theme().highlight.bg ?? "magenta",
+        ...host.theme().titleBarFocused,
         bold: true,
       });
 
@@ -517,7 +516,7 @@ export default function setup(host: MicroappHost) {
           };
           node.titleBar.style = selectedNode === node.id
             ? activeTitleStyle()
-            : { fg: fg.fg, bg: host.theme().bodyAlt.bg };
+            : { ...host.theme().header };
           node.titleBar.setContent(` ${selectedNode === node.id ? "●" : " "} ${node.title} `);
           node.content.style = { fg: fg.fg, bg: bg.bg };
           node.resizeGrip.style = selectedNode === node.id ? host.theme().highlight : host.theme().selected;

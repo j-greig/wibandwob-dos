@@ -120,8 +120,9 @@ export default function setup(host: MicroappHost) {
 
     // Cache actual window dimensions from resize events — blessed body.width can return
     // a style string expression before the first layout pass, giving wrong dimensions.
-    let cachedW = 80;
-    let cachedH = 24;
+    // Seed from initial window size so the first render() is correct before onResize fires.
+    let cachedW = Math.max(20, initialWidth - 6);
+    let cachedH = Math.max(8, initialHeight - 4);
 
 
     const render = () => {

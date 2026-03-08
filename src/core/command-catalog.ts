@@ -70,6 +70,11 @@ export interface AppMenuActions {
   openPlasmaFromPrimer: (args?: Record<string, unknown>) => void;
   // ── Monster Cam ───────────────────────────────────────
   openMonsterCam: () => void;
+  // ── Window control (by id — agent/API use) ────────────
+  closeWindowById: (args?: Record<string, unknown>) => void;
+  focusWindowById: (args?: Record<string, unknown>) => void;
+  moveWindowById: (args?: Record<string, unknown>) => void;
+  resizeWindowById: (args?: Record<string, unknown>) => void;
   // ── Help ──────────────────────────────────────────────
   viewReadme: () => void;
 }
@@ -499,6 +504,42 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     menuPlacements: [{ category: "window", order: 30 }]
   },
   {
+    id: "window.close",
+    label: "Close Window",
+    description: "Close a window by id. Args: { id: number }",
+    group: "focus",
+    actionKey: "closeWindowById",
+    api: true,
+    agent: true,
+  },
+  {
+    id: "window.focus",
+    label: "Focus Window",
+    description: "Focus a window by id. Args: { id: number }",
+    group: "focus",
+    actionKey: "focusWindowById",
+    api: true,
+    agent: true,
+  },
+  {
+    id: "window.move",
+    label: "Move Window",
+    description: "Move a window by id. Args: { id: number, x: number, y: number }",
+    group: "focus",
+    actionKey: "moveWindowById",
+    api: true,
+    agent: true,
+  },
+  {
+    id: "window.resize",
+    label: "Resize Window",
+    description: "Resize a window by id. Args: { id: number, w: number, h: number }",
+    group: "focus",
+    actionKey: "resizeWindowById",
+    api: true,
+    agent: true,
+  },
+  {
     id: "desktop.clear-all",
     label: "Clear Desktop",
     description: "Close all windows except the Wib&Wob Agent. Use for silence cues in timelines.",
@@ -618,7 +659,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
   },
   {
     id: "art.open",
-    label: "Open Art",
+    label: "Open Generative Art Demo",
     description: "Open an animated generative art window.",
     group: "surface",
     actionKey: "openArtWindow",

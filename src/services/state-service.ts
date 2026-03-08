@@ -98,6 +98,7 @@ export class StateService {
         statePath: this.options.statePath,
         instanceLabel: this.options.instanceLabel,
         sessionId: this.options.sessionId,
+        deployProfile: process.env.WIBWOB_DEPLOY_PROFILE ?? null,
         controlApiEnabled: this.options.getControlApiStatus?.().enabled,
         controlApiPort: this.options.getControlApiStatus?.().port,
         theme: themeName(),

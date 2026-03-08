@@ -170,6 +170,7 @@ export interface DesktopState {
     statePath: string;
     instanceLabel?: string;
     sessionId?: string;
+    deployProfile?: string | null;
     controlApiEnabled?: boolean;
     controlApiPort?: number;
     theme?: string;
@@ -214,6 +215,8 @@ export interface WindowRecord {
 
   // Chrome elements (set by WindowManager.createFrame)
   titleBar?: Box;
+  closeHint?: Box;
+  resizeGrip?: Box;
   shadow?: Box;
 
   // Editor-specific (set by text-windows.ts)

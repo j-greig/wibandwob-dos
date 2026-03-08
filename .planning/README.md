@@ -290,6 +290,41 @@ running a planning audit), see the `simplify-planning` skill:
 1. **Epic issue only.** Each epic gets one GitHub issue for board visibility and
    PR linkage. Features/stories/tasks live in `.planning/` briefs, not as
    separate issues.
+
+### GitHub Issues as Inbox
+
+GitHub issues serve a second role: **quick capture**. Opening an issue from a
+browser or mobile is intentionally frictionless — a way to capture a scatterbrain
+idea before it gets lost between branches.
+
+**The rule:** a GitHub issue that is not an epic tracker is an inbox item.
+It must graduate within one session or get closed.
+
+Graduation paths:
+
+| Issue contains | Do this |
+|----------------|---------|
+| A new epic's worth of work | Create `eNNN-brief.md`, link in frontmatter, keep issue open as epic tracker |
+| A story or task inside an existing epic | Add to the relevant epic brief as a story/task checkbox, close the issue |
+| A quick bug or polish item | Add to the epic's parking lot or a `fix/` story, close the issue |
+| A vague idea, might-be-nice | Add to `AGENTS.md` Parking Lot if genuinely deferred, close the issue |
+| Superseded or won't do | Close with a comment explaining why |
+
+**Never** leave a non-epic GitHub issue open across multiple sessions — it becomes
+invisible drift. If in doubt: promote or close, never leave open.
+
+### `.pi/todos` as Session Whiteboard
+
+`.pi/todos` are **session-scoped only**. They are the working whiteboard for
+an agent mid-session — quick subtask tracking, cross-branch capture, things too
+small to warrant a brief.
+
+**The rule:** a pi todo that is still open after two sessions without being
+promoted to a `.planning/` story is dead weight. Either promote it or close it.
+
+Pi todos are never authoritative. They do not replace `.planning/` briefs.
+Do not use them to track work that spans more than one coding session.
+
 2. **Branch-per-epic or per-feature.** One branch per logical unit of work. One
    logical change per PR.
 3. **No force-push to `main`.** Ever.

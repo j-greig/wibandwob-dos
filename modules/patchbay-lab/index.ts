@@ -259,7 +259,7 @@ export default function setup(host: MicroappHost) {
     const desktopWidth = Math.max(48, Math.floor(host.geometry.width));
     const desktopHeight = Math.max(18, Math.floor(host.geometry.height));
     const initialWidth = clamp(Math.floor(desktopWidth * 0.78), 88, 140);
-    const initialHeight = clamp(Math.floor(desktopHeight * 0.74), 24, 42);
+    const initialHeight = clamp(Math.floor(desktopHeight * 0.74) + 15, 39, 57);
 
     const win = host.createWindow({
       title: "Patchbay Lab",
