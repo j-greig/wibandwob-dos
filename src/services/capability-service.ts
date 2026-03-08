@@ -145,24 +145,29 @@ export class CapabilityService {
     const profilePath = candidates.find((candidate) => fs.existsSync(candidate));
 
     if (!profilePath) {
-      console.warn(
-        `[capability-service] WIBWOB_DEPLOY_PROFILE=${profileName} but no profile file found in: ${candidates.join(", ")}`,
+      // Fail-closed: explicit profile requested but not found — crash startup rather
+      // than silently enabling all capabilities (which defeats the profile entirely).
+      throw new Error(
+        `[capability-service] FATAL: WIBWOB_DEPLOY_PROFILE=${profileName} but no profile file found.\n` +
+        `  Searched:\n${candidates.map((c) => `    ${c}`).join("\n")}\n` +
+        `  Create the profile file or unset WIBWOB_DEPLOY_PROFILE to run with no profile.`,
       );
-      return { forceOff: [], forceOn: [] };
     }
 
     try {
       const raw = fs.readFileSync(profilePath, "utf8");
       const parsed = JSON.parse(raw) as Partial<CapabilityProfilePolicy>;
+      console.log(`[capability-service] profile loaded: ${profileName} (${profilePath})`);
       return {
         forceOff: this.filterCapabilityKeys(parsed.forceOff),
         forceOn: this.filterCapabilityKeys(parsed.forceOn),
       };
     } catch (error) {
-      console.warn(
-        `[capability-service] Failed to parse capability profile at ${profilePath}: ${String(error)}`,
+      // Fail-closed: profile found but unreadable/invalid JSON — crash rather than open.
+      throw new Error(
+        `[capability-service] FATAL: Failed to load capability profile '${profileName}' at ${profilePath}: ${String(error)}\n` +
+        `  Fix the profile file or unset WIBWOB_DEPLOY_PROFILE.`,
       );
-      return { forceOff: [], forceOn: [] };
     }
   }
 
