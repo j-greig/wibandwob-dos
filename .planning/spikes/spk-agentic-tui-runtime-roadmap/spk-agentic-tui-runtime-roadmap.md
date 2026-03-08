@@ -112,6 +112,8 @@ Upcoming example tasks to keep in view:
 - [x] Review external TUI references: Textual, Rich, Bubble Tea, Blessed
 - [x] Capture symbient/autonomy feedback in
   [`symbient-feedback.md`](./symbient-feedback.md)
+- [x] Capture proving-app shortlist in
+  [`sdk-proving-app-shortlist.md`](./sdk-proving-app-shortlist.md)
 - [ ] Split this umbrella spike into implementation epics/stories
 
 ## Why This Is A Spike Right Now
@@ -532,7 +534,7 @@ Each phase below has:
 
 Parsing notes for agents:
 
-- stable IDs: `CC`, `P0`-`P7`, `W1`-`W6`
+- stable IDs: `CC`, `P0`-`P8`, `W1`-`W6`
 - progress source of truth: checkbox state in this file
 - if a later status line and checkboxes diverge, trust the checkboxes
 
@@ -549,7 +551,8 @@ Parsing notes for agents:
     { "id": "P4", "title": "Agentic developer experience", "status": "not-started" },
     { "id": "P5", "title": "Product surfaces", "status": "not-started" },
     { "id": "P6", "title": "Multi-instance and swarm runtime", "status": "not-started" },
-    { "id": "P7", "title": "Renderer revisit", "status": "not-started" }
+    { "id": "P7", "title": "Renderer revisit", "status": "not-started" },
+    { "id": "P8", "title": "SDK nomenclature and surface cleanup", "status": "not-started" }
   ],
   "workstreams": [
     { "id": "W1", "phase": "P1", "title": "SDK foundation", "status": "not-started" },
@@ -566,6 +569,18 @@ Parsing notes for agents:
 
 Status: ongoing
 
+Decision notes:
+
+- symbients remain a later product-layer concern for now, primarily expressed
+  through `modules/` and `modules-private/`, not as a core runtime primitive
+- agent memory should be scaffolded now toward a future live shared runtime
+  substrate, with a simple file-backed project-memory pattern as the likely v1
+  bridge
+- hot reload should default to safe teardown + reopen first; live state
+  preservation is a later stretch goal once unload/reload semantics are proven
+- explicit roster UI is deferred; MVP identity presence can ride on lightweight
+  window metadata such as title prefixes or authored-by fields
+
 - [ ] Keep pi integration behind `wibwob-agent-session.ts`; do not leak
       vendor-specific behavior into unrelated app code
 - [ ] Keep every user-visible capability state-visible and API-visible
@@ -575,6 +590,8 @@ Status: ongoing
       one canonical location per concept
 - [ ] Keep responsive layout, agent affordances, and module/runtime visibility
       visible in `/state` rather than implicit in UI text
+- [ ] Reserve a v2 cleanup pass for naming, clustering, and dev-facing surface
+      consistency across SDK exports, commands, window types, and module terms
 
 ### P0 — Split the spike into real implementation epics
 
@@ -650,9 +667,14 @@ Action checklist:
 - [ ] Implement module unload semantics
 - [ ] Implement module reload semantics
 - [ ] Design reactive runtime event subscription for agents and tools
-- [ ] Design persistent agent-memory partitions or equivalent writable runtime
-      memory surfaces
+- [ ] Scaffold a simple project-memory pattern modeled after Claude-style
+      project memory files, with room to project it into runtime-backed memory
+      later
+- [ ] Design v2 agent-memory partitions or equivalent writable runtime memory
+      surfaces for a live shared substrate
 - [ ] Define persistence semantics for agent-authored modules
+- [ ] Make teardown + reopen the default reload path for v1
+- [ ] Define explicit stretch-path semantics for preserved-state reload in v2/v3
 - [ ] Add `/modules/list`, `/modules/reload`, `/modules/unload` API endpoints
 - [ ] Add dev watch mode for module directories
 - [ ] Surface module runtime status in `/state`
@@ -737,7 +759,9 @@ Action checklist:
       foundation
 - [ ] Add on-chain / API-fed private data modules through the module runtime
 - [ ] Add scene/layout graph behaviors for creative desktop pieces
-- [ ] Add a named runtime roster for active symbients/agents
+- [ ] Defer explicit roster UI to a later SDK/product phase
+- [ ] Add lightweight identity metadata affordances first, such as owner-prefixed
+      window titles or authored-by fields in window state
 - [ ] Add an explicit single-instance multi-agent milestone:
       `Sy2 + Wib&Wob + Scramble` can cohabit one DOS instance and address each
       other's windows directly without human relay
@@ -785,6 +809,50 @@ Completion signal:
 
 the renderer decision is informed by proven runtime needs rather than by early
 frustration with current seams.
+
+### P8 — SDK nomenclature and surface cleanup
+
+Status: not-started
+
+Goal:
+review and rationalize the naming and grouping of the microapp SDK and adjacent
+authoring surfaces once the first proving apps have exposed the real API shape.
+
+Action checklist:
+
+- [ ] Audit current SDK export names for consistency, overlap, and internal
+      history leakage
+- [ ] Propose clearer clustering for layout primitives, animation helpers,
+      terrain/world helpers, host capabilities, and module-author types
+- [ ] Review command ids, command labels, window titles, manifest keys, and
+      module terminology for consistency and ergonomics
+- [ ] Define v2 naming conventions for exported helpers and host capability
+      namespaces
+- [ ] Identify rename candidates that should wait for a compatibility window
+      instead of churning phase-1 work
+- [ ] Document migration guidance so agents and humans can move from v1 naming
+      to v2 naming without guesswork
+
+Completion signal:
+
+the SDK has a documented v2 naming map and clustering model that feels
+intentional, teachable, and stable enough for wider module authorship.
+
+## Current Architecture Decisions
+
+- Symbient model:
+  later product layer, primarily via `modules/` and `modules-private/`, rather
+  than a runtime primitive in the current foundation work
+- Agent memory:
+  scaffold now with a simple file-backed project-memory pattern; target a live
+  shared runtime substrate in a later SDK/runtime version
+- Hot reload:
+  v1 default is safe teardown + reopen; preserved live-state reload is a v2/v3
+  stretch path once runtime ownership and cleanup semantics are stable
+- Multi-agent identity UI:
+  explicit roster UI deferred; MVP identity presence should ride on lightweight
+  metadata such as title prefixes, authored-by fields, or other existing window
+  state affordances
 
 ## Proposed Workstreams
 
