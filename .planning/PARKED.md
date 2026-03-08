@@ -8,6 +8,36 @@ GitHub issue: —
 PR: —
 
 ## Active Items
+
+### Session 2026-03-08 housekeeping batch
+
+**Stale worktree cleanup** `chore`
+Remove 5 abandoned worktrees — all branches merged or C++ era dead ends.
+```
+git worktree remove --force /Users/james/Repos/wibandwob-dos-e007
+git worktree remove --force /Users/james/Repos/wibandwob-dos-e023
+git worktree remove --force /Users/james/Repos/wibandwob-dos-origin-claude-possible-ts-refactor
+git worktree remove --force /Users/james/Repos/wibandwob-dos-planning-infra
+git worktree remove --force /Users/james/Repos/wibandwob-dos-premerge
+```
+Keep: `wibandwob-dos-last-days-of-tvision` (active C++ archive, last edited Mar 5).
+
+**Ghost skill purge** `chore`
+Stale C++ era skills to delete:
+- `.agents/skills/ww-build-game/SKILL.md` — TView/tvision, cmake, zero TS relevance
+- `.agents/skills/ww-scaffold-view/SKILL.md` — TView/cmake/app/*.cpp, wrong stack
+- `.pi/skills/micropolis-engine/SKILL.md` — app/micropolis/, emscripten, all paths gone
+
+Broken cross-refs to fix:
+- `.agents/skills/chiptune/SKILL.md` — references `chiptune-bricks` skill that doesn't exist; update to point at `.pi/skills/chiptune-studio/SKILL.md`
+- `.agents/skills/codex/SKILL.md` — examples use .cpp files and cmake step; replace with TS file references
+- `.pi/skills/michel-gondry-music-video-director/SKILL.md` — blank `name:` in frontmatter; one-line fix
+
+**Docker VPS hardening** `spike` → see `.planning/spikes/spk-docker-vps-hardening/`
+Substantial security + reliability work; broken out as its own spike brief.
+
+**E001 S02 — 3 subsystem specs** `story` → see `.planning/epics/e001-codified-context-infrastructure/e001-brief.md`
+Write command-system, window-manager, and agent-session specs in machine-consumption format.
 - `spike` — Pi-in-tvterm as agentic hands for W&W: rather than inter-instance chat, run a Pi/Claude agent inside a tvterm window, give it access to the WibWob API, and let it operate the DOS autonomously — spawning windows, painting canvases, calling MCP tools — as a "body" layer separate from the W&W chat "voice" layer; Pi inter-instance protocol is a poor fit for symbient identity but a natural fit for task handoff between agents sharing a session
 - `task` — E014 follow-on: W&W are instance-locked — each pair has independent context and treats relayed messages as external input not "other self"; true cross-instance identity would require shared prompt/memory layer; shelved until heartbeat/world-registry epic
 - `task` — E014 follow-on: no `/broadcast` endpoint — seeding multiple instances with the same prompt requires N separate API calls; add `POST /broadcast` or broker `--seed-prompt` param
