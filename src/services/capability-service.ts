@@ -16,7 +16,14 @@ export type CapabilityKey =
   /** Resource-heavy apps (plasma, companion). Always probes true — gate via profile forceOff. */
   | "feature.resource-heavy"
   /** File manager — disabled in hosted profiles (no filesystem jail). Always probes true; gate via forceOff. */
-  | "feature.file-manager";
+  | "feature.file-manager"
+  | "feature.primer-open"
+  | "feature.editor-open"
+  | "feature.workspace-persist"
+  | "feature.backrooms-logs"
+  | "feature.document-reader"
+  | "feature.agent"
+  | "feature.music-player";
 
 export interface CapabilityStatus {
   ok: boolean;
@@ -46,6 +53,13 @@ const CAPABILITY_KEYS: CapabilityKey[] = [
   "feature.inference",
   "feature.resource-heavy",
   "feature.file-manager",
+  "feature.primer-open",
+  "feature.editor-open",
+  "feature.workspace-persist",
+  "feature.backrooms-logs",
+  "feature.document-reader",
+  "feature.agent",
+  "feature.music-player",
 ];
 
 function buildStatus(ok: boolean, reason?: string): CapabilityStatus {
@@ -106,6 +120,13 @@ export class CapabilityService {
       "feature.resource-heavy": buildStatus(true),
       // File manager probes true — disabled in hosted profiles via forceOff (no filesystem jail).
       "feature.file-manager": buildStatus(true),
+      "feature.primer-open": buildStatus(true),
+      "feature.editor-open": buildStatus(true),
+      "feature.workspace-persist": buildStatus(true),
+      "feature.backrooms-logs": buildStatus(true),
+      "feature.document-reader": buildStatus(true),
+      "feature.agent": buildStatus(true),
+      "feature.music-player": buildStatus(true),
     };
     const checkedAt = new Date().toISOString();
     for (const key of policy.forceOn) {

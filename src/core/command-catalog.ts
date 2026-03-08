@@ -297,6 +297,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     multiInstance: true,
     menuPlacements: [{ category: "file", order: 20 }],
     contextMenu: { desktop: true, order: 10 },
+    requires: ["feature.primer-open"],
     api: true,
     agent: true
   },
@@ -330,6 +331,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     multiInstance: true,
     menuPlacements: [{ category: "file", order: 30 }],
     contextMenu: { desktop: true, order: 20 },
+    requires: ["feature.editor-open"],
     api: true,
     agent: true
   },
@@ -351,7 +353,8 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     actionKey: "saveFocusedEditor",
     menuPlacements: [{ category: "file", order: 50 }],
     palettePlacement: { order: 50 },
-    contextMenu: { windowKinds: ["editor"], order: 10 }
+    contextMenu: { windowKinds: ["editor"], order: 10 },
+    requires: ["feature.editor-open"]
   },
   {
     id: "editor.save_as",
@@ -360,7 +363,8 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     actionKey: "saveAsFocusedEditor",
     menuPlacements: [{ category: "file", order: 60 }],
     palettePlacement: { order: 60 },
-    contextMenu: { windowKinds: ["editor"], order: 20 }
+    contextMenu: { windowKinds: ["editor"], order: 20 },
+    requires: ["feature.editor-open"]
   },
   {
     id: "workspace.save_as",
@@ -368,7 +372,8 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     group: "save",
     actionKey: "saveWorkspaceAs",
     menuPlacements: [{ category: "file", order: 70 }],
-    palettePlacement: { order: 70 }
+    palettePlacement: { order: 70 },
+    requires: ["feature.workspace-persist"]
   },
   {
     id: "workspace.load",
@@ -376,7 +381,8 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     group: "save",
     actionKey: "loadWorkspacePrompt",
     menuPlacements: [{ category: "file", order: 80 }],
-    palettePlacement: { order: 80 }
+    palettePlacement: { order: 80 },
+    requires: ["feature.workspace-persist"]
   },
   // ── Edit ──────────────────────────────────────────────
   {
@@ -423,6 +429,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     menuPlacements: [{ category: "applications", order: 120, label: "Wib&Wob Agent" }],
     palettePlacement: { order: 130 },
     contextMenu: { desktop: true, order: 70 },
+    requires: ["feature.agent"],
     api: true,
     agent: true
   },
@@ -564,6 +571,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     description: "Browse and preview backrooms TV log files. Two-pane view with list and live preview.",
     menuPlacements: [{ category: "applications", order: 20 }],
     palettePlacement: { order: 5 },
+    requires: ["feature.backrooms-logs"],
     api: true,
     agent: true
   },
@@ -623,12 +631,13 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     multiInstance: true,
     menuPlacements: [{ category: "applications", order: 50 }],
     palettePlacement: { order: 30 },
+    requires: ["feature.document-reader"],
     api: true,
     agent: true
   },
   {
     id: "art.open",
-    label: "Open Art",
+    label: "Open Generative Art Demo",
     description: "Open an animated generative art window.",
     group: "surface",
     actionKey: "openArtWindow",
@@ -717,6 +726,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     actionKey: "openMusicPlayer",
     menuPlacements: [{ category: "applications", order: 125 }],
     palettePlacement: { order: 115 },
+    requires: ["feature.music-player"],
     api: true,
     agent: true
   },

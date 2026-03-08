@@ -4,7 +4,14 @@
     "path.monster_cam.venv",
     "path.backrooms.repo",
     "bin.chrome",
-    "feature.file-manager"
+    "feature.file-manager",
+    "feature.primer-open",
+    "feature.editor-open",
+    "feature.workspace-persist",
+    "feature.backrooms-logs",
+    "feature.document-reader",
+    "feature.agent",
+    "feature.music-player"
   ],
   "forceOn": [
     "bin.figlet",
