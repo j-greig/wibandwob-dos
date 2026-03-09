@@ -16,10 +16,33 @@ The old name `wibwob-screenshot` appears in some legacy scripts — ignore it.
 
 ## CRITICAL — screenshots need a visible terminal
 
-If using the studio setup with 2 displays, `screencapture -D 2` grabs display 2.
-The tmux terminal window must be **visible and fullscreened on display 2**.
+James uses a MacBook Air with an external display (iMac or studio monitor).
+The TUI terminal (Ghostty) runs on the **laptop built-in screen**.
+Zed and other apps typically live on the **external display**.
 
-At home (single display): `screencapture -D 1` or just `screencapture`.
+**Always detect which display number is built-in before screencapture:**
+
+```bash
+# List displays — Built-In Retina LCD is the laptop screen
+system_profiler SPDisplaysDataType | grep -n "Display Type"
+# Display 1 = first listed, Display 2 = second listed
+
+# Quick check — built-in is always smaller resolution
+# External (iMac/Studio): 5120x2880 or similar
+# Laptop built-in: 2560x1600
+
+# Capture laptop screen (built-in — usually display 2 when ext is connected):
+screencapture -x -D 2 /tmp/shot.png
+
+# Capture external display (usually display 1):
+screencapture -x -D 1 /tmp/shot.png
+
+# If unsure, capture both and check which has the TUI:
+screencapture -x -D 1 /tmp/shot1.png && screencapture -x -D 2 /tmp/shot2.png
+```
+
+Rule of thumb: when an external display is connected, built-in = D2, external = D1.
+When laptop only: just `screencapture -x /tmp/shot.png` (no -D needed).
 
 ## Start fresh (no existing session)
 

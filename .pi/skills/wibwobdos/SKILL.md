@@ -1,7 +1,6 @@
 ---
 name: wibwobdos
-description: Operate WibWob-DOS — a shared terminal desktop with overlapping windows, generative art, a 3D world with chat rooms, and an embedded AI agent. Use to open windows, read desktop state, send messages to the agent chat, capture screenshots, and post to Discord. Triggers on: "open WibWobWorld", "show the desktop", "take a screenshot", "share to Discord", "what's on screen", "open some art", "send a chat message".
-compatibility: Requires bash, curl, python3. Scripts marked [vps-ok] work with bearer token only. Scripts marked [local-only] require SSH key or local deps (Pillow, Discord webhook).
+description: "Operate WibWob-DOS — a shared terminal desktop with overlapping windows, generative art, a 3D world with chat rooms, and an embedded AI agent. Use to open windows, read desktop state, send messages to the agent chat, capture screenshots, and post to Discord. Triggers on: open WibWobWorld, show the desktop, take a screenshot, share to Discord, what's on screen, open some art, send a chat message."
 ---
 
 # WibWob-DOS
