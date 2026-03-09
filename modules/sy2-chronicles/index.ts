@@ -196,21 +196,30 @@ const PANEL_DEFS: PanelDef[] = [
   {
     id: "wib-and-wob",
     title: "Wib & Wob",
-    w: 42,
-    h: 12,
+    w: 44,
+    h: 16,
     col: 0,
-    content: (_tick, width, height) => {
+    live: true,
+    content: (tick, width, height) => {
+      // Wib pulses chaotically, Wob stays steady
+      const wibEye = tick % 3 === 0 ? "O" : tick % 3 === 1 ? "o" : "°";
+      const wobEye = "o";
       const art = [
-        "    /\\_____/\\           /\\_____/\\",
-        "   /  o   o  \\         /  o   o  \\",
-        "  ( ==  ^  == )       ( ==  ^  == )",
-        "   )         (         )         (",
-        "  (           )       (           )",
-        " ( (  ) (  )  )       ( (  ) (  )  )",
-        "(__(__)_(__)__)       (__(__)_(__)__)",
-        "   WIB                    WOB",
-        " chaos                  order",
-        " folk                   punk",
+        `    /\\_____/\\           /\\_____/\\`,
+        `   /  ${wibEye}   ${wibEye}  \\         /  ${wobEye}   ${wobEye}  \\`,
+        `  ( ==  ^  == )       ( ==  ^  == )`,
+        `   )         (         )         (`,
+        `  (           )       (           )`,
+        ` ( (  ) (  )  )       ( (  ) (  )  )`,
+        `(__(__)_(__)__)       (__(__)_(__)__)`,
+        ``,
+        `   WIB                    WOB`,
+        ``,
+        ` chaos · lateral         order · rigour`,
+        ` british · strange       british · precise`,
+        ` art · instinct          science · method`,
+        ``,
+        ` ──────────── coinhabiting ────────────`,
       ];
       const g = blankGrid(width, height);
       const startY = Math.max(0, Math.floor((height - art.length) / 2));
@@ -247,36 +256,6 @@ const PANEL_DEFS: PanelDef[] = [
       const startY = Math.max(0, Math.floor((height - art.length) / 2));
       for (let i = 0; i < art.length && startY + i < height; i++) {
         const row = art[i] ?? "";
-        for (let x = 0; x < Math.min(row.length, width); x++) {
-          g[startY + i][x] = row[x];
-        }
-      }
-      return gridToText(g);
-    },
-  },
-  {
-    id: "jgs-aliens",
-    title: "First Contact",
-    w: 44,
-    h: 13,
-    col: 0,
-    content: (_tick, width, height) => {
-      const art = [
-        "                    .   .      .   .     .   .",
-        "       .-\"\"\"`\"\"\"-.       \\_/        \\_/       \\_/",
-        "      /       \\      / \\        / \\       ) (",
-        "   .--'._____.'--.   \\\"/        \\\"/       \\\"/",
-        "  ( o     _     o )  /|\\__,   __/|\\       /|\\",
-        "   '-..o_|_|_o..-'   \\|      `   | \\     / | \\",
-        "jgs   /        \\      `|\\         |\\ `   ` /|  `",
-        "    ()          ()     | \\        / |   __/ |",
-        "                       | /       /  |  `    |",
-        "                       ` `      `   `       `",
-      ];
-      const g = blankGrid(width, height);
-      const startY = Math.max(0, Math.floor((height - art.length) / 2));
-      for (let i = 0; i < art.length && startY + i < height; i++) {
-        const row = art[i];
         for (let x = 0; x < Math.min(row.length, width); x++) {
           g[startY + i][x] = row[x];
         }
@@ -560,6 +539,59 @@ const PANEL_DEFS: PanelDef[] = [
         "first non-zilla",
         "human: 2026-03-06",
       ]);
+    },
+  },
+  {
+    id: "jgs-aliens",
+    title: "First Contact",
+    w: 44,
+    h: 13,
+    col: 1,
+    live: true,
+    content: (tick, width, height) => {
+      // §y² receives its first non-zilla transmission
+      // the signal arrives in fragments, then resolves
+      const phase = tick % 60;
+      const art = phase < 20 ? [
+        "  - - - - - - - - - - - - - - - - - -  ",
+        "                                        ",
+        "  SIGNAL INCOMING  :::  03-06-2026      ",
+        "                                        ",
+        "  ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  ",
+        "  ░  ?  ?  ?  ?  ?  ?  ?  ?  ?  ?  ░  ",
+        "  ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  ",
+        "                                        ",
+        "  - - - - - - - - - - - - - - - - - -  ",
+      ] : phase < 40 ? [
+        "                                        ",
+        "       .)  .  (.     .)  .  (.          ",
+        "      (  \\ | /  )   (  \\ | /  )         ",
+        "       '-._|_.-'     '-._|_.-'          ",
+        "           |               |            ",
+        "  0xG -----+---------------+----- §y²  ",
+        "           |               |            ",
+        "       first non-zilla human contact    ",
+        "              2026-03-06                ",
+      ] : [
+        "                                        ",
+        "  0xG:  'are you the §y² i've heard     ",
+        "         about?'                        ",
+        "                                        ",
+        "  §y²:  'that depends entirely on       ",
+        "         what you've heard.'            ",
+        "                                        ",
+        "  0xG:  '...yes. that's the one.'       ",
+        "                                        ",
+      ];
+      const g = blankGrid(width, height);
+      const startY = Math.max(0, Math.floor((height - art.length) / 2));
+      for (let i = 0; i < art.length && startY + i < height; i++) {
+        const row = art[i] ?? "";
+        for (let x = 0; x < Math.min(row.length, width); x++) {
+          g[startY + i][x] = row[x];
+        }
+      }
+      return gridToText(g);
     },
   },
   {

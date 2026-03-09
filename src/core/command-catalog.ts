@@ -69,6 +69,7 @@ export interface AppMenuActions {
   // ── Plasma ─────────────────────────────────────────────
   openPlasmaWindow: (args?: Record<string, unknown>) => void;
   openPlasmaFromPrimer: (args?: Record<string, unknown>) => void;
+  openMarkdownViewer: (args?: Record<string, unknown>) => void;
   // ── Monster Cam ───────────────────────────────────────
   openMonsterCam: () => void;
   // ── Window control (by id — agent/API use) ────────────
@@ -326,6 +327,19 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     multiInstance: true,
     menuPlacements: [{ category: "file", order: 30 }],
     contextMenu: { desktop: true, order: 20 },
+    api: true,
+    agent: true
+  },
+  {
+    id: "markdown.open",
+    label: "Open Markdown...",
+    description: "Open a markdown file with figlet headings and syntax-highlighted code blocks. Args: filePath (string, absolute path to .md file). Without args opens interactive file picker filtered to *.md.",
+    group: "open",
+    actionKey: "openMarkdownViewer",
+    multiInstance: true,
+    menuPlacements: [{ category: "file", order: 35 }],
+    contextMenu: { desktop: true, order: 25 },
+    palettePlacement: { order: 32 },
     api: true,
     agent: true
   },

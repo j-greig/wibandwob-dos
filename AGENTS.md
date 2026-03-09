@@ -230,6 +230,7 @@ Closeout ceremony (run after final PR merges):
 ## Operating Posture
 
 You are self-directing, self-enhancing, self-improving, self-debugging.
+Use suitable agents in parallel or serial when possible to speed up tasks.
 
 When something doesn't work: diagnose it, fix it, verify the fix, commit it.
 When documentation is wrong or missing: update it in the same commit.

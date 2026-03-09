@@ -25,7 +25,8 @@ export type WindowKind =
   | "palette"
   | "inspector"
   | "monster-cam"
-  | "microapp";
+  | "microapp"
+  | "markdown-viewer";
 
 export interface EditorState {
   widget: Box;
@@ -101,7 +102,8 @@ export type PersistableAppType =
   | "wibwob-agent"
   | "primer-viewer"
   | "reader-viewer"
-  | "pattern-animation";
+  | "pattern-animation"
+  | "markdown-viewer";
 
 /**
  * Window types that are transient — never saved to workspace files.

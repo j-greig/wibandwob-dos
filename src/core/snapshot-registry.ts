@@ -55,6 +55,7 @@ export interface SnapshotRestoreActions {
   openArtWindow: () => MaybeWindow;
   openMonsterCamWindow: () => MaybeWindow;
   openWibWobAgentWindow: () => MaybeWindow;
+  openMarkdownViewerWindow: (filePath: string, restore?: { scrollOffset?: number; figlet?: boolean }) => MaybeWindow;
   windows: WindowFacade;
 }
 
@@ -140,6 +141,24 @@ export const snapshotRegistry = {
     serialize: (_window) => undefined,
     restore: (_snapshot, _payload, actions) => {
       return actions.openPatternWindow();
+    },
+  },
+
+  // --- kind: "markdown-viewer" ---
+  "markdown-viewer": {
+    serialize: (window) => {
+      const d = getDetails(window);
+      return {
+        scrollOffset: detailNumber(d, "scrollOffset") ?? 0,
+        figlet: d.figlet !== false,
+      };
+    },
+    restore: (snapshot, payload, actions) => {
+      if (!snapshot.filePath) return undefined;
+      return actions.openMarkdownViewerWindow(snapshot.filePath, {
+        scrollOffset: typeof payload.scrollOffset === "number" ? payload.scrollOffset : 0,
+        figlet: payload.figlet !== false,
+      });
     },
   },
 

@@ -70,6 +70,7 @@ function makeRestoreActions(overrides?: Partial<SnapshotRestoreActions>): Snapsh
     openArtWindow: () => undefined,
     openMonsterCamWindow: () => undefined,
     openWibWobAgentWindow: () => undefined,
+    openMarkdownViewerWindow: () => undefined,
     windows: {} as any,  // not used by restore handlers directly
     ...overrides,
   };

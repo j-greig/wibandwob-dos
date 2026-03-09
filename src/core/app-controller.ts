@@ -139,6 +139,7 @@ import { openChromeBrowserWindow } from "../windows/chrome-browser-window.js";
 import { openWibWobAgentWindow as openNativeWibWobAgentWindow } from "../windows/wibwob-agent-window.js";
 import { CustomCursor } from "./custom-cursor.js";
 import { openMonsterCamWindow } from "../windows/monster-cam-window.js";
+import { openMarkdownViewerWindow } from "../windows/markdown-viewer-window.js";
 import { worldChatService } from "../services/world-chat-service.js";
 
 /** Exit code used by dev-mode reload. The launcher script watches for this. */
@@ -1036,6 +1037,47 @@ export class TsTuiMvpApp {
     );
   }
 
+  private openMarkdownViewerWindow(filePath?: string, restore?: { scrollOffset?: number; figlet?: boolean }): WindowRecord | undefined {
+    if (filePath) {
+      return openMarkdownViewerWindow({
+        windowManager: this.windowManager,
+        overlays: this.overlays,
+        screen: this.screen,
+        filePath,
+        restore,
+        onStateChanged: () => this.syncLiveState(),
+      });
+    }
+    // No path — pick from repo .md files using glob-style walk
+    const { execSync } = require("node:child_process");
+    let mdList: string[] = [];
+    try {
+      const raw = execSync(`find "${REPO_ROOT}" -name "*.md" -not -path "*/node_modules/*" -not -path "*/.git/*" 2>/dev/null`, { encoding: "utf8" });
+      mdList = raw.trim().split("\n").filter(Boolean).sort();
+    } catch {
+      // ignore
+    }
+    if (mdList.length === 0) {
+      this.overlays.flash("No .md files found in repo");
+      return undefined;
+    }
+    this.overlays.openCenteredListPrompt(
+      "Open Markdown",
+      mdList.map(fp => ({ label: fp.replace(REPO_ROOT + "/", ""), filePath: fp })),
+      0,
+      (item) => {
+        openMarkdownViewerWindow({
+          windowManager: this.windowManager,
+          overlays: this.overlays,
+          screen: this.screen,
+          filePath: (item as any).filePath,
+          onStateChanged: () => this.syncLiveState(),
+        });
+      }
+    );
+    return undefined;
+  }
+
   private openPlasmaFromPrimer(filePath?: string): void {
     if (filePath) {
       this.spawnPlasmaForFile(filePath);
@@ -1351,6 +1393,9 @@ export class TsTuiMvpApp {
       openArtWindow: () => this.openArtWindow(),
       openMonsterCamWindow: () => this.openMonsterCam(),
       openWibWobAgentWindow: () => this.openWibWobAgentWindow(),
+      openMarkdownViewerWindow: (filePath, restore) => {
+        return this.openMarkdownViewerWindow(filePath, restore) ?? undefined;
+      },
       windows: this.windowManager,
     };
   }
@@ -1691,6 +1736,13 @@ export class TsTuiMvpApp {
         const filePath =
           typeof args?.filePath === "string" ? args.filePath : undefined;
         this.openPlasmaFromPrimer(filePath);
+      },
+      openMarkdownViewer: (args) => {
+        const filePath =
+          typeof args?.filePath === "string" && args.filePath.trim()
+            ? args.filePath.trim()
+            : undefined;
+        this.openMarkdownViewerWindow(filePath, undefined);
       },
       openWibWobAgent: () => this.openWibWobAgentWindow(),
       reloadAgentPrompt: () => {
