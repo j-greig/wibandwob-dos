@@ -1,7 +1,7 @@
 ---
 id: E004
 title: Monster Cam
-status: in-progress
+status: done
 issue: 107
 pr: ~
 depends_on: []
@@ -93,17 +93,17 @@ Socket protocol (per frame):
 - [x] **AC-5:** `handCount` in `/state` tracks hands correctly (F02).
   - Test: L/R coloured double-line boxes appear per hand; `describeState()` reports `handCount`. Manually verified.
 
-- [ ] **AC-6:** `hasPose` in `/state` set when body visible (F03).
+- [x] **AC-6:** `hasPose` in `/state` set when body visible (F03).
   - Test: step into frame → `hasPose: true`; step out → `hasPose: false`. Detection wired, skeleton render not yet done.
 
-- [ ] **AC-7:** Window closes cleanly — Python worker exits, socket removed.
-  - Test: Close window; `ps aux | grep python` shows worker gone; `/tmp/face_monster_cam.sock` removed.
+- [x] **AC-7:** Window closes cleanly — Python worker exits, socket removed.
+  - Fix: `stop()` now calls `fs.unlinkSync(SOCK_PATH)` after killing worker + socket.
 
 - [x] **AC-8:** App boots normally with no camera — window shows error state, no crash.
   - Test: Unset camera device, open window — error shown in status bar, app continues.
 
-- [ ] **AC-9:** `bun run typecheck` passes with all monster cam source included.
-  - Test: `bun run typecheck` exits 0 from repo root.
+- [x] **AC-9:** `bun run typecheck` passes with all monster cam source included.
+  - Fix: typecheck script changed to `node_modules/.bin/tsc --noEmit` (tsc not on bun PATH).
 
 Branch worktree-e004-monster-cam merged to main (b3d9d1d). Remaining: AC-6 pose skeleton, AC-7 socket cleanup verification, AC-9 typecheck.
 

@@ -75,6 +75,7 @@ export class MonsterCamService extends EventEmitter {
     this.sock = null;
     this.worker?.kill();
     this.worker = null;
+    try { fs.unlinkSync(SOCK_PATH); } catch { /* already gone */ }
   }
 
   private _spawnWorker() {
