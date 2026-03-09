@@ -233,6 +233,35 @@ const { cancel } = tween({
 Available easings: `linear` `easeIn` `easeOut` `easeInOut` `easeInCubic`
 `easeOutCubic` `easeInOutCubic` `elasticOut` `bounceOut`
 
+### RenderMonitor — screen FPS instrumentation
+
+```typescript
+import { createRenderMonitor } from "../../src/services/microapp-sdk.js";
+
+const monitor = createRenderMonitor(host.screen);
+
+// Point-in-time readings
+monitor.fps          // frames rendered in last 1000ms
+monitor.avgFrameMs   // average ms between renders
+monitor.totalFrames  // lifetime frame count
+
+// Subscribe to periodic updates (default 1000ms interval)
+const unsub = monitor.subscribe((r) => {
+  console.log(`${r.fps} fps  ${r.avgFrameMs.toFixed(1)}ms/frame`);
+}, 500);
+
+// Cleanup — always call in win.onCleanup()
+win.onCleanup(() => {
+  unsub();
+  monitor.destroy();  // restores original screen.render
+});
+```
+
+`createRenderMonitor` wraps `screen.render` to count call frequency.
+FPS reflects actual TUI render throughput — animations, timers, and user
+input all show up here. One monitor per window is sufficient; destroy it
+on cleanup to restore `screen.render` to its original form.
+
 ### Markdown viewer (F03)
 ```typescript
 // Open any .md file in the viewer window

@@ -110,6 +110,8 @@ export {
 
 // Webcam / Monster Cam — portable feed + renderer for embedding in any microapp.
 // See modules/sy2-chronicles/index.ts for the canonical MicroappHost pattern.
+export { createRenderMonitor } from "../core/render-monitor.js";
+export type { RenderMonitorHandle, RenderReading } from "../core/render-monitor.js";
 export { MonsterCamService } from "./monster-cam-service.js";
 export type { MonsterCamFrame } from "./monster-cam-service.js";
 export { renderWebcamFrame, gridToBlessedContent } from "./webcam-renderer.js";

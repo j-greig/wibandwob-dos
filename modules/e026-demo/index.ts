@@ -21,6 +21,7 @@ import type { MicroappHost } from "../../src/services/microapp-sdk.js";
 import { createTreeWidget, type TreeNode } from "../../src/core/tree-widget.js";
 import { createTimer, clearTimers } from "../../src/core/ui-primitives.js";
 import { tweenWindowPosition, tweenWindowSize } from "../../src/services/motion-service.js";
+import { createRenderMonitor } from "../../src/services/microapp-sdk.js";
 import path from "node:path";
 
 // ── Sample tree ───────────────────────────────────────────────────────────────
@@ -83,6 +84,7 @@ function openDemo(host: MicroappHost) {
   const timers = new Set<ReturnType<typeof setInterval>>();
   let ticks = 0;
   let lastNode = "—";
+  const monitor = createRenderMonitor(host.screen);
 
   // ── Helper: panel label ───────────────────────────────────────────────────
 
@@ -101,7 +103,7 @@ function openDemo(host: MicroappHost) {
     border: "line",
     style: { ...host.theme().body, border: { fg: host.theme().windowBorderUnfocused.fg } },
   });
-  panelLabel("F05 TreeWidget  (j/k ←/→ Enter)", 0, 0);
+  panelLabel("F05 TreeWidget  (j/k ←/→ Enter  Tab=exit)", 0, 0);
 
   const tree = createTreeWidget(tlBox, { style: host.theme().body });
   tree.setNodes(DEMO_TREE);
@@ -177,19 +179,31 @@ function openDemo(host: MicroappHost) {
     tags: false, style: host.theme().body,
   });
 
-  function updateStatus() {
+  function fpsBar(fps: number): string {
+    const max = 30;
+    const fill = Math.min(max, Math.round(fps));
+    const color = fps >= 20 ? "\x1b[32m" : fps >= 10 ? "\x1b[93m" : "\x1b[91m";
+    return color + "█".repeat(fill) + "\x1b[90m" + "░".repeat(max - fill) + "\x1b[0m";
+  }
+
+  function updateStatus(fps = monitor.fps, avgMs = monitor.avgFrameMs) {
+    const fpsColor = fps >= 20 ? "\x1b[32m" : fps >= 10 ? "\x1b[93m" : "\x1b[91m";
     statusBox.setContent(
-      `\x1b[96m  selected:\x1b[0m\n  ${lastNode}\n\n` +
-      `  \x1b[93m  h\x1b[0m  open AGENTS.md viewer\n` +
-      `  \x1b[93m  t\x1b[0m  tween position\n` +
-      `  \x1b[93m  r\x1b[0m  reset centre\n` +
-      `  \x1b[93m  z\x1b[0m  size bounce\n` +
-      `  \x1b[93m  q\x1b[0m  close\n\n` +
+      `\x1b[96m  RenderMonitor\x1b[0m\n` +
+      `  ${fpsBar(fps)}\n` +
+      `  ${fpsColor}${String(fps).padStart(3)} fps\x1b[0m  \x1b[90m${avgMs.toFixed(1)}ms/frame\x1b[0m\n` +
+      `  \x1b[90m${monitor.totalFrames} frames total\x1b[0m\n\n` +
+      `  \x1b[96m  selected:\x1b[0m\n  ${lastNode}\n\n` +
+      `  \x1b[93m h\x1b[0m md  \x1b[93mt\x1b[0m tween  \x1b[93mr\x1b[0m reset\n` +
+      `  \x1b[93m z\x1b[0m bounce  \x1b[93mTab\x1b[0m focus  \x1b[93mq\x1b[0m close\n\n` +
       `  \x1b[32m F03 F05 F06 F07 ✓\x1b[0m`
     );
     host.screen.render();
   }
   updateStatus();
+
+  // Live FPS updates every 500ms
+  const unsubMonitor = monitor.subscribe((r) => updateStatus(r.fps, r.avgFrameMs), 500);
 
   // ── Motion ────────────────────────────────────────────────────────────────
 
@@ -215,15 +229,27 @@ function openDemo(host: MicroappHost) {
   }
 
   // ── Keys ─────────────────────────────────────────────────────────────────
+  // Wire global keys on BOTH win.body and tree.widget so they fire
+  // regardless of which element is focused. Tab/Escape escape tree focus.
 
   const repoRoot = path.resolve(new URL(import.meta.url).pathname, "../../../");
   const agentsPath = path.join(repoRoot, "AGENTS.md");
 
-  win.body.key(["t"], tweenToRandom);
-  win.body.key(["r"], resetCentre);
-  win.body.key(["z"], sizeBounce);
-  win.body.key(["h"], () => host.runCommand("markdown.open", { filePath: agentsPath }));
-  win.body.key(["q", "escape"], () => win.close());
+  function bindGlobal(target: blessed.Widgets.BlessedElement) {
+    target.key(["t"], tweenToRandom);
+    target.key(["r"], resetCentre);
+    target.key(["z"], sizeBounce);
+    target.key(["h"], () => host.runCommand("markdown.open", { filePath: agentsPath }));
+    target.key(["q"], () => win.close());
+    // Tab / Escape releases tree focus back to body
+    target.key(["tab", "escape"], () => { win.body.focus(); host.screen.render(); });
+  }
+
+  bindGlobal(win.body);
+  bindGlobal(tree.widget);
+
+  // Tab on body focuses the tree (so Tab toggles between them)
+  win.body.key(["tab"], () => { tree.widget.focus(); host.screen.render(); });
 
   // ── Hooks ─────────────────────────────────────────────────────────────────
 
@@ -244,6 +270,8 @@ function openDemo(host: MicroappHost) {
 
   win.onCleanup(() => {
     clearTimers(timers);
+    unsubMonitor();
+    monitor.destroy();
     tree.destroy();
   });
 
