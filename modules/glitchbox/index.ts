@@ -462,6 +462,7 @@ export default function setup(host: MicroappHost) {
 
     win.onCleanup(() => {
       clearTimers(timers);
+      if (haikuAgent) { haikuAgent.abort(); haikuAgent = undefined; }
       poseBar.destroy(); moodBar.destroy();
       activeWindow = undefined;
       activeRenderAll = undefined;
