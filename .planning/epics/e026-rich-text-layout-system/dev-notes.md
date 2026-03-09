@@ -25,6 +25,38 @@ section.
 
 ---
 
+## SDK enhancement ideas — from E026 panel work
+
+### Border style system — should be an SDK primitive
+Currently every microapp that wants styled borders has to roll its own
+box-drawing character logic. This is a gap. The SDK should expose a
+`createStyledBorder(parent, opts)` UiPart (or a `setBorderStyle(box, style)`
+utility) with a defined set of named styles:
+
+  thin      ╌╌╌  (U+254C/254E dashed)
+  single    ───   ┌┐└┘│─   (current blessed "line" border)
+  bold      ━━━   ┏┓┗┛┃━   (U+2501 heavy)
+  double    ═══   ╔╗╚╝║═   (U+2550 double)
+
+Each style should support:
+  - active/inactive colour from theme (windowBorderUnfocused / titleBarFocused.bg)
+  - a title string embedded in the top rail
+  - `setActive(bool)` to swap style + colour
+  - `layout(rect)` from UiPart protocol
+  - `restyle()` hook for theme changes
+
+Root cause of this gap: blessed's built-in `border: "line"` only does
+single-line chars and doesn't expose the char set. Any richer border
+requires manual setContent() — which has a pitfall (ANSI codes confuse
+blessed's line-width calc → wrapping). Fix: use `wrap: false` + plain
+box-drawing chars + `style.fg` for colour (no ANSI in content).
+
+TODO: extract `createPanel` from `modules/e026-demo/index.ts` into
+`src/core/ui-parts.ts` as a proper exported SDK primitive once the
+implementation is proven stable.
+
+---
+
 ## Patterns that worked well
 
 ### createTimer + Set<Timeout> lifecycle
