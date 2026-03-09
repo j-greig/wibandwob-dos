@@ -47,6 +47,7 @@ if USE_SOLUTIONS:
     pose_det  = mp.solutions.pose.Pose(
         static_image_mode=False,
         min_detection_confidence=0.5, min_tracking_confidence=0.5)
+    face_lm_det = None
 else:
     log("Using mp.tasks API (mp.solutions not available)")
     from mediapipe.tasks import python as mp_tasks
@@ -91,6 +92,23 @@ else:
         log(f"Pose model not found at {_pose_model} — pose detection disabled")
         pose_det = None
 
+    # Face landmarker (for emotion from 478 landmarks)
+    _face_lm_model = os.path.join(os.path.dirname(__file__), "..", "..", "assets", "mediapipe", "face_landmarker.task")
+    if os.path.exists(_face_lm_model):
+        _face_lm_opts = mp_vision.FaceLandmarkerOptions(
+            base_options=mp_tasks.BaseOptions(model_asset_path=_face_lm_model),
+            num_faces=1,
+            min_face_detection_confidence=0.5,
+            min_tracking_confidence=0.5,
+            running_mode=mp_vision.RunningMode.IMAGE,
+            output_face_blendshapes=True,
+        )
+        face_lm_det = mp_vision.FaceLandmarker.create_from_options(_face_lm_opts)
+        log("Face landmarker ready (emotion detection enabled)")
+    else:
+        face_lm_det = None
+        log(f"Face landmarker not found — emotion detection disabled")
+
 log("MediaPipe ready")
 
 # ── Camera ─────────────────────────────────────────────────────────────────────
@@ -125,6 +143,34 @@ def cleanup(*_):
 signal.signal(signal.SIGINT,  cleanup)
 signal.signal(signal.SIGTERM, cleanup)
 
+def compute_emotion(blendshapes) -> str:
+    """Map MediaPipe face blendshapes to a single emotion word."""
+    if not blendshapes or not blendshapes[0]:
+        return "neutral"
+
+    bs = {s.category_name: s.score for s in blendshapes[0]}
+
+    smile     = max(bs.get("mouthSmileLeft", 0), bs.get("mouthSmileRight", 0))
+    frown     = max(bs.get("mouthFrownLeft", 0), bs.get("mouthFrownRight", 0))
+    surprised = bs.get("jawOpen", 0)
+    brow_up   = max(bs.get("browInnerUp", 0), bs.get("browOuterUpLeft", 0), bs.get("browOuterUpRight", 0))
+    brow_down = max(bs.get("browDownLeft", 0), bs.get("browDownRight", 0))
+    eye_wide  = max(bs.get("eyeWideLeft", 0), bs.get("eyeWideRight", 0))
+
+    if surprised > 0.5 and (brow_up > 0.3 or eye_wide > 0.3):
+        return "surprised"
+    if smile > 0.5:
+        return "happy"
+    if frown > 0.4 and brow_down > 0.3:
+        return "angry"
+    if frown > 0.4:
+        return "sad"
+    if brow_down > 0.4:
+        return "focused"
+    if eye_wide > 0.4:
+        return "surprised"
+    return "neutral"
+
 # ── Main loop ──────────────────────────────────────────────────────────────────
 fps_count = 0
 fps_val   = 0
@@ -157,11 +203,14 @@ while True:
 
     has_face   = False
     bbox       = [0, 0, 0, 0]
+    face_keypoints = []
     has_hands  = False
     hand_count = 0
     hand_boxes  = []
     hand_labels = []
     has_pose   = False
+    emotion    = "neutral"
+    pose_landmarks = []
 
     if clients:
         hand_boxes  = []
@@ -174,6 +223,9 @@ while True:
                 d  = face_res.detections[0].location_data.relative_bounding_box
                 bbox = [int(d.xmin * W), int(d.ymin * H),
                         int(d.width * W), int(d.height * H)]
+                kp_list = face_res.detections[0].location_data.relative_keypoints
+                for kp in kp_list:
+                    face_keypoints.append([round(kp.x * W), round(kp.y * H)])
 
             hands_res = hands_det.process(frame_rgb)
             if hands_res.multi_hand_landmarks:
@@ -196,6 +248,8 @@ while True:
             pose_res = pose_det.process(frame_rgb)
             if pose_res.pose_landmarks:
                 has_pose = True
+                for lm in pose_res.pose_landmarks.landmark:
+                    pose_landmarks.append([round(lm.x * W), round(lm.y * H)])
 
         else:
             # mp.tasks API
@@ -233,14 +287,26 @@ while True:
                 pose_res = pose_det.detect(mp_image)
                 if pose_res.pose_landmarks:
                     has_pose = True
+                    for lm_list in pose_res.pose_landmarks:
+                        for lm in lm_list:
+                            pose_landmarks.append([round(lm.x * W), round(lm.y * H)])
+                        break
+
+            if face_lm_det is not None and has_face:
+                try:
+                    lm_res = face_lm_det.detect(mp_image)
+                    if lm_res.face_blendshapes:
+                        emotion = compute_emotion(lm_res.face_blendshapes)
+                except Exception as e:
+                    log(f"emotion detect error: {e}")
 
     gray    = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2GRAY)
     header  = json.dumps({
         "w": W, "h": H, "ts": int(now * 1000),
-        "has_face": has_face, "bbox": bbox,
+        "has_face": has_face, "bbox": bbox, "face_keypoints": face_keypoints,
         "has_hands": has_hands, "hand_count": hand_count,
         "hand_boxes": hand_boxes, "hand_labels": hand_labels,
-        "has_pose": has_pose, "fps": fps_val
+        "has_pose": has_pose, "pose_landmarks": pose_landmarks, "emotion": emotion, "fps": fps_val
     }) + "\n"
     payload = header.encode() + bytes(gray)
 
