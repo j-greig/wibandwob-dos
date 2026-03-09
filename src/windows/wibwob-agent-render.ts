@@ -54,7 +54,13 @@ export function renderMessage(msg: ChatMessageEntry, useKaomoji: boolean): strin
       return `  {${c.blue}-fg}▸{/${c.blue}-fg} {${c.muted}-fg}${trimmed}{/${c.muted}-fg}`;
     }
     if (escaped.startsWith("[done]")) {
-      const trimmed = escaped.replace(/^\s*\[done\]\s*/, "");
+      let trimmed = escaped.replace(/^\s*\[done\]\s*/, "");
+      // Shorten verbose tui_run_command tool results to single readable line
+      // "run_command microapp.wibwob.foo.bar → tui_run_command → {json}" → "bar → ok"
+      trimmed = trimmed.replace(/run_command\s+microapp\.wibwob\.\w+\.(\S+)\s*→\s*tui_run_command\s*→\s*/, "$1 → ");
+      // Strip redundant ok wrappers from result
+      trimmed = trimmed.replace(/\\?\{"ok":true,"result":\\?\{(.+?)\\?\}\s*\\?\}/, "{$1}");
+      trimmed = trimmed.replace(/\\?\{"ok":true\}/, "ok");
       return `  {${c.lime}-fg}✓{/${c.lime}-fg} {${c.muted}-fg}${trimmed}{/${c.muted}-fg}`;
     }
     if (escaped.startsWith("[fail]")) {
@@ -72,7 +78,7 @@ export function renderTranscript(messages: ChatMessageEntry[], useKaomoji: boole
   const visibleMessages = messages.filter((m) => !(m.role === "status" && m.text.startsWith("[status]")));
   if (visibleMessages.length === 0) return "";
 
-  // Collapse [tool] + [done/fail] pairs into one line: ▸ toolname → result
+  // Collapse [tool] + [done/fail] pairs into one line: ✓ toolname → short result
   const collapsed: ChatMessageEntry[] = [];
   for (let i = 0; i < visibleMessages.length; i++) {
     const m = visibleMessages[i];
@@ -85,7 +91,9 @@ export function renderTranscript(messages: ChatMessageEntry[], useKaomoji: boole
     ) {
       // Merge: strip [tool] prefix, append result from next
       const toolPart = m.text.replace(/^\[tool\]\s*/, "");
-      const resultPart = next.text.replace(/^\[done\]\s*/, "").replace(/^\[fail\]\s*/, "");
+      let resultPart = next.text.replace(/^\[done\]\s*/, "").replace(/^\[fail\]\s*/, "");
+      // Truncate verbose JSON results — keep first 60 chars max
+      if (resultPart.length > 60) resultPart = resultPart.slice(0, 57) + "...";
       const isError = next.text.startsWith("[fail]");
       collapsed.push({
         ...m,

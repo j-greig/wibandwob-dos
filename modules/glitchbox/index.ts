@@ -74,8 +74,66 @@ export default function setup(host: MicroappHost) {
   let fieldMood: FieldMood = "calm";
   let variantTick = 0;
   let lastUserAction = 0;
+  let genArtEnabled = false;
   const HAIKU_COOLDOWN_MS = 15_000; // skip haiku tick if user acted within 15s
   const touchUser = () => { lastUserAction = Date.now(); };
+
+  // ── Generative art background — slow cellular automata ────────────────
+  const GEN_CHARS = " ·∙·:;░▒▓█▓▒░";
+  let genGrid: number[][] = []; // heat values 0-12
+  function genArtInit(w: number, h: number) {
+    genGrid = [];
+    for (let y = 0; y < h; y++) {
+      const row: number[] = [];
+      for (let x = 0; x < w; x++) {
+        // seed with organic blobs — sine interference pattern
+        const v = Math.sin(x * 0.15) * Math.sin(y * 0.2) * 4
+                + Math.sin(x * 0.07 + y * 0.09) * 3
+                + (Math.random() < 0.08 ? 5 + Math.random() * 6 : 0);
+        row.push(Math.max(0, Math.min(12, v)));
+      }
+      genGrid.push(row);
+    }
+  }
+  function genArtStep(w: number, h: number, energy = 5) {
+    const next: number[][] = [];
+    const sparkRate = 0.003 + energy * 0.004;  // 0.003 at e0, 0.043 at e10
+    const decay = 0.08 - energy * 0.005;       // 0.08 at e0, 0.03 at e10
+    const reaction = 0.15 + energy * 0.03;     // more reactive at high energy
+    for (let y = 0; y < h; y++) {
+      const row: number[] = [];
+      for (let x = 0; x < w; x++) {
+        const cur = genGrid[y]?.[x] ?? 0;
+        let sum = 0, count = 0;
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            if (dx === 0 && dy === 0) continue;
+            const v = genGrid[(y + dy + h) % h]?.[(x + dx + w) % w] ?? 0;
+            sum += v; count++;
+          }
+        }
+        const avg = sum / count;
+        let v = cur * 0.7 + avg * 0.3 - decay;
+        if (avg > 1.2 && cur > 0.3) v += reaction;
+        if (Math.random() < sparkRate) v += 4 + Math.random() * 6;
+        row.push(Math.max(0, Math.min(12, v)));
+      }
+      next.push(row);
+    }
+    genGrid = next;
+  }
+  function genArtRender(w: number, h: number): string {
+    const lines: string[] = [];
+    for (let y = 0; y < h; y++) {
+      let line = "";
+      for (let x = 0; x < w; x++) {
+        const idx = Math.round(genGrid[y]?.[x] ?? 0);
+        line += GEN_CHARS[Math.min(idx, GEN_CHARS.length - 1)] ?? " ";
+      }
+      lines.push(line);
+    }
+    return lines.join("\n");
+  }
 
   function nextFieldMood(): FieldMood {
     const i = FIELD_MOOD_CYCLE.indexOf(fieldMood);
@@ -87,7 +145,8 @@ export default function setup(host: MicroappHost) {
   }
   function statusText(d: DancerState): string {
     const state = d.paused ? "⏸ PAUSED" : d.playing ? "▶ PLAYING" : d.preset;
-    return `${d.label}  ${state}  energy:${d.energy}  mood:${d.mood}  field:${fieldMood}`;
+    const bg = genArtEnabled ? "gen" : fieldMood;
+    return `${d.label}  ${state}  energy:${d.energy}  mood:${d.mood}  field:${bg}`;
   }
 
   // ── Commands ───────────────────────────────────────────────────────────────
@@ -155,6 +214,17 @@ export default function setup(host: MicroappHost) {
       if (args.mood   !== undefined) activeDancer.mood = String(args.mood);
       activeRenderAll?.();
       return { ok: true, energy: activeDancer.energy, mood: activeDancer.mood };
+    },
+  });
+
+  host.registerCommand({
+    id: "glitchbox.gen", direct: true,
+    label: "Toggle GlitchBox Generative Art",
+    description: "Toggle generative art background on/off",
+    action: () => {
+      genArtEnabled = !genArtEnabled;
+      activeRenderAll?.();
+      return { ok: true, genArt: genArtEnabled };
     },
   });
 
@@ -245,7 +315,7 @@ export default function setup(host: MicroappHost) {
     );
 
     // Energy + mood button bar (row -2 from bottom)
-    const moodBar = createButtonBar<MoodBtn | EnergyBtn>(
+    const moodBar = createButtonBar<MoodBtn | EnergyBtn | "gen">(
       root,
       [
         { id: "e-",    label: "E-"    },
@@ -254,12 +324,14 @@ export default function setup(host: MicroappHost) {
         { id: "pulse", label: "PULSE" },
         { id: "chaos", label: "CHAOS" },
         { id: "drift", label: "DRIFT" },
+        { id: "gen",   label: "GEN"   },
       ],
       (id) => {
         touchUser();
         if (id === "e-") dancer.energy = Math.max(0, dancer.energy - 1);
         else if (id === "e+") dancer.energy = Math.min(10, dancer.energy + 1);
-        else { fieldMood = id as FieldMood; }
+        else if (id === "gen") { genArtEnabled = !genArtEnabled; }
+        else { fieldMood = id as FieldMood; genArtEnabled = false; }
         renderAll();
         host.screen.render();
       },
@@ -292,6 +364,12 @@ export default function setup(host: MicroappHost) {
 
     function renderField() {
       const { w, h } = canvasSize();
+      if (genArtEnabled) {
+        if (genGrid.length !== h || (genGrid[0]?.length ?? 0) !== w) genArtInit(w, h);
+        genArtStep(w, h, dancer.energy);
+        fieldLayer.setContent(genArtRender(w, h));
+        return;
+      }
       const chars = FIELD_MOODS[fieldMood] ?? [" "];
       const bias = Math.floor(dancer.energy / 3);
       const grid = blankGrid(w, h);
@@ -426,10 +504,11 @@ export default function setup(host: MicroappHost) {
       if (ch === " ") { dancer.paused = !dancer.paused; renderAll(); host.screen.render(); }
       if (ch === "p") { dancer.preset = nextPose(dancer.preset); renderAll(); host.screen.render(); }
       if (ch === "m") { fieldMood = nextFieldMood(); renderAll(); host.screen.render(); }
+      if (ch === "g") { genArtEnabled = !genArtEnabled; renderAll(); host.screen.render(); }
       if (ch === "+") { dancer.energy = Math.min(10, dancer.energy+1); restartTick(); renderAll(); host.screen.render(); }
       if (ch === "-") { dancer.energy = Math.max(0,  dancer.energy-1); restartTick(); renderAll(); host.screen.render(); }
     };
-    root.key(["q","escape","space","p","m","+","-"], handleKey);
+    root.key(["q","escape","space","p","m","g","+","-"], handleKey);
     win.onInput(handleKey);
 
     win.onResize(() => {
