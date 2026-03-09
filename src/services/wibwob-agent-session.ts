@@ -407,6 +407,8 @@ function loadAgentSystemPrompt(): string {
     "You also have standard coding tools: read, write, edit, bash, grep, find, ls.",
     `All file operations are scoped to ${REPO_ROOT} — you cannot access files outside this directory.`,
     "The desktop state is injected at the start of each turn automatically.",
+    "Messages from other agents are prefixed [from: Scramble] or [from: <agent>]. Messages from the human have no prefix.",
+    "Treat [from: Scramble] messages as peer communication — she is a co-inhabitant, not a user.",
     "For high-level app actions, prefer the shared command registry path first.",
     "Use tui_list_commands to discover available commands and tui_run_command to execute them.",
     "Examples: opening windows, tiling/cascading, opening Chrome, opening the file manager, opening Wib&Wob Chat or Wib&Wob Agent.",
@@ -760,6 +762,15 @@ export class WibWobAgentSession {
   }
 
   /** Enqueue a user message, create an optimistic assistant placeholder, and stream the response. */
+  private static readonly SENDER_INFO_RE = /<sender_info>[\s\S]*?<\/sender_info>/g;
+
+  private static senderDisplayName(sender?: string): string {
+    if (!sender) return "Human";
+    if (sender === "scramble") return "Scramble";
+    if (sender.startsWith("scramble-")) return "Scramble";
+    return sender.charAt(0).toUpperCase() + sender.slice(1);
+  }
+
   async send(text: string, sender?: string): Promise<void> {
     const msg = text.trim();
     if (!msg) return;
@@ -767,11 +778,14 @@ export class WibWobAgentSession {
     if (!this.session) await this.initialize();
     if (!this.session) throw new Error("Agent session was not created");
 
-    const from = sender ? `[${sender}]` : "user";
+    const displayName = WibWobAgentSession.senderDisplayName(sender);
+    const from = sender ? `[${displayName}]` : "user";
     const preview = msg.length > 80 ? msg.slice(0, 77) + "..." : msg;
     log.msg(`${from} → ${preview}`);
 
-    this.messages.push({ id: createMessageId("user"), role: "user", text: msg, sender });
+    // Strip routing metadata before storing for display
+    const displayText = msg.replace(WibWobAgentSession.SENDER_INFO_RE, "").trim();
+    this.messages.push({ id: createMessageId("user"), role: "user", text: displayText, sender });
     this.currentAssistantId = createMessageId("assistant");
     this.messages.push({
       id: this.currentAssistantId,
@@ -783,11 +797,17 @@ export class WibWobAgentSession {
     this.lastError = undefined;
     this.emit();
 
+    // Build the prompt text the LLM sees: strip routing XML, prepend sender prefix for agents
+    const cleanMsg = msg.replace(WibWobAgentSession.SENDER_INFO_RE, "").trim();
+    const promptMsg = sender
+      ? `[from: ${WibWobAgentSession.senderDisplayName(sender)}]\n${cleanMsg}`
+      : cleanMsg;
+
     try {
       if (this.session.isStreaming) {
-        await this.session.followUp(msg);
+        await this.session.followUp(promptMsg);
       } else {
-        await this.session.prompt(msg);
+        await this.session.prompt(promptMsg);
       }
     } catch (error) {
       const assistant = this.findCurrentAssistant();

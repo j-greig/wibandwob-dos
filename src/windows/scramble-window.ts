@@ -91,12 +91,22 @@ function wireInput(
 
 // ── Render transcript from brain history ──────────────────────────────────────
 
+/** Map session alias → display name for Scramble's transcript */
+function senderLabel(sender?: string): string {
+  if (!sender) return "Human";
+  if (sender === "wibwob-tui") return "Wib&Wob";
+  return sender.charAt(0).toUpperCase() + sender.slice(1);
+}
+
 function renderHistory(brain: ScrambleBrain): string {
   const c = C();
   return brain.history
     .map((msg) => {
       if (msg.role === "user") {
-        return `{${c.pink}-fg}you:{/${c.pink}-fg} {${c.gray}-fg}${escBraces(msg.content)}{/${c.gray}-fg}`;
+        const label = senderLabel(msg.sender);
+        const isAgent = !!msg.sender;
+        const color = isAgent ? c.blue : c.pink;
+        return `{${color}-fg}${label}:{/${color}-fg} {${c.gray}-fg}${escBraces(msg.content)}{/${c.gray}-fg}`;
       }
       return `{${c.lime}-fg}scramble:{/${c.lime}-fg} ${escBraces(msg.content)}`;
     })
@@ -261,6 +271,14 @@ export function openScrambleFloatingWindow(deps: ScrambleFloatingDeps): void {
     lastMessage: brain.history.at(-1)?.content ?? null,
     contentPreview: brain.history.slice(-3).map((m) => `${m.role}: ${m.content}`).join(" | "),
   });
+
+  frame.refresh = () => {
+    renderCat();
+    renderStatus();
+    renderTranscriptContent();
+    renderInputEl();
+    screen.render();
+  };
 
   frame.cleanup = () => {
     // Brain is owned by app-controller, don't dispose here
@@ -490,6 +508,14 @@ export function openScrambleSmolPopup(deps: ScrambleSmolDeps): void {
     messageCount: brain.history.length,
     lastMessage: brain.history.at(-1)?.content ?? null,
   });
+
+  frame.refresh = () => {
+    renderCat();
+    renderStatus();
+    renderTranscriptContent();
+    renderBubble();
+    screen.render();
+  };
 
   frame.cleanup = () => { /* brain owned by app-controller */ };
 

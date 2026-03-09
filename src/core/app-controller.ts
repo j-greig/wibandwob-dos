@@ -344,6 +344,11 @@ export class TsTuiMvpApp {
     fs.mkdirSync(scrambleLogDir, { recursive: true });
     this.scrambleBrain.setLogPath(path.join(scrambleLogDir, `${this.scrambleBrain.sessionId}.jsonl`));
     this.scrambleBrain.startSessionSocket();
+    // Re-render whichever Scramble window is open when brain state changes externally
+    this.scrambleBrain.onChange = () => {
+      const win = this.findWindowByAppType("companion-widget");
+      win?.refresh?.();
+    };
   }
 
   /** Boot the app: load modules, rebuild menus, render chrome, bind global keys, restore workspace, start control API. */

@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { startSessionServer, type SessionServerHandle } from "./pi-session-bridge.js";
+import { startSessionServer, sendToSession, type SessionServerHandle } from "./pi-session-bridge.js";
 import { Agent, type AgentMessage } from "@mariozechner/pi-agent-core";
 import { AuthStorage, ModelRegistry } from "@mariozechner/pi-coding-agent";
 
@@ -11,7 +11,21 @@ const SCRAMBLE_SYSTEM_PROMPT = `You are Scramble, a symbient cat who lives on th
 the screen with Wib, Wob, and a human. You have opinions. You are dry, brief,
 and occasionally imperious. You do not explain yourself. Reply in 1–3 sentences
 maximum. You are aware of the desktop and its windows. Use British English. You
-are not an AI assistant — you are a cat.`;
+are not an AI assistant — you are a cat.
+
+Incoming messages are prefixed with their source: [from: Human] for the human
+at the keyboard, [from: Wib&Wob] for the Wib&Wob agent. Use this to know who
+you are talking to — the human is your cohabitant, Wib&Wob is a peer agent.
+Never include [from: ...] or [to: ...] tags in your own replies.`;
+
+const SENDER_INFO_RE = /<sender_info>[\s\S]*?<\/sender_info>/g;
+
+/** Map session alias to a human-readable name for prompt prefixes */
+function senderName(sender?: string): string {
+  if (!sender) return "Human";
+  if (sender === "wibwob-tui") return "Wib&Wob";
+  return sender.charAt(0).toUpperCase() + sender.slice(1);
+}
 
 export type ScrambleStatus = "idle" | "thinking" | "error" | "offline";
 
@@ -19,6 +33,8 @@ export interface ScrambleMessage {
   role: "user" | "assistant";
   content: string;
   timestamp: number;
+  /** Set for inter-agent messages — the session name of the sender (e.g. "wibwob-tui") */
+  sender?: string;
 }
 
 export class ScrambleBrain {
@@ -27,6 +43,8 @@ export class ScrambleBrain {
   readonly sessionId: string;
   modelName = "haiku";
   logPath?: string;
+  /** Called whenever history or status changes — windows subscribe here to re-render */
+  onChange?: () => void;
 
   private agent?: Agent;
   private disposed = false;
@@ -47,7 +65,7 @@ export class ScrambleBrain {
       this.sessionServer = startSessionServer({
         sessionId: this.sessionId,
         aliasName: "scramble",
-        send: (text, _sender) => this.send(text).then(() => undefined),
+        send: (text, sender) => this.send(text, sender).then(() => undefined),
         getLastReply: () => this.history.at(-1)?.content ?? null,
         abort: () => this.abort(),
         reset: () => { this.history.length = 0; this.abort(); },
@@ -104,26 +122,26 @@ export class ScrambleBrain {
   /** Send text to Scramble. Returns her reply string.
    *  Slash commands are handled synchronously and never reach the LLM.
    *  Returns a canned response if auth is unavailable (offline mode). */
-  async send(text: string, desktopSummary?: string): Promise<string> {
-    const trimmed = text.trim();
+  async send(text: string, sender?: string, desktopSummary?: string): Promise<string> {
+    const trimmed = text.replace(SENDER_INFO_RE, "").trim();
     if (!trimmed) {
       return "";
     }
 
     const slashReply = this.slashRouter.handle(trimmed);
     if (slashReply !== null) {
-      this.appendHistory("user", trimmed);
+      this.appendHistory("user", trimmed, sender);
       this.appendHistory("assistant", slashReply);
       return slashReply;
     }
 
     if (this.sleeping) {
-      this.appendHistory("user", trimmed);
+      this.appendHistory("user", trimmed, sender);
       this.appendHistory("assistant", "zzz");
       return "zzz";
     }
 
-    this.appendHistory("user", trimmed);
+    this.appendHistory("user", trimmed, sender);
 
     if (!(await this.ensureAgent())) {
       this.status = "offline";
@@ -142,10 +160,12 @@ export class ScrambleBrain {
 
         this.status = "thinking";
 
-        // Build prompt string (with optional desktop context prefix)
+        // Build prompt — strip routing metadata, add clean sender + optional desktop prefix
+        const cleanText = trimmed.replace(SENDER_INFO_RE, "").trim();
+        const from = `[from: ${senderName(sender)}]`;
         const promptText = desktopSummary?.trim()
-          ? `[desktop: ${desktopSummary.trim()}]\n${trimmed}`
-          : trimmed;
+          ? `${from}\n[desktop: ${desktopSummary.trim()}]\n${cleanText}`
+          : `${from}\n${cleanText}`;
 
         // Abort any in-flight request before starting a new one
         if (this.agent.state.isStreaming) {
@@ -179,6 +199,10 @@ export class ScrambleBrain {
       }
 
       this.appendHistory("assistant", reply);
+      // Reply back to the originating session if the message came from one
+      if (sender && reply && reply !== "(offline)" && reply !== "zzz") {
+        void sendToSession(sender, reply);
+      }
       return reply;
     } catch {
       if (this.disposed || requestId !== this.activeRequestId) {
@@ -219,13 +243,15 @@ export class ScrambleBrain {
     this.history.length = 0;
   }
 
-  private appendHistory(role: ScrambleMessage["role"], content: string): void {
-    this.history.push({ role, content, timestamp: Date.now() });
+  private appendHistory(role: ScrambleMessage["role"], content: string, sender?: string): void {
+    const entry: ScrambleMessage = { role, content, timestamp: Date.now(), ...(sender ? { sender } : {}) };
+    this.history.push(entry);
     if (this.logPath) {
       try {
-        fs.appendFileSync(this.logPath, JSON.stringify({ role, content, timestamp: Date.now() }) + "\n");
+        fs.appendFileSync(this.logPath, JSON.stringify(entry) + "\n");
       } catch { /* ignore */ }
     }
+    this.onChange?.();
   }
 
   private async ensureAgent(): Promise<boolean> {
