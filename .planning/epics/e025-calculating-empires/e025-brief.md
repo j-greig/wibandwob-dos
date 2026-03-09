@@ -171,12 +171,15 @@ WibWobWorld geology, etc). The panel system is content-agnostic.
 - [x] AC-5: Figlet headlines auto-size to panel width
 - [x] AC-6: ASCII/primer panels render from file path
 - [ ] AC-7: Panel search by title works
-- [-] AC-8: Two zoom levels — normal and compact — replaced with z=minimap (text doesn't scale)
+- [ ] AC-7.1: Stretch Goal: Panel search filter eg type 'S' and only panels with 'S*' in name are displayed. Will need debounce etc. Move to parking lot if hard.
+- [-] AC-8: Two zoom levels — normal and compact — replaced with z=minimap (text doesn't scale) [Zilla: I think this is done via minimap]
 - [x] AC-9: `describeState()` contract correct (panelCount, viewport, scrollPos)
 - [x] AC-10: `bun run typecheck` clean
-- [x] AC-11: Any panel draggable by human via mouse
+- [ ] AC-11: Any panel draggable by human via mouse [we got this working in the `TouchLab MVP` app already]
 - [x] AC-12: Agent can move panels via registered command — sy2.panel.move + sy2.panel.inspect
-- [x] AC-13: Double-click text panel enters edit mode
+- [ ] AC-13: Double-click text panel enters edit mode [what does edit mode look like? Do we open 'modal' or sidebar or show reverse of window {be mindful of memory etc too}]
+- [ ] AC-14: Clicking a panel while scrolled south does not jump canvas back to top
+- [ ] AC-15: microapp-sdk.ts exports all helpers modules need — no module should reach past the SDK into src/core/ or src/services/ directly. See audit: `.planning/refactor-docs/030-microapp-sdk-audit-2026-03.md`
 
 ---
 
