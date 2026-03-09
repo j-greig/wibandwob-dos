@@ -1273,7 +1273,27 @@ const PANEL_DEFS: CEPanelDef[] = [
     col: 2,
     live: true,
     webcamMonster: true,
-    content: () => "[webcam]",   // placeholder — actual frames handled via service
+    content: () => [
+      "        ┌──────────────────────┐",
+      "        │  ◉            ◉      │",
+      "        │       ╱  ╲           │",
+      "        │      │    │          │",
+      "        │       ╲──╱           │",
+      "        │    ╭──────────╮      │",
+      "        └────┤ MONSTER  ├──────┘",
+      "             ╰──────────╯",
+      "            ╱│╲        ╱│╲",
+      "           ╱ │ ╲      ╱ │ ╲",
+      "          ╱  │  ╲    ╱  │  ╲",
+      "         ╱   │   ╲  ╱   │   ╲",
+      "        ╱    │    ╲╱    │    ╲",
+      "       ▀     ▀          ▀     ▀",
+      "",
+      "    ┌─────────────────────────────┐",
+      "    │  press w for live webcam    │",
+      "    │  (requires mediapipe venv)  │",
+      "    └─────────────────────────────┘",
+    ].join("\n"),
   },
 
   // ── CALCULATING EMPIRES / GENEALOGY PANELS ──────────────────────────────────
