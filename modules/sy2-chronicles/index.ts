@@ -1876,6 +1876,7 @@ export default function setup(host: MicroappHost) {
 
     function scrollBy(delta: number) {
       (canvas as any).scroll(delta);
+      renderLayoutAndContent(); // re-set content on newly-visible panels (blessed lpos stale for off-screen nodes)
       updateStatus();
       host.screen.render();
     }
@@ -1896,8 +1897,9 @@ export default function setup(host: MicroappHost) {
     host.screen.on("mouse", handleWheel);
     win.onCleanup(() => host.screen.off("mouse", handleWheel));
 
-    canvas.on("wheeldown", () => { (canvas as any).scroll(3); updateStatus(); host.screen.render(); });
-    canvas.on("wheelup", () => { (canvas as any).scroll(-3); updateStatus(); host.screen.render(); });
+    canvas.on("wheeldown", () => { (canvas as any).scroll(3);  renderLayoutAndContent(); updateStatus(); host.screen.render(); });
+    canvas.on("wheelup",   () => { (canvas as any).scroll(-3); renderLayoutAndContent(); updateStatus(); host.screen.render(); });
+    canvas.on("scroll",    () => { renderLayoutAndContent(); updateStatus(); host.screen.render(); });
 
     // S07: Screen-level handler for drag
     const handleDragMouse = (data: any) => {
@@ -1950,8 +1952,8 @@ export default function setup(host: MicroappHost) {
       if (key?.name === "down" || ch === "j") { scrollBy(1 * speed);  return; }
       if (key?.name === "pageup")   { scrollBy(-Math.floor(host.geometry.height * speed)); return; }
       if (key?.name === "pagedown") { scrollBy( Math.floor(host.geometry.height * speed)); return; }
-      if (key?.name === "home") { (canvas as any).scrollTo(0); updateStatus(); host.screen.render(); return; }
-      if (key?.name === "end")  { (canvas as any).scrollTo(totalContentHeight); updateStatus(); host.screen.render(); return; }
+      if (key?.name === "home") { (canvas as any).scrollTo(0); renderLayoutAndContent(); updateStatus(); host.screen.render(); return; }
+      if (key?.name === "end")  { (canvas as any).scrollTo(totalContentHeight); renderLayoutAndContent(); updateStatus(); host.screen.render(); return; }
       if (ch === "z") { openChroniclesMinimap(); return; }
       if (ch === "r") { buildPanels(); return; }
       if (ch === "q" || ch === "Q" || key?.name === "escape") { win.close(); return; }
@@ -2273,8 +2275,8 @@ export default function setup(host: MicroappHost) {
       if (key?.name === "down" || ch === "j") { scrollBy(1 * speed);  return; }
       if (key?.name === "pageup")   { scrollBy(-Math.floor(host.geometry.height * speed)); return; }
       if (key?.name === "pagedown") { scrollBy( Math.floor(host.geometry.height * speed)); return; }
-      if (key?.name === "home") { (canvas as any).scrollTo(0); updateStatus(); host.screen.render(); }
-      if (key?.name === "end")  { (canvas as any).scrollTo(totalContentHeight); updateStatus(); host.screen.render(); }
+      if (key?.name === "home") { (canvas as any).scrollTo(0); renderLayoutAndContent(); updateStatus(); host.screen.render(); }
+      if (key?.name === "end")  { (canvas as any).scrollTo(totalContentHeight); renderLayoutAndContent(); updateStatus(); host.screen.render(); }
       if (ch === "z") { openChroniclesMinimap(); }
       if (ch === "r") { buildPanels(); }
       if (ch === "q" || key?.name === "escape") { win.close(); }
