@@ -1630,7 +1630,13 @@ export default function setup(host: MicroappHost) {
         }
       }
 
-      // Position frames — clamp width to viewport so panels never overflow on narrow windows
+      // Position frames — clamp width to viewport so panels never overflow on narrow windows.
+      // Viewport-clip height for panels at the bottom edge: blessed fixed:true children
+      // bypass scroll clipping, so we manually shrink frames that extend past the viewport.
+      const scrollY = (canvas as any).childBase ?? 0;
+      const viewTop = scrollY;
+      const viewBot = scrollY + vh;
+
       for (const placement of panelPlacements) {
         const node = panelNodes.get(placement.id);
         if (!node) continue;
@@ -1640,9 +1646,23 @@ export default function setup(host: MicroappHost) {
         node.frame.left = node.x;
         node.frame.top = node.y;
         node.frame.width = effectiveW;
-        node.frame.height = node.def.h;
+
+        // Viewport clipping: how much of this panel is inside the visible area?
+        const panelTop = node.y;
+        const panelBot = node.y + node.def.h;
+
+        if (panelBot <= viewTop || panelTop >= viewBot) {
+          // Fully off-screen — hide entirely
+          node.frame.hidden = true;
+        } else {
+          node.frame.hidden = false;
+          // Clip height if panel extends past bottom of viewport
+          const visibleH = Math.min(node.def.h, viewBot - panelTop);
+          node.frame.height = Math.max(3, visibleH);
+          node.content.height = Math.max(1, visibleH - 2);
+        }
+
         node.content.width = Math.max(1, effectiveW - 2);
-        node.content.height = Math.max(1, node.def.h - 2);
       }
 
       // Update content — respect overrides and editing state
