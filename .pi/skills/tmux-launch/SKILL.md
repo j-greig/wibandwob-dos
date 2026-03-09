@@ -179,6 +179,12 @@ The irc-framework client reconnects automatically (auto_reconnect_max_retries=99
 | `WIBWOB_CHAT_IRC_HOST` | — | IRC server host (required if transport=irc) |
 | `WIBWOB_CHAT_IRC_PORT` | — | IRC server port (required if transport=irc) |
 
+## Sidebar (tmux-sidebar plugin)
+
+PREFIX Tab toggles a left sidebar showing all windows. Installed via tpm.
+~/.tmux.conf contains the config — mouse on + tpm + tmux-sidebar.
+To reinstall after a fresh machine: `~/.tmux/plugins/tpm/bin/install_plugins`
+
 ## Mouse and window naming
 
 Enable mouse (click status bar tabs to switch windows) and rename windows to

@@ -70,6 +70,7 @@ export interface AppMenuActions {
   openPlasmaWindow: (args?: Record<string, unknown>) => void;
   openPlasmaFromPrimer: (args?: Record<string, unknown>) => void;
   openMarkdownViewer: (args?: Record<string, unknown>) => void;
+  toggleMarkdownFiglet: () => void;
   // ── Monster Cam ───────────────────────────────────────
   openMonsterCam: () => void;
   // ── Window control (by id — agent/API use) ────────────
@@ -340,6 +341,17 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     menuPlacements: [{ category: "file", order: 35 }],
     contextMenu: { desktop: true, order: 25 },
     palettePlacement: { order: 32 },
+    api: true,
+    agent: true
+  },
+  {
+    id: "markdown.toggle_figlet",
+    label: "Toggle Figlet Headings",
+    description: "Toggle figlet/plain heading rendering in the focused markdown viewer.",
+    group: "edit",
+    actionKey: "toggleMarkdownFiglet",
+    contextMenu: { windowKinds: ["markdown-viewer"], order: 10 },
+    palettePlacement: { order: 33 },
     api: true,
     agent: true
   },

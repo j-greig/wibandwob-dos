@@ -145,6 +145,25 @@ import { worldChatService } from "../services/world-chat-service.js";
 /** Exit code used by dev-mode reload. The launcher script watches for this. */
 export const DEV_RELOAD_EXIT_CODE = 75;
 
+/** Recursively collect .md file paths under root, skipping node_modules/.git/vendor. */
+function collectMarkdownFiles(root: string): string[] {
+  const SKIP = new Set(["node_modules", ".git", "vendor", ".pnpm"]);
+  const results: string[] = [];
+  function walk(dir: string): void {
+    let entries: fs.Dirent[];
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    for (const e of entries) {
+      if (e.name.startsWith(".") && e.name !== ".planning" && e.name !== ".agents") continue;
+      if (SKIP.has(e.name)) continue;
+      const full = path.join(dir, e.name);
+      if (e.isDirectory()) { walk(full); }
+      else if (e.isFile() && e.name.endsWith(".md")) { results.push(full); }
+    }
+  }
+  walk(root);
+  return results.sort();
+}
+
 /** Top-level application coordinator. Builds the screen, service graph, menus, and window manager. */
 export class TsTuiMvpApp {
   private readonly screen: blessed.Widgets.Screen;
@@ -1048,15 +1067,8 @@ export class TsTuiMvpApp {
         onStateChanged: () => this.syncLiveState(),
       });
     }
-    // No path — pick from repo .md files using glob-style walk
-    const { execSync } = require("node:child_process");
-    let mdList: string[] = [];
-    try {
-      const raw = execSync(`find "${REPO_ROOT}" -name "*.md" -not -path "*/node_modules/*" -not -path "*/.git/*" 2>/dev/null`, { encoding: "utf8" });
-      mdList = raw.trim().split("\n").filter(Boolean).sort();
-    } catch {
-      // ignore
-    }
+    // No path — pick from repo .md files via recursive fs walk
+    const mdList = collectMarkdownFiles(REPO_ROOT);
     if (mdList.length === 0) {
       this.overlays.flash("No .md files found in repo");
       return undefined;
@@ -1070,7 +1082,7 @@ export class TsTuiMvpApp {
           windowManager: this.windowManager,
           overlays: this.overlays,
           screen: this.screen,
-          filePath: (item as any).filePath,
+          filePath: item.filePath,
           onStateChanged: () => this.syncLiveState(),
         });
       }
@@ -1743,6 +1755,14 @@ export class TsTuiMvpApp {
             ? args.filePath.trim()
             : undefined;
         this.openMarkdownViewerWindow(filePath, undefined);
+      },
+      toggleMarkdownFiglet: () => {
+        const focused = this.windowManager.getFocusedWindow();
+        if (focused?.kind === "markdown-viewer") {
+          focused.writeInput?.("h");
+        } else {
+          this.overlays.flash("No markdown viewer focused");
+        }
       },
       openWibWobAgent: () => this.openWibWobAgentWindow(),
       reloadAgentPrompt: () => {

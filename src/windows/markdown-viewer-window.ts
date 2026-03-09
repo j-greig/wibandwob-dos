@@ -208,6 +208,11 @@ export function openMarkdownViewerWindow(
 
   record.captureText = () => cachedLines.join("\n");
 
+  // writeInput — allows API/command to send 'h' to toggle figlet
+  record.writeInput = (input: string) => {
+    if (input === "h") { figletEnabled = !figletEnabled; render(true); }
+  };
+
   // ── onRestyle ────────────────────────────────────────────────────────────────
 
   record.onRestyle = () => {

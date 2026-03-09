@@ -50,3 +50,24 @@ export function isRightClick(data?: { button?: string | number; buttons?: string
   }
   return data.button === "right" || data.button === 2 || data.buttons === "right" || data.buttons === 2;
 }
+
+/**
+ * Lifecycle-bound timer. Registers setInterval into a caller-owned Set.
+ * Call clearTimers(timers) in window cleanup to prevent leaks.
+ * @primitive
+ */
+export function createTimer(
+  fn: () => void,
+  ms: number,
+  timers: Set<ReturnType<typeof setInterval>>,
+): ReturnType<typeof setInterval> {
+  const id = setInterval(fn, ms);
+  timers.add(id);
+  return id;
+}
+
+/** Clear and drain all timers in a lifecycle Set. @primitive */
+export function clearTimers(timers: Set<ReturnType<typeof setInterval>>): void {
+  for (const id of timers) clearInterval(id);
+  timers.clear();
+}
