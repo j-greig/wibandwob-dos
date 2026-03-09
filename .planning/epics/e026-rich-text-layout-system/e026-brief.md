@@ -1,7 +1,7 @@
 ---
 id: E026
 title: Rich Text and Layout System
-status: not-started
+status: in-progress
 issue: ~
 pr: ~
 depends_on: [E015, E016]
@@ -719,6 +719,15 @@ decides.
 ---
 
 ## Parking Lot
+
+- **Browser delivery via xterm.js + WebSocket PTY** — WibWob-DOS in a browser
+  tab with no install. Run the Bun process server-side; pipe PTY output to
+  xterm.js over WebSocket (ttyd/wetty pattern, ~100 lines of bridge code).
+  xterm.js renders VT100/ANSI faithfully including mouse — drag, resize, scroll
+  all work. `markdown-service.ts` is pure TS with no Bun-specific APIs so it
+  could also run fully clientside if the rendering target were swapped. Full
+  in-browser compute (Bun → WASM) is not viable — Blessed needs real PTY APIs.
+  Deferred; no dependency on this epic.
 
 - **Live markdown preview** — side-by-side editor + MarkdownViewer updating as
   you type. Needs debounced re-render and likely long-running Python helper if
