@@ -128,6 +128,19 @@ curl -sf -X POST http://127.0.0.1:8099/screenshot \
 # Or use the ww-screenshot skill for targeted window crops
 ```
 
+## 7b. MICROAPP PANEL INSPECTION
+
+To verify rendered content of §y² Chronicles panels programmatically (useful for scroll/render debugging):
+```bash
+# Last 10 panels — returns contentLines, nonEmptyLines, lpos coords, first/last line
+curl -s -X POST http://127.0.0.1:8098/commands/run -H 'Content-Type: application/json' \
+  -d '{"id":"microapp.wibwob.sy2chronicles.sy2.panel.inspect","args":{"tail":10}}'
+# Single panel by id
+  -d '{"id":"microapp.wibwob.sy2chronicles.sy2.panel.inspect","args":{"id":"space-cat"}}'
+# All panels
+  -d '{"id":"microapp.wibwob.sy2chronicles.sy2.panel.inspect","args":{"all":true}}'
+```
+
 ## 8. KEY PATHS
 
 | What | Path |

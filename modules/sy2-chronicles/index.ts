@@ -2089,6 +2089,49 @@ export default function setup(host: MicroappHost) {
       });
 
       host.registerCommand({
+        id: "sy2.panel.inspect",
+        label: "Inspect Panel Content",
+        description: "Return rendered content of panel(s). Args: id (single panel), or tail:N (last N panels), or all:true",
+        action: (args: Record<string, unknown>) => {
+          if (!activePanelNodes) return { ok: false, error: "No active window" };
+          const entries = [...activePanelNodes.entries()];
+          let selected: [string, (typeof entries)[0][1]][];
+          if (args.id) {
+            const id = String(args.id);
+            const node = activePanelNodes.get(id);
+            if (!node) return { ok: false, error: `Panel not found: ${id}` };
+            selected = [[id, node]];
+          } else if (args.tail) {
+            const n = Math.min(Number(args.tail) || 5, entries.length);
+            selected = entries.slice(-n);
+          } else if (args.all) {
+            selected = entries;
+          } else {
+            selected = entries.slice(-5);
+          }
+          const panels = selected.map(([id, n]) => {
+            const raw = n.content.getContent();
+            const lines = raw.split("\n");
+            const nonEmpty = lines.filter((l: string) => l.trim().length > 0).length;
+            return {
+              id,
+              title: n.def.title,
+              y: n.y,
+              contentLines: lines.length,
+              nonEmptyLines: nonEmpty,
+              firstLine: lines[0]?.substring(0, 80) ?? "",
+              lastLine: lines[lines.length - 1]?.substring(0, 80) ?? "",
+              frameTop: (n.frame as any).top,
+              frameLposYi: (n.frame as any).lpos?.yi ?? null,
+              contentLposYi: (n.content as any).lpos?.yi ?? null,
+              contentFixed: (n.content as any).fixed ?? false,
+            };
+          });
+          return { ok: true, panels };
+        },
+      });
+
+      host.registerCommand({
         id: "sy2.panel.focus",
         label: "Focus Panel",
         description: "Focus and highlight a §y² Chronicles panel",
