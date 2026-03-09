@@ -23,134 +23,15 @@
 import blessed from "blessed";
 // All SDK imports from one place — dogfooding TODO-5f986603 fix
 import {
-  applyRect,
   createRenderMonitor,
-  type UiPart,
-  type Rect,
+  createBorderedPanel,
+  type BorderedPanelHandle,
   type MicroappHost,
 } from "../../src/services/microapp-sdk.js";
 import { createTreeWidget, type TreeNode } from "../../src/core/tree-widget.js";
 import { createTimer, clearTimers } from "../../src/core/ui-primitives.js";
 import { tweenWindowPosition, tweenWindowSize } from "../../src/services/motion-service.js";
 import path from "node:path";
-
-// ── createPanel ────────────────────────────────────────────────────────────────
-// A UiPart with a manually-drawn border that switches single↔double depending
-// on active state, and uses theme accent colour when active.
-
-type PanelHandle = UiPart<void> & {
-  content: blessed.Widgets.BoxElement;
-  setActive(active: boolean): void;
-  restyle(): void;
-};
-
-function createPanel(
-  parent: blessed.Widgets.Node,
-  title: string,
-  getTheme: () => import("../../src/core/theme/types.js").ThemeTokens,
-): PanelHandle {
-  // Outer box — no blessed border; we draw it as plain text so blessed
-  // doesn't try to parse widths. wrap:false prevents the top border line
-  // from wrapping when the box is wide. Colour via style.fg only — no
-  // ANSI escape codes in content (they confuse blessed's width maths).
-  const outer = blessed.box({
-    parent,
-    top: 0, left: 0, width: 0, height: 0,
-    tags: false,
-    wrap: false,
-    style: { fg: getTheme().windowBorderUnfocused.fg, bg: getTheme().body.bg },
-  });
-
-  // Title sits on the top border row, inside the corners
-  const titleBox = blessed.box({
-    parent: outer,
-    top: 0, left: 2, width: "shrink", height: 1,
-    tags: false,
-    content: ` ${title} `,
-    style: getTheme().body,
-  });
-
-  // Inner content box — lives inside the 1-cell border inset
-  const inner = blessed.box({
-    parent: outer,
-    top: 1, left: 1, right: 1, bottom: 1,
-    tags: false,
-    style: getTheme().body,
-  });
-
-  let active = false;
-  let lastW = 0;
-  let lastH = 0;
-
-  function drawBorder() {
-    const w = lastW;
-    const h = lastH;
-    if (w < 2 || h < 2) return;
-
-    const tl = active ? "╔" : "┌";
-    const tr = active ? "╗" : "┐";
-    const bl = active ? "╚" : "└";
-    const br = active ? "╝" : "┘";
-    const hz = active ? "═" : "─";
-    const vt = active ? "║" : "│";
-
-    // Top row: corners + fill. Title box overlays left of centre.
-    const topLine = tl + hz.repeat(w - 2) + tr;
-    // Mid rows: just left/right verticals; inner box covers the middle
-    const midLine = vt + " ".repeat(w - 2) + vt;
-    const botLine = bl + hz.repeat(w - 2) + br;
-
-    const rows = [topLine];
-    for (let i = 1; i < h - 1; i++) rows.push(midLine);
-    rows.push(botLine);
-    outer.setContent(rows.join("\n"));
-  }
-
-  function applyStyle() {
-    const t = getTheme();
-    const borderFg = active ? t.titleBarFocused.bg : t.windowBorderUnfocused.fg;
-    (outer as any).style    = { fg: borderFg, bg: t.body.bg };
-    (titleBox as any).style = active
-      ? { fg: t.titleBarFocused.fg, bg: t.titleBarFocused.bg, bold: true }
-      : t.body;
-    (inner as any).style = t.body;
-  }
-
-  return {
-    node: outer,
-    content: inner,
-
-    layout(rect: Rect) {
-      lastW = rect.width;
-      lastH = rect.height;
-      applyRect(outer, rect);
-      inner.top    = 1;
-      inner.left   = 1;
-      inner.width  = Math.max(1, rect.width  - 2);
-      inner.height = Math.max(1, rect.height - 2);
-      drawBorder();
-    },
-
-    update() {},
-
-    setActive(a: boolean) {
-      active = a;
-      applyStyle();
-      drawBorder();
-    },
-
-    restyle() {
-      applyStyle();
-      drawBorder();
-    },
-
-    destroy() {
-      titleBox.destroy();
-      inner.destroy();
-      outer.destroy();
-    },
-  };
-}
 
 // ── Sample tree ───────────────────────────────────────────────────────────────
 
@@ -230,10 +111,10 @@ function openDemo(host: MicroappHost) {
 
   // ── Panels ────────────────────────────────────────────────────────────────
 
-  const p1 = createPanel(win.body, "① F05 TreeWidget", host.theme);
-  const p2 = createPanel(win.body, "② F06 Timer",      host.theme);
-  const p3 = createPanel(win.body, "③ F07 Motion",     host.theme);
-  const p4 = createPanel(win.body, "④ RenderMonitor",  host.theme);
+  const p1 = createBorderedPanel(win.body, { title: "① F05 TreeWidget" }, host.theme);
+  const p2 = createBorderedPanel(win.body, { title: "② F06 Timer" },      host.theme);
+  const p3 = createBorderedPanel(win.body, { title: "③ F07 Motion" },     host.theme);
+  const p4 = createBorderedPanel(win.body, { title: "④ RenderMonitor" },  host.theme);
 
   const panels = [p1, p2, p3, p4] as const;
   let activeIdx = 0;

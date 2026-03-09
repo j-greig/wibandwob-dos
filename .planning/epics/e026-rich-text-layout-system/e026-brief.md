@@ -1,7 +1,7 @@
 ---
 id: E026
 title: Rich Text and Layout System
-status: in-progress
+status: done
 issue: ~
 pr: ~
 depends_on: [E015, E016]
@@ -126,19 +126,19 @@ virtual indent rendering. Lives in `src/core/tree-widget.ts`.
 - [x] F01 Approach spike — native TS chosen (S01-findings.md)
 - [x] F02 Markdown viewer — markdown-service.ts + ansi-utils.ts + syntax-highlight.ts + markdown-viewer-window.ts
 - [x] F03 Figlet heading config — toggle command, fallback guard, wrap fix
-- [ ] F04 Inline styles + code blocks — coverage audit pending
+- [x] F04 Inline styles + code blocks — stripAnsi + y clipboard copy
 - [x] F05 Tree component — src/core/tree-widget.ts
 - [x] F06 Timed refresh primitive — createTimer/clearTimers in ui-primitives.ts
 - [x] F07 Motion service — motion-service.ts, 9 easings, tweenWindowPosition/Size
-- [ ] F09 Panel layout and grid canvas primitives — extract from sy2-chronicles
+- [x] F09 Panel layout + grid canvas — src/core/panel-layout.ts + grid-canvas.ts
 - [ ] F08 (stretch) Syntax highlighting — extend regex (JSON/YAML/CSS done; more pending)
 - [ ] F10 (stretch) Markdown panels in sy2-chronicles — .md files as live panels
 
 **SDK enhancements found during implementation (tracked in dev-notes.md):**
 - [x] host.runGlobalCommand — internal vs external command distinction (done)
 - [x] Export host.ui primitives from microapp-sdk.ts directly (TODO-5f986603 closed)
-- [ ] createStyledBorder SDK primitive — thin/single/bold/double border styles
-- [ ] createPanel extracted from e026-demo into src/core/ui-parts.ts
+- [x] createBorderedPanel SDK primitive — thin/single/bold/double border styles (src/core/ui-parts.ts)
+- [x] createPanel extracted → createBorderedPanel in src/core/ui-parts.ts
 
 **Demo:**
 - [x] modules/e026-demo — 4-panel grid, createStack/createColumns layout, active panel double-border, button bar

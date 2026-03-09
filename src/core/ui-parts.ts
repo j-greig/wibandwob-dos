@@ -723,3 +723,138 @@ export function createButtonBar<Id extends string>(
     },
   };
 }
+
+// ── Border styles ─────────────────────────────────────────────────────────────
+
+export type BorderStyle = "single" | "double" | "bold" | "thin";
+
+const BORDER_CHARS: Record<BorderStyle, { tl: string; tr: string; bl: string; br: string; hz: string; vt: string }> = {
+  single: { tl: "┌", tr: "┐", bl: "└", br: "┘", hz: "─", vt: "│" },
+  double: { tl: "╔", tr: "╗", bl: "╚", br: "╝", hz: "═", vt: "║" },
+  bold:   { tl: "┏", tr: "┓", bl: "┗", br: "┛", hz: "━", vt: "┃" },
+  thin:   { tl: "╌", tr: "╌", bl: "╌", br: "╌", hz: "╌", vt: "╎" },
+};
+
+export interface BorderedPanelOpts {
+  title?: string;
+  /** Border style when inactive. Default: "single" */
+  inactiveStyle?: BorderStyle;
+  /** Border style when active. Default: "double" */
+  activeStyle?: BorderStyle;
+}
+
+export type BorderedPanelHandle = UiPart<void> & {
+  /** The inner content node — attach child widgets here */
+  content: blessed.Widgets.BoxElement;
+  /** Switch active/inactive border style and theme colour */
+  setActive(active: boolean): void;
+};
+
+/**
+ * A UiPart with a manually-drawn border that switches style on setActive().
+ *
+ * Key implementation notes:
+ * - wrap:false on outer box prevents blessed wrapping the border line
+ * - No ANSI codes in setContent() — colour via style.fg only (ANSI confuses
+ *   blessed's line-width calculation causing corner chars to wrap to col 0)
+ * - Title rendered in a separate child box at top:0,left:2 to overlay the border
+ * - Inner content box inset 1 cell on all sides
+ *
+ * @param parent  Blessed parent node
+ * @param opts    Title, inactive/active border styles
+ * @param getTheme  Returns current ThemeTokens — called on every restyle
+ */
+export function createBorderedPanel(
+  parent: blessed.Widgets.Node,
+  opts: BorderedPanelOpts,
+  getTheme: () => import("./theme/types.js").ThemeTokens,
+): BorderedPanelHandle {
+  const { title = "", inactiveStyle = "single", activeStyle = "double" } = opts;
+
+  const t = getTheme();
+  const outer = blessed.box({
+    parent,
+    top: 0, left: 0, width: 0, height: 0,
+    tags: false,
+    wrap: false,
+    style: { fg: t.windowBorderUnfocused.fg, bg: t.body.bg },
+  });
+
+  const titleBox = blessed.box({
+    parent: outer,
+    top: 0, left: 2, width: "shrink", height: 1,
+    tags: false,
+    content: title ? ` ${title} ` : "",
+    style: t.body,
+  });
+
+  const inner = blessed.box({
+    parent: outer,
+    top: 1, left: 1, right: 1, bottom: 1,
+    tags: false,
+    style: t.body,
+  });
+
+  let active = false;
+  let lastW = 0;
+  let lastH = 0;
+
+  function drawBorder() {
+    const w = lastW;
+    const h = lastH;
+    if (w < 2 || h < 2) return;
+    const chars = BORDER_CHARS[active ? activeStyle : inactiveStyle]!;
+    const topLine = chars.tl + chars.hz.repeat(w - 2) + chars.tr;
+    const midLine = chars.vt + " ".repeat(w - 2) + chars.vt;
+    const botLine = chars.bl + chars.hz.repeat(w - 2) + chars.br;
+    const rows = [topLine];
+    for (let i = 1; i < h - 1; i++) rows.push(midLine);
+    rows.push(botLine);
+    outer.setContent(rows.join("\n"));
+  }
+
+  function applyColors() {
+    const th = getTheme();
+    const borderFg = active ? th.titleBarFocused.bg : th.windowBorderUnfocused.fg;
+    (outer as any).style    = { fg: borderFg, bg: th.body.bg };
+    (titleBox as any).style = active
+      ? { fg: th.titleBarFocused.fg, bg: th.titleBarFocused.bg, bold: true }
+      : th.body;
+    (inner as any).style = th.body;
+  }
+
+  return {
+    node: outer,
+    content: inner,
+
+    layout(rect: Rect) {
+      lastW = rect.width;
+      lastH = rect.height;
+      applyRect(outer, rect);
+      inner.top    = 1;
+      inner.left   = 1;
+      inner.width  = Math.max(1, rect.width  - 2);
+      inner.height = Math.max(1, rect.height - 2);
+      drawBorder();
+    },
+
+    update() {},
+
+    setActive(a: boolean) {
+      active = a;
+      applyColors();
+      drawBorder();
+    },
+
+    restyle() {
+      applyColors();
+      drawBorder();
+    },
+
+    destroy() {
+      titleBox.destroy();
+      inner.destroy();
+      outer.destroy();
+    },
+  };
+}

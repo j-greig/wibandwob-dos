@@ -126,11 +126,15 @@ export {
   createFigletDisplay,
   createAnimatedPanel,
   createButtonBar,
+  createBorderedPanel,
 } from "../core/ui-parts.js";
 export type {
   InputLineProps,
   MessageHistoryEntry,
   MessageHistoryProps,
+  BorderedPanelHandle,
+  BorderedPanelOpts,
+  BorderStyle,
 } from "../core/ui-parts.js";
 
 export { createRenderMonitor } from "../core/render-monitor.js";
