@@ -73,6 +73,11 @@ at idle. That contrast is the point.
 - `host.windowManager()` does not exist — use `host.windows`. Worth
   adding to the "common mistakes" table in microapp-sdk.md (done).
 
+- `"calc(50% - 1)"` as a height string — **Blessed has no calc() support**.
+  The string is silently ignored and the box gets zero height. Always use
+  `bottom: N` for "height minus N rows from bottom" instead of calc strings.
+  Top panels: `height: "50%"`. Bottom panels: `top: "50%", bottom: 1`.
+
 - `panel("50%", "50%", "50%", "calc(50% - 0)")` — blessed percentage
   heights in a split layout sometimes off-by-one at the bottom edge.
   Empirically `calc(50% - 0)` and `calc(50% - 1)` differ by one row

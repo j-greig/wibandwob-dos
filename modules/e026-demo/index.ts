@@ -238,8 +238,14 @@ function openDemo(host: MicroappHost) {
       if (id === "close")  win.close();
     },
   );
-  bar.layout({ top: -1, left: 0, width: "100%", height: 1 } as any);
-  bar.update({ leftText: " E026 demo — F03 F05 F06 F07 RenderMonitor ✓", activeId: "tween" });
+  // Pin the bar node to the bottom of win.body directly
+  const barNode = bar.node as any;
+  barNode.top    = undefined;
+  barNode.bottom = 0;
+  barNode.left   = 0;
+  barNode.width  = "100%";
+  barNode.height = 1;
+  bar.update({ leftText: " E026 — F03 F05 F06 F07 RenderMonitor ✓", activeId: "tween" });
 
   // ── Body keys ─────────────────────────────────────────────────────────────
 
