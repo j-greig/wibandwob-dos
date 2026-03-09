@@ -168,6 +168,14 @@ Pattern to codify in microapp-sdk.md common-mistakes table:
 
 ---
 
+## Reference reading (2026-03-09)
+
+- [pi-mono TUI Architecture review](/Users/james/Repos/wibwob-sdk/context.md) —
+  pi-mono TUI internals, component model, layout system. Context for E026 native
+  TS approach decision and future SDK alignment.
+
+---
+
 ## Pi session-control socket discovery — stale socket accumulation (2026-03-09)
 
 **Context:** During E017 Scramble Brains, Scramble was given a pi inter-agent
