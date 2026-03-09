@@ -7,6 +7,7 @@ Concept: proactive, autonomous AI/agent has equal control of OS with a human.
 @.agents/architecture.md
 @.agents/invariants.md
 @.agents/control-api.md
+@.agents/microapp-sdk.md
 
 ## Direction
 
