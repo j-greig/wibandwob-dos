@@ -229,7 +229,7 @@ AC-2: Snapshot registry `companion` entry includes displayMode.
 - [x] Session ID + model shown in info bar; click to open JSONL log
 - [x] Status bar (=^=) indicator clickable → opens smol popup
 - [x] bun run typecheck passes clean
-- [ ] SG-7: Scramble reachable via send_to_session "scramble" (inter-agent socket)
+- [x] SG-7: Scramble reachable via send_to_session "scramble" (inter-agent socket)
 
 ---
 
@@ -359,9 +359,9 @@ send_to_session "scramble" "hello"  → Scramble replies, visible in her window
 get_session_message "scramble"      → returns her last reply
 ```
 
-AC: `[ ]` `list_sessions` shows scramble
-AC: `[ ]` `send_to_session "scramble" "hello from wib"` triggers brain.send, reply in window
-AC: `[ ]` `get_session_message "scramble"` returns last reply string
+AC: `[x]` `list_sessions` shows scramble
+AC: `[x]` `send_to_session "scramble" "hello from wib"` triggers brain.send, reply in window
+AC: `[x]` `get_session_message "scramble"` returns last reply string
 
 ---
 

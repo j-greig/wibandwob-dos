@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { startSessionServer, type SessionServerHandle } from "./pi-session-bridge.js";
 import { Agent, type AgentMessage } from "@mariozechner/pi-agent-core";
 import { AuthStorage, ModelRegistry } from "@mariozechner/pi-coding-agent";
 
@@ -29,6 +30,7 @@ export class ScrambleBrain {
 
   private agent?: Agent;
   private disposed = false;
+  private sessionServer?: SessionServerHandle;
   sleeping = false;
   private authAttempted = false;
   private activeRequestId = 0;
@@ -36,6 +38,28 @@ export class ScrambleBrain {
   constructor() {
     const hex = Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, "0");
     this.sessionId = `scramble-${hex}`;
+  }
+
+  /** Register a Unix socket so other pi sessions can reach Scramble via send_to_session "scramble". */
+  startSessionSocket(): void {
+    if (this.sessionServer) return;
+    try {
+      this.sessionServer = startSessionServer({
+        sessionId: this.sessionId,
+        aliasName: "scramble",
+        send: (text, _sender) => this.send(text).then(() => undefined),
+        getLastReply: () => this.history.at(-1)?.content ?? null,
+        abort: () => this.abort(),
+        reset: () => { this.history.length = 0; this.abort(); },
+      });
+    } catch {
+      // Non-fatal — Scramble runs fine without peer socket
+    }
+  }
+
+  stopSessionSocket(): void {
+    this.sessionServer?.close();
+    this.sessionServer = undefined;
   }
 
   setLogPath(p: string): void {
@@ -185,6 +209,7 @@ export class ScrambleBrain {
   dispose(): void {
     this.disposed = true;
     this.abort();
+    this.stopSessionSocket();
     this.history.length = 0;
   }
 

@@ -202,6 +202,8 @@ export interface SessionServerHandle {
 export interface SessionServerTarget {
   /** The session's unique id (used as the socket filename) */
   sessionId: string;
+  /** Human-readable alias name for discovery (default: "wibwob-tui") */
+  aliasName?: string;
   /** Submit a message into the session */
   send(text: string, sender?: string): Promise<void>;
   /** Return the last assistant reply, or null if none yet */
@@ -226,7 +228,7 @@ export function startSessionServer(target: SessionServerTarget): SessionServerHa
   fs.mkdirSync(CONTROL_DIR, { recursive: true });
 
   const socketPath = getSocketPath(target.sessionId);
-  const aliasPath = path.join(CONTROL_DIR, "wibwob-tui.alias");
+  const aliasPath = path.join(CONTROL_DIR, `${target.aliasName ?? "wibwob-tui"}.alias`);
 
   // Clean up any stale socket from a previous run
   try { fs.unlinkSync(socketPath); } catch { /* ignore */ }

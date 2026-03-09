@@ -343,6 +343,7 @@ export class TsTuiMvpApp {
     const scrambleLogDir = path.join(SCRATCH_BASE, "scramble-sessions");
     fs.mkdirSync(scrambleLogDir, { recursive: true });
     this.scrambleBrain.setLogPath(path.join(scrambleLogDir, `${this.scrambleBrain.sessionId}.jsonl`));
+    this.scrambleBrain.startSessionSocket();
   }
 
   /** Boot the app: load modules, rebuild menus, render chrome, bind global keys, restore workspace, start control API. */
