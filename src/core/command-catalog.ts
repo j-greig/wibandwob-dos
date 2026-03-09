@@ -52,6 +52,11 @@ export interface AppMenuActions {
   openScrambleFloating: () => void;
   scrambleSay: (args?: Record<string, unknown>) => void;
   scrambleExpand: () => void;
+  scramblePopOut: () => void;
+  scramblePet: () => void;
+  scrambleSleep: () => void;
+  scrambleWake: () => void;
+  scrambleMeow: () => void;
   openWorkspaceManager: () => void;
   openCommandPalette: () => void;
   openStateInspector: () => void;
@@ -824,6 +829,51 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     description: "Toggle Scramble popup between smol and tall.",
     group: "surface",
     actionKey: "scrambleExpand",
+    api: true,
+    agent: true
+  },
+  {
+    id: "scramble.pop-out",
+    label: "Scramble: pop out to floating",
+    description: "Pop Scramble out of smol/tall popup into a full floating window.",
+    group: "surface",
+    actionKey: "scramblePopOut",
+    api: true,
+    agent: true
+  },
+  {
+    id: "scramble.pet",
+    label: "Scramble: pet",
+    description: "Pet Scramble (/pet slash command — she allows it).",
+    group: "surface",
+    actionKey: "scramblePet",
+    api: true,
+    agent: true
+  },
+  {
+    id: "scramble.sleep",
+    label: "Scramble: sleep",
+    description: "Put Scramble to sleep (/sleep — silences idle quips).",
+    group: "surface",
+    actionKey: "scrambleSleep",
+    api: true,
+    agent: true
+  },
+  {
+    id: "scramble.wake",
+    label: "Scramble: wake",
+    description: "Wake Scramble up (/wake — re-enables responses).",
+    group: "surface",
+    actionKey: "scrambleWake",
+    api: true,
+    agent: true
+  },
+  {
+    id: "scramble.meow",
+    label: "Scramble: meow",
+    description: "Make Scramble meow (/meow — no LLM call).",
+    group: "surface",
+    actionKey: "scrambleMeow",
     api: true,
     agent: true
   },

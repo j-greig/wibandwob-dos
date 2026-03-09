@@ -115,6 +115,7 @@ export interface ScrambleFloatingDeps {
   brain: ScrambleBrain;
   initialPos?: { top: number; left: number; width: number; height: number };
   onStateChanged?: () => void;
+  onOpenLog?: () => void;
 }
 
 export function openScrambleFloatingWindow(deps: ScrambleFloatingDeps): void {
@@ -132,10 +133,25 @@ export function openScrambleFloatingWindow(deps: ScrambleFloatingDeps): void {
     frame.frame.height = 18;
   }
 
+  // Info bar (session ID + model, clickable to open log)
+  const infoBar = blessed.box({
+    parent: frame.body,
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 1,
+    tags: true,
+    mouse: true,
+    clickable: true,
+    style: theme().muted,
+  });
+
+  infoBar.on("click", () => deps.onOpenLog?.());
+
   // Cat header (3 lines)
   const catHeader = blessed.box({
     parent: frame.body,
-    top: 0,
+    top: 1,
     left: 0,
     right: 0,
     height: 3,
@@ -146,7 +162,7 @@ export function openScrambleFloatingWindow(deps: ScrambleFloatingDeps): void {
   // Scrollable message history
   const transcript = blessed.box({
     parent: frame.body,
-    top: 3,
+    top: 4,
     left: 0,
     right: 0,
     bottom: 2,
@@ -181,6 +197,13 @@ export function openScrambleFloatingWindow(deps: ScrambleFloatingDeps): void {
     style: theme().input,
   });
 
+  const renderInfoBar = () => {
+    const c = C();
+    const model = brain.modelName.padStart(12);
+    const sid = brain.sessionId.replace("scramble-", "#");
+    infoBar.setContent(`{${c.muted}-fg}${model}  {${c.blue}-fg}${sid}{/${c.blue}-fg}{/${c.muted}-fg}`);
+  };
+
   const renderCat = () => {
     catHeader.setContent(catArt(brain));
   };
@@ -214,6 +237,7 @@ export function openScrambleFloatingWindow(deps: ScrambleFloatingDeps): void {
 
   const { getDraft } = wireInput(screen, inputEl, renderInputEl, (text) => {
     void brain.send(text).then((reply) => {
+      renderInfoBar();
       renderCat();
       renderStatus();
       renderTranscriptContent();
@@ -228,6 +252,7 @@ export function openScrambleFloatingWindow(deps: ScrambleFloatingDeps): void {
     screen.render();
   });
 
+  renderInfoBar();
   renderCat();
   renderStatus();
   renderTranscriptContent();
@@ -256,6 +281,7 @@ export function openScrambleFloatingWindow(deps: ScrambleFloatingDeps): void {
   };
 
   frame.onRestyle = () => {
+    safeSetStyle(infoBar, theme().muted);
     safeSetStyle(catHeader, theme().body);
     safeSetStyle(transcript, theme().agentBg);
     statusLine.style = theme().warning;
@@ -265,6 +291,7 @@ export function openScrambleFloatingWindow(deps: ScrambleFloatingDeps): void {
 
   frame.writeInput = (text: string) => {
     void brain.send(text).then(() => {
+      renderInfoBar();
       renderCat();
       renderStatus();
       renderTranscriptContent();
@@ -507,7 +534,19 @@ export function openScrambleSmolPopup(deps: ScrambleSmolDeps): void {
     applyMode();
   };
 
+  (frame as unknown as Record<string, unknown>)._scramblePopOut = () => {
+    deps.onPopOut?.();
+  };
+
   windowManager.registerWindow(frame);
+
+  // Fix initial sizing/positioning after registration
+  const sw = Math.max(1, Number(screen.width) || 80);
+  const sh = Math.max(1, Number(screen.height) || 24);
+  const h = mode === "tall" ? TALL_H : SMOL_H;
+  windowManager.resizeWindow(frame.id, SMOL_W, h);
+  windowManager.moveWindow(frame.id, Math.max(0, sw - SMOL_W - 2), Math.max(0, sh - h - 3));
+
   applyMode();
   inputEl.focus();
 }

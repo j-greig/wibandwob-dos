@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import path from "node:path";
 import { Agent, type AgentMessage } from "@mariozechner/pi-agent-core";
 import { AuthStorage, ModelRegistry } from "@mariozechner/pi-coding-agent";
 
@@ -21,12 +23,24 @@ export interface ScrambleMessage {
 export class ScrambleBrain {
   readonly history: ScrambleMessage[] = [];
   status: ScrambleStatus = "idle";
+  readonly sessionId: string;
+  modelName = "haiku";
+  logPath?: string;
 
   private agent?: Agent;
   private disposed = false;
   sleeping = false;
   private authAttempted = false;
   private activeRequestId = 0;
+
+  constructor() {
+    const hex = Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, "0");
+    this.sessionId = `scramble-${hex}`;
+  }
+
+  setLogPath(p: string): void {
+    this.logPath = p;
+  }
 
   private readonly idleQuips = [
     "*stretches* (=^..^=)",
@@ -175,11 +189,12 @@ export class ScrambleBrain {
   }
 
   private appendHistory(role: ScrambleMessage["role"], content: string): void {
-    this.history.push({
-      role,
-      content,
-      timestamp: Date.now(),
-    });
+    this.history.push({ role, content, timestamp: Date.now() });
+    if (this.logPath) {
+      try {
+        fs.appendFileSync(this.logPath, JSON.stringify({ role, content, timestamp: Date.now() }) + "\n");
+      } catch { /* ignore */ }
+    }
   }
 
   private async ensureAgent(): Promise<boolean> {
@@ -218,6 +233,7 @@ export class ScrambleBrain {
         getApiKey: (provider) => authStorage.getApiKey(provider),
       });
 
+      this.modelName = model.id.replace(/^claude-/, "").slice(0, 24);
       this.status = "idle";
       return true;
     } catch {

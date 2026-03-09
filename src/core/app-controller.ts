@@ -18,6 +18,7 @@ import {
   MASTER_PHILOSOPHY_PATH,
   README_PATH,
   REPO_ROOT,
+  SCRATCH_BASE,
   SPIKE_NOTES_PATH,
   SPIKE_ROOT,
   STATE_PATH,
@@ -288,6 +289,20 @@ export class TsTuiMvpApp {
         runCommand: (id, args) => this.commands.run(id, args),
         windows: this.windowManager,
         screenshotText: () => (this.screen as any).screenshot() as string,
+        getScrambleState: () => ({
+          status: this.scrambleBrain.status,
+          sleeping: this.scrambleBrain.sleeping,
+          model: this.scrambleBrain.modelName,
+          sessionId: this.scrambleBrain.sessionId,
+          messageCount: this.scrambleBrain.history.length,
+          lastMessage: this.scrambleBrain.history.at(-1)?.content ?? null,
+          logPath: this.scrambleBrain.logPath ?? null,
+        }),
+        getScrambleHistory: () => this.scrambleBrain.history.map((m) => ({
+          role: m.role,
+          content: m.content,
+          timestamp: m.timestamp,
+        })),
       },
       {
         instanceLabel: this.instanceLabel,
@@ -311,6 +326,11 @@ export class TsTuiMvpApp {
         getOpenMenuLabel: () => this.menuUi.getOpenMenuLabel(),
       },
     );
+
+    // Set scramble session log path
+    const scrambleLogDir = path.join(SCRATCH_BASE, "scramble-sessions");
+    fs.mkdirSync(scrambleLogDir, { recursive: true });
+    this.scrambleBrain.setLogPath(path.join(scrambleLogDir, `${this.scrambleBrain.sessionId}.jsonl`));
   }
 
   /** Boot the app: load modules, rebuild menus, render chrome, bind global keys, restore workspace, start control API. */
@@ -1170,6 +1190,11 @@ export class TsTuiMvpApp {
         brain: this.scrambleBrain,
         initialPos,
         onStateChanged: () => this.updateStatusLine(),
+        onOpenLog: () => {
+          const lp = this.scrambleBrain.logPath;
+          if (!lp) return;
+          this.editor.openFile(lp);
+        },
       });
     });
   }
@@ -1930,6 +1955,29 @@ export class TsTuiMvpApp {
           const expand = (win as unknown as Record<string, unknown>)._scrambleExpand;
           if (typeof expand === "function") (expand as () => void)();
         }
+      },
+      scramblePopOut: () => {
+        const win = this.findWindowByAppType("companion-widget");
+        if (win) {
+          const popOut = (win as unknown as Record<string, unknown>)._scramblePopOut;
+          if (typeof popOut === "function") (popOut as () => void)();
+        }
+      },
+      scramblePet: () => {
+        void this.scrambleBrain.send("/pet").then(() => this.updateStatusLine());
+        const win = this.findWindowByAppType("companion-widget");
+        win?.writeInput?.("/pet");
+      },
+      scrambleSleep: () => {
+        void this.scrambleBrain.send("/sleep").then(() => this.updateStatusLine());
+      },
+      scrambleWake: () => {
+        void this.scrambleBrain.send("/wake").then(() => this.updateStatusLine());
+      },
+      scrambleMeow: () => {
+        void this.scrambleBrain.send("/meow").then(() => this.updateStatusLine());
+        const win = this.findWindowByAppType("companion-widget");
+        win?.writeInput?.("/meow");
       },
       openWorkspaceManager: () => this.openWorkspaceManagerWindow(),
       openCommandPalette: () => this.openCommandPaletteWindow(),
