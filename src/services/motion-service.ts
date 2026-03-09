@@ -58,8 +58,8 @@ function resolveEasing(easing?: EasingFn | string): EasingFn {
 }
 
 export function tween(opts: TweenOpts): { cancel: () => void } {
-  const from = opts.from;
-  const to = opts.to;
+  const from = Number.isFinite(opts.from) ? opts.from : 0;
+  const to = Number.isFinite(opts.to) ? opts.to : 0;
   const duration = Math.max(0, opts.duration);
   const easing = resolveEasing(opts.easing);
 

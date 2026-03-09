@@ -125,6 +125,7 @@ export default function setup(host: MicroappHost) {
       const ty = Number(args.y ?? activeDancer.y);
       const sx = activeDancer.x, sy = activeDancer.y;
       tween({
+        from: 0, to: 1,
         duration: 400,
         easing: (t) => t < 0.5 ? 2*t*t : -1+(4-2*t)*t,
         onUpdate: (p) => {
@@ -462,6 +463,7 @@ export default function setup(host: MicroappHost) {
 
     win.onCleanup(() => {
       clearTimers(timers);
+      if (haikuAgent) { haikuAgent.abort(); haikuAgent = undefined; }
       poseBar.destroy(); moodBar.destroy();
       activeWindow = undefined;
       activeRenderAll = undefined;
