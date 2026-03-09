@@ -166,20 +166,24 @@ WibWobWorld geology, etc). The panel system is content-agnostic.
 
 - [x] AC-1: Panel grid renders in full-screen window, no sidebar
 - [x] AC-2: 6 panel types all render correctly (ascii, figlet, infographic, text, pixel, mixed) — 7 types + webcam
-- [ ] AC-3: Grid reflows on window resize — panels re-wrap, no overflow clipping
+- [x] AC-3: Grid reflows on window resize — panels re-wrap, width clamps to viewport
 - [x] AC-4: 100+ panels load from content directory, scroll smoothly — 62 panels, scroll fixed (blessed fixed:true)
 - [x] AC-5: Figlet headlines auto-size to panel width
 - [x] AC-6: ASCII/primer panels render from file path
-- [ ] AC-7: Panel search by title works
-- [ ] AC-7.1: Stretch Goal: Panel search filter eg type 'S' and only panels with 'S*' in name are displayed. Will need debounce etc. Move to parking lot if hard.
-- [-] AC-8: Two zoom levels — normal and compact — replaced with z=minimap (text doesn't scale) [Zilla: I think this is done via minimap]
+- [x] AC-7: Panel search by title works — / key opens search, enter submits, escape cancels
+- [ ] AC-7.1: Stretch: live filter as you type (debounce). Parking lot if hard.
+- [-] AC-8: Two zoom levels — replaced with z=minimap (text doesn't scale)
 - [x] AC-9: `describeState()` contract correct (panelCount, viewport, scrollPos)
 - [x] AC-10: `bun run typecheck` clean
-- [ ] AC-11: Any panel draggable by human via mouse [we got this working in the `TouchLab MVP` app already]
+- [~] AC-11: Any panel draggable by human via mouse — wired at screen level, needs human test
 - [x] AC-12: Agent can move panels via registered command — sy2.panel.move + sy2.panel.inspect
-- [ ] AC-13: Double-click text panel enters edit mode [what does edit mode look like? Do we open 'modal' or sidebar or show reverse of window {be mindful of memory etc too}]
-- [ ] AC-14: Clicking a panel while scrolled south does not jump canvas back to top
-- [ ] AC-15: microapp-sdk.ts exports all helpers modules need — no module should reach past the SDK into src/core/ or src/services/ directly. See audit: `.planning/refactor-docs/030-microapp-sdk-audit-2026-03.md`
+- [~] AC-13: Double-click text panel enters edit mode — wired at screen level, needs human test
+- [x] AC-14: Clicking a panel while scrolled does not jump canvas back to top — isInsideCanvas bounds + canvas.focus override
+- [ ] AC-15: microapp-sdk.ts exports all helpers — no module should reach past SDK into src/core/ or src/services/ directly
+- [x] AC-16: Panels at bottom viewport edge clip cleanly — manual viewport clipping for fixed:true children
+- [x] AC-17: Panel type glyph prefixes in title bar — PANEL_TYPE_PREFIX registry, switchable to word labels
+- [x] AC-18: Bottom toolbar with clickable buttons (Search, Map, Pause/Play)
+- [x] AC-19: Global pause/play toggle freezes all panel animations (p key or toolbar button)
 
 ---
 
