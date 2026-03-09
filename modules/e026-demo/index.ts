@@ -238,14 +238,16 @@ function openDemo(host: MicroappHost) {
       if (id === "close")  win.close();
     },
   );
-  // Pin the bar node to the bottom of win.body directly
-  const barNode = bar.node as any;
-  barNode.top    = undefined;
-  barNode.bottom = 0;
-  barNode.left   = 0;
-  barNode.width  = "100%";
-  barNode.height = 1;
   bar.update({ leftText: " E026 — F03 F05 F06 F07 RenderMonitor ✓", activeId: "tween" });
+
+  function layoutBar() {
+    const w = Math.max(20, Number(win.body.width)  || 80);
+    const h = Math.max(4,  Number(win.body.height) || 20);
+    bar.layout({ top: h - 1, left: 0, width: w, height: 1 });
+    host.screen.render();
+  }
+  setImmediate(layoutBar);
+  win.onResize(layoutBar);
 
   // ── Body keys ─────────────────────────────────────────────────────────────
 
