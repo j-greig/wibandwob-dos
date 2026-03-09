@@ -47,6 +47,18 @@ interface ControlApiHandlers {
   windows: import("../core/window-facade.js").WindowFacade;
   /** Blessed screen.screenshot() — returns full TUI as ANSI text. */
   screenshotText: () => string;
+  /** Scramble brain state snapshot for agents. */
+  getScrambleState: () => {
+    status: string;
+    sleeping: boolean;
+    model: string;
+    sessionId: string;
+    messageCount: number;
+    lastMessage: string | null;
+    logPath: string | null;
+  };
+  /** Scramble full conversation history. */
+  getScrambleHistory: () => Array<{ role: string; content: string; timestamp: number }>;
 }
 
 interface ControlApiIdentity {
@@ -84,7 +96,17 @@ const ENDPOINT_CATALOGUE = [
   { method: "POST", path: "/view/art/open",                 body: {}, description: "Alias: art.open" },
   { method: "POST", path: "/view/monster-cam/open",         body: {}, description: "Alias: monster_cam.open" },
   { method: "POST", path: "/view/wibwob-agent/open",        body: {}, description: "Alias: agent.open" },
-  { method: "POST", path: "/view/companion/open",           body: {}, description: "Alias: companion.open" },
+  { method: "POST", path: "/view/companion/open",           body: {}, description: "Alias: companion.open (floating)" },
+  { method: "POST", path: "/view/companion/smol",           body: {}, description: "Alias: companion.smol (popup)" },
+  { method: "GET",  path: "/scramble/state",                body: {}, description: "Scramble brain state: status, model, sessionId, messageCount, lastMessage, sleeping, logPath" },
+  { method: "GET",  path: "/scramble/history",              body: {}, description: "Full Scramble conversation history as JSON array" },
+  { method: "POST", path: "/scramble/say",                  body: { text: "string" }, description: "Send a message to Scramble (returns reply)" },
+  { method: "POST", path: "/scramble/expand",               body: {}, description: "Toggle Scramble smol/tall" },
+  { method: "POST", path: "/scramble/pop-out",              body: {}, description: "Pop Scramble out to floating window" },
+  { method: "POST", path: "/scramble/pet",                  body: {}, description: "Pet Scramble" },
+  { method: "POST", path: "/scramble/sleep",                body: {}, description: "Put Scramble to sleep" },
+  { method: "POST", path: "/scramble/wake",                 body: {}, description: "Wake Scramble up" },
+  { method: "POST", path: "/scramble/meow",                 body: {}, description: "Make Scramble meow" },
   { method: "POST", path: "/view/music-player/open",        body: { filePath: "string (optional)" }, description: "Alias: music-player.open" },
   { method: "POST", path: "/view/primer-browser/open",      body: {}, description: "Alias: primer.browse" },
   { method: "POST", path: "/view/file-manager/open",        body: {}, description: "Alias: finder.open" },
@@ -237,6 +259,14 @@ export class ControlApiService {
       // without triggering a window-manager onChange (e.g. direct microapp commands).
       return Response.json(this.handlers.syncState());
     }
+
+    if (request.method === "GET" && url.pathname === "/scramble/state") {
+      return Response.json(this.handlers.getScrambleState());
+    }
+
+    if (request.method === "GET" && url.pathname === "/scramble/history") {
+      return Response.json({ history: this.handlers.getScrambleHistory() });
+    }
     if (request.method === "GET" && url.pathname === "/commands/list") {
       const surface = url.searchParams.get("surface") as CommandSurface | null;
       const includeUnavailableRaw = url.searchParams.get("includeUnavailable");
@@ -360,6 +390,14 @@ export class ControlApiService {
       "/view/monster-cam/open":     { id: "monster_cam.open" },
       "/view/wibwob-agent/open":    { id: "agent.open" },
       "/view/companion/open":       { id: "companion.open" },
+      "/view/companion/smol":       { id: "companion.smol" },
+      "/scramble/say":              { id: "scramble.say", argsMapper: (b) => b.text ? { text: b.text } : undefined },
+      "/scramble/expand":           { id: "scramble.expand" },
+      "/scramble/pop-out":          { id: "scramble.pop-out" },
+      "/scramble/pet":              { id: "scramble.pet" },
+      "/scramble/sleep":            { id: "scramble.sleep" },
+      "/scramble/wake":             { id: "scramble.wake" },
+      "/scramble/meow":             { id: "scramble.meow" },
       "/view/music-player/open":    { id: "music-player.open" },
       "/view/workspace/open":       { id: "workspace.manage" },
       "/view/palette/open":         { id: "palette.open" },

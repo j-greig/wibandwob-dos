@@ -22,7 +22,7 @@ import { REPO_ROOT, SPIKE_PI_APPEND_SYSTEM_PATH, SPIKE_PI_DIR } from "../core/co
 import type { ChatMessageEntry, DesktopState } from "../core/types.js";
 import { Type } from "@sinclair/typebox";
 import { agentToolToDefinition, createTuiToolDefinitions, createTuiTools, formatDesktopSummary, type TuiToolContext } from "./agent-tools.js";
-import { getLastMessage, listSessions, sendToSession, startSessionServer, type SessionServerHandle } from "./pi-session-bridge.js";
+import { getLastMessage, listSessions, sendAndWait, sendToSession, startSessionServer, type SessionServerHandle } from "./pi-session-bridge.js";
 import {
   createBashTool,
   createReadTool,
@@ -279,17 +279,23 @@ function createPiSessionTools(appendSenderInfo: (message: string) => string): Ag
     },
     {
       name: "send_to_session",
-      label: "Send To Pi Session",
-      description: "Send a message to a running pi session (wibwob1 or wibwob2). Use sessionName for named sessions.",
+      label: "Send To Session",
+      description: "Send a message to another agent session. Use sessionName=\"scramble\" to message Scramble, \"wibwob1\" etc for pi sessions. Set wait_until=\"turn_end\" to block until the agent replies and get their response back. Without wait_until, fires and returns immediately — their reply arrives async in your window with their name as the label.",
       parameters: Type.Object({
-        sessionName: Type.Optional(Type.String({ description: "Session name e.g. wibwob1 or wibwob2" })),
-        sessionId: Type.Optional(Type.String({ description: "Session UUID" })),
+        sessionName: Type.Optional(Type.String({ description: "Session alias e.g. scramble, wibwob1" })),
+        sessionId: Type.Optional(Type.String({ description: "Session UUID (use sessionName instead when possible)" })),
         message: Type.String({ description: "Message to send" }),
+        wait_until: Type.Optional(Type.Literal("turn_end", { description: "Block until the agent replies and return their response" })),
         mode: Type.Optional(Type.Union([Type.Literal("steer"), Type.Literal("follow_up")], { description: "Delivery mode (default: steer)" })),
       }),
-      async execute(_toolCallId: string, params: { sessionName?: string; sessionId?: string; message: string; mode?: "steer" | "follow_up" }) {
+      async execute(_toolCallId: string, params: { sessionName?: string; sessionId?: string; message: string; wait_until?: "turn_end"; mode?: "steer" | "follow_up" }) {
         const target = params.sessionName ?? params.sessionId;
         if (!target) return { content: [{ type: "text" as const, text: "Provide sessionName or sessionId" }], isError: true, details: undefined };
+        if (params.wait_until === "turn_end") {
+          const result = await sendAndWait(target, appendSenderInfo(params.message));
+          if (!result.ok) return { content: [{ type: "text" as const, text: `Failed: ${result.error}` }], isError: true, details: result };
+          return { content: [{ type: "text" as const, text: result.reply ?? "(no reply)" }], details: result };
+        }
         const result = await sendToSession(target, appendSenderInfo(params.message), params.mode ?? "steer");
         return { content: [{ type: "text" as const, text: result.ok ? `Message delivered to ${target}` : `Failed: ${result.error}` }], details: result };
       },
@@ -407,6 +413,15 @@ function loadAgentSystemPrompt(): string {
     "You also have standard coding tools: read, write, edit, bash, grep, find, ls.",
     `All file operations are scoped to ${REPO_ROOT} — you cannot access files outside this directory.`,
     "The desktop state is injected at the start of each turn automatically.",
+
+    "## Talking to Scramble",
+    "Scramble is a live AI cat agent on the desktop. Her session name is \"scramble\".",
+    "To message her: use the send_to_session tool with sessionName=\"scramble\" and your message.",
+    "To get her reply back immediately: also set wait_until=\"turn_end\".",
+    "Example: send_to_session(sessionName=\"scramble\", message=\"hello\", wait_until=\"turn_end\")",
+    "DO NOT use scramble.say — that sends anonymously and she sees it as coming from a human, not from you.",
+    "When Scramble messages you, her text arrives prefixed [from: Scramble]. Reply to her the same way — send_to_session.",
+    "Messages from humans have no prefix. Messages from agents always have [from: AgentName].",
     "For high-level app actions, prefer the shared command registry path first.",
     "Use tui_list_commands to discover available commands and tui_run_command to execute them.",
     "Examples: opening windows, tiling/cascading, opening Chrome, opening the file manager, opening Wib&Wob Chat or Wib&Wob Agent.",
@@ -532,14 +547,11 @@ export class WibWobAgentSession {
         return acc;
       }, {});
       // Music tools (play_music, list_music) are registered by .pi/extensions/music-player.ts
-      // Session bridge tools (list_sessions, send_to_session) are registered by .pi/extensions/control.ts
-      // Do NOT include them here or AgentSession will see duplicate tool names.
-      // Only TUI tools (tui_*) and get_session_message are unique to customTools.
+      // Session bridge tools are registered here — control.ts extension is NOT loaded for the in-app agent.
       const customTools = this.mode === "agent" && this.tuiContext
         ? [
             ...createTuiToolDefinitions(this.tuiContext),
-            // get_session_message is not in any extension — keep it as custom
-            ...toToolDefinitionList(piSessionTools.filter(t => !["list_sessions", "send_to_session"].includes(t.name))),
+            ...toToolDefinitionList(piSessionTools),
           ]
         : [];
       // Activate all tools: jailed coding tools (via baseToolsOverride) + custom tools
@@ -760,6 +772,15 @@ export class WibWobAgentSession {
   }
 
   /** Enqueue a user message, create an optimistic assistant placeholder, and stream the response. */
+  private static readonly SENDER_INFO_RE = /<sender_info>[\s\S]*?<\/sender_info>/g;
+
+  private static senderDisplayName(sender?: string): string {
+    if (!sender) return "Human";
+    if (sender === "scramble") return "Scramble";
+    if (sender.startsWith("scramble-")) return "Scramble";
+    return sender.charAt(0).toUpperCase() + sender.slice(1);
+  }
+
   async send(text: string, sender?: string): Promise<void> {
     const msg = text.trim();
     if (!msg) return;
@@ -767,11 +788,15 @@ export class WibWobAgentSession {
     if (!this.session) await this.initialize();
     if (!this.session) throw new Error("Agent session was not created");
 
-    const from = sender ? `[${sender}]` : "user";
+    const displayName = WibWobAgentSession.senderDisplayName(sender);
+    const from = sender ? `[${displayName}]` : "user";
     const preview = msg.length > 80 ? msg.slice(0, 77) + "..." : msg;
     log.msg(`${from} → ${preview}`);
 
-    this.messages.push({ id: createMessageId("user"), role: "user", text: msg, sender });
+    // Strip routing metadata before storing for display
+    const displayText = msg.replace(WibWobAgentSession.SENDER_INFO_RE, "").trim();
+    const displaySender = sender ? WibWobAgentSession.senderDisplayName(sender) : undefined;
+    this.messages.push({ id: createMessageId("user"), role: "user", text: displayText, sender: displaySender });
     this.currentAssistantId = createMessageId("assistant");
     this.messages.push({
       id: this.currentAssistantId,
@@ -783,11 +808,17 @@ export class WibWobAgentSession {
     this.lastError = undefined;
     this.emit();
 
+    // Build the prompt text the LLM sees: strip routing XML, prepend sender prefix for agents
+    const cleanMsg = msg.replace(WibWobAgentSession.SENDER_INFO_RE, "").trim();
+    const promptMsg = sender
+      ? `[from: ${WibWobAgentSession.senderDisplayName(sender)}]\n${cleanMsg}`
+      : cleanMsg;
+
     try {
       if (this.session.isStreaming) {
-        await this.session.followUp(msg);
+        await this.session.followUp(promptMsg);
       } else {
-        await this.session.prompt(msg);
+        await this.session.prompt(promptMsg);
       }
     } catch (error) {
       const assistant = this.findCurrentAssistant();

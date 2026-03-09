@@ -48,6 +48,15 @@ export interface AppMenuActions {
   openSy2Chronicles: (args?: Record<string, unknown>) => void;
   openPatternWindow: () => void;
   openCompanionWindow: () => void;
+  openScrambleSmol: () => void;
+  openScrambleFloating: () => void;
+  scrambleSay: (args?: Record<string, unknown>) => void;
+  scrambleExpand: () => void;
+  scramblePopOut: () => void;
+  scramblePet: () => void;
+  scrambleSleep: () => void;
+  scrambleWake: () => void;
+  scrambleMeow: () => void;
   openWorkspaceManager: () => void;
   openCommandPalette: () => void;
   openStateInspector: () => void;
@@ -785,12 +794,86 @@ const APP_COMMANDS: AppCommandDefinition[] = [
   },
   {
     id: "companion.open",
-    label: "Companion",
-    description: "Open Scramble the cat companion window.",
+    label: "Scramble (floating)",
+    description: "Open Scramble the cat as a full floating window.",
     group: "surface",
-    actionKey: "openCompanionWindow",
+    actionKey: "openScrambleFloating",
     menuPlacements: [{ category: "applications", order: 130 }],
     palettePlacement: { order: 120 },
+    api: true,
+    agent: true
+  },
+  {
+    id: "companion.smol",
+    label: "Scramble (popup)",
+    description: "Open Scramble as a smol popup anchored to the bottom-right corner.",
+    group: "surface",
+    actionKey: "openScrambleSmol",
+    menuPlacements: [{ category: "applications", order: 131 }],
+    palettePlacement: { order: 121 },
+    api: true,
+    agent: true
+  },
+  {
+    id: "scramble.say",
+    label: "Scramble: say",
+    description: "Send a message to Scramble. Args: { text: string }",
+    group: "surface",
+    actionKey: "scrambleSay",
+    api: true,
+    agent: true
+  },
+  {
+    id: "scramble.expand",
+    label: "Scramble: expand/collapse",
+    description: "Toggle Scramble popup between smol and tall.",
+    group: "surface",
+    actionKey: "scrambleExpand",
+    api: true,
+    agent: true
+  },
+  {
+    id: "scramble.pop-out",
+    label: "Scramble: pop out to floating",
+    description: "Pop Scramble out of smol/tall popup into a full floating window.",
+    group: "surface",
+    actionKey: "scramblePopOut",
+    api: true,
+    agent: true
+  },
+  {
+    id: "scramble.pet",
+    label: "Scramble: pet",
+    description: "Pet Scramble (/pet slash command — she allows it).",
+    group: "surface",
+    actionKey: "scramblePet",
+    api: true,
+    agent: true
+  },
+  {
+    id: "scramble.sleep",
+    label: "Scramble: sleep",
+    description: "Put Scramble to sleep (/sleep — silences idle quips).",
+    group: "surface",
+    actionKey: "scrambleSleep",
+    api: true,
+    agent: true
+  },
+  {
+    id: "scramble.wake",
+    label: "Scramble: wake",
+    description: "Wake Scramble up (/wake — re-enables responses).",
+    group: "surface",
+    actionKey: "scrambleWake",
+    api: true,
+    agent: true
+  },
+  {
+    id: "scramble.meow",
+    label: "Scramble: meow",
+    description: "Make Scramble meow (/meow — no LLM call).",
+    group: "surface",
+    actionKey: "scrambleMeow",
     api: true,
     agent: true
   },

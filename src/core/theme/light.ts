@@ -24,7 +24,7 @@ export const light: ThemeVariant = {
     footer: { fg: "white", bg: "blue" },
 
     selected: { fg: "white", bg: "blue" },
-    input: { fg: "white", bg: "blue" },
+    input: { fg: "#1a1a1a", bg: "#4a90d9" },
     scrollbar: { fg: "blue", bg: "white", track: "grey" },
 
     accent: { fg: "blue", bg: "white" },

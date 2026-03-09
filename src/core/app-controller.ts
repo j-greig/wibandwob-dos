@@ -18,6 +18,7 @@ import {
   MASTER_PHILOSOPHY_PATH,
   README_PATH,
   REPO_ROOT,
+  SCRATCH_BASE,
   SPIKE_NOTES_PATH,
   SPIKE_ROOT,
   STATE_PATH,
@@ -117,12 +118,16 @@ import {
 } from "../windows/figlet-windows.js";
 import {
   openCommandPaletteWindow as openPaletteWindow,
-  openCompanionWindow as openScrambleWindow,
   openArtWindow as openGenerativeArtWindow,
   openPatternWindow as openPatternAnimationWindow,
   openStateInspectorWindow as openInspectorWindow,
   openWorkspaceManagerWindow as openWorkspaceCommandWindow,
 } from "../windows/misc-windows.js";
+import {
+  openScrambleFloatingWindow,
+  openScrambleSmolPopup,
+} from "../windows/scramble-window.js";
+import { ScrambleBrain } from "../services/scramble-brain.js";
 import { openContourWindow as openContourStudioWindow } from "../windows/contour-window.js";
 import { openPlasmaWindow as openPlasmaStudioWindow } from "../windows/plasma-window.js";
 import {
@@ -189,6 +194,8 @@ export class TsTuiMvpApp {
   private readonly controlApi: ControlApiService;
   private readonly editor: EditorCoordinator;
   private activeAgentSession?: WibWobAgentSession;
+  private readonly scrambleBrain: ScrambleBrain = new ScrambleBrain();
+  private scramblePopupWindowId?: string;
   private readonly instanceLabel?: string;
   private readonly sessionId: string;
 
@@ -229,7 +236,19 @@ export class TsTuiMvpApp {
       height: 1,
       width: "100%",
       tags: true,
+      mouse: true,
+      clickable: true,
       style: theme().statusLine,
+    });
+
+    // Click the Scramble indicator (=^=) in the bottom-right to toggle smol popup
+    this.statusLine.on("click", (mouse) => {
+      const clickX = (mouse as unknown as { x: number }).x;
+      const w = Math.max(1, Number(this.screen.width) || 80);
+      // Indicator is last 7 chars: " (=^=)"
+      if (clickX >= w - 8) {
+        this.openScrambleSmol();
+      }
     });
 
     this.windowManager = new WindowManager(
@@ -282,6 +301,20 @@ export class TsTuiMvpApp {
         runCommand: (id, args) => this.commands.run(id, args),
         windows: this.windowManager,
         screenshotText: () => (this.screen as any).screenshot() as string,
+        getScrambleState: () => ({
+          status: this.scrambleBrain.status,
+          sleeping: this.scrambleBrain.sleeping,
+          model: this.scrambleBrain.modelName,
+          sessionId: this.scrambleBrain.sessionId,
+          messageCount: this.scrambleBrain.history.length,
+          lastMessage: this.scrambleBrain.history.at(-1)?.content ?? null,
+          logPath: this.scrambleBrain.logPath ?? null,
+        }),
+        getScrambleHistory: () => this.scrambleBrain.history.map((m) => ({
+          role: m.role,
+          content: m.content,
+          timestamp: m.timestamp,
+        })),
       },
       {
         instanceLabel: this.instanceLabel,
@@ -305,6 +338,17 @@ export class TsTuiMvpApp {
         getOpenMenuLabel: () => this.menuUi.getOpenMenuLabel(),
       },
     );
+
+    // Set scramble session log path
+    const scrambleLogDir = path.join(SCRATCH_BASE, "scramble-sessions");
+    fs.mkdirSync(scrambleLogDir, { recursive: true });
+    this.scrambleBrain.setLogPath(path.join(scrambleLogDir, `${this.scrambleBrain.sessionId}.jsonl`));
+    this.scrambleBrain.startSessionSocket();
+    // Re-render whichever Scramble window is open when brain state changes externally
+    this.scrambleBrain.onChange = () => {
+      const win = this.findWindowByAppType("companion-widget");
+      win?.refresh?.();
+    };
   }
 
   /** Boot the app: load modules, rebuild menus, render chrome, bind global keys, restore workspace, start control API. */
@@ -502,9 +546,14 @@ export class TsTuiMvpApp {
       ? ` Focus ${focus.id}:${focus.kind} ${focus.width ?? "?"}x${focus.height ?? "?"}@${focus.left ?? 0},${focus.top ?? 0}`
       : " Focus none";
     const left = `Alt-F File  Alt-E Edit  Alt-V View  Alt-W Window  Alt-A Applications  Tab Next  Shift-Tab Prev  Alt-Shift-Arrows Resize  Ctrl-S Save  Ctrl-Q Quit  |  Term ${current.screen.width}x${current.screen.height}  Theme ${themeName()}  Windows ${current.screen.openWindowCount}${focusSummary}`;
+    const scrFace = this.scrambleBrain.sleeping ? "(-.-)" :
+      this.scrambleBrain.status === "thinking" ? "(o.O)" :
+      this.scrambleBrain.status === "error"    ? "(x.x)" :
+      this.scrambleBrain.status === "offline"  ? "(-.-)" : "(=^=)";
+    const scrLabel = ` ${scrFace}`;
     const width = Math.max(1, Number(this.screen.width));
-    const content = left.slice(0, width);
-    this.statusLine.setContent(content);
+    const trimLeft = left.slice(0, width - scrLabel.length);
+    this.statusLine.setContent(trimLeft.padEnd(width - scrLabel.length) + scrLabel);
   }
 
   private toggleTheme(): void {
@@ -1142,16 +1191,54 @@ export class TsTuiMvpApp {
 
   private openCompanionWindow(restore?: {
     tick?: number;
+    displayMode?: string;
   }): WindowRecord | undefined {
+    const mode = restore?.displayMode;
+    if (mode === "smol" || mode === "tall") {
+      return this.openScrambleSmol(mode);
+    }
+    return this.openScrambleFloating();
+  }
+
+  private openScrambleFloating(initialPos?: { top: number; left: number; width: number; height: number }): WindowRecord | undefined {
     return this.focusOrCreate("companion-widget", () => {
-      openScrambleWindow(
-        {
-          screen: this.screen,
-          windowManager: this.windowManager,
+      openScrambleFloatingWindow({
+        screen: this.screen,
+        windowManager: this.windowManager,
+        brain: this.scrambleBrain,
+        initialPos,
+        onStateChanged: () => this.updateStatusLine(),
+        onOpenLog: () => {
+          const lp = this.scrambleBrain.logPath;
+          if (!lp) return;
+          this.editor.openFile(lp);
         },
-        restore,
-      );
+      });
     });
+  }
+
+  private openScrambleSmol(initialMode?: "smol" | "tall"): WindowRecord | undefined {
+    // Close any existing popup first
+    const existing = this.findWindowByAppType("companion-widget");
+    if (existing) {
+      existing.focus();
+      return existing;
+    }
+    openScrambleSmolPopup({
+      screen: this.screen,
+      windowManager: this.windowManager,
+      brain: this.scrambleBrain,
+      initialMode,
+      onStateChanged: () => this.updateStatusLine(),
+      onPopOut: () => {
+        // Abort any in-flight send, then close popup and open floating
+        this.scrambleBrain.abort();
+        const popup = this.findWindowByAppType("companion-widget");
+        if (popup) this.windowManager.closeWindow(popup.id);
+        this.openScrambleFloating();
+      },
+    });
+    return this.findWindowByAppType("companion-widget");
   }
 
   private openWorkspaceManagerWindow(): WindowRecord | undefined {
@@ -1869,6 +1956,48 @@ export class TsTuiMvpApp {
       },
       openPatternWindow: () => this.openPatternWindow(),
       openCompanionWindow: () => this.openCompanionWindow(),
+      openScrambleSmol: () => { this.openScrambleSmol(); },
+      openScrambleFloating: () => { this.openScrambleFloating(); },
+      scrambleSay: (args) => {
+        const text = typeof args?.text === "string" ? args.text.trim() : "";
+        if (!text) return;
+        const win = this.findWindowByAppType("companion-widget");
+        if (win?.writeInput) {
+          win.writeInput(text);
+        } else {
+          void this.scrambleBrain.send(text).then(() => this.updateStatusLine());
+        }
+      },
+      scrambleExpand: () => {
+        const win = this.findWindowByAppType("companion-widget");
+        if (win) {
+          const expand = (win as unknown as Record<string, unknown>)._scrambleExpand;
+          if (typeof expand === "function") (expand as () => void)();
+        }
+      },
+      scramblePopOut: () => {
+        const win = this.findWindowByAppType("companion-widget");
+        if (win) {
+          const popOut = (win as unknown as Record<string, unknown>)._scramblePopOut;
+          if (typeof popOut === "function") (popOut as () => void)();
+        }
+      },
+      scramblePet: () => {
+        void this.scrambleBrain.send("/pet").then(() => this.updateStatusLine());
+        const win = this.findWindowByAppType("companion-widget");
+        win?.writeInput?.("/pet");
+      },
+      scrambleSleep: () => {
+        void this.scrambleBrain.send("/sleep").then(() => this.updateStatusLine());
+      },
+      scrambleWake: () => {
+        void this.scrambleBrain.send("/wake").then(() => this.updateStatusLine());
+      },
+      scrambleMeow: () => {
+        void this.scrambleBrain.send("/meow").then(() => this.updateStatusLine());
+        const win = this.findWindowByAppType("companion-widget");
+        win?.writeInput?.("/meow");
+      },
       openWorkspaceManager: () => this.openWorkspaceManagerWindow(),
       openCommandPalette: () => this.openCommandPaletteWindow(),
       openStateInspector: () => this.openStateInspectorWindow(),

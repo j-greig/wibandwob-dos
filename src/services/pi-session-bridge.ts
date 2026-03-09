@@ -174,6 +174,60 @@ export async function sendToSession(
   }
 }
 
+/** Send a message and wait for the turn_end event — returns the reply content. */
+export async function sendAndWait(
+  target: string,
+  message: string,
+  timeoutMs = 120_000,
+): Promise<{ ok: boolean; reply?: string; error?: string }> {
+  const sockPath = await resolveSocketPath(target);
+  if (!sockPath) return { ok: false, error: `Session not found: ${target}` };
+
+  return new Promise((resolve) => {
+    const socket = net.createConnection(sockPath);
+    socket.setEncoding("utf8");
+    const timer = setTimeout(() => {
+      socket.destroy();
+      resolve({ ok: false, error: "timeout waiting for turn_end" });
+    }, timeoutMs);
+
+    let buffer = "";
+    let acked = false;
+
+    socket.once("connect", () => {
+      socket.write(`${JSON.stringify({ type: "send", message })}\n`);
+      socket.write(`${JSON.stringify({ type: "subscribe", event: "turn_end" })}\n`);
+    });
+
+    socket.on("data", (chunk) => {
+      buffer += chunk;
+      while (buffer.includes("\n")) {
+        const nl = buffer.indexOf("\n");
+        const line = buffer.slice(0, nl).trim();
+        buffer = buffer.slice(nl + 1);
+        if (!line) continue;
+        try {
+          const msg = JSON.parse(line) as Record<string, unknown>;
+          if (msg.type === "response" && msg.command === "send") acked = true;
+          if (msg.type === "event" && msg.event === "turn_end") {
+            clearTimeout(timer);
+            socket.end();
+            const data = msg.data as { message?: { content?: string } } | undefined;
+            resolve({ ok: true, reply: data?.message?.content ?? undefined });
+          }
+        } catch { /* ignore parse errors */ }
+      }
+    });
+
+    socket.once("error", (e) => {
+      clearTimeout(timer);
+      resolve({ ok: false, error: e.message });
+    });
+
+    void acked; // used implicitly via acked flag above
+  });
+}
+
 export async function getLastMessage(target: string): Promise<string | null> {
   const sockPath = await resolveSocketPath(target);
   if (!sockPath) return null;
@@ -187,13 +241,19 @@ export async function getLastMessage(target: string): Promise<string | null> {
 }
 
 // ============================================================================
-// Session Server — makes wibwob-tui a first-class peer in list_sessions
+// Session Server — makes any in-app session a first-class peer in list_sessions
 // ============================================================================
+
+/** A subscriber waiting for the next turn_end event on a given socket. */
+interface TurnEndSub {
+  socket: net.Socket;
+  subscriptionId: string;
+}
 
 export interface SessionServerHandle {
   /** The socket file path, e.g. ~/.pi/session-control/<id>.sock */
   socketPath: string;
-  /** The alias symlink path, e.g. ~/.pi/session-control/wibwob-tui.alias */
+  /** The alias symlink path, e.g. ~/.pi/session-control/scramble.alias */
   aliasPath: string;
   /** Stop the server and remove the socket + alias */
   close(): void;
@@ -202,6 +262,8 @@ export interface SessionServerHandle {
 export interface SessionServerTarget {
   /** The session's unique id (used as the socket filename) */
   sessionId: string;
+  /** Human-readable alias name for discovery (default: "wibwob-tui") */
+  aliasName?: string;
   /** Submit a message into the session */
   send(text: string, sender?: string): Promise<void>;
   /** Return the last assistant reply, or null if none yet */
@@ -226,74 +288,142 @@ export function startSessionServer(target: SessionServerTarget): SessionServerHa
   fs.mkdirSync(CONTROL_DIR, { recursive: true });
 
   const socketPath = getSocketPath(target.sessionId);
-  const aliasPath = path.join(CONTROL_DIR, "wibwob-tui.alias");
+  const aliasPath = path.join(CONTROL_DIR, `${target.aliasName ?? "wibwob-tui"}.alias`);
 
   // Clean up any stale socket from a previous run
   try { fs.unlinkSync(socketPath); } catch { /* ignore */ }
   try { fs.unlinkSync(aliasPath); } catch { /* ignore */ }
 
+  // Sockets waiting for the next turn_end event (registered via `subscribe` command)
+  const turnEndSubs: TurnEndSub[] = [];
+
+  function fireTurnEnd(reply: string | null): void {
+    if (turnEndSubs.length === 0) return;
+    const subs = turnEndSubs.splice(0);
+    for (const sub of subs) {
+      try {
+        const event = JSON.stringify({
+          type: "event",
+          event: "turn_end",
+          subscriptionId: sub.subscriptionId,
+          data: { message: reply ? { content: reply } : null },
+        });
+        sub.socket.end(event + "\n");
+      } catch { /* subscriber already gone */ }
+    }
+  }
+
   const server = net.createServer((socket) => {
     socket.setEncoding("utf8");
     let buffer = "";
+    let socketHasSubscriber = false;
 
-    socket.on("data", (chunk) => {
-      buffer += chunk;
-      const nl = buffer.indexOf("\n");
-      if (nl === -1) return;
-      const line = buffer.slice(0, nl);
-      buffer = buffer.slice(nl + 1);
-
+    function processLine(line: string): void {
       let cmd: Record<string, unknown>;
       try { cmd = JSON.parse(line); }
       catch { socket.end(); return; }
 
       const id = typeof cmd.id === "string" ? cmd.id : undefined;
+      const cmdType = typeof cmd.type === "string" ? cmd.type : "unknown";
 
-      function respond(success: boolean, data?: unknown, error?: string) {
-        const resp = JSON.stringify({ type: "response", command: cmd.type, success, data, error, id });
-        socket.end(resp + "\n");
+      // Reply helper. keepOpen=true writes without closing (used by subscribe).
+      // Otherwise closes the socket unless a subscriber is still pending.
+      function reply(success: boolean, data?: unknown, error?: string, keepOpen = false) {
+        const resp = JSON.stringify({ type: "response", command: cmdType, success, data, error, id });
+        if (keepOpen || socketHasSubscriber) {
+          socket.write(resp + "\n");
+        } else {
+          socket.end(resp + "\n");
+        }
       }
 
-      switch (cmd.type) {
+      switch (cmdType) {
         case "send": {
           const message = typeof cmd.message === "string" ? cmd.message : "";
-          const mode = cmd.mode === "follow_up" ? "follow_up" : "steer";
-          // Sender from explicit field, or extracted from <sender_info> in message text
+          if (!message) { reply(false, undefined, "empty message"); return; }
+          // Sender: explicit field, or strip from <sender_info>sessionName</sender_info> tag
           let sender = typeof cmd.sender === "string" ? cmd.sender : undefined;
           if (!sender) {
-            const m = message.match(/<sender_info>\s*\{[^}]*"sessionName"\s*:\s*"([^"]+)"[^}]*\}\s*<\/sender_info>/);
+            const m = message.match(/<sender_info>[^<]*"sessionName"\s*:\s*"([^"]+)"[^<]*<\/sender_info>/);
             if (m) sender = m[1];
           }
-          if (!message) { respond(false, undefined, "empty message"); return; }
-          // Fire and forget — the response is sent immediately so the caller isn't blocked
-          target.send(message, sender).catch(() => { /* swallow */ });
-          void mode; // mode noted, steer vs follow_up distinction handled by session.send internals
-          respond(true, { queued: true });
+          // Acknowledge immediately, then fire turn_end when the reply resolves
+          reply(true, { queued: true });
+          target.send(message, sender)
+            .then(() => fireTurnEnd(target.getLastReply()))
+            .catch(() => fireTurnEnd(null));
+          return;
+        }
+        case "subscribe": {
+          if (cmd.event !== "turn_end") {
+            reply(false, undefined, `Unknown event type: ${String(cmd.event)}`);
+            return;
+          }
+          const subscriptionId = (typeof id === "string" ? id : undefined)
+            ?? `sub_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+          const sub: TurnEndSub = { socket, subscriptionId };
+          socketHasSubscriber = true;
+          turnEndSubs.push(sub);
+          // Remove subscriber if socket closes before the event fires
+          const cleanup = () => {
+            const idx = turnEndSubs.indexOf(sub);
+            if (idx !== -1) turnEndSubs.splice(idx, 1);
+            socketHasSubscriber = false;
+          };
+          socket.once("close", cleanup);
+          socket.once("error", cleanup);
+          reply(true, { subscriptionId, event: "turn_end" }, undefined, true /* keepOpen */);
           return;
         }
         case "get_message": {
-          const reply = target.getLastReply();
-          respond(true, { message: reply ? { content: reply } : null });
+          const last = target.getLastReply();
+          reply(true, { message: last ? { content: last } : null });
           return;
         }
         case "get_summary": {
-          // Stub: return the last reply as summary
-          const reply = target.getLastReply();
-          respond(true, { summary: reply ?? "No messages yet." });
+          const last = target.getLastReply();
+          reply(true, { summary: last ?? "No messages yet." });
           return;
         }
         case "abort": {
           target.abort?.();
-          respond(true);
+          reply(true);
           return;
         }
         case "clear": {
           target.reset?.();
-          respond(true);
+          reply(true);
           return;
         }
         default:
-          respond(false, undefined, `Unknown command: ${cmd.type}`);
+          reply(false, undefined, `Unknown command: ${cmdType}`);
+      }
+    }
+
+    socket.on("data", (chunk) => {
+      buffer += chunk;
+      // Collect all complete lines from the buffer
+      const lines: string[] = [];
+      let nl = buffer.indexOf("\n");
+      while (nl !== -1) {
+        const line = buffer.slice(0, nl).trim();
+        buffer = buffer.slice(nl + 1);
+        nl = buffer.indexOf("\n");
+        if (line) lines.push(line);
+      }
+      // Pre-scan: if any line is a subscribe command, mark socketHasSubscriber
+      // before processing so that a preceding send command doesn't close the socket.
+      for (const line of lines) {
+        try {
+          const peek = JSON.parse(line) as Record<string, unknown>;
+          if (peek.type === "subscribe" && peek.event === "turn_end") {
+            socketHasSubscriber = true;
+            break;
+          }
+        } catch { /* ignore */ }
+      }
+      for (const line of lines) {
+        processLine(line);
       }
     });
 

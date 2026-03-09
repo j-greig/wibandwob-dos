@@ -51,7 +51,7 @@ export interface SnapshotRestoreActions {
   openBackroomsLogBrowserWindow: () => MaybeWindow;
   openBackroomsPrimerPickerWindow: () => MaybeWindow;
   openChromeBrowserWindow: (restore?: { url?: string }) => MaybeWindow;
-  openCompanionWindow: (restore?: { tick?: number }) => MaybeWindow;
+  openCompanionWindow: (restore?: { tick?: number; displayMode?: string }) => MaybeWindow;
   openArtWindow: () => MaybeWindow;
   openMonsterCamWindow: () => MaybeWindow;
   openWibWobAgentWindow: () => MaybeWindow;
@@ -280,12 +280,17 @@ export const snapshotRegistry = {
 
   // --- kind: "companion" ---
   "companion-widget": {
-    serialize: (window) => ({
-      tick: detailNumber(getDetails(window), "tick") ?? 0,
-    }),
+    serialize: (window) => {
+      const details = getDetails(window);
+      return {
+        tick: detailNumber(details, "tick") ?? 0,
+        displayMode: typeof details?.displayMode === "string" ? details.displayMode : "floating",
+      };
+    },
     restore: (_snapshot, payload, actions) => {
       return actions.openCompanionWindow({
         tick: typeof payload.tick === "number" ? payload.tick : undefined,
+        displayMode: typeof payload.displayMode === "string" ? payload.displayMode : undefined,
       });
     },
   },
