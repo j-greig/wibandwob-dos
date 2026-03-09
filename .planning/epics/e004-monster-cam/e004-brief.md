@@ -109,12 +109,39 @@ Branch worktree-e004-monster-cam merged to main (b3d9d1d). Remaining: AC-6 pose 
 
 **2026-03-08:** venv created at `assets/mediapipe-venv/` (gitignored). `monster_cam.open` now appears in Applications menu and opens successfully. Worktree: `feat/e004-monster-cam-complete`.
 
-## Out of Scope
+## Stretch Goals
 
-- Monster/emoji face compositing
-- Multiple simultaneous cameras
-- Recording or video export
-- Windows/Linux camera capture (avfoundation is macOS only — abstract later)
+Not part of the done definition. Pick up when the mood strikes.
+
+### SG-1 — Pose skeleton render
+Detection is wired, `hasPose` flows through to `/state`, but no visual overlay yet.
+Render the 33-point MediaPipe pose model as an ASCII stick figure on top of the
+grayscale feed. Use the same double-line box style as hands. Expected ~30 lines of
+window render code.
+
+### SG-2 — Monster/emoji face compositing
+Replace (or overlay) the face bbox with a rendered emoji or ASCII monster face,
+locked to the detected face landmarks. Mouth open/closed state from landmarks → swap
+sprite. Very Wib. Could be a toggle key alongside `b` for bg.
+
+### SG-3 — Recording / export
+Capture frames to disk as a timelapse or short clip. Options:
+- ASCII art frames → text file per second → playback via primer animation
+- Raw frame buffer → ffmpeg pipe → mp4
+
+### SG-4 — Multi-camera support
+Open multiple camera devices simultaneously, each in its own Monster Cam window.
+Worker would need a `DEVICE_INDEX` env var; window/service pair per device.
+Low priority — needs a second webcam to test.
+
+### SG-5 — Cross-platform camera
+Current capture uses OpenCV `VideoCapture` which works on macOS, Linux, Windows.
+The old ffmpeg avfoundation path was macOS-only. OpenCV already mostly solves this —
+just needs testing on Linux and documenting.
+
+## Out of Scope (permanent)
+
+- VPS / headless server support — no webcam, never will be. See SPK-glitchbox-tui for agent embodiment without a camera.
 
 ## Known Risks
 
