@@ -179,15 +179,21 @@ No dependency on 0xG for S01–S04. SG-2 requires active coordination.
 
 ## Acceptance Criteria (Epic-Level)
 
-- [ ] GlitchBox window opens from Applications menu
-- [ ] Idle skeleton visible on open, generative field behind it
-- [ ] dance.pose with any named preset updates skeleton immediately
-- [ ] dance.transition animates smoothly between two presets
-- [ ] dance.field changes background mood
-- [ ] dance.join supports at least 2 named coloured skeletons simultaneously
-- [ ] /state includes glitchbox appType + current pose + agent count
-- [ ] bun run typecheck passes clean
-- [ ] Manual smoke: open window, call dance.pose arms-raised, see skeleton change
+- [x] AC-1: `glitchbox.open` in Applications menu + command palette
+- [x] AC-2: Idle skeleton visible on open, generative field behind it
+- [x] AC-3: `renderSkeletonAt()` extracted to `src/core/skeleton-renderer.ts`, exported via SDK
+- [ ] AC-4: `/dance` in Wib&Wob chat opens window, places skeleton at clear position
+- [ ] AC-5: `/dance` in Scramble chat joins same window, placed clear of W&W
+- [x] AC-6: All 5 MVP presets (`idle`, `arms-raised`, `step-left`, `jump`, `wave`) in `landmarksFromPreset()`
+- [ ] AC-7: `glitchbox.pose` updates skeleton immediately via API
+- [ ] AC-8: `glitchbox.move` smoothly tweens skeleton to new x,y over 8 frames
+- [ ] AC-9: `glitchbox.state` sets energy (0–10) — field density + animation speed visibly react
+- [ ] AC-10: Haiku tick fires ~60s per dancer, updates x,y,energy,mood autonomously
+- [ ] AC-11: `glitchbox.field` changes background mood (calm / pulse / chaos / drift)
+- [x] AC-12: `/state` reports `dancers[]` with agentId, x, y, preset, energy, mood
+- [x] AC-13: Works without webcam / mediapipe venv — no camera dependency
+- [x] AC-14: `bun run typecheck` clean
+- [x] AC-15: Manual smoke: window opens, skeleton renders, status bar correct, describeState valid
 
 ---
 
