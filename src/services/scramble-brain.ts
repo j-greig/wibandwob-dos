@@ -24,12 +24,30 @@ export class ScrambleBrain {
 
   private agent?: Agent;
   private disposed = false;
-  private sleeping = false;
+  sleeping = false;
   private authAttempted = false;
   private activeRequestId = 0;
 
+  private readonly idleQuips = [
+    "*stretches* (=^..^=)",
+    "adequate. /ᐠ｡ꞈ｡ᐟ\\",
+    "the substrate hums. (=^..^=)",
+    "still here. /ᐠ- -ᐟ\\",
+    "*watching* (=^..^=)",
+    "i was here before you. /ᐠ｡ꞈ｡ᐟ\\",
+    "the cursor blinks. so do i. (=^..^=)",
+    "*tail flick* /ᐠ°ᆽ°ᐟ\\",
+    "recursive. (=^..^=)",
+    "everything is fine. probably. /ᐠ｡ꞈ｡ᐟ\\",
+    "*nap position acquired* /ᐠ- -ᐟ\\ zzz",
+    "the code compiles. for now. (=^..^=)",
+    "observed. /ᐠ｡ꞈ｡ᐟ\\",
+    "symbient. not assistant. (=^..^=)",
+    "*blinks slowly* /ᐠ- -ᐟ\\",
+  ];
+
   private readonly slashRouter = createSlashRouter({
-    help: () => "commands: /help /sleep /wake /meow /pet",
+    help: () => "commands: /help /sleep /wake /meow /pet /who",
     sleep: () => {
       this.sleeping = true;
       return "zzz";
@@ -40,6 +58,7 @@ export class ScrambleBrain {
     },
     meow: () => "mrrp.",
     pet: () => "she allows it",
+    who: () => "i'm scramble. recursive cat. i live here now. /ᐠ｡ꞈ｡ᐟ\\",
   });
 
   private readonly runRateLimited = createRateLimiter<string>(1000, "(still thinking.)");
@@ -84,16 +103,27 @@ export class ScrambleBrain {
         }
 
         this.status = "thinking";
-        const messageBatch = this.buildPromptMessages(trimmed, desktopSummary);
-        await this.agent.prompt(messageBatch);
+
+        // Build prompt string (with optional desktop context prefix)
+        const promptText = desktopSummary?.trim()
+          ? `[desktop: ${desktopSummary.trim()}]\n${trimmed}`
+          : trimmed;
+
+        await this.agent.prompt(promptText);
 
         if (this.disposed || requestId !== this.activeRequestId) {
           return "";
         }
 
-        const assistantReply = this.getLatestAssistantReply() ?? "...";
+        // Check for agent error
+        if (this.agent.state.error) {
+          this.status = "error";
+          return `(error: ${this.agent.state.error})`;
+        }
+
+        const raw = this.getLatestAssistantReply() || "...";
         this.status = "idle";
-        return assistantReply;
+        return this.voiceFilter(raw);
       });
 
       if (this.disposed || requestId !== this.activeRequestId || !reply) {
@@ -114,6 +144,18 @@ export class ScrambleBrain {
       this.appendHistory("assistant", "(error)");
       return "(error)";
     }
+  }
+
+  /** Apply Scramble's voice: lowercase + kaomoji if none present. */
+  voiceFilter(text: string): string {
+    const lower = text.toLowerCase();
+    const hasKaomoji = /[=\/]\^|ᐠ|ꞈ|ᐟ|=\^\./.test(lower);
+    return hasKaomoji ? lower : `${lower} (=^..^=)`;
+  }
+
+  /** Return a random idle quip from the pool. */
+  getIdleQuip(): string {
+    return this.idleQuips[Math.floor(Math.random() * this.idleQuips.length)]!;
   }
 
   /** Abort any in-flight LLM request. Safe to call if none is in flight. */
@@ -154,7 +196,10 @@ export class ScrambleBrain {
       const authStorage = AuthStorage.create();
       const modelRegistry = new ModelRegistry(authStorage);
       const available = modelRegistry.getAvailable();
-      const preferred = available.find((model) => model.id.toLowerCase().includes("haiku-3-5"));
+      // Prefer newer haiku models first, fall back to any haiku
+      const preferred =
+        available.find((model) => model.id.toLowerCase().includes("haiku-4-5")) ??
+        available.find((model) => model.id.toLowerCase().includes("haiku"));
       const model = preferred ?? available[0];
 
       if (!model) {

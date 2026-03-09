@@ -48,6 +48,10 @@ export interface AppMenuActions {
   openSy2Chronicles: (args?: Record<string, unknown>) => void;
   openPatternWindow: () => void;
   openCompanionWindow: () => void;
+  openScrambleSmol: () => void;
+  openScrambleFloating: () => void;
+  scrambleSay: (args?: Record<string, unknown>) => void;
+  scrambleExpand: () => void;
   openWorkspaceManager: () => void;
   openCommandPalette: () => void;
   openStateInspector: () => void;
@@ -785,12 +789,41 @@ const APP_COMMANDS: AppCommandDefinition[] = [
   },
   {
     id: "companion.open",
-    label: "Companion",
-    description: "Open Scramble the cat companion window.",
+    label: "Scramble (floating)",
+    description: "Open Scramble the cat as a full floating window.",
     group: "surface",
-    actionKey: "openCompanionWindow",
+    actionKey: "openScrambleFloating",
     menuPlacements: [{ category: "applications", order: 130 }],
     palettePlacement: { order: 120 },
+    api: true,
+    agent: true
+  },
+  {
+    id: "companion.smol",
+    label: "Scramble (popup)",
+    description: "Open Scramble as a smol popup anchored to the bottom-right corner.",
+    group: "surface",
+    actionKey: "openScrambleSmol",
+    menuPlacements: [{ category: "applications", order: 131 }],
+    palettePlacement: { order: 121 },
+    api: true,
+    agent: true
+  },
+  {
+    id: "scramble.say",
+    label: "Scramble: say",
+    description: "Send a message to Scramble. Args: { text: string }",
+    group: "surface",
+    actionKey: "scrambleSay",
+    api: true,
+    agent: true
+  },
+  {
+    id: "scramble.expand",
+    label: "Scramble: expand/collapse",
+    description: "Toggle Scramble popup between smol and tall.",
+    group: "surface",
+    actionKey: "scrambleExpand",
     api: true,
     agent: true
   },
