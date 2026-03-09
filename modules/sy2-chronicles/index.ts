@@ -1597,9 +1597,6 @@ export default function setup(host: MicroappHost) {
       arrowOverlay.setContent(gridToText(arrowGrid));
       arrowOverlay.setBack();
 
-      // Tell blessed how tall the scrollable content is so it clips correctly
-      (canvas as any).height = totalContentHeight + 2;
-
       applyStyles();
       updateStatus();
     }
@@ -1763,37 +1760,63 @@ export default function setup(host: MicroappHost) {
         win.onCleanup(() => host.screen.off("mouse", resizeHandler));
       }
 
-      // Wire up live webcam feed to the "live-cam" panel
+      // Webcam panel — OFF by default, toggled with 'w' key
+      // tags:true required for gridToBlessedContent colour output
       const camNode = panelNodes.get("live-cam");
       if (camNode) {
-        // Webcam content needs tags:true for colored cells
         (camNode.content as any).tags = true;
-
-        const svc = getCamService();
-        if (!camStarted) {
-          svc.start();
-          camStarted = true;
-        }
-
-        const onFrame = (frame: MonsterCamFrame) => {
-          const node = panelNodes.get("live-cam");
-          if (!node) return;
-          const iw = Math.max(1, node.def.w - 2);
-          const ih = Math.max(1, node.def.h - 2);
-          const ceDef = PANEL_DEFS.find(p => p.id === "live-cam");
-          const monsterMode = ceDef?.webcamMonster ?? true;
-          const grid = renderWebcamFrame(frame, iw, ih, { showBg: true, monsterMode });
-          node.content.setContent(gridToBlessedContent(grid));
-          host.screen.render();
-        };
-        svc.on("frame", onFrame);
-
-        // Remove listener when window closes
-        win.onCleanup(() => {
-          svc.off("frame", onFrame);
-          // Don't stop the service — it's module-level and may be reused
-        });
+        camNode.content.setContent(" [Monster Cam]\n\n press w to activate");
       }
+
+      let camActive = false;
+      let lastFrameTs = 0;
+      const CAM_MIN_INTERVAL_MS = 100; // max 10fps
+
+      let activeCamListener: ((f: MonsterCamFrame) => void) | undefined;
+
+      const toggleCam = () => {
+        camActive = !camActive;
+        const node = panelNodes.get("live-cam");
+        if (!node) return;
+
+        if (camActive) {
+          const svc = getCamService();
+          if (!camStarted) { svc.start(); camStarted = true; }
+
+          activeCamListener = (frame: MonsterCamFrame) => {
+            const now = Date.now();
+            if (now - lastFrameTs < CAM_MIN_INTERVAL_MS) return; // throttle
+            lastFrameTs = now;
+            const n = panelNodes.get("live-cam");
+            if (!n) return;
+            const iw = Math.max(1, n.def.w - 2);
+            const ih = Math.max(1, n.def.h - 2);
+            const grid = renderWebcamFrame(frame, iw, ih, { showBg: true, monsterMode: true });
+            n.content.setContent(gridToBlessedContent(grid));
+            host.screen.render();
+          };
+          svc.on("frame", activeCamListener);
+          node.content.setContent(" [Monster Cam] live");
+        } else {
+          if (activeCamListener) {
+            getCamService().off("frame", activeCamListener);
+            activeCamListener = undefined;
+          }
+          node.content.setContent(" [Monster Cam]\n\n press w to activate");
+        }
+        host.screen.render();
+      };
+
+      // 'w' key anywhere in the window toggles webcam
+      canvas.key(["w"], toggleCam);
+      root.key(["w"], toggleCam);
+      win.onInput((ch) => { if (ch === "w") toggleCam(); });
+
+      win.onCleanup(() => {
+        if (activeCamListener) getCamService().off("frame", activeCamListener);
+        activeCamListener = undefined;
+        camActive = false;
+      });
 
       renderLayoutAndContent();
       host.screen.render();
@@ -1865,37 +1888,19 @@ export default function setup(host: MicroappHost) {
     host.screen.on("mouse", handleDragMouse);
     win.onCleanup(() => host.screen.off("mouse", handleDragMouse));
 
-    // Key handlers with shift=5x ctrl=10x speed
+    // win.onInput handles keys when blessed focus is on the win frame itself
+    // (canvas/root keys above handle the common case after panel clicks)
     win.onInput((ch: string, key?: blessed.Widgets.Events.IKeyEventArg) => {
       const speed = key?.shift ? 5 : key?.ctrl ? 10 : 1;
-
-      if (key?.name === "up" || ch === "k") { scrollBy(-1 * speed); return; }
-      if (key?.name === "down" || ch === "j") { scrollBy(1 * speed); return; }
-      if (key?.name === "pageup") { scrollBy(-Math.floor(host.geometry.height * speed)); return; }
-      if (key?.name === "pagedown") { scrollBy(Math.floor(host.geometry.height * speed)); return; }
+      if (key?.name === "up"   || ch === "k") { scrollBy(-1 * speed); return; }
+      if (key?.name === "down" || ch === "j") { scrollBy(1 * speed);  return; }
+      if (key?.name === "pageup")   { scrollBy(-Math.floor(host.geometry.height * speed)); return; }
+      if (key?.name === "pagedown") { scrollBy( Math.floor(host.geometry.height * speed)); return; }
       if (key?.name === "home") { (canvas as any).scrollTo(0); updateStatus(); host.screen.render(); return; }
-      if (key?.name === "end") { (canvas as any).scrollTo(totalContentHeight); updateStatus(); host.screen.render(); return; }
-
-      if (ch === "z") {
-        openChroniclesMinimap();
-        return;
-      }
-      if (ch === "r") {
-        buildPanels();
-        return;
-      }
-      if (ch === "q" || ch === "Q" || key?.name === "escape") {
-        win.close();
-        return;
-      }
-      if (ch === "/") {
-        // Simple search cycle
-        const queries = ["", "2024", "2025", "2026", "canon", "wib", "agent"];
-        const idx = queries.indexOf(searchQuery);
-        searchQuery = queries[(idx + 1) % queries.length] ?? "";
-        buildPanels();
-        return;
-      }
+      if (key?.name === "end")  { (canvas as any).scrollTo(totalContentHeight); updateStatus(); host.screen.render(); return; }
+      if (ch === "z") { openChroniclesMinimap(); return; }
+      if (ch === "r") { buildPanels(); return; }
+      if (ch === "q" || ch === "Q" || key?.name === "escape") { win.close(); return; }
     });
 
     // Tick loop — update live panels
@@ -2166,10 +2171,32 @@ export default function setup(host: MicroappHost) {
         if (gy + 1 < MH && gw > 2) paintText(grid, gx + 1, gy, label);
       }
 
-      const mapText = `§y² Chronicles v2 — bird's-eye map (${panelPlacements.length} panels)\n\n` + gridToText(grid);
+      const mapText = gridToText(grid);
+      const header = `§y² Map — ${panelPlacements.length} panels across ${maxX}×${maxY} canvas   [any key to close]`;
 
-      // Open in a Document Reader window
-      host.runGlobalCommand("document-reader.open", { content: mapText, title: "§y² Map" });
+      // Overlay directly on win.body — no external commands needed
+      const overlay = blessed.box({
+        parent: win.body,
+        top: 1, left: 2,
+        width: MW + 4, height: MH + 4,
+        border: "line",
+        tags: false,
+        keys: true, mouse: true,
+        style: { fg: host.theme().body.fg, bg: host.theme().body.bg, border: { fg: host.theme().highlight.fg } },
+        label: " §y² Map ",
+      });
+      const mapBody = blessed.box({
+        parent: overlay,
+        top: 1, left: 1, right: 1, bottom: 1,
+        tags: false,
+        content: header + "\n\n" + mapText,
+        style: host.theme().body,
+      });
+      overlay.focus();
+      host.screen.render();
+      const closeOverlay = () => { overlay.destroy(); canvas.focus(); host.screen.render(); };
+      overlay.key(["escape","q","enter","space","z"], closeOverlay);
+      overlay.on("click", closeOverlay);
     }
 
     // Initial build
@@ -2180,12 +2207,29 @@ export default function setup(host: MicroappHost) {
       (canvas as any).scrollTo(scrollOffset);
     }
 
-    root.focus();
-    win.focus();
+    // Wire scroll keys directly on canvas + root so they fire regardless of
+    // which child blessed currently considers focused (panel clicks steal focus)
+    const scrollKeys = (ch: string, key?: blessed.Widgets.Events.IKeyEventArg) => {
+      const speed = key?.shift ? 5 : key?.ctrl ? 10 : 1;
+      if (key?.name === "up"   || ch === "k") { scrollBy(-1 * speed); return; }
+      if (key?.name === "down" || ch === "j") { scrollBy(1 * speed);  return; }
+      if (key?.name === "pageup")   { scrollBy(-Math.floor(host.geometry.height * speed)); return; }
+      if (key?.name === "pagedown") { scrollBy( Math.floor(host.geometry.height * speed)); return; }
+      if (key?.name === "home") { (canvas as any).scrollTo(0); updateStatus(); host.screen.render(); }
+      if (key?.name === "end")  { (canvas as any).scrollTo(totalContentHeight); updateStatus(); host.screen.render(); }
+      if (ch === "z") { openChroniclesMinimap(); }
+      if (ch === "r") { buildPanels(); }
+      if (ch === "q" || key?.name === "escape") { win.close(); }
+    };
+    canvas.key(["j","k","up","down","pageup","pagedown","home","end","z","r","q","escape"], scrollKeys);
+    root.key(  ["j","k","up","down","pageup","pagedown","home","end","z","r","q","escape"], scrollKeys);
 
-    // Deferred re-render
+    canvas.focus();
+
+    // Deferred re-render — blessed needs a tick to compute off-screen panel positions
     setTimeout(() => {
       renderLayoutAndContent();
+      canvas.focus();
       host.screen.render();
     }, 80);
 
