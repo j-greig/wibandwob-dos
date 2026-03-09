@@ -132,3 +132,26 @@ Rules:
 - [ ] Add a `reload-safe vs restart-required` helper or docs note for agent workflows
 - [ ] Add a shared nested panel/window chrome primitive so microapps stop reimplementing border/title/grip/focus
 - [ ] Add structured app-control endpoints or conventions for richer inputs than raw key streams
+
+## 2026-03-09 — E025 blessed mouse/focus/key bug cluster
+
+Three bugs in §y² Chronicles (scrollable canvas with 62 clickable panel children)
+all trace back to blessed internals:
+
+1. **Double-input**: `element.key()` registers globally on `program`, not per-element.
+   Having `canvas.key + root.key + win.onInput` = 2-3x fire per keystroke.
+2. **Wrong edit target**: `fixed:true` children desync blessed's `lpos` hit-testing
+   from visual scroll position. Blessed routes clicks to wrong panel.
+3. **Scroll jump on refocus**: `screen._focus` auto-scrolls to child `rtop` on any
+   click (via `element click` → `el.focus()`). Our `_scrollIntoView` override
+   patched the wrong method — blessed uses a different path.
+
+**Fix pattern**: remove `clickable:true` from all panel children, handle ALL mouse
+interaction at screen level via existing `handleDragMouse` + `pointerToContent`.
+This kills blessed autofocus entirely for panels. Keep `fixed:true` for rendering
+(still needed to prevent double childBase subtraction in `_getCoords`).
+
+**Lesson**: blessed's focus/click model assumes elements are either scrollable OR
+clickable, not both nested. Any microapp with clickable children inside a scrollable
+canvas will hit this. Should be a shared primitive or at minimum a documented pattern
+in the microapp SDK.
