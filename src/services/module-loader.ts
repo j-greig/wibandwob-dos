@@ -100,7 +100,10 @@ export interface MicroappHost {
 
   registerTheme(variant: ThemeVariant): void;
 
+  /** Run a microapp-local command (id is prefixed with microapp.<module>.). */
   runCommand(localId: string, args?: Record<string, unknown>): void;
+  /** Run any global system command by its full id (e.g. "markdown.open"). */
+  runGlobalCommand(id: string, args?: Record<string, unknown>): void;
 
   readonly screen: blessed.Widgets.Screen;
   readonly geometry: { width: number; height: number; cellAspect: number };
@@ -292,6 +295,10 @@ function createMicroappHost(
         ? localId
         : `microapp.${moduleId}.${localId}`;
       commands.run(fullId, args);
+    },
+
+    runGlobalCommand(id, args) {
+      commands.run(id, args);
     },
 
     screen,

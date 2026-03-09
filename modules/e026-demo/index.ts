@@ -1,24 +1,159 @@
 /**
  * E026 Demo — live showcase of F03/F05/F06/F07 + RenderMonitor.
  *
- * Layout:
- *   TOP-LEFT     TreeWidget (F05)
- *   TOP-RIGHT    createTimer ticker (F06)
- *   BOTTOM-LEFT  Motion cheatsheet (F07)
- *   BOTTOM-RIGHT RenderMonitor FPS (SDK)
- *   FOOTER       Fixed button bar — [Tween] [Reset] [Bounce] [AGENTS.md] [Close]
+ * Layout (CSS-flexbox via createStack + createColumns):
  *
- * Keys: t tween  r reset  z bounce  h open AGENTS.md  q/Esc close
- * Tab on tree returns focus to body.
+ *   ┌──────────────────────────────────┐
+ *   │  row1: createColumns             │  1fr
+ *   │   ┌────────────┬────────────┐    │
+ *   │   │ F05 Tree   │ F06 Timer  │    │
+ *   │   └────────────┴────────────┘    │
+ *   │  row2: createColumns             │  1fr
+ *   │   ┌────────────┬────────────┐    │
+ *   │   │ F07 Motion │ RenderMon  │    │
+ *   │   └────────────┴────────────┘    │
+ *   │  buttonBar: basis 1              │
+ *   │  [①][②][③][④]  [Tween][Close]   │
+ *   └──────────────────────────────────┘
+ *
+ * Active panel: double box-drawing border + theme accent colour.
+ * Tab / ①②③④ buttons switch focus.
  */
 
 import blessed from "blessed";
+import type { UiPart, Rect } from "../../src/core/ui-parts.js";
+import { applyRect, createNodePart } from "../../src/core/ui-parts.js";
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
 import { createTreeWidget, type TreeNode } from "../../src/core/tree-widget.js";
 import { createTimer, clearTimers } from "../../src/core/ui-primitives.js";
 import { tweenWindowPosition, tweenWindowSize } from "../../src/services/motion-service.js";
 import { createRenderMonitor } from "../../src/services/microapp-sdk.js";
 import path from "node:path";
+
+// ── createPanel ────────────────────────────────────────────────────────────────
+// A UiPart with a manually-drawn border that switches single↔double depending
+// on active state, and uses theme accent colour when active.
+
+type PanelHandle = UiPart<void> & {
+  content: blessed.Widgets.BoxElement;
+  setActive(active: boolean): void;
+  restyle(): void;
+};
+
+function createPanel(
+  parent: blessed.Widgets.Node,
+  title: string,
+  getTheme: () => import("../../src/core/theme/types.js").ThemeTokens,
+): PanelHandle {
+  // Outer box — no blessed border, we draw it manually as ANSI content
+  const outer = blessed.box({
+    parent,
+    top: 0, left: 0, width: 0, height: 0,
+    tags: false,
+    style: getTheme().body,
+  });
+
+  // Inner content box — lives inside the drawn border (1-cell inset all sides)
+  const inner = blessed.box({
+    parent: outer,
+    top: 1, left: 1, right: 1, bottom: 1,
+    tags: false,
+    style: getTheme().body,
+  });
+
+  let active = false;
+  let lastW = 0;
+  let lastH = 0;
+
+  function drawBorder() {
+    const w = lastW;
+    const h = lastH;
+    if (w < 2 || h < 2) return;
+
+    const t = getTheme();
+    const accentFg = t.titleBarFocused.bg;   // theme accent — same tint used on focused title bar
+    const inactFg  = t.windowBorderUnfocused.fg ?? "grey";
+
+    const tl = active ? "╔" : "┌";
+    const tr = active ? "╗" : "┐";
+    const bl = active ? "╚" : "└";
+    const br = active ? "╝" : "┘";
+    const hz = active ? "═" : "─";
+    const vt = active ? "║" : "│";
+    const color = active ? `\x1b[38;5;${ansiColor(accentFg)}m` : `\x1b[38;5;${ansiColor(inactFg)}m`;
+    const reset = "\x1b[0m";
+
+    const titleStr = title ? ` ${title} ` : "";
+    const topFill = Math.max(0, w - 2 - titleStr.length);
+    const topLine = `${color}${tl}${hz}${reset}${active ? `\x1b[1m` : ""}${titleStr}${reset}${color}${hz.repeat(topFill)}${tr}${reset}`;
+    const midLine = `${color}${vt}${reset}${" ".repeat(w - 2)}${color}${vt}${reset}`;
+    const botLine = `${color}${bl}${hz.repeat(w - 2)}${br}${reset}`;
+
+    const rows = [topLine];
+    for (let i = 1; i < h - 1; i++) rows.push(midLine);
+    rows.push(botLine);
+    outer.setContent(rows.join("\n"));
+  }
+
+  return {
+    node: outer,
+    content: inner,
+
+    layout(rect: Rect) {
+      lastW = rect.width;
+      lastH = rect.height;
+      applyRect(outer, rect);
+      // inner sits 1 cell inside the border
+      inner.top    = 1;
+      inner.left   = 1;
+      inner.width  = Math.max(1, rect.width  - 2);
+      inner.height = Math.max(1, rect.height - 2);
+      drawBorder();
+    },
+
+    update() {},
+
+    setActive(a: boolean) {
+      active = a;
+      drawBorder();
+    },
+
+    restyle() {
+      const t = getTheme();
+      (outer as any).style = t.body;
+      (inner as any).style = t.body;
+      drawBorder();
+    },
+
+    destroy() {
+      inner.destroy();
+      outer.destroy();
+    },
+  };
+}
+
+// Cheap ANSI 256-colour approximation: map named colours the theme uses
+// to their xterm-256 indices, fall back to white.
+function ansiColor(name: string | undefined): number {
+  if (!name) return 7;
+  const map: Record<string, number> = {
+    white: 15, black: 0, grey: 8, gray: 8,
+    red: 9, green: 10, yellow: 11, blue: 12,
+    magenta: 13, cyan: 14, "bright-white": 15,
+  };
+  // hex colours — map to nearest xterm-256 via simple lookup
+  if (name.startsWith("#")) {
+    const r = parseInt(name.slice(1, 3), 16);
+    const g = parseInt(name.slice(3, 5), 16);
+    const b = parseInt(name.slice(5, 7), 16);
+    // xterm 6×6×6 cube: 16 + 36r + 6g + b  (each channel 0-5)
+    const ri = Math.round(r / 51);
+    const gi = Math.round(g / 51);
+    const bi = Math.round(b / 51);
+    return 16 + 36 * ri + 6 * gi + bi;
+  }
+  return map[name.toLowerCase()] ?? 7;
+}
 
 // ── Sample tree ───────────────────────────────────────────────────────────────
 
@@ -69,7 +204,7 @@ export default function setup(host: MicroappHost) {
 }
 
 function openDemo(host: MicroappHost) {
-  const win = host.createWindow({ title: "E026 Demo", width: 104, height: 34 });
+  const win = host.createWindow({ title: "E026 Demo", width: 110, height: 36 });
   const timers = new Set<ReturnType<typeof setInterval>>();
   let ticks = 0;
   let lastNode = "—";
@@ -87,127 +222,168 @@ function openDemo(host: MicroappHost) {
     tweenWindowPosition(wm, win.id, x, y, 600, "elasticOut");
   }
   function resetCentre() {
-    const x = Math.max(0, Math.floor((sw() - 104) / 2));
-    const y = Math.max(0, Math.floor((sh() - 34) / 2));
+    const x = Math.max(0, Math.floor((sw() - 110) / 2));
+    const y = Math.max(0, Math.floor((sh() - 36) / 2));
     tweenWindowPosition(wm, win.id, x, y, 400, "easeOutCubic");
   }
   function sizeBounce() {
-    tweenWindowSize(wm, win.id, 124, 38, 300, "easeOutCubic");
-    setTimeout(() => tweenWindowSize(wm, win.id, 104, 34, 350, "bounceOut"), 350);
+    tweenWindowSize(wm, win.id, 130, 40, 300, "easeOutCubic");
+    setTimeout(() => tweenWindowSize(wm, win.id, 110, 36, 350, "bounceOut"), 350);
   }
 
-  const repoRoot = path.resolve(new URL(import.meta.url).pathname, "../../../");
-  const agentsPath = path.join(repoRoot, "AGENTS.md");
-  function openAgents() { host.runCommand("markdown.open", { filePath: agentsPath }); }
+  // ── Panels ────────────────────────────────────────────────────────────────
 
-  // ── Layout ────────────────────────────────────────────────────────────────
-  // body is split: top 32 rows for panels, bottom 1 row for button bar.
-  // Each panel box uses explicit bottom:1 so the bar isn't covered.
+  const p1 = createPanel(win.body, "① F05 TreeWidget", host.theme);
+  const p2 = createPanel(win.body, "② F06 Timer",      host.theme);
+  const p3 = createPanel(win.body, "③ F07 Motion",     host.theme);
+  const p4 = createPanel(win.body, "④ RenderMonitor",  host.theme);
 
-  // Panel helper — top half uses height:"50%", bottom half uses bottom:1 to
-  // leave room for the button bar (blessed has no calc() support)
-  function panelBox(opts: { top: number | string; left: number | string; height?: number | string; bottom?: number }) {
-    return blessed.box({
-      parent: win.body, top: opts.top, left: opts.left, width: "50%",
-      ...(opts.bottom !== undefined ? { bottom: opts.bottom } : { height: opts.height }),
-      border: "line",
-      style: { ...host.theme().body, border: { fg: host.theme().windowBorderUnfocused.fg } },
-    });
+  const panels = [p1, p2, p3, p4] as const;
+  let activeIdx = 0;
+
+  // ── Layout: createColumns rows + createStack ──────────────────────────────
+
+  type BtnId = "p1" | "p2" | "p3" | "p4" | "tween" | "reset" | "bounce" | "close";
+
+  const topRow = host.ui.createColumns(win.body, [
+    { key: "tl", basis: "1fr", part: p1 },
+    { key: "tr", basis: "1fr", part: p2 },
+  ]);
+  const botRow = host.ui.createColumns(win.body, [
+    { key: "bl", basis: "1fr", part: p3 },
+    { key: "br", basis: "1fr", part: p4 },
+  ]);
+  const bar = host.ui.createButtonBar<BtnId>(
+    win.body,
+    [
+      { id: "p1", label: "① Tree"   },
+      { id: "p2", label: "② Timer"  },
+      { id: "p3", label: "③ Motion" },
+      { id: "p4", label: "④ FPS"    },
+      { id: "tween",  label: "t Tween"  },
+      { id: "reset",  label: "r Reset"  },
+      { id: "bounce", label: "z Bounce" },
+      { id: "close",  label: "q Close"  },
+    ],
+    (id) => {
+      if      (id === "p1") setFocus(0);
+      else if (id === "p2") setFocus(1);
+      else if (id === "p3") setFocus(2);
+      else if (id === "p4") setFocus(3);
+      else if (id === "tween")  tweenToRandom();
+      else if (id === "reset")  resetCentre();
+      else if (id === "bounce") sizeBounce();
+      else if (id === "close")  win.close();
+    },
+  );
+
+  const root = host.ui.createStack(win.body, [
+    { key: "top", basis: "1fr", part: topRow },
+    { key: "bot", basis: "1fr", part: botRow },
+    { key: "bar", basis: 1,     part: bar    },
+  ]);
+
+  function render() {
+    const w = Math.max(20, Number(win.body.width)  || 80);
+    const h = Math.max(8,  Number(win.body.height) || 30);
+    root.layout({ top: 0, left: 0, width: w, height: h });
+    host.screen.render();
   }
-  function panelLabel(text: string, top: number | string, left: number | string) {
-    blessed.box({
-      parent: win.body, top, left, width: "shrink", height: 1,
-      content: ` ${text} `, tags: false,
-      style: { fg: host.theme().titleBarFocused.fg, bg: host.theme().titleBarFocused.bg },
-    });
+
+  setImmediate(render);
+  win.onResize(render);
+
+  // ── Panel focus ───────────────────────────────────────────────────────────
+
+  const panelBtnIds: BtnId[] = ["p1", "p2", "p3", "p4"];
+
+  function setFocus(idx: number) {
+    activeIdx = idx;
+    panels.forEach((p, i) => p.setActive(i === idx));
+    bar.update({ leftText: " E026 demo — Tab to cycle panels", activeId: panelBtnIds[idx] });
+    // Focus the content node of the active panel
+    const content = panels[idx]!.content;
+    content.focus();
+    host.screen.render();
   }
 
-  const tlBox = panelBox({ top: 1,    left: 0,    height: "50%" });
-  const trBox = panelBox({ top: 1,    left: "50%", height: "50%" });
-  const blBox = panelBox({ top: "50%", left: 0,    bottom: 1 });
-  const brBox = panelBox({ top: "50%", left: "50%", bottom: 1 });
+  setFocus(0);
 
-  panelLabel("F05 TreeWidget  (j/k ←/→ Enter · Tab=body)", 0, 0);
-  panelLabel("F06 createTimer  (1s tick)", 0, "50%");
-  panelLabel("F07 motion/tween", "50%", 0);
-  panelLabel("RenderMonitor", "50%", "50%");
+  // ── TOP-LEFT panel: TreeWidget (F05) ──────────────────────────────────────
 
-  // ── TOP-LEFT: TreeWidget ──────────────────────────────────────────────────
-
-  const tree = createTreeWidget(tlBox, { style: host.theme().body });
+  const tree = createTreeWidget(p1.content, { style: host.theme().body });
   tree.setNodes(DEMO_TREE);
   tree.onFocus((node) => { lastNode = node.label; });
   tree.onSelect((node) => { lastNode = `★ ${node.label}`; });
-
-  // Escape/Tab on tree → back to body
-  tree.widget.key(["tab", "escape"], () => { win.body.focus(); host.screen.render(); });
-  // Global actions still reachable from tree
+  // Escape/Tab on tree → body → normal panel cycling takes over
+  tree.widget.key(["escape"], () => { win.body.focus(); host.screen.render(); });
+  tree.widget.key(["tab"],    () => setFocus((activeIdx + 1) % 4));
   tree.widget.key(["t"], tweenToRandom);
   tree.widget.key(["r"], resetCentre);
   tree.widget.key(["z"], sizeBounce);
-  tree.widget.key(["h"], openAgents);
   tree.widget.key(["q"], () => win.close());
 
-  // ── TOP-RIGHT: Timer counter ──────────────────────────────────────────────
+  // ── TOP-RIGHT panel: createTimer ticker (F06) ─────────────────────────────
 
   const counterBox = blessed.box({
-    parent: trBox, top: 1, left: 2, right: 2, bottom: 1,
+    parent: p2.content, top: 0, left: 1, right: 1, bottom: 0,
     tags: false, style: host.theme().body,
   });
 
   createTimer(() => {
     ticks++;
     const fill = ticks % 20;
-    const bar = "\x1b[96m" + "█".repeat(fill) + "\x1b[90m" + "░".repeat(20 - fill) + "\x1b[0m";
+    const progressBar = "\x1b[96m" + "█".repeat(fill) + "\x1b[90m" + "░".repeat(20 - fill) + "\x1b[0m";
     counterBox.setContent(
       `\x1b[96m  tick\x1b[0m  \x1b[93m${String(ticks).padStart(5)}\x1b[0m\n\n` +
-      `  ${bar}\n\n` +
+      `  ${progressBar}\n\n` +
       `  interval    1000ms\n` +
       `  lifecycle   Set<Timeout>\n` +
       `  cleanup     clearTimers()\n\n` +
-      `  \x1b[32m✓ no leaks\x1b[0m`
+      `  \x1b[32m✓ no leaks\x1b[0m`,
     );
     host.screen.render();
   }, 1000, timers);
 
-  // ── BOTTOM-LEFT: Motion info ──────────────────────────────────────────────
+  // ── BOTTOM-LEFT panel: Motion cheatsheet (F07) ────────────────────────────
 
   blessed.box({
-    parent: blBox, top: 1, left: 2, right: 2, bottom: 1,
+    parent: p3.content, top: 0, left: 1, right: 1, bottom: 0,
     tags: false, style: host.theme().body,
     content:
       `\x1b[96m  tweenWindowPosition\x1b[0m\n` +
       `  tweenWindowSize\n\n` +
-      `  easings: linear easeIn/Out\n` +
-      `  easeInOut cubic elasticOut\n` +
-      `  bounceOut — 16ms setInterval\n\n` +
-      `  Click buttons below ↓\n` +
-      `  or keys: t  r  z`,
+      `  easings:\n` +
+      `    linear  easeIn/Out\n` +
+      `    easeInOut  cubic\n` +
+      `    elasticOut  bounceOut\n\n` +
+      `  16ms setInterval tick\n\n` +
+      `  keys: t  r  z`,
   });
 
-  // ── BOTTOM-RIGHT: RenderMonitor ───────────────────────────────────────────
+  // ── BOTTOM-RIGHT panel: RenderMonitor ─────────────────────────────────────
 
   const fpsBox = blessed.box({
-    parent: brBox, top: 1, left: 2, right: 2, bottom: 1,
+    parent: p4.content, top: 0, left: 1, right: 1, bottom: 0,
     tags: false, style: host.theme().body,
   });
 
   function fpsBar(fps: number): string {
-    const max = 28;
+    const max = 24;
     const fill = Math.min(max, Math.round(fps));
-    const color = fps >= 20 ? "\x1b[32m" : fps >= 10 ? "\x1b[93m" : "\x1b[91m";
-    return color + "█".repeat(fill) + "\x1b[90m" + "░".repeat(max - fill) + "\x1b[0m";
+    const col = fps >= 20 ? "\x1b[32m" : fps >= 10 ? "\x1b[93m" : "\x1b[91m";
+    return col + "█".repeat(fill) + "\x1b[90m" + "░".repeat(max - fill) + "\x1b[0m";
   }
 
   function updateFps(fps = monitor.fps, avgMs = monitor.avgFrameMs) {
-    const fpsColor = fps >= 20 ? "\x1b[32m" : fps >= 10 ? "\x1b[93m" : "\x1b[91m";
+    const fpsCol = fps >= 20 ? "\x1b[32m" : fps >= 10 ? "\x1b[93m" : "\x1b[91m";
     fpsBox.setContent(
       `  ${fpsBar(fps)}\n` +
-      `  ${fpsColor}${String(fps).padStart(3)} fps\x1b[0m  \x1b[90m${avgMs.toFixed(1)}ms avg\x1b[0m\n\n` +
+      `  ${fpsCol}${String(fps).padStart(3)} fps\x1b[0m  \x1b[90m${avgMs.toFixed(1)}ms avg\x1b[0m\n\n` +
       `  \x1b[90m${monitor.totalFrames} frames total\x1b[0m\n\n` +
       `  idle ≈ 1-2 fps\n` +
       `  tween ≈ 30+ fps\n\n` +
-      `  \x1b[96m  selected:\x1b[0m\n  ${lastNode}`
+      `  \x1b[96m  last selected:\x1b[0m\n  ${lastNode}`,
     );
   }
   updateFps();
@@ -217,62 +393,34 @@ function openDemo(host: MicroappHost) {
     host.screen.render();
   }, 500);
 
-  // ── FOOTER: Button bar ────────────────────────────────────────────────────
+  // ── Body / global keys ────────────────────────────────────────────────────
 
-  type BtnId = "tween" | "reset" | "bounce" | "agents" | "close";
-  const bar = host.ui.createButtonBar<BtnId>(
-    win.body,
-    [
-      { id: "tween",  label: "t Tween"   },
-      { id: "reset",  label: "r Reset"   },
-      { id: "bounce", label: "z Bounce"  },
-      { id: "agents", label: "h MD View" },
-      { id: "close",  label: "q Close"   },
-    ],
-    (id) => {
-      win.body.focus();
-      if (id === "tween")  tweenToRandom();
-      if (id === "reset")  resetCentre();
-      if (id === "bounce") sizeBounce();
-      if (id === "agents") openAgents();
-      if (id === "close")  win.close();
-    },
-  );
-  bar.update({ leftText: " E026 — F03 F05 F06 F07 RenderMonitor ✓", activeId: "tween" });
-
-  function layoutBar() {
-    const w = Math.max(20, Number(win.body.width)  || 80);
-    const h = Math.max(4,  Number(win.body.height) || 20);
-    bar.layout({ top: h - 1, left: 0, width: w, height: 1 });
-    host.screen.render();
-  }
-  setImmediate(layoutBar);
-  win.onResize(layoutBar);
-
-  // ── Body keys ─────────────────────────────────────────────────────────────
-
-  win.body.key(["t"], tweenToRandom);
-  win.body.key(["r"], resetCentre);
-  win.body.key(["z"], sizeBounce);
-  win.body.key(["h"], openAgents);
-  win.body.key(["q", "escape"], () => win.close());
-  win.body.key(["tab"], () => { tree.widget.focus(); host.screen.render(); });
+  win.body.key(["1"], () => setFocus(0));
+  win.body.key(["2"], () => setFocus(1));
+  win.body.key(["3"], () => setFocus(2));
+  win.body.key(["4"], () => setFocus(3));
+  win.body.key(["tab"],            () => setFocus((activeIdx + 1) % 4));
+  win.body.key(["S-tab"],          () => setFocus((activeIdx + 3) % 4));
+  win.body.key(["t"],              tweenToRandom);
+  win.body.key(["r"],              resetCentre);
+  win.body.key(["z"],              sizeBounce);
+  win.body.key(["q", "escape"],    () => win.close());
 
   // ── Hooks ─────────────────────────────────────────────────────────────────
 
   win.describeState(() => ({
-    summary: `E026 Demo — ${monitor.fps}fps ticks:${ticks} selected:${lastNode}`,
+    summary: `E026 Demo — panel:${activeIdx + 1} ${monitor.fps}fps ticks:${ticks}`,
   }));
-  win.captureText(() => `E026 Demo\nfps: ${monitor.fps}\nticks: ${ticks}\nselected: ${lastNode}`);
+  win.captureText(() =>
+    `E026 Demo\npanel: ${activeIdx + 1}\nfps: ${monitor.fps}\nticks: ${ticks}\nselected: ${lastNode}`,
+  );
 
   win.onRestyle(() => {
-    for (const box of [tlBox, trBox, blBox, brBox]) {
-      (box as any).style = { ...host.theme().body, border: { fg: host.theme().windowBorderUnfocused.fg } };
-    }
+    panels.forEach(p => p.restyle());
+    bar.restyle();
     (counterBox as any).style = host.theme().body;
     (fpsBox as any).style = host.theme().body;
-    bar.restyle();
-    host.screen.render();
+    render();
   });
 
   win.onCleanup(() => {
@@ -280,6 +428,7 @@ function openDemo(host: MicroappHost) {
     unsubMonitor();
     monitor.destroy();
     tree.destroy();
+    root.destroy();
   });
 
   win.focus();

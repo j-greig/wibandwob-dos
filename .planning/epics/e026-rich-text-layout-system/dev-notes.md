@@ -57,6 +57,31 @@ at idle. That contrast is the point.
 
 ---
 
+## SDK gaps found during demo wiring (continued)
+
+### host.runCommand vs global system commands — internal/external distinction broken
+`host.runCommand(id, args)` ALWAYS namespaces the id:
+  `"markdown.open"` → `"microapp.e026-demo.markdown.open"` → not found → silent fail.
+
+There is no way for a microapp to call a global system command (e.g. `markdown.open`,
+`primer.open`, any File menu command) via the host API. The distinction between
+"internal microapp command" and "external system command" is not exposed.
+
+Fix needed in `src/services/module-loader.ts`:
+  - Add `host.runGlobalCommand(id, args)` that calls `commands.run(id, args)` directly
+    without any namespace prefix.
+  - Keep `host.runCommand(localId)` for internal commands (prefixed as now).
+  - Document both clearly in `.agents/microapp-sdk.md` with examples.
+
+Also add `runGlobalCommand` to the "common mistakes" table:
+  WRONG: `host.runCommand("markdown.open", { filePath })`   → silently does nothing
+  RIGHT: `host.runGlobalCommand("markdown.open", { filePath })`
+
+TODO: wire the impl in module-loader.ts and export type from microapp-sdk.ts.
+(Type declaration added; impl pending — see fix/e026-demo-runGlobalCommand branch)
+
+---
+
 ## Surprises / things to codify
 
 - `host.ui.createButtonBar` `layout()` call requires a Rect-like object.
