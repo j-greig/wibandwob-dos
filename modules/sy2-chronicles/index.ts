@@ -2074,7 +2074,7 @@ export default function setup(host: MicroappHost) {
     // S09: Register agent panel manipulation commands (once)
     if (!commandsRegistered) {
       host.registerCommand({
-        id: "sy2.panel.list",
+        id: "sy2.panel.list", direct: true,
         label: "List Panels",
         description: "List all §y² Chronicles panel IDs and titles",
         action: () => {
@@ -2089,7 +2089,7 @@ export default function setup(host: MicroappHost) {
       });
 
       host.registerCommand({
-        id: "sy2.panel.inspect",
+        id: "sy2.panel.inspect", direct: true,
         label: "Inspect Panel Content",
         description: "Return rendered content of panel(s). Args: id (single panel), or tail:N (last N panels), or all:true",
         action: (args: Record<string, unknown>) => {
@@ -2132,7 +2132,7 @@ export default function setup(host: MicroappHost) {
       });
 
       host.registerCommand({
-        id: "sy2.panel.focus",
+        id: "sy2.panel.focus", direct: true,
         label: "Focus Panel",
         description: "Focus and highlight a §y² Chronicles panel",
         action: (args: Record<string, unknown>) => {
@@ -2150,7 +2150,7 @@ export default function setup(host: MicroappHost) {
       });
 
       host.registerCommand({
-        id: "sy2.panel.move",
+        id: "sy2.panel.move", direct: true,
         label: "Move Panel",
         description: "Move a §y² Chronicles panel to a new position",
         action: (args: Record<string, unknown>) => {
@@ -2171,7 +2171,7 @@ export default function setup(host: MicroappHost) {
       });
 
       host.registerCommand({
-        id: "sy2.panel.reset",
+        id: "sy2.panel.reset", direct: true,
         label: "Reset Panel Layout",
         description: "Reset all panels to their computed layout positions",
         action: (args: Record<string, unknown>) => {
@@ -2188,7 +2188,7 @@ export default function setup(host: MicroappHost) {
       });
 
       host.registerCommand({
-        id: "sy2.panel.write",
+        id: "sy2.panel.write", direct: true,
         label: "Write Panel Content",
         description: "Set the text content of a §y² Chronicles panel",
         action: (args: Record<string, unknown>) => {
@@ -2203,7 +2203,7 @@ export default function setup(host: MicroappHost) {
       });
 
       host.registerCommand({
-        id: "sy2.panel.append",
+        id: "sy2.panel.append", direct: true,
         label: "Append Panel Content",
         description: "Append text to a §y² Chronicles panel",
         action: (args: Record<string, unknown>) => {
@@ -2220,7 +2220,7 @@ export default function setup(host: MicroappHost) {
       });
 
       host.registerCommand({
-        id: "sy2.panel.clear",
+        id: "sy2.panel.clear", direct: true,
         label: "Clear Panel Override",
         description: "Clear content overrides of a §y² Chronicles panel, restoring original",
         action: (args: Record<string, unknown>) => {
