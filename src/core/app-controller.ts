@@ -1226,7 +1226,8 @@ export class TsTuiMvpApp {
       initialMode,
       onStateChanged: () => this.updateStatusLine(),
       onPopOut: () => {
-        // Close popup, open floating
+        // Abort any in-flight send, then close popup and open floating
+        this.scrambleBrain.abort();
         const popup = this.findWindowByAppType("companion-widget");
         if (popup) this.windowManager.closeWindow(popup.id);
         this.openScrambleFloating();

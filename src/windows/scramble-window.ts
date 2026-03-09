@@ -133,25 +133,10 @@ export function openScrambleFloatingWindow(deps: ScrambleFloatingDeps): void {
     frame.frame.height = 18;
   }
 
-  // Info bar (session ID + model, clickable to open log)
-  const infoBar = blessed.box({
-    parent: frame.body,
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 1,
-    tags: true,
-    mouse: true,
-    clickable: true,
-    style: theme().muted,
-  });
-
-  infoBar.on("click", () => deps.onOpenLog?.());
-
   // Cat header (3 lines)
   const catHeader = blessed.box({
     parent: frame.body,
-    top: 1,
+    top: 0,
     left: 0,
     right: 0,
     height: 3,
@@ -162,7 +147,7 @@ export function openScrambleFloatingWindow(deps: ScrambleFloatingDeps): void {
   // Scrollable message history
   const transcript = blessed.box({
     parent: frame.body,
-    top: 4,
+    top: 3,
     left: 0,
     right: 0,
     bottom: 2,
@@ -175,13 +160,16 @@ export function openScrambleFloatingWindow(deps: ScrambleFloatingDeps): void {
     style: theme().agentBg,
   });
 
-  // Status line
+  // Status line — shows brain state left, model+session right (click right to open log)
   const statusLine = blessed.box({
     parent: frame.body,
     bottom: 1,
     left: 0,
     right: 0,
     height: 1,
+    tags: true,
+    mouse: true,
+    clickable: true,
     style: theme().warning,
   });
 
@@ -197,20 +185,26 @@ export function openScrambleFloatingWindow(deps: ScrambleFloatingDeps): void {
     style: theme().input,
   });
 
-  const renderInfoBar = () => {
-    const c = C();
-    const model = brain.modelName.padStart(12);
-    const sid = brain.sessionId.replace("scramble-", "#");
-    infoBar.setContent(`{${c.muted}-fg}${model}  {${c.blue}-fg}${sid}{/${c.blue}-fg}{/${c.muted}-fg}`);
-  };
-
   const renderCat = () => {
     catHeader.setContent(catArt(brain));
   };
 
   const renderStatus = () => {
-    statusLine.setContent(statusLabel(brain));
+    const c = C();
+    const w = Math.max(1, Number(statusLine.width) || 40);
+    const left = statusLabel(brain);
+    const sid = brain.sessionId.replace("scramble-", "#");
+    const right = `${brain.modelName}  ${sid}`;
+    const gap = Math.max(1, w - left.length - right.length);
+    statusLine.setContent(`${left}${" ".repeat(gap)}{${c.muted}-fg}${right}{/${c.muted}-fg}`);
   };
+
+  // Click the right side of status line to open log
+  statusLine.on("click", (mouse) => {
+    const clickX = (mouse as unknown as { x: number }).x;
+    const w = Math.max(1, Number(statusLine.width) || 40);
+    if (clickX > w - 24) deps.onOpenLog?.();
+  });
 
   const renderTranscriptContent = () => {
     transcript.setContent(renderHistory(brain));
@@ -237,7 +231,6 @@ export function openScrambleFloatingWindow(deps: ScrambleFloatingDeps): void {
 
   const { getDraft } = wireInput(screen, inputEl, renderInputEl, (text) => {
     void brain.send(text).then((reply) => {
-      renderInfoBar();
       renderCat();
       renderStatus();
       renderTranscriptContent();
@@ -252,7 +245,6 @@ export function openScrambleFloatingWindow(deps: ScrambleFloatingDeps): void {
     screen.render();
   });
 
-  renderInfoBar();
   renderCat();
   renderStatus();
   renderTranscriptContent();
@@ -281,7 +273,6 @@ export function openScrambleFloatingWindow(deps: ScrambleFloatingDeps): void {
   };
 
   frame.onRestyle = () => {
-    safeSetStyle(infoBar, theme().muted);
     safeSetStyle(catHeader, theme().body);
     safeSetStyle(transcript, theme().agentBg);
     statusLine.style = theme().warning;
@@ -291,7 +282,6 @@ export function openScrambleFloatingWindow(deps: ScrambleFloatingDeps): void {
 
   frame.writeInput = (text: string) => {
     void brain.send(text).then(() => {
-      renderInfoBar();
       renderCat();
       renderStatus();
       renderTranscriptContent();

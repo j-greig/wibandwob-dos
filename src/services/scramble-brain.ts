@@ -147,6 +147,12 @@ export class ScrambleBrain {
           ? `[desktop: ${desktopSummary.trim()}]\n${trimmed}`
           : trimmed;
 
+        // Abort any in-flight request before starting a new one
+        if (this.agent.state.isStreaming) {
+          this.agent.abort();
+          await this.agent.waitForIdle();
+        }
+
         await this.agent.prompt(promptText);
 
         if (this.disposed || requestId !== this.activeRequestId) {
