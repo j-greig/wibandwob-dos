@@ -132,6 +132,7 @@ virtual indent rendering. Lives in `src/core/tree-widget.ts`.
 - [ ] F07 Motion service — tweenStyle + easing for microapps and window components
 - [ ] F09 Panel layout and grid canvas primitives — extract from sy2-chronicles
 - [ ] F08 (stretch) Syntax highlighting — evaluate Rich subprocess vs extend regex
+- [ ] F10 (stretch) Markdown panels in sy2-chronicles — .md files as live panels
 
 ---
 
@@ -599,6 +600,90 @@ Test: screenshot.
 
 AC-2: An unknown language fence falls back to plain code block without error.
 Test: open file with ```brainfuck fence, confirm no crash.
+
+---
+
+## F10 (Stretch) — Markdown Panels in sy2-chronicles
+
+### Status
+Status: not-started
+
+Depends on: F02 (markdown-service.ts), F09 (panel-layout primitives)
+
+The sy2-chronicles microapp has a PanelDef system where each panel is a
+`content: (tick, w, h) => string` callback. This stretch feature adds a
+`MarkdownPanelDef` variant — a panel backed by a .md file, rendered via
+markdown-service.ts, displayed as a live panel within the chronicles
+scrollable canvas. The result: documentation, notes, or any .md file can
+appear as a first-class panel inside the chronicle layout.
+
+This is composability in practice: panel-layout primitives (F09) +
+markdown-service (F02) + sy2-chronicles = .md files as subwindows without
+a full MarkdownViewer window.
+
+### S14 — MarkdownPanelDef type and renderer
+
+Tasks:
+- [ ] Define `MarkdownPanelDef` extending `PanelDef` in `src/core/panel-layout.ts`:
+      ```ts
+      interface MarkdownPanelDef extends Omit<PanelDef, 'content'> {
+        type: 'markdown';
+        filePath: string;   // path to .md file, relative to REPO_ROOT
+        headingConfig?: FigletHeadingConfig;  // defaults to no figlet (plain)
+      }
+      ```
+- [ ] `createMarkdownPanelContent(def: MarkdownPanelDef): PanelDef['content']` —
+      returns a content function `(tick, w, h) => string` that:
+      - On first call: reads filePath, calls `renderMarkdown(text, w)` from
+        markdown-service.ts, caches result keyed by (w)
+      - On resize (w changes): re-renders at new width
+      - Returns `cachedLines.slice(0, h).join('\n')` — viewport-clips to panel height
+      - tick is unused (markdown panels are static by default unless file changes)
+- [ ] File-watch variant (opt-in, `live: true`): if `live` is set, re-render
+      when the file mtime changes. Use `fs.statSync` on each tick, re-render
+      if mtime differs from cached value. This makes the panel a live preview
+      of the .md file.
+- [ ] Wire into sy2-chronicles: add 1–2 sample MarkdownPanelDefs pointing at
+      real .md files in the repo (e.g. WELCOME.md, NOTES.md) to demonstrate
+      the feature. Position them in the layout as regular panels.
+- [ ] Height policy: `h` in the MarkdownPanelDef controls the panel viewport
+      height. Content taller than h is clipped (no scroll within the panel —
+      the parent canvas scrolls). Recommended h = first screenful of the doc.
+- [ ] Export `createMarkdownPanelContent` from `src/core/panel-layout.ts`
+
+**Design notes:**
+
+No figlet headings by default — inside a panel, figlet art for headings is
+almost always too wide and too tall to be useful. The `headingConfig` override
+lets callers opt in to figlet for specific panel sizes if they want it.
+Plain bold ANSI headings are the right default for embedded panels.
+
+The viewport-clip (slice to h rows) is intentional. A MarkdownPanel is a
+window into a document, not a full reader. Use MarkdownViewer (F02/S03) when
+you need scrollable reading. Use MarkdownPanel when you want the doc embedded
+in a composition.
+
+The live file-watch pattern (mtime polling on tick) reuses the sy2-chronicles
+tick loop already in place. No new timer infrastructure needed — the existing
+`setInterval(120)` in openChronicles already drives tick for live panels.
+
+AC-1: Opening sy2-chronicles shows at least one panel rendering the content
+of a real .md file with inline styles (bold, code spans) visible.
+Test: `./scripts/screenshot-window.sh "§y² Chronicles"` — confirm markdown
+panel content is visible and styled.
+
+AC-2: A MarkdownPanel with `live: true` updates when the source .md file is
+modified on disk.
+Test: open chronicles, edit NOTES.md, confirm panel content updates within
+one tick cycle (~120ms).
+
+AC-3: A MarkdownPanel wider than its content does not overflow into adjacent
+panels (viewport-clipped to panel inner width).
+Test: screenshot at various canvas widths.
+
+AC-4: `createMarkdownPanelContent` is importable from `src/core/panel-layout.ts`
+and usable by any microapp — not locked inside sy2-chronicles.
+Test: `bun run typecheck` with a test import from a different module.
 
 ---
 
