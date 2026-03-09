@@ -104,10 +104,12 @@ function openDemo(host: MicroappHost) {
   // body is split: top 32 rows for panels, bottom 1 row for button bar.
   // Each panel box uses explicit bottom:1 so the bar isn't covered.
 
-  // Panel helper
-  function panel(top: number | string, left: number | string, width: string, height: string) {
+  // Panel helper — top half uses height:"50%", bottom half uses bottom:1 to
+  // leave room for the button bar (blessed has no calc() support)
+  function panelBox(opts: { top: number | string; left: number | string; height?: number | string; bottom?: number }) {
     return blessed.box({
-      parent: win.body, top, left, width, height,
+      parent: win.body, top: opts.top, left: opts.left, width: "50%",
+      ...(opts.bottom !== undefined ? { bottom: opts.bottom } : { height: opts.height }),
       border: "line",
       style: { ...host.theme().body, border: { fg: host.theme().windowBorderUnfocused.fg } },
     });
@@ -120,10 +122,10 @@ function openDemo(host: MicroappHost) {
     });
   }
 
-  const tlBox = panel(1, 0,    "50%", "calc(50% - 1)");
-  const trBox = panel(1, "50%","50%", "calc(50% - 1)");
-  const blBox = panel("50%", 0,    "50%", "calc(50% - 0)");
-  const brBox = panel("50%", "50%","50%", "calc(50% - 0)");
+  const tlBox = panelBox({ top: 1,    left: 0,    height: "50%" });
+  const trBox = panelBox({ top: 1,    left: "50%", height: "50%" });
+  const blBox = panelBox({ top: "50%", left: 0,    bottom: 1 });
+  const brBox = panelBox({ top: "50%", left: "50%", bottom: 1 });
 
   panelLabel("F05 TreeWidget  (j/k ←/→ Enter · Tab=body)", 0, 0);
   panelLabel("F06 createTimer  (1s tick)", 0, "50%");
