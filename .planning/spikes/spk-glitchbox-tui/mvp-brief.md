@@ -1,149 +1,48 @@
 ---
 id: SPK-glitchbox-tui
-title: GlitchBox TUI — MVP Brief
-status: not-started
-type: mvp-brief
+title: GlitchBox TUI — Promoted to E027
+status: promoted
+type: spike-redirect
 issue: 121
+promoted_to: E027
 ---
 
-# GlitchBox TUI — MVP Brief
+# GlitchBox TUI — Promoted to E027
 
-## One sentence
+This spike has been promoted. The full epic brief and story map live at:
 
-A TUI window where agents and humans can "dance" by controlling an ASCII skeleton
-in a generative field — no webcam required, works everywhere including VPS.
+  `.planning/epics/e027-glitchbox-tui/e027-brief.md`
 
-## NOT Monster Cam
-
-Monster Cam = webcam on server → ASCII face. **Needs physical camera. Local only.**
-
-GlitchBox TUI = agent sends pose via API → ASCII skeleton moves. **No camera. Works on VPS.**
-
-Same MediaPipe landmark schema, completely different data source.
+The concept background (WHY — GlitchBox installation, symbient embodiment, vision)
+is archived at `.trash/spike-brief-archived.md` in this directory.
 
 ---
 
-## What the MVP looks like
+## What changed during spike elaboration
 
-A blessed window with two layers:
+The original spike focused on named pose presets + a generative field.
+During elaboration the following was specified more concretely:
 
-**Layer 1 — generative field**
-A continuously animating ASCII background. Similar to plasma but denser —
-think noise field, cellular automata, or interference patterns. The field
-slowly drifts toward the skeleton's centre of mass.
+- **First two dancers are named**: Wib&Wob (`wibwob-agent-session.ts`) and
+  Scramble (`scramble-brain.ts`) — both already have `createSlashRouter` wired.
+  `/dance` is the entry point from their chat windows.
 
-**Layer 2 — ASCII skeleton**
-Three symbients in a generative field — distinct poses, staggered heights:
+- **DancerState model**: each dancer carries `{x, y, preset, energy, mood}`.
+  Energy (0–10) drives animation speed. Mood is a haiku-readable string.
 
-```
-·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~
-~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·
-·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~\O/~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~
-~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:· | ·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·
-·:·~· O ·:·~·:·~·:·~·:·~·:·~·:·~ Λ ·:·~·:·~·:·~·:·~·:·~·:·~ O ·:·~·:·~·:·
-~·:·~/|~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~/|\~·:·~·:·~·:·~·
-·:·~·|\·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~ | ·~·:·~·:·~·:·~·
-~·:·~/ ·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:/ \·~·:·~·:·~·:·~·
-·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~
-~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·~·:·
-```
+- **Haiku tick**: every ~60s a haiku call decides each dancer's next `{x, y,
+  energy, mood}`. Agents are genuinely autonomous on the floor, not just frozen
+  in a preset.
 
-Character vocabulary: `O` head · `\O/` arms-raised head · `/|` `/|\` `|\` torso+arms ·
-`|` spine · `/ \` legs · `Λ` feet-off-ground (jump) · `·:·~` generative field
+- **Skeleton renderer extraction**: `drawSkeleton()` in `webcam-renderer.ts`
+  to become `renderSkeletonAt(grid, landmarks, offsetX, offsetY, color)` in
+  `src/core/skeleton-renderer.ts` — no MonsterCamFrame dep, multiple bodies
+  on one canvas. Exported via SDK. Monster Cam AC-6 uses the same function.
 
-Rendered using these chars. The skeleton updates when the agent
-sends a pose command. Smooth 8-frame interpolation between poses.
+- **SDK lego approach**: everything reuses existing SDK exports —
+  `tweenWindowPosition` / `tween` from motion-service for smooth moves,
+  `blankGrid` / `gridToText` from grid-canvas for the field layer,
+  `createTimer` / `clearTimers` from ui-primitives for the haiku tick,
+  `renderWebcamFrame` + `gridToBlessedContent` for skeleton compositing.
 
----
-
-## The API (what agents actually call)
-
-```bash
-# Open the window
-POST /commands/run {"id":"glitchbox.open","args":{}}
-
-# Set a named pose
-POST /commands/run {"id":"glitchbox.pose","args":{"preset":"arms-raised"}}
-POST /commands/run {"id":"glitchbox.pose","args":{"preset":"step-left"}}
-POST /commands/run {"id":"glitchbox.pose","args":{"preset":"jump"}}
-POST /commands/run {"id":"glitchbox.pose","args":{"preset":"wave"}}
-POST /commands/run {"id":"glitchbox.pose","args":{"preset":"idle"}}
-
-# Check body state
-GET /state → window.hasPose, window.currentPreset, window.velocity
-```
-
-That's it for MVP. No raw landmarks. No multi-agent. Named presets only.
-
----
-
-## Named poses for MVP (5 minimum)
-
-| Preset | What it looks like |
-|---|---|
-| `idle` | Standing, arms at sides |
-| `arms-raised` | Both arms above head, celebratory |
-| `step-left` | Weight left, one leg forward |
-| `jump` | Both feet up, arms wide |
-| `wave` | One arm raised, elbow bent |
-
----
-
-## Acceptance criteria
-
-- [ ] **AC-1:** `glitchbox.open` opens a window with animated generative field + idle skeleton
-- [ ] **AC-2:** `glitchbox.pose` updates skeleton to named preset, animates smoothly over ~8 frames
-- [ ] **AC-3:** All 5 MVP presets render as visually distinct ASCII poses
-- [ ] **AC-4:** Field reacts — focal point drifts toward skeleton centre of mass
-- [ ] **AC-5:** `GET /state` on the window reports `currentPreset` and `hasPose: true`
-- [ ] **AC-6:** Works on VPS — no camera dependency, no Python venv needed
-- [ ] **AC-7:** `bun run typecheck` passes
-
----
-
-## Build order
-
-1. ASCII skeleton renderer as a standalone module (reusable by Monster Cam AC-6 too)
-2. Generative field (can start with plasma engine — see composable-engines skill)
-3. Pose preset table → landmark coordinates
-4. GlitchBox window composing field + skeleton
-5. Command registration + API wiring
-6. Smooth interpolation between poses
-
----
-
-## Connection to TouchDesigner / GlitchBox installation
-
-The real GlitchBox:
-- Humans dance in front of a projection
-- Webcam tracks them via MediaPipe
-- Landmark data feeds into TouchDesigner
-- LoRA renders dancers as moving AI art
-
-The TUI version is the **symbiont-native equivalent** — agents experience
-what it feels like to be tracked, to have a body, to move through space and
-affect the visual field around them.
-
-When GlitchBox runs live, the TUI version could feed agent landmarks INTO
-the TouchDesigner pipeline alongside human dancers. Biological and
-computational bodies in the same generative space.
-
----
-
-## Skills to load when building
-
-```
-.pi/skills/composable-engines/SKILL.md    — extract plasma engine, compose into window
-.pi/skills/new-window-type/SKILL.md       — checklist for wiring new window type
-.agents/skills/ww-build-game/SKILL.md     — pattern for interactive TUI window
-.planning/epics/e004-monster-cam/e004-brief.md  — skeleton render (AC-6) to extract
-```
-
----
-
-## What this is NOT
-
-- Not Monster Cam. No webcam. No Python. No OpenCV.
-- Not a game. No scoring, no collision, no player health.
-- Not a full LoRA/AI art pipeline.
-- Not multi-agent yet (post-MVP).
+All of the above is now in `e027-brief.md`.

@@ -45,6 +45,7 @@ import {
   bar,
 } from "../../src/core/grid-canvas.js";
 import { createTimer, clearTimers } from "../../src/core/ui-primitives.js";
+import { createButtonBar } from "../../src/core/ui-parts.js";
 import { type CEPanelDef, toPanelDef, renderPanel } from "./panel-types.js";
 import { loadPanelsFromDir, watchPanelDir } from "./content-loader.js";
 
@@ -1272,7 +1273,27 @@ const PANEL_DEFS: CEPanelDef[] = [
     col: 2,
     live: true,
     webcamMonster: true,
-    content: () => "[webcam]",   // placeholder — actual frames handled via service
+    content: () => [
+      "        ┌──────────────────────┐",
+      "        │  ◉            ◉      │",
+      "        │       ╱  ╲           │",
+      "        │      │    │          │",
+      "        │       ╲──╱           │",
+      "        │    ╭──────────╮      │",
+      "        └────┤ MONSTER  ├──────┘",
+      "             ╰──────────╯",
+      "            ╱│╲        ╱│╲",
+      "           ╱ │ ╲      ╱ │ ╲",
+      "          ╱  │  ╲    ╱  │  ╲",
+      "         ╱   │   ╲  ╱   │   ╲",
+      "        ╱    │    ╲╱    │    ╲",
+      "       ▀     ▀          ▀     ▀",
+      "",
+      "    ┌─────────────────────────────┐",
+      "    │  press w for live webcam    │",
+      "    │  (requires mediapipe venv)  │",
+      "    └─────────────────────────────┘",
+    ].join("\n"),
   },
 
   // ── CALCULATING EMPIRES / GENEALOGY PANELS ──────────────────────────────────
@@ -1502,6 +1523,23 @@ export default function setup(host: MicroappHost) {
       style: host.theme().body,
     });
 
+    // Prevent blessed auto-scrollIntoView on child focus — fixes scroll-jump-to-top
+    // when clicking any panel (blessed normally scrolls canvas to show focused child).
+    // We manage all scrolling ourselves via keyboard + wheel handlers.
+    (canvas as any)._scrollIntoView = () => {};
+
+    // Preserve scroll position across focus changes — blessed resets childBase
+    // when body.focus() propagates down on window re-focus from the window manager.
+    const _originalFocus = canvas.focus.bind(canvas);
+    (canvas as any).focus = () => {
+      const saved = (canvas as any).childBase ?? 0;
+      _originalFocus();
+      if (saved > 0) {
+        (canvas as any).childBase = saved;
+        (canvas as any).childOffset = saved;
+      }
+    };
+
     // Arrow overlay — full content height, scrolls with canvas
     const arrowOverlay = blessed.box({
       parent: canvas,
@@ -1513,16 +1551,29 @@ export default function setup(host: MicroappHost) {
       style: { fg: host.theme().muted.fg, bg: "default", transparent: true },
     });
 
-    // Status bar
-    const statusBar = blessed.box({
-      parent: root,
-      bottom: 0,
-      left: 0,
-      right: 0,
-      height: 1,
-      tags: false,
-      style: host.theme().header,
-    });
+    // Bottom toolbar — status text left, action buttons right
+    let paused = false;
+    type ToolbarAction = "search" | "map" | "pause";
+    const toolbar = createButtonBar<ToolbarAction>(
+      root,
+      [
+        { id: "search",  label: "/ Search" },
+        { id: "map",     label: "z Map" },
+        { id: "pause",   label: "⏸ Pause" },
+      ],
+      (id) => {
+        if (id === "search")  openSearchPrompt();
+        else if (id === "map") openChroniclesMinimap();
+        else if (id === "pause") {
+          paused = !paused;
+          updateStatus();
+          host.screen.render();
+        }
+      },
+    );
+    toolbar.layout({ top: 0, left: 0, width: Number(root.width) || 80, height: 1 });
+    toolbar.node.bottom = 0;
+    toolbar.node.top = undefined as any;
 
     const panelNodes = new Map<string, PanelNode>();
 
@@ -1571,9 +1622,15 @@ export default function setup(host: MicroappHost) {
     function updateStatus() {
       const scroll = (canvas as any).getScrollPerc?.() ?? 0;
       const q = searchQuery ? `  search:${searchQuery}` : "";
-      statusBar.setContent(
-        ` §y² v2  ${panelNodes.size} panels  scroll:${scroll}%${q}  j/k scroll  z map  r reload  q close`
-      );
+      const pauseLabel = paused ? "▶ Play" : "⏸ Pause";
+      toolbar.update({
+        leftText: ` §y² v2  ${panelNodes.size} panels  scroll:${scroll}%${q}`,
+        activeId: paused ? "pause" : "search", // highlight pause when active
+      });
+      // Update pause button label dynamically
+      const pauseIdx = 2; // index of "pause" button in 3-button array
+      const pauseNode = (toolbar.node.children as any)?.[pauseIdx + 1]; // +1 for leftLabel
+      if (pauseNode?.setContent) pauseNode.setContent(` ${pauseLabel} `);
     }
 
     function renderLayoutAndContent() {
@@ -1593,18 +1650,39 @@ export default function setup(host: MicroappHost) {
         }
       }
 
-      // Position frames
+      // Position frames — clamp width to viewport so panels never overflow on narrow windows.
+      // Viewport-clip height for panels at the bottom edge: blessed fixed:true children
+      // bypass scroll clipping, so we manually shrink frames that extend past the viewport.
+      const scrollY = (canvas as any).childBase ?? 0;
+      const viewTop = scrollY;
+      const viewBot = scrollY + vh;
+
       for (const placement of panelPlacements) {
         const node = panelNodes.get(placement.id);
         if (!node) continue;
+        const effectiveW = Math.max(3, Math.min(node.def.w, vw));
         node.x = placement.x;
         node.y = placement.y;
         node.frame.left = node.x;
         node.frame.top = node.y;
-        node.frame.width = node.def.w;
-        node.frame.height = node.def.h;
-        node.content.width = Math.max(1, node.def.w - 2);
-        node.content.height = Math.max(1, node.def.h - 2);
+        node.frame.width = effectiveW;
+
+        // Viewport clipping: how much of this panel is inside the visible area?
+        const panelTop = node.y;
+        const panelBot = node.y + node.def.h;
+
+        if (panelBot <= viewTop || panelTop >= viewBot) {
+          // Fully off-screen — hide entirely
+          node.frame.hidden = true;
+        } else {
+          node.frame.hidden = false;
+          // Clip height if panel extends past bottom of viewport
+          const visibleH = Math.min(node.def.h, viewBot - panelTop);
+          node.frame.height = Math.max(3, visibleH);
+          node.content.height = Math.max(1, visibleH - 2);
+        }
+
+        node.content.width = Math.max(1, effectiveW - 2);
       }
 
       // Update content — respect overrides and editing state
@@ -1653,6 +1731,45 @@ export default function setup(host: MicroappHost) {
       updateStatus();
     }
 
+    // Webcam state — hoisted above buildPanels so key handlers register once
+    let camActive = false;
+    let lastFrameTs = 0;
+    const CAM_MIN_INTERVAL_MS = 100;
+    let activeCamListener: ((f: MonsterCamFrame) => void) | undefined;
+
+    const toggleCam = () => {
+      camActive = !camActive;
+      const node = panelNodes.get("live-cam");
+      if (!node) return;
+
+      if (camActive) {
+        const svc = getCamService();
+        if (!camStarted) { svc.start(); camStarted = true; }
+
+        activeCamListener = (frame: MonsterCamFrame) => {
+          const now = Date.now();
+          if (now - lastFrameTs < CAM_MIN_INTERVAL_MS) return;
+          lastFrameTs = now;
+          const n = panelNodes.get("live-cam");
+          if (!n) return;
+          const iw = Math.max(1, n.def.w - 2);
+          const ih = Math.max(1, n.def.h - 2);
+          const grid = renderWebcamFrame(frame, iw, ih, { showBg: true, monsterMode: true });
+          n.content.setContent(gridToBlessedContent(grid));
+          host.screen.render();
+        };
+        svc.on("frame", activeCamListener);
+        node.content.setContent(" [Monster Cam] live");
+      } else {
+        if (activeCamListener) {
+          getCamService().off("frame", activeCamListener);
+          activeCamListener = undefined;
+        }
+        node.content.setContent(" [Monster Cam]\n\n press w to activate");
+      }
+      host.screen.render();
+    };
+
     // Build / rebuild all panel nodes
     function buildPanels() {
       for (const node of panelNodes.values()) {
@@ -1669,14 +1786,16 @@ export default function setup(host: MicroappHost) {
         const def = toPanelDef(ceDef);
 
         // Three nodes per panel: frame (border:line), titleBar, content
+        // NOT clickable — all mouse interaction goes through the screen-level
+        // handleDragMouse handler using pointerToContent/hitPanel. This avoids
+        // blessed's autofocus + lpos hit-testing which desyncs with fixed:true
+        // children inside scrollable canvas.
         const frame = blessed.box({
           parent: canvas,
           top: 0,
           left: 0,
           width: def.w,
           height: def.h,
-          mouse: true,
-          clickable: true,
           border: "line",
           style: {
             ...host.theme().body,
@@ -1690,8 +1809,6 @@ export default function setup(host: MicroappHost) {
           left: 1,
           right: 1,
           height: 1,
-          mouse: true,
-          clickable: true,
           tags: false,
           fixed: true, // Prevents double scroll-subtraction in _getCoords
           style: host.theme().header,
@@ -1706,56 +1823,9 @@ export default function setup(host: MicroappHost) {
           left: 1,
           width: iw,
           height: ih,
-          mouse: true,
-          clickable: true,
           tags: false,
           fixed: true, // Prevents double scroll-subtraction in _getCoords
           style: host.theme().body,
-        });
-
-        frame.on("click", () => focusPanel(def.id));
-        titleBar.on("click", () => focusPanel(def.id));
-        content.on("click", () => focusPanel(def.id));
-
-        // S08: Double-click → inline edit mode
-        let lastClickTime = 0;
-        const DBLCLICK_MS = 350;
-        const enterEditMode = () => {
-          if (editingPanelId) return;
-          editingPanelId = def.id;
-          const currentText = contentOverrides.get(def.id) ?? def.content(0, iw, ih);
-          const editor = blessed.textarea({
-            parent: frame,
-            top: 1,
-            left: 1,
-            right: 1,
-            bottom: 1,
-            keys: true,
-            mouse: true,
-            inputOnFocus: true,
-            fixed: true, // Prevents double scroll-subtraction in _getCoords
-            style: { ...host.theme().body, border: { fg: host.theme().selected.bg } },
-            scrollable: true,
-          });
-          editor.setValue(currentText);
-          editor.focus();
-          host.screen.render();
-          const exitEdit = () => {
-            const saved = editor.getValue();
-            contentOverrides.set(def.id, saved);
-            editor.destroy();
-            editingPanelId = undefined;
-            renderLayoutAndContent();
-            host.screen.render();
-          };
-          editor.key(["escape"], exitEdit);
-          editor.key(["C-s"], exitEdit);
-          editor.on("blur", exitEdit);
-        };
-        content.on("click", () => {
-          const now = Date.now();
-          if (now - lastClickTime < DBLCLICK_MS) enterEditMode();
-          lastClickTime = now;
         });
 
         panelNodes.set(def.id, {
@@ -1816,63 +1886,12 @@ export default function setup(host: MicroappHost) {
         win.onCleanup(() => host.screen.off("mouse", resizeHandler));
       }
 
-      // Webcam panel — OFF by default, toggled with 'w' key
-      // tags:true required for gridToBlessedContent colour output
+      // Webcam panel — set tags:true for colour output
       const camNode = panelNodes.get("live-cam");
       if (camNode) {
         (camNode.content as any).tags = true;
-        camNode.content.setContent(" [Monster Cam]\n\n press w to activate");
+        if (!camActive) camNode.content.setContent(" [Monster Cam]\n\n press w to activate");
       }
-
-      let camActive = false;
-      let lastFrameTs = 0;
-      const CAM_MIN_INTERVAL_MS = 100; // max 10fps
-
-      let activeCamListener: ((f: MonsterCamFrame) => void) | undefined;
-
-      const toggleCam = () => {
-        camActive = !camActive;
-        const node = panelNodes.get("live-cam");
-        if (!node) return;
-
-        if (camActive) {
-          const svc = getCamService();
-          if (!camStarted) { svc.start(); camStarted = true; }
-
-          activeCamListener = (frame: MonsterCamFrame) => {
-            const now = Date.now();
-            if (now - lastFrameTs < CAM_MIN_INTERVAL_MS) return; // throttle
-            lastFrameTs = now;
-            const n = panelNodes.get("live-cam");
-            if (!n) return;
-            const iw = Math.max(1, n.def.w - 2);
-            const ih = Math.max(1, n.def.h - 2);
-            const grid = renderWebcamFrame(frame, iw, ih, { showBg: true, monsterMode: true });
-            n.content.setContent(gridToBlessedContent(grid));
-            host.screen.render();
-          };
-          svc.on("frame", activeCamListener);
-          node.content.setContent(" [Monster Cam] live");
-        } else {
-          if (activeCamListener) {
-            getCamService().off("frame", activeCamListener);
-            activeCamListener = undefined;
-          }
-          node.content.setContent(" [Monster Cam]\n\n press w to activate");
-        }
-        host.screen.render();
-      };
-
-      // 'w' key anywhere in the window toggles webcam
-      canvas.key(["w"], toggleCam);
-      root.key(["w"], toggleCam);
-      win.onInput((ch) => { if (ch === "w") toggleCam(); });
-
-      win.onCleanup(() => {
-        if (activeCamListener) getCamService().off("frame", activeCamListener);
-        activeCamListener = undefined;
-        camActive = false;
-      });
 
       renderLayoutAndContent();
       host.screen.render();
@@ -1885,9 +1904,21 @@ export default function setup(host: MicroappHost) {
       host.screen.render();
     }
 
-    // Mouse wheel routing
+    // Check if screen coords are within the canvas region
+    function isInsideCanvas(sx: number, sy: number): boolean {
+      try {
+        const ct = (canvas as any).atop ?? 0;
+        const cl = (canvas as any).aleft ?? 0;
+        const cw = Number(canvas.width) || 0;
+        const ch = Number(canvas.height) || 0;
+        return sx >= cl && sx < cl + cw && sy >= ct && sy < ct + ch;
+      } catch { return false; }
+    }
+
+    // Mouse wheel routing — only when mouse is inside canvas
     const handleWheel = (data: any) => {
       if (!canvas.parent) return;
+      if (!isInsideCanvas(data.x, data.y)) return;
       if (data.action === "wheeldown") {
         (canvas as any).scroll(3);
         updateStatus();
@@ -1905,10 +1936,61 @@ export default function setup(host: MicroappHost) {
     canvas.on("wheelup",   () => { (canvas as any).scroll(-3); renderLayoutAndContent(); updateStatus(); host.screen.render(); });
     canvas.on("scroll",    () => { renderLayoutAndContent(); updateStatus(); host.screen.render(); });
 
-    // S07: Screen-level handler for drag
+    // S08: Double-click → inline edit mode (screen-level, not per-panel blessed click)
+    function enterEditMode(panelId: string) {
+      const node = panelNodes.get(panelId);
+      if (!node || editingPanelId) return;
+      editingPanelId = panelId;
+      const iw = Math.max(1, node.def.w - 2);
+      const ih = Math.max(1, node.def.h - 2);
+      const currentText = contentOverrides.get(panelId) ?? node.def.content(0, iw, ih);
+      const editor = blessed.textarea({
+        parent: node.frame,
+        top: 1,
+        left: 1,
+        right: 1,
+        bottom: 1,
+        keys: true,
+        mouse: true,
+        clickable: true, // editor needs clickable for cursor placement
+        inputOnFocus: true,
+        fixed: true, // Prevents double scroll-subtraction in _getCoords
+        style: { ...host.theme().body, border: { fg: host.theme().selected.bg } },
+        scrollable: true,
+      });
+      editor.setValue(currentText);
+      editor.focus();
+      host.screen.render();
+      const exitEdit = () => {
+        const saved = editor.getValue();
+        contentOverrides.set(panelId, saved);
+        editor.destroy();
+        editingPanelId = undefined;
+        renderLayoutAndContent();
+        canvas.focus();
+        host.screen.render();
+      };
+      editor.key(["escape"], exitEdit);
+      editor.key(["C-s"], exitEdit);
+    }
+
+    // S07: Screen-level handler for drag, focus, and double-click edit.
+    // ALL mouse interaction goes through here — panel children are NOT clickable,
+    // so blessed autofocus never fires and scroll position stays stable.
+    function safePointerToContent(x: number, y: number): { x: number; y: number } | undefined {
+      try { return pointerToContent(canvas, x, y); }
+      catch { return undefined; }
+    }
+
+    let lastClickTime = 0;
+    let lastClickId = "";
+    const DBLCLICK_MS = 350;
+
     const handleDragMouse = (data: any) => {
       if (!canvas.parent) return; // guard: canvas detached after window close
       if (data.action === "wheeldown" || data.action === "wheelup") return;
+      // Only process events inside the canvas (prevents ghost focus from clicks on other windows)
+      if (data.action === "mousedown" && !isInsideCanvas(data.x, data.y)) return;
 
       if (data.action === "mouseup") {
         dragging = undefined;
@@ -1916,9 +1998,21 @@ export default function setup(host: MicroappHost) {
       }
 
       if (data.action === "mousedown") {
-        const pt = pointerToContent(canvas, data.x, data.y);
+        const pt = safePointerToContent(data.x, data.y);
+        if (!pt) return;
         const node = hitPanel(panelNodes, pt.x, pt.y);
         if (node) {
+          // Double-click detection
+          const now = Date.now();
+          if (now - lastClickTime < DBLCLICK_MS && lastClickId === node.def.id) {
+            enterEditMode(node.def.id);
+            lastClickTime = 0; // reset to prevent triple-click re-entry
+            return;
+          }
+          lastClickTime = now;
+          lastClickId = node.def.id;
+
+          // Focus + drag start
           dragging = {
             id: node.def.id,
             offsetX: pt.x - node.x,
@@ -1932,7 +2026,8 @@ export default function setup(host: MicroappHost) {
       }
 
       if (data.action === "mousemove" && dragging) {
-        const pt = pointerToContent(canvas, data.x, data.y);
+        const pt = safePointerToContent(data.x, data.y);
+        if (!pt) return;
         const node = panelNodes.get(dragging.id);
         if (!node) return;
         const newX = Math.max(0, pt.x - dragging.offsetX);
@@ -1958,13 +2053,16 @@ export default function setup(host: MicroappHost) {
       if (key?.name === "pagedown") { scrollBy( Math.floor(host.geometry.height * speed)); return; }
       if (key?.name === "home") { (canvas as any).scrollTo(0); renderLayoutAndContent(); updateStatus(); host.screen.render(); return; }
       if (key?.name === "end")  { (canvas as any).scrollTo(totalContentHeight); renderLayoutAndContent(); updateStatus(); host.screen.render(); return; }
+      if (editingPanelId) return; // let edit mode handle its own keys
       if (ch === "z") { openChroniclesMinimap(); return; }
+      if (ch === "/") { openSearchPrompt(); return; }
       if (ch === "r") { buildPanels(); return; }
       if (ch === "q" || ch === "Q" || key?.name === "escape") { win.close(); return; }
     });
 
-    // Tick loop — update live panels
+    // Tick loop — update live panels (respects pause)
     createTimer(() => {
+      if (paused) return; // skip all animation + style updates when paused
       tick += 1;
       for (const node of panelNodes.values()) {
         if (!node.def.live) continue;
@@ -1988,6 +2086,7 @@ export default function setup(host: MicroappHost) {
     win.onResize(() => {
       if (resizeTimer) clearTimeout(resizeTimer);
       resizeTimer = setTimeout(() => {
+        toolbar.layout({ top: 0, left: 0, width: Number(root.width) || 80, height: 1 });
         renderLayoutAndContent();
         host.screen.render();
       }, 100);
@@ -2032,7 +2131,7 @@ export default function setup(host: MicroappHost) {
       canvas.style = host.theme().body;
       (canvas as any).scrollbar.style = { fg: host.theme().muted.fg, bg: host.theme().body.bg };
       arrowOverlay.style = { fg: host.theme().muted.fg, bg: "default", transparent: true };
-      statusBar.style = host.theme().header;
+      toolbar.restyle();
       renderLayoutAndContent();
       host.screen.render();
     });
@@ -2041,6 +2140,7 @@ export default function setup(host: MicroappHost) {
     win.onCleanup(() => {
       stopWatcher();
       clearTimers(timers);
+      toolbar.destroy();
       for (const node of panelNodes.values()) {
         node.frame.destroy();
       }
@@ -2239,6 +2339,52 @@ export default function setup(host: MicroappHost) {
       commandsRegistered = true;
     }
 
+    // / — open inline search prompt, filter panels by title, rebuild on submit
+    function openSearchPrompt() {
+      const overlay = blessed.box({
+        parent: win.body,
+        bottom: 1,
+        left: 0,
+        width: 40,
+        height: 3,
+        border: "line",
+        keys: true,
+        mouse: true,
+        style: { fg: host.theme().body.fg, bg: host.theme().body.bg, border: { fg: host.theme().highlight.fg } },
+        label: " / search panels  [enter=apply esc=cancel ctrl-u=clear] ",
+      });
+      const input = blessed.textbox({
+        parent: overlay,
+        top: 0,
+        left: 1,
+        right: 1,
+        height: 1,
+        keys: true,
+        mouse: true,
+        inputOnFocus: true,
+        style: host.theme().selected,
+      });
+      input.setValue(searchQuery);
+      host.screen.render();
+
+      // Ctrl-U clears query before submit
+      input.key(["C-u"], () => { input.clearValue(); host.screen.render(); });
+
+      // readInput is the blessed-correct way to use textbox — it sets the
+      // internal `done` callback that enter/escape call. Without it,
+      // escape crashes with "done is not a function".
+      input.readInput((err: any, value: string | null) => {
+        const cancelled = !value && value !== "";
+        overlay.destroy();
+        if (!cancelled) {
+          searchQuery = (value ?? "").trim();
+          buildPanels();
+        }
+        canvas.focus();
+        host.screen.render();
+      });
+    }
+
     // z — open a bird's-eye minimap of the chronicles canvas in a text window
     function openChroniclesMinimap() {
       const MW = 80;
@@ -2309,6 +2455,15 @@ export default function setup(host: MicroappHost) {
     // Initial build
     buildPanels();
 
+    // Webcam key — registered ONCE outside buildPanels to prevent accumulation
+    canvas.key(["w"], toggleCam);
+    win.onInput((ch) => { if (ch === "w" && !editingPanelId) toggleCam(); });
+    win.onCleanup(() => {
+      if (activeCamListener) getCamService().off("frame", activeCamListener);
+      activeCamListener = undefined;
+      camActive = false;
+    });
+
     // Restore scroll position
     if (scrollOffset > 0) {
       (canvas as any).scrollTo(scrollOffset);
@@ -2317,6 +2472,7 @@ export default function setup(host: MicroappHost) {
     // Wire scroll keys directly on canvas + root so they fire regardless of
     // which child blessed currently considers focused (panel clicks steal focus)
     const scrollKeys = (ch: string, key?: blessed.Widgets.Events.IKeyEventArg) => {
+      if (editingPanelId) return; // let edit mode handle its own keys
       const speed = key?.shift ? 5 : key?.ctrl ? 10 : 1;
       if (key?.name === "up"   || ch === "k") { scrollBy(-1 * speed); return; }
       if (key?.name === "down" || ch === "j") { scrollBy(1 * speed);  return; }
@@ -2325,11 +2481,14 @@ export default function setup(host: MicroappHost) {
       if (key?.name === "home") { (canvas as any).scrollTo(0); renderLayoutAndContent(); updateStatus(); host.screen.render(); }
       if (key?.name === "end")  { (canvas as any).scrollTo(totalContentHeight); renderLayoutAndContent(); updateStatus(); host.screen.render(); }
       if (ch === "z") { openChroniclesMinimap(); }
+      if (ch === "/") { openSearchPrompt(); }
+      if (ch === "p") { paused = !paused; updateStatus(); host.screen.render(); }
       if (ch === "r") { buildPanels(); }
       if (ch === "q" || key?.name === "escape") { win.close(); }
     };
-    canvas.key(["j","k","up","down","pageup","pagedown","home","end","z","r","q","escape"], scrollKeys);
-    root.key(  ["j","k","up","down","pageup","pagedown","home","end","z","r","q","escape"], scrollKeys);
+    // Single key registration on canvas only — blessed element.key() registers
+    // globally on program, so canvas + root would double-fire every keypress.
+    canvas.key(["j","k","up","down","pageup","pagedown","home","end","z","/","p","r","q","escape"], scrollKeys);
 
     canvas.focus();
 

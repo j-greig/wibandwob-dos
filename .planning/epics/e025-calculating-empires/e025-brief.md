@@ -1,7 +1,7 @@
 ---
 id: E025
 title: Calculating Empires TUI
-status: in-progress
+status: done
 issue: 120
 pr: ~
 depends_on: [E015, E016]
@@ -166,17 +166,24 @@ WibWobWorld geology, etc). The panel system is content-agnostic.
 
 - [x] AC-1: Panel grid renders in full-screen window, no sidebar
 - [x] AC-2: 6 panel types all render correctly (ascii, figlet, infographic, text, pixel, mixed) — 7 types + webcam
-- [ ] AC-3: Grid reflows on window resize — panels re-wrap, no overflow clipping
+- [x] AC-3: Grid reflows on window resize — panels re-wrap, width clamps to viewport
 - [x] AC-4: 100+ panels load from content directory, scroll smoothly — 62 panels, scroll fixed (blessed fixed:true)
 - [x] AC-5: Figlet headlines auto-size to panel width
 - [x] AC-6: ASCII/primer panels render from file path
-- [ ] AC-7: Panel search by title works
-- [-] AC-8: Two zoom levels — normal and compact — replaced with z=minimap (text doesn't scale)
+- [x] AC-7: Panel search by title works — / key opens search, enter submits, escape cancels
+- [-] AC-7.1: Stretch: live filter as you type — dropped, not needed
+- [-] AC-8: Two zoom levels — replaced with z=minimap (text doesn't scale)
 - [x] AC-9: `describeState()` contract correct (panelCount, viewport, scrollPos)
 - [x] AC-10: `bun run typecheck` clean
-- [x] AC-11: Any panel draggable by human via mouse
+- [ ] AC-11: Any panel draggable by human via mouse — parked: needs megatidyup of dense panel grid first
 - [x] AC-12: Agent can move panels via registered command — sy2.panel.move + sy2.panel.inspect
-- [x] AC-13: Double-click text panel enters edit mode
+- [x] AC-13: Double-click text panel enters edit mode — screen-level handler, Esc/Ctrl-S to save
+- [x] AC-14: Clicking a panel while scrolled does not jump canvas back to top — isInsideCanvas bounds + canvas.focus override
+- [ ] AC-15: microapp-sdk.ts exports all helpers — parked to agentic-devlog, separate scope
+- [x] AC-16: Panels at bottom viewport edge clip cleanly — manual viewport clipping for fixed:true children
+- [x] AC-17: Panel type glyph prefixes in title bar — PANEL_TYPE_PREFIX registry, switchable to word labels
+- [x] AC-18: Bottom toolbar with clickable buttons (Search, Map, Pause/Play)
+- [x] AC-19: Global pause/play toggle freezes all panel animations (p key or toolbar button)
 
 ---
 
