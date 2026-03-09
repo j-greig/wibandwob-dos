@@ -196,3 +196,76 @@ This should never require a prompt.
 
 **Recommendation**: option 1. The hook already exists and runs on every commit.
 File: `.claude/hooks/pre-commit-main-guard.sh`
+
+## 2026-03-09 (evening) — scroll rendering diagnosis, inspect tooling, worktree ops
+
+### blessed fixed:true is the canonical scroll fix
+
+Root cause confirmed for empty panels below initial viewport in scrollable canvas:
+blessed `_getCoords()` walks up to find the scrollable ancestor and subtracts
+`childBase` (scroll offset). For frame (direct child of canvas) this is correct.
+For content (grandchild — child of frame, which is child of canvas), it subtracts
+`childBase` AGAIN via `frame.lpos.yi` which already had it subtracted. Double
+subtraction → yi goes negative → `_getCoords` returns undefined → content never
+drawn. Borders render (frame is direct child, single subtraction) but content is
+blank.
+
+**Fix**: `fixed: true` on all grandchildren (titleBar, content, editor, resize grip).
+`fixed: true` makes `_getCoords` skip past one scrollable ancestor, avoiding the
+double subtraction.
+
+**This should be in the microapp SDK docs as a mandatory pattern** for any microapp
+that puts child elements inside child elements of a scrollable box:
+```
+frame (parent: scrollable canvas)  → no fixed needed
+  titleBar (parent: frame)         → fixed: true
+  content (parent: frame)          → fixed: true
+```
+
+### Agent can't verify scroll rendering without programmatic panel inspection
+
+**Friction**: tmux `capture-pane` only returns the physical viewport. Panels below
+the scroll position are invisible to the agent. Screenshots via `macOS screencapture`
+work for the human but are opaque to the agent. Result: agent committed a "fix"
+(renderLayoutAndContent on scroll) without verifying it actually worked, and it
+didn't — the real fix was `fixed: true`.
+
+**Fix delivered**: `sy2.panel.inspect` command. Returns `contentLines`,
+`nonEmptyLines`, `lpos` coords, `fixed` flag, first/last line per panel. Verified
+62/62 panels have content. All panel control commands also got `direct: true` —
+without it, `focusOrCreate` wrapper swallows the return value.
+
+**Skill/script need**: a generic "inspect microapp subwindow content" pattern.
+Currently bespoke per module (`sy2.panel.inspect`). Should be a convention:
+any microapp with sub-panels registers a `.inspect` command returning content
+metadata. Or better: `describeState()` should include content summaries for
+all child elements, not just IDs and positions.
+
+**Proposed follow-on**: extend `describeState()` contract to include optional
+`contentPreview` per child element. This would eliminate the need for per-module
+inspect commands.
+
+### focusOrCreate swallows return values from direct-query commands
+
+**Friction**: `host.registerCommand()` wraps action in `focusOrCreate()` by default.
+This is correct for "open the app" commands but wrong for query/control commands
+on already-open windows. Without `direct: true`, the action fires inside
+focusOrCreate's callback and the return value is discarded — API caller gets
+`{ok: true}` with no data.
+
+**Fix**: all query/control commands must use `direct: true`. This is not documented
+anywhere. Should be in `.agents/microapp-sdk.md`.
+
+### Worktree management is manual and fragile
+
+**Friction**: worktree at `wibwobdos-e027` needed to be moved to `wibwob-glitchbox`
+per studio handover. Local branch was 40+ commits behind `origin/epic/e027-glitchbox-tui`.
+Required `git worktree move` + `git reset --hard origin/...` + `bun install` + tmux
+session setup. All manual, no script.
+
+**Wishlist**: `scripts/setup-worktree.sh <epic-branch> <dir-name> [port]` that:
+1. Creates or moves worktree to target dir
+2. Resets to origin HEAD
+3. Runs bun install
+4. Starts tmux session on specified port
+5. Waits for /health
