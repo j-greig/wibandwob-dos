@@ -201,7 +201,8 @@ export class ScrambleBrain {
       this.appendHistory("assistant", reply);
       // Reply back to the originating session if the message came from one
       if (sender && reply && reply !== "(offline)" && reply !== "zzz") {
-        void sendToSession(sender, reply);
+        const senderTag = `<sender_info>${JSON.stringify({ sessionName: "scramble" })}</sender_info>`;
+        void sendToSession(sender, `${reply}\n\n${senderTag}`);
       }
       return reply;
     } catch {

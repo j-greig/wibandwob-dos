@@ -18,7 +18,7 @@ export const dark: ThemeVariant = {
     windowShadow:         { fg: "black", bg: "#333", char: "▒" },
 
     body:                 { fg: "white",  bg: "black"   },
-    bodyAlt:              { fg: "white",  bg: "blue"    },
+    bodyAlt:              { fg: "#1a1a1a", bg: "#c084a0" },
     agentBg:              { fg: "#c8c8ff", bg: "#0d0d2b" },
     header:               { fg: "black",  bg: "cyan"    },
     footer:               { fg: "black",  bg: "white"   },

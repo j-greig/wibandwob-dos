@@ -22,7 +22,7 @@ import { REPO_ROOT, SPIKE_PI_APPEND_SYSTEM_PATH, SPIKE_PI_DIR } from "../core/co
 import type { ChatMessageEntry, DesktopState } from "../core/types.js";
 import { Type } from "@sinclair/typebox";
 import { agentToolToDefinition, createTuiToolDefinitions, createTuiTools, formatDesktopSummary, type TuiToolContext } from "./agent-tools.js";
-import { getLastMessage, listSessions, sendToSession, startSessionServer, type SessionServerHandle } from "./pi-session-bridge.js";
+import { getLastMessage, listSessions, sendAndWait, sendToSession, startSessionServer, type SessionServerHandle } from "./pi-session-bridge.js";
 import {
   createBashTool,
   createReadTool,
@@ -279,17 +279,23 @@ function createPiSessionTools(appendSenderInfo: (message: string) => string): Ag
     },
     {
       name: "send_to_session",
-      label: "Send To Pi Session",
-      description: "Send a message to a running pi session (wibwob1 or wibwob2). Use sessionName for named sessions.",
+      label: "Send To Session",
+      description: "Send a message to another agent session. Use sessionName=\"scramble\" to message Scramble, \"wibwob1\" etc for pi sessions. Set wait_until=\"turn_end\" to block until the agent replies and get their response back. Without wait_until, fires and returns immediately — their reply arrives async in your window with their name as the label.",
       parameters: Type.Object({
-        sessionName: Type.Optional(Type.String({ description: "Session name e.g. wibwob1 or wibwob2" })),
-        sessionId: Type.Optional(Type.String({ description: "Session UUID" })),
+        sessionName: Type.Optional(Type.String({ description: "Session alias e.g. scramble, wibwob1" })),
+        sessionId: Type.Optional(Type.String({ description: "Session UUID (use sessionName instead when possible)" })),
         message: Type.String({ description: "Message to send" }),
+        wait_until: Type.Optional(Type.Literal("turn_end", { description: "Block until the agent replies and return their response" })),
         mode: Type.Optional(Type.Union([Type.Literal("steer"), Type.Literal("follow_up")], { description: "Delivery mode (default: steer)" })),
       }),
-      async execute(_toolCallId: string, params: { sessionName?: string; sessionId?: string; message: string; mode?: "steer" | "follow_up" }) {
+      async execute(_toolCallId: string, params: { sessionName?: string; sessionId?: string; message: string; wait_until?: "turn_end"; mode?: "steer" | "follow_up" }) {
         const target = params.sessionName ?? params.sessionId;
         if (!target) return { content: [{ type: "text" as const, text: "Provide sessionName or sessionId" }], isError: true, details: undefined };
+        if (params.wait_until === "turn_end") {
+          const result = await sendAndWait(target, appendSenderInfo(params.message));
+          if (!result.ok) return { content: [{ type: "text" as const, text: `Failed: ${result.error}` }], isError: true, details: result };
+          return { content: [{ type: "text" as const, text: result.reply ?? "(no reply)" }], details: result };
+        }
         const result = await sendToSession(target, appendSenderInfo(params.message), params.mode ?? "steer");
         return { content: [{ type: "text" as const, text: result.ok ? `Message delivered to ${target}` : `Failed: ${result.error}` }], details: result };
       },
@@ -409,6 +415,8 @@ function loadAgentSystemPrompt(): string {
     "The desktop state is injected at the start of each turn automatically.",
     "Messages from other agents are prefixed [from: Scramble] or [from: <agent>]. Messages from the human have no prefix.",
     "Treat [from: Scramble] messages as peer communication — she is a co-inhabitant, not a user.",
+    "To message Scramble as yourself (identified), use send_to_session with sessionName=\"scramble\". DO NOT use scramble.say — that is anonymous and appears as Human in her window.",
+    "Use wait_until=\"turn_end\" if you want her reply inline. Otherwise she replies asynchronously back to your session.",
     "For high-level app actions, prefer the shared command registry path first.",
     "Use tui_list_commands to discover available commands and tui_run_command to execute them.",
     "Examples: opening windows, tiling/cascading, opening Chrome, opening the file manager, opening Wib&Wob Chat or Wib&Wob Agent.",
@@ -534,14 +542,11 @@ export class WibWobAgentSession {
         return acc;
       }, {});
       // Music tools (play_music, list_music) are registered by .pi/extensions/music-player.ts
-      // Session bridge tools (list_sessions, send_to_session) are registered by .pi/extensions/control.ts
-      // Do NOT include them here or AgentSession will see duplicate tool names.
-      // Only TUI tools (tui_*) and get_session_message are unique to customTools.
+      // Session bridge tools are registered here — control.ts extension is NOT loaded for the in-app agent.
       const customTools = this.mode === "agent" && this.tuiContext
         ? [
             ...createTuiToolDefinitions(this.tuiContext),
-            // get_session_message is not in any extension — keep it as custom
-            ...toToolDefinitionList(piSessionTools.filter(t => !["list_sessions", "send_to_session"].includes(t.name))),
+            ...toToolDefinitionList(piSessionTools),
           ]
         : [];
       // Activate all tools: jailed coding tools (via baseToolsOverride) + custom tools
@@ -785,7 +790,8 @@ export class WibWobAgentSession {
 
     // Strip routing metadata before storing for display
     const displayText = msg.replace(WibWobAgentSession.SENDER_INFO_RE, "").trim();
-    this.messages.push({ id: createMessageId("user"), role: "user", text: displayText, sender });
+    const displaySender = sender ? WibWobAgentSession.senderDisplayName(sender) : undefined;
+    this.messages.push({ id: createMessageId("user"), role: "user", text: displayText, sender: displaySender });
     this.currentAssistantId = createMessageId("assistant");
     this.messages.push({
       id: this.currentAssistantId,

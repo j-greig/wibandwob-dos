@@ -174,6 +174,60 @@ export async function sendToSession(
   }
 }
 
+/** Send a message and wait for the turn_end event — returns the reply content. */
+export async function sendAndWait(
+  target: string,
+  message: string,
+  timeoutMs = 120_000,
+): Promise<{ ok: boolean; reply?: string; error?: string }> {
+  const sockPath = await resolveSocketPath(target);
+  if (!sockPath) return { ok: false, error: `Session not found: ${target}` };
+
+  return new Promise((resolve) => {
+    const socket = net.createConnection(sockPath);
+    socket.setEncoding("utf8");
+    const timer = setTimeout(() => {
+      socket.destroy();
+      resolve({ ok: false, error: "timeout waiting for turn_end" });
+    }, timeoutMs);
+
+    let buffer = "";
+    let acked = false;
+
+    socket.once("connect", () => {
+      socket.write(`${JSON.stringify({ type: "send", message })}\n`);
+      socket.write(`${JSON.stringify({ type: "subscribe", event: "turn_end" })}\n`);
+    });
+
+    socket.on("data", (chunk) => {
+      buffer += chunk;
+      while (buffer.includes("\n")) {
+        const nl = buffer.indexOf("\n");
+        const line = buffer.slice(0, nl).trim();
+        buffer = buffer.slice(nl + 1);
+        if (!line) continue;
+        try {
+          const msg = JSON.parse(line) as Record<string, unknown>;
+          if (msg.type === "response" && msg.command === "send") acked = true;
+          if (msg.type === "event" && msg.event === "turn_end") {
+            clearTimeout(timer);
+            socket.end();
+            const data = msg.data as { message?: { content?: string } } | undefined;
+            resolve({ ok: true, reply: data?.message?.content ?? undefined });
+          }
+        } catch { /* ignore parse errors */ }
+      }
+    });
+
+    socket.once("error", (e) => {
+      clearTimeout(timer);
+      resolve({ ok: false, error: e.message });
+    });
+
+    void acked; // used implicitly via acked flag above
+  });
+}
+
 export async function getLastMessage(target: string): Promise<string | null> {
   const sockPath = await resolveSocketPath(target);
   if (!sockPath) return null;
