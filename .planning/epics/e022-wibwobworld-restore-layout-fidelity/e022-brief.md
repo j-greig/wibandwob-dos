@@ -1,7 +1,7 @@
 ---
 id: E022
 title: WibWobWorld Restore & Layout Fidelity
-status: in-progress
+status: done
 issue: 116
 pr: ~
 depends_on: [E018]
@@ -105,7 +105,7 @@ AC:
 ---
 
 ### S03 — ISO serialises terrain params not file path (RC-1)
-Status: [ ] not-started
+Status: [x] done — N/A: wibwobworld-iso merged into wibwobworld during S05 migration. No separate ISO window exists. Main module serialises seed/terrainIdx/seaLevel/levels directly.
 
 `wibwobworld-iso` should serialise `{ seed, terrainIdx, seaLevel, levels }` and
 regenerate terrain on restore. The ephemeral `sourcePath` must not be the restore key.
@@ -136,7 +136,7 @@ AC:
 ---
 
 ### S05 — Hybrid iso right pane fill parity (RC-5)
-Status: [ ] not-started
+Status: [x] done — Fixed during wibwobworld-iso merge. Hybrid right pane uses hybridIsoViewportW/H with isoN formula (same as standalone ISO), separate terrain + cache from contour left pane. See index.ts ~493.
 
 In hybrid mode the right iso pane should render a world sized to the iso pane canvas
 dimensions (same as standalone ISO mode), not the full contour world strided down.
@@ -153,7 +153,7 @@ AC:
 ---
 
 ### S06 — Ordering contract for paired WibWobWorld + ISO restore (RC-2)
-Status: [ ] not-started
+Status: [x] done — N/A: no separate ISO window exists after S05 migration. RC-2 no longer applies.
 
 ISO window restore must wait for WibWobWorld to finish terrain generation before
 loading. Implement a simple parent/child dependency: ISO checks if WibWobWorld is
