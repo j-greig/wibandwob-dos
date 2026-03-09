@@ -1,0 +1,11 @@
+{
+  "name": "wibwob-dos-mcp-bridge",
+  "version": "0.1.0",
+  "description": "Thin MCP stdio server wrapping the wibandwob-dos REST API on port 8099",
+  "type": "module",
+  "main": "server.ts",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "zod": "^3.25.0"
+  }
+}
