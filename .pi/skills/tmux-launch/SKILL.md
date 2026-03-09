@@ -179,6 +179,32 @@ The irc-framework client reconnects automatically (auto_reconnect_max_retries=99
 | `WIBWOB_CHAT_IRC_HOST` | — | IRC server host (required if transport=irc) |
 | `WIBWOB_CHAT_IRC_PORT` | — | IRC server port (required if transport=irc) |
 
+## Mouse and window naming
+
+Enable mouse (click status bar tabs to switch windows) and rename windows to
+meaningful labels based on what's running in each pane:
+
+```bash
+bash scripts/tmux-setup.sh          # default session: wibwob
+bash scripts/tmux-setup.sh wibwob   # explicit session name
+```
+
+Safe to re-run. Does not kill or restart anything. Output:
+
+```
+mouse on
+window 0 → wibwob-app
+window 1 → wibwob-shell
+Done. Use PREFIX w or click the status bar tabs to switch.
+```
+
+View current window state without running the script:
+
+```bash
+tmux list-windows -t wibwob -F "#{window_index}: #{window_name} [#{pane_current_command}]"
+tmux show-option -t wibwob mouse   # → mouse on / off
+```
+
 ## Convenience scripts
 
 ```bash
@@ -186,4 +212,43 @@ bun run dev               # basic launch (no IRC)
 bun run dev:world         # main instance with IRC (port 8099, label=main)
 bun run dev:world:alt     # alt instance with IRC (port 8098, label=zuk, scratch/alt)
 bun run dev-irc-server    # start IRC server
+```
+
+## Human attach
+
+```bash
+wwdos    # alias → bash scripts/attach.sh — shows sessionId, attaches to wibwob tmux
+         # Ctrl-b d to detach, Ctrl-b 0/1 to switch windows
+```
+
+## Related skills for testing
+
+Once the app is running, these skills cover common testing workflows:
+
+| Skill | When to use |
+|-------|-------------|
+| `wibwobdos` | API-based window control, screenshots, state inspection via HTTP |
+| `ww-screenshot` | Targeted plain-text crop of a single window — cheaper than full state dump |
+| `tui-smoke-test` | Write and run headless integration tests for the TUI |
+| `discord-tui-share` | Share a TUI screenshot or minimap to Discord |
+| `timeline-smoke` | End-to-end smoke test a VJ timeline with screencapture evidence |
+
+## asciinema recording
+
+To record a session for documentation:
+
+```bash
+# Do NOT use wwdos inside asciinema — tmux creates a PTY layer asciinema can't see.
+# Run the app directly inside the asciinema shell:
+
+kill $(lsof -ti:8099) 2>/dev/null   # stop any existing instance
+asciinema rec /tmp/demo.cast --cols 180 --rows 47
+# inside the recording:
+cd ~/Repos/wibandwob-dos && bun run dev:world
+# Ctrl-C to stop app, Ctrl-D to end recording
+
+# Convert to mp4:
+agg /tmp/demo.cast /tmp/demo.gif
+ffmpeg -y -i /tmp/demo.gif -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" \
+  -movflags faststart -pix_fmt yuv420p /tmp/demo.mp4
 ```
