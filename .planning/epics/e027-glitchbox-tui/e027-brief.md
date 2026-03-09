@@ -2,7 +2,7 @@
 id: E027
 title: GlitchBox TUI — Symbiont Embodiment
 status: not-started
-issue: ~
+issue: 122
 pr: ~
 depends_on: [E004, E016]
 collaborators: [0xG]
