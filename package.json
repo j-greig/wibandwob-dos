@@ -14,7 +14,7 @@
     "gen-primitives": "bun scripts/gen-primitives.ts",
     "scaffold:microapp": "bash scripts/scaffold-microapp.sh",
     "check-surface-parity": "bun run scripts/check-surface-parity.ts",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "node_modules/.bin/tsc --noEmit",
     "handover": "bash scripts/handover.sh",
     "check-themes": "bun run scripts/check-themes.ts",
     "planning:status": "bash .claude/scripts/planning.sh status",

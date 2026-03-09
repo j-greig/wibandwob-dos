@@ -8,17 +8,24 @@ import { fileURLToPath } from "url";
 import { EventEmitter } from "events";
 import { spawn, type ChildProcess } from "child_process";
 
+/** @primitive */
 export interface MonsterCamFrame {
   w: number;
   h: number;
   ts: number;
   hasFace: boolean;
   bbox: [number, number, number, number];
+  /** Face keypoints in source pixel coords. Up to 6 points: [x,y][] (eyes, nose, mouth, ears) */
+  faceKeypoints: [number, number][];
   hasHands: boolean;
   handCount: number;
   handBoxes: [number, number, number, number][];
   handLabels: string[];
   hasPose: boolean;
+  /** Pose skeleton landmarks in source pixel coords. 33 points: [x,y][] */
+  poseLandmarks: [number, number][];
+  /** Detected emotion word: happy | sad | angry | surprised | focused | neutral */
+  emotion: string;
   fps: number;
   gray: Uint8Array; // w*h grayscale bytes
 }
@@ -40,6 +47,7 @@ const VENV_PY = path.resolve(
   "../../assets/mediapipe-venv/bin/python"
 );
 
+/** @primitive */
 export class MonsterCamService extends EventEmitter {
   private worker: ChildProcess | null = null;
   private sock: net.Socket | null = null;
@@ -75,6 +83,7 @@ export class MonsterCamService extends EventEmitter {
     this.sock = null;
     this.worker?.kill();
     this.worker = null;
+    try { fs.unlinkSync(SOCK_PATH); } catch { /* already gone */ }
   }
 
   private _spawnWorker() {
@@ -136,11 +145,14 @@ export class MonsterCamService extends EventEmitter {
             w: h.w, h: h.h, ts: h.ts,
             hasFace:   h.has_face   ?? false,
             bbox:      h.bbox       ?? [0,0,0,0],
+            faceKeypoints: (h.face_keypoints ?? []) as [number, number][],
             hasHands:  h.has_hands  ?? false,
             handCount: h.hand_count ?? 0,
             handBoxes:  h.hand_boxes   ?? [],
             handLabels: h.hand_labels  ?? [],
             hasPose:   h.has_pose   ?? false,
+            poseLandmarks: (h.pose_landmarks ?? []) as [number, number][],
+            emotion: h.emotion ?? "neutral",
             fps:       h.fps        ?? 0,
           };
         } catch { /* malformed header — skip */ }

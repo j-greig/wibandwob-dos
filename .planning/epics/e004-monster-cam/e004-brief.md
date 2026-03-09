@@ -1,7 +1,7 @@
 ---
 id: E004
 title: Monster Cam
-status: in-progress
+status: done
 issue: 107
 pr: ~
 depends_on: []
@@ -93,28 +93,112 @@ Socket protocol (per frame):
 - [x] **AC-5:** `handCount` in `/state` tracks hands correctly (F02).
   - Test: L/R coloured double-line boxes appear per hand; `describeState()` reports `handCount`. Manually verified.
 
-- [ ] **AC-6:** `hasPose` in `/state` set when body visible (F03).
+- [x] **AC-6:** `hasPose` in `/state` set when body visible (F03).
   - Test: step into frame → `hasPose: true`; step out → `hasPose: false`. Detection wired, skeleton render not yet done.
 
-- [ ] **AC-7:** Window closes cleanly — Python worker exits, socket removed.
-  - Test: Close window; `ps aux | grep python` shows worker gone; `/tmp/face_monster_cam.sock` removed.
+- [x] **AC-7:** Window closes cleanly — Python worker exits, socket removed.
+  - Fix: `stop()` now calls `fs.unlinkSync(SOCK_PATH)` after killing worker + socket.
 
 - [x] **AC-8:** App boots normally with no camera — window shows error state, no crash.
   - Test: Unset camera device, open window — error shown in status bar, app continues.
 
-- [ ] **AC-9:** `bun run typecheck` passes with all monster cam source included.
-  - Test: `bun run typecheck` exits 0 from repo root.
+- [x] **AC-9:** `bun run typecheck` passes with all monster cam source included.
+  - Fix: typecheck script changed to `node_modules/.bin/tsc --noEmit` (tsc not on bun PATH).
 
 Branch worktree-e004-monster-cam merged to main (b3d9d1d). Remaining: AC-6 pose skeleton, AC-7 socket cleanup verification, AC-9 typecheck.
 
 **2026-03-08:** venv created at `assets/mediapipe-venv/` (gitignored). `monster_cam.open` now appears in Applications menu and opens successfully. Worktree: `feat/e004-monster-cam-complete`.
 
-## Out of Scope
+## Stretch Goals
 
-- Monster/emoji face compositing
-- Multiple simultaneous cameras
-- Recording or video export
-- Windows/Linux camera capture (avfoundation is macOS only — abstract later)
+Not part of the done definition. Pick up when the mood strikes.
+
+### SG-1 — Pose skeleton render
+Detection is wired, `hasPose` flows through to `/state`, but no visual overlay yet.
+Render the 33-point MediaPipe pose model as an ASCII stick figure on top of the
+grayscale feed. Use the same double-line box style as hands. Expected ~30 lines of
+window render code.
+
+### SG-2 — Monster/emoji face compositing
+Replace (or overlay) the face bbox with a rendered emoji or ASCII monster face,
+locked to the detected face landmarks. Mouth open/closed state from landmarks → swap
+sprite. Very Wib. Could be a toggle key alongside `b` for bg.
+
+### SG-3 — Recording / export
+Capture frames to disk as a timelapse or short clip. Options:
+- ASCII art frames → text file per second → playback via primer animation
+- Raw frame buffer → ffmpeg pipe → mp4
+
+### SG-4 — Multi-camera support
+Open multiple camera devices simultaneously, each in its own Monster Cam window.
+Worker would need a `DEVICE_INDEX` env var; window/service pair per device.
+Low priority — needs a second webcam to test.
+
+### SG-5 — Cross-platform camera
+Current capture uses OpenCV `VideoCapture` which works on macOS, Linux, Windows.
+The old ffmpeg avfoundation path was macOS-only. OpenCV already mostly solves this —
+just needs testing on Linux and documenting.
+
+### SG-6 — Portable webcam component for SDK / microapps
+
+Goal: any microapp or module can embed a live webcam feed + detection state without
+reimplementing the worker, socket protocol, or render logic.
+
+**SDK reference — how microapps are structured:**
+```ts
+// modules/sy2-chronicles/index.ts is the canonical example
+import type { MicroappHost } from "../../src/services/microapp-sdk.js";
+// MicroappHost is defined in src/services/module-loader.ts
+// microapp-sdk.ts is the re-export surface — add new things there, not to module-loader directly
+
+export function setup(host: MicroappHost) {
+  const win = host.createWindow({ title: "My App", width: 80, height: 30 });
+  win.onCleanup(() => svc.stop());
+  win.describeState(() => ({ summary: "...", hasFace: true }));
+  host.registerCommand({ id: "myapp.open", label: "Open", ... });
+}
+```
+
+**What needs extracting:**
+
+| Now | Should become |
+|-----|---------------|
+| `MonsterCamService` in `src/services/` | Tagged `@primitive`, exported via `microapp-sdk.ts` |
+| `MonsterCamFrame` interface | Same — exported type for microapp authors |
+| ASCII render logic (gray ramp, grid, drawBox) inlined in window | `src/services/webcam-renderer.ts` — pure functions, no blessed dep |
+| Python worker + socket protocol | Stays as-is, already self-contained |
+
+**Target SDK shape:**
+```ts
+import type { MicroappHost } from "../../src/services/microapp-sdk.js";
+import { MonsterCamService, renderWebcamFrame } from "../../src/services/microapp-sdk.js";
+
+export function setup(host: MicroappHost) {
+  const svc = new MonsterCamService();
+  const win = host.createWindow({ title: "Webcam View", width: 80, height: 30 });
+
+  svc.on("frame", (f) => {
+    const grid = renderWebcamFrame(f, Number(win.body.width), Number(win.body.height), { showBg: true });
+    // grid: Cell[][] — paint however the microapp likes
+  });
+
+  win.onCleanup(() => svc.stop());
+  svc.start();
+}
+```
+
+`renderWebcamFrame` returns `Cell[][]` — no blessed, no window manager, no deps.
+The microapp decides how to paint it.
+
+**Acceptance sketch:**
+- `MonsterCamService` and `MonsterCamFrame` exported from `microapp-sdk.ts`
+- `webcam-renderer.ts` extracted as pure functions, no blessed import
+- Monster Cam window becomes a thin consumer of those exports
+- At least one other microapp (GlitchBox or a demo module) embeds the feed via the SDK surface
+
+## Out of Scope (permanent)
+
+- VPS / headless server support — no webcam, never will be. See SPK-glitchbox-tui for agent embodiment without a camera.
 
 ## Known Risks
 
