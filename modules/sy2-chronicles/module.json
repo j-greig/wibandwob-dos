@@ -1,8 +1,8 @@
 {
   "id": "wibwob.sy2chronicles",
-  "name": "§y² Chronicles",
-  "version": "0.1.0",
-  "description": "§y²'s first week — a dense panel visualization",
+  "name": "§y² Chronicles v2",
+  "version": "2.0.0",
+  "description": "Dense panel visualization — §y² narrative + genealogy + Calculating Empires data",
   "main": "index.ts",
   "commands": [
     {
@@ -15,14 +15,15 @@
   "entry": "index.ts",
   "microapp": {
     "id": "wibwob.sy2chronicles",
-    "title": "§y² Chronicles",
-    "description": "§y²'s first week — a dense panel visualization",
+    "title": "§y² Chronicles v2",
+    "description": "Dense panel visualization — §y² narrative + genealogy + Calculating Empires data",
     "persist": true,
     "multiInstance": true,
     "menu": [
       { "category": "applications", "order": 39, "label": "§y² Chronicles" }
     ],
     "palette": { "order": 59, "label": "Open §y² Chronicles" },
+    "paletteAliases": ["Calculating Empires"],
     "agent": true,
     "api": true
   }

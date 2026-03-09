@@ -168,6 +168,37 @@ Pattern to codify in microapp-sdk.md common-mistakes table:
 
 ---
 
+## §y² Chronicles → Calculating Empires → v2 merge lesson (2026-03-09)
+
+Built `modules/calculating-empires/` as a new microapp with CE's data layer
+(CEPanelDef schema, JSON loader, 6 panel type renderers, zoom, search). Then
+noticed it was missing ALL the hard-won interaction from sy2-chronicles (drag,
+double-click edit, screen-level mouse handler, wheel routing, scrollbar,
+shift/ctrl speed, scroll restore). Classic mistake: extracted primitives but not
+the patterns.
+
+**Key pattern: extract behaviour, not just data.** When building a successor
+microapp, read the predecessor's interaction code as carefully as its data model.
+sy2-chronicles had:
+- Screen-level mouse handler for drag (NOT child mousedown — unreliable in scrollable)
+- `pointerToContent(canvas, x, y)` via canvas.atop/aleft (NOT lpos — stale)
+- `hitPanel(panelNodes, cx, cy)` — hit-test the content-space point
+- Double-click DBLCLICK_MS=350 window + textarea overlay
+- `contentOverrides` + `panelPositionOverrides` module-level (persist across opens)
+- `host.screen.on('mouse')` + cleanup via `win.onCleanup(() => host.screen.off(...))`
+- `canvas.on('wheeldown'/'wheelup')` for direct wheel
+- Arrow overlay: transparent blessed.box covering full canvas height, scrolls with content
+
+Resolution: merged both into sy2-chronicles v2. CE's data layer (panel types,
+JSON loading, zoom, search) + sy2's proven interaction layer = one canonical
+module. `modules/calculating-empires/` removed as superseded.
+
+**Rule added to AGENTS.md pattern:** When building a new microapp that extends
+an existing one, read the existing interaction code completely before writing any
+new interaction code.
+
+---
+
 ## Reference reading (2026-03-09)
 
 - [pi-mono TUI Architecture review](/Users/james/Repos/wibwob-sdk/context.md) —
