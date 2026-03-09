@@ -65,6 +65,48 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
+// ── ASCII DONUT ─────────────────────────────────────────────────────────────
+// Ported from C++ TVision generative_torus_view.cpp (a1k0n-inspired donut math)
+// z-buffer occlusion, 12-level luminance shading, animated rotation
+function renderDonut(tick: number, w: number, h: number): string {
+  const SHADE = ".,-~:;=!*#$@";
+  const R1 = 1.0, R2 = 2.0, K2 = 5.0;
+  const K1 = w * K2 * 0.5 * 0.1625;
+  const yStretch = 1.25;
+  const aRot = tick * 0.06;
+  const bRot = tick * 0.035;
+
+  const grid = blankGrid(w, h);
+  const zbuf = new Float32Array(w * h).fill(-1e9);
+
+  const cosA = Math.cos(aRot), sinA = Math.sin(aRot);
+  const cosB = Math.cos(bRot), sinB = Math.sin(bRot);
+
+  for (let theta = 0; theta < 6.2832; theta += 0.07) {
+    const cost = Math.cos(theta), sint = Math.sin(theta);
+    for (let phi = 0; phi < 6.2832; phi += 0.02) {
+      const cosp = Math.cos(phi), sinp = Math.sin(phi);
+      const cx = R2 + R1 * cost;
+      const cy = R1 * sint;
+      const x = cx * (cosB * cosp + sinA * sinB * sinp) - cy * cosA * sinB;
+      const y = cx * (sinB * cosp - sinA * cosB * sinp) + cy * cosA * cosB;
+      const z = cosA * cx * sinp + cy * sinA;
+      const ooz = 1 / (z + K2);
+      const xp = Math.floor(w / 2 + K1 * ooz * x);
+      const yp = Math.floor(h / 2 + K1 * ooz * y * yStretch);
+      if (xp < 0 || xp >= w || yp < 0 || yp >= h) continue;
+      const idx = yp * w + xp;
+      if (ooz > zbuf[idx]) {
+        zbuf[idx] = ooz;
+        const L = Math.max(0, Math.min(1, (cosp * cost - cosp + sint + 1) * 0.5));
+        const si = Math.min(11, Math.floor(L * 11.999));
+        grid[yp][xp] = SHADE[si] ?? ".";
+      }
+    }
+  }
+  return gridToText(grid);
+}
+
 // ── MERGED PANEL DEFINITIONS ──────────────────────────────────────────────────
 // All narrative panels from sy2-chronicles + genealogy panels from CE.
 // All use CEPanelDef format with type field.
@@ -100,6 +142,16 @@ const PANEL_DEFS: CEPanelDef[] = [
       }
       return gridToText(grid);
     },
+  },
+  {
+    id: "donut",
+    type: "mixed",
+    title: "Torus",
+    w: 52,
+    h: 28,
+    col: 0,
+    live: true,
+    content: (tick, w, h) => renderDonut(tick, w, h),
   },
   {
     id: "kaomoji-variants",
