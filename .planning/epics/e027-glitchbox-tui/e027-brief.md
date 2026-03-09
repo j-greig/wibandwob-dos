@@ -163,6 +163,46 @@ cat-sit. Wib can do jazz hands.
 Upgrade skeleton render from ASCII chars to Unicode braille (`⠀`–`⣿`) for
 4× higher resolution limb lines within same cell grid.
 
+### SG-6 — choreopath video→landmark playback
+
+Extract real human movement from any dance video and play it back through
+the ASCII skeleton — no live webcam, no mocap rig, just a YouTube clip.
+
+**How it works:**
+
+```
+dance video (mp4/url)
+    ↓
+choreopath (PyPI) — runs MediaPipe offline on each frame
+    ↓
+CSV: frame, landmark_0_x, landmark_0_y ... landmark_32_x, landmark_32_y
+    ↓
+GlitchBox playback engine — reads CSV row by row at tick rate
+    ↓
+renderSkeletonAt() — same render path, real movement data
+```
+
+**Why this is good:**
+- `choreopath` outputs normalised 0-1 coords — exact format `renderSkeletonAt()` already expects
+- No schema conversion, no joint remapping
+- Any dance video becomes skeleton animation: grime, ballet, anything
+- Agents could fetch a YouTube URL, extract landmarks, play them back mid-conversation
+
+**Research findings (2026-03-09):**
+- No official BlazePose-33 dance dataset exists from Google
+- AIST++ (Google) is SMPL+COCO-17 — wrong schema, needs conversion
+- `choreopath` (PyPI) is the cleanest path: `pip install choreopath && choreopath extract video.mp4 --output dance.csv`
+- CMU Mocap has dance BVH but no BlazePose-33 converter exists yet
+- Total Capture dataset on Zenodo has MediaPipe world landmarks in JSON — possible secondary source
+
+**Build tasks:**
+- [ ] Script: `scripts/extract-landmarks.sh <video-url>` — yt-dlp + choreopath → CSV in `content/glitchbox/sequences/`
+- [ ] `glitchbox.sequence.load` command — loads a CSV landmark file into memory
+- [ ] `glitchbox.sequence.play` command — plays loaded sequence at energy-scaled speed, loops
+- [ ] `glitchbox.sequence.stop` command — stops playback, returns to manual pose
+- [ ] Sequence player integrated into button bar: SEQ button cycles loaded sequences, PLAY/STOP controls
+- [ ] First sequence: extract from a short grime/dance clip (W&W aesthetic)
+
 ---
 
 ## Collaboration Notes (0xG)
