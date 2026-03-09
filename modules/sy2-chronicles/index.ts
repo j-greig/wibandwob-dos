@@ -1882,6 +1882,7 @@ export default function setup(host: MicroappHost) {
 
     // Mouse wheel routing
     const handleWheel = (data: any) => {
+      if (!canvas.parent) return;
       if (data.action === "wheeldown") {
         (canvas as any).scroll(3);
         updateStatus();
@@ -1900,6 +1901,7 @@ export default function setup(host: MicroappHost) {
 
     // S07: Screen-level handler for drag
     const handleDragMouse = (data: any) => {
+      if (!canvas.parent) return; // guard: canvas detached after window close
       if (data.action === "wheeldown" || data.action === "wheelup") return;
 
       if (data.action === "mouseup") {
@@ -2047,6 +2049,10 @@ export default function setup(host: MicroappHost) {
     if (!snapshotRegistered) {
       host.registerSnapshot({
         canRestore: (snap) => snap.appType === "sy2-chronicles" || snap.appType === "wibwob.sy2chronicles",
+        serialize: (win) => ({
+          appType: "sy2-chronicles",
+          _scrollY: (win as any).describeState?.()?.scrollY ?? 0,
+        }),
         restore: (snap) => {
           openChronicles({ _scrollY: snap._scrollY });
         },
