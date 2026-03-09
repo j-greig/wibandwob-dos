@@ -153,3 +153,13 @@ export { createTimer, clearTimers } from "../core/ui-primitives.js";
 // Skeleton renderer — dance/pose system. Multiple skeletons on one canvas.
 export { renderSkeletonAt, landmarksFromPreset, POSE_CONNECTIONS } from "../core/skeleton-renderer.js";
 export type { NormalisedLandmarks } from "../core/skeleton-renderer.js";
+
+// Motion / tween — animate values, window position and size smoothly.
+export { tween, tweenWindowPosition, tweenWindowSize, EASINGS } from "./motion-service.js";
+export type { EasingFn, TweenOpts } from "./motion-service.js";
+
+// Markdown + figlet raw renderers
+export { renderMarkdown, renderMarkdownFile, PLAIN_HEADING_CONFIG } from "./markdown-service.js";
+export type { RenderMarkdownOptions } from "./markdown-service.js";
+export { renderFiglet, renderFigletLines, measureFiglet, isFigletAvailable } from "./figlet-service.js";
+export type { FigletMeasurement } from "./figlet-service.js";
