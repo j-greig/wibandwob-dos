@@ -4,22 +4,12 @@
  * Consume via microapp-sdk.ts.
  */
 import type { MonsterCamFrame } from "./monster-cam-service.js";
+import { renderSkeletonAt } from "../core/skeleton-renderer.js";
 
 const RAMP     = " .:-=+*#%@";
 const RAMP_LEN = RAMP.length;
 
 const HAND_COLORS: Record<string, string> = { L: "yellow", R: "cyan" };
-const POSE_CONNECTIONS: [number, number][] = [
-  [11, 12],
-  [11, 13], [13, 15],
-  [12, 14], [14, 16],
-  [11, 23], [12, 24],
-  [23, 24],
-  [23, 25], [25, 27],
-  [24, 26], [26, 28],
-  [0, 11], [0, 12],
-];
-
 // Face designs: [eyes, mouth, topDecor?]
 // These get stamped into a dynamically-sized box based on the detected face bbox.
 const MONSTER_DESIGNS: { eyes: string; mouth: string; ears?: string; color: string }[] = [
@@ -129,72 +119,16 @@ function drawBox(
   }
 }
 
-function projectToCanvas(
-  x: number,
-  y: number,
-  srcW: number,
-  srcH: number,
-  canvasW: number,
-  canvasH: number,
-): [number, number] {
-  const cx = Math.max(0, Math.min(canvasW - 1, Math.round((x / srcW) * canvasW)));
-  const cy = Math.max(0, Math.min(canvasH - 1, Math.round((y / srcH) * canvasH)));
-  return [cx, cy];
-}
-
-function drawLine(
-  grid: WebcamCell[][],
-  x0: number,
-  y0: number,
-  x1: number,
-  y1: number,
-  color = "green",
-): void {
-  let x = x0;
-  let y = y0;
-  const dx = Math.abs(x1 - x0);
-  const dy = Math.abs(y1 - y0);
-  const sx = x0 < x1 ? 1 : -1;
-  const sy = y0 < y1 ? 1 : -1;
-  let err = dx - dy;
-
-  while (true) {
-    setCell(grid, y, x, "·", color);
-    if (x === x1 && y === y1) break;
-    const e2 = err * 2;
-    if (e2 > -dy) {
-      err -= dy;
-      x += sx;
-    }
-    if (e2 < dx) {
-      err += dx;
-      y += sy;
-    }
-  }
-}
-
 function drawSkeleton(
   grid: WebcamCell[][],
   frame: MonsterCamFrame,
   canvasW: number,
   canvasH: number,
 ): void {
-  const srcW = frame.w;
-  const srcH = frame.h;
-  const points = frame.poseLandmarks.map(([x, y]) =>
-    projectToCanvas(x, y, srcW, srcH, canvasW, canvasH)
-  );
-
-  for (const [a, b] of POSE_CONNECTIONS) {
-    const p0 = points[a];
-    const p1 = points[b];
-    if (!p0 || !p1) continue;
-    drawLine(grid, p0[0], p0[1], p1[0], p1[1], "green");
-  }
-
-  points.forEach(([x, y], i) => {
-    setCell(grid, y, x, i === 0 ? "◉" : "○", i === 0 ? "cyan" : "green");
-  });
+  const srcW = Math.max(1, frame.w);
+  const srcH = Math.max(1, frame.h);
+  const landmarks = frame.poseLandmarks.map(([x, y]) => [x / srcW, y / srcH] as [number, number]);
+  renderSkeletonAt(grid, landmarks, 0, 0, canvasW, canvasH, "green");
 }
 
 function drawMonsterFace(
