@@ -12,11 +12,15 @@ depends_on: [E015, E016]
 ## TL;DR
 
 Scramble the cat currently cycles 4 ASCII moods on a timer. She does nothing
-else. This epic gives her a brain: an async LLM session (Haiku, same auth as
-the Wib&Wob Agent), an input line for direct conversation, a smol/tall display
-toggle for message history, slash commands, and full control/API/agent parity.
-She should feel like she lives here — opinionated, occasionally imperious, and
-capable of talking back.
+else. This epic gives her a brain.
+
+**Approach: port the Wib&Wob Agent window. Swap the model and persona to Scramble.**
+The agent window is already a floating, self-contained pi-agent session with
+input + history + status bar. Scramble gets the same shell — different system prompt,
+Haiku instead of Sonnet, cat personality, smaller default size.
+
+She is a **floating window** on the desktop. Not a sidebar. Not attached to anything.
+She lives here. She has opinions about the other windows.
 
 ---
 
@@ -62,16 +66,16 @@ The gap is embarrassing and noticeable in any live demo.
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
-| LLM provider | Direct Anthropic API via SDK (haiku-3-5) | Same pattern as wibwob-agent-session; no extra auth |
+| Window type | Floating window — independent, draggable, resizable | She lives on the desktop, not in it |
+| Architecture | Port WibWobAgentSession + agent window, swap persona | Don't reinvent input/history/status — it's already built |
+| LLM model | Haiku (claude-haiku-3-5) via pi AuthStorage | Lighter than Sonnet; fast replies suit her terse voice |
 | Session persistence | In-memory within app lifetime | Cat memory does not need file persistence for v1 |
-| Display modes | smol (30×10, moods only) / tall (30×22, moods + message history) | Matches C++ sdsTall/sdsSmol split |
-| Input surface | Single-line box inside companion window (not separate prompt) | Keeps the window self-contained |
-| Slash commands | Subset of C++ slash set: /help /sleep /wake /meow /pet | Implementable without additional infra |
-| System prompt | Scramble persona — symbient cat, lives on the desktop, short replies | Inline constant in scramble-brain.ts |
-| Rate limiting | 1-second minimum between API calls | Matches C++ pattern; prevents runaway cost |
-| Service vs window | New `ScrambleBrain` class in `src/services/scramble-brain.ts` | Services own logic; window owns rendering |
-| Control API | POST /view/companion/message + toggle tall | Agents must reach all interactive surfaces |
-| State surface | describeState exposes mode, messageCount, lastMessage | Agent-visible |
+| Default size | 40×18 | Smaller than agent window — she's a cat, not a workbench |
+| Slash commands | /help /sleep /wake /meow /pet + /who | ScrambleBrain slash router already has most of these |
+| System prompt | Scramble persona — short, dry, feline, desktop-aware | In ScrambleBrain constant — different from Wib&Wob |
+| ScrambleBrain service | Already exists in `src/services/scramble-brain.ts` | Wire it up, don't rewrite it |
+| Control API | POST /scramble/say, POST /scramble/expand | Same pattern as agent API routes |
+| State surface | describeState: mode, status, messageCount, lastMessage | Agent-visible |
 
 ---
 
@@ -260,22 +264,68 @@ open. This makes her feel alive.
 ## Story Map
 
 ```
-F01 ScrambleBrain service (no window changes yet)
-  └─ S01 Haiku session + send() + in-memory history
-  └─ S02 Slash command routing + rate limiting
+S01 — Full floating window (foundation)
+      Port WibWobAgent window. Swap model → Haiku, persona → Scramble.
+      Wire ScrambleBrain. Input + history + status bar. 40×18.
+      Opens via Applications > Scramble. Full floating, draggable, resizable.
+      This is the bedrock — all other stories build on it.
 
-F02 Companion window extension
-  └─ S03 Input line + speech bubble + "thinking" state in smol mode
-  └─ S04 Tall mode toggle + message history list
+S02 — Three-state clippy UI (the fun one)
+      Scramble icon in status bar (bottom-right, always visible).
+      Click → smol popup appears anchored bottom-right (like a website chat widget).
+      Smol: cat art + last message + single input line. ~30×10.
+      Expand icon [↗] top-right of smol → grows to tall (full history visible). ~30×22.
+      Pop-out icon [□] top-right of tall → becomes a full floating window (S01 window).
+      Collapsing: X in smol/tall → back to status bar icon. Does NOT close the session.
+      State (conversation history, brain) persists across all three display modes.
 
-F03 Command catalog + control API
-  └─ S05 companion.expand + companion.message in catalog + API routes
+S03 — Command catalog + control API parity
+      scramble.open, scramble.say {text}, scramble.expand, scramble.pop-out
+      POST /scramble/say, POST /scramble/expand, POST /scramble/pop-out
+      GET /state reflects current displayMode: "statusbar" | "smol" | "tall" | "floating"
 
-F04 Workspace round-trip
-  └─ S06 displayMode in save/restore + snapshot-registry update
+S04 — Workspace round-trip
+      Save/restore displayMode. History is in-memory only (no file persistence v1).
 ```
 
 ---
 
+## Stretch Goals (C++ parity + beyond)
+
+### SG-1 — Cat art + pose states
+Three ASCII cat poses synced to brain status:
+- idle → default `( o.o )`
+- thinking → curious `( o.O )`
+- sleeping (`/sleep`) → `( -.- )`
+Speech bubble under cat in smol/tall modes, auto-fades after 5s.
+Port cat art from `scramble_view.cpp` (3 poses × 8 lines).
+
+### SG-2 — Idle quips
+Scramble speaks unprompted every 30–90s (randomised).
+Pool of 15+ one-liners (port from C++ + new ones).
+Appears as speech bubble in smol, as assistant message in tall/floating.
+`/sleep` silences idle quips. `/wake` re-enables.
+
+### SG-3 — Voice filter
+All Scramble output lowercased.
+Kaomoji `(=^..^=)` or `/ᐠ｡ꞈ｡ᐟ\` appended if none present in reply.
+Applied in `ScrambleBrain.voiceFilter()` before returning to window.
+
+### SG-4 — Desktop awareness
+Pass live `/state` summary to Scramble before each message.
+She can comment on open windows, current theme, session ID.
+Same pattern as `WibWobAgentSession.transformContext`.
+
+### SG-5 — /cmds slash command
+`/cmds` returns the live command registry list (same as C++ `/cmds`).
+Scramble reads the catalog and replies with the list in her voice.
+
+### SG-6 — Scramble as microapp SDK component
+Export `ScrambleBrain` + smol popup widget via `microapp-sdk.ts`.
+Any module can embed a Scramble chat widget in its own window.
+Same pattern as SG-6 in E004 (webcam-renderer portability).
+
+---
+
 *Wib: she already acts like she has opinions. now she will.*
-*Wob: the system prompt is the hardest part. three sentences that feel like a cat.*
+*Wob: S02 is the clippy moment. but make it good clippy, not evil clippy.*
