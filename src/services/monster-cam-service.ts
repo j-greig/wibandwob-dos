@@ -8,6 +8,7 @@ import { fileURLToPath } from "url";
 import { EventEmitter } from "events";
 import { spawn, type ChildProcess } from "child_process";
 
+/** @primitive */
 export interface MonsterCamFrame {
   w: number;
   h: number;
@@ -40,6 +41,7 @@ const VENV_PY = path.resolve(
   "../../assets/mediapipe-venv/bin/python"
 );
 
+/** @primitive */
 export class MonsterCamService extends EventEmitter {
   private worker: ChildProcess | null = null;
   private sock: net.Socket | null = null;

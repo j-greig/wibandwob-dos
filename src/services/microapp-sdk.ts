@@ -78,3 +78,10 @@ export {
   renderTerrainMap,
   ContentService,
 };
+
+// Webcam / Monster Cam — portable feed + renderer for embedding in any microapp.
+// See modules/sy2-chronicles/index.ts for the canonical MicroappHost pattern.
+export { MonsterCamService } from "./monster-cam-service.js";
+export type { MonsterCamFrame } from "./monster-cam-service.js";
+export { renderWebcamFrame, gridToBlessedContent } from "./webcam-renderer.js";
+export type { WebcamCell, WebcamRenderOptions } from "./webcam-renderer.js";

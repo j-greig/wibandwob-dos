@@ -7,7 +7,7 @@
 e001-codified-context-infrastructure — not-started
 e002-ts-tui-root-migration — done
 e003-finder-app — done
-e004-monster-cam — in-progress
+e004-monster-cam — done
 e014-theme-system — done
 e015-microapp-modules — done
 e016-microapp-primitives — done
