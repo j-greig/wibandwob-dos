@@ -20,4 +20,5 @@ e022-wibwobworld-restore-layout-fidelity — in-progress
 e023-capability-aware-command-registry — done
 e024-session-retroapply — done
 e025-calculating-empires — in-progress
+e026-rich-text-layout-system — not-started
 

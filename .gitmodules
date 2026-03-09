@@ -8,3 +8,12 @@
 [submodule "ralph"]
 	path = ralph
 	url = https://github.com/j-greig/wibandwob-ralph
+[submodule "vendor/rich"]
+	path = vendor/rich
+	url = https://github.com/Textualize/rich
+[submodule "vendor/textual"]
+	path = vendor/textual
+	url = https://github.com/Textualize/textual
+[submodule "vendor/pi-mono"]
+	path = vendor/pi-mono
+	url = https://github.com/badlogic/pi-mono
