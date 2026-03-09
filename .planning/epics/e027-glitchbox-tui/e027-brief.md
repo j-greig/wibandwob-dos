@@ -1,7 +1,7 @@
 ---
 id: E027
 title: GlitchBox TUI — Symbiont Embodiment
-status: in-progress
+status: done
 issue: 122
 pr: ~
 depends_on: [E004, E016]
@@ -222,13 +222,13 @@ No dependency on 0xG for S01–S04. SG-2 requires active coordination.
 - [x] AC-1: `glitchbox.open` in Applications menu + command palette
 - [x] AC-2: Idle skeleton visible on open, generative field behind it
 - [x] AC-3: `renderSkeletonAt()` extracted to `src/core/skeleton-renderer.ts`, exported via SDK
-- [ ] AC-4: `/dance` in Wib&Wob chat opens window, places skeleton at clear position
-- [ ] AC-5: `/dance` in Scramble chat joins same window, placed clear of W&W
+- [x] AC-4: `/dance` in Wib&Wob chat opens window, places skeleton at clear position
+- [x] AC-5: `/dance` in Scramble chat joins same window, placed clear of W&W
 - [x] AC-6: All 5 MVP presets (`idle`, `arms-raised`, `step-left`, `jump`, `wave`) in `landmarksFromPreset()`
 - [x] AC-7: `glitchbox.pose` updates skeleton immediately via API
 - [x] AC-8: `glitchbox.move` smoothly tweens skeleton to new x,y over 8 frames
 - [x] AC-9: `glitchbox.state` sets energy (0–10) — field density + animation speed visibly react
-- [ ] AC-10: Haiku tick fires ~60s per dancer, updates x,y,energy,mood autonomously
+- [x] AC-10: Haiku tick fires ~60s per dancer, updates x,y,energy,mood autonomously
 - [x] AC-11: `glitchbox.field` changes background mood (calm / pulse / chaos / drift)
 - [x] AC-12: `/state` reports `dancers[]` with agentId, x, y, preset, energy, mood
 - [x] AC-13: Works without webcam / mediapipe venv — no camera dependency
