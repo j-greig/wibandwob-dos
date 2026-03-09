@@ -88,6 +88,7 @@ rendering and keyboard toggle. Lives in `src/windows/tree-widget.ts`.
 - [ ] F05 Tree component — collapsible blessed-native TreeWidget
 - [ ] F06 Timed refresh primitive — lifecycle-bound createTimer in ui-primitives
 - [ ] F07 Motion service — tweenStyle + easing for microapps and window components
+- [ ] F09 Panel layout and grid canvas primitives — extract from sy2-chronicles
 - [ ] F08 (stretch) Syntax highlighting — Rich Syntax bridge for code blocks
 
 ---
@@ -470,6 +471,138 @@ changes via GET /state.
 
 ---
 
+## F09 — Panel Layout and Grid Canvas Primitives (from sy2-chronicles)
+
+### Status
+Status: not-started
+
+`modules/sy2-chronicles/index.ts` contains a complete, battle-tested responsive
+panel layout engine and a 2D string-canvas drawing API that are currently locked
+inside one microapp. Both belong in the SDK. This feature extracts them.
+
+Reference: `modules/sy2-chronicles/index.ts` — read in full before implementing.
+
+### S16 — Extract panel layout engine and grid canvas API to primitives
+
+**What exists in sy2-chronicles today:**
+
+`layoutPanels(panels, maxWidth): LayoutResult` — responsive reflow algorithm.
+Wraps panels into rows when they would exceed maxWidth (with COL_GAP=2 between
+panels). Respects per-panel `col` hint for sort order within a row. Returns
+`{ placements: [{id, x, y}], contentWidth, contentHeight }`. This is the
+directly portable core.
+
+Grid canvas API (pure functions, no Blessed dependency):
+- `blankGrid(w, h): string[][]` — allocate a 2D char grid
+- `paintText(grid, x, y, text)` — write a string at a position, clipped
+- `paintCentered(grid, y, text)` — centre a string on a row
+- `paintLines(w, h, lines, opts?): string` — layout lines into a grid with
+  optional centerX/centerY, returns a string ready for setContent
+- `drawArrow(grid, fromX, fromY, toX, toY)` — draw an L-shaped ASCII arrow
+- `gridToText(grid): string` — serialise grid to newline-joined string
+- `waveLine(width, tick, phaseShift): string` — animated wave character line
+- `bar(label, fill, total, value): string` — block-character progress bar
+
+Interaction helpers (Blessed-aware, worth extracting as documented patterns):
+- `measureViewport(canvas): {width, height}` — safe dimension extraction from a
+  scrollable blessed box. Uses `(canvas as any).width/height` with fallbacks to
+  `host.geometry`. Do NOT use `lpos` — it is stale in scrollable boxes.
+- `pointerToContent(canvas, screenX, screenY): {x, y}` — converts screen
+  coordinates to content-space (scroll-aware). Uses `atop/aleft` not `lpos`.
+- `hitPanel(panelNodes, cx, cy): PanelNode | undefined` — hit-test content-space
+  point against a Map of panel nodes.
+
+PanelDef pattern (types worth formalising):
+```ts
+interface PanelDef {
+  id: string;
+  title: string;
+  w: number;        // preferred width in chars
+  h: number;        // preferred height in rows
+  col?: number;     // sort hint for column order within a row
+  live?: boolean;   // if true, tick-driven re-render needed
+  content: (tick: number, w: number, h: number) => string;
+}
+interface PanelNode {
+  def: PanelDef;
+  frame: blessed.Widgets.BoxElement;
+  titleBar: blessed.Widgets.BoxElement;
+  content: blessed.Widgets.BoxElement;
+  x: number;
+  y: number;
+}
+interface LayoutResult {
+  placements: Array<{ id: string; x: number; y: number }>;
+  contentWidth: number;
+  contentHeight: number;
+}
+```
+
+**Tasks:**
+
+- [ ] Create `src/core/panel-layout.ts` — pure layout engine (no Blessed):
+      export `layoutPanels`, `LayoutResult`, `PanelDef` (type only), `PanelNode` (type only)
+- [ ] Create `src/core/grid-canvas.ts` — pure string-grid drawing primitives:
+      export `blankGrid`, `paintText`, `paintCentered`, `paintLines`, `drawArrow`,
+      `gridToText`, `waveLine`, `bar`
+- [ ] Add `measureViewport`, `pointerToContent`, `hitPanel` as documented
+      functions in `src/core/ui-primitives.ts` with JSDoc explaining the
+      `atop/aleft` vs `lpos` distinction
+- [ ] Export all new exports from `src/core/primitives.ts`
+- [ ] Refactor `modules/sy2-chronicles/index.ts` to import from the new
+      primitives instead of its local copies. Verify it still works identically.
+- [ ] Add `src/core/panel-layout.test.ts`:
+      - `layoutPanels` with panels that fit in one row
+      - `layoutPanels` with panels that wrap to a second row
+      - `layoutPanels` respects col sort order within a row
+      - `layoutPanels` clamps panel widths to maxWidth
+- [ ] `bun run typecheck` clean
+
+**Patterns to document but NOT extract as SDK (too app-specific):**
+
+Drag-to-move: single screen-level mouse handler (not child mousedown — unreliable
+in scrollable boxes). Pattern: mousedown → hitPanel → store dragging state →
+mousemove → update panelPositionOverrides map → rerenderLayout. Document in
+`.agents/invariants.md` as a Blessed interaction pattern.
+
+Inline double-click edit: DBLCLICK_MS threshold on content click → spawn
+blessed.textarea overlay → Escape/Ctrl-S commits to contentOverrides map →
+destroy editor → re-render. Good pattern but too app-specific for SDK.
+
+Resize grip: corner blessed.box widget tracking mousedown delta. Same: document
+as pattern, do not genericise prematurely.
+
+**Why this matters beyond sy2-chronicles:**
+
+`layoutPanels` + `PanelDef` + grid canvas is the right foundation for:
+- Multi-panel status dashboards in microapps
+- The MarkdownViewer's heading+body layout (F03/S07)
+- The TreeWidget composition surface (F05)
+- Any future microapp with a "magazine layout" feel
+
+The `content: (tick, w, h) => string` callback pairs directly with the F06
+timed-refresh primitive. A live panel is: `createTimer(() => { node.content
+.setContent(def.content(tick++, w, h)); screen.render(); }, 120, timers)`.
+
+AC-1: `import { layoutPanels } from "src/core/panel-layout"` works from any
+module. sy2-chronicles imports from it.
+Test: `bun run typecheck` + `bun test src/core/panel-layout.test.ts`
+
+AC-2: `layoutPanels` produces identical placements to the old inline version
+for the sy2-chronicles PANEL_DEFS array.
+Test: snapshot test comparing old vs new output for the full panel list at
+width=120.
+
+AC-3: `paintLines`, `blankGrid`, `gridToText` produce correct output for known
+inputs (centred text, line wrapping, empty grid).
+Test: `bun test src/core/grid-canvas.test.ts`
+
+AC-4: sy2-chronicles module opens and renders without visual regression after
+the refactor.
+Test: `./scripts/screenshot-window.sh "§y² Chronicles"` — compare to baseline.
+
+---
+
 ## F08 (Stretch) — Syntax Highlighting Bridge
 
 ### Status
@@ -552,6 +685,12 @@ mtime, width). S01 measures this; the approach is chosen during the spike.
 - **TreeWidget as file manager backbone** — replace the flat list in the
   primer browser and file manager with a TreeWidget showing directory
   hierarchy. Deferred post F05.
+- **Drag-to-move panels as SDK primitive** — the single screen-level mouse
+  handler drag pattern from sy2-chronicles is currently documented-but-not-
+  extracted. If a second microapp needs panel drag, promote to sdk. Deferred
+  post F09.
+- **Inline double-click edit as SDK primitive** — ditto. Too app-specific now;
+  promote if a second consumer appears. Deferred post F09.
 - **Animated window entrance/exit** — use motion-service tweenWindowPosition
   to slide windows in from a screen edge on open and out on close. Deferred
   post F07.
