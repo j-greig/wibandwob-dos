@@ -117,6 +117,28 @@ TODO: wire the impl in module-loader.ts and export type from microapp-sdk.ts.
 
 ---
 
+### statusLine / any bar widget: tags:false by default — blessed tags not rendered
+Spotted in e017 worktree: `statusLine` was showing `{grey-fg}haiku-4-5` as
+literal text instead of rendering the colour. Root cause: the box was created
+without `tags: true`. Blessed boxes default to `tags: false` — you MUST set
+`tags: true` explicitly if you use `{color}text{/}` style tag syntax in content.
+
+Two valid approaches:
+  1. `tags: true` on the box + `{colour-name}text{/colour-name}` blessed tags
+  2. `tags: false` + raw ANSI escape codes `\x1b[...m` (no blessed tag parsing)
+
+They are mutually exclusive. Mixing them produces literal `{` characters in output.
+SDK docs should call this out. The statusLine in app-controller.ts already has
+`tags: true` — but any NEW bar or status widget created without it will silently
+show tags as text with no error.
+
+Pattern to codify in microapp-sdk.md common-mistakes table:
+  WRONG: `blessed.box({ content: "{green-fg}ok{/green-fg}" })` → shows literal braces
+  RIGHT: `blessed.box({ tags: true, content: "{green-fg}ok{/green-fg}" })`
+  OR:    `blessed.box({ tags: false, content: "\x1b[32mok\x1b[0m" })`
+
+---
+
 ## Surprises / things to codify
 
 - `host.ui.createButtonBar` `layout()` call requires a Rect-like object.
