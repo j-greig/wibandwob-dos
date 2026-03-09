@@ -91,8 +91,12 @@ function tryFiglet(text: string, font: string, width: number): string[] | null {
   if (result.status !== 0 || !result.stdout.trim()) return null;
   const lines = result.stdout.split("\n");
   while (lines.length && lines[lines.length - 1]!.trim() === "") lines.pop();
-  // Reject if any line exceeds width (font didn't wrap properly)
+  // Reject if any line exceeds width
   if (lines.some(l => visibleWidth(l) > width)) return null;
+  // Reject if figlet wrapped (blank line in the middle = multiple glyph rows)
+  const trimmed = lines.map(l => l.trim());
+  const hasInternalBlank = trimmed.slice(0, -1).some(l => l === "");
+  if (hasInternalBlank) return null;
   return lines;
 }
 
@@ -104,10 +108,16 @@ function renderFigletHeading(text: string, level: number, width: number, config:
   // Strip existing ANSI from heading text before passing to figlet
   const plain = text.replace(/\x1b\[[0-9;]*m/g, "");
 
-  // Try primary font then fallbacks
-  for (const font of [cfg.font, ...cfg.fallbackFonts]) {
-    const lines = tryFiglet(plain, font, width);
-    if (lines) return lines.map(l => color + l + R);
+  // Only attempt figlet if text is short enough to plausibly fit.
+  // Even the most compact font ("term") needs ~6 cols/char.
+  // Skip figlet entirely for headings that would wrap at any font size.
+  const likelyFits = plain.length <= Math.floor(width / 6);
+
+  if (likelyFits) {
+    for (const font of [cfg.font, ...cfg.fallbackFonts]) {
+      const lines = tryFiglet(plain, font, width);
+      if (lines) return lines.map(l => color + l + R);
+    }
   }
 
   // Plain fallback
