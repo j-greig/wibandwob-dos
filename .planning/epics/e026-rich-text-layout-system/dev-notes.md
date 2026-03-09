@@ -143,3 +143,59 @@ TODO: wire the impl in module-loader.ts and export type from microapp-sdk.ts.
   Empirically `calc(50% - 0)` and `calc(50% - 1)` differ by one row
   depending on odd/even window height. No clean solution; accept minor
   seam at mid-point.
+
+---
+
+## Pi session-control socket discovery — stale socket accumulation (2026-03-09)
+
+**Context:** During E017 Scramble Brains, Scramble was given a pi inter-agent
+session socket so `send_to_session "scramble"` works from the Wib&Wob agent.
+While verifying, `~/.pi/session-control/` was found to have 100+ stale `.sock`
+files from previous sessions that were never cleaned up.
+
+**The directory:**
+```
+~/.pi/session-control/
+  scramble.alias          → scramble-5be76b.sock   (live)
+  wibwob-tui.alias        → wibwob-agent-....sock  (live)
+  scramble-81c49e.sock    (stale — previous app run)
+  scramble-fed92d.sock    (stale)
+  wibwob-agent-1772575141085-gq42af.sock  (stale, one of ~100)
+  ...
+```
+
+**How `list_sessions` discovers sessions:**
+`src/services/pi-session-bridge.ts` — `listSessions()` function (line ~100).
+It reads the directory, finds all `.sock` files, probes each one with a
+`get_message` JSON RPC call, and includes the session if it responds.
+Stale sockets fail to connect and are skipped, but the probe attempt adds
+latency — O(n) where n = all dead sockets.
+
+**Alias resolution:**
+`.alias` files are symlinks. The basename before `.alias` is the human name
+(`scramble`, `wibwob-tui`). `listSessions()` builds an alias map at line ~118,
+matching socket paths to their alias names.
+
+**`startSessionServer` alias param** was hardcoded as `"wibwob-tui"` — fixed in
+E017 by adding optional `aliasName` field to `SessionServerTarget` interface
+(`src/services/pi-session-bridge.ts` ~line 207). Scramble registers as
+`"scramble"`. Any session can now pass a custom alias.
+
+**Suggested fix — startup cleanup sweep:**
+On `startSessionServer`, before creating the new socket, scan the directory and
+remove any stale `.sock` files (i.e. files that fail a connect probe). Could
+also be done on app startup in `app-controller.ts` constructor. A simple
+approach: `fs.readdirSync(CONTROL_DIR).filter(f => f.endsWith('.sock'))` →
+probe each → `fs.unlinkSync` the dead ones. Skip files modified in the last
+30s to avoid racing with a session that just started.
+
+**File references:**
+- `src/services/pi-session-bridge.ts` — `listSessions()`, `startSessionServer()`,
+  `SessionServerTarget` interface, `CONTROL_DIR` constant
+- `src/services/wibwob-agent-session.ts` line ~604 — where `startSessionServer`
+  is called for the main agent (wibwob-tui alias)
+- `src/services/scramble-brain.ts` — `startSessionSocket()` / `stopSessionSocket()`
+  — where Scramble registers her socket (scramble alias)
+
+**Not blocking anything** — `list_sessions` works correctly despite the clutter,
+just slower. Good candidate for a small cleanup script or a startup sweep.
