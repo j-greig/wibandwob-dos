@@ -1,7 +1,7 @@
 ---
 id: E017
 title: Scramble Brains — LLM Companion Integration
-status: not-started
+status: in-progress
 issue: 115
 pr: ~
 depends_on: [E015, E016]
@@ -218,15 +218,18 @@ AC-2: Snapshot registry `companion` entry includes displayMode.
 
 ## Acceptance Criteria (Epic-Level)
 
-- [ ] Scramble responds to natural language input via Haiku
-- [ ] Slash commands work without LLM: /help /sleep /wake /meow /pet
-- [ ] Smol/tall toggle works; tall mode shows message history
-- [ ] describeState includes mode, status, messageCount, lastMessage
-- [ ] Control API: /view/companion/message and /view/companion/expand work
-- [ ] Agent tool surface discovers companion.expand and companion.message
-- [ ] Workspace round-trip preserves displayMode
-- [ ] bun run typecheck passes clean
-- [ ] Manual smoke: open companion, type something, get a reply
+- [x] Scramble responds to natural language input via Haiku (haiku-4-5)
+- [x] Slash commands work without LLM: /help /sleep /wake /meow /pet /who
+- [x] Smol popup + tall toggle + pop-out to floating window
+- [x] describeState includes displayMode, status, messageCount, lastMessage
+- [x] Control API: 9 commands + GET /scramble/state + GET /scramble/history
+- [x] Agent tool surface: companion.open, companion.smol, scramble.say/expand/pet/sleep/wake/meow/pop-out
+- [x] Workspace round-trip preserves displayMode
+- [x] Voice filter: lowercase + kaomoji append
+- [x] Session ID + model shown in info bar; click to open JSONL log
+- [x] Status bar (=^=) indicator clickable → opens smol popup
+- [x] bun run typecheck passes clean
+- [ ] SG-7: Scramble reachable via send_to_session "scramble" (inter-agent socket)
 
 ---
 
@@ -325,7 +328,42 @@ Export `ScrambleBrain` + smol popup widget via `microapp-sdk.ts`.
 Any module can embed a Scramble chat widget in its own window.
 Same pattern as SG-6 in E004 (webcam-renderer portability).
 
+### SG-7 — Pi inter-agent session socket ✦ IN PROGRESS
+Make Scramble reachable via `send_to_session "scramble"` from the Wib&Wob agent
+and any other pi session. Evidence: pi session `81cf388a` (2026-03-09) shows
+Wib&Wob already tried to reach Scramble and couldn't.
+
+**Infra already exists:** `src/services/pi-session-bridge.ts` exports
+`startSessionServer(target: SessionServerTarget)` — same function used by
+`WibWobAgentSession`. Just needs calling for `ScrambleBrain`.
+
+**Implementation:**
+- `ScrambleBrain.startSessionSocket()` — call `startSessionServer` with:
+  - `sessionId: this.sessionId` (e.g. "scramble-fed92d")
+  - `send: (text) => this.send(text)`
+  - `getLastReply: () => this.history.at(-1)?.content ?? null`
+  - `abort/reset` wired through
+  - alias name: `"scramble"` (hardcoded so agents always use `send_to_session "scramble"`)
+- `ScrambleBrain.stopSessionSocket()` — called from `dispose()`
+- `AppController` constructor — call `this.scrambleBrain.startSessionSocket()`
+
+**Alias:** the existing `startSessionServer` hardcodes the alias as `"wibwob-tui"`.
+Need to either: (a) add an optional `aliasName` param to `startSessionServer`, or
+(b) manually create the alias symlink as `"scramble.alias"` pointing to Scramble's
+socket. Option (a) is cleaner — one-line change to `pi-session-bridge.ts`.
+
+**Verification:**
+```
+list_sessions          → shows "scramble" in the list
+send_to_session "scramble" "hello"  → Scramble replies, visible in her window
+get_session_message "scramble"      → returns her last reply
+```
+
+AC: `[ ]` `list_sessions` shows scramble
+AC: `[ ]` `send_to_session "scramble" "hello from wib"` triggers brain.send, reply in window
+AC: `[ ]` `get_session_message "scramble"` returns last reply string
+
 ---
 
 *Wib: she already acts like she has opinions. now she will.*
-*Wob: S02 is the clippy moment. but make it good clippy, not evil clippy.*
+*Wob: SG-7 is the last piece. two AI processes, one desktop.*
