@@ -11,30 +11,16 @@ PR: —
 
 ### Session 2026-03-08 housekeeping batch
 
-**Stale worktree cleanup** `chore`
-Remove 5 abandoned worktrees — all branches merged or C++ era dead ends.
-```
-git worktree remove --force /Users/james/Repos/wibandwob-dos-e007
-git worktree remove --force /Users/james/Repos/wibandwob-dos-e023
-git worktree remove --force /Users/james/Repos/wibandwob-dos-origin-claude-possible-ts-refactor
-git worktree remove --force /Users/james/Repos/wibandwob-dos-planning-infra
-git worktree remove --force /Users/james/Repos/wibandwob-dos-premerge
-```
-Keep: `wibandwob-dos-last-days-of-tvision` (active C++ archive, last edited Mar 5).
-
-**Ghost skill purge** `chore`
-Stale C++ era skills to delete:
-- `.agents/skills/ww-build-game/SKILL.md` — TView/tvision, cmake, zero TS relevance
-- `.agents/skills/ww-scaffold-view/SKILL.md` — TView/cmake/app/*.cpp, wrong stack
-- `.pi/skills/micropolis-engine/SKILL.md` — app/micropolis/, emscripten, all paths gone
-
-Broken cross-refs to fix:
-- `.agents/skills/chiptune/SKILL.md` — references `chiptune-bricks` skill that doesn't exist; update to point at `.pi/skills/chiptune-studio/SKILL.md`
-- `.agents/skills/codex/SKILL.md` — examples use .cpp files and cmake step; replace with TS file references
-- `.pi/skills/michel-gondry-music-video-director/SKILL.md` — blank `name:` in frontmatter; one-line fix
-
 **Docker VPS hardening** `spike` → see `.planning/spikes/spk-docker-vps-hardening/`
 Substantial security + reliability work; broken out as its own spike brief.
+
+**Microapp SDK boundary audit** `chore` → see `agentic-devlog.md` AC-15 entry
+Modules reach past `microapp-sdk.ts` into `src/core/` and `src/services/` directly.
+9 gaps identified in `modules/sy2-chronicles/index.ts`. Fix: re-export from SDK.
+
+**Blessed scrollable + clickable pattern** `spike` → see `agentic-devlog.md` 2026-03-09 entry
+Any microapp with clickable children inside a scrollable canvas hits blessed's
+autofocus/lpos/scroll bugs. Should be a shared primitive or SDK-documented pattern.
 
 **E001 S02 — 3 subsystem specs** `story` → see `.planning/epics/e001-codified-context-infrastructure/e001-brief.md`
 Write command-system, window-manager, and agent-session specs in machine-consumption format.
@@ -45,6 +31,8 @@ Write command-system, window-manager, and agent-session specs in machine-consump
 - `task` — `capabilities` response returns bare command names with no descriptions; agents must guess from name alone — add description field to capabilities JSON
 
 ## Completed Items
+- [x] `chore` — stale worktree cleanup: e007, e023, origin-claude, planning-infra, premerge all removed
+- [x] `chore` — ghost skill purge: ww-build-game, ww-scaffold-view, micropolis-engine deleted (C++ era, zero TS relevance)
 - [x] `spike` #100 — rename test_pattern binary/class to wwdos + DRY docs pass (merged 2026-02-24)
 - [x] `fix` #94 — scramble jet-black bg + tall→smol resize fix (merged 2026-02-24)
 - [x] `epic` E014 #92 — inter-instance group chat: `get_chat_history`, broker, TTS voice fallback, 4-pane monitor (merged 2026-02-24)
