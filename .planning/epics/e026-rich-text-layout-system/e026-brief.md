@@ -136,7 +136,7 @@ virtual indent rendering. Lives in `src/core/tree-widget.ts`.
 
 **SDK enhancements found during implementation (tracked in dev-notes.md):**
 - [x] host.runGlobalCommand — internal vs external command distinction (done)
-- [ ] Export host.ui primitives from microapp-sdk.ts directly (TODO-5f986603)
+- [x] Export host.ui primitives from microapp-sdk.ts directly (TODO-5f986603 closed)
 - [ ] createStyledBorder SDK primitive — thin/single/bold/double border styles
 - [ ] createPanel extracted from e026-demo into src/core/ui-parts.ts
 
@@ -148,7 +148,7 @@ virtual indent rendering. Lives in `src/core/tree-widget.ts`.
 ## F01 — Approach Spike
 
 ### Status
-Status: not-started
+Status: done
 
 ### S01 — Evaluate rendering approaches, decide, document
 
@@ -174,16 +174,16 @@ C. pi-tui markdown.ts direct port — port the full Markdown class from
    between pi-tui Markdown and the prototype's renderer.ts is small.
 
 Tasks:
-- [ ] Read prototype's renderer.ts in full; identify any gaps vs a real-world
+- [x] Read prototype's renderer.ts in full; identify any gaps vs a real-world
       .md file (the pi-mono README is a good stress test)
-- [ ] Run the prototype on 3 representative .md files from the wwdos repo and
+- [x] Run the prototype on 3 representative .md files from the wwdos repo and
       note any rendering failures
-- [ ] Write `scripts/rich-bridge-test.sh` that measures Python Rich subprocess
+- [x] Write `scripts/rich-bridge-test.sh` that measures Python Rich subprocess
       cold-start latency on 3 file sizes
-- [ ] Compare: what does Python Rich give us that the prototype doesn't?
-- [ ] Decision: choose approach B (native TS) or A (subprocess) or hybrid
+- [x] Compare: what does Python Rich give us that the prototype doesn't?
+- [x] Decision: choose approach B (native TS) or A (subprocess) or hybrid
       (B for body, A for syntax highlighting stretch)
-- [ ] Write `S01-findings.md` with the decision and rationale
+- [x] Write `S01-findings.md` with the decision and rationale
 
 AC-1: S01-findings.md exists with: approach chosen, latency numbers for option A,
 gap analysis for option B, decision rationale.
@@ -198,7 +198,7 @@ Test: load AGENTS.md through prototype renderer, screenshot output.
 ## F02 — Markdown Viewer Window
 
 ### Status
-Status: not-started
+Status: done
 
 The prototype's rendering pipeline is the foundation. This feature promotes it
 from a hardcoded demo into a general-purpose markdown viewer that opens any
@@ -215,25 +215,25 @@ Do not copy-paste — the prototype is the authoritative source; import or port
 cleanly with full attribution.
 
 Tasks:
-- [ ] Create `src/services/markdown-service.ts`:
+- [x] Create `src/services/markdown-service.ts`:
       - `renderMarkdown(text, width, opts?) → string[]` — port from prototype
         renderer.ts. Same pipeline: marked.lexer → renderToken dispatch →
         wrapTextWithAnsi → padToWidth.
       - `isMarkdownFile(path) → boolean` — extension check (.md, .markdown)
       - `renderMarkdownFile(filePath, width, opts?) → string[]` — read + render
-- [ ] Promote prototype utils.ts to `src/core/ansi-utils.ts`:
+- [x] Promote prototype utils.ts to `src/core/ansi-utils.ts`:
       export `visibleWidth`, `wrapTextWithAnsi`, `padToWidth`, `extractAnsiCode`,
       `AnsiCodeTracker`. These replace any existing stringWidth usage for ANSI
       content. Add to `src/core/primitives.ts`.
-- [ ] Promote prototype highlight.ts to `src/services/syntax-highlight.ts`:
+- [x] Promote prototype highlight.ts to `src/services/syntax-highlight.ts`:
       export `highlightCode(text, lang) → string[]`. Currently covers Python,
       TypeScript, Bash. Document extension points for new languages.
-- [ ] Unit tests:
+- [x] Unit tests:
       - `renderMarkdown("# Hello\n\n**bold**", 80)` returns lines containing
         ANSI for figlet output + bold escape codes
       - `visibleWidth` correct for emoji, CJK, plain ASCII
       - `wrapTextWithAnsi` preserves ANSI codes across wrap point
-- [ ] `bun run typecheck` clean
+- [x] `bun run typecheck` clean
 
 AC-1: `import { renderMarkdown } from "src/services/markdown-service"` works.
 Test: `bun run typecheck` + `bun test tests/unit/markdown-service.test.ts`
@@ -247,22 +247,22 @@ New window type `markdown-viewer`. The prototype's index.ts is the structural
 reference — promote from hardcoded content to arbitrary file opener.
 
 Tasks:
-- [ ] Extend `WindowKind` with `"markdown-viewer"`
-- [ ] Factory in `src/windows/markdown-viewer-window.ts`. Pattern: follows
+- [x] Extend `WindowKind` with `"markdown-viewer"`
+- [x] Factory in `src/windows/markdown-viewer-window.ts`. Pattern: follows
       prototype's index.ts structure (scrollBox + statusBar + resize re-render)
       but opens a file from disk rather than PI_README.
-- [ ] Wire `open_markdown_viewer` in command-catalog.ts (File menu + palette)
-- [ ] On open: show overlay file picker filtered to *.md; on select call
+- [x] Wire `open_markdown_viewer` in command-catalog.ts (File menu + palette)
+- [x] On open: show overlay file picker filtered to *.md; on select call
       `renderMarkdownFile(path, innerWidth)` and set scrollBox content
-- [ ] Resize handler: re-render at new width (same cache-by-width pattern as
+- [x] Resize handler: re-render at new width (same cache-by-width pattern as
       prototype's `lastWidth` guard)
-- [ ] Status bar: line position + percentage (port from prototype)
-- [ ] Keybindings: j/k/d/u/g/G/q (port from prototype)
-- [ ] `describeState()`: appType, filePath, scrollOffset, rendererMode
-- [ ] Workspace snapshot: round-trips filePath + scrollOffset; restore reopens
+- [x] Status bar: line position + percentage (port from prototype)
+- [x] Keybindings: j/k/d/u/g/G/q (port from prototype)
+- [x] `describeState()`: appType, filePath, scrollOffset, rendererMode
+- [x] Workspace snapshot: round-trips filePath + scrollOffset; restore reopens
       file at saved position
-- [ ] `POST /windows/markdown-viewer {filePath}` in control-api.ts
-- [ ] `bun run typecheck` clean
+- [x] `POST /windows/markdown-viewer {filePath}` in control-api.ts
+- [x] `bun run typecheck` clean
 
 AC-1: Opening AGENTS.md via command palette shows rendered markdown — figlet
 H1/H2, bold, code blocks with dark background.
@@ -282,7 +282,7 @@ Test: scroll to line 30, save workspace, restart, confirm position via state API
 ## F03 — Figlet Heading Config
 
 ### Status
-Status: not-started
+Status: done
 
 The prototype hardcodes doom/slant/shadow/small/smslant with a fixed colour
 gradient. This feature makes heading configuration explicit, per-level, and
@@ -389,7 +389,7 @@ Test: focus code block, press `y`, assert `pbpaste` returns the block content.
 ## F05 — Tree Component
 
 ### Status
-Status: not-started
+Status: done
 
 Port the concept from Rich's Tree class and pi-tui's SelectList to a native
 Blessed collapsible tree widget.
@@ -409,16 +409,16 @@ interface TreeNode {
 ```
 
 Tasks:
-- [ ] `createTreeWidget(parent, nodes, opts)` — Blessed list-backed widget
+- [x] `createTreeWidget(parent, nodes, opts)` — Blessed list-backed widget
       with unicode guide lines (├── └── │) rendered as virtual list rows
-- [ ] Keyboard: j/k navigate, Enter/Space expand/collapse, `o` expand all,
+- [x] Keyboard: j/k navigate, Enter/Space expand/collapse, `o` expand all,
       `O` collapse all
-- [ ] Mouse: click to select, click indicator to toggle
-- [ ] Emit events: `select`, `expand`, `collapse`
-- [ ] `setNodes(nodes: TreeNode[])`, `getSelectedNode(): TreeNode | null`
-- [ ] Theme tokens for guide line colour, selected row, expand indicator
-- [ ] Export from `src/core/primitives.ts`
-- [ ] Demo command `open_tree_demo` in command-catalog.ts with a file hierarchy
+- [x] Mouse: click to select, click indicator to toggle
+- [x] Emit events: `select`, `expand`, `collapse`
+- [x] `setNodes(nodes: TreeNode[])`, `getSelectedNode(): TreeNode | null`
+- [x] Theme tokens for guide line colour, selected row, expand indicator
+- [x] Export from `src/core/primitives.ts`
+- [x] Demo command `open_tree_demo` in command-catalog.ts with a file hierarchy
 
 AC-1: TreeWidget renders nested nodes with guide lines and expand/collapse.
 Test: screenshot of tree demo window.
@@ -434,7 +434,7 @@ Test: `GET /state` after selecting a node.
 ## F06 — Timed Refresh Primitive
 
 ### Status
-Status: not-started
+Status: done
 
 Textual's `set_interval(fn, seconds)` bound to widget lifecycle. Our TS
 equivalent. This is the missing piece that makes PanelDef `live: true` panels
@@ -443,7 +443,7 @@ clean across window open/close cycles.
 ### S08 — createTimer in ui-primitives.ts
 
 Tasks:
-- [ ] Add to `src/core/ui-primitives.ts`:
+- [x] Add to `src/core/ui-primitives.ts`:
       ```ts
       type TimerHandle = ReturnType<typeof setInterval>;
       type TimerSet    = Set<TimerHandle>;
@@ -451,8 +451,8 @@ Tasks:
       function createTimer(fn: () => void, ms: number, timers: TimerSet): TimerHandle
       function clearTimers(timers: TimerSet): void
       ```
-- [ ] Export from `src/core/primitives.ts`
-- [ ] Document the pattern in AGENTS.md: "timed-refresh primitive"
+- [x] Export from `src/core/primitives.ts`
+- [x] Document the pattern in AGENTS.md: "timed-refresh primitive"
 
 ### S09 — Wire into animation-service.ts
 
@@ -471,7 +471,7 @@ Test: `bun test tests/unit/timer-cleanup.test.ts`
 ## F07 — Motion Service
 
 ### Status
-Status: not-started
+Status: done
 
 ### S10 — motion-service.ts
 
@@ -492,13 +492,13 @@ const easings: Record<string, EasingFn>
 ```
 
 Tasks:
-- [ ] 16ms tick setInterval via createTimer
-- [ ] Easing functions: linear, easeInCubic, easeOutCubic, easeInOutCubic,
+- [x] 16ms tick setInterval via createTimer
+- [x] Easing functions: linear, easeInCubic, easeOutCubic, easeInOutCubic,
       bounce, elastic — port formulas from `vendor/textual/src/textual/css/
       easing.py` (already in vendor tree)
-- [ ] `tweenWindowPosition(window, {x, y}, duration, timers)` — animate left/top
-- [ ] `tweenWindowSize(window, {w, h}, duration, timers)` — animate width/height
-- [ ] Export from `src/services/`
+- [x] `tweenWindowPosition(window, {x, y}, duration, timers)` — animate left/top
+- [x] `tweenWindowSize(window, {w, h}, duration, timers)` — animate width/height
+- [x] Export from `src/services/`
 
 ### S11 — API surface
 
