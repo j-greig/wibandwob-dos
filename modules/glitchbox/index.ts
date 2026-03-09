@@ -36,6 +36,18 @@ const POSE_ANIM: Record<Pose, string[]> = {
   "wave":        ["wave", "wave-b", "wave-c", "wave-b"],
 };
 
+// Full dance sequence — all frames of all poses in order, flattened.
+// PLAY mode runs this end-to-end on loop.
+const DANCE_SEQUENCE: string[] = [
+  "idle", "idle-b",
+  "step-left", "step-left-b", "step-left-c", "step-left-b", "step-left",
+  "arms-raised", "arms-raised-b", "arms-raised-c", "arms-raised-b", "arms-raised",
+  "wave", "wave-b", "wave-c", "wave-b", "wave",
+  "jump", "jump-b", "jump-b", "jump-c",
+  "arms-raised-c", "arms-raised-b",
+  "idle-b", "idle",
+];
+
 type DancerState = {
   agentId: string;
   label: string;
@@ -46,9 +58,10 @@ type DancerState = {
   energy: number;
   mood: string;
   paused: boolean;
+  playing: boolean;  // PLAY mode — runs full DANCE_SEQUENCE on loop
 };
 
-type PoseBtn  = Pose | "pause";
+type PoseBtn  = Pose | "pause" | "play";
 type MoodBtn  = FieldMood;
 type EnergyBtn = "e-" | "e+";
 
@@ -68,7 +81,8 @@ export default function setup(host: MicroappHost) {
     return POSES[(i + 1) % POSES.length] ?? "idle";
   }
   function statusText(d: DancerState): string {
-    return `${d.label}  pose:${d.preset}  energy:${d.energy}  mood:${d.mood}  field:${fieldMood}${d.paused ? "  ⏸ PAUSED" : ""}`;
+    const state = d.paused ? "⏸ PAUSED" : d.playing ? "▶ PLAYING" : d.preset;
+    return `${d.label}  ${state}  energy:${d.energy}  mood:${d.mood}  field:${fieldMood}`;
   }
 
   // ── Commands ───────────────────────────────────────────────────────────────
@@ -194,19 +208,26 @@ export default function setup(host: MicroappHost) {
     const poseBar = createButtonBar<PoseBtn>(
       root,
       [
+        { id: "play",        label: "▶"     },
+        { id: "pause",       label: "⏸"    },
         { id: "idle",        label: "IDLE"  },
         { id: "arms-raised", label: "\\O/"  },
         { id: "step-left",   label: "STEP"  },
         { id: "jump",        label: "JUMP"  },
         { id: "wave",        label: "WAVE"  },
-        { id: "pause",       label: "⏸"    },
       ],
       (id) => {
-        if (id === "pause") {
+        if (id === "play") {
+          dancer.playing = !dancer.playing;
+          dancer.paused = false;
+          if (dancer.playing) variantTick = 0;
+        } else if (id === "pause") {
           dancer.paused = !dancer.paused;
+          dancer.playing = false;
         } else {
           dancer.preset = id as Pose;
           dancer.paused = false;
+          dancer.playing = false;
         }
         renderAll();
         host.screen.render();
@@ -274,13 +295,19 @@ export default function setup(host: MicroappHost) {
       const grid: WebcamCell[][] = blankGrid(w, h).map(row => row.map(ch => ({ ch })));
       dancer.x = Math.max(0, Math.min(dancer.x || Math.floor(w/2)-5, w-12));
       dancer.y = Math.max(0, Math.min(dancer.y, h-20));
-      // Pick animation frame — high energy cycles faster through frames
-      const frames = POSE_ANIM[dancer.preset] ?? [dancer.preset];
-      // At energy ≤ 3: hold first frame (hold every 3 ticks). At energy > 3: advance each tick.
-      const frameIdx = dancer.energy <= 3
-        ? Math.floor(variantTick / 3) % frames.length
-        : variantTick % frames.length;
-      const frameName = frames[frameIdx] ?? dancer.preset;
+      // PLAY mode: run full DANCE_SEQUENCE on loop
+      // Normal mode: cycle frames of current pose
+      let frameName: string;
+      if (dancer.playing) {
+        const seqIdx = variantTick % DANCE_SEQUENCE.length;
+        frameName = DANCE_SEQUENCE[seqIdx] ?? "idle";
+      } else {
+        const frames = POSE_ANIM[dancer.preset] ?? [dancer.preset];
+        const frameIdx = dancer.energy <= 3
+          ? Math.floor(variantTick / 3) % frames.length
+          : variantTick % frames.length;
+        frameName = frames[frameIdx] ?? dancer.preset;
+      }
       const lm: NormalisedLandmarks = landmarksFromPreset(frameName);
       renderSkeletonAt(grid, lm, dancer.x, dancer.y, w, h, dancer.color);
       skeletonLayer.setContent(gridToBlessedContent(grid));
