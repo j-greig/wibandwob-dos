@@ -21,4 +21,5 @@ e023-capability-aware-command-registry — done
 e024-session-retroapply — done
 e025-calculating-empires — in-progress
 e026-rich-text-layout-system — done
+e027-glitchbox-tui — not-started
 
