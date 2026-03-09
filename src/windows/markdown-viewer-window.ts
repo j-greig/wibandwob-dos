@@ -20,6 +20,7 @@ import {
   PLAIN_HEADING_CONFIG,
   type FigletHeadingConfig,
 } from "../services/markdown-service.js";
+import { stripAnsi } from "../core/ansi-utils.js";
 
 export interface MarkdownViewerParams {
   windowManager: WindowManager;
@@ -179,7 +180,43 @@ export function openMarkdownViewerWindow(
       render(true);
     });
     widget.key(["q", "escape"], () => windowManager.closeWindow(record.id));
+
+    // y — copy nearest code block to clipboard (macOS pbcopy / xclip)
+    widget.key(["y"], () => {
+      const scrollTop = (scrollBox as any).childBase ?? 0;
+      const block = nearestCodeBlock(cachedLines, scrollTop);
+      if (!block) { overlays.flash("No code block in view"); return; }
+      const raw = block.map(stripAnsi).join("\n");
+      try {
+        const { execSync } = require("node:child_process") as typeof import("node:child_process");
+        const cmd = process.platform === "darwin" ? "pbcopy" : "xclip -selection clipboard";
+        execSync(cmd, { input: raw });
+        overlays.flash(`Copied ${block.length} lines`);
+      } catch {
+        overlays.flash("Copy failed — pbcopy/xclip not available");
+      }
+    });
   };
+
+  /** Find the code block whose opening fence is closest to scrollTop. */
+  function nearestCodeBlock(lines: string[], scrollTop: number): string[] | null {
+    // Find all fence start positions (``` lines)
+    const fences: number[] = [];
+    for (let i = 0; i < lines.length; i++) {
+      if (stripAnsi(lines[i] ?? "").trimStart().startsWith("```")) fences.push(i);
+    }
+    if (fences.length < 2) return null;
+    // Find opening fence nearest to scroll position
+    let bestOpen = fences[0]!;
+    for (const f of fences) {
+      if (f <= scrollTop + 5) bestOpen = f;
+    }
+    // Find the matching closing fence
+    const closeIdx = fences.find(f => f > bestOpen) ?? -1;
+    if (closeIdx === -1) return null;
+    // Return the lines between the fences (excluding fence lines themselves)
+    return lines.slice(bestOpen + 1, closeIdx).map(stripAnsi);
+  }
 
   bindScroll(record.body);
   bindScroll(scrollBox);

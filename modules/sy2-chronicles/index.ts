@@ -2,119 +2,11 @@ import blessed from "blessed";
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
 import { renderContour } from "../../src/services/contour-engine.js";
 import { renderFiglet } from "../../src/services/figlet-service.js";
-
-type PanelDef = {
-  id: string;
-  title: string;
-  w: number;
-  h: number;
-  col: 0 | 1 | 2;
-  live?: boolean;
-  content: (tick: number, w: number, h: number) => string;
-};
-
-type PanelNode = {
-  def: PanelDef;
-  frame: blessed.Widgets.BoxElement;
-  titleBar: blessed.Widgets.BoxElement;
-  content: blessed.Widgets.BoxElement;
-  x: number;
-  y: number;
-};
-
-type LayoutResult = {
-  contentWidth: number;
-  contentHeight: number;
-  placements: Array<{ id: string; x: number; y: number }>;
-};
-
-const COL_GAP = 2;
+import { layoutPanels, pointerToContent, hitPanel, COL_GAP, type PanelDef, type PanelNode, type LayoutResult } from "../../src/core/panel-layout.js";
+import { blankGrid, paintText, paintCentered, paintLines, drawArrow, gridToText, waveLine, bar } from "../../src/core/grid-canvas.js";
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
-}
-
-function blankGrid(w: number, h: number): string[][] {
-  return Array.from({ length: Math.max(0, h) }, () => Array.from({ length: Math.max(0, w) }, () => " "));
-}
-
-function paintText(grid: string[][], x: number, y: number, text: string): void {
-  if (y < 0 || y >= grid.length) return;
-  const row = grid[y];
-  if (!row) return;
-  for (let i = 0; i < text.length; i += 1) {
-    const xPos = x + i;
-    if (xPos < 0 || xPos >= row.length) continue;
-    row[xPos] = text[i] ?? " ";
-  }
-}
-
-function gridToText(grid: string[][]): string {
-  return grid.map((row) => row.join("")).join("\n");
-}
-
-function paintCentered(grid: string[][], y: number, text: string): void {
-  const row = grid[y];
-  if (!row) return;
-  const trimmed = text.length > row.length ? text.slice(0, row.length) : text;
-  const x = Math.max(0, Math.floor((row.length - trimmed.length) / 2));
-  paintText(grid, x, y, trimmed);
-}
-
-function drawArrow(grid: string[][], fromX: number, fromY: number, toX: number, toY: number): void {
-  const minX = Math.min(fromX, toX);
-  const maxX = Math.max(fromX, toX);
-  for (let x = minX; x <= maxX && fromY >= 0 && fromY < grid.length; x += 1) {
-    const row = grid[fromY];
-    if (row && x >= 0 && x < row.length) {
-      row[x] = x === toX ? ">" : "-";
-    }
-  }
-  const minY = Math.min(fromY, toY);
-  const maxY = Math.max(fromY, toY);
-  for (let y = minY; y <= maxY; y += 1) {
-    const row = grid[y];
-    if (row && toX >= 0 && toX < row.length) {
-      row[toX] = y === toY ? ">" : "|";
-    }
-  }
-}
-
-function paintLines(
-  width: number,
-  height: number,
-  lines: string[],
-  opts?: { centerX?: boolean; centerY?: boolean },
-): string {
-  const grid = blankGrid(width, height);
-  const centerX = opts?.centerX ?? false;
-  const centerY = opts?.centerY ?? false;
-  const startY = centerY ? Math.max(0, Math.floor((height - lines.length) / 2)) : 0;
-  for (let i = 0; i < lines.length; i += 1) {
-    const y = startY + i;
-    if (y >= height) break;
-    if (centerX) {
-      paintCentered(grid, y, lines[i] ?? "");
-    } else {
-      paintText(grid, 0, y, (lines[i] ?? "").slice(0, width));
-    }
-  }
-  return gridToText(grid);
-}
-
-function waveLine(width: number, tick: number, phaseShift: number): string {
-  const chars = ["~", "^", "~", "^"];
-  const points: string[] = [];
-  for (let x = 0; x < width; x += 1) {
-    points.push(chars[(x + tick + phaseShift) % chars.length] ?? "~");
-  }
-  return points.join("");
-}
-
-function bar(label: string, fill: number, total: number, value: string): string {
-  const clampedFill = clamp(fill, 0, total);
-  const line = `${"█".repeat(clampedFill)}${" ".repeat(Math.max(0, total - clampedFill))}`;
-  return `${label.padEnd(5)} ${line} ${value}`;
 }
 
 const PANEL_DEFS: PanelDef[] = [
@@ -1230,59 +1122,6 @@ const PANEL_DEFS: PanelDef[] = [
   },
 ];
 
-function layoutPanels(panels: PanelDef[], maxWidth: number): LayoutResult {
-  const placements: Array<{ id: string; x: number; y: number }> = [];
-  let contentWidth = 0;
-  const safeWidth = Math.max(20, Math.floor(maxWidth));
-  const normalizedPanels = panels.map((panel, index) => ({
-    ...panel,
-    w: clamp(panel.w, 3, safeWidth),
-    h: Math.max(3, panel.h),
-    _index: index,
-  }));
-  const rows: Array<typeof normalizedPanels> = [];
-  let row: typeof normalizedPanels = [];
-  let rowWidth = 0;
-
-  for (const panel of normalizedPanels) {
-    const nextWidth = row.length === 0 ? panel.w : rowWidth + COL_GAP + panel.w;
-    if (row.length > 0 && nextWidth > safeWidth) {
-      rows.push(row);
-      row = [];
-      rowWidth = 0;
-    }
-    row.push(panel);
-    rowWidth = row.length === 1 ? panel.w : rowWidth + COL_GAP + panel.w;
-  }
-  if (row.length > 0) {
-    rows.push(row);
-  }
-
-  let cursorY = 0;
-  let contentHeight = 1;
-  for (let rowIndex = 0; rowIndex < rows.length; rowIndex += 1) {
-    const rowPanels = [...(rows[rowIndex] ?? [])].sort((a, b) => a.col - b.col || a._index - b._index);
-    let cursorX = 0;
-    let rowHeight = 0;
-    for (const panel of rowPanels) {
-      placements.push({ id: panel.id, x: cursorX, y: cursorY });
-      cursorX += panel.w + COL_GAP;
-      rowHeight = Math.max(rowHeight, panel.h);
-      contentWidth = Math.max(contentWidth, cursorX - COL_GAP);
-    }
-    contentHeight = Math.max(contentHeight, cursorY + rowHeight);
-    if (rowIndex < rows.length - 1) {
-      cursorY += rowHeight + 1;
-    }
-  }
-
-  return {
-    placements,
-    contentWidth: Math.max(contentWidth, safeWidth),
-    contentHeight: Math.max(contentHeight, 1),
-  };
-}
-
 export default function setup(host: MicroappHost) {
   let snapshotRegistered = false;
   let commandsRegistered = false;
@@ -1347,29 +1186,6 @@ export default function setup(host: MicroappHost) {
       },
       style: host.theme().body,
     });
-
-    // S07: Convert screen coords → canvas content-space coords (scroll-aware).
-    // Uses canvas.atop/aleft (actual screen position) which are reliable
-    // after first render, unlike lpos which can be stale in scrollable boxes.
-    const pointerToContent = (screenX: number, screenY: number) => {
-      const ct = (canvas as any).atop  ?? (canvas as any).lpos?.yi ?? 1;
-      const cl = (canvas as any).aleft ?? (canvas as any).lpos?.xi ?? 1;
-      const scrollY = (canvas as any).getScroll?.() ?? 0;
-      return { x: screenX - cl, y: screenY - ct + scrollY };
-    };
-
-    // S07: Hit-test a content-space point against all panel nodes.
-    const hitPanel = (cx: number, cy: number): PanelNode | undefined => {
-      for (const node of panelNodes.values()) {
-        const w = Number(node.frame.width)  || node.def.w;
-        const h = Number(node.frame.height) || node.def.h;
-        if (cx >= node.x && cx < node.x + w &&
-            cy >= node.y && cy < node.y + h) {
-          return node;
-        }
-      }
-      return undefined;
-    };
 
     // Arrow overlay — full content height, scrolls with canvas
     const arrowOverlay = blessed.box({
@@ -1732,8 +1548,8 @@ export default function setup(host: MicroappHost) {
       }
 
       if (data.action === 'mousedown') {
-        const pt = pointerToContent(data.x, data.y);
-        const node = hitPanel(pt.x, pt.y);
+        const pt = pointerToContent(canvas, data.x, data.y);
+        const node = hitPanel(panelNodes, pt.x, pt.y);
         if (node) {
           dragging = {
             id: node.def.id,
@@ -1748,7 +1564,7 @@ export default function setup(host: MicroappHost) {
       }
 
       if (data.action === 'mousemove' && dragging) {
-        const pt = pointerToContent(data.x, data.y);
+        const pt = pointerToContent(canvas, data.x, data.y);
         const node = panelNodes.get(dragging.id);
         if (!node) return;
         const newX = Math.max(0, pt.x - dragging.offsetX);

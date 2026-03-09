@@ -323,3 +323,9 @@ export function padToWidth(line: string, width: number): string {
   const vw = visibleWidth(line);
   return vw >= width ? line : line + " ".repeat(width - vw);
 }
+
+/** Strip all ANSI escape codes from a string, returning plain text. */
+export function stripAnsi(str: string): string {
+  // eslint-disable-next-line no-control-regex
+  return str.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "");
+}
