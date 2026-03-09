@@ -236,7 +236,19 @@ export class TsTuiMvpApp {
       height: 1,
       width: "100%",
       tags: true,
+      mouse: true,
+      clickable: true,
       style: theme().statusLine,
+    });
+
+    // Click the Scramble indicator (=^=) in the bottom-right to toggle smol popup
+    this.statusLine.on("click", (mouse) => {
+      const clickX = (mouse as unknown as { x: number }).x;
+      const w = Math.max(1, Number(this.screen.width) || 80);
+      // Indicator is last 7 chars: " (=^=)"
+      if (clickX >= w - 8) {
+        this.openScrambleSmol();
+      }
     });
 
     this.windowManager = new WindowManager(
