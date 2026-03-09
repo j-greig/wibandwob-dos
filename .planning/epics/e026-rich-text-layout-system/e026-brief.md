@@ -123,16 +123,25 @@ virtual indent rendering. Lives in `src/core/tree-widget.ts`.
 
 ## Feature Checklist
 
-- [ ] F01 Approach spike — native TS vs subprocess decision + gap analysis
-- [ ] F02 Markdown viewer — port prototype into core service + general file opener
-- [ ] F03 Figlet heading config — per-level schema, fallback chain, toggle
-- [ ] F04 Inline styles + code blocks — verify coverage, fill gaps vs prototype
-- [ ] F05 Tree component — collapsible blessed-native TreeWidget
-- [ ] F06 Timed refresh primitive — lifecycle-bound createTimer in ui-primitives
-- [ ] F07 Motion service — tweenStyle + easing for microapps and window components
+- [x] F01 Approach spike — native TS chosen (S01-findings.md)
+- [x] F02 Markdown viewer — markdown-service.ts + ansi-utils.ts + syntax-highlight.ts + markdown-viewer-window.ts
+- [x] F03 Figlet heading config — toggle command, fallback guard, wrap fix
+- [ ] F04 Inline styles + code blocks — coverage audit pending
+- [x] F05 Tree component — src/core/tree-widget.ts
+- [x] F06 Timed refresh primitive — createTimer/clearTimers in ui-primitives.ts
+- [x] F07 Motion service — motion-service.ts, 9 easings, tweenWindowPosition/Size
 - [ ] F09 Panel layout and grid canvas primitives — extract from sy2-chronicles
-- [ ] F08 (stretch) Syntax highlighting — evaluate Rich subprocess vs extend regex
+- [ ] F08 (stretch) Syntax highlighting — extend regex (JSON/YAML/CSS done; more pending)
 - [ ] F10 (stretch) Markdown panels in sy2-chronicles — .md files as live panels
+
+**SDK enhancements found during implementation (tracked in dev-notes.md):**
+- [x] host.runGlobalCommand — internal vs external command distinction (done)
+- [ ] Export host.ui primitives from microapp-sdk.ts directly (TODO-5f986603)
+- [ ] createStyledBorder SDK primitive — thin/single/bold/double border styles
+- [ ] createPanel extracted from e026-demo into src/core/ui-parts.ts
+
+**Demo:**
+- [x] modules/e026-demo — 4-panel grid, createStack/createColumns layout, active panel double-border, button bar
 
 ---
 

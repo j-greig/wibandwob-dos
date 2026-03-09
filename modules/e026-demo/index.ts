@@ -21,13 +21,17 @@
  */
 
 import blessed from "blessed";
-import type { UiPart, Rect } from "../../src/core/ui-parts.js";
-import { applyRect, createNodePart } from "../../src/core/ui-parts.js";
-import type { MicroappHost } from "../../src/services/microapp-sdk.js";
+// All SDK imports from one place — dogfooding TODO-5f986603 fix
+import {
+  applyRect,
+  createRenderMonitor,
+  type UiPart,
+  type Rect,
+  type MicroappHost,
+} from "../../src/services/microapp-sdk.js";
 import { createTreeWidget, type TreeNode } from "../../src/core/tree-widget.js";
 import { createTimer, clearTimers } from "../../src/core/ui-primitives.js";
 import { tweenWindowPosition, tweenWindowSize } from "../../src/services/motion-service.js";
-import { createRenderMonitor } from "../../src/services/microapp-sdk.js";
 import path from "node:path";
 
 // ── createPanel ────────────────────────────────────────────────────────────────
@@ -45,15 +49,28 @@ function createPanel(
   title: string,
   getTheme: () => import("../../src/core/theme/types.js").ThemeTokens,
 ): PanelHandle {
-  // Outer box — no blessed border, we draw it manually as ANSI content
+  // Outer box — no blessed border; we draw it as plain text so blessed
+  // doesn't try to parse widths. wrap:false prevents the top border line
+  // from wrapping when the box is wide. Colour via style.fg only — no
+  // ANSI escape codes in content (they confuse blessed's width maths).
   const outer = blessed.box({
     parent,
     top: 0, left: 0, width: 0, height: 0,
     tags: false,
+    wrap: false,
+    style: { fg: getTheme().windowBorderUnfocused.fg, bg: getTheme().body.bg },
+  });
+
+  // Title sits on the top border row, inside the corners
+  const titleBox = blessed.box({
+    parent: outer,
+    top: 0, left: 2, width: "shrink", height: 1,
+    tags: false,
+    content: ` ${title} `,
     style: getTheme().body,
   });
 
-  // Inner content box — lives inside the drawn border (1-cell inset all sides)
+  // Inner content box — lives inside the 1-cell border inset
   const inner = blessed.box({
     parent: outer,
     top: 1, left: 1, right: 1, bottom: 1,
@@ -70,29 +87,33 @@ function createPanel(
     const h = lastH;
     if (w < 2 || h < 2) return;
 
-    const t = getTheme();
-    const accentFg = t.titleBarFocused.bg;   // theme accent — same tint used on focused title bar
-    const inactFg  = t.windowBorderUnfocused.fg ?? "grey";
-
     const tl = active ? "╔" : "┌";
     const tr = active ? "╗" : "┐";
     const bl = active ? "╚" : "└";
     const br = active ? "╝" : "┘";
     const hz = active ? "═" : "─";
     const vt = active ? "║" : "│";
-    const color = active ? `\x1b[38;5;${ansiColor(accentFg)}m` : `\x1b[38;5;${ansiColor(inactFg)}m`;
-    const reset = "\x1b[0m";
 
-    const titleStr = title ? ` ${title} ` : "";
-    const topFill = Math.max(0, w - 2 - titleStr.length);
-    const topLine = `${color}${tl}${hz}${reset}${active ? `\x1b[1m` : ""}${titleStr}${reset}${color}${hz.repeat(topFill)}${tr}${reset}`;
-    const midLine = `${color}${vt}${reset}${" ".repeat(w - 2)}${color}${vt}${reset}`;
-    const botLine = `${color}${bl}${hz.repeat(w - 2)}${br}${reset}`;
+    // Top row: corners + fill. Title box overlays left of centre.
+    const topLine = tl + hz.repeat(w - 2) + tr;
+    // Mid rows: just left/right verticals; inner box covers the middle
+    const midLine = vt + " ".repeat(w - 2) + vt;
+    const botLine = bl + hz.repeat(w - 2) + br;
 
     const rows = [topLine];
     for (let i = 1; i < h - 1; i++) rows.push(midLine);
     rows.push(botLine);
     outer.setContent(rows.join("\n"));
+  }
+
+  function applyStyle() {
+    const t = getTheme();
+    const borderFg = active ? t.titleBarFocused.bg : t.windowBorderUnfocused.fg;
+    (outer as any).style    = { fg: borderFg, bg: t.body.bg };
+    (titleBox as any).style = active
+      ? { fg: t.titleBarFocused.fg, bg: t.titleBarFocused.bg, bold: true }
+      : t.body;
+    (inner as any).style = t.body;
   }
 
   return {
@@ -103,7 +124,6 @@ function createPanel(
       lastW = rect.width;
       lastH = rect.height;
       applyRect(outer, rect);
-      // inner sits 1 cell inside the border
       inner.top    = 1;
       inner.left   = 1;
       inner.width  = Math.max(1, rect.width  - 2);
@@ -115,44 +135,21 @@ function createPanel(
 
     setActive(a: boolean) {
       active = a;
+      applyStyle();
       drawBorder();
     },
 
     restyle() {
-      const t = getTheme();
-      (outer as any).style = t.body;
-      (inner as any).style = t.body;
+      applyStyle();
       drawBorder();
     },
 
     destroy() {
+      titleBox.destroy();
       inner.destroy();
       outer.destroy();
     },
   };
-}
-
-// Cheap ANSI 256-colour approximation: map named colours the theme uses
-// to their xterm-256 indices, fall back to white.
-function ansiColor(name: string | undefined): number {
-  if (!name) return 7;
-  const map: Record<string, number> = {
-    white: 15, black: 0, grey: 8, gray: 8,
-    red: 9, green: 10, yellow: 11, blue: 12,
-    magenta: 13, cyan: 14, "bright-white": 15,
-  };
-  // hex colours — map to nearest xterm-256 via simple lookup
-  if (name.startsWith("#")) {
-    const r = parseInt(name.slice(1, 3), 16);
-    const g = parseInt(name.slice(3, 5), 16);
-    const b = parseInt(name.slice(5, 7), 16);
-    // xterm 6×6×6 cube: 16 + 36r + 6g + b  (each channel 0-5)
-    const ri = Math.round(r / 51);
-    const gi = Math.round(g / 51);
-    const bi = Math.round(b / 51);
-    return 16 + 36 * ri + 6 * gi + bi;
-  }
-  return map[name.toLowerCase()] ?? 7;
 }
 
 // ── Sample tree ───────────────────────────────────────────────────────────────

@@ -110,6 +110,29 @@ export {
 
 // Webcam / Monster Cam — portable feed + renderer for embedding in any microapp.
 // See modules/sy2-chronicles/index.ts for the canonical MicroappHost pattern.
+// ── ui-parts — layout primitives, directly importable ────────────────────────
+// These are also available on host.ui.* but can be imported directly for
+// cleaner module-level imports. host.ui.createButtonBar(...) and
+// import { createButtonBar } from "microapp-sdk" are equivalent.
+export {
+  createStack,
+  createColumns,
+  createHeaderBar,
+  createStatusBar,
+  createTextBlock,
+  createInputLine,
+  createMessageHistory,
+  createRule,
+  createFigletDisplay,
+  createAnimatedPanel,
+  createButtonBar,
+} from "../core/ui-parts.js";
+export type {
+  InputLineProps,
+  MessageHistoryEntry,
+  MessageHistoryProps,
+} from "../core/ui-parts.js";
+
 export { createRenderMonitor } from "../core/render-monitor.js";
 export type { RenderMonitorHandle, RenderReading } from "../core/render-monitor.js";
 export { MonsterCamService } from "./monster-cam-service.js";
