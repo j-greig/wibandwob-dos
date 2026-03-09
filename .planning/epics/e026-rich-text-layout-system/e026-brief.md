@@ -10,10 +10,11 @@ depends_on: [E015, E016]
 # E026 — Rich Text and Layout System
 
 Elevate WibWob-DOS text rendering and layout primitives, taking direct
-inspiration from Rich, Textual, and pi-mono/tui. Delivers: markdown rendering
-with figlet headings, inline styles (bold/italic/links/code), a tree component,
-a timed-refresh primitive, a motion/tween affordance for microapps, and stretch
-syntax highlighting via Rich/pygments.
+inspiration from Rich, Textual, and pi-mono/tui. Delivers: a general-purpose
+markdown viewer that opens any .md file with figlet headings, inline styles,
+code block borders, and optional syntax highlighting — plus a tree component,
+timed-refresh primitive, motion/tween affordance, and the panel layout engine
+extracted from sy2-chronicles into the SDK.
 
 Reference docs compiled from vendor libs:
 - `docs/vendor-reference/rich-internals-reference.md`
@@ -22,124 +23,165 @@ Reference docs compiled from vendor libs:
 
 ---
 
-## Architecture Decisions (pre-decided)
+## Prior Art — pi-markdown-reader prototype
 
-### Rich bridge strategy — subprocess, not port
+Before touching any story in this epic, read:
 
-Rich is a Python library backed by Pygments and markdown-it. Porting it to
-TypeScript is months of work with no clear benefit over a thin subprocess bridge.
-The figlet-service.ts pattern (`spawnSync`) already proves the model works.
+  `wibwob-sdk/modules/pi-markdown-reader/` — 1,523 lines across 5 files.
 
-**Canon approach:**
-- `src/services/rich-bridge.ts` — `spawnSync("python3", ["-c", ...])` with
-  `force_terminal=True, width=N` on a Console writing to StringIO. Returns an
-  ANSI string.
-- Blessed viewports accept raw ANSI content via `setContent()` with
-  `tags: false` and direct escape injection, or via a thin ANSI→blessed tag
-  adapter.
-- Rich's Markdown class is used for body text. Rich's Syntax class is used for
-  code blocks (stretch).
-- If python3+rich is absent, degrade gracefully to plain text.
+This prototype already proves the core rendering pipeline works end-to-end
+in native TypeScript. Its approach is not necessarily the best approach for
+every decision in this epic, but it is the baseline all implementation
+stories build from or consciously depart from.
 
-### Figlet heading system — native, not bridged
+What it delivers:
+- `renderer.ts` (443 lines) — full marked-AST → ANSI pipeline. Heading
+  dispatch to figlet (H1→doom, H2→slant, H3→shadow, H4→small, H5→smslant)
+  with ANSI colour gradient. Inline bold/italic/code/links/strikethrough.
+  Tables with unicode box borders and proportional column sizing. Blockquotes
+  with │ borders. Lists (ordered + unordered, nested). Code blocks with dark
+  background strip and ``` lang header/footer.
+- `highlight.ts` (255 lines) — regex-based syntax highlighter (Rich-inspired
+  Monokai palette). Separate alternation regexes for Python, TypeScript, Bash.
+  Comments dim-gray-italic, strings sage-green, keywords cornflower-blue,
+  numbers orange, decorators gold, function names pale-yellow, types sky-blue.
+- `utils.ts` (368 lines) — direct port of pi-mono's ANSI utilities:
+  visibleWidth (grapheme-aware, Intl.Segmenter + get-east-asian-width),
+  wrapTextWithAnsi (preserves ANSI codes across line breaks), padToWidth,
+  extractAnsiCode, AnsiCodeTracker.
+- `index.ts` (170 lines) — scrollable blessed box, resize-aware re-render,
+  vi keys, status bar. Renders hardcoded `PI_README` from content.ts.
 
-figlet-service.ts already has 148 fonts with height/width metadata.
-The wibwob-sdk fonts are identical to the local copy — no import needed.
-Heading rendering stays TypeScript-native: detect H1–H6 in a markdown pre-pass,
-render each heading with renderFiglet(), splice into the output stream before
-passing body text to the Rich bridge.
+What the prototype does NOT have (the work this epic actually does):
+- Opens arbitrary .md files (not hardcoded content)
+- File picker integration
+- Workspace persistence (filePath, scrollOffset)
+- Figlet heading config (per-level font, fallback chain, toggle)
+- The ANSI-in-Blessed question is answered: `tags: false` + raw ANSI works.
+- Per-file heading config saved to workspace state
+- All the non-markdown features (tree, motion, panel primitives, timers)
 
-Wrapping policy: if figlet output exceeds container inner width, downgrade to
-the next smaller font in the heading's font chain. If no font fits, fall back to
-plain bold text.
+---
+
+## Architecture Decisions
+
+### Rendering strategy — open question, decided in S01
+
+The prototype proves native TS (marked + figlet CLI + ANSI) is viable with
+zero Python dependency and no subprocess startup cost. Python Rich as a
+subprocess is an alternative path with broader language support for syntax
+highlighting but adds a dependency and ~300-500ms cold start.
+
+S01 evaluates both approaches honestly and chooses one. The leading candidate
+is the native TS path (prototype evidence), with Rich subprocess as a
+stretch-only option for syntax highlighting breadth (F08).
+
+### Figlet heading system — native, proven
+
+figlet-service.ts has 148 fonts with height/width metadata. The prototype
+confirms doom/slant/shadow/small/smslant with ANSI colour gradient renders
+correctly. The heading pre-pass calls renderFiglet() from figlet-service.ts.
+
+Always pass innerWidth (window body width minus chrome offsets), never raw
+terminal width.
+
+Fallback chain: if figlet output exceeds container width, try fallbackFonts
+in order. If all overflow, use plain bold ANSI text.
+
+### ANSI in Blessed — resolved by prototype
+
+The prototype uses `tags: false` on the scrollable box and sets raw ANSI
+string content. This works. No ANSI→Blessed tag adapter is needed. This
+question is closed — do not reopen it.
+
+### pi-tui utils — already ported
+
+The prototype's `utils.ts` is a direct port of pi-mono's ANSI utilities.
+Before writing any new ANSI measurement or wrapping code, check whether
+utils.ts covers it. For wwdos core, promote these to `src/core/ui-primitives.ts`
+rather than duplicating from the module.
 
 ### Timed refresh — TS setInterval with lifecycle binding
 
-No need to port Textual's `set_interval`. Bun's `setInterval` is the primitive.
-The pattern: a createTimer(fn, ms, cleanupSet) helper that returns a handle and
-registers it in a Set<NodeJS.Timeout> owned by the window. On window close, the
-window calls clearAllTimers(cleanupSet). This lives in `src/core/ui-primitives.ts`
-as a named export.
+Bun's `setInterval` is the primitive. Wrap it as createTimer(fn, ms, timers)
+where timers is a Set<NodeJS.Timeout> owned by the window and cleared in
+onCleanup. Lives in `src/core/ui-primitives.ts`.
 
-### Motion/tween — thin animator over blessed style properties
+### Motion/tween — thin animator over blessed numeric properties
 
-Textual's animate() tweens CSS variables. Our equivalent: animate blessed box
-properties (style.fg, style.bg, position top/left, width, height) over time using
-requestAnimationFrame-equivalent (setInterval at 16ms). A `tweenStyle` helper
-interpolates between two states over a duration with an easing function. This is
-new functionality in `src/services/motion-service.ts`.
+`src/services/motion-service.ts` — tween(opts) at 16ms tick with easing
+functions ported from Textual's easing.py (already in vendor/textual).
+tweenWindowPosition and tweenWindowSize as convenience wrappers.
 
-### Tree component — Blessed-native port of the concept
+### Tree component — Blessed-native
 
-Rich's Tree class and Textual's Tree widget share the same model: nodes with
-children, expand/collapse, guide lines. pi-tui's SelectList shows how to do
-interactive keyboard navigation in a string-render model. Our port is a native
-Blessed implementation — a box containing a list with virtual indent/guide
-rendering and keyboard toggle. Lives in `src/windows/tree-widget.ts`.
+Rich's Tree and Textual's Tree share the model: nodes, expand/collapse,
+unicode guide lines. Our port is native Blessed — a list-backed widget with
+virtual indent rendering. Lives in `src/core/tree-widget.ts`.
 
 ---
 
 ## Feature Checklist
 
-- [ ] F01 Architecture spikes — subprocess ANSI bridge PoC + pi-tui port audit
-- [ ] F02 Markdown viewer — Rich bridge + scrollable MarkdownViewer window
-- [ ] F03 Figlet heading system — H1–H6 with per-level font config + wrapping policy
-- [ ] F04 Inline styles — bold, italic, code span, link, code block border
+- [ ] F01 Approach spike — native TS vs subprocess decision + gap analysis
+- [ ] F02 Markdown viewer — port prototype into core service + general file opener
+- [ ] F03 Figlet heading config — per-level schema, fallback chain, toggle
+- [ ] F04 Inline styles + code blocks — verify coverage, fill gaps vs prototype
 - [ ] F05 Tree component — collapsible blessed-native TreeWidget
 - [ ] F06 Timed refresh primitive — lifecycle-bound createTimer in ui-primitives
 - [ ] F07 Motion service — tweenStyle + easing for microapps and window components
 - [ ] F09 Panel layout and grid canvas primitives — extract from sy2-chronicles
-- [ ] F08 (stretch) Syntax highlighting — Rich Syntax bridge for code blocks
+- [ ] F08 (stretch) Syntax highlighting — evaluate Rich subprocess vs extend regex
 
 ---
 
-## F01 — Architecture Spikes
+## F01 — Approach Spike
 
 ### Status
 Status: not-started
 
-### S01 — Rich subprocess bridge proof of concept
+### S01 — Evaluate rendering approaches, decide, document
 
-**Goal:** verify that `spawnSync("python3", ["-c", RICH_SCRIPT, markdown_text])`
-produces usable ANSI output in a Blessed viewport before committing to this path.
+The prototype is evidence. This spike evaluates it honestly against alternatives
+and produces a decision document all subsequent stories implement against.
 
-Tasks:
-- [ ] Write a 20-line python3 one-liner that accepts markdown via argv[1] or stdin,
-      renders with `Console(force_terminal=True, width=N, file=StringIO())` and
-      prints to stdout
-- [ ] Call it from a test script in `scripts/rich-bridge-test.ts` via `spawnSync`
-- [ ] Capture output and render it into a raw Blessed box via `setContent`
-- [ ] Measure round-trip latency for a 200-line document at widths 40/60/80
-- [ ] Verify graceful degradation when python3 or rich is absent (exit code check)
-- [ ] Document findings in `S01-findings.md`
+Three approaches to evaluate:
 
-AC-1: `bun run scripts/rich-bridge-test.ts` opens a Blessed window with rendered
-markdown visible (headings, bold, code blocks).
-Test: manual smoke — run the script, screenshot the window.
+A. Python Rich subprocess — `spawnSync("python3", ["-c", ...])`, Console with
+   `force_terminal=True`, StringIO capture, ANSI piped into Blessed. Pros:
+   full Pygments language coverage, handles markdown-it AST internally. Cons:
+   Python dependency, ~300-500ms cold start, subprocess-per-render unless
+   long-running helper process added.
 
-AC-2: When python3 or rich is absent, the script falls back to plain text output
-(no crash, no empty screen).
-Test: `PATH="" bun run scripts/rich-bridge-test.ts` — confirm plain text fallback.
+B. Native TS — marked AST tokeniser + figlet-service.ts + regex highlighter
+   as in prototype. Pros: zero new dependencies, no subprocess startup cost,
+   full control, already working. Cons: regex highlighter covers only
+   Python/TS/Bash unless extended; less battle-tested for edge cases.
 
-AC-3: Round-trip latency < 300ms for a 200-line document.
-Test: `time bun run scripts/rich-bridge-test.ts --benchmark`.
-
-### S02 — pi-tui port audit
-
-**Goal:** determine which pi-tui components are worth porting to Blessed and which
-are redundant given existing wwdos primitives.
+C. pi-tui markdown.ts direct port — port the full Markdown class from
+   `vendor/pi-mono/packages/tui/src/components/markdown.ts` to Blessed.
+   Pros: mature pipeline. Cons: prototype already did most of this; the delta
+   between pi-tui Markdown and the prototype's renderer.ts is small.
 
 Tasks:
-- [ ] Read vendor/pi-mono/packages/tui/src/components/markdown.ts in full
-- [ ] Read components/box.ts, text.ts, truncated-text.ts
-- [ ] Compare markdown.ts approach vs Rich bridge — is a pure TS port viable?
-- [ ] Identify any utils.ts functions (visibleWidth, wrapTextWithAnsi,
-      truncateToWidth) that improve on or duplicate existing stringWidth usage
-- [ ] Identify any render patterns worth lifting into wwdos ui-primitives
-- [ ] Document findings and go/no-go decisions in `S02-findings.md`
+- [ ] Read prototype's renderer.ts in full; identify any gaps vs a real-world
+      .md file (the pi-mono README is a good stress test)
+- [ ] Run the prototype on 3 representative .md files from the wwdos repo and
+      note any rendering failures
+- [ ] Write `scripts/rich-bridge-test.sh` that measures Python Rich subprocess
+      cold-start latency on 3 file sizes
+- [ ] Compare: what does Python Rich give us that the prototype doesn't?
+- [ ] Decision: choose approach B (native TS) or A (subprocess) or hybrid
+      (B for body, A for syntax highlighting stretch)
+- [ ] Write `S01-findings.md` with the decision and rationale
 
-AC-1: S02-findings.md exists with a table: component | port? | reason | target file.
-Test: cat .planning/epics/e026-rich-text-layout-system/S02-findings.md
+AC-1: S01-findings.md exists with: approach chosen, latency numbers for option A,
+gap analysis for option B, decision rationale.
+Test: `cat .planning/epics/e026-rich-text-layout-system/S01-findings.md`
+
+AC-2: Prototype renderer correctly handles a real .md file from the wwdos repo
+(e.g. AGENTS.md) without crashing.
+Test: load AGENTS.md through prototype renderer, screenshot output.
 
 ---
 
@@ -148,185 +190,189 @@ Test: cat .planning/epics/e026-rich-text-layout-system/S02-findings.md
 ### Status
 Status: not-started
 
-### S03 — rich-bridge.ts service
+The prototype's rendering pipeline is the foundation. This feature promotes it
+from a hardcoded demo into a general-purpose markdown viewer that opens any
+file and integrates with wwdos workspace persistence.
 
-New service at `src/services/rich-bridge.ts`.
+Prototype reference: `wibwob-sdk/modules/pi-markdown-reader/renderer.ts` +
+`utils.ts` + `highlight.ts` + `index.ts`. Read before implementing any story
+in this feature.
 
-Tasks:
-- [ ] `renderMarkdown(text: string, width: number): string` — subprocess call,
-      returns ANSI string. Throws if subprocess fails with rich error, returns
-      plain text if python3/rich absent.
-- [ ] `isRichAvailable(): boolean` — cached check for python3 + rich import
-- [ ] Error boundaries: if rich renders empty output, return raw text unchanged
-- [ ] Unit test: `tests/unit/rich-bridge.test.ts` — mock spawnSync, assert output
-      contains ANSI escape codes for a known input
+### S02 — Promote rendering pipeline to wwdos core service
 
-AC-1: `renderMarkdown("# Hello\n\n**bold**", 80)` returns a string containing
-ANSI escape sequences.
-Test: `bun test tests/unit/rich-bridge.test.ts`
-
-AC-2: `isRichAvailable()` returns false and renderMarkdown returns plain text
-when python3 is not on PATH.
-Test: mock PATH in test, assert no ANSI codes in fallback output.
-
-### S04 — MarkdownViewer window
-
-New window type: `markdown-viewer`. Factory in `src/windows/markdown-viewer-window.ts`.
+Extract the prototype's rendering code into wwdos-core as a proper service.
+Do not copy-paste — the prototype is the authoritative source; import or port
+cleanly with full attribution.
 
 Tasks:
-- [ ] Extend WindowKind with `"markdown-viewer"`
-- [ ] Wire command `open_markdown_viewer` in command-catalog.ts (palette + File menu)
-- [ ] Window opens a file picker filtered to *.md, then opens a scrollable viewer
-- [ ] On open: call rich-bridge.renderMarkdown(fileContent, innerWidth)
-- [ ] Re-render on resize (debounced 200ms)
-- [ ] Scrollbar, keyboard scroll (j/k, PgUp/PgDn, g/G)
-- [ ] `describeState()` includes: filePath, scrollOffset, rendererMode (rich|plain)
-- [ ] Workspace snapshot round-trips filePath + scrollOffset
-- [ ] Add to control-api.ts: `POST /windows/markdown-viewer {filePath}`
+- [ ] Create `src/services/markdown-service.ts`:
+      - `renderMarkdown(text, width, opts?) → string[]` — port from prototype
+        renderer.ts. Same pipeline: marked.lexer → renderToken dispatch →
+        wrapTextWithAnsi → padToWidth.
+      - `isMarkdownFile(path) → boolean` — extension check (.md, .markdown)
+      - `renderMarkdownFile(filePath, width, opts?) → string[]` — read + render
+- [ ] Promote prototype utils.ts to `src/core/ansi-utils.ts`:
+      export `visibleWidth`, `wrapTextWithAnsi`, `padToWidth`, `extractAnsiCode`,
+      `AnsiCodeTracker`. These replace any existing stringWidth usage for ANSI
+      content. Add to `src/core/primitives.ts`.
+- [ ] Promote prototype highlight.ts to `src/services/syntax-highlight.ts`:
+      export `highlightCode(text, lang) → string[]`. Currently covers Python,
+      TypeScript, Bash. Document extension points for new languages.
+- [ ] Unit tests:
+      - `renderMarkdown("# Hello\n\n**bold**", 80)` returns lines containing
+        ANSI for figlet output + bold escape codes
+      - `visibleWidth` correct for emoji, CJK, plain ASCII
+      - `wrapTextWithAnsi` preserves ANSI codes across wrap point
 - [ ] `bun run typecheck` clean
 
-AC-1: Opening a .md file via command palette shows rendered markdown with visible
-heading hierarchy, bold text, and code block borders.
-Test: manual smoke + `./scripts/screenshot-window.sh "Markdown Viewer"`.
+AC-1: `import { renderMarkdown } from "src/services/markdown-service"` works.
+Test: `bun run typecheck` + `bun test tests/unit/markdown-service.test.ts`
 
-AC-2: Window survives resize without crash; content re-renders to new width.
-Test: resize window via API, confirm no crash, screenshot.
+AC-2: `visibleWidth("hello 👋")` returns 8 (not 7).
+Test: `bun test tests/unit/ansi-utils.test.ts`
 
-AC-3: `GET /state` includes a markdown-viewer entry with filePath and scrollOffset.
-Test: `curl http://127.0.0.1:8099/state | jq '.windows[] | select(.appType=="markdown-viewer")'`.
+### S03 — MarkdownViewer window — general file opener
 
-AC-4: Workspace restore reopens the file at the saved scroll position.
-Test: Open file, scroll to line 20, save workspace, restart, confirm scroll offset.
+New window type `markdown-viewer`. The prototype's index.ts is the structural
+reference — promote from hardcoded content to arbitrary file opener.
+
+Tasks:
+- [ ] Extend `WindowKind` with `"markdown-viewer"`
+- [ ] Factory in `src/windows/markdown-viewer-window.ts`. Pattern: follows
+      prototype's index.ts structure (scrollBox + statusBar + resize re-render)
+      but opens a file from disk rather than PI_README.
+- [ ] Wire `open_markdown_viewer` in command-catalog.ts (File menu + palette)
+- [ ] On open: show overlay file picker filtered to *.md; on select call
+      `renderMarkdownFile(path, innerWidth)` and set scrollBox content
+- [ ] Resize handler: re-render at new width (same cache-by-width pattern as
+      prototype's `lastWidth` guard)
+- [ ] Status bar: line position + percentage (port from prototype)
+- [ ] Keybindings: j/k/d/u/g/G/q (port from prototype)
+- [ ] `describeState()`: appType, filePath, scrollOffset, rendererMode
+- [ ] Workspace snapshot: round-trips filePath + scrollOffset; restore reopens
+      file at saved position
+- [ ] `POST /windows/markdown-viewer {filePath}` in control-api.ts
+- [ ] `bun run typecheck` clean
+
+AC-1: Opening AGENTS.md via command palette shows rendered markdown — figlet
+H1/H2, bold, code blocks with dark background.
+Test: screenshot `./scripts/screenshot-window.sh "Markdown Viewer"`
+
+AC-2: Resize triggers re-render at new width; no crash.
+Test: resize via API, screenshot before/after.
+
+AC-3: `GET /state` includes markdown-viewer with filePath and scrollOffset.
+Test: `curl .../state | jq '.windows[] | select(.appType=="markdown-viewer")'`
+
+AC-4: Workspace restore reopens file at saved scroll position.
+Test: scroll to line 30, save workspace, restart, confirm position via state API.
 
 ---
 
-## F03 — Figlet Heading System
+## F03 — Figlet Heading Config
 
 ### Status
 Status: not-started
 
-### S05 — FigletHeadingConfig schema
+The prototype hardcodes doom/slant/shadow/small/smslant with a fixed colour
+gradient. This feature makes heading configuration explicit, per-level, and
+overridable per viewer instance. The font choices and colour gradient from the
+prototype are the defaults.
 
-Define the per-level heading configuration schema.
-
-Font catalogue reference: `modules/wibwob-figlet-fonts/fonts.json` (148 fonts, each
-with height and width metadata). Use `figlet-service.ts` exclusively — do not
-re-implement font discovery.
+### S04 — FigletHeadingConfig schema and defaults
 
 Tasks:
-- [ ] Define `FigletHeadingConfig` interface in `src/core/types.ts`:
+- [ ] Define `FigletHeadingLevel` and `FigletHeadingConfig` in `src/core/types.ts`:
       ```ts
       interface FigletHeadingLevel {
-        font: string;           // figlet font name
-        fallbackFonts: string[]; // tried in order if primary overflows
-        plainFallback: boolean;  // if true, use bold plain text when all fonts overflow
+        font: string;            // figlet font name (from 148-font catalogue)
+        fallbackFonts: string[]; // tried in order if primary overflows width
+        color: string;           // ANSI escape prefix e.g. "\x1b[96m"
+        plainFallback: boolean;  // bold ANSI text if all fonts overflow
       }
       interface FigletHeadingConfig {
-        h1: FigletHeadingLevel;
-        h2: FigletHeadingLevel;
-        h3: FigletHeadingLevel;
-        h4: FigletHeadingLevel;
-        h5: FigletHeadingLevel;
-        h6: FigletHeadingLevel;
+        h1: FigletHeadingLevel;  // default: doom + bright cyan
+        h2: FigletHeadingLevel;  // default: slant + bright blue
+        h3: FigletHeadingLevel;  // default: shadow + bright magenta
+        h4: FigletHeadingLevel;  // default: small + bright yellow
+        h5: FigletHeadingLevel;  // default: smslant + bright green
+        h6: FigletHeadingLevel;  // default: term + dim (no figlet art)
       }
       ```
-- [ ] Define `DEFAULT_FIGLET_HEADING_CONFIG: FigletHeadingConfig` in
-      `src/core/defaults.ts` using favourite fonts from the catalogue
-      (h1→big/banner, h2→standard, h3→small, h4–h6→term/mini)
+- [ ] `DEFAULT_FIGLET_HEADING_CONFIG` in `src/core/defaults.ts` — mirrors the
+      prototype's HEADING_FONTS and HEADING_COLORS exactly as the baseline
 - [ ] Export from `src/core/primitives.ts`
+- [ ] `bun run typecheck` clean
 
-AC-1: TypeScript compile clean after adding types.
-Test: `bun run typecheck`.
+AC-1: Type compiles and DEFAULT_FIGLET_HEADING_CONFIG is importable.
+Test: `bun run typecheck`
 
-### S06 — Heading pre-pass renderer
-
-Tasks:
-- [ ] `renderMarkdownHeadings(text: string, config: FigletHeadingConfig, width: number): string`
-      in `src/services/markdown-heading-service.ts`
-- [ ] Parse H1–H6 lines (lines starting with `#`..`######` followed by space)
-- [ ] For each heading: call `renderFiglet(headingText, font, width)` from
-      figlet-service.ts
-- [ ] If rendered width > container width, try fallbackFonts in order
-- [ ] If all overflow, fall back to plain styled text (if plainFallback) or
-      smallest font that fits
-- [ ] Return full document with heading lines replaced by figlet blocks
-
-AC-1: `renderMarkdownHeadings("# Hello World\nBody", DEFAULT_CONFIG, 80)` returns
-a string where "Hello World" is replaced by multi-line figlet art.
-Test: `bun test tests/unit/markdown-heading.test.ts`
-
-AC-2: When figlet output would overflow width, a narrower font is used instead.
-Test: call with width=20, assert output lines all <= 20 chars.
-
-### S07 — Wrapping policy + integration into MarkdownViewer
+### S05 — Heading pre-pass service + viewer integration
 
 Tasks:
-- [ ] Integrate heading pre-pass into MarkdownViewer render pipeline:
-      1. Run `renderMarkdownHeadings` on raw markdown
-      2. Pass result to `rich-bridge.renderMarkdown`
-      3. Display final ANSI string in viewport
-- [ ] MarkdownViewer settings: toggle figlet headings on/off (keybind `h`)
-- [ ] Per-viewer heading config overridable via workspace state (allows custom font
-      assignments saved per-file)
+- [ ] Integrate heading rendering into markdown-service.ts:
+      `renderToken` dispatches headings through FigletHeadingConfig rather
+      than hardcoded font array. Pass config as an opts parameter.
+- [ ] Wrapping policy: if figlet output exceeds innerWidth, try fallbackFonts;
+      if all fail and plainFallback is true, emit bold ANSI heading; else use
+      smallest font that fits. Always pass innerWidth, never terminal width.
+- [ ] MarkdownViewer: keybind `h` toggles between figlet and plain headings
+      (switches between DEFAULT_FIGLET_HEADING_CONFIG and a plain config)
+- [ ] Per-viewer heading config serialised to workspace state so custom font
+      assignments survive restart
+- [ ] Heading config overridable via control API:
+      `PATCH /windows/:id/markdown-heading-config {h1: {font: "big"}}`
 
-AC-1: Opening a markdown file with H1 and H2 shows figlet art for headings with
-body text rendered by Rich below.
-Test: smoke screenshot.
+AC-1: Opening a .md with H1 and H2 shows figlet art using doom and slant fonts.
+Test: screenshot.
 
-AC-2: Pressing `h` in the viewer toggles between figlet and plain headings.
+AC-2: Pressing `h` switches headings to plain bold text and back.
 Test: manual smoke.
+
+AC-3: A heading that overflows at width=40 falls back to a narrower font.
+Test: `bun test tests/unit/markdown-heading.test.ts` — render H1 at width=20,
+assert all output lines <= 20 chars.
 
 ---
 
-## F04 — Inline Styles
+## F04 — Inline Styles and Code Blocks
 
 ### Status
 Status: not-started
 
-Rich handles bold, italic, code spans, and links natively via its Markdown class.
-This feature is about ensuring those styles survive the ANSI→Blessed pipeline and
-adding explicit code block border rendering on top.
+The prototype's renderer.ts already handles bold, italic, code spans, links,
+strikethrough, tables, blockquotes, and code blocks with dark background.
+This feature verifies full coverage, documents any gaps found during S01/S02,
+and adds the `c` keybind for copying code blocks.
 
-### S08 — ANSI→Blessed style verification
-
-Tasks:
-- [ ] Confirm that ANSI codes from Rich's Markdown render (bold=\e[1m,
-      italic=\e[3m, underline=\e[4m) display correctly in a Blessed box set
-      with `tags: false` and raw content injection
-- [ ] If Blessed strips codes: implement a thin ANSI→Blessed-tag adapter in
-      `src/core/ansi-to-blessed.ts`
-- [ ] Verify link rendering: Rich renders links as underlined + URL in parens;
-      confirm readable
-- [ ] Unit test: assert that a known ANSI string renders visibly styled in a
-      headless Blessed box
-
-AC-1: Bold markdown text appears visually bold in the MarkdownViewer.
-Test: screenshot showing bold text in a .md file.
-
-AC-2: Code spans (backtick) appear with distinct colour/background.
-Test: screenshot.
-
-### S09 — Code block border renderer
-
-Triple-backtick code blocks from Rich get an additional Blessed box drawn around
-them with a language label in the border title.
+### S06 — Style coverage audit and gap-fill
 
 Tasks:
-- [ ] Pre-process Rich output: detect code block ANSI regions by Rich's Syntax
-      framing (Rich wraps code blocks in Panel borders)
-- [ ] OR: pre-process the raw markdown before bridging — extract code blocks,
-      render them separately with a border box, splice back
-- [ ] Code block box: border style from theme tokens, language label as title,
-      monospace bg
-- [ ] Keyboard: `c` cycles focus to next code block for copy (copies raw to
-      clipboard via `pbcopy` on macOS / `xclip` on Linux)
+- [ ] Run prototype renderer against a comprehensive .md file and list any
+      rendering gaps (e.g. nested blockquotes, definition lists, footnotes,
+      HTML passthrough)
+- [ ] Fix any gaps found in markdown-service.ts
+- [ ] Code block copy: `c` key cycles focus to next code block in the viewport;
+      `y` copies the raw (un-ANSI-decorated) code to clipboard via `pbcopy`
+      (macOS) or `xclip` (Linux)
+- [ ] Verify inline code spans render with distinct colour/background (confirmed
+      in prototype: `\x1b[38;5;223m\x1b[48;5;236m text \x1b[0m`)
+- [ ] Verify links render as underlined text + dim URL in parens (confirmed in
+      prototype's theme.link + theme.linkUrl)
 
-AC-1: A .md file with a triple-backtick Python block shows a bordered box with
-"python" label.
+Note: ANSI-in-Blessed is solved — `tags: false` + raw ANSI content works.
+This is proven by the prototype. Do not add an ANSI→Blessed adapter.
+
+AC-1: Bold, italic, code spans, links, strikethrough all render visually
+distinct in the MarkdownViewer.
+Test: screenshot of a .md file exercising each style.
+
+AC-2: A .md file with a triple-backtick Python block shows a dark-background
+code block with ``` python header and ``` footer.
 Test: screenshot.
 
-AC-2: Pressing `c` copies the code block contents to clipboard.
-Test: press `c`, assert `pbpaste` returns the block content.
+AC-3: `y` on a focused code block copies raw text to clipboard.
+Test: focus code block, press `y`, assert `pbpaste` returns the block content.
 
 ---
 
@@ -338,39 +384,36 @@ Status: not-started
 Port the concept from Rich's Tree class and pi-tui's SelectList to a native
 Blessed collapsible tree widget.
 
-### S10 — TreeWidget
+### S07 — TreeWidget
 
-`src/windows/tree-widget.ts`
+`src/core/tree-widget.ts`
 
-Model:
 ```ts
 interface TreeNode {
   id: string;
   label: string;
   children?: TreeNode[];
-  data?: unknown;      // arbitrary payload for consumers
-  expanded?: boolean;  // default true
+  data?: unknown;
+  expanded?: boolean;   // default true
 }
 ```
 
 Tasks:
-- [ ] `createTreeWidget(parent, nodes, opts)` — returns a Blessed list-backed
-      widget that renders a virtual tree with unicode guide lines (├── └── │)
+- [ ] `createTreeWidget(parent, nodes, opts)` — Blessed list-backed widget
+      with unicode guide lines (├── └── │) rendered as virtual list rows
 - [ ] Keyboard: j/k navigate, Enter/Space expand/collapse, `o` expand all,
       `O` collapse all
-- [ ] Mouse: click to select, click expand/collapse indicator
-- [ ] Emit events: `select` (node selected), `expand`, `collapse`
-- [ ] `setNodes(nodes: TreeNode[])` — replace tree data and re-render
-- [ ] `getSelectedNode(): TreeNode | null`
-- [ ] Theme tokens for guide line colour, selected row, expanded indicator
+- [ ] Mouse: click to select, click indicator to toggle
+- [ ] Emit events: `select`, `expand`, `collapse`
+- [ ] `setNodes(nodes: TreeNode[])`, `getSelectedNode(): TreeNode | null`
+- [ ] Theme tokens for guide line colour, selected row, expand indicator
 - [ ] Export from `src/core/primitives.ts`
-- [ ] Demo command `open_tree_demo` in command-catalog.ts showing a file hierarchy
+- [ ] Demo command `open_tree_demo` in command-catalog.ts with a file hierarchy
 
-AC-1: TreeWidget renders a nested node structure with visible guide lines and
-expand/collapse indicators.
+AC-1: TreeWidget renders nested nodes with guide lines and expand/collapse.
 Test: screenshot of tree demo window.
 
-AC-2: j/k navigation moves the cursor; Enter toggles expand/collapse.
+AC-2: j/k navigates; Enter toggles expand/collapse.
 Test: manual smoke.
 
 AC-3: `describeState()` on a tree-containing window reports selected node id.
@@ -383,35 +426,34 @@ Test: `GET /state` after selecting a node.
 ### Status
 Status: not-started
 
-Textual's `set_interval(fn, seconds)` bound to widget lifecycle. Our TS equivalent.
+Textual's `set_interval(fn, seconds)` bound to widget lifecycle. Our TS
+equivalent. This is the missing piece that makes PanelDef `live: true` panels
+clean across window open/close cycles.
 
-### S11 — createTimer in ui-primitives.ts
+### S08 — createTimer in ui-primitives.ts
 
 Tasks:
 - [ ] Add to `src/core/ui-primitives.ts`:
       ```ts
       type TimerHandle = ReturnType<typeof setInterval>;
-      type TimerSet = Set<TimerHandle>;
-
+      type TimerSet    = Set<TimerHandle>;
       function createTimerSet(): TimerSet
       function createTimer(fn: () => void, ms: number, timers: TimerSet): TimerHandle
       function clearTimers(timers: TimerSet): void
       ```
-- [ ] Pattern: window factory creates a TimerSet at open time, passes it to
-      components that need periodic refresh, calls clearTimers in the window's
-      close handler
 - [ ] Export from `src/core/primitives.ts`
-- [ ] Update AGENTS.md with the pattern name ("timed-refresh primitive")
+- [ ] Document the pattern in AGENTS.md: "timed-refresh primitive"
 
-### S12 — Wire into animation-service.ts and MarkdownViewer
+### S09 — Wire into animation-service.ts
 
 Tasks:
-- [ ] Convert animation-service.ts FramePlayer to use createTimer instead of raw
-      setInterval, so timers are properly cleaned up via the window's TimerSet
-- [ ] Wire MarkdownViewer to use createTimer for any deferred re-render on resize
+- [ ] Convert animation-service.ts FramePlayer to use createTimer instead of
+      raw setInterval. Timers owned by the window's TimerSet; cleared in
+      onCleanup.
+- [ ] Wire MarkdownViewer resize debounce to use createTimer
 
-AC-1: Opening and closing an animated primer 10 times leaves no dangling setInterval
-handles (verify via heap snapshot or process.hrtime interval tracking).
+AC-1: Opening and closing an animated primer 10 times leaves no dangling
+setInterval handles.
 Test: `bun test tests/unit/timer-cleanup.test.ts`
 
 ---
@@ -421,11 +463,7 @@ Test: `bun test tests/unit/timer-cleanup.test.ts`
 ### Status
 Status: not-started
 
-Textual animates CSS properties via `widget.animate(property, value, duration)`.
-Our equivalent: tween numeric blessed properties over time for microapps and window
-components.
-
-### S13 — motion-service.ts
+### S10 — motion-service.ts
 
 `src/services/motion-service.ts`
 
@@ -433,203 +471,134 @@ components.
 interface TweenOptions {
   from: number;
   to: number;
-  duration: number;       // ms
-  easing?: EasingFn;      // default: easeInOutCubic
-  onUpdate: (value: number) => void;
+  duration: number;      // ms
+  easing?: EasingFn;     // default: easeInOutCubic
+  onUpdate: (v: number) => void;
   onComplete?: () => void;
-  timers: TimerSet;       // lifecycle binding — auto-cancelled on window close
+  timers: TimerSet;      // auto-cancelled on window close
 }
-
 function tween(opts: TweenOptions): void
-function easings: Record<string, EasingFn>  // linear, easeIn, easeOut, easeInOut, bounce, elastic
+const easings: Record<string, EasingFn>
 ```
 
 Tasks:
-- [ ] Implement tween with 60fps setInterval (16ms tick)
+- [ ] 16ms tick setInterval via createTimer
 - [ ] Easing functions: linear, easeInCubic, easeOutCubic, easeInOutCubic,
-      bounce, elastic (port formulas from Textual's easing.py in vendor/textual)
-- [ ] `tweenWindowPosition(window, {x, y}, duration, timers)` — convenience
-      wrapper that animates left/top of a blessed box
-- [ ] `tweenWindowSize(window, {w, h}, duration, timers)` — convenience wrapper
+      bounce, elastic — port formulas from `vendor/textual/src/textual/css/
+      easing.py` (already in vendor tree)
+- [ ] `tweenWindowPosition(window, {x, y}, duration, timers)` — animate left/top
+- [ ] `tweenWindowSize(window, {w, h}, duration, timers)` — animate width/height
 - [ ] Export from `src/services/`
 
-### S14 — API surface and agent visibility
+### S11 — API surface
 
 Tasks:
-- [ ] Command `animate_window` in command-catalog.ts — takes windowId, property,
-      target value, duration
-- [ ] Expose via control-api.ts: `POST /windows/:id/animate {property, to, duration}`
-- [ ] Add to state-service describeState if animation is in-progress
+- [ ] Command `animate_window` in command-catalog.ts
+- [ ] `POST /windows/:id/animate {property, to, duration}` in control-api.ts
+- [ ] State reports in-progress animation
 
-AC-1: `POST /windows/:id/animate {property:"left", to:20, duration:500}` smoothly
-moves a window to x=20 over 500ms.
-Test: call endpoint, screenshot before/after, verify position in GET /state.
+AC-1: `POST /windows/:id/animate {property:"left", to:20, duration:500}` moves
+window smoothly.
+Test: call endpoint, screenshot at 250ms and 500ms, verify position in GET /state.
 
-AC-2: Animation auto-cancels when the window is closed mid-tween.
-Test: start a 2s tween, close window after 100ms, verify no further position
-changes via GET /state.
+AC-2: Animation cancels cleanly when window is closed mid-tween.
+Test: start 2s tween, close at 100ms, verify no further state changes.
 
 ---
 
-## F09 — Panel Layout and Grid Canvas Primitives (from sy2-chronicles)
+## F09 — Panel Layout and Grid Canvas Primitives
 
 ### Status
 Status: not-started
 
-`modules/sy2-chronicles/index.ts` contains a complete, battle-tested responsive
-panel layout engine and a 2D string-canvas drawing API that are currently locked
-inside one microapp. Both belong in the SDK. This feature extracts them.
+`modules/sy2-chronicles/index.ts` contains a battle-tested responsive panel
+layout engine and 2D string-canvas API currently locked inside one microapp.
+Extract them to SDK. Reference: read sy2-chronicles/index.ts in full first.
 
-Reference: `modules/sy2-chronicles/index.ts` — read in full before implementing.
+### S12 — Extract panel layout engine and grid canvas to primitives
 
-### S16 — Extract panel layout engine and grid canvas API to primitives
+**What to extract from sy2-chronicles:**
 
-**What exists in sy2-chronicles today:**
+`layoutPanels(panels, maxWidth): LayoutResult` — responsive reflow. Wraps
+rows when they exceed maxWidth. Respects per-panel `col` hint. Returns
+`{ placements: [{id, x, y}], contentWidth, contentHeight }`.
 
-`layoutPanels(panels, maxWidth): LayoutResult` — responsive reflow algorithm.
-Wraps panels into rows when they would exceed maxWidth (with COL_GAP=2 between
-panels). Respects per-panel `col` hint for sort order within a row. Returns
-`{ placements: [{id, x, y}], contentWidth, contentHeight }`. This is the
-directly portable core.
+Grid canvas API (pure, no Blessed dependency):
+- `blankGrid(w, h)`, `paintText(grid, x, y, text)`, `paintCentered(grid, y, text)`
+- `paintLines(w, h, lines, opts?): string` (centerX/centerY options)
+- `drawArrow(grid, fromX, fromY, toX, toY)`, `gridToText(grid)`
+- `waveLine(width, tick, phaseShift): string`, `bar(label, fill, total, value): string`
 
-Grid canvas API (pure functions, no Blessed dependency):
-- `blankGrid(w, h): string[][]` — allocate a 2D char grid
-- `paintText(grid, x, y, text)` — write a string at a position, clipped
-- `paintCentered(grid, y, text)` — centre a string on a row
-- `paintLines(w, h, lines, opts?): string` — layout lines into a grid with
-  optional centerX/centerY, returns a string ready for setContent
-- `drawArrow(grid, fromX, fromY, toX, toY)` — draw an L-shaped ASCII arrow
-- `gridToText(grid): string` — serialise grid to newline-joined string
-- `waveLine(width, tick, phaseShift): string` — animated wave character line
-- `bar(label, fill, total, value): string` — block-character progress bar
+Interaction helpers (Blessed-aware, document with JSDoc):
+- `measureViewport(canvas): {width, height}` — use `(canvas as any).width/height`,
+  NOT `lpos` (stale in scrollable boxes)
+- `pointerToContent(canvas, screenX, screenY): {x, y}` — use `atop/aleft`, not `lpos`
+- `hitPanel(panelNodes, cx, cy): PanelNode | undefined`
 
-Interaction helpers (Blessed-aware, worth extracting as documented patterns):
-- `measureViewport(canvas): {width, height}` — safe dimension extraction from a
-  scrollable blessed box. Uses `(canvas as any).width/height` with fallbacks to
-  `host.geometry`. Do NOT use `lpos` — it is stale in scrollable boxes.
-- `pointerToContent(canvas, screenX, screenY): {x, y}` — converts screen
-  coordinates to content-space (scroll-aware). Uses `atop/aleft` not `lpos`.
-- `hitPanel(panelNodes, cx, cy): PanelNode | undefined` — hit-test content-space
-  point against a Map of panel nodes.
+PanelDef / PanelNode / LayoutResult types — formalise as interfaces.
 
-PanelDef pattern (types worth formalising):
-```ts
-interface PanelDef {
-  id: string;
-  title: string;
-  w: number;        // preferred width in chars
-  h: number;        // preferred height in rows
-  col?: number;     // sort hint for column order within a row
-  live?: boolean;   // if true, tick-driven re-render needed
-  content: (tick: number, w: number, h: number) => string;
-}
-interface PanelNode {
-  def: PanelDef;
-  frame: blessed.Widgets.BoxElement;
-  titleBar: blessed.Widgets.BoxElement;
-  content: blessed.Widgets.BoxElement;
-  x: number;
-  y: number;
-}
-interface LayoutResult {
-  placements: Array<{ id: string; x: number; y: number }>;
-  contentWidth: number;
-  contentHeight: number;
-}
-```
+Patterns documented but not extracted (too app-specific; promote when second
+consumer exists): drag-to-move (single screen-level handler pattern), inline
+double-click edit, resize grip.
 
-**Tasks:**
-
-- [ ] Create `src/core/panel-layout.ts` — pure layout engine (no Blessed):
-      export `layoutPanels`, `LayoutResult`, `PanelDef` (type only), `PanelNode` (type only)
-- [ ] Create `src/core/grid-canvas.ts` — pure string-grid drawing primitives:
-      export `blankGrid`, `paintText`, `paintCentered`, `paintLines`, `drawArrow`,
-      `gridToText`, `waveLine`, `bar`
-- [ ] Add `measureViewport`, `pointerToContent`, `hitPanel` as documented
-      functions in `src/core/ui-primitives.ts` with JSDoc explaining the
-      `atop/aleft` vs `lpos` distinction
-- [ ] Export all new exports from `src/core/primitives.ts`
-- [ ] Refactor `modules/sy2-chronicles/index.ts` to import from the new
-      primitives instead of its local copies. Verify it still works identically.
-- [ ] Add `src/core/panel-layout.test.ts`:
-      - `layoutPanels` with panels that fit in one row
-      - `layoutPanels` with panels that wrap to a second row
-      - `layoutPanels` respects col sort order within a row
-      - `layoutPanels` clamps panel widths to maxWidth
+Tasks:
+- [ ] `src/core/panel-layout.ts` — pure: layoutPanels + types
+- [ ] `src/core/grid-canvas.ts` — pure: all 8 grid functions
+- [ ] Add measureViewport/pointerToContent/hitPanel to `src/core/ui-primitives.ts`
+      with JSDoc on the atop/aleft-vs-lpos distinction
+- [ ] Export all from `src/core/primitives.ts`
+- [ ] Refactor sy2-chronicles to import from new primitives. Verify no regression.
+- [ ] Tests: panel-layout.test.ts (row wrap, col sort, width clamp) +
+      grid-canvas.test.ts (centring, wrapping, arrow)
 - [ ] `bun run typecheck` clean
+- [ ] Document drag-to-move and resize grip patterns in `.agents/invariants.md`
 
-**Patterns to document but NOT extract as SDK (too app-specific):**
+AC-1: sy2-chronicles imports from panel-layout.ts and grid-canvas.ts.
+Test: `bun run typecheck`
 
-Drag-to-move: single screen-level mouse handler (not child mousedown — unreliable
-in scrollable boxes). Pattern: mousedown → hitPanel → store dragging state →
-mousemove → update panelPositionOverrides map → rerenderLayout. Document in
-`.agents/invariants.md` as a Blessed interaction pattern.
+AC-2: layoutPanels output identical for full PANEL_DEFS array at width=120.
+Test: snapshot test vs pre-refactor output.
 
-Inline double-click edit: DBLCLICK_MS threshold on content click → spawn
-blessed.textarea overlay → Escape/Ctrl-S commits to contentOverrides map →
-destroy editor → re-render. Good pattern but too app-specific for SDK.
+AC-3: sy2-chronicles opens and renders without regression.
+Test: `./scripts/screenshot-window.sh "§y² Chronicles"`
 
-Resize grip: corner blessed.box widget tracking mousedown delta. Same: document
-as pattern, do not genericise prematurely.
-
-**Why this matters beyond sy2-chronicles:**
-
-`layoutPanels` + `PanelDef` + grid canvas is the right foundation for:
-- Multi-panel status dashboards in microapps
-- The MarkdownViewer's heading+body layout (F03/S07)
-- The TreeWidget composition surface (F05)
-- Any future microapp with a "magazine layout" feel
-
-The `content: (tick, w, h) => string` callback pairs directly with the F06
-timed-refresh primitive. A live panel is: `createTimer(() => { node.content
-.setContent(def.content(tick++, w, h)); screen.render(); }, 120, timers)`.
-
-AC-1: `import { layoutPanels } from "src/core/panel-layout"` works from any
-module. sy2-chronicles imports from it.
-Test: `bun run typecheck` + `bun test src/core/panel-layout.test.ts`
-
-AC-2: `layoutPanels` produces identical placements to the old inline version
-for the sy2-chronicles PANEL_DEFS array.
-Test: snapshot test comparing old vs new output for the full panel list at
-width=120.
-
-AC-3: `paintLines`, `blankGrid`, `gridToText` produce correct output for known
-inputs (centred text, line wrapping, empty grid).
-Test: `bun test src/core/grid-canvas.test.ts`
-
-AC-4: sy2-chronicles module opens and renders without visual regression after
-the refactor.
-Test: `./scripts/screenshot-window.sh "§y² Chronicles"` — compare to baseline.
+Why panel layout + PanelDef + grid canvas matters beyond sy2-chronicles:
+the `content: (tick, w, h) => string` callback pairs with F06 createTimer.
+A live panel = `createTimer(() => node.content.setContent(def.content(tick++,
+w, h)), 120, timers)`. This is the primitive for any magazine-layout microapp.
 
 ---
 
-## F08 (Stretch) — Syntax Highlighting Bridge
+## F08 (Stretch) — Syntax Highlighting
 
 ### Status
 Status: not-started
 
-Use Rich's Syntax class (backed by Pygments, 500+ languages) via the same
-subprocess bridge as the markdown renderer, to highlight code blocks inside the
-MarkdownViewer.
+The prototype's highlight.ts covers Python, TypeScript, and Bash via regex.
+This stretch feature evaluates whether extending the regex approach or adding
+a Python Rich subprocess for syntax highlighting gives better ROI.
 
-### S15 — Syntax highlight subprocess
+### S13 — Evaluate and extend syntax highlighting
 
 Tasks:
-- [ ] Add `renderSyntax(code: string, language: string, width: number): string`
-      to `src/services/rich-bridge.ts`
-- [ ] Python one-liner: `Console(force_terminal=True, width=N).print(Syntax(code, lang, theme="monokai"))`
-- [ ] Integration: S09 code block renderer calls renderSyntax instead of plain
-      code display
-- [ ] Language auto-detection: pass detected language from markdown fence info string
-- [ ] Fallback: if language unknown to Pygments, plain code block
-- [ ] Degrade gracefully if rich absent
+- [ ] Audit which languages appear most in wwdos .md files and docs
+- [ ] Option A: extend highlight.ts with new regex alternations for top-N
+      missing languages (e.g. Bash already there, add JSON, YAML, CSS, SQL)
+- [ ] Option B: add `renderSyntax(code, lang, width): string` via Python Rich
+      subprocess (Pygments, 500+ languages): `python3 -c "from rich.console
+      import Console; from io import StringIO; from rich.syntax import Syntax;
+      s=StringIO(); c=Console(file=s, force_terminal=True, width=N);
+      c.print(Syntax(code, lang, theme='monokai')); print(s.getvalue())"`
+- [ ] Decide based on language coverage vs dependency cost
+- [ ] Integrate chosen approach into markdown-service.ts code block renderer
+- [ ] Degrade gracefully if chosen approach unavailable
 
-AC-1: A Python code block in a .md file renders with Monokai syntax colours.
+AC-1: A Python code block renders with Monokai syntax colours (at minimum:
+keywords, strings, comments visually distinct).
 Test: screenshot.
 
-AC-2: An unknown language fence info string (`​```brainfuck`) falls back to plain
-code block without error.
-Test: open a file with unknown language fence, confirm no crash.
+AC-2: An unknown language fence falls back to plain code block without error.
+Test: open file with ```brainfuck fence, confirm no crash.
 
 ---
 
@@ -637,60 +606,45 @@ Test: open a file with unknown language fence, confirm no crash.
 
 ### Figlet font catalogue — no import needed
 
-The local catalogue at `modules/wibwob-figlet-fonts/fonts.json` is identical
-to the wibwob-sdk copy (148 fonts, same metadata). No import story required.
-figlet-service.ts already exposes `getFigletCatalogue()`, `renderFiglet()`,
-`measureFiglet()`, and `getFigletFontHeight()`. These are the canonical APIs
-for all heading rendering work in this epic.
+Local catalogue `modules/wibwob-figlet-fonts/fonts.json` is identical to the
+wibwob-sdk copy (148 fonts, same metadata). No import story required.
+figlet-service.ts `getFigletCatalogue()`, `renderFiglet()`, `measureFiglet()`
+are the canonical APIs. Never re-implement font discovery.
 
-**Figlet wrapping awareness:** the `width` parameter to `renderFiglet()` already
-limits output width. The heading pre-pass must also account for the inner width
-of the containing window (outer width minus chrome offsets from window-chrome.ts).
-Never pass raw terminal width — always pass innerWidth from the window's body box.
+### pi-tui utils — already ported in prototype
 
-### pi-tui utils worth auditing
+`wibwob-sdk/modules/pi-markdown-reader/utils.ts` is a direct port of pi-mono
+utils. S02 promotes this to wwdos core. Do not re-port from vendor/pi-mono
+unless the prototype's version is found to be incorrect.
 
-`vendor/pi-mono/packages/tui/src/utils.ts` contains `visibleWidth()`,
-`wrapTextWithAnsi()`, `truncateToWidth()`, `sliceByColumn()`. These are
-grapheme-aware and ANSI-safe. Compare against our `stringWidth` usage in
-`content-windows.ts` — if they are strictly better, consider adopting via
-a TypeScript port into `src/core/ui-primitives.ts`.
+### No Textual CSS port
 
-### No full Textual port
-
-Textual's CSS layout system is its killer feature. It is not worth porting —
-the explicit blessed layout model (manual cell positions) is different in kind,
-not just implementation. Take inspiration (fr units concept, docking patterns)
-but do not attempt a CSS engine. If a future epic wants auto-layout, start with
-a simpler flex-row/flex-col helper, not a full CSS cascade.
+Textual's CSS layout system is not worth porting. The explicit Blessed layout
+model is different in kind. Take inspiration (fr units, docking concepts) but
+do not attempt a CSS engine. If auto-layout is needed, start with a simple
+flex-row/flex-col helper in panel-layout.ts, not a full cascade.
 
 ### Rich subprocess startup cost
 
-Rich imports Pygments, markdown-it, and friends. First call latency may be
-300–500ms. Solutions: keep a long-running Python helper process (vs spawnSync
-per call), or accept the latency and cache rendered output per (filePath,
-mtime, width). S01 measures this; the approach is chosen during the spike.
+If the spike (S01) chooses the subprocess path for any feature, first-call
+latency is 300–500ms. Mitigation: cache rendered output per (filePath, mtime,
+width), or keep a long-running Python helper process alive. S01 measures and
+decides.
 
 ---
 
 ## Parking Lot
 
-- **Live markdown preview in editor** — as you type in the editor window,
-  a side-by-side MarkdownViewer updates. Requires debounced re-render and
-  probably the long-running Python helper process to keep latency acceptable.
-  Deferred post F02.
-- **Custom theme for syntax highlight** — allow the wwdos theme system to
-  control the Rich/Pygments theme (monokai, dracula, etc.) so syntax colours
-  match the desktop theme. Deferred post F08.
-- **TreeWidget as file manager backbone** — replace the flat list in the
-  primer browser and file manager with a TreeWidget showing directory
-  hierarchy. Deferred post F05.
-- **Drag-to-move panels as SDK primitive** — the single screen-level mouse
-  handler drag pattern from sy2-chronicles is currently documented-but-not-
-  extracted. If a second microapp needs panel drag, promote to sdk. Deferred
-  post F09.
-- **Inline double-click edit as SDK primitive** — ditto. Too app-specific now;
-  promote if a second consumer appears. Deferred post F09.
-- **Animated window entrance/exit** — use motion-service tweenWindowPosition
-  to slide windows in from a screen edge on open and out on close. Deferred
-  post F07.
+- **Live markdown preview** — side-by-side editor + MarkdownViewer updating as
+  you type. Needs debounced re-render and likely long-running Python helper if
+  subprocess path chosen. Deferred post F02.
+- **Custom syntax theme** — wwdos theme system controls Rich/Pygments theme
+  (monokai, dracula, etc.). Deferred post F08.
+- **TreeWidget as file manager backbone** — replace flat primer-browser list
+  with TreeWidget showing directory hierarchy. Deferred post F05.
+- **Drag-to-move panels as SDK primitive** — single screen-level handler
+  pattern from sy2-chronicles. Promote when a second microapp needs it.
+  Deferred post F09.
+- **Inline double-click edit as SDK primitive** — same. Deferred post F09.
+- **Animated window entrance/exit** — tweenWindowPosition to slide windows in
+  from screen edge on open. Deferred post F07.
