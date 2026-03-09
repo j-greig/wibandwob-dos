@@ -93,6 +93,7 @@ const TESTABLE_TYPES: PersistableAppType[] = [
   "primer-browser",
   "farjs-file-manager",
   "reader-viewer",
+  "markdown-viewer",
 ];
 
 // Types that need external runtime (backrooms needs model, chrome needs browser)
@@ -119,6 +120,7 @@ async function openWindowForAppType(appType: PersistableAppType): Promise<boolea
     "primer-browser": () => post("/commands/run", { id: "primer.browse" }),
     "farjs-file-manager": () => post("/commands/run", { id: "finder.open" }),
     "reader-viewer": () => post("/commands/run", { id: "readme.open" }),
+    "markdown-viewer": () => post("/view/markdown/open", { filePath: path.join(REPO_ROOT, "AGENTS.md") }),
   };
   const opener = openers[appType];
   if (!opener) return false;
@@ -144,7 +146,7 @@ describe("snapshot registry coverage", () => {
 
   test("registry key count matches PersistableAppType union", () => {
     // 16 types as of this writing — if this fails, update TESTABLE/SKIP lists
-    expect(ALL_REGISTRY_TYPES.length).toBe(16);
+    expect(ALL_REGISTRY_TYPES.length).toBe(17);
   });
 });
 
