@@ -1,7 +1,7 @@
 ---
 id: SPK-glitchbox-tui
 title: GlitchBox TUI — Symbient Embodiment + Dancing
-status: not-started
+status: promoted
 type: spike
 tags: [embodiment, dance, generative, monster-cam, agent-ux, glitchbox]
 issue: 121
