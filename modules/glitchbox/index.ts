@@ -26,6 +26,16 @@ type FieldMood = typeof FIELD_MOOD_CYCLE[number];
 const POSES = ["idle", "arms-raised", "step-left", "jump", "wave"] as const;
 type Pose = typeof POSES[number];
 
+// Animation sequences per pose — frames cycle at tick rate
+// High energy = fast cycle through all frames. Low energy = holds first frame longer.
+const POSE_ANIM: Record<Pose, string[]> = {
+  "idle":        ["idle", "idle-b", "idle", "idle-b"],
+  "arms-raised": ["arms-raised", "arms-raised-b", "arms-raised-c", "arms-raised-b"],
+  "step-left":   ["step-left", "step-left-b", "step-left-c", "step-left-b"],
+  "jump":        ["jump", "jump-b", "jump-b", "jump-c"],
+  "wave":        ["wave", "wave-b", "wave-c", "wave-b"],
+};
+
 type DancerState = {
   agentId: string;
   label: string;
@@ -264,7 +274,14 @@ export default function setup(host: MicroappHost) {
       const grid: WebcamCell[][] = blankGrid(w, h).map(row => row.map(ch => ({ ch })));
       dancer.x = Math.max(0, Math.min(dancer.x || Math.floor(w/2)-5, w-12));
       dancer.y = Math.max(0, Math.min(dancer.y, h-20));
-      const lm: NormalisedLandmarks = landmarksFromPreset(dancer.preset);
+      // Pick animation frame — high energy cycles faster through frames
+      const frames = POSE_ANIM[dancer.preset] ?? [dancer.preset];
+      // At energy ≤ 3: hold first frame (hold every 3 ticks). At energy > 3: advance each tick.
+      const frameIdx = dancer.energy <= 3
+        ? Math.floor(variantTick / 3) % frames.length
+        : variantTick % frames.length;
+      const frameName = frames[frameIdx] ?? dancer.preset;
+      const lm: NormalisedLandmarks = landmarksFromPreset(frameName);
       renderSkeletonAt(grid, lm, dancer.x, dancer.y, w, h, dancer.color);
       skeletonLayer.setContent(gridToBlessedContent(grid));
     }
