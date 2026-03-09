@@ -12,16 +12,19 @@ implementation. Each entry gets a TODO id if actionable.
 no filePath given. Replaced with a proper recursive `fs.readdirSync` walk
 (`collectMarkdownFiles()`). Fixed in feat(markdown) S03 commit.
 
-### TODO-5f986603 — host.ui primitives not directly importable from SDK
+### ~~TODO-5f986603~~ DONE — host.ui primitives now directly importable from SDK
 `createButtonBar`, `createStack`, `createColumns`, `createHeaderBar`,
-`createStatusBar`, `createTextBlock`, `createRule`, `createFigletDisplay`,
-`createAnimatedPanel` all live on `host.ui.*` but are NOT re-exported
-from `microapp-sdk.ts`. Module authors importing standalone (like
-`createTimer`, `createTreeWidget`) hit a dead end.
+`createStatusBar`, `createTextBlock`, `createInputLine`, `createMessageHistory`,
+`createRule`, `createFigletDisplay`, `createAnimatedPanel` all re-exported from
+`microapp-sdk.ts`. `import { createButtonBar } from "microapp-sdk"` works.
+e026-demo dogfoods it — all SDK imports consolidated to one block.
 
-Fix: add named exports from `microapp-sdk.ts` for all `host.ui` members.
-Update `.agents/microapp-sdk.md` with a "Layout primitives (direct import)"
-section.
+### ~~Panel border ANSI wrapping bug~~ FIXED — wrap:false + style.fg pattern
+ANSI escape codes in `setContent()` confuse blessed's line-width calculation
+causing long border lines to wrap — putting the `╗` corner at column 0 of
+the next row. Fix: no ANSI in border content, use `wrap: false` on the outer
+box, set colour via `style.fg` only. Title rendered in a separate child box
+at `top:0, left:2`. Result: correct single↔double border corners on all panels.
 
 ---
 
