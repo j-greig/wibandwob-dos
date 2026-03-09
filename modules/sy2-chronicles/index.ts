@@ -1693,6 +1693,7 @@ export default function setup(host: MicroappHost) {
           mouse: true,
           clickable: true,
           tags: false,
+          fixed: true, // Prevents double scroll-subtraction in _getCoords
           style: host.theme().header,
           content: def.title,
         });
@@ -1708,6 +1709,7 @@ export default function setup(host: MicroappHost) {
           mouse: true,
           clickable: true,
           tags: false,
+          fixed: true, // Prevents double scroll-subtraction in _getCoords
           style: host.theme().body,
         });
 
@@ -1731,6 +1733,7 @@ export default function setup(host: MicroappHost) {
             keys: true,
             mouse: true,
             inputOnFocus: true,
+            fixed: true, // Prevents double scroll-subtraction in _getCoords
             style: { ...host.theme().body, border: { fg: host.theme().selected.bg } },
             scrollable: true,
           });
@@ -1777,6 +1780,7 @@ export default function setup(host: MicroappHost) {
           content: " ◢ ",
           mouse: true,
           clickable: true,
+          fixed: true, // Prevents double scroll-subtraction in _getCoords
           style: host.theme().selected,
         });
 
