@@ -2311,7 +2311,7 @@ export default function setup(host: MicroappHost) {
         keys: true,
         mouse: true,
         style: { fg: host.theme().body.fg, bg: host.theme().body.bg, border: { fg: host.theme().highlight.fg } },
-        label: " / search panels ",
+        label: " / search panels  [enter=apply esc=cancel ctrl-u=clear] ",
       });
       const input = blessed.textbox({
         parent: overlay,
@@ -2325,24 +2325,24 @@ export default function setup(host: MicroappHost) {
         style: host.theme().selected,
       });
       input.setValue(searchQuery);
-      input.focus();
       host.screen.render();
 
-      const closeSearch = (submit: boolean) => {
-        const val = (input.getValue() ?? "").trim();
+      // Ctrl-U clears query before submit
+      input.key(["C-u"], () => { input.clearValue(); host.screen.render(); });
+
+      // readInput is the blessed-correct way to use textbox — it sets the
+      // internal `done` callback that enter/escape call. Without it,
+      // escape crashes with "done is not a function".
+      input.readInput((err: any, value: string | null) => {
+        const cancelled = !value && value !== "";
         overlay.destroy();
-        if (submit) {
-          searchQuery = val;
+        if (!cancelled) {
+          searchQuery = (value ?? "").trim();
           buildPanels();
         }
         canvas.focus();
         host.screen.render();
-      };
-
-      input.key(["enter"], () => closeSearch(true));
-      input.key(["escape"], () => closeSearch(false));
-      // Ctrl-U clears query (clear + submit)
-      input.key(["C-u"], () => { input.clearValue(); closeSearch(true); });
+      });
     }
 
     // z — open a bird's-eye minimap of the chronicles canvas in a text window
