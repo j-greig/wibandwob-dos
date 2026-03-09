@@ -23,6 +23,8 @@ import { fileURLToPath } from "node:url";
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
 import { renderContour } from "../../src/services/contour-engine.js";
 import { renderFiglet } from "../../src/services/figlet-service.js";
+import { MonsterCamService, type MonsterCamFrame } from "../../src/services/monster-cam-service.js";
+import { renderWebcamFrame, gridToBlessedContent } from "../../src/services/webcam-renderer.js";
 import {
   layoutPanels,
   measureViewport,
@@ -49,6 +51,16 @@ import { loadPanelsFromDir, watchPanelDir } from "./content-loader.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CONTENT_DIR = path.resolve(__dirname, "../../content/sy2-chronicles/panels");
 
+// ── MODULE-LEVEL WEBCAM SERVICE ───────────────────────────────────────────────
+// Shared across window opens to avoid multiple camera starts
+let camService: MonsterCamService | undefined;
+let camStarted = false;
+
+function getCamService(): MonsterCamService {
+  if (!camService) camService = new MonsterCamService();
+  return camService;
+}
+
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
@@ -64,7 +76,7 @@ const PANEL_DEFS: CEPanelDef[] = [
     type: "mixed",
     title: "Arrival",
     w: 68,
-    h: 6,
+    h: 12,
     col: 0,
     live: true,
     content: (tick, width, height) => {
@@ -1198,6 +1210,19 @@ const PANEL_DEFS: CEPanelDef[] = [
     },
   },
 
+  // ── LIVE WEBCAM PANEL ────────────────────────────────────────────────────────
+  {
+    id: "live-cam",
+    type: "webcam",
+    title: "Monster Cam",
+    w: 50,
+    h: 26,
+    col: 2,
+    live: true,
+    webcamMonster: true,
+    content: () => "[webcam]",   // placeholder — actual frames handled via service
+  },
+
   // ── CALCULATING EMPIRES / GENEALOGY PANELS ──────────────────────────────────
   {
     id: "era-2024",
@@ -1387,7 +1412,6 @@ export default function setup(host: MicroappHost) {
     let activePanelId = PANEL_DEFS[0]?.id ?? "";
     let totalContentHeight = 1;
     let panelPlacements: Array<{ id: string; x: number; y: number }> = [];
-    let zoom: "normal" | "compact" = "normal";
     let searchQuery = "";
     let stopWatcher = () => {};
     const timers = new Set<ReturnType<typeof setInterval>>();
@@ -1409,7 +1433,7 @@ export default function setup(host: MicroappHost) {
 
     const canvas = blessed.box({
       parent: root,
-      top: 0,
+      top: 1,
       left: 0,
       right: 0,
       bottom: 1,
@@ -1457,11 +1481,8 @@ export default function setup(host: MicroappHost) {
       const filtered = searchQuery
         ? combined.filter(p => p.title.toLowerCase().includes(searchQuery.toLowerCase()))
         : combined;
-      const scaled = zoom === "compact"
-        ? filtered.map(p => ({ ...p, w: Math.floor(p.w * 0.7), h: Math.floor(p.h * 0.7) }))
-        : filtered;
       // Apply terrain size override
-      return scaled.map(p => p.id === "terrain-hill" ? { ...p, w: terrainSize.w, h: terrainSize.h } : p);
+      return filtered.map(p => p.id === "terrain-hill" ? { ...p, w: terrainSize.w, h: terrainSize.h } : p);
     }
 
     function focusPanel(id: string) {
@@ -1499,7 +1520,7 @@ export default function setup(host: MicroappHost) {
       const scroll = (canvas as any).getScrollPerc?.() ?? 0;
       const q = searchQuery ? `  search:${searchQuery}` : "";
       statusBar.setContent(
-        ` §y² v2  ${panelNodes.size} panels  scroll:${scroll}%  zoom:${zoom}${q}  j/k scroll  z zoom  / search  q close`
+        ` §y² v2  ${panelNodes.size} panels  scroll:${scroll}%${q}  j/k scroll  z map  r reload  q close`
       );
     }
 
@@ -1575,6 +1596,9 @@ export default function setup(host: MicroappHost) {
       arrowOverlay.height = totalContentHeight;
       arrowOverlay.setContent(gridToText(arrowGrid));
       arrowOverlay.setBack();
+
+      // Tell blessed how tall the scrollable content is so it clips correctly
+      (canvas as any).height = totalContentHeight + 2;
 
       applyStyles();
       updateStatus();
@@ -1739,6 +1763,38 @@ export default function setup(host: MicroappHost) {
         win.onCleanup(() => host.screen.off("mouse", resizeHandler));
       }
 
+      // Wire up live webcam feed to the "live-cam" panel
+      const camNode = panelNodes.get("live-cam");
+      if (camNode) {
+        // Webcam content needs tags:true for colored cells
+        (camNode.content as any).tags = true;
+
+        const svc = getCamService();
+        if (!camStarted) {
+          svc.start();
+          camStarted = true;
+        }
+
+        const onFrame = (frame: MonsterCamFrame) => {
+          const node = panelNodes.get("live-cam");
+          if (!node) return;
+          const iw = Math.max(1, node.def.w - 2);
+          const ih = Math.max(1, node.def.h - 2);
+          const ceDef = PANEL_DEFS.find(p => p.id === "live-cam");
+          const monsterMode = ceDef?.webcamMonster ?? true;
+          const grid = renderWebcamFrame(frame, iw, ih, { showBg: true, monsterMode });
+          node.content.setContent(gridToBlessedContent(grid));
+          host.screen.render();
+        };
+        svc.on("frame", onFrame);
+
+        // Remove listener when window closes
+        win.onCleanup(() => {
+          svc.off("frame", onFrame);
+          // Don't stop the service — it's module-level and may be reused
+        });
+      }
+
       renderLayoutAndContent();
       host.screen.render();
     }
@@ -1821,8 +1877,7 @@ export default function setup(host: MicroappHost) {
       if (key?.name === "end") { (canvas as any).scrollTo(totalContentHeight); updateStatus(); host.screen.render(); return; }
 
       if (ch === "z") {
-        zoom = zoom === "normal" ? "compact" : "normal";
-        buildPanels();
+        openChroniclesMinimap();
         return;
       }
       if (ch === "r") {
@@ -1876,12 +1931,11 @@ export default function setup(host: MicroappHost) {
     // describeState — semantic metadata for agents
     win.describeState(() => ({
       appType: "sy2-chronicles",
-      summary: `§y² Chronicles v2 — ${panelNodes.size} panels, scroll:${(canvas as any).getScrollPerc?.() ?? 0}%, zoom:${zoom}`,
+      summary: `§y² Chronicles v2 — ${panelNodes.size} panels, scroll:${(canvas as any).getScrollPerc?.() ?? 0}%`,
       scrollY: (canvas as any).getScroll?.() ?? 0,
       panelCount: panelNodes.size,
       activePanelId,
       contentHeight: totalContentHeight,
-      zoom,
       search: searchQuery,
       panels: [...panelNodes.entries()].map(([id, n]) => ({
         id,
@@ -2071,6 +2125,51 @@ export default function setup(host: MicroappHost) {
       });
 
       commandsRegistered = true;
+    }
+
+    // z — open a bird's-eye minimap of the chronicles canvas in a text window
+    function openChroniclesMinimap() {
+      const MW = 80;
+      const MH = 30;
+      const sx = MW / Math.max(1, totalContentHeight > 0 ? 300 : 1); // x-scale guess
+      const allDefs = getPanelDefs();
+
+      // Compute bounds of the canvas
+      let maxX = 1, maxY = 1;
+      for (const p of panelPlacements) {
+        const def = allDefs.find(d => d.id === p.id);
+        if (def) { maxX = Math.max(maxX, p.x + def.w); maxY = Math.max(maxY, p.y + def.h); }
+      }
+      const scaleX = (MW - 2) / Math.max(1, maxX);
+      const scaleY = (MH - 2) / Math.max(1, maxY);
+
+      const grid = blankGrid(MW, MH);
+      for (const p of panelPlacements) {
+        const def = allDefs.find(d => d.id === p.id);
+        if (!def) continue;
+        const gx = Math.round(p.x * scaleX);
+        const gy = Math.round(p.y * scaleY);
+        const gw = Math.max(2, Math.round(def.w * scaleX));
+        const gh = Math.max(1, Math.round(def.h * scaleY));
+        // Draw box outline
+        for (let dx = 0; dx < gw; dx++) {
+          if (gx + dx < MW) { paintText(grid, gx + dx, gy, "─"); paintText(grid, gx + dx, gy + gh - 1, "─"); }
+        }
+        for (let dy = 0; dy < gh; dy++) {
+          if (gy + dy < MH) { paintText(grid, gx, gy + dy, "│"); if (gx + gw - 1 < MW) paintText(grid, gx + gw - 1, gy + dy, "│"); }
+        }
+        // Corners
+        paintText(grid, gx, gy, "┌"); if (gx + gw - 1 < MW) paintText(grid, gx + gw - 1, gy, "┐");
+        if (gy + gh - 1 < MH) { paintText(grid, gx, gy + gh - 1, "└"); if (gx + gw - 1 < MW) paintText(grid, gx + gw - 1, gy + gh - 1, "┘"); }
+        // Title truncated to fit
+        const label = def.title.slice(0, Math.max(1, gw - 2));
+        if (gy + 1 < MH && gw > 2) paintText(grid, gx + 1, gy, label);
+      }
+
+      const mapText = `§y² Chronicles v2 — bird's-eye map (${panelPlacements.length} panels)\n\n` + gridToText(grid);
+
+      // Open in a Document Reader window
+      host.runGlobalCommand("document-reader.open", { content: mapText, title: "§y² Map" });
     }
 
     // Initial build

@@ -17,7 +17,7 @@ import { renderFiglet } from "../../src/services/figlet-service.js";
 import { renderMarkdown, PLAIN_HEADING_CONFIG } from "../../src/services/markdown-service.js";
 import type { PanelDef } from "../../src/core/panel-layout.js";
 
-export type PanelType = "text" | "figlet" | "ascii-art" | "pixel" | "infographic" | "markdown" | "mixed";
+export type PanelType = "text" | "figlet" | "ascii-art" | "pixel" | "infographic" | "markdown" | "mixed" | "webcam";
 
 export interface CEPanelDef {
   id: string;
@@ -36,6 +36,7 @@ export interface CEPanelDef {
   pixelData?: string[];                 // rows of pixel chars for "pixel"
   markdown?: string;                    // for "markdown" type
   content?: (tick: number, w: number, h: number) => string; // for "mixed"/"infographic"
+  webcamMonster?: boolean; // for "webcam" — enable monster face overlays
 }
 
 /**
@@ -68,6 +69,7 @@ export function renderPanel(def: CEPanelDef, w: number, h: number, tick: number)
     case "infographic": return renderInfographic(def, iw, ih, tick);
     case "markdown":    return renderMarkdownPanel(def, iw, ih);
     case "mixed":       return def.content?.(tick, iw, ih) ?? renderText(def, iw, ih);
+    case "webcam":      return `[webcam]\n${def.title}`;
     default:            return renderText(def, iw, ih);
   }
 }
