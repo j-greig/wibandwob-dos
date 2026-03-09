@@ -1,7 +1,7 @@
 ---
 id: E025
 title: Calculating Empires TUI
-status: not-started
+status: in-progress
 issue: 120
 pr: ~
 depends_on: [E015, E016]

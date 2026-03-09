@@ -1,7 +1,7 @@
 ---
 id: E017
 title: Scramble Brains — LLM Companion Integration
-status: not-started
+status: done
 issue: 115
 pr: ~
 depends_on: [E015, E016]
