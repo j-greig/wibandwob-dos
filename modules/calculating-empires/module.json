@@ -1,0 +1,18 @@
+{
+  "name": "calculating-empires",
+  "version": "0.1.0",
+  "description": "Dense scrollable panel visualization — WibWob genealogy",
+  "type": "microapp",
+  "entry": "index.ts",
+  "microapp": {
+    "id": "wibwob.calculating-empires",
+    "title": "Calculating Empires",
+    "description": "Dense scrollable panel grid — Crawford & Joler inspired",
+    "multiInstance": false,
+    "persist": true,
+    "menu": [{ "category": "applications", "order": 80, "label": "Calculating Empires" }],
+    "palette": { "order": 230, "label": "Calculating Empires" },
+    "agent": true,
+    "api": true
+  }
+}
