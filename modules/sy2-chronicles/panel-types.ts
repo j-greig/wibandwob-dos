@@ -19,6 +19,31 @@ import type { PanelDef } from "../../src/core/panel-layout.js";
 
 export type PanelType = "text" | "figlet" | "ascii-art" | "pixel" | "infographic" | "markdown" | "mixed" | "webcam";
 
+/** Display prefix per panel type — glyph for dense view, label for readable view. */
+export const PANEL_TYPE_PREFIX: Record<PanelType, { glyph: string; label: string }> = {
+  "text":          { glyph: "¶",  label: "Text" },
+  "figlet":        { glyph: "▌",  label: "Figlet" },
+  "ascii-art":     { glyph: "◈",  label: "Art" },
+  "pixel":         { glyph: "▒",  label: "Pixel" },
+  "infographic":   { glyph: "◊",  label: "Info" },
+  "markdown":      { glyph: "≡",  label: "Doc" },
+  "mixed":         { glyph: "⊕",  label: "Mixed" },
+  "webcam":        { glyph: "◉",  label: "Cam" },
+};
+
+/** Current prefix mode — change to "label" for readable names. */
+export type PrefixMode = "glyph" | "label";
+let prefixMode: PrefixMode = "glyph";
+
+export function setPrefixMode(mode: PrefixMode): void { prefixMode = mode; }
+export function getPrefixMode(): PrefixMode { return prefixMode; }
+
+/** Return the display title with type prefix. */
+export function prefixedTitle(type: PanelType, title: string): string {
+  const p = PANEL_TYPE_PREFIX[type];
+  return prefixMode === "glyph" ? `${p.glyph} ${title}` : `${p.label}: ${title}`;
+}
+
 export interface CEPanelDef {
   id: string;
   type: PanelType;
@@ -45,7 +70,7 @@ export interface CEPanelDef {
 export function toPanelDef(def: CEPanelDef): PanelDef {
   return {
     id: def.id,
-    title: def.title,
+    title: prefixedTitle(def.type, def.title),
     w: def.w,
     h: def.h,
     col: def.col,
