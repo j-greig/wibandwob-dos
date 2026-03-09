@@ -1,0 +1,20 @@
+{
+  "name": "glitchbox",
+  "version": "0.1.0",
+  "description": "GlitchBox TUI — symbient embodiment. ASCII skeletons dance in a generative field.",
+  "type": "microapp",
+  "entry": "index.ts",
+  "microapp": {
+    "id": "wibwob.glitchbox",
+    "title": "GlitchBox",
+    "description": "GlitchBox TUI — symbient embodiment. ASCII skeletons dance in a generative field.",
+    "persist": true,
+    "multiInstance": false,
+    "menu": [
+      { "category": "applications", "order": 55, "label": "GlitchBox" }
+    ],
+    "palette": { "order": 255, "label": "GlitchBox — Symbient Dance Floor" },
+    "agent": true,
+    "api": true
+  }
+}
