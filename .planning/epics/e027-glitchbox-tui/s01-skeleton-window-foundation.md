@@ -1,6 +1,7 @@
 # E027 S01 — Skeleton Window Foundation
 
 Status: not-started
+Worktree: ~/Repos/wibwob-glitchbox (branch: epic/e027-glitchbox-tui)
 
 ## Goal
 
@@ -220,25 +221,34 @@ In `app-controller.ts`: wire to `new GlitchBoxWindow(screen, dancePoseService)`.
 ## Files to create
 
 ```
-src/services/dance-pose-service.ts   — new
-src/windows/glitchbox-window.ts      — new
+src/core/skeleton-renderer.ts        — new: renderSkeletonAt() extracted from webcam-renderer
+src/services/dance-pose-service.ts   — new: DancePoseService + IDLE_LANDMARKS + preset table
+modules/glitchbox/index.ts           — new: microapp module (follows sy2-chronicles pattern)
+modules/glitchbox/module.json        — new: module manifest
 ```
 
 ## Files to touch
 
 ```
+src/services/microapp-sdk.ts         — export renderSkeletonAt + POSE_CONNECTIONS
+src/services/webcam-renderer.ts      — refactor drawSkeleton to call renderSkeletonAt
 src/core/command-catalog.ts          — add glitchbox.open
-src/core/app-controller.ts           — wire command + instantiate DancePoseService
+src/core/app-controller.ts           — wire command + instantiate DancePoseService singleton
 ```
 
-## Import path for SDK (from wibwobdos-e027 worktree)
+## Import path (from ~/Repos/wibwob-glitchbox worktree)
 
-The E004 SDK is on main. The e027 worktree branches from main so it has the exports.
-Import as:
+SDK exports all render primitives. Import as:
 
 ```ts
-import { renderWebcamFrame, gridToBlessedContent } from "../services/microapp-sdk.js"
-import type { MonsterCamFrame } from "../services/microapp-sdk.js"
+import {
+  renderWebcamFrame, gridToBlessedContent,
+  blankGrid, gridToText, waveLine,
+  createTimer, clearTimers,
+  tween,
+} from "../../src/services/microapp-sdk.js"
+import type { MonsterCamFrame } from "../../src/services/microapp-sdk.js"
+import { renderSkeletonAt, POSE_CONNECTIONS } from "../../src/core/skeleton-renderer.js"
 ```
 
-No new packages needed. The render logic is already there.
+No new packages needed. All render logic already exists — S01 is pure extraction + wiring.

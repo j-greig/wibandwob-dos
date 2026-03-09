@@ -155,3 +155,27 @@ This kills blessed autofocus entirely for panels. Keep `fixed:true` for renderin
 clickable, not both nested. Any microapp with clickable children inside a scrollable
 canvas will hit this. Should be a shared primitive or at minimum a documented pattern
 in the microapp SDK.
+
+## AC-15 parked: microapp SDK boundary audit
+
+Modules should import from `src/services/microapp-sdk.ts` only, not reach
+into `src/core/` or `src/services/` directly. Currently `modules/sy2-chronicles/index.ts`
+has 9 direct imports past the SDK:
+
+```
+src/services/contour-engine.js    — renderContour
+src/services/figlet-service.js    — renderFiglet
+src/services/monster-cam-service.js — MonsterCamService, MonsterCamFrame
+src/services/webcam-renderer.js   — renderWebcamFrame, gridToBlessedContent
+src/core/panel-layout.js          — layoutPanels, measureViewport, pointerToContent, hitPanel, PanelNode, etc
+src/core/grid-canvas.js           — blankGrid, paintText, gridToText, paintLines, bar, waveLine
+src/core/ui-primitives.js         — createTimer, clearTimers
+src/core/ui-parts.js              — createButtonBar
+```
+
+Fix: re-export these from `src/services/microapp-sdk.ts`. The SDK already
+re-exports some primitives; these are gaps. See also:
+`.planning/refactor-docs/030-microapp-sdk-audit-2026-03.md`
+
+Scope: separate from E025. Could be a standalone chore or folded into a
+future SDK hardening epic.

@@ -1,7 +1,7 @@
 ---
 id: E025
 title: Calculating Empires TUI
-status: in-progress
+status: done
 issue: 120
 pr: ~
 depends_on: [E015, E016]
@@ -171,15 +171,15 @@ WibWobWorld geology, etc). The panel system is content-agnostic.
 - [x] AC-5: Figlet headlines auto-size to panel width
 - [x] AC-6: ASCII/primer panels render from file path
 - [x] AC-7: Panel search by title works — / key opens search, enter submits, escape cancels
-- [ ] AC-7.1: Stretch: live filter as you type (debounce). Parking lot if hard.
+- [-] AC-7.1: Stretch: live filter as you type — dropped, not needed
 - [-] AC-8: Two zoom levels — replaced with z=minimap (text doesn't scale)
 - [x] AC-9: `describeState()` contract correct (panelCount, viewport, scrollPos)
 - [x] AC-10: `bun run typecheck` clean
-- [~] AC-11: Any panel draggable by human via mouse — wired at screen level, needs human test
+- [ ] AC-11: Any panel draggable by human via mouse — parked: needs megatidyup of dense panel grid first
 - [x] AC-12: Agent can move panels via registered command — sy2.panel.move + sy2.panel.inspect
-- [~] AC-13: Double-click text panel enters edit mode — wired at screen level, needs human test
+- [x] AC-13: Double-click text panel enters edit mode — screen-level handler, Esc/Ctrl-S to save
 - [x] AC-14: Clicking a panel while scrolled does not jump canvas back to top — isInsideCanvas bounds + canvas.focus override
-- [ ] AC-15: microapp-sdk.ts exports all helpers — no module should reach past SDK into src/core/ or src/services/ directly
+- [ ] AC-15: microapp-sdk.ts exports all helpers — parked to agentic-devlog, separate scope
 - [x] AC-16: Panels at bottom viewport edge clip cleanly — manual viewport clipping for fixed:true children
 - [x] AC-17: Panel type glyph prefixes in title bar — PANEL_TYPE_PREFIX registry, switchable to word labels
 - [x] AC-18: Bottom toolbar with clickable buttons (Search, Map, Pause/Play)
