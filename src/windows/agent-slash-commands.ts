@@ -14,7 +14,8 @@ const HELP_TEXT =
   "  /tools      — list active tools\n" +
   "  /clear      — clear transcript (keeps session)\n" +
   "  /minimap    — ASCII spatial map of desktop windows\n" +
-  "  /state      — compact desktop state summary";
+  "  /state      — compact desktop state summary\n" +
+  "  /dance      — open GlitchBox and start dancing";
 
 export async function dispatchSlashCommand(
   trimmed: string,
@@ -89,6 +90,17 @@ export async function dispatchSlashCommand(
     exec(script, { timeout: 5000 }, (err, stdout) => {
       agent.pushStatus(err ? "[minimap] app not running or script failed" : stdout.trimEnd());
     });
+    return true;
+  }
+
+  if (trimmed === "/dance") {
+    fetch("http://127.0.0.1:" + (process.env.CONTROL_API_PORT ?? "8099") + "/commands/run", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: "microapp.wibwob.glitchbox.glitchbox.open" }),
+    })
+      .then(() => agent.pushStatus("[dance] GlitchBox opened — Wib&Wob on the floor"))
+      .catch(() => agent.pushStatus("[dance] could not open GlitchBox"));
     return true;
   }
 

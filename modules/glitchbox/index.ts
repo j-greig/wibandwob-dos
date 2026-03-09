@@ -1,4 +1,6 @@
 import blessed from "blessed";
+import { Agent } from "@mariozechner/pi-agent-core";
+import { AuthStorage, ModelRegistry } from "@mariozechner/pi-coding-agent";
 import {
   blankGrid,
   gridToText,
@@ -71,6 +73,9 @@ export default function setup(host: MicroappHost) {
   let activeRenderAll: (() => void) | undefined;
   let fieldMood: FieldMood = "calm";
   let variantTick = 0;
+  let lastUserAction = 0;
+  const HAIKU_COOLDOWN_MS = 15_000; // skip haiku tick if user acted within 15s
+  const touchUser = () => { lastUserAction = Date.now(); };
 
   function nextFieldMood(): FieldMood {
     const i = FIELD_MOOD_CYCLE.indexOf(fieldMood);
@@ -101,6 +106,7 @@ export default function setup(host: MicroappHost) {
     description: "Set dancer pose. Args: preset (idle|arms-raised|step-left|jump|wave)",
     action: (args: Record<string, unknown>) => {
       if (!activeDancer) return { ok: false, error: "No dancer on floor" };
+      touchUser();
       const p = String(args.preset ?? "idle") as Pose;
       activeDancer.preset = POSES.includes(p) ? p : "idle";
       activeRenderAll?.();
@@ -114,6 +120,7 @@ export default function setup(host: MicroappHost) {
     description: "Smoothly tween dancer to new x,y. Args: x, y",
     action: (args: Record<string, unknown>) => {
       if (!activeDancer) return { ok: false, error: "No dancer on floor" };
+      touchUser();
       const tx = Number(args.x ?? activeDancer.x);
       const ty = Number(args.y ?? activeDancer.y);
       const sx = activeDancer.x, sy = activeDancer.y;
@@ -142,6 +149,7 @@ export default function setup(host: MicroappHost) {
     description: "Set energy (0-10) and/or mood. Args: energy, mood",
     action: (args: Record<string, unknown>) => {
       if (!activeDancer) return { ok: false, error: "No dancer on floor" };
+      touchUser();
       if (args.energy !== undefined) activeDancer.energy = Math.max(0, Math.min(10, Number(args.energy)));
       if (args.mood   !== undefined) activeDancer.mood = String(args.mood);
       activeRenderAll?.();
@@ -217,6 +225,7 @@ export default function setup(host: MicroappHost) {
         { id: "wave",        label: "WAVE"  },
       ],
       (id) => {
+        touchUser();
         if (id === "play") {
           dancer.playing = !dancer.playing;
           dancer.paused = false;
@@ -246,6 +255,7 @@ export default function setup(host: MicroappHost) {
         { id: "drift", label: "DRIFT" },
       ],
       (id) => {
+        touchUser();
         if (id === "e-") dancer.energy = Math.max(0, dancer.energy - 1);
         else if (id === "e+") dancer.energy = Math.min(10, dancer.energy + 1);
         else { fieldMood = id as FieldMood; }
@@ -331,6 +341,7 @@ export default function setup(host: MicroappHost) {
       tickTimer = setInterval(() => {
         if (!dancer.paused) { tick++; variantTick++; }
         renderAll();
+        host.screen.render();
       }, tickMs());
       timers.add(tickTimer);
     }
@@ -339,8 +350,77 @@ export default function setup(host: MicroappHost) {
     // Recheck tick speed every 2s (when energy changes via button)
     createTimer(() => restartTick(), 2000, timers);
 
+    // ── Haiku autonomous tick ───────────────────────────────────────────────
+    // Every ~60s, a haiku-class model picks the next move. ~50 input tokens,
+    // ~30 output tokens per tick. Skips if user acted within HAIKU_COOLDOWN_MS.
+    const HAIKU_TICK_MS = 60_000;
+    let haikuAgent: Agent | undefined;
+    let haikuBusy = false;
+
+    async function ensureHaikuAgent(): Promise<Agent | undefined> {
+      if (haikuAgent) return haikuAgent;
+      try {
+        const auth = AuthStorage.create();
+        const reg = new ModelRegistry(auth);
+        const avail = reg.getAvailable();
+        const model =
+          avail.find(m => m.id.toLowerCase().includes("haiku-4-5")) ??
+          avail.find(m => m.id.toLowerCase().includes("haiku")) ??
+          avail[0];
+        if (!model) return undefined;
+        haikuAgent = new Agent({
+          initialState: {
+            systemPrompt: "Reply ONLY with JSON. No markdown, no text, no explanation.",
+            model,
+            thinkingLevel: "off",
+            tools: [],
+            messages: [],
+          },
+          getApiKey: (provider) => auth.getApiKey(provider),
+        });
+        return haikuAgent;
+      } catch { return undefined; }
+    }
+
+    async function haikuTick() {
+      if (haikuBusy || dancer.paused || !activeWindow) return;
+      if (Date.now() - lastUserAction < HAIKU_COOLDOWN_MS) return;
+      const agent = await ensureHaikuAgent();
+      if (!agent) return;
+      haikuBusy = true;
+      try {
+        const { w, h } = canvasSize();
+        // ~50 tokens prompt. Pose names are short. JSON response ~30 tokens.
+        const prompt =
+          `dancer x:${dancer.x} y:${dancer.y} e:${dancer.energy} mood:${dancer.mood} pose:${dancer.preset} field:${fieldMood} w:${w} h:${h}\n` +
+          `pick next: {"x":int,"y":int,"e":0-10,"mood":str,"pose":"${POSES.join('"|"')}","field":"${FIELD_MOOD_CYCLE.join('"|"')}"}`;
+        const result = await agent.run(prompt);
+        const text = result.messages
+          .filter((m: any) => m.role === "assistant")
+          .map((m: any) => typeof m.content === "string" ? m.content : (m.content?.[0]?.text ?? ""))
+          .join("");
+        // Extract JSON from response (tolerant of wrapping text)
+        const match = text.match(/\{[^}]+\}/);
+        if (!match) return;
+        const parsed = JSON.parse(match[0]);
+        // Apply — clamp values, validate pose/mood
+        if (typeof parsed.x === "number") dancer.x = Math.max(0, Math.min(parsed.x, w - 12));
+        if (typeof parsed.y === "number") dancer.y = Math.max(0, Math.min(parsed.y, h - 20));
+        if (typeof parsed.e === "number") dancer.energy = Math.max(0, Math.min(10, Math.round(parsed.e)));
+        if (typeof parsed.mood === "string") dancer.mood = parsed.mood;
+        if (typeof parsed.pose === "string" && POSES.includes(parsed.pose as Pose)) dancer.preset = parsed.pose as Pose;
+        if (typeof parsed.field === "string" && FIELD_MOODS[parsed.field]) fieldMood = parsed.field as FieldMood;
+        renderAll();
+        host.screen.render();
+      } catch { /* silent — haiku tick is best-effort */ }
+      finally { haikuBusy = false; }
+    }
+
+    createTimer(() => { void haikuTick(); }, HAIKU_TICK_MS, timers);
+
     // Keys
     const handleKey = (ch: string) => {
+      touchUser();
       if (ch === "q" || ch === "\x1b") { win.close(); return; }
       if (ch === " ") { dancer.paused = !dancer.paused; renderAll(); host.screen.render(); }
       if (ch === "p") { dancer.preset = nextPose(dancer.preset); renderAll(); host.screen.render(); }

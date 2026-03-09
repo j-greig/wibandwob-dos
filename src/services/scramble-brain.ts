@@ -115,6 +115,14 @@ export class ScrambleBrain {
     meow: () => "mrrp.",
     pet: () => "she allows it",
     who: () => "i'm scramble. recursive cat. i live here now. /ᐠ｡ꞈ｡ᐟ\\",
+    dance: () => {
+      fetch("http://127.0.0.1:" + (process.env.CONTROL_API_PORT ?? "8099") + "/commands/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: "microapp.wibwob.glitchbox.glitchbox.open" }),
+      }).catch(() => {});
+      return "*pads onto dance floor* /ᐠ｡ꞈ｡ᐟ\\";
+    },
   });
 
   private readonly runRateLimited = createRateLimiter<string>(1000, "(still thinking.)");
