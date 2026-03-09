@@ -143,6 +143,8 @@ export { MonsterCamService } from "./monster-cam-service.js";
 export type { MonsterCamFrame } from "./monster-cam-service.js";
 export { renderWebcamFrame, gridToBlessedContent } from "./webcam-renderer.js";
 export type { WebcamCell, WebcamRenderOptions } from "./webcam-renderer.js";
+export { landmarksFromPreset, POSE_PRESETS, renderSkeletonAt } from "../core/skeleton-renderer.js";
+export type { NormalisedLandmarks } from "../core/skeleton-renderer.js";
 
 // Panel layout + grid canvas — primitives for magazine-layout microapps
 export { layoutPanels, pointerToContent, hitPanel, measureViewport, COL_GAP } from "../core/panel-layout.js";
