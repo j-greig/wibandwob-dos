@@ -31,8 +31,8 @@ if [ -n "$OLD" ]; then
   sleep 1
 fi
 
-# Open a new tmux window and capture its index
-WIN=$(tmux new-window -t wibwob -P -F '#{window_index}')
+# Open a new tmux window named after the label, capture its index
+WIN=$(tmux new-window -t wibwob -n "$LABEL" -P -F '#{window_index}')
 echo "Opened tmux window $WIN"
 
 CMD="WIBWOB_CHAT_TRANSPORT=irc WIBWOB_CHAT_IRC_HOST=127.0.0.1 WIBWOB_CHAT_IRC_PORT=6667"
