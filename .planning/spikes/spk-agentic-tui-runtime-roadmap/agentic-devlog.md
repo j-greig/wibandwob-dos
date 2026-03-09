@@ -179,3 +179,20 @@ re-exports some primitives; these are gaps. See also:
 
 Scope: separate from E025. Could be a standalone chore or folded into a
 future SDK hardening epic.
+
+## 2026-03-09 — planning:sync should be automatic
+
+Human had to remind agent to run `bun run planning:sync` after closing E025.
+This should never require a prompt.
+
+**Friction**: agents forget. EPIC_STATUS.md drifts from frontmatter truth.
+
+**Fix options (ranked)**:
+1. Git pre-commit hook: if any `.planning/epics/*/e*-brief.md` is staged,
+   run `bun run planning:sync` and auto-stage `EPIC_STATUS.md`. Add to
+   `.claude/hooks/pre-commit-main-guard.sh`. Low risk, catches all paths.
+2. Make `planning:sync` idempotent and run it in CI on every push to main.
+3. Add a `postcommit` lint that warns if EPIC_STATUS.md is stale.
+
+**Recommendation**: option 1. The hook already exists and runs on every commit.
+File: `.claude/hooks/pre-commit-main-guard.sh`
