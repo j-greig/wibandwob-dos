@@ -337,6 +337,7 @@ export interface ResizeState {
 export interface MenuItem {
   label: string;
   action: () => void;
+  appTypes?: string[];
 }
 
 export interface MenuConfig {

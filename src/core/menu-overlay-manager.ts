@@ -16,7 +16,8 @@ export class MenuOverlayManager {
     private readonly menuBar: Box,
     private readonly menus: MenuConfig[],
     private readonly restoreWindowFocus: () => void,
-    private readonly onChange: () => void
+    private readonly onChange: () => void,
+    private readonly getFocusedAppType: () => string | undefined
   ) {}
 
   getOpenMenuLabel(): string | undefined {
@@ -77,8 +78,13 @@ export class MenuOverlayManager {
     if (!menu) {
       return;
     }
-    const width = Math.max(...menu.items.map((item) => item.label.length)) + 4;
-    const height = menu.items.length + 2;
+    const focusedAppType = this.getFocusedAppType();
+    const visibleItems = menu.items.filter(
+      (item) =>
+        !item.appTypes || !focusedAppType || item.appTypes.includes(focusedAppType),
+    );
+    const width = Math.max(...visibleItems.map((item) => item.label.length)) + 4;
+    const height = visibleItems.length + 2;
     this.menuShadow = this.createShadow(menu.left, 1, width, height);
     this.menuList = blessed.list({
       parent: this.screen,
@@ -95,7 +101,7 @@ export class MenuOverlayManager {
         border: theme().windowBorderFocused,
         selected: theme().selected
       },
-      items: menu.items.map((item) => item.label)
+      items: visibleItems.map((item) => item.label)
     });
     this.menuList.setFront();
     this.openMenuLabel = label;
@@ -103,7 +109,7 @@ export class MenuOverlayManager {
     this.menuList.select(0);
     this.menuList.on("select", (_, index) => {
       this.closeMenu();
-      menu.items[index].action();
+      visibleItems[index].action();
     });
     this.onChange();
     this.screen.render();
