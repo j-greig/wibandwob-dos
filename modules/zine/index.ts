@@ -563,21 +563,62 @@ export default function setup(host: MicroappHost) {
     }
 
     // ── Search ──────────────────────────────────────────────────────
+    let searchBarOpen = false;
+
     function openSearchPrompt() {
-      const prompt = blessed.textbox({
+      if (searchBarOpen) return;
+      searchBarOpen = true;
+
+      const CLOSE_W = 5; // " [×] "
+      const bar = blessed.box({
         parent: root,
         bottom: 1, left: 0, right: 0, height: 1,
         style: { fg: host.theme().body.fg, bg: host.theme().selected.bg },
+      });
+
+      const input = blessed.textbox({
+        parent: bar,
+        top: 0, left: 0, right: CLOSE_W, height: 1,
+        style: { fg: host.theme().body.fg, bg: host.theme().selected.bg },
         inputOnFocus: true,
       });
-      prompt.focus();
-      prompt.readInput((_err, value) => {
-        searchQuery = (value ?? "").trim();
-        prompt.destroy();
+
+      const closeBtn = blessed.box({
+        parent: bar,
+        top: 0, right: 0, width: CLOSE_W, height: 1,
+        content: " [×] ",
+        mouse: true, clickable: true,
+        style: { fg: host.theme().highlight.fg, bg: host.theme().selected.bg },
+      });
+
+      function closeSearch(commit: boolean) {
+        if (!searchBarOpen) return;
+        searchBarOpen = false;
+        if (commit) {
+          const val = (input as any).value ?? "";
+          searchQuery = val.trim();
+        }
+        bar.destroy();
         rebuild();
         canvas.focus();
-      });
+        host.screen.render();
+      }
+
+      closeBtn.on("click", () => closeSearch(false));
+
+      input.key(["escape"], () => closeSearch(false));
+      input.key(["enter"], () => closeSearch(true));
+
+      input.focus();
+      if (searchQuery) (input as any).setValue(searchQuery);
       host.screen.render();
+    }
+
+    function closeSearchIfOpen() {
+      // External escape handler — fires if canvas has focus and bar is open
+      if (searchBarOpen) {
+        // The input's own escape handler will run; this is a safety fallback
+      }
     }
 
     // ── Double-click → open in native editor ──────────────────────
