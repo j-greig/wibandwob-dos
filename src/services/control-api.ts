@@ -75,6 +75,7 @@ const ENDPOINT_CATALOGUE = [
   { method: "GET",  path: "/help",                          description: "Alias for /" },
   { method: "GET",  path: "/health",                        description: "Health check" },
   { method: "GET",  path: "/openapi.json",                  description: "OpenAPI 3.0 spec" },
+  { method: "GET",  path: "/docs",                          description: "Interactive API docs (Scalar)" },
   { method: "GET",  path: "/state",                         description: "Full live desktop + window state" },
   { method: "GET",  path: "/commands/list",                 description: "All registered commands (optional ?surface=menu|palette|api|agent&includeUnavailable=1)" },
   { method: "GET",  path: "/content/primer-info",           description: "Primer content metadata. ?path=/abs/path.txt" },
@@ -243,6 +244,13 @@ export class ControlApiService {
 
     if (request.method === "GET" && url.pathname === "/openapi.json") {
       return Response.json(buildOpenApiSpec(this.actualPort ?? this.port));
+    }
+
+    if (request.method === "GET" && url.pathname === "/docs") {
+      const port = this.actualPort ?? this.port;
+      return new Response(scalarDocsHtml(port), {
+        headers: { "Content-Type": "text/html; charset=utf-8" },
+      });
     }
 
     if (request.method === "GET" && url.pathname === "/health") {
@@ -575,4 +583,38 @@ function normalizeBackroomsChannel(raw: unknown): BackroomsChannel {
     model,
     mode,
   };
+}
+
+// ── Scalar API docs ───────────────────────────────────────────────────────
+
+function scalarDocsHtml(port: number): string {
+  const config = JSON.stringify({
+    theme: "kepler",
+    hideModels: true,
+    defaultHttpClient: { targetKey: "shell", clientKey: "curl" },
+  });
+  return `<!doctype html>
+<html>
+<head>
+  <title>WibWob-DOS API</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { margin: 0; font-family: system-ui, sans-serif; }
+    .custom-header { background: #1a1a2e; color: #e0e0e0; padding: 12px 24px; font-size: 14px; }
+    .custom-header code { background: #2a2a4e; padding: 2px 8px; border-radius: 3px; }
+    .custom-header a { color: #7dc4e4; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="custom-header">
+    WibWob-DOS Control API &middot; <code>http://127.0.0.1:${port}</code>
+    &middot; <a href="/openapi.json">OpenAPI spec</a>
+    &middot; <a href="/health">Health</a>
+    &middot; <a href="/help">Endpoints</a>
+  </div>
+  <script id="api-reference" data-url="http://127.0.0.1:${port}/openapi.json" data-configuration='${config}'></script>
+  <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
+</body>
+</html>`;
 }

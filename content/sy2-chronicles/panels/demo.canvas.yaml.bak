@@ -5,7 +5,7 @@ meta:
   columnHeaders: true
 
 columns:
-  0: { header: "WIBWOB ORIGINS TEST" }
+  0: { header: "Origins" }
   1: { header: "Substrate" }
   2: { header: "Emergence" }
 
