@@ -147,6 +147,154 @@ Migrate to overlays.openValuePrompt. Migrate-only.
 
 ---
 
+## Part A2 — Second sweep findings (src/windows, src/core, modules)
+
+These were found in a follow-up parallel audit. New patterns only.
+
+### W01 — Split-pane ratio magic numbers — MEDIUM
+
+Hardcoded 34%/36% list-to-preview split ratios appear 10 times inside
+content-windows.ts (:152, :162, :176, :585, :594, :605, :638, :1010, :1011,
+:1012). No shared constant. If the ratio changes one instance drifts.
+Extract: PREVIEW_SPLIT_RATIO = 0.34 constant at top of file.
+
+### W02 — Mode-key routing duplicated between list and icon view — MEDIUM
+
+content-windows.ts has two key-handler blocks (list view :1082 and icon view
+:1254) that duplicate the same 5 command branches: v, slash, s, backspace,
+tab. If a key is added to one it must be manually mirrored in the other.
+Extract a shared dispatchFileManagerKey(mode, key) function.
+
+### W03 — Deferred preview-update setTimeout(0) — MEDIUM
+
+Three windows use setTimeout(..., 0) to defer a preview/content update after
+a list selection event: content-windows.ts :266, :1133 and
+backrooms-windows.ts :257. The pattern is identical — force a blessed render
+tick before updating preview content. Should be a named helper
+deferRender(fn) so the intent is clear and the magic 0 is in one place.
+
+### W04 — Close-key wiring inconsistent — MEDIUM
+
+Five windows wire close keys in different ways:
+  markdown-viewer-window.ts :182 — .key(["q"], closeWindow)
+  backrooms-log-browser-window.ts :235 — .key(["q", "escape"], close)
+  monster-cam-window.ts :155 — .key(["q", "escape"], closeWindow)
+  music-player-window.ts :233 — .key(["q"], closeWindow)
+  monster-cam-window.ts :62 — escape only, no q
+Some use frame.close(), some use windowManager.closeWindow(id). No
+consistent pattern. Should be a single bindCloseKeys(widget, frame)
+helper that always wires both q and Escape to windowManager.closeWindow.
+
+### W05 — initialPos restore block verbatim duplicate — LOW
+
+Two windows copy-paste the identical 4-line restore block:
+  wibwob-agent-window.ts :38
+  scramble-window.ts :135
+Both do: frame.frame.top/left/width/height = initialPos.*
+Extract to applyInitialPos(frame, pos) helper.
+
+### W06 — Clamp math repeated — LOW
+
+Math.max(0, Math.min(...)) inline clamp appears 7 times across text-windows.ts
+and content-windows.ts. ui-primitives.ts already has a clampSize() function
+that is private. Export it or add a clamp(value, min, max) to ui-primitives.ts
+and replace inline occurrences.
+
+### C01 — Overlay split-browser prompt duplicated internally — MEDIUM
+
+overlay-manager.ts has two full implementations of the same split-pane search
+modal shell: openBrowserPrompt (:326) and openFileBrowserPrompt (:534). Both
+re-implement focusSearch (:455/:709), jumpToLetter (:461/:696), search keypress
+(:477/:721), and list keypress (:508/:751). Extract a private
+createSearchListPreviewOverlay() returning { modal, searchBox, list, preview,
+close } and let both public methods use it.
+
+### C02 — Overlay input prompt lifecycle duplicated — LOW
+
+openValuePrompt (:50) and openPathPrompt (:117) duplicate the modal/input/
+button-bar lifecycle — closePrompt/submitValue at :76/:163 and :83/:173.
+They differ only in completion behaviour. Extract shared private
+openTextInputPrompt({ onSubmit, completion? }).
+
+### C03 — Shadow rendering duplicated with magic offsets — MEDIUM
+
+Shadow creation and sync logic is duplicated across window-manager.ts (:81,
+:591) and menu-overlay-manager.ts (:238, :256). Both use hardcoded +2/+1
+offsets and identical char-fill logic with no shared constant or helper.
+Extract SHADOW_X_OFFSET=2, SHADOW_Y_OFFSET=1 constants and a shared
+syncShadowRect(shadow, frame) helper into window-chrome.ts.
+
+### C04 — Theme tokens bypassed in overlays — MEDIUM
+
+overlay-manager.ts has 22 hardcoded fg/bg color literals in prompt style
+blocks (:342, :350, :360, :398, :553, :568, :578, :601, :610 and more).
+All other core surfaces use theme() resolver tokens. Overlays are immune
+to theme switching. Migrate overlay prompt styles to theme().body,
+theme().selected, theme().highlight etc.
+
+### C05 — createHeaderBar and createStatusBar near-identical — LOW
+
+ui-parts.ts :259 and :301 — the two functions differ only in prop type and
+default left inset. The render/layout/restyle implementation is copy-pasted.
+Extract a shared private createAlignedBarPart() and let both call it.
+
+### C06 — command-catalog boilerplate — LOW
+
+62 command entries repeat api:true, agent:true as explicit fields. Could be
+defaulted to true with explicit opt-outs. The four window-by-id commands
+(focus, move, resize, close) share identical shape and could use a
+windowByIdCommand() local builder to remove copy-paste.
+
+### C07 — Near-identical types in types.ts — LOW
+
+Three duplication clusters:
+  PrimerGroup and GalleryTab (:51 and :56) — same {label, entries} shape
+  DragState and ResizeState (:320 and :329) — same {windowId, startX, startY} base
+  WindowSnapshot and DesktopWindowState (:94 and :172) — overlapping geometry fields
+Extract shared base types: LabeledEntries, PointerDragBase, WindowGeometry.
+
+### M01 — Raw setInterval bypassing createTimer SDK — MEDIUM
+
+Four modules use raw setInterval/clearInterval instead of the SDK createTimer:
+  wibwob-poetry-clock/index.ts :115, :124, :501, :504
+  touchlab-mvp/index.ts :747, :800
+  glitchbox/index.ts :419, :420 (partial — mixes raw and SDK)
+Other modules (sy2-chronicles, zine, e026-demo) correctly use createTimer +
+clearTimers. Inconsistent teardown means leaks on window close if the module
+does not manually call clearInterval in its cleanup. Migrate all to createTimer.
+
+### M02 — appType values inconsistent across modules — MEDIUM
+
+appType strings use three different formats:
+  "glitchbox"         — bare name (glitchbox)
+  "wibwob.tidepool"   — dot namespaced (tidepool)
+  "sy2-chronicles"    — hyphenated (sy2-chronicles)
+  "wibwob.zine"       — dot namespaced (zine)
+appType drives workspace restore — drift here causes silently broken restores.
+Normalise to wibwob.slug to match the module ID convention from N02/S00b.
+Files: glitchbox/index.ts :532, wibwob-tidepool/index.ts :331,
+sy2-chronicles/index.ts :2097/:2159/:2504, zine/index.ts :887.
+
+### M03 — Modules importing directly from src/core/ bypassing SDK — MEDIUM
+
+Three modules reach past the SDK into src/core/ directly:
+  e026-demo/index.ts :31 — imports createTreeWidget from src/core/tree-widget
+  e026-demo/index.ts :32 — imports createTimer from src/core/ui-primitives
+  zine/index.ts :31 — imports createTimer from src/core/ui-primitives
+  zine/index.ts :32 — imports createButtonBar from src/core/ui-parts
+  sy2-chronicles/panel-types.ts :15 — imports paintLines from src/core/grid-canvas
+These should go through microapp-sdk.ts. Missing SDK exports need adding.
+Leaky imports mean modules break if core file paths change.
+
+### M04 — Single-instance open guard only in glitchbox — LOW
+
+Only glitchbox.ts :246 has an explicit "if already open, focus and return"
+guard. Other modules (wibwob-tidepool, wibwobworld, patchbay-lab, zine)
+open a second window without checking. Inconsistent — some surfaces should
+be singletons. The SDK has no focusOrCreate() helper. Add one.
+
+---
+
 ## Part B — Nomenclature audit (naming debt)
 
 The system presents itself inconsistently. User-facing strings, module IDs,
@@ -526,6 +674,29 @@ renamed. All imports updated. typecheck clean.
 - [ ] AC-21: API endpoints renamed, skill files and docs updated
 - [ ] AC-22: WindowKind "markdown-viewer" → "reader", workspace restore handles legacy
 - [ ] AC-23: misc-windows.ts renamed/split, content-windows.ts audited
+
+### Second sweep — windows (W01–W06)
+- [ ] AC-28: PREVIEW_SPLIT_RATIO constant, 10 inline ratios replaced
+- [ ] AC-29: dispatchFileManagerKey shared, list/icon view key parity
+- [ ] AC-30: deferRender(fn) helper, 3 setTimeout(0) calls replaced
+- [ ] AC-31: bindCloseKeys helper, q+Escape consistent across all windows
+- [ ] AC-32: applyInitialPos helper, 2 restore blocks replaced
+- [ ] AC-33: clamp() exported from ui-primitives, 7 inline clamps replaced
+
+### Second sweep — core (C01–C07)
+- [ ] AC-34: createSearchListPreviewOverlay private helper, browser prompts unified
+- [ ] AC-35: openTextInputPrompt private helper, value/path prompts unified
+- [ ] AC-36: SHADOW_X_OFFSET/Y_OFFSET constants + syncShadowRect helper
+- [ ] AC-37: Overlay prompt styles use theme() tokens, no hardcoded colors
+- [ ] AC-38: createAlignedBarPart shared, createHeaderBar/createStatusBar unified
+- [ ] AC-39: command-catalog windowByIdCommand builder, api/agent defaults
+- [ ] AC-40: Shared base types extracted (LabeledEntries, PointerDragBase, WindowGeometry)
+
+### Second sweep — modules (M01–M04)
+- [ ] AC-41: All modules use createTimer/clearTimers, raw setInterval removed
+- [ ] AC-42: appType values normalised to wibwob.slug
+- [ ] AC-43: Direct src/core/ imports removed, SDK exports added
+- [ ] AC-44: SDK focusOrCreate() helper added, singleton modules use it
 
 ### Throughout
 - [ ] AC-26: bun run typecheck clean after every story
