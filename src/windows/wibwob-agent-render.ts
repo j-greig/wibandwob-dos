@@ -105,15 +105,77 @@ export function renderTranscript(messages: ChatMessageEntry[], useKaomoji: boole
     }
   }
 
+  // ── Collapse runs of consecutive [done] tool lines ──────────────────────
+  // When many tool calls stack up between text messages, show first 2,
+  // a summary "... N more commands", and the last 1.  [fail] lines always shown.
+  const MAX_VISIBLE_TOOLS = 3; // first 2 + last 1
+
+  const folded: Array<ChatMessageEntry | { role: "tool-summary"; text: string }> = [];
+  let i = 0;
+  while (i < collapsed.length) {
+    const m = collapsed[i];
+    // Detect a run of [done] status lines
+    if (m.role === "status" && m.text.startsWith("[done]")) {
+      const runStart = i;
+      const run: ChatMessageEntry[] = [];
+      const fails: ChatMessageEntry[] = [];
+      while (i < collapsed.length && collapsed[i].role === "status") {
+        const s = collapsed[i];
+        if (s.text.startsWith("[done]")) {
+          run.push(s);
+        } else if (s.text.startsWith("[fail]")) {
+          fails.push(s);
+        } else {
+          break; // some other status line — stop the run
+        }
+        i++;
+      }
+      if (run.length <= MAX_VISIBLE_TOOLS) {
+        // Short run — show all
+        for (const r of run) folded.push(r);
+      } else {
+        // Long run — first 2, summary, last 1
+        folded.push(run[0]);
+        folded.push(run[1]);
+        const hidden = run.length - 3;
+        // Gather unique short command names from the hidden middle
+        const names = run.slice(2, -1).map((r) => {
+          const match = r.text.match(/^\[done\]\s*(\S+)/);
+          return match ? match[1].replace(/run_command\s+/, "") : "?";
+        });
+        const uniqueNames = Array.from(new Set(names));
+        const nameStr = uniqueNames.length <= 3
+          ? uniqueNames.join(", ")
+          : uniqueNames.slice(0, 3).join(", ") + " …";
+        folded.push({ role: "tool-summary", text: `… ${hidden} more (${nameStr})` });
+        folded.push(run[run.length - 1]);
+      }
+      // Always show all fails
+      for (const f of fails) folded.push(f);
+      continue;
+    }
+    folded.push(m);
+    i++;
+  }
+
   // Single blank line between user/assistant turns, no gap between tool lines
   const lines: string[] = [];
-  for (let i = 0; i < collapsed.length; i++) {
-    const m = collapsed[i];
-    const prev = collapsed[i - 1];
-    const rendered = renderMessage(m, useKaomoji);
+  for (let i = 0; i < folded.length; i++) {
+    const m = folded[i];
+    const prev = folded[i - 1];
+
+    if ((m as any).role === "tool-summary") {
+      const c = C();
+      lines.push(`  {${c.muted}-fg}${(m as any).text}{/${c.muted}-fg}`);
+      continue;
+    }
+
+    const msg = m as ChatMessageEntry;
+    const rendered = renderMessage(msg, useKaomoji);
     if (!rendered) continue;
-    // Add blank line before user/assistant turns (not between consecutive tool calls)
-    if (i > 0 && (m.role !== "status" || prev?.role !== "status")) {
+    // Add blank line before user/assistant turns (not between consecutive tool/status lines)
+    const prevRole = prev && "role" in prev ? (prev as any).role : undefined;
+    if (i > 0 && (msg.role !== "status" || (prevRole !== "status" && prevRole !== "tool-summary"))) {
       lines.push("");
     }
     lines.push(rendered);
