@@ -638,6 +638,7 @@ export default function setup(host: MicroappHost) {
             }
           }
           contentOverrides.clear();
+          panelPositionOverrides.clear();
           rebuild();
           updateStatus();
         } catch { /* ignore transient write races */ }
