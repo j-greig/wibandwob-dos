@@ -91,6 +91,13 @@ export interface StarCell {
   speed: number;
 }
 
+export interface BeamCell {
+  x: number;
+  y: number;
+  ch: string;
+  ttl: number;   // animation ticks remaining
+}
+
 export interface GameState {
   tiles: Map<string, Tile>;
   player: Player;
@@ -107,6 +114,7 @@ export interface GameState {
   stars: StarCell[];
   nearbyMech?: Entity | null;
   hints: string[];
+  beamCells: BeamCell[];  // transient cannon beam overlay
 }
 
 export interface FrameCell {

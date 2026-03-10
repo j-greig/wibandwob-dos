@@ -6,7 +6,7 @@
 
 import { FOV } from "rot-js";
 import { RNG } from "rot-js";
-import type { GameState, GameCommand, FrameCell, Entity, Tile, StarCell } from "./types.js";
+import type { GameState, GameCommand, FrameCell, Entity, Tile, StarCell, BeamCell } from "./types.js";
 import {
   HEIGHT, WIDTH, VIEWPORT_WIDTH, BASE_LIGHT_RADIUS, SQUEEZE_LIGHT_FACTOR,
   MAX_LOG_LINES, MAIN_PATH_Y, ROOMS, REGION_BOUNDS,
@@ -80,6 +80,7 @@ export function initState(seed: number): GameState {
     stars: generateStars(seed),
     nearbyMech: null,
     hints: [],
+    beamCells: [],
   };
 
   // Initial FOV + camera
@@ -341,9 +342,12 @@ function fireCannon(state: GameState): void {
   let bx = state.player.x + stepX;
   let by = state.player.y + stepY;
   let hit = false;
+  const newBeam: BeamCell[] = [];
+
   for (let i = 0; i < 20; i++) {
     const tile = state.tiles.get(`${bx},${by}`);
     if (!tile?.transparent) break;
+    newBeam.push({ x: bx, y: by, ch: beamGlyph, ttl: 3 });
     const monster = state.monsters.find(m => m.x === bx && m.y === by);
     if (monster) {
       state.monsters = state.monsters.filter(m => m !== monster);
@@ -355,7 +359,10 @@ function fireCannon(state: GameState): void {
     by += stepY;
   }
 
-  if (!hit) addLog(state, `Mech cannon fires ${beamGlyph} - nothing hit.`);
+  // Replace beam overlay — new beam gets TTL 3 anim ticks (~2.4s)
+  state.beamCells = newBeam;
+
+  if (!hit) addLog(state, `Mech cannon fires — nothing hit.`);
   state.turn++;
   computeFov(state);
   refreshNearby(state);
@@ -440,13 +447,13 @@ export function step(state: GameState, command: GameCommand): void {
   // Update facing
   if (dx < 0) {
     state.player.facingLeft = true;
-    if (!state.player.squeezing) {
+    if (!state.player.squeezing && !state.player.piloting) {
       state.player.normalSprite = PLAYER_SPRITE_LEFT;
       state.player.sprite = PLAYER_SPRITE_LEFT;
     }
   } else if (dx > 0) {
     state.player.facingLeft = false;
-    if (!state.player.squeezing) {
+    if (!state.player.squeezing && !state.player.piloting) {
       state.player.normalSprite = PLAYER_SPRITE_RIGHT;
       state.player.sprite = PLAYER_SPRITE_RIGHT;
     }
@@ -482,6 +489,12 @@ export function tickAnim(state: GameState): void {
     if (state.animTick % star.speed === 0) {
       star.phase = (star.phase + 1) % STAR_GLYPHS.length;
     }
+  }
+  // Decay beam overlay
+  if (state.beamCells.length > 0) {
+    state.beamCells = state.beamCells
+      .map(b => ({ ...b, ttl: b.ttl - 1 }))
+      .filter(b => b.ttl > 0);
   }
 }
 
@@ -559,6 +572,17 @@ export function getFrame(state: GameState, viewW: number, viewH: number): FrameC
   for (const structure of state.structures) paintEntity(structure);
   for (const monster of state.monsters) paintEntity(monster);
   paintEntity(state.player);
+
+  // Beam overlay — cyan, drawn on top of everything visible
+  for (const beam of state.beamCells) {
+    const sx = beam.x - camX;
+    const sy = beam.y - camY;
+    if (sx < 0 || sx >= viewW || sy < 0 || sy >= viewH) continue;
+    const idx = sy * viewW + sx;
+    if (idx >= 0 && idx < cells.length) {
+      cells[idx] = { x: sx, y: sy, ch: beam.ch, fg: "#00ffff", bg: "#000000" };
+    }
+  }
 
   return cells;
 }
