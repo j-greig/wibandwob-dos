@@ -29,7 +29,7 @@ import {
 } from "../../src/core/panel-layout.js";
 import type { ZineItem, ZineSourceType } from "../../src/core/canvas-types.js";
 import { createTimer, clearTimers } from "../../src/core/ui-primitives.js";
-import { createButtonBar } from "../../src/core/ui-parts.js";
+import { createButtonBar, createSidebarPanel } from "../../src/core/ui-parts.js";
 import { toPanelDef, renderPanel } from "../sy2-chronicles/panel-types.js";
 import YAML from "yaml";
 import { loadCanvas } from "../sy2-chronicles/content-loader.js";
@@ -142,7 +142,6 @@ export default function setup(host: MicroappHost) {
 
     // ── Sidebar state ───────────────────────────────────────────────
     const SIDEBAR_WIDTH = 26;
-    let sidebarOpen = true;
     let activeFilePath = filePath;
     const contentDir = path.join(REPO_ROOT, "content");
     // Declared here so loadFile (defined below) can reassign it before watcher init
@@ -180,17 +179,24 @@ export default function setup(host: MicroappHost) {
       style: host.theme().body,
     });
 
-    // ── Sidebar ─────────────────────────────────────────────────────
-    const sidebarBox = blessed.box({
+    // ── Body area (between header row and toolbar row) ──────────────
+    const bodyArea = blessed.box({
       parent: root,
-      top: 1, left: 0,
-      width: SIDEBAR_WIDTH, bottom: 1,
+      top: 1, left: 0, right: 0, bottom: 1,
       style: host.theme().body,
-      hidden: !sidebarOpen,
     });
 
+    // ── Sidebar panel (createSidebarPanel handles width + toggle) ───
+    const sidePanel = createSidebarPanel({
+      parent: bodyArea,
+      side: "left",
+      width: { fixed: SIDEBAR_WIDTH },
+      mainMinWidth: 12,
+    });
+
+    // ── Sidebar ─────────────────────────────────────────────────────
     const sidebarList = blessed.list({
-      parent: sidebarBox,
+      parent: sidePanel.sidebar,
       top: 0, left: 0, right: 0, bottom: 0,
       keys: true, vi: true, mouse: true,
       scrollable: true,
@@ -200,16 +206,6 @@ export default function setup(host: MicroappHost) {
         item: host.theme().body,
       },
       items: [],
-    });
-
-    const sidebarDivider = blessed.box({
-      parent: root,
-      top: 1, bottom: 1,
-      left: SIDEBAR_WIDTH,
-      width: 1,
-      style: { fg: host.theme().muted.fg, bg: host.theme().body.bg },
-      content: Array(80).fill("│").join("\n"),
-      hidden: !sidebarOpen,
     });
 
     function refreshSidebarList() {
@@ -222,16 +218,7 @@ export default function setup(host: MicroappHost) {
     }
 
     function toggleSidebar() {
-      sidebarOpen = !sidebarOpen;
-      if (sidebarOpen) {
-        sidebarBox.show();
-        sidebarDivider.show();
-        canvas.left = SIDEBAR_WIDTH + 1 as any;
-      } else {
-        sidebarBox.hide();
-        sidebarDivider.hide();
-        canvas.left = 0 as any;
-      }
+      sidePanel.toggle();
       renderLayoutAndContent();
       updateStatus();
       host.screen.render();
@@ -276,10 +263,9 @@ export default function setup(host: MicroappHost) {
     });
 
     // ── Scrollable canvas ───────────────────────────────────────────
-    const canvasLeft = sidebarOpen ? SIDEBAR_WIDTH + 1 : 0;
     const canvas = blessed.box({
-      parent: root,
-      top: 1, left: canvasLeft, right: 0, bottom: 1,
+      parent: sidePanel.main,
+      top: 0, left: 0, right: 0, bottom: 0,
       keys: true, mouse: true, clickable: true,
       scrollable: true,
       alwaysScroll: true,
@@ -382,7 +368,7 @@ export default function setup(host: MicroappHost) {
       const scroll = (canvas as any).getScrollPerc?.() ?? 0;
       const q = searchQuery ? `  search:${searchQuery}` : "";
       const pauseLabel = paused ? "▶ Play" : "⏸ Pause";
-      const sidebarLabel = sidebarOpen ? "[▶] Files" : "[ ] Files";
+      const sidebarLabel = sidePanel.isOpen() ? "[▶] Files" : "[ ] Files";
       const panelCount = [...zineNodes.values()].filter(n => n.item.type === "panel").length;
       toolbar.update({
         leftText: ` Zine  ${panelCount} panels  ${scroll}%${q}`,
@@ -889,7 +875,7 @@ export default function setup(host: MicroappHost) {
         panelCount,
         filePath: activeFilePath,
         title: freshTitle,
-        sidebarOpen,
+        sidebarOpen: sidePanel.isOpen(),
         availableFiles: discoveredFiles,
         activeFile: activeFilePath,
         items: [...zineNodes.values()].map(n => ({

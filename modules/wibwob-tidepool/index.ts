@@ -9,6 +9,7 @@
  */
 
 import { TidePoolEngine } from "./engine.js";
+import { TIDEPOOL_SIDEBAR_WIDTH } from "./layout-constants.js";
 import {
   renderTidePool,
   summarizeState,
@@ -141,7 +142,7 @@ export default function setup(host: MicroappHost) {
       if (!engine) return;
       const innerW = Math.max(60, Number(win.body.width) || 100);
       const innerH = Math.max(20, Number(win.body.height) || 30);
-      const sidebarW = 26;
+      const sidebarW = TIDEPOOL_SIDEBAR_WIDTH;
       const dividerW = 3;
       const gridAreaW = innerW - sidebarW - dividerW - 2;
       const targetGridW = Math.max(5, Math.floor(gridAreaW / CELL_COLS));

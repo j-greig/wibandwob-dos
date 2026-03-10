@@ -25,6 +25,7 @@ import {
   applyRect,
   createNodePart,
   terrainNames,
+  resolveSidebarWidth,
 } from "../../src/services/microapp-sdk.js";
 import { renderIso } from "./render-iso.js";
 
@@ -307,7 +308,12 @@ export default function setup(host: MicroappHost) {
           return;
         }
 
-        const sidebarWidth = Math.max(14, Math.floor(rect.width / 6));
+        const sidebarWidth = resolveSidebarWidth(
+          rect.width,
+          { percent: 1 / 6, min: 14 },
+          false, // no divider between map and info panel
+          12,    // main (map) minimum width
+        );
         const mapWidth = Math.max(1, rect.width - sidebarWidth);
         mapPart.layout({ top: 0, left: 0, width: mapWidth, height: rect.height });
         infoBlock.layout({ top: 0, left: mapWidth, width: sidebarWidth, height: rect.height });

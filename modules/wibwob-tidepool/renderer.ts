@@ -11,6 +11,7 @@
 
 import { TidePoolEngine, type Era, type TideLevel } from "./engine.js";
 import { SPECIES, SPECIES_IDS, MAX_SHANNON, type SpeciesId } from "./species.js";
+import { TIDEPOOL_SIDEBAR_WIDTH } from "./layout-constants.js";
 
 // ---------------------------------------------------------------------------
 // Visual constants
@@ -137,7 +138,7 @@ export function renderTidePool(
   const w = Math.max(60, Math.floor(width));
   const h = Math.max(5, Math.floor(height));
 
-  const sidebarW = 26;
+  const sidebarW = TIDEPOOL_SIDEBAR_WIDTH;
   const dividerW = 3; // " │ "
   const gridAreaW = w - sidebarW - dividerW - 2; // 2 for left/right padding
 

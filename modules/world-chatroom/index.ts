@@ -4,6 +4,7 @@ import type {
   MicroappHost,
   MicroappSnapshotWindow,
 } from "../../src/services/microapp-sdk.js";
+import { createSidebarPanel } from "../../src/services/microapp-sdk.js";
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
@@ -49,12 +50,18 @@ export default function setup(host: MicroappHost) {
       bottom: 2,
       style: host.theme().body,
     });
-    const transcript = blessed.box({
+    const sidePanel = createSidebarPanel({
       parent: bodyNode,
+      side: "right",
+      width: { fixed: 26 },
+      mainMinWidth: 12,
+    });
+    const transcript = blessed.box({
+      parent: sidePanel.main,
       top: 0,
       left: 0,
-      width: 0,
-      height: 0,
+      width: "100%",
+      height: "100%",
       tags: true,
       mouse: true,
       keys: true,
@@ -63,11 +70,11 @@ export default function setup(host: MicroappHost) {
       style: host.theme().body,
     });
     const gameLog = blessed.box({
-      parent: bodyNode,
+      parent: sidePanel.sidebar,
       top: 0,
       left: 0,
-      width: 0,
-      height: 0,
+      width: "100%",
+      height: "100%",
       tags: true,
       mouse: true,
       keys: true,
@@ -140,10 +147,9 @@ export default function setup(host: MicroappHost) {
       host.ui.applyRect(statusBar, { top: footerTop,            left: 0,              width: innerW,         height: statusHeight });
       host.ui.applyRect(input,     { top: footerTop + statusHeight, left: 0,          width: innerW,         height: inputRows    });
 
-      const sidebarWidth = 26;
-      const transcriptWidth = Math.max(12, innerW - sidebarWidth);
-      host.ui.applyRect(transcript, { top: 0, left: 0,              width: transcriptWidth, height: bodyHeight });
-      host.ui.applyRect(gameLog,    { top: 0, left: transcriptWidth, width: sidebarWidth,   height: bodyHeight });
+      // Sidebar panel handles width resolution and overflow guard.
+      sidePanel.layout();
+      const sidebarWidth = sidePanel.sidebarWidth();
 
       const channel = channelId ? host.worldChat.readChannel(channelId) : undefined;
       const transport = host.worldChat.getTransportStatus();

@@ -10,6 +10,7 @@ import {
   getTerrainFocusPoint,
   readNodeViewport,
   renderTerrainMap,
+  resolveSidebarWidth,
   terrainNames,
   type AnimatedPanelPlayer,
   type BrowserEntry,
@@ -499,7 +500,13 @@ export default function setup(host: MicroappHost) {
           const frameInset = 1;
           const titleHeight = 1;
           const statusHeight = 1;
-          const sidebarWidth = clamp(Math.floor(rect.width * 0.32), 24, 36);
+          const innerWidth = Math.max(0, rect.width - frameInset * 2);
+          const sidebarWidth = resolveSidebarWidth(
+            innerWidth,
+            { percent: 0.32, min: 24, max: 36 },
+            true,  // has divider
+            8,     // minimum content width
+          );
           const dividerWidth = 1;
           simplePreviewBox.hide();
           primerFrameBox.show();
@@ -543,7 +550,7 @@ export default function setup(host: MicroappHost) {
             left: frameInset + sidebarWidth + dividerWidth,
             width: Math.max(
               0,
-              rect.width - frameInset * 2 - sidebarWidth - dividerWidth,
+              innerWidth - sidebarWidth - dividerWidth,
             ),
             height: innerHeight,
           });
