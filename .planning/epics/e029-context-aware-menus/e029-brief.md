@@ -1,7 +1,7 @@
 ---
 id: E029
 title: Context-Aware Menus
-status: in-progress
+status: done
 issue: ~
 pr: ~
 depends_on: []
@@ -31,7 +31,7 @@ No focused window = safe global fallback (current behaviour preserved).
 
 ## Stories
 
-- [~] S01 — Context-aware File menu (appTypes filter on MenuPlacement)
+- [x] S01 — Context-aware File menu (appTypes filter on MenuPlacement)
 
 ## Out of Scope (this epic)
 

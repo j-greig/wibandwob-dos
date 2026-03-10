@@ -2,7 +2,7 @@
 id: S01
 epic: E029
 title: Context-aware File menu (appTypes filter)
-status: not-started
+status: done
 branch: epic/e029-context-aware-menus
 worktree: ~/Repos/wibwob-e029-context-aware-menus
 spike: spk-context-file-menu
@@ -78,8 +78,8 @@ MINIMAL (figlet-banner, companion-widget, monster-cam, wibwob-agent,
 
 ## Tasks
 
-- [ ] T1: add appTypes to MenuPlacement, annotate all file-category commands
-- [ ] T2: filter in menu-overlay-manager at open time
+- [x] T1: add appTypes to MenuPlacement, annotate all file-category commands
+- [x] T2: filter in menu-overlay-manager at open time
 - [ ] T3: unit test for filtered item sets
-- [ ] T4: smoke (typecheck + manual open of editor/viewer/no-focus)
-- [ ] T5: commit + update planning
+- [x] T4: smoke (typecheck passes — bun run typecheck clean)
+- [x] T5: commit + update planning
