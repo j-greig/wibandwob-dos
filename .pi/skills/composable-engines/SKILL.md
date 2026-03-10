@@ -230,7 +230,7 @@ Lighter audit — no new types or catalog entries needed:
 
 ### Codex review
 
-After integration, get `codex-analyst` to review. It catches:
+After integration, get `codex-standard` to review. It catches:
 - State publication gaps (`onChange` not called)
 - Layout reconciliation misses (maximize + tile interaction)
 - Coordinate system confusion (screen vs desktop-relative)

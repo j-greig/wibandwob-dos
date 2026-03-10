@@ -7,7 +7,8 @@ import type { OverlayManager } from "../core/overlay-manager.js";
 import { theme } from "../core/theme/resolver.js";
 import type { WindowRecord } from "../core/types.js";
 import type { WindowManager } from "../core/window-manager.js";
-import { createScrollbar, safeSetStyle } from "../core/ui-primitives.js";
+import { createScrollbar } from "../core/ui-primitives.js";
+import { createRestyleBundle } from "../core/ui-parts.js";
 import { getDefaultFigletFont, getFigletCatalogue, getFigletFontChoices, measureFiglet, renderFiglet } from "../services/figlet-service.js";
 
 export function promptForFigletText(
@@ -184,18 +185,15 @@ export function openFigletWindow(params: {
     contentHeight: lastMeasurement.measurement.lineCount,
     contentPreview: viewer.getContent().split("\n").slice(0, 8).join("\n")
   });
-  frame.focus = () => {
-    params.windowManager.focusWindow(frame);
-    viewer.focus();
-  };
-  frame.onRestyle = () => {
-    toolbar.style = theme().header;
-    toolbarLabel.style = theme().header;
-    textInput.style = theme().input;
-    fontBtn.style = { ...theme().footer, hover: theme().selected };
-    editBtn.style = { ...theme().footer, hover: theme().selected };
-    safeSetStyle(viewer, theme().body);
-  };
+  frame.setFocusTarget(viewer);
+  frame.onRestyle = createRestyleBundle([
+    [toolbar, () => theme().header],
+    [toolbarLabel, () => theme().header],
+    [textInput, () => theme().input],
+    [fontBtn, () => ({ ...theme().footer, hover: theme().selected })],
+    [editBtn, () => ({ ...theme().footer, hover: theme().selected })],
+    [viewer, () => theme().body],
+  ]).restyle;
 
   frame.frame.key(["e"], editText);
   frame.frame.key(["f"], pickFont);

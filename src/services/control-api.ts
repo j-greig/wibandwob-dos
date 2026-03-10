@@ -75,6 +75,7 @@ const ENDPOINT_CATALOGUE = [
   { method: "GET",  path: "/help",                          description: "Alias for /" },
   { method: "GET",  path: "/health",                        description: "Health check" },
   { method: "GET",  path: "/openapi.json",                  description: "OpenAPI 3.0 spec" },
+  { method: "GET",  path: "/docs",                          description: "Interactive API docs (Scalar)" },
   { method: "GET",  path: "/state",                         description: "Full live desktop + window state" },
   { method: "GET",  path: "/commands/list",                 description: "All registered commands (optional ?surface=menu|palette|api|agent&includeUnavailable=1)" },
   { method: "GET",  path: "/content/primer-info",           description: "Primer content metadata. ?path=/abs/path.txt" },
@@ -92,12 +93,16 @@ const ENDPOINT_CATALOGUE = [
   { method: "POST", path: "/view/editor/open",              body: { filePath: "string (optional)", title: "string (optional)", initial: "string (optional)" }, description: "Alias: editor.open" },
   { method: "POST", path: "/view/backrooms/open",           body: { theme: "string", mode: "auto|live|fake-live", model: "haiku|sonnet|opus", turns: "number", primers: "string (optional csv)" }, description: "Alias: backrooms.run" },
   { method: "POST", path: "/view/browser-reader/open",      body: { filePath: "string (optional)" }, description: "Alias: document.open" },
-  { method: "POST", path: "/view/markdown/open",            body: { filePath: "string (absolute .md path)" }, description: "Alias: markdown.open" },
-  { method: "POST", path: "/view/art/open",                 body: {}, description: "Alias: art.open" },
+  { method: "POST", path: "/view/markdown/open",            body: { filePath: "string (absolute .md path)" }, description: "Alias: markdown.open (legacy; prefer /view/reader/open)" },
+  { method: "POST", path: "/view/reader/open",              body: { filePath: "string (absolute .md path)" }, description: "Alias: markdown.open" },
+  { method: "POST", path: "/view/art/open",                 body: {}, description: "Alias: art.open (legacy; prefer /view/generative-art/open)" },
+  { method: "POST", path: "/view/generative-art/open",      body: {}, description: "Alias: art.open" },
   { method: "POST", path: "/view/monster-cam/open",         body: {}, description: "Alias: monster_cam.open" },
-  { method: "POST", path: "/view/wibwob-agent/open",        body: {}, description: "Alias: agent.open" },
+  { method: "POST", path: "/view/wibwob-agent/open",        body: {}, description: "Alias: agent.open (legacy; prefer /view/agent/open)" },
+  { method: "POST", path: "/view/agent/open",               body: {}, description: "Alias: agent.open" },
   { method: "POST", path: "/view/companion/open",           body: {}, description: "Alias: companion.open (floating)" },
-  { method: "POST", path: "/view/companion/smol",           body: {}, description: "Alias: companion.smol (popup)" },
+  { method: "POST", path: "/view/companion/smol",           body: {}, description: "Alias: companion.smol (popup, legacy; prefer /view/companion/compact)" },
+  { method: "POST", path: "/view/companion/compact",        body: {}, description: "Alias: companion.smol (popup)" },
   { method: "GET",  path: "/scramble/state",                body: {}, description: "Scramble brain state: status, model, sessionId, messageCount, lastMessage, sleeping, logPath" },
   { method: "GET",  path: "/scramble/history",              body: {}, description: "Full Scramble conversation history as JSON array" },
   { method: "POST", path: "/scramble/say",                  body: { text: "string" }, description: "Send a message to Scramble (returns reply)" },
@@ -175,6 +180,7 @@ export class ControlApiService {
       globalThis as {
         Bun?: {
           serve: (options: {
+            hostname?: string;
             port: number;
             fetch: (request: Request) => Promise<Response> | Response;
           }) => { stop: (closeActiveConnections?: boolean) => void };
@@ -196,6 +202,7 @@ export class ControlApiService {
     for (const port of ports) {
       try {
         this.server = bunRuntime.serve({
+          hostname: "127.0.0.1",
           port,
           fetch: async (request) => this.handleRequest(request),
         });
@@ -243,6 +250,13 @@ export class ControlApiService {
 
     if (request.method === "GET" && url.pathname === "/openapi.json") {
       return Response.json(buildOpenApiSpec(this.actualPort ?? this.port));
+    }
+
+    if (request.method === "GET" && url.pathname === "/docs") {
+      const port = this.actualPort ?? this.port;
+      return new Response(scalarDocsHtml(port), {
+        headers: { "Content-Type": "text/html; charset=utf-8" },
+      });
     }
 
     if (request.method === "GET" && url.pathname === "/health") {
@@ -385,12 +399,16 @@ export class ControlApiService {
       "/view/primer/open":          { id: "primer.open", argsMapper: (b) => b.filePath ? { filePath: b.filePath, x: b.x, y: b.y, w: b.w, h: b.h } : undefined },
       "/view/browser-reader/open":  { id: "document.open", argsMapper: (b) => b.filePath ? { filePath: b.filePath } : undefined },
       "/view/markdown/open":        { id: "markdown.open", argsMapper: (b) => b.filePath ? { filePath: b.filePath } : undefined },
+      "/view/reader/open":          { id: "markdown.open", argsMapper: (b) => b.filePath ? { filePath: b.filePath } : undefined },
       "/view/figlet/open":          { id: "figlet.open", argsMapper: (b) => b.text ? { text: b.text, font: b.font } : undefined },
       "/view/art/open":             { id: "art.open" },
+      "/view/generative-art/open":  { id: "art.open" },
       "/view/monster-cam/open":     { id: "monster_cam.open" },
       "/view/wibwob-agent/open":    { id: "agent.open" },
+      "/view/agent/open":           { id: "agent.open" },
       "/view/companion/open":       { id: "companion.open" },
       "/view/companion/smol":       { id: "companion.smol" },
+      "/view/companion/compact":    { id: "companion.smol" },
       "/scramble/say":              { id: "scramble.say", argsMapper: (b) => b.text ? { text: b.text } : undefined },
       "/scramble/expand":           { id: "scramble.expand" },
       "/scramble/pop-out":          { id: "scramble.pop-out" },
@@ -575,4 +593,38 @@ function normalizeBackroomsChannel(raw: unknown): BackroomsChannel {
     model,
     mode,
   };
+}
+
+// ── Scalar API docs ───────────────────────────────────────────────────────
+
+function scalarDocsHtml(port: number): string {
+  const config = JSON.stringify({
+    theme: "kepler",
+    hideModels: true,
+    defaultHttpClient: { targetKey: "shell", clientKey: "curl" },
+  });
+  return `<!doctype html>
+<html>
+<head>
+  <title>WibWob-DOS API</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { margin: 0; font-family: system-ui, sans-serif; }
+    .custom-header { background: #1a1a2e; color: #e0e0e0; padding: 12px 24px; font-size: 14px; }
+    .custom-header code { background: #2a2a4e; padding: 2px 8px; border-radius: 3px; }
+    .custom-header a { color: #7dc4e4; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="custom-header">
+    WibWob-DOS Control API &middot; <code>http://127.0.0.1:${port}</code>
+    &middot; <a href="/openapi.json">OpenAPI spec</a>
+    &middot; <a href="/health">Health</a>
+    &middot; <a href="/help">Endpoints</a>
+  </div>
+  <script id="api-reference" data-url="http://127.0.0.1:${port}/openapi.json" data-configuration='${config}'></script>
+  <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
+</body>
+</html>`;
 }

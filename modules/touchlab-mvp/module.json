@@ -5,7 +5,7 @@
   "type": "microapp",
   "entry": "index.ts",
   "microapp": {
-    "id": "touchlab.mvp",
+    "id": "wibwob.touchlab",
     "title": "TouchLab MVP",
     "description": "Three nested source windows piping ASCII into one composite output window.",
     "multiInstance": false,

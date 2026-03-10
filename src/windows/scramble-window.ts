@@ -10,7 +10,8 @@
 
 import blessed from "blessed";
 import { theme } from "../core/theme/resolver.js";
-import { createScrollbar, safeSetStyle } from "../core/ui-primitives.js";
+import { createScrollbar } from "../core/ui-primitives.js";
+import { createRestyleBundle } from "../core/ui-parts.js";
 import type { WindowManager } from "../core/window-manager.js";
 import type { ScrambleBrain } from "../services/scramble-brain.js";
 import { C } from "./wibwob-agent-render.js";
@@ -285,16 +286,18 @@ export function openScrambleFloatingWindow(deps: ScrambleFloatingDeps): void {
   };
 
   frame.focus = () => {
-    windowManager.focusWindow(frame);
     inputEl.focus();
     screen.render();
   };
 
+  const restyleBundle1 = createRestyleBundle([
+    [catHeader, () => theme().body],
+    [transcript, () => theme().agentBg],
+    [statusLine, () => theme().warning],
+    [inputEl, () => theme().input],
+  ]);
   frame.onRestyle = () => {
-    safeSetStyle(catHeader, theme().body);
-    safeSetStyle(transcript, theme().agentBg);
-    statusLine.style = theme().warning;
-    inputEl.style = theme().input;
+    restyleBundle1.restyle();
     screen.render();
   };
 
@@ -520,16 +523,18 @@ export function openScrambleSmolPopup(deps: ScrambleSmolDeps): void {
   frame.cleanup = () => { /* brain owned by app-controller */ };
 
   frame.focus = () => {
-    windowManager.focusWindow(frame);
     inputEl.focus();
     screen.render();
   };
 
+  const restyleBundle2 = createRestyleBundle([
+    [catHeader, () => theme().body],
+    [transcript, () => theme().agentBg],
+    [statusLine, () => theme().warning],
+    [inputEl, () => theme().input],
+  ]);
   frame.onRestyle = () => {
-    safeSetStyle(catHeader, theme().body);
-    safeSetStyle(transcript, theme().agentBg);
-    statusLine.style = theme().warning;
-    inputEl.style = theme().input;
+    restyleBundle2.restyle();
     screen.render();
   };
 

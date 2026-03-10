@@ -12,7 +12,8 @@ import path from "node:path";
 import { SessionManager } from "@mariozechner/pi-coding-agent";
 import { REPO_ROOT } from "../core/config.js";
 import { theme } from "../core/theme/resolver.js";
-import { createScrollbar, safeSetStyle } from "../core/ui-primitives.js";
+import { safeSetStyle } from "../core/ui-primitives.js";
+import { createCollapsibleBlock, createContentStack, createRestyleBundle, type CollapsibleBlockHandle, type ContentStackChild } from "../core/ui-parts.js";
 import type { Box } from "../core/types.js";
 import type { WindowManager } from "../core/window-manager.js";
 import { listLocalSessions, type LocalSessionInfo } from "../services/pi-session-bridge.js";
@@ -20,7 +21,7 @@ import type { WibWobAgentSession } from "../services/wibwob-agent-session.js";
 import { sharedPlayer, fmtTime } from "../services/audio-player-controller.js";
 import { findClaudeCodeJsonl, formatRelativeSessionTime, truncatePreview } from "../services/agent-session-helpers.js";
 import { dispatchSlashCommand } from "./agent-slash-commands.js";
-import { C, renderTranscript } from "./wibwob-agent-render.js";
+import { C, renderTranscript, buildTranscriptBlocks, type TranscriptBlock } from "./wibwob-agent-render.js";
 
 export function openWibWobAgentWindow(params: {
   screen: blessed.Widgets.Screen;
@@ -54,20 +55,17 @@ export function openWibWobAgentWindow(params: {
     style: theme().muted,
   });
 
-  const transcript = blessed.box({
-    parent: frame.body,
-    top: 1,
-    left: 0,
-    right: 0,
-    bottom: 2,
-    tags: true,
-    mouse: true,
-    keys: true,
-    scrollable: true,
-    alwaysScroll: true,
-    scrollbar: createScrollbar(),
-    style: theme().agentBg,
-  });
+  // Content stack manages variable-height child blocks (text messages + collapsible tool runs)
+  // inside a scrollable container. Replaces the old single-string transcript box.
+  const transcriptStack = createContentStack(frame.body, { style: theme().agentBg });
+  const transcript = transcriptStack.node;
+  transcript.top = 1;
+  transcript.bottom = 2;
+
+  // Track collapsible block handles for cleanup and re-use
+  const collapsibleBlocks = new Map<string, CollapsibleBlockHandle>();
+  const textBlocks = new Map<string, blessed.Widgets.BoxElement>();
+  let lastBlockKeys: string[] = [];
 
   const statusLine = blessed.box({
     parent: frame.body,
@@ -310,11 +308,120 @@ export function openWibWobAgentWindow(params: {
     }
   });
 
+  // ── Block-based transcript rendering ─────────────────────────────────────────
+  // Build transcript as individual blessed child boxes inside the content stack.
+  // Text messages → plain boxes. Tool runs → collapsible blocks.
+
+  const updateTranscript = (snapshot: ReturnType<typeof params.agent.getSnapshot>) => {
+    const useKaomoji = !snapshot.model?.toLowerCase().includes("haiku");
+    const blocks = buildTranscriptBlocks(snapshot.messages, snapshot.toolRuns, useKaomoji);
+    const newKeys = blocks.map((b) => b.key);
+
+    // Fast path: if keys haven't changed, just update content in place
+    const keysChanged = newKeys.length !== lastBlockKeys.length ||
+      newKeys.some((k, i) => k !== lastBlockKeys[i]);
+
+    if (!keysChanged) {
+      // Update content of existing blocks without rebuilding
+      for (const block of blocks) {
+        if (block.type === "text") {
+          const existing = textBlocks.get(block.key);
+          if (existing) {
+            existing.setContent(block.content);
+            // Recalculate height — content may have changed line count (streaming)
+            existing.height = block.content.split("\n").length + 1;
+          }
+        } else {
+          const existing = collapsibleBlocks.get(block.key);
+          if (existing) {
+            existing.update({ summary: block.summary, detail: block.detail, badge: block.badge });
+            // Auto-collapse when run transitions from active to inactive
+            if (!block.run.active && !existing.isCollapsed()) {
+              existing.setCollapsed(true);
+            }
+          }
+        }
+      }
+      transcriptStack.relayout();
+      transcriptStack.scrollToBottom();
+      return;
+    }
+
+    // Full rebuild: create new children array
+    const children: ContentStackChild[] = [];
+
+    // Clean up blocks that are no longer present
+    const newKeySet = new Set(newKeys);
+    for (const [key, handle] of collapsibleBlocks) {
+      if (!newKeySet.has(key)) {
+        handle.destroy();
+        collapsibleBlocks.delete(key);
+      }
+    }
+    for (const [key, node] of textBlocks) {
+      if (!newKeySet.has(key)) {
+        node.destroy();
+        textBlocks.delete(key);
+      }
+    }
+
+    for (const block of blocks) {
+      if (block.type === "text") {
+        let node = textBlocks.get(block.key);
+        if (!node) {
+          node = blessed.box({
+            parent: transcript,
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 1,
+            tags: true,
+            style: theme().agentBg,
+          });
+          textBlocks.set(block.key, node);
+        }
+        node.setContent(block.content);
+        // Height = number of lines in content + 1 blank line for spacing between turns
+        const lineCount = block.content.split("\n").length;
+        node.height = lineCount + 1;
+        children.push({
+          key: block.key,
+          node,
+          contentHeight: () => Number(node!.height) || 1,
+        });
+      } else {
+        // Tool run → collapsible block
+        let handle = collapsibleBlocks.get(block.key);
+        if (!handle) {
+          handle = createCollapsibleBlock(transcript, {
+            collapsed: !block.run.active, // active runs start expanded
+            onChange: () => {
+              transcriptStack.relayout();
+              params.screen.render();
+            },
+          });
+          collapsibleBlocks.set(block.key, handle);
+        } else if (!block.run.active && !handle.isCollapsed()) {
+          // Sync collapsed state on full rebuild (run finished since creation)
+          handle.setCollapsed(true);
+        }
+        handle.update({ summary: block.summary, detail: block.detail, badge: block.badge });
+        children.push({
+          key: block.key,
+          node: handle.node,
+          contentHeight: () => handle!.contentHeight(),
+        });
+      }
+    }
+
+    transcriptStack.setChildren(children);
+    transcriptStack.scrollToBottom();
+    lastBlockKeys = newKeys;
+  };
+
   // Subscribe to agent state
   const unsubscribe = params.agent.subscribe((snapshot) => {
-    const useKaomoji = !snapshot.model?.toLowerCase().includes("haiku");
-    transcript.setContent(renderTranscript(snapshot.messages, useKaomoji));
-    transcript.setScrollPerc(100);
+    updateTranscript(snapshot);
     statusLine.setContent(` ${snapshot.status}`);
     renderInfoBar(snapshot.model ?? "—", snapshot.sessionId ?? "", snapshot.sessionFile);
     params.onStateChanged?.();
@@ -407,6 +514,11 @@ export function openWibWobAgentWindow(params: {
   frame.cleanup = () => {
     unsubscribe();
     unsubscribePlayer();
+    for (const handle of collapsibleBlocks.values()) handle.destroy();
+    collapsibleBlocks.clear();
+    for (const node of textBlocks.values()) node.destroy();
+    textBlocks.clear();
+    transcriptStack.destroy();
     params.agent.dispose();
   };
 
@@ -422,11 +534,16 @@ export function openWibWobAgentWindow(params: {
         params.agent.pushStatus(`[slash] ${error instanceof Error ? error.message : String(error)}`);
       });
   };
+  const restyleBundle = createRestyleBundle([
+    [infoBar, () => theme().muted],
+    [statusLine, () => theme().warning],
+    [input, () => theme().input],
+  ]);
   frame.onRestyle = () => {
-    infoBar.style = theme().muted;
-    safeSetStyle(transcript, theme().agentBg);
-    statusLine.style = theme().warning;
-    input.style = theme().input;
+    restyleBundle.restyle();
+    transcriptStack.restyle();
+    for (const handle of collapsibleBlocks.values()) handle.restyle();
+    for (const node of textBlocks.values()) safeSetStyle(node, theme().agentBg);
     // playerBar keeps its own fixed dark style
   };
 

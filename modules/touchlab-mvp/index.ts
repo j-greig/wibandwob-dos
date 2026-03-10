@@ -1,5 +1,6 @@
 import blessed from "blessed";
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
+import { clamp } from "../../src/services/microapp-sdk.js";
 
 type NodeId = "gen" | "text" | "input" | "mix";
 
@@ -67,9 +68,6 @@ const BG_OPTIONS: ThemeColorName[] = [
   "muted",
 ];
 
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
-}
 
 function blankGrid(width: number, height: number): string[][] {
   return Array.from({ length: height }, () => Array.from({ length: width }, () => " "));

@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import {
+  clamp,
   createSavedTerrainArtifact,
   createTerrainMap,
   getTerrainFocusPoint,
@@ -25,6 +26,7 @@ import {
   applyRect,
   createNodePart,
   terrainNames,
+  resolveSidebarWidth,
 } from "../../src/services/microapp-sdk.js";
 import { renderIso } from "./render-iso.js";
 
@@ -74,9 +76,6 @@ const PLAYER_SPRITE = [
   "╱ ╲",
 ];
 
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
-}
 
 function viewportOf(node: { width?: number | string; height?: number | string }) {
   return {
@@ -307,7 +306,12 @@ export default function setup(host: MicroappHost) {
           return;
         }
 
-        const sidebarWidth = Math.max(14, Math.floor(rect.width / 6));
+        const sidebarWidth = resolveSidebarWidth(
+          rect.width,
+          { percent: 1 / 6, min: 14 },
+          false, // no divider between map and info panel
+          12,    // main (map) minimum width
+        );
         const mapWidth = Math.max(1, rect.width - sidebarWidth);
         mapPart.layout({ top: 0, left: 0, width: mapWidth, height: rect.height });
         infoBlock.layout({ top: 0, left: mapWidth, width: sidebarWidth, height: rect.height });
@@ -956,7 +960,7 @@ export default function setup(host: MicroappHost) {
   host.registerSnapshot({
     serialize: (window) => {
       const state = window.describeState?.() ?? {};
-      if (state.appType !== "wibwobworld") {
+      if (state.appType !== "wibwob.world") {
         return undefined;
       }
       return {

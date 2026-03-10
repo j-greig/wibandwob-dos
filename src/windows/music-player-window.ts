@@ -12,12 +12,14 @@ import { basename } from "path";
 import { stat } from "fs/promises";
 
 import { theme } from "../core/theme/resolver.js";
-import { safeSetStyle } from "../core/ui-primitives.js";
+import { createRestyleBundle } from "../core/ui-parts.js";
+import type { OverlayManager } from "../core/overlay-manager.js";
 import type { WindowManager } from "../core/window-manager.js";
 
 export interface MusicPlayerDeps {
   screen: blessed.Widgets.Screen;
   windowManager: WindowManager;
+  overlays: OverlayManager;
   onStateChanged?: () => void;
 }
 
@@ -236,28 +238,8 @@ export function openMusicPlayerWindow(
   display.key(["right"], () => scrub(5));
   display.key(["left"], () => scrub(-5));
   display.key(["o"], () => {
-    // Simple file prompt
-    const input = blessed.textbox({
-      parent: deps.screen,
-      top: "center",
-      left: "center",
-      width: 60,
-      height: 3,
-      border: { type: "line" },
-      style: {
-        ...theme().body,
-        border: theme().header,
-      },
-      inputOnFocus: true,
-    });
-    input.focus();
-    deps.screen.render();
-    input.readInput((_err: Error | null, value?: string) => {
-      input.destroy();
-      if (value?.trim()) {
-        loadFile(value.trim());
-      }
-      deps.screen.render();
+    deps.overlays.openValuePrompt("Open file path", filePath ?? "", (value) => {
+      if (value.trim()) loadFile(value.trim());
     });
   });
 
@@ -274,13 +256,10 @@ export function openMusicPlayerWindow(
     volume,
   });
   frame.cleanup = () => killProc();
-  frame.focus = () => {
-    deps.windowManager.focusWindow(frame);
-    display.focus();
-  };
-  frame.onRestyle = () => {
-    safeSetStyle(display, theme().body);
-  };
+  frame.setFocusTarget(display);
+  frame.onRestyle = createRestyleBundle([
+    [display, () => theme().body],
+  ]).restyle;
 
   // Public controller for API/commands
   (frame as any).musicPlayer = {

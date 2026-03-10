@@ -6,7 +6,8 @@ description: |
   pipeline (pydub bridge, mixing, splicing, voice, export). Use when composing original
   music for video reels, generating stingers/interstitials, mixing voiceover with score,
   or any task requiring programmatic audio synthesis. Triggers on: music composition,
-  chiptune generation, audio scoring, sound design, stinger creation, reel audio mixing.
+  chiptune generation, audio scoring, sound design, stinger creation, reel audio mixing,
+  chiptune studio, studio, open the studio, audio synthesis, compose audio.
 ---
 
 # Chiptune Bricks
@@ -43,8 +44,8 @@ Python 3.13+ removed the `audioop` module that pydub depends on. **Always includ
 # ///
 # NOTE: audioop-lts is REQUIRED — pydub breaks without it on Python 3.13+
 
-import sys
-sys.path.insert(0, "~/Repos/symbient-skills/skills/chiptune-studio/scripts")
+import sys, os
+sys.path.insert(0, os.path.join(os.environ.get("REPO_ROOT", os.getcwd()), ".pi/skills/chiptune-studio/scripts"))
 
 from bricks import *
 

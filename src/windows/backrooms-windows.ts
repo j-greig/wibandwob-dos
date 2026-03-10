@@ -6,7 +6,9 @@ import path from "node:path";
 import { REPO_ROOT } from "../core/config.js";
 import type { OverlayManager } from "../core/overlay-manager.js";
 import { theme as appTheme } from "../core/theme/resolver.js";
-import { createScrollbar, safeSetStyle } from "../core/ui-primitives.js";
+import { createScrollbar } from "../core/ui-primitives.js";
+import { createRestyleBundle, createSelectableList, deferRender } from "../core/ui-parts.js";
+import { EMPTY_PRIMER_SELECTED } from "../core/empty-states.js";
 import type { BackroomsChannel, List, LogBox } from "../core/types.js";
 import type { WindowManager } from "../core/window-manager.js";
 import type { BackroomsService } from "../services/backrooms-service.js";
@@ -80,20 +82,14 @@ export function openBackroomsPrimerPicker(context: BackroomsWindowContext, theme
     mouse: true,
     style: appTheme().input
   });
-  const list = blessed.list({
+  const listHandle = createSelectableList({
     parent: frame.body,
     top: 3,
     left: 0,
     width: "36%",
     bottom: 0,
-    keys: true,
-    vi: true,
-    mouse: true,
-    scrollable: true,
-    alwaysScroll: true,
-    scrollbar: createScrollbar(),
-    style: { ...appTheme().body, selected: appTheme().selected }
   });
+  const list = listHandle.node;
   const preview = blessed.box({
     parent: frame.body,
     top: 2,
@@ -133,7 +129,7 @@ export function openBackroomsPrimerPicker(context: BackroomsWindowContext, theme
   const updatePreview = (index: number) => {
     const entry = filteredEntries[index];
     if (!entry) {
-      preview.setContent(searchValue ? `No primers match "${searchValue}".` : "No primer selected.");
+      preview.setContent(searchValue ? `No primers match "${searchValue}".` : EMPTY_PRIMER_SELECTED);
       context.screen.render();
       return;
     }
@@ -254,7 +250,7 @@ export function openBackroomsPrimerPicker(context: BackroomsWindowContext, theme
       return;
     }
     if (["up", "down", "j", "k", "pageup", "pagedown", "home", "end"].includes(key.name ?? "")) {
-      setTimeout(() => updatePreview((list as List & { selected: number }).selected ?? 0), 0);
+      deferRender(() => updatePreview((list as List & { selected: number }).selected ?? 0));
       return;
     }
     if (ch && /^[a-z]$/i.test(ch)) {
@@ -273,16 +269,13 @@ export function openBackroomsPrimerPicker(context: BackroomsWindowContext, theme
     selectedLabel: filteredEntries[(list as List & { selected: number }).selected ?? 0]?.label,
     contentPreview: preview.getContent().split("\n").slice(0, 8).join("\n")
   });
-  frame.focus = () => {
-    context.windowManager.focusWindow(frame);
-    list.focus();
-  };
-  frame.onRestyle = () => {
-    header.style = appTheme().header;
-    searchBox.style = appTheme().input;
-    safeSetStyle(list, { ...appTheme().body, selected: appTheme().selected });
-    safeSetStyle(preview, appTheme().body);
-  };
+  frame.setFocusTarget(list);
+  frame.onRestyle = createRestyleBundle([
+    [header, () => appTheme().header],
+    [searchBox, () => appTheme().input],
+    [list, () => ({ ...appTheme().body, selected: appTheme().selected })],
+    [preview, () => appTheme().body],
+  ]).restyle;
 
   context.windowManager.registerWindow(frame);
   renderList(0);
@@ -666,16 +659,13 @@ export function openBackroomsTvWindow(context: BackroomsWindowContext, channel: 
     transcriptLineCount: transcript.getContent().split("\n").filter(Boolean).length
   });
   frame.captureText = () => transcript.getContent();
-  frame.focus = () => {
-    context.windowManager.focusWindow(frame);
-    transcript.focus();
-  };
+  frame.setFocusTarget(transcript);
   frame.frame.key(["space", "n"], () => startBackrooms());
-  frame.onRestyle = () => {
-    header.style = appTheme().header;
-    safeSetStyle(transcript, appTheme().body);
-    footer.style = appTheme().footer;
-  };
+  frame.onRestyle = createRestyleBundle([
+    [header, () => appTheme().header],
+    [transcript, () => appTheme().body],
+    [footer, () => appTheme().footer],
+  ]).restyle;
   context.windowManager.registerWindow(frame);
   frame.focus();
   startBackrooms();

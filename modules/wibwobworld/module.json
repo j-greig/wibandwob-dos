@@ -5,7 +5,7 @@
   "type": "microapp",
   "entry": "index.ts",
   "microapp": {
-    "id": "wibwobworld",
+    "id": "wibwob.world",
     "title": "WibWobWorld",
     "description": "Seeded terrain world generator with water, vegetation, and contour overlays.",
     "persist": true,

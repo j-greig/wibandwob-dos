@@ -25,8 +25,7 @@ export type WindowKind =
   | "palette"
   | "inspector"
   | "monster-cam"
-  | "microapp"
-  | "markdown-viewer";
+  | "microapp";
 
 export interface EditorState {
   widget: Box;
@@ -69,6 +68,28 @@ export interface ChatMessageEntry {
   sender?: string;
 }
 
+/** A single tool invocation within a ToolRun. */
+export interface ToolCallEntry {
+  name: string;
+  args: string;
+  result?: string;
+  isError: boolean;
+  done: boolean;
+}
+
+/**
+ * A group of consecutive tool calls that belong to one agent turn.
+ * Used by the agent chat window to render collapsible tool blocks.
+ */
+export interface ToolRun {
+  id: string;
+  tools: ToolCallEntry[];
+  /** True while the run is still in progress (more tool calls expected). */
+  active: boolean;
+  /** Count of tools that returned errors. */
+  errorCount: number;
+}
+
 export interface WindowSnapshot {
   kind: WindowKind;
   title: string;
@@ -102,8 +123,7 @@ export type PersistableAppType =
   | "wibwob-agent"
   | "primer-viewer"
   | "reader-viewer"
-  | "pattern-animation"
-  | "markdown-viewer";
+  | "pattern-animation";
 
 /**
  * Window types that are transient — never saved to workspace files.
@@ -130,9 +150,8 @@ export type AppType = PersistableAppType | TransientAppType | (string & {});
  * Add entries HERE when a new generic factory produces a persistable appType.
  * Using these instead of template-literal casts gives real compile-time safety.
  */
-export const viewerAppType: Record<"primer" | "reader", PersistableAppType> = {
+export const viewerAppType: Record<"primer", PersistableAppType> = {
   primer: "primer-viewer",
-  reader: "reader-viewer",
 };
 
 export const animationAppType: Record<"pattern", PersistableAppType> = {
@@ -214,6 +233,8 @@ export interface WindowRecord {
   body: Box;
   close: () => void;
   focus: () => void;
+  /** Override the default body.focus() with a specific widget. Called once at window setup. */
+  setFocusTarget: (widget: Box) => void;
 
   // Chrome elements (set by WindowManager.createFrame)
   titleBar?: Box;
@@ -226,8 +247,10 @@ export interface WindowRecord {
   filePath?: string;
   isDirty?: boolean;
   lastSavedContent?: string;
+  /** If set, Ctrl-S calls this instead of writing to disk. */
+  onSave?: (content: string) => void;
 
-  // Finder-specific (set by content-windows.ts)
+  // Finder-specific (set by browser-windows.ts)
   finder?: FinderController;
 
   // Microapp-specific (set by module-loader.ts via MicroappHost)
@@ -315,6 +338,8 @@ export interface ResizeState {
 export interface MenuItem {
   label: string;
   action: () => void;
+  appTypes?: string[];
+  separator?: true;
 }
 
 export interface MenuConfig {

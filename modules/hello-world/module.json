@@ -5,7 +5,7 @@
   "type": "microapp",
   "entry": "index.ts",
   "microapp": {
-    "id": "example.hello-world",
+    "id": "wibwob.example.hello",
     "title": "Hello World",
     "description": "The simplest possible microapp. Opens a window with a figlet greeting.",
     "multiInstance": true,

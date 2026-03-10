@@ -1,7 +1,9 @@
 import blessed from "blessed";
 import fs from "node:fs";
+import { EMPTY_PRIMER_SELECTED } from "../../src/core/empty-states.js";
 
 import {
+  clamp,
   ContentService,
   createContourPlayer,
   createLazyMountedPlayer,
@@ -10,6 +12,7 @@ import {
   getTerrainFocusPoint,
   readNodeViewport,
   renderTerrainMap,
+  resolveSidebarWidth,
   terrainNames,
   type AnimatedPanelPlayer,
   type BrowserEntry,
@@ -38,9 +41,6 @@ const HELPER_TITLES: Record<HelperKind, string> = {
 
 const primerContent = new ContentService();
 
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
-}
 
 function clipText(value: string, width: number): string {
   if (width <= 0) {
@@ -158,7 +158,7 @@ function createPatchAnimationPlayer(host: MicroappHost): AnimatedPanelPlayer & {
 
 function readPrimerPreview(entry: BrowserEntry | undefined): string {
   if (!entry) {
-    return "No primer selected.";
+    return EMPTY_PRIMER_SELECTED;
   }
   try {
     const raw = fs.readFileSync(entry.filePath, "utf8");
@@ -499,7 +499,13 @@ export default function setup(host: MicroappHost) {
           const frameInset = 1;
           const titleHeight = 1;
           const statusHeight = 1;
-          const sidebarWidth = clamp(Math.floor(rect.width * 0.32), 24, 36);
+          const innerWidth = Math.max(0, rect.width - frameInset * 2);
+          const sidebarWidth = resolveSidebarWidth(
+            innerWidth,
+            { percent: 0.32, min: 24, max: 36 },
+            true,  // has divider
+            8,     // minimum content width
+          );
           const dividerWidth = 1;
           simplePreviewBox.hide();
           primerFrameBox.show();
@@ -543,7 +549,7 @@ export default function setup(host: MicroappHost) {
             left: frameInset + sidebarWidth + dividerWidth,
             width: Math.max(
               0,
-              rect.width - frameInset * 2 - sidebarWidth - dividerWidth,
+              innerWidth - sidebarWidth - dividerWidth,
             ),
             height: innerHeight,
           });

@@ -5,7 +5,7 @@
  * by command-registry.ts.
  */
 
-import type { MenuConfig, MenuItem } from "./types.js";
+import type { AppType, MenuConfig, MenuItem } from "./types.js";
 import type { CapabilityKey } from "../services/capability-service.js";
 
 /** Controller action contract consumed by the command registry and catalog projections. */
@@ -87,6 +87,9 @@ export interface AppMenuActions {
   focusWindowById: (args?: Record<string, unknown>) => void;
   moveWindowById: (args?: Record<string, unknown>) => void;
   resizeWindowById: (args?: Record<string, unknown>) => void;
+  // ── Canvas documents ───────────────────────────────────
+  loadCanvas: (args?: Record<string, unknown>) => void;
+  exportCanvas: (args?: Record<string, unknown>) => void;
   // ── Help ──────────────────────────────────────────────
   viewReadme: () => void;
 }
@@ -110,6 +113,9 @@ export interface MenuPlacement {
   category: AppCommandCategory;
   order: number;
   label?: string;
+  appTypes?: AppType[];
+  separatorAfter?: true;
+  favourite?: true;
 }
 
 /** Where a command appears in the command palette. Not executable on its own. */
@@ -199,7 +205,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
   },
   {
     id: "finder.open",
-    label: "Open File Manager",
+    label: "File Manager",
     description: "Open the file manager browser.",
     group: "browse",
     actionKey: "openFileManager",
@@ -318,7 +324,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
   },
   {
     id: "text.smear",
-    label: "Smear Text Surface",
+    label: "Smear Surface",
     description: "Run scripts/smear.py on a file-backed text surface. Args: filePath (string, optional; defaults to focused file-backed primer/reader/editor), mode (wipe|shear|glitch|stretch, default wipe), width (number, optional), at/tile/skew/seed/intensity (mode-specific options), openAs (primer|reader, optional). Returns {ok, filePath, windowId, sourcePath, kind, mode}.",
     group: "edit",
     actionKey: "smearTextSurface",
@@ -359,7 +365,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     description: "Toggle figlet/plain heading rendering in the focused markdown viewer.",
     group: "edit",
     actionKey: "toggleMarkdownFiglet",
-    contextMenu: { windowKinds: ["markdown-viewer"], order: 10 },
+    contextMenu: { windowKinds: ["reader"], order: 10 },
     palettePlacement: { order: 33 },
     api: true,
     agent: true
@@ -371,7 +377,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     group: "open",
     actionKey: "openEditor",
     multiInstance: true,
-    menuPlacements: [{ category: "file", order: 40 }],
+    menuPlacements: [{ category: "file", order: 40, appTypes: ["text-editor"] }],
     api: true,
     agent: true
   },
@@ -380,7 +386,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     label: "Save",
     group: "save",
     actionKey: "saveFocusedEditor",
-    menuPlacements: [{ category: "file", order: 50 }],
+    menuPlacements: [{ category: "file", order: 50, appTypes: ["text-editor"] }],
     palettePlacement: { order: 50 },
     contextMenu: { windowKinds: ["editor"], order: 10 }
   },
@@ -389,7 +395,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     label: "Save As...",
     group: "save",
     actionKey: "saveAsFocusedEditor",
-    menuPlacements: [{ category: "file", order: 60 }],
+    menuPlacements: [{ category: "file", order: 60, appTypes: ["text-editor"] }],
     palettePlacement: { order: 60 },
     contextMenu: { windowKinds: ["editor"], order: 20 }
   },
@@ -433,7 +439,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
   // ── Applications ─────────────────────────────────────
   {
     id: "chrome.open",
-    label: "Open Chrome Browser",
+    label: "Web Browser",
     description: "Open a Chrome browser window for web content extraction. Args: url (string, optional). Without args opens to default page.",
     group: "open",
     actionKey: "openChromeBrowser",
@@ -447,11 +453,11 @@ const APP_COMMANDS: AppCommandDefinition[] = [
   },
   {
     id: "agent.open",
-    label: "Open Wib&Wob Agent",
+    label: "Wib&Wob Agent",
     description: "Open (or focus) the native Wib&Wob Agent chat window.",
     group: "open",
     actionKey: "openWibWobAgent",
-    menuPlacements: [{ category: "applications", order: 120, label: "Wib&Wob Agent" }],
+    menuPlacements: [{ category: "applications", order: 120, label: "Wib&Wob Agent", favourite: true }],
     palettePlacement: { order: 130 },
     contextMenu: { desktop: true, order: 70 },
     api: true,
@@ -463,6 +469,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     description: "Re-read system prompt files from disk and hot-swap into the running agent session. No restart needed.",
     group: "system",
     actionKey: "reloadAgentPrompt",
+    menuPlacements: [{ category: "file", order: 190, appTypes: ["wibwob-agent"] }],
     api: true,
     agent: true
   },
@@ -599,7 +606,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
 
   {
     id: "backrooms.open",
-    label: "Backrooms TV...",
+    label: "Backrooms: Live TV",
     description: "Open Backrooms TV with an interactive channel picker.",
     group: "surface",
     actionKey: "openBackroomsPrompt",
@@ -610,22 +617,9 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     api: true,
     agent: true
   },
-
-  {
-    id: "backrooms.run",
-    label: "Open Backrooms TV (with args)",
-    group: "surface",
-    actionKey: "openBackroomsTv",
-    requires: ["path.backrooms.repo"],
-    description: "Open a Backrooms TV channel directly. Args: theme (string), model (haiku|sonnet|opus), turns (number), mode (auto|live|fake-live).",
-    multiInstance: true,
-    menuPlacements: [],
-    api: true,
-    agent: true
-  },
   {
     id: "backrooms_logs.open",
-    label: "Backrooms Log Browser",
+    label: "Backrooms: Log Browser",
     group: "surface",
     actionKey: "openBackroomsLogBrowser",
     description: "Browse and preview backrooms TV log files. Two-pane view with list and live preview.",
@@ -672,7 +666,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
   },
   {
     id: "primer_gallery.open",
-    label: "Open Gallery",
+    label: "Gallery",
     description: "Open the primer gallery with tabbed categories and preview.",
     group: "surface",
     actionKey: "openGallery",
@@ -683,7 +677,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
   },
   {
     id: "document.open",
-    label: "Document Reader",
+    label: "Reader",
     description: "Open a local file in the document reader. Args: filePath (string). Without args opens the default document.",
     group: "surface",
     actionKey: "openBrowserReader",
@@ -695,7 +689,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
   },
   {
     id: "art.open",
-    label: "Open Generative Art Demo",
+    label: "Generative Art",
     description: "Open an animated generative art window.",
     group: "surface",
     actionKey: "openArtWindow",
@@ -706,20 +700,20 @@ const APP_COMMANDS: AppCommandDefinition[] = [
 
   {
     id: "figlet.open",
-    label: "Open Figlet Banner",
+    label: "Figlet Banner",
     description: "Open a FIGlet banner. Args: text (string), font (string, optional). Without args opens interactive prompt.",
     group: "surface",
     actionKey: "openFigletBanner",
     requires: ["bin.figlet"],
     multiInstance: true,
     menuPlacements: [{ category: "applications", order: 70, label: "Figlet Banner" }],
-    palettePlacement: { order: 50, label: "Open Figlet Banner" },
+    palettePlacement: { order: 50, label: "Figlet Banner" },
     api: true,
     agent: true
   },
   {
     id: "pattern.open",
-    label: "Pattern Window",
+    label: "Plasma Patterns",
     description: "Open a pattern field window.",
     group: "surface",
     actionKey: "openPatternWindow",
@@ -730,7 +724,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
   },
   {
     id: "plasma.open",
-    label: "Plasma Screensaver",
+    label: "Plasma",
     description: "Open animated plasma colour-field screensaver. Args: mood (circuit|void|chaos|aurora|sunset|acid|deep-space|chrome), renderMode (plain|emoji|ansi).",
     group: "surface",
     actionKey: "openPlasmaWindow",
@@ -742,7 +736,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
   },
   {
     id: "plasma.from-primer",
-    label: "Plasma from Primer",
+    label: "Plasma: From Primer",
     description: "Open a plasma screensaver tuned to a primer file's mood. Args: filePath (string). Analyses the text and picks a matching plasma mood.",
     group: "surface",
     actionKey: "openPlasmaFromPrimer",
@@ -787,25 +781,25 @@ const APP_COMMANDS: AppCommandDefinition[] = [
   },
   {
     id: "microapp.wibwob.sy2chronicles.open",
-    label: "Open §y² Chronicles",
+    label: "§y² Chronicles",
     description: "Bridge command for the §y² Chronicles microapp dynamic opener.",
     group: "surface",
     actionKey: "openSy2Chronicles",
   },
   {
     id: "companion.open",
-    label: "Scramble (floating)",
+    label: "Scramble: Floating",
     description: "Open Scramble the cat as a full floating window.",
     group: "surface",
     actionKey: "openScrambleFloating",
-    menuPlacements: [{ category: "applications", order: 130 }],
+    menuPlacements: [{ category: "applications", order: 130, favourite: true }],
     palettePlacement: { order: 120 },
     api: true,
     agent: true
   },
   {
     id: "companion.smol",
-    label: "Scramble (popup)",
+    label: "Scramble: Popup",
     description: "Open Scramble as a smol popup anchored to the bottom-right corner.",
     group: "surface",
     actionKey: "openScrambleSmol",
@@ -901,7 +895,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
   },
   {
     id: "inspector.open",
-    label: "Open State Inspector",
+    label: "State Inspector",
     description: "Open the live desktop state inspector.",
     group: "inspect",
     actionKey: "openStateInspector",
@@ -930,10 +924,31 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     api: true,
     agent: true
   },
+  // ── Canvas documents ───────────────────────────────────
+  {
+    id: "canvas.load",
+    label: "Load Canvas",
+    description: "Load a .canvas.yaml document. Args: filePath (string, absolute path to .canvas.yaml file).",
+    group: "save",
+    actionKey: "loadCanvas",
+    palettePlacement: { order: 185 },
+    api: true,
+    agent: true
+  },
+  {
+    id: "canvas.export",
+    label: "Export Canvas",
+    description: "Export current desktop to a .canvas.yaml file. Args: filePath (string), title (string, optional).",
+    group: "save",
+    actionKey: "exportCanvas",
+    palettePlacement: { order: 186 },
+    api: true,
+    agent: true
+  },
   // ── Help ──────────────────────────────────────────────
   {
     id: "readme.open",
-    label: "View README",
+    label: "README",
     group: "surface",
     actionKey: "viewReadme",
     description: "Open the project README in a document reader window.",
@@ -976,18 +991,74 @@ export function createMenuConfigs(actions: AppMenuActions): MenuConfig[] {
     label: menu.label,
     key: menu.key,
     left: menu.left,
-    items: listAppCommands()
-      .flatMap((command) =>
-        command.menuPlacements
-          .filter((placement) => placement.category === menu.category)
-          .map((placement) => ({
-            order: placement.order,
-            label: placement.label ?? command.label,
-            action: actions[command.actionKey]
-          })),
-      )
-      .sort(byPlacementOrder)
-      .map(({ label, action }) => ({ label, action }))
+    items: (() => {
+      if (menu.category !== "applications") {
+        return listAppCommands()
+          .flatMap((command) =>
+            command.menuPlacements
+              .filter((placement) => placement.category === menu.category)
+              .map((placement) => ({
+                order: placement.order,
+                label: placement.label ?? command.label,
+                action: actions[command.actionKey],
+                appTypes: placement.appTypes,
+                separatorAfter: placement.separatorAfter,
+                favourite: placement.favourite
+              })),
+          )
+          .sort(byPlacementOrder)
+          .reduce((acc, item) => {
+            acc.push({
+              label: item.label,
+              action: item.action,
+              ...(item.appTypes ? { appTypes: item.appTypes } : {})
+            });
+            if (item.separatorAfter) {
+              acc.push({ label: "---separator---", action: () => {}, separator: true as const });
+            }
+            return acc;
+          }, [] as MenuItem[]);
+      }
+
+      const all = listAppCommands()
+        .flatMap((command) =>
+          command.menuPlacements
+            .filter((placement) => placement.category === "applications")
+            .map((placement) => ({
+              order: placement.order,
+              label: placement.label ?? command.label,
+              action: actions[command.actionKey],
+              appTypes: placement.appTypes,
+              favourite: placement.favourite
+            })),
+        );
+
+      const favourites = all.filter((item) => item.favourite).sort(byPlacementOrder);
+      const rest = all.filter((item) => !item.favourite).sort((a, b) => {
+        const stripOpen = (s: string): string => s.replace(/^open\s+/i, "").toLowerCase();
+        return stripOpen(a.label).localeCompare(stripOpen(b.label));
+      });
+
+      const result: MenuItem[] = favourites.map((item) => ({
+        label: item.label,
+        action: item.action,
+        ...(item.appTypes ? { appTypes: item.appTypes } : {})
+      }));
+
+      if (favourites.length > 0 && rest.length > 0) {
+        result.push({ label: "---separator---", action: () => {}, separator: true as const });
+      }
+
+      result.push(
+        ...rest.map((item) => ({
+          label: item.label,
+          action: item.action,
+          ...(item.appTypes ? { appTypes: item.appTypes } : {})
+        })),
+      );
+
+      return result;
+    })()
   }));
 }
 

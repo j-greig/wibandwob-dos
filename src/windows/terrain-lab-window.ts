@@ -18,6 +18,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { theme } from "../core/theme/resolver.js";
 import {
+  createRestyleBundle,
   createStack,
   createColumns,
   createNodePart,
@@ -31,7 +32,7 @@ import {
   readNodeViewport,
   terrainNames,
 } from "../services/contour-engine.js";
-import type { BaseWindowDeps } from "./misc-windows.js";
+import type { BaseWindowDeps } from "./generative-windows.js";
 
 const MODE_ORDER = ["chaos", "order", "hybrid"] as const;
 
@@ -145,11 +146,10 @@ export function openTerrainLabWindow(deps: BaseWindowDeps): void {
     player.destroy();
     root.destroy();
   };
-  frame.focus = () => {
-    deps.windowManager.focusWindow(frame);
-    contourBox.focus();
-  };
+  frame.setFocusTarget(contourBox);
+  const restyleBundle = createRestyleBundle([]);
   frame.onRestyle = () => {
+    restyleBundle.restyle();
     root.restyle();
   };
 

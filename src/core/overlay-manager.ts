@@ -10,6 +10,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { theme } from "./theme/resolver.js";
+import { EMPTY_FILE_SELECTED } from "./empty-states.js";
 import { createModal, createButtonBar, showToast, type ModalPosition } from "./modal.js";
 import type { Box, List, Textbox } from "./types.js";
 
@@ -626,7 +627,7 @@ export class OverlayManager {
 
     const buildPreview = (entry: BrowserPromptItem | undefined) => {
       if (!entry) {
-        preview.setContent("No file selected.");
+        preview.setContent(EMPTY_FILE_SELECTED);
         return;
       }
       if (entry.isDirectory) {

@@ -12,12 +12,12 @@
  */
 
 import fs from "node:fs";
-import { paintLines, bar, waveLine } from "../../src/core/grid-canvas.js";
+import { paintLines } from "../../src/services/microapp-sdk.js";
 import { renderFiglet } from "../../src/services/figlet-service.js";
 import { renderMarkdown, PLAIN_HEADING_CONFIG } from "../../src/services/markdown-service.js";
 import type { PanelDef } from "../../src/core/panel-layout.js";
 
-export type PanelType = "text" | "figlet" | "ascii-art" | "pixel" | "infographic" | "markdown" | "mixed" | "webcam";
+export type PanelType = "text" | "figlet" | "ascii-art" | "pixel" | "infographic" | "markdown" | "mixed" | "webcam" | "animated-text";
 
 /** Display prefix per panel type — glyph for dense view, label for readable view. */
 export const PANEL_TYPE_PREFIX: Record<PanelType, { glyph: string; label: string }> = {
@@ -29,6 +29,7 @@ export const PANEL_TYPE_PREFIX: Record<PanelType, { glyph: string; label: string
   "markdown":      { glyph: "≡",  label: "Doc" },
   "mixed":         { glyph: "⊕",  label: "Mixed" },
   "webcam":        { glyph: "◉",  label: "Cam" },
+  "animated-text": { glyph: "▶",  label: "Anim" },
 };
 
 /** Current prefix mode — change to "label" for readable names. */
@@ -62,6 +63,7 @@ export interface CEPanelDef {
   markdown?: string;                    // for "markdown" type
   content?: (tick: number, w: number, h: number) => string; // for "mixed"/"infographic"
   webcamMonster?: boolean; // for "webcam" — enable monster face overlays
+  frames?: string[];       // for "animated-text" — text frames cycled on tick
 }
 
 /**
@@ -94,7 +96,8 @@ export function renderPanel(def: CEPanelDef, w: number, h: number, tick: number)
     case "infographic": return renderInfographic(def, iw, ih, tick);
     case "markdown":    return renderMarkdownPanel(def, iw, ih);
     case "mixed":       return def.content?.(tick, iw, ih) ?? renderText(def, iw, ih);
-    case "webcam":      return `[webcam]\n${def.title}`;
+    case "webcam":        return `[webcam]\n${def.title}`;
+    case "animated-text": return renderAnimatedText(def, iw, ih, tick);
     default:            return renderText(def, iw, ih);
   }
 }
@@ -186,24 +189,33 @@ function renderPixel(def: CEPanelDef, iw: number, ih: number): string {
   return paintLines(iw, ih, clipped, { centerX: false, centerY: true });
 }
 
+/**
+ * Animated text: cycle through frames on tick.
+ * Frames come from def.frames[] (split by --- in YAML).
+ * Each frame is padded/clipped to fit the panel.
+ */
+function renderAnimatedText(def: CEPanelDef, iw: number, ih: number, tick: number): string {
+  const frames = def.frames;
+  if (!frames || frames.length === 0) return def.text ?? def.title;
+  const frameIdx = tick % frames.length;
+  const frame = frames[frameIdx]!;
+  const lines = frame.split("\n");
+  // Pad or clip to panel height, clip width
+  const out: string[] = [];
+  for (let i = 0; i < ih; i++) {
+    const line = lines[i] ?? "";
+    out.push(line.length > iw ? line.slice(0, iw) : line);
+  }
+  return out.join("\n");
+}
+
 function renderInfographic(def: CEPanelDef, iw: number, ih: number, tick: number): string {
-  // If def.content is provided, use it (live callback)
+  // Infographic panels must provide a content callback
   if (def.content) {
     return def.content(tick, iw, ih);
   }
-  
-  // Default infographic: simple bars + wave
-  const animOffset = def.live ? tick % 12 : 0;
-  const lines = [
-    def.title,
-    "",
-    bar("val1", 5 + animOffset % 6, 12, "50%"),
-    bar("val2", 8 + animOffset % 4, 12, "75%"),
-    bar("val3", 3 + animOffset % 8, 12, "30%"),
-    "",
-    waveLine(iw, tick, 0),
-  ];
-  return lines.slice(0, ih).join("\n");
+  // No callback — show title only. Use animated-text for frame-based animations.
+  return def.title;
 }
 
 /**

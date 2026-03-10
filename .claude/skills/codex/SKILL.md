@@ -1,6 +1,6 @@
 ---
 name: codex
-description: Delegate tasks to OpenAI Codex CLI as a subagent. Three modes — analysis (read-only debugging/review), implementation (file writes), and review (structured code review with artifact output). Use when stuck after 2+ fix attempts, need a second opinion, want multi-file debugging, root-cause analysis, cross-file refactors, or architecture review.
+description: Delegate tasks to OpenAI Codex CLI as a subagent. Two agents — codex-standard (gpt-5.3-codex, general-purpose) and codex-heavy (gpt-5.4, complex tasks). USAGE RESTRICTION — Codex budget is limited this month. Do NOT use proactively. Only use when the human explicitly requests Codex. Ask permission before delegating.
 ---
 
 # Codex — Unified Subagent Skill
@@ -19,8 +19,8 @@ Delegate to OpenAI Codex CLI. One skill, three modes.
 
 **Preferred: use the pi codex tool directly:**
 ```
-codex-analyst: "diagnose the crash in app/micropolis_ascii_view.cpp"
-codex-worker: "fix the timer cleanup in app/room_chat_view.cpp"
+codex-standard: "diagnose and fix the crash in app/micropolis_ascii_view.cpp"
+codex-heavy: "deep architectural refactor of the event system"
 ```
 
 **Or via scripts:**

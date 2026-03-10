@@ -109,6 +109,49 @@ printf '\033[?1000l\033[?1002l\033[?1003l\033[?1006l\033[?25h\033[0m\033[?1049l'
 bash scripts/start-alt-instance.sh
 ```
 
+## When to reload vs restart
+
+| Changed | Action |
+|---------|--------|
+| `modules/*/index.ts` or `module.json` | Reload: `POST /commands/run` with `modules.reload` |
+| `.pi/skills/*`, `scratch/*`, docs | No action needed — read at use time |
+| `src/core/*`, `src/services/*` | RESTART required (`bash scripts/restart.sh`) |
+| `src/windows/*` | RESTART required |
+| Theme files | RESTART required (theme loaded at startup) |
+| `package.json`, `tsconfig.json` | RESTART required |
+
+Rule of thumb: if it lives in `modules/`, reload. If it lives in `src/`, restart.
+
+## Subsystem Specs
+
+Four subsystem specs live in `.agents/specs/`. Read the relevant one before
+touching the files listed. Agents may edit specs directly — append findings,
+correct errors, update failure modes. They are living documents.
+
+### Pre-change triggers — read spec BEFORE touching these files
+
+| Files | Read spec |
+|-------|-----------|
+| `src/core/window-manager.ts`, `src/core/window-facade.ts`, `src/core/window-chrome.ts`, `src/core/types.ts` (WindowRecord/WindowKind), any `modules/*/index.ts` | `.agents/specs/window-system.md` |
+| `src/services/state-service.ts`, `src/services/control-api.ts`, `src/services/agent-tools.ts` | `.agents/specs/state-and-api.md` |
+| `src/services/workspace-service.ts`, workspace restore in `src/core/app-controller.ts` | `.agents/specs/workspace.md` |
+| `src/services/wibwob-agent-session.ts`, `src/services/scramble-brain.ts`, `src/windows/wibwob-agent-window.ts`, `src/windows/scramble-window.ts`, any `modules/*/` | `.agents/specs/agent-session.md` |
+
+### Post-change triggers — verify after touching these files
+
+| Files changed | Verify |
+|---------------|--------|
+| Window system | `bun run typecheck` · GET /state shows correct windows · close() removes from stack |
+| State / API | GET /state field names match · /health responds · tui_get_state returns real IDs |
+| Workspace | Save → restart → windows restore at correct positions with correct content |
+| Agent session / modules | Module loads without stderr errors · command appears in menu · no double-input |
+
+### Self-edit rule
+
+When you discover a failure mode, correction, or pattern not in a spec:
+edit it in. Use the `## Agent Notes` table for quick session findings,
+or edit the spec body directly if the finding is clearly correct.
+
 ## Control Loop
 
 API on `http://127.0.0.1:8099`. Full reference: `.agents/control-api.md`.
@@ -134,6 +177,25 @@ Smoke targets: menus, primer open, text file open, editor typing, window drag/cl
 ./scripts/screenshot-window.sh "Title"
 ./scripts/minimap.sh
 ```
+
+### Visual verification is mandatory
+
+API responses and `/state` JSON are NOT sufficient proof that a feature works.
+The human must be able to see the running TUI. Every test or demo workflow must:
+
+1. **Ensure the app is running in tmux** — if not, start it:
+   ```bash
+   tmux new-session -d -s wibwob -x 230 -y 62 'bun run start'
+   ```
+2. **Tell the human to attach** — after making visual changes, say:
+   ```
+   tmux attach -t wibwob
+   ```
+3. **Never skip this step.** API-only testing misses rendering bugs, layout
+   issues, visual regressions, and chrome problems that only show on screen.
+
+If the human is already attached (they told you so, or you're in an interactive
+session), skip the prompt. But when in doubt: remind them to look.
 
 ## Agent Tooling
 

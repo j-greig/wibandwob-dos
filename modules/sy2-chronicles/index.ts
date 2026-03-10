@@ -21,6 +21,21 @@ import blessed from "blessed";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
+import {
+  clamp,
+  createButtonBar,
+  createInlineSearch,
+  createTimer,
+  clearTimers,
+  blankGrid,
+  paintText,
+  paintCentered,
+  paintLines,
+  drawArrow,
+  gridToText,
+  waveLine,
+  bar,
+} from "../../src/services/microapp-sdk.js";
 import { renderContour } from "../../src/services/contour-engine.js";
 import { renderFiglet } from "../../src/services/figlet-service.js";
 import { MonsterCamService, type MonsterCamFrame } from "../../src/services/monster-cam-service.js";
@@ -34,18 +49,6 @@ import {
   type PanelDef,
   type PanelNode,
 } from "../../src/core/panel-layout.js";
-import {
-  blankGrid,
-  paintText,
-  paintCentered,
-  paintLines,
-  drawArrow,
-  gridToText,
-  waveLine,
-  bar,
-} from "../../src/core/grid-canvas.js";
-import { createTimer, clearTimers } from "../../src/core/ui-primitives.js";
-import { createButtonBar } from "../../src/core/ui-parts.js";
 import { type CEPanelDef, toPanelDef, renderPanel } from "./panel-types.js";
 import { loadPanelsFromDir, watchPanelDir } from "./content-loader.js";
 
@@ -62,9 +65,6 @@ function getCamService(): MonsterCamService {
   return camService;
 }
 
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
-}
 
 // ── ASCII DONUT ─────────────────────────────────────────────────────────────
 // Ported from C++ TVision generative_torus_view.cpp (a1k0n-inspired donut math)
@@ -2109,7 +2109,7 @@ export default function setup(host: MicroappHost) {
         w: n.def.w,
         h: n.def.h,
         live: n.def.live ?? false,
-        type: (PANEL_DEFS.find(p => p.id === id) as CEPanelDef)?.type ?? "mixed",
+        type: (getPanelDefs().find(p => p.id === id) as CEPanelDef)?.type ?? "mixed",
       })),
     }));
 
@@ -2339,50 +2339,28 @@ export default function setup(host: MicroappHost) {
       commandsRegistered = true;
     }
 
-    // / — open inline search prompt, filter panels by title, rebuild on submit
-    function openSearchPrompt() {
-      const overlay = blessed.box({
-        parent: win.body,
-        bottom: 1,
-        left: 0,
-        width: 40,
-        height: 3,
-        border: "line",
-        keys: true,
-        mouse: true,
-        style: { fg: host.theme().body.fg, bg: host.theme().body.bg, border: { fg: host.theme().highlight.fg } },
-        label: " / search panels  [enter=apply esc=cancel ctrl-u=clear] ",
-      });
-      const input = blessed.textbox({
-        parent: overlay,
-        top: 0,
-        left: 1,
-        right: 1,
-        height: 1,
-        keys: true,
-        mouse: true,
-        inputOnFocus: true,
-        style: host.theme().selected,
-      });
-      input.setValue(searchQuery);
-      host.screen.render();
-
-      // Ctrl-U clears query before submit
-      input.key(["C-u"], () => { input.clearValue(); host.screen.render(); });
-
-      // readInput is the blessed-correct way to use textbox — it sets the
-      // internal `done` callback that enter/escape call. Without it,
-      // escape crashes with "done is not a function".
-      input.readInput((err: any, value: string | null) => {
-        const cancelled = !value && value !== "";
-        overlay.destroy();
-        if (!cancelled) {
-          searchQuery = (value ?? "").trim();
-          buildPanels();
-        }
+    // / — inline search prompt via createInlineSearch (shared with zine, P06)
+    const inlineSearch = createInlineSearch({
+      parent: win.body,
+      initialValue: searchQuery,
+      onSubmit: (val) => {
+        searchQuery = val;
+        buildPanels();
         canvas.focus();
         host.screen.render();
-      });
+      },
+      onCancel: () => {
+        canvas.focus();
+        host.screen.render();
+      },
+      afterClose: () => {
+        host.screen.render();
+      },
+    });
+    function openSearchPrompt() {
+      inlineSearch.setValue(searchQuery);
+      inlineSearch.open();
+      host.screen.render();
     }
 
     // z — open a bird's-eye minimap of the chronicles canvas in a text window
@@ -2511,7 +2489,9 @@ export default function setup(host: MicroappHost) {
     id: "open",
     label: "Open §y² Chronicles",
     description: "Open a dense multi-panel visualization — §y² narrative + genealogy.",
-    menu: [{ category: "applications", order: 39, label: "§y² Chronicles" }],
+    // Retired from Applications menu — open via palette (Alt-P) or API
+    // Use Zine to browse sy2-chronicles.canvas.yaml instead
+    menu: [],
     palette: { order: 59, label: "Open §y² Chronicles" },
     action: (args) => {
       openChronicles(args as Record<string, unknown> | undefined);

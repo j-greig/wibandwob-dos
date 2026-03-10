@@ -115,6 +115,7 @@ export {
 // cleaner module-level imports. host.ui.createButtonBar(...) and
 // import { createButtonBar } from "microapp-sdk" are equivalent.
 export {
+  clamp,
   createStack,
   createColumns,
   createHeaderBar,
@@ -127,6 +128,14 @@ export {
   createAnimatedPanel,
   createButtonBar,
   createBorderedPanel,
+  createCollapsibleBlock,
+  createContentStack,
+  createSidebarPanel,
+  resolveSidebarWidth,
+  createSelectableList,
+  createInlineSearch,
+  createRestyleBundle,
+  deferRender,
 } from "../core/ui-parts.js";
 export type {
   InputLineProps,
@@ -135,6 +144,21 @@ export type {
   BorderedPanelHandle,
   BorderedPanelOpts,
   BorderStyle,
+  CollapsibleBlockProps,
+  CollapsibleBlockHandle,
+  ContentStackChild,
+  ContentStackHandle,
+  SidebarPanel,
+  SidebarPanelOptions,
+  SidebarWidth,
+  SidebarWidthFixed,
+  SidebarWidthPercent,
+  SelectableListOptions,
+  SelectableListHandle,
+  InlineSearchOptions,
+  InlineSearchHandle,
+  RestyleEntry,
+  RestyleBundleHandle,
 } from "../core/ui-parts.js";
 
 export { createRenderMonitor } from "../core/render-monitor.js";
@@ -143,18 +167,15 @@ export { MonsterCamService } from "./monster-cam-service.js";
 export type { MonsterCamFrame } from "./monster-cam-service.js";
 export { renderWebcamFrame, gridToBlessedContent } from "./webcam-renderer.js";
 export type { WebcamCell, WebcamRenderOptions } from "./webcam-renderer.js";
-export { landmarksFromPreset, POSE_PRESETS, renderSkeletonAt } from "../core/skeleton-renderer.js";
+export { landmarksFromPreset, POSE_PRESETS, POSE_CONNECTIONS, renderSkeletonAt } from "../core/skeleton-renderer.js";
 export type { NormalisedLandmarks } from "../core/skeleton-renderer.js";
 
 // Panel layout + grid canvas — primitives for magazine-layout microapps
-export { layoutPanels, pointerToContent, hitPanel, measureViewport, COL_GAP } from "../core/panel-layout.js";
-export type { PanelDef, PanelNode, LayoutResult } from "../core/panel-layout.js";
+export { layoutPanels, layoutColumns, pointerToContent, hitPanel, measureViewport, COL_GAP } from "../core/panel-layout.js";
+export type { PanelDef, PanelNode, LayoutResult, ColumnLayoutResult, ColumnLayoutOptions, ColumnHeader } from "../core/panel-layout.js";
+export type { ZineItem, ZineLayoutResult, ZineItemType, CanvasDocument, CanvasColumnDef } from "../core/canvas-types.js";
 export { blankGrid, paintText, paintCentered, paintLines, drawArrow, gridToText, waveLine, bar } from "../core/grid-canvas.js";
 export { createTimer, clearTimers } from "../core/ui-primitives.js";
-
-// Skeleton renderer — dance/pose system. Multiple skeletons on one canvas.
-export { renderSkeletonAt, landmarksFromPreset, POSE_CONNECTIONS } from "../core/skeleton-renderer.js";
-export type { NormalisedLandmarks } from "../core/skeleton-renderer.js";
 
 // Motion / tween — animate values, window position and size smoothly.
 export { tween, tweenWindowPosition, tweenWindowSize, EASINGS } from "./motion-service.js";

@@ -26,6 +26,11 @@ export type StackChild = {
 
 type Axis = "vertical" | "horizontal";
 
+/** Clamp n between lo and hi (inclusive). */
+export function clamp(n: number, lo: number, hi: number): number {
+  return Math.max(lo, Math.min(hi, n));
+}
+
 function clampSize(value: number): number {
   return Math.max(0, Math.floor(value));
 }
@@ -209,7 +214,7 @@ function createLinearLayout(
         remainingFr -= fr;
       }
 
-      const cappedExtent = Math.max(0, Math.min(extent, totalExtent - cursor));
+      const cappedExtent = clamp(extent, 0, totalExtent - cursor);
       const childRect =
         axis === "vertical"
           ? { top: cursor, left: 0, width: lastRect.width, height: cappedExtent }
@@ -857,4 +862,682 @@ export function createBorderedPanel(
       outer.destroy();
     },
   };
+}
+
+// ── Collapsible block ─────────────────────────────────────────────────────────
+
+/** @primitive */
+export interface CollapsibleBlockProps {
+  /** Single line shown when collapsed (blessed {tag} markup OK). */
+  summary: string;
+  /** Full content shown when expanded (blessed {tag} markup OK, may be multi-line). */
+  detail: string;
+  /** Optional badge always visible even when collapsed (e.g. "✗ 2 failed"). */
+  badge?: string;
+}
+
+/** @primitive */
+export type CollapsibleBlockHandle = UiPart<CollapsibleBlockProps> & {
+  toggle(): void;
+  setCollapsed(collapsed: boolean): void;
+  isCollapsed(): boolean;
+  /** Current content height in rows (1 when collapsed, N when expanded). */
+  contentHeight(): number;
+};
+
+/**
+ * A block that toggles between a one-line summary and full detail on click.
+ * Calls `onChange` when height changes so the parent layout can reflow.
+ *
+ * @primitive
+ */
+export function createCollapsibleBlock(
+  parent: blessed.Widgets.Node,
+  opts?: {
+    collapsed?: boolean;
+    onChange?: () => void;
+  },
+): CollapsibleBlockHandle {
+  let collapsed = opts?.collapsed ?? true;
+
+  const node = blessed.box({
+    parent,
+    top: 0,
+    left: 0,
+    width: 0,
+    height: 1,
+    tags: true,
+    mouse: true,
+    clickable: true,
+    style: theme().body,
+  });
+
+  let lastProps: CollapsibleBlockProps = { summary: "", detail: "" };
+  let lastWidth = 0;
+
+  const render = () => {
+    const chevron = collapsed ? "▸" : "▾";
+    if (collapsed) {
+      const badge = lastProps.badge ? `  ${lastProps.badge}` : "";
+      node.setContent(`${chevron}${lastProps.summary}${badge}`);
+      node.height = 1;
+    } else {
+      const badge = lastProps.badge ? `  ${lastProps.badge}` : "";
+      const header = `${chevron}${lastProps.summary}${badge}`;
+      const full = lastProps.detail ? `${header}\n${lastProps.detail}` : header;
+      node.setContent(full);
+      const lineCount = full.split("\n").length;
+      node.height = lineCount;
+    }
+  };
+
+  node.on("click", () => {
+    collapsed = !collapsed;
+    render();
+    opts?.onChange?.();
+  });
+
+  return {
+    node,
+    layout(rect) {
+      lastWidth = rect.width;
+      node.top = rect.top;
+      node.left = rect.left;
+      node.width = clampSize(rect.width);
+      render();
+    },
+    update(props) {
+      lastProps = props;
+      render();
+    },
+    restyle() {
+      safeSetStyle(node, theme().body);
+      render();
+    },
+    destroy() {
+      node.destroy();
+    },
+    toggle() {
+      collapsed = !collapsed;
+      render();
+      opts?.onChange?.();
+    },
+    setCollapsed(value: boolean) {
+      if (collapsed === value) return;
+      collapsed = value;
+      render();
+      opts?.onChange?.();
+    },
+    isCollapsed() {
+      return collapsed;
+    },
+    contentHeight() {
+      return Number(node.height) || 1;
+    },
+  };
+}
+
+// ── Content stack ─────────────────────────────────────────────────────────────
+
+/**
+ * A child in a content stack. Each child exposes a blessed node and a way to
+ * query its current height in rows. The stack positions children top-to-bottom
+ * inside a scrollable container.
+ *
+ * @primitive
+ */
+export interface ContentStackChild {
+  key: string;
+  node: blessed.Widgets.BoxElement;
+  contentHeight(): number;
+}
+
+/** @primitive */
+export interface ContentStackHandle {
+  /** The scrollable container node — use as parent in createStack or similar. */
+  node: blessed.Widgets.BoxElement;
+  /** Replace the child list and relayout. */
+  setChildren(children: ContentStackChild[]): void;
+  /** Append a child and relayout (avoids full rebuild on each new message). */
+  appendChild(child: ContentStackChild): void;
+  /** Recalculate all child positions. Call after any child height change. */
+  relayout(): void;
+  /** Scroll to the bottom of the content. */
+  scrollToBottom(): void;
+  /** Clean up. */
+  restyle(): void;
+  destroy(): void;
+}
+
+/**
+ * Manages variable-height children stacked vertically inside a scrollable
+ * blessed box. Children are positioned with manual `top` values that
+ * accumulate. Call `relayout()` whenever a child changes height.
+ *
+ * @primitive
+ */
+export function createContentStack(
+  parent: blessed.Widgets.Node,
+  stackOpts?: { style?: Record<string, any> },
+): ContentStackHandle {
+  const baseStyle = stackOpts?.style ?? theme().body;
+  const node = blessed.box({
+    parent,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    tags: true,
+    mouse: true,
+    keys: true,
+    scrollable: true,
+    alwaysScroll: true,
+    scrollbar: createScrollbar(),
+    style: scrollableStyle(baseStyle),
+  });
+
+  let children: ContentStackChild[] = [];
+
+  const relayout = () => {
+    let cursor = 0;
+    for (const child of children) {
+      child.node.top = cursor;
+      child.node.left = 0;
+      child.node.width = Math.max(1, Number(node.width) || 1);
+      const h = child.contentHeight();
+      child.node.height = h;
+      cursor += h;
+    }
+  };
+
+  return {
+    node,
+
+    setChildren(newChildren: ContentStackChild[]) {
+      // Detach old children that aren't in the new list
+      const newKeys = new Set(newChildren.map((c) => c.key));
+      for (const old of children) {
+        if (!newKeys.has(old.key)) {
+          old.node.detach();
+        }
+      }
+      // Attach new children that aren't already parented
+      for (const child of newChildren) {
+        if (child.node.parent !== node) {
+          node.append(child.node);
+        }
+      }
+      children = newChildren;
+      relayout();
+    },
+
+    appendChild(child: ContentStackChild) {
+      node.append(child.node);
+      children.push(child);
+      relayout();
+    },
+
+    relayout,
+
+    scrollToBottom() {
+      node.setScrollPerc(100);
+    },
+
+    restyle() {
+      safeSetStyle(node, scrollableStyle(stackOpts?.style ?? theme().body));
+    },
+
+    destroy() {
+      for (const child of children) {
+        child.node.destroy();
+      }
+      node.destroy();
+    },
+  };
+}
+
+// ── createSidebarPanel ────────────────────────────────────────────────────
+// Shared sidebar primitive for all sidebar-bearing windows (P01).
+// Handles width policy (fixed | percent with min/max), overflow guard,
+// optional divider, and open/close toggle.
+
+export type SidebarWidthFixed = { fixed: number };
+export type SidebarWidthPercent = { percent: number; min?: number; max?: number };
+export type SidebarWidth = SidebarWidthFixed | SidebarWidthPercent;
+
+export interface SidebarPanelOptions {
+  parent: blessed.Widgets.BoxElement;
+  side: "left" | "right";
+  width: SidebarWidth;
+  divider?: boolean;       // default true
+  open?: boolean;          // default true
+  mainMinWidth?: number;   // default 12, overflow guard
+  style?: {
+    sidebar?: blessed.Widgets.BoxOptions["style"];
+    main?: blessed.Widgets.BoxOptions["style"];
+    divider?: blessed.Widgets.BoxOptions["style"];
+  };
+}
+
+export interface SidebarPanel {
+  /** The main content area (opposite side from sidebar). */
+  main: blessed.Widgets.BoxElement;
+  /** The sidebar panel. */
+  sidebar: blessed.Widgets.BoxElement;
+  /** Optional 1-char divider between sidebar and main. */
+  divider?: blessed.Widgets.BoxElement;
+  toggle(): void;
+  setOpen(open: boolean): void;
+  isOpen(): boolean;
+  /** Re-apply layout to parent's current dimensions. Call from parent resize handler. */
+  layout(): void;
+  sidebarWidth(): number;
+  mainWidth(): number;
+}
+
+/**
+ * Resolve sidebar pixel width given total available columns.
+ * Applies overflow guard: if sidebar + divider + mainMinWidth > total,
+ * shrink sidebar so main has at least mainMinWidth columns.
+ */
+export function resolveSidebarWidth(
+  total: number,
+  widthPolicy: SidebarWidth,
+  hasDivider: boolean,
+  mainMinWidth: number,
+): number {
+  let raw: number;
+  if ("fixed" in widthPolicy) {
+    raw = widthPolicy.fixed;
+  } else {
+    const pct = widthPolicy.percent;
+    const computed = Math.floor(total * pct);
+    const lo = widthPolicy.min ?? 0;
+    const hi = widthPolicy.max ?? Infinity;
+    raw = clamp(computed, lo, hi);
+  }
+  const dividerCost = hasDivider ? 1 : 0;
+  const maxAllowed = Math.max(0, total - dividerCost - mainMinWidth);
+  return Math.min(raw, maxAllowed);
+}
+
+export function createSidebarPanel(opts: SidebarPanelOptions): SidebarPanel {
+  const {
+    parent,
+    side,
+    width: widthPolicy,
+    divider: hasDivider = true,
+    open: initialOpen = true,
+    mainMinWidth = 12,
+    style = {},
+  } = opts;
+
+  let isOpenState = initialOpen;
+
+  const sidebar = blessed.box({
+    parent,
+    top: 0,
+    left: side === "left" ? 0 : undefined,
+    right: side === "right" ? 0 : undefined,
+    width: 1,
+    height: "100%",
+    hidden: !isOpenState,
+    style: style.sidebar ?? theme().body,
+  });
+
+  const dividerNode = hasDivider
+    ? blessed.box({
+        parent,
+        top: 0,
+        left: 0,
+        width: 1,
+        height: "100%",
+        hidden: !isOpenState,
+        content: Array(100).fill("│").join("\n"),
+        style: style.divider ?? theme().body,
+      })
+    : undefined;
+
+  const main = blessed.box({
+    parent,
+    top: 0,
+    left: 0,
+    width: 1,
+    height: "100%",
+    style: style.main ?? theme().body,
+  });
+
+  function currentTotal(): number {
+    return Math.max(1, Number(parent.width) || 80);
+  }
+
+  function computeWidths(): { sw: number; dw: number; mw: number; mLeft: number; dLeft: number } {
+    const total = currentTotal();
+    if (!isOpenState) {
+      return { sw: 0, dw: 0, mw: total, mLeft: 0, dLeft: 0 };
+    }
+    const sw = resolveSidebarWidth(total, widthPolicy, hasDivider, mainMinWidth);
+    const dw = hasDivider ? 1 : 0;
+    const mw = Math.max(0, total - sw - dw);
+    const mLeft = side === "left" ? sw + dw : 0;
+    const dLeft = side === "left" ? sw : mw;
+    return { sw, dw, mw, mLeft, dLeft };
+  }
+
+  function applyLayout() {
+    const { sw, mw, mLeft, dLeft } = computeWidths();
+
+    if (isOpenState) {
+      sidebar.show();
+      sidebar.width = sw as any;
+      sidebar.height = "100%" as any;
+      if (side === "left") {
+        sidebar.left = 0 as any;
+        (sidebar as any).right = undefined;
+      } else {
+        sidebar.left = mw as any;
+        (sidebar as any).right = undefined;
+      }
+      if (dividerNode) {
+        dividerNode.show();
+        dividerNode.left = dLeft as any;
+        dividerNode.width = 1 as any;
+        dividerNode.height = "100%" as any;
+      }
+    } else {
+      sidebar.hide();
+      if (dividerNode) dividerNode.hide();
+    }
+
+    main.left = mLeft as any;
+    main.width = mw as any;
+    main.height = "100%" as any;
+  }
+
+  applyLayout();
+
+  return {
+    main,
+    sidebar,
+    divider: dividerNode,
+
+    toggle() {
+      isOpenState = !isOpenState;
+      applyLayout();
+    },
+
+    setOpen(open: boolean) {
+      if (isOpenState !== open) {
+        isOpenState = open;
+        applyLayout();
+      }
+    },
+
+    isOpen() {
+      return isOpenState;
+    },
+
+    layout() {
+      applyLayout();
+    },
+
+    sidebarWidth() {
+      const { sw } = computeWidths();
+      return sw;
+    },
+
+    mainWidth() {
+      const { mw } = computeWidths();
+      return mw;
+    },
+  };
+}
+
+// ── createSelectableList ──────────────────────────────────────────────────
+// Shared selectable list primitive (P04).
+// Wraps blessed.list with canonical keys/vi/mouse/scrollbar defaults baked in.
+
+export interface SelectableListOptions {
+  parent: blessed.Widgets.BoxElement;
+  top?: number | string;
+  left?: number | string;
+  right?: number | string;
+  bottom?: number | string;
+  width?: number | string;
+  height?: number | string;
+  items?: string[];
+  style?: blessed.Widgets.BoxOptions["style"];
+}
+
+export interface SelectableListHandle {
+  node: blessed.Widgets.ListElement;
+  setItems(items: string[]): void;
+  selected(): number;
+  select(index: number): void;
+  onSelect(fn: (index: number, item: string) => void): void;
+  onSelectItem(fn: () => void): void;
+  focus(): void;
+}
+
+export function createSelectableList(opts: SelectableListOptions): SelectableListHandle {
+  const {
+    parent,
+    top = 0,
+    left = 0,
+    right,
+    bottom,
+    width,
+    height,
+    items = [],
+    style,
+  } = opts;
+
+  const listStyle = style ?? { ...theme().body, selected: theme().selected };
+
+  const node = blessed.list({
+    parent,
+    top,
+    left,
+    ...(right !== undefined ? { right } : {}),
+    ...(bottom !== undefined ? { bottom } : {}),
+    ...(width !== undefined ? { width } : {}),
+    ...(height !== undefined ? { height } : {}),
+    keys: true,
+    vi: true,
+    mouse: true,
+    scrollable: true,
+    alwaysScroll: true,
+    scrollbar: createScrollbar(),
+    items,
+    style: listStyle,
+  } as blessed.Widgets.ListOptions<blessed.Widgets.BoxOptions["style"]>);
+
+  return {
+    node,
+
+    setItems(newItems: string[]) {
+      (node as any).setItems(newItems);
+    },
+
+    selected() {
+      return (node as any).selected ?? 0;
+    },
+
+    select(index: number) {
+      node.select(index);
+    },
+
+    onSelect(fn: (index: number, item: string) => void) {
+      node.on("select", (_item: blessed.Widgets.BlessedElement, index: number) => fn(index, items[index] ?? ""));
+    },
+
+    onSelectItem(fn: () => void) {
+      node.on("select item", fn);
+    },
+
+    focus() {
+      node.focus();
+    },
+  };
+}
+
+// ── createInlineSearch ────────────────────────────────────────────────────
+// Bottom-anchored inline search overlay (P06).
+// Shared by zine and sy2-chronicles (and any future module with in-canvas search).
+
+export interface InlineSearchOptions {
+  parent: blessed.Widgets.BoxElement;
+  placeholder?: string;
+  initialValue?: string;
+  onSubmit: (value: string) => void;
+  onCancel: () => void;
+  afterClose?: () => void;
+  /** Bottom inset from parent bottom edge (default 1). */
+  bottom?: number;
+}
+
+export interface InlineSearchHandle {
+  /** Mount the search bar (creates blessed nodes). Idempotent — no-ops if already open. */
+  open(): void;
+  /** Tear down the search bar. Idempotent — no-ops if already closed. */
+  close(): void;
+  isOpen(): boolean;
+  setValue(value: string): void;
+}
+
+export function createInlineSearch(opts: InlineSearchOptions): InlineSearchHandle {
+  const {
+    parent,
+    placeholder = "search…",
+    initialValue = "",
+    onSubmit,
+    onCancel,
+    afterClose,
+    bottom = 1,
+  } = opts;
+
+  let isOpenState = false;
+  let bar: blessed.Widgets.BoxElement | undefined;
+  let inputNode: blessed.Widgets.TextboxElement | undefined;
+
+  function mount() {
+    const CLOSE_W = 5; // " [×] "
+    const bg = theme().selected.bg ?? "blue";
+    const fg = theme().body.fg ?? "white";
+    const hfg = theme().highlight.fg ?? "yellow";
+
+    bar = blessed.box({
+      parent,
+      bottom,
+      left: 0,
+      right: 0,
+      height: 1,
+      style: { fg, bg },
+    });
+
+    inputNode = blessed.textbox({
+      parent: bar,
+      top: 0,
+      left: 0,
+      right: CLOSE_W,
+      height: 1,
+      inputOnFocus: true,
+      style: { fg, bg },
+    }) as blessed.Widgets.TextboxElement;
+
+    const closeBtn = blessed.box({
+      parent: bar,
+      top: 0,
+      right: 0,
+      width: CLOSE_W,
+      height: 1,
+      content: " [×] ",
+      mouse: true,
+      clickable: true,
+      style: { fg: hfg, bg },
+    });
+
+    if (initialValue) (inputNode as any).setValue(initialValue);
+
+    closeBtn.on("click", () => handle.close());
+    inputNode.key(["escape"], () => { onCancel(); handle.close(); });
+    inputNode.key(["enter"], () => {
+      const val = ((inputNode as any).value ?? "").trim();
+      onSubmit(val);
+      handle.close();
+    });
+    inputNode.key(["C-u"], () => { (inputNode as any).clearValue(); });
+
+    inputNode.focus();
+  }
+
+  function unmount() {
+    bar?.destroy();
+    bar = undefined;
+    inputNode = undefined;
+    afterClose?.();
+  }
+
+  const handle: InlineSearchHandle = {
+    open() {
+      if (isOpenState) return;
+      isOpenState = true;
+      mount();
+    },
+
+    close() {
+      if (!isOpenState) return;
+      isOpenState = false;
+      unmount();
+    },
+
+    isOpen() {
+      return isOpenState;
+    },
+
+    setValue(value: string) {
+      if (inputNode) (inputNode as any).setValue(value);
+    },
+  };
+
+  return handle;
+}
+
+// ── createRestyleBundle ───────────────────────────────────────────────────
+// Declarative restyle coverage for windows (P03).
+// Replaces 24 hand-rolled frame.onRestyle blocks with a single declaration.
+
+/** A widget + style-getter pair. The getter is called at restyle time so it always uses current theme. */
+export type RestyleEntry = [
+  widget: blessed.Widgets.BlessedElement,
+  styleGetter: () => Record<string, any>,
+];
+
+export interface RestyleBundleHandle {
+  /** Call this as frame.onRestyle = bundle.restyle (or bundle.restyle()). */
+  restyle: () => void;
+  /** Add an additional entry after creation. */
+  add(entry: RestyleEntry): void;
+}
+
+export function createRestyleBundle(entries: RestyleEntry[]): RestyleBundleHandle {
+  const list: RestyleEntry[] = [...entries];
+  return {
+    restyle() {
+      for (const [widget, getStyle] of list) {
+        safeSetStyle(widget, getStyle());
+      }
+    },
+    add(entry: RestyleEntry) {
+      list.push(entry);
+    },
+  };
+}
+
+/**
+ * deferRender — schedule fn after the current paint cycle completes (P-S25).
+ * Replaces scattered setTimeout(fn, 0) defers so intent is explicit.
+ */
+export function deferRender(fn: () => void): void {
+  setTimeout(fn, 0);
 }

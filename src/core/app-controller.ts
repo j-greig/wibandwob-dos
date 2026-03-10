@@ -50,6 +50,7 @@ import {
   type WorkspaceRestoreActions,
 } from "./workspace-snapshots.js";
 import { isPersistable } from "./snapshot-registry.js";
+import { loadCanvasFile, restoreCanvas, exportCanvasDocument } from "../services/canvas-document.js";
 import type {
   AppType,
   BackroomsChannel,
@@ -109,7 +110,7 @@ import {
   openPrimerBrowserWindow as openPrimerBrowserListWindow,
   openPrimerGalleryWindow as openPrimerGalleryListWindow,
   openTextViewerWindow as openContentViewerWindow,
-} from "../windows/content-windows.js";
+} from "../windows/browser-windows.js";
 import {
   openBrowserReaderWindow as openBrowserReaderContentWindow,
   openFigletFontPicker as openFigletFontPickerWindow,
@@ -122,7 +123,7 @@ import {
   openPatternWindow as openPatternAnimationWindow,
   openStateInspectorWindow as openInspectorWindow,
   openWorkspaceManagerWindow as openWorkspaceCommandWindow,
-} from "../windows/misc-windows.js";
+} from "../windows/generative-windows.js";
 import {
   openScrambleFloatingWindow,
   openScrambleSmolPopup,
@@ -144,7 +145,6 @@ import { openChromeBrowserWindow } from "../windows/chrome-browser-window.js";
 import { openWibWobAgentWindow as openNativeWibWobAgentWindow } from "../windows/wibwob-agent-window.js";
 import { CustomCursor } from "./custom-cursor.js";
 import { openMonsterCamWindow } from "../windows/monster-cam-window.js";
-import { openMarkdownViewerWindow } from "../windows/markdown-viewer-window.js";
 import { worldChatService } from "../services/world-chat-service.js";
 
 /** Exit code used by dev-mode reload. The launcher script watches for this. */
@@ -279,6 +279,7 @@ export class TsTuiMvpApp {
       this.menus,
       () => this.windowManager.restoreWindowFocus(),
       () => this.syncLiveState(),
+      () => this.windowManager.getFocusedWindow()?.describeState?.()?.appType as string | undefined,
     );
     this.editor = new EditorCoordinator({
       windowManager: this.windowManager,
@@ -1105,16 +1106,9 @@ export class TsTuiMvpApp {
     );
   }
 
-  private openMarkdownViewerWindow(filePath?: string, restore?: { scrollOffset?: number; figlet?: boolean }): WindowRecord | undefined {
+  private openMarkdownViewerWindow(filePath?: string, restore?: { scrollOffset?: number; figlet?: boolean; viewMode?: "edit" | "view" }): WindowRecord | undefined {
     if (filePath) {
-      return openMarkdownViewerWindow({
-        windowManager: this.windowManager,
-        overlays: this.overlays,
-        screen: this.screen,
-        filePath,
-        restore,
-        onStateChanged: () => this.syncLiveState(),
-      });
+      return this.editor.openWindow(filePath, undefined, undefined, restore);
     }
     // No path — pick from repo .md files via recursive fs walk
     const mdList = collectMarkdownFiles(REPO_ROOT);
@@ -1127,13 +1121,7 @@ export class TsTuiMvpApp {
       mdList.map(fp => ({ label: fp.replace(REPO_ROOT + "/", ""), filePath: fp })),
       0,
       (item) => {
-        openMarkdownViewerWindow({
-          windowManager: this.windowManager,
-          overlays: this.overlays,
-          screen: this.screen,
-          filePath: item.filePath,
-          onStateChanged: () => this.syncLiveState(),
-        });
+        this.editor.openWindow(item.filePath);
       }
     );
     return undefined;
@@ -1182,6 +1170,7 @@ export class TsTuiMvpApp {
         {
           screen: this.screen,
           windowManager: this.windowManager,
+          overlays: this.overlays,
           onStateChanged: () => this.syncLiveState(),
         },
         restore,
@@ -1492,9 +1481,6 @@ export class TsTuiMvpApp {
       openArtWindow: () => this.openArtWindow(),
       openMonsterCamWindow: () => this.openMonsterCam(),
       openWibWobAgentWindow: () => this.openWibWobAgentWindow(),
-      openMarkdownViewerWindow: (filePath, restore) => {
-        return this.openMarkdownViewerWindow(filePath, restore) ?? undefined;
-      },
       windows: this.windowManager,
     };
   }
@@ -1802,7 +1788,9 @@ export class TsTuiMvpApp {
             typeof args?.title === "string" ? args.title : undefined;
           const initial =
             typeof args?.initial === "string" ? args.initial : undefined;
-          this.editor.openWindow(undefined, title, initial);
+          const onSave = typeof args?.onSave === "function" ? args.onSave as (content: string) => void : undefined;
+          const win = this.editor.openWindow(undefined, title, initial);
+          if (win && onSave) win.onSave = onSave;
         } else {
           // Path C: interactive file picker
           this.editor.openPicker();
@@ -1845,10 +1833,10 @@ export class TsTuiMvpApp {
       },
       toggleMarkdownFiglet: () => {
         const focused = this.windowManager.getFocusedWindow();
-        if (focused?.kind === "markdown-viewer") {
+        if (focused?.kind === "editor" && focused.filePath) {
           focused.writeInput?.("h");
         } else {
-          this.overlays.flash("No markdown viewer focused");
+          this.overlays.flash("No markdown file focused");
         }
       },
       openWibWobAgent: () => this.openWibWobAgentWindow(),
@@ -2098,6 +2086,41 @@ export class TsTuiMvpApp {
       },
       // ── Monster Cam ─────────────────────────────────────
       openMonsterCam: () => this.openMonsterCam(),
+      // ── Canvas documents ─────────────────────────────────
+      loadCanvas: (args) => {
+        const filePath = typeof args?.filePath === "string" ? args.filePath : "";
+        if (!filePath) {
+          this.overlays.flash("canvas.load requires filePath arg");
+          return;
+        }
+        try {
+          const doc = loadCanvasFile(filePath);
+          const result = restoreCanvas(doc, this.getRestoreActions());
+          this.overlays.flash(`Canvas loaded: ${result.loaded} windows (${result.skipped} skipped)`);
+          if (result.errors.length > 0) {
+            for (const err of result.errors) log.app(err);
+          }
+        } catch (e) {
+          this.overlays.flash(`Canvas load failed: ${e}`);
+        }
+      },
+      exportCanvas: (args) => {
+        const filePath = typeof args?.filePath === "string" ? args.filePath : "";
+        if (!filePath) {
+          this.overlays.flash("canvas.export requires filePath arg");
+          return;
+        }
+        const title = typeof args?.title === "string" ? args.title : "Untitled Canvas";
+        try {
+          const windows = this.windowManager.getWindows();
+          const yaml = exportCanvasDocument(windows, this.windowManager, title);
+          fs.mkdirSync(path.dirname(filePath), { recursive: true });
+          fs.writeFileSync(filePath, yaml, "utf8");
+          this.overlays.flash(`Canvas exported: ${filePath}`);
+        } catch (e) {
+          this.overlays.flash(`Canvas export failed: ${e}`);
+        }
+      },
       // ── Help ────────────────────────────────────────────
       viewReadme: () => this.openBrowserReaderWindow(README_PATH),
     };

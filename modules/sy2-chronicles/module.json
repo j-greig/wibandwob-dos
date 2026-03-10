@@ -1,13 +1,13 @@
 {
   "id": "wibwob.sy2chronicles",
-  "name": "§y² Chronicles v2",
+  "name": "\u00a7y\u00b2 Chronicles v2",
   "version": "2.0.0",
-  "description": "Dense panel visualization — §y² narrative + genealogy + Calculating Empires data",
+  "description": "Dense panel visualization \u2014 \u00a7y\u00b2 narrative + genealogy + Calculating Empires data",
   "main": "index.ts",
   "commands": [
     {
       "id": "microapp.wibwob.sy2chronicles.open",
-      "label": "Open §y² Chronicles",
+      "label": "Open \u00a7y\u00b2 Chronicles",
       "category": "Microapps"
     }
   ],
@@ -15,15 +15,18 @@
   "entry": "index.ts",
   "microapp": {
     "id": "wibwob.sy2chronicles",
-    "title": "§y² Chronicles v2",
-    "description": "Dense panel visualization — §y² narrative + genealogy + Calculating Empires data",
+    "title": "\u00a7y\u00b2 Chronicles v2",
+    "description": "Dense panel visualization \u2014 \u00a7y\u00b2 narrative + genealogy + Calculating Empires data",
     "persist": true,
     "multiInstance": true,
-    "menu": [
-      { "category": "applications", "order": 39, "label": "§y² Chronicles" }
+    "menu": [],
+    "palette": {
+      "order": 59,
+      "label": "Open \u00a7y\u00b2 Chronicles"
+    },
+    "paletteAliases": [
+      "Calculating Empires"
     ],
-    "palette": { "order": 59, "label": "Open §y² Chronicles" },
-    "paletteAliases": ["Calculating Empires"],
     "agent": true,
     "api": true
   }

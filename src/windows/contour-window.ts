@@ -7,12 +7,12 @@ import {
   createColumns,
   createHeaderBar,
   createNodePart,
+  createRestyleBundle,
   createRule,
   createStack,
   createStatusBar,
   type UiPart,
 } from "../core/ui-parts.js";
-import { safeSetStyle } from "../core/ui-primitives.js";
 import {
   createContourPlayer,
   readNodeViewport,
@@ -20,7 +20,7 @@ import {
   type ContourMode,
   type ContourPlayer,
 } from "../services/contour-engine.js";
-import type { BaseWindowDeps } from "./misc-windows.js";
+import type { BaseWindowDeps } from "./generative-windows.js";
 
 const MODE_ORDER: readonly ContourMode[] = ["chaos", "order", "hybrid"];
 const PANEL_COUNT = 3;
@@ -374,16 +374,18 @@ export function openContourWindow(deps: BaseWindowDeps): void {
     destroyTriptych();
   };
   frame.focus = () => {
-    deps.windowManager.focusWindow(frame);
     if (viewMode === "triptych") {
       triptych?.panelBoxes[0]?.focus();
       return;
     }
     canvas.focus();
   };
+  const restyleBundle = createRestyleBundle([
+    [canvas, () => theme().body],
+    [status, () => theme().header],
+  ]);
   frame.onRestyle = () => {
-    safeSetStyle(canvas, theme().body);
-    status.style = theme().header;
+    restyleBundle.restyle();
     triptych?.root.restyle();
   };
   frame.refresh = doLayout;

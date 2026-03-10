@@ -1,5 +1,9 @@
 # Invariants, Anti-Patterns & Integration Rules
 
+> Deeper failure-mode coverage per subsystem in `.agents/specs/` —
+> window-system.md · state-and-api.md · workspace.md · agent-session.md
+
+
 WibWob-DOS is designed for equal human/agent control. The invariants below exist to enforce that — if an agent cannot reach a surface, discover a command, or read meaningful state, that is a bug not a limitation.
 
 ## Architecture Invariants

@@ -15,6 +15,7 @@ import path from "node:path";
 import { theme } from "../core/theme/resolver.js";
 import {
   applyRect,
+  createRestyleBundle,
   createStack,
   createColumns,
   createNodePart,
@@ -30,7 +31,7 @@ import {
   type PlasmaModifiers,
   type PlasmaRenderMode,
 } from "../services/plasma-engine.js";
-import type { BaseWindowDeps } from "./misc-windows.js";
+import type { BaseWindowDeps } from "./generative-windows.js";
 
 export interface PlasmaWindowOptions {
   mood?: string;
@@ -231,11 +232,10 @@ export function openPlasmaWindow(
     player.destroy();
     root.destroy();
   };
-  frame.focus = () => {
-    deps.windowManager.focusWindow(frame);
-    canvas.focus();
-  };
+  frame.setFocusTarget(canvas);
+  const restyleBundle = createRestyleBundle([]);
   frame.onRestyle = () => {
+    restyleBundle.restyle();
     root.restyle();
   };
 
