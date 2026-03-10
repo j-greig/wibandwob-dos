@@ -1090,3 +1090,200 @@ export function createContentStack(
     },
   };
 }
+
+// ── createSidebarPanel ────────────────────────────────────────────────────
+// Shared sidebar primitive for all sidebar-bearing windows (P01).
+// Handles width policy (fixed | percent with min/max), overflow guard,
+// optional divider, and open/close toggle.
+
+export type SidebarWidthFixed = { fixed: number };
+export type SidebarWidthPercent = { percent: number; min?: number; max?: number };
+export type SidebarWidth = SidebarWidthFixed | SidebarWidthPercent;
+
+export interface SidebarPanelOptions {
+  parent: blessed.Widgets.BoxElement;
+  side: "left" | "right";
+  width: SidebarWidth;
+  divider?: boolean;       // default true
+  open?: boolean;          // default true
+  mainMinWidth?: number;   // default 12, overflow guard
+  style?: {
+    sidebar?: blessed.Widgets.BoxOptions["style"];
+    main?: blessed.Widgets.BoxOptions["style"];
+    divider?: blessed.Widgets.BoxOptions["style"];
+  };
+}
+
+export interface SidebarPanel {
+  /** The main content area (opposite side from sidebar). */
+  main: blessed.Widgets.BoxElement;
+  /** The sidebar panel. */
+  sidebar: blessed.Widgets.BoxElement;
+  /** Optional 1-char divider between sidebar and main. */
+  divider?: blessed.Widgets.BoxElement;
+  toggle(): void;
+  setOpen(open: boolean): void;
+  isOpen(): boolean;
+  /** Re-apply layout to parent's current dimensions. Call from parent resize handler. */
+  layout(): void;
+  sidebarWidth(): number;
+  mainWidth(): number;
+}
+
+/**
+ * Resolve sidebar pixel width given total available columns.
+ * Applies overflow guard: if sidebar + divider + mainMinWidth > total,
+ * shrink sidebar so main has at least mainMinWidth columns.
+ */
+export function resolveSidebarWidth(
+  total: number,
+  widthPolicy: SidebarWidth,
+  hasDivider: boolean,
+  mainMinWidth: number,
+): number {
+  let raw: number;
+  if ("fixed" in widthPolicy) {
+    raw = widthPolicy.fixed;
+  } else {
+    const pct = widthPolicy.percent;
+    const computed = Math.floor(total * pct);
+    const lo = widthPolicy.min ?? 0;
+    const hi = widthPolicy.max ?? Infinity;
+    raw = Math.max(lo, Math.min(hi, computed));
+  }
+  const dividerCost = hasDivider ? 1 : 0;
+  const maxAllowed = Math.max(0, total - dividerCost - mainMinWidth);
+  return Math.min(raw, maxAllowed);
+}
+
+export function createSidebarPanel(opts: SidebarPanelOptions): SidebarPanel {
+  const {
+    parent,
+    side,
+    width: widthPolicy,
+    divider: hasDivider = true,
+    open: initialOpen = true,
+    mainMinWidth = 12,
+    style = {},
+  } = opts;
+
+  let isOpenState = initialOpen;
+
+  const sidebar = blessed.box({
+    parent,
+    top: 0,
+    left: side === "left" ? 0 : undefined,
+    right: side === "right" ? 0 : undefined,
+    width: 1,
+    height: "100%",
+    hidden: !isOpenState,
+    style: style.sidebar ?? theme().body,
+  });
+
+  const dividerNode = hasDivider
+    ? blessed.box({
+        parent,
+        top: 0,
+        left: 0,
+        width: 1,
+        height: "100%",
+        hidden: !isOpenState,
+        content: Array(100).fill("│").join("\n"),
+        style: style.divider ?? theme().body,
+      })
+    : undefined;
+
+  const main = blessed.box({
+    parent,
+    top: 0,
+    left: 0,
+    width: 1,
+    height: "100%",
+    style: style.main ?? theme().body,
+  });
+
+  function currentTotal(): number {
+    return Math.max(1, Number(parent.width) || 80);
+  }
+
+  function computeWidths(): { sw: number; dw: number; mw: number; mLeft: number; dLeft: number } {
+    const total = currentTotal();
+    if (!isOpenState) {
+      return { sw: 0, dw: 0, mw: total, mLeft: 0, dLeft: 0 };
+    }
+    const sw = resolveSidebarWidth(total, widthPolicy, hasDivider, mainMinWidth);
+    const dw = hasDivider ? 1 : 0;
+    const mw = Math.max(0, total - sw - dw);
+    const mLeft = side === "left" ? sw + dw : 0;
+    const dLeft = side === "left" ? sw : mw;
+    return { sw, dw, mw, mLeft, dLeft };
+  }
+
+  function applyLayout() {
+    const { sw, mw, mLeft, dLeft } = computeWidths();
+
+    if (isOpenState) {
+      sidebar.show();
+      sidebar.width = sw as any;
+      sidebar.height = "100%" as any;
+      if (side === "left") {
+        sidebar.left = 0 as any;
+        (sidebar as any).right = undefined;
+      } else {
+        sidebar.left = mw as any;
+        (sidebar as any).right = undefined;
+      }
+      if (dividerNode) {
+        dividerNode.show();
+        dividerNode.left = dLeft as any;
+        dividerNode.width = 1 as any;
+        dividerNode.height = "100%" as any;
+      }
+    } else {
+      sidebar.hide();
+      if (dividerNode) dividerNode.hide();
+    }
+
+    main.left = mLeft as any;
+    main.width = mw as any;
+    main.height = "100%" as any;
+  }
+
+  applyLayout();
+
+  return {
+    main,
+    sidebar,
+    divider: dividerNode,
+
+    toggle() {
+      isOpenState = !isOpenState;
+      applyLayout();
+    },
+
+    setOpen(open: boolean) {
+      if (isOpenState !== open) {
+        isOpenState = open;
+        applyLayout();
+      }
+    },
+
+    isOpen() {
+      return isOpenState;
+    },
+
+    layout() {
+      applyLayout();
+    },
+
+    sidebarWidth() {
+      const { sw } = computeWidths();
+      return sw;
+    },
+
+    mainWidth() {
+      const { mw } = computeWidths();
+      return mw;
+    },
+  };
+}

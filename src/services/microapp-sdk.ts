@@ -129,6 +129,8 @@ export {
   createBorderedPanel,
   createCollapsibleBlock,
   createContentStack,
+  createSidebarPanel,
+  resolveSidebarWidth,
 } from "../core/ui-parts.js";
 export type {
   InputLineProps,
@@ -141,6 +143,11 @@ export type {
   CollapsibleBlockHandle,
   ContentStackChild,
   ContentStackHandle,
+  SidebarPanel,
+  SidebarPanelOptions,
+  SidebarWidth,
+  SidebarWidthFixed,
+  SidebarWidthPercent,
 } from "../core/ui-parts.js";
 
 export { createRenderMonitor } from "../core/render-monitor.js";
