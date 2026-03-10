@@ -10,6 +10,7 @@ import path from "node:path";
 import stringWidth from "string-width";
 
 import { theme } from "../core/theme/resolver.js";
+import { EMPTY_PRIMER_SELECTED, EMPTY_FILE_SELECTED, EMPTY_MATCHES } from "../core/empty-states.js";
 import { createScrollbar } from "../core/ui-primitives.js";
 import { createRestyleBundle, createSelectableList } from "../core/ui-parts.js";
 import type { ContentMeasurement } from "../services/content-measurement.js";
@@ -178,7 +179,7 @@ export function openPrimerGalleryWindow(params: {
   const updatePreview = (index: number) => {
     const entry = activeEntries[index];
     if (!entry) {
-      previewRawContent = "No primer selected.";
+      previewRawContent = EMPTY_PRIMER_SELECTED;
       setViewportContent(preview, previewRawContent);
       params.screen.render();
       return;
@@ -814,7 +815,7 @@ export function openFileManagerWindow(params: {
   const updatePreview = (index: number) => {
     const entry = entries[index];
     if (!entry) {
-      previewRawContent = "No file selected.";
+      previewRawContent = EMPTY_FILE_SELECTED;
       setViewportContent(preview, previewRawContent);
       params.screen.render();
       return;
@@ -901,7 +902,7 @@ export function openFileManagerWindow(params: {
     searchActive = true;
     if (searchResults.length === 0) {
       list.setItems(["  (no results)"]);
-      previewRawContent = "No matches found.";
+      previewRawContent = EMPTY_MATCHES;
       setViewportContent(preview, previewRawContent);
     } else {
       const items = searchResults.map((r) => {

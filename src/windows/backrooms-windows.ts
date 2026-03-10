@@ -8,6 +8,7 @@ import type { OverlayManager } from "../core/overlay-manager.js";
 import { theme as appTheme } from "../core/theme/resolver.js";
 import { createScrollbar } from "../core/ui-primitives.js";
 import { createRestyleBundle, createSelectableList } from "../core/ui-parts.js";
+import { EMPTY_PRIMER_SELECTED } from "../core/empty-states.js";
 import type { BackroomsChannel, List, LogBox } from "../core/types.js";
 import type { WindowManager } from "../core/window-manager.js";
 import type { BackroomsService } from "../services/backrooms-service.js";
@@ -128,7 +129,7 @@ export function openBackroomsPrimerPicker(context: BackroomsWindowContext, theme
   const updatePreview = (index: number) => {
     const entry = filteredEntries[index];
     if (!entry) {
-      preview.setContent(searchValue ? `No primers match "${searchValue}".` : "No primer selected.");
+      preview.setContent(searchValue ? `No primers match "${searchValue}".` : EMPTY_PRIMER_SELECTED);
       context.screen.render();
       return;
     }

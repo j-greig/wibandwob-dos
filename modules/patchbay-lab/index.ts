@@ -1,5 +1,6 @@
 import blessed from "blessed";
 import fs from "node:fs";
+import { EMPTY_PRIMER_SELECTED } from "../../src/core/empty-states.js";
 
 import {
   ContentService,
@@ -159,7 +160,7 @@ function createPatchAnimationPlayer(host: MicroappHost): AnimatedPanelPlayer & {
 
 function readPrimerPreview(entry: BrowserEntry | undefined): string {
   if (!entry) {
-    return "No primer selected.";
+    return EMPTY_PRIMER_SELECTED;
   }
   try {
     const raw = fs.readFileSync(entry.filePath, "utf8");

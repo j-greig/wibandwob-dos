@@ -1184,6 +1184,7 @@ export class TsTuiMvpApp {
         {
           screen: this.screen,
           windowManager: this.windowManager,
+          overlays: this.overlays,
           onStateChanged: () => this.syncLiveState(),
         },
         restore,
