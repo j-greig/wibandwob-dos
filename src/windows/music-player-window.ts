@@ -12,7 +12,7 @@ import { basename } from "path";
 import { stat } from "fs/promises";
 
 import { theme } from "../core/theme/resolver.js";
-import { createRestyleBundle } from "../core/ui-parts.js";
+import { createRestyleBundle, createButtonBar } from "../core/ui-parts.js";
 import type { OverlayManager } from "../core/overlay-manager.js";
 import type { WindowManager } from "../core/window-manager.js";
 
@@ -54,10 +54,34 @@ export function openMusicPlayerWindow(
     top: 0,
     left: 0,
     right: 0,
-    bottom: 0,
+    bottom: 1,   // leave 1 row for the button toolbar
     style: theme().body,
     tags: true,
   });
+
+  // ── Bottom button toolbar ──
+  type ToolbarAction = "playpause" | "stop" | "voldown" | "volup" | "open";
+  const toolbar = createButtonBar<ToolbarAction>(
+    frame.body,
+    [
+      { id: "playpause", label: "▶/⏸" },
+      { id: "stop",      label: "■" },
+      { id: "voldown",   label: "vol-" },
+      { id: "volup",     label: "vol+" },
+      { id: "open",      label: "open" },
+    ],
+    (id) => {
+      if (id === "playpause") togglePause();
+      else if (id === "stop") stopPlayback();
+      else if (id === "voldown") setVolume(-10);
+      else if (id === "volup") setVolume(10);
+      else if (id === "open") {
+        deps.overlays.openValuePrompt("Open file path", filePath ?? "", (value) => {
+          if (value.trim()) loadFile(value.trim());
+        });
+      }
+    },
+  );
 
   // ── Duration detection ──
   async function detectDuration(path: string): Promise<number> {
@@ -111,10 +135,16 @@ export function openMusicPlayerWindow(
       "",
       ` Vol: ${volumeBar(volume)}  ${volume}%`,
       "",
-      ` [space] play/pause  [s] stop  [+/-] vol  [o] open`,
-      ` [←/→] scrub ±5s    [q] close`,
+      ` [←/→] scrub ±5s   [q] close`,
     ];
     display.setContent(lines.join("\n"));
+
+    // keep toolbar anchored at bottom of frame.body
+    const bodyW = Math.max(10, Number(frame.body.width) || 50);
+    const bodyH = Math.max(2, Number(frame.body.height) || 10);
+    toolbar.layout({ top: bodyH - 1, left: 0, width: bodyW, height: 1 });
+    toolbar.update({ leftText: "", activeId: state === "playing" ? "playpause" : "stop" });
+
     deps.onStateChanged?.();
     deps.screen.render();
   }
@@ -243,6 +273,7 @@ export function openMusicPlayerWindow(
     });
   });
 
+
   // ── Window registration ──
   frame.kind = "microapp";
   frame.describeState = () => ({
@@ -255,11 +286,12 @@ export function openMusicPlayerWindow(
     duration: Math.round(duration),
     volume,
   });
-  frame.cleanup = () => killProc();
+  frame.cleanup = () => { killProc(); toolbar.destroy(); };
   frame.setFocusTarget(display);
-  frame.onRestyle = createRestyleBundle([
-    [display, () => theme().body],
-  ]).restyle;
+  frame.onRestyle = () => {
+    createRestyleBundle([[display, () => theme().body]]).restyle();
+    toolbar.restyle();
+  };
 
   // Public controller for API/commands
   (frame as any).musicPlayer = {

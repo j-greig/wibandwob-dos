@@ -1,0 +1,20 @@
+{
+  "name": "heartbeat",
+  "version": "0.1.0",
+  "description": "A tiny ASCII pulse — one beat per second",
+  "type": "microapp",
+  "entry": "index.ts",
+  "microapp": {
+    "id": "wibwob.heartbeat",
+    "title": "Heartbeat",
+    "description": "A tiny ASCII pulse — one beat per second",
+    "multiInstance": false,
+    "persist": false,
+    "menu": [
+      { "category": "applications", "order": 80, "label": "Heartbeat" }
+    ],
+    "palette": { "order": 280, "label": "Heartbeat" },
+    "agent": true,
+    "api": true
+  }
+}
