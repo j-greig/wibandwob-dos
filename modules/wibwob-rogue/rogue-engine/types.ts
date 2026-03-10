@@ -96,6 +96,7 @@ export interface BeamCell {
   y: number;
   ch: string;
   ttl: number;   // animation ticks remaining
+  fg: string;    // staged beam color
 }
 
 export interface GameState {
@@ -130,6 +131,10 @@ export type GameCommand =
   | "move-south"
   | "move-east"
   | "move-west"
+  | "move-nw"
+  | "move-ne"
+  | "move-sw"
+  | "move-se"
   | "squeeze-toggle"
   | "interact"
   | "board-mech"

@@ -154,7 +154,7 @@ function addLog(state: GameState, text: string) {
 }
 
 function refreshHints(state: GameState): void {
-  const hints: string[] = ["hjkl move"];
+  const hints: string[] = ["hjkl/yubn move"];
   if (state.player.piloting) {
     hints.push("e eject");
     hints.push("f fire");
@@ -343,11 +343,15 @@ function fireCannon(state: GameState): void {
   let by = state.player.y + stepY;
   let hit = false;
   const newBeam: BeamCell[] = [];
+  const BEAM_COLORS = ["#8df6ff", "#6bd8ff", "#4aa8ff"];
 
   for (let i = 0; i < 20; i++) {
     const tile = state.tiles.get(`${bx},${by}`);
     if (!tile?.transparent) break;
-    newBeam.push({ x: bx, y: by, ch: beamGlyph, ttl: 3 });
+    // Staged glyph: full beam near muzzle, dot further out
+    const glyph = i < 8 ? beamGlyph : "·";
+    const colorIdx = Math.min(Math.floor(i / 7), BEAM_COLORS.length - 1);
+    newBeam.push({ x: bx, y: by, ch: glyph, ttl: 3, fg: BEAM_COLORS[colorIdx] });
     const monster = state.monsters.find(m => m.x === bx && m.y === by);
     if (monster) {
       state.monsters = state.monsters.filter(m => m !== monster);
@@ -379,6 +383,10 @@ export function step(state: GameState, command: GameCommand): void {
     case "move-south": dy = 1; break;
     case "move-east": dx = 1; break;
     case "move-west": dx = -1; break;
+    case "move-nw": dx = -1; dy = -1; break;
+    case "move-ne": dx = 1; dy = -1; break;
+    case "move-sw": dx = -1; dy = 1; break;
+    case "move-se": dx = 1; dy = 1; break;
     case "squeeze-toggle":
       state.player.squeezing = !state.player.squeezing;
       state.player.sprite = state.player.squeezing ? PLAYER_SQUEEZE_SPRITE : state.player.normalSprite;
@@ -573,14 +581,14 @@ export function getFrame(state: GameState, viewW: number, viewH: number): FrameC
   for (const monster of state.monsters) paintEntity(monster);
   paintEntity(state.player);
 
-  // Beam overlay — cyan, drawn on top of everything visible
+  // Beam overlay — staged cyan colors, drawn on top of everything visible
   for (const beam of state.beamCells) {
     const sx = beam.x - camX;
     const sy = beam.y - camY;
     if (sx < 0 || sx >= viewW || sy < 0 || sy >= viewH) continue;
     const idx = sy * viewW + sx;
     if (idx >= 0 && idx < cells.length) {
-      cells[idx] = { x: sx, y: sy, ch: beam.ch, fg: "#00ffff", bg: "#000000" };
+      cells[idx] = { x: sx, y: sy, ch: beam.ch, fg: beam.fg, bg: "#000000" };
     }
   }
 

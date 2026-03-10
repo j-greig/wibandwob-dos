@@ -77,6 +77,10 @@ function openRogue(host: MicroappHost) {
   win.body.key(["j", "down"],  () => handleCmd("move-south"));
   win.body.key(["k", "up"],    () => handleCmd("move-north"));
   win.body.key(["l", "right"], () => handleCmd("move-east"));
+  win.body.key(["y"],          () => handleCmd("move-nw"));
+  win.body.key(["u"],          () => handleCmd("move-ne"));
+  win.body.key(["b"],          () => handleCmd("move-sw"));
+  win.body.key(["n"],          () => handleCmd("move-se"));
   win.body.key(["w"],          () => handleCmd("squeeze-toggle"));
   win.body.key(["e", "enter", "space"], () => handleCmd("interact"));
   win.body.key(["f"],          () => handleCmd("fire-cannon"));
@@ -85,6 +89,7 @@ function openRogue(host: MicroappHost) {
   win.onInput((input: string) => {
     const cmdMap: Record<string, GameCommand> = {
       h: "move-west", j: "move-south", k: "move-north", l: "move-east",
+      y: "move-nw", u: "move-ne", b: "move-sw", n: "move-se",
       w: "squeeze-toggle", e: "interact", f: "fire-cannon",
     };
     const cmd = cmdMap[input.toLowerCase()];
