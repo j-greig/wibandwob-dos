@@ -19,8 +19,10 @@ import type { WindowManager } from "../core/window-manager.js";
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
-const MUSIC_DIR = path.join(process.cwd(), "content/music");
 const AUDIO_RE = /\.(mp3|wav|m4a|ogg|flac)$/i;
+function getMusicDir() {
+  return path.join(process.cwd(), "content/music");
+}
 const SCRUB_SECS = 5;
 const VOL_STEP = 10;
 const DEFAULT_VOL = 80;
@@ -29,6 +31,14 @@ const DEFAULT_VOL = 80;
 const PLAYLIST_MIN_WIDTH = 70;
 // Playlist panel width (chars)
 const PLAYLIST_WIDTH = 28;
+// Spectrum viz appears when body is at least this tall (and playlist visible)
+const VIZ_MIN_HEIGHT = 20;
+// Number of spectrum bands
+const VIZ_BANDS = 24;
+// Rows of viz to draw
+const VIZ_ROWS = 6;
+// Sub-row block chars: space → ▁▂▃▄▅▆▇█
+const BLOCKS = [" ", "▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"];
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -71,7 +81,7 @@ class AudioController {
     if (initialFiles?.length) {
       this._files = initialFiles;
     } else {
-      this._scanDir(MUSIC_DIR);
+      this._scanDir(getMusicDir());
     }
   }
 
@@ -351,8 +361,8 @@ export function openMusicPlayerWindow(
   restore?: MusicPlayerRestore
 ): void {
   const frame = deps.windowManager.createFrame("♫ Music Player", "microapp");
-  frame.frame.width = 52;
-  frame.frame.height = 14;
+  frame.frame.width = 82;
+  frame.frame.height = 22;
 
   const ctrl = new AudioController(restore?.playlist);
   if (restore?.volume !== undefined) {
@@ -361,10 +371,10 @@ export function openMusicPlayerWindow(
 
   // ── Layout containers ────────────────────────────────────────────────────
 
-  // Player pane (left / full)
+  // Player pane (left / full) — dimensions set by layout(), not blessed CSS
   const playerPane = blessed.box({
     parent: frame.body,
-    top: 0, left: 0, right: 0, bottom: 1,
+    top: 0, left: 0, width: 1, height: 1,
     style: theme().body,
     tags: true,
   });
@@ -372,7 +382,8 @@ export function openMusicPlayerWindow(
   // Playlist pane (right — hidden until window is wide enough)
   const playlistPane = blessed.list({
     parent: frame.body,
-    top: 0, left: 0, right: 0, bottom: 1,
+    top: 0, left: 0, width: 1, height: 1,
+    hidden: true,
     mouse: true,
     keys: false,
     vi: false,
@@ -385,6 +396,91 @@ export function openMusicPlayerWindow(
   }) as blessed.Widgets.ListElement;
 
   let playlistVisible = false;
+
+  // ── Spectrum visualiser ──────────────────────────────────────────────────
+
+  const vizPane = blessed.box({
+    parent: playerPane,
+    top: 0, left: 0, width: 1, height: 1,
+    hidden: true,
+    style: theme().body,
+    tags: false,
+  });
+
+  // Band state: current height (0–1) and peak hold
+  const bandH    = new Float32Array(VIZ_BANDS).fill(0);
+  const bandPeak = new Float32Array(VIZ_BANDS).fill(0);
+  const DECAY  = 0.18;   // per-tick fall speed
+  const PEAK_DECAY = 0.04;
+
+  let vizTimer: ReturnType<typeof setInterval> | null = null;
+
+  function startViz() {
+    if (vizTimer) return;
+    vizTimer = setInterval(() => {
+      const playing = ctrl.state === "playing";
+      for (let i = 0; i < VIZ_BANDS; i++) {
+        if (playing) {
+          // Randomised target with some frequency-shape bias
+          // (low + high bands slightly louder — typical of music)
+          const bias = i < 4 || i > VIZ_BANDS - 5 ? 0.75 : 0.55;
+          const spike = Math.random() < 0.18 ? Math.random() * 0.6 : 0;
+          const target = bias * Math.random() + spike;
+          // Smooth rise, gravity fall
+          bandH[i] = bandH[i] < target
+            ? bandH[i] + (target - bandH[i]) * 0.55
+            : bandH[i] - DECAY * (1 + Math.random() * 0.3);
+        } else {
+          bandH[i] = Math.max(0, bandH[i] - DECAY * 1.5);
+        }
+        bandH[i] = clamp(bandH[i], 0, 1);
+        if (bandH[i] > bandPeak[i]) {
+          bandPeak[i] = bandH[i];
+        } else {
+          bandPeak[i] = Math.max(0, bandPeak[i] - PEAK_DECAY);
+        }
+      }
+      renderViz();
+      deps.screen.render();
+    }, 80);
+  }
+
+  function stopViz() {
+    if (vizTimer) { clearInterval(vizTimer); vizTimer = null; }
+  }
+
+  function renderViz() {
+    if (vizPane.hidden) return;
+    const totalLevels = VIZ_ROWS * 8; // 8 sub-rows per char row
+    const lines: string[] = [];
+
+    for (let row = VIZ_ROWS - 1; row >= 0; row--) {
+      let line = " ";
+      for (let b = 0; b < VIZ_BANDS; b++) {
+        const level = Math.round(bandH[b] * totalLevels);
+        const peakLevel = Math.round(bandPeak[b] * totalLevels);
+        const rowBase = row * 8;
+        const fill = clamp(level - rowBase, 0, 8);
+        const isPeak = peakLevel >= rowBase + 7 && peakLevel < rowBase + 8 + 8;
+
+        if (fill === 8) {
+          line += "█";
+        } else if (fill > 0) {
+          line += BLOCKS[fill] ?? " ";
+        } else if (isPeak && row > 0) {
+          line += "▔"; // peak hold dot
+        } else {
+          line += " ";
+        }
+        line += " "; // gap between bands
+      }
+      lines.push(line);
+    }
+    lines.push(" ─ SPECTRUM ─".padEnd(VIZ_BANDS * 2, "─").slice(0, VIZ_BANDS * 2 + 1));
+    vizPane.setContent(lines.join("\n"));
+  }
+
+  let vizVisible = false;
 
   // ── Toolbar ──────────────────────────────────────────────────────────────
 
@@ -414,7 +510,7 @@ export function openMusicPlayerWindow(
   // ── File browser ─────────────────────────────────────────────────────────
 
   function openFileBrowser() {
-    const startDir = fs.existsSync(MUSIC_DIR) ? MUSIC_DIR : process.cwd();
+    const startDir = fs.existsSync(getMusicDir()) ? getMusicDir() : process.cwd();
     deps.overlays.openFileBrowserPrompt(
       "Add audio file",
       startDir,
@@ -453,27 +549,30 @@ export function openMusicPlayerWindow(
 
     if (showPlaylist !== playlistVisible) {
       playlistVisible = showPlaylist;
-      playerPane.show();
-      playlistPane[showPlaylist ? "show" : "hide"]();
+      if (showPlaylist) {
+        playlistPane.show();
+      } else {
+        playlistPane.hide();
+      }
     }
 
     const playerW = showPlaylist ? bodyW - PLAYLIST_WIDTH - 1 : bodyW;
+    const paneH = Math.max(1, bodyH - 1);
 
-    // Player pane
+    // Player pane — explicit width+height, no right/bottom
     playerPane.top = 0;
     playerPane.left = 0;
     playerPane.width = playerW;
-    playerPane.height = bodyH - 1;
+    playerPane.height = paneH;
 
     if (showPlaylist) {
-      // Divider visual is handled by playlist border
       playlistPane.top = 0;
       playlistPane.left = playerW;
       playlistPane.width = PLAYLIST_WIDTH;
-      playlistPane.height = bodyH - 1;
+      playlistPane.height = paneH;
     }
 
-    // Toolbar
+    // Toolbar anchored to bottom
     toolbar.layout({ top: bodyH - 1, left: 0, width: bodyW, height: 1 });
   }
 
@@ -557,6 +656,7 @@ export function openMusicPlayerWindow(
   // ── Window registration ──────────────────────────────────────────────────
 
   frame.kind = "microapp";
+  frame.refresh = render;
   frame.describeState = () => ({
     appType: "music-player" as const,
     summary: `Music player: ${ctrl.fileName} [${ctrl.state}]`,
