@@ -178,17 +178,28 @@ export class MenuOverlayManager {
         }
       }, 0);
     });
-    // Click anywhere outside the menu list closes it.
-    // Capture this list instance so the timeout doesn't fire against a newer menu.
-    const thisMenuList = this.menuList;
-    thisMenuList.on("blur", () => {
-      setTimeout(() => {
-        // Only close if this is still the active menu list (not already replaced)
-        if (this.menuList === thisMenuList) {
-          this.closeMenu();
-        }
-      }, 80);
-    });
+    // Click outside the menu box closes it.
+    // Use a screen-level mousedown instead of blur — blur fires immediately
+    // on focus hand-off and causes the menu to flash open then instantly close.
+    const outsideClickHandler = (data: { x: number; y: number; action?: string }) => {
+      if (!this.menuList) return;
+      if (data.action !== "mousedown" && data.action !== "mouseup") return;
+      const left = Number(this.menuList.left);
+      const top = Number(this.menuList.top);
+      const w = Number(this.menuList.width);
+      const h = Number(this.menuList.height);
+      const inside = data.x >= left && data.x < left + w && data.y >= top && data.y < top + h;
+      if (!inside) {
+        this.closeMenu();
+      }
+    };
+    // Defer by one tick so the click that opened this menu doesn't immediately close it
+    setTimeout(() => { this.screen.on("mouse", outsideClickHandler as any); }, 0);
+    // Clean up listener when menu closes so it doesn't accumulate
+    const onceClose = () => {
+      (this.screen as any).removeListener("mouse", outsideClickHandler);
+    };
+    this.menuList.once("destroy", onceClose);
     this.onChange();
     this.screen.render();
   }
