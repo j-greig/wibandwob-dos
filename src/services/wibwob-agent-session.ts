@@ -883,7 +883,8 @@ export class WibWobAgentSession {
   private handleSessionEvent(event: AgentSessionEvent): void {
     switch (event.type) {
       case "message_start": {
-        this.closeToolRun();
+        // Don't close tool run here — tool calls span multiple message_start/end
+        // cycles within one agentic turn. closeToolRun happens at agent_end.
         if (getMessageRole(event.message) !== "assistant" || this.findCurrentAssistant()) return;
         this.currentAssistantId = createMessageId("assistant");
         this.messages.push({
@@ -967,7 +968,7 @@ export class WibWobAgentSession {
         return;
       }
       case "message_end": {
-        this.closeToolRun();
+        // Don't close tool run here — see message_start comment.
         if (getMessageRole(event.message) !== "assistant") return;
         const a = this.findCurrentAssistant();
         if (a) {

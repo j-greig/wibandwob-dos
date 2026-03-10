@@ -326,10 +326,20 @@ export function openWibWobAgentWindow(params: {
       for (const block of blocks) {
         if (block.type === "text") {
           const existing = textBlocks.get(block.key);
-          if (existing) existing.setContent(block.content);
+          if (existing) {
+            existing.setContent(block.content);
+            // Recalculate height — content may have changed line count (streaming)
+            existing.height = block.content.split("\n").length + 1;
+          }
         } else {
           const existing = collapsibleBlocks.get(block.key);
-          if (existing) existing.update({ summary: block.summary, detail: block.detail, badge: block.badge });
+          if (existing) {
+            existing.update({ summary: block.summary, detail: block.detail, badge: block.badge });
+            // Auto-collapse when run transitions from active to inactive
+            if (!block.run.active && !existing.isCollapsed()) {
+              existing.setCollapsed(true);
+            }
+          }
         }
       }
       transcriptStack.relayout();
