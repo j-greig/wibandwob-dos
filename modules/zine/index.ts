@@ -79,7 +79,7 @@ export default function setup(host: MicroappHost) {
           top: "center", left: "center",
           width: "60%", height: Math.min(candidates.length + 2, 20),
           border: "line",
-          label: " Open ZINE — select canvas ",
+          label: " Open Zine — select canvas ",
           keys: true, mouse: true, vi: true,
           items: candidates.map(c => path.relative(REPO_ROOT, c)),
           style: {
@@ -305,17 +305,19 @@ export default function setup(host: MicroappHost) {
       }
     };
 
-    // ── Toolbar (bottom bar) ────────────────────────────────────────
+    // ── Toolbar (bottom nav bar) ────────────────────────────────────
     let paused = false;
-    type ToolbarAction = "search" | "pause";
+    type ToolbarAction = "sidebar" | "search" | "pause";
     const toolbar = createButtonBar<ToolbarAction>(
       root,
       [
-        { id: "search", label: "/ Search" },
-        { id: "pause",  label: "⏸ Pause" },
+        { id: "sidebar", label: "[ ] Files" },
+        { id: "search",  label: "/ Search"  },
+        { id: "pause",   label: "⏸ Pause"   },
       ],
       (id) => {
-        if (id === "search") openSearchPrompt();
+        if (id === "sidebar") toggleSidebar();
+        else if (id === "search") openSearchPrompt();
         else if (id === "pause") {
           paused = !paused;
           updateStatus();
@@ -378,14 +380,13 @@ export default function setup(host: MicroappHost) {
       const scroll = (canvas as any).getScrollPerc?.() ?? 0;
       const q = searchQuery ? `  search:${searchQuery}` : "";
       const pauseLabel = paused ? "▶ Play" : "⏸ Pause";
+      const sidebarLabel = sidebarOpen ? "[▶] Files" : "[ ] Files";
       const panelCount = [...zineNodes.values()].filter(n => n.item.type === "panel").length;
-      const sidebarIndicator = sidebarOpen ? "[ ]" : "[▶]";
       toolbar.update({
-        leftText: ` ZINE  ${sidebarIndicator}  ${panelCount} panels  scroll:${scroll}%${q}`,
-        activeId: paused ? "pause" : "search",
+        leftText: ` Zine  ${panelCount} panels  ${scroll}%${q}`,
+        activeId: paused ? "pause" : undefined,
+        buttonLabels: { sidebar: ` ${sidebarLabel} `, pause: ` ${pauseLabel} ` },
       });
-      const pauseNode = (toolbar.node.children as any)?.[3];
-      if (pauseNode?.setContent) pauseNode.setContent(` ${pauseLabel} `);
       statusBar.setContent("");
     }
 
@@ -880,12 +881,12 @@ export default function setup(host: MicroappHost) {
 
   host.registerCommand({
     id: "open",
-    label: "Open ZINE",
+    label: "Open Zine",
     description: "Open a ZINE canvas — panels from .canvas.yaml rendered as §y²-style sub-windows. Args: filePath (string).",
     action: openZine,
     multiInstance: true,
     direct: true,
-    menu: [{ category: "applications", order: 40, label: "ZINE" }],
-    palette: { order: 60, label: "Open ZINE" },
+    menu: [{ category: "applications", order: 40, label: "Zine" }],
+    palette: { order: 60, label: "Open Zine" },
   });
 }
