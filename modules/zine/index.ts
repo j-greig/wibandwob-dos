@@ -109,7 +109,10 @@ export default function setup(host: MicroappHost) {
     const canvas_doc = loadCanvas(filePath);
     if (!canvas_doc) return;
 
-    const { title, panels: cePanelDefs, columnHeaders: showHeaders, columns: columnDefs } = canvas_doc;
+    const { title, panels: initialPanels, columnHeaders: showHeaders, columns: columnDefs } = canvas_doc;
+
+    // Mutable panel list — hot reload swaps this in place
+    let cePanelDefs = initialPanels;
 
     // Build column header map for layout engine
     const columnHeaderMap = new Map<number, string>();
@@ -617,6 +620,34 @@ export default function setup(host: MicroappHost) {
     // ── Build + first render ────────────────────────────────────────
     rebuild();
     canvas.focus();
+
+    // ── Hot reload — watch canvas file for changes ───────────────────
+    let reloadDebounce: ReturnType<typeof setTimeout> | undefined;
+    const watcher = fs.watch(filePath, () => {
+      clearTimeout(reloadDebounce);
+      reloadDebounce = setTimeout(() => {
+        try {
+          const fresh = loadCanvas(filePath);
+          if (!fresh) return;
+          cePanelDefs = fresh.panels;
+          // Rebuild column headers from fresh doc
+          columnHeaderMap.clear();
+          if (fresh.columnHeaders) {
+            for (const [idx, def] of fresh.columns) {
+              if (def.header) columnHeaderMap.set(idx, def.header);
+            }
+          }
+          contentOverrides.clear();
+          rebuild();
+          updateStatus();
+        } catch { /* ignore transient write races */ }
+      }, 80);
+    });
+    // Clean up watcher when window closes
+    win.on("destroy", () => {
+      clearTimeout(reloadDebounce);
+      watcher.close();
+    });
 
     // ── Tick (live panels) ──────────────────────────────────────────
     createTimer(() => {
