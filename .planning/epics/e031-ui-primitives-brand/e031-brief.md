@@ -1,7 +1,7 @@
 ---
 id: E031
 title: Shared UI Primitives + Brand Nomenclature
-status: in-progress
+status: done
 issue: ~
 pr: ~
 depends_on: []
@@ -579,70 +579,70 @@ renamed. All imports updated. typecheck clean.
 ## Acceptance criteria
 
 ### Brand naming — FIRST (F00)
-- [ ] AC-0a: Command labels follow WibWob-DOS convention, rename table applied
-- [ ] AC-0b: Module IDs normalised to wibwob.slug, state service reflects new IDs
+- [x] AC-0a: Command labels follow WibWob-DOS convention, rename table applied
+- [x] AC-0b: Module IDs normalised to wibwob.slug, state service reflects new IDs
 
 ### Sidebar (F01)
 - [x] AC-1: Audit complete, all sidebar implementations catalogued
-- [ ] AC-2: createSidebarPanel in ui-parts.ts, exported via SDK
-- [ ] AC-3: Width resolution handles fixed, percent, overflow
-- [ ] AC-4: world-chatroom migrated, overflow fixed
-- [ ] AC-5: ZINE migrated, toggle preserved
-- [ ] AC-6: WibWobWorld migrated, mode-awareness preserved
-- [ ] AC-7: Patchbay Lab migrated, mode-gated visibility preserved
-- [ ] AC-8: Tidepool width constant deduped
-- [ ] AC-9: Dead sidebar code removed (blocked on AC-4–AC-8 smoked)
+- [x] AC-2: createSidebarPanel in ui-parts.ts, exported via SDK
+- [x] AC-3: Width resolution handles fixed, percent, overflow
+- [x] AC-4: world-chatroom migrated, overflow fixed
+- [x] AC-5: ZINE migrated, toggle preserved
+- [x] AC-6: WibWobWorld migrated, mode-awareness preserved
+- [x] AC-7: Patchbay Lab migrated, mode-gated visibility preserved
+- [x] AC-8: Tidepool width constant deduped
+- [x] AC-9: Dead sidebar code removed (blocked on AC-4–AC-8 smoked)
 
 ### List + toolbar (F02)
-- [ ] AC-10: createSelectableList in ui-parts.ts, exported via SDK
-- [ ] AC-11: Raw blessed.list calls outside overlay-manager migrated
-- [ ] AC-12: Raw toolbar boxes migrated to createHeaderBar
+- [x] AC-10: createSelectableList in ui-parts.ts, exported via SDK
+- [x] AC-11: Raw blessed.list calls outside overlay-manager migrated
+- [x] AC-12: Raw toolbar boxes migrated to createHeaderBar
 
 ### Inline search (F03)
-- [ ] AC-13: createInlineSearch in ui-parts.ts, exported via SDK
-- [ ] AC-14: zine and sy2-chronicles migrated
+- [x] AC-13: createInlineSearch in ui-parts.ts, exported via SDK
+- [x] AC-14: zine and sy2-chronicles migrated
 
 ### Focus + restyle (F04)
-- [ ] AC-15: frame.setFocusTarget on WindowFacade, 23 callers migrated
-- [ ] AC-16: createRestyleBundle in ui-parts.ts, 24 restyle blocks migrated
+- [x] AC-15: frame.setFocusTarget on WindowFacade, 23 callers migrated
+- [x] AC-16: createRestyleBundle in ui-parts.ts, 24 restyle blocks migrated
 
 ### Cleanup (F05)
-- [ ] AC-17: 6 raw status bars → createStatusBar
-- [ ] AC-18: Vi scroll key bindings → bindScrollKeys helper
-- [ ] AC-19: Inline textbox prompts → overlays.openValuePrompt
-- [ ] AC-20: Empty state strings → constants module
+- [x] AC-17: 6 raw status bars → createStatusBar
+- [x] AC-18: Vi scroll key bindings → bindScrollKeys helper
+- [x] AC-19: Inline textbox prompts → overlays.openValuePrompt
+- [x] AC-20: Empty state strings → constants module
 
 ### Type renames + structure (F06)
-- [ ] AC-21: API endpoints renamed, skill files and docs updated
-- [ ] AC-22: WindowKind "markdown-viewer" → "reader", workspace restore handles legacy
-- [ ] AC-23: misc-windows.ts renamed/split, content-windows.ts audited
+- [x] AC-21: API endpoints renamed, skill files and docs updated
+- [x] AC-22: WindowKind "markdown-viewer" → "reader", workspace restore handles legacy
+- [x] AC-23: misc-windows.ts renamed/split, content-windows.ts audited
 
 ### Second sweep — windows (W01–W06)
-- [ ] AC-28: PREVIEW_SPLIT_RATIO constant, 10 inline ratios replaced
-- [ ] AC-29: dispatchFileManagerKey shared, list/icon view key parity
-- [ ] AC-30: deferRender(fn) helper, 3 setTimeout(0) calls replaced
-- [ ] AC-31: bindCloseKeys helper, q+Escape consistent across all windows
-- [ ] AC-32: applyInitialPos helper, 2 restore blocks replaced
-- [ ] AC-33: clamp() exported from ui-primitives, 7 inline clamps replaced
+- [x] AC-28: PREVIEW_SPLIT_RATIO constant, 10 inline ratios replaced
+- [-] AC-29: dispatchFileManagerKey shared, list/icon view key parity
+- [x] AC-30: deferRender(fn) helper, 3 setTimeout(0) calls replaced
+- [-] AC-31: bindCloseKeys helper, q+Escape consistent across all windows
+- [-] AC-32: applyInitialPos helper, 2 restore blocks replaced
+- [x] AC-33: clamp() exported from ui-primitives, 7 inline clamps replaced
 
 ### Second sweep — core (C01–C07)
-- [ ] AC-34: createSearchListPreviewOverlay private helper, browser prompts unified
-- [ ] AC-35: openTextInputPrompt private helper, value/path prompts unified
-- [ ] AC-36: SHADOW_X_OFFSET/Y_OFFSET constants + syncShadowRect helper
-- [ ] AC-37: Overlay prompt styles use theme() tokens, no hardcoded colors
-- [ ] AC-38: createAlignedBarPart shared, createHeaderBar/createStatusBar unified
-- [ ] AC-39: command-catalog windowByIdCommand builder, api/agent defaults
-- [ ] AC-40: Shared base types extracted (LabeledEntries, PointerDragBase, WindowGeometry)
+- [-] AC-34: createSearchListPreviewOverlay private helper, browser prompts unified
+- [-] AC-35: openTextInputPrompt private helper, value/path prompts unified
+- [-] AC-36: SHADOW_X_OFFSET/Y_OFFSET constants + syncShadowRect helper
+- [-] AC-37: Overlay prompt styles use theme() tokens, no hardcoded colors
+- [-] AC-38: createAlignedBarPart shared, createHeaderBar/createStatusBar unified
+- [-] AC-39: command-catalog windowByIdCommand builder, api/agent defaults
+- [-] AC-40: Shared base types extracted (LabeledEntries, PointerDragBase, WindowGeometry)
 
 ### Second sweep — modules (M01–M04)
-- [ ] AC-41: All modules use createTimer/clearTimers, raw setInterval removed
-- [ ] AC-42: appType values normalised to wibwob.slug
-- [ ] AC-43: Direct src/core/ imports removed, SDK exports added
-- [ ] AC-44: SDK focusOrCreate() helper added, singleton modules use it
+- [-] AC-41: All modules use createTimer/clearTimers, raw setInterval removed
+- [-] AC-42: appType values normalised to wibwob.slug
+- [-] AC-43: Direct src/core/ imports removed, SDK exports added
+- [-] AC-44: SDK focusOrCreate() helper added, singleton modules use it
 
 ### Throughout
-- [ ] AC-26: bun run typecheck clean after every story
-- [ ] AC-27: Smoke test all migrated modules after each F-block
+- [x] AC-26: bun run typecheck clean after every story
+- [x] AC-27: Smoke test all migrated modules after each F-block
 
 ---
 

@@ -1,7 +1,7 @@
 ---
 id: E032
 title: Smart Editor — one window, mode-aware rendering
-status: not-started
+status: done
 area: editor
 ---
 
@@ -36,16 +36,16 @@ A key toggle (`e` / `v`) switches modes for any file.
 
 ## Acceptance criteria
 
-- [ ] AC-1: `editor.open` with a `.md` path opens in view mode (formatted, figlet headings optional).
-- [ ] AC-2: `editor.open` with any other file opens in edit mode (current behavior).
-- [ ] AC-3: `e` key in view mode switches to edit mode. `v` key in edit mode switches to view mode for .md files.
-- [ ] AC-4: `WindowKind "reader"` no longer exists. Retired via legacy snapshot alias.
-- [ ] AC-5: `markdown-viewer-window.ts` deleted; all imports/call sites removed.
-- [ ] AC-6: `markdown.open` command and `/view/reader/open` route still work as aliases (backward compat).
-- [ ] AC-7: Workspace restore: old snapshots with `appType: "reader"` and `appType: "markdown-viewer"` load as the new `text-editor` window in view mode.
-- [ ] AC-8: `bun run typecheck` passes. Existing tests pass.
-- [ ] AC-9: View mode status bar shows filename, scroll position, pct, key hints.
-- [ ] AC-10: `h` key toggles figlet headings in view mode (matches current reader behavior).
+- [x] AC-1: `editor.open` with a `.md` path opens in view mode (formatted, figlet headings optional).
+- [x] AC-2: `editor.open` with any other file opens in edit mode (current behavior).
+- [x] AC-3: `e` key in view mode switches to edit mode. `v` key in edit mode switches to view mode for .md files.
+- [x] AC-4: `WindowKind "reader"` no longer exists. Retired via legacy snapshot alias.
+- [x] AC-5: `markdown-viewer-window.ts` deleted; all imports/call sites removed.
+- [x] AC-6: `markdown.open` command and `/view/reader/open` route still work as aliases (backward compat).
+- [x] AC-7: Workspace restore: old snapshots with `appType: "reader"` and `appType: "markdown-viewer"` load as the new `text-editor` window in view mode.
+- [x] AC-8: `bun run typecheck` passes. Existing tests pass.
+- [x] AC-9: View mode status bar shows filename, scroll position, pct, key hints.
+- [x] AC-10: `h` key toggles figlet headings in view mode (matches current reader behavior).
 
 ## Out of scope
 
