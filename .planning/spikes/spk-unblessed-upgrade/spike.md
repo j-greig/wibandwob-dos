@@ -209,6 +209,187 @@ TBD — to be populated during Phase 1 and 2.
 
 ---
 
+---
+
+## App Architecture: The Elm Architecture on top of blessed/unblessed
+
+### Why this matters here
+
+blessed gives you a widget API and an event system. It does not give you an
+opinionated app architecture. Its docs describe it as "a high-level terminal
+interface library with widgets and event bubbling" — full stop.
+
+The result in practice: event-handler soup. `box.on('click', () => { selectedTool = 'brush'; status.setContent('Brush'); screen.render() })` scattered across 40 files. State split between widget internals, service singletons, and ad-hoc locals. No single path from input to output.
+
+The Elm Architecture (TEA) solves this. It is a set of design principles, not
+something tied to Elm syntax. The Elm guide explicitly says it emphasises
+patterns that generalise to any language.
+
+References:
+- Elm Architecture: https://guide.elm-lang.org/architecture/
+- Elm Guide: https://guide.elm-lang.org/
+- blessed: https://github.com/chjj/blessed
+- unblessed: https://github.com/vdeantoni/unblessed
+
+### The core mapping
+
+| TEA concept    | TS/blessed equivalent |
+|----------------|-----------------------|
+| Model          | Plain TS object holding all app state |
+| Msg            | Discriminated union of all events/actions |
+| update()       | Pure-ish reducer: (model, msg) -> [nextModel, effects] |
+| view()         | Function deriving screen content from model |
+| Cmd / Sub      | Async work and external sources: timers, keyboard, mouse, file IO, child processes, websockets |
+
+This is the same shape the Elm guide documents.
+
+### What the flow looks like
+
+```
+blessed event -> Msg -> update(model, msg) -> nextModel + effects -> render(nextModel)
+```
+
+Instead of:
+```ts
+box.on('click', () => {
+  selectedTool = 'brush'
+  status.setContent('Brush')
+  screen.render()
+})
+```
+
+You do:
+```ts
+dispatch({ type: 'ToolSelected', tool: 'brush' })
+```
+
+Then:
+```ts
+type Msg =
+  | { type: 'ToolSelected'; tool: Tool }
+  | { type: 'MouseDown'; x: number; y: number }
+  | { type: 'KeyPressed'; key: string }
+  | { type: 'Tick' }
+  | { type: 'FileLoaded'; content: string }
+
+type Model = {
+  tool: Tool
+  status: string
+  canvas: string[][]
+}
+
+function update(model: Model, msg: Msg): [Model, Effect[]] {
+  switch (msg.type) {
+    case 'ToolSelected':
+      return [{ ...model, tool: msg.tool, status: `Tool: ${msg.tool}` }, []]
+    case 'MouseDown':
+      return [paintAt(model, msg.x, msg.y), []]
+    default:
+      return [model, []]
+  }
+}
+```
+
+And the render layer becomes one place:
+```ts
+function render(model: Model, ui: UI) {
+  ui.status.setContent(model.status)
+  ui.canvas.setContent(drawCanvas(model.canvas))
+  ui.screen.render()
+}
+```
+
+### The critical rule: blessed is the commit layer
+
+Do NOT try to make blessed itself pure. Treat it as the terminal IO substrate.
+
+- Core logic stays reducer-like and testable
+- View derives screen content from state
+- Actual widget mutation is the final side-effect step
+
+blessed is plumbing. Your Elm-ish layer is the architecture.
+
+### Composing sub-models
+
+Elm's composition model works directly in TS. Each window or panel gets its
+own Model, Msg, and update. A root dispatcher routes messages downward and
+lifts child messages upward.
+
+```ts
+type AppModel = {
+  menu: MenuModel
+  desktop: DesktopModel
+  paint: PaintModel
+  status: StatusModel
+}
+
+type AppMsg =
+  | { type: 'MenuMsg'; msg: MenuMsg }
+  | { type: 'DesktopMsg'; msg: DesktopMsg }
+  | { type: 'PaintMsg'; msg: PaintMsg }
+  | { type: 'StatusMsg'; msg: StatusMsg }
+```
+
+This scales. A flat widget jungle does not.
+
+### Effects as commands
+
+Async work — file load/save, timers, subprocess output, network, debounce,
+animation ticks — should be returned as effect descriptors from update(),
+not triggered inline. Elm's Cmd pattern is the right model:
+
+```ts
+type Effect =
+  | { type: 'SaveFile'; path: string; content: string }
+  | { type: 'LoadFile'; path: string; onDone: (content: string) => Msg }
+  | { type: 'Delay'; ms: number; msg: Msg }
+  | { type: 'SpawnProcess'; cmd: string; onOutput: (line: string) => Msg }
+```
+
+The runtime runs effects after each update, feeds results back as messages.
+The reducer never touches IO directly.
+
+### Five rules for TEA on a TS TUI
+
+1. Put UI state in the model: focus, scroll offsets, selected widget, current
+   modal, cursor mode, viewport position. Not half-hidden inside widgets.
+2. Typed messages everywhere. TS discriminated unions give you most of Elm's
+   clarity benefit without the compiler overhead.
+3. Keep update() free of direct widget calls. No box.setContent() inside
+   reducers. Return state and effect descriptions.
+4. Treat effects as commands. Return them; do not fire them.
+5. Compose sub-models. One root Model with named sub-fields; one root Msg
+   with wrapper variants. Route and lift at the root dispatcher.
+
+### How this intersects with the unblessed upgrade
+
+The architecture advice is the same whether we stay on blessed or move to
+unblessed. unblessed's typed API makes the view layer cleaner (no as any
+casts, real widget types), but the TEA structure sits above the library
+in both cases.
+
+If we adopt the drop-in (@unblessed/blessed), the architecture refactor is
+a separate, independent strand of work.
+
+If we ever adopt @unblessed/react, the React/JSX renderer is itself a
+TEA-compatible view layer — React's reconciler is conceptually similar to
+the view -> DOM diff pattern Elm uses.
+
+### What this would mean for WibWob-DOS
+
+Current state: 40 files with direct blessed event wiring, state scattered
+across service singletons and window locals, no single update path.
+
+Target: a root App model, a typed Msg union, a dispatch function wired to
+all blessed events, a render() called once per update. Windows become
+sub-models. Commands replace inline async.
+
+This is a multi-sprint refactor, not a spike. But the spike is a good place
+to prototype the shape of the dispatcher and one window sub-model to validate
+the pattern before committing.
+
+---
+
 ## Decision
 
 TBD
