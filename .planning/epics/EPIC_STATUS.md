@@ -8,3 +8,6 @@ e001-codified-context-infrastructure — in-progress
 e019-rogue-tui-port — not-started
 e021-vps-multi-agent-world — blocked
 e028-responsive-column-layout — in-progress
+e029-context-aware-menus — done
+e031-sidebar-primitive — not-started
+
