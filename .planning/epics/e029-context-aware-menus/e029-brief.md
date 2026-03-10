@@ -36,7 +36,7 @@ Favourites bucket above an A-Z sorted main list.
 
 ## Stories
 
-- [~] S01 — Context-aware File menu (`appTypes` filter on `MenuPlacement`)
+- [x] S01 — Context-aware File menu (`appTypes` filter on `MenuPlacement`)
 - [ ] S02 — Menu separators (non-selectable dividers, keyboard-skip)
 - [ ] S03 — Applications Favourites + A-Z sort
 
