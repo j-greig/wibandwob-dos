@@ -81,7 +81,7 @@ export class MenuOverlayManager {
     const focusedAppType = this.getFocusedAppType();
     const visibleItems = menu.items.filter(
       (item) =>
-        !item.appTypes || !focusedAppType || item.appTypes.includes(focusedAppType),
+        !item.appTypes || (!!focusedAppType && item.appTypes.includes(focusedAppType)),
     );
     const width = Math.max(...visibleItems.map((item) => item.label.length)) + 4;
     const height = visibleItems.length + 2;
