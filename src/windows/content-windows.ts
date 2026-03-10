@@ -11,6 +11,7 @@ import stringWidth from "string-width";
 
 import { theme } from "../core/theme/resolver.js";
 import { createScrollbar, safeSetStyle } from "../core/ui-primitives.js";
+import { createSelectableList } from "../core/ui-parts.js";
 import type { ContentMeasurement } from "../services/content-measurement.js";
 import { createPreRenderedPlayer, type FramePlayer } from "../services/animation-service.js";
 import { viewerAppType } from "../core/types.js";
@@ -74,21 +75,16 @@ export function openPrimerBrowserWindow(params: {
     content: " Enter opens file  j/k scroll  Esc closes menu ",
     style: theme().header
   });
-  const list = blessed.list({
+  const listHandle = createSelectableList({
     parent: frame.body,
     top: 1,
     left: 0,
     right: 0,
     bottom: 0,
-    keys: true,
-    vi: true,
-    mouse: true,
-    scrollable: true,
-    alwaysScroll: true,
-    scrollbar: createScrollbar(),
     items: entries.map((entry) => entry.label),
-    style: { ...theme().body, selected: theme().selected }
+    style: { ...theme().body, selected: theme().selected },
   });
+  const list = listHandle.node;
   const initialSelectedIndex = Math.max(0, Math.min(params.restore?.selectedIndex ?? 0, entries.length - 1));
   const openSelected = (index?: number) => {
     const itemIndex = typeof index === "number" ? index : (list as List & { selected: number }).selected ?? 0;
@@ -155,21 +151,15 @@ export function openPrimerGalleryWindow(params: {
     mouse: true,
     style: theme().input
   });
-  const list = blessed.list({
+  const listHandle = createSelectableList({
     parent: frame.body,
     top: 2,
     left: 0,
     width: "34%",
     bottom: 0,
-    keys: true,
-    vi: true,
-    mouse: true,
-    scrollable: true,
-    alwaysScroll: true,
-    scrollbar: createScrollbar(),
     items: tabs[0].entries.map((entry) => entry.label),
-    style: { ...theme().body, selected: theme().selected }
   });
+  const list = listHandle.node;
   const preview = blessed.box({
     parent: frame.body,
     top: 1,
@@ -598,20 +588,14 @@ export function openFileManagerWindow(params: {
   });
 
   // Left pane: directory listing (list view)
-  const list = blessed.list({
+  const listHandle = createSelectableList({
     parent: frame.body,
     top: 2,
     left: 0,
     width: "36%",
     bottom: 1,
-    keys: true,
-    vi: true,
-    mouse: true,
-    scrollable: true,
-    alwaysScroll: true,
-    scrollbar: createScrollbar(),
-    style: { ...theme().body, selected: theme().selected }
   });
+  const list = listHandle.node;
 
   // Left pane: icon grid (icon view) — full width, toggled via hidden
   const iconGrid = blessed.box({

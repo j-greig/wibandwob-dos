@@ -1287,3 +1287,91 @@ export function createSidebarPanel(opts: SidebarPanelOptions): SidebarPanel {
     },
   };
 }
+
+// ── createSelectableList ──────────────────────────────────────────────────
+// Shared selectable list primitive (P04).
+// Wraps blessed.list with canonical keys/vi/mouse/scrollbar defaults baked in.
+
+export interface SelectableListOptions {
+  parent: blessed.Widgets.BoxElement;
+  top?: number | string;
+  left?: number | string;
+  right?: number | string;
+  bottom?: number | string;
+  width?: number | string;
+  height?: number | string;
+  items?: string[];
+  style?: blessed.Widgets.BoxOptions["style"];
+}
+
+export interface SelectableListHandle {
+  node: blessed.Widgets.ListElement;
+  setItems(items: string[]): void;
+  selected(): number;
+  select(index: number): void;
+  onSelect(fn: (index: number, item: string) => void): void;
+  onSelectItem(fn: () => void): void;
+  focus(): void;
+}
+
+export function createSelectableList(opts: SelectableListOptions): SelectableListHandle {
+  const {
+    parent,
+    top = 0,
+    left = 0,
+    right,
+    bottom,
+    width,
+    height,
+    items = [],
+    style,
+  } = opts;
+
+  const listStyle = style ?? { ...theme().body, selected: theme().selected };
+
+  const node = blessed.list({
+    parent,
+    top,
+    left,
+    ...(right !== undefined ? { right } : {}),
+    ...(bottom !== undefined ? { bottom } : {}),
+    ...(width !== undefined ? { width } : {}),
+    ...(height !== undefined ? { height } : {}),
+    keys: true,
+    vi: true,
+    mouse: true,
+    scrollable: true,
+    alwaysScroll: true,
+    scrollbar: createScrollbar(),
+    items,
+    style: listStyle,
+  } as blessed.Widgets.ListOptions<blessed.Widgets.BoxOptions["style"]>);
+
+  return {
+    node,
+
+    setItems(newItems: string[]) {
+      (node as any).setItems(newItems);
+    },
+
+    selected() {
+      return (node as any).selected ?? 0;
+    },
+
+    select(index: number) {
+      node.select(index);
+    },
+
+    onSelect(fn: (index: number, item: string) => void) {
+      node.on("select", (_item: blessed.Widgets.BlessedElement, index: number) => fn(index, items[index] ?? ""));
+    },
+
+    onSelectItem(fn: () => void) {
+      node.on("select item", fn);
+    },
+
+    focus() {
+      node.focus();
+    },
+  };
+}

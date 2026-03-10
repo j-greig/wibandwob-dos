@@ -131,6 +131,7 @@ export {
   createContentStack,
   createSidebarPanel,
   resolveSidebarWidth,
+  createSelectableList,
 } from "../core/ui-parts.js";
 export type {
   InputLineProps,
@@ -148,6 +149,8 @@ export type {
   SidebarWidth,
   SidebarWidthFixed,
   SidebarWidthPercent,
+  SelectableListOptions,
+  SelectableListHandle,
 } from "../core/ui-parts.js";
 
 export { createRenderMonitor } from "../core/render-monitor.js";

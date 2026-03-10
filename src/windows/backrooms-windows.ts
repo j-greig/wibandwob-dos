@@ -7,6 +7,7 @@ import { REPO_ROOT } from "../core/config.js";
 import type { OverlayManager } from "../core/overlay-manager.js";
 import { theme as appTheme } from "../core/theme/resolver.js";
 import { createScrollbar, safeSetStyle } from "../core/ui-primitives.js";
+import { createSelectableList } from "../core/ui-parts.js";
 import type { BackroomsChannel, List, LogBox } from "../core/types.js";
 import type { WindowManager } from "../core/window-manager.js";
 import type { BackroomsService } from "../services/backrooms-service.js";
@@ -80,20 +81,14 @@ export function openBackroomsPrimerPicker(context: BackroomsWindowContext, theme
     mouse: true,
     style: appTheme().input
   });
-  const list = blessed.list({
+  const listHandle = createSelectableList({
     parent: frame.body,
     top: 3,
     left: 0,
     width: "36%",
     bottom: 0,
-    keys: true,
-    vi: true,
-    mouse: true,
-    scrollable: true,
-    alwaysScroll: true,
-    scrollbar: createScrollbar(),
-    style: { ...appTheme().body, selected: appTheme().selected }
   });
+  const list = listHandle.node;
   const preview = blessed.box({
     parent: frame.body,
     top: 2,

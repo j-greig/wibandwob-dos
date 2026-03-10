@@ -21,6 +21,19 @@ import blessed from "blessed";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
+import {
+  createButtonBar,
+  createTimer,
+  clearTimers,
+  blankGrid,
+  paintText,
+  paintCentered,
+  paintLines,
+  drawArrow,
+  gridToText,
+  waveLine,
+  bar,
+} from "../../src/services/microapp-sdk.js";
 import { renderContour } from "../../src/services/contour-engine.js";
 import { renderFiglet } from "../../src/services/figlet-service.js";
 import { MonsterCamService, type MonsterCamFrame } from "../../src/services/monster-cam-service.js";
@@ -34,18 +47,6 @@ import {
   type PanelDef,
   type PanelNode,
 } from "../../src/core/panel-layout.js";
-import {
-  blankGrid,
-  paintText,
-  paintCentered,
-  paintLines,
-  drawArrow,
-  gridToText,
-  waveLine,
-  bar,
-} from "../../src/core/grid-canvas.js";
-import { createTimer, clearTimers } from "../../src/core/ui-primitives.js";
-import { createButtonBar } from "../../src/core/ui-parts.js";
 import { type CEPanelDef, toPanelDef, renderPanel } from "./panel-types.js";
 import { loadPanelsFromDir, watchPanelDir } from "./content-loader.js";
 

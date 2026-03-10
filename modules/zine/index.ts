@@ -195,24 +195,18 @@ export default function setup(host: MicroappHost) {
     });
 
     // ── Sidebar ─────────────────────────────────────────────────────
-    const sidebarList = blessed.list({
+    const sidebarListHandle = createSelectableList({
       parent: sidePanel.sidebar,
       top: 0, left: 0, right: 0, bottom: 0,
-      keys: true, vi: true, mouse: true,
-      scrollable: true,
-      style: {
-        ...host.theme().body,
-        selected: host.theme().selected,
-        item: host.theme().body,
-      },
-      items: [],
+      style: { ...host.theme().body, selected: host.theme().selected, item: host.theme().body },
     });
+    const sidebarList = sidebarListHandle.node;
 
     function refreshSidebarList() {
       const labels = discoveredFiles.map(f =>
         sidebarEntryLabel(f, SIDEBAR_WIDTH - 1)
       );
-      (sidebarList as any).setItems(labels);
+      sidebarListHandle.setItems(labels);
       const activeIdx = discoveredFiles.indexOf(activeFilePath);
       if (activeIdx >= 0) sidebarList.select(activeIdx);
     }

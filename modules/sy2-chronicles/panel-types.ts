@@ -12,7 +12,7 @@
  */
 
 import fs from "node:fs";
-import { paintLines } from "../../src/core/grid-canvas.js";
+import { paintLines } from "../../src/services/microapp-sdk.js";
 import { renderFiglet } from "../../src/services/figlet-service.js";
 import { renderMarkdown, PLAIN_HEADING_CONFIG } from "../../src/services/markdown-service.js";
 import type { PanelDef } from "../../src/core/panel-layout.js";

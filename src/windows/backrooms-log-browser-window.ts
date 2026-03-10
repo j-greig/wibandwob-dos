@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { createScrollbar, safeSetStyle } from "../core/ui-primitives.js";
+import { createSelectableList } from "../core/ui-parts.js";
 import { createFilePathMenuItems } from "../core/context-menu-items.js";
 import type { OverlayManager } from "../core/overlay-manager.js";
 import { theme } from "../core/theme/resolver.js";
@@ -75,23 +76,15 @@ export function openBackroomsLogBrowserWindow(params: {
   const CONTENT_LEFT = "25%+1";
 
   // Left pane — log list
-  const list = blessed.list({
+  const listHandle = createSelectableList({
     parent: frame.body,
     top: 0,
     left: 0,
     width: LIST_WIDTH,
     bottom: 0,
-    mouse: true,
-    keys: true,
-    vi: true,
-    scrollbar: createScrollbar(),
-    style: {
-      ...theme().body,
-      selected: theme().selected,
-      item: theme().body
-    },
-    items: []
-  }) as blessed.Widgets.ListElement;
+    style: { ...theme().body, selected: theme().selected, item: theme().body },
+  });
+  const list = listHandle.node;
 
   // Divider
   const divider = blessed.box({
