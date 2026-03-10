@@ -15,7 +15,6 @@ import { createScrollbar } from "../core/ui-primitives.js";
 import { createRestyleBundle, createSelectableList, deferRender } from "../core/ui-parts.js";
 import type { ContentMeasurement } from "../services/content-measurement.js";
 import { createPreRenderedPlayer, type FramePlayer } from "../services/animation-service.js";
-import { viewerAppType } from "../core/types.js";
 import type { Box, BrowserEntry, List, WindowKind, WindowRecord } from "../core/types.js";
 import type { OverlayManager } from "../core/overlay-manager.js";
 
@@ -386,7 +385,7 @@ export function openTextViewerWindow(params: {
   }
 
   frame.describeState = () => ({
-    appType: viewerAppType[params.kind],
+    appType: params.kind === "primer" ? "primer-viewer" : "reader-viewer",
     summary: params.filePath ? `Viewing ${params.filePath}` : `Viewing ${params.kind} content.`,
     filePath: params.filePath,
     lineCount: m?.lineCount ?? 0,

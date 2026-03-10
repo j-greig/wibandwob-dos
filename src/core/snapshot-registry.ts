@@ -40,7 +40,7 @@ type MaybeWindow = WindowRecord | undefined;
 
 export interface SnapshotRestoreActions {
   openPrimerWindow: (filePath: string) => MaybeWindow;
-  openEditorWindow: (filePath: string | undefined, title: string, initial: string, restore?: { cursor?: number }) => MaybeWindow;
+  openEditorWindow: (filePath: string | undefined, title: string, initial: string, restore?: { cursor?: number; viewMode?: "edit" | "view"; scrollOffset?: number; figlet?: boolean }) => MaybeWindow;
   openBrowserReaderWindow: (filePath?: string) => MaybeWindow;
   openFigletWindow: (text: string, font: string) => MaybeWindow;
   openPatternWindow: () => MaybeWindow;
@@ -55,7 +55,6 @@ export interface SnapshotRestoreActions {
   openArtWindow: () => MaybeWindow;
   openMonsterCamWindow: () => MaybeWindow;
   openWibWobAgentWindow: () => MaybeWindow;
-  openMarkdownViewerWindow: (filePath: string, restore?: { scrollOffset?: number; figlet?: boolean }) => MaybeWindow;
   windows: WindowFacade;
 }
 
@@ -93,11 +92,23 @@ export const snapshotRegistry = {
 
   // --- kind: "editor" ---
   "text-editor": {
-    serialize: (window) =>
-      window.editor
+    serialize: (window) => {
+      const d = getDetails(window);
+      const viewMode = detailString(d, "viewMode");
+      if (viewMode === "view") {
+        // Markdown view mode — save scroll + figlet state
+        return {
+          viewMode: "view",
+          scrollOffset: detailNumber(d, "scrollOffset") ?? 0,
+          figlet: d.figlet !== false,
+        };
+      }
+      return window.editor
         ? { content: window.editor.value, cursor: window.editor.cursor }
-        : undefined,
+        : undefined;
+    },
     restore: (snapshot, payload, actions) => {
+      const viewMode = typeof payload.viewMode === "string" ? payload.viewMode as "edit" | "view" : undefined;
       return actions.openEditorWindow(
         snapshot.filePath,
         snapshot.title,
@@ -106,7 +117,12 @@ export const snapshotRegistry = {
           : snapshot.filePath && fs.existsSync(snapshot.filePath)
             ? fs.readFileSync(snapshot.filePath, "utf8")
             : "",
-        { cursor: typeof payload.cursor === "number" ? payload.cursor : undefined }
+        {
+          cursor: typeof payload.cursor === "number" ? payload.cursor : undefined,
+          viewMode,
+          scrollOffset: typeof payload.scrollOffset === "number" ? payload.scrollOffset : undefined,
+          figlet: typeof payload.figlet === "boolean" ? payload.figlet : undefined,
+        }
       );
     },
   },
@@ -141,24 +157,6 @@ export const snapshotRegistry = {
     serialize: (_window) => undefined,
     restore: (_snapshot, _payload, actions) => {
       return actions.openPatternWindow();
-    },
-  },
-
-  // --- kind: "reader" (renamed from "markdown-viewer" in E031; legacy alias in legacyAppTypeRemap) ---
-  "reader": {
-    serialize: (window) => {
-      const d = getDetails(window);
-      return {
-        scrollOffset: detailNumber(d, "scrollOffset") ?? 0,
-        figlet: d.figlet !== false,
-      };
-    },
-    restore: (snapshot, payload, actions) => {
-      if (!snapshot.filePath) return undefined;
-      return actions.openMarkdownViewerWindow(snapshot.filePath, {
-        scrollOffset: typeof payload.scrollOffset === "number" ? payload.scrollOffset : 0,
-        figlet: payload.figlet !== false,
-      });
     },
   },
 
@@ -371,6 +369,8 @@ const legacyAppTypeRemap: Record<string, string> = {
   "chat-transcript": "wibwob-agent",
   // E031 S21 — "markdown-viewer" renamed to "reader"
   "markdown-viewer": "reader",
+  // E032 S02 — "reader" appType (old markdown-viewer) merged into "text-editor"
+  "reader": "text-editor",
   // E031 — module ID normalisation (S00b): old IDs → wibwob.slug
   "world-chatroom": "wibwob.chatroom",
   "wibwobworld": "wibwob.world",

@@ -2,7 +2,7 @@
 id: S20
 epic: E031
 title: API endpoint surface rename
-status: not-started
+status: done
 branch: epic/e031-ui-primitives-brand
 ---
 

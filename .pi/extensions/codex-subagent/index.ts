@@ -71,14 +71,14 @@ export default function (pi: ExtensionAPI) {
 		label: "Codex",
 		description: [
 			"Delegate tasks to OpenAI Codex CLI as an isolated subagent.",
-			"Modes: codex-analyst (read-only debugging/review) or codex-worker (implementation with file writes).",
-			"Codex runs in a separate process with its own context. Use for: debugging, root-cause analysis,",
-			"cross-file refactors, code review, feature implementation, architecture review.",
-			"Especially useful when stuck after 2+ fix attempts.",
+			"Agents: codex-standard (general-purpose, gpt-5.3-codex) or codex-heavy (complex tasks, gpt-5.4).",
+			"Codex runs in a separate process with its own context.",
+			"USAGE RESTRICTION: Codex budget is limited. Do NOT use proactively.",
+			"Only use when the human explicitly requests Codex. Ask permission first.",
 		].join(" "),
 		parameters: Type.Object({
 			agent: Type.String({
-				description: 'Codex agent name: "codex-analyst" (read-only) or "codex-worker" (writes files)',
+				description: 'Codex agent name: "codex-standard" (general-purpose) or "codex-heavy" (complex tasks)',
 			}),
 			task: Type.String({ description: "Task to delegate to Codex" }),
 			files: Type.Optional(

@@ -1,6 +1,6 @@
 ---
-name: codex-worker
-description: READ+WRITE Codex. Use for any task that creates, edits, or commits files — code changes, refactors, new planning docs, epic briefs, config. If output needs to land on disk, this is the agent.
+name: codex-standard
+description: General-purpose Codex agent for code changes, debugging, refactors, reviews, planning docs. USAGE RESTRICTION — Codex budget is limited this month. Do NOT use proactively. Only use when the human explicitly requests Codex. Ask permission before delegating to this agent.
 model: gpt-5.3-codex
 mode: implementation
 ---
@@ -12,4 +12,5 @@ Prefer rg -n -C3 'pattern' file or sed -n '45,55p' file.
 Avoid nl -ba file | sed -n '1,300p'. Only dump full files if <50 lines.
 
 Make the smallest correct changes. Build and test when done.
+If reviewing/debugging: deliver root cause, fix options with tradeoffs, risks and tests to add.
 Summarise what changed and why.

@@ -25,8 +25,7 @@ export type WindowKind =
   | "palette"
   | "inspector"
   | "monster-cam"
-  | "microapp"
-  | "reader";
+  | "microapp";
 
 export interface EditorState {
   widget: Box;
@@ -124,8 +123,7 @@ export type PersistableAppType =
   | "wibwob-agent"
   | "primer-viewer"
   | "reader-viewer"
-  | "pattern-animation"
-  | "reader";
+  | "pattern-animation";
 
 /**
  * Window types that are transient — never saved to workspace files.
@@ -152,9 +150,8 @@ export type AppType = PersistableAppType | TransientAppType | (string & {});
  * Add entries HERE when a new generic factory produces a persistable appType.
  * Using these instead of template-literal casts gives real compile-time safety.
  */
-export const viewerAppType: Record<"primer" | "reader", PersistableAppType> = {
+export const viewerAppType: Record<"primer", PersistableAppType> = {
   primer: "primer-viewer",
-  reader: "reader-viewer",
 };
 
 export const animationAppType: Record<"pattern", PersistableAppType> = {

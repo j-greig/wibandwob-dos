@@ -2,7 +2,7 @@
 id: S22
 epic: E031
 title: Window file-name cleanup
-status: not-started
+status: done
 branch: epic/e031-ui-primitives-brand
 ---
 

@@ -2,7 +2,7 @@
 id: S21
 epic: E031
 title: WindowKind cleanup (markdown-viewer → reader)
-status: not-started
+status: done
 branch: epic/e031-ui-primitives-brand
 ---
 

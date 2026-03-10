@@ -178,12 +178,6 @@ function restoreWindowEntry(
     case "reader":
       return actions.openBrowserReaderWindow(entry.filePath);
 
-    case "reader":
-      if (entry.filePath) {
-        return actions.openMarkdownViewerWindow(entry.filePath);
-      }
-      return undefined;
-
     case "browser":
       return actions.openChromeBrowserWindow(
         entry.url ? { url: entry.url } : undefined,

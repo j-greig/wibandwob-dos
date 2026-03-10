@@ -71,24 +71,27 @@ export class EditorCoordinator {
   }
 
   /** Open an editor window. Multi-instance. */
-  openWindow(filePath?: string, title = "Untitled.txt", initial = "", restore?: { cursor?: number }): WindowRecord | undefined {
+  openWindow(filePath?: string, title = "Untitled.txt", initial = "", restore?: { cursor?: number; scrollOffset?: number; figlet?: boolean; viewMode?: "edit" | "view" }): WindowRecord | undefined {
     const wm = this.deps.windowManager;
-    const window = (() => {
-      const countBefore = wm.getWindows().length;
-      openTextEditorWindow({
-        windowManager: wm,
-        title,
-        filePath,
-        initial,
-        cursor: restore?.cursor,
-        renderEditor: (windowId) => {
-          const w = wm.getWindowById(windowId);
-          if (w) this.render(w);
-        },
-      });
-      const windows = wm.getWindows();
-      return windows.length > countBefore ? windows[windows.length - 1] : undefined;
-    })();
+    const window = openTextEditorWindow({
+      windowManager: wm,
+      overlays: this.deps.overlays,
+      screen: this.deps.screen,
+      title,
+      filePath,
+      initial,
+      cursor: restore?.cursor,
+      restore: restore ? {
+        scrollOffset: restore.scrollOffset,
+        figlet: restore.figlet,
+        viewMode: restore.viewMode,
+      } : undefined,
+      renderEditor: (windowId) => {
+        const w = wm.getWindowById(windowId);
+        if (w) this.render(w);
+      },
+      onStateChanged: () => this.deps.syncLiveState(),
+    });
     // Set initial saved content for dirty tracking
     if (window?.kind === "editor") {
       window.lastSavedContent = initial;

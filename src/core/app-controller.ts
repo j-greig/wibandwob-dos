@@ -145,7 +145,6 @@ import { openChromeBrowserWindow } from "../windows/chrome-browser-window.js";
 import { openWibWobAgentWindow as openNativeWibWobAgentWindow } from "../windows/wibwob-agent-window.js";
 import { CustomCursor } from "./custom-cursor.js";
 import { openMonsterCamWindow } from "../windows/monster-cam-window.js";
-import { openMarkdownViewerWindow } from "../windows/markdown-viewer-window.js";
 import { worldChatService } from "../services/world-chat-service.js";
 
 /** Exit code used by dev-mode reload. The launcher script watches for this. */
@@ -1107,16 +1106,9 @@ export class TsTuiMvpApp {
     );
   }
 
-  private openMarkdownViewerWindow(filePath?: string, restore?: { scrollOffset?: number; figlet?: boolean }): WindowRecord | undefined {
+  private openMarkdownViewerWindow(filePath?: string, restore?: { scrollOffset?: number; figlet?: boolean; viewMode?: "edit" | "view" }): WindowRecord | undefined {
     if (filePath) {
-      return openMarkdownViewerWindow({
-        windowManager: this.windowManager,
-        overlays: this.overlays,
-        screen: this.screen,
-        filePath,
-        restore,
-        onStateChanged: () => this.syncLiveState(),
-      });
+      return this.editor.openWindow(filePath, undefined, undefined, restore);
     }
     // No path — pick from repo .md files via recursive fs walk
     const mdList = collectMarkdownFiles(REPO_ROOT);
@@ -1129,13 +1121,7 @@ export class TsTuiMvpApp {
       mdList.map(fp => ({ label: fp.replace(REPO_ROOT + "/", ""), filePath: fp })),
       0,
       (item) => {
-        openMarkdownViewerWindow({
-          windowManager: this.windowManager,
-          overlays: this.overlays,
-          screen: this.screen,
-          filePath: item.filePath,
-          onStateChanged: () => this.syncLiveState(),
-        });
+        this.editor.openWindow(item.filePath);
       }
     );
     return undefined;
@@ -1495,9 +1481,6 @@ export class TsTuiMvpApp {
       openArtWindow: () => this.openArtWindow(),
       openMonsterCamWindow: () => this.openMonsterCam(),
       openWibWobAgentWindow: () => this.openWibWobAgentWindow(),
-      openMarkdownViewerWindow: (filePath, restore) => {
-        return this.openMarkdownViewerWindow(filePath, restore) ?? undefined;
-      },
       windows: this.windowManager,
     };
   }
@@ -1850,10 +1833,10 @@ export class TsTuiMvpApp {
       },
       toggleMarkdownFiglet: () => {
         const focused = this.windowManager.getFocusedWindow();
-        if (focused?.kind === "reader") {
+        if (focused?.kind === "editor" && focused.filePath) {
           focused.writeInput?.("h");
         } else {
-          this.overlays.flash("No markdown viewer focused");
+          this.overlays.flash("No markdown file focused");
         }
       },
       openWibWobAgent: () => this.openWibWobAgentWindow(),

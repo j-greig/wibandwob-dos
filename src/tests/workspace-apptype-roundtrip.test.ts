@@ -70,7 +70,6 @@ function makeRestoreActions(overrides?: Partial<SnapshotRestoreActions>): Snapsh
     openArtWindow: () => undefined,
     openMonsterCamWindow: () => undefined,
     openWibWobAgentWindow: () => undefined,
-    openMarkdownViewerWindow: () => undefined,
     windows: {} as any,  // not used by restore handlers directly
     ...overrides,
   };
@@ -93,7 +92,7 @@ const TESTABLE_TYPES: PersistableAppType[] = [
   "primer-browser",
   "farjs-file-manager",
   "reader-viewer",
-  "reader",
+  // "reader" retired in E032 — merged into "text-editor" with viewMode: "view"
 ];
 
 // Types that need external runtime (backrooms needs model, chrome needs browser)
@@ -120,7 +119,6 @@ async function openWindowForAppType(appType: PersistableAppType): Promise<boolea
     "primer-browser": () => post("/commands/run", { id: "primer.browse" }),
     "farjs-file-manager": () => post("/commands/run", { id: "finder.open" }),
     "reader-viewer": () => post("/commands/run", { id: "readme.open" }),
-    "reader": () => post("/view/markdown/open", { filePath: path.join(REPO_ROOT, "AGENTS.md") }),
   };
   const opener = openers[appType];
   if (!opener) return false;
