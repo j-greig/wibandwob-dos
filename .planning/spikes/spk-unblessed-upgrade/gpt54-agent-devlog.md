@@ -222,3 +222,103 @@ If this planning track becomes implementation work, the next concrete changes sh
 Read the prompt first, then checked the repo constitution before touching conclusions. The existing docs were useful and importantly consistent with the code: the command catalog really is canonical, the state service really is semantic rather than scraped, and the editor coordinator really is the clearest example of the desired extraction style. That made the planning sharper because it turned the task from “invent architecture” into “spread the best existing architecture”.
 
 The code scan then concentrated on where state, events, and terminal commits currently meet. `screen.render()` distribution was the biggest signal. It appears in shell infrastructure, overlays, window manager, extracted collaborators, and individual windows, which explains why the repo still feels callback-heavy even where the nouns are clean. The main conclusion from this pass is simple: the next improvement should not be another big subsystem. It should be a tiny explicit render/invalidation seam, then one proof-of-pattern window refactor to show how Elm-ish local architecture fits Blessed without pretending Blessed is pure.
+
+## SIDETRACK-UNBLESSED-PROMPT
+
+Exact human prompt, condensed only for readability not meaning:
+
+“Before we do a quick sidequest: does unblessed offer us anything useful? New TS-strict updated blessed in 2025, but after a promising start no commits for 3 months so we can’t adopt it as canon or as a blessed alternative. Just curious what, if anything, we could port or steal from its ideas.”
+
+Follow-up constraints added by the human:
+
+- testing needs to be better
+- modularity matters, especially shared and private modules because they are the hero/demo surfaces for first-time repo testers
+- leave React integration alone
+- flexbox is only interesting later as a stretch idea for responsive `zine`-style layouts
+- Unicode edge cases are real, especially in private primers and ASCII-adjacent art assets
+- long-term performance target is very high-resolution, animation-heavy WibWob-DOS scenes, so render speed and memory usage matter directly
+
+Concrete question being answered:
+
+Not “should we migrate to unblessed now?” but “which specific unblessed ideas, implementation techniques, or standards are worth porting into the current Blessed codebase even if we never adopt unblessed itself?”
+
+Concrete inspection checklist used for the sidetrack:
+
+- check whether the unblessed compatibility layer actually preserves the Blessed patterns this repo uses heavily
+- check whether `blessed.Widgets.*` types map cleanly enough to tell us anything useful about stricter typing
+- check whether our `screen.program` usage has any meaningful analogue
+- check whether our heavy `screen.render()` pattern would benefit from any render-policy ideas rather than a runtime swap
+- check whether our string-based grid and ASCII rendering could benefit from cell/canvas ideas
+- check whether unblessed suggests anything useful for testing, modularity, and layout discipline
+- explicitly separate “useful ideas to steal” from “features we should ignore for now”
+
+Repo-specific surfaces compared in this sidetrack:
+
+- `src/core/app-controller.ts` — render ownership and central orchestration pressure
+- `src/core/window-manager.ts` — window lifecycle plus direct render commits
+- `src/core/editor-coordinator.ts` — example of the kind of focused extracted collaborator we do want
+- `src/core/render-monitor.ts` — current render-rate instrumentation seam
+- `src/services/module-loader.ts` — module host lifecycle and registration semantics
+- `src/services/microapp-sdk.ts` — public module authoring surface
+- `src/core/grid-canvas.ts` and text-heavy windows — string/cell rendering implications
+- `modules/` and `modules-private/` — first-run extensibility and demo surface quality
+- local compatibility notes in `/Users/james/Repos/wibandwob-dos/.planning/spikes/spk-unblessed-upgrade/unblessed-compat-assessment.md`
+- wider spike notes in `/Users/james/Repos/wibandwob-dos/.planning/spikes/spk-unblessed-upgrade/spike.md`
+
+## SIDETRACK-UNBLESSED-SOURCES
+
+Primary links captured for future agent passes:
+
+- GitHub: https://github.com/vdeantoni/unblessed
+- Docs intro: https://unblessed.dev/docs/getting-started/introduction
+- Local assessment: `/Users/james/Repos/wibandwob-dos/.planning/spikes/spk-unblessed-upgrade/unblessed-compat-assessment.md`
+- Existing spike brief: `/Users/james/Repos/wibandwob-dos/.planning/spikes/spk-unblessed-upgrade/spike.md`
+
+## SIDETRACK-UNBLESSED-VERDICT
+
+Current stance: do not adopt unblessed as canon, but do actively borrow from it. The compatibility assessment in `unblessed-compat-assessment.md` argues the drop-in path may be technically plausible, but that is still a migration claim, not a reason to tie the project’s long-term runtime to a dependency whose recent momentum is unclear. The better move is selective theft.
+
+Most valuable ideas to port into WibWob-DOS now:
+
+- stricter TypeScript posture around widget contracts and local state ownership
+- a cleaner runtime seam between app state, render scheduling, and terminal commit
+- more cell-aware text handling for ANSI-safe truncation, Unicode edge cases, and layout correctness
+- better visual and regression-testing discipline
+- stronger modularity expectations at the subsystem and module-host boundary
+
+Least useful right now:
+
+- React integration
+- wholesale runtime migration
+- flexbox as a general layout rewrite
+- browser-portability ambitions
+
+## SIDETRACK-UNBLESSED-TESTING
+
+The unblessed comparison sharpened one existing conclusion: WibWob-DOS testing needs to improve, especially around visible output. The repo already says visual verification is mandatory, but the architecture plan should treat that as a subsystem concern rather than a final checklist item. The missing capability is not just “more tests”; it is stronger regression capture for windows, theme shifts, overlapping layouts, ANSI-heavy text views, and live-updating surfaces.
+
+That matters even more if the project’s long-term target is extremely high-resolution desktop scenes with many concurrent animations and moving parts. The future failure mode is not a TypeScript error; it is a terminal that technically runs while rendering too slowly, tearing visually, leaking memory, or degrading under animated load. Testing should grow toward sustained-scene checks, frame-rate awareness, and evidence capture for dense multi-window compositions.
+
+## SIDETRACK-UNBLESSED-MODULARITY
+
+The comparison also reinforces that modularity is one of the repo’s public face layers. The shared and private modules are not side content; they are hero surfaces and first-run advertisements for how extensible the system feels. `modules/hello-world`, `modules/world-chatroom`, `modules/sy2-chronicles`, and the private prompt/primer modules collectively teach newcomers what this desktop is and what it can become.
+
+That makes the module boundary worth polishing as product, not just architecture. The `module-loader.ts` host contract, `microapp-sdk.ts`, shared UI primitives, and snapshot/state conventions should become cleaner and more legible because they directly shape first impressions for anyone testing or extending the repo. Better module lifecycle semantics and redraw rules would improve both agent legibility and newcomer trust.
+
+## SIDETRACK-UNBLESSED-TEXT-AND-UNICODE
+
+Cell-aware text handling is worth stealing conceptually. WibWob-DOS already has a known unicode/cell-rendering follow-on in planning, and the need is real: some private primers and ASCII-adjacent assets contain awkward characters that render inconsistently, mis-measure width, or drift visually once ANSI styling and box constraints mix together.
+
+So the right takeaway is not “switch to unblessed for Unicode”. It is “treat text measurement, truncation, and cell rendering as a first-class engine concern”. This connects directly to list/sidebar truncation, primer rendering, figlet framing, mixed Unicode art, and any future high-density layouts where one bad width assumption can ripple through the whole desktop.
+
+## SIDETRACK-UNBLESSED-FLEXBOX
+
+React stays out. Flexbox stays a later, narrow research thread.
+
+The only place where flexbox-like thinking currently looks interesting is the `zine` direction and similar responsive editorial layouts where three-column-to-one-column collapse might eventually be cleaner with a stronger layout engine. That is a stretch investigation for later, not a near-term architectural move for the shell. The current shell problem is still render ownership and state/event clarity, not lack of flex layouts.
+
+## SIDETRACK-UNBLESSED-PERFORMANCE
+
+Long-term performance and memory discipline should stay explicit in the architecture plan. If WibWob-DOS is meant to drive very large terminals or projected displays with dense scenes, many windows, complex ASCII, and multiple live animations, then render speed and memory usage are core product constraints. They are not merely implementation polish.
+
+This supports the earlier refactor ordering. A render scheduler or invalidation seam is useful not just because it is architecturally tidy, but because it is a prerequisite for understanding, controlling, and later optimising redraw pressure. Likewise, local model/update/render patterns make it easier to reason about what actually changes per frame and where memory or rendering work is being created unnecessarily.
