@@ -253,7 +253,7 @@ export default function setup(host: MicroappHost) {
       });
       const pauseNode = (toolbar.node.children as any)?.[3];
       if (pauseNode?.setContent) pauseNode.setContent(` ${pauseLabel} `);
-      statusBar.setContent(` ${title}`);
+      statusBar.setContent("");
     }
 
     // ── Build ZineNodes from items ──────────────────────────────────
