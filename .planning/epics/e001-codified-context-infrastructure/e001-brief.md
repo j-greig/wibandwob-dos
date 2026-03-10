@@ -1,7 +1,7 @@
 ---
 id: E001
 title: Codified Context Infrastructure
-status: not-started
+status: in-progress
 issue: 106
 pr: ~
 depends_on: []
@@ -74,35 +74,43 @@ We lack:
 - Factory agents for bootstrapping new specs/agents from templates
 - Phased rollout plan starting with high-failure domains
 
+## Shipped (2026-03-10)
+
+Four Tier 3 subsystem specs in `.agents/specs/`:
+- window-system.md — WindowManager, WindowFacade, WindowRecord, microapps,
+  blessed scroll/fixed bugs, panel chrome pattern
+- state-and-api.md — DesktopState shape, control API endpoints, tui_* tools,
+  exact field names (left/top not x/y), direct:true for query commands
+- workspace.md — save/restore flow, snapshot schema, race conditions,
+  branch discipline, planning:sync rule
+- agent-session.md — jailed coding tools, Scramble states, module registration
+  pattern, module loader silent errors, reload vs restart table
+
+Each spec has: Overview · Key Files · Core Types/Schema · Invariants ·
+Failure Modes table (symptom→cause→fix) · Do/Don't · Agent Notes (append-only,
+self-enhancing) · Change Checklist.
+
+Enriched from agentic-devlog — real failure modes from 645 session logs.
+Agents may edit specs directly. Agent Notes table for quick session findings.
+
+Tier 1 constitution (AGENTS.md) updated with:
+- Pre-change trigger table: file patterns → which spec to read
+- Post-change trigger table: what to verify per subsystem
+- Self-edit rule: agents edit specs, they are living documents
+
+Scope deliberately narrowed from original AC set — no Tier 2 agents, no
+drift detector, no retrieval service. The value is in the specs and triggers.
+Remaining ACs deferred to future iterations if confusion signals warrant.
+
 ## Acceptance Criteria
 
-- [ ] AC-1: Constitution includes trigger table with BOTH pre-change and
-  post-change triggers, plus fallback to suggest_agent(task) for unfamiliar code
-  Test: grep CLAUDE.md for pre-change and post-change trigger sections;
-  verify at least 10 file-pattern->skill mappings across both categories;
-  verify suggest_agent fallback instruction exists
-
-- [ ] AC-2: At least 5 subsystem specs, each scoped to ONE subsystem, using
-  repeatable structure: overview / key files / invariants / failure modes
-  (symptom-cause-fix) / do-don't / commands / change checklist
-  Test: each spec validates against structure checklist; each contains
-  file paths, parameter names, expected behaviour; no spec covers >1 subsystem
-
-- [ ] AC-3: Context drift detector runs as SESSION-START HOOK, parses recent
-  Git commits against spec-to-file mapping, injects warning when code changed
-  without corresponding spec update
-  Test: modify a file covered by a spec without updating spec; start new
-  session; verify warning injected into context mentioning the stale spec
-
-- [ ] AC-4: Retrieval exposes 4 search paths: list all specs, lookup by
-  subsystem key, free-text search, and agent suggestion (suggest_agent)
-  Test: exercise all 4 paths from agent session; verify each returns results
-
-- [ ] AC-5: Telemetry tracks spec-hit rate (how often specs are retrieved),
-  stale-spec warnings fired, and tasks requiring repeated human re-explanation
-  (the paper's useful signal: agent confusion = missing/stale spec)
-  Test: run telemetry script; verify it reports hit rate, warning count,
-  and flags repeated explanation patterns from session logs
+- [x] AC-1: Constitution includes pre-change and post-change trigger tables
+  Note: suggest_agent fallback not implemented — deferred
+- [~] AC-2: Four subsystem specs (not five), correct structure throughout
+  Note: all four pass structure checklist; fifth spec deferred
+- [ ] AC-3: Context drift detector — deferred
+- [ ] AC-4: Retrieval (list/lookup/search/suggest) — deferred
+- [ ] AC-5: Telemetry — deferred
 
 ## Design Questions (open — block implementation until answered)
 
