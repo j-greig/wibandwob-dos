@@ -351,5 +351,7 @@ export default function setup(host: MicroappHost) {
     action: openZine,
     multiInstance: true,
     direct: true,
+    menu: [{ category: "applications", order: 40, label: "ZINE" }],
+    palette: { order: 60, label: "Open ZINE" },
   });
 }
