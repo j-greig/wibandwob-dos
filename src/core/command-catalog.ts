@@ -5,7 +5,7 @@
  * by command-registry.ts.
  */
 
-import type { MenuConfig, MenuItem } from "./types.js";
+import type { AppType, MenuConfig, MenuItem } from "./types.js";
 import type { CapabilityKey } from "../services/capability-service.js";
 
 /** Controller action contract consumed by the command registry and catalog projections. */
@@ -113,6 +113,7 @@ export interface MenuPlacement {
   category: AppCommandCategory;
   order: number;
   label?: string;
+  appTypes?: AppType[];
 }
 
 /** Where a command appears in the command palette. Not executable on its own. */
@@ -374,7 +375,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     group: "open",
     actionKey: "openEditor",
     multiInstance: true,
-    menuPlacements: [{ category: "file", order: 40 }],
+    menuPlacements: [{ category: "file", order: 40, appTypes: ["text-editor"] }],
     api: true,
     agent: true
   },
@@ -383,7 +384,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     label: "Save",
     group: "save",
     actionKey: "saveFocusedEditor",
-    menuPlacements: [{ category: "file", order: 50 }],
+    menuPlacements: [{ category: "file", order: 50, appTypes: ["text-editor"] }],
     palettePlacement: { order: 50 },
     contextMenu: { windowKinds: ["editor"], order: 10 }
   },
@@ -392,7 +393,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     label: "Save As...",
     group: "save",
     actionKey: "saveAsFocusedEditor",
-    menuPlacements: [{ category: "file", order: 60 }],
+    menuPlacements: [{ category: "file", order: 60, appTypes: ["text-editor"] }],
     palettePlacement: { order: 60 },
     contextMenu: { windowKinds: ["editor"], order: 20 }
   },
@@ -466,6 +467,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     description: "Re-read system prompt files from disk and hot-swap into the running agent session. No restart needed.",
     group: "system",
     actionKey: "reloadAgentPrompt",
+    menuPlacements: [{ category: "file", order: 190, appTypes: ["wibwob-agent"] }],
     api: true,
     agent: true
   },
@@ -1007,11 +1009,16 @@ export function createMenuConfigs(actions: AppMenuActions): MenuConfig[] {
           .map((placement) => ({
             order: placement.order,
             label: placement.label ?? command.label,
-            action: actions[command.actionKey]
+            action: actions[command.actionKey],
+            appTypes: placement.appTypes
           })),
       )
       .sort(byPlacementOrder)
-      .map(({ label, action }) => ({ label, action }))
+      .map(({ label, action, appTypes }) => ({
+        label,
+        action,
+        ...(appTypes ? { appTypes } : {})
+      }))
   }));
 }
 

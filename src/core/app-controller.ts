@@ -280,6 +280,7 @@ export class TsTuiMvpApp {
       this.menus,
       () => this.windowManager.restoreWindowFocus(),
       () => this.syncLiveState(),
+      () => this.windowManager.getFocusedWindow()?.describeState?.()?.appType as string | undefined,
     );
     this.editor = new EditorCoordinator({
       windowManager: this.windowManager,
