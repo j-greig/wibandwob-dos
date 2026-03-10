@@ -44,7 +44,14 @@ export class MenuOverlayManager {
           hover: theme().selected
         }
       });
-      target.on("click", () => openMenu(menu.label));
+      target.on("click", () => {
+        // If this menu is already open, close it (toggle). Otherwise open it.
+        if (this.openMenuLabel === menu.label) {
+          this.closeMenu();
+        } else {
+          openMenu(menu.label);
+        }
+      });
       this.menuTargets.push(target);
     }
   }
@@ -83,8 +90,31 @@ export class MenuOverlayManager {
       (item) =>
         !item.appTypes || (!!focusedAppType && item.appTypes.includes(focusedAppType)),
     );
-    const width = Math.max(...visibleItems.map((item) => item.label.length)) + 4;
+    const width =
+      Math.max(
+        ...visibleItems.filter((item) => !item.separator).map((item) => item.label.length),
+        10,
+      ) + 4;
     const height = visibleItems.length + 2;
+    const separatorLabel = "─".repeat(Math.max(1, width - 4));
+    const findNextSelectable = (startIndex: number, direction: 1 | -1, wrap: boolean): number => {
+      if (visibleItems.length === 0) {
+        return -1;
+      }
+      let candidate = startIndex;
+      for (let steps = 0; steps < visibleItems.length; steps += 1) {
+        if (wrap) {
+          candidate = (candidate + visibleItems.length) % visibleItems.length;
+        } else if (candidate < 0 || candidate >= visibleItems.length) {
+          return -1;
+        }
+        if (!visibleItems[candidate]?.separator) {
+          return candidate;
+        }
+        candidate += direction;
+      }
+      return -1;
+    };
     this.menuShadow = this.createShadow(menu.left, 1, width, height);
     this.menuList = blessed.list({
       parent: this.screen,
@@ -101,15 +131,63 @@ export class MenuOverlayManager {
         border: theme().windowBorderFocused,
         selected: theme().selected
       },
-      items: visibleItems.map((item) => item.label)
+      items: visibleItems.map((item) => (item.separator ? separatorLabel : item.label))
     });
     this.menuList.setFront();
     this.openMenuLabel = label;
     this.menuList.focus();
-    this.menuList.select(0);
+    const initialIndex = findNextSelectable(0, 1, false);
+    this.menuList.select(initialIndex >= 0 ? initialIndex : 0);
     this.menuList.on("select", (_, index) => {
+      const selectedItem = visibleItems[index];
+      if (!selectedItem) {
+        return;
+      }
+      if (selectedItem.separator) {
+        const nextSelectable = findNextSelectable(index + 1, 1, true);
+        if (nextSelectable >= 0) {
+          (this.menuList as any).select(nextSelectable);
+          this.screen.render();
+        }
+        return;
+      }
       this.closeMenu();
-      visibleItems[index].action();
+      selectedItem.action();
+    });
+    this.menuList.on("keypress", (_, key) => {
+      if (key.name === "escape") {
+        this.closeMenu();
+        return;
+      }
+      if (key.name !== "up" && key.name !== "down" && key.name !== "k" && key.name !== "j") {
+        return;
+      }
+      const direction: 1 | -1 = key.name === "up" || key.name === "k" ? -1 : 1;
+      setTimeout(() => {
+        if (!this.menuList) {
+          return;
+        }
+        const idx = (this.menuList as any).selected as number;
+        if (!visibleItems[idx]?.separator) {
+          return;
+        }
+        const nextSelectable = findNextSelectable(idx + direction, direction, true);
+        if (nextSelectable >= 0) {
+          (this.menuList as any).select(nextSelectable);
+          this.screen.render();
+        }
+      }, 0);
+    });
+    // Click anywhere outside the menu list closes it.
+    // Capture this list instance so the timeout doesn't fire against a newer menu.
+    const thisMenuList = this.menuList;
+    thisMenuList.on("blur", () => {
+      setTimeout(() => {
+        // Only close if this is still the active menu list (not already replaced)
+        if (this.menuList === thisMenuList) {
+          this.closeMenu();
+        }
+      }, 80);
     });
     this.onChange();
     this.screen.render();
@@ -188,7 +266,11 @@ export class MenuOverlayManager {
     if (items.length === 0) {
       return;
     }
-    const width = Math.max(...items.map((item) => item.label.length)) + 4;
+    const width =
+      Math.max(
+        ...items.filter((item) => !item.separator).map((item) => item.label.length),
+        10,
+      ) + 4;
     const left = Math.max(0, Math.min((x ?? 2) - 1, Math.max(0, Number(this.screen.width) - width - 1)));
     const top = Math.max(1, Math.min(y ?? 2, Math.max(1, Number(this.screen.height) - items.length - 3)));
     const height = items.length + 2;
@@ -208,7 +290,9 @@ export class MenuOverlayManager {
         border: theme().windowBorderFocused,
         selected: theme().selected
       },
-      items: items.map((item) => item.label)
+      items: items.map((item) =>
+        item.separator ? "─".repeat(Math.max(1, width - 4)) : item.label,
+      )
     });
     this.popupMenu.setFront();
     this.popupMenu.focus();

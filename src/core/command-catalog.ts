@@ -114,6 +114,8 @@ export interface MenuPlacement {
   order: number;
   label?: string;
   appTypes?: AppType[];
+  separatorAfter?: true;
+  favourite?: true;
 }
 
 /** Where a command appears in the command palette. Not executable on its own. */
@@ -455,7 +457,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     description: "Open (or focus) the native Wib&Wob Agent chat window.",
     group: "open",
     actionKey: "openWibWobAgent",
-    menuPlacements: [{ category: "applications", order: 120, label: "Wib&Wob Agent" }],
+    menuPlacements: [{ category: "applications", order: 120, label: "Wib&Wob Agent", favourite: true }],
     palettePlacement: { order: 130 },
     contextMenu: { desktop: true, order: 70 },
     api: true,
@@ -803,7 +805,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     description: "Open Scramble the cat as a full floating window.",
     group: "surface",
     actionKey: "openScrambleFloating",
-    menuPlacements: [{ category: "applications", order: 130 }],
+    menuPlacements: [{ category: "applications", order: 130, favourite: true }],
     palettePlacement: { order: 120 },
     api: true,
     agent: true
@@ -1002,23 +1004,74 @@ export function createMenuConfigs(actions: AppMenuActions): MenuConfig[] {
     label: menu.label,
     key: menu.key,
     left: menu.left,
-    items: listAppCommands()
-      .flatMap((command) =>
-        command.menuPlacements
-          .filter((placement) => placement.category === menu.category)
-          .map((placement) => ({
-            order: placement.order,
-            label: placement.label ?? command.label,
-            action: actions[command.actionKey],
-            appTypes: placement.appTypes
-          })),
-      )
-      .sort(byPlacementOrder)
-      .map(({ label, action, appTypes }) => ({
-        label,
-        action,
-        ...(appTypes ? { appTypes } : {})
-      }))
+    items: (() => {
+      if (menu.category !== "applications") {
+        return listAppCommands()
+          .flatMap((command) =>
+            command.menuPlacements
+              .filter((placement) => placement.category === menu.category)
+              .map((placement) => ({
+                order: placement.order,
+                label: placement.label ?? command.label,
+                action: actions[command.actionKey],
+                appTypes: placement.appTypes,
+                separatorAfter: placement.separatorAfter,
+                favourite: placement.favourite
+              })),
+          )
+          .sort(byPlacementOrder)
+          .reduce((acc, item) => {
+            acc.push({
+              label: item.label,
+              action: item.action,
+              ...(item.appTypes ? { appTypes: item.appTypes } : {})
+            });
+            if (item.separatorAfter) {
+              acc.push({ label: "---separator---", action: () => {}, separator: true as const });
+            }
+            return acc;
+          }, [] as MenuItem[]);
+      }
+
+      const all = listAppCommands()
+        .flatMap((command) =>
+          command.menuPlacements
+            .filter((placement) => placement.category === "applications")
+            .map((placement) => ({
+              order: placement.order,
+              label: placement.label ?? command.label,
+              action: actions[command.actionKey],
+              appTypes: placement.appTypes,
+              favourite: placement.favourite
+            })),
+        );
+
+      const favourites = all.filter((item) => item.favourite).sort(byPlacementOrder);
+      const rest = all.filter((item) => !item.favourite).sort((a, b) => {
+        const stripOpen = (s: string): string => s.replace(/^open\s+/i, "").toLowerCase();
+        return stripOpen(a.label).localeCompare(stripOpen(b.label));
+      });
+
+      const result: MenuItem[] = favourites.map((item) => ({
+        label: item.label,
+        action: item.action,
+        ...(item.appTypes ? { appTypes: item.appTypes } : {})
+      }));
+
+      if (favourites.length > 0 && rest.length > 0) {
+        result.push({ label: "---separator---", action: () => {}, separator: true as const });
+      }
+
+      result.push(
+        ...rest.map((item) => ({
+          label: item.label,
+          action: item.action,
+          ...(item.appTypes ? { appTypes: item.appTypes } : {})
+        })),
+      );
+
+      return result;
+    })()
   }));
 }
 
