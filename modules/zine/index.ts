@@ -27,7 +27,7 @@ import {
   hitPanel,
   type PanelNode,
 } from "../../src/core/panel-layout.js";
-import type { ZineItem } from "../../src/core/canvas-types.js";
+import type { ZineItem, ZineSourceType } from "../../src/core/canvas-types.js";
 import { createTimer, clearTimers } from "../../src/core/ui-primitives.js";
 import { createButtonBar } from "../../src/core/ui-parts.js";
 import { toPanelDef, renderPanel } from "../sy2-chronicles/panel-types.js";
@@ -131,7 +131,6 @@ export default function setup(host: MicroappHost) {
     let tick = 0;
     let activePanelId = cePanelDefs[0]?.id ?? "";
     let searchQuery = "";
-    let editingPanelId: string | undefined;
     let dragging: { id: string; offsetX: number; offsetY: number } | undefined;
     const panelPositionOverrides = new Map<string, { x: number; y: number }>();
     const contentOverrides = new Map<string, string>();
@@ -417,7 +416,6 @@ export default function setup(host: MicroappHost) {
       // Render panel content (respect overrides and editing)
       for (const node of zineNodes.values()) {
         if (node.item.type !== "panel" || !node.content || !node.item.content) continue;
-        if (editingPanelId === node.item.id) continue;
         const iw = Math.max(1, node.item.w - 2);
         const ih = Math.max(1, node.item.h - 2);
         const override = contentOverrides.get(node.item.id);
@@ -446,37 +444,59 @@ export default function setup(host: MicroappHost) {
       host.screen.render();
     }
 
-    // ── Double-click → inline edit ──────────────────────────────────
-    function enterEditMode(panelId: string) {
-      const node = panelNodes.get(panelId);
-      if (!node || editingPanelId) return;
-      editingPanelId = panelId;
-      const iw = Math.max(1, node.def.w - 2);
-      const ih = Math.max(1, node.def.h - 2);
-      const currentText = contentOverrides.get(panelId) ?? node.def.content(0, iw, ih);
-      const editor = blessed.textarea({
-        parent: node.frame,
-        top: 1, left: 1, right: 1, bottom: 1,
-        keys: true, mouse: true, clickable: true,
-        inputOnFocus: true,
-        fixed: true,
-        style: { ...host.theme().body, border: { fg: host.theme().selected.bg } },
-        scrollable: true,
-      });
-      editor.setValue(currentText);
-      editor.focus();
-      host.screen.render();
-      const exitEdit = () => {
-        const saved = editor.getValue();
-        contentOverrides.set(panelId, saved);
-        editor.destroy();
-        editingPanelId = undefined;
-        renderLayoutAndContent();
-        canvas.focus();
-        host.screen.render();
-      };
-      editor.key(["escape"], exitEdit);
-      editor.key(["C-s"], exitEdit);
+    // ── Double-click → open in native editor ──────────────────────
+    //
+    // Dispatch map: sourceType → global command + args builder.
+    // Each entry says "for this kind of panel content, open THIS editor".
+    // Add new entries as editor apps get SDK-ised.
+    //
+    type EditorDispatch = {
+      command: string;
+      buildArgs: (panelId: string, content: string, panelTitle: string) => Record<string, unknown>;
+    };
+
+    const EDITOR_DISPATCH: Record<string, EditorDispatch> = {
+      text: {
+        command: "editor.open",
+        buildArgs: (_id, content, panelTitle) => ({
+          title: panelTitle,
+          initial: content,
+        }),
+      },
+      markdown: {
+        command: "editor.open",
+        buildArgs: (_id, content, panelTitle) => ({
+          title: panelTitle,
+          initial: content,
+        }),
+      },
+      // figlet: { command: "figlet.open", buildArgs: ... }  ← scaffold slot
+      // "ascii-art": { command: "primer.open", buildArgs: ... }  ← scaffold slot
+    };
+
+    // Build sourceType lookup from the original CEPanelDefs
+    const panelSourceTypes = new Map<string, ZineSourceType>();
+    for (const def of cePanelDefs) {
+      // CEPanelDef.type maps directly to ZineSourceType for supported types
+      panelSourceTypes.set(def.id, def.type as ZineSourceType);
+    }
+
+    function openInEditor(panelId: string) {
+      const zNode = zineNodes.get(panelId);
+      if (!zNode || zNode.item.type !== "panel") return;
+
+      const sourceType = panelSourceTypes.get(panelId) ?? "text";
+      const dispatch = EDITOR_DISPATCH[sourceType];
+      if (!dispatch) return; // no editor registered for this type yet
+
+      // Get current content (override or rendered)
+      const iw = Math.max(1, zNode.item.w - 2);
+      const ih = Math.max(1, zNode.item.h - 2);
+      const content = contentOverrides.get(panelId)
+        ?? (zNode.item.content ? zNode.item.content(0, iw, ih) : "");
+      const panelTitle = zNode.item.title ?? panelId;
+
+      host.runGlobalCommand(dispatch.command, dispatch.buildArgs(panelId, content, panelTitle));
     }
 
     // ── Mouse: click-to-focus, double-click-to-edit, drag-to-move ──
@@ -516,7 +536,7 @@ export default function setup(host: MicroappHost) {
         if (node) {
           const now = Date.now();
           if (now - lastClickTime < DBLCLICK_MS && lastClickId === node.def.id) {
-            enterEditMode(node.def.id);
+            openInEditor(node.def.id);
             lastClickTime = 0;
             return;
           }
@@ -574,7 +594,6 @@ export default function setup(host: MicroappHost) {
       let dirty = false;
       for (const node of zineNodes.values()) {
         if (node.item.type !== "panel" || !node.item.live || !node.content || !node.item.content) continue;
-        if (editingPanelId === node.item.id) continue;
         if (contentOverrides.has(node.item.id)) continue;
         const iw = Math.max(1, node.item.w - 2);
         const ih = Math.max(1, node.item.h - 2);
@@ -610,7 +629,6 @@ export default function setup(host: MicroappHost) {
       if (key?.name === "down" || ch === "j") { scrollBy(1 * speed);  return; }
       if (key?.name === "pageup")   { scrollBy(-20 * speed); return; }
       if (key?.name === "pagedown") { scrollBy(20 * speed);  return; }
-      if (editingPanelId) return;
       if (ch === "/") { openSearchPrompt(); return; }
       if (ch === "r") { rebuild(); return; }
     });

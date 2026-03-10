@@ -12,6 +12,9 @@ import type { CEPanelDef } from "../../modules/sy2-chronicles/panel-types.js";
 /** Item types that the ZINE layout engine can position. */
 export type ZineItemType = "panel" | "header" | "divider" | "spacer";
 
+/** Editor hint for double-click dispatch. Maps to a global command id. */
+export type ZineSourceType = "text" | "figlet" | "ascii-art";
+
 /** A positioned rectangle on the ZINE canvas. */
 export interface ZineItem {
   id: string;
@@ -24,6 +27,8 @@ export interface ZineItem {
   title?: string;
   content?: (tick: number, w: number, h: number) => string;
   live?: boolean;
+  /** What kind of editor should open on double-click. */
+  sourceType?: ZineSourceType;
   headerText?: string;
   ruleChar?: string;
 }
