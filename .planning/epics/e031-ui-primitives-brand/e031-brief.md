@@ -10,10 +10,13 @@ branch: epic/e031-ui-primitives-brand
 
 # E031 — Shared UI Primitives + Brand Nomenclature
 
-> TL;DR: Two parallel problems. First: the app has ~10 categories of
+> TL;DR: Two parallel problems.
+> 
+> First: the app has ~10 categories of
 > duplicated raw-blessed construction across 30+ files — sidebars, restyle
 > hooks, list widgets, search overlays, status bars. Extract each pattern
 > once into ui-parts.ts, export via SDK, migrate every consumer.
+> 
 > Second: the system presents itself as a jumble of generic names, dev
 > jargon ("Demo", "MVP", "Inspector"), and inconsistent conventions. Audit
 > every user-facing string, module ID, API endpoint, and internal type name.
@@ -22,37 +25,9 @@ branch: epic/e031-ui-primitives-brand
 
 ---
 
-## Audit sources
-
-Primitive duplication: `.codex-logs/2026-03-10/codex-audit-the-entire-src-and-modul-2026-03-10T15-23-19.log`
-Sidebar detail: `.codex-logs/2026-03-10/codex-analyse-all-sidebar-implementa-2026-03-10T14-52-55.log`
-
 ---
 
-## Review notes on the plan
-
-These are fresh-eyes observations before the build order, not changes to
-the brief — record them here so agents carrying this work can weigh them.
-
-- F04 (P02 focus + P03 restyle) touches two different layers: window-manager
-  for setFocusTarget, ui-parts for createRestyleBundle. Keep stories S13 and
-  S14 sequential not parallel — S13 changes WindowRecord/Facade, S14 changes
-  ui-parts. Mixing them in one PR will produce noisy diffs.
-- P07 (raw toolbar boxes) is listed as MEDIUM but has 13 occurrences — same
-  count as P05 (raw status bars). Promote P07 to HIGH. It should move before
-  P08 in execution order.
-- S08 (remove dead sidebar code) should be gated on all five sidebar
-  migrations being smoke-tested. Do not merge S08 until S03–S07 are verified.
-  Add that dependency explicitly.
-- The "migrate-only" framing in F05 is correct but worth flagging: S15–S18
-  have zero new code risk. They can be done in one sitting across multiple
-  files as a pure cleanup pass. Assign to one agent, ship in one PR.
-- Empty state constants (P09) are a tiny win. Do not let them block anything.
-  Slot into F05 as the last item.
-
----
-
-## Part A — Pattern catalogue (primitive duplication)
+## Pattern catalogue
 
 Severity: HIGH = 3+ occurrences, complex, confirmed bugs.
 MEDIUM = 2–3, moderate. LOW = minor.
@@ -146,10 +121,6 @@ music-player-window.ts:240 hand-rolls a blessed.textbox for file input.
 Migrate to overlays.openValuePrompt. Migrate-only.
 
 ---
-
-## Part A2 — Second sweep findings (src/windows, src/core, modules)
-
-These were found in a follow-up parallel audit. New patterns only.
 
 ### W01 — Split-pane ratio magic numbers — MEDIUM
 
@@ -295,7 +266,7 @@ be singletons. The SDK has no focusOrCreate() helper. Add one.
 
 ---
 
-## Part B — Nomenclature audit (naming debt)
+## Nomenclature audit
 
 The system presents itself inconsistently. User-facing strings, module IDs,
 API endpoints, and internal types all follow different conventions set by
@@ -315,24 +286,6 @@ Convention B: bare noun / verb
 Convention C: namespaced
   "Finder: Search Files", "Scramble: meow", "Scramble: expand/collapse"
 
-Problems beyond inconsistency:
-  - "Open" prefix is noise — DOS didn't say "Open Notepad"
-  - "..." suffix applied inconsistently (some prompts don't have it, some non-prompts do)
-  - Developer jargon in user-facing menu: "Open Generative Art Demo",
-    "Open State Inspector", "Smear Text Surface", "Pattern Window"
-  - "Pattern Window" — "Window" is an implementation detail, not a name
-  - "Open §y² Chronicles" — special character in command label
-  - "Document Reader" and "Chrome Browser" — one names the function,
-    one names the technology
-
-Proposed convention for WibWob-DOS:
-  - Bare Title Case noun or verb phrase, no "Open" prefix
-  - "..." only when the command opens a prompt that requires user input
-    before anything happens (file picker, value prompt)
-  - Subsystem prefix with colon for grouped sub-commands: "Finder: X",
-    "Scramble: X", "Canvas: X" — consistent across all subsystems or none
-  - No developer jargon: drop "Demo", "MVP", "Inspector", "e026", "Pattern"
-  - Replace with WibWob-DOS names: see S19 rename table
 
 ### N02 — Module ID inconsistency — MEDIUM
 
@@ -344,10 +297,6 @@ Module IDs use three different separator conventions:
 
 Developer names leaking into IDs: touchlab.mvp, wibwob.e026-demo, example.hello-world
 
-Proposed convention: wibwob.slug — every module ID is wibwob. + lowercase-hyphen.
-  wibwob.tidepool, wibwob.glitchbox, wibwob.zine, wibwob.world,
-  wibwob.backrooms, wibwob.chatroom, wibwob.patchbay, wibwob.tr808, etc.
-  Internal/example modules keep wibwob.example.slug or are not registered.
 
 ### N03 — API endpoint inconsistency — MEDIUM
 
@@ -364,13 +313,6 @@ Problems:
   /view/wibwob-agent/open — "wibwob" is redundant in a WibWob-DOS API
   /view/art/open — too generic
   /view/companion/open and /view/companion/smol — mixed verbs
-
-Proposed convention:
-  /windows/... for window management (already clean)
-  /view/{surface}/open for opening named surfaces (already mostly clean)
-  Surface names should match command label slugs: "agent" not "wibwob-agent",
-  "backrooms" not "backrooms-tv", "reader" not "browser-reader"
-  Subsystem namespaces (/scramble/...) are good — extend to /canvas/... etc
 
 ### N04 — WindowKind type values — LOW
 
