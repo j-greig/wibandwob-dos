@@ -176,6 +176,7 @@ export class ControlApiService {
       globalThis as {
         Bun?: {
           serve: (options: {
+            hostname?: string;
             port: number;
             fetch: (request: Request) => Promise<Response> | Response;
           }) => { stop: (closeActiveConnections?: boolean) => void };
@@ -197,6 +198,7 @@ export class ControlApiService {
     for (const port of ports) {
       try {
         this.server = bunRuntime.serve({
+          hostname: "127.0.0.1",
           port,
           fetch: async (request) => this.handleRequest(request),
         });
