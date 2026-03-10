@@ -1,7 +1,7 @@
 ---
 id: SPK-agent-chat-tool-display
 title: Agent Chat Tool Display — Collapse Stacking Tool Results
-status: not-started
+status: done
 type: spike
 tags: [agent-ux, chat-window, tool-display, blessed]
 issue: ~
