@@ -7,6 +7,36 @@
 
 import type { CEPanelDef } from "../../modules/sy2-chronicles/panel-types.js";
 
+// ── ZineItem: unified layout primitive ────────────────────────────────────
+
+/** Item types that the ZINE layout engine can position. */
+export type ZineItemType = "panel" | "header" | "divider" | "spacer";
+
+/** A positioned rectangle on the ZINE canvas. */
+export interface ZineItem {
+  id: string;
+  type: ZineItemType;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  col?: number;
+  title?: string;
+  content?: (tick: number, w: number, h: number) => string;
+  live?: boolean;
+  headerText?: string;
+  ruleChar?: string;
+}
+
+/** Result from ZINE column layout — a flat list of positioned items. */
+export interface ZineLayoutResult {
+  items: ZineItem[];
+  contentWidth: number;
+  contentHeight: number;
+}
+
+// ── Canvas document types ─────────────────────────────────────────────────
+
 /** Column definition in a canvas document. */
 export interface CanvasColumnDef {
   /** Header text displayed above the column. */

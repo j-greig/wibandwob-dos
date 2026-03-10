@@ -6,8 +6,12 @@
  * Renders identically to §y² Chronicles — same panel chrome, title bars,
  * scrollable canvas, toolbar, keyboard navigation.
  *
+ * Uses ZineItem as the unified layout primitive — every positioned rectangle
+ * (panel, header, divider) is a ZineItem, positioned by the layout engine,
+ * rendered and clipped uniformly.
+ *
  * Reuses: content-loader (YAML parsing), panel-types (CEPanelDef, toPanelDef,
- * renderPanel), panel-layout (column layout engine).
+ * renderPanel), panel-layout (column layout engine), canvas-types (ZineItem).
  */
 
 import blessed from "blessed";
@@ -22,9 +26,8 @@ import {
   pointerToContent,
   hitPanel,
   type PanelNode,
-  type ColumnHeader,
-  type ColumnLayoutResult,
 } from "../../src/core/panel-layout.js";
+import type { ZineItem } from "../../src/core/canvas-types.js";
 import { createTimer, clearTimers } from "../../src/core/ui-primitives.js";
 import { createButtonBar } from "../../src/core/ui-parts.js";
 import { toPanelDef, renderPanel } from "../sy2-chronicles/panel-types.js";
@@ -32,6 +35,14 @@ import { loadCanvas } from "../sy2-chronicles/content-loader.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "../..");
+
+/** Blessed node backing a ZineItem on the canvas. */
+interface ZineNode {
+  item: ZineItem;
+  frame: blessed.Widgets.BoxElement;
+  titleBar?: blessed.Widgets.BoxElement;
+  content?: blessed.Widgets.BoxElement;
+}
 
 /** Recursively find all .canvas.yaml files under a directory. */
 function findCanvasFiles(dir: string, maxDepth = 3, depth = 0): string[] {
@@ -62,7 +73,6 @@ export default function setup(host: MicroappHost) {
       if (candidates.length === 1) {
         filePath = candidates[0]!;
       } else {
-        // Show list picker
         const picker = blessed.list({
           parent: host.screen,
           top: "center", left: "center",
@@ -135,7 +145,7 @@ export default function setup(host: MicroappHost) {
       style: host.theme().body,
     });
 
-    // ── Scrollable canvas (identical to §y²) ────────────────────────
+    // ── Scrollable canvas ───────────────────────────────────────────
     const canvas = blessed.box({
       parent: root,
       top: 1, left: 0, right: 0, bottom: 1,
@@ -164,7 +174,7 @@ export default function setup(host: MicroappHost) {
       }
     };
 
-    // ── Toolbar (bottom bar, identical to §y²) ─────────────────────
+    // ── Toolbar (bottom bar) ────────────────────────────────────────
     let paused = false;
     type ToolbarAction = "search" | "pause";
     const toolbar = createButtonBar<ToolbarAction>(
@@ -196,7 +206,9 @@ export default function setup(host: MicroappHost) {
       style: host.theme().body,
     });
 
-    // ── Panel nodes ─────────────────────────────────────────────────
+    // ── ZineItem nodes (unified: panels + headers) ──────────────────
+    const zineNodes = new Map<string, ZineNode>();
+    // Legacy panelNodes view for hitPanel() compatibility
     const panelNodes = new Map<string, PanelNode>();
 
     function getFilteredDefs() {
@@ -206,22 +218,28 @@ export default function setup(host: MicroappHost) {
       );
     }
 
+    // ── Styles ──────────────────────────────────────────────────────
     function applyStyles() {
-      for (const node of panelNodes.values()) {
-        const active = node.def.id === activePanelId;
-        const borderColor = active
-          ? host.theme().highlight.fg
-          : host.theme().muted.fg;
-
-        node.frame.style = {
-          ...host.theme().body,
-          border: { fg: borderColor },
-        };
-        node.titleBar.style = active
-          ? { ...host.theme().titleBarFocused, bold: true }
-          : host.theme().header;
-        node.content.style = host.theme().body;
-        node.titleBar.setContent(node.def.title);
+      for (const node of zineNodes.values()) {
+        if (node.item.type === "panel") {
+          const active = node.item.id === activePanelId;
+          const borderColor = active
+            ? host.theme().highlight.fg
+            : host.theme().muted.fg;
+          node.frame.style = {
+            ...host.theme().body,
+            border: { fg: borderColor },
+          };
+          if (node.titleBar) {
+            node.titleBar.style = active
+              ? { ...host.theme().titleBarFocused, bold: true }
+              : host.theme().header;
+            node.titleBar.setContent(node.item.title ?? "");
+          }
+          if (node.content) node.content.style = host.theme().body;
+        } else if (node.item.type === "header") {
+          node.frame.style = { fg: host.theme().highlight.fg, bg: host.theme().body.bg };
+        }
       }
     }
 
@@ -229,8 +247,9 @@ export default function setup(host: MicroappHost) {
       const scroll = (canvas as any).getScrollPerc?.() ?? 0;
       const q = searchQuery ? `  search:${searchQuery}` : "";
       const pauseLabel = paused ? "▶ Play" : "⏸ Pause";
+      const panelCount = [...zineNodes.values()].filter(n => n.item.type === "panel").length;
       toolbar.update({
-        leftText: ` ZINE  ${panelNodes.size} panels  scroll:${scroll}%${q}`,
+        leftText: ` ZINE  ${panelCount} panels  scroll:${scroll}%${q}`,
         activeId: paused ? "pause" : "search",
       });
       const pauseNode = (toolbar.node.children as any)?.[3];
@@ -238,144 +257,171 @@ export default function setup(host: MicroappHost) {
       statusBar.setContent(` ${title}`);
     }
 
-    function buildPanels() {
-      for (const node of panelNodes.values()) node.frame.destroy();
+    // ── Build ZineNodes from items ──────────────────────────────────
+    function buildItems(items: ZineItem[]) {
+      for (const node of zineNodes.values()) node.frame.destroy();
+      zineNodes.clear();
       panelNodes.clear();
 
-      const defs = getFilteredDefs();
-      if (!activePanelId && defs.length > 0) activePanelId = defs[0]!.id;
+      for (const item of items) {
+        if (item.type === "panel") {
+          const frame = blessed.box({
+            parent: canvas,
+            top: 0, left: 0,
+            width: item.w, height: item.h,
+            border: "line",
+            style: {
+              ...host.theme().body,
+              border: { fg: host.theme().muted.fg },
+            },
+          });
 
-      for (const ceDef of defs) {
-        const def = toPanelDef(ceDef);
+          const titleBar = blessed.box({
+            parent: frame,
+            top: 0, left: 1, right: 1, height: 1,
+            tags: false,
+            fixed: true,
+            style: host.theme().header,
+            content: item.title ?? "",
+          });
 
-        const frame = blessed.box({
-          parent: canvas,
-          top: 0, left: 0,
-          width: def.w, height: def.h,
-          border: "line",
-          style: {
-            ...host.theme().body,
-            border: { fg: host.theme().muted.fg },
-          },
-        });
+          const iw = Math.max(1, item.w - 2);
+          const ih = Math.max(1, item.h - 2);
+          const contentBox = blessed.box({
+            parent: frame,
+            top: 1, left: 1,
+            width: iw, height: ih,
+            tags: false,
+            fixed: true,
+            style: host.theme().body,
+          });
 
-        const titleBar = blessed.box({
-          parent: frame,
-          top: 0, left: 1, right: 1, height: 1,
-          tags: false,
-          fixed: true,
-          style: host.theme().header,
-          content: def.title,
-        });
+          const zNode: ZineNode = { item, frame, titleBar, content: contentBox };
+          zineNodes.set(item.id, zNode);
 
-        const iw = Math.max(1, def.w - 2);
-        const ih = Math.max(1, def.h - 2);
-        const content = blessed.box({
-          parent: frame,
-          top: 1, left: 1,
-          width: iw, height: ih,
-          tags: false,
-          fixed: true,
-          style: host.theme().body,
-        });
+          // Populate legacy panelNodes for hitPanel()
+          if (item.content) {
+            panelNodes.set(item.id, {
+              def: {
+                id: item.id, title: item.title ?? "",
+                w: item.w, h: item.h,
+                col: (item.col ?? 0) as 0|1|2,
+                live: item.live,
+                content: item.content,
+              },
+              frame, titleBar, content: contentBox,
+              x: 0, y: 0,
+            });
+          }
 
-        panelNodes.set(def.id, {
-          def, frame, titleBar, content,
-          x: 0, y: 0,
-        });
+          if (!activePanelId) activePanelId = item.id;
+
+        } else if (item.type === "header") {
+          const rule = "─".repeat(item.w);
+          const frame = blessed.box({
+            parent: canvas,
+            top: item.y, left: item.x,
+            width: item.w, height: 2,
+            tags: false,
+            style: { fg: host.theme().highlight.fg, bg: host.theme().body.bg },
+            content: `${item.headerText ?? item.title ?? ""}\n${rule}`,
+          });
+          zineNodes.set(item.id, { item, frame });
+        }
       }
     }
 
-    // ── Column header nodes ────────────────────────────────────────
-    const headerNodes: blessed.Widgets.BoxElement[] = [];
+    /** Tear down all nodes and re-render from scratch. */
+    function rebuild() {
+      for (const n of zineNodes.values()) n.frame.destroy();
+      zineNodes.clear();
+      panelNodes.clear();
+      renderLayoutAndContent();
+      host.screen.render();
+    }
 
+    // ── Layout + render ─────────────────────────────────────────────
     function renderLayoutAndContent() {
       const measured = measureViewport(canvas);
-      // Fallback to window body width if canvas hasn't rendered yet
       const vw = measured.width > 20 ? measured.width : Math.max(80, (Number(win.body.width) || 80) - 2);
       const vh = measured.height;
       const defs = getFilteredDefs();
       const layoutDefs = defs.map(toPanelDef);
-      // Use column layout if any panel has col > 0, otherwise flow layout
-      const hasColumns = defs.some(d => (d.col ?? 0) > 0);
-      const layout = hasColumns
-        ? layoutColumns(layoutDefs, Math.max(20, vw), {
-            columnHeaders: columnHeaderMap.size > 0 ? columnHeaderMap : undefined,
-          })
-        : layoutPanels(layoutDefs, Math.max(20, vw));
-      const totalContentHeight = Math.max(layout.contentHeight, vh);
 
-      // Apply position overrides from drags
-      for (const placement of layout.placements) {
-        const override = panelPositionOverrides.get(placement.id);
-        if (override) {
-          placement.x = override.x;
-          placement.y = override.y;
-        }
+      // Column or flow layout → unified ZineItem[]
+      const hasColumns = defs.some(d => (d.col ?? 0) > 0);
+      let items: ZineItem[];
+      if (hasColumns) {
+        const result = layoutColumns(layoutDefs, Math.max(20, vw), {
+          columnHeaders: columnHeaderMap.size > 0 ? columnHeaderMap : undefined,
+        });
+        items = result.items;
+      } else {
+        const result = layoutPanels(layoutDefs, Math.max(20, vw));
+        items = result.placements.map(p => {
+          const def = layoutDefs.find(d => d.id === p.id);
+          return {
+            id: p.id, type: "panel" as const,
+            x: p.x, y: p.y,
+            w: def?.w ?? 40, h: def?.h ?? 10,
+            title: def?.title, content: def?.content, live: def?.live,
+          };
+        });
+      }
+
+      // Build nodes on first render (or after rebuild/search)
+      if (zineNodes.size === 0) buildItems(items);
+
+      // Apply drag overrides
+      for (const item of items) {
+        const override = panelPositionOverrides.get(item.id);
+        if (override) { item.x = override.x; item.y = override.y; }
       }
 
       const scrollY = (canvas as any).childBase ?? 0;
       const viewTop = scrollY;
       const viewBot = scrollY + vh;
 
-      for (const placement of layout.placements) {
-        const node = panelNodes.get(placement.id);
+      // Position and clip all ZineNodes uniformly
+      for (const item of items) {
+        const node = zineNodes.get(item.id);
         if (!node) continue;
-        const effectiveW = Math.max(3, Math.min(node.def.w, vw));
-        node.x = placement.x;
-        node.y = placement.y;
-        node.frame.left = node.x;
-        node.frame.top = node.y;
+
+        const effectiveW = Math.max(3, Math.min(item.w, vw));
+        node.frame.left = item.x;
+        node.frame.top = item.y;
         node.frame.width = effectiveW;
 
-        const panelTop = node.y;
-        const panelBot = node.y + node.def.h;
+        const top = item.y;
+        const bot = item.y + item.h;
 
-        if (panelBot <= viewTop || panelTop >= viewBot) {
+        if (bot <= viewTop || top >= viewBot) {
           node.frame.hidden = true;
         } else {
           node.frame.hidden = false;
-          const visibleH = Math.min(node.def.h, viewBot - panelTop);
-          node.frame.height = Math.max(3, visibleH);
-          node.content.height = Math.max(1, visibleH - 2);
+          if (item.type === "panel") {
+            const visibleH = Math.min(item.h, viewBot - top);
+            node.frame.height = Math.max(3, visibleH);
+            if (node.content) {
+              node.content.height = Math.max(1, visibleH - 2);
+              node.content.width = Math.max(1, effectiveW - 2);
+            }
+          }
         }
 
-        node.content.width = Math.max(1, effectiveW - 2);
+        // Sync panelNodes position for hitPanel
+        const pNode = panelNodes.get(item.id);
+        if (pNode) { pNode.x = item.x; pNode.y = item.y; }
       }
 
-      // Render content (respect overrides and editing)
-      for (const node of panelNodes.values()) {
-        if (editingPanelId === node.def.id) continue;
-        const iw = Math.max(1, node.def.w - 2);
-        const ih = Math.max(1, node.def.h - 2);
-        const override = contentOverrides.get(node.def.id);
-        node.content.setContent(override ?? node.def.content(tick, iw, ih));
-      }
-
-      // Column headers — render name + rule line above each column
-      for (const node of headerNodes) node.destroy();
-      headerNodes.length = 0;
-
-      const headers: ColumnHeader[] = "headers" in layout ? (layout as ColumnLayoutResult).headers : [];
-      for (const hdr of headers) {
-        const rule = "─".repeat(hdr.width);
-        const headerBox = blessed.box({
-          parent: canvas,
-          top: hdr.y, left: hdr.x,
-          width: hdr.width, height: 2,
-          tags: false,
-          style: { fg: host.theme().highlight.fg, bg: host.theme().body.bg },
-          content: `${hdr.text}\n${rule}`,
-        });
-        // Viewport clipping — same as panels
-        const hdrTop = hdr.y;
-        const hdrBot = hdr.y + 2;
-        if (hdrBot <= viewTop || hdrTop >= viewBot) {
-          headerBox.hidden = true;
-        } else {
-          headerBox.hidden = false;
-        }
-        headerNodes.push(headerBox);
+      // Render panel content (respect overrides and editing)
+      for (const node of zineNodes.values()) {
+        if (node.item.type !== "panel" || !node.content || !node.item.content) continue;
+        if (editingPanelId === node.item.id) continue;
+        const iw = Math.max(1, node.item.w - 2);
+        const ih = Math.max(1, node.item.h - 2);
+        const override = contentOverrides.get(node.item.id);
+        node.content.setContent(override ?? node.item.content(tick, iw, ih));
       }
 
       applyStyles();
@@ -394,10 +440,8 @@ export default function setup(host: MicroappHost) {
       prompt.readInput((_err, value) => {
         searchQuery = (value ?? "").trim();
         prompt.destroy();
-        buildPanels();
-        renderLayoutAndContent();
+        rebuild();
         canvas.focus();
-        host.screen.render();
       });
       host.screen.render();
     }
@@ -470,7 +514,6 @@ export default function setup(host: MicroappHost) {
         if (!pt) return;
         const node = hitPanel(panelNodes, pt.x, pt.y);
         if (node) {
-          // Double-click detection
           const now = Date.now();
           if (now - lastClickTime < DBLCLICK_MS && lastClickId === node.def.id) {
             enterEditMode(node.def.id);
@@ -480,7 +523,6 @@ export default function setup(host: MicroappHost) {
           lastClickTime = now;
           lastClickId = node.def.id;
 
-          // Focus + drag start
           dragging = {
             id: node.def.id,
             offsetX: pt.x - node.x,
@@ -510,7 +552,6 @@ export default function setup(host: MicroappHost) {
     };
     host.screen.on("mouse", handleMouse);
 
-    // Mouse wheel
     const handleWheel = (data: any) => {
       if (!canvas.parent) return;
       if (!isInsideCanvas(data.x, data.y)) return;
@@ -523,8 +564,7 @@ export default function setup(host: MicroappHost) {
     host.screen.on("mouse", handleWheel);
 
     // ── Build + first render ────────────────────────────────────────
-    buildPanels();
-    renderLayoutAndContent();
+    rebuild();
     canvas.focus();
 
     // ── Tick (live panels) ──────────────────────────────────────────
@@ -532,15 +572,14 @@ export default function setup(host: MicroappHost) {
       if (paused) return;
       tick++;
       let dirty = false;
-      for (const node of panelNodes.values()) {
-        if (node.def.live && !editingPanelId) {
-          const iw = Math.max(1, node.def.w - 2);
-          const ih = Math.max(1, node.def.h - 2);
-          if (!contentOverrides.has(node.def.id)) {
-            node.content.setContent(node.def.content(tick, iw, ih));
-            dirty = true;
-          }
-        }
+      for (const node of zineNodes.values()) {
+        if (node.item.type !== "panel" || !node.item.live || !node.content || !node.item.content) continue;
+        if (editingPanelId === node.item.id) continue;
+        if (contentOverrides.has(node.item.id)) continue;
+        const iw = Math.max(1, node.item.w - 2);
+        const ih = Math.max(1, node.item.h - 2);
+        node.content.setContent(node.item.content(tick, iw, ih));
+        dirty = true;
       }
       if (dirty) { updateStatus(); host.screen.render(); }
     }, 1000, timers);
@@ -563,9 +602,8 @@ export default function setup(host: MicroappHost) {
     canvas.key(["home", "g"], () => { canvas.scrollTo(0); renderLayoutAndContent(); host.screen.render(); });
     canvas.key(["end", "G"], () => { canvas.scrollTo(99999); renderLayoutAndContent(); host.screen.render(); });
     canvas.key(["/"], () => openSearchPrompt());
-    canvas.key(["r"], () => { buildPanels(); });
+    canvas.key(["r"], () => rebuild());
 
-    // Also handle keys via win.onInput for when blessed focus is on the frame
     win.onInput((ch: string, key?: blessed.Widgets.Events.IKeyEventArg) => {
       const speed = key?.shift ? 5 : key?.ctrl ? 10 : 1;
       if (key?.name === "up"   || ch === "k") { scrollBy(-1 * speed); return; }
@@ -574,7 +612,7 @@ export default function setup(host: MicroappHost) {
       if (key?.name === "pagedown") { scrollBy(20 * speed);  return; }
       if (editingPanelId) return;
       if (ch === "/") { openSearchPrompt(); return; }
-      if (ch === "r") { buildPanels(); return; }
+      if (ch === "r") { rebuild(); return; }
     });
 
     // ── Resize reflow ───────────────────────────────────────────────
@@ -589,16 +627,18 @@ export default function setup(host: MicroappHost) {
     });
 
     // ── Describe state ──────────────────────────────────────────────
-    win.describeState(() => ({
-      appType: "zine",
-      summary: `ZINE: ${title} — ${panelNodes.size} panels`,
-      panelCount: panelNodes.size,
-      filePath, title,
-      panels: [...panelNodes.entries()].map(([id, n]) => ({
-        id, title: n.def.title,
-        x: n.x, y: n.y, w: n.def.w, h: n.def.h,
-      })),
-    }));
+    win.describeState(() => {
+      const panelCount = [...zineNodes.values()].filter(n => n.item.type === "panel").length;
+      return {
+        appType: "zine",
+        summary: `ZINE: ${title} — ${panelCount} panels`,
+        panelCount, filePath, title,
+        items: [...zineNodes.values()].map(n => ({
+          id: n.item.id, type: n.item.type, title: n.item.title,
+          x: n.item.x, y: n.item.y, w: n.item.w, h: n.item.h,
+        })),
+      };
+    });
 
     // ── Restyle ─────────────────────────────────────────────────────
     win.onRestyle(() => {
@@ -606,7 +646,6 @@ export default function setup(host: MicroappHost) {
       canvas.style = host.theme().body;
       (canvas as any).scrollbar.style = { fg: host.theme().muted.fg, bg: host.theme().body.bg };
       statusBar.style = host.theme().body;
-      for (const h of headerNodes) h.style = { fg: host.theme().highlight.fg, bg: host.theme().body.bg };
       applyStyles();
       updateStatus();
       host.screen.render();
