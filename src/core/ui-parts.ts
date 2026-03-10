@@ -1375,3 +1375,125 @@ export function createSelectableList(opts: SelectableListOptions): SelectableLis
     },
   };
 }
+
+// ── createInlineSearch ────────────────────────────────────────────────────
+// Bottom-anchored inline search overlay (P06).
+// Shared by zine and sy2-chronicles (and any future module with in-canvas search).
+
+export interface InlineSearchOptions {
+  parent: blessed.Widgets.BoxElement;
+  placeholder?: string;
+  initialValue?: string;
+  onSubmit: (value: string) => void;
+  onCancel: () => void;
+  afterClose?: () => void;
+  /** Bottom inset from parent bottom edge (default 1). */
+  bottom?: number;
+}
+
+export interface InlineSearchHandle {
+  /** Mount the search bar (creates blessed nodes). Idempotent — no-ops if already open. */
+  open(): void;
+  /** Tear down the search bar. Idempotent — no-ops if already closed. */
+  close(): void;
+  isOpen(): boolean;
+  setValue(value: string): void;
+}
+
+export function createInlineSearch(opts: InlineSearchOptions): InlineSearchHandle {
+  const {
+    parent,
+    placeholder = "search…",
+    initialValue = "",
+    onSubmit,
+    onCancel,
+    afterClose,
+    bottom = 1,
+  } = opts;
+
+  let isOpenState = false;
+  let bar: blessed.Widgets.BoxElement | undefined;
+  let inputNode: blessed.Widgets.TextboxElement | undefined;
+
+  function mount() {
+    const CLOSE_W = 5; // " [×] "
+    const bg = theme().selected.bg ?? "blue";
+    const fg = theme().body.fg ?? "white";
+    const hfg = theme().highlight.fg ?? "yellow";
+
+    bar = blessed.box({
+      parent,
+      bottom,
+      left: 0,
+      right: 0,
+      height: 1,
+      style: { fg, bg },
+    });
+
+    inputNode = blessed.textbox({
+      parent: bar,
+      top: 0,
+      left: 0,
+      right: CLOSE_W,
+      height: 1,
+      inputOnFocus: true,
+      style: { fg, bg },
+    }) as blessed.Widgets.TextboxElement;
+
+    const closeBtn = blessed.box({
+      parent: bar,
+      top: 0,
+      right: 0,
+      width: CLOSE_W,
+      height: 1,
+      content: " [×] ",
+      mouse: true,
+      clickable: true,
+      style: { fg: hfg, bg },
+    });
+
+    if (initialValue) (inputNode as any).setValue(initialValue);
+
+    closeBtn.on("click", () => handle.close());
+    inputNode.key(["escape"], () => { onCancel(); handle.close(); });
+    inputNode.key(["enter"], () => {
+      const val = ((inputNode as any).value ?? "").trim();
+      onSubmit(val);
+      handle.close();
+    });
+    inputNode.key(["C-u"], () => { (inputNode as any).clearValue(); });
+
+    inputNode.focus();
+  }
+
+  function unmount() {
+    bar?.destroy();
+    bar = undefined;
+    inputNode = undefined;
+    afterClose?.();
+  }
+
+  const handle: InlineSearchHandle = {
+    open() {
+      if (isOpenState) return;
+      isOpenState = true;
+      mount();
+    },
+
+    close() {
+      if (!isOpenState) return;
+      isOpenState = false;
+      unmount();
+    },
+
+    isOpen() {
+      return isOpenState;
+    },
+
+    setValue(value: string) {
+      if (inputNode) (inputNode as any).setValue(value);
+    },
+  };
+
+  return handle;
+}

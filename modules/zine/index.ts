@@ -29,7 +29,7 @@ import {
 } from "../../src/core/panel-layout.js";
 import type { ZineItem, ZineSourceType } from "../../src/core/canvas-types.js";
 import { createTimer, clearTimers } from "../../src/core/ui-primitives.js";
-import { createButtonBar, createSidebarPanel } from "../../src/core/ui-parts.js";
+import { createButtonBar, createSidebarPanel, createSelectableList, createInlineSearch } from "../../src/core/ui-parts.js";
 import { toPanelDef, renderPanel } from "../sy2-chronicles/panel-types.js";
 import YAML from "yaml";
 import { loadCanvas } from "../sy2-chronicles/content-loader.js";
@@ -297,7 +297,7 @@ export default function setup(host: MicroappHost) {
       ],
       (id) => {
         if (id === "sidebar") toggleSidebar();
-        else if (id === "search") openSearchPrompt();
+        else if (id === "search") inlineSearch.open();
         else if (id === "pause") {
           paused = !paused;
           updateStatus();
@@ -543,63 +543,24 @@ export default function setup(host: MicroappHost) {
     }
 
     // ── Search ──────────────────────────────────────────────────────
-    let searchBarOpen = false;
-
-    function openSearchPrompt() {
-      if (searchBarOpen) return;
-      searchBarOpen = true;
-
-      const CLOSE_W = 5; // " [×] "
-      const bar = blessed.box({
-        parent: root,
-        bottom: 1, left: 0, right: 0, height: 1,
-        style: { fg: host.theme().body.fg, bg: host.theme().selected.bg },
-      });
-
-      const input = blessed.textbox({
-        parent: bar,
-        top: 0, left: 0, right: CLOSE_W, height: 1,
-        style: { fg: host.theme().body.fg, bg: host.theme().selected.bg },
-        inputOnFocus: true,
-      });
-
-      const closeBtn = blessed.box({
-        parent: bar,
-        top: 0, right: 0, width: CLOSE_W, height: 1,
-        content: " [×] ",
-        mouse: true, clickable: true,
-        style: { fg: host.theme().highlight.fg, bg: host.theme().selected.bg },
-      });
-
-      function closeSearch(commit: boolean) {
-        if (!searchBarOpen) return;
-        searchBarOpen = false;
-        if (commit) {
-          const val = (input as any).value ?? "";
-          searchQuery = val.trim();
-        }
-        bar.destroy();
+    // ── Search (createInlineSearch) ─────────────────────────────────
+    const inlineSearch = createInlineSearch({
+      parent: root,
+      initialValue: searchQuery,
+      onSubmit: (val) => {
+        searchQuery = val;
         rebuild();
         canvas.focus();
         host.screen.render();
-      }
-
-      closeBtn.on("click", () => closeSearch(false));
-
-      input.key(["escape"], () => closeSearch(false));
-      input.key(["enter"], () => closeSearch(true));
-
-      input.focus();
-      if (searchQuery) (input as any).setValue(searchQuery);
-      host.screen.render();
-    }
-
-    function closeSearchIfOpen() {
-      // External escape handler — fires if canvas has focus and bar is open
-      if (searchBarOpen) {
-        // The input's own escape handler will run; this is a safety fallback
-      }
-    }
+      },
+      onCancel: () => {
+        canvas.focus();
+        host.screen.render();
+      },
+      afterClose: () => {
+        host.screen.render();
+      },
+    });
 
     // ── Double-click → open in native editor ──────────────────────
     //
@@ -833,7 +794,7 @@ export default function setup(host: MicroappHost) {
     canvas.key(["pageup"], () => scrollBy(-20));
     canvas.key(["home", "g"], () => { canvas.scrollTo(0); renderLayoutAndContent(); host.screen.render(); });
     canvas.key(["end", "G"], () => { canvas.scrollTo(99999); renderLayoutAndContent(); host.screen.render(); });
-    canvas.key(["/"], () => openSearchPrompt());
+    canvas.key(["/"], () => inlineSearch.open());
     canvas.key(["r"], () => rebuild());
     canvas.key(["["], () => toggleSidebar());
 
@@ -843,7 +804,7 @@ export default function setup(host: MicroappHost) {
       if (key?.name === "down" || ch === "j") { scrollBy(1 * speed);  return; }
       if (key?.name === "pageup")   { scrollBy(-20 * speed); return; }
       if (key?.name === "pagedown") { scrollBy(20 * speed);  return; }
-      if (ch === "/") { openSearchPrompt(); return; }
+      if (ch === "/") { inlineSearch.open(); return; }
       if (ch === "r") { rebuild(); return; }
       if (ch === "[") { toggleSidebar(); return; }
     });

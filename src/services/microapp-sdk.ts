@@ -132,6 +132,7 @@ export {
   createSidebarPanel,
   resolveSidebarWidth,
   createSelectableList,
+  createInlineSearch,
 } from "../core/ui-parts.js";
 export type {
   InputLineProps,
@@ -151,6 +152,8 @@ export type {
   SidebarWidthPercent,
   SelectableListOptions,
   SelectableListHandle,
+  InlineSearchOptions,
+  InlineSearchHandle,
 } from "../core/ui-parts.js";
 
 export { createRenderMonitor } from "../core/render-monitor.js";
