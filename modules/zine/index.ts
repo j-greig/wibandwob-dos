@@ -175,25 +175,17 @@ export default function setup(host: MicroappHost) {
       style: host.theme().body,
     });
 
-    // Scrollable canvas (matches §y² pattern)
+    // Scrollable canvas
     const canvas = blessed.box({
       parent: root,
       top: 0, left: 0, right: 0, bottom: 0,
-      keys: true,
-      mouse: true,
-      clickable: true,
       scrollable: true,
       alwaysScroll: true,
-      scrollbar: {
-        ch: "│",
-        track: { ch: "░" },
-        style: { fg: host.theme().muted.fg, bg: host.theme().body.bg },
-      },
-      style: host.theme().body,
+      scrollbar: createScrollbar(),
+      style: scrollableStyle(host.theme().body),
+      mouse: true,
+      keys: true,
     });
-
-    // Prevent blessed scroll-jump on child focus
-    (canvas as any)._scrollIntoView = () => {};
 
     // Convert YAML panels to PanelDefs
     const panelDefs: PanelDef[] = doc.panels.map(p => ({
@@ -230,29 +222,20 @@ export default function setup(host: MicroappHost) {
             top: p.y,
             width: p.def.w,
             height: p.def.h,
-            border: "line",
+            border: { type: "line" },
+            label: ` ${p.def.title} `,
             style: {
-              ...host.theme().body,
               border: { fg: host.theme().muted.fg },
+              label: { fg: host.theme().body.fg },
+              ...host.theme().body,
             },
           });
 
-          // Title bar
-          const titleBar = blessed.box({
-            parent: frame,
-            top: 0,
-            left: 1,
-            right: 1,
-            height: 1,
-            tags: false,
-            style: { fg: host.theme().body.fg, bg: host.theme().body.bg },
-          });
-          titleBar.setContent(p.def.title);
-
           const content = blessed.box({
             parent: frame,
-            top: 1, left: 1, right: 1, bottom: 0,
+            top: 0, left: 0, right: 0, bottom: 0,
             tags: false,
+            fixed: true,
             style: host.theme().body,
           });
 
