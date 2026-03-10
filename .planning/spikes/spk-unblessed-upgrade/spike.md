@@ -230,6 +230,7 @@ References:
 - Elm Guide: https://guide.elm-lang.org/
 - blessed: https://github.com/chjj/blessed
 - unblessed: https://github.com/vdeantoni/unblessed
+- Migration from blessed: https://unblessed.dev/docs/getting-started/migration-from-blessed
 
 ### The core mapping
 
