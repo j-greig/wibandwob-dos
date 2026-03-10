@@ -55,72 +55,183 @@ export function createSprite(rawFrames: (string | string[])[], options: {
   };
 }
 
-// Player sprites — simplified to single-cell for TUI
-export const PLAYER_SPRITE_RIGHT = createSprite([["◕‿◕"]]);
-export const PLAYER_SPRITE_LEFT = createSprite([["◕‿◕"]]);
+// Player sprites
+export const PLAYER_SPRITE_RIGHT = createSprite([
+  ["◕‿◕‿◕༽"],
+  ["◡‿◕‿◕༽"],
+  ["◕‿◡‿◕༽"],
+  ["◕‿◕‿◡༽"],
+]);
+export const PLAYER_SPRITE_LEFT = createSprite([
+  ["༼◕‿◕‿◕"],
+  ["༼◡‿◕‿◕"],
+  ["༼◕‿◡‿◕"],
+  ["༼◕‿◕‿◡"],
+]);
 export const PLAYER_SQUEEZE_SPRITE = createSprite([["◕"]]);
 
 // Scramble
-export const SCRAMBLE_SPRITE = createSprite([["ꞈ"]], {
+export const SCRAMBLE_SPRITE = createSprite([
+  ["/ᐠ｡ꞈ｡ᐟ\\"],
+  ["/ᐠ｡-｡ᐟ\\"],
+  ["/ᐠ｡ꞈ｡ᐟ\\"],
+], {
   emotionalStates: {
-    normal: ["ꞈ"],
-    asleep: ["-z"],
-    prowling: ["ꞈ"],
-    curious: ["°"],
+    normal: ["/ᐠ｡ꞈ｡ᐟ\\"],
+    surprised: ["/ᐠ｡◕｡ᐟ\\"],
+    extra_happy: ["/ᐠ｡^｡ᐟ\\"],
+    playful_joy: ["/ᐠ｡◠｡ᐟ\\"],
+    relaxed: ["/ᐠ｡-｡ᐟ\\"],
+    curious: ["/ᐠ｡o｡ᐟ\\"],
+    blissful: ["/ᐠ｡◡｡ᐟ\\"],
+    focused: ["/ᐠ｡•｡ᐟ\\"],
+    friendly: ["/ᐠ｡◜｡ᐟ\\"],
+    asleep: ["/ᐠ｡_｡ᐟ\\"],
+    prowling: ["/ᐠ｡ꞈ｡ᐟ\\"],
+    battlemode: ["/ᐠ｡#｡ᐟ\\"],
+    zooming: ["/ᐠ｡!｡ᐟ\\"],
   },
 });
 
 // Titan / ridge sentinel
 export const TITAN_SPRITE = createSprite([
   [
-    " ╭─╮ ",
-    "╭╰─╯╮",
-    "│ ◉ │",
-    "╰───╯",
+    "   ╭─╮   ",
+    "  ╭╯ ╰╮  ",
+    " ╭╯ ◕◕╰╮ ",
+    "╭╯ ~~~~╰╮",
+  ],
+  [
+    "   ╭─╮   ",
+    "  ╭╯ ╰╮  ",
+    " ╭╯ ◡◡╰╮ ",
+    "╭╯ ~~~~╰╮",
+  ],
+  [
+    "   ╭─╮   ",
+    "  ╭╯ ╰╮  ",
+    " ╭╯ ◕◕╰╮ ",
+    "╭╯ ~~~~╰╮",
   ],
 ], { solidRowsFromBottom: 2 });
 
-// Castle facade — simplified for TUI
+// Castle facade
 export const CASTLE_SPRITE = createSprite([
   [
-    "╔═══╗",
-    "║   ║",
-    "║ ☖ ║",
-    "╚═╤═╝",
+    "      |WWW   ",
+    "      |      ",
+    "  _  _|_  __ ",
+    " |;|_|;|_|;||",
+    "  \\ .    .// ",
+    "   \\ .  ://  ",
+    "    |  :||   ",
+    "    |. :||   ",
+    "    |: :||   ",
+    "    |, :||   ",
+    "    |   ||   ",
+    "    |. :||   ",
+    "    |:  ||   ",
+    "    | ☖ |/   ",
   ],
-], { solidRowsFromBottom: 3 });
+], { solidRowsFromBottom: 7 });
 
 // Wobbler
-export const WOBBLER_SPRITE = createSprite([["◠‿◠"]]);
+export const WOBBLER_SPRITE = createSprite([
+  [
+    " ╭╮╭╮╭╮ ",
+    "╭╯╰╯╰╯╰╮",
+    "│ ▓ ▓  │",
+    "│  ═   │",
+    "│      │",
+    "│╭╮╭╮╭╮│",
+    "╰╯╰╯╰╯╰╯",
+  ],
+  [
+    " ╭╮╭╮╭╮ ",
+    "╭╯╰╯╰╯╰╮",
+    "│ ░ ░  │",
+    "│  ═   │",
+    "│      │",
+    "│╭╮╭╮╭╮│",
+    "╰╯╰╯╰╯╰╯",
+  ],
+]);
 
 // Screamer
-export const SCREAMER_SPRITE = createSprite([["◎"]]);
+export const SCREAMER_SPRITE = createSprite([
+  ["╱◕◕╲"],
+  ["╱◉◉╲"],
+]);
 
 // Mech
 export const MECH_SPRITE = createSprite([
   [
-    "┌─┐",
-    "│▣│",
-    "└┬┘",
+    "    ╭──┬──┬──╮    ",
+    "    │◕ │◡ │ ◕│    ",
+    "    ╰──┴╮╭┴──╯    ",
+    "      ╭─╯╰─╮      ",
+    "  ┌───┤    ├───┐  ",
+    "  │   ╰────╯   │  ",
+    "  │            │  ",
+    " ╱│╲          ╱│╲ ",
   ],
-], { solidRowsFromBottom: 2 });
+  [
+    "    ╭──┬──┬──╮    ",
+    "    │◡ │– │ ◡│    ",
+    "    ╰──┴╮╭┴──╯    ",
+    "      ╭─╯╰─╮      ",
+    "  ┌───┤    ├───┐  ",
+    "  │   ╰────╯   │  ",
+    "  │            │  ",
+    " ╱│╲          ╱│╲ ",
+  ],
+], { solidRowsFromBottom: 3 });
 
 // Skinny mech
 export const SKINNY_MECH_SPRITE = createSprite([
   [
-    "╓─╖",
-    "║▪║",
-    "╙┬╜",
+    "     ┌──┐      ",
+    " ┌───│◕◕│───┐ ",
+    " │   └──┘   │ ",
+    " │          │ ",
+    " │          │ ",
+    " │          │ ",
+    " │          │ ",
+    " │          │ ",
+    " │          │ ",
+    "╱│╲        ╱│╲",
   ],
-], { solidRowsFromBottom: 2 });
+  [
+    "     ┌──┐      ",
+    " ┌───│◡◡│───┐ ",
+    " │   └──┘   │ ",
+    " │          │ ",
+    " │          │ ",
+    " │          │ ",
+    " │          │ ",
+    " │          │ ",
+    " │          │ ",
+    "╱│╲        ╱│╲",
+  ],
+], { solidRowsFromBottom: 3 });
 
 // Tree
 export const TREE_SPRITE = createSprite([
   [
-    " ♣ ",
-    " │ ",
+    "   *   ",
+    "  /|\\  ",
+    " /◕|◕\\ ",
+    "///|\\\\\\",
+    " /|||\\ ",
+    "//|||\\\\",
+    " /|||\\ ",
+    "//|||\\\\",
+    "  |||  ",
+    "  |||  ",
+    "  |||  ",
+    "  |||   ",
   ],
-], { solidRowsFromBottom: 1 });
+]);
 
 // Mysterious cube
 export const MYSTERIOUS_CUBE_SPRITE = createSprite([["▣"]]);

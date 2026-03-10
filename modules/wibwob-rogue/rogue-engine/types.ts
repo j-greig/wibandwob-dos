@@ -79,6 +79,13 @@ export interface Player extends Entity {
   normalSprite: Sprite;
 }
 
+export interface StarCell {
+  x: number;
+  y: number;
+  phase: number;
+  speed: number;
+}
+
 export interface GameState {
   tiles: Map<string, Tile>;
   player: Player;
@@ -91,6 +98,8 @@ export interface GameState {
   turn: number;
   seed: number;
   mode: string;
+  animTick: number;
+  stars: StarCell[];
 }
 
 export interface FrameCell {

@@ -24,9 +24,14 @@ export function renderFrame(
   viewH: number,
   log: string[],
   logLines: number,
+  status = "",
 ) {
-  const mapH = viewH - logLines;
   const lines: string[] = [];
+  if (status) {
+    const padded = status.length < viewW ? status + " ".repeat(viewW - status.length) : status.slice(0, viewW);
+    lines.push(`{#393939-fg}${padded}{/}`);
+  }
+  const mapH = viewH - logLines - (status ? 1 : 0);
 
   for (let y = 0; y < mapH && y < viewH; y++) {
     let line = "";

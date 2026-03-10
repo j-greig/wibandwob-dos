@@ -5,7 +5,7 @@
 
 import blessed from "blessed";
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
-import { initState, step, getFrame, describeEngine, setViewportHeight } from "./rogue-engine/engine.js";
+import { initState, step, getFrame, describeEngine, setViewportHeight, tickAnim } from "./rogue-engine/engine.js";
 import { renderFrame } from "./rogue-renderer.js";
 import { mapKey } from "./rogue-input.js";
 import type { GameState, GameCommand } from "./rogue-engine/types.js";
@@ -49,18 +49,24 @@ function openRogue(host: MicroappHost) {
   function draw() {
     const innerW = (content.width as number) || 96;
     const innerH = (content.height as number) || 36;
-    const mapH = innerH - LOG_LINES;
+    const mapH = innerH - LOG_LINES - 1;
     const viewW = Math.min(innerW, 96);
     const viewH = Math.min(mapH, 72);
     setViewportHeight(viewH);
 
     const cells = getFrame(state, viewW, viewH);
-    renderFrame(content, cells, viewW, viewH + LOG_LINES, state.log, LOG_LINES);
+    const desc = describeEngine(state);
+    const status = `${desc.biome.toUpperCase()} [${desc.playerPos.x},${desc.playerPos.y}] T:${desc.turn}${desc.squeezing ? " ◕squeeze" : ""}`;
+    renderFrame(content, cells, viewW, viewH + LOG_LINES + 1, state.log, LOG_LINES, status);
     host.screen.render();
   }
 
   // Initial render
   draw();
+  const animTimer = setInterval(() => {
+    tickAnim(state);
+    draw();
+  }, 800);
 
   // Key bindings — use win.body.key() like other microapps
   const handleCmd = (cmd: GameCommand) => {
@@ -127,7 +133,9 @@ function openRogue(host: MicroappHost) {
     draw();
   });
 
-  win.onCleanup(() => {});
+  win.onCleanup(() => {
+    clearInterval(animTimer);
+  });
 
   win.focus();
 }

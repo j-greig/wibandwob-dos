@@ -6,7 +6,7 @@
 
 import { FOV } from "rot-js";
 import { RNG } from "rot-js";
-import type { GameState, GameCommand, FrameCell, Entity, Tile } from "./types.js";
+import type { GameState, GameCommand, FrameCell, Entity, Tile, StarCell } from "./types.js";
 import {
   HEIGHT, WIDTH, VIEWPORT_WIDTH, BASE_LIGHT_RADIUS, SQUEEZE_LIGHT_FACTOR,
   MAX_LOG_LINES, MAIN_PATH_Y, ROOMS, REGION_BOUNDS,
@@ -16,6 +16,32 @@ import {
   spriteWorldCells, spriteSolidCells,
 } from "./sprites.js";
 import { generateWorld, tileKey } from "./worldgen.js";
+
+const STAR_GLYPHS = ["·", "✦", "✧", "✶", "✹", "*", "˙"] as const;
+
+function generateStars(seed: number): StarCell[] {
+  const stars: StarCell[] = [];
+  const skyRows = 3;
+  const starDensity = 0.08;
+  let r = seed;
+  function rand() {
+    r = (r * 1664525 + 1013904223) & 0xffffffff;
+    return (r >>> 0) / 0xffffffff;
+  }
+  for (let y = 0; y < skyRows; y++) {
+    for (let x = 0; x < WIDTH; x++) {
+      if (rand() < starDensity) {
+        stars.push({
+          x,
+          y,
+          phase: Math.floor(rand() * STAR_GLYPHS.length),
+          speed: 1 + Math.floor(rand() * 3),
+        });
+      }
+    }
+  }
+  return stars;
+}
 
 // ─── state initialisation ────────────────────────────────
 
@@ -46,6 +72,8 @@ export function initState(seed: number): GameState {
     turn: 0,
     seed,
     mode: "overworld",
+    animTick: 0,
+    stars: generateStars(seed),
   };
 
   // Initial FOV + camera
@@ -131,7 +159,7 @@ function detectMonsterCollision(state: GameState, targetX: number, targetY: numb
   }
   for (const structure of state.structures) {
     if (!structure.solid) continue;
-    const cells = spriteWorldCells(structure.sprite, structure.x, structure.y);
+    const cells = spriteSolidCells(structure.sprite, structure.x, structure.y);
     for (const cell of cells) {
       if (playerOccupied.has(tileKey(cell.x, cell.y))) return structure;
     }
@@ -275,6 +303,15 @@ export function step(state: GameState, command: GameCommand): void {
   }
 }
 
+export function tickAnim(state: GameState): void {
+  state.animTick++;
+  for (const star of state.stars) {
+    if (state.animTick % star.speed === 0) {
+      star.phase = (star.phase + 1) % STAR_GLYPHS.length;
+    }
+  }
+}
+
 // ─── frame output ────────────────────────────────────────
 
 export function getFrame(state: GameState, viewW: number, viewH: number): FrameCell[] {
@@ -303,9 +340,34 @@ export function getFrame(state: GameState, viewW: number, viewH: number): FrameC
     }
   }
 
+  // Star layer — sky rows only
+  const brightness = ["#505050", "#707070", "#909090", "#b0b0b0", "#d0d0d0", "#f0f0f0", "#ffffff"];
+  for (const star of state.stars) {
+    const sx = star.x - camX;
+    const sy = star.y - camY;
+    if (sx < 0 || sx >= viewW || sy < 0 || sy >= viewH) continue;
+    const idx = sy * viewW + sx;
+    if (idx < 0 || idx >= cells.length) continue;
+    const cell = cells[idx];
+    if (cell.ch === " ") {
+      cells[idx] = {
+        x: sx,
+        y: sy,
+        ch: STAR_GLYPHS[star.phase % STAR_GLYPHS.length],
+        fg: brightness[star.phase % brightness.length],
+        bg: "#000000",
+      };
+    }
+  }
+
   // Entity layers — structures, monsters, player
   const paintEntity = (entity: Entity) => {
-    const spriteCells = spriteWorldCells(entity.sprite, entity.x, entity.y);
+    const frameCount = entity.sprite.frames.length;
+    let frameIndex = 0;
+    if (frameCount > 1) {
+      frameIndex = Math.floor(state.animTick / 2) % frameCount;
+    }
+    const spriteCells = spriteWorldCells(entity.sprite, entity.x, entity.y, frameIndex);
     const color = entity.color || "#f5f5f5";
     for (const cell of spriteCells) {
       const sx = cell.x - camX;
