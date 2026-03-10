@@ -403,3 +403,9 @@ Priority candidates for E001 specialists:
 2. **Panel chrome** — frame/titleBar/content pattern, fixed:true, theme tokens
 3. **Content pipeline** — content-loader, panel-types, panel-layout, canvas YAML schema
 4. **Branch discipline** — pre-action branch check, epic branch naming, commit conventions
+
+### blessed.box keyboard gotcha (2026-03-10)
+
+`blessed.box` silently drops all key events unless created with both `input: true`
+and `keys: true`. No error thrown, no warning — bindings register fine but never
+fire. Fix: add both options to any box that owns `.key()` bindings.

@@ -213,3 +213,4 @@ When adding a new WindowKind:
 
 | Date | Type | Subsystem | Finding | Triggered by |
 |------|------|-----------|---------|--------------|
+| 2026-03-10 | gotcha | microapp keyboard | `blessed.box` silently drops all key events unless created with `input: true` AND `keys: true` — no error, bindings just never fire | music-player keyboard shortcuts not working |
