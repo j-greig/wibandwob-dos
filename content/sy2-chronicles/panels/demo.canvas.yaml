@@ -2,6 +2,12 @@
 meta:
   title: "Demo Canvas — 3 Column Layout"
   format: "sy2-canvas-v1"
+  columnHeaders: true
+
+columns:
+  0: { header: "Origins" }
+  1: { header: "Substrate" }
+  2: { header: "Emergence" }
 
 panels:
   # ── Column 0: Origins ──────────────────────────────

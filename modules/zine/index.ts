@@ -22,6 +22,7 @@ import {
   pointerToContent,
   hitPanel,
   type PanelNode,
+  type ColumnHeader,
 } from "../../src/core/panel-layout.js";
 import { createTimer, clearTimers } from "../../src/core/ui-primitives.js";
 import { createButtonBar } from "../../src/core/ui-parts.js";
@@ -96,7 +97,15 @@ export default function setup(host: MicroappHost) {
     const canvas_doc = loadCanvas(filePath);
     if (!canvas_doc) return;
 
-    const { title, panels: cePanelDefs } = canvas_doc;
+    const { title, panels: cePanelDefs, columnHeaders: showHeaders, columns: columnDefs } = canvas_doc;
+
+    // Build column header map for layout engine
+    const columnHeaderMap = new Map<number, string>();
+    if (showHeaders) {
+      for (const [idx, def] of columnDefs) {
+        if (def.header) columnHeaderMap.set(idx, def.header);
+      }
+    }
 
     const sw = Math.max(80, Number(host.screen.width));
     const sh = Math.max(24, Number(host.screen.height));
@@ -276,23 +285,20 @@ export default function setup(host: MicroappHost) {
       }
     }
 
-    // ── Column separator overlay ──────────────────────────────────
-    const colSepOverlay = blessed.box({
-      parent: canvas,
-      top: 0, left: 0, right: 0, height: 1,
-      tags: false,
-      fixed: true,
-      style: { fg: host.theme().muted.fg, bg: "default", transparent: true },
-    });
+    // ── Column header nodes ────────────────────────────────────────
+    const headerNodes: blessed.Widgets.BoxElement[] = [];
 
     function renderLayoutAndContent() {
-      const { width: vw, height: vh } = measureViewport(canvas);
+      const measured = measureViewport(canvas);
+      // Fallback to window body width if canvas hasn't rendered yet
+      const vw = measured.width > 20 ? measured.width : Math.max(80, (Number(win.body.width) || 80) - 2);
+      const vh = measured.height;
       const defs = getFilteredDefs();
       const layoutDefs = defs.map(toPanelDef);
       // Use column layout if any panel has col > 0, otherwise flow layout
       const hasColumns = defs.some(d => (d.col ?? 0) > 0);
       const layout = hasColumns
-        ? layoutColumns(layoutDefs, Math.max(20, vw))
+        ? layoutColumns(layoutDefs, Math.max(20, vw), columnHeaderMap.size > 0 ? columnHeaderMap : undefined)
         : layoutPanels(layoutDefs, Math.max(20, vw));
       const totalContentHeight = Math.max(layout.contentHeight, vh);
 
@@ -343,10 +349,24 @@ export default function setup(host: MicroappHost) {
         node.content.setContent(override ?? node.def.content(tick, iw, ih));
       }
 
-      // Column separators disabled — the panel arrangement itself
-      // provides sufficient visual grouping.
-      colSepOverlay.setContent("");
-      colSepOverlay.hidden = true;
+      // Column headers — render name + rule line above each column
+      for (const node of headerNodes) node.destroy();
+      headerNodes.length = 0;
+
+      const headers: ColumnHeader[] = "headers" in layout ? (layout as any).headers : [];
+      for (const hdr of headers) {
+        const rule = "─".repeat(hdr.width);
+        const headerBox = blessed.box({
+          parent: canvas,
+          top: hdr.y, left: hdr.x,
+          width: hdr.width, height: 2,
+          tags: false,
+          fixed: true,
+          style: { fg: host.theme().highlight.fg, bg: host.theme().body.bg },
+          content: `${hdr.text}\n${rule}`,
+        });
+        headerNodes.push(headerBox);
+      }
 
       applyStyles();
       updateStatus();
@@ -576,7 +596,7 @@ export default function setup(host: MicroappHost) {
       canvas.style = host.theme().body;
       (canvas as any).scrollbar.style = { fg: host.theme().muted.fg, bg: host.theme().body.bg };
       statusBar.style = host.theme().body;
-      colSepOverlay.style = { fg: host.theme().muted.fg, bg: "default", transparent: true };
+      for (const h of headerNodes) h.style = { fg: host.theme().highlight.fg, bg: host.theme().body.bg };
       applyStyles();
       updateStatus();
       host.screen.render();

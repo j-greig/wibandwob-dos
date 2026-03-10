@@ -45,15 +45,42 @@ export function loadCanvasPanels(filePath: string): CEPanelDef[] {
   return doc.panels as CEPanelDef[];
 }
 
+export interface CanvasColumnDef {
+  header?: string;
+}
+
+export interface CanvasDocument {
+  title: string;
+  columnHeaders: boolean;
+  columns: Map<number, CanvasColumnDef>;
+  panels: CEPanelDef[];
+}
+
 /**
  * Load canvas meta + panels from a .canvas.yaml file.
  */
-export function loadCanvas(filePath: string): { title: string; panels: CEPanelDef[] } | null {
+export function loadCanvas(filePath: string): CanvasDocument | null {
   try {
     const raw = fs.readFileSync(filePath, "utf8");
     const doc = YAML.parse(raw);
     if (!doc || !Array.isArray(doc.panels) || doc.panels.length === 0) return null;
-    return { title: doc.meta?.title ?? "Untitled", panels: doc.panels as CEPanelDef[] };
+
+    const columns = new Map<number, CanvasColumnDef>();
+    if (doc.columns && typeof doc.columns === "object") {
+      for (const [key, val] of Object.entries(doc.columns)) {
+        const idx = parseInt(key, 10);
+        if (!isNaN(idx) && val && typeof val === "object") {
+          columns.set(idx, val as CanvasColumnDef);
+        }
+      }
+    }
+
+    return {
+      title: doc.meta?.title ?? "Untitled",
+      columnHeaders: doc.meta?.columnHeaders === true,
+      columns,
+      panels: doc.panels as CEPanelDef[],
+    };
   } catch { return null; }
 }
 

@@ -41,11 +41,13 @@ export const COL_GAP = 2;
  * Column-first layout: group panels by `col`, stack each column vertically,
  * place columns side by side. Use when panels have meaningful col assignments.
  */
-export function layoutColumns(panels: PanelDef[], maxWidth: number): LayoutResult {
+export type ColumnHeader = { col: number; text: string; x: number; y: number; width: number };
+
+export function layoutColumns(panels: PanelDef[], maxWidth: number, columnHeaders?: Map<number, string>): LayoutResult & { headers: ColumnHeader[] } {
   const safeWidth = Math.max(20, Math.floor(maxWidth));
   const placements: Array<{ id: string; x: number; y: number }> = [];
 
-  // Group by col
+  // Group by col, measure each column's max width and total height
   const cols = new Map<number, PanelDef[]>();
   for (const p of panels) {
     const c = p.col ?? 0;
@@ -54,30 +56,70 @@ export function layoutColumns(panels: PanelDef[], maxWidth: number): LayoutResul
   }
 
   const sortedCols = [...cols.keys()].sort((a, b) => a - b);
-  let cursorX = 0;
-  let contentHeight = 1;
-  let contentWidth = 0;
 
+  // Pre-measure each column
+  const colWidths: number[] = [];
+  const colHeights: number[] = [];
   for (const colIdx of sortedCols) {
     const colPanels = cols.get(colIdx)!;
-    let cursorY = 0;
-    let colMaxW = 0;
+    let maxW = 0;
+    let totalH = 0;
+    for (const p of colPanels) {
+      const w = Math.max(3, Math.min(p.w, safeWidth));
+      const h = Math.max(3, p.h);
+      if (w > maxW) maxW = w;
+      totalH += h + 1;
+    }
+    colWidths.push(maxW);
+    colHeights.push(Math.max(0, totalH - 1));
+  }
 
-    for (const panel of colPanels) {
-      const w = Math.max(3, Math.min(panel.w, safeWidth));
-      const h = Math.max(3, panel.h);
-      placements.push({ id: panel.id, x: cursorX, y: cursorY });
-      cursorY += h + 1; // 1 row gap between panels
-      if (w > colMaxW) colMaxW = w;
+  // Place columns left-to-right, wrapping to next row when exceeding maxWidth
+  const headerHeight = columnHeaders?.size ? 2 : 0; // header text + rule line
+  const headers: ColumnHeader[] = [];
+  let cursorX = 0;
+  let rowBaseY = 0;
+  let rowMaxH = 0;
+  let contentWidth = 0;
+  let contentHeight = 1;
+
+  for (let i = 0; i < sortedCols.length; i++) {
+    const colIdx = sortedCols[i]!;
+    const colW = colWidths[i]!;
+    const colH = colHeights[i]!;
+    const colPanels = cols.get(colIdx)!;
+
+    // Wrap: if this column doesn't fit and we're not at the start of a row
+    if (cursorX > 0 && cursorX + colW > safeWidth) {
+      rowBaseY += rowMaxH + headerHeight + 2;
+      cursorX = 0;
+      rowMaxH = 0;
     }
 
-    contentHeight = Math.max(contentHeight, cursorY - 1);
-    cursorX += colMaxW + COL_GAP;
-    contentWidth = cursorX - COL_GAP;
+    // Column header
+    const headerText = columnHeaders?.get(colIdx);
+    if (headerText) {
+      headers.push({ col: colIdx, text: headerText, x: cursorX, y: rowBaseY, width: colW });
+    }
+
+    // Place panels in this column (offset by header height)
+    let cursorY = rowBaseY + headerHeight;
+    for (const panel of colPanels) {
+      const h = Math.max(3, panel.h);
+      placements.push({ id: panel.id, x: cursorX, y: cursorY });
+      cursorY += h + 1;
+    }
+
+    const totalColH = colH + headerHeight;
+    if (totalColH > rowMaxH) rowMaxH = totalColH;
+    contentWidth = Math.max(contentWidth, cursorX + colW);
+    contentHeight = Math.max(contentHeight, rowBaseY + totalColH);
+    cursorX += colW + COL_GAP;
   }
 
   return {
     placements,
+    headers,
     contentWidth: Math.max(contentWidth, safeWidth),
     contentHeight: Math.max(contentHeight, 1),
   };
