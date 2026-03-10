@@ -1497,3 +1497,34 @@ export function createInlineSearch(opts: InlineSearchOptions): InlineSearchHandl
 
   return handle;
 }
+
+// ── createRestyleBundle ───────────────────────────────────────────────────
+// Declarative restyle coverage for windows (P03).
+// Replaces 24 hand-rolled frame.onRestyle blocks with a single declaration.
+
+/** A widget + style-getter pair. The getter is called at restyle time so it always uses current theme. */
+export type RestyleEntry = [
+  widget: blessed.Widgets.BlessedElement,
+  styleGetter: () => Record<string, any>,
+];
+
+export interface RestyleBundleHandle {
+  /** Call this as frame.onRestyle = bundle.restyle (or bundle.restyle()). */
+  restyle: () => void;
+  /** Add an additional entry after creation. */
+  add(entry: RestyleEntry): void;
+}
+
+export function createRestyleBundle(entries: RestyleEntry[]): RestyleBundleHandle {
+  const list: RestyleEntry[] = [...entries];
+  return {
+    restyle() {
+      for (const [widget, getStyle] of list) {
+        safeSetStyle(widget, getStyle());
+      }
+    },
+    add(entry: RestyleEntry) {
+      list.push(entry);
+    },
+  };
+}

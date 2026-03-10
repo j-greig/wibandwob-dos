@@ -15,6 +15,7 @@ import path from "node:path";
 import { theme } from "../core/theme/resolver.js";
 import {
   applyRect,
+  createRestyleBundle,
   createStack,
   createColumns,
   createNodePart,
@@ -232,7 +233,9 @@ export function openPlasmaWindow(
     root.destroy();
   };
   frame.setFocusTarget(canvas);
+  const restyleBundle = createRestyleBundle([]);
   frame.onRestyle = () => {
+    restyleBundle.restyle();
     root.restyle();
   };
 

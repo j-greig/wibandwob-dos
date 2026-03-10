@@ -2,8 +2,8 @@ import blessed from "blessed";
 import fs from "node:fs";
 import path from "node:path";
 
-import { createScrollbar, safeSetStyle } from "../core/ui-primitives.js";
-import { createSelectableList } from "../core/ui-parts.js";
+import { createScrollbar } from "../core/ui-primitives.js";
+import { createRestyleBundle, createSelectableList } from "../core/ui-parts.js";
 import { createFilePathMenuItems } from "../core/context-menu-items.js";
 import type { OverlayManager } from "../core/overlay-manager.js";
 import { theme } from "../core/theme/resolver.js";
@@ -264,17 +264,13 @@ export function openBackroomsLogBrowserWindow(params: {
 
   frame.setFocusTarget(list);
 
-  frame.onRestyle = () => {
-    safeSetStyle(list, {
-      ...theme().body,
-      selected: theme().selected,
-      item: theme().body
-    });
-    divider.style = theme().muted;
-    titleBar.style = { ...theme().body, bold: true };
-    pathBar.style = theme().muted;
-    safeSetStyle(preview, theme().body);
-  };
+  frame.onRestyle = createRestyleBundle([
+    [list, () => ({ ...theme().body, selected: theme().selected, item: theme().body })],
+    [divider, () => theme().muted],
+    [titleBar, () => ({ ...theme().body, bold: true })],
+    [pathBar, () => theme().muted],
+    [preview, () => theme().body],
+  ]).restyle;
 
   params.windowManager.registerWindow(frame);
   refreshList();

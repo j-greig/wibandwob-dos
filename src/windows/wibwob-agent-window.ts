@@ -13,7 +13,7 @@ import { SessionManager } from "@mariozechner/pi-coding-agent";
 import { REPO_ROOT } from "../core/config.js";
 import { theme } from "../core/theme/resolver.js";
 import { safeSetStyle } from "../core/ui-primitives.js";
-import { createCollapsibleBlock, createContentStack, type CollapsibleBlockHandle, type ContentStackChild } from "../core/ui-parts.js";
+import { createCollapsibleBlock, createContentStack, createRestyleBundle, type CollapsibleBlockHandle, type ContentStackChild } from "../core/ui-parts.js";
 import type { Box } from "../core/types.js";
 import type { WindowManager } from "../core/window-manager.js";
 import { listLocalSessions, type LocalSessionInfo } from "../services/pi-session-bridge.js";
@@ -534,13 +534,16 @@ export function openWibWobAgentWindow(params: {
         params.agent.pushStatus(`[slash] ${error instanceof Error ? error.message : String(error)}`);
       });
   };
+  const restyleBundle = createRestyleBundle([
+    [infoBar, () => theme().muted],
+    [statusLine, () => theme().warning],
+    [input, () => theme().input],
+  ]);
   frame.onRestyle = () => {
-    infoBar.style = theme().muted;
+    restyleBundle.restyle();
     transcriptStack.restyle();
     for (const handle of collapsibleBlocks.values()) handle.restyle();
     for (const node of textBlocks.values()) safeSetStyle(node, theme().agentBg);
-    statusLine.style = theme().warning;
-    input.style = theme().input;
     // playerBar keeps its own fixed dark style
   };
 

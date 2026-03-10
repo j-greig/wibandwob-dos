@@ -18,6 +18,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { theme } from "../core/theme/resolver.js";
 import {
+  createRestyleBundle,
   createStack,
   createColumns,
   createNodePart,
@@ -146,7 +147,9 @@ export function openTerrainLabWindow(deps: BaseWindowDeps): void {
     root.destroy();
   };
   frame.setFocusTarget(contourBox);
+  const restyleBundle = createRestyleBundle([]);
   frame.onRestyle = () => {
+    restyleBundle.restyle();
     root.restyle();
   };
 

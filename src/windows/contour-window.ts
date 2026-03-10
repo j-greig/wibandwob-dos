@@ -7,12 +7,12 @@ import {
   createColumns,
   createHeaderBar,
   createNodePart,
+  createRestyleBundle,
   createRule,
   createStack,
   createStatusBar,
   type UiPart,
 } from "../core/ui-parts.js";
-import { safeSetStyle } from "../core/ui-primitives.js";
 import {
   createContourPlayer,
   readNodeViewport,
@@ -380,9 +380,12 @@ export function openContourWindow(deps: BaseWindowDeps): void {
     }
     canvas.focus();
   };
+  const restyleBundle = createRestyleBundle([
+    [canvas, () => theme().body],
+    [status, () => theme().header],
+  ]);
   frame.onRestyle = () => {
-    safeSetStyle(canvas, theme().body);
-    status.style = theme().header;
+    restyleBundle.restyle();
     triptych?.root.restyle();
   };
   frame.refresh = doLayout;

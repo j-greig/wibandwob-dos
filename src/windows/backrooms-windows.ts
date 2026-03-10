@@ -6,8 +6,8 @@ import path from "node:path";
 import { REPO_ROOT } from "../core/config.js";
 import type { OverlayManager } from "../core/overlay-manager.js";
 import { theme as appTheme } from "../core/theme/resolver.js";
-import { createScrollbar, safeSetStyle } from "../core/ui-primitives.js";
-import { createSelectableList } from "../core/ui-parts.js";
+import { createScrollbar } from "../core/ui-primitives.js";
+import { createRestyleBundle, createSelectableList } from "../core/ui-parts.js";
 import type { BackroomsChannel, List, LogBox } from "../core/types.js";
 import type { WindowManager } from "../core/window-manager.js";
 import type { BackroomsService } from "../services/backrooms-service.js";
@@ -269,12 +269,12 @@ export function openBackroomsPrimerPicker(context: BackroomsWindowContext, theme
     contentPreview: preview.getContent().split("\n").slice(0, 8).join("\n")
   });
   frame.setFocusTarget(list);
-  frame.onRestyle = () => {
-    header.style = appTheme().header;
-    searchBox.style = appTheme().input;
-    safeSetStyle(list, { ...appTheme().body, selected: appTheme().selected });
-    safeSetStyle(preview, appTheme().body);
-  };
+  frame.onRestyle = createRestyleBundle([
+    [header, () => appTheme().header],
+    [searchBox, () => appTheme().input],
+    [list, () => ({ ...appTheme().body, selected: appTheme().selected })],
+    [preview, () => appTheme().body],
+  ]).restyle;
 
   context.windowManager.registerWindow(frame);
   renderList(0);
@@ -660,11 +660,11 @@ export function openBackroomsTvWindow(context: BackroomsWindowContext, channel: 
   frame.captureText = () => transcript.getContent();
   frame.setFocusTarget(transcript);
   frame.frame.key(["space", "n"], () => startBackrooms());
-  frame.onRestyle = () => {
-    header.style = appTheme().header;
-    safeSetStyle(transcript, appTheme().body);
-    footer.style = appTheme().footer;
-  };
+  frame.onRestyle = createRestyleBundle([
+    [header, () => appTheme().header],
+    [transcript, () => appTheme().body],
+    [footer, () => appTheme().footer],
+  ]).restyle;
   context.windowManager.registerWindow(frame);
   frame.focus();
   startBackrooms();

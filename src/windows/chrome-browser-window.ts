@@ -8,7 +8,8 @@
 
 import blessed from "blessed";
 import { theme } from "../core/theme/resolver.js";
-import { createScrollbar, safeSetStyle } from "../core/ui-primitives.js";
+import { createScrollbar } from "../core/ui-primitives.js";
+import { createRestyleBundle } from "../core/ui-parts.js";
 import type { WindowRecord } from "../core/types.js";
 import type { WindowManager } from "../core/window-manager.js";
 import type { OverlayManager } from "../core/overlay-manager.js";
@@ -321,16 +322,16 @@ export function openChromeBrowserWindow(params: {
     const trimmed = input.trim();
     if (trimmed) void navigateTo(trimmed);
   };
-  frame.onRestyle = () => {
-    toolbar.style = theme().footer;
-    backBtn.style = { ...theme().footer, hover: theme().header };
-    fwdBtn.style = { ...theme().footer, hover: theme().header };
-    reloadBtn.style = { ...theme().footer, hover: theme().header };
-    goBtn.style = { ...theme().input, hover: theme().header };
-    urlBox.style = theme().input;
-    statusBar.style = theme().header;
-    safeSetStyle(content, theme().body);
-  };
+  frame.onRestyle = createRestyleBundle([
+    [toolbar, () => theme().footer],
+    [backBtn, () => ({ ...theme().footer, hover: theme().header })],
+    [fwdBtn, () => ({ ...theme().footer, hover: theme().header })],
+    [reloadBtn, () => ({ ...theme().footer, hover: theme().header })],
+    [goBtn, () => ({ ...theme().input, hover: theme().header })],
+    [urlBox, () => theme().input],
+    [statusBar, () => theme().header],
+    [content, () => theme().body],
+  ]).restyle;
 
   windowManager.registerWindow(frame);
   frame.focus();

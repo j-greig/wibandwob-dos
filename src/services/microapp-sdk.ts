@@ -133,6 +133,7 @@ export {
   resolveSidebarWidth,
   createSelectableList,
   createInlineSearch,
+  createRestyleBundle,
 } from "../core/ui-parts.js";
 export type {
   InputLineProps,
@@ -154,6 +155,8 @@ export type {
   SelectableListHandle,
   InlineSearchOptions,
   InlineSearchHandle,
+  RestyleEntry,
+  RestyleBundleHandle,
 } from "../core/ui-parts.js";
 
 export { createRenderMonitor } from "../core/render-monitor.js";

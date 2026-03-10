@@ -3,7 +3,8 @@ import blessed from "blessed";
 import { theme } from "../core/theme/resolver.js";
 import type { StateService } from "../services/state-service.js";
 import type { WorkspaceService } from "../services/workspace-service.js";
-import { createScrollbar, safeSetStyle } from "../core/ui-primitives.js";
+import { createScrollbar } from "../core/ui-primitives.js";
+import { createRestyleBundle } from "../core/ui-parts.js";
 import { createLivePlayer, type LiveFrameGenerator } from "../services/animation-service.js";
 import { animationAppType } from "../core/types.js";
 import type { DesktopState, List, LogBox, MenuItem, WindowKind, WindowRecord } from "../core/types.js";
@@ -55,9 +56,9 @@ export function openAnimatedWindow(
   });
   frame.cleanup = () => player.destroy();
   frame.setFocusTarget(canvas);
-  frame.onRestyle = () => {
-    safeSetStyle(canvas, theme().body);
-  };
+  frame.onRestyle = createRestyleBundle([
+    [canvas, () => theme().body],
+  ]).restyle;
   deps.windowManager.registerWindow(frame);
   frame.focus();
 }
@@ -115,9 +116,9 @@ export function openCompanionWindow(
   });
   frame.cleanup = () => clearInterval(timer);
   frame.setFocusTarget(bubble);
-  frame.onRestyle = () => {
-    safeSetStyle(bubble, theme().body);
-  };
+  frame.onRestyle = createRestyleBundle([
+    [bubble, () => theme().body],
+  ]).restyle;
   deps.windowManager.registerWindow(frame);
   frame.focus();
 }
@@ -169,9 +170,9 @@ export function openArtWindow(deps: BaseWindowDeps): void {
   });
   frame.cleanup = () => player.destroy();
   frame.setFocusTarget(canvas);
-  frame.onRestyle = () => {
-    safeSetStyle(canvas, theme().body);
-  };
+  frame.onRestyle = createRestyleBundle([
+    [canvas, () => theme().body],
+  ]).restyle;
   deps.windowManager.registerWindow(frame);
   frame.focus();
 }
@@ -239,10 +240,10 @@ export function openWorkspaceManagerWindow(params: {
     knownWorkspaces: params.workspace.list()
   });
   frame.setFocusTarget(list);
-  frame.onRestyle = () => {
-    footer.style = theme().header;
-    safeSetStyle(list, { ...theme().body, selected: theme().selected });
-  };
+  frame.onRestyle = createRestyleBundle([
+    [footer, () => theme().header],
+    [list, () => ({ ...theme().body, selected: theme().selected })],
+  ]).restyle;
   params.windowManager.registerWindow(frame);
   frame.focus();
 }
@@ -276,9 +277,9 @@ export function openCommandPaletteWindow(params: {
     commandCount: params.commands.length
   });
   frame.setFocusTarget(list);
-  frame.onRestyle = () => {
-    safeSetStyle(list, { ...theme().body, selected: theme().selected });
-  };
+  frame.onRestyle = createRestyleBundle([
+    [list, () => ({ ...theme().body, selected: theme().selected })],
+  ]).restyle;
   params.windowManager.registerWindow(frame);
   frame.focus();
 }
@@ -318,9 +319,9 @@ export function openStateInspectorWindow(params: {
   });
   frame.cleanup = () => unsubscribe();
   frame.setFocusTarget(viewer);
-  frame.onRestyle = () => {
-    safeSetStyle(viewer, theme().body);
-  };
+  frame.onRestyle = createRestyleBundle([
+    [viewer, () => theme().body],
+  ]).restyle;
   params.windowManager.registerWindow(frame);
   frame.focus();
 }

@@ -6,7 +6,7 @@
  */
 import blessed from "blessed";
 import { theme } from "../core/theme/resolver.js";
-import { safeSetStyle } from "../core/ui-primitives.js";
+import { createRestyleBundle } from "../core/ui-parts.js";
 import { MonsterCamService } from "../services/monster-cam-service.js";
 import { renderFiglet } from "../services/figlet-service.js";
 import { renderWebcamFrame, gridToBlessedContent } from "../services/webcam-renderer.js";
@@ -144,10 +144,10 @@ export function openMonsterCamWindow(deps: Deps): void {
 
   frame.cleanup = () => svc.stop();
 
-  frame.onRestyle = () => {
-    safeSetStyle(canvas, theme().body);
-    safeSetStyle(status, theme().header);
-  };
+  frame.onRestyle = createRestyleBundle([
+    [canvas, () => theme().body],
+    [status, () => theme().header],
+  ]).restyle;
 
   for (const el of [canvas, frame.body]) {
     el.key(["b"], () => toggleBg());

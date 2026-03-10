@@ -12,7 +12,7 @@ import { basename } from "path";
 import { stat } from "fs/promises";
 
 import { theme } from "../core/theme/resolver.js";
-import { safeSetStyle } from "../core/ui-primitives.js";
+import { createRestyleBundle } from "../core/ui-parts.js";
 import type { WindowManager } from "../core/window-manager.js";
 
 export interface MusicPlayerDeps {
@@ -275,9 +275,9 @@ export function openMusicPlayerWindow(
   });
   frame.cleanup = () => killProc();
   frame.setFocusTarget(display);
-  frame.onRestyle = () => {
-    safeSetStyle(display, theme().body);
-  };
+  frame.onRestyle = createRestyleBundle([
+    [display, () => theme().body],
+  ]).restyle;
 
   // Public controller for API/commands
   (frame as any).musicPlayer = {

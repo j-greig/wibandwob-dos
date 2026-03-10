@@ -10,8 +10,8 @@ import path from "node:path";
 import stringWidth from "string-width";
 
 import { theme } from "../core/theme/resolver.js";
-import { createScrollbar, safeSetStyle } from "../core/ui-primitives.js";
-import { createSelectableList } from "../core/ui-parts.js";
+import { createScrollbar } from "../core/ui-primitives.js";
+import { createRestyleBundle, createSelectableList } from "../core/ui-parts.js";
 import type { ContentMeasurement } from "../services/content-measurement.js";
 import { createPreRenderedPlayer, type FramePlayer } from "../services/animation-service.js";
 import { viewerAppType } from "../core/types.js";
@@ -104,10 +104,10 @@ export function openPrimerBrowserWindow(params: {
     entryCount: entries.length
   });
   frame.setFocusTarget(list);
-  frame.onRestyle = () => {
-    header.style = theme().header;
-    safeSetStyle(list, { ...theme().body, selected: theme().selected });
-  };
+  frame.onRestyle = createRestyleBundle([
+    [header, () => theme().header],
+    [list, () => ({ ...theme().body, selected: theme().selected })],
+  ]).restyle;
   params.windowManager.registerWindow(frame);
   list.select(initialSelectedIndex);
   frame.focus();
@@ -288,11 +288,14 @@ export function openPrimerGalleryWindow(params: {
       list.focus();
     }
   };
+  const restyleBundle = createRestyleBundle([
+    [tabBar, () => theme().footer],
+    [filterBox, () => theme().input],
+    [list, () => ({ ...theme().body, selected: theme().selected })],
+    [preview, () => theme().body],
+  ]);
   frame.onRestyle = () => {
-    tabBar.style = theme().footer;
-    filterBox.style = theme().input;
-    safeSetStyle(list, { ...theme().body, selected: theme().selected });
-    safeSetStyle(preview, theme().body);
+    restyleBundle.restyle();
     tabBar.children.forEach((child, index) => {
       (child as blessed.Widgets.BoxElement).style = index === activeTabIndex ? theme().input : theme().footer;
     });
@@ -397,9 +400,9 @@ export function openTextViewerWindow(params: {
   });
   frame.setFocusTarget(viewer);
   frame.refresh = () => setViewportContent(viewer, currentContent);
-  frame.onRestyle = () => {
-    safeSetStyle(viewer, theme().body);
-  };
+  frame.onRestyle = createRestyleBundle([
+    [viewer, () => theme().body],
+  ]).restyle;
 
   // Space to pause/resume animation
   if (player) {
@@ -1353,23 +1356,22 @@ export function openFileManagerWindow(params: {
       list.focus();
     }
   };
-  frame.onRestyle = () => {
-    toolbar.style = theme().header;
-    pathLabel.style = theme().header;
-    btnFilter.style = theme().footer;
-    btnSearch.style = theme().footer;
-    btnView.style = theme().footer;
-    filterBox.style = theme().footer;
-    searchBox.style = theme().footer;
-    safeSetStyle(list, { ...theme().body, selected: theme().selected });
-    safeSetStyle(iconGrid, theme().body);
-    safeSetStyle(preview, theme().body);
-    statusBar.style = theme().footer;
-    statusInfo.style = theme().footer;
-    btnSort.style = theme().footer;
-
-    btnRefresh.style = theme().footer;
-  };
+  frame.onRestyle = createRestyleBundle([
+    [toolbar, () => theme().header],
+    [pathLabel, () => theme().header],
+    [btnFilter, () => theme().footer],
+    [btnSearch, () => theme().footer],
+    [btnView, () => theme().footer],
+    [filterBox, () => theme().footer],
+    [searchBox, () => theme().footer],
+    [list, () => ({ ...theme().body, selected: theme().selected })],
+    [iconGrid, () => theme().body],
+    [preview, () => theme().body],
+    [statusBar, () => theme().footer],
+    [statusInfo, () => theme().footer],
+    [btnSort, () => theme().footer],
+    [btnRefresh, () => theme().footer],
+  ]).restyle;
 
   // Expose FinderController for command dispatch
   frame.finder = {

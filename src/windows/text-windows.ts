@@ -1,7 +1,8 @@
 import blessed from "blessed";
 
 import { theme } from "../core/theme/resolver.js";
-import { createScrollbar, safeSetStyle } from "../core/ui-primitives.js";
+import { createScrollbar } from "../core/ui-primitives.js";
+import { createRestyleBundle } from "../core/ui-parts.js";
 import type { WindowManager } from "../core/window-manager.js";
 
 export function openEditorWindow(params: {
@@ -43,9 +44,9 @@ export function openEditorWindow(params: {
     contentPreview: (frame.editor?.value ?? "").split("\n").slice(0, 8).join("\n")
   });
   frame.setFocusTarget(editorWidget);
-  frame.onRestyle = () => {
-    safeSetStyle(editorWidget, theme().body);
-  };
+  frame.onRestyle = createRestyleBundle([
+    [editorWidget, () => theme().body],
+  ]).restyle;
   params.windowManager.registerWindow(frame);
   params.renderEditor(frame.id);
   frame.focus();
