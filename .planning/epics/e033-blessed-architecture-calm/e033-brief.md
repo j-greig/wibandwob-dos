@@ -81,7 +81,10 @@ Current architectural pressure points:
    animation-heavy windows, or future dense scenes.
 7. Module quality matters disproportionately because `modules/` and
    `modules-private/` are hero/demo surfaces for first-time users and agents.
-8. Third-party developers do not yet have a clean “build your first custom
+8. The control API likely contains some fast-grown, vibe-engineered edges:
+   alias routes, overlapping command surfaces, and endpoint contracts that
+   may be useful but not yet as coherent as the rest of the architecture.
+9. Third-party developers do not yet have a clean “build your first custom
    app” path for creating modules under `/modules`.
 
 ## Outcome
@@ -95,6 +98,7 @@ After E033:
 - visual regression and render telemetry are stronger
 - text/cell correctness becomes an explicit engineering track, not an incidental fix
 - module authoring surfaces become cleaner and more trustworthy as first-run demos
+- the control API becomes easier to discover, trust, and extend without route drift
 - third-party developers have a canonical documentation path for building custom apps
 
 ## User stories
@@ -109,6 +113,9 @@ After E033:
   into memory leaks or render storms.
 - As a first-time tester, the shipped modules demonstrate a coherent system,
   not a patchwork of one-off patterns.
+- As an external operator or agent integration author, I can discover the API,
+  predict its naming and behaviour, and trust `GET /help`, `GET /openapi.json`,
+  commands, and live state to agree.
 - As a third-party developer, I can read one obvious doc path and build a custom
   app under `/modules` without copying random internals from `src/`.
 
@@ -128,10 +135,11 @@ After E033:
 | S01 | not-started | none | medium | Render scheduler and explicit invalidation policy |
 | S02 | not-started | S01 | medium | Local model/update/render pilot for live windows |
 | S03 | not-started | S01 | medium | Microapp host lifecycle, redraw, and state contract |
-| S04 | not-started | S01 | medium | Thin the composition root |
-| S05 | not-started | none | medium | Cell-aware text correctness and Unicode discipline |
-| S06 | not-started | S01 | medium | Visual regression, render telemetry, and dense-scene performance checks |
-| S07 | not-started | S03 | low | Third-party developer docs for building custom apps in `/modules` |
+| S04 | not-started | none | medium | Thin the composition root |
+| S05 | not-started | none | medium | API contract audit and control-surface cleanup |
+| S06 | not-started | none | medium | Cell-aware text correctness and Unicode discipline |
+| S07 | not-started | none, then coordinate with S01 | medium | Visual regression, render telemetry, and dense-scene performance checks |
+| S08 | not-started | S03 | low | Third-party developer docs for building custom apps in `/modules` |
 
 ## Stories
 
@@ -139,9 +147,10 @@ After E033:
 - [ ] S02 — Local model/update/render pilot for live windows
 - [ ] S03 — Microapp host lifecycle, redraw, and state contract
 - [ ] S04 — Thin the composition root
-- [ ] S05 — Cell-aware text correctness and Unicode discipline
-- [ ] S06 — Visual regression, render telemetry, and dense-scene performance checks
-- [ ] S07 — Third-party developer docs for custom modules
+- [ ] S05 — API contract audit and control-surface cleanup
+- [ ] S06 — Cell-aware text correctness and Unicode discipline
+- [ ] S07 — Visual regression, render telemetry, and dense-scene performance checks
+- [ ] S08 — Third-party developer docs for custom modules
 
 ---
 
@@ -161,6 +170,15 @@ changes and terminal commits are not mixed together all over the codebase.
 The devlog scan found direct `screen.render()` calls throughout the shell,
 window manager, overlays, extracted collaborators, and individual windows.
 That makes ownership blurry and will make future performance tuning harder.
+
+Here, “tiny” means the API surface and decision surface, not the total number
+of adoption call sites. The goal is a very small app-level seam above Blessed
+such as `requestRender`, `requestSync`, and `requestPersist`, while allowing a
+broader but incremental wiring pass across a few core owners.
+
+The scheduler lives above Blessed as an app-level gate. It does not replace
+Blessed batching or alter Blessed internals; Blessed remains the final commit
+layer once the app decides to render.
 
 ### Expected files
 
@@ -185,10 +203,13 @@ That makes ownership blurry and will make future performance tuning harder.
 - [ ] AC-2: `WindowManager` move, resize, focus, and close paths no longer encode final render policy implicitly
 - [ ] AC-3: `EditorCoordinator` routes redraw intent through the seam rather than direct terminal commits in its normal render/update path
 - [ ] AC-4: render, sync, and persist intent are described separately in code
-- [ ] AC-5: `bun run typecheck` passes
+- [ ] AC-5: direct `screen.render()` calls from unconverted windows continue to work without interference from the scheduler
+- [ ] AC-6: the scheduler seam has direct test coverage for its gating / batching logic
+- [ ] AC-7: `bun run typecheck` passes
 
 ### Verification
 
+- [ ] scheduler tests pass
 - [ ] move, resize, focus, close windows — behaviour unchanged
 - [ ] editor typing and save still work
 - [ ] `/state` still updates correctly for routine mutations
@@ -237,12 +258,12 @@ The best proving ground is a complex but bounded live surface. The spike found
 
 ### Acceptance criteria
 
-- [ ] AC-1: Monster Cam has a readable local model/update/render shape
+- [ ] AC-1: Monster Cam has an explicit local pattern named in code, with a model type, a message/event type, an update/apply-transition function, and a render/apply-to-widgets function
 - [ ] AC-2: service events (`ready`, `error`, `frame`) feed one visible state path
 - [ ] AC-3: widget mutation is concentrated in render/application functions
 - [ ] AC-4: cleanup remains explicit and correct
 - [ ] AC-5: `describeState()` still reports semantically useful live data
-- [ ] AC-6: at least one second live window is either migrated or explicitly deferred with reasons recorded
+- [ ] AC-6: the second-candidate surface is named explicitly in the story outcome, with either a real migration or a concrete defer note that does not weaken the epic-level two-surface requirement
 - [ ] AC-7: `bun run typecheck` passes
 
 ### Verification
@@ -277,6 +298,18 @@ The spike found the module boundary powerful but too implicit. The `setTimeout`
 registration defer in `module-loader.ts` is a real signal that lifecycle is
 not yet expressed cleanly enough.
 
+The first move here is to understand and document why that defer exists and
+what ordering guarantee it currently protects. Only after that should the code
+replace it with a clearer mount / registration phase if the same guarantees can
+be preserved.
+
+There is also a concrete SDK import anti-pattern to clean up: several modules
+bypass `microapp-sdk.ts` and import directly from `src/core/*`. Verified
+examples include imports of `panel-layout.js`, `ui-parts.js`,
+`ui-primitives.js`, `canvas-types.js`, `tree-widget.js`, and
+`empty-states.js` from modules such as zine, sy2-chronicles, e026-demo,
+heartbeat, and patchbay-lab.
+
 ### Expected files
 
 - `src/services/module-loader.ts`
@@ -286,23 +319,25 @@ not yet expressed cleanly enough.
 
 ### Tasks
 
-- [ ] audit the current `createWindow()` registration flow
-- [ ] replace or reduce `setTimeout(ensureRegistered, 0)` lifecycle reliance
+- [ ] audit the current `createWindow()` registration flow and document why the defer exists
+- [ ] replace or reduce `setTimeout(ensureRegistered, 0)` lifecycle reliance only if an explicit lifecycle hook preserves the same guarantees
 - [ ] define explicit redraw/invalidate guidance for modules
 - [ ] tighten `describeState()` expectations for microapps
-- [ ] migrate at least two representative modules to the improved contract
-- [ ] ensure SDK exports are the preferred import path for module authors
+- [ ] re-export missing shared helpers through `microapp-sdk.ts` where module authors currently reach into `src/core/*`
+- [ ] migrate at least two representative modules to the improved contract and SDK import path
 - [ ] check workspace restore behaviour for touched modules
 
 ### Acceptance criteria
 
-- [ ] AC-1: microapp registration semantics are explicit and documented
+- [ ] AC-1: microapp registration semantics are explicit and documented, including the ordering guarantee that the old defer was providing
 - [ ] AC-2: redraw/invalidation policy for microapps is clearer than “call `host.screen.render()` whenever”
 - [ ] AC-3: at least two representative modules use the new pattern cleanly
 - [ ] AC-4: module `describeState()` remains trustworthy for `/state` and agent use
-- [ ] AC-5: migrated modules preserve workspace restore correctness
-- [ ] AC-6: migrated modules preserve theme/restyle correctness with windows left open across a theme switch
-- [ ] AC-7: `bun run typecheck` passes
+- [ ] AC-5: the SDK import anti-pattern is reduced in the touched modules by routing shared helpers through `microapp-sdk.ts`
+- [ ] AC-6: existing modules remain compatible during the transition; this is not a flag-day rewrite
+- [ ] AC-7: migrated modules preserve workspace restore correctness
+- [ ] AC-8: migrated modules preserve theme/restyle correctness with windows left open across a theme switch
+- [ ] AC-9: `bun run typecheck` passes
 
 ### Verification
 
@@ -373,7 +408,73 @@ obviously in charge of wiring rather than detailed feature policy.
 
 ---
 
-## S05 — Cell-aware text correctness and Unicode discipline
+## S05 — API contract audit and control-surface cleanup
+
+Status: not-started
+Depends on: none
+Risk: medium
+
+### User story
+
+As an external operator or agent integration author, I want the control API to
+feel deliberately designed rather than quickly accreted, so I can discover it,
+trust it, and extend against it without guessing which routes are canonical.
+
+### Why this story exists
+
+The same kind of architectural scrutiny applied to Blessed and TypeScript
+ownership should also be applied to the API. `control-api.ts` already provides
+real value, but it likely has some fast-grown edges: alias routes, overlapping
+command surfaces, and contracts that are useful but not always as crisp as the
+rest of the architecture. This story audits the API with the same calm,
+repo-specific standards used elsewhere in the epic.
+
+### Expected files
+
+- `src/services/control-api.ts`
+- `src/services/agent-tools.ts`
+- `src/core/command-registry.ts`
+- `src/core/command-catalog.ts`
+- `src/services/state-service.ts`
+- `.agents/specs/state-and-api.md`
+- any touched tests under `src/tests/`
+
+### Tasks
+
+- [ ] audit the current endpoint catalogue for overlap, drift, and ambiguous aliases
+- [ ] identify which routes are canonical versus backward-compat alias paths
+- [ ] tighten route naming and documentation where the API currently feels vibe-engineered
+- [ ] ensure `GET /help`, `GET /openapi.json`, command routes, and live state descriptions agree
+- [ ] check parity between control API routes and agent/control tooling where they overlap
+- [ ] add tests for any new pure-ish API normalization helpers or touched endpoint behaviour
+- [ ] update state/API docs so the cleaned contract is written down, not left in code only
+
+### Acceptance criteria
+
+- [ ] AC-1: the API has a clearer distinction between canonical routes and backward-compat aliases
+- [ ] AC-2: `GET /help`, `GET /openapi.json`, and the real handlers agree on touched routes and shapes
+- [ ] AC-3: touched control routes preserve or improve command/state parity for agents and external operators
+- [ ] AC-4: any route cleanup preserves backward compatibility where intended and makes deprecation intent explicit where relevant
+- [ ] AC-5: touched API seams have direct test coverage where practical
+- [ ] AC-6: `.agents/specs/state-and-api.md` is updated if the contract changes
+- [ ] AC-7: `bun run typecheck` passes
+
+### Verification
+
+- [ ] `GET /help` is accurate
+- [ ] `GET /openapi.json` is accurate
+- [ ] representative `GET /state`, command, window, and alias routes behave as documented
+- [ ] agent/control tooling still works on touched routes
+
+### Out of scope for this story
+
+- replacing the control API framework wholesale
+- deleting every alias route in one pass
+- inventing a second control surface parallel to the existing one
+
+---
+
+## S06 — Cell-aware text correctness and Unicode discipline
 
 Status: not-started
 Depends on: none
@@ -392,6 +493,10 @@ especially in private primers and ASCII-adjacent assets. The repo already has a
 parked follow-on for Unicode/cell-aware rendering; this story starts the work
 where it most affects visible correctness.
 
+Known bad-case anchors for this story include problematic private primers with
+mixed-width characters, narrow sidebar/list truncation, ANSI-styled text width
+drift, and framed or figlet-adjacent text around mixed-width characters.
+
 ### Expected files
 
 - `src/core/grid-canvas.ts`
@@ -402,7 +507,7 @@ where it most affects visible correctness.
 
 ### Tasks
 
-- [ ] audit the worst current Unicode/cell-width failure surfaces
+- [ ] audit the known bad Unicode/cell-width failure surfaces first
 - [ ] define one shared text-width / truncation rule for touched surfaces
 - [ ] reduce ad hoc width assumptions in list/sidebar/text rendering
 - [ ] fix at least one primer-facing or module-facing Unicode bug class
@@ -415,7 +520,8 @@ where it most affects visible correctness.
 - [ ] AC-3: primer/module surfaces with mixed-width text behave more predictably
 - [ ] AC-4: touched surfaces preserve ANSI-coloured text behaviour where expected
 - [ ] AC-5: follow-on scope for deeper cell-rendering work is documented clearly
-- [ ] AC-6: `bun run typecheck` passes
+- [ ] AC-6: touched API or state descriptions do not regress because of text-width fixes where relevant
+- [ ] AC-7: `bun run typecheck` passes
 
 ### Verification
 
@@ -431,10 +537,10 @@ where it most affects visible correctness.
 
 ---
 
-## S06 — Visual regression, render telemetry, and dense-scene performance checks
+## S07 — Visual regression, render telemetry, and dense-scene performance checks
 
 Status: not-started
-Depends on: S01
+Depends on: none, then coordinate with S01
 Risk: medium
 
 ### User story
@@ -448,6 +554,10 @@ The long-term target includes very large terminals or projected displays with
 many windows, complex art, and live movement. Performance and memory use are
 not polish items; they are product constraints.
 
+This story can start before S01 fully lands: instrumentation, artifact format,
+and scene definition work are useful immediately. Scheduler-aware interpretation
+of the results can then tighten later.
+
 ### Expected files
 
 - `src/core/render-monitor.ts`
@@ -458,19 +568,21 @@ not polish items; they are product constraints.
 ### Tasks
 
 - [ ] strengthen render telemetry so redraw pressure is easier to observe
-- [ ] add or improve visual regression capture for representative windows/scenes
-- [ ] define one dense-scene smoke scenario with multiple live windows
-- [ ] record acceptable behaviour expectations for render speed and stability
+- [ ] define at least one concrete artifact format for evidence capture
+- [ ] define one dense-scene benchmark scenario
+- [ ] record provisional behaviour expectations for render speed and stability
 - [ ] note memory/perf blind spots honestly if tooling is still partial
 
 ### Acceptance criteria
 
 - [ ] AC-1: render telemetry is easier to read and use during smoke testing
 - [ ] AC-2: at least one dense-scene visual smoke workflow exists and is repeatable
-- [ ] AC-3: representative animated/text-heavy windows are included in regression coverage
-- [ ] AC-4: performance notes are captured in docs, not left as chat-only lore
-- [ ] AC-5: a dense-scene smoke pass includes visual evidence plus at least one textual evidence artefact
-- [ ] AC-6: `bun run typecheck` passes for any code touched
+- [ ] AC-3: the first benchmark scene is named explicitly: 12 windows open including at least 2 animated surfaces such as Monster Cam and Music Player viz
+- [ ] AC-4: the evidence format is concrete, for example tmux text dump plus screenshot plus render-monitor readout
+- [ ] AC-5: provisional behaviour expectations are written down, for example whether the render loop stays under roughly 200ms per frame in the benchmark scene
+- [ ] AC-6: performance notes are captured in docs, not left as chat-only lore
+- [ ] AC-7: a dense-scene smoke pass includes visual evidence plus at least one textual evidence artefact
+- [ ] AC-8: `bun run typecheck` passes for any code touched
 
 ### Verification
 
@@ -486,7 +598,7 @@ not polish items; they are product constraints.
 
 ---
 
-## S07 — Third-party developer docs for custom modules
+## S08 — Third-party developer docs for custom modules
 
 Status: not-started
 Depends on: S03
@@ -506,10 +618,10 @@ looks less modular than it really is. This story makes extensibility legible.
 
 ### Expected files
 
-- one long doc or a small family of docs under a planning-approved docs path
+- one long doc or a small family of docs under `docs/`
+- `modules/README.md` as a landing pointer if needed
 - `src/services/microapp-sdk.ts` if exports need cleanup for docs accuracy
 - representative example modules in `modules/`
-- possibly `modules/README.md` or a linked developer-doc landing page
 
 ### Tasks
 
@@ -525,7 +637,7 @@ looks less modular than it really is. This story makes extensibility legible.
 - [ ] AC-1: there is a clear third-party developer doc path for building custom apps under `/modules`
 - [ ] AC-2: docs describe the canonical path without requiring direct imports from random `src/core/*` files
 - [ ] AC-3: docs include one minimal module example and one stateful/live example
-- [ ] AC-4: docs explain `describeState()`, cleanup, restyle, and command registration expectations
+- [ ] AC-4: docs explain `describeState()`, cleanup, restyle, invalidation, and command registration expectations
 - [ ] AC-5: docs are accurate against the post-S03 host contract
 - [ ] AC-6: a first-time developer can follow the docs to add a new module and see it appear in the app
 
@@ -582,6 +694,7 @@ looks less modular than it really is. This story makes extensibility legible.
 - investigate flexbox-like responsive layout only for `zine`-class editorial surfaces
 - deepen cell-aware rendering into a shared engine path if S05 proves the need
 - add denser performance scenes once render telemetry and smoke scripts mature
+- explore a lightweight runtime metrics surface showing FPS and RAM usage, either as a tiny top-right desktop indicator or a help/menu-accessible diagnostics microapp, so operators can watch redraw pressure and memory cost live while running dense animated scenes, perhaps only visible in dev mode
 
 ## Branch
 
