@@ -564,6 +564,8 @@ export function openMusicPlayerWindow(
     top: 0, left: 0, width: 1, height: 1,
     style: theme().body,
     tags: true,
+    input: true,
+    keys: true,
   });
 
   const playlistPane = blessed.list({
