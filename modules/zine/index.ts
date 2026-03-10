@@ -336,44 +336,10 @@ export default function setup(host: MicroappHost) {
         node.content.setContent(override ?? node.def.content(tick, iw, ih));
       }
 
-      // Column separators — find column group boundaries from panel col assignments
-      // Group placements by their source col, find the max right edge per col group
-      const colMaxRight = new Map<number, number>();
-      for (const placement of layout.placements) {
-        const ceDef = defs.find(d => d.id === placement.id);
-        const col = ceDef?.col ?? 0;
-        const right = placement.x + (ceDef?.w ?? 0);
-        const prev = colMaxRight.get(col) ?? 0;
-        if (right > prev) colMaxRight.set(col, right);
-      }
-      // Separator X positions: midpoint between column right edge and next column left edge
-      const colGroups = [...colMaxRight.keys()].sort((a, b) => a - b);
-      const colMinLeft = new Map<number, number>();
-      for (const placement of layout.placements) {
-        const ceDef = defs.find(d => d.id === placement.id);
-        const col = ceDef?.col ?? 0;
-        const prev = colMinLeft.get(col);
-        if (prev === undefined || placement.x < prev) colMinLeft.set(col, placement.x);
-      }
-      const sepXPositions: number[] = [];
-      for (let i = 0; i < colGroups.length - 1; i++) {
-        const rightEdge = colMaxRight.get(colGroups[i]!) ?? 0;
-        const nextLeft = colMinLeft.get(colGroups[i + 1]!) ?? rightEdge + 2;
-        const midX = Math.floor((rightEdge + nextLeft) / 2);
-        if (midX > 0 && midX < vw) sepXPositions.push(midX);
-      }
-
-      const sepLines: string[] = [];
-      for (let row = 0; row < totalContentHeight; row++) {
-        let line = " ".repeat(vw);
-        for (const x of sepXPositions) {
-          line = line.slice(0, x) + "│" + line.slice(x + 1);
-        }
-        sepLines.push(line);
-      }
-      colSepOverlay.height = totalContentHeight;
-      colSepOverlay.setContent(sepLines.join("\n"));
-      colSepOverlay.setBack();
+      // Column separators disabled — the panel arrangement itself
+      // provides sufficient visual grouping.
+      colSepOverlay.setContent("");
+      colSepOverlay.hidden = true;
 
       applyStyles();
       updateStatus();
