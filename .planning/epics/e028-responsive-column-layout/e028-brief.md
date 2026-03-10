@@ -129,16 +129,23 @@ With canvas documents on disk:
 
 ### Canvas documents
 - [x] AC-1: Format decision documented (YAML vs TOML spike)
-- [ ] AC-2: Canvas doc loads into correct window arrangement
+- [x] AC-2: Canvas doc loads into correct window arrangement (ZINE microapp)
 - [ ] AC-3: Export current desktop to canvas doc round-trips cleanly
 - [ ] AC-4: Fork creates a copy, edits show in git diff
 - [ ] AC-5: Agent can write + load canvas documents via tools
 
 ### Integration
 - [ ] AC-6: Layout presets are canvas documents, switchable via command
-- [ ] AC-7: E025 panel content loadable from canvas document
-- [ ] AC-8: `describeState()` includes canvas info
-- [ ] AC-9: `bun run typecheck` clean
+- [x] AC-7: E025 panel content loadable from canvas document (demo.canvas.yaml)
+- [x] AC-8: `describeState()` includes canvas info (items with type/position)
+- [x] AC-9: `bun run typecheck` clean
+
+### ZINE microapp (added during implementation)
+- [x] AC-10: ZineItem unified layout primitive (panels + headers same type)
+- [x] AC-11: Column layout with responsive wrapping, maxColumns default 6
+- [x] AC-12: Column headers scroll with content, viewport clipped
+- [x] AC-13: Double-click dispatches to native editor by sourceType map
+- [x] AC-14: SDK exports: layoutColumns, ZineItem, ZineLayoutResult, CanvasDocument
 
 ---
 

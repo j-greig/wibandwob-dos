@@ -1803,7 +1803,9 @@ export class TsTuiMvpApp {
             typeof args?.title === "string" ? args.title : undefined;
           const initial =
             typeof args?.initial === "string" ? args.initial : undefined;
-          this.editor.openWindow(undefined, title, initial);
+          const onSave = typeof args?.onSave === "function" ? args.onSave as (content: string) => void : undefined;
+          const win = this.editor.openWindow(undefined, title, initial);
+          if (win && onSave) win.onSave = onSave;
         } else {
           // Path C: interactive file picker
           this.editor.openPicker();

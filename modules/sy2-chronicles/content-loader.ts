@@ -66,11 +66,24 @@ export function loadCanvas(filePath: string): CanvasDocument | null {
       }
     }
 
+    // Post-process panels: split animated-text frames from text field
+    const panels = (doc.panels as CEPanelDef[]).map(p => {
+      if (p.type === "animated-text" && !p.frames && p.text) {
+        // Split text on ~~~ separator into frames
+        return { ...p, frames: p.text.split(/\n~~~\n/), live: true };
+      }
+      if (p.type === "animated-text" && p.frames) {
+        // Frames already provided as YAML array — just ensure live
+        return { ...p, live: true };
+      }
+      return p;
+    });
+
     return {
       title: doc.meta?.title ?? "Untitled",
       columnHeaders: doc.meta?.columnHeaders === true,
       columns,
-      panels: doc.panels as CEPanelDef[],
+      panels,
     };
   } catch { return null; }
 }

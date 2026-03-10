@@ -31,6 +31,7 @@ import type { ZineItem, ZineSourceType } from "../../src/core/canvas-types.js";
 import { createTimer, clearTimers } from "../../src/core/ui-primitives.js";
 import { createButtonBar } from "../../src/core/ui-parts.js";
 import { toPanelDef, renderPanel } from "../sy2-chronicles/panel-types.js";
+import YAML from "yaml";
 import { loadCanvas } from "../sy2-chronicles/content-loader.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -458,16 +459,28 @@ export default function setup(host: MicroappHost) {
     const EDITOR_DISPATCH: Record<string, EditorDispatch> = {
       text: {
         command: "editor.open",
-        buildArgs: (_id, content, panelTitle) => ({
+        buildArgs: (id, content, panelTitle) => ({
           title: panelTitle,
           initial: content,
+          onSave: (newContent: string) => {
+            contentOverrides.set(id, newContent);
+            saveContentToYaml(id, newContent);
+            renderLayoutAndContent();
+            host.screen.render();
+          },
         }),
       },
       markdown: {
         command: "editor.open",
-        buildArgs: (_id, content, panelTitle) => ({
+        buildArgs: (id, content, panelTitle) => ({
           title: panelTitle,
           initial: content,
+          onSave: (newContent: string) => {
+            contentOverrides.set(id, newContent);
+            saveContentToYaml(id, newContent);
+            renderLayoutAndContent();
+            host.screen.render();
+          },
         }),
       },
       // figlet: { command: "figlet.open", buildArgs: ... }  ← scaffold slot
@@ -479,6 +492,24 @@ export default function setup(host: MicroappHost) {
     for (const def of cePanelDefs) {
       // CEPanelDef.type maps directly to ZineSourceType for supported types
       panelSourceTypes.set(def.id, def.type as ZineSourceType);
+    }
+
+    /** Write edited content back to the .canvas.yaml file. */
+    function saveContentToYaml(panelId: string, newContent: string) {
+      try {
+        const raw = fs.readFileSync(filePath, "utf8");
+        const doc = YAML.parseDocument(raw);
+        const panels = doc.get("panels");
+        if (!panels || !panels.items) return;
+        for (const item of panels.items) {
+          const id = item.get("id");
+          if (id === panelId) {
+            item.set("text", newContent);
+            break;
+          }
+        }
+        fs.writeFileSync(filePath, doc.toString(), "utf8");
+      } catch { /* silent — editor still has the content */ }
     }
 
     function openInEditor(panelId: string) {
