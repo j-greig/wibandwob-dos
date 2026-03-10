@@ -90,16 +90,42 @@ export interface CanvasLoadResult {
   windows: WindowRecord[];
 }
 
+/** Window kinds that are singletons — skip if already open. */
+const SINGLETON_KINDS = new Set(["chat", "companion", "monster-cam"]);
+
 export function restoreCanvas(
   doc: CanvasDocument,
   actions: SnapshotRestoreActions,
 ): CanvasLoadResult {
   const result: CanvasLoadResult = { loaded: 0, skipped: 0, errors: [], windows: [] };
 
+  // Track which singleton kinds we've already seen in this load
+  const existingWindows = actions.windows.getWindows();
+  const existingSingletons = new Set(
+    existingWindows
+      .filter(w => SINGLETON_KINDS.has(w.kind as string))
+      .map(w => w.kind as string)
+  );
+
   for (const entry of doc.windows) {
+    // Skip singleton kinds that already exist
+    if (SINGLETON_KINDS.has(entry.kind) && existingSingletons.has(entry.kind)) {
+      // Just reposition the existing one
+      const existing = existingWindows.find(w => w.kind === entry.kind);
+      if (existing && entry.position) {
+        actions.windows.moveWindow(existing.id, entry.position.x, entry.position.y);
+      }
+      if (existing && entry.size) {
+        actions.windows.resizeWindow(existing.id, entry.size.w, entry.size.h);
+      }
+      result.loaded++;
+      continue;
+    }
+
     try {
       const win = restoreWindowEntry(entry, actions);
       if (win) {
+        if (SINGLETON_KINDS.has(entry.kind)) existingSingletons.add(entry.kind);
         // Apply position and size
         if (entry.position) {
           actions.windows.moveWindow(win.id, entry.position.x, entry.position.y);
