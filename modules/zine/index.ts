@@ -17,6 +17,7 @@ import { fileURLToPath } from "node:url";
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
 import {
   layoutPanels,
+  layoutColumns,
   measureViewport,
   pointerToContent,
   hitPanel,
@@ -171,9 +172,11 @@ export default function setup(host: MicroappHost) {
         }
       },
     );
-    toolbar.layout({ top: 0, left: 0, width: Number(root.width) || 80, height: 1 });
     toolbar.node.bottom = 0;
+    toolbar.node.left = 0;
+    toolbar.node.right = 0;
     toolbar.node.top = undefined as any;
+    toolbar.node.height = 1;
 
     // ── Status bar (top) ────────────────────────────────────────────
     const statusBar = blessed.box({
@@ -286,7 +289,11 @@ export default function setup(host: MicroappHost) {
       const { width: vw, height: vh } = measureViewport(canvas);
       const defs = getFilteredDefs();
       const layoutDefs = defs.map(toPanelDef);
-      const layout = layoutPanels(layoutDefs, Math.max(20, vw));
+      // Use column layout if any panel has col > 0, otherwise flow layout
+      const hasColumns = defs.some(d => (d.col ?? 0) > 0);
+      const layout = hasColumns
+        ? layoutColumns(layoutDefs, Math.max(20, vw))
+        : layoutPanels(layoutDefs, Math.max(20, vw));
       const totalContentHeight = Math.max(layout.contentHeight, vh);
 
       // Apply position overrides from drags

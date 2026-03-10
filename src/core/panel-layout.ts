@@ -37,6 +37,53 @@ export type LayoutResult = {
 
 export const COL_GAP = 2;
 
+/**
+ * Column-first layout: group panels by `col`, stack each column vertically,
+ * place columns side by side. Use when panels have meaningful col assignments.
+ */
+export function layoutColumns(panels: PanelDef[], maxWidth: number): LayoutResult {
+  const safeWidth = Math.max(20, Math.floor(maxWidth));
+  const placements: Array<{ id: string; x: number; y: number }> = [];
+
+  // Group by col
+  const cols = new Map<number, PanelDef[]>();
+  for (const p of panels) {
+    const c = p.col ?? 0;
+    if (!cols.has(c)) cols.set(c, []);
+    cols.get(c)!.push(p);
+  }
+
+  const sortedCols = [...cols.keys()].sort((a, b) => a - b);
+  let cursorX = 0;
+  let contentHeight = 1;
+  let contentWidth = 0;
+
+  for (const colIdx of sortedCols) {
+    const colPanels = cols.get(colIdx)!;
+    let cursorY = 0;
+    let colMaxW = 0;
+
+    for (const panel of colPanels) {
+      const w = Math.max(3, Math.min(panel.w, safeWidth));
+      const h = Math.max(3, panel.h);
+      placements.push({ id: panel.id, x: cursorX, y: cursorY });
+      cursorY += h + 1; // 1 row gap between panels
+      if (w > colMaxW) colMaxW = w;
+    }
+
+    contentHeight = Math.max(contentHeight, cursorY - 1);
+    cursorX += colMaxW + COL_GAP;
+    contentWidth = cursorX - COL_GAP;
+  }
+
+  return {
+    placements,
+    contentWidth: Math.max(contentWidth, safeWidth),
+    contentHeight: Math.max(contentHeight, 1),
+  };
+}
+
+/** Row-flow layout: pack panels left-to-right, wrapping at maxWidth. */
 export function layoutPanels(panels: PanelDef[], maxWidth: number): LayoutResult {
   const clamp = (value: number, min: number, max: number): number =>
     Math.max(min, Math.min(max, value));
