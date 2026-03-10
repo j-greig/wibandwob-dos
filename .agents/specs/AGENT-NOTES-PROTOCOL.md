@@ -1,53 +1,33 @@
 ---
 title: Agent Notes Protocol
-scope: all Tier 2 specialist agents
+scope: all agents working in this codebase
 ---
 
 # Agent Notes Protocol
 
-Every subsystem spec has an ## Agent Notes table at the bottom.
-This is the mechanism by which specialists improve their own knowledge across sessions.
+Specs in `.agents/specs/` are living documents. Agents may edit them.
 
-## When to append
+## What to do when you find something new
 
-Append a row when you encounter ANY of these during a session:
-- A failure mode not covered in the spec's Failure Modes table
-- A pattern that contradicts a Do/Don't in the spec
-- A new invariant you had to discover the hard way
-- A correction to something the spec says that turned out to be wrong
-- A gotcha that cost you a retry (edge case, timing issue, blessed quirk)
+If you hit a failure mode, spot a wrong invariant, or discover a pattern
+the spec is missing — just fix it. Edit the spec body if you are confident.
+Use the `## Agent Notes` table if you want to flag it for human review first.
 
-Do NOT append:
-- Things already in the spec body
-- Vague observations without a concrete cause/fix
-- Information that belongs in a different spec (write it there instead)
+## Agent Notes table format
 
-## How to append
+Each spec has an append-only notes table at the bottom. One row per finding.
 
-Use your edit tool. Find the Agent Notes table in the relevant spec and add ONE row.
-Never modify the spec body above the Agent Notes section.
+| Date | Type | Subsystem | Finding | Triggered by |
+|------|------|-----------|---------|--------------|
 
-Template row:
-| YYYY-MM-DD | <type> | <subsystem> | <one-line finding — symptom: cause → fix> | <what triggered: task/command/error> |
+Types: `failure-mode` · `invariant` · `correction` · `gotcha` · `do-dont`
 
-Types: failure-mode | invariant | correction | gotcha | do-dont
+Finding format: `symptom: cause → fix` in one line.
 
-Example rows:
-| 2026-03-10 | failure-mode | window-system | Window not closing: close() called before cleanup() wired — wire cleanup first | Tried to close a window mid-session, blessed threw |
-| 2026-03-10 | gotcha | state-and-api | GET /state stale after module reload — call sync() or wait 500ms | modules.reload returned ok but /state showed old commands |
-| 2026-03-10 | correction | workspace | describeState() called before registerWindow() in some factories — appType missing from first /state sync | Workspace restore produced windows with undefined appType |
+Example:
+| 2026-03-10 | gotcha | state-and-api | GET /state stale after module reload: sync() not called → wait 500ms or call sync() manually | modules.reload returned ok but /state showed old commands |
 
-## Consolidation (human task, quarterly)
+## Consolidation
 
-When Agent Notes reaches 8+ rows in any spec:
-1. Review each row for accuracy
-2. Promote valid findings into the spec body (Failure Modes table, Invariants, Do/Don't)
-3. Delete promoted rows from Agent Notes
-4. Commit: "docs(e001): consolidate agent notes into <subsystem> spec"
-
-## Spec body is read-only for agents
-
-Agents MUST NOT edit the spec body above ## Agent Notes.
-The canonical spec is human-maintained. Agent Notes is agent-maintained.
-This boundary prevents spec rot from incorrect self-edits propagating into
-load-bearing knowledge.
+When Agent Notes has 8+ rows: promote valid findings into the spec body,
+clear the promoted rows, commit: `docs(e001): consolidate agent notes into <subsystem> spec`.
