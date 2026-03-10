@@ -41,6 +41,9 @@ Epic status: `not-started` · `in-progress` · `blocked` · `done` · `dropped`
 
 Full canon: `.planning/README.md`
 
+Running devlog (friction, fixes, lessons from live agent work):
+`.planning/spikes/spk-agentic-tui-runtime-roadmap/agentic-devlog.md`
+
 ## GitHub kanban board
 
 https://github.com/users/j-greig/projects/2 — epic-level board, one card per epic.
