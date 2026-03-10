@@ -16,6 +16,7 @@ import {
   spriteWorldCells, spriteSolidCells,
 } from "./sprites.js";
 import { generateWorld, tileKey } from "./worldgen.js";
+import { buildCastleInterior } from "./castle.js";
 
 const STAR_GLYPHS = ["·", "✦", "✧", "✶", "✹", "*", "˙"] as const;
 
@@ -58,6 +59,7 @@ export function initState(seed: number): GameState {
     visible: true,
     facingLeft: false,
     squeezing: false,
+    squeezeAnimating: false,
     piloting: false,
     pilotedMech: null,
     cannonCooldown: 0,
@@ -75,9 +77,22 @@ export function initState(seed: number): GameState {
     log: [],
     turn: 0,
     seed,
-    mode: "overworld",
+    mode: "overworld" as const,
     animTick: 0,
     stars: generateStars(seed),
+    interactables: [],
+    nearbyInteractable: null,
+    nearbyPetTarget: null,
+    overworldSnapshot: null,
+    magick: 80,
+    maxMagick: 100,
+    sigils: new Set<string>(),
+    groundItems: [],
+    inventory: [],
+    pressurePlateProgress: [],
+    instrumentsPlayed: new Set<string>(),
+    libraryBooksRead: 0,
+    mirrorVaultOpened: false,
     nearbyMech: null,
     hints: [],
     beamCells: [],
@@ -124,11 +139,11 @@ export let viewportHeight = 36;
 export function setViewportHeight(h: number) { viewportHeight = h; }
 
 function updateCamera(state: GameState) {
-  const room = getCurrentRoom(state.player.x);
+  const room = state.mode === "castleInterior" ? "interior" : getCurrentRoom(state.player.x);
   state.camera.prevRoom = state.camera.currentRoom;
   state.camera.currentRoom = room;
 
-  const bounds = ROOMS[room];
+  const bounds = room === "interior" ? { minX: 108, maxX: 180 } : ROOMS[room];
   const halfViewport = Math.floor(VIEWPORT_WIDTH / 2);
   const minOffset = bounds.minX;
   const maxOffset = Math.max(bounds.maxX - VIEWPORT_WIDTH + 1, bounds.minX);
@@ -141,7 +156,7 @@ function updateCamera(state: GameState) {
   state.camera.offsetY = Math.min(Math.max(desiredY, 0), Math.max(0, HEIGHT - viewportHeight));
 
   if (state.camera.prevRoom !== state.camera.currentRoom) {
-    const names: Record<string, string> = { castle: "the castle", forest: "the forest", mountain: "the mountains" };
+    const names: Record<string, string> = { castle: "the castle", forest: "the forest", mountain: "the mountains", interior: "the keep" };
     addLog(state, `You enter ${names[room] ?? room}.`);
   }
 }
@@ -154,13 +169,20 @@ function addLog(state: GameState, text: string) {
 }
 
 function refreshHints(state: GameState): void {
-  const hints: string[] = ["hjkl/yubn move"];
+  const hints: string[] = ['hjkl/yubn move'];
   if (state.player.piloting) {
-    hints.push("e eject");
-    hints.push("f fire");
+    hints.push('e eject');
+    hints.push('f fire');
   } else {
-    hints.push("w squeeze");
-    if (state.nearbyMech) hints.push("e board mech");
+    hints.push('w squeeze');
+    if (state.nearbyMech) {
+      hints.push('e board mech');
+    } else if (state.nearbyInteractable) {
+      hints.push(state.nearbyInteractable.prompt);
+    }
+    if (state.nearbyPetTarget?.petPrompt) {
+      hints.push(state.nearbyPetTarget.petPrompt);
+    }
   }
   state.hints = hints;
 }
@@ -168,7 +190,19 @@ function refreshHints(state: GameState): void {
 function refreshNearby(state: GameState): void {
   state.nearbyMech = state.monsters.find(m => {
     const d = Math.abs(state.player.x - m.x) + Math.abs(state.player.y - m.y);
-    return d <= 1 && (m.behavior === "mech-warden" || m.behavior === "skinny-mech" || m.id?.startsWith("mech"));
+    return d <= 1 && (m.behavior === 'mech-warden' || m.behavior === 'skinny-mech' || (m.id?.startsWith('mech') ?? false));
+  }) ?? null;
+
+  state.nearbyInteractable = state.interactables.find(obj => {
+    if (obj.exhausted) return false;
+    const d = Math.abs(state.player.x - obj.x) + Math.abs(state.player.y - obj.y);
+    return d <= obj.radius;
+  }) ?? null;
+
+  state.nearbyPetTarget = state.interactables.find(obj => {
+    if (!obj.onPet || obj.exhausted) return false;
+    const d = Math.abs(state.player.x - obj.x) + Math.abs(state.player.y - obj.y);
+    return d <= obj.radius;
   }) ?? null;
   refreshHints(state);
 }
@@ -328,6 +362,11 @@ function fireCannon(state: GameState): void {
     addLog(state, "Cannon recharging...");
     return;
   }
+  if (state.magick < 4) {
+    addLog(state, 'Magick sputters — insufficient charge.');
+    return;
+  }
+  state.magick -= 4;
 
   state.player.cannonCooldown = now + 800;
   const dir = state.player.lastMoveDir || { dx: state.player.facingLeft ? -1 : 1, dy: 0 };
@@ -372,6 +411,86 @@ function fireCannon(state: GameState): void {
   refreshNearby(state);
 }
 
+function enterCastle(state: GameState): void {
+  if (state.mode !== 'overworld') return;
+  if (state.player.piloting) {
+    addLog(state, "The mech can't squeeze through the castle gate.");
+    return;
+  }
+  if (!state.player.squeezing) {
+    addLog(state, 'Squeeze first (press W) to fit through the gate. ◕');
+    return;
+  }
+
+  state.overworldSnapshot = {
+    tiles: state.tiles,
+    monsters: state.monsters,
+    structures: state.structures,
+    groundItems: state.groundItems,
+    stars: state.stars,
+    discovered: state.discovered,
+    visible: state.visible,
+    playerX: state.player.x,
+    playerY: state.player.y,
+    camera: { ...state.camera },
+  };
+
+  const interior = buildCastleInterior(state.seed);
+  state.mode = 'castleInterior';
+  state.tiles = interior.tiles;
+  state.monsters = interior.monsters;
+  state.structures = interior.structures;
+  state.interactables = interior.interactables;
+  state.groundItems = [];
+  state.stars = [];
+  state.discovered = new Set();
+  state.visible = new Set();
+  state.player.x = interior.playerStart.x;
+  state.player.y = interior.playerStart.y;
+  state.camera = { offsetX: 0, offsetY: 0, currentRoom: 'interior', prevRoom: 'castle' };
+  state.pressurePlateProgress = [];
+  state.instrumentsPlayed = new Set();
+  state.libraryBooksRead = 0;
+  state.mirrorVaultOpened = false;
+
+  computeFov(state);
+  updateCamera(state);
+  refreshNearby(state);
+  addLog(state, 'You slip through the tower gate into the keep.');
+}
+
+function exitCastle(state: GameState): void {
+  if (state.mode !== 'castleInterior') return;
+  if (state.player.piloting) {
+    addLog(state, 'Eject from the mech first.');
+    return;
+  }
+  const snap = state.overworldSnapshot;
+  if (!snap) {
+    addLog(state, 'No way back.');
+    return;
+  }
+
+  state.mode = 'overworld';
+  state.tiles = snap.tiles;
+  state.monsters = snap.monsters;
+  state.structures = snap.structures;
+  state.groundItems = snap.groundItems;
+  state.stars = snap.stars;
+  state.discovered = snap.discovered;
+  state.visible = snap.visible;
+  state.player.x = snap.playerX;
+  state.player.y = snap.playerY;
+  state.camera = snap.camera;
+  state.interactables = [];
+  state.overworldSnapshot = null;
+
+  computeFov(state);
+  updateCamera(state);
+  refreshNearby(state);
+  addLog(state, 'You squeeze back out onto the moonlit causeway.');
+}
+
 // ─── step ────────────────────────────────────────────────
 
 export function step(state: GameState, command: GameCommand): void {
@@ -395,15 +514,26 @@ export function step(state: GameState, command: GameCommand): void {
       refreshHints(state);
       return;
     case "interact": {
-      const mech = state.nearbyMech;
-      if (mech && !state.player.piloting) {
-        boardMech(state, mech);
+      if (state.nearbyMech && !state.player.piloting) {
+        boardMech(state, state.nearbyMech);
       } else if (state.player.piloting) {
         ejectMech(state);
+      } else if (state.nearbyInteractable) {
+        state.nearbyInteractable.onInteract(state);
+        refreshNearby(state);
       } else {
         addLog(state, "Nothing to interact with here.");
       }
       refreshHints(state);
+      return;
+    }
+    case "pet": {
+      if (state.nearbyPetTarget?.onPet) {
+        state.nearbyPetTarget.onPet(state);
+        refreshNearby(state);
+      } else {
+        addLog(state, 'Nothing to pet here.');
+      }
       return;
     }
     case "board-mech": {
@@ -480,6 +610,16 @@ export function step(state: GameState, command: GameCommand): void {
   refreshNearby(state);
   updateCamera(state);
 
+  // Portal transition
+  const landedTile = state.tiles.get(tileKey(state.player.x, state.player.y));
+  if (landedTile?.portal === 'castleGate') {
+    if (state.mode === 'overworld') {
+      enterCastle(state);
+    } else if (state.mode === 'castleInterior') {
+      exitCastle(state);
+    }
+  }
+
   // Location label
   const tile = state.tiles.get(tileKey(state.player.x, state.player.y));
   if (tile && tile.label) {
@@ -497,6 +637,9 @@ export function tickAnim(state: GameState): void {
     if (state.animTick % star.speed === 0) {
       star.phase = (star.phase + 1) % STAR_GLYPHS.length;
     }
+  }
+  if (state.magick < state.maxMagick) {
+    state.magick = Math.min(state.maxMagick, state.magick + 0.08);
   }
   // Decay beam overlay
   if (state.beamCells.length > 0) {
@@ -581,6 +724,20 @@ export function getFrame(state: GameState, viewW: number, viewH: number): FrameC
   for (const monster of state.monsters) paintEntity(monster);
   paintEntity(state.player);
 
+  // Interactable glyphs overlay
+  for (const obj of state.interactables) {
+    if (obj.exhausted) continue;
+    const sx = obj.x - camX;
+    const sy = obj.y - camY;
+    if (sx < 0 || sx >= viewW || sy < 0 || sy >= viewH) continue;
+    const key = tileKey(obj.x, obj.y);
+    if (!state.visible.has(key)) continue;
+    const idx = sy * viewW + sx;
+    if (idx >= 0 && idx < cells.length) {
+      cells[idx] = { x: sx, y: sy, ch: obj.glyph, fg: obj.fg ?? '#f5f5f5', bg: '#000000' };
+    }
+  }
+
   // Beam overlay — staged cyan colors, drawn on top of everything visible
   for (const beam of state.beamCells) {
     const sx = beam.x - camX;
@@ -599,9 +756,15 @@ export function getFrame(state: GameState, viewW: number, viewH: number): FrameC
 export function describeEngine(state: GameState) {
   const tile = state.tiles.get(tileKey(state.player.x, state.player.y));
   return {
+    mode: state.mode,
     biome: state.camera.currentRoom,
     playerPos: { x: state.player.x, y: state.player.y },
     turn: state.turn,
+    magick: Math.floor(state.magick),
+    maxMagick: state.maxMagick,
+    sigilCount: state.sigils.size,
+    sigils: Array.from(state.sigils),
+    inventoryCount: state.inventory.length,
     seed: state.seed,
     lastMessage: state.log[state.log.length - 1] ?? "",
     label: tile?.label ?? "",

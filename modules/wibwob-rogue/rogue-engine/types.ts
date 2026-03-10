@@ -76,12 +76,28 @@ export interface Camera {
 export interface Player extends Entity {
   facingLeft: boolean;
   squeezing: boolean;
+  squeezeAnimating?: boolean;
   normalSprite: Sprite;
   piloting: boolean;
   pilotedMech?: Entity | null;
   cannonCooldown: number;
   lastMoveDir: { dx: number; dy: number };
   previousForm?: any;
+}
+
+export interface Interactable {
+  id: string;
+  x: number;
+  y: number;
+  glyph: string;
+  fg?: string;
+  radius: number;
+  prompt: string;
+  petPrompt?: string;
+  onInteract: (state: GameState) => void;
+  onPet?: (state: GameState) => void;
+  exhausted?: boolean;
+  istate?: Record<string, any>;
 }
 
 export interface StarCell {
@@ -110,9 +126,22 @@ export interface GameState {
   log: string[];
   turn: number;
   seed: number;
-  mode: string;
+  mode: "overworld" | "castleInterior";
   animTick: number;
   stars: StarCell[];
+  interactables: Interactable[];
+  nearbyInteractable: Interactable | null;
+  nearbyPetTarget: Interactable | null;
+  overworldSnapshot: any | null;
+  magick: number;
+  maxMagick: number;
+  sigils: Set<string>;
+  groundItems: { id: string; type: string; x: number; y: number }[];
+  inventory: { type: string; quantity: number }[];
+  pressurePlateProgress: string[];
+  instrumentsPlayed: Set<string>;
+  libraryBooksRead: number;
+  mirrorVaultOpened: boolean;
   nearbyMech?: Entity | null;
   hints: string[];
   beamCells: BeamCell[];  // transient cannon beam overlay

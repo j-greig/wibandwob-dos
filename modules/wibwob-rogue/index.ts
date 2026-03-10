@@ -56,7 +56,11 @@ function openRogue(host: MicroappHost) {
 
     const cells = getFrame(state, viewW, viewH);
     const desc = describeEngine(state);
-    const status = `${desc.biome.toUpperCase()} [${desc.playerPos.x},${desc.playerPos.y}] T:${desc.turn}${desc.squeezing ? " ◕squeeze" : ""}${state.player.piloting ? " [PILOTING]" : ""}`;
+    const sigilStr = state.sigils.size > 0 ? ` | ${Array.from(state.sigils).join(' ')}` : '';
+    const magickStr = `${Math.floor(state.magick)}/${state.maxMagick}mp`;
+    const pilotStr = state.player.piloting ? ' [PILOTING]' : '';
+    const sqzStr = desc.squeezing ? ' ◕squeeze' : '';
+    const status = `${desc.biome.toUpperCase()} [${desc.playerPos.x},${desc.playerPos.y}] T:${desc.turn} ${magickStr}${sigilStr}${pilotStr}${sqzStr}`;
     renderFrame(content, cells, viewW, viewH + LOG_LINES + 1, state.log, LOG_LINES, status, state.hints);
     host.screen.render();
   }
@@ -84,13 +88,14 @@ function openRogue(host: MicroappHost) {
   win.body.key(["w"],          () => handleCmd("squeeze-toggle"));
   win.body.key(["e", "enter", "space"], () => handleCmd("interact"));
   win.body.key(["f"],          () => handleCmd("fire-cannon"));
+  win.body.key(['p'], () => handleCmd('pet'));
 
   // Also handle writeInput (agent API sends input this way)
   win.onInput((input: string) => {
     const cmdMap: Record<string, GameCommand> = {
       h: "move-west", j: "move-south", k: "move-north", l: "move-east",
       y: "move-nw", u: "move-ne", b: "move-sw", n: "move-se",
-      w: "squeeze-toggle", e: "interact", f: "fire-cannon",
+      w: "squeeze-toggle", e: "interact", f: "fire-cannon", p: "pet",
     };
     const cmd = cmdMap[input.toLowerCase()];
     if (cmd) {

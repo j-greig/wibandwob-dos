@@ -363,6 +363,15 @@ export function generateWorld(seed: number) {
   const castleAnchorX = Math.floor((REGION_BOUNDS.castle.minX + REGION_BOUNDS.castle.maxX) / 2);
   const castleAnchorY = MAIN_PATH_Y - 2;
   structures.push(createEntity("castle-facade", castleAnchorX, castleAnchorY, CASTLE_SPRITE, "#f5f5f5", { static: true, solid: true }));
+  // Castle gate portal tile — squeezed player walks north onto this to enter interior
+  setTile(tiles, castleAnchorX, MAIN_PATH_Y - 1, {
+    glyph: '☖',
+    walkable: true,
+    transparent: true,
+    region: 'castle',
+    label: 'Tower Gate',
+    portal: 'castleGate' as any,
+  });
 
   // Wobblers in castle
   const wobblerPositions: { x: number; y: number }[] = [];
