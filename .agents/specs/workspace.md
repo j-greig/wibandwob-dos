@@ -174,3 +174,11 @@ When adding a new persistable window type:
 - [ ] Implement describeState() returning the new appType + any restore-needed fields in details
 - [ ] Add restore factory in app-controller keyed to the new kind/appType
 - [ ] Test full round-trip: open → save → restart → verify restored
+
+## Agent Notes
+<!-- Append-only. Agents write here during sessions using their edit tool.
+     Do not modify the spec body directly. Human consolidates into body quarterly.
+     Format: one row per finding. Types: failure-mode | invariant | correction | gotcha | do-dont -->
+
+| Date | Type | Subsystem | Finding | Triggered by |
+|------|------|-----------|---------|--------------|

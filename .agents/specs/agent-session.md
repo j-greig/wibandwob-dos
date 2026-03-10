@@ -235,3 +235,11 @@ When changing Scramble:
 - [ ] Test all 3 smol states (smol → tall → pop-out)
 - [ ] Test pop-out then close: smol popup should NOT re-open automatically
 - [ ] Verify /scramble/state returns correct fields after changes
+
+## Agent Notes
+<!-- Append-only. Agents write here during sessions using their edit tool.
+     Do not modify the spec body directly. Human consolidates into body quarterly.
+     Format: one row per finding. Types: failure-mode | invariant | correction | gotcha | do-dont -->
+
+| Date | Type | Subsystem | Finding | Triggered by |
+|------|------|-----------|---------|--------------|
