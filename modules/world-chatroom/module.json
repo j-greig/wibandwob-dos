@@ -5,7 +5,7 @@
   "type": "microapp",
   "entry": "index.ts",
   "microapp": {
-    "id": "world-chatroom",
+    "id": "wibwob.chatroom",
     "title": "World Chatroom",
     "description": "Open a location-bound world chat channel inside WibWob-DOS.",
     "persist": true,

@@ -956,7 +956,7 @@ export default function setup(host: MicroappHost) {
   host.registerSnapshot({
     serialize: (window) => {
       const state = window.describeState?.() ?? {};
-      if (state.appType !== "wibwobworld") {
+      if (state.appType !== "wibwob.world") {
         return undefined;
       }
       return {

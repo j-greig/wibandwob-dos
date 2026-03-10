@@ -20,7 +20,7 @@ import type { SnapshotRestoreActions } from "../../src/core/snapshot-registry.js
 // Helpers
 // ---------------------------------------------------------------------------
 
-const APP_TYPE = "example.hello-world";
+const APP_TYPE = "wibwob.example.hello";
 
 /** Minimal WindowRecord stub — only describeState() is needed by the registry. */
 function makeWindowRecord(appType: string, extra: Record<string, unknown> = {}): WindowRecord {

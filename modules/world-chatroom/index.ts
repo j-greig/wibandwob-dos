@@ -388,7 +388,7 @@ export default function setup(host: MicroappHost) {
   host.registerSnapshot({
     serialize: (window) => {
       const state = window.describeState?.() ?? {};
-      if (state.appType !== "world-chatroom") return undefined;
+      if (state.appType !== "wibwob.chatroom") return undefined;
       return {
         channelId: state.channelId,
       };

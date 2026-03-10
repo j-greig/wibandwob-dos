@@ -5,7 +5,7 @@
   "type": "microapp",
   "entry": "index.ts",
   "microapp": {
-    "id": "patchbay.lab",
+    "id": "wibwob.patchbay",
     "title": "Patchbay Lab",
     "description": "Patchbay Lab SDK coverage harness.",
     "multiInstance": false,

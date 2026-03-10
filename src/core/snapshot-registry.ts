@@ -365,9 +365,17 @@ export function registrySerialize(window: WindowRecord): Record<string, unknown>
 }
 
 // Legacy appType remaps — old workspace files may contain retired appTypes.
-const legacyAppTypeRemap: Record<string, PersistableAppType> = {
+// Built-in type remaps are typed strictly; dynamic module remaps are plain strings.
+const legacyAppTypeRemap: Record<string, string> = {
   "wibwob-chat-v2": "wibwob-agent",
   "chat-transcript": "wibwob-agent",
+  // E031 — module ID normalisation (S00b): old IDs → wibwob.slug
+  "world-chatroom": "wibwob.chatroom",
+  "wibwobworld": "wibwob.world",
+  "patchbay.lab": "wibwob.patchbay",
+  "touchlab.mvp": "wibwob.touchlab",
+  "example.hello-world": "wibwob.example.hello",
+  "wibwob.e026-demo": "wibwob.example.e026",
 };
 
 // Maps WindowKind → default PersistableAppType for old workspace files

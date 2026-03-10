@@ -5,7 +5,7 @@
   "type": "microapp",
   "entry": "index.ts",
   "microapp": {
-    "id": "wibwob.e026-demo",
+    "id": "wibwob.example.e026",
     "title": "E026 Demo",
     "description": "Live demo of F05 TreeWidget, F06 createTimer, F07 motion, F03 figlet toggle",
     "multiInstance": true,
