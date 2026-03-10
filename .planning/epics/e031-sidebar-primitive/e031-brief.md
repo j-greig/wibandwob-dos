@@ -5,7 +5,7 @@ status: in-progress
 issue: ~
 pr: ~
 depends_on: []
-branch: epic/e031-sidebar-primitive
+branch: epic/e031-ui-primitives-brand
 ---
 
 # E031 — Shared UI Primitives + Brand Nomenclature
