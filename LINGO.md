@@ -25,9 +25,87 @@
 - raw terminal dimensions in character cells, usually width x height, before any app-specific chrome or desktop layout rules
 - value: keeps the difference clear between actual terminal space and the desktop/window space we derive from it
 
+## ARCHITECTURE TERMS
+
+**imperative vs declarative**
+- imperative: you call `.setContent("hello")` on the blessed widget directly from a timer, a key handler, a service callback — all in different places
+- declarative: you update a state object, one render function reads that state and calls `.setContent()` as a result
+- imperative is fine until three things try to update the same widget and you lose track of what it shows and why
+
+**direct mutation**
+- when code reaches directly into a widget and changes it: `myBox.content = "..."` or `myList.select(2)`
+- the widget property becomes the only record of what changed — no one else knows
+- the opposite: own the state yourself, let a render function apply it to the widget
+
+**composition root**
+- the single file that knows about everything: creates all the services, creates all the collaborators, wires them together, passes them to each other
+- `app-controller.ts` is ours
+- the problem is not that it exists — it should. the problem is when it also starts doing actual work instead of just wiring
+- "giant-controller drift" is what happens when it keeps absorbing logic because it's the easiest place to add things
+
+**seam**
+- a place where two pieces of code touch through a clear interface rather than by reaching into each other
+- good seams can be cut cleanly — you can change one side without breaking the other
+- `microapp-sdk.ts` is a seam: modules talk to the shell only through that interface, not by importing internals
+
+**Elm Architecture / TEA**
+- a loop: Model (state record) → Msg (what happened) → update (pure fn: old state + msg → new state) → view (state → what to draw) → back to Model
+- WibWob-DOS already has the spirit of this: StateService is a Model, commands are almost Msgs
+- the gap is that the loop isn't closed consistently — some paths update state correctly, others skip it and mutate widgets directly
+- see: https://guide.elm-lang.org/architecture/
+
+**discriminated union / Msg type**
+- a TypeScript type listing exactly what can happen in a subsystem:
+  `type EditorMsg = { type: "keypress", key: string } | { type: "save" } | { type: "close" }`
+- instead of three separate callbacks each mutating things, one update function handles all cases
+- makes it impossible to forget a case; the compiler will tell you
+
+**reducer**
+- the update function: `(state, msg) => newState`
+- takes current state + one thing that happened, returns next state
+- no side effects inside it — side effects (saving to disk, timers, spawning processes) happen separately after it runs
+
+**effect**
+- anything that talks to the outside world: file read, timer, network call, spawning ffmpeg
+- the Elm term draws a clear line between pure state changes (in → out) and things with consequences
+- the point is to name effects explicitly rather than having them appear randomly inside callbacks
+
+**event-handler soup**
+- a key handler mutates a widget, a timer also mutates it, a service callback also mutates it, none know about each other
+- debugging means chasing all three sources
+- the fix: a single update path that all three feed into
+
+**render invalidation**
+- marking that something changed and a re-render is needed, without immediately calling `screen.render()`
+- like queuing "this is dirty" and flushing at the right moment
+- the alternative — calling `screen.render()` from 40 different places — works but makes timing unpredictable and wastes CPU
+
+**ownership boundary**
+- a rule about who is allowed to change what
+- preferred split in this codebase: services own logic and state, windows own layout and render, controller wires them together
+- when a window is also doing domain logic, or a service is calling render, the boundary is broken
+
 ## PROMPTING
 
-Vibe-first. Describe the feeling of the problem, not the exact technical issue. Paste one of these when something feels off but you can't name it precisely.
+Vibe-first. Describe the feeling of the problem, not the exact technical issue. Paste one of these when something feels off but you can't name it precisely. The first four prompts target Elm-style architectural smells specifically.
+
+```
+The render calls feel scattered. Find every place screen.render() or direct widget mutation happens outside of a clear render function. Map who is calling it and why. Propose one rule for when rendering is allowed to happen and from where. Apply it to one subsystem as proof. Typecheck clean. Commit.
+```
+
+```
+State is living in the wrong place. Find widgets whose properties are the only record of something meaningful — content, selection, dirty flag, playback position, whatever. Pull that state into an explicit record. Let the widget be updated from it rather than being the source of truth. Typecheck clean. Commit.
+```
+
+```
+Something is doing too many jobs at once. Find one complex window or service that owns its own timers, mutates its own widgets, handles its own key events, and manages its own state — all in one blob. Give each job a name. Extract the state into a local model. Write one render function that reads from it. Everything else feeds into that. Typecheck clean. Commit.
+```
+
+```
+The composition root is doing actual work. Read app-controller.ts top to bottom. Mark every line that is wiring (good) vs every line that is policy or behavior (bad). Extract the policy and behavior into focused collaborators. Leave app-controller.ts as the place that creates things and connects them, not the place that runs them. Typecheck clean. Commit.
+```
+
+
 
 ```
 This codebase feels copy-pasty. Hunt for anything that appears to have been written twice — same logic, same shape, same idea — in more than one place. Every duplicate you find: give it one home, wire it up everywhere else, delete the copies. Typecheck clean. Commit. Tell me what you found.
