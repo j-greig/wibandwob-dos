@@ -2109,7 +2109,7 @@ export default function setup(host: MicroappHost) {
         w: n.def.w,
         h: n.def.h,
         live: n.def.live ?? false,
-        type: (PANEL_DEFS.find(p => p.id === id) as CEPanelDef)?.type ?? "mixed",
+        type: (getPanelDefs().find(p => p.id === id) as CEPanelDef)?.type ?? "mixed",
       })),
     }));
 
