@@ -203,17 +203,17 @@ export default function setup(host: MicroappHost) {
 
     function renderLayout() {
       const vp = measureViewport(canvas);
-      const placed = layoutPanels(panelDefs, vp.width);
+      const result = layoutPanels(panelDefs, vp.width);
 
       // Total content height
-      let maxY = 0;
-      for (const p of placed) {
-        const bottom = p.y + p.def.h;
-        if (bottom > maxY) maxY = bottom;
-      }
+      let maxY = result.contentHeight;
 
       // Create or update panel blessed nodes
-      for (const p of placed) {
+      // Join placements with defs by id
+      for (const placement of result.placements) {
+        const def = panelDefs.find(d => d.id === placement.id);
+        if (!def) continue;
+        const p = { ...placement, def };
         let node = panelNodes.get(p.id);
         if (!node) {
           const frame = blessed.box({
@@ -327,8 +327,6 @@ export default function setup(host: MicroappHost) {
     label: "Open ZINE",
     description: "Open a ZINE canvas. Args: filePath (string, path to .canvas.yaml).",
     action: openZine,
-    menu: "applications",
-    palette: true,
     multiInstance: true,
     direct: true,
   });
