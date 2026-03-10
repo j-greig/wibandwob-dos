@@ -22,6 +22,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
 import {
+  clamp,
   createButtonBar,
   createInlineSearch,
   createTimer,
@@ -64,9 +65,6 @@ function getCamService(): MonsterCamService {
   return camService;
 }
 
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
-}
 
 // ── ASCII DONUT ─────────────────────────────────────────────────────────────
 // Ported from C++ TVision generative_torus_view.cpp (a1k0n-inspired donut math)

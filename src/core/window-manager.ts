@@ -1,5 +1,6 @@
 import blessed from "blessed";
 
+import { clamp } from "./ui-parts.js";
 import type { WindowFacade } from "./window-facade.js";
 import { theme } from "./theme/resolver.js";
 import { safeSetStyle } from "./ui-primitives.js";
@@ -314,8 +315,8 @@ export class WindowManager implements WindowFacade {
     const screenHeight = Number(this.screen.height);
     const frameWidth = Number(record.frame.width);
     const frameHeight = Number(record.frame.height);
-    record.frame.left = this.clamp(left, 0, Math.max(0, screenWidth - frameWidth));
-    record.frame.top = this.clamp(top, 0, Math.max(0, screenHeight - 2 - frameHeight));
+    record.frame.left = clamp(left, 0, Math.max(0, screenWidth - frameWidth));
+    record.frame.top = clamp(top, 0, Math.max(0, screenHeight - 2 - frameHeight));
     this.syncShadow(record);
     this.onChange?.();
     this.screen.render();
@@ -333,8 +334,8 @@ export class WindowManager implements WindowFacade {
     const screenHeight = Number(this.screen.height);
     const maxWidth = Math.max(24, screenWidth - Number(record.frame.left));
     const maxHeight = Math.max(8, screenHeight - 2 - Number(record.frame.top));
-    record.frame.width = this.clamp(width, 24, maxWidth);
-    record.frame.height = this.clamp(height, 8, maxHeight);
+    record.frame.width = clamp(width, 24, maxWidth);
+    record.frame.height = clamp(height, 8, maxHeight);
     this.syncShadow(record);
     record.refresh?.();
     this.onChange?.();
@@ -473,8 +474,8 @@ export class WindowManager implements WindowFacade {
     for (const [index, window] of this.windows.entries()) {
       this.clearMaximize(window);
       const offset = index * 2;
-      window.frame.left = this.clamp(1 + offset, 1, Math.max(1, desktopWidth - width));
-      window.frame.top = this.clamp(offset, 0, Math.max(0, desktopHeight - height));
+      window.frame.left = clamp(1 + offset, 1, Math.max(1, desktopWidth - width));
+      window.frame.top = clamp(offset, 0, Math.max(0, desktopHeight - height));
       window.frame.width = width;
       window.frame.height = height;
       this.syncShadow(window);
@@ -509,12 +510,12 @@ export class WindowManager implements WindowFacade {
     const screenHeight = Number(this.screen.height);
     const frameWidth = Number(record.frame.width);
     const frameHeight = Number(record.frame.height);
-    const nextLeft = this.clamp(
+    const nextLeft = clamp(
       dragState.originLeft + (data.x - dragState.startX),
       0,
       Math.max(0, screenWidth - frameWidth)
     );
-    const nextTop = this.clamp(
+    const nextTop = clamp(
       dragState.originTop + (data.y - dragState.startY),
       0,
       Math.max(0, screenHeight - 2 - frameHeight)
@@ -555,8 +556,8 @@ export class WindowManager implements WindowFacade {
     const maxWidth = Math.max(24, desktopWidth - resizeState.originLeft);
     const maxHeight = Math.max(8, desktopHeight - resizeState.originTop);
 
-    record.frame.width = this.clamp(resizeState.originWidth + deltaX, 24, maxWidth);
-    record.frame.height = this.clamp(resizeState.originHeight + deltaY, 8, maxHeight);
+    record.frame.width = clamp(resizeState.originWidth + deltaX, 24, maxWidth);
+    record.frame.height = clamp(resizeState.originHeight + deltaY, 8, maxHeight);
     this.syncShadow(record);
     record.refresh?.();
     this.onChange?.();
@@ -606,10 +607,6 @@ export class WindowManager implements WindowFacade {
     record.shadow.setContent(Array.from({ length: h }, () => sh.char.repeat(w)).join("\n"));
   }
 
-  private clamp(value: number, min: number, max: number): number {
-    return Math.max(min, Math.min(max, value));
-  }
-
   private isRightClick(data?: blessed.Widgets.Events.IMouseEventArg): boolean {
     if (!data) {
       return false;
@@ -635,8 +632,8 @@ export class WindowManager implements WindowFacade {
       const b = record.savedBounds;
       const sw = Number(this.desktop.width) || Number(this.screen.width);
       const sh = Number(this.desktop.height) || (Number(this.screen.height) - 2);
-      record.frame.left = this.clamp(b.left, 0, Math.max(0, sw - b.width));
-      record.frame.top = this.clamp(b.top, 0, Math.max(0, sh - b.height));
+      record.frame.left = clamp(b.left, 0, Math.max(0, sw - b.width));
+      record.frame.top = clamp(b.top, 0, Math.max(0, sh - b.height));
       record.frame.width = Math.min(b.width, sw);
       record.frame.height = Math.min(b.height, sh);
       record.savedBounds = undefined;

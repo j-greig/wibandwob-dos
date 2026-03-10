@@ -9,6 +9,7 @@
  */
 
 import type blessed from "blessed";
+import { clamp } from "./ui-parts.js";
 
 export type PanelDef = {
   id: string;
@@ -123,7 +124,7 @@ export function layoutColumns(panels: PanelDef[], maxWidth: number, opts?: Colum
     let totalH = 0;
     for (let i = 0; i < colPanels.length; i++) {
       const p = colPanels[i]!;
-      const w = Math.max(minColumnWidth, Math.min(p.w, safeWidth));
+      const w = clamp(p.w, minColumnWidth, safeWidth);
       const h = Math.max(minPanelHeight, p.h);
       if (w > maxW) maxW = w;
       totalH += h + (i < colPanels.length - 1 ? panelGap : 0);
@@ -175,7 +176,7 @@ export function layoutColumns(panels: PanelDef[], maxWidth: number, opts?: Colum
     let cursorY = rowBaseY + headerHeight;
     for (let j = 0; j < colPanels.length; j++) {
       const panel = colPanels[j]!;
-      const w = Math.max(minColumnWidth, Math.min(panel.w, safeWidth));
+      const w = clamp(panel.w, minColumnWidth, safeWidth);
       const h = Math.max(minPanelHeight, panel.h);
       items.push({
         id: panel.id,
@@ -207,9 +208,6 @@ export function layoutColumns(panels: PanelDef[], maxWidth: number, opts?: Colum
 
 /** Row-flow layout: pack panels left-to-right, wrapping at maxWidth. */
 export function layoutPanels(panels: PanelDef[], maxWidth: number): LayoutResult {
-  const clamp = (value: number, min: number, max: number): number =>
-    Math.max(min, Math.min(max, value));
-
   const placements: Array<{ id: string; x: number; y: number }> = [];
   let contentWidth = 0;
   const safeWidth = Math.max(20, Math.floor(maxWidth));

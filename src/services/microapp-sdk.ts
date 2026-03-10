@@ -115,6 +115,7 @@ export {
 // cleaner module-level imports. host.ui.createButtonBar(...) and
 // import { createButtonBar } from "microapp-sdk" are equivalent.
 export {
+  clamp,
   createStack,
   createColumns,
   createHeaderBar,
@@ -134,6 +135,7 @@ export {
   createSelectableList,
   createInlineSearch,
   createRestyleBundle,
+  deferRender,
 } from "../core/ui-parts.js";
 export type {
   InputLineProps,

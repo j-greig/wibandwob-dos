@@ -3,6 +3,7 @@ import fs from "node:fs";
 import { EMPTY_PRIMER_SELECTED } from "../../src/core/empty-states.js";
 
 import {
+  clamp,
   ContentService,
   createContourPlayer,
   createLazyMountedPlayer,
@@ -40,9 +41,6 @@ const HELPER_TITLES: Record<HelperKind, string> = {
 
 const primerContent = new ContentService();
 
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
-}
 
 function clipText(value: string, width: number): string {
   if (width <= 0) {

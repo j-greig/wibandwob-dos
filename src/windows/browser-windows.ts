@@ -12,12 +12,15 @@ import stringWidth from "string-width";
 import { theme } from "../core/theme/resolver.js";
 import { EMPTY_PRIMER_SELECTED, EMPTY_FILE_SELECTED, EMPTY_MATCHES } from "../core/empty-states.js";
 import { createScrollbar } from "../core/ui-primitives.js";
-import { createRestyleBundle, createSelectableList } from "../core/ui-parts.js";
+import { createRestyleBundle, createSelectableList, deferRender } from "../core/ui-parts.js";
 import type { ContentMeasurement } from "../services/content-measurement.js";
 import { createPreRenderedPlayer, type FramePlayer } from "../services/animation-service.js";
 import { viewerAppType } from "../core/types.js";
 import type { Box, BrowserEntry, List, WindowKind, WindowRecord } from "../core/types.js";
 import type { OverlayManager } from "../core/overlay-manager.js";
+
+/** Percent of window width given to the list/left pane; preview gets the rest. */
+const PREVIEW_SPLIT_RATIO = 34;
 import type { WindowManager } from "../core/window-manager.js";
 
 /** Truncate a line by display width (not string length) and pad to fixed width for full-Unicode rendering. */
@@ -143,7 +146,7 @@ export function openPrimerGalleryWindow(params: {
     parent: frame.body,
     top: 1,
     left: 0,
-    width: "34%",
+    width: `${PREVIEW_SPLIT_RATIO}%`,
     height: 1,
     inputOnFocus: true,
     mouse: true,
@@ -153,7 +156,7 @@ export function openPrimerGalleryWindow(params: {
     parent: frame.body,
     top: 2,
     left: 0,
-    width: "34%",
+    width: `${PREVIEW_SPLIT_RATIO}%`,
     bottom: 0,
     items: tabs[0].entries.map((entry) => entry.label),
   });
@@ -161,7 +164,7 @@ export function openPrimerGalleryWindow(params: {
   const preview = blessed.box({
     parent: frame.body,
     top: 1,
-    left: "34%",
+    left: `${PREVIEW_SPLIT_RATIO}%`,
     right: 0,
     bottom: 0,
     mouse: true,
@@ -251,7 +254,7 @@ export function openPrimerGalleryWindow(params: {
   });
   list.on("keypress", (_, key) => {
     if (["up", "down", "j", "k"].includes(key.name ?? "")) {
-      setTimeout(() => updatePreview((list as List & { selected: number }).selected ?? 0), 0);
+      deferRender(() => updatePreview((list as List & { selected: number }).selected ?? 0));
     } else if (key.name === "left") {
       switchTab((activeTabIndex - 1 + tabs.length) % tabs.length);
     } else if (key.name === "right") {
@@ -569,7 +572,7 @@ export function openFileManagerWindow(params: {
     parent: frame.body,
     top: 1,
     left: 0,
-    width: "36%",
+    width: `${PREVIEW_SPLIT_RATIO}%`,
     height: 1,
     style: theme().footer
   });
@@ -578,7 +581,7 @@ export function openFileManagerWindow(params: {
   const searchBox = blessed.box({
     parent: frame.body,
     top: 1,
-    left: "36%",
+    left: `${PREVIEW_SPLIT_RATIO}%`,
     right: 0,
     height: 1,
     style: theme().footer
@@ -589,7 +592,7 @@ export function openFileManagerWindow(params: {
     parent: frame.body,
     top: 2,
     left: 0,
-    width: "36%",
+    width: `${PREVIEW_SPLIT_RATIO}%`,
     bottom: 1,
   });
   const list = listHandle.node;
@@ -599,7 +602,7 @@ export function openFileManagerWindow(params: {
     parent: frame.body,
     top: 2,
     left: 0,
-    width: viewMode === "icon" ? "100%" : "36%",
+    width: viewMode === "icon" ? "100%" : `${PREVIEW_SPLIT_RATIO}%`,
     bottom: 1,
     mouse: true,
     keys: true,
@@ -616,7 +619,7 @@ export function openFileManagerWindow(params: {
   const preview = blessed.box({
     parent: frame.body,
     top: 2,
-    left: "36%",
+    left: `${PREVIEW_SPLIT_RATIO}%`,
     right: 0,
     bottom: 1,
     mouse: true,
@@ -988,9 +991,9 @@ export function openFileManagerWindow(params: {
       list.hidden = false;
       iconGrid.hidden = true;
       // Restore split layout
-      list.width = "36%";
-      filterBox.width = "36%";
-      searchBox.left = "36%";
+      list.width = `${PREVIEW_SPLIT_RATIO}%`;
+      filterBox.width = `${PREVIEW_SPLIT_RATIO}%`;
+      searchBox.left = `${PREVIEW_SPLIT_RATIO}%`;
       preview.hidden = false;
       // Sync selection from icon -> list
       list.select(iconSelected);

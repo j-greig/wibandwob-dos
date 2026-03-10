@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import {
+  clamp,
   createSavedTerrainArtifact,
   createTerrainMap,
   getTerrainFocusPoint,
@@ -75,9 +76,6 @@ const PLAYER_SPRITE = [
   "╱ ╲",
 ];
 
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
-}
 
 function viewportOf(node: { width?: number | string; height?: number | string }) {
   return {

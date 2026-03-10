@@ -4,11 +4,9 @@ import type {
   MicroappHost,
   MicroappSnapshotWindow,
 } from "../../src/services/microapp-sdk.js";
+import { clamp } from "../../src/services/microapp-sdk.js";
 import { createSidebarPanel } from "../../src/services/microapp-sdk.js";
 
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
-}
 
 function firstChannelId(host: MicroappHost): string | undefined {
   return host.worldChat.listChannels()[0]?.id;

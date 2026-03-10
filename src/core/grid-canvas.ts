@@ -8,6 +8,8 @@
  * Extracted from modules/sy2-chronicles/index.ts.
  */
 
+import { clamp } from "./ui-parts.js";
+
 export function blankGrid(w: number, h: number): string[][] {
   return Array.from({ length: Math.max(0, h) }, () =>
     Array.from({ length: Math.max(0, w) }, () => " "),
@@ -90,7 +92,7 @@ export function waveLine(width: number, tick: number, phaseShift: number): strin
 }
 
 export function bar(label: string, fill: number, total: number, value: string): string {
-  const clamped = Math.max(0, Math.min(fill, total));
+  const clamped = clamp(fill, 0, total);
   const line = `${"█".repeat(clamped)}${" ".repeat(Math.max(0, total - clamped))}`;
   return `${label.padEnd(5)} ${line} ${value}`;
 }

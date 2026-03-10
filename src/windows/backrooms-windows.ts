@@ -7,7 +7,7 @@ import { REPO_ROOT } from "../core/config.js";
 import type { OverlayManager } from "../core/overlay-manager.js";
 import { theme as appTheme } from "../core/theme/resolver.js";
 import { createScrollbar } from "../core/ui-primitives.js";
-import { createRestyleBundle, createSelectableList } from "../core/ui-parts.js";
+import { createRestyleBundle, createSelectableList, deferRender } from "../core/ui-parts.js";
 import { EMPTY_PRIMER_SELECTED } from "../core/empty-states.js";
 import type { BackroomsChannel, List, LogBox } from "../core/types.js";
 import type { WindowManager } from "../core/window-manager.js";
@@ -250,7 +250,7 @@ export function openBackroomsPrimerPicker(context: BackroomsWindowContext, theme
       return;
     }
     if (["up", "down", "j", "k", "pageup", "pagedown", "home", "end"].includes(key.name ?? "")) {
-      setTimeout(() => updatePreview((list as List & { selected: number }).selected ?? 0), 0);
+      deferRender(() => updatePreview((list as List & { selected: number }).selected ?? 0));
       return;
     }
     if (ch && /^[a-z]$/i.test(ch)) {

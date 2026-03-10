@@ -26,6 +26,11 @@ export type StackChild = {
 
 type Axis = "vertical" | "horizontal";
 
+/** Clamp n between lo and hi (inclusive). */
+export function clamp(n: number, lo: number, hi: number): number {
+  return Math.max(lo, Math.min(hi, n));
+}
+
 function clampSize(value: number): number {
   return Math.max(0, Math.floor(value));
 }
@@ -209,7 +214,7 @@ function createLinearLayout(
         remainingFr -= fr;
       }
 
-      const cappedExtent = Math.max(0, Math.min(extent, totalExtent - cursor));
+      const cappedExtent = clamp(extent, 0, totalExtent - cursor);
       const childRect =
         axis === "vertical"
           ? { top: cursor, left: 0, width: lastRect.width, height: cappedExtent }
@@ -1149,7 +1154,7 @@ export function resolveSidebarWidth(
     const computed = Math.floor(total * pct);
     const lo = widthPolicy.min ?? 0;
     const hi = widthPolicy.max ?? Infinity;
-    raw = Math.max(lo, Math.min(hi, computed));
+    raw = clamp(computed, lo, hi);
   }
   const dividerCost = hasDivider ? 1 : 0;
   const maxAllowed = Math.max(0, total - dividerCost - mainMinWidth);
@@ -1527,4 +1532,12 @@ export function createRestyleBundle(entries: RestyleEntry[]): RestyleBundleHandl
       list.push(entry);
     },
   };
+}
+
+/**
+ * deferRender — schedule fn after the current paint cycle completes (P-S25).
+ * Replaces scattered setTimeout(fn, 0) defers so intent is explicit.
+ */
+export function deferRender(fn: () => void): void {
+  setTimeout(fn, 0);
 }
