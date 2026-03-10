@@ -409,3 +409,49 @@ Priority candidates for E001 specialists:
 `blessed.box` silently drops all key events unless created with both `input: true`
 and `keys: true`. No error thrown, no warning — bindings register fine but never
 fire. Fix: add both options to any box that owns `.key()` bindings.
+
+### Music player — real audio analysis via ffmpeg PCM pipe (2026-03-10)
+
+The three viz modes (BARS/WAVE/GRID) were initially driven by `Math.random()` with
+a `playing: boolean` flag. No actual audio data. Looked like a visualiser, was not.
+
+**Fix implemented**: parallel ffmpeg process pipes raw PCM (s16le mono, 8kHz) from
+the same file at the same seek offset. Node reads 256-sample chunks, computes N
+frequency bands via energy binning (no full FFT needed at 8kHz), and emits a
+`Float32Array` of band amplitudes + an RMS value to the viz tick loop.
+
+`VizMode.tick()` signature changed from `tick(playing: boolean)` to
+`tick(bands: Float32Array, rms: number, playing: boolean)`.
+
+**Why two processes**: ffplay handles playback (pause/seek via stdin), ffmpeg handles
+analysis. They start at the same offset; drift is negligible at 80ms viz frames.
+Both are killed together on stop/seek/close.
+
+- [x] ffmpeg PCM pipe spawned alongside ffplay at same seek offset
+- [x] 256-sample chunk reader with band energy binning
+- [x] VizMode interface updated to receive real band + rms data
+- [x] BARS driven by real band amplitudes
+- [x] WAVE amplitude envelope driven by real RMS
+- [x] GRID spawn rate driven by real RMS beats
+
+### ffmpeg real-time analysis: -re flag is mandatory (2026-03-10)
+
+The AudioAnalyser spawns a parallel ffmpeg process to pipe raw PCM. Without
+the `-re` (real-time) flag, ffmpeg decodes the entire file at full speed —
+a 90-second track is read in ~1-2 seconds. The _smooth band arrays spike
+briefly then decay to zero before any viz frame can show them. Effect: bars
+appear flat or show a single faint row regardless of track loudness.
+
+**Fix**: add `-re` between `-ss <offset>` and `-i <file>` in the ffmpeg args.
+This throttles output to the native audio rate (8kHz mono = 16KB/sec), keeping
+the analyser in sync with playback.
+
+Root cause was silent: `spawn()` succeeds, `stdout.on("data")` fires, values
+update — but they update and decay before the 80ms viz timer even fires once.
+The tell was `ps aux | grep ffmpeg` returning nothing while ffplay was running.
+
+Diagnosis path:
+1. ps check — ffplay running, no ffmpeg → analyser process not alive
+2. Bun spawn test in isolation → works fine, produces data
+3. Realised: no `-re` = decodes at max CPU speed, finishes instantly
+4. Add `-re` → ffmpeg process stays alive, ps shows it, bars animate
