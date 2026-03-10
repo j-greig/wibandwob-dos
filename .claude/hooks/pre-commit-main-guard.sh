@@ -33,4 +33,11 @@ if echo "$STAGED" | grep -qE "$PROTECTED_PATTERN"; then
   exit 1
 fi
 
+# Auto-sync EPIC_STATUS.md when epic briefs change
+EPIC_PATTERN="^\.planning/epics/.*/e[0-9].*-brief\.md"
+if echo "$STAGED" | grep -qE "$EPIC_PATTERN"; then
+  bun run planning:sync 2>/dev/null
+  git add .planning/epics/EPIC_STATUS.md 2>/dev/null
+fi
+
 exit 0
