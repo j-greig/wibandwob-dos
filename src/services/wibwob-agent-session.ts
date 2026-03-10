@@ -19,7 +19,7 @@ import {
 } from "@mariozechner/pi-coding-agent";
 
 import { REPO_ROOT, SPIKE_PI_APPEND_SYSTEM_PATH, SPIKE_PI_DIR } from "../core/config.js";
-import type { ChatMessageEntry, DesktopState } from "../core/types.js";
+import type { ChatMessageEntry, DesktopState, ToolRun, ToolCallEntry } from "../core/types.js";
 import { Type } from "@sinclair/typebox";
 import { agentToolToDefinition, createTuiToolDefinitions, createTuiTools, formatDesktopSummary, type TuiToolContext } from "./agent-tools.js";
 import { getLastMessage, listSessions, sendAndWait, sendToSession, startSessionServer, type SessionServerHandle } from "./pi-session-bridge.js";
@@ -221,6 +221,8 @@ interface AgentSnapshot {
   cost?: number;
   messageCount: number;
   messages: ChatMessageEntry[];
+  /** Grouped tool runs — consecutive tool calls bundled for collapsible display. */
+  toolRuns: ToolRun[];
 }
 
 type Listener = (snapshot: AgentSnapshot) => void;
@@ -471,6 +473,8 @@ function resolveModel(params: {
 export class WibWobAgentSession {
   private readonly listeners = new Set<Listener>();
   private messages: ChatMessageEntry[] = [];
+  private toolRuns: ToolRun[] = [];
+  private activeToolRun?: ToolRun;
   private agent?: Agent;
   private session?: AgentSession;
   private ready = false;
@@ -697,6 +701,7 @@ export class WibWobAgentSession {
       cost: stats?.cost,
       messageCount: this.messages.length,
       messages: this.messages.map((m) => ({ ...m })),
+      toolRuns: this.toolRuns.map((r) => ({ ...r, tools: r.tools.map((t) => ({ ...t })) })),
     };
   }
 
@@ -712,6 +717,8 @@ export class WibWobAgentSession {
   /** Clear the transcript without resetting the session or model. */
   clearTranscript(): void {
     this.messages = [];
+    this.toolRuns = [];
+    this.activeToolRun = undefined;
     this.currentAssistantId = undefined;
     this.lastToolName = undefined;
     this.lastError = undefined;
@@ -732,6 +739,8 @@ export class WibWobAgentSession {
     if (!this.session || this.session.isStreaming) return; // don't reset mid-stream
     await this.session.newSession();
     this.messages = [];
+    this.toolRuns = [];
+    this.activeToolRun = undefined;
     this.currentAssistantId = undefined;
     this.lastToolName = undefined;
     this.lastError = undefined;
@@ -756,6 +765,8 @@ export class WibWobAgentSession {
     }
 
     this.messages = [];
+    this.toolRuns = [];
+    this.activeToolRun = undefined;
     this.currentAssistantId = undefined;
     this.lastToolName = undefined;
     this.lastError = undefined;
@@ -860,10 +871,19 @@ export class WibWobAgentSession {
       : undefined;
   }
 
+  /** Close the active tool run (called when a non-tool event arrives). */
+  private closeToolRun(): void {
+    if (this.activeToolRun) {
+      this.activeToolRun.active = false;
+      this.activeToolRun = undefined;
+    }
+  }
+
   /** Translate low-level agent events into chat transcript entries and visible session status. */
   private handleSessionEvent(event: AgentSessionEvent): void {
     switch (event.type) {
       case "message_start": {
+        this.closeToolRun();
         if (getMessageRole(event.message) !== "assistant" || this.findCurrentAssistant()) return;
         this.currentAssistantId = createMessageId("assistant");
         this.messages.push({
@@ -894,7 +914,7 @@ export class WibWobAgentSession {
         this.emit();
         return;
       }
-      case "tool_execution_start":
+      case "tool_execution_start": {
         this.lastToolName = event.toolName;
         this.status = `Running ${event.toolName}...`;
         this.messages.push({
@@ -902,8 +922,25 @@ export class WibWobAgentSession {
           role: "status",
           text: `[tool] ${formatToolCall(event.toolName, event.args)}`,
         });
+        // ToolRun tracking: start or extend the active run
+        if (!this.activeToolRun) {
+          this.activeToolRun = {
+            id: createMessageId("toolrun"),
+            tools: [],
+            active: true,
+            errorCount: 0,
+          };
+          this.toolRuns.push(this.activeToolRun);
+        }
+        this.activeToolRun.tools.push({
+          name: event.toolName,
+          args: formatToolCall(event.toolName, event.args),
+          isError: false,
+          done: false,
+        });
         this.emit();
         return;
+      }
       case "tool_execution_end": {
         const summary = event.isError
           ? `[fail] ${event.toolName}`
@@ -916,10 +953,21 @@ export class WibWobAgentSession {
         this.status = event.isError
           ? `Tool ${event.toolName} failed.`
           : `Tool ${event.toolName} done.`;
+        // ToolRun tracking: update the last tool in the active run
+        if (this.activeToolRun) {
+          const last = this.activeToolRun.tools[this.activeToolRun.tools.length - 1];
+          if (last && last.name === event.toolName) {
+            last.done = true;
+            last.isError = event.isError;
+            last.result = event.isError ? String(event.result) : formatToolResult(event.result);
+          }
+          if (event.isError) this.activeToolRun.errorCount++;
+        }
         this.emit();
         return;
       }
       case "message_end": {
+        this.closeToolRun();
         if (getMessageRole(event.message) !== "assistant") return;
         const a = this.findCurrentAssistant();
         if (a) {
@@ -997,6 +1045,7 @@ export class WibWobAgentSession {
         return;
       }
       case "agent_end": {
+        this.closeToolRun();
         const a = this.findCurrentAssistant();
         if (a) {
           a.text = normalizeVisibleReply(a.text);
