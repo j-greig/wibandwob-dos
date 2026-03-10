@@ -5,7 +5,7 @@ meta:
   columnHeaders: true
 
 columns:
-  0: { header: "Origins" }
+  0: { header: "HOT RELOAD WORKS" }
   1: { header: "Substrate" }
   2: { header: "Emergence" }
 

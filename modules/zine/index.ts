@@ -643,11 +643,7 @@ export default function setup(host: MicroappHost) {
         } catch { /* ignore transient write races */ }
       }, 80);
     });
-    // Clean up watcher when window closes
-    win.on("destroy", () => {
-      clearTimeout(reloadDebounce);
-      watcher.close();
-    });
+    // Watcher cleaned up in onCleanup below alongside timers
 
     // ── Tick (live panels) ──────────────────────────────────────────
     createTimer(() => {
@@ -734,6 +730,8 @@ export default function setup(host: MicroappHost) {
     // ── Cleanup ─────────────────────────────────────────────────────
     win.onCleanup(() => {
       clearTimers(timers);
+      clearTimeout(reloadDebounce);
+      watcher.close();
       host.screen.off("mouse", handleMouse);
       host.screen.off("mouse", handleWheel);
     });
