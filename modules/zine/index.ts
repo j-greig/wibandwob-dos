@@ -325,11 +325,13 @@ export default function setup(host: MicroappHost) {
         }
       },
     );
-    toolbar.node.bottom = 0;
-    toolbar.node.left = 0;
-    toolbar.node.right = 0;
-    toolbar.node.top = undefined as any;
-    toolbar.node.height = 1;
+    // Position the bar at the bottom of root and call layout() to place buttons
+    function layoutToolbar() {
+      const w = Math.max(20, Number(root.width) || 80);
+      const h = Number(root.height) || 24;
+      toolbar.layout({ top: h - 1, left: 0, width: w, height: 1 });
+    }
+    layoutToolbar();
 
     // ── Status bar (top) ────────────────────────────────────────────
     const statusBar = blessed.box({
@@ -830,7 +832,7 @@ export default function setup(host: MicroappHost) {
     win.onResize(() => {
       if (resizeTimer) clearTimeout(resizeTimer);
       resizeTimer = setTimeout(() => {
-        toolbar.layout({ top: 0, left: 0, width: Number(root.width) || 80, height: 1 });
+        layoutToolbar();
         renderLayoutAndContent();
         host.screen.render();
       }, 100);
