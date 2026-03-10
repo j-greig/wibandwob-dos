@@ -1,278 +1,565 @@
 ---
 id: E031
-title: Sidebar Primitive
-status: not-started
+title: Shared UI Primitives + Brand Nomenclature
+status: in-progress
 issue: ~
 pr: ~
 depends_on: []
+branch: epic/e031-sidebar-primitive
 ---
 
-# E031 — Sidebar Primitive
+# E031 — Shared UI Primitives + Brand Nomenclature
 
-> TL;DR: Six modules hand-roll sidebars with duplicated width maths, divider
-> drawing, toggle logic, and no overflow guards. Extract a single
-> `createSidebarPanel` primitive into `src/core/ui-parts.ts`, export via SDK,
-> migrate each consumer. Fixes two known overflow bugs for free.
-
----
-
-## Problem
-
-Every module that needs a sidebar builds one from scratch with raw blessed
-boxes. The result is:
-
-- Six independent implementations of width calculation
-- Four separate divider box constructions
-- Three different toggle show/hide patterns
-- Zero shared overflow protection (two modules have confirmed bugs)
-- Constant values duplicated across files (Tidepool has sidebar width
-  hardcoded in both renderer and index — they will drift)
+> TL;DR: Two parallel problems. First: the app has ~10 categories of
+> duplicated raw-blessed construction across 30+ files — sidebars, restyle
+> hooks, list widgets, search overlays, status bars. Extract each pattern
+> once into ui-parts.ts, export via SDK, migrate every consumer.
+> Second: the system presents itself as a jumble of generic names, dev
+> jargon ("Demo", "MVP", "Inspector"), and inconsistent conventions. Audit
+> every user-facing string, module ID, API endpoint, and internal type name.
+> Make it feel like a single bespoke WibWob-DOS system, not an accretion
+> of random decisions.
 
 ---
 
-## Audit: current sidebar implementations
+## Audit sources
 
-### 1. Patchbay Lab — primer list sidebar
-
-**Files:** `modules/patchbay-lab/index.ts:459-578`
-
-- Content: scrollable primer list + preview pane, only visible in overview mode
-- Width: `clamp(width * 0.32, 24, 36)` — percent with min/max
-- Toggle: mode-gated (shown when `view === "overview"`)
-- Built with: raw blessed.box + manual `applyRect`
-- Issues: none confirmed, but width policy is bespoke
-
-### 2. World Chatroom — participants sidebar
-
-**Files:** `modules/world-chatroom/index.ts:143-218`
-
-- Content: right-side gameLog with players + system events
-- Width: fixed `26`, never changes
-- Toggle: none, always visible
-- Built with: raw blessed + manual rects
-- BUG: can overflow on narrow windows (`transcriptWidth` goes to 12, but
-  `12 + 26` may exceed `innerW`)
-
-### 3. WibWobWorld — terrain info sidebar
-
-**Files:** `modules/wibwobworld/index.ts:154-735`
-
-- Content: right info panel for terrain/contour modes, hidden in iso/hybrid/firstperson
-- Width: `max(14, floor(rect.width / 6))` — proportional with floor
-- Toggle: `i` key toggles `sidebarOpen` boolean
-- Built with: SDK `createTextBlock` for content + manual rect layout
-- BUG: sidebar width can exceed available width on very small windows
-
-### 4. WibWob Tidepool — ecology stats sidebar
-
-**Files:** `modules/wibwob-tidepool/renderer.ts:126-215`, `modules/wibwob-tidepool/index.ts:140-146`
-
-- Content: text-only inline sidebar (species, biodiversity, tide, ecology)
-- Width: fixed `26`, hardcoded in BOTH renderer.ts AND index.ts
-- Toggle: none, always visible
-- Built with: pure text rendering, no separate blessed node
-- BUG (latent): width constant duplicated across two files — will drift on edit
-
-### 5. ZINE — file browser sidebar
-
-**Files:** `modules/zine/index.ts:143-271`
-
-- Content: list of .canvas.yaml files with selection highlight
-- Width: fixed `SIDEBAR_WIDTH` (26) + 1 char divider
-- Toggle: `[` key toggles, moves canvas.left
-- Built with: raw blessed.box + blessed.list + divider box
-- Issues: toggle changes canvas geometry directly, tight coupling
-
-### 6. Scene Layout — VJ timeline tokens
-
-**Files:** `src/services/scene-layout.ts:83-87`
-
-- Content: `sidebar-right` and `sidebar-left` as layout presets (30% width)
-- Toggle: N/A (geometry resolver only, no UI)
-- Built with: pure rect maths
-- Shared primitive fit: indirect — useful as geometry policy source
+Primitive duplication: `.codex-logs/2026-03-10/codex-audit-the-entire-src-and-modul-2026-03-10T15-23-19.log`
+Sidebar detail: `.codex-logs/2026-03-10/codex-analyse-all-sidebar-implementa-2026-03-10T14-52-55.log`
 
 ---
 
-## What is duplicated (patterns repeated 3+ times)
+## Review notes on the plan
 
-| Pattern | Occurrences | Notes |
-|---------|-------------|-------|
-| Width calculation | 6 | fixed, percent, clamp — all different |
-| Divider box creation | 4 | patchbay, zine, tidepool, world-chatroom |
-| Toggle show/hide state | 3 | wibwobworld, zine, patchbay (mode-gated) |
-| Sidebar resize on window resize | 5 | all except scene-layout |
-| Overflow guard (mainWidth >= minWidth) | 0 | NONE — two confirmed overflow bugs |
+These are fresh-eyes observations before the build order, not changes to
+the brief — record them here so agents carrying this work can weigh them.
+
+- F04 (P02 focus + P03 restyle) touches two different layers: window-manager
+  for setFocusTarget, ui-parts for createRestyleBundle. Keep stories S13 and
+  S14 sequential not parallel — S13 changes WindowRecord/Facade, S14 changes
+  ui-parts. Mixing them in one PR will produce noisy diffs.
+- P07 (raw toolbar boxes) is listed as MEDIUM but has 13 occurrences — same
+  count as P05 (raw status bars). Promote P07 to HIGH. It should move before
+  P08 in execution order.
+- S08 (remove dead sidebar code) should be gated on all five sidebar
+  migrations being smoke-tested. Do not merge S08 until S03–S07 are verified.
+  Add that dependency explicitly.
+- The "migrate-only" framing in F05 is correct but worth flagging: S15–S18
+  have zero new code risk. They can be done in one sitting across multiple
+  files as a pure cleanup pass. Assign to one agent, ship in one PR.
+- Empty state constants (P09) are a tiny win. Do not let them block anything.
+  Slot into F05 as the last item.
 
 ---
 
-## Design: `createSidebarPanel`
+## Part A — Pattern catalogue (primitive duplication)
 
-New primitive in `src/core/ui-parts.ts`, exported via `src/services/microapp-sdk.ts`.
+Severity: HIGH = 3+ occurrences, complex, confirmed bugs.
+MEDIUM = 2–3, moderate. LOW = minor.
 
-### Shape
+### P01 — Sidebars — HIGH
 
-```typescript
-interface SidebarPanelOptions {
-  parent: blessed.Widgets.BoxElement;
-  side: "left" | "right";
-  width: SidebarWidth;
-  divider?: boolean;          // default true, single char column
-  open?: boolean;             // default true
-  mainMinWidth?: number;      // default 12, overflow guard
-  style?: {
-    sidebar?: blessed.Widgets.Types.TStyle;
-    main?: blessed.Widgets.Types.TStyle;
-    divider?: blessed.Widgets.Types.TStyle;
-  };
-}
+Six modules build sidebars from raw blessed boxes. Three different width
+policies. Zero overflow guards. Two confirmed overflow bugs.
 
-type SidebarWidth =
-  | { fixed: number }                          // e.g. { fixed: 26 }
-  | { percent: number; min?: number; max?: number }  // e.g. { percent: 0.32, min: 24, max: 36 }
+| Consumer | Side | Width policy | Toggle | Bug |
+|----------|------|-------------|--------|-----|
+| patchbay-lab | left | clamp(32%, 24, 36) | mode-gated | none confirmed |
+| world-chatroom | right | fixed 26 | none | overflow at narrow width |
+| wibwobworld | right | max(14, w/6) | i key | overflow at small window |
+| wibwob-tidepool | right | fixed 26 (in TWO files) | none | latent drift |
+| zine | left | fixed 26 + divider | [ key | none |
+| scene-layout | both | 30% (geometry only) | N/A | — |
 
-interface SidebarPanel {
-  /** The outer container — append to window body. */
-  container: blessed.Widgets.BoxElement;
-  /** The main content pane (larger side). */
-  main: blessed.Widgets.BoxElement;
-  /** The sidebar pane. */
-  sidebar: blessed.Widgets.BoxElement;
-  /** The divider element (if enabled). */
-  divider?: blessed.Widgets.BoxElement;
+### P02 — frame.focus boilerplate — HIGH
 
-  /** Toggle sidebar open/closed. Preserves focus. */
-  toggle(): void;
-  /** Set sidebar open state explicitly. */
-  setOpen(open: boolean): void;
-  /** Current open state. */
-  isOpen(): boolean;
+23 occurrences in src/windows/. Every window hand-wires the identical
+focusWindow + widget.focus() pair. Only the target widget varies.
+Should be frame.setFocusTarget(widget) so windows declare not imperative-wire.
 
-  /** Recalculate layout after container resize. Call from onResize. */
-  layout(): void;
+Files: content-windows.ts (×4), backrooms-log-browser-window.ts,
+chrome-browser-window.ts, figlet-windows.ts, misc-windows.ts (×6),
+scramble-window.ts (×2), terrain-lab-window.ts, contour-window.ts,
+wibwob-agent-window.ts, monster-cam-window.ts, markdown-viewer-window.ts,
+music-player-window.ts, plasma-window.ts.
 
-  /** Resolved sidebar width in current layout. */
-  sidebarWidth(): number;
-  /** Resolved main width in current layout. */
-  mainWidth(): number;
-}
-```
+### P03 — frame.onRestyle boilerplate — HIGH
 
-### Width resolution logic
+24 occurrences in src/windows/. Every restyle hook hand-rolls safeSetStyle
+per widget with inline theme token lookup. No shared convention; some windows
+miss widgets leaving stale colours on theme switch.
+Should be createRestyleBundle(entries) so coverage is declarative and complete.
 
-```
-resolvedWidth = policy is fixed   → policy.fixed
-              | policy is percent → clamp(floor(total * percent), min, max)
+Files: content-windows.ts (×4), backrooms-log-browser-window.ts,
+chrome-browser-window.ts, figlet-windows.ts, misc-windows.ts (×6),
+scramble-window.ts (×2), terrain-lab-window.ts, contour-window.ts,
+wibwob-agent-window.ts, plasma-window.ts, text-windows.ts.
 
-if resolvedWidth + divider + mainMinWidth > totalWidth:
-  resolvedWidth = max(0, totalWidth - divider - mainMinWidth)
-```
+### P04 — Raw selectable list — HIGH
 
-This overflow guard is the single biggest win — it prevents the bugs in
-world-chatroom and wibwobworld.
+14 blessed.list() constructions across src/windows + modules + core. Every
+one repeats keys:true, vi:true, mouse:true, scrollbar, scrollable. Style
+tokens applied inline — none use scrollableStyle(). Three inside
+overlay-manager.ts are already centralised; the other 11 are scattered.
+Primitive: createSelectableList(parent, opts) with scrollableStyle() baked in.
 
-### Divider
+### P05 — Raw status bar — HIGH
 
-Single character column (`│`) between sidebar and main. Styled separately.
-Shown/hidden with sidebar.
+13 raw blessed.box status bars vs 7 using the createStatusBar SDK primitive.
+Six bypass the primitive: music-player-window.ts, monster-cam-window.ts,
+scramble-window.ts (×2), markdown-viewer-window.ts,
+backrooms-log-browser-window.ts. All six hand-roll identical height:1 chrome.
+Migrate-only. No new primitive needed.
 
-### Toggle behaviour
+### P06 — Inline search overlay — MEDIUM
 
-- `toggle()` flips open state
-- When closed: sidebar and divider get `width: 0; hidden: true`
-- Main expands to fill container
-- Focus preserved: if sidebar had focus, moves to main on close
+Two modules build an identical bottom-of-window search overlay from scratch:
+modules/zine/index.ts:568 and modules/sy2-chronicles/index.ts:2343.
+Both: blessed.box at bottom, blessed.textbox inside, Escape/Enter handling,
+show/hide by destroy+recreate. Should be createInlineSearch(parent, opts).
+
+### P07 — Raw toolbar / header box — HIGH (promoted from MEDIUM)
+
+13 raw blessed.box toolbar/header constructions not using createHeaderBar.
+All share: height:1, top/bottom anchor, tags:true, inline button strings.
+content-windows.ts (tab bar :140, filter bar :148), backrooms-windows.ts,
+chrome-browser-window.ts, music-player-window.ts, zine sidebar buttons,
+sy2-chronicles toolbar (imports createButtonBar directly, not via SDK).
+Migrate-only for most; SDK import path fix for sy2-chronicles.
+
+### P08 — Vi scroll key bindings — MEDIUM
+
+Repeated j/k/g/G/d/u key registration across 6+ windows with custom
+scrollable boxes. Blessed lists handle vi with vi:true — duplication is
+only in non-list scrollable boxes. Helper: bindScrollKeys(widget, box).
+
+### P09 — Empty state strings — LOW
+
+Scattered inline strings: "No primer selected.", "No matches found.",
+"No file selected.", "(empty)", "(no message)". Extract to
+src/core/empty-states.ts constants. No blessed primitive — string constants
+only. Slot into F05 cleanup pass.
+
+### P10 — Inline textbox input prompt — LOW
+
+music-player-window.ts:240 hand-rolls a blessed.textbox for file input.
+Migrate to overlays.openValuePrompt. Migrate-only.
+
+---
+
+## Part B — Nomenclature audit (naming debt)
+
+The system presents itself inconsistently. User-facing strings, module IDs,
+API endpoints, and internal types all follow different conventions set by
+different contributors at different times. The result feels like a toolkit,
+not an OS.
+
+### N01 — Command label inconsistency — HIGH
+
+Three conflicting label conventions in command-catalog.ts:
+
+Convention A (most common): "Open X" prefix
+  "Open Chrome Browser", "Open Wib&Wob Agent", "Open Gallery", "Open Markdown..."
+
+Convention B: bare noun / verb
+  "Monster Cam", "Music Player", "Terrain Lab", "Contour Studio", "Cascade Windows"
+
+Convention C: namespaced
+  "Finder: Search Files", "Scramble: meow", "Scramble: expand/collapse"
+
+Problems beyond inconsistency:
+  - "Open" prefix is noise — DOS didn't say "Open Notepad"
+  - "..." suffix applied inconsistently (some prompts don't have it, some non-prompts do)
+  - Developer jargon in user-facing menu: "Open Generative Art Demo",
+    "Open State Inspector", "Smear Text Surface", "Pattern Window"
+  - "Pattern Window" — "Window" is an implementation detail, not a name
+  - "Open §y² Chronicles" — special character in command label
+  - "Document Reader" and "Chrome Browser" — one names the function,
+    one names the technology
+
+Proposed convention for WibWob-DOS:
+  - Bare Title Case noun or verb phrase, no "Open" prefix
+  - "..." only when the command opens a prompt that requires user input
+    before anything happens (file picker, value prompt)
+  - Subsystem prefix with colon for grouped sub-commands: "Finder: X",
+    "Scramble: X", "Canvas: X" — consistent across all subsystems or none
+  - No developer jargon: drop "Demo", "MVP", "Inspector", "e026", "Pattern"
+  - Replace with WibWob-DOS names: see S19 rename table
+
+### N02 — Module ID inconsistency — MEDIUM
+
+Module IDs use three different separator conventions:
+  Dot-namespaced: wibwob.tidepool, wibwob.poetry-clock, wibwob.glitchbox,
+                  touchlab.mvp, patchbay.lab, example.hello-world
+  Pure hyphen: world-chatroom (no namespace)
+  No separator: wibwobworld
+
+Developer names leaking into IDs: touchlab.mvp, wibwob.e026-demo, example.hello-world
+
+Proposed convention: wibwob.slug — every module ID is wibwob. + lowercase-hyphen.
+  wibwob.tidepool, wibwob.glitchbox, wibwob.zine, wibwob.world,
+  wibwob.backrooms, wibwob.chatroom, wibwob.patchbay, wibwob.tr808, etc.
+  Internal/example modules keep wibwob.example.slug or are not registered.
+
+### N03 — API endpoint inconsistency — MEDIUM
+
+Current endpoint shape is a mix of three patterns:
+  /view/X/open — opening windows (mostly consistent, good)
+  /scramble/... — own namespace (good, should be the pattern for all subsystems)
+  /world-chat/... — hyphenated resource name
+  /windows/... — plural resource
+
+Problems:
+  /view/companion/smol — "smol" is internal slang, not a public API verb
+  /view/inspector/open — "inspector" is dev jargon
+  /view/browser-reader/open — double noun
+  /view/wibwob-agent/open — "wibwob" is redundant in a WibWob-DOS API
+  /view/art/open — too generic
+  /view/companion/open and /view/companion/smol — mixed verbs
+
+Proposed convention:
+  /windows/... for window management (already clean)
+  /view/{surface}/open for opening named surfaces (already mostly clean)
+  Surface names should match command label slugs: "agent" not "wibwob-agent",
+  "backrooms" not "backrooms-tv", "reader" not "browser-reader"
+  Subsystem namespaces (/scramble/...) are good — extend to /canvas/... etc
+
+### N04 — WindowKind type values — LOW
+
+WindowKind union contains a mix of naming styles:
+  Simple: "primer", "editor", "browser", "art", "chat"
+  Hyphenated: "terrain-lab", "monster-cam", "markdown-viewer"
+  Full phrase: "markdown-viewer" (should just be "reader" or "markdown")
+
+The values must match window registration and workspace restore — renames
+require careful migration. Low priority but worth a single cleanup pass.
+
+### N05 — Internal file names — LOW
+
+src/windows/misc-windows.ts — "misc" is a smell. Contents should be split
+or renamed to reflect what is actually in there.
+src/windows/content-windows.ts — very generic. The file contains primer
+browser, gallery, file manager, and finder. Should be split or renamed.
+
+---
+
+## What already exists (do not duplicate)
+
+ui-parts.ts exports: createStack, createColumns, createHeaderBar,
+createStatusBar, createTextBlock, createInputLine, createMessageHistory,
+createRule, createFigletDisplay, createAnimatedPanel, createCollapsibleBlock,
+createContentStack, createButtonBar.
+
+ui-primitives.ts exports: createScrollbar, scrollableStyle, safeSetStyle,
+isRightClick, createTimer, clearTimers.
+
+New primitives go into ui-parts.ts only. Migrate-only items need no new code.
 
 ---
 
 ## Build order
 
-### F01 — Primitive
+### F00 — Brand naming, pure strings (N01, N02) — SHIP FIRST
 
-#### S01 — Create `createSidebarPanel` in `ui-parts.ts`
-- Implement the interface above
-- Width resolution with overflow guard
-- Divider rendering
-- Toggle with focus preservation
-- Export via `microapp-sdk.ts`
-- AC: typecheck clean, unit test for width resolution edge cases
+Zero logic risk. Touches only command-catalog.ts string literals and
+module.json ID fields. Cannot break windows, overflow sidebars, or corrupt
+workspace state. Ships as a single PR before any primitive migration begins.
+Gives every subsequent story a system that already looks intentional.
+
+#### S00a — Command label rename (N01)
+
+Apply the WibWob-DOS label convention to command-catalog.ts:
+  - Bare Title Case. No "Open" prefix. No redundant "Window".
+  - "..." only when a prompt fires before anything opens.
+  - Subsystem colon prefix for groups of 3+ commands.
+  - No dev jargon.
+
+Rename table:
+  "Open Wib&Wob Agent"            → "Wib&Wob Agent"
+  "Open Chrome Browser"           → "Web Browser"
+  "Open Gallery"                  → "Gallery"
+  "Open File Manager"             → "File Manager"
+  "Open Figlet Banner"            → "Figlet Banner"
+  "Open Generative Art Demo"      → "Generative Art"
+  "Open State Inspector"          → "State Inspector"
+  "Open §y² Chronicles"           → "§y² Chronicles"
+  "Pattern Window"                → "Plasma Patterns"
+  "Plasma Screensaver"            → "Plasma"
+  "Plasma from Primer"            → "Plasma: From Primer"
+  "Smear Text Surface"            → "Smear Surface"
+  "Document Reader"               → "Reader"
+  "View README"                   → "README"
+  "Backrooms TV..."               → "Backrooms: Live TV"
+  "Backrooms Log Browser"         → "Backrooms: Log Browser"
+  "Open Backrooms TV (with args)" → remove (internal/debug)
+  "Scramble (floating)"           → "Scramble: Floating"
+  "Scramble (popup)"              → "Scramble: Popup"
+
+AC: All labels updated in command-catalog.ts. Menu and palette display
+correct. bun run typecheck clean.
+
+#### S00b — Module ID normalisation (N02)
+
+Establish: every production module ID is wibwob.slug (dot + lowercase-hyphen).
+
+  world-chatroom      → wibwob.chatroom
+  wibwobworld         → wibwob.world
+  patchbay.lab        → wibwob.patchbay
+  touchlab.mvp        → wibwob.touchlab
+  example.hello-world → wibwob.example.hello
+  wibwob.e026-demo    → wibwob.example.e026
+
+Module display titles unchanged — only ID slugs change.
+AC: All module.json IDs updated. Module reload via command still works.
+State service returns correct IDs. GET /state shows new IDs.
+
+---
+
+### F01 — Sidebar primitive (P01)
+
+#### S01 — createSidebarPanel in ui-parts.ts
+```typescript
+interface SidebarPanelOptions {
+  parent: blessed.Widgets.BoxElement;
+  side: "left" | "right";
+  width: { fixed: number } | { percent: number; min?: number; max?: number };
+  divider?: boolean;       // default true
+  open?: boolean;          // default true
+  mainMinWidth?: number;   // default 12, overflow guard
+  style?: { sidebar?; main?; divider? };
+}
+interface SidebarPanel {
+  main: blessed.Widgets.BoxElement;
+  sidebar: blessed.Widgets.BoxElement;
+  divider?: blessed.Widgets.BoxElement;
+  toggle(): void;
+  setOpen(open: boolean): void;
+  isOpen(): boolean;
+  layout(): void;
+  sidebarWidth(): number;
+  mainWidth(): number;
+}
+```
+Width resolution: fixed | clamp(floor(total*pct), min, max).
+Overflow guard: if resolved + divider + mainMinWidth > total, shrink sidebar.
+Export via microapp-sdk.ts.
+AC: typecheck clean. Unit test for width resolution edge cases.
 
 #### S02 — Unit tests for width resolution
-- Fixed width at various container sizes
-- Percent width with min/max clamping
-- Overflow: sidebar + mainMin > total → sidebar shrinks
-- Zero-width edge case
-- AC: `bun test` passes
-
-### F02 — Migration (highest payoff first)
+Fixed at various sizes. Percent with min/max. Overflow guard fires correctly.
+Zero-width edge case. AC: bun test passes.
 
 #### S03 — Migrate world-chatroom
-- Replace manual sidebar layout with `createSidebarPanel`
-- Fixed width 26, right side, no toggle
-- AC: smoke test, overflow bug fixed at narrow widths
+Fixed 26, right, no toggle. Overflow bug fixed at narrow widths.
 
 #### S04 — Migrate ZINE
-- Replace sidebarBox + sidebarList + sidebarDivider with primitive
-- Fixed width 26, left side, `[` toggle
-- AC: toggle works, canvas geometry updates, file switching works
+Fixed 26, left, [ toggle. Canvas geometry updates correctly.
 
 #### S05 — Migrate WibWobWorld
-- Replace manual info sidebar with primitive
-- Percent width `1/6` with min 14, right side, `i` toggle
-- Mode-aware: setOpen(false) in iso/hybrid/firstperson
-- AC: toggle works, overflow bug fixed, mode switching correct
+Percent 1/6 min 14, right, i toggle, mode-aware setOpen.
+Overflow bug fixed.
 
 #### S06 — Migrate Patchbay Lab
-- Replace primerSidebarBox with primitive
-- Percent width 32% with clamp 24-36, left side, mode-gated
-- AC: overview mode shows sidebar, other modes hide it
+Percent 32% clamp 24–36, left, mode-gated via setOpen.
 
 #### S07 — Tidepool: shared sizing constant
-- Extract sidebar width to shared constant or use primitive's sidebarWidth()
-- Tidepool renderer is text-only so full primitive may not apply
-- At minimum: single constant imported by both renderer.ts and index.ts
-- AC: width constant defined once, both files import it
-
-### F03 — Cleanup
+Single constant imported by both renderer.ts and index.ts. Full primitive
+migration deferred until renderer uses blessed nodes.
 
 #### S08 — Remove dead sidebar code
-- Delete all replaced manual sidebar implementations
-- Verify no regressions via smoke test across all migrated modules
-- AC: grep for manual sidebar patterns returns only the primitive
+BLOCKED ON: S03–S07 all smoke-tested.
+grep for manual sidebar patterns returns zero results.
+
+---
+
+### F02 — Selectable list + toolbar (P04, P07)
+
+These are grouped because both affect the same consumer files — doing them
+together means one restyle sweep per file, not two.
+
+#### S09 — createSelectableList in ui-parts.ts
+Wraps blessed.list with keys:true, vi:true, mouse:true, scrollableStyle().
+Returns typed handle: setItems, selected, onSelect callback. Export via SDK.
+
+#### S10 — Migrate raw blessed.list calls outside overlay-manager
+content-windows.ts (×3), backrooms-log-browser-window.ts,
+backrooms-windows.ts, zine module. Leave overlay-manager.ts untouched.
+
+#### S11 — Migrate raw toolbar/header boxes to createHeaderBar (P07)
+content-windows.ts (tab bar, filter bar), backrooms-windows.ts,
+chrome-browser-window.ts, music-player-window.ts.
+Fix sy2-chronicles to import createButtonBar via SDK not direct path.
+
+---
+
+### F03 — Inline search overlay (P06)
+
+#### S12 — createInlineSearch in ui-parts.ts
+createInlineSearch(parent, { placeholder, onSubmit, onCancel }) →
+{ open(), close(), isOpen() }.
+Bottom-anchored, textbox inside, Escape cancels, Enter commits.
+Export via SDK.
+
+#### S13 — Migrate zine and sy2-chronicles
+Replace openSearchPrompt() in both with createInlineSearch.
+
+---
+
+### F04 — Focus + restyle (P02, P03)
+
+NOTE: S14 touches window-manager/facade (a core type). S15 touches
+ui-parts. Ship as separate PRs to keep diffs clean.
+
+#### S14 — frame.setFocusTarget(widget) on WindowFacade
+Encapsulates the 23 identical frame.focus boilerplate blocks.
+Behaviour not data — belongs on WindowFacade not WindowRecord.
+All 23 callers migrate to a single line.
+
+#### S15 — createRestyleBundle in ui-parts.ts
+createRestyleBundle(entries: Array<[widget, () => Style]>) → { restyle() }.
+Windows: frame.onRestyle = bundle.restyle.
+Declarative coverage guarantees no missed-widget restyle bugs.
+Migrate the 24 frame.onRestyle blocks.
+
+---
+
+### F05 — Cleanup pass (P05, P08, P09, P10)
+
+Zero new code. One agent, one PR.
+
+#### S16 — Raw status bars → createStatusBar (P05)
+music-player-window.ts, monster-cam-window.ts, scramble-window.ts (×2),
+markdown-viewer-window.ts, backrooms-log-browser-window.ts.
+
+#### S17 — Vi scroll keys → bindScrollKeys helper (P08)
+Extract helper, migrate custom scrollable boxes that hand-roll j/k/g/G.
+
+#### S18 — Inline textbox prompts → overlays.openValuePrompt (P10)
+music-player-window.ts file input. Remove raw blessed.textbox.
+
+#### S19 — Empty state constants (P09)
+src/core/empty-states.ts. Migrate scattered inline strings.
+
+---
+
+### F06 — Type renames + structural cleanup (N03–N05)
+
+Pure renaming, no logic changes. Ships after all primitive migrations are
+complete — these stories touch the same files. One story per PR.
+
+#### S20 — API endpoint surface rename (N03)
+
+Targeted endpoint renames — no logic change, only route string and any
+places that construct the URL:
+  /view/wibwob-agent/open  → /view/agent/open
+  /view/browser-reader/open → /view/reader/open
+  /view/companion/smol     → /view/companion/compact
+  /view/inspector/open     → /view/inspector/open       (keep, it is fine)
+  /view/art/open           → /view/generative-art/open
+
+Update control-api.ts routes. Update any agent skill files or docs that
+reference the old paths. AC: GET /help shows new paths. Existing callers
+(skills, docs) updated.
+
+#### S21 — WindowKind type cleanup (N04)
+
+Minor cleanup pass on the WindowKind union:
+  "markdown-viewer" → "reader"   (aligns with command "Reader")
+
+Single value rename — requires migration in: types.ts definition,
+command-catalog.ts actionKey, app-controller.ts factory, workspace restore.
+AC: typecheck clean. Workspace snapshots with old kind load gracefully
+(add legacy alias in restore logic).
+
+#### S22 — File name cleanup (N05)
+
+src/windows/misc-windows.ts — audit contents, rename to descriptive name
+or split into logical files. Likely: misc-windows → desktop-windows.ts or
+system-windows.ts (contains workspace manager, command palette, etc).
+
+src/windows/content-windows.ts — very large (1400+ lines, 4+ window types).
+Audit split: primer-browser-window.ts, gallery-window.ts, file-manager-window.ts.
+Do not break imports — update re-exports.
+
+AC: No files named misc-windows.ts. content-windows.ts either split or
+renamed. All imports updated. typecheck clean.
 
 ---
 
 ## Acceptance criteria
 
-- [x] AC-1: Audit complete, all sidebar implementations catalogued (this doc)
-- [ ] AC-2: `createSidebarPanel` primitive in ui-parts.ts, exported via SDK
-- [ ] AC-3: Width resolution handles fixed, percent, and overflow cases
-- [ ] AC-4: world-chatroom migrated, narrow-window overflow fixed
-- [ ] AC-5: ZINE migrated, toggle and file switching preserved
-- [ ] AC-6: WibWobWorld migrated, toggle and mode-awareness preserved
+### Brand naming — FIRST (F00)
+- [ ] AC-0a: Command labels follow WibWob-DOS convention, rename table applied
+- [ ] AC-0b: Module IDs normalised to wibwob.slug, state service reflects new IDs
+
+### Sidebar (F01)
+- [x] AC-1: Audit complete, all sidebar implementations catalogued
+- [ ] AC-2: createSidebarPanel in ui-parts.ts, exported via SDK
+- [ ] AC-3: Width resolution handles fixed, percent, overflow
+- [ ] AC-4: world-chatroom migrated, overflow fixed
+- [ ] AC-5: ZINE migrated, toggle preserved
+- [ ] AC-6: WibWobWorld migrated, mode-awareness preserved
 - [ ] AC-7: Patchbay Lab migrated, mode-gated visibility preserved
-- [ ] AC-8: Tidepool sidebar width defined once, no duplication
-- [ ] AC-9: `bun run typecheck` clean throughout
-- [ ] AC-10: All five sidebar modules smoke-tested after migration
+- [ ] AC-8: Tidepool width constant deduped
+- [ ] AC-9: Dead sidebar code removed (blocked on AC-4–AC-8 smoked)
+
+### List + toolbar (F02)
+- [ ] AC-10: createSelectableList in ui-parts.ts, exported via SDK
+- [ ] AC-11: Raw blessed.list calls outside overlay-manager migrated
+- [ ] AC-12: Raw toolbar boxes migrated to createHeaderBar
+
+### Inline search (F03)
+- [ ] AC-13: createInlineSearch in ui-parts.ts, exported via SDK
+- [ ] AC-14: zine and sy2-chronicles migrated
+
+### Focus + restyle (F04)
+- [ ] AC-15: frame.setFocusTarget on WindowFacade, 23 callers migrated
+- [ ] AC-16: createRestyleBundle in ui-parts.ts, 24 restyle blocks migrated
+
+### Cleanup (F05)
+- [ ] AC-17: 6 raw status bars → createStatusBar
+- [ ] AC-18: Vi scroll key bindings → bindScrollKeys helper
+- [ ] AC-19: Inline textbox prompts → overlays.openValuePrompt
+- [ ] AC-20: Empty state strings → constants module
+
+### Type renames + structure (F06)
+- [ ] AC-21: API endpoints renamed, skill files and docs updated
+- [ ] AC-22: WindowKind "markdown-viewer" → "reader", workspace restore handles legacy
+- [ ] AC-23: misc-windows.ts renamed/split, content-windows.ts audited
+
+### Throughout
+- [ ] AC-26: bun run typecheck clean after every story
+- [ ] AC-27: Smoke test all migrated modules after each F-block
 
 ---
 
-## Analysis source
+## Decisions
 
-Codex analyst report (full details, per-file line references):
-`.codex-logs/2026-03-10/codex-analyse-all-sidebar-implementa-2026-03-10T14-52-55.log`
-
----
+- New primitives go in ui-parts.ts only. No parallel helper files.
+- Export every new primitive via microapp-sdk.ts so modules can use them.
+- F05 (cleanup pass) is zero new code — assign to one agent, ship as one PR.
+- F00 (brand naming) ships first — zero logic risk, high emotional payoff.
+  Pure string literals and JSON fields. One PR before any primitive work.
+- F06 (type renames + file structure) ships last — touches same files as
+  primitive migrations. Zero logic change. One story per PR.
+- Overlay-manager's blessed.list constructions are NOT migrated (already
+  centralised inside one owner).
+- Tidepool full sidebar migration deferred until renderer uses blessed nodes.
+- S24 (file split) should not attempt to redesign module boundaries — rename
+  and split only, no logic movement.
 
 ## Open questions
 
-- Should the primitive support nested scrollable content in both panes, or
-  leave that to the consumer? (Recommendation: leave it — the panes are
-  plain blessed boxes, consumers append scrollable children as needed.)
-- Should Tidepool migrate fully or just share the width constant?
-  (Recommendation: constant first, full migration only if text rendering
-  moves to blessed nodes later.)
-- Should scene-layout sidebar presets (`sidebar-left`, `sidebar-right`) use
-  the same width resolution function? (Recommendation: yes, extract the
-  pure math into a shared `resolveSidebarWidth` function that both the
-  primitive and scene-layout use.)
+- Should createSelectableList support column headers, or leave to consumers?
+  (Recommendation: leave it — the panes are plain boxes.)
+- Should createRestyleBundle be a class or plain object factory?
+  (Recommendation: plain factory — consistent with ui-parts.ts conventions.)
+- Does frame.setFocusTarget belong on WindowRecord (type) or WindowFacade?
+  (Recommendation: WindowFacade — it is behaviour, not data.)
+- Should the "Open" prefix be dropped from ALL commands including those that
+  open prompts? ("Open Markdown..." → "Markdown...")?
+  (Currently: keeping "Open X..." for commands that show a prompt before
+  opening. Could also drop the Open and just keep "...". TBD.)
+- Should §y² in command labels and module names be kept (it is a WibWob brand
+  mark) or replaced with plain text for terminal compatibility?
+  (Recommendation: keep — it renders correctly in blessed.)
