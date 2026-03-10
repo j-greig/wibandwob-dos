@@ -62,15 +62,17 @@ function openRogue(host: MicroappHost) {
   // Initial render
   draw();
 
-  // Key handler
-  const onKey = (_ch: string, key: any) => {
-    if (!content.screen) return;
-    const cmd = mapKey(key?.name, _ch);
-    if (!cmd) return;
+  // Key bindings — use win.body.key() like other microapps
+  const handleCmd = (cmd: GameCommand) => {
     step(state, cmd);
     draw();
   };
-  content.on("keypress", onKey);
+  win.body.key(["h", "left"],  () => handleCmd("move-west"));
+  win.body.key(["j", "down"],  () => handleCmd("move-south"));
+  win.body.key(["k", "up"],    () => handleCmd("move-north"));
+  win.body.key(["l", "right"], () => handleCmd("move-east"));
+  win.body.key(["w"],          () => handleCmd("squeeze-toggle"));
+  win.body.key(["e", "enter", "space"], () => handleCmd("interact"));
 
   // Also handle writeInput (agent API sends input this way)
   win.onInput((input: string) => {
@@ -125,10 +127,7 @@ function openRogue(host: MicroappHost) {
     draw();
   });
 
-  win.onCleanup(() => {
-    content.removeListener("keypress", onKey);
-  });
+  win.onCleanup(() => {});
 
   win.focus();
-  content.focus();
 }
