@@ -23,6 +23,7 @@ import {
   hitPanel,
   type PanelNode,
   type ColumnHeader,
+  type ColumnLayoutResult,
 } from "../../src/core/panel-layout.js";
 import { createTimer, clearTimers } from "../../src/core/ui-primitives.js";
 import { createButtonBar } from "../../src/core/ui-parts.js";
@@ -298,7 +299,9 @@ export default function setup(host: MicroappHost) {
       // Use column layout if any panel has col > 0, otherwise flow layout
       const hasColumns = defs.some(d => (d.col ?? 0) > 0);
       const layout = hasColumns
-        ? layoutColumns(layoutDefs, Math.max(20, vw), columnHeaderMap.size > 0 ? columnHeaderMap : undefined)
+        ? layoutColumns(layoutDefs, Math.max(20, vw), {
+            columnHeaders: columnHeaderMap.size > 0 ? columnHeaderMap : undefined,
+          })
         : layoutPanels(layoutDefs, Math.max(20, vw));
       const totalContentHeight = Math.max(layout.contentHeight, vh);
 
@@ -353,7 +356,7 @@ export default function setup(host: MicroappHost) {
       for (const node of headerNodes) node.destroy();
       headerNodes.length = 0;
 
-      const headers: ColumnHeader[] = "headers" in layout ? (layout as any).headers : [];
+      const headers: ColumnHeader[] = "headers" in layout ? (layout as ColumnLayoutResult).headers : [];
       for (const hdr of headers) {
         const rule = "─".repeat(hdr.width);
         const headerBox = blessed.box({

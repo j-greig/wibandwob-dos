@@ -6,6 +6,8 @@ import fs from "node:fs";
 import path from "node:path";
 import YAML from "yaml";
 import type { CEPanelDef } from "./panel-types.js";
+import type { CanvasColumnDef, CanvasDocument } from "../../src/core/canvas-types.js";
+export type { CanvasColumnDef, CanvasDocument } from "../../src/core/canvas-types.js";
 
 /**
  * Load all panel definitions from a directory.
@@ -43,17 +45,6 @@ export function loadCanvasPanels(filePath: string): CEPanelDef[] {
   const doc = YAML.parse(raw);
   if (!doc || !Array.isArray(doc.panels)) return [];
   return doc.panels as CEPanelDef[];
-}
-
-export interface CanvasColumnDef {
-  header?: string;
-}
-
-export interface CanvasDocument {
-  title: string;
-  columnHeaders: boolean;
-  columns: Map<number, CanvasColumnDef>;
-  panels: CEPanelDef[];
 }
 
 /**

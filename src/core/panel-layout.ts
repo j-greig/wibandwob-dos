@@ -41,13 +41,67 @@ export const COL_GAP = 2;
  * Column-first layout: group panels by `col`, stack each column vertically,
  * place columns side by side. Use when panels have meaningful col assignments.
  */
+// ── Column layout types and defaults ──────────────────────────────────────
+
+/** Positioned column header from layout result. */
 export type ColumnHeader = { col: number; text: string; x: number; y: number; width: number };
 
-export function layoutColumns(panels: PanelDef[], maxWidth: number, columnHeaders?: Map<number, string>): LayoutResult & { headers: ColumnHeader[] } {
+/** Result from layoutColumns — extends LayoutResult with header positions. */
+export type ColumnLayoutResult = LayoutResult & { headers: ColumnHeader[] };
+
+/** Options for column layout. All optional — sensible defaults applied. */
+export interface ColumnLayoutOptions {
+  /** Maximum number of columns before wrapping (default: 6). */
+  maxColumns?: number;
+  /** Horizontal gap between columns in chars (default: COL_GAP = 2). */
+  columnGap?: number;
+  /** Vertical gap between panels within a column (default: 1). */
+  panelGap?: number;
+  /** Vertical gap between wrapped column-rows (default: 2). */
+  rowGap?: number;
+  /** Minimum column width in chars (default: 3). */
+  minColumnWidth?: number;
+  /** Minimum panel height in chars (default: 3). */
+  minPanelHeight?: number;
+  /** Column header text keyed by col index. Omit for no headers. */
+  columnHeaders?: Map<number, string>;
+}
+
+const COLUMN_DEFAULTS: Required<Omit<ColumnLayoutOptions, "columnHeaders">> = {
+  maxColumns: 6,
+  columnGap: COL_GAP,
+  panelGap: 1,
+  rowGap: 2,
+  minColumnWidth: 3,
+  minPanelHeight: 3,
+};
+
+/**
+ * Column-first layout: group panels by `col`, stack each column vertically,
+ * place columns side by side. Wraps when columns exceed maxWidth.
+ *
+ * Options with defaults:
+ * - maxColumns: 6 (columns beyond this always wrap)
+ * - columnGap: 2 (chars between columns)
+ * - panelGap: 1 (rows between panels in a column)
+ * - rowGap: 2 (rows between wrapped column-rows)
+ * - columnHeaders: Map<col, text> (renders header + rule above column)
+ */
+export function layoutColumns(panels: PanelDef[], maxWidth: number, opts?: ColumnLayoutOptions): ColumnLayoutResult {
+  const {
+    maxColumns,
+    columnGap,
+    panelGap,
+    rowGap,
+    minColumnWidth,
+    minPanelHeight,
+  } = { ...COLUMN_DEFAULTS, ...opts };
+  const columnHeaders = opts?.columnHeaders;
+
   const safeWidth = Math.max(20, Math.floor(maxWidth));
   const placements: Array<{ id: string; x: number; y: number }> = [];
 
-  // Group by col, measure each column's max width and total height
+  // Group by col
   const cols = new Map<number, PanelDef[]>();
   for (const p of panels) {
     const c = p.col ?? 0;
@@ -64,22 +118,24 @@ export function layoutColumns(panels: PanelDef[], maxWidth: number, columnHeader
     const colPanels = cols.get(colIdx)!;
     let maxW = 0;
     let totalH = 0;
-    for (const p of colPanels) {
-      const w = Math.max(3, Math.min(p.w, safeWidth));
-      const h = Math.max(3, p.h);
+    for (let i = 0; i < colPanels.length; i++) {
+      const p = colPanels[i]!;
+      const w = Math.max(minColumnWidth, Math.min(p.w, safeWidth));
+      const h = Math.max(minPanelHeight, p.h);
       if (w > maxW) maxW = w;
-      totalH += h + 1;
+      totalH += h + (i < colPanels.length - 1 ? panelGap : 0);
     }
     colWidths.push(maxW);
-    colHeights.push(Math.max(0, totalH - 1));
+    colHeights.push(totalH);
   }
 
-  // Place columns left-to-right, wrapping to next row when exceeding maxWidth
-  const headerHeight = columnHeaders?.size ? 2 : 0; // header text + rule line
+  // Place columns left-to-right, wrapping at maxWidth or maxColumns
+  const headerHeight = columnHeaders?.size ? 2 : 0;
   const headers: ColumnHeader[] = [];
   let cursorX = 0;
   let rowBaseY = 0;
   let rowMaxH = 0;
+  let colsInRow = 0;
   let contentWidth = 0;
   let contentHeight = 1;
 
@@ -89,11 +145,14 @@ export function layoutColumns(panels: PanelDef[], maxWidth: number, columnHeader
     const colH = colHeights[i]!;
     const colPanels = cols.get(colIdx)!;
 
-    // Wrap: if this column doesn't fit and we're not at the start of a row
-    if (cursorX > 0 && cursorX + colW > safeWidth) {
-      rowBaseY += rowMaxH + headerHeight + 2;
+    // Wrap: exceeds width or maxColumns per row
+    const wouldExceed = cursorX > 0 && cursorX + colW > safeWidth;
+    const wouldExceedMax = colsInRow >= maxColumns;
+    if (wouldExceed || wouldExceedMax) {
+      rowBaseY += rowMaxH + headerHeight + rowGap;
       cursorX = 0;
       rowMaxH = 0;
+      colsInRow = 0;
     }
 
     // Column header
@@ -102,19 +161,21 @@ export function layoutColumns(panels: PanelDef[], maxWidth: number, columnHeader
       headers.push({ col: colIdx, text: headerText, x: cursorX, y: rowBaseY, width: colW });
     }
 
-    // Place panels in this column (offset by header height)
+    // Place panels vertically within column
     let cursorY = rowBaseY + headerHeight;
-    for (const panel of colPanels) {
-      const h = Math.max(3, panel.h);
+    for (let j = 0; j < colPanels.length; j++) {
+      const panel = colPanels[j]!;
+      const h = Math.max(minPanelHeight, panel.h);
       placements.push({ id: panel.id, x: cursorX, y: cursorY });
-      cursorY += h + 1;
+      cursorY += h + (j < colPanels.length - 1 ? panelGap : 0);
     }
 
     const totalColH = colH + headerHeight;
     if (totalColH > rowMaxH) rowMaxH = totalColH;
     contentWidth = Math.max(contentWidth, cursorX + colW);
     contentHeight = Math.max(contentHeight, rowBaseY + totalColH);
-    cursorX += colW + COL_GAP;
+    cursorX += colW + columnGap;
+    colsInRow++;
   }
 
   return {
