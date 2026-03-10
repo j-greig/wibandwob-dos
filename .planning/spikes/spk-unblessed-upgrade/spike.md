@@ -481,6 +481,21 @@ Revisit unblessed if and only if:
 
 Until then: vendor snapshot stays as reference material. Migration is parked.
 
+## Promotion outcome
+
+This spike now promotes to an implementation epic rather than a migration.
+The follow-on plan is:
+
+- `.planning/epics/e033-blessed-architecture-calm/e033-brief.md`
+
+Core direction of the promotion:
+- keep Blessed
+- introduce explicit render/invalidation ownership
+- adopt local model/update/render patterns in selected live windows
+- clarify the microapp host lifecycle and redraw contract
+- thin `app-controller.ts`
+- improve Unicode/cell correctness, visual regression, and performance telemetry
+
 ---
 
 ## TEA: constructive critique

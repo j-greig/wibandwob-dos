@@ -12,4 +12,5 @@ e029-context-aware-menus — done
 e030-zine-multi-file — done
 e031-ui-primitives-brand — done
 e032-smart-editor — done
+e033-blessed-architecture-calm — not-started
 
