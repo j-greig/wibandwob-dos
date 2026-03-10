@@ -178,7 +178,7 @@ function restoreWindowEntry(
     case "reader":
       return actions.openBrowserReaderWindow(entry.filePath);
 
-    case "markdown-viewer":
+    case "reader":
       if (entry.filePath) {
         return actions.openMarkdownViewerWindow(entry.filePath);
       }
@@ -245,7 +245,7 @@ export function exportCanvasDocument(
       if (details?.model) entry.model = details.model as string;
     } else if (w.kind === "browser" && details) {
       entry.url = (details.url as string) ?? "";
-    } else if ((w.kind === "editor" || w.kind === "markdown-viewer") && w.filePath) {
+    } else if ((w.kind === "editor" || w.kind === "reader") && w.filePath) {
       entry.filePath = w.filePath;
     }
 

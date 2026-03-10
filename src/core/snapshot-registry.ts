@@ -144,8 +144,8 @@ export const snapshotRegistry = {
     },
   },
 
-  // --- kind: "markdown-viewer" ---
-  "markdown-viewer": {
+  // --- kind: "reader" (renamed from "markdown-viewer" in E031; legacy alias in legacyAppTypeRemap) ---
+  "reader": {
     serialize: (window) => {
       const d = getDetails(window);
       return {
@@ -369,6 +369,8 @@ export function registrySerialize(window: WindowRecord): Record<string, unknown>
 const legacyAppTypeRemap: Record<string, string> = {
   "wibwob-chat-v2": "wibwob-agent",
   "chat-transcript": "wibwob-agent",
+  // E031 S21 — "markdown-viewer" renamed to "reader"
+  "markdown-viewer": "reader",
   // E031 — module ID normalisation (S00b): old IDs → wibwob.slug
   "world-chatroom": "wibwob.chatroom",
   "wibwobworld": "wibwob.world",

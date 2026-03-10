@@ -110,7 +110,7 @@ import {
   openPrimerBrowserWindow as openPrimerBrowserListWindow,
   openPrimerGalleryWindow as openPrimerGalleryListWindow,
   openTextViewerWindow as openContentViewerWindow,
-} from "../windows/content-windows.js";
+} from "../windows/browser-windows.js";
 import {
   openBrowserReaderWindow as openBrowserReaderContentWindow,
   openFigletFontPicker as openFigletFontPickerWindow,
@@ -123,7 +123,7 @@ import {
   openPatternWindow as openPatternAnimationWindow,
   openStateInspectorWindow as openInspectorWindow,
   openWorkspaceManagerWindow as openWorkspaceCommandWindow,
-} from "../windows/misc-windows.js";
+} from "../windows/generative-windows.js";
 import {
   openScrambleFloatingWindow,
   openScrambleSmolPopup,
@@ -1850,7 +1850,7 @@ export class TsTuiMvpApp {
       },
       toggleMarkdownFiglet: () => {
         const focused = this.windowManager.getFocusedWindow();
-        if (focused?.kind === "markdown-viewer") {
+        if (focused?.kind === "reader") {
           focused.writeInput?.("h");
         } else {
           this.overlays.flash("No markdown viewer focused");

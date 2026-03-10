@@ -32,7 +32,7 @@ import {
   readNodeViewport,
   terrainNames,
 } from "../services/contour-engine.js";
-import type { BaseWindowDeps } from "./misc-windows.js";
+import type { BaseWindowDeps } from "./generative-windows.js";
 
 const MODE_ORDER = ["chaos", "order", "hybrid"] as const;
 

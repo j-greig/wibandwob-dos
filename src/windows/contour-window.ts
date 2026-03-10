@@ -20,7 +20,7 @@ import {
   type ContourMode,
   type ContourPlayer,
 } from "../services/contour-engine.js";
-import type { BaseWindowDeps } from "./misc-windows.js";
+import type { BaseWindowDeps } from "./generative-windows.js";
 
 const MODE_ORDER: readonly ContourMode[] = ["chaos", "order", "hybrid"];
 const PANEL_COUNT = 3;

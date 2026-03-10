@@ -26,7 +26,7 @@ export type WindowKind =
   | "inspector"
   | "monster-cam"
   | "microapp"
-  | "markdown-viewer";
+  | "reader";
 
 export interface EditorState {
   widget: Box;
@@ -125,7 +125,7 @@ export type PersistableAppType =
   | "primer-viewer"
   | "reader-viewer"
   | "pattern-animation"
-  | "markdown-viewer";
+  | "reader";
 
 /**
  * Window types that are transient — never saved to workspace files.
@@ -253,7 +253,7 @@ export interface WindowRecord {
   /** If set, Ctrl-S calls this instead of writing to disk. */
   onSave?: (content: string) => void;
 
-  // Finder-specific (set by content-windows.ts)
+  // Finder-specific (set by browser-windows.ts)
   finder?: FinderController;
 
   // Microapp-specific (set by module-loader.ts via MicroappHost)

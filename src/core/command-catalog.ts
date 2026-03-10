@@ -365,7 +365,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     description: "Toggle figlet/plain heading rendering in the focused markdown viewer.",
     group: "edit",
     actionKey: "toggleMarkdownFiglet",
-    contextMenu: { windowKinds: ["markdown-viewer"], order: 10 },
+    contextMenu: { windowKinds: ["reader"], order: 10 },
     palettePlacement: { order: 33 },
     api: true,
     agent: true

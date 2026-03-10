@@ -31,7 +31,7 @@ import {
   type PlasmaModifiers,
   type PlasmaRenderMode,
 } from "../services/plasma-engine.js";
-import type { BaseWindowDeps } from "./misc-windows.js";
+import type { BaseWindowDeps } from "./generative-windows.js";
 
 export interface PlasmaWindowOptions {
   mood?: string;

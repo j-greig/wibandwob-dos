@@ -43,7 +43,7 @@ export function openMarkdownViewerWindow(
 
   // ── Window frame ─────────────────────────────────────────────────────────────
 
-  const record = windowManager.createFrame("Markdown", "markdown-viewer");
+  const record = windowManager.createFrame("Markdown", "reader");
 
   const screenW = Number(screen.width);
   const screenH = Number(screen.height);
@@ -231,7 +231,7 @@ export function openMarkdownViewerWindow(
   // ── describeState ─────────────────────────────────────────────────────────────
 
   record.describeState = () => ({
-    appType: "markdown-viewer",
+    appType: "reader",
     filePath,
     scrollOffset: (scrollBox as any).getScroll?.() ?? 0,
     figlet: figletEnabled,
