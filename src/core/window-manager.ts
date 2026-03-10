@@ -171,6 +171,12 @@ export class WindowManager implements WindowFacade {
         this.focusWindowInternal(record);
         body.focus();
       },
+      setFocusTarget: (widget: Box) => {
+        record.focus = () => {
+          this.focusWindowInternal(record);
+          (widget as blessed.Widgets.BlessedElement).focus();
+        };
+      },
       openContextMenu: (x, y) => this.onWindowContextMenu?.(record, x, y)
     };
 

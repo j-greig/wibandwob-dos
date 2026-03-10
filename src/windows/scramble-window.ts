@@ -285,7 +285,6 @@ export function openScrambleFloatingWindow(deps: ScrambleFloatingDeps): void {
   };
 
   frame.focus = () => {
-    windowManager.focusWindow(frame);
     inputEl.focus();
     screen.render();
   };
@@ -520,7 +519,6 @@ export function openScrambleSmolPopup(deps: ScrambleSmolDeps): void {
   frame.cleanup = () => { /* brain owned by app-controller */ };
 
   frame.focus = () => {
-    windowManager.focusWindow(frame);
     inputEl.focus();
     screen.render();
   };

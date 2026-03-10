@@ -184,10 +184,7 @@ export function openFigletWindow(params: {
     contentHeight: lastMeasurement.measurement.lineCount,
     contentPreview: viewer.getContent().split("\n").slice(0, 8).join("\n")
   });
-  frame.focus = () => {
-    params.windowManager.focusWindow(frame);
-    viewer.focus();
-  };
+  frame.setFocusTarget(viewer);
   frame.onRestyle = () => {
     toolbar.style = theme().header;
     toolbarLabel.style = theme().header;

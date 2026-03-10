@@ -103,10 +103,7 @@ export function openPrimerBrowserWindow(params: {
     selectedLabel: entries[(list as List & { selected: number }).selected ?? 0]?.label,
     entryCount: entries.length
   });
-  frame.focus = () => {
-    params.windowManager.focusWindow(frame);
-    list.focus();
-  };
+  frame.setFocusTarget(list);
   frame.onRestyle = () => {
     header.style = theme().header;
     safeSetStyle(list, { ...theme().body, selected: theme().selected });
@@ -284,7 +281,6 @@ export function openPrimerGalleryWindow(params: {
     contentPreview: preview.getContent().split("\n").slice(0, 8).join("\n")
   });
   frame.focus = () => {
-    params.windowManager.focusWindow(frame);
     if (activeTabIndex === 5) {
       filterBox.focus();
       filterBox.readInput();
@@ -399,10 +395,7 @@ export function openTextViewerWindow(params: {
     skippedCommentLines: m?.skippedCommentLines,
     contentPreview: params.content.split("\n").slice(0, 8).join("\n")
   });
-  frame.focus = () => {
-    params.windowManager.focusWindow(frame);
-    viewer.focus();
-  };
+  frame.setFocusTarget(viewer);
   frame.refresh = () => setViewportContent(viewer, currentContent);
   frame.onRestyle = () => {
     safeSetStyle(viewer, theme().body);
@@ -1354,7 +1347,6 @@ export function openFileManagerWindow(params: {
     contentPreview: preview.getContent().split("\n").slice(0, 10).join("\n")
   });
   frame.focus = () => {
-    params.windowManager.focusWindow(frame);
     if (viewMode === "icon") {
       iconGrid.focus();
     } else {

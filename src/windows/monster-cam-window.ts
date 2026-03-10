@@ -156,7 +156,7 @@ export function openMonsterCamWindow(deps: Deps): void {
   }
   canvas.focus();
 
-  frame.focus = () => { windowManager.focusWindow(frame); canvas.focus(); };
+  frame.setFocusTarget(canvas);
 
   windowManager.registerWindow(frame);
   frame.focus();

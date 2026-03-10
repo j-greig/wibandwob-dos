@@ -145,10 +145,7 @@ export function openTerrainLabWindow(deps: BaseWindowDeps): void {
     player.destroy();
     root.destroy();
   };
-  frame.focus = () => {
-    deps.windowManager.focusWindow(frame);
-    contourBox.focus();
-  };
+  frame.setFocusTarget(contourBox);
   frame.onRestyle = () => {
     root.restyle();
   };

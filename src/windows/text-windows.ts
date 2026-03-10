@@ -42,10 +42,7 @@ export function openEditorWindow(params: {
     cursor: frame.editor?.cursor ?? 0,
     contentPreview: (frame.editor?.value ?? "").split("\n").slice(0, 8).join("\n")
   });
-  frame.focus = () => {
-    params.windowManager.focusWindow(frame);
-    editorWidget.focus();
-  };
+  frame.setFocusTarget(editorWidget);
   frame.onRestyle = () => {
     safeSetStyle(editorWidget, theme().body);
   };

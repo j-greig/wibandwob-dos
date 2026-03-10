@@ -231,10 +231,7 @@ export function openPlasmaWindow(
     player.destroy();
     root.destroy();
   };
-  frame.focus = () => {
-    deps.windowManager.focusWindow(frame);
-    canvas.focus();
-  };
+  frame.setFocusTarget(canvas);
   frame.onRestyle = () => {
     root.restyle();
   };

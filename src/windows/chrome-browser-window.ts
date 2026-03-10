@@ -315,10 +315,7 @@ export function openChromeBrowserWindow(params: {
     loading,
     contentPreview: pageMarkdown.split("\n").slice(0, 12).join("\n"),
   });
-  frame.focus = () => {
-    windowManager.focusWindow(frame);
-    content.focus();
-  };
+  frame.setFocusTarget(content);
   // Allow agent tools to navigate by sending a URL string
   frame.writeInput = (input: string) => {
     const trimmed = input.trim();

@@ -262,10 +262,7 @@ export function openBackroomsLogBrowserWindow(params: {
 
   frame.captureText = () => previewContent;
 
-  frame.focus = () => {
-    params.windowManager.focusWindow(frame);
-    list.focus();
-  };
+  frame.setFocusTarget(list);
 
   frame.onRestyle = () => {
     safeSetStyle(list, {

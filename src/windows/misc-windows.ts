@@ -54,10 +54,7 @@ export function openAnimatedWindow(
     contentPreview: canvas.getContent().split("\n").slice(0, 8).join("\n")
   });
   frame.cleanup = () => player.destroy();
-  frame.focus = () => {
-    deps.windowManager.focusWindow(frame);
-    canvas.focus();
-  };
+  frame.setFocusTarget(canvas);
   frame.onRestyle = () => {
     safeSetStyle(canvas, theme().body);
   };
@@ -117,10 +114,7 @@ export function openCompanionWindow(
     tick
   });
   frame.cleanup = () => clearInterval(timer);
-  frame.focus = () => {
-    deps.windowManager.focusWindow(frame);
-    bubble.focus();
-  };
+  frame.setFocusTarget(bubble);
   frame.onRestyle = () => {
     safeSetStyle(bubble, theme().body);
   };
@@ -174,10 +168,7 @@ export function openArtWindow(deps: BaseWindowDeps): void {
     tick: player.currentFrame
   });
   frame.cleanup = () => player.destroy();
-  frame.focus = () => {
-    deps.windowManager.focusWindow(frame);
-    canvas.focus();
-  };
+  frame.setFocusTarget(canvas);
   frame.onRestyle = () => {
     safeSetStyle(canvas, theme().body);
   };
@@ -247,10 +238,7 @@ export function openWorkspaceManagerWindow(params: {
     workspacePath: params.workspace.path,
     knownWorkspaces: params.workspace.list()
   });
-  frame.focus = () => {
-    params.windowManager.focusWindow(frame);
-    list.focus();
-  };
+  frame.setFocusTarget(list);
   frame.onRestyle = () => {
     footer.style = theme().header;
     safeSetStyle(list, { ...theme().body, selected: theme().selected });
@@ -287,10 +275,7 @@ export function openCommandPaletteWindow(params: {
     selectedCommand: params.commands[(list as List & { selected: number }).selected ?? 0]?.label,
     commandCount: params.commands.length
   });
-  frame.focus = () => {
-    params.windowManager.focusWindow(frame);
-    list.focus();
-  };
+  frame.setFocusTarget(list);
   frame.onRestyle = () => {
     safeSetStyle(list, { ...theme().body, selected: theme().selected });
   };
@@ -332,10 +317,7 @@ export function openStateInspectorWindow(params: {
     statePath: params.statePath
   });
   frame.cleanup = () => unsubscribe();
-  frame.focus = () => {
-    params.windowManager.focusWindow(frame);
-    viewer.focus();
-  };
+  frame.setFocusTarget(viewer);
   frame.onRestyle = () => {
     safeSetStyle(viewer, theme().body);
   };

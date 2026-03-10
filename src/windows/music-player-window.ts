@@ -274,10 +274,7 @@ export function openMusicPlayerWindow(
     volume,
   });
   frame.cleanup = () => killProc();
-  frame.focus = () => {
-    deps.windowManager.focusWindow(frame);
-    display.focus();
-  };
+  frame.setFocusTarget(display);
   frame.onRestyle = () => {
     safeSetStyle(display, theme().body);
   };

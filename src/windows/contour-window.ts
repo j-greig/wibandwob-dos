@@ -374,7 +374,6 @@ export function openContourWindow(deps: BaseWindowDeps): void {
     destroyTriptych();
   };
   frame.focus = () => {
-    deps.windowManager.focusWindow(frame);
     if (viewMode === "triptych") {
       triptych?.panelBoxes[0]?.focus();
       return;

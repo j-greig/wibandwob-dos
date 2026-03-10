@@ -268,10 +268,7 @@ export function openBackroomsPrimerPicker(context: BackroomsWindowContext, theme
     selectedLabel: filteredEntries[(list as List & { selected: number }).selected ?? 0]?.label,
     contentPreview: preview.getContent().split("\n").slice(0, 8).join("\n")
   });
-  frame.focus = () => {
-    context.windowManager.focusWindow(frame);
-    list.focus();
-  };
+  frame.setFocusTarget(list);
   frame.onRestyle = () => {
     header.style = appTheme().header;
     searchBox.style = appTheme().input;
@@ -661,10 +658,7 @@ export function openBackroomsTvWindow(context: BackroomsWindowContext, channel: 
     transcriptLineCount: transcript.getContent().split("\n").filter(Boolean).length
   });
   frame.captureText = () => transcript.getContent();
-  frame.focus = () => {
-    context.windowManager.focusWindow(frame);
-    transcript.focus();
-  };
+  frame.setFocusTarget(transcript);
   frame.frame.key(["space", "n"], () => startBackrooms());
   frame.onRestyle = () => {
     header.style = appTheme().header;

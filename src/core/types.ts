@@ -236,6 +236,8 @@ export interface WindowRecord {
   body: Box;
   close: () => void;
   focus: () => void;
+  /** Override the default body.focus() with a specific widget. Called once at window setup. */
+  setFocusTarget: (widget: Box) => void;
 
   // Chrome elements (set by WindowManager.createFrame)
   titleBar?: Box;
