@@ -1,0 +1,20 @@
+{
+  "name": "wibwob-rogue",
+  "version": "0.1.0",
+  "description": "WibWob Roguelike — castle, forest, and mountain biomes in the TUI",
+  "type": "microapp",
+  "entry": "index.ts",
+  "microapp": {
+    "id": "wibwob.rogue",
+    "title": "WibWob Rogue",
+    "description": "Roguelike adventure across castle, forest, and mountain biomes.",
+    "multiInstance": false,
+    "persist": false,
+    "menu": [
+      { "category": "applications", "order": 60, "label": "WibWob Rogue" }
+    ],
+    "palette": { "order": 260, "label": "WibWob Rogue" },
+    "agent": true,
+    "api": true
+  }
+}

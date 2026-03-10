@@ -19,6 +19,7 @@
         "jsdom": "^28.1.0",
         "marked": "^17.0.4",
         "puppeteer-core": "^24.37.5",
+        "rot-js": "^2.2.1",
         "string-width": "^8.2.0",
         "turndown": "^7.2.2",
         "turndown-plugin-gfm": "^1.0.2",
@@ -973,6 +974,8 @@
     "robust-subtract": ["robust-subtract@1.0.0", "", {}, "sha512-xhKUno+Rl+trmxAIVwjQMiVdpF5llxytozXJOdoT4eTIqmqsndQqFb1A0oiW3sZGlhMRhOi6pAD4MF1YYW6o/A=="],
 
     "robust-sum": ["robust-sum@1.0.0", "", {}, "sha512-AvLExwpaqUqD1uwLU6MwzzfRdaI6VEZsyvQ3IAQ0ZJ08v1H+DTyqskrf2ZJyh0BDduFVLN7H04Zmc+qTiahhAw=="],
+
+    "rot-js": ["rot-js@2.2.1", "", {}, "sha512-lItXH31vj4ebdypayCx9dh98qPr57E7jGW2lVMKxtBHooU3xpGRtLS8kdJIni232tvPJ8Sl0+aqXZj8c6W0MGw=="],
 
     "safe-buffer": ["safe-buffer@5.2.1", "", {}, "sha512-rp3So07KcdmmKbGvgaNxQSJr7bGVSVk5S9Eq1F+ppbRo70+YeaDxkw5Dd8NPN+GD6bjnYm2VuPuCXmpuYvmCXQ=="],
 
