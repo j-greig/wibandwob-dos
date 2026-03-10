@@ -12,6 +12,8 @@
 
 import blessed from "blessed";
 import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
 import {
   layoutPanels,
@@ -23,12 +25,70 @@ import { createButtonBar } from "../../src/core/ui-parts.js";
 import { toPanelDef, renderPanel } from "../sy2-chronicles/panel-types.js";
 import { loadCanvas } from "../sy2-chronicles/content-loader.js";
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const REPO_ROOT = path.resolve(__dirname, "../..");
+
+/** Recursively find all .canvas.yaml files under a directory. */
+function findCanvasFiles(dir: string, maxDepth = 3, depth = 0): string[] {
+  if (depth > maxDepth || !fs.existsSync(dir)) return [];
+  const results: string[] = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (entry.name.startsWith(".") || entry.name === "node_modules") continue;
+    const full = path.join(dir, entry.name);
+    if (entry.isFile() && entry.name.endsWith(".canvas.yaml")) {
+      results.push(full);
+    } else if (entry.isDirectory()) {
+      results.push(...findCanvasFiles(full, maxDepth, depth + 1));
+    }
+  }
+  return results;
+}
+
 // ── Module ────────────────────────────────────────────────────────────────
 
 export default function setup(host: MicroappHost) {
   function openZine(args?: Record<string, unknown>) {
-    const filePath = typeof args?.filePath === "string" ? args.filePath : "";
-    if (!filePath || !fs.existsSync(filePath)) return;
+    let filePath = typeof args?.filePath === "string" ? args.filePath : "";
+
+    // If no path given, find canvas files and show a picker
+    if (!filePath) {
+      const candidates = findCanvasFiles(path.join(REPO_ROOT, "content"));
+      if (candidates.length === 0) return;
+      if (candidates.length === 1) {
+        filePath = candidates[0]!;
+      } else {
+        // Show list picker
+        const picker = blessed.list({
+          parent: host.screen,
+          top: "center", left: "center",
+          width: "60%", height: Math.min(candidates.length + 2, 20),
+          border: "line",
+          label: " Open ZINE — select canvas ",
+          keys: true, mouse: true, vi: true,
+          items: candidates.map(c => path.relative(REPO_ROOT, c)),
+          style: {
+            ...host.theme().body,
+            border: { fg: host.theme().highlight.fg },
+            selected: host.theme().selected,
+            item: host.theme().body,
+          },
+        });
+        picker.focus();
+        picker.on("select", (_item: any, index: number) => {
+          picker.destroy();
+          host.screen.render();
+          openZine({ filePath: candidates[index] });
+        });
+        picker.key(["escape", "q"], () => {
+          picker.destroy();
+          host.screen.render();
+        });
+        host.screen.render();
+        return;
+      }
+    }
+
+    if (!fs.existsSync(filePath)) return;
 
     const canvas_doc = loadCanvas(filePath);
     if (!canvas_doc) return;
