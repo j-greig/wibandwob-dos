@@ -651,11 +651,17 @@ export function createAnimatedPanel(
  * // in render():
  * bar.update({ leftText: hintText, activeId: currentMode });
  */
+export type ButtonBarPart<Id extends string> =
+  UiPart<{ leftText: string; activeId: Id }> & {
+    /** Mutate a button's displayed label in place. */
+    updateLabel(id: Id, label: string): void;
+  };
+
 export function createButtonBar<Id extends string>(
   parent: blessed.Widgets.Node,
   buttons: ReadonlyArray<{ id: Id; label: string }>,
   onSelect: (id: Id) => void,
-): UiPart<{ leftText: string; activeId: Id }> {
+): ButtonBarPart<Id> {
   // Static button widths: label + 1 space padding each side; 1 gap between buttons.
   const buttonWidths = buttons.map(b => b.label.length + 2);
   const buttonsAreaWidth = buttonWidths.reduce((sum, w, i) => sum + w + (i > 0 ? 1 : 0), 0);
@@ -719,6 +725,12 @@ export function createButtonBar<Id extends string>(
         const isActive = buttons[i]!.id === props.activeId;
         safeSetStyle(buttonNodes[i]!, isActive ? { ...theme().footer, inverse: true } : theme().footer);
       }
+    },
+    updateLabel(id: Id, label: string) {
+      const idx = (buttons as Array<{ id: Id; label: string }>).findIndex(b => b.id === id);
+      if (idx < 0) return;
+      (buttons as Array<{ id: Id; label: string }>)[idx]!.label = label;
+      buttonNodes[idx]!.setContent(` ${label} `);
     },
     restyle() {
       this.update(lastProps);
