@@ -327,6 +327,32 @@ win.onRestyle(() => {
 | `win.screen` | Use `host.screen` |
 | Importing from `src/core/app-controller.ts` | Never — use host API |
 | `multiInstance: false` + opening twice | Set `multiInstance: true` if each call should open a new window |
+| Query command returns `{ok:true}` with no data | Add `direct: true` to `registerCommand`. Without it, `focusOrCreate` wraps the action and swallows the return value. All query/control commands on already-open windows must use `direct: true`. |
+
+---
+
+## Scrollable canvas with child elements
+
+Blessed's `_getCoords()` subtracts `childBase` (scroll offset) once per scrollable
+ancestor. For grandchildren (element inside element inside scrollable box), it
+subtracts twice — once for the parent frame, once for the content. Result: content
+`yi` goes negative, `_getCoords` returns undefined, content never renders.
+
+**Fix**: set `fixed: true` on all grandchildren of the scrollable container.
+`fixed: true` makes `_getCoords` skip one scrollable ancestor, avoiding double
+subtraction.
+
+```
+scrollableCanvas (scrollable: true)
+  frame (parent: canvas)           → no fixed needed
+    titleBar (parent: frame)       → fixed: true  ← REQUIRED
+    content (parent: frame)        → fixed: true  ← REQUIRED
+    resizeGrip (parent: frame)     → fixed: true  ← REQUIRED
+```
+
+This is mandatory for any microapp that nests clickable/visible elements
+inside children of a scrollable box. Without it, elements below the initial
+viewport will render borders but blank content.
 
 ---
 

@@ -109,6 +109,19 @@ printf '\033[?1000l\033[?1002l\033[?1003l\033[?1006l\033[?25h\033[0m\033[?1049l'
 bash scripts/start-alt-instance.sh
 ```
 
+## When to reload vs restart
+
+| Changed | Action |
+|---------|--------|
+| `modules/*/index.ts` or `module.json` | Reload: `POST /commands/run` with `modules.reload` |
+| `.pi/skills/*`, `scratch/*`, docs | No action needed — read at use time |
+| `src/core/*`, `src/services/*` | RESTART required (`bash scripts/restart.sh`) |
+| `src/windows/*` | RESTART required |
+| Theme files | RESTART required (theme loaded at startup) |
+| `package.json`, `tsconfig.json` | RESTART required |
+
+Rule of thumb: if it lives in `modules/`, reload. If it lives in `src/`, restart.
+
 ## Control Loop
 
 API on `http://127.0.0.1:8099`. Full reference: `.agents/control-api.md`.
