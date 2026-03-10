@@ -38,11 +38,23 @@ export function loadPanelsFromDir(dir: string): CEPanelDef[] {
  * Load panels from a .canvas.yaml file.
  * Expected shape: { meta: {...}, panels: CEPanelDef[] }
  */
-function loadCanvasPanels(filePath: string): CEPanelDef[] {
+export function loadCanvasPanels(filePath: string): CEPanelDef[] {
   const raw = fs.readFileSync(filePath, "utf8");
   const doc = YAML.parse(raw);
   if (!doc || !Array.isArray(doc.panels)) return [];
   return doc.panels as CEPanelDef[];
+}
+
+/**
+ * Load canvas meta + panels from a .canvas.yaml file.
+ */
+export function loadCanvas(filePath: string): { title: string; panels: CEPanelDef[] } | null {
+  try {
+    const raw = fs.readFileSync(filePath, "utf8");
+    const doc = YAML.parse(raw);
+    if (!doc || !Array.isArray(doc.panels) || doc.panels.length === 0) return null;
+    return { title: doc.meta?.title ?? "Untitled", panels: doc.panels as CEPanelDef[] };
+  } catch { return null; }
 }
 
 /**

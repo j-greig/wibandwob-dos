@@ -3,158 +3,38 @@
  *
  * A canvas of arranged panels loaded entirely from a .canvas.yaml file.
  * No hardcoded content. One file = one composition.
- * Reuses panel-layout engine and panel-types renderers from §y² Chronicles.
+ * Renders identically to §y² Chronicles — same panel chrome, title bars,
+ * scrollable canvas, toolbar, keyboard navigation.
+ *
+ * Reuses: content-loader (YAML parsing), panel-types (CEPanelDef, toPanelDef,
+ * renderPanel), panel-layout (column layout engine).
  */
 
 import blessed from "blessed";
 import fs from "node:fs";
-import YAML from "yaml";
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
 import {
   layoutPanels,
   measureViewport,
-  type PanelDef,
   type PanelNode,
 } from "../../src/core/panel-layout.js";
-import {
-  blankGrid,
-  paintLines,
-  gridToText,
-} from "../../src/core/grid-canvas.js";
-import { renderFiglet } from "../../src/services/figlet-service.js";
 import { createTimer, clearTimers } from "../../src/core/ui-primitives.js";
-import { createScrollbar, scrollableStyle } from "../../src/core/ui-primitives.js";
-
-// ── Panel types (subset of CEPanelDef, YAML-serialisable) ─────────────────
-
-interface ZinePanelDef {
-  id: string;
-  type: "text" | "figlet" | "ascii-art" | "pixel" | "infographic";
-  title: string;
-  w: number;
-  h: number;
-  col?: number;
-  live?: boolean;
-  text?: string;
-  figletText?: string;
-  figletFont?: string;
-  asciiArt?: string;
-  asciiFile?: string;
-}
-
-interface ZineDocument {
-  meta: { title: string; format?: string };
-  panels: ZinePanelDef[];
-}
-
-// ── Panel type prefixes ───────────────────────────────────────────────────
-
-const TYPE_PREFIX: Record<string, string> = {
-  text: "¶",
-  figlet: "▌",
-  "ascii-art": "◈",
-  pixel: "▒",
-  infographic: "◊",
-};
-
-// ── Renderers ─────────────────────────────────────────────────────────────
-
-function wrapText(text: string, width: number): string[] {
-  const lines: string[] = [];
-  for (const para of text.split("\n")) {
-    if (para.length <= width) { lines.push(para); continue; }
-    let rem = para;
-    while (rem.length > width) {
-      let b = rem.lastIndexOf(" ", width);
-      if (b <= 0) b = width;
-      lines.push(rem.slice(0, b));
-      rem = rem.slice(b).trimStart();
-    }
-    if (rem) lines.push(rem);
-  }
-  return lines;
-}
-
-function renderPanel(def: ZinePanelDef, w: number, h: number, _tick: number): string {
-  const iw = Math.max(1, w - 2);
-  const ih = Math.max(1, h - 2);
-
-  switch (def.type) {
-    case "text": {
-      const text = def.text ?? def.title;
-      return paintLines(iw, ih, wrapText(text, iw), { centerX: false, centerY: false });
-    }
-    case "figlet": {
-      const text = def.figletText ?? def.title;
-      const font = def.figletFont ?? "small";
-      try {
-        const rendered = renderFiglet(text, font, iw);
-        if (!rendered || rendered.includes("(figlet")) {
-          return paintLines(iw, ih, [text], { centerX: true, centerY: true });
-        }
-        return paintLines(iw, ih, rendered.split("\n"), { centerX: true, centerY: true });
-      } catch {
-        return paintLines(iw, ih, [text], { centerX: true, centerY: true });
-      }
-    }
-    case "ascii-art": {
-      let lines: string[] = [];
-      if (def.asciiFile) {
-        try { lines = fs.readFileSync(def.asciiFile, "utf8").split("\n"); }
-        catch { lines = [`[${def.asciiFile}]`, "(not found)"]; }
-      } else if (def.asciiArt) {
-        lines = def.asciiArt.split("\n");
-      } else {
-        lines = [def.title];
-      }
-      return paintLines(iw, ih, lines.slice(0, ih).map(l => l.slice(0, iw)), { centerX: true, centerY: true });
-    }
-    case "pixel": {
-      const chars = ["▓", "▒", "░", " "];
-      const lines: string[] = [];
-      for (let y = 0; y < ih; y++) {
-        let row = "";
-        for (let x = 0; x < iw; x++) row += chars[(x + y) % chars.length];
-        lines.push(row);
-      }
-      return paintLines(iw, ih, lines, { centerX: false, centerY: true });
-    }
-    case "infographic": {
-      const lines = [
-        def.title,
-        "",
-        `${"█".repeat(8)}  80%`,
-        `${"█".repeat(5)}  50%`,
-        `${"█".repeat(3)}  30%`,
-      ];
-      return lines.slice(0, ih).join("\n");
-    }
-    default:
-      return def.text ?? def.title;
-  }
-}
+import { createButtonBar } from "../../src/core/ui-parts.js";
+import { toPanelDef, renderPanel } from "../sy2-chronicles/panel-types.js";
+import { loadCanvas } from "../sy2-chronicles/content-loader.js";
 
 // ── Module ────────────────────────────────────────────────────────────────
 
 export default function setup(host: MicroappHost) {
   function openZine(args?: Record<string, unknown>) {
     const filePath = typeof args?.filePath === "string" ? args.filePath : "";
-    if (!filePath || !fs.existsSync(filePath)) {
-      host.screen.render();
-      return;
-    }
+    if (!filePath || !fs.existsSync(filePath)) return;
 
-    // Parse the YAML
-    let doc: ZineDocument;
-    try {
-      const raw = YAML.parse(fs.readFileSync(filePath, "utf8"));
-      doc = raw as ZineDocument;
-      if (!Array.isArray(doc.panels) || doc.panels.length === 0) return;
-    } catch {
-      return;
-    }
+    const canvas_doc = loadCanvas(filePath);
+    if (!canvas_doc) return;
 
-    const title = doc.meta?.title ?? "ZINE";
+    const { title, panels: cePanelDefs } = canvas_doc;
+
     const sw = Math.max(80, Number(host.screen.width));
     const sh = Math.max(24, Number(host.screen.height));
     const win = host.createWindow({
@@ -166,158 +46,300 @@ export default function setup(host: MicroappHost) {
     });
 
     let tick = 0;
+    let activePanelId = cePanelDefs[0]?.id ?? "";
+    let searchQuery = "";
     const timers = new Set<ReturnType<typeof setInterval>>();
 
-    // Root container
+    // ── Root container ──────────────────────────────────────────────
     const root = blessed.box({
       parent: win.body,
       top: 0, left: 0, right: 0, bottom: 0,
+      keys: true, mouse: true, clickable: true,
       style: host.theme().body,
     });
 
-    // Scrollable canvas
+    // ── Scrollable canvas (identical to §y²) ────────────────────────
     const canvas = blessed.box({
       parent: root,
-      top: 0, left: 0, right: 0, bottom: 0,
+      top: 1, left: 0, right: 0, bottom: 1,
+      keys: true, mouse: true, clickable: true,
       scrollable: true,
       alwaysScroll: true,
-      scrollbar: createScrollbar(),
-      style: scrollableStyle(host.theme().body),
-      mouse: true,
-      keys: true,
+      scrollbar: {
+        ch: "│",
+        track: { ch: "░" },
+        style: { fg: host.theme().muted.fg, bg: host.theme().body.bg },
+      },
+      style: host.theme().body,
     });
 
-    // Convert YAML panels to PanelDefs
-    const panelDefs: PanelDef[] = doc.panels.map(p => ({
-      id: p.id,
-      title: `${TYPE_PREFIX[p.type] ?? "·"} ${p.title}`,
-      w: p.w,
-      h: p.h,
-      col: (p.col ?? 0) as 0 | 1 | 2,
-      live: p.live,
-      content: (t: number, w: number, h: number) => renderPanel(p, w, h, t),
-    }));
+    // Prevent blessed scroll-jump on child focus
+    (canvas as any)._scrollIntoView = () => {};
 
-    // Layout + render
+    // Preserve scroll position across focus changes
+    const _originalFocus = canvas.focus.bind(canvas);
+    (canvas as any).focus = () => {
+      const saved = (canvas as any).childBase ?? 0;
+      _originalFocus();
+      if (saved > 0) {
+        (canvas as any).childBase = saved;
+        (canvas as any).childOffset = saved;
+      }
+    };
+
+    // ── Toolbar (bottom bar, identical to §y²) ─────────────────────
+    let paused = false;
+    type ToolbarAction = "search" | "pause";
+    const toolbar = createButtonBar<ToolbarAction>(
+      root,
+      [
+        { id: "search", label: "/ Search" },
+        { id: "pause",  label: "⏸ Pause" },
+      ],
+      (id) => {
+        if (id === "search") openSearchPrompt();
+        else if (id === "pause") {
+          paused = !paused;
+          updateStatus();
+          host.screen.render();
+        }
+      },
+    );
+    toolbar.layout({ top: 0, left: 0, width: Number(root.width) || 80, height: 1 });
+    toolbar.node.bottom = 0;
+    toolbar.node.top = undefined as any;
+
+    // ── Status bar (top) ────────────────────────────────────────────
+    const statusBar = blessed.box({
+      parent: root,
+      top: 0, left: 0, right: 0, height: 1,
+      tags: false,
+      style: host.theme().body,
+    });
+
+    // ── Panel nodes ─────────────────────────────────────────────────
     const panelNodes = new Map<string, PanelNode>();
 
-    function renderLayout() {
-      const vp = measureViewport(canvas);
-      const result = layoutPanels(panelDefs, vp.width);
+    function getFilteredDefs() {
+      if (!searchQuery) return cePanelDefs;
+      return cePanelDefs.filter(p =>
+        p.title.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
 
-      // Total content height
-      let maxY = result.contentHeight;
+    function applyStyles() {
+      for (const node of panelNodes.values()) {
+        const active = node.def.id === activePanelId;
+        const borderColor = active
+          ? host.theme().highlight.fg
+          : host.theme().muted.fg;
 
-      // Create or update panel blessed nodes
-      // Join placements with defs by id
-      for (const placement of result.placements) {
-        const def = panelDefs.find(d => d.id === placement.id);
-        if (!def) continue;
-        const p = { ...placement, def };
-        let node = panelNodes.get(p.id);
-        if (!node) {
-          const frame = blessed.box({
-            parent: canvas,
-            left: p.x,
-            top: p.y,
-            width: p.def.w,
-            height: p.def.h,
-            border: { type: "line" },
-            label: ` ${p.def.title} `,
-            style: {
-              border: { fg: host.theme().muted.fg },
-              label: { fg: host.theme().body.fg },
-              ...host.theme().body,
-            },
-          });
+        node.frame.style = {
+          ...host.theme().body,
+          border: { fg: borderColor },
+        };
+        node.titleBar.style = active
+          ? { ...host.theme().titleBarFocused, bold: true }
+          : host.theme().header;
+        node.content.style = host.theme().body;
+        node.titleBar.setContent(node.def.title);
+      }
+    }
 
-          const content = blessed.box({
-            parent: frame,
-            top: 0, left: 0, right: 0, bottom: 0,
-            tags: false,
-            fixed: true,
-            style: host.theme().body,
-          });
+    function updateStatus() {
+      const scroll = (canvas as any).getScrollPerc?.() ?? 0;
+      const q = searchQuery ? `  search:${searchQuery}` : "";
+      const pauseLabel = paused ? "▶ Play" : "⏸ Pause";
+      toolbar.update({
+        leftText: ` ZINE  ${panelNodes.size} panels  scroll:${scroll}%${q}`,
+        activeId: paused ? "pause" : "search",
+      });
+      const pauseNode = (toolbar.node.children as any)?.[3];
+      if (pauseNode?.setContent) pauseNode.setContent(` ${pauseLabel} `);
+      statusBar.setContent(` ${title}`);
+    }
 
-          node = { id: p.id, x: p.x, y: p.y, def: p.def, frame, content };
-          panelNodes.set(p.id, node);
+    function buildPanels() {
+      for (const node of panelNodes.values()) node.frame.destroy();
+      panelNodes.clear();
+
+      const defs = getFilteredDefs();
+      if (!activePanelId && defs.length > 0) activePanelId = defs[0]!.id;
+
+      for (const ceDef of defs) {
+        const def = toPanelDef(ceDef);
+
+        const frame = blessed.box({
+          parent: canvas,
+          top: 0, left: 0,
+          width: def.w, height: def.h,
+          border: "line",
+          style: {
+            ...host.theme().body,
+            border: { fg: host.theme().muted.fg },
+          },
+        });
+
+        const titleBar = blessed.box({
+          parent: frame,
+          top: 0, left: 1, right: 1, height: 1,
+          tags: false,
+          fixed: true,
+          style: host.theme().header,
+          content: def.title,
+        });
+
+        const iw = Math.max(1, def.w - 2);
+        const ih = Math.max(1, def.h - 2);
+        const content = blessed.box({
+          parent: frame,
+          top: 1, left: 1,
+          width: iw, height: ih,
+          tags: false,
+          fixed: true,
+          style: host.theme().body,
+        });
+
+        panelNodes.set(def.id, {
+          def, frame, titleBar, content,
+          x: 0, y: 0,
+        });
+      }
+    }
+
+    function renderLayoutAndContent() {
+      const { width: vw, height: vh } = measureViewport(canvas);
+      const defs = getFilteredDefs();
+      const layoutDefs = defs.map(toPanelDef);
+      const layout = layoutPanels(layoutDefs, Math.max(20, vw));
+
+      const scrollY = (canvas as any).childBase ?? 0;
+      const viewTop = scrollY;
+      const viewBot = scrollY + vh;
+
+      for (const placement of layout.placements) {
+        const node = panelNodes.get(placement.id);
+        if (!node) continue;
+        const effectiveW = Math.max(3, Math.min(node.def.w, vw));
+        node.x = placement.x;
+        node.y = placement.y;
+        node.frame.left = node.x;
+        node.frame.top = node.y;
+        node.frame.width = effectiveW;
+
+        const panelTop = node.y;
+        const panelBot = node.y + node.def.h;
+
+        if (panelBot <= viewTop || panelTop >= viewBot) {
+          node.frame.hidden = true;
         } else {
-          node.frame.left = p.x;
-          node.frame.top = p.y;
-          node.x = p.x;
-          node.y = p.y;
+          node.frame.hidden = false;
+          const visibleH = Math.min(node.def.h, viewBot - panelTop);
+          node.frame.height = Math.max(3, visibleH);
+          node.content.height = Math.max(1, visibleH - 2);
         }
 
-        // Render content
-        const text = p.def.content?.(tick, p.def.w, p.def.h) ?? "";
-        node.content.setContent(text);
+        node.content.width = Math.max(1, effectiveW - 2);
       }
 
+      for (const node of panelNodes.values()) {
+        const iw = Math.max(1, node.def.w - 2);
+        const ih = Math.max(1, node.def.h - 2);
+        node.content.setContent(node.def.content(tick, iw, ih));
+      }
+
+      applyStyles();
+      updateStatus();
+    }
+
+    // ── Search ──────────────────────────────────────────────────────
+    function openSearchPrompt() {
+      const prompt = blessed.textbox({
+        parent: root,
+        bottom: 1, left: 0, right: 0, height: 1,
+        style: { fg: host.theme().body.fg, bg: host.theme().selected.bg },
+        inputOnFocus: true,
+      });
+      prompt.focus();
+      prompt.readInput((_err, value) => {
+        searchQuery = (value ?? "").trim();
+        prompt.destroy();
+        buildPanels();
+        renderLayoutAndContent();
+        canvas.focus();
+        host.screen.render();
+      });
       host.screen.render();
     }
 
-    renderLayout();
-
-    // Tick for live panels
-    createTimer(() => {
-      tick++;
-      for (const [, node] of panelNodes) {
-        if (node.def.live) {
-          const text = node.def.content?.(tick, node.def.w, node.def.h) ?? "";
-          node.content.setContent(text);
-        }
-      }
-      host.screen.render();
-    }, 1000, timers);
-
-    // Keyboard scroll
-    canvas.key(["j", "down"], () => { canvas.scroll(1); host.screen.render(); });
-    canvas.key(["k", "up"], () => { canvas.scroll(-1); host.screen.render(); });
-    canvas.key(["S-j", "S-down"], () => { canvas.scroll(5); host.screen.render(); });
-    canvas.key(["S-k", "S-up"], () => { canvas.scroll(-5); host.screen.render(); });
-    canvas.key(["pagedown"], () => { canvas.scroll(20); host.screen.render(); });
-    canvas.key(["pageup"], () => { canvas.scroll(-20); host.screen.render(); });
-    canvas.key(["home"], () => { canvas.scrollTo(0); host.screen.render(); });
-
-    // Focus canvas
+    // ── Build + first render ────────────────────────────────────────
+    buildPanels();
+    renderLayoutAndContent();
     canvas.focus();
 
-    // Describe state
+    // ── Tick (live panels) ──────────────────────────────────────────
+    createTimer(() => {
+      if (paused) return;
+      tick++;
+      let dirty = false;
+      for (const node of panelNodes.values()) {
+        if (node.def.live) {
+          const iw = Math.max(1, node.def.w - 2);
+          const ih = Math.max(1, node.def.h - 2);
+          node.content.setContent(node.def.content(tick, iw, ih));
+          dirty = true;
+        }
+      }
+      if (dirty) { updateStatus(); host.screen.render(); }
+    }, 1000, timers);
+
+    // ── Keyboard ────────────────────────────────────────────────────
+    const scrollAndRender = (amount: number) => {
+      canvas.scroll(amount);
+      renderLayoutAndContent();
+      host.screen.render();
+    };
+
+    canvas.key(["j", "down"], () => scrollAndRender(1));
+    canvas.key(["k", "up"], () => scrollAndRender(-1));
+    canvas.key(["S-j", "S-down"], () => scrollAndRender(5));
+    canvas.key(["S-k", "S-up"], () => scrollAndRender(-5));
+    canvas.key(["C-j", "C-down"], () => scrollAndRender(10));
+    canvas.key(["C-k", "C-up"], () => scrollAndRender(-10));
+    canvas.key(["pagedown"], () => scrollAndRender(20));
+    canvas.key(["pageup"], () => scrollAndRender(-20));
+    canvas.key(["home", "g"], () => { canvas.scrollTo(0); renderLayoutAndContent(); host.screen.render(); });
+    canvas.key(["end", "G"], () => { canvas.scrollTo(99999); renderLayoutAndContent(); host.screen.render(); });
+    canvas.key(["/"], () => openSearchPrompt());
+
+    canvas.on("wheeldown", () => scrollAndRender(3));
+    canvas.on("wheelup", () => scrollAndRender(-3));
+
+    // ── Describe state ──────────────────────────────────────────────
     win.describeState(() => ({
       appType: "zine",
       summary: `ZINE: ${title} — ${panelNodes.size} panels`,
       panelCount: panelNodes.size,
-      filePath,
-      title,
+      filePath, title,
       panels: [...panelNodes.entries()].map(([id, n]) => ({
-        id,
-        title: n.def.title,
-        x: n.x,
-        y: n.y,
-        w: n.def.w,
-        h: n.def.h,
+        id, title: n.def.title,
+        x: n.x, y: n.y, w: n.def.w, h: n.def.h,
       })),
     }));
 
-    // Restyle
+    // ── Restyle ─────────────────────────────────────────────────────
     win.onRestyle(() => {
       root.style = host.theme().body;
-      canvas.style = scrollableStyle(host.theme().body);
-      for (const [, node] of panelNodes) {
-        node.frame.style = {
-          border: { fg: host.theme().muted.fg },
-          label: { fg: host.theme().body.fg },
-          ...host.theme().body,
-        };
-        node.content.style = host.theme().body;
-      }
+      canvas.style = host.theme().body;
+      (canvas as any).scrollbar.style = { fg: host.theme().muted.fg, bg: host.theme().body.bg };
+      statusBar.style = host.theme().body;
+      applyStyles();
+      updateStatus();
       host.screen.render();
     });
 
-    // Cleanup
-    win.onCleanup(() => {
-      clearTimers(timers);
-    });
+    // ── Cleanup ─────────────────────────────────────────────────────
+    win.onCleanup(() => clearTimers(timers));
 
     return win.record;
   }
@@ -325,7 +347,7 @@ export default function setup(host: MicroappHost) {
   host.registerCommand({
     id: "open",
     label: "Open ZINE",
-    description: "Open a ZINE canvas. Args: filePath (string, path to .canvas.yaml).",
+    description: "Open a ZINE canvas — panels from .canvas.yaml rendered as §y²-style sub-windows. Args: filePath (string).",
     action: openZine,
     multiInstance: true,
     direct: true,
