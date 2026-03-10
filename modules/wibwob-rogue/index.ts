@@ -56,8 +56,8 @@ function openRogue(host: MicroappHost) {
 
     const cells = getFrame(state, viewW, viewH);
     const desc = describeEngine(state);
-    const status = `${desc.biome.toUpperCase()} [${desc.playerPos.x},${desc.playerPos.y}] T:${desc.turn}${desc.squeezing ? " ◕squeeze" : ""}`;
-    renderFrame(content, cells, viewW, viewH + LOG_LINES + 1, state.log, LOG_LINES, status);
+    const status = `${desc.biome.toUpperCase()} [${desc.playerPos.x},${desc.playerPos.y}] T:${desc.turn}${desc.squeezing ? " ◕squeeze" : ""}${state.player.piloting ? " [PILOTING]" : ""}`;
+    renderFrame(content, cells, viewW, viewH + LOG_LINES + 1, state.log, LOG_LINES, status, state.hints);
     host.screen.render();
   }
 
@@ -79,12 +79,13 @@ function openRogue(host: MicroappHost) {
   win.body.key(["l", "right"], () => handleCmd("move-east"));
   win.body.key(["w"],          () => handleCmd("squeeze-toggle"));
   win.body.key(["e", "enter", "space"], () => handleCmd("interact"));
+  win.body.key(["f"],          () => handleCmd("fire-cannon"));
 
   // Also handle writeInput (agent API sends input this way)
   win.onInput((input: string) => {
     const cmdMap: Record<string, GameCommand> = {
       h: "move-west", j: "move-south", k: "move-north", l: "move-east",
-      w: "squeeze-toggle", e: "interact",
+      w: "squeeze-toggle", e: "interact", f: "fire-cannon",
     };
     const cmd = cmdMap[input.toLowerCase()];
     if (cmd) {
@@ -98,6 +99,7 @@ function openRogue(host: MicroappHost) {
     const desc = describeEngine(state);
     return {
       summary: `WibWob Rogue — Turn ${desc.turn}, ${desc.biome} (${desc.label})`,
+      piloting: state.player.piloting,
       ...desc,
     };
   });

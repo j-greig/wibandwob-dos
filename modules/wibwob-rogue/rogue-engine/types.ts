@@ -77,6 +77,11 @@ export interface Player extends Entity {
   facingLeft: boolean;
   squeezing: boolean;
   normalSprite: Sprite;
+  piloting: boolean;
+  pilotedMech?: Entity | null;
+  cannonCooldown: number;
+  lastMoveDir: { dx: number; dy: number };
+  previousForm?: any;
 }
 
 export interface StarCell {
@@ -100,6 +105,8 @@ export interface GameState {
   mode: string;
   animTick: number;
   stars: StarCell[];
+  nearbyMech?: Entity | null;
+  hints: string[];
 }
 
 export interface FrameCell {
@@ -117,4 +124,8 @@ export type GameCommand =
   | "move-west"
   | "squeeze-toggle"
   | "interact"
+  | "board-mech"
+  | "eject-mech"
+  | "fire-cannon"
+  | "pet"
   | "noop";

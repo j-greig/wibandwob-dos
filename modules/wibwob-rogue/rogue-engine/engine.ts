@@ -58,6 +58,10 @@ export function initState(seed: number): GameState {
     visible: true,
     facingLeft: false,
     squeezing: false,
+    piloting: false,
+    pilotedMech: null,
+    cannonCooldown: 0,
+    lastMoveDir: { dx: 1, dy: 0 },
   };
 
   const state: GameState = {
@@ -74,11 +78,14 @@ export function initState(seed: number): GameState {
     mode: "overworld",
     animTick: 0,
     stars: generateStars(seed),
+    nearbyMech: null,
+    hints: [],
   };
 
   // Initial FOV + camera
   computeFov(state);
   updateCamera(state);
+  refreshNearby(state);
   addLog(state, "Wibwob awakens in the castle.");
 
   return state;
@@ -143,6 +150,26 @@ function updateCamera(state: GameState) {
 function addLog(state: GameState, text: string) {
   state.log.push(text);
   if (state.log.length > MAX_LOG_LINES) state.log.shift();
+}
+
+function refreshHints(state: GameState): void {
+  const hints: string[] = ["hjkl move"];
+  if (state.player.piloting) {
+    hints.push("e eject");
+    hints.push("f fire");
+  } else {
+    hints.push("w squeeze");
+    if (state.nearbyMech) hints.push("e board mech");
+  }
+  state.hints = hints;
+}
+
+function refreshNearby(state: GameState): void {
+  state.nearbyMech = state.monsters.find(m => {
+    const d = Math.abs(state.player.x - m.x) + Math.abs(state.player.y - m.y);
+    return d <= 1 && (m.behavior === "mech-warden" || m.behavior === "skinny-mech" || m.id?.startsWith("mech"));
+  }) ?? null;
+  refreshHints(state);
 }
 
 // ─── collision ───────────────────────────────────────────
@@ -218,6 +245,122 @@ function stepMonsters(state: GameState) {
   }
 }
 
+function boardMech(state: GameState, mech: Entity): void {
+  const dist = Math.abs(state.player.x - mech.x) + Math.abs(state.player.y - mech.y);
+  if (dist > 1) {
+    addLog(state, "The mech is just out of reach.");
+    return;
+  }
+  if (state.player.piloting) {
+    addLog(state, "Already piloting a mech.");
+    return;
+  }
+
+  state.player.previousForm = {
+    sprite: state.player.sprite,
+    normalSprite: state.player.normalSprite,
+    color: state.player.color,
+    facingLeft: state.player.facingLeft,
+    squeezing: state.player.squeezing,
+  };
+
+  state.monsters = state.monsters.filter(m => m !== mech);
+  state.player.x = mech.x;
+  state.player.y = mech.y;
+  state.player.piloting = true;
+  state.player.pilotedMech = mech;
+  state.player.squeezing = false;
+
+  const pilotedSprite = mech.pilotedSprite ?? mech.sprite;
+  state.player.sprite = pilotedSprite;
+  state.player.normalSprite = pilotedSprite;
+  state.player.color = mech.color || "#d8f3ff";
+  state.player.cannonCooldown = 0;
+
+  addLog(state, "Wibwob slides into the mech's chassis.");
+  computeFov(state);
+  refreshNearby(state);
+}
+
+function ejectMech(state: GameState): void {
+  if (!state.player.piloting || !state.player.pilotedMech) {
+    addLog(state, "Not piloting anything.");
+    return;
+  }
+
+  const mech = state.player.pilotedMech;
+  mech.x = state.player.x;
+  mech.y = state.player.y;
+  state.monsters.push(mech);
+
+  const prev = state.player.previousForm;
+  if (prev) {
+    state.player.sprite = prev.sprite;
+    state.player.normalSprite = prev.normalSprite;
+    state.player.color = prev.color;
+    state.player.facingLeft = prev.facingLeft;
+    state.player.squeezing = prev.squeezing;
+  }
+
+  state.player.piloting = false;
+  state.player.pilotedMech = null;
+
+  const exitY = state.player.y + 1;
+  const exitKey = `${state.player.x},${exitY}`;
+  if (state.tiles.get(exitKey)?.walkable) {
+    state.player.y = exitY;
+  }
+
+  addLog(state, "Wibwob drops out of the mech chassis.");
+  computeFov(state);
+  refreshNearby(state);
+}
+
+function fireCannon(state: GameState): void {
+  if (!state.player.piloting) {
+    addLog(state, "Wibwob needs a mech chassis to fire.");
+    return;
+  }
+
+  const now = Date.now();
+  if (state.player.cannonCooldown > now) {
+    addLog(state, "Cannon recharging...");
+    return;
+  }
+
+  state.player.cannonCooldown = now + 800;
+  const dir = state.player.lastMoveDir || { dx: state.player.facingLeft ? -1 : 1, dy: 0 };
+  let stepX = Math.sign(dir.dx || (state.player.facingLeft ? -1 : 1));
+  let stepY = Math.sign(dir.dy || 0);
+  if (stepX === 0 && stepY === 0) stepX = state.player.facingLeft ? -1 : 1;
+
+  const beamGlyph = (stepX === 0 && stepY !== 0) ? "┃"
+    : (stepY === 0 && stepX !== 0) ? "━"
+    : (stepX > 0 && stepY < 0) || (stepX < 0 && stepY > 0) ? "╱" : "╲";
+
+  let bx = state.player.x + stepX;
+  let by = state.player.y + stepY;
+  let hit = false;
+  for (let i = 0; i < 20; i++) {
+    const tile = state.tiles.get(`${bx},${by}`);
+    if (!tile?.transparent) break;
+    const monster = state.monsters.find(m => m.x === bx && m.y === by);
+    if (monster) {
+      state.monsters = state.monsters.filter(m => m !== monster);
+      addLog(state, `Mech cannon vaporises ${monster.id.replace(/-/g, " ")}!`);
+      hit = true;
+      break;
+    }
+    bx += stepX;
+    by += stepY;
+  }
+
+  if (!hit) addLog(state, `Mech cannon fires ${beamGlyph} - nothing hit.`);
+  state.turn++;
+  computeFov(state);
+  refreshNearby(state);
+}
+
 // ─── step ────────────────────────────────────────────────
 
 export function step(state: GameState, command: GameCommand): void {
@@ -234,9 +377,37 @@ export function step(state: GameState, command: GameCommand): void {
       state.player.sprite = state.player.squeezing ? PLAYER_SQUEEZE_SPRITE : state.player.normalSprite;
       addLog(state, state.player.squeezing ? "Wibwob squeezes into a tiny form ◕" : "Wibwob expands back to normal size.");
       computeFov(state);
+      refreshHints(state);
       return;
-    case "interact":
-      addLog(state, "Nothing to interact with here.");
+    case "interact": {
+      const mech = state.nearbyMech;
+      if (mech && !state.player.piloting) {
+        boardMech(state, mech);
+      } else if (state.player.piloting) {
+        ejectMech(state);
+      } else {
+        addLog(state, "Nothing to interact with here.");
+      }
+      refreshHints(state);
+      return;
+    }
+    case "board-mech": {
+      const mech = state.nearbyMech;
+      if (mech && !state.player.piloting) {
+        boardMech(state, mech);
+      } else {
+        addLog(state, "Nothing to interact with here.");
+      }
+      refreshHints(state);
+      return;
+    }
+    case "eject-mech":
+      ejectMech(state);
+      refreshHints(state);
+      return;
+    case "fire-cannon":
+      fireCannon(state);
+      refreshHints(state);
       return;
   }
 
@@ -283,6 +454,7 @@ export function step(state: GameState, command: GameCommand): void {
 
   state.player.x = targetX;
   state.player.y = targetY;
+  state.player.lastMoveDir = { dx, dy };
   state.turn++;
 
   // Step monsters
@@ -290,6 +462,7 @@ export function step(state: GameState, command: GameCommand): void {
 
   // Update FOV and camera
   computeFov(state);
+  refreshNearby(state);
   updateCamera(state);
 
   // Location label
@@ -401,6 +574,7 @@ export function describeEngine(state: GameState) {
     lastMessage: state.log[state.log.length - 1] ?? "",
     label: tile?.label ?? "",
     squeezing: state.player.squeezing,
+    piloting: state.player.piloting,
     monstersVisible: state.monsters.filter(m =>
       spriteWorldCells(m.sprite, m.x, m.y).some(c => state.visible.has(tileKey(c.x, c.y)))
     ).map(m => ({ id: m.id, x: m.x, y: m.y, behavior: m.behavior })),

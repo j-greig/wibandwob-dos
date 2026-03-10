@@ -25,13 +25,15 @@ export function renderFrame(
   log: string[],
   logLines: number,
   status = "",
+  hints: string[] = [],
 ) {
   const lines: string[] = [];
   if (status) {
     const padded = status.length < viewW ? status + " ".repeat(viewW - status.length) : status.slice(0, viewW);
     lines.push(`{#393939-fg}${padded}{/}`);
   }
-  const mapH = viewH - logLines - (status ? 1 : 0);
+  const hintLines = hints.length > 0 ? 1 : 0;
+  const mapH = viewH - logLines - (status ? 1 : 0) - hintLines;
 
   for (let y = 0; y < mapH && y < viewH; y++) {
     let line = "";
@@ -64,9 +66,15 @@ export function renderFrame(
     for (const msg of recentLog) {
       lines.push(`{white-fg}${msg}{/}`);
     }
-    while (lines.length < viewH) {
+    while (lines.length < viewH - hintLines) {
       lines.push("");
     }
+  }
+
+  if (hints.length > 0) {
+    const hintStr = hints.join("  ·  ");
+    const padded = hintStr.length < viewW ? hintStr + " ".repeat(viewW - hintStr.length) : hintStr.slice(0, viewW);
+    lines.push(`{#393939-fg}${padded}{/}`);
   }
 
   box.setContent(lines.join("\n"));
