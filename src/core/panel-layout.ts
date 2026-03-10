@@ -43,7 +43,10 @@ export const COL_GAP = 2;
  */
 // ── Column layout types and defaults ──────────────────────────────────────
 
-/** Positioned column header from layout result. */
+import type { ZineItem, ZineLayoutResult } from "./canvas-types.js";
+export type { ZineItem, ZineLayoutResult } from "./canvas-types.js";
+
+/** @deprecated Use ZineItem with type:"header" instead. */
 export type ColumnHeader = { col: number; text: string; x: number; y: number; width: number };
 
 /** Result from layoutColumns — extends LayoutResult with header positions. */
@@ -87,7 +90,7 @@ const COLUMN_DEFAULTS: Required<Omit<ColumnLayoutOptions, "columnHeaders">> = {
  * - rowGap: 2 (rows between wrapped column-rows)
  * - columnHeaders: Map<col, text> (renders header + rule above column)
  */
-export function layoutColumns(panels: PanelDef[], maxWidth: number, opts?: ColumnLayoutOptions): ColumnLayoutResult {
+export function layoutColumns(panels: PanelDef[], maxWidth: number, opts?: ColumnLayoutOptions): ZineLayoutResult {
   const {
     maxColumns,
     columnGap,
@@ -99,7 +102,7 @@ export function layoutColumns(panels: PanelDef[], maxWidth: number, opts?: Colum
   const columnHeaders = opts?.columnHeaders;
 
   const safeWidth = Math.max(20, Math.floor(maxWidth));
-  const placements: Array<{ id: string; x: number; y: number }> = [];
+  const items: ZineItem[] = [];
 
   // Group by col
   const cols = new Map<number, PanelDef[]>();
@@ -131,7 +134,6 @@ export function layoutColumns(panels: PanelDef[], maxWidth: number, opts?: Colum
 
   // Place columns left-to-right, wrapping at maxWidth or maxColumns
   const headerHeight = columnHeaders?.size ? 3 : 0; // text + rule + blank line
-  const headers: ColumnHeader[] = [];
   let cursorX = 0;
   let rowBaseY = 0;
   let rowMaxH = 0;
@@ -155,18 +157,36 @@ export function layoutColumns(panels: PanelDef[], maxWidth: number, opts?: Colum
       colsInRow = 0;
     }
 
-    // Column header
+    // Column header → ZineItem type:"header"
     const headerText = columnHeaders?.get(colIdx);
     if (headerText) {
-      headers.push({ col: colIdx, text: headerText, x: cursorX, y: rowBaseY, width: colW });
+      items.push({
+        id: `__header_col${colIdx}`,
+        type: "header",
+        x: cursorX, y: rowBaseY,
+        w: colW, h: 2,
+        col: colIdx,
+        title: headerText,
+        headerText,
+      });
     }
 
-    // Place panels vertically within column
+    // Panels → ZineItem type:"panel"
     let cursorY = rowBaseY + headerHeight;
     for (let j = 0; j < colPanels.length; j++) {
       const panel = colPanels[j]!;
+      const w = Math.max(minColumnWidth, Math.min(panel.w, safeWidth));
       const h = Math.max(minPanelHeight, panel.h);
-      placements.push({ id: panel.id, x: cursorX, y: cursorY });
+      items.push({
+        id: panel.id,
+        type: "panel",
+        x: cursorX, y: cursorY,
+        w, h,
+        col: colIdx,
+        title: panel.title,
+        content: panel.content,
+        live: panel.live,
+      });
       cursorY += h + (j < colPanels.length - 1 ? panelGap : 0);
     }
 
@@ -179,8 +199,7 @@ export function layoutColumns(panels: PanelDef[], maxWidth: number, opts?: Colum
   }
 
   return {
-    placements,
-    headers,
+    items,
     contentWidth: Math.max(contentWidth, safeWidth),
     contentHeight: Math.max(contentHeight, 1),
   };

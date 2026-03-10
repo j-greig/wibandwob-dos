@@ -8,6 +8,6 @@ e001-codified-context-infrastructure — not-started
 e019-rogue-tui-port — not-started
 e021-vps-multi-agent-world — blocked
 e025-calculating-empires — done
-e028-responsive-column-layout — not-started
-e029-context-aware-menus — done
+e028-responsive-column-layout — in-progress
+e029-context-aware-menus — in-progress
 
