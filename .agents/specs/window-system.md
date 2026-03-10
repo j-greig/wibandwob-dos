@@ -131,6 +131,64 @@ WindowKind for all microapps is "microapp" (types.ts:9). AppType is the register
 The isMicroappWindow(w) guard (types.ts) narrows to MicroappWindowRecord with guaranteed microappId.
 Full SDK: .agents/microapp-sdk.md
 
+## Blessed Scroll + Nested Child Gotchas (from agentic-devlog 2026-03-09)
+
+These patterns affect ANY microapp that puts child elements inside a scrollable canvas.
+
+### The double-subtraction bug — use `fixed: true` on grandchildren
+
+When a frame (direct child of a scrollable canvas) contains children (grandchildren of
+canvas), blessed's `_getCoords()` walks up and subtracts `childBase` (scroll offset)
+at each scrollable ancestor. Grandchildren get it subtracted TWICE — once via `frame.lpos.yi`,
+once again in `_getCoords`. Result: `yi` goes negative, `_getCoords` returns undefined,
+content is never drawn. Borders render (frame = direct child, single subtraction) but
+body content is blank.
+
+Fix: `fixed: true` on ALL grandchildren (titleBar, content, editor, resize grip).
+`fixed: true` tells `_getCoords` to skip past one scrollable ancestor.
+
+Correct panel chrome pattern for scrollable canvas microapps:
+
+  frame (parent: scrollable canvas)  → NO fixed needed
+    titleBar (parent: frame)         → fixed: true  ← REQUIRED
+    content (parent: frame)          → fixed: true  ← REQUIRED
+    resizeGrip (parent: frame)       → fixed: true  ← REQUIRED
+
+### Double-input from element.key()
+
+`element.key()` in blessed registers globally on `program`, not per-element.
+If you wire `canvas.key + root.key + win.onInput`, each keystroke fires 2-3x.
+Fix: use ONE keypress listener at the topmost element, or use `screen.key()` with
+a focus check. Never layer multiple `.key()` calls for the same action.
+
+### Click routing breaks inside scrollable canvas with fixed:true children
+
+`fixed: true` children desync blessed's `lpos` hit-testing from visual scroll position.
+Blessed routes clicks to the wrong panel when children have `fixed: true`.
+Fix: remove `clickable: true` from all panel children. Handle ALL mouse interaction at
+screen level via `screen.on("mouse")` + `pointerToContent()` from panel-layout.ts.
+This kills blessed auto-focus for panels entirely — that is correct behaviour.
+
+### Scroll-jump on refocus
+
+`screen._focus` auto-scrolls to child `rtop` on any click (via `element click` → `el.focus()`).
+Do not call `el.focus()` on panel children — it triggers unwanted scroll-jump.
+Keep `fixed: true` for rendering; handle focus at the canvas/screen level only.
+
+### Panel chrome must match exactly
+
+  border: "line"                      // shorthand — NOT { type: "line" }
+  titleBar style: theme().header      // NOT theme().body
+  fixed: true on titleBar and content // REQUIRED in scrollable canvas
+  Separate titleBar box               // NOT blessed label property
+  right: 0 + height: 1 for toolbar   // NOT computed width (root.width is 0 at creation)
+
+### layoutPanels() col field
+
+`col` in panel layout is SORT ORDER only, not a physical column position.
+Panels flow left-to-right wrapping by width. Do NOT compute column separator
+positions from `col` values — they don't map to screen columns.
+
 ## Change Checklist
 
 When touching window-manager.ts:

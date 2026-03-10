@@ -176,6 +176,49 @@ DON'T: rely on state auto-updating — it is cache-based
 DO: check /scramble/state before sending to Scramble (may be sleeping/offline)
 DON'T: send Scramble messages and assume they land — check status first
 
+## Agent Verification Patterns (from agentic-devlog 2026-03-08/09)
+
+### /windows/input is NOT end-to-end proof
+
+POST /windows/input injects logical input into a window record's writeInput hook.
+It does NOT prove: blessed key focus, global key routing, or mouse behavior.
+For real keyboard UX proof: use `tmux send-keys -t wibwob:0 "text" Enter`.
+For API correctness proof: use /windows/input + GET /state.
+NEVER claim UX is correct from /windows/input alone.
+
+### Color changes cannot be proved by agent — use text
+
+Agent pane captures (tmux capture-pane) return characters, not colors.
+Color-only changes are invisible to agents. Always include text-visible
+changes alongside any color change to verify: title, body text, or status line.
+
+### describeState() should surface child content for rich microapps
+
+For microapps with sub-panels, GET /state only shows the top-level window.
+Content inside panels is invisible to agents without a bespoke inspect command.
+Convention: implement a `<module>.panel.inspect` command returning per-panel
+{ contentLines, nonEmptyLines, lpos, fixed, firstLine, lastLine }.
+Better: include optional contentPreview per child in describeState() details.
+Proposed pattern: `details.panels: [{ id, title, contentLines, nonEmptyLines }]`
+
+### focusOrCreate swallows return values — use direct:true for query commands
+
+module-loader.ts:261 — without `direct: true`, registerCommand wraps the action
+in focusOrCreate() and discards the return value. Caller gets `{ok:true}` with no data.
+ALL query/control commands on already-open windows must use `direct: true`:
+
+  host.registerCommand({ id: "my.inspect", direct: true, action: () => { return data; } })
+
+Without direct:true: action fires, return value discarded, API response is empty.
+With direct:true: action fires directly, return value passed through to API caller.
+
+### POST /windows/mouse — does not exist yet
+
+There is no agent-facing API to synthesize mouse down/move/up inside a window.
+Nested drag/resize CANNOT be robustly agent-tested. Workaround: route nested
+drag/resize off `screen.on("mouse")` and use text-visible feedback to verify.
+Wishlist: `POST /windows/mouse { id, action, x, y, button }` — not yet implemented.
+
 ## Change Checklist
 
 When changing DesktopState or DesktopWindowState shape:

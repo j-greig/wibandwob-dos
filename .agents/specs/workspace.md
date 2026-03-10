@@ -131,6 +131,35 @@ DON'T: only test save — save can succeed while restore silently produces wrong
 DO: use workspaceService.list() to enumerate available workspaces in the UI
 DON'T: read the workspaces directory directly — list() handles missing dir gracefully
 
+## Branch and Planning Discipline (from agentic-devlog 2026-03-10)
+
+These are not workspace bugs but were the most repeated agent failures in the session
+logs. They belong here because they affect save/restore state correctness and commit hygiene.
+
+### Always check branch before any code change
+
+Three times during E028 sessions, an agent was on `main` instead of the epic branch.
+Files were committed to wrong branches. Module directories vanished after wrong-branch reverts.
+
+BEFORE any edit, run/confirm:
+
+  git branch --show-current     → must match current epic (e.g. epic/e028-canvas-documents)
+
+If on main: `git checkout <epic-branch>` BEFORE any edit. Do not edit on main.
+
+### planning:sync must run after any .planning/epics/ change
+
+EPIC_STATUS.md drifts silently if planning:sync is not run after closing/updating epics.
+After any edit to .planning/epics/*/e*-brief.md: run `bun run planning:sync`.
+After merging an epic to main: run `bun run planning:sync` and commit the result.
+This is a hook candidate — pre-commit hook on .planning/epics/ should auto-run it.
+
+### content-loader.ts — do not rewrite what already exists
+
+Before writing any YAML/panel parsing: check modules/sy2-chronicles/content-loader.ts.
+It already exports loadCanvas() for .canvas.yaml files.
+panel-layout.ts, panel-types.ts, grid-canvas.ts — all exist. Read before writing.
+
 ## Change Checklist
 
 When changing WindowSnapshot schema:

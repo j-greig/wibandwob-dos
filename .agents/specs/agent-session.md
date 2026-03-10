@@ -153,6 +153,69 @@ DON'T: assume Scramble is always ready — it may be sleeping or thinking
 DO: keep jailed tools jailed — any bypass defeats the safety model
 DON'T: add an unjailed bash or read tool for "convenience"
 
+## Module Registration (from agentic-devlog 2026-03-10)
+
+Adding a new microapp module is a multi-file dance that agents get wrong every time.
+Both files must be correct simultaneously.
+
+### module.json — exact required shape
+
+  {
+    "name": "my-module",
+    "type": "microapp",
+    "entry": "index.ts",
+    "microapp": {
+      "id": "wibwob.my-module",
+      "title": "My Module",
+      "menu": [{ "category": "applications", "order": 50, "label": "My Module" }],
+      "palette": { "order": 60, "label": "Open My Module" }
+    }
+  }
+
+### registerCommand — exact required shape in index.ts
+
+  host.registerCommand({
+    id: "my-module.open",
+    label: "Open My Module",
+    menu: [{ category: "applications", order: 50, label: "My Module" }],  // ARRAY not string
+    palette: { order: 60 },
+    action: (args) => { /* open the window */ }
+  });
+
+WRONG: `menu: "applications"` — module-loader calls `.map()` on it, crashes silently.
+WRONG: omitting `menu` from registerCommand — module.json menu field is for bridge
+commands only, NOT what places the item in the actual menu bar.
+
+### Commands with required args must have a picker fallback
+
+Any command in menu/palette that requires args must either:
+1. Show a picker/prompt when called with no args (preferred)
+2. Use a sensible default (e.g. scan for files and auto-open the only one)
+3. Not appear in menu at all (agent/API only, no menu placement)
+
+A command that requires filePath but has no picker will silently do nothing when
+clicked from the menu. User sees nothing. This is always wrong.
+
+### Module loader errors are invisible to agents
+
+Module load failures (missing manifest fields, export errors, type errors) go to
+console.warn() — which hits the blessed TTY and is swallowed. They do NOT appear
+in GET /state, GET /health, or the app log by default.
+
+To see module errors: redirect stderr → `bun run dev:world 2>scratch/logs/stderr.log`
+Then: `tail scratch/logs/stderr.log` for live errors.
+
+### Reload vs restart
+
+| Changed | Action |
+|---------|--------|
+| modules/*/index.ts or module.json | Reload: POST /commands/run with id:"modules.reload" |
+| src/core/*, src/services/* | RESTART: bash scripts/restart.sh |
+| .pi/skills/*, scratch/* | No action — read at use time |
+| Theme files, package.json | RESTART required |
+
+Mnemonic: modules/ = reload, src/ = restart.
+
 ## Change Checklist
 
 When adding a new tui_* tool:
