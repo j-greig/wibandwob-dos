@@ -18,6 +18,8 @@ import type { MicroappHost } from "../../src/services/microapp-sdk.js";
 import {
   layoutPanels,
   measureViewport,
+  pointerToContent,
+  hitPanel,
   type PanelNode,
 } from "../../src/core/panel-layout.js";
 import { createTimer, clearTimers } from "../../src/core/ui-primitives.js";
@@ -108,6 +110,10 @@ export default function setup(host: MicroappHost) {
     let tick = 0;
     let activePanelId = cePanelDefs[0]?.id ?? "";
     let searchQuery = "";
+    let editingPanelId: string | undefined;
+    let dragging: { id: string; offsetX: number; offsetY: number } | undefined;
+    const panelPositionOverrides = new Map<string, { x: number; y: number }>();
+    const contentOverrides = new Map<string, string>();
     const timers = new Set<ReturnType<typeof setInterval>>();
 
     // ── Root container ──────────────────────────────────────────────
@@ -267,11 +273,30 @@ export default function setup(host: MicroappHost) {
       }
     }
 
+    // ── Column separator overlay ──────────────────────────────────
+    const colSepOverlay = blessed.box({
+      parent: canvas,
+      top: 0, left: 0, right: 0, height: 1,
+      tags: false,
+      fixed: true,
+      style: { fg: host.theme().muted.fg, bg: "default", transparent: true },
+    });
+
     function renderLayoutAndContent() {
       const { width: vw, height: vh } = measureViewport(canvas);
       const defs = getFilteredDefs();
       const layoutDefs = defs.map(toPanelDef);
       const layout = layoutPanels(layoutDefs, Math.max(20, vw));
+      const totalContentHeight = Math.max(layout.contentHeight, vh);
+
+      // Apply position overrides from drags
+      for (const placement of layout.placements) {
+        const override = panelPositionOverrides.get(placement.id);
+        if (override) {
+          placement.x = override.x;
+          placement.y = override.y;
+        }
+      }
 
       const scrollY = (canvas as any).childBase ?? 0;
       const viewTop = scrollY;
@@ -302,11 +327,53 @@ export default function setup(host: MicroappHost) {
         node.content.width = Math.max(1, effectiveW - 2);
       }
 
+      // Render content (respect overrides and editing)
       for (const node of panelNodes.values()) {
+        if (editingPanelId === node.def.id) continue;
         const iw = Math.max(1, node.def.w - 2);
         const ih = Math.max(1, node.def.h - 2);
-        node.content.setContent(node.def.content(tick, iw, ih));
+        const override = contentOverrides.get(node.def.id);
+        node.content.setContent(override ?? node.def.content(tick, iw, ih));
       }
+
+      // Column separators — find column group boundaries from panel col assignments
+      // Group placements by their source col, find the max right edge per col group
+      const colMaxRight = new Map<number, number>();
+      for (const placement of layout.placements) {
+        const ceDef = defs.find(d => d.id === placement.id);
+        const col = ceDef?.col ?? 0;
+        const right = placement.x + (ceDef?.w ?? 0);
+        const prev = colMaxRight.get(col) ?? 0;
+        if (right > prev) colMaxRight.set(col, right);
+      }
+      // Separator X positions: midpoint between column right edge and next column left edge
+      const colGroups = [...colMaxRight.keys()].sort((a, b) => a - b);
+      const colMinLeft = new Map<number, number>();
+      for (const placement of layout.placements) {
+        const ceDef = defs.find(d => d.id === placement.id);
+        const col = ceDef?.col ?? 0;
+        const prev = colMinLeft.get(col);
+        if (prev === undefined || placement.x < prev) colMinLeft.set(col, placement.x);
+      }
+      const sepXPositions: number[] = [];
+      for (let i = 0; i < colGroups.length - 1; i++) {
+        const rightEdge = colMaxRight.get(colGroups[i]!) ?? 0;
+        const nextLeft = colMinLeft.get(colGroups[i + 1]!) ?? rightEdge + 2;
+        const midX = Math.floor((rightEdge + nextLeft) / 2);
+        if (midX > 0 && midX < vw) sepXPositions.push(midX);
+      }
+
+      const sepLines: string[] = [];
+      for (let row = 0; row < totalContentHeight; row++) {
+        let line = " ".repeat(vw);
+        for (const x of sepXPositions) {
+          line = line.slice(0, x) + "│" + line.slice(x + 1);
+        }
+        sepLines.push(line);
+      }
+      colSepOverlay.height = totalContentHeight;
+      colSepOverlay.setContent(sepLines.join("\n"));
+      colSepOverlay.setBack();
 
       applyStyles();
       updateStatus();
@@ -332,6 +399,126 @@ export default function setup(host: MicroappHost) {
       host.screen.render();
     }
 
+    // ── Double-click → inline edit ──────────────────────────────────
+    function enterEditMode(panelId: string) {
+      const node = panelNodes.get(panelId);
+      if (!node || editingPanelId) return;
+      editingPanelId = panelId;
+      const iw = Math.max(1, node.def.w - 2);
+      const ih = Math.max(1, node.def.h - 2);
+      const currentText = contentOverrides.get(panelId) ?? node.def.content(0, iw, ih);
+      const editor = blessed.textarea({
+        parent: node.frame,
+        top: 1, left: 1, right: 1, bottom: 1,
+        keys: true, mouse: true, clickable: true,
+        inputOnFocus: true,
+        fixed: true,
+        style: { ...host.theme().body, border: { fg: host.theme().selected.bg } },
+        scrollable: true,
+      });
+      editor.setValue(currentText);
+      editor.focus();
+      host.screen.render();
+      const exitEdit = () => {
+        const saved = editor.getValue();
+        contentOverrides.set(panelId, saved);
+        editor.destroy();
+        editingPanelId = undefined;
+        renderLayoutAndContent();
+        canvas.focus();
+        host.screen.render();
+      };
+      editor.key(["escape"], exitEdit);
+      editor.key(["C-s"], exitEdit);
+    }
+
+    // ── Mouse: click-to-focus, double-click-to-edit, drag-to-move ──
+    function isInsideCanvas(sx: number, sy: number): boolean {
+      try {
+        const ct = (canvas as any).atop ?? 0;
+        const cl = (canvas as any).aleft ?? 0;
+        const cw = Number(canvas.width) || 0;
+        const ch = Number(canvas.height) || 0;
+        return sx >= cl && sx < cl + cw && sy >= ct && sy < ct + ch;
+      } catch { return false; }
+    }
+
+    function safePointerToContent(x: number, y: number): { x: number; y: number } | undefined {
+      try { return pointerToContent(canvas, x, y); }
+      catch { return undefined; }
+    }
+
+    let lastClickTime = 0;
+    let lastClickId = "";
+    const DBLCLICK_MS = 350;
+
+    const handleMouse = (data: any) => {
+      if (!canvas.parent) return;
+      if (data.action === "wheeldown" || data.action === "wheelup") return;
+      if (data.action === "mousedown" && !isInsideCanvas(data.x, data.y)) return;
+
+      if (data.action === "mouseup") {
+        dragging = undefined;
+        return;
+      }
+
+      if (data.action === "mousedown") {
+        const pt = safePointerToContent(data.x, data.y);
+        if (!pt) return;
+        const node = hitPanel(panelNodes, pt.x, pt.y);
+        if (node) {
+          // Double-click detection
+          const now = Date.now();
+          if (now - lastClickTime < DBLCLICK_MS && lastClickId === node.def.id) {
+            enterEditMode(node.def.id);
+            lastClickTime = 0;
+            return;
+          }
+          lastClickTime = now;
+          lastClickId = node.def.id;
+
+          // Focus + drag start
+          dragging = {
+            id: node.def.id,
+            offsetX: pt.x - node.x,
+            offsetY: pt.y - node.y,
+          };
+          activePanelId = node.def.id;
+          applyStyles();
+          host.screen.render();
+        }
+        return;
+      }
+
+      if (data.action === "mousemove" && dragging) {
+        const pt = safePointerToContent(data.x, data.y);
+        if (!pt) return;
+        const node = panelNodes.get(dragging.id);
+        if (!node) return;
+        const newX = Math.max(0, pt.x - dragging.offsetX);
+        const newY = Math.max(0, pt.y - dragging.offsetY);
+        panelPositionOverrides.set(dragging.id, { x: newX, y: newY });
+        node.x = newX;
+        node.y = newY;
+        node.frame.left = newX;
+        node.frame.top = newY;
+        host.screen.render();
+      }
+    };
+    host.screen.on("mouse", handleMouse);
+
+    // Mouse wheel
+    const handleWheel = (data: any) => {
+      if (!canvas.parent) return;
+      if (!isInsideCanvas(data.x, data.y)) return;
+      if (data.action === "wheeldown") {
+        canvas.scroll(3); renderLayoutAndContent(); host.screen.render();
+      } else if (data.action === "wheelup") {
+        canvas.scroll(-3); renderLayoutAndContent(); host.screen.render();
+      }
+    };
+    host.screen.on("mouse", handleWheel);
+
     // ── Build + first render ────────────────────────────────────────
     buildPanels();
     renderLayoutAndContent();
@@ -343,37 +530,60 @@ export default function setup(host: MicroappHost) {
       tick++;
       let dirty = false;
       for (const node of panelNodes.values()) {
-        if (node.def.live) {
+        if (node.def.live && !editingPanelId) {
           const iw = Math.max(1, node.def.w - 2);
           const ih = Math.max(1, node.def.h - 2);
-          node.content.setContent(node.def.content(tick, iw, ih));
-          dirty = true;
+          if (!contentOverrides.has(node.def.id)) {
+            node.content.setContent(node.def.content(tick, iw, ih));
+            dirty = true;
+          }
         }
       }
       if (dirty) { updateStatus(); host.screen.render(); }
     }, 1000, timers);
 
     // ── Keyboard ────────────────────────────────────────────────────
-    const scrollAndRender = (amount: number) => {
-      canvas.scroll(amount);
+    function scrollBy(delta: number) {
+      canvas.scroll(delta);
       renderLayoutAndContent();
       host.screen.render();
-    };
+    }
 
-    canvas.key(["j", "down"], () => scrollAndRender(1));
-    canvas.key(["k", "up"], () => scrollAndRender(-1));
-    canvas.key(["S-j", "S-down"], () => scrollAndRender(5));
-    canvas.key(["S-k", "S-up"], () => scrollAndRender(-5));
-    canvas.key(["C-j", "C-down"], () => scrollAndRender(10));
-    canvas.key(["C-k", "C-up"], () => scrollAndRender(-10));
-    canvas.key(["pagedown"], () => scrollAndRender(20));
-    canvas.key(["pageup"], () => scrollAndRender(-20));
+    canvas.key(["j", "down"], () => scrollBy(1));
+    canvas.key(["k", "up"], () => scrollBy(-1));
+    canvas.key(["S-j", "S-down"], () => scrollBy(5));
+    canvas.key(["S-k", "S-up"], () => scrollBy(-5));
+    canvas.key(["C-j", "C-down"], () => scrollBy(10));
+    canvas.key(["C-k", "C-up"], () => scrollBy(-10));
+    canvas.key(["pagedown"], () => scrollBy(20));
+    canvas.key(["pageup"], () => scrollBy(-20));
     canvas.key(["home", "g"], () => { canvas.scrollTo(0); renderLayoutAndContent(); host.screen.render(); });
     canvas.key(["end", "G"], () => { canvas.scrollTo(99999); renderLayoutAndContent(); host.screen.render(); });
     canvas.key(["/"], () => openSearchPrompt());
+    canvas.key(["r"], () => { buildPanels(); });
 
-    canvas.on("wheeldown", () => scrollAndRender(3));
-    canvas.on("wheelup", () => scrollAndRender(-3));
+    // Also handle keys via win.onInput for when blessed focus is on the frame
+    win.onInput((ch: string, key?: blessed.Widgets.Events.IKeyEventArg) => {
+      const speed = key?.shift ? 5 : key?.ctrl ? 10 : 1;
+      if (key?.name === "up"   || ch === "k") { scrollBy(-1 * speed); return; }
+      if (key?.name === "down" || ch === "j") { scrollBy(1 * speed);  return; }
+      if (key?.name === "pageup")   { scrollBy(-20 * speed); return; }
+      if (key?.name === "pagedown") { scrollBy(20 * speed);  return; }
+      if (editingPanelId) return;
+      if (ch === "/") { openSearchPrompt(); return; }
+      if (ch === "r") { buildPanels(); return; }
+    });
+
+    // ── Resize reflow ───────────────────────────────────────────────
+    let resizeTimer: ReturnType<typeof setTimeout> | undefined;
+    win.onResize(() => {
+      if (resizeTimer) clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        toolbar.layout({ top: 0, left: 0, width: Number(root.width) || 80, height: 1 });
+        renderLayoutAndContent();
+        host.screen.render();
+      }, 100);
+    });
 
     // ── Describe state ──────────────────────────────────────────────
     win.describeState(() => ({
@@ -393,13 +603,18 @@ export default function setup(host: MicroappHost) {
       canvas.style = host.theme().body;
       (canvas as any).scrollbar.style = { fg: host.theme().muted.fg, bg: host.theme().body.bg };
       statusBar.style = host.theme().body;
+      colSepOverlay.style = { fg: host.theme().muted.fg, bg: "default", transparent: true };
       applyStyles();
       updateStatus();
       host.screen.render();
     });
 
     // ── Cleanup ─────────────────────────────────────────────────────
-    win.onCleanup(() => clearTimers(timers));
+    win.onCleanup(() => {
+      clearTimers(timers);
+      host.screen.off("mouse", handleMouse);
+      host.screen.off("mouse", handleWheel);
+    });
 
     return win.record;
   }
