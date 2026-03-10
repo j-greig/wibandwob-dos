@@ -1,0 +1,22 @@
+{
+  "id": "wibwob.zine",
+  "name": "ZINE",
+  "version": "0.1.0",
+  "description": "Zone of Interstitial Narrative Emergence — canvas of panels from .canvas.yaml",
+  "main": "index.ts",
+  "type": "microapp",
+  "entry": "index.ts",
+  "microapp": {
+    "id": "wibwob.zine",
+    "title": "ZINE",
+    "description": "Open a ZINE canvas from a .canvas.yaml file. Args: filePath (string).",
+    "persist": false,
+    "multiInstance": true,
+    "menu": [
+      { "category": "applications", "order": 40, "label": "ZINE" }
+    ],
+    "palette": { "order": 60, "label": "Open ZINE" },
+    "agent": true,
+    "api": true
+  }
+}

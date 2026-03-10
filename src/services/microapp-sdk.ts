@@ -153,8 +153,9 @@ export { landmarksFromPreset, POSE_PRESETS, POSE_CONNECTIONS, renderSkeletonAt }
 export type { NormalisedLandmarks } from "../core/skeleton-renderer.js";
 
 // Panel layout + grid canvas — primitives for magazine-layout microapps
-export { layoutPanels, pointerToContent, hitPanel, measureViewport, COL_GAP } from "../core/panel-layout.js";
-export type { PanelDef, PanelNode, LayoutResult } from "../core/panel-layout.js";
+export { layoutPanels, layoutColumns, pointerToContent, hitPanel, measureViewport, COL_GAP } from "../core/panel-layout.js";
+export type { PanelDef, PanelNode, LayoutResult, ColumnLayoutResult, ColumnLayoutOptions, ColumnHeader } from "../core/panel-layout.js";
+export type { ZineItem, ZineLayoutResult, ZineItemType, CanvasDocument, CanvasColumnDef } from "../core/canvas-types.js";
 export { blankGrid, paintText, paintCentered, paintLines, drawArrow, gridToText, waveLine, bar } from "../core/grid-canvas.js";
 export { createTimer, clearTimers } from "../core/ui-primitives.js";
 

@@ -248,6 +248,8 @@ export interface WindowRecord {
   filePath?: string;
   isDirty?: boolean;
   lastSavedContent?: string;
+  /** If set, Ctrl-S calls this instead of writing to disk. */
+  onSave?: (content: string) => void;
 
   // Finder-specific (set by content-windows.ts)
   finder?: FinderController;

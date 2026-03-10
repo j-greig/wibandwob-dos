@@ -269,3 +269,137 @@ session setup. All manual, no script.
 3. Runs bun install
 4. Starts tmux session on specified port
 5. Waits for /health
+
+## 2026-03-10 — ZINE microapp build (E028 canvas documents)
+
+### Branch discipline failure: agents keep landing on main
+
+**Failure mode**: three times during this session the agent was on `main` instead of
+`epic/e028-canvas-documents`. Once committed unrelated files to a spike branch.
+Once created the module directory on main, then couldn't find it after switching.
+Once the whole `modules/zine/` directory vanished because a revert on the wrong
+branch nuked it.
+
+**Root cause**: no pre-action branch check. Agent starts work without running
+`git branch --show-current` first.
+
+**Fix needed**: E001 trigger table should include "before any code change, verify
+branch matches current epic." Could also be a pre-commit hook that refuses commits
+to main when an epic branch exists.
+
+### Module registration is a multi-file dance that agents get wrong every time
+
+**Failure mode**: creating a new microapp module required getting ALL of these right
+simultaneously:
+1. `module.json` — needs `name`, `type`, `microapp.id`, `microapp.title`
+2. `registerCommand()` in `index.ts` — menu placement uses array format
+   `[{ category, order, label }]`, NOT the string `"applications"`
+3. The manifest `microapp.menu` field is read by the loader for bridge commands
+   but `registerCommand({ menu })` is what actually places the command in menus
+4. `palette` config also goes in `registerCommand`, not just `module.json`
+
+Agent tried 4 different module.json formats before one worked. Then the menu
+item was registered but did nothing because `registerCommand` lacked `menu`.
+Then adding `menu: "applications"` (string) crashed because the loader calls
+`.map()` on it expecting an array.
+
+**Fix needed**: E001 specialist doc for "adding a new microapp module" with exact
+template. The `new-window-type` skill exists but doesn't cover the module.json +
+registerCommand dance in enough detail. Alternatively: a `scripts/scaffold-module.sh`
+that generates both files from a template.
+
+### Silent failures from module loader are invisible to agents
+
+**Failure mode**: module failed to load with `def.menu?.map is not a function` but
+no error appeared in logs, tmux, or API. Agent had to redirect stderr to a file
+(`2>scratch/stderr.log`) to discover the error. Console output goes to blessed's
+tty and gets swallowed.
+
+**Fix needed**: module loader errors should write to the app's file log
+(`logs/tui-app/YYYY-MM-DD.log`), not just console.warn. Currently the log only
+records command execution, not startup lifecycle.
+
+### Commands that require args must have a no-arg fallback or picker
+
+**Failure mode**: ZINE appeared in the Applications menu but clicking it did nothing.
+The command requires `filePath` but the menu provides no args. The function returned
+silently. User had to report "it doesn't do anything."
+
+**Fix**: any command exposed in menu/palette that requires args should either:
+1. Show a picker/prompt when called with no args
+2. Use a sensible default
+3. Not appear in the menu at all (agent/API only)
+
+ZINE now scans `content/` for `.canvas.yaml` files and auto-opens the only one, or
+shows a list picker if multiple exist. This should be the standard pattern.
+
+### content-loader.ts already existed — agent duplicated YAML parsing
+
+**Failure mode**: agent wrote its own YAML-to-panel parsing in the ZINE module,
+duplicating what `modules/sy2-chronicles/content-loader.ts` already does. Had to be
+told by human that the loader exists. Then exported `loadCanvas()` from it.
+
+**Fix needed**: E001 cold memory doc for "panel/canvas content pipeline" listing
+content-loader.ts, panel-types.ts, panel-layout.ts, and their public APIs. Agent
+should never need to rewrite these.
+
+### Misunderstanding the design intent caused a full rewrite to wrong architecture
+
+**Failure mode**: user said ZINE should render "like §y² Chronicles". Agent
+interpreted this as "spawn multiple desktop windows" and rewrote the entire module
+to create separate windows per panel. User had to correct: it's a SINGLE window
+with panels inside, matching §y²'s chrome exactly.
+
+**Root cause**: agent didn't look at the §y² screenshot carefully enough and made an
+assumption about the architecture instead of reading the code.
+
+**Lesson**: when porting from an existing module, READ the source first, don't infer
+from the description. The §y² index.ts is 2500 lines — agent should have studied
+`buildPanels()`, `renderLayoutAndContent()`, and the frame/titleBar/content pattern
+before writing anything.
+
+### Panel chrome must match exactly: theme().header, fixed:true, border:"line"
+
+**Failure mode**: first ZINE render was a wall of `a` characters (theme background
+fill). Then panels rendered but with wrong borders and no coloured title bars.
+Required three iterations to match §y²'s chrome:
+- `border: "line"` (shorthand, not `{ type: "line" }`)
+- `style: host.theme().header` on titleBar (not body)
+- `fixed: true` on both titleBar and content (the scroll fix from devlog 2026-03-09)
+- Separate titleBar box (not blessed `label` property)
+
+**Fix needed**: this pattern should be a shared primitive or at minimum documented
+in the SDK. Every new scrollable-canvas microapp will hit this. See existing note
+about "shared nested panel chrome primitive."
+
+### layoutPanels() col field is sort-only, not positional
+
+**Failure mode**: agent tried to compute column separator positions from `col`
+assignments, assuming col 0/1/2 map to physical screen columns. They don't — the
+layout engine flows panels left-to-right wrapping by width. `col` only affects
+sort order within a row.
+
+**Fix**: either document this clearly in panel-layout.ts, or add real column-group
+support to the layout engine. For now, column separators are disabled.
+
+### Toolbar createButtonBar needs width at render time, not creation time
+
+**Failure mode**: toolbar created with `Number(root.width) || 80` at construction
+time, but root.width is 0 before blessed renders. Toolbar was invisible (zero width).
+
+**Fix**: use `right: 0` and `height: 1` instead of computed width. Defer layout
+call to resize handler. §y² works because it calls `toolbar.layout()` in the
+resize handler too.
+
+### E001 is increasingly urgent
+
+Every friction point above is a "codified context would have prevented this" case.
+The paper's insight is correct: documentation is infrastructure. When the spec for
+"how to add a microapp module" doesn't exist as a machine-readable doc, agents will
+fail 4 times before stumbling on the right incantation.
+
+Priority candidates for E001 specialists:
+1. **Module registration** — module.json schema, registerCommand patterns, menu/palette wiring
+2. **Panel chrome** — frame/titleBar/content pattern, fixed:true, theme tokens
+3. **Content pipeline** — content-loader, panel-types, panel-layout, canvas YAML schema
+4. **Branch discipline** — pre-action branch check, epic branch naming, commit conventions

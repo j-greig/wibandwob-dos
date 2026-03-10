@@ -141,6 +141,13 @@ export class EditorCoordinator {
   }
 
   save(window: WindowRecord): void {
+    // If onSave callback is set, call it instead of writing to disk
+    if (window.onSave && window.editor) {
+      window.onSave(window.editor.value);
+      this.markClean(window);
+      this.deps.overlays.flash(`Saved to source`);
+      return;
+    }
     saveEditorWindow({
       window,
       overlays: this.deps.overlays,

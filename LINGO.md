@@ -69,6 +69,26 @@ The tests and scripts probably make assumptions that are no longer true. Find ev
 New modules probably reinvented things the older modules already solved. Read the oldest and most stable parts of the codebase to understand what patterns were established. Then read the newest parts. Find the gaps where new code ignored those patterns. Close them. Typecheck clean. Commit.
 ```
 
+## SCAFFOLD PROMPTS
+
+Token-efficient patterns for requesting extensible features. Name the trigger, the dispatch pattern, the first case, and the API. Skip rationale.
+
+```
+[SURFACE]: [trigger] dispatches to [target] by [dispatch key] map. [First type] -> [command] via [API]. Scaffold for [future types] later.
+```
+
+Example:
+```
+ZINE: double-click dispatches to editor by sourceType map. Text -> editor.open via runGlobalCommand. Scaffold for figlet later.
+```
+
+Rules:
+- Name exact trigger and target
+- Name the pattern not the implementation (dispatch map, not switch statement)
+- Name the API so the agent does not have to discover it
+- Say what the FIRST case is and that others come LATER
+- Skip rationale, skip alternatives, skip please
+
 ## DEV TERMS
 
 **smoke test**
