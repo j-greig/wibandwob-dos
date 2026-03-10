@@ -87,6 +87,9 @@ export interface AppMenuActions {
   focusWindowById: (args?: Record<string, unknown>) => void;
   moveWindowById: (args?: Record<string, unknown>) => void;
   resizeWindowById: (args?: Record<string, unknown>) => void;
+  // ── Canvas documents ───────────────────────────────────
+  loadCanvas: (args?: Record<string, unknown>) => void;
+  exportCanvas: (args?: Record<string, unknown>) => void;
   // ── Help ──────────────────────────────────────────────
   viewReadme: () => void;
 }
@@ -927,6 +930,27 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     group: "save",
     actionKey: "loadWorkspace",
     palettePlacement: { order: 180 },
+    api: true,
+    agent: true
+  },
+  // ── Canvas documents ───────────────────────────────────
+  {
+    id: "canvas.load",
+    label: "Load Canvas",
+    description: "Load a .canvas.yaml document. Args: filePath (string, absolute path to .canvas.yaml file).",
+    group: "save",
+    actionKey: "loadCanvas",
+    palettePlacement: { order: 185 },
+    api: true,
+    agent: true
+  },
+  {
+    id: "canvas.export",
+    label: "Export Canvas",
+    description: "Export current desktop to a .canvas.yaml file. Args: filePath (string), title (string, optional).",
+    group: "save",
+    actionKey: "exportCanvas",
+    palettePlacement: { order: 186 },
     api: true,
     agent: true
   },

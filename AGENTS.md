@@ -148,6 +148,25 @@ Smoke targets: menus, primer open, text file open, editor typing, window drag/cl
 ./scripts/minimap.sh
 ```
 
+### Visual verification is mandatory
+
+API responses and `/state` JSON are NOT sufficient proof that a feature works.
+The human must be able to see the running TUI. Every test or demo workflow must:
+
+1. **Ensure the app is running in tmux** — if not, start it:
+   ```bash
+   tmux new-session -d -s wibwob -x 230 -y 62 'bun run start'
+   ```
+2. **Tell the human to attach** — after making visual changes, say:
+   ```
+   tmux attach -t wibwob
+   ```
+3. **Never skip this step.** API-only testing misses rendering bugs, layout
+   issues, visual regressions, and chrome problems that only show on screen.
+
+If the human is already attached (they told you so, or you're in an interactive
+session), skip the prompt. But when in doubt: remind them to look.
+
 ## Agent Tooling
 
 Scripts and skills that exist to help agents work are **agent tooling**. When agent tooling causes friction, degrades, or fails — improve it, don't work around it. Delegate improvement to Codex when the fix is self-contained.

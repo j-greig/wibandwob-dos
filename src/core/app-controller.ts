@@ -50,6 +50,7 @@ import {
   type WorkspaceRestoreActions,
 } from "./workspace-snapshots.js";
 import { isPersistable } from "./snapshot-registry.js";
+import { loadCanvasFile, restoreCanvas, exportCanvasDocument } from "../services/canvas-document.js";
 import type {
   AppType,
   BackroomsChannel,
@@ -2098,6 +2099,41 @@ export class TsTuiMvpApp {
       },
       // ── Monster Cam ─────────────────────────────────────
       openMonsterCam: () => this.openMonsterCam(),
+      // ── Canvas documents ─────────────────────────────────
+      loadCanvas: (args) => {
+        const filePath = typeof args?.filePath === "string" ? args.filePath : "";
+        if (!filePath) {
+          this.overlays.flash("canvas.load requires filePath arg");
+          return;
+        }
+        try {
+          const doc = loadCanvasFile(filePath);
+          const result = restoreCanvas(doc, this.getRestoreActions());
+          this.overlays.flash(`Canvas loaded: ${result.loaded} windows (${result.skipped} skipped)`);
+          if (result.errors.length > 0) {
+            for (const err of result.errors) log.app(err);
+          }
+        } catch (e) {
+          this.overlays.flash(`Canvas load failed: ${e}`);
+        }
+      },
+      exportCanvas: (args) => {
+        const filePath = typeof args?.filePath === "string" ? args.filePath : "";
+        if (!filePath) {
+          this.overlays.flash("canvas.export requires filePath arg");
+          return;
+        }
+        const title = typeof args?.title === "string" ? args.title : "Untitled Canvas";
+        try {
+          const windows = this.windowManager.getWindows();
+          const yaml = exportCanvasDocument(windows, this.windowManager, title);
+          fs.mkdirSync(path.dirname(filePath), { recursive: true });
+          fs.writeFileSync(filePath, yaml, "utf8");
+          this.overlays.flash(`Canvas exported: ${filePath}`);
+        } catch (e) {
+          this.overlays.flash(`Canvas export failed: ${e}`);
+        }
+      },
       // ── Help ────────────────────────────────────────────
       viewReadme: () => this.openBrowserReaderWindow(README_PATH),
     };
