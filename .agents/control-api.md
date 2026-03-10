@@ -1,5 +1,9 @@
 # Control API Reference
 
+> Exact field names, failure modes, tui_* tool reference, and agent verification
+> patterns: `.agents/specs/state-and-api.md`
+
+
 Local HTTP API on `http://127.0.0.1:8099`.
 
 Always `GET /state` before acting on specific windows — use real ids from live state, never guessed ones.
