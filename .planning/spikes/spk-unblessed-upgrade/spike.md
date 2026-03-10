@@ -1,22 +1,23 @@
 ---
 id: spk-unblessed-upgrade
-title: Upgrade TUI engine from blessed to unblessed
-status: in-progress
+title: Upgrade TUI engine from blessed to unblessed — and TEA architecture assessment
+status: done
 branch: spike/spk-unblessed-upgrade
 created: 2026-03-10
+closed: 2026-03-10
 ---
 
-# Spike: blessed → unblessed upgrade
+# Spike: blessed → unblessed upgrade — and TEA architecture assessment
 
 ## Question
 
-Can we swap our TUI rendering engine from `blessed` (unmaintained, JS, no types)
-to `@unblessed/blessed` or `@unblessed/node` (TypeScript-native, 2,355 tests,
-active development) — and what would we gain?
+Can we swap our TUI rendering engine from `blessed` to `@unblessed/blessed`
+or `@unblessed/node` — and what would we gain? Separately: is the Elm
+Architecture a useful pattern for this codebase?
 
 ## Timebox
 
-2 sessions. Decision at end: adopt, defer, or drop.
+1 session. Decided.
 
 ---
 
@@ -381,16 +382,194 @@ the view -> DOM diff pattern Elm uses.
 Current state: 40 files with direct blessed event wiring, state scattered
 across service singletons and window locals, no single update path.
 
-Target: a root App model, a typed Msg union, a dispatch function wired to
-all blessed events, a render() called once per update. Windows become
-sub-models. Commands replace inline async.
+A full app-level TEA refactor would mean: one root App model, a typed Msg
+union, a dispatch function wired to all blessed events, a render() called
+once per update. Windows become sub-models. Commands replace inline async.
 
-This is a multi-sprint refactor, not a spike. But the spike is a good place
-to prototype the shape of the dispatcher and one window sub-model to validate
-the pattern before committing.
+This is a multi-sprint refactor, not a spike. See "TEA: constructive
+critique" section below for why full app-level TEA is probably the wrong call.
+
+---
+
+## Compatibility assessment (haiku agent, 2026-03-10)
+
+Analysis of src/ against vendor/unblessed/. Seven areas checked.
+
+### Migration guide patterns: CLEAR
+
+All patterns we use are supported by the @unblessed/blessed backward-compat
+wrapper: blessed.Widgets.* types, screen.render(), factory functions
+(blessed.box, blessed.list, blessed.textbox), blessed.screen() options.
+No migration-breaking patterns found in our codebase.
+
+### Type namespace: COMPATIBLE
+
+unblessed/packages/core/src/types/index.ts exports a Widgets namespace.
+Every type we reference maps cleanly:
+  blessed.Widgets.Screen, BoxElement, BlessedElement, ListElement,
+  Events.IKeyEventArg, BoxOptions, TextboxElement.
+No gaps or renames found.
+
+### screen.program: COMPATIBLE
+
+custom-cursor.ts only calls hideCursor() and showCursor(). Both exist in
+unblessed Program with identical escape sequences. Access pattern unchanged.
+alpha.22 adds automatic cursor restoration on exit — custom-cursor.ts may
+become partially redundant if we ever migrate.
+
+### Render loop: COMPATIBLE
+
+RenderMonitor wraps 234 explicit screen.render() calls. unblessed's damage
+buffer is an optimisation inside render() — does not change the calling
+convention. No conflict.
+
+### Grid canvas: COMPATIBLE
+
+grid-canvas.ts is pure string manipulation feeding setContent(). No blessed
+internal cell buffer access. Zero migration cost. unblessed ships CharCanvas
+(vendor/unblessed/packages/core/src/widgets/char-canvas.ts) as a future
+enhancement — out of scope for a drop-in swap.
+
+### Bun 1.3.8 compatibility: NO BLOCKING ISSUES (static analysis)
+
+@unblessed/blessed imports: fs, tty, net, child_process, stream, events,
+string_decoder, buffer, url, util — all implemented in Bun 1.3.8. NodeRuntime
+class wires these at module load. No dynamic requires or known Bun stubs.
+Note: runtime smoke test still required before committing.
+
+### API differences: TWO ONLY
+
+Migration guide documents exactly two differences from blessed:
+1. Node >= 22.0.0 — Bun 1.3.8 satisfies this
+2. Runtime injection — transparent via @unblessed/blessed wrapper
+
+### Overall risk rating: LOW (but see maintenance section)
+
+Technical compatibility is solid. The only unresolved question is live
+runtime smoke test under Bun. However — see maintenance reality below.
+
+---
+
+## Maintenance reality (2026-03-10)
+
+### blessed
+
+- Stars: 11,777 — forks: 562 — npm downloads: 5.6 million / month
+- Last push: March 2024. Not archived.
+- Open issues: 253 (longstanding; nothing critical for our usage)
+- Status: stable-frozen. Not abandoned. The API is complete. The world
+  depends on it. Like a load-bearing library that does what it does and
+  no longer needs to change.
+
+### unblessed
+
+- Stars: 7 — forks: 1 — watchers: 0
+- Last push: December 2025. Three months of silence at time of writing.
+- Status: one-person alpha experiment. Technically impressive — strict TS,
+  2,355 tests. But community signal is essentially zero. 7 stars after
+  multiple alpha releases is not adoption, it is a project looking for users.
+
+### Verdict
+
+Stay on blessed. It is stable-frozen, not abandoned. 5.6M npm downloads/month
+is the market's verdict. The ecosystem has decided it is done and working.
+
+Revisit unblessed if and only if:
+- It reaches 1.0.0 stable (not alpha)
+- Meaningful community adoption (hundreds of stars, active issues/PRs)
+- A specific blessed bug is blocking us that unblessed demonstrably fixes
+
+Until then: vendor snapshot stays as reference material. Migration is parked.
+
+---
+
+## TEA: constructive critique
+
+The Elm Architecture is excellent for a certain class of app. WibWob-DOS is
+not obviously that class. This section is the honest assessment.
+
+### The core tension
+
+TEA's elegance comes from view-as-pure-function-of-model. Elm can do this
+because it has a virtual DOM — it diffs old and new virtual trees and patches
+cheaply.
+
+blessed has no virtual DOM. Widgets are mutable objects with internal state.
+To run a "view" function on every message you must either:
+
+A. Recreate blessed boxes on every event — catastrophically slow, and you
+   lose focus, scroll, and cursor state on every update.
+B. Do selective widget mutation — which is exactly what the codebase already
+   does, just with extra ceremony around it.
+
+You cannot have the pure view guarantee in a blessed app. What you get is
+TEA-ish: typed messages, a reducer for some state, then an imperative render
+step that mutates specific widgets. That is tractable, but it is not the clean
+thing the Elm guide is describing.
+
+### Window state is genuinely heterogeneous and local
+
+A paint canvas has brush, colour, undo stack, viewport. A music player has
+playlist, playback position, visualiser mode. A terminal has scroll buffer,
+cursor position, PTY state. Folding all of that into one root AppModel is not
+cleaner — it is a god object. The wiring cost of sub-models is real: every
+new window type adds Model, Msg wrapper, a case in root update, and a case in
+root render. For a desktop that can have 20+ window types, that is a lot of
+scaffolding for unclear gain.
+
+### The app already has a service layer
+
+state-service.ts, workspace-service.ts, wibwob-agent-session.ts — these ARE
+models, just not in TEA form. The problem is not a missing architecture.
+It is inconsistency: some state in services, some in window locals, some
+inside blessed widget internals. TEA formalises what already exists but does
+not obviously fix the inconsistency problem.
+
+### What TEA actually gives you here
+
+Not pure views. But:
+- Typed messages: you can reason about what can happen
+- Reducer: unit-test state transitions without a screen
+- Effects as commands: async work is auditable and not buried in callbacks
+
+These are worth having. The question is whether full app-level TEA is the
+right vehicle for them.
+
+### The pragmatic version
+
+TEA at the window level, not the app level.
+
+Each window dispatches messages internally through its own small update
+function. Windows communicate upward via the existing command registry —
+which is already basically a message bus. The window manager owns the spatial
+model. The services own persistence. No root AppModel with every window's
+state folded in.
+
+This gives the real benefits (testable state transitions per window, typed
+events, no scattered mutation) without rebuilding the composition root.
+
+### Recommended approach
+
+Do not refactor the app shell to TEA. It is working, complex, and the cost
+would be high.
+
+The next time a new window type is built — a paint canvas, a game, a complex
+microapp — build it TEA-style internally: Model, Msg, update, imperative
+render step. Evaluate whether it is actually better to work in. That is
+more useful evidence than a speculative full-app refactor.
+
+The Elm Architecture is the right way to think about state INSIDE a window.
+It is probably the wrong pattern to apply wholesale to the app shell.
 
 ---
 
 ## Decision
 
-TBD
+**Stay on blessed. Park the unblessed migration. Apply TEA at window level only.**
+
+1. blessed is stable-frozen with massive ecosystem adoption — not a problem to solve
+2. unblessed is a one-person alpha with no community — wrong time to depend on it
+3. TEA full app-level refactor costs too much for a working codebase; the view-
+   purity guarantee is impossible on blessed anyway
+4. TEA at window level is the right scope: build the next complex window TEA-style
+   and validate the pattern before any broader commitment
