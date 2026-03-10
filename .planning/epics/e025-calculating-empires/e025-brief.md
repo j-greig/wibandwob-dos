@@ -179,7 +179,7 @@ WibWobWorld geology, etc). The panel system is content-agnostic.
 - [x] AC-12: Agent can move panels via registered command — sy2.panel.move + sy2.panel.inspect
 - [x] AC-13: Double-click text panel enters edit mode — screen-level handler, Esc/Ctrl-S to save
 - [x] AC-14: Clicking a panel while scrolled does not jump canvas back to top — isInsideCanvas bounds + canvas.focus override
-- [ ] AC-15: microapp-sdk.ts exports all helpers — parked to agentic-devlog, separate scope
+- [x] AC-15: microapp-sdk.ts exports all helpers — documented in microapp-sdk.md + devlog (2026-03-10)
 - [x] AC-16: Panels at bottom viewport edge clip cleanly — manual viewport clipping for fixed:true children
 - [x] AC-17: Panel type glyph prefixes in title bar — PANEL_TYPE_PREFIX registry, switchable to word labels
 - [x] AC-18: Bottom toolbar with clickable buttons (Search, Map, Pause/Play)
