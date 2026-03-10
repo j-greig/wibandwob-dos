@@ -2511,7 +2511,9 @@ export default function setup(host: MicroappHost) {
     id: "open",
     label: "Open §y² Chronicles",
     description: "Open a dense multi-panel visualization — §y² narrative + genealogy.",
-    menu: [{ category: "applications", order: 39, label: "§y² Chronicles" }],
+    // Retired from Applications menu — open via palette (Alt-P) or API
+    // Use Zine to browse sy2-chronicles.canvas.yaml instead
+    menu: [],
     palette: { order: 59, label: "Open §y² Chronicles" },
     action: (args) => {
       openChronicles(args as Record<string, unknown> | undefined);

@@ -79,7 +79,7 @@ export default function setup(host: MicroappHost) {
           top: "center", left: "center",
           width: "60%", height: Math.min(candidates.length + 2, 20),
           border: "line",
-          label: " Open ZINE — select canvas ",
+          label: " Open Zine — select canvas ",
           keys: true, mouse: true, vi: true,
           items: candidates.map(c => path.relative(REPO_ROOT, c)),
           style: {
@@ -109,7 +109,10 @@ export default function setup(host: MicroappHost) {
     const canvas_doc = loadCanvas(filePath);
     if (!canvas_doc) return;
 
-    const { title, panels: cePanelDefs, columnHeaders: showHeaders, columns: columnDefs } = canvas_doc;
+    const { title, panels: initialPanels, columnHeaders: showHeaders, columns: columnDefs } = canvas_doc;
+
+    // Mutable panel list — hot reload swaps this in place
+    let cePanelDefs = initialPanels;
 
     // Build column header map for layout engine
     const columnHeaderMap = new Map<number, string>();
@@ -137,6 +140,38 @@ export default function setup(host: MicroappHost) {
     const contentOverrides = new Map<string, string>();
     const timers = new Set<ReturnType<typeof setInterval>>();
 
+    // ── Sidebar state ───────────────────────────────────────────────
+    const SIDEBAR_WIDTH = 26;
+    let sidebarOpen = true;
+    let activeFilePath = filePath;
+    const contentDir = path.join(REPO_ROOT, "content");
+    // Declared here so loadFile (defined below) can reassign it before watcher init
+    let watcher!: ReturnType<typeof fs.watch>;
+
+    function discoverFiles(): string[] {
+      const found = findCanvasFiles(contentDir);
+      // Validate: must parse + have correct format field
+      return found.filter(f => {
+        try {
+          const doc = loadCanvas(f);
+          return !!doc;
+        } catch { return false; }
+      });
+    }
+
+    let discoveredFiles = discoverFiles();
+
+    function sidebarEntryLabel(fp: string, maxW: number): string {
+      const rel = path.relative(contentDir, fp);
+      const display = rel.replace(/\.canvas\.yaml$/, "");
+      const prefix = fp === activeFilePath ? "▶ " : "  ";
+      const available = maxW - prefix.length;
+      const truncated = display.length > available
+        ? "…" + display.slice(-(available - 1))
+        : display;
+      return prefix + truncated;
+    }
+
     // ── Root container ──────────────────────────────────────────────
     const root = blessed.box({
       parent: win.body,
@@ -145,10 +180,106 @@ export default function setup(host: MicroappHost) {
       style: host.theme().body,
     });
 
+    // ── Sidebar ─────────────────────────────────────────────────────
+    const sidebarBox = blessed.box({
+      parent: root,
+      top: 1, left: 0,
+      width: SIDEBAR_WIDTH, bottom: 1,
+      style: host.theme().body,
+      hidden: !sidebarOpen,
+    });
+
+    const sidebarList = blessed.list({
+      parent: sidebarBox,
+      top: 0, left: 0, right: 0, bottom: 0,
+      keys: true, vi: true, mouse: true,
+      scrollable: true,
+      style: {
+        ...host.theme().body,
+        selected: host.theme().selected,
+        item: host.theme().body,
+      },
+      items: [],
+    });
+
+    const sidebarDivider = blessed.box({
+      parent: root,
+      top: 1, bottom: 1,
+      left: SIDEBAR_WIDTH,
+      width: 1,
+      style: { fg: host.theme().muted.fg, bg: host.theme().body.bg },
+      content: Array(80).fill("│").join("\n"),
+      hidden: !sidebarOpen,
+    });
+
+    function refreshSidebarList() {
+      const labels = discoveredFiles.map(f =>
+        sidebarEntryLabel(f, SIDEBAR_WIDTH - 1)
+      );
+      (sidebarList as any).setItems(labels);
+      const activeIdx = discoveredFiles.indexOf(activeFilePath);
+      if (activeIdx >= 0) sidebarList.select(activeIdx);
+    }
+
+    function toggleSidebar() {
+      sidebarOpen = !sidebarOpen;
+      if (sidebarOpen) {
+        sidebarBox.show();
+        sidebarDivider.show();
+        canvas.left = SIDEBAR_WIDTH + 1 as any;
+      } else {
+        sidebarBox.hide();
+        sidebarDivider.hide();
+        canvas.left = 0 as any;
+      }
+      renderLayoutAndContent();
+      updateStatus();
+      host.screen.render();
+    }
+
+    function loadFile(fp: string) {
+      if (fp === activeFilePath) return;
+      try {
+        const fresh = loadCanvas(fp);
+        if (!fresh) return;
+        // Hand off watcher
+        watcher.close();
+        activeFilePath = fp;
+        cePanelDefs = fresh.panels;
+        columnHeaderMap.clear();
+        if (fresh.columnHeaders) {
+          for (const [idx, def] of fresh.columns) {
+            if (def.header) columnHeaderMap.set(idx, def.header);
+          }
+        }
+        contentOverrides.clear();
+        panelPositionOverrides.clear();
+        activePanelId = cePanelDefs[0]?.id ?? "";
+        watcher = fs.watch(activeFilePath, onFileChange);
+        // Update window chrome title bar
+        const chromeTitleBar = (win.body.parent as any)?.children?.find(
+          (c: any) => c._isTitleBar
+        );
+        if (chromeTitleBar?.setContent) {
+          chromeTitleBar.setContent(` ZINE: ${fresh.title}`);
+        }
+        refreshSidebarList();
+        rebuild();
+        updateStatus();
+        host.screen.render();
+      } catch { /* ignore */ }
+    }
+
+    sidebarList.on("select", (_, idx) => {
+      const fp = discoveredFiles[idx];
+      if (fp) { loadFile(fp); canvas.focus(); }
+    });
+
     // ── Scrollable canvas ───────────────────────────────────────────
+    const canvasLeft = sidebarOpen ? SIDEBAR_WIDTH + 1 : 0;
     const canvas = blessed.box({
       parent: root,
-      top: 1, left: 0, right: 0, bottom: 1,
+      top: 1, left: canvasLeft, right: 0, bottom: 1,
       keys: true, mouse: true, clickable: true,
       scrollable: true,
       alwaysScroll: true,
@@ -174,17 +305,19 @@ export default function setup(host: MicroappHost) {
       }
     };
 
-    // ── Toolbar (bottom bar) ────────────────────────────────────────
+    // ── Toolbar (bottom nav bar) ────────────────────────────────────
     let paused = false;
-    type ToolbarAction = "search" | "pause";
+    type ToolbarAction = "sidebar" | "search" | "pause";
     const toolbar = createButtonBar<ToolbarAction>(
       root,
       [
-        { id: "search", label: "/ Search" },
-        { id: "pause",  label: "⏸ Pause" },
+        { id: "sidebar", label: "[ ] Files" },
+        { id: "search",  label: "/ Search"  },
+        { id: "pause",   label: "⏸ Pause"   },
       ],
       (id) => {
-        if (id === "search") openSearchPrompt();
+        if (id === "sidebar") toggleSidebar();
+        else if (id === "search") openSearchPrompt();
         else if (id === "pause") {
           paused = !paused;
           updateStatus();
@@ -192,11 +325,13 @@ export default function setup(host: MicroappHost) {
         }
       },
     );
-    toolbar.node.bottom = 0;
-    toolbar.node.left = 0;
-    toolbar.node.right = 0;
-    toolbar.node.top = undefined as any;
-    toolbar.node.height = 1;
+    // Position the bar at the bottom of root and call layout() to place buttons
+    function layoutToolbar() {
+      const w = Math.max(20, Number(root.width) || 80);
+      const h = Number(root.height) || 24;
+      toolbar.layout({ top: h - 1, left: 0, width: w, height: 1 });
+    }
+    layoutToolbar();
 
     // ── Status bar (top) ────────────────────────────────────────────
     const statusBar = blessed.box({
@@ -247,13 +382,13 @@ export default function setup(host: MicroappHost) {
       const scroll = (canvas as any).getScrollPerc?.() ?? 0;
       const q = searchQuery ? `  search:${searchQuery}` : "";
       const pauseLabel = paused ? "▶ Play" : "⏸ Pause";
+      const sidebarLabel = sidebarOpen ? "[▶] Files" : "[ ] Files";
       const panelCount = [...zineNodes.values()].filter(n => n.item.type === "panel").length;
       toolbar.update({
-        leftText: ` ZINE  ${panelCount} panels  scroll:${scroll}%${q}`,
-        activeId: paused ? "pause" : "search",
+        leftText: ` Zine  ${panelCount} panels  ${scroll}%${q}`,
+        activeId: paused ? "pause" : undefined,
+        buttonLabels: { sidebar: ` ${sidebarLabel} `, pause: ` ${pauseLabel} ` },
       });
-      const pauseNode = (toolbar.node.children as any)?.[3];
-      if (pauseNode?.setContent) pauseNode.setContent(` ${pauseLabel} `);
       statusBar.setContent("");
     }
 
@@ -428,21 +563,62 @@ export default function setup(host: MicroappHost) {
     }
 
     // ── Search ──────────────────────────────────────────────────────
+    let searchBarOpen = false;
+
     function openSearchPrompt() {
-      const prompt = blessed.textbox({
+      if (searchBarOpen) return;
+      searchBarOpen = true;
+
+      const CLOSE_W = 5; // " [×] "
+      const bar = blessed.box({
         parent: root,
         bottom: 1, left: 0, right: 0, height: 1,
         style: { fg: host.theme().body.fg, bg: host.theme().selected.bg },
+      });
+
+      const input = blessed.textbox({
+        parent: bar,
+        top: 0, left: 0, right: CLOSE_W, height: 1,
+        style: { fg: host.theme().body.fg, bg: host.theme().selected.bg },
         inputOnFocus: true,
       });
-      prompt.focus();
-      prompt.readInput((_err, value) => {
-        searchQuery = (value ?? "").trim();
-        prompt.destroy();
+
+      const closeBtn = blessed.box({
+        parent: bar,
+        top: 0, right: 0, width: CLOSE_W, height: 1,
+        content: " [×] ",
+        mouse: true, clickable: true,
+        style: { fg: host.theme().highlight.fg, bg: host.theme().selected.bg },
+      });
+
+      function closeSearch(commit: boolean) {
+        if (!searchBarOpen) return;
+        searchBarOpen = false;
+        if (commit) {
+          const val = (input as any).value ?? "";
+          searchQuery = val.trim();
+        }
+        bar.destroy();
         rebuild();
         canvas.focus();
-      });
+        host.screen.render();
+      }
+
+      closeBtn.on("click", () => closeSearch(false));
+
+      input.key(["escape"], () => closeSearch(false));
+      input.key(["enter"], () => closeSearch(true));
+
+      input.focus();
+      if (searchQuery) (input as any).setValue(searchQuery);
       host.screen.render();
+    }
+
+    function closeSearchIfOpen() {
+      // External escape handler — fires if canvas has focus and bar is open
+      if (searchBarOpen) {
+        // The input's own escape handler will run; this is a safety fallback
+      }
     }
 
     // ── Double-click → open in native editor ──────────────────────
@@ -615,8 +791,34 @@ export default function setup(host: MicroappHost) {
     host.screen.on("mouse", handleWheel);
 
     // ── Build + first render ────────────────────────────────────────
+    refreshSidebarList();
     rebuild();
     canvas.focus();
+
+    // ── Hot reload — watch canvas file for changes ───────────────────
+    let reloadDebounce: ReturnType<typeof setTimeout> | undefined;
+    function onFileChange() {
+      clearTimeout(reloadDebounce);
+      reloadDebounce = setTimeout(() => {
+        try {
+          const fresh = loadCanvas(activeFilePath);
+          if (!fresh) return;
+          cePanelDefs = fresh.panels;
+          columnHeaderMap.clear();
+          if (fresh.columnHeaders) {
+            for (const [idx, def] of fresh.columns) {
+              if (def.header) columnHeaderMap.set(idx, def.header);
+            }
+          }
+          contentOverrides.clear();
+          panelPositionOverrides.clear();
+          rebuild();
+          updateStatus();
+        } catch { /* ignore transient write races */ }
+      }, 80);
+    }
+    watcher = fs.watch(activeFilePath, onFileChange);
+    // Watcher cleaned up in onCleanup below alongside timers
 
     // ── Tick (live panels) ──────────────────────────────────────────
     createTimer(() => {
@@ -653,6 +855,7 @@ export default function setup(host: MicroappHost) {
     canvas.key(["end", "G"], () => { canvas.scrollTo(99999); renderLayoutAndContent(); host.screen.render(); });
     canvas.key(["/"], () => openSearchPrompt());
     canvas.key(["r"], () => rebuild());
+    canvas.key(["["], () => toggleSidebar());
 
     win.onInput((ch: string, key?: blessed.Widgets.Events.IKeyEventArg) => {
       const speed = key?.shift ? 5 : key?.ctrl ? 10 : 1;
@@ -662,6 +865,7 @@ export default function setup(host: MicroappHost) {
       if (key?.name === "pagedown") { scrollBy(20 * speed);  return; }
       if (ch === "/") { openSearchPrompt(); return; }
       if (ch === "r") { rebuild(); return; }
+      if (ch === "[") { toggleSidebar(); return; }
     });
 
     // ── Resize reflow ───────────────────────────────────────────────
@@ -669,7 +873,7 @@ export default function setup(host: MicroappHost) {
     win.onResize(() => {
       if (resizeTimer) clearTimeout(resizeTimer);
       resizeTimer = setTimeout(() => {
-        toolbar.layout({ top: 0, left: 0, width: Number(root.width) || 80, height: 1 });
+        layoutToolbar();
         renderLayoutAndContent();
         host.screen.render();
       }, 100);
@@ -678,10 +882,16 @@ export default function setup(host: MicroappHost) {
     // ── Describe state ──────────────────────────────────────────────
     win.describeState(() => {
       const panelCount = [...zineNodes.values()].filter(n => n.item.type === "panel").length;
+      const freshTitle = loadCanvas(activeFilePath)?.title ?? title;
       return {
-        appType: "zine",
-        summary: `ZINE: ${title} — ${panelCount} panels`,
-        panelCount, filePath, title,
+        appType: "wibwob.zine",
+        summary: `ZINE: ${freshTitle} — ${panelCount} panels`,
+        panelCount,
+        filePath: activeFilePath,
+        title: freshTitle,
+        sidebarOpen,
+        availableFiles: discoveredFiles,
+        activeFile: activeFilePath,
         items: [...zineNodes.values()].map(n => ({
           id: n.item.id, type: n.item.type, title: n.item.title,
           x: n.item.x, y: n.item.y, w: n.item.w, h: n.item.h,
@@ -703,6 +913,8 @@ export default function setup(host: MicroappHost) {
     // ── Cleanup ─────────────────────────────────────────────────────
     win.onCleanup(() => {
       clearTimers(timers);
+      clearTimeout(reloadDebounce);
+      watcher.close();
       host.screen.off("mouse", handleMouse);
       host.screen.off("mouse", handleWheel);
     });
@@ -712,12 +924,12 @@ export default function setup(host: MicroappHost) {
 
   host.registerCommand({
     id: "open",
-    label: "Open ZINE",
+    label: "Open Zine",
     description: "Open a ZINE canvas — panels from .canvas.yaml rendered as §y²-style sub-windows. Args: filePath (string).",
     action: openZine,
     multiInstance: true,
     direct: true,
-    menu: [{ category: "applications", order: 40, label: "ZINE" }],
-    palette: { order: 60, label: "Open ZINE" },
+    menu: [{ category: "applications", order: 40, label: "Zine" }],
+    palette: { order: 60, label: "Open Zine" },
   });
 }

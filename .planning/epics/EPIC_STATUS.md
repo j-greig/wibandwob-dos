@@ -9,5 +9,6 @@ e019-rogue-tui-port — not-started
 e021-vps-multi-agent-world — blocked
 e028-responsive-column-layout — in-progress
 e029-context-aware-menus — done
+e030-zine-multi-file — done
 e031-sidebar-primitive — not-started
 
