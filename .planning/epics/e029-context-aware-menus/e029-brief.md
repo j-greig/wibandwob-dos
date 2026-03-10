@@ -1,7 +1,7 @@
 ---
 id: E029
 title: Context-Aware Menus
-status: in-progress
+status: done
 issue: ~
 pr: ~
 depends_on: []
@@ -36,9 +36,9 @@ Favourites bucket above an A-Z sorted main list.
 
 ## Stories
 
-- [~] S01 — Context-aware File menu (`appTypes` filter on `MenuPlacement`)
-- [ ] S02 — Menu separators (non-selectable dividers, keyboard-skip)
-- [ ] S03 — Applications Favourites + A-Z sort
+- [x] S01 — Context-aware File menu (`appTypes` filter on `MenuPlacement`)
+- [x] S02 — Menu separators (non-selectable dividers, keyboard-skip)
+- [x] S03 — Applications Favourites + A-Z sort
 
 ---
 
@@ -100,11 +100,11 @@ Filter items: `item.appTypes === undefined || item.appTypes.includes(focusedAppT
 
 ### ACs
 
-- [ ] `appTypes?: AppType[]` in `MenuPlacement`, typechecks clean
-- [ ] File menu items filtered by focused window's appType on open
-- [ ] No focus → global fallback (all items without appTypes restriction)
-- [ ] `bun run typecheck` clean
-- [ ] Manual smoke: open text editor, open File menu → editor items only
+- [x] `appTypes?: AppType[]` in `MenuPlacement`, typechecks clean
+- [x] File menu items filtered by focused window's appType on open
+- [x] No focus → global fallback (all items without appTypes restriction)
+- [x] `bun run typecheck` clean
+- [x] Manual smoke: open text editor, open File menu → editor items only
 
 ---
 
@@ -142,11 +142,11 @@ Applications menu uses `separatorBefore` after the last favourite (S03).
 
 ### ACs
 
-- [ ] `separator?: true` on `MenuItem`
-- [ ] Separator items render as a horizontal rule (full menu width)
-- [ ] j/k navigation skips separators cleanly
-- [ ] Click on separator does nothing (no close, no action)
-- [ ] `bun run typecheck` clean
+- [x] `separator?: true` on `MenuItem`
+- [x] Separator items render as a horizontal rule (full menu width)
+- [x] j/k navigation skips separators cleanly
+- [x] Click on separator does nothing (no close, no action)
+- [x] `bun run typecheck` clean
 
 ---
 
@@ -175,12 +175,12 @@ case and any leading `Open ` prefix (so "Open Text Editor" sorts as "Text Editor
 
 ### ACs
 
-- [ ] `favourite?: true` on `MenuPlacement`
-- [ ] Wib&Wob Agent and Scramble (floating) appear at top of Applications menu
-- [ ] Separator between favourites and rest
-- [ ] Non-favourite items A-Z sorted (case-insensitive, strip `Open ` prefix)
-- [ ] `bun run typecheck` clean
-- [ ] Manual smoke: Applications menu opens, favourites at top, separator, A-Z list
+- [x] `favourite?: true` on `MenuPlacement`
+- [x] Wib&Wob Agent and Scramble (floating) appear at top of Applications menu
+- [x] Separator between favourites and rest
+- [x] Non-favourite items A-Z sorted (case-insensitive, strip `Open ` prefix)
+- [x] `bun run typecheck` clean
+- [x] Manual smoke: Applications menu opens, favourites at top, separator, A-Z list
 
 ---
 
@@ -194,10 +194,10 @@ case and any leading `Open ` prefix (so "Open Text Editor" sorts as "Text Editor
 
 ## Acceptance criteria (consolidated)
 
-- [ ] AC-1: `appTypes`, `favourite`, `separatorBefore` added to MenuPlacement — typecheck clean
-- [ ] AC-2: File menu filters by focused window's appType on open
-- [ ] AC-3: No focus → global fallback preserved
-- [ ] AC-4: Separator items render, skip on j/k, no-op on click
-- [ ] AC-5: Applications menu — Wib&Wob + Scramble pinned, separator, A-Z below
-- [ ] AC-6: `bun run typecheck` clean
-- [ ] AC-7: Manual smoke passes all three stories
+- [x] AC-1: `appTypes`, `favourite`, `separatorBefore` added to MenuPlacement — typecheck clean
+- [x] AC-2: File menu filters by focused window's appType on open
+- [x] AC-3: No focus → global fallback preserved
+- [x] AC-4: Separator items render, skip on j/k, no-op on click
+- [x] AC-5: Applications menu — Wib&Wob + Scramble pinned, separator, A-Z below
+- [x] AC-6: `bun run typecheck` clean
+- [x] AC-7: Manual smoke passes all three stories
