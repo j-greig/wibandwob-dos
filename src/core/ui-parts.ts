@@ -911,13 +911,14 @@ export function createCollapsibleBlock(
   let lastWidth = 0;
 
   const render = () => {
+    const chevron = collapsed ? "▸" : "▾";
     if (collapsed) {
       const badge = lastProps.badge ? `  ${lastProps.badge}` : "";
-      node.setContent(`${lastProps.summary}${badge}`);
+      node.setContent(`${chevron}${lastProps.summary}${badge}`);
       node.height = 1;
     } else {
       const badge = lastProps.badge ? `  ${lastProps.badge}` : "";
-      const header = `${lastProps.summary}${badge}`;
+      const header = `${chevron}${lastProps.summary}${badge}`;
       const full = lastProps.detail ? `${header}\n${lastProps.detail}` : header;
       node.setContent(full);
       const lineCount = full.split("\n").length;

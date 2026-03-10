@@ -401,6 +401,9 @@ export function openWibWobAgentWindow(params: {
             },
           });
           collapsibleBlocks.set(block.key, handle);
+        } else if (!block.run.active && !handle.isCollapsed()) {
+          // Sync collapsed state on full rebuild (run finished since creation)
+          handle.setCollapsed(true);
         }
         handle.update({ summary: block.summary, detail: block.detail, badge: block.badge });
         children.push({
