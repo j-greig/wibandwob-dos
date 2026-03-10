@@ -858,3 +858,235 @@ export function createBorderedPanel(
     },
   };
 }
+
+// ── Collapsible block ─────────────────────────────────────────────────────────
+
+/** @primitive */
+export interface CollapsibleBlockProps {
+  /** Single line shown when collapsed (blessed {tag} markup OK). */
+  summary: string;
+  /** Full content shown when expanded (blessed {tag} markup OK, may be multi-line). */
+  detail: string;
+  /** Optional badge always visible even when collapsed (e.g. "✗ 2 failed"). */
+  badge?: string;
+}
+
+/** @primitive */
+export type CollapsibleBlockHandle = UiPart<CollapsibleBlockProps> & {
+  toggle(): void;
+  setCollapsed(collapsed: boolean): void;
+  isCollapsed(): boolean;
+  /** Current content height in rows (1 when collapsed, N when expanded). */
+  contentHeight(): number;
+};
+
+/**
+ * A block that toggles between a one-line summary and full detail on click.
+ * Calls `onChange` when height changes so the parent layout can reflow.
+ *
+ * @primitive
+ */
+export function createCollapsibleBlock(
+  parent: blessed.Widgets.Node,
+  opts?: {
+    collapsed?: boolean;
+    onChange?: () => void;
+  },
+): CollapsibleBlockHandle {
+  let collapsed = opts?.collapsed ?? true;
+
+  const node = blessed.box({
+    parent,
+    top: 0,
+    left: 0,
+    width: 0,
+    height: 1,
+    tags: true,
+    mouse: true,
+    clickable: true,
+    style: theme().body,
+  });
+
+  let lastProps: CollapsibleBlockProps = { summary: "", detail: "" };
+  let lastWidth = 0;
+
+  const render = () => {
+    const chevron = collapsed ? "▸" : "▾";
+    if (collapsed) {
+      const badge = lastProps.badge ? `  ${lastProps.badge}` : "";
+      node.setContent(`${chevron}${lastProps.summary}${badge}`);
+      node.height = 1;
+    } else {
+      const badge = lastProps.badge ? `  ${lastProps.badge}` : "";
+      const header = `${chevron}${lastProps.summary}${badge}`;
+      const full = lastProps.detail ? `${header}\n${lastProps.detail}` : header;
+      node.setContent(full);
+      const lineCount = full.split("\n").length;
+      node.height = lineCount;
+    }
+  };
+
+  node.on("click", () => {
+    collapsed = !collapsed;
+    render();
+    opts?.onChange?.();
+  });
+
+  return {
+    node,
+    layout(rect) {
+      lastWidth = rect.width;
+      node.top = rect.top;
+      node.left = rect.left;
+      node.width = clampSize(rect.width);
+      render();
+    },
+    update(props) {
+      lastProps = props;
+      render();
+    },
+    restyle() {
+      safeSetStyle(node, theme().body);
+      render();
+    },
+    destroy() {
+      node.destroy();
+    },
+    toggle() {
+      collapsed = !collapsed;
+      render();
+      opts?.onChange?.();
+    },
+    setCollapsed(value: boolean) {
+      if (collapsed === value) return;
+      collapsed = value;
+      render();
+      opts?.onChange?.();
+    },
+    isCollapsed() {
+      return collapsed;
+    },
+    contentHeight() {
+      return Number(node.height) || 1;
+    },
+  };
+}
+
+// ── Content stack ─────────────────────────────────────────────────────────────
+
+/**
+ * A child in a content stack. Each child exposes a blessed node and a way to
+ * query its current height in rows. The stack positions children top-to-bottom
+ * inside a scrollable container.
+ *
+ * @primitive
+ */
+export interface ContentStackChild {
+  key: string;
+  node: blessed.Widgets.BoxElement;
+  contentHeight(): number;
+}
+
+/** @primitive */
+export interface ContentStackHandle {
+  /** The scrollable container node — use as parent in createStack or similar. */
+  node: blessed.Widgets.BoxElement;
+  /** Replace the child list and relayout. */
+  setChildren(children: ContentStackChild[]): void;
+  /** Append a child and relayout (avoids full rebuild on each new message). */
+  appendChild(child: ContentStackChild): void;
+  /** Recalculate all child positions. Call after any child height change. */
+  relayout(): void;
+  /** Scroll to the bottom of the content. */
+  scrollToBottom(): void;
+  /** Clean up. */
+  restyle(): void;
+  destroy(): void;
+}
+
+/**
+ * Manages variable-height children stacked vertically inside a scrollable
+ * blessed box. Children are positioned with manual `top` values that
+ * accumulate. Call `relayout()` whenever a child changes height.
+ *
+ * @primitive
+ */
+export function createContentStack(
+  parent: blessed.Widgets.Node,
+  stackOpts?: { style?: Record<string, any> },
+): ContentStackHandle {
+  const baseStyle = stackOpts?.style ?? theme().body;
+  const node = blessed.box({
+    parent,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    tags: true,
+    mouse: true,
+    keys: true,
+    scrollable: true,
+    alwaysScroll: true,
+    scrollbar: createScrollbar(),
+    style: scrollableStyle(baseStyle),
+  });
+
+  let children: ContentStackChild[] = [];
+
+  const relayout = () => {
+    let cursor = 0;
+    for (const child of children) {
+      child.node.top = cursor;
+      child.node.left = 0;
+      child.node.width = Math.max(1, Number(node.width) || 1);
+      const h = child.contentHeight();
+      child.node.height = h;
+      cursor += h;
+    }
+  };
+
+  return {
+    node,
+
+    setChildren(newChildren: ContentStackChild[]) {
+      // Detach old children that aren't in the new list
+      const newKeys = new Set(newChildren.map((c) => c.key));
+      for (const old of children) {
+        if (!newKeys.has(old.key)) {
+          old.node.detach();
+        }
+      }
+      // Attach new children that aren't already parented
+      for (const child of newChildren) {
+        if (child.node.parent !== node) {
+          node.append(child.node);
+        }
+      }
+      children = newChildren;
+      relayout();
+    },
+
+    appendChild(child: ContentStackChild) {
+      node.append(child.node);
+      children.push(child);
+      relayout();
+    },
+
+    relayout,
+
+    scrollToBottom() {
+      node.setScrollPerc(100);
+    },
+
+    restyle() {
+      safeSetStyle(node, scrollableStyle(stackOpts?.style ?? theme().body));
+    },
+
+    destroy() {
+      for (const child of children) {
+        child.node.destroy();
+      }
+      node.destroy();
+    },
+  };
+}

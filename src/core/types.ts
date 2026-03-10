@@ -69,6 +69,28 @@ export interface ChatMessageEntry {
   sender?: string;
 }
 
+/** A single tool invocation within a ToolRun. */
+export interface ToolCallEntry {
+  name: string;
+  args: string;
+  result?: string;
+  isError: boolean;
+  done: boolean;
+}
+
+/**
+ * A group of consecutive tool calls that belong to one agent turn.
+ * Used by the agent chat window to render collapsible tool blocks.
+ */
+export interface ToolRun {
+  id: string;
+  tools: ToolCallEntry[];
+  /** True while the run is still in progress (more tool calls expected). */
+  active: boolean;
+  /** Count of tools that returned errors. */
+  errorCount: number;
+}
+
 export interface WindowSnapshot {
   kind: WindowKind;
   title: string;
