@@ -1,9 +1,10 @@
 /**
  * Music Player Window — WinAMP-style for WibWob-DOS.
  *
- * Uses ffplay for audio (pause via stdin "p", seek via -ss).
- * Responsive: compact when narrow, playlist panel at ≥70 cols,
- * spectrum analyser when wide+tall (≥20 body rows).
+ * Audio engine:  ffplay for playback (pause via stdin "p", seek via -ss).
+ * Audio analysis: parallel ffmpeg process pipes raw PCM (s16le mono 8kHz).
+ *                 Node reads 256-sample chunks, bins into N frequency bands,
+ *                 feeds real amplitudes + RMS to viz tick loop.
  *
  * Viz modes are modular — implement VizMode and push to VIZ_MODES to add one.
  */
@@ -16,7 +17,7 @@ import * as path from "path";
 import { promisify } from "util";
 
 import { theme } from "../core/theme/resolver.js";
-import { createRestyleBundle, createButtonBar, clamp } from "../core/ui-parts.js";
+import { createRestyleBundle, createButtonBar, clamp, type ButtonBarPart } from "../core/ui-parts.js";
 import type { ThemeTokens } from "../core/theme/types.js";
 import type { OverlayManager } from "../core/overlay-manager.js";
 import type { WindowManager } from "../core/window-manager.js";
@@ -33,6 +34,12 @@ const PLAYLIST_MIN_WIDTH = 70;
 const PLAYLIST_WIDTH     = 28;
 const VIZ_MIN_HEIGHT     = 18;
 const VIZ_TICK_MS        = 80;
+
+// PCM analysis constants
+const PCM_SAMPLE_RATE  = 8000;          // 8kHz — enough for spectrum up to 4kHz
+const PCM_CHUNK_FRAMES = 256;           // samples per analysis frame
+const PCM_BYTES        = PCM_CHUNK_FRAMES * 2;  // s16le = 2 bytes/sample
+const VIZ_BANDS        = 24;            // output frequency bands
 
 function getMusicDir() { return path.join(process.cwd(), "content/music"); }
 
@@ -69,6 +76,161 @@ export interface MusicPlayerPublicAPI {
   };
 }
 
+// ── Audio Analyser ────────────────────────────────────────────────────────────
+//
+// Spawns a parallel ffmpeg process to pipe raw PCM from the same file at the
+// same seek offset. Reads chunks, runs a 256-point radix-2 FFT, bins magnitude
+// spectrum into VIZ_BANDS log-spaced bands, exposes bands + RMS for viz tick.
+
+/** Cooley-Tukey radix-2 in-place FFT (n must be a power of 2). */
+function fftInPlace(re: Float32Array, im: Float32Array): void {
+  const n = re.length;
+  // bit-reverse permutation
+  for (let i = 1, j = 0; i < n; i++) {
+    let bit = n >> 1;
+    for (; j & bit; bit >>= 1) j ^= bit;
+    j ^= bit;
+    if (i < j) {
+      let t = re[i]!; re[i] = re[j]!; re[j] = t;
+      t = im[i]!;     im[i] = im[j]!; im[j] = t;
+    }
+  }
+  // butterfly stages
+  for (let len = 2; len <= n; len <<= 1) {
+    const ang = -2 * Math.PI / len;
+    const wRe = Math.cos(ang), wIm = Math.sin(ang);
+    for (let i = 0; i < n; i += len) {
+      let cRe = 1, cIm = 0;
+      const half = len >> 1;
+      for (let j = 0; j < half; j++) {
+        const uRe = re[i + j]!,        uIm = im[i + j]!;
+        const vRe = re[i + j + half]! * cRe - im[i + j + half]! * cIm;
+        const vIm = re[i + j + half]! * cIm + im[i + j + half]! * cRe;
+        re[i + j]        = uRe + vRe;  im[i + j]        = uIm + vIm;
+        re[i + j + half] = uRe - vRe;  im[i + j + half] = uIm - vIm;
+        const nr = cRe * wRe - cIm * wIm;
+        cIm = cRe * wIm + cIm * wRe; cRe = nr;
+      }
+    }
+  }
+}
+
+class AudioAnalyser {
+  private _proc:       ChildProcess | null = null;
+  private _buf:        Buffer = Buffer.alloc(0);
+  private _bands:      Float32Array = new Float32Array(VIZ_BANDS).fill(0);
+  private _smooth:     Float32Array = new Float32Array(VIZ_BANDS).fill(0);
+  private _rms:        number = 0;
+  private _rollingPeak = 0.001;
+
+  // Pre-allocated FFT scratch buffers
+  private readonly _re = new Float32Array(PCM_CHUNK_FRAMES);
+  private readonly _im = new Float32Array(PCM_CHUNK_FRAMES);
+
+  // Log-spaced band edges (computed once)
+  private readonly _bandEdges: Array<[number, number]>;
+
+  private readonly DECAY = 0.12;
+
+  constructor() {
+    const minF = 40, maxF = PCM_SAMPLE_RATE / 2;
+    const logMin = Math.log2(minF), logMax = Math.log2(maxF);
+    const freqPerBin = PCM_SAMPLE_RATE / PCM_CHUNK_FRAMES;
+    this._bandEdges = Array.from({ length: VIZ_BANDS }, (_, b) => {
+      const fLo = Math.pow(2, logMin + (b       / VIZ_BANDS) * (logMax - logMin));
+      const fHi = Math.pow(2, logMin + ((b + 1) / VIZ_BANDS) * (logMax - logMin));
+      const iLo = Math.max(0, Math.floor(fLo / freqPerBin));
+      const iHi = Math.min(PCM_CHUNK_FRAMES / 2 - 1, Math.ceil(fHi / freqPerBin));
+      return [iLo, Math.max(iLo, iHi)] as [number, number];
+    });
+  }
+
+  get bands(): Float32Array { return this._smooth; }
+  get rms():   number       { return this._rms; }
+
+  start(filePath: string, offsetSecs: number) {
+    this.stop();
+    const args = [
+      "-v", "quiet",
+      "-ss", String(Math.max(0, Math.floor(offsetSecs))),
+      "-re",    // throttle to real-time — prevents decoding entire file instantly
+      "-i", filePath,
+      "-af", `aformat=sample_fmts=s16:channel_layouts=mono,aresample=${PCM_SAMPLE_RATE}`,
+      "-f", "s16le",
+      "pipe:1",
+    ];
+    try {
+      this._proc = spawn("ffmpeg", args, { stdio: ["ignore", "pipe", "ignore"] });
+      this._proc.stdout?.on("data", (chunk: Buffer) => this._onData(chunk));
+      this._proc.once("close", () => { this._proc = null; });
+      this._proc.once("error", ()  => { this._proc = null; });
+    } catch { this._proc = null; }
+  }
+
+  stop() {
+    const p = this._proc; this._proc = null; this._buf = Buffer.alloc(0);
+    if (p) { try { p.kill("SIGTERM"); } catch {} }
+  }
+
+  /** Smooth all bands toward zero — call each viz tick when paused/stopped. */
+  decay() {
+    for (let i = 0; i < VIZ_BANDS; i++) this._smooth[i] = Math.max(0, this._smooth[i]! - this.DECAY * 1.5);
+    this._rms = Math.max(0, this._rms - 0.05);
+  }
+
+  private _onData(chunk: Buffer) {
+    this._buf = Buffer.concat([this._buf, chunk]);
+    while (this._buf.length >= PCM_BYTES) {
+      this._processFrame(this._buf.subarray(0, PCM_BYTES));
+      this._buf = this._buf.subarray(PCM_BYTES);
+    }
+  }
+
+  private _processFrame(frame: Buffer) {
+    const n = PCM_CHUNK_FRAMES;
+
+    // s16le → float with Hann window + RMS accumulation
+    let sumSq = 0;
+    for (let i = 0; i < n; i++) {
+      const s = frame.readInt16LE(i * 2) / 32768;
+      const w = 0.5 * (1 - Math.cos(2 * Math.PI * i / n));  // Hann window
+      this._re[i] = s * w;
+      this._im[i] = 0;
+      sumSq += s * s;
+    }
+    this._rms = Math.sqrt(sumSq / n);
+
+    // FFT
+    fftInPlace(this._re, this._im);
+
+    // Magnitude spectrum (first n/2 bins)
+    const mag = new Float32Array(n / 2);
+    for (let k = 0; k < n / 2; k++) {
+      mag[k] = Math.sqrt(this._re[k]! * this._re[k]! + this._im[k]! * this._im[k]!) / n;
+    }
+
+    // Bin into VIZ_BANDS log-spaced bands
+    for (let b = 0; b < VIZ_BANDS; b++) {
+      const [iLo, iHi] = this._bandEdges[b]!;
+      let sum = 0;
+      for (let k = iLo; k <= iHi; k++) sum += mag[k]!;
+      this._bands[b] = sum / (iHi - iLo + 1);
+    }
+
+    // Rolling peak normalisation — adapts to track loudness
+    const frameMax = Math.max(...Array.from(this._bands));
+    this._rollingPeak = Math.max(this._rollingPeak * 0.996, frameMax, 0.001);
+
+    // Smooth: fast attack (0.7), slow decay (DECAY per frame)
+    for (let b = 0; b < VIZ_BANDS; b++) {
+      const raw = clamp(this._bands[b]! / this._rollingPeak, 0, 1);
+      this._smooth[b] = raw > this._smooth[b]!
+        ? this._smooth[b]! + (raw - this._smooth[b]!) * 0.7
+        : Math.max(0, this._smooth[b]! - this.DECAY);
+    }
+  }
+}
+
 // ── Viz SDK ───────────────────────────────────────────────────────────────────
 //
 // To add a new viz mode:
@@ -86,13 +248,16 @@ export interface VizColors {
 /**
  * A self-contained visualiser mode.
  *
- * tick()   — called every VIZ_TICK_MS; update internal animation state.
+ * tick()   — called every VIZ_TICK_MS with real audio data.
+ *            bands: Float32Array[VIZ_BANDS] of normalised [0,1] band energies.
+ *            rms:   normalised RMS amplitude [0,1].
+ *            playing: whether audio is playing (false = analyser decaying).
  * render() — produce the full setContent() string (blessed tags OK).
- * reset()  — called on mode switch or resize; re-initialise any size-dependent state.
+ * reset()  — called on mode switch or resize; re-initialise size-dependent state.
  */
 export interface VizMode {
   readonly name: string;
-  tick(playing: boolean): void;
+  tick(bands: Float32Array, rms: number, playing: boolean): void;
   render(nW: number, nH: number, colors: VizColors): string;
   reset(): void;
 }
@@ -104,32 +269,24 @@ function fg(color: string, char: string): string {
 
 // ── Mode 0: BARS — Designers Republic spectrum ────────────────────────────────
 //
-// Vertical frequency bars. Shade chars encode amplitude gradient:
-// ░ at the tip (light) → █ at the base (heavy). Peak dots float above.
+// Vertical frequency bars driven by real band amplitudes.
+// Shade chars encode amplitude gradient: ░ tip → █ base.
+// Peak dots float above bars and decay slowly.
 
 export function createBarsViz(): VizMode {
-  const MAX  = 128;
+  const MAX  = VIZ_BANDS;
   const h    = new Float32Array(MAX).fill(0);
   const peak = new Float32Array(MAX).fill(0);
-  const DECAY = 0.18, PDECAY = 0.04;
+  const PDECAY = 0.025;
 
   return {
     name: "BARS",
     reset() { h.fill(0); peak.fill(0); },
 
-    tick(playing) {
+    tick(bands, _rms, _playing) {
       for (let i = 0; i < MAX; i++) {
-        if (playing) {
-          const bias   = (i < 4 || i > MAX - 5) ? 0.75 : 0.55;
-          const spike  = Math.random() < 0.18 ? Math.random() * 0.6 : 0;
-          const target = bias * Math.random() + spike;
-          h[i] = h[i] < target
-            ? h[i] + (target - h[i]) * 0.55
-            : h[i] - DECAY * (1 + Math.random() * 0.3);
-        } else {
-          h[i] = Math.max(0, h[i] - DECAY * 1.5);
-        }
-        h[i] = clamp(h[i], 0, 1);
+        // Bands come in pre-smoothed with attack+decay from AudioAnalyser
+        h[i] = clamp(bands[i]!, 0, 1);
         peak[i] = h[i] > peak[i] ? h[i] : Math.max(0, peak[i] - PDECAY);
       }
     },
@@ -138,7 +295,6 @@ export function createBarsViz(): VizMode {
       const nBands = Math.max(4, nW - 1);
       const nRows  = Math.max(1, nH);
 
-      // Shade char by row-from-bottom: light at tip, solid at base
       const shadeAt = (rFromBot: number): string => {
         const t = rFromBot / Math.max(1, nRows - 1);
         if (t >= 0.75) return "█";
@@ -153,12 +309,13 @@ export function createBarsViz(): VizMode {
         const threshold = rFromBot / nRows;
         let line = " ";
         for (let b = 0; b < nBands; b++) {
-          const bh = h[b % MAX];
-          const bp = peak[b % MAX];
+          const bIdx = Math.floor((b / nBands) * MAX);
+          const bh   = h[bIdx]!;
+          const bp   = peak[bIdx]!;
           const peakRow = nRows - 1 - Math.round(bp * (nRows - 1));
           if (bh > threshold && bh > 0) {
             line += fg(c.accent, shadeAt(rFromBot));
-          } else if (row === peakRow && bp > 0.05) {
+          } else if (row === peakRow && bp > 0.04) {
             line += fg(c.highlight, "▔");
           } else {
             line += " ";
@@ -171,40 +328,45 @@ export function createBarsViz(): VizMode {
   };
 }
 
-// ── Mode 1: SCOPE — oscilloscope ──────────────────────────────────────────────
+// ── Mode 1: WAVE — oscilloscope ───────────────────────────────────────────────
 //
-// Composite sine wave with smooth amp envelope. Single waveform dot per column,
-// vertical fill between steps. Faint baseline when idle.
+// Waveform line driven by RMS amplitude envelope.
+// Phase advances with playback; RMS controls vertical excursion.
+// Sub-row precision chars for smoother curves.
 
 export function createScopeViz(): VizMode {
-  let phase = 0;
-  let amp   = 0;
-  const FREQS = [1.0, 2.3, 0.7, 3.1]; // harmonic mix
+  let phase  = 0;
+  let amp    = 0;          // smoothed from real RMS
+  // Harmonic weights — shape changes slightly with mid/high band energy
+  const FREQS = [1.0, 2.3, 0.7, 3.1];
 
   return {
     name: "WAVE",
     reset() { phase = 0; amp = 0; },
 
-    tick(playing) {
-      phase += playing ? 0.15 : 0.01;
-      amp    = playing
-        ? clamp(amp + 0.08, 0, 0.88)
-        : clamp(amp - 0.05, 0, 0.88);
+    tick(bands, rms, playing) {
+      // Phase: advance faster when mid bands are hot (more musical energy)
+      const midEnergy = (bands[4]! + bands[8]! + bands[12]!) / 3;
+      phase += playing ? 0.12 + midEnergy * 0.10 : 0.008;
+
+      // Amp: real RMS drives excursion, smoothed to avoid jitter
+      const targetAmp = playing ? clamp(rms * 3.5, 0.05, 0.95) : 0;
+      amp = amp < targetAmp
+        ? amp + (targetAmp - amp) * 0.25
+        : amp + (targetAmp - amp) * 0.08;
     },
 
     render(nW, nH, c) {
       const mid  = (nH - 1) / 2;
       const cols = Math.max(2, nW - 1);
-
-      // Grid: array of strings per row, initially spaces
       const grid: string[][] = Array.from({ length: nH }, () => Array(cols + 1).fill(" "));
 
       // Faint baseline
       for (let x = 1; x <= cols; x++) {
-        grid[Math.round(mid)][x] = fg(c.muted, "─");
+        grid[Math.round(mid)]![x] = fg(c.muted, "─");
       }
 
-      if (amp > 0.02) {
+      if (amp > 0.015) {
         let prevRow = -1;
         for (let x = 0; x < cols; x++) {
           let val = 0;
@@ -212,20 +374,18 @@ export function createScopeViz(): VizMode {
           for (const f of FREQS) val += Math.sin(phase * f + t * Math.PI * 2 * f) / FREQS.length;
           const row = clamp(Math.round(mid + val * amp * mid), 0, nH - 1);
 
-          // Vertical stem between this and previous column
           if (prevRow >= 0 && Math.abs(row - prevRow) > 1) {
             const lo = Math.min(row, prevRow) + 1;
             const hi = Math.max(row, prevRow) - 1;
             for (let fy = lo; fy <= hi; fy++) {
-              grid[fy][x + 1] = fg(c.accent, "╎");
+              grid[fy]![x + 1] = fg(c.accent, "╎");
             }
           }
 
-          // Waveform point — sub-row char based on fractional y
           const yFrac  = mid + val * amp * mid;
           const frac   = yFrac - Math.floor(yFrac);
           const ptChar = frac > 0.75 ? "▄" : frac > 0.25 ? "─" : "▀";
-          grid[row][x + 1] = fg(c.accent, ptChar);
+          grid[row]![x + 1] = fg(c.accent, ptChar);
           prevRow = row;
         }
       }
@@ -237,13 +397,15 @@ export function createScopeViz(): VizMode {
 
 // ── Mode 2: GRID — pulse field ────────────────────────────────────────────────
 //
-// 2-D heat map. Glowing clusters spawn on beat, diffuse outward, decay away.
-// Characters encode heat density: · ░ ▒ ▓ █. Very Milkdrop-era.
+// 2-D heat map. Beat detection from RMS spike → spawn glowing cluster.
+// Heat diffuses outward, decays. Characters encode density: · ░ ▒ ▓ █.
+// Higher-energy bands spawn brighter/larger clusters.
 
 export function createGridViz(): VizMode {
   let grid: Float32Array | null = null;
   let gW = 0, gH = 0;
-  let spawnTick = 0;
+  let prevRms    = 0;
+  let beatCooldown = 0;
 
   const HEAT_CHARS = [" ", "·", "░", "▒", "▓", "█"] as const;
 
@@ -253,49 +415,66 @@ export function createGridViz(): VizMode {
     grid = new Float32Array(gW * gH).fill(0);
   }
 
-  function spawnCluster(cx: number, cy: number, radius: number) {
+  function spawnCluster(cx: number, cy: number, radius: number, intensity: number) {
     if (!grid) return;
     for (let dy = -radius; dy <= radius; dy++) {
       for (let dx = -radius; dx <= radius; dx++) {
         const x = cx + dx, y = cy + dy;
         if (x < 0 || x >= gW || y < 0 || y >= gH) continue;
         const dist = Math.sqrt(dx * dx + dy * dy);
-        grid[y * gW + x] = Math.min(1, grid[y * gW + x] + Math.max(0, 1 - dist / radius));
+        const add  = Math.max(0, 1 - dist / radius) * intensity;
+        grid[y * gW + x] = Math.min(1, (grid[y * gW + x] ?? 0) + add);
       }
     }
   }
 
   return {
     name: "GRID",
-    reset() { grid = null; gW = 0; gH = 0; spawnTick = 0; },
+    reset() { grid = null; gW = 0; gH = 0; prevRms = 0; beatCooldown = 0; },
 
-    tick(playing) {
+    tick(bands, rms, playing) {
       if (!grid || gW === 0) return;
-      // Decay + light diffusion
+
+      // Decay + diffusion
       const next = new Float32Array(grid.length);
       for (let y = 0; y < gH; y++) {
         for (let x = 0; x < gW; x++) {
-          const i    = y * gW + x;
-          let   sum  = 0, n = 0;
+          const i = y * gW + x;
+          let sum = 0, n = 0;
           for (const [dy, dx] of [[-1,0],[1,0],[0,-1],[0,1]] as const) {
             const nx = x + dx, ny = y + dy;
-            if (nx >= 0 && nx < gW && ny >= 0 && ny < gH) { sum += grid[ny * gW + nx]; n++; }
+            if (nx >= 0 && nx < gW && ny >= 0 && ny < gH) { sum += grid[ny * gW + nx]!; n++; }
           }
-          next[i] = clamp(grid[i] * 0.84 + (n > 0 ? (sum / n) * 0.08 : 0), 0, 1);
+          next[i] = clamp((grid[i] ?? 0) * 0.84 + (n > 0 ? (sum / n) * 0.08 : 0), 0, 1);
         }
       }
       grid.set(next);
 
-      // Spawn clusters when playing
-      if (playing) {
-        spawnTick++;
-        const rate = Math.random() < 0.4 ? 3 : 6; // occasional dense bursts
-        if (spawnTick >= rate) {
-          spawnTick = 0;
-          const cx = 1 + Math.floor(Math.random() * (gW - 2));
-          const cy = 1 + Math.floor(Math.random() * (gH - 2));
-          spawnCluster(cx, cy, 2 + Math.floor(Math.random() * 3));
-        }
+      if (!playing) { beatCooldown = Math.max(0, beatCooldown - 1); return; }
+
+      beatCooldown = Math.max(0, beatCooldown - 1);
+
+      // Beat detection: RMS spike above threshold
+      const rmsDelta = rms - prevRms;
+      prevRms = rms;
+      const isBeat = rmsDelta > 0.08 && rms > 0.15 && beatCooldown === 0;
+
+      if (isBeat) {
+        beatCooldown = 4;
+        // Spawn cluster influenced by which bands are hottest
+        const cx = 1 + Math.floor(Math.random() * (gW - 2));
+        const cy = 1 + Math.floor(Math.random() * (gH - 2));
+        // High bands = small tight cluster; low bands = large diffuse bloom
+        const lowEnergy  = (bands[0]! + bands[1]! + bands[2]!) / 3;
+        const highEnergy = (bands[VIZ_BANDS - 3]! + bands[VIZ_BANDS - 2]! + bands[VIZ_BANDS - 1]!) / 3;
+        const radius    = 2 + Math.round(lowEnergy * 4);
+        const intensity = 0.6 + highEnergy * 0.4;
+        spawnCluster(cx, cy, radius, intensity);
+      } else if (rms > 0.05 && Math.random() < rms * 0.3) {
+        // Ambient drizzle between beats
+        const cx = 1 + Math.floor(Math.random() * (gW - 2));
+        const cy = 1 + Math.floor(Math.random() * (gH - 2));
+        spawnCluster(cx, cy, 1, rms * 0.5);
       }
     },
 
@@ -309,11 +488,11 @@ export function createGridViz(): VizMode {
       for (let y = 0; y < h; y++) {
         let line = " ";
         for (let x = 0; x < w; x++) {
-          const v  = grid[y * w + x];
+          const v  = grid[y * w + x] ?? 0;
           const ci = Math.min(HEAT_CHARS.length - 1, Math.floor(v * HEAT_CHARS.length));
-          const ch = HEAT_CHARS[ci];
+          const ch = HEAT_CHARS[ci]!;
           if      (v < 0.05) line += " ";
-          else if (v < 0.3)  line += fg(c.muted, ch);
+          else if (v < 0.35) line += fg(c.muted, ch);
           else               line += fg(c.accent, ch);
         }
         lines.push(line);
@@ -359,6 +538,7 @@ class AudioController {
   private _generation        = 0;
   private _activeGen         = 0;
   private _listeners         = new Set<() => void>();
+  readonly analyser          = new AudioAnalyser();
 
   constructor(initialFiles?: string[]) {
     if (initialFiles?.length) this._files = [...initialFiles];
@@ -403,10 +583,14 @@ class AudioController {
       if (this._state === "playing" && this._proc) {
         const cur = this.elapsed;
         this._writeProc("p"); this._stopTicker();
-        this._state = "paused"; this._elapsed = cur; this._baseOffset = cur; this._emit();
+        this._state = "paused"; this._elapsed = cur; this._baseOffset = cur;
+        this.analyser.stop();
+        this._emit();
       } else if (this._state === "paused" && this._proc) {
         this._writeProc("p"); this._startTime = Date.now();
-        this._state = "playing"; this._startTicker(); this._emit();
+        this._state = "playing";
+        this.analyser.start(this._filePath, this._baseOffset);
+        this._startTicker(); this._emit();
       } else {
         await this._restart(this._baseOffset, "playing");
       }
@@ -416,6 +600,7 @@ class AudioController {
   async stop() {
     return this._enqueue(async () => {
       const p = this._detach(); await this._kill(p); this._stopTicker();
+      this.analyser.stop();
       this._state = "stopped"; this._elapsed = 0; this._baseOffset = 0; this._emit();
     });
   }
@@ -440,7 +625,10 @@ class AudioController {
 
   setVolumeDirect(v: number) { this._volume = clamp(v, 0, 100); this._emit(); }
 
-  destroy() { const p = this._detach(); void this._kill(p); this._stopTicker(); }
+  destroy() {
+    const p = this._detach(); void this._kill(p); this._stopTicker();
+    this.analyser.stop();
+  }
 
   private _scanDir(dir: string) {
     try {
@@ -477,6 +665,7 @@ class AudioController {
 
   private async _restart(offset: number, desiredState: PlayState) {
     const old = this._detach(); await this._kill(old);
+    this.analyser.stop();
     if (!this._filePath) return;
     await this._spawn(offset, desiredState);
   }
@@ -506,19 +695,24 @@ class AudioController {
       proc.stderr?.on("data", onData); proc.once("error", onError); proc.once("close", onClose);
     }).catch((e) => { if (gen === this._activeGen) this._handleExit(); throw e; });
 
-    this._state = "playing"; this._startTicker(); this._emit();
+    this._state = "playing";
+    this.analyser.start(this._filePath, offset);
+    this._startTicker(); this._emit();
+
     proc.on("error", () => { if (gen === this._activeGen) this._handleExit(); });
     proc.on("close", () => { if (gen === this._activeGen) this._handleExit(); });
 
     if (desiredState === "paused") {
       await new Promise(r => setTimeout(r, 60));
       this._writeProc("p"); this._stopTicker();
+      this.analyser.stop();
       this._state = "paused"; this._elapsed = offset; this._baseOffset = offset; this._emit();
     }
   }
 
   private _handleExit() {
     this._proc = null; this._stopTicker();
+    this.analyser.stop();
     this._state = "stopped"; this._elapsed = 0; this._baseOffset = 0; this._emit();
   }
 
@@ -591,7 +785,10 @@ export function openMusicPlayerWindow(
   let vizVisible  = false;
   let vizTimer:   ReturnType<typeof setInterval> | null = null;
 
-  function currentMode()   { return VIZ_MODES[vizModeIdx]; }
+  // Stable scratch arrays — avoid allocating on every tick
+  const _emptyBands = new Float32Array(VIZ_BANDS).fill(0);
+
+  function currentMode() { return VIZ_MODES[vizModeIdx]!; }
   function vizColors(): VizColors { return makeVizColors(theme()); }
 
   function cycleVizMode() {
@@ -606,7 +803,11 @@ export function openMusicPlayerWindow(
   function startViz() {
     if (vizTimer) return;
     vizTimer = setInterval(() => {
-      currentMode().tick(ctrl.state === "playing");
+      const playing = ctrl.state === "playing";
+      const bands   = playing ? ctrl.analyser.bands : _emptyBands;
+      const rms     = playing ? ctrl.analyser.rms   : 0;
+      if (!playing) ctrl.analyser.decay();
+      currentMode().tick(bands, rms, playing);
       renderViz();
       deps.screen.render();
     }, VIZ_TICK_MS);
@@ -626,7 +827,7 @@ export function openMusicPlayerWindow(
   // ── Toolbar ───────────────────────────────────────────────────────────────
 
   type BtnId = "playpause" | "stop" | "prev" | "next" | "voldown" | "volup" | "viz" | "add";
-  const toolbar = createButtonBar<BtnId>(
+  const toolbar: ButtonBarPart<BtnId> = createButtonBar<BtnId>(
     frame.body,
     [
       { id: "prev",      label: "◀◀" },
@@ -704,10 +905,9 @@ export function openMusicPlayerWindow(
       playlistPane.width = PLAYLIST_WIDTH; playlistPane.height = paneH;
     }
 
-    // Viz: lower portion of player pane, only when playlist visible and tall enough
-    const PLAYER_INFO_ROWS = 10; // rows consumed by track info block
-    const vizH      = Math.max(4, paneH - PLAYER_INFO_ROWS - 1);
-    const showViz   = showPlaylist && paneH >= VIZ_MIN_HEIGHT;
+    const PLAYER_INFO_ROWS = 10;
+    const vizH    = Math.max(4, paneH - PLAYER_INFO_ROWS - 1);
+    const showViz = showPlaylist && paneH >= VIZ_MIN_HEIGHT;
 
     if (showViz !== vizVisible) {
       vizVisible = showViz;
@@ -798,8 +998,7 @@ export function openMusicPlayerWindow(
 
   frame.writeInput = (input: string) => {
     const k = input.trim().toLowerCase();
-    if      (k === " " || k === "play" || k === "pause") {
-      // If nothing loaded yet, play the selected/first track
+    if (k === " " || k === "play" || k === "pause") {
       if (!ctrl.filePath && ctrl.files.length > 0) void ctrl.playSelected();
       else void ctrl.togglePause();
     }
@@ -848,7 +1047,10 @@ export function openMusicPlayerWindow(
   };
 
   const publicAPI: MusicPlayerPublicAPI = {
-    play:      () => void ctrl.togglePause(),
+    play:      () => {
+      if (!ctrl.filePath && ctrl.files.length > 0) void ctrl.playSelected();
+      else void ctrl.togglePause();
+    },
     pause:     () => { if (ctrl.state === "playing") void ctrl.togglePause(); },
     stop:      () => void ctrl.stop(),
     next:      () => { ctrl.selectNext(); void ctrl.playSelected(); },

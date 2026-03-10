@@ -14,10 +14,10 @@ Replace raw textbox prompt logic in music player with `overlays.openValuePrompt`
 
 ## Acceptance criteria
 
-- [ ] AC-19: music-player file input prompt uses `overlays.openValuePrompt`.
-- [ ] Raw blessed textbox prompt construction is removed from music player window code.
-- [ ] Prompt UX (submit/cancel/focus) remains equivalent.
-- [ ] AC-27: smoke music player prompt flow.
+- [x] AC-19: music-player file input prompt uses `overlays.openValuePrompt`.
+- [x] Raw blessed textbox prompt construction is removed from music player window code.
+- [x] Prompt UX (submit/cancel/focus) remains equivalent.
+- [x] AC-27: smoke music player prompt flow.
 
 ## Files to change
 
@@ -26,7 +26,7 @@ Replace raw textbox prompt logic in music player with `overlays.openValuePrompt`
 
 ## Tasks
 
-- [ ] T1: Swap raw textbox prompt code for `openValuePrompt` call.
-- [ ] T2: Preserve existing callback/validation behavior.
-- [ ] T3: Remove obsolete prompt lifecycle code.
-- [ ] T4: Smoke + `bun run typecheck`.
+- [x] T1: Swap raw textbox prompt code for `openValuePrompt` call.
+- [x] T2: Preserve existing callback/validation behavior.
+- [x] T3: Remove obsolete prompt lifecycle code.
+- [x] T4: Smoke + `bun run typecheck`.
