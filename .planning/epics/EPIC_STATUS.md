@@ -10,6 +10,6 @@ e021-vps-multi-agent-world — blocked
 e025-calculating-empires — done
 e028-responsive-column-layout — in-progress
 e029-context-aware-menus — in-progress
-e030-zine-multi-file — not-started
+e030-zine-multi-file — done
 e031-sidebar-primitive — not-started
 

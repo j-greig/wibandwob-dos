@@ -1,7 +1,7 @@
 ---
 id: E030
 title: ZINE Multi-File Editor
-status: not-started
+status: done
 issue: ~
 pr: ~
 depends_on: [E028]
@@ -89,24 +89,33 @@ activeFile: string;        // currently loaded file path
 
 ## Stories
 
-- [ ] S01 — Sidebar UI (blessed list, toggle, divider, width)
-- [ ] S02 — File discovery (recursive scan, validation, grouped display)
-- [ ] S03 — File switching (swap content in-place, title update, watcher handoff)
-- [ ] S04 — describeState + API parity
+- [x] S01 — Sidebar UI (blessed list, toggle, divider, width)
+- [x] S02 — File discovery (recursive scan, validation, grouped display)
+- [x] S03 — File switching (swap content in-place, title update, watcher handoff)
+- [x] S04 — describeState + API parity
 
 ---
 
 ## Acceptance criteria
 
-- [ ] AC-1: Sidebar shows with `[` key, hides with `[` again — canvas reflows
-- [ ] AC-2: All `.canvas.yaml` files under `content/` listed on open
-- [ ] AC-3: Active file has `▶` indicator in sidebar
-- [ ] AC-4: Clicking a sidebar entry loads that file, rebuilds canvas, updates title
-- [ ] AC-5: Hot reload still works after switching files (new watcher on new file)
-- [ ] AC-6: Invalid/unparseable YAML files shown with `⚠`, not loadable
-- [ ] AC-7: `describeState()` includes `sidebarOpen`, `availableFiles`, `activeFile`
-- [ ] AC-8: `bun run typecheck` clean
-- [ ] AC-9: Smoke — open ZINE, toggle sidebar, switch file, confirm title changes
+- [x] AC-1: Sidebar shows with `[` key, hides with `[` again — canvas reflows
+- [x] AC-2: All `.canvas.yaml` files under `content/` listed on open
+- [x] AC-3: Active file has `▶` indicator in sidebar
+- [x] AC-4: Clicking a sidebar entry loads that file, rebuilds canvas, updates title
+- [x] AC-5: Hot reload still works after switching files (new watcher on new file)
+- [-] AC-6: Invalid/unparseable YAML files shown with `⚠`, not loadable — deferred, bad files silently omitted
+- [x] AC-7: `describeState()` includes `sidebarOpen`, `availableFiles`, `activeFile`
+- [x] AC-8: `bun run typecheck` clean
+- [x] AC-9: Smoke — open Zine, toggle sidebar, switch file, confirm title changes
+
+## Also shipped
+
+- Zine renamed from ZINE throughout
+- §y² Chronicles retired from Applications menu (palette + API access preserved)
+- sy2-chronicles.canvas.yaml static canvas companion created
+- wibwob-world.canvas.yaml 4-column canvas with wibwob-primers + amiga archive primers
+- Bottom nav bar: `[ ] Files`, `/ Search`, `⏸ Pause` — Files button label reflects open/closed state
+- Search bar: Escape cancels, Enter commits, `[×]` close button far right
 
 ## Out of scope
 
