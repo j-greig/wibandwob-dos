@@ -1,0 +1,244 @@
+/**
+ * Custom styles for unblessed documentation
+ * VSCode-inspired terminal theme
+ */
+
+:root {
+  /* Primary color - terminal cyan/blue */
+  --ifm-color-primary: #1177bb;
+  --ifm-color-primary-dark: #0e639c;
+  --ifm-color-primary-darker: #0d5a8f;
+  --ifm-color-primary-darkest: #0a4a75;
+  --ifm-color-primary-light: #1480c8;
+  --ifm-color-primary-lighter: #2b8fd1;
+  --ifm-color-primary-lightest: #4ca3dd;
+
+  /* Typography */
+  --ifm-code-font-size: 95%;
+  --ifm-font-family-base:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu,
+    sans-serif;
+  --ifm-font-family-monospace:
+    "Monaco", "Menlo", "Ubuntu Mono", "Consolas", monospace;
+
+  /* Code blocks */
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
+}
+
+/* Body height for landing page - use svh for mobile support */
+body {
+  min-height: 100svh;
+}
+
+[data-theme="dark"] {
+  /* Terminal/VSCode dark theme colors */
+  --ifm-color-primary: #0dbc79;
+  --ifm-color-primary-dark: #0ba868;
+  --ifm-color-primary-darker: #0a9d62;
+  --ifm-color-primary-darkest: #088150;
+  --ifm-color-primary-light: #23d18b;
+  --ifm-color-primary-lighter: #2ed895;
+  --ifm-color-primary-lightest: #4fdda8;
+
+  /* Background colors matching VSCode */
+  --ifm-background-color: #1e1e1e;
+  --ifm-background-surface-color: #2d2d30;
+
+  /* Code blocks */
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
+
+  /* Navbar */
+  --ifm-navbar-background-color: #2d2d30;
+  --ifm-navbar-shadow: 0 1px 0 0 rgba(62, 62, 66, 0.5);
+
+  /* Footer */
+  --ifm-footer-background-color: #1a1a1a;
+  --ifm-footer-link-color: #0dbc79;
+  --ifm-footer-link-hover-color: #23d18b;
+}
+
+/* Footer styling */
+.footer {
+  background: linear-gradient(180deg, #1a1a1a 0%, #0f0f0f 100%);
+  border-top: 1px solid #3e3e42;
+}
+
+.footer__title {
+  color: #0dbc79;
+  font-weight: 600;
+}
+
+.footer__link-item {
+  color: #a0a0a0;
+  transition: color 0.2s ease;
+}
+
+.footer__link-item:hover {
+  color: #0dbc79;
+}
+
+.footer__copyright {
+  color: #707070;
+  font-size: 0.875rem;
+}
+
+/* Hero section */
+.hero {
+  background: linear-gradient(135deg, #1e1e1e 0%, #2d2d30 100%);
+  border-bottom: 1px solid #3e3e42;
+}
+
+.hero--primary {
+  background: linear-gradient(135deg, #0e639c 0%, #1177bb 100%);
+}
+
+/* Feature cards */
+.features {
+  padding: 4rem 0;
+}
+
+.feature {
+  padding: 2rem;
+  border-radius: 8px;
+  background: var(--ifm-background-surface-color);
+  border: 1px solid #3e3e42;
+  transition: all 0.2s ease;
+}
+
+.feature:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  border-color: var(--ifm-color-primary);
+}
+
+/* Code blocks */
+.prism-code {
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 14px;
+}
+
+/* Terminal-style code blocks */
+.terminal-block {
+  background: #1e1e1e;
+  border: 1px solid #3e3e42;
+  border-radius: 6px;
+  padding: 1rem;
+  font-family: var(--ifm-font-family-monospace);
+  color: #d4d4d4;
+}
+
+/* Buttons */
+.button--primary {
+  background: var(--ifm-color-primary);
+  border: none;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.button--primary:hover {
+  background: var(--ifm-color-primary-dark);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(17, 119, 187, 0.3);
+}
+
+.button--secondary {
+  background: #3c3c3c;
+  color: #d4d4d4;
+  border: 1px solid #5a5a5a;
+}
+
+.button--secondary:hover {
+  background: #454545;
+  color: #fff;
+  border-color: #6a6a6a;
+}
+
+/* Navbar layout */
+.navbar {
+  border-bottom: 1px solid #3e3e42;
+}
+
+.navbar__title {
+  font-weight: 600;
+}
+
+/* Position Algolia search in center */
+.navbar .DocSearch {
+  position: absolute;
+  top: 0.6rem;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+/* Ensure left/right items don't overlap center search */
+.navbar__items--left {
+  flex: 1;
+  min-width: 0;
+}
+
+.navbar__items--right {
+  flex: 1;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+/* Responsive: move search back to right on mobile */
+@media (max-width: 996px) {
+  .navbar .DocSearch {
+    position: static;
+    transform: none;
+    order: 999; /* Put it at the end on mobile */
+  }
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 14px;
+  height: 14px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--ifm-background-color);
+}
+
+::-webkit-scrollbar-thumb {
+  background: #424242;
+  border-radius: 0;
+  border: 3px solid var(--ifm-background-color);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #4e4e4e;
+}
+
+/* Algolia DocSearch - Wide search box */
+.DocSearch-Button {
+  width: 500px;
+  height: 40px;
+  border-radius: 6px;
+  background: var(--ifm-background-surface-color);
+  border: 1px solid #3e3e42;
+  transition: all 0.2s ease;
+}
+
+.DocSearch-Button:hover {
+  border-color: var(--ifm-color-primary);
+  box-shadow: 0 0 0 2px rgba(13, 188, 121, 0.1);
+}
+
+.DocSearch-Button-Placeholder {
+  font-size: 14px;
+}
+
+/* Responsive: smaller on mobile */
+@media (max-width: 768px) {
+  .DocSearch-Button {
+    width: 200px;
+  }
+}
+
+@media (max-width: 480px) {
+  .DocSearch-Button {
+    width: 150px;
+  }
+}

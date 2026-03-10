@@ -1,0 +1,166 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "src/**/*.{ts,tsx}",
+        "lib/**/*.{ts,tsx}",
+        "bin/**/*.{ts,tsx}",
+        "data/**",
+        "templates/**",
+        "docs/**",
+        "blog/**",
+        "static/**",
+        "docusaurus.config.ts",
+        "sidebars.ts",
+        "tsconfig.json",
+        "tsup.config.ts",
+        "package.json"
+      ],
+      "outputs": ["dist/**", "build/**", ".docusaurus/**"],
+      "outputLogs": "new-only"
+    },
+    "dev": {
+      "dependsOn": ["^build"],
+      "cache": false,
+      "persistent": true,
+      "outputLogs": "new-only"
+    },
+    "build:watch": {
+      "dependsOn": ["^build"],
+      "cache": false,
+      "persistent": true,
+      "outputLogs": "new-only"
+    },
+    "clean": {
+      "cache": false,
+      "outputLogs": "new-only"
+    },
+    "test": {
+      "dependsOn": ["build"],
+      "inputs": [
+        "src/**/*.{ts,tsx}",
+        "lib/**/*.{ts,tsx,js}",
+        "bin/**/*.{ts,tsx}",
+        "data/**",
+        "templates/**",
+        "__tests__/**/*.{ts,tsx,js,html}",
+        "vitest.config.ts",
+        "tsconfig.json",
+        "tsup.config.ts",
+        "package.json"
+      ],
+      "outputs": ["coverage/**"],
+      "outputLogs": "new-only"
+    },
+    "test:watch": {
+      "dependsOn": ["build"],
+      "cache": false,
+      "persistent": true,
+      "outputLogs": "new-only"
+    },
+    "test:ui": {
+      "dependsOn": ["build"],
+      "cache": false,
+      "persistent": true,
+      "outputLogs": "new-only"
+    },
+    "test:coverage": {
+      "dependsOn": ["build"],
+      "inputs": [
+        "src/**/*.{ts,tsx}",
+        "lib/**/*.{ts,tsx}",
+        "bin/**/*.{ts,tsx}",
+        "data/**",
+        "templates/**",
+        "__tests__/**/*.{ts,tsx,js,html}",
+        "vitest.config.ts",
+        "tsconfig.json",
+        "tsup.config.ts",
+        "package.json"
+      ],
+      "outputs": ["coverage/**"],
+      "outputLogs": "new-only"
+    },
+    "bench": {
+      "dependsOn": ["build"],
+      "inputs": ["*.js", "benchmarks/**/*.js"],
+      "outputs": ["results/**/*.json"],
+      "cache": false,
+      "outputLogs": "new-only"
+    },
+    "lint": {
+      "inputs": [
+        "src/**/*.{ts,tsx}",
+        "lib/**/*.{ts,tsx}",
+        "bin/**/*.{ts,tsx}",
+        "data/**",
+        "templates/**",
+        "__tests__/**/*.{ts,tsx,js}",
+        "eslint.config.js",
+        ".eslintignore",
+        "vitest.config.ts",
+        "tsconfig.json",
+        "tsup.config.ts",
+        "package.json"
+      ],
+      "outputLogs": "new-only"
+    },
+    "lint:check": {
+      "inputs": [
+        "src/**/*.{ts,tsx}",
+        "lib/**/*.{ts,tsx}",
+        "bin/**/*.{ts,tsx}",
+        "data/**",
+        "templates/**",
+        "__tests__/**/*.{ts,tsx,js}",
+        "eslint.config.js",
+        ".eslintignore",
+        "vitest.config.ts",
+        "tsconfig.json",
+        "tsup.config.ts",
+        "package.json"
+      ],
+      "outputLogs": "new-only"
+    },
+    "format": {
+      "inputs": [
+        "src/**/*.{ts,tsx}",
+        "lib/**/*.{ts,tsx}",
+        "bin/**/*.{ts,tsx}",
+        "data/**",
+        "templates/**",
+        "generated/**/*.md",
+        "__tests__/**/*.{ts,tsx,js}",
+        ".prettierrc",
+        ".prettierignore",
+        "vitest.config.ts",
+        "tsconfig.json",
+        "tsup.config.ts",
+        "package.json"
+      ],
+      "outputLogs": "new-only"
+    },
+    "format:check": {
+      "inputs": [
+        "src/**/*.{ts,tsx}",
+        "lib/**/*.{ts,tsx}",
+        "bin/**/*.{ts,tsx}",
+        "data/**",
+        "templates/**",
+        "generated/**/*.md",
+        "__tests__/**/*.{ts,tsx,js}",
+        ".prettierrc",
+        ".prettierignore",
+        "vitest.config.ts",
+        "tsconfig.json",
+        "tsup.config.ts",
+        "package.json"
+      ],
+      "outputLogs": "new-only"
+    }
+  },
+  "globalEnv": ["NODE_ENV"],
+  "globalDependencies": ["package.json", "pnpm-lock.yaml"]
+}

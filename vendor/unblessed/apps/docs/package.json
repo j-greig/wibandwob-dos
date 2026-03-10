@@ -1,0 +1,64 @@
+{
+  "name": "docs",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Documentation site for unblessed TUI library",
+  "scripts": {
+    "docusaurus": "docusaurus",
+    "dev": "docusaurus start --port 4000",
+    "build": "docusaurus build",
+    "build:api": "typedoc --options typedoc.json && node scripts/fix-mdx.mjs && pnpm format",
+    "swizzle": "docusaurus swizzle",
+    "deploy": "docusaurus deploy",
+    "clean": "docusaurus clear && rimraf build .docusaurus",
+    "serve": "docusaurus serve",
+    "write-translations": "docusaurus write-translations",
+    "write-heading-ids": "docusaurus write-heading-ids",
+    "lint": "eslint . --fix",
+    "lint:check": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "dependencies": {
+    "@babel/standalone": "^7.28.5",
+    "@docusaurus/core": "3.9.2",
+    "@docusaurus/faster": "^3.9.2",
+    "@docusaurus/plugin-google-gtag": "^3.9.2",
+    "@docusaurus/plugin-pwa": "^3.9.2",
+    "@docusaurus/preset-classic": "3.9.2",
+    "@docusaurus/theme-mermaid": "^3.9.2",
+    "@docusaurus/theme-search-algolia": "^3.9.2",
+    "@mdx-js/react": "^3.0.0",
+    "@monaco-editor/react": "^4.6.0",
+    "@sentry/react": "^10.23.0",
+    "@unblessed/browser": "workspace:*",
+    "@unblessed/react": "workspace:*",
+    "@xterm/addon-fit": "^0.10.0",
+    "clsx": "^2.0.0",
+    "docusaurus-plugin-image-zoom": "^3.0.1",
+    "prism-react-renderer": "^2.4.1",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "xterm": "^5.3.0"
+  },
+  "devDependencies": {
+    "@docusaurus/module-type-aliases": "3.9.2",
+    "@docusaurus/tsconfig": "3.9.2",
+    "@docusaurus/types": "3.9.2",
+    "@types/react": "^19.2.0",
+    "typedoc": "^0.28.14",
+    "typedoc-plugin-markdown": "^4.9.0"
+  },
+  "browserslist": {
+    "production": [
+      ">0.5%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 3 chrome version",
+      "last 3 firefox version",
+      "last 5 safari version"
+    ]
+  }
+}

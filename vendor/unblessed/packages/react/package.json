@@ -1,0 +1,81 @@
+{
+  "name": "@unblessed/react",
+  "description": "React renderer for unblessed with flexbox layout support",
+  "version": "1.0.0-alpha.23",
+  "author": "Vinicius De Antoni <vdeantoni@gmail.com>",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public",
+    "provenance": true,
+    "registry": "https://registry.npmjs.org/"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.cjs",
+    "dist/**/*.d.ts",
+    "dist/**/*.d.cts",
+    "dist/**/*.map",
+    "LICENSE",
+    "README.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vdeantoni/unblessed.git",
+    "directory": "packages/react"
+  },
+  "homepage": "https://github.com/vdeantoni/unblessed/tree/alpha/packages/react",
+  "bugs": {
+    "url": "https://github.com/vdeantoni/unblessed/issues"
+  },
+  "keywords": [
+    "unblessed",
+    "react",
+    "tui",
+    "terminal",
+    "ui",
+    "flexbox",
+    "yoga",
+    "jsx"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "build:watch": "tsup --watch",
+    "clean": "rimraf dist coverage .turbo",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint . --fix",
+    "lint:check": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "dependencies": {
+    "@unblessed/core": "workspace:^",
+    "@unblessed/layout": "workspace:*",
+    "react-reconciler": "0.33.0"
+  },
+  "devDependencies": {
+    "@unblessed/node": "workspace:*",
+    "@testing-library/react": "^16.3.0",
+    "@types/react": "^19.2.0",
+    "@types/react-reconciler": "^0.32.3",
+    "react": "^19.2.0"
+  },
+  "peerDependencies": {
+    "react": "^19.2.0"
+  },
+  "engines": {
+    "node": ">= 22.0.0"
+  }
+}

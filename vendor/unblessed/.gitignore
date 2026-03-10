@@ -1,0 +1,13 @@
+node_modules/
+coverage/
+dist/
+*.tsbuildinfo
+.vitest/
+.turbo/
+*.log
+
+# Benchmark/test results
+tools/benchmarks/results/*.json
+playwright-report/
+test-results/
+
