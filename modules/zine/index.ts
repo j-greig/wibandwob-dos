@@ -364,10 +364,17 @@ export default function setup(host: MicroappHost) {
           top: hdr.y, left: hdr.x,
           width: hdr.width, height: 2,
           tags: false,
-          fixed: true,
           style: { fg: host.theme().highlight.fg, bg: host.theme().body.bg },
           content: `${hdr.text}\n${rule}`,
         });
+        // Viewport clipping — same as panels
+        const hdrTop = hdr.y;
+        const hdrBot = hdr.y + 2;
+        if (hdrBot <= viewTop || hdrTop >= viewBot) {
+          headerBox.hidden = true;
+        } else {
+          headerBox.hidden = false;
+        }
         headerNodes.push(headerBox);
       }
 

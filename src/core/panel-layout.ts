@@ -130,7 +130,7 @@ export function layoutColumns(panels: PanelDef[], maxWidth: number, opts?: Colum
   }
 
   // Place columns left-to-right, wrapping at maxWidth or maxColumns
-  const headerHeight = columnHeaders?.size ? 2 : 0;
+  const headerHeight = columnHeaders?.size ? 3 : 0; // text + rule + blank line
   const headers: ColumnHeader[] = [];
   let cursorX = 0;
   let rowBaseY = 0;
