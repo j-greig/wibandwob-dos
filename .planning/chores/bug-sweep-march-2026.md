@@ -13,8 +13,9 @@ items as they come up.
 
 ## Bugs
 
-- [ ] Zine app column wrapping borked — 3 cols becomes 2 or 1, was working before
-- [ ] Drop shadow invisible on some themes (visible on dark pastel, not others) — needs better shadow colour/char per theme
+- [x] Zine app column wrapping — responsive shrink when columns exceed viewport
+- [x] Drop shadow invisible on dark-nord (fg/bg were identical to desktop bg)
+- [x] Phosphor theme missing (lost in theme file split, restored)
 
 ## Small features
 

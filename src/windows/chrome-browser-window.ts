@@ -14,6 +14,7 @@ import type { WindowRecord } from "../core/types.js";
 import type { WindowManager } from "../core/window-manager.js";
 import type { OverlayManager } from "../core/overlay-manager.js";
 import { ChromeBrowserService, type BrowseResult } from "../services/chrome-browser-service.js";
+import { renderMarkdown, DEFAULT_FIGLET_HEADING_CONFIG, PLAIN_HEADING_CONFIG, type FigletHeadingConfig } from "../services/markdown-service.js";
 
 const DEFAULT_HOME = "https://en.wikipedia.org/wiki/Main_Page";
 
@@ -127,6 +128,7 @@ export function openChromeBrowserWindow(params: {
   let currentTitle = "";
   let pageMarkdown = "";
   let loading = false;
+  let figletHeadings = true;
   const history: string[] = [];
   let historyIndex = -1;
 
@@ -155,16 +157,25 @@ export function openChromeBrowserWindow(params: {
     currentTitle = result.title || result.url;
     pageMarkdown = result.markdown;
 
-    // Build display: title header + markdown body
-    const display = result.title
-      ? `${result.title}\n${"=".repeat(Math.min(result.title.length, 78))}\n\n${result.markdown}`
-      : result.markdown;
-
-    content.setContent(display);
+    // Render markdown with figlet headings (same renderer as the smart editor)
+    const contentWidth = Math.max(40, Number(content.width) || 80);
+    const headingConfig = figletHeadings ? DEFAULT_FIGLET_HEADING_CONFIG : PLAIN_HEADING_CONFIG;
+    const lines = renderMarkdown(result.markdown, contentWidth, { headingConfig });
+    content.setContent(lines.join("\n"));
     content.scrollTo(0);
     setUrl(result.url);
     params.onStateChanged?.();
     setStatus(`${result.title || result.url}`);
+    screen.render();
+  };
+
+  /** Re-render the current page markdown (e.g. after resize or figlet toggle). */
+  const rerenderPage = () => {
+    if (!pageMarkdown) return;
+    const contentWidth = Math.max(40, Number(content.width) || 80);
+    const headingConfig = figletHeadings ? DEFAULT_FIGLET_HEADING_CONFIG : PLAIN_HEADING_CONFIG;
+    const lines = renderMarkdown(pageMarkdown, contentWidth, { headingConfig });
+    content.setContent(lines.join("\n"));
     screen.render();
   };
 
@@ -284,6 +295,12 @@ export function openChromeBrowserWindow(params: {
       void goBack();
       return;
     }
+    // 'h' = toggle figlet headings
+    if (key.name === "h" && !key.ctrl && !key.meta) {
+      figletHeadings = !figletHeadings;
+      rerenderPage();
+      return;
+    }
   });
 
   // Escape in URL bar returns to content
@@ -314,6 +331,7 @@ export function openChromeBrowserWindow(params: {
     historyLength: history.length,
     historyIndex,
     loading,
+    figletHeadings,
     contentPreview: pageMarkdown.split("\n").slice(0, 12).join("\n"),
   });
   frame.setFocusTarget(content);
@@ -333,6 +351,9 @@ export function openChromeBrowserWindow(params: {
     [content, () => theme().body],
   ]).restyle;
 
+  // Re-render figlet headings responsively on resize
+  frame.frame.on("resize", () => rerenderPage());
+
   windowManager.registerWindow(frame);
   frame.focus();
 
@@ -349,6 +370,7 @@ export function openChromeBrowserWindow(params: {
     `    Enter   Navigate to URL\n` +
     `    b       Back\n` +
     `    r       Reload\n` +
+    `    h       Toggle figlet headings\n` +
     `    j/k     Scroll\n\n` +
     `  Requires Chrome with --remote-debugging-port=9222\n` +
     `  Run: browser-start.js  (from badlogic/browser-tools)\n\n` +
