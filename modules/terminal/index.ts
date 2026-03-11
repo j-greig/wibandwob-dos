@@ -57,11 +57,15 @@ function installTerminalMousePassthrough(
     onScreenEvent?: (type: string, handler: (data: blessed.Widgets.Events.IMouseEventArg) => void) => void;
     removeScreenEvent?: (type: string, handler: (data: blessed.Widgets.Events.IMouseEventArg) => void) => void;
     _slisteners?: Array<{ type: string; handler: (data: blessed.Widgets.Events.IMouseEventArg) => void }>;
+    _wwTerminalMouseHandler?: (data: blessed.Widgets.Events.IMouseEventArg) => void;
   },
 ) {
-  const existing = term._slisteners?.find((listener) => listener.type === "mouse");
-  if (existing) {
-    term.removeScreenEvent?.("mouse", existing.handler);
+  const existingMouseHandlers = (term._slisteners ?? [])
+    .filter((listener) => listener.type === "mouse")
+    .map((listener) => listener.handler);
+
+  for (const handler of existingMouseHandlers) {
+    term.removeScreenEvent?.("mouse", handler);
   }
 
   const mouseHandler = (data: blessed.Widgets.Events.IMouseEventArg) => {
@@ -105,7 +109,15 @@ function installTerminalMousePassthrough(
     term.handler?.(sequence);
   };
 
+  term._wwTerminalMouseHandler = mouseHandler;
   term.onScreenEvent?.("mouse", mouseHandler);
+
+  const activeMouseHandlers = (term._slisteners ?? [])
+    .filter((listener) => listener.type === "mouse")
+    .map((listener) => listener.handler);
+  if (activeMouseHandlers.length !== 1 || activeMouseHandlers[0] !== mouseHandler) {
+    throw new Error("terminal mouse passthrough install failed: expected exactly one active mouse handler");
+  }
 }
 
 export default function setup(host: MicroappHost) {
