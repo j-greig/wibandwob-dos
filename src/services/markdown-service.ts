@@ -67,12 +67,12 @@ export interface FigletHeadingConfig {
 }
 
 export const DEFAULT_FIGLET_HEADING_CONFIG: FigletHeadingConfig = {
-  h1: { font: "doom",    fallbackFonts: ["slant","small","term"], color: "\x1b[96m", plainFallback: true },  // 8h
-  h2: { font: "small",   fallbackFonts: ["smshadow","mini","term"], color: "\x1b[94m", plainFallback: true },  // 5h
-  h3: { font: "mini",    fallbackFonts: ["smshadow","term"], color: "\x1b[95m", plainFallback: true },  // 4h
-  h4: { font: "digital", fallbackFonts: ["mini","term"], color: "\x1b[93m", plainFallback: true },  // 3h
-  h5: { font: "smslant", fallbackFonts: ["term"], color: "\x1b[92m", plainFallback: true },
-  h6: { font: "term",    fallbackFonts: [], color: "\x1b[37m", plainFallback: true },
+  h1: { font: "slant",      fallbackFonts: ["small","term"], color: "\x1b[96m", plainFallback: true },       // 6h
+  h2: { font: "small",      fallbackFonts: ["smshadow","mini","term"], color: "\x1b[94m", plainFallback: true }, // 5h
+  h3: { font: "threepoint", fallbackFonts: ["digital","term"], color: "\x1b[95m", plainFallback: true },        // 3h
+  h4: { font: "digital",    fallbackFonts: ["term"], color: "\x1b[93m", plainFallback: true },                  // 3h
+  h5: { font: "",           fallbackFonts: [], color: "\x1b[92m", plainFallback: true },                        // CAPS + =====
+  h6: { font: "",           fallbackFonts: [], color: "\x1b[37m", plainFallback: true },                        // CAPS + -----
 };
 
 /** Plain-headings config: no figlet, just bold ANSI text. */
@@ -132,8 +132,22 @@ function renderFigletHeading(text: string, level: number, width: number, config:
     }
   }
 
-  // Plain fallback
+  // Plain fallback — H5 gets CAPS + =====, H6 gets CAPS + -----
   if (cfg.plainFallback) {
+    if (level === 5) {
+      const caps = plain.toUpperCase();
+      return [
+        color + bold(caps) + R,
+        color + "=".repeat(caps.length) + R,
+      ];
+    }
+    if (level === 6) {
+      const caps = plain.toUpperCase();
+      return [
+        color + bold(caps) + R,
+        color + "-".repeat(caps.length) + R,
+      ];
+    }
     const prefix = "#".repeat(level) + " ";
     return [color + bold(underline(prefix + plain)) + R];
   }
