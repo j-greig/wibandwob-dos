@@ -153,6 +153,28 @@ export {
   createInlineSearch,
   createRestyleBundle,
   deferRender,
+  // Tabbed container
+  createTabs,
+  // Pattern generators
+  PATTERNS,
+  patternBlockGradient,
+  patternDiagonalHatch,
+  patternDiamondGrid,
+  patternBraille,
+  patternCrossStitch,
+  patternWave,
+  patternHashInterference,
+  patternCheckerboard,
+  patternPipeMaze,
+  patternBrailleDensity,
+  patternConcentricRings,
+  // Data simulation helpers
+  sinWave,
+  randHistory,
+  xLabels,
+  // Colour helpers
+  hslToRgb,
+  ansiGradientLine,
 } from "../core/ui-parts.js";
 export type {
   InputLineProps,
@@ -176,6 +198,11 @@ export type {
   InlineSearchHandle,
   RestyleEntry,
   RestyleBundleHandle,
+  // Tabs
+  TabDef,
+  TabbedContainerHandle,
+  // Patterns
+  PatternGenerator,
 } from "../core/ui-parts.js";
 
 // ═══════════════════════════════════════════════════════════════════════════

@@ -209,6 +209,50 @@ tree.destroy();  // call in win.onCleanup()
 
 Keys wired automatically: j/k up/down, Enter/Space/←/→ toggle, g/G ends.
 
+### Tabbed container
+
+Create a tab bar with switchable content panels. Handles tab bar rendering,
+show/hide, keyboard shortcuts (1-9), and cleanup.
+
+```typescript
+import { createTabs, type TabDef } from "../../src/services/microapp-sdk.js";
+
+const tabHandle = createTabs(win.body, [
+  {
+    name: "Overview",
+    build: (container) => {
+      // container is a blessed box — add your widgets here
+      const box = blessed.box({ parent: container, ... });
+    },
+    update: () => {
+      // called on tick and on tab switch — refresh dynamic content
+    },
+    cleanup: () => {
+      // called on destroy — clear tab-specific resources
+    },
+  },
+  { name: "Details", build: (c) => { ... } },
+]);
+
+// Switch programmatically
+tabHandle.switchTo(1);
+
+// Use in tick loop — only updates the active tab
+createTimer(() => { tabHandle.tickActive(); screen.render(); }, 1000, timers);
+
+// Listen for tab switches
+tabHandle.onSwitch((idx) => console.log(`switched to tab ${idx}`));
+
+// Cleanup — call in win.onCleanup()
+win.onCleanup(() => tabHandle.destroy());
+
+// Re-render tab bar after restyle
+win.onRestyle(() => { tabHandle.renderBar(); screen.render(); });
+```
+
+Keys 1-9 are wired automatically. Pass `{ keys: false }` as the third
+argument to disable. Reference adopter: `modules/dashboard/index.ts`.
+
 ### Lifecycle timers (F06)
 ```typescript
 import { createTimer, clearTimers } from "../../src/services/microapp-sdk.js";
@@ -329,6 +373,73 @@ host.runCommand("markdown.open", { filePath: "/absolute/path/to/file.md" });
 host.runCommand("markdown.toggle_figlet");
 ```
 
+### Pattern generators
+
+11 built-in animated text-fill functions for decorative panels, mosaics,
+and demo surfaces. Each takes `(width, height, tick)` and returns `string[]`.
+
+```typescript
+import {
+  PATTERNS,                  // all 11 as an array
+  patternBlockGradient,      // ░▒▓█
+  patternDiagonalHatch,      // ╱╲
+  patternDiamondGrid,        // <>v^*+.o
+  patternBraille,            // ⠁⠂⠄⡀⢀⠠⠐⠈
+  patternCrossStitch,        // ┼─│
+  patternWave,               // ~-_
+  patternHashInterference,   // #=:.|
+  patternCheckerboard,       // ▄▀
+  patternPipeMaze,           // +-|.
+  patternBrailleDensity,     // ⣿⣷⣶...⡀
+  patternConcentricRings,    // .,:;!|#@
+  type PatternGenerator,
+} from "../../src/services/microapp-sdk.js";
+
+// Use in a box update loop
+const fn = PATTERNS[tick % PATTERNS.length]!;
+const lines = fn(boxWidth, boxHeight, tick);
+box.setContent(lines.join("\n"));
+```
+
+### Data simulation helpers
+
+Fake data generators for dashboards, demos, and contrib widgets.
+
+```typescript
+import { sinWave, randHistory, xLabels } from "../../src/services/microapp-sdk.js";
+
+const wave = sinWave(tick, 30, 2, 0.2);          // sine array
+const history = randHistory(40, 20, 80);          // random walk
+const labels = xLabels(40);                       // ["0","1",..."39"]
+```
+
+### ANSI gradient line
+
+True-colour gradient rendering for plain blessed boxes.
+
+```typescript
+import { ansiGradientLine, hslToRgb } from "../../src/services/microapp-sdk.js";
+
+// Render a rainbow band — hueStart/hueEnd in degrees (0-360)
+const line = ansiGradientLine(width, 0, 180);
+box.setContent(line);
+
+// Raw HSL→RGB (h/s/l all 0-1)
+const [r, g, b] = hslToRgb(0.5, 0.8, 0.5);
+```
+
+### Figlet text (string, no widget)
+
+```typescript
+import { renderFiglet } from "../../src/services/microapp-sdk.js";
+
+const text = renderFiglet("HELLO", "slant");  // returns string
+box.setContent(text);
+```
+
+Use `renderFiglet` when you need the string. Use `host.ui.createFigletDisplay`
+when you want a scrollable UiPart widget. Never shell out to figlet directly.
+
 ### Scrollbars
 ```typescript
 import { createScrollbar, scrollableStyle } from "../../src/core/ui-primitives.js";
@@ -386,6 +497,9 @@ win.onRestyle(() => {
 | Importing from `src/core/app-controller.ts` | Never — use host API |
 | `multiInstance: false` + opening twice | Set `multiInstance: true` if each call should open a new window |
 | Query command returns `{ok:true}` with no data | Add `direct: true` to `registerCommand`. Without it, `focusOrCreate` wraps the action and swallows the return value. All query/control commands on already-open windows must use `direct: true`. |
+| `spawnSync("figlet", ...)` directly | Use `renderFiglet` from the SDK — cached, safe fallback |
+| Hand-built tab bar + key bindings | Use `createTabs` — handles bar, show/hide, keys, cleanup |
+| Copy-pasting pattern generators | Import from `PATTERNS` or individual named exports |
 
 ---
 

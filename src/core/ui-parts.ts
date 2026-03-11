@@ -1560,3 +1560,338 @@ export function createRestyleBundle(entries: RestyleEntry[]): RestyleBundleHandl
 export function deferRender(fn: () => void): void {
   setTimeout(fn, 0);
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TABBED CONTAINER — reusable tab bar + switchable content panels
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface TabDef {
+  name: string;
+  build: (container: blessed.Widgets.BoxElement) => void;
+  update?: () => void;
+  cleanup?: () => void;
+}
+
+export interface TabbedContainerHandle {
+  /** Switch to tab by zero-based index. */
+  switchTo(idx: number): void;
+  /** Current active tab index. */
+  readonly active: number;
+  /** Call update() on the active tab (for tick loops). */
+  tickActive(): void;
+  /** Register a callback when tab switches. */
+  onSwitch(fn: (idx: number) => void): void;
+  /** Destroy all tabs and the tab bar. */
+  destroy(): void;
+  /** Re-render the tab bar (e.g. after restyle). */
+  renderBar(): void;
+}
+
+/** @primitive */
+export function createTabs(
+  parent: blessed.Widgets.BoxElement,
+  tabs: TabDef[],
+  opts?: { keys?: boolean },
+): TabbedContainerHandle {
+  let activeIdx = 0;
+  const switchHandlers: Array<(idx: number) => void> = [];
+
+  const tabBar = blessed.box({
+    parent,
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 1,
+    tags: true,
+    style: { fg: "white", bg: "black" },
+  });
+
+  const contentArea = blessed.box({
+    parent,
+    top: 1,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  });
+
+  const containers: blessed.Widgets.BoxElement[] = [];
+  for (let i = 0; i < tabs.length; i++) {
+    const c = blessed.box({
+      parent: contentArea,
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+    });
+    if (i !== 0) c.hide();
+    containers.push(c);
+    tabs[i]!.build(c);
+  }
+
+  function renderBar() {
+    const names = tabs.map((t, i) =>
+      i === activeIdx
+        ? `{inverse} ${i + 1}:${t.name} {/inverse}`
+        : ` ${i + 1}:${t.name} `,
+    );
+    const hint = tabs.length <= 9 ? `  {gray-fg}[1-${tabs.length}] switch{/gray-fg}` : "";
+    tabBar.setContent(`{bold}${names.join("│")}${hint}{/bold}`);
+  }
+
+  function switchTo(idx: number) {
+    if (idx < 0 || idx >= tabs.length || idx === activeIdx) return;
+    containers[activeIdx]!.hide();
+    activeIdx = idx;
+    containers[activeIdx]!.show();
+    renderBar();
+    try { tabs[activeIdx]?.update?.(); } catch { /* ignore */ }
+    for (const fn of switchHandlers) fn(idx);
+  }
+
+  // Wire number keys
+  if (opts?.keys !== false) {
+    for (let i = 0; i < Math.min(tabs.length, 9); i++) {
+      const idx = i;
+      parent.key([`${i + 1}`], () => switchTo(idx));
+    }
+    (parent as any).input = true;
+    (parent as any).keys = true;
+  }
+
+  renderBar();
+
+  return {
+    switchTo,
+    get active() { return activeIdx; },
+    tickActive() { try { tabs[activeIdx]?.update?.(); } catch { /* ignore */ } },
+    onSwitch(fn) { switchHandlers.push(fn); },
+    destroy() {
+      for (const t of tabs) t.cleanup?.();
+      for (const c of containers) c.destroy();
+      tabBar.destroy();
+      contentArea.destroy();
+    },
+    renderBar,
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PATTERN GENERATORS — reusable animated text fill functions
+// ═══════════════════════════════════════════════════════════════════════════
+
+export type PatternGenerator = (w: number, h: number, tick: number) => string[];
+
+/** Shifting block gradient ░▒▓█ */
+export const patternBlockGradient: PatternGenerator = (w, h, t) => {
+  const chars = "░▒▓█▓▒";
+  const lines: string[] = [];
+  for (let y = 0; y < h; y++) {
+    let line = "";
+    for (let x = 0; x < w; x++) line += chars[(x + y + t) % chars.length];
+    lines.push(line);
+  }
+  return lines;
+};
+
+/** Diagonal hatching ╱╲ */
+export const patternDiagonalHatch: PatternGenerator = (w, h, t) => {
+  const lines: string[] = [];
+  for (let y = 0; y < h; y++) {
+    let line = "";
+    for (let x = 0; x < w; x++) line += (x + y + t) % 2 === 0 ? "╱" : "╲";
+    lines.push(line);
+  }
+  return lines;
+};
+
+/** Diamond grid of assorted chars */
+export const patternDiamondGrid: PatternGenerator = (w, h, t) => {
+  const chars = "<>v^*+.o";
+  const lines: string[] = [];
+  for (let y = 0; y < h; y++) {
+    let line = "";
+    for (let x = 0; x < w; x++) line += chars[(x + y + t) % chars.length];
+    lines.push(line);
+  }
+  return lines;
+};
+
+/** Braille dot animation */
+export const patternBraille: PatternGenerator = (w, h, t) => {
+  const braille = "⠁⠂⠄⡀⢀⠠⠐⠈";
+  const lines: string[] = [];
+  for (let y = 0; y < h; y++) {
+    let line = "";
+    for (let x = 0; x < w; x++) line += braille[(x * 3 + y * 7 + t * 2) % braille.length];
+    lines.push(line);
+  }
+  return lines;
+};
+
+/** Cross-stitch ┼─│ grid */
+export const patternCrossStitch: PatternGenerator = (w, h, t) => {
+  const lines: string[] = [];
+  for (let y = 0; y < h; y++) {
+    let line = "";
+    for (let x = 0; x < w; x++) {
+      if ((x + t) % 4 === 0 && (y + t) % 3 === 0) line += "┼";
+      else if ((y + t) % 3 === 0) line += "─";
+      else if ((x + t) % 4 === 0) line += "│";
+      else line += " ";
+    }
+    lines.push(line);
+  }
+  return lines;
+};
+
+/** Sine wave ~-_ */
+export const patternWave: PatternGenerator = (w, h, t) => {
+  const lines: string[] = [];
+  for (let y = 0; y < h; y++) {
+    let line = "";
+    const phase = Math.floor(Math.sin((y + t) * 0.5) * 3);
+    for (let x = 0; x < w; x++) {
+      const v = Math.sin((x + phase + t) * 0.4);
+      line += v > 0.3 ? "~" : v > -0.3 ? "-" : "_";
+    }
+    lines.push(line);
+  }
+  return lines;
+};
+
+/** Hash interference #=:.| */
+export const patternHashInterference: PatternGenerator = (w, h, t) => {
+  const chars = "#=:.|";
+  const lines: string[] = [];
+  for (let y = 0; y < h; y++) {
+    let line = "";
+    for (let x = 0; x < w; x++) line += chars[(x * 3 + y * 7 + t) % chars.length];
+    lines.push(line);
+  }
+  return lines;
+};
+
+/** Checkerboard ▄▀ */
+export const patternCheckerboard: PatternGenerator = (w, h, t) => {
+  const lines: string[] = [];
+  for (let y = 0; y < h; y++) {
+    let line = "";
+    for (let x = 0; x < w; x++) line += (x + y + t) % 2 === 0 ? "▄" : "▀";
+    lines.push(line);
+  }
+  return lines;
+};
+
+/** Pipe maze +-|.: */
+export const patternPipeMaze: PatternGenerator = (w, h, t) => {
+  const c = "+-|.+-|:";
+  const lines: string[] = [];
+  for (let y = 0; y < h; y++) {
+    let line = "";
+    for (let x = 0; x < w; x++) line += c[(x * 3 + y * 5 + t) % c.length];
+    lines.push(line);
+  }
+  return lines;
+};
+
+/** Braille density field ⣿⣷⣶...⡀ */
+export const patternBrailleDensity: PatternGenerator = (w, h, t) => {
+  const dots = "⣿⣷⣶⣦⣤⣄⣀⡀ ";
+  const lines: string[] = [];
+  for (let y = 0; y < h; y++) {
+    let line = "";
+    for (let x = 0; x < w; x++) {
+      const d = Math.sin((x + t) * 0.4) * Math.cos((y + t) * 0.3);
+      const idx = Math.floor((d + 1) * 0.5 * (dots.length - 1));
+      line += dots[Math.max(0, Math.min(dots.length - 1, idx))];
+    }
+    lines.push(line);
+  }
+  return lines;
+};
+
+/** Concentric rings .,:;!|#@ */
+export const patternConcentricRings: PatternGenerator = (w, h, t) => {
+  const chars = " .,:;!|#@";
+  const lines: string[] = [];
+  const cx = w / 2, cy = h / 2;
+  for (let y = 0; y < h; y++) {
+    let line = "";
+    for (let x = 0; x < w; x++) {
+      const dist = Math.sqrt((x - cx) ** 2 + ((y - cy) * 2) ** 2);
+      const idx = Math.floor(dist + t) % chars.length;
+      line += chars[idx];
+    }
+    lines.push(line);
+  }
+  return lines;
+};
+
+/** All built-in patterns as an ordered array. */
+export const PATTERNS: PatternGenerator[] = [
+  patternBlockGradient,
+  patternDiagonalHatch,
+  patternDiamondGrid,
+  patternBraille,
+  patternCrossStitch,
+  patternWave,
+  patternHashInterference,
+  patternCheckerboard,
+  patternPipeMaze,
+  patternBrailleDensity,
+  patternConcentricRings,
+];
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DATA SIMULATION HELPERS — fake data for dashboards and demos
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** Generate a sine wave array. */
+export function sinWave(offset: number, len: number, amp: number, freq: number): number[] {
+  const out: number[] = [];
+  for (let i = 0; i < len; i++) out.push(amp * Math.sin(freq * (i + offset)));
+  return out;
+}
+
+/** Generate a random-walk history series. */
+export function randHistory(len: number, lo: number, hi: number): number[] {
+  const out: number[] = [];
+  let v = lo + Math.random() * (hi - lo);
+  for (let i = 0; i < len; i++) {
+    v += (Math.random() - 0.5) * (hi - lo) * 0.15;
+    v = Math.max(lo, Math.min(hi, v));
+    out.push(Math.round(v));
+  }
+  return out;
+}
+
+/** Generate numeric x-axis labels ["0", "1", ...]. */
+export function xLabels(len: number): string[] {
+  return Array.from({ length: len }, (_, i) => `${i}`);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// COLOUR HELPERS — ANSI gradient rendering
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** Convert HSL (h 0-1, s 0-1, l 0-1) to RGB [0-255, 0-255, 0-255]. */
+export function hslToRgb(h: number, s: number, l: number): [number, number, number] {
+  const a = s * Math.min(l, 1 - l);
+  const f = (n: number) => {
+    const k = (n + h * 12) % 12;
+    return Math.round(255 * (l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1))));
+  };
+  return [f(0), f(8), f(4)];
+}
+
+/** Render a single line of ANSI true-colour gradient blocks. hueStart/hueEnd in degrees 0-360. */
+export function ansiGradientLine(width: number, hueStart: number, hueEnd: number): string {
+  let line = "";
+  for (let i = 0; i < width; i++) {
+    const t = i / Math.max(1, width - 1);
+    const h = hueStart + t * (hueEnd - hueStart);
+    const [r, g, b] = hslToRgb(h / 360, 0.8, 0.5);
+    line += `\x1b[38;2;${r};${g};${b}m█`;
+  }
+  return line + "\x1b[0m";
+}
