@@ -241,3 +241,7 @@ When adding a control API endpoint:
 
 | Date | Type | Subsystem | Finding | Triggered by |
 |------|------|-----------|---------|--------------|
+| 2026-03-11 | correction | control-api | Retired legacy duplicate routes: /view/markdown/open, /view/art/open, /view/wibwob-agent/open, /view/companion/smol. Canonical routes: /view/reader/open, /view/generative-art/open, /view/agent/open, /view/companion/compact | E033 S05 |
+| 2026-03-11 | correction | control-api | /windows/batch now accepts canonical left/top/width/height fields (x/y/w/h still accepted as fallback) | E033 S05 |
+| 2026-03-11 | correction | control-api | Added missing descriptions to all POST endpoint catalogue entries | E033 S05 |
+| 2026-03-11 | invariant | control-api | GET /runtime/stats endpoint added for structured telemetry | E033 S08 |

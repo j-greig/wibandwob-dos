@@ -195,16 +195,16 @@ const batchLayout = tuiTool({
   label: "Batch Layout",
   description:
     "Move, resize, and/or close multiple windows in a single call. " +
-    "Pass an array of ops — each op needs an 'id' plus any of: x, y, w, h (move/resize), or close:true. " +
+    "Pass an array of ops — each op needs an 'id' plus any of: left, top (move), width, height (resize), or close:true. " +
     "Ops are applied in order. Use this instead of chained tui_move_window calls whenever positioning more than one window.",
   parameters: Type.Object({
     ops: Type.Array(
       Type.Object({
         id: Type.Number({ description: "Window ID" }),
-        x: Type.Optional(Type.Number({ description: "Left position (columns)" })),
-        y: Type.Optional(Type.Number({ description: "Top position (rows)" })),
-        w: Type.Optional(Type.Number({ description: "Width (columns)" })),
-        h: Type.Optional(Type.Number({ description: "Height (rows)" })),
+        left: Type.Optional(Type.Number({ description: "Left position (columns)" })),
+        top: Type.Optional(Type.Number({ description: "Top position (rows)" })),
+        width: Type.Optional(Type.Number({ description: "Width (columns)" })),
+        height: Type.Optional(Type.Number({ description: "Height (rows)" })),
         close: Type.Optional(Type.Boolean({ description: "Close this window if true" })),
       }),
       { description: "Array of window operations to apply in order" }
@@ -218,12 +218,12 @@ const batchLayout = tuiTool({
         results.push(`${op.id}: ${ok ? "closed" : "not found"}`);
         continue;
       }
-      if (op.x !== undefined && op.y !== undefined) {
-        const moved = ctx.windows.moveWindow(op.id, op.x, op.y);
+      if (op.left !== undefined && op.top !== undefined) {
+        const moved = ctx.windows.moveWindow(op.id, op.left, op.top);
         if (!moved) { results.push(`${op.id}: not found`); continue; }
       }
-      if (op.w !== undefined && op.h !== undefined) {
-        ctx.windows.resizeWindow(op.id, op.w, op.h);
+      if (op.width !== undefined && op.height !== undefined) {
+        ctx.windows.resizeWindow(op.id, op.width, op.height);
       }
       results.push(`${op.id}: ok`);
     }

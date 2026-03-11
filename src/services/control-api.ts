@@ -89,26 +89,22 @@ const ENDPOINT_CATALOGUE = [
   { method: "GET",  path: "/world-chat/channel/text",       description: "Plain text export of one world chat channel. ?id=%23world-ridge-overlook" },
   { method: "GET",  path: "/windows/text",                  description: "Raw text content of a window. ?id=N" },
   { method: "GET",  path: "/screenshot/text",               description: "ANSI-stripped text screenshot of a window. ?id=N" },
-  { method: "POST", path: "/commands/run",                  body: { id: "string (command id, canonical)", command: "string (deprecated alias for id)", args: "object (optional)" } },
-  // ── View endpoints — command aliases, kept for backward compat ──
-  // All dispatch through /commands/run internally. Prefer /commands/run for new integrations.
-  { method: "POST", path: "/view/primer/open",              body: { filePath: "string (absolute path)" }, description: "Alias: primer.open" },
-  { method: "POST", path: "/view/figlet/open",              body: { text: "string", font: "string (optional)" }, description: "Alias: figlet.open" },
-  { method: "POST", path: "/view/editor/open",              body: { filePath: "string (optional)", title: "string (optional)", initial: "string (optional)" }, description: "Alias: editor.open" },
-  { method: "POST", path: "/view/backrooms/open",           body: { theme: "string", mode: "auto|live|fake-live", model: "haiku|sonnet|opus", turns: "number", primers: "string (optional csv)" }, description: "Alias: backrooms.run" },
-  { method: "POST", path: "/view/browser-reader/open",      body: { filePath: "string (optional)" }, description: "Alias: document.open" },
-  { method: "POST", path: "/view/markdown/open",            body: { filePath: "string (absolute .md path)" }, description: "Alias: markdown.open (legacy; prefer /view/reader/open)" },
-  { method: "POST", path: "/view/reader/open",              body: { filePath: "string (absolute .md path)" }, description: "Alias: markdown.open" },
-  { method: "POST", path: "/view/art/open",                 body: {}, description: "Alias: art.open (legacy; prefer /view/generative-art/open)" },
-  { method: "POST", path: "/view/generative-art/open",      body: {}, description: "Alias: art.open" },
-  { method: "POST", path: "/view/monster-cam/open",         body: {}, description: "Alias: monster_cam.open" },
-  { method: "POST", path: "/view/wibwob-agent/open",        body: {}, description: "Alias: agent.open (legacy; prefer /view/agent/open)" },
-  { method: "POST", path: "/view/agent/open",               body: {}, description: "Alias: agent.open" },
-  { method: "POST", path: "/view/companion/open",           body: {}, description: "Alias: companion.open (floating)" },
-  { method: "POST", path: "/view/companion/smol",           body: {}, description: "Alias: companion.smol (popup, legacy; prefer /view/companion/compact)" },
-  { method: "POST", path: "/view/companion/compact",        body: {}, description: "Alias: companion.smol (popup)" },
-  { method: "GET",  path: "/scramble/state",                body: {}, description: "Scramble brain state: status, model, sessionId, messageCount, lastMessage, sleeping, logPath" },
-  { method: "GET",  path: "/scramble/history",              body: {}, description: "Full Scramble conversation history as JSON array" },
+  { method: "POST", path: "/commands/run",                  body: { id: "string (command id, canonical)", command: "string (deprecated alias for id)", args: "object (optional)" }, description: "Execute a command by id. Canonical command execution endpoint." },
+  // ── View endpoints — convenience aliases for /commands/run ──
+  // All dispatch through the command registry. Prefer /commands/run for new integrations.
+  { method: "POST", path: "/view/primer/open",              body: { filePath: "string (absolute path)" }, description: "Open primer viewer. Alias: primer.open" },
+  { method: "POST", path: "/view/figlet/open",              body: { text: "string", font: "string (optional)" }, description: "Open figlet banner. Alias: figlet.open" },
+  { method: "POST", path: "/view/editor/open",              body: { filePath: "string (optional)", title: "string (optional)", initial: "string (optional)" }, description: "Open text editor. Alias: editor.open" },
+  { method: "POST", path: "/view/backrooms/open",           body: { theme: "string", mode: "auto|live|fake-live", model: "haiku|sonnet|opus", turns: "number", primers: "string (optional csv)" }, description: "Start backrooms session. Alias: backrooms.run" },
+  { method: "POST", path: "/view/reader/open",              body: { filePath: "string (absolute .md path)" }, description: "Open document reader. Alias: markdown.open" },
+  { method: "POST", path: "/view/generative-art/open",      body: {}, description: "Open generative art. Alias: art.open" },
+  { method: "POST", path: "/view/monster-cam/open",         body: {}, description: "Open Monster Cam. Alias: monster_cam.open" },
+  { method: "POST", path: "/view/agent/open",               body: {}, description: "Open Wib&Wob Agent. Alias: agent.open" },
+  { method: "POST", path: "/view/companion/open",           body: {}, description: "Open Scramble companion (floating). Alias: companion.open" },
+  { method: "POST", path: "/view/companion/compact",        body: {}, description: "Open Scramble companion (popup). Alias: companion.smol" },
+  // ── Scramble endpoints ──
+  { method: "GET",  path: "/scramble/state",                description: "Scramble brain state: status, model, sessionId, messageCount, lastMessage, sleeping, logPath" },
+  { method: "GET",  path: "/scramble/history",              description: "Full Scramble conversation history as JSON array" },
   { method: "POST", path: "/scramble/say",                  body: { text: "string" }, description: "Send a message to Scramble (returns reply)" },
   { method: "POST", path: "/scramble/expand",               body: {}, description: "Toggle Scramble smol/tall" },
   { method: "POST", path: "/scramble/pop-out",              body: {}, description: "Pop Scramble out to floating window" },
@@ -116,24 +112,27 @@ const ENDPOINT_CATALOGUE = [
   { method: "POST", path: "/scramble/sleep",                body: {}, description: "Put Scramble to sleep" },
   { method: "POST", path: "/scramble/wake",                 body: {}, description: "Wake Scramble up" },
   { method: "POST", path: "/scramble/meow",                 body: {}, description: "Make Scramble meow" },
-  { method: "POST", path: "/view/music-player/open",        body: { filePath: "string (optional)" }, description: "Alias: music-player.open" },
-  { method: "POST", path: "/view/primer-browser/open",      body: {}, description: "Alias: primer.browse" },
-  { method: "POST", path: "/view/file-manager/open",        body: {}, description: "Alias: finder.open" },
-  { method: "POST", path: "/view/primer-gallery/open",      body: {}, description: "Alias: primer_gallery.open" },
-  { method: "POST", path: "/view/workspace/open",           body: {}, description: "Alias: workspace.manage" },
-  { method: "POST", path: "/view/palette/open",             body: {}, description: "Alias: palette.open" },
-  { method: "POST", path: "/view/inspector/open",           body: {}, description: "Alias: inspector.open" },
-  { method: "POST", path: "/windows/focus",                 body: { id: "number" } },
-  { method: "POST", path: "/windows/move",                  body: { id: "number", left: "number", top: "number" } },
-  { method: "POST", path: "/windows/resize",                body: { id: "number", width: "number", height: "number" } },
-  { method: "POST", path: "/windows/close",                 body: { id: "number" } },
-  { method: "POST", path: "/windows/maximize",              body: { id: "number" } },
-  { method: "POST", path: "/windows/batch",                 body: { ops: "[{id, x?, y?, w?, h?, close?}]" }, description: "Move/resize/close multiple windows in one request. Applied in order. Returns {ok, results[]}" },
-  { method: "POST", path: "/windows/input",                 body: { id: "number", input: "string (trailing \\r submits)" } },
-  { method: "POST", path: "/windows/agent-message",         body: { id: "number", text: "string", sender: "string (optional — shows as sender label in agent window)" } },
-  { method: "POST", path: "/windows/text/export",           body: { id: "number", name: "string (optional, canonical)", label: "string (optional, alias for name)" } },
-  { method: "POST", path: "/workspace/save",                body: { name: "string" }, description: "Alias: workspace.save" },
-  { method: "POST", path: "/workspace/load",                body: { name: "string" }, description: "Alias: workspace.load_named" },
+  // ── More view aliases ──
+  { method: "POST", path: "/view/music-player/open",        body: { filePath: "string (optional)" }, description: "Open music player. Alias: music-player.open" },
+  { method: "POST", path: "/view/primer-browser/open",      body: {}, description: "Open primer browser. Alias: primer.browse" },
+  { method: "POST", path: "/view/file-manager/open",        body: {}, description: "Open file manager. Alias: finder.open" },
+  { method: "POST", path: "/view/primer-gallery/open",      body: {}, description: "Open primer gallery. Alias: primer_gallery.open" },
+  { method: "POST", path: "/view/workspace/open",           body: {}, description: "Open workspace manager. Alias: workspace.manage" },
+  { method: "POST", path: "/view/palette/open",             body: {}, description: "Open command palette. Alias: palette.open" },
+  { method: "POST", path: "/view/inspector/open",           body: {}, description: "Open state inspector. Alias: inspector.open" },
+  // ── Window operations ──
+  { method: "POST", path: "/windows/focus",                 body: { id: "number" }, description: "Focus a window by id" },
+  { method: "POST", path: "/windows/move",                  body: { id: "number", left: "number", top: "number" }, description: "Move a window to absolute coordinates" },
+  { method: "POST", path: "/windows/resize",                body: { id: "number", width: "number", height: "number" }, description: "Resize a window" },
+  { method: "POST", path: "/windows/close",                 body: { id: "number" }, description: "Close a window by id" },
+  { method: "POST", path: "/windows/maximize",              body: { id: "number" }, description: "Toggle maximize for a window" },
+  { method: "POST", path: "/windows/batch",                 body: { ops: "[{id, left?, top?, width?, height?, close?}]" }, description: "Move/resize/close multiple windows in one request. Applied in order." },
+  { method: "POST", path: "/windows/input",                 body: { id: "number", input: "string (trailing \\r submits)" }, description: "Send text input to a window" },
+  { method: "POST", path: "/windows/agent-message",         body: { id: "number", text: "string", sender: "string (optional — shows as sender label)" }, description: "Send a message to the Wib&Wob Agent window" },
+  { method: "POST", path: "/windows/text/export",           body: { id: "number", name: "string (optional)" }, description: "Export window text content to scratch/captures/" },
+  // ── Workspace persistence ──
+  { method: "POST", path: "/workspace/save",                body: { name: "string" }, description: "Save current workspace layout" },
+  { method: "POST", path: "/workspace/load",                body: { name: "string" }, description: "Load a named workspace layout" },
 ];
 
 function buildOpenApiSpec(port: number) {
@@ -406,16 +405,12 @@ export class ControlApiService {
       "/view/primer-gallery/open":  { id: "primer_gallery.open" },
       "/view/primer/open":          { id: "primer.open", argsMapper: (b) => b.filePath ? { filePath: b.filePath, x: b.x, y: b.y, w: b.w, h: b.h } : undefined },
       "/view/browser-reader/open":  { id: "document.open", argsMapper: (b) => b.filePath ? { filePath: b.filePath } : undefined },
-      "/view/markdown/open":        { id: "markdown.open", argsMapper: (b) => b.filePath ? { filePath: b.filePath } : undefined },
       "/view/reader/open":          { id: "markdown.open", argsMapper: (b) => b.filePath ? { filePath: b.filePath } : undefined },
       "/view/figlet/open":          { id: "figlet.open", argsMapper: (b) => b.text ? { text: b.text, font: b.font } : undefined },
-      "/view/art/open":             { id: "art.open" },
       "/view/generative-art/open":  { id: "art.open" },
       "/view/monster-cam/open":     { id: "monster_cam.open" },
-      "/view/wibwob-agent/open":    { id: "agent.open" },
       "/view/agent/open":           { id: "agent.open" },
       "/view/companion/open":       { id: "companion.open" },
-      "/view/companion/smol":       { id: "companion.smol" },
       "/view/companion/compact":    { id: "companion.smol" },
       "/scramble/say":              { id: "scramble.say", argsMapper: (b) => b.text ? { text: b.text } : undefined },
       "/scramble/expand":           { id: "scramble.expand" },
@@ -492,6 +487,9 @@ export class ControlApiService {
       // Each op can move, resize, or close a window. All applied in order.
       const ops = (body as any).ops as Array<{
         id: number;
+        left?: number; top?: number;
+        width?: number; height?: number;
+        // Legacy aliases — accepted but canonical names preferred
         x?: number; y?: number;
         w?: number; h?: number;
         close?: boolean;
@@ -506,11 +504,15 @@ export class ControlApiService {
           results.push(this.handlers.windows.closeWindow(id));
           continue;
         }
-        if (op.x !== undefined && op.y !== undefined) {
-          results.push(this.handlers.windows.moveWindow(id, Number(op.x), Number(op.y)));
+        const left = op.left ?? op.x;
+        const top = op.top ?? op.y;
+        const width = op.width ?? op.w;
+        const height = op.height ?? op.h;
+        if (left !== undefined && top !== undefined) {
+          results.push(this.handlers.windows.moveWindow(id, Number(left), Number(top)));
         }
-        if (op.w !== undefined && op.h !== undefined) {
-          results.push(this.handlers.windows.resizeWindow(id, Number(op.w), Number(op.h)));
+        if (width !== undefined && height !== undefined) {
+          results.push(this.handlers.windows.resizeWindow(id, Number(width), Number(height)));
         }
       }
       return Response.json({ ok: results.every(Boolean), results });

@@ -166,7 +166,7 @@ After E033:
 | S02 | done | S01 | medium | Local model/update/render pilot for live windows |
 | S03 | done | S01 | medium | Microapp host lifecycle, redraw, and state contract |
 | S04 | done | none | medium | Thin the composition root |
-| S05 | not-started | none | medium | API contract audit and control-surface cleanup |
+| S05 | done | none | medium | API contract audit and control-surface cleanup |
 | S06 | not-started | none | medium | Cell-aware text correctness and Unicode discipline |
 | S07 | not-started | none, then coordinate with S01 | medium | Visual regression, render telemetry, and dense-scene performance checks |
 | S08 | done | none, then coordinate with S01 and S07 | medium | Runtime telemetry, stats surface, and agent/session health metrics |
@@ -181,7 +181,7 @@ After E033:
 - [x] S02 — Local model/update/render pilot for live windows
 - [x] S03 — Microapp host lifecycle, redraw, and state contract
 - [x] S04 — Thin the composition root
-- [ ] S05 — API contract audit and control-surface cleanup
+- [x] S05 — API contract audit and control-surface cleanup
 - [ ] S06 — Cell-aware text correctness and Unicode discipline
 - [ ] S07 — Visual regression, render telemetry, and dense-scene performance checks
 - [x] S08 — Runtime telemetry, stats surface, and agent/session health metrics
@@ -520,7 +520,7 @@ sprawling across the controller body.
 
 ## S05 — API contract audit and control-surface cleanup
 
-Status: not-started
+Status: done
 Depends on: none
 Risk: medium
 
@@ -551,25 +551,25 @@ repo-specific standards used elsewhere in the epic.
 
 ### Tasks
 
-- [ ] audit the current endpoint catalogue for overlap, drift, ambiguous aliases, and legacy cruft
-- [ ] identify which routes are canonical versus backward-compat alias paths
-- [ ] remove alias or backward-compat routes that are no longer justified, rather than preserving them by default
-- [ ] tighten route naming and documentation where the API currently feels vibe-engineered
-- [ ] ensure `GET /help`, `GET /openapi.json`, command routes, and live state descriptions agree
-- [ ] check parity between control API routes and agent/control tooling where they overlap
-- [ ] add tests for any new pure-ish API normalization helpers or touched endpoint behaviour
-- [ ] update state/API docs so the cleaned contract is written down, not left in code only
+- [x] audit the current endpoint catalogue for overlap, drift, ambiguous aliases, and legacy cruft
+- [x] identify which routes are canonical versus backward-compat alias paths
+- [x] remove alias or backward-compat routes that are no longer justified, rather than preserving them by default
+- [x] tighten route naming and documentation where the API currently feels vibe-engineered
+- [x] ensure `GET /help`, `GET /openapi.json`, command routes, and live state descriptions agree
+- [x] check parity between control API routes and agent/control tooling where they overlap
+- [x] add tests for any new pure-ish API normalization helpers or touched endpoint behaviour
+- [x] update state/API docs so the cleaned contract is written down, not left in code only
 
 ### Acceptance criteria
 
-- [ ] AC-1: the API has a clearer distinction between canonical routes and backward-compat aliases
-- [ ] AC-2: unjustified alias or legacy routes touched by the story are retired rather than preserved automatically
-- [ ] AC-3: `GET /help`, `GET /openapi.json`, and the real handlers agree on touched routes and shapes
-- [ ] AC-4: touched control routes preserve or improve command/state parity for agents and external operators
-- [ ] AC-5: any remaining backward-compat path is explicitly justified and documented rather than retained by inertia
-- [ ] AC-6: touched API seams have direct test coverage where practical
-- [ ] AC-7: `.agents/specs/state-and-api.md` is updated if the contract changes
-- [ ] AC-8: `bun run typecheck` passes
+- [x] AC-1: the API has a clearer distinction between canonical routes and backward-compat aliases
+- [x] AC-2: unjustified alias or legacy routes touched by the story are retired rather than preserved automatically
+- [x] AC-3: `GET /help`, `GET /openapi.json`, and the real handlers agree on touched routes and shapes
+- [x] AC-4: touched control routes preserve or improve command/state parity for agents and external operators
+- [x] AC-5: any remaining backward-compat path is explicitly justified and documented rather than retained by inertia
+- [x] AC-6: touched API seams have direct test coverage where practical
+- [x] AC-7: `.agents/specs/state-and-api.md` is updated if the contract changes
+- [x] AC-8: `bun run typecheck` passes
 
 ### Verification
 
