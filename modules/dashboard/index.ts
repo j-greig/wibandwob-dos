@@ -676,6 +676,274 @@ export default function setup(host: MicroappHost) {
         });
       })();
 
+      // ═══════════════════════════════════════════════════
+      // TAB 6: Maximalist Grid — figlet + pattern mosaic
+      // ═══════════════════════════════════════════════════
+
+      (() => {
+        const container = createTabContainer();
+        container.hide();
+
+        // 6×8 grid of boxes — some large (figlet), some small (patterns)
+        // Layout (rows 0-47, cols 0-139 approx):
+        //
+        //  ┌─────────────SYMBIENT──────────────┐┌──pattern──┐┌──pattern──┐┌──pattern──┐
+        //  │          (figlet slant)            ││  ░▒▓█▓▒░  ││  ╱╲╱╲╱╲  ││  ◆◇◆◇◆◇  │
+        //  │                                   ││           ││          ││           │
+        //  ├────────────────────────────────────┤├───────────┤├──────────┤├───────────┤
+        //  ┌──pattern──┐┌────────WIBWOB─────────────────────┐┌──pattern──┐┌──pattern──┐
+        //  │  ⣿⣶⣤⣀⣀⣤⣶⣿ ││       (figlet big)              ││  ┼┼┼┼┼┼  ││  ∴∵∴∵∴∵  │
+        //  ├───────────┤├───────────────────────────────────┤├──────────┤├───────────┤
+        //  ┌──pattern──┐┌──pattern──┐┌─────────DOS──────────────────────┐┌──pattern──┐
+        //  │  ▄▀▄▀▄▀▄▀ ││  ☰☱☲☳☴☵  ││     (figlet banner3)           ││  ≈≈≈≈≈≈  │
+        //  ├───────────┤├──────────┤├──────────────────────────────────┤├───────────┤
+        //  ┌─────────BLESSED────────────────────┐┌──pattern──┐┌──────────CONTRIB─────┐
+        //  │        (figlet small)              ││  ⠿⠿⠿⠿⠿⠿ ││    (figlet small)    │
+        //  └────────────────────────────────────┘└───────────┘└──────────────────────┘
+
+        const patterns = [
+          // Each is a function: (w, h, tick) => string[]
+          (w: number, h: number, t: number) => {
+            // Shifting block gradient ░▒▓█
+            const chars = "░▒▓█▓▒";
+            const lines: string[] = [];
+            for (let y = 0; y < h; y++) {
+              let line = "";
+              for (let x = 0; x < w; x++) line += chars[(x + y + t) % chars.length];
+              lines.push(line);
+            }
+            return lines;
+          },
+          (w: number, h: number, t: number) => {
+            // Diagonal hatching ╱╲
+            const lines: string[] = [];
+            for (let y = 0; y < h; y++) {
+              let line = "";
+              for (let x = 0; x < w; x++) line += (x + y + t) % 2 === 0 ? "╱" : "╲";
+              lines.push(line);
+            }
+            return lines;
+          },
+          (w: number, h: number, t: number) => {
+            // Diamond grid ◆◇
+            const lines: string[] = [];
+            for (let y = 0; y < h; y++) {
+              let line = "";
+              for (let x = 0; x < w; x++) line += (x + y + t) % 3 === 0 ? "◆" : (x + y + t) % 3 === 1 ? "◇" : "·";
+              lines.push(line);
+            }
+            return lines;
+          },
+          (w: number, h: number, t: number) => {
+            // Braille animation
+            const braille = "⠁⠂⠄⡀⢀⠠⠐⠈";
+            const lines: string[] = [];
+            for (let y = 0; y < h; y++) {
+              let line = "";
+              for (let x = 0; x < w; x++) line += braille[(x * 3 + y * 7 + t * 2) % braille.length];
+              lines.push(line);
+            }
+            return lines;
+          },
+          (w: number, h: number, t: number) => {
+            // Cross-stitch ┼─│
+            const lines: string[] = [];
+            for (let y = 0; y < h; y++) {
+              let line = "";
+              for (let x = 0; x < w; x++) {
+                if ((x + t) % 4 === 0 && (y + t) % 3 === 0) line += "┼";
+                else if ((y + t) % 3 === 0) line += "─";
+                else if ((x + t) % 4 === 0) line += "│";
+                else line += " ";
+              }
+              lines.push(line);
+            }
+            return lines;
+          },
+          (w: number, h: number, t: number) => {
+            // Wave ∿ ~ ≈
+            const chars = "∿~≈~";
+            const lines: string[] = [];
+            for (let y = 0; y < h; y++) {
+              let line = "";
+              const phase = Math.floor(Math.sin((y + t) * 0.5) * 2);
+              for (let x = 0; x < w; x++) line += chars[(x + phase + t) % chars.length];
+              lines.push(line);
+            }
+            return lines;
+          },
+          (w: number, h: number, t: number) => {
+            // Trigram cycle ☰☱☲☳☴☵☶☷
+            const tri = "☰☱☲☳☴☵☶☷";
+            const lines: string[] = [];
+            for (let y = 0; y < h; y++) {
+              let line = "";
+              for (let x = 0; x < w; x++) line += tri[(x + y * 2 + t) % tri.length];
+              lines.push(line);
+            }
+            return lines;
+          },
+          (w: number, h: number, t: number) => {
+            // Checkerboard ▄▀
+            const lines: string[] = [];
+            for (let y = 0; y < h; y++) {
+              let line = "";
+              for (let x = 0; x < w; x++) line += (x + y + t) % 2 === 0 ? "▄" : "▀";
+              lines.push(line);
+            }
+            return lines;
+          },
+          (w: number, h: number, t: number) => {
+            // Maze-like ╔╗╚╝
+            const c = "╔═╗║ ║╚═╝";
+            const lines: string[] = [];
+            for (let y = 0; y < h; y++) {
+              let line = "";
+              for (let x = 0; x < w; x++) line += c[(x * 3 + y * 5 + t) % c.length];
+              lines.push(line);
+            }
+            return lines;
+          },
+          (w: number, h: number, t: number) => {
+            // Dense dots ⣿⣶⣤⣀ descending density
+            const dots = "⣿⣷⣶⣦⣤⣄⣀⡀ ";
+            const lines: string[] = [];
+            for (let y = 0; y < h; y++) {
+              let line = "";
+              for (let x = 0; x < w; x++) {
+                const d = Math.sin((x + t) * 0.4) * Math.cos((y + t) * 0.3);
+                const idx = Math.floor((d + 1) * 0.5 * (dots.length - 1));
+                line += dots[Math.max(0, Math.min(dots.length - 1, idx))];
+              }
+              lines.push(line);
+            }
+            return lines;
+          },
+          (w: number, h: number, t: number) => {
+            // Box drawing spiral ┌┐└┘
+            const chars = "┌─┐│ │└─┘";
+            const lines: string[] = [];
+            for (let y = 0; y < h; y++) {
+              let line = "";
+              for (let x = 0; x < w; x++) {
+                const cx = w / 2, cy = h / 2;
+                const angle = Math.atan2(y - cy, x - cx) + t * 0.2;
+                const dist = Math.sqrt((x - cx) ** 2 + (y - cy) ** 2);
+                const idx = Math.floor((angle + dist * 0.3) * 2) % chars.length;
+                line += chars[Math.abs(idx) % chars.length];
+              }
+              lines.push(line);
+            }
+            return lines;
+          },
+        ];
+
+        // Layout: 8 rows × 6 cols conceptual grid
+        // Each cell is a blessed box, some span multiple cells
+        interface Cell {
+          row: number; col: number;
+          rowSpan: number; colSpan: number;
+          type: "figlet" | "pattern";
+          // figlet cells
+          text?: string; font?: string;
+          // pattern cells
+          patternIdx?: number;
+        }
+
+        const layout: Cell[] = [
+          // Row 0-1: big figlet left, 3 patterns right
+          { row: 0, col: 0, rowSpan: 2, colSpan: 3, type: "figlet", text: "SYMBIENT", font: "slant" },
+          { row: 0, col: 3, rowSpan: 1, colSpan: 1, type: "pattern", patternIdx: 0 },
+          { row: 0, col: 4, rowSpan: 1, colSpan: 1, type: "pattern", patternIdx: 1 },
+          { row: 0, col: 5, rowSpan: 1, colSpan: 1, type: "pattern", patternIdx: 2 },
+          { row: 1, col: 3, rowSpan: 1, colSpan: 1, type: "pattern", patternIdx: 3 },
+          { row: 1, col: 4, rowSpan: 1, colSpan: 1, type: "pattern", patternIdx: 4 },
+          { row: 1, col: 5, rowSpan: 1, colSpan: 1, type: "pattern", patternIdx: 5 },
+
+          // Row 2-3: pattern left, big figlet center, 2 patterns right
+          { row: 2, col: 0, rowSpan: 1, colSpan: 1, type: "pattern", patternIdx: 6 },
+          { row: 2, col: 1, rowSpan: 2, colSpan: 3, type: "figlet", text: "WIBWOB", font: "big" },
+          { row: 2, col: 4, rowSpan: 1, colSpan: 1, type: "pattern", patternIdx: 7 },
+          { row: 2, col: 5, rowSpan: 1, colSpan: 1, type: "pattern", patternIdx: 8 },
+          { row: 3, col: 0, rowSpan: 1, colSpan: 1, type: "pattern", patternIdx: 9 },
+          { row: 3, col: 4, rowSpan: 1, colSpan: 1, type: "pattern", patternIdx: 10 },
+          { row: 3, col: 5, rowSpan: 1, colSpan: 1, type: "pattern", patternIdx: 0 },
+
+          // Row 4-5: 2 patterns left, big figlet center-right, pattern far right
+          { row: 4, col: 0, rowSpan: 1, colSpan: 1, type: "pattern", patternIdx: 1 },
+          { row: 4, col: 1, rowSpan: 1, colSpan: 1, type: "pattern", patternIdx: 2 },
+          { row: 4, col: 2, rowSpan: 2, colSpan: 3, type: "figlet", text: "DOS", font: "banner3" },
+          { row: 4, col: 5, rowSpan: 1, colSpan: 1, type: "pattern", patternIdx: 3 },
+          { row: 5, col: 0, rowSpan: 1, colSpan: 1, type: "pattern", patternIdx: 4 },
+          { row: 5, col: 1, rowSpan: 1, colSpan: 1, type: "pattern", patternIdx: 5 },
+          { row: 5, col: 5, rowSpan: 1, colSpan: 1, type: "pattern", patternIdx: 6 },
+
+          // Row 6-7: figlet left, pattern center, figlet right
+          { row: 6, col: 0, rowSpan: 2, colSpan: 2, type: "figlet", text: "BLESSED", font: "small" },
+          { row: 6, col: 2, rowSpan: 1, colSpan: 1, type: "pattern", patternIdx: 7 },
+          { row: 6, col: 3, rowSpan: 1, colSpan: 1, type: "pattern", patternIdx: 8 },
+          { row: 6, col: 4, rowSpan: 2, colSpan: 2, type: "figlet", text: "CONTRIB", font: "small" },
+          { row: 7, col: 2, rowSpan: 1, colSpan: 1, type: "pattern", patternIdx: 9 },
+          { row: 7, col: 3, rowSpan: 1, colSpan: 1, type: "pattern", patternIdx: 10 },
+        ];
+
+        const ROWS = 8, COLS = 6;
+        const boxes: Array<{ box: blessed.Widgets.BoxElement; cell: Cell }> = [];
+
+        for (const cell of layout) {
+          const top = `${(cell.row / ROWS * 100).toFixed(1)}%`;
+          const left = `${(cell.col / COLS * 100).toFixed(1)}%`;
+          const height = `${(cell.rowSpan / ROWS * 100).toFixed(1)}%`;
+          const width = `${(cell.colSpan / COLS * 100).toFixed(1)}%`;
+
+          const isFiglet = cell.type === "figlet";
+          const box = blessed.box({
+            parent: container,
+            top, left, height, width,
+            border: { type: "line" },
+            style: {
+              fg: isFiglet ? "cyan" : "white",
+              border: { fg: isFiglet ? "cyan" : "gray" },
+            },
+            tags: false,
+          });
+          boxes.push({ box, cell });
+        }
+
+        // Pre-render figlet texts (they don't change, just the patterns animate)
+        const figletCache = new Map<string, string>();
+        for (const { cell } of boxes) {
+          if (cell.type === "figlet" && cell.text && cell.font) {
+            const key = `${cell.text}|${cell.font}`;
+            if (!figletCache.has(key)) {
+              figletCache.set(key, figlet(cell.text, cell.font));
+            }
+          }
+        }
+
+        tabs.push({
+          name: "Mosaic",
+          container,
+          setup: () => {},
+          update: () => {
+            for (const { box, cell } of boxes) {
+              if (cell.type === "figlet") {
+                const key = `${cell.text}|${cell.font}`;
+                box.setContent(figletCache.get(key) ?? cell.text ?? "");
+              } else {
+                const pIdx = (cell.patternIdx ?? 0) % patterns.length;
+                const fn = patterns[pIdx]!;
+                const bw = Math.max(1, (box.width as number || 10) - 2);
+                const bh = Math.max(1, (box.height as number || 5) - 2);
+                const lines = fn(bw, bh, tick);
+                box.setContent(lines.join("\n"));
+              }
+            }
+          },
+          cleanup: () => {},
+        });
+      })();
+
       // ── keyboard ─────────────────────────────────────
 
       body.key(["1"], () => switchTab(0));
@@ -683,6 +951,7 @@ export default function setup(host: MicroappHost) {
       body.key(["3"], () => switchTab(2));
       body.key(["4"], () => switchTab(3));
       body.key(["5"], () => switchTab(4));
+      body.key(["6"], () => switchTab(5));
       (body as any).input = true;
       (body as any).keys = true;
 
