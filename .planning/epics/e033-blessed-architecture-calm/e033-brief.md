@@ -1,7 +1,7 @@
 ---
 id: E033
 title: Blessed Architecture Calm
-status: not-started
+status: in-progress
 issue: ~
 pr: ~
 depends_on: []
@@ -157,8 +157,8 @@ After E033:
 
 | Story | Status | Depends on | Risk | Summary |
 |------|--------|------------|------|---------|
-| S01 | not-started | none | medium | Render scheduler and explicit invalidation policy |
-| S02 | not-started | S01 | medium | Local model/update/render pilot for live windows |
+| S01 | done | none | medium | Render scheduler and explicit invalidation policy |
+| S02 | in-progress | S01 | medium | Local model/update/render pilot for live windows |
 | S03 | not-started | S01 | medium | Microapp host lifecycle, redraw, and state contract |
 | S04 | not-started | none | medium | Thin the composition root |
 | S05 | not-started | none | medium | API contract audit and control-surface cleanup |
@@ -172,8 +172,8 @@ After E033:
 
 ## Stories
 
-- [ ] S01 — Render scheduler and explicit invalidation policy
-- [ ] S02 — Local model/update/render pilot for live windows
+- [x] S01 — Render scheduler and explicit invalidation policy
+- [~] S02 — Local model/update/render pilot for live windows
 - [ ] S03 — Microapp host lifecycle, redraw, and state contract
 - [ ] S04 — Thin the composition root
 - [ ] S05 — API contract audit and control-surface cleanup
@@ -220,7 +220,7 @@ Notes:
 
 ## S01 — Render scheduler and explicit invalidation policy
 
-Status: not-started
+Status: done
 Depends on: none
 Risk: medium
 
@@ -254,30 +254,30 @@ layer once the app decides to render.
 
 ### Tasks
 
-- [ ] add a tiny render scheduler / invalidation seam
-- [ ] separate `requestRender`, live state sync, and persist intent
-- [ ] inject the seam into `WindowManager`
-- [ ] inject the seam into `EditorCoordinator`
-- [ ] update shell-level comments/docs so render policy is explicit
-- [ ] document who may still call direct `screen.render()` and why
+- [x] add a tiny render scheduler / invalidation seam
+- [x] separate `requestRender`, live state sync, and persist intent
+- [x] inject the seam into `WindowManager`
+- [x] inject the seam into `EditorCoordinator`
+- [x] update shell-level comments/docs so render policy is explicit
+- [x] document who may still call direct `screen.render()` and why
 
 ### Acceptance criteria
 
-- [ ] AC-1: there is a named render/invalidation seam with clear ownership
-- [ ] AC-2: `WindowManager` move, resize, focus, and close paths no longer encode final render policy implicitly
-- [ ] AC-3: `EditorCoordinator` routes redraw intent through the seam rather than direct terminal commits in its normal render/update path
-- [ ] AC-4: render, sync, and persist intent are described separately in code
-- [ ] AC-5: direct `screen.render()` calls from unconverted windows continue to work without interference from the scheduler
-- [ ] AC-6: the scheduler seam has direct test coverage for its gating / batching logic
-- [ ] AC-7: `bun run typecheck` passes
+- [x] AC-1: there is a named render/invalidation seam with clear ownership
+- [x] AC-2: `WindowManager` move, resize, focus, and close paths no longer encode final render policy implicitly
+- [x] AC-3: `EditorCoordinator` routes redraw intent through the seam rather than direct terminal commits in its normal render/update path
+- [x] AC-4: render, sync, and persist intent are described separately in code
+- [x] AC-5: direct `screen.render()` calls from unconverted windows continue to work without interference from the scheduler
+- [x] AC-6: the scheduler seam has direct test coverage for its gating / batching logic
+- [x] AC-7: `bun run typecheck` passes
 
 ### Verification
 
-- [ ] scheduler tests pass
-- [ ] move, resize, focus, close windows — behaviour unchanged
-- [ ] editor typing and save still work
-- [ ] `/state` still updates correctly for routine mutations
-- [ ] visual smoke in tmux confirms no missed redraws or flicker regression
+- [x] scheduler tests pass
+- [x] move, resize, focus, close windows — behaviour unchanged
+- [x] editor typing and save still work
+- [x] `/state` still updates correctly for routine mutations
+- [x] visual smoke in tmux confirms no missed redraws or flicker regression
 
 ### Out of scope for this story
 
@@ -289,7 +289,7 @@ layer once the app decides to render.
 
 ## S02 — Local model/update/render pilot for live windows
 
-Status: not-started
+Status: in-progress
 Depends on: S01
 Risk: medium
 
@@ -313,11 +313,11 @@ The best proving ground is a complex but bounded live surface. The spike found
 
 ### Tasks
 
-- [ ] define a local model for Monster Cam state
-- [ ] define a local `Msg` union for service events and UI actions
-- [ ] implement update-style logic for state transitions
-- [ ] implement a single render function that applies model to widgets
-- [ ] route service events through messages instead of direct widget mutation
+- [x] define a local model for Monster Cam state
+- [x] define a local `Msg` union for service events and UI actions
+- [x] implement update-style logic for state transitions
+- [x] implement a single render function that applies model to widgets
+- [x] route service events through messages instead of direct widget mutation
 - [ ] if the pattern lands well, adopt it in one more live window
 
 ### Acceptance criteria
@@ -333,9 +333,22 @@ The best proving ground is a complex but bounded live surface. The spike found
 ### Verification
 
 - [ ] Monster Cam opens, updates, toggles bg/monster modes, and closes cleanly
-- [ ] `/state` reflects toggles and live semantic fields
-- [ ] no regressions in focus, resize, or window close behaviour
+- [x] `/state` reflects toggles and live semantic fields
+- [x] no regressions in focus, resize, or window close behaviour
 - [ ] visual smoke in tmux confirms live updates still feel immediate
+
+### Current outcome note
+
+Monster Cam now has a named local model/update/render path via
+`src/windows/monster-cam-model.ts` and `src/windows/monster-cam-window.ts`.
+The second candidate remains `src/windows/music-player-window.ts`, but is
+explicitly deferred for a later E033 pass because the file is much broader and
+would blur this story's "first canonical example" goal. The epic-level two-
+surface requirement remains open and must be satisfied by a later story.
+
+Live Monster Cam smoke is currently blocked on the missing local
+`assets/mediapipe-venv/` capability, so model/event behaviour is covered by unit
+tests while full live-feed evidence remains outstanding.
 
 ### Out of scope for this story
 

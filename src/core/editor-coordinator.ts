@@ -11,6 +11,7 @@ import os from "node:os";
 import path from "node:path";
 
 import type { WindowManager } from "./window-manager.js";
+import type { RenderScheduler } from "./render-scheduler.js";
 import type { WindowRecord, WindowKind } from "./types.js";
 import type { OverlayManager } from "./overlay-manager.js";
 import type { ContentService } from "../services/content-service.js";
@@ -30,8 +31,7 @@ export interface EditorCoordinatorDeps {
   content: ContentService;
   screen: blessed.Widgets.Screen;
   isMenuOpen: () => boolean;
-  syncLiveState: () => void;
-  persistState: () => void;
+  invalidation: RenderScheduler;
   defaultDir: string;
   editorStartDir: string;
 }
@@ -90,7 +90,7 @@ export class EditorCoordinator {
         const w = wm.getWindowById(windowId);
         if (w) this.render(w);
       },
-      onStateChanged: () => this.deps.syncLiveState(),
+      onStateChanged: () => this.deps.invalidation.requestSync(),
     });
     // Set initial saved content for dirty tracking
     if (window?.kind === "editor") {
@@ -137,7 +137,7 @@ export class EditorCoordinator {
         focused.title = path.basename(resolved);
         this.updateTitleBar(focused);
         this.markClean(focused);
-        this.deps.persistState();
+        this.deps.invalidation.requestPersist();
         this.deps.overlays.flash(`Saved as ${resolved}`);
       },
     );
@@ -148,6 +148,7 @@ export class EditorCoordinator {
     if (window.onSave && window.editor) {
       window.onSave(window.editor.value);
       this.markClean(window);
+      this.deps.invalidation.requestPersist();
       this.deps.overlays.flash(`Saved to source`);
       return;
     }
@@ -158,7 +159,7 @@ export class EditorCoordinator {
       defaultDir: this.deps.defaultDir,
       onWritten: () => {
         this.markClean(window);
-        this.deps.persistState();
+        this.deps.invalidation.requestPersist();
         if (window.filePath) {
           this.deps.overlays.flash(`Saved ${window.filePath}`);
         }
@@ -234,13 +235,13 @@ export class EditorCoordinator {
     if (!window.titleBar) return;
     const display = window.isDirty ? `*${window.title}` : window.title;
     window.titleBar.setContent(` ${display} `);
-    this.deps.screen.render();
+    this.deps.invalidation.requestRender();
   }
 
   private render(window: WindowRecord): void {
     if (!window.editor) return;
     renderEditorState(window.editor);
-    this.deps.syncLiveState();
-    this.deps.screen.render();
+    this.deps.invalidation.requestSync();
+    this.deps.invalidation.requestRender();
   }
 }

@@ -8,9 +8,14 @@ import blessed from "blessed";
 import { theme } from "../core/theme/resolver.js";
 import { createRestyleBundle } from "../core/ui-parts.js";
 import { MonsterCamService } from "../services/monster-cam-service.js";
-import { renderFiglet } from "../services/figlet-service.js";
 import { renderWebcamFrame, gridToBlessedContent } from "../services/webcam-renderer.js";
 import type { WindowManager } from "../core/window-manager.js";
+import {
+  createMonsterCamModel,
+  updateMonsterCamModel,
+  type MonsterCamModel,
+  type MonsterCamMsg,
+} from "./monster-cam-model.js";
 
 interface Deps {
   screen: blessed.Widgets.Screen;
@@ -71,75 +76,71 @@ export function openMonsterCamWindow(deps: Deps): void {
     tags: false,
   });
 
-  let hasFace   = false;
-  let hasHands  = false;
-  let handCount = 0;
-  let hasPose   = false;
-  let fps       = 0;
-  let currentEmotion = "";
-  let lastBbox: [number,number,number,number] = [0,0,0,0];
-  let showBg = false;
-  let monsterMode = false;
+  // Local model/update/render loop for E033 S02.
+  // Service events and UI toggles become MonsterCamMsg values, updateMonsterCamModel
+  // owns state transitions, and renderModel is the single widget mutation path.
+  let model = createMonsterCamModel();
 
-  const toggleBg = () => {
-    showBg = !showBg;
-    bgBtn.setContent(showBg ? " [B] BG on " : " [B] BG off");
+  const renderModel = (nextModel: MonsterCamModel) => {
+    bgBtn.setContent(nextModel.showBg ? " [B] BG on " : " [B] BG off");
+    monsterBtn.setContent(nextModel.monsterMode ? " [M] Monster*" : " [M] Monster");
+    emotionOverlay.setContent(nextModel.emotionOverlayText);
+
+    if (nextModel.latestFrame) {
+      const w = Math.max(1, Number(canvas.width));
+      const h = Math.max(1, Number(canvas.height));
+      const grid = renderWebcamFrame(nextModel.latestFrame, w, h, {
+        showBg: nextModel.showBg,
+        monsterMode: nextModel.monsterMode,
+      });
+      canvas.setContent(gridToBlessedContent(grid));
+      const detections = [
+        nextModel.hasFace ? "FACE" : "·",
+        nextModel.hasHands ? `HANDS(${nextModel.handCount})` : "·",
+        nextModel.hasPose ? "POSE" : "·",
+        nextModel.monsterMode ? "MONSTER" : "·",
+      ].join(" ");
+      status.setContent(
+        ` ${detections} | ${nextModel.fps}fps | b=${nextModel.showBg ? "bg ON" : "bg off"} m=${nextModel.monsterMode ? "monster ON" : "monster off"} q=close`
+      );
+    } else {
+      status.setContent(nextModel.statusText);
+      canvas.setContent("");
+    }
+
     deps.onStateChanged?.();
     screen.render();
   };
 
-  const toggleMonster = () => {
-    monsterMode = !monsterMode;
-    monsterBtn.setContent(monsterMode ? " [M] Monster*" : " [M] Monster");
-    deps.onStateChanged?.();
-    screen.render();
+  const dispatch = (msg: MonsterCamMsg) => {
+    model = updateMonsterCamModel(model, msg);
+    renderModel(model);
   };
+
+  const toggleBg = () => dispatch({ type: "toggle-bg" });
+  const toggleMonster = () => dispatch({ type: "toggle-monster" });
 
   const svc = new MonsterCamService();
 
-  svc.on("ready", () => { status.setContent(" Ready  b=bg m=monster q=close"); screen.render(); });
-  svc.on("error", (err) => { status.setContent(` Error: ${err.message}`); screen.render(); });
-
-  svc.on("frame", (f) => {
-    hasFace   = f.hasFace;
-    hasHands  = f.hasHands;
-    handCount = f.handCount;
-    hasPose   = f.hasPose;
-    fps       = f.fps;
-    if (f.hasFace) lastBbox = f.bbox;
-    if (f.emotion !== currentEmotion) {
-      currentEmotion = f.emotion;
-      const figText = renderFiglet(f.emotion.toUpperCase(), "small");
-      emotionOverlay.setContent(figText);
-    }
-    deps.onStateChanged?.();
-
-    const w = Math.max(1, Number(canvas.width));
-    const h = Math.max(1, Number(canvas.height));
-
-    const grid    = renderWebcamFrame(f, w, h, { showBg, monsterMode });
-    const content = gridToBlessedContent(grid);
-
-    const detections = [
-      hasFace   ? "FACE"            : "·",
-      hasHands  ? `HANDS(${handCount})` : "·",
-      hasPose   ? "POSE"            : "·",
-      monsterMode ? "MONSTER" : "·",
-    ].join(" ");
-
-    canvas.setContent(content);
-    status.setContent(
-      ` ${detections} | ${fps}fps | b=${showBg?"bg ON":"bg off"} m=${monsterMode?"monster ON":"monster off"} q=close`
-    );
-    screen.render();
-  });
+  svc.on("ready", () => dispatch({ type: "ready" }));
+  svc.on("error", (err) => dispatch({ type: "error", error: err }));
+  svc.on("frame", (frameData) => dispatch({ type: "frame", frame: frameData }));
 
   svc.start();
 
   frame.describeState = () => ({
     appType: "monster-cam",
-    summary: `Monster Cam — face:${hasFace} hands:${handCount} pose:${hasPose} @ ${fps}fps`,
-    hasFace, hasHands, handCount, hasPose, fps, bbox: lastBbox, showBg, monsterMode,
+    summary: `Monster Cam — face:${model.hasFace} hands:${model.handCount} pose:${model.hasPose} @ ${model.fps}fps`,
+    hasFace: model.hasFace,
+    hasHands: model.hasHands,
+    handCount: model.handCount,
+    hasPose: model.hasPose,
+    fps: model.fps,
+    bbox: model.lastBbox,
+    showBg: model.showBg,
+    monsterMode: model.monsterMode,
+    phase: model.phase,
+    emotion: model.currentEmotion,
   });
 
   frame.cleanup = () => svc.stop();

@@ -69,6 +69,7 @@ import {
   getChromeModeForWindow,
 } from "./window-chrome.js";
 import { WindowManager } from "./window-manager.js";
+import { createRenderScheduler, type RenderScheduler } from "./render-scheduler.js";
 import { BackroomsService } from "../services/backrooms-service.js";
 import {
   measurePlainTextContent,
@@ -192,6 +193,7 @@ export class TsTuiMvpApp {
   private readonly customCursor: CustomCursor | null;
   private readonly state: StateService;
   private readonly controlApi: ControlApiService;
+  private readonly invalidation: RenderScheduler;
   private readonly editor: EditorCoordinator;
   private activeAgentSession?: WibWobAgentSession;
   private readonly scrambleBrain: ScrambleBrain = new ScrambleBrain();
@@ -251,12 +253,22 @@ export class TsTuiMvpApp {
       }
     });
 
+    // App-level render policy lives here.
+    // Converted core owners request sync/persist/render intent through the scheduler.
+    // Direct screen.render() still exists in unconverted windows and a few shell-only
+    // chrome updates where the app is mutating widgets directly in-place.
+    this.invalidation = createRenderScheduler({
+      sync: () => this.syncLiveState(),
+      persist: () => this.persistState(),
+      render: () => this.screen.render(),
+    });
     this.windowManager = new WindowManager(
       this.screen,
       this.desktop,
+      this.invalidation,
       () => {
         this.repaintDesktop();
-        this.syncLiveState();
+        this.invalidation.requestSync();
       },
       (window, x, y) => this.openWindowContextMenu(window, x, y),
     );
@@ -287,8 +299,7 @@ export class TsTuiMvpApp {
       content: this.content,
       screen: this.screen,
       isMenuOpen: () => this.menuUi.isAnyMenuOpen(),
-      syncLiveState: () => this.syncLiveState(),
-      persistState: () => this.persistState(),
+      invalidation: this.invalidation,
       defaultDir: SPIKE_ROOT,
       editorStartDir: path.dirname(SPIKE_NOTES_PATH),
     });

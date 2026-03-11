@@ -4,6 +4,7 @@ import { clamp } from "./ui-parts.js";
 import type { WindowFacade } from "./window-facade.js";
 import { theme } from "./theme/resolver.js";
 import { safeSetStyle } from "./ui-primitives.js";
+import type { RenderScheduler } from "./render-scheduler.js";
 import type { Box, DragState, ResizeState, WindowKind, WindowRecord } from "./types.js";
 
 /** Called when an editor window receives input text. Return true if handled. */
@@ -27,7 +28,8 @@ export class WindowManager implements WindowFacade {
   constructor(
     private readonly screen: blessed.Widgets.Screen,
     private readonly desktop: Box,
-    private readonly onChange?: () => void,
+    private readonly invalidation: RenderScheduler,
+    private readonly onWindowMutation?: () => void,
     private readonly onWindowContextMenu?: (window: WindowRecord, x?: number, y?: number) => void
   ) {}
 
@@ -165,8 +167,8 @@ export class WindowManager implements WindowFacade {
           this.focusedWindow = undefined;
           this.focusNextWindow(-1);
         }
-        this.onChange?.();
-        this.screen.render();
+        this.onWindowMutation?.();
+        this.invalidation.requestRender();
       },
       focus: () => {
         this.focusWindowInternal(record);
@@ -250,7 +252,7 @@ export class WindowManager implements WindowFacade {
     }
     this.windows.push(record);
     this.syncShadow(record);
-    this.onChange?.();
+    this.onWindowMutation?.();
     this.focusWindowInternal(record);
   }
 
@@ -270,8 +272,8 @@ export class WindowManager implements WindowFacade {
         window.titleBar.style = active ? theme().titleBarFocused : theme().titleBarUnfocused;
       }
     }
-    this.onChange?.();
-    this.screen.render();
+    this.onWindowMutation?.();
+    this.invalidation.requestRender();
   }
 
   focusNextWindow(direction: 1 | -1): void {
@@ -318,8 +320,8 @@ export class WindowManager implements WindowFacade {
     record.frame.left = clamp(left, 0, Math.max(0, screenWidth - frameWidth));
     record.frame.top = clamp(top, 0, Math.max(0, screenHeight - 2 - frameHeight));
     this.syncShadow(record);
-    this.onChange?.();
-    this.screen.render();
+    this.onWindowMutation?.();
+    this.invalidation.requestRender();
     return true;
   }
 
@@ -338,8 +340,8 @@ export class WindowManager implements WindowFacade {
     record.frame.height = clamp(height, 8, maxHeight);
     this.syncShadow(record);
     record.refresh?.();
-    this.onChange?.();
-    this.screen.render();
+    this.onWindowMutation?.();
+    this.invalidation.requestRender();
     return true;
   }
 
@@ -421,7 +423,7 @@ export class WindowManager implements WindowFacade {
       }
       window.onRestyle?.();
     }
-    this.screen.render();
+    this.invalidation.requestRender();
   }
 
   handleMouse(data: blessed.Widgets.Events.IMouseEventArg): void {
@@ -461,8 +463,8 @@ export class WindowManager implements WindowFacade {
       this.syncShadow(window);
     }
 
-    this.onChange?.();
-    this.screen.render();
+    this.onWindowMutation?.();
+    this.invalidation.requestRender();
   }
 
   /** Arrange all windows in a diagonal cascade with uniform size and 2-cell offset. */
@@ -480,8 +482,8 @@ export class WindowManager implements WindowFacade {
       window.frame.height = height;
       this.syncShadow(window);
     }
-    this.onChange?.();
-    this.screen.render();
+    this.onWindowMutation?.();
+    this.invalidation.requestRender();
   }
 
   private handleDragMouse(data: blessed.Widgets.Events.IMouseEventArg): void {
@@ -527,8 +529,8 @@ export class WindowManager implements WindowFacade {
     if (nextLeft !== dragState.originLeft || nextTop !== dragState.originTop) {
       dragState.moved = true;
     }
-    this.onChange?.();
-    this.screen.render();
+    this.onWindowMutation?.();
+    this.invalidation.requestRender();
   }
 
   private handleResizeMouse(data: blessed.Widgets.Events.IMouseEventArg): void {
@@ -560,8 +562,8 @@ export class WindowManager implements WindowFacade {
     record.frame.height = clamp(resizeState.originHeight + deltaY, 8, maxHeight);
     this.syncShadow(record);
     record.refresh?.();
-    this.onChange?.();
-    this.screen.render();
+    this.onWindowMutation?.();
+    this.invalidation.requestRender();
   }
 
   private startDrag(record: WindowRecord, data: blessed.Widgets.Events.IMouseEventArg): void {
@@ -658,8 +660,8 @@ export class WindowManager implements WindowFacade {
     this.syncShadow(record);
     if (record.savedBounds && record.shadow) record.shadow.hide();
     record.refresh?.();
-    this.onChange?.();
-    this.screen.render();
+    this.onWindowMutation?.();
+    this.invalidation.requestRender();
   }
 
   /** Clear maximize state — call before any manual geometry mutation. */

@@ -74,7 +74,7 @@ export function openEditorWindow(params: EditorWindowParams): WindowRecord | und
   const editorWidget = blessed.box({
     parent: frame.body,
     top: 0, left: 0, right: 0, bottom: 0,
-    keys: true, mouse: true, tags: true,
+    input: true, keys: true, mouse: true, tags: true,
     scrollable: true, alwaysScroll: true,
     scrollbar: createScrollbar(),
     style: theme().body,
@@ -85,6 +85,7 @@ export function openEditorWindow(params: EditorWindowParams): WindowRecord | und
     value: initial,
     cursor: Math.max(0, Math.min(cursor ?? initial.length, initial.length)),
   };
+  frame.setFocusTarget(editorWidget);
 
   // ── View mode widgets (created only for md files) ──────────────────────────
 
@@ -125,12 +126,14 @@ export function openEditorWindow(params: EditorWindowParams): WindowRecord | und
   function applyMode(mode: "edit" | "view"): void {
     currentMode = mode;
     if (mode === "view" && scrollBox) {
+      frame.setFocusTarget(scrollBox);
       editorWidget.hide();
       scrollBox.show();
       statusBar?.show();
       renderView();
       scrollBox.focus();
     } else {
+      frame.setFocusTarget(editorWidget);
       scrollBox?.hide();
       statusBar?.hide();
       editorWidget.show();
