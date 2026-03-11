@@ -1207,6 +1207,37 @@ If a legacy path remains, the burden is to justify it explicitly in code and
 in docs. If it no longer serves a real user, operator, agent, workspace, or
 migration need, retire it.
 
+## Parallel work: a2 lane
+
+a2 is building ESLint SDK boundary enforcement (tier 1) on their branch:
+- `eslint.config.js` with `no-restricted-imports` scoped to `modules/**`
+- bans `../../src/core/*` and `../../src/services/*` except `microapp-sdk`
+- `lint` script in `package.json` (opt-in, not wired into typecheck)
+- fixes violations in modules a2 already touched (patchbay, zine, sy2, e026, dream-forecast)
+- tier 2 (tsconfig paths alias `@wibwob/sdk`) and tier 3 (separate tsconfig for modules) noted but NOT approved yet
+
+## ESLint opportunities beyond SDK boundary
+
+Places where lint rules would catch real bugs or drift we have hit:
+
+1. **SDK boundary** (tier 1, a2 building now) — modules importing src/core internals
+2. **No floating promises** — async handlers in control-api and agent-tools that
+   forget `await`, causing silent swallowed errors. `no-floating-promises` via
+   typescript-eslint would catch these.
+3. **Consistent type imports** — `import type` vs value import. We have a mix;
+   `consistent-type-imports` would enforce the `type` keyword and help tree-shaking.
+4. **No unused vars** — TypeScript noUnusedLocals is off; an eslint rule would
+   catch dead locals without needing a tsconfig change.
+5. **Blessed style object shape** — not lintable with stock rules, but a custom
+   rule or type-narrowing pattern could catch `style: { fg: "red" }` where
+   the theme object was expected (a recurring bug source in restyle hooks).
+6. **Timer cleanup enforcement** — modules that call setInterval without
+   registering in a cleanup set. Not trivially lintable but a custom rule
+   scanning for `setInterval` without `createTimer` in module files would help.
+
+Priority: 1 now (a2), 2+3+4 next time we touch eslint config, 5+6 only if
+the pattern keeps causing regressions.
+
 ## Stretch / later follow-on
 
 - investigate flexbox-like responsive layout only for `zine`-class editorial surfaces
