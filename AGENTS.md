@@ -168,6 +168,7 @@ correct errors, update failure modes. They are living documents.
 | `src/services/state-service.ts`, `src/services/control-api.ts`, `src/services/agent-tools.ts` | `.agents/specs/state-and-api.md` |
 | `src/services/workspace-service.ts`, workspace restore in `src/core/app-controller.ts` | `.agents/specs/workspace.md` |
 | `src/services/wibwob-agent-session.ts`, `src/services/scramble-brain.ts`, `src/windows/wibwob-agent-window.ts`, `src/windows/scramble-window.ts`, any `modules/*/` | `.agents/specs/agent-session.md` |
+| `src/services/image-hydrator.mjs`, `src/services/chrome-browser-service.ts` (image methods), `src/windows/chrome-browser-window.ts` (postProcessImages/spliceImages) | `.agents/specs/image-rendering.md` |
 
 ### Post-change triggers — verify after touching these files
 

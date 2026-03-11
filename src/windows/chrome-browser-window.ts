@@ -132,6 +132,8 @@ export function openChromeBrowserWindow(params: {
   let navigationToken = 0;
   const history: string[] = [];
   let historyIndex = -1;
+  // Cached chafa blocks keyed by alt text — survives re-renders
+  let cachedChafaBlocks = new Map<string, string>();
 
 
   const setStatus = (text: string) => {
@@ -197,29 +199,37 @@ export function openChromeBrowserWindow(params: {
     }
     if (chafaBlocks.size === 0) return;
 
-    // Splice raw chafa ANSI into the already-rendered content.
-    // renderMarkdown() turns ![alt](url) into just "alt" (plain text line).
-    // Find those placeholder lines and replace with chafa output.
-    // Raw ANSI escape codes pass through blessed's rendering.
+    // Store in persistent cache so resize/rerender can re-splice
+    for (const [alt, ansi] of chafaBlocks) {
+      cachedChafaBlocks.set(alt, ansi.replace(/\x1b\[\?25[lh]/g, ""));
+    }
+
+    // Splice into already-rendered content
     setImmediate(() => {
       if (token !== navigationToken) return;
-      const lines = content.getContent().split("\n");
-      const out: string[] = [];
-      for (const line of lines) {
-        const trimmed = line.trim();
-        const chafa = chafaBlocks.get(trimmed);
-        if (chafa) {
-          // Strip cursor hide/show but keep colour codes
-          out.push(chafa.replace(/\x1b\[\?25[lh]/g, ""));
-          chafaBlocks.delete(trimmed);
-        } else {
-          out.push(line);
-        }
-      }
-      content.setContent(out.join("\n"));
+      spliceImages();
       screen.render();
       setStatus(`Images: ${currentTitle}`);
     });
+  };
+
+  /** Splice cached chafa blocks into rendered content by matching alt text lines. */
+  const spliceImages = () => {
+    if (cachedChafaBlocks.size === 0) return;
+    const lines = content.getContent().split("\n");
+    const out: string[] = [];
+    const used = new Set<string>();
+    for (const line of lines) {
+      const trimmed = line.trim();
+      const chafa = cachedChafaBlocks.get(trimmed);
+      if (chafa && !used.has(trimmed)) {
+        out.push(chafa);
+        used.add(trimmed);
+      } else {
+        out.push(line);
+      }
+    }
+    content.setContent(out.join("\n"));
   };
 
   /** Re-render the current page markdown (e.g. after resize or figlet toggle). */
@@ -230,6 +240,7 @@ export function openChromeBrowserWindow(params: {
     const headingConfig = figletHeadings ? DEFAULT_FIGLET_HEADING_CONFIG : PLAIN_HEADING_CONFIG;
     const lines = renderMarkdown(pageMarkdown, contentWidth, { headingConfig });
     content.setContent(lines.join("\n"));
+    spliceImages();
     screen.render();
   };
 
@@ -246,6 +257,7 @@ export function openChromeBrowserWindow(params: {
     }
 
     loading = true;
+    cachedChafaBlocks = new Map();
     setStatus(`Loading ${url}...`);
     content.setContent(`\n  Loading ${url}...\n\n  Connecting to Chrome on :9222...`);
     screen.render();
