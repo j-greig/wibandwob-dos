@@ -8,7 +8,10 @@
  * Extracted from modules/sy2-chronicles/index.ts.
  */
 
+import { clipToVisibleWidth, visibleWidth } from "./ansi-utils.js";
 import { clamp } from "./ui-parts.js";
+
+const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
 
 export function blankGrid(w: number, h: number): string[][] {
   return Array.from({ length: Math.max(0, h) }, () =>
@@ -20,10 +23,25 @@ export function paintText(grid: string[][], x: number, y: number, text: string):
   if (y < 0 || y >= grid.length) return;
   const row = grid[y];
   if (!row) return;
-  for (let i = 0; i < text.length; i += 1) {
-    const xPos = x + i;
-    if (xPos < 0 || xPos >= row.length) continue;
-    row[xPos] = text[i] ?? " ";
+
+  let cursorX = x;
+  for (const { segment } of segmenter.segment(text)) {
+    const width = Math.max(0, visibleWidth(segment));
+    if (width <= 0) continue;
+    if (cursorX >= row.length) break;
+    if (cursorX + width <= 0) {
+      cursorX += width;
+      continue;
+    }
+    if (cursorX < 0 || cursorX + width > row.length) {
+      cursorX += width;
+      continue;
+    }
+    row[cursorX] = segment;
+    for (let offset = 1; offset < width; offset += 1) {
+      row[cursorX + offset] = "";
+    }
+    cursorX += width;
   }
 }
 
@@ -34,8 +52,8 @@ export function gridToText(grid: string[][]): string {
 export function paintCentered(grid: string[][], y: number, text: string): void {
   const row = grid[y];
   if (!row) return;
-  const trimmed = text.length > row.length ? text.slice(0, row.length) : text;
-  const x = Math.max(0, Math.floor((row.length - trimmed.length) / 2));
+  const trimmed = clipToVisibleWidth(text, row.length);
+  const x = Math.max(0, Math.floor((row.length - visibleWidth(trimmed)) / 2));
   paintText(grid, x, y, trimmed);
 }
 
@@ -76,7 +94,7 @@ export function paintLines(
     if (centerX) {
       paintCentered(grid, y, lines[i] ?? "");
     } else {
-      paintText(grid, 0, y, (lines[i] ?? "").slice(0, width));
+      paintText(grid, 0, y, clipToVisibleWidth(lines[i] ?? "", width));
     }
   }
   return gridToText(grid);

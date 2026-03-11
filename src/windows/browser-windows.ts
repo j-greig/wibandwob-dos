@@ -7,11 +7,11 @@
 import blessed from "blessed";
 import fs from "node:fs";
 import path from "node:path";
-import stringWidth from "string-width";
 
 import { theme } from "../core/theme/resolver.js";
 import { EMPTY_PRIMER_SELECTED, EMPTY_FILE_SELECTED, EMPTY_MATCHES } from "../core/empty-states.js";
 import { createScrollbar } from "../core/ui-primitives.js";
+import { clipToVisibleWidth, padToWidth } from "../core/ansi-utils.js";
 import { createRestyleBundle, createSelectableList, deferRender } from "../core/ui-parts.js";
 import type { ContentMeasurement } from "../services/content-measurement.js";
 import { createPreRenderedPlayer, type FramePlayer } from "../services/animation-service.js";
@@ -22,22 +22,12 @@ import type { OverlayManager } from "../core/overlay-manager.js";
 const PREVIEW_SPLIT_RATIO = 34;
 import type { WindowManager } from "../core/window-manager.js";
 
-/** Truncate a line by display width (not string length) and pad to fixed width for full-Unicode rendering. */
+/** Truncate a line by visible width and pad to a fixed viewport width. */
 function fitLineToWidth(line: string, width: number): string {
   if (width <= 0) {
     return "";
   }
-  let visible = "";
-  let currentWidth = 0;
-  for (const char of line) {
-    const charWidth = stringWidth(char);
-    if (currentWidth + charWidth > width) {
-      break;
-    }
-    visible += char;
-    currentWidth += charWidth;
-  }
-  return visible + " ".repeat(Math.max(0, width - currentWidth));
+  return padToWidth(clipToVisibleWidth(line, width), width);
 }
 
 /** Convert raw text into viewport-safe lines, accounting for inner width and scrollbar, then setContent. */
