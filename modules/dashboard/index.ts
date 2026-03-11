@@ -946,6 +946,212 @@ export default function setup(host: MicroappHost) {
         });
       })();
 
+      // ═══════════════════════════════════════════════════
+      // TAB 7: Emoji Mosaic — unicode rendering test grid
+      // ═══════════════════════════════════════════════════
+
+      (() => {
+        const container = createTabContainer();
+        container.hide();
+
+        // Test categories — each is a labelled grid cell showing
+        // how blessed handles different unicode/emoji classes
+        interface EmojiTest {
+          label: string;
+          note: string; // expected behaviour
+          chars: string[]; // test strings
+          fill?: boolean; // fill the cell with repeating chars
+        }
+
+        const tests: EmojiTest[] = [
+          {
+            label: "Basic Emoji",
+            note: "EAW:W — should be 2 cols each",
+            chars: ["😀", "😎", "🔥", "💀", "👻", "🎉", "🚀", "⭐", "❤️", "🌈"],
+            fill: true,
+          },
+          {
+            label: "Skin Tone Modifiers",
+            note: "Base + modifier = 1 glyph, 2 cols",
+            chars: ["👋🏻", "👋🏼", "👋🏽", "👋🏾", "👋🏿", "👍🏻", "👍🏿"],
+          },
+          {
+            label: "ZWJ Sequences",
+            note: "Multiple codepoints, 1 glyph, 2 cols",
+            chars: ["👨‍👩‍👧‍👦", "👩‍💻", "🏳️‍🌈", "👨‍🎤", "🧑‍🚀", "👩‍🔬"],
+          },
+          {
+            label: "Variation Selectors",
+            note: "VS16 makes text emoji render as graphic",
+            chars: ["☺️", "☺", "❤️", "❤", "✨", "⭐", "☠️", "☠"],
+          },
+          {
+            label: "CJK Ideographs",
+            note: "EAW:W — 2 cols, well-supported",
+            chars: ["漢", "字", "日", "本", "語", "中", "文", "東", "京", "道"],
+            fill: true,
+          },
+          {
+            label: "Hangul Syllables",
+            note: "EAW:W — 2 cols",
+            chars: ["한", "글", "가", "나", "다", "라", "마", "바", "사", "아"],
+            fill: true,
+          },
+          {
+            label: "Box Drawing",
+            note: "EAW:N — 1 col, safe",
+            chars: ["┌", "─", "┐", "│", "└", "┘", "├", "┤", "┬", "┴", "┼", "═", "║", "╔", "╗", "╚", "╝"],
+            fill: true,
+          },
+          {
+            label: "Block Elements",
+            note: "EAW:A — ambiguous, usually 1 col",
+            chars: ["░", "▒", "▓", "█", "▀", "▄", "▌", "▐", "▍", "▎", "▏", "▊", "▋"],
+            fill: true,
+          },
+          {
+            label: "Braille Patterns",
+            note: "EAW:N — 1 col, safe",
+            chars: ["⠁", "⠂", "⠄", "⡀", "⢀", "⠿", "⣿", "⣶", "⣤", "⣀"],
+            fill: true,
+          },
+          {
+            label: "Misc Symbols",
+            note: "EAW:N/A — width varies by terminal",
+            chars: ["♠", "♣", "♥", "♦", "♪", "♫", "☆", "★", "○", "●", "◎", "□", "■"],
+            fill: true,
+          },
+          {
+            label: "Dingbats",
+            note: "EAW:N — but some terminals render wide",
+            chars: ["✓", "✗", "✦", "✧", "✩", "✪", "✫", "✬", "✭", "✮", "✯", "✰"],
+            fill: true,
+          },
+          {
+            label: "Math Symbols",
+            note: "EAW:A/N — usually 1 col",
+            chars: ["∀", "∃", "∅", "∇", "∈", "∉", "∋", "∏", "∑", "√", "∞", "∧", "∨"],
+            fill: true,
+          },
+          {
+            label: "Arrows",
+            note: "EAW:N — 1 col",
+            chars: ["←", "→", "↑", "↓", "↔", "↕", "⇐", "⇒", "⇑", "⇓", "⇔", "➜", "➤"],
+            fill: true,
+          },
+          {
+            label: "Trigrams (EAW:W!)",
+            note: "EAW:W — these BREAK blessed layout",
+            chars: ["☰", "☱", "☲", "☳", "☴", "☵", "☶", "☷"],
+          },
+          {
+            label: "Flags",
+            note: "Regional indicators, 2 codepoints each",
+            chars: ["🇬🇧", "🇺🇸", "🇯🇵", "🇫🇷", "🇩🇪", "🇧🇷", "🇦🇺"],
+          },
+          {
+            label: "Keycaps",
+            note: "Digit + VS16 + combining enclosing keycap",
+            chars: ["0️⃣", "1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "#️⃣", "*️⃣"],
+          },
+          {
+            label: "Animal Emoji",
+            note: "EAW:W — fill test",
+            chars: ["🐱", "🐶", "🐸", "🐙", "🦊", "🐝", "🦋", "🐢", "🐬", "🐧"],
+            fill: true,
+          },
+          {
+            label: "Food Emoji",
+            note: "EAW:W — fill test",
+            chars: ["🍕", "🍔", "🌮", "🍣", "🍩", "🎂", "🍺", "☕", "🧁", "🥐"],
+            fill: true,
+          },
+          {
+            label: "Weather/Nature",
+            note: "Mix of EAW:W and N",
+            chars: ["🌞", "🌙", "⛅", "🌧️", "❄️", "⚡", "🌊", "🍃", "🌸", "🌻"],
+            fill: true,
+          },
+          {
+            label: "fullUnicode:false",
+            note: "Control — plain ASCII baseline",
+            chars: ["A", "B", "C", "1", "2", "3", "#", "@", "&", "%", "!", "?"],
+            fill: true,
+          },
+        ];
+
+        // Layout: 5 cols × 4 rows grid of test cells
+        const GCOLS = 5, GROWS = 4;
+        const cellBoxes: Array<{ box: blessed.Widgets.BoxElement; test: EmojiTest }> = [];
+
+        for (let i = 0; i < tests.length && i < GCOLS * GROWS; i++) {
+          const test = tests[i]!;
+          const row = Math.floor(i / GCOLS);
+          const col = i % GCOLS;
+
+          const box = blessed.box({
+            parent: container,
+            top: `${(row / GROWS * 100).toFixed(1)}%`,
+            left: `${(col / GCOLS * 100).toFixed(1)}%`,
+            width: `${(100 / GCOLS).toFixed(1)}%`,
+            height: `${(100 / GROWS).toFixed(1)}%`,
+            border: { type: "line" },
+            label: ` ${test.label} `,
+            tags: false,
+            style: {
+              fg: "white",
+              border: { fg: "gray" },
+            },
+          });
+          cellBoxes.push({ box, test });
+        }
+
+        tabs.push({
+          name: "Emoji",
+          container,
+          setup: () => {},
+          update: () => {
+            for (const { box, test } of cellBoxes) {
+              const bw = Math.max(1, (box.width as number || 20) - 2);
+              const bh = Math.max(1, (box.height as number || 8) - 2);
+
+              const lines: string[] = [];
+              // Line 1: note
+              lines.push(test.note);
+              lines.push("");
+
+              if (test.fill) {
+                // Fill remaining rows with repeating chars
+                for (let y = 0; y < bh - 2; y++) {
+                  let line = "";
+                  let col = 0;
+                  while (col < bw) {
+                    const ch = test.chars[(col + y + tick) % test.chars.length]!;
+                    line += ch;
+                    col++; // assume 1 col — blessed will show the breakage
+                  }
+                  lines.push(line);
+                }
+              } else {
+                // Show chars spaced out with labels
+                let line = "";
+                for (const ch of test.chars) {
+                  line += ch + " ";
+                  if (line.length > bw - 4) {
+                    lines.push(line);
+                    line = "";
+                  }
+                }
+                if (line) lines.push(line);
+              }
+
+              box.setContent(lines.join("\n"));
+            }
+          },
+          cleanup: () => {},
+        });
+      })();
+
       // ── keyboard ─────────────────────────────────────
 
       body.key(["1"], () => switchTab(0));
@@ -954,6 +1160,7 @@ export default function setup(host: MicroappHost) {
       body.key(["4"], () => switchTab(3));
       body.key(["5"], () => switchTab(4));
       body.key(["6"], () => switchTab(5));
+      body.key(["7"], () => switchTab(6));
       (body as any).input = true;
       (body as any).keys = true;
 

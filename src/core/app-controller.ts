@@ -6,6 +6,7 @@
  */
 
 import blessed from "blessed";
+import { patchBlessedUnicode } from "./unicode-patch.js";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -203,6 +204,7 @@ export class TsTuiMvpApp {
     this.instanceLabel = opts?.instanceLabel?.trim() || undefined;
     this.sessionId = opts?.sessionId?.trim() || "???";
     log.setIdentity(this.getInstanceDisplayLabel());
+    patchBlessedUnicode();
     this.screen = blessed.screen({
       smartCSR: true,
       fullUnicode: true,
