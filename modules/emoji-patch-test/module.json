@@ -1,0 +1,20 @@
+{
+  "name": "emoji-patch-test",
+  "version": "0.1.0",
+  "description": "Visual test suite for the blessed unicode monkey-patch",
+  "type": "microapp",
+  "entry": "index.ts",
+  "microapp": {
+    "id": "wibwob.emoji-patch-test",
+    "title": "Emoji Patch Test",
+    "description": "Three visual tests proving charWidth and chars.all regex agree for emoji, CJK, trigrams, etc.",
+    "multiInstance": false,
+    "persist": false,
+    "menu": [
+      { "category": "demos", "order": 90, "label": "Emoji Patch Test" }
+    ],
+    "palette": { "order": 250, "label": "Emoji Patch Test" },
+    "agent": true,
+    "api": true
+  }
+}

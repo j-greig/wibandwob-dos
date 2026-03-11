@@ -283,7 +283,16 @@ export class TsTuiMvpApp {
     this.invalidation = createRenderScheduler({
       sync: () => this.syncLiveState(),
       persist: () => this.persistState(),
-      render: () => this.screen.render(),
+      render: () => {
+        // Force full repaint when fullUnicode is on — blessed's smartCSR
+        // differential rendering doesn't properly clear double-width char
+        // positions after window move/resize, leaving ghost artifacts.
+        // alloc() resets the comparison buffer so draw() does a full pass.
+        if (this.screen.fullUnicode) {
+          this.screen.alloc();
+        }
+        this.screen.render();
+      },
     });
     this.windowManager = new WindowManager(
       this.screen,

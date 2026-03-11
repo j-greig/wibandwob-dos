@@ -184,6 +184,7 @@ export class CommandRegistry {
       return result === undefined ? { ok: true } : { ok: true, result: safeSerializable(result) };
     }
     // Check dynamic commands
+    // Check dynamic commands
     const dyn = this.dynamicCommands.find((candidate) => candidate.id === canonicalId);
     if (dyn) {
       const result = dyn.action(args);
