@@ -15,6 +15,7 @@ import TurndownService from "turndown";
 // @ts-ignore — no types available for turndown-plugin-gfm
 import { gfm } from "turndown-plugin-gfm";
 import fs from "node:fs";
+import path from "node:path";
 import { spawn } from "node:child_process";
 import { capabilityService } from "./capability-service.js";
 
@@ -61,7 +62,7 @@ export class ChromeBrowserService {
   private page: Page | null = null;
   private launched = false;
   /** chafa symbol mode: "braille" (default, higher res) or "block" (half blocks) */
-  imageSymbols: "braille" | "block" = "braille";
+  imageSymbols: "braille" | "block" = "block";
 
   /**
    * Launch or connect to Chrome. Tries launching headless first,
@@ -535,23 +536,40 @@ export class ChromeBrowserService {
 
   async renderImagesAsAscii(markdown: string): Promise<string> {
     const imageRegex = /!\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g;
-    const matches = Array.from(markdown.matchAll(imageRegex));
-    if (matches.length === 0) return markdown;
+    if (!imageRegex.test(markdown)) return markdown;
 
-    let out = markdown;
-    for (const match of matches) {
-      const full = match[0];
-      const alt = match[1] ?? "";
-      const src = match[2] ?? "";
-      if (!src) continue;
-      const ascii = await this.imageToAscii(src);
-      const replacement = ascii ? `\n${ascii}\n` : (alt ? `[${alt}]` : "");
-      out = out.replace(full, replacement);
-    }
+    // Run image conversion in a separate Node subprocess to avoid blocking
+    // the blessed event loop. The hydrator reads markdown on stdin, converts
+    // images via curl+chafa, and writes updated markdown to stdout.
+    const hydrator = path.join(
+      path.dirname(new URL(import.meta.url).pathname),
+      "image-hydrator.mjs"
+    );
+    return new Promise<string>((resolve) => {
+      const child = spawn("node", [
+        hydrator,
+        "--symbols", this.imageSymbols,
+        "--max-images", "3",
+        "--max-cols", "60",
+      ], { stdio: ["pipe", "pipe", "ignore"] });
 
-    return out
-      .replace(/\n{3,}/g, "\n\n")
-      .trim();
+      let stdout = "";
+      child.stdout.on("data", (chunk: Buffer | string) => { stdout += chunk.toString(); });
+      child.on("error", () => resolve(markdown));
+      child.on("close", (code) => {
+        resolve(code === 0 && stdout ? stdout : markdown);
+      });
+
+      // Send markdown on stdin then close
+      child.stdin.write(markdown);
+      child.stdin.end();
+
+      // Safety timeout — don't wait forever
+      setTimeout(() => {
+        child.kill("SIGKILL");
+        resolve(markdown);
+      }, 30000);
+    });
   }
 
   private async runCommand(
@@ -632,9 +650,9 @@ export class ChromeBrowserService {
       const rows = Math.max(5, Math.round(cols * aspect / 2));
 
       const chafa = await this.runCommand("chafa", [
+        "-f", "symbols", "-c", "256",
         "-s", `${cols}x${rows}`,
         "--symbols", this.imageSymbols,
-        "--color-space", "rgb",
         tmpPath,
       ], 5000);
 

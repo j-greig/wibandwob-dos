@@ -133,6 +133,7 @@ export function openChromeBrowserWindow(params: {
   const history: string[] = [];
   let historyIndex = -1;
 
+
   const setStatus = (text: string) => {
     statusBar.setContent(` ${text}`);
     screen.render();
@@ -173,12 +174,52 @@ export function openChromeBrowserWindow(params: {
 
   const postProcessImages = async (result: BrowseResult, token: number) => {
     if (!result.ok || !result.markdown.includes("![")) return;
-    const updated = await service.renderImagesAsAscii(result.markdown);
-    if (token !== navigationToken) return;
-    if (!updated || updated === pageMarkdown) return;
-    pageMarkdown = updated;
-    rerenderPage();
-    setStatus(`Rendered: ${currentTitle}`);
+
+    // Collect alt texts from the original markdown
+    const imgRegex = /!\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g;
+    const images: Array<{ alt: string; src: string }> = [];
+    for (const m of result.markdown.matchAll(imgRegex)) {
+      if (m[1] && m[2]) images.push({ alt: m[1], src: m[2] });
+    }
+    if (images.length === 0) return;
+
+    // Convert each image individually (subprocess, non-blocking)
+    const chafaBlocks = new Map<string, string>();
+    for (const { alt, src } of images) {
+      if (chafaBlocks.size >= 3) break; // max 3 images
+      const singleMd = `![${alt}](${src})`;
+      const hydrated = await service.renderImagesAsAscii(singleMd);
+      if (token !== navigationToken) return; // stale navigation
+      // If hydration produced ANSI output, store it keyed by alt text
+      if (hydrated && hydrated !== singleMd && hydrated.includes("\x1b[")) {
+        chafaBlocks.set(alt, hydrated.trim());
+      }
+    }
+    if (chafaBlocks.size === 0) return;
+
+    // Splice raw chafa ANSI into the already-rendered content.
+    // renderMarkdown() turns ![alt](url) into just "alt" (plain text line).
+    // Find those placeholder lines and replace with chafa output.
+    // Raw ANSI escape codes pass through blessed's rendering.
+    setImmediate(() => {
+      if (token !== navigationToken) return;
+      const lines = content.getContent().split("\n");
+      const out: string[] = [];
+      for (const line of lines) {
+        const trimmed = line.trim();
+        const chafa = chafaBlocks.get(trimmed);
+        if (chafa) {
+          // Strip cursor hide/show but keep colour codes
+          out.push(chafa.replace(/\x1b\[\?25[lh]/g, ""));
+          chafaBlocks.delete(trimmed);
+        } else {
+          out.push(line);
+        }
+      }
+      content.setContent(out.join("\n"));
+      screen.render();
+      setStatus(`Images: ${currentTitle}`);
+    });
   };
 
   /** Re-render the current page markdown (e.g. after resize or figlet toggle). */
@@ -211,6 +252,7 @@ export function openChromeBrowserWindow(params: {
 
     const result = await service.navigate(url);
     showResult(result);
+    service.disconnect();
     void postProcessImages(result, token);
 
     if (result.ok && pushHistory) {
@@ -235,6 +277,7 @@ export function openChromeBrowserWindow(params: {
     const url = history[historyIndex];
     const result = await service.navigate(url);
     showResult(result);
+    service.disconnect();
     void postProcessImages(result, token);
   };
 
@@ -250,6 +293,7 @@ export function openChromeBrowserWindow(params: {
     const url = history[historyIndex];
     const result = await service.navigate(url);
     showResult(result);
+    service.disconnect();
     void postProcessImages(result, token);
   };
 
@@ -260,6 +304,7 @@ export function openChromeBrowserWindow(params: {
     setStatus(`Reloading ${currentUrl}...`);
     const result = await service.navigate(currentUrl);
     showResult(result);
+    service.disconnect();
     void postProcessImages(result, token);
   };
 
