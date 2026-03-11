@@ -9,6 +9,7 @@ import {
   createContourPlayer,
   readNodeViewport,
   terrainNames,
+  renderContour,
 } from "./contour-engine.js";
 import {
   createSavedTerrainArtifact,
@@ -98,6 +99,7 @@ export {
   createLazyMountedPlayer,
   readNodeViewport,
   terrainNames,
+  renderContour,
   createSavedTerrainArtifact,
   createTerrainMap,
   getTerrainFocusPoint,
@@ -163,6 +165,15 @@ export type {
 
 export { createRenderMonitor } from "../core/render-monitor.js";
 export type { RenderMonitorHandle, RenderReading } from "../core/render-monitor.js";
+export { createTreeWidget } from "../core/tree-widget.js";
+export type { TreeNode, TreeWidgetHandle } from "../core/tree-widget.js";
+export {
+  EMPTY_PRIMER_SELECTED,
+  EMPTY_FILE_SELECTED,
+  EMPTY_MATCHES,
+  EMPTY_PLACEHOLDER,
+  EMPTY_NO_MESSAGE,
+} from "../core/empty-states.js";
 export { MonsterCamService } from "./monster-cam-service.js";
 export type { MonsterCamFrame } from "./monster-cam-service.js";
 export { renderWebcamFrame, gridToBlessedContent } from "./webcam-renderer.js";

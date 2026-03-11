@@ -6,8 +6,8 @@ import fs from "node:fs";
 import path from "node:path";
 import YAML from "yaml";
 import type { CEPanelDef } from "./panel-types.js";
-import type { CanvasColumnDef, CanvasDocument } from "../../src/core/canvas-types.js";
-export type { CanvasColumnDef, CanvasDocument } from "../../src/core/canvas-types.js";
+import type { CanvasColumnDef, CanvasDocument } from "../../src/services/microapp-sdk.js";
+export type { CanvasColumnDef, CanvasDocument } from "../../src/services/microapp-sdk.js";
 
 /**
  * Load all panel definitions from a directory.

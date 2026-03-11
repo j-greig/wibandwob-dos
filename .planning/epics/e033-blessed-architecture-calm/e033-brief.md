@@ -164,7 +164,7 @@ After E033:
 |------|--------|------------|------|---------|
 | S01 | done | none | medium | Render scheduler and explicit invalidation policy |
 | S02 | done | S01 | medium | Local model/update/render pilot for live windows |
-| S03 | not-started | S01 | medium | Microapp host lifecycle, redraw, and state contract |
+| S03 | in-progress | S01 | medium | Microapp host lifecycle, redraw, and state contract |
 | S04 | not-started | none | medium | Thin the composition root |
 | S05 | not-started | none | medium | API contract audit and control-surface cleanup |
 | S06 | not-started | none | medium | Cell-aware text correctness and Unicode discipline |
@@ -179,7 +179,7 @@ After E033:
 
 - [x] S01 — Render scheduler and explicit invalidation policy
 - [x] S02 — Local model/update/render pilot for live windows
-- [ ] S03 — Microapp host lifecycle, redraw, and state contract
+- [~] S03 — Microapp host lifecycle, redraw, and state contract
 - [ ] S04 — Thin the composition root
 - [ ] S05 — API contract audit and control-surface cleanup
 - [ ] S06 — Cell-aware text correctness and Unicode discipline
@@ -366,7 +366,7 @@ remains outstanding even though the model/update/render seam is now landed.
 
 ## S03 — Microapp host lifecycle, redraw, and state contract
 
-Status: not-started
+Status: in-progress
 Depends on: S01
 Risk: medium
 
@@ -406,8 +406,8 @@ heartbeat, and patchbay-lab.
 - [ ] replace or reduce `setTimeout(ensureRegistered, 0)` lifecycle reliance only if an explicit lifecycle hook preserves the same guarantees
 - [ ] define explicit redraw/invalidate guidance for modules
 - [ ] tighten `describeState()` expectations for microapps
-- [ ] re-export missing shared helpers through `microapp-sdk.ts` where module authors currently reach into `src/core/*`
-- [ ] migrate at least two representative modules to the improved contract and SDK import path
+- [x] re-export missing shared helpers through `microapp-sdk.ts` where module authors currently reach into `src/core/*`
+- [x] migrate at least two representative modules to the improved contract and SDK import path
 - [ ] identify a shared architecture for embedding animated subwindows or animated surfaces inside other modules, with `modules/zine/index.ts` and `modules/touchlab-mvp/` as target consumers if feasible
 - [ ] check workspace restore behaviour for touched modules
 
@@ -426,10 +426,21 @@ heartbeat, and patchbay-lab.
 
 ### Verification
 
-- [ ] representative module windows still open and close cleanly
+- [x] representative module windows still open and close cleanly
 - [ ] workspace restore still works for migrated modules
-- [ ] theme switching with migrated modules open does not leave stale colours
-- [ ] first-run demo modules remain clean, legible, and agent-operable
+- [x] theme switching with migrated modules open does not leave stale colours
+- [x] first-run demo modules remain clean, legible, and agent-operable
+
+### Current outcome note
+
+The SDK import anti-pattern is now reduced in a first pass by re-exporting
+missing helpers through `src/services/microapp-sdk.ts` and migrating multiple
+modules (`patchbay-lab`, `e026-demo`, `zine`, and `sy2-chronicles`) away from
+direct `src/core/*` imports for the touched helpers.
+
+This story is still in progress because the `setTimeout(ensureRegistered, 0)`
+registration defer in `module-loader.ts` has not yet been replaced or formally
+documented, and workspace-restore evidence is still partial.
 
 ### Out of scope for this story
 

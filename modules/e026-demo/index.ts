@@ -25,12 +25,15 @@ import blessed from "blessed";
 import {
   createRenderMonitor,
   createBorderedPanel,
+  createTreeWidget,
+  createTimer,
+  clearTimers,
+  tweenWindowPosition,
+  tweenWindowSize,
   type BorderedPanelHandle,
   type MicroappHost,
+  type TreeNode,
 } from "../../src/services/microapp-sdk.js";
-import { createTreeWidget, type TreeNode } from "../../src/core/tree-widget.js";
-import { createTimer, clearTimers } from "../../src/core/ui-primitives.js";
-import { tweenWindowPosition, tweenWindowSize } from "../../src/services/motion-service.js";
 import path from "node:path";
 
 // ── Sample tree ───────────────────────────────────────────────────────────────

@@ -12,10 +12,13 @@
  */
 
 import fs from "node:fs";
-import { paintLines } from "../../src/services/microapp-sdk.js";
-import { renderFiglet } from "../../src/services/figlet-service.js";
-import { renderMarkdown, PLAIN_HEADING_CONFIG } from "../../src/services/markdown-service.js";
-import type { PanelDef } from "../../src/core/panel-layout.js";
+import {
+  paintLines,
+  renderFiglet,
+  renderMarkdown,
+  PLAIN_HEADING_CONFIG,
+  type PanelDef,
+} from "../../src/services/microapp-sdk.js";
 
 export type PanelType = "text" | "figlet" | "ascii-art" | "pixel" | "infographic" | "markdown" | "mixed" | "webcam" | "animated-text";
 

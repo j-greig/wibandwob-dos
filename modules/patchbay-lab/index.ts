@@ -1,8 +1,8 @@
 import blessed from "blessed";
 import fs from "node:fs";
-import { EMPTY_PRIMER_SELECTED } from "../../src/core/empty-states.js";
 
 import {
+  EMPTY_PRIMER_SELECTED,
   clamp,
   ContentService,
   createContourPlayer,

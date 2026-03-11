@@ -18,18 +18,23 @@ import blessed from "blessed";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import type { MicroappHost } from "../../src/services/microapp-sdk.js";
 import {
   layoutPanels,
   layoutColumns,
   measureViewport,
   pointerToContent,
   hitPanel,
+  createTimer,
+  clearTimers,
+  createButtonBar,
+  createSidebarPanel,
+  createSelectableList,
+  createInlineSearch,
+  type MicroappHost,
   type PanelNode,
-} from "../../src/core/panel-layout.js";
-import type { ZineItem, ZineSourceType } from "../../src/core/canvas-types.js";
-import { createTimer, clearTimers } from "../../src/core/ui-primitives.js";
-import { createButtonBar, createSidebarPanel, createSelectableList, createInlineSearch } from "../../src/core/ui-parts.js";
+  type ZineItem,
+  type ZineSourceType,
+} from "../../src/services/microapp-sdk.js";
 import { toPanelDef, renderPanel } from "../sy2-chronicles/panel-types.js";
 import YAML from "yaml";
 import { loadCanvas } from "../sy2-chronicles/content-loader.js";
