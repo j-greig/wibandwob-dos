@@ -1,3 +1,10 @@
+/**
+ * ascii-composition.ts — shared composition helpers for ASCII art modules.
+ *
+ * Module authors: do NOT import from this file directly.
+ * Use ../../src/services/microapp-sdk.js instead, which re-exports
+ * composeAsciiLayers, renderAsciiTextBlock, and related types.
+ */
 import { blankGrid, gridToText, paintText } from "../core/grid-canvas.js";
 
 export type AsciiCompositionRole =

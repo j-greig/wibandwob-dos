@@ -1,6 +1,10 @@
 /**
  * grid-canvas.ts — Pure 2D string-canvas API.
  *
+ * Module authors: do NOT import from this file directly.
+ * Use ../../src/services/microapp-sdk.js instead, which re-exports
+ * blankGrid, paintText, paintCentered, paintLines, gridToText, etc.
+ *
  * No blessed dependency. Functions work on a string[][] grid that can be
  * converted to text via gridToText(). Used by panel-layout microapps and
  * any surface that needs programmatic ASCII drawing.

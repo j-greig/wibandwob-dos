@@ -1,3 +1,10 @@
+/**
+ * ui-primitives.ts — internal low-level helpers (timers, scrollbars).
+ *
+ * Module authors: do NOT import from this file directly.
+ * Use ../../src/services/microapp-sdk.js instead, which re-exports
+ * createTimer and clearTimers under a stable public surface.
+ */
 import { theme } from "./theme/resolver.js";
 
 /** @primitive */

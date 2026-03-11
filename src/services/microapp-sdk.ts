@@ -1,3 +1,15 @@
+/**
+ * microapp-sdk.ts — the ONE canonical import surface for module authors.
+ *
+ * Modules should import types and helpers from this file:
+ *   import type { MicroappHost } from "../../src/services/microapp-sdk.js";
+ *   import { createTimer, clamp } from "../../src/services/microapp-sdk.js";
+ *
+ * Do NOT import directly from src/core/* or other src/services/* files
+ * unless the SDK genuinely does not re-export what you need.
+ *
+ * If something is missing, add the re-export here rather than bypassing.
+ */
 import type blessed from "blessed";
 import {
   applyRect,

@@ -1,6 +1,10 @@
 /**
  * Animation Service — reusable frame playback engine.
  *
+ * Module authors: do NOT import from this file directly.
+ * Use ../../src/services/microapp-sdk.js instead, which re-exports
+ * createEmbeddedLivePlayer, createLazyMountedPlayer, and related types.
+ *
  * Supports two sources:
  *   1. Pre-rendered frames (string[][] from content-measurement.ts)
  *   2. Live generators (function that produces a frame each tick)
