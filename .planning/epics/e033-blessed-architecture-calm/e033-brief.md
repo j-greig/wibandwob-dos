@@ -84,8 +84,21 @@ Current architectural pressure points:
 8. The control API likely contains some fast-grown, vibe-engineered edges:
    alias routes, overlapping command surfaces, and endpoint contracts that
    may be useful but not yet as coherent as the rest of the architecture.
-9. Third-party developers do not yet have a clean “build your first custom
-   app” path for creating modules under `/modules`.
+9. Runtime telemetry exists only as fragments: `src/core/render-monitor.ts`
+   is real but unwired, Monster Cam reports its own service FPS only, and the
+   shell has no dedicated debug/stats surface for FPS, frame time, RAM, or
+   agent/session health.
+10. Blessed custom stream routing may be strategically useful for composition
+    work: a `blessed.screen()` can manually target arbitrary duplex streams,
+    which suggests future possibilities for piping one Blessed surface into
+    another widget or composition surface rather than treating every animated
+    system as a top-level window only.
+11. Application launching and window switching still lean too much on menus,
+    commands, and knowledge of the system. There is room for a more immediate,
+    TUI-native macOS-like launcher/switcher surface with icon-ish affordances,
+    running indicators, and one-click open/focus behaviour.
+12. Third-party developers do not yet have a clean “build your first custom
+    app” path for creating modules under `/modules`.
 
 ## Outcome
 
@@ -99,6 +112,9 @@ After E033:
 - text/cell correctness becomes an explicit engineering track, not an incidental fix
 - module authoring surfaces become cleaner and more trustworthy as first-run demos
 - the control API becomes easier to discover, trust, and extend without route drift
+- runtime telemetry becomes a real operator tool rather than an unwired primitive
+- composition work has a clearer path toward embeddable Blessed surfaces, not only top-level windows
+- application launching and switching become faster and more intuitive through a TUI-native macOS-like launcher/switcher surface
 - third-party developers have a canonical documentation path for building custom apps
 
 ## User stories
@@ -116,6 +132,12 @@ After E033:
 - As an external operator or agent integration author, I can discover the API,
   predict its naming and behaviour, and trust `GET /help`, `GET /openapi.json`,
   commands, and live state to agree.
+- As a developer or operator in a debugging session, I can turn on a stats
+  surface and see render FPS, frame timing, RAM usage, and key agent/session
+  health signals without inventing ad hoc instrumentation.
+- As a human operator, I can switch between running apps and launch apps faster
+  through a TUI-fied macOS-like launcher/switcher surface with recognisable
+  indicators and instant open/focus behaviour.
 - As a third-party developer, I can read one obvious doc path and build a custom
   app under `/modules` without copying random internals from `src/`.
 
@@ -139,7 +161,11 @@ After E033:
 | S05 | not-started | none | medium | API contract audit and control-surface cleanup |
 | S06 | not-started | none | medium | Cell-aware text correctness and Unicode discipline |
 | S07 | not-started | none, then coordinate with S01 | medium | Visual regression, render telemetry, and dense-scene performance checks |
-| S08 | not-started | S03 | low | Third-party developer docs for building custom apps in `/modules` |
+| S08 | not-started | none, then coordinate with S01 and S07 | medium | Runtime telemetry, stats surface, and agent/session health metrics |
+| S09 | not-started | none | medium | WibWobTUI macOS-ification for app launch and switching |
+| S10 | not-started | S03 | low | Third-party developer docs for building custom apps in `/modules` |
+| S11 | not-started | S03, S07 | medium | Composable animated surfaces for zine, touchlab, and future dashboard modules |
+| S12 | not-started | S03, S11 | medium | TouchDesigner-like composition scaffolding for ASCII / ANSI art modules |
 
 ## Stories
 
@@ -150,7 +176,11 @@ After E033:
 - [ ] S05 — API contract audit and control-surface cleanup
 - [ ] S06 — Cell-aware text correctness and Unicode discipline
 - [ ] S07 — Visual regression, render telemetry, and dense-scene performance checks
-- [ ] S08 — Third-party developer docs for custom modules
+- [ ] S08 — Runtime telemetry, stats surface, and agent/session health metrics
+- [ ] S09 — WibWobTUI macOS-ification for app launch and switching
+- [ ] S10 — Third-party developer docs for custom modules
+- [ ] S11 — Composable animated surfaces for zine, touchlab, and future dashboard modules
+- [ ] S12 — TouchDesigner-like composition scaffolding for ASCII / ANSI art modules
 
 ---
 
@@ -325,6 +355,7 @@ heartbeat, and patchbay-lab.
 - [ ] tighten `describeState()` expectations for microapps
 - [ ] re-export missing shared helpers through `microapp-sdk.ts` where module authors currently reach into `src/core/*`
 - [ ] migrate at least two representative modules to the improved contract and SDK import path
+- [ ] identify a shared architecture for embedding animated subwindows or animated surfaces inside other modules, with `modules/zine/index.ts` and `modules/touchlab-mvp/` as target consumers if feasible
 - [ ] check workspace restore behaviour for touched modules
 
 ### Acceptance criteria
@@ -335,9 +366,10 @@ heartbeat, and patchbay-lab.
 - [ ] AC-4: module `describeState()` remains trustworthy for `/state` and agent use
 - [ ] AC-5: the SDK import anti-pattern is reduced in the touched modules by routing shared helpers through `microapp-sdk.ts`
 - [ ] AC-6: existing modules remain compatible during the transition; this is not a flag-day rewrite
-- [ ] AC-7: migrated modules preserve workspace restore correctness
-- [ ] AC-8: migrated modules preserve theme/restyle correctness with windows left open across a theme switch
-- [ ] AC-9: `bun run typecheck` passes
+- [ ] AC-7: the story records whether a shared animated-subwindow architecture for `modules/zine/index.ts` and `modules/touchlab-mvp/` is feasible now, deferred, or partially landed
+- [ ] AC-8: migrated modules preserve workspace restore correctness
+- [ ] AC-9: migrated modules preserve theme/restyle correctness with windows left open across a theme switch
+- [ ] AC-10: `bun run typecheck` passes
 
 ### Verification
 
@@ -497,6 +529,16 @@ Known bad-case anchors for this story include problematic private primers with
 mixed-width characters, narrow sidebar/list truncation, ANSI-styled text width
 drift, and framed or figlet-adjacent text around mixed-width characters.
 
+Known troublesome ASCII / Unicode-heavy primers to test:
+
+- `modules-private/wibwob-primers/primers/cosmic-horror.txt`
+  - repro note: drag a primer window while showing this file; known render corruption exists
+  - screenshot reference: `/var/folders/00/hh5g78b97blgb_7dlj2plsrc0000gn/T/pi-clipboard-22ef905e-bc57-4404-9f3d-54c8fbe299de.png`
+- `modules-private/wibwob-primers/primers/graveyard-emoji-flow.txt`
+  - screenshot reference: `/var/folders/00/hh5g78b97blgb_7dlj2plsrc0000gn/T/pi-clipboard-eeba5096-4476-4614-988b-a60093cdbd9a.png`
+- `modules-private/wibwob-primers/primers/conscious-matrix-1.txt`
+  - screenshot reference: `/var/folders/00/hh5g78b97blgb_7dlj2plsrc0000gn/T/pi-clipboard-b4afe3b2-0706-4713-8598-04fd5a2b247a.png`
+
 ### Expected files
 
 - `src/core/grid-canvas.ts`
@@ -510,6 +552,7 @@ drift, and framed or figlet-adjacent text around mixed-width characters.
 - [ ] audit the known bad Unicode/cell-width failure surfaces first
 - [ ] define one shared text-width / truncation rule for touched surfaces
 - [ ] reduce ad hoc width assumptions in list/sidebar/text rendering
+- [ ] test whether `libncursesw` wide-character behaviour is useful reference material or toolkit input for fixing complex ASCII-art rendering bugs
 - [ ] fix at least one primer-facing or module-facing Unicode bug class
 - [ ] document remaining hard cases and the follow-on boundary
 
@@ -558,6 +601,39 @@ This story can start before S01 fully lands: instrumentation, artifact format,
 and scene definition work are useful immediately. Scheduler-aware interpretation
 of the results can then tighten later.
 
+Known animated surfaces to include in render-controller and dense-scene smoke
+coverage:
+
+Core windows / window families:
+- `src/windows/generative-windows.ts`
+- `src/windows/plasma-window.ts`
+- `src/windows/terrain-lab-window.ts`
+- `src/windows/contour-window.ts`
+- `src/windows/monster-cam-window.ts`
+- `src/windows/music-player-window.ts`
+- `src/windows/browser-windows.ts` (animated text / primer playback)
+- `src/windows/backrooms-windows.ts` (fallback playback timers)
+- `src/windows/backrooms-log-browser-window.ts` (refresh timer)
+
+Animated or timer-driven modules:
+- `modules/glitchbox/`
+- `modules/heartbeat/`
+- `modules/touchlab-mvp/`
+- `modules/patchbay-lab/`
+- `modules/wibwob-poetry-clock/`
+- `modules/sy2-chronicles/`
+- `modules/e026-demo/`
+- `modules/zine/`
+
+Minimum must-test anchors from the human's explicit list:
+- `modules/glitchbox/`
+- `modules/heartbeat/`
+- `src/windows/generative-windows.ts`
+- `src/windows/plasma-window.ts`
+- `src/windows/terrain-lab-window.ts`
+- `src/windows/contour-window.ts`
+- `src/windows/monster-cam-window.ts`
+
 ### Expected files
 
 - `src/core/render-monitor.ts`
@@ -598,7 +674,147 @@ of the results can then tighten later.
 
 ---
 
-## S08 — Third-party developer docs for custom modules
+## S08 — Runtime telemetry, stats surface, and agent/session health metrics
+
+Status: not-started
+Depends on: none, then coordinate with S01 and S07
+Risk: medium
+
+### User story
+
+As a developer or operator in a debugging session, I want one obvious stats
+surface so I can see render FPS, frame timing, RAM usage, and key agent/session
+health signals while the app is running, without inventing ad hoc probes.
+
+### Why this story exists
+
+The repo already has a useful primitive sitting unused: `createRenderMonitor(screen)`
+in `src/core/render-monitor.ts`. It can measure render FPS and frame timing, but
+nothing in the shell currently wires it up. The shell also has no debug/stats
+flag or diagnostics surface beyond environment variables, and Monster Cam’s FPS
+readout is service-level camera FPS rather than desktop render FPS.
+
+This story turns telemetry from a hidden primitive into a real operator tool.
+It should also think beyond render alone: if future multiple-agent setups matter,
+we need at least a first pass at session-health visibility for the in-app agent.
+
+### Expected files
+
+- `src/core/render-monitor.ts`
+- `src/core/app-controller.ts`
+- `src/core/cli.ts` or the nearest startup/config seam if a debug/stats flag is added
+- `src/services/wibwob-agent-session.ts`
+- `src/windows/wibwob-agent-window.ts`
+- optional diagnostics surface under `src/windows/` or as a small microapp
+- docs / AGENTS updates if a new debug mode or stats command is introduced
+
+### Tasks
+
+- [ ] wire the existing render monitor into the shell in a controlled way
+- [ ] decide the first operator surface: top-right indicator, help-menu diagnostics window, command palette action, or small diagnostics microapp
+- [ ] decide the first debug gate: env var, startup flag, dev-only surface, or explicit command
+- [ ] expose at least render FPS, frame timing, and RAM usage in the chosen surface
+- [ ] add a first pass at agent/session health stats that are actually useful, such as active agent window/session presence, turn/streaming status, or message/tool counts where available
+- [ ] keep the surface lightweight and non-invasive, ideally dev-only by default if always visible chrome would clutter the desktop
+- [ ] document how operators turn the stats surface on and what each metric means
+
+### Acceptance criteria
+
+- [ ] AC-1: the existing render-monitor primitive is used by a real shell-visible or command-visible diagnostics path
+- [ ] AC-2: the chosen stats surface reports render FPS and frame timing from shell-level render monitoring, not only service-local FPS
+- [ ] AC-3: the chosen stats surface reports RAM usage from the running process
+- [ ] AC-4: the chosen stats surface includes at least one useful Wib&Wob agent/session health signal beyond raw render stats
+- [ ] AC-5: the stats surface can be turned on intentionally and does not become unavoidable chrome for normal users unless explicitly desired
+- [ ] AC-6: if a flag or env var is introduced, it is documented and wired cleanly at startup
+- [ ] AC-7: touched telemetry seams have direct test coverage where practical
+- [ ] AC-8: `bun run typecheck` passes
+
+### Verification
+
+- [ ] enable the stats surface and verify FPS/frame timing/RAM visibly update during runtime
+- [ ] confirm the render numbers change under a dense-scene benchmark rather than staying static
+- [ ] confirm at least one agent/session metric changes meaningfully during agent activity
+- [ ] visually verify the diagnostics surface does not make the normal desktop unusable
+
+### Out of scope for this story
+
+- full observability platform
+- remote telemetry backend
+- perfect per-window profiling
+- solving all future multi-agent monitoring in one pass
+
+---
+
+## S09 — WibWobTUI macOS-ification for app launch and switching
+
+Status: not-started
+Depends on: none
+Risk: medium
+
+### User story
+
+As a human operator, I want to switch between running apps and launch apps
+faster through a TUI-fied macOS-like launcher/switcher surface, so opening or
+focusing an app feels instant and legible rather than buried in menus and
+commands.
+
+### Why this story exists
+
+The desktop already has windows, commands, menus, and modules, but the app
+launch and app-switch flow is still more operator-knowledge-heavy than it
+should be. A TUI-native macOS-like surface could make the system feel more
+immediate: click or focus an app icon-ish entry to open it instantly, show
+running indicators, and use one consistent surface to launch or jump to an
+existing app.
+
+The goal is not to clone Finder or Dock literally. The goal is to translate the
+best interaction patterns into terminal-native form: recognisable app entries,
+running-state indicators, instant open/focus, and faster switching between live
+windows or app types.
+
+### Expected files
+
+- `src/core/app-controller.ts`
+- `src/core/command-registry.ts`
+- `src/core/command-catalog.ts`
+- relevant launcher/switcher UI surface under `src/core/` or `src/windows/`
+- `src/services/state-service.ts` if running indicators need stronger semantic state
+- touched docs if this becomes a canonical launch path
+
+### Tasks
+
+- [ ] define the TUI-native launcher/switcher surface: dock-like strip, app shelf, finder-like launcher, or similar
+- [ ] use canonical command metadata rather than inventing a parallel app registry
+- [ ] support instant open for unopened apps and instant focus/jump for already-running ones
+- [ ] add running indicators or equivalent TUI state cues for active apps
+- [ ] make the surface mouse-friendly and keyboard-friendly
+- [ ] ensure the interaction feels macOS-inspired but terminal-native, not a fake pixel clone
+
+### Acceptance criteria
+
+- [ ] AC-1: there is one clear launcher/switcher surface for opening and focusing apps faster
+- [ ] AC-2: clicking or selecting an app entry opens it if absent and focuses it if already running
+- [ ] AC-3: the surface shows running-state indicators or equivalent cues for active apps
+- [ ] AC-4: the implementation reuses canonical command/state sources rather than inventing a second app registry
+- [ ] AC-5: the surface works with both mouse and keyboard interaction
+- [ ] AC-6: `bun run typecheck` passes
+
+### Verification
+
+- [ ] open multiple apps and verify the launcher/switcher can jump between them quickly
+- [ ] verify unopened apps launch directly from the surface
+- [ ] visually verify indicators update as apps open and close
+- [ ] confirm the surface feels faster than the current menu-only path for common app switching
+
+### Out of scope for this story
+
+- pixel-perfect macOS imitation
+- replacing the command palette
+- full desktop shell redesign
+
+---
+
+## S10 — Third-party developer docs for custom modules
 
 Status: not-started
 Depends on: S03
@@ -655,6 +871,161 @@ looks less modular than it really is. This story makes extensibility legible.
 
 ---
 
+## S11 — Composable animated surfaces for zine, touchlab, and future dashboard modules
+
+Status: not-started
+Depends on: S03, S07
+Risk: medium
+
+### User story
+
+As a module author building editorial or dashboard-style surfaces, I want a
+shared way to embed animated windows or animated players as subsurfaces inside
+other modules, so I can compose motion-rich layouts in `modules/zine/`,
+`modules/touchlab-mvp/`, and future modules without inventing bespoke
+embedding code each time.
+
+### Why this story exists
+
+The epic already identifies a future desire to support animated subwindows in
+`modules/zine/index.ts` and `modules/touchlab-mvp/`. The module and telemetry
+stories also surfaced a broad set of animated windows and timer-driven modules.
+If composability matters, it should become a first-class architecture story
+rather than a vague stretch wish.
+
+This story should prefer one shared architecture over one-off embedding paths.
+It can build on existing animation primitives such as `createAnimatedPanel`,
+`createLazyMountedPlayer`, and related SDK exports, but the outcome should be a
+clear reusable pattern rather than two special-case integrations.
+
+### Expected files
+
+- `src/services/microapp-sdk.ts`
+- `src/services/animation-service.ts`
+- `src/core/ui-parts.ts`
+- `modules/zine/index.ts`
+- `modules/touchlab-mvp/`
+- any shared helper extracted for animated embedding
+- docs or notes for the pattern if the contract changes
+
+### Tasks
+
+- [ ] audit the existing animated-surface primitives and current embedding patterns
+- [ ] define the shared architecture for composable animated subsurfaces
+- [ ] identify the minimum contract needed for embedding an animated player or animated window fragment inside another module
+- [ ] implement the shared path in reusable code rather than per-module hacks
+- [ ] adopt the shared path in `modules/zine/` and `modules/touchlab-mvp/` if feasible in this epic pass, or land one adopter and record the second as a concrete follow-on
+- [ ] verify the new path plays nicely with restyle, resize, cleanup, and window lifecycle
+
+### Acceptance criteria
+
+- [ ] AC-1: there is a named shared architecture or helper path for embedding animated subsurfaces inside modules
+- [ ] AC-2: the path is reusable and not specific only to `zine` or only to `touchlab-mvp`
+- [ ] AC-3: at least one real module adopter uses the shared path successfully
+- [ ] AC-4: feasibility and next-step status for both `modules/zine/` and `modules/touchlab-mvp/` are recorded clearly
+- [ ] AC-5: the embedded animated path preserves cleanup, resize, and restyle correctness
+- [ ] AC-6: the shared path does not require modules to bypass the SDK and reach into random `src/core/*` internals
+- [ ] AC-7: `bun run typecheck` passes
+
+### Verification
+
+- [ ] open the adopter module and verify the embedded animated surface renders correctly
+- [ ] resize the containing module/window and confirm the animated subsurface adapts or degrades predictably
+- [ ] switch themes and confirm no stale-colour leakage
+- [ ] close the module and confirm timers / animation resources clean up cleanly
+
+### Out of scope for this story
+
+- making every existing animated window embeddable in one pass
+- solving general nested-window layout for the whole OS
+- replatforming all animation around a new rendering engine
+
+---
+
+## S12 — TouchDesigner-like composition scaffolding for ASCII / ANSI art modules
+
+Status: not-started
+Depends on: S03, S11
+Risk: medium
+
+### User story
+
+As a creator building terminal-native visual compositions, I want a small set of
+shared composition primitives inspired by TouchDesigner so I can patch, layer,
+mix, preview, and animate ASCII / ANSI art surfaces inside WibWob-DOS without
+rewriting a bespoke mini-engine for every creative module.
+
+### Why this story exists
+
+`modules/touchlab-mvp/` already points toward this future: it has source nodes,
+a mix node, nested frames, a canvas, inspector controls, and simple animation.
+That makes it more than a toy; it is an early proof that WibWob-DOS wants a
+terminal-native composition language.
+
+Thinking in TouchDesigner terms, the useful transferable ideas are not the full
+app metaphor or GPU pipeline. The useful ideas are smaller and fit the TUI:
+source operators, transform/composite operators, parameter controls, preview vs
+output surfaces, reusable graph/player contracts, and a way to treat animated
+ASCII/ANSI content as composable materials rather than isolated windows.
+
+One additional technical angle is worth keeping in scope here: Blessed can
+manually route a `blessed.screen()` instance to arbitrary duplex streams. If
+that proves workable in this repo, it may offer a surprisingly powerful path
+for piping one Blessed surface into another widget or composition container.
+That does not mean "nest full apps everywhere" by default, but it is highly
+relevant reference material for embeddable composition work and should be
+investigated before inventing a more complicated bespoke path.
+
+This story should identify the minimum shared scaffolding needed for those
+possibilities and land it in a form that future creative modules can reuse.
+
+### Expected files
+
+- `modules/touchlab-mvp/index.ts`
+- `modules/zine/index.ts`
+- `src/services/microapp-sdk.ts`
+- `src/services/animation-service.ts`
+- `src/core/ui-parts.ts`
+- any new shared composition helper under `src/core/` or `src/services/`
+- supporting docs if the pattern becomes part of the public module contract
+
+### Tasks
+
+- [ ] audit what `modules/touchlab-mvp/` already proves: source generation, mixing, nested node frames, inspector state, animation toggle, and simple compositing
+- [ ] define the smallest reusable composition vocabulary for TUI art modules, for example source, transform, mix, output, parameter, and preview
+- [ ] test whether Blessed custom duplex stream routing can help embed one Blessed surface inside another composition surface before inventing a more bespoke architecture
+- [ ] decide which parts belong in shared code versus staying module-local experimentation
+- [ ] extract one or more shared helpers or contracts that let modules compose animated ASCII / ANSI surfaces without reaching into random internals
+- [ ] verify the scaffolding can serve both a patch-oriented creative module (`modules/touchlab-mvp/`) and a layout/editorial surface (`modules/zine/` or similar)
+- [ ] document what is intentionally not being copied from TouchDesigner, so scope stays terminal-native and honest
+
+### Acceptance criteria
+
+- [ ] AC-1: the story defines a named shared composition vocabulary for ASCII / ANSI art modules rather than leaving TouchLab as a one-off experiment
+- [ ] AC-2: at least one shared helper, contract, or primitive is extracted from the composition work and is usable outside `modules/touchlab-mvp/`
+- [ ] AC-3: the scaffolding is demonstrated in at least one second context beyond TouchLab, or that second-context feasibility is recorded concretely with blockers
+- [ ] AC-4: the story records whether Blessed custom stream routing is useful, irrelevant, or too awkward for the composition architecture, so the question is closed for future implementers
+- [ ] AC-5: the shared path works with animated surfaces and not only static text blocks
+- [ ] AC-6: the design stays terminal-native and does not require React, webview, or GPU-style assumptions
+- [ ] AC-7: the extracted path remains compatible with module cleanup, resize, restyle, and state reporting expectations
+- [ ] AC-8: `bun run typecheck` passes
+
+### Verification
+
+- [ ] open TouchLab and verify the composition scaffolding still supports animated source → mix → output style behaviour
+- [ ] exercise the shared path in at least one second module or prototype surface
+- [ ] verify resize, theme switch, and close cleanup remain correct
+- [ ] confirm the resulting pattern is understandable enough to document for future module authors
+
+### Out of scope for this story
+
+- cloning TouchDesigner feature-for-feature
+- real-time shader graphs or GPU effects
+- node editor UI for the entire OS
+- replacing windows with a full patcher runtime
+
+---
+
 ## Consolidated acceptance criteria
 
 - [ ] AC-1: Blessed remains the runtime; no runtime migration is required for the epic to succeed
@@ -664,13 +1035,16 @@ looks less modular than it really is. This story makes extensibility legible.
 - [ ] AC-5: `app-controller.ts` is thinner and more obviously a composition root
 - [ ] AC-6: Unicode/cell correctness improves on at least one known bad surface
 - [ ] AC-7: visual regression and render telemetry improve materially
-- [ ] AC-8: hero modules remain clean first-run demos after the refactors
-- [ ] AC-9: touched surfaces preserve workspace/snapshot restore correctness
-- [ ] AC-10: touched surfaces preserve command and API parity
-- [ ] AC-11: touched surfaces preserve theme/restyle correctness
-- [ ] AC-12: there is a clear third-party developer doc path for building custom apps under `/modules`
-- [ ] AC-13: `/state`, commands, and visible behaviour stay aligned for touched surfaces
-- [ ] AC-14: `bun run typecheck` passes
+- [ ] AC-8: a real stats/diagnostics surface exists for development-time runtime observation, including render stats and basic process or agent health signals
+- [ ] AC-9: hero modules remain clean first-run demos after the refactors
+- [ ] AC-10: touched surfaces preserve workspace/snapshot restore correctness
+- [ ] AC-11: touched surfaces preserve command and API parity
+- [ ] AC-12: touched surfaces preserve theme/restyle correctness
+- [ ] AC-13: there is a clear third-party developer doc path for building custom apps under `/modules`
+- [ ] AC-14: there is a reusable path for composing animated subsurfaces inside module-driven editorial or dashboard layouts
+- [ ] AC-15: there is a shared, terminal-native composition vocabulary or helper path for TouchDesigner-like ASCII / ANSI art composition work
+- [ ] AC-16: `/state`, commands, and visible behaviour stay aligned for touched surfaces
+- [ ] AC-17: `bun run typecheck` passes
 
 ## Risks
 
@@ -694,7 +1068,6 @@ looks less modular than it really is. This story makes extensibility legible.
 - investigate flexbox-like responsive layout only for `zine`-class editorial surfaces
 - deepen cell-aware rendering into a shared engine path if S05 proves the need
 - add denser performance scenes once render telemetry and smoke scripts mature
-- explore a lightweight runtime metrics surface showing FPS and RAM usage, either as a tiny top-right desktop indicator or a help/menu-accessible diagnostics microapp, so operators can watch redraw pressure and memory cost live while running dense animated scenes, perhaps only visible in dev mode
 
 ## Branch
 
