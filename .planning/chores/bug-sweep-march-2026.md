@@ -1,7 +1,7 @@
 ---
 id: chore-bug-sweep-march-2026
 title: Bug sweep & small features — March 2026
-status: in-progress
+status: done
 branch: chore/bug-sweep-march-2026
 ---
 
@@ -25,7 +25,7 @@ items as they come up.
 - [x] Applications menu: 3 sections — favourites, main apps A-Z, Prototypes (labelled separator)
 - [x] Right-click context menu: apps removed, only Cycle Theme + Toggle Chromeless + Tile/Cascade
 - [x] Kaomoji in top-right: 12 emotional states cycling every ~5 mins with blink transition
-- [ ] Web browser: render H1-H5 with figlet text like the markdown renderer/editor, responsively sized
+- [x] Web browser: render H1-H5 with figlet headings, responsive on resize, 'h' to toggle
 
 ## Housekeeping
 
