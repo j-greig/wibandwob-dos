@@ -149,7 +149,8 @@ export function openEditorWindow(params: EditorWindowParams): WindowRecord | und
   function getInnerWidth(): number {
     const w = Number(frame.body.width);
     const fallback = Math.max(40, Number(screen.width) - 10);
-    return Math.max(40, Number.isFinite(w) && w > 2 ? w - 2 : fallback);
+    // -4: scrollbar (1) + rounding leeway (2) + 1 safety
+    return Math.max(40, Number.isFinite(w) && w > 4 ? w - 4 : fallback);
   }
 
   function getHeadingConfig(): FigletHeadingConfig {

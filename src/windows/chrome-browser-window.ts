@@ -158,7 +158,8 @@ export function openChromeBrowserWindow(params: {
     pageMarkdown = result.markdown;
 
     // Render markdown with figlet headings (same renderer as the smart editor)
-    const contentWidth = Math.max(40, Number(content.width) || 80);
+    // -3: scrollbar (1) + rounding leeway (2)
+    const contentWidth = Math.max(40, (Number(content.width) || 80) - 3);
     const headingConfig = figletHeadings ? DEFAULT_FIGLET_HEADING_CONFIG : PLAIN_HEADING_CONFIG;
     const lines = renderMarkdown(result.markdown, contentWidth, { headingConfig });
     content.setContent(lines.join("\n"));
@@ -172,7 +173,8 @@ export function openChromeBrowserWindow(params: {
   /** Re-render the current page markdown (e.g. after resize or figlet toggle). */
   const rerenderPage = () => {
     if (!pageMarkdown) return;
-    const contentWidth = Math.max(40, Number(content.width) || 80);
+    // -3: scrollbar (1) + rounding leeway (2)
+    const contentWidth = Math.max(40, (Number(content.width) || 80) - 3);
     const headingConfig = figletHeadings ? DEFAULT_FIGLET_HEADING_CONFIG : PLAIN_HEADING_CONFIG;
     const lines = renderMarkdown(pageMarkdown, contentWidth, { headingConfig });
     content.setContent(lines.join("\n"));
