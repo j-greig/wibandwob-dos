@@ -22,6 +22,8 @@ export interface RenderMonitorHandle {
   readonly avgFrameMs: number;
   /** Total frames rendered since monitor was created. */
   readonly totalFrames: number;
+  /** Current snapshot reading. */
+  read(): RenderReading;
   /**
    * Subscribe to periodic readings. fn is called every intervalMs (default 1000).
    * Returns unsubscribe function.
@@ -35,6 +37,11 @@ export interface RenderReading {
   fps: number;
   avgFrameMs: number;
   totalFrames: number;
+}
+
+export function formatRenderReading(reading: RenderReading): string {
+  const avg = reading.avgFrameMs > 0 ? `${reading.avgFrameMs.toFixed(1)}ms` : "n/a";
+  return `fps=${reading.fps} avg=${avg} total=${reading.totalFrames}`;
 }
 
 /** Rolling window size in milliseconds for FPS calculation. */
@@ -95,6 +102,7 @@ export function createRenderMonitor(
     get fps() { return currentFps(); },
     get avgFrameMs() { return currentAvgFrameMs(); },
     get totalFrames() { return totalFrames; },
+    read() { return reading(); },
 
     subscribe(fn, intervalMs = 1000) {
       const id = nextSubId++;
