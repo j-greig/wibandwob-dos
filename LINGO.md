@@ -80,6 +80,57 @@
 - like queuing "this is dirty" and flushing at the right moment
 - the alternative — calling `screen.render()` from 40 different places — works but makes timing unpredictable and wastes CPU
 
+**East Asian Width (EAW)**
+- a Unicode property that says how wide a character renders in a monospaced terminal
+- values that matter: W (wide, 2 cols — CJK, Hangul, trigrams ☰), N (narrow, 1 col — ASCII, box drawing, braille), A (ambiguous — terminal decides; blocks ▒▓█ and misc symbols are usually 1 col in Western terminals)
+- blessed has a `charWidth()` function that checks this but its lookup table is from 2015 and misses emoji entirely
+
+**surrogate pairs**
+- JavaScript strings are UTF-16, so any codepoint above U+FFFF (the Basic Multilingual Plane) gets split into two 16-bit values called a surrogate pair
+- a high surrogate (U+D800-DBFF) followed by a low surrogate (U+DC00-DFFF)
+- emoji like 😀 (U+1F600) are surrogate pairs: `"😀".length === 2` even though it's one visible character
+- CJK like 漢 (U+6F22) is NOT a surrogate pair: it's in the BMP so `"漢".length === 1`
+- blessed treats surrogate pairs specially in parseContent — it already knows their `.length` is 2, so it skips the regex-inserted spacer for them. BMP wide chars (CJK, trigrams) need the regex spacer because their `.length` is 1 but their visual width is 2
+- this is why fixing emoji (surrogates) and fixing CJK/trigrams (BMP wide) are actually two different code paths in blessed
+
+**charWidth / strWidth**
+- blessed's two width-measuring functions in `lib/unicode.js`
+- `charWidth(codepoint)` returns 0, 1, or 2 for one character
+- `strWidth(string)` sums charWidth across a string
+- we monkey-patch both with `string-width` v8 which handles emoji, ZWJ, skin tones, flags, keycaps, variation selectors
+- the patch lives in `src/core/unicode-patch.ts`, called once before `blessed.screen()` creation
+
+**chars.all regex**
+- blessed regex in `unicode.chars.all` that matches every character considered "wide"
+- used by `parseContent()` to insert `\x03` spacer cells after wide characters
+- MUST agree with `charWidth()` — if charWidth says 2 but the regex doesn't match, parseContent won't insert a spacer, and screen.draw() will eat a real neighbouring character
+- we patch this regex too, adding emoji surrogate pair ranges and BMP ranges blessed missed (☰ trigrams, dingbats, misc symbols)
+
+**spacer cell / \x03**
+- when blessed encounters a double-width character, parseContent inserts a `\x03` byte after it
+- this is a placeholder that screen.draw() "eats" — it advances past it without outputting anything
+- the terminal renders the wide char across two columns; the spacer reserves the second column in blessed's internal buffer
+- if the spacer is missing, draw() eats the real next character instead
+
+**smartCSR / differential rendering**
+- blessed's screen.draw() compares old buffer vs new buffer cell by cell, only outputting changes
+- `smartCSR: true` (our default) enables this optimisation
+- the problem: when a window containing double-width chars moves, the old position has stale cells that draw() doesn't know are part of a wide char — it fails to clear the second column, leaving ghost artifacts
+- fix: call `screen.alloc()` before render to reset the comparison buffer, forcing a full repaint
+- this is cheap (zeroes an array) and we do it on every render when `fullUnicode` is on
+
+**fullUnicode**
+- blessed screen option that enables the double-width character handling path
+- without it, all wide chars get replaced with `??` and surrogates with `?`
+- with it, blessed uses `charWidth()` + `chars.all` regex + spacer insertion + the eat-next-cell logic in draw()
+- we always enable it: `blessed.screen({ fullUnicode: true })`
+
+**ghost artifacts / stale cells**
+- wide chars that persist on screen after a window moves or closes
+- root cause: blessed's differential render doesn't know a cell was the second half of a wide char
+- the reblessed fork (kenan238/reblessed) tried to fix this by checking string length instead of charWidth — works for surrogate pair emoji but not BMP wide chars
+- nobody has fully solved this in any blessed fork; our `screen.alloc()` approach is the most complete workaround
+
 **ownership boundary**
 - a rule about who is allowed to change what
 - preferred split in this codebase: services own logic and state, windows own layout and render, controller wires them together
