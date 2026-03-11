@@ -68,7 +68,7 @@ export interface FigletHeadingConfig {
 
 export const DEFAULT_FIGLET_HEADING_CONFIG: FigletHeadingConfig = {
   h1: { font: "doom",    fallbackFonts: ["slant","small","term"], color: "\x1b[96m", plainFallback: true },
-  h2: { font: "slant",   fallbackFonts: ["shadow","small","term"], color: "\x1b[94m", plainFallback: true },
+  h2: { font: "small",   fallbackFonts: ["shadow","mini","term"], color: "\x1b[94m", plainFallback: true },
   h3: { font: "shadow",  fallbackFonts: ["small","term"], color: "\x1b[95m", plainFallback: true },
   h4: { font: "small",   fallbackFonts: ["term"], color: "\x1b[93m", plainFallback: true },
   h5: { font: "smslant", fallbackFonts: ["term"], color: "\x1b[92m", plainFallback: true },
