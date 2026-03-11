@@ -93,7 +93,7 @@ export default function setup(host: MicroappHost) {
       });
 
       win.describeState(() => ({
-        summary: `${ESC_TITLE} scaffold`,
+        summary: \`${ESC_TITLE} scaffold\`,
         contentPreview: APP_SUMMARY,
       }));
 

@@ -160,7 +160,20 @@ host.registerCommand({
 ```
 
 For commands that query or control an already-open window rather than opening
-one, add `direct: true` so the return value passes through to the API caller.
+one, add `direct: true` so the return value passes through to the API caller:
+
+```typescript
+host.registerCommand({
+  id: "inspect",
+  direct: true,
+  label: "Inspect My App",
+  description: "Return current state from the running window.",
+  action: () => ({ ok: true, status: "ready", tick: currentTick }),
+});
+```
+
+Without `direct: true`, the host may focus/open a window and swallow the
+return value.
 
 ### host.screen
 
@@ -187,6 +200,8 @@ Every module window MUST implement these four hooks:
    when the user cycles themes. Call `host.screen.render()` at the end.
 
 ## Adding animation
+
+### Simple timers
 
 Use `createTimer` from the SDK for interval-based updates:
 
@@ -215,6 +230,30 @@ function openMyApp(host: MicroappHost) {
   win.onRestyle(() => { display.style = host.theme().body; host.screen.render(); });
   win.onCleanup(() => clearTimers(timers));
 }
+```
+
+### Embedded live animation
+
+For animated subsurfaces inside a larger module, use `createEmbeddedLivePlayer`
+instead of a handwritten timer loop:
+
+```typescript
+import { createEmbeddedLivePlayer, readNodeViewport } from "../../src/services/microapp-sdk.js";
+
+const player = createEmbeddedLivePlayer({
+  fps: 6,
+  generator: (tick, width, height) => renderMyFrame(tick, width, height),
+  getViewport: (target) => readNodeViewport(target, {
+    minWidth: 8, minHeight: 4,
+    fallbackWidth: 24, fallbackHeight: 6,
+  }),
+  onFrame: (content) => { /* update dependent state */ },
+  render: () => host.screen.render(),
+});
+
+player.attachTarget(myAnimatedBox);
+player.setRunning(true);
+win.onCleanup(() => player.destroy());
 ```
 
 ## SDK imports
@@ -252,12 +291,24 @@ After creating your module:
 6. Cycle the theme — your window should restyle correctly
 7. Close the window — no console errors, no leaked timers
 
+## Common mistakes
+
+- Importing from `app-controller.ts` or other load-bearing internals
+- Adding widgets to the window frame instead of `win.body`
+- Forgetting `describeState` and `captureText` (breaks /state and text export)
+- Forgetting `direct: true` for query/control commands that must return data
+- Reading `host.theme()` once at startup and never restyling
+- Forgetting cleanup for timers, subscriptions, or players
+- Using `setInterval` directly instead of `createTimer` (leaks on close)
+
 ## Examples in the repo
 
 - `modules/hello-world/` — minimal static example (figlet banner)
 - `modules/heartbeat/` — animated example with timers and state reporting
-- `modules/glitchbox/` — more complex animated surface
+- `modules/glitchbox/` — complex animated surface with multiple commands
 - `modules/dream-forecast/` — stateful microapp with per-window model
+- `modules/e026-demo/` — broad feature sampler (tween, tree widget, sidebar)
+- `modules/wibwob-poetry-clock/` — compact but lived-in real app
 
 ## Further reading
 

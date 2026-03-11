@@ -1,7 +1,7 @@
 ---
 id: E033
 title: Blessed Architecture Calm
-status: in-progress
+status: done
 issue: ~
 pr: ~
 depends_on: []

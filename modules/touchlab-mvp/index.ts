@@ -1,9 +1,11 @@
 import blessed from "blessed";
 import type { AsciiCompositionNodeSpec, MicroappHost } from "../../src/services/microapp-sdk.js";
 import {
+  blankGrid,
   clamp,
   composeAsciiLayers,
   createEmbeddedLivePlayer,
+  gridToText,
   readNodeViewport,
   renderAsciiTextBlock,
 } from "../../src/services/microapp-sdk.js";
