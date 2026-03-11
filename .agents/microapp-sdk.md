@@ -16,6 +16,13 @@ A TypeScript module that drops a window into the WibWob-DOS desktop. It gets:
 - Access to the screen, theme, and window manager via a host object
 - Lifecycle hooks: cleanup, restyle, resize, input
 
+Render policy for microapps:
+- keep one local render function per window or surface where possible
+- mutate widgets inside that render function, not ad hoc across event handlers
+- use `win.onResize()` as the re-layout seam
+- use `win.describeState()` for semantic state, not UI scraping
+- prefer imports from `src/services/microapp-sdk.ts` over direct `src/core/*` imports
+
 ---
 
 ## File structure
@@ -153,7 +160,8 @@ win.onInput(fn)         // (input: string) => void — receives writeInput calls
 
 ## Core primitives you can import directly
 
-These live in `src/` but are stable and safe to import from modules:
+Import these from `../../src/services/microapp-sdk.js`, not from scattered
+`src/core/*` paths. The SDK surface is the stable contract for module authors.
 
 ### Blessed widgets
 ```typescript
@@ -164,7 +172,7 @@ const box = blessed.box({ parent: win.body, top: 0, left: 0, ... });
 
 ### TreeWidget (F05)
 ```typescript
-import { createTreeWidget, type TreeNode } from "../../src/core/tree-widget.js";
+import { createTreeWidget, type TreeNode } from "../../src/services/microapp-sdk.js";
 
 const tree = createTreeWidget(parentBox, { style: host.theme().body });
 tree.setNodes([
@@ -188,7 +196,7 @@ Keys wired automatically: j/k up/down, Enter/Space/←/→ toggle, g/G ends.
 
 ### Lifecycle timers (F06)
 ```typescript
-import { createTimer, clearTimers } from "../../src/core/ui-primitives.js";
+import { createTimer, clearTimers } from "../../src/services/microapp-sdk.js";
 
 // In your openMyApp function:
 const timers = new Set<ReturnType<typeof setInterval>>();
@@ -212,7 +220,7 @@ import {
   tweenWindowSize,
   tween,
   EASINGS,
-} from "../../src/services/motion-service.js";
+} from "../../src/services/microapp-sdk.js";
 
 // Slide window to x=20, y=5 over 400ms
 tweenWindowPosition(host.windows, win.id, 20, 5, 400, "easeOutCubic");
