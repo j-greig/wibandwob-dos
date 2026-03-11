@@ -15,6 +15,7 @@ import type { StylePair, ThemeTokens, ThemeVariant } from "./types.js";
 import { dark } from "./dark.js";
 import { darkNord } from "./dark-nord.js";
 import { darkPastel } from "./dark-pastel.js";
+import { phosphor } from "./phosphor.js";
 import { light } from "./light.js";
 
 /** Built-in variants in cycle order. External variants append after these. */
@@ -22,6 +23,7 @@ const BUILTIN_VARIANTS: readonly ThemeVariant[] = [
   dark,
   darkNord,
   darkPastel,
+  phosphor,
   light,
 ];
 

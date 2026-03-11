@@ -115,8 +115,8 @@ export function layoutColumns(panels: PanelDef[], maxWidth: number, opts?: Colum
 
   const sortedCols = [...cols.keys()].sort((a, b) => a - b);
 
-  // Pre-measure each column
-  const colWidths: number[] = [];
+  // Pre-measure each column (natural widths)
+  const naturalWidths: number[] = [];
   const colHeights: number[] = [];
   for (const colIdx of sortedCols) {
     const colPanels = cols.get(colIdx)!;
@@ -129,8 +129,23 @@ export function layoutColumns(panels: PanelDef[], maxWidth: number, opts?: Colum
       if (w > maxW) maxW = w;
       totalH += h + (i < colPanels.length - 1 ? panelGap : 0);
     }
-    colWidths.push(maxW);
+    naturalWidths.push(maxW);
     colHeights.push(totalH);
+  }
+
+  // Responsive shrink: if all columns at natural width don't fit, shrink
+  // proportionally so they do. This prevents wrapping to single column.
+  const totalNatural = naturalWidths.reduce((s, w) => s + w, 0)
+    + (naturalWidths.length - 1) * columnGap;
+  let colWidths: number[];
+  if (totalNatural > safeWidth && naturalWidths.length > 1) {
+    const availableForCols = safeWidth - (naturalWidths.length - 1) * columnGap;
+    const totalW = naturalWidths.reduce((s, w) => s + w, 0);
+    colWidths = naturalWidths.map(w =>
+      Math.max(minColumnWidth, Math.floor((w / totalW) * availableForCols))
+    );
+  } else {
+    colWidths = [...naturalWidths];
   }
 
   // Place columns left-to-right, wrapping at maxWidth or maxColumns
@@ -176,7 +191,7 @@ export function layoutColumns(panels: PanelDef[], maxWidth: number, opts?: Colum
     let cursorY = rowBaseY + headerHeight;
     for (let j = 0; j < colPanels.length; j++) {
       const panel = colPanels[j]!;
-      const w = clamp(panel.w, minColumnWidth, safeWidth);
+      const w = clamp(panel.w, minColumnWidth, colW);  // shrink to column width
       const h = Math.max(minPanelHeight, panel.h);
       items.push({
         id: panel.id,

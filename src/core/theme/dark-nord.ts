@@ -16,7 +16,7 @@ export const darkNord: ThemeVariant = {
     titleBarUnfocused:    { fg: "#d8dee9",  bg: "#3b4252"  },
     closeButton:          { fg: "#2e3440",  bg: "#bf616a"  },  // nord11 red
     resizeGrip:           { fg: "#ebcb8b",  bg: "#2e3440"  },
-    windowShadow:         { fg: "#2e3440", bg: "#2e3440", char: "▒" },
+    windowShadow:         { fg: "#1d2028", bg: "#232831", char: "▒" },
 
     body:                 { fg: "#d8dee9",  bg: "#2e3440"  },
     bodyAlt:              { fg: "#d8dee9",  bg: "#3b4252"  },

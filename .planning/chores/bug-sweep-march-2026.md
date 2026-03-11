@@ -18,15 +18,14 @@ items as they come up.
 
 ## Small features
 
-- [ ] Cursor: blinking solid rectangle instead of underline for agent/scramble input
-- [ ] Rename "Scramble: Floating" to "Scramble Chat"
-- [ ] Rename "Wib&Wob Agent" to "Wib&Wob Chat"
-- [ ] Applications menu: group into 3 sections — main apps (A-Z sorted), separator, then "Prototypes" label with: TR-808, Tide Pool, Patchbay Lab, Hello World, Heartbeat, WibWobWorld, E026 Demo
-- [ ] Right-click context menu: remove apps, keep only window commands + toggle theme
-- [ ] Kaomoji in top-right: cycle through emotional states randomly every ~5 mins using render system
-
+- [x] Cursor: solid block instead of underline for agent/scramble input
+- [x] Rename "Scramble: Floating" to "Scramble Chat"
+- [x] Rename "Wib&Wob Agent" to "Wib&Wob Chat"
+- [x] Applications menu: 3 sections — favourites, main apps A-Z, Prototypes (labelled separator)
+- [x] Right-click context menu: apps removed, only Cycle Theme + Toggle Chromeless + Tile/Cascade
+- [x] Kaomoji in top-right: 12 emotional states cycling every ~5 mins with blink transition
 - [ ] Web browser: render H1-H5 with figlet text like the markdown renderer/editor, responsively sized
 
 ## Housekeeping
 
-- [ ] Delete Dream Forecast module (not needed)
+- [x] Delete Dream Forecast module (not needed)
