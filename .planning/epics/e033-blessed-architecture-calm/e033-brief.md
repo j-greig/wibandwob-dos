@@ -61,6 +61,8 @@ internal grammar”.
   for dense multi-window, animation-heavy, high-resolution future scenes
 - Improve module authoring ergonomics because `modules/` and `modules-private/`
   are first-run demo surfaces and extension surfaces
+- Retire unnecessary backward-compat cruft where we can prove it is no longer needed,
+  rather than preserving legacy commands, aliases, and dead compatibility paths forever
 
 ## Problem
 
@@ -149,6 +151,7 @@ After E033:
 - Browser portability work
 - React surface area expansion
 - Flexbox-first shell rewrite
+- Keeping legacy aliases or compatibility shims by default when the epic proves they are unnecessary
 
 ## Story register
 
@@ -181,6 +184,37 @@ After E033:
 - [ ] S10 — Third-party developer docs for custom modules
 - [ ] S11 — Composable animated surfaces for zine, touchlab, and future dashboard modules
 - [ ] S12 — TouchDesigner-like composition scaffolding for ASCII / ANSI art modules
+
+## Recommended execution order
+
+Phase A — core foundations and cleanup
+- S01 render scheduler
+- S04 thin the composition root
+- S05 API cleanup
+- S06 Unicode / cell correctness
+
+Phase B — observability and proof
+- S08 runtime telemetry / stats surface
+- S07 dense-scene smoke, regression evidence, and render telemetry workflows
+
+Phase C — local architecture and module contract
+- S02 local model/update/render pilot
+- S03 microapp host lifecycle and redraw contract
+
+Phase D — user-facing operability and authoring
+- S09 WibWobTUI macOS-ification for app launch and switching
+- S10 third-party developer docs for custom modules
+
+Phase E — advanced composition
+- S11 composable animated surfaces for zine / touchlab / dashboard modules
+- S12 TouchDesigner-like composition scaffolding
+
+Notes:
+- S04, S05, and S06 are intentionally parallelisable and should not wait on S01 unless they touch its exact seam.
+- S07 can begin before S01 fully lands by defining benchmark scenes, evidence formats, and telemetry workflows.
+- S08 should happen before or alongside the heavier dense-scene validation work so the benchmark passes have a real stats surface.
+- S10 should follow the stabilized module-host contract from S03.
+- S12 should not start before S11 proves the lower-level animated embedding path.
 
 ---
 
@@ -473,8 +507,9 @@ repo-specific standards used elsewhere in the epic.
 
 ### Tasks
 
-- [ ] audit the current endpoint catalogue for overlap, drift, and ambiguous aliases
+- [ ] audit the current endpoint catalogue for overlap, drift, ambiguous aliases, and legacy cruft
 - [ ] identify which routes are canonical versus backward-compat alias paths
+- [ ] remove alias or backward-compat routes that are no longer justified, rather than preserving them by default
 - [ ] tighten route naming and documentation where the API currently feels vibe-engineered
 - [ ] ensure `GET /help`, `GET /openapi.json`, command routes, and live state descriptions agree
 - [ ] check parity between control API routes and agent/control tooling where they overlap
@@ -484,12 +519,13 @@ repo-specific standards used elsewhere in the epic.
 ### Acceptance criteria
 
 - [ ] AC-1: the API has a clearer distinction between canonical routes and backward-compat aliases
-- [ ] AC-2: `GET /help`, `GET /openapi.json`, and the real handlers agree on touched routes and shapes
-- [ ] AC-3: touched control routes preserve or improve command/state parity for agents and external operators
-- [ ] AC-4: any route cleanup preserves backward compatibility where intended and makes deprecation intent explicit where relevant
-- [ ] AC-5: touched API seams have direct test coverage where practical
-- [ ] AC-6: `.agents/specs/state-and-api.md` is updated if the contract changes
-- [ ] AC-7: `bun run typecheck` passes
+- [ ] AC-2: unjustified alias or legacy routes touched by the story are retired rather than preserved automatically
+- [ ] AC-3: `GET /help`, `GET /openapi.json`, and the real handlers agree on touched routes and shapes
+- [ ] AC-4: touched control routes preserve or improve command/state parity for agents and external operators
+- [ ] AC-5: any remaining backward-compat path is explicitly justified and documented rather than retained by inertia
+- [ ] AC-6: touched API seams have direct test coverage where practical
+- [ ] AC-7: `.agents/specs/state-and-api.md` is updated if the contract changes
+- [ ] AC-8: `bun run typecheck` passes
 
 ### Verification
 
@@ -1062,6 +1098,17 @@ possibilities and land it in a form that future creative modules can reuse.
 - global flexbox layout system for the shell
 - browser runtime support
 - solving every Unicode/cell issue in one pass
+
+## Cross-cutting cleanup principle
+
+When this epic touches legacy code, legacy commands, alias routes, or compatibility
+shims, the default should be removal once they are proven unnecessary.
+
+Do not keep backward-compat cruft by habit.
+
+If a legacy path remains, the burden is to justify it explicitly in code and
+in docs. If it no longer serves a real user, operator, agent, workspace, or
+migration need, retire it.
 
 ## Stretch / later follow-on
 
