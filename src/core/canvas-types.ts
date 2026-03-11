@@ -5,7 +5,7 @@
  * microapp that consumes canvas documents.
  */
 
-import type { CEPanelDef } from "../../modules/sy2-chronicles/panel-types.js";
+import type { CEPanelDef } from "../../modules/zine/panel-types.js";
 
 // ── ZineItem: unified layout primitive ────────────────────────────────────
 
@@ -48,8 +48,16 @@ export interface CanvasColumnDef {
   header?: string;
 }
 
+/** Canvas format discriminator. */
+export type CanvasFormat = "sy2-canvas-v1" | "zine-freeform-v1";
+
+/** Layout mode for freeform canvases. */
+export type FreeformLayoutMode = "freeform" | "masonry" | "grid" | "stack";
+
 /** Parsed .canvas.yaml document. */
 export interface CanvasDocument {
+  /** Document format (from meta.format). */
+  format: CanvasFormat;
   /** Document title (from meta.title). */
   title: string;
   /** Whether to show column headers (from meta.columnHeaders). */
@@ -58,4 +66,6 @@ export interface CanvasDocument {
   columns: Map<number, CanvasColumnDef>;
   /** Panel definitions. */
   panels: CEPanelDef[];
+  /** Layout mode hint for freeform canvases. */
+  layout?: FreeformLayoutMode;
 }

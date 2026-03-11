@@ -34,10 +34,11 @@ import {
   createSidebarPanel,
   createSelectableList,
   createInlineSearch,
+  clamp,
 } from "../../src/services/microapp-sdk.js";
-import { toPanelDef, renderPanel } from "../sy2-chronicles/panel-types.js";
+import { toPanelDef, renderPanel } from "./panel-types.js";
 import YAML from "yaml";
-import { loadCanvas } from "../sy2-chronicles/content-loader.js";
+import { loadCanvas } from "./content-loader.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "../..");
@@ -114,14 +115,15 @@ export default function setup(host: MicroappHost) {
     const canvas_doc = loadCanvas(filePath);
     if (!canvas_doc) return;
 
-    const { title, panels: initialPanels, columnHeaders: showHeaders, columns: columnDefs } = canvas_doc;
+    const { title, panels: initialPanels, columnHeaders: showHeaders, columns: columnDefs, format: canvasFormat } = canvas_doc;
 
     // Mutable panel list — hot reload swaps this in place
     let cePanelDefs = initialPanels;
+    let isFreeform = canvasFormat === "zine-freeform-v1";
 
     // Build column header map for layout engine
     const columnHeaderMap = new Map<number, string>();
-    if (showHeaders) {
+    if (showHeaders && !isFreeform) {
       for (const [idx, def] of columnDefs) {
         if (def.header) columnHeaderMap.set(idx, def.header);
       }
@@ -232,6 +234,7 @@ export default function setup(host: MicroappHost) {
         watcher.close();
         activeFilePath = fp;
         cePanelDefs = fresh.panels;
+        isFreeform = fresh.format === "zine-freeform-v1";
         columnHeaderMap.clear();
         if (fresh.columnHeaders) {
           for (const [idx, def] of fresh.columns) {
@@ -265,7 +268,11 @@ export default function setup(host: MicroappHost) {
     const canvas = blessed.box({
       parent: sidePanel.main,
       top: 0, left: 0, right: 0, bottom: 0,
-      keys: true, mouse: true, clickable: true,
+      keys: true, clickable: true,
+      // NOTE: mouse intentionally OFF on canvas. Blessed's scrollable box
+      // with mouse:true consumes drag events for its own scroll handling,
+      // which prevents panel drag-to-move. All mouse interaction (click,
+      // drag, scroll) is handled at screen level via handleMouse/handleWheel.
       scrollable: true,
       alwaysScroll: true,
       scrollbar: {
@@ -390,20 +397,49 @@ export default function setup(host: MicroappHost) {
             top: 0, left: 0,
             width: item.w, height: item.h,
             border: "line",
+            mouse: true,
+            // clickable intentionally OFF — prevents blessed from stealing
+            // focus away from the canvas when panels are clicked.
             style: {
               ...host.theme().body,
               border: { fg: host.theme().muted.fg },
             },
           });
+          // Prevent blessed auto-focus on click
+          (frame as any).focusable = false;
 
           const titleBar = blessed.box({
             parent: frame,
             top: 0, left: 1, right: 1, height: 1,
             tags: false,
             fixed: true,
+            mouse: true,
             style: host.theme().header,
             content: item.title ?? "",
           });
+          (titleBar as any).focusable = false;
+
+          // ── Element-level drag start (same pattern as window-manager) ──
+          // Blessed delivers element mousedown reliably even inside scrollable
+          // parents. Screen-level mousemove/mouseup handle the rest.
+          const startPanelDrag = (data: any) => {
+            const panelId = item.id;
+            const node = panelNodes.get(panelId);
+            if (!node) return;
+            activePanelId = panelId;
+            dragging = {
+              id: panelId,
+              offsetX: data.x - ((frame as any).aleft ?? 0),
+              offsetY: data.y - ((frame as any).atop ?? 0),
+            };
+            dragMoved = false;
+            applyStyles();
+            // Keep focus on canvas so arrow keys keep working
+            canvas.focus();
+            host.screen.render();
+          };
+          titleBar.on("mousedown", startPanelDrag);
+          frame.on("mousedown", startPanelDrag);
 
           const iw = Math.max(1, item.w - 2);
           const ih = Math.max(1, item.h - 2);
@@ -425,7 +461,7 @@ export default function setup(host: MicroappHost) {
               def: {
                 id: item.id, title: item.title ?? "",
                 w: item.w, h: item.h,
-                col: (item.col ?? 0) as 0|1|2,
+                col: item.col ?? 0,
                 live: item.live,
                 content: item.content,
               },
@@ -463,30 +499,44 @@ export default function setup(host: MicroappHost) {
     // ── Layout + render ─────────────────────────────────────────────
     function renderLayoutAndContent() {
       const measured = measureViewport(canvas);
-      const vw = measured.width > 20 ? measured.width : Math.max(80, (Number(win.body.width) || 80) - 2);
+      const sidebarAwareWidth = Math.max(20, sidePanel.mainWidth());
+      const vw = measured.width > 20 ? measured.width : sidebarAwareWidth;
       const vh = measured.height;
       const defs = getFilteredDefs();
       const layoutDefs = defs.map(toPanelDef);
 
-      // Column or flow layout → unified ZineItem[]
-      const hasColumns = defs.some(d => (d.col ?? 0) > 0);
+      // Layout dispatch: freeform, column, or flow
       let items: ZineItem[];
-      if (hasColumns) {
-        const result = layoutColumns(layoutDefs, Math.max(20, vw), {
-          columnHeaders: columnHeaderMap.size > 0 ? columnHeaderMap : undefined,
-        });
-        items = result.items;
-      } else {
-        const result = layoutPanels(layoutDefs, Math.max(20, vw));
-        items = result.placements.map(p => {
-          const def = layoutDefs.find(d => d.id === p.id);
+      if (isFreeform) {
+        // Freeform: use panel x/y directly from YAML, no layout engine
+        items = defs.map(d => {
+          const def = layoutDefs.find(ld => ld.id === d.id);
           return {
-            id: p.id, type: "panel" as const,
-            x: p.x, y: p.y,
-            w: def?.w ?? 40, h: def?.h ?? 10,
-            title: def?.title, content: def?.content, live: def?.live,
+            id: d.id, type: "panel" as const,
+            x: d.x ?? 0, y: d.y ?? 0,
+            w: Math.min(d.w, vw), h: d.h,
+            title: def?.title ?? d.title, content: def?.content, live: def?.live,
           };
         });
+      } else {
+        const hasColumns = defs.some(d => (d.col ?? 0) > 0);
+        if (hasColumns) {
+          const result = layoutColumns(layoutDefs, Math.max(20, vw), {
+            columnHeaders: columnHeaderMap.size > 0 ? columnHeaderMap : undefined,
+          });
+          items = result.items;
+        } else {
+          const result = layoutPanels(layoutDefs, Math.max(20, vw));
+          items = result.placements.map(p => {
+            const def = layoutDefs.find(d => d.id === p.id);
+            return {
+              id: p.id, type: "panel" as const,
+              x: p.x, y: p.y,
+              w: def?.w ?? 40, h: def?.h ?? 10,
+              title: def?.title, content: def?.content, live: def?.live,
+            };
+          });
+        }
       }
 
       // Build nodes on first render (or after rebuild/search)
@@ -507,8 +557,12 @@ export default function setup(host: MicroappHost) {
         const node = zineNodes.get(item.id);
         if (!node) continue;
 
-        const effectiveW = Math.max(3, Math.min(item.w, vw));
-        node.frame.left = item.x;
+        const maxLeft = Math.max(0, vw - (item.type === "panel" ? 3 : 1));
+        const effectiveX = clamp(item.x, 0, maxLeft);
+        const maxWAtX = Math.max(1, vw - effectiveX);
+        const minW = item.type === "panel" ? 3 : 1;
+        const effectiveW = Math.max(minW, Math.min(item.w, maxWAtX));
+        node.frame.left = effectiveX;
         node.frame.top = item.y;
         node.frame.width = effectiveW;
 
@@ -526,19 +580,24 @@ export default function setup(host: MicroappHost) {
               node.content.height = Math.max(1, visibleH - 2);
               node.content.width = Math.max(1, effectiveW - 2);
             }
+          } else if (item.type === "header") {
+            const rule = "─".repeat(Math.max(1, effectiveW));
+            node.frame.setContent(`${item.headerText ?? item.title ?? ""}\n${rule}`);
           }
         }
 
         // Sync panelNodes position for hitPanel
         const pNode = panelNodes.get(item.id);
-        if (pNode) { pNode.x = item.x; pNode.y = item.y; }
+        if (pNode) { pNode.x = effectiveX; pNode.y = item.y; }
       }
 
       // Render panel content (respect overrides and editing)
       for (const node of zineNodes.values()) {
         if (node.item.type !== "panel" || !node.content || !node.item.content) continue;
-        const iw = Math.max(1, node.item.w - 2);
-        const ih = Math.max(1, node.item.h - 2);
+        const frameW = Math.max(3, Number(node.frame.width) || node.item.w);
+        const frameH = Math.max(3, Number(node.frame.height) || node.item.h);
+        const iw = Math.max(1, frameW - 2);
+        const ih = Math.max(1, frameH - 2);
         const override = contentOverrides.get(node.item.id);
         node.content.setContent(override ?? node.item.content(tick, iw, ih));
       }
@@ -587,6 +646,7 @@ export default function setup(host: MicroappHost) {
           onSave: (newContent: string) => {
             contentOverrides.set(id, newContent);
             saveContentToYaml(id, newContent);
+            openEditors.delete(id);
             renderLayoutAndContent();
             host.screen.render();
           },
@@ -600,6 +660,7 @@ export default function setup(host: MicroappHost) {
           onSave: (newContent: string) => {
             contentOverrides.set(id, newContent);
             saveContentToYaml(id, newContent);
+            openEditors.delete(id);
             renderLayoutAndContent();
             host.screen.render();
           },
@@ -634,6 +695,29 @@ export default function setup(host: MicroappHost) {
       } catch { /* silent — editor still has the content */ }
     }
 
+    /** Write freeform drag position back to the .canvas.yaml file. */
+    let savePositionDebounce: ReturnType<typeof setTimeout> | undefined;
+    function savePositionToYaml(panelId: string, x: number, y: number) {
+      clearTimeout(savePositionDebounce);
+      savePositionDebounce = setTimeout(() => {
+        try {
+          const raw = fs.readFileSync(activeFilePath, "utf8");
+          const doc = YAML.parseDocument(raw);
+          const panels = doc.get("panels");
+          if (!panels || !(panels as any).items) return;
+          for (const item of (panels as any).items) {
+            const id = item.get("id");
+            if (id === panelId) {
+              item.set("x", x);
+              item.set("y", y);
+              break;
+            }
+          }
+          fs.writeFileSync(activeFilePath, doc.toString(), "utf8");
+        } catch { /* silent */ }
+      }, 500);
+    }
+
     function openInEditor(panelId: string) {
       const zNode = zineNodes.get(panelId);
       if (!zNode || zNode.item.type !== "panel") return;
@@ -643,12 +727,15 @@ export default function setup(host: MicroappHost) {
       if (!dispatch) return; // no editor registered for this type yet
 
       // Get current content (override or rendered)
-      const iw = Math.max(1, zNode.item.w - 2);
-      const ih = Math.max(1, zNode.item.h - 2);
+      const frameW = Math.max(3, Number(zNode.frame.width) || zNode.item.w);
+      const frameH = Math.max(3, Number(zNode.frame.height) || zNode.item.h);
+      const iw = Math.max(1, frameW - 2);
+      const ih = Math.max(1, frameH - 2);
       const content = contentOverrides.get(panelId)
         ?? (zNode.item.content ? zNode.item.content(0, iw, ih) : "");
       const panelTitle = zNode.item.title ?? panelId;
 
+      openEditors.add(panelId);
       host.runGlobalCommand(dispatch.command, dispatch.buildArgs(panelId, content, panelTitle));
     }
 
@@ -670,7 +757,9 @@ export default function setup(host: MicroappHost) {
 
     let lastClickTime = 0;
     let lastClickId = "";
-    const DBLCLICK_MS = 350;
+    const openEditors = new Set<string>(); // panels with an editor open
+    const DBLCLICK_MS = 300;
+    let dragMoved = false;
 
     const handleMouse = (data: any) => {
       if (!canvas.parent) return;
@@ -678,7 +767,32 @@ export default function setup(host: MicroappHost) {
       if (data.action === "mousedown" && !isInsideCanvas(data.x, data.y)) return;
 
       if (data.action === "mouseup") {
+        if (!dragging) return;
+        const finishedId = dragging.id;
+        if (dragMoved && isFreeform) {
+          const pos = panelPositionOverrides.get(finishedId);
+          if (pos) savePositionToYaml(finishedId, pos.x, pos.y);
+        } else if (!dragMoved) {
+          const now = Date.now();
+          if (now - lastClickTime < DBLCLICK_MS && lastClickId === finishedId) {
+            // Double-click: open editor if not already open
+            if (!openEditors.has(finishedId)) {
+              openInEditor(finishedId);
+            }
+            lastClickTime = 0;
+            lastClickId = "";
+          } else {
+            lastClickTime = now;
+            lastClickId = finishedId;
+          }
+        } else {
+          // Never interpret a drag-release as a click sequence.
+          lastClickTime = 0;
+          lastClickId = "";
+        }
+
         dragging = undefined;
+        dragMoved = false;
         return;
       }
 
@@ -687,34 +801,33 @@ export default function setup(host: MicroappHost) {
         if (!pt) return;
         const node = hitPanel(panelNodes, pt.x, pt.y);
         if (node) {
-          const now = Date.now();
-          if (now - lastClickTime < DBLCLICK_MS && lastClickId === node.def.id) {
-            openInEditor(node.def.id);
-            lastClickTime = 0;
-            return;
-          }
-          lastClickTime = now;
-          lastClickId = node.def.id;
-
           dragging = {
             id: node.def.id,
             offsetX: pt.x - node.x,
             offsetY: pt.y - node.y,
           };
+          dragMoved = false;
           activePanelId = node.def.id;
           applyStyles();
           host.screen.render();
+        } else {
+          dragging = undefined;
+          dragMoved = false;
         }
         return;
       }
 
       if (data.action === "mousemove" && dragging) {
-        const pt = safePointerToContent(data.x, data.y);
-        if (!pt) return;
         const node = panelNodes.get(dragging.id);
         if (!node) return;
-        const newX = Math.max(0, pt.x - dragging.offsetX);
-        const newY = Math.max(0, pt.y - dragging.offsetY);
+        // Screen-space drag: offset was captured as screen coords in element mousedown
+        const canvasLeft = (canvas as any).aleft ?? 0;
+        const canvasTop = (canvas as any).atop ?? 0;
+        const scrollY = (canvas as any).childBase ?? 0;
+        const newX = Math.max(0, data.x - dragging.offsetX - canvasLeft);
+        const newY = Math.max(0, data.y - dragging.offsetY - canvasTop + scrollY);
+        if (newX === node.x && newY === node.y) return;
+        dragMoved = true;
         panelPositionOverrides.set(dragging.id, { x: newX, y: newY });
         node.x = newX;
         node.y = newY;
@@ -738,6 +851,7 @@ export default function setup(host: MicroappHost) {
 
     // ── Build + first render ────────────────────────────────────────
     refreshSidebarList();
+    sidePanel.layout();
     rebuild();
     canvas.focus();
 
@@ -774,8 +888,10 @@ export default function setup(host: MicroappHost) {
       for (const node of zineNodes.values()) {
         if (node.item.type !== "panel" || !node.item.live || !node.content || !node.item.content) continue;
         if (contentOverrides.has(node.item.id)) continue;
-        const iw = Math.max(1, node.item.w - 2);
-        const ih = Math.max(1, node.item.h - 2);
+        const frameW = Math.max(3, Number(node.frame.width) || node.item.w);
+        const frameH = Math.max(3, Number(node.frame.height) || node.item.h);
+        const iw = Math.max(1, frameW - 2);
+        const ih = Math.max(1, frameH - 2);
         node.content.setContent(node.item.content(tick, iw, ih));
         dirty = true;
       }
@@ -789,10 +905,31 @@ export default function setup(host: MicroappHost) {
       host.screen.render();
     }
 
-    canvas.key(["j", "down"], () => scrollBy(1));
-    canvas.key(["k", "up"], () => scrollBy(-1));
-    canvas.key(["S-j", "S-down"], () => scrollBy(5));
-    canvas.key(["S-k", "S-up"], () => scrollBy(-5));
+    /** Nudge the active panel by dx/dy chars. Freeform only. */
+    function nudgeActivePanel(dx: number, dy: number) {
+      if (!isFreeform || !activePanelId) return false;
+      const node = panelNodes.get(activePanelId);
+      if (!node) return false;
+      const newX = Math.max(0, node.x + dx);
+      const newY = Math.max(0, node.y + dy);
+      panelPositionOverrides.set(activePanelId, { x: newX, y: newY });
+      node.x = newX;
+      node.y = newY;
+      node.frame.left = newX;
+      node.frame.top = newY;
+      savePositionToYaml(activePanelId, newX, newY);
+      host.screen.render();
+      return true;
+    }
+
+    canvas.key(["j", "down"], () => { if (!nudgeActivePanel(0, 1)) scrollBy(1); });
+    canvas.key(["k", "up"], () => { if (!nudgeActivePanel(0, -1)) scrollBy(-1); });
+    canvas.key(["h", "left"], () => { if (!nudgeActivePanel(-1, 0)) {} });
+    canvas.key(["l", "right"], () => { if (!nudgeActivePanel(1, 0)) {} });
+    canvas.key(["S-j", "S-down"], () => { if (!nudgeActivePanel(0, 5)) scrollBy(5); });
+    canvas.key(["S-k", "S-up"], () => { if (!nudgeActivePanel(0, -5)) scrollBy(-5); });
+    canvas.key(["S-h", "S-left"], () => nudgeActivePanel(-5, 0));
+    canvas.key(["S-l", "S-right"], () => nudgeActivePanel(5, 0));
     canvas.key(["C-j", "C-down"], () => scrollBy(10));
     canvas.key(["C-k", "C-up"], () => scrollBy(-10));
     canvas.key(["pagedown"], () => scrollBy(20));
@@ -802,13 +939,26 @@ export default function setup(host: MicroappHost) {
     canvas.key(["/"], () => inlineSearch.open());
     canvas.key(["r"], () => rebuild());
     canvas.key(["["], () => toggleSidebar());
+    canvas.key(["escape", "tab"], () => {
+      activePanelId = "";
+      applyStyles();
+      host.screen.render();
+    });
 
     win.onInput((ch: string, key?: blessed.Widgets.Events.IKeyEventArg) => {
       const speed = key?.shift ? 5 : key?.ctrl ? 10 : 1;
-      if (key?.name === "up"   || ch === "k") { scrollBy(-1 * speed); return; }
-      if (key?.name === "down" || ch === "j") { scrollBy(1 * speed);  return; }
+      if (key?.name === "up"   || ch === "k") { if (!nudgeActivePanel(0, -speed)) scrollBy(-1 * speed); return; }
+      if (key?.name === "down" || ch === "j") { if (!nudgeActivePanel(0, speed)) scrollBy(1 * speed); return; }
+      if (key?.name === "left"  || ch === "h") { nudgeActivePanel(-speed, 0); return; }
+      if (key?.name === "right" || ch === "l") { nudgeActivePanel(speed, 0); return; }
       if (key?.name === "pageup")   { scrollBy(-20 * speed); return; }
       if (key?.name === "pagedown") { scrollBy(20 * speed);  return; }
+      if (key?.name === "escape") {
+        activePanelId = "";
+        applyStyles();
+        host.screen.render();
+        return;
+      }
       if (ch === "/") { inlineSearch.open(); return; }
       if (ch === "r") { rebuild(); return; }
       if (ch === "[") { toggleSidebar(); return; }
@@ -819,6 +969,7 @@ export default function setup(host: MicroappHost) {
     win.onResize(() => {
       if (resizeTimer) clearTimeout(resizeTimer);
       resizeTimer = setTimeout(() => {
+        sidePanel.layout();
         layoutToolbar();
         renderLayoutAndContent();
         host.screen.render();

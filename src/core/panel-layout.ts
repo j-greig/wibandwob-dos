@@ -16,7 +16,7 @@ export type PanelDef = {
   title: string;
   w: number;
   h: number;
-  col: 0 | 1 | 2;
+  col: number;
   live?: boolean;
   content: (tick: number, w: number, h: number) => string;
 };
@@ -133,22 +133,63 @@ export function layoutColumns(panels: PanelDef[], maxWidth: number, opts?: Colum
     colHeights.push(totalH);
   }
 
-  // Responsive shrink: if all columns at natural width don't fit, shrink
-  // proportionally so they do. This prevents wrapping to single column.
-  const totalNatural = naturalWidths.reduce((s, w) => s + w, 0)
-    + (naturalWidths.length - 1) * columnGap;
-  let colWidths: number[];
-  if (totalNatural > safeWidth && naturalWidths.length > 1) {
-    const availableForCols = safeWidth - (naturalWidths.length - 1) * columnGap;
-    const totalW = naturalWidths.reduce((s, w) => s + w, 0);
-    colWidths = naturalWidths.map(w =>
-      Math.max(minColumnWidth, Math.floor((w / totalW) * availableForCols))
+  // ── Responsive breakpoint layout ──────────────────────────────────────
+  // Instead of shrinking all N columns to 1/N width (unreadable at narrow
+  // viewports), we find the best number of columns per row:
+  //   Wide:   all columns fit (with proportional shrink if needed)
+  //   Medium: 2 columns per row
+  //   Narrow: 1 column per row (full-width stacked)
+  //
+  // Minimum usable column width prevents columns from becoming too thin.
+  // Within each row-group, columns are proportionally shrunk to fill width.
+
+  const MIN_USABLE_WIDTH = 18; // below this a column is unreadable
+
+  /**
+   * For a given number of columns-per-row, compute the shrunk widths.
+   * Returns null if any column would be narrower than MIN_USABLE_WIDTH.
+   */
+  function tryShrink(colIndices: number[], available: number): number[] | null {
+    const gapCost = Math.max(0, colIndices.length - 1) * columnGap;
+    const forCols = available - gapCost;
+    if (forCols < colIndices.length * minColumnWidth) return null;
+    const totalNat = colIndices.reduce((s, ci) => s + naturalWidths[ci]!, 0);
+    if (totalNat === 0) return null;
+    const widths = colIndices.map(ci =>
+      Math.max(minColumnWidth, Math.floor((naturalWidths[ci]! / totalNat) * forCols))
     );
-  } else {
-    colWidths = [...naturalWidths];
+    // Check minimum usable
+    if (widths.some(w => w < MIN_USABLE_WIDTH)) return null;
+    return widths;
   }
 
-  // Place columns left-to-right, wrapping at maxWidth or maxColumns
+  // Determine best columns-per-row (try all N, then N-1, ... down to 1)
+  const N = sortedCols.length;
+  let colsPerRow = N;
+  // Check if natural widths already fit
+  const totalNatural = naturalWidths.reduce((s, w) => s + w, 0)
+    + Math.max(0, N - 1) * columnGap;
+  if (totalNatural <= safeWidth) {
+    colsPerRow = N; // everything fits at natural size
+  } else {
+    // Try N columns shrunk, then N-1, etc.
+    let found = false;
+    for (let try_n = N; try_n >= 1; try_n--) {
+      // Check if try_n columns would all be >= MIN_USABLE_WIDTH
+      const testIndices = Array.from({ length: try_n }, (_, i) => i);
+      const testWidths = tryShrink(testIndices, safeWidth);
+      if (testWidths) {
+        colsPerRow = try_n;
+        found = true;
+        break;
+      }
+    }
+    if (!found) colsPerRow = 1;
+  }
+  // Cap at maxColumns
+  colsPerRow = Math.min(colsPerRow, maxColumns);
+
+  // ── Place columns in row-groups ─────────────────────────────────────
   const headerHeight = columnHeaders?.size ? 3 : 0; // text + rule + blank line
   let cursorX = 0;
   let rowBaseY = 0;
@@ -157,61 +198,85 @@ export function layoutColumns(panels: PanelDef[], maxWidth: number, opts?: Colum
   let contentWidth = 0;
   let contentHeight = 1;
 
-  for (let i = 0; i < sortedCols.length; i++) {
-    const colIdx = sortedCols[i]!;
-    const colW = colWidths[i]!;
-    const colH = colHeights[i]!;
-    const colPanels = cols.get(colIdx)!;
+  // Collect row-groups of column indices
+  const rowGroups: number[][] = [];
+  for (let i = 0; i < N; i++) {
+    if (i % colsPerRow === 0) rowGroups.push([]);
+    rowGroups[rowGroups.length - 1]!.push(i);
+  }
 
-    // Wrap: exceeds width or maxColumns per row
-    const wouldExceed = cursorX > 0 && cursorX + colW > safeWidth;
-    const wouldExceedMax = colsInRow >= maxColumns;
-    if (wouldExceed || wouldExceedMax) {
-      rowBaseY += rowMaxH + headerHeight + rowGap;
-      cursorX = 0;
-      rowMaxH = 0;
-      colsInRow = 0;
+  for (const group of rowGroups) {
+    // Compute widths for this row-group
+    let groupWidths: number[];
+    const shrunk = tryShrink(group, safeWidth);
+    if (shrunk) {
+      groupWidths = shrunk;
+    } else {
+      // Single-column fallback: each column gets full width
+      groupWidths = group.map(() => safeWidth);
     }
 
-    // Column header → ZineItem type:"header"
-    const headerText = columnHeaders?.get(colIdx);
-    if (headerText) {
-      items.push({
-        id: `__header_col${colIdx}`,
-        type: "header",
-        x: cursorX, y: rowBaseY,
-        w: colW, h: 2,
-        col: colIdx,
-        title: headerText,
-        headerText,
-      });
+    // If natural widths fit without shrinking, use natural
+    const groupNatTotal = group.reduce((s, ci) => s + naturalWidths[ci]!, 0)
+      + Math.max(0, group.length - 1) * columnGap;
+    if (groupNatTotal <= safeWidth) {
+      groupWidths = group.map(ci => naturalWidths[ci]!);
     }
 
-    // Panels → ZineItem type:"panel"
-    let cursorY = rowBaseY + headerHeight;
-    for (let j = 0; j < colPanels.length; j++) {
-      const panel = colPanels[j]!;
-      const w = clamp(panel.w, minColumnWidth, colW);  // shrink to column width
-      const h = Math.max(minPanelHeight, panel.h);
-      items.push({
-        id: panel.id,
-        type: "panel",
-        x: cursorX, y: cursorY,
-        w, h,
-        col: colIdx,
-        title: panel.title,
-        content: panel.content,
-        live: panel.live,
-      });
-      cursorY += h + (j < colPanels.length - 1 ? panelGap : 0);
+    cursorX = 0;
+    colsInRow = 0;
+    rowMaxH = 0;
+
+    for (let gi = 0; gi < group.length; gi++) {
+      const ci = group[gi]!;
+      const colIdx = sortedCols[ci]!;
+      const colW = groupWidths[gi]!;
+      const colH = colHeights[ci]!;
+      const colPanels = cols.get(colIdx)!;
+
+      // Column header → ZineItem type:"header"
+      const headerText = columnHeaders?.get(colIdx);
+      if (headerText) {
+        items.push({
+          id: `__header_col${colIdx}`,
+          type: "header",
+          x: cursorX, y: rowBaseY,
+          w: colW, h: 2,
+          col: colIdx,
+          title: headerText,
+          headerText,
+        });
+      }
+
+      // Panels → ZineItem type:"panel"
+      let cursorY = rowBaseY + headerHeight;
+      for (let j = 0; j < colPanels.length; j++) {
+        const panel = colPanels[j]!;
+        const w = clamp(panel.w, minColumnWidth, colW);  // shrink to column width
+        const h = Math.max(minPanelHeight, panel.h);
+        items.push({
+          id: panel.id,
+          type: "panel",
+          x: cursorX, y: cursorY,
+          w, h,
+          col: colIdx,
+          title: panel.title,
+          content: panel.content,
+          live: panel.live,
+        });
+        cursorY += h + (j < colPanels.length - 1 ? panelGap : 0);
+      }
+
+      const totalColH = colH + headerHeight;
+      if (totalColH > rowMaxH) rowMaxH = totalColH;
+      contentWidth = Math.max(contentWidth, cursorX + colW);
+      contentHeight = Math.max(contentHeight, rowBaseY + totalColH);
+      cursorX += colW + columnGap;
+      colsInRow++;
     }
 
-    const totalColH = colH + headerHeight;
-    if (totalColH > rowMaxH) rowMaxH = totalColH;
-    contentWidth = Math.max(contentWidth, cursorX + colW);
-    contentHeight = Math.max(contentHeight, rowBaseY + totalColH);
-    cursorX += colW + columnGap;
-    colsInRow++;
+    // Advance to next row-group
+    rowBaseY += rowMaxH + rowGap;
   }
 
   return {
@@ -283,9 +348,24 @@ export function layoutPanels(panels: PanelDef[], maxWidth: number): LayoutResult
  * in scrollable boxes). Uses direct Number coercion of width/height.
  */
 export function measureViewport(box: blessed.Widgets.BoxElement): { width: number; height: number } {
+  const asFinite = (value: unknown): number | undefined => {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : undefined;
+  };
+
+  const lpos = (box as any).lpos;
+  const xi = asFinite(lpos?.xi);
+  const xl = asFinite(lpos?.xl);
+  const yi = asFinite(lpos?.yi);
+  const yl = asFinite(lpos?.yl);
+  const lposWidth = xi !== undefined && xl !== undefined ? xl - xi + 1 : undefined;
+  const lposHeight = yi !== undefined && yl !== undefined ? yl - yi + 1 : undefined;
+
+  const width = lposWidth ?? asFinite(box.width) ?? 80;
+  const height = lposHeight ?? asFinite(box.height) ?? 24;
   return {
-    width: Math.max(1, Number(box.width) || 80),
-    height: Math.max(1, Number(box.height) || 24),
+    width: Math.max(1, Math.floor(width)),
+    height: Math.max(1, Math.floor(height)),
   };
 }
 

@@ -1,0 +1,80 @@
+# Freeform canvas test — drag panels anywhere
+meta:
+  title: "Freeform Test"
+  format: "zine-freeform-v1"
+
+panels:
+  - id: note-wib
+    type: text
+    title: "Wib Says"
+    x: 3
+    y: 0
+    w: 28
+    h: 8
+    text: |
+      Chaos is not disorder.
+      Chaos is possibility
+      space. Every mess is a
+      composition waiting to
+      be noticed.
+
+  - id: note-wob
+    type: text
+    title: "Wob Says"
+    x: 40
+    y: 0
+    w: 28
+    h: 8
+    text: |
+      Structure is not rigidity.
+      Structure is the skeleton
+      that lets the organism
+      move. Without bones,
+      no dancing.
+
+  - id: art-cat
+    type: text
+    title: "Scramble"
+    x: 9
+    y: 8
+    w: 24
+    h: 10
+    text: |
+      .    /\_/\
+      .   ( o.o )
+      .    > ^ <
+      .   /|   |\
+      .  (_|   |_)
+
+  - id: idea-one
+    type: text
+    title: "Idea"
+    x: 72
+    y: 8
+    w: 30
+    h: 6
+    text: |
+      What if the zine could
+      rearrange itself while
+      you sleep? Dream layout.
+
+  - id: figlet-hello
+    type: figlet
+    title: "Hello"
+    figletText: "HELLO"
+    x: 2
+    y: 22
+    w: 40
+    h: 8
+
+  - id: note-bottom
+    type: text
+    title: "Footerzzzzz"
+    x: 51
+    y: 18
+    w: 30
+    h: 6
+    text: |
+      Drag any panel.
+      Positions save to YAML.
+      This is your canvas.

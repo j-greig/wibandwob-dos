@@ -49,8 +49,8 @@ import {
   type PanelDef,
   type PanelNode,
 } from "../../src/services/microapp-sdk.js";
-import { type CEPanelDef, toPanelDef, renderPanel } from "./panel-types.js";
-import { loadPanelsFromDir, watchPanelDir } from "./content-loader.js";
+import { type CEPanelDef, toPanelDef, renderPanel } from "../zine/panel-types.js";
+import { loadPanelsFromDir, watchPanelDir } from "../zine/content-loader.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CONTENT_DIR = path.resolve(__dirname, "../../content/sy2-chronicles/panels");
