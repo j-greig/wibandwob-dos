@@ -34,6 +34,7 @@
     "ascii-data-image": "^1.0.7852",
     "ascii-raytracer": "^0.0.154",
     "blessed": "^0.1.81",
+    "blessed-contrib": "^4.11.0",
     "blessed-xterm": "^1.5.1",
     "get-east-asian-width": "^1.5.0",
     "irc-framework": "^4.14.0",

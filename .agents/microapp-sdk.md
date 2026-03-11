@@ -61,7 +61,20 @@ modules/my-app/
 }
 ```
 
-`menu.category` must be one of: `file` `edit` `view` `window` `applications` `help`
+`menu.category` must be one of: `file` `edit` `view` `window` `applications` `demos` `help`
+
+### dependencies (optional)
+
+```json
+"dependencies": {
+  "blessed-contrib": "^4.11.0"
+}
+```
+
+Informational — declares npm packages the module needs. These must be
+installed in the root `package.json` via `bun add <pkg>`. The loader
+does not auto-install them. If a dependency is missing, the module
+will fail to import at load time with a clear error in stderr.
 `multiInstance: true` lets the user open multiple windows at once.
 `persist: true` means the workspace saves/restores the window on reload.
 

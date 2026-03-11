@@ -1,0 +1,23 @@
+{
+  "name": "dashboard",
+  "version": "0.1.0",
+  "description": "System dashboard using blessed-contrib widgets — line charts, bars, donuts, gauges, sparklines, logs, tables",
+  "type": "microapp",
+  "entry": "index.ts",
+  "dependencies": {
+    "blessed-contrib": "^4.11.0"
+  },
+  "microapp": {
+    "id": "wibwob.dashboard",
+    "title": "Dashboard",
+    "description": "Live system dashboard with blessed-contrib charts and widgets",
+    "multiInstance": true,
+    "persist": false,
+    "menu": [
+      { "category": "applications", "order": 55, "label": "Dashboard" }
+    ],
+    "palette": { "order": 220, "label": "Dashboard" },
+    "agent": true,
+    "api": true
+  }
+}
