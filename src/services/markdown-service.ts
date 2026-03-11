@@ -91,12 +91,8 @@ function tryFiglet(text: string, font: string, width: number): string[] | null {
   if (result.status !== 0 || !result.stdout.trim()) return null;
   const lines = result.stdout.split("\n");
   while (lines.length && lines[lines.length - 1]!.trim() === "") lines.pop();
-  // Reject if any line exceeds width
+  // Reject if any line exceeds width (figlet -w should prevent this, but guard)
   if (lines.some(l => visibleWidth(l) > width)) return null;
-  // Reject if figlet wrapped (blank line in the middle = multiple glyph rows)
-  const trimmed = lines.map(l => l.trim());
-  const hasInternalBlank = trimmed.slice(0, -1).some(l => l === "");
-  if (hasInternalBlank) return null;
   return lines;
 }
 
@@ -116,12 +112,9 @@ function renderFigletHeading(text: string, level: number, width: number, config:
     plain = plain.slice(0, attrMatch.index!).trimEnd();
   }
 
-  // Only attempt figlet if text is short enough to plausibly fit.
-  // Even the most compact font ("term") needs ~6 cols/char.
-  // Skip figlet entirely for headings that would wrap at any font size.
-  const likelyFits = plain.length <= Math.floor(width / 6);
-
-  if (likelyFits) {
+  // Try figlet — the -w flag handles word wrapping for long headings.
+  // Only skip if absurdly long (> 200 chars) where figlet output would be noise.
+  if (plain.length <= 200) {
     // If an override font was specified, try it first before defaults
     const fontList = overrideFont
       ? [overrideFont, cfg.font, ...cfg.fallbackFonts]
