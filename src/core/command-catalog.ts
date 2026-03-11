@@ -95,7 +95,7 @@ export interface AppMenuActions {
 }
 
 /** Menu bucket — determines which top-level menu a command appears in. */
-export type AppCommandCategory = "file" | "edit" | "view" | "window" | "applications" | "help";
+export type AppCommandCategory = "file" | "edit" | "view" | "window" | "applications" | "demos" | "help";
 /** Logical clustering within a category, used for future separators and adapters. */
 export type AppCommandGroup =
   | "browse"
@@ -189,7 +189,8 @@ const MENU_DEFINITIONS: MenuDefinition[] = [
   { category: "view", label: "View", key: "v", left: 15 },
   { category: "window", label: "Window", key: "w", left: 22 },
   { category: "applications", label: "Applications", key: "a", left: 31 },
-  { category: "help", label: "Help", key: "h", left: 47 }
+  { category: "demos", label: "Demos", key: "d", left: 47 },
+  { category: "help", label: "Help", key: "h", left: 55 }
 ];
 
 const APP_COMMANDS: AppCommandDefinition[] = [
@@ -687,7 +688,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     description: "Open an animated generative art window.",
     group: "surface",
     actionKey: "openArtWindow",
-    menuPlacements: [{ category: "applications", order: 60 }],
+    menuPlacements: [{ category: "demos", order: 60 }],
     api: true,
     agent: true
   },
@@ -1013,18 +1014,6 @@ export function createMenuConfigs(actions: AppMenuActions): MenuConfig[] {
           }, [] as MenuItem[]);
       }
 
-      const DEMO_IDS = new Set([
-        "art.open",
-        "microapp.wibwob.heartbeat.open",
-        "microapp.wibwob.example.hello.open",
-        "microapp.wibwob.tidepool.open",
-        "microapp.wibwob.example.e026.open",
-        "microapp.wibwob.touchlab.open",
-        "microapp.wibwob.glitchbox.open",
-        "microapp.wibwob.patchbay.open",
-        "microapp.wibwob.poetry-clock.open",
-      ]);
-
       const allWithIds = listAppCommands()
         .flatMap((command) =>
           command.menuPlacements
@@ -1040,12 +1029,10 @@ export function createMenuConfigs(actions: AppMenuActions): MenuConfig[] {
         );
 
       const favourites = allWithIds.filter((item) => item.favourite).sort(byPlacementOrder);
-      const demos = allWithIds.filter((item) => !item.favourite && DEMO_IDS.has(item.commandId));
-      const rest = allWithIds.filter((item) => !item.favourite && !DEMO_IDS.has(item.commandId));
+      const rest = allWithIds.filter((item) => !item.favourite);
 
       const stripOpen = (s: string): string => s.replace(/^open\s+/i, "").toLowerCase();
       rest.sort((a, b) => stripOpen(a.label).localeCompare(stripOpen(b.label)));
-      demos.sort((a, b) => stripOpen(a.label).localeCompare(stripOpen(b.label)));
 
       const toMenuItem = (item: typeof allWithIds[0]): MenuItem => ({
         label: item.label,
@@ -1060,11 +1047,6 @@ export function createMenuConfigs(actions: AppMenuActions): MenuConfig[] {
       }
 
       result.push(...rest.map(toMenuItem));
-
-      if (demos.length > 0) {
-        result.push({ label: "Demos", action: () => {}, separator: true as const });
-        result.push(...demos.map(toMenuItem));
-      }
 
       return result;
     })()

@@ -11,7 +11,7 @@
     "multiInstance": false,
     "persist": false,
     "menu": [
-      { "category": "applications", "order": 80, "label": "Heartbeat" }
+      { "category": "demos", "order": 80, "label": "Heartbeat" }
     ],
     "palette": { "order": 280, "label": "Heartbeat" },
     "agent": true,

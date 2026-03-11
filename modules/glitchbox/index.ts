@@ -154,7 +154,7 @@ export default function setup(host: MicroappHost) {
   host.registerCommand({
     id: "open",
     label: "Open GlitchBox",
-    menu: [{ category: "applications", order: 55, label: "GlitchBox" }],
+    menu: [{ category: "demos", order: 55, label: "GlitchBox" }],
     palette: { order: 255, label: "GlitchBox — Symbient Dance Floor" },
     action: () => openGlitchBox(),
   });

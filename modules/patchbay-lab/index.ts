@@ -1157,7 +1157,7 @@ export default function setup(host: MicroappHost) {
     label: "Open Patchbay Lab",
     description: "Open the Patchbay Lab SDK coverage harness.",
     action: openPatchbay,
-    menu: [{ category: "applications", order: 125, label: "Patchbay Lab" }],
+    menu: [{ category: "demos", order: 125, label: "Patchbay Lab" }],
     palette: { order: 125, label: "Open Patchbay Lab" },
   });
 

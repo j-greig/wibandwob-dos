@@ -11,7 +11,7 @@
     "persist": true,
     "multiInstance": false,
     "menu": [
-      { "category": "applications", "order": 55, "label": "GlitchBox" }
+      { "category": "demos", "order": 55, "label": "GlitchBox" }
     ],
     "palette": { "order": 255, "label": "GlitchBox — Symbient Dance Floor" },
     "agent": true,

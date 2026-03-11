@@ -10,7 +10,7 @@
     "description": "Time told as tiny poems. Inspired by Poem/1.",
     "persist": true,
     "menu": [
-      { "category": "applications", "order": 30, "label": "Poetry Clock" }
+      { "category": "demos", "order": 30, "label": "Poetry Clock" }
     ],
     "palette": { "order": 50, "label": "Open Poetry Clock" },
     "agent": true,

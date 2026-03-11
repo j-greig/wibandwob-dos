@@ -536,7 +536,7 @@ export default function setup(host: MicroappHost) {
     label: "Open Poetry Clock",
     description: "A clock that tells the time — plain or as AI-generated poems",
     action: openClock,
-    menu: [{ category: "applications", order: 30, label: "Poetry Clock" }],
+    menu: [{ category: "demos", order: 30, label: "Poetry Clock" }],
     palette: { order: 50, label: "Poetry Clock" },
   });
 

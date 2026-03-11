@@ -11,7 +11,7 @@
     "multiInstance": false,
     "persist": true,
     "menu": [
-      { "category": "applications", "order": 125, "label": "Patchbay Lab" }
+      { "category": "demos", "order": 125, "label": "Patchbay Lab" }
     ],
     "palette": { "order": 125, "label": "Open Patchbay Lab" },
     "agent": true,

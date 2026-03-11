@@ -73,7 +73,7 @@ export default function setup(host: MicroappHost) {
   host.registerCommand({
     id: "open",
     label: "E026 Demo",
-    menu: [{ category: "applications", order: 99, label: "E026 Demo" }],
+    menu: [{ category: "demos", order: 99, label: "E026 Demo" }],
     palette: { order: 220, label: "E026 Demo" },
     action: () => openDemo(host),
   });

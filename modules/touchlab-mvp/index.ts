@@ -135,7 +135,7 @@ export default function setup(host: MicroappHost) {
     id: "open",
     label: "Open TouchLab MVP",
     description: "Open the minimal nested-window composition proof.",
-    menu: [{ category: "applications", order: 48, label: "TouchLab MVP" }],
+    menu: [{ category: "demos", order: 48, label: "TouchLab MVP" }],
     palette: { order: 218, label: "TouchLab MVP" },
     action: () => {
       const win = host.createWindow({

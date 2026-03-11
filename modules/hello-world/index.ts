@@ -25,7 +25,7 @@ export default function setup(host: MicroappHost) {
   host.registerCommand({
     id: "open",
     label: "Hello World Example",
-    menu: [{ category: "applications", order: 40, label: "Hello World" }],
+    menu: [{ category: "demos", order: 40, label: "Hello World" }],
     palette: { order: 210, label: "Hello World" },
     action: () => {
       const win = host.createWindow({ title: "Hello World", width, height });

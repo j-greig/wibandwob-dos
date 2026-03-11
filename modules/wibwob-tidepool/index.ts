@@ -342,7 +342,7 @@ export default function setup(host: MicroappHost) {
     id: "open",
     label: "Tide Pool",
     description: "Open an ASCII ecosystem simulator — five species competing in a bounded tide pool.",
-    menu: [{ category: "applications", order: 38, label: "Tide Pool" }],
+    menu: [{ category: "demos", order: 38, label: "Tide Pool" }],
     palette: { order: 58, label: "Open Tide Pool" },
     action: (args) => {
       openTidePool(args as Record<string, unknown> | undefined);

@@ -27,7 +27,7 @@ export default function setup(host: MicroappHost) {
     id: "open",
     label: "Heartbeat",
     description: "Open the ASCII heartbeat monitor",
-    menu: [{ category: "applications", order: 80, label: "Heartbeat" }],
+    menu: [{ category: "demos", order: 80, label: "Heartbeat" }],
     palette: { order: 280, label: "Heartbeat" },
     action: () => openHeartbeat(host),
   });

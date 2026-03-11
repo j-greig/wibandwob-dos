@@ -531,6 +531,7 @@ export class TsTuiMvpApp {
     this.screen.key(["M-v"], () => this.openMenu("View"));
     this.screen.key(["M-w"], () => this.openMenu("Window"));
     this.screen.key(["M-a"], () => this.openMenu("Applications"));
+    this.screen.key(["M-d"], () => this.openMenu("Demos"));
     this.screen.key(["M-t"], () => this.toggleTheme());
     this.screen.key(["M-S-left"], () =>
       this.windowManager.resizeFocusedWindow(-2, 0),

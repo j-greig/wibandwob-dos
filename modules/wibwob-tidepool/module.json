@@ -11,7 +11,7 @@
     "multiInstance": true,
     "persist": true,
     "menu": [
-      { "category": "applications", "order": 38, "label": "Tide Pool" }
+      { "category": "demos", "order": 38, "label": "Tide Pool" }
     ],
     "palette": { "order": 58, "label": "Open Tide Pool" },
     "agent": true,

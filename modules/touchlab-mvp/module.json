@@ -11,7 +11,7 @@
     "multiInstance": false,
     "persist": false,
     "menu": [
-      { "category": "applications", "order": 48, "label": "TouchLab MVP" }
+      { "category": "demos", "order": 48, "label": "TouchLab MVP" }
     ],
     "palette": { "order": 218, "label": "TouchLab MVP" },
     "agent": true,

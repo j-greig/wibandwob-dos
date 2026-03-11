@@ -11,7 +11,7 @@
     "multiInstance": true,
     "persist": false,
     "menu": [
-      { "category": "applications", "order": 40, "label": "Hello World" }
+      { "category": "demos", "order": 40, "label": "Hello World" }
     ],
     "palette": { "order": 210, "label": "Hello World" },
     "agent": true,
