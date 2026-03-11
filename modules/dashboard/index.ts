@@ -725,11 +725,12 @@ export default function setup(host: MicroappHost) {
             return lines;
           },
           (w: number, h: number, t: number) => {
-            // Diamond grid ◆◇
+            // Diamond grid
+            const chars = "<>v^*+.o";
             const lines: string[] = [];
             for (let y = 0; y < h; y++) {
               let line = "";
-              for (let x = 0; x < w; x++) line += (x + y + t) % 3 === 0 ? "◆" : (x + y + t) % 3 === 1 ? "◇" : "·";
+              for (let x = 0; x < w; x++) line += chars[(x + y + t) % chars.length];
               lines.push(line);
             }
             return lines;
@@ -761,24 +762,26 @@ export default function setup(host: MicroappHost) {
             return lines;
           },
           (w: number, h: number, t: number) => {
-            // Wave ∿ ~ ≈
-            const chars = "∿~≈~";
+            // Wave
             const lines: string[] = [];
             for (let y = 0; y < h; y++) {
               let line = "";
-              const phase = Math.floor(Math.sin((y + t) * 0.5) * 2);
-              for (let x = 0; x < w; x++) line += chars[(x + phase + t) % chars.length];
+              const phase = Math.floor(Math.sin((y + t) * 0.5) * 3);
+              for (let x = 0; x < w; x++) {
+                const v = Math.sin((x + phase + t) * 0.4);
+                line += v > 0.3 ? "~" : v > -0.3 ? "-" : "_";
+              }
               lines.push(line);
             }
             return lines;
           },
           (w: number, h: number, t: number) => {
-            // Trigram cycle ☰☱☲☳☴☵☶☷
-            const tri = "☰☱☲☳☴☵☶☷";
+            // Hash interference
+            const chars = "#=:.|";
             const lines: string[] = [];
             for (let y = 0; y < h; y++) {
               let line = "";
-              for (let x = 0; x < w; x++) line += tri[(x + y * 2 + t) % tri.length];
+              for (let x = 0; x < w; x++) line += chars[(x * 3 + y * 7 + t) % chars.length];
               lines.push(line);
             }
             return lines;
@@ -794,8 +797,8 @@ export default function setup(host: MicroappHost) {
             return lines;
           },
           (w: number, h: number, t: number) => {
-            // Maze-like ╔╗╚╝
-            const c = "╔═╗║ ║╚═╝";
+            // Pipe maze
+            const c = "+-|.+-|:";
             const lines: string[] = [];
             for (let y = 0; y < h; y++) {
               let line = "";
@@ -820,17 +823,16 @@ export default function setup(host: MicroappHost) {
             return lines;
           },
           (w: number, h: number, t: number) => {
-            // Box drawing spiral ┌┐└┘
-            const chars = "┌─┐│ │└─┘";
+            // Concentric rings
+            const chars = " .,:;!|#@";
             const lines: string[] = [];
+            const cx = w / 2, cy = h / 2;
             for (let y = 0; y < h; y++) {
               let line = "";
               for (let x = 0; x < w; x++) {
-                const cx = w / 2, cy = h / 2;
-                const angle = Math.atan2(y - cy, x - cx) + t * 0.2;
-                const dist = Math.sqrt((x - cx) ** 2 + (y - cy) ** 2);
-                const idx = Math.floor((angle + dist * 0.3) * 2) % chars.length;
-                line += chars[Math.abs(idx) % chars.length];
+                const dist = Math.sqrt((x - cx) ** 2 + ((y - cy) * 2) ** 2);
+                const idx = Math.floor(dist + t) % chars.length;
+                line += chars[idx];
               }
               lines.push(line);
             }
