@@ -147,6 +147,8 @@ export interface MicroappWindowHandle {
 
   focus(): void;
   close(): void;
+  /** Redirect window focus to a specific child widget (e.g. a terminal emulator). */
+  setFocusTarget(widget: blessed.Widgets.BlessedElement): void;
 }
 
 interface MicroappStateDetails {
@@ -246,6 +248,7 @@ function createMicroappHost(
           frame.focus();
         },
         close() { windowManager.closeWindow(frame.id); },
+        setFocusTarget(widget) { frame.setFocusTarget(widget as any); },
       };
 
       return handle;

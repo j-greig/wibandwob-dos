@@ -1,0 +1,20 @@
+{
+  "name": "terminal",
+  "version": "0.1.0",
+  "description": "PTY-backed terminal emulator window",
+  "type": "microapp",
+  "entry": "index.ts",
+  "microapp": {
+    "id": "wibwob.terminal",
+    "title": "Terminal",
+    "description": "PTY-backed terminal emulator window",
+    "multiInstance": true,
+    "persist": false,
+    "menu": [
+      { "category": "applications", "order": 92, "label": "Terminal" }
+    ],
+    "palette": { "order": 292, "label": "Terminal" },
+    "agent": true,
+    "api": true
+  }
+}
