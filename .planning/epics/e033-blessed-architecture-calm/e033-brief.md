@@ -164,7 +164,7 @@ After E033:
 |------|--------|------------|------|---------|
 | S01 | done | none | medium | Render scheduler and explicit invalidation policy |
 | S02 | done | S01 | medium | Local model/update/render pilot for live windows |
-| S03 | in-progress | S01 | medium | Microapp host lifecycle, redraw, and state contract |
+| S03 | done | S01 | medium | Microapp host lifecycle, redraw, and state contract |
 | S04 | not-started | none | medium | Thin the composition root |
 | S05 | not-started | none | medium | API contract audit and control-surface cleanup |
 | S06 | not-started | none | medium | Cell-aware text correctness and Unicode discipline |
@@ -179,7 +179,7 @@ After E033:
 
 - [x] S01 — Render scheduler and explicit invalidation policy
 - [x] S02 — Local model/update/render pilot for live windows
-- [~] S03 — Microapp host lifecycle, redraw, and state contract
+- [x] S03 — Microapp host lifecycle, redraw, and state contract
 - [ ] S04 — Thin the composition root
 - [ ] S05 — API contract audit and control-surface cleanup
 - [ ] S06 — Cell-aware text correctness and Unicode discipline
@@ -366,7 +366,7 @@ remains outstanding even though the model/update/render seam is now landed.
 
 ## S03 — Microapp host lifecycle, redraw, and state contract
 
-Status: in-progress
+Status: done
 Depends on: S01
 Risk: medium
 
@@ -403,31 +403,31 @@ heartbeat, and patchbay-lab.
 ### Tasks
 
 - [x] audit the current `createWindow()` registration flow and document why the defer exists
-- [ ] replace or reduce `setTimeout(ensureRegistered, 0)` lifecycle reliance only if an explicit lifecycle hook preserves the same guarantees
+- [x] replace or reduce `setTimeout(ensureRegistered, 0)` lifecycle reliance only if an explicit lifecycle hook preserves the same guarantees
 - [x] define explicit redraw/invalidate guidance for modules
-- [ ] tighten `describeState()` expectations for microapps
+- [x] tighten `describeState()` expectations for microapps
 - [x] re-export missing shared helpers through `microapp-sdk.ts` where module authors currently reach into `src/core/*`
 - [x] migrate at least two representative modules to the improved contract and SDK import path
-- [ ] identify a shared architecture for embedding animated subwindows or animated surfaces inside other modules, with `modules/zine/index.ts` and `modules/touchlab-mvp/` as target consumers if feasible
-- [ ] check workspace restore behaviour for touched modules
+- [x] identify a shared architecture for embedding animated subwindows or animated surfaces inside other modules, with `modules/zine/index.ts` and `modules/touchlab-mvp/` as target consumers if feasible
+- [x] check workspace restore behaviour for touched modules
 
 ### Acceptance criteria
 
 - [x] AC-1: microapp registration semantics are explicit and documented, including the ordering guarantee that the old defer was providing
 - [x] AC-2: redraw/invalidation policy for microapps is clearer than “call `host.screen.render()` whenever”
-- [ ] AC-3: at least two representative modules use the new pattern cleanly
-- [ ] AC-4: module `describeState()` remains trustworthy for `/state` and agent use
-- [ ] AC-5: the SDK import anti-pattern is reduced in the touched modules by routing shared helpers through `microapp-sdk.ts`
-- [ ] AC-6: existing modules remain compatible during the transition; this is not a flag-day rewrite
-- [ ] AC-7: the story records whether a shared animated-subwindow architecture for `modules/zine/index.ts` and `modules/touchlab-mvp/` is feasible now, deferred, or partially landed
-- [ ] AC-8: migrated modules preserve workspace restore correctness
-- [ ] AC-9: migrated modules preserve theme/restyle correctness with windows left open across a theme switch
-- [ ] AC-10: `bun run typecheck` passes
+- [x] AC-3: at least two representative modules use the new pattern cleanly
+- [x] AC-4: module `describeState()` remains trustworthy for `/state` and agent use
+- [x] AC-5: the SDK import anti-pattern is reduced in the touched modules by routing shared helpers through `microapp-sdk.ts`
+- [x] AC-6: existing modules remain compatible during the transition; this is not a flag-day rewrite
+- [x] AC-7: the story records whether a shared animated-subwindow architecture for `modules/zine/index.ts` and `modules/touchlab-mvp/` is feasible now, deferred, or partially landed
+- [x] AC-8: migrated modules preserve workspace restore correctness
+- [x] AC-9: migrated modules preserve theme/restyle correctness with windows left open across a theme switch
+- [x] AC-10: `bun run typecheck` passes
 
 ### Verification
 
 - [x] representative module windows still open and close cleanly
-- [ ] workspace restore still works for migrated modules
+- [x] workspace restore still works for migrated modules
 - [x] theme switching with migrated modules open does not leave stale colours
 - [x] first-run demo modules remain clean, legible, and agent-operable
 
@@ -438,9 +438,15 @@ missing helpers through `src/services/microapp-sdk.ts` and migrating multiple
 modules (`patchbay-lab`, `e026-demo`, `zine`, and `sy2-chronicles`) away from
 direct `src/core/*` imports for the touched helpers.
 
-This story is still in progress because the `setTimeout(ensureRegistered, 0)`
-registration defer in `module-loader.ts` has not yet been replaced or formally
-documented, and workspace-restore evidence is still partial.
+`module-loader.ts` now documents the registration ordering guarantee explicitly
+and reduces the old `setTimeout(ensureRegistered, 0)` defer to a microtask,
+which preserves the same setup contract with less event-loop drift.
+
+Shared animated-subwindow architecture is NOT fully landed here. Current status:
+partially-landed / deferred. Existing primitives such as
+`createLazyMountedPlayer`, `createContourPlayer`, and the touched `zine` /
+`patchbay-lab` import cleanup prove the shape, but the fuller reusable embedding
+contract remains future work for S11 and S12.
 
 ### Out of scope for this story
 
