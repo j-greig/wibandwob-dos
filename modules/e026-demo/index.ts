@@ -28,9 +28,7 @@ import {
   type BorderedPanelHandle,
   type MicroappHost,
 } from "../../src/services/microapp-sdk.js";
-import { createTreeWidget, type TreeNode } from "../../src/core/tree-widget.js";
-import { createTimer, clearTimers } from "../../src/core/ui-primitives.js";
-import { tweenWindowPosition, tweenWindowSize } from "../../src/services/motion-service.js";
+import { createTreeWidget, type TreeNode, createTimer, clearTimers, tweenWindowPosition, tweenWindowSize } from "../../src/services/microapp-sdk.js";
 import path from "node:path";
 
 // ── Sample tree ───────────────────────────────────────────────────────────────

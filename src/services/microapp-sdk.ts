@@ -194,6 +194,19 @@ export { composeAsciiLayers, renderAsciiTextBlock } from "./ascii-composition.js
 export type { AsciiBlendMode, AsciiCompositionNodeSpec, AsciiCompositionRole } from "./ascii-composition.js";
 export { createTimer, clearTimers } from "../core/ui-primitives.js";
 
+// Tree widget — hierarchical nav/explorer
+export { createTreeWidget } from "../core/tree-widget.js";
+export type { TreeNode } from "../core/tree-widget.js";
+
+// Empty-state placeholders
+export { EMPTY_PRIMER_SELECTED } from "../core/empty-states.js";
+
+// Contour rendering (terrain engine surface)
+export { renderContour, renderContourFromHills } from "./contour-engine.js";
+
+// Canvas types — zine source type
+export type { ZineSourceType } from "../core/canvas-types.js";
+
 // Motion / tween — animate values, window position and size smoothly.
 export { tween, tweenWindowPosition, tweenWindowSize, EASINGS } from "./motion-service.js";
 export type { EasingFn, TweenOpts } from "./motion-service.js";

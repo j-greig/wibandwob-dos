@@ -35,12 +35,12 @@ import {
   gridToText,
   waveLine,
   bar,
-} from "../../src/services/microapp-sdk.js";
-import { renderContour } from "../../src/services/contour-engine.js";
-import { renderFiglet } from "../../src/services/figlet-service.js";
-import { MonsterCamService, type MonsterCamFrame } from "../../src/services/monster-cam-service.js";
-import { renderWebcamFrame, gridToBlessedContent } from "../../src/services/webcam-renderer.js";
-import {
+  renderContour,
+  renderFiglet,
+  MonsterCamService,
+  type MonsterCamFrame,
+  renderWebcamFrame,
+  gridToBlessedContent,
   layoutPanels,
   measureViewport,
   pointerToContent,
@@ -48,7 +48,7 @@ import {
   COL_GAP,
   type PanelDef,
   type PanelNode,
-} from "../../src/core/panel-layout.js";
+} from "../../src/services/microapp-sdk.js";
 import { type CEPanelDef, toPanelDef, renderPanel } from "./panel-types.js";
 import { loadPanelsFromDir, watchPanelDir } from "./content-loader.js";
 
