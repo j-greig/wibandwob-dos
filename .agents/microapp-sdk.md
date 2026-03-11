@@ -296,6 +296,7 @@ win.onCleanup(() => player.destroy());
 
 Use this when one panel inside a larger microapp should animate independently.
 Reference adopter: `modules/touchlab-mvp/index.ts`.
+Composition vocabulary note: `docs/ascii-composition-vocabulary.md`.
 
 ### Markdown viewer (F03)
 ```typescript

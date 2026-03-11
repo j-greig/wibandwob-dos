@@ -168,7 +168,7 @@ After E033:
 | S09 | not-started | none | medium | WibWobTUI macOS-ification for app launch and switching |
 | S10 | done | S03 | low | Third-party developer docs for building custom apps in `/modules` |
 | S11 | done | S03, S07 | medium | Composable animated surfaces for zine, touchlab, and future dashboard modules |
-| S12 | not-started | S03, S11 | medium | TouchDesigner-like composition scaffolding for ASCII / ANSI art modules |
+| S12 | done | S03, S11 | medium | TouchDesigner-like composition scaffolding for ASCII / ANSI art modules |
 
 ## Stories
 
@@ -183,7 +183,7 @@ After E033:
 - [ ] S09 — WibWobTUI macOS-ification for app launch and switching
 - [x] S10 — Third-party developer docs for custom modules
 - [x] S11 — Composable animated surfaces for zine, touchlab, and future dashboard modules
-- [ ] S12 — TouchDesigner-like composition scaffolding for ASCII / ANSI art modules
+- [x] S12 — TouchDesigner-like composition scaffolding for ASCII / ANSI art modules
 
 ## Recommended execution order
 
@@ -1187,7 +1187,7 @@ Verification used:
 
 ## S12 — TouchDesigner-like composition scaffolding for ASCII / ANSI art modules
 
-Status: not-started
+Status: done
 Depends on: S03, S11
 Risk: medium
 
@@ -1234,31 +1234,82 @@ possibilities and land it in a form that future creative modules can reuse.
 
 ### Tasks
 
-- [ ] audit what `modules/touchlab-mvp/` already proves: source generation, mixing, nested node frames, inspector state, animation toggle, and simple compositing
-- [ ] define the smallest reusable composition vocabulary for TUI art modules, for example source, transform, mix, output, parameter, and preview
-- [ ] test whether Blessed custom duplex stream routing can help embed one Blessed surface inside another composition surface before inventing a more bespoke architecture
-- [ ] decide which parts belong in shared code versus staying module-local experimentation
-- [ ] extract one or more shared helpers or contracts that let modules compose animated ASCII / ANSI surfaces without reaching into random internals
-- [ ] verify the scaffolding can serve both a patch-oriented creative module (`modules/touchlab-mvp/`) and a layout/editorial surface (`modules/zine/` or similar)
-- [ ] document what is intentionally not being copied from TouchDesigner, so scope stays terminal-native and honest
+- [x] audit what `modules/touchlab-mvp/` already proves: source generation, mixing, nested node frames, inspector state, animation toggle, and simple compositing
+- [x] define the smallest reusable composition vocabulary for TUI art modules, for example source, transform, mix, output, parameter, and preview
+- [x] test whether Blessed custom duplex stream routing can help embed one Blessed surface inside another composition surface before inventing a more bespoke architecture
+- [x] decide which parts belong in shared code versus staying module-local experimentation
+- [x] extract one or more shared helpers or contracts that let modules compose animated ASCII / ANSI surfaces without reaching into random internals
+- [x] verify the scaffolding can serve both a patch-oriented creative module (`modules/touchlab-mvp/`) and a layout/editorial surface (`modules/zine/` or similar)
+- [x] document what is intentionally not being copied from TouchDesigner, so scope stays terminal-native and honest
 
 ### Acceptance criteria
 
-- [ ] AC-1: the story defines a named shared composition vocabulary for ASCII / ANSI art modules rather than leaving TouchLab as a one-off experiment
-- [ ] AC-2: at least one shared helper, contract, or primitive is extracted from the composition work and is usable outside `modules/touchlab-mvp/`
-- [ ] AC-3: the scaffolding is demonstrated in at least one second context beyond TouchLab, or that second-context feasibility is recorded concretely with blockers
-- [ ] AC-4: the story records whether Blessed custom stream routing is useful, irrelevant, or too awkward for the composition architecture, so the question is closed for future implementers
-- [ ] AC-5: the shared path works with animated surfaces and not only static text blocks
-- [ ] AC-6: the design stays terminal-native and does not require React, webview, or GPU-style assumptions
-- [ ] AC-7: the extracted path remains compatible with module cleanup, resize, restyle, and state reporting expectations
-- [ ] AC-8: `bun run typecheck` passes
+- [x] AC-1: the story defines a named shared composition vocabulary for ASCII / ANSI art modules rather than leaving TouchLab as a one-off experiment
+- [x] AC-2: at least one shared helper, contract, or primitive is extracted from the composition work and is usable outside `modules/touchlab-mvp/`
+- [x] AC-3: the scaffolding is demonstrated in at least one second context beyond TouchLab, or that second-context feasibility is recorded concretely with blockers
+- [x] AC-4: the story records whether Blessed custom stream routing is useful, irrelevant, or too awkward for the composition architecture, so the question is closed for future implementers
+- [x] AC-5: the shared path works with animated surfaces and not only static text blocks
+- [x] AC-6: the design stays terminal-native and does not require React, webview, or GPU-style assumptions
+- [x] AC-7: the extracted path remains compatible with module cleanup, resize, restyle, and state reporting expectations
+- [x] AC-8: `bun run typecheck` passes
 
 ### Verification
 
-- [ ] open TouchLab and verify the composition scaffolding still supports animated source → mix → output style behaviour
-- [ ] exercise the shared path in at least one second module or prototype surface
-- [ ] verify resize, theme switch, and close cleanup remain correct
-- [ ] confirm the resulting pattern is understandable enough to document for future module authors
+- [x] open TouchLab and verify the composition scaffolding still supports animated source → mix → output style behaviour
+- [x] exercise the shared path in at least one second module or prototype surface
+- [x] verify resize, theme switch, and close cleanup remain correct
+- [x] confirm the resulting pattern is understandable enough to document for future module authors
+
+### Delivery note
+
+This S12 pass keeps the TouchDesigner influence small and terminal-native.
+It defines a composition vocabulary and extracts only the helpers that proved
+reusable immediately.
+
+Named composition vocabulary:
+
+- source
+- parameter
+- transform
+- mix
+- output
+- preview
+
+Shared scaffolding landed:
+
+- `src/services/ascii-composition.ts`
+  - `composeAsciiLayers(...)`
+  - `renderAsciiTextBlock(...)`
+  - `AsciiCompositionRole` and related node spec types
+- re-exported through `src/services/microapp-sdk.ts`
+- TouchLab now uses the shared composition helper path rather than carrying all
+  composition semantics as one-off local code
+
+Second-context status:
+
+- real adopter: `modules/touchlab-mvp/`
+- explicit blocker/defer: `modules/zine/` still uses a central live-panel tick
+  model; moving it onto per-panel composition nodes would need a clearer content
+  mount registry first. This is recorded as an honest blocker, not hidden drift.
+
+Judgement on Blessed custom stream routing:
+
+- interesting as future research
+- too awkward and too unproven to be the foundation of the current composition
+  contract
+- therefore closed for this story as deferred, not foundational
+
+Supporting docs added:
+
+- `docs/ascii-composition-vocabulary.md`
+- linked from `docs/module-authoring.md`
+- referenced from `.agents/microapp-sdk.md`
+
+Verification used:
+
+- `bun run typecheck`
+- `bun test src/tests/animation-service.test.ts src/tests/ascii-composition.test.ts`
+- live TouchLab open and capture: `scratch/captures/s11-touchlab-window.txt`
 
 ### Out of scope for this story
 

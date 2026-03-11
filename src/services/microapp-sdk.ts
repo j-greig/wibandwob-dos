@@ -178,6 +178,8 @@ export { layoutPanels, layoutColumns, pointerToContent, hitPanel, measureViewpor
 export type { PanelDef, PanelNode, LayoutResult, ColumnLayoutResult, ColumnLayoutOptions, ColumnHeader } from "../core/panel-layout.js";
 export type { ZineItem, ZineLayoutResult, ZineItemType, CanvasDocument, CanvasColumnDef } from "../core/canvas-types.js";
 export { blankGrid, paintText, paintCentered, paintLines, drawArrow, gridToText, waveLine, bar } from "../core/grid-canvas.js";
+export { composeAsciiLayers, renderAsciiTextBlock } from "./ascii-composition.js";
+export type { AsciiBlendMode, AsciiCompositionNodeSpec, AsciiCompositionRole } from "./ascii-composition.js";
 export { createTimer, clearTimers } from "../core/ui-primitives.js";
 
 // Motion / tween — animate values, window position and size smoothly.

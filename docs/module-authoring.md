@@ -16,6 +16,7 @@ Good starter references:
 - minimal: `modules/hello-world/`
 - richer live module: `modules/glitchbox/`
 - broad feature demo: `modules/e026-demo/`
+- composition note: `docs/ascii-composition-vocabulary.md`
 - scaffold helper: `bash scripts/scaffold-microapp.sh modules/<name> <app-id> "<Title>"`
 
 ## What a module is
