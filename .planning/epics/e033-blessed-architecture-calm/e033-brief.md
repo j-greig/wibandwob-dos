@@ -166,7 +166,7 @@ After E033:
 | S07 | done | none, then coordinate with S01 | medium | Visual regression, render telemetry, and dense-scene performance checks |
 | S08 | not-started | none, then coordinate with S01 and S07 | medium | Runtime telemetry, stats surface, and agent/session health metrics |
 | S09 | not-started | none | medium | WibWobTUI macOS-ification for app launch and switching |
-| S10 | not-started | S03 | low | Third-party developer docs for building custom apps in `/modules` |
+| S10 | done | S03 | low | Third-party developer docs for building custom apps in `/modules` |
 | S11 | not-started | S03, S07 | medium | Composable animated surfaces for zine, touchlab, and future dashboard modules |
 | S12 | not-started | S03, S11 | medium | TouchDesigner-like composition scaffolding for ASCII / ANSI art modules |
 
@@ -181,7 +181,7 @@ After E033:
 - [x] S07 — Visual regression, render telemetry, and dense-scene performance checks
 - [ ] S08 — Runtime telemetry, stats surface, and agent/session health metrics
 - [ ] S09 — WibWobTUI macOS-ification for app launch and switching
-- [ ] S10 — Third-party developer docs for custom modules
+- [x] S10 — Third-party developer docs for custom modules
 - [ ] S11 — Composable animated surfaces for zine, touchlab, and future dashboard modules
 - [ ] S12 — TouchDesigner-like composition scaffolding for ASCII / ANSI art modules
 
@@ -989,7 +989,7 @@ windows or app types.
 
 ## S10 — Third-party developer docs for custom modules
 
-Status: not-started
+Status: done
 Depends on: S03
 Risk: low
 
@@ -1014,27 +1014,52 @@ looks less modular than it really is. This story makes extensibility legible.
 
 ### Tasks
 
-- [ ] choose doc shape: one long page or a small doc family
-- [ ] document the module mental model: manifest, setup, commands, window creation, cleanup, restyle, state reporting
-- [ ] document the preferred SDK import path and anti-patterns
-- [ ] include one minimal app example and one stateful/live app example
-- [ ] include first-run guidance for where custom apps live in `/modules`
-- [ ] include verification steps for making a new app appear in the running desktop
+- [x] choose doc shape: one long page or a small doc family
+- [x] document the module mental model: manifest, setup, commands, window creation, cleanup, restyle, state reporting
+- [x] document the preferred SDK import path and anti-patterns
+- [x] include one minimal app example and one stateful/live app example
+- [x] include first-run guidance for where custom apps live in `/modules`
+- [x] include verification steps for making a new app appear in the running desktop
 
 ### Acceptance criteria
 
-- [ ] AC-1: there is a clear third-party developer doc path for building custom apps under `/modules`
-- [ ] AC-2: docs describe the canonical path without requiring direct imports from random `src/core/*` files
-- [ ] AC-3: docs include one minimal module example and one stateful/live example
-- [ ] AC-4: docs explain `describeState()`, cleanup, restyle, invalidation, and command registration expectations
-- [ ] AC-5: docs are accurate against the post-S03 host contract
-- [ ] AC-6: a first-time developer can follow the docs to add a new module and see it appear in the app
+- [x] AC-1: there is a clear third-party developer doc path for building custom apps under `/modules`
+- [x] AC-2: docs describe the canonical path without requiring direct imports from random `src/core/*` files
+- [x] AC-3: docs include one minimal module example and one stateful/live example
+- [x] AC-4: docs explain `describeState()`, cleanup, restyle, invalidation, and command registration expectations
+- [x] AC-5: docs are accurate against the post-S03 host contract
+- [x] AC-6: a first-time developer can follow the docs to add a new module and see it appear in the app
 
 ### Verification
 
-- [ ] follow the docs with a fresh minimal test module or update an example module accordingly
-- [ ] visually verify the module appears in the running app
-- [ ] verify linked examples and file paths are correct
+- [x] follow the docs with a fresh minimal test module or update an example module accordingly
+- [x] visually verify the module appears in the running app
+- [x] verify linked examples and file paths are correct
+
+### Delivery note
+
+This S10 pass chose one obvious public doc path instead of a scattered doc family.
+
+Landed:
+
+- new canonical public guide at `docs/module-authoring.md`
+- updated `modules/README.md` to point at the guide first
+- updated `.agents/microapp-sdk.md` so the agent-facing SDK notes point at the same public doc
+
+What the guide now covers:
+
+- module mental model and file layout
+- `module.json` contract
+- preferred import rule: `../../src/services/microapp-sdk.js`
+- minimal example reference: `modules/hello-world/`
+- stateful/live example reference: `modules/glitchbox/`
+- command registration, `direct: true`, cleanup, restyle, `describeState()`, and `captureText()`
+- first-run scaffold flow and verification commands
+
+Visual verification used for this story:
+
+- opened `microapp.wibwob.example.hello.open` in the running app
+- captured the result to `scratch/captures/s10-hello-world-window.txt`
 
 ### Out of scope for this story
 

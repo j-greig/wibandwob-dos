@@ -5,6 +5,7 @@ any file in `modules/` or `modules-private/`.
 
 Reference implementation: `modules/hello-world/` (minimal)
 Full example with all primitives: `modules/e026-demo/` (F03/F05/F06/F07)
+Public authoring guide: `docs/module-authoring.md`
 
 ---
 

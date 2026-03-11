@@ -14,6 +14,10 @@ visible to everyone.
 
 ## Microapp Authoring
 
+Canonical doc:
+
+- `docs/module-authoring.md`
+
 For microapps, the current canonical authoring surface is:
 
 - manifest: `module.json`
