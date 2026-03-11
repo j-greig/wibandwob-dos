@@ -12,6 +12,14 @@ WWDOS live in tmux/API. Smoke passed: health, state, tmux text dump, 1-window cr
 
 Use this only if 2 agents are working at once. Goal: parallelise without file collisions.
 
+Current note after S12 on a2:
+- there is not a clean parallel-safe E033 implementation story left while a1 owns
+  the active shell/runtime lane
+- remaining meaningful stories are S08 and S09, and both now collide with
+  app-controller / shell / runtime seams
+- safe parallel work for a2 is prep-only planning or handover notes, not new
+  runtime code, until that lane settles
+
 Core rule:
 - Agent 1 takes ONE hotspot seam.
 - Agent 2 takes a disjoint lane with different files.

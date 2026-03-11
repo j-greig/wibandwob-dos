@@ -916,6 +916,38 @@ Reference bug / architecture anchor for terminal recursion work:
 - perfect per-window profiling
 - solving all future multi-agent monitoring in one pass
 
+### Prep-only note from a2
+
+No runtime implementation was started here because the active shell/runtime lane is
+owned elsewhere and the likely S08 seams now overlap directly.
+
+Useful prep conclusions before coding:
+
+- the story should keep `createRenderMonitor(screen)` as the single render-FPS
+  source of truth rather than inventing a second telemetry path
+- the first operator surface should prefer command-visible or dev-gated UI over
+  always-on chrome; the desktop is already visually busy and permanent stats in
+  shell chrome would raise collision risk with S09
+- the minimum useful agent/session health signals should stay humble on v1:
+  agent window present, session attached, currently streaming or idle, last turn
+  timestamp if already available, and coarse message/tool counters only if they
+  can be collected without threading new ambient state through the app
+- terminal recursion findings should be recorded as an explicit smoke matrix by
+  depth rather than hidden in prose; suggested columns: depth, input latency,
+  render smoothness, API reachability, agent usability, obvious breakage notes
+- avoid coupling the telemetry surface to Monster Cam or any one animated app;
+  shell-level render stats need to remain desktop-wide
+- if startup gating is added, prefer one obvious dev flag or command over a mix
+  of partial env vars and hidden keybinds
+
+Suggested implementation order when the shell seam is free:
+
+1. wire render monitor lifecycle in the shell
+2. expose one command to open or toggle a diagnostics surface
+3. add RAM and minimal agent/session signals
+4. run recursive terminal smoke and record evidence
+5. only then consider nicer chrome or persistent indicators
+
 ---
 
 ## S09 — WibWobTUI macOS-ification for app launch and switching
@@ -984,6 +1016,38 @@ windows or app types.
 - pixel-perfect macOS imitation
 - replacing the command palette
 - full desktop shell redesign
+
+### Prep-only note from a2
+
+No runtime implementation was started here because the likely launcher/switcher
+seams now overlap directly with the active shell lane.
+
+Useful prep conclusions before coding:
+
+- the launcher should be derived from canonical command metadata first, with
+  running-window state layered on top; do not invent a second app registry just
+  because the UI wants icon-like entries
+- the surface should answer two different questions cleanly: what can I open,
+  and what is already running; trying to collapse those without clear state will
+  make focus-vs-launch behaviour feel random
+- the most terminal-native macOS translation is probably not a literal dock
+  clone; a shelf or launcher strip with strong labels, running dots, and one-key
+  focus/open actions would be more honest and more legible in text mode
+- keyboard path matters as much as mouse path: arrow or tab navigation, enter to
+  open/focus, and a predictable escape route back to the desktop
+- focus semantics should be explicit before visuals are polished: if multiple
+  windows belong to one app family, the launcher needs a deterministic rule for
+  which live window becomes the jump target
+- S09 should prefer reuse of existing command palette and state-service data
+  over bespoke launch bookkeeping in shell chrome
+
+Suggested implementation order when the shell seam is free:
+
+1. define one canonical app-entry model from command metadata plus running state
+2. decide live-window focus rules for multi-window apps
+3. build the launcher/switcher surface with keyboard and mouse parity
+4. verify running indicators update from real state changes
+5. only then tune visual styling toward the macOS-inspired feel
 
 ---
 
