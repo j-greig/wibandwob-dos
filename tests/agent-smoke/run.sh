@@ -173,7 +173,7 @@ sleep 2
 # ── Test 1: Open agent window ───────────────────────────────────────────────
 
 log "Test 1: Open agent window"
-api_post "/view/wibwob-agent/open" "{}"
+api_post "/view/agent/open" "{}"
 sleep 3
 
 STATE=$(get_state "01-agent-open")

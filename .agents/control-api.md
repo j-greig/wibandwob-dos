@@ -25,7 +25,7 @@ GET /screenshot/text?id=…         text screenshot of window
 ## Core Writes
 
 ```
-POST /commands/run                {"id":"command-id","args":{}}
+POST /commands/run                {"id":"command-id","args":{}}   ← canonical body only
 POST /windows/batch               {"ops":[{"id":N,"x":X,"y":Y,"w":W,"h":H},{"id":M,"close":true}]}
 ```
 
@@ -53,12 +53,13 @@ Each op is applied independently in order. A single op can move AND resize in on
 Response: `{ "ok": true, "results": [true, true, true, true] }` — one boolean per op.
 
 ```
-POST /windows/input               {"id":N,"input":"text\r"}   — trailing \r submits
+POST /windows/input               {"id":N,"input":"text\r","sender":"optional-label"}   — trailing \r submits
 POST /windows/agent-message       {"id":N,"text":"message","sender":"wibwob2"}
 POST /windows/focus               {"id":N}
 POST /windows/move                {"id":N,"left":X,"top":Y}
 POST /windows/resize              {"id":N,"width":W,"height":H}
 POST /windows/close               {"id":N}
+POST /windows/editor/write        {"id":N,"text":"replacement or insert text"}
 POST /windows/text/export         {"id":N,"name":"optional-name"}
 POST /workspace/save              {"name":"workspace-name"}
 POST /workspace/load              {"name":"workspace-name"}
@@ -69,13 +70,14 @@ POST /workspace/load              {"name":"workspace-name"}
 Dedicated `/view` routes:
 
 ```
-POST /view/wibwob-agent/open      {}
+POST /view/agent/open             {}
 POST /view/primer/open            {"filePath":"/abs/path.txt","x":X,"y":Y,"w":W,"h":H}
 POST /view/editor/open            {"filePath":"/abs/path.txt"}
 POST /view/browser-reader/open    {"filePath":"/abs/path.txt"}
+POST /view/reader/open            {"filePath":"/abs/path.md"}
 POST /view/figlet/open            {"text":"HELLO","font":"optional"}
 POST /view/backrooms/open         {"theme":"…","mode":"auto|live|fake-live","model":"haiku|sonnet","turns":3,"primers":"optional"}
-POST /view/art/open               {}
+POST /view/generative-art/open    {}
 POST /view/companion/open         {}
 POST /view/primer-browser/open    {}
 POST /view/primer-gallery/open    {}
@@ -116,7 +118,7 @@ backrooms.run                           {"theme":"…","mode":"…","model":"…
 
 1. `bun run start` — launch the app
 2. `GET /health` — wait until this responds (`{"ok":true,"port":8099,"sessionId":"abc"}`)
-3. `POST /view/wibwob-agent/open`
+3. `POST /view/agent/open`
 4. `GET /state` — find the `wibwob-agent` window id
 5. `POST /windows/input` with `{"id":N,"input":"your text\r"}`
 6. Wait for streaming to settle

@@ -97,22 +97,20 @@ describe("workspace round-trip", () => {
     await post("/commands/run", { id: "theme.set", args: { name: "wibwob-dark" } });
   });
 
-  test("move API accepts x/y aliases", async () => {
+  test("move and resize API use canonical field names", async () => {
     await post("/commands/run", { id: "companion.open" });
     await new Promise((r) => setTimeout(r, 300));
     const state = await get("/state");
     const win = state.windows[state.windows.length - 1];
 
-    // Move with x/y
-    await post("/windows/move", { id: win.id, x: 10, y: 5 });
+    await post("/windows/move", { id: win.id, left: 10, top: 5 });
     await new Promise((r) => setTimeout(r, 200));
     const after = await get("/state");
     const moved = after.windows.find((w: any) => w.id === win.id);
     expect(moved.left).toBe(10);
     expect(moved.top).toBe(5);
 
-    // Resize with w/h
-    await post("/windows/resize", { id: win.id, w: 30, h: 15 });
+    await post("/windows/resize", { id: win.id, width: 30, height: 15 });
     await new Promise((r) => setTimeout(r, 200));
     const resized = await get("/state");
     const sized = resized.windows.find((w: any) => w.id === win.id);

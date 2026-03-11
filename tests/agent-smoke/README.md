@@ -27,7 +27,7 @@ This will:
 
 | # | Test | What it checks |
 |---|------|---------------|
-| 1 | Agent window opens | POST /view/wibwob-agent/open → state has wibwob-agent window |
+| 1 | Agent window opens | POST /view/agent/open → state has wibwob-agent window |
 | 2 | /help | Send /help, verify status message appears with command list |
 | 3 | /session | Send /session, verify model + message count in output |
 | 4 | /tools | Send /tools, verify tool list appears |

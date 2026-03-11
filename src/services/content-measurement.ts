@@ -1,4 +1,4 @@
-import stringWidth from "string-width";
+import { visibleWidth } from "../core/ansi-utils.js";
 
 export interface ContentMeasurement {
   lineCount: number;
@@ -92,7 +92,7 @@ export function measureContent(rawContent: string, options: MeasureOptions = {})
     ? primaryFrameLines
     : (frames.length > 0 ? frames[0] : visibleLines);
   const measuredLines = sawFrameDelimiter ? effectivePrimary : visibleLines;
-  const columnWidth = measuredLines.reduce((max, line) => Math.max(max, stringWidth(line)), 0);
+  const columnWidth = measuredLines.reduce((max, line) => Math.max(max, visibleWidth(line)), 0);
 
   return {
     raw: normalized,

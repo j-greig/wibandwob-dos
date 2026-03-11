@@ -21,7 +21,8 @@
     "planning:sync": "bash .claude/scripts/planning.sh sync",
     "planning:branch": "git branch --show-current && git log --oneline -5",
     "planning:inbox": "bun run scripts/planning-inbox.ts",
-    "prepare": "git config core.hooksPath .githooks"
+    "prepare": "git config core.hooksPath .githooks",
+    "lint": "npx eslint 'modules/**/index.ts'"
   },
   "dependencies": {
     "@anthropic-ai/claude-code": "^2.1.63",
@@ -51,6 +52,7 @@
     "@types/jsdom": "^28.0.0",
     "@types/node": "^24.0.0",
     "@types/turndown": "^5.0.6",
-    "typescript": "^5.9.0"
+    "typescript": "^5.9.0",
+    "typescript-eslint": "^8.57.0"
   }
 }

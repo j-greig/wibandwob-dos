@@ -1,3 +1,15 @@
+/**
+ * microapp-sdk.ts — the ONE canonical import surface for module authors.
+ *
+ * Modules should import types and helpers from this file:
+ *   import type { MicroappHost } from "../../src/services/microapp-sdk.js";
+ *   import { createTimer, clamp } from "../../src/services/microapp-sdk.js";
+ *
+ * Do NOT import directly from src/core/* or other src/services/* files
+ * unless the SDK genuinely does not re-export what you need.
+ *
+ * If something is missing, add the re-export here rather than bypassing.
+ */
 import type blessed from "blessed";
 import {
   applyRect,
@@ -194,7 +206,13 @@ export { composeAsciiLayers, renderAsciiTextBlock } from "./ascii-composition.js
 export type { AsciiBlendMode, AsciiCompositionNodeSpec, AsciiCompositionRole } from "./ascii-composition.js";
 export { createTimer, clearTimers } from "../core/ui-primitives.js";
 
-// Motion / tween — animate values, window position and size smoothly.
+// Canvas types — zine source type (added by a2 lint sweep)
+export type { ZineSourceType } from "../core/canvas-types.js";
+
+// Contour rendering — additional (renderContourFromHills not in main export block)
+export { renderContourFromHills } from "./contour-engine.js";
+
+// Motion / tween
 export { tween, tweenWindowPosition, tweenWindowSize, EASINGS } from "./motion-service.js";
 export type { EasingFn, TweenOpts } from "./motion-service.js";
 

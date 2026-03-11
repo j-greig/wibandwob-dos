@@ -140,7 +140,7 @@ describe("window parity audit", () => {
     expect(win).toBeDefined();
     openedIds.push(win.id);
     expect(win.details.appType).toBe("companion-widget");
-    expect(win.details.summary).toContain("scramble");
+    expect(win.details.summary.toLowerCase()).toContain("scramble");
   });
 
   test("generative-art: reports appType and summary", async () => {

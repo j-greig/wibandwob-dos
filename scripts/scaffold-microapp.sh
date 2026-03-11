@@ -57,15 +57,18 @@ cat > "$MODULE_DIR/index.ts" <<EOF
 import blessed from "blessed";
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
 
+const APP_TITLE = "${ESC_TITLE}";
+const APP_SUMMARY = "Microapp scaffold loaded.";
+
 export default function setup(host: MicroappHost) {
   host.registerCommand({
     id: "open",
-    label: "${ESC_TITLE}",
+    label: APP_TITLE,
     description: "Open the ${ESC_TITLE} microapp scaffold.",
-    menu: [{ category: "applications", order: ${MENU_ORDER}, label: "${ESC_TITLE}" }],
+    menu: [{ category: "applications", order: ${MENU_ORDER}, label: APP_TITLE }],
     palette: { order: ${MENU_ORDER}, label: "Open ${ESC_TITLE}" },
     action: () => {
-      const win = host.createWindow({ title: "${ESC_TITLE}", width: 56, height: 14 });
+      const win = host.createWindow({ title: APP_TITLE, width: 56, height: 14 });
 
       const content = blessed.box({
         parent: win.body,
@@ -77,26 +80,27 @@ export default function setup(host: MicroappHost) {
         content: [
           "{bold}${ESC_TITLE}{/bold}",
           "",
-          "Microapp scaffold loaded.",
+          APP_SUMMARY,
           "",
           "Next steps:",
           "  1. Replace this box tree with real UI",
-          "  2. Add describeState fields agents can use",
-          "  3. Add snapshot support if persist:true",
+          "  2. Keep imports on the public microapp SDK path",
+          "  3. Add describeState fields agents can use",
+          "  4. Add snapshot support if persist:true",
+          "  5. Add onCleanup only when there is real cleanup to do",
         ].join("\n"),
         style: host.theme().body,
       });
 
       win.describeState(() => ({
-        summary: "${ESC_TITLE} scaffold",
-        contentPreview: "Microapp scaffold loaded.",
+        summary: `${ESC_TITLE} scaffold`,
+        contentPreview: APP_SUMMARY,
       }));
 
       win.captureText(() => content.getContent());
       win.onRestyle(() => {
         content.style = host.theme().body;
       });
-      win.onCleanup(() => {});
       win.focus();
     },
   });

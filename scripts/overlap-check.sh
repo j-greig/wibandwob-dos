@@ -10,8 +10,9 @@ import sys, json, math
 
 data = json.load(open(sys.argv[1]))
 desktop = data.get("desktop") or {}
-dw = desktop.get("width", 0)
-dh = desktop.get("height", 0)
+screen = data.get("screen") or {}
+dw = desktop.get("width", screen.get("width", 0))
+dh = desktop.get("height", screen.get("height", 0))
 MENU_ROW = 1  # menu bar occupies y=0
 
 all_wins = [w for w in data.get("windows", []) if w.get("appType") != "wibwob-agent"]

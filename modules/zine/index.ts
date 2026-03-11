@@ -18,22 +18,22 @@ import blessed from "blessed";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import type { MicroappHost } from "../../src/services/microapp-sdk.js";
 import {
   layoutPanels,
   layoutColumns,
   measureViewport,
   pointerToContent,
   hitPanel,
+  type PanelNode,
+  type ZineItem,
+  type ZineSourceType,
   createTimer,
   clearTimers,
   createButtonBar,
   createSidebarPanel,
   createSelectableList,
   createInlineSearch,
-  type MicroappHost,
-  type PanelNode,
-  type ZineItem,
-  type ZineSourceType,
 } from "../../src/services/microapp-sdk.js";
 import { toPanelDef, renderPanel } from "../sy2-chronicles/panel-types.js";
 import YAML from "yaml";

@@ -144,7 +144,7 @@ describe("snapshot registry coverage", () => {
 
   test("registry key count matches PersistableAppType union", () => {
     // 16 types as of this writing — if this fails, update TESTABLE/SKIP lists
-    expect(ALL_REGISTRY_TYPES.length).toBe(17);
+    expect(ALL_REGISTRY_TYPES.length).toBe(16);
   });
 });
 

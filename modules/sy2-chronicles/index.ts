@@ -20,6 +20,7 @@
 import blessed from "blessed";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import type { MicroappHost } from "../../src/services/microapp-sdk.js";
 import {
   clamp,
   createButtonBar,
@@ -37,6 +38,7 @@ import {
   renderContour,
   renderFiglet,
   MonsterCamService,
+  type MonsterCamFrame,
   renderWebcamFrame,
   gridToBlessedContent,
   layoutPanels,
@@ -44,8 +46,6 @@ import {
   pointerToContent,
   hitPanel,
   COL_GAP,
-  type MicroappHost,
-  type MonsterCamFrame,
   type PanelDef,
   type PanelNode,
 } from "../../src/services/microapp-sdk.js";

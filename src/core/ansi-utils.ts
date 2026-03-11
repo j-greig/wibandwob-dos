@@ -67,22 +67,8 @@ export function visibleWidth(str: string): number {
   const cached = widthCache.get(str);
   if (cached !== undefined) return cached;
 
-  let clean = str;
-  if (str.includes("\t")) clean = clean.replace(/\t/g, "   ");
-  if (clean.includes("\x1b")) {
-    let stripped = "";
-    let i = 0;
-    while (i < clean.length) {
-      const ansiLen = extractAnsiCode(clean, i);
-      if (ansiLen) { i += ansiLen; continue; }
-      stripped += clean[i];
-      i++;
-    }
-    clean = stripped;
-  }
-
   let width = 0;
-  for (const { segment } of segmenter.segment(clean)) width += graphemeWidth(segment);
+  for (const { segment } of iterateVisibleSegments(str)) width += graphemeWidth(segment);
 
   if (widthCache.size >= WIDTH_CACHE_SIZE) {
     const firstKey = widthCache.keys().next().value as string | undefined;
@@ -90,6 +76,27 @@ export function visibleWidth(str: string): number {
   }
   widthCache.set(str, width);
   return width;
+}
+
+function *iterateVisibleSegments(str: string): Generator<{ segment: string; start: number; end: number }> {
+  let i = 0;
+  while (i < str.length) {
+    const ansiLen = extractAnsiCode(str, i);
+    if (ansiLen) {
+      i += ansiLen;
+      continue;
+    }
+    const nextAnsiIndex = str.indexOf("\x1b", i);
+    const end = nextAnsiIndex === -1 ? str.length : nextAnsiIndex;
+    const chunk = str.slice(i, end).replace(/\t/g, "   ");
+    let offset = 0;
+    for (const { segment } of segmenter.segment(chunk)) {
+      const start = i + offset;
+      offset += segment.length;
+      yield { segment, start, end: i + offset };
+    }
+    i = end;
+  }
 }
 
 // ── ANSI code extraction ──────────────────────────────────────────────────────
@@ -205,8 +212,16 @@ export class AnsiCodeTracker {
     return codes.length === 0 ? "" : `\x1b[${codes.join(";")}m`;
   }
 
+  hasActiveCodes(): boolean {
+    return this.getActiveCodes() !== "";
+  }
+
   getLineEndReset(): string {
     return this.underline ? "\x1b[24m" : "";
+  }
+
+  getFullReset(): string {
+    return this.hasActiveCodes() ? "\x1b[0m" : "";
   }
 }
 
@@ -316,6 +331,38 @@ export function wrapTextWithAnsi(text: string, width: number): string[] {
     updateTracker(inputLine, tracker);
   }
   return result.length > 0 ? result : [""];
+}
+
+/** Clip a string to at most `width` visible columns without splitting graphemes. */
+export function clipToVisibleWidth(line: string, width: number): string {
+  if (width <= 0 || !line) return "";
+  if (visibleWidth(line) <= width) return line;
+
+  let result = "";
+  let used = 0;
+  let i = 0;
+  const tracker = new AnsiCodeTracker();
+  while (i < line.length && used < width) {
+    const ansiLen = extractAnsiCode(line, i);
+    if (ansiLen) {
+      result += line.slice(i, i + ansiLen);
+      tracker.process(line, i, ansiLen);
+      i += ansiLen;
+      continue;
+    }
+
+    const nextAnsiIndex = line.indexOf("\x1b", i);
+    const end = nextAnsiIndex === -1 ? line.length : nextAnsiIndex;
+    const chunk = line.slice(i, end).replace(/\t/g, "   ");
+    for (const { segment } of segmenter.segment(chunk)) {
+      const gw = graphemeWidth(segment);
+      if (used + gw > width) return result + tracker.getFullReset();
+      result += segment;
+      used += gw;
+    }
+    i = end;
+  }
+  return result + tracker.getFullReset();
 }
 
 /** Pad a string to exactly `width` visible columns. */

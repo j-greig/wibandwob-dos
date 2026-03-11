@@ -1,3 +1,10 @@
+/**
+ * ui-parts.ts — internal layout primitives.
+ *
+ * Module authors: do NOT import from this file directly.
+ * Use ../../src/services/microapp-sdk.js instead, which re-exports
+ * everything here under a stable public surface.
+ */
 import blessed from "blessed";
 
 import type { FramePlayer } from "../services/animation-service.js";

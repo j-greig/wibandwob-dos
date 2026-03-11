@@ -130,6 +130,7 @@ const ENDPOINT_CATALOGUE = [
   { method: "POST", path: "/windows/input",                 body: { id: "number", input: "string (trailing \\r submits)" }, description: "Send text input to a window" },
   { method: "POST", path: "/windows/agent-message",         body: { id: "number", text: "string", sender: "string (optional — shows as sender label)" }, description: "Send a message to the Wib&Wob Agent window" },
   { method: "POST", path: "/windows/text/export",           body: { id: "number", name: "string (optional)" }, description: "Export window text content to scratch/captures/" },
+  { method: "POST", path: "/windows/editor/write",          body: { id: "number", content: "string" }, description: "Write content to an editor window buffer" },
   // ── Workspace persistence ──
   { method: "POST", path: "/workspace/save",                body: { name: "string" }, description: "Save current workspace layout" },
   { method: "POST", path: "/workspace/load",                body: { name: "string" }, description: "Load a named workspace layout" },

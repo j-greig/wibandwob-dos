@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { visibleWidth, wrapTextWithAnsi, padToWidth, extractAnsiCode } from "../../src/core/ansi-utils.js";
+import { visibleWidth, wrapTextWithAnsi, padToWidth, extractAnsiCode, clipToVisibleWidth } from "../../src/core/ansi-utils.js";
 
 describe("visibleWidth", () => {
   it("plain ASCII", () => expect(visibleWidth("hello")).toBe(5));
@@ -35,6 +35,20 @@ describe("wrapTextWithAnsi", () => {
     expect(result[0]).toContain("\x1b[");
   });
   it("handles empty string", () => expect(wrapTextWithAnsi("", 80)).toEqual([""]));
+});
+
+describe("clipToVisibleWidth", () => {
+  it("clips mixed-width text without splitting emoji clusters", () => {
+    expect(clipToVisibleWidth("A👁️B", 2)).toBe("A👁️");
+    expect(visibleWidth(clipToVisibleWidth("🌈👅🌈👅", 5))).toBeLessThanOrEqual(5);
+  });
+
+  it("preserves ANSI escapes while clipping visible width", () => {
+    const clipped = clipToVisibleWidth("\x1b[31mhi 👋 there\x1b[0m", 6);
+    expect(clipped).toContain("\x1b[31m");
+    expect(clipped.endsWith("\x1b[0m")).toBe(true);
+    expect(visibleWidth(clipped)).toBeLessThanOrEqual(6);
+  });
 });
 
 describe("padToWidth", () => {
