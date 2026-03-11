@@ -30,6 +30,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { BackroomsChannel, DesktopState } from "../core/types.js";
+import type { RuntimeStatsSnapshot } from "../core/runtime-stats.js";
 import type { CommandSurface, CommandListItem, CommandRunResult } from "../core/command-registry.js";
 import { log } from "./app-logger.js";
 import { worldChatService, formatWorldChannelText } from "./world-chat-service.js";
@@ -57,6 +58,8 @@ interface ControlApiHandlers {
     lastMessage: string | null;
     logPath: string | null;
   };
+  /** Shell-level runtime stats snapshot for diagnostics and benchmark evidence. */
+  getRuntimeStats: () => RuntimeStatsSnapshot;
   /** Scramble full conversation history. */
   getScrambleHistory: () => Array<{ role: string; content: string; timestamp: number }>;
 }
@@ -77,6 +80,7 @@ const ENDPOINT_CATALOGUE = [
   { method: "GET",  path: "/openapi.json",                  description: "OpenAPI 3.0 spec" },
   { method: "GET",  path: "/docs",                          description: "Interactive API docs (Scalar)" },
   { method: "GET",  path: "/state",                         description: "Full live desktop + window state" },
+  { method: "GET",  path: "/runtime/stats",                 description: "Shell-level runtime stats: render FPS, frame time, RAM, and agent activity" },
   { method: "GET",  path: "/commands/list",                 description: "All registered commands (optional ?surface=menu|palette|api|agent&includeUnavailable=1)" },
   { method: "GET",  path: "/content/primer-info",           description: "Primer content metadata. ?path=/abs/path.txt" },
   { method: "GET",  path: "/world-chat/state",              description: "Structured world chat snapshot outside the TUI" },
@@ -272,6 +276,10 @@ export class ControlApiService {
       // Always rebuild state fresh — internal window state may have changed
       // without triggering a window-manager onChange (e.g. direct microapp commands).
       return Response.json(this.handlers.syncState());
+    }
+
+    if (request.method === "GET" && url.pathname === "/runtime/stats") {
+      return Response.json({ ok: true, stats: this.handlers.getRuntimeStats() });
     }
 
     if (request.method === "GET" && url.pathname === "/scramble/state") {

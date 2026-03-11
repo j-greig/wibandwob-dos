@@ -334,6 +334,7 @@ export class TsTuiMvpApp {
         runCommand: (id, args) => this.commands.run(id, args),
         windows: this.windowManager,
         screenshotText: () => (this.screen as any).screenshot() as string,
+        getRuntimeStats: () => this.runtimeStats.snapshot(),
         getScrambleState: () => ({
           status: this.scrambleBrain.status,
           sleeping: this.scrambleBrain.sleeping,

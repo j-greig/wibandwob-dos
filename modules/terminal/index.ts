@@ -11,6 +11,7 @@
  */
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
 import blessed from "blessed";
+import fs from "node:fs";
 import { spawn, type ChildProcess } from "child_process";
 import path from "path";
 
@@ -31,6 +32,19 @@ function findNodePtyPath(): string {
     } catch { /* next */ }
   }
   return candidates[0]; // best-effort fallback
+}
+
+function ensureNodePtyHelperExecutable(nodeModulesPath: string): void {
+  const helper = path.join(nodeModulesPath, "node-pty", "prebuilds", `${process.platform}-${process.arch}`, "spawn-helper");
+  try {
+    if (!fs.existsSync(helper)) return;
+    const mode = fs.statSync(helper).mode & 0o777;
+    if ((mode & 0o111) !== 0o111) {
+      fs.chmodSync(helper, mode | 0o755);
+    }
+  } catch {
+    // Best-effort only. If this still fails, the bridge will surface the real error.
+  }
 }
 
 function installTerminalMousePassthrough(
@@ -183,6 +197,7 @@ function openTerminal(host: MicroappHost) {
 
   function spawnBridge() {
     const nodePtyPath = findNodePtyPath();
+    ensureNodePtyHelperExecutable(nodePtyPath);
     bridge = spawn("node", [BRIDGE_SCRIPT], {
       stdio: ["pipe", "pipe", "pipe"],
       env: {
@@ -272,6 +287,11 @@ function openTerminal(host: MicroappHost) {
     } catch {
       return "(terminal capture unavailable)";
     }
+  });
+
+  win.onInput((input: string) => {
+    if (!bridge || bridgeDead) return;
+    bridge.stdin?.write(input.replace(/\r/g, "\n"));
   });
 
   win.onRestyle(() => {

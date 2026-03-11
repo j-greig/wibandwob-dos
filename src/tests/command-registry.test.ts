@@ -92,6 +92,21 @@ describe("state service", () => {
     expect(Array.isArray(data.windows)).toBe(true);
   });
 
+  test("returns runtime stats snapshot", async () => {
+    const { status, data } = await api("/runtime/stats");
+    expect(status).toBe(200);
+    expect(data.ok).toBe(true);
+    expect(typeof data.stats.render.fps).toBe("number");
+    expect(typeof data.stats.render.avgFrameMs).toBe("number");
+    expect(typeof data.stats.render.totalFrames).toBe("number");
+    expect(typeof data.stats.rssMb).toBe("number");
+    expect(typeof data.stats.heapUsedMb).toBe("number");
+    expect(typeof data.stats.agent.active).toBe("boolean");
+    expect(typeof data.stats.agent.streaming).toBe("boolean");
+    expect(typeof data.stats.agent.messageCount).toBe("number");
+    expect(typeof data.stats.agent.toolRunCount).toBe("number");
+  });
+
   test("every window has required fields", async () => {
     const { data } = await api("/state");
     for (const w of data.windows) {

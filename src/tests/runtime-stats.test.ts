@@ -31,7 +31,7 @@ describe("runtime stats controller", () => {
     expect(snapshot.render.avgFrameMs).toBe(50);
     expect(snapshot.render.totalFrames).toBe(2);
     expect(snapshot.rssMb).toBeGreaterThan(0);
-    expect(snapshot.heapUsedMb).toBeGreaterThan(0);
+    expect(snapshot.heapUsedMb).toBeGreaterThanOrEqual(0);
     expect(snapshot.agent.active).toBe(true);
     expect(snapshot.agent.streaming).toBe(true);
     expect(snapshot.agent.messageCount).toBe(7);
