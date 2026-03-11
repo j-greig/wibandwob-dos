@@ -197,7 +197,7 @@ export function openChromeBrowserWindow(params: {
     // fall back to URL-based hydrator for anything Chrome didn't fetch
     const chafaBlocks = new Map<string, string>();
     for (const { alt, src } of images) {
-      if (chafaBlocks.size >= 3) break; // max 3 images
+      // No cap — render all discovered images
       const localPath = imagePaths?.get(src);
       let singleMd: string;
       if (localPath) {

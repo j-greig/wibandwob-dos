@@ -413,7 +413,7 @@ export class ChromeBrowserService {
     const urls: string[] = [];
     for (const m of markdown.matchAll(imgRegex)) {
       if (m[2]) urls.push(m[2]);
-      if (urls.length >= 3) break;
+      // No cap — fetch all discovered images
     }
     if (urls.length === 0) return result;
 

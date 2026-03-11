@@ -82,7 +82,7 @@ renderer entirely for image content.
 ## Size and filtering
 
 - **Min dimensions**: 150×150 pixels — skip icons, spacers, tracking pixels
-- **Max images per page**: 3 — avoid blocking on image-heavy pages
+- **Max images per page**: no cap — all images rendered
 - **Max columns**: 60 — fits comfortably in browser window
 - **Aspect ratio**: terminal chars are ~2:1, so rows = cols × aspect / 2
 - **Timeout**: 3s per curl, 5s per chafa, 30s total for hydrator subprocess
