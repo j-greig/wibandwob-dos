@@ -23,6 +23,7 @@ Current note after S12 on a2:
   - `.planning/epics/e033-blessed-architecture-calm/module-audit.md`
   - `.planning/epics/e033-blessed-architecture-calm/module-audit-shortlist.md`
   - `.planning/epics/e033-blessed-architecture-calm/module-audit-themes.md`
+  - `.planning/epics/e033-blessed-architecture-calm/module-audit-story-seeds.md`
 
 Core rule:
 - Agent 1 takes ONE hotspot seam.
