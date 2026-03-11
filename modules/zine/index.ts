@@ -796,28 +796,19 @@ export default function setup(host: MicroappHost) {
         return;
       }
 
-      if (data.action === "mousedown") {
+      // Click on canvas background (not on a panel) → deselect
+      if (data.action === "mousedown" && !dragging) {
         const pt = safePointerToContent(data.x, data.y);
-        if (!pt) return;
-        const node = hitPanel(panelNodes, pt.x, pt.y);
-        if (node) {
-          dragging = {
-            id: node.def.id,
-            offsetX: pt.x - node.x,
-            offsetY: pt.y - node.y,
-          };
-          dragMoved = false;
-          activePanelId = node.def.id;
+        if (pt && !hitPanel(panelNodes, pt.x, pt.y)) {
+          activePanelId = "";
           applyStyles();
           host.screen.render();
-        } else {
-          dragging = undefined;
-          dragMoved = false;
         }
         return;
       }
 
-      if (data.action === "mousemove" && dragging) {
+      // blessed sends mousedown (not mousemove) during drag — handle move BEFORE new-drag
+      if ((data.action === "mousemove" || data.action === "mousedown") && dragging) {
         const node = panelNodes.get(dragging.id);
         if (!node) return;
         // Screen-space drag: offset was captured as screen coords in element mousedown
@@ -945,7 +936,21 @@ export default function setup(host: MicroappHost) {
       host.screen.render();
     });
 
-    win.onInput((ch: string, key?: blessed.Widgets.Events.IKeyEventArg) => {
+    // Screen-level keypress handler — win.onInput only receives text, not key events.
+    // Gated by focus: only act when a child of our window body is focused.
+    const zineKeyHandler = (_ch: any, key: any) => {
+      const focused = (host.screen as any).focused;
+      if (!focused) return;
+      // Walk up from focused element to see if it's inside our window body
+      let el = focused;
+      let isOurs = false;
+      while (el) {
+        if (el === win.body || el === canvas || el === root) { isOurs = true; break; }
+        el = el.parent;
+      }
+      if (!isOurs) return;
+
+      const ch = typeof _ch === "string" ? _ch : "";
       const speed = key?.shift ? 5 : key?.ctrl ? 10 : 1;
       if (key?.name === "up"   || ch === "k") { if (!nudgeActivePanel(0, -speed)) scrollBy(-1 * speed); return; }
       if (key?.name === "down" || ch === "j") { if (!nudgeActivePanel(0, speed)) scrollBy(1 * speed); return; }
@@ -953,7 +958,7 @@ export default function setup(host: MicroappHost) {
       if (key?.name === "right" || ch === "l") { nudgeActivePanel(speed, 0); return; }
       if (key?.name === "pageup")   { scrollBy(-20 * speed); return; }
       if (key?.name === "pagedown") { scrollBy(20 * speed);  return; }
-      if (key?.name === "escape") {
+      if (key?.name === "escape" || key?.name === "tab") {
         activePanelId = "";
         applyStyles();
         host.screen.render();
@@ -962,7 +967,8 @@ export default function setup(host: MicroappHost) {
       if (ch === "/") { inlineSearch.open(); return; }
       if (ch === "r") { rebuild(); return; }
       if (ch === "[") { toggleSidebar(); return; }
-    });
+    };
+    host.screen.on("keypress", zineKeyHandler);
 
     // ── Resize reflow ───────────────────────────────────────────────
     let resizeTimer: ReturnType<typeof setTimeout> | undefined;
@@ -1014,6 +1020,7 @@ export default function setup(host: MicroappHost) {
       watcher.close();
       host.screen.off("mouse", handleMouse);
       host.screen.off("mouse", handleWheel);
+      host.screen.removeListener("keypress", zineKeyHandler);
     });
 
     return win.record;

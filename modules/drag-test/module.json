@@ -1,0 +1,20 @@
+{
+  "id": "wibwob.dragtest",
+  "name": "Drag Test",
+  "version": "0.1.0",
+  "description": "Minimal test: one draggable box inside a window. Arrow keys move it.",
+  "main": "index.ts",
+  "type": "microapp",
+  "entry": "index.ts",
+  "microapp": {
+    "id": "wibwob.dragtest",
+    "title": "Drag Test",
+    "description": "Minimal drag test — one box, arrow keys move it",
+    "persist": false,
+    "multiInstance": false,
+    "menu": [],
+    "palette": { "order": 99, "label": "Drag Test" },
+    "agent": false,
+    "api": true
+  }
+}

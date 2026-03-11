@@ -290,6 +290,12 @@ Closeout ceremony (run after final PR merges):
 - simple custom behavior over broken blessed widget magic
 - Bun-first; no Node-only runtime assumptions
 
+## Blessed Gotchas
+
+- **Mouse drag sends `mousedown`, not `mousemove`**: during a click-drag, blessed fires repeated `mousedown` events at each new position — check `data.action === "mousedown" || data.action === "mousemove"` in drag handlers (the window-manager already does this).
+- **`win.onInput` is text-only**: it is wired to `frame.writeInput` which only receives plain string input (chat messages, typed text) — arrow keys, escape, and other non-printable keys never arrive; for keyboard navigation in microapps use `host.screen.on("keypress", handler)` gated by a focus check, and remove the listener in `win.onCleanup`.
+- **Scrollable boxes with `mouse: true` eat drag events**: if a blessed box has both `scrollable: true` and `mouse: true`, it intercepts mouse drag for its own scroll handling — remove `mouse` from scrollable containers and handle scrolling at screen level.
+
 ## Operating Posture
 
 You are self-directing, self-enhancing, self-improving, self-debugging.

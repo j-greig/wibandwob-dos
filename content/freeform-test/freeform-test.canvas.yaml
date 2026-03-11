@@ -22,7 +22,7 @@ panels:
     type: text
     title: "Wob Says"
     x: 40
-    y: 0
+    y: 10
     w: 28
     h: 8
     text: |
@@ -49,8 +49,8 @@ panels:
   - id: idea-one
     type: text
     title: "Idea"
-    x: 72
-    y: 8
+    x: 78
+    y: 10
     w: 30
     h: 6
     text: |
@@ -62,16 +62,16 @@ panels:
     type: figlet
     title: "Hello"
     figletText: "HELLO"
-    x: 2
-    y: 22
+    x: 13
+    y: 31
     w: 40
     h: 8
 
   - id: note-bottom
     type: text
     title: "Footerzzzzz"
-    x: 51
-    y: 18
+    x: 111
+    y: 23
     w: 30
     h: 6
     text: |
