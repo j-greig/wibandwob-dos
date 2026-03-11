@@ -152,7 +152,7 @@ export default function setup(host: MicroappHost) {
   // ── Commands ───────────────────────────────────────────────────────────────
 
   host.registerCommand({
-    id: "glitchbox.open",
+    id: "open",
     label: "Open GlitchBox",
     menu: [{ category: "applications", order: 55, label: "GlitchBox" }],
     palette: { order: 255, label: "GlitchBox — Symbient Dance Floor" },
@@ -160,7 +160,7 @@ export default function setup(host: MicroappHost) {
   });
 
   host.registerCommand({
-    id: "glitchbox.pose", direct: true,
+    id: "pose", direct: true,
     label: "Set GlitchBox Pose",
     description: "Set dancer pose. Args: preset (idle|arms-raised|step-left|jump|wave)",
     action: (args: Record<string, unknown>) => {
@@ -174,7 +174,7 @@ export default function setup(host: MicroappHost) {
   });
 
   host.registerCommand({
-    id: "glitchbox.move", direct: true,
+    id: "move", direct: true,
     label: "Move GlitchBox Dancer",
     description: "Smoothly tween dancer to new x,y. Args: x, y",
     action: (args: Record<string, unknown>) => {
@@ -204,7 +204,7 @@ export default function setup(host: MicroappHost) {
   });
 
   host.registerCommand({
-    id: "glitchbox.state", direct: true,
+    id: "state", direct: true,
     label: "Set GlitchBox Dancer State",
     description: "Set energy (0-10) and/or mood. Args: energy, mood",
     action: (args: Record<string, unknown>) => {
@@ -218,7 +218,7 @@ export default function setup(host: MicroappHost) {
   });
 
   host.registerCommand({
-    id: "glitchbox.gen", direct: true,
+    id: "gen", direct: true,
     label: "Toggle GlitchBox Generative Art",
     description: "Toggle generative art background on/off",
     action: () => {
@@ -229,7 +229,7 @@ export default function setup(host: MicroappHost) {
   });
 
   host.registerCommand({
-    id: "glitchbox.field", direct: true,
+    id: "field", direct: true,
     label: "Set GlitchBox Field Mood",
     description: "Set background field mood. Args: mood (calm|pulse|chaos|drift)",
     action: (args: Record<string, unknown>) => {

@@ -405,7 +405,6 @@ export class ControlApiService {
       "/view/file-manager/open":    { id: "finder.open" },
       "/view/primer-gallery/open":  { id: "primer_gallery.open" },
       "/view/primer/open":          { id: "primer.open", argsMapper: (b) => b.filePath ? { filePath: b.filePath, x: b.x, y: b.y, w: b.w, h: b.h } : undefined },
-      "/view/browser-reader/open":  { id: "document.open", argsMapper: (b) => b.filePath ? { filePath: b.filePath } : undefined },
       "/view/reader/open":          { id: "markdown.open", argsMapper: (b) => b.filePath ? { filePath: b.filePath } : undefined },
       "/view/figlet/open":          { id: "figlet.open", argsMapper: (b) => b.text ? { text: b.text, font: b.font } : undefined },
       "/view/generative-art/open":  { id: "art.open" },

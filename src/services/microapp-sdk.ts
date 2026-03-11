@@ -178,11 +178,65 @@ export type {
   RestyleBundleHandle,
 } from "../core/ui-parts.js";
 
+// ═══════════════════════════════════════════════════════════════════════════
+// CORE MODULE AUTHORING — start here when building a new microapp
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Timers — use instead of raw setInterval for proper cleanup
+export { createTimer, clearTimers } from "../core/ui-primitives.js";
+
+// Motion / tween — animate values, window position and size smoothly
+export { tween, tweenWindowPosition, tweenWindowSize, EASINGS } from "./motion-service.js";
+export type { EasingFn, TweenOpts } from "./motion-service.js";
+
+// Render monitoring — track frame rate and render pressure
 export { createRenderMonitor } from "../core/render-monitor.js";
 export type { RenderMonitorHandle, RenderReading } from "../core/render-monitor.js";
-export type { AnimatedSurfaceTarget } from "./animation-service.js";
+
+// Tree widget — hierarchical nav/explorer for sidebars
 export { createTreeWidget } from "../core/tree-widget.js";
 export type { TreeNode, TreeWidgetHandle } from "../core/tree-widget.js";
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ANIMATION — for microapps with live/animated content
+// ═══════════════════════════════════════════════════════════════════════════
+
+export type { AnimatedSurfaceTarget } from "./animation-service.js";
+
+// ═══════════════════════════════════════════════════════════════════════════
+// GRID CANVAS + ASCII COMPOSITION — for microapps that draw ASCII art
+// ═══════════════════════════════════════════════════════════════════════════
+
+export { blankGrid, paintText, paintCentered, paintLines, drawArrow, gridToText, waveLine, bar } from "../core/grid-canvas.js";
+export { composeAsciiLayers, renderAsciiTextBlock } from "./ascii-composition.js";
+export type { AsciiBlendMode, AsciiCompositionNodeSpec, AsciiCompositionRole } from "./ascii-composition.js";
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TEXT RENDERING — markdown and figlet
+// ═══════════════════════════════════════════════════════════════════════════
+
+export { renderMarkdown, renderMarkdownFile, PLAIN_HEADING_CONFIG } from "./markdown-service.js";
+export type { RenderMarkdownOptions } from "./markdown-service.js";
+export { renderFiglet, renderFigletLines, measureFiglet, isFigletAvailable } from "./figlet-service.js";
+export type { FigletMeasurement } from "./figlet-service.js";
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PANEL LAYOUT — for magazine-style multi-panel microapps (zine, sy2)
+// ═══════════════════════════════════════════════════════════════════════════
+
+export { layoutPanels, layoutColumns, pointerToContent, hitPanel, measureViewport, COL_GAP } from "../core/panel-layout.js";
+export type { PanelDef, PanelNode, LayoutResult, ColumnLayoutResult, ColumnLayoutOptions, ColumnHeader } from "../core/panel-layout.js";
+export type { ZineItem, ZineLayoutResult, ZineItemType, CanvasDocument, CanvasColumnDef } from "../core/canvas-types.js";
+export type { ZineSourceType } from "../core/canvas-types.js";
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ADVANCED / BUILT-IN MODULE INTERNALS
+// Below here are exports used by specific built-in modules (Monster Cam,
+// GlitchBox, Terrain Lab, etc). Third-party modules typically do not need
+// these. They are exported to avoid direct src/core/* imports.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Empty state placeholders (used by primer-browser, file-manager, etc)
 export {
   EMPTY_PRIMER_SELECTED,
   EMPTY_FILE_SELECTED,
@@ -190,34 +244,16 @@ export {
   EMPTY_PLACEHOLDER,
   EMPTY_NO_MESSAGE,
 } from "../core/empty-states.js";
+
+// Monster Cam / webcam
 export { MonsterCamService } from "./monster-cam-service.js";
 export type { MonsterCamFrame } from "./monster-cam-service.js";
 export { renderWebcamFrame, gridToBlessedContent } from "./webcam-renderer.js";
 export type { WebcamCell, WebcamRenderOptions } from "./webcam-renderer.js";
+
+// Skeleton / pose rendering (GlitchBox)
 export { landmarksFromPreset, POSE_PRESETS, POSE_CONNECTIONS, renderSkeletonAt } from "../core/skeleton-renderer.js";
 export type { NormalisedLandmarks } from "../core/skeleton-renderer.js";
 
-// Panel layout + grid canvas — primitives for magazine-layout microapps
-export { layoutPanels, layoutColumns, pointerToContent, hitPanel, measureViewport, COL_GAP } from "../core/panel-layout.js";
-export type { PanelDef, PanelNode, LayoutResult, ColumnLayoutResult, ColumnLayoutOptions, ColumnHeader } from "../core/panel-layout.js";
-export type { ZineItem, ZineLayoutResult, ZineItemType, CanvasDocument, CanvasColumnDef } from "../core/canvas-types.js";
-export { blankGrid, paintText, paintCentered, paintLines, drawArrow, gridToText, waveLine, bar } from "../core/grid-canvas.js";
-export { composeAsciiLayers, renderAsciiTextBlock } from "./ascii-composition.js";
-export type { AsciiBlendMode, AsciiCompositionNodeSpec, AsciiCompositionRole } from "./ascii-composition.js";
-export { createTimer, clearTimers } from "../core/ui-primitives.js";
-
-// Canvas types — zine source type (added by a2 lint sweep)
-export type { ZineSourceType } from "../core/canvas-types.js";
-
-// Contour rendering — additional (renderContourFromHills not in main export block)
+// Contour / terrain engine
 export { renderContourFromHills } from "./contour-engine.js";
-
-// Motion / tween
-export { tween, tweenWindowPosition, tweenWindowSize, EASINGS } from "./motion-service.js";
-export type { EasingFn, TweenOpts } from "./motion-service.js";
-
-// Markdown + figlet raw renderers
-export { renderMarkdown, renderMarkdownFile, PLAIN_HEADING_CONFIG } from "./markdown-service.js";
-export type { RenderMarkdownOptions } from "./markdown-service.js";
-export { renderFiglet, renderFigletLines, measureFiglet, isFigletAvailable } from "./figlet-service.js";
-export type { FigletMeasurement } from "./figlet-service.js";
