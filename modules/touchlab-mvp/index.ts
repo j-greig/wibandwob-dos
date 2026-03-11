@@ -1,6 +1,12 @@
 import blessed from "blessed";
-import type { MicroappHost } from "../../src/services/microapp-sdk.js";
-import { clamp } from "../../src/services/microapp-sdk.js";
+import type { AsciiCompositionNodeSpec, MicroappHost } from "../../src/services/microapp-sdk.js";
+import {
+  clamp,
+  composeAsciiLayers,
+  createEmbeddedLivePlayer,
+  readNodeViewport,
+  renderAsciiTextBlock,
+} from "../../src/services/microapp-sdk.js";
 
 type NodeId = "gen" | "text" | "input" | "mix";
 
@@ -38,6 +44,13 @@ type PaletteSlot = {
   box: blessed.Widgets.BoxElement;
 };
 
+const NODE_SPECS: Record<NodeId, AsciiCompositionNodeSpec> = {
+  gen: { id: "gen", title: "GEN A", role: "source", description: "animated waveform source" },
+  text: { id: "text", title: "TEXT B", role: "source", description: "phrase source" },
+  input: { id: "input", title: "INPUT C", role: "parameter", description: "live typed source" },
+  mix: { id: "mix", title: "MIX D", role: "output", description: "composited output" },
+};
+
 const TEXT_PHRASES = [
   "signal patch",
   "terminal garden",
@@ -69,65 +82,33 @@ const BG_OPTIONS: ThemeColorName[] = [
 ];
 
 
-function blankGrid(width: number, height: number): string[][] {
-  return Array.from({ length: height }, () => Array.from({ length: width }, () => " "));
-}
-
-function gridToText(grid: string[][]): string {
-  return grid.map((row) => row.join("")).join("\n");
-}
-
-function paintText(grid: string[][], x: number, y: number, text: string): void {
-  if (y < 0 || y >= grid.length) return;
-  const row = grid[y];
-  if (!row) return;
-  for (let i = 0; i < text.length && x + i < row.length; i += 1) {
-    if (x + i >= 0) row[x + i] = text[i] ?? " ";
-  }
-}
-
 function waveSource(width: number, height: number, phase: number): string {
-  const grid = blankGrid(width, height);
-  for (let x = 0; x < width; x += 1) {
-    const y = Math.floor((Math.sin((x + phase) / 2.8) + 1) * 0.5 * Math.max(0, height - 1));
-    grid[y]![x] = x % 2 === 0 ? "~" : "^";
+  const rows: string[] = [];
+  const safeWidth = Math.max(1, width);
+  const safeHeight = Math.max(1, height);
+  for (let y = 0; y < safeHeight; y += 1) {
+    rows.push(" ".repeat(safeWidth));
   }
-  return gridToText(grid);
+  const chars = rows.map((row) => row.split(""));
+  for (let x = 0; x < safeWidth; x += 1) {
+    const y = Math.floor((Math.sin((x + phase) / 2.8) + 1) * 0.5 * Math.max(0, safeHeight - 1));
+    chars[y]![x] = x % 2 === 0 ? "~" : "^";
+  }
+  return chars.map((row) => row.join("")).join("\n");
 }
 
 function textSource(width: number, height: number, phrase: string): string {
-  const grid = blankGrid(width, height);
-  const top = Math.floor(height / 2);
-  paintText(grid, 0, top, phrase.slice(0, width));
-  return gridToText(grid);
+  return renderAsciiTextBlock(width, height, phrase.slice(0, Math.max(1, width)));
 }
 
 function inputSource(width: number, height: number, value: string): string {
-  const grid = blankGrid(width, height);
-  paintText(grid, 0, 0, "INPUT");
-  paintText(grid, 0, 2, value.slice(0, width));
-  paintText(grid, 0, Math.min(height - 1, 4), ":)".slice(0, width));
-  return gridToText(grid);
-}
-
-function composite(width: number, height: number, layers: string[], mode: BlendMode): string {
-  const grid = blankGrid(width, height);
-  for (const layer of layers) {
-    const rows = layer.split("\n");
-    for (let y = 0; y < Math.min(height, rows.length); y += 1) {
-      const row = rows[y] ?? "";
-      for (let x = 0; x < Math.min(width, row.length); x += 1) {
-        const ch = row[x];
-        if (!ch || ch === " ") continue;
-        if (mode === "overwrite") {
-          grid[y]![x] = ch;
-        } else {
-          grid[y]![x] = grid[y]![x] === " " ? "." : ch;
-        }
-      }
-    }
-  }
-  return gridToText(grid);
+  const safeWidth = Math.max(1, width);
+  const safeHeight = Math.max(1, height);
+  return composeAsciiLayers(safeWidth, safeHeight, [
+    renderAsciiTextBlock(safeWidth, safeHeight, "INPUT", 0),
+    renderAsciiTextBlock(safeWidth, safeHeight, value.slice(0, safeWidth), 2),
+    renderAsciiTextBlock(safeWidth, safeHeight, ":)", Math.min(Math.max(0, safeHeight - 1), 4)),
+  ], "overwrite");
 }
 
 function drawArrow(grid: string[][], fromX: number, fromY: number, toX: number, toY: number): void {
@@ -252,9 +233,9 @@ export default function setup(host: MicroappHost) {
       let blendMode: BlendMode = "overwrite";
       let textInput = "human signal";
       let phraseIndex = 0;
-      let motionPhase = 0;
       let animationEnabled = true;
       let inspectorCollapsed = false;
+      let currentGen = waveSource(24, 6, 0);
       let dragging:
         | { id: NodeId; offsetX: number; offsetY: number }
         | undefined;
@@ -276,10 +257,10 @@ export default function setup(host: MicroappHost) {
         name === "bodyAlt" ? "ba" : name.slice(0, 2);
 
       const initial: Array<Pick<NestedNode, "id" | "title" | "x" | "y" | "w" | "h" | "z" | "fg" | "bg">> = [
-        { id: "gen", title: "GEN A", x: 2, y: 1, w: 26, h: 9, z: 0, fg: "highlight", bg: "body" },
-        { id: "text", title: "TEXT B", x: 34, y: 2, w: 24, h: 8, z: 1, fg: "accent", bg: "body" },
-        { id: "input", title: "INPUT C", x: 12, y: 12, w: 22, h: 8, z: 2, fg: "success", bg: "body" },
-        { id: "mix", title: "MIX D", x: 40, y: 12, w: 38, h: 12, z: 3, fg: "body", bg: "bodyAlt" },
+        { id: "gen", title: NODE_SPECS.gen.title, x: 2, y: 1, w: 26, h: 9, z: 0, fg: "highlight", bg: "body" },
+        { id: "text", title: NODE_SPECS.text.title, x: 34, y: 2, w: 24, h: 8, z: 1, fg: "accent", bg: "body" },
+        { id: "input", title: NODE_SPECS.input.title, x: 12, y: 12, w: 22, h: 8, z: 2, fg: "success", bg: "body" },
+        { id: "mix", title: NODE_SPECS.mix.title, x: 40, y: 12, w: 38, h: 12, z: 3, fg: "body", bg: "bodyAlt" },
       ];
 
       for (const item of initial) {
@@ -489,16 +470,40 @@ export default function setup(host: MicroappHost) {
         });
       };
 
+      const refreshMixNode = () => {
+        const text = textSource(22, 5, TEXT_PHRASES[phraseIndex] ?? "signal patch");
+        const input = inputSource(18, 5, textInput);
+        const mix = composite(34, 8, [currentGen, text, input], blendMode);
+        nodes.get("text")?.content.setContent(text);
+        nodes.get("input")?.content.setContent(input);
+        nodes.get("mix")?.content.setContent(mix);
+      };
+
+      const genPlayer = createEmbeddedLivePlayer({
+        fps: 6,
+        generator: (tick, width, height) => waveSource(Math.max(1, width), Math.max(1, height), tick),
+        getViewport: (target) => readNodeViewport(target, {
+          minWidth: 8,
+          minHeight: 4,
+          fallbackWidth: 24,
+          fallbackHeight: 6,
+        }),
+        clearOnStop: false,
+        onFrame: (content) => {
+          currentGen = content;
+          refreshMixNode();
+        },
+        render: () => host.screen.render(),
+      });
+      const genTarget = nodes.get("gen")?.content;
+      if (genTarget) genPlayer.attachTarget(genTarget);
+
       const renderNodes = () => {
         const canvasWidth = Math.max(1, Number(canvas.width) || 1);
         const canvasHeight = Math.max(1, Number(canvas.height) || 1);
         const inspectorWidth = inspectorCollapsed ? 8 : 26;
         inspector.width = inspectorWidth;
         canvas.right = inspectorWidth;
-        const gen = waveSource(24, 6, motionPhase);
-        const text = textSource(22, 5, TEXT_PHRASES[phraseIndex] ?? "signal patch");
-        const input = inputSource(18, 5, textInput);
-        const mix = composite(34, 8, [gen, text, input], blendMode);
 
         for (const node of nodes.values()) {
           node.frame.left = clamp(node.x, 0, Math.max(0, canvasWidth - node.w));
@@ -520,10 +525,8 @@ export default function setup(host: MicroappHost) {
           node.resizeGrip.style = selectedNode === node.id ? host.theme().highlight : host.theme().selected;
         }
 
-        nodes.get("gen")?.content.setContent(gen);
-        nodes.get("text")?.content.setContent(text);
-        nodes.get("input")?.content.setContent(input);
-        nodes.get("mix")?.content.setContent(mix);
+        nodes.get("gen")?.content.setContent(currentGen);
+        refreshMixNode();
         renderOverlay();
         renderInspector();
         orderNodes();
@@ -663,7 +666,10 @@ export default function setup(host: MicroappHost) {
         if (input === "-") cycleSelectedBg(-1);
         if (input === "=") cycleSelectedBg(1);
         if (input === "b") blendMode = blendMode === "overwrite" ? "mask" : "overwrite";
-        if (input === " ") animationEnabled = !animationEnabled;
+        if (input === " ") {
+          animationEnabled = !animationEnabled;
+          genPlayer.setRunning(animationEnabled);
+        }
         if (input === "i") inspectorCollapsed = !inspectorCollapsed;
         if (input === "t") {
           phraseIndex = (phraseIndex + 1) % TEXT_PHRASES.length;
@@ -742,12 +748,6 @@ export default function setup(host: MicroappHost) {
 
       host.screen.on("keypress", handleKeypress);
       host.screen.on("mouse", handleNestedMouse);
-      const animationTimer = setInterval(() => {
-        if (!animationEnabled) return;
-        motionPhase = (motionPhase + 1) % 10_000;
-        renderNodes();
-        host.screen.render();
-      }, 180);
 
       win.onInput((input) => {
         handleInputSequence(input);
@@ -761,11 +761,15 @@ export default function setup(host: MicroappHost) {
         selectedNode,
         blendMode,
         animationEnabled,
+        animatedSurfaces: ["gen"],
+        compositionVocabulary: ["source", "parameter", "output", "preview"],
         phraseIndex,
         textInput,
         pipeline: ["gen", "text", "input", "mix"],
         nodes: [...nodes.values()].map((node) => ({
           id: node.id,
+          role: NODE_SPECS[node.id].role,
+          description: NODE_SPECS[node.id].description,
           x: node.x,
           y: node.y,
           w: node.w,
@@ -792,15 +796,20 @@ export default function setup(host: MicroappHost) {
 
       win.onResize(() => {
         renderNodes();
+        if (animationEnabled) {
+          genPlayer.setRunning(false);
+          genPlayer.setRunning(true);
+        }
       });
 
       win.onCleanup(() => {
-        clearInterval(animationTimer);
+        genPlayer.destroy();
         host.screen.off("keypress", handleKeypress);
         host.screen.off("mouse", handleNestedMouse);
       });
 
       renderNodes();
+      genPlayer.setRunning(animationEnabled);
       root.focus();
       win.focus();
     },

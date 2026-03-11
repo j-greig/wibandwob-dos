@@ -167,13 +167,13 @@ After E033:
 | S03 | done | S01 | medium | Microapp host lifecycle, redraw, and state contract |
 | S04 | done | none | medium | Thin the composition root |
 | S05 | done | none | medium | API contract audit and control-surface cleanup |
-| S06 | not-started | none | medium | Cell-aware text correctness and Unicode discipline |
+| S06 | dropped | none | medium | Cell-aware text correctness and Unicode discipline (deferred — non-essential) |
 | S07 | done | none, then coordinate with S01 | medium | Visual regression, render telemetry, and dense-scene performance checks |
 | S08 | done | none, then coordinate with S01 and S07 | medium | Runtime telemetry, stats surface, and agent/session health metrics |
-| S09 | not-started | none | medium | WibWobTUI macOS-ification for app launch and switching |
+| S09 | dropped | none | medium | WibWobTUI macOS-ification for app launch and switching (deferred — non-essential) |
 | S10 | done | S03 | low | Third-party developer docs for building custom apps in `/modules` |
-| S11 | not-started | S03, S07 | medium | Composable animated surfaces for zine, touchlab, and future dashboard modules |
-| S12 | not-started | S03, S11 | medium | TouchDesigner-like composition scaffolding for ASCII / ANSI art modules |
+| S11 | done | S03, S07 | medium | Composable animated surfaces for zine, touchlab, and future dashboard modules |
+| S12 | done | S03, S11 | medium | TouchDesigner-like composition scaffolding for ASCII / ANSI art modules |
 
 ## Stories
 
@@ -182,13 +182,13 @@ After E033:
 - [x] S03 — Microapp host lifecycle, redraw, and state contract
 - [x] S04 — Thin the composition root
 - [x] S05 — API contract audit and control-surface cleanup
-- [ ] S06 — Cell-aware text correctness and Unicode discipline
+- [-] S06 — Cell-aware text correctness and Unicode discipline (deferred — non-essential)
 - [x] S07 — Visual regression, render telemetry, and dense-scene performance checks
 - [x] S08 — Runtime telemetry, stats surface, and agent/session health metrics
-- [ ] S09 — WibWobTUI macOS-ification for app launch and switching
+- [-] S09 — WibWobTUI macOS-ification for app launch and switching (deferred — non-essential)
 - [x] S10 — Third-party developer docs for custom modules
-- [ ] S11 — Composable animated surfaces for zine, touchlab, and future dashboard modules
-- [ ] S12 — TouchDesigner-like composition scaffolding for ASCII / ANSI art modules
+- [x] S11 — Composable animated surfaces for zine, touchlab, and future dashboard modules
+- [x] S12 — TouchDesigner-like composition scaffolding for ASCII / ANSI art modules
 
 ## Recommended execution order
 

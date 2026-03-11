@@ -28,7 +28,9 @@ import {
   type TerrainRenderMode,
 } from "./terrain-render.js";
 import {
+  createEmbeddedLivePlayer,
   createLazyMountedPlayer,
+  type AnimatedSurfaceTarget,
   type LazyMountedPlayer,
 } from "./animation-service.js";
 import { ContentService } from "./content-service.js";
@@ -96,6 +98,7 @@ export {
   applyRect,
   createNodePart,
   createContourPlayer,
+  createEmbeddedLivePlayer,
   createLazyMountedPlayer,
   readNodeViewport,
   terrainNames,
@@ -165,6 +168,7 @@ export type {
 
 export { createRenderMonitor } from "../core/render-monitor.js";
 export type { RenderMonitorHandle, RenderReading } from "../core/render-monitor.js";
+export type { AnimatedSurfaceTarget } from "./animation-service.js";
 export { createTreeWidget } from "../core/tree-widget.js";
 export type { TreeNode, TreeWidgetHandle } from "../core/tree-widget.js";
 export {
@@ -186,6 +190,8 @@ export { layoutPanels, layoutColumns, pointerToContent, hitPanel, measureViewpor
 export type { PanelDef, PanelNode, LayoutResult, ColumnLayoutResult, ColumnLayoutOptions, ColumnHeader } from "../core/panel-layout.js";
 export type { ZineItem, ZineLayoutResult, ZineItemType, CanvasDocument, CanvasColumnDef } from "../core/canvas-types.js";
 export { blankGrid, paintText, paintCentered, paintLines, drawArrow, gridToText, waveLine, bar } from "../core/grid-canvas.js";
+export { composeAsciiLayers, renderAsciiTextBlock } from "./ascii-composition.js";
+export type { AsciiBlendMode, AsciiCompositionNodeSpec, AsciiCompositionRole } from "./ascii-composition.js";
 export { createTimer, clearTimers } from "../core/ui-primitives.js";
 
 // Motion / tween — animate values, window position and size smoothly.
