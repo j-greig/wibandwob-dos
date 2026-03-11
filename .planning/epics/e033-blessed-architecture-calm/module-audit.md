@@ -15,6 +15,7 @@ Legend:
 
 ## Module checklist
 
+- [x] dream-forecast
 - [x] e026-demo
 - [x] example-primers
 - [x] glitchbox
@@ -31,6 +32,17 @@ Legend:
 - [x] wibwobworld
 - [x] world-chatroom
 - [x] zine
+
+## Module: dream-forecast
+
+- Audit status: complete.
+- Result: strong positive reference module for the current safe lane.
+- Positive note: it stays on the public SDK path and does not reach into `src/core/*` or ad hoc service seams.
+- Positive note: runtime state is per-window rather than module-global, which keeps its `multiInstance: true` contract honest.
+- Positive note: it uses a reasonably rich surface mix without sprawling into host-side IO or private shell seams: header/status bars, bordered panels, selectable list, button bars, stack/column layout, animation clock, snapshot restore, semantic state, and text capture.
+- Watch-out: `render()` still ends in a direct `host.screen.render()` call. That is acceptable in a local module, but it means the module is disciplined rather than fully declarative.
+- Watch-out: `describeState()` is correct and semantic, but it is recomputed from live helpers rather than from one canonical serialisable state object. Fine here, though worth keeping an eye on as the module grows.
+- Safe future tidy-up target: if this module evolves further, preserve it as a canonical “complex but honest” example and resist packing file IO, network, or loader-side behaviour into it.
 
 ## Module: e026-demo
 

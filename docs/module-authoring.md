@@ -187,6 +187,7 @@ Also useful:
 
 - `modules/e026-demo/` for a broad feature sampler
 - `modules/wibwob-poetry-clock/` for a compact but more lived-in app
+- `modules/dream-forecast/` for a more disciplined complex module using lots of SDK parts without reaching into hot runtime seams
 
 ## Command rules
 

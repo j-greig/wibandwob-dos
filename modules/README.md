@@ -37,6 +37,7 @@ Start from:
 
 - `modules/hello-world/` for the minimal scaffold
 - `modules/wibwob-poetry-clock/` for a real microapp using richer behavior
+- `modules/dream-forecast/` for a richer multi-panel module that stays on the public SDK path
 - `bash scripts/scaffold-microapp.sh modules/<name> <app-id> "<Title>"` for a
   fresh scaffold generated against the current SDK path
 
