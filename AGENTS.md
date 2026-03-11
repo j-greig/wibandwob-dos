@@ -78,6 +78,30 @@ Rule: registry command first → low-level TUI tool if insufficient → expose v
 
 ## App Lifecycle
 
+**Bun scripts** (`package.json`):
+
+| Script | What it does |
+|--------|-------------|
+| `bun run start` | Launch without dev mode (no `--dev` flag) |
+| `bun run dev` | Launch with `--dev` (reload button ↻, Ctrl+R hot reload) |
+| `bun run dev:world` | Dev mode + IRC chat transport + instance label `main` |
+| `bun run dev:world:alt` | Second instance: label `zuk`, port 8098, separate scratch |
+| `bun run typecheck` | `tsc --noEmit` — minimum gate before any commit |
+| `bun run check-themes` | Validate all theme files |
+| `bun run handover` | Generate session handover doc from live state |
+| `bun run planning:status` | Show current epic state |
+| `bun run planning:sync` | Regenerate EPIC_STATUS.md from frontmatter |
+| `bun run scaffold:microapp` | Scaffold a new microapp module |
+| `bun run gen-primitives` | Regenerate `src/core/primitives.ts` index |
+
+**CLI flags** (defined in `src/core/cli.ts`):
+
+| Flag | Effect |
+|------|--------|
+| `--dev` | Reload button (↻) in top-right, Ctrl+R hot reload, auto-save on reload |
+| `--custom-cursor` | Enable custom TUI cursor overlay (hides system cursor) |
+| `--help` / `-h` | Print usage and exit |
+
 **Start** (first time or after `bun install`):
 ```bash
 bun install && bun run typecheck && bun run dev:world
