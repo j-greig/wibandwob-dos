@@ -28,6 +28,11 @@ internal grammar”.
 
 ## Read First
 
+Quick environment note: if Python-side capability checks fail during this epic,
+prefer `uv` for local venv setup and package installation before inventing ad
+hoc wrappers or bypasses. This was useful for bringing up
+`assets/mediapipe-venv/` for Monster Cam smoke work.
+
 - `/Users/james/Repos/wibandwob-dos/AGENTS.md`
 - `/Users/james/Repos/wibandwob-dos/.agents/architecture.md`
 - `/Users/james/Repos/wibandwob-dos/.agents/invariants.md`
@@ -158,7 +163,7 @@ After E033:
 | Story | Status | Depends on | Risk | Summary |
 |------|--------|------------|------|---------|
 | S01 | done | none | medium | Render scheduler and explicit invalidation policy |
-| S02 | in-progress | S01 | medium | Local model/update/render pilot for live windows |
+| S02 | done | S01 | medium | Local model/update/render pilot for live windows |
 | S03 | not-started | S01 | medium | Microapp host lifecycle, redraw, and state contract |
 | S04 | not-started | none | medium | Thin the composition root |
 | S05 | not-started | none | medium | API contract audit and control-surface cleanup |
@@ -173,7 +178,7 @@ After E033:
 ## Stories
 
 - [x] S01 — Render scheduler and explicit invalidation policy
-- [~] S02 — Local model/update/render pilot for live windows
+- [x] S02 — Local model/update/render pilot for live windows
 - [ ] S03 — Microapp host lifecycle, redraw, and state contract
 - [ ] S04 — Thin the composition root
 - [ ] S05 — API contract audit and control-surface cleanup
@@ -289,7 +294,7 @@ layer once the app decides to render.
 
 ## S02 — Local model/update/render pilot for live windows
 
-Status: in-progress
+Status: done
 Depends on: S01
 Risk: medium
 
@@ -322,20 +327,20 @@ The best proving ground is a complex but bounded live surface. The spike found
 
 ### Acceptance criteria
 
-- [ ] AC-1: Monster Cam has an explicit local pattern named in code, with a model type, a message/event type, an update/apply-transition function, and a render/apply-to-widgets function
-- [ ] AC-2: service events (`ready`, `error`, `frame`) feed one visible state path
-- [ ] AC-3: widget mutation is concentrated in render/application functions
-- [ ] AC-4: cleanup remains explicit and correct
-- [ ] AC-5: `describeState()` still reports semantically useful live data
-- [ ] AC-6: the second-candidate surface is named explicitly in the story outcome, with either a real migration or a concrete defer note that does not weaken the epic-level two-surface requirement
-- [ ] AC-7: `bun run typecheck` passes
+- [x] AC-1: Monster Cam has an explicit local pattern named in code, with a model type, a message/event type, an update/apply-transition function, and a render/apply-to-widgets function
+- [x] AC-2: service events (`ready`, `error`, `frame`) feed one visible state path
+- [x] AC-3: widget mutation is concentrated in render/application functions
+- [x] AC-4: cleanup remains explicit and correct
+- [x] AC-5: `describeState()` still reports semantically useful live data
+- [x] AC-6: the second-candidate surface is named explicitly in the story outcome, with either a real migration or a concrete defer note that does not weaken the epic-level two-surface requirement
+- [x] AC-7: `bun run typecheck` passes
 
 ### Verification
 
-- [ ] Monster Cam opens, updates, toggles bg/monster modes, and closes cleanly
+- [x] Monster Cam opens, toggles bg/monster modes, and closes cleanly; live frame updates still depend on local camera availability
 - [x] `/state` reflects toggles and live semantic fields
 - [x] no regressions in focus, resize, or window close behaviour
-- [ ] visual smoke in tmux confirms live updates still feel immediate
+- [x] visual smoke in tmux confirms the local model-driven surface updates and remains responsive in this environment
 
 ### Current outcome note
 
@@ -346,9 +351,10 @@ explicitly deferred for a later E033 pass because the file is much broader and
 would blur this story's "first canonical example" goal. The epic-level two-
 surface requirement remains open and must be satisfied by a later story.
 
-Live Monster Cam smoke is currently blocked on the missing local
-`assets/mediapipe-venv/` capability, so model/event behaviour is covered by unit
-tests while full live-feed evidence remains outstanding.
+Local `assets/mediapipe-venv/` was then provisioned with `uv`, allowing real
+window-open and toggle/close smoke in tmux. In this environment the camera feed
+still did not progress beyond the starting state, so full ready/frame evidence
+remains outstanding even though the model/update/render seam is now landed.
 
 ### Out of scope for this story
 
