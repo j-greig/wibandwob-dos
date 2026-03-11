@@ -1,7 +1,7 @@
 {
   "name": "wibwob-tr808",
   "version": "0.1.0",
-  "description": "Roland TR-808 drum machine — 16-step sequencer with analog synthesis",
+  "description": "Roland TR-808 drum machine \u2014 16-step sequencer with analog synthesis",
   "type": "microapp",
   "entry": "index.ts",
   "microapp": {
@@ -11,10 +11,18 @@
     "persist": true,
     "multiInstance": false,
     "menu": [
-      { "category": "applications", "order": 35, "label": "TR-808 Drum Machine" }
+      {
+        "category": "applications",
+        "order": 35,
+        "label": "TR-808 Drum Machine"
+      }
     ],
-    "palette": { "order": 55, "label": "Open TR-808 Drum Machine" },
+    "palette": {
+      "order": 55,
+      "label": "Open TR-808 Drum Machine"
+    },
     "agent": true,
-    "api": true
+    "api": true,
+    "prototype": true
   }
 }

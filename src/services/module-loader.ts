@@ -62,6 +62,8 @@ interface MicroappManifestConfig {
   description?: string;
   multiInstance?: boolean;
   persist?: boolean;
+  /** If true, appears in the Prototypes submenu instead of the main applications list. */
+  prototype?: boolean;
   menu?: { category: string; order: number; label?: string }[];
   palette?: { order: number; label?: string };
   agent?: boolean;
@@ -278,6 +280,7 @@ function createMicroappHost(
         } : undefined,
         api: manifest.api !== false,
         agent: manifest.agent !== false,
+        prototype: manifest.prototype === true,
       };
       commands.addDynamic(dynDef);
     },

@@ -1,7 +1,7 @@
 {
   "name": "hello-world",
   "version": "1.0.0",
-  "description": "Minimal microapp example — a figlet banner in a window",
+  "description": "Minimal microapp example \u2014 a figlet banner in a window",
   "type": "microapp",
   "entry": "index.ts",
   "microapp": {
@@ -11,10 +11,18 @@
     "multiInstance": true,
     "persist": false,
     "menu": [
-      { "category": "applications", "order": 40, "label": "Hello World" }
+      {
+        "category": "applications",
+        "order": 40,
+        "label": "Hello World"
+      }
     ],
-    "palette": { "order": 210, "label": "Hello World" },
+    "palette": {
+      "order": 210,
+      "label": "Hello World"
+    },
     "agent": true,
-    "api": true
+    "api": true,
+    "prototype": true
   }
 }

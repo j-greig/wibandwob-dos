@@ -43,6 +43,8 @@ export interface DynamicCommandDefinition {
   palettePlacement?: PalettePlacement;
   api?: boolean;
   agent?: boolean;
+  /** If true, this command appears in the Prototypes submenu instead of the main apps list. */
+  prototype?: boolean;
 }
 
 const LEGACY_COMMAND_ALIASES: Record<string, string> = {
@@ -113,8 +115,21 @@ export class CommandRegistry {
     for (const dyn of this.dynamicCommands) {
       for (const placement of dyn.menuPlacements ?? []) {
         const menu = menus.find((m) => m.label.toLowerCase() === placement.category);
-        if (menu) {
-          menu.items.push({ label: placement.label ?? dyn.label, action: () => dyn.action() });
+        if (!menu) continue;
+
+        const item: MenuItem = { label: placement.label ?? dyn.label, action: () => dyn.action() };
+
+        if (dyn.prototype && placement.category === "applications") {
+          // Route into the Prototypes submenu
+          const prototypesParent = menu.items.find((m) => m.children && m.label.includes("Prototypes"));
+          if (prototypesParent?.children) {
+            prototypesParent.children.push(item);
+          } else {
+            // First prototype — create the submenu parent
+            menu.items.push({ label: "Prototypes  ▸", action: () => {}, children: [item] });
+          }
+        } else {
+          menu.items.push(item);
         }
       }
     }

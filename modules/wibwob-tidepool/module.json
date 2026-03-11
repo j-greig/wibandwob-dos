@@ -1,7 +1,7 @@
 {
   "name": "wibwob-tidepool",
   "version": "0.1.0",
-  "description": "ASCII ecosystem simulator — cellular automata tide pool with five interacting species",
+  "description": "ASCII ecosystem simulator \u2014 cellular automata tide pool with five interacting species",
   "type": "microapp",
   "entry": "index.ts",
   "microapp": {
@@ -11,10 +11,18 @@
     "multiInstance": true,
     "persist": true,
     "menu": [
-      { "category": "applications", "order": 38, "label": "Tide Pool" }
+      {
+        "category": "applications",
+        "order": 38,
+        "label": "Tide Pool"
+      }
     ],
-    "palette": { "order": 58, "label": "Open Tide Pool" },
+    "palette": {
+      "order": 58,
+      "label": "Open Tide Pool"
+    },
     "agent": true,
-    "api": true
+    "api": true,
+    "prototype": true
   }
 }

@@ -1,7 +1,7 @@
 {
   "name": "e026-demo",
   "version": "0.1.0",
-  "description": "E026 feature demo — TreeWidget, createTimer, motion/tween, markdown figlet toggle",
+  "description": "E026 feature demo \u2014 TreeWidget, createTimer, motion/tween, markdown figlet toggle",
   "type": "microapp",
   "entry": "index.ts",
   "microapp": {
@@ -11,10 +11,18 @@
     "multiInstance": true,
     "persist": false,
     "menu": [
-      { "category": "applications", "order": 99, "label": "E026 Demo" }
+      {
+        "category": "applications",
+        "order": 99,
+        "label": "E026 Demo"
+      }
     ],
-    "palette": { "order": 220, "label": "E026 Demo" },
+    "palette": {
+      "order": 220,
+      "label": "E026 Demo"
+    },
     "agent": true,
-    "api": true
+    "api": true,
+    "prototype": true
   }
 }
