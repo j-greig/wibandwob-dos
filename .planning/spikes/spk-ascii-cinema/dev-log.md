@@ -1,3 +1,9 @@
+---
+id: spk-ascii-cinema
+title: ASCII Cinema — timed visual performances in WibWob-DOS
+status: done
+---
+
 # ASCII Cinema — Dev Log
 
 ## 2026-03-08: Shrigley Film v4 + Retrospective
