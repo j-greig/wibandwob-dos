@@ -2000,7 +2000,26 @@ export class TsTuiMvpApp {
         }
       },
       // ── Help ────────────────────────────────────────────
-      viewReadme: () => this.openBrowserReaderWindow(README_PATH),
+      viewReadme: () => {
+        const rec = this.openMarkdownViewerWindow(README_PATH);
+        if (rec) {
+          const sw = Number(this.screen.width);
+          const sh = Number(this.screen.height);
+          const w = Math.round(sw * 0.8);
+          const h = Math.round(sh * 0.7);
+          rec.frame.width = w;
+          rec.frame.height = h;
+          rec.frame.left = Math.round((sw - w) / 2);
+          rec.frame.top = Math.round((sh - h) / 2);
+          if (rec.shadow) {
+            rec.shadow.width = w;
+            rec.shadow.height = h;
+            rec.shadow.left = Number(rec.frame.left) + 2;
+            rec.shadow.top = Number(rec.frame.top) + 1;
+          }
+          this.screen.render();
+        }
+      },
     };
   }
 

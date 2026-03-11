@@ -1013,15 +1013,15 @@ export function createMenuConfigs(actions: AppMenuActions): MenuConfig[] {
           }, [] as MenuItem[]);
       }
 
-      const PROTOTYPE_IDS = new Set([
-        "microapp.wibwob.tr808.open",
-        "microapp.wibwob.tidepool.open",
-        "microapp.wibwob.patchbay.open",
-        "microapp.wibwob.example.hello.open",
+      const DEMO_IDS = new Set([
+        "art.open",
         "microapp.wibwob.heartbeat.open",
-        "microapp.wibwob.world.open",
+        "microapp.wibwob.example.hello.open",
+        "microapp.wibwob.tidepool.open",
         "microapp.wibwob.example.e026.open",
         "microapp.wibwob.touchlab.open",
+        "microapp.wibwob.glitchbox.open",
+        "microapp.wibwob.patchbay.open",
         "microapp.wibwob.poetry-clock.open",
       ]);
 
@@ -1040,12 +1040,12 @@ export function createMenuConfigs(actions: AppMenuActions): MenuConfig[] {
         );
 
       const favourites = allWithIds.filter((item) => item.favourite).sort(byPlacementOrder);
-      const prototypes = allWithIds.filter((item) => !item.favourite && PROTOTYPE_IDS.has(item.commandId));
-      const rest = allWithIds.filter((item) => !item.favourite && !PROTOTYPE_IDS.has(item.commandId));
+      const demos = allWithIds.filter((item) => !item.favourite && DEMO_IDS.has(item.commandId));
+      const rest = allWithIds.filter((item) => !item.favourite && !DEMO_IDS.has(item.commandId));
 
       const stripOpen = (s: string): string => s.replace(/^open\s+/i, "").toLowerCase();
       rest.sort((a, b) => stripOpen(a.label).localeCompare(stripOpen(b.label)));
-      prototypes.sort((a, b) => stripOpen(a.label).localeCompare(stripOpen(b.label)));
+      demos.sort((a, b) => stripOpen(a.label).localeCompare(stripOpen(b.label)));
 
       const toMenuItem = (item: typeof allWithIds[0]): MenuItem => ({
         label: item.label,
@@ -1061,9 +1061,9 @@ export function createMenuConfigs(actions: AppMenuActions): MenuConfig[] {
 
       result.push(...rest.map(toMenuItem));
 
-      if (prototypes.length > 0) {
-        result.push({ label: "Prototypes", action: () => {}, separator: true as const });
-        result.push(...prototypes.map(toMenuItem));
+      if (demos.length > 0) {
+        result.push({ label: "Demos", action: () => {}, separator: true as const });
+        result.push(...demos.map(toMenuItem));
       }
 
       return result;
