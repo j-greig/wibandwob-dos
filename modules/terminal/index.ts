@@ -213,43 +213,6 @@ function openTerminal(host: MicroappHost) {
   // Also grab focus when the window gets focus from the window manager
   body.on("focus", () => { term.focus(); });
 
-  // Fix blessed Terminal mouse y-offset: the built-in handler in terminal.js
-  // removes the old screen 'mouse' listener at bootstrap but we need to patch
-  // the coordinate translation. Remove blessed's handler, add our own.
-  if (term._mouseHandler) {
-    host.screen.removeListener("mouse", term._mouseHandler);
-  }
-  // Re-register with corrected y offset (subtract itop for chrome row)
-  const mouseHandler = (data: any) => {
-    if (host.screen.focused !== term) return;
-    // Bounds check
-    if (data.x < term.aleft + term.ileft) return;
-    if (data.y < term.atop + term.itop) return;
-    if (data.x > term.aleft - term.ileft + term.width) return;
-    if (data.y > term.atop - term.itop + term.height) return;
-    // Check if term.js has mouse enabled
-    const t = term.term;
-    if (!(t.x10Mouse || t.vt200Mouse || t.normalMouse || t.mouseEvents
-        || t.utfMouse || t.sgrMouse || t.urxvtMouse)) return;
-
-    const b = data.raw[0];
-    const x = data.x - term.aleft - term.ileft;
-    const y = data.y - term.atop - term.itop;  // key fix: subtract itop
-
-    let s: string;
-    if (t.sgrMouse) {
-      const bb = host.screen.program.sgrMouse ? b : b - 32;
-      s = `\x1b[<${bb};${x};${y}${data.action === "mousedown" ? "M" : "m"}`;
-    } else {
-      const bb = host.screen.program.sgrMouse ? b + 32 : b;
-      s = "\x1b[M" + String.fromCharCode(bb)
-        + String.fromCharCode(x + 32) + String.fromCharCode(y + 32);
-    }
-    term.handler(s);
-  };
-  (term as any)._mouseHandler = mouseHandler;
-  host.screen.on("mouse", mouseHandler);
-
   term.focus();
   host.screen.render();
 }
