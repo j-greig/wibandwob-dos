@@ -1,15 +1,19 @@
 /**
- * Dashboard — blessed-contrib powered system dashboard.
+ * Dashboard — blessed-contrib powered multi-tab dashboard.
  *
- * Shows live-updating charts, gauges, sparklines, logs, donut,
- * and a data table inside a single WibWob-DOS window.
+ * Tab 1: System Overview — line charts, bar, sparklines, donut, gauge, log, table
+ * Tab 2: Network Monitor — stacked bars, sparklines, connection log
+ * Tab 3: Application Metrics — LCD counters, gauge list, multi-line charts
+ * Tab 4: World Map — geo markers, event log, gauges
+ * Tab 5: Creative Lab — figlet clock, animated ASCII art, colour gradients
  */
 
 import blessed from "blessed";
 import contrib from "blessed-contrib";
+import { spawnSync } from "node:child_process";
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
 
-// ── data generators ──────────────────────────────────────────
+// ── helpers ──────────────────────────────────────────────────
 
 function sinWave(offset: number, len: number, amp: number, freq: number): number[] {
   const out: number[] = [];
@@ -32,6 +36,41 @@ function xLabels(len: number): string[] {
   return Array.from({ length: len }, (_, i) => `${i}`);
 }
 
+function figlet(text: string, font = "small"): string {
+  const r = spawnSync("figlet", ["-f", font, text], { encoding: "utf8" });
+  return r.status === 0 ? r.stdout : `  ${text}\n`;
+}
+
+function ansiGradientLine(width: number, hueStart: number, hueEnd: number): string {
+  let line = "";
+  for (let i = 0; i < width; i++) {
+    const t = i / Math.max(1, width - 1);
+    const h = hueStart + t * (hueEnd - hueStart);
+    const [r, g, b] = hslToRgb(h / 360, 0.8, 0.5);
+    line += `\x1b[38;2;${r};${g};${b}m█`;
+  }
+  return line + "\x1b[0m";
+}
+
+function hslToRgb(h: number, s: number, l: number): [number, number, number] {
+  const a = s * Math.min(l, 1 - l);
+  const f = (n: number) => {
+    const k = (n + h * 12) % 12;
+    return Math.round(255 * (l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1))));
+  };
+  return [f(0), f(8), f(4)];
+}
+
+// ── tab infrastructure ───────────────────────────────────────
+
+interface Tab {
+  name: string;
+  container: blessed.Widgets.BoxElement;
+  setup: () => void;
+  update: () => void;
+  cleanup: () => void;
+}
+
 // ── module setup ─────────────────────────────────────────────
 
 export default function setup(host: MicroappHost) {
@@ -45,235 +84,638 @@ export default function setup(host: MicroappHost) {
       const win = host.createWindow({
         title: "Dashboard",
         width: 140,
-        height: 45,
+        height: 48,
       });
 
-      // ── grid layout ──────────────────────────────────
-
-      const grid = new contrib.grid({
-        rows: 12,
-        cols: 12,
-        screen: win.body as any,
-      });
-
-      // ── row 0: line chart (top half-left) ────────────
-
-      const line = grid.set(0, 0, 4, 6, contrib.line, {
-        label: " CPU & Memory ",
-        showLegend: true,
-        legend: { width: 12 },
-        style: {
-          line: "cyan",
-          text: "white",
-          baseline: "white",
-        },
-      }) as any;
-
-      // ── row 0: bar chart (top half-right) ────────────
-
-      const bar = grid.set(0, 6, 4, 6, contrib.bar, {
-        label: " Network I/O (KB/s) ",
-        barWidth: 6,
-        barSpacing: 2,
-        maxHeight: 100,
-        style: { fg: "green" },
-      }) as any;
-
-      // ── row 4: sparklines ────────────────────────────
-
-      const spark = grid.set(4, 0, 2, 6, contrib.sparkline, {
-        label: " Load Average ",
-        tags: true,
-        style: { fg: "cyan" },
-      }) as any;
-
-      // ── row 4: donut ─────────────────────────────────
-
-      const donut = grid.set(4, 6, 2, 3, contrib.donut, {
-        label: " Disk Usage ",
-        radius: 8,
-        arcWidth: 3,
-        remainColor: "black",
-        yPadding: 1,
-      }) as any;
-
-      // ── row 4: gauge ─────────────────────────────────
-
-      const gauge = grid.set(4, 9, 2, 3, contrib.gauge, {
-        label: " Uptime Health ",
-        stroke: "green",
-        fill: "white",
-      }) as any;
-
-      // ── row 6: log ───────────────────────────────────
-
-      const log = grid.set(6, 0, 3, 6, contrib.log, {
-        label: " System Log ",
-        fg: "green",
-        selectedFg: "green",
-        bufferLength: 30,
-      }) as any;
-
-      // ── row 6: table ─────────────────────────────────
-
-      const table = grid.set(6, 6, 3, 6, contrib.table, {
-        label: " Process Table ",
-        columnSpacing: 2,
-        columnWidth: [18, 8, 8, 10],
-        fg: "white",
-        selectedFg: "white",
-        selectedBg: "blue",
-        keys: true,
-        interactive: true,
-      }) as any;
-
-      // ── row 9: second line chart (bottom) ────────────
-
-      const line2 = grid.set(9, 0, 3, 12, contrib.line, {
-        label: " Request Latency (ms) ",
-        style: {
-          line: "yellow",
-          text: "white",
-          baseline: "white",
-        },
-        xLabelPadding: 3,
-        xPadding: 5,
-      }) as any;
-
-      // ── data state ───────────────────────────────────
-
+      const body = win.body;
+      const screen = host.screen;
       let tick = 0;
-      const HISTORY = 40;
-      let cpuHistory = randHistory(HISTORY, 20, 80);
-      let memHistory = randHistory(HISTORY, 40, 90);
-      let latencyHistory = randHistory(HISTORY, 5, 120);
-      const labels = xLabels(HISTORY);
+      let activeTab = 0;
+      const tabs: Tab[] = [];
+      const timers: ReturnType<typeof setInterval>[] = [];
 
-      const logMessages = [
-        "sshd: accepted publickey for admin",
-        "nginx: GET /api/health 200 2ms",
-        "cron: scheduled backup started",
-        "docker: container wibwob-web healthy",
-        "systemd: reload complete",
-        "postgres: checkpoint complete",
-        "redis: background save finished",
-        "certbot: certificate renewal OK",
-        "ufw: ALLOW IN eth0 80/tcp",
-        "node: worker 4 listening on :3000",
-        "bun: hot reload triggered",
-        "k8s: pod wibwob-api-7f ready",
-        "grafana: alert resolved: CPU spike",
-        "haproxy: backend web UP 3/3",
-        "nginx: GET /dashboard 200 14ms",
-        "docker: image prune freed 2.3GB",
-        "sshd: session closed for admin",
-        "postgres: autovacuum: pages removed 847",
-        "systemd: wibwob-worker.service started",
-        "nginx: GET /api/data 200 8ms",
-      ];
+      // ── tab bar ──────────────────────────────────────
 
-      const processes = [
-        ["wibwob-api", "node", "148MB", "2.3%"],
-        ["postgres", "postgres", "312MB", "1.1%"],
-        ["nginx", "root", "24MB", "0.4%"],
-        ["redis-server", "redis", "86MB", "0.2%"],
-        ["bun", "bun", "96MB", "3.7%"],
-        ["dockerd", "root", "204MB", "0.8%"],
-        ["sshd", "root", "4MB", "0.0%"],
-        ["grafana-svr", "grafana", "178MB", "1.4%"],
-        ["haproxy", "root", "16MB", "0.1%"],
-        ["certbot", "root", "42MB", "0.0%"],
-      ];
+      const tabBar = blessed.box({
+        parent: body,
+        top: 0,
+        left: 0,
+        right: 0,
+        height: 1,
+        tags: true,
+        style: { fg: "white", bg: "black" },
+      });
 
-      // ── update loop ──────────────────────────────────
+      const contentArea = blessed.box({
+        parent: body,
+        top: 1,
+        left: 0,
+        right: 0,
+        bottom: 0,
+      });
 
-      const update = () => {
+      function renderTabBar() {
+        const names = tabs.map((t, i) =>
+          i === activeTab ? `{inverse} ${i + 1}:${t.name} {/inverse}` : ` ${i + 1}:${t.name} `
+        );
+        tabBar.setContent(`{bold}${names.join("│")}{/bold}  {gray-fg}[1-5] switch tabs{/gray-fg}`);
+        tabBar.tags = true;
+      }
+
+      function switchTab(idx: number) {
+        if (idx < 0 || idx >= tabs.length || idx === activeTab) return;
+        tabs[activeTab]!.container.hide();
+        activeTab = idx;
+        tabs[activeTab]!.container.show();
+        renderTabBar();
+        try { tabs[activeTab]?.update(); } catch {}
+        screen.render();
+      }
+
+      function createTabContainer(): blessed.Widgets.BoxElement {
+        return blessed.box({
+          parent: contentArea,
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+        });
+      }
+
+      // ═══════════════════════════════════════════════════
+      // TAB 1: System Overview
+      // ═══════════════════════════════════════════════════
+
+      (() => {
+        const container = createTabContainer();
+        const grid = new contrib.grid({ rows: 12, cols: 12, screen: container as any });
+
+        const line = grid.set(0, 0, 4, 6, contrib.line, {
+          label: " CPU & Memory ",
+          showLegend: true,
+          legend: { width: 12 },
+          style: { line: "cyan", text: "white", baseline: "white" },
+        }) as any;
+
+        const bar = grid.set(0, 6, 4, 6, contrib.bar, {
+          label: " Network I/O (KB/s) ",
+          barWidth: 6, barSpacing: 2, maxHeight: 100,
+          style: { fg: "green" },
+        }) as any;
+
+        const spark = grid.set(4, 0, 2, 6, contrib.sparkline, {
+          label: " Load Average ", tags: true, style: { fg: "cyan" },
+        }) as any;
+
+        const donut = grid.set(4, 6, 2, 3, contrib.donut, {
+          label: " Disk Usage ", radius: 8, arcWidth: 3,
+          remainColor: "black", yPadding: 1,
+        }) as any;
+
+        const gauge = grid.set(4, 9, 2, 3, contrib.gauge, {
+          label: " Uptime Health ", stroke: "green", fill: "white",
+        }) as any;
+
+        const log = grid.set(6, 0, 3, 6, contrib.log, {
+          label: " System Log ", fg: "green", selectedFg: "green", bufferLength: 30,
+        }) as any;
+
+        const table = grid.set(6, 6, 3, 6, contrib.table, {
+          label: " Process Table ", columnSpacing: 2,
+          columnWidth: [18, 8, 8, 10],
+          fg: "white", selectedFg: "white", selectedBg: "blue",
+        }) as any;
+
+        const line2 = grid.set(9, 0, 3, 12, contrib.line, {
+          label: " Request Latency (ms) ",
+          style: { line: "yellow", text: "white", baseline: "white" },
+          xLabelPadding: 3, xPadding: 5,
+        }) as any;
+
+        const H = 40;
+        let cpu = randHistory(H, 20, 80), mem = randHistory(H, 40, 90);
+        let lat = randHistory(H, 5, 120);
+        const xl = xLabels(H);
+
+        const logMsgs = [
+          "sshd: accepted publickey for admin", "nginx: GET /api/health 200 2ms",
+          "cron: scheduled backup started", "docker: container wibwob-web healthy",
+          "postgres: checkpoint complete", "redis: background save finished",
+          "bun: hot reload triggered", "k8s: pod wibwob-api-7f ready",
+        ];
+        const procs = [
+          ["wibwob-api","node","148MB","2.3%"], ["postgres","postgres","312MB","1.1%"],
+          ["nginx","root","24MB","0.4%"], ["redis-server","redis","86MB","0.2%"],
+          ["bun","bun","96MB","3.7%"], ["dockerd","root","204MB","0.8%"],
+        ];
+
+        tabs.push({
+          name: "System",
+          container,
+          setup: () => {},
+          update: () => {
+            cpu.push(Math.max(5, Math.min(100, cpu[cpu.length-1]! + (Math.random()-0.48)*12))); cpu.shift();
+            mem.push(Math.max(20, Math.min(100, mem[mem.length-1]! + (Math.random()-0.5)*6))); mem.shift();
+            line.setData([
+              { title: "CPU %", x: xl, y: cpu.map(Math.round), style: { line: "cyan" } },
+              { title: "Mem %", x: xl, y: mem.map(Math.round), style: { line: "magenta" } },
+            ]);
+            const nl = ["eth0↓","eth0↑","lo↓","lo↑","wg0↓","wg0↑"];
+            bar.setData({ titles: nl, data: nl.map(() => Math.round(Math.random()*80+5)) });
+            spark.setData(["1m","5m"], [
+              sinWave(tick,30,2,0.2).map(v => Math.round(Math.abs(v)*10+10)),
+              sinWave(tick*0.5,30,1.5,0.15).map(v => Math.round(Math.abs(v)*10+8)),
+            ]);
+            const du = 55 + Math.round(Math.sin(tick*0.05)*15);
+            donut.setData([{ label: "Used", percent: du, color: du>80?"red":"cyan" }]);
+            gauge.setPercent(Math.min(100, Math.max(0, 92+Math.round(Math.sin(tick*0.03)*8))));
+            if (tick%3===0) log.log(`${new Date().toISOString().slice(11,19)} ${logMsgs[Math.floor(Math.random()*logMsgs.length)]}`);
+            const sh = [...procs].sort(()=>Math.random()-0.5).slice(0,5).map(([n,u,m,c])=>[n,u,`${parseInt(m as string)+Math.round((Math.random()-0.5)*20)}MB`,`${(parseFloat(c as string)+(Math.random()-0.5)*1.5).toFixed(1)}%`]);
+            table.setData({ headers: ["Process","User","Memory","CPU"], data: sh });
+            lat.push(Math.max(1, Math.min(200, lat[lat.length-1]! + (Math.random()-0.5)*30))); lat.shift();
+            line2.setData([{ title: "p99", x: xl, y: lat.map(Math.round), style: { line: "yellow" } }]);
+          },
+          cleanup: () => {},
+        });
+      })();
+
+      // ═══════════════════════════════════════════════════
+      // TAB 2: Network Monitor
+      // ═══════════════════════════════════════════════════
+
+      (() => {
+        const container = createTabContainer();
+        container.hide();
+        const grid = new contrib.grid({ rows: 12, cols: 12, screen: container as any });
+
+        const bw = grid.set(0, 0, 5, 8, contrib.line, {
+          label: " Bandwidth (Mbps) ",
+          showLegend: true, legend: { width: 14 },
+          style: { line: "green", text: "white", baseline: "white" },
+        }) as any;
+
+        const connGauge = grid.set(0, 8, 2, 4, contrib.gauge, {
+          label: " Active Connections ", stroke: "cyan", fill: "white",
+        }) as any;
+
+        const pktSpark = grid.set(2, 8, 3, 4, contrib.sparkline, {
+          label: " Packets/sec ", tags: true, style: { fg: "green" },
+        }) as any;
+
+        const connLog = grid.set(5, 0, 4, 6, contrib.log, {
+          label: " Connection Log ", fg: "cyan", selectedFg: "cyan", bufferLength: 40,
+        }) as any;
+
+        const portTable = grid.set(5, 6, 4, 6, contrib.table, {
+          label: " Open Ports ",
+          columnSpacing: 2, columnWidth: [8, 12, 10, 14],
+          fg: "white", selectedFg: "white", selectedBg: "blue",
+        }) as any;
+
+        const errLine = grid.set(9, 0, 3, 12, contrib.line, {
+          label: " Error Rate (per min) ",
+          style: { line: "red", text: "white", baseline: "white" },
+        }) as any;
+
+        const H = 40, xl = xLabels(H);
+        let dlHist = randHistory(H, 10, 90), ulHist = randHistory(H, 5, 40);
+        let errHist = randHistory(H, 0, 30);
+        const connMsgs = [
+          "TCP 192.168.1.42:443 ESTABLISHED", "UDP 10.0.0.1:53 → dns.google",
+          "TCP 172.16.0.5:8080 SYN_RECV", "TCP 192.168.1.100:22 ESTABLISHED",
+          "ICMP 8.8.8.8 echo reply 14ms", "TCP 10.0.0.50:3000 FIN_WAIT",
+          "UDP 224.0.0.1:5353 mDNS", "TCP 172.16.0.12:443 TIME_WAIT",
+        ];
+        const ports = [
+          ["80","nginx","LISTEN","0.0.0.0:80"], ["443","nginx","LISTEN","0.0.0.0:443"],
+          ["22","sshd","LISTEN","0.0.0.0:22"], ["5432","postgres","LISTEN","127.0.0.1:5432"],
+          ["6379","redis","LISTEN","127.0.0.1:6379"], ["3000","bun","LISTEN","0.0.0.0:3000"],
+          ["8099","wibwob","LISTEN","127.0.0.1:8099"], ["9222","chrome","LISTEN","127.0.0.1:9222"],
+        ];
+
+        tabs.push({
+          name: "Network",
+          container,
+          setup: () => {},
+          update: () => {
+            dlHist.push(Math.max(0, Math.min(100, dlHist[dlHist.length-1]!+(Math.random()-0.5)*15))); dlHist.shift();
+            ulHist.push(Math.max(0, Math.min(60, ulHist[ulHist.length-1]!+(Math.random()-0.5)*10))); ulHist.shift();
+            bw.setData([
+              { title: "Download", x: xl, y: dlHist.map(Math.round), style: { line: "green" } },
+              { title: "Upload", x: xl, y: ulHist.map(Math.round), style: { line: "yellow" } },
+            ]);
+            connGauge.setPercent(Math.min(100, Math.max(10, 45+Math.round(Math.sin(tick*0.08)*30))));
+            pktSpark.setData(["IN","OUT"], [
+              sinWave(tick,20,500,0.3).map(v => Math.round(Math.abs(v)+200)),
+              sinWave(tick*0.7,20,300,0.25).map(v => Math.round(Math.abs(v)+100)),
+            ]);
+            if (tick%2===0) connLog.log(`${new Date().toISOString().slice(11,19)} ${connMsgs[Math.floor(Math.random()*connMsgs.length)]}`);
+            const sp = [...ports].sort(()=>Math.random()-0.5).slice(0,6);
+            portTable.setData({ headers: ["Port","Service","State","Address"], data: sp });
+            errHist.push(Math.max(0, Math.min(50, errHist[errHist.length-1]!+(Math.random()-0.5)*8))); errHist.shift();
+            errLine.setData([{ title: "5xx", x: xl, y: errHist.map(Math.round), style: { line: "red" } }]);
+          },
+          cleanup: () => {},
+        });
+      })();
+
+      // ═══════════════════════════════════════════════════
+      // TAB 3: Application Metrics
+      // ═══════════════════════════════════════════════════
+
+      (() => {
+        const container = createTabContainer();
+        container.hide();
+        const grid = new contrib.grid({ rows: 12, cols: 12, screen: container as any });
+
+        const lcd = grid.set(0, 0, 3, 4, contrib.lcd, {
+          label: " Requests/sec ",
+          segmentWidth: 0.06, segmentInterval: 0.11, strokeWidth: 0.1,
+          elements: 5, display: "00000", elementSpacing: 4, elementPadding: 2,
+          color: "green",
+        }) as any;
+
+        const lcd2 = grid.set(0, 4, 3, 4, contrib.lcd, {
+          label: " Active Users ",
+          segmentWidth: 0.06, segmentInterval: 0.11, strokeWidth: 0.1,
+          elements: 4, display: "0000", elementSpacing: 4, elementPadding: 2,
+          color: "cyan",
+        }) as any;
+
+        const lcd3 = grid.set(0, 8, 3, 4, contrib.lcd, {
+          label: " Queue Depth ",
+          segmentWidth: 0.06, segmentInterval: 0.11, strokeWidth: 0.1,
+          elements: 3, display: "000", elementSpacing: 4, elementPadding: 2,
+          color: "yellow",
+        }) as any;
+
+        const gaugeList = grid.set(3, 0, 3, 6, contrib.gaugeList, {
+          label: " Service Health ",
+          gauges: [
+            { stack: [95] },
+            { stack: [88] },
+            { stack: [99] },
+            { stack: [72] },
+          ],
+          style: { fg: "white" },
+        }) as any;
+
+        const respLine = grid.set(3, 6, 3, 6, contrib.line, {
+          label: " Response Times (ms) ",
+          showLegend: true, legend: { width: 10 },
+          style: { line: "cyan", text: "white", baseline: "white" },
+        }) as any;
+
+        const deployLog = grid.set(6, 0, 3, 6, contrib.log, {
+          label: " Deploy Log ", fg: "magenta", selectedFg: "magenta", bufferLength: 30,
+        }) as any;
+
+        const featureTable = grid.set(6, 6, 3, 6, contrib.table, {
+          label: " Feature Flags ",
+          columnSpacing: 2, columnWidth: [22, 10, 10, 12],
+          fg: "white", selectedFg: "white", selectedBg: "blue",
+        }) as any;
+
+        const throughput = grid.set(9, 0, 3, 12, contrib.line, {
+          label: " Throughput (req/min) ",
+          style: { line: "green", text: "white", baseline: "white" },
+        }) as any;
+
+        const H = 40, xl = xLabels(H);
+        let p50 = randHistory(H, 5, 50), p95 = randHistory(H, 20, 150), p99 = randHistory(H, 50, 300);
+        let tput = randHistory(H, 500, 2000);
+        let rps = 1200, users = 340, queue = 12;
+
+        const deployMsgs = [
+          "v2.14.3 deployed to production", "canary: 10% traffic shifted",
+          "rollback: v2.14.2 restored", "feature: dark-mode enabled 50%",
+          "hotfix: memory leak patched", "scale: +2 pods (CPU > 80%)",
+          "build: image wibwob:latest pushed", "test: 847/847 passed",
+        ];
+        const features = [
+          ["dark-mode","enabled","50%","experiment"], ["new-editor","enabled","100%","released"],
+          ["ai-assist","enabled","25%","canary"], ["v3-api","disabled","0%","dev"],
+          ["websockets","enabled","100%","released"], ["markdown-v2","enabled","75%","rollout"],
+          ["image-cache","enabled","100%","released"], ["lazy-load","disabled","0%","planned"],
+        ];
+
+        tabs.push({
+          name: "App Metrics",
+          container,
+          setup: () => {},
+          update: () => {
+            rps = Math.max(100, Math.min(9999, rps + Math.round((Math.random()-0.5)*200)));
+            users = Math.max(10, Math.min(9999, users + Math.round((Math.random()-0.5)*50)));
+            queue = Math.max(0, Math.min(999, queue + Math.round((Math.random()-0.5)*5)));
+            lcd.setDisplay(String(rps).padStart(5, "0"));
+            lcd2.setDisplay(String(users).padStart(4, "0"));
+            lcd3.setDisplay(String(queue).padStart(3, "0"));
+
+            gaugeList.setGauges([
+              { stack: [Math.min(100, Math.max(50, 95+Math.round((Math.random()-0.5)*10)))] },
+              { stack: [Math.min(100, Math.max(50, 88+Math.round((Math.random()-0.5)*15)))] },
+              { stack: [Math.min(100, Math.max(70, 99+Math.round((Math.random()-0.5)*5)))] },
+              { stack: [Math.min(100, Math.max(30, 72+Math.round((Math.random()-0.5)*20)))] },
+            ]);
+
+            p50.push(Math.max(1,Math.min(80,p50[p50.length-1]!+(Math.random()-0.5)*10))); p50.shift();
+            p95.push(Math.max(10,Math.min(200,p95[p95.length-1]!+(Math.random()-0.5)*20))); p95.shift();
+            p99.push(Math.max(30,Math.min(400,p99[p99.length-1]!+(Math.random()-0.5)*40))); p99.shift();
+            respLine.setData([
+              { title: "p50", x: xl, y: p50.map(Math.round), style: { line: "green" } },
+              { title: "p95", x: xl, y: p95.map(Math.round), style: { line: "yellow" } },
+              { title: "p99", x: xl, y: p99.map(Math.round), style: { line: "red" } },
+            ]);
+
+            if (tick%4===0) deployLog.log(`${new Date().toISOString().slice(11,19)} ${deployMsgs[Math.floor(Math.random()*deployMsgs.length)]}`);
+            const sf = [...features].sort(()=>Math.random()-0.5).slice(0,6);
+            featureTable.setData({ headers: ["Feature","Status","Rollout","Type"], data: sf });
+
+            tput.push(Math.max(100,Math.min(3000,tput[tput.length-1]!+(Math.random()-0.5)*200))); tput.shift();
+            throughput.setData([{ title: "req/min", x: xl, y: tput.map(Math.round), style: { line: "green" } }]);
+          },
+          cleanup: () => {},
+        });
+      })();
+
+      // ═══════════════════════════════════════════════════
+      // TAB 4: World Map + Geo Events
+      // ═══════════════════════════════════════════════════
+
+      (() => {
+        const container = createTabContainer();
+        container.hide();
+        const grid = new contrib.grid({ rows: 12, cols: 12, screen: container as any });
+
+        const map = grid.set(0, 0, 6, 8, contrib.map, {
+          label: " Global Traffic ",
+          style: { shapeColor: "cyan" },
+        }) as any;
+
+        const regionGauge = grid.set(0, 8, 3, 4, contrib.gaugeList, {
+          label: " Region Load ",
+          gauges: [
+            { stack: [65] },
+            { stack: [82] },
+            { stack: [45] },
+          ],
+          style: { fg: "white" },
+        }) as any;
+
+        const regionSpark = grid.set(3, 8, 3, 4, contrib.sparkline, {
+          label: " Latency by Region ", tags: true, style: { fg: "yellow" },
+        }) as any;
+
+        const geoLog = grid.set(6, 0, 3, 6, contrib.log, {
+          label: " Geo Events ", fg: "green", selectedFg: "green", bufferLength: 30,
+        }) as any;
+
+        const cdnTable = grid.set(6, 6, 3, 6, contrib.table, {
+          label: " CDN Nodes ",
+          columnSpacing: 2, columnWidth: [14, 10, 10, 12],
+          fg: "white", selectedFg: "white", selectedBg: "blue",
+        }) as any;
+
+        const globalLine = grid.set(9, 0, 3, 12, contrib.line, {
+          label: " Global Requests/sec ",
+          showLegend: true, legend: { width: 10 },
+          style: { line: "cyan", text: "white", baseline: "white" },
+        }) as any;
+
+        const cities = [
+          { lon: -73.94, lat: 40.67, name: "New York" },
+          { lon: -0.12, lat: 51.5, name: "London" },
+          { lon: 139.69, lat: 35.68, name: "Tokyo" },
+          { lon: -122.41, lat: 37.77, name: "San Francisco" },
+          { lon: 2.35, lat: 48.85, name: "Paris" },
+          { lon: 13.40, lat: 52.52, name: "Berlin" },
+          { lon: 151.21, lat: -33.87, name: "Sydney" },
+          { lon: 103.85, lat: 1.35, name: "Singapore" },
+          { lon: -46.63, lat: -23.55, name: "São Paulo" },
+        ];
+        const geoMsgs = cities.map(c => `${c.name}: ${Math.round(Math.random()*500+100)} req/s`);
+        const cdnNodes = [
+          ["us-east-1","Virginia","active","32ms"], ["eu-west-1","Ireland","active","18ms"],
+          ["ap-northeast-1","Tokyo","active","45ms"], ["ap-southeast-1","Singapore","active","52ms"],
+          ["sa-east-1","São Paulo","active","78ms"], ["eu-central-1","Frankfurt","active","22ms"],
+        ];
+
+        const H = 40, xl = xLabels(H);
+        let euHist = randHistory(H, 200, 800), usHist = randHistory(H, 300, 1200), apHist = randHistory(H, 100, 500);
+
+        tabs.push({
+          name: "World Map",
+          container,
+          setup: () => {},
+          update: () => {
+            // Animate markers — different cities light up each tick
+            const active = [0,1,2].map(() => cities[Math.floor(Math.random()*cities.length)]!);
+            const markers = active.map(c => ({
+              lon: c.lon + (Math.random()-0.5)*2,
+              lat: c.lat + (Math.random()-0.5)*2,
+              color: "red",
+              char: "X",
+            }));
+            map.clearMarkers();
+            for (const m of markers) map.addMarker(m);
+
+            regionGauge.setGauges([
+              { stack: [Math.min(100, Math.max(20, 65+Math.round((Math.random()-0.5)*30)))] },
+              { stack: [Math.min(100, Math.max(20, 82+Math.round((Math.random()-0.5)*25)))] },
+              { stack: [Math.min(100, Math.max(20, 45+Math.round((Math.random()-0.5)*20)))] },
+            ]);
+
+            regionSpark.setData(["EU","US","AP"], [
+              sinWave(tick,20,30,0.2).map(v => Math.round(Math.abs(v)+15)),
+              sinWave(tick*0.8,20,25,0.25).map(v => Math.round(Math.abs(v)+20)),
+              sinWave(tick*0.6,20,40,0.15).map(v => Math.round(Math.abs(v)+30)),
+            ]);
+
+            if (tick%2===0) geoLog.log(`${new Date().toISOString().slice(11,19)} ${geoMsgs[Math.floor(Math.random()*geoMsgs.length)]}`);
+            const sn = [...cdnNodes].map(([id,loc,st,lat]) => [id,loc,st,`${parseInt(lat)+Math.round((Math.random()-0.5)*10)}ms`]);
+            cdnTable.setData({ headers: ["Node","Location","Status","Latency"], data: sn });
+
+            euHist.push(Math.max(50,Math.min(1000,euHist[euHist.length-1]!+(Math.random()-0.5)*100))); euHist.shift();
+            usHist.push(Math.max(100,Math.min(1500,usHist[usHist.length-1]!+(Math.random()-0.5)*120))); usHist.shift();
+            apHist.push(Math.max(50,Math.min(800,apHist[apHist.length-1]!+(Math.random()-0.5)*80))); apHist.shift();
+            globalLine.setData([
+              { title: "EU", x: xl, y: euHist.map(Math.round), style: { line: "cyan" } },
+              { title: "US", x: xl, y: usHist.map(Math.round), style: { line: "green" } },
+              { title: "AP", x: xl, y: apHist.map(Math.round), style: { line: "yellow" } },
+            ]);
+          },
+          cleanup: () => {},
+        });
+      })();
+
+      // ═══════════════════════════════════════════════════
+      // TAB 5: Creative Lab — figlet, gradients, animation
+      // ═══════════════════════════════════════════════════
+
+      (() => {
+        const container = createTabContainer();
+        container.hide();
+
+        // Top: figlet clock
+        const clockBox = blessed.box({
+          parent: container,
+          top: 0, left: 0, right: 0, height: 8,
+          label: " Figlet Clock ",
+          border: { type: "line" },
+          style: { fg: "cyan", border: { fg: "cyan" } },
+        });
+
+        // Middle: gradient bands
+        const gradientBox = blessed.box({
+          parent: container,
+          top: 8, left: 0, width: "50%", height: 12,
+          label: " Colour Gradients ",
+          border: { type: "line" },
+          style: { fg: "white", border: { fg: "magenta" } },
+          tags: false,
+        });
+
+        // Middle right: ASCII art animation
+        const artBox = blessed.box({
+          parent: container,
+          top: 8, left: "50%", right: 0, height: 12,
+          label: " Animated Art ",
+          border: { type: "line" },
+          style: { fg: "green", border: { fg: "green" } },
+          tags: false,
+        });
+
+        // Bottom: figlet marquee
+        const marqueeBox = blessed.box({
+          parent: container,
+          top: 20, left: 0, right: 0, bottom: 0,
+          label: " Figlet Marquee ",
+          border: { type: "line" },
+          style: { fg: "yellow", border: { fg: "yellow" } },
+        });
+
+        // Pre-render some figlet words for marquee
+        const words = ["WIBWOB", "DOS", "SYMBIENT", "DASHBOARD", "BLESSED", "CONTRIB"];
+        let marqueeIdx = 0;
+
+        // ASCII art frames — simple animation
+        const artFrames = [
+          [
+            "    ╔══╗    ",
+            "    ║◉◉║    ",
+            "    ║──║    ",
+            "    ╚══╝    ",
+            "   /│  │\\   ",
+            "  / │  │ \\  ",
+            " ╱  └──┘  ╲ ",
+          ],
+          [
+            "    ╔══╗    ",
+            "    ║◉ ║    ",
+            "    ║──║    ",
+            "    ╚══╝    ",
+            "  ─/│  │\\─  ",
+            "  / │  │ \\  ",
+            " ╱  └──┘  ╲ ",
+          ],
+          [
+            "    ╔══╗    ",
+            "    ║ ◉║    ",
+            "    ║──║    ",
+            "    ╚══╝    ",
+            "   /│  │\\   ",
+            "  ─ │  │ ─  ",
+            " ╱  └──┘  ╲ ",
+          ],
+          [
+            "    ╔══╗    ",
+            "    ║◉◉║    ",
+            "    ║▬▬║    ",
+            "    ╚══╝    ",
+            "   /│  │\\   ",
+            "  / │  │ \\  ",
+            " ╱  └──┘  ╲ ",
+          ],
+        ];
+        let artFrame = 0;
+
+        tabs.push({
+          name: "Creative",
+          container,
+          setup: () => {},
+          update: () => {
+            // Figlet clock
+            const now = new Date();
+            const timeStr = now.toTimeString().slice(0, 8);
+            const clockFig = figlet(timeStr, "big");
+            clockBox.setContent(clockFig);
+
+            // Gradient bands — shifting hues
+            const w = (gradientBox.width as number || 50) - 2;
+            const lines: string[] = [];
+            for (let row = 0; row < 8; row++) {
+              const hueStart = (tick * 5 + row * 40) % 360;
+              lines.push(ansiGradientLine(w, hueStart, hueStart + 180));
+            }
+            gradientBox.setContent(lines.join("\n"));
+
+            // ASCII art animation
+            artFrame = (artFrame + 1) % artFrames.length;
+            const frame = artFrames[artFrame]!;
+            artBox.setContent("\n" + frame.join("\n"));
+
+            // Figlet marquee — cycle through words
+            if (tick % 5 === 0) {
+              marqueeIdx = (marqueeIdx + 1) % words.length;
+            }
+            const word = words[marqueeIdx]!;
+            const marqueeFig = figlet(word, "slant");
+            marqueeBox.setContent(marqueeFig);
+          },
+          cleanup: () => {},
+        });
+      })();
+
+      // ── keyboard ─────────────────────────────────────
+
+      body.key(["1"], () => switchTab(0));
+      body.key(["2"], () => switchTab(1));
+      body.key(["3"], () => switchTab(2));
+      body.key(["4"], () => switchTab(3));
+      body.key(["5"], () => switchTab(4));
+      (body as any).input = true;
+      (body as any).keys = true;
+
+      // ── tick loop ────────────────────────────────────
+
+      renderTabBar();
+
+      const mainTimer = setInterval(() => {
         tick++;
-
-        // Line chart: CPU + Memory
-        cpuHistory.push(Math.max(5, Math.min(100, cpuHistory[cpuHistory.length - 1]! + (Math.random() - 0.48) * 12)));
-        cpuHistory.shift();
-        memHistory.push(Math.max(20, Math.min(100, memHistory[memHistory.length - 1]! + (Math.random() - 0.5) * 6)));
-        memHistory.shift();
-
-        line.setData([
-          { title: "CPU %", x: labels, y: cpuHistory.map(Math.round), style: { line: "cyan" } },
-          { title: "Mem %", x: labels, y: memHistory.map(Math.round), style: { line: "magenta" } },
-        ]);
-
-        // Bar chart: network
-        const netLabels = ["eth0↓", "eth0↑", "lo↓", "lo↑", "wg0↓", "wg0↑"];
-        const netData = netLabels.map(() => Math.round(Math.random() * 80 + 5));
-        bar.setData({ titles: netLabels, data: netData });
-
-        // Sparklines
-        const load1 = sinWave(tick, 30, 2, 0.2).map(v => Math.round(Math.abs(v) * 10 + 10));
-        const load5 = sinWave(tick * 0.5, 30, 1.5, 0.15).map(v => Math.round(Math.abs(v) * 10 + 8));
-        spark.setData(["1min", "5min"], [load1, load5]);
-
-        // Donut
-        const diskUsed = 55 + Math.round(Math.sin(tick * 0.05) * 15);
-        donut.setData([
-          { label: "Used", percent: diskUsed, color: diskUsed > 80 ? "red" : "cyan" },
-        ]);
-
-        // Gauge
-        const health = Math.min(100, Math.max(0, 92 + Math.round(Math.sin(tick * 0.03) * 8)));
-        gauge.setPercent(health);
-
-        // Log — add a message every few ticks
-        if (tick % 3 === 0) {
-          const msg = logMessages[Math.floor(Math.random() * logMessages.length)]!;
-          const ts = new Date().toISOString().slice(11, 19);
-          log.log(`${ts} ${msg}`);
-        }
-
-        // Table
-        const shuffled = [...processes].sort(() => Math.random() - 0.5).slice(0, 7);
-        // Jitter the memory and CPU values
-        const jittered = shuffled.map(([name, user, mem, cpu]) => {
-          const memVal = parseInt(mem as string) + Math.round((Math.random() - 0.5) * 20);
-          const cpuVal = (parseFloat(cpu as string) + (Math.random() - 0.5) * 1.5).toFixed(1);
-          return [name, user, `${memVal}MB`, `${cpuVal}%`];
-        });
-        table.setData({
-          headers: ["Process", "User", "Memory", "CPU"],
-          data: jittered,
-        });
-
-        // Latency line
-        latencyHistory.push(Math.max(1, Math.min(200, latencyHistory[latencyHistory.length - 1]! + (Math.random() - 0.5) * 30)));
-        latencyHistory.shift();
-        line2.setData([
-          { title: "p99", x: labels, y: latencyHistory.map(Math.round), style: { line: "yellow" } },
-        ]);
-
-        host.screen.render();
-      };
+        // Only update active tab — hidden contrib widgets crash on missing canvas
+        try { tabs[activeTab]?.update(); } catch {}
+        screen.render();
+      }, 1000);
+      timers.push(mainTimer);
 
       // Initial render
-      update();
-
-      // Tick every second
-      const timer = setInterval(update, 1000);
+      try { tabs[activeTab]?.update(); } catch {}
+      screen.render();
 
       // ── lifecycle ────────────────────────────────────
 
-      win.cleanup(() => {
-        clearInterval(timer);
+      win.onCleanup(() => {
+        for (const t of timers) clearInterval(t);
+        for (const t of tabs) t.cleanup();
       });
 
       win.describeState(() => ({
-        summary: `System dashboard — tick ${tick}, CPU ~${Math.round(cpuHistory[cpuHistory.length - 1]!)}%, Mem ~${Math.round(memHistory[memHistory.length - 1]!)}%`,
+        summary: `Dashboard tab ${activeTab + 1}/${tabs.length}: ${tabs[activeTab]?.name ?? "?"} — tick ${tick}`,
       }));
 
-      win.captureText(() => `Dashboard tick=${tick}`);
+      win.captureText(() => `Dashboard — ${tabs[activeTab]?.name ?? "?"} — tick ${tick}`);
 
-      win.onRestyle(() => {
-        // blessed-contrib widgets don't support restyle well,
-        // but at least re-render
-        host.screen.render();
-      });
+      win.onRestyle(() => screen.render());
 
       win.focus();
     },
