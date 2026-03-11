@@ -10,12 +10,21 @@
 
 import puppeteer, { type Browser, type Page } from "puppeteer-core";
 import { Readability } from "@mozilla/readability";
-import { JSDOM } from "jsdom";
+import { JSDOM, VirtualConsole } from "jsdom";
 import TurndownService from "turndown";
 // @ts-ignore — no types available for turndown-plugin-gfm
 import { gfm } from "turndown-plugin-gfm";
 import fs from "node:fs";
 import { capabilityService } from "./capability-service.js";
+
+/** Suppress jsdom CSS parse warnings that leak to stderr. */
+function quietConsole(): VirtualConsole {
+  const vc = new VirtualConsole();
+  // Forward everything except jsdom's internal CSS errors
+  vc.on("error", () => {});
+  vc.on("warn", () => {});
+  return vc;
+}
 
 export interface BrowseResult {
   ok: boolean;
@@ -149,7 +158,7 @@ export class ChromeBrowserService {
       await client.detach();
 
       // Extract with Readability
-      const doc = new JSDOM(outerHTML, { url: finalUrl });
+      const doc = new JSDOM(outerHTML, { url: finalUrl, virtualConsole: quietConsole() });
       const reader = new Readability(doc.window.document);
       const article = reader.parse();
 
@@ -160,7 +169,7 @@ export class ChromeBrowserService {
         markdown = this.htmlToMarkdown(article.content);
       } else {
         // Fallback: strip noise and extract main content
-        const fallbackDoc = new JSDOM(outerHTML, { url: finalUrl });
+        const fallbackDoc = new JSDOM(outerHTML, { url: finalUrl, virtualConsole: quietConsole() });
         const fallbackBody = fallbackDoc.window.document;
         fallbackBody
           .querySelectorAll(
@@ -372,7 +381,7 @@ export class ChromeBrowserService {
       });
       await client.detach();
 
-      const doc = new JSDOM(outerHTML, { url });
+      const doc = new JSDOM(outerHTML, { url, virtualConsole: quietConsole() });
       const reader = new Readability(doc.window.document);
       const article = reader.parse();
 
@@ -382,7 +391,7 @@ export class ChromeBrowserService {
       if (article?.content) {
         markdown = this.htmlToMarkdown(article.content);
       } else {
-        const fallbackDoc = new JSDOM(outerHTML, { url });
+        const fallbackDoc = new JSDOM(outerHTML, { url, virtualConsole: quietConsole() });
         const fallbackBody = fallbackDoc.window.document;
         fallbackBody
           .querySelectorAll(
