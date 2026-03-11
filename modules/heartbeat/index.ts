@@ -1,6 +1,6 @@
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
 import blessed from "blessed";
-import { createTimer, clearTimers } from "../../src/core/ui-primitives.js";
+import { createTimer, clearTimers } from "../../src/services/microapp-sdk.js";
 
 // Pulse waveform frames — a heartbeat spike cycling through
 const FRAMES = [
@@ -95,9 +95,16 @@ function openHeartbeat(host: MicroappHost) {
     host.screen.render();
   }, 1000, timers);
 
-  win.describeState(() => ({
-    summary: `Heartbeat — alive ${Math.floor((Date.now() - startTime) / 1000)}s`,
-  }));
+  win.describeState(() => {
+    const uptime = Math.floor((Date.now() - startTime) / 1000);
+    return {
+      summary: `Heartbeat — alive ${uptime}s`,
+      bpm: 60,
+      uptime,
+      frame: frame % FRAMES.length,
+      beat,
+    };
+  });
 
   win.captureText(() => `Heartbeat\n60 BPM\nuptime ${Math.floor((Date.now() - startTime) / 1000)}s`);
 

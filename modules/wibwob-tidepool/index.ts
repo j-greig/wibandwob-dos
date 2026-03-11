@@ -38,14 +38,15 @@ const MAX_TICK_MS = 2000;
 type TideMode = "all" | SpeciesId;
 
 export default function setup(host: MicroappHost) {
-  let engine: TidePoolEngine | undefined;
-  let tickTimer: ReturnType<typeof setTimeout> | null = null;
-  let tickMs = DEFAULT_TICK_MS;
-  let speed = 1;
-  let shannonHistory: number[] = [];
-  let highlight: SpeciesId | null = null;
-
   function openTidePool(args?: Record<string, unknown>) {
+    // All mutable runtime state is per-window, not module-global.
+    // This keeps multiInstance: true honest.
+    let tickTimer: ReturnType<typeof setTimeout> | null = null;
+    let tickMs = DEFAULT_TICK_MS;
+    let speed = 1;
+    let shannonHistory: number[] = [];
+    let highlight: SpeciesId | null = null;
+
     const win = host.createWindow({
       title: "Tide Pool",
       width: 120,
@@ -58,9 +59,7 @@ export default function setup(host: MicroappHost) {
     const gridW = Math.max(10, Math.floor((initW - 35) / CELL_COLS));
     const gridH = Math.max(5, initH - 12);
 
-    engine = new TidePoolEngine(gridW, gridH);
-    shannonHistory = [];
-    highlight = null;
+    let engine: TidePoolEngine | undefined = new TidePoolEngine(gridW, gridH);
 
     // Restore from snapshot if provided
     if (args?._restore && typeof args._restore === "object") {
@@ -310,14 +309,6 @@ export default function setup(host: MicroappHost) {
       engine = undefined;
     });
 
-    // -- Snapshot --
-    host.registerSnapshot({
-      canRestore: (snap) => snap.appType === "wibwob.tidepool",
-      restore: (snap) => {
-        openTidePool({ _restore: snap._restore, _speed: snap._speed, _shannonHistory: snap._shannonHistory });
-      },
-    });
-
     // Initial resize + render, then start ticking after a brief delay
     resizeEngine();
     render();
@@ -337,6 +328,14 @@ export default function setup(host: MicroappHost) {
       },
     };
   }
+
+  // -- Snapshot (registered once at setup, not per-window) --
+  host.registerSnapshot({
+    canRestore: (snap) => snap.appType === "wibwob.tidepool",
+    restore: (snap) => {
+      openTidePool({ _restore: snap._restore, _speed: snap._speed, _shannonHistory: snap._shannonHistory });
+    },
+  });
 
   // -- Register command --
   host.registerCommand({

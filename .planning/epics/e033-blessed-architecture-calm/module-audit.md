@@ -73,21 +73,19 @@ Legend:
 
 ## Module: heartbeat
 
-- Audit status: complete.
-- Anti-pattern: the module imports `createTimer` and `clearTimers` directly from `src/core/ui-primitives.ts` instead of the public SDK surface.
-- Anti-pattern: animation is driven by two independent timers for waveform and beat state. It is simple enough here, but even this tiny app is already teaching split-timer choreography.
-- Anti-pattern: state reporting is very thin. The visible app has frame state, beat state, and uptime, but `describeState()` only exposes the summary string.
-- Positive note: the module is tiny, cleanup is correct, and the timer ownership is at least explicit.
-- Safe future tidy-up target: expose timer helpers through the SDK and give the state payload a slightly richer machine-readable shape.
+- Audit status: complete. Cleaned in this pass.
+- Fixed: imports now use the public SDK surface instead of `src/core/ui-primitives.ts`.
+- Fixed: `describeState()` now exposes `bpm`, `uptime`, `frame`, and `beat` as machine-readable fields, not just a summary string.
+- Remaining watch-out: animation is still driven by two independent timers for waveform and beat state. Acceptable for this tiny module, but worth noting.
+- Positive note: the module is tiny, cleanup is correct, and the timer ownership is explicit.
 
 ## Module: hello-world
 
-- Audit status: complete.
-- Anti-pattern: `renderFiglet(...)` uses `spawnSync(...)` during banner generation. Acceptable for a toy example, but risky as canonical starter behaviour.
-- Anti-pattern: the example includes an empty `win.onCleanup(() => {})`. Harmless, but it teaches no-op cleanup as standard ceremony.
-- Anti-pattern: command metadata and banner/window strings are all handwritten inline, so new authors are likely to cargo-cult copy-paste duplication.
+- Audit status: complete. Cleaned in this pass.
+- Fixed: removed the no-op `win.onCleanup(() => {})` stub. Cleanup should only be registered when there is real cleanup to do.
+- Remaining watch-out: `renderFiglet(...)` uses `spawnSync(...)` during banner generation. Acceptable for a toy example, but risky as canonical starter behaviour.
+- Remaining watch-out: command metadata and banner/window strings are all handwritten inline, so new authors are likely to cargo-cult copy-paste duplication.
 - Positive note: it otherwise uses the canonical SDK import path, state description, text capture, and restyle hook correctly.
-- Safe future tidy-up target: either document synchronous shelling-out as demo-only or replace it with a more static starter path.
 
 ## Module: patchbay-lab
 
@@ -150,12 +148,11 @@ Legend:
 
 ## Module: wibwob-tidepool
 
-- Audit status: complete.
-- Anti-pattern: module-level `engine`, timer, speed, history, and highlight state live outside any one window instance, which is especially awkward because the manifest allows `multiInstance: true`.
-- Anti-pattern: the module is described as following the TR-808 pattern, but it still drives its own tick scheduler and render loop directly, so the pattern is only partial.
-- Anti-pattern: repeated direct `host.screen.render()` calls remain in button handlers and render paths.
-- Positive note: the engine/renderer split is conceptually clean, which gives this module a strong refactor base.
-- Safe future tidy-up target: move per-window state inside `openTidePool(...)` so multi-instance semantics become honest.
+- Audit status: complete. Cleaned in this pass.
+- Fixed: all mutable runtime state (engine, timers, speed, history, highlight) is now per-window inside `openTidePool(...)`, making `multiInstance: true` honest.
+- Fixed: snapshot registration moved outside the window-open function so it registers once at setup, not per-window.
+- Remaining watch-out: the module still drives its own tick scheduler and render loop with direct `host.screen.render()` calls. Acceptable, but noted.
+- Positive note: the engine/renderer split is conceptually clean and now the lifecycle ownership matches.
 
 ## Module: wibwob-tr808
 

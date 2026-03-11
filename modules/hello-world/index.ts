@@ -50,8 +50,6 @@ export default function setup(host: MicroappHost) {
         content.style = host.theme().body;
       });
 
-      win.onCleanup(() => {});
-
       win.focus();
     },
   });
