@@ -308,6 +308,84 @@ export class ChromeBrowserService {
         } catch { /* DOM walk failed, keep Readability result */ }
       }
 
+      // Image discovery: if markdown has no images, scan the rendered DOM
+      // for <img>, CSS background-image, and OG meta tags.
+      // Readability often strips images from non-article sections.
+      if (!markdown.includes("![")) {
+        try {
+          const discovered = await this.page!.evaluate(() => {
+            const imgs: Array<{src: string, alt: string, w: number, h: number, section: string}> = [];
+
+            // 1. All visible <img> elements
+            document.querySelectorAll("img").forEach(img => {
+              const src = img.src;
+              if (!src || src.includes("data:") || src.includes("1x1") || src.includes("pixel")) return;
+              const rect = img.getBoundingClientRect();
+              const w = img.naturalWidth || Math.round(rect.width);
+              const h = img.naturalHeight || Math.round(rect.height);
+              if (w < 150 || h < 150) return;
+              // Find nearest heading or section for context
+              let section = "";
+              let el: Element | null = img;
+              while (el && !section) {
+                el = el.previousElementSibling || el.parentElement;
+                if (el && /^H[1-6]$/i.test(el.tagName)) {
+                  section = el.textContent?.trim() ?? "";
+                }
+              }
+              imgs.push({ src, alt: img.alt || "", w, h, section });
+            });
+
+            // 2. CSS background-image on visible elements > 150px
+            document.querySelectorAll("div, section, figure, header, [class*='hero'], [class*='banner']").forEach(el => {
+              const bg = getComputedStyle(el).backgroundImage;
+              if (!bg || bg === "none" || !bg.startsWith("url(")) return;
+              const url = bg.slice(5, -2).replace(/["']/g, "");
+              if (url.includes("data:") || url.includes("gradient")) return;
+              const rect = el.getBoundingClientRect();
+              if (rect.width < 150 || rect.height < 150) return;
+              // Deduplicate with <img> results
+              if (imgs.some(i => i.src === url)) return;
+              imgs.push({ src: url, alt: "", w: Math.round(rect.width), h: Math.round(rect.height), section: "" });
+            });
+
+            // 3. OG / Twitter meta tags as fallback hero
+            if (imgs.length === 0) {
+              const og = document.querySelector('meta[property="og:image"]') as HTMLMetaElement;
+              const tw = document.querySelector('meta[name="twitter:image"]') as HTMLMetaElement;
+              const heroUrl = og?.content || tw?.content;
+              if (heroUrl) {
+                imgs.push({ src: heroUrl, alt: "Hero image", w: 800, h: 600, section: "" });
+              }
+            }
+
+            return imgs;
+          });
+
+          if (discovered.length > 0) {
+            // Inject discovered images into markdown after their section headings
+            // or append at the end if no section match
+            const appended: string[] = [];
+            for (const img of discovered) {
+              const alt = img.alt || (img.section ? `Image from ${img.section}` : "Image");
+              const imgMd = `![${alt}](${img.src})`;
+              if (img.section) {
+                // Try to inject after the section heading
+                const headingPattern = new RegExp(`(## ${img.section.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^\n]*\n)`);
+                if (headingPattern.test(markdown)) {
+                  markdown = markdown.replace(headingPattern, `$1\n${imgMd}\n`);
+                  continue;
+                }
+              }
+              appended.push(imgMd);
+            }
+            if (appended.length > 0) {
+              markdown += "\n\n" + appended.join("\n\n");
+            }
+          }
+        } catch { /* image discovery failed, continue without */ }
+      }
+
       return { ok: true, url: finalUrl, title, markdown };
     } catch (err) {
       const message =
