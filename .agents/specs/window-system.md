@@ -214,3 +214,4 @@ When adding a new WindowKind:
 | Date | Type | Subsystem | Finding | Triggered by |
 |------|------|-----------|---------|--------------|
 | 2026-03-10 | gotcha | microapp keyboard | `blessed.box` silently drops all key events unless created with `input: true` AND `keys: true` — no error, bindings just never fire | music-player keyboard shortcuts not working |
+| 2026-03-10 | gotcha | terminal mouse | blessed.terminal mouse passthrough encodes 0-based coords into 1-based xterm sequences (SGR/X10/urxvt) — off by 1 row south, compounds per nesting level. Fix: replace handler via `_slisteners` filter+remove, re-register with +1 offset. Must remove ALL existing mouse handlers or both fire. | nested WibWob-DOS click offset |
