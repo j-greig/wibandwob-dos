@@ -33,6 +33,81 @@ function findNodePtyPath(): string {
   return candidates[0]; // best-effort fallback
 }
 
+function installTerminalMousePassthrough(
+  term: blessed.Widgets.BlessedElement & {
+    aleft: number;
+    atop: number;
+    ileft: number;
+    itop: number;
+    width: number;
+    height: number;
+    term?: {
+      x10Mouse?: boolean;
+      vt200Mouse?: boolean;
+      normalMouse?: boolean;
+      mouseEvents?: boolean;
+      utfMouse?: boolean;
+      sgrMouse?: boolean;
+      urxvtMouse?: boolean;
+    };
+    screen: blessed.Widgets.Screen & {
+      program: blessed.Widgets.Screen["program"] & { sgrMouse?: boolean };
+    };
+    handler?: (data: string) => void;
+    onScreenEvent?: (type: string, handler: (data: blessed.Widgets.Events.IMouseEventArg) => void) => void;
+    removeScreenEvent?: (type: string, handler: (data: blessed.Widgets.Events.IMouseEventArg) => void) => void;
+    _slisteners?: Array<{ type: string; handler: (data: blessed.Widgets.Events.IMouseEventArg) => void }>;
+  },
+) {
+  const existing = term._slisteners?.find((listener) => listener.type === "mouse");
+  if (existing) {
+    term.removeScreenEvent?.("mouse", existing.handler);
+  }
+
+  const mouseHandler = (data: blessed.Widgets.Events.IMouseEventArg) => {
+    if (term.screen.focused !== term) return;
+
+    if (data.x < term.aleft + term.ileft) return;
+    if (data.y < term.atop + term.itop) return;
+    if (data.x > term.aleft - term.ileft + term.width) return;
+    if (data.y > term.atop - term.itop + term.height) return;
+
+    const state = term.term;
+    if (!state) return;
+    if (!(
+      state.x10Mouse
+      || state.vt200Mouse
+      || state.normalMouse
+      || state.mouseEvents
+      || state.utfMouse
+      || state.sgrMouse
+      || state.urxvtMouse
+    )) {
+      return;
+    }
+
+    let b = data.raw[0];
+    const x = data.x - term.aleft + 1;
+    const y = data.y - term.atop + 1;
+    let sequence: string;
+
+    if (state.urxvtMouse) {
+      if (term.screen.program.sgrMouse) b += 32;
+      sequence = `\x1b[${b};${x};${y}M`;
+    } else if (state.sgrMouse) {
+      if (!term.screen.program.sgrMouse) b -= 32;
+      sequence = `\x1b[<${b};${x};${y}${data.action === "mousedown" ? "M" : "m"}`;
+    } else {
+      if (term.screen.program.sgrMouse) b += 32;
+      sequence = `\x1b[M${String.fromCharCode(b)}${String.fromCharCode(x + 32)}${String.fromCharCode(y + 32)}`;
+    }
+
+    term.handler?.(sequence);
+  };
+
+  term.onScreenEvent?.("mouse", mouseHandler);
+}
+
 export default function setup(host: MicroappHost) {
   host.registerCommand({
     id: "open",
@@ -86,6 +161,8 @@ function openTerminal(host: MicroappHost) {
       fg: host.theme().body.fg,
     },
   });
+
+  installTerminalMousePassthrough(term);
 
   // --- Spawn Node bridge for PTY ---
   let bridge: ChildProcess | null = null;
