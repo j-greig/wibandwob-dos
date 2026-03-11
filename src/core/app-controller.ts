@@ -6,7 +6,6 @@
  */
 
 import blessed from "blessed";
-import stringWidth from "string-width";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -70,6 +69,7 @@ import {
 } from "./window-chrome.js";
 import { WindowManager } from "./window-manager.js";
 import { createRenderScheduler, type RenderScheduler } from "./render-scheduler.js";
+import { ShellChromeController } from "./shell-chrome.js";
 import { BackroomsService } from "../services/backrooms-service.js";
 import {
   measurePlainTextContent,
@@ -176,11 +176,7 @@ export class TsTuiMvpApp {
   private readonly menuBar: Box;
   private readonly desktop: Box;
   private readonly statusLine: Box;
-  private statusKaomoji?: Box;
-  private statusIdentity?: Box;
-  private kaomojiBlink = false;
-  private desktopChromeless = false;
-  private kaomojiTimer?: NodeJS.Timeout;
+  private readonly shellChrome: ShellChromeController;
   private readonly menus: MenuConfig[];
   private readonly commands: CommandRegistry;
   private readonly menuUi: MenuOverlayManager;
@@ -253,6 +249,23 @@ export class TsTuiMvpApp {
       }
     });
 
+    this.shellChrome = new ShellChromeController({
+      screen: this.screen,
+      menuBar: this.menuBar,
+      desktop: this.desktop,
+      statusLine: this.statusLine,
+      getInstanceDisplayLabel: () => this.getInstanceDisplayLabel(),
+      getDesktopState: () => this.state.sync(),
+      getScrambleFace: () =>
+        this.scrambleBrain.sleeping ? "(-.-)"
+        : this.scrambleBrain.status === "thinking" ? "(o.O)"
+        : this.scrambleBrain.status === "error" ? "(x.x)"
+        : this.scrambleBrain.status === "offline" ? "(-.-)"
+        : "(=^=)",
+      onResize: () => this.syncLiveState(),
+      onRestart: () => this.devRestart(),
+    });
+
     // App-level render policy lives here.
     // Converted core owners request sync/persist/render intent through the scheduler.
     // Direct screen.render() still exists in unconverted windows and a few shell-only
@@ -267,7 +280,7 @@ export class TsTuiMvpApp {
       this.desktop,
       this.invalidation,
       () => {
-        this.repaintDesktop();
+        this.shellChrome.repaintDesktop();
         this.invalidation.requestSync();
       },
       (window, x, y) => this.openWindowContextMenu(window, x, y),
@@ -423,38 +436,7 @@ export class TsTuiMvpApp {
   }
 
   private renderChrome(): void {
-    this.updateStatusLine();
-    this.repaintDesktop();
-    if (appFlags().dev) this.renderDevControls();
-    this.renderTopIdentity();
-    this.renderTopKaomoji();
-    this.startKaomojiBlink();
-    this.screen.on("resize", () => {
-      this.repaintDesktop();
-      this.syncLiveState();
-      this.renderTopIdentity();
-      this.renderTopKaomoji();
-      this.screen.render();
-    });
-  }
-
-  /** Dev-mode controls: restart button top-right, Ctrl+R to restart. */
-  private renderDevControls(): void {
-    const t = theme();
-    const restartBtn = blessed.box({
-      parent: this.screen,
-      top: 0,
-      right: 0,
-      height: 1,
-      width: 5,
-      tags: true,
-      content: " ↻  ",
-      style: { ...t.menuBar, hover: t.selected },
-      mouse: true,
-      clickable: true,
-    });
-    restartBtn.on("click", () => this.devRestart());
-    this.screen.key(["C-r"], () => this.devRestart());
+    this.shellChrome.init();
   }
 
   /** Save workspace, quit, then send Up arrow to terminal so last command is ready to re-run. */
@@ -464,6 +446,7 @@ export class TsTuiMvpApp {
     } catch {
       /* best effort */
     }
+    this.shellChrome.destroy();
     this.screen.destroy();
     // After blessed releases the terminal, send Up arrow keystroke
     // so the shell shows the last command (e.g. bun run dev) ready to press Enter
@@ -473,99 +456,10 @@ export class TsTuiMvpApp {
     }, 300);
   }
 
-  private getStatusKaomoji(): string {
-    // Old arms (double-width): this.kaomojiBlink ? "༼つ-‿-‿-༽つ" : "༼つ◕‿◕‿◕༽つ";
-    return this.kaomojiBlink ? "༼ﾂ-‿-‿-༽ﾂ" : "༼ﾂ◕‿◕‿◕༽ﾂ";
-  }
-
-  private startKaomojiBlink(): void {
-    if (this.kaomojiTimer) return;
-    const scheduleNext = () => {
-      const delay = 120_000 + Math.random() * 60_000; // 2-3 minutes
-      this.kaomojiTimer = setTimeout(() => {
-        this.kaomojiBlink = true;
-        this.renderTopKaomoji();
-        this.screen.render();
-        setTimeout(() => {
-          this.kaomojiBlink = false;
-          this.renderTopKaomoji();
-          this.screen.render();
-          scheduleNext();
-        }, 250);
-      }, delay);
-    };
-    scheduleNext();
-  }
-
-  private renderTopKaomoji(): void {
-    const text = this.getStatusKaomoji();
-    const identityWidth = stringWidth(` ${this.getInstanceDisplayLabel()} `);
-    const baseOffset = appFlags().dev ? 6 : 1;
-    const rightOffset = Math.max(0, baseOffset + identityWidth);
-    const width = Math.max(1, stringWidth(text));
-    if (!this.statusKaomoji) {
-      this.statusKaomoji = blessed.box({
-        parent: this.menuBar,
-        top: 0,
-        right: rightOffset,
-        height: 1,
-        width,
-        tags: true,
-        content: text,
-        style: theme().menuBar,
-      });
-      return;
-    }
-    this.statusKaomoji.right = rightOffset;
-    this.statusKaomoji.width = width;
-    this.statusKaomoji.setContent(text);
-    this.statusKaomoji.style = theme().menuBar;
-  }
-
   private getInstanceDisplayLabel(): string {
     return this.instanceLabel
       ? `${this.instanceLabel} · ${this.sessionId}`
       : this.sessionId;
-  }
-
-  private renderTopIdentity(): void {
-    const text = ` ${this.getInstanceDisplayLabel()} `;
-    const rightOffset = Math.max(0, appFlags().dev ? 6 : 1);
-    const width = Math.max(1, stringWidth(text));
-    if (!this.statusIdentity) {
-      this.statusIdentity = blessed.box({
-        parent: this.menuBar,
-        top: 0,
-        right: rightOffset,
-        height: 1,
-        width,
-        tags: true,
-        content: text,
-        style: theme().menuBar,
-      });
-      return;
-    }
-    this.statusIdentity.right = rightOffset;
-    this.statusIdentity.width = width;
-    this.statusIdentity.setContent(text);
-    this.statusIdentity.style = theme().menuBar;
-  }
-
-  private updateStatusLine(): void {
-    const current = this.state.sync();
-    const focus = current.windows.find((window) => window.focused);
-    const focusSummary = focus
-      ? ` Focus ${focus.id}:${focus.kind} ${focus.width ?? "?"}x${focus.height ?? "?"}@${focus.left ?? 0},${focus.top ?? 0}`
-      : " Focus none";
-    const left = `Alt-F File  Alt-E Edit  Alt-V View  Alt-W Window  Alt-A Applications  Tab Next  Shift-Tab Prev  Alt-Shift-Arrows Resize  Ctrl-S Save  Ctrl-Q Quit  |  Term ${current.screen.width}x${current.screen.height}  Theme ${themeName()}  Windows ${current.screen.openWindowCount}${focusSummary}`;
-    const scrFace = this.scrambleBrain.sleeping ? "(-.-)" :
-      this.scrambleBrain.status === "thinking" ? "(o.O)" :
-      this.scrambleBrain.status === "error"    ? "(x.x)" :
-      this.scrambleBrain.status === "offline"  ? "(-.-)" : "(=^=)";
-    const scrLabel = ` ${scrFace}`;
-    const width = Math.max(1, Number(this.screen.width));
-    const trimLeft = left.slice(0, width - scrLabel.length);
-    this.statusLine.setContent(trimLeft.padEnd(width - scrLabel.length) + scrLabel);
   }
 
   private toggleTheme(): void {
@@ -609,39 +503,12 @@ export class TsTuiMvpApp {
   /** Apply current theme tokens to all shell chrome and open windows. */
   private applyTheme(): void {
     log.app(`theme → ${themeName()}`);
-    this.menuBar.style = theme().menuBar;
-    this.desktop.style = theme().desktop;
-    this.statusLine.style = theme().statusLine;
     this.menuUi.restyle();
     this.customCursor?.restyle();
     this.windowManager.restyleAll();
-    this.renderTopIdentity();
-    this.renderTopKaomoji();
-    this.repaintDesktop();
+    this.shellChrome.applyTheme();
     this.persistState();
     this.screen.render();
-  }
-
-  private repaintDesktop(): void {
-    const width = Math.max(1, Number(this.screen.width));
-    const height = Math.max(1, Number(this.screen.height) - 2);
-    const pattern = theme().desktopPattern;
-    if (pattern && pattern.length > 0) {
-      const rows: string[] = [];
-      for (let y = 0; y < height; y++) {
-        const patRow = pattern[y % pattern.length];
-        let line = "";
-        while (line.length < width) line += patRow;
-        rows.push(line.slice(0, width));
-      }
-      this.desktop.setContent(rows.join("\n"));
-    } else {
-      const fill = theme().desktopFillChar || " ";
-      const line = fill.repeat(width);
-      this.desktop.setContent(
-        Array.from({ length: height }, () => line).join("\n"),
-      );
-    }
   }
 
   /** Global input contract: menu triggers, window cycling/resizing, editor save, mouse delegation. */
@@ -727,19 +594,7 @@ export class TsTuiMvpApp {
   }
 
   private toggleDesktopChrome(): void {
-    this.desktopChromeless = !this.desktopChromeless;
-    if (this.desktopChromeless) {
-      this.menuBar.hide();
-      this.statusLine.hide();
-      this.desktop.top = 0 as any;
-      this.desktop.bottom = 0 as any;
-    } else {
-      this.menuBar.show();
-      this.statusLine.show();
-      this.desktop.top = 1 as any;
-      this.desktop.bottom = 1 as any;
-    }
-    this.screen.render();
+    this.shellChrome.toggleDesktopChrome();
   }
 
   private findWindowByAppType(appType: AppType): WindowRecord | undefined {
@@ -1207,7 +1062,7 @@ export class TsTuiMvpApp {
         windowManager: this.windowManager,
         brain: this.scrambleBrain,
         initialPos,
-        onStateChanged: () => this.updateStatusLine(),
+        onStateChanged: () => this.shellChrome.updateStatusLine(),
         onOpenLog: () => {
           const lp = this.scrambleBrain.logPath;
           if (!lp) return;
@@ -1229,7 +1084,7 @@ export class TsTuiMvpApp {
       windowManager: this.windowManager,
       brain: this.scrambleBrain,
       initialMode,
-      onStateChanged: () => this.updateStatusLine(),
+      onStateChanged: () => this.shellChrome.updateStatusLine(),
       onPopOut: () => {
         // Abort any in-flight send, then close popup and open floating
         this.scrambleBrain.abort();
@@ -1964,7 +1819,7 @@ export class TsTuiMvpApp {
         if (win?.writeInput) {
           win.writeInput(text);
         } else {
-          void this.scrambleBrain.send(text).then(() => this.updateStatusLine());
+          void this.scrambleBrain.send(text).then(() => this.shellChrome.updateStatusLine());
         }
       },
       scrambleExpand: () => {
@@ -1982,18 +1837,18 @@ export class TsTuiMvpApp {
         }
       },
       scramblePet: () => {
-        void this.scrambleBrain.send("/pet").then(() => this.updateStatusLine());
+        void this.scrambleBrain.send("/pet").then(() => this.shellChrome.updateStatusLine());
         const win = this.findWindowByAppType("companion-widget");
         win?.writeInput?.("/pet");
       },
       scrambleSleep: () => {
-        void this.scrambleBrain.send("/sleep").then(() => this.updateStatusLine());
+        void this.scrambleBrain.send("/sleep").then(() => this.shellChrome.updateStatusLine());
       },
       scrambleWake: () => {
-        void this.scrambleBrain.send("/wake").then(() => this.updateStatusLine());
+        void this.scrambleBrain.send("/wake").then(() => this.shellChrome.updateStatusLine());
       },
       scrambleMeow: () => {
-        void this.scrambleBrain.send("/meow").then(() => this.updateStatusLine());
+        void this.scrambleBrain.send("/meow").then(() => this.shellChrome.updateStatusLine());
         const win = this.findWindowByAppType("companion-widget");
         win?.writeInput?.("/meow");
       },
@@ -2168,19 +2023,20 @@ export class TsTuiMvpApp {
   /** Cheap live state sync: rebuild in-memory state and update status line. No disk write, no listener fanout.
    *  Use for routine mutations: drag, resize, focus, typing, window-internal state changes. */
   private syncLiveState(): void {
-    this.updateStatusLine();
+    this.shellChrome.updateStatusLine();
   }
 
   /** Expensive state checkpoint: rebuild, write to disk, fire listeners.
    *  Use for significant events: startup, theme change, workspace load/save, editor save. */
   private persistState(): void {
-    this.updateStatusLine();
+    this.shellChrome.updateStatusLine();
     this.state.persistAndNotify();
   }
 
   private destroy(): void {
     this.autoSaveWorkspace();
     this.controlApi.stop();
+    this.shellChrome.destroy();
     this.screen.destroy();
     process.exit(0);
   }

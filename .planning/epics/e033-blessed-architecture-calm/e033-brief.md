@@ -165,7 +165,7 @@ After E033:
 | S01 | done | none | medium | Render scheduler and explicit invalidation policy |
 | S02 | done | S01 | medium | Local model/update/render pilot for live windows |
 | S03 | done | S01 | medium | Microapp host lifecycle, redraw, and state contract |
-| S04 | not-started | none | medium | Thin the composition root |
+| S04 | in-progress | none | medium | Thin the composition root |
 | S05 | not-started | none | medium | API contract audit and control-surface cleanup |
 | S06 | not-started | none | medium | Cell-aware text correctness and Unicode discipline |
 | S07 | not-started | none, then coordinate with S01 | medium | Visual regression, render telemetry, and dense-scene performance checks |
@@ -180,7 +180,7 @@ After E033:
 - [x] S01 — Render scheduler and explicit invalidation policy
 - [x] S02 — Local model/update/render pilot for live windows
 - [x] S03 — Microapp host lifecycle, redraw, and state contract
-- [ ] S04 — Thin the composition root
+- [~] S04 — Thin the composition root
 - [ ] S05 — API contract audit and control-surface cleanup
 - [ ] S06 — Cell-aware text correctness and Unicode discipline
 - [ ] S07 — Visual regression, render telemetry, and dense-scene performance checks
@@ -458,7 +458,7 @@ contract remains future work for S11 and S12.
 
 ## S04 — Thin the composition root
 
-Status: not-started
+Status: in-progress
 Depends on: S01
 Risk: medium
 
@@ -481,11 +481,11 @@ obviously in charge of wiring rather than detailed feature policy.
 
 ### Tasks
 
-- [ ] identify one coherent extraction seam besides editor handling
-- [ ] extract a focused collaborator or family coordinator
-- [ ] reduce opportunistic utility logic in `app-controller.ts`
-- [ ] keep dependency wiring explicit rather than hidden through globals
-- [ ] preserve command, API, and workspace restore behaviour
+- [x] identify one coherent extraction seam besides editor handling
+- [x] extract a focused collaborator or family coordinator
+- [x] reduce opportunistic utility logic in `app-controller.ts`
+- [x] keep dependency wiring explicit rather than hidden through globals
+- [x] preserve command, API, and workspace restore behaviour
 
 ### Acceptance criteria
 
@@ -498,9 +498,17 @@ obviously in charge of wiring rather than detailed feature policy.
 
 ### Verification
 
-- [ ] startup, menuing, workspace restore, and control API still function
-- [ ] touched window families still open via commands and restore correctly
-- [ ] no regressions in `/commands/list`, `/state`, or window focus behaviour
+- [x] startup, menuing, workspace restore, and control API still function
+- [x] touched window families still open via commands and restore correctly
+- [x] no regressions in `/commands/list`, `/state`, or window focus behaviour
+
+### Current outcome note
+
+A new `src/core/shell-chrome.ts` collaborator now owns desktop wallpaper,
+status-line rendering, top identity widgets, dev restart chrome, resize repaint,
+and chromeless toggling. `app-controller.ts` remains the composition root, but
+this shell-only behaviour is now wired through one focused owner instead of
+sprawling across the controller body.
 
 ### Out of scope for this story
 
