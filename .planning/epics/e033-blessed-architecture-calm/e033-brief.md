@@ -402,7 +402,7 @@ heartbeat, and patchbay-lab.
 
 ### Tasks
 
-- [ ] audit the current `createWindow()` registration flow and document why the defer exists
+- [x] audit the current `createWindow()` registration flow and document why the defer exists
 - [ ] replace or reduce `setTimeout(ensureRegistered, 0)` lifecycle reliance only if an explicit lifecycle hook preserves the same guarantees
 - [ ] define explicit redraw/invalidate guidance for modules
 - [ ] tighten `describeState()` expectations for microapps
@@ -413,7 +413,7 @@ heartbeat, and patchbay-lab.
 
 ### Acceptance criteria
 
-- [ ] AC-1: microapp registration semantics are explicit and documented, including the ordering guarantee that the old defer was providing
+- [x] AC-1: microapp registration semantics are explicit and documented, including the ordering guarantee that the old defer was providing
 - [ ] AC-2: redraw/invalidation policy for microapps is clearer than “call `host.screen.render()` whenever”
 - [ ] AC-3: at least two representative modules use the new pattern cleanly
 - [ ] AC-4: module `describeState()` remains trustworthy for `/state` and agent use

@@ -140,8 +140,10 @@ export interface MicroappWindowHandle {
 
   onCleanup(fn: () => void): void;
   onRestyle(fn: () => void): void;
+  /** Called after window geometry changes. Use this as the microapp's re-layout seam. */
   onResize(fn: () => void): void;
   onInput(fn: (input: string) => void): void;
+  /** Semantic state only — this feeds /state and workspace snapshots. */
   describeState(fn: () => MicroappStateDetails): void;
   captureText(fn: () => string): void;
 
@@ -214,8 +216,11 @@ function createMicroappHost(
         summary: manifest.title,
       });
 
-      // Defer registerWindow until next tick so the microapp can wire up
-      // describeState, cleanup, onRestyle, etc. before the first state sync.
+      // Registration is intentionally delayed until after createWindow() returns.
+      // Ordering guarantee: microapps get one synchronous setup pass to attach
+      // describeState, cleanup, onRestyle, refresh, and focus target before the
+      // first registerWindow() call triggers state sync and focus side effects.
+      // Prefer a microtask over setTimeout(0): same guarantee, less event-loop drift.
       let registered = false;
       const ensureRegistered = () => {
         if (registered) return;
@@ -223,8 +228,7 @@ function createMicroappHost(
         windowManager.registerWindow(frame);
         frame.focus();
       };
-      // Auto-register on next tick if the microapp hasn't triggered it
-      setTimeout(ensureRegistered, 0);
+      queueMicrotask(ensureRegistered);
 
       const handle: MicroappWindowHandle = {
         get id() { return frame.id; },
