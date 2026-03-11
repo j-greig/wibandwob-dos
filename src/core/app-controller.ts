@@ -70,6 +70,7 @@ import {
 import { WindowManager } from "./window-manager.js";
 import { createRenderScheduler, type RenderScheduler } from "./render-scheduler.js";
 import { ShellChromeController } from "./shell-chrome.js";
+import { RuntimeStatsController } from "./runtime-stats.js";
 import { BackroomsService } from "../services/backrooms-service.js";
 import {
   measurePlainTextContent,
@@ -177,6 +178,7 @@ export class TsTuiMvpApp {
   private readonly desktop: Box;
   private readonly statusLine: Box;
   private readonly shellChrome: ShellChromeController;
+  private readonly runtimeStats: RuntimeStatsController;
   private readonly menus: MenuConfig[];
   private readonly commands: CommandRegistry;
   private readonly menuUi: MenuOverlayManager;
@@ -264,6 +266,12 @@ export class TsTuiMvpApp {
         : "(=^=)",
       onResize: () => this.syncLiveState(),
       onRestart: () => this.devRestart(),
+    });
+    this.runtimeStats = new RuntimeStatsController({
+      screen: this.screen,
+      menuBar: this.menuBar,
+      enabled: appFlags().stats,
+      getAgentSnapshot: () => this.activeAgentSession?.getSnapshot(),
     });
 
     // App-level render policy lives here.
@@ -397,6 +405,7 @@ export class TsTuiMvpApp {
     this.menus.push(...this.commands.buildMenus());
 
     this.renderChrome();
+    this.runtimeStats.init();
     this.bindGlobalKeys();
     this.menuUi.bindMenuClicks((label) => this.openMenu(label));
     this.restoreDefaultWorkspace();
@@ -446,6 +455,7 @@ export class TsTuiMvpApp {
     } catch {
       /* best effort */
     }
+    this.runtimeStats.destroy();
     this.shellChrome.destroy();
     this.screen.destroy();
     // After blessed releases the terminal, send Up arrow keystroke
@@ -507,6 +517,7 @@ export class TsTuiMvpApp {
     this.customCursor?.restyle();
     this.windowManager.restyleAll();
     this.shellChrome.applyTheme();
+    this.runtimeStats.applyTheme();
     this.persistState();
     this.screen.render();
   }
@@ -2036,6 +2047,7 @@ export class TsTuiMvpApp {
   private destroy(): void {
     this.autoSaveWorkspace();
     this.controlApi.stop();
+    this.runtimeStats.destroy();
     this.shellChrome.destroy();
     this.screen.destroy();
     process.exit(0);

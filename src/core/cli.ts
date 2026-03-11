@@ -10,6 +10,8 @@ import { parseArgs } from "node:util";
 export interface AppFlags {
   /** Dev mode: reload button, Ctrl+R hot reload, extra diagnostics. */
   dev: boolean;
+  /** Show runtime stats badge in shell chrome. */
+  stats: boolean;
   /** Enable custom cursor overlay (hides system cursor). Off by default. */
   customCursor: boolean;
   /** Show help and exit. */
@@ -18,6 +20,7 @@ export interface AppFlags {
 
 const FLAG_DEFS = {
   dev:           { type: "boolean" as const, default: false, description: "Dev mode: reload button (Ctrl+R), auto-save on reload" },
+  stats:         { type: "boolean" as const, default: false, description: "Show runtime stats badge (render FPS, frame ms, RAM, agent activity)" },
   "custom-cursor": { type: "boolean" as const, default: false, description: "Enable custom TUI cursor overlay" },
   help:          { type: "boolean" as const, short: "h", default: false, description: "Show this help" },
 };
@@ -36,6 +39,7 @@ export function parseAppFlags(): AppFlags {
 
   parsed = {
     dev: Boolean(values.dev),
+    stats: Boolean(values.stats),
     customCursor: Boolean(values["custom-cursor"]),
     help: Boolean(values.help),
   };

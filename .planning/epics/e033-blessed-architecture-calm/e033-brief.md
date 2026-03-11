@@ -169,7 +169,7 @@ After E033:
 | S05 | not-started | none | medium | API contract audit and control-surface cleanup |
 | S06 | not-started | none | medium | Cell-aware text correctness and Unicode discipline |
 | S07 | not-started | none, then coordinate with S01 | medium | Visual regression, render telemetry, and dense-scene performance checks |
-| S08 | not-started | none, then coordinate with S01 and S07 | medium | Runtime telemetry, stats surface, and agent/session health metrics |
+| S08 | in-progress | none, then coordinate with S01 and S07 | medium | Runtime telemetry, stats surface, and agent/session health metrics |
 | S09 | not-started | none | medium | WibWobTUI macOS-ification for app launch and switching |
 | S10 | not-started | S03 | low | Third-party developer docs for building custom apps in `/modules` |
 | S11 | not-started | S03, S07 | medium | Composable animated surfaces for zine, touchlab, and future dashboard modules |
@@ -184,7 +184,7 @@ After E033:
 - [ ] S05 — API contract audit and control-surface cleanup
 - [ ] S06 — Cell-aware text correctness and Unicode discipline
 - [ ] S07 — Visual regression, render telemetry, and dense-scene performance checks
-- [ ] S08 — Runtime telemetry, stats surface, and agent/session health metrics
+- [~] S08 — Runtime telemetry, stats surface, and agent/session health metrics
 - [ ] S09 — WibWobTUI macOS-ification for app launch and switching
 - [ ] S10 — Third-party developer docs for custom modules
 - [ ] S11 — Composable animated surfaces for zine, touchlab, and future dashboard modules
@@ -756,7 +756,7 @@ Minimum must-test anchors from the human's explicit list:
 
 ## S08 — Runtime telemetry, stats surface, and agent/session health metrics
 
-Status: not-started
+Status: in-progress
 Depends on: none, then coordinate with S01 and S07
 Risk: medium
 
@@ -804,13 +804,13 @@ Reference bug / architecture anchor for terminal recursion work:
 
 ### Tasks
 
-- [ ] wire the existing render monitor into the shell in a controlled way
-- [ ] decide the first operator surface: top-right indicator, help-menu diagnostics window, command palette action, or small diagnostics microapp
-- [ ] decide the first debug gate: env var, startup flag, dev-only surface, or explicit command
-- [ ] expose at least render FPS, frame timing, and RAM usage in the chosen surface
-- [ ] add a first pass at agent/session health stats that are actually useful, such as active agent window/session presence, turn/streaming status, or message/tool counts where available
+- [x] wire the existing render monitor into the shell in a controlled way
+- [x] decide the first operator surface: top-right indicator, help-menu diagnostics window, command palette action, or small diagnostics microapp
+- [x] decide the first debug gate: env var, startup flag, dev-only surface, or explicit command
+- [x] expose at least render FPS, frame timing, and RAM usage in the chosen surface
+- [x] add a first pass at agent/session health stats that are actually useful, such as active agent window/session presence, turn/streaming status, or message/tool counts where available
 - [ ] test recursive WibWob-DOS-in-terminal runs and record what still works at multiple depths, including API reachability and agent affordances
-- [ ] keep the surface lightweight and non-invasive, ideally dev-only by default if always visible chrome would clutter the desktop
+- [x] keep the surface lightweight and non-invasive, ideally dev-only by default if always visible chrome would clutter the desktop
 - [ ] document how operators turn the stats surface on and what each metric means
 
 ### Acceptance criteria
@@ -828,11 +828,22 @@ Reference bug / architecture anchor for terminal recursion work:
 
 ### Verification
 
-- [ ] enable the stats surface and verify FPS/frame timing/RAM visibly update during runtime
+- [x] enable the stats surface and verify FPS/frame timing/RAM visibly update during runtime
 - [ ] confirm the render numbers change under a dense-scene benchmark rather than staying static
 - [ ] confirm at least one agent/session metric changes meaningfully during agent activity
 - [ ] run at least a recursive terminal smoke path and record what happens to FPS/RAM/agent affordances across depth
-- [ ] visually verify the diagnostics surface does not make the normal desktop unusable
+- [x] visually verify the diagnostics surface does not make the normal desktop unusable
+
+### Current outcome note
+
+A first S08 slice is landed but not closed. The shell now has an optional
+runtime stats badge controlled by the `--stats` CLI flag. It reports shell-level
+render FPS, average frame time, RAM usage, and basic in-app agent activity.
+The implementation lives in `src/core/runtime-stats.ts` and is wired from
+`app-controller.ts`.
+
+This remains in-progress because recursive terminal smoke and a fuller operator
+workflow note are still outstanding.
 
 ### Out of scope for this story
 
