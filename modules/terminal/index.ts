@@ -194,8 +194,12 @@ function openTerminal(host: MicroappHost) {
   win.onCleanup(() => {
     if (bridge && !bridgeDead) {
       bridge.stdin?.write("\x00" + JSON.stringify({ type: "kill" }) + "\n");
-      setTimeout(() => bridge?.kill(), 500);
+      // SIGTERM immediately, SIGKILL after 1s fallback
+      try { bridge.kill("SIGTERM"); } catch { /* already dead */ }
+      const b = bridge;
+      setTimeout(() => { try { b.kill("SIGKILL"); } catch { /* ok */ } }, 1000);
     }
+    bridge = null;
     bridgeDead = true;
   });
 
@@ -203,21 +207,48 @@ function openTerminal(host: MicroappHost) {
   // _onData handler sees screen.focused === term and forwards keystrokes
   win.setFocusTarget(term);
 
-  // Click inside terminal → grab focus
-  term.on("click", () => { term.focus(); });
-  body.on("click", () => { term.focus(); });
+  // Click inside terminal → grab focus (aggressive: both term and body)
+  term.on("click", () => { term.focus(); host.screen.render(); });
+  body.on("click", () => { term.focus(); host.screen.render(); });
+  // Also grab focus when the window gets focus from the window manager
+  body.on("focus", () => { term.focus(); });
 
-  // Fix blessed Terminal mouse y-offset bug: the built-in handler uses
-  // y = data.y - self.atop but doesn't subtract 1 for the 0-indexed
-  // term.js grid. Patch by overriding the screen mouse listener.
-  if (term._onData) {
-    // Remove blessed's built-in raw input listener — we handle it ourselves
-    // (the handler callback already receives keystrokes via the bootstrap)
+  // Fix blessed Terminal mouse y-offset: the built-in handler in terminal.js
+  // removes the old screen 'mouse' listener at bootstrap but we need to patch
+  // the coordinate translation. Remove blessed's handler, add our own.
+  if (term._mouseHandler) {
+    host.screen.removeListener("mouse", term._mouseHandler);
   }
-  // Monkey-patch: shift mouse y by -1 inside the terminal's screen event
-  const origOnScreenEvent = term.onScreenEvent.bind(term);
-  // The terminal already registered a 'mouse' screen event in bootstrap().
-  // We can't easily patch that, but we CAN adjust the term.js write offset.
+  // Re-register with corrected y offset (subtract itop for chrome row)
+  const mouseHandler = (data: any) => {
+    if (host.screen.focused !== term) return;
+    // Bounds check
+    if (data.x < term.aleft + term.ileft) return;
+    if (data.y < term.atop + term.itop) return;
+    if (data.x > term.aleft - term.ileft + term.width) return;
+    if (data.y > term.atop - term.itop + term.height) return;
+    // Check if term.js has mouse enabled
+    const t = term.term;
+    if (!(t.x10Mouse || t.vt200Mouse || t.normalMouse || t.mouseEvents
+        || t.utfMouse || t.sgrMouse || t.urxvtMouse)) return;
+
+    const b = data.raw[0];
+    const x = data.x - term.aleft - term.ileft;
+    const y = data.y - term.atop - term.itop;  // key fix: subtract itop
+
+    let s: string;
+    if (t.sgrMouse) {
+      const bb = host.screen.program.sgrMouse ? b : b - 32;
+      s = `\x1b[<${bb};${x};${y}${data.action === "mousedown" ? "M" : "m"}`;
+    } else {
+      const bb = host.screen.program.sgrMouse ? b + 32 : b;
+      s = "\x1b[M" + String.fromCharCode(bb)
+        + String.fromCharCode(x + 32) + String.fromCharCode(y + 32);
+    }
+    term.handler(s);
+  };
+  (term as any)._mouseHandler = mouseHandler;
+  host.screen.on("mouse", mouseHandler);
 
   term.focus();
   host.screen.render();
