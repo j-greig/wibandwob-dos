@@ -6,6 +6,7 @@
  * Toolbar: [<] [>] [URL input field] [Go] [Reload] [Search]
  */
 
+import fs from "node:fs";
 import blessed from "blessed";
 import { theme } from "../core/theme/resolver.js";
 import { createScrollbar } from "../core/ui-primitives.js";
@@ -174,7 +175,14 @@ export function openChromeBrowserWindow(params: {
     screen.render();
   };
 
-  const postProcessImages = async (result: BrowseResult, token: number) => {
+  /** After navigate: fetch images via Chrome session, disconnect, start hydration */
+  const finishNavigation = async (result: BrowseResult, token: number) => {
+    const imagePaths = result.ok ? await service.fetchImagesViaChrome(result.markdown) : new Map<string, string>();
+    service.disconnect();
+    void postProcessImages(result, token, imagePaths);
+  };
+
+  const postProcessImages = async (result: BrowseResult, token: number, imagePaths?: Map<string, string>) => {
     if (!result.ok || !result.markdown.includes("![")) return;
 
     // Collect alt texts from the original markdown
@@ -185,17 +193,26 @@ export function openChromeBrowserWindow(params: {
     }
     if (images.length === 0) return;
 
-    // Convert each image individually (subprocess, non-blocking)
+    // Convert each image — use pre-fetched local files when available,
+    // fall back to URL-based hydrator for anything Chrome didn't fetch
     const chafaBlocks = new Map<string, string>();
     for (const { alt, src } of images) {
       if (chafaBlocks.size >= 3) break; // max 3 images
-      const singleMd = `![${alt}](${src})`;
+      const localPath = imagePaths?.get(src);
+      let singleMd: string;
+      if (localPath) {
+        // Chrome already fetched this image — use local file path
+        singleMd = `![${alt}](file://${localPath})`;
+      } else {
+        singleMd = `![${alt}](${src})`;
+      }
       const hydrated = await service.renderImagesAsAscii(singleMd);
       if (token !== navigationToken) return; // stale navigation
-      // If hydration produced ANSI output, store it keyed by alt text
       if (hydrated && hydrated !== singleMd && hydrated.includes("\x1b[")) {
         chafaBlocks.set(alt, hydrated.trim());
       }
+      // Clean up local file
+      if (localPath) try { fs.unlinkSync(localPath); } catch {}
     }
     if (chafaBlocks.size === 0) return;
 
@@ -264,8 +281,7 @@ export function openChromeBrowserWindow(params: {
 
     const result = await service.navigate(url);
     showResult(result);
-    service.disconnect();
-    void postProcessImages(result, token);
+    void finishNavigation(result, token);
 
     if (result.ok && pushHistory) {
       // Trim forward history when navigating from a back position
@@ -289,8 +305,7 @@ export function openChromeBrowserWindow(params: {
     const url = history[historyIndex];
     const result = await service.navigate(url);
     showResult(result);
-    service.disconnect();
-    void postProcessImages(result, token);
+    void finishNavigation(result, token);
   };
 
   const goForward = async () => {
@@ -305,8 +320,7 @@ export function openChromeBrowserWindow(params: {
     const url = history[historyIndex];
     const result = await service.navigate(url);
     showResult(result);
-    service.disconnect();
-    void postProcessImages(result, token);
+    void finishNavigation(result, token);
   };
 
   const doReload = async () => {
@@ -316,8 +330,7 @@ export function openChromeBrowserWindow(params: {
     setStatus(`Reloading ${currentUrl}...`);
     const result = await service.navigate(currentUrl);
     showResult(result);
-    service.disconnect();
-    void postProcessImages(result, token);
+    void finishNavigation(result, token);
   };
 
   const submitUrl = () => {

@@ -119,13 +119,21 @@ Known-pattern matchers for common frameworks:
 | SPA with hash routing | URL has `#/` or empty body | Wait longer, check for React root |
 | Paywall soft-wall | `<meta name="robots" content="noarchive">` | Try Google cache URL |
 
-## Implementation priority
+## Implemented (2026-03-11)
 
-1. **Layer 1** (smart waiting + scroll trigger) — biggest bang, ~1 day
-2. **Layer 3** (image discovery) — CSS backgrounds + OG tags, ~half day
-3. **Layer 2** (multi-pass fallback) — catches thin extractions, ~half day
-4. **Layer 4** (scroll capture) — nice to have, ~1 day
-5. **Layer 5** (site adapters) — only when specific sites matter
+- **Scroll trigger**: scroll to bottom + wait 1.5s before extraction (IntersectionObserver)
+- **Thin-content DOM walk**: if Readability < 500 chars, structured walk of
+  `main/article/[role=main]` extracting headings, paragraphs, lists, images
+- **Chrome session image fetch**: `fetchImagesViaChrome()` uses `page.evaluate(fetch())`
+  to download images through Chrome's session (same cookies, CDN auth, CORS).
+  Saved to /tmp, passed as `file://` paths to hydrator. No more curl.
+
+## Implementation priority (remaining)
+
+1. **CSS background-image discovery** — scan computed styles, ~half day
+2. **OG/meta image fallback** — og:image, twitter:image as hero, ~1 hour
+3. **Scroll-and-capture for infinite content** — N viewport scrolls, ~1 day
+4. **Site-specific adapters** — only when specific sites matter
 
 ## Measurement
 

@@ -210,6 +210,15 @@ export class ChromeBrowserService {
         });
       }).catch(() => {});
 
+      // Scroll to bottom and back to trigger IntersectionObserver lazy loads
+      await this.page!.evaluate(async () => {
+        const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
+        window.scrollTo(0, document.body.scrollHeight);
+        await delay(1500);
+        window.scrollTo(0, 0);
+        await delay(500);
+      }).catch(() => {});
+
       // Get HTML via CDP (works even with TrustedScriptURL restrictions)
       const client = await this.page!.createCDPSession();
       const { root } = await client.send("DOM.getDocument", {
@@ -256,6 +265,49 @@ export class ChromeBrowserService {
         }
       }
 
+      // Thin-content detection: if Readability returned very little,
+      // try a structured DOM walk of the rendered page
+      if (markdown.length < 500) {
+        try {
+          const domText = await this.page!.evaluate(() => {
+            const root = document.querySelector("main, article, [role='main']") || document.body;
+            // Remove noise elements
+            root.querySelectorAll("nav, footer, header, aside, script, style, noscript").forEach(el => el.remove());
+            // Walk visible elements and extract structured text
+            const lines: string[] = [];
+            const walk = (el: Element) => {
+              const style = window.getComputedStyle(el);
+              if (style.display === "none" || style.visibility === "hidden") return;
+              const tag = el.tagName.toLowerCase();
+              if (tag === "img") {
+                const src = (el as HTMLImageElement).src;
+                const alt = el.getAttribute("alt") || "";
+                if (src && !src.includes("data:")) lines.push(`![${alt}](${src})`);
+                return;
+              }
+              if (/^h[1-6]$/.test(tag)) {
+                const level = parseInt(tag[1]!);
+                const text = el.textContent?.trim();
+                if (text) lines.push("\n" + "#".repeat(level) + " " + text + "\n");
+                return;
+              }
+              if (tag === "p" || tag === "li") {
+                const text = el.textContent?.trim();
+                if (text) lines.push((tag === "li" ? "- " : "") + text + "\n");
+                return;
+              }
+              // Recurse into containers
+              for (const child of el.children) walk(child);
+            };
+            walk(root);
+            return lines.join("\n");
+          });
+          if (domText.length > markdown.length) {
+            markdown = domText;
+          }
+        } catch { /* DOM walk failed, keep Readability result */ }
+      }
+
       return { ok: true, url: finalUrl, title, markdown };
     } catch (err) {
       const message =
@@ -268,6 +320,60 @@ export class ChromeBrowserService {
         error: `Navigation failed: ${message}`,
       };
     }
+  }
+
+  /**
+   * Fetch images through Chrome's session context (same cookies, CORS, CDN auth).
+   * Returns map of URL → local /tmp path for images > 150px.
+   * Must be called BEFORE disconnect().
+   */
+  async fetchImagesViaChrome(markdown: string): Promise<Map<string, string>> {
+    const result = new Map<string, string>();
+    if (!this.page) return result;
+
+    const imgRegex = /!\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g;
+    const urls: string[] = [];
+    for (const m of markdown.matchAll(imgRegex)) {
+      if (m[2]) urls.push(m[2]);
+      if (urls.length >= 3) break;
+    }
+    if (urls.length === 0) return result;
+
+    for (const url of urls) {
+      try {
+        const localPath = await this.page.evaluate(async (imgUrl: string) => {
+          try {
+            const resp = await fetch(imgUrl);
+            if (!resp.ok) return null;
+            const blob = await resp.blob();
+            const buf = await blob.arrayBuffer();
+            // Return base64
+            const bytes = new Uint8Array(buf);
+            let binary = "";
+            for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]!);
+            return btoa(binary);
+          } catch { return null; }
+        }, url);
+
+        if (!localPath) continue;
+
+        // Write base64 to temp file
+        const tmpPath = `/tmp/chafa-chrome-${Date.now()}-${Math.random().toString(36).slice(2)}.img`;
+        fs.writeFileSync(tmpPath, Buffer.from(localPath, "base64"));
+
+        // Check dimensions via sips
+        const sipsResult = await this.runCommand("sips", ["-g", "pixelWidth", "-g", "pixelHeight", tmpPath], 3000);
+        const pw = parseInt(sipsResult.stdout.match(/pixelWidth:\s*(\d+)/)?.[1] ?? "0");
+        const ph = parseInt(sipsResult.stdout.match(/pixelHeight:\s*(\d+)/)?.[1] ?? "0");
+        if (pw < 150 || ph < 150) {
+          try { fs.unlinkSync(tmpPath); } catch {}
+          continue;
+        }
+
+        result.set(url, tmpPath);
+      } catch { /* skip this image */ }
+    }
+    return result;
   }
 
   /**

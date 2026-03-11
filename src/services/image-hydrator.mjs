@@ -7,7 +7,7 @@
  * Usage: echo "markdown" | node src/services/image-hydrator.mjs [--symbols braille|block] [--max-images 3] [--max-cols 60]
  */
 import { execFileSync } from "node:child_process";
-import { unlinkSync, writeFileSync } from "node:fs";
+import { unlinkSync, writeFileSync, copyFileSync } from "node:fs";
 
 const args = process.argv.slice(2);
 const symbols = args.includes("--symbols") ? args[args.indexOf("--symbols") + 1] : "braille";
@@ -48,13 +48,20 @@ process.exit(0);
 
 function convertImage(url, cols, syms) {
   const tmpPath = `/tmp/chafa-${Date.now()}-${Math.random().toString(36).slice(2)}.img`;
+  const isLocal = url.startsWith("file://");
+  const localFile = isLocal ? url.slice(7) : null;
   try {
-    // Download
-    execFileSync("curl", [
-      "-sL", "--max-time", "3",
-      "-A", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
-      "-o", tmpPath, url,
-    ], { timeout: 4000 });
+    if (isLocal) {
+      // Already fetched by Chrome — just copy to working path
+      copyFileSync(localFile, tmpPath);
+    } else {
+      // Download via curl (fallback for URLs Chrome didn't pre-fetch)
+      execFileSync("curl", [
+        "-sL", "--max-time", "3",
+        "-A", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+        "-o", tmpPath, url,
+      ], { timeout: 4000 });
+    }
 
     // Check file type
     const fileType = execFileSync("file", ["--brief", tmpPath], { encoding: "utf8", timeout: 2000 }).trim();
