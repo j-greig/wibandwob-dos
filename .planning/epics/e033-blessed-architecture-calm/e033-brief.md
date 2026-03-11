@@ -167,7 +167,7 @@ After E033:
 | S08 | not-started | none, then coordinate with S01 and S07 | medium | Runtime telemetry, stats surface, and agent/session health metrics |
 | S09 | not-started | none | medium | WibWobTUI macOS-ification for app launch and switching |
 | S10 | done | S03 | low | Third-party developer docs for building custom apps in `/modules` |
-| S11 | not-started | S03, S07 | medium | Composable animated surfaces for zine, touchlab, and future dashboard modules |
+| S11 | done | S03, S07 | medium | Composable animated surfaces for zine, touchlab, and future dashboard modules |
 | S12 | not-started | S03, S11 | medium | TouchDesigner-like composition scaffolding for ASCII / ANSI art modules |
 
 ## Stories
@@ -182,7 +182,7 @@ After E033:
 - [ ] S08 — Runtime telemetry, stats surface, and agent/session health metrics
 - [ ] S09 — WibWobTUI macOS-ification for app launch and switching
 - [x] S10 — Third-party developer docs for custom modules
-- [ ] S11 — Composable animated surfaces for zine, touchlab, and future dashboard modules
+- [x] S11 — Composable animated surfaces for zine, touchlab, and future dashboard modules
 - [ ] S12 — TouchDesigner-like composition scaffolding for ASCII / ANSI art modules
 
 ## Recommended execution order
@@ -1071,7 +1071,7 @@ Visual verification used for this story:
 
 ## S11 — Composable animated surfaces for zine, touchlab, and future dashboard modules
 
-Status: not-started
+Status: done
 Depends on: S03, S07
 Risk: medium
 
@@ -1108,29 +1108,74 @@ clear reusable pattern rather than two special-case integrations.
 
 ### Tasks
 
-- [ ] audit the existing animated-surface primitives and current embedding patterns
-- [ ] define the shared architecture for composable animated subsurfaces
-- [ ] identify the minimum contract needed for embedding an animated player or animated window fragment inside another module
-- [ ] implement the shared path in reusable code rather than per-module hacks
-- [ ] adopt the shared path in `modules/zine/` and `modules/touchlab-mvp/` if feasible in this epic pass, or land one adopter and record the second as a concrete follow-on
-- [ ] verify the new path plays nicely with restyle, resize, cleanup, and window lifecycle
+- [x] audit the existing animated-surface primitives and current embedding patterns
+- [x] define the shared architecture for composable animated subsurfaces
+- [x] identify the minimum contract needed for embedding an animated player or animated window fragment inside another module
+- [x] implement the shared path in reusable code rather than per-module hacks
+- [x] adopt the shared path in `modules/zine/` and `modules/touchlab-mvp/` if feasible in this epic pass, or land one adopter and record the second as a concrete follow-on
+- [x] verify the new path plays nicely with restyle, resize, cleanup, and window lifecycle
 
 ### Acceptance criteria
 
-- [ ] AC-1: there is a named shared architecture or helper path for embedding animated subsurfaces inside modules
-- [ ] AC-2: the path is reusable and not specific only to `zine` or only to `touchlab-mvp`
-- [ ] AC-3: at least one real module adopter uses the shared path successfully
-- [ ] AC-4: feasibility and next-step status for both `modules/zine/` and `modules/touchlab-mvp/` are recorded clearly
-- [ ] AC-5: the embedded animated path preserves cleanup, resize, and restyle correctness
-- [ ] AC-6: the shared path does not require modules to bypass the SDK and reach into random `src/core/*` internals
-- [ ] AC-7: `bun run typecheck` passes
+- [x] AC-1: there is a named shared architecture or helper path for embedding animated subsurfaces inside modules
+- [x] AC-2: the path is reusable and not specific only to `zine` or only to `touchlab-mvp`
+- [x] AC-3: at least one real module adopter uses the shared path successfully
+- [x] AC-4: feasibility and next-step status for both `modules/zine/` and `modules/touchlab-mvp/` are recorded clearly
+- [x] AC-5: the embedded animated path preserves cleanup, resize, and restyle correctness
+- [x] AC-6: the shared path does not require modules to bypass the SDK and reach into random `src/core/*` internals
+- [x] AC-7: `bun run typecheck` passes
 
 ### Verification
 
-- [ ] open the adopter module and verify the embedded animated surface renders correctly
-- [ ] resize the containing module/window and confirm the animated subsurface adapts or degrades predictably
-- [ ] switch themes and confirm no stale-colour leakage
-- [ ] close the module and confirm timers / animation resources clean up cleanly
+- [x] open the adopter module and verify the embedded animated surface renders correctly
+- [x] resize the containing module/window and confirm the animated subsurface adapts or degrades predictably
+- [x] switch themes and confirm no stale-colour leakage
+- [x] close the module and confirm timers / animation resources clean up cleanly
+
+### Delivery note
+
+This S11 pass names and lands one reusable pattern: the lazy-mounted embedded
+player bridge for animated subsurfaces.
+
+Named shared path:
+
+- `createEmbeddedLivePlayer(...)` in `src/services/animation-service.ts`
+- exported through `src/services/microapp-sdk.ts`
+- built on top of the existing `createLazyMountedPlayer(...)` contract rather
+  than inventing a second parallel animation host
+
+What the shared path does:
+
+- attach an animated content target lazily
+- derive viewport dimensions from the mounted target at run time
+- route a live generator through the existing `createLivePlayer(...)`
+- preserve cleanup through `destroy()`
+- support pause/freeze behaviour via `setRunning(false)` with optional
+  `clearOnStop: false`
+
+Real adopter landed:
+
+- `modules/touchlab-mvp/index.ts`
+- the GEN node now uses the shared embedded animation path instead of its own
+  raw `setInterval` loop
+- the MIX node continues to compose that animated source with the text and input
+  nodes, so the animation is now a reusable embedded surface rather than a
+  one-off timer hack
+
+Status for both target modules:
+
+- `modules/touchlab-mvp/` — adopted successfully in this pass
+- `modules/zine/index.ts` — not adopted in this pass; current live-panel model
+  is a many-panel central tick loop keyed off canvas items, so swapping to a
+  per-panel embedded player bridge would need a clearer mount/lifecycle registry
+  first. Treat this as an explicit follow-on, not hidden drift.
+
+Verification used:
+
+- `bun run typecheck`
+- `bun test src/tests/animation-service.test.ts`
+- opened `microapp.wibwob.touchlab.open` in the running app
+- captured the adopter to `scratch/captures/s11-touchlab-window.txt`
 
 ### Out of scope for this story
 

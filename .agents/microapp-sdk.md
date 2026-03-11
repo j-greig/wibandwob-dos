@@ -263,6 +263,40 @@ FPS reflects actual TUI render throughput — animations, timers, and user
 input all show up here. One monitor per window is sufficient; destroy it
 on cleanup to restore `screen.render` to its original form.
 
+### Embedded animated surfaces
+
+For animated subsurfaces inside a microapp, use the lazy-mounted embedded
+player bridge rather than a raw `setInterval` loop.
+
+```typescript
+import { createEmbeddedLivePlayer, readNodeViewport } from "../../src/services/microapp-sdk.js";
+
+const player = createEmbeddedLivePlayer({
+  fps: 6,
+  generator: (tick, width, height) => renderMyFrame(tick, width, height),
+  getViewport: (target) => readNodeViewport(target, {
+    minWidth: 8,
+    minHeight: 4,
+    fallbackWidth: 24,
+    fallbackHeight: 6,
+  }),
+  onFrame: (content) => {
+    latestFrame = content;
+    updateComposite();
+  },
+  render: () => host.screen.render(),
+  clearOnStop: false,   // freeze last frame when paused
+});
+
+player.attachTarget(myBox);
+player.setRunning(true);
+
+win.onCleanup(() => player.destroy());
+```
+
+Use this when one panel inside a larger microapp should animate independently.
+Reference adopter: `modules/touchlab-mvp/index.ts`.
+
 ### Markdown viewer (F03)
 ```typescript
 // Open any .md file in the viewer window

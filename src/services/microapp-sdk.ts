@@ -27,6 +27,7 @@ import {
   type TerrainRenderMode,
 } from "./terrain-render.js";
 import {
+  createEmbeddedLivePlayer,
   createLazyMountedPlayer,
   type LazyMountedPlayer,
 } from "./animation-service.js";
@@ -95,6 +96,7 @@ export {
   applyRect,
   createNodePart,
   createContourPlayer,
+  createEmbeddedLivePlayer,
   createLazyMountedPlayer,
   readNodeViewport,
   terrainNames,
@@ -163,6 +165,7 @@ export type {
 
 export { createRenderMonitor } from "../core/render-monitor.js";
 export type { RenderMonitorHandle, RenderReading } from "../core/render-monitor.js";
+export type { AnimatedSurfaceTarget } from "./animation-service.js";
 export { MonsterCamService } from "./monster-cam-service.js";
 export type { MonsterCamFrame } from "./monster-cam-service.js";
 export { renderWebcamFrame, gridToBlessedContent } from "./webcam-renderer.js";

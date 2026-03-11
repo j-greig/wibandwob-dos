@@ -1,6 +1,6 @@
 import blessed from "blessed";
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
-import { clamp } from "../../src/services/microapp-sdk.js";
+import { clamp, createEmbeddedLivePlayer, readNodeViewport } from "../../src/services/microapp-sdk.js";
 
 type NodeId = "gen" | "text" | "input" | "mix";
 
@@ -252,9 +252,9 @@ export default function setup(host: MicroappHost) {
       let blendMode: BlendMode = "overwrite";
       let textInput = "human signal";
       let phraseIndex = 0;
-      let motionPhase = 0;
       let animationEnabled = true;
       let inspectorCollapsed = false;
+      let currentGen = waveSource(24, 6, 0);
       let dragging:
         | { id: NodeId; offsetX: number; offsetY: number }
         | undefined;
@@ -489,16 +489,40 @@ export default function setup(host: MicroappHost) {
         });
       };
 
+      const refreshMixNode = () => {
+        const text = textSource(22, 5, TEXT_PHRASES[phraseIndex] ?? "signal patch");
+        const input = inputSource(18, 5, textInput);
+        const mix = composite(34, 8, [currentGen, text, input], blendMode);
+        nodes.get("text")?.content.setContent(text);
+        nodes.get("input")?.content.setContent(input);
+        nodes.get("mix")?.content.setContent(mix);
+      };
+
+      const genPlayer = createEmbeddedLivePlayer({
+        fps: 6,
+        generator: (tick, width, height) => waveSource(Math.max(1, width), Math.max(1, height), tick),
+        getViewport: (target) => readNodeViewport(target, {
+          minWidth: 8,
+          minHeight: 4,
+          fallbackWidth: 24,
+          fallbackHeight: 6,
+        }),
+        clearOnStop: false,
+        onFrame: (content) => {
+          currentGen = content;
+          refreshMixNode();
+        },
+        render: () => host.screen.render(),
+      });
+      const genTarget = nodes.get("gen")?.content;
+      if (genTarget) genPlayer.attachTarget(genTarget);
+
       const renderNodes = () => {
         const canvasWidth = Math.max(1, Number(canvas.width) || 1);
         const canvasHeight = Math.max(1, Number(canvas.height) || 1);
         const inspectorWidth = inspectorCollapsed ? 8 : 26;
         inspector.width = inspectorWidth;
         canvas.right = inspectorWidth;
-        const gen = waveSource(24, 6, motionPhase);
-        const text = textSource(22, 5, TEXT_PHRASES[phraseIndex] ?? "signal patch");
-        const input = inputSource(18, 5, textInput);
-        const mix = composite(34, 8, [gen, text, input], blendMode);
 
         for (const node of nodes.values()) {
           node.frame.left = clamp(node.x, 0, Math.max(0, canvasWidth - node.w));
@@ -520,10 +544,8 @@ export default function setup(host: MicroappHost) {
           node.resizeGrip.style = selectedNode === node.id ? host.theme().highlight : host.theme().selected;
         }
 
-        nodes.get("gen")?.content.setContent(gen);
-        nodes.get("text")?.content.setContent(text);
-        nodes.get("input")?.content.setContent(input);
-        nodes.get("mix")?.content.setContent(mix);
+        nodes.get("gen")?.content.setContent(currentGen);
+        refreshMixNode();
         renderOverlay();
         renderInspector();
         orderNodes();
@@ -663,7 +685,10 @@ export default function setup(host: MicroappHost) {
         if (input === "-") cycleSelectedBg(-1);
         if (input === "=") cycleSelectedBg(1);
         if (input === "b") blendMode = blendMode === "overwrite" ? "mask" : "overwrite";
-        if (input === " ") animationEnabled = !animationEnabled;
+        if (input === " ") {
+          animationEnabled = !animationEnabled;
+          genPlayer.setRunning(animationEnabled);
+        }
         if (input === "i") inspectorCollapsed = !inspectorCollapsed;
         if (input === "t") {
           phraseIndex = (phraseIndex + 1) % TEXT_PHRASES.length;
@@ -742,12 +767,6 @@ export default function setup(host: MicroappHost) {
 
       host.screen.on("keypress", handleKeypress);
       host.screen.on("mouse", handleNestedMouse);
-      const animationTimer = setInterval(() => {
-        if (!animationEnabled) return;
-        motionPhase = (motionPhase + 1) % 10_000;
-        renderNodes();
-        host.screen.render();
-      }, 180);
 
       win.onInput((input) => {
         handleInputSequence(input);
@@ -761,6 +780,7 @@ export default function setup(host: MicroappHost) {
         selectedNode,
         blendMode,
         animationEnabled,
+        animatedSurfaces: ["gen"],
         phraseIndex,
         textInput,
         pipeline: ["gen", "text", "input", "mix"],
@@ -792,15 +812,20 @@ export default function setup(host: MicroappHost) {
 
       win.onResize(() => {
         renderNodes();
+        if (animationEnabled) {
+          genPlayer.setRunning(false);
+          genPlayer.setRunning(true);
+        }
       });
 
       win.onCleanup(() => {
-        clearInterval(animationTimer);
+        genPlayer.destroy();
         host.screen.off("keypress", handleKeypress);
         host.screen.off("mouse", handleNestedMouse);
       });
 
       renderNodes();
+      genPlayer.setRunning(animationEnabled);
       root.focus();
       win.focus();
     },

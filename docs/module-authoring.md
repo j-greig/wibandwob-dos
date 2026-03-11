@@ -238,6 +238,8 @@ Why this matters:
 
 Do not scatter raw `setInterval` if a shared helper already exists.
 Prefer SDK helpers such as `createTimer`.
+For animated subsurfaces inside a larger module, prefer `createEmbeddedLivePlayer`
+over a handwritten timer loop.
 
 Pattern:
 
@@ -254,6 +256,33 @@ win.onCleanup(() => clearTimers(timers));
 
 If you create subscriptions, players, or monitors, destroy or unsubscribe from
 all of them in `onCleanup()`.
+
+Example embedded animation bridge:
+
+```ts
+import { createEmbeddedLivePlayer, readNodeViewport } from "../../src/services/microapp-sdk.js";
+
+const player = createEmbeddedLivePlayer({
+  fps: 6,
+  generator: (tick, width, height) => renderMyFrame(tick, width, height),
+  getViewport: (target) => readNodeViewport(target, {
+    minWidth: 8,
+    minHeight: 4,
+    fallbackWidth: 24,
+    fallbackHeight: 6,
+  }),
+  onFrame: (content) => {
+    latestFrame = content;
+    updateComposite();
+  },
+  render: () => host.screen.render(),
+  clearOnStop: false,
+});
+
+player.attachTarget(myAnimatedBox);
+player.setRunning(true);
+win.onCleanup(() => player.destroy());
+```
 
 ## Theme and restyle rule
 

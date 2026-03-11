@@ -54,6 +54,12 @@ export interface LazyMountedPlayer {
   destroy(): void;
 }
 
+export type AnimatedSurfaceTarget = {
+  setContent(s: string): void;
+  width?: number | string;
+  height?: number | string;
+};
+
 /**
  * Create a player for pre-rendered frames (e.g. animated primers).
  * Frames are cycled at the given FPS. onFrame is called with the
@@ -164,11 +170,11 @@ export function createLivePlayer(options: LivePlayerOptions): FramePlayer {
  * expected by createAnimatedPanel in microapps.
  */
 export function createLazyMountedPlayer(opts: {
-  create(target: { setContent(s: string): void; width?: number | string; height?: number | string }): FramePlayer;
+  create(target: AnimatedSurfaceTarget): FramePlayer;
   render: () => void;
   clearOnStop?: boolean;
 }): LazyMountedPlayer {
-  let target: { setContent(s: string): void; width?: number | string; height?: number | string } | null = null;
+  let target: AnimatedSurfaceTarget | null = null;
   let player: FramePlayer | null = null;
 
   return {
@@ -194,4 +200,30 @@ export function createLazyMountedPlayer(opts: {
       target = null;
     },
   };
+}
+
+export function createEmbeddedLivePlayer(opts: {
+  fps: number;
+  generator: LiveFrameGenerator;
+  getViewport: (target: AnimatedSurfaceTarget) => { width: number; height: number };
+  render: () => void;
+  clearOnStop?: boolean;
+  onFrame?: (content: string, target: AnimatedSurfaceTarget, index: number, total: number) => void;
+}): LazyMountedPlayer {
+  return createLazyMountedPlayer({
+    clearOnStop: opts.clearOnStop,
+    render: opts.render,
+    create(target) {
+      return createLivePlayer({
+        fps: opts.fps,
+        generator: opts.generator,
+        getViewport: () => opts.getViewport(target),
+        onFrame: (content, index, total) => {
+          target.setContent(content);
+          opts.onFrame?.(content, target, index, total);
+          opts.render();
+        },
+      });
+    },
+  });
 }
