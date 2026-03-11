@@ -15,6 +15,7 @@ import TurndownService from "turndown";
 // @ts-ignore — no types available for turndown-plugin-gfm
 import { gfm } from "turndown-plugin-gfm";
 import fs from "node:fs";
+import { spawn } from "node:child_process";
 import { capabilityService } from "./capability-service.js";
 
 /** Suppress jsdom CSS parse warnings that leak to stderr. */
@@ -59,6 +60,8 @@ export class ChromeBrowserService {
   private browser: Browser | null = null;
   private page: Page | null = null;
   private launched = false;
+  /** chafa symbol mode: "braille" (default, higher res) or "block" (half blocks) */
+  imageSymbols: "braille" | "block" = "braille";
 
   /**
    * Launch or connect to Chrome. Tries launching headless first,
@@ -75,17 +78,22 @@ export class ChromeBrowserService {
       const chromePath = findChromeExecutablePath();
       if (chromePath) {
         try {
-          this.browser = await puppeteer.launch({
-            executablePath: chromePath,
-            headless: true,
-            args: [
-              "--no-first-run",
-              "--no-default-browser-check",
-              "--disable-background-networking",
-              "--disable-sync",
-              "--disable-gpu",
-            ],
-          });
+          this.browser = await Promise.race([
+            puppeteer.launch({
+              executablePath: chromePath,
+              headless: true,
+              args: [
+                "--no-first-run",
+                "--no-default-browser-check",
+                "--disable-background-networking",
+                "--disable-sync",
+                "--disable-gpu",
+              ],
+            }),
+            new Promise<never>((_, reject) =>
+              setTimeout(() => reject(new Error("timeout")), 10000)
+            ),
+          ]);
           const pages = await this.browser.pages();
           this.page = pages.at(-1) ?? (await this.browser.newPage());
           this.launched = true;
@@ -145,6 +153,61 @@ export class ChromeBrowserService {
       ]).catch(() => {});
 
       const finalUrl = this.page!.url();
+
+      // Resolve lazy-loaded images: multiple strategies for different sites
+      await this.page!.evaluate(() => {
+        // 1. data-src → src (common lazy-load pattern)
+        document.querySelectorAll("img[data-src]").forEach((img) => {
+          const src = img.getAttribute("src") ?? "";
+          if (!src || src.includes("data:") || src.includes("placeholder") || src.includes("1x1")) {
+            img.setAttribute("src", img.getAttribute("data-src")!);
+          }
+        });
+        // 2. srcset → src (responsive images without src)
+        document.querySelectorAll("img").forEach((img) => {
+          const src = img.getAttribute("src") ?? "";
+          if (!src || src.includes("data:") || src.includes("1x1")) {
+            const srcset = img.getAttribute("srcset") ?? img.getAttribute("data-srcset") ?? "";
+            if (srcset) {
+              // Pick the largest from srcset
+              const entries = srcset.split(",").map(s => s.trim().split(/\s+/));
+              const best = entries.sort((a, b) => {
+                const aw = parseInt(a[1] ?? "0");
+                const bw = parseInt(b[1] ?? "0");
+                return bw - aw;
+              })[0];
+              if (best?.[0]) img.setAttribute("src", best[0]);
+            }
+          }
+        });
+        // 3. <noscript> tags often contain real <img> for JS-disabled fallback
+        document.querySelectorAll("noscript").forEach((ns) => {
+          const html = ns.textContent ?? "";
+          const match = html.match(/src=["']([^"']+)["']/);
+          if (match?.[1] && ns.parentElement) {
+            const existingImg = ns.parentElement.querySelector("img");
+            if (existingImg) {
+              const curSrc = existingImg.getAttribute("src") ?? "";
+              if (!curSrc || curSrc.includes("data:")) {
+                existingImg.setAttribute("src", match[1]);
+              }
+            }
+          }
+        });
+        // 4. <picture> <source> → img src
+        document.querySelectorAll("picture").forEach((pic) => {
+          const img = pic.querySelector("img");
+          if (!img) return;
+          const src = img.getAttribute("src") ?? "";
+          if (src && !src.includes("data:")) return;
+          const source = pic.querySelector("source[srcset]");
+          if (source) {
+            const srcset = source.getAttribute("srcset") ?? "";
+            const first = srcset.split(",")[0]?.trim().split(/\s+/)[0];
+            if (first) img.setAttribute("src", first);
+          }
+        });
+      }).catch(() => {});
 
       // Get HTML via CDP (works even with TrustedScriptURL restrictions)
       const client = await this.page!.createCDPSession();
@@ -450,6 +513,16 @@ export class ChromeBrowserService {
         node.nodeName === "A" && !node.textContent?.trim(),
       replacement: () => "",
     });
+    // Keep image placeholders synchronous for Turndown; render ASCII later.
+    turndown.addRule("chafaImages", {
+      filter: "img",
+      replacement: (_content, node) => {
+        const src = (node as HTMLElement).getAttribute("src") ?? "";
+        const alt = (node as HTMLElement).getAttribute("alt") ?? "";
+        if (!src) return alt ? `[${alt}]` : "";
+        return `![${alt}](${src})`;
+      },
+    });
     return turndown
       .turndown(html)
       .replace(/\[\\?\[\s*\\?\]\]\([^)]*\)/g, "")
@@ -458,5 +531,122 @@ export class ChromeBrowserService {
       .replace(/\s+\./g, ".")
       .replace(/\n{3,}/g, "\n\n")
       .trim();
+  }
+
+  async renderImagesAsAscii(markdown: string): Promise<string> {
+    const imageRegex = /!\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g;
+    const matches = Array.from(markdown.matchAll(imageRegex));
+    if (matches.length === 0) return markdown;
+
+    let out = markdown;
+    for (const match of matches) {
+      const full = match[0];
+      const alt = match[1] ?? "";
+      const src = match[2] ?? "";
+      if (!src) continue;
+      const ascii = await this.imageToAscii(src);
+      const replacement = ascii ? `\n${ascii}\n` : (alt ? `[${alt}]` : "");
+      out = out.replace(full, replacement);
+    }
+
+    return out
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+  }
+
+  private async runCommand(
+    command: string,
+    args: string[],
+    timeoutMs: number
+  ): Promise<{ code: number | null; stdout: string; stderr: string; timedOut: boolean }> {
+    return new Promise((resolve) => {
+      const child = spawn(command, args, { stdio: ["ignore", "pipe", "pipe"] });
+      let stdout = "";
+      let stderr = "";
+      let settled = false;
+
+      const timer = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        child.kill("SIGKILL");
+        resolve({ code: null, stdout, stderr, timedOut: true });
+      }, timeoutMs);
+
+      child.stdout.on("data", (chunk: Buffer | string) => {
+        stdout += chunk.toString();
+      });
+      child.stderr.on("data", (chunk: Buffer | string) => {
+        stderr += chunk.toString();
+      });
+      child.on("error", () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve({ code: null, stdout, stderr, timedOut: false });
+      });
+      child.on("close", (code) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve({ code, stdout, stderr, timedOut: false });
+      });
+    });
+  }
+
+  private async imageToAscii(url: string, maxCols = 60): Promise<string | null> {
+    try {
+      // Download image to temp file
+      const tmpPath = `/tmp/chafa-${Date.now()}-${Math.random().toString(36).slice(2)}.img`;
+      const dl = await this.runCommand("curl", [
+        "-sL", "--max-time", "3",
+        "-A", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko)",
+        "-o", tmpPath, url,
+      ], 4000);
+      if (dl.code !== 0 || dl.timedOut) return null;
+
+      // Check file is a real image and large enough
+      const fileResult = await this.runCommand("file", ["--brief", tmpPath], 2000);
+      const fileType = fileResult.stdout.trim();
+      if (!/image|PNG|JPEG|GIF|WebP|bitmap/i.test(fileType)) {
+        try { fs.unlinkSync(tmpPath); } catch {}
+        return null;
+      }
+
+      // Get dimensions via file output or sips
+      const sipsResult = await this.runCommand("sips", ["-g", "pixelWidth", "-g", "pixelHeight", tmpPath], 3000);
+      const wMatch = sipsResult.stdout.match(/pixelWidth:\s*(\d+)/);
+      const hMatch = sipsResult.stdout.match(/pixelHeight:\s*(\d+)/);
+      const pw = wMatch ? Number(wMatch[1]) : 0;
+      const ph = hMatch ? Number(hMatch[1]) : 0;
+
+      // Skip small images (icons, spacers, tracking pixels)
+      if (pw < 150 || ph < 150) {
+        try { fs.unlinkSync(tmpPath); } catch {}
+        return null;
+      }
+
+      // Scale: preserve aspect ratio, max width = maxCols
+      const aspect = ph / pw;
+      const cols = Math.min(maxCols, pw);
+      // Terminal chars are ~2:1, so rows = cols * aspect / 2
+      const rows = Math.max(5, Math.round(cols * aspect / 2));
+
+      const chafa = await this.runCommand("chafa", [
+        "-s", `${cols}x${rows}`,
+        "--symbols", this.imageSymbols,
+        "--color-space", "rgb",
+        tmpPath,
+      ], 5000);
+
+      try { fs.unlinkSync(tmpPath); } catch {}
+
+      if (chafa.code !== 0 || chafa.timedOut || !chafa.stdout.trim()) return null;
+      // Strip terminal cursor hide/show sequences chafa adds
+      return chafa.stdout
+        .replace(/\x1b\[\?25[lh]/g, "")
+        .trimEnd();
+    } catch {
+      return null;
+    }
   }
 }

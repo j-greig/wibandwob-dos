@@ -129,6 +129,7 @@ export function openChromeBrowserWindow(params: {
   let pageMarkdown = "";
   let loading = false;
   let figletHeadings = true;
+  let navigationToken = 0;
   const history: string[] = [];
   let historyIndex = -1;
 
@@ -170,6 +171,16 @@ export function openChromeBrowserWindow(params: {
     screen.render();
   };
 
+  const postProcessImages = async (result: BrowseResult, token: number) => {
+    if (!result.ok || !result.markdown.includes("![")) return;
+    const updated = await service.renderImagesAsAscii(result.markdown);
+    if (token !== navigationToken) return;
+    if (!updated || updated === pageMarkdown) return;
+    pageMarkdown = updated;
+    rerenderPage();
+    setStatus(`Rendered: ${currentTitle}`);
+  };
+
   /** Re-render the current page markdown (e.g. after resize or figlet toggle). */
   const rerenderPage = () => {
     if (!pageMarkdown) return;
@@ -182,6 +193,7 @@ export function openChromeBrowserWindow(params: {
   };
 
   const navigateTo = async (url: string, pushHistory = true) => {
+    const token = ++navigationToken;
     // Normalise URL
     if (!/^https?:\/\//i.test(url)) {
       // If it looks like a search query, search Google
@@ -199,6 +211,7 @@ export function openChromeBrowserWindow(params: {
 
     const result = await service.navigate(url);
     showResult(result);
+    void postProcessImages(result, token);
 
     if (result.ok && pushHistory) {
       // Trim forward history when navigating from a back position
@@ -211,6 +224,7 @@ export function openChromeBrowserWindow(params: {
   };
 
   const goBack = async () => {
+    const token = ++navigationToken;
     if (historyIndex <= 0) {
       setStatus("No previous page");
       return;
@@ -221,9 +235,11 @@ export function openChromeBrowserWindow(params: {
     const url = history[historyIndex];
     const result = await service.navigate(url);
     showResult(result);
+    void postProcessImages(result, token);
   };
 
   const goForward = async () => {
+    const token = ++navigationToken;
     if (historyIndex >= history.length - 1) {
       setStatus("No next page");
       return;
@@ -234,14 +250,17 @@ export function openChromeBrowserWindow(params: {
     const url = history[historyIndex];
     const result = await service.navigate(url);
     showResult(result);
+    void postProcessImages(result, token);
   };
 
   const doReload = async () => {
+    const token = ++navigationToken;
     if (!currentUrl) return;
     loading = true;
     setStatus(`Reloading ${currentUrl}...`);
     const result = await service.navigate(currentUrl);
     showResult(result);
+    void postProcessImages(result, token);
   };
 
   const submitUrl = () => {
