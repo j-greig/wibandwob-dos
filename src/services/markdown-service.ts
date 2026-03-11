@@ -67,10 +67,10 @@ export interface FigletHeadingConfig {
 }
 
 export const DEFAULT_FIGLET_HEADING_CONFIG: FigletHeadingConfig = {
-  h1: { font: "doom",    fallbackFonts: ["slant","small","term"], color: "\x1b[96m", plainFallback: true },
-  h2: { font: "small",   fallbackFonts: ["shadow","mini","term"], color: "\x1b[94m", plainFallback: true },
-  h3: { font: "shadow",  fallbackFonts: ["small","term"], color: "\x1b[95m", plainFallback: true },
-  h4: { font: "small",   fallbackFonts: ["term"], color: "\x1b[93m", plainFallback: true },
+  h1: { font: "doom",    fallbackFonts: ["slant","small","term"], color: "\x1b[96m", plainFallback: true },  // 8h
+  h2: { font: "small",   fallbackFonts: ["smshadow","mini","term"], color: "\x1b[94m", plainFallback: true },  // 5h
+  h3: { font: "mini",    fallbackFonts: ["smshadow","term"], color: "\x1b[95m", plainFallback: true },  // 4h
+  h4: { font: "digital", fallbackFonts: ["mini","term"], color: "\x1b[93m", plainFallback: true },  // 3h
   h5: { font: "smslant", fallbackFonts: ["term"], color: "\x1b[92m", plainFallback: true },
   h6: { font: "term",    fallbackFonts: [], color: "\x1b[37m", plainFallback: true },
 };
@@ -106,7 +106,15 @@ function renderFigletHeading(text: string, level: number, width: number, config:
   const color = cfg.color;
 
   // Strip existing ANSI from heading text before passing to figlet
-  const plain = text.replace(/\x1b\[[0-9;]*m/g, "");
+  let plain = text.replace(/\x1b\[[0-9;]*m/g, "");
+
+  // Parse inline font override: `## Heading {fontname}`
+  let overrideFont: string | undefined;
+  const attrMatch = plain.match(/\s*\{([a-zA-Z0-9_-]+)\}\s*$/);
+  if (attrMatch) {
+    overrideFont = attrMatch[1];
+    plain = plain.slice(0, attrMatch.index!).trimEnd();
+  }
 
   // Only attempt figlet if text is short enough to plausibly fit.
   // Even the most compact font ("term") needs ~6 cols/char.
@@ -114,7 +122,11 @@ function renderFigletHeading(text: string, level: number, width: number, config:
   const likelyFits = plain.length <= Math.floor(width / 6);
 
   if (likelyFits) {
-    for (const font of [cfg.font, ...cfg.fallbackFonts]) {
+    // If an override font was specified, try it first before defaults
+    const fontList = overrideFont
+      ? [overrideFont, cfg.font, ...cfg.fallbackFonts]
+      : [cfg.font, ...cfg.fallbackFonts];
+    for (const font of fontList) {
       const lines = tryFiglet(plain, font, width);
       if (lines) return lines.map(l => color + l + R);
     }
