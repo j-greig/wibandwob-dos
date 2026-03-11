@@ -50,6 +50,14 @@ Quick index — full descriptions live in `.agents/architecture.md`.
 - `src/services/content-measurement.ts` — content measurement
 - `src/services/wibwob-agent-session.ts` — pi agent session
 
+## Building a New Module
+
+1. `bash scripts/scaffold-microapp.sh modules/<name> wibwob.<id> "<Title>" <menuOrder>`
+2. Read `docs/building-custom-modules.md` — lifecycle, SDK, common mistakes
+3. Edit the scaffold, `bun run typecheck`, restart app
+4. Reference modules: `glitchbox` (animated), `e026-demo` (broad sampler), `wibwob-poetry-clock` (compact real app)
+5. SDK surface: `.agents/microapp-sdk.md`
+
 ## Command Rules
 
 - add commands in `src/core/command-catalog.ts` first — never hand-wire menu/palette/API separately
