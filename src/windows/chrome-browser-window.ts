@@ -128,7 +128,7 @@ export function openChromeBrowserWindow(params: {
   let currentTitle = "";
   let pageMarkdown = "";
   let loading = false;
-  let figletHeadings = true;
+  let figletHeadings = false;
   const history: string[] = [];
   let historyIndex = -1;
 
