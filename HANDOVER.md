@@ -19,6 +19,10 @@ Current note after S12 on a2:
   app-controller / shell / runtime seams
 - safe parallel work for a2 is prep-only planning or handover notes, not new
   runtime code, until that lane settles
+- module audit follow-ons now exist as planning docs:
+  - `.planning/epics/e033-blessed-architecture-calm/module-audit.md`
+  - `.planning/epics/e033-blessed-architecture-calm/module-audit-shortlist.md`
+  - `.planning/epics/e033-blessed-architecture-calm/module-audit-themes.md`
 
 Core rule:
 - Agent 1 takes ONE hotspot seam.
