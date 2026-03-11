@@ -86,6 +86,7 @@ Base URL: http://127.0.0.1:8099 (or CONTROL_API_PORT env)
   GET  /help            → endpoint catalogue (human+agent readable)
   GET  /openapi.json    → OpenAPI 3.0 spec
   POST /windows/batch   → batch move/resize/focus; prefer over chained individual calls
+  POST /windows/editor/write → write text directly into an editor buffer
   GET  /windows/text    → raw window text content; ?id=N
   GET  /screenshot/text → ANSI-stripped text; ?id=N
 
@@ -143,6 +144,8 @@ Never guess window IDs. Never call tui_list_commands with assumed command names.
 4. describeState() is called synchronously by StateService.buildState() — it must be fast.
 5. The state cache is NOT thread-safe — all mutations happen on the single Bun event loop.
 6. GET /health must return ok:true before any other endpoint is reliable.
+7. `/help`, `/openapi.json`, and real handlers must agree on touched routes. If a route exists in code, it belongs in the catalogue.
+8. POST `/commands/run` input is `{ id, args }`.
 
 ## Failure Modes
 
@@ -151,8 +154,10 @@ Never guess window IDs. Never call tui_list_commands with assumed command names.
 | GET /state shows stale window data | sync() not called after mutation | Call stateService.sync() or wire onStateChanged callback |
 | Window missing from /state | registerWindow() not called or window closed | GET /state first; re-open if needed |
 | POST /commands/run returns {ok:false} | Wrong command id, missing required args | GET /commands/list first; check exact id and arg names |
+| POST /commands/run returns 400 `id required` | Request body omitted canonical `id` | Send `{ id, args }` |
 | tui_move_window has no effect | Used "x"/"y" instead of "left"/"top" | Field names are left, top, width, height |
 | Wrong window targeted | Cached/guessed window ID | Always GET /state for fresh IDs before targeting |
+| /help or /openapi is missing a live route | Endpoint catalogue drift in control-api.ts | Add/update ENDPOINT_CATALOGUE in the same change as the handler |
 | /health returns connection refused | App not running or wrong port | Check CONTROL_API_PORT; run curl /health; restart if needed |
 | width/height null in /state | Window created without explicit size | Normal for auto-sized windows; use frame dimensions from blessed directly if needed |
 
@@ -241,3 +246,4 @@ When adding a control API endpoint:
 
 | Date | Type | Subsystem | Finding | Triggered by |
 |------|------|-----------|---------|--------------|
+| 2026-03-11 | correction | control-api | Keep `/help` and `/openapi.json` generated from the same touched route list; S05 caught live drift where `/windows/editor/write` existed in handlers but not in the catalogue, and removed redundant legacy view routes `/view/markdown/open`, `/view/art/open`, `/view/wibwob-agent/open`, `/view/companion/smol`. | E033 S05 |

@@ -78,14 +78,14 @@ const ENDPOINT_CATALOGUE = [
   { method: "GET",  path: "/docs",                          description: "Interactive API docs (Scalar)" },
   { method: "GET",  path: "/state",                         description: "Full live desktop + window state" },
   { method: "GET",  path: "/commands/list",                 description: "All registered commands (optional ?surface=menu|palette|api|agent&includeUnavailable=1)" },
-  { method: "GET",  path: "/content/primer-info",           description: "Primer content metadata. ?path=/abs/path.txt" },
+  { method: "GET",  path: "/content/primer-info",           description: "Primer content metadata. ?path=/abs/path.txt or ?name=filename.txt" },
   { method: "GET",  path: "/world-chat/state",              description: "Structured world chat snapshot outside the TUI" },
   { method: "GET",  path: "/world-chat/channels",           description: "List world chat channels outside the TUI" },
   { method: "GET",  path: "/world-chat/channel",            description: "Read one world chat channel. ?id=%23world-ridge-overlook" },
   { method: "GET",  path: "/world-chat/channel/text",       description: "Plain text export of one world chat channel. ?id=%23world-ridge-overlook" },
   { method: "GET",  path: "/windows/text",                  description: "Raw text content of a window. ?id=N" },
   { method: "GET",  path: "/screenshot/text",               description: "ANSI-stripped text screenshot of a window. ?id=N" },
-  { method: "POST", path: "/commands/run",                  body: { id: "string (command id, canonical)", command: "string (deprecated alias for id)", args: "object (optional)" } },
+  { method: "POST", path: "/commands/run",                  body: { id: "string (command id, canonical)", args: "object (optional)" } },
   // ── View endpoints — command aliases, kept for backward compat ──
   // All dispatch through /commands/run internally. Prefer /commands/run for new integrations.
   { method: "POST", path: "/view/primer/open",              body: { filePath: "string (absolute path)" }, description: "Alias: primer.open" },
@@ -93,18 +93,14 @@ const ENDPOINT_CATALOGUE = [
   { method: "POST", path: "/view/editor/open",              body: { filePath: "string (optional)", title: "string (optional)", initial: "string (optional)" }, description: "Alias: editor.open" },
   { method: "POST", path: "/view/backrooms/open",           body: { theme: "string", mode: "auto|live|fake-live", model: "haiku|sonnet|opus", turns: "number", primers: "string (optional csv)" }, description: "Alias: backrooms.run" },
   { method: "POST", path: "/view/browser-reader/open",      body: { filePath: "string (optional)" }, description: "Alias: document.open" },
-  { method: "POST", path: "/view/markdown/open",            body: { filePath: "string (absolute .md path)" }, description: "Alias: markdown.open (legacy; prefer /view/reader/open)" },
-  { method: "POST", path: "/view/reader/open",              body: { filePath: "string (absolute .md path)" }, description: "Alias: markdown.open" },
-  { method: "POST", path: "/view/art/open",                 body: {}, description: "Alias: art.open (legacy; prefer /view/generative-art/open)" },
-  { method: "POST", path: "/view/generative-art/open",      body: {}, description: "Alias: art.open" },
+  { method: "POST", path: "/view/reader/open",              body: { filePath: "string (absolute .md path)" }, description: "Alias: markdown.open (canonical reader opener)" },
+  { method: "POST", path: "/view/generative-art/open",      body: {}, description: "Alias: art.open (canonical generative art opener)" },
   { method: "POST", path: "/view/monster-cam/open",         body: {}, description: "Alias: monster_cam.open" },
-  { method: "POST", path: "/view/wibwob-agent/open",        body: {}, description: "Alias: agent.open (legacy; prefer /view/agent/open)" },
   { method: "POST", path: "/view/agent/open",               body: {}, description: "Alias: agent.open" },
   { method: "POST", path: "/view/companion/open",           body: {}, description: "Alias: companion.open (floating)" },
-  { method: "POST", path: "/view/companion/smol",           body: {}, description: "Alias: companion.smol (popup, legacy; prefer /view/companion/compact)" },
   { method: "POST", path: "/view/companion/compact",        body: {}, description: "Alias: companion.smol (popup)" },
   { method: "GET",  path: "/scramble/state",                body: {}, description: "Scramble brain state: status, model, sessionId, messageCount, lastMessage, sleeping, logPath" },
-  { method: "GET",  path: "/scramble/history",              body: {}, description: "Full Scramble conversation history as JSON array" },
+  { method: "GET",  path: "/scramble/history",              body: {}, description: "Full Scramble conversation history as { history: [...] }" },
   { method: "POST", path: "/scramble/say",                  body: { text: "string" }, description: "Send a message to Scramble (returns reply)" },
   { method: "POST", path: "/scramble/expand",               body: {}, description: "Toggle Scramble smol/tall" },
   { method: "POST", path: "/scramble/pop-out",              body: {}, description: "Pop Scramble out to floating window" },
@@ -125,8 +121,9 @@ const ENDPOINT_CATALOGUE = [
   { method: "POST", path: "/windows/close",                 body: { id: "number" } },
   { method: "POST", path: "/windows/maximize",              body: { id: "number" } },
   { method: "POST", path: "/windows/batch",                 body: { ops: "[{id, x?, y?, w?, h?, close?}]" }, description: "Move/resize/close multiple windows in one request. Applied in order. Returns {ok, results[]}" },
-  { method: "POST", path: "/windows/input",                 body: { id: "number", input: "string (trailing \\r submits)" } },
+  { method: "POST", path: "/windows/input",                 body: { id: "number", input: "string (trailing \\r submits)", sender: "string (optional sender label)" } },
   { method: "POST", path: "/windows/agent-message",         body: { id: "number", text: "string", sender: "string (optional — shows as sender label in agent window)" } },
+  { method: "POST", path: "/windows/editor/write",          body: { id: "number", text: "string" }, description: "Write text directly into an editor window buffer." },
   { method: "POST", path: "/windows/text/export",           body: { id: "number", name: "string (optional, canonical)", label: "string (optional, alias for name)" } },
   { method: "POST", path: "/workspace/save",                body: { name: "string" }, description: "Alias: workspace.save" },
   { method: "POST", path: "/workspace/load",                body: { name: "string" }, description: "Alias: workspace.load_named" },
@@ -373,11 +370,9 @@ export class ControlApiService {
     }
 
     if (request.method === "POST" && url.pathname === "/commands/run") {
-      const id = typeof (body as any).id === "string" ? (body as any).id
-        : typeof (body as any).command === "string" ? (body as any).command
-        : "";
+      const id = typeof (body as any).id === "string" ? (body as any).id : "";
       if (!id) {
-        return Response.json({ ok: false, error: "id required (also accepts 'command' as deprecated alias)" }, { status: 400 });
+        return Response.json({ ok: false, error: "id required" }, { status: 400 });
       }
       const args = typeof (body as any).args === "object" && (body as any).args !== null
         ? (body as any).args as Record<string, unknown>
@@ -398,16 +393,12 @@ export class ControlApiService {
       "/view/primer-gallery/open":  { id: "primer_gallery.open" },
       "/view/primer/open":          { id: "primer.open", argsMapper: (b) => b.filePath ? { filePath: b.filePath, x: b.x, y: b.y, w: b.w, h: b.h } : undefined },
       "/view/browser-reader/open":  { id: "document.open", argsMapper: (b) => b.filePath ? { filePath: b.filePath } : undefined },
-      "/view/markdown/open":        { id: "markdown.open", argsMapper: (b) => b.filePath ? { filePath: b.filePath } : undefined },
       "/view/reader/open":          { id: "markdown.open", argsMapper: (b) => b.filePath ? { filePath: b.filePath } : undefined },
       "/view/figlet/open":          { id: "figlet.open", argsMapper: (b) => b.text ? { text: b.text, font: b.font } : undefined },
-      "/view/art/open":             { id: "art.open" },
       "/view/generative-art/open":  { id: "art.open" },
       "/view/monster-cam/open":     { id: "monster_cam.open" },
-      "/view/wibwob-agent/open":    { id: "agent.open" },
       "/view/agent/open":           { id: "agent.open" },
       "/view/companion/open":       { id: "companion.open" },
-      "/view/companion/smol":       { id: "companion.smol" },
       "/view/companion/compact":    { id: "companion.smol" },
       "/scramble/say":              { id: "scramble.say", argsMapper: (b) => b.text ? { text: b.text } : undefined },
       "/scramble/expand":           { id: "scramble.expand" },
@@ -452,8 +443,8 @@ export class ControlApiService {
       return Response.json({
         ok: this.handlers.windows.moveWindow(
           Number(b.id),
-          Number(b.left ?? b.x),
-          Number(b.top ?? b.y),
+          Number(b.left),
+          Number(b.top),
         ),
       });
     }
@@ -462,8 +453,8 @@ export class ControlApiService {
       return Response.json({
         ok: this.handlers.windows.resizeWindow(
           Number(b.id),
-          Number(b.width ?? b.w),
-          Number(b.height ?? b.h),
+          Number(b.width),
+          Number(b.height),
         ),
       });
     }

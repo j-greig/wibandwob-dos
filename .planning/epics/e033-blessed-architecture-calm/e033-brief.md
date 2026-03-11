@@ -161,7 +161,7 @@ After E033:
 | S02 | not-started | S01 | medium | Local model/update/render pilot for live windows |
 | S03 | not-started | S01 | medium | Microapp host lifecycle, redraw, and state contract |
 | S04 | not-started | none | medium | Thin the composition root |
-| S05 | not-started | none | medium | API contract audit and control-surface cleanup |
+| S05 | done | none | medium | API contract audit and control-surface cleanup |
 | S06 | not-started | none | medium | Cell-aware text correctness and Unicode discipline |
 | S07 | not-started | none, then coordinate with S01 | medium | Visual regression, render telemetry, and dense-scene performance checks |
 | S08 | not-started | none, then coordinate with S01 and S07 | medium | Runtime telemetry, stats surface, and agent/session health metrics |
@@ -176,7 +176,7 @@ After E033:
 - [ ] S02 — Local model/update/render pilot for live windows
 - [ ] S03 — Microapp host lifecycle, redraw, and state contract
 - [ ] S04 — Thin the composition root
-- [ ] S05 — API contract audit and control-surface cleanup
+- [x] S05 — API contract audit and control-surface cleanup
 - [ ] S06 — Cell-aware text correctness and Unicode discipline
 - [ ] S07 — Visual regression, render telemetry, and dense-scene performance checks
 - [ ] S08 — Runtime telemetry, stats surface, and agent/session health metrics
@@ -476,7 +476,7 @@ obviously in charge of wiring rather than detailed feature policy.
 
 ## S05 — API contract audit and control-surface cleanup
 
-Status: not-started
+Status: done
 Depends on: none
 Risk: medium
 
@@ -507,32 +507,50 @@ repo-specific standards used elsewhere in the epic.
 
 ### Tasks
 
-- [ ] audit the current endpoint catalogue for overlap, drift, ambiguous aliases, and legacy cruft
-- [ ] identify which routes are canonical versus backward-compat alias paths
-- [ ] remove alias or backward-compat routes that are no longer justified, rather than preserving them by default
-- [ ] tighten route naming and documentation where the API currently feels vibe-engineered
-- [ ] ensure `GET /help`, `GET /openapi.json`, command routes, and live state descriptions agree
-- [ ] check parity between control API routes and agent/control tooling where they overlap
-- [ ] add tests for any new pure-ish API normalization helpers or touched endpoint behaviour
-- [ ] update state/API docs so the cleaned contract is written down, not left in code only
+- [x] audit the current endpoint catalogue for overlap, drift, ambiguous aliases, and legacy cruft
+- [x] identify which routes are canonical versus backward-compat alias paths
+- [x] remove alias or backward-compat routes that are no longer justified, rather than preserving them by default
+- [x] tighten route naming and documentation where the API currently feels vibe-engineered
+- [x] ensure `GET /help`, `GET /openapi.json`, command routes, and live state descriptions agree
+- [x] check parity between control API routes and agent/control tooling where they overlap
+- [x] add tests for any new pure-ish API normalization helpers or touched endpoint behaviour
+- [x] update state/API docs so the cleaned contract is written down, not left in code only
 
 ### Acceptance criteria
 
-- [ ] AC-1: the API has a clearer distinction between canonical routes and backward-compat aliases
-- [ ] AC-2: unjustified alias or legacy routes touched by the story are retired rather than preserved automatically
-- [ ] AC-3: `GET /help`, `GET /openapi.json`, and the real handlers agree on touched routes and shapes
-- [ ] AC-4: touched control routes preserve or improve command/state parity for agents and external operators
-- [ ] AC-5: any remaining backward-compat path is explicitly justified and documented rather than retained by inertia
-- [ ] AC-6: touched API seams have direct test coverage where practical
-- [ ] AC-7: `.agents/specs/state-and-api.md` is updated if the contract changes
-- [ ] AC-8: `bun run typecheck` passes
+- [x] AC-1: the API has a clearer distinction between canonical routes and backward-compat aliases
+- [x] AC-2: unjustified alias or legacy routes touched by the story are retired rather than preserved automatically
+- [x] AC-3: `GET /help`, `GET /openapi.json`, and the real handlers agree on touched routes and shapes
+- [x] AC-4: touched control routes preserve or improve command/state parity for agents and external operators
+- [x] AC-5: any remaining backward-compat path is explicitly justified and documented rather than retained by inertia
+- [x] AC-6: touched API seams have direct test coverage where practical
+- [x] AC-7: `.agents/specs/state-and-api.md` is updated if the contract changes
+- [x] AC-8: `bun run typecheck` passes
 
 ### Verification
 
-- [ ] `GET /help` is accurate
-- [ ] `GET /openapi.json` is accurate
-- [ ] representative `GET /state`, command, window, and alias routes behave as documented
-- [ ] agent/control tooling still works on touched routes
+- [x] `GET /help` is accurate
+- [x] `GET /openapi.json` is accurate
+- [x] representative `GET /state`, command, window, and alias routes behave as documented
+- [x] agent/control tooling still works on touched routes
+
+### Delivery note
+
+S05 was completed as a canonicalisation pass, not a broad API rewrite.
+
+Landed changes:
+
+- removed redundant legacy view routes `/view/markdown/open`, `/view/art/open`, `/view/wibwob-agent/open`, and `/view/companion/smol`
+- tightened `POST /commands/run` to require canonical `{ id, args }`
+- tightened move/resize writes to canonical field names only: `left` / `top` and `width` / `height`
+- repaired catalogue drift so `/help`, `/openapi.json`, and handlers agree on touched routes, including `/windows/editor/write`
+- updated control API docs, state/API spec, and agent smoke references to canonical routes
+- added regression coverage for route parity and removed-route behaviour
+
+Verification run:
+
+- `bun run typecheck`
+- `bun test src/tests/command-registry.test.ts src/tests/workspace-roundtrip.test.ts`
 
 ### Out of scope for this story
 
@@ -613,6 +631,56 @@ Known troublesome ASCII / Unicode-heavy primers to test:
 - solving all Unicode rendering in the whole app
 - replacing string rendering with a full cell engine everywhere
 - theme/token redesign
+
+### Dev note — S06 attempt, findings, and handover
+
+Work completed in the a2 worktree so far:
+
+- added a shared grapheme-safe clipping helper in `src/core/ansi-utils.ts`
+- switched `src/services/content-measurement.ts` from `string-width` to the existing ANSI/Unicode-aware `visibleWidth`
+- made `src/core/grid-canvas.ts` centre and clip by visible cell width instead of code-unit length
+- fixed `src/windows/browser-windows.ts` viewer row fitting to use the shared visible-width helpers instead of per-character `string-width`
+- added focused unit coverage for ANSI clipping, mixed-width measurement, and grid-canvas painting
+- created local repro fixtures and notes under `scratch/` because the named private primers are not fully self-contained in this worktree
+
+Important asset / portability note:
+
+- `modules-private` initialises correctly as a git submodule
+- but `modules-private/wibwob-primers/primers` resolves via symlink to `/Users/james/Repos/wibwobworld/primers`
+- so the named repro primers are not guaranteed to be local to the worktree or portable across machines
+
+What seems to work:
+
+- width measurement is now more internally consistent across measurement, clipping, and centred text helpers
+- ANSI-aware clipping now preserves a trailing reset instead of bleeding colour/style past the clip edge
+- text-only crops of the repro primers look materially better than before
+- `bun run typecheck` passes
+- targeted unit tests for the helper layer pass
+
+What still does NOT work:
+
+- live TUI PNG / tmux capture still shows ragged right edges and stray vertical border fragments around mixed-width primer content
+- this is most visible in the primer viewer, even after helper fixes land
+- the remaining failure looks like stale-cell / partial repaint corruption in the live Blessed surface, not only bad width math
+- in other words: the text now knows its width better, but the repaint path still does not fully clear the previous mixed-width footprint
+
+Evidence captured:
+
+- `scratch/e033-s06-unicode-repro-pack.md`
+- `scratch/unicode-repros/`
+- `scratch/captures/e033-s06-live-check.png`
+- `scratch/captures/e033-s06-live-check-fixed.png`
+- `scratch/captures/e033-s06-unicode-tmux.txt`
+- `scratch/captures/e033-s06-unicode-tmux-fixed.txt`
+- `scratch/captures/e033-s06-conscious-window.txt`
+- `scratch/captures/e033-s06-cosmic-window.txt`
+
+Current judgement:
+
+- the helper pass is useful and probably worth keeping
+- but S06 is not visually complete yet
+- the next real fix likely needs a stronger viewer repaint strategy or a genuinely cell-aware render path for risky Unicode rows
+- if we park S06 for now, this note should be treated as the restart point rather than assuming the current pass solved the live corruption class
 
 ---
 

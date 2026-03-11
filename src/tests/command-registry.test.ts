@@ -26,6 +26,44 @@ describe("control API health", () => {
   });
 });
 
+describe("control API contract docs", () => {
+  test("/help and /openapi expose the same touched canonical routes", async () => {
+    const help = await api("/help");
+    expect(help.status).toBe(200);
+    const endpointPaths = new Set<string>(help.data.endpoints.map((ep: { path: string }) => ep.path));
+    expect(endpointPaths.has("/windows/editor/write")).toBe(true);
+    expect(endpointPaths.has("/view/reader/open")).toBe(true);
+    expect(endpointPaths.has("/view/generative-art/open")).toBe(true);
+    expect(endpointPaths.has("/view/markdown/open")).toBe(false);
+    expect(endpointPaths.has("/view/art/open")).toBe(false);
+
+    const openapiRes = await fetch(`${API}/openapi.json`);
+    expect(openapiRes.status).toBe(200);
+    const openapi = await openapiRes.json() as { paths: Record<string, unknown> };
+    expect(openapi.paths["/windows/editor/write"]).toBeDefined();
+    expect(openapi.paths["/view/reader/open"]).toBeDefined();
+    expect(openapi.paths["/view/generative-art/open"]).toBeDefined();
+    expect(openapi.paths["/view/markdown/open"]).toBeUndefined();
+    expect(openapi.paths["/view/art/open"]).toBeUndefined();
+  });
+
+  test("retired legacy view aliases return 404", async () => {
+    const markdown = await fetch(`${API}/view/markdown/open`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filePath: "/tmp/example.md" }),
+    });
+    expect(markdown.status).toBe(404);
+
+    const art = await fetch(`${API}/view/art/open`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    expect(art.status).toBe(404);
+  });
+});
+
 describe("command registry", () => {
   test("lists commands", async () => {
     const { status, data } = await api("/commands/list");
@@ -56,6 +94,13 @@ describe("command registry", () => {
     const { status, data } = await api("/commands/run", "POST", { id: "nonexistent.command" });
     expect(status).toBe(404);
     expect(data.ok).toBe(false);
+  });
+
+  test("commands.run requires canonical id field", async () => {
+    const { status, data } = await api("/commands/run", "POST", { command: "theme.cycle" });
+    expect(status).toBe(400);
+    expect(data.ok).toBe(false);
+    expect(data.error).toContain("id required");
   });
 
   test("toggle_theme executes without error", async () => {
