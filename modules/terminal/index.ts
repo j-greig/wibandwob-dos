@@ -207,6 +207,10 @@ function openTerminal(host: MicroappHost) {
         PTY_ROWS: String(ptyRows),
         PTY_CWD: REPO_ROOT,
         PTY_SHELL: process.env.SHELL || "/bin/zsh",
+        // Prevent zsh/shell from probing kitty keyboard protocol, bracketed
+        // paste extensions, etc. that blessed's term.js doesn't understand —
+        // leaked escape fragments appear as literal text like "5u".
+        TERM: "xterm",
       },
     });
 
