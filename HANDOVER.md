@@ -1,5 +1,27 @@
 # E033 HANDOVER — Mega Prompt for a Fresh Coding Instance
 
+## TL;DR
+
+Keep Blessed. Start with one real seam, not a grand rewrite. Best opening slices: S01 render seam, S05 API cleanup, or S08 stats surface. Retire cruft when safe. Protect state/API/theme/workspace parity. Verify visually, not just by JSON.
+
+Handover note:
+
+WWDOS live in tmux/API. Smoke passed: health, state, tmux text dump, 1-window crop, PNG capture. Artefacts in `scratch/captures/`. `/commands/list` returns `{ok,commands}` not bare array. Good first move: S01 or S08. Keep mixed-mode render coexistence.
+
+## Current smoke state
+
+- tmux session live: `wibwob`
+- API health passed: `http://127.0.0.1:8099/health`
+- state passed: `http://127.0.0.1:8099/state`
+- artefacts:
+  - `scratch/captures/e033-tmux-screen.txt`
+  - `scratch/captures/e033-window-1.txt`
+  - `scratch/captures/e033-tui.png`
+- scratch checklist/report:
+  - `scratch/e033-smoke-2026-03-11.md`
+- useful gotcha:
+  - `/commands/list` returns envelope `{ok, commands}`
+
 You are entering the WibWob-DOS repository in a fresh context window to begin implementation work on E033.
 
 Repository root for this worktree:
