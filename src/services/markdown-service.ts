@@ -85,14 +85,19 @@ export const PLAIN_HEADING_CONFIG: FigletHeadingConfig = {
   h6: { font: "", fallbackFonts: [], color: "\x1b[37m", plainFallback: true },
 };
 
+const figletCache = new Map<string, string[] | null>();
+
 function tryFiglet(text: string, font: string, width: number): string[] | null {
   if (!font || !isFigletAvailable()) return null;
+  const key = `${font}\0${width}\0${text}`;
+  const cached = figletCache.get(key);
+  if (cached !== undefined) return cached;
   const result = spawnSync("figlet", ["-f", font, "-w", String(width), text], { encoding: "utf8" });
-  if (result.status !== 0 || !result.stdout.trim()) return null;
+  if (result.status !== 0 || !result.stdout.trim()) { figletCache.set(key, null); return null; }
   const lines = result.stdout.split("\n");
   while (lines.length && lines[lines.length - 1]!.trim() === "") lines.pop();
-  // Reject if any line exceeds width (figlet -w should prevent this, but guard)
-  if (lines.some(l => visibleWidth(l) > width)) return null;
+  if (lines.some(l => visibleWidth(l) > width)) { figletCache.set(key, null); return null; }
+  figletCache.set(key, lines);
   return lines;
 }
 
