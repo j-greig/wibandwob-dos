@@ -59,7 +59,7 @@ const WINDOW_TYPES: Array<{
   { name: "art", endpoint: "/view/art/open", expectedAppType: "generative-art" },
   { name: "companion", endpoint: "/view/companion/open", expectedAppType: "companion-widget" },
   { name: "primer-browser", endpoint: "/view/primer-browser/open", expectedAppType: "primer-browser" },
-  { name: "file-manager", endpoint: "/view/file-manager/open", expectedAppType: "farjs-file-manager" },
+  { name: "file-manager", endpoint: "/view/file-manager/open", expectedAppType: "file-manager" },
   { name: "primer-gallery", endpoint: "/view/primer-gallery/open", expectedAppType: "primer-gallery" },
   { name: "music-player", endpoint: "/view/music-player/open", expectedAppType: "music-player" },
   { name: "monster-cam", endpoint: "/view/monster-cam/open", expectedAppType: "monster-cam" },

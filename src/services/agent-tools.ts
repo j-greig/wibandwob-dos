@@ -276,7 +276,7 @@ const readWindow = tuiTool({
 });
 
 const openChromeBrowser = tuiTool({
-  name: "tui_open_chrome_browser",
+  name: "tui_open_web_reader",
   label: "Open Chrome Browser",
   description:
     "Opens a Chrome browser window, optionally navigating to a URL. " +

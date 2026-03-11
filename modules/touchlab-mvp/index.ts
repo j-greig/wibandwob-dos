@@ -473,7 +473,7 @@ export default function setup(host: MicroappHost) {
       const refreshMixNode = () => {
         const text = textSource(22, 5, TEXT_PHRASES[phraseIndex] ?? "signal patch");
         const input = inputSource(18, 5, textInput);
-        const mix = composite(34, 8, [currentGen, text, input], blendMode);
+        const mix = composeAsciiLayers(34, 8, [currentGen, text, input], blendMode);
         nodes.get("text")?.content.setContent(text);
         nodes.get("input")?.content.setContent(input);
         nodes.get("mix")?.content.setContent(mix);

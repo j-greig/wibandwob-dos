@@ -132,7 +132,7 @@ function formatToolCall(name: string, args: Record<string, unknown>): string {
     case "tui_focus_window": return `focus #${args.id}`;
     case "tui_send_input": return `input #${args.id} "${String(args.text || args.input || "").slice(0, 40)}"`;
     case "tui_read_window": return `read_window #${args.id}`;
-    case "tui_open_chrome_browser": return `open_chrome${args.url ? ` ${String(args.url).slice(0, 50)}` : ""}`;
+    case "tui_open_web_reader": return `open_chrome${args.url ? ` ${String(args.url).slice(0, 50)}` : ""}`;
     case "tui_browser_navigate": return `navigate #${args.id} → ${String(args.url || "").slice(0, 50)}`;
     case "tui_browser_list_links": return `list_links #${args.id}`;
     case "tui_browser_follow_link": return `follow_link #${args.id} link ${args.link_index}`;

@@ -109,9 +109,9 @@ export interface WindowSnapshot {
  */
 export type PersistableAppType =
   | "primer-browser"
-  | "farjs-file-manager"
+  | "file-manager"
   | "backrooms-log-browser"
-  | "chrome-browser"
+  | "web-reader"
   | "backrooms-primer-picker"
   | "primer-gallery"
   | "figlet-banner"

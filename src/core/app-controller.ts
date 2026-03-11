@@ -805,7 +805,7 @@ export class TsTuiMvpApp {
   private openFileManagerWindow(
     restore?: FileManagerRestore,
   ): WindowRecord | undefined {
-    return this.focusOrCreate("farjs-file-manager", () => {
+    return this.focusOrCreate("file-manager", () => {
       openFarjsFileManagerWindow({
         screen: this.screen,
         windowManager: this.windowManager,
@@ -853,7 +853,7 @@ export class TsTuiMvpApp {
     initialUrl?: string,
   ): WindowRecord | undefined {
     return this.focusOrCreate(
-      "chrome-browser",
+      "web-reader",
       () => {
         openChromeBrowserWindow({
           screen: this.screen,

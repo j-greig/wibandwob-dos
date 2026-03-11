@@ -192,7 +192,7 @@ export const snapshotRegistry = {
     },
   },
 
-  "farjs-file-manager": {
+  "file-manager": {
     serialize: (window) => {
       const d = getDetails(window);
       return {
@@ -227,7 +227,7 @@ export const snapshotRegistry = {
     },
   },
 
-  "chrome-browser": {
+  "web-reader": {
     serialize: (window) => ({
       currentUrl: detailString(getDetails(window), "currentUrl"),
     }),
@@ -367,6 +367,9 @@ export function registrySerialize(window: WindowRecord): Record<string, unknown>
 const legacyAppTypeRemap: Record<string, string> = {
   "wibwob-chat-v2": "wibwob-agent",
   "chat-transcript": "wibwob-agent",
+  // E033 — nomenclature cleanup
+  "farjs-file-manager": "file-manager",
+  "chrome-browser": "web-reader",
   // E031 S21 — "markdown-viewer" renamed to "reader"
   "markdown-viewer": "reader",
   // E032 S02 — "reader" appType (old markdown-viewer) merged into "text-editor"

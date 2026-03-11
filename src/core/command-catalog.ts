@@ -438,7 +438,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
   },
   // ── Applications ─────────────────────────────────────
   {
-    id: "chrome.open",
+    id: "web-reader.open",
     label: "Web Browser",
     description: "Open a Chrome browser window for web content extraction. Args: url (string, optional). Without args opens to default page.",
     group: "open",
@@ -474,7 +474,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     agent: true
   },
   {
-    id: "monster_cam.open",
+    id: "monster-cam.open",
     label: "Monster Cam",
     description: "Open the Monster Cam window.",
     group: "open",
@@ -665,7 +665,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     agent: true
   },
   {
-    id: "primer_gallery.open",
+    id: "primer-gallery.open",
     label: "Gallery",
     description: "Open the primer gallery with tabbed categories and preview.",
     group: "surface",
@@ -758,7 +758,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     agent: true
   },
   {
-    id: "terrain_lab.open",
+    id: "terrain-lab.open",
     label: "Terrain Lab",
     description: "Contour map with info panel — demonstrates composable ContourPlayer embedding.",
     group: "surface",

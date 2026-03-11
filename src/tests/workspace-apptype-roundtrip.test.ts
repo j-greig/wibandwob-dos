@@ -90,7 +90,7 @@ const TESTABLE_TYPES: PersistableAppType[] = [
   "monster-cam",
   "primer-gallery",
   "primer-browser",
-  "farjs-file-manager",
+  "file-manager",
   "reader-viewer",
   // "reader" retired in E032 — merged into "text-editor" with viewMode: "view"
 ];
@@ -100,7 +100,7 @@ const SKIP_TYPES: PersistableAppType[] = [
   "backrooms-tv",
   "backrooms-log-browser",
   "backrooms-primer-picker",
-  "chrome-browser",
+  "web-reader",
 ];
 
 /** Open a window for a given PersistableAppType. */
@@ -114,10 +114,10 @@ async function openWindowForAppType(appType: PersistableAppType): Promise<boolea
     "pattern-animation": () => post("/commands/run", { id: "pattern.open" }),
     "companion-widget": () => post("/commands/run", { id: "companion.open" }),
     "wibwob-agent": () => post("/commands/run", { id: "agent.open" }),
-    "monster-cam": () => post("/commands/run", { id: "monster_cam.open" }),
-    "primer-gallery": () => post("/commands/run", { id: "primer_gallery.open" }),
+    "monster-cam": () => post("/commands/run", { id: "monster-cam.open" }),
+    "primer-gallery": () => post("/commands/run", { id: "primer-gallery.open" }),
     "primer-browser": () => post("/commands/run", { id: "primer.browse" }),
-    "farjs-file-manager": () => post("/commands/run", { id: "finder.open" }),
+    "file-manager": () => post("/commands/run", { id: "finder.open" }),
     "reader-viewer": () => post("/commands/run", { id: "readme.open" }),
   };
   const opener = openers[appType];

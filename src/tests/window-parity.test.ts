@@ -100,10 +100,10 @@ describe("window parity audit", () => {
   });
 
   test("chrome-browser: reports appType and summary", async () => {
-    const win = await openAndFind("chrome.open", "chrome-browser", undefined, 1000);
+    const win = await openAndFind("web-reader.open", "web-reader", undefined, 1000);
     expect(win).toBeDefined();
     openedIds.push(win.id);
-    expect(win.details.appType).toBe("chrome-browser");
+    expect(win.details.appType).toBe("web-reader");
     expect(win.details.summary).toBeDefined();
   });
 
@@ -160,7 +160,7 @@ describe("window parity audit", () => {
   });
 
   test("primer-gallery: reports appType and summary", async () => {
-    const win = await openAndFind("primer_gallery.open", "primer-gallery");
+    const win = await openAndFind("primer-gallery.open", "primer-gallery");
     expect(win).toBeDefined();
     openedIds.push(win.id);
     expect(win.details.appType).toBe("primer-gallery");

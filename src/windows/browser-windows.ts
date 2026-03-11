@@ -1326,7 +1326,7 @@ export function openFileManagerWindow(params: {
 
   frame.kind = "browser";
   frame.describeState = () => ({
-    appType: "farjs-file-manager",
+    appType: "file-manager",
     summary: `File manager at ${currentPath}` + (searchActive ? ` (searching: ${searchQuery})` : ""),
     currentPath,
     filterValue,

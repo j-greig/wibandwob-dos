@@ -307,7 +307,7 @@ export function openChromeBrowserWindow(params: {
   };
   frame.captureText = () => pageMarkdown;
   frame.describeState = () => ({
-    appType: "chrome-browser",
+    appType: "web-reader",
     summary: `Chrome browser viewing ${currentTitle || currentUrl || "(no page)"}`,
     currentUrl,
     currentTitle,
