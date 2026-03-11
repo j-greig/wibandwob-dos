@@ -1,0 +1,21 @@
+{
+  "name": "dashboard-xxl",
+  "version": "0.1.0",
+  "description": "Exhibition-scale mosaic — figlet typography + animated pattern tiles rendered to a hypermassive virtual canvas with pannable viewport",
+  "type": "microapp",
+  "entry": "index.ts",
+  "dependencies": {},
+  "microapp": {
+    "id": "wibwob.dashboard-xxl",
+    "title": "Dashboard XXL",
+    "description": "Hypermassive mosaic for testing exhibition-scale displays — renders to a virtual canvas far larger than the physical terminal",
+    "multiInstance": true,
+    "persist": false,
+    "menu": [
+      { "category": "applications", "order": 56, "label": "Dashboard XXL" }
+    ],
+    "palette": { "order": 221, "label": "Dashboard XXL" },
+    "agent": true,
+    "api": true
+  }
+}
