@@ -147,6 +147,7 @@ win.onCleanup(fn)       // runs on close — clear timers here
 win.onRestyle(fn)       // runs on theme change — re-apply host.theme()
 win.onResize(fn)        // runs when window is resized
 win.onInput(fn)         // (input: string) => void — receives writeInput calls
+win.setFocusTarget(w)   // redirect window focus to a child widget (e.g. terminal emulator)
 ```
 
 ---
