@@ -165,7 +165,7 @@ After E033:
 | S01 | done | none | medium | Render scheduler and explicit invalidation policy |
 | S02 | done | S01 | medium | Local model/update/render pilot for live windows |
 | S03 | done | S01 | medium | Microapp host lifecycle, redraw, and state contract |
-| S04 | in-progress | none | medium | Thin the composition root |
+| S04 | done | none | medium | Thin the composition root |
 | S05 | not-started | none | medium | API contract audit and control-surface cleanup |
 | S06 | not-started | none | medium | Cell-aware text correctness and Unicode discipline |
 | S07 | not-started | none, then coordinate with S01 | medium | Visual regression, render telemetry, and dense-scene performance checks |
@@ -180,7 +180,7 @@ After E033:
 - [x] S01 — Render scheduler and explicit invalidation policy
 - [x] S02 — Local model/update/render pilot for live windows
 - [x] S03 — Microapp host lifecycle, redraw, and state contract
-- [~] S04 — Thin the composition root
+- [x] S04 — Thin the composition root
 - [ ] S05 — API contract audit and control-surface cleanup
 - [ ] S06 — Cell-aware text correctness and Unicode discipline
 - [ ] S07 — Visual regression, render telemetry, and dense-scene performance checks
@@ -458,7 +458,7 @@ contract remains future work for S11 and S12.
 
 ## S04 — Thin the composition root
 
-Status: in-progress
+Status: done
 Depends on: S01
 Risk: medium
 
@@ -489,12 +489,12 @@ obviously in charge of wiring rather than detailed feature policy.
 
 ### Acceptance criteria
 
-- [ ] AC-1: `app-controller.ts` is materially thinner or more clearly sectioned
-- [ ] AC-2: one new focused collaborator owns a coherent window/service family
-- [ ] AC-3: command routing still flows through the canonical command system
-- [ ] AC-4: touched surfaces preserve command and API parity
-- [ ] AC-5: touched surfaces preserve workspace restore correctness
-- [ ] AC-6: `bun run typecheck` passes
+- [x] AC-1: `app-controller.ts` is materially thinner or more clearly sectioned
+- [x] AC-2: one new focused collaborator owns a coherent window/service family
+- [x] AC-3: command routing still flows through the canonical command system
+- [x] AC-4: touched surfaces preserve command and API parity
+- [x] AC-5: touched surfaces preserve workspace restore correctness
+- [x] AC-6: `bun run typecheck` passes
 
 ### Verification
 
