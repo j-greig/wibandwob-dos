@@ -734,6 +734,19 @@ This story turns telemetry from a hidden primitive into a real operator tool.
 It should also think beyond render alone: if future multiple-agent setups matter,
 we need at least a first pass at session-health visibility for the in-app agent.
 
+It also needs to cover terminal recursion. The PTY-backed terminal module makes
+WibWob-DOS able to run inside WibWob-DOS, and the human has already pushed this
+four levels deep. So telemetry and smoothness checks should not assume a
+single-level desktop only. We need to know whether the terminal app still feels
+smooth, preserves API/agent affordances, and degrades sanely under recursive
+use.
+
+Reference bug / architecture anchor for terminal recursion work:
+- fix context: `a2f5a8da0a4b6f94ce41db38e5349c7211b1a2da`
+- initial terminal architecture summary worth preserving:
+  `feat(terminal): PTY-backed terminal emulator module`
+  `Architecture: Bun process <-> Node bridge (pty-bridge.cjs) <-> node-pty <-> real PTY`
+
 ### Expected files
 
 - `src/core/render-monitor.ts`
@@ -741,6 +754,7 @@ we need at least a first pass at session-health visibility for the in-app agent.
 - `src/core/cli.ts` or the nearest startup/config seam if a debug/stats flag is added
 - `src/services/wibwob-agent-session.ts`
 - `src/windows/wibwob-agent-window.ts`
+- `modules/terminal/index.ts`
 - optional diagnostics surface under `src/windows/` or as a small microapp
 - docs / AGENTS updates if a new debug mode or stats command is introduced
 
@@ -751,6 +765,7 @@ we need at least a first pass at session-health visibility for the in-app agent.
 - [ ] decide the first debug gate: env var, startup flag, dev-only surface, or explicit command
 - [ ] expose at least render FPS, frame timing, and RAM usage in the chosen surface
 - [ ] add a first pass at agent/session health stats that are actually useful, such as active agent window/session presence, turn/streaming status, or message/tool counts where available
+- [ ] test recursive WibWob-DOS-in-terminal runs and record what still works at multiple depths, including API reachability and agent affordances
 - [ ] keep the surface lightweight and non-invasive, ideally dev-only by default if always visible chrome would clutter the desktop
 - [ ] document how operators turn the stats surface on and what each metric means
 
@@ -760,16 +775,19 @@ we need at least a first pass at session-health visibility for the in-app agent.
 - [ ] AC-2: the chosen stats surface reports render FPS and frame timing from shell-level render monitoring, not only service-local FPS
 - [ ] AC-3: the chosen stats surface reports RAM usage from the running process
 - [ ] AC-4: the chosen stats surface includes at least one useful Wib&Wob agent/session health signal beyond raw render stats
-- [ ] AC-5: the stats surface can be turned on intentionally and does not become unavoidable chrome for normal users unless explicitly desired
-- [ ] AC-6: if a flag or env var is introduced, it is documented and wired cleanly at startup
-- [ ] AC-7: touched telemetry seams have direct test coverage where practical
-- [ ] AC-8: `bun run typecheck` passes
+- [ ] AC-5: terminal-recursive WibWob-DOS runs are exercised as part of the telemetry story, with findings recorded for at least more than one depth level
+- [ ] AC-6: the story records whether API access and key agent affordances remain usable through recursive terminal runs, and where they degrade
+- [ ] AC-7: the stats surface can be turned on intentionally and does not become unavoidable chrome for normal users unless explicitly desired
+- [ ] AC-8: if a flag or env var is introduced, it is documented and wired cleanly at startup
+- [ ] AC-9: touched telemetry seams have direct test coverage where practical
+- [ ] AC-10: `bun run typecheck` passes
 
 ### Verification
 
 - [ ] enable the stats surface and verify FPS/frame timing/RAM visibly update during runtime
 - [ ] confirm the render numbers change under a dense-scene benchmark rather than staying static
 - [ ] confirm at least one agent/session metric changes meaningfully during agent activity
+- [ ] run at least a recursive terminal smoke path and record what happens to FPS/RAM/agent affordances across depth
 - [ ] visually verify the diagnostics surface does not make the normal desktop unusable
 
 ### Out of scope for this story

@@ -8,6 +8,109 @@ Handover note:
 
 WWDOS live in tmux/API. Smoke passed: health, state, tmux text dump, 1-window crop, PNG capture. Artefacts in `scratch/captures/`. `/commands/list` returns `{ok,commands}` not bare array. Good first move: S01 or S08. Keep mixed-mode render coexistence.
 
+## Parallel-safe second-agent lanes
+
+Use this only if 2 agents are working at once. Goal: parallelise without file collisions.
+
+Core rule:
+- Agent 1 takes ONE hotspot seam.
+- Agent 2 takes a disjoint lane with different files.
+- Avoid parallel edits to these hotspot files unless explicitly coordinated:
+  - `src/core/app-controller.ts`
+  - `src/core/window-manager.ts`
+  - `src/core/editor-coordinator.ts`
+  - `src/services/module-loader.ts`
+  - `src/services/microapp-sdk.ts`
+  - `src/services/control-api.ts`
+  - `src/core/command-catalog.ts`
+  - `src/core/command-registry.ts`
+  - `src/core/render-monitor.ts`
+  - `modules/touchlab-mvp/index.ts`
+  - `modules/zine/index.ts`
+
+Best parallel pairings:
+
+1. If Agent 1 is doing S01 render seam
+- Agent 2 can do S06 Unicode/cell audit + repro pack
+- Safe files:
+  - `src/core/grid-canvas.ts`
+  - `src/core/ansi-utils.ts`
+  - `src/services/content-measurement.ts`
+  - primer test fixtures / notes / scratch captures
+- Avoid touching:
+  - `app-controller.ts`
+  - `window-manager.ts`
+  - `editor-coordinator.ts`
+
+2. If Agent 1 is doing S01 render seam
+- Agent 2 can do S05 API audit WRITEUP first, then tiny cleanup only if file ownership is clear
+- Safe-first tasks:
+  - endpoint inventory
+  - canonical-vs-alias map
+  - deprecation candidates list
+  - update `.agents/specs/state-and-api.md`
+- Code-touch caution:
+  - `control-api.ts`, `command-registry.ts`, `command-catalog.ts` are fine only if Agent 1 is NOT also touching command/state flow
+
+3. If Agent 1 is doing S03 module host contract
+- Agent 2 can do S10 module-author docs draft in `docs/` + `modules/README.md`
+- Safe pattern:
+  - draft docs from current contract
+  - mark TODOs where S03 may change semantics
+  - final accuracy pass after S03 lands
+- Avoid editing `microapp-sdk.ts` in parallel unless coordinated
+
+4. If Agent 1 is doing S03 module host contract
+- Agent 2 can do S07 smoke/benchmark scaffolding
+- Safe files:
+  - `scripts/`
+  - `scratch/`
+  - smoke markdown reports
+  - capture helpers
+- Defer final telemetry numbers until S08 / S01 settle
+
+5. If Agent 1 is doing S08 stats surface
+- Agent 2 can do S07 dense-scene scenario definition + evidence workflow
+- Safe split:
+  - Agent 1: `render-monitor.ts`, app wiring, stats UI
+  - Agent 2: benchmark scene recipe, capture scripts, smoke checklist, artefact format
+- Do NOT both edit `render-monitor.ts`
+
+6. If Agent 1 is doing S04 composition-root extraction
+- Agent 2 can do S06 Unicode or S10 docs
+- Good because S04 is mostly `app-controller.ts` and collaborator extraction, while S06/S10 can stay elsewhere
+
+7. If Agent 1 is doing S11 animated embedding
+- Agent 2 can do S12 TouchDesigner-like design note / vocabulary doc ONLY
+- Safe split:
+  - Agent 1 changes code in SDK / animation / module embedding
+  - Agent 2 writes the composition vocabulary, operator taxonomy, and TouchLab audit notes
+- Do NOT let both agents edit `touchlab-mvp` or `zine` concurrently
+
+8. If Agent 1 is doing terminal recursion / telemetry work inside S08
+- Agent 2 can do terminal smoke artefacts and recursive run notes
+- Safe files:
+  - `scratch/`
+  - smoke scripts
+  - docs / HANDOVER / notes
+- Caution:
+  - avoid parallel edits to `modules/terminal/index.ts` or any PTY bridge files
+
+Bad pairings — avoid:
+- S01 + S04 if both need `app-controller.ts`
+- S03 + S10 if both need `microapp-sdk.ts`
+- S08 + S07 if both change `render-monitor.ts` or same stats UI surface
+- S11 + S12 if both touch `touchlab-mvp` or `zine`
+- any two agents editing `control-api.ts` / `command-catalog.ts` / `command-registry.ts` together
+
+Best current 2-agent plan from this exact handover:
+- Agent 1: S01 render seam in core (`app-controller.ts`, `window-manager.ts`, `editor-coordinator.ts`)
+- Agent 2: S06 Unicode repro pack + helper work, including known-bad primer fixtures and notes
+
+Backup 2-agent plan:
+- Agent 1: S08 stats surface
+- Agent 2: S07 benchmark scene + smoke capture workflow + artefact scripts
+
 ## Current smoke state
 
 - tmux session live: `wibwob`
