@@ -158,8 +158,8 @@ function renderRadar(width: number, height: number, args: {
 
   const frontY = 2 + ((args.tick / 2) % Math.max(3, h - 5));
   for (let x = 1; x < w - 2; x += 1) {
-    const y = Math.max(1, Math.min(h - 2, Math.round(frontY + Math.sin((x + args.tick) / 5) * 2)));
-    grid[y]![x] = args.skyMode === "eclipse" ? "#" : args.skyMode === "aurora" ? "~" : "=";
+    const y = Math.max(1, Math.min(h - 3, Math.round(frontY + Math.sin((x + args.tick) / 5) * 2)));
+    if (grid[y]) grid[y]![x] = args.skyMode === "eclipse" ? "#" : args.skyMode === "aurora" ? "~" : "=";
   }
 
   paintCentered(grid, 0, ` DREAM RADAR · ${SKY_LABELS[args.skyMode]} · ${OVERLAY_LABELS[args.overlay]} `);
