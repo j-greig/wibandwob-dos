@@ -226,7 +226,7 @@ export function openScrambleFloatingWindow(deps: ScrambleFloatingDeps): void {
 
   const renderInputEl = () => {
     const width = Math.max(1, Number(inputEl.width) || 1);
-    const cursor = inputEl === screen.focused ? "_" : " ";
+    const cursor = inputEl === screen.focused ? "█" : " ";
     const full = getDraft() + cursor;
     const rows: string[] = [];
     for (let i = 0; i < full.length || rows.length === 0; i += width) {

@@ -309,7 +309,6 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     actionKey: "openPrimerPrompt",
     multiInstance: true,
     menuPlacements: [{ category: "file", order: 20 }],
-    contextMenu: { desktop: true, order: 10 },
     api: true,
     agent: true
   },
@@ -342,7 +341,6 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     actionKey: "openTextFile",
     multiInstance: true,
     menuPlacements: [{ category: "file", order: 30 }],
-    contextMenu: { desktop: true, order: 20 },
     api: true,
     agent: true
   },
@@ -354,7 +352,6 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     actionKey: "openMarkdownViewer",
     multiInstance: true,
     menuPlacements: [{ category: "file", order: 35 }],
-    contextMenu: { desktop: true, order: 25 },
     palettePlacement: { order: 32 },
     api: true,
     agent: true
@@ -447,19 +444,17 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     multiInstance: true,
     menuPlacements: [{ category: "applications", order: 40 }],
     palettePlacement: { order: 110 },
-    contextMenu: { desktop: true, order: 50 },
     api: true,
     agent: true
   },
   {
     id: "agent.open",
-    label: "Wib&Wob Agent",
+    label: "Wib&Wob Chat",
     description: "Open (or focus) the native Wib&Wob Agent chat window.",
     group: "open",
     actionKey: "openWibWobAgent",
-    menuPlacements: [{ category: "applications", order: 120, label: "Wib&Wob Agent", favourite: true }],
+    menuPlacements: [{ category: "applications", order: 120, label: "Wib&Wob Chat", favourite: true }],
     palettePlacement: { order: 130 },
-    contextMenu: { desktop: true, order: 70 },
     api: true,
     agent: true
   },
@@ -482,7 +477,6 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     requires: ["path.monster_cam.venv"],
     menuPlacements: [{ category: "applications", order: 150, label: "Monster Cam" }],
     palettePlacement: { order: 145 },
-    contextMenu: { desktop: true, order: 80 },
     api: true,
     agent: true
   },
@@ -493,6 +487,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     group: "system",
     actionKey: "toggleTheme",
     menuPlacements: [{ category: "view", order: 30 }],
+    contextMenu: { desktop: true, order: 10 },
     palettePlacement: { order: 190 },
     api: true,
     agent: true
@@ -613,7 +608,6 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     requires: ["path.backrooms.repo"],
     menuPlacements: [{ category: "applications", order: 10 }],
     palettePlacement: { order: 0 },
-    contextMenu: { desktop: true, order: 30 },
     api: true,
     agent: true
   },
@@ -788,7 +782,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
   },
   {
     id: "companion.open",
-    label: "Scramble: Floating",
+    label: "Scramble Chat",
     description: "Open Scramble the cat as a full floating window.",
     group: "surface",
     actionKey: "openScrambleFloating",
@@ -879,7 +873,6 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     actionKey: "openWorkspaceManager",
     menuPlacements: [{ category: "window", order: 60 }],
     palettePlacement: { order: 120 },
-    contextMenu: { desktop: true, order: 40 },
     api: true,
     agent: true
   },
@@ -1020,42 +1013,58 @@ export function createMenuConfigs(actions: AppMenuActions): MenuConfig[] {
           }, [] as MenuItem[]);
       }
 
-      const all = listAppCommands()
+      const PROTOTYPE_IDS = new Set([
+        "microapp.wibwob.tr808.open",
+        "microapp.wibwob.tidepool.open",
+        "microapp.wibwob.patchbay.open",
+        "microapp.wibwob.example.hello.open",
+        "microapp.wibwob.heartbeat.open",
+        "microapp.wibwob.world.open",
+        "microapp.wibwob.example.e026.open",
+        "microapp.wibwob.touchlab.open",
+        "microapp.wibwob.poetry-clock.open",
+      ]);
+
+      const allWithIds = listAppCommands()
         .flatMap((command) =>
           command.menuPlacements
             .filter((placement) => placement.category === "applications")
             .map((placement) => ({
+              commandId: command.id,
               order: placement.order,
               label: placement.label ?? command.label,
               action: actions[command.actionKey],
               appTypes: placement.appTypes,
-              favourite: placement.favourite
+              favourite: placement.favourite,
             })),
         );
 
-      const favourites = all.filter((item) => item.favourite).sort(byPlacementOrder);
-      const rest = all.filter((item) => !item.favourite).sort((a, b) => {
-        const stripOpen = (s: string): string => s.replace(/^open\s+/i, "").toLowerCase();
-        return stripOpen(a.label).localeCompare(stripOpen(b.label));
-      });
+      const favourites = allWithIds.filter((item) => item.favourite).sort(byPlacementOrder);
+      const prototypes = allWithIds.filter((item) => !item.favourite && PROTOTYPE_IDS.has(item.commandId));
+      const rest = allWithIds.filter((item) => !item.favourite && !PROTOTYPE_IDS.has(item.commandId));
 
-      const result: MenuItem[] = favourites.map((item) => ({
+      const stripOpen = (s: string): string => s.replace(/^open\s+/i, "").toLowerCase();
+      rest.sort((a, b) => stripOpen(a.label).localeCompare(stripOpen(b.label)));
+      prototypes.sort((a, b) => stripOpen(a.label).localeCompare(stripOpen(b.label)));
+
+      const toMenuItem = (item: typeof allWithIds[0]): MenuItem => ({
         label: item.label,
         action: item.action,
-        ...(item.appTypes ? { appTypes: item.appTypes } : {})
-      }));
+        ...(item.appTypes ? { appTypes: item.appTypes } : {}),
+      });
+
+      const result: MenuItem[] = favourites.map(toMenuItem);
 
       if (favourites.length > 0 && rest.length > 0) {
         result.push({ label: "---separator---", action: () => {}, separator: true as const });
       }
 
-      result.push(
-        ...rest.map((item) => ({
-          label: item.label,
-          action: item.action,
-          ...(item.appTypes ? { appTypes: item.appTypes } : {})
-        })),
-      );
+      result.push(...rest.map(toMenuItem));
+
+      if (prototypes.length > 0) {
+        result.push({ label: "Prototypes", action: () => {}, separator: true as const });
+        result.push(...prototypes.map(toMenuItem));
+      }
 
       return result;
     })()

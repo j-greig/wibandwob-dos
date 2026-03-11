@@ -96,7 +96,14 @@ export class MenuOverlayManager {
         10,
       ) + 4;
     const height = visibleItems.length + 2;
-    const separatorLabel = "─".repeat(Math.max(1, width - 4));
+    const makeSeparator = (item: MenuItem): string => {
+      const sectionName = item.label && item.label !== "---separator---" ? item.label : "";
+      if (sectionName) {
+        const pad = Math.max(1, Math.floor((width - 4 - sectionName.length - 2) / 2));
+        return "─".repeat(pad) + " " + sectionName + " " + "─".repeat(Math.max(1, width - 4 - pad - sectionName.length - 2));
+      }
+      return "─".repeat(Math.max(1, width - 4));
+    };
     const findNextSelectable = (startIndex: number, direction: 1 | -1, wrap: boolean): number => {
       if (visibleItems.length === 0) {
         return -1;
@@ -131,7 +138,7 @@ export class MenuOverlayManager {
         border: theme().windowBorderFocused,
         selected: theme().selected
       },
-      items: visibleItems.map((item) => (item.separator ? separatorLabel : item.label))
+      items: visibleItems.map((item) => (item.separator ? makeSeparator(item) : item.label))
     });
     this.menuList.setFront();
     this.openMenuLabel = label;

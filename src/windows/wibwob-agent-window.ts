@@ -31,7 +31,7 @@ export function openWibWobAgentWindow(params: {
   initialPos?: { top: number; left: number; width: number; height: number };
   onStateChanged?: () => void;
 }): void {
-  const frame = params.windowManager.createFrame(params.title ?? "Wib&Wob Agent", "chat");
+  const frame = params.windowManager.createFrame(params.title ?? "Wib&Wob Chat", "chat");
   let lastSessionList: LocalSessionInfo[] | undefined;
 
   // Restore position/size if reloading
@@ -168,7 +168,7 @@ export function openWibWobAgentWindow(params: {
 
   const renderInput = () => {
     const width = Math.max(1, Number(input.width) || 1);
-    const cursor = input === params.screen.focused ? "_" : " ";
+    const cursor = input === params.screen.focused ? "█" : " ";
     const full = draft + cursor;
 
     // Word-wrap the draft into rows of (width) chars

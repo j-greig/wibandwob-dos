@@ -136,24 +136,54 @@ export class ShellChromeController {
     this.deps.screen.key(["C-r"], () => this.deps.onRestart());
   }
 
+  // ── Kaomoji mood rotation ───────────────────────────────────────────
+  // Cycles through emotional states every ~5 minutes with a brief blink
+  // transition. Each mood has a resting face and a blink (eyes-closed) face.
+
+  private static readonly MOODS: Array<{ rest: string; blink: string }> = [
+    { rest: "༼ﾂ◕‿◕‿◕༽ﾂ",   blink: "༼ﾂ-‿-‿-༽ﾂ"    },  // content
+    { rest: "(ﾉ◕ヮ◕)ﾉ*:・ﾟ✧", blink: "(ﾉ-ヮ-)ﾉ*:・ﾟ✧"  },  // excited
+    { rest: "( ˘ ³˘)♥",       blink: "( ˘ -˘)♥"       },  // affectionate
+    { rest: "ʕ•ᴥ•ʔ",         blink: "ʕ-ᴥ-ʔ"          },  // bearish
+    { rest: "(づ｡◕‿‿◕｡)づ",   blink: "(づ｡-‿‿-｡)づ"    },  // huggy
+    { rest: "٩(◕‿◕｡)۶",      blink: "٩(-‿-｡)۶"       },  // celebratory
+    { rest: "( ͡° ͜ʖ ͡°)",     blink: "( ͡- ͜ʖ ͡-)"     },  // mischievous
+    { rest: "(⊙_⊙)",         blink: "(-_-)"           },  // surprised
+    { rest: "◖⚆ᴥ⚆◗",        blink: "◖-ᴥ-◗"          },  // watchful
+    { rest: "♪(´ε` )",       blink: "♪(´- ` )"        },  // musical
+    { rest: "(ᵔᴥᵔ)",         blink: "(-ᴥ-)"           },  // puppy
+    { rest: "⸜(｡˃ ᵕ ˂ )⸝♡",  blink: "⸜(｡- ᵕ - )⸝♡"   },  // smitten
+  ];
+
+  private moodIndex = Math.floor(Math.random() * ShellChromeController.MOODS.length);
+
   private getStatusKaomoji(): string {
-    return this.kaomojiBlink ? "༼ﾂ-‿-‿-༽ﾂ" : "༼ﾂ◕‿◕‿◕༽ﾂ";
+    const mood = ShellChromeController.MOODS[this.moodIndex];
+    return this.kaomojiBlink ? mood.blink : mood.rest;
   }
 
   private startKaomojiBlink(): void {
     if (this.kaomojiTimer) return;
     const scheduleNext = () => {
-      const delay = 120_000 + Math.random() * 60_000;
+      // Change mood every 4-6 minutes
+      const delay = 240_000 + Math.random() * 120_000;
       this.kaomojiTimer = setTimeout(() => {
+        // Blink transition
         this.kaomojiBlink = true;
         this.renderTopKaomoji();
         this.deps.screen.render();
         setTimeout(() => {
+          // Pick a new mood (different from current)
+          const prev = this.moodIndex;
+          const moods = ShellChromeController.MOODS;
+          do {
+            this.moodIndex = Math.floor(Math.random() * moods.length);
+          } while (moods.length > 1 && this.moodIndex === prev);
           this.kaomojiBlink = false;
           this.renderTopKaomoji();
           this.deps.screen.render();
           scheduleNext();
-        }, 250);
+        }, 300);
       }, delay);
     };
     scheduleNext();
