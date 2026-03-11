@@ -8,6 +8,9 @@ export class MenuOverlayManager {
   private popupMenu?: List;
   private menuShadow?: Box;
   private popupShadow?: Box;
+  private submenuList?: List;
+  private submenuShadow?: Box;
+  private submenuItems?: MenuItem[];
   private openMenuLabel?: string;
   private menuTargets: Box[] = [];
 
@@ -158,12 +161,28 @@ export class MenuOverlayManager {
         }
         return;
       }
+      if (selectedItem.children?.length) {
+        // Open submenu to the right
+        const menuLeft = menu.left;
+        const rowY = 1 + 1 + index; // menu top (1) + border (1) + row
+        this.openSubmenu(selectedItem.children, menuLeft, width, rowY);
+        return;
+      }
       this.closeMenu();
       selectedItem.action();
     });
     this.menuList.on("keypress", (_, key) => {
       if (key.name === "escape") {
         this.closeMenu();
+        return;
+      }
+      if (key.name === "right") {
+        const idx = (this.menuList as any).selected as number;
+        const item = visibleItems[idx];
+        if (item?.children?.length) {
+          const rowY = 1 + 1 + idx;
+          this.openSubmenu(item.children, menu.left, width, rowY);
+        }
         return;
       }
       if (key.name !== "up" && key.name !== "down" && key.name !== "k" && key.name !== "j") {
@@ -211,7 +230,81 @@ export class MenuOverlayManager {
     this.screen.render();
   }
 
+  private closeSubmenu(): void {
+    if (this.submenuList) {
+      this.submenuList.destroy();
+      this.submenuList = undefined;
+      this.submenuItems = undefined;
+    }
+    if (this.submenuShadow) {
+      this.destroyShadow(this.submenuShadow);
+      this.submenuShadow = undefined;
+    }
+  }
+
+  private openSubmenu(children: MenuItem[], parentLeft: number, parentWidth: number, rowY: number): void {
+    this.closeSubmenu();
+    this.submenuItems = children;
+
+    const width = Math.max(
+      ...children.filter(c => !c.separator).map(c => c.label.length),
+      10,
+    ) + 4;
+    const height = children.length + 2;
+    const left = parentLeft + parentWidth - 1;
+    const top = rowY;
+
+    // Clamp to screen
+    const screenW = Number(this.screen.width) || 80;
+    const screenH = Number(this.screen.height) || 24;
+    const clampedLeft = left + width > screenW ? parentLeft - width + 1 : left;
+    const clampedTop = top + height > screenH ? Math.max(1, screenH - height) : top;
+
+    this.submenuShadow = this.createShadow(clampedLeft, clampedTop, width, height);
+    this.submenuList = blessed.list({
+      parent: this.screen,
+      top: clampedTop,
+      left: clampedLeft,
+      width,
+      height,
+      border: "line",
+      keys: true,
+      vi: true,
+      mouse: true,
+      style: {
+        ...theme().body,
+        border: theme().windowBorderFocused,
+        selected: theme().selected,
+      },
+      items: children.map(c => c.separator ? "─".repeat(width - 4) : c.label),
+    });
+    this.submenuList.setFront();
+    this.submenuList.focus();
+    this.submenuList.select(0);
+
+    this.submenuList.on("select", (_, index) => {
+      const item = children[index];
+      if (!item || item.separator) return;
+      this.closeSubmenu();
+      this.closeMenu();
+      item.action();
+    });
+
+    this.submenuList.on("keypress", (_, key) => {
+      if (key.name === "escape" || key.name === "left") {
+        this.closeSubmenu();
+        if (this.menuList) {
+          this.menuList.focus();
+          this.screen.render();
+        }
+      }
+    });
+
+    this.screen.render();
+  }
+
   closeMenu(): void {
+    this.closeSubmenu();
     if (!this.menuList) {
       return;
     }

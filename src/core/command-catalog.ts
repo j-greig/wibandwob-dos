@@ -1062,8 +1062,11 @@ export function createMenuConfigs(actions: AppMenuActions): MenuConfig[] {
       result.push(...rest.map(toMenuItem));
 
       if (prototypes.length > 0) {
-        result.push({ label: "Prototypes", action: () => {}, separator: true as const });
-        result.push(...prototypes.map(toMenuItem));
+        result.push({
+          label: "Prototypes  ▸",
+          action: () => {},
+          children: prototypes.map(toMenuItem),
+        });
       }
 
       return result;

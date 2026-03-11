@@ -340,6 +340,7 @@ export interface MenuItem {
   action: () => void;
   appTypes?: string[];
   separator?: true;
+  children?: MenuItem[];
 }
 
 export interface MenuConfig {
