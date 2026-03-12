@@ -434,13 +434,13 @@ export default function setup(host: MicroappHost) {
       });
       infoBox.hide();
 
-      // Cats — docked bottom-right, float above everything
-      const art = dockTo(root, WIBWOB_ART.join("\n"), {
-        anchor: "bottom-right",
-        width: ART_W, height: ART_H,
-        minParentWidth: ART_W + 6, minParentHeight: ART_H + 10,
-        margin: 2,
-      }, host.theme().body);
+      // Cats — plain box, bottom-right, floats above everything
+      const catBox = blessed.box({
+        parent: root, width: ART_W, height: ART_H,
+        content: WIBWOB_ART.join("\n"),
+        style: host.theme().body,
+      });
+      catBox.hide();
 
       // ── XL grid ─────────────────────────────────────────────────
       const xlGrid = createGrid(root, {
@@ -551,11 +551,20 @@ export default function setup(host: MicroappHost) {
           contourBox.hide(); clockBox.hide(); statsBox.hide(); infoBox.hide();
         }
 
+        // Cats: visible at XL/L only (hide when figlet downgrades)
+        const showCats = mode === "xl" || mode === "l";
+        if (showCats) {
+          catBox.show();
+          catBox.top = h - ART_H - 2;   // 2 = 1 status bar + 1 margin
+          catBox.left = w - ART_W - 1;
+        } else {
+          catBox.hide();
+        }
+
         // Z-order: toolbar above content, cats above everything
         if (showToolbar) toolbar.setFront();
         statusBar.setFront();
-        art.layout(w, h - 2);  // -2 for status bar
-        if (art.visible) art.node.setFront();
+        if (showCats) catBox.setFront();
 
         host.screen.render();
       }
@@ -595,7 +604,7 @@ export default function setup(host: MicroappHost) {
         const w = Number(root.width) || 60;
         const title = responsiveFiglet("HELLO WORLD", w);
         const parts = [title];
-        if (art.visible) parts.push("", WIBWOB_ART.join("\n"));
+        if (catBox.visible) parts.push("", WIBWOB_ART.join("\n"));
         return parts.join("\n");
       });
 
@@ -609,13 +618,13 @@ export default function setup(host: MicroappHost) {
         clockBox.style = { ...t.body, border: { fg: t.muted.fg } };
         statsBox.style = { ...t.body, border: { fg: t.muted.fg } };
         infoBox.style = t.body;
-        art.node.style = t.body;
+        catBox.style = t.body;
       });
 
       win.onCleanup(() => {
         host.screen.off("keypress", handleKeypress);
         clearTimers(timers);
-        art.destroy();
+        catBox.destroy();
       });
 
       win.focus();
