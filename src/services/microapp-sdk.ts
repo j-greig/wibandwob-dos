@@ -234,6 +234,15 @@ export { createTimer, clearTimers } from "../core/ui-primitives.js";
 // Scroll helpers — use with scrollable blessed boxes
 export { createScrollbar, scrollableStyle } from "../core/ui-primitives.js";
 
+// Form controls — buttons, checkboxes, radio groups, selects
+export { createButton, createCheckbox, createRadioGroup, createSelect } from "../core/ui-parts-forms.js";
+export type {
+  ButtonOptions, ButtonHandle, CheckboxOptions, CheckboxHandle,
+  RadioOption, RadioGroupOptions, RadioGroupHandle,
+  SelectOption, SelectOptions, SelectHandle,
+  ChangeEvent, SelectEvent,
+} from "../core/ui-parts-forms.js";
+
 // Motion / tween — animate values, window position and size smoothly
 export { tween, tweenWindowPosition, tweenWindowSize, EASINGS } from "./motion-service.js";
 export type { EasingFn, TweenOpts } from "./motion-service.js";

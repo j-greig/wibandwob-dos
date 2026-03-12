@@ -11,6 +11,17 @@ import type { FramePlayer } from "../services/animation-service.js";
 import { theme } from "./theme/resolver.js";
 import { createScrollbar, safeSetStyle, scrollableStyle } from "./ui-primitives.js";
 
+// Re-export form controls
+export {
+  createButton, createCheckbox, createRadioGroup, createSelect,
+} from "./ui-parts-forms.js";
+export type {
+  ButtonOptions, ButtonHandle, CheckboxOptions, CheckboxHandle,
+  RadioOption, RadioGroupOptions, RadioGroupHandle,
+  SelectOption, SelectOptions, SelectHandle,
+  ChangeEvent, SelectEvent,
+} from "./ui-parts-forms.js";
+
 /** @primitive */
 export type Rect = { top: number; left: number; width: number; height: number };
 
