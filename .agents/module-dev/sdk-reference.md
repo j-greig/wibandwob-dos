@@ -341,6 +341,140 @@ const spinner = createSpinner({
 Auto-starts on creation. Animated braille frames by default.
 Call `destroy()` or `stop()` to clean up the internal timer.
 
+### createToast
+
+```typescript
+createToast({
+  message: "Saved!",
+  severity: "success",     // "info" | "success" | "warning" | "error"
+  parent: win.body,        // required — positions at bottom of this node
+  duration: 3000,          // optional, ms, default 3000
+});
+// Returns { dismiss() } for manual removal
+```
+
+Per-window auto-dismissing notification. Non-blocking (does not steal focus).
+Colour-coded by severity. Auto-cleans up after duration.
+
+---
+
+## Navigation
+
+### createFilterableList
+
+```typescript
+const list = createFilterableList({
+  items: [
+    { label: "Apple", value: "apple" },
+    { label: "Banana", value: "banana" },
+  ],
+  placeholder: "Search...",  // optional
+  onSelect: (e) => {         // e: SelectEvent<string>
+    console.log(e.value);
+  },
+});
+// list.filter()    → current search query
+// list.selected()  → value of focused item
+```
+
+Type to filter, Arrow Up/Down to navigate, Enter to select, Escape to clear,
+Backspace to edit query. Height = 1 (search row) + visible items.
+
+### createFormField
+
+```typescript
+const field = createFormField({
+  label: "Username",
+  help: "Letters and numbers only",  // optional
+  error: "Required field",           // optional, shows in red
+  child: someLayoutPart,             // any LayoutPart
+});
+// field.update({ error: "" })  → clears error
+```
+
+Wraps any LayoutPart child with label, optional help text, optional error text.
+Height = 1 (label) + child + (1 if help) + (1 if error).
+
+### createTextArea
+
+```typescript
+const ta = createTextArea({
+  placeholder: "Type notes...",  // optional
+  rows: 4,                      // optional, fills available height if omitted
+  value: "",                    // optional
+  onChange: (e) => {            // e: ChangeEvent<string>
+    console.log(e.value);
+  },
+  disabled: false,              // optional
+});
+// ta.value()  → current text
+```
+
+Multiline text input using blessed.textarea. Bordered.
+Focus to type, placeholder shown when empty and blurred.
+
+---
+
+## Data Display
+
+### createKeyValuePanel
+
+```typescript
+const kv = createKeyValuePanel({
+  entries: [
+    { key: "Name", value: "Antopolis" },
+    { key: "Population", value: "142" },
+  ],
+  border: true,    // optional
+  label: "Stats",  // optional (requires border)
+  keyWidth: 12,    // optional, auto-calculated if omitted
+});
+// kv.update({ entries: newEntries })
+```
+
+Aligned key-value pairs. Auto-calculates key column width.
+Truncates values on narrow resize.
+
+### createLogView
+
+```typescript
+const log = createLogView({
+  maxEntries: 50,     // optional, default 100
+  autoscroll: true,   // optional, default true
+  border: true,       // optional
+  label: "Events",    // optional
+});
+log.append({ text: "Reactor online", severity: "success" });
+log.append("Plain message");  // string shorthand, severity defaults to "info"
+// log.clear()
+// log.entries()  → readonly LogEntry[]
+```
+
+Rolling event log. Severity prefixes: info=`  `, success=`+ `, warning=`~ `, error=`! `.
+
+### createDataTable
+
+```typescript
+const table = createDataTable({
+  columns: [
+    { key: "name", label: "Name" },           // flex width
+    { key: "role", label: "Role", width: 10 }, // fixed width
+  ],
+  rows: [
+    { name: "Alice", role: "Engineer" },
+    { name: "Bob", role: "Designer" },
+  ],
+  sortable: true,        // optional
+  onSelect: (row, idx) => console.log(row.name),  // optional
+});
+// table.selectedIndex()  → number
+// table.selectedRow()    → Record<string, string> | undefined
+// table.update({ rows: newRows })
+```
+
+Arrow Up/Down navigates, Enter selects. Column headers with `|` separators.
+Flex columns share remaining space proportionally. Truncates with `~` on narrow.
+
 ---
 
 ## SDK Primitives

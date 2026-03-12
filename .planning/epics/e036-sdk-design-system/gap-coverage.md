@@ -6,14 +6,14 @@ Maps every gap from `gap-analysis.md` §2 to its E036 feature or deferral status
 
 | Gap (from analysis §2) | Level | E036 Feature | Status |
 |-------------------------|-------|-------------|--------|
-| Form controls | High | F01 (button, checkbox), F02 (radio, select), F03 (textarea) | F01+F02 DONE, F03 deferred |
-| Form model / validation | High | F03 (createFormField with label/help/error) | Partially covered — full validation layer deferred |
-| Data table primitive | High | F04 (createDataTable) | Covered |
+| Form controls | High | F01 (button, checkbox), F02 (radio, select), F03 (textarea) | ALL DONE (F01+F02+F03) |
+| Form model / validation | High | F03 (createFormField with label/help/error) | DONE (createFormField with label/help/error) |
+| Data table primitive | High | F04 (createDataTable) | DONE |
 | Progress + status widgets | Med-High | F06 (createProgressBar, createSpinner) | DONE |
-| Notification patterns | Medium | F07 (createToast) | Partially covered — confirm dialog deferred |
+| Notification patterns | Medium | F07 (createToast) | DONE (toast; confirm dialog deferred) |
 | Command/quick action UI | Medium | — | Deferred — app-level palette exists, module-local deferred |
-| List/select patterns | Medium | F08 (createFilterableList) | Covered |
-| Rich text rendering primitives | Medium | F05 (createKeyValuePanel, createLogView) | Partially covered — panel/columns/tree deferred |
+| List/select patterns | Medium | F08 (createFilterableList) | DONE |
+| Rich text rendering primitives | Medium | F05 (createKeyValuePanel, createLogView) | DONE (KV panel + log view; tree deferred) |
 | Layout container variants | Medium | — | Deferred — centering/flow wrappers not in scope |
 | Component state variants | Medium | F00 (component behaviour contract, variant model) | DONE |
 | Design tokens / scale | Medium | F00 (spacing scale, control heights, density) | DONE |

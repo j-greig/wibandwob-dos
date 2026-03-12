@@ -122,28 +122,28 @@ Selection controls.
 ### F03 — Forms family: createTextArea + createFormField (SHOULD)
 Text editing and field wrapper.
 
-- [ ] `createTextArea({ value?, onChange, rows? })` — multiline text input
-- [ ] `createFormField({ label, help?, error?, child })` — wrapper that adds label/help/error chrome around any form control
-- [ ] Error state visually distinct (uses variant model)
+- [x] `createTextArea({ value?, onChange, rows? })` — multiline text input
+- [x] `createFormField({ label, help?, error?, child })` — wrapper that adds label/help/error chrome around any form control
+- [x] Error state visually distinct (uses variant model)
 
 ### F04 — Data display: createDataTable (SHOULD)
 Canonical sortable table.
 
-- [ ] `createDataTable({ columns, rows, sortable?, onSelect? })`
-- [ ] Column headers, row selection, keyboard navigation
-- [ ] Sorting is client-side only
-- [ ] Column widths: flex by default (proportional to content), fixed override option
-- [ ] Fits inside createStack/createGrid cells
-- [ ] Handles resize gracefully (column truncation, not crush)
+- [x] `createDataTable({ columns, rows, sortable?, onSelect? })`
+- [x] Column headers, row selection, keyboard navigation
+- [x] Sorting is client-side only
+- [x] Column widths: flex by default (proportional to content), fixed override option
+- [x] Fits inside createStack/createGrid cells
+- [x] Handles resize gracefully (column truncation, not crush)
 
 ### F05 — Data display: createKeyValuePanel + createLogView (SHOULD)
 Structured data display.
 
-- [ ] `createKeyValuePanel({ entries: Array<{key, value}>, border? })`
-- [ ] Aligned key-value pairs, respects theme tokens
-- [ ] `createLogView({ maxEntries?, autoscroll?, severity? })` — rolling event log
-- [ ] Log: capped history, auto-scroll to bottom, optional severity prefixes
-- [ ] Both Antopolis and Terrarium Life built this pattern ad-hoc — SDK-ise it
+- [x] `createKeyValuePanel({ entries: Array<{key, value}>, border? })`
+- [x] Aligned key-value pairs, respects theme tokens
+- [x] `createLogView({ maxEntries?, autoscroll?, severity? })` — rolling event log
+- [x] Log: capped history, auto-scroll to bottom, optional severity prefixes
+- [x] Both Antopolis and Terrarium Life built this pattern ad-hoc — SDK-ise it
 
 ### F06 — Feedback: createProgressBar + createSpinner (MUST)
 Progress indication.
@@ -157,32 +157,32 @@ Progress indication.
 ### F07 — Feedback: createToast (SHOULD)
 Transient notification.
 
-- [ ] `createToast({ message, duration?, severity? })` — auto-dismissing notification
-- [ ] Severity: info / success / warning / error
-- [ ] Per-window, positions at bottom of parent (not screen-level singleton)
-- [ ] Non-blocking (does not steal focus)
-- [ ] Auto-cleanup after duration
+- [x] `createToast({ message, duration?, severity? })` — auto-dismissing notification
+- [x] Severity: info / success / warning / error
+- [x] Per-window, positions at bottom of parent (not screen-level singleton)
+- [x] Non-blocking (does not steal focus)
+- [x] Auto-cleanup after duration
 
 ### F08 — Navigation: createFilterableList (SHOULD)
 Unified search+select pattern.
 
-- [ ] `createFilterableList({ items, onSelect, placeholder? })`
-- [ ] Inline search filters the list as you type
-- [ ] Keyboard: type to filter, arrows to navigate, Enter to select
-- [ ] Replaces ad-hoc combinations of createInlineSearch + createSelectableList
+- [x] `createFilterableList({ items, onSelect, placeholder? })`
+- [x] Inline search filters the list as you type
+- [x] Keyboard: type to filter, arrows to navigate, Enter to select
+- [x] Replaces ad-hoc combinations of createInlineSearch + createSelectableList
 
 ### F09 — Integration proof, migration, docs (MUST)
 Prove the family works together and lands in real modules.
 
-- [ ] Build one `demo-forms-playground` module using all MUST components
-- [ ] Migrate 2 existing modules to use new SDK components:
+- [x] Build one `demo-forms-playground` module using all MUST components
+- [x] Migrate 2 existing modules to use new SDK components:
   - terrarium/terrarium-life: replace ad-hoc log with createLogView (if F05 lands)
   - At least one module adopts createButton or createProgressBar
-- [ ] Update sdk-reference.md with full forms/data/feedback sections
-- [ ] Update component family map in sdk-reference.md
-- [ ] Update examples-by-tier.md if forms-playground becomes canonical
-- [ ] Update AGENTS.md if tier table changes
-- [ ] Verify all new components survive resize (wide→narrow→wide)
+- [x] Update sdk-reference.md with full forms/data/feedback sections
+- [x] Update component family map in sdk-reference.md
+- [x] Update examples-by-tier.md if forms-playground becomes canonical
+- [x] Update AGENTS.md if tier table changes
+- [x] Verify all new components survive resize (wide→narrow→wide)
 
 ## Migration policy
 
