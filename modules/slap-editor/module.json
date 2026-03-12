@@ -1,0 +1,20 @@
+{
+  "name": "slap-editor",
+  "version": "0.1.0",
+  "description": "Sublime-like code editor window — edit files with syntax highlighting, undo/redo, find",
+  "type": "microapp",
+  "entry": "index.ts",
+  "microapp": {
+    "id": "wibwob.slap-editor",
+    "title": "Code Editor (Slap)",
+    "description": "Open a code editor window. Pass filePath to edit a file, or open empty.",
+    "multiInstance": true,
+    "persist": false,
+    "menu": [
+      { "category": "applications", "order": 15, "label": "Code Editor" }
+    ],
+    "palette": { "order": 115, "label": "Code Editor" },
+    "agent": true,
+    "api": true
+  }
+}
