@@ -1,7 +1,16 @@
 # E035 Layout SDK Buildout — Human Briefing
 
-**Branch:** `epic/e035-layout-sdk-buildout` (12 commits)
-**Status:** 74/86 tasks done. Typecheck clean. Visual verification passed.
+**Branch:** `epic/e035-layout-sdk-buildout` (19 commits)
+**Status:** Ready for sign-off. Typecheck clean. Visual verified. Two gpt53 review passes actioned.
+
+## QUICK-FIRE DECISIONS (60 seconds)
+
+1. Dashboard: keep on contrib.grid, exempt from SDK migration? **Y/N**
+2. Proving-ground demos: delete 6, keep 4 strongest? **Y/N**
+3. Private modules: any exist that need migrating? **paths / none**
+4. Parking lot: confirm nothing parked? **Y/N**
+
+Recommended answers: Y, Y, none, Y — then I close the epic.
 
 ## What changed
 
