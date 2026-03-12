@@ -227,25 +227,25 @@ export default function setup(host: MicroappHost) {
       // Banner area — transparent container, no border
       const bannerBox = blessed.box({
         parent: root, top: 0, left: 0, width: 0, height: 0,
-        style: host.theme().body,
+        style: { ...host.theme().body, bg: "yellow" },
       });
       // Inner text box — tight-fit to figlet, positioned within bannerBox
       const bannerText = blessed.box({
         parent: bannerBox, top: 0, left: 0, width: 0, height: 0,
-        style: host.theme().body,
+        style: { ...host.theme().body, bg: "yellow" },
       });
 
       const contourBox = blessed.box({
         parent: root, top: 0, left: 0, width: 0, height: 0,
         border: "line", label: " contour ",
-        style: { ...host.theme().body, border: { fg: host.theme().muted.fg } },
+        style: { ...host.theme().body, bg: "red", border: { fg: host.theme().muted.fg } },
       });
       contourBox.hide();
 
       const clockBox = blessed.box({
         parent: root, top: 0, left: 0, width: 0, height: 0,
         border: "line", label: " clock ",
-        style: { ...host.theme().body, border: { fg: host.theme().muted.fg } },
+        style: { ...host.theme().body, bg: "blue", border: { fg: host.theme().muted.fg } },
       });
       clockBox.hide();
 
@@ -260,14 +260,14 @@ export default function setup(host: MicroappHost) {
       const statsBox = blessed.box({
         parent: root, top: 0, left: 0, width: 0, height: 0,
         border: "line", label: " stats ",
-        style: { ...host.theme().body, border: { fg: host.theme().muted.fg } },
+        style: { ...host.theme().body, bg: "green", border: { fg: host.theme().muted.fg } },
       });
       statsBox.hide();
 
       const infoBox = blessed.box({
         parent: root, top: 0, left: 0, width: 0, height: 0,
         content: INFO_TEXT,
-        style: host.theme().body,
+        style: { ...host.theme().body, bg: "magenta" },
       });
       infoBox.hide();
 
@@ -275,7 +275,7 @@ export default function setup(host: MicroappHost) {
       const catBox = blessed.box({
         parent: root, width: ART_W, height: ART_H,
         content: WIBWOB_ART.join("\n"),
-        style: host.theme().body,
+        style: { ...host.theme().body, bg: "cyan" },
       });
       catBox.hide();
 
@@ -366,45 +366,48 @@ export default function setup(host: MicroappHost) {
         const gridTop = contentTop + bannerAllocH;
         const gridH = Math.max(4, h - gridTop - 1);
 
-        // Helper: hide + collapse to zero so blessed clears the old region
+        // Helper: detach hidden nodes so blessed fully clears the old region.
+        // hide() + 0x0 alone leaves ghost borders; detach is the nuclear fix.
         const collapse = (node: blessed.Widgets.BoxElement) => {
           node.hide();
-          applyRect(node, { top: 0, left: 0, width: 0, height: 0 });
+          if (node.parent) node.detach();
+        };
+        const reveal = (node: blessed.Widgets.BoxElement) => {
+          if (!node.parent) root.append(node);
+          node.show();
         };
 
         if (mode === "xl") {
-          contourBox.show(); clockBox.show(); statsBox.show();
-          collapse(infoBox);
+          reveal(contourBox); reveal(clockBox); reveal(statsBox);
+          collapse(infoBox); collapse(catBox);
           xlGrid.layout({ top: gridTop, left: 0, width: w, height: gridH });
           updateContour(); updateClock(); updateStats(mode, w, h);
+          // Cats float over grid at XL
+          reveal(catBox);
+          catBox.top = Math.max(contentTop, h - ART_H - 1);
+          catBox.left = Math.max(0, w - ART_W - 1);
         } else if (mode === "l") {
-          contourBox.show(); clockBox.show();
+          reveal(contourBox); reveal(clockBox);
           collapse(statsBox); collapse(infoBox);
           const half = Math.floor((w - 1) / 2);
           applyRect(contourBox, { top: gridTop, left: 0, width: half, height: gridH });
           applyRect(clockBox,   { top: gridTop, left: half + 1, width: w - half - 1, height: gridH });
           updateContour(); updateClock();
+          // Cats float over panels at L
+          reveal(catBox);
+          catBox.top = Math.max(contentTop, h - ART_H - 1);
+          catBox.left = Math.max(0, w - ART_W - 1);
         } else if (mode === "m") {
-          collapse(contourBox); collapse(clockBox); collapse(statsBox);
-          infoBox.show();
+          collapse(contourBox); collapse(clockBox); collapse(statsBox); collapse(catBox);
+          reveal(infoBox);
           applyRect(infoBox, { top: gridTop, left: 1, width: Math.min(40, w - 2), height: Math.max(2, gridH) });
         } else {
-          collapse(contourBox); collapse(clockBox); collapse(statsBox); collapse(infoBox);
-        }
-
-        // Cats: visible at XL/L only
-        const showCats = mode === "xl" || mode === "l";
-        if (showCats) {
-          catBox.show();
-          catBox.top = h - ART_H + 1;
-          catBox.left = w - ART_W - 1;
-        } else {
-          collapse(catBox);
+          collapse(contourBox); collapse(clockBox); collapse(statsBox); collapse(infoBox); collapse(catBox);
         }
 
         // Z-order: toolbar above content, cats above everything
         if (showToolbar) toolbar.setFront();
-        if (showCats) catBox.setFront();
+        if (catBox.visible) catBox.setFront();
 
         host.screen.render();
       }
@@ -420,13 +423,22 @@ export default function setup(host: MicroappHost) {
       win.onResize(doLayout);
 
       // Helper: extract rect from a blessed node
-      const nodeRect = (n: blessed.Widgets.BoxElement) => ({
-        top: Number(n.top) || 0, left: Number(n.left) || 0,
-        width: Number(n.width) || 0, height: Number(n.height) || 0,
-      });
-      const regionInfo = (n: blessed.Widgets.BoxElement) => ({
-        visible: n.visible, rect: nodeRect(n), collapsed: !n.visible && (Number(n.width) || 0) === 0,
-      });
+      const nodeRect = (n: blessed.Widgets.BoxElement) => {
+        // Detached nodes have no parent; reading width/height can throw in blessed
+        if (!n.parent) return { top: 0, left: 0, width: 0, height: 0 };
+        return {
+          top: Number(n.top) || 0, left: Number(n.left) || 0,
+          width: Number(n.width) || 0, height: Number(n.height) || 0,
+        };
+      };
+      const regionInfo = (n: blessed.Widgets.BoxElement) => {
+        const rect = nodeRect(n);
+        return {
+          visible: n.visible,
+          rect,
+          collapsed: !n.parent || (!n.visible && rect.width === 0 && rect.height === 0),
+        };
+      };
 
       win.describeState(() => {
         const w = Number(root.width) || 0, h = Number(root.height) || 0;

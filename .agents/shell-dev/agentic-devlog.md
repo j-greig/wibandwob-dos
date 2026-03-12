@@ -493,3 +493,26 @@ Diagnosis path:
 2. Bun spawn test in isolation → works fine, produces data
 3. Realised: no `-re` = decodes at max CPU speed, finishes instantly
 4. Add `-re` → ffmpeg process stays alive, ps shows it, bars animate
+
+### 2026-03-12 — Hello World responsive ghost panels + layout introspection
+
+We hit repeated ghost artifacts while resizing `demo-hello-world` from larger modes
+(XL/L) down to M/S. Visual-only debugging was too slow and ambiguous.
+
+What changed:
+- Added explicit region collapse/reveal flow in layout transitions.
+  Hidden regions now detach from parent (instead of hide-only), which avoids
+  stale border repaint artefacts in blessed.
+- Added safer region geometry reporting in `describeState()` under `layoutReport`
+  with per-region visibility + rect + collapsed state.
+- Added `scripts/layout-sweep.sh` to drive a module through breakpoint sizes and
+  print a diffable region-state report from `/state` at each step.
+- Added temporary per-region debug background colours in hello-world so ghost
+  surfaces can be identified instantly by colour in live runs.
+- Fixed cat overlay positioning to keep it inside viewport bounds (`top/left`
+  clamped), reducing overflow artefacts near window bottom.
+
+Human note:
+`layoutReport` should be globalised / SDK-ised. It currently lives inside the
+hello-world module implementation. This should become a shared SDK helper +
+canonical schema for all responsive modules so layout diagnostics are not bespoke.
