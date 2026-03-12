@@ -89,7 +89,7 @@ The outcome is not just "new primitives exist." The outcome is:
 - [x] Fix `createTextBlock` zero-width crash path
 - [x] Clean up resize double-fire / cascading relayout behavior
 - [x] Keep `win.onResize(() => root.layout(...))` as the recommended module pattern
-- [ ] Verify narrow resize no longer crashes or behaves pathologically
+- [x] Verify narrow resize no longer crashes or behaves pathologically (all 4 test modules survived 5x5 narrow and back)
 
 ### F06 — Proof ports
 - [x] Port `hello-world` to final SDK names and helpers (removed inline layout primitives, uses SDK createGrid)
