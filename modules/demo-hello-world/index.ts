@@ -24,6 +24,7 @@ import {
   createGrid,
   createNodePart,
   applyRect,
+  createLayoutReporter,
 } from "../../src/services/microapp-sdk.js";
 
 // ── compass alignment ─────────────────────────────────────────────────────
@@ -124,6 +125,17 @@ export default function setup(host: MicroappHost) {
       const root = blessed.box({
         parent: win.body, top: 0, left: 0, right: 0, bottom: 0,
         mouse: true, clickable: true,
+        style: host.theme().body,
+      });
+
+      // Backplate: force full-body repaint on every layout pass.
+      // This clears stale glyphs left by detached/hid panels in blessed.
+      const backplate = blessed.box({
+        parent: root,
+        top: 0,
+        left: 0,
+        width: 0,
+        height: 0,
         style: host.theme().body,
       });
 
@@ -279,6 +291,17 @@ export default function setup(host: MicroappHost) {
       });
       catBox.hide();
 
+      const layoutReporter = createLayoutReporter({
+        backplate,
+        toolbar,
+        banner: bannerBox,
+        contour: contourBox,
+        clock: clockBox,
+        stats: statsBox,
+        info: infoBox,
+        cats: catBox,
+      });
+
       // ── XL grid — uses SDK createGrid with object-form set ──────
       const xlGrid = createGrid(root, {
         rows: 2, columns: 2,
@@ -323,6 +346,9 @@ export default function setup(host: MicroappHost) {
         const w = Math.max(10, Number(root.width) || 60);
         const h = Math.max(5, Number(root.height) || 20);
         const mode = pickMode(w, h);
+
+        applyRect(backplate, { top: 0, left: 0, width: w, height: h });
+        backplate.setBack();
 
         // ── Responsive title ──
         const banner = responsiveFiglet("HELLO WORLD", w);
@@ -422,24 +448,6 @@ export default function setup(host: MicroappHost) {
       doLayout();
       win.onResize(doLayout);
 
-      // Helper: extract rect from a blessed node
-      const nodeRect = (n: blessed.Widgets.BoxElement) => {
-        // Detached nodes have no parent; reading width/height can throw in blessed
-        if (!n.parent) return { top: 0, left: 0, width: 0, height: 0 };
-        return {
-          top: Number(n.top) || 0, left: Number(n.left) || 0,
-          width: Number(n.width) || 0, height: Number(n.height) || 0,
-        };
-      };
-      const regionInfo = (n: blessed.Widgets.BoxElement) => {
-        const rect = nodeRect(n);
-        return {
-          visible: n.visible,
-          rect,
-          collapsed: !n.parent || (!n.visible && rect.width === 0 && rect.height === 0),
-        };
-      };
-
       win.describeState(() => {
         const w = Number(root.width) || 0, h = Number(root.height) || 0;
         const mode = pickMode(w, h);
@@ -448,18 +456,7 @@ export default function setup(host: MicroappHost) {
                    (compass ? ` compass:${compass}` : ""),
           mode, width: w, height: h, seed: contourSeed,
           compass: compass ?? "auto",
-          layoutReport: {
-            viewport: { width: w, height: h },
-            regions: {
-              toolbar:  regionInfo(toolbar),
-              banner:   regionInfo(bannerBox),
-              contour:  regionInfo(contourBox),
-              clock:    regionInfo(clockBox),
-              stats:    regionInfo(statsBox),
-              info:     regionInfo(infoBox),
-              cats:     regionInfo(catBox),
-            },
-          },
+          layoutReport: layoutReporter.snapshot({ width: w, height: h }),
         };
       });
 
@@ -474,6 +471,7 @@ export default function setup(host: MicroappHost) {
       win.onRestyle(() => {
         const t = host.theme();
         root.style = t.body;
+        backplate.style = t.body;
         bannerBox.style = t.body;
         bannerText.style = t.body;
         contourBox.style = { ...t.body, border: { fg: t.muted.fg } };
@@ -487,6 +485,7 @@ export default function setup(host: MicroappHost) {
         clearTimers(timers);
         xlGrid.destroy();
         catBox.destroy();
+        backplate.destroy();
       });
 
       win.focus();

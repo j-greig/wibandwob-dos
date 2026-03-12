@@ -16,6 +16,7 @@ API surface for module authors. Import everything from
 | **Feedback** | createProgressBar, createSpinner |
 | **Animation** | createAnimationClock, tween, EASINGS |
 | **Rendering** | grid-canvas helpers, ascii-composition, figlet, markdown |
+| **Diagnostics** | createLayoutReporter (canonical responsive layout report) |
 
 All components follow the [component contract](component-contract.md).
 
@@ -199,6 +200,37 @@ change composition instead of squeezing: hide panels, switch from row to
 stack, allow the surface to become taller than the viewport, and provide
 a scrollbar. Do not treat "everything fits on one screen" as a goal if
 legibility is lost.
+
+### Layout diagnostics: createLayoutReporter
+
+Use this for canonical, API-visible responsive introspection. This avoids
+screenshot guesswork when debugging mode transitions.
+
+```typescript
+import { createLayoutReporter } from "../../src/services/microapp-sdk.js";
+
+const reporter = createLayoutReporter({
+  toolbar,
+  banner: bannerBox,
+  contour: contourBox,
+  clock: clockBox,
+  stats: statsBox,
+  info: infoBox,
+  cats: catBox,
+});
+
+win.describeState(() => {
+  const w = Number(root.width) || 0;
+  const h = Number(root.height) || 0;
+  return {
+    summary: `My Module ${w}x${h}`,
+    layoutReport: reporter.snapshot({ width: w, height: h }),
+  };
+});
+```
+
+Output schema is `wibwob.layout-report/v1` with `viewport` and named `regions`.
+Each region reports `visible`, `attached`, `collapsed`, and `rect`.
 
 ### Scroll viewport: createScrollViewport
 

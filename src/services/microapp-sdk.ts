@@ -81,6 +81,58 @@ export function createAnimationClock(fps: number): AnimationClock {
   };
 }
 
+export type LayoutRegionRect = { top: number; left: number; width: number; height: number };
+
+export interface LayoutRegionSnapshot {
+  visible: boolean;
+  attached: boolean;
+  collapsed: boolean;
+  rect: LayoutRegionRect;
+}
+
+export interface LayoutReport {
+  schema: "wibwob.layout-report/v1";
+  viewport: { width: number; height: number };
+  regions: Record<string, LayoutRegionSnapshot>;
+}
+
+export interface LayoutReporter {
+  snapshot(viewport: { width: number; height: number }): LayoutReport;
+}
+
+export function createLayoutReporter(regions: Record<string, blessed.Widgets.BoxElement>): LayoutReporter {
+  const rectOf = (node: blessed.Widgets.BoxElement): LayoutRegionRect => {
+    if (!node.parent) return { top: 0, left: 0, width: 0, height: 0 };
+    return {
+      top: Number(node.top) || 0,
+      left: Number(node.left) || 0,
+      width: Number(node.width) || 0,
+      height: Number(node.height) || 0,
+    };
+  };
+
+  return {
+    snapshot(viewport) {
+      const out: Record<string, LayoutRegionSnapshot> = {};
+      for (const [name, node] of Object.entries(regions)) {
+        const rect = rectOf(node);
+        const attached = !!node.parent;
+        out[name] = {
+          visible: !!node.visible,
+          attached,
+          collapsed: !attached || (!node.visible && rect.width === 0 && rect.height === 0),
+          rect,
+        };
+      }
+      return {
+        schema: "wibwob.layout-report/v1",
+        viewport,
+        regions: out,
+      };
+    },
+  };
+}
+
 // Canonical type-only import surface for module authors.
 // Runtime capabilities still flow through the host object itself.
 export type {

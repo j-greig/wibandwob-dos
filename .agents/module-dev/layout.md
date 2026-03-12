@@ -314,3 +314,12 @@ These are explicitly not part of the layout system:
 Alignment (`justify`/`align` on FlexChild and GridChild) is declared in
 the types but not yet implemented. Grid cells fill their track area.
 Flex children fill their cross-axis. This is a future enhancement.
+
+---
+
+## Agent Notes
+
+Responsive modules should expose a canonical `layoutReport` via
+`createLayoutReporter` from the SDK (see `sdk-reference.md`).
+This makes breakpoint debugging API-visible and diffable, and avoids
+screen-capture guesswork.
