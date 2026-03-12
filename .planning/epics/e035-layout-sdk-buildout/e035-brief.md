@@ -86,9 +86,9 @@ The outcome is not just "new primitives exist." The outcome is:
 - [ ] Port any real module already using bespoke viewport boilerplate
 
 ### F05 — Safety and internals cleanup
-- [ ] Fix `createTextBlock` zero-width crash path
-- [ ] Clean up resize double-fire / cascading relayout behavior
-- [ ] Keep `win.onResize(() => root.layout(...))` as the recommended module pattern
+- [x] Fix `createTextBlock` zero-width crash path
+- [x] Clean up resize double-fire / cascading relayout behavior
+- [x] Keep `win.onResize(() => root.layout(...))` as the recommended module pattern
 - [ ] Verify narrow resize no longer crashes or behaves pathologically
 
 ### F06 — Proof ports

@@ -209,12 +209,8 @@ function createLinearLayout(
   }
 
   let lastRect: Rect = { top: 0, left: 0, width: 0, height: 0 };
-  let laying = false;
-
-  const relayout = () => { if (!laying) layoutChildren(lastRect); };
 
   const layoutChildren = (rect: Rect) => {
-    laying = true;
     lastRect = {
       top: rect.top,
       left: rect.left,
@@ -270,11 +266,11 @@ function createLinearLayout(
       child.part.layout(childRect);
       cursor += cappedExtent;
     }
-    laying = false;
   };
 
-  (node as blessed.Widgets.Node).on?.("resize", relayout);
-  parent.on?.("resize", relayout);
+  // NOTE: Internal resize listeners removed to prevent double-fire.
+  // Modules should call root.layout(...) from win.onResize() — that is
+  // the canonical pattern and avoids cascading relayouts.
 
   return {
     node,
@@ -671,7 +667,7 @@ export function createTextBlock(
     parent,
     top: 0,
     left: 0,
-    width: 0,
+    width: 1,
     height: 0,
     tags: false,
     scrollable: true,
@@ -680,10 +676,12 @@ export function createTextBlock(
     style: scrollableStyle(theme().body),
   });
 
-  let lastRect: Rect = { top: 0, left: 0, width: 0, height: 0 };
+  let lastRect: Rect = { top: 0, left: 0, width: 1, height: 0 };
   let lastProps = { text: "" };
 
   const render = () => {
+    // Guard: blessed crashes if scrollable box has zero width
+    if (lastRect.width < 1) return;
     node.setContent(
       wrapIndentedText(lastProps.text, lastRect.width, opts.paddingLeft ?? 0, opts.paddingTop ?? 0)
     );
@@ -692,8 +690,9 @@ export function createTextBlock(
   return {
     node,
     layout(rect) {
-      lastRect = rect;
-      applyRect(node, rect);
+      // Clamp width to minimum 1 — blessed scrollable boxes crash at 0 width
+      lastRect = { ...rect, width: Math.max(1, rect.width) };
+      applyRect(node, lastRect);
       render();
     },
     update(props) {
