@@ -167,6 +167,60 @@ Rules:
 - Say what the FIRST case is and that others come LATER
 - Skip rationale, skip alternatives, skip please
 
+## AGENT DOCS ARCHITECTURE
+
+**progressive disclosure by filepath**
+- directory names encode audience so an agent can determine relevance from `ls` alone, before opening any file
+- value: a breadth-first agent (Claude/pi) skips entire subtrees it doesn't need; a depth-first agent (Codex/GPT) navigates to the right depth faster
+- the test: if a module author opens anything in `shell-dev/`, the signposting failed
+
+**breadth-first vs depth-first agent reading**
+- breadth-first (Claude/pi pattern): scans the whole surface, follows the main trail, stops once the pattern is clear, then acts
+- depth-first (Codex/GPT pattern): follows every cross-reference to its source, verifies doc claims against implementation code, catalogues every mismatch
+- breadth-first benefits from front-loaded summaries and stop-signals; depth-first benefits from accurate cross-refs and source-of-truth markers
+- neither is better — design docs that work for both by structuring for breadth and ensuring accuracy for depth
+
+**cold read test**
+- can an agent determine what a file or directory is for from the name alone, without opening it?
+- `module-dev/` passes. `core/` fails (too generic). `modules/` fails (collides with the actual code directory)
+- applies to directories, filenames, and section headings in AGENTS.md
+
+**stop signal**
+- an explicit structural cue that tells an agent "you don't need anything past this point for your task"
+- in AGENTS.md: module authoring is §1, shell development is §2 — a module author stops after §1
+- in `.agents/`: `module-dev/` and `shell-dev/` are separate dirs — a module author never enters `shell-dev/`
+
+**token budget awareness**
+- deduplicate content across docs because agents pay for every token in their context window
+- if the same skeleton, manifest template, or common-mistakes table appears in two docs, one of them is wasting context
+- single source of truth per concern, applied to the docs themselves
+
+**dead link as agent trap**
+- a cross-reference that resolves to nothing (e.g. `docs/module-authoring.md` referenced by two docs but missing)
+- breadth-first agents paper over it and move on; depth-first agents keep falling into it and waste cycles
+- worse than no link — it implies a canonical doc exists somewhere and the agent hasn't found it yet
+
+**barrel file (SDK surface)**
+- one file that re-exports everything a module author is allowed to import (`microapp-sdk.ts`)
+- the seam between "public stable API" and "internal implementation details"
+- if an export isn't in the barrel, it's not part of the contract — agents should not use it
+- risk: barrel grows silently and docs don't track new exports, producing SDK drift
+
+**SDK drift**
+- when the actual exports in the barrel file diverge from what the docs describe
+- agents reading source find undocumented exports and assume they're fair game
+- fix: mark stable exports `@public` and internal ones `@internal` in the source, or pin the public list in the SDK doc
+
+**scaffold as ground truth**
+- the generated boilerplate from `scaffold-microapp.sh` is what agents and new developers trust as the correct starting pattern
+- if the scaffold violates the documented contract (e.g. omits a "required" lifecycle hook), agents inherit the violation
+- scaffold and docs must agree — if they disagree, agents follow the scaffold
+
+**tiered examples**
+- example modules ranked by complexity: static → animated → persistent → complex
+- each tier teaches one new concept on top of the previous one
+- value: an agent picks the tier that matches their task instead of reading the most complex example and extracting the basics from it
+
 ## DEV TERMS
 
 **smoke test**
