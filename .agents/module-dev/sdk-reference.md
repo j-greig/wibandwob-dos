@@ -106,6 +106,107 @@ Always call `host.theme()` fresh — never cache the result.
 
 ---
 
+## Layout
+
+Two primitives: flex and grid. See `.agents/module-dev/.workings/layout-guide-final.md` for the full canon guide.
+
+### Flex: createStack and createRow
+
+```typescript
+import { createStack, createRow, createNodePart } from "../../src/services/microapp-sdk.js";
+
+// Vertical layout: header / body / footer
+const root = createStack(win.body, [
+  { key: "header", basis: 1,    part: headerPart },
+  { key: "body",   basis: "1fr", part: bodyPart },
+  { key: "footer", basis: 1,    part: footerPart },
+]);
+
+// Horizontal layout: sidebar / main
+const body = createRow(win.body, [
+  { key: "sidebar", basis: 20,    part: sidebarPart },
+  { key: "main",    basis: "1fr", part: mainPart },
+]);
+
+// Wrap a raw blessed box as a LayoutPart
+const panel = createNodePart(blessed.box({ parent: win.body, style: host.theme().body }));
+```
+
+### Grid: createGrid
+
+```typescript
+import { createGrid, createNodePart } from "../../src/services/microapp-sdk.js";
+
+const grid = createGrid(win.body, {
+  rows: 2, columns: 2,
+  templateRows: ["1fr", "1fr"],
+  templateColumns: ["2fr", "1fr"],
+  gap: { row: 1, column: 1 },
+});
+
+grid.set({ key: "main",  row: 0, column: 0, rowSpan: 2, part: mainPart });
+grid.set({ key: "stats", row: 0, column: 1, part: statsPart });
+grid.set({ key: "log",   row: 1, column: 1, part: logPart });
+```
+
+### Responsive: pickBreakpoint
+
+```typescript
+import { pickBreakpoint } from "../../src/services/microapp-sdk.js";
+
+function render() {
+  const w = Math.max(1, Number(win.body.width) || 0);
+  const mode = pickBreakpoint(w);  // returns "xs" | "sm" | "md" | "lg" | "xl"
+
+  // Or with custom breakpoints:
+  const custom = pickBreakpoint(w, [
+    { name: "compact", minWidth: 0 },
+    { name: "normal",  minWidth: 50 },
+    { name: "wide",    minWidth: 80 },
+  ]);
+}
+```
+
+**Responsive rule: stack and scroll before you crush.**
+When a narrow layout would produce illegible panels or useless slivers,
+change composition instead of squeezing: hide panels, switch from row to
+stack, allow the surface to become taller than the viewport, and provide
+a scrollbar. Do not treat "everything fits on one screen" as a goal if
+legibility is lost.
+
+### Scroll viewport: createScrollViewport
+
+```typescript
+import { createScrollViewport } from "../../src/services/microapp-sdk.js";
+
+const sv = createScrollViewport(win.body, {
+  headerHeight: 1,
+  footerHeight: 1,
+});
+// sv.header — fixed header box (or null)
+// sv.viewport — scrollable middle region
+// sv.footer — fixed footer box (or null)
+// sv.scrollToBottom(), sv.scrollToTop()
+```
+
+### Layout lifecycle
+
+```typescript
+function render() {
+  const w = Math.max(1, Number(win.body.width) || 0);
+  const h = Math.max(1, Number(win.body.height) || 0);
+  root.layout({ top: 0, left: 0, width: w, height: h });
+  host.screen.render();
+}
+
+render();
+win.onResize(render);
+win.onRestyle(() => { root.restyle(); host.screen.render(); });
+win.onCleanup(() => root.destroy());
+```
+
+---
+
 ## SDK Primitives
 
 ### Timers

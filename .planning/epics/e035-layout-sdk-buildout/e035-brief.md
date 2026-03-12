@@ -69,8 +69,8 @@ The outcome is not just "new primitives exist." The outcome is:
 ### F03 — Responsive helpers
 - [x] Implement `pickBreakpoint`
 - [x] Export breakpoint types/utilities from microapp-sdk
-- [ ] Document width-first responsive switching
-- [ ] Encode the rule: stack and scroll before you crush
+- [x] Document width-first responsive switching
+- [x] Encode the rule: stack and scroll before you crush
 
 ### F04 — Scroll support helper
 - [x] Export `createScrollbar()` from microapp-sdk
