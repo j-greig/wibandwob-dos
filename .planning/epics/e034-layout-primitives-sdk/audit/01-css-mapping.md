@@ -3,6 +3,22 @@
 **Date:** 2026-03-12  
 **Scope:** All layout functions, types, and concepts from `ui-parts.ts`, `panel-layout.ts`, `canvas-types.ts`, `modules/hello-world/index.ts`, `microapp-sdk.ts`
 
+> **CORRECTIONS (post-review decisions):**
+>
+> This doc was generated before the final architecture review. The following
+> recommendations in this doc are WRONG and superseded:
+>
+> - DO NOT extract Compass/COMPASS_ALIGN to SDK. "Compass" is demo vocabulary
+>   from hello-world. The SDK uses CSS-standard justify/align two-axis system:
+>   `{ justify: "start" | "center" | "end", align: "start" | "center" | "end" }`.
+>   See Codex review in 05-module-audit-summary.md.
+> - DO NOT treat layoutColumns as an SDK primitive. It is a domain-specific
+>   pattern for zine, not a peer of flex/grid.
+> - The composition interface is LayoutPart (not UiPart). See Codex review.
+> - Breakpoints are ascending: xs/sm/md/lg/xl (Tailwind order).
+>
+> The CSS mapping table below remains accurate. The recommendations are stale.
+
 ---
 
 ## Critical Naming Issues Found

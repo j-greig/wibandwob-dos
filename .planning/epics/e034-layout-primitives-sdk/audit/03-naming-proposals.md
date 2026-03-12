@@ -8,11 +8,19 @@
 
 ## Overview
 
-This document proposes canonical naming for five distinct naming conflicts in WibWob-DOS layout primitives. The goal is CSS/Tailwind alignment so any developer with web experience can read our API without a translation layer.
+This document proposes canonical naming for layout primitive conflicts in
+WibWob-DOS. The goal is CSS/Tailwind alignment so any developer with web
+experience can read our API without a translation layer.
+
+> **DECISION: Compass section removed.** "Compass" (NW/SE) is demo vocabulary
+> from hello-world's toolbar, not an SDK concept. The SDK uses standard CSS
+> alignment: `{ justify: "start" | "center" | "end", align: "start" | "center" | "end" }`.
+> Hello-world maps its toolbar buttons to this internally. No compass type
+> is exported from the SDK. See Codex review in 05-module-audit-summary.md.
 
 ---
 
-## Conflict 1: COMPASS vs JUSTIFY+ALIGN
+## ~~Conflict 1: COMPASS vs JUSTIFY+ALIGN~~ — RESOLVED, removed
 
 ### Current API
 
@@ -682,7 +690,7 @@ const grid = createGrid(root, {
 
 | Conflict | Current | Proposed | Rationale | Files | Risk |
 |----------|---------|----------|-----------|-------|------|
-| 1. Compass → Justify/Align | `type Compass = "nw" \| "n" \| ...` | `type HorizontalAlignment = "start" \| "center" \| "end"` + `VerticalAlignment` | CSS flex semantics, agent discoverability | 1 | Low |
+| ~~1. Compass → Justify/Align~~ | RESOLVED — compass is demo-only, SDK uses `{ justify, align }` | — | — | — | — |
 | 2. Two Columns | `createColumns` + `layoutColumns` | `createRow` + `layoutColumnFlow` | Distinct names for different purposes | 15+ | Medium |
 | 3. Breakpoints | `xl \| l \| m \| s` (desc) | `xs \| sm \| md \| lg \| xl` (asc) | Tailwind alignment, agent training | 1 | Low |
 | 4. Stack/Columns | `createStack`, `createColumns` | `createStack`, `createRow` | Flex symmetry; "createColumns" is misleading | 25+ | Medium |
@@ -696,7 +704,7 @@ const grid = createGrid(root, {
 
 1. **Adopt all five proposals** in this order (dependency ordering):
    - **First:** Breakpoint naming (isolated, low churn) → Tailwind ascending order
-   - **Second:** Compass → Justify/Align (isolated, hello-world only)
+   - ~~**Second:** Compass → Justify/Align~~ — RESOLVED, not an SDK concern
    - **Third:** Stack/Columns renaming (medium churn, many imports)
    - **Fourth:** Grid API surface (captured in hello-world grid setup)
    - **Last:** Two column systems (high churn, impacts all panel-based modules)

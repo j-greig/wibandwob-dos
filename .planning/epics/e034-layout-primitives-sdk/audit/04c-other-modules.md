@@ -430,7 +430,11 @@ export type UiPart<Props = void> = {
 };
 ```
 
-### 6. layoutColumns (Zine column flow) as a GRID primitive
+### 6. layoutColumns (Zine column flow) ~~as a GRID primitive~~
+
+> **DECISION:** layoutColumns stays as a domain-specific pattern for zine,
+> NOT an SDK primitive. It consumes PanelDef[], bakes in zine semantics,
+> and is not a reusable composition surface. See 05-module-audit-summary.md.
 
 `layoutColumns(defs, viewportWidth, { columnHeaders, ... }): { items: ZineItem[] }`
 
