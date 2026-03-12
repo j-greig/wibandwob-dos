@@ -73,9 +73,10 @@ POST /workspace/load              {"name":"workspace-name"}
 Modal overlays (value prompts, list pickers, browser prompts) can be driven via API:
 
 ```
-GET  /overlay/info                returns {"active":true/false,"type":"value|browser|list|..."}
+GET  /overlay/info                returns {"active":true/false,"type":"value|browser|file-browser|...", "selectedIndex"?, "count"?}
 POST /overlay/confirm             confirm active overlay (OK/Enter). Returns ok:false if none active.
 POST /overlay/cancel              cancel active overlay (Cancel/Escape). Returns ok:false if none active.
+POST /overlay/select              {"index":N} select item index in active browser/list/file-browser overlay.
 ```
 
 Also available as commands: `overlay.info`, `overlay.confirm`, `overlay.cancel`, `menu.close`.
