@@ -474,12 +474,12 @@ Planned script path for repeatability
 |---|---|---|---|---|
 | Primer List | `primer.list` | None (returns data directly) | done | use as canonical primer path source for deterministic runs |
 | Primer Open (explicit) | `primer.open` + `filePath` | None (opens directly) | done | prefer explicit `filePath` in automation |
-| Primer Open (interactive) | `primer.open` (no args) | File-browser interstitial opens; `overlay.confirm` currently returns confirmed but does not advance selection to window | blocked | add shared overlay selection API (`overlay.select-index`) and explicit submit path for file-browser prompts |
+| Primer Open (interactive) | `primer.open` (no args) | File-browser interstitial requires selecting an entry before confirm | done | fixed via shared `overlay.select` + `overlay.confirm` (opened `bods.txt` in retest) |
 | Primer Browser | `primer.browse` | None (opens directly) | done | keep as baseline primer UI smoke |
-| Backrooms: Live TV | `backrooms.open` | Value-prompt interstitial (`Backrooms Theme`) before final window | in-progress | drive via `overlay.confirm/cancel`; add `overlay.set-value` for deterministic theme input |
-| Figlet Banner | `figlet.open` | Value prompt then font browser picker before banner | in-progress | overlay confirm/cancel works; still need `overlay.set-value` + `overlay.select-index` for deterministic automation |
+| Backrooms: Live TV | `backrooms.open` | Value-prompt interstitial (`Backrooms Theme`) before final window | in-progress | add shared `overlay.set-value` for deterministic theme input |
+| Figlet Banner | `figlet.open` | Value prompt then font browser picker before banner | in-progress | add `overlay.set-value` for text prompt; `overlay.select` now handles font index |
 | Plasma: From Primer (explicit) | `plasma.from-primer` + `filePath` | None (opens directly) | done | prefer explicit `filePath` from `primer.list` |
-| Plasma: From Primer (interactive) | `plasma.from-primer` (no args) | File-browser interstitial opens; `overlay.confirm` currently returns confirmed but does not advance to window | blocked | same shared file-browser fix as `primer.open` interactive |
+| Plasma: From Primer (interactive) | `plasma.from-primer` (no args) | File-browser interstitial requires selecting an entry before confirm | done | fixed via shared `overlay.select` + `overlay.confirm` (opened Plasma in retest) |
 | Zine | `microapp.wibwob.zine.open` | Default canvas picker was local list (not shared overlay) | mitigated | module commands added: `zine.picker.info/select/confirm/cancel`; later migrate to shared overlay primitive |
 
 Latest primer pass evidence: `scratch/reports/primer-api-pass-clean.json`
