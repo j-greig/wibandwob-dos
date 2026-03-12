@@ -1,0 +1,271 @@
+AUDIT: Layout Primitives — What We Have, What Others Have, What We Need
+=========================================================================
+
+
+1. WHAT WE HAVE TODAY
+======================
+
+Our SDK layout system (src/core/ui-parts.ts):
+
+  createStack(parent, children)    -- vertical linear layout
+  createColumns(parent, children)  -- horizontal linear layout
+  applyRect(node, rect)            -- absolute positioning
+  createNodePart(node)             -- wrap blessed box as UiPart
+
+Each child is a StackChild: { key, basis, part, visible? }
+  basis: number (fixed px) or "Nfr" (fractional unit)
+  visible: () => boolean (conditional show/hide)
+
+These compose: a createStack can contain createColumns children,
+and vice versa. This gives us flexbox-style nesting.
+
+Panel layout system (src/core/panel-layout.ts):
+  layoutColumns(panels, maxWidth, opts)  -- magazine-style column flow
+  layoutPanels(panels, maxWidth)         -- single-column flow
+  measureViewport(node)                  -- get usable dimensions
+
+Higher-level SDK components:
+  createSidebarPanel()        -- left/right sidebar with toggle
+  createButtonBar()           -- horizontal button strip
+  createHeaderBar()           -- left/right aligned single-line header
+  createStatusBar()           -- left/right aligned single-line status
+  createFigletDisplay()       -- scrollable figlet text area
+  createTextBlock()           -- wrapped text area
+  createInputLine()           -- single-line text input
+  createMessageHistory()      -- scrollable message list
+  createCollapsibleBlock()    -- expandable/collapsible section
+  createContentStack()        -- scrollable vertical content area
+
+
+2. HOW MODULES ACTUALLY LAY OUT THEIR UIS
+==========================================
+
++---------------------+--------------------------------------+-------------------+
+| Module              | Layout pattern                       | SDK primitives    |
++---------------------+--------------------------------------+-------------------+
+| wibwob-poetry-clock | createStack [                        | createStack       |
+|                     |   headerBar (1 fixed)                | createColumns     |
+|                     |   createColumns [                    | createHeaderBar   |
+|                     |     figletDisplay (5 basis)          | createStatusBar   |
+|                     |     contour/scramble (1fr)           | createFigletDisp  |
+|                     |   ]                                  |                   |
+|                     |   statusBar (1 fixed)                |                   |
+|                     | ]                                    |                   |
++---------------------+--------------------------------------+-------------------+
+| wibwob-tr808        | createStack [                        | createStack       |
+|                     |   headerBar (1)                      | createHeaderBar   |
+|                     |   custom grid body (1fr)             | createStatusBar   |
+|                     |   statusBar (1)                      |                   |
+|                     | ]                                    |                   |
+|                     | Internal: manual grid of step        |                   |
+|                     | buttons via absolute positioning     |                   |
++---------------------+--------------------------------------+-------------------+
+| patchbay-lab        | createStack [                        | createStack       |
+|                     |   headerBar (1)                      | createColumns     |
+|                     |   createColumns [                    | createHeaderBar   |
+|                     |     sidebar (fixed)                  | createStatusBar   |
+|                     |     content (1fr)                    | applyRect         |
+|                     |   ]                                  |                   |
+|                     |   statusBar (1)                      |                   |
+|                     | ]                                    |                   |
+|                     | Inside content: manual applyRect     |                   |
+|                     | for sidebar/divider/content split    |                   |
++---------------------+--------------------------------------+-------------------+
+| wibwobworld         | createStack [                        | createStack       |
+|                     |   headerBar (1)                      | createHeaderBar   |
+|                     |   body (1fr) — custom layout()       | applyRect         |
+|                     |   statusBar (1)                      | createStatusBar   |
+|                     | ]                                    |                   |
+|                     | Body layout: manual applyRect for    |                   |
+|                     | map/iso/fp/sidebar depending on      |                   |
+|                     | render mode. Complex conditional.    |                   |
++---------------------+--------------------------------------+-------------------+
+| zine                | Root: toolbar (bottom 1 row)         | createSidebarPanl |
+|                     | Body: createSidebarPanel splits      | createButtonBar   |
+|                     |   sidebar (26 fixed) + main          | createSelectList  |
+|                     | Main: scrollable canvas with         | createInlineSrch  |
+|                     |   absolutely-positioned panels       |                   |
+|                     | Panel positions from layoutColumns() |                   |
++---------------------+--------------------------------------+-------------------+
+| sy2-chronicles      | Similar to zine but larger.          | (same as zine)    |
+|                     | Root + toolbar + scrollable canvas.  |                   |
+|                     | Panel layout via layoutColumns().    |                   |
++---------------------+--------------------------------------+-------------------+
+| dashboard           | Tabbed layout. Per-tab content is    | renderFiglet      |
+|                     | hand-positioned blessed boxes with   | createTimer       |
+|                     | absolute top/left/width/height.      |                   |
+|                     | No SDK layout primitives for the     |                   |
+|                     | grid itself.                         |                   |
++---------------------+--------------------------------------+-------------------+
+| dashboard-xxl       | Virtual canvas (800x200 buffer).     | (none)            |
+|                     | Grid cells defined as                |                   |
+|                     | {row, col, rowSpan, colSpan}.        |                   |
+|                     | Manual pixel math to position.       |                   |
++---------------------+--------------------------------------+-------------------+
+| hello-world         | Single box + floating art box.       | responsiveFiglet  |
+|                     | Manual show/hide based on dims.      |                   |
++---------------------+--------------------------------------+-------------------+
+| world-chatroom      | createSidebarPanel splits            | createSidebarPanl |
+|                     |   sidebar (participants) + main      |                   |
+|                     | Main: chat messages area             |                   |
++---------------------+--------------------------------------+-------------------+
+| heartbeat           | Single blessed box, full window.     | (none)            |
++---------------------+--------------------------------------+-------------------+
+| glitchbox           | Single blessed box, full window.     | (none)            |
++---------------------+--------------------------------------+-------------------+
+| wibwob-tidepool     | Manual applyRect for sidebar +       | applyRect         |
+|                     | grid area. No SDK stack/columns.     |                   |
++---------------------+--------------------------------------+-------------------+
+
+
+3. WHAT BLESSED-CONTRIB HAS (vendor/blessed-contrib)
+=====================================================
+
+One primitive: Grid
+
+  new Grid({ rows: 12, cols: 12, screen })
+  grid.set(row, col, rowSpan, colSpan, WidgetConstructor, opts)
+
+How it works internally:
+  cellWidth  = 100 / cols  (as percentage)
+  cellHeight = 100 / rows  (as percentage)
+  Widget positioned with CSS-like percentage units:
+    top:    row * cellHeight + "%"
+    left:   col * cellWidth + "%"
+    width:  cellWidth * colSpan + "%"
+    height: cellHeight * rowSpan + "%"
+
+Strengths:
+  Dead simple. Percentage-based = automatically responsive.
+  Cell spans for complex layouts. Dashboard-style grids trivial.
+
+Weaknesses:
+  No content-sized rows/columns (no "auto" or "fr" units).
+  No gutter/gap control.
+  No nested grids.
+  Percentage math means fractional character boundaries.
+
+
+4. WHAT TEXTUAL HAS (vendor/textual)
+======================================
+
+Three layout modes:
+
+VERTICAL   layout: vertical
+  Children flow top-to-bottom. Width: fill parent. Height: explicit or fr.
+  Overflow: auto-scrollbar.
+
+HORIZONTAL   layout: horizontal
+  Children flow left-to-right. Height: explicit or 100%. Width: explicit or fr.
+  Overflow: optional horizontal scrollbar.
+
+GRID   layout: grid
+  grid-size: <cols> [<rows>]       -- define grid dimensions
+  grid-columns: 2fr 1fr 1fr       -- per-column width (fr, auto, fixed)
+  grid-rows: 1fr auto 2fr         -- per-row height
+  grid-gutter: 1 2                 -- vertical + horizontal gap
+  column-span: N / row-span: N    -- cell spanning
+  Auto rows: omit row count, rows created on demand.
+  Auto columns: "auto" keyword sizes to content.
+
+DOCK   dock: top|right|bottom|left
+  Fixed to edge. Does not scroll. Removes from flow.
+  Multiple docks stack in yield order.
+  Ideal for headers, footers, sidebars.
+
+KEY TEXTUAL FEATURES WE LACK:
+  - Grid with fr + auto + fixed column/row sizing
+  - Dock (fixed-edge positioning independent of flow)
+  - Gutter (spacing between grid cells)
+  - Auto-sizing to content
+  - Column/row span in a proper grid
+  - Overflow scroll on any container
+
+
+5. THE GAP IN OUR SDK
+======================
+
+We have FLEXBOX (createStack/createColumns with fr units).
+We do NOT have GRID.
+We do NOT have DOCK.
+
+What modules resort to without grid/dock:
+
+  GRID WORKAROUNDS:
+  - dashboard: hand-positioned absolute boxes
+  - dashboard-xxl: manual {row, col, rowSpan, colSpan} + pixel math
+  - tr808: manual step-button grid with absolute positioning
+  - tidepool: manual sidebar + grid area with applyRect
+
+  DOCK WORKAROUNDS:
+  - hello-world: floating art box with bottom/right + manual show/hide
+  - zine: toolbar manually positioned at root height - 1
+  - all modules: headerBar and statusBar are fake docks (fixed basis
+    in a createStack, always first/last child)
+
+The pattern that keeps repeating: "I need N children in a grid that
+responds to resize, with some cells spanning multiple slots." Every
+module that needs this reinvents it.
+
+
+6. PROPOSED NEW PRIMITIVES
+===========================
+
+A) createGrid(parent, opts) -- THE BIG ONE
+   opts: {
+     rows: number | "auto",
+     cols: number,
+     rowSizes?: (number | string)[],   // fixed, fr, or "auto"
+     colSizes?: (number | string)[],   // fixed, fr, or "auto"
+     gap?: number | [number, number],  // vertical, horizontal
+   }
+   Returns a UiPart with:
+     set(row, col, rowSpan, colSpan, part) -> void
+     layout(rect) -> void  (recalculates all cells)
+   
+   Cells auto-resize on parent resize. Uses fr resolution
+   algorithm from createLinearLayout (already exists).
+   Percentage-based like blessed-contrib but with fr/auto.
+
+   This replaces ALL the manual grid code in dashboard,
+   dashboard-xxl, tr808, tidepool.
+
+B) dock(parent, edge, part) -- or integrate into createStack
+   Position a part at top/right/bottom/left edge, removed from
+   flow. Remaining space given to the "main" content.
+   
+   Currently faked by putting headerBar/statusBar as fixed-basis
+   children in a stack. Could stay that way -- it works. But
+   true docking would handle the hello-world art case cleanly:
+
+     dock(win.body, "bottom-right", artPart, {
+       minParentWidth: 40, minParentHeight: 20
+     })
+
+   Shows/hides automatically based on parent dimensions.
+
+C) Responsive breakpoints on any layout
+   A general mechanism: "when parent width < N, switch to
+   layout variant B." This handles:
+   - Figlet font cascade (already done via responsiveFiglet)
+   - Sidebar collapse (createSidebarPanel already does this)
+   - Grid column collapse (3-col -> 2-col -> 1-col)
+   
+   Could be as simple as a wrapper:
+     responsive(part, [
+       { minWidth: 80, layout: threeColumnGrid },
+       { minWidth: 40, layout: twoColumnGrid },
+       { minWidth: 0,  layout: singleColumn },
+     ])
+
+
+7. PRIORITY ORDER
+==================
+
+1. createGrid -- highest impact, most modules need it
+2. Responsive breakpoints on grid (column collapse)
+3. Dock with auto-show/hide -- nice-to-have, current pattern works
+
+The grid primitive should be a spike first. Build it, port one
+module (dashboard or tr808), measure the code reduction, then
+decide if it's worth porting everything.
