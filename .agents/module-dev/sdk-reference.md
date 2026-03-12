@@ -25,8 +25,8 @@ error in stderr.
 host.createWindow({ title, width?, height?, left?, top? })  // → MicroappWindowHandle
 host.registerCommand({ id, label, description?, action, menu?, palette?, direct? })
 host.registerSnapshot({ serialize, restore })   // workspace persistence — see persistence.md
-host.runCommand("markdown.open", { filePath })  // run any registered command
-host.runCommand("open")                         // run a command within this module
+host.runGlobalCommand("markdown.open", { filePath })  // run any global command by full id
+host.runCommand("open")                                // run a command within this module (auto-prefixed)
 host.screen                                     // blessed screen — call .render() after changes
 host.geometry                                   // { width, height, cellAspect }
 host.theme()                                    // current ThemeTokens — call fresh, not once
@@ -39,8 +39,7 @@ host.windows.closeWindow(id)
 
 // UI layout primitives (also importable directly from SDK)
 host.ui.createStack(...)       // vertical flex layout
-host.ui.createRow(...)         // horizontal flex layout (canon name)
-host.ui.createColumns(...)     // deprecated alias for createRow
+host.ui.createRow(...)         // horizontal flex layout
 host.ui.createHeaderBar(...)
 host.ui.createStatusBar(...)
 host.ui.createTextBlock(...)
@@ -346,7 +345,7 @@ scrollable widget. Never shell out to figlet directly.
 ### Markdown
 
 ```typescript
-host.runCommand("markdown.open", { filePath: "/path/to/file.md" });
+host.runGlobalCommand("markdown.open", { filePath: "/path/to/file.md" });
 ```
 
 ---

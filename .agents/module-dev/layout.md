@@ -58,7 +58,7 @@ type FlexChild = {
   basis: number | `${number}fr`;  // fixed rows/cols or fractional
   part: LayoutPart<any>;
   visible?: () => boolean;        // hide/show for responsive breakpoints
-  align?: Alignment;              // declared, not yet implemented
+  align?: Alignment;              // RESERVED — not yet applied by layout
 };
 ```
 
@@ -104,7 +104,7 @@ grid.set({
   columnSpan?: number;   // default 1
   part: LayoutPart<any>;
   visible?: () => boolean;
-  align?: Alignment;     // declared, not yet implemented
+  align?: Alignment;     // RESERVED — not yet applied by layout
 });
 ```
 

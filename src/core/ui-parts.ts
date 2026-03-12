@@ -29,13 +29,13 @@ export type FlexBasis = number | `${number}fr`;
 /** @primitive */
 export type TrackSize = number | `${number}fr`;
 
-/** @primitive */
+/** @primitive — reserved for future use; not yet applied by layout functions. */
 export type AxisAlign = "start" | "center" | "end";
 
-/** @primitive */
+/** @primitive — reserved for future use; not yet applied by layout functions. */
 export type Alignment = {
-  justify?: AxisAlign; // horizontal
-  align?: AxisAlign;   // vertical
+  justify?: AxisAlign; // horizontal (not yet implemented)
+  align?: AxisAlign;   // vertical (not yet implemented)
 };
 
 /** @primitive */
@@ -344,6 +344,7 @@ export function pickBreakpoint<T extends string>(
   entries?: BreakpointEntry<T>[],
 ): T {
   const bp = entries ?? (DEFAULT_BREAKPOINTS as BreakpointEntry<T>[]);
+  if (bp.length === 0) return (DEFAULT_BREAKPOINTS[0] as BreakpointEntry<T>).name;
   let matched = bp[0]!.name;
   for (const entry of bp) {
     if (width >= entry.minWidth) {
