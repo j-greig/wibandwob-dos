@@ -71,13 +71,22 @@ interface Particle {
   color?: string;
 }
 
+type EventSeverity = "calm" | "warn" | "chaos";
+
+interface WorldEvent {
+  text: string;
+  severity: EventSeverity;
+}
+
+type DecreeType = "festival" | "lockdown" | "rush" | "science_push" | "none";
+
 interface World {
   tick: number;
   resources: Record<ResourceType, number>;
   ants: Ant[];
   buildings: Building[];
   particles: Particle[];
-  events: string[];
+  events: WorldEvent[];
   nextId: number;
   paused: boolean;
   speed: number;
@@ -85,27 +94,33 @@ interface World {
   dangerLevel: number;
   happiness: number;
   techLevel: number;
+  decree: DecreeType;
+  decreeTicks: number;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CONSTANTS
 // ═══════════════════════════════════════════════════════════════════════════
 
-const DISTRICTS: Record<DistrictId, { label: string; bg: string[] }> = {
+const DISTRICTS: Record<DistrictId, { label: string; subtitle: string; bg: string[] }> = {
   industrial: {
     label: "Industrial Zone",
+    subtitle: "where sparks fly and progress grinds",
     bg: [".", ".", " ", ".", "·", " ", ".", " "],
   },
   residential: {
     label: "Residential Burrows",
+    subtitle: "cosy tunnels, warm hearths",
     bg: ["·", " ", "·", " ", ".", " ", " ", "·"],
   },
   plaza: {
     label: "Grand Plaza",
+    subtitle: "the beating heart of Antopolis",
     bg: [" ", " ", "·", " ", " ", " ", "·", " "],
   },
   mines: {
     label: "Crystal Mines",
+    subtitle: "deep and glittering",
     bg: [".", " ", "▪", " ", ".", "·", " ", "."],
   },
 };
@@ -164,6 +179,31 @@ const EXPLOSION_CHARS = ["*", "✷", "◉", "●", "⊕", "✸", "★", "#", "×
 const FOUNTAIN_CHARS = ["·", ":", "∴", "°", "'", "`", "˙", ".", "·"];
 const SPARK_CHARS = ["*", "✦", "+", "·", ".", "'"];
 
+const SEVERITY_PREFIX: Record<EventSeverity, string> = {
+  calm:  "  ",
+  warn:  "~ ",
+  chaos: "! ",
+};
+
+function evt(w: World, text: string, severity: EventSeverity = "calm") {
+  w.events.push({ text, severity });
+}
+
+const DECREE_NAMES: Record<DecreeType, string> = {
+  festival: "FESTIVAL",
+  lockdown: "LOCKDOWN",
+  rush: "PRODUCTION RUSH",
+  science_push: "SCIENCE MANDATE",
+  none: "",
+};
+
+const DECREE_ANNOUNCE: Record<Exclude<DecreeType, "none">, string> = {
+  festival: "The Queen decrees: LET THERE BE FESTIVITIES! All ants dance!",
+  lockdown: "The Queen decrees: LOCKDOWN! All ants shelter in place!",
+  rush: "The Queen decrees: PRODUCTION RUSH! Double resource output!",
+  science_push: "The Queen decrees: SCIENCE MANDATE! All labs work overtime!",
+};
+
 // ═══════════════════════════════════════════════════════════════════════════
 // WORLD SIMULATION
 // ═══════════════════════════════════════════════════════════════════════════
@@ -183,6 +223,8 @@ function createWorld(): World {
     dangerLevel: 0,
     happiness: 70,
     techLevel: 1,
+    decree: "none",
+    decreeTicks: 0,
   };
 
   // Starting buildings
@@ -199,9 +241,9 @@ function createWorld(): World {
   spawnAnt(world, "queen");
   spawnAnt(world, "scientist");
 
-  world.events.push("☆ ANTOPOLIS founded! The colony begins...");
-  world.events.push("  Queen settles into the Royal Nest.");
-  world.events.push("  Engineers survey the land.");
+  evt(world, "ANTOPOLIS founded! The colony begins...");
+  evt(world, "Queen settles into the Royal Nest.");
+  evt(world, "Engineers survey the land.");
   return world;
 }
 
@@ -412,8 +454,8 @@ function tickWorld(w: World) {
       emitExplosion(w, r.x, r.y, r.district, 25);
       r.hp -= 10;
       w.dangerLevel = Math.max(0, w.dangerLevel - 0.3);
-      w.events.push("⚠ REACTOR OVERLOAD! Explosion in the Industrial Zone!");
-      w.events.push("  Engineers scramble to contain the damage!");
+      evt(w, "REACTOR OVERLOAD! Explosion in the Industrial Zone!", "chaos");
+      evt(w, "Engineers scramble to contain the damage!", "warn");
       // Knock nearby ants back
       for (const ant of w.ants.filter(a => a.district === r.district)) {
         if (Math.abs(ant.x - r.x) < 0.2 && Math.abs(ant.y - r.y) < 0.2) {
@@ -432,8 +474,8 @@ function tickWorld(w: World) {
     if (drills.length > 0) {
       const d = drills[Math.floor(Math.random() * drills.length)]!;
       emitExplosion(w, d.x, d.y, d.district, 15);
-      w.events.push("💥 Gas pocket breach in the Crystal Mines!");
-      w.events.push("  Miners evacuate! Crystals scatter!");
+      evt(w, "Gas pocket breach in the Crystal Mines!", "chaos");
+      evt(w, "Miners evacuate! Crystals scatter!", "warn");
       w.resources.crystals += 5; // silver lining
     }
   }
@@ -452,7 +494,7 @@ function tickWorld(w: World) {
           district: cat.district,
         });
       }
-      w.events.push("🎯 Catapult test fire in the Industrial Zone! THWACK!");
+      evt(w, "Catapult test fire! THWACK!", "warn");
     }
   }
 
@@ -471,7 +513,7 @@ function tickWorld(w: World) {
           "starts a book club with", "invents a handshake with",
         ];
         const verb = verbs[Math.floor(Math.random() * verbs.length)]!;
-        w.events.push(`${CASTE_NAMES[a.caste]} #${a.id} ${verb} ${CASTE_NAMES[b.caste]} #${b.id}`);
+        evt(w, `${CASTE_NAMES[a.caste]} #${a.id} ${verb} ${CASTE_NAMES[b.caste]} #${b.id}`);
       }
     }
   }
@@ -493,7 +535,7 @@ function tickWorld(w: World) {
       w.resources.crystals -= 10;
       w.resources.energy -= 5;
       emitSparks(w, x, y, district, 8);
-      w.events.push(`🔨 Engineers built a new ${type}! (${DISTRICTS[district].label})`);
+      evt(w, `Engineers built a new ${type}! (${DISTRICTS[district].label})`);
     }
   }
 
@@ -501,7 +543,7 @@ function tickWorld(w: World) {
   if (w.resources.science >= 50 * w.techLevel && w.techLevel < 5) {
     w.techLevel++;
     w.resources.science = 0;
-    w.events.push(`★ TECH LEVEL ${w.techLevel}! New buildings unlocked!`);
+    evt(w, `TECH LEVEL ${w.techLevel}! New buildings unlocked!`, "warn");
     // Celebration fireworks
     for (const d of ["plaza", "residential"] as DistrictId[]) {
       emitExplosion(w, 0.5, 0.3, d, 20);
@@ -514,7 +556,7 @@ function tickWorld(w: World) {
     const caste = castes[Math.floor(Math.random() * castes.length)]!;
     spawnAnt(w, caste);
     w.resources.food -= 10;
-    w.events.push(`🐣 A new ${CASTE_NAMES[caste]} hatches in the nursery!`);
+    evt(w, `A new ${CASTE_NAMES[caste]} hatches in the nursery!`);
   }
 
   // Danger ramp
@@ -532,9 +574,61 @@ function tickWorld(w: World) {
     + (hasTavern ? 10 : 0)
     + Math.min(20, w.resources.food * 0.5)
     - w.dangerLevel * 30
-    - (w.resources.food <= 0 ? 20 : 0),
+    - (w.resources.food <= 0 ? 20 : 0)
+    + (w.decree === "festival" ? 15 : 0),
     0, 100
   );
+
+  // ── Queen decrees ───────────────────────────────────────────────────
+  if (w.decreeTicks > 0) {
+    w.decreeTicks -= w.speed;
+    if (w.decreeTicks <= 0) {
+      evt(w, `The ${DECREE_NAMES[w.decree]} ends. Normal operations resume.`);
+      w.decree = "none";
+      w.decreeTicks = 0;
+    }
+  }
+
+  // Decree effects on resources
+  if (w.decree === "rush" && w.tick % 10 === 0) {
+    w.resources.food += 3;
+    w.resources.crystals += 2;
+    w.resources.energy += 1;
+  }
+  if (w.decree === "science_push" && w.tick % 10 === 0) {
+    w.resources.science += 4;
+  }
+  if (w.decree === "festival" && w.tick % 15 === 0) {
+    // Festival: random social events + fireworks
+    const biomes: DistrictId[] = ["plaza", "residential"];
+    const d = biomes[Math.floor(Math.random() * biomes.length)]!;
+    emitSparks(w, 0.3 + Math.random() * 0.4, 0.2 + Math.random() * 0.3, d, 5);
+    for (const ant of w.ants) { ant.mood = "ecstatic"; }
+  }
+  if (w.decree === "lockdown") {
+    for (const ant of w.ants) {
+      ant.dx *= 0.85;
+      ant.dy *= 0.85;
+      ant.task = "sheltering";
+    }
+  }
+
+  // Rare queen decree (every ~200 ticks, 15% chance)
+  if (w.decree === "none" && w.tick % 200 === 0 && Math.random() < 0.15) {
+    const queens = w.ants.filter(a => a.caste === "queen");
+    if (queens.length > 0) {
+      const decrees: Exclude<DecreeType, "none">[] = ["festival", "lockdown", "rush", "science_push"];
+      const pick = decrees[Math.floor(Math.random() * decrees.length)]!;
+      w.decree = pick;
+      w.decreeTicks = 15 + Math.floor(Math.random() * 10); // 15-25 effective ticks (scaled by speed)
+      evt(w, DECREE_ANNOUNCE[pick], "chaos");
+      if (pick === "festival") {
+        // Celebratory fireworks
+        emitExplosion(w, 0.5, 0.3, "plaza", 20);
+        emitExplosion(w, 0.4, 0.4, "residential", 15);
+      }
+    }
+  }
 
   // Cap events
   if (w.events.length > 80) w.events = w.events.slice(-50);
@@ -614,10 +708,11 @@ function renderResources(world: World, w: number): string {
 function renderStatus(world: World, w: number): string {
   const dayNames = ["midnight", "dawn", "morning", "noon", "afternoon", "dusk", "evening", "night"];
   const day = dayNames[Math.floor(world.dayPhase * 8) % 8];
-  const danger = world.dangerLevel > 0.5 ? " ⚠DANGER" : world.dangerLevel > 0.3 ? " ⚠caution" : "";
+  const danger = world.dangerLevel > 0.5 ? " DANGER" : world.dangerLevel > 0.3 ? " caution" : "";
   const speedStr = `${world.speed}x`;
-  const pauseStr = world.paused ? " ‖PAUSED" : "";
-  const left = ` ${day}${danger}${pauseStr} ${speedStr}`;
+  const pauseStr = world.paused ? " PAUSED" : "";
+  const decree = world.decree !== "none" ? ` [${DECREE_NAMES[world.decree]}]` : "";
+  const left = ` ${day}${danger}${decree}${pauseStr} ${speedStr}`;
   const right = " [p]ause [+/-]spd [1-5]spawn [e]xplode [b]uild ";
   const gap = Math.max(1, w - left.length - right.length);
   return (left + " ".repeat(gap) + right).slice(0, w);
@@ -732,12 +827,13 @@ function openAntopolis(host: MicroappHost) {
       box.setContent(renderDistrict(id, bw, bh, world));
       const count = world.ants.filter(a => a.district === id).length;
       const buildings = world.buildings.filter(b => b.district === id).length;
-      (box as any).setLabel(` ${DISTRICTS[id].label} [${count}🐜 ${buildings}🏠] `);
+      const sub = DISTRICTS[id].subtitle;
+      (box as any).setLabel(` ${DISTRICTS[id].label} — ${sub} [${count} ant${count !== 1 ? "s" : ""}, ${buildings} bldg] `);
     }
 
-    // Log
+    // Log with severity prefixes
     const logH = Math.max(2, Number(logBox.height) || 4);
-    const logLines = world.events.slice(-logH);
+    const logLines = world.events.slice(-logH).map(e => SEVERITY_PREFIX[e.severity] + e.text);
     logBox.setContent(logLines.join("\n"));
     logBox.setScrollPerc(100);
 
@@ -762,20 +858,20 @@ function openAntopolis(host: MicroappHost) {
 
     if (key.full === "p") {
       world.paused = !world.paused;
-      world.events.push(world.paused ? "⏸ Time freezes over Antopolis..." : "▶ Time resumes!");
+      evt(world, world.paused ? "Time freezes over Antopolis..." : "Time resumes!");
       render();
     } else if (key.full === "+" || key.full === "=") {
       world.speed = Math.min(8, world.speed * 2);
-      world.events.push(`⏩ Speed: ${world.speed}x`);
+      evt(world, `Speed: ${world.speed}x`);
     } else if (key.full === "-" || key.full === "_") {
       world.speed = Math.max(1, world.speed / 2);
-      world.events.push(`⏪ Speed: ${world.speed}x`);
+      evt(world, `Speed: ${world.speed}x`);
     } else if (key.full === "e") {
       // Manual explosion for fun!
       const districts: DistrictId[] = ["industrial", "residential", "plaza", "mines"];
       const d = districts[Math.floor(Math.random() * 4)]!;
       emitExplosion(world, 0.3 + Math.random() * 0.4, 0.3 + Math.random() * 0.4, d, 30);
-      world.events.push(`💥 BOOM! Mysterious explosion in ${DISTRICTS[d].label}!`);
+      evt(world, `BOOM! Mysterious explosion in ${DISTRICTS[d].label}!`, "chaos");
       render();
     } else if (key.full === "b") {
       // Manual build
@@ -785,16 +881,16 @@ function openAntopolis(host: MicroappHost) {
         const district = BUILDING_DISTRICT[type];
         placeBuilding(world, type, district, 0.15 + Math.random() * 0.7, 0.15 + Math.random() * 0.7);
         world.resources.crystals -= 5;
-        world.events.push(`🔨 Built a ${type} in ${DISTRICTS[district].label}!`);
+        evt(world, `Built a ${type} in ${DISTRICTS[district].label}!`);
         emitSparks(world, 0.5, 0.5, district, 10);
       } else {
-        world.events.push("Not enough crystals to build!");
+        evt(world, "Not enough crystals to build!", "warn");
       }
       render();
     } else if (SPAWN_KEYS[key.full]) {
       const caste = SPAWN_KEYS[key.full]!;
       spawnAnt(world, caste);
-      world.events.push(`🐣 Summoned a ${CASTE_NAMES[caste]}!`);
+      evt(world, `Summoned a ${CASTE_NAMES[caste]}!`);
       render();
     }
   });
@@ -807,7 +903,7 @@ function openAntopolis(host: MicroappHost) {
   win.onResize(render);
 
   win.describeState(() => ({
-    summary: `Antopolis — pop:${world.ants.length} bldg:${world.buildings.length} tech:${world.techLevel} happy:${world.happiness.toFixed(0)}%${world.paused ? " PAUSED" : ""}`,
+    summary: `Antopolis — pop:${world.ants.length} bldg:${world.buildings.length} tech:${world.techLevel} happy:${world.happiness.toFixed(0)}%${world.decree !== "none" ? ` [${DECREE_NAMES[world.decree]}]` : ""}${world.paused ? " PAUSED" : ""}`,
     population: world.ants.length,
     buildings: world.buildings.length,
     techLevel: world.techLevel,
@@ -819,7 +915,7 @@ function openAntopolis(host: MicroappHost) {
   win.captureText(() => [
     `ANTOPOLIS — pop:${world.ants.length} tech:${world.techLevel}`,
     `Resources: food=${world.resources.food} crystals=${world.resources.crystals} energy=${world.resources.energy}`,
-    "", ...world.events.slice(-15),
+    "", ...world.events.slice(-15).map(e => SEVERITY_PREFIX[e.severity] + e.text),
   ].join("\n"));
 
   win.onRestyle(() => {
