@@ -1,0 +1,95 @@
+%%{init: {'theme': 'dark', 'themeVariables': {'fontSize': '13px', 'nodeTextColor': '#fff'}}}%%
+graph TD
+    subgraph ENTRY["AGENTS.md — front door"]
+        A_TOP["§1 Building Modules<br/><i>first section, not buried at line 53</i>"]
+        A_CORE["§2 Shell Development<br/><i>below the fold — core contributors only</i>"]
+    end
+
+    subgraph MODDEV[".agents/module-dev/"]
+        direction TB
+        QUICK["quick-start.md<br/><i>30-second pattern + scaffold command<br/>the fast path Claude wanted</i>"]
+        TIERS["examples-by-tier.md<br/><i>which module for which pattern:<br/>STATIC → ANIMATED → PERSISTENT → COMPLEX</i>"]
+        SDK_REF["sdk-reference.md<br/><i>MicroappHost + WindowHandle API<br/>deduplicated: no skeleton, no manifest</i>"]
+        PERSIST["persistence.md<br/><i>registerSnapshot + serialize/restore<br/>poetry-clock as canonical example</i>"]
+        PITFALLS["pitfalls.md<br/><i>common mistakes, scaffold gaps,<br/>onCleanup contract note</i>"]
+    end
+
+    subgraph PUBLIC["docs/"]
+        BUILD_GUIDE["building-custom-modules.md<br/><i>THE full public guide<br/>manifest, skeleton, lifecycle, checklist<br/>single source of truth for basics</i>"]
+        MODULE_AUTH["module-authoring.md<br/><i>EXISTS NOW — redirect or alias<br/>kills the dead link</i>"]
+    end
+
+    subgraph MODULES["modules/ — examples by tier"]
+        direction LR
+        T1["hello-world/<br/><i>TIER 1: static</i>"]
+        T2["heartbeat/<br/><i>TIER 2: animated</i>"]
+        T3["poetry-clock/<br/><i>TIER 3: persistent + AI</i>"]
+        T4["e026-demo/<br/><i>TIER 4: SDK sampler</i>"]
+    end
+
+    subgraph SHELLDEV[".agents/shell-dev/"]
+        direction TB
+        ARCH["architecture.md<br/><i>file inventory, service map</i>"]
+        INVAR["invariants.md<br/><i>strict rules, anti-patterns</i>"]
+        CTLAPI["control-api.md<br/><i>HTTP surface, endpoints</i>"]
+        subgraph SPECS["specs/"]
+            S_WIN["window-system.md"]
+            S_STATE["state-and-api.md"]
+            S_WORK["workspace.md"]
+            S_AGENT["agent-session.md"]
+            S_IMG["image-rendering.md"]
+        end
+    end
+
+    subgraph SDKSRC["src/services/ — source of truth"]
+        SDK_TS["microapp-sdk.ts<br/><i>stable public exports marked<br/>internal exports flagged</i>"]
+        LOADER["module-loader.ts<br/><i>MicroappHost owner<br/>depth-first agents verify here</i>"]
+    end
+
+    %% Module author path (green)
+    A_TOP -->|"read first"| QUICK
+    QUICK -->|"full guide"| BUILD_GUIDE
+    QUICK -->|"pick your tier"| TIERS
+    TIERS --> T1
+    TIERS --> T2
+    TIERS --> T3
+    TIERS --> T4
+    BUILD_GUIDE -->|"advanced API"| SDK_REF
+    SDK_REF -->|"if persist:true"| PERSIST
+    SDK_REF -->|"gotchas"| PITFALLS
+    MODULE_AUTH -.->|"redirects to"| BUILD_GUIDE
+
+    %% Shell dev path (blue)
+    A_CORE --> ARCH
+    A_CORE --> INVAR
+    A_CORE --> CTLAPI
+    ARCH --> SPECS
+
+    %% Depth-first verification (grey, dashed)
+    SDK_REF -.->|"verify exports"| SDK_TS
+    PERSIST -.->|"verify API"| LOADER
+
+    %% STOP signals
+    STOP_MOD(["MODULE AUTHOR STOPS HERE<br/>never needs shell-dev/"])
+    PITFALLS --> STOP_MOD
+
+    %% Styling
+    style A_TOP fill:#006400,color:#fff,stroke:#44ff44
+    style QUICK fill:#006400,color:#fff,stroke:#44ff44
+    style BUILD_GUIDE fill:#006400,color:#fff,stroke:#44ff44
+    style TIERS fill:#228B22,color:#fff,stroke:#44ff44
+    style SDK_REF fill:#228B22,color:#fff,stroke:#44ff44
+    style PERSIST fill:#228B22,color:#fff,stroke:#44ff44
+    style PITFALLS fill:#228B22,color:#fff,stroke:#44ff44
+    style MODULE_AUTH fill:#8B8000,color:#fff,stroke:#ffff44
+    style A_CORE fill:#00008b,color:#fff,stroke:#4444ff
+    style ARCH fill:#00008b,color:#fff,stroke:#4444ff
+    style INVAR fill:#00008b,color:#fff,stroke:#4444ff
+    style CTLAPI fill:#00008b,color:#fff,stroke:#4444ff
+    style SDK_TS fill:#444,color:#aaa,stroke:#888
+    style LOADER fill:#444,color:#aaa,stroke:#888
+    style STOP_MOD fill:#333,color:#fff,stroke:#44ff44,stroke-dasharray: 5 5
+    style T1 fill:#1a1a2e,color:#fff,stroke:#666
+    style T2 fill:#1a1a2e,color:#fff,stroke:#666
+    style T3 fill:#1a1a2e,color:#fff,stroke:#666
+    style T4 fill:#1a1a2e,color:#fff,stroke:#666

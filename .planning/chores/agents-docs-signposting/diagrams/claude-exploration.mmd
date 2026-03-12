@@ -1,0 +1,42 @@
+%%{init: {'theme': 'dark', 'themeVariables': {'fontSize': '14px'}}}%%
+graph TD
+    ROOT["ls / (orient)"]
+    AGENTS["AGENTS.md<br/><i>agent constitution</i>"]
+    BUILD["docs/building-custom-modules.md<br/><i>the motherlode</i>"]
+    SDK_DOC[".agents/microapp-sdk.md<br/><i>SDK policy + advanced API</i>"]
+    DEAD1["docs/module-authoring.md<br/><b>✗ DEAD LINK</b>"]
+    SCAFFOLD["scripts/scaffold-microapp.sh<br/><i>working boilerplate</i>"]
+    ARCH[".agents/architecture.md<br/><i>NOT relevant for modules</i>"]
+    MODULES_LS["ls modules/"]
+    HELLO_JSON["hello-world/module.json<br/><i>minimal manifest</i>"]
+    HELLO_TS["hello-world/index.ts<br/><i>responsive figlet</i>"]
+    HEART["heartbeat/index.ts<br/><i>timers + cleanup</i>"]
+    POETRY["poetry-clock/index.ts<br/><i>complex: AI, modes</i>"]
+    README["modules/README.md"]
+    DEAD2["docs/module-authoring.md<br/><b>✗ DEAD LINK again</b>"]
+    SDK_SRC["src/services/microapp-sdk.ts<br/><i>actual SDK barrel</i>"]
+    STOP(["STOPPED — assessed + proposed restructure"])
+
+    ROOT --> AGENTS
+    AGENTS --> BUILD
+    AGENTS --> SCAFFOLD
+    AGENTS --> ARCH
+    AGENTS --> MODULES_LS
+    BUILD --> SDK_DOC
+    SDK_DOC --> DEAD1
+    MODULES_LS --> HELLO_JSON
+    MODULES_LS --> HELLO_TS
+    MODULES_LS --> HEART
+    MODULES_LS --> POETRY
+    AGENTS --> README
+    README --> DEAD2
+    SDK_DOC --> SDK_SRC
+    SDK_SRC --> STOP
+    ARCH --> STOP
+
+    style DEAD1 fill:#8b0000,color:#fff,stroke:#ff4444
+    style DEAD2 fill:#8b0000,color:#fff,stroke:#ff4444
+    style ARCH fill:#555,color:#aaa,stroke:#777
+    style BUILD fill:#006400,color:#fff,stroke:#44ff44
+    style SDK_DOC fill:#006400,color:#fff,stroke:#44ff44
+    style STOP fill:#333,color:#fff,stroke:#888,stroke-dasharray: 5 5
