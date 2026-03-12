@@ -555,7 +555,7 @@ export default function setup(host: MicroappHost) {
         const showCats = mode === "xl" || mode === "l";
         if (showCats) {
           catBox.show();
-          catBox.top = h - ART_H - 2;   // 2 = 1 status bar + 1 margin
+          catBox.top = h - ART_H + 1;   // tuck into bottom edge
           catBox.left = w - ART_W - 1;
         } else {
           catBox.hide();
