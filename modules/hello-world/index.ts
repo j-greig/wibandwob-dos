@@ -1,8 +1,7 @@
 /**
  * Hello World v2 — Layout engine showcase + SDK primitive proving ground.
  *
- * Now uses the canon layout SDK: createGrid, createRow, createStack,
- * createNodePart, pickBreakpoint, applyRect.
+ * Now uses the canon layout SDK: createGrid, createNodePart, applyRect.
  *
  * Toolbar (visible at L+ sizes):
  *   Compass buttons, regen button, mode indicator.
