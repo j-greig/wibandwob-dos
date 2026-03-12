@@ -37,6 +37,10 @@ export interface AppMenuActions {
   openBackroomsPrompt: () => void;
   openBackroomsTv: (args?: Record<string, unknown>) => void;
   openBackroomsLogBrowser: () => void;
+  backroomsPickerInfo: () => unknown;
+  backroomsPickerSelect: (args?: Record<string, unknown>) => unknown;
+  backroomsPickerConfirm: () => unknown;
+  backroomsPickerCancel: () => unknown;
   tileWindows: () => void;
   cascadeWindows: () => void;
   toggleMaximizeFocused: (args?: Record<string, unknown>) => void;
@@ -683,6 +687,42 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     palettePlacement: { order: 0 },
     api: true,
     agent: true
+  },
+  {
+    id: "backrooms.picker.info",
+    label: "Backrooms Picker Info",
+    description: "Inspect Backrooms primer picker state (active, selected index, selected primers).",
+    group: "inspect",
+    actionKey: "backroomsPickerInfo",
+    api: true,
+    agent: true,
+  },
+  {
+    id: "backrooms.picker.select",
+    label: "Backrooms Picker Select",
+    description: "Select an index in Backrooms primer picker. Args: index (number).",
+    group: "focus",
+    actionKey: "backroomsPickerSelect",
+    api: true,
+    agent: true,
+  },
+  {
+    id: "backrooms.picker.confirm",
+    label: "Backrooms Picker Confirm",
+    description: "Confirm Backrooms primer picker and continue to run options prompts.",
+    group: "focus",
+    actionKey: "backroomsPickerConfirm",
+    api: true,
+    agent: true,
+  },
+  {
+    id: "backrooms.picker.cancel",
+    label: "Backrooms Picker Cancel",
+    description: "Cancel and close Backrooms primer picker.",
+    group: "focus",
+    actionKey: "backroomsPickerCancel",
+    api: true,
+    agent: true,
   },
   {
     id: "backrooms_logs.open",

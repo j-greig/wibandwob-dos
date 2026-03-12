@@ -189,8 +189,10 @@ export function openBackroomsPrimerPicker(context: BackroomsWindowContext, theme
     frame.close();
   };
 
+  const getSelectedIndex = () => (list as List & { selected: number }).selected ?? 0;
+
   const confirmSelection = () => {
-    const focusedIndex = (list as List & { selected: number }).selected ?? 0;
+    const focusedIndex = getSelectedIndex();
     const fallback = filteredEntries[focusedIndex]?.label;
     const selected = selectedLabels.size > 0 ? [...selectedLabels] : fallback ? [fallback] : [];
     closePicker();
@@ -257,6 +259,37 @@ export function openBackroomsPrimerPicker(context: BackroomsWindowContext, theme
       jumpToLetter(ch);
     }
   });
+
+  // API bridge hooks for command-driven picker automation.
+  (frame as unknown as Record<string, unknown>)._backroomsPickerInfo = () => ({
+    active: !pickerClosed,
+    selectedIndex: getSelectedIndex(),
+    visibleEntryCount: filteredEntries.length,
+    selectedLabel: filteredEntries[getSelectedIndex()]?.label,
+    selectedPrimers: [...selectedLabels],
+    searchValue,
+    theme,
+  });
+  (frame as unknown as Record<string, unknown>)._backroomsPickerSelect = (requestedIndex: number) => {
+    if (pickerClosed) return { ok: false, error: "Backrooms picker is closed" };
+    const count = filteredEntries.length;
+    if (count <= 0) return { ok: false, error: "No selectable entries", count: 0 };
+    const index = Math.max(0, Math.min(Math.trunc(requestedIndex), count - 1));
+    list.select(index);
+    updatePreview(index);
+    context.screen.render();
+    return { ok: true, index, count, label: filteredEntries[index]?.label };
+  };
+  (frame as unknown as Record<string, unknown>)._backroomsPickerConfirm = () => {
+    if (pickerClosed) return { ok: false, error: "Backrooms picker is closed" };
+    confirmSelection();
+    return { ok: true };
+  };
+  (frame as unknown as Record<string, unknown>)._backroomsPickerCancel = () => {
+    if (pickerClosed) return { ok: false, error: "Backrooms picker is already closed" };
+    closePicker();
+    return { ok: true };
+  };
 
   frame.kind = "browser";
   frame.describeState = () => ({

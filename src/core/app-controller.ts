@@ -807,6 +807,23 @@ export class TsTuiMvpApp {
     return win?.finder ?? null;
   }
 
+  private getBackroomsPickerApi(): {
+    info?: () => unknown;
+    select?: (index: number) => unknown;
+    confirm?: () => unknown;
+    cancel?: () => unknown;
+  } | null {
+    const win = this.findWindowByAppType("backrooms-primer-picker");
+    if (!win) return null;
+    const dyn = win as unknown as Record<string, unknown>;
+    return {
+      info: typeof dyn._backroomsPickerInfo === "function" ? (dyn._backroomsPickerInfo as () => unknown) : undefined,
+      select: typeof dyn._backroomsPickerSelect === "function" ? (dyn._backroomsPickerSelect as (index: number) => unknown) : undefined,
+      confirm: typeof dyn._backroomsPickerConfirm === "function" ? (dyn._backroomsPickerConfirm as () => unknown) : undefined,
+      cancel: typeof dyn._backroomsPickerCancel === "function" ? (dyn._backroomsPickerCancel as () => unknown) : undefined,
+    };
+  }
+
   private openFileManagerWindow(
     restore?: FileManagerRestore,
   ): WindowRecord | undefined {
@@ -1810,6 +1827,28 @@ export class TsTuiMvpApp {
         this.openBackroomsTv({ theme, model, turns, mode, primers: "" });
       },
       openBackroomsLogBrowser: () => this.openBackroomsLogBrowserWindow(),
+      backroomsPickerInfo: () => {
+        const api = this.getBackroomsPickerApi();
+        if (!api?.info) return { active: false, error: "Backrooms picker not active" };
+        return api.info();
+      },
+      backroomsPickerSelect: (args) => {
+        const api = this.getBackroomsPickerApi();
+        if (!api?.select) return { selected: false, error: "Backrooms picker not active" };
+        const index = Number(args?.index);
+        if (!Number.isFinite(index)) return { selected: false, error: "index must be a number" };
+        return api.select(index);
+      },
+      backroomsPickerConfirm: () => {
+        const api = this.getBackroomsPickerApi();
+        if (!api?.confirm) return { confirmed: false, error: "Backrooms picker not active" };
+        return api.confirm();
+      },
+      backroomsPickerCancel: () => {
+        const api = this.getBackroomsPickerApi();
+        if (!api?.cancel) return { cancelled: false, error: "Backrooms picker not active" };
+        return api.cancel();
+      },
       tileWindows: () => this.windowManager.tileWindows(),
       cascadeWindows: () => this.windowManager.cascadeWindows(),
       toggleMaximizeFocused: (args?: Record<string, unknown>) => {

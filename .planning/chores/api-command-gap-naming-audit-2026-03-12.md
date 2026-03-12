@@ -78,12 +78,11 @@ Aliases declared in `/help` descriptions that do not exist in `/commands/list`:
   - [x] Register as commands in command-catalog + expose as `POST /overlay/confirm` and `POST /overlay/cancel` in control-api
     - Also added `GET /overlay/info` and `overlay.info` command.
   - [x] Verify compatibility with: openValuePrompt (figlet text), list/browser picker modals (figlet font picker, zine canvas picker)
-    - Figlet flow fully works: `figlet.open` -> `overlay/confirm` (text) -> `overlay/confirm` (font) -> banner window created.
-    - Zine picker uses raw blessed.list, not OverlayManager — so overlay commands don't apply. But `/view/zine/open` with `filePath` or `index` args bypasses the picker entirely.
+    - Figlet flow works end-to-end: `figlet.open` -> `/overlay/confirm` (text) -> `/overlay/select` (font index, optional) -> `/overlay/confirm` (open banner).
+    - Zine picker remains module-local (raw blessed.list), handled via dedicated commands (`microapp.wibwob.zine.picker.*`) and `/view/zine/open` filePath/index.
   - [x] Return `ok:false` with clear error when no overlay is active
-  - [ ] Nice-to-have: `POST /overlay/select` with `{index}` for deterministic picker selection before confirm
-    - Deferred — would require OverlayManager to expose selection mutation on browser/list overlays.
-  - Acceptance: figlet.open -> /overlay/confirm advances to font picker; /overlay/cancel closes cleanly; zine picker uses direct-open path; typecheck passes; /health ok after flows
+  - [x] Added `POST /overlay/select` with `{index}` for deterministic picker selection before confirm.
+  - Acceptance: figlet.open and plasma.from-primer interactive flows are now fully API-drivable; typecheck passes; /health ok after flows.
 
 ## Also added
 
@@ -96,3 +95,14 @@ Aliases declared in `/help` descriptions that do not exist in `/commands/list`:
 - [x] Add short naming canon to command-catalog docs (segment separators, open label policy).
 - [ ] Add API parity test asserting `/commands/list` available commands are runnable or intentionally gated.
   - Deferred — needs a smoke test script, not a code change.
+
+## Later-session follow-on landed
+
+- [x] Shared overlay selection affordance added (`overlay.select`) at SDK/control-API level for browser/list/file-browser overlays.
+- [x] Primer interactive and Plasma-from-Primer interactive paths verified with `overlay.select + overlay.confirm`.
+- [x] Backrooms primer picker became API-actionable via dedicated commands:
+  - `backrooms.picker.info`
+  - `backrooms.picker.select`
+  - `backrooms.picker.confirm`
+  - `backrooms.picker.cancel`
+- [x] Demos menu first-pass API control sweep: 22/22 pass (`scratch/reports/demos-api-control-audit-latest.json`).

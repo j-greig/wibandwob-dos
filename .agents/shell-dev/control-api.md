@@ -148,8 +148,13 @@ primer.browse                           {}
 primer-gallery.open                     {}
 editor.open                             {"filePath":"/abs/path.txt"}
 backrooms.open                          {"theme":"…","mode":"…","model":"…","turns":N}
+backrooms.picker.info                   {}   ← inspect Backrooms primer picker state
+backrooms.picker.select                 {"index":N}
+backrooms.picker.confirm                {}
+backrooms.picker.cancel                 {}
 overlay.confirm                         {}   ← confirm active modal overlay
 overlay.cancel                          {}   ← cancel active modal overlay
+overlay.select                          {"index":N}  ← select index in active browser/list/file-browser overlay
 overlay.info                            {}   ← check if overlay is active
 menu.close                              {}   ← close any open dropdown/popup menu
 ```

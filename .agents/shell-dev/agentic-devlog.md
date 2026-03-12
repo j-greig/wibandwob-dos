@@ -9,7 +9,10 @@ depends_on: [spk-agentic-tui-runtime-roadmap]
 
 # Agentic Devlog
 
-Canonical place to record what it feels like to build against the live WibWob-DOS runtime as an agent.
+THIS IS THE MASTER AGENT DEV DIARY.
+If you discover friction, a failure mode, or a repeatable win while working in live WibWob-DOS, log it here first.
+
+Canonical purpose: record what it feels like to build against the live runtime and module surfaces from an agent perspective, so future agents inherit working patterns instead of repeating pain.
 
 Rules:
 - Log friction the first time it is clearly real.
@@ -18,6 +21,41 @@ Rules:
 - Prefer concrete notes tied to scripts, APIs, or runtime surfaces over vague complaints.
 
 ## Current Notes
+
+### 2026-03-12 — Applications/Demos API control sweep + interstitial canon
+
+- Interactive-first app flows are the main agent failure mode, not command execution itself.
+  Real examples from Applications pass:
+  - `figlet.open` -> value prompt -> font picker
+  - `plasma.from-primer` -> primer file-browser picker
+  - `backrooms.open` -> theme prompt -> custom primer picker -> turns/model prompts
+  - `microapp.wibwob.zine.open` -> module-local canvas picker
+
+- Winning control pattern for shared overlays is now explicit and reusable:
+  - `overlay.info`
+  - `overlay.select` (index)
+  - `overlay.confirm`
+  - `overlay.cancel`
+  This made Primer + Plasma interactive paths deterministic without filePath shortcutting.
+
+- Not all pickers are shared overlays.
+  Zine and Backrooms had module-local picker UIs; they needed module/window-level command hooks.
+  Principle: if a picker is not built on shared OverlayManager, expose local picker commands (`*.picker.info/select/confirm/cancel`) until migrated.
+
+- Operational discipline that avoided false negatives:
+  - `menu.close` + `desktop.clear-all` before each test
+  - one app per run, then clear
+  - verify with both `/overlay/info` and `/state`
+
+- First-pass result quality improved sharply once interstitials were treated as first-class states.
+  Demos sweep then passed 22/22 with the same harness style.
+
+- Backrooms required a hybrid approach.
+  Shared overlay controls handled value prompts, but Backrooms primer picker is a custom window.
+  Winning approach: expose dedicated picker controls (`backrooms.picker.info/select/confirm/cancel`) while keeping overlay controls for shared prompt steps.
+
+- Diary discoverability itself was a friction point.
+  We moved the master devlog into `.agents/` and added a root pointer doc so agents can find it fast without archaeology.
 
 ### 2026-03-08 — Patchbay, reload, TouchLab MVP
 
