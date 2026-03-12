@@ -23,9 +23,6 @@ export type LayoutPart<Props = void> = {
   destroy(): void;
 };
 
-/** @deprecated Use `LayoutPart` — kept for backward compatibility during migration. */
-export type UiPart<Props = void> = LayoutPart<Props>;
-
 /** @primitive */
 export type FlexBasis = number | `${number}fr`;
 
@@ -55,9 +52,6 @@ export type FlexChild = {
   visible?: () => boolean;
   align?: Alignment;
 };
-
-/** @deprecated Use `FlexChild` — kept for backward compatibility during migration. */
-export type StackChild = FlexChild;
 
 /** @primitive */
 export type GridChild = {
@@ -302,9 +296,6 @@ export function createStack(parent: blessed.Widgets.Node, children: FlexChild[])
 export function createRow(parent: blessed.Widgets.Node, children: FlexChild[]): LayoutPart<void> {
   return createLinearLayout(parent, children, "horizontal");
 }
-
-/** @deprecated Use `createRow` — kept for backward compatibility during migration. */
-export const createColumns = createRow;
 
 // ── Responsive helpers ────────────────────────────────────────────────────
 

@@ -15,7 +15,7 @@ import {
   applyRect,
   createNodePart,
 } from "../core/ui-parts.js";
-import type { Rect, LayoutPart, UiPart, FlexChild, StackChild, GridChild, FlexBasis, TrackSize, AxisAlign, Alignment, Gap } from "../core/ui-parts.js";
+import type { Rect, LayoutPart, FlexChild, GridChild, FlexBasis, TrackSize, AxisAlign, Alignment, Gap } from "../core/ui-parts.js";
 import type { BrowserEntry, GalleryTab } from "../core/types.js";
 import {
   createContourPlayer,
@@ -89,9 +89,7 @@ export type {
   MicroappWindowHandle,
   Rect,
   LayoutPart,
-  UiPart,
   FlexChild,
-  StackChild,
   GridChild,
   FlexBasis,
   TrackSize,
@@ -143,7 +141,6 @@ export {
   clamp,
   createStack,
   createRow,
-  createColumns,
   createGrid,
   createScrollViewport,
   pickBreakpoint,

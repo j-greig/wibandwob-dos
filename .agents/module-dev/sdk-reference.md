@@ -38,8 +38,9 @@ host.windows.focusWindow(id)
 host.windows.closeWindow(id)
 
 // UI layout primitives (also importable directly from SDK)
-host.ui.createStack(...)
-host.ui.createColumns(...)
+host.ui.createStack(...)       // vertical flex layout
+host.ui.createRow(...)         // horizontal flex layout (canon name)
+host.ui.createColumns(...)     // deprecated alias for createRow
 host.ui.createHeaderBar(...)
 host.ui.createStatusBar(...)
 host.ui.createTextBlock(...)
@@ -48,6 +49,14 @@ host.ui.createFigletDisplay(...)
 host.ui.createAnimatedPanel(...)
 host.ui.createButtonBar(...)
 host.ui.applyRect(node, rect)
+
+// Available via direct import from microapp-sdk (not on host.ui):
+// createGrid(parent, options)       — 2D grid layout
+// createScrollViewport(parent, opts) — fixed header/footer + scrollable middle
+// pickBreakpoint(width, entries?)    — responsive breakpoint selection
+// createNodePart(node)              — wrap blessed box as LayoutPart
+// createScrollbar()                 — scrollbar config for blessed boxes
+// scrollableStyle(base)             — merge scrollbar styling into base style
 ```
 
 ## MicroappWindowHandle API

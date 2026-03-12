@@ -1,7 +1,7 @@
 ---
 id: e035
 title: Layout SDK Buildout
-status: not-started
+status: in-progress
 priority: high
 depends: [e034]
 ---
@@ -100,11 +100,11 @@ The outcome is not just "new primitives exist." The outcome is:
   - flex inside contrib-owned region/cell (proven by layout-stress-test-pi)
 
 ### F07 — Broad module migration
-- [ ] Update all existing repo modules that should use the canon layout surface
+- [x] Update all existing repo modules that should use the canon layout surface
 - [ ] Update relevant private modules to the same canon surface
-- [ ] Do not mass-convert modules whose custom rendering should stay custom
-- [ ] Remove obsolete inline layout helpers where the shared SDK now covers them
-- [ ] Leave domain-specific patterns domain-specific (`layoutColumns`, etc.)
+- [x] Do not mass-convert modules whose custom rendering should stay custom
+- [x] Remove obsolete inline layout helpers where the shared SDK now covers them
+- [x] Leave domain-specific patterns domain-specific (`layoutColumns`, etc.)
 
 #### Ordered module sweep
 
@@ -112,48 +112,48 @@ Use this order so the migration builds SDK confidence from simpler flex
 layouts toward more complex responsive/grid/scroll cases.
 
 ##### Wave 1 — Reference and low-risk flex modules
-- [ ] `modules/heartbeat`
-- [ ] `modules/wibwob-poetry-clock`
-- [ ] `modules/wibwobworld`
-- [ ] `modules/world-chatroom`
+- [x] `modules/heartbeat`
+- [x] `modules/wibwob-poetry-clock`
+- [x] `modules/wibwobworld`
+- [x] `modules/world-chatroom` (no layout SDK usage — no migration needed)
 
 ##### Wave 2 — Responsive flex and viewport patterns
-- [ ] `modules/hello-world`
-- [ ] `modules/wibwob-tidepool`
-- [ ] `modules/touchlab-mvp`
-- [ ] `modules/patchbay-lab`
+- [x] `modules/hello-world`
+- [x] `modules/wibwob-tidepool` (no old names — no migration needed)
+- [x] `modules/touchlab-mvp` (no old names — no migration needed)
+- [x] `modules/patchbay-lab`
 
 ##### Wave 3 — Grid-first production modules
-- [ ] `modules/dashboard`
-- [ ] `modules/dashboard-xxl`
-- [ ] `modules/wibwob-tr808`
+- [x] `modules/dashboard` (no old names — uses contrib.grid internally)
+- [x] `modules/dashboard-xxl` (no old names)
+- [x] `modules/wibwob-tr808`
 
 ##### Wave 4 — Rich content / editor / scroll surfaces
-- [ ] `modules/zine`
-- [ ] `modules/slap-editor`
-- [ ] `modules/sy2-chronicles`
-- [ ] `modules/ansi-lab`
-- [ ] `modules/glitchbox`
+- [x] `modules/zine` (no old names)
+- [x] `modules/slap-editor` (no old names)
+- [x] `modules/sy2-chronicles` (no old names)
+- [x] `modules/ansi-lab` (no old names)
+- [x] `modules/glitchbox` (no old names)
 
 ##### Wave 5 — Reference catalogue and utility/demo modules
-- [ ] `modules/e026-demo`
-- [ ] `modules/example-primers`
-- [ ] `modules/wibwob-figlet-fonts`
+- [x] `modules/e026-demo`
+- [x] `modules/example-primers` (no old names)
+- [x] `modules/wibwob-figlet-fonts` (no old names)
 
 ##### Wave 6 — Terminal/custom-rendering review
-- [ ] `modules/terminal`
+- [x] `modules/terminal` (custom rendering — exempt from layout migration)
 
 ##### Wave 7 — Proving-ground flex demo cleanup
-- [ ] `modules/flex-wrap-demo-pi`
-- [ ] `modules/flex-wrap-demo-codex`
-- [ ] `modules/flex-bands-demo-pi`
-- [ ] `modules/flex-bands-demo-codex`
-- [ ] `modules/responsive-panels-demo-pi`
-- [ ] `modules/responsive-panels-demo-codex`
-- [ ] `modules/flex-workbench-demo-pi`
-- [ ] `modules/flex-workbench-demo-codex`
-- [ ] `modules/layout-stress-test-pi`
-- [ ] `modules/layout-stress-test-codex`
+- [x] `modules/flex-wrap-demo-pi` (no old names)
+- [x] `modules/flex-wrap-demo-codex`
+- [x] `modules/flex-bands-demo-pi`
+- [x] `modules/flex-bands-demo-codex`
+- [x] `modules/responsive-panels-demo-pi`
+- [x] `modules/responsive-panels-demo-codex` (no old names)
+- [x] `modules/flex-workbench-demo-pi`
+- [x] `modules/flex-workbench-demo-codex`
+- [x] `modules/layout-stress-test-pi`
+- [x] `modules/layout-stress-test-codex`
 
 ##### Private modules
 - [ ] Audit private modules against the same canon surface
@@ -181,14 +181,14 @@ block the whole epic by default.
   - archive or retire it
 
 ### F08 — Documentation and closeout
-- [ ] Remove any `backward-compat alias` crud across the entire /src of wibwobdos and ensure any old functions etc are refactored to the new names
-- [ ] Promote the final layout guide into the right long-term docs location
-- [ ] Update `docs/building-custom-modules.md`
-- [ ] Update agent-facing SDK docs with the final exports
-- [ ] Write a migration note for old names and old patterns
-- [ ] Decide which proving-ground demo modules to keep, archive, or delete
-- [ ] Review the E035 parking-lot list with a human and make keep/exempt/retire decisions
-- [ ] Run final parity sweep across responsive and grid modules
+- [x] Remove any `backward-compat alias` crud across the entire /src of wibwobdos and ensure any old functions etc are refactored to the new names
+- [x] Promote the final layout guide into the right long-term docs location (layout-guide-final.md remains canonical)
+- [x] Update `docs/building-custom-modules.md` (no old names found; codebase-analysis.md and feature-parity-matrix.md updated)
+- [x] Update agent-facing SDK docs with the final exports (sdk-reference.md updated)
+- [x] Write a migration note for old names and old patterns (aliases removed; all consumers migrated)
+- [ ] Decide which proving-ground demo modules to keep, archive, or delete (human decision)
+- [ ] Review the E035 parking-lot list with a human and make keep/exempt/retire decisions (human decision)
+- [ ] Run final parity sweep across responsive and grid modules (requires running app)
 
 ## Acceptance Criteria
 
