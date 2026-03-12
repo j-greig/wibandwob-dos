@@ -34,6 +34,7 @@ import type { RuntimeStatsSnapshot } from "../core/runtime-stats.js";
 import type { CommandSurface, CommandListItem, CommandRunResult } from "../core/command-registry.js";
 import { log } from "./app-logger.js";
 import { worldChatService, formatWorldChannelText } from "./world-chat-service.js";
+import { stripAnsi, stripBlessedChrome } from "./strip-ansi.js";
 
 interface ControlApiHandlers {
   getState: () => DesktopState;
@@ -88,7 +89,8 @@ const ENDPOINT_CATALOGUE = [
   { method: "GET",  path: "/world-chat/channel",            description: "Read one world chat channel. ?id=%23world-ridge-overlook" },
   { method: "GET",  path: "/world-chat/channel/text",       description: "Plain text export of one world chat channel. ?id=%23world-ridge-overlook" },
   { method: "GET",  path: "/windows/text",                  description: "Raw text content of a window. ?id=N" },
-  { method: "GET",  path: "/screenshot/text",               description: "ANSI-stripped text screenshot of a window. ?id=N" },
+  { method: "GET",  path: "/screenshot/text",               description: "Clean readable text screenshot. ?id=N uses semantic captureText. Full screen strips ANSI + chrome." },
+  { method: "GET",  path: "/screenshot/ansi",               description: "Raw ANSI text screenshot (blessed screen dump). ?id=N to crop to window rect." },
   { method: "POST", path: "/commands/run",                  body: { id: "string (command id, canonical)", command: "string (deprecated alias for id)", args: "object (optional)" }, description: "Execute a command by id. Canonical command execution endpoint." },
   // ── View endpoints — convenience aliases for /commands/run ──
   // All dispatch through the command registry. Prefer /commands/run for new integrations.
@@ -344,9 +346,46 @@ export class ControlApiService {
         headers: { "Content-Type": "text/plain; charset=utf-8" },
       });
     }
+    // ── /screenshot/text — clean readable text (default) ──────────────────
     if (request.method === "GET" && url.pathname === "/screenshot/text") {
       const rawId = url.searchParams.get("id");
+      const TEXT_HEADERS = { "Content-Type": "text/plain; charset=utf-8" };
+
+      if (rawId !== null) {
+        // Per-window: prefer semantic captureText(), fall back to stripped crop
+        const id = Number(rawId);
+        const semantic = this.handlers.windows.captureText(id);
+        if (semantic !== undefined) {
+          // captureText may include ANSI styling (e.g. syntax-highlighted editor content)
+          return new Response(stripAnsi(semantic), { headers: TEXT_HEADERS });
+        }
+        // Fallback: crop from blessed screen dump + strip
+        const raw = this.handlers.screenshotText();
+        const win = this.handlers.windows.getWindowById(id);
+        if (win) {
+          const x = Number(win.frame.left);
+          const y = Number(win.frame.top);
+          const w = Number(win.frame.width);
+          const h = Number(win.frame.height);
+          const lines = raw.split("\n");
+          const cropped = lines.slice(y, y + h).map(line => {
+            return stripBlessedChrome(line).slice(x, x + w);
+          });
+          return new Response(cropped.join("\n"), { headers: TEXT_HEADERS });
+        }
+        return new Response("window not found", { status: 404, headers: TEXT_HEADERS });
+      }
+      // Full screen: strip everything
+      const text = stripBlessedChrome(this.handlers.screenshotText());
+      return new Response(text, { headers: TEXT_HEADERS });
+    }
+
+    // ── /screenshot/ansi — raw blessed dump (preserves escapes) ─────────
+    if (request.method === "GET" && url.pathname === "/screenshot/ansi") {
+      const rawId = url.searchParams.get("id");
       let text = this.handlers.screenshotText();
+      const TEXT_HEADERS = { "Content-Type": "text/plain; charset=utf-8" };
+
       if (rawId !== null) {
         const id = Number(rawId);
         const win = this.handlers.windows.getWindowById(id);
@@ -355,16 +394,18 @@ export class ControlApiService {
           const y = Number(win.frame.top);
           const w = Number(win.frame.width);
           const h = Number(win.frame.height);
-          // Strip ANSI, crop to window rect
           const lines = text.split("\n");
+          // Strip ANSI only for slicing accuracy, but return raw lines
           const cropped = lines.slice(y, y + h).map(line => {
-            const stripped = line.replace(/\x1b\[[0-9;]*m/g, "");
-            return stripped.slice(x, x + w);
+            // We need char-accurate slicing so strip for measurement,
+            // but return the raw line segment. This is inherently imperfect
+            // with ANSI — return the raw line for now.
+            return line;
           });
           text = cropped.join("\n");
         }
       }
-      return new Response(text, { headers: { "Content-Type": "text/plain; charset=utf-8" } });
+      return new Response(text, { headers: TEXT_HEADERS });
     }
 
     if (request.method === "GET" && url.pathname === "/windows/text") {

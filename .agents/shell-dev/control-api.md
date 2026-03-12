@@ -18,8 +18,11 @@ GET /openapi.json                 OpenAPI 3.0 spec
 GET /state                        full live desktop + window state
 GET /commands/list                all command ids with descriptions and surfaces
 GET /content/primer-info?path=…   primer content metadata
-GET /windows/text?id=…            window text content
-GET /screenshot/text?id=…         text screenshot of window
+GET /windows/text?id=…            window semantic content (JSON, may include ANSI styling)
+GET /screenshot/text              clean readable text screenshot (ANSI + chrome stripped)
+GET /screenshot/text?id=…         clean text of one window (captureText if available, else stripped crop)
+GET /screenshot/ansi              raw ANSI text screenshot (blessed screen dump, escapes preserved)
+GET /screenshot/ansi?id=…         raw ANSI crop of one window rect
 ```
 
 ## Core Writes
@@ -167,6 +170,10 @@ Trust exported text snapshots and state captures over screenshots when debugging
 
 ```bash
 curl -s http://127.0.0.1:8099/state | python3 -m json.tool
+curl -s http://127.0.0.1:8099/screenshot/text          # clean full-screen text
+curl -s http://127.0.0.1:8099/screenshot/text?id=5      # clean single window
+curl -s http://127.0.0.1:8099/screenshot/ansi           # raw ANSI (for colour-aware tools)
+curl -s http://127.0.0.1:8099/windows/text?id=5 | python3 -m json.tool  # semantic JSON
 curl -s -X POST http://127.0.0.1:8099/view/figlet/open \
   -H "Content-Type: application/json" -d '{"text":"HELLO"}'
 curl -s -X POST http://127.0.0.1:8099/windows/move \

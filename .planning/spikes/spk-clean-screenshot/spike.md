@@ -1,6 +1,6 @@
 ---
 title: "Clean text screenshot endpoint"
-status: in-progress
+status: done
 branch: spike/clean-screenshot
 worktree: ../wibandwob-dos-spike-clean-screenshot
 ---
@@ -12,62 +12,64 @@ worktree: ../wibandwob-dos-spike-clean-screenshot
 Can `/screenshot/text` default to clean readable output and offer a
 `/screenshot/ansi` variant for the raw dump?
 
-## Current state
+## Answer: YES
 
-Two text capture paths exist:
+Works well. Full-screen drops from 20KB raw to 9KB clean and is fully
+readable — you can see window titles, content, spatial layout, ASCII art.
+Per-window mode uses semantic `captureText()` when available (editor gives
+full file contents, browser gives markdown). Falls back to stripped blessed
+crop for windows without captureText (pattern, primer).
 
-1. `screen.screenshot()` — blessed raw dump. Full of ANSI escapes, multi-byte
-   Unicode block chars (box-drawing, shading), blessed internal rendering chars.
-   This is what `/screenshot/text` currently returns.
-
-2. `WindowRecord.captureText()` — semantic text per window. Already clean for
-   most window types: editor returns file text, browser returns markdown,
-   primer returns content, agent chat returns transcript. Exposed via
-   `/windows/text?id=N` (returns JSON) and used by agent tools.
-
-The existing per-window crop in `/screenshot/text?id=N` tries to strip ANSI
-from the blessed dump with a weak regex — but `captureText()` already gives
-clean text for free. The full-screen mode does NO stripping at all.
-
-## Proposed API shape
+## API shape
 
 | Endpoint | Returns | Content-Type |
 |----------|---------|-------------|
-| `GET /screenshot/text` | Clean text. Full screen: strip ANSI + Unicode crud. Per-window (`?id=N`): use `captureText()` if available, fall back to stripped blessed crop. | text/plain |
-| `GET /screenshot/ansi` | Raw `screen.screenshot()`. Useful for ANSI-aware renderers, terminal replay, colour-preserving tools. Per-window crop with `?id=N`. | text/plain |
+| `GET /screenshot/text` | Clean text. Full screen: strip ANSI + Unicode chrome. Per-window (`?id=N`): `captureText()` with ANSI stripped, or stripped blessed crop fallback. | text/plain |
+| `GET /screenshot/ansi` | Raw `screen.screenshot()`. Per-window crop with `?id=N`. | text/plain |
 
 Default = clean. Append `/ansi` for the raw version.
 
-No `?clean=1` param — cleaner to just have two endpoints.
+## What was built (worktree)
 
-## Implementation plan
+### New file: `src/services/strip-ansi.ts`
 
-- [ ] Add `stripAnsi()` utility — comprehensive regex covering SGR, CSI, OSC,
-      cursor movement, 256-colour, truecolour, and stray control chars
-- [ ] Add `stripBlessedChrome()` — replace common blessed Unicode block/box
-      chars with ASCII equivalents or spaces
-- [ ] Refactor `/screenshot/text` handler:
-      - per-window: prefer `captureText()`, fall back to stripped crop
-      - full-screen: apply stripAnsi + stripBlessedChrome to screenshot()
-- [ ] Add `/screenshot/ansi` — current raw behaviour, preserved
-- [ ] Update `/help` route description text
-- [ ] Update `.agents/control-api.md` if it references the endpoint
+Two functions:
+- `stripAnsi(text)` — comprehensive regex removing CSI, OSC, ESC sequences,
+  stray control chars. Covers SGR, cursor, 256-colour, truecolour.
+- `stripBlessedChrome(text)` — calls stripAnsi then replaces Unicode
+  box-drawing (U+2500–U+256C + arcs/diagonals), block elements (U+2580–259F),
+  braille (U+2800–28FF), and PUA (U+E000–F8FF) with ASCII equivalents.
 
-## Files to touch (in worktree)
+### Changed: `src/services/control-api.ts`
 
-- `src/services/control-api.ts` — endpoint handlers (~line 347), help table (~line 91)
-- New: `src/services/strip-ansi.ts` or inline util
-- `.agents/control-api.md` — API docs
+- `/screenshot/text` rewritten: per-window uses `captureText()` + `stripAnsi()`,
+  full-screen uses `stripBlessedChrome()` on blessed dump.
+- `/screenshot/ansi` added: raw blessed dump preserved for ANSI-aware consumers.
+- Help table updated with both endpoints.
 
-## Out of scope
+## Test results
 
-- Changing captureText() on any window type
-- Image/pixel screenshot
-- New window types
+See `test-captures/` directory:
 
-## Key finding
+| File | Size | Notes |
+|------|------|-------|
+| fullscreen-raw.txt | 22KB | Blessed dump — unreadable ANSI soup |
+| fullscreen-strip-ansi.txt | 11KB | ANSI stripped, Unicode chrome remains |
+| fullscreen-clean.txt | 9KB | Fully readable — windows, content, layout visible |
+| window-5-captureText.txt | 93KB | Semantic editor content (full file, has ANSI styling) |
+| window-5-editor-clean.txt | 3KB | Blessed crop, stripped — readable but spatially cropped |
 
-For single-window reads, `captureText()` is the RIGHT source. The blessed
-screen crop approach was always a hack. The full-screen case is the only one
-that needs actual stripping — and that is a lossy best-effort (animated
-windows, overlaps, etc. won't have clean semantic text).
+Key finding: `captureText()` output can contain ANSI (syntax highlighting in
+editor). The endpoint now strips that too.
+
+## Remaining work
+
+- [ ] Merge to main (after review)
+- [ ] Verify pattern/primer windows — they lack captureText(), fallback works
+      but could add captureText() to those window types for better output
+- [ ] Consider adding captureText() to more window types (pattern, primer)
+
+## Files changed (in worktree only)
+
+- `src/services/strip-ansi.ts` (NEW)
+- `src/services/control-api.ts` (CHANGED — endpoints + help table + import)

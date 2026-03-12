@@ -9,250 +9,138 @@ depends_on: []
 
 # E034 — Layout Primitives SDK
 
-Establish a coherent layout model for WibWob-DOS microapps, align naming
-to CSS/Tailwind vocabulary, make primitives composable and nestable, then
-extract to the SDK. NOT a mass rewrite of existing modules.
+Extract the layout primitives proven in hello-world v2 into the microapp SDK,
+then port existing modules to use them. Eliminates repeated manual grid/position
+code across the codebase.
 
 ---
 
 ## Problem
 
-1. No layout MODEL. We have scattered primitives (createStack, createColumns,
-   layoutColumns, createGrid-inline) but no documented model that tells a
-   module author WHICH to use WHEN, or how they compose together.
+Every module that needs a grid, responsive breakpoints, or positioned elements
+reinvents the same patterns:
 
-2. Naming diverges from CSS vocabulary. "Compass positioning", "createColumns"
-   (which is actually a flex-row), breakpoints in descending order. An agent
-   or developer with CSS knowledge has to learn a translation layer.
+- dashboard: hand-positioned absolute boxes
+- dashboard-xxl: manual {row, col, rowSpan, colSpan} + pixel math
+- tr808: manual step-button grid with absolute positioning
+- tidepool: manual sidebar + grid area with applyRect
+- hello-world v2: inlined createGrid, pickBreakpoint, compass positioning
 
-3. Primitives don't compose. createGrid takes raw blessed nodes, not UiParts.
-   You can't put a createStack inside a grid cell, or a grid inside a sidebar.
-   This forces modules into ad-hoc wiring whenever layouts get non-trivial.
-
-4. No responsive strategy for grid or component layouts. pickBreakpoint exists
-   in hello-world but isn't generalised. A grid can't say "collapse from 3
-   columns to 1 at sm breakpoint". A sidebar can't say "hide below md".
+The audit (`.planning/chores/menu-nav-figlet-audit/chore-audit-layout-primitives.txt`)
+documents the full gap analysis against blessed-contrib and Textual.
 
 ---
 
-## Layout model: three modes
+## What was proven in hello-world v2
 
-Every microapp layout is one of three modes, or a composition of them.
-The heuristic for choosing:
+Three primitives built inline and validated:
 
-### Component layout (most apps)
+1. **createGrid** — CSS Grid-like layout with fr/fixed track sizes, row/col
+   spans, and gap. Used for the XL 2-col grid (contour spanning 2 rows,
+   stats top-right, clock bottom-right).
 
-Named structural regions: header, body, footer, sidebar, main. Fixed
-relationships between regions. Content fills regions.
+2. **pickBreakpoint** — Responsive breakpoint picker. Given width/height,
+   returns the matching layout mode from an ordered list. Used for
+   XL/L/M/S responsive switching.
 
-USE WHEN: your UI has named areas with structural roles.
-PRIMITIVES: createStack (vertical), createRow (horizontal), sidebar.
-EXAMPLES: poetry-clock, tr808, patchbay-lab, world-chatroom, wibwobworld.
-
-Most modules are this. The existing createStack/createColumns pattern
-is correct for component layout. It needs solidifying, not replacing.
-
-### Grid layout (dashboards, matrices)
-
-N cells tiled in rows and columns. Cells may span. Content is
-semi-homogeneous (dashboard widgets, step buttons, monitoring panels).
-
-USE WHEN: you have a matrix of similar-shaped cells, not named regions.
-PRIMITIVES: createGrid with templateRows/templateColumns, cell spanning.
-EXAMPLES: dashboard, dashboard-xxl, tr808 step grid.
-
-Fewer modules need this. Don't force component-layout apps into grid.
-
-### Document layout (content flow)
-
-Content flows into columns, wraps responsively. Column count adapts to
-available width. Content-driven, not structure-driven.
-
-USE WHEN: variable-length content needs magazine-style arrangement.
-PRIMITIVES: layoutColumnFlow (currently layoutColumns).
-EXAMPLES: zine, sy2-chronicles.
-
-### Composition rule
-
-All three modes MUST nest inside each other:
-
-- A sidebar (component) containing a grid, where one grid cell contains
-  a createStack with a figlet header and primer body
-- A grid cell containing a document-flow layout
-- A document column containing a component layout with header/body/footer
-
-This means every layout primitive must accept UiPart children AND be
-expressible as a UiPart itself. The interface contract is:
-  { layout(rect: Rect): void; destroy(): void }
-
-If createGrid returns a UiPart AND accepts UiPart children (not raw
-blessed nodes), composition works. Same for createStack, createRow,
-layoutColumnFlow.
-
----
-
-## What exists today and what changes
-
-### Keep and solidify (DON'T rewrite)
-
-| Primitive | What it is | Status |
-|-----------|-----------|--------|
-| createStack | Vertical flex (flex-direction: column) | Solid. Keep name. |
-| createColumns | Horizontal flex (flex-direction: row) | Solid. Rename to createRow. Add deprecation wrapper. |
-| StackChild with basis | Flex items with fr/fixed sizing | Solid. Keep. |
-| createHeaderBar | Fixed-height top bar | Solid. Keep. |
-| createStatusBar | Fixed-height bottom bar | Solid. Keep. |
-| createSidebarPanel | Sidebar + main with toggle | Solid. Keep. |
-| layoutColumns | Magazine column flow for zine/sy2 | Solid. Rename to layoutColumnFlow. |
-
-These are component-layout and document-layout primitives. They work.
-Modules using them should NOT be rewritten to use grid.
-
-### Extract from hello-world to SDK (NEW)
-
-| Primitive | What it is | Naming change |
-|-----------|-----------|---------------|
-| createGrid | CSS Grid with fr/fixed tracks, spans, gap | templateRows/templateColumns, gap: {row, column} |
-| pickBreakpoint | Responsive size matching | Adopt xs/sm/md/lg/xl ascending order |
-| Container positioning | Position inner box within outer | Replace compass (NW/SE) with justify/align two-axis |
-
-### Build new (FUTURE — F02/F03)
-
-| Primitive | What it does |
-|-----------|-------------|
-| Responsive wrapper | Any layout can declare breakpoint variants |
-| Grid column collapse | Grid reflows N-col to M-col at breakpoint |
-| UiPart composition | Grid cells accept UiPart children, grid is a UiPart |
+3. **Compass positioning** — Position a tight-fit inner box within an outer
+   transparent container. Nine positions (NW/N/NE/W/C/E/SW/S/SE). Used
+   for figlet banner alignment. Key insight: move the container, not
+   the content (blessed align/valign is broken for multi-line text).
 
 ---
 
 ## Build order
 
-### F00 — Layout model and naming decisions
+### F01 — Extract primitives to SDK
 
-#### S00 — Layout vocabulary decision doc
-- Document the three-mode model (component, grid, document)
-- Heuristic table: when to use which
-- Naming decisions for all five conflicts (see evidence/03-naming-proposals.md)
-- Composition contract: UiPart interface that all primitives share
-- Responsive strategy: how breakpoints work across all three modes
-- Deliverable: layout-vocabulary.md in this epic dir
-- AC: decision doc committed and reviewed
-
-### F01 — Composition foundation
-
-Before extracting anything, ensure the UiPart interface supports nesting.
-
-#### S01 — UiPart composition audit
-- Can createStack children be UiParts? (yes, via createNodePart)
-- Can createGrid cells be UiParts? (no, takes raw blessed nodes)
-- Can a UiPart be placed inside a grid cell? (not without wrapping)
-- Propose minimal interface changes to enable composition
-- AC: audit doc with specific interface changes needed
-
-#### S02 — createGrid accepts UiPart children
-- Grid cells specified as UiPart, not raw blessed.Widgets.BoxElement
-- Grid itself returns a UiPart (has layout(rect) and destroy())
-- createStack can be placed in a grid cell
-- A grid can be placed inside a createStack child
-- AC: hello-world grid works with UiPart composition
-- AC: test case: createStack inside grid cell inside sidebar
-
-### F02 — Extract primitives to SDK (using canon names)
-
-#### S03 — Grid primitive to SDK
-- Extract from hello-world with canon names (templateRows/templateColumns)
-- UiPart-composable from day one
-- AC: hello-world imports from SDK, no inlined grid code
+#### S01 — createGrid in microapp-sdk
+- Move createGrid, resolveTrackSizes, and supporting types from
+  hello-world/index.ts to src/services/microapp-sdk.ts (or a new
+  src/core/layout-primitives.ts re-exported from the SDK)
+- Export: createGrid, Grid, GridOptions, TrackSize, Rect, applyRect
+- Hello-world imports from SDK instead of inlining
+- AC: hello-world works identically, no inlined grid code
 - AC: bun run typecheck clean
 
-#### S04 — Responsive breakpoints to SDK
-- pickBreakpoint with xs/sm/md/lg/xl naming
-- Generic: works with any layout mode, not grid-specific
-- AC: hello-world responsive switching works from SDK import
+#### S02 — pickBreakpoint in microapp-sdk
+- Move pickBreakpoint and Breakpoint type to SDK
+- Export: pickBreakpoint, Breakpoint
+- Hello-world imports from SDK
+- AC: responsive switching works identically
 
-#### S05 — Content alignment to SDK (replaces compass)
-- Two-axis system: horizontal start/center/end, vertical start/center/end
-- Positions inner container within outer (the proven pattern)
-- AC: hello-world toolbar alignment works from SDK import
+#### S03 — Compass positioning in microapp-sdk
+- Move COMPASS_ALIGN, compass types, and the container-positioning
+  pattern to SDK as a reusable primitive
+- Shape: positionInContainer(inner, outer, compass) or similar
+- Export: Compass, COMPASS_ALIGN, positionInContainer
+- Hello-world imports from SDK
+- AC: compass toolbar works identically
 
-#### S06 — Rename createColumns to createRow
-- Add createRow export to ui-parts.ts
-- Deprecation wrapper on createColumns (console.warn, keeps working)
-- Update hello-world to use createRow
-- DO NOT mass-rename all modules — deprecation wrapper handles existing code
-- AC: both names work, new code uses createRow
+### F02 — Port modules to SDK grid
 
-### F03 — Responsive grid
+#### S04 — Port dashboard to createGrid
+- Replace hand-positioned absolute boxes with createGrid
+- Measure code reduction
+- AC: dashboard renders identically at all sizes
+- AC: net line reduction documented
 
-#### S07 — Grid breakpoint config
-- Grid can declare: at breakpoint sm, collapse to 1 column
-- Shape: responsive option on GridOptions or a wrapper
+#### S05 — Port dashboard-xxl to createGrid
+- Replace manual pixel math grid with createGrid
+- AC: virtual canvas grid renders identically
+
+#### S06 — Port tr808 to createGrid
+- Replace manual step-button grid with createGrid
+- AC: step sequencer grid renders and clicks correctly
+
+#### S07 — Port tidepool to createGrid
+- Replace manual sidebar + grid with createGrid + createStack
+- AC: tidepool layout renders identically
+
+### F03 — Responsive grid features
+
+#### S08 — Column collapse breakpoints
+- createGrid gains optional responsive config: at breakpoint X,
+  reflow N-col grid to M-col
+- Shape: responsive option on GridOptions, or a wrapper
 - AC: a 3-col grid collapses to 2-col then 1-col on resize
 
-#### S08 — Auto-sized tracks
-- Track size "auto" measures content
-- AC: grid with auto-width column sizes to its content
-
-### F04 — Port selected modules (ONLY where grid is the right fit)
-
-Apply the heuristic. Only port modules that are genuinely grid-shaped.
-
-#### S09 — Port dashboard to createGrid
-- Dashboard IS a grid (tiled widgets). Good fit.
-- AC: renders identically, code reduction documented
-
-#### S10 — Port dashboard-xxl to createGrid
-- Dashboard-xxl IS a grid (virtual canvas cells). Good fit.
-- AC: renders identically
-
-DO NOT port: poetry-clock (component layout), tr808 (component + custom
-grid — evaluate), patchbay (component + sidebar), world-chatroom (component).
-These work fine with createStack/createRow/sidebar.
+#### S09 — Auto-sized rows/columns
+- Track size "auto" measures content and allocates accordingly
+- AC: a grid with one auto-width column sizes to its content
 
 ---
 
 ## Acceptance criteria
 
-### Model and naming
-- [ ] AC-0: Layout model doc committed (three modes, heuristic, composition contract)
-
-### Composition
-- [ ] AC-1: UiPart interface supports nesting (grid accepts UiPart, grid is UiPart)
-- [ ] AC-2: Demonstrated: createStack inside grid cell inside sidebar
-
 ### SDK extraction
-- [ ] AC-3: createGrid in SDK with canon names, UiPart-composable
-- [ ] AC-4: pickBreakpoint in SDK with xs/sm/md/lg/xl
-- [ ] AC-5: Content alignment in SDK (two-axis, replaces compass)
-- [ ] AC-6: createRow exported, createColumns deprecated
-- [ ] AC-7: All primitives have JSDoc with CSS equivalence notes
-- [ ] AC-8: bun run typecheck clean
+- [ ] AC-1: createGrid exported from microapp-sdk, hello-world uses it
+- [ ] AC-2: pickBreakpoint exported from microapp-sdk
+- [ ] AC-3: Compass positioning exported from microapp-sdk
+- [ ] AC-4: All three primitives have JSDoc with usage examples
+- [ ] AC-5: bun run typecheck clean after extraction
+
+### Module ports
+- [ ] AC-6: At least 2 modules ported to SDK createGrid
+- [ ] AC-7: Net code reduction measured and documented
+- [ ] AC-8: No visual regressions in ported modules
 
 ### Responsive
-- [ ] AC-9: Grid breakpoint collapse works on at least one layout
-
-### Module ports (grid-appropriate modules only)
-- [ ] AC-10: At least 1 dashboard-style module ported to SDK grid
-- [ ] AC-11: No visual regressions
+- [ ] AC-9: Column collapse works on at least one grid
+- [ ] AC-10: Auto-sized tracks work for at least one use case
 
 ---
 
 ## Non-goals
 
-- Full CSS Grid spec (subgrid, named lines, auto-placement)
-- Mass rewriting component-layout modules to use grid
-- Dock primitive (fixed-basis stack children work fine)
-- Breaking existing createStack/createColumns API (deprecate, don't remove)
-- Responsive features on component layout (sidebar already has toggle;
-  createStack doesn't need breakpoints yet)
+- Full CSS Grid spec compliance (subgrid, named lines, etc)
+- Dock primitive (current pattern of fixed-basis stack children works fine)
+- Breaking changes to existing createStack/createColumns API
 
 ---
 
 ## Evidence
 
 - Layout audit: `.planning/chores/menu-nav-figlet-audit/chore-audit-layout-primitives.txt`
-- CSS/Tailwind naming mapping: `scratch/e034-audit/01-css-mapping.md`
-- Textual comparison: `scratch/e034-audit/02-textual-mapping.md`
-- Naming proposals (five conflicts): `scratch/e034-audit/03-naming-proposals.md`
 - Hello-world v2 proving ground: `modules/hello-world/index.ts`
+- Vendor comparison (blessed-contrib Grid, Textual Grid): audit section 3-4
