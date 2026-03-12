@@ -1,0 +1,20 @@
+{
+  "name": "terrarium",
+  "version": "0.1.0",
+  "description": "ANTOPOLIS — A micro-city for ants with ant technology",
+  "type": "microapp",
+  "entry": "index.ts",
+  "microapp": {
+    "id": "wibwob.terrarium",
+    "title": "Antopolis",
+    "description": "Living ant civilization with four districts, fountains, explosions, and drama.",
+    "multiInstance": false,
+    "persist": false,
+    "menu": [
+      { "category": "applications", "order": 90, "label": "Antopolis" }
+    ],
+    "palette": { "order": 90, "label": "Open Antopolis" },
+    "agent": true,
+    "api": true
+  }
+}
