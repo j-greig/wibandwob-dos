@@ -1,0 +1,219 @@
+AUDIT: Text / Markdown / Code Viewing and Editing Engines
+==========================================================
+
+All applications that display or edit text content, what engine drives them,
+and how they compare.
+
+
++------------------------+-------------+----------------------------+------------------+
+| Application            | Mode        | Engine / Components        | Window Kind      |
++------------------------+-------------+----------------------------+------------------+
+| Built-in Editor        | edit + view | editor-service.ts (state)  | "editor"         |
+|  (text-windows.ts)     |             | text-windows.ts (render)   |                  |
+|                        |             | editor-coordinator.ts      |                  |
+|                        |             | blessed.box (tags:true)    |                  |
++------------------------+-------------+----------------------------+------------------+
+| Built-in Editor        | view (md)   | markdown-service.ts        | "editor"         |
+|  (text-windows.ts)     |             | renderMarkdownFile()       | (view mode)      |
+|                        |             | figlet headings, syntax    |                  |
+|                        |             | highlighted code blocks    |                  |
++------------------------+-------------+----------------------------+------------------+
+| Slap Editor (module)   | edit only   | editor-engine.ts (custom)  | microapp window  |
+|  modules/slap-editor   |             | EditorEngine class         |                  |
+|                        |             | blessed.box (tags:true)    |                  |
++------------------------+-------------+----------------------------+------------------+
+| Document Reader        | view only   | markdown-service.ts        | "reader"         |
+|  (browser-windows.ts)  |             | renderMarkdownFile()       |                  |
+|                        |             | figlet headings, syntax    |                  |
+|                        |             | highlighted code blocks    |                  |
++------------------------+-------------+----------------------------+------------------+
+| Primer Viewer          | view only   | Raw text display           | "primer"         |
+|  (app-controller.ts)   |             | blessed.box, plain content |                  |
+|                        |             | No syntax, no markdown     |                  |
++------------------------+-------------+----------------------------+------------------+
+| Zine (module)          | view only   | Custom panel renderer      | microapp window  |
+|  modules/zine          |             | Markdown + figlet via      |                  |
+|                        |             | host.renderMarkdown() (?)  |                  |
+|                        |             | + plain text panels        |                  |
++------------------------+-------------+----------------------------+------------------+
+
+
+FEATURE COMPARISON
+==================
+
+                         Built-in    Slap       Document   Primer    Zine
+                         Editor      Editor     Reader     Viewer    Module
+                         ---------   ---------  ---------  --------  --------
+Edit text                YES         YES        no         no        no
+Save to disk             YES         YES        no         no        no
+Save As                  YES         no         no         no        no
+Undo / Redo              YES (1)     YES        n/a        n/a       n/a
+Cursor movement          YES         YES        n/a        n/a       n/a
+Selection                no          YES        n/a        n/a       n/a
+Clipboard copy           no          YES        no         no        no
+Find / search            no          YES        no         no        YES
+Line numbers / gutter    no          YES        no         no        no
+Syntax highlighting      no (2)      no         YES (3)    no        no
+Markdown rendering       YES (4)     no         YES (4)    no        partial
+Figlet headings          YES (4)     no         YES (4)    no        no
+Scrollbar                YES         no (5)     YES        no        no
+View/Edit mode toggle    YES (md)    no         no         no        no
+File picker on open      YES         no (6)     YES        YES       sidebar
+Dirty indicator          YES         YES        n/a        n/a       n/a
+Word wrap                YES         no         YES        no        no
+
+NOTES:
+(1) Built-in editor undo is basic -- single character undo, not grouped
+(2) Built-in editor has NO syntax highlighting in edit mode
+(3) Document Reader has syntax-highlighted code blocks via markdown-service
+(4) Markdown view mode in text-windows.ts and document reader both use
+    renderMarkdownFile() from markdown-service.ts -- SAME engine
+(5) Slap editor has no scrollbar widget, scrolls via cursor movement
+(6) Slap editor only opens via command args, no interactive file picker
+
+
+ASCII ARCHITECTURE COMPARISON
+=============================
+
+BUILT-IN EDITOR (text-windows.ts + editor-service.ts + editor-coordinator.ts)
+.---------------------------------------------------------------------------.
+| Title Bar                                                                 |
+|---------------------------------------------------------------------------|
+| blessed.box (tags:true, scrollable:true)                                  |
+|                                                                           |
+|  [EDIT MODE]                    [VIEW MODE - md only]                     |
+|  editor-service.ts state:       markdown-service.ts:                      |
+|    lines[], cursor, scroll        renderMarkdownFile()                    |
+|    insertText/deleteBackward      figlet H1-H6 headings                   |
+|    moveCursor/render              syntax-highlighted code                  |
+|                                   blessed {tags} for colour               |
+|  NO gutter                                                                |
+|  NO line numbers                  Scrollbar widget                        |
+|  NO syntax highlighting           Read-only scroll (j/k/d/u)             |
+|  NO selection                     Toggle figlet: h key                    |
+|  Basic undo (char-level)          Toggle edit: e key                      |
+|                                                                           |
+|  File: editor-coordinator.ts                                              |
+|    openFile() / saveFocused()                                             |
+|    file picker via OverlayManager                                         |
+'---------------------------------------------------------------------------'
+
+SLAP EDITOR (modules/slap-editor/editor-engine.ts)
+.---------------------------------------------------------------------------.
+| Title Bar                                                                 |
+|---------------------------------------------------------------------------|
+| blessed.box (tags:true)                                                   |
+|                                                                           |
+|  EditorEngine class (self-contained):                                     |
+|    lines[], cursor{line,col}, selection{start,end}                        |
+|    viewport{topLine, leftCol}                                             |
+|                                                                           |
+|  +------+----------------------------------------------------------+     |
+|  |gutter|  code area                                                |     |
+|  | 1    |  function hello() {                                       |     |
+|  | 2    |    console.log("hi");                                     |     |
+|  | 3    |  }                                                        |     |
+|  +------+----------------------------------------------------------+     |
+|  | status bar: filename  Ln X Col Y  mode                          |     |
+|  +------+----------------------------------------------------------+     |
+|                                                                           |
+|  YES gutter + line numbers                                                |
+|  YES selection (shift+arrows, shift+home/end)                             |
+|  YES clipboard (ctrl+c, ctrl+v, ctrl+x)                                  |
+|  YES find (ctrl+f)                                                        |
+|  YES undo/redo (grouped by word boundary)                                 |
+|  NO syntax highlighting                                                   |
+|  NO markdown view mode                                                    |
+|  NO file picker (opens via args only)                                     |
+|  NO scrollbar widget                                                      |
+'---------------------------------------------------------------------------'
+
+DOCUMENT READER (browser-windows.ts openBrowserReaderWindow)
+.---------------------------------------------------------------------------.
+| Title Bar                                                                 |
+|---------------------------------------------------------------------------|
+| blessed.box (tags:true, scrollable:true, scrollbar)                       |
+|                                                                           |
+|  markdown-service.ts renderMarkdownFile():                                |
+|    Figlet H1-H6 headings (slant/small/threepoint/digital/CAPS)           |
+|    Syntax-highlighted code blocks (blessed {color} tags)                  |
+|    Blockquote formatting                                                  |
+|    Link rendering                                                         |
+|    Horizontal rules                                                       |
+|                                                                           |
+|  Scroll: j/k line, d/u page, g/G top/bottom                              |
+|  Toggle figlet headings: via context menu                                 |
+|  Read-only -- no editing                                                  |
+|  NO search                                                                |
+|  NO edit capability                                                       |
+|                                                                           |
+|  File picker via OverlayManager.openFileBrowserPrompt()                   |
+'---------------------------------------------------------------------------'
+
+PRIMER VIEWER (plain text window)
+.---------------------------------------------------------------------------.
+| Title Bar                                                                 |
+|---------------------------------------------------------------------------|
+| blessed.box (plain content, no tags)                                      |
+|                                                                           |
+|  Raw text display. No processing. No syntax. No markdown.                 |
+|  Used for ASCII art, primers, plain text files.                           |
+|  Sized to fit content dimensions.                                         |
+|                                                                           |
+|  File picker via OverlayManager.openFileBrowserPrompt()                   |
+'---------------------------------------------------------------------------'
+
+
+CONSOLIDATION OPPORTUNITIES
+============================
+
+1. MERGE BUILT-IN EDITOR + SLAP EDITOR
+   The Slap Editor has strictly better editing features: gutter, line
+   numbers, selection, clipboard, find, grouped undo. The built-in editor
+   has: file picker integration, save-as, markdown view toggle.
+   PROPOSAL: Port Slap Editor features into built-in editor, or replace
+   built-in editor engine with EditorEngine. Keep the text-windows.ts
+   frame/chrome and markdown view mode toggle.
+
+2. DOCUMENT READER = BUILT-IN EDITOR (VIEW MODE)
+   Both use renderMarkdownFile() from markdown-service.ts. The document
+   reader is essentially a read-only version of the editor's view mode.
+   PROPOSAL: Could eliminate Document Reader as a separate window type.
+   Opening a .md file in the editor already defaults to view mode.
+   The reader adds: separate window kind, dedicated scroll keys, context
+   menu figlet toggle. These could live in the editor view mode.
+
+3. SYNTAX HIGHLIGHTING GAP
+   markdown-service.ts has syntax highlighting for code blocks (in view
+   mode / reader). Neither editor has syntax highlighting in EDIT mode.
+   PROPOSAL: Extract the syntax highlighter from markdown-service and
+   make it available to the edit-mode renderer. This benefits both
+   editor engines.
+
+4. ZINE SIDEBAR vs FILE MENU
+   The Zine uses createSidebarPanel for file navigation. This could be
+   replaced by opening files from the File menu or command palette,
+   giving the Zine full-screen editing space.
+   TRADEOFF: Sidebar gives quick switching between zine panels. File
+   menu is slower but cleaner. Consider: keep sidebar as optional
+   (toggled off by default), rely on File menu / keyboard for open.
+
+5. FILE PICKER CONSISTENCY
+   Three file-open UIs exist:
+   a) OverlayManager.openFileBrowserPrompt() -- modal overlay
+   b) createSidebarPanel() -- sidebar list
+   c) openFileManagerWindow() -- full file manager
+   PROPOSAL: Standardise on (a) as the primary open-file path for all
+   apps. (c) stays as a power-user tool. (b) is module-specific.
+
+
+SHARED SDK COMPONENTS REFERENCED
+=================================
+  createSidebarPanel()       -- src/core/ui-parts.ts line 1183
+  createSelectableList()     -- src/core/ui-parts.ts line 1341
+  resolveSidebarWidth()      -- src/services/microapp-sdk.ts
+  OverlayManager.openFileBrowserPrompt() -- src/core/overlay-manager.ts line 535
+  renderMarkdownFile()       -- src/services/markdown-service.ts
+  EditorEngine               -- modules/slap-editor/editor-engine.ts
+  editor-service.ts          -- src/services/editor-service.ts (built-in editor state)
+  editor-coordinator.ts      -- src/core/editor-coordinator.ts (open/save orchestration)
