@@ -8,6 +8,15 @@ see `docs/building-custom-modules.md`.
 
 For common mistakes: see `pitfalls.md`.
 
+## Manifest notes
+
+`menu.category` must be one of: `file` `edit` `view` `window` `applications` `demos` `help`
+
+Optional `dependencies` in `module.json` declares npm packages the module needs.
+These must be installed in the root `package.json` via `bun add <pkg>`. The loader
+does not auto-install them. If missing, the module fails to import with a clear
+error in stderr.
+
 ---
 
 ## MicroappHost API
@@ -108,6 +117,11 @@ import { createTreeWidget, type TreeNode } from "../../src/services/microapp-sdk
 const tree = createTreeWidget(parentBox, { style: host.theme().body });
 tree.setNodes([{ id: "a", label: "Folder", children: [{ id: "a1", label: "Child" }] }]);
 tree.onSelect((node) => { /* selected */ });
+tree.onFocus((node) => { /* focused */ });
+tree.expandNode("a");
+tree.collapseNode("a");
+tree.toggleNode("a");
+const focused = tree.getFocusedNode();
 tree.destroy();  // in win.onCleanup()
 ```
 
@@ -125,6 +139,7 @@ const tabs = createTabs(win.body, [
 
 tabs.switchTo(1);
 tabs.tickActive();                   // call in timer loop
+tabs.onSwitch((idx) => { /* tab changed */ });
 win.onCleanup(() => tabs.destroy());
 win.onRestyle(() => { tabs.renderBar(); host.screen.render(); });
 ```
@@ -157,6 +172,7 @@ import { createRenderMonitor } from "../../src/services/microapp-sdk.js";
 const monitor = createRenderMonitor(host.screen);
 monitor.fps;           // frames in last 1000ms
 monitor.avgFrameMs;    // ms between renders
+monitor.totalFrames;   // lifetime frame count
 const unsub = monitor.subscribe((r) => { /* periodic update */ }, 500);
 win.onCleanup(() => { unsub(); monitor.destroy(); });
 ```

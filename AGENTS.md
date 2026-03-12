@@ -25,7 +25,7 @@ Quick start (30-second pattern): `.agents/module-dev/quick-start.md`
 | Persistent | `modules/wibwob-poetry-clock/` | registerSnapshot, AI integration, modes |
 | SDK sampler | `modules/e026-demo/` | Trees, tabs, tweens, patterns — reference catalogue |
 
-Full guide: `.agents/module-dev/examples-by-tier.md`
+Full examples guide: `.agents/module-dev/examples-by-tier.md`
 
 ### Module dev docs
 
@@ -41,8 +41,6 @@ Public full guide: `docs/building-custom-modules.md`
 
 **You do not need `.agents/shell-dev/` to build a module.** That directory
 is for contributors working on the shell itself.
-
-@.agents/module-dev/sdk-reference.md
 
 ---
 
@@ -194,18 +192,18 @@ Rule of thumb: if it lives in `modules/`, reload. If it lives in `src/`, restart
 
 ## Subsystem Specs
 
-Subsystem specs live in `.agents/shell-dev/specs/`. Read the relevant one before
-touching the files listed. Agents may edit specs directly — append findings,
-correct errors, update failure modes. They are living documents.
+Subsystem specs live in `.agents/shell-dev/specs/`. These are for shell
+contributors editing `src/` internals — **not for module authors** editing
+their own `modules/*/index.ts`. Module authors use `.agents/module-dev/`.
 
-### Pre-change triggers — read spec BEFORE touching these files
+Read the relevant spec before touching the `src/` files listed:
 
 | Files | Read spec |
 |-------|-----------|
-| `src/core/window-manager.ts`, `src/core/window-facade.ts`, `src/core/window-chrome.ts`, `src/core/types.ts` (WindowRecord/WindowKind), any `modules/*/index.ts` | `.agents/shell-dev/specs/window-system.md` |
+| `src/core/window-manager.ts`, `src/core/window-facade.ts`, `src/core/window-chrome.ts`, `src/core/types.ts` (WindowRecord/WindowKind) | `.agents/shell-dev/specs/window-system.md` |
 | `src/services/state-service.ts`, `src/services/control-api.ts`, `src/services/agent-tools.ts` | `.agents/shell-dev/specs/state-and-api.md` |
 | `src/services/workspace-service.ts`, workspace restore in `src/core/app-controller.ts` | `.agents/shell-dev/specs/workspace.md` |
-| `src/services/wibwob-agent-session.ts`, `src/services/scramble-brain.ts`, `src/windows/wibwob-agent-window.ts`, `src/windows/scramble-window.ts`, any `modules/*/` | `.agents/shell-dev/specs/agent-session.md` |
+| `src/services/wibwob-agent-session.ts`, `src/services/scramble-brain.ts`, `src/windows/wibwob-agent-window.ts`, `src/windows/scramble-window.ts` | `.agents/shell-dev/specs/agent-session.md` |
 | `src/services/image-hydrator.mjs`, `src/services/chrome-browser-service.ts` (image methods), `src/windows/chrome-browser-window.ts` (postProcessImages/spliceImages) | `.agents/shell-dev/specs/image-rendering.md` |
 
 ### Post-change triggers — verify after touching these files

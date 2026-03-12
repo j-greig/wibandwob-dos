@@ -167,7 +167,7 @@ function openTerminal(host: MicroappHost) {
     width: "100%",
     height: "100%",
     // input + keys required for blessed.box keypress events to fire
-    // (same gotcha as music player — see .agents/specs/window-system.md)
+    // (same gotcha as music player — see .agents/shell-dev/specs/window-system.md)
     input: true,
     keys: true,
     mouse: true,

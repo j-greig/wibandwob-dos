@@ -12,7 +12,7 @@ isn't working and you can't see why.
 | Missing `onCleanup()` | Timers and connections leak when window closes | Clear all timers, destroy tree widgets, close connections |
 | Missing `onRestyle()` | Window keeps old colours when theme changes | Re-apply `host.theme()` to all styled widgets |
 
-The scaffold script generates code without `onCleanup()` — add one if your
+The scaffold generates an empty `onCleanup()` stub. Fill it in when your
 module creates timers, players, subscriptions, or any resource that outlives
 a function call.
 
