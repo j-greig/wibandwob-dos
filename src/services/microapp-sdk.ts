@@ -234,14 +234,16 @@ export { createTimer, clearTimers } from "../core/ui-primitives.js";
 // Scroll helpers — use with scrollable blessed boxes
 export { createScrollbar, scrollableStyle } from "../core/ui-primitives.js";
 
-// Form controls — buttons, checkboxes, radio groups, selects, filterable lists
-export { createButton, createCheckbox, createRadioGroup, createSelect, createFilterableList } from "../core/ui-parts-forms.js";
+// Form controls — buttons, checkboxes, radio groups, selects, filterable lists, text areas
+export { createButton, createCheckbox, createRadioGroup, createSelect, createFilterableList, createFormField, createTextArea } from "../core/ui-parts-forms.js";
 export type {
   ButtonOptions, ButtonHandle, CheckboxOptions, CheckboxHandle,
   RadioOption, RadioGroupOptions, RadioGroupHandle,
   SelectOption, SelectOptions, SelectHandle,
   ChangeEvent, SelectEvent,
   FilterableItem, FilterableListOptions, FilterableListHandle,
+  FormFieldOptions, FormFieldHandle,
+  TextAreaOptions, TextAreaHandle,
 } from "../core/ui-parts-forms.js";
 
 // Feedback components — progress bars, spinners, toasts
@@ -252,11 +254,12 @@ export type {
   ToastSeverity, ToastOptions, ToastHandle,
 } from "../core/ui-parts-feedback.js";
 
-// Data display components — key-value panels, log views
-export { createKeyValuePanel, createLogView } from "../core/ui-parts-data.js";
+// Data display components — key-value panels, log views, data tables
+export { createKeyValuePanel, createLogView, createDataTable } from "../core/ui-parts-data.js";
 export type {
   KVEntry, KeyValuePanelOptions, KeyValuePanelHandle,
   LogSeverity, LogEntry, LogViewOptions, LogViewHandle,
+  DataColumn, DataTableOptions, DataTableHandle,
 } from "../core/ui-parts-data.js";
 
 // Motion / tween — animate values, window position and size smoothly

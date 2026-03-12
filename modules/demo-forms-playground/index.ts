@@ -21,8 +21,11 @@ import {
   createSpinner,
   createToast,
   createFilterableList,
+  createFormField,
+  createTextArea,
   createKeyValuePanel,
   createLogView,
+  createDataTable,
 } from "../../src/services/microapp-sdk.js";
 
 export default function setup(host: MicroappHost) {
@@ -37,7 +40,7 @@ export default function setup(host: MicroappHost) {
 }
 
 function openPlayground(host: MicroappHost) {
-  const win = host.createWindow({ title: "Forms Playground", width: 60, height: 44 });
+  const win = host.createWindow({ title: "Forms Playground", width: 64, height: 58 });
 
   // ── Section label helper ────────────────────────────────────────────
   function sectionLabel(text: string) {
@@ -53,6 +56,8 @@ function openPlayground(host: MicroappHost) {
   const lblSelect    = sectionLabel("SELECT");
   const lblFeedback  = sectionLabel("FEEDBACK");
   const lblFilter    = sectionLabel("FILTERABLE LIST");
+  const lblForm      = sectionLabel("FORM FIELD + TEXTAREA");
+  const lblTable     = sectionLabel("DATA TABLE");
   const lblData      = sectionLabel("DATA DISPLAY");
 
   // ── Header ──────────────────────────────────────────────────────────
@@ -135,6 +140,36 @@ function openPlayground(host: MicroappHost) {
     onSelect: (e) => log(`Selected fruit: ${e.value}`),
   });
 
+  // Form field wrapping a textarea
+  const textArea = createTextArea({
+    placeholder: "Type notes here...",
+    rows: 3,
+    onChange: (e) => log(`TextArea: ${e.value.length} chars`),
+  });
+  const formField = createFormField({
+    label: "Notes",
+    help: "Enter any free-form text",
+    child: textArea,
+  });
+
+  // Data table
+  const dataTable = createDataTable({
+    columns: [
+      { key: "name", label: "Name" },
+      { key: "role", label: "Role", width: 12 },
+      { key: "lvl", label: "Lvl", width: 5 },
+    ],
+    rows: [
+      { name: "Alice", role: "Engineer", lvl: "5" },
+      { name: "Bob", role: "Designer", lvl: "3" },
+      { name: "Carol", role: "Manager", lvl: "7" },
+      { name: "Dave", role: "Analyst", lvl: "4" },
+      { name: "Eve", role: "Engineer", lvl: "6" },
+    ],
+    sortable: true,
+    onSelect: (row) => log(`Table select: ${row.name} (${row.role})`),
+  });
+
   const progress = createProgressBar({ value: 0, max: 100, label: "Progress" });
   const spinner = createSpinner({ label: "Processing..." });
 
@@ -176,6 +211,10 @@ function openPlayground(host: MicroappHost) {
     { key: "sel",         basis: 1,     part: sel },
     { key: "lblFilter",   basis: 1,     part: createNodePart(lblFilter) },
     { key: "filterList", basis: 5,     part: filterList },
+    { key: "lblForm",     basis: 1,     part: createNodePart(lblForm) },
+    { key: "formField",  basis: 6,     part: formField },
+    { key: "lblTable",   basis: 1,     part: createNodePart(lblTable) },
+    { key: "dataTable",  basis: 8,     part: dataTable },
     { key: "lblFb",       basis: 1,     part: createNodePart(lblFeedback) },
     { key: "progress",    basis: 1,     part: progress },
     { key: "spinner",     basis: 1,     part: spinner },
@@ -217,7 +256,7 @@ function openPlayground(host: MicroappHost) {
   win.onRestyle(() => {
     const t = host.theme();
     headerBox.style = { fg: t.body.bg, bg: t.body.fg, bold: true };
-    for (const lbl of [lblButtons, lblChecks, lblRadio, lblSelect, lblFilter, lblFeedback, lblData]) {
+    for (const lbl of [lblButtons, lblChecks, lblRadio, lblSelect, lblFilter, lblForm, lblTable, lblFeedback, lblData]) {
       lbl.style = { fg: t.accent?.fg ?? "cyan", bg: t.body.bg };
     }
     root.restyle();

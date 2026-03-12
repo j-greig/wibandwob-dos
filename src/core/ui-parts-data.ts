@@ -218,3 +218,164 @@ export function createLogView(opts: LogViewOptions = {}): LogViewHandle {
     entries() { return _entries; },
   };
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// createDataTable
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface DataColumn {
+  key: string;
+  label: string;
+  width?: number; // fixed char width; flex (proportional) if omitted
+}
+
+export interface DataTableOptions {
+  columns: DataColumn[];
+  rows?: Record<string, string>[];
+  sortable?: boolean;
+  onSelect?: (row: Record<string, string>, index: number) => void;
+}
+
+export type DataTableHandle = LayoutPart<Partial<DataTableOptions>> & {
+  selectedIndex(): number;
+  selectedRow(): Record<string, string> | undefined;
+};
+
+/**
+ * A sortable data table with column headers, row selection, and keyboard nav.
+ * Arrow Up/Down navigates rows, Enter selects, click on header sorts.
+ *
+ * @example
+ * const table = createDataTable({
+ *   columns: [{ key: "name", label: "Name" }, { key: "pop", label: "Pop", width: 8 }],
+ *   rows: [{ name: "London", pop: "9M" }, { name: "Paris", pop: "2M" }],
+ *   sortable: true,
+ *   onSelect: (row) => console.log(row.name),
+ * });
+ */
+export function createDataTable(opts: DataTableOptions): DataTableHandle {
+  let { columns, rows = [], sortable = false, onSelect } = opts;
+  let selIndex = 0;
+  let sortKey: string | null = null;
+  let sortAsc = true;
+  let displayRows = rows.slice();
+  let lastWidth = 0;
+
+  const node = blessed.box({
+    width: 0,
+    height: 0,
+    content: "",
+    focusable: true,
+    mouse: true,
+    keys: true,
+    style: getStyle(),
+    tags: false,
+  });
+
+  function getStyle() {
+    const t = theme();
+    return { fg: t.body.fg, bg: t.body.bg };
+  }
+
+  function computeColWidths(totalW: number): number[] {
+    const fixedCols = columns.filter(c => c.width);
+    const flexCols = columns.filter(c => !c.width);
+    const fixedTotal = fixedCols.reduce((s, c) => s + (c.width ?? 0), 0);
+    const separators = Math.max(0, columns.length - 1);
+    const remaining = Math.max(0, totalW - fixedTotal - separators);
+    const flexW = flexCols.length > 0 ? Math.max(1, Math.floor(remaining / flexCols.length)) : 0;
+    return columns.map(c => c.width ?? flexW);
+  }
+
+  function reSort() {
+    if (!sortable || !sortKey) { displayRows = rows.slice(); return; }
+    const key = sortKey;
+    const dir = sortAsc ? 1 : -1;
+    displayRows = rows.slice().sort((a, b) => {
+      const va = a[key] ?? "";
+      const vb = b[key] ?? "";
+      return va < vb ? -dir : va > vb ? dir : 0;
+    });
+  }
+
+  function renderContent() {
+    const widths = computeColWidths(lastWidth);
+    const isFocused = node.screen?.focused === node;
+
+    // Header
+    const headerCells = columns.map((c, i) => {
+      let lbl = c.label;
+      if (sortable && sortKey === c.key) lbl += sortAsc ? " ^" : " v";
+      return truncPad(lbl, widths[i]!);
+    });
+    const headerLine = headerCells.join("|");
+
+    const sepLine = widths.map(w => "-".repeat(w)).join("+");
+
+    // Rows
+    const maxRows = Math.max(0, (Number(node.height) || 0) - 2); // header + separator
+    const visible = displayRows.slice(0, maxRows);
+    const rowLines = visible.map((row, ri) => {
+      const cells = columns.map((c, ci) => truncPad(row[c.key] ?? "", widths[ci]!));
+      const line = cells.join("|");
+      const originalIndex = rows.indexOf(row);
+      if (originalIndex === selIndex && isFocused) return `>${line.slice(1)}`;
+      return line;
+    });
+
+    node.setContent([headerLine, sepLine, ...rowLines].join("\n"));
+  }
+
+  function truncPad(s: string, w: number): string {
+    if (s.length > w) return s.slice(0, Math.max(0, w - 1)) + "~";
+    return s.padEnd(w);
+  }
+
+  node.on("focus", () => renderContent());
+  node.on("blur", () => renderContent());
+
+  node.on("keypress", (_ch: string, key: { name: string }) => {
+    if (!key) return;
+    if (key.name === "up") {
+      selIndex = Math.max(0, selIndex - 1);
+      renderContent();
+    } else if (key.name === "down") {
+      selIndex = Math.min(rows.length - 1, selIndex + 1);
+      renderContent();
+    } else if (key.name === "enter") {
+      if (rows[selIndex]) onSelect?.(rows[selIndex]!, selIndex);
+    }
+  });
+
+  node.on("click", () => { node.focus(); });
+
+  return {
+    node,
+    layout(rect: Rect) {
+      node.position.top = rect.top;
+      node.position.left = rect.left;
+      node.width = rect.width;
+      node.height = rect.height;
+      lastWidth = rect.width;
+      renderContent();
+    },
+    restyle() {
+      node.style = getStyle();
+      renderContent();
+    },
+    destroy() { node.destroy(); },
+    update(props: Partial<DataTableOptions>) {
+      if (props.columns !== undefined) columns = props.columns;
+      if (props.rows !== undefined) {
+        rows = props.rows;
+        selIndex = Math.min(selIndex, Math.max(0, rows.length - 1));
+      }
+      if (props.sortable !== undefined) sortable = props.sortable;
+      if (props.onSelect !== undefined) onSelect = props.onSelect;
+      reSort();
+      renderContent();
+    },
+    selectedIndex() { return selIndex; },
+    selectedRow() { return rows[selIndex]; },
+  };
+}

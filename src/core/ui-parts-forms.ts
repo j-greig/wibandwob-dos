@@ -635,3 +635,247 @@ export function createFilterableList(opts: FilterableListOptions): FilterableLis
     },
   };
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// createFormField
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface FormFieldOptions {
+  label: string;
+  help?: string;
+  error?: string;
+  child: LayoutPart;
+}
+
+export type FormFieldHandle = LayoutPart<Partial<Omit<FormFieldOptions, "child">>>;
+
+/**
+ * Wraps any LayoutPart child with a label row, optional help text, and
+ * optional error text. Error state uses the error variant colour.
+ *
+ * Height = 1 (label) + child height + (1 if help) + (1 if error).
+ *
+ * @example
+ * const field = createFormField({
+ *   label: "Username",
+ *   help: "Letters and numbers only",
+ *   child: createCheckbox({ label: "Agree to terms" }),
+ * });
+ */
+export function createFormField(opts: FormFieldOptions): FormFieldHandle {
+  let { label, help = "", error = "" } = opts;
+  const child = opts.child;
+
+  const node = blessed.box({
+    width: 0,
+    height: 0,
+    style: getStyle(),
+  });
+
+  const labelNode = blessed.box({
+    parent: node,
+    top: 0, left: 0, width: 0, height: 1,
+    content: ` ${label}`,
+    style: getLabelStyle(),
+    tags: false,
+  });
+
+  // Ensure child is parented
+  node.append(child.node);
+
+  const helpNode = blessed.box({
+    parent: node,
+    top: 0, left: 0, width: 0, height: 1,
+    content: "",
+    style: getHelpStyle(),
+    tags: false,
+  });
+
+  const errorNode = blessed.box({
+    parent: node,
+    top: 0, left: 0, width: 0, height: 1,
+    content: "",
+    style: getErrorStyle(),
+    tags: false,
+  });
+
+  function getStyle() {
+    const t = theme();
+    return { fg: t.body.fg, bg: t.body.bg };
+  }
+
+  function getLabelStyle() {
+    const t = theme();
+    return { fg: t.body.fg, bg: t.body.bg, bold: true };
+  }
+
+  function getHelpStyle() {
+    const t = theme();
+    return { fg: t.muted.fg, bg: t.body.bg };
+  }
+
+  function getErrorStyle() {
+    return { fg: "red", bg: theme().body.bg };
+  }
+
+  function computeHeight(availH: number): { labelH: number; childH: number; helpH: number; errorH: number } {
+    const labelH = 1;
+    const helpH = help ? 1 : 0;
+    const errorH = error ? 1 : 0;
+    const childH = Math.max(1, availH - labelH - helpH - errorH);
+    return { labelH, childH, helpH, errorH };
+  }
+
+  return {
+    node,
+    layout(rect: Rect) {
+      node.position.top = rect.top;
+      node.position.left = rect.left;
+      node.width = rect.width;
+      node.height = rect.height;
+
+      const { labelH, childH, helpH, errorH } = computeHeight(rect.height);
+      let y = 0;
+
+      labelNode.position.top = y; labelNode.width = rect.width; y += labelH;
+      child.layout({ top: y, left: 0, width: rect.width, height: childH }); y += childH;
+
+      if (helpH) {
+        helpNode.position.top = y; helpNode.width = rect.width;
+        helpNode.setContent(` ${help}`);
+        helpNode.show();
+        y += helpH;
+      } else { helpNode.hide(); }
+
+      if (errorH) {
+        errorNode.position.top = y; errorNode.width = rect.width;
+        errorNode.setContent(` ${error}`);
+        errorNode.show();
+      } else { errorNode.hide(); }
+    },
+    restyle() {
+      node.style = getStyle();
+      labelNode.style = getLabelStyle();
+      helpNode.style = getHelpStyle();
+      errorNode.style = getErrorStyle();
+      child.restyle();
+    },
+    destroy() {
+      child.destroy();
+      node.destroy();
+    },
+    update(props: Partial<Omit<FormFieldOptions, "child">>) {
+      if (props.label !== undefined) { label = props.label; labelNode.setContent(` ${label}`); }
+      if (props.help !== undefined) help = props.help;
+      if (props.error !== undefined) error = props.error;
+    },
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// createTextArea
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface TextAreaOptions {
+  value?: string;
+  onChange?: (event: ChangeEvent<string>) => void;
+  rows?: number;
+  placeholder?: string;
+  disabled?: boolean;
+}
+
+export type TextAreaHandle = LayoutPart<Partial<TextAreaOptions>> & {
+  value(): string;
+};
+
+/**
+ * A multiline text input. Focus to type.
+ * Height = rows option or fills available space.
+ *
+ * @example
+ * const ta = createTextArea({
+ *   placeholder: "Enter notes...",
+ *   rows: 4,
+ *   onChange: (e) => console.log(e.value),
+ * });
+ */
+export function createTextArea(opts: TextAreaOptions = {}): TextAreaHandle {
+  let { value = "", onChange, rows, placeholder = "", disabled = false } = opts;
+
+  const node = blessed.textarea({
+    width: 0,
+    height: rows ?? 3,
+    inputOnFocus: true,
+    mouse: true,
+    keys: true,
+    border: "line",
+    style: getStyle(false),
+    value: value || undefined,
+  } as any);
+
+  function getStyle(focused: boolean) {
+    const t = theme();
+    if (disabled) return { fg: t.muted.fg, bg: t.muted.bg ?? t.body.bg, border: { fg: t.muted.fg } };
+    if (focused) return { fg: t.body.fg, bg: t.body.bg, border: { fg: t.body.fg } };
+    return { fg: t.body.fg, bg: t.body.bg, border: { fg: t.muted.fg } };
+  }
+
+  function applyVisuals() {
+    const focused = node.screen?.focused === node;
+    node.style = getStyle(focused);
+    // Show placeholder when empty and not focused
+    if (!value && !focused && placeholder) {
+      node.setValue(placeholder);
+    } else if ((node as any).getValue?.() === placeholder) {
+      node.setValue(value);
+    }
+  }
+
+  // Track value changes
+  node.on("keypress", () => {
+    if (disabled) return;
+    // Defer to let blessed update internal value
+    setTimeout(() => {
+      const newVal = (node as any).getValue?.() ?? "";
+      if (newVal !== value && newVal !== placeholder) {
+        const prev = value;
+        value = newVal;
+        onChange?.({ value, previousValue: prev });
+      }
+    }, 0);
+  });
+
+  node.on("focus", () => {
+    if (disabled) { node.screen?.focusNext?.(); return; }
+    if ((node as any).getValue?.() === placeholder) {
+      node.setValue(value);
+    }
+    applyVisuals();
+  });
+
+  node.on("blur", applyVisuals);
+
+  return {
+    node: node as any,
+    layout(rect: Rect) {
+      node.position.top = rect.top;
+      node.position.left = rect.left;
+      node.width = rect.width;
+      node.height = rows ?? rect.height;
+    },
+    restyle() { applyVisuals(); },
+    destroy() { node.destroy(); },
+    update(props: Partial<TextAreaOptions>) {
+      if (props.value !== undefined) { value = props.value; node.setValue(value); }
+      if (props.onChange !== undefined) onChange = props.onChange;
+      if (props.rows !== undefined) rows = props.rows;
+      if (props.placeholder !== undefined) placeholder = props.placeholder;
+      if (props.disabled !== undefined) {
+        disabled = props.disabled;
+        (node as any).focusable = !disabled;
+      }
+      applyVisuals();
+    },
+    value() { return value; },
+  };
+}

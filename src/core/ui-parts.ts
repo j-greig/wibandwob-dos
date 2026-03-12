@@ -14,7 +14,7 @@ import { createScrollbar, safeSetStyle, scrollableStyle } from "./ui-primitives.
 // Re-export form controls
 export {
   createButton, createCheckbox, createRadioGroup, createSelect,
-  createFilterableList,
+  createFilterableList, createFormField, createTextArea,
 } from "./ui-parts-forms.js";
 export type {
   ButtonOptions, ButtonHandle, CheckboxOptions, CheckboxHandle,
@@ -22,6 +22,8 @@ export type {
   SelectOption, SelectOptions, SelectHandle,
   ChangeEvent, SelectEvent,
   FilterableItem, FilterableListOptions, FilterableListHandle,
+  FormFieldOptions, FormFieldHandle,
+  TextAreaOptions, TextAreaHandle,
 } from "./ui-parts-forms.js";
 
 // Re-export feedback components
@@ -33,10 +35,11 @@ export type {
 } from "./ui-parts-feedback.js";
 
 // Re-export data display components
-export { createKeyValuePanel, createLogView } from "./ui-parts-data.js";
+export { createKeyValuePanel, createLogView, createDataTable } from "./ui-parts-data.js";
 export type {
   KVEntry, KeyValuePanelOptions, KeyValuePanelHandle,
   LogSeverity, LogEntry, LogViewOptions, LogViewHandle,
+  DataColumn, DataTableOptions, DataTableHandle,
 } from "./ui-parts-data.js";
 
 /** @primitive */
