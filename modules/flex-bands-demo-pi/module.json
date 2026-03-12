@@ -1,0 +1,18 @@
+{
+  "name": "flex-bands-demo-pi",
+  "version": "0.1.0",
+  "description": "Holy grail flex layout — header, nav, main, aside, footer (Pi version)",
+  "type": "microapp",
+  "entry": "index.ts",
+  "microapp": {
+    "id": "wibwob.flex-bands-demo-pi",
+    "title": "Flex Bands (Pi)",
+    "description": "Pure flex composition: stack + row with fixed and fluid regions",
+    "multiInstance": false,
+    "persist": false,
+    "menu": [{ "category": "demos", "order": 93, "label": "Flex Bands (Pi)" }],
+    "palette": { "order": 293, "label": "Flex Bands (Pi)" },
+    "agent": true,
+    "api": true
+  }
+}

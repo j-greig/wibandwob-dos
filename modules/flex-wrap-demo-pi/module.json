@@ -1,0 +1,20 @@
+{
+  "name": "flex-wrap-demo-pi",
+  "version": "0.1.0",
+  "description": "Flex-wrap proving ground — colour chips that reflow on resize (Pi/Claude version)",
+  "type": "microapp",
+  "entry": "index.ts",
+  "microapp": {
+    "id": "wibwob.flex-wrap-demo-pi",
+    "title": "Flex Wrap Demo (Pi)",
+    "description": "Colour chips that reflow on resize — proving flex-wrap layout",
+    "multiInstance": false,
+    "persist": false,
+    "menu": [
+      { "category": "demos", "order": 92, "label": "Flex Wrap (Pi)" }
+    ],
+    "palette": { "order": 292, "label": "Flex Wrap Demo (Pi)" },
+    "agent": true,
+    "api": true
+  }
+}
