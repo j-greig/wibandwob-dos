@@ -8,7 +8,7 @@
     "id": "wibwob.example.hello",
     "title": "Hello World",
     "description": "The simplest possible microapp. Opens a window with a figlet greeting.",
-    "multiInstance": true,
+    "multiInstance": false,
     "persist": false,
     "menu": [
       { "category": "demos", "order": 40, "label": "Hello World" }
