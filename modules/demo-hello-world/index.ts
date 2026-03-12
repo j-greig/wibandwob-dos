@@ -336,7 +336,7 @@ export default function setup(host: MicroappHost) {
 
         // ── Banner: position inner text box within transparent area ──
         bannerBox.show();
-        const bannerAllocH = Math.max(bannerH, Math.min(bannerH + 6, Math.floor(h * 0.4)));
+        const bannerAllocH = bannerH;
         applyRect(bannerBox, { top: contentTop, left: 0, width: w, height: bannerAllocH });
 
         const trimmedBanner = banner.split("\n").map(l => l.trimEnd()).join("\n");
@@ -361,22 +361,30 @@ export default function setup(host: MicroappHost) {
         const gridTop = contentTop + bannerAllocH;
         const gridH = Math.max(4, h - gridTop - 1);
 
+        // Helper: hide + collapse to zero so blessed clears the old region
+        const collapse = (node: blessed.Widgets.BoxElement) => {
+          node.hide();
+          applyRect(node, { top: 0, left: 0, width: 0, height: 0 });
+        };
+
         if (mode === "xl") {
-          contourBox.show(); clockBox.show(); statsBox.show(); infoBox.hide();
+          contourBox.show(); clockBox.show(); statsBox.show();
+          collapse(infoBox);
           xlGrid.layout({ top: gridTop, left: 0, width: w, height: gridH });
           updateContour(); updateClock(); updateStats(mode, w, h);
         } else if (mode === "l") {
-          contourBox.show(); clockBox.show(); statsBox.hide(); infoBox.hide();
+          contourBox.show(); clockBox.show();
+          collapse(statsBox); collapse(infoBox);
           const half = Math.floor((w - 1) / 2);
           applyRect(contourBox, { top: gridTop, left: 0, width: half, height: gridH });
           applyRect(clockBox,   { top: gridTop, left: half + 1, width: w - half - 1, height: gridH });
           updateContour(); updateClock();
         } else if (mode === "m") {
-          contourBox.hide(); clockBox.hide(); statsBox.hide();
+          collapse(contourBox); collapse(clockBox); collapse(statsBox);
           infoBox.show();
           applyRect(infoBox, { top: gridTop, left: 1, width: Math.min(40, w - 2), height: Math.max(2, gridH) });
         } else {
-          contourBox.hide(); clockBox.hide(); statsBox.hide(); infoBox.hide();
+          collapse(contourBox); collapse(clockBox); collapse(statsBox); collapse(infoBox);
         }
 
         // Cats: visible at XL/L only
