@@ -869,6 +869,32 @@ export default function setup(host: MicroappHost) {
   }
 
   host.registerCommand({
+    id: "list-canvases",
+    label: "List Zine Canvases",
+    description: "List discoverable .canvas.yaml files for Zine picker automation.",
+    action: () => {
+      const contentDir = path.join(REPO_ROOT, "content");
+      const files = findCanvasFiles(contentDir).filter((fp) => {
+        try {
+          return !!loadCanvas(fp);
+        } catch {
+          return false;
+        }
+      });
+      return {
+        count: files.length,
+        root: contentDir,
+        files: files.map((fp, index) => ({
+          index,
+          filePath: fp,
+          relativePath: path.relative(REPO_ROOT, fp),
+        })),
+      };
+    },
+    direct: true,
+  });
+
+  host.registerCommand({
     id: "open",
     label: "Open Zine",
     description: "Open a ZINE canvas — panels from .canvas.yaml rendered as §y²-style sub-windows. Args: filePath (string).",

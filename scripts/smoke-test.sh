@@ -105,8 +105,8 @@ smoke_command "editor.new" "text-editor"
 smoke_command "companion.open" "companion-widget"
 smoke_command "art.open" "generative-art"
 smoke_command "figlet.open" "figlet-banner" '{"text":"SMOKE"}'
-smoke_command "primer-browser.open" "primer-browser"
-smoke_command "file-manager.open" "farjs-file-manager"
+smoke_command "primer.browse" "primer-browser"
+smoke_command "finder.open" "file-manager"
 smoke_command "inspector.open" "state-inspector"
 
 echo

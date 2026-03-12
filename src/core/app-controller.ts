@@ -1745,8 +1745,16 @@ export class TsTuiMvpApp {
       closeFocusedWindow: () => this.windowManager.closeFocusedWindow(),
       closeWindowById: (args) => { this.windowManager.closeWindow(Number(args?.id)); },
       focusWindowById: (args) => { this.windowManager.focusWindowById(Number(args?.id)); },
-      moveWindowById: (args) => { this.windowManager.moveWindow(Number(args?.id), Number(args?.x), Number(args?.y)); },
-      resizeWindowById: (args) => { this.windowManager.resizeWindow(Number(args?.id), Number(args?.w), Number(args?.h)); },
+      moveWindowById: (args) => {
+        const x = args?.x ?? args?.left;
+        const y = args?.y ?? args?.top;
+        this.windowManager.moveWindow(Number(args?.id), Number(x), Number(y));
+      },
+      resizeWindowById: (args) => {
+        const w = args?.w ?? args?.width;
+        const h = args?.h ?? args?.height;
+        this.windowManager.resizeWindow(Number(args?.id), Number(w), Number(h));
+      },
       clearDesktop: () => {
         const windows = this.windowManager.getWindows();
         for (const w of windows) {
@@ -1756,6 +1764,19 @@ export class TsTuiMvpApp {
         }
       },
       toggleDesktopChrome: () => this.toggleDesktopChrome(),
+      closeMenus: () => this.closeMenus(),
+      overlayConfirm: () => {
+        const confirmed = this.overlays.confirmActiveOverlay();
+        return confirmed ? { confirmed: true } : { confirmed: false, error: "No active overlay" };
+      },
+      overlayCancel: () => {
+        const cancelled = this.overlays.cancelActiveOverlay();
+        return cancelled ? { cancelled: true } : { cancelled: false, error: "No active overlay" };
+      },
+      overlayInfo: () => {
+        const info = this.overlays.getActiveOverlayInfo();
+        return info ? { active: true, type: info.type } : { active: false };
+      },
       openBackroomsPrompt: () => this.promptForBackroomsTv(),
       openBackroomsTv: (args?: Record<string, unknown>) => {
         const theme =
@@ -1811,6 +1832,19 @@ export class TsTuiMvpApp {
         } else {
           this.promptForFigletText();
         }
+      },
+      listFigletFonts: () => {
+        const catalogue = getFigletCatalogue();
+        return {
+          defaultFont: getDefaultFigletFont(),
+          favourites: catalogue.favourites,
+          count: catalogue.allFontsSorted.length,
+          fonts: catalogue.allFontsSorted.map((font) => ({
+            name: font,
+            favourite: catalogue.favourites.includes(font),
+            meta: catalogue.fontMetadata[font] ?? { height: 0, width: 0 },
+          })),
+        };
       },
       openMusicPlayer: (args) => {
         const filePath =

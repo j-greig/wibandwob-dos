@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
-# screenshot-window.sh — crop the live TUI to a single window's rect
+# screenshot-window.sh — TEXT crop of the live TUI to a single window's rect
+#
+# WARNING: This tool outputs plain text, NOT PNG/JPEG images.
+# It is intended for semantic capture/debugging only.
 #
 # Usage:
-#   ./scripts/screenshot-window.sh <id>          # by window id
+#   ./scripts/screenshot-window.sh <id>           # by window id
 #   ./scripts/screenshot-window.sh <title>        # by title substring (first match)
 #
 # Prints plain-text crop of the window. Small enough to paste into any context.

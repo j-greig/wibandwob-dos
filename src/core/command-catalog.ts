@@ -44,6 +44,7 @@ export interface AppMenuActions {
   openBrowserReader: (args?: Record<string, unknown>) => void;
   openChromeBrowser: (args?: Record<string, unknown>) => void;
   openFigletBanner: (args?: Record<string, unknown>) => void;
+  listFigletFonts: () => unknown;
   openMusicPlayer: (args?: Record<string, unknown>) => void;
   openSy2Chronicles: (args?: Record<string, unknown>) => void;
   openPatternWindow: () => void;
@@ -90,6 +91,12 @@ export interface AppMenuActions {
   // ── Canvas documents ───────────────────────────────────
   loadCanvas: (args?: Record<string, unknown>) => void;
   exportCanvas: (args?: Record<string, unknown>) => void;
+  // ── Menu ──────────────────────────────────────────────
+  closeMenus: () => void;
+  // ── Overlay ───────────────────────────────────────────
+  overlayConfirm: () => unknown;
+  overlayCancel: () => unknown;
+  overlayInfo: () => unknown;
   // ── Help ──────────────────────────────────────────────
   viewReadme: () => void;
 }
@@ -193,6 +200,20 @@ const MENU_DEFINITIONS: MenuDefinition[] = [
   { category: "help", label: "Help", key: "h", left: 55 }
 ];
 
+/**
+ * ── Command ID Naming Canon ─────────────────────────────────────────
+ *
+ * Format:  <domain>.<verb>  or  <domain>.<noun>
+ * Separator: dot between domain and action, kebab-case within segments.
+ *
+ * Legacy underscore IDs (e.g. window.close_focused) are kept for backward
+ * compatibility. Kebab-case aliases are registered in LEGACY_COMMAND_ALIASES
+ * in command-registry.ts so both forms work.
+ *
+ * Microapp commands are auto-prefixed: microapp.<moduleId>.<commandId>
+ *
+ * Labels: use plain names, not "Open ..." prefix (majority convention).
+ */
 const APP_COMMANDS: AppCommandDefinition[] = [
   {
     id: "primer.browse",
@@ -601,6 +622,46 @@ const APP_COMMANDS: AppCommandDefinition[] = [
   },
 
   {
+    id: "menu.close",
+    label: "Close Menus",
+    description: "Close any open dropdown menu (File, Edit, View, etc.) or popup context menu.",
+    group: "focus",
+    actionKey: "closeMenus",
+    api: true,
+    agent: true,
+  },
+
+  {
+    id: "overlay.confirm",
+    label: "Confirm Overlay",
+    description: "Confirm the active modal overlay (equivalent to OK/Enter). Returns ok:false if no overlay is active.",
+    group: "focus",
+    actionKey: "overlayConfirm",
+    api: true,
+    agent: true,
+  },
+
+  {
+    id: "overlay.cancel",
+    label: "Cancel Overlay",
+    description: "Cancel the active modal overlay (equivalent to Cancel/Escape). Returns ok:false if no overlay is active.",
+    group: "focus",
+    actionKey: "overlayCancel",
+    api: true,
+    agent: true,
+  },
+
+  {
+    id: "overlay.info",
+    label: "Overlay Info",
+    description: "Check if a modal overlay is active and its type. Returns { active: true/false, type? }.",
+    group: "inspect",
+    actionKey: "overlayInfo",
+    api: true,
+    agent: true,
+  },
+
+  {
     id: "backrooms.open",
     label: "Backrooms: Live TV",
     description: "Open Backrooms TV with an interactive channel picker.",
@@ -703,6 +764,16 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     multiInstance: true,
     menuPlacements: [{ category: "applications", order: 70, label: "Figlet Banner" }],
     palettePlacement: { order: 50, label: "Figlet Banner" },
+    api: true,
+    agent: true
+  },
+  {
+    id: "figlet.fonts",
+    label: "Figlet Fonts",
+    description: "List available FIGlet fonts with default and metadata. Useful for API-driven figlet flows that skip interactive prompts.",
+    group: "inspect",
+    actionKey: "listFigletFonts",
+    requires: ["bin.figlet"],
     api: true,
     agent: true
   },
