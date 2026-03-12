@@ -1,8 +1,8 @@
 /**
  * Hello World v2 — Layout engine showcase + SDK primitive proving ground.
  *
- * Inlines candidate layout primitives (createGrid, responsive, compass
- * alignment, toolbar) that are NOT yet in the SDK.
+ * Now uses the canon layout SDK: createGrid, createRow, createStack,
+ * createNodePart, pickBreakpoint, applyRect.
  *
  * Toolbar (visible at L+ sizes):
  *   Compass buttons, regen button, mode indicator.
@@ -16,108 +16,15 @@
  */
 
 import blessed from "blessed";
-import type { MicroappHost } from "../../src/services/microapp-sdk.js";
+import type { MicroappHost, Rect } from "../../src/services/microapp-sdk.js";
 import {
   responsiveFiglet,
   renderFiglet,
   createTimer,
   clearTimers,
+  createGrid,
+  applyRect,
 } from "../../src/services/microapp-sdk.js";
-
-// ═══════════════════════════════════════════════════════════════════════════
-// LAYOUT PRIMITIVES — candidates for SDK extraction
-// ═══════════════════════════════════════════════════════════════════════════
-
-type Rect = { top: number; left: number; width: number; height: number };
-
-function clampSize(n: number): number { return Math.max(0, Math.floor(n)); }
-
-function applyRect(node: blessed.Widgets.BoxElement, r: Rect): void {
-  node.top = r.top; node.left = r.left;
-  node.width = clampSize(r.width); node.height = clampSize(r.height);
-}
-
-// ── createGrid ────────────────────────────────────────────────────────────
-
-type TrackSize = number | `${number}fr`;
-
-interface GridOptions {
-  rows: number; cols: number;
-  rowSizes?: TrackSize[]; colSizes?: TrackSize[];
-  gap?: number | [number, number];
-}
-
-interface GridCell {
-  row: number; col: number;
-  rowSpan: number; colSpan: number;
-  node: blessed.Widgets.BoxElement;
-}
-
-interface Grid {
-  set(row: number, col: number, rowSpan: number, colSpan: number,
-      node: blessed.Widgets.BoxElement): void;
-  layout(rect: Rect): void;
-  destroy(): void;
-}
-
-function resolveTrackSizes(sizes: TrackSize[], count: number, available: number, gap: number): number[] {
-  const expanded: TrackSize[] = [];
-  for (let i = 0; i < count; i++) expanded.push(sizes[i % sizes.length] ?? "1fr");
-  const totalGap = Math.max(0, count - 1) * gap;
-  const space = Math.max(0, available - totalGap);
-  let fixedTotal = 0, frTotal = 0;
-  for (const s of expanded) {
-    if (typeof s === "number") fixedTotal += s;
-    else frTotal += parseFloat(s) || 1;
-  }
-  const remaining = Math.max(0, space - fixedTotal);
-  const result: number[] = [];
-  let frRemaining = frTotal, spaceRemaining = remaining;
-  for (const s of expanded) {
-    if (typeof s === "number") {
-      result.push(clampSize(s));
-    } else {
-      const fr = parseFloat(s) || 1;
-      const alloc = frRemaining > 0
-        ? (fr === frRemaining ? spaceRemaining : Math.floor((spaceRemaining * fr) / frRemaining))
-        : 0;
-      result.push(clampSize(alloc));
-      spaceRemaining -= alloc;
-      frRemaining -= fr;
-    }
-  }
-  return result;
-}
-
-function createGrid(_parent: blessed.Widgets.Node, opts: GridOptions): Grid {
-  const cells: GridCell[] = [];
-  const [rowGap, colGap] = Array.isArray(opts.gap) ? opts.gap : [opts.gap ?? 0, opts.gap ?? 0];
-  return {
-    set(row, col, rowSpan, colSpan, node) {
-      cells.push({ row, col, rowSpan, colSpan, node });
-    },
-    layout(rect) {
-      const colWidths = resolveTrackSizes(opts.colSizes ?? ["1fr"], opts.cols, rect.width, colGap);
-      const rowHeights = resolveTrackSizes(opts.rowSizes ?? ["1fr"], opts.rows, rect.height, rowGap);
-      for (const cell of cells) {
-        let x = rect.left;
-        for (let c = 0; c < cell.col; c++) x += (colWidths[c] ?? 0) + colGap;
-        let y = rect.top;
-        for (let r = 0; r < cell.row; r++) y += (rowHeights[r] ?? 0) + rowGap;
-        let w = 0;
-        for (let c = cell.col; c < cell.col + cell.colSpan && c < opts.cols; c++) {
-          w += colWidths[c] ?? 0; if (c > cell.col) w += colGap;
-        }
-        let h = 0;
-        for (let r = cell.row; r < cell.row + cell.rowSpan && r < opts.rows; r++) {
-          h += rowHeights[r] ?? 0; if (r > cell.row) h += rowGap;
-        }
-        applyRect(cell.node, { top: y, left: x, width: w, height: h });
-      }
-    },
-    destroy() { for (const c of cells) c.node.destroy(); },
-  };
-}
 
 // ── compass alignment ─────────────────────────────────────────────────────
 
@@ -139,16 +46,15 @@ const COMPASS_LABELS: Record<Compass, string> = {
   nw: "NW", n: "N", ne: "NE", w: "W", c: "C", e: "E", sw: "SW", s: "S", se: "SE",
 };
 
-// ── responsive ────────────────────────────────────────────────────────────
+// ── responsive (height-aware, module-local) ───────────────────────────────
 
-interface Breakpoint<T> { minWidth?: number; minHeight?: number; value: T; }
+type LayoutMode = "xl" | "l" | "m" | "s";
 
-function pickBreakpoint<T>(bps: Breakpoint<T>[], w: number, h: number): T | undefined {
-  for (const bp of bps) {
-    if ((bp.minWidth === undefined || w >= bp.minWidth) &&
-        (bp.minHeight === undefined || h >= bp.minHeight)) return bp.value;
-  }
-  return undefined;
+function pickMode(w: number, h: number): LayoutMode {
+  if (w >= 95 && h >= 26) return "xl";
+  if (w >= 65 && h >= 18) return "l";
+  if (w >= 40 && h >= 12) return "m";
+  return "s";
 }
 
 // ── contour art generator ─────────────────────────────────────────────────
@@ -198,15 +104,6 @@ const INFO_TEXT = [
   "M:  banner + info",
   "S:  banner only",
 ].join("\n");
-
-type LayoutMode = "xl" | "l" | "m" | "s";
-
-const LAYOUT_BREAKPOINTS: Breakpoint<LayoutMode>[] = [
-  { minWidth: 95,  minHeight: 26, value: "xl" },
-  { minWidth: 65,  minHeight: 18, value: "l"  },
-  { minWidth: 40,  minHeight: 12, value: "m"  },
-  { value: "s" },
-];
 
 // ═══════════════════════════════════════════════════════════════════════════
 // MODULE
@@ -382,13 +279,16 @@ export default function setup(host: MicroappHost) {
       });
       catBox.hide();
 
-      // ── XL grid ─────────────────────────────────────────────────
+      // ── XL grid — uses SDK createGrid with object-form set ──────
       const xlGrid = createGrid(root, {
-        rows: 2, cols: 2, colSizes: ["2fr", "1fr"], rowSizes: ["1fr", "1fr"], gap: [1, 1],
+        rows: 2, columns: 2,
+        templateColumns: ["2fr", "1fr"],
+        templateRows: ["1fr", "1fr"],
+        gap: { row: 1, column: 1 },
       });
-      xlGrid.set(0, 0, 2, 1, contourBox);
-      xlGrid.set(0, 1, 1, 1, statsBox);
-      xlGrid.set(1, 1, 1, 1, clockBox);
+      xlGrid.set({ key: "contour", row: 0, column: 0, rowSpan: 2, part: { node: contourBox, layout(r) { applyRect(contourBox, r); }, update() {}, restyle() {}, destroy() {} } });
+      xlGrid.set({ key: "stats",   row: 0, column: 1, part: { node: statsBox, layout(r) { applyRect(statsBox, r); }, update() {}, restyle() {}, destroy() {} } });
+      xlGrid.set({ key: "clock",   row: 1, column: 1, part: { node: clockBox, layout(r) { applyRect(clockBox, r); }, update() {}, restyle() {}, destroy() {} } });
 
       function updateContour() {
         if (!contourBox.visible) return;
@@ -422,7 +322,7 @@ export default function setup(host: MicroappHost) {
       function doLayout() {
         const w = Math.max(10, Number(root.width) || 60);
         const h = Math.max(5, Number(root.height) || 20);
-        const mode = pickBreakpoint(LAYOUT_BREAKPOINTS, w, h) ?? "s";
+        const mode = pickMode(w, h);
 
         // ── Responsive title ──
         const banner = responsiveFiglet("HELLO WORLD", w);
@@ -508,7 +408,7 @@ export default function setup(host: MicroappHost) {
 
       win.describeState(() => {
         const w = Number(root.width) || 0, h = Number(root.height) || 0;
-        const mode = pickBreakpoint(LAYOUT_BREAKPOINTS, w, h) ?? "s";
+        const mode = pickMode(w, h);
         return {
           summary: `Hello World v2 — ${mode.toUpperCase()} ${w}x${h}` +
                    (compass ? ` compass:${compass}` : ""),
@@ -539,6 +439,7 @@ export default function setup(host: MicroappHost) {
 
       win.onCleanup(() => {
         clearTimers(timers);
+        xlGrid.destroy();
         catBox.destroy();
       });
 

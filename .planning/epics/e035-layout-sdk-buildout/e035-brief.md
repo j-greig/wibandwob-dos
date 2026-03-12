@@ -92,12 +92,12 @@ The outcome is not just "new primitives exist." The outcome is:
 - [ ] Verify narrow resize no longer crashes or behaves pathologically
 
 ### F06 — Proof ports
-- [ ] Port `hello-world` to final SDK names and helpers
-- [ ] Port `dashboard` to `createGrid`
-- [ ] Port at least one flex-first real module to the canon flex surface
-- [ ] Verify contrib interop:
-  - contrib inside flex
-  - flex inside contrib-owned region/cell
+- [x] Port `hello-world` to final SDK names and helpers (removed inline layout primitives, uses SDK createGrid)
+- [ ] Port `dashboard` to `createGrid` (deferred — deep contrib.grid dependency)
+- [x] Port at least one flex-first real module to the canon flex surface (heartbeat → createStack + createNodePart)
+- [x] Verify contrib interop:
+  - contrib inside flex (proven by layout-stress-test-pi)
+  - flex inside contrib-owned region/cell (proven by layout-stress-test-pi)
 
 ### F07 — Broad module migration
 - [ ] Update all existing repo modules that should use the canon layout surface
