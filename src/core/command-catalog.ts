@@ -96,6 +96,7 @@ export interface AppMenuActions {
   // ── Overlay ───────────────────────────────────────────
   overlayConfirm: () => unknown;
   overlayCancel: () => unknown;
+  overlaySelect: (args?: Record<string, unknown>) => unknown;
   overlayInfo: () => unknown;
   // ── Help ──────────────────────────────────────────────
   viewReadme: () => void;
@@ -647,6 +648,16 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     description: "Cancel the active modal overlay (equivalent to Cancel/Escape). Returns ok:false if no overlay is active.",
     group: "focus",
     actionKey: "overlayCancel",
+    api: true,
+    agent: true,
+  },
+
+  {
+    id: "overlay.select",
+    label: "Select Overlay Index",
+    description: "Select an item index in the active overlay when supported (browser/list/file-browser). Args: index (number).",
+    group: "focus",
+    actionKey: "overlaySelect",
     api: true,
     agent: true,
   },

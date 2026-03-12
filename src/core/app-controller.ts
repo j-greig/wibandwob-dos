@@ -1773,9 +1773,19 @@ export class TsTuiMvpApp {
         const cancelled = this.overlays.cancelActiveOverlay();
         return cancelled ? { cancelled: true } : { cancelled: false, error: "No active overlay" };
       },
+      overlaySelect: (args) => {
+        const index = Number(args?.index);
+        if (!Number.isFinite(index)) {
+          return { selected: false, error: "index must be a number" };
+        }
+        const result = this.overlays.selectActiveOverlayIndex(index);
+        return result.ok
+          ? { selected: true, index: result.index, count: result.count }
+          : { selected: false, error: result.error ?? "Selection failed", count: result.count };
+      },
       overlayInfo: () => {
         const info = this.overlays.getActiveOverlayInfo();
-        return info ? { active: true, type: info.type } : { active: false };
+        return info ? { active: true, ...info } : { active: false };
       },
       openBackroomsPrompt: () => this.promptForBackroomsTv(),
       openBackroomsTv: (args?: Record<string, unknown>) => {

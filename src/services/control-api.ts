@@ -138,9 +138,10 @@ const ENDPOINT_CATALOGUE = [
   { method: "POST", path: "/windows/text/export",           body: { id: "number", name: "string (optional)" }, description: "Export window text content to scratch/captures/" },
   { method: "POST", path: "/windows/editor/write",          body: { id: "number", content: "string" }, description: "Write content to an editor window buffer" },
   // ── Overlay control ──
-  { method: "GET",  path: "/overlay/info",                  description: "Check if a modal overlay is active. Returns { active, type? }." },
+  { method: "GET",  path: "/overlay/info",                  description: "Check if a modal overlay is active. Returns { active, type?, selectedIndex?, count? }." },
   { method: "POST", path: "/overlay/confirm",               body: {}, description: "Confirm the active modal overlay (OK/Enter). Returns ok:false if no overlay." },
   { method: "POST", path: "/overlay/cancel",                body: {}, description: "Cancel the active modal overlay (Cancel/Escape). Returns ok:false if no overlay." },
+  { method: "POST", path: "/overlay/select",                body: { index: "number (required)" }, description: "Select item index in active overlay when supported (browser/list/file-browser)." },
   // ── Workspace persistence ──
   { method: "POST", path: "/workspace/save",                body: { name: "string" }, description: "Save current workspace layout" },
   { method: "POST", path: "/workspace/load",                body: { name: "string" }, description: "Load a named workspace layout" },
@@ -683,6 +684,18 @@ export class ControlApiService {
       const inner = (result as any).result;
       if (inner && !inner.cancelled) {
         return Response.json({ ok: false, error: inner.error ?? "No active overlay" });
+      }
+      return Response.json(result);
+    }
+    if (request.method === "POST" && url.pathname === "/overlay/select") {
+      const index = Number((body as any).index);
+      if (!Number.isFinite(index)) {
+        return Response.json({ ok: false, error: "index is required and must be a number" }, { status: 400 });
+      }
+      const result = this.handlers.runCommand("overlay.select", { index });
+      const inner = (result as any).result;
+      if (inner && !inner.selected) {
+        return Response.json({ ok: false, error: inner.error ?? "Overlay selection failed" });
       }
       return Response.json(result);
     }

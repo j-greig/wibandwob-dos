@@ -27,6 +27,8 @@ interface ActiveOverlay {
   type: "value" | "path" | "list" | "centered-list" | "browser" | "file-browser";
   confirm: () => void;
   cancel: () => void;
+  selectIndex?: (index: number) => { ok: boolean; index?: number; count?: number; error?: string };
+  info?: () => Record<string, unknown>;
 }
 
 /** Shared transient-UI manager for prompts, browsers, pickers, and notifications. */
@@ -47,8 +49,12 @@ export class OverlayManager {
   }
 
   /** Get info about the active overlay, or null if none. */
-  getActiveOverlayInfo(): { type: string } | null {
-    return this.activeOverlay ? { type: this.activeOverlay.type } : null;
+  getActiveOverlayInfo(): Record<string, unknown> | null {
+    if (!this.activeOverlay) return null;
+    return {
+      type: this.activeOverlay.type,
+      ...(this.activeOverlay.info ? this.activeOverlay.info() : {}),
+    };
   }
 
   /** Confirm the active overlay (equivalent to pressing OK/Enter). Returns true if an overlay was confirmed. */
@@ -63,6 +69,15 @@ export class OverlayManager {
     if (!this.activeOverlay) return false;
     this.activeOverlay.cancel();
     return true;
+  }
+
+  /** Select an index in the active overlay when supported (browser/list/file-browser). */
+  selectActiveOverlayIndex(index: number): { ok: boolean; index?: number; count?: number; error?: string } {
+    if (!this.activeOverlay) return { ok: false, error: "No active overlay" };
+    if (!this.activeOverlay.selectIndex) {
+      return { ok: false, error: `Overlay type '${this.activeOverlay.type}' does not support index selection` };
+    }
+    return this.activeOverlay.selectIndex(index);
   }
 
   /** Clear the active overlay reference (called by overlay close handlers). */
@@ -379,6 +394,18 @@ export class OverlayManager {
       type: "centered-list",
       confirm: applySelection,
       cancel: () => closePrompt(true),
+      selectIndex: (requestedIndex) => {
+        const count = items.length;
+        if (count <= 0) return { ok: false, error: "No selectable items", count: 0 };
+        const index = Math.max(0, Math.min(Math.trunc(requestedIndex), count - 1));
+        list.select(index);
+        this.screen.render();
+        return { ok: true, index, count };
+      },
+      info: () => ({
+        selectedIndex: list.selected ?? 0,
+        count: items.length,
+      }),
     };
 
     list.focus();
@@ -607,6 +634,19 @@ export class OverlayManager {
       type: "browser",
       confirm: applySelection,
       cancel: closePrompt,
+      selectIndex: (requestedIndex) => {
+        const count = filteredItems.length;
+        if (count <= 0) return { ok: false, error: "No selectable items", count: 0 };
+        const index = Math.max(0, Math.min(Math.trunc(requestedIndex), count - 1));
+        list.select(index);
+        updatePreview(index);
+        this.screen.render();
+        return { ok: true, index, count };
+      },
+      info: () => ({
+        selectedIndex: (list as List & { selected: number }).selected ?? 0,
+        count: filteredItems.length,
+      }),
     };
 
     list.focus();
@@ -876,6 +916,20 @@ export class OverlayManager {
       type: "file-browser",
       confirm: applySelection,
       cancel: closePrompt,
+      selectIndex: (requestedIndex) => {
+        const count = visibleEntries.length;
+        if (count <= 0) return { ok: false, error: "No selectable entries", count: 0 };
+        const index = Math.max(0, Math.min(Math.trunc(requestedIndex), count - 1));
+        list.select(index);
+        buildPreview(visibleEntries[index]);
+        this.screen.render();
+        return { ok: true, index, count };
+      },
+      info: () => ({
+        selectedIndex: (list as List & { selected: number }).selected ?? 0,
+        count: visibleEntries.length,
+        currentDirectory,
+      }),
     };
 
     list.focus();
