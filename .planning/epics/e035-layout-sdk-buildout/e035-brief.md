@@ -1,7 +1,7 @@
 ---
 id: e035
 title: Layout SDK Buildout
-status: in-progress
+status: done
 priority: high
 depends: [e034]
 ---
