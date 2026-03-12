@@ -326,7 +326,10 @@ export default function setup(host: MicroappHost) {
 
         // ── Responsive title ──
         const banner = responsiveFiglet("HELLO WORLD", w);
-        const bannerH = banner.split("\n").length;
+        // Trim trailing blank lines from figlet output
+        const bannerLines = banner.split("\n");
+        while (bannerLines.length > 0 && bannerLines[bannerLines.length - 1].trim() === "") bannerLines.pop();
+        const bannerH = bannerLines.length;
 
         // ── Toolbar: visible at L+ ──
         const showToolbar = mode === "xl" || mode === "l";
@@ -336,10 +339,12 @@ export default function setup(host: MicroappHost) {
 
         // ── Banner: position inner text box within transparent area ──
         bannerBox.show();
-        const bannerAllocH = bannerH;
+        // Cap banner to ~40% of available height so grid always has room
+        const availH = h - contentTop;
+        const bannerAllocH = Math.min(bannerH, Math.max(3, Math.floor(availH * 0.45)));
         applyRect(bannerBox, { top: contentTop, left: 0, width: w, height: bannerAllocH });
 
-        const trimmedBanner = banner.split("\n").map(l => l.trimEnd()).join("\n");
+        const trimmedBanner = bannerLines.map(l => l.trimEnd()).join("\n");
         const textW = Math.max(...trimmedBanner.split("\n").map(l => l.length));
         const textH = bannerH;
         bannerText.setContent(trimmedBanner);
@@ -394,7 +399,7 @@ export default function setup(host: MicroappHost) {
           catBox.top = h - ART_H + 1;
           catBox.left = w - ART_W - 1;
         } else {
-          catBox.hide();
+          collapse(catBox);
         }
 
         // Z-order: toolbar above content, cats above everything
@@ -414,6 +419,15 @@ export default function setup(host: MicroappHost) {
       doLayout();
       win.onResize(doLayout);
 
+      // Helper: extract rect from a blessed node
+      const nodeRect = (n: blessed.Widgets.BoxElement) => ({
+        top: Number(n.top) || 0, left: Number(n.left) || 0,
+        width: Number(n.width) || 0, height: Number(n.height) || 0,
+      });
+      const regionInfo = (n: blessed.Widgets.BoxElement) => ({
+        visible: n.visible, rect: nodeRect(n), collapsed: !n.visible && (Number(n.width) || 0) === 0,
+      });
+
       win.describeState(() => {
         const w = Number(root.width) || 0, h = Number(root.height) || 0;
         const mode = pickMode(w, h);
@@ -422,6 +436,18 @@ export default function setup(host: MicroappHost) {
                    (compass ? ` compass:${compass}` : ""),
           mode, width: w, height: h, seed: contourSeed,
           compass: compass ?? "auto",
+          layoutReport: {
+            viewport: { width: w, height: h },
+            regions: {
+              toolbar:  regionInfo(toolbar),
+              banner:   regionInfo(bannerBox),
+              contour:  regionInfo(contourBox),
+              clock:    regionInfo(clockBox),
+              stats:    regionInfo(statsBox),
+              info:     regionInfo(infoBox),
+              cats:     regionInfo(catBox),
+            },
+          },
         };
       });
 
