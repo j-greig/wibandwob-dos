@@ -96,6 +96,7 @@ interface World {
   techLevel: number;
   decree: DecreeType;
   decreeTicks: number;
+  decreeHistory: string[];
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -225,6 +226,7 @@ function createWorld(): World {
     techLevel: 1,
     decree: "none",
     decreeTicks: 0,
+    decreeHistory: [],
   };
 
   // Starting buildings
@@ -621,6 +623,8 @@ function tickWorld(w: World) {
       const pick = decrees[Math.floor(Math.random() * decrees.length)]!;
       w.decree = pick;
       w.decreeTicks = 15 + Math.floor(Math.random() * 10); // 15-25 effective ticks (scaled by speed)
+      w.decreeHistory.push(DECREE_NAMES[pick]);
+      if (w.decreeHistory.length > 3) w.decreeHistory.shift();
       evt(w, DECREE_ANNOUNCE[pick], "chaos");
       if (pick === "festival") {
         // Celebratory fireworks
@@ -910,6 +914,8 @@ function openAntopolis(host: MicroappHost) {
     happiness: world.happiness,
     resources: { ...world.resources },
     dangerLevel: world.dangerLevel,
+    decree: world.decree !== "none" ? DECREE_NAMES[world.decree] : null,
+    recentDecrees: world.decreeHistory,
   }));
 
   win.captureText(() => [
