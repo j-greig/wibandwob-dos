@@ -35,6 +35,7 @@ export default function setup(host: MicroappHost) {
     description: "E036 SDK form controls showcase",
     menu: [{ category: "demos", order: 95, label: "Forms Playground" }],
     palette: { order: 295, label: "Forms Playground" },
+    multiInstance: true,
     action: () => openPlayground(host),
   });
 
@@ -44,6 +45,7 @@ export default function setup(host: MicroappHost) {
     description: "Realistic form layout demo",
     menu: [{ category: "demos", order: 96, label: "Contact Form Demo" }],
     palette: { order: 296, label: "Contact Form Demo" },
+    multiInstance: true,
     action: () => openContactForm(host),
   });
 }

@@ -8,7 +8,7 @@
     "id": "wibwob.forms-playground",
     "title": "Forms Playground",
     "description": "Forms Playground microapp scaffold.",
-    "multiInstance": false,
+    "multiInstance": true,
     "persist": false,
     "menu": [
       { "category": "applications", "order": 95, "label": "Forms Playground" }
