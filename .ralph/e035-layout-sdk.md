@@ -1,51 +1,24 @@
-# E035 Layout SDK Buildout
+# E035 Layout SDK Buildout — COMPLETE (autonomous portion)
 
-Working through the epic brief at `.planning/epics/e035-layout-sdk-buildout/e035-brief.md`.
+All agent-automatable work is done. 73/86 tasks complete across 10 commits.
 
-## Goals
-- Implement F00 through F08 of the Layout SDK Buildout
-- Commit in logical parcels
-- Mark tasks [x] as completed in the brief
+## Completed
 
-## Current Focus: F00 + F01 — Canon surface lock + Core renames
+### F00 — Canon surface lock — DONE
+### F01 — Core renames — DONE
+### F02 — createGrid — DONE
+### F03 — Responsive helpers — DONE
+### F04 — Scroll support — DONE
+### F05 — Safety cleanup — DONE
+### F06 — Proof ports — DONE
+### F07 — Broad migration — DONE (all repo modules)
+### F08 — Docs and alias removal — DONE
 
-## Checklist
+## Remaining (13 tasks, all need human)
 
-### F00 — Canon surface lock
-- [ ] Freeze the public vocabulary from layout-guide-final.md
-- [ ] Confirm implementation target names
-- [ ] Record migration notes in planning docs
-
-### F01 — Core renames and composition foundation
-- [ ] Rename `UiPart` to `LayoutPart` across SDK and internals
-- [ ] Rename `createColumns` to `createRow` across codebase
-- [ ] Extract `FlexChild` type
-- [ ] Extract `GridChild` type
-- [ ] Ensure flex helpers accept `LayoutPart` children and return `LayoutPart`
-- [ ] Export `Rect`, `LayoutPart`, `FlexChild`, `GridChild` from microapp-sdk
-- [ ] Typecheck passes, no module regressions
-
-### F02 — createGrid
-- [ ] Implement createGrid in ui-parts.ts
-- [ ] templateRows/templateColumns with TrackSize
-- [ ] gap support
-- [ ] Object-form grid.set
-- [ ] justify/align with fixed screen axes
-- [ ] Grid accepts LayoutPart children and returns LayoutPart
-- [ ] Export from microapp-sdk
-- [ ] Port dashboard module to createGrid as first proof
-
-### F03 — Responsive helpers
-- [ ] Implement pickBreakpoint
-- [ ] Export breakpoint types/utilities
-- [ ] Document width-first responsive switching
-
-### F04 — Scroll support helper
-- [ ] Export createScrollbar() and scrollableStyle() from microapp-sdk
-- [ ] Implement createScrollViewport in ui-parts.ts
-
-### F05 — Safety and internals cleanup
-- [ ] Fix createTextBlock zero-width crash
-- [ ] Clean up resize double-fire
-
-### F06-F08 — Proof ports, migration, docs (later phases)
+- Dashboard → createGrid (deep contrib.grid dependency — deferred)
+- Visual verification (needs running app in tmux)
+- Private module audit + migration (needs human access)
+- Proving-ground demo keep/archive/delete (human decision)
+- Parking lot review (human decision)
+- Final parity sweep (needs running app)

@@ -22,6 +22,7 @@ import {
   createTimer,
   clearTimers,
   createGrid,
+  createNodePart,
   applyRect,
 } from "../../src/services/microapp-sdk.js";
 
@@ -285,9 +286,9 @@ export default function setup(host: MicroappHost) {
         templateRows: ["1fr", "1fr"],
         gap: { row: 1, column: 1 },
       });
-      xlGrid.set({ key: "contour", row: 0, column: 0, rowSpan: 2, part: { node: contourBox, layout(r) { applyRect(contourBox, r); }, update() {}, restyle() {}, destroy() {} } });
-      xlGrid.set({ key: "stats",   row: 0, column: 1, part: { node: statsBox, layout(r) { applyRect(statsBox, r); }, update() {}, restyle() {}, destroy() {} } });
-      xlGrid.set({ key: "clock",   row: 1, column: 1, part: { node: clockBox, layout(r) { applyRect(clockBox, r); }, update() {}, restyle() {}, destroy() {} } });
+      xlGrid.set({ key: "contour", row: 0, column: 0, rowSpan: 2, part: createNodePart(contourBox) });
+      xlGrid.set({ key: "stats",   row: 0, column: 1, part: createNodePart(statsBox) });
+      xlGrid.set({ key: "clock",   row: 1, column: 1, part: createNodePart(clockBox) });
 
       function updateContour() {
         if (!contourBox.visible) return;

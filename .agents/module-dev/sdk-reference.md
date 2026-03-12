@@ -108,7 +108,7 @@ Always call `host.theme()` fresh — never cache the result.
 
 ## Layout
 
-Two primitives: flex and grid. See `.agents/module-dev/.workings/layout-guide-final.md` for the full canon guide.
+Two primitives: flex and grid. Full guide: `layout.md` in this directory.
 
 ### Flex: createStack and createRow
 
@@ -148,6 +148,10 @@ grid.set({ key: "main",  row: 0, column: 0, rowSpan: 2, part: mainPart });
 grid.set({ key: "stats", row: 0, column: 1, part: statsPart });
 grid.set({ key: "log",   row: 1, column: 1, part: logPart });
 ```
+
+Note: `align` on FlexChild and GridChild is declared in the types but
+not yet implemented. Grid cells always fill their track area. Flex children
+always fill their cross-axis. This is a future enhancement.
 
 ### Responsive: pickBreakpoint
 

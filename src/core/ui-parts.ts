@@ -1057,8 +1057,6 @@ export type ScrollViewportOptions = {
   headerHeight?: number;
   /** Fixed footer height in rows (0 = no footer). */
   footerHeight?: number;
-  /** Show scrollbar only when content overflows viewport. Default: true. */
-  conditionalScrollbar?: boolean;
 };
 
 /** @primitive */
@@ -1092,7 +1090,6 @@ export function createScrollViewport(
 ): ScrollViewportHandle {
   const headerHeight = options?.headerHeight ?? 0;
   const footerHeight = options?.footerHeight ?? 0;
-  const conditionalScrollbar = options?.conditionalScrollbar ?? true;
 
   const container = blessed.box({
     parent,
