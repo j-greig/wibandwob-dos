@@ -1,15 +1,15 @@
 /**
  * Forms Playground — E036 SDK component showcase.
  *
- * Tests: createButton, createCheckbox, createRadioGroup, createSelect,
- * createProgressBar, createSpinner, createKeyValuePanel, createLogView.
- * All composed via createStack.
+ * Two-column layout: left = interactive controls, right = data + feedback.
+ * Tests every SDK form/data/feedback component in one window.
  */
 
 import blessed from "blessed";
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
 import {
   createStack,
+  createRow,
   createNodePart,
   createTimer,
   clearTimers,
@@ -40,49 +40,37 @@ export default function setup(host: MicroappHost) {
 }
 
 function openPlayground(host: MicroappHost) {
-  const win = host.createWindow({ title: "Forms Playground", width: 64, height: 58 });
+  const win = host.createWindow({ title: "Forms Playground", width: 100, height: 36 });
 
-  // ── Section label helper ────────────────────────────────────────────
-  function sectionLabel(text: string) {
+  // ── Helpers ─────────────────────────────────────────────────────────
+  function sLabel(text: string) {
     return blessed.box({
       parent: win.body, top: 0, left: 0, width: 0, height: 1,
       tags: false, content: ` ${text}`,
       style: { fg: host.theme().accent?.fg ?? "cyan", bg: host.theme().body.bg },
     });
   }
-  const lblButtons   = sectionLabel("BUTTONS");
-  const lblChecks    = sectionLabel("CHECKBOXES");
-  const lblRadio     = sectionLabel("RADIO GROUP");
-  const lblSelect    = sectionLabel("SELECT");
-  const lblFeedback  = sectionLabel("FEEDBACK");
-  const lblFilter    = sectionLabel("FILTERABLE LIST");
-  const lblForm      = sectionLabel("FORM FIELD + TEXTAREA");
-  const lblTable     = sectionLabel("DATA TABLE");
-  const lblData      = sectionLabel("DATA DISPLAY");
+  const allLabels: blessed.Widgets.BoxElement[] = [];
+  function sl(text: string) { const b = sLabel(text); allLabels.push(b); return b; }
 
-  // ── Header ──────────────────────────────────────────────────────────
   const headerBox = blessed.box({
     parent: win.body, top: 0, left: 0, width: 0, height: 1, tags: false,
-    content: " E036 Forms Playground — Tab/Space/Enter/Arrows",
+    content: " E036 Forms Playground",
     style: { fg: host.theme().body.bg, bg: host.theme().body.fg, bold: true },
   });
 
-  // ── Controls ────────────────────────────────────────────────────────
+  // ── State ───────────────────────────────────────────────────────────
   const timers = new Set<ReturnType<typeof setInterval>>();
   let clickCount = 0;
 
-  // Log view (replaces ad-hoc logBox)
   const logView = createLogView({ maxEntries: 50, border: true, label: "Events" });
   logView.append("Forms Playground ready.");
+  function log(msg: string) { logView.append(msg); host.screen.render(); }
 
-  function log(msg: string) {
-    logView.append(msg);
-    host.screen.render();
-  }
-
+  // ── Left column: interactive controls ───────────────────────────────
   const btn1 = createButton({
     label: "Click Me",
-    onPress: () => { clickCount++; log(`Button pressed! (${clickCount}x)`); kvPanel.update({ entries: kvEntries() }); },
+    onPress: () => { clickCount++; log(`Button #${clickCount}`); kvPanel.update({ entries: kvEntries() }); },
   });
 
   const severities = ["info", "success", "warning", "error"] as const;
@@ -91,42 +79,34 @@ function openPlayground(host: MicroappHost) {
     onPress: () => {
       const sev = severities[clickCount % severities.length]!;
       createToast({ message: `Toast #${clickCount} (${sev})`, severity: sev, parent: win.body });
-      log(`Toast shown: ${sev}`);
+      log(`Toast: ${sev}`);
     },
   });
 
   const cb1 = createCheckbox({
-    label: "Enable sound",
-    checked: true,
+    label: "Enable sound", checked: true,
     onChange: (e) => { log(`Sound: ${e.value ? "ON" : "OFF"}`); kvPanel.update({ entries: kvEntries() }); },
   });
-
   const cb2 = createCheckbox({
     label: "Dark mode",
-    onChange: (e) => { log(`Dark mode: ${e.value ? "ON" : "OFF"}`); kvPanel.update({ entries: kvEntries() }); },
+    onChange: (e) => { log(`Dark: ${e.value ? "ON" : "OFF"}`); kvPanel.update({ entries: kvEntries() }); },
   });
-
-  const cb3 = createCheckbox({ label: "Disabled option", disabled: true });
 
   const radio = createRadioGroup({
     options: [
-      { label: "Small", value: "sm" },
-      { label: "Medium", value: "md" },
-      { label: "Large", value: "lg" },
-      { label: "Extra Large", value: "xl" },
+      { label: "Small", value: "sm" }, { label: "Medium", value: "md" },
+      { label: "Large", value: "lg" }, { label: "XL", value: "xl" },
     ],
     selected: "md",
-    onChange: (e) => { log(`Size: ${e.value} (index ${e.index})`); kvPanel.update({ entries: kvEntries() }); },
+    onChange: (e) => { log(`Size: ${e.value}`); kvPanel.update({ entries: kvEntries() }); },
   });
 
   const sel = createSelect({
     options: [
-      { label: "Red", value: "red" },
-      { label: "Green", value: "green" },
-      { label: "Blue", value: "blue" },
-      { label: "Yellow", value: "yellow" },
+      { label: "Red", value: "red" }, { label: "Green", value: "green" },
+      { label: "Blue", value: "blue" }, { label: "Yellow", value: "yellow" },
     ],
-    placeholder: "Pick a colour",
+    placeholder: "Pick colour",
     onChange: (e) => { log(`Colour: ${e.value}`); kvPanel.update({ entries: kvEntries() }); },
   });
 
@@ -136,28 +116,38 @@ function openPlayground(host: MicroappHost) {
       { label: "Cherry", value: "cherry" }, { label: "Dragonfruit", value: "dragon" },
       { label: "Elderberry", value: "elder" }, { label: "Fig", value: "fig" },
     ],
-    placeholder: "Type to filter fruit...",
-    onSelect: (e) => log(`Selected fruit: ${e.value}`),
+    placeholder: "Filter fruit...",
+    onSelect: (e) => log(`Fruit: ${e.value}`),
   });
 
-  // Form field wrapping a textarea
-  const textArea = createTextArea({
-    placeholder: "Type notes here...",
-    rows: 3,
-    onChange: (e) => log(`TextArea: ${e.value.length} chars`),
+  const textArea = createTextArea({ placeholder: "Type notes...", rows: 3,
+    onChange: (e) => log(`Text: ${e.value.length} chars`),
   });
-  const formField = createFormField({
-    label: "Notes",
-    help: "Enter any free-form text",
-    child: textArea,
-  });
+  const formField = createFormField({ label: "Notes", help: "Free-form text", child: textArea });
 
-  // Data table
+  const leftCol = createStack(win.body, [
+    { key: "lBtn",    basis: 1, part: createNodePart(sl("BUTTONS")) },
+    { key: "btn1",    basis: 1, part: btn1 },
+    { key: "btn2",    basis: 1, part: btn2 },
+    { key: "lCb",     basis: 1, part: createNodePart(sl("CHECKBOXES")) },
+    { key: "cb1",     basis: 1, part: cb1 },
+    { key: "cb2",     basis: 1, part: cb2 },
+    { key: "lRadio",  basis: 1, part: createNodePart(sl("RADIO")) },
+    { key: "radio",   basis: 4, part: radio },
+    { key: "lSel",    basis: 1, part: createNodePart(sl("SELECT")) },
+    { key: "sel",     basis: 1, part: sel },
+    { key: "lFilter", basis: 1, part: createNodePart(sl("FILTER LIST")) },
+    { key: "filter",  basis: 4, part: filterList },
+    { key: "lForm",   basis: 1, part: createNodePart(sl("FORM FIELD")) },
+    { key: "form",    basis: 6, part: formField },
+  ]);
+
+  // ── Right column: data + feedback ───────────────────────────────────
   const dataTable = createDataTable({
     columns: [
       { key: "name", label: "Name" },
-      { key: "role", label: "Role", width: 12 },
-      { key: "lvl", label: "Lvl", width: 5 },
+      { key: "role", label: "Role", width: 10 },
+      { key: "lvl", label: "Lvl", width: 4 },
     ],
     rows: [
       { name: "Alice", role: "Engineer", lvl: "5" },
@@ -167,24 +157,19 @@ function openPlayground(host: MicroappHost) {
       { name: "Eve", role: "Engineer", lvl: "6" },
     ],
     sortable: true,
-    onSelect: (row) => log(`Table select: ${row.name} (${row.role})`),
+    onSelect: (row) => log(`Row: ${row.name}`),
   });
 
   const progress = createProgressBar({ value: 0, max: 100, label: "Progress" });
   const spinner = createSpinner({ label: "Processing..." });
 
-  // Auto-increment progress
   let progressVal = 0;
   createTimer(() => {
     progressVal = (progressVal + 1) % 101;
     progress.update({ value: progressVal });
-    if (progressVal === 100) {
-      log("Progress complete!");
-      progressVal = 0;
-    }
+    if (progressVal === 100) { log("Progress done!"); progressVal = 0; }
   }, 200, timers);
 
-  // Key-Value panel (live state summary)
   function kvEntries() {
     return [
       { key: "Clicks", value: String(clickCount) },
@@ -195,35 +180,29 @@ function openPlayground(host: MicroappHost) {
   }
   const kvPanel = createKeyValuePanel({ entries: kvEntries(), border: true, label: "State" });
 
-  // ── Layout ──────────────────────────────────────────────────────────
-  const root = createStack(win.body, [
-    { key: "header",      basis: 1,     part: createNodePart(headerBox) },
-    { key: "lblBtn",      basis: 1,     part: createNodePart(lblButtons) },
-    { key: "btn1",        basis: 1,     part: btn1 },
-    { key: "btn2",        basis: 1,     part: btn2 },
-    { key: "lblCb",       basis: 1,     part: createNodePart(lblChecks) },
-    { key: "cb1",         basis: 1,     part: cb1 },
-    { key: "cb2",         basis: 1,     part: cb2 },
-    { key: "cb3",         basis: 1,     part: cb3 },
-    { key: "lblRadio",    basis: 1,     part: createNodePart(lblRadio) },
-    { key: "radio",       basis: 4,     part: radio },
-    { key: "lblSel",      basis: 1,     part: createNodePart(lblSelect) },
-    { key: "sel",         basis: 1,     part: sel },
-    { key: "lblFilter",   basis: 1,     part: createNodePart(lblFilter) },
-    { key: "filterList", basis: 5,     part: filterList },
-    { key: "lblForm",     basis: 1,     part: createNodePart(lblForm) },
-    { key: "formField",  basis: 6,     part: formField },
-    { key: "lblTable",   basis: 1,     part: createNodePart(lblTable) },
-    { key: "dataTable",  basis: 8,     part: dataTable },
-    { key: "lblFb",       basis: 1,     part: createNodePart(lblFeedback) },
-    { key: "progress",    basis: 1,     part: progress },
-    { key: "spinner",     basis: 1,     part: spinner },
-    { key: "lblData",     basis: 1,     part: createNodePart(lblData) },
-    { key: "kv",          basis: 6,     part: kvPanel },
-    { key: "log",         basis: "1fr", part: logView },
+  const rightCol = createStack(win.body, [
+    { key: "lTable",  basis: 1,     part: createNodePart(sl("TABLE")) },
+    { key: "table",   basis: 8,     part: dataTable },
+    { key: "lFb",     basis: 1,     part: createNodePart(sl("FEEDBACK")) },
+    { key: "prog",    basis: 1,     part: progress },
+    { key: "spin",    basis: 1,     part: spinner },
+    { key: "lData",   basis: 1,     part: createNodePart(sl("STATE")) },
+    { key: "kv",      basis: 6,     part: kvPanel },
+    { key: "log",     basis: "1fr", part: logView },
   ]);
 
-  // ── Render + lifecycle ──────────────────────────────────────────────
+  // ── Two-column root ─────────────────────────────────────────────────
+  const columns = createRow(win.body, [
+    { key: "left",  basis: "1fr", part: leftCol },
+    { key: "right", basis: "1fr", part: rightCol },
+  ]);
+
+  const root = createStack(win.body, [
+    { key: "header", basis: 1,     part: createNodePart(headerBox) },
+    { key: "cols",   basis: "1fr", part: columns },
+  ]);
+
+  // ── Lifecycle ───────────────────────────────────────────────────────
   function render() {
     const w = Math.max(1, Number(win.body.width) || 0);
     const h = Math.max(1, Number(win.body.height) || 0);
@@ -236,37 +215,24 @@ function openPlayground(host: MicroappHost) {
 
   win.describeState(() => ({
     summary: `Forms Playground: ${clickCount} clicks`,
-    clickCount,
-    sound: cb1.checked(),
-    size: radio.selected(),
-    colour: sel.selected(),
-    logEntries: logView.entries().length,
+    clickCount, sound: cb1.checked(), size: radio.selected(),
+    colour: sel.selected(), logEntries: logView.entries().length,
   }));
 
   win.captureText(() => [
     "Forms Playground — E036 SDK showcase",
-    `Clicks: ${clickCount}`,
-    `Sound: ${cb1.checked()}`,
-    `Size: ${radio.selected()}`,
-    `Colour: ${sel.selected()}`,
-    "",
-    ...logView.entries().slice(-10).map(e => e.text),
+    `Clicks: ${clickCount}  Sound: ${cb1.checked()}  Size: ${radio.selected()}  Colour: ${sel.selected()}`,
+    "", ...logView.entries().slice(-10).map(e => e.text),
   ].join("\n"));
 
   win.onRestyle(() => {
     const t = host.theme();
     headerBox.style = { fg: t.body.bg, bg: t.body.fg, bold: true };
-    for (const lbl of [lblButtons, lblChecks, lblRadio, lblSelect, lblFilter, lblForm, lblTable, lblFeedback, lblData]) {
-      lbl.style = { fg: t.accent?.fg ?? "cyan", bg: t.body.bg };
-    }
+    for (const lbl of allLabels) lbl.style = { fg: t.accent?.fg ?? "cyan", bg: t.body.bg };
     root.restyle();
     host.screen.render();
   });
 
-  win.onCleanup(() => {
-    clearTimers(timers);
-    root.destroy();
-  });
-
+  win.onCleanup(() => { clearTimers(timers); root.destroy(); });
   win.focus();
 }
