@@ -1,7 +1,7 @@
 ---
 id: chore-menu-nav-figlet-audit
 title: Menu toggle, nav cleanup, responsive figlet, SDK audit
-status: in-progress
+status: done
 branch: chore/menu-nav-file-audit
 ---
 
@@ -17,7 +17,7 @@ Fixes, polish, and prep work for consolidating file/text/figlet surfaces.
 - [x] BUG 3b: Remove all six menu hint labels from bottom nav
 - [x] CHORE 4: Responsive figlet in Hello World
 - [x] CHORE 5: Extract SDK primitives for responsive figlet
-- [ ] CHORE 6: SDK audit skill idea (deferred)
+- [x] CHORE 6: SDK audit skill idea (moved to agents-docs-signposting chore)
 
 ## BUG 1: Menu toggle on keyboard shortcut
 
