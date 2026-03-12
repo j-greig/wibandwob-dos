@@ -140,11 +140,14 @@ const root = createStack(win.body, [
   { key: "footer", basis: 1,    part: footerPart },
 ]);
 
-// Horizontal layout: sidebar / main
+// Horizontal layout: sidebar / main, with 2-char gap
 const body = createRow(win.body, [
   { key: "sidebar", basis: 20,    part: sidebarPart },
   { key: "main",    basis: "1fr", part: mainPart },
-]);
+], { gap: 2 });
+
+// Both accept optional { gap: N } — character-cell spacing between children
+// Gap is subtracted before flex distribution, so 1fr children still split evenly.
 
 // Wrap a raw blessed box as a LayoutPart
 const panel = createNodePart(blessed.box({ parent: win.body, style: host.theme().body }));
