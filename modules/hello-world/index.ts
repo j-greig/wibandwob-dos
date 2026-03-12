@@ -1,22 +1,17 @@
 /**
  * Hello World v2 — Layout engine showcase + SDK primitive proving ground.
  *
- * Inlines candidate layout primitives (createGrid, dockTo, responsive,
- * compass alignment, toolbar) that are NOT yet in the SDK.
- *
- * Controls:
- *   Click        — regenerate contour art
- *   1-9 (numpad) — position banner at compass point
- *   0            — reset to auto alignment
+ * Inlines candidate layout primitives (createGrid, responsive, compass
+ * alignment, toolbar) that are NOT yet in the SDK.
  *
  * Toolbar (visible at L+ sizes):
- *   Compass buttons, seed display, regen button, mode indicator.
- *   Responsive: hidden at M/S. That IS the Tailwind "hidden lg:flex" pattern.
+ *   Compass buttons, regen button, mode indicator.
+ *   Responsive: hidden at M/S — the Tailwind "hidden lg:flex" pattern.
  *
  * Layout modes:
- *   XL  (95+ x 26+)  toolbar + 2-col grid (contour span-2, stats, clock) + art
- *   L   (65+ x 18+)  toolbar + 2-col (contour, clock) + art
- *   M   (40+ x 12+)  banner + info + art
+ *   XL  (95+ x 26+)  toolbar + 2-col grid (contour span-2, stats, clock) + cats
+ *   L   (65+ x 18+)  toolbar + 2-col (contour, clock) + cats
+ *   M   (40+ x 12+)  banner + info
  *   S   (< 40)        banner only
  */
 
@@ -30,7 +25,7 @@ import {
 } from "../../src/services/microapp-sdk.js";
 
 // ═══════════════════════════════════════════════════════════════════════════
-// INLINED LAYOUT ENGINE — candidates for SDK extraction
+// LAYOUT PRIMITIVES — candidates for SDK extraction
 // ═══════════════════════════════════════════════════════════════════════════
 
 type Rect = { top: number; left: number; width: number; height: number };
@@ -124,42 +119,6 @@ function createGrid(_parent: blessed.Widgets.Node, opts: GridOptions): Grid {
   };
 }
 
-// ── dockTo ────────────────────────────────────────────────────────────────
-
-interface DockOptions {
-  anchor: "bottom-right" | "bottom-left" | "top-right" | "top-left";
-  width: number; height: number;
-  minParentWidth?: number; minParentHeight?: number;
-  margin?: number;
-}
-
-interface DockedWidget {
-  node: blessed.Widgets.BoxElement;
-  layout(pw: number, ph: number): void;
-  visible: boolean;
-  destroy(): void;
-}
-
-function dockTo(parent: blessed.Widgets.BoxElement, content: string, opts: DockOptions, style: Record<string, any>): DockedWidget {
-  const node = blessed.box({ parent, width: opts.width, height: opts.height, content, style });
-  node.hide();
-  const m = opts.margin ?? 1;
-  const minW = opts.minParentWidth ?? (opts.width + m * 2);
-  const minH = opts.minParentHeight ?? (opts.height + m * 2);
-  const result: DockedWidget = {
-    node, visible: false,
-    layout(pw, ph) {
-      result.visible = pw >= minW && ph >= minH;
-      if (!result.visible) { node.hide(); return; }
-      node.show();
-      node.top  = opts.anchor.startsWith("top")  ? m : ph - opts.height - m;
-      node.left = opts.anchor.endsWith("left")   ? m : pw - opts.width - m;
-    },
-    destroy() { node.destroy(); },
-  };
-  return result;
-}
-
 // ── compass alignment ─────────────────────────────────────────────────────
 
 type Compass = "nw" | "n" | "ne" | "w" | "c" | "e" | "sw" | "s" | "se";
@@ -179,14 +138,6 @@ const COMPASS_ALIGN: Record<Compass, { align: string; valign: string }> = {
 const COMPASS_LABELS: Record<Compass, string> = {
   nw: "NW", n: "N", ne: "NE", w: "W", c: "C", e: "E", sw: "SW", s: "S", se: "SE",
 };
-
-const KEY_TO_COMPASS: Record<string, Compass> = {
-  "7": "nw", "8": "n", "9": "ne",
-  "4": "w",  "5": "c", "6": "e",
-  "1": "sw", "2": "s", "3": "se",
-};
-
-// padCompass removed — we position the inner box instead of padding content
 
 // ── responsive ────────────────────────────────────────────────────────────
 
@@ -241,12 +192,10 @@ const INFO_TEXT = [
   "Layout engine test suite.",
   "Resize to see responsive layout.",
   "Click to regenerate contour.",
-  "Keys 1-9: compass alignment.",
-  "Key 0: reset to auto.",
   "",
   "XL: toolbar + 2-col grid",
   "L:  toolbar + 2-col",
-  "M:  banner + info + art",
+  "M:  banner + info",
   "S:  banner only",
 ].join("\n");
 
@@ -277,14 +226,13 @@ export default function setup(host: MicroappHost) {
 
       const root = blessed.box({
         parent: win.body, top: 0, left: 0, right: 0, bottom: 0,
-        mouse: true, clickable: true, keys: true, inputOnFocus: true,
+        mouse: true, clickable: true,
         style: host.theme().body,
       });
 
       // ══════════════════════════════════════════════════════════════
       // TOOLBAR — visible at L+ sizes (the "hidden lg:flex" pattern)
       // ══════════════════════════════════════════════════════════════
-      // ╭─ ◈ WibWob ─┬─ NW  N  NE  W  ●  E  SW  S  SE ─┬─ ↻ regen ─┬─ XL 130x38 ─╮
 
       const TOOLBAR_H = 1;
 
@@ -295,20 +243,20 @@ export default function setup(host: MicroappHost) {
       });
       toolbar.hide();
 
-      // Toolbar: app label (left)
-      const toolbarLabel = blessed.box({
+      // App label
+      blessed.box({
         parent: toolbar, top: 0, left: 0, width: 12, height: 1,
         content: " \u25C8 WibWob ",
         style: { fg: "cyan", bg: "black", bold: true },
       });
 
-      // Toolbar: separator
+      // Separator
       blessed.box({
         parent: toolbar, top: 0, left: 12, width: 1, height: 1,
         content: "\u2502", style: { fg: "gray", bg: "black" },
       });
 
-      // Toolbar: compass buttons
+      // Compass buttons
       const COMPASS_ORDER: (Compass | "auto")[] = ["nw","n","ne","w","c","e","sw","s","se","auto"];
       const COMPASS_BTN_LABELS: Record<string, string> = {
         nw: "NW", n: "N", ne: "NE", w: "W", c: "\u25CF", e: "E",
@@ -332,14 +280,14 @@ export default function setup(host: MicroappHost) {
         cx += w;
       }
 
-      // Toolbar: separator
+      // Separator
       blessed.box({
         parent: toolbar, top: 0, left: cx, width: 1, height: 1,
         content: "\u2502", style: { fg: "gray", bg: "black" },
       });
       cx += 1;
 
-      // Toolbar: regen button
+      // Regen button
       const regenBtn = blessed.box({
         parent: toolbar, top: 0, left: cx, width: 10, height: 1,
         content: " \u21BB regen ", mouse: true, clickable: true,
@@ -351,13 +299,13 @@ export default function setup(host: MicroappHost) {
       });
       cx += 10;
 
-      // Toolbar: separator
+      // Separator
       blessed.box({
         parent: toolbar, top: 0, left: cx, width: 1, height: 1,
         content: "\u2502", style: { fg: "gray", bg: "black" },
       });
 
-      // Toolbar: mode/size label (right-aligned)
+      // Mode/size label (right-aligned)
       const toolbarMode = blessed.box({
         parent: toolbar, top: 0, right: 0, width: 20, height: 1,
         align: "right" as any,
@@ -367,10 +315,8 @@ export default function setup(host: MicroappHost) {
       function updateToolbar(mode: LayoutMode, w: number, h: number) {
         const compassStr = compass ? COMPASS_LABELS[compass] : "auto";
         toolbarMode.setContent(`${mode.toUpperCase()} ${w}x${h} ${compassStr} `);
-        // Highlight active compass button
         for (const { key, node } of compassBtns) {
-          const isActive = (key === "auto" && compass === null) ||
-                           (key === compass);
+          const isActive = (key === "auto" && compass === null) || (key === compass);
           node.style = isActive
             ? { fg: "black", bg: "cyan", bold: true }
             : { fg: "white", bg: "black" };
@@ -381,7 +327,7 @@ export default function setup(host: MicroappHost) {
       // CONTENT PANELS
       // ══════════════════════════════════════════════════════════════
 
-      // Banner area — transparent div, no border/chrome
+      // Banner area — transparent container, no border
       const bannerBox = blessed.box({
         parent: root, top: 0, left: 0, width: 0, height: 0,
         style: host.theme().body,
@@ -390,12 +336,6 @@ export default function setup(host: MicroappHost) {
       const bannerText = blessed.box({
         parent: bannerBox, top: 0, left: 0, width: 0, height: 0,
         style: host.theme().body,
-      });
-
-      // Status bar (always visible, bottom row)
-      const statusBar = blessed.box({
-        parent: root, bottom: 0, left: 0, width: "100%" as any, height: 1,
-        style: host.theme().muted,
       });
 
       const contourBox = blessed.box({
@@ -434,7 +374,7 @@ export default function setup(host: MicroappHost) {
       });
       infoBox.hide();
 
-      // Cats — plain box, bottom-right, floats above everything
+      // Cats — float bottom-right, visible at XL/L only
       const catBox = blessed.box({
         parent: root, width: ART_W, height: ART_H,
         content: WIBWOB_ART.join("\n"),
@@ -471,7 +411,7 @@ export default function setup(host: MicroappHost) {
           `  contour  ${mode === "xl" || mode === "l" ? "YES" : "-"}`,
           `  clock    ${mode === "xl" || mode === "l" ? "YES" : "-"}`,
           `  stats    ${mode === "xl" ? "YES" : "-"}`,
-          `  art      ${mode !== "s" ? "YES" : "-"}`,
+          `  cats     ${mode === "xl" || mode === "l" ? "YES" : "-"}`,
         ].join("\n"));
       }
 
@@ -484,24 +424,15 @@ export default function setup(host: MicroappHost) {
         const h = Math.max(5, Number(root.height) || 20);
         const mode = pickBreakpoint(LAYOUT_BREAKPOINTS, w, h) ?? "s";
 
-        // ── Responsive title ──────────────────────────────────────
+        // ── Responsive title ──
         const banner = responsiveFiglet("HELLO WORLD", w);
         const bannerH = banner.split("\n").length;
 
-        // ── Toolbar: visible at L+ (the "hidden lg:flex" pattern) ──
+        // ── Toolbar: visible at L+ ──
         const showToolbar = mode === "xl" || mode === "l";
-        if (showToolbar) {
-          toolbar.show();
-          updateToolbar(mode, w, h);
-        } else {
-          toolbar.hide();
-        }
+        if (showToolbar) { toolbar.show(); updateToolbar(mode, w, h); }
+        else { toolbar.hide(); }
         const contentTop = showToolbar ? TOOLBAR_H : 0;
-
-        // ── Status bar (always) ────────────────────────────────────
-        const compassStr = compass ? COMPASS_LABELS[compass] : "auto";
-        const statusHint = showToolbar ? "" : "  1-9:align 0:auto click:regen";
-        statusBar.setContent(` ${mode.toUpperCase()} ${w}x${h} ${compassStr} tb=${showToolbar} cTop=${contentTop}${statusHint}`);
 
         // ── Banner: position inner text box within transparent area ──
         bannerBox.show();
@@ -526,36 +457,33 @@ export default function setup(host: MicroappHost) {
                        : cp.valign === "middle" ? Math.floor(vPad / 2)
                        : 0;
 
-        // ── Grid area below banner ────────────────────────────────
+        // ── Grid area below banner ──
         const gridTop = contentTop + bannerAllocH;
-        const gridH = Math.max(4, h - gridTop - 2); // -2 for status bar + breathing room
+        const gridH = Math.max(4, h - gridTop - 1);
 
         if (mode === "xl") {
           contourBox.show(); clockBox.show(); statsBox.show(); infoBox.hide();
           xlGrid.layout({ top: gridTop, left: 0, width: w, height: gridH });
           updateContour(); updateClock(); updateStats(mode, w, h);
-
         } else if (mode === "l") {
           contourBox.show(); clockBox.show(); statsBox.hide(); infoBox.hide();
           const half = Math.floor((w - 1) / 2);
           applyRect(contourBox, { top: gridTop, left: 0, width: half, height: gridH });
           applyRect(clockBox,   { top: gridTop, left: half + 1, width: w - half - 1, height: gridH });
           updateContour(); updateClock();
-
         } else if (mode === "m") {
           contourBox.hide(); clockBox.hide(); statsBox.hide();
           infoBox.show();
           applyRect(infoBox, { top: gridTop, left: 1, width: Math.min(40, w - 2), height: Math.max(2, gridH) });
-
         } else {
           contourBox.hide(); clockBox.hide(); statsBox.hide(); infoBox.hide();
         }
 
-        // Cats: visible at XL/L only (hide when figlet downgrades)
+        // Cats: visible at XL/L only
         const showCats = mode === "xl" || mode === "l";
         if (showCats) {
           catBox.show();
-          catBox.top = h - ART_H + 1;   // tuck into bottom edge
+          catBox.top = h - ART_H + 1;
           catBox.left = w - ART_W - 1;
         } else {
           catBox.hide();
@@ -563,23 +491,12 @@ export default function setup(host: MicroappHost) {
 
         // Z-order: toolbar above content, cats above everything
         if (showToolbar) toolbar.setFront();
-        statusBar.setFront();
         if (showCats) catBox.setFront();
 
         host.screen.render();
       }
 
-      // ── Keyboard ────────────────────────────────────────────────
-      // Compass keys (1-9, 0) — listen on screen, guard with focus check
-      const handleKeypress = (_ch: string, key: any) => {
-        if (!win.isFocused()) return;
-        const name = key?.name ?? key?.ch ?? "";
-        if (name === "0") { compass = null; doLayout(); return; }
-        if (KEY_TO_COMPASS[name]) { compass = KEY_TO_COMPASS[name]; doLayout(); return; }
-      };
-      host.screen.on("keypress", handleKeypress);
-
-      // Click to regen (only if not on a toolbar button)
+      // Click to regen contour
       root.on("click", () => {
         contourSeed = Math.floor(Math.random() * 10000);
         doLayout();
@@ -613,7 +530,6 @@ export default function setup(host: MicroappHost) {
         root.style = t.body;
         bannerBox.style = t.body;
         bannerText.style = t.body;
-        statusBar.style = t.muted;
         contourBox.style = { ...t.body, border: { fg: t.muted.fg } };
         clockBox.style = { ...t.body, border: { fg: t.muted.fg } };
         statsBox.style = { ...t.body, border: { fg: t.muted.fg } };
@@ -622,7 +538,6 @@ export default function setup(host: MicroappHost) {
       });
 
       win.onCleanup(() => {
-        host.screen.off("keypress", handleKeypress);
         clearTimers(timers);
         catBox.destroy();
       });
