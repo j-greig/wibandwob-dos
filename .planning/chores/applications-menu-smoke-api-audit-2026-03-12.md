@@ -467,3 +467,17 @@ Optional fast mode
 Planned script path for repeatability
 - `scripts/demo-phase1-sequence.sh` (to be added)
 - This script should generate timestamped capture folder and a markdown report with blocker classification.
+
+## Update: figlet + zine interstitial controls verified (2026-03-12, later pass)
+
+- [x] Figlet interstitial flow is now API-drivable end-to-end
+  - open prompt -> confirm -> font picker -> cancel/confirm path works
+  - overlay control commands/endpoints available: `overlay.info`, `overlay.confirm`, `overlay.cancel`
+
+- [x] Zine default picker is now API-drivable on current branch via module commands
+  - `microapp.wibwob.zine.picker.info`
+  - `microapp.wibwob.zine.picker.select` (args: `index`)
+  - `microapp.wibwob.zine.picker.confirm`
+  - `microapp.wibwob.zine.picker.cancel`
+
+- [x] Manual confirmation from operator received: both confirm and cancel paths worked

@@ -69,6 +69,26 @@ function findCanvasFiles(dir: string, maxDepth = 3, depth = 0): string[] {
 // ── Module ────────────────────────────────────────────────────────────────
 
 export default function setup(host: MicroappHost) {
+  let activePicker:
+    | {
+        list: blessed.Widgets.ListElement;
+        candidates: string[];
+      }
+    | undefined;
+
+  function closeActivePicker(): boolean {
+    if (!activePicker) return false;
+    const picker = activePicker.list;
+    activePicker = undefined;
+    try {
+      picker.destroy();
+      host.screen.render();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   function openZine(args?: Record<string, unknown>) {
     let filePath = typeof args?.filePath === "string" ? args.filePath : "";
 
@@ -79,6 +99,7 @@ export default function setup(host: MicroappHost) {
       if (candidates.length === 1) {
         filePath = candidates[0]!;
       } else {
+        closeActivePicker();
         const picker = blessed.list({
           parent: host.screen,
           top: "center", left: "center",
@@ -94,15 +115,17 @@ export default function setup(host: MicroappHost) {
             item: host.theme().body,
           },
         });
+        activePicker = { list: picker, candidates };
         picker.focus();
         picker.on("select", (_item: any, index: number) => {
-          picker.destroy();
-          host.screen.render();
-          openZine({ filePath: candidates[index] });
+          const selected = activePicker?.candidates[index];
+          closeActivePicker();
+          if (selected) {
+            openZine({ filePath: selected });
+          }
         });
         picker.key(["escape", "q"], () => {
-          picker.destroy();
-          host.screen.render();
+          closeActivePicker();
         });
         host.screen.render();
         return;
@@ -891,6 +914,79 @@ export default function setup(host: MicroappHost) {
         })),
       };
     },
+    direct: true,
+  });
+
+  host.registerCommand({
+    id: "picker.info",
+    label: "Zine Picker Info",
+    description: "Return current state of the Open Zine canvas picker.",
+    action: () => {
+      if (!activePicker) {
+        return { active: false };
+      }
+      const listAny = activePicker.list as any;
+      const selectedIndex = Number(listAny?.selected ?? 0);
+      return {
+        active: true,
+        count: activePicker.candidates.length,
+        selectedIndex,
+        selectedPath: activePicker.candidates[selectedIndex] ?? null,
+      };
+    },
+    direct: true,
+  });
+
+  host.registerCommand({
+    id: "picker.select",
+    label: "Zine Picker Select",
+    description: "Set selected index in Open Zine picker. Args: index (number).",
+    action: (args?: Record<string, unknown>) => {
+      if (!activePicker) {
+        return { ok: false, error: "No active zine picker" };
+      }
+      const requested = Number(args?.index);
+      if (!Number.isFinite(requested)) {
+        return { ok: false, error: "index must be a number" };
+      }
+      const index = Math.max(0, Math.min(Math.trunc(requested), activePicker.candidates.length - 1));
+      activePicker.list.select(index);
+      host.screen.render();
+      return {
+        ok: true,
+        index,
+        path: activePicker.candidates[index] ?? null,
+      };
+    },
+    direct: true,
+  });
+
+  host.registerCommand({
+    id: "picker.confirm",
+    label: "Zine Picker Confirm",
+    description: "Confirm current selection in Open Zine picker and open selected canvas.",
+    action: () => {
+      if (!activePicker) {
+        return { ok: false, error: "No active zine picker" };
+      }
+      const listAny = activePicker.list as any;
+      const selectedIndex = Number(listAny?.selected ?? 0);
+      const selectedPath = activePicker.candidates[selectedIndex];
+      closeActivePicker();
+      if (!selectedPath) {
+        return { ok: false, error: "No selectable canvas at current index" };
+      }
+      openZine({ filePath: selectedPath });
+      return { ok: true, index: selectedIndex, filePath: selectedPath };
+    },
+    direct: true,
+  });
+
+  host.registerCommand({
+    id: "picker.cancel",
+    label: "Zine Picker Cancel",
+    description: "Cancel and close Open Zine picker.",
+    action: () => ({ ok: closeActivePicker() }),
     direct: true,
   });
 

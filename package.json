@@ -13,7 +13,7 @@
     "dev-irc-bot-burst": "python3 scripts/dev-irc-bot-burst.py",
     "gen-primitives": "bun scripts/gen-primitives.ts",
     "scaffold:microapp": "bash scripts/scaffold-microapp.sh",
-    "check-surface-parity": "bun run scripts/check-surface-parity.ts",
+    "check-surface-parity": "bun run scripts/.archive/check-surface-parity.ts",
     "typecheck": "node_modules/.bin/tsc --noEmit",
     "handover": "bash scripts/handover.sh",
     "check-themes": "bun run scripts/check-themes.ts",
