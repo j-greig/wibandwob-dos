@@ -15,7 +15,6 @@
  */
 
 import { readFileSync } from "node:fs";
-import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import {
@@ -24,6 +23,7 @@ import {
   createLazyMountedPlayer,
   readNodeViewport,
   terrainNames,
+  renderFiglet,
   type ContourMode,
   type MicroappHost,
 } from "../../src/services/microapp-sdk.js";
@@ -57,11 +57,9 @@ function formatDate(date: Date): string {
 const FIGLET_FONT = "chunky";
 
 function renderFigletTime(time: string): string {
-  const result = spawnSync("figlet", ["-f", FIGLET_FONT, time], { encoding: "utf8" });
-  if (result.status !== 0 || !result.stdout.trim()) {
-    return `  ${time}`;
-  }
-  return result.stdout.replace(/\s+$/u, "");
+  const rendered = renderFiglet(time, FIGLET_FONT);
+  if (!rendered || rendered.includes("(figlet")) return `  ${time}`;
+  return rendered;
 }
 
 const SCRAMBLE_FRAMES: string[][] = [

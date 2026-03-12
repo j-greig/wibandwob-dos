@@ -1,0 +1,91 @@
+AUDIT: Applications with File Open / Save
+==========================================
+
+Which apps let the user open or save files, how they access that,
+and which SDK component (if any) powers it.
+
+
++-------------------------+--------+--------+----------------------------+----------------------------+
+| Application             | Open?  | Save?  | UI method                  | SDK / engine component     |
++-------------------------+--------+--------+----------------------------+----------------------------+
+| Text Editor (built-in)  | YES    | YES    | File menu (editor.open,    | EditorCoordinator          |
+|  kind: "editor"         |        |        | editor.save, editor.save   | promptForEditorFile()      |
+|  appType: "text-editor" |        |        | _as) + Ctrl-S + file       | saveEditorWindow()         |
+|                         |        |        | picker overlay             | OverlayManager.            |
+|                         |        |        |                            |  openFileBrowserPrompt()   |
++-------------------------+--------+--------+----------------------------+----------------------------+
+| Slap Editor (module)    | YES    | YES    | Command palette / Apps     | EditorEngine (custom)      |
+|  modules/slap-editor    |        |        | menu. filePath arg on      | engine.loadFile()          |
+|                         |        |        | launch. Ctrl-S save.       | engine.saveFile()          |
+|                         |        |        | No file picker UI.         | No SDK file picker.        |
++-------------------------+--------+--------+----------------------------+----------------------------+
+| Document Reader         | YES    | no     | File menu (reader.open)    | openBrowserReaderWindow()  |
+|  kind: "reader"         |        |        | + command palette +        | OverlayManager.            |
+|  appType: "browser-     |        |        | file picker overlay.       |  openFileBrowserPrompt()   |
+|   reader"               |        |        | Also: "Open README"        |                            |
+|                         |        |        | command, direct filePath.  |                            |
++-------------------------+--------+--------+----------------------------+----------------------------+
+| Markdown Viewer         | YES    | no     | File menu (markdown.open)  | renderMarkdownFile()       |
+|  (inside text-windows)  |        |        | + file picker overlay      | markdown-service.ts        |
+|  kind: "editor" in      |        |        | filtered to *.md.          | Opens inside editor        |
+|  view mode              |        |        |                            | window in "view" mode.     |
++-------------------------+--------+--------+----------------------------+----------------------------+
+| Primer Viewer           | YES    | no     | File menu (primer.open)    | OverlayManager.            |
+|  kind: "primer"         |        |        | + file picker overlay.     |  openFileBrowserPrompt()   |
+|                         |        |        | Direct filePath arg.       | Opens as primer window.    |
++-------------------------+--------+--------+----------------------------+----------------------------+
+| Zine (module)           | YES    | no     | SIDEBAR (createSidebar     | createSidebarPanel() SDK   |
+|  modules/zine           |        |        | Panel + createSelectable   | createSelectableList() SDK |
+|                         |        |        | List). Watches a zine      | fs.watch on directory.     |
+|                         |        |        | directory. Also toolbar    | Double-click opens in      |
+|                         |        |        | toggle "[  ] Files".       | editor.open command.       |
++-------------------------+--------+--------+----------------------------+----------------------------+
+| Patchbay Lab (module)   | YES    | no     | SIDEBAR for primer         | createSidebarPanel via     |
+|  modules/patchbay-lab   |        |        | gallery. Lists primer      | resolveSidebarWidth().     |
+|                         |        |        | files from scratch/        | Custom sidebar, not SDK    |
+|                         |        |        | primers directory.         | createSidebarPanel.        |
++-------------------------+--------+--------+----------------------------+----------------------------+
+| File Manager            | YES    | no     | Dedicated window. Full     | openFileManagerWindow()    |
+|  kind: "gallery"        |        |        | file browser with search,  | browser-windows.ts         |
+|  (Far-JS style)         |        |        | preview, icon/list view.   | Opens files via            |
+|                         |        |        | Double-click opens in      | editor.openFile().         |
+|                         |        |        | editor or reader.          |                            |
++-------------------------+--------+--------+----------------------------+----------------------------+
+| Music Player            | YES    | no     | Toolbar "add" button +     | OverlayManager.            |
+|  kind: "music-player"   |        |        | "o"/"a" key. File picker   |  openFileBrowserPrompt()   |
+|                         |        |        | overlay filtered to        |                            |
+|                         |        |        | audio files.               |                            |
++-------------------------+--------+--------+----------------------------+----------------------------+
+| Chrome Browser          | no     | no     | URL bar only. No local     | chrome-browser-service.ts  |
+|  kind: "browser"        |        |        | file open.                 |                            |
++-------------------------+--------+--------+----------------------------+----------------------------+
+| WibWobWorld (module)    | no     | YES*   | Sidebar for terrain info.  | resolveSidebarWidth() SDK  |
+|  modules/wibwobworld    |        |        | *Saves terrain artifacts   | Saves to scratch/worlds/   |
+|                         |        |        | automatically to scratch/  | via custom save logic.     |
+|                         |        |        | worlds/.                   |                            |
++-------------------------+--------+--------+----------------------------+----------------------------+
+| World Chatroom (module) | no     | no     | Sidebar for participants.  | createSidebarPanel() SDK   |
+|  modules/world-chatroom |        |        | No file open/save.         |                            |
++-------------------------+--------+--------+----------------------------+----------------------------+
+| Backrooms Browser       | YES    | no     | Built-in session list      | createSelectableList()     |
+|  kind: "backrooms"      |        |        | sidebar. Reads from        | from ui-parts.ts.          |
+|                         |        |        | backrooms archive dir.     |                            |
++-------------------------+--------+--------+----------------------------+----------------------------+
+
+
+NOTES ON CONSOLIDATION
+----------------------
+1. Three different "open file" UIs exist:
+   a) OverlayManager.openFileBrowserPrompt() -- modal overlay, used by editor, reader, primer, music
+   b) createSidebarPanel() + createSelectableList() -- sidebar file list, used by zine, patchbay
+   c) openFileManagerWindow() -- full dedicated Far-JS file manager window
+
+2. The Zine has a sidebar that could be replaced by the File menu's open command
+   if we want full-screen editing. The "[  ] Files" toolbar toggle and "[" key
+   control the sidebar.
+
+3. Save is only in: built-in editor (EditorCoordinator), Slap Editor (EditorEngine),
+   and WibWobWorld (auto-save terrain).
+
+4. The built-in editor and Slap Editor are two completely separate editor engines
+   with no shared code. See the text/code audit doc for details.

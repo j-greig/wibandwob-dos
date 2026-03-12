@@ -528,12 +528,10 @@ export class TsTuiMvpApp {
   /** Global input contract: menu triggers, window cycling/resizing, editor save, mouse delegation. */
   private bindGlobalKeys(): void {
     this.screen.key(["C-q"], () => this.destroy());
-    this.screen.key(["M-f"], () => this.openMenu("File"));
-    this.screen.key(["M-e"], () => this.openMenu("Edit"));
-    this.screen.key(["M-v"], () => this.openMenu("View"));
-    this.screen.key(["M-w"], () => this.openMenu("Window"));
-    this.screen.key(["M-a"], () => this.openMenu("Applications"));
-    this.screen.key(["M-d"], () => this.openMenu("Demos"));
+    this.screen.key(["M-f"], () => this.toggleMenu("File"));
+    this.screen.key(["M-e"], () => this.toggleMenu("Edit"));
+    this.screen.key(["M-v"], () => this.toggleMenu("View"));
+    this.screen.key(["M-w"], () => this.toggleMenu("Window"));
     this.screen.key(["M-t"], () => this.toggleTheme());
     this.screen.key(["M-S-left"], () =>
       this.windowManager.resizeFocusedWindow(-2, 0),
@@ -574,6 +572,10 @@ export class TsTuiMvpApp {
 
   private openMenu(label: string): void {
     this.menuUi.openMenu(label);
+  }
+
+  private toggleMenu(label: string): void {
+    this.menuUi.toggleMenu(label);
   }
 
   private closeMenu(): void {

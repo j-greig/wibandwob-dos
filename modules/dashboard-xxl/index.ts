@@ -12,10 +12,10 @@
  */
 
 import blessed from "blessed";
-import { spawnSync } from "node:child_process";
 import { writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
+import { renderFiglet } from "../../src/services/microapp-sdk.js";
 
 // ── virtual canvas ───────────────────────────────────────────
 
@@ -76,8 +76,7 @@ function viewport(c: VCanvas, vx: number, vy: number, vw: number, vh: number): s
 // ── helpers ──────────────────────────────────────────────────
 
 function figlet(text: string, font = "small"): string {
-  const r = spawnSync("figlet", ["-f", font, text], { encoding: "utf8" });
-  return r.status === 0 ? r.stdout : `  ${text}\n`;
+  return renderFiglet(text, font);
 }
 
 // ── pattern generators ───────────────────────────────────────

@@ -1,0 +1,67 @@
+%%{init: {'theme': 'dark', 'themeVariables': {'fontSize': '13px'}}}%%
+graph TD
+    AGENTS["AGENTS.md<br/><i>root contract</i>"]
+    AGENTS_LS["ls .agents/"]
+    BUILD["docs/building-custom-modules.md<br/><i>noted: persistence light</i>"]
+    SCAFFOLD["scripts/scaffold-microapp.sh<br/><i>found: no onCleanup</i>"]
+    SDK_DOC[".agents/microapp-sdk.md<br/><i>deeper authoring contract</i>"]
+    DEAD1["docs/module-authoring.md<br/><b>✗ DEAD LINK</b>"]
+    SPEC_WIN[".agents/specs/window-system.md<br/><i>too internal for modules</i>"]
+    SPEC_AGENT[".agents/specs/agent-session.md<br/><i>module info buried in filename</i>"]
+    HELLO_TS["hello-world/index.ts<br/><i>no longer minimal!</i>"]
+    HELLO_JSON["hello-world/module.json<br/><i>manifest still clean</i>"]
+    GLITCH["glitchbox/index.ts<br/><i>too dense for first-stop</i>"]
+    POETRY["poetry-clock/index.ts<br/><i>compact real app</i>"]
+    POETRY_JSON["poetry-clock/module.json<br/><i>persist:true</i>"]
+    POETRY_SNAP["poetry-clock § snapshot<br/><i>serialize mode+voice</i>"]
+    E026["e026-demo/index.ts<br/><i>excellent but too much</i>"]
+    ARCH[".agents/architecture.md<br/><i>mostly shell maintainer</i>"]
+    INVAR[".agents/invariants.md<br/><i>mixed audience rules</i>"]
+    SDK_SRC["src/services/microapp-sdk.ts<br/><i>100+ exports, drift risk</i>"]
+    LOADER["src/services/module-loader.ts<br/><i>THE real MicroappHost owner</i>"]
+    SEARCH_SNAP["search: registerSnapshot<br/><i>persistence across modules</i>"]
+    TIDEPOOL["tidepool § snapshot<br/><i>different pattern — drift?</i>"]
+    README["modules/README.md"]
+    DEAD2["docs/module-authoring.md<br/><b>✗ DEAD LINK</b>"]
+    SEARCH_XREF["search: cross-references<br/><i>stale link audit</i>"]
+    STOP(["STOPPED — assessed + proposed restructure"])
+
+    AGENTS --> AGENTS_LS
+    AGENTS --> BUILD
+    AGENTS --> SCAFFOLD
+    AGENTS --> SDK_DOC
+    SDK_DOC --> DEAD1
+    SDK_DOC --> SPEC_WIN
+    SDK_DOC --> SPEC_AGENT
+    AGENTS --> HELLO_TS
+    HELLO_TS --> HELLO_JSON
+    AGENTS --> GLITCH
+    AGENTS --> POETRY
+    POETRY --> POETRY_JSON
+    POETRY --> POETRY_SNAP
+    AGENTS --> E026
+    AGENTS --> ARCH
+    AGENTS --> INVAR
+    SDK_DOC --> SDK_SRC
+    SDK_SRC --> LOADER
+    LOADER --> SEARCH_SNAP
+    SEARCH_SNAP --> POETRY_SNAP
+    SEARCH_SNAP --> TIDEPOOL
+    AGENTS --> README
+    README --> DEAD2
+    AGENTS --> SEARCH_XREF
+    SEARCH_XREF --> STOP
+    TIDEPOOL --> STOP
+
+    style DEAD1 fill:#8b0000,color:#fff,stroke:#ff4444
+    style DEAD2 fill:#8b0000,color:#fff,stroke:#ff4444
+    style ARCH fill:#555,color:#aaa,stroke:#777
+    style INVAR fill:#555,color:#aaa,stroke:#777
+    style SPEC_WIN fill:#555,color:#aaa,stroke:#777
+    style BUILD fill:#006400,color:#fff,stroke:#44ff44
+    style SDK_DOC fill:#006400,color:#fff,stroke:#44ff44
+    style LOADER fill:#00008b,color:#fff,stroke:#4444ff
+    style SEARCH_SNAP fill:#00008b,color:#fff,stroke:#4444ff
+    style POETRY_SNAP fill:#00008b,color:#fff,stroke:#4444ff
+    style TIDEPOOL fill:#8b4500,color:#fff,stroke:#ff8844
+    style STOP fill:#333,color:#fff,stroke:#888,stroke-dasharray: 5 5

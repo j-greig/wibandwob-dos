@@ -167,6 +167,13 @@ Rules:
 - Say what the FIRST case is and that others come LATER
 - Skip rationale, skip alternatives, skip please
 
+## AGENT DOCS ARCHITECTURE
+
+**progressive disclosure by filepath**
+- directory names encode audience so an agent can determine relevance from `ls` alone, before opening any file
+- value: agents skip entire subtrees they don't need; the filepath IS the table of contents
+- the test: if a module author opens anything in `shell-dev/`, the signposting failed
+
 ## DEV TERMS
 
 **smoke test**

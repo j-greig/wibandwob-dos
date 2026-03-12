@@ -157,6 +157,77 @@ export interface FigletMeasurement {
   fontHeight: number;
 }
 
+// ── Width-aware rendering + responsive font cascade ──────────────────────────
+
+const tryFigletCache = new Map<string, string | null>();
+
+/**
+ * Render figlet text constrained to a width. Returns null if the output
+ * overflows (any line exceeds width) or if the font/CLI fails.
+ * Results are cached by (font, width, text) triple.
+ */
+export function tryFiglet(text: string, font: string, width: number): string | null {
+  if (!font || !isFigletAvailable()) return null;
+  const key = `${font}\0${width}\0${text}`;
+  const cached = tryFigletCache.get(key);
+  if (cached !== undefined) return cached;
+  const result = spawnSync("figlet", ["-f", font, "-w", String(width), text], { encoding: "utf8" });
+  if (result.status !== 0 || !result.stdout.trim()) {
+    tryFigletCache.set(key, null);
+    return null;
+  }
+  const output = result.stdout;
+  const lines = output.split("\n");
+  // Reject if any line exceeds the requested width
+  if (lines.some(l => l.replace(/\s+$/, "").length > width)) {
+    tryFigletCache.set(key, null);
+    return null;
+  }
+  tryFigletCache.set(key, output);
+  return output;
+}
+
+/** One tier in a responsive font cascade. */
+export interface FontCascadeTier {
+  /** Figlet font name. Empty string means plain-text fallback. */
+  font: string;
+  /** Minimum available width (columns) to attempt this font. */
+  minWidth: number;
+}
+
+/** Standard cascade: XL -> L -> M -> S -> XS. */
+export const DEFAULT_FONT_CASCADE: FontCascadeTier[] = [
+  { font: "larry3d",    minWidth: 50 },
+  { font: "slant",      minWidth: 42 },
+  { font: "small",      minWidth: 30 },
+  { font: "smslant",    minWidth: 30 },
+  { font: "digital",    minWidth: 24 },
+];
+
+/**
+ * Pick the best figlet font for the available width and render the text.
+ * Tries each tier in the cascade where minWidth <= width. Falls through
+ * to plain CAPS + underline if nothing fits.
+ */
+export function responsiveFiglet(
+  text: string,
+  width: number,
+  cascade: FontCascadeTier[] = DEFAULT_FONT_CASCADE,
+): string {
+  for (const tier of cascade) {
+    if (width >= tier.minWidth && tier.font) {
+      const result = tryFiglet(text, tier.font, width);
+      if (result) return result;
+    }
+  }
+  // Plain CAPS fallback
+  const caps = text.toUpperCase();
+  const underline = "=".repeat(Math.min(caps.length, Math.max(1, width)));
+  return `\n  ${caps}\n  ${underline}\n`;
+}
+
+// ── Measurement ──────────────────────────────────────────────────────────────
+
 export function measureFiglet(text: string, font = FALLBACK_FONT, width = 0): FigletMeasurement {
   const rendered = renderFiglet(text, font, width);
   const lines = rendered ? rendered.split("\n") : [];

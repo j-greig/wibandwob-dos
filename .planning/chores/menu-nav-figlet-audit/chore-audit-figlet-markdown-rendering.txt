@@ -1,0 +1,172 @@
+AUDIT: Figlet and Markdown Rendering Across the Codebase
+=========================================================
+
+How figlet text and markdown content are rendered, which components
+exist, what the SDK exposes, and where responsive sizing does or
+does not exist.
+
+
+1. FIGLET RENDERING STACK
+==========================
+
+Layer 1: Raw figlet CLI
+  figlet -f <font> [-w <width>] <text>
+  Returns ASCII art. -w flag wraps words at width boundary.
+
+Layer 2: figlet-service.ts (src/services/figlet-service.ts)
+  renderFiglet(text, font, width)    -> string (full output)
+  renderFigletLines(text, font, w)   -> string[] (line array)
+  measureFiglet(text, font, width)   -> { width, height, lines }
+  isFigletAvailable()                -> boolean
+  Exported via SDK: YES (microapp-sdk.ts line 247)
+
+Layer 3: markdown-service.ts (src/services/markdown-service.ts)
+  tryFiglet(text, font, width)       -> string[] | null (with cache)
+  renderFigletHeading(text, level, width, config) -> string[]
+    Uses FigletHeadingConfig to pick font per heading level.
+    Tries primary font, then fallbackFonts, then plain text.
+  Exported via SDK: renderMarkdown, renderMarkdownFile, PLAIN_HEADING_CONFIG
+
+Layer 4: ui-parts.ts createFigletDisplay() primitive
+  Creates a blessed.box with scrollbar. Takes a renderText callback.
+  Does NOT handle responsive font selection -- that's the caller's job.
+  Exported via SDK: YES (microapp-sdk.ts line 144)
+
+
+2. FONT CLASSIFICATION
+========================
+
+Font tiers by approximate character height:
+
+  TIER     FONT EXAMPLES                   APPROX HEIGHT   USE CASE
+  -------  ------------------------------  --------------   ----------------
+  XL       larry3d, banner3, big           8-10 lines       Title cards
+  L        slant, doom, shadow             6 lines          H1 headings
+  M        small, smslant, smshadow        4-5 lines        H2 headings
+  S        threepoint, digital, mini       3 lines           H3-H4 headings
+  XS       term                            1 line            Minimal figlet
+  PLAIN    (no figlet)                     1-2 lines         H5-H6, fallback
+
+The DEFAULT_FIGLET_HEADING_CONFIG maps:
+  H1 -> L tier:  slant,  fallback [small, term]
+  H2 -> M tier:  small,  fallback [smshadow, mini, term]
+  H3 -> S tier:  threepoint, fallback [digital, term]
+  H4 -> S tier:  digital, fallback [term]
+  H5 -> PLAIN:   CAPS + ===== underline
+  H6 -> PLAIN:   CAPS + ----- underline
+
+
+3. RESPONSIVE BEHAVIOUR TODAY
+==============================
+
+Where it exists:
+  markdown-service.ts renderFigletHeading():
+    Receives a `width` param (the available content width).
+    tryFiglet checks if output exceeds width -- returns null if so.
+    Falls through fallbackFonts within the SAME heading level.
+    E.g. H1 tries: slant -> small -> term -> plain fallback.
+
+  chrome-browser-window.ts:
+    Re-renders page on resize (line 446): frame.on("resize", rerenderPage)
+    This causes figlet headings to re-measure at new width.
+
+  text-windows.ts (editor view mode):
+    Re-renders markdown on resize via debounced rerender.
+
+  figlet-windows.ts (standalone figlet banner):
+    Re-renders on resize using measureFiglet at new availableWidth.
+    But uses the SAME font -- no font cascade.
+
+Where it DOES NOT exist:
+  hello-world module:
+    Renders once at module load time. Fixed font, fixed size. No resize.
+
+  dashboard / dashboard-xxl:
+    Pre-renders figlet at build time into cache. Fixed font. No resize.
+
+  wibwob-poetry-clock:
+    Uses createFigletDisplay with fixed "chunky" font. No cascade.
+
+  sy2-chronicles:
+    Fixed fonts per panel definition. No resize adaptation.
+
+  patchbay-lab:
+    No figlet.
+
+SUMMARY: Only the markdown rendering path has responsive figlet.
+And even there, the cascade is within one heading tier's fallback
+list, not across tiers (H1 never downgrades to H3's font).
+
+
+4. ALL MODULES USING FIGLET
+=============================
+
++------------------------+--------------------+-------------------+---------------+
+| Module                 | Font(s)            | Responsive?       | SDK used?     |
++------------------------+--------------------+-------------------+---------------+
+| hello-world            | larry3d            | NO (fixed)        | NO (raw CLI)  |
++------------------------+--------------------+-------------------+---------------+
+| wibwob-poetry-clock    | chunky             | NO (fixed font)   | YES           |
+|                        |                    |                   | createFiglet  |
+|                        |                    |                   | Display()     |
++------------------------+--------------------+-------------------+---------------+
+| dashboard              | big, slant,        | NO (cached)       | YES           |
+|                        | banner3, small     |                   | renderFiglet  |
++------------------------+--------------------+-------------------+---------------+
+| dashboard-xxl          | slant, big,        | NO (cached)       | NO (raw CLI)  |
+|                        | banner3, small     |                   |               |
++------------------------+--------------------+-------------------+---------------+
+| sy2-chronicles         | slant, doom, big   | NO (fixed)        | YES           |
+|                        |                    |                   | renderFiglet  |
++------------------------+--------------------+-------------------+---------------+
+| (built-in editor)      | per heading config | YES (width param) | n/a (core)    |
+|  view mode             | slant/small/etc    | within-tier only  |               |
++------------------------+--------------------+-------------------+---------------+
+| (document reader)      | per heading config | YES (width param) | n/a (core)    |
+|                        | slant/small/etc    | within-tier only  |               |
++------------------------+--------------------+-------------------+---------------+
+| (chrome browser)       | per heading config | YES (rerenders    | n/a (core)    |
+|                        | slant/small/etc    | on resize)        |               |
++------------------------+--------------------+-------------------+---------------+
+| (figlet banner window) | user-selected      | Same font, re-    | YES           |
+|  figlet-windows.ts     |                    | wraps at width    | measureFiglet |
++------------------------+--------------------+-------------------+---------------+
+
+
+5. MARKDOWN RENDERING IN THE SDK
+=================================
+
+What's exported from microapp-sdk.ts:
+  renderMarkdown(text, opts?)         -- render markdown string to tagged text
+  renderMarkdownFile(filePath, opts?) -- read file + render
+  PLAIN_HEADING_CONFIG                -- no-figlet heading config
+  RenderMarkdownOptions (type)        -- { paddingX, headingConfig, width }
+
+What's NOT in the SDK but probably should be:
+  - responsiveFiglet(text, width, cascade) -- pick best font for width
+  - createResponsiveFigletDisplay()        -- UI primitive that auto-adapts
+  - DEFAULT_FIGLET_HEADING_CONFIG          -- not exported! Only PLAIN is.
+  - FigletHeadingConfig type               -- not exported to modules
+  - Font tier metadata                     -- no formal "this font is XL/L/M/S"
+  - A standard font cascade definition     -- modules roll their own or hardcode
+
+
+6. WHAT NEEDS TO HAPPEN
+========================
+
+A) Extract responsive figlet as an SDK primitive:
+   responsiveFiglet(text: string, width: number, cascade?: FontCascade[]): string
+   Where FontCascade = { font: string; minWidth: number } | { style: "caps" }
+
+B) Wrap it in a createResponsiveFigletDisplay() UI part:
+   Like createFigletDisplay but re-selects font on resize.
+
+C) Export DEFAULT_FIGLET_HEADING_CONFIG and FigletHeadingConfig from SDK
+   so modules can reference the standard heading tiers.
+
+D) Apply to hello-world as proof case.
+
+E) Consider applying to poetry-clock, dashboard (at least the title).
+
+F) Document font tiers in .agents/microapp-sdk.md so agents know which
+   fonts to use at which sizes.

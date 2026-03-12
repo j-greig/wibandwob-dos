@@ -79,6 +79,14 @@ export class MenuOverlayManager {
     }
   }
 
+  toggleMenu(label: string): void {
+    if (this.openMenuLabel === label) {
+      this.closeMenu();
+    } else {
+      this.openMenu(label);
+    }
+  }
+
   openMenu(label: string): void {
     this.closeMenus();
     const menu = this.menus.find((entry) => entry.label === label);

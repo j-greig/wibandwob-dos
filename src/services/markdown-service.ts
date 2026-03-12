@@ -18,10 +18,9 @@
 
 import { marked, type Token } from "marked";
 import { readFileSync, statSync } from "node:fs";
-import { spawnSync } from "node:child_process";
 import { visibleWidth, wrapTextWithAnsi, padToWidth } from "../core/ansi-utils.js";
 import { highlightCode } from "./syntax-highlight.js";
-import { isFigletAvailable } from "./figlet-service.js";
+import { isFigletAvailable, tryFiglet as tryFigletRaw } from "./figlet-service.js";
 
 // ── ANSI helpers ──────────────────────────────────────────────────────────────
 
@@ -85,19 +84,12 @@ export const PLAIN_HEADING_CONFIG: FigletHeadingConfig = {
   h6: { font: "", fallbackFonts: [], color: "\x1b[37m", plainFallback: true },
 };
 
-const figletCache = new Map<string, string[] | null>();
-
+/** Thin wrapper: delegates to figlet-service tryFiglet, returns lines or null. */
 function tryFiglet(text: string, font: string, width: number): string[] | null {
-  if (!font || !isFigletAvailable()) return null;
-  const key = `${font}\0${width}\0${text}`;
-  const cached = figletCache.get(key);
-  if (cached !== undefined) return cached;
-  const result = spawnSync("figlet", ["-f", font, "-w", String(width), text], { encoding: "utf8" });
-  if (result.status !== 0 || !result.stdout.trim()) { figletCache.set(key, null); return null; }
-  const lines = result.stdout.split("\n");
+  const raw = tryFigletRaw(text, font, width);
+  if (!raw) return null;
+  const lines = raw.split("\n");
   while (lines.length && lines[lines.length - 1]!.trim() === "") lines.pop();
-  if (lines.some(l => visibleWidth(l) > width)) { figletCache.set(key, null); return null; }
-  figletCache.set(key, lines);
   return lines;
 }
 

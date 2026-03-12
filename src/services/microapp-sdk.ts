@@ -242,10 +242,10 @@ export type { AsciiBlendMode, AsciiCompositionNodeSpec, AsciiCompositionRole } f
 // TEXT RENDERING — markdown and figlet
 // ═══════════════════════════════════════════════════════════════════════════
 
-export { renderMarkdown, renderMarkdownFile, PLAIN_HEADING_CONFIG } from "./markdown-service.js";
-export type { RenderMarkdownOptions } from "./markdown-service.js";
-export { renderFiglet, renderFigletLines, measureFiglet, isFigletAvailable } from "./figlet-service.js";
-export type { FigletMeasurement } from "./figlet-service.js";
+export { renderMarkdown, renderMarkdownFile, PLAIN_HEADING_CONFIG, DEFAULT_FIGLET_HEADING_CONFIG } from "./markdown-service.js";
+export type { RenderMarkdownOptions, FigletHeadingConfig } from "./markdown-service.js";
+export { renderFiglet, renderFigletLines, measureFiglet, isFigletAvailable, tryFiglet, responsiveFiglet, DEFAULT_FONT_CASCADE } from "./figlet-service.js";
+export type { FigletMeasurement, FontCascadeTier } from "./figlet-service.js";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // PANEL LAYOUT — for magazine-style multi-panel microapps (zine, sy2)

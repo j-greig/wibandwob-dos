@@ -1,0 +1,195 @@
+BUG / TERM-D FIX LIST
+=====================
+Branch: chore/menu-nav-file-audit
+
+CHECKLIST (prefix each item with [ ] not started, [x] when done)
+
+[ ] BUG 1   Menu toggle on keyboard shortcut
+[ ] BUG 2   Status bar too cluttered
+[ ] BUG 3a  Unbind Alt-A and Alt-D keyboard shortcuts
+[ ] BUG 3b  Remove all six menu hint labels from bottom nav
+[ ] CHORE 4 Responsive figlet in Hello World + SDK primitive
+[ ] CHORE 5 SDK audit skill idea (deferred)
+
+======================================================================
+
+
+BUG 1: Menu toggle on keyboard shortcut
+----------------------------------------
+WHAT:  Pressing Alt-W (or any menu shortcut) twice should toggle the menu
+       closed. Currently it stays open because openMenu() in
+       MenuOverlayManager always calls closeMenus() first (clearing
+       openMenuLabel) then immediately reopens. The CLICK path already
+       has toggle logic (line 48-52 of menu-overlay-manager.ts) but the
+       keyboard path bypasses it.
+
+WHERE: src/core/app-controller.ts  bindGlobalKeys()  lines 531-538
+       src/core/menu-overlay-manager.ts  openMenu()  line 88
+
+FIX:   Add a toggleMenu(label) method to MenuOverlayManager that checks
+       openMenuLabel before deciding whether to open or close. Wire the
+       keyboard shortcuts to call toggleMenu instead of openMenu.
+
+       In MenuOverlayManager:
+         toggleMenu(label: string): void {
+           if (this.openMenuLabel === label) {
+             this.closeMenu();
+           } else {
+             this.openMenu(label);
+           }
+         }
+
+       In app-controller.ts bindGlobalKeys():
+         Change all this.openMenu("File") calls to this.toggleMenu("File")
+         Wire toggleMenu to call menuUi.toggleMenu().
+
+
+BUG 2: Status bar too cluttered
+--------------------------------
+WHAT:  Bottom status bar has too many keyboard shortcut labels. Need to
+       strip it down to essentials only.
+
+WHERE: src/core/shell-chrome.ts  updateStatusLine()  ~line 61
+
+CURRENT:
+  Alt-F File  Alt-E Edit  Alt-V View  Alt-W Window  Alt-A Applications
+  Alt-D Demos  Tab Next  Shift-Tab Prev  Alt-Shift-Arrows Resize
+  Ctrl-S Save  Ctrl-Q Quit
+
+REMOVE:
+  - Alt-A Applications  (remove shortcut AND status label)
+  - Alt-D Demos          (remove shortcut AND status label)
+  - Alt-F, Alt-E, Alt-V, Alt-W labels (remove from status bar, KEEP the
+    keyboard shortcuts -- they are useful, just noisy in the bar)
+  - Alt-Shift-Arrows Resize label (keep shortcut, rename to clearer label
+    if keeping, or just remove from bar)
+
+KEEP in status bar:
+  - Tab Next
+  - Shift-Tab Prev
+  - Ctrl-S Save
+  - Ctrl-Q Quit
+
+ALSO:
+  - Remove keyboard bindings for Alt-A and Alt-D in bindGlobalKeys()
+  - Rename "Alt-Shift-Arrows Resize" to "Resize Window" if it stays
+
+RESULT status bar should look roughly like:
+  Tab Next  Shift-Tab Prev  Ctrl-S Save  Ctrl-Q Quit  |  Term ...
+
+
+BUG 3a (not a bug -- prep work): Keyboard shortcuts to unbind
+--------------------------------------------------------------
+In app-controller.ts bindGlobalKeys() remove these two lines:
+  this.screen.key(["M-a"], () => this.openMenu("Applications"));
+  this.screen.key(["M-d"], () => this.openMenu("Demos"));
+
+Keep Alt-F, Alt-E, Alt-V, Alt-W keyboard shortcuts (functional, just not shown).
+Keep Alt-Shift-Arrows resize shortcut (functional, just not shown).
+Keep Alt-T theme toggle.
+
+
+BUG 3b: Remove ALL six menu hint labels from bottom nav
+---------------------------------------------------------
+WHAT:  The bottom status bar currently shows these six labels at left:
+
+         Alt-F File  Alt-E Edit  Alt-V View  Alt-W Window
+         Alt-A Applications  Alt-D Demos
+
+       Remove ALL of them. The menus are discoverable by clicking the
+       top menu bar. The bottom nav should not duplicate the top bar.
+
+WHERE: src/core/shell-chrome.ts  updateStatusLine()  ~line 61
+
+CURRENT left portion of status line string:
+  `Alt-F File  Alt-E Edit  Alt-V View  Alt-W Window  Alt-A Applications  Alt-D Demos  Tab Next  Shift-Tab Prev  Alt-Shift-Arrows Resize  Ctrl-S Save  Ctrl-Q Quit ...`
+
+REMOVE these tokens entirely:
+  Alt-F File
+  Alt-E Edit
+  Alt-V View
+  Alt-W Window
+  Alt-A Applications
+  Alt-D Demos
+
+KEEP (from BUG 2):
+  Tab Next  Shift-Tab Prev  Ctrl-S Save  Ctrl-Q Quit
+
+The result should be a clean, minimal bottom bar.
+
+
+CHORE 4: Responsive figlet in Hello World (and SDK-ise the pattern)
+--------------------------------------------------------------------
+WHAT:  Hello World renders "HELLO WORLD" in larry3d at module load
+       time, bakes the banner into a fixed-size window. If the window
+       is resized narrower, the text clips. It should adapt:
+
+       Wide window   -> larry3d (current, ~10 lines tall, ~80+ cols)
+       Medium window -> equivalent of H2 font "small" (~5 lines tall)
+       Narrow window -> equivalent of H5/H6 plain CAPS + underline
+
+WHERE: modules/hello-world/index.ts
+
+HOW IT WORKS IN MARKDOWN TODAY (for reference):
+  markdown-service.ts renderFigletHeading() takes a width param.
+  It calls tryFiglet(text, font, width) which runs:
+    figlet -f <font> -w <width> <text>
+  If the output exceeds width, tryFiglet returns null.
+  It then tries fallbackFonts in order (e.g. slant -> small -> term).
+  If ALL fonts fail, it falls back to plain CAPS text.
+
+  BUT: the fallback chain is per heading LEVEL, not across levels.
+  An H1 tries its own fonts (slant, small, term) but never downgrades
+  to use H3's threepoint or H5's plain CAPS. So the "responsive"
+  behaviour is really "try smaller fonts within the same tier."
+
+PROPOSED APPROACH for Hello World (and future SDK primitive):
+
+  1. Define a responsive font cascade:
+     [
+       { font: "larry3d",    minWidth: 80 },
+       { font: "slant",      minWidth: 60 },
+       { font: "small",      minWidth: 40 },
+       { font: "digital",    minWidth: 25 },
+       { style: "caps",      minWidth: 0  },   // plain fallback
+     ]
+
+  2. On window resize, pick the first entry where minWidth <= available
+     width. Re-render the figlet. If tryFiglet still fails (text too
+     long even at that width), fall through to next.
+
+  3. SDK PRIMITIVE: extract this as a reusable function:
+       responsiveFiglet(text, width, cascade?) -> string
+     or better, as a createResponsiveFigletDisplay() UI primitive
+     that auto-re-renders on resize.
+
+  4. Integrate with existing createFigletDisplay() from ui-parts.ts,
+     which already takes a renderText callback. The callback just
+     needs to receive the current width and pick the right font.
+
+  See: scratch/audit-figlet-markdown-rendering.txt for full landscape.
+
+
+CHORE 5: Consider an SDK audit skill (.agents/skills/sdk-audit)
+----------------------------------------------------------------
+WHAT:  We keep doing the same audit pattern: "which modules use X SDK
+       component, how is it wired, what are the gaps." This is a
+       repeatable agent task.
+
+SHAPE of a skill:
+  .agents/skills/sdk-audit/SKILL.md
+
+  Trigger: "audit SDK usage of X", "which modules use X",
+           "consolidation audit for X"
+
+  Steps:
+  1. Grep modules/*/index.ts for the component name
+  2. Grep src/services/microapp-sdk.ts for the export
+  3. Grep src/core/ui-parts.ts for the implementation
+  4. For each module hit, extract: how it's called, what args,
+     what UI surface wraps it, any custom alternatives
+  5. Output an ASCII table to scratch/audit-<name>.txt
+
+  This skill would speed up future audits like the ones in this
+  chore branch. DEFER until we've done 2-3 more manual audits
+  and the pattern is truly stable.
