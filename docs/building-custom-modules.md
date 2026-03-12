@@ -313,5 +313,5 @@ After creating your module:
 ## Further reading
 
 - `src/services/microapp-sdk.ts` — full list of SDK exports
-- `.agents/microapp-sdk.md` — canonical import and render policy guidance
+- `.agents/module-dev/sdk-reference.md` — SDK API reference and advanced primitives
 - `scripts/scaffold-microapp.sh` — automated module scaffolding

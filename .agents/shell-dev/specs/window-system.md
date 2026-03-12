@@ -7,7 +7,7 @@ files:
   - src/core/window-chrome.ts
   - src/core/types.ts (WindowRecord, WindowKind, AppType)
   - src/core/app-controller.ts (focusOrCreate, clearDesktop)
-  - .agents/microapp-sdk.md
+  - .agents/module-dev/sdk-reference.md
 triggers:
   pre-change: window lifecycle, createFrame, registerWindow, describeState, WindowRecord fields
   post-change: verify bun run typecheck, GET /state, window appears/closes correctly
@@ -28,7 +28,7 @@ Microapps register their own window types at runtime via module-loader.ts.
 - src/core/window-chrome.ts — chrome sizing math (borders, padding offsets); never inline in window code
 - src/core/types.ts:231 — WindowRecord definition; :9 — WindowKind union; :111 — AppType union
 - src/core/app-controller.ts:364 — focusOrCreate (singleton guard pattern); :734 — findWindowByAppType
-- .agents/microapp-sdk.md — full microapp registration contract
+- .agents/module-dev/sdk-reference.md — full microapp registration contract
 
 ## Core Types
 
@@ -129,7 +129,7 @@ Microapps (modules/*/index.ts) register window types via MicroappHost:
 
 WindowKind for all microapps is "microapp" (types.ts:9). AppType is the registered id string.
 The isMicroappWindow(w) guard (types.ts) narrows to MicroappWindowRecord with guaranteed microappId.
-Full SDK: .agents/microapp-sdk.md
+Full SDK: .agents/module-dev/sdk-reference.md
 
 ## Blessed Scroll + Nested Child Gotchas (from agentic-devlog 2026-03-09)
 
@@ -217,3 +217,5 @@ When adding a new WindowKind:
 | 2026-03-10 | gotcha | terminal mouse | blessed.terminal mouse passthrough encodes 0-based coords into 1-based xterm sequences (SGR/X10/urxvt) — off by 1 row south, compounds per nesting level. Fix: replace handler via `_slisteners` filter+remove, re-register with +1 offset. Must remove ALL existing mouse handlers or both fire. | nested WibWob-DOS click offset |
 | 2026-03-11 | gotcha | blessed-contrib | Hidden contrib widgets crash on update — canvas/stack not initialised until attached. Only update the active tab; wrap in try/catch. `gaugeList.setGauges()` expects `{ stack: [percent] }` not `{ percent: N }`. `contrib.grid` takes `screen:` but accepts any blessed box as parent. | dashboard module tabs |
 | 2026-03-11 | gotcha | blessed unicode | `unicode.js charWidth()` has incomplete double-width detection — CJK ranges partly commented out, emoji not handled at all. Trigrams (☰ U+2630, EAW:W), misc symbols, and emoji render as 2 cols in terminal but blessed counts as 1, breaking layout. Known upstream issue chjj/blessed#422 (open since 2019, unresolved). Workaround: use only single-width ASCII/Latin chars for programmatic pattern fills. | dashboard mosaic tab |
+| 2026-03-12 | gotcha | blessed word-wrap | Never `setContent` on a `scrollable: true` node with width=0. Blessed's word-wrap divides by node width; at 0 it loops forever, blocking the event loop with no error. Always guard: `if (Number(node.width) > 0)`. | wibwobworld iso freeze |
+| 2026-03-12 | gotcha | blessed body dimensions | Never read `win.body.width`/`.height` for layout math. Blessed resolves lazily and returns string expressions (`"100%-2"`) that `Number()` converts to NaN. Use `(win.body as any).parent.width` (the frame element) which holds a real numeric value. | wibwobworld iso freeze |

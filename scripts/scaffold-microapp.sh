@@ -101,6 +101,9 @@ export default function setup(host: MicroappHost) {
       win.onRestyle(() => {
         content.style = host.theme().body;
       });
+      win.onCleanup(() => {
+        // Clear timers, destroy resources, close connections here.
+      });
       win.focus();
     },
   });

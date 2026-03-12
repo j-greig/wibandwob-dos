@@ -61,7 +61,7 @@ Best parallel pairings:
   - endpoint inventory
   - canonical-vs-alias map
   - deprecation candidates list
-  - update `.agents/specs/state-and-api.md`
+  - update `.agents/shell-dev/specs/state-and-api.md`
 - Code-touch caution:
   - `control-api.ts`, `command-registry.ts`, `command-catalog.ts` are fine only if Agent 1 is NOT also touching command/state flow
 
@@ -191,12 +191,12 @@ The problem is that too many verbs are still ambient:
 
 Project constitution and architecture:
 - `AGENTS.md`
-- `.agents/architecture.md`
-- `.agents/invariants.md`
-- `.agents/specs/state-and-api.md`
-- `.agents/specs/window-system.md`
-- `.agents/specs/agent-session.md`
-- `.agents/specs/workspace.md`
+- `.agents/shell-dev/architecture.md`
+- `.agents/shell-dev/invariants.md`
+- `.agents/shell-dev/specs/state-and-api.md`
+- `.agents/shell-dev/specs/window-system.md`
+- `.agents/shell-dev/specs/agent-session.md`
+- `.agents/shell-dev/specs/workspace.md`
 
 Planning context:
 - `.planning/epics/e033-blessed-architecture-calm/e033-brief.md`
@@ -481,7 +481,7 @@ Before changing code, run:
 
 1. Re-read the E033 brief and select ONE story or one coherent subset.
 2. Do not widen scope casually.
-3. If touching lifecycle or state parity, check the relevant `.agents/specs/*` doc first.
+3. If touching lifecycle or state parity, check the relevant `.agents/shell-dev/specs/*` doc first.
 4. Keep command/state/API parity intact.
 5. Retire unjustified backward-compat cruft if you touch it and can prove it is safe to remove.
 6. Verify visually if the desktop behaviour changes.

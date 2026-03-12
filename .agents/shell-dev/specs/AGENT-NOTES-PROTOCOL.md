@@ -5,7 +5,7 @@ scope: all agents working in this codebase
 
 # Agent Notes Protocol
 
-Specs in `.agents/specs/` are living documents. Agents may edit them.
+Specs in `.agents/shell-dev/specs/` are living documents. Agents may edit them.
 
 ## What to do when you find something new
 
