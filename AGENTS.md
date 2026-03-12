@@ -297,7 +297,7 @@ Files: point at the script(s) to improve.
 
 Good candidates for Codex tooling improvement:
 - `scripts/restart.sh` — if it reports ready with the same session ID (old process still alive)
-- `scripts/smoke-test.sh` — if smoke targets grow stale
+- `.pi/skills/tui-smoke-test/scripts/smoke-test.sh` — if smoke targets grow stale
 - `.pi/skills/*` — if a skill's instructions cause agents to make repeated mistakes
 - `scripts/handover.sh` — if the epic table or todo list goes stale
 

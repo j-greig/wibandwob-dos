@@ -111,7 +111,7 @@ Two concrete implementations:
 - `IrcWorldChatTransport` — backed by `irc-framework` (kiwiirc); handles protocol,
   PING/PONG, and auto-reconnect. Activated by `WIBWOB_CHAT_TRANSPORT=irc`.
 
-**Dev IRC server** — `scripts/dev-irc-server.ts`
+**Dev IRC server** — `.agents/skills/ww-room-chat/scripts/dev-irc-server.ts`
 Hand-rolled Bun TCP server. Minimal command set: NICK, USER, JOIN, PRIVMSG, PING, QUIT.
 Port 6667. Start with `bun run dev-irc-server`. No TLS, no auth, local dev only.
 
