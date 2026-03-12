@@ -115,6 +115,9 @@ grid.set({
 - `` `${number}fr` `` = fractional share of remaining space
 - Unspecified tracks default to `"1fr"`
 
+Out-of-range row/column values and spans are clamped to valid bounds
+(they do not throw).
+
 ### Gap
 
 ```ts
@@ -199,6 +202,9 @@ const mode = pickBreakpoint(w, [
   { name: "wide",    minWidth: 80 },
 ]);
 ```
+
+Custom entries must be non-empty and sorted ascending by minWidth.
+The largest matching entry wins (not the first match).
 
 ### The responsive rule: stack and scroll before you crush
 

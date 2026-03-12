@@ -49,13 +49,16 @@ host.ui.createAnimatedPanel(...)
 host.ui.createButtonBar(...)
 host.ui.applyRect(node, rect)
 
-// Available via direct import from microapp-sdk (not on host.ui):
+// Advanced layout helpers — direct import only (not on host.ui):
 // createGrid(parent, options)       — 2D grid layout
 // createScrollViewport(parent, opts) — fixed header/footer + scrollable middle
 // pickBreakpoint(width, entries?)    — responsive breakpoint selection
 // createNodePart(node)              — wrap blessed box as LayoutPart
 // createScrollbar()                 — scrollbar config for blessed boxes
 // scrollableStyle(base)             — merge scrollbar styling into base style
+//
+// host.ui is a curated subset (createStack, createRow, bars, applyRect).
+// For grid, scroll, responsive, and composition: import from microapp-sdk directly.
 ```
 
 ## MicroappWindowHandle API
@@ -167,6 +170,7 @@ function render() {
     { name: "normal",  minWidth: 50 },
     { name: "wide",    minWidth: 80 },
   ]);
+  // Entries must be non-empty, sorted ascending by minWidth.
 }
 ```
 

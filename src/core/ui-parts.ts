@@ -1080,8 +1080,8 @@ export type ScrollViewportHandle = LayoutPart<void> & {
  * Creates a scrollable viewport with optional fixed header and footer.
  *
  * The viewport is the scrollable middle region. Content appended to it
- * can grow beyond the visible height and will scroll with mouse, keys,
- * and vi-style bindings (j/k/g/G/Ctrl-d/Ctrl-u).
+ * can grow beyond the visible height and will scroll with mouse wheel
+ * and arrow keys (blessed default key/mouse handling).
  *
  * @primitive
  */
