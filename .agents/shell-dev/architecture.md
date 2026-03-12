@@ -15,7 +15,7 @@ The app is built for a proactive autonomous agent with equal control of the OS a
 - `src/core/window-manager.ts` — z-order, focus, drag, resize, tile, cascade, close; implements WindowFacade
 - `src/core/desktop-geometry.ts` — canonical terminal geometry snapshot; exposes `{width, height, cellAspect}`
 - `src/core/window-chrome.ts` — maps content size to window size; chrome offsets live here, never inline in window code
-- `src/core/overlay-manager.ts` — transient UI primitives: flash, prompts, shared file browser, openers
+- `src/core/overlay-manager.ts` — transient UI primitives: flash, prompts, shared file browser, openers. Tracks active overlay with confirm/cancel callbacks for API-driven modal control (`overlay.confirm`, `overlay.cancel`, `overlay.info` commands).
 - `src/core/theme/resolver.ts` — runtime theme state, cycle, external theme registration with token fallback fill
 
 ### Services

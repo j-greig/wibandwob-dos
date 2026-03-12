@@ -40,6 +40,8 @@ DesktopState (types.ts:192) — returned by GET /state and tui_get_state:
     theme?: string
     controlApiEnabled?: boolean
     controlApiPort?: number
+    controlApiHost?: string
+    controlApiBaseUrl?: string
   screen:
     width: number
     height: number

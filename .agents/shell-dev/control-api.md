@@ -68,6 +68,34 @@ POST /workspace/save              {"name":"workspace-name"}
 POST /workspace/load              {"name":"workspace-name"}
 ```
 
+### Overlay Control
+
+Modal overlays (value prompts, list pickers, browser prompts) can be driven via API:
+
+```
+GET  /overlay/info                returns {"active":true/false,"type":"value|browser|list|..."}
+POST /overlay/confirm             confirm active overlay (OK/Enter). Returns ok:false if none active.
+POST /overlay/cancel              cancel active overlay (Cancel/Escape). Returns ok:false if none active.
+```
+
+Also available as commands: `overlay.info`, `overlay.confirm`, `overlay.cancel`, `menu.close`.
+
+Example — figlet flow entirely via API:
+```bash
+curl -s -X POST http://127.0.0.1:8099/commands/run -H "Content-Type: application/json" -d '{"id":"figlet.open"}'
+# overlay.info -> {"active":true,"type":"value"} (text prompt)
+curl -s -X POST http://127.0.0.1:8099/overlay/confirm
+# overlay.info -> {"active":true,"type":"browser"} (font picker)
+curl -s -X POST http://127.0.0.1:8099/overlay/confirm
+# -> banner window created
+```
+
+### Arg Compatibility
+
+`window.move` accepts both `{x,y}` and `{left,top}` (prefers x/y).
+`window.resize` accepts both `{w,h}` and `{width,height}` (prefers w/h).
+`/windows/batch` ops use `{x,y,w,h}` — the short forms only.
+
 ## Window Openers
 
 Dedicated `/view` routes:
@@ -78,7 +106,9 @@ POST /view/primer/open            {"filePath":"/abs/path.txt","x":X,"y":Y,"w":W,
 POST /view/editor/open            {"filePath":"/abs/path.txt"}
 POST /view/browser-reader/open    {"filePath":"/abs/path.txt"}
 POST /view/reader/open            {"filePath":"/abs/path.md"}
-POST /view/figlet/open            {"text":"HELLO","font":"optional"}
+POST /view/figlet/open            {"text":"HELLO","font":"optional"}  ← prompts if no text; use overlay.confirm to advance
+POST /view/figlet/open-default    {"text":"WIB WOB","font":"optional"}  ← no prompts, opens directly
+GET  /view/figlet/fonts           list available figlet fonts
 POST /view/backrooms/open         {"theme":"…","mode":"auto|live|fake-live","model":"haiku|sonnet","turns":3,"primers":"optional"}
 POST /view/generative-art/open    {}
 POST /view/companion/open         {}
@@ -90,6 +120,8 @@ POST /view/palette/open           {}
 POST /view/inspector/open         {}
 POST /view/monster-cam/open       {}
 POST /view/music-player/open      {}
+GET  /view/zine/canvases          list selectable canvas files
+POST /view/zine/open              {"filePath":"/abs/path","index":N}  ← filePath or index from canvases list
 ```
 
 Windows without a `/view` route — open via `POST /commands/run`:
@@ -112,9 +144,13 @@ desktop.clear-all                       {}   ← API/timeline only; agent:false 
 text.smear                              {"filePath":"…","mode":"wipe|shear|glitch|stretch"}
 primer.open                             {"filePath":"/abs/path.txt"}
 primer.browse                           {}
-primer_gallery.open                     {}
+primer-gallery.open                     {}
 editor.open                             {"filePath":"/abs/path.txt"}
-backrooms.run                           {"theme":"…","mode":"…","model":"…","turns":N}
+backrooms.open                          {"theme":"…","mode":"…","model":"…","turns":N}
+overlay.confirm                         {}   ← confirm active modal overlay
+overlay.cancel                          {}   ← cancel active modal overlay
+overlay.info                            {}   ← check if overlay is active
+menu.close                              {}   ← close any open dropdown/popup menu
 ```
 
 ## Native Agent Debug Loop
