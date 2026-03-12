@@ -256,10 +256,12 @@ export type DataTableHandle = LayoutPart<Partial<DataTableOptions>> & {
 export function createDataTable(opts: DataTableOptions): DataTableHandle {
   let { columns, rows = [], sortable = false, onSelect } = opts;
   let selIndex = 0;
+  // Sort state: null = unsorted, "asc" = A-Z, "desc" = Z-A
   let sortKey: string | null = null;
-  let sortAsc = true;
+  let sortDir: "asc" | "desc" | null = null;
   let displayRows = rows.slice();
   let lastWidth = 0;
+  let colWidthsCache: number[] = [];
 
   const node = blessed.box({
     width: 0,
@@ -288,9 +290,9 @@ export function createDataTable(opts: DataTableOptions): DataTableHandle {
   }
 
   function reSort() {
-    if (!sortable || !sortKey) { displayRows = rows.slice(); return; }
+    if (!sortable || !sortKey || !sortDir) { displayRows = rows.slice(); return; }
     const key = sortKey;
-    const dir = sortAsc ? 1 : -1;
+    const dir = sortDir === "asc" ? 1 : -1;
     displayRows = rows.slice().sort((a, b) => {
       const va = a[key] ?? "";
       const vb = b[key] ?? "";
@@ -298,14 +300,45 @@ export function createDataTable(opts: DataTableOptions): DataTableHandle {
     });
   }
 
+  /** Cycle sort: unsorted → asc → desc → unsorted */
+  function toggleSort(colKey: string) {
+    if (!sortable) return;
+    if (sortKey !== colKey) {
+      // New column: start A-Z
+      sortKey = colKey;
+      sortDir = "asc";
+    } else if (sortDir === "asc") {
+      sortDir = "desc";
+    } else {
+      // Was desc (or null) → revert to unsorted
+      sortKey = null;
+      sortDir = null;
+    }
+    reSort();
+    renderContent();
+    node.screen?.render();
+  }
+
+  /** Find which column index an x position falls in, using cached widths. */
+  function colIndexAtX(x: number): number {
+    let cursor = 0;
+    for (let i = 0; i < colWidthsCache.length; i++) {
+      const w = colWidthsCache[i]!;
+      if (x >= cursor && x < cursor + w) return i;
+      cursor += w + 1; // +1 for separator
+    }
+    return -1;
+  }
+
   function renderContent() {
     const widths = computeColWidths(lastWidth);
+    colWidthsCache = widths;
     const isFocused = node.screen?.focused === node;
 
     // Header
     const headerCells = columns.map((c, i) => {
       let lbl = c.label;
-      if (sortable && sortKey === c.key) lbl += sortAsc ? " ^" : " v";
+      if (sortable && sortKey === c.key && sortDir) lbl += sortDir === "asc" ? " ^" : " v";
       return truncPad(lbl, widths[i]!);
     });
     const headerLine = headerCells.join("|");
@@ -344,10 +377,34 @@ export function createDataTable(opts: DataTableOptions): DataTableHandle {
       renderContent();
     } else if (key.name === "enter") {
       if (rows[selIndex]) onSelect?.(rows[selIndex]!, selIndex);
+    } else if (key.name === "left" && sortable) {
+      // Cycle sort on previous column
+      const curIdx = sortKey ? columns.findIndex(c => c.key === sortKey) : 0;
+      const prev = (curIdx - 1 + columns.length) % columns.length;
+      toggleSort(columns[prev]!.key);
+    } else if (key.name === "right" && sortable) {
+      // Cycle sort on next column
+      const curIdx = sortKey ? columns.findIndex(c => c.key === sortKey) : -1;
+      const next = (curIdx + 1) % columns.length;
+      toggleSort(columns[next]!.key);
     }
   });
 
-  node.on("click", () => { node.focus(); });
+  node.on("click", (_data: any) => {
+    node.focus();
+    // Detect header row click for sorting
+    if (sortable && _data && typeof _data.y === "number" && typeof _data.x === "number") {
+      const relY = _data.y - (Number(node.atop ?? node.top) || 0);
+      if (relY === 0) {
+        // Clicked on header row
+        const relX = _data.x - (Number(node.aleft ?? node.left) || 0);
+        const colIdx = colIndexAtX(relX);
+        if (colIdx >= 0 && colIdx < columns.length) {
+          toggleSort(columns[colIdx]!.key);
+        }
+      }
+    }
+  });
 
   return {
     node,

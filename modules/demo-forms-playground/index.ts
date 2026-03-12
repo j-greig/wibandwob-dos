@@ -37,6 +37,15 @@ export default function setup(host: MicroappHost) {
     palette: { order: 295, label: "Forms Playground" },
     action: () => openPlayground(host),
   });
+
+  host.registerCommand({
+    id: "contact-form",
+    label: "Contact Form Demo",
+    description: "Realistic form layout demo",
+    menu: [{ category: "demos", order: 96, label: "Contact Form Demo" }],
+    palette: { order: 296, label: "Contact Form Demo" },
+    action: () => openContactForm(host),
+  });
 }
 
 function openPlayground(host: MicroappHost) {
@@ -234,5 +243,141 @@ function openPlayground(host: MicroappHost) {
   });
 
   win.onCleanup(() => { clearTimers(timers); root.destroy(); });
+  win.focus();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Contact Form — realistic form layout demo
+// ═══════════════════════════════════════════════════════════════════════════
+
+function openContactForm(host: MicroappHost) {
+  const win = host.createWindow({ title: "Contact Form", width: 50, height: 28 });
+
+  const t = host.theme();
+
+  // ── Header ──────────────────────────────────────────────────────────
+  const header = blessed.box({
+    parent: win.body, top: 0, left: 0, width: 0, height: 1, tags: false,
+    content: " New Contact",
+    style: { fg: t.body.bg, bg: t.body.fg, bold: true },
+  });
+
+  // ── Form fields ─────────────────────────────────────────────────────
+  const firstNameInput = createTextArea({ placeholder: "Jane", rows: 3 });
+  const firstNameField = createFormField({
+    label: "First Name",
+    child: firstNameInput,
+  });
+
+  const lastNameInput = createTextArea({ placeholder: "Smith", rows: 3 });
+  const lastNameField = createFormField({
+    label: "Last Name",
+    child: lastNameInput,
+  });
+
+  const addressInput = createTextArea({ placeholder: "123 High Street\nLondon\nSW1A 1AA", rows: 5 });
+  const addressField = createFormField({
+    label: "Address",
+    help: "Full postal address, multiple lines",
+    child: addressInput,
+  });
+
+  // ── Log for submission results ──────────────────────────────────────
+  const logView = createLogView({ maxEntries: 20, border: true, label: "Submissions" });
+
+  // ── Submit button ───────────────────────────────────────────────────
+  const submitBtn = createButton({
+    label: "Submit",
+    onPress: () => {
+      const first = firstNameInput.value().trim();
+      const last = lastNameInput.value().trim();
+      const addr = addressInput.value().trim();
+
+      // Validate
+      let hasError = false;
+      if (!first) {
+        firstNameField.update({ error: "Required" });
+        hasError = true;
+      } else {
+        firstNameField.update({ error: "" });
+      }
+      if (!last) {
+        lastNameField.update({ error: "Required" });
+        hasError = true;
+      } else {
+        lastNameField.update({ error: "" });
+      }
+
+      if (hasError) {
+        createToast({ message: "Please fill required fields", severity: "error", parent: win.body });
+        render();
+        return;
+      }
+
+      // Success
+      const addrOneLine = addr.replace(/\n/g, ", ") || "-";
+      logView.append({ text: `${first} ${last} — ${addrOneLine}`, severity: "success" });
+      createToast({ message: "Contact saved!", severity: "success", parent: win.body });
+
+      // Clear form
+      firstNameInput.update({ value: "" });
+      lastNameInput.update({ value: "" });
+      addressInput.update({ value: "" });
+      firstNameField.update({ error: "" });
+      lastNameField.update({ error: "" });
+      render();
+    },
+  });
+
+  // ── Spacer ──────────────────────────────────────────────────────────
+  const spacer = blessed.box({
+    parent: win.body, top: 0, left: 0, width: 0, height: 1,
+    content: "", style: t.body,
+  });
+
+  // ── Layout ──────────────────────────────────────────────────────────
+  const root = createStack(win.body, [
+    { key: "header",    basis: 1,     part: createNodePart(header) },
+    { key: "first",     basis: 4,     part: firstNameField },
+    { key: "last",      basis: 4,     part: lastNameField },
+    { key: "address",   basis: 7,     part: addressField },
+    { key: "spacer",    basis: 1,     part: createNodePart(spacer) },
+    { key: "submit",    basis: 1,     part: submitBtn },
+    { key: "log",       basis: "1fr", part: logView },
+  ], { gap: 0 });
+
+  function render() {
+    const w = Math.max(1, Number(win.body.width) || 0);
+    const h = Math.max(1, Number(win.body.height) || 0);
+    root.layout({ top: 0, left: 0, width: w, height: h });
+    host.screen.render();
+  }
+
+  render();
+  win.onResize(render);
+
+  win.describeState(() => ({
+    summary: "Contact Form",
+    firstName: firstNameInput.value(),
+    lastName: lastNameInput.value(),
+    submissions: logView.entries().length,
+  }));
+
+  win.captureText(() => [
+    "Contact Form",
+    `First: ${firstNameInput.value()}`,
+    `Last: ${lastNameInput.value()}`,
+    `Address: ${addressInput.value()}`,
+    "", ...logView.entries().slice(-5).map(e => e.text),
+  ].join("\n"));
+
+  win.onRestyle(() => {
+    header.style = { fg: host.theme().body.bg, bg: host.theme().body.fg, bold: true };
+    spacer.style = host.theme().body;
+    root.restyle();
+    host.screen.render();
+  });
+
+  win.onCleanup(() => { root.destroy(); });
   win.focus();
 }
