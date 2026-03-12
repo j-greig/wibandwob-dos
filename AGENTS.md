@@ -4,10 +4,54 @@ WibWob-DOS is a terminal-native TypeScript desktop shell.
 Runtime: Bun. Renderer: blessed. Entry: `src/app.ts`.
 Concept: proactive, autonomous AI/agent has equal control of OS with a human.
 
-@.agents/architecture.md
-@.agents/invariants.md
-@.agents/control-api.md
-@.agents/microapp-sdk.md
+---
+
+## Building a Module
+
+Most agents arrive here to build a module addon. Start here.
+
+1. `bash scripts/scaffold-microapp.sh modules/<name> wibwob.<id> "<Title>" <menuOrder>`
+2. Read `docs/building-custom-modules.md` — lifecycle, SDK, common mistakes
+3. Edit the scaffold, `bun run typecheck`, restart app
+
+Quick start (30-second pattern): `.agents/module-dev/quick-start.md`
+
+### Which example for which pattern
+
+| Tier | Module | What it shows |
+|------|--------|--------------|
+| Static | `modules/hello-world/` | Responsive figlet, onResize, no timers |
+| Animated | `modules/heartbeat/` | createTimer, cleanup, structured describeState |
+| Persistent | `modules/wibwob-poetry-clock/` | registerSnapshot, AI integration, modes |
+| SDK sampler | `modules/e026-demo/` | Trees, tabs, tweens, patterns — reference catalogue |
+
+Full examples guide: `.agents/module-dev/examples-by-tier.md`
+
+### Module dev docs
+
+All module authoring docs live in `.agents/module-dev/`:
+
+- `quick-start.md` — 30-second scaffold-to-running pattern
+- `sdk-reference.md` — MicroappHost, WindowHandle, and SDK primitives
+- `examples-by-tier.md` — which example module for which pattern
+- `persistence.md` — registerSnapshot for workspace save/restore
+- `pitfalls.md` — common mistakes and gotchas
+
+Public full guide: `docs/building-custom-modules.md`
+
+**You do not need `.agents/shell-dev/` to build a module.** That directory
+is for contributors working on the shell itself.
+
+---
+
+## Shell Development
+
+Everything below is for contributors working on the shell internals:
+window manager, command registry, state service, control API, theme engine.
+
+@.agents/shell-dev/architecture.md
+@.agents/shell-dev/invariants.md
+@.agents/shell-dev/control-api.md
 
 ## Direction
 
@@ -33,11 +77,11 @@ One control/API path for every user-visible surface.
 - services own logic; windows own rendering, input wiring, focus, cleanup
 - prefer established modular Blessed patterns over bespoke widget tangles
 
-Full invariants and anti-patterns: `.agents/invariants.md`
+Full invariants and anti-patterns: `.agents/shell-dev/invariants.md`
 
 ## Key Files
 
-Quick index — full descriptions live in `.agents/architecture.md`.
+Quick index — full descriptions live in `.agents/shell-dev/architecture.md`.
 
 - `src/core/app-controller.ts` — composition root
 - `src/core/command-catalog.ts` — command source of truth
@@ -49,14 +93,6 @@ Quick index — full descriptions live in `.agents/architecture.md`.
 - `src/services/state-service.ts` — live desktop state
 - `src/services/content-measurement.ts` — content measurement
 - `src/services/wibwob-agent-session.ts` — pi agent session
-
-## Building a New Module
-
-1. `bash scripts/scaffold-microapp.sh modules/<name> wibwob.<id> "<Title>" <menuOrder>`
-2. Read `docs/building-custom-modules.md` — lifecycle, SDK, common mistakes
-3. Edit the scaffold, `bun run typecheck`, restart app
-4. Reference modules: `glitchbox` (animated), `e026-demo` (broad sampler), `wibwob-poetry-clock` (compact real app)
-5. SDK surface: `.agents/microapp-sdk.md`
 
 ## Command Rules
 
@@ -156,19 +192,19 @@ Rule of thumb: if it lives in `modules/`, reload. If it lives in `src/`, restart
 
 ## Subsystem Specs
 
-Four subsystem specs live in `.agents/specs/`. Read the relevant one before
-touching the files listed. Agents may edit specs directly — append findings,
-correct errors, update failure modes. They are living documents.
+Subsystem specs live in `.agents/shell-dev/specs/`. These are for shell
+contributors editing `src/` internals — **not for module authors** editing
+their own `modules/*/index.ts`. Module authors use `.agents/module-dev/`.
 
-### Pre-change triggers — read spec BEFORE touching these files
+Read the relevant spec before touching the `src/` files listed:
 
 | Files | Read spec |
 |-------|-----------|
-| `src/core/window-manager.ts`, `src/core/window-facade.ts`, `src/core/window-chrome.ts`, `src/core/types.ts` (WindowRecord/WindowKind), any `modules/*/index.ts` | `.agents/specs/window-system.md` |
-| `src/services/state-service.ts`, `src/services/control-api.ts`, `src/services/agent-tools.ts` | `.agents/specs/state-and-api.md` |
-| `src/services/workspace-service.ts`, workspace restore in `src/core/app-controller.ts` | `.agents/specs/workspace.md` |
-| `src/services/wibwob-agent-session.ts`, `src/services/scramble-brain.ts`, `src/windows/wibwob-agent-window.ts`, `src/windows/scramble-window.ts`, any `modules/*/` | `.agents/specs/agent-session.md` |
-| `src/services/image-hydrator.mjs`, `src/services/chrome-browser-service.ts` (image methods), `src/windows/chrome-browser-window.ts` (postProcessImages/spliceImages) | `.agents/specs/image-rendering.md` |
+| `src/core/window-manager.ts`, `src/core/window-facade.ts`, `src/core/window-chrome.ts`, `src/core/types.ts` (WindowRecord/WindowKind) | `.agents/shell-dev/specs/window-system.md` |
+| `src/services/state-service.ts`, `src/services/control-api.ts`, `src/services/agent-tools.ts` | `.agents/shell-dev/specs/state-and-api.md` |
+| `src/services/workspace-service.ts`, workspace restore in `src/core/app-controller.ts` | `.agents/shell-dev/specs/workspace.md` |
+| `src/services/wibwob-agent-session.ts`, `src/services/scramble-brain.ts`, `src/windows/wibwob-agent-window.ts`, `src/windows/scramble-window.ts` | `.agents/shell-dev/specs/agent-session.md` |
+| `src/services/image-hydrator.mjs`, `src/services/chrome-browser-service.ts` (image methods), `src/windows/chrome-browser-window.ts` (postProcessImages/spliceImages) | `.agents/shell-dev/specs/image-rendering.md` |
 
 ### Post-change triggers — verify after touching these files
 
@@ -187,7 +223,7 @@ or edit the spec body directly if the finding is clearly correct.
 
 ## Control Loop
 
-API on `http://127.0.0.1:8099`. Full reference: `.agents/control-api.md`.
+API on `http://127.0.0.1:8099`. Full reference: `.agents/shell-dev/control-api.md`.
 
 Always `GET /state` first — use real window ids, never guessed ones.
 Use `GET /commands/list` before `POST /commands/run` if ids are uncertain.
@@ -202,7 +238,7 @@ bun run typecheck        # minimum bar
 bun run check-themes     # after any theme change
 ```
 
-Never stop at typecheck alone. Default proactive behaviour after code changes: `.agents/control-api.md § Proactive Tool Use`.
+Never stop at typecheck alone. Default proactive behaviour after code changes: `.agents/shell-dev/control-api.md § Proactive Tool Use`.
 
 Smoke targets: menus, primer open, text file open, editor typing, window drag/close, Wib&Wob Agent input + slash commands, agent-spawned windows controllable via API, `/state` parity with screen.
 

@@ -1,6 +1,6 @@
 # Invariants, Anti-Patterns & Integration Rules
 
-> Deeper failure-mode coverage per subsystem in `.agents/specs/` —
+> Deeper failure-mode coverage per subsystem in `.agents/shell-dev/specs/` —
 > window-system.md · state-and-api.md · workspace.md · agent-session.md
 
 

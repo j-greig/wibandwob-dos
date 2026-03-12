@@ -14,36 +14,25 @@ visible to everyone.
 
 ## Microapp Authoring
 
-Canonical doc:
+Canonical docs:
 
-- `docs/module-authoring.md`
+- Quick start: `.agents/module-dev/quick-start.md`
+- Full guide: `docs/building-custom-modules.md`
+- SDK reference: `.agents/module-dev/sdk-reference.md`
+- Examples by tier: `.agents/module-dev/examples-by-tier.md`
+- Persistence: `.agents/module-dev/persistence.md`
+- Pitfalls: `.agents/module-dev/pitfalls.md`
 
-For microapps, the current canonical authoring surface is:
-
-- manifest: `module.json`
-- entry: `index.ts`
-- host/types import:
-  `../../src/services/microapp-sdk.js`
-
-Current rule:
-
-- import shared module-author types and helpers from `microapp-sdk.js`
-- do not locally redefine `MicroappHost`, `MicroappWindowHandle`, or shared
-  layout types
-- prefer host capabilities and SDK helpers over direct imports into `src/`
-  internals when an SDK path exists
+Import types and helpers from `../../src/services/microapp-sdk.js`.
+Do not import directly from `src/core/*` — if something is missing,
+add the re-export to `microapp-sdk.ts`.
 
 Start from:
 
-- `modules/hello-world/` for the minimal scaffold
-- `modules/wibwob-poetry-clock/` for a real microapp using richer behavior
-- `modules/dream-forecast/` for a richer multi-panel module that stays on the public SDK path
-- `bash scripts/scaffold-microapp.sh modules/<name> <app-id> "<Title>"` for a
-  fresh scaffold generated against the current SDK path
-
-This is still phase-1 SDK work, so some modules still depend on internal
-services directly. The direction is to shrink those direct imports over time by
-projecting stable capabilities through the host.
+- `modules/hello-world/` — minimal static module
+- `modules/heartbeat/` — animated with timers
+- `modules/wibwob-poetry-clock/` — persistent, AI-integrated
+- `bash scripts/scaffold-microapp.sh modules/<name> <app-id> "<Title>"` — fresh scaffold
 
 ## Private modules
 

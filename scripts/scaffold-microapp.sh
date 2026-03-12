@@ -100,6 +100,10 @@ export default function setup(host: MicroappHost) {
       win.captureText(() => content.getContent());
       win.onRestyle(() => {
         content.style = host.theme().body;
+        host.screen.render();
+      });
+      win.onCleanup(() => {
+        // Clear timers, destroy resources, close connections here.
       });
       win.focus();
     },
@@ -114,4 +118,4 @@ echo
 echo "Next:"
 echo "  1. Edit the scaffold"
 echo "  2. Run: bun run typecheck"
-echo "  3. Restart or, after runtime work lands, reload the module"
+echo "  3. Restart the app (bash scripts/restart.sh) or reload (modules.reload)"

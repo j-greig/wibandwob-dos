@@ -21,7 +21,7 @@ The app is built for a proactive autonomous agent with equal control of the OS a
 ### Services
 
 - `src/services/state-service.ts` — canonical live desktop/app/window state; every window reports semantic content metadata through `describeState()`
-- `src/services/control-api.ts` — local HTTP control surface; see `.agents/control-api.md` for full endpoint list
+- `src/services/control-api.ts` — local HTTP control surface; see `.agents/shell-dev/control-api.md` for full endpoint list
 - `src/services/workspace-service.ts` — named workspace persistence only
 - `src/services/content-service.ts` — repo content discovery and text-file utility behaviour
 - `src/services/content-measurement.ts` — shared content measurement for primers, text, and future content types; returns content metrics, never chrome-adjusted widget math
