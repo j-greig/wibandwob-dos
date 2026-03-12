@@ -87,7 +87,8 @@ Base URL: http://127.0.0.1:8099 (or CONTROL_API_PORT env)
   GET  /openapi.json    → OpenAPI 3.0 spec
   POST /windows/batch   → batch move/resize/focus; prefer over chained individual calls
   GET  /windows/text    → raw window text content; ?id=N
-  GET  /screenshot/text → ANSI-stripped text; ?id=N
+  GET  /screenshot/text → clean readable text (default); ?id=N uses captureText
+  GET  /screenshot/ansi → raw ANSI blessed dump; ?id=N crops to window rect
 
 Scramble endpoints:
   GET  /scramble/state  → { status, model, sleeping, lastMessage, messageCount }

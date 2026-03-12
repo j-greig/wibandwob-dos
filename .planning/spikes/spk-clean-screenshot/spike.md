@@ -1,6 +1,6 @@
 ---
 title: "Clean text screenshot endpoint"
-status: in-progress
+status: done
 branch: spike/clean-screenshot
 worktree: ../wibandwob-dos-spike-clean-screenshot
 ---
