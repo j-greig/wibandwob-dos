@@ -92,6 +92,10 @@ Document in `.agents/module-dev/component-contract.md`.
 - [ ] Define variant model: default / hover / focus / disabled / error / success
 - [ ] Define design tokens: spacing scale, control heights, density
 - [ ] Require all components return LayoutPart
+- [ ] Controlled vs uncontrolled policy: update() is source of truth (controlled); internal state only used when no update() called (uncontrolled). Document which pattern each control uses.
+- [ ] Event payload contract: standardise onChange shape ({ value, id?, source? }) across all form controls
+- [ ] Focus/tab-order contract: Tab/Shift-Tab traversal between sibling controls, documented in contract doc
+- [ ] Restyle safety: new scrollable/list components must use safeSetStyle-compatible patterns
 - [ ] All new components in this epic follow the contract
 - [ ] Add SDK category map to sdk-reference.md
 
