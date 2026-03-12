@@ -230,6 +230,119 @@ win.onCleanup(() => root.destroy());
 
 ---
 
+## Forms
+
+All form controls follow the [component contract](component-contract.md).
+They return `LayoutPart` and compose with createStack/createRow/createGrid.
+Import from `../../src/services/microapp-sdk.js`.
+
+### createButton
+
+```typescript
+const btn = createButton({
+  label: "Submit",
+  onPress: () => save(),
+  disabled: false,        // optional
+});
+// btn.update({ label: "Saving...", disabled: true });
+```
+
+Focusable. Enter/Space activates. Focus ring shows inverted colours.
+
+### createCheckbox
+
+```typescript
+const cb = createCheckbox({
+  label: "Enable sound",
+  checked: true,           // optional, default false
+  onChange: (e) => {       // e: ChangeEvent<boolean>
+    console.log(e.value);  // new state
+  },
+  disabled: false,         // optional
+});
+// cb.checked()  → boolean
+// cb.update({ checked: false })
+```
+
+Space toggles. Renders `[x]` or `[ ]`.
+
+### createRadioGroup
+
+```typescript
+const radio = createRadioGroup({
+  options: [
+    { label: "Small", value: "sm" },
+    { label: "Medium", value: "md" },
+    { label: "Large", value: "lg" },
+  ],
+  selected: "md",          // optional
+  onChange: (e) => {       // e: SelectEvent<string>
+    console.log(e.value, e.index);
+  },
+});
+// radio.selected()  → string | undefined
+// Height = number of options
+```
+
+Arrow Up/Down navigates. Enter/Space selects. Shows `(o)` selected, `( )` unselected,
+`>` focus indicator.
+
+### createSelect
+
+```typescript
+const sel = createSelect({
+  options: [
+    { label: "Red", value: "red" },
+    { label: "Blue", value: "blue" },
+  ],
+  placeholder: "Pick a colour",  // optional
+  onChange: (e) => {              // e: SelectEvent<string>
+    console.log(e.value);
+  },
+});
+// sel.selected()  → string | undefined
+```
+
+Inline single-row picker (not a dropdown — blessed constraint).
+Arrow Left/Right or Up/Down cycles through options. Renders `< label >`.
+
+---
+
+## Feedback
+
+### createProgressBar
+
+```typescript
+const bar = createProgressBar({
+  value: 0,
+  max: 100,             // optional, default 100
+  label: "Loading",     // optional
+  showPercent: true,    // optional, default true
+});
+// bar.update({ value: 50 });  → renders: Loading ████████░░░░░░░░ 50%
+```
+
+Single-row horizontal bar with `█` filled and `░` empty segments.
+
+### createSpinner
+
+```typescript
+const spinner = createSpinner({
+  label: "Processing...",  // optional
+  frames: undefined,       // optional, default braille frames
+  interval: 80,            // optional, ms per frame
+});
+// spinner.stop();
+// spinner.start();
+// spinner.running()  → boolean
+// spinner.update({ label: "Done!" });
+```
+
+Auto-starts on creation. Animated braille frames by default.
+Call `destroy()` or `stop()` to clean up the internal timer.
+
+---
+
 ## SDK Primitives
 
 ### Timers

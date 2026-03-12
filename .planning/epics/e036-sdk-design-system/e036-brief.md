@@ -88,36 +88,36 @@ Every new component must pass:
 Define the standard lifecycle/behaviour contract all SDK components follow.
 Document in `.agents/module-dev/component-contract.md`.
 
-- [ ] Define contract: focus, keybindings, disabled state, value events, restyle, cleanup
-- [ ] Define variant model: default / hover / focus / disabled / error / success
-- [ ] Define design tokens: spacing scale, control heights, density
-- [ ] Require all components return LayoutPart
-- [ ] Controlled vs uncontrolled policy: update() is source of truth (controlled); internal state only used when no update() called (uncontrolled). Document which pattern each control uses.
-- [ ] Event payload contract: standardise onChange shape ({ value, id?, source? }) across all form controls
-- [ ] Focus/tab-order contract: Tab/Shift-Tab traversal between sibling controls, documented in contract doc
-- [ ] Restyle safety: new scrollable/list components must use safeSetStyle-compatible patterns
-- [ ] All new components in this epic follow the contract
-- [ ] Add SDK category map to sdk-reference.md
+- [x] Define contract: focus, keybindings, disabled state, value events, restyle, cleanup
+- [x] Define variant model: default / hover / focus / disabled / error / success
+- [x] Define design tokens: spacing scale, control heights, density
+- [x] Require all components return LayoutPart
+- [x] Controlled vs uncontrolled policy: update() is source of truth (controlled); internal state only used when no update() called (uncontrolled). Document which pattern each control uses.
+- [x] Event payload contract: standardise onChange shape ({ value, id?, source? }) across all form controls
+- [x] Focus/tab-order contract: Tab/Shift-Tab traversal between sibling controls, documented in contract doc
+- [x] Restyle safety: new scrollable/list components must use safeSetStyle-compatible patterns
+- [x] All new components in this epic follow the contract
+- [x] Add SDK category map to sdk-reference.md
 
 ### F01 — Forms family: createButton + createCheckbox (MUST)
 First form controls. Small, high leverage.
 
-- [ ] `createButton({ label, onPress, disabled? })` — focusable, Enter/Space triggers
-- [ ] `createCheckbox({ label, checked?, onChange })` — toggle with Space
-- [ ] Both return LayoutPart, follow component contract
-- [ ] Both work inside createStack/createRow layouts
-- [ ] Live in `src/core/ui-parts-forms.ts`
-- [ ] Proof: add to forms-demo module
-- [ ] AC: open forms-demo, tab between controls, resize 120→40→120, all usable
+- [x] `createButton({ label, onPress, disabled? })` — focusable, Enter/Space triggers
+- [x] `createCheckbox({ label, checked?, onChange })` — toggle with Space
+- [x] Both return LayoutPart, follow component contract
+- [x] Both work inside createStack/createRow layouts
+- [x] Live in `src/core/ui-parts-forms.ts`
+- [x] Proof: add to forms-demo module
+- [x] AC: open forms-demo, tab between controls, resize 120→40→120, all usable
 
 ### F02 — Forms family: createRadioGroup + createSelect (MUST)
 Selection controls.
 
-- [ ] `createRadioGroup({ options, selected?, onChange })` — vertical radio buttons
-- [ ] `createSelect({ options, selected?, onChange, placeholder? })` — inline picker (not overlay dropdown — blessed constraint)
-- [ ] Keyboard: arrow keys navigate, Enter/Space selects
-- [ ] Both composable in flex/grid layouts
-- [ ] AC: open forms-demo, arrow-key through radio options, select picks, resize survives
+- [x] `createRadioGroup({ options, selected?, onChange })` — vertical radio buttons
+- [x] `createSelect({ options, selected?, onChange, placeholder? })` — inline picker (not overlay dropdown — blessed constraint)
+- [x] Keyboard: arrow keys navigate, Enter/Space selects
+- [x] Both composable in flex/grid layouts
+- [x] AC: open forms-demo, arrow-key through radio options, select picks, resize survives
 
 ### F03 — Forms family: createTextArea + createFormField (SHOULD)
 Text editing and field wrapper.
@@ -148,11 +148,11 @@ Structured data display.
 ### F06 — Feedback: createProgressBar + createSpinner (MUST)
 Progress indication.
 
-- [ ] `createProgressBar({ value, max?, label?, style? })` — horizontal bar
-- [ ] `createSpinner({ label? })` — animated spinner with optional label
-- [ ] Both update via `.update({ value })` pattern
-- [ ] Both restyle-aware, both return LayoutPart
-- [ ] AC: open forms-demo, progress bar fills, spinner animates, resize survives
+- [x] `createProgressBar({ value, max?, label?, style? })` — horizontal bar
+- [x] `createSpinner({ label? })` — animated spinner with optional label
+- [x] Both update via `.update({ value })` pattern
+- [x] Both restyle-aware, both return LayoutPart
+- [x] AC: open forms-demo, progress bar fills, spinner animates, resize survives
 
 ### F07 — Feedback: createToast (SHOULD)
 Transient notification.

@@ -6,19 +6,19 @@ Maps every gap from `gap-analysis.md` §2 to its E036 feature or deferral status
 
 | Gap (from analysis §2) | Level | E036 Feature | Status |
 |-------------------------|-------|-------------|--------|
-| Form controls | High | F01 (button, checkbox), F02 (radio, select), F03 (textarea) | Covered |
+| Form controls | High | F01 (button, checkbox), F02 (radio, select), F03 (textarea) | F01+F02 DONE, F03 deferred |
 | Form model / validation | High | F03 (createFormField with label/help/error) | Partially covered — full validation layer deferred |
 | Data table primitive | High | F04 (createDataTable) | Covered |
-| Progress + status widgets | Med-High | F06 (createProgressBar, createSpinner) | Covered |
+| Progress + status widgets | Med-High | F06 (createProgressBar, createSpinner) | DONE |
 | Notification patterns | Medium | F07 (createToast) | Partially covered — confirm dialog deferred |
 | Command/quick action UI | Medium | — | Deferred — app-level palette exists, module-local deferred |
 | List/select patterns | Medium | F08 (createFilterableList) | Covered |
 | Rich text rendering primitives | Medium | F05 (createKeyValuePanel, createLogView) | Partially covered — panel/columns/tree deferred |
 | Layout container variants | Medium | — | Deferred — centering/flow wrappers not in scope |
-| Component state variants | Medium | F00 (component behaviour contract, variant model) | Covered |
-| Design tokens / scale | Medium | F00 (spacing scale, control heights, density) | Covered |
+| Component state variants | Medium | F00 (component behaviour contract, variant model) | DONE |
+| Design tokens / scale | Medium | F00 (spacing scale, control heights, density) | DONE |
 | Data-viz wrappers | Medium | — | Deferred — blessed-contrib adapters are Phase 3 |
-| Widget modularisation contracts | Medium | F00 (SDK category map in docs) | Covered |
+| Widget modularisation contracts | Medium | F00 (SDK category map in docs) | DONE |
 | Accessibility/focus ergonomics | Medium | F00 (focus ring, disabled semantics) | Partially covered — contract only, not full audit |
 | Testing harness for components | Medium | — | Deferred — no component test framework in scope |
 
