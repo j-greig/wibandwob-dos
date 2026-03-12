@@ -1,0 +1,20 @@
+{
+  "name": "flex-bands-demo-codex",
+  "version": "0.1.0",
+  "description": "Codex flex bands demo",
+  "type": "microapp",
+  "entry": "index.ts",
+  "microapp": {
+    "id": "wibwob.demo.flex-bands.codex",
+    "title": "Flex Bands",
+    "description": "Pure stack and row composition with fixed and fluid regions.",
+    "multiInstance": false,
+    "persist": false,
+    "menu": [
+      { "category": "demos", "order": 146, "label": "Flex Bands (Codex)" }
+    ],
+    "palette": { "order": 246, "label": "Flex Bands (Codex)" },
+    "agent": true,
+    "api": true
+  }
+}

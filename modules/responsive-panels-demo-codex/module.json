@@ -1,0 +1,20 @@
+{
+  "name": "responsive-panels-demo-codex",
+  "version": "0.1.0",
+  "description": "Codex responsive flex panels demo",
+  "type": "microapp",
+  "entry": "index.ts",
+  "microapp": {
+    "id": "wibwob.demo.responsive-panels.codex",
+    "title": "Responsive Panels",
+    "description": "Breakpoint-driven flex panels with visible() gates.",
+    "multiInstance": false,
+    "persist": false,
+    "menu": [
+      { "category": "demos", "order": 147, "label": "Responsive Panels (Codex)" }
+    ],
+    "palette": { "order": 247, "label": "Responsive Panels (Codex)" },
+    "agent": true,
+    "api": true
+  }
+}

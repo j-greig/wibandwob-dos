@@ -1,0 +1,18 @@
+{
+  "name": "responsive-panels-demo-pi",
+  "version": "0.1.0",
+  "description": "Responsive flex layout with breakpoint-driven panel visibility (Pi version)",
+  "type": "microapp",
+  "entry": "index.ts",
+  "microapp": {
+    "id": "wibwob.responsive-panels-demo-pi",
+    "title": "Responsive Panels (Pi)",
+    "description": "Breakpoint-driven hide/show with nested flex composition",
+    "multiInstance": false,
+    "persist": false,
+    "menu": [{ "category": "demos", "order": 94, "label": "Responsive Panels (Pi)" }],
+    "palette": { "order": 294, "label": "Responsive Panels (Pi)" },
+    "agent": true,
+    "api": true
+  }
+}

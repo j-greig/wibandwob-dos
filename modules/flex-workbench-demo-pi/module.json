@@ -1,0 +1,18 @@
+{
+  "name": "flex-workbench-demo-pi",
+  "version": "0.1.0",
+  "description": "App-scale nested flex composition with wrap, scroll, responsive (Pi version)",
+  "type": "microapp",
+  "entry": "index.ts",
+  "microapp": {
+    "id": "wibwob.flex-workbench-demo-pi",
+    "title": "Flex Workbench (Pi)",
+    "description": "Real app layout: toolbar, nav, document, inspector with wrapped tags",
+    "multiInstance": false,
+    "persist": false,
+    "menu": [{ "category": "demos", "order": 95, "label": "Flex Workbench (Pi)" }],
+    "palette": { "order": 295, "label": "Flex Workbench (Pi)" },
+    "agent": true,
+    "api": true
+  }
+}
