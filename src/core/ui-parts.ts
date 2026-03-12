@@ -14,19 +14,22 @@ import { createScrollbar, safeSetStyle, scrollableStyle } from "./ui-primitives.
 // Re-export form controls
 export {
   createButton, createCheckbox, createRadioGroup, createSelect,
+  createFilterableList,
 } from "./ui-parts-forms.js";
 export type {
   ButtonOptions, ButtonHandle, CheckboxOptions, CheckboxHandle,
   RadioOption, RadioGroupOptions, RadioGroupHandle,
   SelectOption, SelectOptions, SelectHandle,
   ChangeEvent, SelectEvent,
+  FilterableItem, FilterableListOptions, FilterableListHandle,
 } from "./ui-parts-forms.js";
 
 // Re-export feedback components
-export { createProgressBar, createSpinner } from "./ui-parts-feedback.js";
+export { createProgressBar, createSpinner, createToast } from "./ui-parts-feedback.js";
 export type {
   ProgressBarOptions, ProgressBarHandle,
   SpinnerOptions, SpinnerHandle,
+  ToastSeverity, ToastOptions, ToastHandle,
 } from "./ui-parts-feedback.js";
 
 // Re-export data display components

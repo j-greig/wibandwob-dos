@@ -10,6 +10,11 @@ import { theme } from "./theme/resolver.js";
 import type { Rect, LayoutPart } from "./ui-parts.js";
 
 // ═══════════════════════════════════════════════════════════════════════════
+// Toast severity type (shared)
+// ═══════════════════════════════════════════════════════════════════════════
+export type ToastSeverity = "info" | "success" | "warning" | "error";
+
+// ═══════════════════════════════════════════════════════════════════════════
 // createProgressBar
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -189,5 +194,82 @@ export function createSpinner(opts: SpinnerOptions = {}): SpinnerHandle {
     start,
     stop,
     running() { return isRunning; },
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// createToast
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface ToastOptions {
+  message: string;
+  duration?: number;        // ms, default 3000
+  severity?: ToastSeverity; // default "info"
+  parent: blessed.Widgets.Node; // attach to this node (usually win.body)
+}
+
+export interface ToastHandle {
+  dismiss(): void;
+}
+
+const TOAST_ICONS: Record<ToastSeverity, string> = {
+  info: "i",
+  success: "+",
+  warning: "~",
+  error: "!",
+};
+
+/**
+ * A per-window auto-dismissing notification. Positions at bottom of parent.
+ * Non-blocking (does not steal focus). Auto-cleans up after duration.
+ *
+ * @example
+ * createToast({ message: "Saved!", severity: "success", parent: win.body });
+ */
+export function createToast(opts: ToastOptions): ToastHandle {
+  const { message, duration = 3000, severity = "info", parent } = opts;
+
+  const icon = TOAST_ICONS[severity];
+  const content = ` [${icon}] ${message} `;
+
+  const t = theme();
+  const severityStyles: Record<ToastSeverity, { fg: string; bg: string }> = {
+    info:    { fg: t.body.fg, bg: t.muted.bg ?? t.body.bg },
+    success: { fg: "black", bg: "green" },
+    warning: { fg: "black", bg: "yellow" },
+    error:   { fg: "white", bg: "red" },
+  };
+
+  const node = blessed.box({
+    parent,
+    bottom: 0,
+    left: "center",
+    width: Math.min(content.length + 2, 60),
+    height: 1,
+    content,
+    style: severityStyles[severity],
+    tags: false,
+  });
+
+  // Bring to front
+  node.setFront?.();
+  parent.screen?.render();
+
+  let dismissed = false;
+
+  function dismiss() {
+    if (dismissed) return;
+    dismissed = true;
+    try { node.destroy(); } catch { /* already gone */ }
+    parent.screen?.render();
+  }
+
+  const timer = setTimeout(dismiss, duration);
+
+  return {
+    dismiss() {
+      clearTimeout(timer);
+      dismiss();
+    },
   };
 }

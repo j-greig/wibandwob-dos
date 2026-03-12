@@ -479,3 +479,159 @@ export function createSelect(opts: SelectOptions): SelectHandle {
     selected() { return selectedIndex >= 0 ? options[selectedIndex]!.value : undefined; },
   };
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// createFilterableList
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface FilterableItem {
+  label: string;
+  value: string;
+}
+
+export interface FilterableListOptions {
+  items: FilterableItem[];
+  onSelect?: (event: SelectEvent<string>) => void;
+  placeholder?: string;
+  disabled?: boolean;
+}
+
+export type FilterableListHandle = LayoutPart<Partial<FilterableListOptions>> & {
+  filter(): string;
+  selected(): string | undefined;
+};
+
+/**
+ * A combined search + select list. Type to filter, arrows navigate, Enter selects.
+ * Height = 1 (search row) + visible item count.
+ *
+ * @example
+ * const list = createFilterableList({
+ *   items: [{ label: "Apple", value: "apple" }, { label: "Banana", value: "banana" }],
+ *   placeholder: "Search fruit...",
+ *   onSelect: (e) => console.log("Picked:", e.value),
+ * });
+ */
+export function createFilterableList(opts: FilterableListOptions): FilterableListHandle {
+  let { items, onSelect, placeholder = "Search...", disabled = false } = opts;
+  let query = "";
+  let focusIndex = 0;
+  let filtered = items.slice();
+  let lastHeight = 0;
+
+  const node = blessed.box({
+    width: 0,
+    height: 0,
+    content: "",
+    focusable: !disabled,
+    mouse: true,
+    keys: true,
+    inputOnFocus: false,
+    style: getStyle(),
+  });
+
+  function getStyle() {
+    const t = theme();
+    if (disabled) return { fg: t.muted.fg, bg: t.muted.bg ?? t.body.bg };
+    return { fg: t.body.fg, bg: t.body.bg };
+  }
+
+  function refilter() {
+    const q = query.toLowerCase();
+    filtered = q ? items.filter(it => it.label.toLowerCase().includes(q)) : items.slice();
+    focusIndex = Math.min(focusIndex, Math.max(0, filtered.length - 1));
+  }
+
+  function renderContent() {
+    const isFocused = node.screen?.focused === node;
+    const searchLine = query
+      ? ` > ${query}_`
+      : ` > ${isFocused ? "_" : placeholder}`;
+
+    const maxItems = Math.max(0, lastHeight - 1);
+    const visible = filtered.slice(0, maxItems);
+    const lines = visible.map((it, i) => {
+      const pointer = i === focusIndex && isFocused ? ">" : " ";
+      return `${pointer} ${it.label}`;
+    });
+
+    node.setContent([searchLine, ...lines].join("\n"));
+  }
+
+  function applyVisuals() {
+    node.style = getStyle();
+    renderContent();
+  }
+
+  node.on("focus", applyVisuals);
+  node.on("blur", applyVisuals);
+
+  node.on("keypress", (ch: string, key: { name: string; full: string; ctrl?: boolean; sequence?: string }) => {
+    if (disabled || !key) return;
+
+    if (key.name === "up") {
+      focusIndex = Math.max(0, focusIndex - 1);
+      applyVisuals();
+    } else if (key.name === "down") {
+      focusIndex = Math.min(filtered.length - 1, focusIndex + 1);
+      applyVisuals();
+    } else if (key.name === "enter") {
+      if (filtered.length > 0 && focusIndex < filtered.length) {
+        const item = filtered[focusIndex]!;
+        onSelect?.({ value: item.value, index: items.indexOf(item) });
+      }
+    } else if (key.name === "backspace") {
+      if (query.length > 0) {
+        query = query.slice(0, -1);
+        refilter();
+        applyVisuals();
+      }
+    } else if (key.name === "escape") {
+      query = "";
+      refilter();
+      applyVisuals();
+    } else if (ch && ch.length === 1 && !key.ctrl && ch.charCodeAt(0) >= 32) {
+      query += ch;
+      refilter();
+      applyVisuals();
+    }
+  });
+
+  node.on("click", () => {
+    if (disabled) return;
+    node.focus();
+  });
+
+  return {
+    node,
+    layout(rect: Rect) {
+      node.position.top = rect.top;
+      node.position.left = rect.left;
+      node.width = rect.width;
+      lastHeight = rect.height;
+      node.height = rect.height;
+      renderContent();
+    },
+    restyle() { applyVisuals(); },
+    destroy() { node.destroy(); },
+    update(props: Partial<FilterableListOptions>) {
+      if (props.items !== undefined) {
+        items = props.items;
+        refilter();
+      }
+      if (props.onSelect !== undefined) onSelect = props.onSelect;
+      if (props.placeholder !== undefined) placeholder = props.placeholder;
+      if (props.disabled !== undefined) {
+        disabled = props.disabled;
+        node.focusable = !disabled;
+      }
+      applyVisuals();
+    },
+    filter() { return query; },
+    selected() {
+      return filtered.length > 0 && focusIndex < filtered.length
+        ? filtered[focusIndex]!.value
+        : undefined;
+    },
+  };
+}

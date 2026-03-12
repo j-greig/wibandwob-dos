@@ -19,6 +19,8 @@ import {
   createSelect,
   createProgressBar,
   createSpinner,
+  createToast,
+  createFilterableList,
   createKeyValuePanel,
   createLogView,
 } from "../../src/services/microapp-sdk.js";
@@ -35,7 +37,7 @@ export default function setup(host: MicroappHost) {
 }
 
 function openPlayground(host: MicroappHost) {
-  const win = host.createWindow({ title: "Forms Playground", width: 60, height: 36 });
+  const win = host.createWindow({ title: "Forms Playground", width: 60, height: 44 });
 
   // ── Section label helper ────────────────────────────────────────────
   function sectionLabel(text: string) {
@@ -50,6 +52,7 @@ function openPlayground(host: MicroappHost) {
   const lblRadio     = sectionLabel("RADIO GROUP");
   const lblSelect    = sectionLabel("SELECT");
   const lblFeedback  = sectionLabel("FEEDBACK");
+  const lblFilter    = sectionLabel("FILTERABLE LIST");
   const lblData      = sectionLabel("DATA DISPLAY");
 
   // ── Header ──────────────────────────────────────────────────────────
@@ -77,10 +80,14 @@ function openPlayground(host: MicroappHost) {
     onPress: () => { clickCount++; log(`Button pressed! (${clickCount}x)`); kvPanel.update({ entries: kvEntries() }); },
   });
 
+  const severities = ["info", "success", "warning", "error"] as const;
   const btn2 = createButton({
-    label: "Disabled",
-    disabled: true,
-    onPress: () => log("This should never fire"),
+    label: "Show Toast",
+    onPress: () => {
+      const sev = severities[clickCount % severities.length]!;
+      createToast({ message: `Toast #${clickCount} (${sev})`, severity: sev, parent: win.body });
+      log(`Toast shown: ${sev}`);
+    },
   });
 
   const cb1 = createCheckbox({
@@ -116,6 +123,16 @@ function openPlayground(host: MicroappHost) {
     ],
     placeholder: "Pick a colour",
     onChange: (e) => { log(`Colour: ${e.value}`); kvPanel.update({ entries: kvEntries() }); },
+  });
+
+  const filterList = createFilterableList({
+    items: [
+      { label: "Apple", value: "apple" }, { label: "Banana", value: "banana" },
+      { label: "Cherry", value: "cherry" }, { label: "Dragonfruit", value: "dragon" },
+      { label: "Elderberry", value: "elder" }, { label: "Fig", value: "fig" },
+    ],
+    placeholder: "Type to filter fruit...",
+    onSelect: (e) => log(`Selected fruit: ${e.value}`),
   });
 
   const progress = createProgressBar({ value: 0, max: 100, label: "Progress" });
@@ -157,6 +174,8 @@ function openPlayground(host: MicroappHost) {
     { key: "radio",       basis: 4,     part: radio },
     { key: "lblSel",      basis: 1,     part: createNodePart(lblSelect) },
     { key: "sel",         basis: 1,     part: sel },
+    { key: "lblFilter",   basis: 1,     part: createNodePart(lblFilter) },
+    { key: "filterList", basis: 5,     part: filterList },
     { key: "lblFb",       basis: 1,     part: createNodePart(lblFeedback) },
     { key: "progress",    basis: 1,     part: progress },
     { key: "spinner",     basis: 1,     part: spinner },
@@ -198,7 +217,7 @@ function openPlayground(host: MicroappHost) {
   win.onRestyle(() => {
     const t = host.theme();
     headerBox.style = { fg: t.body.bg, bg: t.body.fg, bold: true };
-    for (const lbl of [lblButtons, lblChecks, lblRadio, lblSelect, lblFeedback, lblData]) {
+    for (const lbl of [lblButtons, lblChecks, lblRadio, lblSelect, lblFilter, lblFeedback, lblData]) {
       lbl.style = { fg: t.accent?.fg ?? "cyan", bg: t.body.bg };
     }
     root.restyle();
