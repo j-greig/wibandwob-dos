@@ -15,7 +15,7 @@ import {
   applyRect,
   createNodePart,
 } from "../core/ui-parts.js";
-import type { Rect, LayoutPart, FlexChild, GridChild, FlexBasis, TrackSize, AxisAlign, Alignment, Gap } from "../core/ui-parts.js";
+import type { Rect, LayoutPart, FlexChild, GridChild, FlexBasis, TrackSize, AxisAlign, Alignment, Gap, LinearLayoutOptions } from "../core/ui-parts.js";
 import type { BrowserEntry, GalleryTab } from "../core/types.js";
 import {
   createContourPlayer,
@@ -90,6 +90,7 @@ export type {
   Rect,
   LayoutPart,
   FlexChild,
+  LinearLayoutOptions,
   GridChild,
   FlexBasis,
   TrackSize,

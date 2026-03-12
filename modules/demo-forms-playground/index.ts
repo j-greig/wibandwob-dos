@@ -195,7 +195,7 @@ function openPlayground(host: MicroappHost) {
   const columns = createRow(win.body, [
     { key: "left",  basis: "1fr", part: leftCol },
     { key: "right", basis: "1fr", part: rightCol },
-  ]);
+  ], { gap: 2 });
 
   const root = createStack(win.body, [
     { key: "header", basis: 1,     part: createNodePart(headerBox) },

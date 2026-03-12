@@ -215,10 +215,17 @@ function renderAlignedBar(left: string, right: string | undefined, width: number
   return padLine(`${clippedLeft}${" ".repeat(gap)}${right}`, width);
 }
 
+/** Options for createStack / createRow. */
+export interface LinearLayoutOptions {
+  /** Gap in character cells between children. Default 0. */
+  gap?: number;
+}
+
 function createLinearLayout(
   parent: blessed.Widgets.Node,
   children: FlexChild[],
-  axis: Axis
+  axis: Axis,
+  opts?: LinearLayoutOptions,
 ): LayoutPart<void> {
   const node = blessed.box({
     parent,
@@ -245,14 +252,16 @@ function createLinearLayout(
     applyRect(node, lastRect);
 
     const totalExtent = axis === "vertical" ? lastRect.height : lastRect.width;
+    const gap = opts?.gap ?? 0;
     const activeChildren = children.filter((child) => child.visible?.() !== false);
+    const totalGap = Math.max(0, activeChildren.length - 1) * gap;
     const fixedTotal = activeChildren.reduce((sum, child) => {
       return sum + (typeof child.basis === "number" ? Math.max(0, child.basis) : 0);
     }, 0);
     const totalFr = activeChildren.reduce((sum, child) => {
       return sum + (parseFractionBasis(child.basis) ?? 0);
     }, 0);
-    let remaining = Math.max(0, totalExtent - fixedTotal);
+    let remaining = Math.max(0, totalExtent - fixedTotal - totalGap);
     let remainingFr = totalFr;
     let cursor = 0;
 
@@ -289,7 +298,7 @@ function createLinearLayout(
           : { top: 0, left: cursor, width: cappedExtent, height: lastRect.height };
 
       child.part.layout(childRect);
-      cursor += cappedExtent;
+      cursor += cappedExtent + gap;
     }
   };
 
@@ -319,13 +328,13 @@ function createLinearLayout(
 }
 
 /** @primitive */
-export function createStack(parent: blessed.Widgets.Node, children: FlexChild[]): LayoutPart<void> {
-  return createLinearLayout(parent, children, "vertical");
+export function createStack(parent: blessed.Widgets.Node, children: FlexChild[], opts?: LinearLayoutOptions): LayoutPart<void> {
+  return createLinearLayout(parent, children, "vertical", opts);
 }
 
 /** @primitive */
-export function createRow(parent: blessed.Widgets.Node, children: FlexChild[]): LayoutPart<void> {
-  return createLinearLayout(parent, children, "horizontal");
+export function createRow(parent: blessed.Widgets.Node, children: FlexChild[], opts?: LinearLayoutOptions): LayoutPart<void> {
+  return createLinearLayout(parent, children, "horizontal", opts);
 }
 
 // ── Responsive helpers ────────────────────────────────────────────────────
