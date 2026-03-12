@@ -348,7 +348,7 @@ export default function setup(host: MicroappHost) {
     const poemBlock = host.ui.createTextBlock(win.body, { paddingLeft: 2, paddingTop: 1 });
     const statusBar = host.ui.createStatusBar(win.body, { leftInset: 2 });
 
-    const body = host.ui.createColumns(win.body, [
+    const body = host.ui.createRow(win.body, [
       {
         key: "cat",
         basis: 15,

@@ -4,14 +4,14 @@ import path from "node:path";
 
 import { theme } from "../core/theme/resolver.js";
 import {
-  createColumns,
+  createRow,
   createHeaderBar,
   createNodePart,
   createRestyleBundle,
   createRule,
   createStack,
   createStatusBar,
-  type UiPart,
+  type LayoutPart,
 } from "../core/ui-parts.js";
 import {
   createContourPlayer,
@@ -30,9 +30,9 @@ type ViewMode = "solo" | "triptych";
 
 type TriptychState = {
   panelBoxes: blessed.Widgets.BoxElement[];
-  header: UiPart<{ left: string; right?: string }>;
-  statusBar: UiPart<{ left?: string; right?: string }>;
-  root: UiPart<void>;
+  header: LayoutPart<{ left: string; right?: string }>;
+  statusBar: LayoutPart<{ left?: string; right?: string }>;
+  root: LayoutPart<void>;
   players: ContourPlayer[];
   panelStates: Array<{ mode: ContourMode; terrain: string; seed: number; levels: number }>;
 };
@@ -160,7 +160,7 @@ export function openContourWindow(deps: BaseWindowDeps): void {
       })
     );
 
-    const columns = createColumns(frame.body, [
+    const columns = createRow(frame.body, [
       { key: "panel-1", basis: "1fr", part: panelParts[0]! },
       { key: "divider-1", basis: 1, part: dividerA },
       { key: "panel-2", basis: "1fr", part: panelParts[1]! },

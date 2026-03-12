@@ -1,14 +1,14 @@
 /**
  * E026 Demo — live showcase of F03/F05/F06/F07 + RenderMonitor.
  *
- * Layout (CSS-flexbox via createStack + createColumns):
+ * Layout (CSS-flexbox via createStack + createRow):
  *
  *   ┌──────────────────────────────────┐
- *   │  row1: createColumns             │  1fr
+ *   │  row1: createRow             │  1fr
  *   │   ┌────────────┬────────────┐    │
  *   │   │ F05 Tree   │ F06 Timer  │    │
  *   │   └────────────┴────────────┘    │
- *   │  row2: createColumns             │  1fr
+ *   │  row2: createRow             │  1fr
  *   │   ┌────────────┬────────────┐    │
  *   │   │ F07 Motion │ RenderMon  │    │
  *   │   └────────────┴────────────┘    │
@@ -117,15 +117,15 @@ function openDemo(host: MicroappHost) {
   const panels = [p1, p2, p3, p4] as const;
   let activeIdx = 0;
 
-  // ── Layout: createColumns rows + createStack ──────────────────────────────
+  // ── Layout: createRow rows + createStack ──────────────────────────────
 
   type BtnId = "p1" | "p2" | "p3" | "p4" | "tween" | "reset" | "bounce" | "close";
 
-  const topRow = host.ui.createColumns(win.body, [
+  const topRow = host.ui.createRow(win.body, [
     { key: "tl", basis: "1fr", part: p1 },
     { key: "tr", basis: "1fr", part: p2 },
   ]);
-  const botRow = host.ui.createColumns(win.body, [
+  const botRow = host.ui.createRow(win.body, [
     { key: "bl", basis: "1fr", part: p3 },
     { key: "br", basis: "1fr", part: p4 },
   ]);

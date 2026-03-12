@@ -39,7 +39,7 @@ export default function setup(host: MicroappHost) {
       const aside = makeRegion(win.body, "ASIDE");
       const footer = makeRegion(win.body, "FOOTER");
 
-      const middle = host.ui.createColumns(win.body, [
+      const middle = host.ui.createRow(win.body, [
         { key: "nav",   basis: 20,    part: nav },
         { key: "main",  basis: "1fr", part: main },
         { key: "aside", basis: 20,    part: aside },

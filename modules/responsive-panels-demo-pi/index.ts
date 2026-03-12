@@ -62,7 +62,7 @@ export default function setup(host: MicroappHost) {
       const inspector = makeRegion(win.body, "INSPECTOR");
       const status = makeRegion(win.body, "STATUS");
 
-      const body = host.ui.createColumns(win.body, [
+      const body = host.ui.createRow(win.body, [
         { key: "sidebar", basis: 24, part: sidebar, visible: () => mode !== "sm" },
         { key: "sidebar-div", basis: 1, part: sidebarDiv, visible: () => mode !== "sm" },
         { key: "main", basis: "1fr", part: mainPanel },

@@ -578,7 +578,7 @@ export function createGrid(
 export function createHeaderBar(
   parent: blessed.Widgets.Node,
   opts: { leftInset?: number } = {}
-): UiPart<{ left: string; right?: string }> {
+): LayoutPart<{ left: string; right?: string }> {
   const node = blessed.box({
     parent,
     top: 0,
@@ -620,7 +620,7 @@ export function createHeaderBar(
 export function createStatusBar(
   parent: blessed.Widgets.Node,
   opts: { leftInset?: number } = {}
-): UiPart<{ left?: string; right?: string }> {
+): LayoutPart<{ left?: string; right?: string }> {
   const node = blessed.box({
     parent,
     top: 0,
@@ -662,7 +662,7 @@ export function createStatusBar(
 export function createTextBlock(
   parent: blessed.Widgets.Node,
   opts: { paddingLeft?: number; paddingTop?: number } = {}
-): UiPart<{ text: string }> {
+): LayoutPart<{ text: string }> {
   const node = blessed.box({
     parent,
     top: 0,
@@ -718,7 +718,7 @@ export interface InputLineProps {
 export function createInputLine(
   screen: blessed.Widgets.Screen,
   onSubmit: (value: string) => void
-): UiPart<InputLineProps> {
+): LayoutPart<InputLineProps> {
   const node = blessed.textbox({
     parent: screen,
     top: 0,
@@ -781,7 +781,7 @@ export interface MessageHistoryProps {
 /** @primitive */
 export function createMessageHistory(
   screen: blessed.Widgets.Screen
-): UiPart<MessageHistoryProps> {
+): LayoutPart<MessageHistoryProps> {
   const node = blessed.list({
     parent: screen,
     top: 0,
@@ -822,7 +822,7 @@ export function createMessageHistory(
 export function createRule(
   parent: blessed.Widgets.Node,
   opts: { axis: "horizontal" | "vertical"; inset?: number }
-): UiPart<{ visible: boolean }> {
+): LayoutPart<{ visible: boolean }> {
   const node = blessed.box({
     parent,
     top: 0,
@@ -879,7 +879,7 @@ export function createRule(
 export function createFigletDisplay(
   parent: blessed.Widgets.Node,
   opts: { renderText: (value: string) => string; leftInset?: number }
-): UiPart<{ value: string }> {
+): LayoutPart<{ value: string }> {
   const node = blessed.box({
     parent,
     top: 0,
@@ -925,7 +925,7 @@ export function createFigletDisplay(
 export function createAnimatedPanel(
   parent: blessed.Widgets.Node,
   opts: { player: FramePlayer }
-): UiPart<void> {
+): LayoutPart<void> {
   const node = blessed.box({
     parent,
     top: 0,
@@ -969,7 +969,7 @@ export function createAnimatedPanel(
  * bar.update({ leftText: hintText, activeId: currentMode });
  */
 export type ButtonBarPart<Id extends string> =
-  UiPart<{ leftText: string; activeId: Id }> & {
+  LayoutPart<{ leftText: string; activeId: Id }> & {
     /** Mutate a button's displayed label in place. */
     updateLabel(id: Id, label: string): void;
   };
@@ -1236,7 +1236,7 @@ export interface BorderedPanelOpts {
   activeStyle?: BorderStyle;
 }
 
-export type BorderedPanelHandle = UiPart<void> & {
+export type BorderedPanelHandle = LayoutPart<void> & {
   /** The inner content node — attach child widgets here */
   content: blessed.Widgets.BoxElement;
   /** Switch active/inactive border style and theme colour */
@@ -1244,7 +1244,7 @@ export type BorderedPanelHandle = UiPart<void> & {
 };
 
 /**
- * A UiPart with a manually-drawn border that switches style on setActive().
+ * A LayoutPart with a manually-drawn border that switches style on setActive().
  *
  * Key implementation notes:
  * - wrap:false on outer box prevents blessed wrapping the border line
@@ -1365,7 +1365,7 @@ export interface CollapsibleBlockProps {
 }
 
 /** @primitive */
-export type CollapsibleBlockHandle = UiPart<CollapsibleBlockProps> & {
+export type CollapsibleBlockHandle = LayoutPart<CollapsibleBlockProps> & {
   toggle(): void;
   setCollapsed(collapsed: boolean): void;
   isCollapsed(): boolean;

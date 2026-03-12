@@ -1,12 +1,12 @@
 import blessed from "blessed";
-import type { MicroappHost, Rect, UiPart } from "../../src/services/microapp-sdk.js";
+import type { MicroappHost, Rect, LayoutPart } from "../../src/services/microapp-sdk.js";
 import { applyRect, createNodePart } from "../../src/services/microapp-sdk.js";
 
 type FlexChild = {
   key: string;
   basis: number;
   height: number;
-  part: UiPart<any>;
+  part: LayoutPart<any>;
   visible?: () => boolean;
 };
 
@@ -24,7 +24,7 @@ type WrapMetrics = {
   viewportHeight: number;
 };
 
-type WrappingRowHandle = UiPart<void> & {
+type WrappingRowHandle = LayoutPart<void> & {
   getMetrics(): WrapMetrics;
   setViewportHeight(height: number): void;
 };
@@ -200,7 +200,7 @@ function chipPattern(index: number): string[] {
   return [centered, pattern, pattern];
 }
 
-function createChip(parent: blessed.Widgets.Node, index: number): UiPart<Record<string, never>> {
+function createChip(parent: blessed.Widgets.Node, index: number): LayoutPart<Record<string, never>> {
   const fg = index % 8 === 0 || index % 8 === 3 ? "black" : "white";
   const bg = PALETTE[index % PALETTE.length] ?? "blue";
   const node = blessed.box({

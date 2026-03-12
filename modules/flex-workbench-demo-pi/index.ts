@@ -127,7 +127,7 @@ export default function setup(host: MicroappHost) {
       ]);
 
       // Body row
-      const bodyRow = host.ui.createColumns(win.body, [
+      const bodyRow = host.ui.createRow(win.body, [
         { key: "nav", basis: 16, part: navBox, visible: () => mode !== "sm" },
         { key: "nav-div", basis: 1, part: navDiv, visible: () => mode !== "sm" },
         { key: "document", basis: "1fr", part: docStack },

@@ -17,7 +17,7 @@ import {
   applyRect,
   createRestyleBundle,
   createStack,
-  createColumns,
+  createRow,
   createNodePart,
   createHeaderBar,
   createStatusBar,
@@ -127,7 +127,7 @@ export function openPlasmaWindow(
     restyle: () => { canvas.style = theme().body; },
   });
 
-  const bodyColumns = createColumns(frame.body, [
+  const bodyColumns = createRow(frame.body, [
     { key: "canvas", basis: "3fr", part: canvasPart },
     { key: "divider", basis: 1, part: divider },
     { key: "info", basis: "1fr", part: infoBlock },

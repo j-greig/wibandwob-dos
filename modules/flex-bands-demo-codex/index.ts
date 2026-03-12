@@ -1,5 +1,5 @@
 import blessed from "blessed";
-import type { MicroappHost, UiPart } from "../../src/services/microapp-sdk.js";
+import type { MicroappHost, LayoutPart } from "../../src/services/microapp-sdk.js";
 import { applyRect, createNodePart } from "../../src/services/microapp-sdk.js";
 
 function fillPattern(width: number, height: number, seed: string): string {
@@ -15,7 +15,7 @@ function fillPattern(width: number, height: number, seed: string): string {
   return lines.join("\n");
 }
 
-function createRegion(parent: blessed.Widgets.Node, label: string, seed: string): UiPart<Record<string, never>> & { render(): void } {
+function createRegion(parent: blessed.Widgets.Node, label: string, seed: string): LayoutPart<Record<string, never>> & { render(): void } {
   const node = blessed.box({
     parent,
     top: 0,

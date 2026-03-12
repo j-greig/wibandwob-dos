@@ -21,7 +21,7 @@ import {
   type MicroappSnapshotWindow,
   type Rect,
   type TerrainMap,
-  type UiPart,
+  type LayoutPart,
 } from "../../src/services/microapp-sdk.js";
 
 type ViewMode = "overview" | "terrain" | "chat";
@@ -491,7 +491,7 @@ export default function setup(host: MicroappHost) {
       alwaysScroll: true,
       style: host.theme().body,
     });
-    const viewSurface: UiPart<void> = {
+    const viewSurface: LayoutPart<void> = {
       node: viewSurfaceNode,
       layout(rect: Rect) {
         host.ui.applyRect(viewSurfaceNode, rect);
@@ -617,7 +617,7 @@ export default function setup(host: MicroappHost) {
       paddingLeft: 1,
       paddingTop: 0,
     });
-    const body = host.ui.createColumns(win.body, [
+    const body = host.ui.createRow(win.body, [
       { key: "deck", basis: 29, part: commandDeck },
       { key: "preview", basis: "1fr", part: previewStack },
       { key: "inspector", basis: 34, part: inspector },

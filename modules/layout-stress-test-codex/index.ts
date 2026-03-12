@@ -1,6 +1,6 @@
 import blessed from "blessed";
 import contrib from "blessed-contrib";
-import type { MicroappHost, Rect, UiPart } from "../../src/services/microapp-sdk.js";
+import type { MicroappHost, Rect, LayoutPart } from "../../src/services/microapp-sdk.js";
 import {
   applyRect,
   clearTimers,
@@ -17,7 +17,7 @@ type WrapChild = {
   key: string;
   basis: number;
   height: number;
-  part: UiPart<any>;
+  part: LayoutPart<any>;
   visible?: () => boolean;
 };
 type WrapMetrics = { rowsUsed: number };
@@ -32,7 +32,7 @@ function createWrappingRow(
   parent: blessed.Widgets.Node,
   children: WrapChild[],
   opts?: { gap?: number | { row?: number; column?: number } },
-): UiPart<void> & { metrics(): WrapMetrics } {
+): LayoutPart<void> & { metrics(): WrapMetrics } {
   const node = blessed.box({ parent, top: 0, left: 0, width: 0, height: 0 });
   for (const child of children) node.append(child.part.node);
   const rowGap = typeof opts?.gap === "number" ? opts.gap : opts?.gap?.row ?? 0;

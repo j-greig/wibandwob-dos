@@ -1,11 +1,11 @@
 import blessed from "blessed";
-import type { MicroappHost, Rect, UiPart } from "../../src/services/microapp-sdk.js";
-import { applyRect, createColumns, createNodePart, createStack } from "../../src/services/microapp-sdk.js";
+import type { MicroappHost, Rect, LayoutPart } from "../../src/services/microapp-sdk.js";
+import { applyRect, createRow, createNodePart, createStack } from "../../src/services/microapp-sdk.js";
 import { createScrollbar, scrollableStyle } from "../../src/core/ui-primitives.js";
 
 type Mode = "lg" | "md" | "sm";
 type TagMetrics = { rowsUsed: number };
-type TagChild = { key: string; basis: number; height: number; part: UiPart<any> };
+type TagChild = { key: string; basis: number; height: number; part: LayoutPart<any> };
 
 function pickMode(width: number): Mode {
   if (width >= 90) return "lg";
@@ -13,7 +13,7 @@ function pickMode(width: number): Mode {
   return "sm";
 }
 
-function createTagWrap(parent: blessed.Widgets.Node, children: TagChild[], gap = 1): UiPart<void> & { metrics(): TagMetrics } {
+function createTagWrap(parent: blessed.Widgets.Node, children: TagChild[], gap = 1): LayoutPart<void> & { metrics(): TagMetrics } {
   const node = blessed.box({ parent, top: 0, left: 0, width: 0, height: 0 });
   for (const child of children) node.append(child.part.node);
   let rowsUsed = 0;
@@ -52,7 +52,7 @@ function createTagWrap(parent: blessed.Widgets.Node, children: TagChild[], gap =
   };
 }
 
-function createPanel(parent: blessed.Widgets.Node, label: string): UiPart<Record<string, never>> & { render(lines?: string[]): void } {
+function createPanel(parent: blessed.Widgets.Node, label: string): LayoutPart<Record<string, never>> & { render(lines?: string[]): void } {
   const isDoc = label === "DOC";
   const node = blessed.box({
     parent,
@@ -134,7 +134,7 @@ export default function setup(host: MicroappHost) {
         { key: "df", basis: 1, part: docFooter },
       ]);
 
-      const toolbar = createColumns(win.body, [
+      const toolbar = createRow(win.body, [
         { key: "label", basis: 8, part: toolbarLabel },
         { key: "btnA", basis: 8, part: btnA },
         { key: "btnB", basis: 8, part: btnB },
@@ -142,7 +142,7 @@ export default function setup(host: MicroappHost) {
         { key: "status", basis: 20, part: toolbarStatus },
       ]);
 
-      const body = createColumns(win.body, [
+      const body = createRow(win.body, [
         { key: "nav", basis: 16, part: nav, visible: () => mode !== "sm" },
         { key: "divA", basis: 1, part: dividerA, visible: () => mode !== "sm" },
         { key: "document", basis: "1fr", part: document },

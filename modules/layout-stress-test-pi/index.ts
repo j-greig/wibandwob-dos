@@ -15,13 +15,13 @@
 
 import blessed from "blessed";
 import contrib from "blessed-contrib";
-import type { MicroappHost, Rect, UiPart } from "../../src/services/microapp-sdk.js";
+import type { MicroappHost, Rect, LayoutPart } from "../../src/services/microapp-sdk.js";
 import {
   applyRect,
   clearTimers,
   createNodePart,
   createStack,
-  createColumns,
+  createRow,
   createTimer,
   randHistory,
   renderFiglet,
@@ -159,7 +159,7 @@ export default function setup(host: MicroappHost) {
       const panelA = panel(content, "A: CONTRIB + FLEX", "green");
       const flexSide = panel(content, "Flex Side", "green");
 
-      const panelARow = createColumns(content, [
+      const panelARow = createRow(content, [
         { key: "contrib", basis: "1fr", part: panelA.part },
         { key: "flex-side", basis: 20, part: flexSide.part },
       ]);
@@ -222,7 +222,7 @@ export default function setup(host: MicroappHost) {
         { key: "d4", basis: "1fr", part: d4.part },
         { key: "tags", basis: 3, part: tagPart },
       ]);
-      const level3 = createColumns(panelD.node, [
+      const level3 = createRow(panelD.node, [
         { key: "d3", basis: 12, part: d3.part },
         { key: "level4", basis: "1fr", part: level4 },
       ]);
@@ -230,7 +230,7 @@ export default function setup(host: MicroappHost) {
         { key: "d2", basis: 3, part: d2.part },
         { key: "level3", basis: "1fr", part: level3 },
       ]);
-      const level1 = createColumns(panelD.node, [
+      const level1 = createRow(panelD.node, [
         { key: "d1", basis: 10, part: d1.part },
         { key: "level2", basis: "1fr", part: level2 },
       ]);
