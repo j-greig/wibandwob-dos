@@ -13,7 +13,7 @@ Maps every gap from `gap-analysis.md` §2 to its E036 feature or deferral status
 | Notification patterns | Medium | F07 (createToast) | Partially covered — confirm dialog deferred |
 | Command/quick action UI | Medium | — | Deferred — app-level palette exists, module-local deferred |
 | List/select patterns | Medium | F08 (createFilterableList) | Covered |
-| Rich text rendering primitives | Medium | F05 (createKeyValuePanel) | Partially covered — panel/columns/tree deferred |
+| Rich text rendering primitives | Medium | F05 (createKeyValuePanel, createLogView) | Partially covered — panel/columns/tree deferred |
 | Layout container variants | Medium | — | Deferred — centering/flow wrappers not in scope |
 | Component state variants | Medium | F00 (component behaviour contract, variant model) | Covered |
 | Design tokens / scale | Medium | F00 (spacing scale, control heights, density) | Covered |
