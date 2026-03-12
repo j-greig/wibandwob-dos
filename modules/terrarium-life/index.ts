@@ -6,7 +6,7 @@
  * Weather system, day/night cycle, narrative event log.
  * Creatures cross biome boundaries at dawn/dusk via migration corridors.
  *
- * Layout SDK: createGrid, createStack, createNodePart, pickBreakpoint.
+ * Layout SDK: createGrid, createStack, createNodePart.
  * Design: Wib & Wob (gpt53 session, creative brief 2026-03-12).
  */
 
@@ -18,7 +18,6 @@ import {
   createNodePart,
   createTimer,
   clearTimers,
-  pickBreakpoint,
   clamp,
 } from "../../src/services/microapp-sdk.js";
 
@@ -99,6 +98,7 @@ interface World {
   particles: Particle[];
   events: string[];
   nextId: number;
+  seed: number;
   paused: boolean;
   speed: number;
   autoCycle: boolean;
@@ -120,9 +120,11 @@ const CORRIDORS: Array<[BiomeId, BiomeId]> = [
 // ═══════════════════════════════════════════════════════════════════════════
 
 function createWorld(): World {
-  const rng = mulberry32(Date.now());
+  const seed = Date.now();
+  const rng = mulberry32(seed);
   const world: World = {
     tick: 0,
+    seed,
     dayPhase: 0.25,     // start at dawn
     weather: "clear",
     weatherTimer: 60,
@@ -1054,6 +1056,7 @@ function openTerrarium(host: MicroappHost) {
       weather: world.weather,
       speed: world.speed,
       paused: world.paused,
+      seed: world.seed,
       biomes: Object.fromEntries(
         biomeIds.map(b => [b, {
           total: world.creatures.filter(c => c.biome === b).length,
@@ -1082,8 +1085,7 @@ function openTerrarium(host: MicroappHost) {
 
   win.onCleanup(() => {
     clearTimers(timers);
-    biomeGrid.destroy();
-    root.destroy();
+    root.destroy(); // root owns biomeGrid via LayoutPart — single destroy
   });
 
   win.focus();

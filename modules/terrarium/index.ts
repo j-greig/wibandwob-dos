@@ -938,8 +938,7 @@ function openAntopolis(host: MicroappHost) {
 
   win.onCleanup(() => {
     clearTimers(timers);
-    biomeGrid.destroy();
-    root.destroy();
+    root.destroy(); // root owns biomeGrid via LayoutPart — single destroy
   });
 
   win.focus();
