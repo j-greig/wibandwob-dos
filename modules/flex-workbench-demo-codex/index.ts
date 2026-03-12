@@ -1,7 +1,6 @@
 import blessed from "blessed";
 import type { MicroappHost, Rect, LayoutPart } from "../../src/services/microapp-sdk.js";
-import { applyRect, createRow, createNodePart, createStack } from "../../src/services/microapp-sdk.js";
-import { createScrollbar, scrollableStyle } from "../../src/core/ui-primitives.js";
+import { applyRect, createRow, createNodePart, createStack, createScrollbar, scrollableStyle } from "../../src/services/microapp-sdk.js";
 
 type Mode = "lg" | "md" | "sm";
 type TagMetrics = { rowsUsed: number };

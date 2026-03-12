@@ -1,8 +1,6 @@
 import blessed from "blessed";
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
-import { applyRect, createNodePart } from "../../src/services/microapp-sdk.js";
-// Internal imports for theme-consistent scrollbar (not yet SDK-exported)
-import { createScrollbar, scrollableStyle } from "../../src/core/ui-primitives.js";
+import { applyRect, createNodePart, createScrollbar, scrollableStyle } from "../../src/services/microapp-sdk.js";
 
 type Mode = "lg" | "md" | "sm";
 

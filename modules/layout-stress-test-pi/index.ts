@@ -26,8 +26,9 @@ import {
   randHistory,
   renderFiglet,
   xLabels,
+  createScrollbar,
+  scrollableStyle,
 } from "../../src/services/microapp-sdk.js";
-import { createScrollbar, scrollableStyle } from "../../src/core/ui-primitives.js";
 
 // ── Types ────────────────────────────────────────────────────────────────
 

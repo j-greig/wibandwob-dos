@@ -81,9 +81,9 @@ The outcome is not just "new primitives exist." The outcome is:
   - mouse, keys, vi scroll wiring
   - theme-consistent styling
 - [x] Export from microapp-sdk
-- [ ] Port `responsive-panels-demo` to it as proof
-- [ ] Port `layout-stress-test` to it as proof
-- [ ] Port any real module already using bespoke viewport boilerplate
+- [x] Port `responsive-panels-demo` to it as proof (codex demo migrated to SDK scroll imports)
+- [x] Port `layout-stress-test` to it as proof (pi demo migrated to SDK scroll imports)
+- [x] Port any real module already using bespoke viewport boilerplate (flex-workbench-demo-codex migrated)
 
 ### F05 — Safety and internals cleanup
 - [x] Fix `createTextBlock` zero-width crash path
