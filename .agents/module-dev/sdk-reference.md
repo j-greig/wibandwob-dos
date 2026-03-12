@@ -3,6 +3,22 @@
 API surface for module authors. Import everything from
 `../../src/services/microapp-sdk.js`.
 
+## Component families
+
+| Family | Components |
+|--------|-----------|
+| **Layout** | createStack, createRow, createGrid, createNodePart, pickBreakpoint, createScrollViewport, applyRect |
+| **Chrome** | createHeaderBar, createStatusBar, createButtonBar, createBorderedPanel, createSidebarPanel, createRule |
+| **Content** | createTextBlock, createFigletDisplay, createMessageHistory, createContentStack, createCollapsibleBlock |
+| **Navigation** | createTabs, createSelectableList, createInlineSearch |
+| **Forms** | createInputLine, createButton, createCheckbox, createRadioGroup, createSelect |
+| **Data Display** | createKeyValuePanel, createLogView |
+| **Feedback** | createProgressBar, createSpinner |
+| **Animation** | createAnimationClock, tween, EASINGS |
+| **Rendering** | grid-canvas helpers, ascii-composition, figlet, markdown |
+
+All components follow the [component contract](component-contract.md).
+
 For the basics (manifest, skeleton, lifecycle hooks, verification):
 see `docs/building-custom-modules.md`.
 
