@@ -310,6 +310,218 @@ export function createRow(parent: blessed.Widgets.Node, children: FlexChild[]): 
 /** @deprecated Use `createRow` — kept for backward compatibility during migration. */
 export const createColumns = createRow;
 
+// ── createGrid ────────────────────────────────────────────────────────────
+
+/** @primitive */
+export type GridOptions = {
+  rows: number;
+  columns: number;
+  templateRows?: TrackSize[];
+  templateColumns?: TrackSize[];
+  gap?: Gap;
+  align?: Alignment;
+};
+
+/** @primitive */
+export type GridHandle = LayoutPart<void> & {
+  set(child: GridChild): void;
+  remove(key: string): void;
+};
+
+/**
+ * Resolve an array of TrackSize values into pixel sizes for a given total extent.
+ * Fixed values are taken first, then remaining space is distributed among fr values.
+ */
+function resolveTrackSizes(templates: TrackSize[], count: number, total: number): number[] {
+  // Build effective template array padded/truncated to `count`
+  const specs: TrackSize[] = [];
+  for (let i = 0; i < count; i++) {
+    specs.push(templates[i] ?? "1fr");
+  }
+
+  let fixedTotal = 0;
+  let frTotal = 0;
+  for (const spec of specs) {
+    const fr = parseFractionBasis(spec);
+    if (fr !== null) {
+      frTotal += fr;
+    } else {
+      fixedTotal += typeof spec === "number" ? Math.max(0, spec) : 0;
+    }
+  }
+
+  let remaining = Math.max(0, total - fixedTotal);
+  let remainingFr = frTotal;
+  const sizes: number[] = [];
+
+  for (const spec of specs) {
+    const fr = parseFractionBasis(spec);
+    if (fr !== null) {
+      if (remainingFr <= 0 || fr <= 0) {
+        sizes.push(0);
+      } else if (fr === remainingFr) {
+        sizes.push(remaining);
+        remaining = 0;
+        remainingFr = 0;
+      } else {
+        const size = Math.floor((remaining * fr) / remainingFr);
+        sizes.push(size);
+        remaining -= size;
+        remainingFr -= fr;
+      }
+    } else {
+      sizes.push(typeof spec === "number" ? Math.max(0, spec) : 0);
+    }
+  }
+
+  return sizes;
+}
+
+function resolveGap(gap: Gap | undefined): { rowGap: number; columnGap: number } {
+  if (gap === undefined) return { rowGap: 0, columnGap: 0 };
+  if (typeof gap === "number") return { rowGap: gap, columnGap: gap };
+  return { rowGap: gap.row ?? 0, columnGap: gap.column ?? 0 };
+}
+
+/** @primitive */
+export function createGrid(
+  parent: blessed.Widgets.Node,
+  options: GridOptions,
+): GridHandle {
+  const { rows, columns, gap: gapOpt, align: gridAlign } = options;
+  const templateRows = options.templateRows ?? [];
+  const templateColumns = options.templateColumns ?? [];
+
+  const node = blessed.box({
+    parent,
+    top: 0,
+    left: 0,
+    width: 0,
+    height: 0,
+    style: theme().body,
+  });
+
+  const childrenMap = new Map<string, GridChild>();
+
+  let lastRect: Rect = { top: 0, left: 0, width: 0, height: 0 };
+
+  function layoutChildren(rect: Rect) {
+    lastRect = {
+      top: rect.top,
+      left: rect.left,
+      width: clampSize(rect.width),
+      height: clampSize(rect.height),
+    };
+    applyRect(node, lastRect);
+
+    const { rowGap, columnGap } = resolveGap(gapOpt);
+
+    // Total gaps
+    const totalRowGap = Math.max(0, (rows - 1) * rowGap);
+    const totalColGap = Math.max(0, (columns - 1) * columnGap);
+
+    // Resolve track sizes
+    const colSizes = resolveTrackSizes(templateColumns, columns, lastRect.width - totalColGap);
+    const rowSizes = resolveTrackSizes(templateRows, rows, lastRect.height - totalRowGap);
+
+    // Compute cumulative offsets
+    const colOffsets: number[] = [0];
+    for (let c = 0; c < columns; c++) {
+      colOffsets.push(colOffsets[c]! + colSizes[c]! + (c < columns - 1 ? columnGap : 0));
+    }
+    const rowOffsets: number[] = [0];
+    for (let r = 0; r < rows; r++) {
+      rowOffsets.push(rowOffsets[r]! + rowSizes[r]! + (r < rows - 1 ? rowGap : 0));
+    }
+
+    // Layout each child
+    for (const child of childrenMap.values()) {
+      const isVisible = child.visible?.() !== false;
+      if (!isVisible) {
+        child.part.node.hide();
+        child.part.layout({ top: 0, left: 0, width: 0, height: 0 });
+        continue;
+      }
+
+      child.part.node.show();
+
+      const r = clamp(child.row, 0, rows - 1);
+      const c = clamp(child.column, 0, columns - 1);
+      const rSpan = clamp(child.rowSpan ?? 1, 1, rows - r);
+      const cSpan = clamp(child.columnSpan ?? 1, 1, columns - c);
+
+      const cellTop = rowOffsets[r]!;
+      const cellLeft = colOffsets[c]!;
+      const cellWidth = (colOffsets[c + cSpan] ?? colOffsets[columns]!) - cellLeft -
+        (c + cSpan < columns ? columnGap : 0);
+      const cellHeight = (rowOffsets[r + rSpan] ?? rowOffsets[rows]!) - cellTop -
+        (r + rSpan < rows ? rowGap : 0);
+
+      // Apply alignment within the cell
+      const align = child.align ?? gridAlign;
+      let childLeft = cellLeft;
+      let childTop = cellTop;
+      let childWidth = Math.max(0, cellWidth);
+      let childHeight = Math.max(0, cellHeight);
+
+      // Alignment only adjusts position, not size for grid cells
+      // (size fills the cell unless explicitly constrained — future enhancement)
+
+      child.part.layout({
+        top: childTop,
+        left: childLeft,
+        width: childWidth,
+        height: childHeight,
+      });
+    }
+  }
+
+  return {
+    node,
+    layout(rect) {
+      layoutChildren(rect);
+    },
+    update() {},
+    restyle() {
+      safeSetStyle(node, theme().body);
+      for (const child of childrenMap.values()) {
+        child.part.restyle();
+      }
+    },
+    destroy() {
+      for (const child of childrenMap.values()) {
+        child.part.destroy();
+      }
+      node.destroy();
+    },
+    set(child: GridChild) {
+      // Remove existing child with same key
+      const existing = childrenMap.get(child.key);
+      if (existing && existing.part !== child.part) {
+        existing.part.destroy();
+      }
+      childrenMap.set(child.key, child);
+      if (child.part.node.parent !== node) {
+        node.append(child.part.node);
+      }
+      // Re-layout if we have dimensions
+      if (lastRect.width > 0 || lastRect.height > 0) {
+        layoutChildren(lastRect);
+      }
+    },
+    remove(key: string) {
+      const child = childrenMap.get(key);
+      if (child) {
+        child.part.destroy();
+        childrenMap.delete(key);
+        if (lastRect.width > 0 || lastRect.height > 0) {
+          layoutChildren(lastRect);
+        }
+      }
+    },
+  };
+}
+
 /** @primitive */
 export function createHeaderBar(
   parent: blessed.Widgets.Node,

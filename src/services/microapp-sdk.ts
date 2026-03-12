@@ -144,6 +144,7 @@ export {
   createStack,
   createRow,
   createColumns,
+  createGrid,
   createHeaderBar,
   createStatusBar,
   createTextBlock,
@@ -210,6 +211,9 @@ export type {
   // Tabs
   TabDef,
   TabbedContainerHandle,
+  // Grid
+  GridOptions,
+  GridHandle,
   // Patterns
   PatternGenerator,
 } from "../core/ui-parts.js";

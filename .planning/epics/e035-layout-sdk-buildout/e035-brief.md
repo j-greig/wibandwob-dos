@@ -57,14 +57,14 @@ The outcome is not just "new primitives exist." The outcome is:
 - [x] Typecheck passes, no module regressions
 
 ### F02 — createGrid
-- [ ] Implement `createGrid` in `ui-parts.ts`
-- [ ] `templateRows` / `templateColumns` with `TrackSize = number | \`${number}fr\``
-- [ ] `gap: number | { row?, column? }`
-- [ ] Object-form `grid.set({ key, row, column, rowSpan?, columnSpan?, part })`
-- [ ] `justify` / `align` with fixed screen axes
-- [ ] Grid accepts `LayoutPart` children and returns `LayoutPart`
-- [ ] Export from microapp-sdk
-- [ ] Port dashboard module to `createGrid` as first proof
+- [x] Implement `createGrid` in `ui-parts.ts`
+- [x] `templateRows` / `templateColumns` with `TrackSize = number | \`${number}fr\``
+- [x] `gap: number | { row?, column? }`
+- [x] Object-form `grid.set({ key, row, column, rowSpan?, columnSpan?, part })`
+- [x] `justify` / `align` with fixed screen axes
+- [x] Grid accepts `LayoutPart` children and returns `LayoutPart`
+- [x] Export from microapp-sdk
+- [ ] Port dashboard module to `createGrid` as first proof (deferred to F06 — dashboard uses contrib.grid internally)
 
 ### F03 — Responsive helpers
 - [ ] Implement `pickBreakpoint`
