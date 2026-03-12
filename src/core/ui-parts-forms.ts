@@ -30,7 +30,6 @@ export interface ButtonOptions {
   label: string;
   onPress?: () => void;
   disabled?: boolean;
-  controlled?: boolean;
 }
 
 export type ButtonHandle = LayoutPart<Partial<ButtonOptions>>;
@@ -57,8 +56,7 @@ export function createButton(opts: ButtonOptions): ButtonHandle {
   });
 
   function renderLabel(): string {
-    const prefix = disabled ? " " : " ";
-    return `${prefix}[ ${label} ]`;
+    return ` [ ${label} ]`;
   }
 
   function getStyle(focused: boolean) {
@@ -420,7 +418,11 @@ export function createSelect(opts: SelectOptions): SelectHandle {
   function navigate(dir: number) {
     if (disabled || options.length === 0) return;
     const prev = selectedIndex >= 0 ? options[selectedIndex]!.value : undefined;
-    selectedIndex = ((selectedIndex + dir) + options.length) % options.length;
+    if (selectedIndex < 0) {
+      selectedIndex = dir > 0 ? 0 : options.length - 1;
+    } else {
+      selectedIndex = ((selectedIndex + dir) + options.length) % options.length;
+    }
     applyVisuals();
     onChange?.({
       value: options[selectedIndex]!.value,
@@ -436,6 +438,10 @@ export function createSelect(opts: SelectOptions): SelectHandle {
     if (disabled || !key) return;
     if (key.name === "left" || key.name === "up") navigate(-1);
     else if (key.name === "right" || key.name === "down") navigate(1);
+    else if (key.name === "enter" || key.name === "space") {
+      // Enter/Space confirms current or selects first if nothing picked
+      if (selectedIndex < 0 && options.length > 0) navigate(1);
+    }
   });
 
   node.on("click", () => {

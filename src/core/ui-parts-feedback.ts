@@ -134,6 +134,7 @@ export function createSpinner(opts: SpinnerOptions = {}): SpinnerHandle {
   }
 
   function renderContent(): string {
+    if (frames.length === 0) return label ? ` · ${label}` : " ·";
     const frame = frames[frameIndex % frames.length] ?? "·";
     return label ? ` ${frame} ${label}` : ` ${frame}`;
   }
