@@ -15,7 +15,7 @@ import {
   applyRect,
   createNodePart,
 } from "../core/ui-parts.js";
-import type { Rect, UiPart, StackChild } from "../core/ui-parts.js";
+import type { Rect, LayoutPart, UiPart, FlexChild, StackChild, GridChild, FlexBasis, TrackSize, AxisAlign, Alignment, Gap } from "../core/ui-parts.js";
 import type { BrowserEntry, GalleryTab } from "../core/types.js";
 import {
   createContourPlayer,
@@ -88,8 +88,16 @@ export type {
   MicroappSnapshotWindow,
   MicroappWindowHandle,
   Rect,
+  LayoutPart,
   UiPart,
+  FlexChild,
   StackChild,
+  GridChild,
+  FlexBasis,
+  TrackSize,
+  AxisAlign,
+  Alignment,
+  Gap,
   LazyMountedPlayer,
   SavedTerrainArtifact,
   TerrainBiome,
@@ -134,6 +142,7 @@ export {
 export {
   clamp,
   createStack,
+  createRow,
   createColumns,
   createHeaderBar,
   createStatusBar,

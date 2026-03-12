@@ -15,7 +15,7 @@ import { createScrollbar, safeSetStyle, scrollableStyle } from "./ui-primitives.
 export type Rect = { top: number; left: number; width: number; height: number };
 
 /** @primitive */
-export type UiPart<Props = void> = {
+export type LayoutPart<Props = void> = {
   node: blessed.Widgets.BoxElement;
   layout(rect: Rect): void;
   update(props: Props): void;
@@ -23,12 +23,52 @@ export type UiPart<Props = void> = {
   destroy(): void;
 };
 
+/** @deprecated Use `LayoutPart` — kept for backward compatibility during migration. */
+export type UiPart<Props = void> = LayoutPart<Props>;
+
 /** @primitive */
-export type StackChild = {
+export type FlexBasis = number | `${number}fr`;
+
+/** @primitive */
+export type TrackSize = number | `${number}fr`;
+
+/** @primitive */
+export type AxisAlign = "start" | "center" | "end";
+
+/** @primitive */
+export type Alignment = {
+  justify?: AxisAlign; // horizontal
+  align?: AxisAlign;   // vertical
+};
+
+/** @primitive */
+export type Gap = number | {
+  row?: number;
+  column?: number;
+};
+
+/** @primitive */
+export type FlexChild = {
   key: string;
-  basis: number | string;
-  part: UiPart<any>;
+  basis: FlexBasis;
+  part: LayoutPart<any>;
   visible?: () => boolean;
+  align?: Alignment;
+};
+
+/** @deprecated Use `FlexChild` — kept for backward compatibility during migration. */
+export type StackChild = FlexChild;
+
+/** @primitive */
+export type GridChild = {
+  key: string;
+  row: number;
+  column: number;
+  rowSpan?: number;
+  columnSpan?: number;
+  part: LayoutPart<any>;
+  visible?: () => boolean;
+  align?: Alignment;
 };
 
 type Axis = "vertical" | "horizontal";
@@ -49,11 +89,11 @@ export function applyRect(node: blessed.Widgets.BoxElement, rect: Rect): void {
   node.height = clampSize(rect.height);
 }
 
-/** Wrap a raw blessed box as a UiPart so it can participate in createStack/createColumns layout. */
+/** Wrap a raw blessed box as a LayoutPart so it can participate in createStack/createRow layout. */
 export function createNodePart(
   node: blessed.Widgets.BoxElement,
   opts?: { restyle?: () => void }
-): UiPart<Record<string, never>> {
+): LayoutPart<Record<string, never>> {
   return {
     node,
     layout(rect) { applyRect(node, rect); },
@@ -152,9 +192,9 @@ function renderAlignedBar(left: string, right: string | undefined, width: number
 
 function createLinearLayout(
   parent: blessed.Widgets.Node,
-  children: StackChild[],
+  children: FlexChild[],
   axis: Axis
-): UiPart<void> {
+): LayoutPart<void> {
   const node = blessed.box({
     parent,
     top: 0,
@@ -258,14 +298,17 @@ function createLinearLayout(
 }
 
 /** @primitive */
-export function createStack(parent: blessed.Widgets.Node, children: StackChild[]): UiPart<void> {
+export function createStack(parent: blessed.Widgets.Node, children: FlexChild[]): LayoutPart<void> {
   return createLinearLayout(parent, children, "vertical");
 }
 
 /** @primitive */
-export function createColumns(parent: blessed.Widgets.Node, children: StackChild[]): UiPart<void> {
+export function createRow(parent: blessed.Widgets.Node, children: FlexChild[]): LayoutPart<void> {
   return createLinearLayout(parent, children, "horizontal");
 }
+
+/** @deprecated Use `createRow` — kept for backward compatibility during migration. */
+export const createColumns = createRow;
 
 /** @primitive */
 export function createHeaderBar(

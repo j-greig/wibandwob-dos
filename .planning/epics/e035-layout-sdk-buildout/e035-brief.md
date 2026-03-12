@@ -35,8 +35,8 @@ The outcome is not just "new primitives exist." The outcome is:
 ## Build order
 
 ### F00 — Canon surface lock
-- [ ] Freeze the public vocabulary from `layout-guide-final.md`
-- [ ] Confirm the implementation target names:
+- [x] Freeze the public vocabulary from `layout-guide-final.md`
+- [x] Confirm the implementation target names:
   - `LayoutPart`
   - `createStack`
   - `createRow`
@@ -45,16 +45,16 @@ The outcome is not just "new primitives exist." The outcome is:
   - `templateColumns`
   - `gap: number | { row?, column? }`
   - fixed-axis `justify` / `align`
-- [ ] Record any migration notes in planning docs, not in the canon guide
+- [x] Record any migration notes in planning docs, not in the canon guide
 
 ### F01 — Core renames and composition foundation
-- [ ] Rename `UiPart` to `LayoutPart` across the SDK and internals
-- [ ] Rename `createColumns` to `createRow` across the codebase
-- [ ] Extract `FlexChild` type
-- [ ] Extract `GridChild` type
-- [ ] Ensure flex helpers accept `LayoutPart` children and return `LayoutPart`
-- [ ] Export `Rect`, `LayoutPart`, `FlexChild`, `GridChild` from microapp-sdk
-- [ ] Typecheck passes, no module regressions
+- [x] Rename `UiPart` to `LayoutPart` across the SDK and internals
+- [x] Rename `createColumns` to `createRow` across the codebase
+- [x] Extract `FlexChild` type
+- [x] Extract `GridChild` type
+- [x] Ensure flex helpers accept `LayoutPart` children and return `LayoutPart`
+- [x] Export `Rect`, `LayoutPart`, `FlexChild`, `GridChild` from microapp-sdk
+- [x] Typecheck passes, no module regressions
 
 ### F02 — createGrid
 - [ ] Implement `createGrid` in `ui-parts.ts`

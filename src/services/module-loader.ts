@@ -34,12 +34,12 @@ import type {
 } from "./world-chat-service.js";
 import type { WorldChatTransportStatus } from "./world-chat-transport.js";
 import {
-  createStack, createColumns,
+  createStack, createRow, createColumns,
   createHeaderBar, createStatusBar, createTextBlock,
   createRule, createFigletDisplay, createAnimatedPanel,
   createButtonBar, applyRect,
 } from "../core/ui-parts.js";
-import type { Rect, UiPart, StackChild } from "../core/ui-parts.js";
+import type { Rect, LayoutPart, UiPart, FlexChild, StackChild, GridChild } from "../core/ui-parts.js";
 
 // ---------------------------------------------------------------------------
 // Manifest types
@@ -114,6 +114,7 @@ export interface MicroappHost {
   /** Layout + content primitives. Import these instead of reaching into src/. */
   readonly ui: {
     createStack: typeof createStack;
+    createRow: typeof createRow;
     createColumns: typeof createColumns;
     createHeaderBar: typeof createHeaderBar;
     createStatusBar: typeof createStatusBar;
@@ -129,7 +130,7 @@ export interface MicroappHost {
 }
 
 /** Re-exported types for microapp authors who need them in annotations. */
-export type { Rect, UiPart, StackChild };
+export type { Rect, LayoutPart, UiPart, FlexChild, StackChild, GridChild };
 
 /** Window object passed to a microapp's registerSnapshot serialize handler. */
 export type MicroappSnapshotWindow = { describeState?: () => Record<string, unknown> };
@@ -316,6 +317,7 @@ function createMicroappHost(
 
     ui: {
       createStack,
+      createRow,
       createColumns,
       createHeaderBar,
       createStatusBar,
