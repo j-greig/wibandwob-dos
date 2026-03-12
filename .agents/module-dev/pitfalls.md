@@ -62,3 +62,26 @@ a function call.
 |---------|-----|
 | `persist: true` in manifest but no `registerSnapshot` | Either add the handler or set `persist: false` |
 | Serializing widget state directly | Serialize your own state model, not blessed widget properties |
+
+## Interstitial pickers and prompts (API automation)
+
+| Mistake | Fix |
+|---------|-----|
+| Opening flow starts with a local blessed picker/prompt but exposes no command hooks | Add module commands for picker state + actions (e.g. `picker.info`, `picker.select`, `picker.confirm`, `picker.cancel`) |
+| Picker exists outside shared overlay manager, so `overlay.confirm/cancel` do nothing | Either use shared overlay primitives, or provide module-local confirm/cancel commands explicitly |
+| "Open" command returns ok but no final app window appears (stuck on interstitial) | Treat interstitial as first-class state: expose current selection + deterministic next-step commands |
+| Automation can open only default/first option | Support index-based selection in commands (`args.index`) before confirm |
+
+## Multi-command modules
+
+| Mistake | Fix |
+|---------|-----|
+| Two commands in one module both create different windows, but only one opens | `focusOrCreate` uses `moduleId` as the key — if `multiInstance` is false (the default), the second command just focuses the first command's existing window. Set `multiInstance: true` on commands that create distinct windows, or provide args that skip the picker entirely. |
+| Module manifest has `multiInstance: false` but commands set `multiInstance: true` | The command-level flag wins — `def.multiInstance ?? manifest.multiInstance ?? false`. But check both levels if windows aren't opening. |
+
+## Testing and restarts
+
+| Mistake | Fix |
+|---------|-----|
+| Code changes have no effect after restart | The old process is still alive on the port. Check the session ID: `curl /health` — if it matches the old one, the kill didn't work. Use `kill -9 $(lsof -ti:8099)` as last resort, then `reset` the terminal. |
+| `kill $(cat scratch/wibwob.pid)` and restart, but same session ID | PID file is stale or SIGTERM was ignored. Always verify the session ID changed after restart. |
