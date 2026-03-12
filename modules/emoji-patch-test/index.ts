@@ -31,6 +31,7 @@
  */
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
 import blessed from "blessed";
+import { sanitizeForBlessed } from "../../src/core/unicode-patch.js";
 
 export default function setup(host: MicroappHost) {
   host.registerCommand({
@@ -71,6 +72,24 @@ export default function setup(host: MicroappHost) {
           "Skin tones   |👋🏻 👋🏽 👋🏿|",
           "Keycaps      |1️⃣ 2️⃣ 3️⃣|",
           "ZWJ          |👨‍👩‍👧‍👦 👩‍💻|",
+          "",
+          "--- SANITIZED (broken sequences stripped) ---",
+          "",
+          ...(() => {
+            const broken = [
+              ["Flags raw", "🇬🇧 🇺🇸 🇯🇵 🇫🇷 🇩🇪"],
+              ["Skin raw", "👋🏻 👋🏽 👋🏿"],
+              ["ZWJ raw", "👨‍👩‍👧‍👦 👩‍💻 🧑‍🚀"],
+              ["Keycaps raw", "1️⃣ 2️⃣ 3️⃣"],
+            ];
+            const lines: string[] = [];
+            for (const [label, text] of broken) {
+              const clean = sanitizeForBlessed(text);
+              lines.push(`${label.padEnd(14)}|${text}|`);
+              lines.push(`  sanitized   |${clean}|`);
+            }
+            return lines;
+          })(),
           "",
           "Close window: no ghost chars = cleanup PASS",
         ].join("\n"),

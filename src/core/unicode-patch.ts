@@ -18,9 +18,85 @@
  * extending blessed's existing ranges with the ones it misses.
  *
  * MUST be called before blessed.screen() is created.
+ *
+ * ═══════════════════════════════════════════════════════════════
+ * EMOJI BLOCKLIST — categories that break blessed layout
+ * ═══════════════════════════════════════════════════════════════
+ *
+ * SAFE (width correct, renders fine):
+ *   - Single codepoint emoji: 😀😎🔥💀👻🎉🚀⭐🐱🐶🍕🍔🌞🌙
+ *   - CJK ideographs: 漢字日本語中文
+ *   - Hangul syllables: 한글가나다
+ *   - Trigrams: ☰☱☲☳☴☵☶☷
+ *   - Box drawing, braille, blocks, arrows, math symbols
+ *
+ * BROKEN (blessed decomposes multi-codepoint sequences into separate cells):
+ *   - Flags (regional indicators):  🇬🇧 🇺🇸 🇯🇵 → shows as letter pairs
+ *   - Skin tone modifiers:          👋🏽 👍🏿 → base + modifier as 2 glyphs
+ *   - ZWJ sequences:                👨‍👩‍👧‍👦 👩‍💻 → individual emoji
+ *   - Keycap sequences:             1️⃣ 2️⃣ → inconsistent spacing
+ *   - Variation selectors (VS16):   ☺️ ☠️ → mostly ok but width unreliable
+ *
+ * WORKAROUND for content you control: use only single-codepoint emoji.
+ * For user-generated content: strip or replace blocklisted sequences
+ * before passing to blessed, or accept layout glitches.
+ *
+ * Root cause: blessed parseContent (element.js ~line 2047) builds cells
+ * one codepoint at a time. ZWJ (U+200D), regional indicators, skin tone
+ * modifiers, and variation selectors are not in blessed's combining table,
+ * so each codepoint becomes its own cell. Fixing requires rewriting the
+ * cell builder to be grapheme-cluster-aware.
  */
 
 import stringWidth from "string-width";
+
+// ── blessed-safe text sanitizer ─────────────────────────────────
+//
+// Regex that matches multi-codepoint sequences blessed can't handle:
+//   - Regional indicator pairs (flags): \uD83C[\uDDE6-\uDDFF]{2}
+//   - Skin tone modifiers: \uD83C[\uDFFB-\uDFFF]
+//   - ZWJ (U+200D) and anything joined by it
+//   - Variation selector VS16 (U+FE0F)
+//   - Keycap combining sequence: digit + VS16 + U+20E3
+
+// Matches flag pairs: two regional indicator symbols
+const RE_FLAGS = /\uD83C[\uDDE6-\uDDFF]\uD83C[\uDDE6-\uDDFF]/g;
+
+// Matches skin tone modifier following any emoji
+const RE_SKIN = /(\uD83C[\uDFFB-\uDFFF])/g;
+
+// Matches ZWJ + next codepoint (surrogate pair or BMP char)
+const RE_ZWJ = /\u200D(?:[\uD800-\uDBFF][\uDC00-\uDFFF]|[\s\S])/g;
+
+// Matches VS16 (variation selector that makes text emoji graphic)
+const RE_VS16 = /\uFE0F/g;
+
+// Matches keycap combining mark
+const RE_KEYCAP = /\u20E3/g;
+
+/**
+ * Strip multi-codepoint emoji sequences that blessed can't render correctly.
+ * Replaces each broken sequence with a placeholder that occupies the right
+ * number of columns so layout doesn't shift.
+ *
+ * Use on any text before passing to blessed setContent/pushLine.
+ *
+ *   import { sanitizeForBlessed } from "./unicode-patch.js";
+ *   box.setContent(sanitizeForBlessed(userText));
+ */
+export function sanitizeForBlessed(text: string): string {
+  return text
+    // Flags → two-char replacement (flags are 2 cols wide)
+    .replace(RE_FLAGS, "🏴")
+    // Remove skin tone modifiers (base emoji stays, modifier vanishes)
+    .replace(RE_SKIN, "")
+    // Remove ZWJ + following char (keeps first emoji of sequence)
+    .replace(RE_ZWJ, "")
+    // Remove VS16 (text presentation is fine, graphic selector causes width mismatch)
+    .replace(RE_VS16, "")
+    // Remove keycap combining mark
+    .replace(RE_KEYCAP, "");
+}
 
 // ── charWidth patch ─────────────────────────────────────────────
 
