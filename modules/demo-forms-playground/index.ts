@@ -10,10 +10,14 @@ import type { MicroappHost } from "../../src/services/microapp-sdk.js";
 import {
   createStack,
   createNodePart,
+  createTimer,
+  clearTimers,
   createButton,
   createCheckbox,
   createRadioGroup,
   createSelect,
+  createProgressBar,
+  createSpinner,
 } from "../../src/services/microapp-sdk.js";
 
 export default function setup(host: MicroappHost) {
@@ -88,8 +92,16 @@ function openPlayground(host: MicroappHost) {
     style: { fg: "cyan", bg: "black" },
   });
 
+  const feedbackLabel = blessed.box({
+    parent: win.body, top: 0, left: 0, width: 0, height: 1,
+    tags: false,
+    content: " FEEDBACK",
+    style: { fg: "cyan", bg: "black" },
+  });
+
   // ── Controls ────────────────────────────────────────────────────────
 
+  const timers = new Set<ReturnType<typeof setInterval>>();
   let clickCount = 0;
 
   const btn1 = createButton({
@@ -141,6 +153,20 @@ function openPlayground(host: MicroappHost) {
     onChange: (e) => log(`Colour: ${e.value}`),
   });
 
+  const progress = createProgressBar({ value: 0, max: 100, label: "Progress" });
+  const spinner = createSpinner({ label: "Processing..." });
+
+  // Auto-increment progress for demo
+  let progressVal = 0;
+  createTimer(() => {
+    progressVal = (progressVal + 1) % 101;
+    progress.update({ value: progressVal });
+    if (progressVal === 100) {
+      log("Progress complete!");
+      progressVal = 0;
+    }
+  }, 200, timers);
+
   // ── Layout ──────────────────────────────────────────────────────────
 
   const root = createStack(win.body, [
@@ -156,6 +182,9 @@ function openPlayground(host: MicroappHost) {
     { key: "radio",       basis: 4,     part: radio },
     { key: "selectLabel", basis: 1,     part: createNodePart(selectLabel) },
     { key: "sel",         basis: 1,     part: sel },
+    { key: "fbLabel",     basis: 1,     part: createNodePart(feedbackLabel) },
+    { key: "progress",    basis: 1,     part: progress },
+    { key: "spinner",     basis: 1,     part: spinner },
     { key: "log",         basis: "1fr", part: createNodePart(logBox) },
   ]);
 
@@ -197,12 +226,14 @@ function openPlayground(host: MicroappHost) {
     cbLabel.style = { fg: "cyan", bg: "black" };
     radioLabel.style = { fg: "cyan", bg: "black" };
     selectLabel.style = { fg: "cyan", bg: "black" };
+    feedbackLabel.style = { fg: "cyan", bg: "black" };
     logBox.style = { ...t.body, border: { fg: t.muted.fg } };
     root.restyle();
     host.screen.render();
   });
 
   win.onCleanup(() => {
+    clearTimers(timers);
     root.destroy();
   });
 

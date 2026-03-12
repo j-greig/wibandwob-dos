@@ -22,6 +22,13 @@ export type {
   ChangeEvent, SelectEvent,
 } from "./ui-parts-forms.js";
 
+// Re-export feedback components
+export { createProgressBar, createSpinner } from "./ui-parts-feedback.js";
+export type {
+  ProgressBarOptions, ProgressBarHandle,
+  SpinnerOptions, SpinnerHandle,
+} from "./ui-parts-feedback.js";
+
 /** @primitive */
 export type Rect = { top: number; left: number; width: number; height: number };
 

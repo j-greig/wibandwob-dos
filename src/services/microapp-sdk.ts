@@ -243,6 +243,13 @@ export type {
   ChangeEvent, SelectEvent,
 } from "../core/ui-parts-forms.js";
 
+// Feedback components — progress bars, spinners
+export { createProgressBar, createSpinner } from "../core/ui-parts-feedback.js";
+export type {
+  ProgressBarOptions, ProgressBarHandle,
+  SpinnerOptions, SpinnerHandle,
+} from "../core/ui-parts-feedback.js";
+
 // Motion / tween — animate values, window position and size smoothly
 export { tween, tweenWindowPosition, tweenWindowSize, EASINGS } from "./motion-service.js";
 export type { EasingFn, TweenOpts } from "./motion-service.js";
