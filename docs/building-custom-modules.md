@@ -303,12 +303,12 @@ After creating your module:
 
 ## Examples in the repo
 
-- `modules/hello-world/` — minimal static example (figlet banner)
-- `modules/heartbeat/` — animated example with timers and state reporting
-- `modules/glitchbox/` — complex animated surface with multiple commands
+- `modules/demo-hello-world/` — minimal static example (figlet banner)
+- `modules/demo-heartbeat/` — animated example with timers and state reporting
+- `modules/demo-glitchbox/` — complex animated surface with multiple commands
 - `modules/dream-forecast/` — stateful microapp with per-window model
-- `modules/e026-demo/` — broad feature sampler (tween, tree widget, sidebar)
-- `modules/wibwob-poetry-clock/` — compact but lived-in real app
+- `modules/demo-e026-demo/` — broad feature sampler (tween, tree widget, sidebar)
+- `modules/demo-wibwob-poetry-clock/` — compact but lived-in real app
 
 ## Further reading
 

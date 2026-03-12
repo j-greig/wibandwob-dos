@@ -20,10 +20,10 @@ Quick start (30-second pattern): `.agents/module-dev/quick-start.md`
 
 | Tier | Module | What it shows |
 |------|--------|--------------|
-| Static | `modules/hello-world/` | Responsive figlet, onResize, no timers |
-| Animated | `modules/heartbeat/` | createTimer, cleanup, structured describeState |
-| Persistent | `modules/wibwob-poetry-clock/` | registerSnapshot, AI integration, modes |
-| SDK sampler | `modules/e026-demo/` | Trees, tabs, tweens, patterns — reference catalogue |
+| Static | `modules/demo-hello-world/` | Responsive figlet, onResize, no timers |
+| Animated | `modules/demo-heartbeat/` | createTimer, cleanup, structured describeState |
+| Persistent | `modules/demo-wibwob-poetry-clock/` | registerSnapshot, AI integration, modes |
+| SDK sampler | `modules/demo-e026-demo/` | Trees, tabs, tweens, patterns — reference catalogue |
 
 Full examples guide: `.agents/module-dev/examples-by-tier.md`
 

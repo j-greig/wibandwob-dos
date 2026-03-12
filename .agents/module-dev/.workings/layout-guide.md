@@ -473,7 +473,7 @@ This module uses createStack (vertical) and createRow (horizontal) with
 conditional visibility. It is the gold-standard flex example.
 
 ```typescript
-// modules/wibwob-poetry-clock/index.ts
+// modules/demo-wibwob-poetry-clock/index.ts
 /**
  * Poetry Clock — a microapp that tells the time as a tiny poem every minute.
  * Inspired by Poem/1 by Matt Webb / Acts Not Facts.

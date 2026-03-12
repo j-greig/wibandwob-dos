@@ -11,7 +11,7 @@ Current reusable path:
 - animated subsurface bridge: `createEmbeddedLivePlayer(...)`
 - layer compositor: `composeAsciiLayers(...)`
 - text block helper: `renderAsciiTextBlock(...)`
-- canonical proving surface: `modules/touchlab-mvp/`
+- canonical proving surface: `modules/demo-touchlab-mvp/`
 
 Current judgement on Blessed custom stream routing:
 
@@ -158,7 +158,7 @@ Still local to TouchLab MVP for now:
 
 Real adopter landed:
 
-- `modules/touchlab-mvp/`
+- `modules/demo-touchlab-mvp/`
   - GEN is a source using the embedded animation bridge
   - TEXT is a source
   - INPUT is a parameter/source hybrid
