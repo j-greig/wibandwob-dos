@@ -1,3 +1,34 @@
+/**
+ * emoji-patch-test — Visual test for blessed unicode monkey-patch.
+ *
+ * RESULTS (as of 2026-03-11, blessed + string-width v8 patch):
+ *
+ * WORKING (pipes align, correct width):
+ *   Single-width: ASCII, box drawing (─┐│), braille (⣿), blocks (░▒▓█),
+ *                 arrows (←→↑↓), math (∀∃∅∇∈)
+ *   Double-width: CJK (漢字日本), Hangul (한글가나), trigrams (☰☱☲),
+ *                 emoji faces (😀😎🔥), animals (🐱🐶🐸), food (🍕🍔),
+ *                 weather (🌞🌙⛅), objects (🚀⭐🎉)
+ *
+ * PARTIALLY WORKING (render but blessed decomposes into separate cells):
+ *   Flags:      🇬🇧 shows as two regional indicator letters, not flag glyph
+ *   Skin tones: 👋🏽 shows base hand + modifier as separate glyphs
+ *   Keycaps:    1️⃣ renders but spacing inconsistent
+ *   ZWJ:        👨‍👩‍👧‍👦 decomposes into 👨👩👧👦 (four separate emoji)
+ *
+ * WHY multi-codepoint fails: blessed's parseContent splits content into
+ * cells one codepoint at a time (element.js ~line 2047). It only merges
+ * blessed "combining" chars (from its own combining table). ZWJ (U+200D),
+ * regional indicators, skin tone modifiers, and variation selectors are
+ * NOT in that table, so each codepoint becomes its own cell. Fixing this
+ * would require rewriting the cell builder to be grapheme-cluster-aware.
+ *
+ * GHOST ARTIFACTS: double-width chars leave trails when windows are dragged.
+ * Mitigated by screen.alloc() before every render (forces full repaint).
+ * Some minor right-border bleed on CJK/Hangul/Trigram rows persists.
+ *
+ * See: src/core/unicode-patch.ts, LINGO.md (unicode terms)
+ */
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
 import blessed from "blessed";
 
