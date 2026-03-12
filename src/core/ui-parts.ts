@@ -29,6 +29,13 @@ export type {
   SpinnerOptions, SpinnerHandle,
 } from "./ui-parts-feedback.js";
 
+// Re-export data display components
+export { createKeyValuePanel, createLogView } from "./ui-parts-data.js";
+export type {
+  KVEntry, KeyValuePanelOptions, KeyValuePanelHandle,
+  LogSeverity, LogEntry, LogViewOptions, LogViewHandle,
+} from "./ui-parts-data.js";
+
 /** @primitive */
 export type Rect = { top: number; left: number; width: number; height: number };
 

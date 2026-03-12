@@ -250,6 +250,13 @@ export type {
   SpinnerOptions, SpinnerHandle,
 } from "../core/ui-parts-feedback.js";
 
+// Data display components — key-value panels, log views
+export { createKeyValuePanel, createLogView } from "../core/ui-parts-data.js";
+export type {
+  KVEntry, KeyValuePanelOptions, KeyValuePanelHandle,
+  LogSeverity, LogEntry, LogViewOptions, LogViewHandle,
+} from "../core/ui-parts-data.js";
+
 // Motion / tween — animate values, window position and size smoothly
 export { tween, tweenWindowPosition, tweenWindowSize, EASINGS } from "./motion-service.js";
 export type { EasingFn, TweenOpts } from "./motion-service.js";
