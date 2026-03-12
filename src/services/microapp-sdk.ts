@@ -145,6 +145,9 @@ export {
   createRow,
   createColumns,
   createGrid,
+  createScrollViewport,
+  pickBreakpoint,
+  DEFAULT_BREAKPOINTS,
   createHeaderBar,
   createStatusBar,
   createTextBlock,
@@ -214,6 +217,12 @@ export type {
   // Grid
   GridOptions,
   GridHandle,
+  // Responsive
+  BreakpointName,
+  BreakpointEntry,
+  // Scroll viewport
+  ScrollViewportOptions,
+  ScrollViewportHandle,
   // Patterns
   PatternGenerator,
 } from "../core/ui-parts.js";
@@ -224,6 +233,9 @@ export type {
 
 // Timers — use instead of raw setInterval for proper cleanup
 export { createTimer, clearTimers } from "../core/ui-primitives.js";
+
+// Scroll helpers — use with scrollable blessed boxes
+export { createScrollbar, scrollableStyle } from "../core/ui-primitives.js";
 
 // Motion / tween — animate values, window position and size smoothly
 export { tween, tweenWindowPosition, tweenWindowSize, EASINGS } from "./motion-service.js";

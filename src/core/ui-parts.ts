@@ -310,6 +310,62 @@ export function createRow(parent: blessed.Widgets.Node, children: FlexChild[]): 
 /** @deprecated Use `createRow` — kept for backward compatibility during migration. */
 export const createColumns = createRow;
 
+// ── Responsive helpers ────────────────────────────────────────────────────
+
+/** @primitive */
+export type BreakpointName = "xs" | "sm" | "md" | "lg" | "xl";
+
+/** @primitive */
+export type BreakpointEntry<T extends string = BreakpointName> = {
+  name: T;
+  minWidth: number;
+};
+
+/**
+ * Standard breakpoints for terminal layouts.
+ * Modules can use these directly or define custom entries.
+ */
+export const DEFAULT_BREAKPOINTS: BreakpointEntry[] = [
+  { name: "xs", minWidth: 0 },
+  { name: "sm", minWidth: 40 },
+  { name: "md", minWidth: 60 },
+  { name: "lg", minWidth: 80 },
+  { name: "xl", minWidth: 120 },
+];
+
+/**
+ * Pick the best matching breakpoint for a given width.
+ *
+ * Entries must be sorted ascending by minWidth (largest matching wins).
+ * Returns the name of the matched breakpoint.
+ *
+ * @example
+ * const mode = pickBreakpoint(width, [
+ *   { name: "sm", minWidth: 0 },
+ *   { name: "md", minWidth: 50 },
+ *   { name: "lg", minWidth: 80 },
+ * ]);
+ *
+ * @example
+ * // Using default breakpoints:
+ * const mode = pickBreakpoint(width);
+ *
+ * @primitive
+ */
+export function pickBreakpoint<T extends string>(
+  width: number,
+  entries?: BreakpointEntry<T>[],
+): T {
+  const bp = entries ?? (DEFAULT_BREAKPOINTS as BreakpointEntry<T>[]);
+  let matched = bp[0]!.name;
+  for (const entry of bp) {
+    if (width >= entry.minWidth) {
+      matched = entry.name;
+    }
+  }
+  return matched;
+}
+
 // ── createGrid ────────────────────────────────────────────────────────────
 
 /** @primitive */
@@ -999,6 +1055,165 @@ export function createButtonBar<Id extends string>(
     },
     destroy() {
       bar.destroy();
+    },
+  };
+}
+
+// ── Scroll viewport ───────────────────────────────────────────────────────────
+
+/** @primitive */
+export type ScrollViewportOptions = {
+  /** Fixed header height in rows (0 = no header). */
+  headerHeight?: number;
+  /** Fixed footer height in rows (0 = no footer). */
+  footerHeight?: number;
+  /** Show scrollbar only when content overflows viewport. Default: true. */
+  conditionalScrollbar?: boolean;
+};
+
+/** @primitive */
+export type ScrollViewportHandle = LayoutPart<void> & {
+  /** The fixed header region (if headerHeight > 0). Attach header content here. */
+  header: blessed.Widgets.BoxElement | null;
+  /** The scrollable middle viewport. Attach scrollable content here. */
+  viewport: blessed.Widgets.BoxElement;
+  /** The fixed footer region (if footerHeight > 0). Attach footer content here. */
+  footer: blessed.Widgets.BoxElement | null;
+  /** Scroll to the bottom of the viewport. */
+  scrollToBottom(): void;
+  /** Scroll to the top of the viewport. */
+  scrollToTop(): void;
+  /** Current scroll position as percentage (0-100). */
+  scrollPercent(): number;
+};
+
+/**
+ * Creates a scrollable viewport with optional fixed header and footer.
+ *
+ * The viewport is the scrollable middle region. Content appended to it
+ * can grow beyond the visible height and will scroll with mouse, keys,
+ * and vi-style bindings (j/k/g/G/Ctrl-d/Ctrl-u).
+ *
+ * @primitive
+ */
+export function createScrollViewport(
+  parent: blessed.Widgets.Node,
+  options?: ScrollViewportOptions,
+): ScrollViewportHandle {
+  const headerHeight = options?.headerHeight ?? 0;
+  const footerHeight = options?.footerHeight ?? 0;
+  const conditionalScrollbar = options?.conditionalScrollbar ?? true;
+
+  const container = blessed.box({
+    parent,
+    top: 0,
+    left: 0,
+    width: 0,
+    height: 0,
+    style: theme().body,
+  });
+
+  const headerNode = headerHeight > 0
+    ? blessed.box({
+        parent: container,
+        top: 0,
+        left: 0,
+        width: "100%" as any,
+        height: headerHeight,
+        style: theme().header,
+      })
+    : null;
+
+  const viewport = blessed.box({
+    parent: container,
+    top: headerHeight,
+    left: 0,
+    width: "100%" as any,
+    height: 0,
+    mouse: true,
+    keys: true,
+    scrollable: true,
+    alwaysScroll: true,
+    scrollbar: createScrollbar(),
+    style: scrollableStyle(theme().body),
+  });
+
+  const footerNode = footerHeight > 0
+    ? blessed.box({
+        parent: container,
+        bottom: 0,
+        left: 0,
+        width: "100%" as any,
+        height: footerHeight,
+        style: theme().header,
+      })
+    : null;
+
+  let lastRect: Rect = { top: 0, left: 0, width: 0, height: 0 };
+
+  function layoutInternal(rect: Rect) {
+    lastRect = rect;
+    applyRect(container, rect);
+
+    const totalHeight = clampSize(rect.height);
+    const viewportHeight = Math.max(0, totalHeight - headerHeight - footerHeight);
+
+    if (headerNode) {
+      headerNode.top = 0;
+      headerNode.left = 0;
+      headerNode.width = rect.width;
+      headerNode.height = headerHeight;
+    }
+
+    viewport.top = headerHeight;
+    viewport.left = 0;
+    viewport.width = rect.width;
+    viewport.height = viewportHeight;
+
+    if (footerNode) {
+      footerNode.top = headerHeight + viewportHeight;
+      footerNode.left = 0;
+      footerNode.width = rect.width;
+      footerNode.height = footerHeight;
+    }
+  }
+
+  return {
+    node: container,
+    header: headerNode,
+    viewport,
+    footer: footerNode,
+
+    layout(rect) {
+      layoutInternal(rect);
+    },
+
+    update() {},
+
+    restyle() {
+      safeSetStyle(container, theme().body);
+      if (headerNode) safeSetStyle(headerNode, theme().header);
+      safeSetStyle(viewport, scrollableStyle(theme().body));
+      if (footerNode) safeSetStyle(footerNode, theme().header);
+    },
+
+    destroy() {
+      if (headerNode) headerNode.destroy();
+      viewport.destroy();
+      if (footerNode) footerNode.destroy();
+      container.destroy();
+    },
+
+    scrollToBottom() {
+      viewport.setScrollPerc(100);
+    },
+
+    scrollToTop() {
+      viewport.setScrollPerc(0);
+    },
+
+    scrollPercent() {
+      return (viewport as any).getScrollPerc?.() ?? 0;
     },
   };
 }

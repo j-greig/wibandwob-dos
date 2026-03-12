@@ -67,20 +67,20 @@ The outcome is not just "new primitives exist." The outcome is:
 - [ ] Port dashboard module to `createGrid` as first proof (deferred to F06 — dashboard uses contrib.grid internally)
 
 ### F03 — Responsive helpers
-- [ ] Implement `pickBreakpoint`
-- [ ] Export breakpoint types/utilities from microapp-sdk
+- [x] Implement `pickBreakpoint`
+- [x] Export breakpoint types/utilities from microapp-sdk
 - [ ] Document width-first responsive switching
 - [ ] Encode the rule: stack and scroll before you crush
 
 ### F04 — Scroll support helper
-- [ ] Export `createScrollbar()` from microapp-sdk
-- [ ] Export `scrollableStyle()` from microapp-sdk
-- [ ] Implement `createScrollViewport` in `ui-parts.ts`
+- [x] Export `createScrollbar()` from microapp-sdk
+- [x] Export `scrollableStyle()` from microapp-sdk
+- [x] Implement `createScrollViewport` in `ui-parts.ts`
   - fixed header/footer + scrollable middle
   - conditional scrollbar visibility
   - mouse, keys, vi scroll wiring
   - theme-consistent styling
-- [ ] Export from microapp-sdk
+- [x] Export from microapp-sdk
 - [ ] Port `responsive-panels-demo` to it as proof
 - [ ] Port `layout-stress-test` to it as proof
 - [ ] Port any real module already using bespoke viewport boilerplate
@@ -181,6 +181,7 @@ block the whole epic by default.
   - archive or retire it
 
 ### F08 — Documentation and closeout
+- [ ] Remove any `backward-compat alias` crud across the entire /src of wibwobdos and ensure any old functions etc are refactored to the new names
 - [ ] Promote the final layout guide into the right long-term docs location
 - [ ] Update `docs/building-custom-modules.md`
 - [ ] Update agent-facing SDK docs with the final exports

@@ -10,8 +10,8 @@ export { theme, themeName, setThemeVariant, allVariants, registerExternalTheme }
 export type { StylePair, ThemeTokens, ThemeVariant } from "./theme/types.js";
 
 // src/core/ui-parts.ts
-export { createStack, createRow, createColumns, createGrid, createHeaderBar, createStatusBar, createTextBlock, createInputLine, createMessageHistory, createRule, createFigletDisplay, createAnimatedPanel, createCollapsibleBlock, createContentStack } from "./ui-parts.js";
-export type { Rect, LayoutPart, UiPart, FlexChild, StackChild, GridChild, GridOptions, GridHandle, FlexBasis, TrackSize, AxisAlign, Alignment, Gap, InputLineProps, MessageHistoryEntry, MessageHistoryProps, CollapsibleBlockProps, CollapsibleBlockHandle, ContentStackChild, ContentStackHandle } from "./ui-parts.js";
+export { createStack, createRow, createColumns, createGrid, pickBreakpoint, DEFAULT_BREAKPOINTS, createScrollViewport, createHeaderBar, createStatusBar, createTextBlock, createInputLine, createMessageHistory, createRule, createFigletDisplay, createAnimatedPanel, createCollapsibleBlock, createContentStack } from "./ui-parts.js";
+export type { Rect, LayoutPart, UiPart, FlexChild, StackChild, GridChild, GridOptions, GridHandle, FlexBasis, TrackSize, AxisAlign, Alignment, Gap, BreakpointName, BreakpointEntry, ScrollViewportOptions, ScrollViewportHandle, InputLineProps, MessageHistoryEntry, MessageHistoryProps, CollapsibleBlockProps, CollapsibleBlockHandle, ContentStackChild, ContentStackHandle } from "./ui-parts.js";
 
 // src/core/ui-primitives.ts
 export { createScrollbar, scrollableStyle, safeSetStyle, isRightClick, createTimer, clearTimers } from "./ui-primitives.js";
