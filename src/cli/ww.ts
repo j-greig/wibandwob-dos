@@ -15,6 +15,7 @@
  */
 
 const BASE = process.env.WW_API ?? "http://127.0.0.1:8099";
+const QUIET = process.argv.includes("-q") || process.argv.includes("--quiet");
 
 // ── Helpers ──────────────────────────────────────────────
 
@@ -69,8 +70,12 @@ async function cmdState() {
 }
 
 async function cmdWindows() {
-  const state = (await api("/state")) as { windows: unknown[] };
-  out(state.windows);
+  const state = (await api("/state")) as { windows: Array<{ id: number }> };
+  if (QUIET) {
+    for (const w of state.windows) console.log(w.id);
+  } else {
+    out(state.windows);
+  }
 }
 
 async function cmdCommands() {
@@ -88,17 +93,33 @@ async function cmdRun(id: string, flags: Record<string, unknown>) {
   out(await api("/commands/run", "POST", body));
 }
 
+async function cmdScreenshot() {
+  const res = await fetch(`${BASE}/screenshot/text`);
+  if (!res.ok) {
+    process.stderr.write(`Error: ${res.status}\n`);
+    process.exit(1);
+  }
+  const text = await res.text();
+  process.stdout.write(text);
+}
+
 function usage() {
   process.stderr.write(`ww — Unix CLI for WibWob-DOS
 
 Usage:
   ww state                        Full desktop state (JSON)
-  ww windows                     List windows (JSON array)
-  ww commands                    List available commands
-  ww health                      API health check
-  ww cmd <id> [--key val ...]    Run command by ID
-  ww <domain>.<verb> [--flags]   Run command (shorthand)
-  ww help                        This message
+  ww windows [-q]                 List windows (JSON array, -q for IDs only)
+  ww commands                     List available commands
+  ww health                       API health check
+  ww screenshot                   Text screenshot of desktop
+  ww cmd <id> [--key val ...]     Run command by ID
+  ww <domain>.<verb> [--flags]    Run command (dot syntax)
+  ww <domain> <verb> [--flags]    Run command (noun verb)
+  ww window <id> <verb> [--flags] Target window then act
+  ww help                         This message
+
+Flags:
+  -q, --quiet    Output IDs only, one per line (for piping)
 
 Environment:
   WW_API    Base URL (default: http://127.0.0.1:8099)
@@ -118,7 +139,12 @@ async function main() {
 
   const sub = args[0];
 
-  switch (sub) {
+  // Strip -q/--quiet from args for dispatch (already captured globally)
+  const cleanArgs = args.filter(a => a !== "-q" && a !== "--quiet");
+  const cleanSub = cleanArgs[0];
+  if (!cleanSub) { usage(); return; }
+
+  switch (cleanSub) {
     case "state":
       return cmdState();
     case "windows":
@@ -127,24 +153,35 @@ async function main() {
       return cmdCommands();
     case "health":
       return cmdHealth();
+    case "screenshot":
+      return cmdScreenshot();
     case "cmd": {
-      const id = args[1];
+      const id = cleanArgs[1];
       if (!id) { process.stderr.write("Usage: ww cmd <command-id> [--flags]\n"); process.exit(1); }
-      return cmdRun(id, parseFlags(args.slice(2)));
+      return cmdRun(id, parseFlags(cleanArgs.slice(2)));
     }
     default: {
       // Treat as command ID: ww theme.set --name dark
-      // Or dot-separated: ww window.close --id 3
-      if (sub.includes(".")) {
-        return cmdRun(sub, parseFlags(args.slice(1)));
+      if (cleanSub.includes(".")) {
+        return cmdRun(cleanSub, parseFlags(cleanArgs.slice(1)));
+      }
+      // Try: ww window <id> <verb> --flags → window.<verb> --id <id>
+      // e.g. ww window 3 close → window.close --id 3
+      if (cleanArgs.length >= 3 && !isNaN(Number(cleanArgs[1])) && !cleanArgs[2].startsWith("--")) {
+        const noun = cleanSub;
+        const target = Number(cleanArgs[1]);
+        const verb = cleanArgs[2];
+        const flags = parseFlags(cleanArgs.slice(3));
+        flags.id = target;
+        return cmdRun(`${noun}.${verb}`, flags);
       }
       // Try noun + verb: ww window close --id 3 → window.close
-      if (args.length >= 2 && !args[1].startsWith("--")) {
-        const id = `${sub}.${args[1]}`;
-        return cmdRun(id, parseFlags(args.slice(2)));
+      if (cleanArgs.length >= 2 && !cleanArgs[1].startsWith("--")) {
+        const id = `${cleanSub}.${cleanArgs[1]}`;
+        return cmdRun(id, parseFlags(cleanArgs.slice(2)));
       }
       // Unknown
-      process.stderr.write(`Unknown command: ${sub}\nRun 'ww help' for usage.\n`);
+      process.stderr.write(`Unknown command: ${cleanSub}\nRun 'ww help' for usage.\n`);
       process.exit(1);
     }
   }
