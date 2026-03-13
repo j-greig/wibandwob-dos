@@ -208,6 +208,35 @@ not "missing prerequisite."
 
 ---
 
+## 10. Dogfood: use wibwob in the test suite itself
+
+**Status:** Not started
+**Impact:** Medium — proves the CLI is a real tool, not just a tested artifact
+**Effort:** 1 hour
+
+The test suite (`autoresearch/unix-control/autoresearch.sh`) still uses raw
+`curl` for the API side of every parity check. Now that `wibwob` works, the
+tests should use it everywhere possible:
+
+```bash
+# Before (verbose)
+API_COUNT=$(curl -s http://127.0.0.1:8099/commands/list | jq '.commands | length')
+MX=$(curl -s http://127.0.0.1:8099/state | jq ".windows[] | select(.id==$MID) | .left")
+
+# After (dogfooding)
+API_COUNT=$(wibwob commands | jq length)
+MX=$(wibwob state | jq ".windows[] | select(.id==$MID) | .left")
+```
+
+Keep ONE raw curl parity check (to prove CLI matches raw HTTP) but replace
+the rest. This makes the test suite itself a demonstration of CLI ergonomics
+and catches any CLI-specific bugs that curl wouldn't hit.
+
+Meta-benefit: the test script becomes readable documentation of how to
+actually use `wibwob` for real workflows.
+
+---
+
 ## Priority order
 
 1. Zod schemas (#1) — unlocks #5, improves #6, makes the whole system typed
