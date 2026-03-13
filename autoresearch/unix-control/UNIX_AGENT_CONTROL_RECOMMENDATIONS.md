@@ -29,7 +29,7 @@ From research findings:
 | **`POST /windows/batch` collapses ops** | Agents can't query state mid-operation | High |
 | **No Unix socket variant** | HTTP overhead (TLS, timeouts, serialization) | Medium |
 | **No CLI wrapper** | Agents can't pipe directly to `grep`/`jq` | Medium |
-| **No atomic tool variants** | Agents use batch ops, hit 7-12% hallucination rate | High |
+| **No atomic tool variants** | Agents use batch ops, higher hallucination risk | High |
 
 ---
 
@@ -54,7 +54,7 @@ POST /windows/close      { "id": 3 }
 GET /state → POST /windows/move → GET /state → POST /windows/resize
 ```
 
-**Why:** Forces query-before-act loop, aligning with research findings (88% better error recovery).
+**Why:** Forces query-before-act loop, expected to improve error recovery (anecdotal evidence).
 
 **Cost:** ~200 lines (small router handlers, each ~20 lines).
 
@@ -283,52 +283,13 @@ wibwob-cli commands list
 
 ## Implementation Roadmap
 
-### Week 1: Phase 1.1 - Atomic Command Variants
-```
-Mon: Code review of control-api.ts structure
-Tue: Add 5 atomic endpoints (move, resize, focus, close, raise)
-Wed: Update agent tool definitions (sdk)
-Thu: Integration testing + smoke tests
-Fri: Demo + documentation
-```
+Phase 1 (1-2 weeks): Atomic operations + tool definitions + jq-friendly state.
+Gate: typecheck + smoke test + agent can chain operations with state queries.
 
-**Gate:** Typecheck + smoke test passes.
+Phase 2 (2 weeks): CLI wrapper auto-derived from catalog (see SURFACE_PARITY_ARCHITECTURE.md).
+Gate: `ww` tool works with pipes, parity with HTTP API.
 
----
-
-### Week 2: Phase 1.2 + 1.3 - JQ Friendliness + Tool Clarity
-```
-Mon: Audit /state JSON structure for jq compatibility
-Tue: Update tool descriptions + parameters
-Wed: Test with jq pipelines (manual)
-Thu: Agent smoke tests (verify tools work as described)
-Fri: Docs update
-```
-
-**Gate:** Agent can chain operations with state queries.
-
----
-
-### Weeks 3-4: Phase 2 - Unix Socket + CLI
-```
-Week 3:
-  Mon-Tue: Implement Unix socket listener
-  Wed-Thu: Implement wibwob-cli wrapper
-  Fri: Integration testing
-
-Week 4:
-  Mon-Tue: Stress testing (high throughput from agents)
-  Wed: Performance comparison (HTTP vs socket)
-  Thu-Fri: Docs + examples
-```
-
-**Gate:** CLI tool works with pipes + socket handles 10x current load.
-
----
-
-### Week 5+: Phase 3 - Research/Experimentation
-- Benchmark (optional): 3-4 days
-- VFS prototype (optional): 1-2 weeks
+Phase 3 (optional): Formal benchmark, virtual filesystem prototype.
 
 ---
 
@@ -388,62 +349,6 @@ Week 4:
 
 ---
 
-## Example: Agent Workflow Before vs After
-
-### Before (Current REST)
-```python
-# Agent pseudocode (less reliable)
-state = api.get_state()
-editors = [w for w in state.windows if w.kind == 'editor']
-for w in editors:
-    api.window_close(id=w.id)
-# State is now stale. Agent doesn't know new window positions.
-api.command_run(id='editor.open', args={'path': '/tmp/new.txt'})
-```
-
-**Problems:**
-- State drift (closed windows but didn't query after)
-- Manual loop (not composable)
-- Error recovery requires explicit handling
-
-### After (Atomic + CLI)
-```bash
-# Agent uses pipes (more reliable)
-curl -s http://127.0.0.1:8099/state | \
-  jq '.windows[] | select(.kind=="editor") | .id' | \
-  xargs -I {} curl -X POST http://127.0.0.1:8099/windows/close -d "{\"id\":{}}" && \
-curl -s http://127.0.0.1:8099/state | \
-  jq -r '.focusedWindowId'
-
-# Or with wibwob-cli + pipes:
-wibwob-cli state | jq '.windows[] | select(.kind=="editor") | .id' | \
-  xargs -I {} wibwob-cli window close --id {} && \
-wibwob-cli window open-editor --path /tmp/new.txt
-```
-
-**Advantages:**
-- State is queried at each step (visible in pipeline)
-- Error propagation is automatic (broken pipe = failure)
-- Composability is obvious (agent sees filter → action pattern)
-
----
-
-## Decision Criteria
-
-### Proceed with Phase 1 if:
-- [ ] Research findings align with WibWob-DOS use case (agents controlling TUI)
-- [ ] Atomic operations are feasible within existing architecture
-- [ ] Agent performance on smoke tests improves by >10%
-
-### Proceed with Phase 2 if:
-- [ ] Phase 1 shows measurable improvement
-- [ ] Unix socket RPC is compatible with existing command dispatch
-- [ ] CLI wrapper doesn't conflict with other tools
-
-### Proceed with Phase 3 if:
-- [ ] Phase 1 + 2 together show >20% improvement
-- [ ] Benchmark results are publishable (>2 trials, >10% delta)
-
 ---
 
 ## Summary Table
@@ -452,7 +357,7 @@ wibwob-cli window open-editor --path /tmp/new.txt
 |-------|------|------|------|--------|---------|
 | **1.1** | Atomic operations | Week 1 | Minimal | 200 LOC | Query-before-act loop |
 | **1.2** | JQ-friendly state | Week 1 | None | 2h audit | Pipe compatibility |
-| **1.3** | Tool definitions | Week 2 | Minimal | 400 LOC | 85% less hallucination |
+| **1.3** | Tool definitions | Week 2 | Minimal | 400 LOC | Reduced hallucination |
 | **2.1** | Unix socket RPC | Week 3 | Low | 150 LOC | Lower latency |
 | **2.2** | CLI wrapper | Week 3-4 | Low | 400 LOC | Standard Unix interface |
 | **3.1** | Benchmark suite | Week 5 | None | 3-4 days | Publishable results |
