@@ -12,276 +12,76 @@ Unix philosophy — "do one thing well," "everything is a text stream," "pipes e
 
 ---
 
-## 1. CLI-First Agent Projects (Production References)
+## 1. CLI-First Agent Projects
 
-### 1.1 Simon Willison's `llm` Project
-**GitHub:** https://github.com/simonw/llm  
-**Key Citation:** Willison, S. (2023). "llm: A CLI utility for interacting with large language models"
+Five production projects validate CLI-first control for AI agents. Full
+citations with URLs and verification status are in UNIX_AGENT_CONTROL_EVIDENCE.md.
+Detailed scoring against our design criteria is in REFERENCE_CLI_TOOLS_RANKED.md.
 
-**What it shows:**
-- Pure CLI + Unix pipes for AI workflows
-- Subcommands for model selection, prompting, plugins
-- Output as text streams, composable with grep/awk/sed
-- Plugin system that treats models as filters in pipes
-- **Philosophy match:** Perfect Unix alignment — llm chains with standard tools
+Summary of what each project demonstrates:
 
-**Example usage (pure Unix pipes):**
-```bash
-cat data.csv | llm "analyze this CSV and output JSON" | jq '.summary'
-llm --model gpt-4 "prompt" | tee /tmp/response.txt | grep "ERROR"
-```
+| Project | Key pattern | Why it matters |
+|---------|------------|----------------|
+| Simon Willison's `llm` | Pure CLI + Unix pipes for AI | Agents compose with grep/awk/jq naturally |
+| Anthropic MCP | STDIO JSON-RPC as canonical transport | Transport is not the interface |
+| yabai (macOS WM) | Atomic commands, JSON output | Designed explicitly for scripting |
+| i3/sway | JSON-RPC over Unix socket, 15+ years | Proven architecture for WM control |
+| LangChain Shell Tools | Agents execute shell commands directly | Framework developers observe agents prefer shell |
 
-**Why it works:**
-- No HTTP overhead for agents already in terminal
-- Streaming output naturally composes with pipes
-- Each command has single responsibility
-- State lives in files/environment, not hidden in API server
+The common pattern: all expose stateless, atomic commands with structured
+(JSON or text) output designed for piping. None use REST as the primary
+agent interface.
 
 ---
 
-### 1.2 Anthropic's Model Context Protocol (MCP)
-**GitHub:** https://github.com/anthropic-cdk/python-sdk  
-**Status:** Production (Claude Desktop, Cline, integrations)  
-**Key Reference:** Anthropic. (2024). "Model Context Protocol: A standard for composable tool use."
+## 2. Tool-Calling Patterns: Atomic vs Batch
 
-**What it shows:**
-- Tools as STDIO-based JSON-RPC (not REST)
-- Agents call tools via stdin/stdout streams
-- Tool servers are subprocess boundaries
-- Transport-agnostic (stdio, HTTP, WebSocket all valid but STDIO is canonical)
+Agents appear to perform better with atomic, single-purpose tools than with
+multi-parameter batch endpoints. This is a qualitative observation, not a
+published benchmark — no controlled study exists comparing these formats.
 
-**Relevant quote from MCP docs:**
-> "MCP decouples the transport from the tool semantics. A tool can be invoked via stdio pipes, HTTP POST, or IPC socket — the semantics remain identical. This is the Unix principle: the transport is not the interface."
+**The pattern:** A batch tool like `updateWindowState(id, x, y, w, h, z, theme, focus)`
+invites agents to invent non-existent parameters. Atomic tools like
+`window.move(id, x, y)` leave nothing to hallucinate.
 
-**Evidence of CLI-first preference:**
-- MCP reference implementation uses stdio as primary transport
-- Tool discovery via streaming JSON makes piping natural
-- Server bootstrap via subprocess (not network daemon)
-
----
-
-### 1.3 OpenAI CLI (`openai-python`)
-**GitHub:** https://github.com/openai/openai-python  
-**Key File:** `src/openai/cli.py`
-
-**Pattern observed:**
-- Early CLI tools (text-davinci-003 era) heavily piped-friendly
-- Later REST-only APIs saw reduced scripting adoption
-- Community backlash led to renewed CLI investment
-
----
-
-### 1.4 Anthropic's Claude CLI (pi framework predecessor)
-**Project:** `pi` agent runtime  
-**Evidence:** Your own `.agents/shell-dev/control-api.md` shows HTTP API design, but annotation reveals Unix pipe preference:
-
-```typescript
-// src/services/control-api.ts line 20-23
-//   app.get('/state', (c) => c.json(getState()))  // REST still works
-//
-// This collapses REST + MCP into one process/port. The CommandRegistry
-// is the single source of truth; tools, palette, menus all consume it.
-```
-
-**Inference:** Even REST APIs designed for agents prefer stateless command dispatch. The HTTP layer is transport, not semantics.
-
----
-
-## 2. Tool-Use as Shell Commands: LLM Framework Patterns
-
-### 2.1 Tool Calling Patterns: CLI vs REST
-
-**Observed pattern (qualitative, no published benchmark):**
-
-When given identical tasks, agents appear to perform better with:
-1. **Text-based tool schemas** (simpler parsing, fewer hallucinations)
-2. **Stateless command semantics** (vs. complex state machines in REST)
-3. **Composable tool chains** (agent recognizes `tool1 | tool2` patterns)
-
-**Supporting observations (indirect):**
-- Anthropic's tool_choice parameter defaults to single-tool-at-a-time
-- OpenAI API examples show agents prefer atomic tools (vs. mega-endpoints)
-- General LLM tool-calling literature favours simpler schemas
-
-### 2.2 Tool Definition: Text Schema vs JSON Schema
-
-**Observed Pattern in Claude 3.5 Sonnet:**
-```json
-// ❌ REST-style tool (observed hallucinations)
-{
-  "type": "function",
-  "function": {
-    "name": "updateWindowState",
-    "description": "Update window properties via complex state machine",
-    "parameters": {
-      "type": "object",
-      "properties": {
-        "windowId": {...},
-        "position": {"x": ..., "y": ...},
-        "size": {"w": ..., "h": ...},
-        "state": {"focussed": ..., "z-order": ...}
-      }
-    }
-  }
-}
-
-// ✅ Unix-style tool (more reliable)
-{
-  "type": "function",
-  "function": {
-    "name": "window.move",
-    "description": "Move window to X Y. X and Y are absolute terminal coordinates.",
-    "parameters": { "windowId": "...", "x": 10, "y": 5 }
-  },
-  "function": {
-    "name": "window.resize",
-    "description": "Resize window to W H.",
-    "parameters": { "windowId": "...", "w": 60, "h": 20 }
-  }
-}
-```
-
-**Why:** Agents reason better when they must compose small tools. Multi-operation endpoints add ambiguity.
-
----
-
-### 2.3 Observed Tool Calling Error Patterns
-
-**Qualitative observations (no published source for these specific numbers):**
-- **Batch operations** (REST-style multiple params): higher hallucination rates observed anecdotally
-- **Single-purpose tools** (Unix-style atomic): lower hallucination rates observed anecdotally
-- **State visibility** (agent can query state before acting): noticeably better error recovery
-
-**Note:** Previous versions of this document cited specific percentages
-(7-12%, <2%, 40%) attributed to "Anthropic internal analysis." No published
-source exists for those numbers. The directional pattern (simpler tools =
-fewer hallucinations) is widely observed but unquantified in published literature.
-
-**Implication for WibWob-DOS Control API:**
-Your `POST /windows/batch` operation collapses multiple moves/resizes into one call. This is correct for human efficiency but may harm agent reasoning. Better pattern:
+**Implication for WibWob-DOS:** The `POST /windows/batch` endpoint collapses
+multiple ops into one call. Agents should instead use atomic operations with
+state queries between each step:
 
 ```bash
-# What agent might do (less reliable with batch):
-POST /windows/batch { ops: [{id:3, x:10, y:2}, {id:3, w:60, h:20}] }
-
-# What agent should do (more reliable):
-POST /windows/move {id:3, x:10, y:2}      # Query state after
-GET /state
-POST /windows/resize {id:3, w:60, h:20}   # Verify before next op
+POST /windows/move {id:3, x:10, y:2}
+GET /state                                # verify before next op
+POST /windows/resize {id:3, w:60, h:20}
 GET /state
 ```
 
----
-
-## 3. Projects Exposing Desktop/TUI State as Virtual Filesystems
-
-### 3.1 Plan 9's `/proc` Filesystem
-**Reference:** Pike, R., Presotto, D., Thompson, K. (1995). "Plan 9 from Bell Labs."  
-**Key Innovation:** Every process state readable as text files in `/proc/<pid>/`.
-
-**Examples:**
-```bash
-cat /proc/4/status      # Process status (including fd count, signals)
-cat /proc/4/mem         # Process memory (raw bytes)
-cat /proc/4/note        # Send notes (signals) by writing
-```
-
-**Unix Philosophy:** "Everything is a file" — no special APIs, just `read()` and `write()`.
-
-### 3.2 Linux `/proc` and sysfs (Modern Realization)
-**Current Reality:**
-- `/proc/[pid]/` exposes process state as readable files
-- `/sys/` exposes kernel/device state similarly
-- Tools like `procfs`, `debugfs` extend the pattern
-- **Result:** Nearly every system administration tool can use `cat`, `grep`, pipes instead of binary APIs
+**Caveat:** Previous versions of this document cited specific hallucination
+rates (7-12% vs <2%) attributed to "Anthropic internal analysis." Those
+numbers were fabricated. The directional claim (simpler schemas = fewer
+hallucinations) is widely observed but unquantified.
 
 ---
 
-### 3.3 X11 Window Manager Control (wmctrl, xdotool)
+## 3. "Everything Is a File" — Virtual Filesystems for Control
 
-**wmctrl — Window Manager Control via CLI**
-```bash
-wmctrl -m                          # List window manager info
-wmctrl -l                          # List all windows with IDs
-wmctrl -i -r <id> -b add,maximized # Maximize window <id>
-wmctrl -i -r <id> -e "0,10,20,60,30"  # Move/resize in one command
+Plan 9 (Pike et al., 1995) demonstrated that every system resource — processes,
+network sockets, devices — can be exposed as files readable via `cat`/`grep`.
+Linux adopted this partially with `/proc` and `/sys`. The pattern scales:
+agents need zero special knowledge, just standard Unix tools.
+
+Window manager CLIs follow this principle in spirit. wmctrl, xdotool, yabai,
+and i3/sway all expose window state as structured text queryable from the shell.
+See REFERENCE_CLI_TOOLS_RANKED.md for detailed command-by-command analysis.
+
+**Speculative: desktop `/proc` model for WibWob-DOS**
 ```
-
-**Design Pattern:** Each flag is a small, composable operation.
-
-**xdotool — X11 Automation**
-```bash
-xdotool search --name "Firefox" windowsize 1024 768
-xdotool key --clearmodifiers --delay 50 shift+a
+/desktop/state.json          # Full snapshot
+/windows/3/geometry          # "X Y W H" as one line
+/windows/3/focus             # Read: boolean | Write: focus this window
+/commands/list               # Available commands
 ```
-
-**Philosophy Match:** Tools designed for shell scripting, not API clients.
-
----
-
-### 3.4 macOS yabai (Tiling WM Control)
-**GitHub:** https://github.com/koekeishiya/yabai  
-
-**CLI Interface:**
-```bash
-yabai -m query --windows        # Query windows as JSON
-yabai -m window --move rel:100:0  # Move window relative
-yabai -m space --focus next     # Focus next space (workspace)
-```
-
-**Interesting Twist:** Designed for shell piping + agent control.
-
-**yabai's philosophy (from README):**
-> "yabai is designed to be scriptable. Every command outputs JSON. Pipe to jq for filtering."
-
-**Result:** Widely adopted by shell automation, agent frameworks, and TUI tools.
-
----
-
-### 3.5 i3 / sway IPC (Wayland/X11 Tiling WM)
-
-**i3 IPC Protocol**
-```bash
-i3-msg 'focus left'
-i3-msg 'move window to workspace 1'
-i3-msg '[class="Firefox"] kill'
-```
-
-**Wire Protocol:** JSON-RPC over Unix socket (STDIO-friendly).
-
-**Evidence of Tool-Use Success:**
-- i3 has extensive CLI wrapper ecosystem
-- Agents (human-written automation, later AI) rely heavily on i3-msg
-- No REST API exists because Unix socket + JSON is sufficient
-
----
-
-### 3.6 Virtual Filesystem Concept Applied to Agent Control
-
-**Hypothetical Desktop `/proc` Model:**
-
-```
-/desktop/state.json          # Full desktop snapshot
-/windows/3/info.json         # Window 3 properties
-/windows/3/geometry          # X Y W H as one line
-/windows/3/focus             # Read: focused? | Write: focus this window
-/windows/3/content/text      # Window text content
-/windows/3/screenshot        # Window pixel data (encoded)
-/commands/list               # Available commands (read-only)
-/commands/theme.set          # Command invocation (write-only)
-```
-
-**Advantage:** Agents can use standard tools:
-```bash
-cat /desktop/state.json | jq '.windows[] | select(.title | contains("Editor"))'
-echo "light" > /windows/3/theme
-watch -n 0.5 'cat /windows/3/geometry'  # Real-time monitoring
-```
-
-**Realizations in the wild:**
-- procfs, sysfs (kernel)
-- VirtualBox Guest Additions `/proc/vboxguest/`
-- `systemd-hwdb` (hardware database as files)
+This would let agents use `cat`, `grep`, `echo >` for all control. Unproven
+for TUI state — listed as a long-term research direction, not a near-term plan.
 
 ---
 
