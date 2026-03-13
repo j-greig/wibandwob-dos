@@ -58,16 +58,16 @@ function grey(n: number): number { return 232 + n; } // 0-23 greyscale
 
 const MATERIALS: Record<Biome, Material> = {
   [Biome.DEEP_WATER]: {
-    topGlyphs: ["≈", "~", "∽", "≋", "∿"],
+    topGlyphs: ["≈", "~", "∽", "≋", "∿", "░"],
     sideGlyphs: ["█", "▓"],
-    fgLight: rgb6(1, 2, 5), fgMid: rgb6(0, 1, 4), fgDark: rgb6(0, 0, 3),
-    bgLight: rgb6(0, 1, 3), bgDark: rgb6(0, 0, 2),
+    fgLight: rgb6(2, 3, 5), fgMid: rgb6(1, 2, 5), fgDark: rgb6(0, 1, 3),
+    bgLight: rgb6(0, 1, 4), bgDark: rgb6(0, 0, 3),
   },
   [Biome.WATER]: {
-    topGlyphs: ["~", "∼", "≈", "˜", "∿"],
+    topGlyphs: ["~", "∼", "≈", "˜", "∿", "·"],
     sideGlyphs: ["▓", "▒"],
-    fgLight: rgb6(1, 3, 5), fgMid: rgb6(0, 2, 5), fgDark: rgb6(0, 1, 4),
-    bgLight: rgb6(0, 2, 4), bgDark: rgb6(0, 1, 3),
+    fgLight: rgb6(2, 4, 5), fgMid: rgb6(1, 3, 5), fgDark: rgb6(0, 2, 4),
+    bgLight: rgb6(0, 2, 5), bgDark: rgb6(0, 1, 4),
   },
   [Biome.SAND]: {
     topGlyphs: [".", "·", "∙", ",", "'"],
@@ -76,16 +76,16 @@ const MATERIALS: Record<Biome, Material> = {
     bgLight: rgb6(5, 4, 2), bgDark: rgb6(4, 3, 1),
   },
   [Biome.GRASS]: {
-    topGlyphs: [".", ";", ",", "'", "\"", "`", ":", "∴", "·", "⌂", "♠"],
-    sideGlyphs: ["▒", "░", "▓", "█"],
-    fgLight: rgb6(1, 4, 0), fgMid: rgb6(0, 3, 0), fgDark: rgb6(0, 2, 0),
-    bgLight: rgb6(0, 3, 0), bgDark: rgb6(0, 2, 0),
+    topGlyphs: [".", ";", ",", "'", "\"", "`", ":", "∴", "·", "⌂", "♠", "░"],
+    sideGlyphs: ["▒", "░", "▓", "█", "▌"],
+    fgLight: rgb6(2, 5, 0), fgMid: rgb6(1, 4, 0), fgDark: rgb6(0, 2, 0),
+    bgLight: rgb6(1, 4, 0), bgDark: rgb6(0, 2, 0),
   },
   [Biome.FOREST]: {
-    topGlyphs: ["♣", "♠", "▲", "△", "⌂", "♧", "↟", "↡"],
-    sideGlyphs: ["║", "▓", "█", "▌"],
-    fgLight: rgb6(0, 4, 0), fgMid: rgb6(0, 3, 0), fgDark: rgb6(0, 1, 0),
-    bgLight: rgb6(0, 2, 0), bgDark: rgb6(0, 1, 0),
+    topGlyphs: ["♣", "♠", "▲", "△", "⌂", "♧", "↟", "↡", "▓"],
+    sideGlyphs: ["║", "▓", "█", "▌", "▐"],
+    fgLight: rgb6(1, 5, 0), fgMid: rgb6(0, 3, 0), fgDark: rgb6(0, 1, 0),
+    bgLight: rgb6(0, 3, 0), bgDark: rgb6(0, 1, 0),
   },
   [Biome.ROCK]: {
     topGlyphs: ["#", "▒", "░", "▓", "∎", "▪"],
@@ -507,7 +507,7 @@ function renderScene(
   // Fog parameters — fade to grey at distance
   const fogStart = viewRange * 0.5;
   const fogEnd = viewRange * 0.95;
-  const fogColour = grey(4); // dark grey fog
+  const fogColour = rgb6(1, 1, 2); // blue-grey atmospheric fog
 
   // Collect all terrain columns to render
   type Col = { wx: number; wy: number; h: number; biome: Biome; depth: number; dist: number };
@@ -536,10 +536,14 @@ function renderScene(
   const heightScale = 8;
 
   // Directional light — sun direction rotates slowly
-  const sunAngle = (tick * 0.015) % (Math.PI * 2);
+  // Day/night cycle — sun orbits slowly, elevation changes lighting mood
+  const dayProgress = (tick * 0.003) % 1; // 0-1 full day cycle (~330 ticks = ~42s)
+  const sunAngle = dayProgress * Math.PI * 2;
   const lightX = Math.cos(sunAngle);
   const lightY = Math.sin(sunAngle);
-  const lightZ = 0.7; // sun elevation
+  // Sun elevation: high at noon (0.25), low at dawn/dusk, below horizon at night
+  const sunElevation = Math.sin(dayProgress * Math.PI * 2) * 0.5 + 0.5;
+  const lightZ = 0.3 + sunElevation * 0.6; // 0.3 to 0.9
 
   for (const col of columns) {
     const { wx, wy, h, biome, dist } = col;
@@ -777,26 +781,62 @@ function renderScene(
     }
   }
 
+  // ─── Minimap overlay — top-right corner ────────────────
+  const mmSize = 16;
+  const mmOx = sw - mmSize - 2, mmOy = 2;
+  const mmScale = 4;
+  for (let my = 0; my < mmSize; my++) {
+    for (let mx = 0; mx < mmSize; mx++) {
+      const wmx = Math.floor(playerX) - mmSize * mmScale / 2 + mx * mmScale;
+      const wmy = Math.floor(playerY) - mmSize * mmScale / 2 + my * mmScale;
+      const b = getBiome(terrain, wmx, wmy);
+      const px = mmOx + mx, py = mmOy + my;
+      if (px < 0 || px >= sw || py < 0 || py >= sh) continue;
+      const bidx = py * sw + px;
+      let mmFg = grey(8), mmBg = grey(4), mmCh = "·";
+      switch (b) {
+        case Biome.DEEP_WATER: mmFg = rgb6(0, 0, 3); mmBg = rgb6(0, 0, 2); mmCh = "≈"; break;
+        case Biome.WATER: mmFg = rgb6(0, 1, 4); mmBg = rgb6(0, 1, 3); mmCh = "~"; break;
+        case Biome.SAND: mmFg = rgb6(5, 5, 2); mmBg = rgb6(4, 4, 1); mmCh = "."; break;
+        case Biome.GRASS: mmFg = rgb6(1, 4, 0); mmBg = rgb6(0, 3, 0); mmCh = "."; break;
+        case Biome.FOREST: mmFg = rgb6(0, 3, 0); mmBg = rgb6(0, 2, 0); mmCh = "♣"; break;
+        case Biome.ROCK: mmFg = grey(12); mmBg = grey(6); mmCh = "#"; break;
+        case Biome.MOUNTAIN: mmFg = grey(14); mmBg = grey(8); mmCh = "▲"; break;
+        case Biome.SNOW: mmFg = grey(22); mmBg = grey(18); mmCh = "*"; break;
+      }
+      if (mx === Math.floor(mmSize / 2) && my === Math.floor(mmSize / 2)) {
+        mmFg = rgb6(5, 0, 0); mmBg = rgb6(5, 5, 0); mmCh = "◎";
+      }
+      buf[bidx] = { depth: Infinity, glyph: mmCh, fg: mmFg, bg: mmBg, flags: 1 };
+    }
+  }
+
   return buf;
 }
 
 // ─── Convert buffer to ANSI string ─────────────────────────
 
-function bufferToAnsi(buf: Sample[], sw: number, sh: number, tick: number): string {
-  // Sky gradient — darker at top, lighter at horizon
-  const skyTop = rgb6(0, 0, 2);     // dark blue
-  const skyMid = rgb6(1, 2, 4);     // medium blue
-  const skyBot = rgb6(2, 3, 5);     // light blue/horizon
-  const skyGlyphs = ["·", "∙", " ", " ", " ", " ", " ", " "]; // sparse stars at top
+function bufferToAnsi(buf: Sample[], sw: number, sh: number, tick: number, sunElevation: number = 0.7): string {
+  // Sky gradient — 5 zones for smooth atmospheric transition
+  // Shifts with day/night: darker at night, warmer at dawn/dusk
+  const nightFactor = 1 - sunElevation; // 0 at noon, 1 at midnight
+  const skyZones = [
+    rgb6(0, 0, Math.max(1, Math.round(2 - nightFactor))),
+    rgb6(0, 0, Math.max(1, Math.round(2 - nightFactor * 0.5))),
+    rgb6(0, Math.round(1 - nightFactor * 0.5), Math.round(3 - nightFactor)),
+    rgb6(Math.round(1 - nightFactor * 0.5), Math.round(2 - nightFactor), Math.round(4 - nightFactor)),
+    rgb6(Math.round(2 - nightFactor), Math.round(3 - nightFactor), 5),
+  ];
+  const skyGlyphs = ["·", "∙", "✦", " ", " ", " ", " ", " "];
 
   const lines: string[] = [];
   for (let y = 0; y < sh; y++) {
     let line = "";
     let lastFg = -1, lastBg = -1;
-    // Sky colour for this row
     const skyProgress = y / sh;
-    const skyBg = skyProgress < 0.3 ? skyTop : skyProgress < 0.6 ? skyMid : skyBot;
-    const skyFg = skyProgress < 0.2 ? grey(14) : skyBg; // star colour at top
+    const zoneIdx = Math.min(4, Math.floor(skyProgress * 5));
+    const skyBg = skyZones[zoneIdx];
+    const skyFg = skyProgress < 0.15 ? grey(Math.round(16 - nightFactor * 8)) : skyBg;
 
     for (let x = 0; x < sw; x++) {
       const s = buf[y * sw + x];
@@ -913,35 +953,60 @@ function openAsciicker(host: MicroappHost) {
   function updateDisplay() {
     const { w, h } = getContentSize();
 
-    // Process movement — screen-relative (W=up-on-screen, inverse-projected)
-    // In isometric: screen-up maps to world (-x, -y), screen-right maps to world (+x, -y)
-    // rotated by camera yaw
-    const speed = 0.5;
+    // Process movement — screen-relative with terrain collision
     const yr = cam.yaw * Math.PI / 180;
     const cosY = Math.cos(yr), sinY = Math.sin(yr);
-    // Screen "up" in world coords (before yaw): moves into the screen = +y in world
-    // Screen "right" in world coords: moves +x in world
-    // But we need to un-rotate by yaw to get world movement
     const upWX = sinY, upWY = -cosY;    // screen-up → world
     const rtWX = cosY, rtWY = sinY;     // screen-right → world
 
-    if (keys.has("w") || keys.has("up"))    { playerX += upWX*speed; playerY += upWY*speed; }
-    if (keys.has("s") || keys.has("down"))  { playerX -= upWX*speed; playerY -= upWY*speed; }
-    if (keys.has("d") || keys.has("right")) { playerX += rtWX*speed; playerY += rtWY*speed; }
-    if (keys.has("a") || keys.has("left"))  { playerX -= rtWX*speed; playerY -= rtWY*speed; }
+    // Speed varies with terrain — slower uphill, faster downhill
+    const currentH = getH(terrain, Math.floor(playerX), Math.floor(playerY));
+    const baseSpeed = 0.5;
+    let dx = 0, dy = 0;
+    if (keys.has("w") || keys.has("up"))    { dx += upWX; dy += upWY; }
+    if (keys.has("s") || keys.has("down"))  { dx -= upWX; dy -= upWY; }
+    if (keys.has("d") || keys.has("right")) { dx += rtWX; dy += rtWY; }
+    if (keys.has("a") || keys.has("left"))  { dx -= rtWX; dy -= rtWY; }
+
+    if (dx !== 0 || dy !== 0) {
+      // Normalise diagonal movement
+      const len = Math.sqrt(dx*dx + dy*dy);
+      dx = dx/len * baseSpeed;
+      dy = dy/len * baseSpeed;
+
+      const newX = playerX + dx, newY = playerY + dy;
+      const nx = Math.floor(newX), ny = Math.floor(newY);
+
+      // Terrain collision: can't walk into deep water or off map
+      if (nx >= 2 && nx < terrain.w - 3 && ny >= 2 && ny < terrain.h - 3) {
+        const targetBiome = getBiome(terrain, nx, ny);
+        const targetH = getH(terrain, nx, ny);
+        const heightDiff = targetH - currentH;
+
+        // Block deep water and steep cliffs (>40 height units up)
+        if (targetBiome !== Biome.DEEP_WATER && heightDiff < 40) {
+          // Slow down going uphill
+          const slopeFactor = heightDiff > 10 ? 0.5 : heightDiff > 0 ? 0.8 : 1.0;
+          playerX += dx * slopeFactor;
+          playerY += dy * slopeFactor;
+        }
+      }
+    }
 
     playerX = Math.max(2, Math.min(terrain.w-3, playerX));
     playerY = Math.max(2, Math.min(terrain.h-3, playerY));
 
-    // Smooth camera follow
+    // Smooth camera follow with height tracking
     const targetZ = getH(terrain, Math.floor(playerX), Math.floor(playerY)) / 8;
-    cam.x += (playerX - cam.x) * 0.12;
-    cam.y += (playerY - cam.y) * 0.12;
-    cam.z += (targetZ - cam.z) * 0.12;
+    cam.x += (playerX - cam.x) * 0.15;
+    cam.y += (playerY - cam.y) * 0.15;
+    cam.z += (targetZ - cam.z) * 0.1;
 
     // Render 3D scene
     const buf = renderScene(terrain, cam, w, h, playerX, playerY, tick, worldObjs);
-    const ansi = bufferToAnsi(buf, w, h, tick);
+    const dayProg = (tick * 0.003) % 1;
+    const sunElev = Math.sin(dayProg * Math.PI * 2) * 0.5 + 0.5;
+    const ansi = bufferToAnsi(buf, w, h, tick, sunElev);
     canvas.setContent(ansi);
 
     // Separator
@@ -952,9 +1017,13 @@ function openAsciicker(host: MicroappHost) {
     const biomeName = cell ? biomeNames[cell.biome] : "???";
     const alt = cell ? Math.floor(cell.height / 2.55) : 0;
     const yawStr = `${Math.floor(cam.yaw)}°`;
+    // Day/night phase name
+    const dayPhases = ["Dawn", "Morning", "Noon", "Afternoon", "Dusk", "Evening", "Night", "Late Night"];
+    const phaseIdx = Math.floor(dayProg * 8) % 8;
+    const sunPct = Math.round(sunElev * 100);
     status.setContent(
       ` ⊕${Math.floor(playerX)},${Math.floor(playerY)}  ▲${alt}m  ${biomeName}  ` +
-      `◎${yawStr}  ×${cam.zoom.toFixed(1)}  ` +
+      `◎${yawStr}  ×${cam.zoom.toFixed(1)}  ☀${dayPhases[phaseIdx]}(${sunPct}%)  ` +
       `WASD:move Q/E:rotate +/-:zoom`
     );
 
