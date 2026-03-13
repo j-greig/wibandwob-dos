@@ -18,6 +18,40 @@ Rules:
 - Log friction the first time it is clearly real.
 - If the same thing fails three times, record it even if not yet fixed.
 - If a fix is found, record both the failure mode and the winning approach.
+
+## 2026-03-13: E039 Unix CLI Surface — ww tool
+
+### Command surface pipeline (discovered while building)
+
+```
+command-catalog.ts (static defs)
+  → command-registry.ts (runtime projection, adds dynamic/module commands)
+    → control-api.ts (HTTP on :8099, Hono)
+      → src/cli/ww.ts (pure HTTP client, no catalog import)
+    → agent-tools.ts (MCP tools via TypeBox schemas)
+    → TUI menus/palette (app-controller.ts)
+```
+
+ww.ts is a 4th surface projected THROUGH the API, not a direct catalog
+consumer. This means it automatically gets module commands that register
+at runtime — zero drift by construction.
+
+### What worked well
+- Autoresearch Phase 1 (doc enhancement) graduated at 7.5 after 21 iterations.
+  Aggressive file consolidation (9→3 files, 3231→395 lines) was the biggest driver.
+- ww.ts built in ~30 minutes, 30/30 tests passing. The thin HTTP client
+  approach is right — no catalog import, no build step, just fetch.
+- Three CLI syntaxes (dot, noun-verb, positional-ID) cover all agent patterns.
+
+### What caused friction
+- Phase 1 scorer was LLM-based (claude -p) — scores varied ±0.3 between runs
+  on identical content. Had to average mentally.
+- Fabricated citations in the original research docs wasted ~4 iterations
+  just flagging and fixing across 5+ files before consolidation.
+- `set -euo pipefail` in test scripts causes silent early exit when a test
+  fails — switched to `set -uo pipefail` (no -e) so all tests run.
+- State API returns theme at `.app.theme` not `.theme` — had to discover
+  by inspecting actual JSON structure.
 - Prefer concrete notes tied to scripts, APIs, or runtime surfaces over vague complaints.
 
 ## Current Notes

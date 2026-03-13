@@ -272,6 +272,61 @@ BAD_API=$(WW_API=http://127.0.0.1:9999 $WW health 2>/dev/null && echo "WRONGLY_S
 check "WW_API env var respected (bad port fails)" \
   "$([ "$BAD_API" = "CORRECTLY_FAILED" ] && echo PASS || echo "$BAD_API")"
 
+# ── 20. Agent workflow: find + act ────────────────────────
+echo "--- agent workflow ---"
+
+# Open 2 editors and 1 art window
+$WW cmd editor.new >/dev/null 2>&1; sleep 0.2
+$WW cmd editor.new >/dev/null 2>&1; sleep 0.2
+$WW cmd art.open >/dev/null 2>&1; sleep 0.2
+
+# Agent pattern: find editors, get their IDs, close only editors
+EDITOR_COUNT_BEFORE=$($WW windows | jq '[.[] | select(.kind=="editor")] | length')
+$WW windows | jq -r '.[] | select(.kind=="editor") | .id' | \
+  while read -r eid; do $WW window "$eid" close >/dev/null 2>&1; done
+sleep 0.5
+EDITOR_COUNT_AFTER=$($WW windows | jq '[.[] | select(.kind=="editor")] | length')
+ART_STILL=$($WW windows | jq '[.[] | select(.kind=="art")] | length')
+check "agent: close editors but keep art windows" \
+  "$([ "$EDITOR_COUNT_AFTER" = "0" ] && [ "$ART_STILL" -ge 1 ] && echo PASS || echo "editors=$EDITOR_COUNT_AFTER art=$ART_STILL")"
+
+# ── 21. Focused window default ───────────────────────────
+echo "--- focused window ---"
+
+# The art window should be focused (it's the only one left)
+FOCUSED=$($WW state | jq -r '.focus.windowId // .focus.focusedWindowId // empty')
+check "focused window ID available in state" \
+  "$([ -n "$FOCUSED" ] && [ "$FOCUSED" != "null" ] && echo PASS || echo "focused=$FOCUSED")"
+
+# ── 22. Tile windows ────────────────────────────────────
+echo "--- layout ---"
+$WW cmd editor.new >/dev/null 2>&1; sleep 0.2
+$WW cmd editor.new >/dev/null 2>&1; sleep 0.2
+$WW cmd window.tile >/dev/null 2>&1; sleep 0.3
+
+# After tiling, windows should not all be at 0,0
+POSITIONS=$($WW windows | jq '[.[].left] | unique | length')
+check "ww cmd window.tile arranges windows" \
+  "$([ "$POSITIONS" -ge 2 ] && echo PASS || echo "unique_x=$POSITIONS")"
+
+# Clean up
+$WW windows -q | xargs -I{} $WW window {} close >/dev/null 2>&1
+sleep 0.3
+
+# ── 23. Boolean and JSON flags ───────────────────────────
+echo "--- special flag types ---"
+
+# Open editor with a path (string arg)
+$WW cmd document.open --filePath /tmp/test-ww.txt >/dev/null 2>&1 || true
+sleep 0.3
+DOC_WIN=$($WW windows | jq '[.[] | select(.title | test("test-ww"; "i"))] | length' 2>/dev/null || echo 0)
+check "string flag: document.open --path works" \
+  "$([ "$DOC_WIN" -ge 1 ] && echo PASS || echo "matching_windows=$DOC_WIN")"
+
+# Clean up
+$WW windows -q | xargs -I{} $WW window {} close >/dev/null 2>&1
+sleep 0.3
+
 # ── Cleanup: close test windows ──────────────────────────
 echo "--- cleanup ---"
 for id in $($WW windows 2>/dev/null | jq -r '.[].id'); do
