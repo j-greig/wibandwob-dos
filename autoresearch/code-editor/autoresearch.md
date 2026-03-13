@@ -5,8 +5,15 @@ Port the asciicker 3D ASCII game engine (github.com/msokalski/asciicker, MIT)
 to TypeScript as a WibWob-DOS module. Not a reimagination — a faithful port of
 the original's rendering pipeline, map data, sprites, meshes, and gameplay.
 
+## Reference Materials
+- **C++ source**: `/tmp/asciicker/` — 136K lines (cloned from github, MIT)
+- **Gameplay GIF**: `/Users/james/Repos/wibandwob-dos/asciicker-gameplay-animted.gif`
+  — animated recording of actual gameplay. Extract frames with ffmpeg to study
+  water reflections, 3D camera rotation, mesh rendering, sprite animation,
+  lighting, and the fg+bg dithering in action. Invaluable visual reference.
+  `ffmpeg -i asciicker-gameplay-animted.gif -vf "select=eq(n\,N)" -frames:v 1 /tmp/frame.png`
+
 ## Reference Codebase
-Cloned at `/tmp/asciicker/` — 136K lines C++.
 
 ### Original architecture (what we're porting)
 | System | C++ files | Lines | What it does |
