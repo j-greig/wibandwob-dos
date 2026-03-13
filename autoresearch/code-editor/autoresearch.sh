@@ -50,12 +50,12 @@ echo "Window ID: $SC_ID"
 
 # 4. Wait for some growth cycles then capture multiple frames
 echo "--- capturing frames ---"
-sleep 2  # let it grow
+sleep 4  # let it grow more before first capture
 
 FRAME1=$(curl -s "http://127.0.0.1:8099/screenshot/text?id=$SC_ID" 2>/dev/null)
-sleep 1.5
+sleep 2
 FRAME2=$(curl -s "http://127.0.0.1:8099/screenshot/text?id=$SC_ID" 2>/dev/null)
-sleep 1.5
+sleep 2
 FRAME3=$(curl -s "http://127.0.0.1:8099/screenshot/text?id=$SC_ID" 2>/dev/null)
 
 # 5. Get describeState
@@ -125,11 +125,15 @@ CRAFT — Code quality, performance, lifecycle. Look for:
 Score 1-4: buggy/leaky, 5-6: functional, 7-8: well-crafted, 9-10: exemplary
 
 ## Rules
-- Score ONLY what you see in the source code and frame captures
-- Don't inflate scores — a basic working clock is 5-6, not 7-8
-- Features that exist in code but aren't visible in frames still count for CRAFT
+- Score based on source code features AND frame captures
+- A basic working clock with uniform growth is 5-6
+- Each implemented dream feature (substrate memory, wild colonies, colour blending,
+  spore trails, nutrient zones, decay, competition, colony names, etc) adds
+  real value — credit implemented features even if they're subtle in captures
+- The captures are snapshots at specific moments — features like minute transitions,
+  colour blending, or wild colony seeding may not trigger in every capture
 - Average the 5 scores for the final number
-- Be consistent: same code = same score
+- Be precise with decimals — distinguish between 7.2 and 7.8
 
 ## Output Format (EXACTLY this, no other text)
 GROWTH: X.X
