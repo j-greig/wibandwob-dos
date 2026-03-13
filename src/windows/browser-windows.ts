@@ -5,6 +5,7 @@
  */
 
 import blessed from "blessed";
+import { execSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -728,7 +729,8 @@ export function openFileManagerWindow(params: {
     const sizeStr = totalSize < 1024 ? `${totalSize}B`
       : totalSize < 1048576 ? `${(totalSize / 1024).toFixed(0)}K`
       : `${(totalSize / 1048576).toFixed(1)}M`;
-    statusInfo.setContent(` ${entries.length} items | ${dirs} dirs, ${files} files (${sizeStr}) | enter:open v:view /:filter s:search tab:icon`);
+    const macHints = isMac ? " spc:look o:finder" : "";
+    statusInfo.setContent(` ${entries.length} items | ${dirs} dirs, ${files} files (${sizeStr}) | \u21B5:open v:view c:copy${macHints} /:filter s:search`);
     renderStatusButtons();
     renderToolbarButtons();
   };
@@ -893,11 +895,28 @@ export function openFileManagerWindow(params: {
         });
         const truncDirs = childDirs.length > 10 ? `  {cyan-fg}... +${childDirs.length - 10} more dirs{/cyan-fg}` : "";
         const truncFiles = childFiles.length > 10 ? `  {green-fg}... +${childFiles.length - 10} more files{/green-fg}` : "";
+        // File type distribution bar
+        const extCounts: Record<string, number> = {};
+        for (const f of childFiles) {
+          const ext = path.extname(f.name).toLowerCase() || "(none)";
+          extCounts[ext] = (extCounts[ext] ?? 0) + 1;
+        }
+        const extEntries = Object.entries(extCounts).sort((a, b) => b[1] - a[1]).slice(0, 6);
+        const extBar = extEntries.map(([ext, count]) => {
+          const col = [".md", ".txt"].includes(ext) ? "green"
+            : [".ts", ".tsx", ".js", ".jsx"].includes(ext) ? "yellow"
+            : [".json", ".yaml", ".yml"].includes(ext) ? "magenta"
+            : [".sh", ".bash"].includes(ext) ? "cyan"
+            : "white";
+          return `{${col}-fg}${ext}:${count}{/${col}-fg}`;
+        }).join("  ");
+
         const sections = [header];
         if (dirItems.length) sections.push(dirItems.join("\n"));
         if (truncDirs) sections.push(truncDirs);
         if (fileItems.length) sections.push("\n" + fileItems.join("\n"));
         if (truncFiles) sections.push(truncFiles);
+        if (extBar) sections.push("\n  " + extBar);
         previewRawContent = sections.join("\n");
       } catch (error) {
         previewRawContent = `\u2302 ${entry.fullPath}\n\n  Cannot read directory.\n  ${error instanceof Error ? error.message : String(error)}`;
@@ -978,14 +997,21 @@ export function openFileManagerWindow(params: {
       const lines = content.split("\n");
       const startLine = Math.max(0, result.line - 5);
       const endLine = Math.min(lines.length, result.line + 20);
+      const ext = path.extname(result.file).toLowerCase();
+      const stat = fs.statSync(result.file);
+      const sizeStr = stat.size < 1024 ? `${stat.size}B` : stat.size < 1048576 ? `${(stat.size / 1024).toFixed(0)}K` : `${(stat.size / 1048576).toFixed(1)}M`;
+      const escaped = (s: string) => s.replace(/\{/g, "\\{");
       const context = lines.slice(startLine, endLine)
         .map((ln, i) => {
           const lineNum = startLine + i + 1;
-          const marker = lineNum === result.line ? "\u25B6" : " ";
-          return `${marker}${String(lineNum).padStart(4, " ")} | ${ln}`;
+          const isMatch = lineNum === result.line;
+          const marker = isMatch ? "{yellow-fg}\u25B6{/yellow-fg}" : " ";
+          const numCol = isMatch ? "yellow" : "gray";
+          return `${marker}{${numCol}-fg}${String(lineNum).padStart(4, " ")} |{/${numCol}-fg} ${escaped(ln)}`;
         })
         .join("\n");
-      previewRawContent = `${result.file}:${result.line}\n\n${context}`;
+      const relPath = path.relative(currentPath, result.file);
+      previewRawContent = `{bold}${escaped(relPath)}{/bold}  ${sizeStr}  line ${result.line}\n\n${context}`;
     } catch (error) {
       previewRawContent = `Cannot preview file.\n\n${error instanceof Error ? error.message : String(error)}`;
     }
@@ -1073,22 +1099,37 @@ export function openFileManagerWindow(params: {
       activeSearchProcess = null;
     }
     searchActive = false;
+    // Restore title
+    const dirName = path.basename(currentPath) || currentPath;
+    frame.frame.setLabel(` File Manager - ${dirName} `);
   };
 
   const showSearchResults = () => {
     searchActive = true;
     if (searchResults.length === 0) {
-      list.setItems(["  (no results)"]);
-      previewRawContent = EMPTY_MATCHES;
+      list.setItems(["  {gray-fg}(no results){/gray-fg}"]);
+      previewRawContent = searchQuery
+        ? `{bold}Search: "${searchQuery.replace(/\{/g, "\\{")}"{/bold}\n\n  No matches found in ${path.basename(currentPath)}/\n\n  Try a different query or navigate to another directory.`
+        : EMPTY_MATCHES;
       setViewportContent(preview, previewRawContent);
     } else {
+      // Colour-coded results: file in cyan, line in yellow, text in white
+      const listW = Math.max(1, Number(list.width) || 40);
       const items = searchResults.map((r) => {
         const rel = path.relative(currentPath, r.file);
-        return ` ${rel}:${r.line} ${r.text.trim().slice(0, 60)}`;
+        const ext = path.extname(rel).toLowerCase();
+        const fileCol = [".md", ".txt"].includes(ext) ? "green"
+          : [".ts", ".tsx", ".js", ".jsx"].includes(ext) ? "yellow"
+          : [".json", ".yaml", ".yml"].includes(ext) ? "magenta"
+          : "cyan";
+        const safeText = r.text.trim().slice(0, 50).replace(/\{/g, "\\{");
+        return ` {${fileCol}-fg}${rel}{/${fileCol}-fg}{gray-fg}:${r.line}{/gray-fg} ${safeText}`;
       });
       list.setItems(items);
       list.select(0);
       updatePreviewForSearchResult(searchResults[0]);
+      // Update preview header with search info
+      frame.frame.setLabel(` Search: "${searchQuery}" - ${searchResults.length} results `);
     }
     renderStatusBar();
     params.screen.render();
@@ -1147,8 +1188,9 @@ export function openFileManagerWindow(params: {
     });
 
     // Show "searching..." immediately
-    list.setItems(["  Searching..."]);
-    previewRawContent = `Searching for "${query}" in ${currentPath}...`;
+    list.setItems(["  {yellow-fg}Searching...{/yellow-fg}"]);
+    frame.frame.setLabel(` Search: "${query}" `);
+    previewRawContent = `{bold}Searching for "${query.replace(/\{/g, "\\{")}"{/bold}\n\n  Directory: ${path.basename(currentPath)}/\n  Engine: ripgrep (rg)\n\n  {gray-fg}Results will appear as they are found...{/gray-fg}`;
     setViewportContent(preview, previewRawContent);
     params.screen.render();
   };
@@ -1190,6 +1232,143 @@ export function openFileManagerWindow(params: {
 
   const toggleViewMode = () => {
     setViewMode(viewMode === "list" ? "icon" : "list");
+  };
+
+  // ── File actions ────────────────────────────────────────
+
+  const getEntryPath = (index?: number): string | null => {
+    if (searchActive) {
+      const idx = typeof index === "number" ? index : (list as List & { selected: number }).selected ?? 0;
+      return searchResults[idx]?.file ?? null;
+    }
+    const entry = entries[typeof index === "number" ? index : (list as List & { selected: number }).selected ?? 0];
+    return entry?.fullPath ?? null;
+  };
+
+  const copyPathToClipboard = (index?: number) => {
+    const filePath = getEntryPath(index);
+    if (!filePath) return;
+    try {
+      if (process.platform === "darwin") {
+        execSync(`printf '%s' ${JSON.stringify(filePath)} | pbcopy`);
+      } else {
+        execSync(`printf '%s' ${JSON.stringify(filePath)} | xclip -selection clipboard 2>/dev/null || printf '%s' ${JSON.stringify(filePath)} | xsel --clipboard 2>/dev/null`);
+      }
+      params.overlays.flash(`Copied: ${path.basename(filePath)}`);
+    } catch {
+      params.overlays.flash("Clipboard not available");
+    }
+  };
+
+  const revealInFinder = (index?: number) => {
+    const filePath = getEntryPath(index);
+    if (!filePath) return;
+    try {
+      if (process.platform === "darwin") {
+        execSync(`open -R ${JSON.stringify(filePath)}`);
+      } else {
+        execSync(`xdg-open ${JSON.stringify(path.dirname(filePath))} 2>/dev/null`);
+      }
+    } catch {
+      params.overlays.flash("Could not reveal file");
+    }
+  };
+
+  const isMac = process.platform === "darwin";
+
+  /** Quick Look preview (macOS) or xdg-open (Linux) */
+  const quickLook = (index?: number) => {
+    const filePath = getEntryPath(index);
+    if (!filePath) return;
+    try {
+      if (isMac) {
+        // qlmanage blocks — run detached
+        require("node:child_process").spawn("qlmanage", ["-p", filePath], {
+          detached: true, stdio: "ignore",
+        }).unref();
+      } else {
+        require("node:child_process").spawn("xdg-open", [filePath], {
+          detached: true, stdio: "ignore",
+        }).unref();
+      }
+    } catch {
+      params.overlays.flash("Could not preview file");
+    }
+  };
+
+  // ── Right-click context menu ───────────────────────────
+
+  let contextMenuBox: blessed.Widgets.BoxElement | null = null;
+
+  const showContextMenu = (x: number, y: number, filePath: string) => {
+    closeContextMenu();
+    const isDir = fs.existsSync(filePath) && fs.statSync(filePath).isDirectory();
+    const items = [
+      { label: " Copy Path        c ", action: () => copyPathToClipboard() },
+      ...(!isDir ? [{ label: " Open in Editor  \u21B5 ", action: () => { const e = getSelectedEntry(); if (e && !e.isDirectory) params.onOpenFile(e.fullPath); } }] : []),
+      ...(!isDir ? [{ label: " Quick Look   spc ", action: () => quickLook() }] : []),
+      ...(!isDir ? [{ label: " View            v ", action: () => viewSelected() }] : []),
+      ...(isMac ? [{ label: " Reveal in Finder o ", action: () => revealInFinder() }] : []),
+    ];
+
+    const menuW = 24;
+    const menuH = items.length + 2;
+    const screenW = Number(params.screen.width) || 80;
+    const screenH = Number(params.screen.height) || 24;
+    const menuX = Math.min(x, screenW - menuW - 2);
+    const menuY = Math.min(y, screenH - menuH - 2);
+
+    contextMenuBox = blessed.box({
+      parent: params.screen,
+      top: menuY,
+      left: menuX,
+      width: menuW,
+      height: menuH,
+      border: "line",
+      style: { ...theme().footer, border: { fg: theme().accent.fg } },
+      tags: true,
+      mouse: true,
+      keys: true,
+    });
+
+    const menuList = blessed.list({
+      parent: contextMenuBox,
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      keys: true,
+      vi: true,
+      mouse: true,
+      items: items.map(i => i.label),
+      style: { ...theme().body, selected: theme().selected },
+    });
+
+    menuList.on("select", (_item: any, index: number) => {
+      closeContextMenu();
+      items[index]?.action();
+    });
+
+    menuList.on("keypress", (_ch: any, key: any) => {
+      if (key.name === "escape" || key.name === "q") {
+        closeContextMenu();
+      }
+    });
+
+    menuList.on("blur", () => {
+      closeContextMenu();
+    });
+
+    menuList.focus();
+    params.screen.render();
+  };
+
+  const closeContextMenu = () => {
+    if (contextMenuBox) {
+      contextMenuBox.destroy();
+      contextMenuBox = null;
+      params.screen.render();
+    }
   };
 
   // ── Entry interaction ──────────────────────────────────
@@ -1237,6 +1416,16 @@ export function openFileManagerWindow(params: {
     }
   });
 
+  // Right-click context menu on list items
+  list.on("element click", (_el: any, mouse: any) => {
+    if (mouse && (mouse.button === "right" || mouse.button === 2)) {
+      const filePath = getEntryPath();
+      if (filePath) {
+        showContextMenu(mouse.x ?? 0, mouse.y ?? 0, filePath);
+      }
+    }
+  });
+
   list.on("keypress", (ch, key) => {
     if (key.name === "enter") {
       openSelected();
@@ -1244,6 +1433,18 @@ export function openFileManagerWindow(params: {
     }
     if (key.name === "v" && !key.ctrl && !key.meta) {
       viewSelected();
+      return;
+    }
+    if (key.name === "space") {
+      quickLook();
+      return;
+    }
+    if (key.name === "c" && !key.ctrl && !key.meta) {
+      copyPathToClipboard();
+      return;
+    }
+    if (key.name === "o" && !key.ctrl && !key.meta) {
+      revealInFinder();
       return;
     }
     if (key.name === "slash") {
@@ -1465,6 +1666,18 @@ export function openFileManagerWindow(params: {
       if (entry && !entry.isDirectory) {
         params.onViewFile(entry.fullPath);
       }
+      return;
+    }
+    if (key.name === "space") {
+      quickLook(iconSelected);
+      return;
+    }
+    if (key.name === "c" && !key.ctrl && !key.meta) {
+      copyPathToClipboard(iconSelected);
+      return;
+    }
+    if (key.name === "o" && !key.ctrl && !key.meta) {
+      revealInFinder(iconSelected);
       return;
     }
     if (key.name === "backspace") {

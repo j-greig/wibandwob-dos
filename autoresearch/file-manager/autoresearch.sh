@@ -15,21 +15,19 @@ curl -s -X POST http://127.0.0.1:8099/commands/run \
 
 sleep 1
 
-# ── 3. Navigate to repo root for mixed file types ──────────────────
+# ── 3. Navigate to src/ for TypeScript files ───────────────────────
 curl -s -X POST http://127.0.0.1:8099/commands/run \
   -H 'Content-Type: application/json' \
-  -d '{"id":"finder.navigate","args":{"path":"'"$REPO_ROOT"'"}}' > /dev/null 2>&1 || true
-
-sleep 0.5
-
-# ── 3b. Navigate to docs/ which has .md files ──────────────────────
-curl -s -X POST http://127.0.0.1:8099/commands/run \
-  -H 'Content-Type: application/json' \
-  -d '{"id":"finder.navigate","args":{"path":"'"$REPO_ROOT/docs"'"}}' > /dev/null 2>&1 || true
+  -d '{"id":"finder.navigate","args":{"path":"'"$REPO_ROOT/src"'"}}' > /dev/null 2>&1 || true
 
 sleep 0.3
 
-sleep 0.5
+# ── 3b. Trigger a search to show search results view ───────────────
+curl -s -X POST http://127.0.0.1:8099/commands/run \
+  -H 'Content-Type: application/json' \
+  -d '{"id":"finder.search","args":{"query":"export function","glob":"*.ts"}}' > /dev/null 2>&1 || true
+
+sleep 1.5
 
 # ── 4. Screenshot ───────────────────────────────────────────────────
 SHOT_DIR="$REPO_ROOT/autoresearch/file-manager"
