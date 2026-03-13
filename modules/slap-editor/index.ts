@@ -222,6 +222,38 @@ async function openEditor(host: MicroappHost, filePath?: string) {
     render();
   }
 
+  // Welcome screen for empty/new files
+  const welcomeLines = [
+    "",
+    "",
+    "",
+    "          \u250C\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510",
+    "          \u2502     WibWob Code Editor       \u2502",
+    "          \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518",
+    "",
+    "          Quick Start",
+    "          \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500",
+    "          Ctrl+S     Save file",
+    "          Ctrl+F     Find text",
+    "          Ctrl+G     Go to line",
+    "          Ctrl+Z     Undo",
+    "          Ctrl+Y     Redo",
+    "          Ctrl+A     Select all",
+    "          Ctrl+C     Copy",
+    "          Ctrl+X     Cut",
+    "",
+    "          Navigation",
+    "          \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500",
+    "          Arrows     Move cursor",
+    "          Ctrl+Left  Word left",
+    "          Ctrl+Right Word right",
+    "          Home/End   Line start/end",
+    "          PgUp/PgDn  Page scroll",
+    "",
+    "          Start typing to begin editing.",
+    "          Open a file via the command palette.",
+  ];
+
   // Cached highlighted lines
   let highlightedLines: string[] = [];
   let highlightDirty = true;
@@ -265,6 +297,55 @@ async function openEditor(host: MicroappHost, filePath?: string) {
 
     const gutterLines: string[] = [];
     const textLines: string[] = [];
+
+    // Welcome screen for empty untitled buffer
+    const showWelcome = !engine.filePath && engine.lineCount <= 1 && engine.lines[0] === "";
+    if (showWelcome) {
+      const welcomeAccent = ansiColour(t.accent.fg);
+      const welcomeMuted = ansiColour(t.muted.fg);
+      const welcomeBright = `${A.b}${ansiColour(t.body.fg)}`;
+      for (let y = 0; y < viewHeight; y++) {
+        gutterLines.push(`${A.d}${gutterAccent}${"~".padStart(gutterW - 1)} ${A.r}`);
+        if (y < welcomeLines.length) {
+          const wl = welcomeLines[y];
+          // Style: headers in accent, shortcuts in bright, descriptions in muted
+          if (wl.includes("WibWob Code Editor")) {
+            textLines.push(`${welcomeAccent}${A.b}${wl}${A.r}`);
+          } else if (wl.includes("Quick Start") || wl.includes("Navigation")) {
+            textLines.push(`${welcomeAccent}${wl}${A.r}`);
+          } else if (wl.includes("\u2500")) {
+            textLines.push(`${welcomeMuted}${wl}${A.r}`);
+          } else if (wl.match(/^\s+Ctrl\+|^\s+Arrows|^\s+Home|^\s+PgUp/)) {
+            const parts = wl.match(/^(\s+)(\S+\s+\S*)\s{2,}(.*)$/);
+            if (parts) {
+              textLines.push(`${parts[1]}${welcomeBright}${parts[2].padEnd(12)}${A.r}${welcomeMuted}${parts[3]}${A.r}`);
+            } else {
+              textLines.push(`${welcomeMuted}${wl}${A.r}`);
+            }
+          } else if (wl.includes("Start typing") || wl.includes("Open a file")) {
+            textLines.push(`${welcomeMuted}${A.i}${wl}${A.r}`);
+          } else {
+            textLines.push(wl);
+          }
+        } else {
+          textLines.push("");
+        }
+      }
+      gutterBox.setContent(gutterLines.join("\n"));
+      textBox.setContent(textLines.join("\n"));
+      const wAccent = ansiColour(t.accent.fg);
+      const wDim = ansiColour(t.muted.fg);
+      const wBright = ansiColour(t.body.fg);
+      (headerBar as any).setContent(` ${wAccent}\u2022${A.r} ${wBright}${A.b}untitled${A.r}`);
+      const statusLeftAnsi2 = ` ${wAccent}Ln 1${A.r}${wDim}, Col 1${A.r}`;
+      const statusRightAnsi2 = `${wDim}Plain Text  UTF-8  2 sp  1 ln  100%${A.r} `;
+      const leftP = stripAnsi(statusLeftAnsi2).length;
+      const rightP = stripAnsi(statusRightAnsi2).length;
+      const gap2 = Math.max(1, totalWidth - leftP - rightP);
+      (statusBar as any).setContent(statusLeftAnsi2 + " ".repeat(gap2) + statusRightAnsi2);
+      host.screen.render();
+      return;
+    }
 
     for (let y = 0; y < viewHeight; y++) {
       const row = engine.scroll.row + y;
