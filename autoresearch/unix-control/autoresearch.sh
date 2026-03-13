@@ -116,7 +116,44 @@ EDITORS=$($WW windows 2>/dev/null | jq '[.[] | select(.kind=="editor")] | length
 check "ww windows | jq select(.kind==editor) filters" \
   "$([ "$EDITORS" -ge 1 ] && echo PASS || echo "editors=$EDITORS")"
 
-# ── 8. Error handling ───────────────────────────────────
+# ── 8. Window resize ─────────────────────────────────────
+echo "--- resize ---"
+if [ -n "$WID" ] && [ "$WID" != "null" ]; then
+  $WW cmd window.resize --id "$WID" --width 40 --height 15 >/dev/null 2>&1
+  sleep 0.3
+  NEW_W=$(curl -s "$API/state" | jq ".windows[] | select(.id==$WID) | .width")
+  check "ww window.resize sets width" \
+    "$([ "$NEW_W" = "40" ] && echo PASS || echo "width=$NEW_W expected=40")"
+else
+  check "ww window.resize sets width" "FAIL no windows"
+fi
+
+# ── 9. Theme operations ─────────────────────────────────
+echo "--- theme ---"
+THEME_RESULT=$($WW cmd theme.set --name flexoki-ink 2>&1 || echo "FAIL")
+check "ww cmd theme.set runs" \
+  "$(echo "$THEME_RESULT" | jq -r '.ok' 2>/dev/null | grep -q 'true' && echo PASS || echo "result=$THEME_RESULT")"
+
+# ── 10. Pipe composition ────────────────────────────────
+echo "--- pipe composition ---"
+
+# Open 2 editors, pipe through jq to count editors, close via pipe
+$WW cmd editor.new >/dev/null 2>&1; sleep 0.3
+$WW cmd editor.new >/dev/null 2>&1; sleep 0.3
+
+PIPE_COUNT=$($WW windows | jq '[.[] | select(.kind=="editor")] | length')
+check "pipe: count editors via jq" \
+  "$([ "$PIPE_COUNT" -ge 2 ] && echo PASS || echo "editors=$PIPE_COUNT")"
+
+# Close all editors via pipe
+$WW windows | jq -r '.[] | select(.kind=="editor") | .id' | \
+  while read -r eid; do $WW cmd window.close --id "$eid" >/dev/null 2>&1; done
+sleep 0.5
+AFTER_CLOSE=$($WW windows | jq '[.[] | select(.kind=="editor")] | length')
+check "pipe: close all editors via jq + xargs pattern" \
+  "$([ "$AFTER_CLOSE" = "0" ] && echo PASS || echo "remaining=$AFTER_CLOSE")"
+
+# ── 11. Error handling ──────────────────────────────────
 echo "--- error handling ---"
 
 # Bad command should exit non-zero
@@ -124,11 +161,21 @@ $WW cmd nonexistent.command >/dev/null 2>&1 && BAD_EXIT=0 || BAD_EXIT=$?
 check "bad command exits non-zero" \
   "$([ "$BAD_EXIT" -ne 0 ] && echo PASS || echo "exit=$BAD_EXIT")"
 
-# ── 9. Help ─────────────────────────────────────────────
+# Error output goes to stderr (stdout should be empty or absent)
+ERR_STDOUT=$($WW cmd nonexistent.command 2>/dev/null || true)
+check "error output goes to stderr not stdout" \
+  "$([ -z "$ERR_STDOUT" ] && echo PASS || echo "stdout=$ERR_STDOUT")"
+
+# ── 12. Help ─────────────────────────────────────────────
 echo "--- help ---"
 HELP=$($WW help 2>&1 || true)
 check "ww help shows usage" \
   "$(echo "$HELP" | grep -q 'Usage' && echo PASS || echo "no Usage in output")"
+
+# No args shows help
+NO_ARGS=$($WW 2>&1 || true)
+check "ww (no args) shows usage" \
+  "$(echo "$NO_ARGS" | grep -q 'Usage' && echo PASS || echo "no Usage")"
 
 # ── Cleanup: close test windows ──────────────────────────
 echo "--- cleanup ---"
