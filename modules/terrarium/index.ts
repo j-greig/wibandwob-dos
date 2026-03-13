@@ -111,35 +111,40 @@ const DISTRICTS: Record<DistrictId, { label: string; subtitle: string; bg: strin
   industrial: {
     label: "Industrial Zone",
     subtitle: "where sparks fly and progress grinds",
-    bg: [".", ".", " ", ".", "·", " ", ".", " "],
+    bg: [" ", " ", "░", " ", " ", "·", " ", " ", " ", "░", " ", " "],
     borderFg: "yellow",
   },
   residential: {
     label: "Residential Burrows",
     subtitle: "cosy tunnels, warm hearths",
-    bg: ["·", " ", "·", " ", ".", " ", " ", "·"],
+    bg: [" ", " ", "~", " ", " ", " ", " ", "~", " ", " ", " ", " "],
     borderFg: "green",
   },
   plaza: {
     label: "Grand Plaza",
     subtitle: "the beating heart of Antopolis",
-    bg: [" ", " ", "·", " ", " ", " ", "·", " "],
+    bg: [" ", " ", " ", " ", "·", " ", " ", " ", " ", " ", "·", " "],
     borderFg: "cyan",
   },
   mines: {
     label: "Crystal Mines",
     subtitle: "deep and glittering",
-    bg: [".", " ", "▪", " ", ".", "·", " ", "."],
+    bg: ["▪", " ", "·", "▪", " ", " ", "▪", " ", "·", " ", " ", "▪"],
     borderFg: "magenta",
   },
 };
 
 const CASTE_GLYPHS: Record<AntCaste, string> = {
-  worker:    "ö",
-  soldier:   "Ö",
-  engineer:  "ê",
-  queen:     "♛",
-  scientist: "ë",
+  worker:    "ö·",
+  soldier:   "Ö>",
+  engineer:  "ê=",
+  queen:     "♛*",
+  scientist: "ë?",
+};
+
+// Single-char glyphs for census display
+const CASTE_GLYPH_SHORT: Record<AntCaste, string> = {
+  worker: "ö", soldier: "Ö", engineer: "ê", queen: "♛", scientist: "ë",
 };
 
 const CASTE_NAMES: Record<AntCaste, string> = {
@@ -148,21 +153,21 @@ const CASTE_NAMES: Record<AntCaste, string> = {
 };
 
 const BUILDING_ART: Record<BuildingType, string[]> = {
-  nest:      [" ╔═╗ ", " ║♛║ ", " ╚═╝ "],
-  farm:      [" ┌─┐ ", " │♣│ ", " └─┘ "],
-  factory:   [" ▄▄▄ ", " █▓█ ", " ▀▀▀ "],
-  reactor:   [" ╔●╗ ", " ║☢║ ", " ╚═╝ "],
-  fountain:  ["  ∩  ", " ╔╧╗ ", " ╚═╝ "],
-  barracks:  [" ┌†┐ ", " │░│ ", " └─┘ "],
-  lab:       [" ┌◊┐ ", " │⚗│ ", " └─┘ "],
-  silo:      [" ╔═╗ ", " ║▒║ ", " ╚═╝ "],
-  beacon:    ["  ‡  ", " ─┼─ ", "  │  "],
-  shrine:    ["  △  ", " ╔╩╗ ", " ╚═╝ "],
-  drill:     ["  ▼  ", " ─╫─ ", " ─╨─ "],
-  refinery:  [" ▄█▄ ", " █░█ ", " ▀█▀ "],
-  tavern:    [" ┌♪┐ ", " │☺│ ", " └─┘ "],
-  library:   [" ┌─┐ ", " │▤│ ", " └─┘ "],
-  catapult:  [" ╱─╲ ", " ╲●╱ ", "  ┴  "],
+  nest:      ["  /\\  ", " |♛ | ", " |__| ", " ════ "],
+  farm:      ["  ♣♣  ", " [  ] ", " [__] ", " ···· "],
+  factory:   ["  /|  ", " |▓▓| ", " |▓▓| ", " ▀▀▀▀ "],
+  reactor:   [" ╔══╗ ", " ║☢☢║ ", " ╚══╝ ", " ···· "],
+  fountain:  ["  ::  ", " (  ) ", " (~~) ", " ·  · "],
+  barracks:  ["  ††  ", " |░░| ", " |__| ", " ···· "],
+  lab:       ["  ◊◊  ", " |⚗ | ", " |__| ", " ···· "],
+  silo:      [" ╔══╗ ", " ║▒▒║ ", " ╚══╝ ", " ···· "],
+  beacon:    ["  **  ", " -||- ", "  ||  ", "  ··  "],
+  shrine:    ["  /\\  ", " /  \\ ", " ║══║ ", " ···· "],
+  drill:     ["  ▼▼  ", " -╫╫- ", " -╨╨- ", " ···· "],
+  refinery:  ["  ▄▄  ", " █░░█ ", " ▀██▀ ", " ···· "],
+  tavern:    ["  ♪♪  ", " |☺ | ", " |__| ", " ···· "],
+  library:   ["  ══  ", " |▤▤| ", " |__| ", " ···· "],
+  catapult:  [" /--\\ ", " \\●●/ ", "  ┴┴  ", " ···· "],
 };
 
 const BUILDING_DISTRICT: Record<BuildingType, DistrictId> = {
@@ -696,12 +701,15 @@ function renderDistrict(districtId: DistrictId, w: number, h: number, world: Wor
     }
   }
 
-  // Render ants
+  // Render ants (2-char glyphs)
   for (const ant of world.ants.filter(a => a.district === districtId)) {
-    const ax = Math.floor(ant.x * (w - 1));
+    const ax = Math.floor(ant.x * (w - 3));
     const ay = Math.floor(ant.y * (h - 1));
-    if (ax >= 0 && ax < w && ay >= 0 && ay < h) {
-      grid[ay]![ax] = CASTE_GLYPHS[ant.caste];
+    const glyph = CASTE_GLYPHS[ant.caste];
+    if (ax >= 0 && ay >= 0 && ay < h) {
+      for (let c = 0; c < glyph.length; c++) {
+        if (ax + c < w) grid[ay]![ax + c] = glyph[c]!;
+      }
     }
   }
 
@@ -714,7 +722,7 @@ function renderResources(world: World, w: number): string {
   const census = (["worker", "soldier", "engineer", "queen", "scientist"] as AntCaste[])
     .map(c => {
       const n = world.ants.filter(a => a.caste === c).length;
-      return n > 0 ? `${CASTE_GLYPHS[c]}${n}` : null;
+      return n > 0 ? `${CASTE_GLYPH_SHORT[c]}${n}` : null;
     })
     .filter(Boolean)
     .join(" ");
@@ -795,6 +803,12 @@ function openAntopolis(host: MicroappHost) {
     style: t.header,
   });
 
+  const subtitleBox = blessed.box({
+    parent: win.body, top: 0, left: 0, width: 0, height: 1,
+    tags: false,
+    style: { ...t.body, fg: t.muted.fg },
+  });
+
   const resourceBox = blessed.box({
     parent: win.body, top: 0, left: 0, width: 0, height: 1,
     tags: false,
@@ -836,6 +850,7 @@ function openAntopolis(host: MicroappHost) {
 
   const root = createStack(win.body, [
     { key: "figlet",    basis: figletH, part: createNodePart(figletBox) },
+    { key: "subtitle",  basis: 1,       part: createNodePart(subtitleBox) },
     { key: "resources", basis: 1,       part: createNodePart(resourceBox) },
     { key: "districts", basis: "4fr",   part: biomeGrid },
     { key: "status",    basis: 1,       part: createNodePart(statusBox) },
@@ -853,6 +868,14 @@ function openAntopolis(host: MicroappHost) {
     // Figlet header
     const pauseTag = world.paused ? "  || PAUSED" : "";
     figletBox.setContent(figletText + pauseTag);
+
+    // Subtitle
+    const bldgCount = world.buildings.length;
+    const districtSummary = districtIds.map(id => {
+      const n = world.ants.filter(a => a.district === id).length;
+      return `${DISTRICTS[id].label.split(" ")[0]}:${n}`;
+    }).join("  ");
+    subtitleBox.setContent(` a micro-city for ants with ant technology  --  ${bldgCount} buildings  --  ${districtSummary}`);
 
     // Resources
     resourceBox.setContent(renderResources(world, w));
@@ -964,6 +987,7 @@ function openAntopolis(host: MicroappHost) {
   win.onRestyle(() => {
     const th = host.theme();
     figletBox.style = th.header;
+    subtitleBox.style = { ...th.body, fg: th.muted.fg };
     resourceBox.style = { ...th.body, fg: th.accent.fg };
     statusBox.style = th.header;
     logBox.style = { ...th.body, border: { fg: th.muted.fg } };
