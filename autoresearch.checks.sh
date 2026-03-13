@@ -1,1 +1,1 @@
-autoresearch/unix-control/autoresearch.checks.sh
+autoresearch/unix-control-v2/autoresearch.checks.sh
