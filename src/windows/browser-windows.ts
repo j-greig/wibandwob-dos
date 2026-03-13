@@ -15,6 +15,7 @@ import { createScrollbar } from "../core/ui-primitives.js";
 import { clipToVisibleWidth, padToWidth } from "../core/ansi-utils.js";
 import { createRestyleBundle, createSelectableList, deferRender } from "../core/ui-parts.js";
 import { renderMarkdownFile, PLAIN_HEADING_CONFIG } from "../services/markdown-service.js";
+import { highlightCode, HIGHLIGHTED_LANGUAGES } from "../services/syntax-highlight.js";
 import type { ContentMeasurement } from "../services/content-measurement.js";
 import { createPreRenderedPlayer, type FramePlayer } from "../services/animation-service.js";
 import type { Box, BrowserEntry, List, WindowKind, WindowRecord } from "../core/types.js";
@@ -533,42 +534,51 @@ export function openFileManagerWindow(params: {
     height: 1,
     style: theme().header
   });
-  // Toolbar buttons (right-aligned, fixed widths)
+  // Toolbar buttons (right-aligned, fixed widths) — styled as visible buttons
+  const t = theme();
+  const btnStyle = { fg: t.accent.fg, bg: t.body.bg ?? "black" };
+  const btnHoverStyle = { fg: t.body.bg ?? "black", bg: t.accent.fg };
+
   const btnFilter = blessed.box({
     parent: toolbar,
     top: 0,
-    right: 19,
-    width: 10,
+    right: 22,
+    width: 12,
     height: 1,
-    content: " / Filter ",
+    content: " [/] Filter ",
     mouse: true,
-    style: theme().footer
+    style: { ...btnStyle },
   });
   const btnSearch = blessed.box({
     parent: toolbar,
     top: 0,
-    right: 9,
-    width: 10,
+    right: 10,
+    width: 12,
     height: 1,
-    content: " s Search ",
+    content: " [s] Search ",
     mouse: true,
-    style: theme().footer
+    style: { ...btnStyle },
   });
   const btnView = blessed.box({
     parent: toolbar,
     top: 0,
     right: 0,
-    width: 9,
+    width: 10,
     height: 1,
     content: "",
     mouse: true,
-    style: theme().footer
+    style: { ...btnStyle },
   });
-  // (dotfiles always shown — no toggle button needed)
+
+  // Hover effects
+  for (const btn of [btnFilter, btnSearch, btnView]) {
+    btn.on("mouseover", () => { btn.style = { ...btnHoverStyle }; params.screen.render(); });
+    btn.on("mouseout", () => { btn.style = { ...btnStyle }; params.screen.render(); });
+  }
 
   const renderToolbarButtons = () => {
     const viewLabel = viewMode === "icon" ? "\u2261 List " : "\u25A6 Icon ";
-    btnView.setContent(` ${viewLabel}`);
+    btnView.setContent(` [tab] ${viewLabel}`);
   };
 
   btnFilter.on("click", () => {
@@ -576,10 +586,28 @@ export function openFileManagerWindow(params: {
     renderFilter();
     params.screen.render();
   });
+
+  /** Open search via overlay prompt — much more discoverable */
+  const openSearchPrompt = () => {
+    params.overlays.openValuePrompt(
+      "Search in " + path.basename(currentPath) + "/",
+      searchQuery,
+      (value: string) => {
+        if (value.trim()) {
+          searchQuery = value;
+          if (searchMode === "simple") {
+            runSimpleSearch(searchQuery);
+          } else {
+            runAdvancedSearch(searchQuery);
+          }
+        }
+        focusContentPane();
+      }
+    );
+  };
+
   btnSearch.on("click", () => {
-    searchBox.focus();
-    renderSearchBox();
-    params.screen.render();
+    openSearchPrompt();
   });
   btnView.on("click", () => {
     toggleViewMode();
@@ -868,8 +896,12 @@ export function openFileManagerWindow(params: {
         const childDirs = children.filter(c => c.isDirectory());
         const childFiles = children.filter(c => !c.isDirectory());
         const header = `{bold}\u2302 ${path.basename(dirPath)}/{/bold}\n\n  {cyan-fg}${childDirs.length} directories{/cyan-fg}, {green-fg}${childFiles.length} files{/green-fg}\n`;
-        const dirItems = childDirs.slice(0, 10).map(c => {
-          // Try to count children
+        // Show more items based on available preview height
+        const previewH = Math.max(10, Number(preview.height) || 30);
+        const maxDirs = Math.min(childDirs.length, Math.max(8, Math.floor(previewH * 0.4)));
+        const maxFiles = Math.min(childFiles.length, Math.max(8, Math.floor(previewH * 0.4)));
+
+        const dirItems = childDirs.slice(0, maxDirs).map(c => {
           let childCount = "";
           try {
             const n = fs.readdirSync(path.join(dirPath, c.name)).length;
@@ -877,7 +909,7 @@ export function openFileManagerWindow(params: {
           } catch {}
           return `  {cyan-fg}\u25A0{/cyan-fg} ${c.name}/${childCount}`;
         });
-        const fileItems = childFiles.slice(0, 10).map(c => {
+        const fileItems = childFiles.slice(0, maxFiles).map(c => {
           const ext = path.extname(c.name).toLowerCase();
           const col = [".md", ".txt"].includes(ext) ? "green"
             : [".ts", ".tsx", ".js", ".jsx"].includes(ext) ? "yellow"
@@ -893,8 +925,8 @@ export function openFileManagerWindow(params: {
           const padded = sizeStr ? ` {gray-fg}${sizeStr}{/gray-fg}` : "";
           return `  {${col}-fg}\u2022{/${col}-fg} ${c.name}${padded}`;
         });
-        const truncDirs = childDirs.length > 10 ? `  {cyan-fg}... +${childDirs.length - 10} more dirs{/cyan-fg}` : "";
-        const truncFiles = childFiles.length > 10 ? `  {green-fg}... +${childFiles.length - 10} more files{/green-fg}` : "";
+        const truncDirs = childDirs.length > maxDirs ? `  {cyan-fg}... +${childDirs.length - maxDirs} more dirs{/cyan-fg}` : "";
+        const truncFiles = childFiles.length > maxFiles ? `  {green-fg}... +${childFiles.length - maxFiles} more files{/green-fg}` : "";
         // File type distribution bar
         const extCounts: Record<string, number> = {};
         for (const f of childFiles) {
@@ -917,6 +949,32 @@ export function openFileManagerWindow(params: {
         if (fileItems.length) sections.push("\n" + fileItems.join("\n"));
         if (truncFiles) sections.push(truncFiles);
         if (extBar) sections.push("\n  " + extBar);
+
+        // Quick stats: largest files and most recent
+        if (childFiles.length > 0) {
+          const withStats = childFiles.map(c => {
+            try {
+              const s = fs.statSync(path.join(dirPath, c.name));
+              return { name: c.name, size: s.size, mtime: s.mtimeMs };
+            } catch { return { name: c.name, size: 0, mtime: 0 }; }
+          });
+          const largest = [...withStats].sort((a, b) => b.size - a.size).slice(0, 3);
+          const recent = [...withStats].sort((a, b) => b.mtime - a.mtime).slice(0, 3);
+
+          const fmtSize = (s: number) => s < 1024 ? `${s}B` : s < 1048576 ? `${(s / 1024).toFixed(0)}K` : `${(s / 1048576).toFixed(1)}M`;
+          const fmtDate = (ms: number) => {
+            const d = new Date(ms);
+            const now = Date.now();
+            const diff = now - ms;
+            if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+            if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+            return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
+          };
+
+          sections.push(`\n  {bold}Largest:{/bold} ${largest.map(f => `${f.name} {gray-fg}${fmtSize(f.size)}{/gray-fg}`).join(", ")}`);
+          sections.push(`  {bold}Recent:{/bold}  ${recent.map(f => `${f.name} {gray-fg}${fmtDate(f.mtime)}{/gray-fg}`).join(", ")}`);
+        }
+
         previewRawContent = sections.join("\n");
       } catch (error) {
         previewRawContent = `\u2302 ${entry.fullPath}\n\n  Cannot read directory.\n  ${error instanceof Error ? error.message : String(error)}`;
@@ -973,16 +1031,28 @@ export function openFileManagerWindow(params: {
     }
 
     // Default: raw text with line numbers + file metadata header
+    // Use syntax highlighting for supported languages
     try {
       const content = fs.readFileSync(entry.fullPath, "utf8");
-      const lines = content.slice(0, 8000).split("\n");
+      const rawLines = content.slice(0, 8000).split("\n");
       const stat = fs.statSync(entry.fullPath);
       const sizeStr = stat.size < 1024 ? `${stat.size}B` : stat.size < 1048576 ? `${(stat.size / 1024).toFixed(1)}KB` : `${(stat.size / 1048576).toFixed(1)}MB`;
       const dateStr = new Date(stat.mtimeMs).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
-      // Escape { in content to prevent blessed tag interpretation
       const escaped = (ln: string) => ln.replace(/\{/g, "\\{");
       const header = `{bold}${path.basename(entry.fullPath)}{/bold}  ${sizeStr}, ${dateStr}`;
-      const numbered = lines.map((ln, i) => `{gray-fg}${String(i + 1).padStart(4, " ")} |{/gray-fg} ${escaped(ln)}`).join("\n");
+
+      // Determine language from extension
+      const lang = ext.replace(".", "");
+      const useHighlight = HIGHLIGHTED_LANGUAGES.has(lang);
+
+      let numbered: string;
+      if (useHighlight) {
+        // Syntax-highlighted lines come back with ANSI codes — don't escape those
+        const highlighted = highlightCode(rawLines.join("\n"), lang);
+        numbered = highlighted.map((ln, i) => `{gray-fg}${String(i + 1).padStart(4, " ")} |{/gray-fg} ${ln}`).join("\n");
+      } else {
+        numbered = rawLines.map((ln, i) => `{gray-fg}${String(i + 1).padStart(4, " ")} |{/gray-fg} ${escaped(ln)}`).join("\n");
+      }
       previewRawContent = `${header}\n\n${numbered}`;
     } catch (error) {
       previewRawContent = `Cannot preview file.\n\n${error instanceof Error ? error.message : String(error)}`;
@@ -1408,11 +1478,22 @@ export function openFileManagerWindow(params: {
 
   // ── Key bindings: list ─────────────────────────────────
 
+  // Update preview on keyboard selection (up/down/j/k)
   list.on("select", (_, index) => {
     if (searchActive && searchResults[index]) {
       updatePreviewForSearchResult(searchResults[index]);
     } else {
       updatePreview(index);
+    }
+  });
+
+  // Update preview on mouse click — "select item" fires on any selection change including clicks
+  list.on("select item", () => {
+    const idx = (list as List & { selected: number }).selected ?? 0;
+    if (searchActive && searchResults[idx]) {
+      updatePreviewForSearchResult(searchResults[idx]);
+    } else {
+      updatePreview(idx);
     }
   });
 
@@ -1459,9 +1540,7 @@ export function openFileManagerWindow(params: {
       return;
     }
     if (key.name === "s" && !key.ctrl && !key.meta) {
-      searchBox.focus();
-      renderSearchBox();
-      params.screen.render();
+      openSearchPrompt();
       return;
     }
     if (key.name === "backspace") {
@@ -1701,9 +1780,7 @@ export function openFileManagerWindow(params: {
       return;
     }
     if (key.name === "s" && !key.ctrl && !key.meta) {
-      searchBox.focus();
-      renderSearchBox();
-      params.screen.render();
+      openSearchPrompt();
       return;
     }
     // Jump-to-letter

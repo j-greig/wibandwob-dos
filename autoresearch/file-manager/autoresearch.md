@@ -88,4 +88,10 @@ Already imported in browser-windows.ts:
 
 ## What's Been Tried
 
-(none yet — starting fresh)
+- #1 baseline (4.4): Small 72x20 window, plain dir listing, no colour, no markdown preview
+- #2 keep (6.0): Responsive sizing (85% screen), dir preview with contents, file type icons, markdown rendering, JSON pretty-print, dir crash fix
+- #3 keep (6.6): Breadcrumb nav, total file size in status, docs/ folder visible
+- #4 keep (7.0): Tags on preview, coloured dir preview (cyan dirs, green files), gray line numbers, escaped braces
+- #5 keep (7.6): Dynamic title bar, dir child counts (3), file sizes in preview, keyboard hints in status
+- #6 keep (8.0): Coloured file type icons in list (green md, cyan dirs, yellow ts/js, magenta json, gray sizes)
+- #7 keep (9.0): Search overhaul — colour-coded results, match line arrows, result count in title, Quick Look, copy path, reveal in Finder, right-click context menu
