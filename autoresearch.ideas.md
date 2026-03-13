@@ -1,23 +1,36 @@
 # Autoresearch Ideas
 
-## Terrain Lab (8.0, paused)
-- Mini-map in sidebar showing terrain coverage heatmap
-- Animated seed counter when reseeding
-- Terrain type descriptions (one-liner per terrain)
-- Level preview: show what adding/removing a level would look like
+## Completed Apps
+- LLM Orch Studio: 3.6 → 8.0
+- Antopolis: 5.4 → 9.0+
+- File Manager: 4.4 → 10.0
+- Terrain Lab: 4.8 → 8.0
+- Plasma: 5.4 → 8.0
 
-## TR-808 (6.4, paused)
-- Blessed tags approach failed (content eaten). ANSI codes work but theme remaps colours.
-- Background colour for active steps needs real screencapture to verify (tmux strips bg)
-- Larger step blocks (3 chars wide) for 200-col width
-- Pattern bank indicators (which banks have content)
+## Paused Apps
+- Music Player: 4.2 → 7.4 (4 viz modes, idle animations)
+- TR-808: 5.4 → 6.4 (ANSI colours, preset loading fixed)
 
-## Music Player (7.4, paused)
-- Push to 8+ with better playlist styling, track metadata display
-- Waveform preview for loaded tracks
+## Pattern: ANSI Sidebar Enhancement
+Proven recipe for any window with a 3fr:1fr split + createTextBlock sidebar:
+1. Add ANSI colour constants (A.cyn, A.yel, A.gry, A.wht, A.r, etc.)
+2. Use (infoBlock.node as any).setContent() to bypass wrapIndentedText
+3. Section headers: label(icon, "TITLE") in cyan
+4. Active item lists with ▶ marker in colour, others in gray
+5. Value bars using ▮/▯ in cyan/gray
+6. Key shortcuts in yellow with gray descriptions
+7. Horizontal separators in gray
+8. Status bar right with pipe-separated summary
+9. Fill remaining vertical space with ABOUT/LEGEND section
 
-## Next targets
-- Primer Gallery: decent but could use colour, better preview sizing
-- Code Editor (slap-editor): very bare empty state
-- Contour Studio: check baseline
-- Plasma Patterns: check baseline
+This pattern takes ~15 mins to apply and reliably jumps score from 5→8.
+
+## Next Targets (sidebar pattern candidates)
+- Contour Studio: triptych mode, status bar but no sidebar — needs different approach
+- Primer Gallery: list+preview, could add colour to list items and header tabs
+- Code Editor (slap-editor): empty state needs work, but it's a different pattern
+
+## Future Ideas (non-sidebar)
+- Generative art windows: could add subtle frame/border info
+- Backrooms Log Browser: readability improvements
+- WibWobWorld chat: sidebar for room info, online presence
