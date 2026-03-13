@@ -5,15 +5,20 @@ import path from "node:path";
 import type { MicroappHost, LogSeverity } from "../../src/services/microapp-sdk.js";
 import {
   createButton,
+  createButtonBar,
   createDataTable,
   createFormField,
+  createHeaderBar,
   createKeyValuePanel,
   createLogView,
   createNodePart,
   createRow,
+  createRule,
   createSelect,
   createStack,
+  createStatusBar,
   createTextArea,
+  renderFiglet,
 } from "../../src/services/microapp-sdk.js";
 
 const APP_TITLE = "LLM Orch Studio";
@@ -73,9 +78,28 @@ function openStudio(host: MicroappHost) {
     status: "-",
   };
 
+  // ── Figlet header ──────────────────────────────────────────────────
+  const headerBox = blessed.box({
+    parent: win.body,
+    top: 0, left: 0, width: 0, height: 0,
+    tags: false,
+    style: { fg: host.theme().accent?.fg ?? host.theme().body.fg, bg: host.theme().body.bg },
+  });
+  function refreshHeader() {
+    const w = Math.max(1, Number(win.body.width) || 0);
+    const font = w >= 80 ? "slant" : undefined;
+    try {
+      const art = font ? renderFiglet("LLM ORCH", font) : "═══ LLM ORCH STUDIO ═══";
+      headerBox.setContent(art);
+    } catch {
+      headerBox.setContent("═══ LLM ORCH STUDIO ═══");
+    }
+  }
+
+  // ── Topic input ───────────────────────────────────────────────────
   const topicInput = createTextArea({
     value: topic,
-    rows: 3,
+    rows: 2,
     onChange: (event) => {
       topic = event.value;
       refreshSettings();
@@ -83,7 +107,7 @@ function openStudio(host: MicroappHost) {
   });
   const topicField = createFormField({
     label: "Topic",
-    help: "Wib uses Claude Haiku, Wob uses Claude Sonnet. Include ASCII in each turn.",
+    help: "Wib (Haiku) vs Wob (Sonnet). ASCII in each turn.",
     child: topicInput,
   });
 
@@ -103,58 +127,77 @@ function openStudio(host: MicroappHost) {
     },
   });
 
+  // ── Action buttons in a horizontal bar ────────────────────────────
   const runButton = createButton({
-    label: "▶ RUN LLM-ORCH ▶",
+    label: "▶ RUN",
     onPress: () => {
       if (!applyTopicFromInput({ killRunning: true })) return;
       startRun();
     },
   });
 
-  const applyTopicButton = createButton({
-    label: "Apply Topic",
-    onPress: () => {
-      applyTopicFromInput({ killRunning: true });
-      host.screen.render();
-    },
-  });
-
   const stopButton = createButton({
-    label: "Stop",
+    label: "■ STOP",
     disabled: true,
     onPress: () => stopRun("stopped"),
   });
 
-  const runBanner = blessed.box({
+  const killButton = createButton({
+    label: "✕ KILL",
+    disabled: true,
+    onPress: () => forceKillRun(),
+  });
+
+  const actionBar = createRow(win.body, [
+    { key: "run", basis: "1fr", part: runButton },
+    { key: "stop", basis: "1fr", part: stopButton },
+    { key: "kill", basis: "1fr", part: killButton },
+  ], { gap: 1 });
+
+  // ── Status banner ─────────────────────────────────────────────────
+  const statusBanner = blessed.box({
     parent: win.body,
-    top: 0,
-    left: 0,
-    width: 0,
-    height: 1,
-    content: " READY TO RUN ",
-    align: "center",
+    top: 0, left: 0, width: 0, height: 1,
     tags: false,
+    align: "center" as const,
     style: {
       fg: host.theme().body.bg,
       bg: host.theme().accent?.fg ?? host.theme().body.fg,
       bold: true,
     },
   });
+  function refreshBanner() {
+    const labels: Record<RunStatus, string> = {
+      idle: " ○ READY ",
+      running: " ◉ RUNNING ",
+      completed: " ✓ COMPLETED ",
+      failed: " ✕ FAILED ",
+      stopped: " ■ STOPPED ",
+    };
+    statusBanner.setContent(labels[status] ?? " ○ READY ");
+    if (status === "running") {
+      statusBanner.style.bg = host.theme().accent?.fg ?? host.theme().body.fg;
+    } else if (status === "failed") {
+      statusBanner.style.bg = "red";
+    } else if (status === "completed") {
+      statusBanner.style.bg = "green";
+    } else {
+      statusBanner.style.bg = host.theme().muted?.fg ?? host.theme().body.fg;
+    }
+  }
 
+  // ── Conversation & logs ───────────────────────────────────────────
   const convoLog = createLogView({ border: true, label: "Wib ↔ Wob Conversation", maxEntries: 500 });
-  const stepsLog = createLogView({ border: true, label: "LLM-Orch Steps / Stream", maxEntries: 800 });
+  const stepsLog = createLogView({ border: true, label: "Steps / Stream", maxEntries: 800 });
+
+  // ── Compact settings ──────────────────────────────────────────────
   const settingsPanel = createKeyValuePanel({
     border: true,
     label: "Run Settings",
     entries: [],
   });
 
-  const killButton = createButton({
-    label: "Kill Process",
-    disabled: true,
-    onPress: () => forceKillRun(),
-  });
-
+  // ── Turns table ───────────────────────────────────────────────────
   const turnsTable = createDataTable({
     columns: [
       { key: "speaker", label: "Speaker", width: 8 },
@@ -164,28 +207,23 @@ function openStudio(host: MicroappHost) {
     rows: [],
   });
 
-  const controls = createStack(win.body, [
-    { key: "topic", basis: 6, part: topicField },
+  // ── Layout tree ───────────────────────────────────────────────────
+  const topicControls = createStack(win.body, [
+    { key: "topic", basis: 5, part: topicField },
     { key: "preset", basis: 1, part: presetSelect },
-    { key: "runBanner", basis: 1, part: createNodePart(runBanner) },
-    { key: "run", basis: 1, part: runButton },
-    { key: "applyTopic", basis: 1, part: applyTopicButton },
-    { key: "stop", basis: 1, part: stopButton },
   ], { gap: 0 });
 
   const left = createStack(win.body, [
-    { key: "controls", basis: 11, part: controls },
+    { key: "header", basis: 5, part: createNodePart(headerBox) },
+    { key: "topicControls", basis: 6, part: topicControls },
+    { key: "banner", basis: 1, part: createNodePart(statusBanner) },
+    { key: "actions", basis: 1, part: actionBar },
     { key: "convo", basis: "1fr", part: convoLog },
-    { key: "turns", basis: 4, part: turnsTable },
-  ], { gap: 1 });
-
-  const rightControls = createRow(win.body, [
-    { key: "kill", basis: "1fr", part: killButton },
-  ]);
+    { key: "turns", basis: 5, part: turnsTable },
+  ], { gap: 0 });
 
   const right = createStack(win.body, [
-    { key: "settings", basis: 13, part: settingsPanel },
-    { key: "controls", basis: 1, part: rightControls },
+    { key: "settings", basis: 10, part: settingsPanel },
     { key: "steps", basis: "1fr", part: stepsLog },
   ], { gap: 1 });
 
@@ -195,11 +233,14 @@ function openStudio(host: MicroappHost) {
   ], { gap: 1 });
 
   refreshSettings();
+  refreshHeader();
+  refreshBanner();
   layout();
 
   function layout() {
     const width = Math.max(1, Number(win.body.width) || 0);
     const height = Math.max(1, Number(win.body.height) || 0);
+    refreshHeader();
     root.layout({ top: 0, left: 0, width, height });
     host.screen.render();
   }
@@ -325,27 +366,22 @@ function openStudio(host: MicroappHost) {
   }
 
   function refreshSettings() {
-    const ccPath = findClaudeBinary();
-    settingsPanel.update({
-      entries: [
-        { key: "Status", value: status },
-        { key: "Topic", value: topic.slice(0, 70) },
-        { key: "Wib", value: "cc:haiku" },
-        { key: "Wob", value: "cc:sonnet" },
-        { key: "Runs", value: String(runCount) },
-        { key: "Run Stamp", value: runStamp },
-        { key: "PID", value: pid },
-        { key: "Started", value: startedAt },
-        { key: "Ended", value: endedAt },
-        { key: "Run Dir", value: runDir },
-        { key: "Kill Script", value: killScriptPath !== "-" ? killScriptPath : "(not started)" },
-        { key: "Logs", value: logPaths.stream !== "-" ? logPaths.stream : "(not started)" },
-        { key: "Turns Log", value: logPaths.turns !== "-" ? logPaths.turns : "(not started)" },
-        { key: "Status Log", value: logPaths.status !== "-" ? logPaths.status : "(not started)" },
-        { key: "Claude CLI", value: ccPath ? ccPath : "not found on PATH" },
-        { key: "Last Error", value: lastError.slice(0, 70) },
-      ],
-    });
+    // Show compact essential info; verbose paths only when running/completed
+    const entries: Array<{ key: string; value: string }> = [
+      { key: "Status", value: status },
+      { key: "Wib", value: "cc:haiku" },
+      { key: "Wob", value: "cc:sonnet" },
+      { key: "Runs", value: String(runCount) },
+      { key: "PID", value: pid },
+      { key: "Started", value: startedAt },
+      { key: "Ended", value: endedAt },
+    ];
+    if (lastError !== "-") {
+      entries.push({ key: "Error", value: lastError.slice(0, 60) });
+    }
+    settingsPanel.update({ entries });
+
+    refreshBanner();
     runButton.update({ disabled: status === "running" });
     stopButton.update({ disabled: status !== "running" });
     killButton.update({ disabled: status !== "running" });

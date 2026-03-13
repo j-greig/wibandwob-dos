@@ -1,1 +1,2 @@
 {"type":"config","name":"LLM Orch Studio UI Quality","metricName":"ui_score","metricUnit":"","bestDirection":"higher"}
+{"run":1,"commit":"bdc0329","metric":3.6,"metrics":{"layout":4,"readability":5,"aesthetic":3,"coherence":4,"character":2},"status":"keep","description":"Baseline: LLM Orch Studio scaffold state. Generic layout, no personality.","timestamp":1773399382962,"segment":0}
