@@ -151,21 +151,53 @@ export function openPrimerGalleryWindow(params: {
     top: 2,
     left: 0,
     width: `${PREVIEW_SPLIT_RATIO}%`,
-    bottom: 0,
+    bottom: 1,
     items: tabs[0].entries.map((entry) => cleanLabel(entry.label)),
   });
   const list = listHandle.node;
-  const preview = blessed.box({
+  const divider = blessed.box({
     parent: frame.body,
     top: 1,
     left: `${PREVIEW_SPLIT_RATIO}%`,
-    right: 0,
+    width: 1,
     bottom: 0,
+    style: { fg: theme().header?.fg ?? "cyan", bg: theme().body?.bg ?? "black" },
+    content: "",
+  });
+  // Fill divider with vertical line chars
+  const fillDivider = () => {
+    const h = Math.max(1, Number(divider.height) || 1);
+    divider.setContent("\u2502".repeat(h).split("").join("\n"));
+  };
+  const previewHeader = blessed.box({
+    parent: frame.body,
+    top: 1,
+    left: `${PREVIEW_SPLIT_RATIO}%+1`,
+    right: 0,
+    height: 1,
+    style: theme().header,
+    content: "",
+  });
+  const preview = blessed.box({
+    parent: frame.body,
+    top: 2,
+    left: `${PREVIEW_SPLIT_RATIO}%+1`,
+    right: 0,
+    bottom: 1,
     mouse: true,
     scrollable: true,
     alwaysScroll: true,
     scrollbar: createScrollbar(),
     style: theme().body
+  });
+  const statusBar = blessed.box({
+    parent: frame.body,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 1,
+    style: theme().footer,
+    content: "",
   });
 
   let activeTabIndex = Math.max(0, Math.min(params.restore?.activeTabIndex ?? 0, tabs.length - 1));
@@ -176,20 +208,26 @@ export function openPrimerGalleryWindow(params: {
   const updatePreview = (index: number) => {
     const entry = activeEntries[index];
     if (!entry) {
+      previewHeader.setContent(" Select a primer to preview");
       previewRawContent = EMPTY_PRIMER_SELECTED;
       setViewportContent(preview, previewRawContent);
+      statusBar.setContent(` ${activeEntries.length} primers`);
       params.screen.render();
       return;
     }
     try {
       const content = fs.readFileSync(entry.filePath, "utf8");
       const lineCount = content.split("\n").length;
-      const cleanName = entry.label.replace(/\.(txt|md)$/i, "");
-      previewRawContent = `${tabs[activeTabIndex].label} :: ${cleanName}  (${lineCount} lines)\n${entry.filePath}\n\n${content}`;
+      const cleanName = cleanLabel(entry.label);
+      previewHeader.setContent(` ${cleanName}  (${lineCount} lines)`);
+      previewRawContent = content;
     } catch (error) {
+      previewHeader.setContent(` ${cleanLabel(entry.label)}`);
       previewRawContent = `Cannot preview file.\n\n${error instanceof Error ? error.message : String(error)}`;
     }
     setViewportContent(preview, previewRawContent);
+    statusBar.setContent(` ${index + 1}/${activeEntries.length}  |  ${tabs[activeTabIndex].label}  |  Enter: open  Tab: next tab  /: search`);
+    fillDivider();
     params.screen.render();
   };
   const openSelected = (index?: number) => {
@@ -294,7 +332,10 @@ export function openPrimerGalleryWindow(params: {
     [tabBar, () => theme().footer],
     [filterBox, () => theme().input],
     [list, () => ({ ...theme().body, selected: theme().selected })],
+    [previewHeader, () => theme().header],
     [preview, () => theme().body],
+    [statusBar, () => theme().footer],
+    [divider, () => ({ fg: theme().header?.fg ?? "cyan", bg: theme().body?.bg ?? "black" })],
   ]);
   frame.onRestyle = () => {
     restyleBundle.restyle();
