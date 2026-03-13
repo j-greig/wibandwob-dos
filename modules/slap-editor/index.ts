@@ -145,7 +145,7 @@ async function openEditor(host: MicroappHost, filePath?: string) {
   const hasHighlight = HIGHLIGHTED_LANGUAGES.has(lang);
 
   // --- Blessed widgets ---
-  // Header bar (breadcrumb)
+  // Header bar (breadcrumb + toolbar buttons)
   const headerBar = blessed.box({
     parent: win.body,
     top: 0,
@@ -154,6 +154,33 @@ async function openEditor(host: MicroappHost, filePath?: string) {
     height: 1,
     style: { fg: theme.statusFg, bg: theme.statusBg },
   });
+  // Toolbar buttons (right-aligned)
+  const th = host.theme();
+  const btnStyle = { fg: th.accent.fg, bg: th.body.bg ?? "black" };
+  const btnHoverStyle = { fg: th.body.bg ?? "black", bg: th.accent.fg };
+  const btnSave = blessed.box({
+    parent: headerBar, top: 0, right: 24, width: 12, height: 1,
+    content: " [^S] Save ", mouse: true, style: { ...btnStyle },
+  });
+  const btnFind = blessed.box({
+    parent: headerBar, top: 0, right: 12, width: 12, height: 1,
+    content: " [^F] Find ", mouse: true, style: { ...btnStyle },
+  });
+  const btnGoto = blessed.box({
+    parent: headerBar, top: 0, right: 0, width: 12, height: 1,
+    content: " [^G] Goto ", mouse: true, style: { ...btnStyle },
+  });
+  for (const btn of [btnSave, btnFind, btnGoto]) {
+    btn.on("mouseover", () => { btn.style = { ...btnHoverStyle }; host.screen.render(); });
+    btn.on("mouseout", () => { btn.style = { ...btnStyle }; host.screen.render(); });
+  }
+  btnSave.on("click", () => {
+    engine.saveFile().then((ok) => {
+      showStatus(ok ? `Saved ${engine.filePath}` : "No file path");
+    });
+  });
+  btnFind.on("click", () => { findMode = true; findInput = ""; render(); });
+  btnGoto.on("click", () => { findMode = true; findInput = ":"; render(); });
 
   const gutterBox = blessed.box({
     parent: win.body,
@@ -231,6 +258,10 @@ async function openEditor(host: MicroappHost, filePath?: string) {
     const gutterActive = `${A.b}${ansiColour(theme.cursorBg)}`;
     const cursorAnsi = `${ansiBgColour(theme.cursorBg)}${ansiColour(theme.cursorFg)}`;
     const selAnsi = `${ansiBgColour(theme.selectionBg)}${ansiColour(theme.selectionFg)}`;
+    // Current line: use bodyAlt bg from theme for subtle highlight
+    const t = host.theme();
+    const currentLineBg = ansiBgColour(t.bodyAlt.bg);
+    const currentLineGutterBg = ansiBgColour(t.bodyAlt.bg);
 
     const gutterLines: string[] = [];
     const textLines: string[] = [];
@@ -243,11 +274,11 @@ async function openEditor(host: MicroappHost, filePath?: string) {
         continue;
       }
 
-      // Gutter — active line in bold accent
+      // Gutter — active line in bold accent with subtle bg
       const isCurrentLine = row === cursorRow;
       const lineNum = String(row + 1).padStart(gutterW - 1);
       if (isCurrentLine) {
-        gutterLines.push(`${gutterActive}${lineNum} ${A.r}`);
+        gutterLines.push(`${currentLineGutterBg}${gutterActive}${lineNum} ${A.r}`);
       } else {
         gutterLines.push(`${gutterAccent}${lineNum} ${A.r}`);
       }
@@ -270,10 +301,13 @@ async function openEditor(host: MicroappHost, filePath?: string) {
         const isCursor = isCurrentLine && col === cursorCol;
         const isSelected = selRange !== null && isInSelection(row, col, selRange);
 
+        const lineBgInit = isCurrentLine ? currentLineBg : "";
         if (isCursor) {
           lineOut += `${cursorAnsi}${ch}${A.r}`;
         } else if (isSelected) {
           lineOut += `${selAnsi}${ch}${A.r}`;
+        } else if (lineBgInit) {
+          lineOut += `${lineBgInit}${ch}${A.r}`;
         } else {
           lineOut += ch;
         }
@@ -287,7 +321,6 @@ async function openEditor(host: MicroappHost, filePath?: string) {
         if (scrollCol === 0 && plain.length <= textWidth) {
           lineOut = hlLine + " ".repeat(Math.max(0, textWidth - plain.length));
         }
-        // Otherwise fall through to per-char render above
       } else if (hasHighlight) {
         // For the current line or lines with selection, we need per-char render
         // but with syntax colour per character
@@ -302,14 +335,15 @@ async function openEditor(host: MicroappHost, filePath?: string) {
           const isCursor = isCurrentLine && col === cursorCol;
           const isSelected = selRange !== null && isInSelection(row, col, selRange);
 
+          const lineBg = isCurrentLine ? currentLineBg : "";
           if (isCursor) {
             lineOut += `${cursorAnsi}${ch}${A.r}`;
           } else if (isSelected) {
             lineOut += `${selAnsi}${ch}${A.r}`;
           } else if (col < charColours.length && charColours[col]) {
-            lineOut += `${charColours[col]}${ch}${A.r}`;
+            lineOut += `${lineBg}${charColours[col]}${ch}${A.r}`;
           } else {
-            lineOut += ch;
+            lineOut += `${lineBg}${ch}${A.r}`;
           }
         }
       }
