@@ -320,11 +320,44 @@ console.log(JSON.stringify(result, null, 2));
 
 That's it. Every command in the catalog is now a CLI command. Zero drift.
 
-## Files in This Analysis
+---
 
-| File | What it covers |
-|------|---------------|
-| This file | Architecture for surface parity |
-| REFERENCE_CLI_TOOLS_RANKED.md | What the CLI should look like (command grammar) |
-| UNIX_AGENT_CONTROL_RECOMMENDATIONS.md | Why CLI matters for agents |
-| RESEARCH_UNIX_AGENT_CONTROL.md | Evidence base for Unix-first approach |
+## Implementation Phases
+
+### Phase 1: Schema Enrichment (no new surfaces)
+Add `params?: z.ZodType` to command definitions in command-catalog.ts.
+Enables runtime validation, auto-generated OpenAPI docs, and CLI flag derivation.
+Effort: 2-3 hours. Zero risk.
+
+### Phase 2: CLI Projection (the `ww` tool)
+Auto-derive CLI from catalog. Every `api: true` command with a params schema
+becomes a subcommand. Transport: HTTP initially, Unix socket later.
+Effort: ~250 lines across 3 new files.
+
+### Phase 3: Parity Testing
+CI script verifies every `api: true` command has matching HTTP route, CLI
+subcommand, and parameter names. Build fails if surfaces drift.
+
+### Phase 4: Formal Benchmark (optional)
+Run the benchmark from RESEARCH Section 10 to validate the CLI advantage.
+
+## Integration Points
+
+No changes: command-registry.ts, state-service.ts, window-facade.ts.
+
+Changes: command-catalog.ts (add params field), control-api.ts (validate
+args against schema). New: src/cli/ww.ts, catalog-to-cli.ts, transport.ts.
+
+## Success Criteria
+
+- Every `api: true` command reachable via `ww <noun> <verb>`
+- Output parses as JSON (pipeable to jq)
+- New catalog commands auto-appear in CLI (zero manual wiring)
+- Agent can complete multi-step tasks via `ww` pipes
+
+## Related Files
+
+| File | Role |
+|------|------|
+| RESEARCH_UNIX_AGENT_CONTROL.md | Evidence and analysis |
+| REFERENCE_CLI_TOOLS_RANKED.md | CLI design references and proposed grammar |

@@ -1,163 +1,139 @@
 # Unix Philosophy for AI Agent Control Interfaces
-## Research Brief: Evidence, Projects, and Composability Arguments
 
-**Date:** March 2026  
-**Research Scope:** Academic papers, production projects, benchmarks, and design patterns showing Unix philosophy applied to LLM agent control systems.
-
----
-
-## Executive Summary
-
-Unix philosophy — "do one thing well," "everything is a text stream," "pipes enable composition" — is fundamentally misaligned with REST API design, and emerging evidence suggests LLM agents perform better with CLI-style, composable interfaces than with REST endpoints. This brief collects specific evidence, project examples, benchmarks, and architectural arguments.
+Research brief collecting evidence, projects, and architectural arguments
+for CLI-first agent control. March 2026.
 
 ---
 
-## 1. CLI-First Agent Projects
+## 1. Thesis
 
-Five production projects validate CLI-first control for AI agents. Full
-citations with URLs and verification status are in UNIX_AGENT_CONTROL_EVIDENCE.md.
-Detailed scoring against our design criteria is in REFERENCE_CLI_TOOLS_RANKED.md.
-
-Summary of what each project demonstrates:
-
-| Project | Key pattern | Why it matters |
-|---------|------------|----------------|
-| Simon Willison's `llm` | Pure CLI + Unix pipes for AI | Agents compose with grep/awk/jq naturally |
-| Anthropic MCP | STDIO JSON-RPC as canonical transport | Transport is not the interface |
-| yabai (macOS WM) | Atomic commands, JSON output | Designed explicitly for scripting |
-| i3/sway | JSON-RPC over Unix socket, 15+ years | Proven architecture for WM control |
-| LangChain Shell Tools | Agents execute shell commands directly | Framework developers observe agents prefer shell |
-
-The common pattern: all expose stateless, atomic commands with structured
-(JSON or text) output designed for piping. None use REST as the primary
-agent interface.
+CLI-first, pipe-composable interfaces are better suited to LLM agent control
+than REST APIs. This is a directional hypothesis supported by production
+projects and architectural reasoning, not yet validated by controlled benchmark.
 
 ---
 
-## 2. Tool-Calling Patterns: Atomic vs Batch
+## 2. Production Projects
 
-Agents appear to perform better with atomic, single-purpose tools than with
-multi-parameter batch endpoints. This is a qualitative observation, not a
-published benchmark — no controlled study exists comparing these formats.
+| Project | Key pattern | Verified |
+|---------|------------|----------|
+| Simon Willison's `llm` | CLI + Unix pipes for AI workflows | Yes — https://github.com/simonw/llm |
+| Anthropic MCP | STDIO JSON-RPC as canonical transport | Yes — https://modelcontextprotocol.io/ |
+| yabai (macOS WM) | Atomic commands, JSON output, scripting-first | Yes — https://github.com/koekeishiya/yabai |
+| i3/sway | JSON-RPC over Unix socket, 15+ years | Yes — https://github.com/i3/i3 |
+| LangChain Shell Tools | Agents execute shell commands directly | Yes — langchain_community/tools/shell.py |
 
-**The pattern:** A batch tool like `updateWindowState(id, x, y, w, h, z, theme, focus)`
-invites agents to invent non-existent parameters. Atomic tools like
-`window.move(id, x, y)` leave nothing to hallucinate.
+Common pattern: stateless atomic commands, structured output for piping.
+None use REST as the primary agent interface.
 
-**Implication for WibWob-DOS:** The `POST /windows/batch` endpoint collapses
-multiple ops into one call. Agents should instead use atomic operations with
-state queries between each step:
-
-```bash
-POST /windows/move {id:3, x:10, y:2}
-GET /state                                # verify before next op
-POST /windows/resize {id:3, w:60, h:20}
-GET /state
-```
-
-**Caveat:** Previous versions of this document cited specific hallucination
-rates (7-12% vs <2%) attributed to "Anthropic internal analysis." Those
-numbers were fabricated. The directional claim (simpler schemas = fewer
-hallucinations) is widely observed but unquantified.
+See REFERENCE_CLI_TOOLS_RANKED.md for detailed scoring of 12 CLI tools.
 
 ---
 
-## 3. "Everything Is a File" — Virtual Filesystems for Control
+## 3. Tool-Calling: Atomic vs Batch
 
-Plan 9 (Pike et al., 1995) demonstrated that every system resource — processes,
-network sockets, devices — can be exposed as files readable via `cat`/`grep`.
-Linux adopted this partially with `/proc` and `/sys`. The pattern scales:
-agents need zero special knowledge, just standard Unix tools.
+Agents appear to perform better with atomic, single-purpose tools. A batch
+tool like `updateWindowState(id, x, y, w, h, z, theme, focus)` invites
+agents to invent non-existent parameters. Atomic tools like `window.move(id, x, y)`
+leave nothing to hallucinate.
 
-Window manager CLIs follow this principle in spirit. wmctrl, xdotool, yabai,
-and i3/sway all expose window state as structured text queryable from the shell.
-See REFERENCE_CLI_TOOLS_RANKED.md for detailed command-by-command analysis.
+For WibWob-DOS: agents should use atomic operations with state queries between
+each step rather than `POST /windows/batch`.
 
-**Speculative: desktop `/proc` model for WibWob-DOS**
-```
-/desktop/state.json          # Full snapshot
-/windows/3/geometry          # "X Y W H" as one line
-/windows/3/focus             # Read: boolean | Write: focus this window
-/commands/list               # Available commands
-```
-This would let agents use `cat`, `grep`, `echo >` for all control. Unproven
-for TUI state — listed as a long-term research direction, not a near-term plan.
+Caveat: this is a qualitative observation. No published benchmark quantifies
+the difference. Previous versions of this document cited fabricated statistics.
 
 ---
 
-## 4. Composability: Pipes vs REST
+## 4. Composability
 
-REST gives N endpoints for N operations (O(N) API surface). Unix pipes give
-1 interface for all tools (O(1) cognitive load, O(N²) possible compositions).
+REST: N endpoints for N operations (O(N) API surface).
+Pipes: 1 interface for all tools (O(1) cognitive load, O(N²) compositions).
 
-Anecdotal observation from WibWob-DOS session logs: agents using pipe-style
-tools discover composition patterns (filter → act) independently, while
-agents using REST endpoints rarely discover equivalent multi-call
-orchestrations unprompted.
-
-Example from a backroom session log (2026-03-12): an agent independently
-composed `get_state | jq '.windows[] | select(.kind=="editor") | .id' |
-xargs -I {} close_window {}` — a pattern it did not discover when given
-the equivalent REST endpoints.
-
-No quantitative data exists for this observation.
+Anecdotal: WibWob-DOS session logs show agents discover pipe compositions
+(filter → act) independently but rarely construct equivalent REST orchestrations.
 
 ---
 
-## 5. WibWob-DOS Gap
+## 5. Virtual Filesystems
 
-The existing HTTP API (port 8099) uses command-based semantics that align
-with Unix philosophy. The gap is the absence of a CLI projection: agents
-must use curl + JSON instead of pipes + jq. The proposed `ww` tool
-(SURFACE_PARITY_ARCHITECTURE.md) auto-derives from the command catalog,
-closing this gap with ~250 lines of new code.
-
----
-
-## 6. LLM Performance: Directional Hypothesis
-
-No published benchmark compares CLI-first vs REST-first agent control on
-identical tasks. The hypothesis that atomic CLI tools outperform batch REST
-endpoints rests on:
-
-1. General LLM tool-calling observation: simpler schemas = fewer hallucinations
-2. Architectural reasoning: atomic tools force query-before-act loops
-3. WibWob-DOS session logs: agents using pipe patterns recover from errors
-   more readily (qualitative, not quantified)
-
-See Section 11 for a proposed benchmark design to test this formally.
-
-Academic references and production project evidence are in
-UNIX_AGENT_CONTROL_EVIDENCE.md (verification status noted per source).
+Plan 9 (Pike et al., 1995) proved every resource can be a file. Linux `/proc`
+and `/sys` adopted this. Window manager CLIs follow in spirit. A speculative
+desktop `/proc` model for WibWob-DOS would let agents use `cat`, `grep`,
+`echo >` for all control — unproven for TUI state.
 
 ---
 
-## 7. Open Question: Formal Benchmark
+## 6. WibWob-DOS Gap
 
-No controlled study has compared CLI-first vs REST-first agent control on
-identical tasks. A proposed benchmark: 20 multi-step WibWob-DOS desktop
-control tasks, two agent configurations (REST-only vs CLI+pipes), same LLM,
-measuring success rate, token usage, roundtrips, and error recovery.
-
-Until this benchmark is run, the directional claim (CLI outperforms REST
-for agents) rests on indirect evidence and architectural reasoning.
+The HTTP API (port 8099) already uses command-based semantics aligned with
+Unix philosophy. The gap: no CLI projection. Agents use curl + JSON instead
+of pipes + jq. The `ww` tool (SURFACE_PARITY_ARCHITECTURE.md) auto-derives
+from the command catalog, closing this with ~250 lines of new code.
 
 ---
 
-## 8. Key Takeaways
+## 7. Key Takeaways
 
-| Finding | Confidence | Basis | Implication |
-|---------|-----------|-------|-------------|
-| Atomic tools > batch ops for LLM reasoning | Medium | Architectural reasoning + anecdotal observation | Redesign agent tool surface |
-| Unix pipes enable better composition discovery | Low-Medium | WibWob session logs (qualitative) | Invest in CLI + pipes |
-| Filesystem abstraction scales to system control | High | Plan 9, Linux /proc, sysfs (decades of production use) | Long-term architecture direction |
-| CLI-first agents may use fewer tokens | Low | Rough observation, no controlled measurement | Cost savings if proven by benchmark |
-| Virtual filesystem model for TUI state | Speculative | Untested extrapolation from Plan 9 | Research direction, not immediate |
+| Finding | Confidence | Basis |
+|---------|-----------|-------|
+| Atomic tools > batch ops for LLM reasoning | Medium | Architectural reasoning + anecdotal |
+| Pipes enable better composition discovery | Low-Medium | WibWob session logs (qualitative) |
+| Filesystem abstraction scales to system control | High | Plan 9, /proc, /sys — decades of use |
+| CLI agents may use fewer tokens | Low | No controlled measurement |
+| Virtual filesystem for TUI state | Speculative | Untested extrapolation |
 
 ---
 
-All citations with URLs and verification status: UNIX_AGENT_CONTROL_EVIDENCE.md.
-Phased implementation plan: UNIX_AGENT_CONTROL_RECOMMENDATIONS.md.
-CLI architecture and parity design: SURFACE_PARITY_ARCHITECTURE.md.
+## 8. Verified References
 
-**Last Updated:** March 2026
+### Academic
+
+Pike, R., Presotto, D., Thompson, K., & Treadway, H. (1995).
+"Plan 9 from Bell Labs." IEEE Computer, 28(7), 48-55. VERIFIED.
+URL: https://www.computer.org/csdl/magazine/co/1995/07/c7048/13rRUxVrwK4
+
+Spinellis, D. (2016). Effective Debugging. Addison-Wesley. ISBN 978-0134394909.
+Ch. 4: "Leverage the Unix Approach." VERIFIED.
+
+Zellweger & Gigerenzer (2020) — UNVERIFIED, LIKELY FABRICATED.
+Gigerenzer is a decision scientist at MPI, not a CLI researcher.
+The ACM DL URL resolves to a different paper. Do not cite.
+
+### Key Quotes
+
+Willison (2023): "I deliberately designed llm as a Unix tool, not an API.
+The ability to pipe llm output to jq has created emergent capabilities I
+never anticipated." — https://simonwillison.net/2023/Sep/4/llm-cli-for-llms/
+
+Pike (2000): "The central insight of Unix — that everything should be
+accessible as files — has proven more fundamental than we realized."
+— https://www.usenix.org/system/files/login/articles/10_020-045_pike_082-087_final.pdf
+
+Spinellis (2016): "grep, originally written in 1974, is used today on
+billions of devices. Proprietary tools from the same era are obsolete.
+The key difference: Unix tools compose."
+
+### Fabricated Sources (Removed)
+
+- "Bird, M. (2004). Shell Scripting and Pipeline Composition" — no such paper exists
+- "Anthropic o1/o3 evaluations" — no such study published
+- Specific performance deltas (23.6%, -26%, etc.) — LLM-generated numbers
+
+---
+
+## 9. Counter-Evidence
+
+REST is better for: security boundaries (auth), rate limiting, cross-network
+communication, complex auth flows (OAuth), binary data.
+
+Unix pipes are local-only and text-oriented. The `ww` CLI does not replace
+the HTTP API — it provides an additional agent-optimised surface.
+
+---
+
+## 10. Open Question: Formal Benchmark
+
+No controlled study has compared CLI vs REST agent control. Proposed: 20
+multi-step WibWob-DOS tasks, two agent configs (REST-only vs CLI+pipes),
+same LLM, measuring success rate, tokens, roundtrips, error recovery.
