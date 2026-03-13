@@ -327,6 +327,49 @@ check "string flag: document.open --path works" \
 $WW windows -q | xargs -I{} $WW window {} close >/dev/null 2>&1
 sleep 0.3
 
+# ── 24. Full parity: commands -q sorted matches API sorted ──
+echo "--- full parity ---"
+WW_SORTED=$($WW commands -q | sort)
+API_SORTED=$(curl -s "$API/commands/list" | jq -r '.commands[].id' | sort)
+PARITY_DIFF=$(diff <(echo "$WW_SORTED") <(echo "$API_SORTED") || true)
+check "full parity: ww commands -q sorted == API sorted" \
+  "$([ -z "$PARITY_DIFF" ] && echo PASS || echo "diff found")"
+
+# ── 25. Figlet banner ───────────────────────────────────
+echo "--- figlet ---"
+$WW cmd figlet.open --text "HI" >/dev/null 2>&1; sleep 0.5
+FIG_WIN=$($WW windows | jq '[.[] | select(.kind=="figlet")] | length')
+check "ww cmd figlet.open --text HI creates figlet window" \
+  "$([ "$FIG_WIN" -ge 1 ] && echo PASS || echo "figlet_windows=$FIG_WIN")"
+# Close it
+$WW windows | jq -r '.[] | select(.kind=="figlet") | .id' | \
+  while read -r fid; do $WW window "$fid" close >/dev/null 2>&1; done
+sleep 0.3
+
+# ── 26. State deep parity ───────────────────────────────
+echo "--- state deep parity ---"
+# Open a window, verify its properties match between ww and curl
+$WW cmd editor.new >/dev/null 2>&1; sleep 0.3
+$WW cmd window.move --id "$($WW windows | jq -r '.[0].id')" --x 15 --y 8 >/dev/null 2>&1
+sleep 0.3
+
+WW_WIN_JSON=$($WW windows | jq '.[0] | {id, kind, left, top}')
+API_WIN_JSON=$(curl -s "$API/state" | jq '.windows[0] | {id, kind, left, top}')
+check "state deep parity: ww windows == curl /state windows" \
+  "$([ "$WW_WIN_JSON" = "$API_WIN_JSON" ] && echo PASS || echo "mismatch")"
+
+# Clean up
+$WW windows -q | xargs -I{} $WW window {} close >/dev/null 2>&1
+sleep 0.3
+
+# ── 27. Exit codes ──────────────────────────────────────
+echo "--- exit codes ---"
+$WW health >/dev/null 2>&1; GOOD_EXIT=$?
+check "success exit code is 0" "$([ "$GOOD_EXIT" = "0" ] && echo PASS || echo "exit=$GOOD_EXIT")"
+
+$WW cmd bad.command >/dev/null 2>&1; BAD_EXIT2=$?
+check "failure exit code is non-zero" "$([ "$BAD_EXIT2" -ne 0 ] && echo PASS || echo "exit=$BAD_EXIT2")"
+
 # ── Cleanup: close test windows ──────────────────────────
 echo "--- cleanup ---"
 for id in $($WW windows 2>/dev/null | jq -r '.[].id'); do
