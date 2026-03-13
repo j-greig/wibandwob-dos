@@ -94,7 +94,7 @@ How to use autoresearch to iteratively improve these docs themselves.
 - **i3** — 15-year-old tiling WM, no REST API needed
 - **LangChain Shell Tools** — Agents prefer shell commands
 
-**Key Finding:** All successful agent-control projects use CLI/pipes, not REST.
+**Key Finding:** All studied agent-control projects use CLI/pipes or Unix sockets, not REST.
 
 ---
 
@@ -103,22 +103,18 @@ How to use autoresearch to iteratively improve these docs themselves.
 
 - OpenAI o1/o3 tool calling patterns
 - Claude 3.5 atomic vs batch tool performance
-- Hallucination rates: REST batch (7-12%) vs atomic (< 2%)
+- Anecdotal: simpler tool schemas appear to reduce hallucination
 
-**Key Finding:** Atomic, single-purpose tools reduce agent errors by 85%.
+**Key Finding:** Simpler tool schemas are expected to reduce agent errors (not yet quantified).
 
 ---
 
-### 4. LLM Performance: CLI vs REST Benchmarks
-✅ Covered in: EVIDENCE (data tables), SUMMARY (performance deltas), RESEARCH (analysis)
+### 4. LLM Performance: CLI vs REST (Hypothetical)
+Covered in: RESEARCH (proposed benchmark design)
 
-**Benchmark Results (Anthropic internal):**
-- Success rate: +23.6% (72% → 89%)
-- Token usage: -26% (fewer state queries)
-- Roundtrips: -31% (fewer API calls)
-- Error recovery: +88% (better visibility)
-
-**Key Finding:** CLI-first interfaces save 26% on token cost.
+**No published benchmark exists.** The directional hypothesis — that CLI-first
+interfaces improve agent performance — is supported by architectural reasoning
+and anecdotal observation but has not been formally measured.
 
 ---
 
@@ -173,11 +169,11 @@ How to use autoresearch to iteratively improve these docs themselves.
 
 ## Key Findings Summary
 
-### Performance
-- **Success Rate:** 72% (REST) → 89% (CLI) = **+23.6%**
-- **Token Usage:** 4,200 avg (REST) → 3,100 avg (CLI) = **-26%**
-- **Roundtrips:** 4.1 avg (REST) → 2.8 avg (CLI) = **-31%**
-- **Hallucination:** 7-12% (REST batch) → <2% (CLI atomic) = **-85%**
+### Performance (HYPOTHETICAL — no controlled study exists)
+- CLI-first interfaces are expected to improve agent success rate, reduce tokens,
+  reduce roundtrips, and lower hallucination rates
+- See RESEARCH Section 11 for proposed benchmark design
+- All specific percentages in earlier versions of these docs were fabricated
 
 ### Projects Validating the Approach
 - ✅ Simon Willison's `llm` (4.8k stars)
@@ -264,9 +260,9 @@ How to use autoresearch to iteratively improve these docs themselves.
 - ✅ i3 (i3 team) — GitHub, 10.2k stars, 15+ year track record
 - ✅ LangChain — Documentation + code examples
 
-### Benchmark Data (2)
-- ✅ Anthropic o1/o3 evals (internal, summarized in model cards)
-- ✅ OpenAI tool calling patterns (Cookbook examples)
+### Benchmark Data
+- No formal benchmarks exist. "Anthropic o1/o3 eval data" previously cited was fabricated.
+- OpenAI Cookbook examples show qualitative patterns but no measured benchmarks.
 
 ### WibWob-DOS Context (2)
 - ✅ AGENTS.md (current architecture)
@@ -280,7 +276,7 @@ How to use autoresearch to iteratively improve these docs themselves.
 ## Open Research Questions
 
 ### Answered by This Research
-- ✅ Do agents perform better with CLI than REST? Yes, +23.6% success
+- Directional: agents likely perform better with CLI than REST (unquantified)
 - ✅ Are there production projects using pipes for agent control? Yes, 5+ projects
 - ✅ What's the academic basis for this? Yes, Plan 9 + modern papers
 
@@ -327,7 +323,7 @@ RECOMMENDATIONS
 |--------|--------|----------|
 | Academic sources | ✅ Verified | 3 papers with full citations |
 | Project examples | ✅ Verified | 5 active GitHub projects |
-| Benchmark data | ⚠️ Indirect | Anthropic internal + OpenAI Cookbook |
+| Benchmark data | Not available | No formal benchmarks exist; "Anthropic internal" data was fabricated |
 | WibWob alignment | ✅ Verified | AGENTS.md + control-api.md analysis |
 | Session evidence | ✅ Verifiable | Backroom logs (via backroom-log-explorer skill) |
 

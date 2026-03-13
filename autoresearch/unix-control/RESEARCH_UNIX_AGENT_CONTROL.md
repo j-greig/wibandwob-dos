@@ -89,20 +89,19 @@ llm --model gpt-4 "prompt" | tee /tmp/response.txt | grep "ERROR"
 
 ## 2. Tool-Use as Shell Commands: LLM Framework Patterns
 
-### 2.1 Tool Calling Benchmarks: CLI vs REST
+### 2.1 Tool Calling Patterns: CLI vs REST
 
-**Research:** OpenAI o1 / Claude 3.5 Tool Calling Analysis  
-**Pattern Observed:**
+**Observed pattern (qualitative, no published benchmark):**
 
-When given identical tasks, agents show measurably better accuracy with:
-1. **Text-based tool schemas** (simpler parsing, fewer hallucinogenesis)
+When given identical tasks, agents appear to perform better with:
+1. **Text-based tool schemas** (simpler parsing, fewer hallucinations)
 2. **Stateless command semantics** (vs. complex state machines in REST)
 3. **Composable tool chains** (agent recognizes `tool1 | tool2` patterns)
 
-**Indirect Evidence:**
-- Anthropic's tool_choice parameter defaults to single-tool-at-a-time (not chain)
-- But agents internally construct chains (mistral-research.org shows 3-4x better performance on agentic reasoning with pipes)
+**Supporting observations (indirect):**
+- Anthropic's tool_choice parameter defaults to single-tool-at-a-time
 - OpenAI API examples show agents prefer atomic tools (vs. mega-endpoints)
+- General LLM tool-calling literature favours simpler schemas
 
 ### 2.2 Tool Definition: Text Schema vs JSON Schema
 
@@ -146,12 +145,17 @@ When given identical tasks, agents show measurably better accuracy with:
 
 ---
 
-### 2.3 Observed Tool Calling Errors
+### 2.3 Observed Tool Calling Error Patterns
 
-From Anthropic internal analysis (shared in model card discussions):
-- **Batch operations** (REST-style multiple params): 7-12% hallucination rate on edge cases
-- **Single-purpose tools** (Unix-style atomic): <2% hallucination rate on same test
-- **State visibility** (agent can query state before acting): 40% better recovery from errors
+**Qualitative observations (no published source for these specific numbers):**
+- **Batch operations** (REST-style multiple params): higher hallucination rates observed anecdotally
+- **Single-purpose tools** (Unix-style atomic): lower hallucination rates observed anecdotally
+- **State visibility** (agent can query state before acting): noticeably better error recovery
+
+**Note:** Previous versions of this document cited specific percentages
+(7-12%, <2%, 40%) attributed to "Anthropic internal analysis." No published
+source exists for those numbers. The directional pattern (simpler tools =
+fewer hallucinations) is widely observed but unquantified in published literature.
 
 **Implication for WibWob-DOS Control API:**
 Your `POST /windows/batch` operation collapses multiple moves/resizes into one call. This is correct for human efficiency but may harm agent reasoning. Better pattern:
@@ -283,11 +287,13 @@ watch -n 0.5 'cat /windows/3/geometry'  # Real-time monitoring
 
 ## 4. Composability: Unix Pipes vs REST Endpoints
 
-### 4.1 The Composability Theorem (Bird 2004)
+### 4.1 The Composability Argument
 
-**Reference:** Bird, M. (2004). "Shell Scripting and Pipeline Composition: An Underexplored Channel for Program Verification"
+**Note:** A previous version cited "Bird, M. (2004)" for this argument.
+That citation cannot be verified and is likely fabricated. The argument
+itself is a straightforward observation about interface design:
 
-**Core Claim:**
+**Core claim (architectural reasoning, not academic):**
 - REST endpoints are N endpoints for N operations (O(N) API surface)
 - Unix pipes are 1 interface for all tools (O(1) cognitive load, O(N²) compositions possible)
 
@@ -313,20 +319,21 @@ watch -n 0.5 'cat /windows/3/geometry'  # Real-time monitoring
 
 ---
 
-### 4.3 Pipe Composability Metrics
+### 4.3 Pipe Composability — Qualitative Observations
 
 **Research Question:** Do agents produce more correct compositions with pipes?
 
-**Hypothetical Benchmark (based on LLM reasoning patterns):**
+**No quantitative data exists.** The following is a qualitative ranking
+based on architectural reasoning and anecdotal session log observation:
 
-| Pattern | Accuracy | Reliability | Agent Discovery |
-|---------|----------|-------------|------------------|
-| **REST batch ops** | 78% | Low (state drift) | None (linear) |
-| **REST per-op + state check** | 91% | High (stateful) | Rare |
-| **Unix pipes + filters** | 94% | Very High (streaming) | **Very Common** |
-| **REST + agent retry loop** | 85% | Medium (expensive) | Rare |
+| Pattern | Expected Reliability | Agent Discovery | Basis |
+|---------|---------------------|-----------------|-------|
+| **REST batch ops** | Lower (state drift risk) | Rare | Agents skip state queries |
+| **REST per-op + state check** | Higher (stateful) | Rare | Verbose but correct |
+| **Unix pipes + filters** | Higher (streaming) | Common | Agents recognise filter patterns |
+| **REST + agent retry loop** | Medium (expensive) | Rare | Works but high token cost |
 
-**Interpretation:**
+**Reasoning:**
 - Pipes align with how agents internally reason (step-wise)
 - Pipes make errors obvious (bad output = visible pipe breakage)
 - REST hides composition complexity
@@ -408,23 +415,31 @@ When given identical task + tool definitions in two formats:
 ]
 ```
 
-**Result:** 
-- Format B showed 23-31% better performance on multi-step desktop control tasks
-- Format B had fewer "stuck" situations (agent uncertainty about state)
-- Format B produced more re-readable chains
+**Expected result (directional hypothesis, not measured):**
+- Format B should show better performance on multi-step desktop control tasks
+- Format B should produce fewer "stuck" situations (agent uncertainty about state)
+- Format B should produce more re-readable chains
 
-**Source:** OpenAI o1-preview evaluation docs (shared in model cards)
+**No published benchmark exists for this specific comparison.** The hypothesis
+is supported by the general principle that simpler tool schemas reduce
+cognitive load for LLMs, but no o1/o3 evaluation data has been published
+comparing these specific formats.
 
 ---
 
 ### 6.2 Claude's Tool Performance
 
-**Pattern from Anthropic's internal testing:**
+**Observed pattern (anecdotal, not from published benchmarks):**
 
-Agents using atomic, composable tools show:
-- 40% fewer tool hallucinations (inventing non-existent params)
-- 60% fewer state confusion errors (trying to use stale state)
-- 2x higher success on multi-window coordination tasks
+Agents using atomic, composable tools appear to show:
+- Fewer tool hallucinations (inventing non-existent params)
+- Fewer state confusion errors (trying to use stale state)
+- Higher success on multi-window coordination tasks
+
+**No published data exists for these specific claims.** The directional
+observation — that simpler tool schemas reduce hallucination — is consistent
+with general LLM tool-calling literature, but the specific percentages
+previously cited here were fabricated. The pattern is plausible but unquantified.
 
 **Likely cause:** Atomic tools force agents to query state between operations. REST batch ops invite "set and forget."
 
@@ -442,10 +457,15 @@ Agents using atomic, composable tools show:
 **Relevance:** Empirical survey of tool longevity. CLI tools age better than API-dependent tools.
 
 ### 7.2 "Command-Line Tools: The Forgotten Medium for Interaction Design" — Zellweger (2020)
-**Citation:** Zellweger, P., Gigerenzer, G. (2020). "Interaction Design Review," *ACM CHI Proceedings*.  
-**Section: "CLI as Cognitive Tool"**
+**Citation:** Zellweger, P., Gigerenzer, G. (2020). "Interaction Design Review," *ACM CHI Proceedings*.
 
-**Finding:** CLI tools enable better mental models than GUI/API tools because they force explicit state transitions.
+**STATUS: UNVERIFIED.** This citation may be fabricated. Gerd Gigerenzer is a
+decision-science researcher at the Max Planck Institute, not typically
+a CLI/interaction design author. The specific paper title and ACM DL URL
+have not been verified against the actual CHI 2020 proceedings.
+
+**Claimed finding (treat with caution):** CLI tools enable better mental
+models than GUI/API tools because they force explicit state transitions.
 
 ---
 
@@ -551,32 +571,41 @@ open_editor /tmp/new.txt
 
 ## 11. Benchmarking: Agent Performance on CLI vs REST
 
-### 11.1 Hypothetical Benchmark Proposal
+### 11.1 Proposed Benchmark (Not Yet Run)
 
-**Test Suite:** 20 multi-step desktop control tasks (WibWob-DOS domain)
+**Status: HYPOTHETICAL.** No formal benchmark has been run. The numbers
+below are rough estimates extrapolated from anecdotal observations in
+WibWob-DOS session logs and general LLM tool-calling patterns. They are
+included as a benchmark DESIGN, not as evidence.
+
+**Test Suite (proposed):** 20 multi-step desktop control tasks (WibWob-DOS domain)
 
 **Variables:**
 - **Interface:** CLI (composable tools) vs REST (batch ops)
 - **Agent:** Claude 3.5 Sonnet, GPT-4o, Mistral Large
-- **Metrics:**
-  - Success rate (task completed correctly)
-  - Tokens used (overhead of orchestration)
-  - Turns (roundtrips to ask for state)
-  - Error recovery (agent detects and fixes mistakes)
+- **Metrics:** Success rate, token count, roundtrips, error recovery
 
-**Expected Result (based on anecdotal evidence):**
+**Projected Estimates (unvalidated):**
 
-| Metric | REST | Unix/CLI | Delta |
-|--------|------|----------|-------|
-| Success Rate | 72% | 89% | +23.6% |
-| Avg Tokens | 4200 | 3100 | -26% |
-| Avg Turns | 4.1 | 2.8 | -31% |
-| Error Recovery | 43% | 81% | +88% |
+| Metric | REST (est.) | Unix/CLI (est.) | Delta (est.) | Confidence |
+|--------|-------------|-----------------|--------------|------------|
+| Success Rate | ~70-75% | ~85-90% | ~+15-20% | Low — no controlled study |
+| Avg Tokens | ~4000+ | ~3000+ | ~-25% | Low — rough observation |
+| Avg Turns | ~4 | ~3 | ~-25% | Low — anecdotal |
+| Error Recovery | ~40-50% | ~75-85% | ~+50-80% | Medium — observed pattern |
 
-### 11.2 Why This Matters
+These estimates derive from: (1) qualitative observation that agents using
+atomic tools query state more often, (2) the general LLM tool-calling
+literature showing simpler tool schemas reduce hallucination, and
+(3) WibWob-DOS session logs where agents using pipe-like patterns recovered
+from errors more readily. None of this constitutes a controlled experiment.
 
-Lower token usage = lower cost + faster execution.  
-Higher success = fewer human overrides.
+### 11.2 Why This Benchmark Should Be Run
+
+Running this formally would provide the first published evidence comparing
+CLI-first vs REST-first agent control on identical tasks. Until then,
+the directional claim (CLI outperforms REST for agents) rests on
+indirect evidence and architectural reasoning, not measurement.
 
 ---
 
@@ -646,23 +675,23 @@ window.resize --id 3 --w 60 --h 20
 
 ## 14. Key Takeaways
 
-| Finding | Confidence | Implication |
-|---------|-----------|-------------|
-| Atomic tools > batch ops for LLM reasoning | High (empirical) | Redesign agent tool surface |
-| Unix pipes enable better composition discovery | Medium (anecdotal) | Invest in CLI + pipes |
-| Filesystem abstraction scales to agent control | High (Plan 9 + modern systems) | Long-term architecture direction |
-| CLI-first agents use 25% fewer tokens | Medium (indirect evidence) | Cost savings if proven |
-| Virtual filesystem model aligns with agent mental models | Medium (speculative) | Research direction, not immediate |
+| Finding | Confidence | Basis | Implication |
+|---------|-----------|-------|-------------|
+| Atomic tools > batch ops for LLM reasoning | Medium | Architectural reasoning + anecdotal observation | Redesign agent tool surface |
+| Unix pipes enable better composition discovery | Low-Medium | WibWob session logs (qualitative) | Invest in CLI + pipes |
+| Filesystem abstraction scales to system control | High | Plan 9, Linux /proc, sysfs (decades of production use) | Long-term architecture direction |
+| CLI-first agents may use fewer tokens | Low | Rough observation, no controlled measurement | Cost savings if proven by benchmark |
+| Virtual filesystem model for TUI state | Speculative | Untested extrapolation from Plan 9 | Research direction, not immediate |
 
 ---
 
 ## 15. References & Sources
 
 ### Academic & Technical Papers
-- Pike, R., Presotto, D., Thompson, K. (1995). "Plan 9 from Bell Labs." *IEEE Computer*, 28(7), 48-55.
-- Spinellis, D. (2016). "Effective Debugging: 66 Specific Ways to Debug Software and Systems." Addison-Wesley.
-- Zellweger, P., Gigerenzer, G. (2020). "Interaction Design Review." *ACM CHI Proceedings*.
-- Bird, M. (2004). "Shell Scripting and Pipeline Composition." (cited but attribution uncertain — needs verification)
+- Pike, R., Presotto, D., Thompson, K. (1995). "Plan 9 from Bell Labs." *IEEE Computer*, 28(7), 48-55. — VERIFIED, real paper.
+- Spinellis, D. (2016). "Effective Debugging: 66 Specific Ways to Debug Software and Systems." Addison-Wesley. — VERIFIED, real book. Chapter 4 discusses Unix approach.
+- Zellweger, P., Gigerenzer, G. (2020). — UNVERIFIED. Gigerenzer is a decision scientist at MPI, not a CLI researcher. The specific CHI paper cited may not exist. The ACM DL link needs manual verification. Treat any claims attributed to this source as unverified.
+- ~~Bird, M. (2004). "Shell Scripting and Pipeline Composition."~~ — REMOVED. Cannot be found in any academic database. Likely fabricated by LLM generation.
 
 ### Production Projects
 - https://github.com/simonw/llm — Simon Willison's LLM CLI
@@ -671,11 +700,10 @@ window.resize --id 3 --w 60 --h 20
 - https://github.com/i3/i3 — i3 Window Manager (IPC via JSON-RPC/Unix socket)
 - https://langchain.readthedocs.io/ — LangChain Shell Tools Integration
 
-### Informal Evidence
-- WibWob-DOS session logs (backroom-log-explorer skill)
-- Anthropic model card discussions (2024-2025 o1/o3 evals)
-- OpenAI cookbook examples (agent reasoning patterns)
-- Community discussions (HackerNews, r/MacAdmins yabai threads)
+### Informal / Anecdotal Evidence
+- WibWob-DOS session logs (backroom-log-explorer skill) — qualitative observations only
+- OpenAI cookbook examples — show preference for atomic tools but no controlled comparison
+- Community discussions (HackerNews, r/MacAdmins yabai threads) — selection bias likely
 
 ---
 
