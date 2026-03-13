@@ -56,15 +56,61 @@ at runtime — zero drift by construction.
   descriptions document this but easy to miss. Typed schemas (Zod) would
   catch this at validation time.
 
-### Phase 2 result: ww CLI
-- src/cli/ww.ts — 140 lines, pure HTTP client
-- 42 automated tests via bash + jq (no TUI inspection needed)
+### Phase 2 result: wibwob CLI
+- src/cli/wibwob.ts — ~150 lines, pure HTTP client, shebang-executable
+- 53 automated tests via bash + jq (no TUI inspection needed)
 - Full command parity verified by sorted diff of command IDs
 - Three syntax styles cover all agent use patterns
-- -q mode enables ww windows -q | xargs -I{} ww window {} close
-- Package.json script: bun run ww
-- Total build time: ~45 minutes including test suite
-- Prefer concrete notes tied to scripts, APIs, or runtime surfaces over vague complaints.
+- -q mode enables wibwob windows -q | xargs -I{} wibwob window {} close
+- Package.json script: bun run wibwob
+- Total build time: ~90 minutes including test suite, README, rename, docs
+
+### Rename friction: ww → wibwob mid-session
+- Original name `ww` clashed with existing zsh alias (Claude + wibwob prompt)
+- Rename touched 7+ files: .ts, README, test suite, package.json, checks, ideas
+- sed with \b word boundaries missed some variable assignments (WW_COUNT stayed
+  as WW_COUNT while references became WIBWOB_COUNT). Had to fix 3 rounds of
+  variable mismatches caught by `set -uo pipefail` (unbound variable errors).
+- Help text inside the .ts file was missed entirely on first pass — the user
+  caught it by actually running `wibwob help`.
+- Lesson: renames need a verification step. Run the tool, grep the output,
+  don't just grep the source. The rendered output IS the contract.
+
+### Autoresearch as test-driven development
+- Adding failing tests FIRST (score drops from 10 to 8.4) then implementing
+  features to pass them is exactly TDD. The autoresearch loop makes this natural:
+  add ambitious tests → score drops → implement → score recovers.
+- The scoring formula (PASS * 10 / TOTAL) punishes adding tests you can't pass.
+  This creates healthy tension: expand coverage vs maintain score.
+- 53 tests at 10.0 is a stronger result than 15 tests at 10.0. The secondary
+  metric (tests_total) tracks ambition separately from quality.
+
+### Human-agent collaboration patterns observed
+- Human catches things agents miss: stale help text, naming conflicts with
+  existing aliases, doc inconsistency between README and runtime output.
+- Human asks meta questions ("what libs are we using?", "is ww taken?") that
+  force the agent to map the system properly instead of just building.
+- Human's instinct to test as a user ("just tell me how to use it") catches
+  UX gaps that pass all automated tests.
+- Capturing deferred work (v2 backlog, E040 epic) during the session prevents
+  ideas from evaporating. Subagent delegation for capture keeps flow.
+
+### What the SURFACE_PARITY_ARCHITECTURE doc got right and wrong
+Right:
+- Single source of truth via catalog (correct, verified)
+- CLI should auto-discover commands (correct, implemented)
+- jq-pipeable JSON output (correct, implemented)
+- Three syntaxes for different ergonomics (correct, implemented)
+
+Wrong:
+- "~50 lines importing catalog directly" — actual: ~150 lines, HTTP-only,
+  no catalog import. HTTP approach is BETTER: gets module commands for free.
+- "Three files: ww.ts, catalog-to-cli.ts, transport.ts" — actual: one file.
+  The abstraction layers were unnecessary at this scale.
+- "citty or cac CLI framework" — unnecessary. Raw argv parsing is fine for
+  5 builtins + passthrough dispatch.
+- Zod schemas as prerequisite — CLI works perfectly without them. Schemas
+  are a future quality improvement, not a blocking dependency.
 
 ## Current Notes
 
