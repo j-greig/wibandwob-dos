@@ -91,7 +91,35 @@ async function cmdHealth() {
   out(await api("/health"));
 }
 
+async function cmdHelp(id: string) {
+  const data = (await api("/commands/list")) as { commands: Array<{
+    id: string; label: string; description?: string; returns?: string;
+    params?: { type?: string; properties?: Record<string, { type?: string; description?: string }>; required?: string[] };
+  }> };
+  const cmd = data.commands.find(c => c.id === id);
+  if (!cmd) {
+    process.stderr.write(`Unknown command: ${id}\n`);
+    process.exit(1);
+  }
+  let text = `${cmd.id} — ${cmd.label}\n`;
+  if (cmd.description) text += `\n${cmd.description}\n`;
+  if (cmd.params?.properties) {
+    text += `\nFlags:\n`;
+    const required = new Set(cmd.params.required ?? []);
+    for (const [name, prop] of Object.entries(cmd.params.properties)) {
+      const req = required.has(name) ? " (required)" : " (optional)";
+      const typ = prop.type ?? "unknown";
+      const desc = prop.description ? `  ${prop.description}` : "";
+      text += `  --${name.padEnd(12)} ${typ}${req}${desc}\n`;
+    }
+  }
+  if (cmd.returns) text += `\nReturns: ${cmd.returns}\n`;
+  process.stderr.write(text);
+  process.exit(0);
+}
+
 async function cmdRun(id: string, flags: Record<string, unknown>) {
+  if (flags.help === true) return cmdHelp(id);
   const body: Record<string, unknown> = { id };
   if (Object.keys(flags).length > 0) body.args = flags;
   out(await api("/commands/run", "POST", body));
