@@ -30,6 +30,7 @@ import {
   type SavedTerrainArtifact,
   type TerrainBiome,
   type TerrainMap,
+  type TerrainObject,
   type TerrainPoint,
 } from "./terrain-model.js";
 import {
@@ -153,6 +154,7 @@ export type {
   SavedTerrainArtifact,
   TerrainBiome,
   TerrainMap,
+  TerrainObject,
   TerrainPoint,
   TerrainRenderMode,
   BrowserEntry,

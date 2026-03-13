@@ -19,6 +19,10 @@ import {
   clearTimers,
   pickBreakpoint,
   clamp,
+  renderFiglet,
+  createHeaderBar,
+  createStatusBar,
+  createLogView,
 } from "../../src/services/microapp-sdk.js";
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -60,6 +64,13 @@ interface Ant {
   age: number;
 }
 
+interface Trail {
+  x: number;
+  y: number;
+  district: DistrictId;
+  age: number;
+}
+
 interface Particle {
   x: number;
   y: number;
@@ -85,6 +96,7 @@ interface World {
   resources: Record<ResourceType, number>;
   ants: Ant[];
   buildings: Building[];
+  trails: Trail[];
   particles: Particle[];
   events: WorldEvent[];
   nextId: number;
@@ -103,35 +115,44 @@ interface World {
 // CONSTANTS
 // ═══════════════════════════════════════════════════════════════════════════
 
-const DISTRICTS: Record<DistrictId, { label: string; subtitle: string; bg: string[] }> = {
+const DISTRICTS: Record<DistrictId, { label: string; subtitle: string; bg: string[]; borderFg: string }> = {
   industrial: {
     label: "Industrial Zone",
     subtitle: "where sparks fly and progress grinds",
-    bg: [".", ".", " ", ".", "·", " ", ".", " "],
+    bg: [" ", " ", "░", " ", " ", "·", " ", " ", " ", "░", " ", " "],
+    borderFg: "yellow",
   },
   residential: {
     label: "Residential Burrows",
     subtitle: "cosy tunnels, warm hearths",
-    bg: ["·", " ", "·", " ", ".", " ", " ", "·"],
+    bg: [" ", " ", "~", " ", " ", " ", " ", "~", " ", " ", " ", " "],
+    borderFg: "green",
   },
   plaza: {
     label: "Grand Plaza",
     subtitle: "the beating heart of Antopolis",
-    bg: [" ", " ", "·", " ", " ", " ", "·", " "],
+    bg: [" ", " ", " ", " ", "·", " ", " ", " ", " ", " ", "·", " "],
+    borderFg: "cyan",
   },
   mines: {
     label: "Crystal Mines",
     subtitle: "deep and glittering",
-    bg: [".", " ", "▪", " ", ".", "·", " ", "."],
+    bg: ["▪", " ", "·", "▪", " ", " ", "▪", " ", "·", " ", " ", "▪"],
+    borderFg: "magenta",
   },
 };
 
 const CASTE_GLYPHS: Record<AntCaste, string> = {
-  worker:    "ö",
-  soldier:   "Ö",
-  engineer:  "ê",
-  queen:     "♛",
-  scientist: "ë",
+  worker:    "ö·",
+  soldier:   "Ö>",
+  engineer:  "ê=",
+  queen:     "♛*",
+  scientist: "ë?",
+};
+
+// Single-char glyphs for census display
+const CASTE_GLYPH_SHORT: Record<AntCaste, string> = {
+  worker: "ö", soldier: "Ö", engineer: "ê", queen: "♛", scientist: "ë",
 };
 
 const CASTE_NAMES: Record<AntCaste, string> = {
@@ -140,21 +161,21 @@ const CASTE_NAMES: Record<AntCaste, string> = {
 };
 
 const BUILDING_ART: Record<BuildingType, string[]> = {
-  nest:      [" ╔═╗ ", " ║♛║ ", " ╚═╝ "],
-  farm:      [" ┌─┐ ", " │♣│ ", " └─┘ "],
-  factory:   [" ▄▄▄ ", " █▓█ ", " ▀▀▀ "],
-  reactor:   [" ╔●╗ ", " ║☢║ ", " ╚═╝ "],
-  fountain:  ["  ∩  ", " ╔╧╗ ", " ╚═╝ "],
-  barracks:  [" ┌†┐ ", " │░│ ", " └─┘ "],
-  lab:       [" ┌◊┐ ", " │⚗│ ", " └─┘ "],
-  silo:      [" ╔═╗ ", " ║▒║ ", " ╚═╝ "],
-  beacon:    ["  ‡  ", " ─┼─ ", "  │  "],
-  shrine:    ["  △  ", " ╔╩╗ ", " ╚═╝ "],
-  drill:     ["  ▼  ", " ─╫─ ", " ─╨─ "],
-  refinery:  [" ▄█▄ ", " █░█ ", " ▀█▀ "],
-  tavern:    [" ┌♪┐ ", " │☺│ ", " └─┘ "],
-  library:   [" ┌─┐ ", " │▤│ ", " └─┘ "],
-  catapult:  [" ╱─╲ ", " ╲●╱ ", "  ┴  "],
+  nest:      ["  /\\  ", " |♛ | ", " |__| ", " ════ "],
+  farm:      ["  ♣♣  ", " [  ] ", " [__] ", " ···· "],
+  factory:   ["  /|  ", " |▓▓| ", " |▓▓| ", " ▀▀▀▀ "],
+  reactor:   [" ╔══╗ ", " ║☢☢║ ", " ╚══╝ ", " ···· "],
+  fountain:  ["  ::  ", " (  ) ", " (~~) ", " ·  · "],
+  barracks:  ["  ††  ", " |░░| ", " |__| ", " ···· "],
+  lab:       ["  ◊◊  ", " |⚗ | ", " |__| ", " ···· "],
+  silo:      [" ╔══╗ ", " ║▒▒║ ", " ╚══╝ ", " ···· "],
+  beacon:    ["  **  ", " -||- ", "  ||  ", "  ··  "],
+  shrine:    ["  /\\  ", " /  \\ ", " ║══║ ", " ···· "],
+  drill:     ["  ▼▼  ", " -╫╫- ", " -╨╨- ", " ···· "],
+  refinery:  ["  ▄▄  ", " █░░█ ", " ▀██▀ ", " ···· "],
+  tavern:    ["  ♪♪  ", " |☺ | ", " |__| ", " ···· "],
+  library:   ["  ══  ", " |▤▤| ", " |__| ", " ···· "],
+  catapult:  [" /--\\ ", " \\●●/ ", "  ┴┴  ", " ···· "],
 };
 
 const BUILDING_DISTRICT: Record<BuildingType, DistrictId> = {
@@ -186,6 +207,107 @@ const SEVERITY_PREFIX: Record<EventSeverity, string> = {
   chaos: "! ",
 };
 
+/** Render the council stats dashboard */
+function renderCouncil(world: World, w: number): string {
+  const lines: string[] = [];
+  const hr = "─".repeat(Math.max(1, w - 4));
+
+  // Population breakdown
+  lines.push("{bold} POPULATION{/bold}");
+  lines.push(hr);
+  const castes: AntCaste[] = ["worker", "soldier", "engineer", "queen", "scientist"];
+  const COUNCIL_COLOURS: Record<AntCaste, string> = {
+    worker: "white", soldier: "red", engineer: "cyan", queen: "yellow", scientist: "magenta",
+  };
+  for (const c of castes) {
+    const ants = world.ants.filter(a => a.caste === c);
+    if (ants.length === 0) continue;
+    const col = COUNCIL_COLOURS[c];
+    const districts = (["industrial", "residential", "plaza", "mines"] as DistrictId[])
+      .map(d => { const n = ants.filter(a => a.district === d).length; return n > 0 ? `${DISTRICTS[d].label.split(" ")[0]}:${n}` : null; })
+      .filter(Boolean).join(" ");
+    const avgEnergy = Math.floor(ants.reduce((s, a) => s + a.energy, 0) / ants.length);
+    lines.push(`  {${col}-fg}${CASTE_GLYPHS[c]} ${CASTE_NAMES[c]}s: ${ants.length}{/${col}-fg}  energy:${avgEnergy}%  ${districts}`);
+  }
+  lines.push("");
+
+  // Buildings
+  lines.push("{bold} BUILDINGS{/bold}");
+  lines.push(hr);
+  const districtIds: DistrictId[] = ["industrial", "residential", "plaza", "mines"];
+  for (const d of districtIds) {
+    const bldgs = world.buildings.filter(b => b.district === d);
+    if (bldgs.length === 0) continue;
+    const col = DISTRICTS[d].borderFg;
+    const list = bldgs.map(b => `${b.type}(${b.hp}/${b.maxHp})`).join(", ");
+    lines.push(`  {${col}-fg}${DISTRICTS[d].label}:{/${col}-fg} ${list}`);
+  }
+  lines.push("");
+
+  // Resources + rates
+  lines.push("{bold} RESOURCES{/bold}");
+  lines.push(hr);
+  const r = world.resources;
+  const farms = world.buildings.filter(b => b.type === "farm" && b.powered).length;
+  const drills = world.buildings.filter(b => b.type === "drill" && b.powered).length;
+  const reactors = world.buildings.filter(b => b.type === "reactor" && b.powered).length;
+  const labs = world.buildings.filter(b => b.type === "lab" && b.powered).length;
+  const workers = world.ants.filter(a => a.caste === "worker").length;
+  const consumption = Math.floor(world.ants.length * 0.3);
+  lines.push(`  {green-fg}♣ Food:     ${r.food}{/green-fg}   +${farms * 2 + Math.floor(workers * 0.5)}/tick  -${consumption}/tick`);
+  lines.push(`  {magenta-fg}◇ Crystals: ${r.crystals}{/magenta-fg}   +${drills * 2}/tick`);
+  lines.push(`  {yellow-fg}⚡ Energy:   ${r.energy}{/yellow-fg}   +${reactors * 3}/tick  -${Math.floor(world.buildings.length * 0.3)}/tick`);
+  lines.push(`  {magenta-fg}◊ Science:  ${r.science}{/magenta-fg}   +${labs * 2 + world.ants.filter(a => a.caste === "scientist").length}/tick`);
+  lines.push("");
+
+  // Decrees
+  lines.push("{bold} DECREES{/bold}");
+  lines.push(hr);
+  if (world.decree !== "none") {
+    lines.push(`  Active: {yellow-fg}${DECREE_NAMES[world.decree]}{/yellow-fg} (${Math.ceil(world.decreeTicks)} ticks remaining)`);
+  } else {
+    lines.push("  No active decree. Press [d] to issue one.");
+  }
+  if (world.decreeHistory.length > 0) {
+    lines.push(`  History: ${world.decreeHistory.join(" > ")}`);
+  }
+  lines.push("");
+
+  // Danger
+  lines.push("{bold} DANGER{/bold}");
+  lines.push(hr);
+  const dangerBar = "█".repeat(Math.floor(world.dangerLevel * 20)) + "░".repeat(20 - Math.floor(world.dangerLevel * 20));
+  const dangerCol = world.dangerLevel > 0.5 ? "red" : world.dangerLevel > 0.3 ? "yellow" : "green";
+  lines.push(`  {${dangerCol}-fg}[${dangerBar}] ${(world.dangerLevel * 100).toFixed(0)}%{/${dangerCol}-fg}`);
+  lines.push(`  Reactors: ${reactors}  (each adds danger over time)`);
+
+  return lines.join("\n");
+}
+
+/** Wrap known game terms in blessed colour tags to connect log to game UI */
+function colourizeLogText(text: string): string {
+  // District names → district border colours
+  text = text.replace(/Industrial Zone/g, "{yellow-fg}Industrial Zone{/yellow-fg}");
+  text = text.replace(/Residential Burrows/g, "{green-fg}Residential Burrows{/green-fg}");
+  text = text.replace(/Grand Plaza/g, "{cyan-fg}Grand Plaza{/cyan-fg}");
+  text = text.replace(/Crystal Mines/g, "{magenta-fg}Crystal Mines{/magenta-fg}");
+  // Caste names → caste colours
+  text = text.replace(/Worker/g, "{white-fg}Worker{/white-fg}");
+  text = text.replace(/Soldier/g, "{red-fg}Soldier{/red-fg}");
+  text = text.replace(/Engineer/g, "{cyan-fg}Engineer{/cyan-fg}");
+  text = text.replace(/Queen/g, "{yellow-fg}Queen{/yellow-fg}");
+  text = text.replace(/Scientist/g, "{magenta-fg}Scientist{/magenta-fg}");
+  // Resource keywords
+  text = text.replace(/crystals/gi, "{magenta-fg}crystals{/magenta-fg}");
+  text = text.replace(/TECH LEVEL/g, "{cyan-fg}TECH LEVEL{/cyan-fg}");
+  // Decree keywords
+  text = text.replace(/FESTIVAL/g, "{yellow-fg}FESTIVAL{/yellow-fg}");
+  text = text.replace(/LOCKDOWN/g, "{red-fg}LOCKDOWN{/red-fg}");
+  text = text.replace(/PRODUCTION RUSH/g, "{yellow-fg}PRODUCTION RUSH{/yellow-fg}");
+  text = text.replace(/SCIENCE MANDATE/g, "{magenta-fg}SCIENCE MANDATE{/magenta-fg}");
+  return text;
+}
+
 function evt(w: World, text: string, severity: EventSeverity = "calm") {
   w.events.push({ text, severity });
 }
@@ -215,6 +337,7 @@ function createWorld(): World {
     resources: { food: 50, crystals: 30, energy: 20, science: 0 },
     ants: [],
     buildings: [],
+    trails: [],
     particles: [],
     events: [],
     nextId: 1,
@@ -246,6 +369,11 @@ function createWorld(): World {
   evt(world, "ANTOPOLIS founded! The colony begins...");
   evt(world, "Queen settles into the Royal Nest.");
   evt(world, "Engineers survey the land.");
+  evt(world, `Engineers built a new farm! (${DISTRICTS.residential.label})`);
+  evt(world, `Engineers built a new factory! (${DISTRICTS.industrial.label})`);
+  evt(world, "Worker #1 begins hauling crystals.");
+  evt(world, "Scientist #1 calibrates the drill sensors.");
+  evt(world, "Soldier #2 patrols the Grand Plaza perimeter.");
   return world;
 }
 
@@ -400,6 +528,10 @@ function tickWorld(w: World) {
     w.resources.energy = Math.max(0, w.resources.energy);
   }
 
+  // Trail aging and cleanup
+  for (const trail of w.trails) trail.age++;
+  w.trails = w.trails.filter(t => t.age < 40);
+
   // Ant movement and behavior
   for (const ant of w.ants) {
     ant.age++;
@@ -418,6 +550,11 @@ function tickWorld(w: World) {
     if (ant.y < 0.05 || ant.y > 0.95) ant.dy *= -0.8;
     ant.x = clamp(ant.x, 0.03, 0.97);
     ant.y = clamp(ant.y, 0.03, 0.97);
+
+    // Leave trail marks
+    if (w.tick % 3 === 0 && w.trails.length < 200) {
+      w.trails.push({ x: ant.x, y: ant.y, district: ant.district, age: 0 });
+    }
 
     // Energy drain
     ant.energy -= 0.05 * w.speed;
@@ -650,10 +787,44 @@ function renderDistrict(districtId: DistrictId, w: number, h: number, world: Wor
   for (let y = 0; y < h; y++) {
     const row: string[] = [];
     for (let x = 0; x < w; x++) {
-      const seed = (x * 7 + y * 13 + world.tick) | 0;
+      const seed = (x * 7 + y * 13) | 0;
       row.push(district.bg[Math.abs(seed) % district.bg.length]!);
     }
     grid.push(row);
+  }
+
+  // Render paths between buildings (connect nearest pairs)
+  const distBuildings = world.buildings.filter(b => b.district === districtId);
+  for (let i = 0; i < distBuildings.length; i++) {
+    for (let j = i + 1; j < distBuildings.length; j++) {
+      const a = distBuildings[i]!, b = distBuildings[j]!;
+      const ax = Math.floor(a.x * (w - 6)), ay = Math.floor(a.y * (h - 4)) + 3;
+      const bx = Math.floor(b.x * (w - 6)), by = Math.floor(b.y * (h - 4)) + 3;
+      // Simple horizontal then vertical path
+      const pathChar = "·";
+      const midX = Math.floor((ax + bx) / 2);
+      for (let px = Math.min(ax, midX); px <= Math.max(ax, midX); px++) {
+        if (px >= 0 && px < w && ay >= 0 && ay < h && grid[ay]![px] === " ") grid[ay]![px] = pathChar;
+      }
+      for (let py = Math.min(ay, by); py <= Math.max(ay, by); py++) {
+        if (midX >= 0 && midX < w && py >= 0 && py < h && grid[py]![midX] === " ") grid[py]![midX] = pathChar;
+      }
+      for (let px = Math.min(midX, bx); px <= Math.max(midX, bx); px++) {
+        if (px >= 0 && px < w && by >= 0 && by < h && grid[by]![px] === " ") grid[by]![px] = pathChar;
+      }
+    }
+  }
+
+  // Render ant trails (fading footprints)
+  const TRAIL_CHARS = [",", ".", " "];
+  for (const trail of world.trails.filter(t => t.district === districtId)) {
+    const tx = Math.floor(trail.x * (w - 1));
+    const ty = Math.floor(trail.y * (h - 1));
+    if (tx >= 0 && tx < w && ty >= 0 && ty < h) {
+      const fade = Math.min(TRAIL_CHARS.length - 1, Math.floor(trail.age / 15));
+      const ch = TRAIL_CHARS[fade]!;
+      if (ch !== " ") grid[ty]![tx] = ch;
+    }
   }
 
   // Render buildings
@@ -683,41 +854,94 @@ function renderDistrict(districtId: DistrictId, w: number, h: number, world: Wor
     }
   }
 
-  // Render ants
+  // Render ants (2-char glyphs) — store positions for colour overlay
+  const antPositions: { x: number; y: number; glyph: string; colour: string }[] = [];
+  const CASTE_COLOURS: Record<AntCaste, string> = {
+    worker: "white", soldier: "red", engineer: "cyan", queen: "yellow", scientist: "magenta",
+  };
   for (const ant of world.ants.filter(a => a.district === districtId)) {
-    const ax = Math.floor(ant.x * (w - 1));
+    const ax = Math.floor(ant.x * (w - 3));
     const ay = Math.floor(ant.y * (h - 1));
-    if (ax >= 0 && ax < w && ay >= 0 && ay < h) {
-      grid[ay]![ax] = CASTE_GLYPHS[ant.caste];
+    const glyph = CASTE_GLYPHS[ant.caste];
+    if (ax >= 0 && ay >= 0 && ay < h) {
+      for (let c = 0; c < glyph.length; c++) {
+        if (ax + c < w) grid[ay]![ax + c] = glyph[c]!;
+      }
+      antPositions.push({ x: ax, y: ay, glyph, colour: CASTE_COLOURS[ant.caste] });
     }
   }
 
-  return grid.map(row => row.join("")).join("\n");
+  // Build output with colour tags for ants
+  const lines: string[] = [];
+  for (let y = 0; y < h; y++) {
+    let line = "";
+    let x = 0;
+    while (x < w) {
+      // Check if an ant starts at this position
+      const ant = antPositions.find(a => a.y === y && a.x === x);
+      if (ant) {
+        line += `{${ant.colour}-fg}${ant.glyph}{/${ant.colour}-fg}`;
+        x += ant.glyph.length;
+      } else {
+        // Escape any { in terrain to avoid blessed tag interpretation
+        const ch = grid[y]![x]!;
+        line += ch === "{" ? "\\{" : ch;
+        x++;
+      }
+    }
+    lines.push(line);
+  }
+  return lines.join("\n");
 }
 
 function renderResources(world: World, w: number): string {
   const r = world.resources;
+  // Census by caste with matching colours
+  const CENSUS_COLOURS: Record<AntCaste, string> = {
+    worker: "white", soldier: "red", engineer: "cyan", queen: "yellow", scientist: "magenta",
+  };
+  const census = (["worker", "soldier", "engineer", "queen", "scientist"] as AntCaste[])
+    .map(c => {
+      const n = world.ants.filter(a => a.caste === c).length;
+      return n > 0 ? `{${CENSUS_COLOURS[c]}-fg}${CASTE_GLYPH_SHORT[c]}${n}{/${CENSUS_COLOURS[c]}-fg}` : null;
+    })
+    .filter(Boolean)
+    .join(" ");
+
+  // Resources coloured by producing district
   const items = [
-    `♣${r.food}`,
-    `◇${r.crystals}`,
-    `⚡${r.energy}`,
-    `◊${r.science}`,
-    `☺${world.happiness.toFixed(0)}%`,
-    `⚙T${world.techLevel}`,
-    `pop:${world.ants.length}`,
+    `{green-fg}♣${r.food}{/green-fg}`,
+    `{magenta-fg}◇${r.crystals}{/magenta-fg}`,
+    `{yellow-fg}⚡${r.energy}{/yellow-fg}`,
+    `{magenta-fg}◊${r.science}{/magenta-fg}`,
+    `{cyan-fg}☺${world.happiness.toFixed(0)}%{/cyan-fg}`,
+    `{white-fg}⚙T${world.techLevel}{/white-fg}`,
   ];
-  return " " + items.join("  ");
+  const left = " " + items.join(" | ");
+  const right = `pop:${world.ants.length} [${census}] `;
+  // Note: blessed tag chars don't contribute to visual width, but they do to string length.
+  // Use a rough gap calculation — the visual result is still good.
+  const visualLeft = ` ♣${r.food} | ◇${r.crystals} | ⚡${r.energy} | ◊${r.science} | ☺${world.happiness.toFixed(0)}% | ⚙T${world.techLevel}`;
+  const visualRight = `pop:${world.ants.length} [${(["worker", "soldier", "engineer", "queen", "scientist"] as AntCaste[]).map(c => { const n = world.ants.filter(a => a.caste === c).length; return n > 0 ? `${CASTE_GLYPH_SHORT[c]}${n}` : null; }).filter(Boolean).join(" ")}] `;
+  const gap = Math.max(1, w - visualLeft.length - visualRight.length);
+  return left + " ".repeat(gap) + right;
 }
 
 function renderStatus(world: World, w: number): string {
   const dayNames = ["midnight", "dawn", "morning", "noon", "afternoon", "dusk", "evening", "night"];
-  const day = dayNames[Math.floor(world.dayPhase * 8) % 8];
-  const danger = world.dangerLevel > 0.5 ? " DANGER" : world.dangerLevel > 0.3 ? " caution" : "";
+  const dayIcons = ["*", "~", ".", "o", ".", "~", "*", "*"];
+  const dayIdx = Math.floor(world.dayPhase * 8) % 8;
+  const day = dayNames[dayIdx];
+  const dayIcon = dayIcons[dayIdx];
+  const danger = world.dangerLevel > 0.5 ? " !! DANGER" : world.dangerLevel > 0.3 ? " ! caution" : "";
   const speedStr = `${world.speed}x`;
-  const pauseStr = world.paused ? " PAUSED" : "";
-  const decree = world.decree !== "none" ? ` [${DECREE_NAMES[world.decree]}]` : "";
-  const left = ` ${day}${danger}${decree}${pauseStr} ${speedStr}`;
-  const right = " [p]ause [+/-]spd [1-5]spawn [e]xplode [b]uild ";
+  const pauseStr = world.paused ? " || PAUSED" : "";
+  const decree = world.decree !== "none" ? ` << ${DECREE_NAMES[world.decree]} >>` : "";
+  // Heartbeat pulse shows colony is alive
+  const pulseFrames = ["·", ":", "*", ":", "·", " "];
+  const pulse = world.paused ? "-" : pulseFrames[Math.floor(world.tick / 3) % pulseFrames.length];
+  const left = ` ${pulse} ${dayIcon} ${day}${danger}${decree}${pauseStr} ${speedStr}`;
+  const right = " [v]iew [tab]sel [d]ecree [m]ove [1-5]recruit [e]xplode [b]uild ";
   const gap = Math.max(1, w - left.length - right.length);
   return (left + " ".repeat(gap) + right).slice(0, w);
 }
@@ -738,9 +962,13 @@ export default function setup(host: MicroappHost) {
 }
 
 function openAntopolis(host: MicroappHost) {
-  const win = host.createWindow({ title: "🐜 ANTOPOLIS", width: 120, height: 42 });
+  const geo = host.geometry;
+  const winW = Math.min(geo.width - 4, 180);
+  const winH = Math.min(geo.height - 4, 54);
+  const win = host.createWindow({ title: "🐜 ANTOPOLIS", width: winW, height: winH });
   const timers = new Set<ReturnType<typeof setInterval>>();
   const world = createWorld();
+  const t = host.theme();
 
   // ── UI elements ─────────────────────────────────────────────────────
 
@@ -752,37 +980,72 @@ function openAntopolis(host: MicroappHost) {
       parent: win.body,
       top: 0, left: 0, width: 0, height: 0,
       border: "line",
+      tags: true,
       label: ` ${DISTRICTS[id].label} `,
-      style: { ...host.theme().body, border: { fg: host.theme().muted.fg } },
+      style: { ...t.body, border: { fg: DISTRICTS[id].borderFg } },
     });
   }
 
-  const headerBox = blessed.box({
+  // Figlet header
+  const figletBox = blessed.box({
+    parent: win.body, top: 0, left: 0, width: 0, height: 0,
+    tags: false,
+    style: t.header,
+  });
+
+  const subtitleBox = blessed.box({
     parent: win.body, top: 0, left: 0, width: 0, height: 1,
     tags: false,
-    style: { fg: "white", bg: "black", bold: true },
+    style: { ...t.body, fg: t.muted.fg },
   });
 
   const resourceBox = blessed.box({
     parent: win.body, top: 0, left: 0, width: 0, height: 1,
-    tags: false,
-    style: { fg: "cyan", bg: "black" },
+    tags: true,
+    style: t.body,
   });
 
+  // Status bar with theme colours
   const statusBox = blessed.box({
     parent: win.body, top: 0, left: 0, width: 0, height: 1,
     tags: false,
-    style: { fg: "white", bg: "black" },
+    style: t.header,
   });
 
   const logBox = blessed.box({
     parent: win.body, top: 0, left: 0, width: 0, height: 0,
     scrollable: true, alwaysScroll: true, mouse: true,
-    tags: false,
-    style: host.theme().body,
+    tags: true,
+    label: " .ö· Colony Log ",
+    border: "line",
+    style: { ...t.body, border: { fg: t.muted.fg } },
   });
 
   // ── Layout ──────────────────────────────────────────────────────────
+
+  // Render figlet once to measure height
+  const figletText = renderFiglet("ANTOPOLIS", "small");
+  const figletH = figletText.split("\n").length;
+
+  // View modes: city (4-quarter), focus (single district), council (stats dashboard)
+  type ViewMode = "city" | "focus" | "council";
+  let viewMode: ViewMode = "city";
+  let focusDistrict: DistrictId | null = null;
+  const focusCycle: (DistrictId | null)[] = [null, "industrial", "residential", "plaza", "mines"];
+  let focusIdx = 0;
+
+  // Selected district for targeted actions (highlighted in all views)
+  let selectedDistrict: DistrictId = "plaza";
+
+  // Council view box
+  const councilBox = blessed.box({
+    parent: win.body, top: 0, left: 0, width: 0, height: 0,
+    tags: true,
+    border: "line",
+    label: " Colony Council ",
+    style: { ...t.body, border: { fg: t.accent.fg } },
+    scrollable: true, alwaysScroll: true, mouse: true,
+  });
 
   const biomeGrid = createGrid(win.body, {
     rows: 2, columns: 2,
@@ -795,12 +1058,15 @@ function openAntopolis(host: MicroappHost) {
   biomeGrid.set({ key: "plaza",       row: 1, column: 0, part: createNodePart(districtBoxes.plaza) });
   biomeGrid.set({ key: "mines",       row: 1, column: 1, part: createNodePart(districtBoxes.mines) });
 
+
+
   const root = createStack(win.body, [
-    { key: "header",    basis: 1,     part: createNodePart(headerBox) },
-    { key: "resources", basis: 1,     part: createNodePart(resourceBox) },
-    { key: "districts", basis: "3fr", part: biomeGrid },
-    { key: "status",    basis: 1,     part: createNodePart(statusBox) },
-    { key: "log",       basis: "1fr", part: createNodePart(logBox) },
+    { key: "figlet",    basis: figletH, part: createNodePart(figletBox) },
+    { key: "subtitle",  basis: 1,       part: createNodePart(subtitleBox) },
+    { key: "resources", basis: 1,       part: createNodePart(resourceBox) },
+    { key: "districts", basis: "3fr",   part: biomeGrid },
+    { key: "status",    basis: 1,       part: createNodePart(statusBox) },
+    { key: "log",       basis: "1fr",   part: createNodePart(logBox) },
   ]);
 
   // ── Render ──────────────────────────────────────────────────────────
@@ -811,33 +1077,117 @@ function openAntopolis(host: MicroappHost) {
 
     root.layout({ top: 0, left: 0, width: w, height: h });
 
-    // Header
-    const title = world.paused
-      ? " 🐜 ANTOPOLIS ‖ PAUSED "
-      : " 🐜 ANTOPOLIS ";
-    headerBox.setContent(title.padEnd(w));
+    // ── Header area ──
+    const showHeader = viewMode === "city";
+    if (showHeader) {
+      figletBox.show();
+      subtitleBox.show();
+      const pauseTag = world.paused ? "  || PAUSED" : "";
+      const marchFrames = [" ö· ö· ö·", " ·ö ·ö ·ö", " ö· ö· ö·", "  ö· ö· ö·"];
+      const march = marchFrames[Math.floor(world.tick / 4) % marchFrames.length];
+      figletBox.setContent(figletText + pauseTag + march);
 
-    // Resources
+      const bldgCount = world.buildings.length;
+      const districtSummary = districtIds.map(id => {
+        const n = world.ants.filter(a => a.district === id).length;
+        return `${DISTRICTS[id].label.split(" ")[0]}:${n}`;
+      }).join("  ");
+      const mood = world.happiness >= 80 ? "the colony thrives!"
+        : world.happiness >= 60 ? "a micro-city for ants with ant technology"
+        : world.happiness >= 40 ? "the colony struggles..."
+        : "the colony is in crisis!";
+      subtitleBox.setContent(` ${mood}  --  ${bldgCount} buildings  --  ${districtSummary}`);
+    } else {
+      figletBox.hide();
+      subtitleBox.hide();
+    }
+
+    // Resources + status (always visible)
     resourceBox.setContent(renderResources(world, w));
-
-    // Status
     statusBox.setContent(renderStatus(world, w));
 
-    // Districts
-    for (const id of districtIds) {
-      const box = districtBoxes[id];
-      const bw = Math.max(1, (Number(box.width) || 10) - 2);
-      const bh = Math.max(1, (Number(box.height) || 5) - 2);
-      box.setContent(renderDistrict(id, bw, bh, world));
-      const count = world.ants.filter(a => a.district === id).length;
-      const buildings = world.buildings.filter(b => b.district === id).length;
-      const sub = DISTRICTS[id].subtitle;
-      (box as any).setLabel(` ${DISTRICTS[id].label} — ${sub} [${count} ant${count !== 1 ? "s" : ""}, ${buildings} bldg] `);
+    // ── Main area: depends on view mode ──
+    if (viewMode === "council") {
+      // Council view: hide districts, show stats dashboard in grid area
+      // First show all districts briefly so the grid layout computes positions
+      for (const id of districtIds) districtBoxes[id].show();
+      root.layout({ top: 0, left: 0, width: w, height: h });
+      // Now read the computed grid area
+      const indBox = districtBoxes.industrial;
+      const mineBox = districtBoxes.mines;
+      const gridTop = Number(indBox.top) || 0;
+      const gridLeft = Number(indBox.left) || 0;
+      const gridRight = (Number(mineBox.left) || 0) + (Number(mineBox.width) || 0);
+      const gridBottom = (Number(mineBox.top) || 0) + (Number(mineBox.height) || 0);
+      // Now hide districts and position council
+      for (const id of districtIds) districtBoxes[id].hide();
+      councilBox.show();
+      councilBox.top = gridTop;
+      councilBox.left = gridLeft;
+      councilBox.width = gridRight - gridLeft;
+      councilBox.height = gridBottom - gridTop;
+      const cw = Math.max(1, (gridRight - gridLeft) - 2);
+      councilBox.setContent(renderCouncil(world, cw));
+    } else if (viewMode === "focus" && focusDistrict) {
+      // Focus mode: single district fills grid area
+      councilBox.hide();
+      const gridTop = Number(districtBoxes.industrial.top) || 0;
+      const gridLeft = Number(districtBoxes.industrial.left) || 0;
+      let gridW = w, gridH = h;
+      for (const id of districtIds) {
+        const box = districtBoxes[id];
+        const br = (Number(box.left) || 0) + (Number(box.width) || 0);
+        const bb = (Number(box.top) || 0) + (Number(box.height) || 0);
+        if (br > gridW) gridW = br;
+        if (bb > gridH) gridH = bb;
+      }
+      for (const id of districtIds) {
+        if (id === focusDistrict) {
+          const box = districtBoxes[id];
+          box.top = gridTop;
+          box.left = gridLeft;
+          box.width = gridW - gridLeft;
+          box.height = gridH - gridTop;
+          box.show();
+          const bw = Math.max(1, (Number(box.width) || 10) - 2);
+          const bh = Math.max(1, (Number(box.height) || 5) - 2);
+          box.setContent(renderDistrict(id, bw, bh, world));
+          const count = world.ants.filter(a => a.district === id).length;
+          const buildings = world.buildings.filter(b => b.district === id).length;
+          (box as any).setLabel(` ${DISTRICTS[id].label} [${count} ants, ${buildings} bldg] -- [z] cycle [v] view `);
+        } else {
+          districtBoxes[id].hide();
+        }
+      }
+    } else {
+      // City overview: show all districts in grid
+      councilBox.hide();
+      for (const id of districtIds) {
+        const box = districtBoxes[id];
+        box.show();
+        const bw = Math.max(1, (Number(box.width) || 10) - 2);
+        const bh = Math.max(1, (Number(box.height) || 5) - 2);
+        box.setContent(renderDistrict(id, bw, bh, world));
+        const count = world.ants.filter(a => a.district === id).length;
+        const buildings = world.buildings.filter(b => b.district === id).length;
+        // Highlight selected district
+        const sel = id === selectedDistrict ? " <<" : "";
+        (box as any).setLabel(` ${DISTRICTS[id].label} [${count} ant${count !== 1 ? "s" : ""}, ${buildings} bldg]${sel} `);
+      }
     }
 
     // Log with severity prefixes
-    const logH = Math.max(2, Number(logBox.height) || 4);
-    const logLines = world.events.slice(-logH).map(e => SEVERITY_PREFIX[e.severity] + e.text);
+    const logH = Math.max(2, (Number(logBox.height) || 4) - 2); // -2 for border
+    const SEVERITY_COLOUR: Record<EventSeverity, string> = {
+      calm:  "white",
+      warn:  "yellow",
+      chaos: "red",
+    };
+    const logLines = world.events.slice(-logH).map(e => {
+      const col = SEVERITY_COLOUR[e.severity];
+      const coloured = colourizeLogText(e.text);
+      return `{${col}-fg}${SEVERITY_PREFIX[e.severity]}{/${col}-fg}${coloured}`;
+    });
     logBox.setContent(logLines.join("\n"));
     logBox.setScrollPerc(100);
 
@@ -891,15 +1241,80 @@ function openAntopolis(host: MicroappHost) {
         evt(world, "Not enough crystals to build!", "warn");
       }
       render();
+    } else if (key.full === "v") {
+      // Cycle view: city → focus → council → city
+      const views: ViewMode[] = ["city", "focus", "council"];
+      const idx = views.indexOf(viewMode);
+      viewMode = views[(idx + 1) % views.length]!;
+      if (viewMode === "focus") {
+        focusDistrict = selectedDistrict;
+        evt(world, `Focus: ${DISTRICTS[focusDistrict].label}`);
+      } else if (viewMode === "council") {
+        focusDistrict = null;
+        evt(world, "Colony Council convenes...");
+      } else {
+        focusDistrict = null;
+        evt(world, "City overview restored.");
+      }
+      render();
+    } else if (key.full === "z" || key.name === "tab") {
+      // Cycle selected district (and focus if in focus mode)
+      const idx = districtIds.indexOf(selectedDistrict);
+      selectedDistrict = districtIds[(idx + 1) % districtIds.length]!;
+      if (viewMode === "focus") {
+        focusDistrict = selectedDistrict;
+      }
+      render();
+    } else if (key.full === "d") {
+      // Issue decree (player acts as queen)
+      if (world.decree !== "none") {
+        evt(world, "A decree is already in effect!", "warn");
+      } else {
+        const decrees: Exclude<DecreeType, "none">[] = ["festival", "lockdown", "rush", "science_push"];
+        const pick = decrees[Math.floor(Math.random() * decrees.length)]!;
+        world.decree = pick;
+        world.decreeTicks = 20 + Math.floor(Math.random() * 10);
+        world.decreeHistory.push(DECREE_NAMES[pick]);
+        if (world.decreeHistory.length > 5) world.decreeHistory.shift();
+        evt(world, `You decree: ${DECREE_NAMES[pick]}!`, "chaos");
+        if (pick === "festival") {
+          emitExplosion(world, 0.5, 0.3, "plaza", 20);
+        }
+      }
+      render();
+    } else if (key.full === "m") {
+      // Migrate: move a random ant FROM selected district to another
+      const fromAnts = world.ants.filter(a => a.district === selectedDistrict && a.caste !== "queen");
+      if (fromAnts.length > 0) {
+        const ant = fromAnts[Math.floor(Math.random() * fromAnts.length)]!;
+        const others = districtIds.filter(d => d !== selectedDistrict);
+        const dest = others[Math.floor(Math.random() * others.length)]!;
+        ant.district = dest;
+        ant.x = 0.3 + Math.random() * 0.4;
+        ant.y = 0.3 + Math.random() * 0.4;
+        evt(world, `${CASTE_NAMES[ant.caste]} #${ant.id} reassigned to ${DISTRICTS[dest].label}.`);
+      } else {
+        evt(world, `No movable ants in ${DISTRICTS[selectedDistrict].label}!`, "warn");
+      }
+      render();
     } else if (SPAWN_KEYS[key.full]) {
-      const caste = SPAWN_KEYS[key.full]!;
-      spawnAnt(world, caste);
-      evt(world, `Summoned a ${CASTE_NAMES[caste]}!`);
+      // Spawn ant in selected district (costs food)
+      if (world.resources.food >= 10) {
+        const caste = SPAWN_KEYS[key.full]!;
+        const ant = spawnAnt(world, caste);
+        ant.district = selectedDistrict;
+        ant.x = 0.3 + Math.random() * 0.4;
+        ant.y = 0.3 + Math.random() * 0.4;
+        world.resources.food -= 10;
+        evt(world, `Recruited a ${CASTE_NAMES[caste]} in ${DISTRICTS[selectedDistrict].label}! (-10 food)`);
+      } else {
+        evt(world, "Not enough food to recruit! (need 10)", "warn");
+      }
       render();
     }
   });
 
-  win.body.key(["p", "+", "=", "-", "_", "e", "b", "1", "2", "3", "4", "5"], () => {});
+  win.body.key(["p", "+", "=", "-", "_", "e", "b", "v", "z", "d", "m", "tab", "1", "2", "3", "4", "5"], () => {});
 
   // ── Lifecycle ───────────────────────────────────────────────────────
 
@@ -907,7 +1322,7 @@ function openAntopolis(host: MicroappHost) {
   win.onResize(render);
 
   win.describeState(() => ({
-    summary: `Antopolis — pop:${world.ants.length} bldg:${world.buildings.length} tech:${world.techLevel} happy:${world.happiness.toFixed(0)}%${world.decree !== "none" ? ` [${DECREE_NAMES[world.decree]}]` : ""}${world.paused ? " PAUSED" : ""}`,
+    summary: `Antopolis — ${viewMode.toUpperCase()} pop:${world.ants.length} bldg:${world.buildings.length} tech:${world.techLevel} happy:${world.happiness.toFixed(0)}% sel:${DISTRICTS[selectedDistrict].label}${world.decree !== "none" ? ` [${DECREE_NAMES[world.decree]}]` : ""}${world.paused ? " PAUSED" : ""}`,
     population: world.ants.length,
     buildings: world.buildings.length,
     techLevel: world.techLevel,
@@ -925,13 +1340,14 @@ function openAntopolis(host: MicroappHost) {
   ].join("\n"));
 
   win.onRestyle(() => {
-    const t = host.theme();
-    headerBox.style = { fg: "white", bg: "black", bold: true };
-    resourceBox.style = { fg: "cyan", bg: "black" };
-    statusBox.style = { fg: "white", bg: "black" };
-    logBox.style = t.body;
+    const th = host.theme();
+    figletBox.style = th.header;
+    subtitleBox.style = { ...th.body, fg: th.muted.fg };
+    resourceBox.style = { ...th.body, fg: th.accent.fg };
+    statusBox.style = th.header;
+    logBox.style = { ...th.body, border: { fg: th.muted.fg } };
     for (const id of districtIds) {
-      districtBoxes[id].style = { ...t.body, border: { fg: t.muted.fg } };
+      districtBoxes[id].style = { ...th.body, border: { fg: DISTRICTS[id].borderFg } };
     }
     host.screen.render();
   });

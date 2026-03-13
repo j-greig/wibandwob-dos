@@ -1,0 +1,20 @@
+{
+  "name": "symbient-twitter",
+  "version": "0.1.0",
+  "description": "A lively, colourful, imaginative take on Twitter/X as a TUI social media client.",
+  "type": "microapp",
+  "entry": "index.ts",
+  "microapp": {
+    "id": "wibwob.symbient-twitter",
+    "title": "Symbient Twitter",
+    "description": "Symbient Twitter — lively TUI social media experience.",
+    "multiInstance": false,
+    "persist": false,
+    "menu": [
+      { "category": "applications", "order": 17, "label": "Symbient Twitter" }
+    ],
+    "palette": { "order": 17, "label": "Open Symbient Twitter" },
+    "agent": true,
+    "api": true
+  }
+}

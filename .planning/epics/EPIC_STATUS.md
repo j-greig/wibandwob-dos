@@ -11,4 +11,6 @@ e028-responsive-column-layout — in-progress
 e034-layout-primitives-sdk — not-started
 e035-layout-sdk-buildout — done
 e036-sdk-design-system — not-started
+e037-llm-orch-cli-studio — in-progress
+e038-autoresearch-visual-scoring — in-progress
 

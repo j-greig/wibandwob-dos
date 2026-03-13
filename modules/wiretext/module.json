@@ -1,0 +1,20 @@
+{
+  "name": "wiretext",
+  "version": "0.1.0",
+  "description": "Wiretext microapp",
+  "type": "microapp",
+  "entry": "index.ts",
+  "microapp": {
+    "id": "wibwob.wiretext",
+    "title": "Wiretext",
+    "description": "Wiretext microapp scaffold.",
+    "multiInstance": false,
+    "persist": false,
+    "menu": [
+      { "category": "applications", "order": 16, "label": "Wiretext" }
+    ],
+    "palette": { "order": 16, "label": "Open Wiretext" },
+    "agent": true,
+    "api": true
+  }
+}

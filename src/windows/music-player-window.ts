@@ -31,8 +31,8 @@ const SCRUB_SECS         = 5;
 const VOL_STEP           = 10;
 const DEFAULT_VOL        = 80;
 const PLAYLIST_MIN_WIDTH = 70;
-const PLAYLIST_WIDTH     = 28;
-const VIZ_MIN_HEIGHT     = 18;
+const PLAYLIST_WIDTH     = 30;
+const VIZ_MIN_HEIGHT     = 12;
 const VIZ_TICK_MS        = 80;
 
 // PCM analysis constants
@@ -283,10 +283,17 @@ export function createBarsViz(): VizMode {
     name: "BARS",
     reset() { h.fill(0); peak.fill(0); },
 
-    tick(bands, _rms, _playing) {
+    tick(bands, _rms, playing) {
       for (let i = 0; i < MAX; i++) {
-        // Bands come in pre-smoothed with attack+decay from AudioAnalyser
-        h[i] = clamp(bands[i]!, 0, 1);
+        if (playing) {
+          h[i] = clamp(bands[i]!, 0, 1);
+        } else {
+          // Idle breathing wave when stopped — fills full viz height
+          const t = Date.now() / 1200;
+          const phase = (t + i * 0.3) % (Math.PI * 2);
+          const wave2 = Math.sin(t * 0.7 + i * 0.15);
+          h[i] = clamp(Math.sin(phase) * 0.35 + wave2 * 0.15 + 0.35, 0.05, 0.85);
+        }
         peak[i] = h[i] > peak[i] ? h[i] : Math.max(0, peak[i] - PDECAY);
       }
     },
@@ -328,69 +335,79 @@ export function createBarsViz(): VizMode {
   };
 }
 
-// ── Mode 1: WAVE — oscilloscope ───────────────────────────────────────────────
+// ── Mode 1: RINGS — expanding concentric rings from centre ────────────────────
 //
-// Waveform line driven by RMS amplitude envelope.
-// Phase advances with playback; RMS controls vertical excursion.
-// Sub-row precision chars for smoother curves.
+// Rings pulse outward from centre on beats. Idle: slow expanding circles.
+// Uses box-drawing and braille-style chars for circular shapes.
 
-export function createScopeViz(): VizMode {
-  let phase  = 0;
-  let amp    = 0;          // smoothed from real RMS
-  // Harmonic weights — shape changes slightly with mid/high band energy
-  const FREQS = [1.0, 2.3, 0.7, 3.1];
+export function createRingsViz(): VizMode {
+  const rings: { r: number; intensity: number; speed: number }[] = [];
+  let prevRms = 0;
+  let beatCool = 0;
 
   return {
-    name: "WAVE",
-    reset() { phase = 0; amp = 0; },
+    name: "RINGS",
+    reset() { rings.length = 0; prevRms = 0; beatCool = 0; },
 
-    tick(bands, rms, playing) {
-      // Phase: advance faster when mid bands are hot (more musical energy)
-      const midEnergy = (bands[4]! + bands[8]! + bands[12]!) / 3;
-      phase += playing ? 0.12 + midEnergy * 0.10 : 0.008;
+    tick(_bands, rms, playing) {
+      // Expand and fade existing rings
+      for (let i = rings.length - 1; i >= 0; i--) {
+        const ring = rings[i]!;
+        ring.r += ring.speed;
+        ring.intensity *= 0.96;
+        if (ring.intensity < 0.02) rings.splice(i, 1);
+      }
 
-      // Amp: real RMS drives excursion, smoothed to avoid jitter
-      const targetAmp = playing ? clamp(rms * 3.5, 0.05, 0.95) : 0;
-      amp = amp < targetAmp
-        ? amp + (targetAmp - amp) * 0.25
-        : amp + (targetAmp - amp) * 0.08;
+      if (playing) {
+        const delta = rms - prevRms;
+        prevRms = rms;
+        beatCool = Math.max(0, beatCool - 1);
+        if (delta > 0.08 && rms > 0.15 && beatCool === 0) {
+          beatCool = 3;
+          rings.push({ r: 0.5, intensity: 0.6 + rms * 0.4, speed: 0.4 + rms * 0.3 });
+        } else if (rms > 0.05 && Math.random() < 0.1) {
+          rings.push({ r: 0.3, intensity: rms * 0.4, speed: 0.2 });
+        }
+      } else {
+        // Idle: slow expanding rings
+        if (Math.random() < 0.04) {
+          rings.push({ r: 0.3, intensity: 0.35 + Math.random() * 0.2, speed: 0.15 + Math.random() * 0.1 });
+        }
+      }
     },
 
     render(nW, nH, c) {
-      const mid  = (nH - 1) / 2;
-      const cols = Math.max(2, nW - 1);
-      const grid: string[][] = Array.from({ length: nH }, () => Array(cols + 1).fill(" "));
+      const w = Math.max(4, nW - 1);
+      const h = Math.max(2, nH);
+      const cx = w / 2, cy = h / 2;
+      const aspect = 2.0; // terminal chars are ~2x tall as wide
+      const grid: string[][] = Array.from({ length: h }, () => Array(w).fill(" "));
+      const RING_CHARS = ["·", "∘", "○", "◎", "●"] as const;
 
-      // Faint baseline
-      for (let x = 1; x <= cols; x++) {
-        grid[Math.round(mid)]![x] = fg(c.muted, "─");
-      }
-
-      if (amp > 0.015) {
-        let prevRow = -1;
-        for (let x = 0; x < cols; x++) {
-          let val = 0;
-          const t = x / (cols - 1);
-          for (const f of FREQS) val += Math.sin(phase * f + t * Math.PI * 2 * f) / FREQS.length;
-          const row = clamp(Math.round(mid + val * amp * mid), 0, nH - 1);
-
-          if (prevRow >= 0 && Math.abs(row - prevRow) > 1) {
-            const lo = Math.min(row, prevRow) + 1;
-            const hi = Math.max(row, prevRow) - 1;
-            for (let fy = lo; fy <= hi; fy++) {
-              grid[fy]![x + 1] = fg(c.accent, "╎");
-            }
-          }
-
-          const yFrac  = mid + val * amp * mid;
-          const frac   = yFrac - Math.floor(yFrac);
-          const ptChar = frac > 0.75 ? "▄" : frac > 0.25 ? "─" : "▀";
-          grid[row]![x + 1] = fg(c.accent, ptChar);
-          prevRow = row;
+      for (const ring of rings) {
+        const maxR = Math.max(w, h * aspect);
+        if (ring.r > maxR) continue;
+        // Draw ring as discrete points on circumference
+        const circumf = Math.max(16, Math.round(ring.r * aspect * 6));
+        for (let p = 0; p < circumf; p++) {
+          const angle = (p / circumf) * Math.PI * 2;
+          const px = Math.round(cx + Math.cos(angle) * ring.r * aspect);
+          const py = Math.round(cy + Math.sin(angle) * ring.r);
+          if (px < 0 || px >= w || py < 0 || py >= h) continue;
+          const ci = Math.min(RING_CHARS.length - 1, Math.floor(ring.intensity * RING_CHARS.length));
+          const ch = RING_CHARS[ci]!;
+          const col = ring.intensity > 0.4 ? c.accent : c.muted;
+          grid[py]![px] = fg(col, ch);
         }
       }
 
-      return grid.map(row => row.join("")).join("\n");
+      // Centre marker
+      const mcx = Math.round(cx), mcy = Math.round(cy);
+      if (mcx >= 0 && mcx < w && mcy >= 0 && mcy < h) {
+        grid[mcy]![mcx] = fg(c.highlight, "✦");
+      }
+
+      return grid.map(row => " " + row.join("")).join("\n");
     },
   };
 }
@@ -450,7 +467,16 @@ export function createGridViz(): VizMode {
       }
       grid.set(next);
 
-      if (!playing) { beatCooldown = Math.max(0, beatCooldown - 1); return; }
+      if (!playing) {
+        beatCooldown = Math.max(0, beatCooldown - 1);
+        // Idle: slow ambient pulses
+        if (Math.random() < 0.08) {
+          const cx = 1 + Math.floor(Math.random() * (gW - 2));
+          const cy = 1 + Math.floor(Math.random() * (gH - 2));
+          spawnCluster(cx, cy, 2 + Math.floor(Math.random() * 3), 0.3 + Math.random() * 0.3);
+        }
+        return;
+      }
 
       beatCooldown = Math.max(0, beatCooldown - 1);
 
@@ -502,13 +528,87 @@ export function createGridViz(): VizMode {
   };
 }
 
+// ── Mode 3: RAIN — ASCII rain / matrix-style ─────────────────────────────────
+//
+// Columns of falling characters. Speed and density driven by frequency bands.
+// Each column has its own drop position and character set.
+
+export function createRainViz(): VizMode {
+  const GLYPHS = "♫♪♬◆◇○●∘∙·:;|!¦╎╏┃┆┇┊┋".split("");
+  let drops: { y: number; speed: number; char: string; bright: boolean }[] = [];
+  let gW = 0;
+
+  function ensureDrops(w: number) {
+    if (w === gW && drops.length > 0) return;
+    gW = w;
+    drops = Array.from({ length: w }, () => ({
+      y: Math.random() * 40,
+      speed: 0.2 + Math.random() * 0.3,
+      char: GLYPHS[Math.floor(Math.random() * GLYPHS.length)]!,
+      bright: Math.random() < 0.3,
+    }));
+  }
+
+  return {
+    name: "RAIN",
+    reset() { drops = []; gW = 0; },
+
+    tick(bands, rms, playing) {
+      if (drops.length === 0) return;
+      const energy = playing ? rms * 2 + 0.3 : 0.15;
+      for (let i = 0; i < drops.length; i++) {
+        const d = drops[i]!;
+        // Band energy influences column speed
+        const bandIdx = Math.floor((i / drops.length) * VIZ_BANDS);
+        const bandE = playing ? (bands[bandIdx] ?? 0) : Math.sin(Date.now() / 1500 + i * 0.2) * 0.3 + 0.3;
+        d.speed = 0.1 + bandE * 0.8 + energy * 0.3;
+        d.y += d.speed;
+        // Randomise char occasionally
+        if (Math.random() < 0.02) {
+          d.char = GLYPHS[Math.floor(Math.random() * GLYPHS.length)]!;
+          d.bright = Math.random() < (playing ? rms : 0.2);
+        }
+      }
+    },
+
+    render(nW, nH, c) {
+      const w = Math.max(2, nW - 1);
+      const h = Math.max(1, nH);
+      ensureDrops(w);
+
+      const grid: string[][] = Array.from({ length: h }, () => Array(w).fill(" "));
+
+      for (let col = 0; col < Math.min(w, drops.length); col++) {
+        const d = drops[col]!;
+        const headY = Math.floor(d.y) % (h + 8);
+        // Trail of fading characters
+        const trailLen = 4 + Math.floor(d.speed * 3);
+        for (let t = 0; t < trailLen; t++) {
+          const row = headY - t;
+          if (row < 0 || row >= h) continue;
+          if (t === 0) {
+            grid[row]![col] = fg(d.bright ? c.highlight : c.accent, d.char);
+          } else if (t < 2) {
+            grid[row]![col] = fg(c.accent, d.char);
+          } else {
+            grid[row]![col] = fg(c.muted, t < trailLen - 1 ? "·" : " ");
+          }
+        }
+      }
+
+      return grid.map(row => " " + row.join("")).join("\n");
+    },
+  };
+}
+
 // ── Viz mode registry ─────────────────────────────────────────────────────────
 // Add new modes here — order determines cycle sequence.
 
 const VIZ_MODES: VizMode[] = [
   createBarsViz(),
-  createScopeViz(),
+  createRingsViz(),
   createGridViz(),
+  createRainViz(),
 ];
 
 function makeVizColors(tokens: ThemeTokens): VizColors {
@@ -745,8 +845,13 @@ export function openMusicPlayerWindow(
   restore?: MusicPlayerRestore,
 ): void {
   const frame = deps.windowManager.createFrame("♫ Music Player", "microapp");
-  frame.frame.width  = 82;
-  frame.frame.height = 22;
+  // Responsive sizing: 65% width, 65% height, centered
+  const screenW = Number(deps.screen.width) || 211;
+  const screenH = Number(deps.screen.height) || 56;
+  frame.frame.width  = Math.max(82, Math.round(screenW * 0.65));
+  frame.frame.height = Math.max(22, Math.round(screenH * 0.65));
+  frame.frame.left   = Math.round((screenW - Number(frame.frame.width)) / 2);
+  frame.frame.top    = Math.round((screenH - Number(frame.frame.height)) / 2);
 
   const ctrl = new AudioController(restore?.playlist);
   if (restore?.volume !== undefined) ctrl.setVolumeDirect(restore.volume);
@@ -830,14 +935,14 @@ export function openMusicPlayerWindow(
   const toolbar: ButtonBarPart<BtnId> = createButtonBar<BtnId>(
     frame.body,
     [
-      { id: "prev",      label: "◀◀" },
-      { id: "playpause", label: "▶/⏸" },
-      { id: "stop",      label: "■" },
-      { id: "next",      label: "▶▶" },
-      { id: "voldown",   label: "vol-" },
-      { id: "volup",     label: "vol+" },
-      { id: "viz",       label: currentMode().name },
-      { id: "add",       label: "+ add" },
+      { id: "prev",      label: "\u23EE Prev" },
+      { id: "playpause", label: "\u25B6 Play" },
+      { id: "stop",      label: "\u25A0 Stop" },
+      { id: "next",      label: "Next \u23ED" },
+      { id: "voldown",   label: "[\u2212]" },
+      { id: "volup",     label: "[+]" },
+      { id: "viz",       label: `\u2248 ${currentMode().name}` },
+      { id: "add",       label: "\u271A Add" },
     ],
     (id) => {
       if      (id === "playpause") void ctrl.togglePause();
@@ -852,7 +957,7 @@ export function openMusicPlayerWindow(
   );
 
   function updateVizBtn() {
-    toolbar.updateLabel("viz", currentMode().name);
+    toolbar.updateLabel("viz", `\u2248 ${currentMode().name}`);
   }
 
   // ── File browser ──────────────────────────────────────────────────────────
@@ -905,9 +1010,9 @@ export function openMusicPlayerWindow(
       playlistPane.width = PLAYLIST_WIDTH; playlistPane.height = paneH;
     }
 
-    const PLAYER_INFO_ROWS = 10;
+    const PLAYER_INFO_ROWS = 7;
     const vizH    = Math.max(4, paneH - PLAYER_INFO_ROWS - 1);
-    const showViz = showPlaylist && paneH >= VIZ_MIN_HEIGHT;
+    const showViz = paneH >= VIZ_MIN_HEIGHT;  // show viz even without playlist
 
     if (showViz !== vizVisible) {
       vizVisible = showViz;
@@ -931,33 +1036,73 @@ export function openMusicPlayerWindow(
     const elaps = ctrl.elapsed;
     const dur   = ctrl.duration;
     const ratio = dur > 0 ? elaps / dur : 0;
+    const t = theme();
+    const accentFg = (t.accent as any)?.fg || "cyan";
+
+    // State-dependent colours
+    const stateCol = ctrl.state === "playing" ? "green" : ctrl.state === "paused" ? "yellow" : "gray";
     const icon  = ctrl.state === "playing" ? "▶" : ctrl.state === "paused" ? "⏸" : "■";
     const lbl   = ctrl.state === "playing" ? "PLAYING" : ctrl.state === "paused" ? "PAUSED" : "STOPPED";
-    playerPane.setContent([
+
+    // Coloured progress bar
+    const progW = Math.max(4, w - 2);
+    const filled = Math.round(clamp(ratio, 0, 1) * progW);
+    const progBar = `{${accentFg}-fg}${"█".repeat(filled)}{/${accentFg}-fg}{gray-fg}${"░".repeat(Math.max(0, progW - filled))}{/gray-fg}`;
+
+    // Coloured volume bar
+    const volBars = Math.round(ctrl.volume / 10);
+    const volBar = `{${accentFg}-fg}${"▮".repeat(volBars)}{/${accentFg}-fg}{gray-fg}${"▯".repeat(10 - volBars)}{/gray-fg}`;
+
+    // Track name with colour + clean display name
+    let trackName: string;
+    if (ctrl.fileName === "(no file)") {
+      trackName = `{gray-fg}No track loaded \u2014 press {white-fg}o{/white-fg} to browse{/gray-fg}`;
+    } else {
+      // Strip extension and clean up filename for display
+      const display = ctrl.fileName.replace(/\.[^.]+$/, "").replace(/[-_]/g, " ").replace(/\{/g, "\\{");
+      trackName = `{bold}{white-fg}${display}{/white-fg}{/bold}`;
+    }
+
+    // Now-playing display — compact with visual flair
+    const sepW = Math.max(4, w - 2);
+    const sep = `{${accentFg}-fg}${"\u2500".repeat(sepW)}{/${accentFg}-fg}`;
+    
+    // Time display with elapsed bar
+    const timeDisplay = dur > 0 
+      ? `{white-fg}${fmtTime(elaps)}{/white-fg} {gray-fg}/ ${fmtTime(dur)}{/gray-fg}`
+      : `{gray-fg}${fmtTime(elaps)} / ${fmtTime(dur)}{/gray-fg}`;
+
+    const lines: string[] = [
       "",
-      ` ♫  ${ctrl.fileName}`,
+      ` {${accentFg}-fg}\u266B{/${accentFg}-fg}  ${trackName}`,
+      ` {${stateCol}-fg}${icon}  ${lbl}{/${stateCol}-fg}    ${timeDisplay}`,
+      ` ${progBar}`,
       "",
-      ` ${icon}  ${lbl}    ${fmtTime(elaps)} / ${fmtTime(dur)}`,
-      "",
-      ` ${progressBar(ratio, w - 2)}`,
-      "",
-      ` Vol: ${volumeBar(ctrl.volume)}  ${ctrl.volume}%`,
-      "",
-      ` [←/→] scrub  [↑/↓] prev/next  [v] cycle viz`,
-    ].join("\n"));
+      ` {gray-fg}Vol:{/gray-fg} ${volBar} {white-fg}${ctrl.volume}%{/white-fg}  {gray-fg}\u2502{/gray-fg}  {gray-fg}\u2190\u2192:scrub \u2191\u2193:track v:viz o:add{/gray-fg}`,
+      ` ${sep}`,
+    ];
+    playerPane.setContent(lines.join("\n"));
   }
 
   function renderPlaylist() {
     if (!playlistVisible) return;
-    const items = ctrl.files.map((fp) => {
+    const accentFg = ((theme().accent as any)?.fg) || "cyan";
+    const plW = Number(playlistPane.width) || PLAYLIST_WIDTH;
+    // Header row
+    const headerLine = `{bold} PLAYLIST{/bold} {gray-fg}(${ctrl.files.length} tracks){/gray-fg}`;
+    const items = [headerLine, ...ctrl.files.map((fp, i) => {
       const name    = basename(fp);
       const playing = fp === ctrl.filePath && ctrl.state !== "stopped";
-      const maxLen  = PLAYLIST_WIDTH - 3;
-      const label   = name.length > maxLen ? name.slice(0, maxLen - 1) + "…" : name;
-      return `${playing ? "♫ " : "  "}${label}`;
-    });
+      const maxLen  = plW - 6;
+      const label   = name.length > maxLen ? name.slice(0, maxLen - 1) + "\u2026" : name;
+      const num     = String(i + 1).padStart(2, " ");
+      if (playing) {
+        return `{${accentFg}-fg}\u25B6 ${num}. ${label.replace(/\{/g, "\\{")}{/${accentFg}-fg}`;
+      }
+      return `  {gray-fg}${num}.{/gray-fg} ${label.replace(/\{/g, "\\{")}`;
+    })];
     (playlistPane as any).setItems(items);
-    (playlistPane as any).select(ctrl.selectedIndex);
+    (playlistPane as any).select(ctrl.selectedIndex + 1); // +1 for header
   }
 
   function render() {
@@ -965,6 +1110,10 @@ export function openMusicPlayerWindow(
     renderPlayer();
     renderPlaylist();
     renderViz();
+    // Dynamic title with now-playing info
+    const titleTrack = ctrl.fileName !== "(no file)" ? ctrl.fileName.replace(/\{/g, "\\{") : "";
+    const titleState = ctrl.state === "playing" ? " \u25B6" : ctrl.state === "paused" ? " \u23F8" : "";
+    frame.frame.setLabel(` \u266B ${titleTrack ? titleTrack + titleState : "Music Player"} `);
     toolbar.update({ leftText: "", activeId: ctrl.state === "playing" ? "playpause" : "stop" });
     deps.onStateChanged?.();
     deps.screen.render();

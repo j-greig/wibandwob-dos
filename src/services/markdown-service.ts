@@ -170,10 +170,18 @@ function renderInline(tokens: Token[]): string {
         const href = (t as any).href ?? "";
         const text = (t as any).text ?? "";
         const hrefComp = href.startsWith("mailto:") ? href.slice(7) : href;
+        // Show link text underlined; only show URL for bare-URL links
+        // or external links that differ substantially from the text.
+        // Internal/anchor links and wiki-style links just show the text.
         if (text === href || text === hrefComp) {
+          // Bare URL link — show as-is
           out += theme.link(underline(linkText));
+        } else if (href.startsWith("#") || href.startsWith("mailto:")) {
+          // Anchor or mailto — just the text
+          out += theme.link(linkText);
         } else {
-          out += theme.link(underline(linkText)) + theme.linkUrl(` (${href})`);
+          // Named link — show text only, URL is noise for reading
+          out += theme.link(underline(linkText));
         }
         break;
       }

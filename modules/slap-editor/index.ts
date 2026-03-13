@@ -1,13 +1,15 @@
 /**
- * Slap Editor — Sublime-like code editor microapp for WibWob-DOS.
+ * Slap Editor — code editor microapp for WibWob-DOS.
  *
  * Pure blessed rendering, no native addons.
- * Features: gutter, cursor, selection, undo/redo, find, save, clipboard.
+ * Features: gutter, cursor, selection, undo/redo, find, save, clipboard,
+ * ANSI syntax highlighting, current-line highlight, vim keybindings.
  */
 import blessed from "blessed";
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
 import { createTimer, clearTimers } from "../../src/services/microapp-sdk.js";
 import { EditorEngine, type EditorTheme } from "./editor-engine.js";
+import { highlightCode, HIGHLIGHTED_LANGUAGES } from "../../src/services/syntax-highlight.js";
 
 export default function setup(host: MicroappHost) {
   host.registerCommand({
@@ -36,11 +38,86 @@ function getTheme(host: MicroappHost): EditorTheme {
   };
 }
 
-/** blessed.escape is unreliable — do it ourselves */
-function esc(s: string): string {
-  return s.replace(/\{/g, "{open}").replace(/\}/g, "{close}");
-  // blessed tags: {open} and {close} aren't real tags, so let's use a
-  // different approach — encode then decode
+/** Detect language from file extension for syntax highlighting */
+function detectLang(filePath: string | null): string {
+  if (!filePath) return "plain";
+  const ext = filePath.split(".").pop()?.toLowerCase() ?? "";
+  const map: Record<string, string> = {
+    ts: "ts", tsx: "tsx", js: "js", jsx: "jsx",
+    py: "python", rs: "rust", go: "go", c: "c", cpp: "c++", h: "c",
+    sh: "bash", zsh: "bash", bash: "bash",
+    json: "json", yaml: "yaml", yml: "yaml", toml: "toml",
+    md: "markdown", css: "css", html: "html", xml: "xml",
+  };
+  return map[ext] ?? "plain";
+}
+
+/** File type icon (borrowed from File Manager pattern) */
+function fileIcon(filePath: string | null): string {
+  if (!filePath) return "\u2022";
+  const ext = filePath.split(".").pop()?.toLowerCase() ?? "";
+  const icons: Record<string, string> = {
+    ts: "TS", tsx: "TS", js: "JS", jsx: "JS", py: "PY",
+    rs: "RS", go: "GO", c: "C", cpp: "C+", h: "H",
+    md: "MD", json: "{}", yaml: "::", yml: "::", toml: "::",
+    sh: "$>", bash: "$>", zsh: "$>",
+    css: "##", html: "<>", xml: "<>",
+    txt: "\u2261",
+  };
+  return icons[ext] ?? "\u2022";
+}
+
+// ANSI escape helpers
+const A = {
+  r: "\x1b[0m",
+  b: "\x1b[1m",
+  d: "\x1b[2m",
+  i: "\x1b[3m",
+  rev: "\x1b[7m",
+  // Colours by index — we resolve theme colours to ANSI 256 below
+} as const;
+
+/** Map blessed colour name to ANSI 256 fg code */
+function ansiColour(name: string): string {
+  const map: Record<string, string> = {
+    black: "\x1b[30m", red: "\x1b[31m", green: "\x1b[32m", yellow: "\x1b[33m",
+    blue: "\x1b[34m", magenta: "\x1b[35m", cyan: "\x1b[36m", white: "\x1b[37m",
+    gray: "\x1b[90m", grey: "\x1b[90m",
+    "light-red": "\x1b[91m", "light-green": "\x1b[92m", "light-yellow": "\x1b[93m",
+    "light-blue": "\x1b[94m", "light-magenta": "\x1b[95m", "light-cyan": "\x1b[96m",
+    "light-white": "\x1b[97m",
+  };
+  if (map[name]) return map[name];
+  // Try #hex or raw number
+  if (name.startsWith("#")) {
+    const n = parseInt(name.slice(1), 16);
+    const r = (n >> 16) & 0xff, g = (n >> 8) & 0xff, b = n & 0xff;
+    return `\x1b[38;2;${r};${g};${b}m`;
+  }
+  return "\x1b[37m"; // fallback white
+}
+
+function ansiBgColour(name: string): string {
+  const map: Record<string, string> = {
+    black: "\x1b[40m", red: "\x1b[41m", green: "\x1b[42m", yellow: "\x1b[43m",
+    blue: "\x1b[44m", magenta: "\x1b[45m", cyan: "\x1b[46m", white: "\x1b[47m",
+    gray: "\x1b[100m", grey: "\x1b[100m",
+    "light-red": "\x1b[101m", "light-green": "\x1b[102m", "light-yellow": "\x1b[103m",
+    "light-blue": "\x1b[104m", "light-magenta": "\x1b[105m", "light-cyan": "\x1b[106m",
+    "light-white": "\x1b[107m",
+  };
+  if (map[name]) return map[name];
+  if (name.startsWith("#")) {
+    const n = parseInt(name.slice(1), 16);
+    const r = (n >> 16) & 0xff, g = (n >> 8) & 0xff, b = n & 0xff;
+    return `\x1b[48;2;${r};${g};${b}m`;
+  }
+  return "\x1b[40m";
+}
+
+/** Strip all ANSI escape sequences from a string */
+function stripAnsi(s: string): string {
+  return s.replace(/\x1b\[[0-9;]*m/g, "");
 }
 
 async function openEditor(host: MicroappHost, filePath?: string) {
@@ -63,27 +140,108 @@ async function openEditor(host: MicroappHost, filePath?: string) {
   let statusMessage = "";
   let statusTimeout: ReturnType<typeof setTimeout> | null = null;
 
-  // --- Blessed widgets ---
-  // Use two separate boxes: gutter (no tags) and text area (no tags).
-  // For cursor/selection we'll use tags only on the text box.
+  const lang = detectLang(filePath ?? null);
+  const langLabel = lang === "plain" ? "Plain Text" : lang.toUpperCase();
+  const hasHighlight = HIGHLIGHTED_LANGUAGES.has(lang);
 
-  const gutterBox = blessed.box({
+  // --- Blessed widgets ---
+  // Header bar (breadcrumb + toolbar buttons)
+  const headerBar = blessed.box({
     parent: win.body,
     top: 0,
     left: 0,
-    width: 5, // updated dynamically
+    right: 0,
+    height: 1,
+    style: { fg: theme.statusFg, bg: theme.statusBg },
+  });
+  // Toolbar buttons (right-aligned)
+  const th = host.theme();
+  const btnStyle = { fg: th.accent.fg, bg: th.body.bg ?? "black" };
+  const btnHoverStyle = { fg: th.body.bg ?? "black", bg: th.accent.fg };
+  const btnExplorer = blessed.box({
+    parent: headerBar, top: 0, right: 36, width: 12, height: 1,
+    content: " [^B] Tree ", mouse: true, style: { ...btnStyle },
+  });
+  const btnSave = blessed.box({
+    parent: headerBar, top: 0, right: 24, width: 12, height: 1,
+    content: " [^S] Save ", mouse: true, style: { ...btnStyle },
+  });
+  const btnFind = blessed.box({
+    parent: headerBar, top: 0, right: 12, width: 12, height: 1,
+    content: " [^F] Find ", mouse: true, style: { ...btnStyle },
+  });
+  const btnGoto = blessed.box({
+    parent: headerBar, top: 0, right: 0, width: 12, height: 1,
+    content: " [^G] Goto ", mouse: true, style: { ...btnStyle },
+  });
+  for (const btn of [btnExplorer, btnSave, btnFind, btnGoto]) {
+    btn.on("mouseover", () => { btn.style = { ...btnHoverStyle }; host.screen.render(); });
+    btn.on("mouseout", () => { btn.style = { ...btnStyle }; host.screen.render(); });
+  }
+  btnExplorer.on("click", () => { toggleSidebar(); });
+  btnSave.on("click", () => {
+    engine.saveFile().then((ok) => {
+      showStatus(ok ? `Saved ${engine.filePath}` : "No file path");
+    });
+  });
+  btnFind.on("click", () => { findMode = true; findInput = ""; render(); });
+  btnGoto.on("click", () => { findMode = true; findInput = ":"; render(); });
+
+  // --- File tree sidebar ---
+  const SIDEBAR_WIDTH = 26;
+  let sidebarVisible = !!filePath;
+  let sidebarFiles: Array<{ name: string; isDir: boolean; path: string; lines: number }> = [];
+  let sidebarSelected = 0;
+  let sidebarScrollOffset = 0;
+
+  const sidebarHeader = blessed.box({
+    parent: win.body,
+    top: 1,
+    left: 0,
+    width: SIDEBAR_WIDTH,
+    height: 1,
+    style: { fg: th.accent.fg, bg: th.header.bg },
+  });
+
+  const sidebarBox = blessed.box({
+    parent: win.body,
+    top: 2,
+    left: 0,
+    width: SIDEBAR_WIDTH,
+    bottom: 1,
+    style: { fg: theme.fg, bg: theme.bg },
+    tags: false,
+    mouse: true,
+  });
+
+  const sidebarDivider = blessed.box({
+    parent: win.body,
+    top: 1,
+    left: SIDEBAR_WIDTH,
+    width: 1,
+    bottom: 1,
+    style: { fg: th.muted.fg, bg: theme.bg },
+  });
+
+  const sidebarLeft = sidebarVisible ? SIDEBAR_WIDTH + 1 : 0;
+
+  const gutterBox = blessed.box({
+    parent: win.body,
+    top: 1,
+    left: sidebarLeft,
+    width: 5,
     bottom: 1,
     style: { fg: theme.gutterFg, bg: theme.gutterBg },
   });
 
   const textBox = blessed.box({
     parent: win.body,
-    top: 0,
-    left: 5, // updated dynamically
+    top: 1,
+    left: sidebarLeft + 5,
     right: 0,
     bottom: 1,
     style: { fg: theme.fg, bg: theme.bg },
-    tags: true,
+    tags: false,
   });
 
   const statusBar = blessed.box({
@@ -94,6 +252,145 @@ async function openEditor(host: MicroappHost, filePath?: string) {
     height: 1,
     style: { fg: theme.statusFg, bg: theme.statusBg },
   });
+
+  // Populate sidebar file list
+  function loadSidebarFiles() {
+    if (!engine.filePath) { sidebarFiles = []; return; }
+    const fs = require("fs") as typeof import("fs");
+    const path = require("path") as typeof import("path");
+    const dir = path.dirname(engine.filePath);
+    try {
+      const entries = fs.readdirSync(dir, { withFileTypes: true });
+      sidebarFiles = entries
+        .filter(e => !e.name.startsWith("."))
+        .sort((a, b) => {
+          if (a.isDirectory() && !b.isDirectory()) return -1;
+          if (!a.isDirectory() && b.isDirectory()) return 1;
+          return a.name.localeCompare(b.name);
+        })
+        .map(e => {
+          const fpath = path.join(dir, e.name);
+          let lineCount = 0;
+          if (!e.isDirectory()) {
+            try {
+              const content = fs.readFileSync(fpath, "utf-8");
+              lineCount = content.split("\n").length;
+            } catch { /* ignore */ }
+          }
+          return { name: e.name, isDir: e.isDirectory(), path: fpath, lines: lineCount };
+        });
+      // Select current file
+      const currentName = path.basename(engine.filePath);
+      const idx = sidebarFiles.findIndex(f => f.name === currentName);
+      if (idx >= 0) sidebarSelected = idx;
+    } catch {
+      sidebarFiles = [];
+    }
+  }
+
+  function renderSidebar() {
+    if (!sidebarVisible) {
+      sidebarHeader.hide();
+      sidebarBox.hide();
+      sidebarDivider.hide();
+      return;
+    }
+    sidebarHeader.show();
+    sidebarBox.show();
+    sidebarDivider.show();
+
+    const t2 = host.theme();
+    const accentC = ansiColour(t2.accent.fg);
+    const mutedC = ansiColour(t2.muted.fg);
+    const brightC = ansiColour(t2.body.fg);
+    const selBg = ansiBgColour(t2.selected.bg);
+    const selFg = ansiColour(t2.selected.fg);
+
+    // Header
+    const dirName = engine.filePath
+      ? require("path").basename(require("path").dirname(engine.filePath))
+      : "EXPLORER";
+    sidebarHeader.setContent(` ${accentC}${A.b}EXPLORER${A.r} ${mutedC}${dirName}${A.r}`);
+
+    // Divider
+    const h = Math.max(1, Number(sidebarDivider.height) || 1);
+    sidebarDivider.setContent("\u2502\n".repeat(h).trim());
+
+    // File list
+    const viewH = Math.max(1, Number(sidebarBox.height) || 1);
+    // Ensure selected is visible
+    if (sidebarSelected < sidebarScrollOffset) sidebarScrollOffset = sidebarSelected;
+    if (sidebarSelected >= sidebarScrollOffset + viewH) sidebarScrollOffset = sidebarSelected - viewH + 1;
+
+    const lines: string[] = [];
+    const w = SIDEBAR_WIDTH - 2;
+    for (let i = 0; i < viewH; i++) {
+      const idx = sidebarScrollOffset + i;
+      if (idx >= sidebarFiles.length) { lines.push(""); continue; }
+      const f = sidebarFiles[idx];
+      const icon = f.isDir ? "\u25A0 " : `${fileIcon(f.path)} `;
+      const name = f.name.length > w - 3 ? f.name.slice(0, w - 5) + ".." : f.name;
+      const isActive = idx === sidebarSelected;
+      const isCurrent = engine.filePath && f.path === engine.filePath;
+      const lnSuffix = !f.isDir && f.lines > 0 ? `${mutedC} ${f.lines}${A.r}` : "";
+      const nameW = w - icon.length - (f.lines > 0 ? String(f.lines).length + 1 : 0);
+      const trimName = name.length > nameW ? name.slice(0, nameW - 2) + ".." : name;
+      if (isActive) {
+        lines.push(`${selBg}${selFg} ${icon}${trimName}${" ".repeat(Math.max(0, nameW - trimName.length))}${A.r}${lnSuffix}`);
+      } else if (isCurrent) {
+        lines.push(` ${accentC}${icon}${A.b}${trimName}${A.r}${lnSuffix}`);
+      } else if (f.isDir) {
+        lines.push(` ${mutedC}${icon}${brightC}${trimName}${A.r}`);
+      } else {
+        lines.push(` ${mutedC}${icon}${trimName}${A.r}${lnSuffix}`);
+      }
+    }
+    sidebarBox.setContent(lines.join("\n"));
+  }
+
+  // Sidebar keyboard handling
+  sidebarBox.on("keypress", (_ch: string | undefined, key: blessed.Widgets.Events.IKeyEventArg) => {
+    if (key.name === "up" || key.name === "k") {
+      sidebarSelected = Math.max(0, sidebarSelected - 1);
+      renderSidebar(); host.screen.render();
+    } else if (key.name === "down" || key.name === "j") {
+      sidebarSelected = Math.min(sidebarFiles.length - 1, sidebarSelected + 1);
+      renderSidebar(); host.screen.render();
+    } else if (key.name === "return" || key.name === "enter") {
+      const f = sidebarFiles[sidebarSelected];
+      if (f && !f.isDir) {
+        engine.loadFile(f.path).then(() => {
+          highlightDirty = true;
+          win.setTitle(`Edit: ${f.name}`);
+          render();
+        });
+      }
+    } else if (key.name === "tab") {
+      textBox.focus();
+    }
+  });
+
+  // Toggle sidebar with Ctrl+B (VSCode pattern)
+  function toggleSidebar() {
+    sidebarVisible = !sidebarVisible;
+    const sl = sidebarVisible ? SIDEBAR_WIDTH + 1 : 0;
+    gutterBox.left = sl;
+    textBox.left = sl + (Number(gutterBox.width) || 5);
+    if (!sidebarVisible) {
+      sidebarHeader.hide();
+      sidebarBox.hide();
+      sidebarDivider.hide();
+      textBox.focus();
+    } else {
+      sidebarHeader.show();
+      sidebarBox.show();
+      sidebarDivider.show();
+    }
+    renderSidebar();
+    render();
+  }
+
+  if (filePath) loadSidebarFiles();
 
   // --- Rendering ---
 
@@ -107,82 +404,315 @@ async function openEditor(host: MicroappHost, filePath?: string) {
     render();
   }
 
+  // Welcome screen for empty/new files
+  const welcomeLines = [
+    "",
+    "",
+    "",
+    "          \u250C\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510",
+    "          \u2502     WibWob Code Editor       \u2502",
+    "          \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518",
+    "",
+    "          Quick Start",
+    "          \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500",
+    "          Ctrl+S     Save file",
+    "          Ctrl+F     Find text",
+    "          Ctrl+G     Go to line",
+    "          Ctrl+Z     Undo",
+    "          Ctrl+Y     Redo",
+    "          Ctrl+A     Select all",
+    "          Ctrl+C     Copy",
+    "          Ctrl+X     Cut",
+    "",
+    "          Navigation",
+    "          \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500",
+    "          Arrows     Move cursor",
+    "          Ctrl+Left  Word left",
+    "          Ctrl+Right Word right",
+    "          Home/End   Line start/end",
+    "          PgUp/PgDn  Page scroll",
+    "",
+    "          Start typing to begin editing.",
+    "          Open a file via the command palette.",
+  ];
+
+  // Cached highlighted lines
+  let highlightedLines: string[] = [];
+  let highlightDirty = true;
+
+  function rehighlight() {
+    if (hasHighlight) {
+      highlightedLines = highlightCode(engine.text, lang);
+    } else {
+      highlightedLines = engine.lines.map(l => l);
+    }
+    highlightDirty = false;
+  }
+
   function render() {
-    const totalWidth = (win.body as any).width as number || 80;
-    const height = ((win.body as any).height as number || 20) - 1; // minus status bar
-    const gutterW = engine.gutterWidth();
+    const bodyWidth = (win.body as any).width as number || 80;
+    const viewHeight = ((win.body as any).height as number || 20) - 2; // minus header + status
+    const gutterW = engine.gutterWidth() + 1; // extra space for padding
+    const sl = sidebarVisible ? SIDEBAR_WIDTH + 1 : 0;
 
-    // Update gutter width
+    // Update positions
+    gutterBox.left = sl;
     gutterBox.width = gutterW;
-    textBox.left = gutterW;
+    textBox.left = sl + gutterW;
 
-    const textWidth = totalWidth - gutterW;
-    engine.ensureCursorVisible(textWidth, height);
+    const totalWidth = bodyWidth;
+    const textWidth = Math.max(1, bodyWidth - sl - gutterW);
+    engine.ensureCursorVisible(textWidth, viewHeight);
+
+    if (highlightDirty) rehighlight();
 
     const selRange = engine.getSelectionRange();
+    const cursorRow = engine.cursor.row;
+    const cursorCol = engine.cursor.col;
 
-    // Gutter content
+    // ANSI colour codes from theme
+    const gutterAccent = ansiColour(theme.gutterFg);
+    const gutterActive = `${A.b}${ansiColour(theme.cursorBg)}`;
+    const cursorAnsi = `${ansiBgColour(theme.cursorBg)}${ansiColour(theme.cursorFg)}`;
+    const selAnsi = `${ansiBgColour(theme.selectionBg)}${ansiColour(theme.selectionFg)}`;
+    // Current line: use bodyAlt bg from theme for subtle highlight
+    const t = host.theme();
+    const currentLineBg = ansiBgColour(t.bodyAlt.bg);
+    const currentLineGutterBg = ansiBgColour(t.bodyAlt.bg);
+
     const gutterLines: string[] = [];
     const textLines: string[] = [];
 
-    for (let y = 0; y < height; y++) {
+    // Welcome screen for empty untitled buffer
+    const showWelcome = !engine.filePath && engine.lineCount <= 1 && engine.lines[0] === "";
+    if (showWelcome) {
+      const welcomeAccent = ansiColour(t.accent.fg);
+      const welcomeMuted = ansiColour(t.muted.fg);
+      const welcomeBright = `${A.b}${ansiColour(t.body.fg)}`;
+      for (let y = 0; y < viewHeight; y++) {
+        gutterLines.push(`${A.d}${gutterAccent}${"~".padStart(gutterW - 1)} ${A.r}`);
+        if (y < welcomeLines.length) {
+          const wl = welcomeLines[y];
+          // Style: headers in accent, shortcuts in bright, descriptions in muted
+          if (wl.includes("WibWob Code Editor")) {
+            textLines.push(`${welcomeAccent}${A.b}${wl}${A.r}`);
+          } else if (wl.includes("Quick Start") || wl.includes("Navigation")) {
+            textLines.push(`${welcomeAccent}${wl}${A.r}`);
+          } else if (wl.includes("\u2500")) {
+            textLines.push(`${welcomeMuted}${wl}${A.r}`);
+          } else if (wl.match(/^\s+Ctrl\+|^\s+Arrows|^\s+Home|^\s+PgUp/)) {
+            const parts = wl.match(/^(\s+)(\S+\s+\S*)\s{2,}(.*)$/);
+            if (parts) {
+              textLines.push(`${parts[1]}${welcomeBright}${parts[2].padEnd(12)}${A.r}${welcomeMuted}${parts[3]}${A.r}`);
+            } else {
+              textLines.push(`${welcomeMuted}${wl}${A.r}`);
+            }
+          } else if (wl.includes("Start typing") || wl.includes("Open a file")) {
+            textLines.push(`${welcomeMuted}${A.i}${wl}${A.r}`);
+          } else {
+            textLines.push(wl);
+          }
+        } else {
+          textLines.push("");
+        }
+      }
+      gutterBox.setContent(gutterLines.join("\n"));
+      textBox.setContent(textLines.join("\n"));
+      const wAccent = ansiColour(t.accent.fg);
+      const wDim = ansiColour(t.muted.fg);
+      const wBright = ansiColour(t.body.fg);
+      (headerBar as any).setContent(` ${wAccent}\u2022${A.r} ${wBright}${A.b}untitled${A.r}`);
+      const statusLeftAnsi2 = ` ${wAccent}Ln 1${A.r}${wDim}, Col 1${A.r}`;
+      const statusRightAnsi2 = `${wDim}Plain Text  UTF-8  2 sp  1 ln  100%${A.r} `;
+      const leftP = stripAnsi(statusLeftAnsi2).length;
+      const rightP = stripAnsi(statusRightAnsi2).length;
+      const gap2 = Math.max(1, totalWidth - leftP - rightP);
+      (statusBar as any).setContent(statusLeftAnsi2 + " ".repeat(gap2) + statusRightAnsi2);
+      host.screen.render();
+      return;
+    }
+
+    for (let y = 0; y < viewHeight; y++) {
       const row = engine.scroll.row + y;
       if (row >= engine.lineCount) {
-        gutterLines.push(" ".repeat(gutterW));
+        gutterLines.push(`${A.d}${gutterAccent}${"~".padStart(gutterW - 1)} ${A.r}`);
         textLines.push("");
         continue;
       }
 
-      // Gutter
-      gutterLines.push(String(row + 1).padStart(gutterW - 1) + " ");
+      // Gutter — active line shows absolute number bold, others show relative distance
+      const isCurrentLine = row === cursorRow;
+      if (isCurrentLine) {
+        const lineNum = String(row + 1).padStart(gutterW - 1);
+        gutterLines.push(`${currentLineGutterBg}${gutterActive}${lineNum} ${A.r}`);
+      } else {
+        const relDist = Math.abs(row - cursorRow);
+        const lineNum = String(relDist).padStart(gutterW - 1);
+        gutterLines.push(`${gutterAccent}${lineNum} ${A.r}`);
+      }
 
-      // Text — build with blessed tags for cursor and selection
-      const fullLine = engine.lines[row];
-      let lineStr = "";
+      // Text — start from highlighted line, overlay cursor/selection
+      const rawLine = engine.lines[row] ?? "";
+      const hlLine = highlightedLines[row] ?? rawLine;
 
+      // We need to map visual columns to positions in the ANSI string
+      // Strategy: for cursor/selection, build char-by-char with ANSI overlays
+      const scrollCol = engine.scroll.col;
+      let lineOut = "";
+
+      // Strip the highlighted line to get per-char ANSI spans
+      // Simpler approach: render plain chars with per-char styling
       for (let x = 0; x < textWidth; x++) {
-        const col = engine.scroll.col + x;
-        const rawCh = col < fullLine.length ? fullLine[col] : " ";
-        // Escape blessed tag chars — blessed uses {open} and {close}
-        const ch = rawCh === "{" ? "{open}" : rawCh === "}" ? "{close}" : rawCh;
+        const col = scrollCol + x;
+        const ch = col < rawLine.length ? rawLine[col] : " ";
 
-        const isCursor = row === engine.cursor.row && col === engine.cursor.col;
+        const isCursor = isCurrentLine && col === cursorCol;
         const isSelected = selRange !== null && isInSelection(row, col, selRange);
 
+        const lineBgInit = isCurrentLine ? currentLineBg : "";
         if (isCursor) {
-          lineStr += `{${theme.cursorFg}-fg}{${theme.cursorBg}-bg}${ch}{/}`;
+          lineOut += `${cursorAnsi}${ch}${A.r}`;
         } else if (isSelected) {
-          lineStr += `{${theme.selectionFg}-fg}{${theme.selectionBg}-bg}${ch}{/}`;
+          lineOut += `${selAnsi}${ch}${A.r}`;
+        } else if (lineBgInit) {
+          lineOut += `${lineBgInit}${ch}${A.r}`;
         } else {
-          lineStr += ch;
+          lineOut += ch;
         }
       }
 
-      textLines.push(lineStr);
+      // If we have syntax highlighting AND no selection/cursor on this line,
+      // use the pre-highlighted version for much better performance
+      if (hasHighlight && !isCurrentLine && selRange === null) {
+        // Use highlighted line, sliced to viewport
+        const plain = stripAnsi(hlLine);
+        if (scrollCol === 0 && plain.length <= textWidth) {
+          lineOut = hlLine + " ".repeat(Math.max(0, textWidth - plain.length));
+        }
+      } else if (hasHighlight) {
+        // For the current line or lines with selection, we need per-char render
+        // but with syntax colour per character
+        // Re-highlight just this line and extract per-char colours
+        const singleHL = highlightCode(rawLine, lang)[0] ?? rawLine;
+        lineOut = "";
+        // Walk the ANSI string to extract colour per source char
+        const charColours = extractCharColours(singleHL, rawLine.length);
+        for (let x = 0; x < textWidth; x++) {
+          const col = scrollCol + x;
+          const ch = col < rawLine.length ? rawLine[col] : " ";
+          const isCursor = isCurrentLine && col === cursorCol;
+          const isSelected = selRange !== null && isInSelection(row, col, selRange);
+
+          const lineBg = isCurrentLine ? currentLineBg : "";
+          if (isCursor) {
+            lineOut += `${cursorAnsi}${ch}${A.r}`;
+          } else if (isSelected) {
+            lineOut += `${selAnsi}${ch}${A.r}`;
+          } else if (col < charColours.length && charColours[col]) {
+            lineOut += `${lineBg}${charColours[col]}${ch}${A.r}`;
+          } else {
+            lineOut += `${lineBg}${ch}${A.r}`;
+          }
+        }
+      }
+
+      textLines.push(lineOut);
     }
 
     gutterBox.setContent(gutterLines.join("\n"));
     textBox.setContent(textLines.join("\n"));
 
-    // Status bar
+    // Header bar — breadcrumb (ANSI styled)
+    const icon = fileIcon(engine.filePath);
+    const fname = engine.filePath?.split("/").pop() ?? "untitled";
+    const dirPath = engine.filePath
+      ? engine.filePath.split("/").slice(-3, -1).join("/")
+      : "";
+    const dirtyMark = engine.dirty ? ` ${ansiColour(t.warning.fg)}\u25CF${A.r}` : "";
+    const accentCol = ansiColour(t.accent.fg);
+    const dimCol = ansiColour(t.muted.fg);
+    const brightCol = ansiColour(t.body.fg);
+    const headerText = dirPath
+      ? ` ${accentCol}${icon}${A.r} ${dimCol}${dirPath}/${A.r}${brightCol}${A.b}${fname}${A.r}${dirtyMark}`
+      : ` ${accentCol}${icon}${A.r} ${brightCol}${A.b}${fname}${A.r}${dirtyMark}`;
+    (headerBar as any).setContent(headerText);
+
+    // Status bar — rich info
     const desc = engine.describe();
-    let status = "";
+    let statusLeft = "";
+    let statusRight = "";
     if (findMode) {
-      status = ` Find: ${findInput}_ `;
+      statusLeft = ` Find: ${findInput}_ `;
       if (engine.findMatches.length > 0) {
-        status += `(${engine.findIndex + 1}/${engine.findMatches.length})`;
+        statusLeft += `(${engine.findIndex + 1}/${engine.findMatches.length})`;
       } else if (findInput) {
-        status += "(no matches)";
+        statusLeft += "(no matches)";
       }
     } else if (statusMessage) {
-      status = ` ${statusMessage}`;
+      statusLeft = ` ${statusMessage}`;
     } else {
-      const fname = desc.filePath?.split("/").pop() ?? "untitled";
-      status = ` ${fname}${desc.dirty ? " [+]" : ""} | Ln ${desc.cursor.row + 1}, Col ${desc.cursor.col + 1} | ${desc.lines} lines`;
+      statusLeft = ` Ln ${desc.cursor.row + 1}, Col ${desc.cursor.col + 1}`;
     }
-    statusBar.setContent(status);
+    const scrollPct = engine.lineCount > 1
+      ? Math.round((engine.scroll.row / Math.max(1, engine.lineCount - viewHeight)) * 100)
+      : 100;
+    const pct = Math.min(100, Math.max(0, scrollPct));
+    // ANSI styled status bar
+    const statusLeftAnsi = findMode || statusMessage
+      ? ` ${statusLeft.trim()}`
+      : ` ${accentCol}Ln ${desc.cursor.row + 1}${A.r}${dimCol}, Col ${desc.cursor.col + 1}${A.r}`;
+    const langColour = hasHighlight ? accentCol : dimCol;
+    // Visual scroll bar (5 chars)
+    const barLen = 5;
+    const scrollPos = Math.round((pct / 100) * (barLen - 1));
+    let scrollBar = "";
+    for (let i = 0; i < barLen; i++) {
+      scrollBar += i === scrollPos ? `${accentCol}\u2588${A.r}` : `${dimCol}\u2591${A.r}`;
+    }
+    const statusRightAnsi = `${langColour}${langLabel}${A.r} ${dimCol}\u2502${A.r} ${dimCol}UTF-8${A.r} ${dimCol}\u2502${A.r} ${dimCol}2 sp${A.r} ${dimCol}\u2502${A.r} ${dimCol}${desc.lines} ln${A.r} ${dimCol}\u2502${A.r} ${scrollBar} ${dimCol}${pct}%${A.r} `;
+    // Calculate gap (strip ANSI for width)
+    const leftPlain = stripAnsi(statusLeftAnsi).length;
+    const rightPlain = stripAnsi(statusRightAnsi).length;
+    const gap = Math.max(1, totalWidth - leftPlain - rightPlain);
+    (statusBar as any).setContent(statusLeftAnsi + " ".repeat(gap) + statusRightAnsi);
 
+    renderSidebar();
     host.screen.render();
+  }
+
+  /** Extract per-character ANSI colour codes from a highlighted line */
+  function extractCharColours(hlLine: string, srcLen: number): string[] {
+    const colours: string[] = new Array(srcLen).fill("");
+    let srcIdx = 0;
+    let currentColour = "";
+    let i = 0;
+    while (i < hlLine.length && srcIdx < srcLen) {
+      if (hlLine[i] === "\x1b") {
+        // Read full escape sequence
+        let seq = "\x1b";
+        i++;
+        while (i < hlLine.length && hlLine[i] !== "m") {
+          seq += hlLine[i];
+          i++;
+        }
+        if (i < hlLine.length) {
+          seq += "m";
+          i++;
+        }
+        if (seq === A.r) {
+          currentColour = "";
+        } else {
+          currentColour = seq;
+        }
+      } else {
+        if (srcIdx < srcLen) {
+          colours[srcIdx] = currentColour;
+        }
+        srcIdx++;
+        i++;
+      }
+    }
+    return colours;
   }
 
   function isInSelection(
@@ -242,9 +772,9 @@ async function openEditor(host: MicroappHost, filePath?: string) {
         showStatus(ok ? `Saved ${engine.filePath}` : "No file path");
       });
     } else if (ctrl && key.name === "z") {
-      engine.undo();
+      engine.undo(); highlightDirty = true;
     } else if (ctrl && key.name === "y") {
-      engine.redo();
+      engine.redo(); highlightDirty = true;
     } else if (ctrl && key.name === "f") {
       findMode = true;
       findInput = "";
@@ -260,22 +790,25 @@ async function openEditor(host: MicroappHost, filePath?: string) {
       const text = engine.getSelectedText();
       if (text) {
         host.screen.copyToClipboard(text);
-        engine.deleteSelection();
+        engine.deleteSelection(); highlightDirty = true;
         showStatus(`Cut ${text.length} chars`);
       }
     } else if (ctrl && key.name === "g") {
       findMode = true;
       findInput = ":";
+    } else if (ctrl && key.name === "b") {
+      toggleSidebar();
+      return;
     }
-    // Editing
+    // Editing (mark highlight dirty)
     else if (key.name === "return" || key.name === "enter") {
-      engine.insertNewline();
+      engine.insertNewline(); highlightDirty = true;
     } else if (key.name === "backspace") {
-      engine.backspace();
+      engine.backspace(); highlightDirty = true;
     } else if (key.name === "delete") {
-      engine.deleteForward();
+      engine.deleteForward(); highlightDirty = true;
     } else if (key.name === "tab") {
-      engine.insertTab();
+      engine.insertTab(); highlightDirty = true;
     }
     // Regular character
     else if (
@@ -285,14 +818,14 @@ async function openEditor(host: MicroappHost, filePath?: string) {
       !meta &&
       ch.charCodeAt(0) >= 32
     ) {
-      engine.insertText(ch);
+      engine.insertText(ch); highlightDirty = true;
     }
 
     render();
   }
 
   function height(): number {
-    return ((win.body as any).height as number || 20) - 1;
+    return ((win.body as any).height as number || 20) - 2; // minus header + status
   }
 
   function handleFindKey(
@@ -369,9 +902,14 @@ async function openEditor(host: MicroappHost, filePath?: string) {
 
   win.onRestyle(() => {
     theme = getTheme(host);
+    const t3 = host.theme();
     gutterBox.style = { fg: theme.gutterFg, bg: theme.gutterBg };
     textBox.style = { fg: theme.fg, bg: theme.bg };
     statusBar.style = { fg: theme.statusFg, bg: theme.statusBg };
+    headerBar.style = { fg: theme.statusFg, bg: theme.statusBg };
+    sidebarHeader.style = { fg: t3.accent.fg, bg: t3.header.bg };
+    sidebarBox.style = { fg: theme.fg, bg: theme.bg };
+    sidebarDivider.style = { fg: t3.muted.fg, bg: theme.bg };
     render();
   });
 

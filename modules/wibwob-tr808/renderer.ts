@@ -1,13 +1,13 @@
 /**
- * TR-808 ASCII Renderer — generates the visual representation.
+ * TR-808 ASCII Renderer — pure ANSI colour output.
  *
- * Faithful to the real Roland TR-808 three-band layout:
- *   Band 1 (top): Title + global controls (tempo, mode, transport)
- *   Band 2 (center): Instrument knob grid — columns per voice
- *   Band 3 (bottom): 16-step sequencer with colour-coded groups
+ * Uses raw ANSI escape codes for colour. Content is set via
+ * (display.node).setContent() which bypasses blessed's tag parser
+ * and wrapping. ANSI codes render directly in blessed's terminal output.
  *
- * Pure function: takes engine state → returns string content.
- * No blessed dependency — could render to any text surface.
+ * Colour-coded step groups matching the real TR-808:
+ *   Group 1 (1-4): red, Group 2 (5-8): orange/yellow,
+ *   Group 3 (9-12): yellow, Group 4 (13-16): white
  */
 
 import {
@@ -18,189 +18,217 @@ import {
 } from "./engine.js";
 
 // ---------------------------------------------------------------------------
-// Visual constants
+// ANSI escape codes
 // ---------------------------------------------------------------------------
 
-const STEP_ON  = "██";
-const STEP_OFF = "░░";
-const STEP_CURSOR_ON  = "▓▓";
-const STEP_CURSOR_OFF = "▒▒";
-const ACCENT_ON  = "▲▲";
-const ACCENT_OFF = "△△";
-const KNOB_CHARS = ["○", "◔", "◑", "◕", "●"]; // 5-level knob position
+const R = "\x1b[0m";       // reset
+const B = "\x1b[1m";       // bold
+const DIM = "\x1b[2m";     // dim
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+const FG = {
+  red:    "\x1b[91m",  green: "\x1b[92m",  yellow: "\x1b[93m",
+  cyan:   "\x1b[96m",  white: "\x1b[97m",  gray:   "\x1b[90m",
+  black:  "\x1b[30m",  mag:   "\x1b[95m",
+} as const;
 
-function knobChar(value: number, max: number): string {
-  const ratio = value / max;
-  const idx = Math.min(4, Math.floor(ratio * 5));
-  return KNOB_CHARS[idx];
+const BG = {
+  red:    "\x1b[41m",  yellow: "\x1b[43m",
+  white:  "\x1b[47m",  cyan:   "\x1b[46m",
+} as const;
+
+// Step group colours — matching the real TR-808 button colours
+// Using DIFFERENT characters per group to distinguish even without colour
+const STEP_GROUP = [
+  { fg: FG.red,    bg: BG.red,    on: "\u2588\u2588" },  // ██ solid red
+  { fg: FG.yellow, bg: BG.yellow, on: "\u2593\u2593" },  // ▓▓ dark shade yellow
+  { fg: FG.yellow, bg: BG.yellow, on: "\u2593\u2593" },  // ▓▓ dark shade yellow
+  { fg: FG.white,  bg: BG.white,  on: "\u2592\u2592" },  // ▒▒ medium shade white
+] as const;
+
+function sg(i: number) { return STEP_GROUP[Math.floor(i / 4)]!; }
+
+const OFF = "\u2591\u2591"; // ░░ light shade (empty)
+
+// Accent markers
+const ACC_ON  = "\u25B2 ";  // ▲
+const ACC_OFF = "\u25BD ";  // ▽
+
+// Knob display (phase indicators)
+const KNOB = ["\u25CB", "\u25D4", "\u25D1", "\u25D5", "\u25CF"]; // ○ ◔ ◑ ◕ ●
+function knob(v: number, mx: number) {
+  return KNOB[Math.min(4, Math.floor((v / Math.max(1, mx)) * 5))] ?? "\u25CB";
 }
 
-function padCenter(text: string, width: number): string {
-  if (text.length >= width) return text.slice(0, width);
-  const pad = width - text.length;
-  const left = Math.floor(pad / 2);
-  return " ".repeat(left) + text + " ".repeat(pad - left);
+function bar(v: number, mx: number, w: number): string {
+  const f = Math.round((v / Math.max(1, mx)) * w);
+  return "\u25AE".repeat(f) + "\u25AF".repeat(Math.max(0, w - f));
 }
 
-function padRight(text: string, width: number): string {
-  return text.slice(0, width).padEnd(width, " ");
+/** Strip ANSI escapes to measure visual width */
+function vlen(s: string): number { return s.replace(/\x1b\[[0-9;]*m/g, "").length; }
+function pad(s: string, w: number): string {
+  const vw = vlen(s);
+  return vw >= w ? s : s + " ".repeat(w - vw);
 }
-
-function bar(value: number, max: number, width: number): string {
-  const filled = Math.round((value / max) * width);
-  return "▮".repeat(filled) + "▯".repeat(Math.max(0, width - filled));
+function centre(s: string, w: number): string {
+  const vw = vlen(s);
+  if (vw >= w) return s;
+  const l = Math.floor((w - vw) / 2);
+  return " ".repeat(l) + s + " ".repeat(w - vw - l);
 }
 
 // ---------------------------------------------------------------------------
 // Main renderer
 // ---------------------------------------------------------------------------
 
-export function renderTR808(engine: TR808Engine, width: number, height: number, audioEnabled = false, editCursor = -1): string {
+export function renderTR808(
+  engine: TR808Engine,
+  width: number,
+  height: number,
+  audioEnabled = false,
+  editCursor = -1,
+): string {
   const lines: string[] = [];
-  const safeWidth = Number.isFinite(width) ? Math.floor(width) : 80;
-  const safeHeight = Number.isFinite(height) ? Math.floor(height) : 24;
-  const w = Math.max(80, safeWidth);
+  const w = Math.max(80, Math.floor(Number.isFinite(width) ? width : 80));
+  const h = Math.max(20, Math.floor(Number.isFinite(height) ? height : 24));
 
   const slot = engine.slot;
-  const currentStep = engine.step;
-  const selectedInst = engine.selected;
-  const isPlaying = engine.state === "playing";
+  const cur = engine.step;
+  const sel = engine.selected;
+  const playing = engine.state === "playing";
 
-  // ══════════════════════════════════════════════════════════
-  // BAND 1: Title bar + global controls
-  // ══════════════════════════════════════════════════════════
+  // ── TITLE ─────────────────────────────────────────────────
+  lines.push(`${B}${FG.white}${centre("T R - 8 0 8   R H Y T H M   C O M P O S E R", w)}${R}`);
+  lines.push("");
 
-  // Title with wood panel sides
-  const titleText = " R O L A N D    T R - 8 0 8    R H Y T H M   C O M P O S E R ";
-  const woodL = "▐█";
-  const woodR = "█▌";
-  const innerW = w - woodL.length - woodR.length;
-  lines.push(woodL + padCenter(titleText, innerW) + woodR);
-  lines.push(woodL + "═".repeat(innerW) + woodR);
+  // ── TRANSPORT BAR ─────────────────────────────────────────
+  const stC = playing ? FG.green : FG.gray;
+  const stI = playing ? "\u25B6 PLAY" : "\u25A0 STOP";
+  const aud = audioEnabled ? `${FG.green}\u266B ON${R}` : `${FG.gray}\u266B --${R}`;
+  lines.push(
+    `  ${stC}${stI}${R}  ${FG.white}${engine.tempo}${R} ${FG.gray}BPM${R}` +
+    `  ${FG.cyan}${slot.bank}${slot.number}-${slot.variation}${R}` +
+    `  ${FG.gray}${engine.scaleLabel}${R}` +
+    (engine.swing !== 50 ? `  SWG:${FG.white}${engine.swing}%${R}` : "") +
+    `  ${aud}` +
+    `    VOL:${bar(engine.master, 100, 8)}` +
+    `  ACC:${bar(engine.accent, 100, 8)}`
+  );
+  lines.push("");
 
-  // Transport + global status
-  const transport = isPlaying ? " ▶ PLAYING " : " ■ STOPPED ";
-  const tempoStr = ` TEMPO: ${engine.tempo} `;
-  const bankStr = ` ${slot.bank}${slot.number}-${slot.variation} `;
-  const scaleStr = ` ${engine.scaleLabel} `;
-  const audioStr = audioEnabled ? " ♪ON " : " ♪-- ";
-  const swingStr = engine.swing !== 50 ? ` SWG:${engine.swing}% ` : "";
-  const masterStr = ` VOL:${bar(engine.master, 100, 6)} `;
-  const accentStr = ` ACC:${bar(engine.accent, 100, 6)} `;
+  // ── COLUMN LAYOUT ─────────────────────────────────────────
+  const lblW = 5;       // ▶BD M
+  const stepW = STEPS * 3;  // "XX " * 16 = 48
+  const paramW = Math.min(45, Math.max(16, w - lblW - stepW - 8));
 
-  const statusLine = `${transport}│${tempoStr}│${bankStr}│${scaleStr}${swingStr ? "│" + swingStr : ""}│${masterStr}│${accentStr}│${audioStr}`;
-  lines.push(woodL + padRight(statusLine, innerW) + woodR);
-  lines.push(woodL + "─".repeat(innerW) + woodR);
+  // Step number header with group colours
+  let hdr = " ".repeat(lblW + paramW) + ` ${FG.gray}\u2502${R} `;
+  for (let i = 0; i < STEPS; i++) {
+    const g = sg(i);
+    hdr += `${g.fg}${String(i + 1).padStart(2)}${R} `;
+  }
+  lines.push(hdr);
 
-  // ══════════════════════════════════════════════════════════
-  // BAND 2: Instrument grid — each row is one voice
-  // ══════════════════════════════════════════════════════════
+  // Thin separator
+  lines.push(
+    " ".repeat(lblW + paramW) + ` ${FG.gray}\u2502${R} ` +
+    `${FG.gray}${"\u2500".repeat(stepW)}${R}`
+  );
 
-  // Column widths
-  const selectorW = 7;  // "►BD M  "
-  const stepAreaW = STEPS * 3; // "XX " * 16
-  const sepW = 3; // " │ "
-  const paramW = Math.max(20, innerW - selectorW - stepAreaW - sepW);
-
-  // Step number header
-  const stepNums = Array.from({ length: STEPS }, (_, i) => {
-    const n = i + 1;
-    return n < 10 ? ` ${n}` : `${n}`;
-  }).join(" ");
-  lines.push(woodL + " ".repeat(selectorW) + padRight("", paramW) + " │ " + stepNums + " ".repeat(Math.max(0, innerW - selectorW - paramW - sepW - stepAreaW)) + woodR);
-
-  // Instrument rows
+  // ── INSTRUMENT ROWS ───────────────────────────────────────
   for (const inst of INSTRUMENTS) {
-    const isSelected = selectedInst === inst.id;
+    const isSel = sel === inst.id;
     const isMuted = engine.isMuted(inst.id);
     const isSoloed = engine.isSoloed(inst.id);
-    const marker = isSelected ? "►" : " ";
-    const muteFlag = isSoloed ? "S" : isMuted ? "M" : " ";
-    const label = `${marker}${inst.shortLabel.padEnd(2)}${muteFlag} `;
 
-    // Parameter knobs with labels
-    const paramParts: string[] = [];
+    // Label: ▶BD M (5 chars visual)
+    const mk = isSel ? `${FG.cyan}\u25B6` : " ";
+    const nm = isSel
+      ? `${FG.cyan}${inst.shortLabel.padEnd(2)}${R}`
+      : `${FG.white}${inst.shortLabel.padEnd(2)}${R}`;
+    const mf = isSoloed ? `${FG.yellow}S${R}` : isMuted ? `${FG.red}M${R}` : " ";
+    const label = `${mk}${nm}${mf}`;
+
+    // Params with knobs
+    const pp: string[] = [];
     for (const p of inst.params) {
-      const val = engine.getParam(inst.id, p.id);
-      paramParts.push(`${p.label}${knobChar(val, p.max)}`);
+      pp.push(`${FG.gray}${p.label}${R}${knob(engine.getParam(inst.id, p.id), p.max)}`);
     }
-    const paramStr = padRight(paramParts.join(" "), paramW);
+    const params = pad(pp.join(" "), paramW);
 
-    // Step buttons
-    const steps = engine.getSteps(inst.id);
-    const stepChars = Array.from({ length: STEPS }, (_, i) => {
-      const active = steps[i];
-      const isPlayCursor = isPlaying && i === currentStep;
-      const isEditCur = !isPlaying && i === editCursor;
-      if (isPlayCursor && active) return STEP_CURSOR_ON;
-      if (isPlayCursor) return STEP_CURSOR_OFF;
-      if (isEditCur && active) return "▓█";
-      if (isEditCur) return "▒░";
-      if (active) return STEP_ON;
-      return STEP_OFF;
-    }).join(" ");
+    // Step grid — colour + shape per group
+    let steps = "";
+    const stArr = engine.getSteps(inst.id);
+    for (let i = 0; i < STEPS; i++) {
+      const on = stArr[i];
+      const isHead = playing && i === cur;
+      const isEdit = !playing && i === editCursor;
+      const g = sg(i);
 
-    const row = `${label}${paramStr} │ ${stepChars}`;
-    lines.push(woodL + padRight(row, innerW) + woodR);
+      if (isHead && on)       steps += `${BG.white}${FG.black}${g.on}${R} `;
+      else if (isHead)        steps += `${BG.white}${FG.black}${OFF}${R} `;
+      else if (isEdit && on)  steps += `${BG.cyan}${FG.black}${g.on}${R} `;
+      else if (isEdit)        steps += `${FG.cyan}\u2592\u2592${R} `;
+      else if (on)            steps += `${g.fg}${g.on}${R} `;
+      else                    steps += `${FG.gray}${OFF}${R} `;
+    }
+
+    lines.push(`${label} ${params} ${FG.gray}\u2502${R} ${steps}`);
   }
 
-  // Accent row
+  // ── ACCENT ROW ────────────────────────────────────────────
   {
-    const isAccSel = selectedInst === "accent";
-    const marker = isAccSel ? "►" : " ";
-    const label = `${marker}AC `;
-    const paramStr = padRight(`LVL${bar(engine.accent, 100, 8)} ${engine.accent}%`, paramW);
-    const accentSteps = engine.getSteps("accent");
-    const stepChars = Array.from({ length: STEPS }, (_, i) => {
-      const active = accentSteps[i];
-      const isPlayCursor = isPlaying && i === currentStep;
-      const isEditCur = !isPlaying && i === editCursor;
-      if (isPlayCursor && active) return "▲▲";
-      if (isPlayCursor) return STEP_CURSOR_OFF;
-      if (isEditCur && active) return "▲▲";
-      if (isEditCur) return "▒▒";
-      if (active) return "▲ ";
-      return "△ ";
-    }).join(" ");
-    const row = `${label}${paramStr} │ ${stepChars}`;
-    lines.push(woodL + padRight(row, innerW) + woodR);
+    const isSel = sel === "accent";
+    const mk = isSel ? `${FG.cyan}\u25B6` : " ";
+    const nm = isSel ? `${FG.cyan}AC${R}` : `${FG.white}AC${R}`;
+    const label = `${mk}${nm} `;
+    const params = pad(`LVL${bar(engine.accent, 100, 8)} ${engine.accent}%`, paramW);
+
+    const acSteps = engine.getSteps("accent");
+    let steps = "";
+    for (let i = 0; i < STEPS; i++) {
+      const on = acSteps[i];
+      const isHead = playing && i === cur;
+      const isEdit = !playing && i === editCursor;
+      const g = sg(i);
+
+      if (isHead && on)       steps += `${BG.white}${FG.black}${ACC_ON}${R} `;
+      else if (isHead)        steps += `${BG.white}${FG.black}${ACC_OFF}${R} `;
+      else if (isEdit && on)  steps += `${FG.cyan}${ACC_ON}${R} `;
+      else if (isEdit)        steps += `${FG.cyan}${ACC_OFF}${R} `;
+      else if (on)            steps += `${g.fg}${ACC_ON}${R} `;
+      else                    steps += `${FG.gray}${ACC_OFF}${R} `;
+    }
+
+    lines.push(`${label}${params} ${FG.gray}\u2502${R} ${steps}`);
   }
 
-  // ══════════════════════════════════════════════════════════
-  // BAND 3: Sequencer footer
-  // ══════════════════════════════════════════════════════════
-
-  lines.push(woodL + "─".repeat(innerW) + woodR);
-
-  // Playhead indicator
-  if (isPlaying && currentStep >= 0) {
-    const offset = selectorW + paramW + sepW + currentStep * 3;
-    const cursorLine = " ".repeat(offset) + "▲▲";
-    lines.push(woodL + padRight(cursorLine, innerW) + woodR);
+  // ── PLAYHEAD / CURSOR ─────────────────────────────────────
+  lines.push("");
+  const off = lblW + paramW + 3;
+  if (playing && cur >= 0) {
+    lines.push(" ".repeat(off + cur * 3) + `${FG.white}\u25B2\u25B2${R}`);
+  } else if (editCursor >= 0) {
+    lines.push(" ".repeat(off + editCursor * 3) + `${FG.cyan}\u25B2\u25B2${R}`);
   } else {
-    lines.push(woodL + " ".repeat(innerW) + woodR);
+    lines.push("");
   }
 
-  // Step group colour indicators
-  const groupLine = " ".repeat(selectorW + paramW + sepW) +
-    " 1  2  3  4  5  6  7  8  9  10 11 12 13 14 15 16";
-  lines.push(woodL + padRight(groupLine, innerW) + woodR);
+  // ── GROUP LABELS ──────────────────────────────────────────
+  let grp = " ".repeat(off);
+  for (let g = 0; g < 4; g++) {
+    const c = STEP_GROUP[g]!.fg;
+    grp += `${c}${g * 4 + 1}-${g * 4 + 4}${R}`;
+    if (g < 3) grp += `  ${FG.gray}\u2502${R}  `;
+  }
+  lines.push(grp);
 
-  // Controls
-  lines.push(woodL + "═".repeat(innerW) + woodR);
-  const ctrl1 = " [SPACE] play/stop  [ENTER] toggle step  [1-0,-,=] instrument  [BKSP] CH  [`] accent";
-  const ctrl2 = " [a/z] tempo  [v] var  [b] bank  [F1-8] pat  [p] preset  [c] clear  [s] scale  [w] swing  [x] mute  [o] solo  [m] audio";
-  lines.push(woodL + padRight(ctrl1, innerW) + woodR);
-  lines.push(woodL + padRight(ctrl2, innerW) + woodR);
-  lines.push(woodL + "═".repeat(innerW) + woodR);
+  // ── KEYBOARD HELP ─────────────────────────────────────────
+  lines.push("");
+  lines.push(`  ${FG.gray}SPC:play/stop  ENTER:toggle  \u2190\u2192:cursor  1-0,-,=:inst  \`:accent  a/z:tempo  v:var  b:bank  p:preset  m:audio${R}`);
 
-  // Pad to height
-  while (lines.length < safeHeight) lines.push("");
-  return lines.slice(0, safeHeight).join("\n");
+  while (lines.length < h) lines.push("");
+  return lines.slice(0, h).join("\n");
 }
 
 /**
@@ -217,9 +245,9 @@ export function summarizeState(engine: TR808Engine): string {
   if (accentCount > 0) instCounts.push(`AC:${accentCount}`);
 
   return [
-    `TR-808 ${engine.state === "playing" ? "▶" : "■"}`,
+    `TR-808 ${engine.state === "playing" ? "\u25B6" : "\u25A0"}`,
     `${engine.tempo}bpm`,
     `${slot.bank}${slot.number}-${slot.variation}`,
     instCounts.join(" ") || "(empty)",
-  ].join(" │ ");
+  ].join(" \u2502 ");
 }

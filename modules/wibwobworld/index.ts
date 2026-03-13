@@ -199,8 +199,8 @@ export default function setup(host: MicroappHost) {
 
     const desktopWidth = Math.max(40, Math.floor(host.geometry.width));
     const desktopHeight = Math.max(16, Math.floor(host.geometry.height));
-    const initialWidth = clamp(desktopWidth - 6, 40, 118);
-    const initialHeight = clamp(desktopHeight - 4, 16, 34);
+    const initialWidth = Math.max(40, desktopWidth - 6);
+    const initialHeight = Math.max(16, desktopHeight - 4);
 
     const win = host.createWindow({
       title: "WibWobWorld",
@@ -389,7 +389,7 @@ export default function setup(host: MicroappHost) {
         // the iso renderer strides/scales to fit the right pane independently.
         const worldSize = renderMode === "iso"
           ? (() => {
-              const n = Math.max(12, Math.min(Math.floor(isoBodyW / 4), Math.floor((isoBodyH - 10) / 2)));
+              const n = Math.max(12, Math.min(Math.floor(isoBodyW / 3), Math.floor((isoBodyH - 6) / 1.5)));
               return { width: n, height: n };
             })()
           : worldDimensions(mapViewport);
@@ -491,8 +491,8 @@ export default function setup(host: MicroappHost) {
             // Size the iso world to the pane (same formula as standalone ISO mode),
             // not the large contour world — avoids stride compression in the right pane.
             const isoN = Math.max(12, Math.min(
-              Math.floor(hybridIsoViewportW / 4),
-              Math.floor((hybridIsoViewportH - 10) / 2),
+              Math.floor(hybridIsoViewportW / 3),
+              Math.floor((hybridIsoViewportH - 6) / 1.5),
             ));
             const isoCacheKey = `${seed}|${seaLevel.toFixed(4)}|${levels}|${terrainIdx}|${isoN}`;
             if (isoCacheKey !== hybridIsoCacheKey || !hybridIsoArtifact) {

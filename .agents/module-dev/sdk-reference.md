@@ -34,6 +34,29 @@ These must be installed in the root `package.json` via `bun add <pkg>`. The load
 does not auto-install them. If missing, the module fails to import with a clear
 error in stderr.
 
+Optional `externalDependencies` declares repos, runtimes, or binaries the module
+needs but that live outside npm. These are not auto-installed — they document
+prerequisites for humans and agents. Example:
+
+```json
+"externalDependencies": {
+  "llm-orchestrator": {
+    "repo": "https://github.com/Symbients/llm-orchestrator",
+    "cloneTo": "scratch/llm-orchestrator",
+    "runtime": "cargo",
+    "notes": "Rust CLI. Requires rustup."
+  },
+  "claude-code": {
+    "bin": "claude",
+    "notes": "Must be installed and authenticated."
+  }
+}
+```
+
+Fields: `repo` (git URL), `cloneTo` (path relative to repo root), `runtime`
+(cargo/python/node/etc), `bin` (system binary name), `notes` (human-readable).
+All fields optional — use whichever apply.
+
 ---
 
 ## MicroappHost API

@@ -1,0 +1,1 @@
+autoresearch/code-editor/autoresearch.checks.sh

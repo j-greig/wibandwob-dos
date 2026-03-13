@@ -36,6 +36,20 @@ import type { BaseWindowDeps } from "./generative-windows.js";
 
 const MODE_ORDER = ["chaos", "order", "hybrid"] as const;
 
+// ANSI colour codes for sidebar
+const A = {
+  r:   "\x1b[0m",
+  b:   "\x1b[1m",
+  dim: "\x1b[2m",
+  cyn: "\x1b[96m",
+  grn: "\x1b[92m",
+  yel: "\x1b[93m",
+  wht: "\x1b[97m",
+  gry: "\x1b[90m",
+  mag: "\x1b[95m",
+  red: "\x1b[91m",
+} as const;
+
 export function openTerrainLabWindow(deps: BaseWindowDeps): void {
   const frame = deps.windowManager.createFrame("Terrain Lab", "terrain-lab");
 
@@ -65,21 +79,96 @@ export function openTerrainLabWindow(deps: BaseWindowDeps): void {
       deps.screen.render();
     },
     onStatus: (s) => {
-      header.update({ left: `${s.terrain} #${s.seed}`, right: s.mode.toUpperCase() });
+      // Mode icons
+      const modeIcons: Record<string, string> = {
+        chaos: "\u2248",   // ≈
+        order: "\u2261",   // ≡
+        hybrid: "\u2637",  // ☷
+      };
+      const modeIcon = modeIcons[s.mode] || "\u2022";
+
+      // Terrain icons
+      const terrainIcons: Record<string, string> = {
+        archipelago: "\u2693",  // ⚓
+        "saddle pass": "\u2229",// ∩
+        "ridge valley": "\u2227",// ∧
+        caldera: "\u25CB",      // ○
+        "lone peak": "\u25B2",  // ▲
+        meadow: "\u223F",       // ∿
+        "twin peaks": "\u25B2\u25B2", // ▲▲
+      };
+      const terrainIcon = terrainIcons[s.terrain] || "\u2022";
+
+      header.update({
+        left: `${terrainIcon} ${s.terrain} #${s.seed}`,
+        right: `${modeIcon} ${s.mode.toUpperCase()}`,
+      });
+
+      // Build rich info panel with ANSI colours
+      const sep = `  ${A.gry}${"─".repeat(22)}${A.r}`;
+      const label = (icon: string, text: string) => `  ${A.cyn}${icon} ${text}${A.r}`;
+      const val = (text: string) => `  ${A.wht}${text}${A.r}`;
+      const key = (k: string, desc: string) => `  ${A.yel}${k.padEnd(4)}${A.gry}${desc}${A.r}`;
+      const bar = (v: number, mx: number, w: number) => {
+        const f = Math.round((v / Math.max(1, mx)) * w);
+        return `${A.cyn}${"▮".repeat(f)}${A.gry}${"▯".repeat(Math.max(0, w - f))}${A.r}`;
+      };
+
+      // Mode colours
+      const modeCols: Record<string, string> = {
+        chaos: A.red, order: A.grn, hybrid: A.mag,
+      };
+
+      // Build mode picker line
+      const modeLine = MODE_ORDER.map(m => {
+        const active = m === s.mode;
+        const col = modeCols[m] ?? A.wht;
+        return active
+          ? `${col}${A.b}[${m.toUpperCase()}]${A.r}`
+          : `${A.gry} ${m} ${A.r}`;
+      }).join(" ");
+
+      // Build terrain list with active
+      const tNames = terrainNames;
+      const tIdx = tNames.indexOf(s.terrain);
+      const terrainList = tNames.map((t, i) => {
+        return i === tIdx
+          ? `  ${A.cyn}\u25B6 ${t}${A.r}`
+          : `  ${A.gry}  ${t}${A.r}`;
+      }).join("\n");
+
       infoText = [
-        `Mode:    ${s.mode}`,
-        `Terrain: ${s.terrain}`,
-        `Levels:  ${s.levels}`,
-        `Seed:    ${s.seed}`,
         "",
-        "Keys:",
-        " m   mode",
-        " t   terrain",
-        " r   reseed",
-        " +/- levels",
+        label(modeIcon, "MODE"),
+        `  ${modeLine}`,
+        sep,
+        label(terrainIcon, "TERRAIN"),
+        terrainList,
+        sep,
+        label("\u25A3", "GENERATION"),
+        `  ${A.gry}levels${A.r} ${bar(s.levels, 10, 10)} ${A.wht}${s.levels}${A.r}`,
+        `  ${A.gry}seed   ${A.wht}${s.seed}${A.r}`,
+        sep,
+        label("\u2328", "CONTROLS"),
+        key("m", "cycle mode"),
+        key("t", "next terrain"),
+        key("r", "new seed"),
+        key("+/-", "detail level"),
+        key("s", "save capture"),
+        sep,
+        label("\u2261", "CONTOUR LEGEND"),
+        `  ${A.wht}\u256D\u256E${A.r} ${A.gry}peak edges${A.r}`,
+        `  ${A.wht}\u2570\u256F${A.r} ${A.gry}valley edges${A.r}`,
+        `  ${A.wht}\u2502\u2500${A.r} ${A.gry}contour lines${A.r}`,
+        `  ${A.wht}x${A.r}  ${A.gry}crossing point${A.r}`,
       ].join("\n");
-      infoBlock.update({ text: infoText });
-      statusBar.update({ left: "m:mode t:terrain r:reseed +/-:levels s:save" });
+
+      // Set content directly to preserve ANSI codes
+      (infoBlock.node as any).setContent(infoText);
+      statusBar.update({
+        left: `m:mode  t:terrain  r:reseed  +/-:levels  s:save`,
+        right: `${s.terrain} \u2502 ${s.mode} \u2502 L${s.levels} \u2502 #${s.seed}`,
+      });
       deps.onStateChanged?.();
     },
   });

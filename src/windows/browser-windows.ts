@@ -5,6 +5,7 @@
  */
 
 import blessed from "blessed";
+import { execSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -13,13 +14,17 @@ import { EMPTY_PRIMER_SELECTED, EMPTY_FILE_SELECTED, EMPTY_MATCHES } from "../co
 import { createScrollbar } from "../core/ui-primitives.js";
 import { clipToVisibleWidth, padToWidth } from "../core/ansi-utils.js";
 import { createRestyleBundle, createSelectableList, deferRender } from "../core/ui-parts.js";
+import { renderMarkdownFile, PLAIN_HEADING_CONFIG } from "../services/markdown-service.js";
+import { highlightCode, HIGHLIGHTED_LANGUAGES } from "../services/syntax-highlight.js";
 import type { ContentMeasurement } from "../services/content-measurement.js";
 import { createPreRenderedPlayer, type FramePlayer } from "../services/animation-service.js";
 import type { Box, BrowserEntry, List, WindowKind, WindowRecord } from "../core/types.js";
 import type { OverlayManager } from "../core/overlay-manager.js";
 
 /** Percent of window width given to the list/left pane; preview gets the rest. */
-const PREVIEW_SPLIT_RATIO = 34;
+const PREVIEW_SPLIT_RATIO = 42;
+/** Strip .txt/.md extension for display */
+const cleanLabel = (label: string) => label.replace(/\.(txt|md)$/i, "");
 import type { WindowManager } from "../core/window-manager.js";
 
 /** Truncate a line by visible width and pad to a fixed viewport width. */
@@ -146,21 +151,53 @@ export function openPrimerGalleryWindow(params: {
     top: 2,
     left: 0,
     width: `${PREVIEW_SPLIT_RATIO}%`,
-    bottom: 0,
-    items: tabs[0].entries.map((entry) => entry.label),
+    bottom: 1,
+    items: tabs[0].entries.map((entry) => cleanLabel(entry.label)),
   });
   const list = listHandle.node;
-  const preview = blessed.box({
+  const divider = blessed.box({
     parent: frame.body,
     top: 1,
     left: `${PREVIEW_SPLIT_RATIO}%`,
-    right: 0,
+    width: 1,
     bottom: 0,
+    style: { fg: theme().header?.fg ?? "cyan", bg: theme().body?.bg ?? "black" },
+    content: "",
+  });
+  // Fill divider with vertical line chars
+  const fillDivider = () => {
+    const h = Math.max(1, Number(divider.height) || 1);
+    divider.setContent("\u2502".repeat(h).split("").join("\n"));
+  };
+  const previewHeader = blessed.box({
+    parent: frame.body,
+    top: 1,
+    left: `${PREVIEW_SPLIT_RATIO}%+1`,
+    right: 0,
+    height: 1,
+    style: theme().header,
+    content: "",
+  });
+  const preview = blessed.box({
+    parent: frame.body,
+    top: 2,
+    left: `${PREVIEW_SPLIT_RATIO}%+1`,
+    right: 0,
+    bottom: 1,
     mouse: true,
     scrollable: true,
     alwaysScroll: true,
     scrollbar: createScrollbar(),
     style: theme().body
+  });
+  const statusBar = blessed.box({
+    parent: frame.body,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 1,
+    style: theme().footer,
+    content: "",
   });
 
   let activeTabIndex = Math.max(0, Math.min(params.restore?.activeTabIndex ?? 0, tabs.length - 1));
@@ -171,18 +208,26 @@ export function openPrimerGalleryWindow(params: {
   const updatePreview = (index: number) => {
     const entry = activeEntries[index];
     if (!entry) {
+      previewHeader.setContent(" Select a primer to preview");
       previewRawContent = EMPTY_PRIMER_SELECTED;
       setViewportContent(preview, previewRawContent);
+      statusBar.setContent(` ${activeEntries.length} primers`);
       params.screen.render();
       return;
     }
     try {
       const content = fs.readFileSync(entry.filePath, "utf8");
-      previewRawContent = `${tabs[activeTabIndex].label} :: ${entry.label}\n${entry.filePath}\n\n${content}`;
+      const lineCount = content.split("\n").length;
+      const cleanName = cleanLabel(entry.label);
+      previewHeader.setContent(` ${cleanName}  (${lineCount} lines)`);
+      previewRawContent = content;
     } catch (error) {
+      previewHeader.setContent(` ${cleanLabel(entry.label)}`);
       previewRawContent = `Cannot preview file.\n\n${error instanceof Error ? error.message : String(error)}`;
     }
     setViewportContent(preview, previewRawContent);
+    statusBar.setContent(` ${index + 1}/${activeEntries.length}  |  ${tabs[activeTabIndex].label}  |  Enter: open  Tab: next tab  /: search`);
+    fillDivider();
     params.screen.render();
   };
   const openSelected = (index?: number) => {
@@ -196,24 +241,26 @@ export function openPrimerGalleryWindow(params: {
     tabBar.children.forEach((child) => child.destroy());
     let left = 0;
     tabs.forEach((tabConfig, index) => {
+      const count = tabConfig.entries.length;
+      const tabLabel = count > 0 ? `${tabConfig.label} (${count})` : tabConfig.label;
       const tabNode = blessed.box({
         parent: tabBar,
         top: 0,
         left,
         height: 1,
-        width: tabConfig.label.length + 2,
+        width: tabLabel.length + 2,
         mouse: true,
         clickable: true,
-        content: ` ${tabConfig.label} `,
+        content: ` ${tabLabel} `,
         style: index === activeTabIndex ? theme().input : theme().footer
       });
       tabNode.on("click", () => switchTab(index));
-      left += tabConfig.label.length + 2;
+      left += tabLabel.length + 2;
     });
   };
   const applySearch = () => {
     activeEntries = allEntries.filter((entry) => entry.label.toLowerCase().includes(searchValue.toLowerCase()));
-    list.setItems(activeEntries.map((entry) => entry.label));
+    list.setItems(activeEntries.map((entry) => cleanLabel(entry.label)));
     list.select(0);
     updatePreview(0);
     params.onStateChanged?.();
@@ -222,7 +269,7 @@ export function openPrimerGalleryWindow(params: {
   const switchTab = (index: number) => {
     activeTabIndex = index;
     activeEntries = tabs[index].entries;
-    list.setItems(activeEntries.map((entry) => entry.label));
+    list.setItems(activeEntries.map((entry) => cleanLabel(entry.label)));
     list.select(0);
     filterBox.setValue(index === 5 ? searchValue : ` ${tabs[index].label} `);
     renderTabs();
@@ -285,7 +332,10 @@ export function openPrimerGalleryWindow(params: {
     [tabBar, () => theme().footer],
     [filterBox, () => theme().input],
     [list, () => ({ ...theme().body, selected: theme().selected })],
+    [previewHeader, () => theme().header],
     [preview, () => theme().body],
+    [statusBar, () => theme().footer],
+    [divider, () => ({ fg: theme().header?.fg ?? "cyan", bg: theme().body?.bg ?? "black" })],
   ]);
   frame.onRestyle = () => {
     restyleBundle.restyle();
@@ -470,20 +520,91 @@ export function openFileManagerWindow(params: {
   let searchResults: Array<{ file: string; line: number; text: string }> = [];
   let activeSearchProcess: ReturnType<typeof import("node:child_process").spawn> | null = null;
 
+  // ── Git status ─────────────────────────────────────────
+  let gitStatusMap: Map<string, string> = new Map(); // path -> status char (M/A/?/D)
+  let gitRoot: string | null = null;
+
+  const refreshGitStatus = (dirPath: string) => {
+    gitStatusMap.clear();
+    try {
+      const root = execSync("git rev-parse --show-toplevel", { cwd: dirPath, stdio: ["pipe", "pipe", "pipe"] }).toString().trim();
+      gitRoot = root;
+      const raw = execSync("git status --porcelain -uall", { cwd: dirPath, stdio: ["pipe", "pipe", "pipe"] }).toString();
+      for (const line of raw.split("\n")) {
+        if (line.length < 4) continue;
+        const status = line.slice(0, 2).trim();
+        const filePath = path.resolve(root, line.slice(3));
+        // Map status chars: M=modified, A=added, ?=untracked, D=deleted, R=renamed
+        const ch = status.includes("?") ? "?" : status.includes("M") ? "M" : status.includes("A") ? "A" : status.includes("D") ? "D" : status.includes("R") ? "R" : status;
+        gitStatusMap.set(filePath, ch);
+        // Also set status for parent dirs (propagate up)
+        let parent = path.dirname(filePath);
+        while (parent.length >= root.length && parent !== path.dirname(parent)) {
+          if (!gitStatusMap.has(parent)) gitStatusMap.set(parent, "\u2022"); // dot for "has changes"
+          parent = path.dirname(parent);
+        }
+      }
+    } catch {
+      gitRoot = null;
+    }
+  };
+
+  const gitIndicator = (fullPath: string): string => {
+    const status = gitStatusMap.get(fullPath);
+    if (!status) return "  ";
+    switch (status) {
+      case "M": return "{yellow-fg}M{/yellow-fg} ";
+      case "A": return "{green-fg}A{/green-fg} ";
+      case "?": return "{red-fg}?{/red-fg} ";
+      case "D": return "{red-fg}D{/red-fg} ";
+      case "R": return "{cyan-fg}R{/cyan-fg} ";
+      case "\u2022": return "{yellow-fg}\u2022{/yellow-fg} ";
+      default: return "{magenta-fg}~{/magenta-fg} ";
+    }
+  };
+
   // ── Icon helpers ───────────────────────────────────────
   const fileIcon = (entry: { isDirectory: boolean; label: string }): string => {
-    if (entry.isDirectory) return "\u25A0"; // filled square
+    if (entry.isDirectory) {
+      // Special directory icons
+      const name = entry.label.replace(/\/$/, "");
+      if (name === "..") return "\u25C4"; // left triangle
+      if (name.startsWith(".")) return "\u25AB"; // small white square
+      if (["src", "lib", "app"].includes(name)) return "\u25A3"; // white sq in black sq
+      if (["node_modules", "dist", "build", ".git"].includes(name)) return "\u25A1"; // white square
+      return "\u25A0"; // filled square
+    }
     const ext = path.extname(entry.label).toLowerCase();
-    if ([".ts", ".js", ".tsx", ".jsx", ".py", ".c", ".cpp", ".h", ".rs"].includes(ext)) return "\u2666"; // diamond
-    if ([".md", ".txt", ".doc", ".rtf"].includes(ext)) return "\u2261"; // triple bar
-    if ([".json", ".yaml", ".yml", ".toml", ".xml"].includes(ext)) return "\u2630"; // trigram
+    if ([".ts", ".tsx"].includes(ext)) return "ts";
+    if ([".js", ".jsx"].includes(ext)) return "js";
+    if ([".py"].includes(ext)) return "py";
+    if ([".c", ".cpp", ".h", ".rs", ".go"].includes(ext)) return "<>";
+    if ([".md"].includes(ext)) return "md";
+    if ([".txt", ".doc", ".rtf"].includes(ext)) return "\u2261"; // triple bar
+    if ([".json"].includes(ext)) return "{}";
+    if ([".yaml", ".yml", ".toml"].includes(ext)) return "::";
+    if ([".xml", ".html", ".htm"].includes(ext)) return "</";
     if ([".png", ".jpg", ".gif", ".svg", ".webp", ".bmp"].includes(ext)) return "\u263C"; // sun
-    if ([".sh", ".bash", ".zsh", ".fish"].includes(ext)) return "\u25B6"; // play
-    return "\u2022"; // bullet
+    if ([".sh", ".bash", ".zsh", ".fish"].includes(ext)) return "$>";
+    if ([".css", ".scss", ".less"].includes(ext)) return "##";
+    if ([".lock"].includes(ext)) return "\u25CB"; // circle
+    return " \u2022"; // bullet
   };
 
   // ── Frame + layout ─────────────────────────────────────
   const frame = params.windowManager.createFrame("File Manager", "browser");
+
+  // ── Responsive sizing ──────────────────────────────────
+  {
+    const screenW = Number(params.screen.width);
+    const screenH = Number(params.screen.height);
+    const targetW = Math.min(180, Math.max(80, Math.floor(screenW * 0.85)));
+    const targetH = Math.max(30, screenH - 6);
+    frame.frame.width = targetW;
+    frame.frame.height = targetH;
+    frame.frame.left = Math.max(0, Math.floor((screenW - targetW) / 2));
+    frame.frame.top = Math.max(1, Math.floor((screenH - targetH) / 2));
+  }
 
   // ── Row 0: toolbar with path + clickable buttons ────────
   const toolbar = blessed.box({
@@ -499,46 +620,61 @@ export function openFileManagerWindow(params: {
     parent: toolbar,
     top: 0,
     left: 0,
-    right: 29, // reserve space for buttons on the right
+    right: 34, // reserve space for wider buttons on the right
     height: 1,
     style: theme().header
   });
-  // Toolbar buttons (right-aligned, fixed widths)
+  // Toolbar buttons (right-aligned, fixed widths) — styled as visible buttons
+  const t = theme();
+  const btnStyle = { fg: t.accent.fg, bg: t.body.bg ?? "black" };
+  const btnHoverStyle = { fg: t.body.bg ?? "black", bg: t.accent.fg };
+
   const btnFilter = blessed.box({
     parent: toolbar,
     top: 0,
-    right: 19,
-    width: 10,
+    right: 22,
+    width: 12,
     height: 1,
-    content: " / Filter ",
+    content: " [/] Filter ",
     mouse: true,
-    style: theme().footer
+    style: { ...btnStyle },
   });
   const btnSearch = blessed.box({
     parent: toolbar,
     top: 0,
-    right: 9,
-    width: 10,
+    right: 10,
+    width: 12,
     height: 1,
-    content: " s Search ",
+    content: " [s] Search ",
     mouse: true,
-    style: theme().footer
+    style: { ...btnStyle },
   });
   const btnView = blessed.box({
     parent: toolbar,
     top: 0,
     right: 0,
-    width: 9,
+    width: 10,
     height: 1,
     content: "",
     mouse: true,
-    style: theme().footer
+    style: { ...btnStyle },
   });
-  // (dotfiles always shown — no toggle button needed)
+
+  // Hover effects
+  for (const btn of [btnFilter, btnSearch, btnView]) {
+    btn.on("mouseover", () => { btn.style = { ...btnHoverStyle }; params.screen.render(); });
+    btn.on("mouseout", () => { btn.style = { ...btnStyle }; params.screen.render(); });
+  }
 
   const renderToolbarButtons = () => {
     const viewLabel = viewMode === "icon" ? "\u2261 List " : "\u25A6 Icon ";
-    btnView.setContent(` ${viewLabel}`);
+    btnView.setContent(` [tab] ${viewLabel}`);
+    // Update search button to show active state
+    if (searchActive) {
+      btnSearch.setContent(` \u25CF Search `);
+    } else {
+      btnSearch.setContent(` [s] Search `);
+    }
   };
 
   btnFilter.on("click", () => {
@@ -546,10 +682,28 @@ export function openFileManagerWindow(params: {
     renderFilter();
     params.screen.render();
   });
+
+  /** Open search via overlay prompt — much more discoverable */
+  const openSearchPrompt = () => {
+    params.overlays.openValuePrompt(
+      "Search in " + path.basename(currentPath) + "/",
+      searchQuery,
+      (value: string) => {
+        if (value.trim()) {
+          searchQuery = value;
+          if (searchMode === "simple") {
+            runSimpleSearch(searchQuery);
+          } else {
+            runAdvancedSearch(searchQuery);
+          }
+        }
+        focusContentPane();
+      }
+    );
+  };
+
   btnSearch.on("click", () => {
-    searchBox.focus();
-    renderSearchBox();
-    params.screen.render();
+    openSearchPrompt();
   });
   btnView.on("click", () => {
     toggleViewMode();
@@ -585,6 +739,8 @@ export function openFileManagerWindow(params: {
     bottom: 1,
   });
   const list = listHandle.node;
+  // Enable blessed tags for coloured file type indicators
+  (list as any).parseTags = true;
 
   // Left pane: icon grid (icon view) — full width, toggled via hidden
   const iconGrid = blessed.box({
@@ -605,16 +761,46 @@ export function openFileManagerWindow(params: {
 
   // Right pane: preview
   // Right pane: preview (hidden in icon mode)
-  const preview = blessed.box({
+  // Vertical divider between list and preview
+  const divider = blessed.box({
     parent: frame.body,
     top: 2,
     left: `${PREVIEW_SPLIT_RATIO}%`,
+    width: 1,
+    bottom: 1,
+    style: { fg: (theme() as any).border?.fg || "gray", bg: theme().body?.bg },
+    content: "",
+    hidden: viewMode === "icon"
+  });
+  // Fill divider with thin line chars on resize
+  const fillDivider = () => {
+    const h = Number(divider.height) || 20;
+    divider.setContent("\u2502".repeat(h).split("").join("\n"));
+  };
+
+  // Fixed preview header bar
+  const previewHeaderBar = blessed.box({
+    parent: frame.body,
+    top: 2,
+    left: `${PREVIEW_SPLIT_RATIO}%+1`,
+    right: 0,
+    height: 1,
+    tags: true,
+    style: { ...theme().footer, bold: true },
+    hidden: viewMode === "icon"
+  });
+
+  const preview = blessed.box({
+    parent: frame.body,
+    top: 3,
+    left: `${PREVIEW_SPLIT_RATIO}%+1`,
     right: 0,
     bottom: 1,
     mouse: true,
     scrollable: true,
     alwaysScroll: true,
     scrollbar: createScrollbar(),
+    tags: true,
     style: theme().body,
     hidden: viewMode === "icon"
   });
@@ -679,10 +865,38 @@ export function openFileManagerWindow(params: {
 
   };
 
+  /** Build a breadcrumb from currentPath relative to startPath */
+  const renderBreadcrumb = (): string => {
+    const home = params.startPath;
+    const rel = path.relative(home, currentPath);
+    if (!rel || rel === ".") return "\u2302 ~";
+    const parts = rel.split(path.sep);
+    return "\u2302 ~ / " + parts.join(" / ");
+  };
+
   const renderStatusBar = () => {
     const dirs = entries.filter((e) => e.isDirectory && e.label !== "../").length;
     const files = entries.filter((e) => !e.isDirectory).length;
-    statusInfo.setContent(` ${entries.length} items | ${dirs} dirs, ${files} files`);
+    // Total size of visible files
+    const totalSize = entries.filter(e => !e.isDirectory).reduce((s, e) => s + e.size, 0);
+    const sizeStr = totalSize < 1024 ? `${totalSize}B`
+      : totalSize < 1048576 ? `${(totalSize / 1024).toFixed(0)}K`
+      : `${(totalSize / 1048576).toFixed(1)}M`;
+    const macHints = isMac ? " SPC:look O:finder" : "";
+    const sortArrow = sortField === "name" ? "\u25B2 Name" : sortField === "size" ? "\u25B2 Size" : sortField === "modified" ? "\u25B2 Date" : "\u25B2 Type";
+    // Git summary
+    let gitSummary = "";
+    if (gitRoot) {
+      const modified = [...gitStatusMap.values()].filter(s => s === "M").length;
+      const untracked = [...gitStatusMap.values()].filter(s => s === "?").length;
+      const added = [...gitStatusMap.values()].filter(s => s === "A").length;
+      const parts: string[] = [];
+      if (modified) parts.push(`${modified}M`);
+      if (added) parts.push(`${added}A`);
+      if (untracked) parts.push(`${untracked}?`);
+      gitSummary = parts.length ? ` git:${parts.join("/")}` : " git:clean";
+    }
+    statusInfo.setContent(` ${entries.length} items \u2502 ${dirs} dirs, ${files} files (${sizeStr})${gitSummary} \u2502 ${sortArrow} \u2502 \u21B5:open V:view C:copy${macHints} S:search`);
     renderStatusButtons();
     renderToolbarButtons();
   };
@@ -807,27 +1021,214 @@ export function openFileManagerWindow(params: {
   const updatePreview = (index: number) => {
     const entry = entries[index];
     if (!entry) {
-      previewRawContent = EMPTY_FILE_SELECTED;
+      previewRawContent = [
+        "",
+        "       {bold}\u2302 WibWob File Manager{/bold}",
+        "",
+        "       Select a file to preview",
+        "       or press {bold}S{/bold} to search",
+        "",
+        "       {gray-fg}\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500{/gray-fg}",
+        "",
+        "       {gray-fg}Keys:{/gray-fg}",
+        "       {bold}\u21B5{/bold}  Open in editor",
+        "       {bold}V{/bold}  View file",
+        "       {bold}SPC{/bold} Quick Look",
+        "       {bold}C{/bold}  Copy path",
+        "       {bold}O{/bold}  Reveal in Finder",
+        "       {bold}/{/bold}  Filter files",
+        "       {bold}S{/bold}  Search contents",
+        "       {bold}TAB{/bold} Toggle icon view",
+        "",
+        "       {gray-fg}Right-click for menu{/gray-fg}",
+      ].join("\n");
       setViewportContent(preview, previewRawContent);
       params.screen.render();
       return;
     }
     if (entry.isDirectory) {
-      previewRawContent = `${entry.fullPath}\n\n[directory]`;
+      // Directory preview: show contents summary instead of crashing
+      try {
+        const dirPath = entry.fullPath;
+        const children = fs.readdirSync(dirPath, { withFileTypes: true });
+        const childDirs = children.filter(c => c.isDirectory());
+        const childFiles = children.filter(c => !c.isDirectory());
+        setPreviewHeader(`{bold}\u2302 ${path.basename(dirPath)}/{/bold}  {cyan-fg}${childDirs.length} dirs{/cyan-fg}, {green-fg}${childFiles.length} files{/green-fg}`);
+        const header = "";
+        // Show more items based on available preview height
+        const previewH = Math.max(10, Number(preview.height) || 30);
+        const maxDirs = Math.min(childDirs.length, Math.max(8, Math.floor(previewH * 0.4)));
+        const maxFiles = Math.min(childFiles.length, Math.max(8, Math.floor(previewH * 0.4)));
+
+        const dirItems = childDirs.slice(0, maxDirs).map(c => {
+          let childCount = "";
+          try {
+            const n = fs.readdirSync(path.join(dirPath, c.name)).length;
+            childCount = ` {gray-fg}(${n}){/gray-fg}`;
+          } catch {}
+          return `  {cyan-fg}\u25A0{/cyan-fg} ${c.name}/${childCount}`;
+        });
+        const fileItems = childFiles.slice(0, maxFiles).map(c => {
+          const ext = path.extname(c.name).toLowerCase();
+          const col = [".md", ".txt"].includes(ext) ? "green"
+            : [".ts", ".tsx", ".js", ".jsx"].includes(ext) ? "yellow"
+            : [".json", ".yaml", ".yml"].includes(ext) ? "magenta"
+            : [".sh", ".bash"].includes(ext) ? "cyan"
+            : "white";
+          // Try to get size
+          let sizeStr = "";
+          try {
+            const s = fs.statSync(path.join(dirPath, c.name)).size;
+            sizeStr = s < 1024 ? `${s}B` : s < 1048576 ? `${(s / 1024).toFixed(0)}K` : `${(s / 1048576).toFixed(1)}M`;
+          } catch {}
+          const padded = sizeStr ? ` {gray-fg}${sizeStr}{/gray-fg}` : "";
+          return `  {${col}-fg}\u2022{/${col}-fg} ${c.name}${padded}`;
+        });
+        const truncDirs = childDirs.length > maxDirs ? `  {cyan-fg}... +${childDirs.length - maxDirs} more dirs{/cyan-fg}` : "";
+        const truncFiles = childFiles.length > maxFiles ? `  {green-fg}... +${childFiles.length - maxFiles} more files{/green-fg}` : "";
+        // File type distribution bar
+        const extCounts: Record<string, number> = {};
+        for (const f of childFiles) {
+          const ext = path.extname(f.name).toLowerCase() || "(none)";
+          extCounts[ext] = (extCounts[ext] ?? 0) + 1;
+        }
+        const extEntries = Object.entries(extCounts).sort((a, b) => b[1] - a[1]).slice(0, 6);
+        const extBar = extEntries.map(([ext, count]) => {
+          const col = [".md", ".txt"].includes(ext) ? "green"
+            : [".ts", ".tsx", ".js", ".jsx"].includes(ext) ? "yellow"
+            : [".json", ".yaml", ".yml"].includes(ext) ? "magenta"
+            : [".sh", ".bash"].includes(ext) ? "cyan"
+            : "white";
+          return `{${col}-fg}${ext}:${count}{/${col}-fg}`;
+        }).join("  ");
+
+        const sections = [header];
+        if (dirItems.length) sections.push(dirItems.join("\n"));
+        if (truncDirs) sections.push(truncDirs);
+        if (fileItems.length) sections.push("\n" + fileItems.join("\n"));
+        if (truncFiles) sections.push(truncFiles);
+        if (extBar) sections.push("\n  " + extBar);
+
+        // Quick stats: largest files and most recent
+        if (childFiles.length > 0) {
+          const withStats = childFiles.map(c => {
+            try {
+              const s = fs.statSync(path.join(dirPath, c.name));
+              return { name: c.name, size: s.size, mtime: s.mtimeMs };
+            } catch { return { name: c.name, size: 0, mtime: 0 }; }
+          });
+          const largest = [...withStats].sort((a, b) => b.size - a.size).slice(0, 3);
+          const recent = [...withStats].sort((a, b) => b.mtime - a.mtime).slice(0, 3);
+
+          const fmtSize = (s: number) => s < 1024 ? `${s}B` : s < 1048576 ? `${(s / 1024).toFixed(0)}K` : `${(s / 1048576).toFixed(1)}M`;
+          const fmtDate = (ms: number) => {
+            const d = new Date(ms);
+            const now = Date.now();
+            const diff = now - ms;
+            if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+            if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+            return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
+          };
+
+          sections.push(`\n  {bold}Largest:{/bold} ${largest.map(f => `${f.name} {gray-fg}${fmtSize(f.size)}{/gray-fg}`).join(", ")}`);
+          sections.push(`  {bold}Recent:{/bold}  ${recent.map(f => `${f.name} {gray-fg}${fmtDate(f.mtime)}{/gray-fg}`).join(", ")}`);
+        }
+
+        previewRawContent = sections.join("\n");
+      } catch (error) {
+        previewRawContent = `\u2302 ${entry.fullPath}\n\n  Cannot read directory.\n  ${error instanceof Error ? error.message : String(error)}`;
+      }
       setViewportContent(preview, previewRawContent);
       params.screen.render();
       return;
     }
+
+    const ext = path.extname(entry.label).toLowerCase();
+
+    // Markdown files: render with markdown service
+    if (ext === ".md") {
+      try {
+        const stat = fs.statSync(entry.fullPath);
+        const sizeStr = stat.size < 1024 ? `${stat.size}B` : `${(stat.size / 1024).toFixed(0)}K`;
+        setPreviewHeader(`{bold}${path.basename(entry.fullPath)}{/bold}  ${sizeStr}  MD`);
+        const previewWidth = Math.max(1, (Number(preview.width) || 40) - 4);
+        const lines = renderMarkdownFile(entry.fullPath, previewWidth, {
+          headingConfig: PLAIN_HEADING_CONFIG,
+        });
+        previewRawContent = lines.join("\n");
+      } catch (error) {
+        setPreviewHeader(`{bold}${path.basename(entry.fullPath)}{/bold}`);
+        previewRawContent = `Cannot preview file.\n\n${error instanceof Error ? error.message : String(error)}`;
+      }
+      setViewportContent(preview, previewRawContent);
+      params.screen.render();
+      return;
+    }
+
+    // JSON files: pretty-print with colour
+    if (ext === ".json") {
+      const escapeBraces = (s: string) => s.replace(/\{/g, "\\{");
+      try {
+        const raw = fs.readFileSync(entry.fullPath, "utf8").slice(0, 8000);
+        const parsed = JSON.parse(raw);
+        const pretty = JSON.stringify(parsed, null, 2);
+        const lines = pretty.split("\n");
+        const stat = fs.statSync(entry.fullPath);
+        const sizeStr = stat.size < 1024 ? `${stat.size}B` : `${(stat.size / 1024).toFixed(0)}K`;
+        setPreviewHeader(`{bold}${path.basename(entry.fullPath)}{/bold}  ${sizeStr}  JSON`);
+        // Colourize JSON keys and values
+        const coloured = lines.map((ln: string, i: number) => {
+          const safe = escapeBraces(ln);
+          return `{gray-fg}${String(i + 1).padStart(4, " ")} |{/gray-fg} ${safe}`;
+        }).join("\n");
+        previewRawContent = coloured;
+      } catch {
+        const content = fs.readFileSync(entry.fullPath, "utf8").slice(0, 8000);
+        const lines = content.split("\n");
+        const numbered = lines.map((ln: string, i: number) => `{gray-fg}${String(i + 1).padStart(4, " ")} |{/gray-fg} ${escapeBraces(ln)}`).join("\n");
+        setPreviewHeader(`{bold}${path.basename(entry.fullPath)}{/bold}`);
+        previewRawContent = numbered;
+      }
+      setViewportContent(preview, previewRawContent);
+      params.screen.render();
+      return;
+    }
+
+    // Default: raw text with line numbers + file metadata header
+    // Use syntax highlighting for supported languages
     try {
       const content = fs.readFileSync(entry.fullPath, "utf8");
-      const lines = content.slice(0, 8000).split("\n");
-      const numbered = lines.map((ln, i) => `${String(i + 1).padStart(4, " ")} | ${ln}`).join("\n");
-      previewRawContent = `${entry.fullPath}\n\n${numbered}`;
+      const rawLines = content.slice(0, 8000).split("\n");
+      const stat = fs.statSync(entry.fullPath);
+      const sizeStr = stat.size < 1024 ? `${stat.size}B` : stat.size < 1048576 ? `${(stat.size / 1024).toFixed(1)}KB` : `${(stat.size / 1048576).toFixed(1)}MB`;
+      const dateStr = new Date(stat.mtimeMs).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+      const escaped = (ln: string) => ln.replace(/\{/g, "\\{");
+      const langLabel = ext.replace(".", "").toUpperCase();
+      setPreviewHeader(`{bold}${path.basename(entry.fullPath)}{/bold}  ${sizeStr}  ${dateStr}  ${langLabel}`);
+
+      // Determine language from extension
+      const lang = ext.replace(".", "");
+      const useHighlight = HIGHLIGHTED_LANGUAGES.has(lang);
+
+      let numbered: string;
+      if (useHighlight) {
+        const highlighted = highlightCode(rawLines.join("\n"), lang);
+        numbered = highlighted.map((ln, i) => `{gray-fg}${String(i + 1).padStart(4, " ")} |{/gray-fg} ${ln}`).join("\n");
+      } else {
+        numbered = rawLines.map((ln, i) => `{gray-fg}${String(i + 1).padStart(4, " ")} |{/gray-fg} ${escaped(ln)}`).join("\n");
+      }
+      previewRawContent = numbered;
     } catch (error) {
+      setPreviewHeader("");
       previewRawContent = `Cannot preview file.\n\n${error instanceof Error ? error.message : String(error)}`;
     }
     setViewportContent(preview, previewRawContent);
     params.screen.render();
+  };
+
+  /** Set the fixed preview header bar content */
+  const setPreviewHeader = (text: string) => {
+    previewHeaderBar.setContent(` ${text}`);
   };
 
   const updatePreviewForSearchResult = (result: { file: string; line: number; text: string }) => {
@@ -836,15 +1237,24 @@ export function openFileManagerWindow(params: {
       const lines = content.split("\n");
       const startLine = Math.max(0, result.line - 5);
       const endLine = Math.min(lines.length, result.line + 20);
+      const ext = path.extname(result.file).toLowerCase();
+      const stat = fs.statSync(result.file);
+      const sizeStr = stat.size < 1024 ? `${stat.size}B` : stat.size < 1048576 ? `${(stat.size / 1024).toFixed(0)}K` : `${(stat.size / 1048576).toFixed(1)}M`;
+      const escaped = (s: string) => s.replace(/\{/g, "\\{");
       const context = lines.slice(startLine, endLine)
         .map((ln, i) => {
           const lineNum = startLine + i + 1;
-          const marker = lineNum === result.line ? "\u25B6" : " ";
-          return `${marker}${String(lineNum).padStart(4, " ")} | ${ln}`;
+          const isMatch = lineNum === result.line;
+          const marker = isMatch ? "{yellow-fg}\u25B6{/yellow-fg}" : " ";
+          const numCol = isMatch ? "yellow" : "gray";
+          return `${marker}{${numCol}-fg}${String(lineNum).padStart(4, " ")} |{/${numCol}-fg} ${escaped(ln)}`;
         })
         .join("\n");
-      previewRawContent = `${result.file}:${result.line}\n\n${context}`;
+      const relPath = path.relative(currentPath, result.file);
+      setPreviewHeader(`{bold}${escaped(relPath)}{/bold}  ${sizeStr}  line ${result.line}`);
+      previewRawContent = context;
     } catch (error) {
+      setPreviewHeader("");
       previewRawContent = `Cannot preview file.\n\n${error instanceof Error ? error.message : String(error)}`;
     }
     setViewportContent(preview, previewRawContent);
@@ -853,13 +1263,54 @@ export function openFileManagerWindow(params: {
 
   // ── Filter + refresh ───────────────────────────────────
 
+  const formatSize = (bytes: number): string => {
+    if (bytes === 0) return "";
+    if (bytes < 1024) return `${bytes}B`;
+    if (bytes < 1048576) return `${(bytes / 1024).toFixed(0)}K`;
+    return `${(bytes / 1048576).toFixed(1)}M`;
+  };
+
+  /** Get colour for a file type */
+  const fileColour = (entry: { isDirectory: boolean; label: string }): string => {
+    if (entry.isDirectory) return "cyan";
+    const ext = path.extname(entry.label).toLowerCase();
+    if ([".ts", ".tsx"].includes(ext)) return "yellow";
+    if ([".js", ".jsx"].includes(ext)) return "yellow";
+    if ([".md"].includes(ext)) return "green";
+    if ([".txt", ".doc", ".rtf"].includes(ext)) return "green";
+    if ([".json"].includes(ext)) return "magenta";
+    if ([".yaml", ".yml", ".toml"].includes(ext)) return "magenta";
+    if ([".sh", ".bash", ".zsh"].includes(ext)) return "cyan";
+    if ([".css", ".scss"].includes(ext)) return "blue";
+    if ([".png", ".jpg", ".gif", ".svg"].includes(ext)) return "red";
+    if ([".lock"].includes(ext)) return "gray";
+    return "white";
+  };
+
+  const formatListItem = (e: typeof entries[0]): string => {
+    const icon = fileIcon(e);
+    const col = fileColour(e);
+    const git = gitIndicator(e.fullPath);
+    const listW = Math.max(1, Number(list.width) || 40);
+    const safeName = e.label.replace(/\{/g, "\\{");
+    if (e.isDirectory) {
+      return `${git}{${col}-fg}${icon}{/${col}-fg} ${safeName}`;
+    }
+    const size = formatSize(e.size);
+    const iconVisualLen = icon.length;
+    // git indicator is 2 visual chars (status + space)
+    const nameSpace = Math.max(10, listW - iconVisualLen - size.length - 7);
+    const name = safeName.length > nameSpace ? safeName.slice(0, nameSpace - 2) + ".." : safeName.padEnd(nameSpace);
+    return `${git}{${col}-fg}${icon}{/${col}-fg} ${name} {gray-fg}${size}{/gray-fg}`;
+  };
+
   const applyFilter = (selectedIndex = 0) => {
     const normalized = filterValue.trim().toLowerCase();
     entries = normalized.length === 0
       ? [...allEntries]
       : allEntries.filter((entry) => entry.label.toLowerCase().includes(normalized));
     if (viewMode === "list") {
-      list.setItems(entries.map((e) => ` ${fileIcon(e)} ${e.label}`));
+      list.setItems(entries.map(formatListItem));
     } else {
       renderIconGrid();
     }
@@ -875,8 +1326,20 @@ export function openFileManagerWindow(params: {
     // Cancel any active search when navigating
     cancelSearch();
     currentPath = directoryPath;
+    refreshGitStatus(directoryPath);
     allEntries = buildEntries(directoryPath);
-    pathLabel.setContent(` \u2302 ${currentPath}`);
+    const dirName = path.basename(directoryPath) || directoryPath;
+    let branchTag = "";
+    if (gitRoot) {
+      try {
+        const branch = execSync("git branch --show-current", { cwd: directoryPath, stdio: ["pipe", "pipe", "pipe"] }).toString().trim();
+        if (branch) branchTag = ` \u2387 ${branch}`;
+      } catch {}
+    }
+    frame.frame.setLabel(` \u2302 ${dirName}${branchTag} `);
+    // Show breadcrumb with file type summary
+    const bc = renderBreadcrumb();
+    pathLabel.setContent(` ${bc}`);
     applyFilter(selectedIndex);
   };
 
@@ -888,22 +1351,36 @@ export function openFileManagerWindow(params: {
       activeSearchProcess = null;
     }
     searchActive = false;
+    const dirName = path.basename(currentPath) || currentPath;
+    frame.frame.setLabel(` \u2302 ${dirName} `);
   };
 
   const showSearchResults = () => {
     searchActive = true;
     if (searchResults.length === 0) {
-      list.setItems(["  (no results)"]);
-      previewRawContent = EMPTY_MATCHES;
+      list.setItems(["  {gray-fg}(no results){/gray-fg}"]);
+      previewRawContent = searchQuery
+        ? `{bold}Search: "${searchQuery.replace(/\{/g, "\\{")}"{/bold}\n\n  No matches found in ${path.basename(currentPath)}/\n\n  Try a different query or navigate to another directory.`
+        : EMPTY_MATCHES;
       setViewportContent(preview, previewRawContent);
     } else {
+      // Colour-coded results: file in cyan, line in yellow, text in white
+      const listW = Math.max(1, Number(list.width) || 40);
       const items = searchResults.map((r) => {
         const rel = path.relative(currentPath, r.file);
-        return ` ${rel}:${r.line} ${r.text.trim().slice(0, 60)}`;
+        const ext = path.extname(rel).toLowerCase();
+        const fileCol = [".md", ".txt"].includes(ext) ? "green"
+          : [".ts", ".tsx", ".js", ".jsx"].includes(ext) ? "yellow"
+          : [".json", ".yaml", ".yml"].includes(ext) ? "magenta"
+          : "cyan";
+        const safeText = r.text.trim().slice(0, 50).replace(/\{/g, "\\{");
+        return ` {${fileCol}-fg}${rel}{/${fileCol}-fg}{gray-fg}:${r.line}{/gray-fg} ${safeText}`;
       });
       list.setItems(items);
       list.select(0);
       updatePreviewForSearchResult(searchResults[0]);
+      // Update preview header with search info
+      frame.frame.setLabel(` \u2315 "${searchQuery}" - ${searchResults.length} results `);
     }
     renderStatusBar();
     params.screen.render();
@@ -962,8 +1439,9 @@ export function openFileManagerWindow(params: {
     });
 
     // Show "searching..." immediately
-    list.setItems(["  Searching..."]);
-    previewRawContent = `Searching for "${query}" in ${currentPath}...`;
+    list.setItems(["  {yellow-fg}Searching...{/yellow-fg}"]);
+    frame.frame.setLabel(` \u2315 "${query}" `);
+    previewRawContent = `{bold}Searching for "${query.replace(/\{/g, "\\{")}"{/bold}\n\n  Directory: ${path.basename(currentPath)}/\n  Engine: ripgrep (rg)\n\n  {gray-fg}Results will appear as they are found...{/gray-fg}`;
     setViewportContent(preview, previewRawContent);
     params.screen.render();
   };
@@ -979,11 +1457,14 @@ export function openFileManagerWindow(params: {
     if (mode === "list") {
       list.hidden = false;
       iconGrid.hidden = true;
+      divider.hidden = false;
+      previewHeaderBar.hidden = false;
       // Restore split layout
       list.width = `${PREVIEW_SPLIT_RATIO}%`;
       filterBox.width = `${PREVIEW_SPLIT_RATIO}%`;
       searchBox.left = `${PREVIEW_SPLIT_RATIO}%`;
       preview.hidden = false;
+      fillDivider();
       // Sync selection from icon -> list
       list.select(iconSelected);
       applyFilter(iconSelected);
@@ -991,6 +1472,8 @@ export function openFileManagerWindow(params: {
     } else {
       list.hidden = true;
       iconGrid.hidden = false;
+      divider.hidden = true;
+      previewHeaderBar.hidden = true;
       // Icon mode: full width, hide preview
       iconGrid.width = "100%";
       preview.hidden = true;
@@ -1005,6 +1488,143 @@ export function openFileManagerWindow(params: {
 
   const toggleViewMode = () => {
     setViewMode(viewMode === "list" ? "icon" : "list");
+  };
+
+  // ── File actions ────────────────────────────────────────
+
+  const getEntryPath = (index?: number): string | null => {
+    if (searchActive) {
+      const idx = typeof index === "number" ? index : (list as List & { selected: number }).selected ?? 0;
+      return searchResults[idx]?.file ?? null;
+    }
+    const entry = entries[typeof index === "number" ? index : (list as List & { selected: number }).selected ?? 0];
+    return entry?.fullPath ?? null;
+  };
+
+  const copyPathToClipboard = (index?: number) => {
+    const filePath = getEntryPath(index);
+    if (!filePath) return;
+    try {
+      if (process.platform === "darwin") {
+        execSync(`printf '%s' ${JSON.stringify(filePath)} | pbcopy`);
+      } else {
+        execSync(`printf '%s' ${JSON.stringify(filePath)} | xclip -selection clipboard 2>/dev/null || printf '%s' ${JSON.stringify(filePath)} | xsel --clipboard 2>/dev/null`);
+      }
+      params.overlays.flash(`Copied: ${path.basename(filePath)}`);
+    } catch {
+      params.overlays.flash("Clipboard not available");
+    }
+  };
+
+  const revealInFinder = (index?: number) => {
+    const filePath = getEntryPath(index);
+    if (!filePath) return;
+    try {
+      if (process.platform === "darwin") {
+        execSync(`open -R ${JSON.stringify(filePath)}`);
+      } else {
+        execSync(`xdg-open ${JSON.stringify(path.dirname(filePath))} 2>/dev/null`);
+      }
+    } catch {
+      params.overlays.flash("Could not reveal file");
+    }
+  };
+
+  const isMac = process.platform === "darwin";
+
+  /** Quick Look preview (macOS) or xdg-open (Linux) */
+  const quickLook = (index?: number) => {
+    const filePath = getEntryPath(index);
+    if (!filePath) return;
+    try {
+      if (isMac) {
+        // qlmanage blocks — run detached
+        require("node:child_process").spawn("qlmanage", ["-p", filePath], {
+          detached: true, stdio: "ignore",
+        }).unref();
+      } else {
+        require("node:child_process").spawn("xdg-open", [filePath], {
+          detached: true, stdio: "ignore",
+        }).unref();
+      }
+    } catch {
+      params.overlays.flash("Could not preview file");
+    }
+  };
+
+  // ── Right-click context menu ───────────────────────────
+
+  let contextMenuBox: blessed.Widgets.BoxElement | null = null;
+
+  const showContextMenu = (x: number, y: number, filePath: string) => {
+    closeContextMenu();
+    const isDir = fs.existsSync(filePath) && fs.statSync(filePath).isDirectory();
+    const items = [
+      { label: " Copy Path        c ", action: () => copyPathToClipboard() },
+      ...(!isDir ? [{ label: " Open in Editor  \u21B5 ", action: () => { const e = getSelectedEntry(); if (e && !e.isDirectory) params.onOpenFile(e.fullPath); } }] : []),
+      ...(!isDir ? [{ label: " Quick Look   spc ", action: () => quickLook() }] : []),
+      ...(!isDir ? [{ label: " View            v ", action: () => viewSelected() }] : []),
+      ...(isMac ? [{ label: " Reveal in Finder o ", action: () => revealInFinder() }] : []),
+    ];
+
+    const menuW = 24;
+    const menuH = items.length + 2;
+    const screenW = Number(params.screen.width) || 80;
+    const screenH = Number(params.screen.height) || 24;
+    const menuX = Math.min(x, screenW - menuW - 2);
+    const menuY = Math.min(y, screenH - menuH - 2);
+
+    contextMenuBox = blessed.box({
+      parent: params.screen,
+      top: menuY,
+      left: menuX,
+      width: menuW,
+      height: menuH,
+      border: "line",
+      style: { ...theme().footer, border: { fg: theme().accent.fg } },
+      tags: true,
+      mouse: true,
+      keys: true,
+    });
+
+    const menuList = blessed.list({
+      parent: contextMenuBox,
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      keys: true,
+      vi: true,
+      mouse: true,
+      items: items.map(i => i.label),
+      style: { ...theme().body, selected: theme().selected },
+    });
+
+    menuList.on("select", (_item: any, index: number) => {
+      closeContextMenu();
+      items[index]?.action();
+    });
+
+    menuList.on("keypress", (_ch: any, key: any) => {
+      if (key.name === "escape" || key.name === "q") {
+        closeContextMenu();
+      }
+    });
+
+    menuList.on("blur", () => {
+      closeContextMenu();
+    });
+
+    menuList.focus();
+    params.screen.render();
+  };
+
+  const closeContextMenu = () => {
+    if (contextMenuBox) {
+      contextMenuBox.destroy();
+      contextMenuBox = null;
+      params.screen.render();
+    }
   };
 
   // ── Entry interaction ──────────────────────────────────
@@ -1044,11 +1664,32 @@ export function openFileManagerWindow(params: {
 
   // ── Key bindings: list ─────────────────────────────────
 
+  // Update preview on keyboard selection (up/down/j/k)
   list.on("select", (_, index) => {
     if (searchActive && searchResults[index]) {
       updatePreviewForSearchResult(searchResults[index]);
     } else {
       updatePreview(index);
+    }
+  });
+
+  // Update preview on mouse click — "select item" fires on any selection change including clicks
+  list.on("select item", () => {
+    const idx = (list as List & { selected: number }).selected ?? 0;
+    if (searchActive && searchResults[idx]) {
+      updatePreviewForSearchResult(searchResults[idx]);
+    } else {
+      updatePreview(idx);
+    }
+  });
+
+  // Right-click context menu on list items
+  list.on("element click", (_el: any, mouse: any) => {
+    if (mouse && (mouse.button === "right" || mouse.button === 2)) {
+      const filePath = getEntryPath();
+      if (filePath) {
+        showContextMenu(mouse.x ?? 0, mouse.y ?? 0, filePath);
+      }
     }
   });
 
@@ -1059,6 +1700,18 @@ export function openFileManagerWindow(params: {
     }
     if (key.name === "v" && !key.ctrl && !key.meta) {
       viewSelected();
+      return;
+    }
+    if (key.name === "space") {
+      quickLook();
+      return;
+    }
+    if (key.name === "c" && !key.ctrl && !key.meta) {
+      copyPathToClipboard();
+      return;
+    }
+    if (key.name === "o" && !key.ctrl && !key.meta) {
+      revealInFinder();
       return;
     }
     if (key.name === "slash") {
@@ -1073,9 +1726,7 @@ export function openFileManagerWindow(params: {
       return;
     }
     if (key.name === "s" && !key.ctrl && !key.meta) {
-      searchBox.focus();
-      renderSearchBox();
-      params.screen.render();
+      openSearchPrompt();
       return;
     }
     if (key.name === "backspace") {
@@ -1149,7 +1800,13 @@ export function openFileManagerWindow(params: {
     renderFilter();
     params.screen.render();
   });
+  // Debounce filter keypress to prevent blessed double-fire
+  let lastFilterKey = 0;
   filterBox.on("keypress", (ch, key) => {
+    const now = Date.now();
+    if (now - lastFilterKey < 30) return; // debounce < 30ms = duplicate
+    lastFilterKey = now;
+
     if (key.name === "enter" || key.name === "escape") {
       focusContentPane();
       params.screen.render();
@@ -1161,9 +1818,7 @@ export function openFileManagerWindow(params: {
       return;
     }
     if (key.name === "tab") {
-      searchBox.focus();
-      renderSearchBox();
-      params.screen.render();
+      openSearchPrompt();
       return;
     }
     if (typeof ch === "string" && /^[ -~]$/.test(ch) && !key.ctrl && !key.meta) {
@@ -1183,39 +1838,25 @@ export function openFileManagerWindow(params: {
     renderSearchBox();
     params.screen.render();
   });
-  searchBox.on("keypress", (ch, key) => {
+  // Search box click → open the overlay prompt instead of inline typing
+  searchBox.on("click", () => {
+    openSearchPrompt();
+  });
+  searchBox.on("keypress", (_ch: string, key: { name: string }) => {
+    // Any keypress on the focused search box redirects to overlay or escapes
     if (key.name === "escape") {
       focusContentPane();
       params.screen.render();
       return;
     }
-    if (key.name === "enter") {
-      if (searchMode === "simple") {
-        runSimpleSearch(searchQuery);
-      } else {
-        runAdvancedSearch(searchQuery);
-      }
-      focusContentPane();
-      return;
-    }
-    if (key.name === "backspace") {
-      searchQuery = searchQuery.slice(0, -1);
-      renderSearchBox();
-      params.screen.render();
-      return;
-    }
     if (key.name === "tab") {
-      // Tab from search box goes to filter box
       filterBox.focus();
       renderFilter();
       params.screen.render();
       return;
     }
-    if (typeof ch === "string" && /^[ -~]$/.test(ch) && !key.ctrl && !key.meta) {
-      searchQuery += ch;
-      renderSearchBox();
-      params.screen.render();
-    }
+    // All other keys → open the overlay prompt
+    openSearchPrompt();
   });
 
   // ── Icon grid navigation ────────────────────────────────
@@ -1282,6 +1923,18 @@ export function openFileManagerWindow(params: {
       }
       return;
     }
+    if (key.name === "space") {
+      quickLook(iconSelected);
+      return;
+    }
+    if (key.name === "c" && !key.ctrl && !key.meta) {
+      copyPathToClipboard(iconSelected);
+      return;
+    }
+    if (key.name === "o" && !key.ctrl && !key.meta) {
+      revealInFinder(iconSelected);
+      return;
+    }
     if (key.name === "backspace") {
       const parentPath = path.dirname(currentPath);
       if (parentPath !== currentPath) {
@@ -1303,9 +1956,7 @@ export function openFileManagerWindow(params: {
       return;
     }
     if (key.name === "s" && !key.ctrl && !key.meta) {
-      searchBox.focus();
-      renderSearchBox();
-      params.screen.render();
+      openSearchPrompt();
       return;
     }
     // Jump-to-letter
@@ -1411,10 +2062,12 @@ export function openFileManagerWindow(params: {
     renderSearchBox();
     renderStatusBar();
     if (viewMode === "icon") renderIconGrid();
+    fillDivider();
     setViewportContent(preview, previewRawContent);
     params.screen.render();
   });
   navigateTo(initialPath, params.restore?.selectedIndex ?? 0);
+  fillDivider();
   renderSearchBox();
   frame.focus();
 }
