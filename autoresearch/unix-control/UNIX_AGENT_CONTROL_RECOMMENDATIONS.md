@@ -1,7 +1,11 @@
 # Unix Philosophy for AI Agents: Recommendations for WibWob-DOS
 
 ## Executive Summary
-Research shows CLI-first, pipe-composable agent interfaces outperform REST APIs by 23.6% success rate (72% → 89%), reduce token usage 26%, and improve error recovery 88%. This document maps findings to actionable WibWob-DOS improvements.
+Architectural reasoning and anecdotal evidence suggest CLI-first, pipe-composable
+agent interfaces outperform REST APIs for autonomous agent control. No formal
+benchmark exists yet, but production projects (yabai, i3, llm, MCP) and
+WibWob-DOS session logs support the directional claim. This document maps the
+findings to actionable WibWob-DOS improvements.
 
 ---
 
@@ -56,7 +60,7 @@ GET /state → POST /windows/move → GET /state → POST /windows/resize
 
 **Testing:** Existing smoke tests cover these operations via agent tools already.
 
-**Evidence:** Atomic tools show <2% hallucination vs batch's 7-12%.
+**Evidence:** Atomic tools are expected to reduce hallucination (directional, not yet measured).
 
 ---
 
@@ -133,7 +137,7 @@ tools.push({
 
 **Cost:** ~400 lines (tool definitions + handlers).
 
-**Benefit:** Research shows 85% reduction in tool hallucination.
+**Benefit:** Simpler tool schemas are expected to reduce hallucination (general LLM tool-calling observation).
 
 ---
 
@@ -236,7 +240,7 @@ wibwob-cli commands list
 **Timeline:** 3-4 days to design, run, analyze.
 
 **Expected Outcome:**
-- Validate research findings (23.6% success improvement)
+- Validate hypothesised CLI advantage with controlled measurement
 - Generate publishable benchmark
 - Quantify savings (token cost, execution time)
 
