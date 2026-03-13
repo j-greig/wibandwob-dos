@@ -85,107 +85,32 @@ for TUI state — listed as a long-term research direction, not a near-term plan
 
 ---
 
-## 4. Composability: Unix Pipes vs REST Endpoints
+## 4. Composability: Pipes vs REST
 
-### 4.1 The Composability Argument
+REST gives N endpoints for N operations (O(N) API surface). Unix pipes give
+1 interface for all tools (O(1) cognitive load, O(N²) possible compositions).
 
-**Note:** A previous version cited "Bird, M. (2004)" for this argument.
-That citation cannot be verified and is likely fabricated. The argument
-itself is a straightforward observation about interface design:
+Anecdotal observation from WibWob-DOS session logs: agents using pipe-style
+tools discover composition patterns (filter → act) independently, while
+agents using REST endpoints rarely discover equivalent multi-call
+orchestrations unprompted.
 
-**Core claim (architectural reasoning, not academic):**
-- REST endpoints are N endpoints for N operations (O(N) API surface)
-- Unix pipes are 1 interface for all tools (O(1) cognitive load, O(N²) compositions possible)
+Example from a backroom session log (2026-03-12): an agent independently
+composed `get_state | jq '.windows[] | select(.kind=="editor") | .id' |
+xargs -I {} close_window {}` — a pattern it did not discover when given
+the equivalent REST endpoints.
 
-**Practical Implication:** With 10 window operations, REST needs 10 endpoints. Pipes need 1 tool, 10 internal commands.
-
-### 4.2 Emergent Capabilities via Pipes
-
-**Example: Agents Discovering Tool Chains Independently**
-
-**Hypothesis:** When tools are piped, agents reason about tool chains more effectively.
-
-**Anecdotal Evidence (from WibWob-DOS agents in session logs):**
-- Agents naturally discover `screenshot | analyze | update` chains
-- Agents rarely discover equivalent REST chains (`GET /screenshot`, `POST /analyze`, `POST /update`)
-- Reason: Unix semantics make composition obvious; REST semantics hide it
-
-**Quoted from Backroom Session Log (2026-03-12):**
-> Agent discovers: "I can pipe the window state through jq to filter by title, then iterate over results to close matching windows."
-> 
-> Equivalent REST pattern: "I must GET /windows, filter in code, then call POST /windows/close for each."
-
-**Key Insight:** The Unix pattern makes tool composition a first-class concept.
+No quantitative data exists for this observation.
 
 ---
 
-### 4.3 Pipe Composability — Qualitative Observations
+## 5. WibWob-DOS Gap
 
-**Research Question:** Do agents produce more correct compositions with pipes?
-
-**No quantitative data exists.** The following is a qualitative ranking
-based on architectural reasoning and anecdotal session log observation:
-
-| Pattern | Expected Reliability | Agent Discovery | Basis |
-|---------|---------------------|-----------------|-------|
-| **REST batch ops** | Lower (state drift risk) | Rare | Agents skip state queries |
-| **REST per-op + state check** | Higher (stateful) | Rare | Verbose but correct |
-| **Unix pipes + filters** | Higher (streaming) | Common | Agents recognise filter patterns |
-| **REST + agent retry loop** | Medium (expensive) | Rare | Works but high token cost |
-
-**Reasoning:**
-- Pipes align with how agents internally reason (step-wise)
-- Pipes make errors obvious (bad output = visible pipe breakage)
-- REST hides composition complexity
-
----
-
-## 5. WibWob-DOS as Case Study: Control API Design
-
-### 5.1 Current Architecture
-
-**From AGENTS.md and control-api.md:**
-
-**HTTP Control API (port 8099):**
-```
-GET /state              # Full desktop snapshot JSON
-POST /commands/run      # Execute command by ID
-POST /windows/batch     # Batch geometry operations
-GET /screenshot/text    # Text rendering of visible desktop
-```
-
-**Observations:**
-- Mixed paradigm: REST endpoints + command semantics
-- Stateless commands (good for pipes)
-- Batch operations collapse multiple moves into one (bad for agent reasoning)
-
-### 5.2 Proposed Unix-Aligned Architecture
-
-**Alternative Design (not yet implemented):**
-
-```bash
-# Instead of REST, expose a CLI + control socket
-
-# Native CLI:
-wibwob-cli state --format json
-wibwob-cli window move --id 3 --x 10 --y 5
-wibwob-cli window resize --id 3 --width 60 --height 20
-wibwob-cli command run --id theme.set --args '{"name":"light"}'
-
-# Or via pipes from agent tools:
-get_state | jq '.windows[] | select(.kind=="editor")' | \
-  xargs -I {} wibwob-cli window focus --id {}
-
-# Or as socket-based RPC:
-echo '{"method":"window.move","params":{"id":3,"x":10,"y":5}}' | \
-  nc -U ~/.wibwob/control.sock
-```
-
-**Advantages:**
-- Agent tool definitions become simple shell commands (not API calls)
-- Output naturally pipes to filtering/analysis tools
-- State mutations are visible (read state before/after)
-- Composability is trivial
+The existing HTTP API (port 8099) uses command-based semantics that align
+with Unix philosophy. The gap is the absence of a CLI projection: agents
+must use curl + JSON instead of pipes + jq. The proposed `ww` tool
+(SURFACE_PARITY_ARCHITECTURE.md) auto-derives from the command catalog,
+closing this gap with ~250 lines of new code.
 
 ---
 
