@@ -2,6 +2,7 @@ import {
   createMenuConfigs,
   createPaletteCommands,
   listAppCommands,
+  getCommandDefinition,
   type AppCommandCategory,
   type AppCommandDescriptor,
   type AppMenuActions,
@@ -9,6 +10,7 @@ import {
   type MenuPlacement,
   type PalettePlacement,
 } from "./command-catalog.js";
+import { zodToJsonSchema } from "zod-to-json-schema";
 import type { MenuConfig, MenuItem } from "./types.js";
 import { log } from "../services/app-logger.js";
 import { capabilityService, type CapabilityKey } from "../services/capability-service.js";
@@ -25,6 +27,8 @@ export interface CommandListItem {
   menuCategories: AppCommandCategory[];
   available: boolean;
   missingCapabilities?: CapabilityKey[];
+  returns?: "json" | "text" | "void";
+  params?: Record<string, unknown>;
 }
 
 export type CommandRunResult =
@@ -154,6 +158,11 @@ export class CommandRegistry {
   list(surface?: CommandSurface, opts?: { includeUnavailable?: boolean }): CommandListItem[] {
     const builtIn = this.commands.map((command) => {
       const availability = capabilityService.isAvailable(command.requires);
+      const def = getCommandDefinition(command.id);
+      let params: Record<string, unknown> | undefined;
+      if (def?.params) {
+        try { params = zodToJsonSchema(def.params, { target: "openApi3" }) as Record<string, unknown>; } catch { /* skip */ }
+      }
       return {
         id: command.id,
         label: command.label,
@@ -163,6 +172,8 @@ export class CommandRegistry {
         menuCategories: [...new Set(command.menuPlacements.map((placement) => placement.category))],
         available: availability.ok,
         missingCapabilities: availability.ok ? undefined : availability.missing,
+        returns: def?.returns,
+        params,
       };
     });
 
