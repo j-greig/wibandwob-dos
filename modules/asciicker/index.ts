@@ -459,21 +459,28 @@ function renderScene(
 
     // Project the top face of this column
     const topProj = projectPoint(wx, wy, effectiveZ, cam, sw, sh);
-    if (topProj.sx >= 0 && topProj.sx < sw && topProj.sy >= 0 && topProj.sy < sh) {
-      const idx = topProj.sy * sw + topProj.sx;
+
+    // Select glyph — animated for water, hash-based for others
+    let gi: number;
+    if (isWater) {
+      gi = (tick + wx + wy) % mat.topGlyphs.length;
+    } else {
+      gi = Math.abs((wx * 7 + wy * 13) % mat.topGlyphs.length);
+    }
+    const topGlyph = mat.topGlyphs[gi];
+    const topFlags = isWater ? 4 : 1;
+
+    // Render as a 2x1 block to fill gaps at oblique yaw angles
+    for (let px = 0; px < 2; px++) {
+      const sx = topProj.sx + px;
+      if (sx < 0 || sx >= sw || topProj.sy < 0 || topProj.sy >= sh) continue;
+      const idx = topProj.sy * sw + sx;
       if (topProj.depth > buf[idx].depth) {
-        // Select glyph — animated for water, hash-based for others
-        let gi: number;
-        if (isWater) {
-          gi = (tick + wx + wy) % mat.topGlyphs.length;
-        } else {
-          gi = Math.abs((wx * 7 + wy * 13) % mat.topGlyphs.length);
-        }
         buf[idx] = {
           depth: topProj.depth,
-          glyph: mat.topGlyphs[gi],
+          glyph: topGlyph,
           fg, bg,
-          flags: isWater ? 4 : 1,
+          flags: topFlags,
         };
       }
     }
@@ -492,22 +499,24 @@ function renderScene(
 
       const visibleHeight = effectiveZ - groundZ;
       if (visibleHeight > 1) {
-        const sideSteps = Math.min(8, Math.ceil(visibleHeight / 1.5));
+        const sideSteps = Math.min(10, Math.ceil(visibleHeight / 1.2));
         for (let s = 1; s <= sideSteps; s++) {
           const sideZ = effectiveZ - s * (visibleHeight / sideSteps);
           const sideProj = projectPoint(wx, wy, sideZ, cam, sw, sh);
-          if (sideProj.sx >= 0 && sideProj.sx < sw &&
-              sideProj.sy >= 0 && sideProj.sy < sh) {
-            const sideIdx = sideProj.sy * sw + sideProj.sx;
+          const sideDarkness = 0.4 + (s / sideSteps) * 0.3;
+          const sideFg = fogT > 0.8 ? fogColour : sideDarkness > 0.5 ? mat.fgDark : mat.fgMid;
+          const sideBg = fogT > 0.6 ? fogColour : mat.bgDark;
+          const sideGi = s % mat.sideGlyphs.length;
+          // 2-wide block for gap filling
+          for (let px = 0; px < 2; px++) {
+            const ssx = sideProj.sx + px;
+            if (ssx < 0 || ssx >= sw || sideProj.sy < 0 || sideProj.sy >= sh) continue;
+            const sideIdx = sideProj.sy * sw + ssx;
             if (sideProj.depth > buf[sideIdx].depth) {
-              // Side faces are darker — they don't face the sun
-              const sideDarkness = 0.4 + (s / sideSteps) * 0.3;
-              const sideFg = sideDarkness > 0.5 ? mat.fgDark : mat.fgMid;
-              const sideGi = s % mat.sideGlyphs.length;
               buf[sideIdx] = {
                 depth: sideProj.depth,
                 glyph: mat.sideGlyphs[sideGi],
-                fg: sideFg, bg: mat.bgDark,
+                fg: sideFg, bg: sideBg,
                 flags: 1,
               };
             }
