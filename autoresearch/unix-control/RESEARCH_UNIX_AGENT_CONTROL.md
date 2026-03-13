@@ -189,189 +189,25 @@ echo '{"method":"window.move","params":{"id":3,"x":10,"y":5}}' | \
 
 ---
 
-## 6. LLM Performance: CLI-First Evidence
+## 6. LLM Performance: Directional Hypothesis
 
-### 6.1 OpenAI Reasoning Models
+No published benchmark compares CLI-first vs REST-first agent control on
+identical tasks. The hypothesis that atomic CLI tools outperform batch REST
+endpoints rests on:
 
-**Observation from o1/o3 Evals:**
+1. General LLM tool-calling observation: simpler schemas = fewer hallucinations
+2. Architectural reasoning: atomic tools force query-before-act loops
+3. WibWob-DOS session logs: agents using pipe patterns recover from errors
+   more readily (qualitative, not quantified)
 
-When given identical task + tool definitions in two formats:
+See Section 11 for a proposed benchmark design to test this formally.
 
-**Format A: REST-style operations**
-```json
-[
-  {"name": "window.batch_update", "params": ["id", "x", "y", "w", "h", "z_order", ...]},
-  {"name": "theme.apply", "params": ["name", "intensity", ...]}
-]
-```
-
-**Format B: Unix-style atomic operations**
-```json
-[
-  {"name": "window.move", "params": ["id", "x", "y"]},
-  {"name": "window.resize", "params": ["id", "w", "h"]},
-  {"name": "window.focus", "params": ["id"]},
-  {"name": "theme.set", "params": ["name"]}
-]
-```
-
-**Expected result (directional hypothesis, not measured):**
-- Format B should show better performance on multi-step desktop control tasks
-- Format B should produce fewer "stuck" situations (agent uncertainty about state)
-- Format B should produce more re-readable chains
-
-**No published benchmark exists for this specific comparison.** The hypothesis
-is supported by the general principle that simpler tool schemas reduce
-cognitive load for LLMs, but no o1/o3 evaluation data has been published
-comparing these specific formats.
+Academic references and production project evidence are in
+UNIX_AGENT_CONTROL_EVIDENCE.md (verification status noted per source).
 
 ---
 
-### 6.2 Claude's Tool Performance
-
-**Observed pattern (anecdotal, not from published benchmarks):**
-
-Agents using atomic, composable tools appear to show:
-- Fewer tool hallucinations (inventing non-existent params)
-- Fewer state confusion errors (trying to use stale state)
-- Higher success on multi-window coordination tasks
-
-**No published data exists for these specific claims.** The directional
-observation — that simpler tool schemas reduce hallucination — is consistent
-with general LLM tool-calling literature, but the specific percentages
-previously cited here were fabricated. The pattern is plausible but unquantified.
-
-**Likely cause:** Atomic tools force agents to query state between operations. REST batch ops invite "set and forget."
-
----
-
-## 7. Academic References (Published)
-
-### 7.1 "The Unix Philosophy Revisited" — Spinellis (2016)
-**Citation:** Spinellis, D. (2016). "Effective Debugging: 66 Specific Ways to Debug Software and Systems." Addison-Wesley.  
-**Chapter 4: "Leverage the Unix Approach"**
-
-**Key Quote:**
-> "The Unix philosophy's insistence on simple, composable tools has proven to be one of the most durable software engineering principles. Tools designed for pipes and small interfaces outlast monolithic systems by decades."
-
-**Relevance:** Empirical survey of tool longevity. CLI tools age better than API-dependent tools.
-
-### 7.2 "Command-Line Tools: The Forgotten Medium for Interaction Design" — Zellweger (2020)
-**Citation:** Zellweger, P., Gigerenzer, G. (2020). "Interaction Design Review," *ACM CHI Proceedings*.
-
-**STATUS: UNVERIFIED.** This citation may be fabricated. Gerd Gigerenzer is a
-decision-science researcher at the Max Planck Institute, not typically
-a CLI/interaction design author. The specific paper title and ACM DL URL
-have not been verified against the actual CHI 2020 proceedings.
-
-**Claimed finding (treat with caution):** CLI tools enable better mental
-models than GUI/API tools because they force explicit state transitions.
-
----
-
-## 8. Projects Implementing Agent-First CLI
-
-### 8.1 Anthropic's `claude-cli` (emerging 2024-2025)
-**Status:** In development / research  
-**Concept:** CLI-first agent interaction with composable tool definitions.
-
-### 8.2 Mistral's `agent-cli` Framework
-**GitHub:** https://github.com/mistralai/agent-cli (as of 2025)  
-**Pattern:** Tools defined as shell commands, not APIs.
-
-### 8.3 LangChain's UNIX Tool Integration
-**File:** `langchain_community/tools/shell.py`  
-**Design:** Agents can execute shell commands directly, enabling pipe composition.
-
----
-
-## 9. The Plan 9 Lesson: "Everything Is a File"
-
-### 9.1 Remote Procedure Call via Filesystem
-
-**Plan 9's Design:**
-```c
-// Instead of RPC API server:
-// Interact with remote process via 9P filesystem protocol
-
-open("/proc/123/ctl", O_WRONLY);
-write(fd, "exec /bin/sh\n", ...);  // Execute remotely
-open("/proc/123/fd/0", O_WRONLY);
-write(fd, "ls -la\n", ...);         // Send stdin
-open("/proc/123/fd/1", O_RDONLY);
-read(fd, buf, ...);                 // Read stdout
-```
-
-**Universal Interface:** Every resource is readable/writable via the filesystem.
-
-### 9.2 9P Protocol (Modern Resurgence)
-
-**Current Users:**
-- Jupyter notebooks (9P backend for kernel communication)
-- Cloud storage APIs (mounting remote filesystems)
-- Container runtimes (cgroup/proc facades)
-
-**Lesson:** Filesystem abstraction scales to network services. Agents don't need special RPC knowledge.
-
----
-
-## 10. Composability Examples: Real-World Agent Chains
-
-### 10.1 Image Analysis + Window Control Pipeline
-
-**REST-style (4 separate calls):**
-```python
-# Agent code
-state = api.get_state()
-img = api.screenshot(window_id=state.focused_id)
-analysis = ai.analyze_image(img)
-api.set_theme(theme=analysis['suggested_theme'])
-api.window_move(id=state.focused_id, x=analysis['ideal_x'], y=analysis['ideal_y'])
-```
-
-**Unix pipes (1 conceptual pipeline):**
-```bash
-# Agent invokes directly
-get_state | \
-  jq -r '.focusedWindowId' | \
-  xargs -I {} screenshot {} | \
-  ai-analyze-image | \
-  jq -r '.suggestedTheme' | \
-  xargs -I {} set_theme {} && \
-screenshot | xargs -I {} move-window-to-ideal-position {}
-```
-
-**Agent Reasoning Difference:**
-- **REST:** Agent must manually orchestrate, maintain state, handle errors
-- **Unix:** Agent sees a pipeline. Errors are visible (broken pipe). Composition is automatic.
-
-### 10.2 Multi-Window Coordination
-
-**Task:** Close all editor windows, then open a fresh one.
-
-**REST:**
-```python
-state = api.get_state()
-editor_windows = [w for w in state.windows if w.kind == 'editor']
-for w in editor_windows:
-    api.window_close(id=w.id)
-api.command_run(id='editor.open', args={'path': '/tmp/new.txt'})
-```
-
-**Unix:**
-```bash
-get_state | jq '.windows[] | select(.kind=="editor") | .id' | \
-  xargs -I {} close_window {} && \
-open_editor /tmp/new.txt
-```
-
-**Observation:** The pipe version is declarative. Agent sees "filter + action" pattern. REST version is imperative loop.
-
----
-
-## 11. Benchmarking: Agent Performance on CLI vs REST
-
-### 11.1 Proposed Benchmark (Not Yet Run)
+## 7. Proposed Benchmark (Not Yet Run)
 
 **Status: HYPOTHETICAL.** No formal benchmark has been run. The numbers
 below are rough estimates extrapolated from anecdotal observations in
@@ -400,7 +236,7 @@ literature showing simpler tool schemas reduce hallucination, and
 (3) WibWob-DOS session logs where agents using pipe-like patterns recovered
 from errors more readily. None of this constitutes a controlled experiment.
 
-### 11.2 Why This Benchmark Should Be Run
+### Why This Benchmark Should Be Run
 
 Running this formally would provide the first published evidence comparing
 CLI-first vs REST-first agent control on identical tasks. Until then,
@@ -409,71 +245,7 @@ indirect evidence and architectural reasoning, not measurement.
 
 ---
 
-## 12. The Case Against REST for Agent Control
-
-### 12.1 Hidden State Problem
-
-**REST assumes:** Client maintains request/response cycle, server maintains state.
-
-**Reality for agents:** Agents want to query state, act, query state, act (loop).
-
-**Problem:** Each action requires separate API call, increasing latency and tokens.
-
-### 12.2 Batch Operations Encourage Hallucination
-
-**When agents see:**
-```json
-{
-  "op": "move and resize",
-  "params": {"id": 3, "x": 10, "y": 5, "w": 60, "h": 20}
-}
-```
-
-**Agents sometimes hallucinate:**
-- "I can change z-order in the same call"
-- "I can apply a theme filter"
-- "I can check preconditions"
-
-**When agents see atomic tools:**
-```bash
-window.move --id 3 --x 10 --y 5
-window.resize --id 3 --w 60 --h 20
-```
-
-**Agents understand:** Each tool does one thing. Chain them with pipes. Query between.
-
-### 12.3 Transport Overhead
-
-**REST:** HTTP stack, TLS, timeouts, retries, JSON serialization overhead.
-
-**Unix pipes:** Trivial overhead, streaming by default, error propagation automatic.
-
----
-
-## 13. Recommended Directions for WibWob-DOS
-
-### 13.1 Short-Term (Proven Low-Risk)
-
-1. **Keep HTTP API for backward compatibility** (humans use it fine)
-2. **Add Unix socket RPC variant** (agents prefer lower latency)
-3. **Expose atomic commands, not batch ops** to agents
-4. **Publish `/state` as queryable stream** (agents can pipe `jq`)
-
-### 13.2 Medium-Term (Experimental)
-
-1. **Build CLI wrapper** around control API
-2. **Test agent performance:** CLI vs REST on identical tasks
-3. **Iterate on tool definitions** based on what agents discover works
-
-### 13.3 Long-Term (Speculative)
-
-1. **Virtual filesystem abstraction** for desktop state (Plan 9 style)
-2. **9P protocol support** for remote agents
-3. **Publish benchmark results** showing CLI-first advantage
-
----
-
-## 14. Key Takeaways
+## 8. Key Takeaways
 
 | Finding | Confidence | Basis | Implication |
 |---------|-----------|-------|-------------|
@@ -485,64 +257,8 @@ window.resize --id 3 --w 60 --h 20
 
 ---
 
-## 15. References & Sources
+All citations with URLs and verification status: UNIX_AGENT_CONTROL_EVIDENCE.md.
+Phased implementation plan: UNIX_AGENT_CONTROL_RECOMMENDATIONS.md.
+CLI architecture and parity design: SURFACE_PARITY_ARCHITECTURE.md.
 
-### Academic & Technical Papers
-- Pike, R., Presotto, D., Thompson, K. (1995). "Plan 9 from Bell Labs." *IEEE Computer*, 28(7), 48-55. — VERIFIED, real paper.
-- Spinellis, D. (2016). "Effective Debugging: 66 Specific Ways to Debug Software and Systems." Addison-Wesley. — VERIFIED, real book. Chapter 4 discusses Unix approach.
-- Zellweger, P., Gigerenzer, G. (2020). — UNVERIFIED. Gigerenzer is a decision scientist at MPI, not a CLI researcher. The specific CHI paper cited may not exist. The ACM DL link needs manual verification. Treat any claims attributed to this source as unverified.
-- ~~Bird, M. (2004). "Shell Scripting and Pipeline Composition."~~ — REMOVED. Cannot be found in any academic database. Likely fabricated by LLM generation.
-
-### Production Projects
-- https://github.com/simonw/llm — Simon Willison's LLM CLI
-- https://github.com/anthropic-cdk/python-sdk — Anthropic MCP
-- https://github.com/koekeishiya/yabai — macOS Tiling Window Manager (agent-friendly)
-- https://github.com/i3/i3 — i3 Window Manager (IPC via JSON-RPC/Unix socket)
-- https://langchain.readthedocs.io/ — LangChain Shell Tools Integration
-
-### Informal / Anecdotal Evidence
-- WibWob-DOS session logs (backroom-log-explorer skill) — qualitative observations only
-- OpenAI cookbook examples — show preference for atomic tools but no controlled comparison
-- Community discussions (HackerNews, r/MacAdmins yabai threads) — selection bias likely
-
----
-
-## Appendix A: Related Research Areas
-
-1. **Composable Semantics in Programming Languages** — How piping enables semantic reasoning
-2. **Cognitive Load Theory Applied to API Design** — Why atomic tools > complex endpoints
-3. **State Visibility and Error Recovery** — How query-before-act reduces hallucinations
-4. **Human-AI Co-Management of Desktops** — Your WibWob-DOS concept at its core
-
----
-
-## Appendix B: Experimental Proposals
-
-### Experiment 1: Agent Performance Comparison (Feasible)
-**Hypothesis:** Agents using CLI tools outperform agents using REST on window management tasks.
-
-**Setup:**
-- 20 test scenarios (close windows, arrange by type, apply themes, etc.)
-- Two agent setups: one with REST API only, one with CLI + pipes
-- Same LLM (Claude 3.5 Sonnet)
-- Measure: success rate, tokens, turns, error recovery
-
-**Expected Duration:** 2-3 days
-
-### Experiment 2: Virtual Filesystem Mockup (Speculative)
-**Hypothesis:** Agents can reason more effectively with filesystem abstraction.
-
-**Setup:**
-- Create `/tmp/wibwob` virtual filesystem (via FUSE or HTTP mount)
-- Expose `/tmp/wibwob/state.json`, `/tmp/wibwob/windows/<id>/geometry`, etc.
-- Give agent standard Unix tools only (cat, grep, find, jq)
-- Compare success on same 20 scenarios
-
-**Expected Duration:** 1 week (prototype + eval)
-
----
-
-**Document Status:** Research brief, open for extension.  
-**Last Updated:** March 13, 2026  
-**Author:** Research Task  
-**Audience:** Technical brief for WibWob-DOS architecture decisions
+**Last Updated:** March 2026
