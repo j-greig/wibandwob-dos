@@ -1,1 +1,1 @@
-autoresearch/plasma/autoresearch.md
+autoresearch/primer-gallery/autoresearch.md

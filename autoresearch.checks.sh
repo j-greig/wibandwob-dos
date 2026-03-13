@@ -1,1 +1,1 @@
-autoresearch/plasma/autoresearch.checks.sh
+autoresearch/primer-gallery/autoresearch.checks.sh
