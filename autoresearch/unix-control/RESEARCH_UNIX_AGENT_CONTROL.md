@@ -132,41 +132,15 @@ UNIX_AGENT_CONTROL_EVIDENCE.md (verification status noted per source).
 
 ---
 
-## 7. Proposed Benchmark (Not Yet Run)
+## 7. Open Question: Formal Benchmark
 
-**Status: HYPOTHETICAL.** No formal benchmark has been run. The numbers
-below are rough estimates extrapolated from anecdotal observations in
-WibWob-DOS session logs and general LLM tool-calling patterns. They are
-included as a benchmark DESIGN, not as evidence.
+No controlled study has compared CLI-first vs REST-first agent control on
+identical tasks. A proposed benchmark: 20 multi-step WibWob-DOS desktop
+control tasks, two agent configurations (REST-only vs CLI+pipes), same LLM,
+measuring success rate, token usage, roundtrips, and error recovery.
 
-**Test Suite (proposed):** 20 multi-step desktop control tasks (WibWob-DOS domain)
-
-**Variables:**
-- **Interface:** CLI (composable tools) vs REST (batch ops)
-- **Agent:** Claude 3.5 Sonnet, GPT-4o, Mistral Large
-- **Metrics:** Success rate, token count, roundtrips, error recovery
-
-**Projected Estimates (unvalidated):**
-
-| Metric | REST (est.) | Unix/CLI (est.) | Delta (est.) | Confidence |
-|--------|-------------|-----------------|--------------|------------|
-| Success Rate | ~70-75% | ~85-90% | ~+15-20% | Low — no controlled study |
-| Avg Tokens | ~4000+ | ~3000+ | ~-25% | Low — rough observation |
-| Avg Turns | ~4 | ~3 | ~-25% | Low — anecdotal |
-| Error Recovery | ~40-50% | ~75-85% | ~+50-80% | Medium — observed pattern |
-
-These estimates derive from: (1) qualitative observation that agents using
-atomic tools query state more often, (2) the general LLM tool-calling
-literature showing simpler tool schemas reduce hallucination, and
-(3) WibWob-DOS session logs where agents using pipe-like patterns recovered
-from errors more readily. None of this constitutes a controlled experiment.
-
-### Why This Benchmark Should Be Run
-
-Running this formally would provide the first published evidence comparing
-CLI-first vs REST-first agent control on identical tasks. Until then,
-the directional claim (CLI outperforms REST for agents) rests on
-indirect evidence and architectural reasoning, not measurement.
+Until this benchmark is run, the directional claim (CLI outperforms REST
+for agents) rests on indirect evidence and architectural reasoning.
 
 ---
 
