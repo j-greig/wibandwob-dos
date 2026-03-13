@@ -47,11 +47,12 @@ the difference. Previous versions of this document cited fabricated statistics.
 
 ## 4. Composability
 
-REST: N endpoints for N operations (O(N) API surface).
-Pipes: 1 interface for all tools (O(1) cognitive load, O(N²) compositions).
+With pipes, N tools can compose in N² ways through a uniform interface (stdin/stdout).
+With REST, each composition requires explicit orchestration code.
 
-Anecdotal: WibWob-DOS session logs show agents discover pipe compositions
-(filter → act) independently but rarely construct equivalent REST orchestrations.
+Anecdotal observation from WibWob-DOS session logs: agents using pipe-style
+tools discovered filter-then-act patterns independently. This is a single
+project's qualitative observation, not a controlled study.
 
 ---
 
