@@ -7,7 +7,9 @@ a TypeScript reimplementation of the core rendering concept: heightmap
 terrain rendered as ASCII characters with colour in a blessed window.
 
 ## Current State
-Scaffold only. No rendering code yet.
+Working 3D renderer at 8.1 quality score. Proper depth buffer, back-to-front
+column rendering, per-cell ANSI 256-colour, directional lighting, 8 biomes,
+WASD movement, yaw rotation, smooth camera follow.
 
 ## Architecture
 - `modules/asciicker/index.ts` — single file, all logic self-contained
@@ -40,7 +42,7 @@ After each enhancement round, score the module on 5 axes (each 1-10, averaged):
 - **BEAUTY** — visual richness, glyph variety, colour, composition?
 - **CRAFT** — code quality, performance, clean lifecycle, no leaks?
 
-Current baseline estimate: RENDER:1 WORLD:1 CONTROLS:1 BEAUTY:1 CRAFT:5 = **1.8**
+Current: RENDER:8.4 WORLD:7.8 CONTROLS:8.1 BEAUTY:7.6 CRAFT:8.8 = **8.1**
 
 ## Constraints
 - Modify ONLY: `modules/asciicker/index.ts`

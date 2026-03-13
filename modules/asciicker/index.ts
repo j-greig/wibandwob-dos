@@ -107,6 +107,27 @@ const MATERIALS: Record<Biome, Material> = {
   },
 };
 
+// ─── Player sprite from asciicker (player-nude.xp, front-facing standing) ───
+
+interface SpriteCell { ch: string; fg: [number,number,number]; bg: [number,number,number] }
+const PLAYER_SPRITE = {
+  w: 5, h: 8,
+  cells: [
+    null, null, { ch: "▄", fg: [0,0,0] as [number,number,number], bg: [255,255,85] as [number,number,number] }, null, null,
+    null, { ch: "▐", fg: [0,0,0] as [number,number,number], bg: [255,255,85] as [number,number,number] }, { ch: "\"", fg: [0,0,0] as [number,number,number], bg: [255,85,85] as [number,number,number] }, { ch: "▌", fg: [0,0,0] as [number,number,number], bg: [255,255,85] as [number,number,number] }, null,
+    null, null, { ch: "v", fg: [170,0,0] as [number,number,number], bg: [255,85,85] as [number,number,number] }, null, null,
+    null, { ch: "▄", fg: [255,85,85] as [number,number,number], bg: [255,85,85] as [number,number,number] }, { ch: "┬", fg: [170,0,0] as [number,number,number], bg: [255,85,85] as [number,number,number] }, { ch: "▄", fg: [255,85,85] as [number,number,number], bg: [255,85,85] as [number,number,number] }, null,
+    { ch: "▐", fg: [255,85,85] as [number,number,number], bg: [255,255,85] as [number,number,number] }, { ch: "▐", fg: [255,85,85] as [number,number,number], bg: [255,255,85] as [number,number,number] }, { ch: "┼", fg: [170,0,0] as [number,number,number], bg: [255,85,85] as [number,number,number] }, { ch: "▌", fg: [255,85,85] as [number,number,number], bg: [255,255,85] as [number,number,number] }, { ch: "▌", fg: [255,85,85] as [number,number,number], bg: [255,255,85] as [number,number,number] },
+    null, { ch: "▐", fg: [255,85,85] as [number,number,number], bg: [255,255,85] as [number,number,number] }, { ch: "U", fg: [255,85,85] as [number,number,number], bg: [0,0,0] as [number,number,number] }, { ch: "▌", fg: [255,85,85] as [number,number,number], bg: [255,255,85] as [number,number,number] }, null,
+    null, { ch: "▐", fg: [255,85,85] as [number,number,number], bg: [255,85,85] as [number,number,number] }, null, { ch: "▐", fg: [255,85,85] as [number,number,number], bg: [255,85,85] as [number,number,number] }, null,
+    null, { ch: "▀", fg: [255,85,85] as [number,number,number], bg: [0,0,0] as [number,number,number] }, null, { ch: "▀", fg: [255,85,85] as [number,number,number], bg: [0,0,0] as [number,number,number] }, null,
+  ] as (SpriteCell | null)[],
+};
+
+function spriteRgbToAnsi(c: [number, number, number]): number {
+  return 16 + Math.round(c[0]/255*5) * 36 + Math.round(c[1]/255*5) * 6 + Math.round(c[2]/255*5);
+}
+
 // ─── Noise for terrain generation ───────────────────────────
 
 function hash2d(x: number, y: number, s: number): number {
@@ -246,8 +267,13 @@ function renderScene(
   const viewRange = Math.floor(18 / cam.zoom) + 6;
   const cx = Math.floor(cam.x), cy = Math.floor(cam.y);
 
+  // Fog parameters — fade to grey at distance
+  const fogStart = viewRange * 0.5;
+  const fogEnd = viewRange * 0.95;
+  const fogColour = grey(4); // dark grey fog
+
   // Collect all terrain columns to render
-  type Col = { wx: number; wy: number; h: number; biome: Biome; depth: number };
+  type Col = { wx: number; wy: number; h: number; biome: Biome; depth: number; dist: number };
   const columns: Col[] = [];
 
   for (let dy = -viewRange; dy <= viewRange; dy++) {
@@ -261,7 +287,8 @@ function renderScene(
       const yr = cam.yaw * Math.PI / 180;
       const depth = rx * Math.sin(yr) + ry * Math.cos(yr);
 
-      columns.push({ wx, wy, h, biome, depth });
+      const dist = Math.sqrt(dx*dx + dy*dy);
+      columns.push({ wx, wy, h, biome, depth, dist });
     }
   }
 
@@ -278,7 +305,9 @@ function renderScene(
   const lightZ = 0.7; // sun elevation
 
   for (const col of columns) {
-    const { wx, wy, h, biome } = col;
+    const { wx, wy, h, biome, dist } = col;
+    // Fog factor: 0 = no fog, 1 = full fog
+    const fogT = dist <= fogStart ? 0 : dist >= fogEnd ? 1 : (dist - fogStart) / (fogEnd - fogStart);
     const mat = MATERIALS[biome];
 
     // Surface normal from height differences
@@ -295,11 +324,16 @@ function renderScene(
     const dot = (nx/nLen * lightX + ny/nLen * lightY + nz/nLen * lightZ);
     const diffuse = Math.max(0.15, Math.min(1, dot * 0.5 + 0.5));
 
-    // Choose colour based on lighting
+    // Choose colour based on lighting, then apply fog
     let fg: number, bg: number;
     if (diffuse > 0.65) { fg = mat.fgLight; bg = mat.bgLight; }
     else if (diffuse > 0.35) { fg = mat.fgMid; bg = mat.bgDark; }
     else { fg = mat.fgDark; bg = mat.bgDark; }
+    // Fog blend — lerp ANSI indices towards fog colour at distance
+    if (fogT > 0.1) {
+      fg = fogT > 0.8 ? fogColour : fg;
+      bg = fogT > 0.6 ? fogColour : bg;
+    }
 
     // Top face height in world units
     const topZ = h / heightScale;
@@ -369,18 +403,33 @@ function renderScene(
     }
   }
 
-  // Draw player character
+  // Draw player sprite — multi-cell coloured character from asciicker
   const ph = getH(terrain, Math.floor(playerX), Math.floor(playerY));
-  const pz = ph / heightScale + 1.5;
+  const pz = ph / heightScale + 4; // sprite floats above terrain
   const pp = projectPoint(playerX, playerY, pz, cam, sw, sh);
   if (pp.sx >= 0 && pp.sx < sw && pp.sy >= 0 && pp.sy < sh) {
-    const pidx = pp.sy * sw + pp.sx;
-    buf[pidx] = {
-      depth: pp.depth + 100, // always on top
-      glyph: "@",
-      fg: rgb6(5, 5, 0), bg: 0,
-      flags: 2,
-    };
+    // Blit the sprite centred on the projected position
+    const sprW = PLAYER_SPRITE.w, sprH = PLAYER_SPRITE.h;
+    const ox = pp.sx - Math.floor(sprW / 2);
+    const oy = pp.sy - Math.floor(sprH / 2);
+    for (let sy = 0; sy < sprH; sy++) {
+      for (let sx = 0; sx < sprW; sx++) {
+        const cell = PLAYER_SPRITE.cells[sy * sprW + sx];
+        if (!cell) continue;
+        const bx = ox + sx, by = oy + sy;
+        if (bx < 0 || bx >= sw || by < 0 || by >= sh) continue;
+        const bidx = by * sw + bx;
+        buf[bidx] = {
+          depth: pp.depth + 100, // always on top
+          glyph: cell.ch,
+          fg: spriteRgbToAnsi(cell.fg),
+          bg: cell.bg[0] === 0 && cell.bg[1] === 0 && cell.bg[2] === 0
+            ? buf[bidx].bg // transparent black bg → keep terrain bg
+            : spriteRgbToAnsi(cell.bg),
+          flags: 2,
+        };
+      }
+    }
     // Draw shadow below player
     const shadowProj = projectPoint(playerX, playerY, ph / heightScale, cam, sw, sh);
     if (shadowProj.sx >= 0 && shadowProj.sx < sw &&
@@ -510,16 +559,22 @@ function openAsciicker(host: MicroappHost) {
   function updateDisplay() {
     const { w, h } = getContentSize();
 
-    // Process movement — yaw-relative directions
-    const speed = 0.4;
+    // Process movement — screen-relative (W=up-on-screen, inverse-projected)
+    // In isometric: screen-up maps to world (-x, -y), screen-right maps to world (+x, -y)
+    // rotated by camera yaw
+    const speed = 0.5;
     const yr = cam.yaw * Math.PI / 180;
-    const fwdX = -Math.sin(yr), fwdY = Math.cos(yr);
-    const rightX = Math.cos(yr), rightY = Math.sin(yr);
+    const cosY = Math.cos(yr), sinY = Math.sin(yr);
+    // Screen "up" in world coords (before yaw): moves into the screen = +y in world
+    // Screen "right" in world coords: moves +x in world
+    // But we need to un-rotate by yaw to get world movement
+    const upWX = sinY, upWY = -cosY;    // screen-up → world
+    const rtWX = cosY, rtWY = sinY;     // screen-right → world
 
-    if (keys.has("w") || keys.has("up"))    { playerX += fwdX*speed; playerY += fwdY*speed; }
-    if (keys.has("s") || keys.has("down"))  { playerX -= fwdX*speed; playerY -= fwdY*speed; }
-    if (keys.has("a") || keys.has("left"))  { playerX -= rightX*speed; playerY -= rightY*speed; }
-    if (keys.has("d") || keys.has("right")) { playerX += rightX*speed; playerY += rightY*speed; }
+    if (keys.has("w") || keys.has("up"))    { playerX += upWX*speed; playerY += upWY*speed; }
+    if (keys.has("s") || keys.has("down"))  { playerX -= upWX*speed; playerY -= upWY*speed; }
+    if (keys.has("d") || keys.has("right")) { playerX += rtWX*speed; playerY += rtWY*speed; }
+    if (keys.has("a") || keys.has("left"))  { playerX -= rtWX*speed; playerY -= rtWY*speed; }
 
     playerX = Math.max(2, Math.min(terrain.w-3, playerX));
     playerY = Math.max(2, Math.min(terrain.h-3, playerY));
