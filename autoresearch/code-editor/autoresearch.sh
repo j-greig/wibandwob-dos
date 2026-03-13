@@ -69,11 +69,12 @@ for w in d.get('windows',[]):
         break
 " 2>/dev/null)
 
-# 6. Read source for analysis
-SOURCE=$(cat modules/asciicker/index.ts)
-SOURCE_LINES=$(wc -l < modules/asciicker/index.ts)
+# 6. Read source for analysis — all .ts files in the module
+SOURCE=$(cat modules/asciicker/*.ts)
+SOURCE_LINES=$(cat modules/asciicker/*.ts | wc -l)
+SOURCE_FILE_COUNT=$(ls modules/asciicker/*.ts | wc -l)
 
-echo "--- source lines: $SOURCE_LINES ---"
+echo "--- source: $SOURCE_LINES lines in $SOURCE_FILE_COUNT files ---"
 
 # 7. Score via LLM
 echo "--- scoring ---"
