@@ -1,29 +1,30 @@
 # Autoresearch Ideas: Unix Control Brief Enhancement
 
-## High-impact consolidation moves
-- MERGE SUMMARY into RESEARCH as its opening section — SUMMARY has unique claims not in RESEARCH (violates "summary is strict subset" rule), and the same performance table appears in BOTH
-- MERGE EVIDENCE into RESEARCH — evidence IS research, having two files splits one concern across two owners
-- KILL INDEX entirely — it's 413 lines of navigation/cross-references that repeat every finding. A 10-line "reading order" section at the top of RESEARCH replaces it
-- Result: 8 scored files → 4-5 files, ~40% line reduction, zero content loss
+## DONE
+- [x] Killed fabricated benchmarks across all files (R 3.0 -> 6.8)
+- [x] Gutted INDEX from 413 -> 45 lines
+- [x] Trashed SUMMARY (RESEARCH serves both roles now)
+- [x] Rewrote EVIDENCE: pure citations + verification status
+- [x] Consolidated RESEARCH: 720 -> 200 lines
+- [x] Trimmed RECOMMENDATIONS: 470 -> 95 lines
+- [x] Compressed REFERENCE_CLI_TOOLS_RANKED: tiers 3-4 to table
 
-## Rigour wins (currently ~5.0)
-- The +23.6% / -26% / -31% performance deltas appear as "Anthropic o1/o3 evals + internal testing" — this is almost certainly LLM confabulation. No public source exists. MUST be labelled as hypothetical/projected, not empirical
-- The Bird 2004 "Composability Theorem" citation looks fabricated — no such paper exists
-- Zellweger & Gigerenzer 2020 CHI paper — Gigerenzer is a decision-science researcher at MPI, not a CLI researcher. The ACM DL link needs verification. Likely confabulated.
-- The "Verification Checklist" in EVIDENCE has all boxes checked — dishonest given unverified claims above
+## Next moves to break past 6.0
 
-## Density wins (currently ~6.0)
-- Same core argument ("CLI > REST for agents") restated 5+ times across files
-- Heavy emoji use in SUMMARY and EVIDENCE (📊🎯🚀💡⚠️) adds visual noise
-- INDEX has 413 lines but could be 20 lines of links
-- RECOMMENDATIONS repeats the performance table AGAIN, then adds week-by-week schedules that are already stale
+### COHERENCE (5.5 -> 7.5 needed)
+- Merge devnote-parity-problem INTO SURFACE_PARITY — they cover the same topic
+- Merge devnote-cli-naming INTO REFERENCE_CLI_TOOLS_RANKED — naming IS part of design
+- Result: 8 files -> 6 files. Fewer files = higher coherence automatically.
+- Make cross-references between remaining files explicit and bidirectional
 
-## Actionability wins
-- SURFACE_PARITY_ARCHITECTURE.md is the most actionable doc — it has the actual code, the "50-line CLI" sketch, the package recommendations. It should be the CENTRAL document.
-- The devnotes (naming strategy, parity problem) are sharp and opinionated — they should be sections in SURFACE_PARITY, not standalone files
-- RECOMMENDATIONS has good Phase 1/2/3 structure but the week-by-week timeline is speculative filler
+### DENSITY (4.8 -> 7.5 needed)
+- SURFACE_PARITY still has verbose "Option B/C/D" comparisons that were already rejected — trim to just "Option A (recommended)" with a 1-line note on why others were rejected
+- REFERENCE_CLI_TOOLS_RANKED proposed grammar section has examples that overlap with SURFACE_PARITY's "50-line CLI" — pick one home
 
-## Coherence wins
-- Performance delta table (72%→89%, etc.) appears in: SUMMARY, EVIDENCE, RESEARCH, INDEX, RECOMMENDATIONS — FIVE times
-- Project list (llm, MCP, yabai, i3) appears in: SUMMARY, EVIDENCE, RESEARCH, INDEX — FOUR times
-- The "Before vs After" code examples appear in both RESEARCH and RECOMMENDATIONS
+### EVIDENCE (5.2 -> 7.5 needed)
+- The evidence itself is thin — only 2 verified academic papers, rest is project repos
+- Could strengthen by adding real evidence: actual WibWob-DOS session log excerpts showing agent pipe discovery patterns (not fabricated, actually pulled from backroom logs)
+- Could verify the Zellweger paper URL manually via the ACM DL
+
+### ACTIONABILITY (7.8 -> 8.0 needed)
+- Close to threshold. SURFACE_PARITY is strong. Maybe add concrete "test it" commands that an agent could run right now against the live API.
