@@ -30,6 +30,13 @@ Recipe: header bar, vertical divider, rich status bar, toolbar buttons with hove
 Works for: Code Editor
 Recipe: branded box-drawing title, keyboard shortcuts, navigation reference, italic hints
 
+## Rubric Evolution (next session)
+Current: LAYOUT, READABILITY, AESTHETIC, COHERENCE, CHARACTER (5 axes)
+Proposed: LAYOUT, READABILITY, FUNCTIONALITY, AESTHETIC, CHARACTER (5 axes)
+- Merge COHERENCE into CHARACTER (both about identity and connectedness)
+- Add FUNCTIONALITY: does the app have expected features? Does it feel complete?
+- This better captures "is this actually useful" vs "does this look pretty"
+
 ## Next Targets
 - Code Editor 9.2→10: indent guides, bracket matching, scroll position minimap
 - Contour Studio: gorgeous art, minimal chrome — status bar could be richer
