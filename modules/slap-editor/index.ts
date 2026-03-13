@@ -9,7 +9,7 @@ import blessed from "blessed";
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
 import { createTimer, clearTimers } from "../../src/services/microapp-sdk.js";
 import { EditorEngine, type EditorTheme } from "./editor-engine.js";
-import { highlightCode, HIGHLIGHTED_LANGUAGES } from "../../src/services/syntax-highlight.js";
+import { highlightCode, HIGHLIGHTED_LANGUAGES } from "../../src/services/microapp-sdk.js";
 
 export default function setup(host: MicroappHost) {
   host.registerCommand({
@@ -432,8 +432,10 @@ async function openEditor(host: MicroappHost, filePath?: string) {
     "          Home/End   Line start/end",
     "          PgUp/PgDn  Page scroll",
     "",
-    "          Start typing to begin editing.",
-    "          Open a file via the command palette.",
+    "          Ctrl+O     Open file...",
+    "",
+    "          Start typing to begin editing,",
+    "          or press Ctrl+O to open a file.",
   ];
 
   // Cached highlighted lines
@@ -798,6 +800,29 @@ async function openEditor(host: MicroappHost, filePath?: string) {
       findInput = ":";
     } else if (ctrl && key.name === "b") {
       toggleSidebar();
+      return;
+    } else if (ctrl && key.name === "o") {
+      // Open file picker
+      const startDir = engine.filePath
+        ? require("path").dirname(engine.filePath)
+        : host.repoRoot;
+      host.pickFile("Open File", startDir, (filePath) => {
+        engine.loadFile(filePath).then(() => {
+          highlightDirty = true;
+          loadSidebarFiles();
+          sidebarVisible = true;
+          const sl = SIDEBAR_WIDTH + 1;
+          gutterBox.left = sl;
+          textBox.left = sl + (Number(gutterBox.width) || 5);
+          sidebarHeader.show();
+          sidebarBox.show();
+          sidebarDivider.show();
+          win.setTitle(`Edit: ${filePath.split("/").pop()}`);
+          render();
+        });
+      }, {
+        fileFilter: (fp, isDir) => isDir || /\.(ts|tsx|js|jsx|json|md|txt|py|rs|go|c|cpp|h|sh|bash|css|html|xml|yaml|yml|toml)$/i.test(fp),
+      });
       return;
     }
     // Editing (mark highlight dirty)

@@ -52,6 +52,9 @@ a function call.
 |---------|-----|
 | Importing from `src/core/app-controller.ts` | Never — use the host API |
 | Importing from `src/core/*` directly | Import from `../../src/services/microapp-sdk.js` — if something is missing, add the re-export there |
+| Importing from `src/services/syntax-highlight.js` | Use `highlightCode` from the SDK |
+| Importing from `src/core/theme/types.js` | Use `ThemeVariant` from the SDK |
+| Importing from `src/services/figlet-service.js` | Use `renderFigletLines` etc from the SDK (already re-exported) |
 | `spawnSync("figlet", ...)` | Use `renderFiglet` from the SDK — cached, safe fallback |
 | Hand-built tab bar + key bindings | Use `createTabs` from the SDK |
 | Copy-pasting pattern generators | Import from `PATTERNS` or individual named exports |
