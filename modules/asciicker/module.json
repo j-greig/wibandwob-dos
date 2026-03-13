@@ -7,7 +7,7 @@
   "microapp": {
     "id": "wibwob.asciicker",
     "title": "Asciicker",
-    "description": "Asciicker microapp scaffold.",
+    "description": "ASCII 3D world engine — port of asciicker (MIT).",
     "multiInstance": false,
     "persist": false,
     "menu": [
