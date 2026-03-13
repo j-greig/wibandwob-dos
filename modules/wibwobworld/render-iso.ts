@@ -10,8 +10,8 @@ import {
   type TerrainObject,
 } from "../../src/services/microapp-sdk.js";
 
-// Vertical exaggeration — higher = more dramatic height difference
-const ISO_EXAGGERATION = 10;
+// Vertical exaggeration — controls height difference vs. map coverage tradeoff
+const ISO_EXAGGERATION = 6;
 
 // Biome top-surface colours — lusher, more varied than defaults
 const ISO_BIOME_COLORS: Record<TerrainBiome, string> = {

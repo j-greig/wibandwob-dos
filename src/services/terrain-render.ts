@@ -345,28 +345,47 @@ function renderFirstPerson(
       // Perspective distance: bottom row = nearest, horizon = farthest
       const perspDist = 1 - frac; // 0=very near, 1=at horizon
       if (camElev < sea + 0.08) {
-        // Standing in/near water — rich depth-graded ocean
-        if (perspDist > 0.8) {
-          // Near horizon: calm deep water
-          canvas[r]![col] = tag("blue", ((col + r) & 3) === 0 ? "~" : " ");
+        // Standing in/near water — rich depth-graded ocean with reflections
+        const wave1 = Math.sin(col * 0.5 + r * 0.2) * Math.cos(col * 0.15);
+        const wave2 = Math.sin(col * 0.3 + r * 0.15);
+        const chop = Math.sin(col * 0.8 + r * 0.4) + Math.cos(col * 0.3 - r * 0.6) * 0.5;
+        // Sun reflection on water
+        const sunReflDist = Math.abs(col - sunCol);
+        const isSunRefl = sunReflDist < 8 + frac * 15 && perspDist > 0.3;
+
+        if (perspDist > 0.85) {
+          // Near horizon: sky reflection, calm
+          if (isSunRefl && sunReflDist < 4) {
+            canvas[r]![col] = tag("light-yellow", "~");
+          } else {
+            canvas[r]![col] = tag("blue", ((col + r) & 5) === 0 ? "~" : " ");
+          }
         } else if (perspDist > 0.6) {
-          // Mid distance: gentle swells
-          const swell = Math.sin(col * 0.3 + r * 0.15);
-          canvas[r]![col] = tag("blue", swell > 0.3 ? "~" : swell > -0.3 ? "∽" : " ");
-        } else if (perspDist > 0.35) {
-          // Closer: visible waves
-          const wave = Math.sin(col * 0.5 + r * 0.2) * Math.cos(col * 0.15);
-          if (wave > 0.4) canvas[r]![col] = tag("cyan", "≈");
-          else if (wave > 0) canvas[r]![col] = tag("cyan", "~");
-          else if (wave > -0.3) canvas[r]![col] = tag("blue", "∽");
+          // Mid distance: gentle swells with colour variation
+          if (isSunRefl) {
+            canvas[r]![col] = tag("yellow", wave2 > 0 ? "≈" : "~");
+          } else if (wave2 > 0.3) {
+            canvas[r]![col] = tag("cyan", "~");
+          } else if (wave2 > -0.3) {
+            canvas[r]![col] = tag("blue", "∽");
+          } else {
+            canvas[r]![col] = tag("blue", " ");
+          }
+        } else if (perspDist > 0.3) {
+          // Closer: visible waves with foam caps
+          if (wave1 > 0.6) canvas[r]![col] = tag("light-white", "~");
+          else if (wave1 > 0.3) canvas[r]![col] = tag("light-cyan", "≈");
+          else if (wave1 > 0) canvas[r]![col] = tag("cyan", "~");
+          else if (wave1 > -0.3) canvas[r]![col] = tag("blue", "∽");
           else canvas[r]![col] = tag("blue", " ");
         } else {
-          // Very near: detailed choppy water with foam
-          const chop = Math.sin(col * 0.8 + r * 0.4) + Math.cos(col * 0.3 - r * 0.6) * 0.5;
-          if (chop > 0.8) canvas[r]![col] = tag("light-white", "~");
-          else if (chop > 0.3) canvas[r]![col] = tag("light-cyan", "≈");
-          else if (chop > -0.2) canvas[r]![col] = tag("cyan", "~");
-          else canvas[r]![col] = tag("blue", "∽");
+          // Very near: detailed choppy water with foam spray
+          if (chop > 0.9) canvas[r]![col] = tag("light-white", "≈");
+          else if (chop > 0.5) canvas[r]![col] = tag("light-white", "~");
+          else if (chop > 0.2) canvas[r]![col] = tag("light-cyan", "≈");
+          else if (chop > -0.1) canvas[r]![col] = tag("cyan", "~");
+          else if (chop > -0.4) canvas[r]![col] = tag("blue", "∽");
+          else canvas[r]![col] = tag("blue", " ");
         }
       } else {
         // Solid ground with perspective texture
@@ -392,81 +411,154 @@ function renderFirstPerson(
     }
   }
 
-  // ── Sky rendering ──
-  // Sun glow
+  // ── Sky rendering — layered atmosphere ──
+  // Noise helper for cloud generation
+  const noise2d = (x: number, y: number, sx: number, sy: number) =>
+    Math.sin(x * sx + y * sy * 0.7) * Math.cos(x * sx * 0.5 - y * sy) +
+    Math.sin(x * sx * 0.3 + y * sy * 1.2) * 0.5;
+
   for (let r = 0; r < SH; r++) {
     for (let col = 0; col < SW; col++) {
       if (canvas[r]![col] !== null) continue;
-      const frac = HORIZON > 0 ? r / HORIZON : 0;
+      const frac = HORIZON > 0 ? r / HORIZON : 0; // 0=top, 1=horizon
 
-      // Sun and sun glow
+      // Sun and sun glow — large, warm, radiating
       const dSunC = Math.abs(col - sunCol);
       const dSunR = Math.abs(r - sunRow);
-      const dSun = Math.sqrt(dSunC * dSunC + dSunR * dSunR * 4); // stretch vertically
-      if (dSun < 2) {
-        canvas[r]![col] = tag("light-yellow", "☀");
-        continue;
-      }
-      if (dSun < 5) {
-        canvas[r]![col] = tag("light-yellow", "·");
-        continue;
-      }
-      if (dSun < 10) {
-        canvas[r]![col] = tag("yellow", "·");
-        continue;
-      }
+      const dSun = Math.sqrt(dSunC * dSunC + dSunR * dSunR * 4);
+      if (dSun < 2) { canvas[r]![col] = tag("light-yellow", "☀"); continue; }
+      if (dSun < 6) { canvas[r]![col] = tag("light-yellow", "◌"); continue; }
+      if (dSun < 12) { canvas[r]![col] = tag("yellow", "·"); continue; }
 
-      // Horizon glow band
-      if (frac > 0.88) {
-        // Warm horizon glow
-        const glowIntensity = (frac - 0.88) / 0.12;
-        if (dSun < 25) {
-          canvas[r]![col] = tag("light-yellow", glowIntensity > 0.5 ? "░" : "·");
-        } else {
-          canvas[r]![col] = tag("light-cyan", "░");
-        }
-        continue;
-      }
-      if (frac > 0.75) {
-        canvas[r]![col] = tag("light-cyan", "·");
-        continue;
-      }
-      if (frac > 0.55) {
-        canvas[r]![col] = tag("cyan", "·");
-        continue;
-      }
-
-      // Mid sky: clouds
-      if (frac > 0.3) {
-        const cx = col * 0.12;
-        const cy = r * 0.25;
-        const cn1 = Math.sin(cx + cy * 0.7) * Math.cos(cx * 0.5 - cy);
-        const cn2 = Math.sin(cx * 0.3 + cy * 1.2) * 0.5;
-        const cloud = cn1 + cn2;
-        if (cloud > 0.85) {
-          canvas[r]![col] = tag("light-white", "█");
-        } else if (cloud > 0.65) {
-          canvas[r]![col] = tag("light-white", "▓");
-        } else if (cloud > 0.5) {
-          canvas[r]![col] = tag("light-white", "░");
-        } else {
-          canvas[r]![col] = tag("blue", "·");
-        }
-        continue;
-      }
-
-      // Upper sky: deep blue with occasional stars
-      if (frac < 0.08) {
-        const starRoll = Math.sin(col * 7.3 + r * 13.1) * 0.5 + 0.5;
-        if (starRoll > 0.96) {
+      // ── Layer 1: Zenith (frac 0–0.12) — deep space, stars ──
+      if (frac < 0.12) {
+        const starHash = Math.sin(col * 7.3 + r * 13.1) * 0.5 + 0.5;
+        const starHash2 = Math.sin(col * 11.7 + r * 5.3) * 0.5 + 0.5;
+        if (starHash > 0.96) {
           canvas[r]![col] = tag("light-white", "✦");
-        } else if (starRoll > 0.93) {
+        } else if (starHash > 0.93) {
           canvas[r]![col] = tag("light-white", "·");
+        } else if (starHash2 > 0.97) {
+          canvas[r]![col] = tag("cyan", "·");
         } else {
-          canvas[r]![col] = tag("blue", " ");
+          // Deep blue gradient — darker at very top
+          canvas[r]![col] = frac < 0.04
+            ? tag("blue", " ")
+            : tag("blue", ((col + r) & 7) === 0 ? "·" : " ");
         }
-      } else {
-        canvas[r]![col] = tag("blue", "·");
+        continue;
+      }
+
+      // ── Layer 2: Upper sky (frac 0.12–0.35) — high cirrus clouds ──
+      if (frac < 0.35) {
+        // Wispy high-altitude clouds
+        const cirrus = noise2d(col, r, 0.06, 0.15);
+        const cirrus2 = Math.sin(col * 0.04 + r * 0.08) * 0.4;
+        const combined = cirrus + cirrus2;
+        if (combined > 1.0) {
+          canvas[r]![col] = tag("light-white", "░");
+        } else if (combined > 0.75) {
+          canvas[r]![col] = tag("light-cyan", "·");
+        } else {
+          // Blue sky with subtle gradient
+          const skyDensity = frac < 0.2 ? 5 : 3;
+          canvas[r]![col] = ((col + r * 2) % skyDensity === 0)
+            ? tag("blue", "·")
+            : tag("blue", " ");
+        }
+        continue;
+      }
+
+      // ── Layer 3: Mid sky (frac 0.35–0.6) — cumulus cloud band ──
+      if (frac < 0.6) {
+        const cx = col * 0.09;
+        const cy = r * 0.2;
+        const cloud1 = noise2d(col, r, 0.09, 0.2);
+        const cloud2 = Math.sin(cx * 1.7 + cy * 0.5) * Math.cos(cx * 0.8 + cy * 1.3) * 0.6;
+        const cloud3 = Math.sin(col * 0.02 + r * 0.05) * 0.3; // large-scale patches
+        const cloud = cloud1 + cloud2 + cloud3;
+
+        // Cloud shadow effect — slightly darker below dense clouds
+        const cloudBrightness = frac < 0.48 ? 0 : 0.15; // upper clouds brighter
+
+        if (cloud > 1.1 - cloudBrightness) {
+          canvas[r]![col] = tag("light-white", "█");
+        } else if (cloud > 0.85 - cloudBrightness) {
+          canvas[r]![col] = tag("light-white", "▓");
+        } else if (cloud > 0.6 - cloudBrightness) {
+          canvas[r]![col] = tag("light-white", "░");
+        } else if (cloud > 0.4) {
+          canvas[r]![col] = tag("light-cyan", "░");
+        } else {
+          // Sky between clouds — cyan gradient
+          canvas[r]![col] = ((col + r) & 3) === 0
+            ? tag("cyan", "·")
+            : tag("cyan", " ");
+        }
+        continue;
+      }
+
+      // ── Layer 4: Low sky (frac 0.6–0.8) — atmospheric haze ──
+      if (frac < 0.8) {
+        // Low scattered clouds + haze building toward horizon
+        const haze = noise2d(col, r, 0.07, 0.12);
+        const hazeFrac = (frac - 0.6) / 0.2; // 0=top of band, 1=bottom
+
+        // Sun pillar effect near sun column
+        const sunDist = Math.abs(col - sunCol);
+        if (sunDist < 15 && dSun < 40) {
+          const pillarStrength = (1 - sunDist / 15) * (1 - hazeFrac * 0.5);
+          if (pillarStrength > 0.5) {
+            canvas[r]![col] = tag("yellow", "░");
+            continue;
+          }
+        }
+
+        if (haze > 0.7) {
+          canvas[r]![col] = tag("light-white", hazeFrac > 0.5 ? "▓" : "░");
+        } else if (haze > 0.3) {
+          canvas[r]![col] = tag("light-cyan", hazeFrac > 0.6 ? "░" : "·");
+        } else {
+          canvas[r]![col] = hazeFrac > 0.7
+            ? tag("light-cyan", "·")
+            : tag("cyan", " ");
+        }
+        continue;
+      }
+
+      // ── Layer 5: Horizon glow (frac 0.8–1.0) — warm atmospheric band ──
+      {
+        const horizFrac = (frac - 0.8) / 0.2;
+        const sunDist = Math.abs(col - sunCol);
+        const nearSun = sunDist < 30;
+
+        if (horizFrac > 0.7) {
+          // Very near horizon — bright glow
+          if (nearSun) {
+            const glow = 1 - sunDist / 30;
+            canvas[r]![col] = glow > 0.5
+              ? tag("light-yellow", "▓")
+              : tag("yellow", "░");
+          } else {
+            canvas[r]![col] = tag("light-cyan", "░");
+          }
+        } else if (horizFrac > 0.4) {
+          if (nearSun) {
+            canvas[r]![col] = tag("yellow", "░");
+          } else {
+            canvas[r]![col] = tag("light-cyan", "·");
+          }
+        } else {
+          // Upper horizon glow
+          const haze = noise2d(col, r, 0.05, 0.1);
+          if (haze > 0.5) {
+            canvas[r]![col] = tag("light-white", "░");
+          } else {
+            canvas[r]![col] = nearSun
+              ? tag("yellow", "·")
+              : tag("light-cyan", " ");
+          }
+        }
       }
     }
   }
