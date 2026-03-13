@@ -312,9 +312,117 @@ export class ChromeBrowserService {
         }
       }
 
+      // Post-check: if markdown still contains significant HTML, the extraction failed —
+      // fall back to a clean text-only extraction from the rendered page.
+      // Also retry if content is thin (< 2000 chars) — many pages have much more.
+      const htmlTagCount = (markdown.match(/<[^>]+>/g)?.length ?? 0);
+      const htmlHeavy = htmlTagCount > 10;
+      const thinContent = markdown.length < 2000;
+      if (htmlHeavy || thinContent) {
+        try {
+          const textExtract = await this.page!.evaluate(() => {
+            // Try progressively broader selectors for main content
+            const root = document.querySelector(
+              // GitHub README
+              ".markdown-body, " +
+              // Standard semantic
+              "main article, article, [role='main'], " +
+              // Common class patterns
+              ".content, #content, .post-content, .entry-content, " +
+              // MDN, docs sites
+              ".article-content, .doc-content, " +
+              // Fallback
+              "main"
+            ) || document.body;
+            // Remove noise
+            root.querySelectorAll(
+              "nav, footer, header, aside, script, style, noscript, " +
+              "[role='navigation'], [role='banner'], [role='contentinfo']"
+            ).forEach(el => el.remove());
+
+            const lines: string[] = [];
+            const seen = new Set<string>();
+
+            const walk = (el: Element, depth: number) => {
+              if (depth > 30) return;
+              const style = window.getComputedStyle(el);
+              if (style.display === "none" || style.visibility === "hidden") return;
+
+              const tag = el.tagName.toLowerCase();
+              // Skip noise tags
+              if (["script", "style", "noscript", "svg", "path"].includes(tag)) return;
+
+              if (/^h[1-6]$/.test(tag)) {
+                const text = el.textContent?.trim();
+                if (text && text.length > 1 && !seen.has(text)) {
+                  seen.add(text);
+                  const level = parseInt(tag[1]!);
+                  lines.push("\n" + "#".repeat(level) + " " + text + "\n");
+                }
+                return;
+              }
+
+              if (tag === "img") {
+                const src = (el as HTMLImageElement).src;
+                const alt = el.getAttribute("alt") || "";
+                if (src && !src.includes("data:")) lines.push(`![${alt}](${src})`);
+                return;
+              }
+
+              if (tag === "a") {
+                const text = el.textContent?.trim();
+                const href = (el as HTMLAnchorElement).href;
+                if (text && text.length > 1 && !seen.has(text)) {
+                  seen.add(text);
+                  if (href && !href.startsWith("javascript:")) {
+                    lines.push(`[${text}](${href})`);
+                  } else {
+                    lines.push(text);
+                  }
+                }
+                return;
+              }
+
+              if (tag === "pre" || tag === "code") {
+                const text = el.textContent?.trim();
+                if (text && !seen.has(text)) {
+                  seen.add(text);
+                  lines.push("\n```\n" + text + "\n```\n");
+                }
+                return;
+              }
+
+              // Block-level text elements
+              if (["p", "li", "td", "th", "dd", "dt", "blockquote", "figcaption"].includes(tag)) {
+                const text = el.textContent?.trim();
+                if (text && text.length > 2 && !seen.has(text)) {
+                  seen.add(text);
+                  const prefix = tag === "li" ? "- " : tag === "blockquote" ? "> " : "";
+                  lines.push(prefix + text);
+                }
+                return;
+              }
+
+              // Recurse into containers
+              for (const child of el.children) walk(child, depth + 1);
+            };
+
+            walk(root, 0);
+            return lines.join("\n");
+          });
+
+          // Prefer text extract if: original was HTML-heavy, or text extract has more content
+          const textIsRicher = textExtract.length > markdown.length;
+          const textIsSubstantial = textExtract.length > 500;
+          if (textExtract && (htmlHeavy || (thinContent && textIsRicher) || textIsRicher)) {
+            markdown = textExtract;
+          }
+        } catch { /* text extraction failed, keep what we have */ }
+      }
+
       // Thin-content detection: if Readability returned very little,
       // try a structured DOM walk of the rendered page
-      if (markdown.length < 500) {
+      if (markdown.length < 2000) {
         try {
           const domText = await this.page!.evaluate(() => {
             const root = document.querySelector("main, article, [role='main'], .content, #content") || document.body;
