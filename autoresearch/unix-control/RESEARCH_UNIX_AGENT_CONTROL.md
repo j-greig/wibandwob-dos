@@ -30,50 +30,27 @@ See REFERENCE_CLI_TOOLS_RANKED.md for detailed scoring of 12 CLI tools.
 
 ---
 
-## 3. Tool-Calling: Atomic vs Batch
+## 3. Analysis
 
-Agents appear to perform better with atomic, single-purpose tools. A batch
-tool like `updateWindowState(id, x, y, w, h, z, theme, focus)` invites
-agents to invent non-existent parameters. Atomic tools like `window.move(id, x, y)`
-leave nothing to hallucinate.
+**Atomic vs batch tools.** Agents appear to perform better with atomic
+tools (`window.move(id, x, y)`) than batch endpoints that combine many
+parameters. Atomic tools leave nothing to hallucinate and force state
+queries between operations. This is a qualitative observation — no
+published benchmark quantifies the difference.
 
-For WibWob-DOS: agents should use atomic operations with state queries between
-each step rather than `POST /windows/batch`.
+**Composability.** Pipes compose through stdin/stdout without explicit
+orchestration (Pike et al., 1995; Spinellis, 2016). Whether this
+architectural advantage translates to measurably better LLM performance
+is untested — see Section 7.
 
-Caveat: this is a qualitative observation. No published benchmark quantifies
-the difference. Previous versions of this document cited fabricated statistics.
-
----
-
-## 4. Composability
-
-Pipes compose through a uniform interface (stdin/stdout) without explicit
-orchestration. REST requires purpose-built code for each multi-step workflow.
-
-This architectural advantage is well-established in systems design (Pike et al.,
-1995; Spinellis, 2016). Whether it translates to measurably better LLM agent
-performance is an open question — see Section 10.
+**WibWob-DOS gap.** The HTTP API (port 8099) already uses command-based
+semantics. The gap: no CLI projection. The `ww` tool
+(SURFACE_PARITY_ARCHITECTURE.md) auto-derives from the command catalog,
+closing this with ~250 lines of code.
 
 ---
 
-## 5. Virtual Filesystems (Speculative)
-
-Plan 9's everything-is-a-file model (Pike et al., 1995) scales to system
-control — proven by Linux `/proc` and `/sys`. Applying this to TUI state
-(a desktop `/proc` for WibWob-DOS) is an unproven long-term direction.
-
----
-
-## 6. WibWob-DOS Gap
-
-The HTTP API (port 8099) already uses command-based semantics aligned with
-Unix philosophy. The gap: no CLI projection. Agents use curl + JSON instead
-of pipes + jq. The `ww` tool (SURFACE_PARITY_ARCHITECTURE.md) auto-derives
-from the command catalog, closing this with ~250 lines of new code.
-
----
-
-## 7. Key Takeaways
+## 4. Key Takeaways
 
 | Finding | Confidence | Basis |
 |---------|-----------|-------|
@@ -85,7 +62,7 @@ from the command catalog, closing this with ~250 lines of new code.
 
 ---
 
-## 8. Verified References
+## 5. Verified References
 
 ### Academic
 
@@ -122,7 +99,7 @@ The key difference: Unix tools compose."
 
 ---
 
-## 9. Counter-Evidence
+## 6. Counter-Evidence
 
 REST is better for: security boundaries (auth), rate limiting, cross-network
 communication, complex auth flows (OAuth), binary data.
@@ -132,7 +109,7 @@ the HTTP API — it provides an additional agent-optimised surface.
 
 ---
 
-## 10. Open Question: Formal Benchmark
+## 7. Open Question: Formal Benchmark
 
 No controlled study has compared CLI vs REST agent control. Proposed: 20
 multi-step WibWob-DOS tasks, two agent configs (REST-only vs CLI+pipes),
