@@ -16,113 +16,45 @@ Scale: 1-5 per axis. Total out of 25.
 
 ## Tier 1 — Primary Design References
 
-### 1. swaymsg / i3-msg (score: 23/25)
+### 1. swaymsg / i3-msg — 23/25
+Solved our exact problem: scriptable local WM control via JSON-RPC over Unix
+socket with a thin CLI wrapper. Nearly identical architecture to WibWob-DOS.
+15+ year track record (i3), active Wayland port (sway).
 
-| Axis | Score | Notes |
-|------|-------|-------|
-| Composability | 5 | All output is JSON. Pipes to jq trivially. |
-| Agent fit | 5 | Atomic commands, clear verbs, JSON responses. |
-| Architecture match | 5 | Local window manager with command registry + IPC socket. Nearly identical model to WibWob-DOS. |
-| Maturity | 4 | i3: 15+ years, 10.2k stars. sway: active, Wayland-native. |
-| Relevance | 4 | JSON-RPC over Unix socket is our target transport. Command grammar is close to what we want. |
+Key patterns: `swaymsg -t get_tree` (JSON), `'[title="X"] focus'` (criteria),
+`-t subscribe '["window"]'` (event stream).
 
-Why #1: sway/i3 solved exactly our problem — exposing a local window manager
-to scriptable control. Their JSON-over-socket protocol with a thin CLI wrapper
-(swaymsg) is the direct architectural template for `ww`.
+### 2. yabai — 22/25
+macOS-native proof that CLI window control works. Designed for scripting,
+JSON output, large automation community. Focused-window default (no ID needed
+for common case) is an ergonomic win.
 
-Key patterns: `swaymsg -t get_tree` (JSON hierarchy), `swaymsg '[title="Firefox"] focus'`
-(criteria selectors), `swaymsg -t subscribe '["window"]'` (event stream).
-Repos: https://github.com/swaywm/sway, https://github.com/i3/i3
+Key patterns: `query --windows` (JSON array), `window --focus east` (directional).
 
----
+### 3. tmux — 21/25
+Proves local socket + CLI client handles complex state (sessions, windows,
+panes, buffers) reliably for 20+ years. Same client-server architecture as ours.
 
-### 2. yabai (score: 22/25)
-
-| Axis | Score | Notes |
-|------|-------|-------|
-| Composability | 5 | JSON output, designed for jq pipelines. |
-| Agent fit | 5 | Explicitly designed for scripting and automation. |
-| Architecture match | 4 | macOS window manager (closer to our platform) but uses Accessibility API, not custom renderer. |
-| Maturity | 4 | 7.8k stars, active development, large scripting community. |
-| Relevance | 4 | Command grammar and JSON output format are directly reusable patterns. |
-
-Why #2: yabai is the macOS-native proof that CLI window control works. Its
-community builds complex automation scripts that are exactly the kind of
-agent workflows we want to enable.
-
-Key patterns: `yabai -m query --windows` (JSON array), `yabai -m window --focus east`
-(directional), `--window` defaulting to focused (no ID for common case).
-Repo: https://github.com/koekeishiya/yabai
-
----
-
-### 3. tmux (score: 21/25)
-
-| Axis | Score | Notes |
-|------|-------|-------|
-| Composability | 4 | Format strings (-F) are powerful but idiosyncratic. Not pure JSON. |
-| Agent fit | 4 | Agents already use tmux heavily (it is in our own workflow). Verb-noun grammar is natural. |
-| Architecture match | 5 | Client-server over Unix socket. Server holds state, client sends commands. This IS our model. |
-| Maturity | 5 | 20+ years, ubiquitous, battle-tested at massive scale. |
-| Relevance | 3 | Session/pane model is less relevant than window model, but the IPC pattern is gold. |
-
-Why #3: tmux proves that a local socket server with a CLI client can handle
-extremely complex state management reliably for decades. Same architecture as ours.
-
-Key patterns: `-t session:window.pane` target syntax, `-F` format strings,
-`capture-pane -p` (piping content to stdout — maps to `ww screenshot`).
-Repo: https://github.com/tmux/tmux
+Key patterns: `-t session:window.pane` targeting, `-F` format strings,
+`capture-pane -p` (content to stdout).
 
 ---
 
 ## Tier 2 — Useful Pattern References
 
-### 4. wmctrl (score: 17/25)
+### 4. wmctrl — 17/25
+The original "control windows from CLI" tool. Title-based targeting (`-r`),
+combined move+resize (`-e`), simple greppable list (`-l`). Unmaintained since
+2012 but still works — testament to Unix tool longevity.
 
-| Axis | Score | Notes |
-|------|-------|-------|
-| Composability | 4 | Text output, one window per line, greppable. |
-| Agent fit | 3 | Simple but limited flag vocabulary. |
-| Architecture match | 3 | X11-specific, uses EWMH protocol. Different layer but same concept. |
-| Maturity | 3 | Stable but essentially unmaintained. Last release 2012. Still works. |
-| Relevance | 4 | The original "control windows from command line" tool. Vocabulary is well-known to LLMs. |
+### 5. xdotool — 16/25
+Search+act chaining pattern: `search --name "Firefox" windowfocus`. The
+`getactivewindow` query maps to our focused-window concept.
 
-Key patterns: `-r "Firefox"` (target by title regex), `-e 0,x,y,w,h`
-(combined move+resize), `-l` (simple greppable list).
-Repo: https://github.com/Conservatory/wmctrl
-
----
-
-### 5. xdotool (score: 16/25)
-
-| Axis | Score | Notes |
-|------|-------|-------|
-| Composability | 3 | Text output, window IDs as integers, pipeable. |
-| Agent fit | 3 | Verb-first grammar is natural. But X11-specific concepts leak through. |
-| Architecture match | 2 | Synthetic input injection (mouse, keyboard). Different concern than our command dispatch. |
-| Maturity | 4 | 3.5k stars, widely used in automation scripts. |
-| Relevance | 4 | The `search` + `action` pattern is powerful and maps to our filter+act pipeline concept. |
-
-Key patterns: `search --name "Firefox" windowfocus` (search + act chaining),
-`getactivewindow` (focused window query).
-Repo: https://github.com/jordansissel/xdotool
-
----
-
-### 6. jq (score: 15/25 — different category but essential companion)
-
-| Axis | Score | Notes |
-|------|-------|-------|
-| Composability | 5 | THE pipe companion tool. Defines the standard. |
-| Agent fit | 4 | LLMs write jq filters confidently. Massive training data. |
-| Architecture match | 1 | Not a window manager. JSON processor. |
-| Maturity | 5 | Ubiquitous. 30k+ stars. |
-| Relevance | 5 | Our JSON output will be consumed via jq. Design output FOR jq. |
-
-Why listed: jq is a design constraint, not a competitor. Every JSON structure
-from `ww` must be jq-friendly: arrays of objects, consistent field names,
-IDs as top-level fields.
-Repo: https://github.com/jqlang/jq
+### 6. jq — 15/25 (design constraint, not competitor)
+Every JSON structure from `ww` must be jq-friendly: arrays of objects,
+consistent field names, IDs as top-level fields. LLMs write jq filters
+confidently (massive training data).
 
 ---
 
