@@ -185,7 +185,7 @@ async function main() {
         return cmdRun(id, parseFlags(cleanArgs.slice(2)));
       }
       // Unknown
-      process.stderr.write(`Unknown command: ${cleanSub}\nRun 'ww help' for usage.\n`);
+      process.stderr.write(`Unknown command: ${cleanSub}\nRun 'wibwob help' for usage.\n`);
       process.exit(1);
     }
   }
