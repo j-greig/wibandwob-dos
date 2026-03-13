@@ -20,7 +20,7 @@ import type { Box, BrowserEntry, List, WindowKind, WindowRecord } from "../core/
 import type { OverlayManager } from "../core/overlay-manager.js";
 
 /** Percent of window width given to the list/left pane; preview gets the rest. */
-const PREVIEW_SPLIT_RATIO = 34;
+const PREVIEW_SPLIT_RATIO = 38;
 import type { WindowManager } from "../core/window-manager.js";
 
 /** Truncate a line by visible width and pad to a fixed viewport width. */
@@ -726,7 +726,7 @@ export function openFileManagerWindow(params: {
     const sizeStr = totalSize < 1024 ? `${totalSize}B`
       : totalSize < 1048576 ? `${(totalSize / 1024).toFixed(0)}K`
       : `${(totalSize / 1048576).toFixed(1)}M`;
-    statusInfo.setContent(` ${entries.length} items | ${dirs} dirs, ${files} files (${sizeStr})`);
+    statusInfo.setContent(` ${entries.length} items | ${dirs} dirs, ${files} files (${sizeStr}) | enter:open v:view /:filter s:search tab:icon`);
     renderStatusButtons();
     renderToolbarButtons();
   };
@@ -864,7 +864,15 @@ export function openFileManagerWindow(params: {
         const childDirs = children.filter(c => c.isDirectory());
         const childFiles = children.filter(c => !c.isDirectory());
         const header = `{bold}\u2302 ${path.basename(dirPath)}/{/bold}\n\n  {cyan-fg}${childDirs.length} directories{/cyan-fg}, {green-fg}${childFiles.length} files{/green-fg}\n`;
-        const dirItems = childDirs.slice(0, 10).map(c => `  {cyan-fg}\u25A0{/cyan-fg} ${c.name}/`);
+        const dirItems = childDirs.slice(0, 10).map(c => {
+          // Try to count children
+          let childCount = "";
+          try {
+            const n = fs.readdirSync(path.join(dirPath, c.name)).length;
+            childCount = ` {gray-fg}(${n}){/gray-fg}`;
+          } catch {}
+          return `  {cyan-fg}\u25A0{/cyan-fg} ${c.name}/${childCount}`;
+        });
         const fileItems = childFiles.slice(0, 10).map(c => {
           const ext = path.extname(c.name).toLowerCase();
           const col = [".md", ".txt"].includes(ext) ? "green"
@@ -872,7 +880,14 @@ export function openFileManagerWindow(params: {
             : [".json", ".yaml", ".yml"].includes(ext) ? "magenta"
             : [".sh", ".bash"].includes(ext) ? "cyan"
             : "white";
-          return `  {${col}-fg}\u2022{/${col}-fg} ${c.name}`;
+          // Try to get size
+          let sizeStr = "";
+          try {
+            const s = fs.statSync(path.join(dirPath, c.name)).size;
+            sizeStr = s < 1024 ? `${s}B` : s < 1048576 ? `${(s / 1024).toFixed(0)}K` : `${(s / 1048576).toFixed(1)}M`;
+          } catch {}
+          const padded = sizeStr ? ` {gray-fg}${sizeStr}{/gray-fg}` : "";
+          return `  {${col}-fg}\u2022{/${col}-fg} ${c.name}${padded}`;
         });
         const truncDirs = childDirs.length > 10 ? `  {cyan-fg}... +${childDirs.length - 10} more dirs{/cyan-fg}` : "";
         const truncFiles = childFiles.length > 10 ? `  {green-fg}... +${childFiles.length - 10} more files{/green-fg}` : "";
@@ -1020,6 +1035,8 @@ export function openFileManagerWindow(params: {
     cancelSearch();
     currentPath = directoryPath;
     allEntries = buildEntries(directoryPath);
+    const dirName = path.basename(directoryPath) || directoryPath;
+    frame.frame.setLabel(` File Manager - ${dirName} `);
     pathLabel.setContent(` ${renderBreadcrumb()}`);
     applyFilter(selectedIndex);
   };

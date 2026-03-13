@@ -22,10 +22,12 @@ curl -s -X POST http://127.0.0.1:8099/commands/run \
 
 sleep 0.5
 
-# ── 3b. Navigate to docs/ which has .md files visible near top ──────
+# ── 3b. Navigate to docs/ which has .md files ──────────────────────
 curl -s -X POST http://127.0.0.1:8099/commands/run \
   -H 'Content-Type: application/json' \
   -d '{"id":"finder.navigate","args":{"path":"'"$REPO_ROOT/docs"'"}}' > /dev/null 2>&1 || true
+
+sleep 0.3
 
 sleep 0.5
 
