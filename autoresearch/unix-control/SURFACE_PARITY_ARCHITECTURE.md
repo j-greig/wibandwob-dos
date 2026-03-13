@@ -136,52 +136,11 @@ modules appear in the CLI without any CLI code changes.
 - Need to add `params` schema to every command (incremental)
 - CLI help text derived from `description` field (may need tuning)
 
-### Option B: OpenAPI → CLI generator
+### Rejected Alternatives
 
-**How:** The app already serves `/openapi.json`. Use an existing tool to
-generate a CLI client from the OpenAPI spec.
-
-**Candidates:**
-- `openapi-generator` — Java-based, heavyweight, generates full clients
-- `oazapfts` — TS-native, generates typed API client from OpenAPI
-- `hey-api` — modern OpenAPI → TS client
-- Custom: read `/openapi.json` at CLI startup, build commands dynamically
-
-**Problem:** The OpenAPI spec currently describes REST endpoints, not
-command semantics. `/commands/run` is a single POST endpoint that takes
-`{id, args}` — the OpenAPI spec doesn't decompose this into per-command
-endpoints with typed args. You'd get a CLI with one command:
-`ww commands-run --id window.tile` — useless.
-
-**To make this work:** The OpenAPI spec would need to be generated FROM
-the catalog with per-command endpoints. At that point you've built Option A
-with an extra hop through OpenAPI.
-
-**Verdict:** Option B adds complexity without benefit. The catalog is
-already richer than OpenAPI (it has menu placements, agent flags, etc).
-Generate the CLI from the catalog directly.
-
-### Option C: tRPC / Hono RPC
-
-**How:** Replace the hand-rolled API with tRPC or Hono's RPC mode. Both
-generate typed clients from server definitions.
-
-**Problem:** WibWob already has a working API with 30+ endpoints, an
-OpenAPI spec, and multiple consumers (agents, scripts, tests). Replacing
-the transport layer to get CLI generation is a sledgehammer.
-
-**Verdict:** Only if you're rewriting the API anyway. Not justified for
-CLI parity alone.
-
-### Option D: Effect/Schema or Zod → all surfaces
-
-**How:** Define every command with Effect/Schema or Zod. Auto-derive
-OpenAPI (via `zod-to-openapi`), CLI flags, and runtime validation.
-
-**Problem:** Adds a heavy dependency (Effect is 50KB+). Zod is lighter
-but doesn't add much over TypeBox which is already in the repo.
-
-**Verdict:** Use TypeBox. It's already there.
+- **OpenAPI → CLI generator:** `/openapi.json` describes REST endpoints, not per-command semantics. Would produce one useless `ww commands-run` command.
+- **tRPC / Hono RPC:** Replacing a working 30+ endpoint API to get CLI generation is a sledgehammer.
+- **Effect/Schema:** Heavy dependency (50KB+) for no benefit over Zod which is already transitive.
 
 ## Recommended Architecture
 
@@ -208,78 +167,21 @@ but doesn't add much over TypeBox which is already in the repo.
                     └─────────────────────┘
 ```
 
-### Step-by-step implementation
+See "Implementation Phases" section below for the step-by-step plan.
 
-**Phase 1: Schema enrichment (no new surfaces)**
-- Add `params?: z.ZodType` to `AppCommandDefinition` interface
-- Add Zod schemas to 10 most-used commands (window.move, theme.set, etc)
-- Validate args against schema in `/commands/run` handler
-- OpenAPI spec auto-generates per-command parameter docs via `zod-to-json-schema`
-- Effort: 2-3 hours, zero risk, immediate API quality improvement
+## Multi-Agent Parity
 
-**Phase 2: CLI projection (new surface, auto-derived)**
-- `src/cli/ww.ts` reads catalog, generates subcommands
-- Each command with `api: true` + `params` → CLI subcommand with flags
-- Transport: HTTP to start (works immediately), Unix socket later
-- `ww windows list`, `ww window 3 move --x 10 --y 5` etc
-- Effort: 4-6 hours, builds on Phase 1
+The catalog is append-only in practice. Agents add commands, rarely modify
+existing ones. Two agents adding commands in different worktrees produce no
+merge conflicts. The CLI reads the catalog at runtime, so new commands appear
+automatically. The CI parity check catches missing schemas.
 
-**Phase 3: Parity testing (structural guarantee)**
-- CI script: load catalog, check every `api: true` command has:
-  - An HTTP route (already true by construction)
-  - A CLI subcommand (true after Phase 2 by construction)
-  - Matching parameter names between all surfaces
-- Fail the build if surfaces drift
-- Effort: 1-2 hours
+## Packages
 
-**Phase 4: Module parity (auto-derived for microapps)**
-- Microapp commands from `module.json` already enter the catalog
-- CLI projection picks them up automatically (no module code changes)
-- Verify: install a new module, `ww commands list` shows it without
-  any CLI code change
-- Effort: 0 (falls out of Phase 2 for free)
-
-## Multi-Agent Parity Considerations
-
-The scenario: Agent A adds a module with new commands on branch X.
-Agent B adds API endpoints on branch Y. They merge. Does the CLI break?
-
-**With this architecture: no.** Because:
-
-1. Agent A's module registers commands in `module.json` → auto-enters catalog
-2. Agent B's new commands go in `command-catalog.ts` → auto-projected to CLI
-3. The CLI reads the catalog at runtime, not at build time
-4. Merge conflicts only happen if two agents edit the same catalog entry
-5. The CI parity check (Phase 3) catches any command that has `api: true`
-   but missing params schema
-
-**The key insight:** The catalog is append-only in practice. Agents add
-commands, they rarely modify existing ones. Append-only sources of truth
-have minimal merge conflicts.
-
-## Existing Packages Worth Using
-
-| Package | What for | Already in repo? |
-|---------|----------|-----------------|
-| `zod` | Schema definition + validation + CLI flag derivation | YES (transitive via MCP, Anthropic SDK, OpenAI, Mistral) |
-| `zod-to-json-schema` | Zod → JSON Schema (for OpenAPI spec generation) | YES (transitive via pi-ai) |
-| `citty` (unjs) | CLI framework — 3KB, subcommands, typed args | No |
-| `cac` | CLI framework — 4KB, lightweight alternative | No |
-
-**Why Zod over TypeBox for this:**
-- Zod is already a transitive dep via multiple paths (MCP SDK, Anthropic, OpenAI, Mistral)
-- pi itself uses Zod for tool schemas — the MCP tool definition pattern IS Zod
-- LLMs have massive Zod training data — agents write Zod schemas confidently
-- `zod-to-json-schema` already in the dep tree for OpenAPI generation
-- TypeBox is used in agent-tools.ts but that's a smaller surface; migrating
-  those ~10 tool definitions to Zod is trivial and unifies the schema story
-
-**NOT recommended:**
-- `oclif` — heavyweight (Salesforce), overkill for our needs
-- `commander` / `yargs` — larger than needed, no schema integration
-- `openapi-generator` — Java dependency, wrong direction (API → CLI)
-- `@sinclair/typebox` — already in repo but Zod has better ecosystem
-  alignment (MCP, pi, OpenAI all use Zod)
+Use Zod (already transitive dep via MCP SDK, Anthropic, OpenAI, Mistral)
+for schema definitions. Use `citty` or `cac` (~3-4KB) for CLI framework.
+Avoid: oclif (heavyweight), commander/yargs (no schema integration),
+openapi-generator (Java, wrong direction).
 
 ## The 50-Line CLI
 
