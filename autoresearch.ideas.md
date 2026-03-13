@@ -1,49 +1,29 @@
-# Autoresearch Ideas
+# Autoresearch Ideas: Unix Control Brief Enhancement
 
-## Active: Asciicker Port (ASCII 3D Game Engine)
-- Current: 8.4 (RENDER:8.7 WORLD:8.2 CONTROLS:8.1 BEAUTY:8.1 CRAFT:8.9)
-- Target: 9.0+ via faithful port of original engine
-- Files: `modules/asciicker/*.ts` (multi-file)
-- Plan: `autoresearch.md` — 6 phases, 17 stories
-- Reference: `/tmp/asciicker/` (C++ source, MIT)
+## High-impact consolidation moves
+- MERGE SUMMARY into RESEARCH as its opening section — SUMMARY has unique claims not in RESEARCH (violates "summary is strict subset" rule), and the same performance table appears in BOTH
+- MERGE EVIDENCE into RESEARCH — evidence IS research, having two files splits one concern across two owners
+- KILL INDEX entirely — it's 413 lines of navigation/cross-references that repeat every finding. A 10-line "reading order" section at the top of RESEARCH replaces it
+- Result: 8 scored files → 4-5 files, ~40% line reduction, zero content loss
 
-### Architecture notes from studying the original
+## Rigour wins (currently ~5.0)
+- The +23.6% / -26% / -31% performance deltas appear as "Anthropic o1/o3 evals + internal testing" — this is almost certainly LLM confabulation. No public source exists. MUST be labelled as hypothetical/projected, not empirical
+- The Bird 2004 "Composability Theorem" citation looks fabricated — no such paper exists
+- Zellweger & Gigerenzer 2020 CHI paper — Gigerenzer is a decision-science researcher at MPI, not a CLI researcher. The ACM DL link needs verification. Likely confabulated.
+- The "Verification Checklist" in EVIDENCE has all boxes checked — dishonest given unverified claims above
 
-**The visual secret: fg+bg dithering.**
-Every terrain cell uses BOTH fg AND bg colour. The two colours plus glyph choice
-create a dithering effect — effectively tripling visual density vs fg-only.
-The auto_mat table in render.cpp maps any RGB to the closest (fg, bg, glyph)
-triplet from the 256-colour palette. This is the core visual technique.
+## Density wins (currently ~6.0)
+- Same core argument ("CLI > REST for agents") restated 5+ times across files
+- Heavy emoji use in SUMMARY and EVIDENCE (📊🎯🚀💡⚠️) adds visual noise
+- INDEX has 413 lines but could be 20 lines of links
+- RECOMMENDATIONS repeats the performance table AGAIN, then adds week-by-week schedules that are already stale
 
-**Terrain patches, not individual columns.**
-The original rasterizes terrain as QUAD patches (HEIGHT_CELLS=4, VISUAL_CELLS=8).
-Each patch is a grid of quads, each quad split into 2 triangles. The triangles
-are rasterized with Bresenham scanline fill + depth test. This handles all
-camera angles without gaps. My column-based approach needs 2x-wide hack at
-certain angles.
+## Actionability wins
+- SURFACE_PARITY_ARCHITECTURE.md is the most actionable doc — it has the actual code, the "50-line CLI" sketch, the package recommendations. It should be the CENTRAL document.
+- The devnotes (naming strategy, parity problem) are sharp and opinionated — they should be sections in SURFACE_PARITY, not standalone files
+- RECOMMENDATIONS has good Phase 1/2/3 structure but the week-by-week timeline is speculative filler
 
-**Meshes are coloured PLY files.**
-Trees, houses, rocks etc are PLY ascii meshes with per-vertex RGBA colour.
-Each triangle face is rasterized independently with vertex colour interpolation.
-This means trees are actual 3D geometry, not sprites — they have depth and
-occlude correctly from any camera angle.
-
-**Sprites are multi-frame atlases.**
-player-nude.xp is 126x72 cells, containing 18 animation frames × multiple
-directions. The atlas layout: 9 columns (front-facing frames) × 9 columns
-(side-facing frames), with each column being 7 cells wide × 9 cells tall.
-
-### Next concrete steps
-1. Split index.ts into multi-file architecture (render.ts, terrain.ts, etc)
-2. Port the exact projection matrix from render.cpp
-3. Port CP437 table from game_app.cpp
-4. Port auto_mat dithering table for fg+bg+glyph selection
-5. Parse palette.gz for correct colour mapping
-6. Parse game_map_y8.a3d for the actual terrain
-7. Parse .akm PLY meshes for trees/objects
-
-### Performance notes
-- 256×256 terrain with viewRange=24 = ~2304 columns per frame
-- 2-wide rendering doubles to ~4608 buffer writes
-- At 8fps this is ~37K writes/sec — fast enough in JS
-- The bottleneck is the ANSI string construction, not the math
+## Coherence wins
+- Performance delta table (72%→89%, etc.) appears in: SUMMARY, EVIDENCE, RESEARCH, INDEX, RECOMMENDATIONS — FIVE times
+- Project list (llm, MCP, yabai, i3) appears in: SUMMARY, EVIDENCE, RESEARCH, INDEX — FOUR times
+- The "Before vs After" code examples appear in both RESEARCH and RECOMMENDATIONS
