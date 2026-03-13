@@ -1,4 +1,4 @@
-# ww — Unix CLI for WibWob-DOS
+# wibwob — Unix CLI for WibWob-DOS
 
 A thin, zero-dependency command-line interface to the WibWob-DOS desktop.
 JSON to stdout, errors to stderr. Designed for `jq`, `xargs`, and shell scripts.
@@ -9,7 +9,7 @@ JSON to stdout, errors to stderr. Designed for `jq`, `xargs`, and shell scripts.
 
 ### Architecture: pure HTTP client, zero catalog import
 
-`ww.ts` is ~150 lines of TypeScript. It does NOT import the command catalog,
+`wibwob.ts` is ~150 lines of TypeScript. It does NOT import the command catalog,
 the command registry, or any `src/core/` module. It is a pure HTTP client
 that talks to the control API on port 8099.
 
@@ -40,7 +40,7 @@ dispatches through `POST /commands/run { id, args }`.
 This means:
 - Adding a command to the catalog → CLI gets it for free
 - Removing a command → CLI stops seeing it
-- Module commands registered at runtime → visible via `ww commands`
+- Module commands registered at runtime → visible via `wibwob commands`
 - No sync step, no code generation, no build process
 
 ### Flag parsing
@@ -63,8 +63,8 @@ validation and generated `--help` per command.
 # Builtins
 ww health                          # API health check
 ww state                           # full desktop state (JSON)
-ww windows                         # list open windows
-ww commands                        # list all available commands
+wibwob windows                         # list open windows
+wibwob commands                        # list all available commands
 ww screenshot                      # text screenshot of the desktop
 
 # Run commands — three equivalent syntaxes
@@ -82,8 +82,8 @@ ww window 3 close                  # → window.close --id 3
 ww window 3 move --x 10 --y 5     # → window.move --id 3 --x 10 --y 5
 
 # Quiet mode: IDs only, one per line (for piping)
-ww windows -q                      # window IDs
-ww commands -q                     # command IDs
+wibwob windows -q                      # window IDs
+wibwob commands -q                     # command IDs
 ```
 
 ## Piping
@@ -92,20 +92,20 @@ The whole point is composability with standard Unix tools.
 
 ```bash
 # Count open windows
-ww windows | jq length
+wibwob windows | jq length
 
 # Get all editor window IDs
-ww windows | jq -r '.[] | select(.kind=="editor") | .id'
+wibwob windows | jq -r '.[] | select(.kind=="editor") | .id'
 
 # Close all editors
-ww windows -q | xargs -I{} ww window {} close
+wibwob windows -q | xargs -I{} ww window {} close
 
 # Close all windows of a specific kind
-ww windows | jq -r '.[] | select(.kind=="art") | .id' | \
+wibwob windows | jq -r '.[] | select(.kind=="art") | .id' | \
   xargs -I{} ww window {} close
 
 # List commands matching a pattern
-ww commands -q | grep '^theme\.'
+wibwob commands -q | grep '^theme\.'
 
 # Open 5 editors in a row
 for i in $(seq 5); do ww editor.new; done
@@ -116,7 +116,7 @@ ww cmd window.tile && ww screenshot
 
 ## Agent workflows
 
-Agents (Claude, Codex, etc.) use `ww` instead of raw `curl` calls.
+Agents (Claude, Codex, etc.) use `wibwob` instead of raw `curl` calls.
 The three syntax styles cover different agent preferences:
 
 ```bash
@@ -127,7 +127,7 @@ ww cmd window.move --id 3 --x 10 --y 5
 ww window 3 move --x 10 --y 5
 
 # Discovery
-ww commands -q | grep window       # what can I do with windows?
+wibwob commands -q | grep window       # what can I do with windows?
 ww state | jq '.focus'             # what's focused?
 ```
 
@@ -146,23 +146,23 @@ WW_API=http://127.0.0.1:8098 ww health
 
 ```bash
 # Via bun directly
-bun run src/cli/ww.ts health
+bun run src/cli/wibwob.ts health
 
 # Via package.json script
-bun run ww health
+bun run wibwob health
 
 # Make it a shell alias (add to .zshrc)
-alias ww='bun run /path/to/wibandwob-dos/src/cli/ww.ts'
+alias wibwob='bun run /path/to/wibandwob-dos/src/cli/wibwob.ts'
 ```
 
 ### Name conflicts
 
-`ww` has no PATH conflicts — no Homebrew formula, no common Unix tool,
+`wibwob` has no PATH conflicts — no Homebrew formula, no common Unix tool,
 no man page. Package registries have squatted names (npm: abandoned
 promise lib, PyPI: Python builtins wrapper, crates.io: minimal) but
-none install a `ww` binary. Safe for local alias use.
+none install a `wibwob` binary. Safe for local alias use.
 
-If publishing to npm, use a scoped name: `@wibwob/ww` or `wibwob-cli`.
+If publishing to npm, use a scoped name: `@wibwob/cli` or `wibwob-cli`.
 
 ## Exit codes
 
@@ -180,29 +180,29 @@ command list. So its docs must also be generated from the live API.
 
 ```bash
 # Full command reference (markdown table)
-ww commands | jq -r '
+wibwob commands | jq -r '
   ["| Command | Description |", "| --- | --- |"] +
   [.[] | "| `\(.id)` | \(.description // "-") |"]
   | .[]'
 
 # Grouped by domain
-ww commands | jq -r '
+wibwob commands | jq -r '
   group_by(.id | split(".")[0])[] |
   "\n## \(.[0].id | split(".")[0])\n" +
   ([.[] | "- `\(.id)` — \(.description // "-")"] | join("\n"))'
 
 # Just the IDs, for a quick cheatsheet
-ww commands -q | sort
+wibwob commands -q | sort
 
 # Write a full reference to a file
-ww commands | jq -r '
+wibwob commands | jq -r '
   "# ww command reference\n\nGenerated: \(now | todate)\n\n" +
   "| Command | Description | Surfaces |\n| --- | --- | --- |\n" +
   ([.[] | "| `\(.id)` | \(.description // "-") | \(.surfaces | join(", ")) |"] | join("\n"))
   ' > src/cli/COMMANDS.md
 ```
 
-The key insight: because `ww commands` returns everything the API knows
+The key insight: because `wibwob commands` returns everything the API knows
 (including dynamically registered module commands), the generated docs
 are always complete and current. No manual sync required.
 

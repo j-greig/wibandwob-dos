@@ -23,7 +23,7 @@
     "planning:inbox": "bun run scripts/planning-inbox.ts",
     "prepare": "git config core.hooksPath .githooks",
     "lint": "npx eslint 'modules/**/index.ts'",
-    "ww": "bun run src/cli/ww.ts"
+    "wibwob": "bun run src/cli/wibwob.ts"
   },
   "dependencies": {
     "@anthropic-ai/claude-code": "^2.1.63",

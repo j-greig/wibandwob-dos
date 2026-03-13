@@ -12,11 +12,11 @@ echo "  typecheck passed"
 
 # 2. ww.ts exists and is executable
 echo "--- file check ---"
-if [ ! -f src/cli/ww.ts ]; then
-  echo "FAIL: src/cli/ww.ts missing"
+if [ ! -f src/cli/wibwob.ts ]; then
+  echo "FAIL: src/cli/wibwob.ts missing"
   exit 1
 fi
-echo "  src/cli/ww.ts exists"
+echo "  src/cli/wibwob.ts exists"
 
 # 3. API is reachable
 echo "--- api check ---"
