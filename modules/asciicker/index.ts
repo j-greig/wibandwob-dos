@@ -189,7 +189,121 @@ function genTerrain(w: number, h: number, seed: number): Terrain {
       cells[y * w + x] = { height, biome };
     }
   }
-  return { w, h, cells, seed };
+  const terrain = { w, h, cells, seed };
+
+  // Post-processing pass 1: Carve rivers from mountains to sea
+  carveRivers(terrain, seed);
+
+  // Post-processing pass 2: Add scattered structures on flat grass
+  addStructures(terrain, seed);
+
+  return terrain;
+}
+
+// Carve rivers — follow gradient downhill from random mountain sources
+function carveRivers(t: Terrain, seed: number) {
+  const numRivers = 3 + Math.floor(hash2d(seed, seed * 7, 42) * 4);
+  for (let r = 0; r < numRivers; r++) {
+    // Find a mountain source
+    let sx = Math.floor(hash2d(r * 37, seed, 11) * t.w);
+    let sy = Math.floor(hash2d(seed, r * 53, 22) * t.h);
+    // Walk to nearest high ground
+    for (let i = 0; i < 50; i++) {
+      const best = { x: sx, y: sy, h: t.cells[sy * t.w + sx]?.height ?? 0 };
+      for (let dy = -2; dy <= 2; dy++) {
+        for (let dx = -2; dx <= 2; dx++) {
+          const nx = sx + dx, ny = sy + dy;
+          if (nx >= 0 && nx < t.w && ny >= 0 && ny < t.h) {
+            const nh = t.cells[ny * t.w + nx].height;
+            if (nh > best.h) { best.x = nx; best.y = ny; best.h = nh; }
+          }
+        }
+      }
+      if (best.x === sx && best.y === sy) break;
+      sx = best.x; sy = best.y;
+    }
+
+    // Now flow downhill, carving water
+    let cx = sx, cy = sy;
+    for (let step = 0; step < 200; step++) {
+      const idx = cy * t.w + cx;
+      if (cx < 0 || cx >= t.w || cy < 0 || cy >= t.h) break;
+      const cell = t.cells[idx];
+      if (cell.biome === Biome.DEEP_WATER) break; // reached the sea
+
+      // Carve: set to water level
+      if (cell.height > 60) {
+        cell.biome = Biome.WATER;
+        cell.height = 58;
+        // Widen the river slightly
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            if (Math.abs(dx) + Math.abs(dy) > 1) continue;
+            const nx = cx + dx, ny = cy + dy;
+            if (nx >= 0 && nx < t.w && ny >= 0 && ny < t.h) {
+              const nc = t.cells[ny * t.w + nx];
+              if (nc.height > 65 && nc.biome !== Biome.WATER) {
+                nc.biome = Biome.SAND; // riverbank
+                nc.height = Math.min(nc.height, 70);
+              }
+            }
+          }
+        }
+      }
+
+      // Find lowest neighbour
+      let lowestH = cell.height, lx = cx, ly = cy;
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (dx === 0 && dy === 0) continue;
+          const nx = cx + dx, ny = cy + dy;
+          if (nx >= 0 && nx < t.w && ny >= 0 && ny < t.h) {
+            const nh = t.cells[ny * t.w + nx].height;
+            if (nh < lowestH) { lowestH = nh; lx = nx; ly = ny; }
+          }
+        }
+      }
+      if (lx === cx && ly === cy) break; // stuck in a basin
+      cx = lx; cy = ly;
+    }
+  }
+}
+
+// Add small structures (ruins, huts) on flat grassland
+function addStructures(t: Terrain, seed: number) {
+  const numStructures = 5 + Math.floor(hash2d(seed * 3, seed * 11, 77) * 8);
+  for (let s = 0; s < numStructures; s++) {
+    const sx = Math.floor(hash2d(s * 41, seed * 7, 33) * (t.w - 20)) + 10;
+    const sy = Math.floor(hash2d(seed * 13, s * 59, 44) * (t.h - 20)) + 10;
+    const cell = t.cells[sy * t.w + sx];
+    if (cell.biome !== Biome.GRASS && cell.biome !== Biome.SAND) continue;
+
+    // Check flatness — all neighbours within 10 height units
+    let flat = true;
+    for (let dy = -2; dy <= 2; dy++) {
+      for (let dx = -2; dx <= 2; dx++) {
+        const nc = t.cells[(sy+dy) * t.w + (sx+dx)];
+        if (!nc || Math.abs(nc.height - cell.height) > 10) { flat = false; break; }
+      }
+      if (!flat) break;
+    }
+    if (!flat) continue;
+
+    // Build a small structure — raise height and change biome to ROCK
+    const size = 2 + Math.floor(hash2d(s, seed, 55) * 2);
+    for (let dy = -size; dy <= size; dy++) {
+      for (let dx = -size; dx <= size; dx++) {
+        const nx = sx + dx, ny = sy + dy;
+        if (nx < 0 || nx >= t.w || ny < 0 || ny >= t.h) continue;
+        const nc = t.cells[ny * t.w + nx];
+        // Walls on perimeter, floor inside
+        if (Math.abs(dx) === size || Math.abs(dy) === size) {
+          nc.height = cell.height + 20;
+          nc.biome = Biome.ROCK;
+        }
+      }
+    }
+  }
 }
 
 function getH(t: Terrain, x: number, y: number): number {
@@ -446,20 +560,36 @@ function renderScene(
 
 // ─── Convert buffer to ANSI string ─────────────────────────
 
-function bufferToAnsi(buf: Sample[], sw: number, sh: number): string {
+function bufferToAnsi(buf: Sample[], sw: number, sh: number, tick: number): string {
+  // Sky gradient — darker at top, lighter at horizon
+  const skyTop = rgb6(0, 0, 2);     // dark blue
+  const skyMid = rgb6(1, 2, 4);     // medium blue
+  const skyBot = rgb6(2, 3, 5);     // light blue/horizon
+  const skyGlyphs = ["·", "∙", " ", " ", " ", " ", " ", " "]; // sparse stars at top
+
   const lines: string[] = [];
   for (let y = 0; y < sh; y++) {
     let line = "";
     let lastFg = -1, lastBg = -1;
+    // Sky colour for this row
+    const skyProgress = y / sh;
+    const skyBg = skyProgress < 0.3 ? skyTop : skyProgress < 0.6 ? skyMid : skyBot;
+    const skyFg = skyProgress < 0.2 ? grey(14) : skyBg; // star colour at top
+
     for (let x = 0; x < sw; x++) {
       const s = buf[y * sw + x];
       if (s.flags === 0) {
-        // Empty — reset and space
-        if (lastFg !== -1 || lastBg !== -1) {
-          line += "\x1b[0m";
-          lastFg = -1; lastBg = -1;
+        // Sky background instead of black
+        const thisSkyFg = skyFg;
+        const thisSkyBg = skyBg;
+        // Sparse stars in upper sky
+        const isStar = y < sh * 0.25 && ((x * 7 + y * 13 + tick) % 47 === 0);
+        const skyChar = isStar ? skyGlyphs[0] : " ";
+        if (thisSkyFg !== lastFg || thisSkyBg !== lastBg) {
+          line += `\x1b[38;5;${thisSkyFg};48;5;${thisSkyBg}m`;
+          lastFg = thisSkyFg; lastBg = thisSkyBg;
         }
-        line += " ";
+        line += skyChar;
       } else {
         // Emit ANSI colour codes only when changed
         if (s.fg !== lastFg && s.bg !== lastBg) {
@@ -587,7 +717,7 @@ function openAsciicker(host: MicroappHost) {
 
     // Render 3D scene
     const buf = renderScene(terrain, cam, w, h, playerX, playerY, tick);
-    const ansi = bufferToAnsi(buf, w, h);
+    const ansi = bufferToAnsi(buf, w, h, tick);
     canvas.setContent(ansi);
 
     // Separator
