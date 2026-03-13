@@ -1,379 +1,117 @@
-# Unix Philosophy for AI Agents: Recommendations for WibWob-DOS
+# Recommendations for WibWob-DOS Unix CLI Surface
 
 ## Executive Summary
-Architectural reasoning and anecdotal evidence suggest CLI-first, pipe-composable
-agent interfaces outperform REST APIs for autonomous agent control. No formal
-benchmark exists yet, but production projects (yabai, i3, llm, MCP) and
-WibWob-DOS session logs support the directional claim. This document maps the
-findings to actionable WibWob-DOS improvements.
+
+CLI-first, pipe-composable interfaces are expected to improve agent control
+compared to the current REST-only API. This document identifies the gaps
+and recommends a phased approach. Implementation architecture is in
+SURFACE_PARITY_ARCHITECTURE.md.
 
 ---
 
-## Current State Assessment
+## Current State
 
-### ✅ What WibWob-DOS Does Well
-From AGENTS.md + control-api.md analysis:
+What works well:
+- Command-based semantics (command-catalog.ts is the single source of truth)
+- HTTP API on port 8099 serves humans and agents
+- StateService enables query-before-act loops
+- Agent tools (tui_run_command) are registry-aware and stateless
 
-| Feature | Status | Alignment |
-|---------|--------|-----------|
-| **Command-based semantics** | ✅ Done | Perfect Unix alignment |
-| **HTTP API (port 8099)** | ✅ Done | Good for humans & simple clients |
-| **StateService (canonical state)** | ✅ Done | Enables query-before-act loops |
-| **Agent tools (`tui_run_command`)** | ✅ Done | Registry-aware, stateless |
-
-### ⚠️ Gaps for Agent Optimization
-From research findings:
-
-| Gap | Impact | Severity |
-|-----|--------|----------|
-| **`POST /windows/batch` collapses ops** | Agents can't query state mid-operation | High |
-| **No Unix socket variant** | HTTP overhead (TLS, timeouts, serialization) | Medium |
-| **No CLI wrapper** | Agents can't pipe directly to `grep`/`jq` | Medium |
-| **No atomic tool variants** | Agents use batch ops, higher hallucination risk | High |
+Gaps:
+- No CLI projection — agents use curl + JSON, not pipes + jq
+- No typed argument schemas — commands accept untyped args bags
+- POST /windows/batch collapses ops (agents can't query state mid-operation)
+- All control is HTTP — no Unix socket for lower-latency local agents
 
 ---
 
-## Recommended Changes (Priority Order)
+## Phased Approach
 
-### Phase 1: Low-Risk, High-Impact (Weeks 1-2)
+### Phase 1: Schema Enrichment (no new surfaces)
 
-#### 1.1 Expose Atomic Command Variants to Agents
-**Current:** `/windows/batch` accepts multi-op batch.  
-**Issue:** Agents can't query state between operations.  
-**Solution:** Keep batch for backwards compatibility, but ensure agents prefer atomic paths.
+Add Zod schemas to command definitions in command-catalog.ts. This enables:
+- Runtime argument validation in /commands/run
+- Auto-generated OpenAPI parameter docs via zod-to-json-schema
+- Foundation for CLI flag auto-derivation in Phase 2
 
-**Implementation:**
-```typescript
-// In control-api.ts, add atomic variants
-POST /windows/move       { "id": 3, "x": 10, "y": 5 }
-POST /windows/resize     { "id": 3, "w": 60, "h": 20 }
-POST /windows/focus      { "id": 3 }
-POST /windows/close      { "id": 3 }
+Effort: 2-3 hours. Zero risk. Immediate API quality improvement.
 
-// Agents will naturally chain these with state queries:
-GET /state → POST /windows/move → GET /state → POST /windows/resize
-```
+### Phase 2: CLI Projection (the `ww` tool)
 
-**Why:** Forces query-before-act loop, expected to improve error recovery (anecdotal evidence).
+Auto-derive CLI commands from the catalog. Every command with `api: true`
+and a `params` schema becomes a CLI subcommand with flags.
 
-**Cost:** ~200 lines (small router handlers, each ~20 lines).
-
-**Testing:** Existing smoke tests cover these operations via agent tools already.
-
-**Evidence:** Atomic tools are expected to reduce hallucination (directional, not yet measured).
-
----
-
-#### 1.2 Publish `/state` as JQ-Friendly JSON
-**Current:** `GET /state` returns flat JSON structure.  
-**Improvement:** Ensure output is optimized for piping to `jq`.
-
-**Checklist:**
-- [ ] Field names are `snake_case` (jq-friendly)
-- [ ] Arrays are actually arrays (not objects with numeric keys)
-- [ ] Window IDs are consistent across fields
-- [ ] No circular references
-
-**Example for agent:**
 ```bash
-curl -s http://127.0.0.1:8099/state | \
-  jq '.windows[] | select(.kind=="editor") | .id' | \
-  xargs -I {} curl -X POST http://127.0.0.1:8099/windows/close \
-    -H "Content-Type: application/json" -d "{\"id\": {}}"
+ww windows list              # list all windows as JSON
+ww window 3 move --x 10 --y 5  # move window 3
+ww commands list             # list available commands
+ww state                     # full desktop state (pipe to jq)
 ```
 
-**Cost:** Audit only (~2 hours).
+Transport: HTTP to start (works immediately), Unix socket later.
 
-**Benefit:** Agents can use standard Unix tools (no custom SDK).
+Architecture detail: SURFACE_PARITY_ARCHITECTURE.md
+CLI grammar design: REFERENCE_CLI_TOOLS_RANKED.md (proposed `ww` grammar)
+Naming decisions: devnote-cli-naming-strategy
 
----
+### Phase 3: Parity Testing (structural guarantee)
 
-#### 1.3 Update Agent Tool Definitions (SDK)
-**Location:** `src/services/agent-tools.ts`
+CI script verifies every `api: true` command has:
+- An HTTP route (already true by construction)
+- A CLI subcommand (true after Phase 2 by construction)
+- Matching parameter names across all surfaces
 
-**Current:**
-```typescript
-// Register command runner (generic)
-tools.push({
-  name: 'tui_run_command',
-  description: 'Run any WibWob command by ID',
-  ...
-})
-```
+Build fails if surfaces drift. Parity is structural, not maintained by discipline.
 
-**Proposed:**
-```typescript
-// Register atomic operations as explicit tools
-tools.push({
-  name: 'tui_window_move',
-  description: 'Move window to X, Y coordinates. Query state first with tui_get_state.',
-  parameters: {
-    type: 'object',
-    properties: {
-      id: { type: 'number', description: 'Window ID from tui_get_state' },
-      x: { type: 'number' },
-      y: { type: 'number' }
-    }
-  }
-})
+### Phase 4: Formal Benchmark (optional)
 
-tools.push({
-  name: 'tui_window_resize',
-  description: 'Resize window to W x H. Query state first with tui_get_state.',
-  parameters: {
-    type: 'object',
-    properties: {
-      id: { type: 'number' },
-      w: { type: 'number' },
-      h: { type: 'number' }
-    }
-  }
-})
-
-// ... similar for focus, close, etc.
-```
-
-**Why:** Explicit tool definitions prevent hallucination (agents won't invent parameters).
-
-**Cost:** ~400 lines (tool definitions + handlers).
-
-**Benefit:** Simpler tool schemas are expected to reduce hallucination (general LLM tool-calling observation).
-
----
-
-### Phase 2: Medium-Impact, Moderate-Cost (Weeks 3-4)
-
-#### 2.1 Add Unix Socket RPC Variant
-**Current:** HTTP API only (requires TLS, timeouts, JSON serialization overhead).  
-**Improvement:** Add Unix socket support for local agents.
-
-**Design:**
-```typescript
-// Existing HTTP
-http.post('/windows/move', (c) => ...)
-
-// New: Unix socket JSON-RPC (same semantics)
-// Socket: ~/.wibwob/control.sock
-// Protocol: newline-delimited JSON-RPC 2.0
-
-// Agent sends:
-{ "jsonrpc": "2.0", "id": 1, "method": "windows.move", "params": {"id": 3, "x": 10, "y": 5} }
-
-// Server responds:
-{ "jsonrpc": "2.0", "id": 1, "result": true }
-```
-
-**Implementation:**
-1. Add Bun `serve()` socket listener
-2. Reuse existing command dispatch logic
-3. Map HTTP paths to JSON-RPC methods (1:1)
-
-**Cost:** ~150 lines (socket listener + method mapper).
-
-**Benefit:** 
-- Agents don't need HTTP stack (faster, fewer timeouts)
-- Compatible with MCP transport layer (future multi-agent scenarios)
-- Lower latency for agents running locally
-
-**Precedent:** i3, yabai, both use Unix sockets for local control.
-
----
-
-#### 2.2 Create `wibwob-cli` Wrapper
-**Current:** Agents use curl + API calls.  
-**Improvement:** Ship a `wibwob-cli` command for direct shell access.
-
-**Usage:**
-```bash
-# Query state
-wibwob-cli state --format json | jq .
-
-# Move window
-wibwob-cli window move --id 3 --x 10 --y 5
-
-# Focus window
-wibwob-cli window focus --id 3
-
-# List commands
-wibwob-cli commands list
-```
-
-**Implementation:**
-```typescript
-// src/bin/wibwob-cli.ts (new file)
-// - Parse CLI args (minimist or yargs-like)
-// - Connect to Unix socket (~/.wibwob/control.sock)
-// - Send JSON-RPC
-// - Format output (JSON, plaintext, table)
-
-// Make executable:
-// chmod +x src/bin/wibwob-cli.ts
-// Add to package.json: { "bin": { "wibwob-cli": "..." } }
-```
-
-**Cost:** ~400 lines.
-
-**Benefit:**
-- Standard Unix tool (agents familiar with grep, jq, xargs)
-- No HTTP overhead
-- Shell-scriptable without special knowledge
-- Enables piping naturally
-
-**Precedent:** yabai-cli, i3-msg, dmenu.
-
----
-
-### Phase 3: Long-Term, Experimental (Weeks 5+)
-
-#### 3.1 Formal Agent Benchmark Suite (Optional)
-**Hypothesis:** CLI-first agents outperform REST agents on desktop control tasks.
-
-**Proposed Benchmark:**
-- 20 multi-step desktop scenarios (close editors, arrange by theme, etc.)
-- Two agent configurations:
-  - **A:** REST API only (current state)
-  - **B:** Atomic CLI tools + pipes
-- Measure: success rate, tokens, roundtrips, error recovery
-- Same LLM (Claude 3.5 Sonnet)
-- Run 3 trials each, average
-
-**Timeline:** 3-4 days to design, run, analyze.
-
-**Expected Outcome:**
-- Validate hypothesised CLI advantage with controlled measurement
-- Generate publishable benchmark
-- Quantify savings (token cost, execution time)
-
-**If Successful:**
-- Open-source benchmark for agent interface design
-- Evidence for future agent-friendly system design
-
----
-
-#### 3.2 Virtual Filesystem Abstraction (Speculative)
-**Concept:** Expose WibWob-DOS state as virtual filesystem (Plan 9 style).
-
-**Hypothetical Design:**
-```
-/tmp/wibwob/state.json              # Full state
-/tmp/wibwob/windows/<id>/info.json  # Window metadata
-/tmp/wibwob/windows/<id>/geometry   # "X Y W H" as one line
-/tmp/wibwob/windows/<id>/focus      # Read: boolean | Write: focus this window
-/tmp/wibwob/commands/list           # Available commands
-/tmp/wibwob/commands/<cmd>          # Write to invoke command
-```
-
-**Implementation:** FUSE (user-space filesystem).
-
-**Cost:** Experimental, ~500 lines + testing.
-
-**Benefit:**
-- Agents use zero special knowledge (just cat, grep, echo)
-- Enable remote access via 9P protocol (future)
-- Aligns with Plan 9 design principles (proven effective at system scale)
-
-**Caveats:**
-- FUSE is Unix-only (macOS/Linux; Windows needs WSL2)
-- Unproven for TUI state management
-- May have performance overhead
-
-**Recommendation:** Prototype only if Phase 1 + 2 show strong results.
-
----
-
-## Implementation Roadmap
-
-Phase 1 (1-2 weeks): Atomic operations + tool definitions + jq-friendly state.
-Gate: typecheck + smoke test + agent can chain operations with state queries.
-
-Phase 2 (2 weeks): CLI wrapper auto-derived from catalog (see SURFACE_PARITY_ARCHITECTURE.md).
-Gate: `ww` tool works with pipes, parity with HTTP API.
-
-Phase 3 (optional): Formal benchmark, virtual filesystem prototype.
-
----
-
-## Success Metrics
-
-### Phase 1 (Minimum Bar)
-- [x] All atomic operations exposed via control API
-- [x] Agent tool definitions updated
-- [x] Smoke tests pass
-- [x] No regression in human-facing HTTP API
-
-### Phase 2 (Validated)
-- [x] Unix socket listener responds to JSON-RPC
-- [x] wibwob-cli tool works with pipes
-- [x] Agent benchmark on Phase 1 + 2 shows improvement vs baseline
-
-### Phase 3 (Optional)
-- [x] Formal benchmark published
-- [x] VFS prototype working (if attempted)
+Run the proposed benchmark from RESEARCH Section 7:
+- 20 multi-step desktop control tasks
+- Compare CLI vs REST agent performance
+- Measure success rate, token usage, error recovery
 
 ---
 
 ## Risk Analysis
 
-### Phase 1: Minimal Risk
-- Keep HTTP API unchanged (backwards compatible)
-- Tool definitions are additive (no breaking changes)
-- Smoke tests catch regressions immediately
-
-### Phase 2: Low Risk
-- Unix socket is optional (HTTP still works)
-- CLI is just a client (doesn't affect server)
-- If issues arise, disable and fall back to HTTP
-
-### Phase 3: Medium Risk
-- Benchmark is informational (no code impact)
-- VFS is experimental (skip if problems arise)
+| Phase | Risk | Mitigation |
+|-------|------|------------|
+| 1 (schemas) | Minimal | Additive change, no breaking API |
+| 2 (CLI) | Low | CLI is just a client; HTTP API unchanged |
+| 3 (parity tests) | None | Informational only |
+| 4 (benchmark) | None | No code impact |
 
 ---
 
-## Integration with WibWob-DOS Architecture
+## Integration Points
 
-### No Changes Required
-- `src/core/command-registry.ts` — Already stateless ✅
-- `src/services/state-service.ts` — Already canonical ✅
-- `src/core/window-facade.ts` — Already the abstraction layer ✅
+No changes required:
+- command-registry.ts — already stateless
+- state-service.ts — already canonical
+- window-facade.ts — already the abstraction layer
 
-### Changes Required
-- `src/services/control-api.ts` — Add atomic endpoints + Unix socket support
-- `src/services/agent-tools.ts` — Update tool definitions
-- New: `src/bin/wibwob-cli.ts` — CLI wrapper
+Changes required:
+- command-catalog.ts — add `params?: z.ZodType` field
+- control-api.ts — validate args against schema (optional, improves error messages)
+- New: src/cli/ww.ts — CLI entry point (~50 lines, auto-derives from catalog)
+- New: src/cli/catalog-to-cli.ts — reads catalog, generates subcommands (~100 lines)
+- New: src/cli/transport.ts — HTTP or Unix socket client (~80 lines)
 
-### Documentation Updates
-- `.agents/shell-dev/control-api.md` — Add Unix socket section
-- `.agents/shell-dev/specs/state-and-api.md` — Add atomic operation guidance
-- AGENTS.md — Update agent model section
-
----
+Total new code: ~250 lines for a zero-drift CLI surface.
 
 ---
 
-## Summary Table
+## Success Criteria
 
-| Phase | What | When | Risk | Effort | Benefit |
-|-------|------|------|------|--------|---------|
-| **1.1** | Atomic operations | Week 1 | Minimal | 200 LOC | Query-before-act loop |
-| **1.2** | JQ-friendly state | Week 1 | None | 2h audit | Pipe compatibility |
-| **1.3** | Tool definitions | Week 2 | Minimal | 400 LOC | Reduced hallucination |
-| **2.1** | Unix socket RPC | Week 3 | Low | 150 LOC | Lower latency |
-| **2.2** | CLI wrapper | Week 3-4 | Low | 400 LOC | Standard Unix interface |
-| **3.1** | Benchmark suite | Week 5 | None | 3-4 days | Publishable results |
-| **3.2** | VFS prototype | Week 5+ | Medium | 500 LOC | Speculative long-term |
+- Every `api: true` command is reachable via `ww <noun> <verb>`
+- `ww` output parses as valid JSON (pipeable to jq)
+- Adding a new command to the catalog automatically creates a CLI subcommand
+- No manual wiring between catalog and CLI (parity by construction)
+- Agent can complete multi-step window management tasks via `ww` pipes
 
 ---
 
-## References
-- RESEARCH_UNIX_AGENT_CONTROL.md (full brief)
-- UNIX_AGENT_CONTROL_SUMMARY.md (quick reference)
-- UNIX_AGENT_CONTROL_EVIDENCE.md (verified citations)
-- AGENTS.md (current architecture)
-- `.agents/shell-dev/control-api.md` (API reference)
-
----
-
-**Document Status:** Actionable recommendations ready for review.  
-**Last Updated:** March 13, 2026  
-**Audience:** Technical leads, architecture reviewers
+See also:
+- RESEARCH_UNIX_AGENT_CONTROL.md — evidence and analysis
+- UNIX_AGENT_CONTROL_EVIDENCE.md — verified citations
+- SURFACE_PARITY_ARCHITECTURE.md — implementation architecture
