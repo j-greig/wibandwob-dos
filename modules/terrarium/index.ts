@@ -701,6 +701,15 @@ function renderDistrict(districtId: DistrictId, w: number, h: number, world: Wor
 
 function renderResources(world: World, w: number): string {
   const r = world.resources;
+  // Census by caste
+  const census = (["worker", "soldier", "engineer", "queen", "scientist"] as AntCaste[])
+    .map(c => {
+      const n = world.ants.filter(a => a.caste === c).length;
+      return n > 0 ? `${CASTE_GLYPHS[c]}${n}` : null;
+    })
+    .filter(Boolean)
+    .join(" ");
+
   const items = [
     `♣${r.food}`,
     `◇${r.crystals}`,
@@ -708,19 +717,24 @@ function renderResources(world: World, w: number): string {
     `◊${r.science}`,
     `☺${world.happiness.toFixed(0)}%`,
     `⚙T${world.techLevel}`,
-    `pop:${world.ants.length}`,
   ];
-  return " " + items.join("  ");
+  const left = " " + items.join("  ");
+  const right = `pop:${world.ants.length} [${census}] `;
+  const gap = Math.max(1, w - left.length - right.length);
+  return (left + " ".repeat(gap) + right).slice(0, w);
 }
 
 function renderStatus(world: World, w: number): string {
   const dayNames = ["midnight", "dawn", "morning", "noon", "afternoon", "dusk", "evening", "night"];
-  const day = dayNames[Math.floor(world.dayPhase * 8) % 8];
-  const danger = world.dangerLevel > 0.5 ? " DANGER" : world.dangerLevel > 0.3 ? " caution" : "";
+  const dayIcons = ["*", "~", ".", "o", ".", "~", "*", "*"];
+  const dayIdx = Math.floor(world.dayPhase * 8) % 8;
+  const day = dayNames[dayIdx];
+  const dayIcon = dayIcons[dayIdx];
+  const danger = world.dangerLevel > 0.5 ? " !! DANGER" : world.dangerLevel > 0.3 ? " ! caution" : "";
   const speedStr = `${world.speed}x`;
-  const pauseStr = world.paused ? " PAUSED" : "";
-  const decree = world.decree !== "none" ? ` [${DECREE_NAMES[world.decree]}]` : "";
-  const left = ` ${day}${danger}${decree}${pauseStr} ${speedStr}`;
+  const pauseStr = world.paused ? " || PAUSED" : "";
+  const decree = world.decree !== "none" ? ` << ${DECREE_NAMES[world.decree]} >>` : "";
+  const left = ` ${dayIcon} ${day}${danger}${decree}${pauseStr} ${speedStr}`;
   const right = " [p]ause [+/-]spd [1-5]spawn [e]xplode [b]uild ";
   const gap = Math.max(1, w - left.length - right.length);
   return (left + " ".repeat(gap) + right).slice(0, w);
