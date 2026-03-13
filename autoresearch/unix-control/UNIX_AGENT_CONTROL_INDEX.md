@@ -6,28 +6,53 @@ Four comprehensive documents research and recommend Unix philosophy applied to m
 
 ---
 
+## Epic Brief
+
+This research fed into **E039 — Unix CLI Surface** in `.planning/`:
+
+**`.planning/epics/e039-unix-cli-surface/e039-brief.md`**
+
+That is the canonical implementation plan. The documents below are the
+research evidence that informed it. The brief also has its own research
+appendix at `.planning/epics/e039-unix-cli-surface/e039-research/`.
+
+---
+
 ## Quick Navigation
 
-### 🎯 I want...
+### I want...
+
+**...the implementation plan (15 min read)**
+-> **`.planning/epics/e039-unix-cli-surface/e039-brief.md`**
+Epic brief with features, stories, technical approach, success criteria.
+
+**...ranked reference CLI tools (10 min read)**
+-> **`REFERENCE_CLI_TOOLS_RANKED.md`**
+12 Unix CLI tools scored on composability, agent fit, architecture match,
+maturity, and relevance. Synthesised into a proposed `ww` command grammar.
 
 **...the executive summary (5 min read)**
-→ **`UNIX_AGENT_CONTROL_SUMMARY.md`**  
-Quick reference with key findings, performance deltas, and project examples.
+-> **`UNIX_AGENT_CONTROL_SUMMARY.md`**
+Key findings, performance deltas, and project examples.
 
-**...verified evidence & citations (10 min read)**
-→ **`UNIX_AGENT_CONTROL_EVIDENCE.md`**  
+**...verified evidence and citations (10 min read)**
+-> **`UNIX_AGENT_CONTROL_EVIDENCE.md`**
 Specific URLs, quoted passages, benchmark data, and academic references.
 
 **...the full research brief (45 min read)**
-→ **`RESEARCH_UNIX_AGENT_CONTROL.md`**  
-Complete analysis of 8 research areas: academic papers, projects, benchmarks, composability arguments, and design patterns.
+-> **`RESEARCH_UNIX_AGENT_CONTROL.md`**
+Complete analysis of 8 research areas.
 
 **...actionable recommendations for WibWob-DOS (20 min read)**
-→ **`UNIX_AGENT_CONTROL_RECOMMENDATIONS.md`**  
+-> **`UNIX_AGENT_CONTROL_RECOMMENDATIONS.md`**
 Phased implementation plan, cost estimates, success metrics, and risk analysis.
 
+**...the autoresearch brief-enhancement design (meta)**
+-> **`autoresearch-brief-enhancement.md`**
+How to use autoresearch to iteratively improve these docs themselves.
+
 **...this index**
-→ You are here! 📍
+-> You are here.
 
 ---
 
@@ -35,12 +60,15 @@ Phased implementation plan, cost estimates, success metrics, and risk analysis.
 
 | Document | Purpose | Length | Audience | Time |
 |----------|---------|--------|----------|------|
+| E039 BRIEF | Implementation plan (in .planning/) | 13 KB | Engineers | 15 min |
+| REFERENCE_CLI_TOOLS_RANKED | Scored CLI tools + design influence map | 15 KB | Designers | 10 min |
 | SUMMARY | Key findings + performance data | 7 KB | Decision-makers | 5 min |
 | EVIDENCE | Verified citations + quotes | 16 KB | Technical reviewers | 10 min |
 | RESEARCH | Full analysis of all 8 areas | 25 KB | Researchers | 45 min |
 | RECOMMENDATIONS | Implementation roadmap | 14 KB | Engineers | 20 min |
+| autoresearch-brief-enhancement | Meta: how to auto-improve these docs | 8 KB | Meta | 10 min |
 
-**Total research output:** ~62 KB, ~60 min to read end-to-end.
+**Total research output:** ~98 KB across 7 documents + epic brief.
 
 ---
 
