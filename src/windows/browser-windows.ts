@@ -13,6 +13,7 @@ import { EMPTY_PRIMER_SELECTED, EMPTY_FILE_SELECTED, EMPTY_MATCHES } from "../co
 import { createScrollbar } from "../core/ui-primitives.js";
 import { clipToVisibleWidth, padToWidth } from "../core/ansi-utils.js";
 import { createRestyleBundle, createSelectableList, deferRender } from "../core/ui-parts.js";
+import { renderMarkdownFile, PLAIN_HEADING_CONFIG } from "../services/markdown-service.js";
 import type { ContentMeasurement } from "../services/content-measurement.js";
 import { createPreRenderedPlayer, type FramePlayer } from "../services/animation-service.js";
 import type { Box, BrowserEntry, List, WindowKind, WindowRecord } from "../core/types.js";
@@ -472,18 +473,46 @@ export function openFileManagerWindow(params: {
 
   // ── Icon helpers ───────────────────────────────────────
   const fileIcon = (entry: { isDirectory: boolean; label: string }): string => {
-    if (entry.isDirectory) return "\u25A0"; // filled square
+    if (entry.isDirectory) {
+      // Special directory icons
+      const name = entry.label.replace(/\/$/, "");
+      if (name === "..") return "\u25C4"; // left triangle
+      if (name.startsWith(".")) return "\u25AB"; // small white square
+      if (["src", "lib", "app"].includes(name)) return "\u25A3"; // white sq in black sq
+      if (["node_modules", "dist", "build", ".git"].includes(name)) return "\u25A1"; // white square
+      return "\u25A0"; // filled square
+    }
     const ext = path.extname(entry.label).toLowerCase();
-    if ([".ts", ".js", ".tsx", ".jsx", ".py", ".c", ".cpp", ".h", ".rs"].includes(ext)) return "\u2666"; // diamond
-    if ([".md", ".txt", ".doc", ".rtf"].includes(ext)) return "\u2261"; // triple bar
-    if ([".json", ".yaml", ".yml", ".toml", ".xml"].includes(ext)) return "\u2630"; // trigram
+    if ([".ts", ".tsx"].includes(ext)) return "ts";
+    if ([".js", ".jsx"].includes(ext)) return "js";
+    if ([".py"].includes(ext)) return "py";
+    if ([".c", ".cpp", ".h", ".rs", ".go"].includes(ext)) return "<>";
+    if ([".md"].includes(ext)) return "md";
+    if ([".txt", ".doc", ".rtf"].includes(ext)) return "\u2261"; // triple bar
+    if ([".json"].includes(ext)) return "{}";
+    if ([".yaml", ".yml", ".toml"].includes(ext)) return "::";
+    if ([".xml", ".html", ".htm"].includes(ext)) return "</";
     if ([".png", ".jpg", ".gif", ".svg", ".webp", ".bmp"].includes(ext)) return "\u263C"; // sun
-    if ([".sh", ".bash", ".zsh", ".fish"].includes(ext)) return "\u25B6"; // play
-    return "\u2022"; // bullet
+    if ([".sh", ".bash", ".zsh", ".fish"].includes(ext)) return "$>";
+    if ([".css", ".scss", ".less"].includes(ext)) return "##";
+    if ([".lock"].includes(ext)) return "\u25CB"; // circle
+    return " \u2022"; // bullet
   };
 
   // ── Frame + layout ─────────────────────────────────────
   const frame = params.windowManager.createFrame("File Manager", "browser");
+
+  // ── Responsive sizing ──────────────────────────────────
+  {
+    const screenW = Number(params.screen.width);
+    const screenH = Number(params.screen.height);
+    const targetW = Math.min(180, Math.max(80, Math.floor(screenW * 0.85)));
+    const targetH = Math.max(30, screenH - 6);
+    frame.frame.width = targetW;
+    frame.frame.height = targetH;
+    frame.frame.left = Math.max(0, Math.floor((screenW - targetW) / 2));
+    frame.frame.top = Math.max(1, Math.floor((screenH - targetH) / 2));
+  }
 
   // ── Row 0: toolbar with path + clickable buttons ────────
   const toolbar = blessed.box({
@@ -813,16 +842,77 @@ export function openFileManagerWindow(params: {
       return;
     }
     if (entry.isDirectory) {
-      previewRawContent = `${entry.fullPath}\n\n[directory]`;
+      // Directory preview: show contents summary instead of crashing
+      try {
+        const dirPath = entry.fullPath;
+        const children = fs.readdirSync(dirPath, { withFileTypes: true });
+        const dirs = children.filter(c => c.isDirectory()).length;
+        const files = children.filter(c => !c.isDirectory()).length;
+        const sampleItems = children.slice(0, 20).map(c => {
+          const icon = c.isDirectory() ? "\u25A0" : "\u2022";
+          return `  ${icon} ${c.name}${c.isDirectory() ? "/" : ""}`;
+        });
+        const header = `\u2302 ${dirPath}\n\n  ${dirs} directories, ${files} files\n`;
+        const truncNote = children.length > 20 ? `\n  ... and ${children.length - 20} more` : "";
+        previewRawContent = header + "\n" + sampleItems.join("\n") + truncNote;
+      } catch (error) {
+        previewRawContent = `\u2302 ${entry.fullPath}\n\n  Cannot read directory.\n  ${error instanceof Error ? error.message : String(error)}`;
+      }
       setViewportContent(preview, previewRawContent);
       params.screen.render();
       return;
     }
+
+    const ext = path.extname(entry.label).toLowerCase();
+
+    // Markdown files: render with markdown service
+    if (ext === ".md") {
+      try {
+        const previewWidth = Math.max(1, (Number(preview.width) || 40) - 4);
+        const lines = renderMarkdownFile(entry.fullPath, previewWidth, {
+          headingConfig: PLAIN_HEADING_CONFIG,
+        });
+        previewRawContent = lines.join("\n");
+      } catch (error) {
+        previewRawContent = `Cannot preview file.\n\n${error instanceof Error ? error.message : String(error)}`;
+      }
+      setViewportContent(preview, previewRawContent);
+      params.screen.render();
+      return;
+    }
+
+    // JSON files: pretty-print
+    if (ext === ".json") {
+      try {
+        const raw = fs.readFileSync(entry.fullPath, "utf8").slice(0, 8000);
+        const parsed = JSON.parse(raw);
+        const pretty = JSON.stringify(parsed, null, 2);
+        const lines = pretty.split("\n");
+        const numbered = lines.map((ln: string, i: number) => `${String(i + 1).padStart(4, " ")} | ${ln}`).join("\n");
+        previewRawContent = `${entry.fullPath}\n\n${numbered}`;
+      } catch {
+        // Fall through to raw preview if JSON parse fails
+        const content = fs.readFileSync(entry.fullPath, "utf8").slice(0, 8000);
+        const lines = content.split("\n");
+        const numbered = lines.map((ln: string, i: number) => `${String(i + 1).padStart(4, " ")} | ${ln}`).join("\n");
+        previewRawContent = `${entry.fullPath}\n\n${numbered}`;
+      }
+      setViewportContent(preview, previewRawContent);
+      params.screen.render();
+      return;
+    }
+
+    // Default: raw text with line numbers
     try {
       const content = fs.readFileSync(entry.fullPath, "utf8");
       const lines = content.slice(0, 8000).split("\n");
+      // Show file metadata header
+      const stat = fs.statSync(entry.fullPath);
+      const sizeStr = stat.size < 1024 ? `${stat.size}B` : stat.size < 1048576 ? `${(stat.size / 1024).toFixed(1)}KB` : `${(stat.size / 1048576).toFixed(1)}MB`;
+      const dateStr = new Date(stat.mtimeMs).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+      const header = `${entry.fullPath}  (${sizeStr}, ${dateStr})`;
       const numbered = lines.map((ln, i) => `${String(i + 1).padStart(4, " ")} | ${ln}`).join("\n");
-      previewRawContent = `${entry.fullPath}\n\n${numbered}`;
+      previewRawContent = `${header}\n\n${numbered}`;
     } catch (error) {
       previewRawContent = `Cannot preview file.\n\n${error instanceof Error ? error.message : String(error)}`;
     }
@@ -853,13 +943,32 @@ export function openFileManagerWindow(params: {
 
   // ── Filter + refresh ───────────────────────────────────
 
+  const formatSize = (bytes: number): string => {
+    if (bytes === 0) return "";
+    if (bytes < 1024) return `${bytes}B`;
+    if (bytes < 1048576) return `${(bytes / 1024).toFixed(0)}K`;
+    return `${(bytes / 1048576).toFixed(1)}M`;
+  };
+
+  const formatListItem = (e: typeof entries[0]): string => {
+    const icon = fileIcon(e);
+    const listW = Math.max(1, Number(list.width) || 40);
+    if (e.isDirectory) {
+      return ` ${icon} ${e.label}`;
+    }
+    const size = formatSize(e.size);
+    const nameSpace = Math.max(10, listW - icon.length - size.length - 5);
+    const name = e.label.length > nameSpace ? e.label.slice(0, nameSpace - 2) + ".." : e.label.padEnd(nameSpace);
+    return ` ${icon} ${name} ${size}`;
+  };
+
   const applyFilter = (selectedIndex = 0) => {
     const normalized = filterValue.trim().toLowerCase();
     entries = normalized.length === 0
       ? [...allEntries]
       : allEntries.filter((entry) => entry.label.toLowerCase().includes(normalized));
     if (viewMode === "list") {
-      list.setItems(entries.map((e) => ` ${fileIcon(e)} ${e.label}`));
+      list.setItems(entries.map(formatListItem));
     } else {
       renderIconGrid();
     }

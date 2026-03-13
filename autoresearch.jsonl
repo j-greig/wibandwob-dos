@@ -1,1 +1,2 @@
 {"type":"config","name":"File Manager UI quality and features","metricName":"ui_score","metricUnit":"","bestDirection":"higher"}
+{"run":1,"commit":"3bb48e8","metric":4.4,"metrics":{"layout":5,"readability":5,"aesthetic":4,"coherence":5,"character":3},"status":"keep","description":"Baseline: File Manager at default size (72x20). Plain directory listing, no markdown preview, monochrome icons, minimal chrome. All axes below 6.","timestamp":1773404665631,"segment":0}
