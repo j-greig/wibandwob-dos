@@ -237,22 +237,34 @@ function openStudio(host: MicroappHost) {
     { key: "right", basis: "2fr", part: right },
   ], { gap: 2 });
 
-  // Seed idle state with atmospheric placeholder messages
-  convoLog.append({ text: "Waiting for a conversation to begin...", severity: "info" });
-  convoLog.append({ text: "Press ▶ RUN to start Wib & Wob talking.", severity: "info" });
-  convoLog.append({ text: "", severity: "info" });
-  convoLog.append({ text: "  ╭─ wib ─╮   ╭─ wob ─╮", severity: "info" });
-  convoLog.append({ text: "  │ haiku  │ ↔ │ sonnet │", severity: "info" });
-  convoLog.append({ text: "  ╰────────╯   ╰────────╯", severity: "info" });
-  stepsLog.append({ text: "─── orchestrator idle ───", severity: "info" });
-  stepsLog.append({ text: "Ready to launch cargo run --release", severity: "info" });
-  stepsLog.append({ text: "", severity: "info" });
-  stepsLog.append({ text: "Commands: /run /stop /kill /topic", severity: "info" });
-
   refreshSettings();
   refreshHeader();
   refreshBanner();
   layout();
+
+  // Seed idle state AFTER layout so logViews have dimensions
+  convoLog.append({ text: "Waiting for a conversation to begin...", severity: "info" });
+  convoLog.append({ text: "Press [ RUN ] to start.", severity: "info" });
+  convoLog.append({ text: "", severity: "info" });
+  convoLog.append({ text: "     .---.          .---.", severity: "info" });
+  convoLog.append({ text: "    | wib |  <-->  | wob |", severity: "info" });
+  convoLog.append({ text: "    | hai |        | son |", severity: "info" });
+  convoLog.append({ text: "     '---'          '---'", severity: "info" });
+  convoLog.append({ text: "", severity: "info" });
+  convoLog.append({ text: "Each turn includes ASCII art.", severity: "info" });
+  convoLog.append({ text: "Wib is creative chaos.", severity: "info" });
+  convoLog.append({ text: "Wob is methodical rigour.", severity: "info" });
+
+  stepsLog.append({ text: "orchestrator idle", severity: "info" });
+  stepsLog.append({ text: "awaiting cargo run --release", severity: "info" });
+  stepsLog.append({ text: "", severity: "info" });
+  stepsLog.append({ text: "Slash commands:", severity: "info" });
+  stepsLog.append({ text: "  /run   - start conversation", severity: "info" });
+  stepsLog.append({ text: "  /stop  - graceful stop", severity: "info" });
+  stepsLog.append({ text: "  /kill  - force kill", severity: "info" });
+  stepsLog.append({ text: "  /topic - change topic", severity: "info" });
+  stepsLog.append({ text: "  /logs  - show log paths", severity: "info" });
+  host.screen.render();
 
   function layout() {
     const width = Math.max(1, Number(win.body.width) || 0);
