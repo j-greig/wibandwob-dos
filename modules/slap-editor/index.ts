@@ -158,6 +158,10 @@ async function openEditor(host: MicroappHost, filePath?: string) {
   const th = host.theme();
   const btnStyle = { fg: th.accent.fg, bg: th.body.bg ?? "black" };
   const btnHoverStyle = { fg: th.body.bg ?? "black", bg: th.accent.fg };
+  const btnExplorer = blessed.box({
+    parent: headerBar, top: 0, right: 36, width: 12, height: 1,
+    content: " [^B] Tree ", mouse: true, style: { ...btnStyle },
+  });
   const btnSave = blessed.box({
     parent: headerBar, top: 0, right: 24, width: 12, height: 1,
     content: " [^S] Save ", mouse: true, style: { ...btnStyle },
@@ -170,10 +174,11 @@ async function openEditor(host: MicroappHost, filePath?: string) {
     parent: headerBar, top: 0, right: 0, width: 12, height: 1,
     content: " [^G] Goto ", mouse: true, style: { ...btnStyle },
   });
-  for (const btn of [btnSave, btnFind, btnGoto]) {
+  for (const btn of [btnExplorer, btnSave, btnFind, btnGoto]) {
     btn.on("mouseover", () => { btn.style = { ...btnHoverStyle }; host.screen.render(); });
     btn.on("mouseout", () => { btn.style = { ...btnStyle }; host.screen.render(); });
   }
+  btnExplorer.on("click", () => { toggleSidebar(); });
   btnSave.on("click", () => {
     engine.saveFile().then((ok) => {
       showStatus(ok ? `Saved ${engine.filePath}` : "No file path");
@@ -182,10 +187,48 @@ async function openEditor(host: MicroappHost, filePath?: string) {
   btnFind.on("click", () => { findMode = true; findInput = ""; render(); });
   btnGoto.on("click", () => { findMode = true; findInput = ":"; render(); });
 
-  const gutterBox = blessed.box({
+  // --- File tree sidebar ---
+  const SIDEBAR_WIDTH = 26;
+  let sidebarVisible = !!filePath;
+  let sidebarFiles: Array<{ name: string; isDir: boolean; path: string }> = [];
+  let sidebarSelected = 0;
+  let sidebarScrollOffset = 0;
+
+  const sidebarHeader = blessed.box({
     parent: win.body,
     top: 1,
     left: 0,
+    width: SIDEBAR_WIDTH,
+    height: 1,
+    style: { fg: th.accent.fg, bg: th.header.bg },
+  });
+
+  const sidebarBox = blessed.box({
+    parent: win.body,
+    top: 2,
+    left: 0,
+    width: SIDEBAR_WIDTH,
+    bottom: 1,
+    style: { fg: theme.fg, bg: theme.bg },
+    tags: false,
+    mouse: true,
+  });
+
+  const sidebarDivider = blessed.box({
+    parent: win.body,
+    top: 1,
+    left: SIDEBAR_WIDTH,
+    width: 1,
+    bottom: 1,
+    style: { fg: th.muted.fg, bg: theme.bg },
+  });
+
+  const sidebarLeft = sidebarVisible ? SIDEBAR_WIDTH + 1 : 0;
+
+  const gutterBox = blessed.box({
+    parent: win.body,
+    top: 1,
+    left: sidebarLeft,
     width: 5,
     bottom: 1,
     style: { fg: theme.gutterFg, bg: theme.gutterBg },
@@ -194,11 +237,11 @@ async function openEditor(host: MicroappHost, filePath?: string) {
   const textBox = blessed.box({
     parent: win.body,
     top: 1,
-    left: 5,
+    left: sidebarLeft + 5,
     right: 0,
     bottom: 1,
     style: { fg: theme.fg, bg: theme.bg },
-    tags: false, // ANSI mode — raw escape codes, no blessed tags
+    tags: false,
   });
 
   const statusBar = blessed.box({
@@ -209,6 +252,136 @@ async function openEditor(host: MicroappHost, filePath?: string) {
     height: 1,
     style: { fg: theme.statusFg, bg: theme.statusBg },
   });
+
+  // Populate sidebar file list
+  function loadSidebarFiles() {
+    if (!engine.filePath) { sidebarFiles = []; return; }
+    const fs = require("fs") as typeof import("fs");
+    const path = require("path") as typeof import("path");
+    const dir = path.dirname(engine.filePath);
+    try {
+      const entries = fs.readdirSync(dir, { withFileTypes: true });
+      sidebarFiles = entries
+        .filter(e => !e.name.startsWith("."))
+        .sort((a, b) => {
+          if (a.isDirectory() && !b.isDirectory()) return -1;
+          if (!a.isDirectory() && b.isDirectory()) return 1;
+          return a.name.localeCompare(b.name);
+        })
+        .map(e => ({
+          name: e.name,
+          isDir: e.isDirectory(),
+          path: path.join(dir, e.name),
+        }));
+      // Select current file
+      const currentName = path.basename(engine.filePath);
+      const idx = sidebarFiles.findIndex(f => f.name === currentName);
+      if (idx >= 0) sidebarSelected = idx;
+    } catch {
+      sidebarFiles = [];
+    }
+  }
+
+  function renderSidebar() {
+    if (!sidebarVisible) {
+      sidebarHeader.hide();
+      sidebarBox.hide();
+      sidebarDivider.hide();
+      return;
+    }
+    sidebarHeader.show();
+    sidebarBox.show();
+    sidebarDivider.show();
+
+    const t2 = host.theme();
+    const accentC = ansiColour(t2.accent.fg);
+    const mutedC = ansiColour(t2.muted.fg);
+    const brightC = ansiColour(t2.body.fg);
+    const selBg = ansiBgColour(t2.selected.bg);
+    const selFg = ansiColour(t2.selected.fg);
+
+    // Header
+    const dirName = engine.filePath
+      ? require("path").basename(require("path").dirname(engine.filePath))
+      : "EXPLORER";
+    sidebarHeader.setContent(` ${accentC}${A.b}EXPLORER${A.r} ${mutedC}${dirName}${A.r}`);
+
+    // Divider
+    const h = Math.max(1, Number(sidebarDivider.height) || 1);
+    sidebarDivider.setContent("\u2502\n".repeat(h).trim());
+
+    // File list
+    const viewH = Math.max(1, Number(sidebarBox.height) || 1);
+    // Ensure selected is visible
+    if (sidebarSelected < sidebarScrollOffset) sidebarScrollOffset = sidebarSelected;
+    if (sidebarSelected >= sidebarScrollOffset + viewH) sidebarScrollOffset = sidebarSelected - viewH + 1;
+
+    const lines: string[] = [];
+    const w = SIDEBAR_WIDTH - 2;
+    for (let i = 0; i < viewH; i++) {
+      const idx = sidebarScrollOffset + i;
+      if (idx >= sidebarFiles.length) { lines.push(""); continue; }
+      const f = sidebarFiles[idx];
+      const icon = f.isDir ? "\u25A0 " : `${fileIcon(f.path)} `;
+      const name = f.name.length > w - 3 ? f.name.slice(0, w - 5) + ".." : f.name;
+      const isActive = idx === sidebarSelected;
+      const isCurrent = engine.filePath && f.path === engine.filePath;
+      if (isActive) {
+        lines.push(`${selBg}${selFg} ${icon}${name}${" ".repeat(Math.max(0, w - icon.length - name.length))}${A.r}`);
+      } else if (isCurrent) {
+        lines.push(` ${accentC}${icon}${A.b}${name}${A.r}`);
+      } else if (f.isDir) {
+        lines.push(` ${mutedC}${icon}${brightC}${name}${A.r}`);
+      } else {
+        lines.push(` ${mutedC}${icon}${name}${A.r}`);
+      }
+    }
+    sidebarBox.setContent(lines.join("\n"));
+  }
+
+  // Sidebar keyboard handling
+  sidebarBox.on("keypress", (_ch: string | undefined, key: blessed.Widgets.Events.IKeyEventArg) => {
+    if (key.name === "up" || key.name === "k") {
+      sidebarSelected = Math.max(0, sidebarSelected - 1);
+      renderSidebar(); host.screen.render();
+    } else if (key.name === "down" || key.name === "j") {
+      sidebarSelected = Math.min(sidebarFiles.length - 1, sidebarSelected + 1);
+      renderSidebar(); host.screen.render();
+    } else if (key.name === "return" || key.name === "enter") {
+      const f = sidebarFiles[sidebarSelected];
+      if (f && !f.isDir) {
+        engine.loadFile(f.path).then(() => {
+          highlightDirty = true;
+          win.setTitle(`Edit: ${f.name}`);
+          render();
+        });
+      }
+    } else if (key.name === "tab") {
+      textBox.focus();
+    }
+  });
+
+  // Toggle sidebar with Ctrl+B (VSCode pattern)
+  function toggleSidebar() {
+    sidebarVisible = !sidebarVisible;
+    const sl = sidebarVisible ? SIDEBAR_WIDTH + 1 : 0;
+    gutterBox.left = sl;
+    textBox.left = sl + (Number(gutterBox.width) || 5);
+    if (!sidebarVisible) {
+      sidebarHeader.hide();
+      sidebarBox.hide();
+      sidebarDivider.hide();
+      textBox.focus();
+    } else {
+      sidebarHeader.show();
+      sidebarBox.show();
+      sidebarDivider.show();
+    }
+    renderSidebar();
+    render();
+  }
+
+  if (filePath) loadSidebarFiles();
 
   // --- Rendering ---
 
@@ -268,15 +441,18 @@ async function openEditor(host: MicroappHost, filePath?: string) {
   }
 
   function render() {
-    const totalWidth = (win.body as any).width as number || 80;
+    const bodyWidth = (win.body as any).width as number || 80;
     const viewHeight = ((win.body as any).height as number || 20) - 2; // minus header + status
     const gutterW = engine.gutterWidth() + 1; // extra space for padding
+    const sl = sidebarVisible ? SIDEBAR_WIDTH + 1 : 0;
 
-    // Update gutter width
+    // Update positions
+    gutterBox.left = sl;
     gutterBox.width = gutterW;
-    textBox.left = gutterW;
+    textBox.left = sl + gutterW;
 
-    const textWidth = Math.max(1, totalWidth - gutterW);
+    const totalWidth = bodyWidth;
+    const textWidth = Math.max(1, bodyWidth - sl - gutterW);
     engine.ensureCursorVisible(textWidth, viewHeight);
 
     if (highlightDirty) rehighlight();
@@ -484,6 +660,7 @@ async function openEditor(host: MicroappHost, filePath?: string) {
     const gap = Math.max(1, totalWidth - leftPlain - rightPlain);
     (statusBar as any).setContent(statusLeftAnsi + " ".repeat(gap) + statusRightAnsi);
 
+    renderSidebar();
     host.screen.render();
   }
 
@@ -603,6 +780,9 @@ async function openEditor(host: MicroappHost, filePath?: string) {
     } else if (ctrl && key.name === "g") {
       findMode = true;
       findInput = ":";
+    } else if (ctrl && key.name === "b") {
+      toggleSidebar();
+      return;
     }
     // Editing (mark highlight dirty)
     else if (key.name === "return" || key.name === "enter") {
@@ -706,10 +886,14 @@ async function openEditor(host: MicroappHost, filePath?: string) {
 
   win.onRestyle(() => {
     theme = getTheme(host);
+    const t3 = host.theme();
     gutterBox.style = { fg: theme.gutterFg, bg: theme.gutterBg };
     textBox.style = { fg: theme.fg, bg: theme.bg };
     statusBar.style = { fg: theme.statusFg, bg: theme.statusBg };
     headerBar.style = { fg: theme.statusFg, bg: theme.statusBg };
+    sidebarHeader.style = { fg: t3.accent.fg, bg: t3.header.bg };
+    sidebarBox.style = { fg: theme.fg, bg: theme.bg };
+    sidebarDivider.style = { fg: t3.muted.fg, bg: theme.bg };
     render();
   });
 
