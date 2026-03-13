@@ -6,9 +6,7 @@ For research and analysis: RESEARCH_UNIX_AGENT_CONTROL.md (8 sections)
 For verified citations: UNIX_AGENT_CONTROL_EVIDENCE.md (URLs, quotes, verification status)
 For implementation plan: UNIX_AGENT_CONTROL_RECOMMENDATIONS.md (phased)
 For CLI architecture: SURFACE_PARITY_ARCHITECTURE.md (how to build it)
-For CLI design references: REFERENCE_CLI_TOOLS_RANKED.md (12 tools scored)
-For naming decisions: devnote-cli-naming-strategy (verb vocabulary)
-For parity architecture: devnote-parity-problem (single source of truth)
+For CLI design + naming: REFERENCE_CLI_TOOLS_RANKED.md (12 tools scored, naming strategy, proposed grammar)
 
 ## File Roles (Non-Overlapping)
 
@@ -18,9 +16,7 @@ For parity architecture: devnote-parity-problem (single source of truth)
 | EVIDENCE | Verified citations with URLs and verification status | Analysis or recommendations |
 | RECOMMENDATIONS | Phased implementation plan for WibWob-DOS | Research evidence |
 | SURFACE_PARITY | Architecture for auto-deriving CLI from catalog | Research evidence |
-| REFERENCE_CLI_TOOLS_RANKED | 12 CLI tools scored, proposed ww grammar | Research evidence |
-| devnote-cli-naming | Verb/noun vocabulary for ww command | Everything else |
-| devnote-parity | Why auto-derive CLI from registry | Implementation detail |
+| REFERENCE_CLI_TOOLS_RANKED | CLI tools scored, naming strategy, proposed ww grammar | Research evidence |
 
 ## Verification Status Summary
 

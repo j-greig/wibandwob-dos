@@ -139,24 +139,37 @@ Repo: https://github.com/jqlang/jq
 
 ---
 
-## Summary: Design Influence Map
+## Naming Strategy: Unique Domain Verbs (Not Unix Aliases)
 
-What `ww` should steal from each tool:
+Decision: use domain-specific verbs (close, move, focus) not Unix file
+verbs (rm, mv, cat). Reasons:
 
-| Source | Pattern to steal |
-|--------|-----------------|
-| swaymsg | JSON-RPC over Unix socket. Criteria selectors. Event subscription. |
-| yabai | Query/command split. Focused-window default. Signal system. |
-| tmux | Target syntax. Format strings. capture-pane to stdout. |
-| wmctrl | Title-based targeting. Combined move+resize. Simple list output. |
-| xdotool | Search+act chaining. getactivewindow. |
-| jq | Design output FOR jq consumption. Test with common jq patterns. |
-| herbstclient | Attribute path model (Plan 9 style). |
-| bspwm | Event subscription streaming. |
-| llm | stdin as input. --json flag. Plugin extensibility. |
-| kubectl | Output format flags. Runtime discovery. Declarative apply. |
+1. Eliminates hallucination — LLMs won't confuse `ww move` with `mv`
+2. Maps directly to CommandRegistry IDs (auto-generation is trivial)
+3. Every ranked tool above uses domain verbs, not Unix file verbs
+4. The `ww` prefix already provides namespace isolation
 
-## Proposed `ww` Command Grammar (Synthesised)
+Output format follows Unix conventions: JSON to stdout, errors to stderr,
+exit codes (0 success, 1 error), `--quiet` for one-ID-per-line piping.
+
+| Action | Verb | Rejected | Why |
+|--------|------|----------|-----|
+| List windows | windows | ls | Noun command like `kubectl get pods` |
+| Show one window | window ID | cat | ID is natural |
+| Open | open | new, spawn | Matches registry |
+| Close | close | rm, kill | Not destructive |
+| Move | move | mv | Unambiguous |
+| Resize | resize | scale | Matches registry |
+| Focus | focus | select | Matches registry |
+| Desktop state | state | status | Matches /state endpoint |
+| Run command | cmd | exec | "exec" clashes with bash |
+| Stream events | watch | tail | Familiar, not conflicting |
+
+No aliases. One vocabulary, one surface area.
+
+---
+
+## Proposed `ww` Command Grammar (Synthesised from Above)
 
 Drawing from the best patterns above:
 
