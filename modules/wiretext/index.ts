@@ -417,7 +417,12 @@ export default function setup(host: MicroappHost) {
 }
 
 function openWiretext(host: MicroappHost) {
-  const win = host.createWindow({ title: "Wiretext", width: 120, height: 40 });
+  // Fill most of the available desktop
+  const screenW = Number(host.screen.width) || 200;
+  const screenH = Number(host.screen.height) || 56;
+  const winW = Math.max(100, screenW - 8);
+  const winH = Math.max(30, screenH - 6);
+  const win = host.createWindow({ title: "Wiretext", width: winW, height: winH });
   const timers = new Set<ReturnType<typeof setInterval>>();
   const th = host.theme();
 
@@ -635,32 +640,30 @@ function openWiretext(host: MicroappHost) {
 
     // Welcome screen for empty canvas
     if (objects.length === 0) {
-      const p = "       "; // padding
-      const welcome = [
-        "",
-        `${p}${accent}${A.b}+${"-".repeat(36)}+${A.r}`,
-        `${p}${accent}${A.b}|${A.r}    ${bright}${A.b}W I R E T E X T${A.r}              ${accent}${A.b}|${A.r}`,
-        `${p}${accent}${A.b}|${A.r}    ${muted}${A.i}ASCII wireframing in the terminal${A.r} ${accent}${A.b}|${A.r}`,
-        `${p}${accent}${A.b}+${"-".repeat(36)}+${A.r}`,
-        "",
-        `${p}${bright}${A.b}Getting Started${A.r}`,
-        `${p}${muted}Select a tool, then click-drag on the canvas.${A.r}`,
-        "",
-        `${p}${bright}${A.b}Tools${A.r}`,
-        `${p}  ${accent}B${A.r} ${muted}Box${A.r}      ${accent}T${A.r} ${muted}Text${A.r}     ${accent}L${A.r} ${muted}Line${A.r}`,
-        `${p}  ${accent}A${A.r} ${muted}Arrow${A.r}    ${accent}N${A.r} ${muted}Pencil${A.r}   ${accent}E${A.r} ${muted}Eraser${A.r}`,
-        `${p}  ${accent}V${A.r} ${muted}Select (move and resize objects)${A.r}`,
-        "",
-        `${p}${bright}${A.b}Box Styles${A.r}`,
-        `${p}  ${accent}1${A.r} ${muted}Single   ${A.r}${accent}2${A.r} ${muted}Double   ${A.r}${accent}3${A.r} ${muted}Rounded  ${A.r}${accent}4${A.r} ${muted}Heavy${A.r}`,
-        "",
-        `${p}${bright}${A.b}Actions${A.r}`,
-        `${p}  ${accent}^Z${A.r} ${muted}Undo${A.r}       ${accent}^Y${A.r} ${muted}Redo${A.r}`,
-        `${p}  ${accent}^E${A.r} ${muted}Export${A.r}     ${accent}^X${A.r} ${muted}Clear all${A.r}`,
-        `${p}  ${accent}Del${A.r} ${muted}Delete selected${A.r}`,
-        "",
-        `${p}${muted}${A.i}designed for thinking in text${A.r}`,
-      ];
+      const p = "     "; // padding
+      // Try to render figlet title
+      let titleLines: string[] = [];
+      if (isFigletAvailable()) {
+        titleLines = renderFigletLines("WIRETEXT", "standard");
+      }
+      const welcome: string[] = [""];
+      if (titleLines.length > 0) {
+        for (const line of titleLines) welcome.push(`${p}${accent}${line}${A.r}`);
+      } else {
+        welcome.push(`${p}${accent}${A.b}W I R E T E X T${A.r}`);
+      }
+      welcome.push(`${p}${muted}${A.i}ASCII wireframing in the terminal${A.r}`);
+      welcome.push("");
+      welcome.push(`${p}${bright}${A.b}Draw${A.r}    ${muted}Select a tool, then click-drag on the canvas${A.r}`);
+      welcome.push(`${p}${bright}${A.b}Move${A.r}    ${muted}V to select, then arrow keys or drag${A.r}`);
+      welcome.push(`${p}${bright}${A.b}Edit${A.r}    ${muted}Tab to cycle objects, ^C/^V/^D copy/paste/dupe${A.r}`);
+      welcome.push("");
+      welcome.push(`${p}${accent}B${A.r} ${muted}Box${A.r}    ${accent}T${A.r} ${muted}Text${A.r}    ${accent}L${A.r} ${muted}Line${A.r}    ${accent}A${A.r} ${muted}Arrow${A.r}    ${accent}N${A.r} ${muted}Pencil${A.r}    ${accent}U${A.r} ${muted}Component${A.r}`);
+      welcome.push(`${p}${accent}F${A.r} ${muted}Figlet${A.r}  ${accent}S${A.r} ${muted}Shadow${A.r}  ${accent}E${A.r} ${muted}Eraser${A.r}  ${accent}1-4${A.r} ${muted}Box style${A.r}  ${accent}^I${A.r} ${muted}Import art${A.r}`);
+      welcome.push("");
+      welcome.push(`${p}${accent}D${A.r} ${muted}demo diagram${A.r}  ${muted}|${A.r}  ${accent}^E${A.r} ${muted}export to clipboard${A.r}  ${muted}|${A.r}  ${accent}^X${A.r} ${muted}cut/clear${A.r}`);
+      welcome.push("");
+      welcome.push(`${p}${muted}${A.i}designed for thinking in text${A.r}`);
       for (let y = 0; y < canvasH; y++) {
         if (y < welcome.length) {
           canvasLines.push(welcome[y]);
@@ -708,7 +711,8 @@ function openWiretext(host: MicroappHost) {
     divider.setContent(("|\n").repeat(dH).trim());
 
     // Header
-    const headerLeft = ` ${accent}${A.b}WIRETEXT${A.r} ${muted}│${A.r} ${bright}${tool.toUpperCase()}${A.r}`;
+    const toolLabel = tool === "component" ? `COMPONENT: ${pendingComponent.toUpperCase()}` : tool.toUpperCase();
+    const headerLeft = ` ${accent}${A.b}WIRETEXT${A.r} ${muted}|${A.r} ${bright}${toolLabel}${A.r}`;
     const shadowBadge = shadowEnabled ? `${accent}[S]${A.r} ` : "";
     const headerBtns = `${shadowBadge}${muted}^Z${A.r}${bright}Undo ${A.r}${muted}^Y${A.r}${bright}Redo ${A.r}${muted}^E${A.r}${bright}Export ${A.r}${muted}^X${A.r}${bright}Cut/Clear${A.r} `;
     const hlp = stripAnsi(headerLeft).length;
@@ -767,13 +771,14 @@ function openWiretext(host: MicroappHost) {
     // Components section (shown when component tool active)
     if (tool === "component") {
       lines.push(divLine);
-      lines.push(`${accent}${A.b} COMPONENTS${A.r}`);
+      lines.push(`${accent}${A.b} COMPONENTS${A.r} ${muted}[/]${A.r}`);
       for (const comp of COMPONENTS) {
         const active = comp.type === pendingComponent;
+        const dims = `${muted}${comp.w}x${comp.h}${A.r}`;
         if (active) {
-          lines.push(`${selBg}${selFg} ${comp.label.padEnd(14)} ${A.r}`);
+          lines.push(`${selBg}${selFg} ${comp.label.padEnd(12)}${A.r} ${dims}`);
         } else {
-          lines.push(` ${bright}${comp.label}${A.r}`);
+          lines.push(` ${bright}${comp.label.padEnd(12)}${A.r} ${dims}`);
         }
       }
     }
@@ -798,9 +803,8 @@ function openWiretext(host: MicroappHost) {
       lines.push(` ${muted}^C${A.r} ${bright}copy${A.r}  ${muted}^V${A.r} ${bright}paste${A.r}`);
       lines.push(` ${muted}^D${A.r} ${bright}dupe${A.r}  ${muted}^X${A.r} ${bright}cut${A.r}`);
       lines.push(` ${muted}F${A.r}  ${bright}figlet${A.r} ${muted}S${A.r} ${bright}shadow${A.r}`);
-      if (shadowEnabled) {
-        lines.push(` ${accent}shadow: ON${A.r}`);
-      }
+      lines.push(` ${muted}^I${A.r} ${bright}import art${A.r}`);
+      if (shadowEnabled) lines.push(` ${accent}shadow: ON${A.r}`);
     }
 
     // Pad to fill sidebar
@@ -997,12 +1001,22 @@ function openWiretext(host: MicroappHost) {
       return;
     }
 
-    // STYLE section starts after TOOLS + 2 blank lines
-    const styleStart = TOOLS.length + 3;
+    // STYLE section starts after TOOLS + divider line
+    const styleStart = TOOLS.length + 2;
     if (relY >= styleStart && relY < styleStart + STYLES.length) {
       boxStyle = STYLES[relY - styleStart].id;
       render();
       return;
+    }
+
+    // COMPONENTS section (only when component tool active)
+    if (tool === "component") {
+      const compStart = styleStart + STYLES.length + 2; // after STYLE + divider
+      if (relY >= compStart && relY < compStart + COMPONENTS.length) {
+        pendingComponent = COMPONENTS[relY - compStart].type;
+        render();
+        return;
+      }
     }
   });
 
@@ -1086,6 +1100,11 @@ function openWiretext(host: MicroappHost) {
       if (upper === "2") { boxStyle = "double"; render(); return; }
       if (upper === "3") { boxStyle = "rounded"; render(); return; }
       if (upper === "4") { boxStyle = "heavy"; render(); return; }
+      // Demo diagram (D key, only when no objects)
+      if (upper === "D" && objects.length === 0) {
+        loadDemo();
+        return;
+      }
       // Shadow toggle
       if (upper === "S") {
         shadowEnabled = !shadowEnabled;
@@ -1110,6 +1129,7 @@ function openWiretext(host: MicroappHost) {
     if (ctrl && key.name === "z") { undo(); return; }
     if (ctrl && key.name === "y") { redo(); return; }
     if (ctrl && key.name === "e") { exportToClipboard(); return; }
+    if (ctrl && key.name === "i") { importFromFile(); return; }
     if (ctrl && key.name === "x") {
       if (selectedId) {
         // Cut selected
@@ -1305,6 +1325,55 @@ function openWiretext(host: MicroappHost) {
     objects.push({ id: genId(), type: "box", position: { col: 26, row: 13 }, width: 18, height: 3, zIndex: z(), borderStyle: "single", fill: "solid", label: "Redis Cache" });
     objects.push({ id: genId(), type: "box", position: { col: 47, row: 13 }, width: 18, height: 3, zIndex: z(), borderStyle: "single", fill: "solid", label: "Nginx" });
     showStatus("Loaded demo diagram");
+  }
+
+  // ── Import ASCII art ──
+  function importAscii(text: string, label?: string) {
+    pushUndo();
+    const lines = text.split("\n");
+    const maxW = lines.reduce((m, l) => Math.max(m, l.length), 0);
+    const id = genId();
+    objects.push({
+      id, type: "text",
+      position: { col: cursorCol, row: cursorRow },
+      width: maxW, height: lines.length,
+      zIndex: objects.length,
+      content: text,
+    });
+    selectedId = id;
+    showStatus(label ? `Imported: ${label}` : `Imported ${lines.length} lines`);
+    render();
+  }
+
+  async function importFromFile() {
+    // Read a file via the host's file picker pattern
+    const fs = require("fs") as typeof import("fs");
+    const path = require("path") as typeof import("path");
+    // Try to find primers directory
+    const primerDirs = [
+      path.join(process.cwd(), "modules-private", "amiga-primers", "primers"),
+      path.join(process.cwd(), "scratch", "primers"),
+    ];
+    let primerDir = "";
+    for (const d of primerDirs) {
+      if (fs.existsSync(d)) { primerDir = d; break; }
+    }
+    if (!primerDir) {
+      showStatus("No primer directory found");
+      return;
+    }
+    // Load a random primer as demo
+    try {
+      const files = fs.readdirSync(primerDir).filter((f: string) => f.endsWith(".txt"));
+      if (files.length === 0) { showStatus("No primer files found"); return; }
+      const file = files[Math.floor(Math.random() * files.length)];
+      const content = fs.readFileSync(path.join(primerDir, file), "utf-8");
+      // Strip ANSI codes if present
+      const clean = content.replace(/\x1b\[[0-9;]*m/g, "");
+      importAscii(clean, file);
+    } catch (e) {
+      showStatus("Import failed");
+    }
   }
 
   function exportToClipboard() {
