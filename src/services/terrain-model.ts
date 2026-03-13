@@ -15,6 +15,8 @@ export type TerrainBiome =
   | "ridge"
   | "peak";
 
+export type TerrainObject = "tree" | "pine" | "house" | "rock" | "flower" | "boat" | "bush" | null;
+
 export interface TerrainCell {
   elevation: number;
   relativeElevation: number;
@@ -22,6 +24,7 @@ export interface TerrainCell {
   isWater: boolean;
   biome: TerrainBiome;
   treeDensity: number;
+  object: TerrainObject;
 }
 
 export interface TerrainMap {
@@ -144,6 +147,53 @@ function classifyBiome(
   return "plain";
 }
 
+function placeObject(
+  biome: TerrainBiome,
+  treeDensity: number,
+  roll: number,
+  waterDepth: number,
+  elevation: number,
+  seaLevel: number,
+  slope: number,
+): TerrainObject {
+  // Water: sparse boats near shore
+  if (biome === "shallow-water" && waterDepth < 0.06 && roll < 0.02) return "boat";
+  if (biome === "deep-water" || biome === "shallow-water") return null;
+
+  // Peak/ridge: rocks
+  if (biome === "peak" && roll < 0.3) return "rock";
+  if (biome === "ridge" && roll < 0.2) return "rock";
+
+  // Hill: scattered rocks and bushes
+  if (biome === "hill") {
+    if (roll < 0.08) return "rock";
+    if (roll < 0.15) return "bush";
+    return null;
+  }
+
+  // Forest: dense trees
+  if (biome === "forest") {
+    if (roll < 0.35) return "tree";
+    if (roll < 0.55) return "pine";
+    if (roll < 0.60) return "bush";
+    return null;
+  }
+
+  // Plain: mixed objects
+  if (biome === "plain") {
+    if (treeDensity > 0.3 && roll < 0.12) return "tree";
+    if (treeDensity > 0.2 && roll < 0.18) return "bush";
+    if (roll < 0.02 && slope < 0.15) return "house";
+    if (roll > 0.95) return "flower";
+    return null;
+  }
+
+  // Shore: sparse flowers
+  if (biome === "shore" && roll < 0.05) return "flower";
+
+  return null;
+}
+
 export function createTerrainMap(opts: TerrainModelOptions): TerrainMap {
   const width = Math.max(8, Math.floor(opts.width));
   const height = Math.max(6, Math.floor(opts.height));
@@ -165,6 +215,7 @@ export function createTerrainMap(opts: TerrainModelOptions): TerrainMap {
       isWater: false,
       biome: "plain" as TerrainBiome,
       treeDensity: 0,
+      object: null as TerrainObject,
     })),
   );
 
@@ -193,13 +244,18 @@ export function createTerrainMap(opts: TerrainModelOptions): TerrainMap {
           waterPenalty,
       );
 
+      const biome = classifyBiome(elevation, seaLevel, vegetationEnabled, treeDensity, slope);
+      const objectRoll = cellNoise(opts.seed + 7919, x, y);
+      const object = placeObject(biome, treeDensity, objectRoll, waterDepth, elevation, seaLevel, slope);
+
       cells[y]![x] = {
         elevation,
         relativeElevation: elevation - seaLevel,
         waterDepth,
         isWater: waterDepth > 0,
-        biome: classifyBiome(elevation, seaLevel, vegetationEnabled, treeDensity, slope),
+        biome,
         treeDensity,
+        object,
       };
     }
   }

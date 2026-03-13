@@ -1,61 +1,77 @@
-# Autoresearch — Wiretext (ASCII Diagramming)
+# Autoresearch — WibWobWorld Terrain Views
 
 ## Objective
-Build a Wiretext module for WibWob-DOS — an ASCII art diagramming tool inspired by
-https://github.com/mualat/wiretext. Visual wireframing with box-drawing characters,
-lines, arrows, text, and UI components directly in the terminal.
+Transform WibWobWorld's rendering across all view modes. Make ISO view feel like
+SimCity 2000 isometric with terrain objects. Make 3D/firstperson view feel like
+standing on a hilltop looking at a landscape — rolling hills, distant sea, trees,
+houses, depth fog. Add terrain objects (trees, houses, simple geometric ASCII-friendly
+shapes) that render in BOTH iso and 3D modes.
 
-Reference image: autoresearch/wiretext/wiretext.png
-Wiretext source (cloned for reference): /tmp/wiretext/
+## Current State
+- ISO mode: single-glyph-per-cell diamonds, vertical columns, basic biome colouring
+- 3D/firstperson mode: y-buffer raycaster but VERY sparse — just sky dots and ground
+  underscores with almost no visible terrain features
+- No objects on terrain (no trees, no houses, no structures)
+- 5 render modes: terrain, contours, iso, hybrid, firstperson
 
 ## Architecture
-The wiretext boxDrawing.ts contains 1200 lines of pure grid-based rendering logic
-(no DOM/React dependencies) that can be adapted directly:
-- Grid = string[][] (2D character array)
-- CanvasObject model with position, size, type, style
-- renderObjectsToGrid() renders all objects to the grid
-- Box drawing chars: single/double/rounded/heavy styles
-- Bresenham line algorithm for diagonals
-- Hit testing, bounding boxes, resize handles
-- 30+ UI component types (button, input, table, modal, etc.)
+- `modules/wibwobworld/index.ts` — module shell, layout, controls (981 lines)
+- `modules/wibwobworld/render-iso.ts` — iso renderer (105 lines)
+- `src/services/terrain-render.ts` — all non-iso renderers including firstperson
+- `src/services/terrain-model.ts` — TerrainCell, TerrainMap, biome types
+- `src/services/contour-engine.ts` — heightmap generation, hill system
 
-## Reusable Components from Codebase
-- `src/core/ui-parts.ts` — createHeaderBar, createStatusBar
-- `src/services/syntax-highlight.ts` — not needed here but ANSI pattern reusable
-- Proven ANSI rendering pattern from Code Editor, Terrain Lab, Plasma
+## Key Files to Modify
+- `modules/wibwobworld/render-iso.ts` — SimCity-style iso with objects
+- `src/services/terrain-render.ts` — dramatically improved firstperson renderer
+- `src/services/terrain-model.ts` — add object placement data to TerrainCell
 
-## Target Features (priority order)
-1. CANVAS — grid rendered via blessed box, tags:false, ANSI for cursor/selection
-2. TOOL SIDEBAR — Select, Box, Text, Line, Arrow, Connector, Pencil, Eraser
-3. DRAWING — mouse click-drag to create boxes, lines, arrows on canvas
-4. SELECTION — click to select, move objects, resize handles
-5. HEADER BAR — title + Export/Clear/Undo/Redo buttons
-6. STATUS BAR — tool name, cursor col/row, object count, box style
-7. KEYBOARD SHORTCUTS — V/B/T/L/A/C/N/E for tools, Ctrl+Z undo, Ctrl+C copy
-8. BOX STYLES — single/double/rounded/heavy border toggle
-9. COMPONENTS — UI component palette (button, input, table, modal, etc.)
-10. EXPORT — copy grid to clipboard as plain text
-11. IMPORT — load ASCII art from primer files or paste text (stretch goal)
+## Target Improvements
 
-## Rendering Strategy
-- Canvas: blessed box with tags:false, raw ANSI escape codes
-- Grid: adapted from wiretext's Grid type (string[][])
-- Cursor: ANSI reverse video on current cell
-- Selected objects: ANSI highlight on border/content cells
-- Tool sidebar: ANSI-styled list with active tool highlighted
-- Status bar: ANSI-styled segments like Code Editor
+### 1. Terrain Objects (affects all modes)
+Place objects on terrain during map generation:
+- Trees: `♣` `♠` `⌂` on forest/plain biomes (varying density)
+- Houses: `⌂` `■` on plain biomes near shore (sparse, clustered)
+- Rocks: `�ite` `●` on hill/ridge biomes
+- Flowers: `*` `✿` on plain biomes (sparse)
+- Boats: `⛵` on shallow water near shore
+Objects stored in TerrainCell so all renderers can use them.
+
+### 2. ISO View — SimCity 2000 Style
+- Multi-cell buildings with roofs (not just single glyphs)
+- Trees rendered as 2-cell tall sprites (trunk + canopy)
+- Visible terrain layering with shading on south faces
+- Better colour palette: lush greens, warm browns, blue water
+- Grid lines or tile borders visible at closer zoom
+- Player marker more prominent
+
+### 3. 3D/Firstperson View — Standing on a Hill
+The view should feel like:
+- Standing on top of a hill looking out at rolling terrain
+- Distant hills visible with atmospheric perspective (fog/fade)
+- Sea visible at horizon when facing water
+- Trees visible as vertical elements breaking the skyline
+- Houses visible as small squares on plains
+- Better sky: gradient from dark blue at top to light at horizon
+- Ground texture varies: grass, dirt, sand near shore
+- Depth cueing: distant features use dimmer colours
+- Higher elevation scaling so terrain relief is dramatic
+
+### 4. Hybrid View Polish
+- Left pane (contour map) + right pane (iso) already works
+- Ensure objects visible in both panes
 
 ## Rubric
 5-axis: LAYOUT, READABILITY, COHERENCE, STYLE, FUNCTIONALITY — each 1-10, averaged.
 
-- LAYOUT: spatial arrangement, chrome structure, use of space
-- READABILITY: can you parse the content easily, contrast, typography
-- COHERENCE: do elements work together as a unified system
-- STYLE: visual polish + WibWob personality/brand identity
-- FUNCTIONALITY: does the app have expected features, feel complete, actually useful
+- LAYOUT: spatial arrangement, how well views use available space
+- READABILITY: can you parse terrain features, identify objects, understand depth
+- COHERENCE: do all view modes feel like the same world
+- STYLE: visual richness, colour usage, WibWob personality
+- FUNCTIONALITY: do views feel genuinely useful/immersive, object variety
 
 ## Constraints
-- Only modify files in `modules/wiretext/`
-- Can import shared utilities from src/ (ui-parts, etc.)
+- Modify: `modules/wibwobworld/` files, `src/services/terrain-render.ts`, `src/services/terrain-model.ts`
 - Must pass `bun run typecheck`
-- RESTART required after changes
+- RESTART required after changes (touching src/ files)
+- Keep all 5 existing render modes working
