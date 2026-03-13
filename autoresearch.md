@@ -1,1 +1,1 @@
-autoresearch/tr808/autoresearch.md
+autoresearch/terrain-lab/autoresearch.md

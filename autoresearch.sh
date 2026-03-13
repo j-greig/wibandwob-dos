@@ -1,1 +1,1 @@
-autoresearch/tr808/autoresearch.sh
+autoresearch/terrain-lab/autoresearch.sh
