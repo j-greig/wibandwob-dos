@@ -1,1 +1,1 @@
-autoresearch/terrain-lab/autoresearch.md
+autoresearch/plasma/autoresearch.md

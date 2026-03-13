@@ -1,1 +1,1 @@
-autoresearch/terrain-lab/autoresearch.sh
+autoresearch/plasma/autoresearch.sh

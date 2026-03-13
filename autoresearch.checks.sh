@@ -1,1 +1,1 @@
-autoresearch/terrain-lab/autoresearch.checks.sh
+autoresearch/plasma/autoresearch.checks.sh
