@@ -530,7 +530,7 @@ export function openFileManagerWindow(params: {
     parent: toolbar,
     top: 0,
     left: 0,
-    right: 29, // reserve space for buttons on the right
+    right: 34, // reserve space for wider buttons on the right
     height: 1,
     style: theme().header
   });
@@ -579,6 +579,12 @@ export function openFileManagerWindow(params: {
   const renderToolbarButtons = () => {
     const viewLabel = viewMode === "icon" ? "\u2261 List " : "\u25A6 Icon ";
     btnView.setContent(` [tab] ${viewLabel}`);
+    // Update search button to show active state
+    if (searchActive) {
+      btnSearch.setContent(` \u25CF Search `);
+    } else {
+      btnSearch.setContent(` [s] Search `);
+    }
   };
 
   btnFilter.on("click", () => {
@@ -1157,7 +1163,9 @@ export function openFileManagerWindow(params: {
     allEntries = buildEntries(directoryPath);
     const dirName = path.basename(directoryPath) || directoryPath;
     frame.frame.setLabel(` File Manager - ${dirName} `);
-    pathLabel.setContent(` ${renderBreadcrumb()}`);
+    // Show breadcrumb with file type summary
+    const bc = renderBreadcrumb();
+    pathLabel.setContent(` ${bc}`);
     applyFilter(selectedIndex);
   };
 
