@@ -82,14 +82,27 @@ Three files total: `ww.ts` (~50 lines), `catalog-to-cli.ts` (~100),
 
 ## Implementation Phases
 
-**Phase 1: Schema enrichment** — Add `params?: z.ZodType` to catalog.
-Enables validation, OpenAPI docs, CLI flag derivation. 2-3 hours, zero risk.
+**Phase 1: Schema enrichment** (2-3 hours, zero risk)
+Add `params?: z.ZodType` to `AppCommandDefinition`. Start with one command:
 
-**Phase 2: CLI projection** — Build `ww` tool. Every `api: true` command
-with params becomes a subcommand. HTTP transport initially. ~250 new lines.
+```typescript
+// In command-catalog.ts — add to window.move definition:
+params: z.object({
+  id: z.number().describe("Window ID from GET /state"),
+  x: z.number().describe("Absolute X coordinate"),
+  y: z.number().describe("Absolute Y coordinate"),
+}),
+```
 
-**Phase 3: Parity testing** — CI script verifies every `api: true` command
-has HTTP route + CLI subcommand + matching params. Build fails on drift.
+Then validate in `/commands/run` handler: `cmd.params?.parse(args)`.
+Success metric: `POST /commands/run` with bad args returns 400 + schema error.
+
+**Phase 2: CLI projection** (~250 new lines, 4-6 hours)
+Build `ww` tool. Every `api: true` command with params → subcommand with flags.
+Success metric: `ww commands list | jq length` equals API command count.
+
+**Phase 3: Parity testing** (1-2 hours)
+CI script: build fails if any `api: true` command lacks CLI subcommand.
 
 **Phase 4: Benchmark** (optional) — Test CLI vs REST agent performance.
 
