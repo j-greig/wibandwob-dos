@@ -611,12 +611,13 @@ function openWiretext(host: MicroappHost) {
 
     // Find cells belonging to selected object for highlighting
     const selCells = new Set<string>();
+    const selHandles = new Set<string>(); // corner resize handles
     if (selectedId) {
       const selObj = objects.find(o => o.id === selectedId);
       if (selObj) {
         const bb = getBBox(selObj);
-        if (selObj.type === "box") {
-          // Border cells only
+        if (selObj.type === "box" || selObj.type === "component") {
+          // Border cells
           for (let x = bb.col; x < bb.col + bb.w; x++) { selCells.add(`${x},${bb.row}`); selCells.add(`${x},${bb.row + bb.h - 1}`); }
           for (let y = bb.row; y < bb.row + bb.h; y++) { selCells.add(`${bb.col},${y}`); selCells.add(`${bb.col + bb.w - 1},${y}`); }
         } else if (selObj.type === "line" || selObj.type === "arrow") {
@@ -632,6 +633,11 @@ function openWiretext(host: MicroappHost) {
             for (let x = bb.col; x < bb.col + bb.w; x++) selCells.add(`${x},${y}`);
           }
         }
+        // Corner handles for visual feedback
+        selHandles.add(`${bb.col},${bb.row}`);
+        selHandles.add(`${bb.col + bb.w - 1},${bb.row}`);
+        selHandles.add(`${bb.col},${bb.row + bb.h - 1}`);
+        selHandles.add(`${bb.col + bb.w - 1},${bb.row + bb.h - 1}`);
       }
     }
 
@@ -681,8 +687,11 @@ function openWiretext(host: MicroappHost) {
           const isCursor = gc === cursorCol && gr === cursorRow;
           const isSel = selCells.has(`${gc},${gr}`);
 
+          const isHandle = selHandles.has(`${gc},${gr}`);
           if (isCursor) {
             line += `${ansiBgColour(th.body.fg)}${ansiColour(th.body.bg)}${ch}${A.r}`;
+          } else if (isHandle) {
+            line += `${ansiBgColour(th.accent.fg)}${ansiColour(th.body.bg)}${A.b}+${A.r}`;
           } else if (isSel) {
             line += `${selBg}${selFg}${ch}${A.r}`;
           } else if (ch !== " ") {
@@ -690,9 +699,9 @@ function openWiretext(host: MicroappHost) {
             const colour = ct ? (typeColour[ct] || accent) : accent;
             line += `${colour}${ch}${A.r}`;
           } else {
-            // Grid dots every 4 cells
-            if ((gc % 4 === 0) && (gr % 4 === 0)) {
-              line += `${muted}.${A.r}`;
+            // Grid dots every 5 cells — subtle reference grid
+            if ((gc % 5 === 0) && (gr % 5 === 0)) {
+              line += `${A.d}${muted}.${A.r}`;
             } else {
               line += " ";
             }
@@ -733,7 +742,15 @@ function openWiretext(host: MicroappHost) {
     } else {
       statusLeft = ` ${accent}${cursorCol},${cursorRow}${A.r} ${muted}|${A.r} ${bright}${boxStyle}${A.r}${selInfo}`;
     }
-    const statusRight = `${muted}${objects.length} obj${A.r} ${muted}|${A.r} ${muted}${GRID_COLS}x${GRID_ROWS}${A.r} `;
+    // Visual scroll position bar
+    const barLen = 5;
+    const hPct = GRID_COLS > canvasW ? Math.round((scrollCol / Math.max(1, GRID_COLS - canvasW)) * 100) : 0;
+    const vPct = GRID_ROWS > canvasH ? Math.round((scrollRow / Math.max(1, GRID_ROWS - canvasH)) * 100) : 0;
+    const vPos = Math.round((Math.min(100, vPct) / 100) * (barLen - 1));
+    let scrollVis = "";
+    for (let i = 0; i < barLen; i++) scrollVis += i === vPos ? `${accent}\u2588${A.r}` : `${muted}\u2591${A.r}`;
+
+    const statusRight = `${muted}${objects.length} obj${A.r} ${muted}|${A.r} ${muted}${boxStyle}${A.r} ${muted}|${A.r} ${scrollVis} ${muted}${Math.min(100, vPct)}%${A.r} `;
     const slp = stripAnsi(statusLeft).length;
     const srp = stripAnsi(statusRight).length;
     const sgap = Math.max(1, bodyW - slp - srp);
