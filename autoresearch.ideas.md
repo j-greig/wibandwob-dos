@@ -1,18 +1,20 @@
 # Autoresearch Ideas — File Manager
 
-## High-value (target: layout 9→10)
-- Column headers for list (Name | Size) — adds visual structure, could push layout to 10
-- Search result grouping by file — visually separate groups with subtle divider or header emphasis
+## COMPLETE — Score 10.0 achieved
 
-## Done
-- ~~Git status indicators~~ — done (M/A/? per-file, branch in title, summary in status)
-- ~~Empty state ASCII art~~ — done (keyboard help guide)
-- ~~Layout 8→9~~ — done (42% split ratio)
-- ~~Character 9→10~~ — done (git integration)
+Run archived. 18 experiments, 4.4 → 10.0 (+127%).
 
-## Deferred (low ROI or too complex for single-file change)
+All features implemented:
+- Responsive sizing, breadcrumb navigation, file type icons
+- Syntax highlighting (TS/JS/Python/Bash), markdown rendering, JSON pretty-print
+- Git status indicators (M/A/?), branch in title, git summary in status
+- Search via ripgrep with colour-coded results and match arrows
+- Copy path, Quick Look, Reveal in Finder, right-click context menu
+- Vertical pane divider, fixed preview header bar
+- Blessed double-fire keypress bug fixed (debounce + overlay redirect)
+
+## Deferred (future work, not needed for this run)
 - Clickable breadcrumb segments
 - Thumbnail preview for image files (ASCII art conversion)
 - File permission indicators (rwx)
 - Fuzzy filter matching
-- Dual-pane mode

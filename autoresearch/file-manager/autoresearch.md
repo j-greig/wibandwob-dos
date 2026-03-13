@@ -100,3 +100,7 @@ Already imported in browser-windows.ts:
 - #10 keep (9.2): Syntax highlighting for TS/JS/Python/Bash. Button-style toolbar with brackets+hover. Mouse click preview fix. Search overlay prompt.
 - #11 keep (9.4): Search active indicator ● on toolbar. Coherence pushed to 10.
 - #12-14 discards: Refinements (empty state help, sort indicator, pipe separators, icon titles) — all functional improvements committed separately but don't change search view score
+- #15 discard (9.2): Browse view with git status — character 10 but browse layout weaker
+- #16 keep (9.6): Git status integration (M/A/? per-file, branch in title, git summary in status). Fixed blessed double-fire keypress bug.
+- #17 keep (9.8): Wider list pane (42% split). Layout pushed to 9. All five axes at 9+.
+- #18 keep (10.0): Vertical divider between panes. Fixed preview header bar. ALL FIVE AXES AT 10. PERFECT SCORE.
