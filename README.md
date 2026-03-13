@@ -189,10 +189,9 @@ Microapps are the extension model. Each one gets a window and a host API.
 # Scaffold a new microapp
 bash scripts/scaffold-microapp.sh modules/my-app wibwob.my-app "My App" 50
 
-# Edit modules/my-app/index.ts, then reload
-curl -X POST http://127.0.0.1:8099/commands/run \
-  -H 'Content-Type: application/json' \
-  -d '{"id": "modules.reload"}'
+# Edit modules/my-app/index.ts
+# Module changes take effect after app restart:
+#   kill $(cat scratch/wibwob.pid) && bun run start
 ```
 
 See `docs/building-custom-modules.md` for the full guide. Example modules by complexity:
