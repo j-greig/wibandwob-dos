@@ -655,3 +655,35 @@ Applied in: `modules/wibwob-tr808/index.ts`
 this pattern and provides a copy-pasteable snippet for any microapp that needs
 blessed colour tags in its text display. Would save agents from rediscovering
 this workaround each time.
+
+## 2026-03-13 — Autoresearch multi-app visual scoring pattern
+
+**Pattern:** Autonomous UI improvement loop across multiple windows/microapps.
+
+**What works well:**
+1. **Subdirectory per target**: `autoresearch/<app>/` with its own .sh, .checks.sh, .md,
+   shots/, and symlinks swapped to repo root. Clean separation between runs.
+2. **Self-scoring 5-axis rubric** (layout, readability, aesthetic, coherence, character):
+   Forces disciplined evaluation. Same score = discard prevents score inflation.
+3. **Screenshot + Read for scoring**: Agent reads its own PNG screenshot via the Read
+   tool (which sends it as an image attachment). No external scorer needed.
+4. **Preset loading for screenshots**: Loading a preset (e.g. `rock-1` for TR-808)
+   gives the screenshot content to score against, rather than empty state.
+
+**What could be better — potential new skills/scripts:**
+- `autoresearch-archive.sh`: Automate the archive step (move symlinks, copy
+  autoresearch.md final state, create summary in .planning/).
+- `autoresearch-compare.sh`: Side-by-side text diff of two screenshots using
+  minimap-style output. Hard to diff PNGs in terminal.
+- `ww-visual-test`: Skill that opens a specific window with specific content
+  via API, screenshots it, and provides the image to the agent. Would replace
+  the bespoke .sh scripts per target.
+- **screencapture resilience**: Display sleep/lock causes `screencapture` to fail.
+  Need fallback: try all displays, or use tmux capture-pane for text-only fallback.
+
+**Apps completed so far:**
+- LLM Orch Studio: 3.6 → 8.0
+- Antopolis (terrarium): 5.4 → 9.0+
+- File Manager: 4.4 → 10.0
+- Music Player: 4.2 → 7.4 (in progress)
+- TR-808: 5.4 → 6.4 (in progress)

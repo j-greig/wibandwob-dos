@@ -21,7 +21,8 @@ sleep 0.5
 
 SHOT_DIR="$REPO_ROOT/autoresearch/tr808"
 SHOT="$SHOT_DIR/screenshot.png"
-screencapture -D 2 -x "$SHOT"
+# Try display 2 first, fall back to display 1, then default
+screencapture -D 2 -x "$SHOT" 2>/dev/null || screencapture -D 1 -x "$SHOT" 2>/dev/null || screencapture -x "$SHOT"
 file "$SHOT"
 echo "Screenshot saved to $SHOT"
 
