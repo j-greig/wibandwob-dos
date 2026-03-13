@@ -174,6 +174,12 @@ Rules:
 - value: agents skip entire subtrees they don't need; the filepath IS the table of contents
 - the test: if a module author opens anything in `shell-dev/`, the signposting failed
 
+**transitive dep / transitive dependency**
+- a package you don't directly depend on, but one of your direct dependencies pulls it in
+- example: we don't `bun add zod` but it's already in node_modules because MCP SDK, Anthropic SDK, and OpenAI SDK all depend on it
+- value: you can import and use it without adding a new dependency — but it can disappear if the package that brings it in drops it or changes version
+- rule of thumb: if you rely on a transitive dep heavily, promote it to a direct dep in package.json so it's pinned and intentional
+
 ## DEV TERMS
 
 **smoke test**
