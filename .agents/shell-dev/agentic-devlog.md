@@ -687,3 +687,204 @@ this workaround each time.
 - File Manager: 4.4 → 10.0
 - Music Player: 4.2 → 7.4 (in progress)
 - TR-808: 5.4 → 6.4 (in progress)
+
+## 2026-03-13 — Autoresearch for non-visual targets: Chrome browser extraction quality
+
+**Keywords**: autoresearch, programmatic scoring, content extraction, worktree,
+Defuddle, Readability, benchmark hardening, heuristic vs dogma
+
+### What happened
+
+Ran autoresearch loop targeting Chrome browser content extraction quality — a
+non-visual, programmatically scorable target. Score went from 8.4 baseline to 10.0
+across 8 test URLs in ~10 iterations. Used a git worktree at
+`~/Repos/wibandwob-dos-browse` to isolate changes from the main repo.
+
+### Programmatic scoring vs visual scoring
+
+For the first time, autoresearch used a **programmatic benchmark** rather than agent
+self-scoring. The benchmark (`autoresearch/chrome-browser/benchmark.ts`) navigates
+to each test URL via ChromeBrowserService and scores across 4 axes:
+
+- **EXTRACTION**: expected content keywords present (case-insensitive)
+- **NOISE**: known junk strings absent (word-boundary matching)
+- **STRUCTURE**: heading/list/link/codeblock/image counts meet minimums
+- **DISPLAY**: HTML tag residue, blank line excess, content length
+
+Each axis scores 1-10, averaged per URL, then averaged across all URLs.
+
+This is faster and more reproducible than visual scoring — no PNG screenshots
+needed, no subjective judgement, results are deterministic (modulo live page
+content changes).
+
+**Caveat**: programmatic scoring is vulnerable to overfitting. The human correctly
+flagged this multiple times. Key anti-overfitting discipline:
+
+1. **Don't tune test case thresholds to match your code** — set them once based on
+   what a good extraction SHOULD produce, then improve the extraction to meet them.
+2. **Add harder URLs when the score saturates** — went from 4 → 6 → 8 URLs as
+   scores hit 10.0. Each expansion exposed real weaknesses.
+3. **Fix false positives in the benchmark itself** — "Actions" noise marker matched
+   "Interactions" (legitimate content). Fixed with word-boundary regex, not by
+   removing the marker.
+4. **Use heuristics not dogma** — human explicitly called this out. Noise selectors
+   should be generic CSS patterns (`[class*='newsletter']`), not site-specific
+   selectors (`.yclinks`). Post-extraction cleanup uses regex patterns for common
+   promo text, not per-site rules.
+
+### Worktree pattern for autoresearch
+
+Running autoresearch in a git worktree worked well for isolating experimental
+changes from the main codebase:
+
+```bash
+git worktree add ~/Repos/wibandwob-dos-browse -b autoresearch/chrome-browser-extraction HEAD
+cd ~/Repos/wibandwob-dos-browse && bun install
+```
+
+**Friction**: symlinked `autoresearch.sh` and `autoresearch.checks.sh` at repo root
+pointed to `autoresearch/code-editor/` (previous target). The `log_experiment`
+auto-commit reverted changes, restoring the stale symlinks. Fix: replace symlinks
+with real files in the worktree.
+
+**Friction**: `autoresearch.checks.sh` included an API health check
+(`curl http://127.0.0.1:8099/health`) that hangs indefinitely when the app isn't
+running. The worktree doesn't need the running TUI — it just needs typecheck. The
+check script silently blocked for 1400+ seconds before timing out.
+Fix: worktree-specific checks should only include `bun run typecheck`.
+
+### Candidate comparison pattern (Defuddle vs Readability)
+
+The key architectural insight: run BOTH Defuddle and Readability on the same HTML,
+then pick the winner by a structure-quality scoring function:
+
+```typescript
+const scoreCandidate = (c) => {
+  const headings = (c.md.match(/^#{1,6}\s/gm) || []).length;
+  const lists = (c.md.match(/^[-*]\s/gm) || []).length;
+  const htmlTags = (c.md.match(/<[^>]+>/g) || []).length;
+  return headings * 10 + lists * 3 + links * 0.5
+         + Math.log(c.md.length + 1) * 2 - htmlTags * 5;
+};
+```
+
+Heavily weighting headings (10x) is correct — headings are the strongest signal
+that the extractor understood document structure. A 70KB blob with 400 links but
+no headings (Defuddle on Wikipedia) should lose to a 40KB result with 35 headings
+and 40 lists (Readability on the same page).
+
+**Critical bug found**: Defuddle returns markdown with some residual HTML tags.
+Passing this through `htmlToMarkdown()` (Turndown) destroys the markdown structure —
+Turndown re-processes `## History` as literal text, not a heading. Fix: detect
+whether Defuddle output has good markdown structure (headings > 3), and if so,
+only strip HTML blocks rather than re-parsing everything through Turndown.
+
+### Site-specific in-page extractors via Chrome headless
+
+For sites with non-standard layouts (HN front page = nested `<table>` elements),
+running JavaScript inside Chrome's page context via `page.evaluate()` is far more
+reliable than JSDOM-based extraction. The in-page code can use real DOM selectors
+like `.titleline > a`, `.score`, `.hnuser`, `.age a` to build structured markdown.
+
+This is inspired by [Defuddle](https://github.com/kepano/defuddle)'s per-site
+extractor pattern — but runs in the live rendered DOM rather than a JSDOM parse
+of the HTML string. Advantage: can access computed styles, lazy-loaded content,
+and JS-rendered DOM that JSDOM misses.
+
+Pattern for adding a new site-specific extractor:
+1. Check hostname in `extractSiteSpecific()`
+2. Run `page.evaluate()` with selectors specific to that site's DOM
+3. Return `{ markdown, title }` or `null` to fall through to generic extraction
+4. Result enters the candidate comparison as "site-specific" alongside Defuddle/Readability
+
+### Post-extraction markdown cleanup
+
+Even after the best extractor wins, the output often has trailing noise sections
+that leaked through — newsletter CTAs, "related articles", author bios. A regex-based
+cleanup pass strips these:
+
+- **Section-level**: heading patterns like `## Email Newsletter`, `## Subscribe`,
+  `## Related Articles` → skip until next real heading
+- **Line-level**: standalone promo lines like "Weekly tips on front-end..."
+
+This is generic and site-agnostic — the patterns match common noise text across
+many sites. This is the "heuristics not dogma" principle in practice.
+
+### Using WibWob-DOS itself for development
+
+While building the README, the agent initially opened it in the Document Reader
+(`document.open`) — which showed raw HTML tags. The human pointed out the markdown
+viewer exists (`markdown.open`) which renders with figlet headings, syntax-highlighted
+code blocks, and proper formatting.
+
+**Lesson**: use `tui_list_commands` to discover what's available. The markdown viewer
+was always there — the agent just reached for the wrong tool. The TUI is not just
+a test target, it's a development environment.
+
+**Potential skill**: a `ww-preview-markdown` skill that opens a file in the markdown
+viewer and returns a text screenshot for agent review. Would make README/doc authoring
+much faster — write markdown, preview in the actual TUI renderer, iterate.
+
+### Script/skill ideas from this session
+
+- **`scripts/worktree-autoresearch.sh <branch> <dir>`** — scaffold a worktree for
+  autoresearch with correct `autoresearch.sh`, `autoresearch.checks.sh` (no symlinks),
+  and `bun install`. Avoids the symlink/health-check friction every time.
+
+- **`ww-preview-markdown` skill** — open a `.md` file in the markdown viewer via API,
+  take a text screenshot, return to agent. Useful for doc authoring, README iteration,
+  planning doc review.
+
+- **`ww-extraction-test` skill** — navigate Chrome to a URL via API, extract content,
+  return the markdown and structural stats (headings, lists, links, length). Useful for
+  ad-hoc browser extraction testing without running the full benchmark.
+
+- **`autoresearch-init-worktree.sh`** — create a fresh worktree with autoresearch
+  scaffolding: benchmark template, checks (typecheck only), .sh files, .md template.
+  Eliminates the boilerplate every time a new autoresearch target is started.
+
+### 2026-03-13 — Spore Clock polish + Asciicker 3D engine from scratch
+
+**LLM scorer calibration is critical for autoresearch.**
+The first Spore Clock scoring prompt gave identical 7.3 scores across 4 runs despite
+real code improvements. The scorer was using vague rubrics and rounding to convenient
+values. Fix: switched to feature-checklist scoring (enumerate 10 features per axis,
+count what's present, calibrate score from count). This immediately unstuck the
+scorer — went from 7.3 → 8.5 on the same code. Lesson: autoresearch scorers need
+concrete, enumerable criteria. Vibes-based scoring produces sticky plateaus.
+
+**Per-cell ANSI colour in blessed microapps.**
+`tags: false` + raw `\x1b[38;5;N;48;5;Nm` escape codes in `setContent()` gives
+per-cell fg+bg colour. This is documented nowhere but proven by e026-demo module.
+Game-changer for any module needing rich colour: terrain renderers, art, heatmaps.
+The `canvas.style.fg` only sets a single colour for the whole box — useless for
+anything with spatial colour variation.
+
+**Porting a C++ 3D engine to TS microapp: architecture study first.**
+The asciicker C++ codebase is 136K lines. The first attempt produced a 2D isometric
+tile map — the human correctly called it out as "not 3D." The actual asciicker uses:
+- 3D transformation matrix (yaw rotation + 30° isometric tilt)
+- Triangle rasterization with depth buffer
+- Per-cell material system (glyph + fg + bg + diffuse shading)
+- Back-to-front painter's algorithm for terrain columns
+- Architectural perspective (verticals stay vertical on screen)
+
+The key insight from studying render.cpp: the 3D effect comes from rendering
+the VERTICAL EXTENT of terrain columns. Each heightmap column draws its top face
+plus N side/cliff faces below it. The depth buffer prevents occluded cells from
+showing through. This creates genuine 3D parallax when you rotate the camera.
+
+Second attempt implemented this properly: column-based rendering with side faces,
+depth buffer, per-cell ANSI colour, and surface-normal-based directional lighting.
+Result: 7.6 → 8.1 quality score, and it actually looks like a 3D world.
+
+**Key crash: blessed keypress handler must guard `key.name`.**
+`host.screen.on("keypress", handler)` fires with undefined `key` or `key.name`
+for certain key combos (= and - keys on macOS). Guard pattern:
+`if (!key || !key.name) return;`
+
+**Module reload vs restart confusion.**
+New modules require a full app restart to be discovered (module-loader scans at
+startup). But code changes to an existing module's `index.ts` only need the window
+closed and reopened — the module is re-evaluated on window creation. The autoresearch
+reload pattern (close window → reopen) works for code changes but NOT for new modules.
