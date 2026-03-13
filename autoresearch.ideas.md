@@ -6,31 +6,32 @@
 - File Manager: 4.4 → 10.0
 - Terrain Lab: 4.8 → 8.0
 - Plasma: 5.4 → 8.0
+- Code Editor: 4.4 → 9.2 (syntax highlighting, welcome screen, toolbar, relative line numbers)
 
 ## Paused Apps
 - Music Player: 4.2 → 7.4 (4 viz modes, idle animations)
 - TR-808: 5.4 → 6.4 (ANSI colours, preset loading fixed)
+- Primer Gallery: 6.4 → 7.4 (tab counts, divider, header bar, status bar)
 
-## Pattern: ANSI Sidebar Enhancement
-Proven recipe for any window with a 3fr:1fr split + createTextBlock sidebar:
-1. Add ANSI colour constants (A.cyn, A.yel, A.gry, A.wht, A.r, etc.)
-2. Use (infoBlock.node as any).setContent() to bypass wrapIndentedText
-3. Section headers: label(icon, "TITLE") in cyan
-4. Active item lists with ▶ marker in colour, others in gray
-5. Value bars using ▮/▯ in cyan/gray
-6. Key shortcuts in yellow with gray descriptions
-7. Horizontal separators in gray
-8. Status bar right with pipe-separated summary
-9. Fill remaining vertical space with ABOUT/LEGEND section
+## Proven Patterns
+### ANSI Sidebar (for art+sidebar layouts)
+Works for: Terrain Lab, Plasma, any createTextBlock sidebar
+Recipe: A.cyn/yel/gry constants, setContent() bypass, section headers, active lists, bars
 
-This pattern takes ~15 mins to apply and reliably jumps score from 5→8.
+### Syntax Highlight Reuse (for code/text views)
+Works for: Code Editor, could extend to Document Reader, Markdown viewer
+Key: import highlightCode from syntax-highlight.ts, textBox tags:false, raw ANSI
 
-## Next Targets (sidebar pattern candidates)
-- Contour Studio: triptych mode, status bar but no sidebar — needs different approach
-- Primer Gallery: list+preview, could add colour to list items and header tabs
-- Code Editor (slap-editor): empty state needs work, but it's a different pattern
+### Structural Chrome (for any window)
+Works for: File Manager, Code Editor, Primer Gallery
+Recipe: header bar, vertical divider, rich status bar, toolbar buttons with hover
 
-## Future Ideas (non-sidebar)
-- Generative art windows: could add subtle frame/border info
-- Backrooms Log Browser: readability improvements
-- WibWobWorld chat: sidebar for room info, online presence
+### Welcome Screen (for empty states)
+Works for: Code Editor
+Recipe: branded box-drawing title, keyboard shortcuts, navigation reference, italic hints
+
+## Next Targets
+- Code Editor 9.2→10: indent guides, bracket matching, scroll position minimap
+- Contour Studio: gorgeous art, minimal chrome — status bar could be richer
+- Music Player 7.4→8+: resume with more viz polish
+- Backrooms Log Browser: list colouring, preview improvements
