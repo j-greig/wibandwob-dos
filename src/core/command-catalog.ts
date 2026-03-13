@@ -170,6 +170,8 @@ export interface AppCommandDefinition {
   contextMenu?: ContextMenuPlacement;
   api?: boolean;
   agent?: boolean;
+  /** Hint for CLI output formatting: json (pretty-print), text (raw), void (silent on success). */
+  returns?: "json" | "text" | "void";
 }
 
 interface MenuDefinition {
@@ -193,6 +195,7 @@ export interface AppCommandDescriptor {
   contextMenu?: ContextMenuPlacement;
   api: boolean;
   agent: boolean;
+  returns?: "json" | "text" | "void";
 }
 
 const MENU_DEFINITIONS: MenuDefinition[] = [
@@ -337,7 +340,8 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     multiInstance: true,
     menuPlacements: [{ category: "file", order: 20 }],
     api: true,
-    agent: true
+    agent: true,
+    returns: "json"
   },
   {
     id: "primer.list",
@@ -346,7 +350,8 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     group: "open",
     actionKey: "listPrimers",
     api: true,
-    agent: true
+    agent: true,
+    returns: "json"
   },
   {
     id: "text.smear",
@@ -403,7 +408,8 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     multiInstance: true,
     menuPlacements: [{ category: "file", order: 40, appTypes: ["text-editor"] }],
     api: true,
-    agent: true
+    agent: true,
+    returns: "json"
   },
   {
     id: "editor.save",
@@ -594,6 +600,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     actionKey: "moveWindowById",
     api: true,
     agent: true,
+    returns: "void"
   },
   {
     id: "window.resize",
@@ -603,6 +610,7 @@ const APP_COMMANDS: AppCommandDefinition[] = [
     actionKey: "resizeWindowById",
     api: true,
     agent: true,
+    returns: "void"
   },
   {
     id: "desktop.clear-all",
@@ -1097,7 +1105,8 @@ export function listAppCommands(): AppCommandDescriptor[] {
     palettePlacement: command.palettePlacement,
     contextMenu: command.contextMenu,
     api: command.api ?? false,
-    agent: command.agent ?? false
+    agent: command.agent ?? false,
+    returns: command.returns
   }));
 }
 
