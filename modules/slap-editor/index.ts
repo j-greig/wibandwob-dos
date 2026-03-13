@@ -274,12 +274,14 @@ async function openEditor(host: MicroappHost, filePath?: string) {
         continue;
       }
 
-      // Gutter — active line in bold accent with subtle bg
+      // Gutter — active line shows absolute number bold, others show relative distance
       const isCurrentLine = row === cursorRow;
-      const lineNum = String(row + 1).padStart(gutterW - 1);
       if (isCurrentLine) {
+        const lineNum = String(row + 1).padStart(gutterW - 1);
         gutterLines.push(`${currentLineGutterBg}${gutterActive}${lineNum} ${A.r}`);
       } else {
+        const relDist = Math.abs(row - cursorRow);
+        const lineNum = String(relDist).padStart(gutterW - 1);
         gutterLines.push(`${gutterAccent}${lineNum} ${A.r}`);
       }
 
@@ -354,15 +356,20 @@ async function openEditor(host: MicroappHost, filePath?: string) {
     gutterBox.setContent(gutterLines.join("\n"));
     textBox.setContent(textLines.join("\n"));
 
-    // Header bar — breadcrumb
+    // Header bar — breadcrumb (ANSI styled)
     const icon = fileIcon(engine.filePath);
     const fname = engine.filePath?.split("/").pop() ?? "untitled";
     const dirPath = engine.filePath
       ? engine.filePath.split("/").slice(-3, -1).join("/")
       : "";
-    const breadcrumb = dirPath ? `${dirPath}/${fname}` : fname;
-    const dirtyMark = engine.dirty ? " \u25CF" : "";
-    headerBar.setContent(` ${icon} ${breadcrumb}${dirtyMark}`);
+    const dirtyMark = engine.dirty ? ` ${ansiColour(t.warning.fg)}\u25CF${A.r}` : "";
+    const accentCol = ansiColour(t.accent.fg);
+    const dimCol = ansiColour(t.muted.fg);
+    const brightCol = ansiColour(t.body.fg);
+    const headerText = dirPath
+      ? ` ${accentCol}${icon}${A.r} ${dimCol}${dirPath}/${A.r}${brightCol}${A.b}${fname}${A.r}${dirtyMark}`
+      : ` ${accentCol}${icon}${A.r} ${brightCol}${A.b}${fname}${A.r}${dirtyMark}`;
+    (headerBar as any).setContent(headerText);
 
     // Status bar — rich info
     const desc = engine.describe();
@@ -383,11 +390,18 @@ async function openEditor(host: MicroappHost, filePath?: string) {
     const scrollPct = engine.lineCount > 1
       ? Math.round((engine.scroll.row / Math.max(1, engine.lineCount - viewHeight)) * 100)
       : 100;
-    statusRight = `${langLabel}  UTF-8  2 spaces  ${desc.lines} lines  ${Math.min(100, Math.max(0, scrollPct))}% `;
-    // Pad status bar
-    const totalStatus = totalWidth;
-    const gap = Math.max(1, totalStatus - statusLeft.length - statusRight.length);
-    statusBar.setContent(statusLeft + " ".repeat(gap) + statusRight);
+    const pct = Math.min(100, Math.max(0, scrollPct));
+    // ANSI styled status bar
+    const statusLeftAnsi = findMode || statusMessage
+      ? ` ${statusLeft.trim()}`
+      : ` ${accentCol}Ln ${desc.cursor.row + 1}${A.r}${dimCol}, Col ${desc.cursor.col + 1}${A.r}`;
+    const langColour = hasHighlight ? accentCol : dimCol;
+    const statusRightAnsi = `${langColour}${langLabel}${A.r}  ${dimCol}UTF-8  2 sp  ${desc.lines} ln  ${pct}%${A.r} `;
+    // Calculate gap (strip ANSI for width)
+    const leftPlain = stripAnsi(statusLeftAnsi).length;
+    const rightPlain = stripAnsi(statusRightAnsi).length;
+    const gap = Math.max(1, totalWidth - leftPlain - rightPlain);
+    (statusBar as any).setContent(statusLeftAnsi + " ".repeat(gap) + statusRightAnsi);
 
     host.screen.render();
   }
