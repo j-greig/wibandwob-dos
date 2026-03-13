@@ -19,6 +19,10 @@ import {
   clearTimers,
   pickBreakpoint,
   clamp,
+  renderFiglet,
+  createHeaderBar,
+  createStatusBar,
+  createLogView,
 } from "../../src/services/microapp-sdk.js";
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -738,9 +742,13 @@ export default function setup(host: MicroappHost) {
 }
 
 function openAntopolis(host: MicroappHost) {
-  const win = host.createWindow({ title: "🐜 ANTOPOLIS", width: 120, height: 42 });
+  const geo = host.geometry;
+  const winW = Math.min(geo.width - 4, 180);
+  const winH = Math.min(geo.height - 4, 54);
+  const win = host.createWindow({ title: "🐜 ANTOPOLIS", width: winW, height: winH });
   const timers = new Set<ReturnType<typeof setInterval>>();
   const world = createWorld();
+  const t = host.theme();
 
   // ── UI elements ─────────────────────────────────────────────────────
 
@@ -753,36 +761,44 @@ function openAntopolis(host: MicroappHost) {
       top: 0, left: 0, width: 0, height: 0,
       border: "line",
       label: ` ${DISTRICTS[id].label} `,
-      style: { ...host.theme().body, border: { fg: host.theme().muted.fg } },
+      style: { ...t.body, border: { fg: t.accent.fg } },
     });
   }
 
-  const headerBox = blessed.box({
-    parent: win.body, top: 0, left: 0, width: 0, height: 1,
+  // Figlet header
+  const figletBox = blessed.box({
+    parent: win.body, top: 0, left: 0, width: 0, height: 0,
     tags: false,
-    style: { fg: "white", bg: "black", bold: true },
+    style: t.header,
   });
 
   const resourceBox = blessed.box({
     parent: win.body, top: 0, left: 0, width: 0, height: 1,
     tags: false,
-    style: { fg: "cyan", bg: "black" },
+    style: { ...t.body, fg: t.accent.fg },
   });
 
+  // Status bar with theme colours
   const statusBox = blessed.box({
     parent: win.body, top: 0, left: 0, width: 0, height: 1,
     tags: false,
-    style: { fg: "white", bg: "black" },
+    style: t.header,
   });
 
   const logBox = blessed.box({
     parent: win.body, top: 0, left: 0, width: 0, height: 0,
     scrollable: true, alwaysScroll: true, mouse: true,
     tags: false,
-    style: host.theme().body,
+    label: " Colony Log ",
+    border: "line",
+    style: { ...t.body, border: { fg: t.muted.fg } },
   });
 
   // ── Layout ──────────────────────────────────────────────────────────
+
+  // Render figlet once to measure height
+  const figletText = renderFiglet("ANTOPOLIS", "small");
+  const figletH = figletText.split("\n").length;
 
   const biomeGrid = createGrid(win.body, {
     rows: 2, columns: 2,
@@ -796,11 +812,11 @@ function openAntopolis(host: MicroappHost) {
   biomeGrid.set({ key: "mines",       row: 1, column: 1, part: createNodePart(districtBoxes.mines) });
 
   const root = createStack(win.body, [
-    { key: "header",    basis: 1,     part: createNodePart(headerBox) },
-    { key: "resources", basis: 1,     part: createNodePart(resourceBox) },
-    { key: "districts", basis: "3fr", part: biomeGrid },
-    { key: "status",    basis: 1,     part: createNodePart(statusBox) },
-    { key: "log",       basis: "1fr", part: createNodePart(logBox) },
+    { key: "figlet",    basis: figletH, part: createNodePart(figletBox) },
+    { key: "resources", basis: 1,       part: createNodePart(resourceBox) },
+    { key: "districts", basis: "4fr",   part: biomeGrid },
+    { key: "status",    basis: 1,       part: createNodePart(statusBox) },
+    { key: "log",       basis: "1fr",   part: createNodePart(logBox) },
   ]);
 
   // ── Render ──────────────────────────────────────────────────────────
@@ -811,11 +827,9 @@ function openAntopolis(host: MicroappHost) {
 
     root.layout({ top: 0, left: 0, width: w, height: h });
 
-    // Header
-    const title = world.paused
-      ? " 🐜 ANTOPOLIS ‖ PAUSED "
-      : " 🐜 ANTOPOLIS ";
-    headerBox.setContent(title.padEnd(w));
+    // Figlet header
+    const pauseTag = world.paused ? "  || PAUSED" : "";
+    figletBox.setContent(figletText + pauseTag);
 
     // Resources
     resourceBox.setContent(renderResources(world, w));
@@ -925,13 +939,13 @@ function openAntopolis(host: MicroappHost) {
   ].join("\n"));
 
   win.onRestyle(() => {
-    const t = host.theme();
-    headerBox.style = { fg: "white", bg: "black", bold: true };
-    resourceBox.style = { fg: "cyan", bg: "black" };
-    statusBox.style = { fg: "white", bg: "black" };
-    logBox.style = t.body;
+    const th = host.theme();
+    figletBox.style = th.header;
+    resourceBox.style = { ...th.body, fg: th.accent.fg };
+    statusBox.style = th.header;
+    logBox.style = { ...th.body, border: { fg: th.muted.fg } };
     for (const id of districtIds) {
-      districtBoxes[id].style = { ...t.body, border: { fg: t.muted.fg } };
+      districtBoxes[id].style = { ...th.body, border: { fg: th.accent.fg } };
     }
     host.screen.render();
   });
