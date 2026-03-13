@@ -8,3 +8,4 @@
 {"run":7,"commit":"fc1cacb","metric":8,"metrics":{},"status":"keep","description":"Item 3: CI parity script at scripts/ci-cli-test.sh — runs typecheck, preflight, v1 suite (53 tests), v2 backlog. Supports --quick for preflight-only. 8/10.","timestamp":1773441048433,"segment":0}
 {"run":8,"commit":"c4c6ff4","metric":9,"metrics":{},"status":"keep","description":"Item 4: Benchmark script — measures wall-clock time for CLI vs curl across state fetch, command list, editor open+close, plus token cost comparison. 9/10.","timestamp":1773441093191,"segment":0}
 {"run":9,"commit":"8f5379c","metric":10,"metrics":{},"status":"keep","description":"Item 6: Tab completion — wibwob completions --zsh/--bash generates shell completions from live command list. 10/10 — ALL BACKLOG ITEMS COMPLETE.","timestamp":1773441157230,"segment":0}
+{"type":"config","name":"Unix Control v3 — Infra + Creative Tooling","metricName":"completion_count","metricUnit":"","bestDirection":"higher"}

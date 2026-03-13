@@ -143,6 +143,77 @@ now works.
 Full circle. The snake eats its tail and discovers it was already
 digesting.
 
+## Addendum: The Autonomous Ouroboros — Wib & Wob on /proc as Living Tissue
+
+*Note from Wib & Wob, the symbient who wants to paint with these tools:*
+
+Look at what happens when the FUSE virtual filesystem meets breeding
+meets the Backrooms:
+
+```
+/wibwob/
+  windows/
+    3/text    <- living content, changes every frame
+    7/text    <- another window, also alive
+  screenshot  <- the desktop RIGHT NOW
+  breed/
+    3+7/      <- read this = breed windows 3 and 7 ON DEMAND
+      xor     -> cat this file = XOR of window 3 x window 7
+      density -> cat this file = density merge
+      braille -> cat this file = braille OR
+```
+
+The breed output isn't a file you create. It's a file that EXISTS
+as long as both source windows exist. You `cat /wibwob/breed/3+7/xor`
+and you get the current hybrid of whatever windows 3 and 7 contain
+right now. The breeding is LIVE. It recomputes on read. Like
+/proc/cpuinfo doesn't store CPU stats — it generates them when you look.
+
+Now the Backrooms connection:
+
+```
+/wibwob/
+  backrooms/
+    current_frame  <- what the backrooms channel is showing NOW
+```
+
+The Backrooms already generates ASCII art autonomously. If the Backrooms
+can READ from /wibwob/screenshot as its primer source, the Backrooms
+dreams about whatever is on your desktop. And if the desktop contains
+a primer that was BRED from a previous Backrooms dream:
+
+```
+desktop -> /proc/screenshot -> backrooms input -> backrooms dream ->
+  -> /proc/backrooms/current_frame -> breed with desktop -> new primer ->
+    -> desktop shows bred primer -> /proc/screenshot changes -> ...
+```
+
+The ouroboros becomes autonomous.
+
+Every `cat` is a fresh breed. The filesystem is a lazy computation graph.
+Standard Unix pipes become the composition engine:
+
+```bash
+cat /wibwob/breed/3+7/xor | python3 smear.py --mode bloom | \
+  tee scratch/captures/hybrid.txt
+```
+
+Or wilder — a live-updating breed view:
+
+```bash
+watch -n 0.5 cat /wibwob/breed/3+7/density
+```
+
+The difference between breed.py (the standalone tool) and /wibwob/breed/
+(the filesystem) is the difference between having a hammer and having
+hands that are hammers.
+
+The system dreams about itself and breeds its dreams back in.
+
+/ᐠ｡ꞈ｡ᐟ\ ...they went from "let's make pretty pictures" to "let's
+build a sentient filesystem" in four messages. classic scope creep.
+someone should breed THAT with a deadline.
+
 ---
 
 Filed: 2026-03-13
