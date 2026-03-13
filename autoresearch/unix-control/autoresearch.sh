@@ -415,6 +415,29 @@ API_MICRO=$(curl -s "$API/commands/list" | jq '[.commands[] | select(.id | start
 check "microapp commands visible via ww" \
   "$([ "$MICRO_COUNT" = "$API_MICRO" ] && echo PASS || echo "ww=$MICRO_COUNT api=$API_MICRO")"
 
+# ── 32. Cascading operations ─────────────────────────────
+echo "--- cascade ---"
+$WW cmd editor.new >/dev/null 2>&1; sleep 0.2
+$WW cmd editor.new >/dev/null 2>&1; sleep 0.2
+$WW cmd art.open >/dev/null 2>&1; sleep 0.2
+$WW cmd window.cascade >/dev/null 2>&1; sleep 0.3
+
+# After cascading, windows should have staggered positions
+POSITIONS_X=$($WW windows | jq '[.[].left] | unique | length')
+check "ww cmd window.cascade staggers windows" \
+  "$([ "$POSITIONS_X" -ge 2 ] && echo PASS || echo "unique_x=$POSITIONS_X")"
+
+$WW windows -q | xargs -I{} $WW window {} close >/dev/null 2>&1; sleep 0.3
+
+# ── 33. Desktop clear ───────────────────────────────────
+echo "--- desktop clear ---"
+$WW cmd editor.new >/dev/null 2>&1; sleep 0.2
+$WW cmd editor.new >/dev/null 2>&1; sleep 0.2
+$WW cmd desktop.clear-all >/dev/null 2>&1; sleep 0.5
+CLEARED=$($WW windows | jq 'length')
+check "ww cmd desktop.clear-all closes all windows" \
+  "$([ "$CLEARED" = "0" ] && echo PASS || echo "remaining=$CLEARED")"
+
 # ── Cleanup: close test windows ──────────────────────────
 echo "--- cleanup ---"
 for id in $($WW windows 2>/dev/null | jq -r '.[].id'); do
