@@ -1,2 +1,3 @@
 {"type":"config","name":"Music Player UI Quality","metricName":"ui_score","metricUnit":"","bestDirection":"higher"}
 {"run":1,"commit":"3db370e","metric":4.2,"metrics":{"layout":4,"readability":5,"aesthetic":3,"coherence":5,"character":4},"status":"keep","description":"Baseline: 82x22 fixed window, monochrome, no colour, tiny playlist, big empty space. Minimal player.","timestamp":1773407677111,"segment":0}
+{"run":2,"commit":"8f129f4","metric":5.4,"metrics":{"layout":5,"readability":6,"aesthetic":5,"coherence":6,"character":5},"status":"keep","description":"Responsive sizing (60%x50%), cyan accent colours on volume/progress/icons, numbered playlist, compact layout, idle viz breathing pattern. Still too much empty space.","timestamp":1773407888789,"segment":0}

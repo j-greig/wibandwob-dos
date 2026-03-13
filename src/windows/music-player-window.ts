@@ -288,9 +288,9 @@ export function createBarsViz(): VizMode {
         if (playing) {
           h[i] = clamp(bands[i]!, 0, 1);
         } else {
-          // Idle breathing pattern when stopped
-          const phase = (Date.now() / 2000 + i * 0.15) % (Math.PI * 2);
-          h[i] = Math.max(0, Math.sin(phase) * 0.08 + 0.02);
+          // Idle breathing wave when stopped — visible gentle motion
+          const phase = (Date.now() / 1500 + i * 0.25) % (Math.PI * 2);
+          h[i] = Math.max(0, Math.sin(phase) * 0.25 + 0.12);
         }
         peak[i] = h[i] > peak[i] ? h[i] : Math.max(0, peak[i] - PDECAY);
       }
@@ -750,11 +750,11 @@ export function openMusicPlayerWindow(
   restore?: MusicPlayerRestore,
 ): void {
   const frame = deps.windowManager.createFrame("♫ Music Player", "microapp");
-  // Responsive sizing: 60% width, 50% height, centered
+  // Responsive sizing: 65% width, 65% height, centered
   const screenW = Number(deps.screen.width) || 211;
   const screenH = Number(deps.screen.height) || 56;
-  frame.frame.width  = Math.max(82, Math.round(screenW * 0.6));
-  frame.frame.height = Math.max(22, Math.round(screenH * 0.5));
+  frame.frame.width  = Math.max(82, Math.round(screenW * 0.65));
+  frame.frame.height = Math.max(22, Math.round(screenH * 0.65));
   frame.frame.left   = Math.round((screenW - Number(frame.frame.width)) / 2);
   frame.frame.top    = Math.round((screenH - Number(frame.frame.height)) / 2);
 
@@ -917,7 +917,7 @@ export function openMusicPlayerWindow(
 
     const PLAYER_INFO_ROWS = 8;
     const vizH    = Math.max(4, paneH - PLAYER_INFO_ROWS - 1);
-    const showViz = showPlaylist && paneH >= VIZ_MIN_HEIGHT;
+    const showViz = paneH >= VIZ_MIN_HEIGHT;  // show viz even without playlist
 
     if (showViz !== vizVisible) {
       vizVisible = showViz;
@@ -964,15 +964,17 @@ export function openMusicPlayerWindow(
       : `{bold}{white-fg}${ctrl.fileName.replace(/\{/g, "\\{")}{/white-fg}{/bold}`;
 
     // Now-playing display — compact layout
+    const sepW = Math.max(4, w - 2);
+    const sep = `{gray-fg}${"\u2500".repeat(sepW)}{/gray-fg}`;
     const lines: string[] = [
       "",
       ` {${accentFg}-fg}♫{/${accentFg}-fg}  ${trackName}`,
       ` {${stateCol}-fg}${icon}  ${lbl}{/${stateCol}-fg}    {white-fg}${fmtTime(elaps)}{/white-fg} {gray-fg}/{/gray-fg} {gray-fg}${fmtTime(dur)}{/gray-fg}`,
       "",
       ` ${progBar}`,
-      ` {gray-fg}Vol:{/gray-fg} ${volBar}  {white-fg}${ctrl.volume}%{/white-fg}`,
+      ` {gray-fg}Vol:{/gray-fg} ${volBar}  {white-fg}${ctrl.volume}%{/white-fg}    {gray-fg}\u2190\u2192:scrub \u2191\u2193:track v:viz o:add{/gray-fg}`,
       "",
-      ` {gray-fg}\u2190/\u2192:scrub  \u2191/\u2193:track  v:viz  o:add  +/-:vol{/gray-fg}`,
+      ` ${sep}`,
     ];
     playerPane.setContent(lines.join("\n"));
   }
@@ -981,19 +983,21 @@ export function openMusicPlayerWindow(
     if (!playlistVisible) return;
     const accentFg = ((theme().accent as any)?.fg) || "cyan";
     const plW = Number(playlistPane.width) || PLAYLIST_WIDTH;
-    const items = ctrl.files.map((fp, i) => {
+    // Header row
+    const headerLine = `{bold} PLAYLIST{/bold} {gray-fg}(${ctrl.files.length} tracks){/gray-fg}`;
+    const items = [headerLine, ...ctrl.files.map((fp, i) => {
       const name    = basename(fp);
       const playing = fp === ctrl.filePath && ctrl.state !== "stopped";
       const maxLen  = plW - 6;
       const label   = name.length > maxLen ? name.slice(0, maxLen - 1) + "\u2026" : name;
       const num     = String(i + 1).padStart(2, " ");
       if (playing) {
-        return `{${accentFg}-fg}♫ ${num}. ${label.replace(/\{/g, "\\{")}{/${accentFg}-fg}`;
+        return `{${accentFg}-fg}\u25B6 ${num}. ${label.replace(/\{/g, "\\{")}{/${accentFg}-fg}`;
       }
       return `  {gray-fg}${num}.{/gray-fg} ${label.replace(/\{/g, "\\{")}`;
-    });
+    })];
     (playlistPane as any).setItems(items);
-    (playlistPane as any).select(ctrl.selectedIndex);
+    (playlistPane as any).select(ctrl.selectedIndex + 1); // +1 for header
   }
 
   function render() {
