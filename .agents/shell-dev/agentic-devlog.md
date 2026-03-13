@@ -604,3 +604,27 @@ Human note:
 `layoutReport` should be globalised / SDK-ised. It currently lives inside the
 hello-world module implementation. This should become a shared SDK helper +
 canonical schema for all responsive modules so layout diagnostics are not bespoke.
+
+## 2026-03-13 — Blessed double-fire keypress bug (File Manager)
+
+**Problem:** Typing into a focused `blessed.box` used as a text input fires
+`keypress` twice per keystroke — once from the box, once from the parent/screen.
+Result: `claude` becomes `ccllaauuddee`.
+
+**Root cause:** `blessed.box` is not an input widget. It doesn't consume keypress
+events. When the box is focused and receives a keypress, the event propagates up
+to the parent, which re-fires it.
+
+**Fix patterns:**
+1. **Debounce** — track `Date.now()` and skip events within 30ms of the last.
+   Simple, robust, works for any blessed box used as an input.
+2. **Redirect to overlay** — instead of inline typing in a box, open the
+   `OverlayManager.openValuePrompt()` which uses a proper blessed textbox.
+   Better UX AND avoids the bug entirely.
+3. **Use `blessed.textbox`** — the correct widget for text input. Has its own
+   input handling that doesn't double-fire. But less flexible for custom rendering.
+
+**Recommendation:** For any new text input in blessed, use `openValuePrompt()`
+or `blessed.textbox`. For existing box-as-input patterns, add the 30ms debounce.
+
+Applied in: `src/windows/browser-windows.ts` (filter box + search box)

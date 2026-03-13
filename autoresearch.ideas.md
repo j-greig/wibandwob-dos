@@ -1,13 +1,17 @@
 # Autoresearch Ideas — File Manager
 
-## Deferred optimizations
-- Empty state ASCII art when no file selected (character boost)
-- Breadcrumb as clickable segments to navigate up the tree
+## High-value (target: layout 8→9, character 9→10)
+- Column headers for list (Name | Size) — adds structure, improves layout density
+- Git status indicators (modified/untracked dots) — huge character boost, connects to dev workflow
+- Breadcrumb as clickable segments — more interactive, fills toolbar better
+
+## Medium-value  
+- Thumbnail preview for image files (ASCII art conversion via img-to-ascii pipeline)
 - File permission indicators (rwx) in preview header
-- Git status indicators (modified/untracked) if in a git repo
-- Thumbnail preview for image files (ASCII art conversion)
 - Fuzzy filter matching (not just substring)
-- Recent files / bookmarks panel
-- Dual-pane mode (two directories side by side)
-- File count badge in toolbar buttons
-- Column headers for the list (Name | Size | Modified) like Finder detail view
+
+## Low-priority / done
+- ~~Empty state ASCII art~~ — done (keyboard help guide)
+- ~~Recent files / bookmarks panel~~ — too complex for single-file change
+- ~~Dual-pane mode~~ — too complex, structural change
+- ~~File count badge in toolbar buttons~~ — tried, minimal impact

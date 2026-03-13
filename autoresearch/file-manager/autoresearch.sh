@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 # autoresearch.sh — restart WibWob-DOS and screenshot the File Manager window.
-# Two screenshots: browse view (with .ts file preview) + search view. 
-# Agent scores the BEST of the two views.
 set -euo pipefail
 REPO_ROOT="$(pwd)"
 
@@ -16,21 +14,20 @@ curl -s -X POST http://127.0.0.1:8099/commands/run \
 
 sleep 1
 
-# ── 3. Navigate to src/core which has .ts files near top ───────────
+# ── 3. Navigate to src/ then search ────────────────────────────────
 curl -s -X POST http://127.0.0.1:8099/commands/run \
   -H 'Content-Type: application/json' \
-  -d '{"id":"finder.navigate","args":{"path":"'"$REPO_ROOT/src/core"'"}}' > /dev/null 2>&1 || true
+  -d '{"id":"finder.navigate","args":{"path":"'"$REPO_ROOT/src"'"}}' > /dev/null 2>&1 || true
 
-sleep 0.5
+sleep 0.3
 
-# ── 4. Sort by modified to get interesting files first ─────────────
 curl -s -X POST http://127.0.0.1:8099/commands/run \
   -H 'Content-Type: application/json' \
-  -d '{"id":"finder.sort_by","args":{"field":"modified"}}' > /dev/null 2>&1 || true
+  -d '{"id":"finder.search","args":{"query":"export function","glob":"*.ts"}}' > /dev/null 2>&1 || true
 
-sleep 0.5
+sleep 1.5
 
-# ── 5. Screenshot ───────────────────────────────────────────────────
+# ── 4. Screenshot ───────────────────────────────────────────────────
 SHOT_DIR="$REPO_ROOT/autoresearch/file-manager"
 SHOT="$SHOT_DIR/screenshot.png"
 

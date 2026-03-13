@@ -473,6 +473,49 @@ export function openFileManagerWindow(params: {
   let searchResults: Array<{ file: string; line: number; text: string }> = [];
   let activeSearchProcess: ReturnType<typeof import("node:child_process").spawn> | null = null;
 
+  // ── Git status ─────────────────────────────────────────
+  let gitStatusMap: Map<string, string> = new Map(); // path -> status char (M/A/?/D)
+  let gitRoot: string | null = null;
+
+  const refreshGitStatus = (dirPath: string) => {
+    gitStatusMap.clear();
+    try {
+      const root = execSync("git rev-parse --show-toplevel", { cwd: dirPath, stdio: ["pipe", "pipe", "pipe"] }).toString().trim();
+      gitRoot = root;
+      const raw = execSync("git status --porcelain -uall", { cwd: dirPath, stdio: ["pipe", "pipe", "pipe"] }).toString();
+      for (const line of raw.split("\n")) {
+        if (line.length < 4) continue;
+        const status = line.slice(0, 2).trim();
+        const filePath = path.resolve(root, line.slice(3));
+        // Map status chars: M=modified, A=added, ?=untracked, D=deleted, R=renamed
+        const ch = status.includes("?") ? "?" : status.includes("M") ? "M" : status.includes("A") ? "A" : status.includes("D") ? "D" : status.includes("R") ? "R" : status;
+        gitStatusMap.set(filePath, ch);
+        // Also set status for parent dirs (propagate up)
+        let parent = path.dirname(filePath);
+        while (parent.length >= root.length && parent !== path.dirname(parent)) {
+          if (!gitStatusMap.has(parent)) gitStatusMap.set(parent, "\u2022"); // dot for "has changes"
+          parent = path.dirname(parent);
+        }
+      }
+    } catch {
+      gitRoot = null;
+    }
+  };
+
+  const gitIndicator = (fullPath: string): string => {
+    const status = gitStatusMap.get(fullPath);
+    if (!status) return "  ";
+    switch (status) {
+      case "M": return "{yellow-fg}M{/yellow-fg} ";
+      case "A": return "{green-fg}A{/green-fg} ";
+      case "?": return "{red-fg}?{/red-fg} ";
+      case "D": return "{red-fg}D{/red-fg} ";
+      case "R": return "{cyan-fg}R{/cyan-fg} ";
+      case "\u2022": return "{yellow-fg}\u2022{/yellow-fg} ";
+      default: return "{magenta-fg}~{/magenta-fg} ";
+    }
+  };
+
   // ── Icon helpers ───────────────────────────────────────
   const fileIcon = (entry: { isDirectory: boolean; label: string }): string => {
     if (entry.isDirectory) {
@@ -765,7 +808,19 @@ export function openFileManagerWindow(params: {
       : `${(totalSize / 1048576).toFixed(1)}M`;
     const macHints = isMac ? " SPC:look O:finder" : "";
     const sortArrow = sortField === "name" ? "\u25B2 Name" : sortField === "size" ? "\u25B2 Size" : sortField === "modified" ? "\u25B2 Date" : "\u25B2 Type";
-    statusInfo.setContent(` ${entries.length} items \u2502 ${dirs} dirs, ${files} files (${sizeStr}) \u2502 ${sortArrow} \u2502 \u21B5:open V:view C:copy${macHints} /:filter S:search`);
+    // Git summary
+    let gitSummary = "";
+    if (gitRoot) {
+      const modified = [...gitStatusMap.values()].filter(s => s === "M").length;
+      const untracked = [...gitStatusMap.values()].filter(s => s === "?").length;
+      const added = [...gitStatusMap.values()].filter(s => s === "A").length;
+      const parts: string[] = [];
+      if (modified) parts.push(`${modified}M`);
+      if (added) parts.push(`${added}A`);
+      if (untracked) parts.push(`${untracked}?`);
+      gitSummary = parts.length ? ` git:${parts.join("/")}` : " git:clean";
+    }
+    statusInfo.setContent(` ${entries.length} items \u2502 ${dirs} dirs, ${files} files (${sizeStr})${gitSummary} \u2502 ${sortArrow} \u2502 \u21B5:open V:view C:copy${macHints} S:search`);
     renderStatusButtons();
     renderToolbarButtons();
   };
@@ -1145,18 +1200,18 @@ export function openFileManagerWindow(params: {
   const formatListItem = (e: typeof entries[0]): string => {
     const icon = fileIcon(e);
     const col = fileColour(e);
+    const git = gitIndicator(e.fullPath);
     const listW = Math.max(1, Number(list.width) || 40);
-    // Escape { in filenames
     const safeName = e.label.replace(/\{/g, "\\{");
     if (e.isDirectory) {
-      return ` {${col}-fg}${icon}{/${col}-fg} ${safeName}`;
+      return `${git}{${col}-fg}${icon}{/${col}-fg} ${safeName}`;
     }
     const size = formatSize(e.size);
-    // Calculate visual width (icon may be 2 chars like "ts" or 1 char)
     const iconVisualLen = icon.length;
-    const nameSpace = Math.max(10, listW - iconVisualLen - size.length - 5);
+    // git indicator is 2 visual chars (status + space)
+    const nameSpace = Math.max(10, listW - iconVisualLen - size.length - 7);
     const name = safeName.length > nameSpace ? safeName.slice(0, nameSpace - 2) + ".." : safeName.padEnd(nameSpace);
-    return ` {${col}-fg}${icon}{/${col}-fg} ${name} {gray-fg}${size}{/gray-fg}`;
+    return `${git}{${col}-fg}${icon}{/${col}-fg} ${name} {gray-fg}${size}{/gray-fg}`;
   };
 
   const applyFilter = (selectedIndex = 0) => {
@@ -1181,9 +1236,17 @@ export function openFileManagerWindow(params: {
     // Cancel any active search when navigating
     cancelSearch();
     currentPath = directoryPath;
+    refreshGitStatus(directoryPath);
     allEntries = buildEntries(directoryPath);
     const dirName = path.basename(directoryPath) || directoryPath;
-    frame.frame.setLabel(` \u2302 ${dirName} `);
+    let branchTag = "";
+    if (gitRoot) {
+      try {
+        const branch = execSync("git branch --show-current", { cwd: directoryPath, stdio: ["pipe", "pipe", "pipe"] }).toString().trim();
+        if (branch) branchTag = ` \u2387 ${branch}`;
+      } catch {}
+    }
+    frame.frame.setLabel(` \u2302 ${dirName}${branchTag} `);
     // Show breadcrumb with file type summary
     const bc = renderBreadcrumb();
     pathLabel.setContent(` ${bc}`);
@@ -1642,7 +1705,13 @@ export function openFileManagerWindow(params: {
     renderFilter();
     params.screen.render();
   });
+  // Debounce filter keypress to prevent blessed double-fire
+  let lastFilterKey = 0;
   filterBox.on("keypress", (ch, key) => {
+    const now = Date.now();
+    if (now - lastFilterKey < 30) return; // debounce < 30ms = duplicate
+    lastFilterKey = now;
+
     if (key.name === "enter" || key.name === "escape") {
       focusContentPane();
       params.screen.render();
@@ -1654,9 +1723,7 @@ export function openFileManagerWindow(params: {
       return;
     }
     if (key.name === "tab") {
-      searchBox.focus();
-      renderSearchBox();
-      params.screen.render();
+      openSearchPrompt();
       return;
     }
     if (typeof ch === "string" && /^[ -~]$/.test(ch) && !key.ctrl && !key.meta) {
@@ -1676,39 +1743,25 @@ export function openFileManagerWindow(params: {
     renderSearchBox();
     params.screen.render();
   });
-  searchBox.on("keypress", (ch, key) => {
+  // Search box click → open the overlay prompt instead of inline typing
+  searchBox.on("click", () => {
+    openSearchPrompt();
+  });
+  searchBox.on("keypress", (_ch: string, key: { name: string }) => {
+    // Any keypress on the focused search box redirects to overlay or escapes
     if (key.name === "escape") {
       focusContentPane();
       params.screen.render();
       return;
     }
-    if (key.name === "enter") {
-      if (searchMode === "simple") {
-        runSimpleSearch(searchQuery);
-      } else {
-        runAdvancedSearch(searchQuery);
-      }
-      focusContentPane();
-      return;
-    }
-    if (key.name === "backspace") {
-      searchQuery = searchQuery.slice(0, -1);
-      renderSearchBox();
-      params.screen.render();
-      return;
-    }
     if (key.name === "tab") {
-      // Tab from search box goes to filter box
       filterBox.focus();
       renderFilter();
       params.screen.render();
       return;
     }
-    if (typeof ch === "string" && /^[ -~]$/.test(ch) && !key.ctrl && !key.meta) {
-      searchQuery += ch;
-      renderSearchBox();
-      params.screen.render();
-    }
+    // All other keys → open the overlay prompt
+    openSearchPrompt();
   });
 
   // ── Icon grid navigation ────────────────────────────────
