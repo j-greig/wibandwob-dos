@@ -222,9 +222,16 @@ the loop works. If not, the axes are wrong.
 | UNIX_AGENT_CONTROL_EVIDENCE.md | Citations and evidence (424 lines) | Cloned from repo root |
 | UNIX_AGENT_CONTROL_INDEX.md | Navigation index (385 lines) | Cloned from repo root |
 | UNIX_AGENT_CONTROL_RECOMMENDATIONS.md | Implementation plan (470 lines) | Cloned from repo root |
-| REFERENCE_CLI_TOOLS_RANKED.md | 12 CLI tools ranked as design refs (130 lines) | Cloned from concurrent agent |
+| REFERENCE_CLI_TOOLS_RANKED.md | 12 CLI tools scored and ranked for design influence (~500 lines) | New |
 | autoresearch-brief-enhancement.md | This file — meta design notes | New |
 
-Note: the root-level originals are being enhanced by another agent session
-concurrently. These clones are a snapshot for autoresearch experimentation.
-Sync back to root when the loop produces improvements worth keeping.
+## Related Files Elsewhere
+
+| File | Role |
+|------|------|
+| `.planning/epics/e039-unix-cli-surface/e039-brief.md` | Canonical implementation epic |
+| `.planning/epics/e039-unix-cli-surface/e039-research/` | Curated research appendix (subset of this dir) |
+
+The root-level originals were cleaned up and the curated versions moved into
+the E039 epic directory. This directory retains the full unedited research
+corpus plus the meta-docs (brief enhancement, CLI tools ranking).
