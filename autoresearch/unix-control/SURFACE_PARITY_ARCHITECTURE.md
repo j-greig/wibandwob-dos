@@ -109,6 +109,25 @@ runtime. Two agents adding commands in different worktrees = no conflicts.
 - New catalog commands auto-appear in CLI (zero manual wiring)
 - Agent can complete multi-step tasks via `ww` pipes
 
+## Test It (against live API on port 8099)
+
+```bash
+# Parity check: CLI command count matches API
+ww commands list | jq length
+curl -s http://127.0.0.1:8099/commands/list | jq '.commands | length'
+# Must match
+
+# Functional: move a window via CLI, verify via API
+WID=$(ww windows list | jq -r '.[0].id')
+ww window $WID move --x 10 --y 5
+curl -s http://127.0.0.1:8099/state | jq ".windows[] | select(.id==$WID) | .left"
+# Must return 10
+
+# Pipe composition: close all editors
+ww windows list | jq -r '.[] | select(.kind=="editor") | .id' | \
+  xargs -I{} ww window {} close
+```
+
 ## Related
 
 - RESEARCH_UNIX_AGENT_CONTROL.md — evidence and analysis
