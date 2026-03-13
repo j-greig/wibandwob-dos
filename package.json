@@ -22,7 +22,8 @@
     "planning:branch": "git branch --show-current && git log --oneline -5",
     "planning:inbox": "bun run scripts/planning-inbox.ts",
     "prepare": "git config core.hooksPath .githooks",
-    "lint": "npx eslint 'modules/**/index.ts'"
+    "lint": "npx eslint 'modules/**/index.ts'",
+    "ww": "bun run src/cli/ww.ts"
   },
   "dependencies": {
     "@anthropic-ai/claude-code": "^2.1.63",
