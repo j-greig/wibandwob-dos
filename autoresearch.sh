@@ -1,1 +1,1 @@
-autoresearch/file-manager/autoresearch.sh
+autoresearch/music-player/autoresearch.sh

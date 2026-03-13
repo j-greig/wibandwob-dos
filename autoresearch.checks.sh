@@ -1,1 +1,1 @@
-autoresearch/file-manager/autoresearch.checks.sh
+autoresearch/music-player/autoresearch.checks.sh

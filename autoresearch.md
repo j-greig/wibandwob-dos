@@ -1,1 +1,1 @@
-autoresearch/file-manager/autoresearch.md
+autoresearch/music-player/autoresearch.md
