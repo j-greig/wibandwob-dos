@@ -306,6 +306,8 @@ function openWiretext(host: MicroappHost) {
   let redoStack: CanvasObject[][] = [];
   let cursorCol = 0, cursorRow = 0;
   let textEditId: string | null = null; // inline text editing
+  let statusMessage = "";
+  let statusTimeout: ReturnType<typeof setTimeout> | null = null;
 
   // ── Layout constants ──
   const SIDEBAR_W = 20;
@@ -372,6 +374,13 @@ function openWiretext(host: MicroappHost) {
     if (undoStack.length > 50) undoStack.shift();
   }
 
+  function showStatus(msg: string, duration = 3000) {
+    statusMessage = msg;
+    if (statusTimeout) clearTimeout(statusTimeout);
+    statusTimeout = setTimeout(() => { statusMessage = ""; render(); }, duration);
+    render();
+  }
+
   function undo() {
     if (!undoStack.length) return;
     redoStack.push(JSON.parse(JSON.stringify(objects)));
@@ -430,28 +439,31 @@ function openWiretext(host: MicroappHost) {
 
     // Welcome screen for empty canvas
     if (objects.length === 0) {
+      const p = "       "; // padding
       const welcome = [
         "",
+        `${p}${accent}${A.b}+${"-".repeat(36)}+${A.r}`,
+        `${p}${accent}${A.b}|${A.r}    ${bright}${A.b}W I R E T E X T${A.r}              ${accent}${A.b}|${A.r}`,
+        `${p}${accent}${A.b}|${A.r}    ${muted}${A.i}ASCII wireframing in the terminal${A.r} ${accent}${A.b}|${A.r}`,
+        `${p}${accent}${A.b}+${"-".repeat(36)}+${A.r}`,
         "",
-        `       ${accent}${A.b}W I R E T E X T${A.r}`,
-        `       ${muted}ASCII Art Diagramming${A.r}`,
+        `${p}${bright}${A.b}Getting Started${A.r}`,
+        `${p}${muted}Select a tool, then click-drag on the canvas.${A.r}`,
         "",
-        `       ${bright}Draw${A.r}`,
-        `       ${muted}Click and drag on the canvas to draw.${A.r}`,
-        `       ${muted}Select a tool from the sidebar first.${A.r}`,
+        `${p}${bright}${A.b}Tools${A.r}`,
+        `${p}  ${accent}B${A.r} ${muted}Box${A.r}      ${accent}T${A.r} ${muted}Text${A.r}     ${accent}L${A.r} ${muted}Line${A.r}`,
+        `${p}  ${accent}A${A.r} ${muted}Arrow${A.r}    ${accent}N${A.r} ${muted}Pencil${A.r}   ${accent}E${A.r} ${muted}Eraser${A.r}`,
+        `${p}  ${accent}V${A.r} ${muted}Select (move and resize objects)${A.r}`,
         "",
-        `       ${bright}Tools${A.r}`,
-        `       ${accent}B${A.r}${muted} Box     ${A.r}${accent}T${A.r}${muted} Text    ${A.r}${accent}L${A.r}${muted} Line${A.r}`,
-        `       ${accent}A${A.r}${muted} Arrow   ${A.r}${accent}N${A.r}${muted} Pencil  ${A.r}${accent}E${A.r}${muted} Eraser${A.r}`,
-        `       ${accent}V${A.r}${muted} Select (move & resize objects)${A.r}`,
+        `${p}${bright}${A.b}Box Styles${A.r}`,
+        `${p}  ${accent}1${A.r} ${muted}Single   ${A.r}${accent}2${A.r} ${muted}Double   ${A.r}${accent}3${A.r} ${muted}Rounded  ${A.r}${accent}4${A.r} ${muted}Heavy${A.r}`,
         "",
-        `       ${bright}Styles${A.r}`,
-        `       ${muted}Press 1-4 to change box border style${A.r}`,
+        `${p}${bright}${A.b}Actions${A.r}`,
+        `${p}  ${accent}^Z${A.r} ${muted}Undo${A.r}       ${accent}^Y${A.r} ${muted}Redo${A.r}`,
+        `${p}  ${accent}^E${A.r} ${muted}Export${A.r}     ${accent}^X${A.r} ${muted}Clear all${A.r}`,
+        `${p}  ${accent}Del${A.r} ${muted}Delete selected${A.r}`,
         "",
-        `       ${bright}Actions${A.r}`,
-        `       ${accent}Ctrl+Z${A.r}${muted} Undo   ${A.r}${accent}Ctrl+Y${A.r}${muted} Redo${A.r}`,
-        `       ${accent}Ctrl+E${A.r}${muted} Export to clipboard${A.r}`,
-        `       ${accent}Del${A.r}${muted}    Delete selected object${A.r}`,
+        `${p}${muted}${A.i}designed for thinking in text${A.r}`,
       ];
       for (let y = 0; y < canvasH; y++) {
         if (y < welcome.length) {
@@ -507,9 +519,16 @@ function openWiretext(host: MicroappHost) {
 
     // Status bar
     const selObj = selectedId ? objects.find(o => o.id === selectedId) : null;
-    const selInfo = selObj ? ` ${accent}${selObj.type}${A.r} ${muted}${selObj.id}${A.r}` : "";
-    const statusLeft = ` ${accent}${cursorCol},${cursorRow}${A.r} ${muted}│${A.r} ${muted}${boxStyle}${A.r}${selInfo}`;
-    const statusRight = `${muted}${objects.length} obj${A.r} ${muted}│${A.r} ${muted}${GRID_COLS}×${GRID_ROWS}${A.r} `;
+    const selInfo = selObj
+      ? ` ${muted}|${A.r} ${accent}${selObj.type}${A.r} ${muted}${Math.round(getBBox(selObj).w)}x${Math.round(getBBox(selObj).h)}${A.r}`
+      : "";
+    let statusLeft: string;
+    if (statusMessage) {
+      statusLeft = ` ${warnC}${statusMessage}${A.r}`;
+    } else {
+      statusLeft = ` ${accent}${cursorCol},${cursorRow}${A.r} ${muted}|${A.r} ${bright}${boxStyle}${A.r}${selInfo}`;
+    }
+    const statusRight = `${muted}${objects.length} obj${A.r} ${muted}|${A.r} ${muted}${GRID_COLS}x${GRID_ROWS}${A.r} `;
     const slp = stripAnsi(statusLeft).length;
     const srp = stripAnsi(statusRight).length;
     const sgap = Math.max(1, bodyW - slp - srp);
@@ -543,15 +562,25 @@ function openWiretext(host: MicroappHost) {
       }
     }
 
+    // Selected object info
     lines.push("");
-    lines.push(`${accent}${A.b} HELP${A.r}`);
-    lines.push(` ${muted}V${A.r} ${bright}Select${A.r}`);
-    lines.push(` ${muted}Del${A.r} ${bright}Delete${A.r}`);
-    lines.push(` ${muted}^Z${A.r} ${bright}Undo${A.r}`);
-    lines.push(` ${muted}^Y${A.r} ${bright}Redo${A.r}`);
-    lines.push(` ${muted}^E${A.r} ${bright}Export${A.r}`);
-    lines.push(` ${muted}1-4${A.r} ${bright}Box style${A.r}`);
-    lines.push(` ${muted}←→↑↓${A.r} ${bright}Scroll${A.r}`);
+    if (selectedId) {
+      const selObj2 = objects.find(o => o.id === selectedId);
+      if (selObj2) {
+        lines.push(`${accent}${A.b} SELECTED${A.r}`);
+        lines.push(` ${bright}${selObj2.type}${A.r} ${muted}${selObj2.id}${A.r}`);
+        const bb = getBBox(selObj2);
+        lines.push(` ${muted}pos${A.r} ${bright}${bb.col},${bb.row}${A.r}`);
+        lines.push(` ${muted}size${A.r} ${bright}${bb.w}x${bb.h}${A.r}`);
+        if (selObj2.borderStyle) lines.push(` ${muted}style${A.r} ${bright}${selObj2.borderStyle}${A.r}`);
+        if (selObj2.content) lines.push(` ${muted}text${A.r} ${bright}${selObj2.content.slice(0, 12)}${A.r}`);
+      }
+    } else {
+      lines.push(`${accent}${A.b} INFO${A.r}`);
+      lines.push(` ${muted}${objects.length} objects${A.r}`);
+      lines.push(` ${muted}^E export${A.r}`);
+      lines.push(` ${muted}^X clear all${A.r}`);
+    }
 
     // Pad to fill sidebar
     while (lines.length < viewH) lines.push("");
@@ -559,75 +588,100 @@ function openWiretext(host: MicroappHost) {
   }
 
   // ── Mouse handling ──
+  // We need screen-level mouse tracking for drag operations because blessed
+  // doesn't reliably fire mousemove on individual widgets during drags.
 
-  canvasBox.on("mouse", (data: blessed.Widgets.Events.IMouseEventArg) => {
+  function canvasCoords(data: { x: number; y: number }): { gc: number; gr: number } | null {
     const bx = (canvasBox as any).aleft || 0;
     const by = (canvasBox as any).atop || 0;
+    const cw = Number(canvasBox.width) || 1;
+    const ch = Number(canvasBox.height) || 1;
     const relX = data.x - bx;
     const relY = data.y - by;
-    const gc = scrollCol + relX;
-    const gr = scrollRow + relY;
+    if (relX < 0 || relY < 0 || relX >= cw || relY >= ch) return null;
+    return { gc: scrollCol + relX, gr: scrollRow + relY };
+  }
+
+  canvasBox.on("mousedown", (data: blessed.Widgets.Events.IMouseEventArg) => {
+    const coords = canvasCoords(data);
+    if (!coords) return;
+    const { gc, gr } = coords;
     cursorCol = gc;
     cursorRow = gr;
 
-    if (data.action === "mousedown") {
-      if (tool === "select") {
-        const hit = hitTest(objects, gc, gr);
-        if (hit) {
-          selectedId = hit.id;
-          drag = { type: "moving", objectId: hit.id, offsetCol: gc - hit.position.col, offsetRow: gr - hit.position.row };
-        } else {
-          selectedId = null;
-          drag = { type: "none" };
-        }
-      } else if (tool === "box" || tool === "line" || tool === "arrow") {
+    if (tool === "select") {
+      const hit = hitTest(objects, gc, gr);
+      if (hit) {
+        selectedId = hit.id;
         pushUndo();
-        drag = { type: "drawing", startCol: gc, startRow: gr };
-        const id = genId();
-        const obj: CanvasObject = {
-          id, type: tool === "box" ? "box" : tool === "line" ? "line" : "arrow",
-          position: { col: gc, row: gr }, width: 1, height: 1,
-          zIndex: objects.length,
-          borderStyle: boxStyle, fill: "solid",
-        };
-        if (tool === "line" || tool === "arrow") {
-          obj.endPosition = { col: gc, row: gr };
-        }
-        objects.push(obj);
-        selectedId = id;
-        drag.objectId = id;
-      } else if (tool === "text") {
-        pushUndo();
-        const id = genId();
-        const obj: CanvasObject = {
-          id, type: "text", position: { col: gc, row: gr },
-          width: 1, height: 1, zIndex: objects.length,
-          content: "Text",
-        };
-        objects.push(obj);
-        selectedId = id;
-        textEditId = id;
-      } else if (tool === "pencil") {
-        pushUndo();
-        const id = genId();
-        const obj: CanvasObject = {
-          id, type: "pencil", position: { col: gc, row: gr },
-          width: 1, height: 1, zIndex: objects.length,
-          points: [{ col: gc, row: gr }],
-        };
-        objects.push(obj);
-        selectedId = id;
-        drag = { type: "drawing", objectId: id, startCol: gc, startRow: gr };
-      } else if (tool === "eraser") {
-        const hit = hitTest(objects, gc, gr);
-        if (hit) {
-          pushUndo();
-          objects = objects.filter(o => o.id !== hit.id);
-          if (selectedId === hit.id) selectedId = null;
-        }
+        drag = { type: "moving", objectId: hit.id, offsetCol: gc - hit.position.col, offsetRow: gr - hit.position.row };
+      } else {
+        selectedId = null;
+        drag = { type: "none" };
       }
-      render();
-    } else if (data.action === "mousemove") {
+    } else if (tool === "box" || tool === "line" || tool === "arrow") {
+      pushUndo();
+      drag = { type: "drawing", startCol: gc, startRow: gr };
+      const id = genId();
+      const obj: CanvasObject = {
+        id, type: tool === "box" ? "box" : tool === "line" ? "line" : "arrow",
+        position: { col: gc, row: gr }, width: 1, height: 1,
+        zIndex: objects.length,
+        borderStyle: boxStyle, fill: "solid",
+      };
+      if (tool === "line" || tool === "arrow") {
+        obj.endPosition = { col: gc, row: gr };
+      }
+      objects.push(obj);
+      selectedId = id;
+      drag.objectId = id;
+    } else if (tool === "text") {
+      pushUndo();
+      const id = genId();
+      const obj: CanvasObject = {
+        id, type: "text", position: { col: gc, row: gr },
+        width: 1, height: 1, zIndex: objects.length,
+        content: "",
+      };
+      objects.push(obj);
+      selectedId = id;
+      textEditId = id;
+    } else if (tool === "pencil") {
+      pushUndo();
+      const id = genId();
+      const obj: CanvasObject = {
+        id, type: "pencil", position: { col: gc, row: gr },
+        width: 1, height: 1, zIndex: objects.length,
+        points: [{ col: gc, row: gr }],
+      };
+      objects.push(obj);
+      selectedId = id;
+      drag = { type: "drawing", objectId: id, startCol: gc, startRow: gr };
+    } else if (tool === "eraser") {
+      const hit = hitTest(objects, gc, gr);
+      if (hit) {
+        pushUndo();
+        objects = objects.filter(o => o.id !== hit.id);
+        if (selectedId === hit.id) selectedId = null;
+      }
+    }
+    render();
+  });
+
+  // Screen-level mouse handler for drag tracking
+  function handleScreenMouse(data: blessed.Widgets.Events.IMouseEventArg) {
+    if (drag.type === "none") return;
+
+    const coords = canvasCoords(data);
+    if (!coords) {
+      if (data.action === "mouseup") { drag = { type: "none" }; render(); }
+      return;
+    }
+    const { gc, gr } = coords;
+    cursorCol = gc;
+    cursorRow = gr;
+
+    if (data.action === "mousemove") {
       if (drag.type === "drawing" && drag.objectId) {
         const obj = objects.find(o => o.id === drag.objectId);
         if (obj) {
@@ -640,7 +694,6 @@ function openWiretext(host: MicroappHost) {
             obj.endPosition = { col: gc, row: gr };
           } else if (obj.type === "pencil") {
             if (!obj.points) obj.points = [];
-            // Add intermediate points
             obj.points.push({ col: gc, row: gr });
           }
         }
@@ -648,7 +701,6 @@ function openWiretext(host: MicroappHost) {
       } else if (drag.type === "moving" && drag.objectId) {
         const obj = objects.find(o => o.id === drag.objectId);
         if (obj) {
-          if (!drag.offsetCol) { pushUndo(); drag.offsetCol = 0; drag.offsetRow = 0; }
           const newCol = gc - (drag.offsetCol || 0);
           const newRow = gr - (drag.offsetRow || 0);
           const dc = newCol - obj.position.col;
@@ -662,12 +714,9 @@ function openWiretext(host: MicroappHost) {
           }
         }
         render();
-      } else {
-        render();
       }
     } else if (data.action === "mouseup") {
       if (drag.type === "drawing" && drag.objectId) {
-        // Validate minimum size for boxes
         const obj = objects.find(o => o.id === drag.objectId);
         if (obj && obj.type === "box" && (obj.width < 2 || obj.height < 2)) {
           obj.width = Math.max(2, obj.width);
@@ -677,7 +726,9 @@ function openWiretext(host: MicroappHost) {
       drag = { type: "none" };
       render();
     }
-  });
+  }
+
+  host.screen.on("mouse", handleScreenMouse);
 
   // Sidebar mouse clicks for tool/style selection
   sidebarBox.on("mouse", (data: blessed.Widgets.Events.IMouseEventArg) => {
@@ -744,7 +795,7 @@ function openWiretext(host: MicroappHost) {
     if (ctrl && key.name === "z") { undo(); return; }
     if (ctrl && key.name === "y") { redo(); return; }
     if (ctrl && key.name === "e") { exportToClipboard(); return; }
-    if (ctrl && key.name === "x") { pushUndo(); objects = []; selectedId = null; render(); return; }
+    if (ctrl && key.name === "x") { pushUndo(); const n = objects.length; objects = []; selectedId = null; showStatus(`Cleared ${n} objects`); return; }
 
     // Delete selected
     if (key.name === "delete" || key.name === "backspace") {
@@ -792,6 +843,7 @@ function openWiretext(host: MicroappHost) {
     }
     const text = lines.join("\n");
     host.screen.copyToClipboard(text);
+    showStatus(`Exported ${lines.length} lines to clipboard`);
   }
 
   // ── Lifecycle ──
@@ -824,7 +876,11 @@ function openWiretext(host: MicroappHost) {
   });
 
   win.onResize(() => render());
-  win.onCleanup(() => clearTimers(timers));
+  win.onCleanup(() => {
+    clearTimers(timers);
+    host.screen.removeListener("mouse", handleScreenMouse);
+    if (statusTimeout) clearTimeout(statusTimeout);
+  });
 
   canvasBox.focus();
   win.setFocusTarget(canvasBox);
