@@ -959,6 +959,16 @@ Result: 7.6 → 8.1 quality score, and it actually looks like a 3D world.
 for certain key combos (= and - keys on macOS). Guard pattern:
 `if (!key || !key.name) return;`
 
+**Studying the original asciicker GIF reveals the secret sauce.**
+Extracted frames from asciicker.gif with ffmpeg. Key visual differences from my renderer:
+- Every terrain cell uses BOTH fg AND bg colour — grass has green bg + darker green fg glyphs.
+  This fg+bg dithering creates far richer colour than my fg-only approach.
+- Trees are tall multi-cell vertical sprites (dark trunk █ + green canopy) that poke above
+  terrain, creating genuine 3D objects. My forest biome is just flat glyph variation.
+- Cliff faces are solid walls of dark blocks when terrain drops — very prominent depth cue.
+- The visual density comes from bg colour filling — no black/empty space on terrain at all.
+Takeaway: the per-cell bg colour is not optional decoration, it's the primary visual technique.
+
 **Module reload vs restart confusion.**
 New modules require a full app restart to be discovered (module-loader scans at
 startup). But code changes to an existing module's `index.ts` only need the window
