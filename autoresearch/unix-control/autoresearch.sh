@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -uo pipefail
+# Note: no set -e — we want all tests to run even if some fail
 
 echo "=== Unix CLI (ww) Parity Benchmark ==="
 
@@ -176,6 +177,55 @@ check "ww help shows usage" \
 NO_ARGS=$($WW 2>&1 || true)
 check "ww (no args) shows usage" \
   "$(echo "$NO_ARGS" | grep -q 'Usage' && echo PASS || echo "no Usage")"
+
+# ── 13. Convenience patterns ─────────────────────────────
+echo "--- convenience patterns ---"
+
+# Open a window for testing
+$WW cmd editor.new >/dev/null 2>&1; sleep 0.3
+CID=$($WW windows | jq -r '.[0].id')
+
+# ww window <id> close — positional ID before verb
+$WW window "$CID" close >/dev/null 2>&1
+sleep 0.3
+CLOSED=$($WW windows | jq "[.[] | select(.id==$CID)] | length")
+check "ww window <id> close (positional)" \
+  "$([ "$CLOSED" = "0" ] && echo PASS || echo "still exists")"
+
+# ww window <id> move --x --y — positional ID
+$WW cmd editor.new >/dev/null 2>&1; sleep 0.3
+MID=$($WW windows | jq -r '.[0].id')
+$WW window "$MID" move --x 30 --y 15 >/dev/null 2>&1
+sleep 0.3
+MX=$(curl -s "$API/state" | jq ".windows[] | select(.id==$MID) | .left")
+check "ww window <id> move (positional)" \
+  "$([ "$MX" = "30" ] && echo PASS || echo "left=$MX expected=30")"
+
+# ── 14. Quiet mode ──────────────────────────────────────
+echo "--- quiet mode ---"
+
+# ww windows -q should output just IDs one per line
+QUIET_OUT=$($WW windows -q 2>/dev/null || $WW windows --quiet 2>/dev/null || echo "UNSUPPORTED")
+if [ "$QUIET_OUT" = "UNSUPPORTED" ]; then
+  check "ww windows -q outputs IDs" "FAIL: -q flag not supported"
+else
+  # Should be just numbers, one per line
+  QLINES=$(echo "$QUIET_OUT" | wc -l | tr -d ' ')
+  QVALID=$(echo "$QUIET_OUT" | grep -cE '^[0-9]+$' || echo 0)
+  check "ww windows -q outputs IDs one per line" \
+    "$([ "$QLINES" = "$QVALID" ] && [ "$QLINES" -ge 1 ] && echo PASS || echo "lines=$QLINES valid=$QVALID")"
+fi
+
+# ── 15. Screenshot ──────────────────────────────────────
+echo "--- screenshot ---"
+
+SHOT=$($WW screenshot 2>/dev/null || echo "UNSUPPORTED")
+check "ww screenshot returns content" \
+  "$([ "$SHOT" != "UNSUPPORTED" ] && [ -n "$SHOT" ] && echo PASS || echo "not implemented")"
+
+# Clean up the test window
+$WW cmd window.close --id "$MID" >/dev/null 2>&1 || true
+sleep 0.3
 
 # ── Cleanup: close test windows ──────────────────────────
 echo "--- cleanup ---"
