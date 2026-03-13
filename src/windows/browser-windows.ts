@@ -22,7 +22,7 @@ import type { Box, BrowserEntry, List, WindowKind, WindowRecord } from "../core/
 import type { OverlayManager } from "../core/overlay-manager.js";
 
 /** Percent of window width given to the list/left pane; preview gets the rest. */
-const PREVIEW_SPLIT_RATIO = 38;
+const PREVIEW_SPLIT_RATIO = 42;
 import type { WindowManager } from "../core/window-manager.js";
 
 /** Truncate a line by visible width and pad to a fixed viewport width. */
