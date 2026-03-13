@@ -288,9 +288,11 @@ export function createBarsViz(): VizMode {
         if (playing) {
           h[i] = clamp(bands[i]!, 0, 1);
         } else {
-          // Idle breathing wave when stopped — visible gentle motion
-          const phase = (Date.now() / 1500 + i * 0.25) % (Math.PI * 2);
-          h[i] = Math.max(0, Math.sin(phase) * 0.25 + 0.12);
+          // Idle breathing wave when stopped — fills full viz height
+          const t = Date.now() / 1200;
+          const phase = (t + i * 0.3) % (Math.PI * 2);
+          const wave2 = Math.sin(t * 0.7 + i * 0.15);
+          h[i] = clamp(Math.sin(phase) * 0.35 + wave2 * 0.15 + 0.35, 0.05, 0.85);
         }
         peak[i] = h[i] > peak[i] ? h[i] : Math.max(0, peak[i] - PDECAY);
       }
@@ -915,7 +917,7 @@ export function openMusicPlayerWindow(
       playlistPane.width = PLAYLIST_WIDTH; playlistPane.height = paneH;
     }
 
-    const PLAYER_INFO_ROWS = 8;
+    const PLAYER_INFO_ROWS = 7;
     const vizH    = Math.max(4, paneH - PLAYER_INFO_ROWS - 1);
     const showViz = paneH >= VIZ_MIN_HEIGHT;  // show viz even without playlist
 
@@ -963,17 +965,22 @@ export function openMusicPlayerWindow(
       ? `{gray-fg}(no file loaded){/gray-fg}`
       : `{bold}{white-fg}${ctrl.fileName.replace(/\{/g, "\\{")}{/white-fg}{/bold}`;
 
-    // Now-playing display — compact layout
+    // Now-playing display — compact with visual flair
     const sepW = Math.max(4, w - 2);
     const sep = `{gray-fg}${"\u2500".repeat(sepW)}{/gray-fg}`;
+    
+    // Time display with elapsed bar
+    const timeDisplay = dur > 0 
+      ? `{white-fg}${fmtTime(elaps)}{/white-fg} {gray-fg}/ ${fmtTime(dur)}{/gray-fg}`
+      : `{gray-fg}${fmtTime(elaps)} / ${fmtTime(dur)}{/gray-fg}`;
+
     const lines: string[] = [
       "",
-      ` {${accentFg}-fg}♫{/${accentFg}-fg}  ${trackName}`,
-      ` {${stateCol}-fg}${icon}  ${lbl}{/${stateCol}-fg}    {white-fg}${fmtTime(elaps)}{/white-fg} {gray-fg}/{/gray-fg} {gray-fg}${fmtTime(dur)}{/gray-fg}`,
-      "",
+      ` {${accentFg}-fg}\u266B{/${accentFg}-fg}  ${trackName}`,
+      ` {${stateCol}-fg}${icon}  ${lbl}{/${stateCol}-fg}    ${timeDisplay}`,
       ` ${progBar}`,
-      ` {gray-fg}Vol:{/gray-fg} ${volBar}  {white-fg}${ctrl.volume}%{/white-fg}    {gray-fg}\u2190\u2192:scrub \u2191\u2193:track v:viz o:add{/gray-fg}`,
       "",
+      ` {gray-fg}Vol:{/gray-fg} ${volBar} {white-fg}${ctrl.volume}%{/white-fg}  {gray-fg}\u2502{/gray-fg}  {gray-fg}\u2190\u2192:scrub \u2191\u2193:track v:viz o:add{/gray-fg}`,
       ` ${sep}`,
     ];
     playerPane.setContent(lines.join("\n"));
