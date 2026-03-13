@@ -1,0 +1,20 @@
+{
+  "name": "asciicker",
+  "version": "0.1.0",
+  "description": "Asciicker microapp",
+  "type": "microapp",
+  "entry": "index.ts",
+  "microapp": {
+    "id": "wibwob.asciicker",
+    "title": "Asciicker",
+    "description": "Asciicker microapp scaffold.",
+    "multiInstance": false,
+    "persist": false,
+    "menu": [
+      { "category": "applications", "order": 170, "label": "Asciicker" }
+    ],
+    "palette": { "order": 170, "label": "Open Asciicker" },
+    "agent": true,
+    "api": true
+  }
+}
