@@ -42,9 +42,10 @@ Every command defined here automatically appears in:
 - Agent tools via `tui_run_command` (if `agent: true`)
 - OpenAPI spec at `/openapi.json`
 
-### TypeBox schemas already define agent tool parameters
+### TypeBox schemas define agent tool parameters (migration candidate)
 ```typescript
-// src/services/agent-tools.ts — uses @sinclair/typebox
+// src/services/agent-tools.ts — currently uses @sinclair/typebox
+// but Zod is the better long-term choice (MCP, pi, OpenAI all use Zod)
 const runCommand = tuiTool({
   name: "tui_run_command",
   parameters: Type.Object({
@@ -53,6 +54,7 @@ const runCommand = tuiTool({
   }),
   execute: (params, ctx) => ctx.runCommand(params.id, params.args)
 });
+// → migrate to: z.object({ id: z.string(), args: z.record(z.unknown()).optional() })
 ```
 
 ### Microapp commands auto-register
@@ -67,11 +69,13 @@ The gap is narrow but real:
 Commands accept `args?: Record<string, unknown>` — an untyped bag. The API
 and CLI can't validate or document arguments without schema metadata.
 
-**Fix:** Add optional TypeBox schema to `AppCommandDefinition`:
+**Fix:** Add optional Zod schema to `AppCommandDefinition`:
 ```typescript
+import { z } from "zod";
+
 interface AppCommandDefinition {
   // ...existing fields...
-  params?: TSchema;  // TypeBox schema for command arguments
+  params?: z.ZodType;  // Zod schema for command arguments
 }
 ```
 
@@ -105,10 +109,11 @@ generate a CLI entry point. One TypeBox schema per command defines both
 API validation and CLI flag parsing.
 
 **Stack:**
-- `@sinclair/typebox` — already in the repo, defines schemas
+- `zod` — already a transitive dep, defines schemas, validates at runtime
+- `zod-to-json-schema` — already in dep tree, generates OpenAPI params
 - `citty` or `cac` — lightweight CLI framework (~3KB)
-- `typebox-to-cli` — doesn't exist yet, but trivial to write:
-  TypeBox `Type.Object({ x: Type.Number() })` → `--x <number>`
+- Zod-to-CLI flag mapping is trivial:
+  `z.object({ x: z.number() })` → `--x <number>`
 
 **What to write:**
 ```
@@ -206,10 +211,10 @@ but doesn't add much over TypeBox which is already in the repo.
 ### Step-by-step implementation
 
 **Phase 1: Schema enrichment (no new surfaces)**
-- Add `params?: TSchema` to `AppCommandDefinition` interface
-- Add schemas to 10 most-used commands (window.move, theme.set, etc)
+- Add `params?: z.ZodType` to `AppCommandDefinition` interface
+- Add Zod schemas to 10 most-used commands (window.move, theme.set, etc)
 - Validate args against schema in `/commands/run` handler
-- OpenAPI spec auto-generates per-command parameter docs
+- OpenAPI spec auto-generates per-command parameter docs via `zod-to-json-schema`
 - Effort: 2-3 hours, zero risk, immediate API quality improvement
 
 **Phase 2: CLI projection (new surface, auto-derived)**
@@ -256,16 +261,25 @@ have minimal merge conflicts.
 
 | Package | What for | Already in repo? |
 |---------|----------|-----------------|
-| `@sinclair/typebox` | Schema definition + validation | YES |
+| `zod` | Schema definition + validation + CLI flag derivation | YES (transitive via MCP, Anthropic SDK, OpenAI, Mistral) |
+| `zod-to-json-schema` | Zod → JSON Schema (for OpenAPI spec generation) | YES (transitive via pi-ai) |
 | `citty` (unjs) | CLI framework — 3KB, subcommands, typed args | No |
 | `cac` | CLI framework — 4KB, lightweight alternative | No |
-| `typebox-validators` | TypeBox → runtime validation (Bun-compatible) | No |
+
+**Why Zod over TypeBox for this:**
+- Zod is already a transitive dep via multiple paths (MCP SDK, Anthropic, OpenAI, Mistral)
+- pi itself uses Zod for tool schemas — the MCP tool definition pattern IS Zod
+- LLMs have massive Zod training data — agents write Zod schemas confidently
+- `zod-to-json-schema` already in the dep tree for OpenAPI generation
+- TypeBox is used in agent-tools.ts but that's a smaller surface; migrating
+  those ~10 tool definitions to Zod is trivial and unifies the schema story
 
 **NOT recommended:**
 - `oclif` — heavyweight (Salesforce), overkill for our needs
 - `commander` / `yargs` — larger than needed, no schema integration
 - `openapi-generator` — Java dependency, wrong direction (API → CLI)
-- `zod` — redundant when TypeBox is already in use
+- `@sinclair/typebox` — already in repo but Zod has better ecosystem
+  alignment (MCP, pi, OpenAI all use Zod)
 
 ## The 50-Line CLI
 
