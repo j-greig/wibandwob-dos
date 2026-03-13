@@ -1,40 +1,61 @@
-# Autoresearch — Code Editor (slap-editor)
+# Autoresearch — Wiretext (ASCII Diagramming)
 
 ## Objective
-Transform the bare-bones code editor into a polished VSCode-like editing experience.
-Files in scope: `modules/slap-editor/index.ts`, `modules/slap-editor/editor-engine.ts`.
+Build a Wiretext module for WibWob-DOS — an ASCII art diagramming tool inspired by
+https://github.com/mualat/wiretext. Visual wireframing with box-drawing characters,
+lines, arrows, text, and UI components directly in the terminal.
+
+Reference image: autoresearch/wiretext/wiretext.png
+Wiretext source (cloned for reference): /tmp/wiretext/
+
+## Architecture
+The wiretext boxDrawing.ts contains 1200 lines of pure grid-based rendering logic
+(no DOM/React dependencies) that can be adapted directly:
+- Grid = string[][] (2D character array)
+- CanvasObject model with position, size, type, style
+- renderObjectsToGrid() renders all objects to the grid
+- Box drawing chars: single/double/rounded/heavy styles
+- Bresenham line algorithm for diagonals
+- Hit testing, bounding boxes, resize handles
+- 30+ UI component types (button, input, table, modal, etc.)
 
 ## Reusable Components from Codebase
-- `src/services/syntax-highlight.ts` — ANSI syntax highlighting for TS/JS/Python/Bash.
-  Uses `highlightCode(code, lang)` returning ANSI-styled lines. Already battle-tested.
-- `src/windows/browser-windows.ts` File Manager patterns:
-  - `fileIcon()` — icon per file extension (ts, js, py, md, json, etc.)
-  - Toolbar with path label + right-aligned action buttons with hover effects
-  - `createSelectableList` for file tree sidebar
-  - Breadcrumb builder from path
-  - Vertical divider between panes
-- `src/core/ui-parts.ts` — createHeaderBar, createStatusBar, createRow, createStack, createRule
+- `src/core/ui-parts.ts` — createHeaderBar, createStatusBar
+- `src/services/syntax-highlight.ts` — not needed here but ANSI pattern reusable
+- Proven ANSI rendering pattern from Code Editor, Terrain Lab, Plasma
 
 ## Target Features (priority order)
-1. SYNTAX HIGHLIGHTING — import highlightCode, render ANSI lines with tags:false
-2. CURRENT LINE HIGHLIGHT — accent gutter number, subtle bg on active line
-3. RICH STATUS BAR — language, encoding, indent, Ln:Col, scroll %, dirty marker
-4. HEADER/BREADCRUMB BAR — file path with folder structure
-5. FILE TREE SIDEBAR — left pane with createSelectableList, Space to open in Finder
-6. TOOLBAR — action buttons like File Manager (Save, Find, Go-to-line)
-7. VIM/NANO KEYBINDINGS — hjkl nav, gg/G jump, w/b word, dd delete line, :w save
+1. CANVAS — grid rendered via blessed box, tags:false, ANSI for cursor/selection
+2. TOOL SIDEBAR — Select, Box, Text, Line, Arrow, Connector, Pencil, Eraser
+3. DRAWING — mouse click-drag to create boxes, lines, arrows on canvas
+4. SELECTION — click to select, move objects, resize handles
+5. HEADER BAR — title + Export/Clear/Undo/Redo buttons
+6. STATUS BAR — tool name, cursor col/row, object count, box style
+7. KEYBOARD SHORTCUTS — V/B/T/L/A/C/N/E for tools, Ctrl+Z undo, Ctrl+C copy
+8. BOX STYLES — single/double/rounded/heavy border toggle
+9. COMPONENTS — UI component palette (button, input, table, modal, etc.)
+10. EXPORT — copy grid to clipboard as plain text
+11. IMPORT — load ASCII art from primer files or paste text (stretch goal)
 
 ## Rendering Strategy
-- textBox: tags:false, use raw ANSI from syntax-highlight.ts
-- gutterBox: tags:false, ANSI for current-line number accent
-- Cursor/selection: overlay ANSI escape codes on highlighted output
-- This matches the proven pattern from Terrain Lab, Plasma, TR-808
+- Canvas: blessed box with tags:false, raw ANSI escape codes
+- Grid: adapted from wiretext's Grid type (string[][])
+- Cursor: ANSI reverse video on current cell
+- Selected objects: ANSI highlight on border/content cells
+- Tool sidebar: ANSI-styled list with active tool highlighted
+- Status bar: ANSI-styled segments like Code Editor
 
 ## Rubric
-5-axis: LAYOUT, READABILITY, AESTHETIC, COHERENCE, CHARACTER — each 1-10, averaged.
+5-axis: LAYOUT, READABILITY, COHERENCE, STYLE, FUNCTIONALITY — each 1-10, averaged.
+
+- LAYOUT: spatial arrangement, chrome structure, use of space
+- READABILITY: can you parse the content easily, contrast, typography
+- COHERENCE: do elements work together as a unified system
+- STYLE: visual polish + WibWob personality/brand identity
+- FUNCTIONALITY: does the app have expected features, feel complete, actually useful
 
 ## Constraints
-- Only modify files in `modules/slap-editor/`
-- Can import from `src/services/syntax-highlight.ts` (existing, tested)
+- Only modify files in `modules/wiretext/`
+- Can import shared utilities from src/ (ui-parts, etc.)
 - Must pass `bun run typecheck`
-- RESTART required after changes (src/services import change)
+- RESTART required after changes
