@@ -162,6 +162,34 @@ proved they're unnecessary:
 
 ---
 
+## 8. Naming hygiene: wibwob not ww
+
+**Status:** Mostly done, needs audit
+**Impact:** Low but embarrassing if missed
+**Effort:** 30 mins
+
+The CLI was originally called `ww`, renamed to `wibwob` mid-session
+because `ww` clashed with an existing zsh alias (Claude with wibwob
+system prompt). The rename touched: wibwob.ts, README, test suite,
+package.json, autoresearch scripts, ideas file.
+
+Audit checklist:
+- [ ] `grep -r '\bww\b' src/cli/` — should return nothing
+- [ ] `grep -r '\bww\b' autoresearch/unix-control/` — test descriptions OK, no functional refs
+- [ ] `wibwob help` output says wibwob everywhere
+- [ ] `src/cli/README.md` says wibwob everywhere
+- [ ] `AGENTS.md` mentions wibwob if CLI is referenced
+- [ ] `.planning/epics/e039-*/` docs say wibwob
+- [ ] `.planning/epics/e040-*/` docs say wibwob (music video brief)
+- [ ] `SURFACE_PARITY_ARCHITECTURE.md` updated to say wibwob (currently says ww)
+- [ ] Any future doc generation (COMMANDS.md) uses wibwob in headers
+- [ ] Shell alias in README matches: `alias wibwob=...` not `alias ww=...`
+
+Run `grep -rn '\bww\b' src/ autoresearch/ .planning/ .agents/` to catch strays.
+Exclude `WW_API` env var — that stays as-is (it's the API config, not the CLI name).
+
+---
+
 ## Priority order
 
 1. Zod schemas (#1) — unlocks #5, improves #6, makes the whole system typed
