@@ -445,6 +445,7 @@ function openWiretext(host: MicroappHost) {
   let figletMode = false;
   let figletInput = "";
   let clipboard: CanvasObject | null = null;
+  let labelEditId: string | null = null; // editing box/component label
 
   const COMPONENTS: Array<{ type: ComponentType; label: string; w: number; h: number }> = [
     { type: "button",   label: "Button",   w: 12, h: 3 },
@@ -737,6 +738,9 @@ function openWiretext(host: MicroappHost) {
     let statusLeft: string;
     if (statusMessage) {
       statusLeft = ` ${warnC}${statusMessage}${A.r}`;
+    } else if (labelEditId) {
+      const obj = objects.find(o => o.id === labelEditId);
+      statusLeft = ` ${accent}Label:${A.r} ${bright}${obj?.label || ""}_${A.r} ${muted}(Enter=done, Esc=cancel)${A.r}`;
     } else if (figletMode) {
       statusLeft = ` ${accent}Figlet:${A.r} ${bright}${figletInput}_${A.r} ${muted}(Enter=place, Esc=cancel)${A.r}`;
     } else {
@@ -1085,6 +1089,28 @@ function openWiretext(host: MicroappHost) {
       return;
     }
 
+    // Label editing mode (for boxes/components)
+    if (labelEditId) {
+      const obj = objects.find(o => o.id === labelEditId);
+      if (!obj) { labelEditId = null; return; }
+      if (key.name === "escape" || key.name === "return") {
+        labelEditId = null;
+        render();
+        return;
+      }
+      if (key.name === "backspace") {
+        obj.label = (obj.label || "").slice(0, -1);
+        render();
+        return;
+      }
+      if (_ch && _ch.length === 1 && _ch.charCodeAt(0) >= 32 && !ctrl) {
+        obj.label = (obj.label || "") + _ch;
+        render();
+        return;
+      }
+      return;
+    }
+
     // Text editing mode
     if (textEditId) {
       const obj = objects.find(o => o.id === textEditId);
@@ -1231,6 +1257,22 @@ function openWiretext(host: MicroappHost) {
       else pendingComponent = COMPONENTS[(idx - 1 + COMPONENTS.length) % COMPONENTS.length].type;
       render();
       return;
+    }
+
+    // Enter to edit label/content of selected object
+    if ((key.name === "return" || key.name === "enter") && selectedId) {
+      const obj = objects.find(o => o.id === selectedId);
+      if (obj) {
+        if (obj.type === "box" || obj.type === "component") {
+          labelEditId = obj.id;
+          showStatus(`Editing label: ${obj.label || ""}_  (Enter=done, Esc=cancel)`);
+          return;
+        } else if (obj.type === "text") {
+          textEditId = obj.id;
+          showStatus(`Editing text: ${obj.content || ""}_  (Enter=done, Esc=cancel)`);
+          return;
+        }
+      }
     }
 
     // Escape deselects
@@ -1419,12 +1461,24 @@ function openWiretext(host: MicroappHost) {
 
   // ── Lifecycle ──
 
-  win.describeState(() => ({
-    summary: `Wiretext — ${tool} tool, ${objects.length} objects, style: ${boxStyle}`,
-    tool, objectCount: objects.length, boxStyle,
-    cursor: { col: cursorCol, row: cursorRow },
-    selectedObject: selectedId,
-  }));
+  win.describeState(() => {
+    const sel = selectedId ? objects.find(o => o.id === selectedId) : null;
+    const selDesc = sel ? { id: sel.id, type: sel.type, ...getBBox(sel), label: sel.label, content: sel.content?.slice(0, 50) } : null;
+    return {
+      summary: `Wiretext — ${tool} tool, ${objects.length} objects, style: ${boxStyle}${sel ? `, selected: ${sel.type}` : ""}`,
+      tool, objectCount: objects.length, boxStyle, shadowEnabled,
+      cursor: { col: cursorCol, row: cursorRow },
+      selectedObject: selDesc,
+      objectTypes: {
+        boxes: objects.filter(o => o.type === "box").length,
+        text: objects.filter(o => o.type === "text").length,
+        lines: objects.filter(o => o.type === "line").length,
+        arrows: objects.filter(o => o.type === "arrow").length,
+        components: objects.filter(o => o.type === "component").length,
+        figlets: objects.filter(o => o.type === "figlet").length,
+      },
+    };
+  });
 
   win.captureText(() => {
     const grid = renderObjectsToGrid(objects, GRID_COLS, GRID_ROWS);
