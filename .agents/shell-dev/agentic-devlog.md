@@ -628,3 +628,30 @@ to the parent, which re-fires it.
 or `blessed.textbox`. For existing box-as-input patterns, add the 30ms debounce.
 
 Applied in: `src/windows/browser-windows.ts` (filter box + search box)
+
+## 2026-03-13 — createTextBlock tags + wrapIndentedText conflict
+
+**Problem:** `createTextBlock` from ui-parts has `tags: false` and wraps
+content through `wrapIndentedText()` which splits lines by character width.
+If a microapp sets `parseTags = true` post-creation AND uses `display.update()`,
+the wrapping function breaks blessed tags mid-tag (e.g. `{gray-` on one line,
+`fg}text{/gray-fg}` on the next).
+
+**Fix patterns:**
+1. **Bypass update()** — set content directly: `(display.node as any).setContent(content)`
+   Avoids the wrapIndentedText path entirely. The microapp is responsible for
+   its own line widths.
+2. **Future SDK improvement** — `createTextBlock` should accept a `tags: true`
+   option that also makes wrapIndentedText tag-aware (strip tags before measuring
+   width, preserve them in output). This is the proper fix.
+
+**Recommendation for new microapps needing colour:**
+Use pattern 1 (direct setContent) until the SDK adds tag-aware wrapping.
+Always set `(display.node as any).parseTags = true` in the microapp setup.
+
+Applied in: `modules/wibwob-tr808/index.ts`
+
+**Potential skill/script idea:** A `ww-microapp-colour` skill that documents
+this pattern and provides a copy-pasteable snippet for any microapp that needs
+blessed colour tags in its text display. Would save agents from rediscovering
+this workaround each time.
