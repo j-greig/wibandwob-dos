@@ -2,21 +2,19 @@
 
 ## Reading Order
 
-For implementation: SURFACE_PARITY_ARCHITECTURE.md (how to build it)
-For evidence: RESEARCH_UNIX_AGENT_CONTROL.md (full analysis, 15 sections)
-For quick reference: UNIX_AGENT_CONTROL_SUMMARY.md (key findings, 2 pages)
+For research and analysis: RESEARCH_UNIX_AGENT_CONTROL.md (8 sections)
 For verified citations: UNIX_AGENT_CONTROL_EVIDENCE.md (URLs, quotes, verification status)
-For recommendations: UNIX_AGENT_CONTROL_RECOMMENDATIONS.md (phased plan)
-For CLI design: REFERENCE_CLI_TOOLS_RANKED.md (12 tools scored, proposed ww grammar)
-For naming: devnote-cli-naming-strategy (verb vocabulary analysis)
-For parity: devnote-parity-problem (single source of truth architecture)
+For implementation plan: UNIX_AGENT_CONTROL_RECOMMENDATIONS.md (phased)
+For CLI architecture: SURFACE_PARITY_ARCHITECTURE.md (how to build it)
+For CLI design references: REFERENCE_CLI_TOOLS_RANKED.md (12 tools scored)
+For naming decisions: devnote-cli-naming-strategy (verb vocabulary)
+For parity architecture: devnote-parity-problem (single source of truth)
 
 ## File Roles (Non-Overlapping)
 
 | File | Owns | Does NOT contain |
 |------|------|-----------------|
-| RESEARCH | Full analysis of 15 research areas | Implementation details |
-| SUMMARY | 2-page executive summary (strict subset of RESEARCH) | Unique claims not in RESEARCH |
+| RESEARCH | Analysis and arguments (8 sections) | Citations, implementation detail |
 | EVIDENCE | Verified citations with URLs and verification status | Analysis or recommendations |
 | RECOMMENDATIONS | Phased implementation plan for WibWob-DOS | Research evidence |
 | SURFACE_PARITY | Architecture for auto-deriving CLI from catalog | Research evidence |
