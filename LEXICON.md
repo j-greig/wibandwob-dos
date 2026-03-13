@@ -1,6 +1,6 @@
-# ZILLAS NOTES
+# LEXICON
 
-## PROJECT LINGO
+## PROJECT VOCABULARY
 **content-aware apps**
 - primers, text, figlet, animations, and later other content-aware apps should open from measured/recommended size instead of generic defaults
 - value: stops random `72x20` window guesses, reduces clipping, makes opening content feel intentional and agent-friendly
