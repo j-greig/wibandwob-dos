@@ -1,0 +1,20 @@
+{
+  "name": "spore-clock",
+  "version": "0.1.0",
+  "description": "Spore Clock microapp",
+  "type": "microapp",
+  "entry": "index.ts",
+  "microapp": {
+    "id": "wibwob.spore-clock",
+    "title": "Spore Clock",
+    "description": "Spore Clock microapp scaffold.",
+    "multiInstance": false,
+    "persist": false,
+    "menu": [
+      { "category": "applications", "order": 160, "label": "Spore Clock" }
+    ],
+    "palette": { "order": 160, "label": "Open Spore Clock" },
+    "agent": true,
+    "api": true
+  }
+}

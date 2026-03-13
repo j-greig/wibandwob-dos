@@ -41,8 +41,17 @@ function setViewportContent(viewport: Box, raw: string): void {
   const iw = Number((viewport as any).iwidth ?? 0);
   const sb = (viewport as any).scrollbar ? 1 : 0;
   const width = Math.max(1, outer - iw - sb);
+  // Guard: blessed word-wrap infinite-loops on scrollable widgets with width ≤ 0
+  if (width <= 0) return;
   const minRows = Math.max(1, Number(viewport.height) || 1);
-  const rows = raw.replace(/\r\n/g, "\n").split("\n").map((line) => fitLineToWidth(line, width));
+  // When tags are enabled, blessed processes {tag} markup internally.
+  // clipToVisibleWidth only understands ANSI escapes and would corrupt
+  // blessed tags by clipping mid-tag, causing blessed's word-wrap to hang.
+  // Skip per-line fitting when tags are active — blessed handles wrapping.
+  const hasTags = !!(viewport as any).parseTags;
+  const rows = raw.replace(/\r\n/g, "\n").split("\n").map((line) =>
+    hasTags ? line : fitLineToWidth(line, width)
+  );
   while (rows.length < minRows) {
     rows.push(" ".repeat(width));
   }

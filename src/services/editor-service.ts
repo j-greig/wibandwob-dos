@@ -28,6 +28,8 @@ export function moveCursor(editor: EditorState, delta: number): void {
 }
 
 export function render(editor: EditorState): void {
+  // Guard: blessed's word-wrap infinite-loops if scrollable widget has width ≤ 0
+  if (Number(editor.widget.width) <= 0) return;
   const before = escapeTags(editor.value.slice(0, editor.cursor));
   const atCursor = editor.value[editor.cursor] ?? " ";
   const after = escapeTags(editor.value.slice(editor.cursor + 1));
