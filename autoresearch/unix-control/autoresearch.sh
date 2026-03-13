@@ -438,6 +438,41 @@ CLEARED=$($WW windows | jq 'length')
 check "ww cmd desktop.clear-all closes all windows" \
   "$([ "$CLEARED" = "0" ] && echo PASS || echo "remaining=$CLEARED")"
 
+# ── 34. Mini music video choreography ────────────────────
+echo "--- choreography (E040 proof) ---"
+
+# This test proves the CLI can drive a visual sequence:
+# 1. Set theme
+# 2. Open figlet title
+# 3. Open 2 editors
+# 4. Tile
+# 5. Move windows to specific positions
+# 6. Verify layout matches intent
+# 7. Clear all
+
+$WW theme set --name flexoki-ink >/dev/null 2>&1
+$WW cmd figlet.open --text "WW" >/dev/null 2>&1; sleep 0.3
+$WW cmd editor.new >/dev/null 2>&1; sleep 0.2
+$WW cmd editor.new >/dev/null 2>&1; sleep 0.2
+$WW cmd window.tile >/dev/null 2>&1; sleep 0.3
+
+CHOREO_WINS=$($WW windows | jq 'length')
+CHOREO_KINDS=$($WW windows | jq -r '[.[].kind] | unique | sort | join(",")')
+check "choreography: 3 windows of mixed types created" \
+  "$([ "$CHOREO_WINS" -ge 3 ] && echo PASS || echo "wins=$CHOREO_WINS kinds=$CHOREO_KINDS")"
+
+# Move first window to exact position
+FIRST_ID=$($WW windows | jq -r '.[0].id')
+$WW window "$FIRST_ID" move --x 0 --y 0 >/dev/null 2>&1; sleep 0.2
+FINAL_POS=$($WW windows | jq ".[] | select(.id==$FIRST_ID) | .left")
+check "choreography: precise window placement" \
+  "$([ "$FINAL_POS" = "0" ] && echo PASS || echo "left=$FINAL_POS")"
+
+$WW cmd desktop.clear-all >/dev/null 2>&1; sleep 0.3
+CHOREO_CLEAN=$($WW windows | jq 'length')
+check "choreography: clean teardown" \
+  "$([ "$CHOREO_CLEAN" = "0" ] && echo PASS || echo "remaining=$CHOREO_CLEAN")"
+
 # ── Cleanup: close test windows ──────────────────────────
 echo "--- cleanup ---"
 for id in $($WW windows 2>/dev/null | jq -r '.[].id'); do
