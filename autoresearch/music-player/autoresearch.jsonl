@@ -1,1 +1,2 @@
 {"type":"config","name":"Music Player UI Quality","metricName":"ui_score","metricUnit":"","bestDirection":"higher"}
+{"run":1,"commit":"3db370e","metric":4.2,"metrics":{"layout":4,"readability":5,"aesthetic":3,"coherence":5,"character":4},"status":"keep","description":"Baseline: 82x22 fixed window, monochrome, no colour, tiny playlist, big empty space. Minimal player.","timestamp":1773407677111,"segment":0}

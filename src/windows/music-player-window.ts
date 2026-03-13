@@ -31,8 +31,8 @@ const SCRUB_SECS         = 5;
 const VOL_STEP           = 10;
 const DEFAULT_VOL        = 80;
 const PLAYLIST_MIN_WIDTH = 70;
-const PLAYLIST_WIDTH     = 28;
-const VIZ_MIN_HEIGHT     = 18;
+const PLAYLIST_WIDTH     = 30;
+const VIZ_MIN_HEIGHT     = 12;
 const VIZ_TICK_MS        = 80;
 
 // PCM analysis constants
@@ -283,10 +283,15 @@ export function createBarsViz(): VizMode {
     name: "BARS",
     reset() { h.fill(0); peak.fill(0); },
 
-    tick(bands, _rms, _playing) {
+    tick(bands, _rms, playing) {
       for (let i = 0; i < MAX; i++) {
-        // Bands come in pre-smoothed with attack+decay from AudioAnalyser
-        h[i] = clamp(bands[i]!, 0, 1);
+        if (playing) {
+          h[i] = clamp(bands[i]!, 0, 1);
+        } else {
+          // Idle breathing pattern when stopped
+          const phase = (Date.now() / 2000 + i * 0.15) % (Math.PI * 2);
+          h[i] = Math.max(0, Math.sin(phase) * 0.08 + 0.02);
+        }
         peak[i] = h[i] > peak[i] ? h[i] : Math.max(0, peak[i] - PDECAY);
       }
     },
@@ -745,8 +750,13 @@ export function openMusicPlayerWindow(
   restore?: MusicPlayerRestore,
 ): void {
   const frame = deps.windowManager.createFrame("♫ Music Player", "microapp");
-  frame.frame.width  = 82;
-  frame.frame.height = 22;
+  // Responsive sizing: 60% width, 50% height, centered
+  const screenW = Number(deps.screen.width) || 211;
+  const screenH = Number(deps.screen.height) || 56;
+  frame.frame.width  = Math.max(82, Math.round(screenW * 0.6));
+  frame.frame.height = Math.max(22, Math.round(screenH * 0.5));
+  frame.frame.left   = Math.round((screenW - Number(frame.frame.width)) / 2);
+  frame.frame.top    = Math.round((screenH - Number(frame.frame.height)) / 2);
 
   const ctrl = new AudioController(restore?.playlist);
   if (restore?.volume !== undefined) ctrl.setVolumeDirect(restore.volume);
@@ -905,7 +915,7 @@ export function openMusicPlayerWindow(
       playlistPane.width = PLAYLIST_WIDTH; playlistPane.height = paneH;
     }
 
-    const PLAYER_INFO_ROWS = 10;
+    const PLAYER_INFO_ROWS = 8;
     const vizH    = Math.max(4, paneH - PLAYER_INFO_ROWS - 1);
     const showViz = showPlaylist && paneH >= VIZ_MIN_HEIGHT;
 
@@ -931,30 +941,56 @@ export function openMusicPlayerWindow(
     const elaps = ctrl.elapsed;
     const dur   = ctrl.duration;
     const ratio = dur > 0 ? elaps / dur : 0;
+    const t = theme();
+    const accentFg = (t.accent as any)?.fg || "cyan";
+
+    // State-dependent colours
+    const stateCol = ctrl.state === "playing" ? "green" : ctrl.state === "paused" ? "yellow" : "gray";
     const icon  = ctrl.state === "playing" ? "▶" : ctrl.state === "paused" ? "⏸" : "■";
     const lbl   = ctrl.state === "playing" ? "PLAYING" : ctrl.state === "paused" ? "PAUSED" : "STOPPED";
-    playerPane.setContent([
+
+    // Coloured progress bar
+    const progW = Math.max(4, w - 2);
+    const filled = Math.round(clamp(ratio, 0, 1) * progW);
+    const progBar = `{${accentFg}-fg}${"█".repeat(filled)}{/${accentFg}-fg}{gray-fg}${"░".repeat(Math.max(0, progW - filled))}{/gray-fg}`;
+
+    // Coloured volume bar
+    const volBars = Math.round(ctrl.volume / 10);
+    const volBar = `{${accentFg}-fg}${"▮".repeat(volBars)}{/${accentFg}-fg}{gray-fg}${"▯".repeat(10 - volBars)}{/gray-fg}`;
+
+    // Track name with colour
+    const trackName = ctrl.fileName === "(no file)" 
+      ? `{gray-fg}(no file loaded){/gray-fg}`
+      : `{bold}{white-fg}${ctrl.fileName.replace(/\{/g, "\\{")}{/white-fg}{/bold}`;
+
+    // Now-playing display — compact layout
+    const lines: string[] = [
       "",
-      ` ♫  ${ctrl.fileName}`,
+      ` {${accentFg}-fg}♫{/${accentFg}-fg}  ${trackName}`,
+      ` {${stateCol}-fg}${icon}  ${lbl}{/${stateCol}-fg}    {white-fg}${fmtTime(elaps)}{/white-fg} {gray-fg}/{/gray-fg} {gray-fg}${fmtTime(dur)}{/gray-fg}`,
       "",
-      ` ${icon}  ${lbl}    ${fmtTime(elaps)} / ${fmtTime(dur)}`,
+      ` ${progBar}`,
+      ` {gray-fg}Vol:{/gray-fg} ${volBar}  {white-fg}${ctrl.volume}%{/white-fg}`,
       "",
-      ` ${progressBar(ratio, w - 2)}`,
-      "",
-      ` Vol: ${volumeBar(ctrl.volume)}  ${ctrl.volume}%`,
-      "",
-      ` [←/→] scrub  [↑/↓] prev/next  [v] cycle viz`,
-    ].join("\n"));
+      ` {gray-fg}\u2190/\u2192:scrub  \u2191/\u2193:track  v:viz  o:add  +/-:vol{/gray-fg}`,
+    ];
+    playerPane.setContent(lines.join("\n"));
   }
 
   function renderPlaylist() {
     if (!playlistVisible) return;
-    const items = ctrl.files.map((fp) => {
+    const accentFg = ((theme().accent as any)?.fg) || "cyan";
+    const plW = Number(playlistPane.width) || PLAYLIST_WIDTH;
+    const items = ctrl.files.map((fp, i) => {
       const name    = basename(fp);
       const playing = fp === ctrl.filePath && ctrl.state !== "stopped";
-      const maxLen  = PLAYLIST_WIDTH - 3;
-      const label   = name.length > maxLen ? name.slice(0, maxLen - 1) + "…" : name;
-      return `${playing ? "♫ " : "  "}${label}`;
+      const maxLen  = plW - 6;
+      const label   = name.length > maxLen ? name.slice(0, maxLen - 1) + "\u2026" : name;
+      const num     = String(i + 1).padStart(2, " ");
+      if (playing) {
+        return `{${accentFg}-fg}♫ ${num}. ${label.replace(/\{/g, "\\{")}{/${accentFg}-fg}`;
+      }
+      return `  {gray-fg}${num}.{/gray-fg} ${label.replace(/\{/g, "\\{")}`;
     });
     (playlistPane as any).setItems(items);
     (playlistPane as any).select(ctrl.selectedIndex);
@@ -965,6 +1001,10 @@ export function openMusicPlayerWindow(
     renderPlayer();
     renderPlaylist();
     renderViz();
+    // Dynamic title with now-playing info
+    const titleTrack = ctrl.fileName !== "(no file)" ? ctrl.fileName.replace(/\{/g, "\\{") : "";
+    const titleState = ctrl.state === "playing" ? " \u25B6" : ctrl.state === "paused" ? " \u23F8" : "";
+    frame.frame.setLabel(` \u266B ${titleTrack ? titleTrack + titleState : "Music Player"} `);
     toolbar.update({ leftText: "", activeId: ctrl.state === "playing" ? "playpause" : "stop" });
     deps.onStateChanged?.();
     deps.screen.render();
