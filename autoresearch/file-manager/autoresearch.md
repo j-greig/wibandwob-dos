@@ -95,3 +95,8 @@ Already imported in browser-windows.ts:
 - #5 keep (7.6): Dynamic title bar, dir child counts (3), file sizes in preview, keyboard hints in status
 - #6 keep (8.0): Coloured file type icons in list (green md, cyan dirs, yellow ts/js, magenta json, gray sizes)
 - #7 keep (9.0): Search overhaul — colour-coded results, match line arrows, result count in title, Quick Look, copy path, reveal in Finder, right-click context menu
+- #8 discard (8.4): Browse view screenshot — same code, weaker layout than search view
+- #9 discard (8.4): Browse view with quick stats (Largest/Recent) — doesn't beat search at 9.0
+- #10 keep (9.2): Syntax highlighting for TS/JS/Python/Bash. Button-style toolbar with brackets+hover. Mouse click preview fix. Search overlay prompt.
+- #11 keep (9.4): Search active indicator ● on toolbar. Coherence pushed to 10.
+- #12-14 discards: Refinements (empty state help, sort indicator, pipe separators, icon titles) — all functional improvements committed separately but don't change search view score
