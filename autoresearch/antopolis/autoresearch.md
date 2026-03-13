@@ -94,6 +94,9 @@ From microapp-sdk.js (already imported or importable):
 
 ## What's Been Tried
 
-(Updated as experiments accumulate)
-
-- Baseline: current state — score TBD
+- Baseline (5.4): small window, monochrome dots, tiny single-char ants, sparse log
+- #2 keep (6.8): responsive sizing, figlet header, theme tokens, accent borders, Colony Log border
+- #3 keep (7.0): census by caste in resource bar, day icon in status
+- #4 keep (7.4): per-district border colours (yellow/green/cyan/magenta), 8 seed events
+- #5 discard (7.4): subtitle row — informative but no score improvement
+- #6 keep (8.2): visual overhaul — 2-char ant glyphs, 4-row buildings, distinct terrain per district, subtitle row

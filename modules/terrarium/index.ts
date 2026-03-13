@@ -64,6 +64,13 @@ interface Ant {
   age: number;
 }
 
+interface Trail {
+  x: number;
+  y: number;
+  district: DistrictId;
+  age: number;
+}
+
 interface Particle {
   x: number;
   y: number;
@@ -89,6 +96,7 @@ interface World {
   resources: Record<ResourceType, number>;
   ants: Ant[];
   buildings: Building[];
+  trails: Trail[];
   particles: Particle[];
   events: WorldEvent[];
   nextId: number;
@@ -228,6 +236,7 @@ function createWorld(): World {
     resources: { food: 50, crystals: 30, energy: 20, science: 0 },
     ants: [],
     buildings: [],
+    trails: [],
     particles: [],
     events: [],
     nextId: 1,
@@ -418,6 +427,10 @@ function tickWorld(w: World) {
     w.resources.energy = Math.max(0, w.resources.energy);
   }
 
+  // Trail aging and cleanup
+  for (const trail of w.trails) trail.age++;
+  w.trails = w.trails.filter(t => t.age < 40);
+
   // Ant movement and behavior
   for (const ant of w.ants) {
     ant.age++;
@@ -436,6 +449,11 @@ function tickWorld(w: World) {
     if (ant.y < 0.05 || ant.y > 0.95) ant.dy *= -0.8;
     ant.x = clamp(ant.x, 0.03, 0.97);
     ant.y = clamp(ant.y, 0.03, 0.97);
+
+    // Leave trail marks
+    if (w.tick % 3 === 0 && w.trails.length < 200) {
+      w.trails.push({ x: ant.x, y: ant.y, district: ant.district, age: 0 });
+    }
 
     // Energy drain
     ant.energy -= 0.05 * w.speed;
@@ -674,6 +692,18 @@ function renderDistrict(districtId: DistrictId, w: number, h: number, world: Wor
     grid.push(row);
   }
 
+  // Render ant trails (fading footprints)
+  const TRAIL_CHARS = [",", ".", " "];
+  for (const trail of world.trails.filter(t => t.district === districtId)) {
+    const tx = Math.floor(trail.x * (w - 1));
+    const ty = Math.floor(trail.y * (h - 1));
+    if (tx >= 0 && tx < w && ty >= 0 && ty < h) {
+      const fade = Math.min(TRAIL_CHARS.length - 1, Math.floor(trail.age / 15));
+      const ch = TRAIL_CHARS[fade]!;
+      if (ch !== " ") grid[ty]![tx] = ch;
+    }
+  }
+
   // Render buildings
   for (const b of world.buildings.filter(b => b.district === districtId)) {
     const art = BUILDING_ART[b.type];
@@ -825,7 +855,7 @@ function openAntopolis(host: MicroappHost) {
   const logBox = blessed.box({
     parent: win.body, top: 0, left: 0, width: 0, height: 0,
     scrollable: true, alwaysScroll: true, mouse: true,
-    tags: false,
+    tags: true,
     label: " Colony Log ",
     border: "line",
     style: { ...t.body, border: { fg: t.muted.fg } },
@@ -896,8 +926,16 @@ function openAntopolis(host: MicroappHost) {
     }
 
     // Log with severity prefixes
-    const logH = Math.max(2, Number(logBox.height) || 4);
-    const logLines = world.events.slice(-logH).map(e => SEVERITY_PREFIX[e.severity] + e.text);
+    const logH = Math.max(2, (Number(logBox.height) || 4) - 2); // -2 for border
+    const SEVERITY_COLOUR: Record<EventSeverity, string> = {
+      calm:  "white",
+      warn:  "yellow",
+      chaos: "red",
+    };
+    const logLines = world.events.slice(-logH).map(e => {
+      const col = SEVERITY_COLOUR[e.severity];
+      return `{${col}-fg}${SEVERITY_PREFIX[e.severity]}${e.text}{/${col}-fg}`;
+    });
     logBox.setContent(logLines.join("\n"));
     logBox.setScrollPerc(100);
 
