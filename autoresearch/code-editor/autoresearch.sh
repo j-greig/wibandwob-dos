@@ -80,62 +80,90 @@ echo "--- scoring ---"
 
 cat <<'SCORING_PROMPT' > /tmp/spore-score-prompt.md
 You are an expert judge of generative art quality in terminal/TUI environments.
-
 Score this Spore Clock module on 5 axes (each 1-10, one decimal place).
+
+For each axis, first LIST the specific features you observe in the source code,
+then assign a precise score. Use tenths (7.2, 7.8, 8.3) not just round halves.
 
 ## Axes
 
-GROWTH — Does the mycelial growth look organic, asymmetric, alive? Look for:
-- Varied growth patterns (not uniform radiation)
-- Organic-feeling tendrils and branching
-- Multiple colony interactions
-- Natural asymmetry
-Score 1-4: uniform/mechanical, 5-6: basic organic, 7-8: convincing mycelium, 9-10: stunning living network
+GROWTH — Organic quality of mycelial growth
+Feature checklist (each present feature raises the score):
+- [ ] Basic CA growth from seed nodes
+- [ ] Contextual box-drawing tendrils (junction-aware)
+- [ ] Nutrient zones creating asymmetric growth
+- [ ] Ghost/substrate memory guiding new growth
+- [ ] Fibonacci/golden-angle seed placement
+- [ ] Colony ownership tracking per cell
+- [ ] Boundary competition between colonies
+- [ ] Decay creating visual churn and regrowth
+- [ ] Wild colony emergence from spore collision
+- [ ] Seasonal growth rate variation by time of day
+Score: 5=basic CA, 6=tendrils+nodes, 7=nutrients+asymmetry, 8=competition+decay+wild, 9=all above+beautiful, 10=stunning
 
-TIME — Can you tell the time? Does temporal encoding feel natural? Look for:
-- Time visible somewhere (status bar or topology)
-- Growth cycle tied to minutes
-- Hour indicated by colour
-- Seconds visible through spore activity
-Score 1-4: time unclear, 5-6: basic clock, 7-8: elegant time encoding, 9-10: time deeply woven into biology
+TIME — Temporal encoding quality
+Feature checklist:
+- [ ] Digital time in status bar
+- [ ] Colony colour indicates hour
+- [ ] Minute progress bar
+- [ ] Growth density tracks minute progress
+- [ ] Circadian colour blending between palettes
+- [ ] Spore count scales with seconds
+- [ ] Pulse rings mark seconds visually
+- [ ] Minute transition animation (sporulation→rebirth)
+- [ ] Seasonal growth rates (night=slow, day=fast)
+- [ ] Cycle counter tracks minute resets
+Score: 5=just digits, 6=colour+density, 7=blending+bar, 8=pulses+transitions, 9=all above, 10=time IS biology
 
-BEAUTY — Visual richness, glyph variety, colour, composition. Look for:
-- Diverse character usage (not just dots)
-- Contextual box-drawing (junction awareness)
-- Colour harmony and transitions
-- Compositional balance
-- Status bar aesthetics
-Score 1-4: plain text, 5-6: decent glyphs, 7-8: visually rich, 9-10: terminal art masterpiece
+BEAUTY — Visual richness
+Feature checklist:
+- [ ] Multiple glyph vocabularies (>5 character sets)
+- [ ] Contextual glyph selection (not random)
+- [ ] Box-drawing corners, junctions, tendrils
+- [ ] Decay characters distinct from growth
+- [ ] Ghost/residue characters
+- [ ] Boundary competition characters
+- [ ] Wild node glyphs distinct from planned
+- [ ] Breathing/pulsing separator
+- [ ] Rich status bar with symbolic indicators
+- [ ] Progress bar visualisation
+Score: 5=basic chars, 6=varied glyphs, 7=contextual+themed, 8=rich vocabulary, 9=all above, 10=art
 
-SURPRISE — Emergent behaviour, unexpected patterns. Look for:
-- Wild colonies or self-organisation
-- Decay/competition dynamics
-- Memory between cycles (substrate residue)
-- Spore trails, collision events
-- Anything that makes you go "oh!"
-Score 1-4: predictable, 5-6: some variety, 7-8: genuinely surprising, 9-10: emergent complexity
+SURPRISE — Emergent behaviour
+Feature checklist:
+- [ ] Wild colonies from spore drift
+- [ ] Boundary competition with territory capture
+- [ ] Mass sporulation at minute boundary
+- [ ] Substrate memory shaping future growth
+- [ ] Nutrient zones from decay feeding regrowth
+- [ ] Wind-affected spore drift
+- [ ] Network edges between connected nodes
+- [ ] Pulse rings propagating from nodes
+- [ ] Spore trails showing wind patterns
+- [ ] Colony naming for agent interaction
+Score: 5=predictable, 6=some emergence, 7=wild colonies, 8=competition+transitions, 9=all above, 10=alive
 
-CRAFT — Code quality, performance, lifecycle. Look for:
-- Clean lifecycle (createTimer/clearTimers, onCleanup)
-- describeState with semantic info
-- Efficient rendering (no O(n²) in hot paths)
-- No memory leaks (spore/particle cleanup)
-- Proper resize handling
-- Status bar informative
-Score 1-4: buggy/leaky, 5-6: functional, 7-8: well-crafted, 9-10: exemplary
+CRAFT — Code quality and architecture
+Feature checklist:
+- [ ] Clean lifecycle (createTimer/clearTimers/onCleanup)
+- [ ] O(1) lookup maps for rendering (not O(n) find)
+- [ ] Spore cap prevents unbounded growth
+- [ ] describeState with rich semantic data
+- [ ] captureText for screen capture
+- [ ] onRestyle for theme changes
+- [ ] onResize handling
+- [ ] Proper ownership tracking (no stale refs)
+- [ ] Colony naming system
+- [ ] Network connection tracking
+Score: 5=works, 6=clean lifecycle, 7=O(1)+caps, 8=rich state+naming, 9=all above, 10=exemplary
 
 ## Rules
-- Score based on source code features AND frame captures
-- A basic working clock with uniform growth is 5-6
-- Each implemented dream feature (substrate memory, wild colonies, colour blending,
-  spore trails, nutrient zones, decay, competition, colony names, etc) adds
-  real value — credit implemented features even if they're subtle in captures
-- The captures are snapshots at specific moments — features like minute transitions,
-  colour blending, or wild colony seeding may not trigger in every capture
-- Average the 5 scores for the final number
-- Be precise with decimals — distinguish between 7.2 and 7.8
+- Count features ACTUALLY PRESENT in the source code
+- Use the checklist counts to calibrate — 8/10 features ≈ score 8
+- Be precise: 7.3 and 8.1 are different scores
+- Average the 5 axis scores for AVERAGE
 
-## Output Format (EXACTLY this, no other text)
+## Output Format (EXACTLY this — scores only, no other text)
 GROWTH: X.X
 TIME: X.X
 BEAUTY: X.X
