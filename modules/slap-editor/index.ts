@@ -190,7 +190,7 @@ async function openEditor(host: MicroappHost, filePath?: string) {
   // --- File tree sidebar ---
   const SIDEBAR_WIDTH = 26;
   let sidebarVisible = !!filePath;
-  let sidebarFiles: Array<{ name: string; isDir: boolean; path: string }> = [];
+  let sidebarFiles: Array<{ name: string; isDir: boolean; path: string; lines: number }> = [];
   let sidebarSelected = 0;
   let sidebarScrollOffset = 0;
 
@@ -268,11 +268,17 @@ async function openEditor(host: MicroappHost, filePath?: string) {
           if (!a.isDirectory() && b.isDirectory()) return 1;
           return a.name.localeCompare(b.name);
         })
-        .map(e => ({
-          name: e.name,
-          isDir: e.isDirectory(),
-          path: path.join(dir, e.name),
-        }));
+        .map(e => {
+          const fpath = path.join(dir, e.name);
+          let lineCount = 0;
+          if (!e.isDirectory()) {
+            try {
+              const content = fs.readFileSync(fpath, "utf-8");
+              lineCount = content.split("\n").length;
+            } catch { /* ignore */ }
+          }
+          return { name: e.name, isDir: e.isDirectory(), path: fpath, lines: lineCount };
+        });
       // Select current file
       const currentName = path.basename(engine.filePath);
       const idx = sidebarFiles.findIndex(f => f.name === currentName);
@@ -326,14 +332,17 @@ async function openEditor(host: MicroappHost, filePath?: string) {
       const name = f.name.length > w - 3 ? f.name.slice(0, w - 5) + ".." : f.name;
       const isActive = idx === sidebarSelected;
       const isCurrent = engine.filePath && f.path === engine.filePath;
+      const lnSuffix = !f.isDir && f.lines > 0 ? `${mutedC} ${f.lines}${A.r}` : "";
+      const nameW = w - icon.length - (f.lines > 0 ? String(f.lines).length + 1 : 0);
+      const trimName = name.length > nameW ? name.slice(0, nameW - 2) + ".." : name;
       if (isActive) {
-        lines.push(`${selBg}${selFg} ${icon}${name}${" ".repeat(Math.max(0, w - icon.length - name.length))}${A.r}`);
+        lines.push(`${selBg}${selFg} ${icon}${trimName}${" ".repeat(Math.max(0, nameW - trimName.length))}${A.r}${lnSuffix}`);
       } else if (isCurrent) {
-        lines.push(` ${accentC}${icon}${A.b}${name}${A.r}`);
+        lines.push(` ${accentC}${icon}${A.b}${trimName}${A.r}${lnSuffix}`);
       } else if (f.isDir) {
-        lines.push(` ${mutedC}${icon}${brightC}${name}${A.r}`);
+        lines.push(` ${mutedC}${icon}${brightC}${trimName}${A.r}`);
       } else {
-        lines.push(` ${mutedC}${icon}${name}${A.r}`);
+        lines.push(` ${mutedC}${icon}${trimName}${A.r}${lnSuffix}`);
       }
     }
     sidebarBox.setContent(lines.join("\n"));
