@@ -1,12 +1,17 @@
 # Autoresearch Ideas — LLM Orch Studio UI
 
-- DONE: animated pulse in status banner — was the 7.0→7.4 breakthrough
+## Done / Stale
+- DONE: animated pulse in status banner (7.0→7.4)
+- DONE: dual figlet headers (7.4→7.8)
+- STALE: ASCII logo in right column — superseded by STUDIO figlet
+
+## Live Ideas
 - Use createProgressBar for run progress (step 1/6, 2/6, etc.)
-- Make the settings panel use muted colour for labels vs normal for values
-- Add a small ASCII logo/glyph to the right column header area
+- Theme-aware accent on status banner border, not just background
 - Try a 3-column layout: narrow controls | wide conversation | medium steps
-- Add colour-coded turn entries in the conversation (wib=one colour, wob=another)
-- Use createBorderedPanel instead of plain boxes for better visual framing
-- Try different figlet fonts (banner, big, standard) for different moods
+- Add colour-coded turn entries in conversation (wib=success, wob=info)
 - Add responsive breakpoint: at narrow widths, stack left/right into single column
-- Theme-aware accent on the status banner border, not just background
+- Try different figlet fonts (banner3, big) for the left header
+- Add a subtle animated element to the right column (e.g. embedded pattern fill behind STUDIO)
+- Context-sensitive settings panel: show more detail when running, less when idle
+- Reduce empty void in conversation area with a decorative ASCII scene

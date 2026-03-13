@@ -114,7 +114,6 @@ function openStudio(host: MicroappHost) {
   });
   const topicField = createFormField({
     label: "Topic",
-    help: "Wib (Haiku) vs Wob (Sonnet)",
     child: topicInput,
   });
 
@@ -219,6 +218,7 @@ function openStudio(host: MicroappHost) {
     border: true,
     label: "Run Settings",
     entries: [],
+    keyWidth: 10,
   });
 
   // ── Turns table ───────────────────────────────────────────────────
@@ -233,17 +233,18 @@ function openStudio(host: MicroappHost) {
 
   // ── Layout tree ───────────────────────────────────────────────────
   const topicControls = createStack(win.body, [
-    { key: "topic", basis: 4, part: topicField },
+    { key: "topic", basis: 3, part: topicField },
     { key: "preset", basis: 1, part: presetSelect },
   ], { gap: 0 });
 
+  // Left column: header + controls (with 1-unit breathing room before convo)
   const left = createStack(win.body, [
     { key: "header", basis: 7, part: createNodePart(headerBox) },
-    { key: "topicControls", basis: 5, part: topicControls },
+    { key: "topicControls", basis: 4, part: topicControls },
     { key: "banner", basis: 1, part: createNodePart(statusBanner) },
     { key: "actions", basis: 1, part: actionBar },
     { key: "convo", basis: "1fr", part: convoLog },
-  ], { gap: 0 });
+  ], { gap: 1 });
 
   const right = createStack(win.body, [
     { key: "rightHeader", basis: 4, part: createNodePart(rightHeaderBox) },
@@ -264,7 +265,7 @@ function openStudio(host: MicroappHost) {
   layout();
 
   // Seed idle state AFTER layout so logViews have dimensions
-  convoLog.append({ text: "Waiting for a conversation to begin...", severity: "info" });
+  convoLog.append({ text: "Waiting for a conversation to begin...", severity: "warning" });
   convoLog.append({ text: "Press [ RUN ] to start.", severity: "info" });
   convoLog.append({ text: "", severity: "info" });
   convoLog.append({ text: "     .---.          .---.", severity: "info" });
@@ -272,9 +273,9 @@ function openStudio(host: MicroappHost) {
   convoLog.append({ text: "    | hai |        | son |", severity: "info" });
   convoLog.append({ text: "     '---'          '---'", severity: "info" });
   convoLog.append({ text: "", severity: "info" });
-  convoLog.append({ text: "Each turn includes ASCII art.", severity: "info" });
-  convoLog.append({ text: "Wib is creative chaos.", severity: "info" });
-  convoLog.append({ text: "Wob is methodical rigour.", severity: "info" });
+  convoLog.append({ text: "Wib: creative chaos (Haiku)", severity: "success" });
+  convoLog.append({ text: "Wob: methodical rigour (Sonnet)", severity: "success" });
+  convoLog.append({ text: "6 turns, 3 each, ASCII art in every reply.", severity: "info" });
 
   stepsLog.append({ text: "orchestrator idle", severity: "info" });
   stepsLog.append({ text: "awaiting cargo run --release", severity: "info" });
