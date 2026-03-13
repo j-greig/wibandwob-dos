@@ -107,26 +107,30 @@ interface World {
 // CONSTANTS
 // ═══════════════════════════════════════════════════════════════════════════
 
-const DISTRICTS: Record<DistrictId, { label: string; subtitle: string; bg: string[] }> = {
+const DISTRICTS: Record<DistrictId, { label: string; subtitle: string; bg: string[]; borderFg: string }> = {
   industrial: {
     label: "Industrial Zone",
     subtitle: "where sparks fly and progress grinds",
     bg: [".", ".", " ", ".", "·", " ", ".", " "],
+    borderFg: "yellow",
   },
   residential: {
     label: "Residential Burrows",
     subtitle: "cosy tunnels, warm hearths",
     bg: ["·", " ", "·", " ", ".", " ", " ", "·"],
+    borderFg: "green",
   },
   plaza: {
     label: "Grand Plaza",
     subtitle: "the beating heart of Antopolis",
     bg: [" ", " ", "·", " ", " ", " ", "·", " "],
+    borderFg: "cyan",
   },
   mines: {
     label: "Crystal Mines",
     subtitle: "deep and glittering",
     bg: [".", " ", "▪", " ", ".", "·", " ", "."],
+    borderFg: "magenta",
   },
 };
 
@@ -250,6 +254,11 @@ function createWorld(): World {
   evt(world, "ANTOPOLIS founded! The colony begins...");
   evt(world, "Queen settles into the Royal Nest.");
   evt(world, "Engineers survey the land.");
+  evt(world, `Engineers built a new farm! (${DISTRICTS.residential.label})`);
+  evt(world, `Engineers built a new factory! (${DISTRICTS.industrial.label})`);
+  evt(world, "Worker #1 begins hauling crystals.");
+  evt(world, "Scientist #1 calibrates the drill sensors.");
+  evt(world, "Soldier #2 patrols the Grand Plaza perimeter.");
   return world;
 }
 
@@ -775,7 +784,7 @@ function openAntopolis(host: MicroappHost) {
       top: 0, left: 0, width: 0, height: 0,
       border: "line",
       label: ` ${DISTRICTS[id].label} `,
-      style: { ...t.body, border: { fg: t.accent.fg } },
+      style: { ...t.body, border: { fg: DISTRICTS[id].borderFg } },
     });
   }
 
@@ -959,7 +968,7 @@ function openAntopolis(host: MicroappHost) {
     statusBox.style = th.header;
     logBox.style = { ...th.body, border: { fg: th.muted.fg } };
     for (const id of districtIds) {
-      districtBoxes[id].style = { ...th.body, border: { fg: th.accent.fg } };
+      districtBoxes[id].style = { ...th.body, border: { fg: DISTRICTS[id].borderFg } };
     }
     host.screen.render();
   });
