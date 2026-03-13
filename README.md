@@ -134,7 +134,7 @@ Terminal (iTerm2, kitty, etc.)
 
 **Runtime:** Bun · **Language:** TypeScript · **Renderer:** blessed · **Entry:** `src/app.ts`
 
-The shell itself is ~50 files in `src/`. Microapps live in `modules/` — each is a self-contained directory with an `index.ts` and `module.json`. They get their own window and a host API for timers, state, persistence, and UI primitives.
+The shell itself is ~50 files in `src/`. Microapps live in `modules/` — each is a self-contained directory with an `index.ts` and `module.json`. They get their own window and a full UI toolkit: stacks, rows, grids, tabs, filterable lists, buttons, checkboxes, radio groups, selects, progress bars, spinners, data tables, log views, toasts, text areas, form fields, tweens with easing curves, embedded live players, pattern generators, figlet helpers, and syntax highlighting.
 
 ---
 
@@ -211,6 +211,8 @@ The agent can:
 
 It is not an assistant bolted on. It is a co-inhabitant of the desktop.
 
+Multiple instances can run simultaneously with IRC-backed world chat, shared chatspot channels, and separate control API ports. Two agents on different terminals can inhabit the same world.
+
 ---
 
 ## Building Microapps
@@ -263,11 +265,16 @@ src/
   services/       # browser, state, API, agent, markdown, audio
   windows/        # built-in window types (chat, browser, editor, etc.)
 modules/          # microapps (self-contained, hot-reloadable)
+primers/          # ASCII art library — the visual vocabulary that feeds the Backrooms,
+                  #   the gallery, and the agent's aesthetic sense
 .planning/        # epics, features, stories — the canonical roadmap
 .agents/          # agent constitution, module-dev docs, shell-dev specs
 scripts/          # restart, scaffold, screenshot helpers
-scratch/          # runtime data, compositions, primers
+scratch/          # runtime data, compositions, audio, workspace saves
+docs/             # full module authoring and architecture docs
 ```
+
+Every window exposes machine-readable semantic state via `describeState()` — the agent and the control API can introspect any window's content, position, and application-specific metadata. Workspaces can be saved and restored by name, preserving the full desktop layout across sessions.
 
 ---
 
