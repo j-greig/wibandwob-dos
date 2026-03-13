@@ -400,6 +400,8 @@ export class TsTuiMvpApp {
         this.focusOrCreate(appType, createFn, multiInstance);
       },
       worldChat: worldChatService,
+      overlays: this.overlays,
+      repoRoot: REPO_ROOT,
     };
     await loadModules(microappDeps);
 

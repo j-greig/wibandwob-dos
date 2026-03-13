@@ -137,6 +137,7 @@ const win = host.createWindow({
 - `win.focus()` — bring the window to front and focus it
 - `win.close()` — close and destroy the window
 - `win.setFocusTarget(widget)` — redirect keyboard focus to a specific widget
+- `win.setTitle(title)` — update the window's title bar text
 - `win.describeState(fn)` — REQUIRED: return semantic state for GET /state
 - `win.captureText(fn)` — REQUIRED: return plain text content for text export
 - `win.onCleanup(fn)` — REQUIRED: called when the window closes
@@ -182,6 +183,24 @@ The blessed screen instance. Call `host.screen.render()` after visual changes.
 ### host.theme()
 
 Returns the current theme object. Use in `style:` properties and in `onRestyle`.
+
+### host.pickFile(label, startDir, onSelect, options?)
+
+Opens a file browser prompt overlay. The user navigates directories and picks
+a file. `onSelect` receives the absolute path. Options: `fileFilter`,
+`previewLimit`, `directoriesOnly`.
+
+### host.flash(message)
+
+Show a transient flash message on the TUI overlay layer.
+
+### host.promptValue(label, defaultValue, onSubmit)
+
+Prompt the user for a single text value via overlay.
+
+### host.repoRoot
+
+Absolute path to the WibWob-DOS repo root. Use instead of hardcoding paths.
 
 ## Required lifecycle hooks
 
@@ -271,6 +290,16 @@ import { createTimer } from "../../src/core/ui-primitives.js";
 
 The SDK re-exports all helpers that module authors need. If something is missing,
 add it to `src/services/microapp-sdk.ts` rather than importing from `src/core/`.
+
+Additional SDK exports for specialised modules:
+
+```typescript
+// Syntax highlighting (for code editors)
+import { highlightCode, HIGHLIGHTED_LANGUAGES } from "../../src/services/microapp-sdk.js";
+
+// Theme variant type (for theme modules)
+import type { ThemeVariant } from "../../src/services/microapp-sdk.js";
+```
 
 ## Workspace persistence
 

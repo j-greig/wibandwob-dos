@@ -70,6 +70,10 @@ host.runCommand("open")                                // run a command within t
 host.screen                                     // blessed screen — call .render() after changes
 host.geometry                                   // { width, height, cellAspect }
 host.theme()                                    // current ThemeTokens — call fresh, not once
+host.repoRoot                                   // absolute path to repo root
+host.pickFile(label, startDir, onSelect, opts?) // file browser overlay
+host.flash(message)                             // transient overlay message
+host.promptValue(label, default, onSubmit)      // text input prompt
 
 // WindowFacade — manipulate windows by id
 host.windows.moveWindow(id, x, y)
@@ -110,6 +114,7 @@ win.body            // blessed BoxElement — parent all widgets here
 win.focus()
 win.close()
 win.setFocusTarget(widget)   // redirect keyboard focus to a child widget
+win.setTitle(title)          // update the window's title bar text
 
 // Required hooks:
 win.describeState(fn)   // () => { summary, ...extras }
@@ -136,6 +141,41 @@ t.windowBorderUnfocused   // { fg }
 ```
 
 Always call `host.theme()` fresh — never cache the result.
+
+## Overlays and file picking
+
+```typescript
+// Open a file browser prompt
+host.pickFile("Open File", host.repoRoot, (filePath) => {
+  // filePath is the absolute path the user selected
+}, {
+  fileFilter: (fp, isDir) => isDir || /\.(ts|js|json|md)$/i.test(fp),
+  previewLimit: 5000,
+});
+
+// Flash a transient message
+host.flash("Saved successfully!");
+
+// Prompt for a text value
+host.promptValue("Enter name", "default", (value) => {
+  // value is what the user typed
+});
+
+// Get the repo root for resolving paths
+const startDir = host.repoRoot;
+```
+
+## Syntax highlighting
+
+```typescript
+import { highlightCode, HIGHLIGHTED_LANGUAGES } from "../../src/services/microapp-sdk.js";
+
+const lang = "ts";
+if (HIGHLIGHTED_LANGUAGES.has(lang)) {
+  const lines = highlightCode(sourceText, lang);
+  // lines is string[] with ANSI escape codes
+}
+```
 
 ---
 

@@ -389,3 +389,15 @@ export type { NormalisedLandmarks } from "../core/skeleton-renderer.js";
 
 // Contour / terrain engine
 export { renderContourFromHills } from "./contour-engine.js";
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SYNTAX HIGHLIGHTING — for code-editing microapps
+// ═══════════════════════════════════════════════════════════════════════════
+
+export { highlightCode, HIGHLIGHTED_LANGUAGES } from "./syntax-highlight.js";
+
+// ═══════════════════════════════════════════════════════════════════════════
+// THEME TYPES — for modules that register custom themes
+// ═══════════════════════════════════════════════════════════════════════════
+
+export type { ThemeVariant } from "../core/theme/types.js";

@@ -40,6 +40,7 @@ import {
   createButtonBar, applyRect,
 } from "../core/ui-parts.js";
 import type { Rect, LayoutPart, FlexChild, GridChild } from "../core/ui-parts.js";
+import type { OverlayManager } from "../core/overlay-manager.js";
 
 // ---------------------------------------------------------------------------
 // Manifest types
@@ -126,6 +127,32 @@ export interface MicroappHost {
     /** Position a blessed box within a Rect. Use instead of re-implementing in each microapp. */
     applyRect: typeof applyRect;
   };
+
+  // ── Overlays — prompts and pickers available to modules ──
+
+  /**
+   * Open a file browser prompt. User navigates directories and picks a file.
+   * @param label - Title shown on the overlay
+   * @param startDir - Initial directory to browse
+   * @param onSelect - Called with the selected file's absolute path
+   * @param options - Optional file filter and preview settings
+   */
+  pickFile(label: string, startDir: string, onSelect: (filePath: string) => void, options?: {
+    fileFilter?: (filePath: string, isDirectory: boolean) => boolean;
+    previewLimit?: number;
+    directoriesOnly?: boolean;
+  }): void;
+
+  /** Show a transient flash/toast message on the TUI overlay layer. */
+  flash(message: string): void;
+
+  /** Prompt the user for a single text value. */
+  promptValue(label: string, defaultValue: string, onSubmit: (value: string) => void): void;
+
+  // ── Environment ──
+
+  /** Absolute path to the WibWob-DOS repo root. Use for resolving relative paths. */
+  readonly repoRoot: string;
 }
 
 /** Re-exported types for microapp authors who need them in annotations. */
@@ -151,6 +178,8 @@ export interface MicroappWindowHandle {
   close(): void;
   /** Redirect window focus to a specific child widget (e.g. a terminal emulator). */
   setFocusTarget(widget: blessed.Widgets.BlessedElement): void;
+  /** Update the window's title bar text. */
+  setTitle(title: string): void;
 }
 
 interface MicroappStateDetails {
@@ -181,6 +210,8 @@ export interface MicroappHostDeps {
   geometry: { width: number; height: number; cellAspect: number };
   focusOrCreate: (appType: string, createFn: () => void, multiInstance?: boolean) => void;
   worldChat: WorldChatHostAccess;
+  overlays?: OverlayManager;
+  repoRoot?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -253,6 +284,10 @@ function createMicroappHost(
         },
         close() { windowManager.closeWindow(frame.id); },
         setFocusTarget(widget) { frame.setFocusTarget(widget as any); },
+        setTitle(title) {
+          frame.title = title;
+          if (frame.titleBar) frame.titleBar.setContent(` ${title} `);
+        },
       };
 
       return handle;
@@ -326,6 +361,35 @@ function createMicroappHost(
       createButtonBar,
       applyRect,
     },
+
+    pickFile(label, startDir, onSelect, options) {
+      if (!deps.overlays) {
+        // eslint-disable-next-line no-console
+        console.error(`[${moduleId}] pickFile unavailable — overlays not provided`);
+        return;
+      }
+      deps.overlays.openFileBrowserPrompt(label, startDir, onSelect, options);
+    },
+
+    flash(message) {
+      if (!deps.overlays) {
+        // eslint-disable-next-line no-console
+        console.error(`[${moduleId}] flash unavailable — overlays not provided`);
+        return;
+      }
+      deps.overlays.flash(message);
+    },
+
+    promptValue(label, defaultValue, onSubmit) {
+      if (!deps.overlays) {
+        // eslint-disable-next-line no-console
+        console.error(`[${moduleId}] promptValue unavailable — overlays not provided`);
+        return;
+      }
+      deps.overlays.openValuePrompt(label, defaultValue, onSubmit);
+    },
+
+    repoRoot: deps.repoRoot ?? APP_ROOT,
   };
 
   return host;

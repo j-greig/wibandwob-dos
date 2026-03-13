@@ -7,7 +7,7 @@
 import blessed from "blessed";
 import type { MicroappHost } from "../../src/services/microapp-sdk.js";
 import { createTimer, clearTimers } from "../../src/services/microapp-sdk.js";
-import { renderFigletLines, isFigletAvailable } from "../../src/services/figlet-service.js";
+import { renderFigletLines, isFigletAvailable } from "../../src/services/microapp-sdk.js";
 
 // ── Types ──────────────────────────────────────────────────────────────
 

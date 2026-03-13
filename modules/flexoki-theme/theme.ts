@@ -1,4 +1,4 @@
-import type { ThemeVariant } from "../../src/core/theme/types.js";
+import type { ThemeVariant } from "../../src/services/microapp-sdk.js";
 
 const flexokiPaper: ThemeVariant = {
   name: "flexoki-paper",
