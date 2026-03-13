@@ -714,10 +714,39 @@ export function openFileManagerWindow(params: {
 
   // Right pane: preview
   // Right pane: preview (hidden in icon mode)
-  const preview = blessed.box({
+  // Vertical divider between list and preview
+  const divider = blessed.box({
     parent: frame.body,
     top: 2,
     left: `${PREVIEW_SPLIT_RATIO}%`,
+    width: 1,
+    bottom: 1,
+    style: { fg: (theme() as any).border?.fg || "gray", bg: theme().body?.bg },
+    content: "",
+    hidden: viewMode === "icon"
+  });
+  // Fill divider with thin line chars on resize
+  const fillDivider = () => {
+    const h = Number(divider.height) || 20;
+    divider.setContent("\u2502".repeat(h).split("").join("\n"));
+  };
+
+  // Fixed preview header bar
+  const previewHeaderBar = blessed.box({
+    parent: frame.body,
+    top: 2,
+    left: `${PREVIEW_SPLIT_RATIO}%+1`,
+    right: 0,
+    height: 1,
+    tags: true,
+    style: { ...theme().footer, bold: true },
+    hidden: viewMode === "icon"
+  });
+
+  const preview = blessed.box({
+    parent: frame.body,
+    top: 3,
+    left: `${PREVIEW_SPLIT_RATIO}%+1`,
     right: 0,
     bottom: 1,
     mouse: true,
@@ -977,7 +1006,8 @@ export function openFileManagerWindow(params: {
         const children = fs.readdirSync(dirPath, { withFileTypes: true });
         const childDirs = children.filter(c => c.isDirectory());
         const childFiles = children.filter(c => !c.isDirectory());
-        const header = `{bold}\u2302 ${path.basename(dirPath)}/{/bold}\n\n  {cyan-fg}${childDirs.length} directories{/cyan-fg}, {green-fg}${childFiles.length} files{/green-fg}\n`;
+        setPreviewHeader(`{bold}\u2302 ${path.basename(dirPath)}/{/bold}  {cyan-fg}${childDirs.length} dirs{/cyan-fg}, {green-fg}${childFiles.length} files{/green-fg}`);
+        const header = "";
         // Show more items based on available preview height
         const previewH = Math.max(10, Number(preview.height) || 30);
         const maxDirs = Math.min(childDirs.length, Math.max(8, Math.floor(previewH * 0.4)));
@@ -1071,12 +1101,16 @@ export function openFileManagerWindow(params: {
     // Markdown files: render with markdown service
     if (ext === ".md") {
       try {
+        const stat = fs.statSync(entry.fullPath);
+        const sizeStr = stat.size < 1024 ? `${stat.size}B` : `${(stat.size / 1024).toFixed(0)}K`;
+        setPreviewHeader(`{bold}${path.basename(entry.fullPath)}{/bold}  ${sizeStr}  MD`);
         const previewWidth = Math.max(1, (Number(preview.width) || 40) - 4);
         const lines = renderMarkdownFile(entry.fullPath, previewWidth, {
           headingConfig: PLAIN_HEADING_CONFIG,
         });
         previewRawContent = lines.join("\n");
       } catch (error) {
+        setPreviewHeader(`{bold}${path.basename(entry.fullPath)}{/bold}`);
         previewRawContent = `Cannot preview file.\n\n${error instanceof Error ? error.message : String(error)}`;
       }
       setViewportContent(preview, previewRawContent);
@@ -1094,18 +1128,19 @@ export function openFileManagerWindow(params: {
         const lines = pretty.split("\n");
         const stat = fs.statSync(entry.fullPath);
         const sizeStr = stat.size < 1024 ? `${stat.size}B` : `${(stat.size / 1024).toFixed(0)}K`;
-        const header = `{bold}${path.basename(entry.fullPath)}{/bold}  ${sizeStr}`;
+        setPreviewHeader(`{bold}${path.basename(entry.fullPath)}{/bold}  ${sizeStr}  JSON`);
         // Colourize JSON keys and values
         const coloured = lines.map((ln: string, i: number) => {
           const safe = escapeBraces(ln);
           return `{gray-fg}${String(i + 1).padStart(4, " ")} |{/gray-fg} ${safe}`;
         }).join("\n");
-        previewRawContent = `${header}\n\n${coloured}`;
+        previewRawContent = coloured;
       } catch {
         const content = fs.readFileSync(entry.fullPath, "utf8").slice(0, 8000);
         const lines = content.split("\n");
         const numbered = lines.map((ln: string, i: number) => `{gray-fg}${String(i + 1).padStart(4, " ")} |{/gray-fg} ${escapeBraces(ln)}`).join("\n");
-        previewRawContent = `{bold}${path.basename(entry.fullPath)}{/bold}\n\n${numbered}`;
+        setPreviewHeader(`{bold}${path.basename(entry.fullPath)}{/bold}`);
+        previewRawContent = numbered;
       }
       setViewportContent(preview, previewRawContent);
       params.screen.render();
@@ -1121,7 +1156,8 @@ export function openFileManagerWindow(params: {
       const sizeStr = stat.size < 1024 ? `${stat.size}B` : stat.size < 1048576 ? `${(stat.size / 1024).toFixed(1)}KB` : `${(stat.size / 1048576).toFixed(1)}MB`;
       const dateStr = new Date(stat.mtimeMs).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
       const escaped = (ln: string) => ln.replace(/\{/g, "\\{");
-      const header = `{bold}${path.basename(entry.fullPath)}{/bold}  ${sizeStr}, ${dateStr}`;
+      const langLabel = ext.replace(".", "").toUpperCase();
+      setPreviewHeader(`{bold}${path.basename(entry.fullPath)}{/bold}  ${sizeStr}  ${dateStr}  ${langLabel}`);
 
       // Determine language from extension
       const lang = ext.replace(".", "");
@@ -1129,18 +1165,23 @@ export function openFileManagerWindow(params: {
 
       let numbered: string;
       if (useHighlight) {
-        // Syntax-highlighted lines come back with ANSI codes — don't escape those
         const highlighted = highlightCode(rawLines.join("\n"), lang);
         numbered = highlighted.map((ln, i) => `{gray-fg}${String(i + 1).padStart(4, " ")} |{/gray-fg} ${ln}`).join("\n");
       } else {
         numbered = rawLines.map((ln, i) => `{gray-fg}${String(i + 1).padStart(4, " ")} |{/gray-fg} ${escaped(ln)}`).join("\n");
       }
-      previewRawContent = `${header}\n\n${numbered}`;
+      previewRawContent = numbered;
     } catch (error) {
+      setPreviewHeader("");
       previewRawContent = `Cannot preview file.\n\n${error instanceof Error ? error.message : String(error)}`;
     }
     setViewportContent(preview, previewRawContent);
     params.screen.render();
+  };
+
+  /** Set the fixed preview header bar content */
+  const setPreviewHeader = (text: string) => {
+    previewHeaderBar.setContent(` ${text}`);
   };
 
   const updatePreviewForSearchResult = (result: { file: string; line: number; text: string }) => {
@@ -1163,8 +1204,10 @@ export function openFileManagerWindow(params: {
         })
         .join("\n");
       const relPath = path.relative(currentPath, result.file);
-      previewRawContent = `{bold}${escaped(relPath)}{/bold}  ${sizeStr}  line ${result.line}\n\n${context}`;
+      setPreviewHeader(`{bold}${escaped(relPath)}{/bold}  ${sizeStr}  line ${result.line}`);
+      previewRawContent = context;
     } catch (error) {
+      setPreviewHeader("");
       previewRawContent = `Cannot preview file.\n\n${error instanceof Error ? error.message : String(error)}`;
     }
     setViewportContent(preview, previewRawContent);
@@ -1367,11 +1410,14 @@ export function openFileManagerWindow(params: {
     if (mode === "list") {
       list.hidden = false;
       iconGrid.hidden = true;
+      divider.hidden = false;
+      previewHeaderBar.hidden = false;
       // Restore split layout
       list.width = `${PREVIEW_SPLIT_RATIO}%`;
       filterBox.width = `${PREVIEW_SPLIT_RATIO}%`;
       searchBox.left = `${PREVIEW_SPLIT_RATIO}%`;
       preview.hidden = false;
+      fillDivider();
       // Sync selection from icon -> list
       list.select(iconSelected);
       applyFilter(iconSelected);
@@ -1379,6 +1425,8 @@ export function openFileManagerWindow(params: {
     } else {
       list.hidden = true;
       iconGrid.hidden = false;
+      divider.hidden = true;
+      previewHeaderBar.hidden = true;
       // Icon mode: full width, hide preview
       iconGrid.width = "100%";
       preview.hidden = true;
@@ -1967,10 +2015,12 @@ export function openFileManagerWindow(params: {
     renderSearchBox();
     renderStatusBar();
     if (viewMode === "icon") renderIconGrid();
+    fillDivider();
     setViewportContent(preview, previewRawContent);
     params.screen.render();
   });
   navigateTo(initialPath, params.restore?.selectedIndex ?? 0);
+  fillDivider();
   renderSearchBox();
   frame.focus();
 }
