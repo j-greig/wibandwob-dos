@@ -803,7 +803,10 @@ function renderStatus(world: World, w: number): string {
   const speedStr = `${world.speed}x`;
   const pauseStr = world.paused ? " || PAUSED" : "";
   const decree = world.decree !== "none" ? ` << ${DECREE_NAMES[world.decree]} >>` : "";
-  const left = ` ${dayIcon} ${day}${danger}${decree}${pauseStr} ${speedStr}`;
+  // Heartbeat pulse shows colony is alive
+  const pulseFrames = ["·", ":", "*", ":", "·", " "];
+  const pulse = world.paused ? "-" : pulseFrames[Math.floor(world.tick / 3) % pulseFrames.length];
+  const left = ` ${pulse} ${dayIcon} ${day}${danger}${decree}${pauseStr} ${speedStr}`;
   const right = " [z]oom [p]ause [+/-]spd [1-5]spawn [e]xplode [b]uild ";
   const gap = Math.max(1, w - left.length - right.length);
   return (left + " ".repeat(gap) + right).slice(0, w);
@@ -878,7 +881,7 @@ function openAntopolis(host: MicroappHost) {
     parent: win.body, top: 0, left: 0, width: 0, height: 0,
     scrollable: true, alwaysScroll: true, mouse: true,
     tags: true,
-    label: " Colony Log ",
+    label: " .ö· Colony Log ",
     border: "line",
     style: { ...t.body, border: { fg: t.muted.fg } },
   });
@@ -932,7 +935,10 @@ function openAntopolis(host: MicroappHost) {
       figletBox.show();
       subtitleBox.show();
       const pauseTag = world.paused ? "  || PAUSED" : "";
-      figletBox.setContent(figletText + pauseTag);
+      // Add a small ant march animation beside the figlet
+      const marchFrames = [" ö· ö· ö·", " ·ö ·ö ·ö", " ö· ö· ö·", "  ö· ö· ö·"];
+      const march = marchFrames[Math.floor(world.tick / 4) % marchFrames.length];
+      figletBox.setContent(figletText + pauseTag + march);
 
       const bldgCount = world.buildings.length;
       const districtSummary = districtIds.map(id => {
