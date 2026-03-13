@@ -1,1 +1,1 @@
-autoresearch/music-player/autoresearch.sh
+autoresearch/tr808/autoresearch.sh

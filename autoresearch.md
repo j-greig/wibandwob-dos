@@ -1,1 +1,1 @@
-autoresearch/music-player/autoresearch.md
+autoresearch/tr808/autoresearch.md

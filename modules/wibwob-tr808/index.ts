@@ -85,14 +85,19 @@ export default function setup(host: MicroappHost) {
     }
     audio.renderSamples(allParams);
 
+    // 95% of screen for maximum real estate
+    const screenW = Number(host.screen.width) || 211;
+    const screenH = Number(host.screen.height) || 56;
     const win = host.createWindow({
       title: "TR-808 Rhythm Composer",
-      width: 120,
-      height: 28,
+      width: Math.max(120, Math.round(screenW * 0.95)),
+      height: Math.max(28, Math.round(screenH * 0.95)),
     });
 
     const headerBar = host.ui.createHeaderBar(win.body, { leftInset: 1 });
     const display = host.ui.createTextBlock(win.body, { paddingLeft: 0, paddingTop: 0 });
+    // Enable blessed tags for colour rendering
+    (display.node as any).parseTags = true;
     const statusBar = host.ui.createStatusBar(win.body, { leftInset: 1 });
     const root = host.ui.createStack(win.body, [
       { key: "header", basis: 1, part: headerBar },
@@ -115,7 +120,8 @@ export default function setup(host: MicroappHost) {
         left: "TR-808 Rhythm Composer",
         right: `${engine.state === "playing" ? "PLAY" : "STOP"} ${engine.tempo} BPM`,
       });
-      display.update({ text: content });
+      // Set content directly on the node to avoid wrapIndentedText breaking tags
+      (display.node as any).setContent(content);
       statusBar.update({
         left: "[SPACE] play [ENTER] step [1-0,-,=,`,BKSP] select",
         right: "[q] close",

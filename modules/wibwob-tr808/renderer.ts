@@ -1,13 +1,17 @@
 /**
  * TR-808 ASCII Renderer — generates the visual representation.
  *
- * Faithful to the real Roland TR-808 three-band layout:
- *   Band 1 (top): Title + global controls (tempo, mode, transport)
- *   Band 2 (center): Instrument knob grid — columns per voice
- *   Band 3 (bottom): 16-step sequencer with colour-coded groups
+ * Design philosophy: don't mimic hardware chrome in ASCII (it always
+ * looks broken). Instead, use what terminals are good at: colour-coded
+ * text, clean alignment, and dense information display.
+ *
+ * The real TR-808's iconic features that DO translate to terminal:
+ *   - 16-step grid with 4 colour-coded groups of 4
+ *   - Instrument rows with clear labels
+ *   - Transport state prominent at top
+ *   - Knob positions as visual indicators
  *
  * Pure function: takes engine state → returns string content.
- * No blessed dependency — could render to any text surface.
  */
 
 import {
@@ -18,25 +22,37 @@ import {
 } from "./engine.js";
 
 // ---------------------------------------------------------------------------
-// Visual constants
+// Visual constants — colour tags for blessed
 // ---------------------------------------------------------------------------
 
-const STEP_ON  = "██";
-const STEP_OFF = "░░";
-const STEP_CURSOR_ON  = "▓▓";
-const STEP_CURSOR_OFF = "▒▒";
-const ACCENT_ON  = "▲▲";
-const ACCENT_OFF = "△△";
-const KNOB_CHARS = ["○", "◔", "◑", "◕", "●"]; // 5-level knob position
+// Step group colours matching the real TR-808 button colours
+const GROUP_COLOURS = [
+  "red",      // steps 1-4
+  "yellow",   // steps 5-8
+  "yellow",   // steps 9-12
+  "white",    // steps 13-16
+] as const;
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+function stepColour(stepIdx: number): string {
+  return GROUP_COLOURS[Math.floor(stepIdx / 4)] ?? "white";
+}
+
+// Step characters
+const STEP_ON  = "\u2588\u2588"; // ██
+const STEP_OFF = "\u2591\u2591"; // ░░
+const ACCENT_ON  = "\u25B2 ";    // ▲
+const ACCENT_OFF = "\u25BD ";    // ▽
+
+// Knob display — 9-level for finer resolution
+const KNOB_CHARS = ["\u25CB", "\u25D4", "\u25D1", "\u25D5", "\u25CF"]; // ○ ◔ ◑ ◕ ●
 
 function knobChar(value: number, max: number): string {
-  const ratio = value / max;
-  const idx = Math.min(4, Math.floor(ratio * 5));
-  return KNOB_CHARS[idx];
+  const idx = Math.min(4, Math.floor((value / Math.max(1, max)) * 5));
+  return KNOB_CHARS[idx] ?? "\u25CB";
+}
+
+function padRight(text: string, width: number): string {
+  return text.slice(0, width).padEnd(width, " ");
 }
 
 function padCenter(text: string, width: number): string {
@@ -46,161 +62,191 @@ function padCenter(text: string, width: number): string {
   return " ".repeat(left) + text + " ".repeat(pad - left);
 }
 
-function padRight(text: string, width: number): string {
-  return text.slice(0, width).padEnd(width, " ");
-}
-
 function bar(value: number, max: number, width: number): string {
-  const filled = Math.round((value / max) * width);
-  return "▮".repeat(filled) + "▯".repeat(Math.max(0, width - filled));
+  const filled = Math.round((value / Math.max(1, max)) * width);
+  return "\u25AE".repeat(filled) + "\u25AF".repeat(Math.max(0, width - filled));
 }
 
 // ---------------------------------------------------------------------------
 // Main renderer
 // ---------------------------------------------------------------------------
 
-export function renderTR808(engine: TR808Engine, width: number, height: number, audioEnabled = false, editCursor = -1): string {
+export function renderTR808(
+  engine: TR808Engine,
+  width: number,
+  height: number,
+  audioEnabled = false,
+  editCursor = -1,
+): string {
   const lines: string[] = [];
-  const safeWidth = Number.isFinite(width) ? Math.floor(width) : 80;
-  const safeHeight = Number.isFinite(height) ? Math.floor(height) : 24;
-  const w = Math.max(80, safeWidth);
+  const w = Math.max(80, Math.floor(Number.isFinite(width) ? width : 80));
+  const h = Math.max(20, Math.floor(Number.isFinite(height) ? height : 24));
 
   const slot = engine.slot;
   const currentStep = engine.step;
   const selectedInst = engine.selected;
   const isPlaying = engine.state === "playing";
 
-  // ══════════════════════════════════════════════════════════
-  // BAND 1: Title bar + global controls
-  // ══════════════════════════════════════════════════════════
+  // ── HEADER: Title ─────────────────────────────────────────────
+  const title = "T R - 8 0 8   R H Y T H M   C O M P O S E R";
+  lines.push(`{bold}${padCenter(title, w)}{/bold}`);
 
-  // Title with wood panel sides
-  const titleText = " R O L A N D    T R - 8 0 8    R H Y T H M   C O M P O S E R ";
-  const woodL = "▐█";
-  const woodR = "█▌";
-  const innerW = w - woodL.length - woodR.length;
-  lines.push(woodL + padCenter(titleText, innerW) + woodR);
-  lines.push(woodL + "═".repeat(innerW) + woodR);
+  // ── TRANSPORT BAR ─────────────────────────────────────────────
+  const stateCol = isPlaying ? "green" : "gray";
+  const stateIcon = isPlaying ? "\u25B6" : "\u25A0";
+  const stateLbl = isPlaying ? "PLAY" : "STOP";
+  const tempo = `{white-fg}${engine.tempo}{/white-fg} BPM`;
+  const pattern = `{cyan-fg}${slot.bank}${slot.number}-${slot.variation}{/cyan-fg}`;
+  const scale = `{gray-fg}${engine.scaleLabel}{/gray-fg}`;
+  const swing = engine.swing !== 50 ? `  SWG:{white-fg}${engine.swing}%{/white-fg}` : "";
+  const audioTag = audioEnabled ? "  {green-fg}\u266B ON{/green-fg}" : "  {gray-fg}\u266B --{/gray-fg}";
+  const masterBar = `VOL:${bar(engine.master, 100, 8)}`;
+  const accentBar = `ACC:${bar(engine.accent, 100, 8)}`;
 
-  // Transport + global status
-  const transport = isPlaying ? " ▶ PLAYING " : " ■ STOPPED ";
-  const tempoStr = ` TEMPO: ${engine.tempo} `;
-  const bankStr = ` ${slot.bank}${slot.number}-${slot.variation} `;
-  const scaleStr = ` ${engine.scaleLabel} `;
-  const audioStr = audioEnabled ? " ♪ON " : " ♪-- ";
-  const swingStr = engine.swing !== 50 ? ` SWG:${engine.swing}% ` : "";
-  const masterStr = ` VOL:${bar(engine.master, 100, 6)} `;
-  const accentStr = ` ACC:${bar(engine.accent, 100, 6)} `;
+  lines.push("");
+  lines.push(`  {${stateCol}-fg}${stateIcon} ${stateLbl}{/${stateCol}-fg}  ${tempo}  ${pattern}  ${scale}${swing}${audioTag}    ${masterBar}  ${accentBar}`);
+  lines.push("");
 
-  const statusLine = `${transport}│${tempoStr}│${bankStr}│${scaleStr}${swingStr ? "│" + swingStr : ""}│${masterStr}│${accentStr}│${audioStr}`;
-  lines.push(woodL + padRight(statusLine, innerW) + woodR);
-  lines.push(woodL + "─".repeat(innerW) + woodR);
+  // ── STEP GRID: column headers with colour-coded groups ────────
+  // Calculate layout widths
+  const labelW = 5;   // "►BD "
+  const paramAreaW = Math.min(40, Math.max(16, w - labelW - STEPS * 4 - 8));
+  const stepStartCol = labelW + paramAreaW + 3; // " | "
 
-  // ══════════════════════════════════════════════════════════
-  // BAND 2: Instrument grid — each row is one voice
-  // ══════════════════════════════════════════════════════════
+  // Step number header with group colours
+  let stepHeader = " ".repeat(labelW + paramAreaW) + " \u2502 ";
+  for (let i = 0; i < STEPS; i++) {
+    const col = stepColour(i);
+    const num = String(i + 1).padStart(2, " ");
+    stepHeader += `{${col}-fg}${num}{/${col}-fg} `;
+  }
+  lines.push(stepHeader);
 
-  // Column widths
-  const selectorW = 7;  // "►BD M  "
-  const stepAreaW = STEPS * 3; // "XX " * 16
-  const sepW = 3; // " │ "
-  const paramW = Math.max(20, innerW - selectorW - stepAreaW - sepW);
+  // Thin separator
+  const sepW = labelW + paramAreaW;
+  lines.push(" ".repeat(sepW) + " \u2502 " + "{gray-fg}" + "\u2500".repeat(STEPS * 3) + "{/gray-fg}");
 
-  // Step number header
-  const stepNums = Array.from({ length: STEPS }, (_, i) => {
-    const n = i + 1;
-    return n < 10 ? ` ${n}` : `${n}`;
-  }).join(" ");
-  lines.push(woodL + " ".repeat(selectorW) + padRight("", paramW) + " │ " + stepNums + " ".repeat(Math.max(0, innerW - selectorW - paramW - sepW - stepAreaW)) + woodR);
-
-  // Instrument rows
+  // ── INSTRUMENT ROWS ───────────────────────────────────────────
   for (const inst of INSTRUMENTS) {
     const isSelected = selectedInst === inst.id;
     const isMuted = engine.isMuted(inst.id);
     const isSoloed = engine.isSoloed(inst.id);
-    const marker = isSelected ? "►" : " ";
-    const muteFlag = isSoloed ? "S" : isMuted ? "M" : " ";
-    const label = `${marker}${inst.shortLabel.padEnd(2)}${muteFlag} `;
 
-    // Parameter knobs with labels
+    // Label with selection marker — keep tags outside padRight
+    const marker = isSelected ? "\u25B6" : " ";
+    const muteFlag = isSoloed ? "S" : isMuted ? "M" : " ";
+    const labelPlain = `${marker}${inst.shortLabel.padEnd(2)}${muteFlag}`;
+    // Colourise the whole label
+    const labelCol = isSelected ? "cyan" : "white";
+    const muteFlagCol = isSoloed ? "{yellow-fg}S{/yellow-fg}" : isMuted ? "{red-fg}M{/red-fg}" : " ";
+    const label = isSelected 
+      ? `{cyan-fg}${marker}${inst.shortLabel.padEnd(2)}{/cyan-fg}${muteFlagCol}`
+      : ` {white-fg}${inst.shortLabel.padEnd(2)}{/white-fg}${muteFlagCol}`;
+
+    // Parameter knobs — build plain text then wrap in single tag
     const paramParts: string[] = [];
     for (const p of inst.params) {
       const val = engine.getParam(inst.id, p.id);
-      paramParts.push(`${p.label}${knobChar(val, p.max)}`);
+      const k = knobChar(val, p.max);
+      paramParts.push(`${p.label}${k}`);
     }
-    const paramStr = padRight(paramParts.join(" "), paramW);
+    const paramStr = padRight(paramParts.join(" "), paramAreaW);
 
-    // Step buttons
+    // Step buttons with colour-coded groups
+    let stepStr = "";
     const steps = engine.getSteps(inst.id);
-    const stepChars = Array.from({ length: STEPS }, (_, i) => {
+    for (let i = 0; i < STEPS; i++) {
       const active = steps[i];
-      const isPlayCursor = isPlaying && i === currentStep;
+      const col = stepColour(i);
+      const isPlayHead = isPlaying && i === currentStep;
       const isEditCur = !isPlaying && i === editCursor;
-      if (isPlayCursor && active) return STEP_CURSOR_ON;
-      if (isPlayCursor) return STEP_CURSOR_OFF;
-      if (isEditCur && active) return "▓█";
-      if (isEditCur) return "▒░";
-      if (active) return STEP_ON;
-      return STEP_OFF;
-    }).join(" ");
 
-    const row = `${label}${paramStr} │ ${stepChars}`;
-    lines.push(woodL + padRight(row, innerW) + woodR);
+      if (isPlayHead && active) {
+        stepStr += `{white-bg}{black-fg}${STEP_ON}{/black-fg}{/white-bg} `;
+      } else if (isPlayHead) {
+        stepStr += `{white-bg}{black-fg}${STEP_OFF}{/black-fg}{/white-bg} `;
+      } else if (isEditCur && active) {
+        stepStr += `{cyan-bg}{black-fg}${STEP_ON}{/black-fg}{/cyan-bg} `;
+      } else if (isEditCur) {
+        stepStr += `{cyan-fg}\u2592\u2592{/cyan-fg} `;
+      } else if (active) {
+        stepStr += `{${col}-fg}${STEP_ON}{/${col}-fg} `;
+      } else {
+        stepStr += `{gray-fg}${STEP_OFF}{/gray-fg} `;
+      }
+    }
+
+    lines.push(`${label} ${paramStr} \u2502 ${stepStr}`);
   }
 
-  // Accent row
+  // ── ACCENT ROW ────────────────────────────────────────────────
   {
     const isAccSel = selectedInst === "accent";
-    const marker = isAccSel ? "►" : " ";
-    const label = `${marker}AC `;
-    const paramStr = padRight(`LVL${bar(engine.accent, 100, 8)} ${engine.accent}%`, paramW);
+    const label = isAccSel 
+      ? `{cyan-fg}\u25B6AC{/cyan-fg} `
+      : ` {white-fg}AC{/white-fg} `;
+    const accentLvl = `LVL${bar(engine.accent, 100, 8)} ${engine.accent}%`;
+    const paramStr = padRight(accentLvl, paramAreaW);
+
     const accentSteps = engine.getSteps("accent");
-    const stepChars = Array.from({ length: STEPS }, (_, i) => {
+    let stepStr = "";
+    for (let i = 0; i < STEPS; i++) {
       const active = accentSteps[i];
-      const isPlayCursor = isPlaying && i === currentStep;
+      const col = stepColour(i);
+      const isPlayHead = isPlaying && i === currentStep;
       const isEditCur = !isPlaying && i === editCursor;
-      if (isPlayCursor && active) return "▲▲";
-      if (isPlayCursor) return STEP_CURSOR_OFF;
-      if (isEditCur && active) return "▲▲";
-      if (isEditCur) return "▒▒";
-      if (active) return "▲ ";
-      return "△ ";
-    }).join(" ");
-    const row = `${label}${paramStr} │ ${stepChars}`;
-    lines.push(woodL + padRight(row, innerW) + woodR);
+
+      if (isPlayHead && active) {
+        stepStr += `{white-bg}{black-fg}${ACCENT_ON}{/black-fg}{/white-bg} `;
+      } else if (isPlayHead) {
+        stepStr += `{white-bg}{black-fg}${ACCENT_OFF}{/black-fg}{/white-bg} `;
+      } else if (isEditCur && active) {
+        stepStr += `{cyan-fg}${ACCENT_ON}{/cyan-fg} `;
+      } else if (isEditCur) {
+        stepStr += `{cyan-fg}${ACCENT_OFF}{/cyan-fg} `;
+      } else if (active) {
+        stepStr += `{${col}-fg}${ACCENT_ON}{/${col}-fg} `;
+      } else {
+        stepStr += `{gray-fg}${ACCENT_OFF}{/gray-fg} `;
+      }
+    }
+    lines.push(`${label}${paramStr} \u2502 ${stepStr}`);
   }
 
-  // ══════════════════════════════════════════════════════════
-  // BAND 3: Sequencer footer
-  // ══════════════════════════════════════════════════════════
-
-  lines.push(woodL + "─".repeat(innerW) + woodR);
-
-  // Playhead indicator
+  // ── PLAYHEAD INDICATOR ────────────────────────────────────────
+  lines.push("");
   if (isPlaying && currentStep >= 0) {
-    const offset = selectorW + paramW + sepW + currentStep * 3;
-    const cursorLine = " ".repeat(offset) + "▲▲";
-    lines.push(woodL + padRight(cursorLine, innerW) + woodR);
+    const offset = labelW + paramAreaW + 3 + currentStep * 3;
+    lines.push(" ".repeat(offset) + "{white-fg}\u25B2\u25B2{/white-fg}");
+  } else if (editCursor >= 0) {
+    const offset = labelW + paramAreaW + 3 + editCursor * 3;
+    lines.push(" ".repeat(offset) + "{cyan-fg}\u25B2\u25B2{/cyan-fg}");
   } else {
-    lines.push(woodL + " ".repeat(innerW) + woodR);
+    lines.push("");
   }
 
-  // Step group colour indicators
-  const groupLine = " ".repeat(selectorW + paramW + sepW) +
-    " 1  2  3  4  5  6  7  8  9  10 11 12 13 14 15 16";
-  lines.push(woodL + padRight(groupLine, innerW) + woodR);
+  // ── STEP GROUP LABELS ─────────────────────────────────────────
+  let groupLine = " ".repeat(labelW + paramAreaW + 3);
+  for (let i = 0; i < STEPS; i++) {
+    const col = stepColour(i);
+    // Group divider every 4
+    if (i > 0 && i % 4 === 0) {
+      groupLine += `{gray-fg}\u2502{/gray-fg}`;
+    } else {
+      groupLine += " ";
+    }
+    const num = String(i + 1).padStart(2, " ");
+    groupLine += `{${col}-fg}${num}{/${col}-fg}`;
+  }
+  // Don't duplicate — step nums already in header
 
-  // Controls
-  lines.push(woodL + "═".repeat(innerW) + woodR);
-  const ctrl1 = " [SPACE] play/stop  [ENTER] toggle step  [1-0,-,=] instrument  [BKSP] CH  [`] accent";
-  const ctrl2 = " [a/z] tempo  [v] var  [b] bank  [F1-8] pat  [p] preset  [c] clear  [s] scale  [w] swing  [x] mute  [o] solo  [m] audio";
-  lines.push(woodL + padRight(ctrl1, innerW) + woodR);
-  lines.push(woodL + padRight(ctrl2, innerW) + woodR);
-  lines.push(woodL + "═".repeat(innerW) + woodR);
+  // ── KEYBOARD HELP ─────────────────────────────────────────────
+  lines.push("");
+  lines.push(`  {gray-fg}SPC:play/stop  ENTER:toggle step  \u2190\u2192:cursor  1-0,-,=:instrument  \`:accent  a/z:tempo  v:var  b:bank  p:preset  m:audio{/gray-fg}`);
 
   // Pad to height
-  while (lines.length < safeHeight) lines.push("");
-  return lines.slice(0, safeHeight).join("\n");
+  while (lines.length < h) lines.push("");
+  return lines.slice(0, h).join("\n");
 }
 
 /**
@@ -217,9 +263,9 @@ export function summarizeState(engine: TR808Engine): string {
   if (accentCount > 0) instCounts.push(`AC:${accentCount}`);
 
   return [
-    `TR-808 ${engine.state === "playing" ? "▶" : "■"}`,
+    `TR-808 ${engine.state === "playing" ? "\u25B6" : "\u25A0"}`,
     `${engine.tempo}bpm`,
     `${slot.bank}${slot.number}-${slot.variation}`,
     instCounts.join(" ") || "(empty)",
-  ].join(" │ ");
+  ].join(" \u2502 ");
 }
