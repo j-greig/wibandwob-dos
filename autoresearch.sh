@@ -1,1 +1,1 @@
-autoresearch/asciicker/autoresearch.sh
+autoresearch/unix-control/autoresearch.sh
