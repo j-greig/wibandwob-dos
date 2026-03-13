@@ -227,6 +227,51 @@ check "ww screenshot returns content" \
 $WW cmd window.close --id "$MID" >/dev/null 2>&1 || true
 sleep 0.3
 
+# ── 16. String flag values ───────────────────────────────
+echo "--- string flags ---"
+$WW cmd editor.new >/dev/null 2>&1; sleep 0.3
+
+# Theme set with string arg
+$WW theme set --name flexoki-ink >/dev/null 2>&1
+sleep 0.3
+THEME=$(curl -s "$API/state" | jq -r '.app.theme')
+check "ww theme set --name flexoki-ink" \
+  "$(echo "$THEME" | grep -qi 'flexoki' && echo PASS || echo "theme=$THEME")"
+
+# ── 17. Quiet mode on commands ───────────────────────────
+echo "--- quiet commands ---"
+CMD_Q=$($WW commands -q 2>/dev/null || echo "UNSUPPORTED")
+if [ "$CMD_Q" = "UNSUPPORTED" ]; then
+  check "ww commands -q outputs IDs" "FAIL: -q not supported for commands"
+else
+  CMD_LINES=$(echo "$CMD_Q" | wc -l | tr -d ' ')
+  check "ww commands -q outputs command IDs" \
+    "$([ "$CMD_LINES" -ge 50 ] && echo PASS || echo "lines=$CMD_LINES")"
+fi
+
+# ── 18. Multi-window workflow ────────────────────────────
+echo "--- multi-window workflow ---"
+
+# Open 3 different window types, verify all exist, close all
+$WW cmd editor.new >/dev/null 2>&1; sleep 0.2
+$WW cmd art.open >/dev/null 2>&1; sleep 0.2
+KINDS=$($WW windows | jq -r '[.[].kind] | unique | sort | join(",")')
+check "multi-window: different kinds created" \
+  "$(echo "$KINDS" | grep -q 'editor' && echo PASS || echo "kinds=$KINDS")"
+
+# Close all via quiet + xargs
+$WW windows -q | xargs -I{} $WW window {} close >/dev/null 2>&1
+sleep 0.5
+LEFT=$($WW windows | jq 'length')
+check "multi-window: close all via -q + xargs" \
+  "$([ "$LEFT" = "0" ] && echo PASS || echo "remaining=$LEFT")"
+
+# ── 19. WW_API env override ──────────────────────────────
+echo "--- env override ---"
+BAD_API=$(WW_API=http://127.0.0.1:9999 $WW health 2>/dev/null && echo "WRONGLY_SUCCEEDED" || echo "CORRECTLY_FAILED")
+check "WW_API env var respected (bad port fails)" \
+  "$([ "$BAD_API" = "CORRECTLY_FAILED" ] && echo PASS || echo "$BAD_API")"
+
 # ── Cleanup: close test windows ──────────────────────────
 echo "--- cleanup ---"
 for id in $($WW windows 2>/dev/null | jq -r '.[].id'); do

@@ -79,8 +79,12 @@ async function cmdWindows() {
 }
 
 async function cmdCommands() {
-  const data = (await api("/commands/list")) as { commands: unknown[] };
-  out(data.commands);
+  const data = (await api("/commands/list")) as { commands: Array<{ id: string }> };
+  if (QUIET) {
+    for (const c of data.commands) console.log(c.id);
+  } else {
+    out(data.commands);
+  }
 }
 
 async function cmdHealth() {
