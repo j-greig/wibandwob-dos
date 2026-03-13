@@ -105,10 +105,14 @@ export function openTerrainLabWindow(deps: BaseWindowDeps): void {
       });
 
       // Build rich info panel with ANSI colours
-      const sep = `${A.gry}${"─".repeat(20)}${A.r}`;
+      const sep = `  ${A.gry}${"─".repeat(22)}${A.r}`;
       const label = (icon: string, text: string) => `  ${A.cyn}${icon} ${text}${A.r}`;
       const val = (text: string) => `  ${A.wht}${text}${A.r}`;
       const key = (k: string, desc: string) => `  ${A.yel}${k.padEnd(4)}${A.gry}${desc}${A.r}`;
+      const bar = (v: number, mx: number, w: number) => {
+        const f = Math.round((v / Math.max(1, mx)) * w);
+        return `${A.cyn}${"▮".repeat(f)}${A.gry}${"▯".repeat(Math.max(0, w - f))}${A.r}`;
+      };
 
       // Mode colours
       const modeCols: Record<string, string> = {
@@ -145,24 +149,25 @@ export function openTerrainLabWindow(deps: BaseWindowDeps): void {
         "",
         sep,
         "",
-        label("\u25A3", "PARAMS"),
-        `  ${A.gry}levels${A.r}  ${A.wht}${s.levels}${A.r}`,
-        `  ${A.gry}seed${A.r}    ${A.wht}${s.seed}${A.r}`,
+        label("\u25A3", "GENERATION"),
+        `  ${A.gry}levels  ${A.r}${bar(s.levels, 10, 10)} ${A.wht}${s.levels}${A.r}`,
+        `  ${A.gry}seed    ${A.wht}${s.seed}${A.r}`,
         "",
         sep,
         "",
-        label("\u2328", "KEYS"),
+        label("\u2328", "CONTROLS"),
         key("m", "cycle mode"),
         key("t", "next terrain"),
-        key("r", "reseed"),
-        key("+/-", "levels"),
-        key("s", "save frame"),
+        key("r", "new seed"),
+        key("+/-", "detail level"),
+        key("s", "save capture"),
       ].join("\n");
 
       // Set content directly to preserve ANSI codes
       (infoBlock.node as any).setContent(infoText);
       statusBar.update({
         left: `m:mode  t:terrain  r:reseed  +/-:levels  s:save`,
+        right: `${s.terrain} \u2502 ${s.mode} \u2502 L${s.levels} \u2502 #${s.seed}`,
       });
       deps.onStateChanged?.();
     },
