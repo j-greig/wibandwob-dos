@@ -83,15 +83,16 @@ function openStudio(host: MicroappHost) {
     parent: win.body,
     top: 0, left: 0, width: 0, height: 0,
     tags: false,
-    style: { fg: host.theme().accent?.fg ?? host.theme().body.fg, bg: host.theme().body.bg },
+    style: { fg: host.theme().accent?.fg ?? host.theme().body.fg, bg: host.theme().body.bg, bold: true },
   });
   function refreshHeader() {
     const w = Math.max(1, Number(win.body.width) || 0);
     const font = w >= 80 ? "slant" : undefined;
     try {
       const art = font ? renderFiglet("LLM ORCH", font) : "═══ LLM ORCH STUDIO ═══";
+      const rule = "─".repeat(Math.min(w - 2, 50));
       const subtitle = "  wib ↔ wob conversation orchestrator";
-      headerBox.setContent(art + "\n" + subtitle);
+      headerBox.setContent(art + "\n" + rule + "\n" + subtitle);
     } catch {
       headerBox.setContent("═══ LLM ORCH STUDIO ═══\n  wib ↔ wob conversation orchestrator");
     }
@@ -215,7 +216,7 @@ function openStudio(host: MicroappHost) {
   ], { gap: 0 });
 
   const left = createStack(win.body, [
-    { key: "header", basis: 6, part: createNodePart(headerBox) },
+    { key: "header", basis: 7, part: createNodePart(headerBox) },
     { key: "topicControls", basis: 5, part: topicControls },
     { key: "banner", basis: 1, part: createNodePart(statusBanner) },
     { key: "actions", basis: 1, part: actionBar },
@@ -236,8 +237,14 @@ function openStudio(host: MicroappHost) {
   // Seed idle state with atmospheric placeholder messages
   convoLog.append({ text: "Waiting for a conversation to begin...", severity: "info" });
   convoLog.append({ text: "Press ▶ RUN to start Wib & Wob talking.", severity: "info" });
+  convoLog.append({ text: "", severity: "info" });
+  convoLog.append({ text: "  ╭─ wib ─╮   ╭─ wob ─╮", severity: "info" });
+  convoLog.append({ text: "  │ haiku  │ ↔ │ sonnet │", severity: "info" });
+  convoLog.append({ text: "  ╰────────╯   ╰────────╯", severity: "info" });
   stepsLog.append({ text: "─── orchestrator idle ───", severity: "info" });
   stepsLog.append({ text: "Ready to launch cargo run --release", severity: "info" });
+  stepsLog.append({ text: "", severity: "info" });
+  stepsLog.append({ text: "Commands: /run /stop /kill /topic", severity: "info" });
 
   refreshSettings();
   refreshHeader();
